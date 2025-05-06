@@ -1,25 +1,47 @@
 # @version 0.4.1
 
-struct BalanceData:
-    asset: address
-    bal: uint256 # could be shares or actual balance
+from ethereum.ercs import IERC20
 
-# balance data
-balanceData: public(HashMap[address, HashMap[uint256, BalanceData]]) # user -> index -> BalanceData
-indexOfAsset: public(HashMap[address, HashMap[address, uint256]]) # user -> asset -> index
-numAssets: public(HashMap[address, uint256]) # user -> num assets
+event StratFundsRecovered:
+    stratId: uint256
+    asset: indexed(address)
+    recipient: indexed(address)
+    balance: uint256
 
-totalBalances: public(HashMap[address, uint256]) # asset -> total balances
+event StratIdSet:
+    stratId: uint256
+
+event StratActivated:
+    stratId: uint256
+    isActivated: bool
+
+# config
+stratId: public(uint256)
+isActivated: public(bool)
+
+# balances (may be shares or actual balance)
+userBalances: public(HashMap[address, HashMap[address, uint256]]) # user -> asset -> balance
+totalBalances: public(HashMap[address, uint256]) # asset -> balance
+
+# user assets (iterable)
+userAssets: public(HashMap[address, HashMap[uint256, address]]) # user -> index -> asset
+indexOfUserAsset: public(HashMap[address, HashMap[address, uint256]]) # user -> asset -> index
+numUserAssets: public(HashMap[address, uint256]) # user -> num assets
+
+# strat assets (iterable)
+stratAssets: public(HashMap[uint256, address]) # index -> asset
+indexOfAsset: public(HashMap[address, uint256]) # asset -> index
+numAssets: public(uint256) # num assets
 
 
 @deploy
 def __init__():
-    pass
+    self.isActivated = True
 
 
-################
-# Balance Data #
-################
+###################
+# Balance Updates #
+###################
 
 
 # deposit
@@ -32,20 +54,18 @@ def _addBalanceOnDeposit(
     _depositBal: uint256,
     _shouldUpdateTotal: bool,
 ):
-    aid: uint256 = self.indexOfAsset[_user][_asset]
-    balData: BalanceData = self.balanceData[_user][aid]
-
-    # new asset for this user
+    aid: uint256 = self.indexOfUserAsset[_user][_asset]
     if aid == 0:
-        aid = self._registerAsset(_user, _asset)
-        balData.asset = _asset
+        self._registerUserAsset(_user, _asset)
 
-    # update data
-    balData.bal += _depositBal
-    self.balanceData[_user][aid] = balData
-
+    # update balances
+    self.userBalances[_user][_asset] += _depositBal
     if _shouldUpdateTotal:
         self.totalBalances[_asset] += _depositBal
+
+    # register strat asset (if necessary)
+    if self.indexOfAsset[_asset] == 0:
+        self._registerStratAsset(_asset)
 
 
 # withdrawal
@@ -58,21 +78,20 @@ def _reduceBalanceOnWithdrawal(
     _withdrawBal: uint256,
     _shouldUpdateTotal: bool,
 ) -> (uint256, bool):
-    aid: uint256 = self.indexOfAsset[_user][_asset]
+    aid: uint256 = self.indexOfUserAsset[_user][_asset]
     assert aid != 0 # dev: user does not have this asset
 
-    balData: BalanceData = self.balanceData[_user][aid]
-    withdrawBal: uint256 = min(_withdrawBal, balData.bal)
+    currentBal: uint256 = self.userBalances[_user][_asset]
+    withdrawBal: uint256 = min(_withdrawBal, currentBal)
     assert withdrawBal != 0 # dev: nothing to withdraw
 
-    # update data
-    balData.bal -= withdrawBal
-    self.balanceData[_user][aid] = balData
-
+    # update balances
+    currentBal -= withdrawBal
+    self.userBalances[_user][_asset] = currentBal
     if _shouldUpdateTotal:
         self.totalBalances[_asset] -= withdrawBal
 
-    return withdrawBal, balData.bal == 0
+    return withdrawBal, currentBal == 0
 
 
 ################
@@ -80,45 +99,136 @@ def _reduceBalanceOnWithdrawal(
 ################
 
 
+# user
+
+
 @internal
-def _registerAsset(_user: address, _asset: address) -> uint256:
-    aid: uint256 = self.numAssets[_user]
+def _registerUserAsset(_user: address, _asset: address):
+    aid: uint256 = self.numUserAssets[_user]
     if aid == 0:
         aid = 1 # not using 0 index
-    self.indexOfAsset[_user][_asset] = aid
-    self.numAssets[_user] = aid + 1
-    return aid
+    self.userAssets[_user][aid] = _asset
+    self.indexOfUserAsset[_user][_asset] = aid
+    self.numUserAssets[_user] = aid + 1
 
 
 @internal
-def _deregisterAsset(_user: address, _asset: address):
-    numAssets: uint256 = self.numAssets[_user]
+def _deregisterUserAsset(_user: address, _asset: address):
+    if self.userBalances[_user][_asset] != 0:
+        return
+
+    numUserAssets: uint256 = self.numUserAssets[_user]
+    if numUserAssets == 0:
+        return
+
+    targetIndex: uint256 = self.indexOfUserAsset[_user][_asset]
+    if targetIndex == 0:
+        return
+
+    # update data
+    lastIndex: uint256 = numUserAssets - 1
+    self.numUserAssets[_user] = lastIndex
+    self.indexOfUserAsset[_user][_asset] = 0
+
+    # get last item, replace the removed item
+    if targetIndex != lastIndex:
+        lastItem: address = self.userAssets[_user][lastIndex]
+        self.userAssets[_user][targetIndex] = lastItem
+        self.indexOfUserAsset[_user][lastItem] = targetIndex
+
+
+# strat
+
+
+@internal
+def _registerStratAsset(_asset: address):
+    aid: uint256 = self.numAssets
+    if aid == 0:
+        aid = 1 # not using 0 index
+    self.stratAssets[aid] = _asset
+    self.indexOfAsset[_asset] = aid
+    self.numAssets = aid + 1
+
+
+@internal
+def _deregisterStratAsset(_asset: address):
+    if self.totalBalances[_asset] != 0:
+        return
+
+    numAssets: uint256 = self.numAssets
     if numAssets == 0:
         return
 
-    targetIndex: uint256 = self.indexOfAsset[_user][_asset]
+    targetIndex: uint256 = self.indexOfAsset[_asset]
     if targetIndex == 0:
         return
 
     # update data
     lastIndex: uint256 = numAssets - 1
-    self.numAssets[_user] = lastIndex
-    self.indexOfAsset[_user][_asset] = 0
+    self.numAssets = lastIndex
+    self.indexOfAsset[_asset] = 0
 
     # get last item, replace the removed item
     if targetIndex != lastIndex:
-        lastItem: BalanceData = self.balanceData[_user][lastIndex]
-        self.balanceData[_user][targetIndex] = lastItem
-        self.indexOfAsset[_user][lastItem.asset] = targetIndex
+        lastItem: address = self.stratAssets[lastIndex]
+        self.stratAssets[targetIndex] = lastItem
+        self.indexOfAsset[lastItem] = targetIndex
 
 
-#############
-# Utilities #
-#############
+########
+# Ripe #
+########
+
+
+# has funds
 
 
 @view
+@external
+def hasAnyFunds() -> bool:
+    numAssets: uint256 = self.numAssets
+    for i: uint256 in range(1, numAssets, bound=max_value(uint256)):
+        asset: address = self.stratAssets[i]
+        if self.totalBalances[asset] != 0:
+            return True
+    return False
+
+
+# strat id
+
+
 @internal
-def _getUserBalance(_user: address, _asset: address) -> uint256:
-    aid: uint256 = self.indexOfAsset[_user][_asset]
-    return self.balanceData[_user][aid].bal
+def _setStratId(_stratId: uint256) -> bool:
+    prevStratId: uint256 = self.stratId
+    assert prevStratId == 0 or prevStratId == _stratId # dev: invalid strat id
+    self.stratId = _stratId
+    log StratIdSet(stratId=_stratId)
+    return True
+
+
+# recover funds
+
+
+@internal
+def _recoverFunds(_asset: address, _recipient: address) -> bool:
+    balance: uint256 = staticcall IERC20(_asset).balanceOf(self)
+    if empty(address) in [_recipient, _asset] or balance == 0:
+        return False
+
+    # cannot recover funds from a registered asset with a balance
+    if self.indexOfAsset[_asset] != 0 and self.totalBalances[_asset] != 0:
+        return False
+
+    # recover
+    assert extcall IERC20(_asset).transfer(_recipient, balance, default_return_value=True) # dev: recovery failed
+    log StratFundsRecovered(stratId=self.stratId, asset=_asset, recipient=_recipient, balance=balance)
+    return True
+
+
+# activation
+
+
+@internal
+def _activate(_shouldActivate: bool):
+    self.isActivated = _shouldActivate
+    log StratActivated(stratId=self.stratId, isActivated=_shouldActivate)

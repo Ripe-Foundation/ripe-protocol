@@ -1,0 +1,51 @@
+# @version 0.4.1
+
+
+@external
+def depositTokensInStrat(
+    _user: address,
+    _asset: address,
+    _amount: uint256,
+) -> uint256:
+    ...
+
+
+@external
+def withdrawTokensFromStrat(
+    _user: address,
+    _asset: address,
+    _amount: uint256,
+    _recipient: address,
+) -> (uint256, bool):
+    ...
+
+
+@external
+def transferTokenBalance(
+    _asset: address,
+    _fromUser: address,
+    _toUser: address,
+    _transferAmount: uint256,
+) -> (uint256, bool):
+    ...
+
+
+@view
+@external
+def hasAnyFunds() -> bool:
+    ...
+
+
+@external
+def recoverFunds(_asset: address, _recipient: address) -> bool:
+    ...
+
+
+@external
+def setStratId(_stratId: uint256) -> bool:
+    ...
+
+
+@external
+def activate(_shouldActivate: bool):
+    ...

@@ -1,5 +1,7 @@
 # @version 0.4.1
 
+implements: Strategy
+
 initializes: stratData
 initializes: gov
 
@@ -8,6 +10,7 @@ exports: gov.__interface__
 
 import contracts.modules.StratData as stratData
 import contracts.modules.LocalGov as gov
+from interfaces import Strategy
 from ethereum.ercs import IERC20
 
 interface AddyRegistry:
@@ -31,23 +34,17 @@ event SimpleErc20StratTransfer:
     transferAmount: uint256
     isFromUserDepleted: bool
 
-event SimpleErc20StratActivated:
-    isActivated: bool
-
-# registry ids
 TELLER_ID: constant(uint256) = 1 # TODO: make sure this is correct
 LEDGER_ID: constant(uint256) = 2 # TODO: make sure this is correct
+STRAT_BOOK_ID: constant(uint256) = 3 # TODO: make sure this is correct
 
-# config
 ADDY_REGISTRY: public(immutable(address))
-isActivated: public(bool)
 
 
 @deploy
 def __init__(_addyRegistry: address):
     assert _addyRegistry != empty(address) # dev: invalid addy registry
     ADDY_REGISTRY = _addyRegistry
-    self.isActivated = True
 
     # initialize modules
     stratData.__init__()
@@ -65,7 +62,7 @@ def depositTokensInStrat(
     _asset: address,
     _amount: uint256,
 ) -> uint256:
-    assert self.isActivated # dev: not activated
+    assert stratData.isActivated # dev: not activated
     assert msg.sender == staticcall AddyRegistry(ADDY_REGISTRY).getAddy(TELLER_ID) # dev: only Teller allowed
 
     # validation
@@ -87,7 +84,7 @@ def withdrawTokensFromStrat(
     _amount: uint256,
     _recipient: address,
 ) -> (uint256, bool):
-    assert self.isActivated # dev: not activated
+    assert stratData.isActivated # dev: not activated
     assert msg.sender == staticcall AddyRegistry(ADDY_REGISTRY).getAddy(TELLER_ID) # dev: only Teller allowed
 
     # validation
@@ -115,7 +112,7 @@ def transferTokenBalance(
     _toUser: address,
     _transferAmount: uint256,
 ) -> (uint256, bool):
-    assert self.isActivated # dev: not activated
+    assert stratData.isActivated # dev: not activated
     assert msg.sender == staticcall AddyRegistry(ADDY_REGISTRY).getAddy(LEDGER_ID) # dev: only Ledger allowed
 
     # validation
@@ -138,7 +135,18 @@ def transferTokenBalance(
 
 
 @external
+def recoverFunds(_asset: address, _recipient: address) -> bool:
+    assert gov._canGovern(msg.sender) # dev: no perms
+    return stratData._recoverFunds(_asset, _recipient)
+
+
+@external
+def setStratId(_stratId: uint256) -> bool:
+    assert msg.sender == staticcall AddyRegistry(ADDY_REGISTRY).getAddy(STRAT_BOOK_ID) # dev: no perms
+    return stratData._setStratId(_stratId)
+
+
+@external
 def activate(_shouldActivate: bool):
     assert gov._canGovern(msg.sender) # dev: no perms
-    self.isActivated = _shouldActivate
-    log SimpleErc20StratActivated(isActivated=_shouldActivate)
+    stratData._activate(_shouldActivate)
