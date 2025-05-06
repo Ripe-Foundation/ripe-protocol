@@ -135,6 +135,12 @@ def transferTokenBalance(
 
 
 @external
+def deregisterUserAsset(_user: address, _asset: address):
+    assert msg.sender == staticcall AddyRegistry(ADDY_REGISTRY).getAddy(LEDGER_ID) # dev: only Ledger allowed
+    stratData._deregisterUserAsset(_user, _asset)
+
+
+@external
 def recoverFunds(_asset: address, _recipient: address) -> bool:
     assert gov._canGovern(msg.sender) # dev: no perms
     return stratData._recoverFunds(_asset, _recipient)

@@ -2,14 +2,16 @@
 
 implements: Strategy
 
-initializes: stratData
 initializes: gov
+initializes: stratData
+initializes: sharesMath
 
-exports: stratData.__interface__
 exports: gov.__interface__
+exports: stratData.__interface__
 
-import contracts.modules.StratData as stratData
 import contracts.modules.LocalGov as gov
+import contracts.modules.StratData as stratData
+import contracts.modules.SharesMath as sharesMath
 from interfaces import Strategy
 from ethereum.ercs import IERC20
 
@@ -40,7 +42,6 @@ event RebaseErc20StratTransfer:
 TELLER_ID: constant(uint256) = 1 # TODO: make sure this is correct
 LEDGER_ID: constant(uint256) = 2 # TODO: make sure this is correct
 STRAT_BOOK_ID: constant(uint256) = 3 # TODO: make sure this is correct
-DECIMAL_OFFSET: constant(uint256) = (10 ** 8)
 
 ADDY_REGISTRY: public(immutable(address))
 
@@ -51,8 +52,9 @@ def __init__(_addyRegistry: address):
     ADDY_REGISTRY = _addyRegistry
 
     # initialize modules
-    stratData.__init__()
     gov.__init__(empty(address), _addyRegistry, 0, 0)
+    stratData.__init__()
+    sharesMath.__init__()
 
 
 ########
@@ -77,7 +79,7 @@ def depositTokensInStrat(
 
     # calc shares
     prevTotalBalance: uint256 = totalAssetBalance - depositAmount # remove the deposited amount to calc shares accurately
-    newShares: uint256 = self._amountToShares(_asset, depositAmount, stratData.totalBalances[_asset], prevTotalBalance, False)
+    newShares: uint256 = sharesMath._amountToShares(_asset, depositAmount, stratData.totalBalances[_asset], prevTotalBalance, False)
 
     # add balance on deposit
     stratData._addBalanceOnDeposit(_user, _asset, newShares, True)
@@ -161,9 +163,9 @@ def _calcWithdrawalSharesAndAmount(
     assert withdrawalShares != 0 # dev: user has no shares
 
     # calc amount + shares to withdraw
-    withdrawalAmount: uint256 = self._sharesToAmount(_asset, withdrawalShares, totalShares, totalBalance, False)
+    withdrawalAmount: uint256 = sharesMath._sharesToAmount(_asset, withdrawalShares, totalShares, totalBalance, False)
     if _amount < withdrawalAmount:
-        withdrawalShares = min(withdrawalShares, self._amountToShares(_asset, _amount, totalShares, totalBalance, True))
+        withdrawalShares = min(withdrawalShares, sharesMath._amountToShares(_asset, _amount, totalShares, totalBalance, True))
         withdrawalAmount = _amount
 
     return withdrawalShares, withdrawalAmount
@@ -175,63 +177,11 @@ def _calcWithdrawalSharesAndAmount(
 
 
 @view
-@internal
-def _amountToShares(
-    _asset: address,
-    _amount: uint256,
-    _totalShares: uint256,
-    _totalBalance: uint256,
-    _shouldRoundUp: bool,
-) -> uint256:
-    totalBalance: uint256 = _totalBalance
-
-    # dead shares / decimal offset -- preventing donation attacks
-    totalBalance += 1
-    totalShares: uint256 = _totalShares + DECIMAL_OFFSET
-
-    # calc shares
-    numerator: uint256 = _amount * totalShares
-    shares: uint256 = numerator // totalBalance
-
-    # rounding
-    if _shouldRoundUp and (numerator % totalBalance != 0):
-        shares += 1
-
-    return shares
-
-
-@view
 @external
 def amountToShares(_asset: address, _amount: uint256, _shouldRoundUp: bool) -> uint256:
     totalShares: uint256 = stratData.totalBalances[_asset]
     totalBalance: uint256 = staticcall IERC20(_asset).balanceOf(self)
-    return self._amountToShares(_asset, _amount, totalShares, totalBalance, _shouldRoundUp)
-
-
-@view
-@internal
-def _sharesToAmount(
-    _asset: address,
-    _shares: uint256,
-    _totalShares: uint256,
-    _totalBalance: uint256,
-    _shouldRoundUp: bool,
-) -> uint256:
-    totalBalance: uint256 = _totalBalance
-
-    # dead shares / decimal offset -- preventing donation attacks
-    totalBalance += 1
-    totalShares: uint256 = _totalShares + DECIMAL_OFFSET
-
-    # calc amount
-    numerator: uint256 = _shares * totalBalance
-    amount: uint256 = numerator // totalShares
-
-    # rounding
-    if _shouldRoundUp and (numerator % totalShares != 0):
-        amount += 1
-
-    return amount
+    return sharesMath._amountToShares(_asset, _amount, totalShares, totalBalance, _shouldRoundUp)
 
 
 @view
@@ -239,12 +189,18 @@ def _sharesToAmount(
 def sharesToAmount(_asset: address, _shares: uint256, _shouldRoundUp: bool) -> uint256:
     totalShares: uint256 = stratData.totalBalances[_asset]
     totalBalance: uint256 = staticcall IERC20(_asset).balanceOf(self)
-    return self._sharesToAmount(_asset, _shares, totalShares, totalBalance, _shouldRoundUp)
+    return sharesMath._sharesToAmount(_asset, _shares, totalShares, totalBalance, _shouldRoundUp)
 
 
 ########
 # Ripe #
 ########
+
+
+@external
+def deregisterUserAsset(_user: address, _asset: address):
+    assert msg.sender == staticcall AddyRegistry(ADDY_REGISTRY).getAddy(LEDGER_ID) # dev: only Ledger allowed
+    stratData._deregisterUserAsset(_user, _asset)
 
 
 @external

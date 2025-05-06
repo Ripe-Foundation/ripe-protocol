@@ -37,6 +37,11 @@ def hasAnyFunds() -> bool:
 
 
 @external
+def deregisterUserAsset(_user: address, _asset: address):
+    ...
+
+
+@external
 def recoverFunds(_asset: address, _recipient: address) -> bool:
     ...
 
