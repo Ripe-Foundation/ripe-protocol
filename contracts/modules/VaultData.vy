@@ -54,14 +54,14 @@ def _addBalanceOnDeposit(
     _depositBal: uint256,
     _shouldUpdateTotal: bool,
 ):
-    aid: uint256 = self.indexOfUserAsset[_user][_asset]
-    if aid == 0:
-        self._registerUserAsset(_user, _asset)
-
     # update balances
     self.userBalances[_user][_asset] += _depositBal
     if _shouldUpdateTotal:
         self.totalBalances[_asset] += _depositBal
+
+    # register user asset (if necessary)
+    if self.indexOfUserAsset[_user][_asset] == 0:
+        self._registerUserAsset(_user, _asset)
 
     # register vault asset (if necessary)
     if self.indexOfAsset[_asset] == 0:
@@ -78,8 +78,7 @@ def _reduceBalanceOnWithdrawal(
     _withdrawBal: uint256,
     _shouldUpdateTotal: bool,
 ) -> (uint256, bool):
-    aid: uint256 = self.indexOfUserAsset[_user][_asset]
-    assert aid != 0 # dev: user does not have this asset
+    assert self.indexOfUserAsset[_user][_asset] != 0 # dev: user does not have this asset
 
     currentBal: uint256 = self.userBalances[_user][_asset]
     withdrawBal: uint256 = min(_withdrawBal, currentBal)

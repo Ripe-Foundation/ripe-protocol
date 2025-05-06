@@ -141,6 +141,12 @@ def deregisterUserAsset(_user: address, _asset: address):
 
 
 @external
+def deregisterVaultAsset(_asset: address):
+    assert msg.sender == staticcall AddyRegistry(ADDY_REGISTRY).getAddy(LEDGER_ID) # dev: only Ledger allowed
+    vaultData._deregisterVaultAsset(_asset)
+
+
+@external
 def recoverFunds(_asset: address, _recipient: address) -> bool:
     assert gov._canGovern(msg.sender) # dev: no perms
     return vaultData._recoverFunds(_asset, _recipient)
