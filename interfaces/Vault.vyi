@@ -2,7 +2,7 @@
 
 
 @external
-def depositTokensInStrat(
+def depositTokensInVault(
     _user: address,
     _asset: address,
     _amount: uint256,
@@ -11,7 +11,7 @@ def depositTokensInStrat(
 
 
 @external
-def withdrawTokensFromStrat(
+def withdrawTokensFromVault(
     _user: address,
     _asset: address,
     _amount: uint256,
@@ -21,7 +21,7 @@ def withdrawTokensFromStrat(
 
 
 @external
-def transferTokenBalance(
+def transferBalanceWithinVault(
     _asset: address,
     _fromUser: address,
     _toUser: address,
@@ -47,7 +47,7 @@ def recoverFunds(_asset: address, _recipient: address) -> bool:
 
 
 @external
-def setStratId(_stratId: uint256) -> bool:
+def setVaultId(_vaultId: uint256) -> bool:
     ...
 
 

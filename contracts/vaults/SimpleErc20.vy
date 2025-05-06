@@ -1,33 +1,33 @@
 # @version 0.4.1
 
-implements: Strategy
+implements: Vault
 
-initializes: stratData
+initializes: vaultData
 initializes: gov
 
-exports: stratData.__interface__
+exports: vaultData.__interface__
 exports: gov.__interface__
 
-import contracts.modules.StratData as stratData
+import contracts.modules.VaultData as vaultData
 import contracts.modules.LocalGov as gov
-from interfaces import Strategy
+from interfaces import Vault
 from ethereum.ercs import IERC20
 
 interface AddyRegistry:
     def getAddy(_addyId: uint256) -> address: view
 
-event SimpleErc20StratDeposit:
+event SimpleErc20VaultDeposit:
     user: indexed(address)
     asset: indexed(address)
     amount: uint256
 
-event SimpleErc20StratWithdrawal:
+event SimpleErc20VaultWithdrawal:
     user: indexed(address)
     asset: indexed(address)
     amount: uint256
     isDepleted: bool
 
-event SimpleErc20StratTransfer:
+event SimpleErc20VaultTransfer:
     fromUser: indexed(address)
     toUser: indexed(address)
     asset: indexed(address)
@@ -36,7 +36,7 @@ event SimpleErc20StratTransfer:
 
 TELLER_ID: constant(uint256) = 1 # TODO: make sure this is correct
 LEDGER_ID: constant(uint256) = 2 # TODO: make sure this is correct
-STRAT_BOOK_ID: constant(uint256) = 3 # TODO: make sure this is correct
+VAULT_BOOK_ID: constant(uint256) = 3 # TODO: make sure this is correct
 
 ADDY_REGISTRY: public(immutable(address))
 
@@ -47,7 +47,7 @@ def __init__(_addyRegistry: address):
     ADDY_REGISTRY = _addyRegistry
 
     # initialize modules
-    stratData.__init__()
+    vaultData.__init__()
     gov.__init__(empty(address), _addyRegistry, 0, 0)
 
 
@@ -57,12 +57,12 @@ def __init__(_addyRegistry: address):
 
 
 @external
-def depositTokensInStrat(
+def depositTokensInVault(
     _user: address,
     _asset: address,
     _amount: uint256,
 ) -> uint256:
-    assert stratData.isActivated # dev: not activated
+    assert vaultData.isActivated # dev: not activated
     assert msg.sender == staticcall AddyRegistry(ADDY_REGISTRY).getAddy(TELLER_ID) # dev: only Teller allowed
 
     # validation
@@ -71,20 +71,20 @@ def depositTokensInStrat(
     assert depositAmount != 0 # dev: invalid deposit amount
 
     # add balance on deposit
-    stratData._addBalanceOnDeposit(_user, _asset, depositAmount, True)
+    vaultData._addBalanceOnDeposit(_user, _asset, depositAmount, True)
 
-    log SimpleErc20StratDeposit(user=_user, asset=_asset, amount=depositAmount)
+    log SimpleErc20VaultDeposit(user=_user, asset=_asset, amount=depositAmount)
     return depositAmount
 
 
 @external
-def withdrawTokensFromStrat(
+def withdrawTokensFromVault(
     _user: address,
     _asset: address,
     _amount: uint256,
     _recipient: address,
 ) -> (uint256, bool):
-    assert stratData.isActivated # dev: not activated
+    assert vaultData.isActivated # dev: not activated
     assert msg.sender == staticcall AddyRegistry(ADDY_REGISTRY).getAddy(TELLER_ID) # dev: only Teller allowed
 
     # validation
@@ -94,25 +94,25 @@ def withdrawTokensFromStrat(
     # reduce balance on withdrawal
     withdrawalAmount: uint256 = 0
     isDepleted: bool = False
-    withdrawalAmount, isDepleted = stratData._reduceBalanceOnWithdrawal(_user, _asset, _amount, True)
+    withdrawalAmount, isDepleted = vaultData._reduceBalanceOnWithdrawal(_user, _asset, _amount, True)
 
     # move tokens to recipient
     withdrawalAmount = min(withdrawalAmount, staticcall IERC20(_asset).balanceOf(self))
     assert withdrawalAmount != 0 # dev: no withdrawal amount
     assert extcall IERC20(_asset).transfer(_recipient, withdrawalAmount, default_return_value=True) # dev: token transfer failed
 
-    log SimpleErc20StratWithdrawal(user=_user, asset=_asset, amount=withdrawalAmount, isDepleted=isDepleted)
+    log SimpleErc20VaultWithdrawal(user=_user, asset=_asset, amount=withdrawalAmount, isDepleted=isDepleted)
     return withdrawalAmount, isDepleted
 
 
 @external
-def transferTokenBalance(
+def transferBalanceWithinVault(
     _asset: address,
     _fromUser: address,
     _toUser: address,
     _transferAmount: uint256,
 ) -> (uint256, bool):
-    assert stratData.isActivated # dev: not activated
+    assert vaultData.isActivated # dev: not activated
     assert msg.sender == staticcall AddyRegistry(ADDY_REGISTRY).getAddy(LEDGER_ID) # dev: only Ledger allowed
 
     # validation
@@ -122,10 +122,10 @@ def transferTokenBalance(
     # transfer balances
     transferAmount: uint256 = 0
     isFromUserDepleted: bool = False
-    transferAmount, isFromUserDepleted = stratData._reduceBalanceOnWithdrawal(_fromUser, _asset, _transferAmount, False)
-    stratData._addBalanceOnDeposit(_toUser, _asset, transferAmount, False)
+    transferAmount, isFromUserDepleted = vaultData._reduceBalanceOnWithdrawal(_fromUser, _asset, _transferAmount, False)
+    vaultData._addBalanceOnDeposit(_toUser, _asset, transferAmount, False)
 
-    log SimpleErc20StratTransfer(fromUser=_fromUser, toUser=_toUser, asset=_asset, transferAmount=transferAmount, isFromUserDepleted=isFromUserDepleted)
+    log SimpleErc20VaultTransfer(fromUser=_fromUser, toUser=_toUser, asset=_asset, transferAmount=transferAmount, isFromUserDepleted=isFromUserDepleted)
     return transferAmount, isFromUserDepleted
 
 
@@ -137,22 +137,22 @@ def transferTokenBalance(
 @external
 def deregisterUserAsset(_user: address, _asset: address):
     assert msg.sender == staticcall AddyRegistry(ADDY_REGISTRY).getAddy(LEDGER_ID) # dev: only Ledger allowed
-    stratData._deregisterUserAsset(_user, _asset)
+    vaultData._deregisterUserAsset(_user, _asset)
 
 
 @external
 def recoverFunds(_asset: address, _recipient: address) -> bool:
     assert gov._canGovern(msg.sender) # dev: no perms
-    return stratData._recoverFunds(_asset, _recipient)
+    return vaultData._recoverFunds(_asset, _recipient)
 
 
 @external
-def setStratId(_stratId: uint256) -> bool:
-    assert msg.sender == staticcall AddyRegistry(ADDY_REGISTRY).getAddy(STRAT_BOOK_ID) # dev: no perms
-    return stratData._setStratId(_stratId)
+def setVaultId(_vaultId: uint256) -> bool:
+    assert msg.sender == staticcall AddyRegistry(ADDY_REGISTRY).getAddy(VAULT_BOOK_ID) # dev: no perms
+    return vaultData._setVaultId(_vaultId)
 
 
 @external
 def activate(_shouldActivate: bool):
     assert gov._canGovern(msg.sender) # dev: no perms
-    stratData._activate(_shouldActivate)
+    vaultData._activate(_shouldActivate)

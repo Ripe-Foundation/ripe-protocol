@@ -2,21 +2,21 @@
 
 from ethereum.ercs import IERC20
 
-event StratFundsRecovered:
-    stratId: uint256
+event VaultFundsRecovered:
+    vaultId: uint256
     asset: indexed(address)
     recipient: indexed(address)
     balance: uint256
 
-event StratIdSet:
-    stratId: uint256
+event VaultIdSet:
+    vaultId: uint256
 
-event StratActivated:
-    stratId: uint256
+event VaultActivated:
+    vaultId: uint256
     isActivated: bool
 
 # config
-stratId: public(uint256)
+vaultId: public(uint256)
 isActivated: public(bool)
 
 # balances (may be shares or actual balance)
@@ -28,8 +28,8 @@ userAssets: public(HashMap[address, HashMap[uint256, address]]) # user -> index 
 indexOfUserAsset: public(HashMap[address, HashMap[address, uint256]]) # user -> asset -> index
 numUserAssets: public(HashMap[address, uint256]) # user -> num assets
 
-# strat assets (iterable)
-stratAssets: public(HashMap[uint256, address]) # index -> asset
+# vault assets (iterable)
+vaultAssets: public(HashMap[uint256, address]) # index -> asset
 indexOfAsset: public(HashMap[address, uint256]) # asset -> index
 numAssets: public(uint256) # num assets
 
@@ -63,9 +63,9 @@ def _addBalanceOnDeposit(
     if _shouldUpdateTotal:
         self.totalBalances[_asset] += _depositBal
 
-    # register strat asset (if necessary)
+    # register vault asset (if necessary)
     if self.indexOfAsset[_asset] == 0:
-        self._registerStratAsset(_asset)
+        self._registerVaultAsset(_asset)
 
 
 # withdrawal
@@ -137,21 +137,21 @@ def _deregisterUserAsset(_user: address, _asset: address):
         self.indexOfUserAsset[_user][lastItem] = targetIndex
 
 
-# strat
+# vault
 
 
 @internal
-def _registerStratAsset(_asset: address):
+def _registerVaultAsset(_asset: address):
     aid: uint256 = self.numAssets
     if aid == 0:
         aid = 1 # not using 0 index
-    self.stratAssets[aid] = _asset
+    self.vaultAssets[aid] = _asset
     self.indexOfAsset[_asset] = aid
     self.numAssets = aid + 1
 
 
 @internal
-def _deregisterStratAsset(_asset: address):
+def _deregisterVaultAsset(_asset: address):
     if self.totalBalances[_asset] != 0:
         return
 
@@ -170,8 +170,8 @@ def _deregisterStratAsset(_asset: address):
 
     # get last item, replace the removed item
     if targetIndex != lastIndex:
-        lastItem: address = self.stratAssets[lastIndex]
-        self.stratAssets[targetIndex] = lastItem
+        lastItem: address = self.vaultAssets[lastIndex]
+        self.vaultAssets[targetIndex] = lastItem
         self.indexOfAsset[lastItem] = targetIndex
 
 
@@ -188,21 +188,21 @@ def _deregisterStratAsset(_asset: address):
 def hasAnyFunds() -> bool:
     numAssets: uint256 = self.numAssets
     for i: uint256 in range(1, numAssets, bound=max_value(uint256)):
-        asset: address = self.stratAssets[i]
+        asset: address = self.vaultAssets[i]
         if self.totalBalances[asset] != 0:
             return True
     return False
 
 
-# strat id
+# vault id
 
 
 @internal
-def _setStratId(_stratId: uint256) -> bool:
-    prevStratId: uint256 = self.stratId
-    assert prevStratId == 0 or prevStratId == _stratId # dev: invalid strat id
-    self.stratId = _stratId
-    log StratIdSet(stratId=_stratId)
+def _setVaultId(_vaultId: uint256) -> bool:
+    prevVaultId: uint256 = self.vaultId
+    assert prevVaultId == 0 or prevVaultId == _vaultId # dev: invalid vault id
+    self.vaultId = _vaultId
+    log VaultIdSet(vaultId=_vaultId)
     return True
 
 
@@ -221,7 +221,7 @@ def _recoverFunds(_asset: address, _recipient: address) -> bool:
 
     # recover
     assert extcall IERC20(_asset).transfer(_recipient, balance, default_return_value=True) # dev: recovery failed
-    log StratFundsRecovered(stratId=self.stratId, asset=_asset, recipient=_recipient, balance=balance)
+    log VaultFundsRecovered(vaultId=self.vaultId, asset=_asset, recipient=_recipient, balance=balance)
     return True
 
 
@@ -231,4 +231,4 @@ def _recoverFunds(_asset: address, _recipient: address) -> bool:
 @internal
 def _activate(_shouldActivate: bool):
     self.isActivated = _shouldActivate
-    log StratActivated(stratId=self.stratId, isActivated=_shouldActivate)
+    log VaultActivated(vaultId=self.vaultId, isActivated=_shouldActivate)
