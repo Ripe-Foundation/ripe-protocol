@@ -1,0 +1,79 @@
+# @version 0.4.1
+
+@view
+@external
+def getPrice(_asset: address, _staleTime: uint256 = 0, _oracleRegistry: address = empty(address)) -> uint256:
+    ...
+
+@view
+@external
+def getPriceAndHasFeed(_asset: address, _staleTime: uint256 = 0, _oracleRegistry: address = empty(address)) -> (uint256, bool):
+    ...
+
+@view
+@external
+def hasPriceFeed(_asset: address) -> bool:
+    ...
+
+@view
+@external
+def hasPendingPriceFeedUpdate(_asset: address) -> bool:
+    ...
+
+@view
+@external
+def priceFeedChangeDelay() -> uint256:
+    ...
+
+@external
+def setPriceFeedChangeDelay(_numBlocks: uint256) -> bool:
+    ...
+
+@external
+def setPriceFeedChangeDelayToMin() -> bool:
+    ...
+
+# config
+
+
+@external
+def confirmNewPriceFeed(_asset: address) -> bool:
+    ...
+
+@external
+def cancelNewPendingPriceFeed(_asset: address) -> bool:
+    ...
+
+@external
+def confirmPriceFeedUpdate(_asset: address) -> bool:
+    ...
+
+@external
+def cancelPriceFeedUpdate(_asset: address) -> bool:
+    ...
+
+@external
+def disablePriceFeed(_asset: address) -> bool:
+    ...
+
+@external
+def confirmDisablePriceFeed(_asset: address) -> bool:
+    ...
+
+@external
+def cancelDisablePriceFeed(_asset: address) -> bool:
+    ...
+
+@view
+@external
+def priceSourceId() -> uint256:
+    ...
+
+@external
+def setPriceSourceId(_priceSourceId: uint256) -> bool:
+    ...
+
+@view
+@external
+def getPricedAssets() -> DynArray[address, 50]:
+    ...
