@@ -174,12 +174,16 @@ def _deregisterVaultAsset(_asset: address):
         self.indexOfAsset[lastItem] = targetIndex
 
 
-########
-# Ripe #
-########
+#############
+# Utilities #
+#############
 
 
-# has funds
+@view
+@external
+def isUserInVault(_user: address) -> bool:
+    # if 0 or 1, user is not in vault
+    return self.numUserAssets[_user] > 1
 
 
 @view
@@ -191,6 +195,11 @@ def hasAnyFunds() -> bool:
         if self.totalBalances[asset] != 0:
             return True
     return False
+
+
+########
+# Ripe #
+########
 
 
 # vault id

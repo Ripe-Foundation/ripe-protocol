@@ -32,6 +32,12 @@ def transferBalanceWithinVault(
 
 @view
 @external
+def isUserInVault(_user: address) -> bool:
+    ...
+
+
+@view
+@external
 def hasAnyFunds() -> bool:
     ...
 

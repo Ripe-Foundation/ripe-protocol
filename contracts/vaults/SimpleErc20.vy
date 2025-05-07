@@ -101,6 +101,10 @@ def withdrawTokensFromVault(
     assert withdrawalAmount != 0 # dev: no withdrawal amount
     assert extcall IERC20(_asset).transfer(_recipient, withdrawalAmount, default_return_value=True) # dev: token transfer failed
 
+    # deregister user asset if depleted
+    if isDepleted:
+        vaultData._deregisterUserAsset(_user, _asset)
+
     log SimpleErc20VaultWithdrawal(user=_user, asset=_asset, amount=withdrawalAmount, isDepleted=isDepleted)
     return withdrawalAmount, isDepleted
 
