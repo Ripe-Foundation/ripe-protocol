@@ -68,8 +68,9 @@ def __init__(_addyRegistry: address):
     self.isActivated = True
 
 
+@view
 @internal
-def getAddys() -> address[3]:
+def _getAddys() -> address[3]:
     ar: address = ADDY_REGISTRY
     validator: address = staticcall AddyRegistry(ar).getAddy(VALIDATOR_ID)
     ledger: address = staticcall AddyRegistry(ar).getAddy(LEDGER_ID)
@@ -92,14 +93,14 @@ def addCollateral(
     _vaultId: uint256 = 0,
 ) -> uint256:
     assert self.isActivated # dev: not activated
-    return self._addCollateral(_asset, _amount, _user, _vaultAddr, _vaultId, msg.sender, self.getAddys())
+    return self._addCollateral(_asset, _amount, _user, _vaultAddr, _vaultId, msg.sender, self._getAddys())
 
 
 @nonreentrant
 @external
 def addManyCollaterals(_deposits: DynArray[DepositAction, MAX_BATCH_ACTION]) -> uint256:
     assert self.isActivated # dev: not activated
-    addys: address[3] = self.getAddys()
+    addys: address[3] = self._getAddys()
     for d: DepositAction in _deposits:
         self._addCollateral(d.asset, d.amount, d.user, d.vaultAddr, d.vaultId, msg.sender, addys)
     return len(_deposits)
@@ -155,14 +156,14 @@ def removeCollateral(
     _vaultId: uint256 = 0,
 ) -> uint256:
     assert self.isActivated # dev: not activated
-    return self._removeCollateral(_asset, _amount, _user, _vaultAddr, _vaultId, msg.sender, self.getAddys())
+    return self._removeCollateral(_asset, _amount, _user, _vaultAddr, _vaultId, msg.sender, self._getAddys())
 
 
 @nonreentrant
 @external
 def removeManyCollaterals(_withdrawals: DynArray[WithdrawalAction, MAX_BATCH_ACTION]) -> uint256:
     assert self.isActivated # dev: not activated
-    addys: address[3] = self.getAddys()
+    addys: address[3] = self._getAddys()
     for w: WithdrawalAction in _withdrawals:
         self._removeCollateral(w.asset, w.amount, w.user, w.vaultAddr, w.vaultId, msg.sender, addys)
     return len(_withdrawals)

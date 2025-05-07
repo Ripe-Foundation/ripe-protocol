@@ -3,10 +3,57 @@
 interface AddyRegistry:
     def getAddy(_addyId: uint256) -> address: view
 
+struct RipeRewards:
+    stakers: uint256
+    borrowers: uint256
+    voteDepositors: uint256
+    genDepositors: uint256
+    newRipeRewards: uint256
+    lastUpdate: uint256
+    lastRewardsBlock: uint256
+
+struct GlobalDepositPoints:
+    lastUsdValue: uint256
+    ripeStakerPoints: uint256
+    ripeVotePoints: uint256
+    ripeGenPoints: uint256
+    lastUpdate: uint256
+
+struct AssetDepositPoints:
+    balancePoints: uint256
+    lastBalance: uint256
+    lastUsdValue: uint256
+    ripeStakerPoints: uint256
+    ripeVotePoints: uint256
+    ripeGenPoints: uint256
+    lastUpdate: uint256
+    precision: uint256
+
+struct UserDepositPoints:
+    balancePoints: uint256
+    lastBalance: uint256
+    lastUpdate: uint256
+
+struct BorrowPoints:
+    lastPrincipal: uint256
+    points: uint256
+    lastUpdate: uint256
+
 # user vault participation
 userVaults: public(HashMap[address, HashMap[uint256, uint256]]) # user -> index -> vault id
 indexOfVault: public(HashMap[address, HashMap[uint256, uint256]]) # user -> vault id -> index
 numUserVaults: public(HashMap[address, uint256]) # user -> num vaults
+
+# ripe rewards
+ripeRewards: public(RipeRewards)
+ripeAvailForRewards: public(uint256)
+
+# points
+globalDepositPoints: public(GlobalDepositPoints)
+assetDepositPoints: public(HashMap[uint256, HashMap[address, AssetDepositPoints]]) # vault id -> asset -> points
+userDepositPoints: public(HashMap[address, HashMap[uint256, HashMap[address, UserDepositPoints]]]) # user -> vault id -> asset -> points
+userBorrowPoints:  public(HashMap[address, BorrowPoints]) # user -> BorrowPoints
+globalBorrowPoints: public(BorrowPoints)
 
 TELLER_ID: constant(uint256) = 1 # TODO: make sure this is correct
 
@@ -71,3 +118,8 @@ def removeVaultFromUser(_user: address, _vaultId: uint256):
         lastVaultId: uint256 = self.userVaults[_user][lastIndex]
         self.userVaults[_user][targetIndex] = lastVaultId
         self.indexOfVault[_user][lastVaultId] = targetIndex
+
+
+####################
+# Rewards / Points #
+####################

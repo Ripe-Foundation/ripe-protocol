@@ -32,6 +32,23 @@ def transferBalanceWithinVault(
 
 @view
 @external
+def getUserLootBoxShare(_user: address, _asset: address) -> uint256:
+    ...
+
+@view
+@external
+def getTotalAmountForUser(_user: address, _asset: address) -> uint256:
+    ...
+
+
+@view
+@external
+def getTotalAmountForVault(_asset: address) -> uint256:
+    ...
+
+
+@view
+@external
 def isUserInVault(_user: address) -> bool:
     ...
 

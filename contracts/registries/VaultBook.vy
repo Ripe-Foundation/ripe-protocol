@@ -9,6 +9,10 @@ import contracts.modules.LocalGov as gov
 import contracts.modules.Registry as registry
 from interfaces import Vault
 
+# nft vaults
+isNftVault: public(HashMap[uint256, bool]) # vault id -> is nft vault
+pendingIsNftVault: public(HashMap[address, bool]) # addr -> pending is nft vault
+
 
 @deploy
 def __init__(
@@ -37,17 +41,30 @@ def isValidNewVaultAddr(_addr: address) -> bool:
 
 
 @external
-def registerNewVault(_addr: address, _description: String[64]) -> bool:
+def registerNewVault(_addr: address, _description: String[64], _isNftVault: bool = False) -> bool:
     assert gov._canGovern(msg.sender) # dev: no perms
-    return registry._registerNewAddy(_addr, _description)
+    isPending: bool = registry._registerNewAddy(_addr, _description)
+    if isPending and _isNftVault:
+        self.pendingIsNftVault[_addr] = True
+    return isPending
 
 
 @external
 def confirmNewVaultRegistration(_addr: address) -> uint256:
     assert gov._canGovern(msg.sender) # dev: no perms
     vaultId: uint256 = registry._confirmNewAddy(_addr)
-    if vaultId != 0:
-        assert extcall Vault(_addr).setVaultId(vaultId) # dev: set id failed
+    if vaultId == 0:
+        self.pendingIsNftVault[_addr] = False
+        return 0
+
+    # set vault id
+    assert extcall Vault(_addr).setVaultId(vaultId) # dev: set id failed
+    
+    # set nft vault
+    if self.pendingIsNftVault[_addr]:
+        self.isNftVault[vaultId] = True
+        self.pendingIsNftVault[_addr] = False
+
     return vaultId
 
 

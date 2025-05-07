@@ -133,6 +133,29 @@ def transferBalanceWithinVault(
     return transferAmount, isFromUserDepleted
 
 
+#############
+# Utilities #
+#############
+
+
+@view
+@external
+def getUserLootBoxShare(_user: address, _asset: address) -> uint256:
+    return vaultData.userBalances[_user][_asset]
+
+
+@view
+@external
+def getTotalAmountForUser(_user: address, _asset: address) -> uint256:
+    return vaultData.userBalances[_user][_asset]
+
+
+@view
+@external
+def getTotalAmountForVault(_asset: address) -> uint256:
+    return vaultData.totalBalances[_asset]
+
+
 ########
 # Ripe #
 ########

@@ -196,6 +196,31 @@ def sharesToAmount(_asset: address, _shares: uint256, _shouldRoundUp: bool) -> u
     return sharesMath._sharesToAmount(_asset, _shares, totalShares, totalBalance, _shouldRoundUp)
 
 
+#############
+# Utilities #
+#############
+
+
+@view
+@external
+def getUserLootBoxShare(_user: address, _asset: address) -> uint256:
+    # using shares for lootbox
+    return vaultData.userBalances[_user][_asset]
+
+
+@view
+@external
+def getTotalAmountForUser(_user: address, _asset: address) -> uint256:
+    userShares: uint256 = vaultData.userBalances[_user][_asset]
+    return sharesMath._sharesToAmount(_asset, userShares, vaultData.totalBalances[_asset], staticcall IERC20(_asset).balanceOf(self), False)
+
+
+@view
+@external
+def getTotalAmountForVault(_asset: address) -> uint256:
+    return staticcall IERC20(_asset).balanceOf(self)
+
+
 ########
 # Ripe #
 ########
