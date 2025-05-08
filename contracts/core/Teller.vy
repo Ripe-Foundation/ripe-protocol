@@ -205,3 +205,15 @@ def _removeCollateral(
 
     log TellerRemoveCollateral(user=_user, asset=_asset, requester=_requester, amount=amount, vaultAddr=vaultAddr, vaultId=vaultId, isDepleted=isDepleted)
     return amount
+
+
+##############
+# Borrowing #
+##############
+
+
+@nonreentrant
+@external
+def borrow(_amount: uint256, _user: address = msg.sender, _shouldStake: bool = True) -> uint256:
+    assert self.isActivated # dev: not activated
+    return 0

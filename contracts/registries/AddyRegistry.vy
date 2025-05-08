@@ -9,6 +9,23 @@ exports: registry.__interface__
 import contracts.modules.LocalGov as gov
 import contracts.modules.Registry as registry
 
+event TokensSet:
+    green: address
+    ripe: address
+
+# tokens
+green: public(address)
+ripe: public(address)
+tokensAreSet: public(bool)
+
+# green minting
+isGreenMinter: public(HashMap[uint256, bool]) # addy id -> can mint green
+pendingGreenMinter: public(HashMap[address, bool]) # addr -> pending can mint green
+
+# ripe minting
+isRipeMinter: public(HashMap[uint256, bool]) # addy id -> can mint ripe
+pendingRipeMinter: public(HashMap[address, bool]) # addr -> pending can mint ripe
+
 
 @deploy
 def __init__(
@@ -33,6 +50,7 @@ def __init__(
 # LOOTBOX: 5
 # CONTROL_ROOM: 6
 # PRICE_DESK: 7
+# CREDIT_ENGINE: 8
 
 
 ############
@@ -41,40 +59,59 @@ def __init__(
 
 
 @external
-def registerNewAddy(_addr: address, _description: String[64]) -> bool:
-    """
-    @notice Initiates the registration process for a new address
-    @dev Only callable by governance. Sets up a pending registration that requires confirmation after a delay period
-    @param _addr The address to register
-    @param _description A short description of the address (max 64 characters)
-    @return True if the registration was successfully initiated, False if the address is invalid
-    """
+def registerNewAddy(
+    _addr: address,
+    _description: String[64],
+    _canMintGreen: bool = False,
+    _canMintRipe: bool = False,
+) -> bool:
     assert msg.sender == gov.governance # dev: no perms
-    return registry._registerNewAddy(_addr, _description)
+
+    isPending: bool = registry._registerNewAddy(_addr, _description)
+    if isPending:
+        if _canMintGreen:
+            self.pendingGreenMinter[_addr] = True
+        if _canMintRipe:
+            self.pendingRipeMinter[_addr] = True
+
+    # TODO: log
+    return isPending
 
 
 @external
 def confirmNewAddy(_addr: address) -> uint256:
-    """
-    @notice Confirms a pending address registration after the required delay period
-    @dev Only callable by governance. Finalizes the registration by assigning an ID
-    @param _addr The address to confirm registration for
-    @return The assigned ID for the registered address, or 0 if confirmation fails
-    """
     assert msg.sender == gov.governance # dev: no perms
-    return registry._confirmNewAddy(_addr)
+    addyId: uint256 = registry._confirmNewAddy(_addr)
+    if addyId == 0:
+        self._cancelPendingAddy(_addr)
+        return 0
+
+    if self.pendingGreenMinter[_addr]:
+        self.isGreenMinter[addyId] = True
+        self.pendingGreenMinter[_addr] = False
+
+    if self.pendingRipeMinter[_addr]:
+        self.isRipeMinter[addyId] = True
+        self.pendingRipeMinter[_addr] = False
+
+    # TODO: log
+    return addyId
 
 
 @external
 def cancelPendingNewAddy(_addr: address) -> bool:
-    """
-    @notice Cancels a pending address registration
-    @dev Only callable by governance. Removes the pending registration and emits a cancellation event
-    @param _addr The address whose pending registration should be cancelled
-    @return True if the cancellation was successful, reverts if no pending registration exists
-    """
     assert msg.sender == gov.governance # dev: no perms
+    self._cancelPendingAddy(_addr)
+    # TODO: log
     return registry._cancelPendingNewAddy(_addr)
+
+
+@internal
+def _cancelPendingAddy(_addr: address):
+    if self.pendingGreenMinter[_addr]:
+        self.pendingGreenMinter[_addr] = False
+    if self.pendingRipeMinter[_addr]:
+        self.pendingRipeMinter[_addr] = False
 
 
 ###############
@@ -84,37 +121,18 @@ def cancelPendingNewAddy(_addr: address) -> bool:
 
 @external
 def updateAddyAddr(_addyId: uint256, _newAddr: address) -> bool:
-    """
-    @notice Initiates an address update for an existing registered address
-    @dev Only callable by governance. Sets up a pending update that requires confirmation after a delay period
-    @param _addyId The ID of the address to update
-    @param _newAddr The new address to set
-    @return True if the update was successfully initiated, False if the update is invalid
-    """
     assert msg.sender == gov.governance # dev: no perms
     return registry._updateAddyAddr(_addyId, _newAddr)
 
 
 @external
 def confirmAddyUpdate(_addyId: uint256) -> bool:
-    """
-    @notice Confirms a pending address update after the required delay period
-    @dev Only callable by governance. Finalizes the update by updating the address info
-    @param _addyId The ID of the address to confirm update for
-    @return True if the update was successfully confirmed, False if confirmation fails
-    """
     assert msg.sender == gov.governance # dev: no perms
     return registry._confirmAddyUpdate(_addyId)
 
 
 @external
 def cancelPendingAddyUpdate(_addyId: uint256) -> bool:
-    """
-    @notice Cancels a pending address update
-    @dev Only callable by governance. Removes the pending update and emits a cancellation event
-    @param _addyId The ID of the address whose pending update should be cancelled
-    @return True if the cancellation was successful, reverts if no pending update exists
-    """
     assert msg.sender == gov.governance # dev: no perms
     return registry._cancelPendingAddyUpdate(_addyId)
 
@@ -126,36 +144,18 @@ def cancelPendingAddyUpdate(_addyId: uint256) -> bool:
 
 @external
 def disableAddyAddr(_addyId: uint256) -> bool:
-    """
-    @notice Initiates the disable process for an existing registered address
-    @dev Only callable by governance. Sets up a pending disable that requires confirmation after a delay period
-    @param _addyId The ID of the address to disable
-    @return True if the disable was successfully initiated, False if the disable is invalid
-    """
     assert msg.sender == gov.governance # dev: no perms
     return registry._disableAddyAddr(_addyId)
 
 
 @external
 def confirmAddyDisable(_addyId: uint256) -> bool:
-    """
-    @notice Confirms a pending address disable after the required delay period
-    @dev Only callable by governance. Finalizes the disable by clearing the address
-    @param _addyId The ID of the address to confirm disable for
-    @return True if the disable was successfully confirmed, False if confirmation fails
-    """
     assert msg.sender == gov.governance # dev: no perms
     return registry._confirmAddyDisable(_addyId)
 
 
 @external
 def cancelPendingAddyDisable(_addyId: uint256) -> bool:
-    """
-    @notice Cancels a pending address disable
-    @dev Only callable by governance. Removes the pending disable and emits a cancellation event
-    @param _addyId The ID of the address whose pending disable should be cancelled
-    @return True if the cancellation was successful, reverts if no pending disable exists
-    """
     assert msg.sender == gov.governance # dev: no perms
     return registry._cancelPendingAddyDisable(_addyId)
 
@@ -167,12 +167,6 @@ def cancelPendingAddyDisable(_addyId: uint256) -> bool:
 
 @external
 def setAddyChangeDelay(_numBlocks: uint256) -> bool:
-    """
-    @notice Sets the delay period required for address changes
-    @dev Only callable by governance. The delay must be between MIN_ADDY_CHANGE_DELAY and MAX_ADDY_CHANGE_DELAY
-    @param _numBlocks The number of blocks to set as the delay period
-    @return True if the delay was successfully set, reverts if delay is invalid
-    """
     assert msg.sender == gov.governance # dev: no perms
     return registry._setAddyChangeDelay(_numBlocks)
 
@@ -181,3 +175,44 @@ def setAddyChangeDelay(_numBlocks: uint256) -> bool:
 def setAddyChangeDelayToMin() -> bool:
     assert msg.sender == gov.governance # dev: no perms
     return registry._setAddyChangeDelay(registry.MIN_ADDY_CHANGE_DELAY)
+
+
+##########
+# Tokens #
+##########
+
+
+@external
+def setTokens(_green: address, _ripe: address) -> bool:
+    assert msg.sender == gov.governance # dev: no perms
+
+    assert not self.tokensAreSet # dev: tokens already set
+    assert _green != _ripe # dev: invalid tokens
+    assert empty(address) not in [_green, _ripe] # dev: cannot do 0x0
+    assert _green.is_contract and _ripe.is_contract # dev: not contracts 
+
+    self.green = _green
+    self.ripe = _ripe
+    self.tokensAreSet = True
+
+    log TokensSet(green=_green, ripe=_ripe)
+    return True
+
+
+###########
+# Minting #
+###########
+
+
+@view
+@external
+def canMintGreen(_addr: address) -> bool:
+    addyId: uint256 = registry._getAddyId(_addr)
+    return self.isGreenMinter[addyId]
+
+
+@view
+@external
+def canMintRipe(_addr: address) -> bool:
+    addyId: uint256 = registry._getAddyId(_addr)
+    return self.isRipeMinter[addyId]

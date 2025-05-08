@@ -514,3 +514,9 @@ def getLatestBorrowPoints(_user: address, _didDebtChange: bool) -> (BorrowPoints
     ledger: address = addys[0]
     controlRoom: address = addys[2]
     return self._getLatestBorrowPoints(_user, _didDebtChange, 0, ledger, controlRoom)
+
+
+@external
+def updateBorrowPoints(_user: address, _didDebtChange: bool):
+    assert msg.sender == staticcall AddyRegistry(ADDY_REGISTRY).getAddy(TELLER_ID) # dev: only Teller allowed
+    # TODO: implement

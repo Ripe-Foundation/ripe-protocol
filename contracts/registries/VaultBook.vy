@@ -9,6 +9,10 @@ import contracts.modules.LocalGov as gov
 import contracts.modules.Registry as registry
 from interfaces import Vault
 
+# staked green
+stakedGreenVault: public(uint256) # vault id
+pendingStakedGreenVault: public(address)
+
 # nft vaults
 isNftVault: public(HashMap[uint256, bool]) # vault id -> is nft vault
 pendingIsNftVault: public(HashMap[address, bool]) # addr -> pending is nft vault
@@ -40,13 +44,32 @@ def isValidNewVaultAddr(_addr: address) -> bool:
     return registry._isValidNewAddy(_addr)
 
 
+# initiate
+
+
 @external
-def registerNewVault(_addr: address, _description: String[64], _isNftVault: bool = False) -> bool:
+def registerNewVault(
+    _addr: address,
+    _description: String[64],
+    _isStakedGreenVault: bool = False,
+    _isNftVault: bool = False,
+) -> bool:
     assert gov._canGovern(msg.sender) # dev: no perms
+    
+    # cannot be both
+    assert not (_isStakedGreenVault and _isNftVault) # dev: invalid vault type
+
     isPending: bool = registry._registerNewAddy(_addr, _description)
-    if isPending and _isNftVault:
-        self.pendingIsNftVault[_addr] = True
+    if isPending:
+        if _isStakedGreenVault:
+            self.pendingStakedGreenVault = _addr
+        elif _isNftVault:
+            self.pendingIsNftVault[_addr] = True
+
     return isPending
+
+
+# confirm
 
 
 @external
@@ -54,24 +77,41 @@ def confirmNewVaultRegistration(_addr: address) -> uint256:
     assert gov._canGovern(msg.sender) # dev: no perms
     vaultId: uint256 = registry._confirmNewAddy(_addr)
     if vaultId == 0:
-        self.pendingIsNftVault[_addr] = False
+        self._cancelPendingVault(_addr)
         return 0
 
     # set vault id
     assert extcall Vault(_addr).setVaultId(vaultId) # dev: set id failed
-    
+
+    # set staked green vault
+    if self.pendingStakedGreenVault == _addr:
+        self.stakedGreenVault = vaultId
+        self.pendingStakedGreenVault = empty(address)
+
     # set nft vault
-    if self.pendingIsNftVault[_addr]:
+    elif self.pendingIsNftVault[_addr]:
         self.isNftVault[vaultId] = True
         self.pendingIsNftVault[_addr] = False
 
     return vaultId
 
 
+# cancel
+
+
 @external
 def cancelPendingNewVault(_addr: address) -> bool:
     assert gov._canGovern(msg.sender) # dev: no perms
+    self._cancelPendingVault(_addr)
     return registry._cancelPendingNewAddy(_addr)
+
+
+@internal
+def _cancelPendingVault(_addr: address):
+    if self.pendingIsNftVault[_addr]:
+        self.pendingIsNftVault[_addr] = False
+    elif self.pendingStakedGreenVault == _addr:
+        self.pendingStakedGreenVault = empty(address)
 
 
 ################
@@ -259,3 +299,9 @@ def hasAnyFunds(_vaultId: uint256) -> bool:
 def _hasAnyFunds(_vaultId: uint256) -> bool:
     vaultAddr: address = registry._getAddy(_vaultId)
     return staticcall Vault(vaultAddr).hasAnyFunds()
+
+
+@view
+@external
+def getStakedGreenVault() -> address:
+    return registry._getAddy(self.stakedGreenVault)

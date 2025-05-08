@@ -221,6 +221,20 @@ def getTotalAmountForVault(_asset: address) -> uint256:
     return staticcall IERC20(_asset).balanceOf(self)
 
 
+@view
+@external
+def getUserAssetAndAmountAtIndex(_user: address, _index: uint256) -> (address, uint256):
+    asset: address = vaultData.userAssets[_user][_index]
+    if asset == empty(address):
+        return empty(address), 0
+
+    userShares: uint256 = vaultData.userBalances[_user][asset]
+    if userShares == 0:
+        return empty(address), 0
+
+    return asset, sharesMath._sharesToAmount(asset, userShares, vaultData.totalBalances[asset], staticcall IERC20(asset).balanceOf(self), False)
+
+
 ########
 # Ripe #
 ########

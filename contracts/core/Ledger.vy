@@ -39,6 +39,25 @@ struct BorrowPoints:
     points: uint256
     lastUpdate: uint256
 
+struct DebtTerms:
+    ltv: uint256
+    redemptionThreshold: uint256
+    liqThreshold: uint256
+    liqFee: uint256
+    borrowRate: uint256
+    daowry: uint256
+
+struct UserDebt:
+    amount: uint256
+    principal: uint256
+    debtTerms: DebtTerms
+    lastTimestamp: uint256
+    inLiquidation: bool
+
+struct IntervalBorrow:
+    start: uint256
+    amount: uint256
+
 # user vault participation
 userVaults: public(HashMap[address, HashMap[uint256, uint256]]) # user -> index -> vault id
 indexOfVault: public(HashMap[address, HashMap[uint256, uint256]]) # user -> vault id -> index
@@ -55,7 +74,16 @@ userDepositPoints: public(HashMap[address, HashMap[uint256, HashMap[address, Use
 userBorrowPoints:  public(HashMap[address, BorrowPoints]) # user -> BorrowPoints
 globalBorrowPoints: public(BorrowPoints)
 
+# borrow data
+userDebt: public(HashMap[address, UserDebt]) # user -> user debt
+totalDebt: public(uint256) # total debt
+borrowers: public(HashMap[uint256, address]) # index -> borrower
+indexOfBorrower: public(HashMap[address, uint256]) # borrower -> index
+numBorrowers: public(uint256) # num borrowers
+borrowIntervals: public(HashMap[address, IntervalBorrow]) # user -> borrow interval
+
 TELLER_ID: constant(uint256) = 1 # TODO: make sure this is correct
+CREDIT_ENGINE_ID: constant(uint256) = 8 # TODO: make sure this is correct
 
 # config
 ADDY_REGISTRY: public(immutable(address))
@@ -123,3 +151,70 @@ def removeVaultFromUser(_user: address, _vaultId: uint256):
 ####################
 # Rewards / Points #
 ####################
+
+
+
+########
+# Debt #
+########
+
+
+@external
+def setUserDebt(_user: address, _userDebt: UserDebt, _interval: IntervalBorrow):
+    assert msg.sender == staticcall AddyRegistry(ADDY_REGISTRY).getAddy(CREDIT_ENGINE_ID) # dev: only CreditEngine allowed
+
+    # reduce prev user debt
+    totalDebt: uint256 = self.totalDebt
+    prevUserDebt: uint256 = self.userDebt[_user].amount
+    if prevUserDebt != 0:
+        totalDebt -= prevUserDebt
+
+    # save new user debt
+    self.userDebt[_user] = _userDebt
+    if _userDebt.amount != 0:
+        totalDebt += _userDebt.amount
+    self.totalDebt = totalDebt
+
+    # update intervals
+    if _interval.start != 0:
+        self.borrowIntervals[_user] = _interval
+
+    # remove borrower
+    if _userDebt.amount == 0:
+        self._removeBorrower(_user)
+
+    # add borrower (if necessary)
+    elif self.indexOfBorrower[_user] == 0:
+        self._addNewBorrower(_user)
+
+
+@internal
+def _addNewBorrower(_user: address):
+    bid: uint256 = self.numBorrowers
+    if bid == 0:
+        bid = 1 # not using 0 index
+    self.borrowers[bid] = _user
+    self.indexOfBorrower[_user] = bid
+    self.numBorrowers = bid + 1
+
+
+@internal
+def _removeBorrower(_user: address):
+    numBorrowers: uint256 = self.numBorrowers
+    if numBorrowers == 0:
+        return
+
+    targetIndex: uint256 = self.indexOfBorrower[_user]
+    if targetIndex == 0:
+        return
+
+    # update data
+    lastIndex: uint256 = numBorrowers - 1
+    self.numBorrowers = lastIndex
+    self.indexOfBorrower[_user] = 0
+
+    # shift users to replace the removed one
+    if targetIndex != lastIndex:
+        lastUser: address = self.borrowers[lastIndex]
+        self.borrowers[targetIndex] = lastUser
+        self.indexOfBorrower[lastUser] = targetIndex

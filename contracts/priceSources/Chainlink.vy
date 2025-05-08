@@ -168,7 +168,7 @@ def _setDefaultFeedOnDeploy(_asset: address, _newFeed: address) -> bool:
 
 @view
 @external
-def getPrice(_asset: address, _staleTime: uint256 = 0, _oracleRegistry: address = empty(address)) -> uint256:
+def getPrice(_asset: address, _staleTime: uint256 = 0, _priceDesk: address = empty(address)) -> uint256:
     config: ChainlinkConfig = self.feedConfig[_asset]
     if config.feed == empty(address):
         return 0
@@ -177,7 +177,7 @@ def getPrice(_asset: address, _staleTime: uint256 = 0, _oracleRegistry: address 
 
 @view
 @external
-def getPriceAndHasFeed(_asset: address, _staleTime: uint256 = 0, _oracleRegistry: address = empty(address)) -> (uint256, bool):
+def getPriceAndHasFeed(_asset: address, _staleTime: uint256 = 0, _priceDesk: address = empty(address)) -> (uint256, bool):
     config: ChainlinkConfig = self.feedConfig[_asset]
     if config.feed == empty(address):
         return 0, False

@@ -156,6 +156,15 @@ def getTotalAmountForVault(_asset: address) -> uint256:
     return vaultData.totalBalances[_asset]
 
 
+@view
+@external
+def getUserAssetAndAmountAtIndex(_user: address, _index: uint256) -> (address, uint256):
+    asset: address = vaultData.userAssets[_user][_index]
+    if asset == empty(address):
+        return empty(address), 0
+    return asset, vaultData.userBalances[_user][asset]
+
+
 ########
 # Ripe #
 ########

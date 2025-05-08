@@ -59,6 +59,24 @@ def hasAnyFunds() -> bool:
     ...
 
 
+@view
+@external
+def userAssets(_user: address, _index: uint256) -> address:
+    ...
+
+
+@view
+@external
+def numUserAssets(_user: address) -> uint256:
+    ...
+
+
+@view
+@external
+def getUserAssetAndAmountAtIndex(_user: address, _index: uint256) -> (address, uint256):
+    ...
+
+
 @external
 def deregisterUserAsset(_user: address, _asset: address):
     ...
@@ -74,8 +92,20 @@ def recoverFunds(_asset: address, _recipient: address) -> bool:
     ...
 
 
+@view
+@external
+def vaultId() -> uint256:
+    ...
+
+
 @external
 def setVaultId(_vaultId: uint256) -> bool:
+    ...
+
+
+@view
+@external
+def isActivated() -> bool:
     ...
 
 
