@@ -8,6 +8,7 @@ interface Ledger:
     def userVaults(_user: address, _index: uint256) -> uint256: view
     def numUserVaults(_user: address) -> uint256: view
     def userDebt(_user: address) -> UserDebt: view
+
 interface PriceDesk:
     def getUsdValue(_asset: address, _amount: uint256, _shouldRaise: bool) -> uint256: view
 
@@ -25,6 +26,9 @@ interface AddyRegistry:
 
 interface LootBoxPoints:
     def updateBorrowPoints(_user: address, _didDebtChange: bool): nonpayable
+
+interface GreenToken:
+    def mint(_to: address, _amount: uint256): nonpayable
 
 struct DebtTerms:
     ltv: uint256
@@ -195,6 +199,14 @@ def _getLatestUserDebt(_user: address, _ledger: address) -> (UserDebt, uint256):
     return userDebt, newInterest
 
 
+@view
+@external
+def getUserDebtPrincipal(_user: address) -> uint256:
+    ledger: address = staticcall AddyRegistry(ADDY_REGISTRY).getAddy(LEDGER_ID)
+    userDebt: UserDebt = staticcall Ledger(ledger).userDebt(_user)
+    return userDebt.principal
+
+
 ##########
 # Borrow #
 ##########
@@ -258,9 +270,7 @@ def _handleGreenMint(
 
     # mint green
     greenToMint: uint256 = _newBorrowAmount + _newInterest
-    # mint green (comes to this contract)
-    # AddyRegistry.mint(greenToMint)
-    # TODO: implement
+    extcall GreenToken(greenToken).mint(self, greenToMint)
 
     # calc daowry (origination fee)
     daowry: uint256 = 0

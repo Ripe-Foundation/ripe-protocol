@@ -3,6 +3,8 @@
 interface AddyRegistry:
     def getAddy(_addyId: uint256) -> address: view
 
+# points / rewards
+
 struct RipeRewards:
     stakers: uint256
     borrowers: uint256
@@ -38,6 +40,22 @@ struct BorrowPoints:
     lastPrincipal: uint256
     points: uint256
     lastUpdate: uint256
+
+struct BorrowPointsBundle:
+    userPoints: BorrowPoints
+    globalPoints: BorrowPoints
+    userDebtPrincipal: uint256
+
+struct DepositPointsBundle:
+    userPoints: UserDepositPoints
+    assetPoints: AssetDepositPoints
+    globalPoints: GlobalDepositPoints
+
+struct RipeRewardsBundle:
+    ripeRewards: RipeRewards
+    ripeAvailForRewards: uint256
+
+# debt
 
 struct DebtTerms:
     ltv: uint256
@@ -83,6 +101,7 @@ numBorrowers: public(uint256) # num borrowers
 borrowIntervals: public(HashMap[address, IntervalBorrow]) # user -> borrow interval
 
 TELLER_ID: constant(uint256) = 1 # TODO: make sure this is correct
+LOOTBOX_ID: constant(uint256) = 5 # TODO: make sure this is correct
 CREDIT_ENGINE_ID: constant(uint256) = 8 # TODO: make sure this is correct
 
 # config
@@ -152,6 +171,96 @@ def removeVaultFromUser(_user: address, _vaultId: uint256):
 # Rewards / Points #
 ####################
 
+
+# deposit points
+
+
+@external
+def setDepositPointsAndRipeRewards(
+    _user: address,
+    _vaultId: uint256,
+    _asset: address,
+    _userPoints: UserDepositPoints,
+    _assetPoints: AssetDepositPoints,
+    _globalPoints: GlobalDepositPoints,
+    _ripeRewards: RipeRewards,
+):
+    assert msg.sender == staticcall AddyRegistry(ADDY_REGISTRY).getAddy(LOOTBOX_ID) # dev: only Lootbox allowed
+
+    if _user != empty(address):
+        self.userDepositPoints[_user][_vaultId][_asset] = _userPoints
+    self.assetDepositPoints[_vaultId][_asset] = _assetPoints
+    self.globalDepositPoints = _globalPoints
+    self._setRipeRewards(_ripeRewards)
+
+
+# borrow points
+
+
+@external
+def setBorrowPointsAndRipeRewards(
+    _user: address,
+    _userPoints: BorrowPoints,
+    _globalPoints: BorrowPoints,
+    _ripeRewards: RipeRewards,
+):
+    assert msg.sender == staticcall AddyRegistry(ADDY_REGISTRY).getAddy(LOOTBOX_ID) # dev: only Lootbox allowed
+
+    self.globalBorrowPoints = _globalPoints
+    if _user != empty(address):
+        self.userBorrowPoints[_user] = _userPoints
+    self._setRipeRewards(_ripeRewards)
+
+
+# ripe rewards
+
+
+@external
+def setRipeRewards(_ripeRewards: RipeRewards):
+    assert msg.sender == staticcall AddyRegistry(ADDY_REGISTRY).getAddy(LOOTBOX_ID) # dev: only Lootbox allowed
+    self._setRipeRewards(_ripeRewards)
+
+
+@internal
+def _setRipeRewards(_ripeRewards: RipeRewards):
+    self.ripeRewards = _ripeRewards
+    if _ripeRewards.newRipeRewards != 0:
+        self.ripeAvailForRewards -= min(self.ripeAvailForRewards, _ripeRewards.newRipeRewards)
+
+
+# utils
+
+
+@view
+@external
+def getRipeRewardsBundle() -> RipeRewardsBundle:
+    return RipeRewardsBundle(
+        ripeRewards=self.ripeRewards,
+        ripeAvailForRewards=self.ripeAvailForRewards,
+    )
+
+
+@view
+@external
+def getBorrowPointsBundle(_user: address) -> BorrowPointsBundle:
+    return BorrowPointsBundle(
+        userPoints=self.userBorrowPoints[_user],
+        globalPoints=self.globalBorrowPoints,
+        userDebtPrincipal=self.userDebt[_user].principal,
+    )
+
+
+@view
+@external
+def getDepositPointsBundle(_user: address, _vaultId: uint256, _asset: address) -> DepositPointsBundle:
+    userPoints: UserDepositPoints = empty(UserDepositPoints)
+    if _user != empty(address):
+        userPoints = self.userDepositPoints[_user][_vaultId][_asset]
+    return DepositPointsBundle(
+        userPoints=userPoints,
+        assetPoints=self.assetDepositPoints[_vaultId][_asset],
+        globalPoints=self.globalDepositPoints,
+    )
 
 
 ########

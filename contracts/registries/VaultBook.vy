@@ -13,6 +13,10 @@ from interfaces import Vault
 stakedGreenVault: public(uint256) # vault id
 pendingStakedGreenVault: public(address)
 
+# staked ripe
+stakedRipeVault: public(uint256) # vault id
+pendingStakedRipeVault: public(address)
+
 # nft vaults
 isNftVault: public(HashMap[uint256, bool]) # vault id -> is nft vault
 pendingIsNftVault: public(HashMap[address, bool]) # addr -> pending is nft vault
@@ -301,7 +305,16 @@ def _hasAnyFunds(_vaultId: uint256) -> bool:
     return staticcall Vault(vaultAddr).hasAnyFunds()
 
 
+# staked vaults
+
+
 @view
 @external
 def getStakedGreenVault() -> address:
     return registry._getAddy(self.stakedGreenVault)
+
+
+@view
+@external
+def getStakedRipeVault() -> address:
+    return registry._getAddy(self.stakedRipeVault)

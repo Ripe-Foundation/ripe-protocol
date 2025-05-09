@@ -10,12 +10,12 @@ import contracts.modules.LocalGov as gov
 import contracts.modules.Registry as registry
 
 event TokensSet:
-    green: address
-    ripe: address
+    greenToken: address
+    ripeToken: address
 
 # tokens
-green: public(address)
-ripe: public(address)
+greenToken: public(address)
+ripeToken: public(address)
 tokensAreSet: public(bool)
 
 # green minting
@@ -183,19 +183,19 @@ def setAddyChangeDelayToMin() -> bool:
 
 
 @external
-def setTokens(_green: address, _ripe: address) -> bool:
+def setTokens(_greenToken: address, _ripeToken: address) -> bool:
     assert msg.sender == gov.governance # dev: no perms
 
     assert not self.tokensAreSet # dev: tokens already set
-    assert _green != _ripe # dev: invalid tokens
-    assert empty(address) not in [_green, _ripe] # dev: cannot do 0x0
-    assert _green.is_contract and _ripe.is_contract # dev: not contracts 
+    assert _greenToken != _ripeToken # dev: invalid tokens
+    assert empty(address) not in [_greenToken, _ripeToken] # dev: cannot do 0x0
+    assert _greenToken.is_contract and _ripeToken.is_contract # dev: not contracts 
 
-    self.green = _green
-    self.ripe = _ripe
+    self.greenToken = _greenToken
+    self.ripeToken = _ripeToken
     self.tokensAreSet = True
 
-    log TokensSet(green=_green, ripe=_ripe)
+    log TokensSet(greenToken=_greenToken, ripeToken=_ripeToken)
     return True
 
 

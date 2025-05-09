@@ -14,6 +14,24 @@ struct DebtTerms:
     borrowRate: uint256
     daowry: uint256
 
+struct RipeRewardsAllocs:
+    stakers: uint256
+    borrowers: uint256
+    voteDepositors: uint256
+    genDepositors: uint256
+    total: uint256
+
+struct RipeRewardsConfig:
+    ripeRewardsAllocs: RipeRewardsAllocs
+    ripeRewardsStartBlock: uint256
+    ripePerBlock: uint256
+
+struct DepositPointsAllocs:
+    stakers: uint256
+    stakersTotal: uint256
+    voteDepositor: uint256
+    voteDepositorTotal: uint256
+
 # config
 isActivated: public(bool)
 ADDY_REGISTRY: public(immutable(address))
@@ -28,23 +46,26 @@ def __init__(_addyRegistry: address):
 
 @view
 @external
-def getSpecificRipeAllocs(_vaultId: uint256, _asset: address) -> (uint256, uint256):
-    # TODO: implement
-
-    return 0, 0
-
-
-@view
-@external
-def getTotalRipeAllocs() -> (uint256, uint256):
-    # TODO: implement
-
-    return 0, 0
-
-
-@view
-@external
 def getDebtTerms(_vaultId: uint256, _asset: address) -> DebtTerms:
     # TODO: implement
 
     return empty(DebtTerms)
+
+
+####################
+# Rewards / Points #
+####################
+
+
+@view
+@external
+def getRipeRewardsConfig() -> RipeRewardsConfig:
+    # TODO: implement
+    return empty(RipeRewardsConfig)
+
+
+@view
+@external
+def getDepositPointsAllocs(_vaultId: uint256, _asset: address) -> DepositPointsAllocs:
+    # TODO: implement
+    return empty(DepositPointsAllocs)
