@@ -14,6 +14,15 @@ struct DebtTerms:
     borrowRate: uint256
     daowry: uint256
 
+struct BorrowConfig:
+    isBorrowEnabled: bool
+    numAllowedBorrowers: uint256
+    maxBorrowPerInterval: uint256
+    numBlocksPerInterval: uint256
+    perUserDebtLimit: uint256
+    globalDebtLimit: uint256
+    minDebtAmount: uint256
+
 struct RipeRewardsAllocs:
     stakers: uint256
     borrowers: uint256
@@ -44,12 +53,23 @@ def __init__(_addyRegistry: address):
     self.isActivated = True
 
 
+########
+# Debt #
+########
+
+
 @view
 @external
 def getDebtTerms(_vaultId: uint256, _asset: address) -> DebtTerms:
     # TODO: implement
-
     return empty(DebtTerms)
+
+
+@view
+@external
+def getBorrowConfig() -> BorrowConfig:
+    # TODO: implement
+    return empty(BorrowConfig)
 
 
 ####################

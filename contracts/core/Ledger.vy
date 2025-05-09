@@ -57,6 +57,14 @@ struct RipeRewardsBundle:
 
 # debt
 
+struct BorrowDataBundle:
+    userDebt: UserDebt
+    userBorrowInterval: IntervalBorrow
+    isUserBorrower: bool
+    numUserVaults: uint256
+    totalDebt: uint256
+    numBorrowers: uint256
+
 struct DebtTerms:
     ltv: uint256
     redemptionThreshold: uint256
@@ -297,6 +305,9 @@ def setUserDebt(_user: address, _userDebt: UserDebt, _interval: IntervalBorrow):
         self._addNewBorrower(_user)
 
 
+# registration
+
+
 @internal
 def _addNewBorrower(_user: address):
     bid: uint256 = self.numBorrowers
@@ -327,3 +338,25 @@ def _removeBorrower(_user: address):
         lastUser: address = self.borrowers[lastIndex]
         self.borrowers[targetIndex] = lastUser
         self.indexOfBorrower[lastUser] = targetIndex
+
+
+# utils
+
+
+@view
+@external
+def getBorrowDataBundle(_user: address) -> BorrowDataBundle:
+    return BorrowDataBundle(
+        userDebt=self.userDebt[_user],
+        userBorrowInterval=self.borrowIntervals[_user],
+        isUserBorrower=self.indexOfBorrower[_user] != 0,
+        numUserVaults=self.numUserVaults[_user],
+        totalDebt=self.totalDebt,
+        numBorrowers=self.numBorrowers,
+    )
+
+
+@view
+@external
+def isBorrower(_user: address) -> bool:
+    return self.indexOfBorrower[_user] != 0
