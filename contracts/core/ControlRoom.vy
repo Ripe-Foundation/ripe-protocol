@@ -72,6 +72,13 @@ def getBorrowConfig() -> BorrowConfig:
     return empty(BorrowConfig)
 
 
+@view
+@external
+def isRepayEnabled() -> bool:
+    # TODO: implement
+    return True
+
+
 ####################
 # Rewards / Points #
 ####################

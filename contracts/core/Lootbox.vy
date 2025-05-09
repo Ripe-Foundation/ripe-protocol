@@ -147,9 +147,13 @@ def claimLoot(_user: address, _shouldStake: bool) -> uint256:
     for i: uint256 in range(1, numUserVaults, bound=max_value(uint256)):
         vaultId: uint256 = staticcall Ledger(ledger).userVaults(_user, i)
         vaultAddr: address = staticcall VaultBook(vaultBook).getVault(vaultId)
+        if vaultAddr == empty(address):
+            continue
         numUserAssets: uint256 = staticcall Vault(vaultAddr).numUserAssets(_user)
         for y: uint256 in range(1, numUserAssets, bound=max_value(uint256)):
             asset: address = staticcall Vault(vaultAddr).userAssets(_user, y)
+            if asset == empty(address):
+                continue
             totalRipeForUser += self._claimDepositLoot(_user, vaultId, vaultAddr, asset, addys)
 
     # mint ripe, then stake or transfer to user
@@ -191,9 +195,13 @@ def getClaimableLoot(_user: address) -> uint256:
     for i: uint256 in range(1, numUserVaults, bound=max_value(uint256)):
         vaultId: uint256 = staticcall Ledger(ledger).userVaults(_user, i)
         vaultAddr: address = staticcall VaultBook(vaultBook).getVault(vaultId)
+        if vaultAddr == empty(address):
+            continue
         numUserAssets: uint256 = staticcall Vault(vaultAddr).numUserAssets(_user)
         for y: uint256 in range(1, numUserAssets, bound=max_value(uint256)):
             asset: address = staticcall Vault(vaultAddr).userAssets(_user, y)
+            if asset == empty(address):
+                continue
             totalRipeForUser += self._getClaimableDepositLoot(_user, vaultId, vaultAddr, asset, addys)
 
     return totalRipeForUser
