@@ -3,6 +3,14 @@
 interface AddyRegistry:
     def getAddy(_addyId: uint256) -> address: view
 
+# deposit / withdrawals
+
+
+struct DepositLedgerData:
+    isParticipatingInVault: bool
+    numUserVaults: uint256
+
+
 # points / rewards
 
 struct RipeRewards:
@@ -134,8 +142,17 @@ def __init__(_addyRegistry: address):
 
 @view
 @external
-def isVaultRegistered(_user: address, _vaultId: uint256) -> bool:
+def isParticipatingInVault(_user: address, _vaultId: uint256) -> bool:
     return self.indexOfVault[_user][_vaultId] != 0
+
+
+@view
+@internal
+def _getNumUserVaults(_user: address) -> uint256:
+    numVaults: uint256 = self.numUserVaults[_user]
+    if numVaults == 0:
+        return 0
+    return numVaults - 1
 
 
 @external
@@ -178,6 +195,18 @@ def removeVaultFromUser(_user: address, _vaultId: uint256):
         lastVaultId: uint256 = self.userVaults[_user][lastIndex]
         self.userVaults[_user][targetIndex] = lastVaultId
         self.indexOfVault[_user][lastVaultId] = targetIndex
+
+
+# utils
+
+
+@view
+@external
+def getDepositLedgerData(_user: address, _vaultId: uint256) -> DepositLedgerData:
+    return DepositLedgerData(
+        isParticipatingInVault=self.indexOfVault[_user][_vaultId] != 0,
+        numUserVaults=self._getNumUserVaults(_user),
+    )
 
 
 ########

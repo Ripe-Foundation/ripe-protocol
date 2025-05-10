@@ -165,6 +165,17 @@ def getUserAssetAndAmountAtIndex(_user: address, _index: uint256) -> (address, u
     return asset, vaultData.userBalances[_user][asset]
 
 
+@view
+@external
+def getVaultDataOnDeposit(_user: address, _asset: address) -> Vault.VaultDataOnDeposit:
+    return Vault.VaultDataOnDeposit(
+        hasPosition=vaultData.indexOfUserAsset[_user][_asset] != 0,
+        numAssets=vaultData._getNumUserAssets(_user),
+        userBalance=vaultData.userBalances[_user][_asset],
+        totalBalance=vaultData.totalBalances[_asset],
+    )
+
+
 ########
 # Ripe #
 ########

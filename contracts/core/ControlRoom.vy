@@ -6,6 +6,14 @@ from ethereum.ercs import IERC20
 interface AddyRegistry:
     def getAddy(_addyId: uint256) -> address: view
 
+struct DepositConfig:
+    canDeposit: bool
+    isUserAllowed: bool
+    perUserDepositLimit: uint256
+    globalDepositLimit: uint256
+    maxDepositAssetsPerVault: uint256
+    maxDepositVaults: uint256
+
 struct DebtTerms:
     ltv: uint256
     redemptionThreshold: uint256
@@ -51,6 +59,18 @@ def __init__(_addyRegistry: address):
     assert _addyRegistry != empty(address) # dev: invalid addy registry
     ADDY_REGISTRY = _addyRegistry
     self.isActivated = True
+
+
+##########################
+# Deposits / Withdrawals #
+##########################
+
+
+@view
+@external
+def getDepositConfig(_vaultId: uint256, _asset: address, _user: address) -> DepositConfig:
+    # TODO: implement
+    return empty(DepositConfig)
 
 
 ########

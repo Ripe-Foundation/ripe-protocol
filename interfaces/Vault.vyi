@@ -1,5 +1,10 @@
 # @version 0.4.1
 
+struct VaultDataOnDeposit:
+    hasPosition: bool
+    numAssets: uint256
+    userBalance: uint256
+    totalBalance: uint256
 
 @external
 def depositTokensInVault(
@@ -74,6 +79,12 @@ def numUserAssets(_user: address) -> uint256:
 @view
 @external
 def getUserAssetAndAmountAtIndex(_user: address, _index: uint256) -> (address, uint256):
+    ...
+
+
+@view
+@external
+def getVaultDataOnDeposit(_user: address, _asset: address) -> VaultDataOnDeposit:
     ...
 
 

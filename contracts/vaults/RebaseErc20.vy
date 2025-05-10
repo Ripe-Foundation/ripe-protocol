@@ -211,8 +211,14 @@ def getUserLootBoxShare(_user: address, _asset: address) -> uint256:
 @view
 @external
 def getTotalAmountForUser(_user: address, _asset: address) -> uint256:
+    return self._getTotalAmountForUser(_user, _asset, staticcall IERC20(_asset).balanceOf(self))
+
+
+@view
+@internal
+def _getTotalAmountForUser(_user: address, _asset: address, _totalBalance: uint256) -> uint256:
     userShares: uint256 = vaultData.userBalances[_user][_asset]
-    return sharesMath._sharesToAmount(_asset, userShares, vaultData.totalBalances[_asset], staticcall IERC20(_asset).balanceOf(self), False)
+    return sharesMath._sharesToAmount(_asset, userShares, vaultData.totalBalances[_asset], _totalBalance, False)
 
 
 @view
@@ -233,6 +239,18 @@ def getUserAssetAndAmountAtIndex(_user: address, _index: uint256) -> (address, u
         return empty(address), 0
 
     return asset, sharesMath._sharesToAmount(asset, userShares, vaultData.totalBalances[asset], staticcall IERC20(asset).balanceOf(self), False)
+
+
+@view
+@external
+def getVaultDataOnDeposit(_user: address, _asset: address) -> Vault.VaultDataOnDeposit:
+    totalBalance: uint256 = staticcall IERC20(_asset).balanceOf(self)
+    return Vault.VaultDataOnDeposit(
+        hasPosition=vaultData.indexOfUserAsset[_user][_asset] != 0,
+        numAssets=vaultData._getNumUserAssets(_user),
+        userBalance=self._getTotalAmountForUser(_user, _asset, totalBalance),
+        totalBalance=totalBalance,
+    )
 
 
 ########

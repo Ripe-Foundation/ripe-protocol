@@ -187,6 +187,15 @@ def isUserInVault(_user: address) -> bool:
 
 
 @view
+@internal
+def _getNumUserAssets(_user: address) -> uint256:
+    numAssets: uint256 = self.numUserAssets[_user]
+    if numAssets == 0:
+        return 0
+    return numAssets - 1
+
+
+@view
 @external
 def hasAnyFunds() -> bool:
     numAssets: uint256 = self.numAssets
