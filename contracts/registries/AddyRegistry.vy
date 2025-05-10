@@ -13,6 +13,10 @@ event TokensSet:
     greenToken: address
     ripeToken: address
 
+event CanSetTokenBlacklistSet:
+    addyId: uint256
+    canSet: bool
+
 # tokens
 greenToken: public(address)
 ripeToken: public(address)
@@ -25,6 +29,9 @@ pendingGreenMinter: public(HashMap[address, bool]) # addr -> pending can mint gr
 # ripe minting
 isRipeMinter: public(HashMap[uint256, bool]) # addy id -> can mint ripe
 pendingRipeMinter: public(HashMap[address, bool]) # addr -> pending can mint ripe
+
+# blacklist
+canIdSetTokenBlacklist: public(HashMap[uint256, bool]) # addy id -> can set blacklist
 
 
 @deploy
@@ -216,3 +223,24 @@ def canMintGreen(_addr: address) -> bool:
 def canMintRipe(_addr: address) -> bool:
     addyId: uint256 = registry._getAddyId(_addr)
     return self.isRipeMinter[addyId]
+
+
+#############
+# Blacklist #
+#############
+
+
+@external
+def setCanSetTokenBlacklist(_addyId: uint256, _canSetTokenBlacklist: bool) -> bool:
+    assert msg.sender == gov.governance # dev: no perms
+    assert registry._isValidAddyId(_addyId) # dev: invalid addy id
+    self.canIdSetTokenBlacklist[_addyId] = _canSetTokenBlacklist
+    log CanSetTokenBlacklistSet(addyId=_addyId, canSet=_canSetTokenBlacklist)
+    return True
+
+
+@view
+@external
+def canSetTokenBlacklist(_addr: address) -> bool:
+    addyId: uint256 = registry._getAddyId(_addr)
+    return self.canIdSetTokenBlacklist[addyId]
