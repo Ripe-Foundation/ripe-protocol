@@ -7,25 +7,28 @@ import contracts.modules.Addys as addys
 from interfaces import Vault
 from ethereum.ercs import IERC20
 
+interface CreditEngine:
+    def repayForUser(_user: address, _amount: uint256, _shouldStakeRefund: bool, _caller: address, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
+    def borrowForUser(_user: address, _amount: uint256, _shouldStake: bool, _caller: address, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
+    def getMaxWithdrawableForAsset(_user: address, _asset: address, _a: addys.Addys = empty(addys.Addys)) -> uint256: view
+    def hasGoodDebtHealth(_user: address, _a: addys.Addys = empty(addys.Addys)) -> bool: view
+
 interface Ledger:
     def getDepositLedgerData(_user: address, _vaultId: uint256) -> DepositLedgerData: view
     def removeVaultFromUser(_user: address, _vaultId: uint256): nonpayable
     def addVaultToUser(_user: address, _vaultId: uint256): nonpayable
 
+interface Lootbox:
+    def updateDepositPoints(_user: address, _vaultId: uint256, _vaultAddr: address, _asset: address, _a: addys.Addys = empty(addys.Addys)): nonpayable
+    def claimLootForUser(_user: address, _shouldStake: bool, _caller: address, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
+
 interface ControlRoom:
     def getWithdrawConfig(_vaultId: uint256, _asset: address, _user: address, _caller: address) -> WithdrawConfig: view
     def getDepositConfig(_vaultId: uint256, _asset: address, _user: address) -> DepositConfig: view
 
-interface CreditEngine:
-    def getMaxWithdrawableForAsset(_user: address, _asset: address, _a: addys.Addys = empty(addys.Addys)) -> uint256: view
-    def hasGoodDebtHealth(_user: address, _a: addys.Addys = empty(addys.Addys)) -> bool: view
-
 interface VaultBook:
     def getVaultAddr(_vaultId: uint256) -> address: view
     def getVaultId(_vaultAddr: address) -> uint256: view
-
-interface Lootbox:
-    def updateDepositPoints(_user: address, _vaultId: uint256, _vaultAddr: address, _asset: address, _a: addys.Addys = empty(addys.Addys)): nonpayable
 
 struct DepositLedgerData:
     isParticipatingInVault: bool
@@ -197,32 +200,6 @@ def _validateOnDeposit(
     return amount
 
 
-# per user deposit limit
-
-
-@view 
-@internal 
-def _getAvailPerUserDepositLimit(_userDepositBal: uint256, _perUserDepositLimit: uint256) -> uint256:
-    if _perUserDepositLimit == max_value(uint256):
-        return max_value(uint256)
-    availDeposits: uint256 = 0
-    if _perUserDepositLimit > _userDepositBal:
-        availDeposits = _perUserDepositLimit - _userDepositBal
-    return availDeposits
-
-
-# global deposit limit
-
-
-@view 
-@internal 
-def _getAvailGlobalDepositLimit(_totalDepositBal: uint256, _globalDepositLimit: uint256) -> uint256:
-    availDeposits: uint256 = 0
-    if _globalDepositLimit > _totalDepositBal:
-        availDeposits = _globalDepositLimit - _totalDepositBal
-    return availDeposits
-
-
 ###############
 # Withdrawals #
 ###############
@@ -321,20 +298,48 @@ def _validateOnWithdrawal(
     return min(_amount, maxWithdrawable)
 
 
-##############
-# Borrowing #
-##############
+########
+# Debt #
+########
 
 
 @nonreentrant
 @external
 def borrow(
-    _amount: uint256,
+    _amount: uint256 = max_value(uint256),
     _user: address = msg.sender,
     _shouldStake: bool = True,
 ) -> uint256:
     assert self.isActivated # dev: not activated
-    return 0
+    a: addys.Addys = addys._getAddys()
+    return extcall CreditEngine(a.creditEngine).borrowForUser(_user, _amount, _shouldStake, msg.sender, a)
+
+
+@nonreentrant
+@external
+def repay(
+    _amount: uint256 = max_value(uint256),
+    _user: address = msg.sender,
+    _shouldStakeRefund: bool = True,
+) -> uint256:
+    assert self.isActivated # dev: not activated
+    a: addys.Addys = addys._getAddys()
+    amount: uint256 = min(_amount, staticcall IERC20(a.greenToken).balanceOf(msg.sender))
+    assert extcall IERC20(a.greenToken).transferFrom(msg.sender, a.creditEngine, amount) # dev: token transfer failed
+    return extcall CreditEngine(a.creditEngine).repayForUser(_user, amount, _shouldStakeRefund, msg.sender, a)
+
+
+###########
+# Rewards #
+###########
+
+
+@nonreentrant
+@external
+def claimLoot(_user: address = msg.sender, _shouldStake: bool = True) -> uint256:
+    assert self.isActivated # dev: not activated
+    a: addys.Addys = addys._getAddys()
+    return extcall Lootbox(a.lootbox).claimLootForUser(_user, _shouldStake, msg.sender, a)
 
 
 #############
@@ -368,3 +373,29 @@ def _getVaultAddrAndId(
         vaultAddr = _vaultAddr
 
     return vaultAddr, vaultId
+
+
+# per user deposit limit
+
+
+@view 
+@internal 
+def _getAvailPerUserDepositLimit(_userDepositBal: uint256, _perUserDepositLimit: uint256) -> uint256:
+    if _perUserDepositLimit == max_value(uint256):
+        return max_value(uint256)
+    availDeposits: uint256 = 0
+    if _perUserDepositLimit > _userDepositBal:
+        availDeposits = _perUserDepositLimit - _userDepositBal
+    return availDeposits
+
+
+# global deposit limit
+
+
+@view 
+@internal 
+def _getAvailGlobalDepositLimit(_totalDepositBal: uint256, _globalDepositLimit: uint256) -> uint256:
+    availDeposits: uint256 = 0
+    if _globalDepositLimit > _totalDepositBal:
+        availDeposits = _globalDepositLimit - _totalDepositBal
+    return availDeposits

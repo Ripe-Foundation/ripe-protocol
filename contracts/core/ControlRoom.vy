@@ -31,12 +31,17 @@ struct DebtTerms:
 
 struct BorrowConfig:
     isBorrowEnabled: bool
+    canBorrowForUser: bool
     numAllowedBorrowers: uint256
     maxBorrowPerInterval: uint256
     numBlocksPerInterval: uint256
     perUserDebtLimit: uint256
     globalDebtLimit: uint256
     minDebtAmount: uint256
+
+struct RepayConfig:
+    isRepayEnabled: bool
+    canOthersRepayForUser: bool
 
 struct RipeRewardsAllocs:
     stakers: uint256
@@ -99,16 +104,16 @@ def getDebtTerms(_vaultId: uint256, _asset: address) -> DebtTerms:
 
 @view
 @external
-def getBorrowConfig() -> BorrowConfig:
+def getBorrowConfig(_user: address, _caller: address) -> BorrowConfig:
     # TODO: implement
     return empty(BorrowConfig)
 
 
 @view
 @external
-def isRepayEnabled() -> bool:
+def getRepayConfig(_user: address) -> RepayConfig:
     # TODO: implement
-    return True
+    return empty(RepayConfig)
 
 
 @view
@@ -135,3 +140,10 @@ def getRipeRewardsConfig() -> RipeRewardsConfig:
 def getDepositPointsAllocs(_vaultId: uint256, _asset: address) -> DepositPointsAllocs:
     # TODO: implement
     return empty(DepositPointsAllocs)
+
+
+@view
+@external
+def canOthersClaimLootForUser(_user: address) -> bool:
+    # TODO: implement
+    return False

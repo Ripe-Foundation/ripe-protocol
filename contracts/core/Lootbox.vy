@@ -20,6 +20,7 @@ interface Ledger:
 
 interface ControlRoom:
     def getDepositPointsAllocs(_vaultId: uint256, _asset: address) -> DepositPointsAllocs: view
+    def canOthersClaimLootForUser(_user: address) -> bool: view
     def getRipeRewardsConfig() -> RipeRewardsConfig: view
 
 interface VaultBook:
@@ -124,9 +125,18 @@ def __init__(_hq: address):
 
 
 @external
-def claimLoot(_user: address, _shouldStake: bool, _a: addys.Addys = empty(addys.Addys)) -> uint256:
-    assert addys._isValidRipeHqAddy(msg.sender) # dev: no perms
+def claimLootForUser(
+    _user: address,
+    _shouldStake: bool,
+    _caller: address,
+    _a: addys.Addys = empty(addys.Addys),
+) -> uint256:
+    assert msg.sender == addys._getTellerAddr() # dev: only teller allowed
     a: addys.Addys = addys._getAddys(_a)
+
+    # check if caller can claim for user
+    if _user != _caller:
+        assert staticcall ControlRoom(a.controlRoom).canOthersClaimLootForUser(_user) # dev: cannot claim for user
 
     # total loot -- start with borrow loot
     totalRipeForUser: uint256 = self._claimBorrowLoot(_user, a)

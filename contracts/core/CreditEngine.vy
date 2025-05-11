@@ -15,10 +15,10 @@ interface Ledger:
     def flushUnrealizedYield() -> uint256: nonpayable
 
 interface ControlRoom:
+    def getBorrowConfig(_user: address, _caller: address) -> BorrowConfig: view
     def getDebtTerms(_vaultId: uint256, _asset: address) -> DebtTerms: view
-    def getBorrowConfig() -> BorrowConfig: view
+    def getRepayConfig(_user: address) -> RepayConfig: view
     def isDaowryEnabled() -> bool: view
-    def isRepayEnabled() -> bool: view
 
 interface PriceDesk:
     def getAssetAmount(_asset: address, _usdValue: uint256, _shouldRaise: bool = False) -> uint256: view
@@ -52,12 +52,17 @@ struct RepayDataBundle:
 
 struct BorrowConfig:
     isBorrowEnabled: bool
+    canBorrowForUser: bool
     numAllowedBorrowers: uint256
     maxBorrowPerInterval: uint256
     numBlocksPerInterval: uint256
     perUserDebtLimit: uint256
     globalDebtLimit: uint256
     minDebtAmount: uint256
+
+struct RepayConfig:
+    isRepayEnabled: bool
+    canOthersRepayForUser: bool
 
 struct DebtTerms:
     ltv: uint256
@@ -127,11 +132,13 @@ def borrowForUser(
     _user: address,
     _amount: uint256,
     _shouldStake: bool,
+    _caller: address,
+    _a: addys.Addys = empty(addys.Addys),
 ) -> uint256:
     assert msg.sender == addys._getTellerAddr() # dev: only teller allowed
 
     # get borrow data
-    a: addys.Addys = addys._getAddys()
+    a: addys.Addys = addys._getAddys(_a)
     d: BorrowDataBundle = staticcall Ledger(a.ledger).getBorrowDataBundle(_user)
 
     # get latest user debt
@@ -145,7 +152,7 @@ def borrowForUser(
     # validation
     newBorrowAmount: uint256 = 0
     isFreshInterval: bool = False
-    newBorrowAmount, isFreshInterval = self._validateOnBorrow(_amount, userDebt, bt.totalMaxDebt, d.userBorrowInterval, d.isUserBorrower, d.numBorrowers, d.totalDebt, a.controlRoom)
+    newBorrowAmount, isFreshInterval = self._validateOnBorrow(_user, _caller, _amount, userDebt, bt.totalMaxDebt, d.userBorrowInterval, d.isUserBorrower, d.numBorrowers, d.totalDebt, a.controlRoom)
     assert newBorrowAmount != 0 # dev: cannot borrow
 
     # update borrow interval
@@ -192,6 +199,8 @@ def borrowForUser(
 @view
 @internal
 def _validateOnBorrow(
+    _user: address,
+    _caller: address,
     _amount: uint256,
     _userDebt: UserDebt,
     _maxUserDebt: uint256,
@@ -205,8 +214,9 @@ def _validateOnBorrow(
     assert _amount != 0 # dev: cannot borrow 0 amount
 
     # get borrow config
-    config: BorrowConfig = staticcall ControlRoom(_controlRoom).getBorrowConfig()
+    config: BorrowConfig = staticcall ControlRoom(_controlRoom).getBorrowConfig(_user, _caller)
     assert config.isBorrowEnabled # dev: borrow not enabled
+    assert config.canBorrowForUser # dev: cannot borrow for user
 
     # check num allowed borrowers
     if not _isUserBorrower:
@@ -263,7 +273,7 @@ def getMaxBorrowAmount(_user: address) -> uint256:
         return 0
 
     # get borrow config
-    config: BorrowConfig = staticcall ControlRoom(a.controlRoom).getBorrowConfig()
+    config: BorrowConfig = staticcall ControlRoom(a.controlRoom).getBorrowConfig(_user, _user)
     if not config.isBorrowEnabled:
         return 0
 
@@ -318,13 +328,15 @@ def getMaxBorrowAmount(_user: address) -> uint256:
 @external
 def repayForUser(
     _user: address,
-    _repayAmount: uint256,
+    _amount: uint256,
     _shouldStakeRefund: bool,
+    _caller: address,
+    _a: addys.Addys = empty(addys.Addys),
 ) -> uint256:
     assert msg.sender == addys._getTellerAddr() # dev: only teller allowed
 
     # get repay data
-    a: addys.Addys = addys._getAddys()
+    a: addys.Addys = addys._getAddys(_a)
     d: RepayDataBundle = staticcall Ledger(a.ledger).getRepayDataBundle(_user)
 
     # get latest user debt
@@ -336,7 +348,7 @@ def repayForUser(
     # validation
     repayAmount: uint256 = 0
     refundAmount: uint256 = 0
-    repayAmount, refundAmount = self._validateOnRepay(_repayAmount, userDebt, a.greenToken, a.controlRoom)
+    repayAmount, refundAmount = self._validateOnRepay(_user, _caller, _amount, userDebt, a)
 
     # get borrow data (debt terms for user)
     bt: UserBorrowTerms = self._getUserBorrowTerms(_user, d.numUserVaults, True, a)
@@ -344,7 +356,8 @@ def repayForUser(
     # update user debt
     userDebt.amount -= repayAmount
     if repayAmount > totalAccruedInterest:
-        userDebt.principal -= min(userDebt.principal, totalAccruedInterest)
+        principalToReduce: uint256 = repayAmount - totalAccruedInterest
+        userDebt.principal -= min(principalToReduce, userDebt.principal)
     userDebt.debtTerms = bt.debtTerms
     extcall Ledger(a.ledger).setUserDebt(_user, userDebt, newInterest, empty(IntervalBorrow))
 
@@ -368,16 +381,22 @@ def repayForUser(
 @view
 @internal
 def _validateOnRepay(
-    _repayAmount: uint256,
+    _user: address,
+    _caller: address,
+    _amount: uint256,
     _userDebt: UserDebt,
-    _greenToken: address,
-    _controlRoom: address,
+    _a: addys.Addys,
 ) -> (uint256, uint256):
     assert _userDebt.amount != 0 # dev: no debt outstanding
-    assert staticcall ControlRoom(_controlRoom).isRepayEnabled() # dev: repay paused
+
+    # get repay config
+    repayConfig: RepayConfig = staticcall ControlRoom(_a.controlRoom).getRepayConfig(_user)
+    assert repayConfig.isRepayEnabled # dev: repay paused
+    if _user != _caller:
+        assert repayConfig.canOthersRepayForUser # dev: cannot repay for user
 
     # available amount
-    availAmount: uint256 = min(_repayAmount, staticcall IERC20(_greenToken).balanceOf(self))
+    availAmount: uint256 = min(_amount, staticcall IERC20(_a.greenToken).balanceOf(self))
     assert availAmount != 0 # dev: cannot repay with 0 green
 
     # finalize amounts
