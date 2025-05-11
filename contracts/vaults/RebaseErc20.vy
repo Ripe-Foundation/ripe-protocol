@@ -30,6 +30,7 @@ event RebaseErc20VaultWithdrawal:
     amount: uint256
     isDepleted: bool
     shares: uint256
+    isUserStillInVault: bool
 
 event RebaseErc20VaultTransfer:
     fromUser: indexed(address)
@@ -94,7 +95,7 @@ def withdrawTokensFromVault(
     _asset: address,
     _amount: uint256,
     _recipient: address,
-) -> (uint256, bool):
+) -> (uint256, bool, bool):
     assert vaultData.isActivated # dev: not activated
     assert msg.sender == staticcall AddyRegistry(ADDY_REGISTRY).getAddy(TELLER_ID) # dev: only Teller allowed
 
@@ -117,11 +118,12 @@ def withdrawTokensFromVault(
     assert extcall IERC20(_asset).transfer(_recipient, withdrawalAmount, default_return_value=True) # dev: token transfer failed
 
     # deregister user asset if depleted
+    isUserStillInVault: bool = True
     if isDepleted:
-        vaultData._deregisterUserAsset(_user, _asset)
+        isUserStillInVault = vaultData._deregisterUserAsset(_user, _asset)
 
-    log RebaseErc20VaultWithdrawal(user=_user, asset=_asset, amount=withdrawalAmount, isDepleted=isDepleted, shares=withdrawalShares)
-    return withdrawalAmount, isDepleted
+    log RebaseErc20VaultWithdrawal(user=_user, asset=_asset, amount=withdrawalAmount, isDepleted=isDepleted, shares=withdrawalShares, isUserStillInVault=isUserStillInVault)
+    return withdrawalAmount, isDepleted, isUserStillInVault
 
 
 @external
@@ -233,11 +235,9 @@ def getUserAssetAndAmountAtIndex(_user: address, _index: uint256) -> (address, u
     asset: address = vaultData.userAssets[_user][_index]
     if asset == empty(address):
         return empty(address), 0
-
     userShares: uint256 = vaultData.userBalances[_user][asset]
     if userShares == 0:
         return empty(address), 0
-
     return asset, sharesMath._sharesToAmount(asset, userShares, vaultData.totalBalances[asset], staticcall IERC20(asset).balanceOf(self), False)
 
 

@@ -1,5 +1,9 @@
 # @version 0.4.1
 
+initializes: addys
+exports: addys.__interface__
+import contracts.modules.Addys as addys
+
 from interfaces import Vault
 from ethereum.ercs import IERC20
 
@@ -16,6 +20,10 @@ interface ControlRoom:
     def isDaowryEnabled() -> bool: view
     def isRepayEnabled() -> bool: view
 
+interface PriceDesk:
+    def getAssetAmount(_asset: address, _usdValue: uint256, _shouldRaise: bool = False) -> uint256: view
+    def getUsdValue(_asset: address, _amount: uint256, _shouldRaise: bool) -> uint256: view
+
 interface GreenToken:
     def burn(_from: address, _amount: uint256): nonpayable
     def mint(_to: address, _amount: uint256): nonpayable
@@ -24,15 +32,11 @@ interface VaultBook:
     def getVault(_vaultId: uint256) -> address: view
     def getStakedGreenVault() -> address: view
 
-interface AddyRegistry:
-    def getAddy(_addyId: uint256) -> address: view
-    def governance() -> address: view
-
-interface PriceDesk:
-    def getUsdValue(_asset: address, _amount: uint256, _shouldRaise: bool) -> uint256: view
-
 interface LootBox:
-    def updateBorrowPoints(_user: address): nonpayable
+    def updateBorrowPoints(_user: address, _a: addys.Addys = empty(addys.Addys)): nonpayable
+
+interface RipeHq:
+    def governance() -> address: view
 
 struct BorrowDataBundle:
     userDebt: UserDebt
@@ -98,26 +102,18 @@ event RepayDebt:
     userCollateralVal: uint256
     maxUserDebt: uint256
 
-TELLER_ID: constant(uint256) = 1 # TODO: make sure this is correct
-LEDGER_ID: constant(uint256) = 2 # TODO: make sure this is correct
-VAULT_BOOK_ID: constant(uint256) = 3 # TODO: make sure this is correct
-LOOTBOX_ID: constant(uint256) = 5 # TODO: make sure this is correct
-CONTROL_ROOM_ID: constant(uint256) = 6 # TODO: make sure this is correct
-PRICE_DESK_ID: constant(uint256) = 7 # TODO: make sure this is correct
-
 # config
 isActivated: public(bool)
-ADDY_REGISTRY: public(immutable(address))
 
 ONE_YEAR: constant(uint256) = 60 * 60 * 24 * 365
 HUNDRED_PERCENT: constant(uint256) = 100_00 # 100.00%
+ONE_PERCENT: constant(uint256) = 1_00 # 1.00%
 MAX_DEBT_UPDATES: constant(uint256) = 25
 
 
 @deploy
-def __init__(_addyRegistry: address):
-    assert _addyRegistry != empty(address) # dev: invalid addy registry
-    ADDY_REGISTRY = _addyRegistry
+def __init__(_hq: address):
+    addys.__init__(_hq)
     self.isActivated = True
 
 
@@ -131,18 +127,12 @@ def borrowForUser(
     _user: address,
     _amount: uint256,
     _shouldStake: bool,
-    _greenToken: address,
 ) -> uint256:
-    addys: address[6] = self._getAddys()
-    teller: address = addys[0]
-    ledger: address = addys[1]
-    lootBox: address = addys[3]
-    controlRoom: address = addys[4]
-    vaultBook: address = addys[2]
-    assert msg.sender == teller # dev: only teller allowed
+    assert msg.sender == addys._getTellerAddr() # dev: only teller allowed
 
     # get borrow data
-    d: BorrowDataBundle = staticcall Ledger(ledger).getBorrowDataBundle(_user)
+    a: addys.Addys = addys._getAddys()
+    d: BorrowDataBundle = staticcall Ledger(a.ledger).getBorrowDataBundle(_user)
 
     # get latest user debt
     userDebt: UserDebt = empty(UserDebt)
@@ -150,12 +140,12 @@ def borrowForUser(
     userDebt, newInterest = self._getLatestUserDebtWithInterest(d.userDebt)
 
     # get borrow data (debt terms for user)
-    bt: UserBorrowTerms = self._getUserBorrowTerms(_user, d.numUserVaults, True, addys)
+    bt: UserBorrowTerms = self._getUserBorrowTerms(_user, d.numUserVaults, True, a)
 
     # validation
     newBorrowAmount: uint256 = 0
     isFreshInterval: bool = False
-    newBorrowAmount, isFreshInterval = self._validateOnBorrow(_amount, userDebt, bt.totalMaxDebt, d.userBorrowInterval, d.isUserBorrower, d.numBorrowers, d.totalDebt, controlRoom)
+    newBorrowAmount, isFreshInterval = self._validateOnBorrow(_amount, userDebt, bt.totalMaxDebt, d.userBorrowInterval, d.isUserBorrower, d.numBorrowers, d.totalDebt, a.controlRoom)
     assert newBorrowAmount != 0 # dev: cannot borrow
 
     # update borrow interval
@@ -170,27 +160,27 @@ def borrowForUser(
     userDebt.amount += newBorrowAmount
     userDebt.principal += newBorrowAmount
     userDebt.debtTerms = bt.debtTerms
-    extcall Ledger(ledger).setUserDebt(_user, userDebt, newInterest, userBorrowInterval)
+    extcall Ledger(a.ledger).setUserDebt(_user, userDebt, newInterest, userBorrowInterval)
 
     # update borrow points
-    extcall LootBox(lootBox).updateBorrowPoints(_user)
+    extcall LootBox(a.lootbox).updateBorrowPoints(_user, a)
 
     # mint green - piggy back on borrow to flush unrealized yield
-    unrealizedYield: uint256 = extcall Ledger(ledger).flushUnrealizedYield()
+    unrealizedYield: uint256 = extcall Ledger(a.ledger).flushUnrealizedYield()
     totalGreenMint: uint256 = newBorrowAmount + unrealizedYield
-    extcall GreenToken(_greenToken).mint(self, totalGreenMint)
+    extcall GreenToken(a.greenToken).mint(self, totalGreenMint)
 
     # origination fee
-    daowry: uint256 = self._getDaowryAmount(newBorrowAmount, bt.debtTerms.daowry, controlRoom)
+    daowry: uint256 = self._getDaowryAmount(newBorrowAmount, bt.debtTerms.daowry, a.controlRoom)
 
     # green for stakers
     forGreenStakers: uint256 = daowry + unrealizedYield
     if forGreenStakers != 0:
-        self._sendGreenToStakers(_greenToken, forGreenStakers, vaultBook)
+        self._sendGreenToStakers(a.greenToken, forGreenStakers, a.vaultBook)
 
     # borrower gets their green now -- do this AFTER sending green to stakers
     forBorrower: uint256 = newBorrowAmount - daowry
-    self._handleGreenForUser(_user, forBorrower, _shouldStake, _greenToken)
+    self._handleGreenForUser(_user, forBorrower, _shouldStake, a.greenToken)
 
     log NewBorrow(user=_user, newLoan=forBorrower, daowry=daowry, didStake=_shouldStake, outstandingUserDebt=userDebt.amount, userCollateralVal=bt.collateralVal, maxUserDebt=bt.totalMaxDebt, globalYieldRealized=unrealizedYield)
     return forBorrower
@@ -260,12 +250,10 @@ def _validateOnBorrow(
 @view
 @external
 def getMaxBorrowAmount(_user: address) -> uint256:
-    addys: address[6] = self._getAddys()
-    ledger: address = addys[1]
-    controlRoom: address = addys[4]
+    a: addys.Addys = addys._getAddys()
 
     # get latest user debt
-    d: BorrowDataBundle = staticcall Ledger(ledger).getBorrowDataBundle(_user)
+    d: BorrowDataBundle = staticcall Ledger(a.ledger).getBorrowDataBundle(_user)
     userDebt: UserDebt = empty(UserDebt)
     na1: uint256 = 0
     userDebt, na1 = self._getLatestUserDebtWithInterest(d.userDebt)
@@ -275,7 +263,7 @@ def getMaxBorrowAmount(_user: address) -> uint256:
         return 0
 
     # get borrow config
-    config: BorrowConfig = staticcall ControlRoom(controlRoom).getBorrowConfig()
+    config: BorrowConfig = staticcall ControlRoom(a.controlRoom).getBorrowConfig()
     if not config.isBorrowEnabled:
         return 0
 
@@ -289,7 +277,7 @@ def getMaxBorrowAmount(_user: address) -> uint256:
     newBorrowAmount: uint256 = max_value(uint256)
 
     # avail debt based on collateral value / ltv
-    bt: UserBorrowTerms = self._getUserBorrowTerms(_user, d.numUserVaults, False, addys)
+    bt: UserBorrowTerms = self._getUserBorrowTerms(_user, d.numUserVaults, False, a)
     availDebtPerLtv: uint256 = self._getAvailBasedOnLtv(userDebt.amount, bt.totalMaxDebt)
     if availDebtPerLtv == 0:
         return 0
@@ -332,17 +320,12 @@ def repayForUser(
     _user: address,
     _repayAmount: uint256,
     _shouldStakeRefund: bool,
-    _greenToken: address,
 ) -> uint256:
-    addys: address[6] = self._getAddys()
-    teller: address = addys[0]
-    ledger: address = addys[1]
-    lootBox: address = addys[3]
-    controlRoom: address = addys[4]
-    assert msg.sender == teller # dev: only teller allowed
+    assert msg.sender == addys._getTellerAddr() # dev: only teller allowed
 
     # get repay data
-    d: RepayDataBundle = staticcall Ledger(ledger).getRepayDataBundle(_user)
+    a: addys.Addys = addys._getAddys()
+    d: RepayDataBundle = staticcall Ledger(a.ledger).getRepayDataBundle(_user)
 
     # get latest user debt
     userDebt: UserDebt = empty(UserDebt)
@@ -353,27 +336,27 @@ def repayForUser(
     # validation
     repayAmount: uint256 = 0
     refundAmount: uint256 = 0
-    repayAmount, refundAmount = self._validateOnRepay(_repayAmount, userDebt, _greenToken, controlRoom)
+    repayAmount, refundAmount = self._validateOnRepay(_repayAmount, userDebt, a.greenToken, a.controlRoom)
 
     # get borrow data (debt terms for user)
-    bt: UserBorrowTerms = self._getUserBorrowTerms(_user, d.numUserVaults, True, addys)
+    bt: UserBorrowTerms = self._getUserBorrowTerms(_user, d.numUserVaults, True, a)
 
     # update user debt
     userDebt.amount -= repayAmount
     if repayAmount > totalAccruedInterest:
         userDebt.principal -= min(userDebt.principal, totalAccruedInterest)
     userDebt.debtTerms = bt.debtTerms
-    extcall Ledger(ledger).setUserDebt(_user, userDebt, newInterest, empty(IntervalBorrow))
+    extcall Ledger(a.ledger).setUserDebt(_user, userDebt, newInterest, empty(IntervalBorrow))
 
     # update borrow points
-    extcall LootBox(lootBox).updateBorrowPoints(_user)
+    extcall LootBox(a.lootbox).updateBorrowPoints(_user, a)
 
     # burn green repayment
-    extcall GreenToken(_greenToken).burn(self, repayAmount)
+    extcall GreenToken(a.greenToken).burn(self, repayAmount)
 
     # handle refund
     if refundAmount != 0:
-        self._handleGreenForUser(_user, refundAmount, _shouldStakeRefund, _greenToken)
+        self._handleGreenForUser(_user, refundAmount, _shouldStakeRefund, a.greenToken)
 
     log RepayDebt(user=_user, repayAmount=repayAmount, refundAmount=refundAmount, didStakeRefund=_shouldStakeRefund, outstandingUserDebt=userDebt.amount, userCollateralVal=bt.collateralVal, maxUserDebt=bt.totalMaxDebt)
     return repayAmount
@@ -414,9 +397,9 @@ def _validateOnRepay(
 @view
 @external
 def getUserBorrowTerms(_user: address, _shouldRaise: bool) -> UserBorrowTerms:
-    addys: address[6] = self._getAddys()
-    data: BorrowDataBundle = staticcall Ledger(addys[1]).getBorrowDataBundle(_user)
-    return self._getUserBorrowTerms(_user, data.numUserVaults, _shouldRaise, addys)
+    a: addys.Addys = addys._getAddys()
+    data: BorrowDataBundle = staticcall Ledger(a.ledger).getBorrowDataBundle(_user)
+    return self._getUserBorrowTerms(_user, data.numUserVaults, _shouldRaise, a)
 
 
 @view
@@ -425,14 +408,10 @@ def _getUserBorrowTerms(
     _user: address,
     _numUserVaults: uint256,
     _shouldRaise: bool,
-    _addys: address[6],
+    _a: addys.Addys,
 ) -> UserBorrowTerms:
-    ledger: address = _addys[1]
-    vaultBook: address = _addys[2]
-    controlRoom: address = _addys[4]
-    priceDesk: address = _addys[5]
 
-    # to facilitate weighted debt terms
+    # sum vars
     bt: UserBorrowTerms = empty(UserBorrowTerms)
     redemptionThresholdSum: uint256 = 0
     liqThresholdSum: uint256 = 0
@@ -443,8 +422,8 @@ def _getUserBorrowTerms(
 
     # iterate thru each user vault
     for i: uint256 in range(1, _numUserVaults, bound=max_value(uint256)):
-        vaultId: uint256 = staticcall Ledger(ledger).userVaults(_user, i)
-        vaultAddr: address = staticcall VaultBook(vaultBook).getVault(vaultId)
+        vaultId: uint256 = staticcall Ledger(_a.ledger).userVaults(_user, i)
+        vaultAddr: address = staticcall VaultBook(_a.vaultBook).getVault(vaultId)
         if vaultAddr == empty(address):
             continue
 
@@ -460,10 +439,10 @@ def _getUserBorrowTerms(
                 continue
 
             # debt terms
-            debtTerms: DebtTerms = staticcall ControlRoom(controlRoom).getDebtTerms(vaultId, asset)
+            debtTerms: DebtTerms = staticcall ControlRoom(_a.controlRoom).getDebtTerms(vaultId, asset)
 
             # collateral value, max debt
-            collateralVal: uint256 = staticcall PriceDesk(priceDesk).getUsdValue(asset, amount, _shouldRaise)
+            collateralVal: uint256 = staticcall PriceDesk(_a.priceDesk).getUsdValue(asset, amount, _shouldRaise)
             maxDebt: uint256 = collateralVal * debtTerms.ltv // HUNDRED_PERCENT
 
             # debt terms sums -- weight is based on max debt (ltv)
@@ -507,25 +486,22 @@ def _getUserBorrowTerms(
 
 @external
 def updateDebtForUser(_user: address) -> bool:
-    addys: address[6] = self._getAddys()
-    return self._updateDebtForUser(_user, addys)
+    return self._updateDebtForUser(_user, addys._getAddys())
 
 
 @external
 def updateDebtForManyUsers(_users: DynArray[address, MAX_DEBT_UPDATES]) -> bool:
-    addys: address[6] = self._getAddys()
+    a: addys.Addys = addys._getAddys()
     for u: address in _users:
-        self._updateDebtForUser(u, addys)
+        self._updateDebtForUser(u, a)
     return True
 
 
 @internal
-def _updateDebtForUser(_user: address, _addys: address[6]) -> bool:
-    ledger: address = _addys[1]
-    lootBox: address = _addys[3]
+def _updateDebtForUser(_user: address, _a: addys.Addys) -> bool:
 
     # get data (repay data has the only stuff we need)
-    d: RepayDataBundle = staticcall Ledger(ledger).getRepayDataBundle(_user)
+    d: RepayDataBundle = staticcall Ledger(_a.ledger).getRepayDataBundle(_user)
     if d.userDebt.amount == 0:
         return False
 
@@ -535,12 +511,12 @@ def _updateDebtForUser(_user: address, _addys: address[6]) -> bool:
     userDebt, newInterest = self._getLatestUserDebtWithInterest(d.userDebt)
 
     # debt terms for user
-    bt: UserBorrowTerms = self._getUserBorrowTerms(_user, d.numUserVaults, True, _addys)
+    bt: UserBorrowTerms = self._getUserBorrowTerms(_user, d.numUserVaults, True, _a)
     userDebt.debtTerms = bt.debtTerms
-    extcall Ledger(ledger).setUserDebt(_user, userDebt, newInterest, empty(IntervalBorrow))
+    extcall Ledger(_a.ledger).setUserDebt(_user, userDebt, newInterest, empty(IntervalBorrow))
 
     # update borrow points
-    extcall LootBox(lootBox).updateBorrowPoints(_user)
+    extcall LootBox(_a.lootbox).updateBorrowPoints(_user, _a)
     return True
 
 
@@ -551,30 +527,30 @@ def _updateDebtForUser(_user: address, _addys: address[6]) -> bool:
 
 @view
 @external
-def hasGoodDebtHealth(_user: address) -> bool:
-    return self._checkDebtHealth(_user, True, self._getAddys())
+def hasGoodDebtHealth(_user: address, _a: addys.Addys = empty(addys.Addys)) -> bool:
+    return self._checkDebtHealth(_user, True, _a)
 
 
 @view
 @external
-def canLiquidateUser(_user: address) -> bool:
-    return self._checkDebtHealth(_user, False, self._getAddys())
+def canLiquidateUser(_user: address, _a: addys.Addys = empty(addys.Addys)) -> bool:
+    return self._checkDebtHealth(_user, False, _a)
 
 
 @view
 @internal
-def _checkDebtHealth(_user: address, _shouldCheckLtv: bool, _addys: address[6]) -> bool:
-    ledger: address = _addys[1]
+def _checkDebtHealth(_user: address, _shouldCheckLtv: bool, _a: addys.Addys) -> bool:
+    a: addys.Addys = addys._getAddys(_a)
 
     # get data (repay data has the only stuff we need)
-    d: RepayDataBundle = staticcall Ledger(ledger).getRepayDataBundle(_user)
+    d: RepayDataBundle = staticcall Ledger(a.ledger).getRepayDataBundle(_user)
     if d.userDebt.amount == 0:
         return _shouldCheckLtv # nothing to check, use that var to return correct value
 
     userDebt: UserDebt = empty(UserDebt)
     na: uint256 = 0
     userDebt, na = self._getLatestUserDebtWithInterest(d.userDebt)
-    bt: UserBorrowTerms = self._getUserBorrowTerms(_user, d.numUserVaults, False, _addys)
+    bt: UserBorrowTerms = self._getUserBorrowTerms(_user, d.numUserVaults, False, a)
 
     # check debt health
     if _shouldCheckLtv:
@@ -603,6 +579,39 @@ def _canLiquidateUser(_userDebtAmount: uint256, _collateralVal: uint256, _liqThr
 #############
 
 
+# max withdrawable
+
+
+@view
+@external
+def getMaxWithdrawableForAsset(_user: address, _asset: address, _a: addys.Addys = empty(addys.Addys)) -> uint256:
+    a: addys.Addys = addys._getAddys(_a)
+
+    # get data (repay data has the only stuff we need)
+    d: RepayDataBundle = staticcall Ledger(a.ledger).getRepayDataBundle(_user)
+    if d.userDebt.amount == 0:
+        return max_value(uint256)
+
+    # debt terms
+    userDebt: UserDebt = empty(UserDebt)
+    na: uint256 = 0
+    userDebt, na = self._getLatestUserDebtWithInterest(d.userDebt)
+    bt: UserBorrowTerms = self._getUserBorrowTerms(_user, d.numUserVaults, False, a)
+
+    # calculate max transferable usd value
+    usdValueMustRemain: uint256 = max_value(uint256)
+    if bt.debtTerms.ltv != 0:
+        usdValueMustRemain = userDebt.amount * (HUNDRED_PERCENT + ONE_PERCENT) // bt.debtTerms.ltv # extra 1% buffer
+    maxTransferUsdValue: uint256 = bt.collateralVal - min(usdValueMustRemain, bt.collateralVal)
+
+    # cannot withdraw anything
+    if maxTransferUsdValue == 0:
+        return 0
+
+    # based stricly on total ltvs, not taking into consideration how much user actually has deposited
+    return staticcall PriceDesk(a.priceDesk).getAssetAmount(_asset, maxTransferUsdValue, False)
+
+
 # green to stakers
 
 
@@ -616,7 +625,7 @@ def _sendGreenToStakers(
 
     # edge case (vault not set) -- for now transfer tokens to governance
     if receiver == empty(address):
-        receiver = staticcall AddyRegistry(ADDY_REGISTRY).governance()
+        receiver = staticcall RipeHq(addys._getRipeHq()).governance()
 
     # transfer tokens to staked green vault
     amount: uint256 = min(_amount, staticcall IERC20(_greenToken).balanceOf(self))
@@ -739,19 +748,3 @@ def _getAvailGlobalDebt(_totalDebt: uint256, _globalDebtLimit: uint256) -> uint2
     if _globalDebtLimit > _totalDebt:
         availableDebt = _globalDebtLimit - _totalDebt
     return availableDebt
-
-
-# addys
-
-
-@view
-@internal
-def _getAddys() -> address[6]:
-    ar: address = ADDY_REGISTRY
-    teller: address = staticcall AddyRegistry(ar).getAddy(TELLER_ID)
-    ledger: address = staticcall AddyRegistry(ar).getAddy(LEDGER_ID)
-    vaultBook: address = staticcall AddyRegistry(ar).getAddy(VAULT_BOOK_ID)
-    lootBox: address = staticcall AddyRegistry(ar).getAddy(LOOTBOX_ID)
-    controlRoom: address = staticcall AddyRegistry(ar).getAddy(CONTROL_ROOM_ID)
-    priceDesk: address = staticcall AddyRegistry(ar).getAddy(PRICE_DESK_ID)
-    return [teller, ledger, vaultBook, lootBox, controlRoom, priceDesk]

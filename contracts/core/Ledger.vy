@@ -1,15 +1,14 @@
 # @version 0.4.1
 
-interface AddyRegistry:
-    def getAddy(_addyId: uint256) -> address: view
+initializes: addys
+exports: addys.__interface__
+import contracts.modules.Addys as addys
 
 # deposit / withdrawals
-
 
 struct DepositLedgerData:
     isParticipatingInVault: bool
     numUserVaults: uint256
-
 
 # points / rewards
 
@@ -101,10 +100,6 @@ userVaults: public(HashMap[address, HashMap[uint256, uint256]]) # user -> index 
 indexOfVault: public(HashMap[address, HashMap[uint256, uint256]]) # user -> vault id -> index
 numUserVaults: public(HashMap[address, uint256]) # user -> num vaults
 
-# ripe rewards
-ripeRewards: public(RipeRewards)
-ripeAvailForRewards: public(uint256)
-
 # borrow data
 userDebt: public(HashMap[address, UserDebt]) # user -> user debt
 totalDebt: public(uint256) # total debt
@@ -114,6 +109,10 @@ numBorrowers: public(uint256) # num borrowers
 borrowIntervals: public(HashMap[address, IntervalBorrow]) # user -> borrow interval
 unrealizedYield: public(uint256) # unrealized yield
 
+# ripe rewards
+ripeRewards: public(RipeRewards)
+ripeAvailForRewards: public(uint256)
+
 # points
 globalDepositPoints: public(GlobalDepositPoints)
 assetDepositPoints: public(HashMap[uint256, HashMap[address, AssetDepositPoints]]) # vault id -> asset -> points
@@ -121,18 +120,10 @@ userDepositPoints: public(HashMap[address, HashMap[uint256, HashMap[address, Use
 userBorrowPoints:  public(HashMap[address, BorrowPoints]) # user -> BorrowPoints
 globalBorrowPoints: public(BorrowPoints)
 
-TELLER_ID: constant(uint256) = 1 # TODO: make sure this is correct
-LOOTBOX_ID: constant(uint256) = 5 # TODO: make sure this is correct
-CREDIT_ENGINE_ID: constant(uint256) = 8 # TODO: make sure this is correct
-
-# config
-ADDY_REGISTRY: public(immutable(address))
-
 
 @deploy
-def __init__(_addyRegistry: address):
-    assert _addyRegistry != empty(address) # dev: invalid addy registry
-    ADDY_REGISTRY = _addyRegistry
+def __init__(_hq: address):
+    addys.__init__(_hq)
 
 
 ###############
@@ -157,7 +148,7 @@ def _getNumUserVaults(_user: address) -> uint256:
 
 @external
 def addVaultToUser(_user: address, _vaultId: uint256):
-    assert msg.sender == staticcall AddyRegistry(ADDY_REGISTRY).getAddy(TELLER_ID) # dev: only Teller allowed
+    assert msg.sender == addys._getTellerAddr() # dev: only Teller allowed
 
     # already participating - fail gracefully
     if self.indexOfVault[_user][_vaultId] != 0:
@@ -175,7 +166,7 @@ def addVaultToUser(_user: address, _vaultId: uint256):
 
 @external
 def removeVaultFromUser(_user: address, _vaultId: uint256):
-    assert msg.sender == staticcall AddyRegistry(ADDY_REGISTRY).getAddy(TELLER_ID) # dev: only Teller allowed
+    assert msg.sender == addys._getTellerAddr() # dev: only Teller allowed
 
     numUserVaults: uint256 = self.numUserVaults[_user]
     if numUserVaults == 0:
@@ -216,7 +207,7 @@ def getDepositLedgerData(_user: address, _vaultId: uint256) -> DepositLedgerData
 
 @external
 def setUserDebt(_user: address, _userDebt: UserDebt, _newYield: uint256, _interval: IntervalBorrow):
-    assert msg.sender == staticcall AddyRegistry(ADDY_REGISTRY).getAddy(CREDIT_ENGINE_ID) # dev: only CreditEngine allowed
+    assert msg.sender == addys._getCreditEngineAddr() # dev: only CreditEngine allowed
 
     # reduce prev user debt
     totalDebt: uint256 = self.totalDebt
@@ -252,7 +243,7 @@ def setUserDebt(_user: address, _userDebt: UserDebt, _newYield: uint256, _interv
 
 @external
 def flushUnrealizedYield() -> uint256:
-    assert msg.sender == staticcall AddyRegistry(ADDY_REGISTRY).getAddy(CREDIT_ENGINE_ID) # dev: only CreditEngine allowed
+    assert msg.sender == addys._getCreditEngineAddr() # dev: only CreditEngine allowed
     unrealizedYield: uint256 = self.unrealizedYield
     self.unrealizedYield = 0
     return unrealizedYield
@@ -329,6 +320,22 @@ def isBorrower(_user: address) -> bool:
 ####################
 
 
+# ripe rewards
+
+
+@external
+def setRipeRewards(_ripeRewards: RipeRewards):
+    assert msg.sender == addys._getLootboxAddr() # dev: only Lootbox allowed
+    self._setRipeRewards(_ripeRewards)
+
+
+@internal
+def _setRipeRewards(_ripeRewards: RipeRewards):
+    self.ripeRewards = _ripeRewards
+    if _ripeRewards.newRipeRewards != 0:
+        self.ripeAvailForRewards -= min(self.ripeAvailForRewards, _ripeRewards.newRipeRewards)
+
+
 # deposit points
 
 
@@ -342,7 +349,7 @@ def setDepositPointsAndRipeRewards(
     _globalPoints: GlobalDepositPoints,
     _ripeRewards: RipeRewards,
 ):
-    assert msg.sender == staticcall AddyRegistry(ADDY_REGISTRY).getAddy(LOOTBOX_ID) # dev: only Lootbox allowed
+    assert msg.sender == addys._getLootboxAddr() # dev: only Lootbox allowed
 
     if _user != empty(address):
         self.userDepositPoints[_user][_vaultId][_asset] = _userPoints
@@ -361,28 +368,12 @@ def setBorrowPointsAndRipeRewards(
     _globalPoints: BorrowPoints,
     _ripeRewards: RipeRewards,
 ):
-    assert msg.sender == staticcall AddyRegistry(ADDY_REGISTRY).getAddy(LOOTBOX_ID) # dev: only Lootbox allowed
+    assert msg.sender == addys._getLootboxAddr() # dev: only Lootbox allowed
 
     self.globalBorrowPoints = _globalPoints
     if _user != empty(address):
         self.userBorrowPoints[_user] = _userPoints
     self._setRipeRewards(_ripeRewards)
-
-
-# ripe rewards
-
-
-@external
-def setRipeRewards(_ripeRewards: RipeRewards):
-    assert msg.sender == staticcall AddyRegistry(ADDY_REGISTRY).getAddy(LOOTBOX_ID) # dev: only Lootbox allowed
-    self._setRipeRewards(_ripeRewards)
-
-
-@internal
-def _setRipeRewards(_ripeRewards: RipeRewards):
-    self.ripeRewards = _ripeRewards
-    if _ripeRewards.newRipeRewards != 0:
-        self.ripeAvailForRewards -= min(self.ripeAvailForRewards, _ripeRewards.newRipeRewards)
 
 
 # utils

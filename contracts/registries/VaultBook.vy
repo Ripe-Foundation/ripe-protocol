@@ -316,5 +316,19 @@ def getStakedGreenVault() -> address:
 
 @view
 @external
+def getStakedGreenData() -> (uint256, address):
+    vaultId: uint256 = self.stakedGreenVault
+    return vaultId, registry._getAddy(vaultId)
+
+
+@view
+@external
 def getStakedRipeVault() -> address:
     return registry._getAddy(self.stakedRipeVault)
+
+
+@view
+@external
+def getStakedRipeData() -> (uint256, address):
+    vaultId: uint256 = self.stakedRipeVault
+    return vaultId, registry._getAddy(vaultId)

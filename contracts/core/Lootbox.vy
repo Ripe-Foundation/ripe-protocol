@@ -1,5 +1,9 @@
 # @version 0.4.1
 
+initializes: addys
+exports: addys.__interface__
+import contracts.modules.Addys as addys
+
 from interfaces import Vault
 from ethereum.ercs import IERC20
 from ethereum.ercs import IERC20Detailed
@@ -14,18 +18,13 @@ interface Ledger:
     def getRipeRewardsBundle() -> RipeRewardsBundle: view
     def numUserVaults(_user: address) -> uint256: view
 
-interface AddyRegistry:
-    def isValidAddyAddr(_addr: address) -> bool: view
-    def getAddy(_addyId: uint256) -> address: view
-    def ripeToken() -> address: view
+interface ControlRoom:
+    def getDepositPointsAllocs(_vaultId: uint256, _asset: address) -> DepositPointsAllocs: view
+    def getRipeRewardsConfig() -> RipeRewardsConfig: view
 
 interface VaultBook:
     def getVault(_vaultId: uint256) -> address: view
     def isNftVault(_vaultId: uint256) -> bool: view
-
-interface ControlRoom:
-    def getDepositPointsAllocs(_vaultId: uint256, _asset: address) -> DepositPointsAllocs: view
-    def getRipeRewardsConfig() -> RipeRewardsConfig: view
 
 interface PriceDesk:
     def getUsdValue(_asset: address, _amount: uint256, _shouldRaise: bool = False) -> uint256: view
@@ -106,23 +105,16 @@ struct DepositPointsAllocs:
     voteDepositor: uint256
     voteDepositorTotal: uint256
 
-LEDGER_ID: constant(uint256) = 2 # TODO: make sure this is correct
-VAULT_BOOK_ID: constant(uint256) = 3 # TODO: make sure this is correct
-CONTROL_ROOM_ID: constant(uint256) = 6 # TODO: make sure this is correct
-PRICE_DESK_ID: constant(uint256) = 7 # TODO: make sure this is correct
-
 EIGHTEEN_DECIMALS: constant(uint256) = 10 ** 18
 HUNDRED_PERCENT: constant(uint256) = 100_00 # 100.00%
 
 # config
 isActivated: public(bool)
-ADDY_REGISTRY: public(immutable(address))
 
 
 @deploy
-def __init__(_addyRegistry: address):
-    assert _addyRegistry != empty(address) # dev: invalid addy registry
-    ADDY_REGISTRY = _addyRegistry
+def __init__(_hq: address):
+    addys.__init__(_hq)
     self.isActivated = True
 
 
@@ -132,21 +124,18 @@ def __init__(_addyRegistry: address):
 
 
 @external
-def claimLoot(_user: address, _shouldStake: bool) -> uint256:
-    assert staticcall AddyRegistry(ADDY_REGISTRY).isValidAddyAddr(msg.sender) # dev: no perms
-
-    addys: address[4] = self._getAddys()
-    ledger: address = addys[0]
-    vaultBook: address = addys[1]
+def claimLoot(_user: address, _shouldStake: bool, _a: addys.Addys = empty(addys.Addys)) -> uint256:
+    assert addys._isValidRipeHqAddy(msg.sender) # dev: no perms
+    a: addys.Addys = addys._getAddys(_a)
 
     # total loot -- start with borrow loot
-    totalRipeForUser: uint256 = self._claimBorrowLoot(_user, addys)
+    totalRipeForUser: uint256 = self._claimBorrowLoot(_user, a)
 
     # now look at deposit loot
-    numUserVaults: uint256 = staticcall Ledger(ledger).numUserVaults(_user)
+    numUserVaults: uint256 = staticcall Ledger(a.ledger).numUserVaults(_user)
     for i: uint256 in range(1, numUserVaults, bound=max_value(uint256)):
-        vaultId: uint256 = staticcall Ledger(ledger).userVaults(_user, i)
-        vaultAddr: address = staticcall VaultBook(vaultBook).getVault(vaultId)
+        vaultId: uint256 = staticcall Ledger(a.ledger).userVaults(_user, i)
+        vaultAddr: address = staticcall VaultBook(a.vaultBook).getVault(vaultId)
         if vaultAddr == empty(address):
             continue
         numUserAssets: uint256 = staticcall Vault(vaultAddr).numUserAssets(_user)
@@ -154,11 +143,11 @@ def claimLoot(_user: address, _shouldStake: bool) -> uint256:
             asset: address = staticcall Vault(vaultAddr).userAssets(_user, y)
             if asset == empty(address):
                 continue
-            totalRipeForUser += self._claimDepositLoot(_user, vaultId, vaultAddr, asset, addys)
+            totalRipeForUser += self._claimDepositLoot(_user, vaultId, vaultAddr, asset, a)
 
     # mint ripe, then stake or transfer to user
     if totalRipeForUser != 0:
-        self._handleRipeMint(_user, totalRipeForUser, _shouldStake)
+        self._handleRipeMint(_user, totalRipeForUser, _shouldStake, a.ripeToken)
 
     return totalRipeForUser
 
@@ -169,11 +158,15 @@ def claimDepositLootOnExit(
     _vaultId: uint256,
     _vaultAddr: address,
     _asset: address,
+    _a: addys.Addys = empty(addys.Addys),
 ) -> uint256:
-    assert staticcall AddyRegistry(ADDY_REGISTRY).isValidAddyAddr(msg.sender) # dev: no perms
-    totalRipeForUser: uint256 = self._claimDepositLoot(_user, _vaultId, _vaultAddr, _asset, self._getAddys())
+    assert addys._isValidRipeHqAddy(msg.sender) # dev: no perms
+    a: addys.Addys = addys._getAddys(_a)
+
+    totalRipeForUser: uint256 = self._claimDepositLoot(_user, _vaultId, _vaultAddr, _asset, a)
     if totalRipeForUser != 0:
-        self._handleRipeMint(_user, totalRipeForUser, True)
+        self._handleRipeMint(_user, totalRipeForUser, True, a.ripeToken)
+
     return totalRipeForUser
 
 
@@ -183,18 +176,16 @@ def claimDepositLootOnExit(
 @view
 @external
 def getClaimableLoot(_user: address) -> uint256:
-    addys: address[4] = self._getAddys()
-    ledger: address = addys[0]
-    vaultBook: address = addys[1]
+    a: addys.Addys = addys._getAddys()
 
     # total loot -- start with borrow loot
-    totalRipeForUser: uint256 = self._getClaimableBorrowLoot(_user, addys)
+    totalRipeForUser: uint256 = self._getClaimableBorrowLoot(_user, a)
 
     # now look at deposit loot
-    numUserVaults: uint256 = staticcall Ledger(ledger).numUserVaults(_user)
+    numUserVaults: uint256 = staticcall Ledger(a.ledger).numUserVaults(_user)
     for i: uint256 in range(1, numUserVaults, bound=max_value(uint256)):
-        vaultId: uint256 = staticcall Ledger(ledger).userVaults(_user, i)
-        vaultAddr: address = staticcall VaultBook(vaultBook).getVault(vaultId)
+        vaultId: uint256 = staticcall Ledger(a.ledger).userVaults(_user, i)
+        vaultAddr: address = staticcall VaultBook(a.vaultBook).getVault(vaultId)
         if vaultAddr == empty(address):
             continue
         numUserAssets: uint256 = staticcall Vault(vaultAddr).numUserAssets(_user)
@@ -202,7 +193,7 @@ def getClaimableLoot(_user: address) -> uint256:
             asset: address = staticcall Vault(vaultAddr).userAssets(_user, y)
             if asset == empty(address):
                 continue
-            totalRipeForUser += self._getClaimableDepositLoot(_user, vaultId, vaultAddr, asset, addys)
+            totalRipeForUser += self._getClaimableDepositLoot(_user, vaultId, vaultAddr, asset, a)
 
     return totalRipeForUser
 
@@ -216,22 +207,27 @@ def getClaimableLoot(_user: address) -> uint256:
 
 
 @external
-def updateDepositPoints(_user: address, _vaultId: uint256, _vaultAddr: address, _asset: address):
-    assert staticcall AddyRegistry(ADDY_REGISTRY).isValidAddyAddr(msg.sender) # dev: no perms
-    addys: address[4] = self._getAddys()
+def updateDepositPoints(
+    _user: address,
+    _vaultId: uint256,
+    _vaultAddr: address,
+    _asset: address,
+    _a: addys.Addys = empty(addys.Addys),
+):
+    assert addys._isValidRipeHqAddy(msg.sender) # dev: no perms
+    a: addys.Addys = addys._getAddys(_a)
 
     # get latest global rewards
-    globalRewards: RipeRewards = self._getLatestGlobalRipeRewards(addys)
+    globalRewards: RipeRewards = self._getLatestGlobalRipeRewards(a)
 
     # get latest deposit points
     up: UserDepositPoints = empty(UserDepositPoints)
     ap: AssetDepositPoints = empty(AssetDepositPoints)
     gp: GlobalDepositPoints = empty(GlobalDepositPoints)
-    up, ap, gp = self._getLatestDepositPoints(_user, _vaultId, _vaultAddr, _asset, globalRewards.lastRewardsBlock, addys)
+    up, ap, gp = self._getLatestDepositPoints(_user, _vaultId, _vaultAddr, _asset, globalRewards.lastRewardsBlock, a)
 
     # update points
-    ledger: address = addys[0]
-    extcall Ledger(ledger).setDepositPointsAndRipeRewards(_user, _vaultId, _asset, up, ap, gp, globalRewards)
+    extcall Ledger(a.ledger).setDepositPointsAndRipeRewards(_user, _vaultId, _asset, up, ap, gp, globalRewards)
 
 
 # global deposit points
@@ -330,29 +326,25 @@ def _getLatestDepositPoints(
     _vaultAddr: address,
     _asset: address,
     _lastRipeRewardsBlock: uint256,
-    _addys: address[4],
+    _a: addys.Addys,
 ) -> (UserDepositPoints, AssetDepositPoints, GlobalDepositPoints):
-    ledger: address = _addys[0]
-    controlRoom: address = _addys[1]
-    vaultBook: address = _addys[2]
-    priceDesk: address = _addys[3]
 
     # get data
-    p: DepositPointsBundle = staticcall Ledger(ledger).getDepositPointsBundle(_user, _vaultId, _asset)
-    a: DepositPointsAllocs = staticcall ControlRoom(controlRoom).getDepositPointsAllocs(_vaultId, _asset) 
+    p: DepositPointsBundle = staticcall Ledger(_a.ledger).getDepositPointsBundle(_user, _vaultId, _asset)
+    allocs: DepositPointsAllocs = staticcall ControlRoom(_a.controlRoom).getDepositPointsAllocs(_vaultId, _asset) 
 
     # latest global points
-    globalPoints: GlobalDepositPoints = self._getLatestGlobalDepositPoints(p.globalPoints, _lastRipeRewardsBlock, a.stakersTotal, a.voteDepositorTotal)
+    globalPoints: GlobalDepositPoints = self._getLatestGlobalDepositPoints(p.globalPoints, _lastRipeRewardsBlock, allocs.stakersTotal, allocs.voteDepositorTotal)
 
     # latest asset points
-    assetPoints: AssetDepositPoints = self._getLatestAssetDepositPoints(p.assetPoints, _lastRipeRewardsBlock, a.stakers, a.voteDepositor)
+    assetPoints: AssetDepositPoints = self._getLatestAssetDepositPoints(p.assetPoints, _lastRipeRewardsBlock, allocs.stakers, allocs.voteDepositor)
     if assetPoints.precision == 0:
-        assetPoints.precision = self._getAssetPrecision(_vaultId, _asset, vaultBook)
+        assetPoints.precision = self._getAssetPrecision(_vaultId, _asset, _a.vaultBook)
 
     # latest asset value (staked assets not eligible for gen deposit rewards)
     newAssetUsdValue: uint256 = 0
-    if a.stakers == 0:
-        newAssetUsdValue = self._refreshAssetUsdValue(_asset, _vaultAddr, priceDesk)
+    if allocs.stakers == 0:
+        newAssetUsdValue = self._refreshAssetUsdValue(_asset, _vaultAddr, _a.priceDesk)
 
     # update `lastUsdValue` for global + asset
     if newAssetUsdValue != assetPoints.lastUsdValue:
@@ -389,19 +381,18 @@ def _claimDepositLoot(
     _vaultId: uint256,
     _vaultAddr: address,
     _asset: address,
-    _addys: address[4],
+    _a: addys.Addys,
 ) -> uint256:
     userRipeRewards: UserDepositLoot = empty(UserDepositLoot)
     up: UserDepositPoints = empty(UserDepositPoints)
     ap: AssetDepositPoints = empty(AssetDepositPoints)
     gp: GlobalDepositPoints = empty(GlobalDepositPoints)
     globalRipeRewards: RipeRewards = empty(RipeRewards)
-    userRipeRewards, up, ap, gp, globalRipeRewards = self._getClaimableDepositLootData(_user, _vaultId, _vaultAddr, _asset, _addys)
+    userRipeRewards, up, ap, gp, globalRipeRewards = self._getClaimableDepositLootData(_user, _vaultId, _vaultAddr, _asset, _a)
 
     totalRipeForUser: uint256 = userRipeRewards.ripeStakerLoot + userRipeRewards.ripeVoteLoot + userRipeRewards.ripeGenLoot
     if totalRipeForUser != 0:
-        ledger: address = _addys[0]
-        extcall Ledger(ledger).setDepositPointsAndRipeRewards(_user, _vaultId, _asset, up, ap, gp, globalRipeRewards)
+        extcall Ledger(_a.ledger).setDepositPointsAndRipeRewards(_user, _vaultId, _asset, up, ap, gp, globalRipeRewards)
 
     return totalRipeForUser
 
@@ -416,17 +407,17 @@ def _getClaimableDepositLootData(
     _vaultId: uint256,
     _vaultAddr: address,
     _asset: address,
-    _addys: address[4],
+    _a: addys.Addys,
 ) -> (UserDepositLoot, UserDepositPoints, AssetDepositPoints, GlobalDepositPoints, RipeRewards):
 
     # need to get this with each iteration because state may have changed (during claim)
-    globalRewards: RipeRewards = self._getLatestGlobalRipeRewards(_addys)
+    globalRewards: RipeRewards = self._getLatestGlobalRipeRewards(_a)
 
     # get latest deposit points
     up: UserDepositPoints = empty(UserDepositPoints)
     ap: AssetDepositPoints = empty(AssetDepositPoints)
     gp: GlobalDepositPoints = empty(GlobalDepositPoints)
-    up, ap, gp = self._getLatestDepositPoints(_user, _vaultId, _vaultAddr, _asset, globalRewards.lastRewardsBlock, _addys)
+    up, ap, gp = self._getLatestDepositPoints(_user, _vaultId, _vaultAddr, _asset, globalRewards.lastRewardsBlock, _a)
 
     # user has no points
     if up.balancePoints == 0:
@@ -467,23 +458,23 @@ def _getClaimableDepositLoot(
     _vaultId: uint256,
     _vaultAddr: address,
     _asset: address,
-    _addys: address[4],
+    _a: addys.Addys,
 ) -> uint256:
     userRipeRewards: UserDepositLoot = empty(UserDepositLoot)
     up: UserDepositPoints = empty(UserDepositPoints)
     ap: AssetDepositPoints = empty(AssetDepositPoints)
     gp: GlobalDepositPoints = empty(GlobalDepositPoints)
     globalRipeRewards: RipeRewards = empty(RipeRewards)
-    userRipeRewards, up, ap, gp, globalRipeRewards = self._getClaimableDepositLootData(_user, _vaultId, _vaultAddr, _asset, _addys)
+    userRipeRewards, up, ap, gp, globalRipeRewards = self._getClaimableDepositLootData(_user, _vaultId, _vaultAddr, _asset, _a)
     return userRipeRewards.ripeStakerLoot + userRipeRewards.ripeVoteLoot + userRipeRewards.ripeGenLoot
 
 
 @view
 @external
 def getClaimableDepositLootForAsset(_user: address, _vaultId: uint256, _asset: address) -> uint256:
-    addys: address[4] = self._getAddys()
-    vaultAddr: address = staticcall VaultBook(addys[2]).getVault(_vaultId)
-    return self._getClaimableDepositLoot(_user, _vaultId, vaultAddr, _asset, addys)
+    a: addys.Addys = addys._getAddys()
+    vaultAddr: address = staticcall VaultBook(a.vaultBook).getVault(_vaultId)
+    return self._getClaimableDepositLoot(_user, _vaultId, vaultAddr, _asset, a)
 
 
 # deposit points utils
@@ -568,16 +559,15 @@ def _getAssetPrecision(_vaultId: uint256, _asset: address, _vaultBook: address) 
 
 
 @external
-def updateBorrowPoints(_user: address):
-    assert staticcall AddyRegistry(ADDY_REGISTRY).isValidAddyAddr(msg.sender) # dev: no perms
-    addys: address[4] = self._getAddys()
-    ledger: address = addys[0]
-    globalRewards: RipeRewards = self._getLatestGlobalRipeRewards(addys)
+def updateBorrowPoints(_user: address, _a: addys.Addys = empty(addys.Addys)):
+    assert addys._isValidRipeHqAddy(msg.sender) # dev: no perms
+    a: addys.Addys = addys._getAddys(_a)
 
+    globalRewards: RipeRewards = self._getLatestGlobalRipeRewards(a)
     up: BorrowPoints = empty(BorrowPoints)
     gp: BorrowPoints = empty(BorrowPoints)
-    up, gp = self._getLatestBorrowPoints(_user, globalRewards.lastRewardsBlock, ledger)
-    extcall Ledger(ledger).setBorrowPointsAndRipeRewards(_user, up, gp, globalRewards)
+    up, gp = self._getLatestBorrowPoints(_user, globalRewards.lastRewardsBlock, a.ledger)
+    extcall Ledger(a.ledger).setBorrowPointsAndRipeRewards(_user, up, gp, globalRewards)
 
 
 # borrow points
@@ -644,15 +634,14 @@ def _getLatestBorrowPoints(_user: address, _lastRipeRewardsBlock: uint256, _ledg
 
 
 @internal 
-def _claimBorrowLoot(_user: address, _addys: address[4]) -> uint256:
+def _claimBorrowLoot(_user: address, _a: addys.Addys) -> uint256:
     userRipeRewards: uint256 = 0
     up: BorrowPoints = empty(BorrowPoints)
     gp: BorrowPoints = empty(BorrowPoints)
     globalRipeRewards: RipeRewards = empty(RipeRewards)
-    userRipeRewards, up, gp, globalRipeRewards = self._getClaimableBorrowLootData(_user, _addys)
+    userRipeRewards, up, gp, globalRipeRewards = self._getClaimableBorrowLootData(_user, _a)
     if userRipeRewards != 0:
-        ledger: address = _addys[0]
-        extcall Ledger(ledger).setBorrowPointsAndRipeRewards(_user, up, gp, globalRipeRewards)
+        extcall Ledger(_a.ledger).setBorrowPointsAndRipeRewards(_user, up, gp, globalRipeRewards)
     return userRipeRewards
 
 
@@ -661,18 +650,15 @@ def _claimBorrowLoot(_user: address, _addys: address[4]) -> uint256:
 
 @view 
 @internal 
-def _getClaimableBorrowLootData(_user: address, _addys: address[4]) -> (uint256, BorrowPoints, BorrowPoints, RipeRewards):
-    ledger: address = _addys[0]
-
-    # get latest global rewards
-    globalRewards: RipeRewards = self._getLatestGlobalRipeRewards(_addys)
+def _getClaimableBorrowLootData(_user: address, _a: addys.Addys) -> (uint256, BorrowPoints, BorrowPoints, RipeRewards):
+    globalRewards: RipeRewards = self._getLatestGlobalRipeRewards(_a)
     if globalRewards.borrowers == 0:
         return 0, empty(BorrowPoints), empty(BorrowPoints), empty(RipeRewards)
 
     # get latest borrow points
     up: BorrowPoints = empty(BorrowPoints)
     gp: BorrowPoints = empty(BorrowPoints)
-    up, gp = self._getLatestBorrowPoints(_user, globalRewards.lastRewardsBlock, ledger)
+    up, gp = self._getLatestBorrowPoints(_user, globalRewards.lastRewardsBlock, _a.ledger)
 
     # user has no points
     if up.points == 0:
@@ -701,19 +687,19 @@ def _getClaimableBorrowLootData(_user: address, _addys: address[4]) -> (uint256,
 
 @view
 @internal 
-def _getClaimableBorrowLoot(_user: address, _addys: address[4]) -> uint256:
+def _getClaimableBorrowLoot(_user: address, _a: addys.Addys) -> uint256:
     userRipeRewards: uint256 = 0
     up: BorrowPoints = empty(BorrowPoints)
     gp: BorrowPoints = empty(BorrowPoints)
     globalRipeRewards: RipeRewards = empty(RipeRewards)
-    userRipeRewards, up, gp, globalRipeRewards = self._getClaimableBorrowLootData(_user, _addys)
+    userRipeRewards, up, gp, globalRipeRewards = self._getClaimableBorrowLootData(_user, _a)
     return userRipeRewards
 
 
 @view
 @external 
 def getClaimableBorrowLoot(_user: address) -> uint256:
-    return self._getClaimableBorrowLoot(_user, self._getAddys())
+    return self._getClaimableBorrowLoot(_user, addys._getAddys())
 
 
 ################
@@ -725,12 +711,11 @@ def getClaimableBorrowLoot(_user: address) -> uint256:
 
 
 @external
-def updateRipeRewards():
-    assert staticcall AddyRegistry(ADDY_REGISTRY).isValidAddyAddr(msg.sender) # dev: no perms
-    addys: address[4] = self._getAddys()
-    ripeRewards: RipeRewards = self._getLatestGlobalRipeRewards(addys)
-    ledger: address = addys[0]
-    extcall Ledger(ledger).setRipeRewards(ripeRewards)
+def updateRipeRewards(_a: addys.Addys = empty(addys.Addys)):
+    assert addys._isValidRipeHqAddy(msg.sender) # dev: no perms
+    a: addys.Addys = addys._getAddys(_a)
+    ripeRewards: RipeRewards = self._getLatestGlobalRipeRewards(a)
+    extcall Ledger(a.ledger).setRipeRewards(ripeRewards)
 
 
 # get latest global ripe rewards
@@ -739,22 +724,18 @@ def updateRipeRewards():
 @view
 @external
 def getLatestGlobalRipeRewards() -> RipeRewards:
-    return self._getLatestGlobalRipeRewards(self._getAddys())
+    return self._getLatestGlobalRipeRewards(addys._getAddys())
 
 
 @view
 @internal
-def _getLatestGlobalRipeRewards(_addys: address[4]) -> RipeRewards:
-    ledger: address = _addys[0]
-    controlRoom: address = _addys[1]
-
-    # get data
-    b: RipeRewardsBundle = staticcall Ledger(ledger).getRipeRewardsBundle()
+def _getLatestGlobalRipeRewards(_a: addys.Addys) -> RipeRewards:
+    b: RipeRewardsBundle = staticcall Ledger(_a.ledger).getRipeRewardsBundle()
     globalRewards: RipeRewards = b.ripeRewards
     globalRewards.newRipeRewards = 0 # important to reset!
 
     # get rewards config
-    config: RipeRewardsConfig = staticcall ControlRoom(controlRoom).getRipeRewardsConfig()
+    config: RipeRewardsConfig = staticcall ControlRoom(_a.controlRoom).getRipeRewardsConfig()
 
     # use most recent time between `lastUpdate` and `ripeRewardsStartBlock`
     lastUpdateAdjusted: uint256 = max(globalRewards.lastUpdate, config.ripeRewardsStartBlock)
@@ -790,19 +771,7 @@ def _getLatestGlobalRipeRewards(_addys: address[4]) -> RipeRewards:
 
 
 @internal
-def _handleRipeMint(_user: address, _amount: uint256, _shouldStake: bool):
-    ripeToken: address = staticcall AddyRegistry(ADDY_REGISTRY).ripeToken()
-    extcall RipeToken(ripeToken).mint(_user, _amount)
+def _handleRipeMint(_user: address, _amount: uint256, _shouldStake: bool, _ripeToken: address):
+    extcall RipeToken(_ripeToken).mint(_user, _amount)
 
     # TODO: handle staking
-
-
-@view
-@internal
-def _getAddys() -> address[4]:
-    ar: address = ADDY_REGISTRY
-    ledger: address = staticcall AddyRegistry(ar).getAddy(LEDGER_ID)
-    controlRoom: address = staticcall AddyRegistry(ar).getAddy(CONTROL_ROOM_ID)
-    vaultBook: address = staticcall AddyRegistry(ar).getAddy(VAULT_BOOK_ID)
-    priceDesk: address = staticcall AddyRegistry(ar).getAddy(PRICE_DESK_ID)
-    return [ledger, controlRoom, vaultBook, priceDesk]

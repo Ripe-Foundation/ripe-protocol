@@ -26,6 +26,7 @@ event SimpleErc20VaultWithdrawal:
     asset: indexed(address)
     amount: uint256
     isDepleted: bool
+    isUserStillInVault: bool
 
 event SimpleErc20VaultTransfer:
     fromUser: indexed(address)
@@ -83,7 +84,7 @@ def withdrawTokensFromVault(
     _asset: address,
     _amount: uint256,
     _recipient: address,
-) -> (uint256, bool):
+) -> (uint256, bool, bool):
     assert vaultData.isActivated # dev: not activated
     assert msg.sender == staticcall AddyRegistry(ADDY_REGISTRY).getAddy(TELLER_ID) # dev: only Teller allowed
 
@@ -102,11 +103,12 @@ def withdrawTokensFromVault(
     assert extcall IERC20(_asset).transfer(_recipient, withdrawalAmount, default_return_value=True) # dev: token transfer failed
 
     # deregister user asset if depleted
+    isUserStillInVault: bool = True
     if isDepleted:
-        vaultData._deregisterUserAsset(_user, _asset)
+        isUserStillInVault = vaultData._deregisterUserAsset(_user, _asset)
 
-    log SimpleErc20VaultWithdrawal(user=_user, asset=_asset, amount=withdrawalAmount, isDepleted=isDepleted)
-    return withdrawalAmount, isDepleted
+    log SimpleErc20VaultWithdrawal(user=_user, asset=_asset, amount=withdrawalAmount, isDepleted=isDepleted, isUserStillInVault=isUserStillInVault)
+    return withdrawalAmount, isDepleted, isUserStillInVault
 
 
 @external

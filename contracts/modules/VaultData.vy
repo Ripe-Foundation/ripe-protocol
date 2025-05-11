@@ -112,17 +112,17 @@ def _registerUserAsset(_user: address, _asset: address):
 
 
 @internal
-def _deregisterUserAsset(_user: address, _asset: address):
+def _deregisterUserAsset(_user: address, _asset: address) -> bool:
     if self.userBalances[_user][_asset] != 0:
-        return
+        return True
 
     numUserAssets: uint256 = self.numUserAssets[_user]
     if numUserAssets == 0:
-        return
+        return False
 
     targetIndex: uint256 = self.indexOfUserAsset[_user][_asset]
     if targetIndex == 0:
-        return
+        return numUserAssets > 1
 
     # update data
     lastIndex: uint256 = numUserAssets - 1
@@ -134,6 +134,8 @@ def _deregisterUserAsset(_user: address, _asset: address):
         lastItem: address = self.userAssets[_user][lastIndex]
         self.userAssets[_user][targetIndex] = lastItem
         self.indexOfUserAsset[_user][lastItem] = targetIndex
+
+    return lastIndex > 1
 
 
 # vault
@@ -182,8 +184,13 @@ def _deregisterVaultAsset(_asset: address):
 @view
 @external
 def isUserInVault(_user: address) -> bool:
-    # if 0 or 1, user is not in vault
-    return self.numUserAssets[_user] > 1
+    return self._isUserInVault(_user)
+
+
+@view
+@internal
+def _isUserInVault(_user: address) -> bool:
+    return self._getNumUserAssets(_user) != 0
 
 
 @view

@@ -1,26 +1,31 @@
 # @version 0.4.1
 
+initializes: addys
+exports: addys.__interface__
+import contracts.modules.Addys as addys
+
 from interfaces import Vault
 from ethereum.ercs import IERC20
 
 interface Ledger:
     def getDepositLedgerData(_user: address, _vaultId: uint256) -> DepositLedgerData: view
-    def isParticipatingInVault(_user: address, _vaultId: uint256) -> bool: view
     def removeVaultFromUser(_user: address, _vaultId: uint256): nonpayable
     def addVaultToUser(_user: address, _vaultId: uint256): nonpayable
+
+interface ControlRoom:
+    def getWithdrawConfig(_vaultId: uint256, _asset: address, _user: address, _caller: address) -> WithdrawConfig: view
+    def getDepositConfig(_vaultId: uint256, _asset: address, _user: address) -> DepositConfig: view
+
+interface CreditEngine:
+    def getMaxWithdrawableForAsset(_user: address, _asset: address, _a: addys.Addys = empty(addys.Addys)) -> uint256: view
+    def hasGoodDebtHealth(_user: address, _a: addys.Addys = empty(addys.Addys)) -> bool: view
 
 interface VaultBook:
     def getVaultAddr(_vaultId: uint256) -> address: view
     def getVaultId(_vaultAddr: address) -> uint256: view
 
-interface ControlRoom:
-    def getDepositConfig(_vaultId: uint256, _asset: address, _user: address) -> DepositConfig: view
-
 interface Lootbox:
-    def updatePoints(_user: address, _vaultId: uint256, _asset: address): nonpayable
-
-interface AddyRegistry:
-    def getAddy(_addyId: uint256) -> address: view
+    def updateDepositPoints(_user: address, _vaultId: uint256, _vaultAddr: address, _asset: address, _a: addys.Addys = empty(addys.Addys)): nonpayable
 
 struct DepositLedgerData:
     isParticipatingInVault: bool
@@ -33,22 +38,26 @@ struct DepositConfig:
     globalDepositLimit: uint256
     maxDepositAssetsPerVault: uint256
     maxDepositVaults: uint256
+    canOthersDepositForUser: bool
 
 struct DepositAction:
     asset: address
     amount: uint256
-    user: address
     vaultAddr: address
     vaultId: uint256
+
+struct WithdrawConfig:
+    canWithdraw: bool
+    isUserAllowed: bool
+    canWithdrawForUser: bool
 
 struct WithdrawalAction:
     asset: address
     amount: uint256
-    user: address
     vaultAddr: address
     vaultId: uint256
 
-event TellerAddCollateral:
+event TellerDeposit:
     user: indexed(address)
     depositor: indexed(address)
     asset: indexed(address)
@@ -56,43 +65,25 @@ event TellerAddCollateral:
     vaultAddr: address
     vaultId: uint256
 
-event TellerRemoveCollateral:
+event TellerWithdrawal:
     user: indexed(address)
     asset: indexed(address)
-    requester: indexed(address)
+    caller: indexed(address)
     amount: uint256
     vaultAddr: address
     vaultId: uint256
     isDepleted: bool
 
-LEDGER_ID: constant(uint256) = 2 # TODO: make sure this is correct
-VAULT_BOOK_ID: constant(uint256) = 3 # TODO: make sure this is correct
-LOOTBOX_ID: constant(uint256) = 5 # TODO: make sure this is correct
-CONTROL_ROOM_ID: constant(uint256) = 6 # TODO: make sure this is correct
-
 MAX_BATCH_ACTION: constant(uint256) = 20
 
 # config
 isActivated: public(bool)
-ADDY_REGISTRY: public(immutable(address))
 
 
 @deploy
-def __init__(_addyRegistry: address):
-    assert _addyRegistry != empty(address) # dev: invalid addy registry
-    ADDY_REGISTRY = _addyRegistry
+def __init__(_hq: address):
+    addys.__init__(_hq)
     self.isActivated = True
-
-
-@view
-@internal
-def _getAddys() -> address[4]:
-    ar: address = ADDY_REGISTRY
-    ledger: address = staticcall AddyRegistry(ar).getAddy(LEDGER_ID)
-    vaultBook: address = staticcall AddyRegistry(ar).getAddy(VAULT_BOOK_ID)
-    lootbox: address = staticcall AddyRegistry(ar).getAddy(LOOTBOX_ID)
-    controlRoom: address = staticcall AddyRegistry(ar).getAddy(CONTROL_ROOM_ID)
-    return [ledger, vaultBook, lootbox, controlRoom]
 
 
 ############
@@ -102,49 +93,47 @@ def _getAddys() -> address[4]:
 
 @nonreentrant
 @external
-def addCollateral(
+def deposit(
     _asset: address,
-    _amount: uint256,
+    _amount: uint256 = max_value(uint256),
     _user: address = msg.sender,
     _vaultAddr: address = empty(address),
     _vaultId: uint256 = 0,
 ) -> uint256:
     assert self.isActivated # dev: not activated
-    return self._addCollateral(_asset, _amount, _user, _vaultAddr, _vaultId, msg.sender, self._getAddys())
+    return self._deposit(_asset, _amount, _user, _vaultAddr, _vaultId, msg.sender, addys._getAddys())
 
 
 @nonreentrant
 @external
-def addManyCollaterals(_deposits: DynArray[DepositAction, MAX_BATCH_ACTION]) -> uint256:
+def depositMany(_user: address, _deposits: DynArray[DepositAction, MAX_BATCH_ACTION]) -> uint256:
     assert self.isActivated # dev: not activated
-    addys: address[4] = self._getAddys()
+    a: addys.Addys = addys._getAddys()
     for d: DepositAction in _deposits:
-        self._addCollateral(d.asset, d.amount, d.user, d.vaultAddr, d.vaultId, msg.sender, addys)
+        self._deposit(d.asset, d.amount, _user, d.vaultAddr, d.vaultId, msg.sender, a)
     return len(_deposits)
 
 
+# core logic
+
+
 @internal
-def _addCollateral(
+def _deposit(
     _asset: address,
     _amount: uint256,
     _user: address,
     _vaultAddr: address,
     _vaultId: uint256,
     _depositor: address,
-    _addys: address[4],
+    _a: addys.Addys,
 ) -> uint256:
-    ledger: address = _addys[0]
-    vaultBook: address = _addys[1]
-    lootbox: address = _addys[2]
-
-    # get vault addr and id
     vaultAddr: address = empty(address)
     vaultId: uint256 = 0
-    vaultAddr, vaultId = self._getVaultAddrAndId(_vaultAddr, _vaultId, vaultBook)
+    vaultAddr, vaultId = self._getVaultAddrAndId(_vaultAddr, _vaultId, _a.vaultBook)
 
     # get ledger data
-    d: DepositLedgerData = staticcall Ledger(ledger).getDepositLedgerData(_user, vaultId)
-    amount: uint256 = self._validateOnDeposit(_asset, _amount, _user, vaultAddr, vaultId, _depositor, d, _addys)
+    d: DepositLedgerData = staticcall Ledger(_a.ledger).getDepositLedgerData(_user, vaultId)
+    amount: uint256 = self._validateOnDeposit(_asset, _amount, _user, vaultAddr, vaultId, _depositor, d, _a.controlRoom)
 
     # deposit tokens
     assert extcall IERC20(_asset).transferFrom(_depositor, vaultAddr, amount) # dev: token transfer failed
@@ -152,13 +141,16 @@ def _addCollateral(
 
     # register vault participation
     if not d.isParticipatingInVault:
-        extcall Ledger(ledger).addVaultToUser(_user, vaultId)
+        extcall Ledger(_a.ledger).addVaultToUser(_user, vaultId)
 
     # update lootbox points
-    extcall Lootbox(lootbox).updatePoints(_user, vaultId, _asset)
+    extcall Lootbox(_a.lootbox).updateDepositPoints(_user, vaultId, vaultAddr, _asset, _a)
 
-    log TellerAddCollateral(user=_user, depositor=_depositor, asset=_asset, amount=amount, vaultAddr=vaultAddr, vaultId=vaultId)
+    log TellerDeposit(user=_user, depositor=_depositor, asset=_asset, amount=amount, vaultAddr=vaultAddr, vaultId=vaultId)
     return amount
+
+
+# validation
 
 
 @view
@@ -171,12 +163,15 @@ def _validateOnDeposit(
     _vaultId: uint256,
     _depositor: address,
     _d: DepositLedgerData,
-    _addys: address[4],
+    _controlRoom: address,
 ) -> uint256:
-    controlRoom: address = _addys[3]
-    config: DepositConfig = staticcall ControlRoom(controlRoom).getDepositConfig(_vaultId, _asset, _user)
+    config: DepositConfig = staticcall ControlRoom(_controlRoom).getDepositConfig(_vaultId, _asset, _user)
     assert config.canDeposit # dev: cannot deposit
     assert config.isUserAllowed # dev: user not allowed
+
+    # make sure depositor is allowed to deposit for user
+    if _user != _depositor:
+        assert config.canOthersDepositForUser # dev: others cannot deposit for user
 
     # check max vaults, max assets per vault
     vd: Vault.VaultDataOnDeposit = staticcall Vault(_vaultAddr).getVaultDataOnDeposit(_user, _asset)
@@ -185,7 +180,8 @@ def _validateOnDeposit(
     elif not vd.hasPosition:
         assert vd.numAssets < config.maxDepositAssetsPerVault # dev: reached max assets per vault
 
-    amount: uint256 = _amount
+    # avail amount
+    amount: uint256 = min(_amount, staticcall IERC20(_asset).balanceOf(_depositor))
     assert amount != 0 # dev: cannot deposit 0
 
     # per user deposit limit
@@ -232,65 +228,97 @@ def _getAvailGlobalDepositLimit(_totalDepositBal: uint256, _globalDepositLimit: 
 ###############
 
 
-# @nonreentrant
-# @external
-# def removeCollateral(
-#     _asset: address,
-#     _amount: uint256,
-#     _user: address = msg.sender,
-#     _vaultAddr: address = empty(address),
-#     _vaultId: uint256 = 0,
-# ) -> uint256:
-#     assert self.isActivated # dev: not activated
-#     return self._removeCollateral(_asset, _amount, _user, _vaultAddr, _vaultId, msg.sender, self._getAddys())
+@nonreentrant
+@external
+def withdraw(
+    _asset: address,
+    _amount: uint256 = max_value(uint256),
+    _user: address = msg.sender,
+    _vaultAddr: address = empty(address),
+    _vaultId: uint256 = 0,
+) -> uint256:
+    assert self.isActivated # dev: not activated
+    a: addys.Addys = addys._getAddys()
+    amount: uint256 = self._withdraw(_asset, _amount, _user, _vaultAddr, _vaultId, msg.sender, a)
+    assert staticcall CreditEngine(a.creditEngine).hasGoodDebtHealth(_user, a) # dev: cannot withdraw, bad debt health
+    return amount
 
 
-# @nonreentrant
-# @external
-# def removeManyCollaterals(_withdrawals: DynArray[WithdrawalAction, MAX_BATCH_ACTION]) -> uint256:
-#     assert self.isActivated # dev: not activated
-#     addys: address[4] = self._getAddys()
-#     for w: WithdrawalAction in _withdrawals:
-#         self._removeCollateral(w.asset, w.amount, w.user, w.vaultAddr, w.vaultId, msg.sender, addys)
-#     return len(_withdrawals)
+@nonreentrant
+@external
+def withdrawMany(_user: address, _withdrawals: DynArray[WithdrawalAction, MAX_BATCH_ACTION]) -> uint256:
+    assert self.isActivated # dev: not activated
+    a: addys.Addys = addys._getAddys()
+    for w: WithdrawalAction in _withdrawals:
+        self._withdraw(w.asset, w.amount, _user, w.vaultAddr, w.vaultId, msg.sender, a)
+    assert staticcall CreditEngine(a.creditEngine).hasGoodDebtHealth(_user, a) # dev: cannot withdraw, bad debt health
+    return len(_withdrawals)
 
 
-# @internal
-# def _removeCollateral(
-#     _asset: address,
-#     _amount: uint256,
-#     _user: address,
-#     _vaultAddr: address,
-#     _vaultId: uint256,
-#     _requester: address,
-#     _addys: address[4],
-# ) -> uint256:
-#     validator: address = _addys[0]
-#     ledger: address = _addys[1]
-#     lootbox: address = _addys[2]
+@internal
+def _withdraw(
+    _asset: address,
+    _amount: uint256,
+    _user: address,
+    _vaultAddr: address,
+    _vaultId: uint256,
+    _caller: address,
+    _a: addys.Addys,
+) -> uint256:
+    vaultAddr: address = empty(address)
+    vaultId: uint256 = 0
+    vaultAddr, vaultId = self._getVaultAddrAndId(_vaultAddr, _vaultId, _a.vaultBook)
 
-#     # validation
-#     amount: uint256 = 0
-#     vaultAddr: address = empty(address)
-#     vaultId: uint256 = 0
-#     amount, vaultAddr, vaultId = staticcall Validator(validator).validateOnWithdrawal(_asset, _amount, _user, _vaultAddr, _vaultId, _requester)
+    # validation
+    amount: uint256 = self._validateOnWithdrawal(_asset, _amount, _user, _vaultAddr, _vaultId, _caller, _a)
 
-#     # withdraw tokens
-#     isDepleted: bool = False
-#     amount, isDepleted = extcall Vault(vaultAddr).withdrawTokensFromVault(_user, _asset, amount, _user)
+    # withdraw tokens
+    isDepleted: bool = False
+    isUserStillInVault: bool = False
+    amount, isDepleted, isUserStillInVault = extcall Vault(vaultAddr).withdrawTokensFromVault(_user, _asset, amount, _user)
 
-#     # deregister vault (if applicable)
-#     if isDepleted and not staticcall Vault(vaultAddr).isUserInVault(_user):
-#         extcall Ledger(ledger).removeVaultFromUser(_user, _vaultId)
+    # deregister vault (if applicable)
+    if not isUserStillInVault:
+        extcall Ledger(_a.ledger).removeVaultFromUser(_user, _vaultId)
 
-#     # update lootbox points
-#     extcall Lootbox(lootbox).updatePoints(_user, _vaultId, _asset)
+    # update lootbox points
+    extcall Lootbox(_a.lootbox).updateDepositPoints(_user, vaultId, vaultAddr, _asset, _a)
+    if isDepleted:
+        pass # TODO: if depleted, claim that vault/asset points
 
-#     # check debt health (invariant!)
-#     assert staticcall Validator(validator).hasGoodHealth(_user) # dev: not healthy
+    log TellerWithdrawal(user=_user, asset=_asset, caller=_caller, amount=amount, vaultAddr=vaultAddr, vaultId=vaultId, isDepleted=isDepleted)
+    return amount
 
-#     log TellerRemoveCollateral(user=_user, asset=_asset, requester=_requester, amount=amount, vaultAddr=vaultAddr, vaultId=vaultId, isDepleted=isDepleted)
-#     return amount
+
+# validation
+
+
+@view
+@internal
+def _validateOnWithdrawal(
+    _asset: address,
+    _amount: uint256,
+    _user: address,
+    _vaultAddr: address,
+    _vaultId: uint256,
+    _caller: address,
+    _a: addys.Addys,
+) -> uint256:
+    assert _amount != 0 # dev: cannot withdraw 0
+
+    config: WithdrawConfig = staticcall ControlRoom(_a.controlRoom).getWithdrawConfig(_vaultId, _asset, _user, _caller)
+    assert config.canWithdraw # dev: cannot withdraw
+    assert config.isUserAllowed # dev: user not allowed
+
+    # make sure caller is allowed to withdraw for user
+    if _user != _caller:
+        assert config.canWithdrawForUser # dev: invalid caller
+
+    # max withdrawable
+    maxWithdrawable: uint256 = staticcall CreditEngine(_a.creditEngine).getMaxWithdrawableForAsset(_user, _asset, _a)
+    assert maxWithdrawable != 0 # dev: cannot withdraw anything
+
+    return min(_amount, maxWithdrawable)
 
 
 ##############

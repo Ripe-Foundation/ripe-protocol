@@ -21,7 +21,7 @@ def withdrawTokensFromVault(
     _asset: address,
     _amount: uint256,
     _recipient: address,
-) -> (uint256, bool):
+) -> (uint256, bool, bool):
     ...
 
 

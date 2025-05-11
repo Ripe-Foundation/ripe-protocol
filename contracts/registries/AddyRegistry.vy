@@ -49,17 +49,6 @@ def __init__(
     registry.__init__(_minRegistryChangeDelay, _maxRegistryChangeDelay, "AddyRegistry.vy")
 
 
-# TEMPORARY
-# TELLER: 1
-# LEDGER: 2
-# VAULT_BOOK: 3
-# VALIDATOR: 4
-# LOOTBOX: 5
-# CONTROL_ROOM: 6
-# PRICE_DESK: 7
-# CREDIT_ENGINE: 8
-
-
 ############
 # New Addy #
 ############

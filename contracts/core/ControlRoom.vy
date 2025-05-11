@@ -1,10 +1,11 @@
 # @version 0.4.1
 
+initializes: addys
+exports: addys.__interface__
+import contracts.modules.Addys as addys
+
 from interfaces import Vault
 from ethereum.ercs import IERC20
-
-interface AddyRegistry:
-    def getAddy(_addyId: uint256) -> address: view
 
 struct DepositConfig:
     canDeposit: bool
@@ -13,6 +14,12 @@ struct DepositConfig:
     globalDepositLimit: uint256
     maxDepositAssetsPerVault: uint256
     maxDepositVaults: uint256
+    canOthersDepositForUser: bool
+
+struct WithdrawConfig:
+    canWithdraw: bool
+    isUserAllowed: bool
+    canWithdrawForUser: bool
 
 struct DebtTerms:
     ltv: uint256
@@ -51,13 +58,11 @@ struct DepositPointsAllocs:
 
 # config
 isActivated: public(bool)
-ADDY_REGISTRY: public(immutable(address))
 
 
 @deploy
-def __init__(_addyRegistry: address):
-    assert _addyRegistry != empty(address) # dev: invalid addy registry
-    ADDY_REGISTRY = _addyRegistry
+def __init__(_hq: address):
+    addys.__init__(_hq)
     self.isActivated = True
 
 
@@ -71,6 +76,13 @@ def __init__(_addyRegistry: address):
 def getDepositConfig(_vaultId: uint256, _asset: address, _user: address) -> DepositConfig:
     # TODO: implement
     return empty(DepositConfig)
+
+
+@view
+@external
+def getWithdrawConfig(_vaultId: uint256, _asset: address, _user: address, _caller: address) -> WithdrawConfig:
+    # TODO: implement
+    return empty(WithdrawConfig)
 
 
 ########
@@ -97,6 +109,13 @@ def getBorrowConfig() -> BorrowConfig:
 def isRepayEnabled() -> bool:
     # TODO: implement
     return True
+
+
+@view
+@external
+def isDaowryEnabled() -> bool:
+    # TODO: implement
+    return False
 
 
 ####################
