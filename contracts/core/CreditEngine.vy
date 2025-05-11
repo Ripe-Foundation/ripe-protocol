@@ -12,6 +12,7 @@ interface Ledger:
     def getBorrowDataBundle(_user: address) -> BorrowDataBundle: view
     def userVaults(_user: address, _index: uint256) -> uint256: view
     def getRepayDataBundle(_user: address) -> RepayDataBundle: view
+    def numUserVaults(_user: address) -> uint256: view
     def flushUnrealizedYield() -> uint256: nonpayable
 
 interface ControlRoom:
@@ -343,7 +344,7 @@ def repayForUser(
     userDebt: UserDebt = empty(UserDebt)
     newInterest: uint256 = 0
     userDebt, newInterest = self._getLatestUserDebtWithInterest(d.userDebt)
-    totalAccruedInterest: uint256 = userDebt.amount - userDebt.principal
+    nonPrincipalDebt: uint256 = userDebt.amount - userDebt.principal
 
     # validation
     repayAmount: uint256 = 0
@@ -355,8 +356,8 @@ def repayForUser(
 
     # update user debt
     userDebt.amount -= repayAmount
-    if repayAmount > totalAccruedInterest:
-        principalToReduce: uint256 = repayAmount - totalAccruedInterest
+    if repayAmount > nonPrincipalDebt:
+        principalToReduce: uint256 = repayAmount - nonPrincipalDebt
         userDebt.principal -= min(principalToReduce, userDebt.principal)
     userDebt.debtTerms = bt.debtTerms
     extcall Ledger(a.ledger).setUserDebt(_user, userDebt, newInterest, empty(IntervalBorrow))
@@ -408,6 +409,59 @@ def _validateOnRepay(
     return repayAmount, refundAmount
 
 
+# repay during liquidation
+
+
+@external
+def repayDebtDuringLiquidation(
+    _liqUser: address,
+    _userDebt: UserDebt,
+    _newInterest: uint256,
+    _totalLiqFees: uint256,
+    _repaymentValueIn: uint256,
+    _a: addys.Addys = empty(addys.Addys),
+) -> bool:
+    assert msg.sender == addys._getAuctionHouseAddr() # dev: only auction house allowed
+    a: addys.Addys = addys._getAddys(_a)
+
+    # add liq fees to total debt
+    userDebt: UserDebt = _userDebt
+    userDebt.amount += _totalLiqFees
+    nonPrincipalDebt: uint256 = userDebt.amount - userDebt.principal
+
+    # finalize repay amount
+    repayAmount: uint256 = min(_repaymentValueIn, userDebt.amount)
+    refundAmount: uint256 = 0
+    if repayAmount > _repaymentValueIn:
+        refundAmount = repayAmount - _repaymentValueIn
+
+    # reduce debt with repay amount
+    userDebt.amount -= repayAmount
+    if repayAmount > nonPrincipalDebt:
+        principalToReduce: uint256 = repayAmount - nonPrincipalDebt
+        userDebt.principal -= min(principalToReduce, userDebt.principal)
+
+    # handle green refund (do before getting latest debt terms)
+    if refundAmount != 0:
+        extcall GreenToken(a.greenToken).mint(self, refundAmount)
+        self._handleGreenForUser(_liqUser, refundAmount, True, a.greenToken)
+
+    # refresh collateral value and debt terms -- LIKELY CHANGED during liquidation (swaps with stability pool)
+    numUserVaults: uint256 = staticcall Ledger(a.ledger).numUserVaults(_liqUser)
+    bt: UserBorrowTerms = self._getUserBorrowTerms(_liqUser, numUserVaults, True, a)
+    userDebt.debtTerms = bt.debtTerms
+
+    # check debt health
+    hasGoodDebtHealth: bool = self._hasGoodDebtHealth(userDebt.amount, bt.collateralVal, bt.debtTerms.ltv)
+    if hasGoodDebtHealth:
+        userDebt.inLiquidation = False
+
+    # update user debt
+    extcall Ledger(a.ledger).setUserDebt(_liqUser, userDebt, _newInterest, empty(IntervalBorrow))
+
+    return userDebt.inLiquidation
+
+
 ################
 # Borrow Terms #
 ################
@@ -415,10 +469,13 @@ def _validateOnRepay(
 
 @view
 @external
-def getUserBorrowTerms(_user: address, _shouldRaise: bool) -> UserBorrowTerms:
-    a: addys.Addys = addys._getAddys()
-    data: BorrowDataBundle = staticcall Ledger(a.ledger).getBorrowDataBundle(_user)
-    return self._getUserBorrowTerms(_user, data.numUserVaults, _shouldRaise, a)
+def getUserBorrowTerms(
+    _user: address,
+    _shouldRaise: bool,
+    _a: addys.Addys = empty(addys.Addys),
+) -> UserBorrowTerms:
+    a: addys.Addys = addys._getAddys(_a)
+    return self._getUserBorrowTerms(_user, staticcall Ledger(a.ledger).numUserVaults(_user), _shouldRaise, a)
 
 
 @view
@@ -498,6 +555,41 @@ def _getUserBorrowTerms(
     return bt
 
 
+# latest user debt and terms
+
+
+@view
+@external
+def getLatestUserDebtAndTerms(
+    _user: address,
+    _shouldRaise: bool,
+    _a: addys.Addys = empty(addys.Addys),
+) -> (UserDebt, UserBorrowTerms, uint256):
+    return self._getLatestUserDebtAndTerms(_user, _shouldRaise, addys._getAddys(_a))
+
+
+@view
+@internal
+def _getLatestUserDebtAndTerms(
+    _user: address,
+    _shouldRaise: bool,
+    _a: addys.Addys,
+) -> (UserDebt, UserBorrowTerms, uint256):
+
+    # get data (repay data has the only stuff we need)
+    d: RepayDataBundle = staticcall Ledger(_a.ledger).getRepayDataBundle(_user)
+
+    # accrue interest
+    userDebt: UserDebt = empty(UserDebt)
+    newInterest: uint256 = 0
+    userDebt, newInterest = self._getLatestUserDebtWithInterest(d.userDebt)
+
+    # debt terms for user
+    bt: UserBorrowTerms = self._getUserBorrowTerms(_user, d.numUserVaults, _shouldRaise, _a)
+
+    return userDebt, bt, newInterest
+
+
 ###############
 # Update Debt #
 ###############
@@ -518,19 +610,14 @@ def updateDebtForManyUsers(_users: DynArray[address, MAX_DEBT_UPDATES]) -> bool:
 
 @internal
 def _updateDebtForUser(_user: address, _a: addys.Addys) -> bool:
+    userDebt: UserDebt = empty(UserDebt)
+    bt: UserBorrowTerms = empty(UserBorrowTerms)
+    newInterest: uint256 = 0
+    userDebt, bt, newInterest = self._getLatestUserDebtAndTerms(_user, True, _a)
 
-    # get data (repay data has the only stuff we need)
-    d: RepayDataBundle = staticcall Ledger(_a.ledger).getRepayDataBundle(_user)
-    if d.userDebt.amount == 0:
+    if userDebt.amount == 0:
         return False
 
-    # accrue interest
-    userDebt: UserDebt = empty(UserDebt)
-    newInterest: uint256 = 0
-    userDebt, newInterest = self._getLatestUserDebtWithInterest(d.userDebt)
-
-    # debt terms for user
-    bt: UserBorrowTerms = self._getUserBorrowTerms(_user, d.numUserVaults, True, _a)
     userDebt.debtTerms = bt.debtTerms
     extcall Ledger(_a.ledger).setUserDebt(_user, userDebt, newInterest, empty(IntervalBorrow))
 
@@ -561,15 +648,14 @@ def canLiquidateUser(_user: address, _a: addys.Addys = empty(addys.Addys)) -> bo
 def _checkDebtHealth(_user: address, _shouldCheckLtv: bool, _a: addys.Addys) -> bool:
     a: addys.Addys = addys._getAddys(_a)
 
-    # get data (repay data has the only stuff we need)
-    d: RepayDataBundle = staticcall Ledger(a.ledger).getRepayDataBundle(_user)
-    if d.userDebt.amount == 0:
-        return _shouldCheckLtv # nothing to check, use that var to return correct value
-
+    # get latest user debt and terms
     userDebt: UserDebt = empty(UserDebt)
+    bt: UserBorrowTerms = empty(UserBorrowTerms)
     na: uint256 = 0
-    userDebt, na = self._getLatestUserDebtWithInterest(d.userDebt)
-    bt: UserBorrowTerms = self._getUserBorrowTerms(_user, d.numUserVaults, False, a)
+    userDebt, bt, na = self._getLatestUserDebtAndTerms(_user, False, a)
+
+    if userDebt.amount == 0:
+        return _shouldCheckLtv # nothing to check, use that var to return correct value
 
     # check debt health
     if _shouldCheckLtv:
@@ -606,16 +692,14 @@ def _canLiquidateUser(_userDebtAmount: uint256, _collateralVal: uint256, _liqThr
 def getMaxWithdrawableForAsset(_user: address, _asset: address, _a: addys.Addys = empty(addys.Addys)) -> uint256:
     a: addys.Addys = addys._getAddys(_a)
 
-    # get data (repay data has the only stuff we need)
-    d: RepayDataBundle = staticcall Ledger(a.ledger).getRepayDataBundle(_user)
-    if d.userDebt.amount == 0:
-        return max_value(uint256)
-
-    # debt terms
+    # get latest user debt and terms
     userDebt: UserDebt = empty(UserDebt)
+    bt: UserBorrowTerms = empty(UserBorrowTerms)
     na: uint256 = 0
-    userDebt, na = self._getLatestUserDebtWithInterest(d.userDebt)
-    bt: UserBorrowTerms = self._getUserBorrowTerms(_user, d.numUserVaults, False, a)
+    userDebt, bt, na = self._getLatestUserDebtAndTerms(_user, False, a)
+
+    if userDebt.amount == 0:
+        return max_value(uint256)
 
     # calculate max transferable usd value
     usdValueMustRemain: uint256 = max_value(uint256)

@@ -4,9 +4,6 @@ initializes: addys
 exports: addys.__interface__
 import contracts.modules.Addys as addys
 
-from interfaces import Vault
-from ethereum.ercs import IERC20
-
 struct DepositConfig:
     canDeposit: bool
     isUserAllowed: bool

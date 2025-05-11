@@ -5,7 +5,6 @@ exports: addys.__interface__
 import contracts.modules.Addys as addys
 
 from interfaces import Vault
-from ethereum.ercs import IERC20
 from ethereum.ercs import IERC20Detailed
 
 interface Ledger:
