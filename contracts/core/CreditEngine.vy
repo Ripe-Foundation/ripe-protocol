@@ -416,35 +416,21 @@ def _validateOnRepay(
 def repayDebtDuringLiquidation(
     _liqUser: address,
     _userDebt: UserDebt,
+    _amount: uint256,
     _newInterest: uint256,
-    _totalLiqFees: uint256,
-    _repaymentValueIn: uint256,
     _a: addys.Addys = empty(addys.Addys),
 ) -> bool:
     assert msg.sender == addys._getAuctionHouseAddr() # dev: only auction house allowed
     a: addys.Addys = addys._getAddys(_a)
 
-    # add liq fees to total debt
     userDebt: UserDebt = _userDebt
-    userDebt.amount += _totalLiqFees
     nonPrincipalDebt: uint256 = userDebt.amount - userDebt.principal
 
-    # finalize repay amount
-    repayAmount: uint256 = min(_repaymentValueIn, userDebt.amount)
-    refundAmount: uint256 = 0
-    if repayAmount > _repaymentValueIn:
-        refundAmount = repayAmount - _repaymentValueIn
-
     # reduce debt with repay amount
-    userDebt.amount -= repayAmount
-    if repayAmount > nonPrincipalDebt:
-        principalToReduce: uint256 = repayAmount - nonPrincipalDebt
+    userDebt.amount -= _amount
+    if _amount > nonPrincipalDebt:
+        principalToReduce: uint256 = _amount - nonPrincipalDebt
         userDebt.principal -= min(principalToReduce, userDebt.principal)
-
-    # handle green refund (do before getting latest debt terms)
-    if refundAmount != 0:
-        extcall GreenToken(a.greenToken).mint(self, refundAmount)
-        self._handleGreenForUser(_liqUser, refundAmount, True, a.greenToken)
 
     # refresh collateral value and debt terms -- LIKELY CHANGED during liquidation (swaps with stability pool)
     numUserVaults: uint256 = staticcall Ledger(a.ledger).numUserVaults(_liqUser)
@@ -456,10 +442,10 @@ def repayDebtDuringLiquidation(
     if hasGoodDebtHealth:
         userDebt.inLiquidation = False
 
-    # update user debt
+    # save user debt
     extcall Ledger(a.ledger).setUserDebt(_liqUser, userDebt, _newInterest, empty(IntervalBorrow))
 
-    return userDebt.inLiquidation
+    return hasGoodDebtHealth
 
 
 ################

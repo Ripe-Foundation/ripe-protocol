@@ -5,7 +5,7 @@ exports: addys.__interface__
 import contracts.modules.Addys as addys
 
 interface CreditEngine:
-    def repayDebtDuringLiquidation(_liqUser: address, _userDebt: UserDebt, _newInterest: uint256, _totalLiqFees: uint256, _repaymentValueIn: uint256, _a: addys.Addys = empty(addys.Addys)) -> bool: nonpayable
+    def repayDebtDuringLiquidation(_liqUser: address, _userDebt: UserDebt, _amount: uint256, _newInterest: uint256, _a: addys.Addys = empty(addys.Addys)) -> bool: nonpayable
     def getLatestUserDebtAndTerms(_user: address, _shouldRaise: bool, _a: addys.Addys = empty(addys.Addys)) -> (UserDebt, UserBorrowTerms, uint256): view
 
 struct DebtTerms:
@@ -28,19 +28,6 @@ struct UserDebt:
     lastTimestamp: uint256
     inLiquidation: bool
 
-# config
-isActivated: public(bool)
-
-HUNDRED_PERCENT: constant(uint256) = 100_00 # 100.00%
-MAX_PRIORITY_ASSETS: constant(uint256) = 20
-
-
-@deploy
-def __init__(_hq: address):
-    addys.__init__(_hq)
-    self.isActivated = True
-
-
 struct LiqConfig:
     keeperFeeRatio: uint256
     minKeeperFee: uint256
@@ -57,6 +44,28 @@ struct AuctionConfig:
     delay: uint256
     duration: uint256
     extension: uint256
+
+event LiquidateUser:
+    user: address
+    totalLiqFees: uint256
+    targetRepayAmount: uint256
+    repayAmount: uint256
+    didRestoreDebtHealth: bool
+    collateralValueOut: uint256
+    auctionValueStarted: uint256
+    keeperFee: uint256
+
+# config
+isActivated: public(bool)
+
+HUNDRED_PERCENT: constant(uint256) = 100_00 # 100.00%
+MAX_PRIORITY_ASSETS: constant(uint256) = 20
+
+
+@deploy
+def __init__(_hq: address):
+    addys.__init__(_hq)
+    self.isActivated = True
 
 
 @internal
@@ -88,37 +97,45 @@ def _liquidateUser(
     # set liquidation mode
     userDebt.inLiquidation = True
 
-    # liq fees
-    basicLiqFee: uint256 = userDebt.amount * bt.debtTerms.liqFee // HUNDRED_PERCENT
-    keeperFee: uint256 = max(_config.minKeeperFee, userDebt.amount * _config.keeperFeeRatio // HUNDRED_PERCENT)
-    totalLiqFees: uint256 = basicLiqFee + keeperFee
+    # liquidation fees
+    totalLiqFees: uint256 = userDebt.amount * bt.debtTerms.liqFee // HUNDRED_PERCENT
+    liqFeeRatio: uint256 = bt.debtTerms.liqFee
 
-    # estimated amount to pay back to achieve safe LTV -- won't be exact because depends on which collateral is liquidated (LTV changes)
+    # keeper fee (for liquidator)
+    keeperFee: uint256 = max(_config.minKeeperFee, userDebt.amount * _config.keeperFeeRatio // HUNDRED_PERCENT)
+    if keeperFee != 0:
+        totalLiqFees += keeperFee
+        liqFeeRatio = totalLiqFees * HUNDRED_PERCENT // userDebt.amount
+
+    # update user debt
+    userDebt.amount += totalLiqFees
+
+    # how much to achieve safe LTV -- won't be exact because depends on which collateral is liquidated (LTV changes)
     targetLtv: uint256 = bt.debtTerms.ltv * (HUNDRED_PERCENT - _config.ltvPaybackBuffer) // HUNDRED_PERCENT
-    toPayNow: uint256 = self._calcAmountToPay(userDebt.amount + totalLiqFees, bt.collateralVal, targetLtv)
+    targetRepayAmount: uint256 = self._calcAmountToPay(userDebt.amount, bt.collateralVal, targetLtv)
 
     # swap collateral to pay debt (liquidation fees basically mean selling at a discount)
-    discount: uint256 = totalLiqFees * HUNDRED_PERCENT // userDebt.amount
-    repaymentValueIn: uint256 = 0
+    repayValueIn: uint256 = 0
     collateralValueOut: uint256 = 0
-    repaymentValueIn, collateralValueOut = self._swapCollateralToPayDebt(_liqUser, toPayNow, discount, _config.priorityAssets)
+    repayValueIn, collateralValueOut = self._swapCollateralToPayDebt(_liqUser, targetRepayAmount, liqFeeRatio, _config.priorityAssets)
 
-    # repay debt from user
-    shouldStartAuctions: bool = extcall CreditEngine(_a.creditEngine).repayDebtDuringLiquidation(_liqUser, userDebt, newInterest, totalLiqFees, repaymentValueIn, _a)
+    # repay debt
+    didRestoreDebtHealth: bool = extcall CreditEngine(_a.creditEngine).repayDebtDuringLiquidation(_liqUser, userDebt, repayValueIn, newInterest, _a)
+
+    # start auctions (if necessary)
     auctionValueStarted: uint256 = 0
-    if shouldStartAuctions:
+    if not didRestoreDebtHealth:
         auctionValueStarted = self._initiateAuctions(_liqUser, _config.defaultAuctionConfig, _a)
 
-    # TODO: log event
-
+    log LiquidateUser(user=_liqUser, totalLiqFees=totalLiqFees, targetRepayAmount=targetRepayAmount, repayAmount=repayValueIn, didRestoreDebtHealth=didRestoreDebtHealth, collateralValueOut=collateralValueOut, auctionValueStarted=auctionValueStarted, keeperFee=keeperFee)
     return keeperFee
 
 
 @internal
 def _swapCollateralToPayDebt(
     _liqUser: address,
-    _toPayNow: uint256,
-    _discount: uint256,
+    _targetRepayAmount: uint256,
+    _liqFeeRatio: uint256,
     _priorityAssets: DynArray[address, MAX_PRIORITY_ASSETS],
 ) -> (uint256, uint256):
     # TODO: implement
@@ -149,5 +166,5 @@ def _calcAmountToPay(_debtAmount: uint256, _collateralValue: uint256, _targetLtv
     # it will never be perfectly precise because depending on what assets are taken, the LTV might slightly change
     collValueAdjusted: uint256 =_collateralValue * _targetLtv // HUNDRED_PERCENT
 
-    debtToRepay: uint256 = (_debtAmount - collValueAdjusted) * HUNDRED_PERCENT // (HUNDRED_PERCENT - _targetLtv)
-    return min(debtToRepay, _debtAmount)
+    toPay: uint256 = (_debtAmount - collValueAdjusted) * HUNDRED_PERCENT // (HUNDRED_PERCENT - _targetLtv)
+    return min(toPay, _debtAmount)
