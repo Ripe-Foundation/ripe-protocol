@@ -58,8 +58,41 @@ struct DepositPointsAllocs:
     voteDepositor: uint256
     voteDepositorTotal: uint256
 
+struct VaultData:
+    vaultId: uint256
+    vaultAddr: address
+    asset: address
+
+struct GenLiqConfig:
+    keeperFeeRatio: uint256
+    minKeeperFee: uint256
+    ltvPaybackBuffer: uint256
+    genAuctionConfig: AuctionConfig
+    genStabPools: DynArray[VaultData, MAX_GEN_STAB_POOLS]
+
+struct AssetLiqConfig:
+    hasConfig: bool
+    hasLtv: bool
+    hasWhitelist: bool
+    isNft: bool
+    specialStabPool: VaultData
+    auctionConfig: AuctionConfig
+
+struct AuctionConfig:
+    hasConfig: bool
+    startDiscount: uint256
+    minEntitled: uint256
+    maxDiscount: uint256
+    minBidIncrement: uint256
+    maxBidIncrement: uint256
+    delay: uint256
+    duration: uint256
+    extension: uint256
+
 # config
 isActivated: public(bool)
+
+MAX_GEN_STAB_POOLS: constant(uint256) = 10
 
 
 @deploy
@@ -118,6 +151,25 @@ def getRepayConfig(_user: address) -> RepayConfig:
 def isDaowryEnabled() -> bool:
     # TODO: implement
     return False
+
+
+#################
+# Auction House #
+#################
+
+
+@view
+@external
+def getGenLiqConfig() -> GenLiqConfig:
+    # TODO: implement
+    return empty(GenLiqConfig)
+
+
+@view
+@external
+def getAssetLiqConfig(_vaultId: uint256, _asset: address) -> AssetLiqConfig:
+    # TODO: implement
+    return empty(AssetLiqConfig)
 
 
 ####################

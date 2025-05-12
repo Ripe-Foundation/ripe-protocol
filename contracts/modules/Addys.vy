@@ -5,6 +5,7 @@ interface RipeHq:
     def getAddy(_addyId: uint256) -> address: view
     def greenToken() -> address: view
     def ripeToken() -> address: view
+    def governance() -> address: view
 
 interface VaultBook:
     def getStakedGreenData() -> (uint256, address): view
@@ -12,6 +13,7 @@ interface VaultBook:
 
 struct Addys:
     hq: address
+    governance: address
     greenToken: address
     ripeToken: address
     priceDesk: address
@@ -84,6 +86,7 @@ def _generateAddys() -> Addys:
 
     return Addys(
         hq=hq,
+        governance=staticcall RipeHq(hq).governance(),
         greenToken=staticcall RipeHq(hq).greenToken(),
         ripeToken=staticcall RipeHq(hq).ripeToken(),
         priceDesk=staticcall RipeHq(hq).getAddy(PRICE_DESK_ID),

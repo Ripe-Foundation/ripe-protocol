@@ -413,7 +413,7 @@ def _validateOnRepay(
 
 
 @external
-def repayDebtDuringLiquidation(
+def updateDebtDuringLiquidation(
     _liqUser: address,
     _userDebt: UserDebt,
     _amount: uint256,
@@ -426,13 +426,13 @@ def repayDebtDuringLiquidation(
     userDebt: UserDebt = _userDebt
     nonPrincipalDebt: uint256 = userDebt.amount - userDebt.principal
 
-    # reduce debt with repay amount
+    # reduce debt with repay amount -- keep in mind, `_amount` may be zero in this case (no stability pool swaps)
     userDebt.amount -= _amount
     if _amount > nonPrincipalDebt:
         principalToReduce: uint256 = _amount - nonPrincipalDebt
         userDebt.principal -= min(principalToReduce, userDebt.principal)
 
-    # refresh collateral value and debt terms -- LIKELY CHANGED during liquidation (swaps with stability pool)
+    # refresh collateral value and debt terms -- may have changed during liquidation (swaps with stability pool)
     numUserVaults: uint256 = staticcall Ledger(a.ledger).numUserVaults(_liqUser)
     bt: UserBorrowTerms = self._getUserBorrowTerms(_liqUser, numUserVaults, True, a)
     userDebt.debtTerms = bt.debtTerms
@@ -503,18 +503,21 @@ def _getUserBorrowTerms(
             # debt terms
             debtTerms: DebtTerms = staticcall ControlRoom(_a.controlRoom).getDebtTerms(vaultId, asset)
 
+            # skip if no ltv (staked green, staked ripe, etc)
+            if debtTerms.ltv == 0:
+                continue
+
             # collateral value, max debt
             collateralVal: uint256 = staticcall PriceDesk(_a.priceDesk).getUsdValue(asset, amount, _shouldRaise)
             maxDebt: uint256 = collateralVal * debtTerms.ltv // HUNDRED_PERCENT
 
             # debt terms sums -- weight is based on max debt (ltv)
-            if maxDebt != 0:
-                redemptionThresholdSum += maxDebt * debtTerms.redemptionThreshold
-                liqThresholdSum += maxDebt * debtTerms.liqThreshold
-                liqFeeSum += maxDebt * debtTerms.liqFee
-                borrowRateSum += maxDebt * debtTerms.borrowRate
-                daowrySum += maxDebt * debtTerms.daowry
-                totalSum += maxDebt
+            redemptionThresholdSum += maxDebt * debtTerms.redemptionThreshold
+            liqThresholdSum += maxDebt * debtTerms.liqThreshold
+            liqFeeSum += maxDebt * debtTerms.liqFee
+            borrowRateSum += maxDebt * debtTerms.borrowRate
+            daowrySum += maxDebt * debtTerms.daowry
+            totalSum += maxDebt
 
             # totals
             bt.collateralVal += collateralVal
