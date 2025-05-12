@@ -67,7 +67,7 @@ struct GenLiqConfig:
     keeperFeeRatio: uint256
     minKeeperFee: uint256
     ltvPaybackBuffer: uint256
-    genAuctionConfig: AuctionConfig
+    genAuctionParams: AuctionParams
     genStabPools: DynArray[VaultData, MAX_GEN_STAB_POOLS]
 
 struct AssetLiqConfig:
@@ -76,10 +76,11 @@ struct AssetLiqConfig:
     hasWhitelist: bool
     isNft: bool
     specialStabPool: VaultData
-    auctionConfig: AuctionConfig
+    canAuctionInstantly: bool
+    customAuctionParams: AuctionParams
 
-struct AuctionConfig:
-    hasConfig: bool
+struct AuctionParams:
+    hasParams: bool
     startDiscount: uint256
     minEntitled: uint256
     maxDiscount: uint256
@@ -170,6 +171,17 @@ def getGenLiqConfig() -> GenLiqConfig:
 def getAssetLiqConfig(_vaultId: uint256, _asset: address) -> AssetLiqConfig:
     # TODO: implement
     return empty(AssetLiqConfig)
+
+
+@view
+@external
+def canBuyAuction(_vaultId: uint256, _asset: address, _buyer: address) -> bool:
+
+    # check global setting (if auctions enabled)
+    # check whitelist (if it exists)
+
+    # TODO: implement
+    return True
 
 
 ####################

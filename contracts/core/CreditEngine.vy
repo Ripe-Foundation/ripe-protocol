@@ -26,8 +26,8 @@ interface PriceDesk:
     def getUsdValue(_asset: address, _amount: uint256, _shouldRaise: bool) -> uint256: view
 
 interface GreenToken:
-    def burn(_from: address, _amount: uint256): nonpayable
     def mint(_to: address, _amount: uint256): nonpayable
+    def burn(_amount: uint256): nonpayable
 
 interface VaultBook:
     def getVault(_vaultId: uint256) -> address: view
@@ -366,7 +366,7 @@ def repayForUser(
     extcall LootBox(a.lootbox).updateBorrowPoints(_user, a)
 
     # burn green repayment
-    extcall GreenToken(a.greenToken).burn(self, repayAmount)
+    extcall GreenToken(a.greenToken).burn(repayAmount)
 
     # handle refund
     if refundAmount != 0:

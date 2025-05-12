@@ -95,6 +95,18 @@ struct IntervalBorrow:
     start: uint256
     amount: uint256
 
+# auctions
+
+struct FungibleAuction:
+    liqUser: address
+    vaultId: uint256
+    asset: address 
+    startDiscount: uint256
+    maxDiscount: uint256
+    startBlock: uint256
+    endBlock: uint256
+    isActive: bool
+
 # user vault participation
 userVaults: public(HashMap[address, HashMap[uint256, uint256]]) # user -> index -> vault id
 indexOfVault: public(HashMap[address, HashMap[uint256, uint256]]) # user -> vault id -> index
@@ -119,6 +131,15 @@ assetDepositPoints: public(HashMap[uint256, HashMap[address, AssetDepositPoints]
 userDepositPoints: public(HashMap[address, HashMap[uint256, HashMap[address, UserDepositPoints]]]) # user -> vault id -> asset -> points
 userBorrowPoints:  public(HashMap[address, BorrowPoints]) # user -> BorrowPoints
 globalBorrowPoints: public(BorrowPoints)
+
+# auctions
+fungibleAuctions: public(HashMap[address, HashMap[uint256, FungibleAuction]]) # liq user -> auction index -> FungibleAuction
+fungibleAuctionIndex: public(HashMap[address, HashMap[uint256, HashMap[address, uint256]]]) # liq user -> vault id -> asset -> auction index
+numFungibleAuctions: public(HashMap[address, uint256]) # liq user -> num fungible auctions
+
+fungLiqUsers: public(HashMap[uint256, address]) # index -> liq user
+indexOfFungLiqUser: public(HashMap[address, uint256]) # liq user -> index
+numFungLiqUsers: public(uint256) # num liq users
 
 
 @deploy
@@ -409,3 +430,54 @@ def getDepositPointsBundle(_user: address, _vaultId: uint256, _asset: address) -
         assetPoints=self.assetDepositPoints[_vaultId][_asset],
         globalPoints=self.globalDepositPoints,
     )
+
+
+############
+# Auctions #
+############
+
+
+@view
+@external
+def getFungibleAuction(_liqUser: address, _vaultId: uint256, _asset: address) -> FungibleAuction:
+    aid: uint256 = self.fungibleAuctionIndex[_liqUser][_vaultId][_asset]
+    return self.fungibleAuctions[_liqUser][aid]
+
+
+@view
+@external
+def hasFungibleAuction(_liqUser: address, _vaultId: uint256, _asset: address) -> bool:
+    return self.fungibleAuctionIndex[_liqUser][_vaultId][_asset] != 0
+
+
+@external
+def createNewFungibleAuction(_auc: FungibleAuction) -> uint256:
+    assert msg.sender == addys._getAuctionHouseAddr() # dev: only AuctionHouse allowed
+
+    # fail gracefully if auction already exists
+    if self.fungibleAuctionIndex[_auc.liqUser][_auc.vaultId][_auc.asset] != 0:
+        return 0
+
+    # create new auction
+    aid: uint256 = self.numFungibleAuctions[_auc.liqUser]
+    if aid == 0:
+        aid = 1
+    self.fungibleAuctions[_auc.liqUser][aid] = _auc
+    self.fungibleAuctionIndex[_auc.liqUser][_auc.vaultId][_auc.asset] = aid
+    self.numFungibleAuctions[_auc.liqUser] = aid + 1
+
+    # register fungible liq user (if applicable)
+    if self.indexOfFungLiqUser[_auc.liqUser] == 0:
+        self._registerFungibleLiqUser(_auc.liqUser)
+
+    return aid
+
+
+@internal
+def _registerFungibleLiqUser(_liqUser: address):
+    uid: uint256 = self.numFungLiqUsers
+    if uid == 0:
+        uid = 1
+    self.fungLiqUsers[uid] = _liqUser
+    self.indexOfFungLiqUser[_liqUser] = uid
+    self.numFungLiqUsers = uid + 1
