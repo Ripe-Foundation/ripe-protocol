@@ -437,17 +437,7 @@ def getDepositPointsBundle(_user: address, _vaultId: uint256, _asset: address) -
 ############
 
 
-@view
-@external
-def getFungibleAuction(_liqUser: address, _vaultId: uint256, _asset: address) -> FungibleAuction:
-    aid: uint256 = self.fungibleAuctionIndex[_liqUser][_vaultId][_asset]
-    return self.fungibleAuctions[_liqUser][aid]
-
-
-@view
-@external
-def hasFungibleAuction(_liqUser: address, _vaultId: uint256, _asset: address) -> bool:
-    return self.fungibleAuctionIndex[_liqUser][_vaultId][_asset] != 0
+# create new auction
 
 
 @external
@@ -473,6 +463,9 @@ def createNewFungibleAuction(_auc: FungibleAuction) -> uint256:
     return aid
 
 
+# register fungible liq user
+
+
 @internal
 def _registerFungibleLiqUser(_liqUser: address):
     uid: uint256 = self.numFungLiqUsers
@@ -481,3 +474,76 @@ def _registerFungibleLiqUser(_liqUser: address):
     self.fungLiqUsers[uid] = _liqUser
     self.indexOfFungLiqUser[_liqUser] = uid
     self.numFungLiqUsers = uid + 1
+
+
+# removal fungible auction
+
+
+@external
+def removeFungibleAuction(_liqUser: address, _vaultId: uint256, _asset: address):
+    assert msg.sender == addys._getAuctionHouseAddr() # dev: only AuctionHouse allowed
+
+    numAuctions: uint256 = self.numFungibleAuctions[_liqUser]
+    if numAuctions == 0:
+        return
+
+    targetIndex: uint256 = self.fungibleAuctionIndex[_liqUser][_vaultId][_asset]
+    if targetIndex == 0:
+        return
+
+    # update data
+    lastIndex: uint256 = numAuctions - 1
+    self.numFungibleAuctions[_liqUser] = lastIndex
+    self.fungibleAuctionIndex[_liqUser][_vaultId][_asset] = 0
+
+    # have last auction replace the target auction
+    if targetIndex != lastIndex:
+        lastItem: FungibleAuction = self.fungibleAuctions[_liqUser][lastIndex]
+        self.fungibleAuctions[_liqUser][targetIndex] = lastItem
+        self.fungibleAuctionIndex[_liqUser][lastItem.vaultId][lastItem.asset] = targetIndex
+
+    # no more fungible auctions
+    if lastIndex <= 1:
+        self.numFungibleAuctions[_liqUser] = 0
+        self._removeFungLiqUser(_liqUser)
+
+
+# remove liq user
+
+
+@internal
+def _removeFungLiqUser(_liqUser: address):
+    numUsers: uint256 = self.numFungLiqUsers
+    if numUsers == 0:
+        return
+
+    targetIndex: uint256 = self.indexOfFungLiqUser[_liqUser]
+    if targetIndex == 0:
+        return
+
+    # update data
+    lastIndex: uint256 = numUsers - 1
+    self.numFungLiqUsers = lastIndex
+    self.indexOfFungLiqUser[_liqUser] = 0
+
+    # have last liq user replace the target liq user
+    if targetIndex != lastIndex:
+        lastUser: address = self.fungLiqUsers[lastIndex]
+        self.fungLiqUsers[targetIndex] = lastUser
+        self.indexOfFungLiqUser[lastUser] = targetIndex
+
+
+# utils
+
+
+@view
+@external
+def getFungibleAuction(_liqUser: address, _vaultId: uint256, _asset: address) -> FungibleAuction:
+    aid: uint256 = self.fungibleAuctionIndex[_liqUser][_vaultId][_asset]
+    return self.fungibleAuctions[_liqUser][aid]
+
+
+@view
+@external
+def hasFungibleAuction(_liqUser: address, _vaultId: uint256, _asset: address) -> bool:
+    return self.fungibleAuctionIndex[_liqUser][_vaultId][_asset] != 0

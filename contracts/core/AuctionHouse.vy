@@ -10,6 +10,7 @@ from ethereum.ercs import IERC20
 interface CreditEngine:
     def updateDebtDuringLiquidation(_liqUser: address, _userDebt: UserDebt, _amount: uint256, _newInterest: uint256, _a: addys.Addys = empty(addys.Addys)) -> bool: nonpayable
     def getLatestUserDebtAndTerms(_user: address, _shouldRaise: bool, _a: addys.Addys = empty(addys.Addys)) -> (UserDebt, UserBorrowTerms, uint256): view
+    def repayDuringAuctionPurchase(_liqUser: address, _repayAmount: uint256, _a: addys.Addys = empty(addys.Addys)) -> bool: nonpayable
 
 interface PriceDesk:
     def getAssetAmount(_asset: address, _usdValue: uint256, _shouldRaise: bool = False) -> uint256: view
@@ -22,6 +23,7 @@ interface ControlRoom:
 
 interface Ledger:
     def getFungibleAuction(_liqUser: address, _vaultId: uint256, _asset: address) -> FungibleAuction: view
+    def removeFungibleAuction(_liqUser: address, _vaultId: uint256, _asset: address): nonpayable
     def createNewFungibleAuction(_auc: FungibleAuction) -> uint256: nonpayable
     def userVaults(_user: address, _index: uint256) -> uint256: view
     def numUserVaults(_user: address) -> uint256: view
@@ -519,12 +521,18 @@ def _buyFungibleAuction(
     isPositionDepleted: bool = False
     amountSentToBuyer, collateralValueOut, amountNeededFromBuyer, isPositionDepleted = self._handleCollateralDuringPurchase(_liqUser, vaultAddr, _asset, payUsdValue, payAmount, _buyer, max_value(uint256), discount, _a.priceDesk)
 
-    # burn amount
-    greenToBurn: uint256 = min(amountNeededFromBuyer, staticcall IERC20(_a.greenToken).balanceOf(self))
-    extcall GreenToken(_a.greenToken).burn(greenToBurn)
+    # disable auction (if depleted)
+    if isPositionDepleted:
+        extcall Ledger(_a.ledger).removeFungibleAuction(_liqUser, _vaultId, _asset)
 
-    # update debt
-    # TODO: update debt
+    # repay debt for liq user
+    repayAmount: uint256 = min(amountNeededFromBuyer, payAmount)
+    assert extcall IERC20(_a.greenToken).transfer(_a.creditEngine, repayAmount) # dev: could not transfer
+    hasGoodDebtHealth: bool = extcall CreditEngine(_a.creditEngine).repayDuringAuctionPurchase(_liqUser, repayAmount, _a)
+
+    if hasGoodDebtHealth:
+        # TODO: kill all auctions for liq user
+        pass
 
     return 0
 
