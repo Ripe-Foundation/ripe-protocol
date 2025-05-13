@@ -408,9 +408,9 @@ def _handleCollateralDuringPurchase(
     return amountSentToBuyer, collateralValueOut, amountNeededFromBuyer, isPositionDepleted
 
 
-##################
-# Start Auctions #
-##################
+######################
+# Auction Management #
+######################
 
 
 # start during liquidation
