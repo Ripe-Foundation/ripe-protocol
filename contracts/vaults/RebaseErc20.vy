@@ -198,16 +198,57 @@ def sharesToAmount(_asset: address, _shares: uint256, _shouldRoundUp: bool) -> u
     return sharesMath._sharesToAmount(_asset, _shares, totalShares, totalBalance, _shouldRoundUp)
 
 
-#############
-# Utilities #
-#############
+####################
+# Needs For Others #
+####################
 
 
 @view
 @external
 def getUserLootBoxShare(_user: address, _asset: address) -> uint256:
-    # using shares for lootbox
+    # used in Lootbox.vy
     return vaultData.userBalances[_user][_asset]
+
+
+@view
+@external
+def getUserAssetAndAmountAtIndex(_user: address, _index: uint256) -> (address, uint256):
+    # used in AuctionHouse.vy and CreditEngine.vy
+    asset: address = vaultData.userAssets[_user][_index]
+    if asset == empty(address):
+        return empty(address), 0
+    userShares: uint256 = vaultData.userBalances[_user][asset]
+    if userShares == 0:
+        return empty(address), 0
+    return asset, sharesMath._sharesToAmount(asset, userShares, vaultData.totalBalances[asset], staticcall IERC20(asset).balanceOf(self), False)
+
+
+@view
+@external
+def getUserAssetAtIndexAndHasBalance(_user: address, _index: uint256) -> (address, bool):
+    # used in Lootbox.vy
+    asset: address = vaultData.userAssets[_user][_index]
+    if asset == empty(address):
+        return empty(address), False
+    return asset, vaultData.userBalances[_user][asset] != 0
+
+
+@view
+@external
+def getVaultDataOnDeposit(_user: address, _asset: address) -> Vault.VaultDataOnDeposit:
+    # used in Teller.vy
+    totalBalance: uint256 = staticcall IERC20(_asset).balanceOf(self)
+    return Vault.VaultDataOnDeposit(
+        hasPosition=vaultData.indexOfUserAsset[_user][_asset] != 0,
+        numAssets=vaultData._getNumUserAssets(_user),
+        userBalance=self._getTotalAmountForUser(_user, _asset, totalBalance),
+        totalBalance=totalBalance,
+    )
+
+
+#############
+# Utilities #
+#############
 
 
 @view
@@ -227,39 +268,6 @@ def _getTotalAmountForUser(_user: address, _asset: address, _totalBalance: uint2
 @external
 def getTotalAmountForVault(_asset: address) -> uint256:
     return staticcall IERC20(_asset).balanceOf(self)
-
-
-@view
-@external
-def getUserAssetAndAmountAtIndex(_user: address, _index: uint256) -> (address, uint256):
-    asset: address = vaultData.userAssets[_user][_index]
-    if asset == empty(address):
-        return empty(address), 0
-    userShares: uint256 = vaultData.userBalances[_user][asset]
-    if userShares == 0:
-        return empty(address), 0
-    return asset, sharesMath._sharesToAmount(asset, userShares, vaultData.totalBalances[asset], staticcall IERC20(asset).balanceOf(self), False)
-
-
-@view
-@external
-def getUserAssetAtIndexAndHasBalance(_user: address, _index: uint256) -> (address, bool):
-    asset: address = vaultData.userAssets[_user][_index]
-    if asset == empty(address):
-        return empty(address), False
-    return asset, vaultData.userBalances[_user][asset] != 0
-
-
-@view
-@external
-def getVaultDataOnDeposit(_user: address, _asset: address) -> Vault.VaultDataOnDeposit:
-    totalBalance: uint256 = staticcall IERC20(_asset).balanceOf(self)
-    return Vault.VaultDataOnDeposit(
-        hasPosition=vaultData.indexOfUserAsset[_user][_asset] != 0,
-        numAssets=vaultData._getNumUserAssets(_user),
-        userBalance=self._getTotalAmountForUser(_user, _asset, totalBalance),
-        totalBalance=totalBalance,
-    )
 
 
 ########

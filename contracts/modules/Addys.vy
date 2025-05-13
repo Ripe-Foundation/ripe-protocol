@@ -3,9 +3,9 @@
 interface RipeHq:
     def isValidAddyAddr(_addr: address) -> bool: view
     def getAddy(_addyId: uint256) -> address: view
+    def governance() -> address: view
     def greenToken() -> address: view
     def ripeToken() -> address: view
-    def governance() -> address: view
 
 interface VaultBook:
     def getStakedGreenData() -> (uint256, address): view
@@ -30,17 +30,17 @@ struct Addys:
     sRipeVaultId: uint256
 
 # hq
-RIPE_HQ: public(immutable(address))
+RIPE_HQ: immutable(address)
 
 # core addys
-PRICE_DESK_ID: public(constant(uint256)) = 1
-VAULT_BOOK_ID: public(constant(uint256)) = 2
-AUCTION_HOUSE_ID: public(constant(uint256)) = 3
-CONTROL_ROOM_ID: public(constant(uint256)) = 4
-CREDIT_ENGINE_ID: public(constant(uint256)) = 5
-LEDGER_ID: public(constant(uint256)) = 6
-LOOTBOX_ID: public(constant(uint256)) = 7
-TELLER_ID: public(constant(uint256)) = 8
+PRICE_DESK_ID: constant(uint256) = 1
+VAULT_BOOK_ID: constant(uint256) = 2
+AUCTION_HOUSE_ID: constant(uint256) = 3
+CONTROL_ROOM_ID: constant(uint256) = 4
+CREDIT_ENGINE_ID: constant(uint256) = 5
+LEDGER_ID: constant(uint256) = 6
+LOOTBOX_ID: constant(uint256) = 7
+TELLER_ID: constant(uint256) = 8
 
 
 @deploy
@@ -119,6 +119,12 @@ def _getRipeHq() -> address:
 @internal
 def _isValidRipeHqAddy(_addr: address) -> bool:
     return staticcall RipeHq(RIPE_HQ).isValidAddyAddr(_addr)
+
+
+@view
+@internal
+def _getGovernance() -> address:
+    return staticcall RipeHq(RIPE_HQ).governance()
 
 
 # price desk

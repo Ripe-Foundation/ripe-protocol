@@ -6,6 +6,12 @@ struct VaultDataOnDeposit:
     userBalance: uint256
     totalBalance: uint256
 
+
+########
+# Core #
+########
+
+
 @external
 def depositTokensInVault(
     _user: address,
@@ -21,7 +27,7 @@ def withdrawTokensFromVault(
     _asset: address,
     _amount: uint256,
     _recipient: address,
-) -> (uint256, bool, bool):
+) -> (uint256, bool):
     ...
 
 
@@ -35,10 +41,57 @@ def transferBalanceWithinVault(
     ...
 
 
+####################
+# Needs For Others #
+####################
+
+
+@view
+@external
+def numUserAssets(_user: address) -> uint256:
+    # used in AuctionHouse.vy
+    ...
+
+
+@view
+@external
+def userAssets(_user: address, _index: uint256) -> address:
+    # used in Lootbox.vy
+    ...
+
+
+@view
+@external
+def getVaultDataOnDeposit(_user: address, _asset: address) -> VaultDataOnDeposit:
+    # used in Teller.vy
+    ...
+
+
 @view
 @external
 def getUserLootBoxShare(_user: address, _asset: address) -> uint256:
+    # used in Lootbox.vy
     ...
+
+
+@view
+@external
+def getUserAssetAndAmountAtIndex(_user: address, _index: uint256) -> (address, uint256):
+    # used in CreditEngine.vy
+    ...
+
+
+@view
+@external
+def getUserAssetAtIndexAndHasBalance(_user: address, _index: uint256) -> (address, bool):
+    # used in Lootbox.vy and AuctionHouse.vy
+    ...
+
+
+###############
+# Other Utils #
+###############
+
 
 @view
 @external
@@ -52,46 +105,12 @@ def getTotalAmountForVault(_asset: address) -> uint256:
     ...
 
 
-@view
-@external
-def isUserInVault(_user: address) -> bool:
-    ...
+########
+# Data #
+########
 
 
-@view
-@external
-def hasAnyFunds() -> bool:
-    ...
-
-
-@view
-@external
-def userAssets(_user: address, _index: uint256) -> address:
-    ...
-
-
-@view
-@external
-def numUserAssets(_user: address) -> uint256:
-    ...
-
-
-@view
-@external
-def getUserAssetAndAmountAtIndex(_user: address, _index: uint256) -> (address, uint256):
-    ...
-
-
-@view
-@external
-def getUserAssetAtIndexAndHasBalance(_user: address, _index: uint256) -> (address, bool):
-    ...
-
-
-@view
-@external
-def getVaultDataOnDeposit(_user: address, _asset: address) -> VaultDataOnDeposit:
-    ...
+# remove data
 
 
 @external
@@ -104,9 +123,30 @@ def deregisterVaultAsset(_asset: address):
     ...
 
 
+# utils
+
+
+@view
 @external
-def recoverFunds(_asset: address, _recipient: address) -> bool:
+def getNumUserAssets(_user: address) -> uint256:
     ...
+
+
+@view
+@external
+def getNumVaultAssets() -> uint256:
+    ...
+
+
+@view
+@external
+def doesVaultHaveAnyFunds() -> bool:
+    ...
+
+
+########
+# Ripe #
+########
 
 
 @view
@@ -128,4 +168,9 @@ def isActivated() -> bool:
 
 @external
 def activate(_shouldActivate: bool):
+    ...
+
+
+@external
+def recoverFunds(_asset: address, _recipient: address) -> bool:
     ...

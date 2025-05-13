@@ -265,9 +265,9 @@ def _handleLiqUserCollateral(
                 break
 
             asset: address = empty(address)
-            amount: uint256 = 0
-            asset, amount = staticcall Vault(vaultAddr).getUserAssetAndAmountAtIndex(_liqUser, y)
-            if asset == empty(address) or amount == 0:
+            hasBalance: bool = False
+            asset, hasBalance = staticcall Vault(vaultAddr).getUserAssetAtIndexAndHasBalance(_liqUser, y)
+            if asset == empty(address) or not hasBalance:
                 continue
 
             # get asset liq config
@@ -294,7 +294,7 @@ def _handleLiqUserCollateral(
                 stabPoolsToUse = [config.specialStabPool]
 
             # iterate thru each stab pool
-            isPositionDepleted: bool = False
+            shouldGoToNextLiqAsset: bool = False
             for sp: VaultData in stabPoolsToUse:
                 if remainingToRepay == 0:
                     break
@@ -307,16 +307,16 @@ def _handleLiqUserCollateral(
                 # swap with stability pool
                 stabValueIn: uint256 = 0
                 collValueOut: uint256 = 0
-                stabValueIn, collValueOut, isPositionDepleted = self._swapCollateralWithStabPool(sp, maxAmountInStabPool, _liqUser, vaultId, vaultAddr, asset, remainingToRepay, _liqFeeRatio, _a)
+                stabValueIn, collValueOut, shouldGoToNextLiqAsset = self._swapCollateralWithStabPool(sp, maxAmountInStabPool, _liqUser, vaultId, vaultAddr, asset, remainingToRepay, _liqFeeRatio, _a)
                 remainingToRepay -= stabValueIn
                 collateralValueOut += collValueOut
 
                 # if position depleted, nothing else to do with this asset
-                if isPositionDepleted:
+                if shouldGoToNextLiqAsset:
                     break
 
             # add to auction list if not depleted
-            if not isPositionDepleted:
+            if not shouldGoToNextLiqAsset:
                 self._saveUserAssetForAuction(_liqUser, vaultId, vaultAddr, asset)
 
     # TODO:
@@ -350,12 +350,20 @@ def _swapCollateralWithStabPool(
         maxValueInStabPool = staticcall PriceDesk(_a.priceDesk).getUsdValue(_stabPool.asset, _maxAmountInStabPool, True)
         proceedsAddr = _a.governance
 
+    # can't get price of stab asset, skip
+    if maxValueInStabPool == 0:
+        return 0, 0, False
+
     # handle collateral buy
     amountSentToBuyer: uint256 = 0
     collateralValueOut: uint256 = 0
     amountNeededFromBuyer: uint256 = 0
-    isPositionDepleted: bool = False
-    amountSentToBuyer, collateralValueOut, amountNeededFromBuyer, isPositionDepleted = self._handleCollateralDuringPurchase(_liqUser, _vaultAddr, _asset, maxValueInStabPool, _maxAmountInStabPool, _stabPool.vaultAddr, _remainingToRepay, _liqFeeRatio, _a.priceDesk)
+    shouldGoToNextLiqAsset: bool = False
+    amountSentToBuyer, collateralValueOut, amountNeededFromBuyer, shouldGoToNextLiqAsset = self._handleCollateralDuringPurchase(_liqUser, _vaultAddr, _asset, maxValueInStabPool, _maxAmountInStabPool, _stabPool.vaultAddr, _remainingToRepay, _liqFeeRatio, _a.priceDesk)
+
+    # nothing sent to buyer, nothing to do here
+    if amountSentToBuyer == 0:
+        return 0, 0, shouldGoToNextLiqAsset
 
     # remove assets from stability pool
     stabAmountSwapped: uint256 = extcall StabilityPool(_stabPool.vaultAddr).swapForLiquidatedCollateral(_stabPool.asset, amountNeededFromBuyer, _asset, amountSentToBuyer, proceedsAddr, _a)
@@ -374,7 +382,7 @@ def _swapCollateralWithStabPool(
         stabAmountSwapped=stabAmountSwapped,
         stabValueSwapped=stabValueSwapped,
     )
-    return min(stabValueSwapped, _remainingToRepay), collateralValueOut, isPositionDepleted
+    return min(stabValueSwapped, _remainingToRepay), collateralValueOut, shouldGoToNextLiqAsset
 
 
 @internal
@@ -394,11 +402,14 @@ def _handleCollateralDuringPurchase(
     maxLiqCollateralValue: uint256 = min(_extraCeilingOnValue, _maxBuyerValue * HUNDRED_PERCENT // (HUNDRED_PERCENT - _discount))
     maxLiqCollateralAmount: uint256 = staticcall PriceDesk(_priceDesk).getAssetAmount(_liqAsset, maxLiqCollateralValue, True)
 
+    # nothing to do here, not getting any price here
+    if maxLiqCollateralAmount == 0:
+        return 0, 0, 0, True
+
     # transfer collateral to buyer
     amountSentToBuyer: uint256 = 0
     isPositionDepleted: bool = False
-    isUserStillInVault: bool = False
-    amountSentToBuyer, isPositionDepleted, isUserStillInVault = extcall Vault(_liqVaultAddr).withdrawTokensFromVault(_liqUser, _liqAsset, maxLiqCollateralAmount, _buyerAddr)
+    amountSentToBuyer, isPositionDepleted = extcall Vault(_liqVaultAddr).withdrawTokensFromVault(_liqUser, _liqAsset, maxLiqCollateralAmount, _buyerAddr)
 
     # finalize values for buyer
     collateralValueOut: uint256 = maxLiqCollateralValue * amountSentToBuyer // maxLiqCollateralAmount

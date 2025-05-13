@@ -13,11 +13,6 @@ interface CreditEngine:
     def getMaxWithdrawableForAsset(_user: address, _asset: address, _a: addys.Addys = empty(addys.Addys)) -> uint256: view
     def hasGoodDebtHealth(_user: address, _a: addys.Addys = empty(addys.Addys)) -> bool: view
 
-interface Ledger:
-    def getDepositLedgerData(_user: address, _vaultId: uint256) -> DepositLedgerData: view
-    def removeVaultFromUser(_user: address, _vaultId: uint256): nonpayable
-    def addVaultToUser(_user: address, _vaultId: uint256): nonpayable
-
 interface Lootbox:
     def updateDepositPoints(_user: address, _vaultId: uint256, _vaultAddr: address, _asset: address, _a: addys.Addys = empty(addys.Addys)): nonpayable
     def claimLootForUser(_user: address, _shouldStake: bool, _caller: address, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
@@ -25,6 +20,10 @@ interface Lootbox:
 interface ControlRoom:
     def getWithdrawConfig(_vaultId: uint256, _asset: address, _user: address, _caller: address) -> WithdrawConfig: view
     def getDepositConfig(_vaultId: uint256, _asset: address, _user: address) -> DepositConfig: view
+
+interface Ledger:
+    def getDepositLedgerData(_user: address, _vaultId: uint256) -> DepositLedgerData: view
+    def addVaultToUser(_user: address, _vaultId: uint256): nonpayable
 
 interface VaultBook:
     def getVaultAddr(_vaultId: uint256) -> address: view
@@ -251,17 +250,10 @@ def _withdraw(
 
     # withdraw tokens
     isDepleted: bool = False
-    isUserStillInVault: bool = False
-    amount, isDepleted, isUserStillInVault = extcall Vault(vaultAddr).withdrawTokensFromVault(_user, _asset, amount, _user)
-
-    # deregister vault (if applicable)
-    if not isUserStillInVault:
-        extcall Ledger(_a.ledger).removeVaultFromUser(_user, _vaultId)
+    amount, isDepleted = extcall Vault(vaultAddr).withdrawTokensFromVault(_user, _asset, amount, _user)
 
     # update lootbox points
     extcall Lootbox(_a.lootbox).updateDepositPoints(_user, vaultId, vaultAddr, _asset, _a)
-    if isDepleted:
-        pass # TODO: if depleted, claim that vault/asset points
 
     log TellerWithdrawal(user=_user, asset=_asset, caller=_caller, amount=amount, vaultAddr=vaultAddr, vaultId=vaultId, isDepleted=isDepleted)
     return amount

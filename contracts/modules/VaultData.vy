@@ -1,12 +1,9 @@
 # @version 0.4.1
 
-from ethereum.ercs import IERC20
+uses: addys
 
-event VaultFundsRecovered:
-    vaultId: uint256
-    asset: indexed(address)
-    recipient: indexed(address)
-    balance: uint256
+import contracts.modules.Addys as addys
+from ethereum.ercs import IERC20
 
 event VaultIdSet:
     vaultId: uint256
@@ -14,6 +11,12 @@ event VaultIdSet:
 event VaultActivated:
     vaultId: uint256
     isActivated: bool
+
+event VaultFundsRecovered:
+    vaultId: uint256
+    asset: indexed(address)
+    recipient: indexed(address)
+    balance: uint256
 
 # config
 vaultId: public(uint256)
@@ -40,7 +43,7 @@ def __init__():
 
 
 ###################
-# Balance Updates #
+# Balance Changes #
 ###################
 
 
@@ -93,12 +96,9 @@ def _reduceBalanceOnWithdrawal(
     return withdrawBal, currentBal == 0
 
 
-################
-# Registration #
-################
-
-
-# user
+###############
+# User Assets #
+###############
 
 
 @internal
@@ -111,8 +111,10 @@ def _registerUserAsset(_user: address, _asset: address):
     self.numUserAssets[_user] = aid + 1
 
 
-@internal
-def _deregisterUserAsset(_user: address, _asset: address) -> bool:
+@external
+def deregisterUserAsset(_user: address, _asset: address) -> bool:
+    assert msg.sender == addys._getLootboxAddr() # dev: only Lootbox allowed
+
     if self.userBalances[_user][_asset] != 0:
         return True
 
@@ -138,7 +140,9 @@ def _deregisterUserAsset(_user: address, _asset: address) -> bool:
     return lastIndex > 1
 
 
-# vault
+################
+# Vault Assets #
+################
 
 
 @internal
@@ -151,8 +155,10 @@ def _registerVaultAsset(_asset: address):
     self.numAssets = aid + 1
 
 
-@internal
-def _deregisterVaultAsset(_asset: address):
+@external
+def deregisterVaultAsset(_asset: address):
+    assert msg.sender == addys._getControlRoomAddr() # dev: only ControlRoom allowed
+
     if self.totalBalances[_asset] != 0:
         return
 
@@ -176,21 +182,32 @@ def _deregisterVaultAsset(_asset: address):
         self.indexOfAsset[lastItem] = targetIndex
 
 
-#############
-# Utilities #
-#############
+##############
+# Data Utils #
+##############
+
+
+# any vault funds
 
 
 @view
 @external
-def isUserInVault(_user: address) -> bool:
-    return self._isUserInVault(_user)
+def doesVaultHaveAnyFunds() -> bool:
+    numAssets: uint256 = self.numAssets
+    for i: uint256 in range(1, numAssets, bound=max_value(uint256)):
+        asset: address = self.vaultAssets[i]
+        if self.totalBalances[asset] != 0:
+            return True
+    return False
+
+
+# num user assets
 
 
 @view
-@internal
-def _isUserInVault(_user: address) -> bool:
-    return self._getNumUserAssets(_user) != 0
+@external
+def getNumUserAssets(_user: address) -> uint256:
+    return self._getNumUserAssets(_user)
 
 
 @view
@@ -202,15 +219,22 @@ def _getNumUserAssets(_user: address) -> uint256:
     return numAssets - 1
 
 
+# num vault assets
+
+
 @view
 @external
-def hasAnyFunds() -> bool:
+def getNumVaultAssets() -> uint256:
+    return self._getNumVaultAssets()
+
+
+@view
+@internal
+def _getNumVaultAssets() -> uint256:
     numAssets: uint256 = self.numAssets
-    for i: uint256 in range(1, numAssets, bound=max_value(uint256)):
-        asset: address = self.vaultAssets[i]
-        if self.totalBalances[asset] != 0:
-            return True
-    return False
+    if numAssets == 0:
+        return 0
+    return numAssets - 1
 
 
 ########
@@ -218,11 +242,10 @@ def hasAnyFunds() -> bool:
 ########
 
 
-# vault id
+@external
+def setVaultId(_vaultId: uint256) -> bool:
+    assert msg.sender == addys._getVaultBookAddr() # dev: only vault book allowed
 
-
-@internal
-def _setVaultId(_vaultId: uint256) -> bool:
     prevVaultId: uint256 = self.vaultId
     assert prevVaultId == 0 or prevVaultId == _vaultId # dev: invalid vault id
     self.vaultId = _vaultId
@@ -230,11 +253,18 @@ def _setVaultId(_vaultId: uint256) -> bool:
     return True
 
 
-# recover funds
+@external
+def activate(_shouldActivate: bool):
+    assert msg.sender == addys._getControlRoomAddr() # dev: only ControlRoom allowed
+
+    self.isActivated = _shouldActivate
+    log VaultActivated(vaultId=self.vaultId, isActivated=_shouldActivate)
 
 
-@internal
-def _recoverFunds(_asset: address, _recipient: address) -> bool:
+@external
+def recoverFunds(_asset: address, _recipient: address) -> bool:
+    assert msg.sender == addys._getControlRoomAddr() # dev: only ControlRoom allowed
+
     balance: uint256 = staticcall IERC20(_asset).balanceOf(self)
     if empty(address) in [_recipient, _asset] or balance == 0:
         return False
@@ -249,10 +279,3 @@ def _recoverFunds(_asset: address, _recipient: address) -> bool:
     return True
 
 
-# activation
-
-
-@internal
-def _activate(_shouldActivate: bool):
-    self.isActivated = _shouldActivate
-    log VaultActivated(vaultId=self.vaultId, isActivated=_shouldActivate)

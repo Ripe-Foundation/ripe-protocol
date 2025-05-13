@@ -126,7 +126,7 @@ def _cancelPendingVault(_addr: address):
 @view
 @external
 def isValidVaultUpdate(_vaultId: uint256, _newAddr: address) -> bool:
-    if self._hasAnyFunds(_vaultId):
+    if self._doesVaultHaveAnyFunds(_vaultId):
         return False
     return registry._isValidAddyUpdate(_vaultId, _newAddr, registry.addyInfo[_vaultId].addr)
 
@@ -134,7 +134,7 @@ def isValidVaultUpdate(_vaultId: uint256, _newAddr: address) -> bool:
 @external
 def updateVaultAddr(_vaultId: uint256, _newAddr: address) -> bool:
     assert gov._canGovern(msg.sender) # dev: no perms
-    if self._hasAnyFunds(_vaultId):
+    if self._doesVaultHaveAnyFunds(_vaultId):
         return False
     return registry._updateAddyAddr(_vaultId, _newAddr)
 
@@ -142,7 +142,7 @@ def updateVaultAddr(_vaultId: uint256, _newAddr: address) -> bool:
 @external
 def confirmVaultUpdate(_vaultId: uint256) -> bool:
     assert gov._canGovern(msg.sender) # dev: no perms
-    if self._hasAnyFunds(_vaultId):
+    if self._doesVaultHaveAnyFunds(_vaultId):
         return False
     didUpdate: bool = registry._confirmAddyUpdate(_vaultId)
     if didUpdate:
@@ -165,7 +165,7 @@ def cancelPendingVaultUpdate(_vaultId: uint256) -> bool:
 @view
 @external
 def isValidVaultDisable(_vaultId: uint256) -> bool:
-    if self._hasAnyFunds(_vaultId):
+    if self._doesVaultHaveAnyFunds(_vaultId):
         return False
     return registry._isValidAddyDisable(_vaultId, registry.addyInfo[_vaultId].addr)
 
@@ -173,7 +173,7 @@ def isValidVaultDisable(_vaultId: uint256) -> bool:
 @external
 def disableVaultAddr(_vaultId: uint256) -> bool:
     assert gov._canGovern(msg.sender) # dev: no perms
-    if self._hasAnyFunds(_vaultId):
+    if self._doesVaultHaveAnyFunds(_vaultId):
         return False
     return registry._disableAddyAddr(_vaultId)
 
@@ -181,7 +181,7 @@ def disableVaultAddr(_vaultId: uint256) -> bool:
 @external
 def confirmVaultDisable(_vaultId: uint256) -> bool:
     assert gov._canGovern(msg.sender) # dev: no perms
-    if self._hasAnyFunds(_vaultId):
+    if self._doesVaultHaveAnyFunds(_vaultId):
         return False
     return registry._confirmAddyDisable(_vaultId)
 
@@ -294,15 +294,15 @@ def getLastVaultId() -> uint256:
 
 @view
 @external
-def hasAnyFunds(_vaultId: uint256) -> bool:
-    return self._hasAnyFunds(_vaultId)
+def doesVaultHaveAnyFunds(_vaultId: uint256) -> bool:
+    return self._doesVaultHaveAnyFunds(_vaultId)
 
 
 @view
 @internal
-def _hasAnyFunds(_vaultId: uint256) -> bool:
+def _doesVaultHaveAnyFunds(_vaultId: uint256) -> bool:
     vaultAddr: address = registry._getAddy(_vaultId)
-    return staticcall Vault(vaultAddr).hasAnyFunds()
+    return staticcall Vault(vaultAddr).doesVaultHaveAnyFunds()
 
 
 # staked vaults

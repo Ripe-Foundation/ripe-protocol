@@ -1,41 +1,18 @@
 # @version 0.4.1
 
-implements: Vault
+uses: vaultData
+uses: addys
 
-initializes: vaultData
-exports: vaultData.__interface__
-
-initializes: addys
-exports: addys.__interface__
-
-from interfaces import Vault
 import contracts.modules.VaultData as vaultData
 import contracts.modules.Addys as addys
+
+from interfaces import Vault
 from ethereum.ercs import IERC20
-
-event SimpleErc20VaultDeposit:
-    user: indexed(address)
-    asset: indexed(address)
-    amount: uint256
-
-event SimpleErc20VaultWithdrawal:
-    user: indexed(address)
-    asset: indexed(address)
-    amount: uint256
-    isDepleted: bool
-
-event SimpleErc20VaultTransfer:
-    fromUser: indexed(address)
-    toUser: indexed(address)
-    asset: indexed(address)
-    transferAmount: uint256
-    isFromUserDepleted: bool
 
 
 @deploy
-def __init__(_hq: address):
-    addys.__init__(_hq)
-    vaultData.__init__()
+def __init__():
+    pass
 
 
 ########
@@ -43,8 +20,8 @@ def __init__(_hq: address):
 ########
 
 
-@external
-def depositTokensInVault(
+@internal
+def _depositTokensInVault(
     _user: address,
     _asset: address,
     _amount: uint256,
@@ -60,12 +37,11 @@ def depositTokensInVault(
     # add balance on deposit
     vaultData._addBalanceOnDeposit(_user, _asset, depositAmount, True)
 
-    log SimpleErc20VaultDeposit(user=_user, asset=_asset, amount=depositAmount)
     return depositAmount
 
 
-@external
-def withdrawTokensFromVault(
+@internal
+def _withdrawTokensFromVault(
     _user: address,
     _asset: address,
     _amount: uint256,
@@ -88,12 +64,11 @@ def withdrawTokensFromVault(
     assert withdrawalAmount != 0 # dev: no withdrawal amount
     assert extcall IERC20(_asset).transfer(_recipient, withdrawalAmount, default_return_value=True) # dev: token transfer failed
 
-    log SimpleErc20VaultWithdrawal(user=_user, asset=_asset, amount=withdrawalAmount, isDepleted=isDepleted)
     return withdrawalAmount, isDepleted
 
 
-@external
-def transferBalanceWithinVault(
+@internal
+def _transferBalanceWithinVault(
     _asset: address,
     _fromUser: address,
     _toUser: address,
@@ -112,7 +87,6 @@ def transferBalanceWithinVault(
     transferAmount, isFromUserDepleted = vaultData._reduceBalanceOnWithdrawal(_fromUser, _asset, _transferAmount, False)
     vaultData._addBalanceOnDeposit(_toUser, _asset, transferAmount, False)
 
-    log SimpleErc20VaultTransfer(fromUser=_fromUser, toUser=_toUser, asset=_asset, transferAmount=transferAmount, isFromUserDepleted=isFromUserDepleted)
     return transferAmount, isFromUserDepleted
 
 
@@ -122,8 +96,8 @@ def transferBalanceWithinVault(
 
 
 @view
-@external
-def getVaultDataOnDeposit(_user: address, _asset: address) -> Vault.VaultDataOnDeposit:
+@internal
+def _getVaultDataOnDeposit(_user: address, _asset: address) -> Vault.VaultDataOnDeposit:
     # used in Teller.vy
     return Vault.VaultDataOnDeposit(
         hasPosition=vaultData.indexOfUserAsset[_user][_asset] != 0,
@@ -134,16 +108,16 @@ def getVaultDataOnDeposit(_user: address, _asset: address) -> Vault.VaultDataOnD
 
 
 @view
-@external
-def getUserLootBoxShare(_user: address, _asset: address) -> uint256:
+@internal
+def _getUserLootBoxShare(_user: address, _asset: address) -> uint256:
     # used in Lootbox.vy
     return vaultData.userBalances[_user][_asset]
 
 
 @view
-@external
-def getUserAssetAndAmountAtIndex(_user: address, _index: uint256) -> (address, uint256):
-    # used in AuctionHouse.vy and CreditEngine.vy
+@internal
+def _getUserAssetAndAmountAtIndex(_user: address, _index: uint256) -> (address, uint256):
+    # used in CreditEngine.vy
     asset: address = vaultData.userAssets[_user][_index]
     if asset == empty(address):
         return empty(address), 0
@@ -151,9 +125,9 @@ def getUserAssetAndAmountAtIndex(_user: address, _index: uint256) -> (address, u
 
 
 @view
-@external
-def getUserAssetAtIndexAndHasBalance(_user: address, _index: uint256) -> (address, bool):
-    # used in Lootbox.vy
+@internal
+def _getUserAssetAtIndexAndHasBalance(_user: address, _index: uint256) -> (address, bool):
+    # used in Lootbox.vy and AuctionHouse.vy
     asset: address = vaultData.userAssets[_user][_index]
     if asset == empty(address):
         return empty(address), False
@@ -166,52 +140,12 @@ def getUserAssetAtIndexAndHasBalance(_user: address, _index: uint256) -> (addres
 
 
 @view
-@external
-def getTotalAmountForUser(_user: address, _asset: address) -> uint256:
+@internal
+def _getTotalAmountForUser(_user: address, _asset: address) -> uint256:
     return vaultData.userBalances[_user][_asset]
 
 
 @view
-@external
-def getTotalAmountForVault(_asset: address) -> uint256:
+@internal
+def _getTotalAmountForVault(_asset: address) -> uint256:
     return vaultData.totalBalances[_asset]
-
-
-###########
-# Storage #
-###########
-
-
-@external
-def deregisterUserAsset(_user: address, _asset: address) -> bool:
-    assert msg.sender == addys._getLootboxAddr() # dev: only Lootbox allowed
-    return vaultData._deregisterUserAsset(_user, _asset)
-
-
-@external
-def deregisterVaultAsset(_asset: address):
-    assert msg.sender == addys._getControlRoomAddr() # dev: only ControlRoom allowed
-    vaultData._deregisterVaultAsset(_asset)
-
-
-########
-# Ripe #
-########
-
-
-@external
-def setVaultId(_vaultId: uint256) -> bool:
-    assert msg.sender == addys._getVaultBookAddr() # dev: only vault book allowed
-    return vaultData._setVaultId(_vaultId)
-
-
-@external
-def activate(_shouldActivate: bool):
-    assert msg.sender == addys._getControlRoomAddr() # dev: only ControlRoom allowed
-    vaultData._activate(_shouldActivate)
-
-
-@external
-def recoverFunds(_asset: address, _recipient: address) -> bool:
-    assert msg.sender == addys._getControlRoomAddr() # dev: only ControlRoom allowed
-    return vaultData._recoverFunds(_asset, _recipient)
