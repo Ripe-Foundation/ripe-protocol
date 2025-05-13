@@ -27,6 +27,7 @@ interface Ledger:
     def createNewFungibleAuction(_auc: FungibleAuction) -> uint256: nonpayable
     def userVaults(_user: address, _index: uint256) -> uint256: view
     def numUserVaults(_user: address) -> uint256: view
+    def isUserInLiquidation(_user: address) -> bool: view
 
 interface StabilityPool:
     def swapForLiquidatedCollateral(_stabAsset: address, _stabAmountToRemove: uint256, _liqAsset: address, _liqAmountSent: uint256, _recipient: address, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
@@ -506,7 +507,7 @@ def _buyFungibleAuction(
     _a: addys.Addys,
 ) -> uint256:
     auc: FungibleAuction = staticcall Ledger(_a.ledger).getFungibleAuction(_liqUser, _vaultId, _asset)
-    payAmount: uint256 = self._validateOnBuyFungibleAuction(auc, _buyer, _payAmount, _a.greenToken, _a.controlRoom)
+    payAmount: uint256 = self._validateOnBuyFungibleAuction(auc, _buyer, _payAmount, _a.greenToken, _a.controlRoom, _a.ledger)
     payUsdValue: uint256 = payAmount # green treated as $1
 
     # calculate discount
@@ -545,10 +546,12 @@ def _validateOnBuyFungibleAuction(
     _payAmount: uint256,
     _greenToken: address,
     _controlRoom: address,
+    _ledger: address,
 ) -> uint256:
     assert _auc.isActive # dev: auction is not active
     assert block.number >= _auc.startBlock and block.number < _auc.endBlock # dev: not within auction window
     assert staticcall ControlRoom(_controlRoom).canBuyAuction(_auc.vaultId, _auc.asset, _buyer) # dev: cannot buy auction
+    assert staticcall Ledger(_ledger).isUserInLiquidation(_auc.liqUser) # dev: liq user must be in liquidation
 
     payAmount: uint256 = min(_payAmount, staticcall IERC20(_greenToken).balanceOf(self))
     assert payAmount != 0 # dev: cannot pay 0

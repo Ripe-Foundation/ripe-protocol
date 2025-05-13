@@ -336,6 +336,12 @@ def isBorrower(_user: address) -> bool:
     return self.indexOfBorrower[_user] != 0
 
 
+@view
+@external
+def isUserInLiquidation(_user: address) -> bool:
+    return self.userDebt[_user].inLiquidation
+
+
 ####################
 # Rewards / Points #
 ####################
