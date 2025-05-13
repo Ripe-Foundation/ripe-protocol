@@ -160,6 +160,15 @@ def getTotalAmountForVault(_asset: address) -> uint256:
 
 @view
 @external
+def getUserAssetAtIndexAndHasBalance(_user: address, _index: uint256) -> (address, bool):
+    asset: address = vaultData.userAssets[_user][_index]
+    if asset == empty(address):
+        return empty(address), False
+    return asset, vaultData.userBalances[_user][asset] != 0
+
+
+@view
+@external
 def getUserAssetAndAmountAtIndex(_user: address, _index: uint256) -> (address, uint256):
     asset: address = vaultData.userAssets[_user][_index]
     if asset == empty(address):
@@ -184,9 +193,12 @@ def getVaultDataOnDeposit(_user: address, _asset: address) -> Vault.VaultDataOnD
 
 
 @external
-def deregisterUserAsset(_user: address, _asset: address):
+def deregisterUserAsset(_user: address, _asset: address) -> bool:
+
+    # TODO: only lootbox
+
     assert msg.sender == staticcall AddyRegistry(ADDY_REGISTRY).getAddy(LEDGER_ID) # dev: only Ledger allowed
-    vaultData._deregisterUserAsset(_user, _asset)
+    return vaultData._deregisterUserAsset(_user, _asset)
 
 
 @external

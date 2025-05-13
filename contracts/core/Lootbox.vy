@@ -11,6 +11,7 @@ interface Ledger:
     def setDepositPointsAndRipeRewards(_user: address, _vaultId: uint256, _asset: address, _userPoints: UserDepositPoints, _assetPoints: AssetDepositPoints, _globalPoints: GlobalDepositPoints, _ripeRewards: RipeRewards): nonpayable
     def setBorrowPointsAndRipeRewards(_user: address, _userPoints: BorrowPoints, _globalPoints: BorrowPoints, _ripeRewards: RipeRewards): nonpayable
     def getDepositPointsBundle(_user: address, _vaultId: uint256, _asset: address) -> DepositPointsBundle: view
+    def removeVaultFromUser(_user: address, _vaultId: uint256): nonpayable
     def getBorrowPointsBundle(_user: address) -> BorrowPointsBundle: view
     def userVaults(_user: address, _index: uint256) -> uint256: view
     def setRipeRewards(_ripeRewards: RipeRewards): nonpayable
@@ -108,6 +109,9 @@ struct DepositPointsAllocs:
 EIGHTEEN_DECIMALS: constant(uint256) = 10 ** 18
 HUNDRED_PERCENT: constant(uint256) = 100_00 # 100.00%
 
+MAX_ASSETS_TO_CLEAN: constant(uint256) = 20
+MAX_VAULTS_TO_CLEAN: constant(uint256) = 10
+
 # config
 isActivated: public(bool)
 
@@ -141,40 +145,41 @@ def claimLootForUser(
     totalRipeForUser: uint256 = self._claimBorrowLoot(_user, a)
 
     # now look at deposit loot
+    vaultsToRemove: DynArray[uint256, MAX_VAULTS_TO_CLEAN] = []
     numUserVaults: uint256 = staticcall Ledger(a.ledger).numUserVaults(_user)
     for i: uint256 in range(1, numUserVaults, bound=max_value(uint256)):
         vaultId: uint256 = staticcall Ledger(a.ledger).userVaults(_user, i)
         vaultAddr: address = staticcall VaultBook(a.vaultBook).getVault(vaultId)
         if vaultAddr == empty(address):
             continue
+
+        assetsToRemove: DynArray[address, MAX_ASSETS_TO_CLEAN] = []
         numUserAssets: uint256 = staticcall Vault(vaultAddr).numUserAssets(_user)
         for y: uint256 in range(1, numUserAssets, bound=max_value(uint256)):
-            asset: address = staticcall Vault(vaultAddr).userAssets(_user, y)
+            asset: address = empty(address)
+            hasBalance: bool = False
+            asset, hasBalance = staticcall Vault(vaultAddr).getUserAssetAtIndexAndHasBalance(_user, y)
             if asset == empty(address):
                 continue
-            totalRipeForUser += self._claimDepositLoot(_user, vaultId, vaultAddr, asset, a)
+
+            # save to clean up later
+            if not hasBalance and len(assetsToRemove) < MAX_ASSETS_TO_CLEAN:
+                assetsToRemove.append(asset)
+
+            # claim loot
+            totalRipeForUser += self._claimDepositLoot(_user, vaultId, vaultAddr, asset, not hasBalance, a)
+
+        # clean up user assets (storage optimization)
+        stillInVault: bool = self._cleanUpUserAssets(_user, vaultAddr, assetsToRemove)
+        if not stillInVault and len(vaultsToRemove) < MAX_VAULTS_TO_CLEAN:
+            vaultsToRemove.append(vaultId)
+
+    # clean up user vaults (storage optimization)
+    self._cleanUpUserVaults(_user, vaultsToRemove, a.ledger)
 
     # mint ripe, then stake or transfer to user
     if totalRipeForUser != 0:
         self._handleRipeMint(_user, totalRipeForUser, _shouldStake, a.ripeToken)
-
-    return totalRipeForUser
-
-
-@external
-def claimDepositLootOnExit(
-    _user: address,
-    _vaultId: uint256,
-    _vaultAddr: address,
-    _asset: address,
-    _a: addys.Addys = empty(addys.Addys),
-) -> uint256:
-    assert addys._isValidRipeHqAddy(msg.sender) # dev: no perms
-    a: addys.Addys = addys._getAddys(_a)
-
-    totalRipeForUser: uint256 = self._claimDepositLoot(_user, _vaultId, _vaultAddr, _asset, a)
-    if totalRipeForUser != 0:
-        self._handleRipeMint(_user, totalRipeForUser, True, a.ripeToken)
 
     return totalRipeForUser
 
@@ -390,6 +395,7 @@ def _claimDepositLoot(
     _vaultId: uint256,
     _vaultAddr: address,
     _asset: address,
+    _shouldFlush: bool,
     _a: addys.Addys,
 ) -> uint256:
     userRipeRewards: UserDepositLoot = empty(UserDepositLoot)
@@ -397,12 +403,10 @@ def _claimDepositLoot(
     ap: AssetDepositPoints = empty(AssetDepositPoints)
     gp: GlobalDepositPoints = empty(GlobalDepositPoints)
     globalRipeRewards: RipeRewards = empty(RipeRewards)
-    userRipeRewards, up, ap, gp, globalRipeRewards = self._getClaimableDepositLootData(_user, _vaultId, _vaultAddr, _asset, _a)
+    userRipeRewards, up, ap, gp, globalRipeRewards = self._getClaimableDepositLootData(_user, _vaultId, _vaultAddr, _asset, _shouldFlush, _a)
 
     totalRipeForUser: uint256 = userRipeRewards.ripeStakerLoot + userRipeRewards.ripeVoteLoot + userRipeRewards.ripeGenLoot
-    if totalRipeForUser != 0:
-        extcall Ledger(_a.ledger).setDepositPointsAndRipeRewards(_user, _vaultId, _asset, up, ap, gp, globalRipeRewards)
-
+    extcall Ledger(_a.ledger).setDepositPointsAndRipeRewards(_user, _vaultId, _asset, up, ap, gp, globalRipeRewards)
     return totalRipeForUser
 
 
@@ -416,6 +420,7 @@ def _getClaimableDepositLootData(
     _vaultId: uint256,
     _vaultAddr: address,
     _asset: address,
+    _shouldFlush: bool,
     _a: addys.Addys,
 ) -> (UserDepositLoot, UserDepositPoints, AssetDepositPoints, GlobalDepositPoints, RipeRewards):
 
@@ -439,6 +444,8 @@ def _getClaimableDepositLootData(
 
     # insufficient user share, may need to wait longer to claim
     if userShareOfAsset == 0:
+        if _shouldFlush:
+            up, ap = self._flushDepositPoints(up, ap)
         return empty(UserDepositLoot), up, ap, gp, globalRewards
 
     # calc user's share of loot, per category
@@ -462,6 +469,16 @@ def _getClaimableDepositLootData(
 
 @view
 @internal
+def _flushDepositPoints(_userPoints: UserDepositPoints, _assetPoints: AssetDepositPoints) -> (UserDepositPoints, AssetDepositPoints):
+    up: UserDepositPoints = _userPoints
+    ap: AssetDepositPoints = _assetPoints
+    ap.balancePoints -= up.balancePoints
+    up.balancePoints = 0
+    return up, ap
+
+
+@view
+@internal
 def _getClaimableDepositLoot(
     _user: address,
     _vaultId: uint256,
@@ -474,7 +491,7 @@ def _getClaimableDepositLoot(
     ap: AssetDepositPoints = empty(AssetDepositPoints)
     gp: GlobalDepositPoints = empty(GlobalDepositPoints)
     globalRipeRewards: RipeRewards = empty(RipeRewards)
-    userRipeRewards, up, ap, gp, globalRipeRewards = self._getClaimableDepositLootData(_user, _vaultId, _vaultAddr, _asset, _a)
+    userRipeRewards, up, ap, gp, globalRipeRewards = self._getClaimableDepositLootData(_user, _vaultId, _vaultAddr, _asset, False, _a)
     return userRipeRewards.ripeStakerLoot + userRipeRewards.ripeVoteLoot + userRipeRewards.ripeGenLoot
 
 
@@ -779,8 +796,40 @@ def _getLatestGlobalRipeRewards(_a: addys.Addys) -> RipeRewards:
 #########
 
 
+# handle ripe mint
+
+
 @internal
 def _handleRipeMint(_user: address, _amount: uint256, _shouldStake: bool, _ripeToken: address):
     extcall RipeToken(_ripeToken).mint(_user, _amount)
 
     # TODO: handle staking
+
+
+# storage clean up
+
+
+@internal
+def _cleanUpUserAssets(
+    _user: address,
+    _vaultAddr: address,
+    _assetsToClean: DynArray[address, MAX_ASSETS_TO_CLEAN],
+) -> bool:
+    if len(_assetsToClean) == 0:
+        return True
+    stillInVault: bool = True
+    for a: address in _assetsToClean:
+        stillInVault = extcall Vault(_vaultAddr).deregisterUserAsset(_user, a)
+    return stillInVault
+
+
+@internal
+def _cleanUpUserVaults(
+    _user: address,
+    _vaultsToClean: DynArray[uint256, MAX_VAULTS_TO_CLEAN],
+    _ledger: address,
+):
+    if len(_vaultsToClean) == 0:
+        return
+    for vid: uint256 in _vaultsToClean:
+        extcall Ledger(_ledger).removeVaultFromUser(_user, vid)

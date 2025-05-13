@@ -84,12 +84,18 @@ def getUserAssetAndAmountAtIndex(_user: address, _index: uint256) -> (address, u
 
 @view
 @external
+def getUserAssetAtIndexAndHasBalance(_user: address, _index: uint256) -> (address, bool):
+    ...
+
+
+@view
+@external
 def getVaultDataOnDeposit(_user: address, _asset: address) -> VaultDataOnDeposit:
     ...
 
 
 @external
-def deregisterUserAsset(_user: address, _asset: address):
+def deregisterUserAsset(_user: address, _asset: address) -> bool:
     ...
 
 

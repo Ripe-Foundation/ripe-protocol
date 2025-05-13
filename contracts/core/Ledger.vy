@@ -187,7 +187,7 @@ def addVaultToUser(_user: address, _vaultId: uint256):
 
 @external
 def removeVaultFromUser(_user: address, _vaultId: uint256):
-    assert msg.sender == addys._getTellerAddr() # dev: only Teller allowed
+    assert msg.sender == addys._getLootboxAddr() # dev: only Lootbox allowed
 
     numUserVaults: uint256 = self.numUserVaults[_user]
     if numUserVaults == 0:

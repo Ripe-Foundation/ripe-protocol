@@ -243,6 +243,15 @@ def getUserAssetAndAmountAtIndex(_user: address, _index: uint256) -> (address, u
 
 @view
 @external
+def getUserAssetAtIndexAndHasBalance(_user: address, _index: uint256) -> (address, bool):
+    asset: address = vaultData.userAssets[_user][_index]
+    if asset == empty(address):
+        return empty(address), False
+    return asset, vaultData.userBalances[_user][asset] != 0
+
+
+@view
+@external
 def getVaultDataOnDeposit(_user: address, _asset: address) -> Vault.VaultDataOnDeposit:
     totalBalance: uint256 = staticcall IERC20(_asset).balanceOf(self)
     return Vault.VaultDataOnDeposit(
