@@ -32,14 +32,14 @@ MAX_PRIORITY_PARTNERS: constant(uint256) = 10
 
 @deploy
 def __init__(
-    _addyRegistry: address,
+    _ripeHq: address,
     _ethAddr: address,
     _minStaleTime: uint256,
     _maxStaleTime: uint256,
     _minPriceSourceChangeDelay: uint256,
     _maxPriceSourceChangeDelay: uint256,
 ):
-    assert empty(address) not in [_addyRegistry, _ethAddr] # dev: invalid addrs
+    assert empty(address) not in [_ripeHq, _ethAddr] # dev: invalid addrs
     ETH = _ethAddr
     MIN_STALE_TIME = _minStaleTime
     MAX_STALE_TIME = _maxStaleTime
@@ -47,7 +47,7 @@ def __init__(
     MAX_PRICE_SOURCE_CHANGE_DELAY = _maxPriceSourceChangeDelay
 
     # initialize modules
-    gov.__init__(empty(address), _addyRegistry, 0, 0)
+    gov.__init__(empty(address), _ripeHq, 0, 0)
     registry.__init__(_minPriceSourceChangeDelay, _maxPriceSourceChangeDelay, "PriceDesk.vy")
 
 

@@ -2,21 +2,18 @@
 
 implements: Vault
 
-initializes: gov
-initializes: vaultData
-initializes: sharesMath
-
-exports: gov.__interface__
+exports: addys.__interface__
 exports: vaultData.__interface__
 
-import contracts.modules.LocalGov as gov
-import contracts.modules.VaultData as vaultData
-import contracts.modules.SharesMath as sharesMath
-from interfaces import Vault
-from ethereum.ercs import IERC20
+initializes: addys
+initializes: vaultData[addys := addys]
+initializes: sharesVault[addys := addys, vaultData := vaultData]
 
-interface AddyRegistry:
-    def getAddy(_addyId: uint256) -> address: view
+from interfaces import Vault
+import contracts.modules.Addys as addys
+import contracts.modules.VaultData as vaultData
+import contracts.modules.SharesVault as sharesVault
+from ethereum.ercs import IERC20
 
 event RebaseErc20VaultDeposit:
     user: indexed(address)
@@ -30,7 +27,6 @@ event RebaseErc20VaultWithdrawal:
     amount: uint256
     isDepleted: bool
     shares: uint256
-    isUserStillInVault: bool
 
 event RebaseErc20VaultTransfer:
     fromUser: indexed(address)
@@ -40,22 +36,12 @@ event RebaseErc20VaultTransfer:
     isFromUserDepleted: bool
     transferShares: uint256
 
-TELLER_ID: constant(uint256) = 1 # TODO: make sure this is correct
-LEDGER_ID: constant(uint256) = 2 # TODO: make sure this is correct
-VAULT_BOOK_ID: constant(uint256) = 3 # TODO: make sure this is correct
-
-ADDY_REGISTRY: public(immutable(address))
-
 
 @deploy
-def __init__(_addyRegistry: address):
-    assert _addyRegistry != empty(address) # dev: invalid addy registry
-    ADDY_REGISTRY = _addyRegistry
-
-    # initialize modules
-    gov.__init__(empty(address), _addyRegistry, 0, 0)
+def __init__(_ripeHq: address):
+    addys.__init__(_ripeHq)
     vaultData.__init__()
-    sharesMath.__init__()
+    sharesVault.__init__()
 
 
 ########
@@ -69,22 +55,9 @@ def depositTokensInVault(
     _asset: address,
     _amount: uint256,
 ) -> uint256:
-    assert vaultData.isActivated # dev: not activated
-    assert msg.sender == staticcall AddyRegistry(ADDY_REGISTRY).getAddy(TELLER_ID) # dev: only Teller allowed
-
-    # validation
-    assert empty(address) not in [_user, _asset] # dev: invalid user or asset
-    totalAssetBalance: uint256 = staticcall IERC20(_asset).balanceOf(self)
-    depositAmount: uint256 = min(_amount, totalAssetBalance)
-    assert depositAmount != 0 # dev: invalid deposit amount
-
-    # calc shares
-    prevTotalBalance: uint256 = totalAssetBalance - depositAmount # remove the deposited amount to calc shares accurately
-    newShares: uint256 = sharesMath._amountToShares(_asset, depositAmount, vaultData.totalBalances[_asset], prevTotalBalance, False)
-
-    # add balance on deposit
-    vaultData._addBalanceOnDeposit(_user, _asset, newShares, True)
-
+    depositAmount: uint256 = 0
+    newShares: uint256 = 0
+    depositAmount, newShares = sharesVault._depositTokensInVault(_user, _asset, _amount)
     log RebaseErc20VaultDeposit(user=_user, asset=_asset, amount=depositAmount, shares=newShares)
     return depositAmount
 
@@ -95,35 +68,13 @@ def withdrawTokensFromVault(
     _asset: address,
     _amount: uint256,
     _recipient: address,
-) -> (uint256, bool, bool):
-    assert vaultData.isActivated # dev: not activated
-    assert msg.sender == staticcall AddyRegistry(ADDY_REGISTRY).getAddy(TELLER_ID) # dev: only Teller allowed
-
-    # validation
-    assert empty(address) not in [_user, _asset, _recipient] # dev: invalid user, asset, or recipient
-    assert _amount != 0 # dev: invalid amount
-
-    # calc shares + amount to withdraw
-    withdrawalShares: uint256 = 0
+) -> (uint256, bool):
     withdrawalAmount: uint256 = 0
-    withdrawalShares, withdrawalAmount = self._calcWithdrawalSharesAndAmount(_user, _asset, _amount)
-
-    # reduce balance on withdrawal
+    withdrawalShares: uint256 = 0
     isDepleted: bool = False
-    withdrawalShares, isDepleted = vaultData._reduceBalanceOnWithdrawal(_user, _asset, withdrawalShares, True)
-
-    # move tokens to recipient
-    withdrawalAmount = min(withdrawalAmount, staticcall IERC20(_asset).balanceOf(self))
-    assert withdrawalAmount != 0 # dev: no withdrawal amount
-    assert extcall IERC20(_asset).transfer(_recipient, withdrawalAmount, default_return_value=True) # dev: token transfer failed
-
-    # deregister user asset if depleted
-    isUserStillInVault: bool = True
-    if isDepleted:
-        isUserStillInVault = vaultData._deregisterUserAsset(_user, _asset)
-
-    log RebaseErc20VaultWithdrawal(user=_user, asset=_asset, amount=withdrawalAmount, isDepleted=isDepleted, shares=withdrawalShares, isUserStillInVault=isUserStillInVault)
-    return withdrawalAmount, isDepleted, isUserStillInVault
+    withdrawalAmount, withdrawalShares, isDepleted = sharesVault._withdrawTokensFromVault(_user, _asset, _amount, _recipient)
+    log RebaseErc20VaultWithdrawal(user=_user, asset=_asset, amount=withdrawalAmount, isDepleted=isDepleted, shares=withdrawalShares)
+    return withdrawalAmount, isDepleted
 
 
 @external
@@ -133,69 +84,12 @@ def transferBalanceWithinVault(
     _toUser: address,
     _transferAmount: uint256,
 ) -> (uint256, bool):
-    assert vaultData.isActivated # dev: not activated
-    assert msg.sender == staticcall AddyRegistry(ADDY_REGISTRY).getAddy(LEDGER_ID) # dev: only Ledger allowed
-
-    # validation
-    assert empty(address) not in [_fromUser, _toUser, _asset] # dev: invalid users or asset
-    assert _transferAmount != 0 # dev: invalid amount
-
-    # calc shares + amount to transfer
-    transferShares: uint256 = 0
     transferAmount: uint256 = 0
-    transferShares, transferAmount = self._calcWithdrawalSharesAndAmount(_fromUser, _asset, _transferAmount)
-
-    # transfer shares
+    transferShares: uint256 = 0
     isFromUserDepleted: bool = False
-    transferShares, isFromUserDepleted = vaultData._reduceBalanceOnWithdrawal(_fromUser, _asset, transferShares, False)
-    vaultData._addBalanceOnDeposit(_toUser, _asset, transferShares, False)
-
+    transferAmount, transferShares, isFromUserDepleted = sharesVault._transferBalanceWithinVault(_asset, _fromUser, _toUser, _transferAmount)
     log RebaseErc20VaultTransfer(fromUser=_fromUser, toUser=_toUser, asset=_asset, transferAmount=transferAmount, isFromUserDepleted=isFromUserDepleted, transferShares=transferShares)
     return transferAmount, isFromUserDepleted
-
-
-@view
-@internal
-def _calcWithdrawalSharesAndAmount(
-    _user: address,
-    _asset: address,
-    _amount: uint256,
-) -> (uint256, uint256):
-    totalShares: uint256 = vaultData.totalBalances[_asset]
-    totalBalance: uint256 = staticcall IERC20(_asset).balanceOf(self)
-
-    # user shares
-    withdrawalShares: uint256 = vaultData.userBalances[_user][_asset]
-    assert withdrawalShares != 0 # dev: user has no shares
-
-    # calc amount + shares to withdraw
-    withdrawalAmount: uint256 = sharesMath._sharesToAmount(_asset, withdrawalShares, totalShares, totalBalance, False)
-    if _amount < withdrawalAmount:
-        withdrawalShares = min(withdrawalShares, sharesMath._amountToShares(_asset, _amount, totalShares, totalBalance, True))
-        withdrawalAmount = _amount
-
-    return withdrawalShares, withdrawalAmount
-
-
-##########
-# Shares #
-##########
-
-
-@view
-@external
-def amountToShares(_asset: address, _amount: uint256, _shouldRoundUp: bool) -> uint256:
-    totalShares: uint256 = vaultData.totalBalances[_asset]
-    totalBalance: uint256 = staticcall IERC20(_asset).balanceOf(self)
-    return sharesMath._amountToShares(_asset, _amount, totalShares, totalBalance, _shouldRoundUp)
-
-
-@view
-@external
-def sharesToAmount(_asset: address, _shares: uint256, _shouldRoundUp: bool) -> uint256:
-    totalShares: uint256 = vaultData.totalBalances[_asset]
-    totalBalance: uint256 = staticcall IERC20(_asset).balanceOf(self)
-    return sharesMath._sharesToAmount(_asset, _shares, totalShares, totalBalance, _shouldRoundUp)
 
 
 ####################
@@ -205,101 +99,44 @@ def sharesToAmount(_asset: address, _shares: uint256, _shouldRoundUp: bool) -> u
 
 @view
 @external
+def getVaultDataOnDeposit(_user: address, _asset: address) -> Vault.VaultDataOnDeposit:
+    # used in Teller.vy
+    return sharesVault._getVaultDataOnDeposit(_user, _asset)
+
+
+@view
+@external
 def getUserLootBoxShare(_user: address, _asset: address) -> uint256:
     # used in Lootbox.vy
-    return vaultData.userBalances[_user][_asset]
+    return sharesVault._getUserLootBoxShare(_user, _asset)
 
 
 @view
 @external
 def getUserAssetAndAmountAtIndex(_user: address, _index: uint256) -> (address, uint256):
-    # used in AuctionHouse.vy and CreditEngine.vy
-    asset: address = vaultData.userAssets[_user][_index]
-    if asset == empty(address):
-        return empty(address), 0
-    userShares: uint256 = vaultData.userBalances[_user][asset]
-    if userShares == 0:
-        return empty(address), 0
-    return asset, sharesMath._sharesToAmount(asset, userShares, vaultData.totalBalances[asset], staticcall IERC20(asset).balanceOf(self), False)
+    # used in CreditEngine.vy
+    return sharesVault._getUserAssetAndAmountAtIndex(_user, _index)
 
 
 @view
 @external
 def getUserAssetAtIndexAndHasBalance(_user: address, _index: uint256) -> (address, bool):
-    # used in Lootbox.vy
-    asset: address = vaultData.userAssets[_user][_index]
-    if asset == empty(address):
-        return empty(address), False
-    return asset, vaultData.userBalances[_user][asset] != 0
+    # used in Lootbox.vy and AuctionHouse.vy
+    return sharesVault._getUserAssetAtIndexAndHasBalance(_user, _index)
 
 
-@view
-@external
-def getVaultDataOnDeposit(_user: address, _asset: address) -> Vault.VaultDataOnDeposit:
-    # used in Teller.vy
-    totalBalance: uint256 = staticcall IERC20(_asset).balanceOf(self)
-    return Vault.VaultDataOnDeposit(
-        hasPosition=vaultData.indexOfUserAsset[_user][_asset] != 0,
-        numAssets=vaultData._getNumUserAssets(_user),
-        userBalance=self._getTotalAmountForUser(_user, _asset, totalBalance),
-        totalBalance=totalBalance,
-    )
-
-
-#############
-# Utilities #
-#############
+###############
+# Other Utils #
+###############
 
 
 @view
 @external
 def getTotalAmountForUser(_user: address, _asset: address) -> uint256:
-    return self._getTotalAmountForUser(_user, _asset, staticcall IERC20(_asset).balanceOf(self))
-
-
-@view
-@internal
-def _getTotalAmountForUser(_user: address, _asset: address, _totalBalance: uint256) -> uint256:
-    userShares: uint256 = vaultData.userBalances[_user][_asset]
-    return sharesMath._sharesToAmount(_asset, userShares, vaultData.totalBalances[_asset], _totalBalance, False)
+    return sharesVault._getTotalAmountForUser(_user, _asset)
 
 
 @view
 @external
 def getTotalAmountForVault(_asset: address) -> uint256:
-    return staticcall IERC20(_asset).balanceOf(self)
-
-
-########
-# Ripe #
-########
-
-
-@external
-def deregisterUserAsset(_user: address, _asset: address):
-    assert msg.sender == staticcall AddyRegistry(ADDY_REGISTRY).getAddy(LEDGER_ID) # dev: only Ledger allowed
-    vaultData._deregisterUserAsset(_user, _asset)
-
-
-@external
-def deregisterVaultAsset(_asset: address):
-    assert msg.sender == staticcall AddyRegistry(ADDY_REGISTRY).getAddy(LEDGER_ID) # dev: only Ledger allowed
-    vaultData._deregisterVaultAsset(_asset)
-
-
-@external
-def recoverFunds(_asset: address, _recipient: address) -> bool:
-    assert gov._canGovern(msg.sender) # dev: no perms
-    return vaultData._recoverFunds(_asset, _recipient)
-
-
-@external
-def setVaultId(_vaultId: uint256) -> bool:
-    assert msg.sender == staticcall AddyRegistry(ADDY_REGISTRY).getAddy(VAULT_BOOK_ID) # dev: no perms
-    return vaultData._setVaultId(_vaultId)
-
-
-@external
-def activate(_shouldActivate: bool):
-    assert gov._canGovern(msg.sender) # dev: no perms
-    vaultData._activate(_shouldActivate)
+    return sharesVault._getTotalAmountForVault(_asset)

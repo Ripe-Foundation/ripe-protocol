@@ -125,8 +125,8 @@ MAX_DEBT_UPDATES: constant(uint256) = 25
 
 
 @deploy
-def __init__(_hq: address):
-    addys.__init__(_hq)
+def __init__(_ripeHq: address):
+    addys.__init__(_ripeHq)
     self.isActivated = True
 
 

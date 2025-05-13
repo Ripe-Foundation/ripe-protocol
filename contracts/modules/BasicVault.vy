@@ -52,7 +52,7 @@ def _withdrawTokensFromVault(
 
     # validation
     assert empty(address) not in [_user, _asset, _recipient] # dev: invalid user, asset, or recipient
-    assert _amount != 0 # dev: invalid amount
+    assert _amount != 0 # dev: invalid withdrawal amount
 
     # reduce balance on withdrawal
     withdrawalAmount: uint256 = 0
@@ -79,7 +79,7 @@ def _transferBalanceWithinVault(
 
     # validation
     assert empty(address) not in [_fromUser, _toUser, _asset] # dev: invalid users or asset
-    assert _transferAmount != 0 # dev: invalid amount
+    assert _transferAmount != 0 # dev: invalid transfer amount
 
     # transfer balances
     transferAmount: uint256 = 0

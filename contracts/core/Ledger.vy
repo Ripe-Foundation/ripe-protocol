@@ -143,8 +143,8 @@ numFungLiqUsers: public(uint256) # num liq users
 
 
 @deploy
-def __init__(_hq: address):
-    addys.__init__(_hq)
+def __init__(_ripeHq: address):
+    addys.__init__(_ripeHq)
 
 
 ###############

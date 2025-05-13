@@ -24,14 +24,14 @@ pendingIsNftVault: public(HashMap[address, bool]) # addr -> pending is nft vault
 
 @deploy
 def __init__(
-    _addyRegistry: address,
+    _ripeHq: address,
     _minVaultChangeDelay: uint256,
     _maxVaultChangeDelay: uint256,
 ):
-    assert _addyRegistry != empty(address) # dev: invalid addy registry
+    assert _ripeHq != empty(address) # dev: invalid addy registry
 
     # initialize gov
-    gov.__init__(empty(address), _addyRegistry, 0, 0)
+    gov.__init__(empty(address), _ripeHq, 0, 0)
 
     # initialize registry
     registry.__init__(_minVaultChangeDelay, _maxVaultChangeDelay, "VaultBook.vy")
