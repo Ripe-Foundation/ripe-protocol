@@ -39,6 +39,11 @@ interface LootBox:
 interface RipeHq:
     def governance() -> address: view
 
+flag RepayType:
+    STANDARD
+    LIQUIDATION
+    AUCTION
+
 struct BorrowDataBundle:
     userDebt: UserDebt
     userBorrowInterval: IntervalBorrow
@@ -102,11 +107,13 @@ event NewBorrow:
 event RepayDebt:
     user: indexed(address)
     repayAmount: uint256
+    repayType: RepayType
     refundAmount: uint256
     didStakeRefund: bool
     outstandingUserDebt: uint256
     userCollateralVal: uint256
     maxUserDebt: uint256
+    hasGoodDebtHealth: bool
 
 # config
 isActivated: public(bool)
@@ -333,14 +340,12 @@ def repayForUser(
     _shouldStakeRefund: bool,
     _caller: address,
     _a: addys.Addys = empty(addys.Addys),
-) -> uint256:
+) -> bool:
     assert msg.sender == addys._getTellerAddr() # dev: only teller allowed
-
-    # get repay data
     a: addys.Addys = addys._getAddys(_a)
-    d: RepayDataBundle = staticcall Ledger(a.ledger).getRepayDataBundle(_user)
 
     # get latest user debt
+    d: RepayDataBundle = staticcall Ledger(a.ledger).getRepayDataBundle(_user)
     userDebt: UserDebt = empty(UserDebt)
     newInterest: uint256 = 0
     userDebt, newInterest = self._getLatestUserDebtWithInterest(d.userDebt)
@@ -348,30 +353,92 @@ def repayForUser(
     # validation
     repayAmount: uint256 = 0
     refundAmount: uint256 = 0
-    repayAmount, refundAmount = self._validateOnRepay(_user, _caller, _amount, userDebt, a)
+    repayAmount, refundAmount = self._validateOnRepay(_user, _caller, _amount, userDebt.amount, a.controlRoom, a.greenToken)
+    assert repayAmount != 0 # dev: cannot repay with 0 green
 
-    # reduce debt amount
-    userDebt = self._reduceDebtAmount(userDebt, repayAmount)
+    return self._repayDebt(_user, userDebt, d.numUserVaults, repayAmount, refundAmount, newInterest, True, _shouldStakeRefund, RepayType.STANDARD, a)
 
-    # get borrow data (debt terms for user)
-    bt: UserBorrowTerms = self._getUserBorrowTerms(_user, d.numUserVaults, True, a)
+
+# repay during liquidation
+
+
+@external
+def repayDuringLiquidation(
+    _liqUser: address,
+    _userDebt: UserDebt,
+    _repayAmount: uint256,
+    _newInterest: uint256,
+    _a: addys.Addys = empty(addys.Addys),
+) -> bool:
+    assert msg.sender == addys._getAuctionHouseAddr() # dev: only auction house allowed
+    a: addys.Addys = addys._getAddys(_a)
+    numUserVaults: uint256 = staticcall Ledger(a.ledger).numUserVaults(_liqUser)
+    return self._repayDebt(_liqUser, _userDebt, numUserVaults, _repayAmount, 0, _newInterest, False, True, RepayType.LIQUIDATION, a)
+
+
+# repay during auction purchase
+
+
+@external
+def repayDuringAuctionPurchase(_liqUser: address, _repayAmount: uint256, _a: addys.Addys = empty(addys.Addys)) -> bool:
+    assert msg.sender == addys._getAuctionHouseAddr() # dev: only auction house allowed
+    a: addys.Addys = addys._getAddys(_a)
+
+    # get latest user debt
+    d: RepayDataBundle = staticcall Ledger(a.ledger).getRepayDataBundle(_liqUser)
+    userDebt: UserDebt = empty(UserDebt)
+    newInterest: uint256 = 0
+    userDebt, newInterest = self._getLatestUserDebtWithInterest(d.userDebt)
+
+    # finalize amounts
+    repayAmount: uint256 = 0
+    refundAmount: uint256 = 0
+    repayAmount, refundAmount = self._getRepayAmountAndRefundAmount(userDebt.amount, _repayAmount, a.greenToken)
+
+    return self._repayDebt(_liqUser, userDebt, d.numUserVaults, repayAmount, refundAmount, newInterest, True, True, RepayType.AUCTION, a)
+
+
+# shared repay functionality
+
+
+@internal
+def _repayDebt(
+    _user: address,
+    _userDebt: UserDebt,
+    _numUserVaults: uint256,
+    _repayAmount: uint256,
+    _refundAmount: uint256,
+    _newInterest: uint256,
+    _shouldBurnGreen: bool,
+    _shouldStakeRefund: bool,
+    _repayType: RepayType,
+    _a: addys.Addys,
+) -> bool:
+    userDebt: UserDebt = self._reduceDebtAmount(_userDebt, _repayAmount)
+
+    # get latest debt terms
+    bt: UserBorrowTerms = self._getUserBorrowTerms(_user, _numUserVaults, True, _a)
     userDebt.debtTerms = bt.debtTerms
 
-    # update user debt
-    extcall Ledger(a.ledger).setUserDebt(_user, userDebt, newInterest, empty(IntervalBorrow))
-
-    # update borrow points
-    extcall LootBox(a.lootbox).updateBorrowPoints(_user, a)
+    # check debt health
+    hasGoodDebtHealth: bool = self._hasGoodDebtHealth(userDebt.amount, bt.collateralVal, bt.debtTerms.ltv)
+    if hasGoodDebtHealth:
+        userDebt.inLiquidation = False
+    
+    # update user debt, borrow points
+    extcall Ledger(_a.ledger).setUserDebt(_user, userDebt, _newInterest, empty(IntervalBorrow))
+    extcall LootBox(_a.lootbox).updateBorrowPoints(_user, _a)
 
     # burn green repayment
-    extcall GreenToken(a.greenToken).burn(repayAmount)
+    if _shouldBurnGreen:
+        extcall GreenToken(_a.greenToken).burn(_repayAmount)
 
     # handle refund
-    if refundAmount != 0:
-        self._handleGreenForUser(_user, refundAmount, _shouldStakeRefund, a.greenToken)
+    if _refundAmount != 0:
+        self._handleGreenForUser(_user, _refundAmount, _shouldStakeRefund, _a.greenToken)
 
-    log RepayDebt(user=_user, repayAmount=repayAmount, refundAmount=refundAmount, didStakeRefund=_shouldStakeRefund, outstandingUserDebt=userDebt.amount, userCollateralVal=bt.collateralVal, maxUserDebt=bt.totalMaxDebt)
-    return repayAmount
+    log RepayDebt(user=_user, repayAmount=_repayAmount, repayType=_repayType, refundAmount=_refundAmount, didStakeRefund=_shouldStakeRefund, outstandingUserDebt=userDebt.amount, userCollateralVal=bt.collateralVal, maxUserDebt=bt.totalMaxDebt, hasGoodDebtHealth=hasGoodDebtHealth)
+    return hasGoodDebtHealth
 
 
 # repay validation
@@ -383,23 +450,30 @@ def _validateOnRepay(
     _user: address,
     _caller: address,
     _amount: uint256,
-    _userDebt: UserDebt,
-    _a: addys.Addys,
+    _userDebtAmount: uint256,
+    _controlRoom: address,
+    _greenToken: address,
 ) -> (uint256, uint256):
-    assert _userDebt.amount != 0 # dev: no debt outstanding
+    assert _userDebtAmount != 0 # dev: no debt outstanding
 
-    # get repay config
-    repayConfig: RepayConfig = staticcall ControlRoom(_a.controlRoom).getRepayConfig(_user)
+    # repay config
+    repayConfig: RepayConfig = staticcall ControlRoom(_controlRoom).getRepayConfig(_user)
     assert repayConfig.isRepayEnabled # dev: repay paused
     if _user != _caller:
         assert repayConfig.canOthersRepayForUser # dev: cannot repay for user
 
-    # available amount
-    availAmount: uint256 = min(_amount, staticcall IERC20(_a.greenToken).balanceOf(self))
-    assert availAmount != 0 # dev: cannot repay with 0 green
+    return self._getRepayAmountAndRefundAmount(_userDebtAmount, _amount, _greenToken)
 
-    # finalize amounts
-    repayAmount: uint256 = min(availAmount, _userDebt.amount)
+
+# repay amount and refund amount
+
+
+@view
+@internal
+def _getRepayAmountAndRefundAmount(_userDebtAmount: uint256, _repayAmount: uint256, _greenToken: address) -> (uint256, uint256):
+    availAmount: uint256 = min(_repayAmount, staticcall IERC20(_greenToken).balanceOf(self))
+
+    repayAmount: uint256 = min(availAmount, _userDebtAmount)
     refundAmount: uint256 = 0
     if repayAmount > availAmount:
         refundAmount = repayAmount - availAmount
@@ -414,97 +488,14 @@ def _validateOnRepay(
 @internal
 def _reduceDebtAmount(_userDebt: UserDebt, _repayAmount: uint256) -> UserDebt:
     userDebt: UserDebt = _userDebt
-
     nonPrincipalDebt: uint256 = userDebt.amount - userDebt.principal
+
     userDebt.amount -= _repayAmount
     if _repayAmount > nonPrincipalDebt:
         principalToReduce: uint256 = _repayAmount - nonPrincipalDebt
         userDebt.principal -= min(principalToReduce, userDebt.principal)
 
     return userDebt
-
-
-# repay during liquidation
-
-
-@external
-def updateDebtDuringLiquidation(
-    _liqUser: address,
-    _userDebt: UserDebt,
-    _amount: uint256,
-    _newInterest: uint256,
-    _a: addys.Addys = empty(addys.Addys),
-) -> bool:
-    assert msg.sender == addys._getAuctionHouseAddr() # dev: only auction house allowed
-    a: addys.Addys = addys._getAddys(_a)
-
-    # reduce debt amount
-    userDebt: UserDebt = self._reduceDebtAmount(_userDebt, _amount)
-
-    # refresh collateral value and debt terms -- may have changed during liquidation (swaps with stability pool)
-    bt: UserBorrowTerms = self._getUserBorrowTerms(_liqUser, staticcall Ledger(a.ledger).numUserVaults(_liqUser), True, a)
-    userDebt.debtTerms = bt.debtTerms
-
-    # check debt health
-    hasGoodDebtHealth: bool = self._hasGoodDebtHealth(userDebt.amount, bt.collateralVal, bt.debtTerms.ltv)
-    if hasGoodDebtHealth:
-        userDebt.inLiquidation = False
-
-    # save user debt
-    extcall Ledger(a.ledger).setUserDebt(_liqUser, userDebt, _newInterest, empty(IntervalBorrow))
-
-    # update borrow points
-    extcall LootBox(a.lootbox).updateBorrowPoints(_liqUser, a)
-
-    return hasGoodDebtHealth
-
-
-@external
-def repayDuringAuctionPurchase(_liqUser: address, _repayAmount: uint256, _a: addys.Addys = empty(addys.Addys)) -> bool:
-    assert msg.sender == addys._getAuctionHouseAddr() # dev: only auction house allowed
-    a: addys.Addys = addys._getAddys(_a)
-
-    # get repay data
-    d: RepayDataBundle = staticcall Ledger(a.ledger).getRepayDataBundle(_liqUser)
-
-    # get latest user debt
-    userDebt: UserDebt = empty(UserDebt)
-    newInterest: uint256 = 0
-    userDebt, newInterest = self._getLatestUserDebtWithInterest(d.userDebt)
-
-    # finalize amounts
-    availAmount: uint256 = min(_repayAmount, staticcall IERC20(a.greenToken).balanceOf(self))
-    repayAmount: uint256 = min(availAmount, userDebt.amount)
-    refundAmount: uint256 = 0
-    if repayAmount > availAmount:
-        refundAmount = repayAmount - availAmount
-
-    # reduce debt amount
-    userDebt = self._reduceDebtAmount(userDebt, repayAmount)
-
-    # get borrow data (debt terms for user)
-    bt: UserBorrowTerms = self._getUserBorrowTerms(_liqUser, d.numUserVaults, True, a)
-    userDebt.debtTerms = bt.debtTerms
-
-    # check debt health
-    hasGoodDebtHealth: bool = self._hasGoodDebtHealth(userDebt.amount, bt.collateralVal, bt.debtTerms.ltv)
-    if hasGoodDebtHealth:
-        userDebt.inLiquidation = False
-    
-    # update user debt
-    extcall Ledger(a.ledger).setUserDebt(_liqUser, userDebt, newInterest, empty(IntervalBorrow))
-
-    # update borrow points
-    extcall LootBox(a.lootbox).updateBorrowPoints(_liqUser, a)
-
-    # burn green repayment
-    extcall GreenToken(a.greenToken).burn(repayAmount)
-
-    # handle refund
-    if refundAmount != 0:
-        self._handleGreenForUser(_liqUser, refundAmount, True, a.greenToken)
-
-    return hasGoodDebtHealth
 
 
 ################

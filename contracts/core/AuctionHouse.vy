@@ -8,7 +8,7 @@ from interfaces import Vault
 from ethereum.ercs import IERC20
 
 interface CreditEngine:
-    def updateDebtDuringLiquidation(_liqUser: address, _userDebt: UserDebt, _amount: uint256, _newInterest: uint256, _a: addys.Addys = empty(addys.Addys)) -> bool: nonpayable
+    def repayDuringLiquidation(_liqUser: address, _userDebt: UserDebt, _repayAmount: uint256, _newInterest: uint256, _a: addys.Addys = empty(addys.Addys)) -> bool: nonpayable
     def getLatestUserDebtAndTerms(_user: address, _shouldRaise: bool, _a: addys.Addys = empty(addys.Addys)) -> (UserDebt, UserBorrowTerms, uint256): view
     def repayDuringAuctionPurchase(_liqUser: address, _repayAmount: uint256, _a: addys.Addys = empty(addys.Addys)) -> bool: nonpayable
 
@@ -211,7 +211,7 @@ def _liquidateUser(
     repayValueIn, collateralValueOut = self._handleLiqUserCollateral(_liqUser, targetRepayAmount, liqFeeRatio, _config.genStabPools, _a)
 
     # repayValueIn may be zero, but need to update debt
-    didRestoreDebtHealth: bool = extcall CreditEngine(_a.creditEngine).updateDebtDuringLiquidation(_liqUser, userDebt, repayValueIn, newInterest, _a)
+    didRestoreDebtHealth: bool = extcall CreditEngine(_a.creditEngine).repayDuringLiquidation(_liqUser, userDebt, repayValueIn, newInterest, _a)
 
     # start auctions (if necessary)
     numAuctionsStarted: uint256 = 0
@@ -383,7 +383,7 @@ def _handleCollateralDuringPurchase(
     _liqAsset: address,
     _maxBuyerValue: uint256,
     _maxBuyerAmount: uint256,
-    _proceedsAddr: address,
+    _buyerAddr: address,
     _extraCeilingOnValue: uint256,
     _discount: uint256,
     _priceDesk: address,
@@ -397,7 +397,7 @@ def _handleCollateralDuringPurchase(
     amountSentToBuyer: uint256 = 0
     isPositionDepleted: bool = False
     isUserStillInVault: bool = False
-    amountSentToBuyer, isPositionDepleted, isUserStillInVault = extcall Vault(_liqVaultAddr).withdrawTokensFromVault(_liqUser, _liqAsset, maxLiqCollateralAmount, _proceedsAddr)
+    amountSentToBuyer, isPositionDepleted, isUserStillInVault = extcall Vault(_liqVaultAddr).withdrawTokensFromVault(_liqUser, _liqAsset, maxLiqCollateralAmount, _buyerAddr)
 
     # finalize values for buyer
     collateralValueOut: uint256 = maxLiqCollateralValue * amountSentToBuyer // maxLiqCollateralAmount
@@ -511,7 +511,7 @@ def _buyFungibleAuction(
 
     # calculate discount
     auctionProgress: uint256 = (block.number - auc.startBlock) * HUNDRED_PERCENT // (auc.endBlock - auc.startBlock)
-    discount: uint256 = self._calculateDiscount(auctionProgress, auc.startDiscount, auc.maxDiscount)
+    discount: uint256 = self._calculateAuctionDiscount(auctionProgress, auc.startDiscount, auc.maxDiscount)
     vaultAddr: address = staticcall VaultBook(_a.vaultBook).getVaultAddr(_vaultId)
 
     # handle collateral buy
@@ -537,7 +537,6 @@ def _buyFungibleAuction(
     return 0
 
 
-
 @view
 @internal
 def _validateOnBuyFungibleAuction(
@@ -558,7 +557,7 @@ def _validateOnBuyFungibleAuction(
 
 @pure
 @internal
-def _calculateDiscount(_progress: uint256, _startDiscount: uint256, _maxDiscount: uint256) -> uint256:
+def _calculateAuctionDiscount(_progress: uint256, _startDiscount: uint256, _maxDiscount: uint256) -> uint256:
     if _progress == 0 or _startDiscount == _maxDiscount:
         return _startDiscount
     discountRange: uint256 = _maxDiscount - _startDiscount

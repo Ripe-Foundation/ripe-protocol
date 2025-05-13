@@ -533,6 +533,29 @@ def _removeFungLiqUser(_liqUser: address):
         self.indexOfFungLiqUser[lastUser] = targetIndex
 
 
+# remove all fungible auctions
+
+
+@external
+def removeAllFungibleAuctions(_liqUser: address):
+    assert msg.sender == addys._getAuctionHouseAddr() # dev: only AuctionHouse allowed
+
+    # remove fung user
+    self._removeFungLiqUser(_liqUser)
+
+    numAuctions: uint256 = self.numFungibleAuctions[_liqUser]
+    if numAuctions == 0:
+        return
+
+    # zero out the auction indexes
+    for i: uint256 in range(1, numAuctions, bound=max_value(uint256)):
+        auc: FungibleAuction = self.fungibleAuctions[_liqUser][i]
+        self.fungibleAuctionIndex[_liqUser][auc.vaultId][auc.asset] = 0
+
+    # zero out total num
+    self.numFungibleAuctions[_liqUser] = 0
+
+
 # utils
 
 
