@@ -299,6 +299,10 @@ def _handleLiqUserCollateral(
                 if remainingToRepay == 0:
                     break
 
+                # skip if same asset
+                if sp.asset == asset:
+                    continue
+
                 # no balance in stability pool, skip
                 maxAmountInStabPool: uint256 = staticcall IERC20(sp.asset).balanceOf(sp.vaultAddr)
                 if maxAmountInStabPool == 0:
