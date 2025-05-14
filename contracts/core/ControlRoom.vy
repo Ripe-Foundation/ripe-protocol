@@ -75,6 +75,7 @@ struct AssetLiqConfig:
     hasLtv: bool
     hasWhitelist: bool
     isNft: bool
+    isStable: bool
     specialStabPool: VaultData
     canAuctionInstantly: bool
     customAuctionParams: AuctionParams

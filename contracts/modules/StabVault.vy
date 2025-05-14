@@ -355,10 +355,8 @@ def swapForLiquidatedCollateral(
     _liqAsset: address,
     _liqAmountSent: uint256,
     _recipient: address,
-    _a: addys.Addys = empty(addys.Addys),
 ) -> uint256:
     assert msg.sender == addys._getAuctionHouseAddr() # dev: only AuctionHouse allowed
-    a: addys.Addys = addys._getAddys(_a)
 
     self._handleReceivedAsset(_stabAsset, _liqAsset, _liqAmountSent)
     return self._transferStabAssetOut(_stabAsset, _stabAmountToRemove, _recipient)

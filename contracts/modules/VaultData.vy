@@ -101,6 +101,12 @@ def _reduceBalanceOnWithdrawal(
 ###############
 
 
+@view
+@external
+def isUserInVaultAsset(_user: address, _asset: address) -> bool:
+    return self.indexOfUserAsset[_user][_asset] != 0
+
+
 @internal
 def _registerUserAsset(_user: address, _asset: address):
     aid: uint256 = self.numUserAssets[_user]
@@ -143,6 +149,12 @@ def deregisterUserAsset(_user: address, _asset: address) -> bool:
 ################
 # Vault Assets #
 ################
+
+
+@view
+@external
+def isSupportedVaultAsset(_asset: address) -> bool:
+    return self.indexOfAsset[_asset] != 0
 
 
 @internal
