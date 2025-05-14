@@ -1,5 +1,7 @@
 # @version 0.4.1
 
+import contracts.modules.Addys as addys
+
 struct VaultDataOnDeposit:
     hasPosition: bool
     numAssets: uint256
@@ -17,6 +19,7 @@ def depositTokensInVault(
     _user: address,
     _asset: address,
     _amount: uint256,
+    _a: addys.Addys = empty(addys.Addys),
 ) -> uint256:
     ...
 
@@ -27,6 +30,7 @@ def withdrawTokensFromVault(
     _asset: address,
     _amount: uint256,
     _recipient: address,
+    _a: addys.Addys = empty(addys.Addys),
 ) -> (uint256, bool):
     ...
 
@@ -37,6 +41,7 @@ def transferBalanceWithinVault(
     _fromUser: address,
     _toUser: address,
     _transferAmount: uint256,
+    _a: addys.Addys = empty(addys.Addys),
 ) -> (uint256, bool):
     ...
 

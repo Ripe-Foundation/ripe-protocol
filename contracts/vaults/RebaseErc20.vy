@@ -54,6 +54,7 @@ def depositTokensInVault(
     _user: address,
     _asset: address,
     _amount: uint256,
+    _a: addys.Addys = empty(addys.Addys),
 ) -> uint256:
     depositAmount: uint256 = 0
     newShares: uint256 = 0
@@ -68,6 +69,7 @@ def withdrawTokensFromVault(
     _asset: address,
     _amount: uint256,
     _recipient: address,
+    _a: addys.Addys = empty(addys.Addys),
 ) -> (uint256, bool):
     withdrawalAmount: uint256 = 0
     withdrawalShares: uint256 = 0
@@ -83,6 +85,7 @@ def transferBalanceWithinVault(
     _fromUser: address,
     _toUser: address,
     _transferAmount: uint256,
+    _a: addys.Addys = empty(addys.Addys),
 ) -> (uint256, bool):
     transferAmount: uint256 = 0
     transferShares: uint256 = 0

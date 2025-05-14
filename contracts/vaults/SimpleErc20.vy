@@ -51,6 +51,7 @@ def depositTokensInVault(
     _user: address,
     _asset: address,
     _amount: uint256,
+    _a: addys.Addys = empty(addys.Addys),
 ) -> uint256:
     depositAmount: uint256 = basicVault._depositTokensInVault(_user, _asset, _amount)
     log SimpleErc20VaultDeposit(user=_user, asset=_asset, amount=depositAmount)
@@ -63,6 +64,7 @@ def withdrawTokensFromVault(
     _asset: address,
     _amount: uint256,
     _recipient: address,
+    _a: addys.Addys = empty(addys.Addys),
 ) -> (uint256, bool):
     withdrawalAmount: uint256 = 0
     isDepleted: bool = False
@@ -77,6 +79,7 @@ def transferBalanceWithinVault(
     _fromUser: address,
     _toUser: address,
     _transferAmount: uint256,
+    _a: addys.Addys = empty(addys.Addys),
 ) -> (uint256, bool):
     transferAmount: uint256 = 0
     isFromUserDepleted: bool = False

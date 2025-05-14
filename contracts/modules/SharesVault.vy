@@ -71,7 +71,6 @@ def _withdrawTokensFromVault(
     withdrawalShares, isDepleted = vaultData._reduceBalanceOnWithdrawal(_user, _asset, withdrawalShares, True)
 
     # move tokens to recipient
-    withdrawalAmount = min(withdrawalAmount, staticcall IERC20(_asset).balanceOf(self))
     assert withdrawalAmount != 0 # dev: no withdrawal amount
     assert extcall IERC20(_asset).transfer(_recipient, withdrawalAmount, default_return_value=True) # dev: token transfer failed
 
@@ -197,7 +196,7 @@ def _calcWithdrawalSharesAndAmount(
     assert withdrawalShares != 0 # dev: user has no shares
 
     # calc amount + shares to withdraw
-    withdrawalAmount: uint256 = self._sharesToAmount(_asset, withdrawalShares, totalShares, totalBalance, False)
+    withdrawalAmount: uint256 = min(totalBalance, self._sharesToAmount(_asset, withdrawalShares, totalShares, totalBalance, False))
     if _amount < withdrawalAmount:
         withdrawalShares = min(withdrawalShares, self._amountToShares(_asset, _amount, totalShares, totalBalance, True))
         withdrawalAmount = _amount

@@ -139,7 +139,7 @@ def _deposit(
 
     # deposit tokens
     assert extcall IERC20(_asset).transferFrom(_depositor, vaultAddr, amount) # dev: token transfer failed
-    amount = extcall Vault(vaultAddr).depositTokensInVault(_user, _asset, amount)
+    amount = extcall Vault(vaultAddr).depositTokensInVault(_user, _asset, amount, _a)
 
     # register vault participation
     if not d.isParticipatingInVault:
@@ -250,7 +250,7 @@ def _withdraw(
 
     # withdraw tokens
     isDepleted: bool = False
-    amount, isDepleted = extcall Vault(vaultAddr).withdrawTokensFromVault(_user, _asset, amount, _user)
+    amount, isDepleted = extcall Vault(vaultAddr).withdrawTokensFromVault(_user, _asset, amount, _user, _a)
 
     # update lootbox points
     extcall Lootbox(_a.lootbox).updateDepositPoints(_user, vaultId, vaultAddr, _asset, _a)

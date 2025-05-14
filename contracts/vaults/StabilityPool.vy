@@ -7,12 +7,12 @@ exports: vaultData.__interface__
 
 initializes: addys
 initializes: vaultData[addys := addys]
-initializes: sharesVault[addys := addys, vaultData := vaultData]
+initializes: stabVault[addys := addys, vaultData := vaultData]
 
 from interfaces import Vault
 import contracts.modules.Addys as addys
 import contracts.modules.VaultData as vaultData
-import contracts.modules.SharesVault as sharesVault
+import contracts.modules.StabVault as stabVault
 from ethereum.ercs import IERC20
 
 event StabilityPoolDeposit:
@@ -41,7 +41,7 @@ event StabilityPoolTransfer:
 def __init__(_ripeHq: address):
     addys.__init__(_ripeHq)
     vaultData.__init__()
-    sharesVault.__init__()
+    stabVault.__init__()
 
 
 ########
@@ -54,10 +54,11 @@ def depositTokensInVault(
     _user: address,
     _asset: address,
     _amount: uint256,
+    _a: addys.Addys = empty(addys.Addys),
 ) -> uint256:
     depositAmount: uint256 = 0
     newShares: uint256 = 0
-    depositAmount, newShares = sharesVault._depositTokensInVault(_user, _asset, _amount)
+    depositAmount, newShares = stabVault._depositTokensInVault(_user, _asset, _amount, addys._getAddys(_a))
     log StabilityPoolDeposit(user=_user, asset=_asset, amount=depositAmount, shares=newShares)
     return depositAmount
 
@@ -68,11 +69,12 @@ def withdrawTokensFromVault(
     _asset: address,
     _amount: uint256,
     _recipient: address,
+    _a: addys.Addys = empty(addys.Addys),
 ) -> (uint256, bool):
     withdrawalAmount: uint256 = 0
     withdrawalShares: uint256 = 0
     isDepleted: bool = False
-    withdrawalAmount, withdrawalShares, isDepleted = sharesVault._withdrawTokensFromVault(_user, _asset, _amount, _recipient)
+    withdrawalAmount, withdrawalShares, isDepleted = stabVault._withdrawTokensFromVault(_user, _asset, _amount, _recipient, addys._getAddys(_a))
     log StabilityPoolWithdrawal(user=_user, asset=_asset, amount=withdrawalAmount, isDepleted=isDepleted, shares=withdrawalShares)
     return withdrawalAmount, isDepleted
 
@@ -83,11 +85,12 @@ def transferBalanceWithinVault(
     _fromUser: address,
     _toUser: address,
     _transferAmount: uint256,
+    _a: addys.Addys = empty(addys.Addys),
 ) -> (uint256, bool):
     transferAmount: uint256 = 0
     transferShares: uint256 = 0
     isFromUserDepleted: bool = False
-    transferAmount, transferShares, isFromUserDepleted = sharesVault._transferBalanceWithinVault(_asset, _fromUser, _toUser, _transferAmount)
+    transferAmount, transferShares, isFromUserDepleted = stabVault._transferBalanceWithinVault(_asset, _fromUser, _toUser, _transferAmount, addys._getAddys(_a))
     log StabilityPoolTransfer(fromUser=_fromUser, toUser=_toUser, asset=_asset, transferAmount=transferAmount, isFromUserDepleted=isFromUserDepleted, transferShares=transferShares)
     return transferAmount, isFromUserDepleted
 
@@ -101,28 +104,28 @@ def transferBalanceWithinVault(
 @external
 def getVaultDataOnDeposit(_user: address, _asset: address) -> Vault.VaultDataOnDeposit:
     # used in Teller.vy
-    return sharesVault._getVaultDataOnDeposit(_user, _asset)
+    return stabVault._getVaultDataOnDeposit(_user, _asset)
 
 
 @view
 @external
 def getUserLootBoxShare(_user: address, _asset: address) -> uint256:
     # used in Lootbox.vy
-    return sharesVault._getUserLootBoxShare(_user, _asset)
+    return stabVault._getUserLootBoxShare(_user, _asset)
 
 
 @view
 @external
 def getUserAssetAndAmountAtIndex(_user: address, _index: uint256) -> (address, uint256):
     # used in CreditEngine.vy
-    return sharesVault._getUserAssetAndAmountAtIndex(_user, _index)
+    return stabVault._getUserAssetAndAmountAtIndex(_user, _index)
 
 
 @view
 @external
 def getUserAssetAtIndexAndHasBalance(_user: address, _index: uint256) -> (address, bool):
     # used in Lootbox.vy and AuctionHouse.vy
-    return sharesVault._getUserAssetAtIndexAndHasBalance(_user, _index)
+    return stabVault._getUserAssetAtIndexAndHasBalance(_user, _index)
 
 
 ###############
@@ -133,10 +136,10 @@ def getUserAssetAtIndexAndHasBalance(_user: address, _index: uint256) -> (addres
 @view
 @external
 def getTotalAmountForUser(_user: address, _asset: address) -> uint256:
-    return sharesVault._getTotalAmountForUser(_user, _asset)
+    return stabVault._getTotalAmountForUser(_user, _asset)
 
 
 @view
 @external
 def getTotalAmountForVault(_asset: address) -> uint256:
-    return sharesVault._getTotalAmountForVault(_asset)
+    return stabVault._getTotalAmountForVault(_asset)
