@@ -1,9 +1,16 @@
 # @version 0.4.1
 
-initializes: addys
-exports: addys.__interface__
-import contracts.modules.Addys as addys
+implements: Department
 
+exports: addys.__interface__
+exports: deptBasics.__interface__
+
+initializes: addys
+initializes: deptBasics[addys := addys]
+
+import contracts.modules.Addys as addys
+import contracts.modules.DeptBasics as deptBasics
+from interfaces import Department
 from interfaces import Vault
 from ethereum.ercs import IERC20
 
@@ -78,14 +85,11 @@ event TellerWithdrawal:
 
 MAX_BATCH_ACTION: constant(uint256) = 20
 
-# config
-isActivated: public(bool)
-
 
 @deploy
 def __init__(_ripeHq: address):
     addys.__init__(_ripeHq)
-    self.isActivated = True
+    deptBasics.__init__(False, False)
 
 
 ############
@@ -102,14 +106,12 @@ def deposit(
     _vaultAddr: address = empty(address),
     _vaultId: uint256 = 0,
 ) -> uint256:
-    assert self.isActivated # dev: not activated
     return self._deposit(_asset, _amount, _user, _vaultAddr, _vaultId, msg.sender, addys._getAddys())
 
 
 @nonreentrant
 @external
 def depositMany(_user: address, _deposits: DynArray[DepositAction, MAX_BATCH_ACTION]) -> uint256:
-    assert self.isActivated # dev: not activated
     a: addys.Addys = addys._getAddys()
     for d: DepositAction in _deposits:
         self._deposit(d.asset, d.amount, _user, d.vaultAddr, d.vaultId, msg.sender, a)
@@ -213,7 +215,6 @@ def withdraw(
     _vaultAddr: address = empty(address),
     _vaultId: uint256 = 0,
 ) -> uint256:
-    assert self.isActivated # dev: not activated
     a: addys.Addys = addys._getAddys()
     amount: uint256 = self._withdraw(_asset, _amount, _user, _vaultAddr, _vaultId, msg.sender, a)
     assert staticcall CreditEngine(a.creditEngine).hasGoodDebtHealth(_user, a) # dev: cannot withdraw, bad debt health
@@ -223,7 +224,6 @@ def withdraw(
 @nonreentrant
 @external
 def withdrawMany(_user: address, _withdrawals: DynArray[WithdrawalAction, MAX_BATCH_ACTION]) -> uint256:
-    assert self.isActivated # dev: not activated
     a: addys.Addys = addys._getAddys()
     for w: WithdrawalAction in _withdrawals:
         self._withdraw(w.asset, w.amount, _user, w.vaultAddr, w.vaultId, msg.sender, a)
@@ -302,7 +302,6 @@ def borrow(
     _user: address = msg.sender,
     _shouldStake: bool = True,
 ) -> uint256:
-    assert self.isActivated # dev: not activated
     a: addys.Addys = addys._getAddys()
     return extcall CreditEngine(a.creditEngine).borrowForUser(_user, _amount, _shouldStake, msg.sender, a)
 
@@ -314,7 +313,6 @@ def repay(
     _user: address = msg.sender,
     _shouldStakeRefund: bool = True,
 ) -> uint256:
-    assert self.isActivated # dev: not activated
     a: addys.Addys = addys._getAddys()
     amount: uint256 = min(_amount, staticcall IERC20(a.greenToken).balanceOf(msg.sender))
     assert extcall IERC20(a.greenToken).transferFrom(msg.sender, a.creditEngine, amount) # dev: token transfer failed
@@ -329,7 +327,6 @@ def repay(
 @nonreentrant
 @external
 def claimLoot(_user: address = msg.sender, _shouldStake: bool = True) -> uint256:
-    assert self.isActivated # dev: not activated
     a: addys.Addys = addys._getAddys()
     return extcall Lootbox(a.lootbox).claimLootForUser(_user, _shouldStake, msg.sender, a)
 

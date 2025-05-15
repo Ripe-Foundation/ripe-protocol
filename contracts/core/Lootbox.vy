@@ -1,9 +1,16 @@
 # @version 0.4.1
 
-initializes: addys
-exports: addys.__interface__
-import contracts.modules.Addys as addys
+implements: Department
 
+exports: addys.__interface__
+exports: deptBasics.__interface__
+
+initializes: addys
+initializes: deptBasics[addys := addys]
+
+import contracts.modules.Addys as addys
+import contracts.modules.DeptBasics as deptBasics
+from interfaces import Department
 from interfaces import Vault
 from ethereum.ercs import IERC20Detailed
 
@@ -112,14 +119,11 @@ HUNDRED_PERCENT: constant(uint256) = 100_00 # 100.00%
 MAX_ASSETS_TO_CLEAN: constant(uint256) = 20
 MAX_VAULTS_TO_CLEAN: constant(uint256) = 10
 
-# config
-isActivated: public(bool)
-
 
 @deploy
 def __init__(_ripeHq: address):
     addys.__init__(_ripeHq)
-    self.isActivated = True
+    deptBasics.__init__(False, True)
 
 
 #############

@@ -1,8 +1,16 @@
 # @version 0.4.1
 
-initializes: addys
+implements: Department
+
 exports: addys.__interface__
+exports: deptBasics.__interface__
+
+initializes: addys
+initializes: deptBasics[addys := addys]
+
 import contracts.modules.Addys as addys
+import contracts.modules.DeptBasics as deptBasics
+from interfaces import Department
 
 # deposit / withdrawals
 
@@ -145,6 +153,7 @@ numFungLiqUsers: public(uint256) # num liq users
 @deploy
 def __init__(_ripeHq: address):
     addys.__init__(_ripeHq)
+    deptBasics.__init__(False, False)
 
 
 ###############
@@ -170,6 +179,7 @@ def _getNumUserVaults(_user: address) -> uint256:
 @external
 def addVaultToUser(_user: address, _vaultId: uint256):
     assert msg.sender == addys._getTellerAddr() # dev: only Teller allowed
+    assert deptBasics.isActivated # dev: not activated
 
     # already participating - fail gracefully
     if self.indexOfVault[_user][_vaultId] != 0:
@@ -188,6 +198,7 @@ def addVaultToUser(_user: address, _vaultId: uint256):
 @external
 def removeVaultFromUser(_user: address, _vaultId: uint256):
     assert msg.sender == addys._getLootboxAddr() # dev: only Lootbox allowed
+    assert deptBasics.isActivated # dev: not activated
 
     numUserVaults: uint256 = self.numUserVaults[_user]
     if numUserVaults == 0:
@@ -229,6 +240,7 @@ def getDepositLedgerData(_user: address, _vaultId: uint256) -> DepositLedgerData
 @external
 def setUserDebt(_user: address, _userDebt: UserDebt, _newYield: uint256, _interval: IntervalBorrow):
     assert msg.sender == addys._getCreditEngineAddr() # dev: only CreditEngine allowed
+    assert deptBasics.isActivated # dev: not activated
 
     # reduce prev user debt
     totalDebt: uint256 = self.totalDebt
@@ -265,6 +277,8 @@ def setUserDebt(_user: address, _userDebt: UserDebt, _newYield: uint256, _interv
 @external
 def flushUnrealizedYield() -> uint256:
     assert msg.sender == addys._getCreditEngineAddr() # dev: only CreditEngine allowed
+    assert deptBasics.isActivated # dev: not activated
+
     unrealizedYield: uint256 = self.unrealizedYield
     self.unrealizedYield = 0
     return unrealizedYield
@@ -353,6 +367,8 @@ def isUserInLiquidation(_user: address) -> bool:
 @external
 def setRipeRewards(_ripeRewards: RipeRewards):
     assert msg.sender == addys._getLootboxAddr() # dev: only Lootbox allowed
+    assert deptBasics.isActivated # dev: not activated
+
     self._setRipeRewards(_ripeRewards)
 
 
@@ -377,6 +393,7 @@ def setDepositPointsAndRipeRewards(
     _ripeRewards: RipeRewards,
 ):
     assert msg.sender == addys._getLootboxAddr() # dev: only Lootbox allowed
+    assert deptBasics.isActivated # dev: not activated
 
     if _user != empty(address):
         self.userDepositPoints[_user][_vaultId][_asset] = _userPoints
@@ -396,6 +413,7 @@ def setBorrowPointsAndRipeRewards(
     _ripeRewards: RipeRewards,
 ):
     assert msg.sender == addys._getLootboxAddr() # dev: only Lootbox allowed
+    assert deptBasics.isActivated # dev: not activated
 
     self.globalBorrowPoints = _globalPoints
     if _user != empty(address):
@@ -449,6 +467,7 @@ def getDepositPointsBundle(_user: address, _vaultId: uint256, _asset: address) -
 @external
 def createNewFungibleAuction(_auc: FungibleAuction) -> uint256:
     assert msg.sender == addys._getAuctionHouseAddr() # dev: only AuctionHouse allowed
+    assert deptBasics.isActivated # dev: not activated
 
     # fail gracefully if auction already exists
     if self.fungibleAuctionIndex[_auc.liqUser][_auc.vaultId][_auc.asset] != 0:
@@ -488,6 +507,7 @@ def _registerFungibleLiqUser(_liqUser: address):
 @external
 def removeFungibleAuction(_liqUser: address, _vaultId: uint256, _asset: address):
     assert msg.sender == addys._getAuctionHouseAddr() # dev: only AuctionHouse allowed
+    assert deptBasics.isActivated # dev: not activated
 
     numAuctions: uint256 = self.numFungibleAuctions[_liqUser]
     if numAuctions == 0:
@@ -545,6 +565,7 @@ def _removeFungLiqUser(_liqUser: address):
 @external
 def removeAllFungibleAuctions(_liqUser: address):
     assert msg.sender == addys._getAuctionHouseAddr() # dev: only AuctionHouse allowed
+    assert deptBasics.isActivated # dev: not activated
 
     # remove fung user
     self._removeFungLiqUser(_liqUser)

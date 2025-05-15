@@ -1,12 +1,21 @@
 # @version 0.4.1
 
-initializes: gov
-initializes: registry
+implements: Department
 
 exports: gov.__interface__
+exports: addys.__interface__
+exports: deptBasics.__interface__
+
+initializes: gov
+initializes: registry
+initializes: addys
+initializes: deptBasics[addys := addys]
 
 import contracts.modules.LocalGov as gov
 import contracts.modules.Registry as registry
+import contracts.modules.Addys as addys
+import contracts.modules.DeptBasics as deptBasics
+from interfaces import Department
 from interfaces import Vault
 
 # staked green
@@ -35,6 +44,8 @@ def __init__(
 
     # initialize registry
     registry.__init__(_minVaultChangeDelay, _maxVaultChangeDelay, "VaultBook.vy")
+    addys.__init__(_ripeHq)
+    deptBasics.__init__(False, False)
 
 
 ##################

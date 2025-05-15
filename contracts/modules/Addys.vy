@@ -3,13 +3,8 @@
 interface RipeHq:
     def isValidAddyAddr(_addr: address) -> bool: view
     def getAddy(_addyId: uint256) -> address: view
-    def governance() -> address: view
     def greenToken() -> address: view
     def ripeToken() -> address: view
-
-interface VaultBook:
-    def getStakedGreenData() -> (uint256, address): view
-    def getStakedRipeData() -> (uint256, address): view
 
 struct Addys:
     hq: address
@@ -26,10 +21,6 @@ struct Addys:
     ledger: address
     lootbox: address
     teller: address
-    sGreenVaultAddr: address
-    sGreenVaultId: uint256
-    sRipeVaultAddr: address
-    sRipeVaultId: uint256
 
 # hq
 RIPE_HQ: immutable(address)
@@ -77,24 +68,12 @@ def getAddys() -> Addys:
 @internal
 def _generateAddys() -> Addys:
     hq: address = RIPE_HQ
-    vaultBook: address = staticcall RipeHq(hq).getAddy(VAULT_BOOK_ID)
-
-    # staked green
-    sGreenVaultId: uint256 = 0
-    sGreenVaultAddr: address = empty(address)
-    sGreenVaultId, sGreenVaultAddr = staticcall VaultBook(vaultBook).getStakedGreenData()
-
-    # staked ripe
-    sRipeVaultId: uint256 = 0
-    sRipeVaultAddr: address = empty(address)
-    sRipeVaultId, sRipeVaultAddr = staticcall VaultBook(vaultBook).getStakedRipeData()
-
     return Addys(
         hq=hq,
         greenToken=staticcall RipeHq(hq).greenToken(),
         ripeToken=staticcall RipeHq(hq).ripeToken(),
         priceDesk=staticcall RipeHq(hq).getAddy(PRICE_DESK_ID),
-        vaultBook=vaultBook,
+        vaultBook=staticcall RipeHq(hq).getAddy(VAULT_BOOK_ID),
         auctionHouse=staticcall RipeHq(hq).getAddy(AUCTION_HOUSE_ID),
         auctionHouseNft=staticcall RipeHq(hq).getAddy(AUCTION_HOUSE_NFT_ID),
         bondRoom=staticcall RipeHq(hq).getAddy(BOND_ROOM_ID),
@@ -104,10 +83,6 @@ def _generateAddys() -> Addys:
         ledger=staticcall RipeHq(hq).getAddy(LEDGER_ID),
         lootbox=staticcall RipeHq(hq).getAddy(LOOTBOX_ID),
         teller=staticcall RipeHq(hq).getAddy(TELLER_ID),
-        sGreenVaultAddr=sGreenVaultAddr,
-        sGreenVaultId=sGreenVaultId,
-        sRipeVaultAddr=sRipeVaultAddr,
-        sRipeVaultId=sRipeVaultId,
     )
 
 

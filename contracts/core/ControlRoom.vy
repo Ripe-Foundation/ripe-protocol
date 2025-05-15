@@ -1,8 +1,16 @@
 # @version 0.4.1
 
-initializes: addys
+implements: Department
+
 exports: addys.__interface__
+exports: deptBasics.__interface__
+
+initializes: addys
+initializes: deptBasics[addys := addys]
+
 import contracts.modules.Addys as addys
+import contracts.modules.DeptBasics as deptBasics
+from interfaces import Department
 
 struct DepositConfig:
     canDeposit: bool
@@ -95,16 +103,13 @@ struct AuctionParams:
     duration: uint256
     extension: uint256
 
-# config
-isActivated: public(bool)
-
 MAX_GEN_STAB_POOLS: constant(uint256) = 10
 
 
 @deploy
 def __init__(_ripeHq: address):
     addys.__init__(_ripeHq)
-    self.isActivated = True
+    deptBasics.__init__(False, False)
 
 
 ##########################

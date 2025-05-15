@@ -1,13 +1,22 @@
 # @version 0.4.1
 
-initializes: addys
+implements: Department
+
 exports: addys.__interface__
+exports: deptBasics.__interface__
+
+initializes: addys
+initializes: deptBasics[addys := addys]
+
 import contracts.modules.Addys as addys
+import contracts.modules.DeptBasics as deptBasics
+from interfaces import Department
+from ethereum.ercs import IERC20
 
 
 @deploy
 def __init__(_ripeHq: address):
     addys.__init__(_ripeHq)
+    deptBasics.__init__(False, False)
 
-    # Just filling up a spot in Ripe HQ for now.
-    # Nothing here. Coming soon.
+    # NOTE: This is a temporary AuctionHouseNFT contract. Real one coming soon.

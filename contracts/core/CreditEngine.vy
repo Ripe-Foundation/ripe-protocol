@@ -1,9 +1,16 @@
 # @version 0.4.1
 
-initializes: addys
-exports: addys.__interface__
-import contracts.modules.Addys as addys
+implements: Department
 
+exports: addys.__interface__
+exports: deptBasics.__interface__
+
+initializes: addys
+initializes: deptBasics[addys := addys]
+
+import contracts.modules.Addys as addys
+import contracts.modules.DeptBasics as deptBasics
+from interfaces import Department
 from interfaces import Vault
 from ethereum.ercs import IERC20
 
@@ -124,9 +131,6 @@ event RepayDebt:
     maxUserDebt: uint256
     hasGoodDebtHealth: bool
 
-# config
-isActivated: public(bool)
-
 ONE_YEAR: constant(uint256) = 60 * 60 * 24 * 365
 HUNDRED_PERCENT: constant(uint256) = 100_00 # 100.00%
 ONE_PERCENT: constant(uint256) = 1_00 # 1.00%
@@ -137,7 +141,7 @@ MAX_REDEMPTIONS: constant(uint256) = 20
 @deploy
 def __init__(_ripeHq: address):
     addys.__init__(_ripeHq)
-    self.isActivated = True
+    deptBasics.__init__(True, False)
 
 
 ##########

@@ -1,0 +1,45 @@
+# @version 0.4.1
+
+
+###########
+# Minting #
+###########
+
+
+@view
+@external
+def canMintGreen() -> bool:
+    # used in RipeHq.vy
+    ...
+
+
+@view
+@external
+def canMintRipe() -> bool:
+    # used in RipeHq.vy
+    ...
+
+
+########
+# Ripe #
+########
+
+
+@view
+@external
+def isActivated() -> bool:
+    ...
+
+
+@external
+def activate(_shouldActivate: bool):
+    ...
+
+
+@external
+def recoverFunds(_recipient: address, _asset: address):
+    ...
+
+@external
+def recoverFundsMany(_recipient: address, _assets: DynArray[address, 20]):
+    ...
