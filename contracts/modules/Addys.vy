@@ -127,6 +127,21 @@ def _getGovernance() -> address:
     return staticcall RipeHq(RIPE_HQ).governance()
 
 
+# tokens
+
+
+@view
+@internal
+def _getGreenToken() -> address:
+    return staticcall RipeHq(RIPE_HQ).greenToken()
+
+
+@view
+@internal
+def _getRipeToken() -> address:
+    return staticcall RipeHq(RIPE_HQ).ripeToken()
+
+
 # price desk
 
 

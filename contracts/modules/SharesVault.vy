@@ -56,10 +56,7 @@ def _withdrawTokensFromVault(
 ) -> (uint256, uint256, bool):
     assert vaultData.isActivated # dev: not activated
     assert msg.sender in [addys._getTellerAddr(), addys._getAuctionHouseAddr()] # dev: only Teller or AuctionHouse allowed
-
-    # validation
     assert empty(address) not in [_user, _asset, _recipient] # dev: invalid user, asset, or recipient
-    assert _amount != 0 # dev: invalid withdrawal amount
 
     # calc shares + amount to withdraw
     withdrawalShares: uint256 = 0
@@ -71,9 +68,7 @@ def _withdrawTokensFromVault(
     withdrawalShares, isDepleted = vaultData._reduceBalanceOnWithdrawal(_user, _asset, withdrawalShares, True)
 
     # move tokens to recipient
-    assert withdrawalAmount != 0 # dev: no withdrawal amount
     assert extcall IERC20(_asset).transfer(_recipient, withdrawalAmount, default_return_value=True) # dev: token transfer failed
-
     return withdrawalAmount, withdrawalShares, isDepleted
 
 
@@ -86,10 +81,7 @@ def _transferBalanceWithinVault(
 ) -> (uint256, uint256, bool):
     assert vaultData.isActivated # dev: not activated
     assert msg.sender == addys._getAuctionHouseAddr() # dev: only AuctionHouse allowed
-
-    # validation
     assert empty(address) not in [_fromUser, _toUser, _asset] # dev: invalid users or asset
-    assert _transferAmount != 0 # dev: invalid transfer amount
 
     # calc shares + amount to transfer
     transferShares: uint256 = 0
@@ -188,8 +180,10 @@ def _calcWithdrawalSharesAndAmount(
     _asset: address,
     _amount: uint256,
 ) -> (uint256, uint256):
-    totalShares: uint256 = vaultData.totalBalances[_asset]
     totalBalance: uint256 = staticcall IERC20(_asset).balanceOf(self)
+    assert totalBalance != 0 # dev: no asset to withdraw
+
+    totalShares: uint256 = vaultData.totalBalances[_asset]
 
     # user shares
     withdrawalShares: uint256 = vaultData.userBalances[_user][_asset]
@@ -201,6 +195,7 @@ def _calcWithdrawalSharesAndAmount(
         withdrawalShares = min(withdrawalShares, self._amountToShares(_asset, _amount, totalShares, totalBalance, True))
         withdrawalAmount = _amount
 
+    assert withdrawalAmount != 0 # dev: no withdrawal amount
     return withdrawalShares, withdrawalAmount
 
 
