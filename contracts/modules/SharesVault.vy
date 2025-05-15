@@ -55,7 +55,7 @@ def _withdrawTokensFromVault(
     _recipient: address,
 ) -> (uint256, uint256, bool):
     assert vaultData.isActivated # dev: not activated
-    assert msg.sender in [addys._getTellerAddr(), addys._getAuctionHouseAddr()] # dev: only Teller or AuctionHouse allowed
+    assert msg.sender in [addys._getTellerAddr(), addys._getAuctionHouseAddr(), addys._getCreditEngineAddr()] # dev: not allowed
     assert empty(address) not in [_user, _asset, _recipient] # dev: invalid user, asset, or recipient
 
     # calc shares + amount to withdraw

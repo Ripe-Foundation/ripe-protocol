@@ -16,6 +16,7 @@ interface Ledger:
     def flushUnrealizedYield() -> uint256: nonpayable
 
 interface ControlRoom:
+    def getRedeemCollateralConfig(_vaultId: uint256, _asset: address) -> RedeemCollateralConfig: view
     def getBorrowConfig(_user: address, _caller: address) -> BorrowConfig: view
     def getDebtTerms(_vaultId: uint256, _asset: address) -> DebtTerms: view
     def getRepayConfig(_user: address) -> RepayConfig: view
@@ -43,6 +44,7 @@ flag RepayType:
     STANDARD
     LIQUIDATION
     AUCTION
+    REDEMPTION
 
 struct BorrowDataBundle:
     userDebt: UserDebt
@@ -69,6 +71,16 @@ struct BorrowConfig:
 struct RepayConfig:
     isRepayEnabled: bool
     canOthersRepayForUser: bool
+
+struct RedeemCollateralConfig:
+    canRedeemCollateral: bool
+    ltvPaybackBuffer: uint256
+
+struct CollateralRedemption:
+    user: address
+    vaultId: uint256
+    asset: address
+    maxGreenAmount: uint256
 
 struct DebtTerms:
     ltv: uint256
@@ -122,6 +134,7 @@ ONE_YEAR: constant(uint256) = 60 * 60 * 24 * 365
 HUNDRED_PERCENT: constant(uint256) = 100_00 # 100.00%
 ONE_PERCENT: constant(uint256) = 1_00 # 1.00%
 MAX_DEBT_UPDATES: constant(uint256) = 25
+MAX_REDEMPTIONS: constant(uint256) = 20
 
 
 @deploy
@@ -496,6 +509,154 @@ def _reduceDebtAmount(_userDebt: UserDebt, _repayAmount: uint256) -> UserDebt:
         userDebt.principal -= min(principalToReduce, userDebt.principal)
 
     return userDebt
+
+
+#####################
+# Redeem Collateral #
+#####################
+
+
+@external
+def redeemCollateralFromMany(
+    _redeemer: address,
+    _greenAmount: uint256,
+    _redemptions: DynArray[CollateralRedemption, MAX_REDEMPTIONS],
+    _a: addys.Addys = empty(addys.Addys),
+) -> uint256:
+    assert msg.sender == addys._getTellerAddr() # dev: only Teller allowed
+    a: addys.Addys = addys._getAddys(_a)
+
+    totalGreenSpent: uint256 = 0
+    totalGreenRemaining: uint256 = min(_greenAmount, staticcall IERC20(a.greenToken).balanceOf(self))
+    assert totalGreenRemaining != 0 # dev: no green to redeem
+
+    for r: CollateralRedemption in _redemptions:
+        if totalGreenRemaining == 0:
+            break
+        greenSpent: uint256 = self._redeemCollateral(r.user, r.vaultId, r.asset, r.maxGreenAmount, totalGreenRemaining, _redeemer, a)
+        totalGreenRemaining -= greenSpent
+        totalGreenSpent += greenSpent
+
+    # transfer leftover green back to redeemer
+    if totalGreenRemaining != 0:
+        assert extcall IERC20(a.greenToken).transfer(_redeemer, totalGreenRemaining, default_return_value=True) # dev: green transfer failed
+
+    return totalGreenSpent
+
+
+@external
+def redeemCollateral(
+    _user: address,
+    _vaultId: uint256,
+    _asset: address,
+    _greenAmount: uint256,
+    _redeemer: address,
+    _a: addys.Addys = empty(addys.Addys),
+) -> uint256:
+    assert msg.sender == addys._getTellerAddr() # dev: only Teller allowed
+    a: addys.Addys = addys._getAddys(_a)
+
+    greenAmount: uint256 = min(_greenAmount, staticcall IERC20(a.greenToken).balanceOf(self))
+    assert greenAmount != 0 # dev: no green to redeem
+    greenSpent: uint256 = self._redeemCollateral(_user, _vaultId, _asset, max_value(uint256), greenAmount, _redeemer, a)
+
+    # transfer leftover green back to redeemer
+    if greenAmount > greenSpent:
+        assert extcall IERC20(a.greenToken).transfer(_redeemer, greenAmount - greenSpent, default_return_value=True) # dev: green transfer failed
+
+    return greenSpent
+
+
+@internal
+def _redeemCollateral(
+    _user: address,
+    _vaultId: uint256,
+    _asset: address,
+    _maxGreenForAsset: uint256,
+    _totalGreenRemaining: uint256,
+    _redeemer: address,
+    _a: addys.Addys,
+) -> uint256:
+
+    # NOTE: failing gracefully here, in case of many redemptions at same time
+
+    # invalid inputs
+    if empty(address) in [_redeemer, _asset, _user] or 0 in [_maxGreenForAsset, _totalGreenRemaining, _vaultId]:
+        return 0
+
+    # redemptions not allowed on asset
+    config: RedeemCollateralConfig = staticcall ControlRoom(_a.controlRoom).getRedeemCollateralConfig(_vaultId, _asset)
+    if not config.canRedeemCollateral:
+        return 0
+
+    # get latest user debt
+    d: RepayDataBundle = staticcall Ledger(_a.ledger).getRepayDataBundle(_user)
+    userDebt: UserDebt = empty(UserDebt)
+    newInterest: uint256 = 0
+    userDebt, newInterest = self._getLatestUserDebtWithInterest(d.userDebt)
+
+    # cannot redeem if no debt or in liquidation
+    if userDebt.amount == 0 or userDebt.inLiquidation:
+        return 0
+    
+    # get latest debt terms
+    bt: UserBorrowTerms = self._getUserBorrowTerms(_user, d.numUserVaults, True, _a)
+    if bt.collateralVal == 0:
+        return 0
+
+    # user has not reached redemption threshold
+    currentRatio: uint256 = userDebt.amount * HUNDRED_PERCENT // bt.collateralVal
+    if currentRatio < bt.debtTerms.redemptionThreshold:
+        return 0
+
+    # estimated debt to pay back to achieve safe LTV
+    # won't be exact because depends on which collateral is redeemed (LTV changes)
+    targetLtv: uint256 = bt.debtTerms.ltv * (HUNDRED_PERCENT - config.ltvPaybackBuffer) // HUNDRED_PERCENT
+    maxCollateralValue: uint256 = self._calcAmountToPay(userDebt.amount, bt.collateralVal, targetLtv)
+
+    # treating green as $1
+    maxGreenAvailable: uint256 = min(_totalGreenRemaining, staticcall IERC20(_a.greenToken).balanceOf(self))
+    maxGreenForAsset: uint256 = min(_maxGreenForAsset, maxGreenAvailable)
+    maxRedeemValue: uint256 = min(maxCollateralValue, maxGreenForAsset)
+    if maxRedeemValue == 0:
+        return 0
+
+    # max asset amount to take from user
+    maxAssetAmount: uint256 = staticcall PriceDesk(_a.priceDesk).getAssetAmount(_asset, maxRedeemValue, True)
+    if maxAssetAmount == 0:
+        return 0
+
+    # vault address
+    vaultAddr: address = staticcall VaultBook(_a.vaultBook).getVault(_vaultId)
+    if vaultAddr == empty(address):
+        return 0
+
+    # user must have this asset in vault
+    if not staticcall Vault(vaultAddr).isUserInVaultAsset(_user, _asset):
+        return 0
+
+    # withdraw from vault, transfer to redeemer
+    amountSent: uint256 = 0
+    na: bool = False
+    amountSent, na = extcall Vault(vaultAddr).withdrawTokensFromVault(_user, _asset, maxAssetAmount, _redeemer, _a)
+
+    # repay debt
+    repayAmount: uint256 = min(maxRedeemValue, amountSent * maxRedeemValue // maxAssetAmount)
+    repayAmount = min(repayAmount, userDebt.amount)
+    hasGoodDebtHealth: bool = self._repayDebt(_user, userDebt, d.numUserVaults, repayAmount, 0, newInterest, True, False, RepayType.REDEMPTION, _a)
+
+    return repayAmount
+
+
+@view
+@internal
+def _calcAmountToPay(_debtAmount: uint256, _collateralValue: uint256, _targetLtv: uint256) -> uint256:
+    # goal here is to only reduce the debt necessary to get LTV back to safe position
+    # it will never be perfectly precise because depending on what assets are taken, the LTV might slightly change
+    collValueAdjusted: uint256 =_collateralValue * _targetLtv // HUNDRED_PERCENT
+
+    toPay: uint256 = (_debtAmount - collValueAdjusted) * HUNDRED_PERCENT // (HUNDRED_PERCENT - _targetLtv)
+    return min(toPay, _debtAmount)
 
 
 ################

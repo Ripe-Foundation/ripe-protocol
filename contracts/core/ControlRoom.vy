@@ -40,6 +40,10 @@ struct RepayConfig:
     isRepayEnabled: bool
     canOthersRepayForUser: bool
 
+struct RedeemCollateralConfig:
+    canRedeemCollateral: bool
+    ltvPaybackBuffer: uint256
+
 struct RipeRewardsAllocs:
     stakers: uint256
     borrowers: uint256
@@ -153,6 +157,18 @@ def getRepayConfig(_user: address) -> RepayConfig:
 def isDaowryEnabled() -> bool:
     # TODO: implement
     return False
+
+
+@view
+@external
+def getRedeemCollateralConfig(_vaultId: uint256, _asset: address) -> RedeemCollateralConfig:
+    # check general canRedeem 
+    # check if has LTV
+    # check whitelist
+    # check if asset is stable
+    # check if NFT
+    return empty(RedeemCollateralConfig)
+
 
 
 #################

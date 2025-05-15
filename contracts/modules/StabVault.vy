@@ -103,7 +103,7 @@ def _withdrawTokensFromVault(
     _a: addys.Addys,
 ) -> (uint256, uint256, bool):
     assert vaultData.isActivated # dev: not activated
-    assert msg.sender in [addys._getTellerAddr(), addys._getAuctionHouseAddr()] # dev: only Teller or AuctionHouse allowed
+    assert msg.sender in [addys._getTellerAddr(), addys._getAuctionHouseAddr(), addys._getCreditEngineAddr()] # dev: not allowed
     assert empty(address) not in [_user, _asset, _recipient] # dev: invalid user, asset, or recipient
 
     # calc shares + amount to withdraw
@@ -568,18 +568,22 @@ def redeemManyFromStabilityPool(
     a: addys.Addys = addys._getAddys(_a)
     assert self._canRedeemInThisVault(a.greenToken) # dev: redemptions not allowed
 
-    totalGreenRemaining: uint256 = _greenAmount
+    totalGreenSpent: uint256 = 0
+    totalGreenRemaining: uint256 = min(_greenAmount, staticcall IERC20(a.greenToken).balanceOf(self))
+    assert totalGreenRemaining != 0 # dev: no green to redeem
+
     for r: StabPoolRedemption in _redemptions:
         if totalGreenRemaining == 0:
             break
         greenSpent: uint256 = self._redeemFromStabilityPool(_redeemer, r.claimAsset, r.maxGreenAmount, totalGreenRemaining, a.greenToken, a.priceDesk)
         totalGreenRemaining -= greenSpent
+        totalGreenSpent += greenSpent
 
     # transfer leftover green back to redeemer
     if totalGreenRemaining != 0:
         assert extcall IERC20(a.greenToken).transfer(_redeemer, totalGreenRemaining, default_return_value=True) # dev: green transfer failed
 
-    return _greenAmount - totalGreenRemaining
+    return totalGreenSpent
 
 
 @external
@@ -592,11 +596,14 @@ def redeemFromStabilityPool(
     assert msg.sender == addys._getTellerAddr() # dev: only Teller allowed
     a: addys.Addys = addys._getAddys(_a)
     assert self._canRedeemInThisVault(a.greenToken) # dev: redemptions not allowed
-    greenSpent: uint256 = self._redeemFromStabilityPool(_redeemer, _claimAsset, max_value(uint256), _greenAmount, a.greenToken, a.priceDesk)
+
+    greenAmount: uint256 = min(_greenAmount, staticcall IERC20(a.greenToken).balanceOf(self))
+    assert greenAmount != 0 # dev: no green to redeem
+    greenSpent: uint256 = self._redeemFromStabilityPool(_redeemer, _claimAsset, max_value(uint256), greenAmount, a.greenToken, a.priceDesk)
 
     # transfer leftover green back to redeemer
-    if _greenAmount > greenSpent:
-        assert extcall IERC20(a.greenToken).transfer(_redeemer, _greenAmount - greenSpent, default_return_value=True) # dev: green transfer failed
+    if greenAmount > greenSpent:
+        assert extcall IERC20(a.greenToken).transfer(_redeemer, greenAmount - greenSpent, default_return_value=True) # dev: green transfer failed
 
     return greenSpent
 
