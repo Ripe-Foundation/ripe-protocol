@@ -30,7 +30,7 @@ interface Ledger:
     def isUserInLiquidation(_user: address) -> bool: view
 
 interface StabilityPool:
-    def swapForLiquidatedCollateral(_stabAsset: address, _stabAmountToRemove: uint256, _liqAsset: address, _liqAmountSent: uint256, _recipient: address) -> uint256: nonpayable
+    def swapForLiquidatedCollateral(_stabAsset: address, _stabAmountToRemove: uint256, _liqAsset: address, _liqAmountSent: uint256, _recipient: address, _greenToken: address) -> uint256: nonpayable
 
 interface VaultBook:
     def getVaultAddr(_vaultId: uint256) -> address: view
@@ -399,7 +399,7 @@ def _swapCollateralWithStabPool(
         return 0, 0, shouldGoToNextLiqAsset
 
     # remove assets from stability pool
-    stabAmountSwapped: uint256 = extcall StabilityPool(_stabPool.vaultAddr).swapForLiquidatedCollateral(_stabPool.asset, amountNeededFromBuyer, _liqAsset, amountSentToBuyer, proceedsAddr)
+    stabAmountSwapped: uint256 = extcall StabilityPool(_stabPool.vaultAddr).swapForLiquidatedCollateral(_stabPool.asset, amountNeededFromBuyer, _liqAsset, amountSentToBuyer, proceedsAddr, _a.greenToken)
     stabValueSwapped: uint256 = maxValueInStabPool * stabAmountSwapped // maxAmountInStabPool
 
     log CollateralSwappedWithStabPool(

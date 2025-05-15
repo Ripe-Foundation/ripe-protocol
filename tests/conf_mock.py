@@ -90,3 +90,23 @@ def charlie_token_whale(env, charlie_token, governor):
 @pytest.fixture(scope="session")
 def charlie_token_vault(charlie_token):
     return boa.load("contracts/mock/MockErc4626Vault.vy", charlie_token, name="charlie_erc4626_vault")
+
+
+#################
+# Price Sources #
+#################
+
+
+@pytest.fixture(scope="session")
+def mock_price_source(price_desk, governor):
+    mock_price_source = boa.load(
+        "contracts/mock/MockPriceSource.vy",
+        name="mock_price_source",
+    )
+
+    # register with price desk
+    assert price_desk.registerNewPriceSource(mock_price_source.address, "Mock Price Source", sender=governor)
+    boa.env.time_travel(blocks=price_desk.priceSourceChangeDelay() + 1)
+    assert price_desk.confirmNewPriceSourceRegistration(mock_price_source.address, sender=governor) != 0
+
+    return mock_price_source

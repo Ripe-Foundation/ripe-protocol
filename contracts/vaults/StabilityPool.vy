@@ -4,6 +4,7 @@ implements: Vault
 
 exports: addys.__interface__
 exports: vaultData.__interface__
+exports: stabVault.__interface__
 
 initializes: addys
 initializes: vaultData[addys := addys]

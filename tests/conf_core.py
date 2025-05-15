@@ -219,3 +219,22 @@ def rebase_erc20_vault(ripe_hq, vault_book, governor):
     assert vault_book.confirmNewVaultRegistration(vault.address, sender=governor) != 0
 
     return vault
+
+
+# stability pool vault
+
+
+@pytest.fixture(scope="session")
+def stability_pool(ripe_hq, vault_book, governor):
+    vault = boa.load(
+        "contracts/vaults/StabilityPool.vy",
+        ripe_hq,
+        name="stability_pool",
+    )
+
+    # register with vault book
+    assert vault_book.registerNewVault(vault.address, "Stability Pool", sender=governor)
+    boa.env.time_travel(blocks=vault_book.vaultChangeDelay() + 1)
+    assert vault_book.confirmNewVaultRegistration(vault.address, sender=governor) != 0
+
+    return vault
