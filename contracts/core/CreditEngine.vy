@@ -37,9 +37,6 @@ interface VaultBook:
 interface LootBox:
     def updateBorrowPoints(_user: address, _a: addys.Addys = empty(addys.Addys)): nonpayable
 
-interface RipeHq:
-    def governance() -> address: view
-
 flag RepayType:
     STANDARD
     LIQUIDATION
@@ -201,10 +198,10 @@ def borrowForUser(
     # origination fee
     daowry: uint256 = self._getDaowryAmount(newBorrowAmount, bt.debtTerms.daowry, a.controlRoom)
 
-    # green for stakers
-    forGreenStakers: uint256 = daowry + unrealizedYield
-    if forGreenStakers != 0:
-        self._sendGreenToStakers(a.greenToken, forGreenStakers, a.vaultBook)
+    # dao revenue
+    forDao: uint256 = daowry + unrealizedYield
+    if forDao != 0:
+        assert extcall IERC20(a.greenToken).transfer(a.endaoment, forDao) # dev: could not transfer
 
     # borrower gets their green now -- do this AFTER sending green to stakers
     forBorrower: uint256 = newBorrowAmount - daowry
@@ -913,27 +910,6 @@ def getMaxWithdrawableForAsset(_user: address, _asset: address, _a: addys.Addys 
 
     # based stricly on total ltvs, not taking into consideration how much user actually has deposited
     return staticcall PriceDesk(a.priceDesk).getAssetAmount(_asset, maxTransferUsdValue, False)
-
-
-# green to stakers
-
-
-@internal
-def _sendGreenToStakers(
-    _greenToken: address,
-    _amount: uint256,
-    _vaultBook: address,
-) -> bool:
-    receiver: address = staticcall VaultBook(_vaultBook).getStakedGreenVault()
-
-    # edge case (vault not set) -- for now transfer tokens to governance
-    if receiver == empty(address):
-        receiver = staticcall RipeHq(addys._getRipeHq()).governance()
-
-    # transfer tokens to staked green vault
-    amount: uint256 = min(_amount, staticcall IERC20(_greenToken).balanceOf(self))
-    assert extcall IERC20(_greenToken).transfer(receiver, amount) # dev: could not transfer
-    return True
 
 
 # green for user

@@ -12,7 +12,7 @@ from config.BluePrint import PARAMS, ADDYS
 @pytest.fixture(scope="session")
 def ripe_hq_deploy(governor, fork):
     return boa.load(
-        "contracts/registries/AddyRegistry.vy",
+        "contracts/registries/RipeHq.vy",
         governor,
         PARAMS[fork]["RIPE_HQ_MIN_GOV_CHANGE_DELAY"],
         PARAMS[fork]["RIPE_HQ_MAX_GOV_CHANGE_DELAY"],
@@ -23,8 +23,24 @@ def ripe_hq_deploy(governor, fork):
 
 
 @pytest.fixture(scope="session", autouse=True)
-def ripe_hq(ripe_hq_deploy, price_desk, auction_house, vault_book, control_room, credit_engine, ledger, lootbox, teller, governor):
+def ripe_hq(
+    ripe_hq_deploy,
+    price_desk,
+    vault_book,
+    auction_house,
+    auction_house_nft,
+    bond_room,
+    control_room,
+    credit_engine,
+    endaoment,
+    ledger,
+    lootbox,
+    teller,
+    governor,
+):
     delay = ripe_hq_deploy.addyChangeDelay()
+
+    # registries
 
     # 1
     assert ripe_hq_deploy.registerNewAddy(price_desk, "Price Desk", sender=governor)
@@ -36,42 +52,59 @@ def ripe_hq(ripe_hq_deploy, price_desk, auction_house, vault_book, control_room,
     boa.env.time_travel(blocks=delay + 1)
     assert ripe_hq_deploy.confirmNewAddy(vault_book, sender=governor) == 2
 
+    # departments
+
     # 3
     assert ripe_hq_deploy.registerNewAddy(auction_house, "Auction House", sender=governor)
     boa.env.time_travel(blocks=delay + 1)
     assert ripe_hq_deploy.confirmNewAddy(auction_house, sender=governor) == 3
 
     # 4
-    assert ripe_hq_deploy.registerNewAddy(control_room, "Control Room", sender=governor)
+    assert ripe_hq_deploy.registerNewAddy(auction_house_nft, "Auction House NFT", sender=governor)
     boa.env.time_travel(blocks=delay + 1)
-    assert ripe_hq_deploy.confirmNewAddy(control_room, sender=governor) == 4
+    assert ripe_hq_deploy.confirmNewAddy(auction_house_nft, sender=governor) == 4
 
     # 5
-    assert ripe_hq_deploy.registerNewAddy(credit_engine, "Credit Engine", sender=governor)
+    assert ripe_hq_deploy.registerNewAddy(bond_room, "Bond Room", sender=governor)
     boa.env.time_travel(blocks=delay + 1)
-    assert ripe_hq_deploy.confirmNewAddy(credit_engine, sender=governor) == 5
+    assert ripe_hq_deploy.confirmNewAddy(bond_room, sender=governor) == 5
 
     # 6
-    assert ripe_hq_deploy.registerNewAddy(ledger, "Ledger", sender=governor)
+    assert ripe_hq_deploy.registerNewAddy(control_room, "Control Room", sender=governor)
     boa.env.time_travel(blocks=delay + 1)
-    assert ripe_hq_deploy.confirmNewAddy(ledger, sender=governor) == 6
+    assert ripe_hq_deploy.confirmNewAddy(control_room, sender=governor) == 6
 
     # 7
-    assert ripe_hq_deploy.registerNewAddy(lootbox, "Lootbox", sender=governor)
+    assert ripe_hq_deploy.registerNewAddy(credit_engine, "Credit Engine", sender=governor)
     boa.env.time_travel(blocks=delay + 1)
-    assert ripe_hq_deploy.confirmNewAddy(lootbox, sender=governor) == 7
+    assert ripe_hq_deploy.confirmNewAddy(credit_engine, sender=governor) == 7
 
     # 8
+    assert ripe_hq_deploy.registerNewAddy(endaoment, "Endaoment", sender=governor)
+    boa.env.time_travel(blocks=delay + 1)
+    assert ripe_hq_deploy.confirmNewAddy(endaoment, sender=governor) == 8
+
+    # 9
+    assert ripe_hq_deploy.registerNewAddy(ledger, "Ledger", sender=governor)
+    boa.env.time_travel(blocks=delay + 1)
+    assert ripe_hq_deploy.confirmNewAddy(ledger, sender=governor) == 9
+
+    # 10
+    assert ripe_hq_deploy.registerNewAddy(lootbox, "Lootbox", sender=governor)
+    boa.env.time_travel(blocks=delay + 1)
+    assert ripe_hq_deploy.confirmNewAddy(lootbox, sender=governor) == 10
+
+    # 11
     assert ripe_hq_deploy.registerNewAddy(teller, "Teller", sender=governor)
     boa.env.time_travel(blocks=delay + 1)
-    assert ripe_hq_deploy.confirmNewAddy(teller, sender=governor) == 8
+    assert ripe_hq_deploy.confirmNewAddy(teller, sender=governor) == 11
 
     return ripe_hq_deploy
 
 
-###############
-# Departments #
-###############
+##############
+# Registries #
+##############
 
 
 # price desk
@@ -106,6 +139,11 @@ def vault_book(ripe_hq_deploy, fork):
     )
 
 
+###############
+# Departments #
+###############
+
+
 # auction house
 
 
@@ -115,6 +153,30 @@ def auction_house(ripe_hq_deploy):
         "contracts/core/AuctionHouse.vy",
         ripe_hq_deploy,
         name="auction_house",
+    )
+
+
+# auction house nft
+
+
+@pytest.fixture(scope="session")
+def auction_house_nft(ripe_hq_deploy):
+    return boa.load(
+        "contracts/core/AuctionHouseNFT.vy",
+        ripe_hq_deploy,
+        name="auction_house_nft",
+    )
+
+
+# bond room
+
+
+@pytest.fixture(scope="session")
+def bond_room(ripe_hq_deploy):
+    return boa.load(
+        "contracts/core/BondRoom.vy",
+        ripe_hq_deploy,
+        name="bond_room",
     )
 
 
@@ -139,6 +201,18 @@ def credit_engine(ripe_hq_deploy):
         "contracts/core/CreditEngine.vy",
         ripe_hq_deploy,
         name="credit_engine",
+    )
+
+
+# endaoment
+
+
+@pytest.fixture(scope="session")
+def endaoment(ripe_hq_deploy):
+    return boa.load(
+        "contracts/core/Endaoment.vy",
+        ripe_hq_deploy,
+        name="endaoment",
     )
 
 

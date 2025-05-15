@@ -13,14 +13,16 @@ interface VaultBook:
 
 struct Addys:
     hq: address
-    governance: address
     greenToken: address
     ripeToken: address
     priceDesk: address
     vaultBook: address
     auctionHouse: address
+    auctionHouseNft: address
+    bondRoom: address
     controlRoom: address
     creditEngine: address
+    endaoment: address
     ledger: address
     lootbox: address
     teller: address
@@ -36,11 +38,14 @@ RIPE_HQ: immutable(address)
 PRICE_DESK_ID: constant(uint256) = 1
 VAULT_BOOK_ID: constant(uint256) = 2
 AUCTION_HOUSE_ID: constant(uint256) = 3
-CONTROL_ROOM_ID: constant(uint256) = 4
-CREDIT_ENGINE_ID: constant(uint256) = 5
-LEDGER_ID: constant(uint256) = 6
-LOOTBOX_ID: constant(uint256) = 7
-TELLER_ID: constant(uint256) = 8
+AUCTION_HOUSE_NFT_ID: constant(uint256) = 4
+BOND_ROOM_ID: constant(uint256) = 5
+CONTROL_ROOM_ID: constant(uint256) = 6
+CREDIT_ENGINE_ID: constant(uint256) = 7
+ENDAOMENT_ID: constant(uint256) = 8
+LEDGER_ID: constant(uint256) = 9
+LOOTBOX_ID: constant(uint256) = 10
+TELLER_ID: constant(uint256) = 11
 
 
 @deploy
@@ -86,14 +91,16 @@ def _generateAddys() -> Addys:
 
     return Addys(
         hq=hq,
-        governance=staticcall RipeHq(hq).governance(),
         greenToken=staticcall RipeHq(hq).greenToken(),
         ripeToken=staticcall RipeHq(hq).ripeToken(),
         priceDesk=staticcall RipeHq(hq).getAddy(PRICE_DESK_ID),
         vaultBook=vaultBook,
         auctionHouse=staticcall RipeHq(hq).getAddy(AUCTION_HOUSE_ID),
+        auctionHouseNft=staticcall RipeHq(hq).getAddy(AUCTION_HOUSE_NFT_ID),
+        bondRoom=staticcall RipeHq(hq).getAddy(BOND_ROOM_ID),
         controlRoom=staticcall RipeHq(hq).getAddy(CONTROL_ROOM_ID),
         creditEngine=staticcall RipeHq(hq).getAddy(CREDIT_ENGINE_ID),
+        endaoment=staticcall RipeHq(hq).getAddy(ENDAOMENT_ID),
         ledger=staticcall RipeHq(hq).getAddy(LEDGER_ID),
         lootbox=staticcall RipeHq(hq).getAddy(LOOTBOX_ID),
         teller=staticcall RipeHq(hq).getAddy(TELLER_ID),
@@ -119,12 +126,6 @@ def _getRipeHq() -> address:
 @internal
 def _isValidRipeHqAddy(_addr: address) -> bool:
     return staticcall RipeHq(RIPE_HQ).isValidAddyAddr(_addr)
-
-
-@view
-@internal
-def _getGovernance() -> address:
-    return staticcall RipeHq(RIPE_HQ).governance()
 
 
 # tokens
@@ -187,6 +188,36 @@ def _getAuctionHouseAddr() -> address:
     return staticcall RipeHq(RIPE_HQ).getAddy(AUCTION_HOUSE_ID)
 
 
+# auction house nft
+
+
+@view
+@internal
+def _getAuctionHouseNftId() -> uint256:
+    return AUCTION_HOUSE_NFT_ID
+
+
+@view
+@internal
+def _getAuctionHouseNftAddr() -> address:
+    return staticcall RipeHq(RIPE_HQ).getAddy(AUCTION_HOUSE_NFT_ID)
+
+
+# bond room
+
+
+@view
+@internal
+def _getBondRoomId() -> uint256:
+    return BOND_ROOM_ID
+
+
+@view
+@internal
+def _getBondRoomAddr() -> address:
+    return staticcall RipeHq(RIPE_HQ).getAddy(BOND_ROOM_ID)
+
+
 # control room
 
 
@@ -215,6 +246,21 @@ def _getCreditEngineId() -> uint256:
 @internal
 def _getCreditEngineAddr() -> address:
     return staticcall RipeHq(RIPE_HQ).getAddy(CREDIT_ENGINE_ID)
+
+
+# endaoment
+
+
+@view
+@internal
+def _getEndaomentId() -> uint256:
+    return ENDAOMENT_ID
+
+
+@view
+@internal
+def _getEndaomentAddr() -> address:
+    return staticcall RipeHq(RIPE_HQ).getAddy(ENDAOMENT_ID)
 
 
 # ledger

@@ -7,20 +7,6 @@ import contracts.modules.Addys as addys
 from interfaces import Vault
 from ethereum.ercs import IERC20
 
-interface CreditEngine:
-    def repayDuringLiquidation(_liqUser: address, _userDebt: UserDebt, _repayAmount: uint256, _newInterest: uint256, _a: addys.Addys = empty(addys.Addys)) -> bool: nonpayable
-    def getLatestUserDebtAndTerms(_user: address, _shouldRaise: bool, _a: addys.Addys = empty(addys.Addys)) -> (UserDebt, UserBorrowTerms, uint256): view
-    def repayDuringAuctionPurchase(_liqUser: address, _repayAmount: uint256, _a: addys.Addys = empty(addys.Addys)) -> bool: nonpayable
-
-interface PriceDesk:
-    def getAssetAmount(_asset: address, _usdValue: uint256, _shouldRaise: bool = False) -> uint256: view
-    def getUsdValue(_asset: address, _amount: uint256, _shouldRaise: bool = False) -> uint256: view
-
-interface ControlRoom:
-    def getAssetLiqConfig(_vaultId: uint256, _asset: address) -> AssetLiqConfig: view
-    def canBuyAuction(_vaultId: uint256, _asset: address, _buyer: address) -> bool: view
-    def getGenLiqConfig() -> GenLiqConfig: view
-
 interface Ledger:
     def getFungibleAuction(_liqUser: address, _vaultId: uint256, _asset: address) -> FungibleAuction: view
     def removeFungibleAuction(_liqUser: address, _vaultId: uint256, _asset: address): nonpayable
@@ -28,6 +14,20 @@ interface Ledger:
     def userVaults(_user: address, _index: uint256) -> uint256: view
     def numUserVaults(_user: address) -> uint256: view
     def isUserInLiquidation(_user: address) -> bool: view
+
+interface CreditEngine:
+    def repayDuringLiquidation(_liqUser: address, _userDebt: UserDebt, _repayAmount: uint256, _newInterest: uint256, _a: addys.Addys = empty(addys.Addys)) -> bool: nonpayable
+    def getLatestUserDebtAndTerms(_user: address, _shouldRaise: bool, _a: addys.Addys = empty(addys.Addys)) -> (UserDebt, UserBorrowTerms, uint256): view
+    def repayDuringAuctionPurchase(_liqUser: address, _repayAmount: uint256, _a: addys.Addys = empty(addys.Addys)) -> bool: nonpayable
+
+interface ControlRoom:
+    def getAssetLiqConfig(_vaultId: uint256, _asset: address) -> AssetLiqConfig: view
+    def canBuyAuction(_vaultId: uint256, _asset: address, _buyer: address) -> bool: view
+    def getGenLiqConfig() -> GenLiqConfig: view
+
+interface PriceDesk:
+    def getAssetAmount(_asset: address, _usdValue: uint256, _shouldRaise: bool = False) -> uint256: view
+    def getUsdValue(_asset: address, _amount: uint256, _shouldRaise: bool = False) -> uint256: view
 
 interface StabilityPool:
     def swapForLiquidatedCollateral(_stabAsset: address, _stabAmountToRemove: uint256, _liqAsset: address, _liqAmountSent: uint256, _recipient: address, _greenToken: address) -> uint256: nonpayable
@@ -345,7 +345,7 @@ def _transferStablesToEndaoment(
     # withdraw from vault
     amountSent: uint256 = 0
     isDepleted: bool = False
-    amountSent, isDepleted = extcall Vault(_vaultAddr).withdrawTokensFromVault(_liqUser, _liqAsset, maxAssetAmount, _a.governance, _a)
+    amountSent, isDepleted = extcall Vault(_vaultAddr).withdrawTokensFromVault(_liqUser, _liqAsset, maxAssetAmount, _a.endaoment, _a)
     usdValue: uint256 = amountSent * _remainingToRepay // maxAssetAmount
 
     log CollateralSentToEndaoment(liqUser=_liqUser, vaultId=_vaultId, liqAsset=_liqAsset, amountSent=amountSent, usdValue=usdValue, isDepleted=isDepleted)
@@ -381,7 +381,7 @@ def _swapCollateralWithStabPool(
     proceedsAddr: address = empty(address)
     if _stabPool.asset != _a.greenToken:
         maxValueInStabPool = staticcall PriceDesk(_a.priceDesk).getUsdValue(_stabPool.asset, maxAmountInStabPool, True)
-        proceedsAddr = _a.governance
+        proceedsAddr = _a.endaoment
 
         # can't get price of stab asset, skip
         if maxValueInStabPool == 0:
