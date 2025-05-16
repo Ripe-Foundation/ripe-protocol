@@ -98,13 +98,13 @@ event RegistryTimeLockModified:
     numBlocks: uint256
     registry: String[28]
 
-# config
+# time lock
 registryChangeTimeLock: public(uint256)
 
-# core registry
-addrInfo: public(HashMap[uint256, AddressInfo])
-addrToRegId: public(HashMap[address, uint256])
-numAddrs: public(uint256)
+# core data (address registry)
+addrInfo: public(HashMap[uint256, AddressInfo]) # regId -> address info
+addrToRegId: public(HashMap[address, uint256]) # addr -> regId
+numAddrs: public(uint256) # number of addrs in registry
 
 # pending changes
 pendingNewAddr: public(HashMap[address, PendingNewAddress]) # addr -> pending new addr
@@ -132,8 +132,7 @@ def __init__(
 
     # set initial time lock -- this may be zero during inital setup of registry
     if _initialTimeLock != 0:
-        assert self._isValidRegistryTimeLock(_initialTimeLock) # dev: invalid time lock
-        self.registryChangeTimeLock = _initialTimeLock
+        assert self._setRegistryTimeLock(_initialTimeLock) # dev: invalid time lock
 
     # start at 1 index
     self.numAddrs = 1
@@ -468,13 +467,6 @@ def setRegistryTimeLock(_numBlocks: uint256) -> bool:
     return self._setRegistryTimeLock(_numBlocks)
 
 
-@external
-def setRegistryTimeLockAfterSetup():
-    assert gov._canGovern(msg.sender) # dev: no perms
-    assert self.registryChangeTimeLock == 0 # dev: already set
-    self._setRegistryTimeLock(MIN_REG_TIME_LOCK)
-
-
 @internal
 def _setRegistryTimeLock(_numBlocks: uint256) -> bool:
     assert self._isValidRegistryTimeLock(_numBlocks) # dev: invalid time lock
@@ -496,6 +488,35 @@ def isValidRegistryTimeLock(_numBlocks: uint256) -> bool:
 @internal
 def _isValidRegistryTimeLock(_numBlocks: uint256) -> bool:
     return _numBlocks >= MIN_REG_TIME_LOCK and _numBlocks <= MAX_REG_TIME_LOCK
+
+
+# finish setup
+
+
+@external
+def setRegistryTimeLockAfterSetup(_numBlocks: uint256 = 0) -> bool:
+    assert gov._canGovern(msg.sender) # dev: no perms
+    assert self.registryChangeTimeLock == 0 # dev: already set
+
+    timeLock: uint256 = _numBlocks
+    if timeLock == 0:
+        timeLock = MIN_REG_TIME_LOCK
+    return self._setRegistryTimeLock(timeLock)
+
+
+# utils
+
+
+@view
+@external
+def minRegistryTimeLock() -> uint256:
+    return MIN_REG_TIME_LOCK
+
+
+@view
+@external
+def maxRegistryTimeLock() -> uint256:
+    return MAX_REG_TIME_LOCK
 
 
 #################

@@ -29,22 +29,20 @@ event GovChangeCancelled:
 event GovChangeTimeLockModified:
     numBlocks: uint256
 
-event HqGovernanceSetup:
-    deployer: indexed(address)
-    newGov: indexed(address)
-
-# time lock
-govChangeTimeLock: public(uint256)
+event RipeHqSetupFinished:
+    governance: indexed(address)
+    timeLock: uint256
 
 # governance
 governance: public(address)
 pendingGov: public(PendingGovernance)
 
-# config
-RIPE_HQ_FOR_GOV: immutable(address)
-didFinishSetup: public(bool)
+# time lock
+govChangeTimeLock: public(uint256)
 
-# time lock boundaries
+# config
+didFinishSetup: public(bool)
+RIPE_HQ_FOR_GOV: immutable(address)
 MIN_GOV_TIME_LOCK: immutable(uint256)
 MAX_GOV_TIME_LOCK: immutable(uint256)
 
@@ -84,8 +82,7 @@ def __init__(
 
     # set initial time lock (for local gov)
     initialTimeLock: uint256 = max(minTimeLock, _initialTimeLock)
-    assert self._isValidGovTimeLock(initialTimeLock) # dev: invalid time lock
-    self.govChangeTimeLock = initialTimeLock
+    assert self._setGovTimeLock(initialTimeLock) # dev: invalid time lock
 
 
 ##############
@@ -209,6 +206,23 @@ def cancelGovernanceChange():
 ####################
 
 
+# set time lock
+
+
+@external
+def setGovTimeLock(_numBlocks: uint256) -> bool:
+    assert self._canGovern(msg.sender) # dev: no perms
+    return self._setGovTimeLock(_numBlocks)
+
+
+@internal
+def _setGovTimeLock(_numBlocks: uint256) -> bool:
+    assert self._isValidGovTimeLock(_numBlocks) # dev: invalid time lock
+    self.govChangeTimeLock = _numBlocks
+    log GovChangeTimeLockModified(numBlocks=_numBlocks)
+    return True
+
+
 # validation
 
 
@@ -226,22 +240,6 @@ def _isValidGovTimeLock(_numBlocks: uint256) -> bool:
     return _numBlocks >= MIN_GOV_TIME_LOCK and _numBlocks <= MAX_GOV_TIME_LOCK
 
 
-# set time lock
-
-
-@external
-def setGovTimeLock(_numBlocks: uint256):
-    assert self._canGovern(msg.sender) # dev: no perms
-    self._setGovTimeLock(_numBlocks)
-
-
-@internal
-def _setGovTimeLock(_numBlocks: uint256):
-    assert self._isValidGovTimeLock(_numBlocks) # dev: invalid time lock
-    self.govChangeTimeLock = _numBlocks
-    log GovChangeTimeLockModified(numBlocks=_numBlocks)
-
-
 # utils
 
 
@@ -257,13 +255,13 @@ def maxGovChangeTimeLock() -> uint256:
     return MAX_GOV_TIME_LOCK
 
 
-############
-# Hq Setup #
-############
+#################
+# Ripe Hq Setup #
+#################
 
 
 @external
-def finishHqSetup(_newGov: address):
+def finishRipeHqSetup(_newGov: address, _timeLock: uint256 = 0) -> bool:
     assert self._isRipeHqGov() # dev: only ripe hq
     assert msg.sender == self.governance # dev: no perms
     assert not self.didFinishSetup # dev: already finished setup
@@ -274,7 +272,11 @@ def finishHqSetup(_newGov: address):
     self.governance = _newGov
 
     # set time lock
-    self._setGovTimeLock(MIN_GOV_TIME_LOCK)
+    timeLock: uint256 = _timeLock
+    if timeLock == 0:
+        timeLock = MIN_GOV_TIME_LOCK
+    assert self._setGovTimeLock(timeLock) # dev: invalid time lock
 
     self.didFinishSetup = True
-    log HqGovernanceSetup(deployer=prevGov, newGov=_newGov)
+    log RipeHqSetupFinished(governance=_newGov, timeLock=timeLock)
+    return True

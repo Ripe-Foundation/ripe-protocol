@@ -1,18 +1,15 @@
 # @version 0.4.1
 
 implements: IERC20
-from ethereum.ercs import IERC20
 
-initializes: token
 exports: token.__interface__
+initializes: token
+
+from ethereum.ercs import IERC20
 from contracts.modules import Erc20Token as token
 
 interface RipeHq:
-    def canSetTokenBlacklist(_addr: address) -> bool: view
     def canMintGreen(_addr: address) -> bool: view
-
-# ripe protocol
-ripeHq: public(address)
 
 # token details
 NAME: constant(String[25]) = "Green USD Stablecoin"
@@ -22,15 +19,13 @@ DECIMALS: constant(uint8) = 18
 
 @deploy
 def __init__(
-    _ripeHq: address,
+    _initialGov: address,
+    _minHqTimeLock: uint256,
+    _maxHqTimeLock: uint256,
     _initialSupply: uint256,
     _initialSupplyRecipient: address,
 ):
-    assert _ripeHq != empty(address) and _ripeHq.is_contract # dev: cannot be 0x0
-    self.ripeHq = _ripeHq
-
-    # initialize erc20 token module
-    token.__init__(NAME, _initialSupply, _initialSupplyRecipient)
+    token.__init__(NAME, _minHqTimeLock, _maxHqTimeLock, _initialGov, _initialSupply, _initialSupplyRecipient)
 
 
 ##########
@@ -56,24 +51,12 @@ def decimals() -> uint8:
     return DECIMALS
 
 
-##################
-# Require Access #
-##################
+###########
+# Minting #
+###########
 
 
 @external
 def mint(_recipient: address, _amount: uint256) -> bool:
-    assert staticcall RipeHq(self.ripeHq).canMintGreen(msg.sender) # dev: cannot mint
+    assert staticcall RipeHq(token.ripeHq).canMintGreen(msg.sender) # dev: cannot mint
     return token._mint(_recipient, _amount)
-
-
-@external
-def setBlacklist(_addr: address, _shouldBlacklist: bool) -> bool:
-    assert staticcall RipeHq(self.ripeHq).canSetTokenBlacklist(msg.sender) # dev: no perms
-    return token._setBlacklist(_addr, _shouldBlacklist)
-
-
-@external
-def setRegistryId(_regId: uint256) -> bool:
-    # registry-related thing, can be ignored
-    return True

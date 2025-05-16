@@ -10,7 +10,7 @@ from contracts.modules import Erc20Token as token
 
 interface RipeHq:
     def canMintRipe(_addr: address) -> bool: view
-
+    
 # token details
 NAME: constant(String[25]) = "Ripe DAO Governance Token"
 SYMBOL: constant(String[4]) = "RIPE"
@@ -20,10 +20,12 @@ DECIMALS: constant(uint8) = 18
 @deploy
 def __init__(
     _initialGov: address,
+    _minHqTimeLock: uint256,
+    _maxHqTimeLock: uint256,
     _initialSupply: uint256,
     _initialSupplyRecipient: address,
 ):
-    token.__init__(NAME, _initialGov, _initialSupply, _initialSupplyRecipient)
+    token.__init__(NAME, _minHqTimeLock, _maxHqTimeLock, _initialGov, _initialSupply, _initialSupplyRecipient)
 
 
 ##########
@@ -58,4 +60,3 @@ def decimals() -> uint8:
 def mint(_recipient: address, _amount: uint256) -> bool:
     assert staticcall RipeHq(token.ripeHq).canMintRipe(msg.sender) # dev: cannot mint
     return token._mint(_recipient, _amount)
-

@@ -21,6 +21,7 @@ event VaultFundsRecovered:
 # config
 vaultId: public(uint256)
 isActivated: public(bool)
+initialVaultBook: address
 
 # balances (may be shares or actual balance)
 userBalances: public(HashMap[address, HashMap[address, uint256]]) # user -> asset -> balance
@@ -40,8 +41,9 @@ MAX_RECOVER_ASSETS: constant(uint256) = 20
 
 
 @deploy
-def __init__():
+def __init__(_initialVaultBook: address):
     self.isActivated = True
+    self.initialVaultBook = _initialVaultBook
 
 
 ###################
@@ -258,7 +260,10 @@ def _getNumVaultAssets() -> uint256:
 
 @external
 def setRegistryId(_regId: uint256) -> bool:
-    assert msg.sender == addys._getVaultBookAddr() # dev: only vault book allowed
+    vaultBook: address = addys._getVaultBookAddr()
+    if vaultBook == empty(address):
+        vaultBook = self.initialVaultBook
+    assert msg.sender == vaultBook # dev: only vault book allowed
 
     prevVaultId: uint256 = self.vaultId
     assert prevVaultId == 0 or prevVaultId == _regId # dev: invalid vault id

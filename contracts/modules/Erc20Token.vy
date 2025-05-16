@@ -2,9 +2,19 @@
 
 interface RipeHq:
     def canSetTokenBlacklist(_addr: address) -> bool: view
+    def canMintGreen(_addr: address) -> bool: view
+    def canMintRipe(_addr: address) -> bool: view
     def hasPendingGovChange() -> bool: view
     def greenToken() -> address: view
+    def governance() -> address: view
     def ripeToken() -> address: view
+
+# erc20
+
+struct PendingHq:
+    newHq: address
+    initiatedBlock: uint256
+    confirmBlock: uint256
 
 event Transfer:
     sender: indexed(address)
@@ -16,18 +26,41 @@ event Approval:
     spender: indexed(address)
     amount: uint256
 
+# ripe 
+
 event BlacklistModified:
     addr: indexed(address)
     isBlacklisted: bool
 
-event RipeHqSet:
+event HqChangeInitiated:
     prevHq: indexed(address)
     newHq: indexed(address)
+    confirmBlock: uint256
 
-_NAME: public(immutable(String[25]))
+event HqChangeConfirmed:
+    prevHq: indexed(address)
+    newHq: indexed(address)
+    initiatedBlock: uint256
+    confirmBlock: uint256
 
-# ripe protocol
+event HqChangeCancelled:
+    cancelledHq: indexed(address)
+    initiatedBlock: uint256
+    confirmBlock: uint256
+
+event InitialRipeHqSet:
+    hq: indexed(address)
+    timeLock: uint256
+
+event HqChangeTimeLockModified:
+    numBlocks: uint256
+
+# ripe hq
 ripeHq: public(address)
+
+# config
+pendingHq: public(PendingHq)
+hqChangeTimeLock: public(uint256)
 tempGov: address
 
 # blacklist
@@ -44,15 +77,23 @@ DOMAIN_TYPE_HASH: constant(bytes32) = keccak256('EIP712Domain(string name,string
 PERMIT_TYPE_HASH: constant(bytes32) = keccak256('Permit(address owner,address spender,uint256 amount,uint256 nonce,uint256 expiry)')
 ECRECOVER_PRECOMPILE: constant(address) = 0x0000000000000000000000000000000000000001
 
+TOKEN_NAME: immutable(String[25])
+MIN_HQ_TIME_LOCK: immutable(uint256)
+MAX_HQ_TIME_LOCK: immutable(uint256)
+
 
 @deploy
 def __init__(
     _tokenName: String[25],
+    _minHqTimeLock: uint256,
+    _maxHqTimeLock: uint256,
     _initialGov: address,
     _initialSupply: uint256,
     _initialSupplyRecipient: address,
 ):
-    _NAME = _tokenName
+    TOKEN_NAME = _tokenName
+    MIN_HQ_TIME_LOCK = _minHqTimeLock
+    MAX_HQ_TIME_LOCK = _maxHqTimeLock
 
     assert _initialGov != empty(address) # dev: cannot be 0x0
     self.tempGov = _initialGov
@@ -64,12 +105,6 @@ def __init__(
     self.balanceOf[_initialSupplyRecipient] = _initialSupply
     self.totalSupply = _initialSupply
     log Transfer(sender=empty(address), recipient=_initialSupplyRecipient, amount=_initialSupply)
-
-
-@external
-def setRegistryId(_regId: uint256) -> bool:
-    # needed to register with RipeHq, can be ignored here
-    return True
 
 
 ########
@@ -185,7 +220,7 @@ def _domainSeparator() -> bytes32:
     return keccak256(
         concat(
             DOMAIN_TYPE_HASH,
-            keccak256(_NAME),
+            keccak256(TOKEN_NAME),
             keccak256("1.0"),
             abi_encode(chain.id, self)
         )
@@ -260,9 +295,71 @@ def setBlacklist(_addr: address, _shouldBlacklist: bool) -> bool:
     return True
 
 
-###########
-# Ripe Hq #
-###########
+###################
+# Ripe Hq Changes #
+###################
+
+
+@view
+@external
+def hasPendingHqChange() -> bool:
+    return self.pendingHq.confirmBlock != 0
+
+
+# initiate hq change
+
+
+@external
+def initiateHqChange(_newHq: address):
+    assert msg.sender == staticcall RipeHq(self.ripeHq).governance() # dev: no perms
+
+    # validate new hq
+    prevHq: address = self.ripeHq
+    assert self._isValidNewRipeHq(_newHq, prevHq) # dev: invalid new hq
+
+    confirmBlock: uint256 = block.number + self.hqChangeTimeLock
+    self.pendingHq = PendingHq(
+        newHq= _newHq,
+        initiatedBlock= block.number,
+        confirmBlock= confirmBlock,
+    )
+    log HqChangeInitiated(prevHq=prevHq, newHq=_newHq, confirmBlock=confirmBlock)
+
+
+# confirm hq change
+
+
+@external
+def confirmHqChange() -> bool:
+    assert msg.sender == staticcall RipeHq(self.ripeHq).governance() # dev: no perms
+
+    data: PendingHq = self.pendingHq
+    assert data.confirmBlock != 0 and block.number >= data.confirmBlock # dev: time lock not reached
+
+    # validate new hq one more time
+    prevHq: address = self.ripeHq
+    if not self._isValidNewRipeHq(data.newHq, prevHq):
+        self.pendingHq = empty(PendingHq)
+        return False
+
+    # set new ripe hq
+    self.ripeHq = data.newHq
+    self.pendingHq = empty(PendingHq)
+    log HqChangeConfirmed(prevHq=prevHq, newHq=data.newHq, initiatedBlock=data.initiatedBlock, confirmBlock=data.confirmBlock)
+    return True
+
+
+# cancel hq change
+
+
+@external
+def cancelHqChange():
+    assert msg.sender == staticcall RipeHq(self.ripeHq).governance() # dev: no perms
+
+    data: PendingHq = self.pendingHq
+    assert data.confirmBlock != 0 # dev: no pending change
+    self.pendingHq = empty(PendingHq)
+    log HqChangeCancelled(cancelledHq=data.newHq, initiatedBlock=data.initiatedBlock, confirmBlock=data.confirmBlock)
 
 
 # validation
@@ -270,28 +367,117 @@ def setBlacklist(_addr: address, _shouldBlacklist: bool) -> bool:
 
 @view
 @external
-def isValidRipeHq(_ripeHq: address) -> bool:
-    return self._isValidRipeHq(_ripeHq)
+def isValidNewRipeHq(_newHq: address) -> bool:
+    return self._isValidNewRipeHq(_newHq, self.ripeHq)
 
 
 @view
 @internal
-def _isValidRipeHq(_ripeHq: address) -> bool:
-    if _ripeHq == empty(address) or not _ripeHq.is_contract:
+def _isValidNewRipeHq(_newHq: address, _prevHq: address) -> bool:
+
+    # same hq, or invalid new hq
+    if _newHq == _prevHq or _newHq == empty(address) or not _newHq.is_contract:
         return False
-    return self in [staticcall RipeHq(_ripeHq).greenToken(), staticcall RipeHq(_ripeHq).ripeToken()]
+
+    # if current hq has pending gov change, cannot change ripe hq now
+    if _prevHq != empty(address) and staticcall RipeHq(_prevHq).hasPendingGovChange():
+        return False
+
+    # if new hq has pending gov change, or is not set, cannot change ripe hq now
+    if staticcall RipeHq(_newHq).hasPendingGovChange() or staticcall RipeHq(_newHq).governance() == empty(address):
+        return False
+
+    # tokens must be set
+    if staticcall RipeHq(_newHq).greenToken() == empty(address) or staticcall RipeHq(_newHq).ripeToken() == empty(address):
+        return False
+
+    # make sure it has the necessary interfaces
+    assert not staticcall RipeHq(_newHq).canSetTokenBlacklist(empty(address)) # dev: invalid interface
+    assert not staticcall RipeHq(_newHq).canMintGreen(empty(address)) # dev: invalid interface
+    assert not staticcall RipeHq(_newHq).canMintRipe(empty(address)) # dev: invalid interface
+
+    return True
 
 
-# initial setup
+####################
+# Time Lock Config #
+####################
 
 
 @external
-def setRipeHqOnSetup(_ripeHq: address):
-    assert msg.sender == self.tempGov # dev: no perms
-    assert self.ripeHq == empty(address) # dev: already set
+def setHqChangeTimeLock(_numBlocks: uint256) -> bool:
+    ripeHq: address = self.ripeHq
+    assert msg.sender == staticcall RipeHq(ripeHq).governance() # dev: no perms
+    assert not staticcall RipeHq(ripeHq).hasPendingGovChange() # dev: pending gov change
+    return self._setHqChangeTimeLock(_numBlocks)
 
-    assert self._isValidRipeHq(_ripeHq) # dev: invalid ripe hq
-    self.ripeHq = _ripeHq
+
+@internal
+def _setHqChangeTimeLock(_numBlocks: uint256) -> bool:
+    assert self._isValidHqChangeTimeLock(_numBlocks) # dev: invalid time lock
+    self.hqChangeTimeLock = _numBlocks
+    log HqChangeTimeLockModified(numBlocks=_numBlocks)
+    return True
+
+
+# validation
+
+
+@view
+@external
+def isValidHqChangeTimeLock(_numBlocks: uint256) -> bool:
+    return self._isValidHqChangeTimeLock(_numBlocks)
+
+
+@view
+@internal
+def _isValidHqChangeTimeLock(_numBlocks: uint256) -> bool:
+    return _numBlocks >= MIN_HQ_TIME_LOCK and _numBlocks <= MAX_HQ_TIME_LOCK
+
+
+# views
+
+
+@view
+@external
+def minHqTimeLock() -> uint256:
+    return MIN_HQ_TIME_LOCK
+
+
+@view
+@external
+def maxHqTimeLock() -> uint256:
+    return MAX_HQ_TIME_LOCK
+
+
+###############
+# Token Setup #
+###############
+
+
+@external
+def finishTokenSetup(_newHq: address, _timeLock: uint256 = 0) -> bool:
+    assert msg.sender == self.tempGov # dev: no perms
+
+    prevHq: address = self.ripeHq
+    assert prevHq == empty(address) # dev: already set
+
+    # set hq
+    assert self._isValidNewRipeHq(_newHq, prevHq) # dev: invalid ripe hq
+    self.ripeHq = _newHq
+
+    # set time lock
+    timeLock: uint256 = _timeLock
+    if timeLock == 0:
+        timeLock = MIN_HQ_TIME_LOCK
+    assert self._setHqChangeTimeLock(timeLock) # dev: invalid time lock
 
     self.tempGov = empty(address)
-    log RipeHqSet(prevHq=empty(address), newHq=_ripeHq)
+    log InitialRipeHqSet(hq=_newHq, timeLock=timeLock)
+    return True
+
+
+@external
+def setRegistryId(_regId: uint256) -> bool:
+    # needed to register with RipeHq (AddressRegistry module), can be ignored here
+    return True

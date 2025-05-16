@@ -21,6 +21,7 @@ event PriceSourceFundsRecovered:
 # config
 priceSourceId: public(uint256)
 isActivated: public(bool)
+initialPriceDesk: address
 
 # priced assets
 assets: public(HashMap[uint256, address]) # index -> asset
@@ -32,8 +33,9 @@ MAX_RECOVER_ASSETS: constant(uint256) = 20
 
 
 @deploy
-def __init__():
+def __init__(_initialPriceDesk: address):
     self.isActivated = True
+    self.initialPriceDesk = _initialPriceDesk
 
 
 ############
@@ -97,7 +99,10 @@ def getPricedAssets() -> DynArray[address, MAX_ASSETS]:
 
 @external
 def setRegistryId(_regId: uint256) -> bool:
-    assert msg.sender == addys._getPriceDeskAddr() # dev: only vault book allowed
+    priceDesk: address = addys._getPriceDeskAddr()
+    if priceDesk == empty(address):
+        priceDesk = self.initialPriceDesk
+    assert msg.sender == priceDesk # dev: only price desk allowed
 
     prevSourceId: uint256 = self.priceSourceId
     assert prevSourceId == 0 or prevSourceId == _regId # dev: invalid vault id

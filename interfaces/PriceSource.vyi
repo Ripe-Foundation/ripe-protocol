@@ -1,72 +1,120 @@
 # @version 0.4.1
 
+
+########
+# Core #
+########
+
+
 @view
 @external
 def getPrice(_asset: address, _staleTime: uint256 = 0, _oracleRegistry: address = empty(address)) -> uint256:
     ...
+
 
 @view
 @external
 def getPriceAndHasFeed(_asset: address, _staleTime: uint256 = 0, _oracleRegistry: address = empty(address)) -> (uint256, bool):
     ...
 
+
 @view
 @external
 def hasPriceFeed(_asset: address) -> bool:
     ...
+
 
 @view
 @external
 def hasPendingPriceFeedUpdate(_asset: address) -> bool:
     ...
 
+
 @view
 @external
-def priceFeedChangeDelay() -> uint256:
+def getPricedAssets() -> DynArray[address, 50]:
     ...
 
-@external
-def setPriceFeedChangeDelay(_numBlocks: uint256) -> bool:
-    ...
 
-@external
-def setPriceFeedChangeDelayToMin() -> bool:
-    ...
+################
+# Feed Changes #
+################
 
-# config
+
+# new feed
 
 
 @external
 def confirmNewPriceFeed(_asset: address) -> bool:
     ...
 
+
 @external
 def cancelNewPendingPriceFeed(_asset: address) -> bool:
     ...
+
+
+# update feed
+
 
 @external
 def confirmPriceFeedUpdate(_asset: address) -> bool:
     ...
 
+
 @external
 def cancelPriceFeedUpdate(_asset: address) -> bool:
     ...
+
+
+# disable feed
+
 
 @external
 def disablePriceFeed(_asset: address) -> bool:
     ...
 
+
 @external
 def confirmDisablePriceFeed(_asset: address) -> bool:
     ...
+
 
 @external
 def cancelDisablePriceFeed(_asset: address) -> bool:
     ...
 
+
+#############
+# Time Lock #
+#############
+
+
 @view
 @external
-def getPricedAssets() -> DynArray[address, 50]:
+def actionTimeLock() -> uint256:
+    ...
+
+
+@view
+@external
+def hasPendingAction(_actionId: uint256) -> bool:
+    ...
+
+
+@view
+@external
+def getActionConfirmationBlock(_actionId: uint256) -> uint256:
+    ...
+
+
+@external
+def setActionTimeLock(_numBlocks: uint256) -> bool:
+    ...
+
+
+@external
+def setActionTimeLockAfterSetup(_numBlocks: uint256 = 0) -> bool:
     ...
 
 

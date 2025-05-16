@@ -2,29 +2,30 @@
 
 implements: PriceSource
 
-initializes: gov
-initializes: psd
-initializes: td
-
 exports: gov.__interface__
-exports: psd.__interface__
-exports: td.__interface__
+exports: addys.__interface__
+exports: priceData.__interface__
+exports: timeLock.__interface__
+
+initializes: gov
+initializes: addys
+initializes: priceData[addys := addys]
+initializes: timeLock[gov := gov]
 
 import contracts.modules.LocalGov as gov
-import contracts.modules.PriceSourceData as psd
-import contracts.modules.TimeDelay as td
+import contracts.modules.Addys as addys
+import contracts.modules.PriceSourceData as priceData
+import contracts.modules.TimeLock as timeLock
+
 import interfaces.PriceSource as PriceSource
 
 interface PriceDesk:
-    def MIN_PRICE_SOURCE_CHANGE_DELAY() -> uint256: view
-    def MAX_PRICE_SOURCE_CHANGE_DELAY() -> uint256: view
+    def minRegistryTimeLock() -> uint256: view
+    def maxRegistryTimeLock() -> uint256: view
 
 interface ChainlinkFeed:
     def latestRoundData() -> ChainlinkRound: view
     def decimals() -> uint8: view 
-
-interface AddyRegistry:
-    def getAddy(_addyId: uint256) -> address: view
 
 struct ChainlinkRound:
     roundId: uint80
@@ -49,6 +50,7 @@ event NewChainlinkFeedPending:
     needsEthToUsd: bool
     needsBtcToUsd: bool
     confirmationBlock: uint256
+    actionId: uint256
 
 event NewChainlinkFeedAdded:
     asset: indexed(address)
@@ -67,6 +69,7 @@ event ChainlinkFeedUpdatePending:
     needsBtcToUsd: bool
     confirmationBlock: uint256
     oldFeed: indexed(address)
+    actionId: uint256
 
 event ChainlinkFeedUpdated:
     asset: indexed(address)
@@ -84,6 +87,7 @@ event DisableChainlinkFeedPending:
     asset: indexed(address)
     feed: indexed(address)
     confirmationBlock: uint256
+    actionId: uint256
 
 event ChainlinkFeedDisabled:
     asset: indexed(address)
@@ -104,9 +108,7 @@ WETH: public(immutable(address))
 ETH: public(immutable(address))
 BTC: public(immutable(address))
 
-ADDY_REGISTRY: public(immutable(address))
 NORMALIZED_DECIMALS: constant(uint256) = 18
-PRICE_DESK_ID: constant(uint256) = 7 # TODO: make sure this is correct
 
 
 @deploy
@@ -116,18 +118,21 @@ def __init__(
     _btcAddr: address,
     _ethUsdFeed: address,
     _btcUsdFeed: address,
-    _addyRegistry: address,
+    _ripeHq: address,
+    _initialPriceDesk: address,
 ):
-    assert empty(address) not in [_wethAddr, _ethAddr, _btcAddr, _addyRegistry] # dev: invalid addrs
-    ADDY_REGISTRY = _addyRegistry
+    gov.__init__(_ripeHq, empty(address), 0, 0, 0)
+    addys.__init__(_ripeHq)
+    priceData.__init__(_initialPriceDesk)
 
-    # initialize modules
-    gov.__init__(empty(address), _addyRegistry, 0, 0)
-    psd.__init__()
-    pd: address = staticcall AddyRegistry(ADDY_REGISTRY).getAddy(PRICE_DESK_ID)
-    td.__init__(staticcall PriceDesk(pd).MIN_PRICE_SOURCE_CHANGE_DELAY(), staticcall PriceDesk(pd).MAX_PRICE_SOURCE_CHANGE_DELAY(), False)
+    # time lock module
+    priceDesk: address = addys._getPriceDeskAddr()
+    if priceDesk == empty(address):
+        priceDesk = _initialPriceDesk
+    timeLock.__init__(staticcall PriceDesk(priceDesk).minRegistryTimeLock(), staticcall PriceDesk(priceDesk).maxRegistryTimeLock(), 0)
 
     # set default assets
+    assert empty(address) not in [_wethAddr, _ethAddr, _btcAddr] # dev: invalid asset addrs
     WETH = _wethAddr
     ETH = _ethAddr
     BTC = _btcAddr
@@ -154,13 +159,13 @@ def _setDefaultFeedOnDeploy(_asset: address, _newFeed: address) -> bool:
         needsEthToUsd=False,
         needsBtcToUsd=False,
     )
-    psd._addPricedAsset(_asset)
+    priceData._addPricedAsset(_asset)
     return True
 
 
-########
-# Core #
-########
+###############
+# Core Prices #
+###############
 
 
 # get price
@@ -212,7 +217,24 @@ def _getPrice(
     return price
 
 
-# chainlink data
+# utilities
+
+
+@view
+@external
+def hasPriceFeed(_asset: address) -> bool:
+    return self.feedConfig[_asset].feed != empty(address)
+
+
+@view
+@external
+def hasPendingPriceFeedUpdate(_asset: address) -> bool:
+    return timeLock._hasPendingAction(self.pendingUpdates[_asset].actionId)
+
+
+##################
+# Chainlink Data #
+##################
 
 
 @view
@@ -248,44 +270,12 @@ def _getChainlinkData(_feed: address, _decimals: uint256, _staleTime: uint256) -
     return price
 
 
-# utilities
-
-
-@view
-@external
-def hasPriceFeed(_asset: address) -> bool:
-    return self.feedConfig[_asset].feed != empty(address)
-
-
-@view
-@external
-def hasPendingPriceFeedUpdate(_asset: address) -> bool:
-    return td._hasPendingAction(self.pendingUpdates[_asset].actionId)
-
-
 ################
 # Add New Feed #
 ################
 
 
-# validation
-
-
-@view
-@external
-def isValidNewFeed(_asset: address, _newFeed: address, _decimals: uint256, _needsEthToUsd: bool, _needsBtcToUsd: bool) -> bool:
-    return self._isValidNewFeed(_asset, _newFeed, _decimals, _needsEthToUsd, _needsBtcToUsd)
-
-
-@view
-@internal
-def _isValidNewFeed(_asset: address, _newFeed: address, _decimals: uint256, _needsEthToUsd: bool, _needsBtcToUsd: bool) -> bool:
-    if psd.indexOfAsset[_asset] != 0 or self.feedConfig[_asset].feed != empty(address): # use the `updatePriceFeed` function instead
-        return False
-    return self._isValidFeedConfig(_asset, _newFeed, _decimals, _needsEthToUsd, _needsBtcToUsd)
-
-
-# initiate
+# initiate new feed
 
 
 @external
@@ -302,7 +292,7 @@ def addNewPriceFeed(
     assert self._isValidNewFeed(_asset, _newFeed, decimals, _needsEthToUsd, _needsBtcToUsd) # dev: invalid feed
 
     # set to pending state
-    aid: uint256 = td._initiateAction()
+    aid: uint256 = timeLock._initiateAction()
     self.pendingUpdates[_asset] = PendingChainlinkConfig(
         actionId=aid,
         config=ChainlinkConfig(
@@ -313,11 +303,11 @@ def addNewPriceFeed(
         ),
     )
 
-    log NewChainlinkFeedPending(asset=_asset, feed=_newFeed, needsEthToUsd=_needsEthToUsd, needsBtcToUsd=_needsBtcToUsd, confirmationBlock=td._getConfirmationBlock(aid))
+    log NewChainlinkFeedPending(asset=_asset, feed=_newFeed, needsEthToUsd=_needsEthToUsd, needsBtcToUsd=_needsBtcToUsd, confirmationBlock=timeLock._getActionConfirmationBlock(aid), actionId=aid)
     return True
 
 
-# confirm
+# confirm new feed
 
 
 @external
@@ -330,17 +320,19 @@ def confirmNewPriceFeed(_asset: address) -> bool:
         self._cancelNewPendingPriceFeed(_asset, d.actionId)
         return False
 
+    # check time lock
+    assert timeLock._confirmAction(d.actionId) # dev: time lock not reached
+
     # save new feed config
-    assert td._confirmAction(d.actionId) # dev: time delay not reached
     self.feedConfig[_asset] = d.config
     self.pendingUpdates[_asset] = empty(PendingChainlinkConfig)
-    psd._addPricedAsset(_asset)
+    priceData._addPricedAsset(_asset)
 
     log NewChainlinkFeedAdded(asset=_asset, feed=d.config.feed, needsEthToUsd=d.config.needsEthToUsd, needsBtcToUsd=d.config.needsBtcToUsd)
     return True
 
 
-# cancel
+# cancel new feed
 
 
 @external
@@ -354,13 +346,105 @@ def cancelNewPendingPriceFeed(_asset: address) -> bool:
 
 @internal
 def _cancelNewPendingPriceFeed(_asset: address, _aid: uint256):
-    assert td._cancelAction(_aid) # dev: cannot cancel action
+    assert timeLock._cancelAction(_aid) # dev: cannot cancel action
     self.pendingUpdates[_asset] = empty(PendingChainlinkConfig)
+
+
+# validation
+
+
+@view
+@external
+def isValidNewFeed(_asset: address, _newFeed: address, _decimals: uint256, _needsEthToUsd: bool, _needsBtcToUsd: bool) -> bool:
+    return self._isValidNewFeed(_asset, _newFeed, _decimals, _needsEthToUsd, _needsBtcToUsd)
+
+
+@view
+@internal
+def _isValidNewFeed(_asset: address, _newFeed: address, _decimals: uint256, _needsEthToUsd: bool, _needsBtcToUsd: bool) -> bool:
+    if priceData.indexOfAsset[_asset] != 0 or self.feedConfig[_asset].feed != empty(address): # use the `updatePriceFeed` function instead
+        return False
+    return self._isValidFeedConfig(_asset, _newFeed, _decimals, _needsEthToUsd, _needsBtcToUsd)
 
 
 ###############
 # Update Feed #
 ###############
+
+
+# initiate update feed
+
+
+@external
+def updatePriceFeed(
+    _asset: address, 
+    _newFeed: address, 
+    _needsEthToUsd: bool = False,
+    _needsBtcToUsd: bool = False,
+) -> bool:
+    assert gov._canGovern(msg.sender) # dev: no perms
+
+    # validation
+    oldFeed: address = self.feedConfig[_asset].feed
+    decimals: uint256 = convert(staticcall ChainlinkFeed(_newFeed).decimals(), uint256)
+    assert self._isValidUpdateFeed(_asset, _newFeed, oldFeed, decimals, _needsEthToUsd, _needsBtcToUsd) # dev: invalid feed
+
+    # set to pending state
+    aid: uint256 = timeLock._initiateAction()
+    self.pendingUpdates[_asset] = PendingChainlinkConfig(
+        actionId=aid,
+        config=ChainlinkConfig(
+            feed=_newFeed,
+            decimals=decimals,
+            needsEthToUsd=_needsEthToUsd,
+            needsBtcToUsd=_needsBtcToUsd,
+        ),
+    )
+    log ChainlinkFeedUpdatePending(asset=_asset, feed=_newFeed, needsEthToUsd=_needsEthToUsd, needsBtcToUsd=_needsBtcToUsd, confirmationBlock=timeLock._getActionConfirmationBlock(aid), oldFeed=oldFeed, actionId=aid)
+    return True
+
+
+# confirm update feed
+
+
+@external
+def confirmPriceFeedUpdate(_asset: address) -> bool:
+    assert gov._canGovern(msg.sender) # dev: no perms
+
+    # validate again
+    oldFeed: address = self.feedConfig[_asset].feed
+    d: PendingChainlinkConfig = self.pendingUpdates[_asset]
+    if not self._isValidUpdateFeed(_asset, d.config.feed, oldFeed, d.config.decimals, d.config.needsEthToUsd, d.config.needsBtcToUsd):
+        self._cancelPriceFeedUpdate(_asset, d.actionId)
+        return False
+
+    # check time lock
+    assert timeLock._confirmAction(d.actionId) # dev: time lock not reached
+
+    # save new feed config
+    self.feedConfig[_asset] = d.config
+    self.pendingUpdates[_asset] = empty(PendingChainlinkConfig)
+
+    log ChainlinkFeedUpdated(asset=_asset, feed=d.config.feed, needsEthToUsd=d.config.needsEthToUsd, needsBtcToUsd=d.config.needsBtcToUsd, oldFeed=oldFeed)
+    return True
+
+
+# cancel update feed
+
+
+@external
+def cancelPriceFeedUpdate(_asset: address) -> bool:
+    assert gov._canGovern(msg.sender) # dev: no perms
+    d: PendingChainlinkConfig = self.pendingUpdates[_asset]
+    self._cancelPriceFeedUpdate(_asset, d.actionId)
+    log ChainlinkFeedUpdateCancelled(asset=_asset, feed=d.config.feed, oldFeed=self.feedConfig[_asset].feed)
+    return True
+
+
+@internal
+def _cancelPriceFeedUpdate(_asset: address, _aid: uint256):
+    assert timeLock._cancelAction(_aid) # dev: cannot cancel action
+    self.pendingUpdates[_asset] = empty(PendingChainlinkConfig)
 
 
 # validation
@@ -377,7 +461,7 @@ def isValidUpdateFeed(_asset: address, _newFeed: address, _decimals: uint256, _n
 def _isValidUpdateFeed(_asset: address, _newFeed: address, _oldFeed: address, _decimals: uint256, _needsEthToUsd: bool, _needsBtcToUsd: bool) -> bool:
     if _newFeed == _oldFeed:
         return False
-    if psd.indexOfAsset[_asset] == 0 or _oldFeed == empty(address): # use the `addNewPriceFeed` function instead
+    if priceData.indexOfAsset[_asset] == 0 or _oldFeed == empty(address): # use the `addNewPriceFeed` function instead
         return False
     return self._isValidFeedConfig(_asset, _newFeed, _decimals, _needsEthToUsd, _needsBtcToUsd)
 
@@ -398,98 +482,12 @@ def _isValidFeedConfig(
     return self._getPrice(_feed, _decimals, _needsEthToUsd, _needsBtcToUsd, 0) != 0
 
 
-# initiate
-
-
-@external
-def updatePriceFeed(
-    _asset: address, 
-    _newFeed: address, 
-    _needsEthToUsd: bool = False,
-    _needsBtcToUsd: bool = False,
-) -> bool:
-    assert gov._canGovern(msg.sender) # dev: no perms
-
-    # validation
-    oldFeed: address = self.feedConfig[_asset].feed
-    decimals: uint256 = convert(staticcall ChainlinkFeed(_newFeed).decimals(), uint256)
-    assert self._isValidUpdateFeed(_asset, _newFeed, oldFeed, decimals, _needsEthToUsd, _needsBtcToUsd) # dev: invalid feed
-
-    # set to pending state
-    aid: uint256 = td._initiateAction()
-    self.pendingUpdates[_asset] = PendingChainlinkConfig(
-        actionId=aid,
-        config=ChainlinkConfig(
-            feed=_newFeed,
-            decimals=decimals,
-            needsEthToUsd=_needsEthToUsd,
-            needsBtcToUsd=_needsBtcToUsd,
-        ),
-    )
-    log ChainlinkFeedUpdatePending(asset=_asset, feed=_newFeed, needsEthToUsd=_needsEthToUsd, needsBtcToUsd=_needsBtcToUsd, confirmationBlock=td._getConfirmationBlock(aid), oldFeed=oldFeed)
-    return True
-
-
-# confirm
-
-
-@external
-def confirmPriceFeedUpdate(_asset: address) -> bool:
-    assert gov._canGovern(msg.sender) # dev: no perms
-
-    # validate again
-    oldFeed: address = self.feedConfig[_asset].feed
-    d: PendingChainlinkConfig = self.pendingUpdates[_asset]
-    if not self._isValidUpdateFeed(_asset, d.config.feed, oldFeed, d.config.decimals, d.config.needsEthToUsd, d.config.needsBtcToUsd):
-        self._cancelPriceFeedUpdate(_asset, d.actionId)
-        return False
-
-    # save new feed config
-    assert td._confirmAction(d.actionId) # dev: time delay not reached
-    self.feedConfig[_asset] = d.config
-    self.pendingUpdates[_asset] = empty(PendingChainlinkConfig)
-
-    log ChainlinkFeedUpdated(asset=_asset, feed=d.config.feed, needsEthToUsd=d.config.needsEthToUsd, needsBtcToUsd=d.config.needsBtcToUsd, oldFeed=oldFeed)
-    return True
-
-
-# cancel
-
-
-@external
-def cancelPriceFeedUpdate(_asset: address) -> bool:
-    assert gov._canGovern(msg.sender) # dev: no perms
-    d: PendingChainlinkConfig = self.pendingUpdates[_asset]
-    self._cancelPriceFeedUpdate(_asset, d.actionId)
-    log ChainlinkFeedUpdateCancelled(asset=_asset, feed=d.config.feed, oldFeed=self.feedConfig[_asset].feed)
-    return True
-
-
-@internal
-def _cancelPriceFeedUpdate(_asset: address, _aid: uint256):
-    assert td._cancelAction(_aid) # dev: cannot cancel action
-    self.pendingUpdates[_asset] = empty(PendingChainlinkConfig)
-
-
 ################
 # Disable Feed #
 ################
 
 
-# validation
-
-
-@view
-@internal
-def _isValidDisablePriceFeed(_asset: address, _oldFeed: address) -> bool:
-    if psd.indexOfAsset[_asset] == 0:
-        return False
-    if _oldFeed == empty(address):
-        return False
-    return _asset not in [ETH, WETH, BTC]
-
-
-# initiate
+# initiate disable feed
 
 
 @external
@@ -501,17 +499,17 @@ def disablePriceFeed(_asset: address) -> bool:
     assert self._isValidDisablePriceFeed(_asset, oldFeed) # dev: invalid asset
 
     # set to pending state
-    aid: uint256 = td._initiateAction()
+    aid: uint256 = timeLock._initiateAction()
     self.pendingUpdates[_asset] = PendingChainlinkConfig(
         actionId=aid,
         config=empty(ChainlinkConfig),
     )
 
-    log DisableChainlinkFeedPending(asset=_asset, feed=oldFeed, confirmationBlock=td._getConfirmationBlock(aid))
+    log DisableChainlinkFeedPending(asset=_asset, feed=oldFeed, confirmationBlock=timeLock._getActionConfirmationBlock(aid), actionId=aid)
     return True
 
 
-# confirm
+# confirm disable feed
 
 
 @external
@@ -525,17 +523,19 @@ def confirmDisablePriceFeed(_asset: address) -> bool:
         self._cancelDisablePriceFeed(_asset, d.actionId)
         return False
 
+    # check time lock
+    assert timeLock._confirmAction(d.actionId) # dev: time lock not reached
+
     # disable feed
-    assert td._confirmAction(d.actionId) # dev: time delay not reached
     self.feedConfig[_asset] = empty(ChainlinkConfig)
     self.pendingUpdates[_asset] = empty(PendingChainlinkConfig)
-    psd._removePricedAsset(_asset)
+    priceData._removePricedAsset(_asset)
     
     log ChainlinkFeedDisabled(asset=_asset, feed=oldFeed)
     return True
 
 
-# cancel
+# cancel disable feed
 
 
 @external
@@ -548,30 +548,18 @@ def cancelDisablePriceFeed(_asset: address) -> bool:
 
 @internal
 def _cancelDisablePriceFeed(_asset: address, _aid: uint256):
-    assert td._cancelAction(_aid) # dev: cannot cancel action
+    assert timeLock._cancelAction(_aid) # dev: cannot cancel action
     self.pendingUpdates[_asset] = empty(PendingChainlinkConfig)
 
 
-################
-# Delay Config #
-################
+# validation
 
 
 @view
-@external
-def priceFeedChangeDelay() -> uint256:
-    return td.actionDelay
-
-
-@external
-def setPriceFeedChangeDelay(_numBlocks: uint256) -> bool:
-    assert gov._canGovern(msg.sender) # dev: no perms
-    assert td._setActionDelay(_numBlocks) # dev: invalid delay
-    return True
-
-
-@external
-def setPriceFeedChangeDelayToMin() -> bool:
-    assert gov._canGovern(msg.sender) # dev: no perms
-    assert td._setActionDelay(td.MIN_ACTION_DELAY) # dev: invalid delay
-    return True
+@internal
+def _isValidDisablePriceFeed(_asset: address, _oldFeed: address) -> bool:
+    if priceData.indexOfAsset[_asset] == 0:
+        return False
+    if _oldFeed == empty(address):
+        return False
+    return _asset not in [ETH, WETH, BTC]

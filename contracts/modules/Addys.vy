@@ -51,16 +51,16 @@ def __init__(_ripeHq: address):
 
 
 @view
-@internal
-def _getAddys(_addys: Addys = empty(Addys)) -> Addys:
-    if _addys.hq != empty(address):
-        return _addys
+@external
+def getAddys() -> Addys:
     return self._generateAddys()
 
 
 @view
-@external
-def getAddys() -> Addys:
+@internal
+def _getAddys(_addys: Addys = empty(Addys)) -> Addys:
+    if _addys.hq != empty(address):
+        return _addys
     return self._generateAddys()
 
 

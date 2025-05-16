@@ -3,20 +3,22 @@
 implements: Department
 
 exports: gov.__interface__
+exports: registry.__interface__
 exports: addys.__interface__
 exports: deptBasics.__interface__
 
 initializes: gov
-initializes: registry
+initializes: registry[gov := gov]
 initializes: addys
 initializes: deptBasics[addys := addys]
 
 import contracts.modules.LocalGov as gov
-import contracts.modules.Registry as registry
+import contracts.modules.AddressRegistry as registry
 import contracts.modules.Addys as addys
 import contracts.modules.DeptBasics as deptBasics
-from interfaces import Department
+
 from interfaces import PriceSource
+from interfaces import Department
 from ethereum.ercs import IERC20Detailed
 
 event PriorityPriceSourceIdsModified:
@@ -32,8 +34,6 @@ staleTime: public(uint256)
 ETH: public(immutable(address))
 MIN_STALE_TIME: public(immutable(uint256))
 MAX_STALE_TIME: public(immutable(uint256))
-MIN_PRICE_SOURCE_CHANGE_DELAY: public(immutable(uint256))
-MAX_PRICE_SOURCE_CHANGE_DELAY: public(immutable(uint256))
 
 MAX_PRIORITY_PARTNERS: constant(uint256) = 10
 
@@ -44,19 +44,19 @@ def __init__(
     _ethAddr: address,
     _minStaleTime: uint256,
     _maxStaleTime: uint256,
-    _minPriceSourceChangeDelay: uint256,
-    _maxPriceSourceChangeDelay: uint256,
+    _minRegistryTimeLock: uint256,
+    _maxRegistryTimeLock: uint256,
 ):
-    assert empty(address) not in [_ripeHq, _ethAddr] # dev: invalid addrs
+    assert _ethAddr != empty(address) # dev: invalid eth addr
     ETH = _ethAddr
+
+    assert _minStaleTime < _maxStaleTime # dev: invalid stale time range
     MIN_STALE_TIME = _minStaleTime
     MAX_STALE_TIME = _maxStaleTime
-    MIN_PRICE_SOURCE_CHANGE_DELAY = _minPriceSourceChangeDelay
-    MAX_PRICE_SOURCE_CHANGE_DELAY = _maxPriceSourceChangeDelay
 
-    # initialize modules
-    gov.__init__(empty(address), _ripeHq, 0, 0)
-    registry.__init__(_minPriceSourceChangeDelay, _maxPriceSourceChangeDelay, "PriceDesk.vy")
+    # modules
+    gov.__init__(_ripeHq, empty(address), 0, 0, 0)
+    registry.__init__(_minRegistryTimeLock, _maxRegistryTimeLock, 0, "PriceDesk.vy")
     addys.__init__(_ripeHq)
     deptBasics.__init__(False, False)
 
@@ -95,16 +95,17 @@ def _getPrice(_asset: address, _shouldRaise: bool = False) -> uint256:
 
     # go thru rest of price sources
     if price == 0:
-        numSources: uint256 = registry.numAddys
-        for id: uint256 in range(1, numSources, bound=max_value(uint256)):
-            if id in alreadyLooked:
-                continue
-            hasFeed: bool = False
-            price, hasFeed = self._getPriceFromPriceSource(id, _asset, staleTime)
-            if price != 0:
-                break
-            if hasFeed:
-                hasFeedConfig = True
+        numSources: uint256 = registry.numAddrs
+        if numSources != 0:
+            for id: uint256 in range(1, numSources, bound=max_value(uint256)):
+                if id in alreadyLooked:
+                    continue
+                hasFeed: bool = False
+                price, hasFeed = self._getPriceFromPriceSource(id, _asset, staleTime)
+                if price != 0:
+                    break
+                if hasFeed:
+                    hasFeedConfig = True
 
     # raise exception if feed exists but no price
     if price == 0 and hasFeedConfig and _shouldRaise:
@@ -116,7 +117,7 @@ def _getPrice(_asset: address, _shouldRaise: bool = False) -> uint256:
 @view
 @internal
 def _getPriceFromPriceSource(_pid: uint256, _asset: address, _staleTime: uint256) -> (uint256, bool):
-    priceSource: address = registry._getAddy(_pid)
+    priceSource: address = registry._getAddr(_pid)
     if priceSource == empty(address):
         return 0, False
     return staticcall PriceSource(priceSource).getPriceAndHasFeed(_asset, _staleTime, self)
@@ -152,9 +153,9 @@ def getAssetAmount(_asset: address, _usdValue: uint256, _shouldRaise: bool = Fal
 @view
 @external
 def hasPriceFeed(_asset: address) -> bool:
-    numSources: uint256 = registry.numAddys
-    for id: uint256 in range(1, numSources, bound=max_value(uint256)):
-        priceSource: address = registry._getAddy(id)
+    numSources: uint256 = registry.numAddrs
+    for pid: uint256 in range(1, numSources, bound=max_value(uint256)):
+        priceSource: address = registry._getAddr(pid)
         if priceSource == empty(address):
             continue
         if staticcall PriceSource(priceSource).hasPriceFeed(_asset):
@@ -181,123 +182,6 @@ def getEthAmount(_usdValue: uint256, _shouldRaise: bool = False) -> uint256:
     return _usdValue * (10 ** 18) // price
 
 
-#########################
-# Register Price Source #
-#########################
-
-
-@view
-@external
-def isValidNewPriceSourceAddr(_addr: address) -> bool:
-    return registry._isValidNewAddy(_addr)
-
-
-@external
-def registerNewPriceSource(_addr: address, _description: String[64]) -> bool:
-    assert gov._canGovern(msg.sender) # dev: no perms
-    return registry._registerNewAddy(_addr, _description)
-
-
-@external
-def confirmNewPriceSourceRegistration(_addr: address) -> uint256:
-    assert gov._canGovern(msg.sender) # dev: no perms
-    priceSourceId: uint256 = registry._confirmNewAddy(_addr)
-    if priceSourceId != 0:
-        assert extcall PriceSource(_addr).setPriceSourceId(priceSourceId) # dev: set id failed
-    return priceSourceId
-
-
-@external
-def cancelPendingNewPriceSourceRegistration(_addr: address) -> bool:
-    assert gov._canGovern(msg.sender) # dev: no perms
-    return registry._cancelPendingNewAddy(_addr)
-
-
-#######################
-# Update Price Source #
-#######################
-
-
-@view
-@external
-def isValidPriceSourceUpdate(_priceSourceId: uint256, _newAddr: address) -> bool:
-    return registry._isValidAddyUpdate(_priceSourceId, _newAddr, registry.addyInfo[_priceSourceId].addr)
-
-
-@external
-def updatePriceSourceAddr(_priceSourceId: uint256, _newAddr: address) -> bool:
-    assert gov._canGovern(msg.sender) # dev: no perms
-    return registry._updateAddyAddr(_priceSourceId, _newAddr)
-
-
-@external
-def confirmPriceSourceUpdate(_priceSourceId: uint256) -> bool:
-    assert gov._canGovern(msg.sender) # dev: no perms
-    didUpdate: bool = registry._confirmAddyUpdate(_priceSourceId)
-    if didUpdate:
-        priceSourceAddr: address = registry.addyInfo[_priceSourceId].addr
-        assert extcall PriceSource(priceSourceAddr).setPriceSourceId(_priceSourceId) # dev: set id failed
-    return didUpdate
-
-
-@external
-def cancelPendingPriceSourceUpdate(_priceSourceId: uint256) -> bool:
-    assert gov._canGovern(msg.sender) # dev: no perms
-    return registry._cancelPendingAddyUpdate(_priceSourceId)
-
-
-########################
-# Disable Price Source #
-########################
-
-
-@view
-@external
-def isValidPriceSourceDisable(_priceSourceId: uint256) -> bool:
-    return registry._isValidAddyDisable(_priceSourceId, registry.addyInfo[_priceSourceId].addr)
-
-
-@external
-def disablePriceSourceAddr(_priceSourceId: uint256) -> bool:
-    assert gov._canGovern(msg.sender) # dev: no perms
-    return registry._disableAddyAddr(_priceSourceId)
-
-
-@external
-def confirmPriceSourceDisable(_priceSourceId: uint256) -> bool:
-    assert gov._canGovern(msg.sender) # dev: no perms
-    return registry._confirmAddyDisable(_priceSourceId)
-
-
-@external
-def cancelPendingPriceSourceDisable(_priceSourceId: uint256) -> bool:
-    assert gov._canGovern(msg.sender) # dev: no perms
-    return registry._cancelPendingAddyDisable(_priceSourceId)
-
-
-#######################
-# Price Source Change #
-#######################
-
-
-@external
-def setPriceSourceChangeDelay(_numBlocks: uint256) -> bool:
-    assert gov._canGovern(msg.sender) # dev: no perms
-    return registry._setAddyChangeDelay(_numBlocks)
-
-
-@view
-@external
-def priceSourceChangeDelay() -> uint256:
-    return registry.addyChangeDelay
-
-
-@external
-def setPriceSourceChangeDelayToMin() -> bool:
-    assert gov._canGovern(msg.sender) # dev: no perms
-    return registry._setAddyChangeDelay(registry.MIN_ADDY_CHANGE_DELAY)
-
-
 ##########################
 # Priority Price Sources #
 ##########################
@@ -314,7 +198,7 @@ def getPriorityPriceSourceIds() -> DynArray[uint256, MAX_PRIORITY_PARTNERS]:
 def _sanitizePriorityPriceSourceIds(_priorityIds: DynArray[uint256, MAX_PRIORITY_PARTNERS]) -> DynArray[uint256, MAX_PRIORITY_PARTNERS]:
     sanitizedIds: DynArray[uint256, MAX_PRIORITY_PARTNERS] = []
     for pid: uint256 in _priorityIds:
-        if not registry._isValidAddyId(pid):
+        if not registry._isValidRegId(pid):
             continue
         if pid in sanitizedIds:
             continue
@@ -375,77 +259,3 @@ def setStaleTime(_staleTime: uint256) -> bool:
     self.staleTime = _staleTime
     log StaleTimeSet(staleTime=_staleTime)
     return True
-
-
-#################
-# Views / Utils #
-#################
-
-
-@view
-@external
-def numPriceSourcesRaw() -> uint256:
-    return registry.numAddys
-
-
-# is valid
-
-
-@view
-@external
-def isValidPriceSourceAddr(_addr: address) -> bool:
-    return registry._isValidAddyAddr(_addr)
-
-
-@view
-@external
-def isValidPriceSourceId(_priceSourceId: uint256) -> bool:
-    return registry._isValidAddyId(_priceSourceId)
-
-
-# oracle partner getters
-
-
-@view
-@external
-def getPriceSourceId(_addr: address) -> uint256:
-    return registry._getAddyId(_addr)
-
-
-@view
-@external
-def getPriceSourceAddr(_priceSourceId: uint256) -> address:
-    return registry._getAddy(_priceSourceId)
-
-
-@view
-@external
-def getPriceSourceInfo(_priceSourceId: uint256) -> registry.AddyInfo:
-    return registry.addyInfo[_priceSourceId]
-
-
-@view
-@external
-def getPriceSourceDescription(_priceSourceId: uint256) -> String[64]:
-    return registry.addyInfo[_priceSourceId].description
-
-
-# high level
-
-
-@view
-@external
-def getNumPriceSources() -> uint256:
-    return registry._getNumAddys()
-
-
-@view
-@external
-def getLastPriceSourceAddr() -> address:
-    return registry._getLastAddyAddr()
-
-
-@view
-@external
-def getLastPriceSourceId() -> uint256:
-    return registry._getLastAddyId()

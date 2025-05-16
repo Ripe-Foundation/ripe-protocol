@@ -8,6 +8,7 @@ initializes: registry[gov := gov]
 
 import contracts.modules.LocalGov as gov
 import contracts.modules.AddressRegistry as registry
+
 from interfaces import Department
 from ethereum.ercs import IERC20
 
@@ -221,6 +222,8 @@ def ripeToken() -> address:
 @view
 @external
 def canMintGreen(_addr: address) -> bool:
+    if _addr == empty(address):
+        return False
     regId: uint256 = registry._getRegId(_addr)
     if regId == 0 or not self.hqConfig[regId].canMintGreen:
         return False
@@ -230,6 +233,8 @@ def canMintGreen(_addr: address) -> bool:
 @view
 @external
 def canMintRipe(_addr: address) -> bool:
+    if _addr == empty(address):
+        return False
     regId: uint256 = registry._getRegId(_addr)
     if regId == 0 or not self.hqConfig[regId].canMintRipe:
         return False
@@ -239,6 +244,8 @@ def canMintRipe(_addr: address) -> bool:
 @view
 @external
 def canSetTokenBlacklist(_addr: address) -> bool:
+    if _addr == empty(address):
+        return False
     regId: uint256 = registry._getRegId(_addr)
     if regId == 0:
         return False

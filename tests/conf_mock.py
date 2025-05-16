@@ -1,6 +1,8 @@
 import pytest
 import boa
 
+from constants import EIGHTEEN_DECIMALS
+
 
 ############
 # Accounts #
@@ -23,8 +25,14 @@ def bob(env):
 
 
 @pytest.fixture(scope="session")
-def governor(env):
-    return env.generate_address("governor")
+def sally(env):
+    return env.generate_address("sally")
+
+
+@pytest.fixture(scope="session")
+def governance():
+    # cannot be EOA
+    return boa.load("contracts/mock/MockGov.vy", name="mock_gov")
 
 
 ##########
@@ -36,14 +44,14 @@ def governor(env):
 
 
 @pytest.fixture(scope="session")
-def alpha_token(governor):
-    return boa.load("contracts/mock/MockErc20.vy", governor, "Alpha Token", "ALPHA", 18, 10_000_000, name="alpha_token")
+def alpha_token(governance):
+    return boa.load("contracts/mock/MockErc20.vy", governance, "Alpha Token", "ALPHA", 18, 10_000_000, name="alpha_token")
 
 
 @pytest.fixture(scope="session")
-def alpha_token_whale(env, alpha_token, governor):
+def alpha_token_whale(env, alpha_token, governance):
     whale = env.generate_address("alpha_token_whale")
-    alpha_token.mint(whale, 1_000_000 * (10 ** alpha_token.decimals()), sender=governor)
+    alpha_token.mint(whale, 1_000_000 * (10 ** alpha_token.decimals()), sender=governance)
     return whale
 
 
@@ -56,14 +64,14 @@ def alpha_token_vault(alpha_token):
 
 
 @pytest.fixture(scope="session")
-def bravo_token(governor):
-    return boa.load("contracts/mock/MockErc20.vy", governor, "Bravo Token", "BRAVO", 18, 10_000_000, name="bravo_token")
+def bravo_token(governance):
+    return boa.load("contracts/mock/MockErc20.vy", governance, "Bravo Token", "BRAVO", 18, 10_000_000, name="bravo_token")
 
 
 @pytest.fixture(scope="session")
-def bravo_token_whale(env, bravo_token, governor):
+def bravo_token_whale(env, bravo_token, governance):
     whale = env.generate_address("bravo_token_whale")
-    bravo_token.mint(whale, 1_000_000 * (10 ** bravo_token.decimals()), sender=governor)
+    bravo_token.mint(whale, 1_000_000 * (10 ** bravo_token.decimals()), sender=governance)
     return whale
 
 
@@ -76,14 +84,14 @@ def bravo_token_vault(bravo_token):
 
 
 @pytest.fixture(scope="session")
-def charlie_token(governor):
-    return boa.load("contracts/mock/MockErc20.vy", governor, "Charlie Token", "CHARLIE", 6, 10_000_000, name="charlie_token")
+def charlie_token(governance):
+    return boa.load("contracts/mock/MockErc20.vy", governance, "Charlie Token", "CHARLIE", 6, 10_000_000, name="charlie_token")
 
 
 @pytest.fixture(scope="session")
-def charlie_token_whale(env, charlie_token, governor):
+def charlie_token_whale(env, charlie_token, governance):
     whale = env.generate_address("charlie_token_whale")
-    charlie_token.mint(whale, 1_000_000 * (10 ** charlie_token.decimals()), sender=governor)
+    charlie_token.mint(whale, 1_000_000 * (10 ** charlie_token.decimals()), sender=governance)
     return whale
 
 
@@ -98,15 +106,28 @@ def charlie_token_vault(charlie_token):
 
 
 @pytest.fixture(scope="session")
-def mock_price_source(price_desk, governor):
-    mock_price_source = boa.load(
+def mock_price_source(ripe_hq_deploy, price_desk_deploy):
+    return boa.load(
         "contracts/mock/MockPriceSource.vy",
+        ripe_hq_deploy,
+        price_desk_deploy,
         name="mock_price_source",
     )
 
-    # register with price desk
-    assert price_desk.registerNewPriceSource(mock_price_source.address, "Mock Price Source", sender=governor)
-    boa.env.time_travel(blocks=price_desk.priceSourceChangeDelay() + 1)
-    assert price_desk.confirmNewPriceSourceRegistration(mock_price_source.address, sender=governor) != 0
 
-    return mock_price_source
+@pytest.fixture(scope="session")
+def mock_chainlink_feed_one():
+    return boa.load(
+        "contracts/mock/MockChainlinkFeed.vy",
+        EIGHTEEN_DECIMALS, # $1
+        name="mock_chainlink_feed_one",
+    )
+
+
+@pytest.fixture(scope="session")
+def mock_chainlink_feed_two():
+    return boa.load(
+        "contracts/mock/MockChainlinkFeed.vy",
+        EIGHTEEN_DECIMALS, # $1
+        name="mock_chainlink_feed_two",
+    )
