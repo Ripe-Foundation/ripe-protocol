@@ -51,7 +51,7 @@ def alpha_token(governance):
 @pytest.fixture(scope="session")
 def alpha_token_whale(env, alpha_token, governance):
     whale = env.generate_address("alpha_token_whale")
-    alpha_token.mint(whale, 1_000_000 * (10 ** alpha_token.decimals()), sender=governance)
+    alpha_token.mint(whale, 1_000_000 * (10 ** alpha_token.decimals()), sender=governance.address)
     return whale
 
 
@@ -71,7 +71,7 @@ def bravo_token(governance):
 @pytest.fixture(scope="session")
 def bravo_token_whale(env, bravo_token, governance):
     whale = env.generate_address("bravo_token_whale")
-    bravo_token.mint(whale, 1_000_000 * (10 ** bravo_token.decimals()), sender=governance)
+    bravo_token.mint(whale, 1_000_000 * (10 ** bravo_token.decimals()), sender=governance.address)
     return whale
 
 
@@ -91,7 +91,7 @@ def charlie_token(governance):
 @pytest.fixture(scope="session")
 def charlie_token_whale(env, charlie_token, governance):
     whale = env.generate_address("charlie_token_whale")
-    charlie_token.mint(whale, 1_000_000 * (10 ** charlie_token.decimals()), sender=governance)
+    charlie_token.mint(whale, 1_000_000 * (10 ** charlie_token.decimals()), sender=governance.address)
     return whale
 
 

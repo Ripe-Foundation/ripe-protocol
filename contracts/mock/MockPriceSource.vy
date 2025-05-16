@@ -46,7 +46,6 @@ def __init__(_ripeHq: address, _initialPriceDesk: address):
 
 @external
 def setPrice(_asset: address, _price: uint256):
-    assert gov._canGovern(msg.sender) # dev: no perms
     self.price[_asset] = _price
 
 
