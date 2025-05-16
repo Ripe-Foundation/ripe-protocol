@@ -291,11 +291,10 @@ def vault_book(vault_book_deploy, deploy3r, stability_pool, simple_erc20_vault, 
 
 
 @pytest.fixture(scope="session")
-def simple_erc20_vault(ripe_hq_deploy, vault_book_deploy):
+def simple_erc20_vault(ripe_hq_deploy):
     return boa.load(
         "contracts/vaults/SimpleErc20.vy",
         ripe_hq_deploy,
-        vault_book_deploy,
         name="simple_erc20_vault",
     )
 
@@ -304,11 +303,10 @@ def simple_erc20_vault(ripe_hq_deploy, vault_book_deploy):
 
 
 @pytest.fixture(scope="session")
-def rebase_erc20_vault(ripe_hq_deploy, vault_book_deploy):
+def rebase_erc20_vault(ripe_hq_deploy):
     return boa.load(
         "contracts/vaults/RebaseErc20.vy",
         ripe_hq_deploy,
-        vault_book_deploy,
         name="rebase_erc20_vault",
     )
 
@@ -317,11 +315,10 @@ def rebase_erc20_vault(ripe_hq_deploy, vault_book_deploy):
 
 
 @pytest.fixture(scope="session")
-def stability_pool(ripe_hq_deploy, vault_book_deploy):
+def stability_pool(ripe_hq_deploy):
     return boa.load(
         "contracts/vaults/StabilityPool.vy",
         ripe_hq_deploy,
-        vault_book_deploy,
         name="stability_pool",
     )
 
