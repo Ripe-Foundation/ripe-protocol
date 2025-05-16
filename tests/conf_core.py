@@ -370,19 +370,20 @@ def price_desk(price_desk_deploy, deploy3r, chainlink, mock_price_source):
 
 
 @pytest.fixture(scope="session")
-def chainlink(ripe_hq_deploy, price_desk_deploy, fork, sally, bob, deploy3r, mock_chainlink_feed_one, mock_chainlink_feed_two):
+def chainlink(ripe_hq_deploy, fork, sally, bob, deploy3r, mock_chainlink_feed_one, mock_chainlink_feed_two):
     CHAINLINK_ETH_USD = ZERO_ADDRESS if fork == "local" else ADDYS[fork]["CHAINLINK_ETH_USD"]
     CHAINLINK_BTC_USD = ZERO_ADDRESS if fork == "local" else ADDYS[fork]["CHAINLINK_BTC_USD"]
 
     c = boa.load(
         "contracts/priceSources/Chainlink.vy",
+        ripe_hq_deploy,
+        PARAMS[fork]["PRICE_DESK_MIN_REG_TIMELOCK"],
+        PARAMS[fork]["PRICE_DESK_MAX_REG_TIMELOCK"],
         ADDYS[fork]["WETH"],
         ADDYS[fork]["ETH"],
         ADDYS[fork]["BTC"],
         CHAINLINK_ETH_USD,
         CHAINLINK_BTC_USD,
-        ripe_hq_deploy,
-        price_desk_deploy,
         name="chainlink",
     )
 

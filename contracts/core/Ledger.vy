@@ -153,7 +153,7 @@ numFungLiqUsers: public(uint256) # num liq users
 @deploy
 def __init__(_ripeHq: address):
     addys.__init__(_ripeHq)
-    deptBasics.__init__(False, False)
+    deptBasics.__init__(False, False) # no minting
 
 
 ###############

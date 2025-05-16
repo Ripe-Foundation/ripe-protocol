@@ -33,8 +33,8 @@ interface Ledger:
     def addVaultToUser(_user: address, _vaultId: uint256): nonpayable
 
 interface VaultBook:
-    def getVaultAddr(_vaultId: uint256) -> address: view
-    def getVaultId(_vaultAddr: address) -> uint256: view
+    def getRegId(_vaultAddr: address) -> uint256: view
+    def getAddr(_vaultId: uint256) -> address: view
 
 struct DepositLedgerData:
     isParticipatingInVault: bool
@@ -89,7 +89,7 @@ MAX_BATCH_ACTION: constant(uint256) = 20
 @deploy
 def __init__(_ripeHq: address):
     addys.__init__(_ripeHq)
-    deptBasics.__init__(False, False)
+    deptBasics.__init__(False, False) # no minting
 
 
 ############
@@ -349,7 +349,7 @@ def _getVaultAddrAndId(
 
     # validate vault id
     if _vaultId != 0:
-        vaultAddr = staticcall VaultBook(_vaultBook).getVaultAddr(_vaultId) # dev: invalid vault id
+        vaultAddr = staticcall VaultBook(_vaultBook).getAddr(_vaultId) # dev: invalid vault id
         assert vaultAddr != empty(address) # dev: invalid vault id
         vaultId = _vaultId
         if _vaultAddr != empty(address):
@@ -357,7 +357,7 @@ def _getVaultAddrAndId(
 
     # validate vault addr
     elif _vaultAddr != empty(address):
-        vaultId = staticcall VaultBook(_vaultBook).getVaultId(_vaultAddr) # dev: invalid vault addr
+        vaultId = staticcall VaultBook(_vaultBook).getRegId(_vaultAddr) # dev: invalid vault addr
         assert vaultId != 0 # dev: invalid vault addr
         vaultAddr = _vaultAddr
 

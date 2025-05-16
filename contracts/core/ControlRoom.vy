@@ -109,7 +109,7 @@ MAX_GEN_STAB_POOLS: constant(uint256) = 10
 @deploy
 def __init__(_ripeHq: address):
     addys.__init__(_ripeHq)
-    deptBasics.__init__(False, False)
+    deptBasics.__init__(False, False) # no minting
 
 
 ##########################

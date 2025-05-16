@@ -5,23 +5,16 @@ uses: addys
 import contracts.modules.Addys as addys
 from ethereum.ercs import IERC20
 
-event VaultIdSet:
-    vaultId: uint256
-
 event VaultActivated:
-    vaultId: uint256
     isActivated: bool
 
 event VaultFundsRecovered:
-    vaultId: uint256
     asset: indexed(address)
     recipient: indexed(address)
     balance: uint256
 
 # config
-vaultId: public(uint256)
 isActivated: public(bool)
-initialVaultBook: address
 
 # balances (may be shares or actual balance)
 userBalances: public(HashMap[address, HashMap[address, uint256]]) # user -> asset -> balance
@@ -41,9 +34,8 @@ MAX_RECOVER_ASSETS: constant(uint256) = 20
 
 
 @deploy
-def __init__(_initialVaultBook: address):
+def __init__():
     self.isActivated = True
-    self.initialVaultBook = _initialVaultBook
 
 
 ###################
@@ -258,25 +250,17 @@ def _getNumVaultAssets() -> uint256:
 ########
 
 
-@external
-def setRegistryId(_regId: uint256) -> bool:
-    vaultBook: address = addys._getVaultBookAddr()
-    if vaultBook == empty(address):
-        vaultBook = self.initialVaultBook
-    assert msg.sender == vaultBook # dev: only vault book allowed
-
-    prevVaultId: uint256 = self.vaultId
-    assert prevVaultId == 0 or prevVaultId == _regId # dev: invalid vault id
-    self.vaultId = _regId
-    log VaultIdSet(vaultId=_regId)
-    return True
+# activate
 
 
 @external
 def activate(_shouldActivate: bool):
     assert msg.sender == addys._getControlRoomAddr() # dev: only ControlRoom allowed
     self.isActivated = _shouldActivate
-    log VaultActivated(vaultId=self.vaultId, isActivated=_shouldActivate)
+    log VaultActivated(isActivated=_shouldActivate)
+
+
+# recover funds
 
 
 @external
@@ -302,4 +286,4 @@ def _recoverFunds(_recipient: address, _asset: address):
     assert self.indexOfAsset[_asset] == 0 and self.totalBalances[_asset] == 0 # dev: invalid recovery
 
     assert extcall IERC20(_asset).transfer(_recipient, balance, default_return_value=True) # dev: recovery failed
-    log VaultFundsRecovered(vaultId=self.vaultId, asset=_asset, recipient=_recipient, balance=balance)
+    log VaultFundsRecovered(asset=_asset, recipient=_recipient, balance=balance)

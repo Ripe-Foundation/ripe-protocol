@@ -19,10 +19,6 @@ import contracts.modules.TimeLock as timeLock
 
 import interfaces.PriceSource as PriceSource
 
-interface PriceDesk:
-    def minRegistryTimeLock() -> uint256: view
-    def maxRegistryTimeLock() -> uint256: view
-
 interface ChainlinkFeed:
     def latestRoundData() -> ChainlinkRound: view
     def decimals() -> uint8: view 
@@ -113,23 +109,19 @@ NORMALIZED_DECIMALS: constant(uint256) = 18
 
 @deploy
 def __init__(
+    _ripeHq: address,
+    _minPriceChangeTimeLock: uint256,
+    _maxPriceChangeTimeLock: uint256,
     _wethAddr: address,
     _ethAddr: address,
     _btcAddr: address,
     _ethUsdFeed: address,
     _btcUsdFeed: address,
-    _ripeHq: address,
-    _initialPriceDesk: address,
 ):
     gov.__init__(_ripeHq, empty(address), 0, 0, 0)
     addys.__init__(_ripeHq)
-    priceData.__init__(_initialPriceDesk)
-
-    # time lock module
-    priceDesk: address = addys._getPriceDeskAddr()
-    if priceDesk == empty(address):
-        priceDesk = _initialPriceDesk
-    timeLock.__init__(staticcall PriceDesk(priceDesk).minRegistryTimeLock(), staticcall PriceDesk(priceDesk).maxRegistryTimeLock(), 0)
+    priceData.__init__()
+    timeLock.__init__(_minPriceChangeTimeLock, _maxPriceChangeTimeLock, 0)
 
     # set default assets
     assert empty(address) not in [_wethAddr, _ethAddr, _btcAddr] # dev: invalid asset addrs

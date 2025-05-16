@@ -27,7 +27,7 @@ event PriorityPriceSourceIdsModified:
 event StaleTimeSet:
     staleTime: uint256
 
-# custom config
+# config
 priorityPriceSourceIds: public(DynArray[uint256, MAX_PRIORITY_PARTNERS])
 staleTime: public(uint256)
 
@@ -58,12 +58,46 @@ def __init__(
     gov.__init__(_ripeHq, empty(address), 0, 0, 0)
     registry.__init__(_minRegistryTimeLock, _maxRegistryTimeLock, 0, "PriceDesk.vy")
     addys.__init__(_ripeHq)
-    deptBasics.__init__(False, False)
+    deptBasics.__init__(False, False) # no minting
 
 
-#########
-# Price #
-#########
+#############################
+# Asset Amount -> USD Value #
+#############################
+
+
+@view
+@external
+def getUsdValue(_asset: address, _amount: uint256, _shouldRaise: bool = False) -> uint256:
+    if _amount == 0 or _asset == empty(address):
+        return 0
+    price: uint256 = self._getPrice(_asset, _shouldRaise)
+    if price == 0:
+        return 0
+    decimals: uint256 = convert(staticcall IERC20Detailed(_asset).decimals(), uint256)
+    return price * _amount // (10 ** decimals)
+
+
+#############################
+# USD Value -> Asset Amount #
+#############################
+
+
+@view
+@external
+def getAssetAmount(_asset: address, _usdValue: uint256, _shouldRaise: bool = False) -> uint256:
+    if _usdValue == 0 or _asset == empty(address):
+        return 0
+    price: uint256 = self._getPrice(_asset, _shouldRaise)
+    if price == 0:
+        return 0
+    decimals: uint256 = convert(staticcall IERC20Detailed(_asset).decimals(), uint256)
+    return _usdValue * (10 ** decimals) // price
+
+
+#############
+# Get Price #
+#############
 
 
 @view
@@ -97,11 +131,11 @@ def _getPrice(_asset: address, _shouldRaise: bool = False) -> uint256:
     if price == 0:
         numSources: uint256 = registry.numAddrs
         if numSources != 0:
-            for id: uint256 in range(1, numSources, bound=max_value(uint256)):
-                if id in alreadyLooked:
+            for pid: uint256 in range(1, numSources, bound=max_value(uint256)):
+                if pid in alreadyLooked:
                     continue
                 hasFeed: bool = False
-                price, hasFeed = self._getPriceFromPriceSource(id, _asset, staleTime)
+                price, hasFeed = self._getPriceFromPriceSource(pid, _asset, staleTime)
                 if price != 0:
                     break
                 if hasFeed:
@@ -123,44 +157,12 @@ def _getPriceFromPriceSource(_pid: uint256, _asset: address, _staleTime: uint256
     return staticcall PriceSource(priceSource).getPriceAndHasFeed(_asset, _staleTime, self)
 
 
-# other utils
+###############
+# Other Utils #
+###############
 
 
-@view
-@external
-def getUsdValue(_asset: address, _amount: uint256, _shouldRaise: bool = False) -> uint256:
-    if _amount == 0 or _asset == empty(address):
-        return 0
-    price: uint256 = self._getPrice(_asset, _shouldRaise)
-    if price == 0:
-        return 0
-    decimals: uint256 = convert(staticcall IERC20Detailed(_asset).decimals(), uint256)
-    return price * _amount // (10 ** decimals)
-
-
-@view
-@external
-def getAssetAmount(_asset: address, _usdValue: uint256, _shouldRaise: bool = False) -> uint256:
-    if _usdValue == 0 or _asset == empty(address):
-        return 0
-    price: uint256 = self._getPrice(_asset, _shouldRaise)
-    if price == 0:
-        return 0
-    decimals: uint256 = convert(staticcall IERC20Detailed(_asset).decimals(), uint256)
-    return _usdValue * (10 ** decimals) // price
-
-
-@view
-@external
-def hasPriceFeed(_asset: address) -> bool:
-    numSources: uint256 = registry.numAddrs
-    for pid: uint256 in range(1, numSources, bound=max_value(uint256)):
-        priceSource: address = registry._getAddr(pid)
-        if priceSource == empty(address):
-            continue
-        if staticcall PriceSource(priceSource).hasPriceFeed(_asset):
-            return True
-    return False
+# ETH
 
 
 @view
@@ -182,9 +184,56 @@ def getEthAmount(_usdValue: uint256, _shouldRaise: bool = False) -> uint256:
     return _usdValue * (10 ** 18) // price
 
 
+# has feed
+
+
+@view
+@external
+def hasPriceFeed(_asset: address) -> bool:
+    numSources: uint256 = registry.numAddrs
+    for pid: uint256 in range(1, numSources, bound=max_value(uint256)):
+        priceSource: address = registry._getAddr(pid)
+        if priceSource == empty(address):
+            continue
+        if staticcall PriceSource(priceSource).hasPriceFeed(_asset):
+            return True
+    return False
+
+
 ##########################
 # Priority Price Sources #
 ##########################
+
+
+@external
+def setPriorityPriceSourceIds(_priorityIds: DynArray[uint256, MAX_PRIORITY_PARTNERS]) -> bool:
+    assert gov._canGovern(msg.sender) # dev: no perms
+
+    priorityIds: DynArray[uint256, MAX_PRIORITY_PARTNERS] = self._sanitizePrioritySources(_priorityIds)
+    assert self._areValidPriorityPriceSourceIds(priorityIds) # dev: invalid priority sources
+
+    self.priorityPriceSourceIds = priorityIds
+    log PriorityPriceSourceIdsModified(numIds=len(priorityIds))
+    return True
+
+
+# validation
+
+
+@view
+@external
+def areValidPriorityPriceSourceIds(_priorityIds: DynArray[uint256, MAX_PRIORITY_PARTNERS]) -> bool:
+    priorityIds: DynArray[uint256, MAX_PRIORITY_PARTNERS] = self._sanitizePrioritySources(_priorityIds)
+    return self._areValidPriorityPriceSourceIds(priorityIds)
+
+
+@view
+@internal
+def _areValidPriorityPriceSourceIds(_priorityIds: DynArray[uint256, MAX_PRIORITY_PARTNERS]) -> bool:
+    return len(_priorityIds) != 0
+
+
+# utilities
 
 
 @view 
@@ -195,7 +244,7 @@ def getPriorityPriceSourceIds() -> DynArray[uint256, MAX_PRIORITY_PARTNERS]:
 
 @view
 @internal
-def _sanitizePriorityPriceSourceIds(_priorityIds: DynArray[uint256, MAX_PRIORITY_PARTNERS]) -> DynArray[uint256, MAX_PRIORITY_PARTNERS]:
+def _sanitizePrioritySources(_priorityIds: DynArray[uint256, MAX_PRIORITY_PARTNERS]) -> DynArray[uint256, MAX_PRIORITY_PARTNERS]:
     sanitizedIds: DynArray[uint256, MAX_PRIORITY_PARTNERS] = []
     for pid: uint256 in _priorityIds:
         if not registry._isValidRegId(pid):
@@ -206,35 +255,22 @@ def _sanitizePriorityPriceSourceIds(_priorityIds: DynArray[uint256, MAX_PRIORITY
     return sanitizedIds
 
 
-@view
-@external
-def areValidPriorityPriceSourceIds(_priorityIds: DynArray[uint256, MAX_PRIORITY_PARTNERS]) -> bool:
-    priorityIds: DynArray[uint256, MAX_PRIORITY_PARTNERS] = self._sanitizePriorityPriceSourceIds(_priorityIds)
-    return self._areValidPriorityPriceSourceIds(priorityIds)
-
-
-@view
-@internal
-def _areValidPriorityPriceSourceIds(_priorityIds: DynArray[uint256, MAX_PRIORITY_PARTNERS]) -> bool:
-    return len(_priorityIds) != 0
-
-
-@external
-def setPriorityPriceSourceIds(_priorityIds: DynArray[uint256, MAX_PRIORITY_PARTNERS]) -> bool:
-    assert gov._canGovern(msg.sender) # dev: no perms
-
-    priorityIds: DynArray[uint256, MAX_PRIORITY_PARTNERS] = self._sanitizePriorityPriceSourceIds(_priorityIds)
-    if not self._areValidPriorityPriceSourceIds(priorityIds):
-        return False
-
-    self.priorityPriceSourceIds = priorityIds
-    log PriorityPriceSourceIdsModified(numIds=len(priorityIds))
-    return True
-
-
 ##############
 # Stale Time #
 ##############
+
+
+@external
+def setStaleTime(_staleTime: uint256) -> bool:
+    assert gov._canGovern(msg.sender) # dev: no perms
+    assert self._isValidStaleTime(_staleTime) # dev: invalid stale time
+
+    self.staleTime = _staleTime
+    log StaleTimeSet(staleTime=_staleTime)
+    return True
+
+
+# validation
 
 
 @view
@@ -247,15 +283,3 @@ def isValidStaleTime(_staleTime: uint256) -> bool:
 @internal
 def _isValidStaleTime(_staleTime: uint256) -> bool:
     return _staleTime >= MIN_STALE_TIME and _staleTime <= MAX_STALE_TIME
-
-
-@external
-def setStaleTime(_staleTime: uint256) -> bool:
-    assert gov._canGovern(msg.sender) # dev: no perms
-
-    if not self._isValidStaleTime(_staleTime):
-        return False
-
-    self.staleTime = _staleTime
-    log StaleTimeSet(staleTime=_staleTime)
-    return True

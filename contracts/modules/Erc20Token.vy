@@ -475,9 +475,3 @@ def finishTokenSetup(_newHq: address, _timeLock: uint256 = 0) -> bool:
     self.tempGov = empty(address)
     log InitialRipeHqSet(hq=_newHq, timeLock=timeLock)
     return True
-
-
-@external
-def setRegistryId(_regId: uint256) -> bool:
-    # needed to register with RipeHq (AddressRegistry module), can be ignored here
-    return True

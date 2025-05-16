@@ -37,12 +37,11 @@ interface GreenToken:
     def mint(_to: address, _amount: uint256): nonpayable
     def burn(_amount: uint256): nonpayable
 
-interface VaultBook:
-    def getVault(_vaultId: uint256) -> address: view
-    def getStakedGreenVault() -> address: view
-
 interface LootBox:
     def updateBorrowPoints(_user: address, _a: addys.Addys = empty(addys.Addys)): nonpayable
+
+interface VaultBook:
+    def getAddr(_vaultId: uint256) -> address: view
 
 flag RepayType:
     STANDARD
@@ -141,7 +140,7 @@ MAX_REDEMPTIONS: constant(uint256) = 20
 @deploy
 def __init__(_ripeHq: address):
     addys.__init__(_ripeHq)
-    deptBasics.__init__(True, False)
+    deptBasics.__init__(True, False) # can mint green only
 
 
 ##########
@@ -628,7 +627,7 @@ def _redeemCollateral(
         return 0
 
     # vault address
-    vaultAddr: address = staticcall VaultBook(_a.vaultBook).getVault(_vaultId)
+    vaultAddr: address = staticcall VaultBook(_a.vaultBook).getAddr(_vaultId)
     if vaultAddr == empty(address):
         return 0
 
@@ -697,7 +696,7 @@ def _getUserBorrowTerms(
     # iterate thru each user vault
     for i: uint256 in range(1, _numUserVaults, bound=max_value(uint256)):
         vaultId: uint256 = staticcall Ledger(_a.ledger).userVaults(_user, i)
-        vaultAddr: address = staticcall VaultBook(_a.vaultBook).getVault(vaultId)
+        vaultAddr: address = staticcall VaultBook(_a.vaultBook).getAddr(vaultId)
         if vaultAddr == empty(address):
             continue
 

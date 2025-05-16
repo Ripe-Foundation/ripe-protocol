@@ -31,7 +31,7 @@ interface ControlRoom:
     def getRipeRewardsConfig() -> RipeRewardsConfig: view
 
 interface VaultBook:
-    def getVault(_vaultId: uint256) -> address: view
+    def getAddr(_vaultId: uint256) -> address: view
     def isNftVault(_vaultId: uint256) -> bool: view
 
 interface PriceDesk:
@@ -123,7 +123,7 @@ MAX_VAULTS_TO_CLEAN: constant(uint256) = 10
 @deploy
 def __init__(_ripeHq: address):
     addys.__init__(_ripeHq)
-    deptBasics.__init__(False, True)
+    deptBasics.__init__(False, True) # can mint ripe only
 
 
 #############
@@ -153,7 +153,7 @@ def claimLootForUser(
     numUserVaults: uint256 = staticcall Ledger(a.ledger).numUserVaults(_user)
     for i: uint256 in range(1, numUserVaults, bound=max_value(uint256)):
         vaultId: uint256 = staticcall Ledger(a.ledger).userVaults(_user, i)
-        vaultAddr: address = staticcall VaultBook(a.vaultBook).getVault(vaultId)
+        vaultAddr: address = staticcall VaultBook(a.vaultBook).getAddr(vaultId)
         if vaultAddr == empty(address):
             continue
 
@@ -203,7 +203,7 @@ def getClaimableLoot(_user: address) -> uint256:
     numUserVaults: uint256 = staticcall Ledger(a.ledger).numUserVaults(_user)
     for i: uint256 in range(1, numUserVaults, bound=max_value(uint256)):
         vaultId: uint256 = staticcall Ledger(a.ledger).userVaults(_user, i)
-        vaultAddr: address = staticcall VaultBook(a.vaultBook).getVault(vaultId)
+        vaultAddr: address = staticcall VaultBook(a.vaultBook).getAddr(vaultId)
         if vaultAddr == empty(address):
             continue
         numUserAssets: uint256 = staticcall Vault(vaultAddr).numUserAssets(_user)
@@ -503,7 +503,7 @@ def _getClaimableDepositLoot(
 @external
 def getClaimableDepositLootForAsset(_user: address, _vaultId: uint256, _asset: address) -> uint256:
     a: addys.Addys = addys._getAddys()
-    vaultAddr: address = staticcall VaultBook(a.vaultBook).getVault(_vaultId)
+    vaultAddr: address = staticcall VaultBook(a.vaultBook).getAddr(_vaultId)
     return self._getClaimableDepositLoot(_user, _vaultId, vaultAddr, _asset, a)
 
 

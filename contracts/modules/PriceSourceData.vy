@@ -5,23 +5,16 @@ uses: addys
 import contracts.modules.Addys as addys
 from ethereum.ercs import IERC20
 
-event PriceSourceIdSet:
-    priceSourceId: uint256
-
 event PriceSourceActivated:
-    priceSourceId: uint256
     isActivated: bool
 
 event PriceSourceFundsRecovered:
-    priceSourceId: uint256
     asset: indexed(address)
     recipient: indexed(address)
     balance: uint256
 
 # config
-priceSourceId: public(uint256)
 isActivated: public(bool)
-initialPriceDesk: address
 
 # priced assets
 assets: public(HashMap[uint256, address]) # index -> asset
@@ -33,14 +26,16 @@ MAX_RECOVER_ASSETS: constant(uint256) = 20
 
 
 @deploy
-def __init__(_initialPriceDesk: address):
+def __init__():
     self.isActivated = True
-    self.initialPriceDesk = _initialPriceDesk
 
 
-############
-# Set Data #
-############
+##############
+# Asset Data #
+##############
+
+
+# add priced asset
 
 
 @internal
@@ -51,6 +46,9 @@ def _addPricedAsset(_asset: address):
     self.assets[aid] = _asset
     self.indexOfAsset[_asset] = aid
     self.numAssets = aid + 1
+
+
+# remove priced asset
 
 
 @internal
@@ -75,9 +73,7 @@ def _removePricedAsset(_asset: address):
         self.indexOfAsset[lastItem] = targetIndex
 
 
-#############
-# Utilities #
-#############
+# get priced assets
 
 
 @view
@@ -97,25 +93,17 @@ def getPricedAssets() -> DynArray[address, MAX_ASSETS]:
 ########
 
 
-@external
-def setRegistryId(_regId: uint256) -> bool:
-    priceDesk: address = addys._getPriceDeskAddr()
-    if priceDesk == empty(address):
-        priceDesk = self.initialPriceDesk
-    assert msg.sender == priceDesk # dev: only price desk allowed
-
-    prevSourceId: uint256 = self.priceSourceId
-    assert prevSourceId == 0 or prevSourceId == _regId # dev: invalid vault id
-    self.priceSourceId = _regId
-    log PriceSourceIdSet(priceSourceId=_regId)
-    return True
+# activate
 
 
 @external
 def activate(_shouldActivate: bool):
     assert msg.sender == addys._getControlRoomAddr() # dev: only ControlRoom allowed
     self.isActivated = _shouldActivate
-    log PriceSourceActivated(priceSourceId=self.priceSourceId, isActivated=_shouldActivate)
+    log PriceSourceActivated(isActivated=_shouldActivate)
+
+
+# recover funds
 
 
 @external
@@ -138,4 +126,4 @@ def _recoverFunds(_recipient: address, _asset: address):
     assert balance != 0 # dev: nothing to recover
 
     assert extcall IERC20(_asset).transfer(_recipient, balance, default_return_value=True) # dev: recovery failed
-    log PriceSourceFundsRecovered(priceSourceId=self.priceSourceId, asset=_asset, recipient=_recipient, balance=balance)
+    log PriceSourceFundsRecovered(asset=_asset, recipient=_recipient, balance=balance)

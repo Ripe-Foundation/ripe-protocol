@@ -19,34 +19,32 @@ import contracts.modules.TimeLock as timeLock
 
 import interfaces.PriceSource as PriceSource
 
-interface PriceDesk:
-    def minRegistryTimeLock() -> uint256: view
-    def maxRegistryTimeLock() -> uint256: view
-
 price: public(HashMap[address, uint256])
 
 
 @deploy
-def __init__(_ripeHq: address, _initialPriceDesk: address):
+def __init__(
+    _ripeHq: address,
+    _minPriceChangeTimeLock: uint256,
+    _maxPriceChangeTimeLock: uint256,
+):
     gov.__init__(_ripeHq, empty(address), 0, 0, 0)
     addys.__init__(_ripeHq)
-    priceData.__init__(_initialPriceDesk)
-
-    # time lock module
-    priceDesk: address = addys._getPriceDeskAddr()
-    if priceDesk == empty(address):
-        priceDesk = _initialPriceDesk
-    timeLock.__init__(staticcall PriceDesk(priceDesk).minRegistryTimeLock(), staticcall PriceDesk(priceDesk).maxRegistryTimeLock(), 0)
+    priceData.__init__()
+    timeLock.__init__(_minPriceChangeTimeLock, _maxPriceChangeTimeLock, 0)
 
 
-########
-# Core #
-########
+# MOCK CONFIG
 
 
 @external
 def setPrice(_asset: address, _price: uint256):
     self.price[_asset] = _price
+
+
+########
+# Core #
+########
 
 
 @view

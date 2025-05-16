@@ -27,17 +27,6 @@ def canMintRipe() -> bool:
 
 @view
 @external
-def deptId() -> uint256:
-    ...
-
-
-@external
-def setRegistryId(_regId: uint256) -> bool:
-    ...
-
-
-@view
-@external
 def isActivated() -> bool:
     ...
 

@@ -1,6 +1,7 @@
 import pytest
 import boa
 
+from config.BluePrint import PARAMS
 from constants import EIGHTEEN_DECIMALS
 
 
@@ -106,11 +107,12 @@ def charlie_token_vault(charlie_token):
 
 
 @pytest.fixture(scope="session")
-def mock_price_source(ripe_hq_deploy, price_desk_deploy):
+def mock_price_source(ripe_hq_deploy, fork):
     return boa.load(
         "contracts/mock/MockPriceSource.vy",
         ripe_hq_deploy,
-        price_desk_deploy,
+        PARAMS[fork]["PRICE_DESK_MIN_REG_TIMELOCK"],
+        PARAMS[fork]["PRICE_DESK_MAX_REG_TIMELOCK"],
         name="mock_price_source",
     )
 

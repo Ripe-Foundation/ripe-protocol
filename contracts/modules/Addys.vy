@@ -91,6 +91,15 @@ def _generateAddys() -> Addys:
 ###########
 
 
+# ripe hq
+
+
+@view
+@external
+def getRipeHq() -> address:
+    return self._getRipeHq()
+
+
 @view
 @internal
 def _getRipeHq() -> address:

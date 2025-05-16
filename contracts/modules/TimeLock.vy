@@ -9,6 +9,7 @@ struct PendingAction:
 
 event ActionTimeLockSet:
     timeLock: uint256
+
 # core data
 pendingActions: public(HashMap[uint256, PendingAction])
 actionId: public(uint256)

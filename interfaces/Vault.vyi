@@ -168,17 +168,6 @@ def doesVaultHaveAnyFunds() -> bool:
 
 @view
 @external
-def vaultId() -> uint256:
-    ...
-
-
-@external
-def setRegistryId(_regId: uint256) -> bool:
-    ...
-
-
-@view
-@external
 def isActivated() -> bool:
     ...
 

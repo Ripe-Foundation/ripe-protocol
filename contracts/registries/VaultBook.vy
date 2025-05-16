@@ -17,20 +17,7 @@ import contracts.modules.AddressRegistry as registry
 import contracts.modules.Addys as addys
 import contracts.modules.DeptBasics as deptBasics
 
-from interfaces import Vault
 from interfaces import Department
-
-# # staked green
-# stakedGreenVault: public(uint256) # vault id
-# pendingStakedGreenVault: public(address)
-
-# # staked ripe
-# stakedRipeVault: public(uint256) # vault id
-# pendingStakedRipeVault: public(address)
-
-# # nft vaults
-# isNftVault: public(HashMap[uint256, bool]) # vault id -> is nft vault
-# pendingIsNftVault: public(HashMap[address, bool]) # addr -> pending is nft vault
 
 
 @deploy
@@ -42,4 +29,11 @@ def __init__(
     gov.__init__(_ripeHq, empty(address), 0, 0, 0)
     registry.__init__(_minRegistryTimeLock, _maxRegistryTimeLock, 0, "VaultBook.vy")
     addys.__init__(_ripeHq)
-    deptBasics.__init__(False, False)
+    deptBasics.__init__(False, False) # no minting
+
+
+@view
+@external
+def isNftVault(_vaultId: uint256) -> bool:
+    # used in Lootbox.vy -- when we introduce NFTs, we'll need to add config for this
+    return False

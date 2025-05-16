@@ -39,9 +39,9 @@ event StabilityPoolTransfer:
 
 
 @deploy
-def __init__(_ripeHq: address, _initialVaultBook: address):
+def __init__(_ripeHq: address):
     addys.__init__(_ripeHq)
-    vaultData.__init__(_initialVaultBook)
+    vaultData.__init__()
     stabVault.__init__()
 
 

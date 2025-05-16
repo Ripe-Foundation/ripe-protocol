@@ -35,9 +35,9 @@ event SimpleErc20VaultTransfer:
 
 
 @deploy
-def __init__(_ripeHq: address, _initialVaultBook: address):
+def __init__(_ripeHq: address):
     addys.__init__(_ripeHq)
-    vaultData.__init__(_initialVaultBook)
+    vaultData.__init__()
     basicVault.__init__()
 
 

@@ -3,9 +3,6 @@
 uses: gov
 import contracts.modules.LocalGov as gov
 
-interface RegistryItem:
-    def setRegistryId(_regId: uint256) -> bool: nonpayable
-
 struct AddressInfo:
     addr: address
     version: uint256
@@ -201,7 +198,6 @@ def _confirmNewAddressToRegistry(_addr: address) -> uint256:
         lastModified=block.timestamp,
         description=data.description,
     )
-    assert extcall RegistryItem(_addr).setRegistryId(regId) # dev: failed to set registry id
 
     # clear pending
     self.pendingNewAddr[_addr] = empty(PendingNewAddress)
@@ -303,7 +299,6 @@ def _confirmAddressUpdateToRegistry(_regId: uint256) -> bool:
     data.version += 1
     self.addrInfo[_regId] = data
     self.addrToRegId[newData.newAddr] = _regId
-    assert extcall RegistryItem(newData.newAddr).setRegistryId(_regId) # dev: failed to set registry id
 
     # handle previous addr
     if prevAddr != empty(address):

@@ -40,7 +40,7 @@ interface StabilityPool:
     def swapForLiquidatedCollateral(_stabAsset: address, _stabAmountToRemove: uint256, _liqAsset: address, _liqAmountSent: uint256, _recipient: address, _greenToken: address) -> uint256: nonpayable
 
 interface VaultBook:
-    def getVaultAddr(_vaultId: uint256) -> address: view
+    def getAddr(_vaultId: uint256) -> address: view
 
 interface GreenToken:
     def burn(_amount: uint256): nonpayable
@@ -160,7 +160,7 @@ MAX_GEN_STAB_POOLS: constant(uint256) = 10
 @deploy
 def __init__(_ripeHq: address):
     addys.__init__(_ripeHq)
-    deptBasics.__init__(False, False)
+    deptBasics.__init__(False, False) # no minting
 
 
 ###############
@@ -212,7 +212,7 @@ def _liquidateUser(
 
     # how much to achieve safe LTV -- won't be exact because depends on which collateral is liquidated (LTV changes)
     targetLtv: uint256 = bt.debtTerms.ltv * (HUNDRED_PERCENT - _config.ltvPaybackBuffer) // HUNDRED_PERCENT
-    targetRepayAmount: uint256 = self._calcAmountToPay(userDebt.amount, bt.collateralVal, targetLtv)
+    targetRepayAmount: uint256 = self._calcAmountOfDebtToRepay(userDebt.amount, bt.collateralVal, targetLtv)
 
     # swap collateral to pay debt (liquidation fees basically mean selling at a discount)
     repayValueIn: uint256 = 0
@@ -229,6 +229,17 @@ def _liquidateUser(
 
     log LiquidateUser(user=_liqUser, totalLiqFees=totalLiqFees, targetRepayAmount=targetRepayAmount, repayAmount=repayValueIn, didRestoreDebtHealth=didRestoreDebtHealth, collateralValueOut=collateralValueOut, numAuctionsStarted=numAuctionsStarted, keeperFee=keeperFee)
     return keeperFee
+
+
+@view
+@internal
+def _calcAmountOfDebtToRepay(_debtAmount: uint256, _collateralValue: uint256, _targetLtv: uint256) -> uint256:
+    # goal here is to only reduce the debt necessary to get LTV back to safe position
+    # it will never be perfectly precise because depending on what assets are taken, the LTV might slightly change
+    collValueAdjusted: uint256 =_collateralValue * _targetLtv // HUNDRED_PERCENT
+
+    toPay: uint256 = (_debtAmount - collValueAdjusted) * HUNDRED_PERCENT // (HUNDRED_PERCENT - _targetLtv)
+    return min(toPay, _debtAmount)
 
 
 # handle user's collateral
@@ -559,7 +570,7 @@ def _buyFungibleAuction(
     # calculate discount
     auctionProgress: uint256 = (block.number - auc.startBlock) * HUNDRED_PERCENT // (auc.endBlock - auc.startBlock)
     discount: uint256 = self._calculateAuctionDiscount(auctionProgress, auc.startDiscount, auc.maxDiscount)
-    vaultAddr: address = staticcall VaultBook(_a.vaultBook).getVaultAddr(_vaultId)
+    vaultAddr: address = staticcall VaultBook(_a.vaultBook).getAddr(_vaultId)
 
     # handle collateral buy
     amountSentToBuyer: uint256 = 0
@@ -635,7 +646,7 @@ def _getVaultAddr(_vaultId: uint256, _vaultBook: address) -> (address, bool):
     vaultAddr: address = self.vaultAddrs[_vaultId]
     if vaultAddr != empty(address):
         return vaultAddr, True
-    return staticcall VaultBook(_vaultBook).getVaultAddr(_vaultId), False
+    return staticcall VaultBook(_vaultBook).getAddr(_vaultId), False
 
 
 @internal
@@ -643,25 +654,3 @@ def _saveUserAssetForAuction(_user: address, _vaultId: uint256, _vaultAddr: addr
     nextId: uint256 = self.numUserAssetsForAuction[_user]
     self.userAssetForAuction[_user][nextId] = VaultData(vaultId=_vaultId, vaultAddr=_vaultAddr, asset=_asset)
     self.numUserAssetsForAuction[_user] = nextId + 1
-
-
-#############
-# Utilities #
-#############
-
-
-@view
-@external
-def calcAmountToPay(_debtAmount: uint256, _collateralValue: uint256, _targetLtv: uint256) -> uint256:
-    return self._calcAmountToPay(_debtAmount, _collateralValue, _targetLtv)
-
-
-@view
-@internal
-def _calcAmountToPay(_debtAmount: uint256, _collateralValue: uint256, _targetLtv: uint256) -> uint256:
-    # goal here is to only reduce the debt necessary to get LTV back to safe position
-    # it will never be perfectly precise because depending on what assets are taken, the LTV might slightly change
-    collValueAdjusted: uint256 =_collateralValue * _targetLtv // HUNDRED_PERCENT
-
-    toPay: uint256 = (_debtAmount - collValueAdjusted) * HUNDRED_PERCENT // (HUNDRED_PERCENT - _targetLtv)
-    return min(toPay, _debtAmount)

@@ -125,17 +125,6 @@ def setActionTimeLockAfterSetup(_numBlocks: uint256 = 0) -> bool:
 
 @view
 @external
-def priceSourceId() -> uint256:
-    ...
-
-
-@external
-def setRegistryId(_regId: uint256) -> bool:
-    ...
-
-
-@view
-@external
 def isActivated() -> bool:
     ...
 
