@@ -71,3 +71,9 @@ def mint(_recipient: address, _amount: uint256) -> bool:
 def setBlacklist(_addr: address, _shouldBlacklist: bool) -> bool:
     assert staticcall RipeHq(self.ripeHq).canSetTokenBlacklist(msg.sender) # dev: no perms
     return token._setBlacklist(_addr, _shouldBlacklist)
+
+
+@external
+def setRegistryId(_regId: uint256) -> bool:
+    # registry-related thing, can be ignored
+    return True

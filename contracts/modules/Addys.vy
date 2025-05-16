@@ -3,8 +3,6 @@
 interface RipeHq:
     def isValidAddr(_addr: address) -> bool: view
     def getAddr(_regId: uint256) -> address: view
-    def greenToken() -> address: view
-    def ripeToken() -> address: view
 
 struct Addys:
     hq: address
@@ -26,17 +24,19 @@ struct Addys:
 RIPE_HQ_FOR_ADDYS: immutable(address)
 
 # core addys
-PRICE_DESK_ID: constant(uint256) = 1
-VAULT_BOOK_ID: constant(uint256) = 2
-AUCTION_HOUSE_ID: constant(uint256) = 3
-AUCTION_HOUSE_NFT_ID: constant(uint256) = 4
-BOND_ROOM_ID: constant(uint256) = 5
-CONTROL_ROOM_ID: constant(uint256) = 6
-CREDIT_ENGINE_ID: constant(uint256) = 7
-ENDAOMENT_ID: constant(uint256) = 8
-LEDGER_ID: constant(uint256) = 9
-LOOTBOX_ID: constant(uint256) = 10
-TELLER_ID: constant(uint256) = 11
+GREEN_TOKEN_ID: constant(uint256) = 1
+RIPE_TOKEN_ID: constant(uint256) = 2
+PRICE_DESK_ID: constant(uint256) = 3
+VAULT_BOOK_ID: constant(uint256) = 4
+AUCTION_HOUSE_ID: constant(uint256) = 5
+AUCTION_HOUSE_NFT_ID: constant(uint256) = 6
+BOND_ROOM_ID: constant(uint256) = 7
+CONTROL_ROOM_ID: constant(uint256) = 8
+CREDIT_ENGINE_ID: constant(uint256) = 9
+ENDAOMENT_ID: constant(uint256) = 10
+LEDGER_ID: constant(uint256) = 11
+LOOTBOX_ID: constant(uint256) = 12
+TELLER_ID: constant(uint256) = 13
 
 
 @deploy
@@ -70,8 +70,8 @@ def _generateAddys() -> Addys:
     hq: address = RIPE_HQ_FOR_ADDYS
     return Addys(
         hq=hq,
-        greenToken=staticcall RipeHq(hq).greenToken(),
-        ripeToken=staticcall RipeHq(hq).ripeToken(),
+        greenToken=staticcall RipeHq(hq).getAddr(GREEN_TOKEN_ID),
+        ripeToken=staticcall RipeHq(hq).getAddr(RIPE_TOKEN_ID),
         priceDesk=staticcall RipeHq(hq).getAddr(PRICE_DESK_ID),
         vaultBook=staticcall RipeHq(hq).getAddr(VAULT_BOOK_ID),
         auctionHouse=staticcall RipeHq(hq).getAddr(AUCTION_HOUSE_ID),
@@ -109,13 +109,13 @@ def _isValidRipeHqAddr(_addr: address) -> bool:
 @view
 @internal
 def _getGreenToken() -> address:
-    return staticcall RipeHq(RIPE_HQ_FOR_ADDYS).greenToken()
+    return staticcall RipeHq(RIPE_HQ_FOR_ADDYS).getAddr(GREEN_TOKEN_ID)
 
 
 @view
 @internal
 def _getRipeToken() -> address:
-    return staticcall RipeHq(RIPE_HQ_FOR_ADDYS).ripeToken()
+    return staticcall RipeHq(RIPE_HQ_FOR_ADDYS).getAddr(RIPE_TOKEN_ID)
 
 
 # price desk

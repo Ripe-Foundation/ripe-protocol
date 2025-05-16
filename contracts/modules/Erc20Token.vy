@@ -1,5 +1,11 @@
 # @version 0.4.1
 
+interface RipeHq:
+    def canSetTokenBlacklist(_addr: address) -> bool: view
+    def hasPendingGovChange() -> bool: view
+    def greenToken() -> address: view
+    def ripeToken() -> address: view
+
 event Transfer:
     sender: indexed(address)
     recipient: indexed(address)
@@ -14,7 +20,15 @@ event BlacklistModified:
     addr: indexed(address)
     isBlacklisted: bool
 
+event RipeHqSet:
+    prevHq: indexed(address)
+    newHq: indexed(address)
+
 _NAME: public(immutable(String[25]))
+
+# ripe protocol
+ripeHq: public(address)
+tempGov: address
 
 # blacklist
 blacklisted: public(HashMap[address, bool])
@@ -32,16 +46,30 @@ ECRECOVER_PRECOMPILE: constant(address) = 0x000000000000000000000000000000000000
 
 
 @deploy
-def __init__(_name: String[25], _initialSupply: uint256, _initialSupplyRecipient: address):
-    _NAME = _name
+def __init__(
+    _tokenName: String[25],
+    _initialGov: address,
+    _initialSupply: uint256,
+    _initialSupplyRecipient: address,
+):
+    _NAME = _tokenName
 
+    assert _initialGov != empty(address) # dev: cannot be 0x0
+    self.tempGov = _initialGov
+
+    # initial supply
     if _initialSupply == 0 or _initialSupplyRecipient in [empty(address), self]:
         return
 
-    # initial supply
-    self.totalSupply = _initialSupply
     self.balanceOf[_initialSupplyRecipient] = _initialSupply
+    self.totalSupply = _initialSupply
     log Transfer(sender=empty(address), recipient=_initialSupplyRecipient, amount=_initialSupply)
+
+
+@external
+def setRegistryId(_regId: uint256) -> bool:
+    # needed to register with RipeHq, can be ignored here
+    return True
 
 
 ########
@@ -115,9 +143,9 @@ def increaseAllowance(_spender: address, _amount: uint256) -> bool:
     return True
 
 
-#########
-# Extra #
-#########
+#####################
+# Minting / Burning #
+#####################
 
 
 @internal
@@ -217,14 +245,53 @@ def permit(
     return True
 
 
-##########
-# Config #
-##########
+#############
+# Blacklist #
+#############
 
 
-@internal
-def _setBlacklist(_addr: address, _shouldBlacklist: bool) -> bool:
+@external
+def setBlacklist(_addr: address, _shouldBlacklist: bool) -> bool:
+    assert staticcall RipeHq(self.ripeHq).canSetTokenBlacklist(msg.sender) # dev: no perms
+
     assert _addr not in [self, empty(address)] # dev: invalid blacklist recipient
     self.blacklisted[_addr] = _shouldBlacklist
     log BlacklistModified(addr=_addr, isBlacklisted=_shouldBlacklist)
     return True
+
+
+###########
+# Ripe Hq #
+###########
+
+
+# validation
+
+
+@view
+@external
+def isValidRipeHq(_ripeHq: address) -> bool:
+    return self._isValidRipeHq(_ripeHq)
+
+
+@view
+@internal
+def _isValidRipeHq(_ripeHq: address) -> bool:
+    if _ripeHq == empty(address) or not _ripeHq.is_contract:
+        return False
+    return self in [staticcall RipeHq(_ripeHq).greenToken(), staticcall RipeHq(_ripeHq).ripeToken()]
+
+
+# initial setup
+
+
+@external
+def setRipeHqOnSetup(_ripeHq: address):
+    assert msg.sender == self.tempGov # dev: no perms
+    assert self.ripeHq == empty(address) # dev: already set
+
+    assert self._isValidRipeHq(_ripeHq) # dev: invalid ripe hq
+    self.ripeHq = _ripeHq
+
+    self.tempGov = empty(address)
+    log RipeHqSet(prevHq=empty(address), newHq=_ripeHq)
