@@ -1,8 +1,8 @@
 # @version 0.4.1
 
 interface RipeHq:
-    def isValidAddyAddr(_addr: address) -> bool: view
-    def getAddy(_addyId: uint256) -> address: view
+    def isValidAddr(_addr: address) -> bool: view
+    def getAddr(_regId: uint256) -> address: view
     def greenToken() -> address: view
     def ripeToken() -> address: view
 
@@ -23,7 +23,7 @@ struct Addys:
     teller: address
 
 # hq
-RIPE_HQ: immutable(address)
+RIPE_HQ_FOR_ADDYS: immutable(address)
 
 # core addys
 PRICE_DESK_ID: constant(uint256) = 1
@@ -42,7 +42,7 @@ TELLER_ID: constant(uint256) = 11
 @deploy
 def __init__(_ripeHq: address):
     assert _ripeHq != empty(address) # dev: invalid ripe hq
-    RIPE_HQ = _ripeHq
+    RIPE_HQ_FOR_ADDYS = _ripeHq
 
 
 ########
@@ -67,22 +67,22 @@ def getAddys() -> Addys:
 @view
 @internal
 def _generateAddys() -> Addys:
-    hq: address = RIPE_HQ
+    hq: address = RIPE_HQ_FOR_ADDYS
     return Addys(
         hq=hq,
         greenToken=staticcall RipeHq(hq).greenToken(),
         ripeToken=staticcall RipeHq(hq).ripeToken(),
-        priceDesk=staticcall RipeHq(hq).getAddy(PRICE_DESK_ID),
-        vaultBook=staticcall RipeHq(hq).getAddy(VAULT_BOOK_ID),
-        auctionHouse=staticcall RipeHq(hq).getAddy(AUCTION_HOUSE_ID),
-        auctionHouseNft=staticcall RipeHq(hq).getAddy(AUCTION_HOUSE_NFT_ID),
-        bondRoom=staticcall RipeHq(hq).getAddy(BOND_ROOM_ID),
-        controlRoom=staticcall RipeHq(hq).getAddy(CONTROL_ROOM_ID),
-        creditEngine=staticcall RipeHq(hq).getAddy(CREDIT_ENGINE_ID),
-        endaoment=staticcall RipeHq(hq).getAddy(ENDAOMENT_ID),
-        ledger=staticcall RipeHq(hq).getAddy(LEDGER_ID),
-        lootbox=staticcall RipeHq(hq).getAddy(LOOTBOX_ID),
-        teller=staticcall RipeHq(hq).getAddy(TELLER_ID),
+        priceDesk=staticcall RipeHq(hq).getAddr(PRICE_DESK_ID),
+        vaultBook=staticcall RipeHq(hq).getAddr(VAULT_BOOK_ID),
+        auctionHouse=staticcall RipeHq(hq).getAddr(AUCTION_HOUSE_ID),
+        auctionHouseNft=staticcall RipeHq(hq).getAddr(AUCTION_HOUSE_NFT_ID),
+        bondRoom=staticcall RipeHq(hq).getAddr(BOND_ROOM_ID),
+        controlRoom=staticcall RipeHq(hq).getAddr(CONTROL_ROOM_ID),
+        creditEngine=staticcall RipeHq(hq).getAddr(CREDIT_ENGINE_ID),
+        endaoment=staticcall RipeHq(hq).getAddr(ENDAOMENT_ID),
+        ledger=staticcall RipeHq(hq).getAddr(LEDGER_ID),
+        lootbox=staticcall RipeHq(hq).getAddr(LOOTBOX_ID),
+        teller=staticcall RipeHq(hq).getAddr(TELLER_ID),
     )
 
 
@@ -94,13 +94,13 @@ def _generateAddys() -> Addys:
 @view
 @internal
 def _getRipeHq() -> address:
-    return RIPE_HQ
+    return RIPE_HQ_FOR_ADDYS
 
 
 @view
 @internal
-def _isValidRipeHqAddy(_addr: address) -> bool:
-    return staticcall RipeHq(RIPE_HQ).isValidAddyAddr(_addr)
+def _isValidRipeHqAddr(_addr: address) -> bool:
+    return staticcall RipeHq(RIPE_HQ_FOR_ADDYS).isValidAddr(_addr)
 
 
 # tokens
@@ -109,13 +109,13 @@ def _isValidRipeHqAddy(_addr: address) -> bool:
 @view
 @internal
 def _getGreenToken() -> address:
-    return staticcall RipeHq(RIPE_HQ).greenToken()
+    return staticcall RipeHq(RIPE_HQ_FOR_ADDYS).greenToken()
 
 
 @view
 @internal
 def _getRipeToken() -> address:
-    return staticcall RipeHq(RIPE_HQ).ripeToken()
+    return staticcall RipeHq(RIPE_HQ_FOR_ADDYS).ripeToken()
 
 
 # price desk
@@ -130,7 +130,7 @@ def _getPriceDeskId() -> uint256:
 @view
 @internal
 def _getPriceDeskAddr() -> address:
-    return staticcall RipeHq(RIPE_HQ).getAddy(PRICE_DESK_ID)
+    return staticcall RipeHq(RIPE_HQ_FOR_ADDYS).getAddr(PRICE_DESK_ID)
 
 
 # vault book
@@ -145,7 +145,7 @@ def _getVaultBookId() -> uint256:
 @view
 @internal
 def _getVaultBookAddr() -> address:
-    return staticcall RipeHq(RIPE_HQ).getAddy(VAULT_BOOK_ID)
+    return staticcall RipeHq(RIPE_HQ_FOR_ADDYS).getAddr(VAULT_BOOK_ID)
 
 
 # auction house
@@ -160,7 +160,7 @@ def _getAuctionHouseId() -> uint256:
 @view
 @internal
 def _getAuctionHouseAddr() -> address:
-    return staticcall RipeHq(RIPE_HQ).getAddy(AUCTION_HOUSE_ID)
+    return staticcall RipeHq(RIPE_HQ_FOR_ADDYS).getAddr(AUCTION_HOUSE_ID)
 
 
 # auction house nft
@@ -175,7 +175,7 @@ def _getAuctionHouseNftId() -> uint256:
 @view
 @internal
 def _getAuctionHouseNftAddr() -> address:
-    return staticcall RipeHq(RIPE_HQ).getAddy(AUCTION_HOUSE_NFT_ID)
+    return staticcall RipeHq(RIPE_HQ_FOR_ADDYS).getAddr(AUCTION_HOUSE_NFT_ID)
 
 
 # bond room
@@ -190,7 +190,7 @@ def _getBondRoomId() -> uint256:
 @view
 @internal
 def _getBondRoomAddr() -> address:
-    return staticcall RipeHq(RIPE_HQ).getAddy(BOND_ROOM_ID)
+    return staticcall RipeHq(RIPE_HQ_FOR_ADDYS).getAddr(BOND_ROOM_ID)
 
 
 # control room
@@ -205,7 +205,7 @@ def _getControlRoomId() -> uint256:
 @view
 @internal
 def _getControlRoomAddr() -> address:
-    return staticcall RipeHq(RIPE_HQ).getAddy(CONTROL_ROOM_ID)
+    return staticcall RipeHq(RIPE_HQ_FOR_ADDYS).getAddr(CONTROL_ROOM_ID)
 
 
 # credit engine
@@ -220,7 +220,7 @@ def _getCreditEngineId() -> uint256:
 @view
 @internal
 def _getCreditEngineAddr() -> address:
-    return staticcall RipeHq(RIPE_HQ).getAddy(CREDIT_ENGINE_ID)
+    return staticcall RipeHq(RIPE_HQ_FOR_ADDYS).getAddr(CREDIT_ENGINE_ID)
 
 
 # endaoment
@@ -235,7 +235,7 @@ def _getEndaomentId() -> uint256:
 @view
 @internal
 def _getEndaomentAddr() -> address:
-    return staticcall RipeHq(RIPE_HQ).getAddy(ENDAOMENT_ID)
+    return staticcall RipeHq(RIPE_HQ_FOR_ADDYS).getAddr(ENDAOMENT_ID)
 
 
 # ledger
@@ -250,7 +250,7 @@ def _getLedgerId() -> uint256:
 @view
 @internal
 def _getLedgerAddr() -> address:
-    return staticcall RipeHq(RIPE_HQ).getAddy(LEDGER_ID)
+    return staticcall RipeHq(RIPE_HQ_FOR_ADDYS).getAddr(LEDGER_ID)
 
 
 # lootbox
@@ -265,7 +265,7 @@ def _getLootboxId() -> uint256:
 @view
 @internal
 def _getLootboxAddr() -> address:
-    return staticcall RipeHq(RIPE_HQ).getAddy(LOOTBOX_ID)
+    return staticcall RipeHq(RIPE_HQ_FOR_ADDYS).getAddr(LOOTBOX_ID)
 
 
 # teller
@@ -280,4 +280,4 @@ def _getTellerId() -> uint256:
 @view
 @internal
 def _getTellerAddr() -> address:
-    return staticcall RipeHq(RIPE_HQ).getAddy(TELLER_ID)
+    return staticcall RipeHq(RIPE_HQ_FOR_ADDYS).getAddr(TELLER_ID)

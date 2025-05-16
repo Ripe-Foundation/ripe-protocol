@@ -232,7 +232,7 @@ def updateDepositPoints(
     _asset: address,
     _a: addys.Addys = empty(addys.Addys),
 ):
-    assert addys._isValidRipeHqAddy(msg.sender) # dev: no perms
+    assert addys._isValidRipeHqAddr(msg.sender) # dev: no perms
     a: addys.Addys = addys._getAddys(_a)
 
     # get latest global rewards
@@ -590,7 +590,7 @@ def _getAssetPrecision(_vaultId: uint256, _asset: address, _vaultBook: address) 
 
 @external
 def updateBorrowPoints(_user: address, _a: addys.Addys = empty(addys.Addys)):
-    assert addys._isValidRipeHqAddy(msg.sender) # dev: no perms
+    assert addys._isValidRipeHqAddr(msg.sender) # dev: no perms
     a: addys.Addys = addys._getAddys(_a)
 
     globalRewards: RipeRewards = self._getLatestGlobalRipeRewards(a)
@@ -742,7 +742,7 @@ def getClaimableBorrowLoot(_user: address) -> uint256:
 
 @external
 def updateRipeRewards(_a: addys.Addys = empty(addys.Addys)):
-    assert addys._isValidRipeHqAddy(msg.sender) # dev: no perms
+    assert addys._isValidRipeHqAddr(msg.sender) # dev: no perms
     a: addys.Addys = addys._getAddys(_a)
     ripeRewards: RipeRewards = self._getLatestGlobalRipeRewards(a)
     extcall Ledger(a.ledger).setRipeRewards(ripeRewards)

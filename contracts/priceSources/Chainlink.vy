@@ -575,14 +575,3 @@ def setPriceFeedChangeDelayToMin() -> bool:
     assert gov._canGovern(msg.sender) # dev: no perms
     assert td._setActionDelay(td.MIN_ACTION_DELAY) # dev: invalid delay
     return True
-
-
-##########
-# Config #
-##########
-
-
-@external
-def setPriceSourceId(_priceSourceId: uint256) -> bool:
-    assert msg.sender == staticcall AddyRegistry(ADDY_REGISTRY).getAddy(PRICE_DESK_ID) # dev: no perms
-    return psd._setPriceSourceId(_priceSourceId)

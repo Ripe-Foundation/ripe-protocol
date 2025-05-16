@@ -36,6 +36,8 @@ vaultAssets: public(HashMap[uint256, address]) # index -> asset
 indexOfAsset: public(HashMap[address, uint256]) # asset -> index
 numAssets: public(uint256) # num assets
 
+MAX_RECOVER_ASSETS: constant(uint256) = 20
+
 
 @deploy
 def __init__():
@@ -255,39 +257,44 @@ def _getNumVaultAssets() -> uint256:
 
 
 @external
-def setVaultId(_vaultId: uint256) -> bool:
+def setRegistryId(_regId: uint256) -> bool:
     assert msg.sender == addys._getVaultBookAddr() # dev: only vault book allowed
 
     prevVaultId: uint256 = self.vaultId
-    assert prevVaultId == 0 or prevVaultId == _vaultId # dev: invalid vault id
-    self.vaultId = _vaultId
-    log VaultIdSet(vaultId=_vaultId)
+    assert prevVaultId == 0 or prevVaultId == _regId # dev: invalid vault id
+    self.vaultId = _regId
+    log VaultIdSet(vaultId=_regId)
     return True
 
 
 @external
 def activate(_shouldActivate: bool):
     assert msg.sender == addys._getControlRoomAddr() # dev: only ControlRoom allowed
-
     self.isActivated = _shouldActivate
     log VaultActivated(vaultId=self.vaultId, isActivated=_shouldActivate)
 
 
 @external
-def recoverFunds(_asset: address, _recipient: address) -> bool:
+def recoverFunds(_recipient: address, _asset: address):
     assert msg.sender == addys._getControlRoomAddr() # dev: only ControlRoom allowed
+    self._recoverFunds(_recipient, _asset)
 
+
+@external
+def recoverFundsMany(_recipient: address, _assets: DynArray[address, MAX_RECOVER_ASSETS]):
+    assert msg.sender == addys._getControlRoomAddr() # dev: only ControlRoom allowed
+    for a: address in _assets:
+        self._recoverFunds(_recipient, a)
+
+
+@internal
+def _recoverFunds(_recipient: address, _asset: address):
+    assert empty(address) not in [_recipient, _asset] # dev: invalid recipient or asset
     balance: uint256 = staticcall IERC20(_asset).balanceOf(self)
-    if empty(address) in [_recipient, _asset] or balance == 0:
-        return False
+    assert balance != 0 # dev: nothing to recover
 
     # cannot recover funds from a registered asset with a balance
-    if self.indexOfAsset[_asset] != 0 and self.totalBalances[_asset] != 0:
-        return False
+    assert self.indexOfAsset[_asset] == 0 and self.totalBalances[_asset] == 0 # dev: invalid recovery
 
-    # recover
     assert extcall IERC20(_asset).transfer(_recipient, balance, default_return_value=True) # dev: recovery failed
     log VaultFundsRecovered(vaultId=self.vaultId, asset=_asset, recipient=_recipient, balance=balance)
-    return True
-
-

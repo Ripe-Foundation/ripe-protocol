@@ -1,13 +1,24 @@
 # @version 0.4.1
 
-initializes: gov
-initializes: registry
-
 exports: gov.__interface__
 exports: registry.__interface__
 
+initializes: gov
+initializes: registry[gov := gov]
+
 import contracts.modules.LocalGov as gov
-import contracts.modules.Registry as registry
+import contracts.modules.AddressRegistry as registry
+from interfaces import Department
+
+struct HqConfig:
+    canMintGreen: bool
+    canMintRipe: bool
+    canSetTokenBlacklist: bool
+
+struct PendingHqConfig:
+    newHqConfig: HqConfig
+    initiatedBlock: uint256
+    confirmBlock: uint256
 
 event TokensSet:
     greenToken: address
@@ -17,36 +28,143 @@ event CanSetTokenBlacklistSet:
     addyId: uint256
     canSet: bool
 
+# hq config
+hqConfig: public(HashMap[uint256, HqConfig])
+pendingHqConfig: public(HashMap[uint256, PendingHqConfig])
+
 # tokens
 greenToken: public(address)
 ripeToken: public(address)
 tokensAreSet: public(bool)
 
-# green minting
-isGreenMinter: public(HashMap[uint256, bool]) # addy id -> can mint green
-pendingGreenMinter: public(HashMap[address, bool]) # addr -> pending can mint green
 
-# ripe minting
-isRipeMinter: public(HashMap[uint256, bool]) # addy id -> can mint ripe
-pendingRipeMinter: public(HashMap[address, bool]) # addr -> pending can mint ripe
 
-# blacklist
-canIdSetTokenBlacklist: public(HashMap[uint256, bool]) # addy id -> can set blacklist
+# # green minting
+# isGreenMinter: public(HashMap[uint256, bool]) # addy id -> can mint green
+# pendingGreenMinter: public(HashMap[address, bool]) # addr -> pending can mint green
+
+# # ripe minting
+# isRipeMinter: public(HashMap[uint256, bool]) # addy id -> can mint ripe
+# pendingRipeMinter: public(HashMap[address, bool]) # addr -> pending can mint ripe
+
+# # blacklist
+# canIdSetTokenBlacklist: public(HashMap[uint256, bool]) # addy id -> can set blacklist
 
 
 @deploy
 def __init__(
     _initialGov: address,
-    _minGovChangeDelay: uint256,
-    _maxGovChangeDelay: uint256,
-    _minRegistryChangeDelay: uint256,
-    _maxRegistryChangeDelay: uint256,
+    _minGovTimeLock: uint256,
+    _maxGovTimeLock: uint256,
+    _minRegistryTimeLock: uint256,
+    _maxRegistryTimeLock: uint256,
 ):
-    # initialize gov
-    gov.__init__(_initialGov, empty(address), _minGovChangeDelay, _maxGovChangeDelay)
+    gov.__init__(empty(address), _initialGov, _minGovTimeLock, _maxGovTimeLock, 0)
+    registry.__init__(_minRegistryTimeLock, _maxRegistryTimeLock, 0, "RipeHq.vy")
 
-    # initialize registry
-    registry.__init__(_minRegistryChangeDelay, _maxRegistryChangeDelay, "AddyRegistry.vy")
+
+#####################
+# Hq Config Changes #
+#####################
+
+
+@view
+@external
+def hasPendingHqConfigChange() -> bool:
+    return self.pendingHqConfig.confirmBlock != 0
+
+
+@internal
+def _isValidHqConfig(
+    _regId: uint256,
+    _canMintGreen: bool,
+    _canMintRipe: bool,
+    _canSetTokenBlacklist: bool,
+) -> bool:
+
+    assert registry._isValidRegId(_regId) # dev: invalid reg id
+
+
+    return True
+
+
+# start hq config change
+
+
+@external
+def initiateHqConfigChange(
+    _regId: uint256,
+    _canMintGreen: bool,
+    _canMintRipe: bool,
+    _canSetTokenBlacklist: bool,
+):
+    assert msg.sender == gov.governance # dev: no perms
+    assert self._isValidHqConfig(_regId, _canMintGreen, _canMintRipe, _canSetTokenBlacklist) # dev: invalid hq config
+
+    # set pending hq config
+    confirmBlock: uint256 = block.number + registry.registryChangeTimeLock
+    self.pendingHqConfig[_regId] = PendingHqConfig(
+        newHqConfig= HqConfig(
+            canMintGreen= _canMintGreen,
+            canMintRipe= _canMintRipe,
+            canSetTokenBlacklist= _canSetTokenBlacklist,
+        ),
+        initiatedBlock= block.number,
+        confirmBlock= confirmBlock,
+    )
+    log HqConfigChangeInitiated(regId=_regId, canMintGreen=_canMintGreen, canMintRipe=_canMintRipe, canSetTokenBlacklist=_canSetTokenBlacklist, confirmBlock=confirmBlock)
+
+
+# confirm gov change
+
+
+@external
+def confirmGovernanceChange():
+    data: PendingGovernance = self.pendingGov
+    assert data.confirmBlock != 0 and block.number >= data.confirmBlock # dev: time lock not reached
+
+    # check permissions
+    if data.newGov != empty(address):
+        assert msg.sender == data.newGov # dev: only new gov can confirm
+    else:
+        assert self._canGovern(msg.sender) # dev: no perms
+        assert not self._isRipeHqGov() # dev: ripe hq cannot set 0x0
+
+    # set new governance
+    prevGov: address = self.governance
+    self.governance = data.newGov
+    self.pendingGov = empty(PendingGovernance)
+    log GovChangeConfirmed(prevGov=prevGov, newGov=data.newGov, initiatedBlock=data.initiatedBlock, confirmBlock=data.confirmBlock)
+
+
+# cancel gov change
+
+
+@external
+def cancelGovernanceChange():
+    assert self._canGovern(msg.sender) # dev: no perms
+    data: PendingGovernance = self.pendingGov
+    assert data.confirmBlock != 0 # dev: no pending change
+    self.pendingGov = empty(PendingGovernance)
+    log GovChangeCancelled(cancelledGov=data.newGov, initiatedBlock=data.initiatedBlock, confirmBlock=data.confirmBlock)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 ############

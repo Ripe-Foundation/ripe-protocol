@@ -66,14 +66,41 @@ def cancelDisablePriceFeed(_asset: address) -> bool:
 
 @view
 @external
-def priceSourceId() -> uint256:
+def getPricedAssets() -> DynArray[address, 50]:
     ...
 
-@external
-def setPriceSourceId(_priceSourceId: uint256) -> bool:
-    ...
+
+########
+# Ripe #
+########
+
 
 @view
 @external
-def getPricedAssets() -> DynArray[address, 50]:
+def priceSourceId() -> uint256:
+    ...
+
+
+@external
+def setRegistryId(_regId: uint256) -> bool:
+    ...
+
+
+@view
+@external
+def isActivated() -> bool:
+    ...
+
+
+@external
+def activate(_shouldActivate: bool):
+    ...
+
+
+@external
+def recoverFunds(_recipient: address, _asset: address):
+    ...
+
+@external
+def recoverFundsMany(_recipient: address, _assets: DynArray[address, 20]):
     ...

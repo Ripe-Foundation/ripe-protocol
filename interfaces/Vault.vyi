@@ -173,7 +173,7 @@ def vaultId() -> uint256:
 
 
 @external
-def setVaultId(_vaultId: uint256) -> bool:
+def setRegistryId(_regId: uint256) -> bool:
     ...
 
 
@@ -189,5 +189,9 @@ def activate(_shouldActivate: bool):
 
 
 @external
-def recoverFunds(_asset: address, _recipient: address) -> bool:
+def recoverFunds(_recipient: address, _asset: address):
+    ...
+
+@external
+def recoverFundsMany(_recipient: address, _assets: DynArray[address, 20]):
     ...
