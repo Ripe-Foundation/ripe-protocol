@@ -20,6 +20,13 @@ struct PendingHqConfig:
     initiatedBlock: uint256
     confirmBlock: uint256
 
+event HqConfigChangeInitiated:
+    regId: uint256
+    canMintGreen: bool
+    canMintRipe: bool
+    canSetTokenBlacklist: bool
+    confirmBlock: uint256
+
 event TokensSet:
     greenToken: address
     ripeToken: address
@@ -77,13 +84,23 @@ def hasPendingHqConfigChange() -> bool:
 @internal
 def _isValidHqConfig(
     _regId: uint256,
-    _canMintGreen: bool,
-    _canMintRipe: bool,
-    _canSetTokenBlacklist: bool,
+    _hqConfig: HqConfig,
 ) -> bool:
 
-    assert registry._isValidRegId(_regId) # dev: invalid reg id
+    # invalid reg id
+    if not registry._isValidRegId(_regId):
+        return False
 
+    # no reg addr
+    addr: address = registry._getRegAddr(_regId)
+    if addr == empty(address):
+        return False
+
+    # two-factor auth on minting
+    if _hqConfig.canMintGreen and not Department(addr).canMintGreen():
+        return False
+    if _hqConfig.canMintRipe and not Department(addr).canMintRipe():
+        return False
 
     return True
 
@@ -99,16 +116,18 @@ def initiateHqConfigChange(
     _canSetTokenBlacklist: bool,
 ):
     assert msg.sender == gov.governance # dev: no perms
-    assert self._isValidHqConfig(_regId, _canMintGreen, _canMintRipe, _canSetTokenBlacklist) # dev: invalid hq config
+
+    hqConfig: HqConfig = HqConfig(
+        canMintGreen= _canMintGreen,
+        canMintRipe= _canMintRipe,
+        canSetTokenBlacklist= _canSetTokenBlacklist,
+    )
+    assert self._isValidHqConfig(_regId, hqConfig) # dev: invalid hq config
 
     # set pending hq config
     confirmBlock: uint256 = block.number + registry.registryChangeTimeLock
     self.pendingHqConfig[_regId] = PendingHqConfig(
-        newHqConfig= HqConfig(
-            canMintGreen= _canMintGreen,
-            canMintRipe= _canMintRipe,
-            canSetTokenBlacklist= _canSetTokenBlacklist,
-        ),
+        newHqConfig= hqConfig,
         initiatedBlock= block.number,
         confirmBlock= confirmBlock,
     )
@@ -119,8 +138,10 @@ def initiateHqConfigChange(
 
 
 @external
-def confirmGovernanceChange():
-    data: PendingGovernance = self.pendingGov
+def confirmHqConfigChange(_regId: uint256):
+    assert msg.sender == gov.governance # dev: no perms
+
+    data: PendingHqConfig = self.pendingHqConfig[_regId]
     assert data.confirmBlock != 0 and block.number >= data.confirmBlock # dev: time lock not reached
 
     # check permissions
