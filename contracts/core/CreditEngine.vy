@@ -157,6 +157,7 @@ def borrowForUser(
     _a: addys.Addys = empty(addys.Addys),
 ) -> uint256:
     assert msg.sender == addys._getTellerAddr() # dev: only teller allowed
+    assert deptBasics.isActivated # dev: contract paused
 
     # get borrow data
     a: addys.Addys = addys._getAddys(_a)
@@ -355,6 +356,7 @@ def repayForUser(
     _a: addys.Addys = empty(addys.Addys),
 ) -> bool:
     assert msg.sender == addys._getTellerAddr() # dev: only teller allowed
+    assert deptBasics.isActivated # dev: contract paused
     a: addys.Addys = addys._getAddys(_a)
 
     # get latest user debt
@@ -384,9 +386,9 @@ def repayDuringLiquidation(
     _a: addys.Addys = empty(addys.Addys),
 ) -> bool:
     assert msg.sender == addys._getAuctionHouseAddr() # dev: only auction house allowed
+    assert deptBasics.isActivated # dev: contract paused
     a: addys.Addys = addys._getAddys(_a)
-    numUserVaults: uint256 = staticcall Ledger(a.ledger).numUserVaults(_liqUser)
-    return self._repayDebt(_liqUser, _userDebt, numUserVaults, _repayAmount, 0, _newInterest, False, True, RepayType.LIQUIDATION, a)
+    return self._repayDebt(_liqUser, _userDebt, staticcall Ledger(a.ledger).numUserVaults(_liqUser), _repayAmount, 0, _newInterest, False, True, RepayType.LIQUIDATION, a)
 
 
 # repay during auction purchase
@@ -395,6 +397,7 @@ def repayDuringLiquidation(
 @external
 def repayDuringAuctionPurchase(_liqUser: address, _repayAmount: uint256, _a: addys.Addys = empty(addys.Addys)) -> bool:
     assert msg.sender == addys._getAuctionHouseAddr() # dev: only auction house allowed
+    assert deptBasics.isActivated # dev: contract paused
     a: addys.Addys = addys._getAddys(_a)
 
     # get latest user debt
@@ -524,6 +527,7 @@ def redeemCollateralFromMany(
     _a: addys.Addys = empty(addys.Addys),
 ) -> uint256:
     assert msg.sender == addys._getTellerAddr() # dev: only Teller allowed
+    assert deptBasics.isActivated # dev: contract paused
     a: addys.Addys = addys._getAddys(_a)
 
     totalGreenSpent: uint256 = 0
@@ -554,6 +558,7 @@ def redeemCollateral(
     _a: addys.Addys = empty(addys.Addys),
 ) -> uint256:
     assert msg.sender == addys._getTellerAddr() # dev: only Teller allowed
+    assert deptBasics.isActivated # dev: contract paused
     a: addys.Addys = addys._getAddys(_a)
 
     greenAmount: uint256 = min(_greenAmount, staticcall IERC20(a.greenToken).balanceOf(self))
@@ -797,11 +802,13 @@ def _getLatestUserDebtAndTerms(
 
 @external
 def updateDebtForUser(_user: address) -> bool:
+    assert deptBasics.isActivated # dev: contract paused
     return self._updateDebtForUser(_user, addys._getAddys())
 
 
 @external
 def updateDebtForManyUsers(_users: DynArray[address, MAX_DEBT_UPDATES]) -> bool:
+    assert deptBasics.isActivated # dev: contract paused
     a: addys.Addys = addys._getAddys()
     for u: address in _users:
         self._updateDebtForUser(u, a)

@@ -155,6 +155,7 @@ userAssetForAuction: transient(HashMap[address, HashMap[uint256, VaultData]]) # 
 
 HUNDRED_PERCENT: constant(uint256) = 100_00 # 100.00%
 MAX_GEN_STAB_POOLS: constant(uint256) = 10
+MAX_LIQ_USERS: constant(uint256) = 50
 
 
 @deploy
@@ -168,12 +169,44 @@ def __init__(_ripeHq: address):
 ###############
 
 
+@external
+def liquidateUser(_liqUser: address, _a: addys.Addys = empty(addys.Addys)) -> uint256:
+    assert msg.sender == addys._getTellerAddr() # dev: only teller allowed
+    assert deptBasics.isActivated # dev: contract paused
+
+    a: addys.Addys = addys._getAddys(_a)
+    config: GenLiqConfig = staticcall ControlRoom(a.controlRoom).getGenLiqConfig()
+    keeperFee: uint256 = self._liquidateUser(_liqUser, config, a)
+
+    # TODO: mint keeper fee for liquidator
+
+    return keeperFee
+
+
+@external
+def liquidateManyUsers(_liqUsers: DynArray[address, MAX_LIQ_USERS], _a: addys.Addys = empty(addys.Addys)) -> uint256:
+    assert msg.sender == addys._getTellerAddr() # dev: only teller allowed
+    assert deptBasics.isActivated # dev: contract paused
+
+    a: addys.Addys = addys._getAddys(_a)
+    config: GenLiqConfig = staticcall ControlRoom(a.controlRoom).getGenLiqConfig()
+    keeperFee: uint256 = 0
+    for liqUser: address in _liqUsers:
+        keeperFee += self._liquidateUser(liqUser, config, a)
+
+    # TODO: mint keeper fee for liquidator
+
+    return keeperFee
+
+
 @internal
 def _liquidateUser(
     _liqUser: address,
     _config: GenLiqConfig,
     _a: addys.Addys,
 ) -> uint256:
+    if _liqUser == empty(address):
+        return 0
 
     # get latest user debt and terms
     userDebt: UserDebt = empty(UserDebt)
@@ -552,6 +585,33 @@ def _createNewFungibleAuction(
 ################
 # Buy Auctions #
 ################
+
+
+struct FungAuctionPurchase:
+    liqUser: address
+    vaultId: uint256
+    asset: address
+    maxGreenAmount: uint256
+
+
+@external
+def buyFungibleAuction(_a: addys.Addys = empty(addys.Addys)) -> uint256:
+    assert msg.sender == addys._getTellerAddr() # dev: only teller allowed
+    assert deptBasics.isActivated # dev: contract paused
+
+    # TODO: implement
+
+    return 0
+
+
+@external
+def buyManyFungibleAuctions(_a: addys.Addys = empty(addys.Addys)) -> uint256:
+    assert msg.sender == addys._getTellerAddr() # dev: only teller allowed
+    assert deptBasics.isActivated # dev: contract paused
+
+    # TODO: implement
+
+    return 0
 
 
 @internal

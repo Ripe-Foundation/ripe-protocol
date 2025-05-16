@@ -26,7 +26,7 @@ def _depositTokensInVault(
     _asset: address,
     _amount: uint256,
 ) -> uint256:
-    assert vaultData.isActivated # dev: not activated
+    assert vaultData.isActivated # dev: contract paused
     assert msg.sender == addys._getTellerAddr() # dev: only Teller allowed
 
     # validation
@@ -47,7 +47,7 @@ def _withdrawTokensFromVault(
     _amount: uint256,
     _recipient: address,
 ) -> (uint256, bool):
-    assert vaultData.isActivated # dev: not activated
+    assert vaultData.isActivated # dev: contract paused
     assert msg.sender in [addys._getTellerAddr(), addys._getAuctionHouseAddr(), addys._getCreditEngineAddr()] # dev: not allowed
 
     # validation
@@ -74,7 +74,7 @@ def _transferBalanceWithinVault(
     _toUser: address,
     _transferAmount: uint256,
 ) -> (uint256, bool):
-    assert vaultData.isActivated # dev: not activated
+    assert vaultData.isActivated # dev: contract paused
     assert msg.sender == addys._getAuctionHouseAddr() # dev: only AuctionHouse allowed
 
     # validation

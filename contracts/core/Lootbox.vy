@@ -139,6 +139,7 @@ def claimLootForUser(
     _a: addys.Addys = empty(addys.Addys),
 ) -> uint256:
     assert msg.sender == addys._getTellerAddr() # dev: only teller allowed
+    assert deptBasics.isActivated # dev: not activated
     a: addys.Addys = addys._getAddys(_a)
 
     # check if caller can claim for user
@@ -233,6 +234,7 @@ def updateDepositPoints(
     _a: addys.Addys = empty(addys.Addys),
 ):
     assert addys._isValidRipeHqAddr(msg.sender) # dev: no perms
+    assert deptBasics.isActivated # dev: contract paused
     a: addys.Addys = addys._getAddys(_a)
 
     # get latest global rewards
@@ -591,6 +593,7 @@ def _getAssetPrecision(_vaultId: uint256, _asset: address, _vaultBook: address) 
 @external
 def updateBorrowPoints(_user: address, _a: addys.Addys = empty(addys.Addys)):
     assert addys._isValidRipeHqAddr(msg.sender) # dev: no perms
+    assert deptBasics.isActivated # dev: contract paused
     a: addys.Addys = addys._getAddys(_a)
 
     globalRewards: RipeRewards = self._getLatestGlobalRipeRewards(a)
@@ -743,6 +746,7 @@ def getClaimableBorrowLoot(_user: address) -> uint256:
 @external
 def updateRipeRewards(_a: addys.Addys = empty(addys.Addys)):
     assert addys._isValidRipeHqAddr(msg.sender) # dev: no perms
+    assert deptBasics.isActivated # dev: contract paused
     a: addys.Addys = addys._getAddys(_a)
     ripeRewards: RipeRewards = self._getLatestGlobalRipeRewards(a)
     extcall Ledger(a.ledger).setRipeRewards(ripeRewards)
