@@ -1,6 +1,8 @@
 import pytest
 import boa
 
+from constants import ZERO_ADDRESS
+
 
 def test_ripe_hq_and_tokens_setup(
     ripe_hq,
