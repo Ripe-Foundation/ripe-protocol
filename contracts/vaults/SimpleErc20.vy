@@ -7,7 +7,7 @@ exports: vaultData.__interface__
 
 initializes: addys
 initializes: vaultData[addys := addys]
-initializes: basicVault[addys := addys, vaultData := vaultData]
+initializes: basicVault[vaultData := vaultData]
 
 from interfaces import Vault
 import contracts.modules.Addys as addys
@@ -53,6 +53,8 @@ def depositTokensInVault(
     _amount: uint256,
     _a: addys.Addys = empty(addys.Addys),
 ) -> uint256:
+    assert msg.sender == addys._getTellerAddr() # dev: only Teller allowed
+
     depositAmount: uint256 = basicVault._depositTokensInVault(_user, _asset, _amount)
     log SimpleErc20VaultDeposit(user=_user, asset=_asset, amount=depositAmount)
     return depositAmount
@@ -66,6 +68,8 @@ def withdrawTokensFromVault(
     _recipient: address,
     _a: addys.Addys = empty(addys.Addys),
 ) -> (uint256, bool):
+    assert msg.sender in [addys._getTellerAddr(), addys._getAuctionHouseAddr(), addys._getCreditEngineAddr()] # dev: not allowed
+
     withdrawalAmount: uint256 = 0
     isDepleted: bool = False
     withdrawalAmount, isDepleted = basicVault._withdrawTokensFromVault(_user, _asset, _amount, _recipient)
@@ -81,6 +85,8 @@ def transferBalanceWithinVault(
     _transferAmount: uint256,
     _a: addys.Addys = empty(addys.Addys),
 ) -> (uint256, bool):
+    assert msg.sender == addys._getAuctionHouseAddr() # dev: only AuctionHouse allowed
+
     transferAmount: uint256 = 0
     isFromUserDepleted: bool = False
     transferAmount, isFromUserDepleted = basicVault._transferBalanceWithinVault(_asset, _fromUser, _toUser, _transferAmount)

@@ -36,6 +36,11 @@ def governance():
     return boa.load("contracts/mock/MockGov.vy", name="mock_gov")
 
 
+@pytest.fixture(scope="session")
+def whale(env):
+    return env.generate_address("whale")
+
+
 ##########
 # Assets #
 ##########

@@ -85,9 +85,10 @@ MAX_HQ_TIME_LOCK: immutable(uint256)
 @deploy
 def __init__(
     _tokenName: String[25],
+    _ripeHq: address,
+    _initialGov: address,
     _minHqTimeLock: uint256,
     _maxHqTimeLock: uint256,
-    _initialGov: address,
     _initialSupply: uint256,
     _initialSupplyRecipient: address,
 ):
@@ -95,8 +96,16 @@ def __init__(
     MIN_HQ_TIME_LOCK = _minHqTimeLock
     MAX_HQ_TIME_LOCK = _maxHqTimeLock
 
-    assert _initialGov != empty(address) # dev: cannot be 0x0
-    self.tempGov = _initialGov
+    # set initial gov (green / ripe tokens)
+    if _initialGov != empty(address):
+        assert _ripeHq == empty(address) # dev: cannot set initial gov and ripe hq
+        self.tempGov = _initialGov
+
+    # set ripe hq
+    if _ripeHq != empty(address):
+        assert self._isValidNewRipeHq(_ripeHq, empty(address)) # dev: invalid ripe hq
+        assert _initialGov == empty(address) # dev: cannot set initial gov and ripe hq
+        self.ripeHq = _ripeHq
 
     # initial supply
     if _initialSupply == 0 or _initialSupplyRecipient in [empty(address), self]:
@@ -107,74 +116,99 @@ def __init__(
     log Transfer(sender=empty(address), recipient=_initialSupplyRecipient, amount=_initialSupply)
 
 
-########
-# Core #
-########
+#############
+# Transfers #
+#############
 
 
 @external
 def transfer(_recipient: address, _amount: uint256) -> bool:
-    assert _amount != 0 # dev: cannot transfer 0
-    assert _recipient not in [self, empty(address)] # dev: invalid recipient
-
-    assert not self.blacklisted[msg.sender] # dev: sender blacklisted
-    assert not self.blacklisted[_recipient] # dev: recipient blacklisted
-
-    self.balanceOf[msg.sender] -= _amount
-    self.balanceOf[_recipient] += _amount
-
-    log Transfer(sender=msg.sender, recipient=_recipient, amount=_amount)
+    self._transfer(msg.sender, _recipient, _amount)
     return True
 
 
 @external
 def transferFrom(_sender: address, _recipient: address, _amount: uint256) -> bool:
-    assert _amount != 0 # dev: cannot transfer 0
+    assert not self.blacklisted[msg.sender] # dev: spender blacklisted
+    self._spendAllowance(_sender, msg.sender, _amount)
+    self._transfer(_sender, _recipient, _amount)
+    return True
+
+
+@internal
+def _transfer(_sender: address, _recipient: address, _amount: uint256):
+    assert _amount != 0 # dev: cannot transfer 0 amount
     assert _recipient not in [self, empty(address)] # dev: invalid recipient
 
     assert not self.blacklisted[_sender] # dev: sender blacklisted
-    assert not self.blacklisted[msg.sender] # dev: spender blacklisted
     assert not self.blacklisted[_recipient] # dev: recipient blacklisted
 
-    self.balanceOf[_sender] -= _amount
-    self.balanceOf[_recipient] += _amount
-    self.allowance[_sender][msg.sender] -= _amount
+    senderBalance: uint256 = self.balanceOf[_sender]
+    assert senderBalance >= _amount # dev: insufficient funds
+    self.balanceOf[_sender] = unsafe_sub(senderBalance, _amount)
+    self.balanceOf[_recipient] = unsafe_add(self.balanceOf[_recipient], _amount)
 
     log Transfer(sender=_sender, recipient=_recipient, amount=_amount)
-    return True
+
+
+#############
+# Allowance #
+#############
+
+
+# approvals
 
 
 @external
 def approve(_spender: address, _amount: uint256) -> bool:
-    assert _spender != empty(address) # dev: invalid spender
-    assert self.allowance[msg.sender][_spender] == 0 or _amount == 0 # dev: invalid approve
-    self.allowance[msg.sender][_spender] = _amount
-    log Approval(owner=msg.sender, spender=_spender, amount=_amount)
+    self._approve(msg.sender, _spender, _amount)
+    return True
+
+
+@internal
+def _approve(_owner: address, _spender: address, _amount: uint256):
+    self.allowance[_owner][_spender] = _amount
+    log Approval(owner=_owner, spender=_spender, amount=_amount)
+
+
+@internal
+def _spendAllowance(_owner: address, _spender: address, _amount: uint256):
+    currentAllowance: uint256 = self.allowance[_owner][_spender]
+    if currentAllowance != max_value(uint256):
+        assert currentAllowance >= _amount # dev: insufficient allowance
+        self._approve(_owner, _spender, unsafe_sub(currentAllowance, _amount))
+
+
+# increase / decrease allowance
+
+
+@external
+def increaseAllowance(_spender: address, _amount: uint256) -> bool:
+    currentAllowance: uint256 = self.allowance[msg.sender][_spender]
+    newAllowance: uint256 = unsafe_add(currentAllowance, _amount)
+
+    # check for an overflow
+    if newAllowance < currentAllowance:
+        newAllowance = max_value(uint256)
+
+    if newAllowance != currentAllowance:
+        self._approve(msg.sender, _spender, newAllowance)
+
     return True
 
 
 @external
 def decreaseAllowance(_spender: address, _amount: uint256) -> bool:
-    assert _spender != empty(address) # dev: invalid spender
-
     currentAllowance: uint256 = self.allowance[msg.sender][_spender]
-    newAllowance: uint256 = currentAllowance - min(_amount, currentAllowance)
+    newAllowance: uint256 = unsafe_sub(currentAllowance, _amount)
 
-    self.allowance[msg.sender][_spender] = newAllowance
-    log Approval(owner=msg.sender, spender=_spender, amount=newAllowance)
-    return True
+    # check for an underflow
+    if currentAllowance < newAllowance:
+        newAllowance = 0
 
+    if newAllowance != currentAllowance:
+        self._approve(msg.sender, _spender, newAllowance)
 
-@external
-def increaseAllowance(_spender: address, _amount: uint256) -> bool:
-    assert _spender != empty(address) # dev: invalid spender
-    assert _amount != 0 # dev: cannot increase by 0
-
-    currentAllowance: uint256 = self.allowance[msg.sender][_spender]
-    newAllowance: uint256 = currentAllowance + min(_amount, max_value(uint256) - currentAllowance)
-
-    self.allowance[msg.sender][_spender] = newAllowance
-    log Approval(owner=msg.sender, spender=_spender, amount=newAllowance)
     return True
 
 
@@ -183,24 +217,34 @@ def increaseAllowance(_spender: address, _amount: uint256) -> bool:
 #####################
 
 
+# mint tokens
+
+
 @internal
 def _mint(_recipient: address, _amount: uint256) -> bool:
     assert _recipient not in [self, empty(address)] # dev: invalid recipient
     assert not self.blacklisted[_recipient] # dev: blacklisted
 
+    self.balanceOf[_recipient] = unsafe_add(self.balanceOf[_recipient], _amount)
     self.totalSupply += _amount
-    self.balanceOf[_recipient] += _amount
-
     log Transfer(sender=empty(address), recipient=_recipient, amount=_amount)
     return True
 
 
+# burn tokens
+
+
 @external
 def burn(_amount: uint256) -> bool:
-    self.balanceOf[msg.sender] -= _amount
-    self.totalSupply -= _amount
-    log Transfer(sender=msg.sender, recipient=empty(address), amount=_amount)
+    self._burn(msg.sender, _amount)
     return True
+
+
+@internal
+def _burn(_owner: address, _amount: uint256):
+    self.balanceOf[_owner] -= _amount
+    self.totalSupply = unsafe_sub(self.totalSupply, _amount)
+    log Transfer(sender=_owner, recipient=empty(address), amount=_amount)
 
 
 ###########
@@ -292,6 +336,17 @@ def setBlacklist(_addr: address, _shouldBlacklist: bool) -> bool:
     assert _addr not in [self, empty(address)] # dev: invalid blacklist recipient
     self.blacklisted[_addr] = _shouldBlacklist
     log BlacklistModified(addr=_addr, isBlacklisted=_shouldBlacklist)
+    return True
+
+
+@external
+def burnBlacklistTokens(_addr: address, _amount: uint256 = max_value(uint256)) -> bool:
+    assert msg.sender == staticcall RipeHq(self.ripeHq).governance() # dev: no perms
+    assert self.blacklisted[_addr] # dev: not blacklisted
+
+    amount: uint256 = min(_amount, self.balanceOf[_addr])
+    assert amount != 0 # dev: cannot burn 0 tokens
+    self._burn(_addr, amount)
     return True
 
 

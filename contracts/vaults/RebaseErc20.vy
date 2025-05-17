@@ -8,7 +8,7 @@ exports: sharesVault.__interface__
 
 initializes: addys
 initializes: vaultData[addys := addys]
-initializes: sharesVault[addys := addys, vaultData := vaultData]
+initializes: sharesVault[vaultData := vaultData]
 
 from interfaces import Vault
 import contracts.modules.Addys as addys
@@ -57,6 +57,8 @@ def depositTokensInVault(
     _amount: uint256,
     _a: addys.Addys = empty(addys.Addys),
 ) -> uint256:
+    assert msg.sender == addys._getTellerAddr() # dev: only Teller allowed
+
     depositAmount: uint256 = 0
     newShares: uint256 = 0
     depositAmount, newShares = sharesVault._depositTokensInVault(_user, _asset, _amount)
@@ -72,6 +74,8 @@ def withdrawTokensFromVault(
     _recipient: address,
     _a: addys.Addys = empty(addys.Addys),
 ) -> (uint256, bool):
+    assert msg.sender in [addys._getTellerAddr(), addys._getAuctionHouseAddr(), addys._getCreditEngineAddr()] # dev: not allowed
+
     withdrawalAmount: uint256 = 0
     withdrawalShares: uint256 = 0
     isDepleted: bool = False
@@ -88,6 +92,8 @@ def transferBalanceWithinVault(
     _transferAmount: uint256,
     _a: addys.Addys = empty(addys.Addys),
 ) -> (uint256, bool):
+    assert msg.sender == addys._getAuctionHouseAddr() # dev: only AuctionHouse allowed
+
     transferAmount: uint256 = 0
     transferShares: uint256 = 0
     isFromUserDepleted: bool = False

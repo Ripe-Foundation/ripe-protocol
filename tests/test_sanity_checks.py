@@ -1,7 +1,7 @@
 import pytest
 import boa
 
-from constants import ZERO_ADDRESS
+from constants import ZERO_ADDRESS, EIGHTEEN_DECIMALS, MAX_UINT256
 
 
 def test_ripe_hq_and_tokens_setup(
@@ -46,3 +46,34 @@ def test_ripe_hq_and_tokens_setup(
     assert chainlink.numAssets() == 3
     assert chainlink.governance() == ZERO_ADDRESS
 
+
+def test_savings_green(
+    green_token,
+    savings_green,
+    whale,
+    sally,
+):
+    # token
+    assert savings_green.asset() == green_token.address
+    assert savings_green.totalAssets() == 0
+
+    # deposit
+    amount = 1_000 * EIGHTEEN_DECIMALS
+    green_token.approve(savings_green, amount, sender=whale)
+    assert savings_green.deposit(amount, sender=whale) != 0
+
+    assert savings_green.totalAssets() == amount
+    assert green_token.balanceOf(savings_green) == amount
+    sgreen_bal = savings_green.balanceOf(whale)
+    assert sgreen_bal != 0
+
+    # transfer sgreen to sally
+    savings_green.transfer(sally, sgreen_bal, sender=whale)
+    assert savings_green.balanceOf(sally) == sgreen_bal
+    assert savings_green.balanceOf(whale) == 0
+
+    # withdraw
+    assert savings_green.redeem(MAX_UINT256, sender=sally) == amount
+    assert savings_green.balanceOf(sally) == 0
+    assert green_token.balanceOf(sally) == amount
+    assert green_token.balanceOf(savings_green) == 0

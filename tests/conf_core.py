@@ -2,7 +2,7 @@ import pytest
 import boa
 
 from config.BluePrint import PARAMS, ADDYS
-from constants import ZERO_ADDRESS
+from constants import ZERO_ADDRESS, EIGHTEEN_DECIMALS
 
 
 ###########
@@ -109,28 +109,45 @@ def ripe_hq(
 
 
 @pytest.fixture(scope="session")
-def green_token(deploy3r, fork):
+def green_token(deploy3r, fork, whale):
     return boa.load(
         "contracts/tokens/GreenToken.vy",
+        ZERO_ADDRESS,
         deploy3r,
         PARAMS[fork]["MIN_HQ_CHANGE_TIMELOCK"],
         PARAMS[fork]["MAX_HQ_CHANGE_TIMELOCK"],
-        0,
-        ZERO_ADDRESS,
+        1_000_000 * EIGHTEEN_DECIMALS,
+        whale,
         name="green_token",
     )
 
 
 @pytest.fixture(scope="session")
-def ripe_token(deploy3r, fork):
+def ripe_token(deploy3r, fork, whale):
     return boa.load(
         "contracts/tokens/RipeToken.vy",
+        ZERO_ADDRESS,
         deploy3r,
+        PARAMS[fork]["MIN_HQ_CHANGE_TIMELOCK"],
+        PARAMS[fork]["MAX_HQ_CHANGE_TIMELOCK"],
+        1_000_000 * EIGHTEEN_DECIMALS,
+        whale,
+        name="ripe_token",
+    )
+
+
+@pytest.fixture(scope="session")
+def savings_green(fork, green_token, ripe_hq_deploy):
+    return boa.load(
+        "contracts/tokens/SavingsGreen.vy",
+        green_token,
+        ripe_hq_deploy,
+        ZERO_ADDRESS,
         PARAMS[fork]["MIN_HQ_CHANGE_TIMELOCK"],
         PARAMS[fork]["MAX_HQ_CHANGE_TIMELOCK"],
         0,
         ZERO_ADDRESS,
-        name="ripe_token",
+        name="savings_green",
     )
 
 

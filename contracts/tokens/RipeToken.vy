@@ -19,18 +19,19 @@ DECIMALS: constant(uint8) = 18
 
 @deploy
 def __init__(
+    _ripeHq: address,
     _initialGov: address,
     _minHqTimeLock: uint256,
     _maxHqTimeLock: uint256,
     _initialSupply: uint256,
     _initialSupplyRecipient: address,
 ):
-    token.__init__(NAME, _minHqTimeLock, _maxHqTimeLock, _initialGov, _initialSupply, _initialSupplyRecipient)
+    token.__init__(NAME, _ripeHq, _initialGov, _minHqTimeLock, _maxHqTimeLock, _initialSupply, _initialSupplyRecipient)
 
 
-##########
-# Basics #
-##########
+##############
+# Token Info #
+##############
 
 
 @pure

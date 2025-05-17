@@ -57,9 +57,12 @@ def depositTokensInVault(
     _amount: uint256,
     _a: addys.Addys = empty(addys.Addys),
 ) -> uint256:
+    assert msg.sender == addys._getTellerAddr() # dev: only Teller allowed
+    a: addys.Addys = addys._getAddys(_a)
+
     depositAmount: uint256 = 0
     newShares: uint256 = 0
-    depositAmount, newShares = stabVault._depositTokensInVault(_user, _asset, _amount, addys._getAddys(_a))
+    depositAmount, newShares = stabVault._depositTokensInVault(_user, _asset, _amount, a.priceDesk)
     log StabilityPoolDeposit(user=_user, asset=_asset, amount=depositAmount, shares=newShares)
     return depositAmount
 
@@ -72,10 +75,13 @@ def withdrawTokensFromVault(
     _recipient: address,
     _a: addys.Addys = empty(addys.Addys),
 ) -> (uint256, bool):
+    assert msg.sender in [addys._getTellerAddr(), addys._getAuctionHouseAddr(), addys._getCreditEngineAddr()] # dev: not allowed
+    a: addys.Addys = addys._getAddys(_a)
+
     withdrawalAmount: uint256 = 0
     withdrawalShares: uint256 = 0
     isDepleted: bool = False
-    withdrawalAmount, withdrawalShares, isDepleted = stabVault._withdrawTokensFromVault(_user, _asset, _amount, _recipient, addys._getAddys(_a))
+    withdrawalAmount, withdrawalShares, isDepleted = stabVault._withdrawTokensFromVault(_user, _asset, _amount, _recipient, a.priceDesk)
     log StabilityPoolWithdrawal(user=_user, asset=_asset, amount=withdrawalAmount, isDepleted=isDepleted, shares=withdrawalShares)
     return withdrawalAmount, isDepleted
 
@@ -88,10 +94,13 @@ def transferBalanceWithinVault(
     _transferAmount: uint256,
     _a: addys.Addys = empty(addys.Addys),
 ) -> (uint256, bool):
+    assert msg.sender == addys._getAuctionHouseAddr() # dev: only AuctionHouse allowed
+    a: addys.Addys = addys._getAddys(_a)
+
     transferAmount: uint256 = 0
     transferShares: uint256 = 0
     isFromUserDepleted: bool = False
-    transferAmount, transferShares, isFromUserDepleted = stabVault._transferBalanceWithinVault(_asset, _fromUser, _toUser, _transferAmount, addys._getAddys(_a))
+    transferAmount, transferShares, isFromUserDepleted = stabVault._transferBalanceWithinVault(_asset, _fromUser, _toUser, _transferAmount, a.priceDesk)
     log StabilityPoolTransfer(fromUser=_fromUser, toUser=_toUser, asset=_asset, transferAmount=transferAmount, isFromUserDepleted=isFromUserDepleted, transferShares=transferShares)
     return transferAmount, isFromUserDepleted
 

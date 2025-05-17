@@ -1,10 +1,7 @@
 # @version 0.4.1
 
 uses: vaultData
-uses: addys
-
 import contracts.modules.VaultData as vaultData
-import contracts.modules.Addys as addys
 
 from interfaces import Vault
 from ethereum.ercs import IERC20
@@ -29,7 +26,6 @@ def _depositTokensInVault(
     _amount: uint256,
 ) -> (uint256, uint256):
     assert vaultData.isActivated # dev: contract paused
-    assert msg.sender == addys._getTellerAddr() # dev: only Teller allowed
 
     # validation
     assert empty(address) not in [_user, _asset] # dev: invalid user or asset
@@ -39,7 +35,7 @@ def _depositTokensInVault(
 
     # calc shares
     prevTotalBalance: uint256 = totalAssetBalance - depositAmount # remove the deposited amount to calc shares accurately
-    newShares: uint256 = self._amountToShares(_asset, depositAmount, vaultData.totalBalances[_asset], prevTotalBalance, False)
+    newShares: uint256 = self._amountToShares(depositAmount, vaultData.totalBalances[_asset], prevTotalBalance, False)
 
     # add balance on deposit
     vaultData._addBalanceOnDeposit(_user, _asset, newShares, True)
@@ -55,7 +51,6 @@ def _withdrawTokensFromVault(
     _recipient: address,
 ) -> (uint256, uint256, bool):
     assert vaultData.isActivated # dev: contract paused
-    assert msg.sender in [addys._getTellerAddr(), addys._getAuctionHouseAddr(), addys._getCreditEngineAddr()] # dev: not allowed
     assert empty(address) not in [_user, _asset, _recipient] # dev: invalid user, asset, or recipient
 
     # calc shares + amount to withdraw
@@ -80,7 +75,6 @@ def _transferBalanceWithinVault(
     _transferAmount: uint256,
 ) -> (uint256, uint256, bool):
     assert vaultData.isActivated # dev: contract paused
-    assert msg.sender == addys._getAuctionHouseAddr() # dev: only AuctionHouse allowed
     assert empty(address) not in [_fromUser, _toUser, _asset] # dev: invalid users or asset
 
     # calc shares + amount to transfer
@@ -131,7 +125,7 @@ def _getUserAssetAndAmountAtIndex(_user: address, _index: uint256) -> (address, 
     userShares: uint256 = vaultData.userBalances[_user][asset]
     if userShares == 0:
         return empty(address), 0
-    return asset, self._sharesToAmount(asset, userShares, vaultData.totalBalances[asset], staticcall IERC20(asset).balanceOf(self), False)
+    return asset, self._sharesToAmount(userShares, vaultData.totalBalances[asset], staticcall IERC20(asset).balanceOf(self), False)
 
 
 @view
@@ -159,7 +153,7 @@ def _getTotalAmountForUser(_user: address, _asset: address) -> uint256:
 @internal
 def _getTotalAmountForUserWithTotalBal(_user: address, _asset: address, _totalBalance: uint256) -> uint256:
     userShares: uint256 = vaultData.userBalances[_user][_asset]
-    return self._sharesToAmount(_asset, userShares, vaultData.totalBalances[_asset], _totalBalance, False)
+    return self._sharesToAmount(userShares, vaultData.totalBalances[_asset], _totalBalance, False)
 
 
 @view
@@ -190,9 +184,9 @@ def _calcWithdrawalSharesAndAmount(
     assert withdrawalShares != 0 # dev: user has no shares
 
     # calc amount + shares to withdraw
-    withdrawalAmount: uint256 = min(totalBalance, self._sharesToAmount(_asset, withdrawalShares, totalShares, totalBalance, False))
+    withdrawalAmount: uint256 = min(totalBalance, self._sharesToAmount(withdrawalShares, totalShares, totalBalance, False))
     if _amount < withdrawalAmount:
-        withdrawalShares = min(withdrawalShares, self._amountToShares(_asset, _amount, totalShares, totalBalance, True))
+        withdrawalShares = min(withdrawalShares, self._amountToShares(_amount, totalShares, totalBalance, True))
         withdrawalAmount = _amount
 
     assert withdrawalAmount != 0 # dev: no withdrawal amount
@@ -207,13 +201,12 @@ def _calcWithdrawalSharesAndAmount(
 def amountToShares(_asset: address, _amount: uint256, _shouldRoundUp: bool) -> uint256:
     totalShares: uint256 = vaultData.totalBalances[_asset]
     totalBalance: uint256 = staticcall IERC20(_asset).balanceOf(self)
-    return self._amountToShares(_asset, _amount, totalShares, totalBalance, _shouldRoundUp)
+    return self._amountToShares(_amount, totalShares, totalBalance, _shouldRoundUp)
 
 
 @view
 @internal
 def _amountToShares(
-    _asset: address,
     _amount: uint256,
     _totalShares: uint256,
     _totalBalance: uint256,
@@ -244,13 +237,12 @@ def _amountToShares(
 def sharesToAmount(_asset: address, _shares: uint256, _shouldRoundUp: bool) -> uint256:
     totalShares: uint256 = vaultData.totalBalances[_asset]
     totalBalance: uint256 = staticcall IERC20(_asset).balanceOf(self)
-    return self._sharesToAmount(_asset, _shares, totalShares, totalBalance, _shouldRoundUp)
+    return self._sharesToAmount(_shares, totalShares, totalBalance, _shouldRoundUp)
 
 
 @view
 @internal
 def _sharesToAmount(
-    _asset: address,
     _shares: uint256,
     _totalShares: uint256,
     _totalBalance: uint256,

@@ -63,11 +63,9 @@ def _depositTokensInVault(
     _user: address,
     _asset: address,
     _amount: uint256,
-    _a: addys.Addys,
+    _priceDesk: address,
 ) -> (uint256, uint256):
     assert vaultData.isActivated # dev: contract paused
-    assert msg.sender == addys._getTellerAddr() # dev: only Teller allowed
-    a: addys.Addys = addys._getAddys(_a)
 
     # validation
     assert empty(address) not in [_user, _asset] # dev: invalid user or asset
@@ -76,7 +74,7 @@ def _depositTokensInVault(
     assert depositAmount != 0 # dev: invalid deposit amount
 
     # calc usd values
-    totalStabValue: uint256 = staticcall PriceDesk(a.priceDesk).getUsdValue(_asset, totalAssetBalance, True)
+    totalStabValue: uint256 = staticcall PriceDesk(_priceDesk).getUsdValue(_asset, totalAssetBalance, True)
     assert totalStabValue != 0 # dev: no price for stab asset
 
     newUserValue: uint256 = totalStabValue
@@ -86,8 +84,8 @@ def _depositTokensInVault(
         prevStabValue = (totalAssetBalance - depositAmount) * totalStabValue // totalAssetBalance # remove the deposited amount to calc shares accurately
 
     # calc shares
-    claimableValue: uint256 = self._getValueOfClaimableAssets(_asset, a.priceDesk)
-    newShares: uint256 = self._valueToShares(_asset, newUserValue, vaultData.totalBalances[_asset], prevStabValue + claimableValue, False)
+    claimableValue: uint256 = self._getValueOfClaimableAssets(_asset, _priceDesk)
+    newShares: uint256 = self._valueToShares(newUserValue, vaultData.totalBalances[_asset], prevStabValue + claimableValue, False)
 
     # add balance on deposit
     vaultData._addBalanceOnDeposit(_user, _asset, newShares, True)
@@ -101,17 +99,15 @@ def _withdrawTokensFromVault(
     _asset: address,
     _amount: uint256,
     _recipient: address,
-    _a: addys.Addys,
+    _priceDesk: address,
 ) -> (uint256, uint256, bool):
     assert vaultData.isActivated # dev: contract paused
-    assert msg.sender in [addys._getTellerAddr(), addys._getAuctionHouseAddr(), addys._getCreditEngineAddr()] # dev: not allowed
     assert empty(address) not in [_user, _asset, _recipient] # dev: invalid user, asset, or recipient
 
     # calc shares + amount to withdraw
-    a: addys.Addys = addys._getAddys(_a)
     withdrawalShares: uint256 = 0
     withdrawalAmount: uint256 = 0
-    withdrawalShares, withdrawalAmount = self._calcWithdrawalSharesAndAmount(_user, _asset, _amount, a.priceDesk)
+    withdrawalShares, withdrawalAmount = self._calcWithdrawalSharesAndAmount(_user, _asset, _amount, _priceDesk)
 
     # reduce balance on withdrawal
     isDepleted: bool = False
@@ -127,17 +123,15 @@ def _transferBalanceWithinVault(
     _fromUser: address,
     _toUser: address,
     _transferAmount: uint256,
-    _a: addys.Addys,
+    _priceDesk: address,
 ) -> (uint256, uint256, bool):
     assert vaultData.isActivated # dev: contract paused
-    assert msg.sender == addys._getAuctionHouseAddr() # dev: only AuctionHouse allowed
     assert empty(address) not in [_fromUser, _toUser, _asset] # dev: invalid users or asset
 
     # calc shares + amount to transfer
-    a: addys.Addys = addys._getAddys(_a)
     transferShares: uint256 = 0
     transferAmount: uint256 = 0
-    transferShares, transferAmount = self._calcWithdrawalSharesAndAmount(_fromUser, _asset, _transferAmount, a.priceDesk)
+    transferShares, transferAmount = self._calcWithdrawalSharesAndAmount(_fromUser, _asset, _transferAmount, _priceDesk)
 
     # transfer shares
     isFromUserDepleted: bool = False
@@ -257,7 +251,7 @@ def _calcWithdrawalSharesAndAmount(
     totalValue: uint256 = totalStabValue + claimableValue
 
     # max withdraw usd value
-    maxWithdrawUsdValue: uint256 = self._sharesToValue(_asset, withdrawalShares, totalShares, totalValue, False)
+    maxWithdrawUsdValue: uint256 = self._sharesToValue(withdrawalShares, totalShares, totalValue, False)
     maxWithdrawStabAmount: uint256 = maxWithdrawUsdValue * totalStabAssetBalance // totalStabValue
     assert maxWithdrawStabAmount != 0 # dev: max withdraw stab amount is 0
 
@@ -271,7 +265,7 @@ def _calcWithdrawalSharesAndAmount(
     assert withdrawalAmount != 0 # dev: no withdrawal amount
 
     withdrawalUsdValue: uint256 = withdrawalAmount * totalStabValue // totalStabAssetBalance
-    withdrawalShares = min(withdrawalShares, self._valueToShares(_asset, withdrawalUsdValue, totalShares, totalValue, True))
+    withdrawalShares = min(withdrawalShares, self._valueToShares(withdrawalUsdValue, totalShares, totalValue, True))
     return withdrawalShares, withdrawalAmount
 
 
@@ -282,13 +276,12 @@ def _calcWithdrawalSharesAndAmount(
 @external
 def valueToShares(_asset: address, _usdValue: uint256, _shouldRoundUp: bool) -> uint256:
     totalValue: uint256 = self._getTotalValue(_asset)
-    return self._valueToShares(_asset, _usdValue, vaultData.totalBalances[_asset], totalValue, _shouldRoundUp)
+    return self._valueToShares(_usdValue, vaultData.totalBalances[_asset], totalValue, _shouldRoundUp)
 
 
 @view
 @internal
 def _valueToShares(
-    _asset: address,
     _usdValue: uint256,
     _totalShares: uint256,
     _totalUsdValue: uint256,
@@ -318,13 +311,12 @@ def _valueToShares(
 @external
 def sharesToValue(_asset: address, _shares: uint256, _shouldRoundUp: bool) -> uint256:
     totalValue: uint256 = self._getTotalValue(_asset)
-    return self._sharesToValue(_asset, _shares, vaultData.totalBalances[_asset], totalValue, _shouldRoundUp)
+    return self._sharesToValue(_shares, vaultData.totalBalances[_asset], totalValue, _shouldRoundUp)
 
 
 @view
 @internal
 def _sharesToValue(
-    _asset: address,
     _shares: uint256,
     _totalShares: uint256,
     _totalUsdValue: uint256,
@@ -396,7 +388,7 @@ def getTotalValue(_asset: address) -> uint256:
 @external
 def getTotalUserValue(_user: address, _asset: address) -> uint256:
     totalValue: uint256 = self._getTotalValue(_asset)
-    return self._sharesToValue(_asset, vaultData.userBalances[_user][_asset], vaultData.totalBalances[_asset], totalValue, False)
+    return self._sharesToValue(vaultData.userBalances[_user][_asset], vaultData.totalBalances[_asset], totalValue, False)
 
 
 @view
@@ -534,7 +526,7 @@ def _calcClaimSharesAndAmount(
     totalValue: uint256 = self._getTotalValue(_stabAsset)
 
     # max claim values for user
-    maxClaimUsdValue: uint256 = self._sharesToValue(_stabAsset, maxUserShares, totalShares, totalValue, False)
+    maxClaimUsdValue: uint256 = self._sharesToValue(maxUserShares, totalShares, totalValue, False)
     maxClaimAmount: uint256 = staticcall PriceDesk(_priceDesk).getAssetAmount(_claimAsset, maxClaimUsdValue, True)
     if maxClaimAmount == 0:
         return 0, 0, 0 # not getting price for claim asset
@@ -550,7 +542,7 @@ def _calcClaimSharesAndAmount(
 
     # finalize values
     claimUsdValue: uint256 = claimAmount * maxClaimUsdValue // maxClaimAmount
-    claimShares: uint256 = min(maxUserShares, self._valueToShares(_stabAsset, claimUsdValue, totalShares, totalValue, True))
+    claimShares: uint256 = min(maxUserShares, self._valueToShares(claimUsdValue, totalShares, totalValue, True))
     return claimShares, claimAmount, claimUsdValue
 
 

@@ -1,10 +1,7 @@
 # @version 0.4.1
 
 uses: vaultData
-uses: addys
-
 import contracts.modules.VaultData as vaultData
-import contracts.modules.Addys as addys
 
 from interfaces import Vault
 from ethereum.ercs import IERC20
@@ -27,7 +24,6 @@ def _depositTokensInVault(
     _amount: uint256,
 ) -> uint256:
     assert vaultData.isActivated # dev: contract paused
-    assert msg.sender == addys._getTellerAddr() # dev: only Teller allowed
 
     # validation
     assert empty(address) not in [_user, _asset] # dev: invalid user or asset
@@ -48,7 +44,6 @@ def _withdrawTokensFromVault(
     _recipient: address,
 ) -> (uint256, bool):
     assert vaultData.isActivated # dev: contract paused
-    assert msg.sender in [addys._getTellerAddr(), addys._getAuctionHouseAddr(), addys._getCreditEngineAddr()] # dev: not allowed
 
     # validation
     assert empty(address) not in [_user, _asset, _recipient] # dev: invalid user, asset, or recipient
@@ -75,7 +70,6 @@ def _transferBalanceWithinVault(
     _transferAmount: uint256,
 ) -> (uint256, bool):
     assert vaultData.isActivated # dev: contract paused
-    assert msg.sender == addys._getAuctionHouseAddr() # dev: only AuctionHouse allowed
 
     # validation
     assert empty(address) not in [_fromUser, _toUser, _asset] # dev: invalid users or asset
