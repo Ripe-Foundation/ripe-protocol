@@ -43,7 +43,8 @@ claimableAssets: public(HashMap[address, HashMap[uint256, address]]) # stab asse
 indexOfClaimableAsset: public(HashMap[address, HashMap[address, uint256]]) # stab asset -> claimable asset -> index
 numClaimableAssets: public(HashMap[address, uint256]) # stab asset -> num claimable assets
 
-MAX_ACTIONS: constant(uint256) = 20
+MAX_STAB_CLAIMS: constant(uint256) = 15
+MAX_STAB_REDEMPTIONS: constant(uint256) = 15
 DECIMAL_OFFSET: constant(uint256) = 10 ** 8
 
 
@@ -438,10 +439,23 @@ def _getValueOfClaimableAssets(_stabAsset: address, _priceDesk: address) -> uint
 
 
 @external
+def claimFromStabilityPool(
+    _claimer: address,
+    _stabAsset: address,
+    _claimAsset: address,
+    _maxUsdValue: uint256,
+    _a: addys.Addys = empty(addys.Addys),
+) -> uint256:
+    assert msg.sender == addys._getTellerAddr() # dev: only Teller allowed
+    assert vaultData.isActivated # dev: contract paused
+    a: addys.Addys = addys._getAddys(_a)
+    return self._claimFromStabilityPool(_claimer, _stabAsset, _claimAsset, _maxUsdValue, a.priceDesk)
+
+
+@external
 def claimManyFromStabilityPool(
-    _user: address,
-    _claims: DynArray[StabPoolClaim, MAX_ACTIONS],
-    _recipient: address,
+    _claimer: address,
+    _claims: DynArray[StabPoolClaim, MAX_STAB_CLAIMS],
     _a: addys.Addys = empty(addys.Addys),
 ) -> uint256:
     assert msg.sender == addys._getTellerAddr() # dev: only Teller allowed
@@ -450,35 +464,19 @@ def claimManyFromStabilityPool(
 
     totalUsdValue: uint256 = 0
     for c: StabPoolClaim in _claims:
-        totalUsdValue += self._claimFromStabilityPool(_user, c.stabAsset, c.claimAsset, c.maxUsdValue, _recipient, a.priceDesk)
+        totalUsdValue += self._claimFromStabilityPool(_claimer, c.stabAsset, c.claimAsset, c.maxUsdValue, a.priceDesk)
     return totalUsdValue
-
-
-@external
-def claimFromStabilityPool(
-    _user: address,
-    _stabAsset: address,
-    _claimAsset: address,
-    _maxUsdValue: uint256,
-    _recipient: address,
-    _a: addys.Addys = empty(addys.Addys),
-) -> uint256:
-    assert msg.sender == addys._getTellerAddr() # dev: only Teller allowed
-    assert vaultData.isActivated # dev: contract paused
-    a: addys.Addys = addys._getAddys(_a)
-    return self._claimFromStabilityPool(_user, _stabAsset, _claimAsset, _maxUsdValue, _recipient, a.priceDesk)
 
 
 @internal
 def _claimFromStabilityPool(
-    _user: address,
+    _claimer: address,
     _stabAsset: address,
     _claimAsset: address,
     _maxUsdValue: uint256,
-    _recipient: address,
     _priceDesk: address,
 ) -> uint256:
-    if empty(address) in [_user, _stabAsset, _claimAsset, _recipient] or _maxUsdValue == 0:
+    if empty(address) in [_claimer, _stabAsset, _claimAsset] or _maxUsdValue == 0:
         return 0
 
     # max claimable asset
@@ -490,28 +488,28 @@ def _claimFromStabilityPool(
     claimShares: uint256 = 0
     claimAmount: uint256 = 0
     claimUsdValue: uint256 = 0
-    claimShares, claimAmount, claimUsdValue = self._calcClaimSharesAndAmount(_user, _stabAsset, _claimAsset, _maxUsdValue, maxClaimableAsset, _priceDesk)
+    claimShares, claimAmount, claimUsdValue = self._calcClaimSharesAndAmount(_claimer, _stabAsset, _claimAsset, _maxUsdValue, maxClaimableAsset, _priceDesk)
     if claimShares == 0:
         return 0
 
     # reduce balance on withdrawal
     isDepleted: bool = False
-    claimShares, isDepleted = vaultData._reduceBalanceOnWithdrawal(_user, _stabAsset, claimShares, True)
+    claimShares, isDepleted = vaultData._reduceBalanceOnWithdrawal(_claimer, _stabAsset, claimShares, True)
 
     # reduce claimable balances
     self._reduceClaimableBalances(_stabAsset, _claimAsset, claimAmount, maxClaimableAsset)
 
     # move tokens to recipient
-    assert extcall IERC20(_claimAsset).transfer(_recipient, claimAmount, default_return_value=True) # dev: token transfer failed
+    assert extcall IERC20(_claimAsset).transfer(_claimer, claimAmount, default_return_value=True) # dev: token transfer failed
 
-    log AssetClaimedInStabilityPool(user=_user, stabAsset=_stabAsset, claimAsset=_claimAsset, claimAmount=claimAmount, claimUsdValue=claimUsdValue, claimShares=claimShares, isDepleted=isDepleted)
+    log AssetClaimedInStabilityPool(user=_claimer, stabAsset=_stabAsset, claimAsset=_claimAsset, claimAmount=claimAmount, claimUsdValue=claimUsdValue, claimShares=claimShares, isDepleted=isDepleted)
     return claimUsdValue
 
 
 @view
 @internal
 def _calcClaimSharesAndAmount(
-    _user: address,
+    _claimer: address,
     _stabAsset: address,
     _claimAsset: address,
     _maxUsdValue: uint256,
@@ -527,7 +525,7 @@ def _calcClaimSharesAndAmount(
         return 0, 0, 0 # no claimable asset
 
     # user shares
-    maxUserShares: uint256 = vaultData.userBalances[_user][_stabAsset]
+    maxUserShares: uint256 = vaultData.userBalances[_claimer][_stabAsset]
     if maxUserShares == 0:
         return 0, 0, 0 # no user shares
 
@@ -562,10 +560,37 @@ def _calcClaimSharesAndAmount(
 
 
 @external
-def redeemManyFromStabilityPool(
-    _redeemer: address,
+def redeemFromStabilityPool(
+    _claimAsset: address,
     _greenAmount: uint256,
-    _redemptions: DynArray[StabPoolRedemption, MAX_ACTIONS],
+    _redeemer: address,
+    _shouldStakeRefund: bool,
+    _a: addys.Addys = empty(addys.Addys),
+) -> uint256:
+    assert msg.sender == addys._getTellerAddr() # dev: only Teller allowed
+    assert vaultData.isActivated # dev: contract paused
+    a: addys.Addys = addys._getAddys(_a)
+    assert self._canRedeemInThisVault(a.greenToken) # dev: redemptions not allowed
+
+    greenAmount: uint256 = min(_greenAmount, staticcall IERC20(a.greenToken).balanceOf(self))
+    assert greenAmount != 0 # dev: no green to redeem
+    greenSpent: uint256 = self._redeemFromStabilityPool(_redeemer, _claimAsset, max_value(uint256), greenAmount, a.greenToken, a.priceDesk)
+
+    # transfer leftover green back to redeemer
+    if greenAmount > greenSpent:
+        assert extcall IERC20(a.greenToken).transfer(_redeemer, greenAmount - greenSpent, default_return_value=True) # dev: green transfer failed
+
+        # TODO: handle refund staking --> `_shouldStakeRefund`
+
+    return greenSpent
+
+
+@external
+def redeemManyFromStabilityPool(
+    _redemptions: DynArray[StabPoolRedemption, MAX_STAB_REDEMPTIONS],
+    _greenAmount: uint256,
+    _redeemer: address,
+    _shouldStakeRefund: bool,
     _a: addys.Addys = empty(addys.Addys),
 ) -> uint256:
     assert msg.sender == addys._getTellerAddr() # dev: only Teller allowed
@@ -588,30 +613,9 @@ def redeemManyFromStabilityPool(
     if totalGreenRemaining != 0:
         assert extcall IERC20(a.greenToken).transfer(_redeemer, totalGreenRemaining, default_return_value=True) # dev: green transfer failed
 
+        # TODO: handle refund staking --> `_shouldStakeRefund`
+
     return totalGreenSpent
-
-
-@external
-def redeemFromStabilityPool(
-    _redeemer: address,
-    _greenAmount: uint256,
-    _claimAsset: address,
-    _a: addys.Addys = empty(addys.Addys),
-) -> uint256:
-    assert msg.sender == addys._getTellerAddr() # dev: only Teller allowed
-    assert vaultData.isActivated # dev: contract paused
-    a: addys.Addys = addys._getAddys(_a)
-    assert self._canRedeemInThisVault(a.greenToken) # dev: redemptions not allowed
-
-    greenAmount: uint256 = min(_greenAmount, staticcall IERC20(a.greenToken).balanceOf(self))
-    assert greenAmount != 0 # dev: no green to redeem
-    greenSpent: uint256 = self._redeemFromStabilityPool(_redeemer, _claimAsset, max_value(uint256), greenAmount, a.greenToken, a.priceDesk)
-
-    # transfer leftover green back to redeemer
-    if greenAmount > greenSpent:
-        assert extcall IERC20(a.greenToken).transfer(_redeemer, greenAmount - greenSpent, default_return_value=True) # dev: green transfer failed
-
-    return greenSpent
 
 
 @view

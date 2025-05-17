@@ -262,7 +262,7 @@ def test_stability_pool_swap_for_liq_collateral(
     _test(stability_pool.userBalances(sally, alpha_token), stability_pool.userBalances(bob, alpha_token))
 
     # claim assets
-    stability_pool.claimFromStabilityPool(sally, alpha_token, bravo_token, MAX_UINT256, sally, sender=teller.address)
+    stability_pool.claimFromStabilityPool(sally, alpha_token, bravo_token, MAX_UINT256, sender=teller.address)
     assert bravo_token.balanceOf(sally) == liq_amount
 
     # test value

@@ -227,6 +227,6 @@ def getDepositPointsAllocs(_vaultId: uint256, _asset: address) -> DepositPointsA
 
 @view
 @external
-def canOthersClaimLootForUser(_user: address) -> bool:
+def canCallerClaimLootForUser(_user: address, _caller: address) -> bool:
     # TODO: implement
     return False

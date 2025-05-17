@@ -121,7 +121,7 @@ event NewBorrow:
 
 event RepayDebt:
     user: indexed(address)
-    repayAmount: uint256
+    repayValue: uint256
     repayType: RepayType
     refundAmount: uint256
     didStakeRefund: bool
@@ -134,7 +134,7 @@ ONE_YEAR: constant(uint256) = 60 * 60 * 24 * 365
 HUNDRED_PERCENT: constant(uint256) = 100_00 # 100.00%
 ONE_PERCENT: constant(uint256) = 1_00 # 1.00%
 MAX_DEBT_UPDATES: constant(uint256) = 25
-MAX_REDEMPTIONS: constant(uint256) = 20
+MAX_COLLATERAL_REDEMPTIONS: constant(uint256) = 20
 
 
 @deploy
@@ -151,16 +151,20 @@ def __init__(_ripeHq: address):
 @external
 def borrowForUser(
     _user: address,
-    _amount: uint256,
+    _greenAmount: uint256,
     _shouldStake: bool,
     _caller: address,
     _a: addys.Addys = empty(addys.Addys),
 ) -> uint256:
     assert msg.sender == addys._getTellerAddr() # dev: only teller allowed
     assert deptBasics.isActivated # dev: contract paused
+    a: addys.Addys = addys._getAddys(_a)
+
+    # nothing to do here
+    if _user == empty(address):
+        return 0
 
     # get borrow data
-    a: addys.Addys = addys._getAddys(_a)
     d: BorrowDataBundle = staticcall Ledger(a.ledger).getBorrowDataBundle(_user)
 
     # get latest user debt
@@ -174,7 +178,7 @@ def borrowForUser(
     # validation
     newBorrowAmount: uint256 = 0
     isFreshInterval: bool = False
-    newBorrowAmount, isFreshInterval = self._validateOnBorrow(_user, _caller, _amount, userDebt, bt.totalMaxDebt, d.userBorrowInterval, d.isUserBorrower, d.numBorrowers, d.totalDebt, a.controlRoom)
+    newBorrowAmount, isFreshInterval = self._validateOnBorrow(_user, _caller, _greenAmount, userDebt, bt.totalMaxDebt, d.userBorrowInterval, d.isUserBorrower, d.numBorrowers, d.totalDebt, a.controlRoom)
     assert newBorrowAmount != 0 # dev: cannot borrow
 
     # update borrow interval
@@ -223,7 +227,7 @@ def borrowForUser(
 def _validateOnBorrow(
     _user: address,
     _caller: address,
-    _amount: uint256,
+    _greenAmount: uint256,
     _userDebt: UserDebt,
     _maxUserDebt: uint256,
     _userBorrowInterval: IntervalBorrow,
@@ -233,7 +237,7 @@ def _validateOnBorrow(
     _controlRoom: address,
 ) -> (uint256, bool):
     assert not _userDebt.inLiquidation # dev: cannot borrow in liquidation
-    assert _amount != 0 # dev: cannot borrow 0 amount
+    assert _greenAmount != 0 # dev: cannot borrow 0 amount
 
     # get borrow config
     config: BorrowConfig = staticcall ControlRoom(_controlRoom).getBorrowConfig(_user, _caller)
@@ -246,7 +250,7 @@ def _validateOnBorrow(
         assert numAvailBorrowers != 0 # dev: max num borrowers reached
 
     # main var
-    newBorrowAmount: uint256 = _amount
+    newBorrowAmount: uint256 = _greenAmount
 
     # avail debt based on collateral value / ltv
     availDebtPerLtv: uint256 = self._getAvailBasedOnLtv(_userDebt.amount, _maxUserDebt)
@@ -350,7 +354,7 @@ def getMaxBorrowAmount(_user: address) -> uint256:
 @external
 def repayForUser(
     _user: address,
-    _amount: uint256,
+    _greenAmount: uint256,
     _shouldStakeRefund: bool,
     _caller: address,
     _a: addys.Addys = empty(addys.Addys),
@@ -368,7 +372,7 @@ def repayForUser(
     # validation
     repayAmount: uint256 = 0
     refundAmount: uint256 = 0
-    repayAmount, refundAmount = self._validateOnRepay(_user, _caller, _amount, userDebt.amount, a.controlRoom, a.greenToken)
+    repayAmount, refundAmount = self._validateOnRepay(_user, _caller, _greenAmount, userDebt.amount, a.controlRoom, a.greenToken)
     assert repayAmount != 0 # dev: cannot repay with 0 green
 
     return self._repayDebt(_user, userDebt, d.numUserVaults, repayAmount, refundAmount, newInterest, True, _shouldStakeRefund, RepayType.STANDARD, a)
@@ -381,21 +385,22 @@ def repayForUser(
 def repayDuringLiquidation(
     _liqUser: address,
     _userDebt: UserDebt,
-    _repayAmount: uint256,
+    _repayValue: uint256,
     _newInterest: uint256,
     _a: addys.Addys = empty(addys.Addys),
 ) -> bool:
     assert msg.sender == addys._getAuctionHouseAddr() # dev: only auction house allowed
     assert deptBasics.isActivated # dev: contract paused
     a: addys.Addys = addys._getAddys(_a)
-    return self._repayDebt(_liqUser, _userDebt, staticcall Ledger(a.ledger).numUserVaults(_liqUser), _repayAmount, 0, _newInterest, False, True, RepayType.LIQUIDATION, a)
+    numVaults: uint256 = staticcall Ledger(a.ledger).numUserVaults(_liqUser)
+    return self._repayDebt(_liqUser, _userDebt, numVaults, _repayValue, 0, _newInterest, False, True, RepayType.LIQUIDATION, a)
 
 
 # repay during auction purchase
 
 
 @external
-def repayDuringAuctionPurchase(_liqUser: address, _repayAmount: uint256, _a: addys.Addys = empty(addys.Addys)) -> bool:
+def repayDuringAuctionPurchase(_liqUser: address, _repayValue: uint256, _a: addys.Addys = empty(addys.Addys)) -> bool:
     assert msg.sender == addys._getAuctionHouseAddr() # dev: only auction house allowed
     assert deptBasics.isActivated # dev: contract paused
     a: addys.Addys = addys._getAddys(_a)
@@ -409,7 +414,7 @@ def repayDuringAuctionPurchase(_liqUser: address, _repayAmount: uint256, _a: add
     # finalize amounts
     repayAmount: uint256 = 0
     refundAmount: uint256 = 0
-    repayAmount, refundAmount = self._getRepayAmountAndRefundAmount(userDebt.amount, _repayAmount, a.greenToken)
+    repayAmount, refundAmount = self._getRepayAmountAndRefundAmount(userDebt.amount, _repayValue, a.greenToken)
 
     return self._repayDebt(_liqUser, userDebt, d.numUserVaults, repayAmount, refundAmount, newInterest, True, True, RepayType.AUCTION, a)
 
@@ -422,7 +427,7 @@ def _repayDebt(
     _user: address,
     _userDebt: UserDebt,
     _numUserVaults: uint256,
-    _repayAmount: uint256,
+    _repayValue: uint256,
     _refundAmount: uint256,
     _newInterest: uint256,
     _shouldBurnGreen: bool,
@@ -430,7 +435,7 @@ def _repayDebt(
     _repayType: RepayType,
     _a: addys.Addys,
 ) -> bool:
-    userDebt: UserDebt = self._reduceDebtAmount(_userDebt, _repayAmount)
+    userDebt: UserDebt = self._reduceDebtAmount(_userDebt, _repayValue)
 
     # get latest debt terms
     bt: UserBorrowTerms = self._getUserBorrowTerms(_user, _numUserVaults, True, _a)
@@ -447,13 +452,13 @@ def _repayDebt(
 
     # burn green repayment
     if _shouldBurnGreen:
-        extcall GreenToken(_a.greenToken).burn(_repayAmount)
+        extcall GreenToken(_a.greenToken).burn(_repayValue)
 
     # handle refund
     if _refundAmount != 0:
         self._handleGreenForUser(_user, _refundAmount, _shouldStakeRefund, _a.greenToken)
 
-    log RepayDebt(user=_user, repayAmount=_repayAmount, repayType=_repayType, refundAmount=_refundAmount, didStakeRefund=_shouldStakeRefund, outstandingUserDebt=userDebt.amount, userCollateralVal=bt.collateralVal, maxUserDebt=bt.totalMaxDebt, hasGoodDebtHealth=hasGoodDebtHealth)
+    log RepayDebt(user=_user, repayValue=_repayValue, repayType=_repayType, refundAmount=_refundAmount, didStakeRefund=_shouldStakeRefund, outstandingUserDebt=userDebt.amount, userCollateralVal=bt.collateralVal, maxUserDebt=bt.totalMaxDebt, hasGoodDebtHealth=hasGoodDebtHealth)
     return hasGoodDebtHealth
 
 
@@ -465,7 +470,7 @@ def _repayDebt(
 def _validateOnRepay(
     _user: address,
     _caller: address,
-    _amount: uint256,
+    _greenAmount: uint256,
     _userDebtAmount: uint256,
     _controlRoom: address,
     _greenToken: address,
@@ -478,7 +483,7 @@ def _validateOnRepay(
     if _user != _caller:
         assert repayConfig.canOthersRepayForUser # dev: cannot repay for user
 
-    return self._getRepayAmountAndRefundAmount(_userDebtAmount, _amount, _greenToken)
+    return self._getRepayAmountAndRefundAmount(_userDebtAmount, _greenAmount, _greenToken)
 
 
 # repay amount and refund amount
@@ -486,8 +491,8 @@ def _validateOnRepay(
 
 @view
 @internal
-def _getRepayAmountAndRefundAmount(_userDebtAmount: uint256, _repayAmount: uint256, _greenToken: address) -> (uint256, uint256):
-    availAmount: uint256 = min(_repayAmount, staticcall IERC20(_greenToken).balanceOf(self))
+def _getRepayAmountAndRefundAmount(_userDebtAmount: uint256, _greenAmount: uint256, _greenToken: address) -> (uint256, uint256):
+    availAmount: uint256 = min(_greenAmount, staticcall IERC20(_greenToken).balanceOf(self))
 
     repayAmount: uint256 = min(availAmount, _userDebtAmount)
     refundAmount: uint256 = 0
@@ -521,9 +526,10 @@ def _reduceDebtAmount(_userDebt: UserDebt, _repayAmount: uint256) -> UserDebt:
 
 @external
 def redeemCollateralFromMany(
-    _redeemer: address,
+    _redemptions: DynArray[CollateralRedemption, MAX_COLLATERAL_REDEMPTIONS],
     _greenAmount: uint256,
-    _redemptions: DynArray[CollateralRedemption, MAX_REDEMPTIONS],
+    _redeemer: address,
+    _shouldStakeRefund: bool,
     _a: addys.Addys = empty(addys.Addys),
 ) -> uint256:
     assert msg.sender == addys._getTellerAddr() # dev: only Teller allowed
@@ -545,6 +551,8 @@ def redeemCollateralFromMany(
     if totalGreenRemaining != 0:
         assert extcall IERC20(a.greenToken).transfer(_redeemer, totalGreenRemaining, default_return_value=True) # dev: green transfer failed
 
+        # TODO: handle refund staking --> `_shouldStakeRefund`
+
     return totalGreenSpent
 
 
@@ -555,6 +563,7 @@ def redeemCollateral(
     _asset: address,
     _greenAmount: uint256,
     _redeemer: address,
+    _shouldStakeRefund: bool,
     _a: addys.Addys = empty(addys.Addys),
 ) -> uint256:
     assert msg.sender == addys._getTellerAddr() # dev: only Teller allowed
@@ -568,6 +577,8 @@ def redeemCollateral(
     # transfer leftover green back to redeemer
     if greenAmount > greenSpent:
         assert extcall IERC20(a.greenToken).transfer(_redeemer, greenAmount - greenSpent, default_return_value=True) # dev: green transfer failed
+
+        # TODO: handle refund staking --> `_shouldStakeRefund`
 
     return greenSpent
 
@@ -802,12 +813,14 @@ def _getLatestUserDebtAndTerms(
 
 @external
 def updateDebtForUser(_user: address) -> bool:
+    assert addys._isValidRipeHqAddr(msg.sender) # dev: no perms
     assert deptBasics.isActivated # dev: contract paused
     return self._updateDebtForUser(_user, addys._getAddys())
 
 
 @external
 def updateDebtForManyUsers(_users: DynArray[address, MAX_DEBT_UPDATES]) -> bool:
+    assert addys._isValidRipeHqAddr(msg.sender) # dev: no perms
     assert deptBasics.isActivated # dev: contract paused
     a: addys.Addys = addys._getAddys()
     for u: address in _users:
@@ -961,6 +974,7 @@ def _getLatestUserDebtWithInterest(_userDebt: UserDebt) -> (UserDebt, uint256):
 
 
 # daowry (origination fee)
+
 
 @view
 @internal

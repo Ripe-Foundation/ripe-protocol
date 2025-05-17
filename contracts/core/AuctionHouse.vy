@@ -108,6 +108,12 @@ struct FungibleAuction:
     endBlock: uint256
     isActive: bool
 
+struct FungAuctionPurchase:
+    liqUser: address
+    vaultId: uint256
+    asset: address
+    maxGreenAmount: uint256
+
 event LiquidateUser:
     user: indexed(address)
     totalLiqFees: uint256
@@ -156,6 +162,7 @@ userAssetForAuction: transient(HashMap[address, HashMap[uint256, VaultData]]) # 
 HUNDRED_PERCENT: constant(uint256) = 100_00 # 100.00%
 MAX_GEN_STAB_POOLS: constant(uint256) = 10
 MAX_LIQ_USERS: constant(uint256) = 50
+MAX_AUCTION_PURCHASES: constant(uint256) = 20
 
 
 @deploy
@@ -170,33 +177,51 @@ def __init__(_ripeHq: address):
 
 
 @external
-def liquidateUser(_liqUser: address, _a: addys.Addys = empty(addys.Addys)) -> uint256:
+def liquidateUser(
+    _liqUser: address,
+    _keeper: address,
+    _shouldStakeRewards: bool,
+    _a: addys.Addys = empty(addys.Addys),
+) -> uint256:
     assert msg.sender == addys._getTellerAddr() # dev: only teller allowed
     assert deptBasics.isActivated # dev: contract paused
-
     a: addys.Addys = addys._getAddys(_a)
+
     config: GenLiqConfig = staticcall ControlRoom(a.controlRoom).getGenLiqConfig()
-    keeperFee: uint256 = self._liquidateUser(_liqUser, config, a)
+    keeperRewards: uint256 = self._liquidateUser(_liqUser, config, a)
+    assert keeperRewards != 0 # dev: no keeper rewards
 
-    # TODO: mint keeper fee for liquidator
+    # handle keeper rewards
+    # TODO: mint green!!
+    assert extcall IERC20(a.greenToken).transfer(_keeper, keeperRewards, default_return_value=True) # dev: green transfer failed
+    # TODO: handle refund staking --> `_shouldStakeRewards`
 
-    return keeperFee
+    return keeperRewards
 
 
 @external
-def liquidateManyUsers(_liqUsers: DynArray[address, MAX_LIQ_USERS], _a: addys.Addys = empty(addys.Addys)) -> uint256:
+def liquidateManyUsers(
+    _liqUsers: DynArray[address, MAX_LIQ_USERS],
+    _keeper: address,
+    _shouldStakeRewards: bool,
+    _a: addys.Addys = empty(addys.Addys),
+) -> uint256:
     assert msg.sender == addys._getTellerAddr() # dev: only teller allowed
     assert deptBasics.isActivated # dev: contract paused
-
     a: addys.Addys = addys._getAddys(_a)
+
     config: GenLiqConfig = staticcall ControlRoom(a.controlRoom).getGenLiqConfig()
-    keeperFee: uint256 = 0
+    totalKeeperRewards: uint256 = 0
     for liqUser: address in _liqUsers:
-        keeperFee += self._liquidateUser(liqUser, config, a)
+        totalKeeperRewards += self._liquidateUser(liqUser, config, a)
+    assert totalKeeperRewards != 0 # dev: no keeper rewards
 
-    # TODO: mint keeper fee for liquidator
+    # handle keeper rewards
+    # TODO: mint green!!
+    assert extcall IERC20(a.greenToken).transfer(_keeper, totalKeeperRewards, default_return_value=True) # dev: green transfer failed
+    # TODO: handle refund staking --> `_shouldStakeRewards`
 
-    return keeperFee
+    return totalKeeperRewards
 
 
 @internal
@@ -471,7 +496,7 @@ def _handleCollateralDuringPurchase(
     _liqAsset: address,
     _maxBuyerValue: uint256,
     _maxBuyerAmount: uint256,
-    _buyerAddr: address,
+    _recipient: address,
     _extraCeilingOnValue: uint256,
     _discount: uint256,
     _priceDesk: address,
@@ -488,7 +513,7 @@ def _handleCollateralDuringPurchase(
     # transfer collateral to buyer
     amountSentToBuyer: uint256 = 0
     isPositionDepleted: bool = False
-    amountSentToBuyer, isPositionDepleted = extcall Vault(_liqVaultAddr).withdrawTokensFromVault(_liqUser, _liqAsset, maxLiqCollateralAmount, _buyerAddr)
+    amountSentToBuyer, isPositionDepleted = extcall Vault(_liqVaultAddr).withdrawTokensFromVault(_liqUser, _liqAsset, maxLiqCollateralAmount, _recipient)
 
     # finalize values for buyer
     collateralValueOut: uint256 = maxLiqCollateralValue * amountSentToBuyer // maxLiqCollateralAmount
@@ -587,31 +612,63 @@ def _createNewFungibleAuction(
 ################
 
 
-struct FungAuctionPurchase:
-    liqUser: address
-    vaultId: uint256
-    asset: address
-    maxGreenAmount: uint256
+@external
+def buyFungibleAuction(
+    _liqUser: address,
+    _vaultId: uint256,
+    _asset: address,
+    _greenAmount: uint256,
+    _buyer: address,
+    _shouldStakeRefund: bool,
+    _a: addys.Addys = empty(addys.Addys),
+) -> uint256:
+    assert msg.sender == addys._getTellerAddr() # dev: only teller allowed
+    assert deptBasics.isActivated # dev: contract paused
+    a: addys.Addys = addys._getAddys(_a)
+
+    greenAmount: uint256 = min(_greenAmount, staticcall IERC20(a.greenToken).balanceOf(self))
+    assert greenAmount != 0 # dev: no green to redeem
+    greenSpent: uint256 = self._buyFungibleAuction(_liqUser, _vaultId, _asset, max_value(uint256), greenAmount, _buyer, a)
+
+    # transfer leftover green back to buyer
+    if greenAmount > greenSpent:
+        assert extcall IERC20(a.greenToken).transfer(_buyer, greenAmount - greenSpent, default_return_value=True) # dev: green transfer failed
+
+        # TODO: handle refund staking --> `_shouldStakeRefund`
+
+    return greenSpent
 
 
 @external
-def buyFungibleAuction(_a: addys.Addys = empty(addys.Addys)) -> uint256:
+def buyManyFungibleAuctions(
+    _purchases: DynArray[FungAuctionPurchase, MAX_AUCTION_PURCHASES],
+    _greenAmount: uint256,
+    _buyer: address,
+    _shouldStakeRefund: bool,
+    _a: addys.Addys = empty(addys.Addys),
+) -> uint256:
     assert msg.sender == addys._getTellerAddr() # dev: only teller allowed
     assert deptBasics.isActivated # dev: contract paused
+    a: addys.Addys = addys._getAddys(_a)
 
-    # TODO: implement
+    totalGreenSpent: uint256 = 0
+    totalGreenRemaining: uint256 = min(_greenAmount, staticcall IERC20(a.greenToken).balanceOf(self))
+    assert totalGreenRemaining != 0 # dev: no green to redeem
 
-    return 0
+    for p: FungAuctionPurchase in _purchases:
+        if totalGreenRemaining == 0:
+            break
+        greenSpent: uint256 = self._buyFungibleAuction(p.liqUser, p.vaultId, p.asset, p.maxGreenAmount, totalGreenRemaining, _buyer, a)
+        totalGreenRemaining -= greenSpent
+        totalGreenSpent += greenSpent
 
+    # transfer leftover green back to redeemer
+    if totalGreenRemaining != 0:
+        assert extcall IERC20(a.greenToken).transfer(_buyer, totalGreenRemaining, default_return_value=True) # dev: green transfer failed
 
-@external
-def buyManyFungibleAuctions(_a: addys.Addys = empty(addys.Addys)) -> uint256:
-    assert msg.sender == addys._getTellerAddr() # dev: only teller allowed
-    assert deptBasics.isActivated # dev: contract paused
+        # TODO: handle refund staking --> `_shouldStakeRefund`
 
-    # TODO: implement
-
-    return 0
+    return totalGreenSpent
 
 
 @internal
@@ -619,61 +676,70 @@ def _buyFungibleAuction(
     _liqUser: address,
     _vaultId: uint256,
     _asset: address,
+    _maxGreenForAsset: uint256,
+    _totalGreenRemaining: uint256,
     _buyer: address,
-    _payAmount: uint256,
     _a: addys.Addys,
 ) -> uint256:
+
+    # NOTE: faililng gracefully in case there are many purchases at same time
+
+    # user is not in liquidation, this is invalid
+    if not staticcall Ledger(_a.ledger).isUserInLiquidation(_liqUser):
+        return 0
+
     auc: FungibleAuction = staticcall Ledger(_a.ledger).getFungibleAuction(_liqUser, _vaultId, _asset)
-    payAmount: uint256 = self._validateOnBuyFungibleAuction(auc, _buyer, _payAmount, _a.greenToken, _a.controlRoom, _a.ledger)
-    payUsdValue: uint256 = payAmount # green treated as $1
+    if not auc.isActive:
+        return 0
+
+    # not within time boundaries, skip
+    if block.number < auc.startBlock or block.number >= auc.endBlock:
+        return 0
+
+    # cannot buy auction, skip
+    if not staticcall ControlRoom(_a.controlRoom).canBuyAuction(_vaultId, _asset, _buyer):
+        return 0
+
+    # finalize green amount
+    availGreen: uint256 = min(_totalGreenRemaining, staticcall IERC20(_a.greenToken).balanceOf(self))
+    greenAmount: uint256 = min(_maxGreenForAsset, availGreen)
+    if greenAmount == 0:
+        return 0
 
     # calculate discount
     auctionProgress: uint256 = (block.number - auc.startBlock) * HUNDRED_PERCENT // (auc.endBlock - auc.startBlock)
     discount: uint256 = self._calculateAuctionDiscount(auctionProgress, auc.startDiscount, auc.maxDiscount)
+
+    # get vault addr
     vaultAddr: address = staticcall VaultBook(_a.vaultBook).getAddr(_vaultId)
+    if vaultAddr == empty(address):
+        return 0
 
     # handle collateral buy
+    payUsdValue: uint256 = greenAmount # green treated as $1
     amountSentToBuyer: uint256 = 0
     collateralValueOut: uint256 = 0
     amountNeededFromBuyer: uint256 = 0
     isPositionDepleted: bool = False
-    amountSentToBuyer, collateralValueOut, amountNeededFromBuyer, isPositionDepleted = self._handleCollateralDuringPurchase(_liqUser, vaultAddr, _asset, payUsdValue, payAmount, _buyer, max_value(uint256), discount, _a.priceDesk)
-    assert amountSentToBuyer != 0 # dev: nothing sent to buyer
+    amountSentToBuyer, collateralValueOut, amountNeededFromBuyer, isPositionDepleted = self._handleCollateralDuringPurchase(_liqUser, vaultAddr, _asset, payUsdValue, greenAmount, _buyer, max_value(uint256), discount, _a.priceDesk)
+    
+    # nothing withdrawn from vault, skip
+    if amountSentToBuyer == 0:
+        return 0
 
     # disable auction (if depleted)
     if isPositionDepleted:
         extcall Ledger(_a.ledger).removeFungibleAuction(_liqUser, _vaultId, _asset)
 
     # repay debt for liq user
-    repayAmount: uint256 = min(amountNeededFromBuyer, payAmount)
-    assert extcall IERC20(_a.greenToken).transfer(_a.creditEngine, repayAmount) # dev: could not transfer
-    hasGoodDebtHealth: bool = extcall CreditEngine(_a.creditEngine).repayDuringAuctionPurchase(_liqUser, repayAmount, _a)
-
+    greenSpent: uint256 = min(amountNeededFromBuyer, greenAmount)
+    assert extcall IERC20(_a.greenToken).transfer(_a.creditEngine, greenSpent) # dev: could not transfer
+    hasGoodDebtHealth: bool = extcall CreditEngine(_a.creditEngine).repayDuringAuctionPurchase(_liqUser, greenSpent, _a)
     if hasGoodDebtHealth:
         # TODO: kill all auctions for liq user
         pass
 
-    return 0
-
-
-@view
-@internal
-def _validateOnBuyFungibleAuction(
-    _auc: FungibleAuction,
-    _buyer: address,
-    _payAmount: uint256,
-    _greenToken: address,
-    _controlRoom: address,
-    _ledger: address,
-) -> uint256:
-    assert _auc.isActive # dev: auction is not active
-    assert block.number >= _auc.startBlock and block.number < _auc.endBlock # dev: not within auction window
-    assert staticcall ControlRoom(_controlRoom).canBuyAuction(_auc.vaultId, _auc.asset, _buyer) # dev: cannot buy auction
-    assert staticcall Ledger(_ledger).isUserInLiquidation(_auc.liqUser) # dev: liq user must be in liquidation
-
-    payAmount: uint256 = min(_payAmount, staticcall IERC20(_greenToken).balanceOf(self))
-    assert payAmount != 0 # dev: cannot pay 0
-    return payAmount
+    return greenSpent
 
 
 @pure

@@ -15,14 +15,29 @@ from interfaces import Vault
 from ethereum.ercs import IERC20
 
 interface CreditEngine:
-    def repayForUser(_user: address, _amount: uint256, _shouldStakeRefund: bool, _caller: address, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
-    def borrowForUser(_user: address, _amount: uint256, _shouldStake: bool, _caller: address, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
+    def redeemCollateralFromMany(_redemptions: DynArray[CollateralRedemption, MAX_COLLATERAL_REDEMPTIONS], _greenAmount: uint256, _redeemer: address, _shouldStakeRefund: bool, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
+    def redeemCollateral(_user: address, _vaultId: uint256, _asset: address, _greenAmount: uint256, _redeemer: address, _shouldStakeRefund: bool, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
+    def repayForUser(_user: address, _greenAmount: uint256, _shouldStakeRefund: bool, _caller: address, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
+    def borrowForUser(_user: address, _greenAmount: uint256, _shouldStake: bool, _caller: address, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
     def getMaxWithdrawableForAsset(_user: address, _asset: address, _a: addys.Addys = empty(addys.Addys)) -> uint256: view
     def hasGoodDebtHealth(_user: address, _a: addys.Addys = empty(addys.Addys)) -> bool: view
 
+interface AuctionHouse:
+    def buyManyFungibleAuctions(_purchases: DynArray[FungAuctionPurchase, MAX_AUCTION_PURCHASES], _greenAmount: uint256, _buyer: address, _shouldStakeRefund: bool, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
+    def buyFungibleAuction(_liqUser: address, _vaultId: uint256, _asset: address, _greenAmount: uint256, _buyer: address, _shouldStakeRefund: bool, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
+    def liquidateManyUsers(_liqUsers: DynArray[address, MAX_LIQ_USERS], _keeper: address, _shouldStakeRewards: bool, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
+    def liquidateUser(_liqUser: address, _keeper: address, _shouldStakeRewards: bool, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
+
+interface StabVault:
+    def redeemManyFromStabilityPool(_redemptions: DynArray[StabPoolRedemption, MAX_STAB_REDEMPTIONS], _greenAmount: uint256, _redeemer: address, _shouldStakeRefund: bool, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
+    def redeemFromStabilityPool(_claimAsset: address, _greenAmount: uint256, _redeemer: address, _shouldStakeRefund: bool, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
+    def claimFromStabilityPool(_claimer: address, _stabAsset: address, _claimAsset: address, _maxUsdValue: uint256, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
+    def claimManyFromStabilityPool(_claimer: address, _claims: DynArray[StabPoolClaim, MAX_STAB_CLAIMS], _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
+
 interface Lootbox:
+    def claimLootForManyUsers(_users: DynArray[address, MAX_CLAIM_USERS], _caller: address, _shouldStake: bool, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
     def updateDepositPoints(_user: address, _vaultId: uint256, _vaultAddr: address, _asset: address, _a: addys.Addys = empty(addys.Addys)): nonpayable
-    def claimLootForUser(_user: address, _shouldStake: bool, _caller: address, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
+    def claimLootForUser(_user: address, _caller: address, _shouldStake: bool, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
 
 interface ControlRoom:
     def getWithdrawConfig(_vaultId: uint256, _asset: address, _user: address, _caller: address) -> WithdrawConfig: view
@@ -66,6 +81,27 @@ struct WithdrawalAction:
     vaultAddr: address
     vaultId: uint256
 
+struct CollateralRedemption:
+    user: address
+    vaultId: uint256
+    asset: address
+    maxGreenAmount: uint256
+
+struct FungAuctionPurchase:
+    liqUser: address
+    vaultId: uint256
+    asset: address
+    maxGreenAmount: uint256
+
+struct StabPoolClaim:
+    stabAsset: address
+    claimAsset: address
+    maxUsdValue: uint256
+
+struct StabPoolRedemption:
+    claimAsset: address
+    maxGreenAmount: uint256
+
 event TellerDeposit:
     user: indexed(address)
     depositor: indexed(address)
@@ -83,7 +119,13 @@ event TellerWithdrawal:
     vaultId: uint256
     isDepleted: bool
 
-MAX_BATCH_ACTION: constant(uint256) = 20
+MAX_BALANCE_ACTION: constant(uint256) = 20
+MAX_CLAIM_USERS: constant(uint256) = 25
+MAX_COLLATERAL_REDEMPTIONS: constant(uint256) = 20
+MAX_AUCTION_PURCHASES: constant(uint256) = 20
+MAX_LIQ_USERS: constant(uint256) = 50
+MAX_STAB_CLAIMS: constant(uint256) = 15
+MAX_STAB_REDEMPTIONS: constant(uint256) = 15
 
 
 @deploy
@@ -112,7 +154,7 @@ def deposit(
 
 @nonreentrant
 @external
-def depositMany(_user: address, _deposits: DynArray[DepositAction, MAX_BATCH_ACTION]) -> uint256:
+def depositMany(_user: address, _deposits: DynArray[DepositAction, MAX_BALANCE_ACTION]) -> uint256:
     assert deptBasics.isActivated # dev: contract paused
     a: addys.Addys = addys._getAddys()
     for d: DepositAction in _deposits:
@@ -203,6 +245,32 @@ def _validateOnDeposit(
     return amount
 
 
+# per user deposit limit
+
+
+@view 
+@internal 
+def _getAvailPerUserDepositLimit(_userDepositBal: uint256, _perUserDepositLimit: uint256) -> uint256:
+    if _perUserDepositLimit == max_value(uint256):
+        return max_value(uint256)
+    availDeposits: uint256 = 0
+    if _perUserDepositLimit > _userDepositBal:
+        availDeposits = _perUserDepositLimit - _userDepositBal
+    return availDeposits
+
+
+# global deposit limit
+
+
+@view 
+@internal 
+def _getAvailGlobalDepositLimit(_totalDepositBal: uint256, _globalDepositLimit: uint256) -> uint256:
+    availDeposits: uint256 = 0
+    if _globalDepositLimit > _totalDepositBal:
+        availDeposits = _globalDepositLimit - _totalDepositBal
+    return availDeposits
+
+
 ###############
 # Withdrawals #
 ###############
@@ -226,7 +294,7 @@ def withdraw(
 
 @nonreentrant
 @external
-def withdrawMany(_user: address, _withdrawals: DynArray[WithdrawalAction, MAX_BATCH_ACTION]) -> uint256:
+def withdrawMany(_user: address, _withdrawals: DynArray[WithdrawalAction, MAX_BALANCE_ACTION]) -> uint256:
     assert deptBasics.isActivated # dev: contract paused
     a: addys.Addys = addys._getAddys()
     for w: WithdrawalAction in _withdrawals:
@@ -299,30 +367,199 @@ def _validateOnWithdrawal(
 ########
 
 
+# borrow
+
+
 @nonreentrant
 @external
 def borrow(
-    _amount: uint256 = max_value(uint256),
+    _greenAmount: uint256 = max_value(uint256),
     _user: address = msg.sender,
     _shouldStake: bool = True,
 ) -> uint256:
     assert deptBasics.isActivated # dev: contract paused
     a: addys.Addys = addys._getAddys()
-    return extcall CreditEngine(a.creditEngine).borrowForUser(_user, _amount, _shouldStake, msg.sender, a)
+    amount: uint256 = extcall CreditEngine(a.creditEngine).borrowForUser(_user, _greenAmount, _shouldStake, msg.sender, a)
+    assert staticcall CreditEngine(a.creditEngine).hasGoodDebtHealth(_user, a) # dev: cannot borrow, bad debt health
+    return amount
+
+
+# repay
 
 
 @nonreentrant
 @external
 def repay(
-    _amount: uint256 = max_value(uint256),
+    _greenAmount: uint256 = max_value(uint256),
     _user: address = msg.sender,
     _shouldStakeRefund: bool = True,
 ) -> uint256:
     assert deptBasics.isActivated # dev: contract paused
     a: addys.Addys = addys._getAddys()
-    amount: uint256 = min(_amount, staticcall IERC20(a.greenToken).balanceOf(msg.sender))
-    assert extcall IERC20(a.greenToken).transferFrom(msg.sender, a.creditEngine, amount) # dev: token transfer failed
-    return extcall CreditEngine(a.creditEngine).repayForUser(_user, amount, _shouldStakeRefund, msg.sender, a)
+    greenAmount: uint256 = self._transferTokensToDepartment(_greenAmount, a.greenToken, a.creditEngine)
+    return extcall CreditEngine(a.creditEngine).repayForUser(_user, greenAmount, _shouldStakeRefund, msg.sender, a)
+
+
+# redeem collateral
+
+
+@nonreentrant
+@external
+def redeemCollateral(
+    _user: address,
+    _vaultId: uint256,
+    _asset: address,
+    _greenAmount: uint256 = max_value(uint256),
+    _shouldStakeRefund: bool = True,
+) -> uint256:
+    assert deptBasics.isActivated # dev: contract paused
+    a: addys.Addys = addys._getAddys()
+    greenAmount: uint256 = self._transferTokensToDepartment(_greenAmount, a.greenToken, a.creditEngine)
+    return extcall CreditEngine(a.creditEngine).redeemCollateral(_user, _vaultId, _asset, greenAmount, msg.sender, _shouldStakeRefund, a)
+
+
+@nonreentrant
+@external
+def redeemCollateralFromMany(
+    _redemptions: DynArray[CollateralRedemption, MAX_COLLATERAL_REDEMPTIONS],
+    _greenAmount: uint256 = max_value(uint256),
+    _shouldStakeRefund: bool = True,
+) -> uint256:
+    assert deptBasics.isActivated # dev: contract paused
+    a: addys.Addys = addys._getAddys()
+    greenAmount: uint256 = self._transferTokensToDepartment(_greenAmount, a.greenToken, a.creditEngine)
+    return extcall CreditEngine(a.creditEngine).redeemCollateralFromMany(_redemptions, greenAmount, msg.sender, _shouldStakeRefund, a)
+
+
+################
+# Liquidations #
+################
+
+
+# buy fungible auctions
+
+
+@nonreentrant
+@external
+def buyFungibleAuction(
+    _liqUser: address,
+    _vaultId: uint256,
+    _asset: address,
+    _greenAmount: uint256 = max_value(uint256),
+    _shouldStakeRefund: bool = True,
+) -> uint256:
+    assert deptBasics.isActivated # dev: contract paused
+    a: addys.Addys = addys._getAddys()
+    greenAmount: uint256 = self._transferTokensToDepartment(_greenAmount, a.greenToken, a.auctionHouse)
+    return extcall AuctionHouse(a.auctionHouse).buyFungibleAuction(_liqUser, _vaultId, _asset, greenAmount, msg.sender, _shouldStakeRefund, a)
+
+
+@nonreentrant
+@external
+def buyManyFungibleAuctions(
+    _purchases: DynArray[FungAuctionPurchase, MAX_AUCTION_PURCHASES],
+    _greenAmount: uint256 = max_value(uint256),
+    _shouldStakeRefund: bool = True,
+) -> uint256:
+    assert deptBasics.isActivated # dev: contract paused
+    a: addys.Addys = addys._getAddys()
+    greenAmount: uint256 = self._transferTokensToDepartment(_greenAmount, a.greenToken, a.auctionHouse)
+    return extcall AuctionHouse(a.auctionHouse).buyManyFungibleAuctions(_purchases, greenAmount, msg.sender, _shouldStakeRefund, a)
+
+
+# liquidate users
+
+
+@nonreentrant
+@external
+def liquidateUser(
+    _liqUser: address,
+    _shouldStakeRewards: bool = True,
+) -> uint256:
+    assert deptBasics.isActivated # dev: contract paused
+    a: addys.Addys = addys._getAddys()
+    return extcall AuctionHouse(a.auctionHouse).liquidateUser(_liqUser, msg.sender, _shouldStakeRewards, a)
+
+
+@nonreentrant
+@external
+def liquidateManyUsers(
+    _liqUsers: DynArray[address, MAX_LIQ_USERS],
+    _shouldStakeRewards: bool = True,
+) -> uint256:
+    assert deptBasics.isActivated # dev: contract paused
+    a: addys.Addys = addys._getAddys()
+    return extcall AuctionHouse(a.auctionHouse).liquidateManyUsers(_liqUsers, msg.sender, _shouldStakeRewards, a)
+
+
+###################
+# Stability Pools #
+###################
+
+
+# claims
+
+
+@nonreentrant
+@external
+def claimFromStabilityPool(
+    _vaultId: uint256,
+    _stabAsset: address,
+    _claimAsset: address,
+    _maxUsdValue: uint256 = max_value(uint256),
+    _a: addys.Addys = empty(addys.Addys),
+) -> uint256:
+    assert deptBasics.isActivated # dev: contract paused
+    a: addys.Addys = addys._getAddys()
+    vaultAddr: address = staticcall VaultBook(a.vaultBook).getAddr(_vaultId) # dev: invalid vault id
+    return extcall StabVault(vaultAddr).claimFromStabilityPool(msg.sender, _stabAsset, _claimAsset, _maxUsdValue, a)
+
+
+@nonreentrant
+@external
+def claimManyFromStabilityPool(
+    _vaultId: uint256,
+    _claims: DynArray[StabPoolClaim, MAX_STAB_CLAIMS],
+) -> uint256:
+    assert deptBasics.isActivated # dev: contract paused
+    a: addys.Addys = addys._getAddys()
+    vaultAddr: address = staticcall VaultBook(a.vaultBook).getAddr(_vaultId) # dev: invalid vault id
+    return extcall StabVault(vaultAddr).claimManyFromStabilityPool(msg.sender, _claims, a)
+
+
+# redemptions
+
+
+@nonreentrant
+@external
+def redeemFromStabilityPool(
+    _vaultId: uint256,
+    _claimAsset: address,
+    _greenAmount: uint256 = max_value(uint256),
+    _shouldStakeRefund: bool = True,
+) -> uint256:
+    assert deptBasics.isActivated # dev: contract paused
+    a: addys.Addys = addys._getAddys()
+    vaultAddr: address = staticcall VaultBook(a.vaultBook).getAddr(_vaultId) # dev: invalid vault id
+    assert vaultAddr != empty(address) # dev: invalid vault id
+    greenAmount: uint256 = self._transferTokensToDepartment(_greenAmount, a.greenToken, vaultAddr)
+    return extcall StabVault(vaultAddr).redeemFromStabilityPool(_claimAsset, greenAmount, msg.sender, _shouldStakeRefund, a)
+
+
+@nonreentrant
+@external
+def redeemManyFromStabilityPool(
+    _vaultId: uint256,
+    _redemptions: DynArray[StabPoolRedemption, MAX_STAB_REDEMPTIONS],
+    _greenAmount: uint256 = max_value(uint256),
+    _shouldStakeRefund: bool = True,
+) -> uint256:
+    assert deptBasics.isActivated # dev: contract paused
+    a: addys.Addys = addys._getAddys()
+    vaultAddr: address = staticcall VaultBook(a.vaultBook).getAddr(_vaultId) # dev: invalid vault id
+    assert vaultAddr != empty(address) # dev: invalid vault id
+    greenAmount: uint256 = self._transferTokensToDepartment(_greenAmount, a.greenToken, vaultAddr)
+    return extcall StabVault(vaultAddr).redeemManyFromStabilityPool(_redemptions, greenAmount, msg.sender, _shouldStakeRefund, a)
 
 
 ###########
@@ -330,12 +567,26 @@ def repay(
 ###########
 
 
+# claim loot
+
+
 @nonreentrant
 @external
 def claimLoot(_user: address = msg.sender, _shouldStake: bool = True) -> uint256:
     assert deptBasics.isActivated # dev: contract paused
     a: addys.Addys = addys._getAddys()
-    return extcall Lootbox(a.lootbox).claimLootForUser(_user, _shouldStake, msg.sender, a)
+    return extcall Lootbox(a.lootbox).claimLootForUser(_user, msg.sender, _shouldStake, a)
+
+
+# claim for many users
+
+
+@nonreentrant
+@external
+def claimLootForManyUsers(_users: DynArray[address, MAX_CLAIM_USERS], _shouldStake: bool = True) -> uint256:
+    assert deptBasics.isActivated # dev: contract paused
+    a: addys.Addys = addys._getAddys()
+    return extcall Lootbox(a.lootbox).claimLootForManyUsers(_users, msg.sender, _shouldStake, a)
 
 
 #############
@@ -371,27 +622,13 @@ def _getVaultAddrAndId(
     return vaultAddr, vaultId
 
 
-# per user deposit limit
-
-
-@view 
-@internal 
-def _getAvailPerUserDepositLimit(_userDepositBal: uint256, _perUserDepositLimit: uint256) -> uint256:
-    if _perUserDepositLimit == max_value(uint256):
-        return max_value(uint256)
-    availDeposits: uint256 = 0
-    if _perUserDepositLimit > _userDepositBal:
-        availDeposits = _perUserDepositLimit - _userDepositBal
-    return availDeposits
-
-
-# global deposit limit
-
-
-@view 
-@internal 
-def _getAvailGlobalDepositLimit(_totalDepositBal: uint256, _globalDepositLimit: uint256) -> uint256:
-    availDeposits: uint256 = 0
-    if _globalDepositLimit > _totalDepositBal:
-        availDeposits = _globalDepositLimit - _totalDepositBal
-    return availDeposits
+@internal
+def _transferTokensToDepartment(
+    _amount: uint256,
+    _asset: address,
+    _recipient: address,
+) -> uint256:
+    tokenAmount: uint256 = min(_amount, staticcall IERC20(_asset).balanceOf(msg.sender))
+    assert tokenAmount != 0 # dev: cannot transfer 0 amount
+    assert extcall IERC20(_asset).transferFrom(msg.sender, _recipient, tokenAmount) # dev: token transfer failed
+    return tokenAmount

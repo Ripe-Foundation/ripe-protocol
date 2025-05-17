@@ -27,7 +27,7 @@ interface Ledger:
 
 interface ControlRoom:
     def getDepositPointsAllocs(_vaultId: uint256, _asset: address) -> DepositPointsAllocs: view
-    def canOthersClaimLootForUser(_user: address) -> bool: view
+    def canCallerClaimLootForUser(_user: address, _caller: address) -> bool: view
     def getRipeRewardsConfig() -> RipeRewardsConfig: view
 
 interface VaultBook:
@@ -113,11 +113,23 @@ struct DepositPointsAllocs:
     voteDepositor: uint256
     voteDepositorTotal: uint256
 
+event DepositLootClaimed:
+    user: indexed(address)
+    vaultId: uint256
+    asset: indexed(address)
+    ripeStakerLoot: uint256
+    ripeVoteLoot: uint256
+    ripeGenLoot: uint256
+
+event BorrowLootClaimed:
+    user: indexed(address)
+    ripeAmount: uint256
+
 EIGHTEEN_DECIMALS: constant(uint256) = 10 ** 18
 HUNDRED_PERCENT: constant(uint256) = 100_00 # 100.00%
-
 MAX_ASSETS_TO_CLEAN: constant(uint256) = 20
 MAX_VAULTS_TO_CLEAN: constant(uint256) = 10
+MAX_CLAIM_USERS: constant(uint256) = 25
 
 
 @deploy
@@ -126,35 +138,66 @@ def __init__(_ripeHq: address):
     deptBasics.__init__(False, True) # can mint ripe only
 
 
-#############
-# Top Level #
-#############
+##############
+# Claim Loot #
+##############
 
 
 @external
 def claimLootForUser(
     _user: address,
-    _shouldStake: bool,
     _caller: address,
+    _shouldStake: bool,
     _a: addys.Addys = empty(addys.Addys),
 ) -> uint256:
-    assert msg.sender == addys._getTellerAddr() # dev: only teller allowed
-    assert deptBasics.isActivated # dev: not activated
+    assert addys._isValidRipeHqAddr(msg.sender) # dev: no perms
+    assert deptBasics.isActivated # dev: contract paused
     a: addys.Addys = addys._getAddys(_a)
+    return self._claimLoot(_user, _caller, _shouldStake, a)
+
+
+@external
+def claimLootForManyUsers(
+    _users: DynArray[address, MAX_CLAIM_USERS],
+    _caller: address,
+    _shouldStake: bool,
+    _a: addys.Addys = empty(addys.Addys),
+) -> uint256:
+    assert addys._isValidRipeHqAddr(msg.sender) # dev: no perms
+    assert deptBasics.isActivated # dev: contract paused
+    a: addys.Addys = addys._getAddys(_a)
+
+    totalRipeForUsers: uint256 = 0
+    for u: address in _users:
+        totalRipeForUsers += self._claimLoot(u, _caller, _shouldStake, a)
+    return totalRipeForUsers
+
+
+@internal
+def _claimLoot(
+    _user: address,
+    _caller: address,
+    _shouldStake: bool,
+    _a: addys.Addys,
+) -> uint256:
+
+    # nothing to do here
+    if _user == empty(address):
+        return 0
 
     # check if caller can claim for user
     if _user != _caller:
-        assert staticcall ControlRoom(a.controlRoom).canOthersClaimLootForUser(_user) # dev: cannot claim for user
+        assert staticcall ControlRoom(_a.controlRoom).canCallerClaimLootForUser(_user, _caller) # dev: cannot claim for user
 
     # total loot -- start with borrow loot
-    totalRipeForUser: uint256 = self._claimBorrowLoot(_user, a)
+    totalRipeForUser: uint256 = self._claimBorrowLoot(_user, _a)
 
     # now look at deposit loot
     vaultsToRemove: DynArray[uint256, MAX_VAULTS_TO_CLEAN] = []
-    numUserVaults: uint256 = staticcall Ledger(a.ledger).numUserVaults(_user)
+    numUserVaults: uint256 = staticcall Ledger(_a.ledger).numUserVaults(_user)
     for i: uint256 in range(1, numUserVaults, bound=max_value(uint256)):
-        vaultId: uint256 = staticcall Ledger(a.ledger).userVaults(_user, i)
-        vaultAddr: address = staticcall VaultBook(a.vaultBook).getAddr(vaultId)
+        vaultId: uint256 = staticcall Ledger(_a.ledger).userVaults(_user, i)
+        vaultAddr: address = staticcall VaultBook(_a.vaultBook).getAddr(vaultId)
         if vaultAddr == empty(address):
             continue
 
@@ -172,7 +215,7 @@ def claimLootForUser(
                 assetsToRemove.append(asset)
 
             # claim loot
-            totalRipeForUser += self._claimDepositLoot(_user, vaultId, vaultAddr, asset, not hasBalance, a)
+            totalRipeForUser += self._claimDepositLoot(_user, vaultId, vaultAddr, asset, not hasBalance, _a)
 
         # clean up user assets (storage optimization)
         stillInVault: bool = self._cleanUpUserAssets(_user, vaultAddr, assetsToRemove)
@@ -180,11 +223,11 @@ def claimLootForUser(
             vaultsToRemove.append(vaultId)
 
     # clean up user vaults (storage optimization)
-    self._cleanUpUserVaults(_user, vaultsToRemove, a.ledger)
+    self._cleanUpUserVaults(_user, vaultsToRemove, _a.ledger)
 
     # mint ripe, then stake or transfer to user
     if totalRipeForUser != 0:
-        self._handleRipeMint(_user, totalRipeForUser, _shouldStake, a.ripeToken)
+        self._handleRipeMint(_user, totalRipeForUser, _shouldStake, _a.ripeToken)
 
     return totalRipeForUser
 
@@ -413,6 +456,8 @@ def _claimDepositLoot(
 
     totalRipeForUser: uint256 = userRipeRewards.ripeStakerLoot + userRipeRewards.ripeVoteLoot + userRipeRewards.ripeGenLoot
     extcall Ledger(_a.ledger).setDepositPointsAndRipeRewards(_user, _vaultId, _asset, up, ap, gp, globalRipeRewards)
+    if totalRipeForUser != 0:
+        log DepositLootClaimed(user=_user, vaultId=_vaultId, asset=_asset, ripeStakerLoot=userRipeRewards.ripeStakerLoot, ripeVoteLoot=userRipeRewards.ripeVoteLoot, ripeGenLoot=userRipeRewards.ripeGenLoot)
     return totalRipeForUser
 
 
@@ -673,8 +718,9 @@ def _claimBorrowLoot(_user: address, _a: addys.Addys) -> uint256:
     gp: BorrowPoints = empty(BorrowPoints)
     globalRipeRewards: RipeRewards = empty(RipeRewards)
     userRipeRewards, up, gp, globalRipeRewards = self._getClaimableBorrowLootData(_user, _a)
+    extcall Ledger(_a.ledger).setBorrowPointsAndRipeRewards(_user, up, gp, globalRipeRewards)
     if userRipeRewards != 0:
-        extcall Ledger(_a.ledger).setBorrowPointsAndRipeRewards(_user, up, gp, globalRipeRewards)
+        log BorrowLootClaimed(user=_user, ripeAmount=userRipeRewards)
     return userRipeRewards
 
 
@@ -808,7 +854,12 @@ def _getLatestGlobalRipeRewards(_a: addys.Addys) -> RipeRewards:
 
 
 @internal
-def _handleRipeMint(_user: address, _amount: uint256, _shouldStake: bool, _ripeToken: address):
+def _handleRipeMint(
+    _user: address,
+    _amount: uint256,
+    _shouldStake: bool,
+    _ripeToken: address,
+):
     extcall RipeToken(_ripeToken).mint(_user, _amount)
 
     # TODO: handle staking
