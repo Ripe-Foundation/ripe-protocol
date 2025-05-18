@@ -194,6 +194,13 @@ def borrowForUser(
     userDebt.amount += newBorrowAmount
     userDebt.principal += newBorrowAmount
     userDebt.debtTerms = bt.debtTerms
+
+    # check debt health
+    hasGoodDebtHealth: bool = self._hasGoodDebtHealth(userDebt.amount, bt.collateralVal, bt.debtTerms.ltv)
+    assert hasGoodDebtHealth # dev: bad debt health
+    userDebt.inLiquidation = False
+
+    # save debt
     extcall Ledger(a.ledger).setUserDebt(_user, userDebt, newInterest, userBorrowInterval)
 
     # update borrow points
@@ -658,6 +665,8 @@ def _redeemCollateral(
     repayAmount = min(repayAmount, userDebt.amount)
     hasGoodDebtHealth: bool = self._repayDebt(_user, userDebt, d.numUserVaults, repayAmount, 0, newInterest, True, False, RepayType.REDEMPTION, _a)
 
+    # TODO: add event
+
     return repayAmount
 
 
@@ -809,17 +818,17 @@ def _getLatestUserDebtAndTerms(
 
 
 @external
-def updateDebtForUser(_user: address) -> bool:
+def updateDebtForUser(_user: address, _a: addys.Addys = empty(addys.Addys)) -> bool:
     assert addys._isValidRipeHqAddr(msg.sender) # dev: no perms
     assert deptBasics.isActivated # dev: contract paused
-    return self._updateDebtForUser(_user, addys._getAddys())
+    return self._updateDebtForUser(_user, addys._getAddys(_a))
 
 
 @external
-def updateDebtForManyUsers(_users: DynArray[address, MAX_DEBT_UPDATES]) -> bool:
+def updateDebtForManyUsers(_users: DynArray[address, MAX_DEBT_UPDATES], _a: addys.Addys = empty(addys.Addys)) -> bool:
     assert addys._isValidRipeHqAddr(msg.sender) # dev: no perms
     assert deptBasics.isActivated # dev: contract paused
-    a: addys.Addys = addys._getAddys()
+    a: addys.Addys = addys._getAddys(_a)
     for u: address in _users:
         self._updateDebtForUser(u, a)
     return True
@@ -831,16 +840,21 @@ def _updateDebtForUser(_user: address, _a: addys.Addys) -> bool:
     bt: UserBorrowTerms = empty(UserBorrowTerms)
     newInterest: uint256 = 0
     userDebt, bt, newInterest = self._getLatestUserDebtAndTerms(_user, True, _a)
-
     if userDebt.amount == 0:
-        return False
+        return True
+
+    # debt health
+    hasGoodDebtHealth: bool = self._hasGoodDebtHealth(userDebt.amount, bt.collateralVal, bt.debtTerms.ltv)
+    if hasGoodDebtHealth:
+        userDebt.inLiquidation = False
 
     userDebt.debtTerms = bt.debtTerms
     extcall Ledger(_a.ledger).setUserDebt(_user, userDebt, newInterest, empty(IntervalBorrow))
 
     # update borrow points
     extcall LootBox(_a.lootbox).updateBorrowPoints(_user, _a)
-    return True
+
+    return hasGoodDebtHealth
 
 
 ###############

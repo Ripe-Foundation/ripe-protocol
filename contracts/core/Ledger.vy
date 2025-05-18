@@ -244,9 +244,9 @@ def setUserDebt(_user: address, _userDebt: UserDebt, _newYield: uint256, _interv
 
     # reduce prev user debt
     totalDebt: uint256 = self.totalDebt
-    prevUserDebt: uint256 = self.userDebt[_user].amount
-    if prevUserDebt != 0:
-        totalDebt -= prevUserDebt
+    prevUserDebt: UserDebt = self.userDebt[_user]
+    if prevUserDebt.amount != 0:
+        totalDebt -= prevUserDebt.amount
 
     # save new user debt
     self.userDebt[_user] = _userDebt
@@ -261,6 +261,10 @@ def setUserDebt(_user: address, _userDebt: UserDebt, _newYield: uint256, _interv
     # update unrealized yield
     if _newYield != 0:
         self.unrealizedYield += _newYield
+
+    # update fung auctions (if they exist)
+    if prevUserDebt.inLiquidation and not _userDebt.inLiquidation:
+        self._removeAllFungibleAuctions(_user)
 
     # remove borrower
     if _userDebt.amount == 0:
@@ -320,6 +324,12 @@ def _removeBorrower(_user: address):
 
 
 # utils
+
+
+@view
+@external
+def hasDebt(_user: address) -> bool:
+    return self.userDebt[_user].amount != 0
 
 
 @view
@@ -461,6 +471,12 @@ def getDepositPointsBundle(_user: address, _vaultId: uint256, _asset: address) -
 ############
 
 
+@view
+@external
+def hasFungibleAuctions(_liqUser: address) -> bool:
+    return self.numFungibleAuctions[_liqUser] != 0
+
+
 # create new auction
 
 
@@ -564,10 +580,13 @@ def _removeFungLiqUser(_liqUser: address):
 
 @external
 def removeAllFungibleAuctions(_liqUser: address):
-    assert msg.sender == addys._getAuctionHouseAddr() # dev: only AuctionHouse allowed
+    assert msg.sender in [addys._getAuctionHouseAddr(), addys._getCreditEngineAddr()] # dev: only AuctionHouse or CreditEngine allowed
     assert deptBasics.isActivated # dev: not activated
+    self._removeAllFungibleAuctions(_liqUser)
 
-    # remove fung user
+
+@internal
+def _removeAllFungibleAuctions(_liqUser: address):
     self._removeFungLiqUser(_liqUser)
 
     numAuctions: uint256 = self.numFungibleAuctions[_liqUser]

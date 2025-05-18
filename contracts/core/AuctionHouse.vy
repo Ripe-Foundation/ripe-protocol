@@ -20,8 +20,8 @@ interface Ledger:
     def removeFungibleAuction(_liqUser: address, _vaultId: uint256, _asset: address): nonpayable
     def createNewFungibleAuction(_auc: FungibleAuction) -> uint256: nonpayable
     def userVaults(_user: address, _index: uint256) -> uint256: view
-    def numUserVaults(_user: address) -> uint256: view
     def isUserInLiquidation(_user: address) -> bool: view
+    def numUserVaults(_user: address) -> uint256: view
 
 interface CreditEngine:
     def repayDuringLiquidation(_liqUser: address, _userDebt: UserDebt, _repayAmount: uint256, _newInterest: uint256, _a: addys.Addys = empty(addys.Addys)) -> bool: nonpayable
@@ -732,9 +732,8 @@ def _buyFungibleAuction(
     greenSpent: uint256 = min(amountNeededFromBuyer, greenAmount)
     assert extcall IERC20(_a.greenToken).transfer(_a.creditEngine, greenSpent) # dev: could not transfer
     hasGoodDebtHealth: bool = extcall CreditEngine(_a.creditEngine).repayDuringAuctionPurchase(_liqUser, greenSpent, _a)
-    if hasGoodDebtHealth:
-        # TODO: kill all auctions for liq user
-        pass
+
+    # TODO: event
 
     return greenSpent
 

@@ -20,7 +20,7 @@ interface CreditEngine:
     def repayForUser(_user: address, _greenAmount: uint256, _shouldStakeRefund: bool, _caller: address, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
     def borrowForUser(_user: address, _greenAmount: uint256, _shouldStake: bool, _caller: address, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
     def getMaxWithdrawableForAsset(_user: address, _asset: address, _a: addys.Addys = empty(addys.Addys)) -> uint256: view
-    def hasGoodDebtHealth(_user: address, _a: addys.Addys = empty(addys.Addys)) -> bool: view
+    def updateDebtForUser(_user: address, _a: addys.Addys = empty(addys.Addys)) -> bool: nonpayable
 
 interface AuctionHouse:
     def buyManyFungibleAuctions(_purchases: DynArray[FungAuctionPurchase, MAX_AUCTION_PURCHASES], _greenAmount: uint256, _buyer: address, _shouldStakeRefund: bool, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
@@ -39,13 +39,13 @@ interface Lootbox:
     def updateDepositPoints(_user: address, _vaultId: uint256, _vaultAddr: address, _asset: address, _a: addys.Addys = empty(addys.Addys)): nonpayable
     def claimLootForUser(_user: address, _caller: address, _shouldStake: bool, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
 
-interface ControlRoom:
-    def getWithdrawConfig(_vaultId: uint256, _asset: address, _user: address, _caller: address) -> WithdrawConfig: view
-    def getDepositConfig(_vaultId: uint256, _asset: address, _user: address) -> DepositConfig: view
-
 interface Ledger:
     def getDepositLedgerData(_user: address, _vaultId: uint256) -> DepositLedgerData: view
     def addVaultToUser(_user: address, _vaultId: uint256): nonpayable
+
+interface ControlRoom:
+    def getWithdrawConfig(_vaultId: uint256, _asset: address, _user: address, _caller: address) -> WithdrawConfig: view
+    def getDepositConfig(_vaultId: uint256, _asset: address, _user: address) -> DepositConfig: view
 
 interface VaultBook:
     def getRegId(_vaultAddr: address) -> uint256: view
@@ -149,7 +149,10 @@ def deposit(
     _vaultId: uint256 = 0,
 ) -> uint256:
     assert deptBasics.isActivated # dev: contract paused
-    return self._deposit(_asset, _amount, _user, _vaultAddr, _vaultId, msg.sender, addys._getAddys())
+    a: addys.Addys = addys._getAddys()
+    amount: uint256 = self._deposit(_asset, _amount, _user, _vaultAddr, _vaultId, msg.sender, a)
+    extcall CreditEngine(a.creditEngine).updateDebtForUser(_user, a)
+    return amount
 
 
 @nonreentrant
@@ -159,6 +162,7 @@ def depositMany(_user: address, _deposits: DynArray[DepositAction, MAX_BALANCE_A
     a: addys.Addys = addys._getAddys()
     for d: DepositAction in _deposits:
         self._deposit(d.asset, d.amount, _user, d.vaultAddr, d.vaultId, msg.sender, a)
+    extcall CreditEngine(a.creditEngine).updateDebtForUser(_user, a)
     return len(_deposits)
 
 
@@ -288,7 +292,7 @@ def withdraw(
     assert deptBasics.isActivated # dev: contract paused
     a: addys.Addys = addys._getAddys()
     amount: uint256 = self._withdraw(_asset, _amount, _user, _vaultAddr, _vaultId, msg.sender, a)
-    assert staticcall CreditEngine(a.creditEngine).hasGoodDebtHealth(_user, a) # dev: cannot withdraw, bad debt health
+    assert extcall CreditEngine(a.creditEngine).updateDebtForUser(_user, a) # dev: bad debt health
     return amount
 
 
@@ -299,7 +303,7 @@ def withdrawMany(_user: address, _withdrawals: DynArray[WithdrawalAction, MAX_BA
     a: addys.Addys = addys._getAddys()
     for w: WithdrawalAction in _withdrawals:
         self._withdraw(w.asset, w.amount, _user, w.vaultAddr, w.vaultId, msg.sender, a)
-    assert staticcall CreditEngine(a.creditEngine).hasGoodDebtHealth(_user, a) # dev: cannot withdraw, bad debt health
+    assert extcall CreditEngine(a.creditEngine).updateDebtForUser(_user, a) # dev: bad debt health
     return len(_withdrawals)
 
 
@@ -379,9 +383,7 @@ def borrow(
 ) -> uint256:
     assert deptBasics.isActivated # dev: contract paused
     a: addys.Addys = addys._getAddys()
-    amount: uint256 = extcall CreditEngine(a.creditEngine).borrowForUser(_user, _greenAmount, _shouldStake, msg.sender, a)
-    assert staticcall CreditEngine(a.creditEngine).hasGoodDebtHealth(_user, a) # dev: cannot borrow, bad debt health
-    return amount
+    return extcall CreditEngine(a.creditEngine).borrowForUser(_user, _greenAmount, _shouldStake, msg.sender, a)
 
 
 # repay
@@ -415,7 +417,9 @@ def redeemCollateral(
     assert deptBasics.isActivated # dev: contract paused
     a: addys.Addys = addys._getAddys()
     greenAmount: uint256 = self._transferTokensToDepartment(_greenAmount, a.greenToken, a.creditEngine)
-    return extcall CreditEngine(a.creditEngine).redeemCollateral(_user, _vaultId, _asset, greenAmount, msg.sender, _shouldStakeRefund, a)
+    greenSpent: uint256 = extcall CreditEngine(a.creditEngine).redeemCollateral(_user, _vaultId, _asset, greenAmount, msg.sender, _shouldStakeRefund, a)
+    extcall CreditEngine(a.creditEngine).updateDebtForUser(msg.sender, a)
+    return greenSpent
 
 
 @nonreentrant
@@ -428,7 +432,9 @@ def redeemCollateralFromMany(
     assert deptBasics.isActivated # dev: contract paused
     a: addys.Addys = addys._getAddys()
     greenAmount: uint256 = self._transferTokensToDepartment(_greenAmount, a.greenToken, a.creditEngine)
-    return extcall CreditEngine(a.creditEngine).redeemCollateralFromMany(_redemptions, greenAmount, msg.sender, _shouldStakeRefund, a)
+    greenSpent: uint256 = extcall CreditEngine(a.creditEngine).redeemCollateralFromMany(_redemptions, greenAmount, msg.sender, _shouldStakeRefund, a)
+    extcall CreditEngine(a.creditEngine).updateDebtForUser(msg.sender, a)
+    return greenSpent
 
 
 ################
@@ -451,7 +457,9 @@ def buyFungibleAuction(
     assert deptBasics.isActivated # dev: contract paused
     a: addys.Addys = addys._getAddys()
     greenAmount: uint256 = self._transferTokensToDepartment(_greenAmount, a.greenToken, a.auctionHouse)
-    return extcall AuctionHouse(a.auctionHouse).buyFungibleAuction(_liqUser, _vaultId, _asset, greenAmount, msg.sender, _shouldStakeRefund, a)
+    greenSpent: uint256 = extcall AuctionHouse(a.auctionHouse).buyFungibleAuction(_liqUser, _vaultId, _asset, greenAmount, msg.sender, _shouldStakeRefund, a)
+    extcall CreditEngine(a.creditEngine).updateDebtForUser(msg.sender, a)
+    return greenSpent
 
 
 @nonreentrant
@@ -464,7 +472,9 @@ def buyManyFungibleAuctions(
     assert deptBasics.isActivated # dev: contract paused
     a: addys.Addys = addys._getAddys()
     greenAmount: uint256 = self._transferTokensToDepartment(_greenAmount, a.greenToken, a.auctionHouse)
-    return extcall AuctionHouse(a.auctionHouse).buyManyFungibleAuctions(_purchases, greenAmount, msg.sender, _shouldStakeRefund, a)
+    greenSpent: uint256 = extcall AuctionHouse(a.auctionHouse).buyManyFungibleAuctions(_purchases, greenAmount, msg.sender, _shouldStakeRefund, a)
+    extcall CreditEngine(a.creditEngine).updateDebtForUser(msg.sender, a)
+    return greenSpent
 
 
 # liquidate users
@@ -478,7 +488,9 @@ def liquidateUser(
 ) -> uint256:
     assert deptBasics.isActivated # dev: contract paused
     a: addys.Addys = addys._getAddys()
-    return extcall AuctionHouse(a.auctionHouse).liquidateUser(_liqUser, msg.sender, _shouldStakeRewards, a)
+    keeperRewards: uint256 = extcall AuctionHouse(a.auctionHouse).liquidateUser(_liqUser, msg.sender, _shouldStakeRewards, a)
+    extcall CreditEngine(a.creditEngine).updateDebtForUser(msg.sender, a)
+    return keeperRewards
 
 
 @nonreentrant
@@ -489,7 +501,9 @@ def liquidateManyUsers(
 ) -> uint256:
     assert deptBasics.isActivated # dev: contract paused
     a: addys.Addys = addys._getAddys()
-    return extcall AuctionHouse(a.auctionHouse).liquidateManyUsers(_liqUsers, msg.sender, _shouldStakeRewards, a)
+    keeperRewards: uint256 = extcall AuctionHouse(a.auctionHouse).liquidateManyUsers(_liqUsers, msg.sender, _shouldStakeRewards, a)
+    extcall CreditEngine(a.creditEngine).updateDebtForUser(msg.sender, a)
+    return keeperRewards
 
 
 ###################
@@ -507,12 +521,13 @@ def claimFromStabilityPool(
     _stabAsset: address,
     _claimAsset: address,
     _maxUsdValue: uint256 = max_value(uint256),
-    _a: addys.Addys = empty(addys.Addys),
 ) -> uint256:
     assert deptBasics.isActivated # dev: contract paused
     a: addys.Addys = addys._getAddys()
     vaultAddr: address = staticcall VaultBook(a.vaultBook).getAddr(_vaultId) # dev: invalid vault id
-    return extcall StabVault(vaultAddr).claimFromStabilityPool(msg.sender, _stabAsset, _claimAsset, _maxUsdValue, a)
+    claimUsdValue: uint256 = extcall StabVault(vaultAddr).claimFromStabilityPool(msg.sender, _stabAsset, _claimAsset, _maxUsdValue, a)
+    assert extcall CreditEngine(a.creditEngine).updateDebtForUser(msg.sender, a) # dev: bad debt health
+    return claimUsdValue
 
 
 @nonreentrant
@@ -524,7 +539,9 @@ def claimManyFromStabilityPool(
     assert deptBasics.isActivated # dev: contract paused
     a: addys.Addys = addys._getAddys()
     vaultAddr: address = staticcall VaultBook(a.vaultBook).getAddr(_vaultId) # dev: invalid vault id
-    return extcall StabVault(vaultAddr).claimManyFromStabilityPool(msg.sender, _claims, a)
+    claimUsdValue: uint256 = extcall StabVault(vaultAddr).claimManyFromStabilityPool(msg.sender, _claims, a)
+    assert extcall CreditEngine(a.creditEngine).updateDebtForUser(msg.sender, a) # dev: bad debt health
+    return claimUsdValue
 
 
 # redemptions
@@ -543,7 +560,9 @@ def redeemFromStabilityPool(
     vaultAddr: address = staticcall VaultBook(a.vaultBook).getAddr(_vaultId) # dev: invalid vault id
     assert vaultAddr != empty(address) # dev: invalid vault id
     greenAmount: uint256 = self._transferTokensToDepartment(_greenAmount, a.greenToken, vaultAddr)
-    return extcall StabVault(vaultAddr).redeemFromStabilityPool(_claimAsset, greenAmount, msg.sender, _shouldStakeRefund, a)
+    greenSpent: uint256 = extcall StabVault(vaultAddr).redeemFromStabilityPool(_claimAsset, greenAmount, msg.sender, _shouldStakeRefund, a)
+    extcall CreditEngine(a.creditEngine).updateDebtForUser(msg.sender, a)
+    return greenSpent
 
 
 @nonreentrant
@@ -559,7 +578,9 @@ def redeemManyFromStabilityPool(
     vaultAddr: address = staticcall VaultBook(a.vaultBook).getAddr(_vaultId) # dev: invalid vault id
     assert vaultAddr != empty(address) # dev: invalid vault id
     greenAmount: uint256 = self._transferTokensToDepartment(_greenAmount, a.greenToken, vaultAddr)
-    return extcall StabVault(vaultAddr).redeemManyFromStabilityPool(_redemptions, greenAmount, msg.sender, _shouldStakeRefund, a)
+    greenSpent: uint256 = extcall StabVault(vaultAddr).redeemManyFromStabilityPool(_redemptions, greenAmount, msg.sender, _shouldStakeRefund, a)
+    extcall CreditEngine(a.creditEngine).updateDebtForUser(msg.sender, a)
+    return greenSpent
 
 
 ###########
@@ -575,7 +596,9 @@ def redeemManyFromStabilityPool(
 def claimLoot(_user: address = msg.sender, _shouldStake: bool = True) -> uint256:
     assert deptBasics.isActivated # dev: contract paused
     a: addys.Addys = addys._getAddys()
-    return extcall Lootbox(a.lootbox).claimLootForUser(_user, msg.sender, _shouldStake, a)
+    totalRipe: uint256 = extcall Lootbox(a.lootbox).claimLootForUser(_user, msg.sender, _shouldStake, a)
+    extcall CreditEngine(a.creditEngine).updateDebtForUser(_user, a)
+    return totalRipe
 
 
 # claim for many users
@@ -586,7 +609,9 @@ def claimLoot(_user: address = msg.sender, _shouldStake: bool = True) -> uint256
 def claimLootForManyUsers(_users: DynArray[address, MAX_CLAIM_USERS], _shouldStake: bool = True) -> uint256:
     assert deptBasics.isActivated # dev: contract paused
     a: addys.Addys = addys._getAddys()
-    return extcall Lootbox(a.lootbox).claimLootForManyUsers(_users, msg.sender, _shouldStake, a)
+    totalRipe: uint256 = extcall Lootbox(a.lootbox).claimLootForManyUsers(_users, msg.sender, _shouldStake, a)
+    extcall CreditEngine(a.creditEngine).updateDebtForUser(msg.sender, a)
+    return totalRipe
 
 
 #############
