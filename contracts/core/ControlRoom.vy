@@ -2,15 +2,49 @@
 
 implements: Department
 
+exports: gov.__interface__
 exports: addys.__interface__
 exports: deptBasics.__interface__
 
+initializes: gov
 initializes: addys
 initializes: deptBasics[addys := addys]
 
+import contracts.modules.LocalGov as gov
 import contracts.modules.Addys as addys
 import contracts.modules.DeptBasics as deptBasics
 from interfaces import Department
+
+struct GenConfig:
+    perUserMaxAssetsPerVault: uint256
+    perUserMaxVaults: uint256
+    canDeposit: bool
+    canWithdraw: bool
+    canBorrow: bool
+    canRepay: bool
+    canRedeemCollateral: bool
+    canRedeemInStabPool: bool
+    canClaimInStabPool: bool
+    canBuyAuction: bool
+    canLiquidate: bool
+    canClaimLoot: bool
+
+struct GenDebtConfig:
+    numAllowedBorrowers: uint256
+    maxBorrowPerInterval: uint256
+    numBlocksPerInterval: uint256
+    perUserDebtLimit: uint256
+    globalDebtLimit: uint256
+    minDebtAmount: uint256
+    ltvPaybackBuffer: uint256
+    keeperFeeRatio: uint256
+    minKeeperFee: uint256
+    genAuctionParams: AuctionParams
+    genStabPoolIds: DynArray[uint256, MAX_GEN_STAB_POOLS]
+
+
+##########
+
 
 struct DepositConfig:
     canDeposit: bool
@@ -106,10 +140,96 @@ struct AuctionParams:
 MAX_GEN_STAB_POOLS: constant(uint256) = 10
 
 
+# config
+genConfig: public(GenConfig)
+genDebtConfig: public(GenDebtConfig)
+
+
+
+# init
 @deploy
 def __init__(_ripeHq: address):
+    gov.__init__(_ripeHq, empty(address), 0, 0, 0)
     addys.__init__(_ripeHq)
     deptBasics.__init__(False, False) # no minting
+
+
+##################
+# General Config #
+##################
+
+
+@external
+def setGeneralConfig(
+    _perUserMaxAssetsPerVault: uint256,
+    _perUserMaxVaults: uint256,
+    _canDeposit: bool = True,
+    _canWithdraw: bool = True,
+    _canBorrow: bool = True,
+    _canRepay: bool = True,
+    _canRedeemCollateral: bool = True,
+    _canRedeemInStabPool: bool = True,
+    _canClaimInStabPool: bool = True,
+    _canBuyAuction: bool = True,
+    _canLiquidate: bool = True,
+    _canClaimLoot: bool = True,
+) -> bool:
+    assert gov._canGovern(msg.sender) # dev: no perms
+
+    # TODO: add time lock, validation, event
+
+    self.genConfig = GenConfig(
+        perUserMaxAssetsPerVault=_perUserMaxAssetsPerVault,
+        perUserMaxVaults=_perUserMaxVaults,
+        canDeposit=_canDeposit,
+        canWithdraw=_canWithdraw,
+        canBorrow=_canBorrow,
+        canRepay=_canRepay,
+        canRedeemCollateral=_canRedeemCollateral,
+        canRedeemInStabPool=_canRedeemInStabPool,
+        canClaimInStabPool=_canClaimInStabPool,
+        canBuyAuction=_canBuyAuction,
+        canLiquidate=_canLiquidate,
+        canClaimLoot=_canClaimLoot,
+    )
+    return True
+
+
+# general debt config
+
+
+@external
+def setGenDebtConfig(
+    _numAllowedBorrowers: uint256,
+    _maxBorrowPerInterval: uint256,
+    _numBlocksPerInterval: uint256,
+    _perUserDebtLimit: uint256,
+    _globalDebtLimit: uint256,
+    _minDebtAmount: uint256,
+    _ltvPaybackBuffer: uint256,
+    _keeperFeeRatio: uint256,
+    _minKeeperFee: uint256,
+    _genAuctionParams: AuctionParams,
+    _genStabPoolIds: DynArray[uint256, MAX_GEN_STAB_POOLS],
+) -> bool:
+    assert gov._canGovern(msg.sender) # dev: no perms
+
+    # TODO: add time lock, validation, event
+
+    self.genDebtConfig = GenDebtConfig(
+        numAllowedBorrowers=_numAllowedBorrowers,
+        maxBorrowPerInterval=_maxBorrowPerInterval,
+        numBlocksPerInterval=_numBlocksPerInterval,
+        perUserDebtLimit=_perUserDebtLimit,
+        globalDebtLimit=_globalDebtLimit,
+        minDebtAmount=_minDebtAmount,
+        ltvPaybackBuffer=_ltvPaybackBuffer,
+        keeperFeeRatio=_keeperFeeRatio,
+        minKeeperFee=_minKeeperFee,
+        genAuctionParams=_genAuctionParams,
+        genStabPoolIds=_genStabPoolIds,
+    )
+    return True
 
 
 ##########################
