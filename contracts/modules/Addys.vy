@@ -7,6 +7,7 @@ interface RipeHq:
 struct Addys:
     hq: address
     greenToken: address
+    savingsGreen: address
     ripeToken: address
     priceDesk: address
     vaultBook: address
@@ -25,18 +26,19 @@ RIPE_HQ_FOR_ADDYS: immutable(address)
 
 # core addys
 GREEN_TOKEN_ID: constant(uint256) = 1
-RIPE_TOKEN_ID: constant(uint256) = 2
-PRICE_DESK_ID: constant(uint256) = 3
-VAULT_BOOK_ID: constant(uint256) = 4
-AUCTION_HOUSE_ID: constant(uint256) = 5
-AUCTION_HOUSE_NFT_ID: constant(uint256) = 6
-BOND_ROOM_ID: constant(uint256) = 7
-CONTROL_ROOM_ID: constant(uint256) = 8
-CREDIT_ENGINE_ID: constant(uint256) = 9
-ENDAOMENT_ID: constant(uint256) = 10
-LEDGER_ID: constant(uint256) = 11
-LOOTBOX_ID: constant(uint256) = 12
-TELLER_ID: constant(uint256) = 13
+SAVINGS_GREEN_ID: constant(uint256) = 2
+RIPE_TOKEN_ID: constant(uint256) = 3
+PRICE_DESK_ID: constant(uint256) = 4
+VAULT_BOOK_ID: constant(uint256) = 5
+AUCTION_HOUSE_ID: constant(uint256) = 6
+AUCTION_HOUSE_NFT_ID: constant(uint256) = 7
+BOND_ROOM_ID: constant(uint256) = 8
+CONTROL_ROOM_ID: constant(uint256) = 9
+CREDIT_ENGINE_ID: constant(uint256) = 10
+ENDAOMENT_ID: constant(uint256) = 11
+LEDGER_ID: constant(uint256) = 12
+LOOTBOX_ID: constant(uint256) = 13
+TELLER_ID: constant(uint256) = 14
 
 
 @deploy
@@ -71,6 +73,7 @@ def _generateAddys() -> Addys:
     return Addys(
         hq=hq,
         greenToken=staticcall RipeHq(hq).getAddr(GREEN_TOKEN_ID),
+        savingsGreen=staticcall RipeHq(hq).getAddr(SAVINGS_GREEN_ID),
         ripeToken=staticcall RipeHq(hq).getAddr(RIPE_TOKEN_ID),
         priceDesk=staticcall RipeHq(hq).getAddr(PRICE_DESK_ID),
         vaultBook=staticcall RipeHq(hq).getAddr(VAULT_BOOK_ID),
@@ -119,6 +122,12 @@ def _isValidRipeHqAddr(_addr: address) -> bool:
 @internal
 def _getGreenToken() -> address:
     return staticcall RipeHq(RIPE_HQ_FOR_ADDYS).getAddr(GREEN_TOKEN_ID)
+
+
+@view
+@internal
+def _getSavingsGreen() -> address:
+    return staticcall RipeHq(RIPE_HQ_FOR_ADDYS).getAddr(SAVINGS_GREEN_ID)
 
 
 @view

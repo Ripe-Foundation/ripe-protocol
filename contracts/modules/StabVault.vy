@@ -7,6 +7,7 @@ import contracts.modules.VaultData as vaultData
 import contracts.modules.Addys as addys
 
 from interfaces import Vault
+from ethereum.ercs import IERC4626
 from ethereum.ercs import IERC20
 
 interface PriceDesk:
@@ -556,7 +557,7 @@ def redeemFromStabilityPool(
     _claimAsset: address,
     _greenAmount: uint256,
     _redeemer: address,
-    _shouldStakeRefund: bool,
+    _wantsSavingsGreen: bool,
     _a: addys.Addys = empty(addys.Addys),
 ) -> uint256:
     assert msg.sender == addys._getTellerAddr() # dev: only Teller allowed
@@ -568,11 +569,9 @@ def redeemFromStabilityPool(
     assert greenAmount != 0 # dev: no green to redeem
     greenSpent: uint256 = self._redeemFromStabilityPool(_redeemer, _claimAsset, max_value(uint256), greenAmount, a.greenToken, a.priceDesk)
 
-    # transfer leftover green back to redeemer
+    # handle leftover green
     if greenAmount > greenSpent:
-        assert extcall IERC20(a.greenToken).transfer(_redeemer, greenAmount - greenSpent, default_return_value=True) # dev: green transfer failed
-
-        # TODO: handle refund staking --> `_shouldStakeRefund`
+        self._handleGreenForUser(_redeemer, greenAmount - greenSpent, _wantsSavingsGreen, a.greenToken, a.savingsGreen)
 
     return greenSpent
 
@@ -582,7 +581,7 @@ def redeemManyFromStabilityPool(
     _redemptions: DynArray[StabPoolRedemption, MAX_STAB_REDEMPTIONS],
     _greenAmount: uint256,
     _redeemer: address,
-    _shouldStakeRefund: bool,
+    _wantsSavingsGreen: bool,
     _a: addys.Addys = empty(addys.Addys),
 ) -> uint256:
     assert msg.sender == addys._getTellerAddr() # dev: only Teller allowed
@@ -601,11 +600,9 @@ def redeemManyFromStabilityPool(
         totalGreenRemaining -= greenSpent
         totalGreenSpent += greenSpent
 
-    # transfer leftover green back to redeemer
+    # handle leftover green
     if totalGreenRemaining != 0:
-        assert extcall IERC20(a.greenToken).transfer(_redeemer, totalGreenRemaining, default_return_value=True) # dev: green transfer failed
-
-        # TODO: handle refund staking --> `_shouldStakeRefund`
+        self._handleGreenForUser(_redeemer, totalGreenRemaining, _wantsSavingsGreen, a.greenToken, a.savingsGreen)
 
     return totalGreenSpent
 
@@ -694,6 +691,29 @@ def _redeemFromStabilityPool(
         greenSpent += redeemAmount
 
     return greenSpent
+
+
+##################
+# Green Handling #
+##################
+
+
+@internal
+def _handleGreenForUser(
+    _recipient: address,
+    _greenAmount: uint256,
+    _wantsSavingsGreen: bool,
+    _greenToken: address,
+    _savingsGreen: address,
+):
+    amount: uint256 = min(_greenAmount, staticcall IERC20(_greenToken).balanceOf(self))
+    if amount == 0:
+        return
+
+    if _wantsSavingsGreen:
+        extcall IERC4626(_savingsGreen).deposit(amount, _recipient)
+    else:
+        assert extcall IERC20(_greenToken).transfer(_recipient, amount, default_return_value=True) # dev: green transfer failed
 
 
 ##################

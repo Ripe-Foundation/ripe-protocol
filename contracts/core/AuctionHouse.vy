@@ -12,6 +12,7 @@ import contracts.modules.Addys as addys
 import contracts.modules.DeptBasics as deptBasics
 from interfaces import Department
 from interfaces import Vault
+from ethereum.ercs import IERC4626
 from ethereum.ercs import IERC20
 
 interface Ledger:
@@ -39,11 +40,12 @@ interface PriceDesk:
 interface StabilityPool:
     def swapForLiquidatedCollateral(_stabAsset: address, _stabAmountToRemove: uint256, _liqAsset: address, _liqAmountSent: uint256, _recipient: address, _greenToken: address) -> uint256: nonpayable
 
+interface GreenToken:
+    def mint(_to: address, _amount: uint256): nonpayable
+    def burn(_amount: uint256): nonpayable
+
 interface VaultBook:
     def getAddr(_vaultId: uint256) -> address: view
-
-interface GreenToken:
-    def burn(_amount: uint256): nonpayable
 
 struct DebtTerms:
     ltv: uint256
@@ -168,7 +170,7 @@ MAX_AUCTION_PURCHASES: constant(uint256) = 20
 @deploy
 def __init__(_ripeHq: address):
     addys.__init__(_ripeHq)
-    deptBasics.__init__(False, False) # no minting
+    deptBasics.__init__(True, False) # can mint green (keeper rewards)
 
 
 ###############
@@ -180,7 +182,7 @@ def __init__(_ripeHq: address):
 def liquidateUser(
     _liqUser: address,
     _keeper: address,
-    _shouldStakeRewards: bool,
+    _wantsSavingsGreen: bool,
     _a: addys.Addys = empty(addys.Addys),
 ) -> uint256:
     assert msg.sender == addys._getTellerAddr() # dev: only teller allowed
@@ -192,9 +194,7 @@ def liquidateUser(
     assert keeperRewards != 0 # dev: no keeper rewards
 
     # handle keeper rewards
-    # TODO: mint green!!
-    assert extcall IERC20(a.greenToken).transfer(_keeper, keeperRewards, default_return_value=True) # dev: green transfer failed
-    # TODO: handle refund staking --> `_shouldStakeRewards`
+    self._handleGreenForUser(_keeper, keeperRewards, True, _wantsSavingsGreen, a.greenToken, a.savingsGreen)
 
     return keeperRewards
 
@@ -203,7 +203,7 @@ def liquidateUser(
 def liquidateManyUsers(
     _liqUsers: DynArray[address, MAX_LIQ_USERS],
     _keeper: address,
-    _shouldStakeRewards: bool,
+    _wantsSavingsGreen: bool,
     _a: addys.Addys = empty(addys.Addys),
 ) -> uint256:
     assert msg.sender == addys._getTellerAddr() # dev: only teller allowed
@@ -217,9 +217,7 @@ def liquidateManyUsers(
     assert totalKeeperRewards != 0 # dev: no keeper rewards
 
     # handle keeper rewards
-    # TODO: mint green!!
-    assert extcall IERC20(a.greenToken).transfer(_keeper, totalKeeperRewards, default_return_value=True) # dev: green transfer failed
-    # TODO: handle refund staking --> `_shouldStakeRewards`
+    self._handleGreenForUser(_keeper, totalKeeperRewards, True, _wantsSavingsGreen, a.greenToken, a.savingsGreen)
 
     return totalKeeperRewards
 
@@ -619,7 +617,7 @@ def buyFungibleAuction(
     _asset: address,
     _greenAmount: uint256,
     _buyer: address,
-    _shouldStakeRefund: bool,
+    _wantsSavingsGreen: bool,
     _a: addys.Addys = empty(addys.Addys),
 ) -> uint256:
     assert msg.sender == addys._getTellerAddr() # dev: only teller allowed
@@ -629,12 +627,11 @@ def buyFungibleAuction(
     greenAmount: uint256 = min(_greenAmount, staticcall IERC20(a.greenToken).balanceOf(self))
     assert greenAmount != 0 # dev: no green to redeem
     greenSpent: uint256 = self._buyFungibleAuction(_liqUser, _vaultId, _asset, max_value(uint256), greenAmount, _buyer, a)
+    assert greenSpent != 0 # dev: no green spent
 
-    # transfer leftover green back to buyer
+    # handle leftover green
     if greenAmount > greenSpent:
-        assert extcall IERC20(a.greenToken).transfer(_buyer, greenAmount - greenSpent, default_return_value=True) # dev: green transfer failed
-
-        # TODO: handle refund staking --> `_shouldStakeRefund`
+        self._handleGreenForUser(_buyer, greenAmount - greenSpent, False, _wantsSavingsGreen, a.greenToken, a.savingsGreen)
 
     return greenSpent
 
@@ -644,7 +641,7 @@ def buyManyFungibleAuctions(
     _purchases: DynArray[FungAuctionPurchase, MAX_AUCTION_PURCHASES],
     _greenAmount: uint256,
     _buyer: address,
-    _shouldStakeRefund: bool,
+    _wantsSavingsGreen: bool,
     _a: addys.Addys = empty(addys.Addys),
 ) -> uint256:
     assert msg.sender == addys._getTellerAddr() # dev: only teller allowed
@@ -662,11 +659,11 @@ def buyManyFungibleAuctions(
         totalGreenRemaining -= greenSpent
         totalGreenSpent += greenSpent
 
-    # transfer leftover green back to redeemer
-    if totalGreenRemaining != 0:
-        assert extcall IERC20(a.greenToken).transfer(_buyer, totalGreenRemaining, default_return_value=True) # dev: green transfer failed
+    assert totalGreenSpent != 0 # dev: no green spent
 
-        # TODO: handle refund staking --> `_shouldStakeRefund`
+    # handle leftover green
+    if totalGreenRemaining != 0:
+        self._handleGreenForUser(_buyer, totalGreenRemaining, False, _wantsSavingsGreen, a.greenToken, a.savingsGreen)
 
     return totalGreenSpent
 
@@ -750,6 +747,38 @@ def _calculateAuctionDiscount(_progress: uint256, _startDiscount: uint256, _maxD
     discountRange: uint256 = _maxDiscount - _startDiscount
     adjustment: uint256 =  _progress * discountRange // HUNDRED_PERCENT
     return _startDiscount + adjustment
+
+
+##################
+# Green Handling #
+##################
+
+
+@internal
+def _handleGreenForUser(
+    _recipient: address,
+    _greenAmount: uint256,
+    _needsMint: bool,
+    _wantsSavingsGreen: bool,
+    _greenToken: address,
+    _savingsGreen: address,
+):
+    # mint green
+    if _needsMint:
+        if not _wantsSavingsGreen:
+            extcall GreenToken(_greenToken).mint(_recipient, _greenAmount) # directly to recipient, exit
+            return
+        extcall GreenToken(_greenToken).mint(self, _greenAmount)
+
+    # finalize amount
+    amount: uint256 = min(_greenAmount, staticcall IERC20(_greenToken).balanceOf(self))
+    if amount == 0:
+        return
+
+    if _wantsSavingsGreen:
+        extcall IERC4626(_savingsGreen).deposit(amount, _recipient)
+    else:
+        assert extcall IERC20(_greenToken).transfer(_recipient, amount, default_return_value=True) # dev: green transfer failed
 
 
 #########

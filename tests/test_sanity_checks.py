@@ -8,18 +8,24 @@ def test_ripe_hq_and_tokens_setup(
     ripe_hq,
     green_token,
     ripe_token,
+    savings_green,
     governance,
     vault_book,
     price_desk,
     chainlink,
+    auction_house,
+    credit_engine,
+    lootbox,
+    control_room,
 ):
     # ripe hq tokens
     assert ripe_hq.greenToken() == green_token.address
+    assert ripe_hq.savingsGreen() == savings_green.address
     assert ripe_hq.ripeToken() == ripe_token.address
 
     # registry
     assert ripe_hq.registryChangeTimeLock() != 0
-    assert ripe_hq.getNumAddrs() == 13
+    assert ripe_hq.getNumAddrs() == 14
 
     # governance
     assert ripe_hq.governance() == governance.address
@@ -45,6 +51,12 @@ def test_ripe_hq_and_tokens_setup(
     assert chainlink.actionTimeLock() != 0
     assert chainlink.numAssets() == 3
     assert chainlink.governance() == ZERO_ADDRESS
+
+    # minting capabilities
+    assert ripe_hq.canMintGreen(auction_house)
+    assert ripe_hq.canMintGreen(credit_engine)
+    assert ripe_hq.canMintRipe(lootbox)
+    assert ripe_hq.canSetTokenBlacklist(control_room)
 
 
 def test_savings_green(

@@ -61,6 +61,7 @@ MAX_RECOVER_ASSETS: constant(uint256) = 20
 @deploy
 def __init__(
     _greenToken: address,
+    _savingsGreen: address,
     _ripeToken: address,
     _initialGov: address,
     _minGovTimeLock: uint256,
@@ -75,9 +76,13 @@ def __init__(
     assert registry._startAddNewAddressToRegistry(_greenToken, "Green Token") # dev: failed to register green token
     assert registry._confirmNewAddressToRegistry(_greenToken) == 1 # dev: failed to confirm green token
 
+    # savings green
+    assert registry._startAddNewAddressToRegistry(_savingsGreen, "Savings Green") # dev: failed to register savings green
+    assert registry._confirmNewAddressToRegistry(_savingsGreen) == 2 # dev: failed to confirm savings green
+
     # ripe token
     assert registry._startAddNewAddressToRegistry(_ripeToken, "Ripe Token") # dev: failed to register ripe token
-    assert registry._confirmNewAddressToRegistry(_ripeToken) == 2 # dev: failed to confirm ripe token
+    assert registry._confirmNewAddressToRegistry(_ripeToken) == 3 # dev: failed to confirm ripe token
 
 
 #############
@@ -180,7 +185,7 @@ def _isValidHqConfig(
 ) -> bool:
 
     # tokens cannot mint, cannot set their own blacklist
-    if _regId in [1, 2]:
+    if _regId in [1, 2, 3]:
         return False
 
     # invalid reg id
@@ -215,8 +220,14 @@ def greenToken() -> address:
 
 @view
 @external
-def ripeToken() -> address:
+def savingsGreen() -> address:
     return registry._getAddr(2)
+
+
+@view
+@external
+def ripeToken() -> address:
+    return registry._getAddr(3)
 
 
 @view

@@ -12,6 +12,7 @@ import contracts.modules.Addys as addys
 import contracts.modules.DeptBasics as deptBasics
 from interfaces import Department
 from interfaces import Vault
+from ethereum.ercs import IERC4626
 from ethereum.ercs import IERC20
 
 interface Ledger:
@@ -113,7 +114,7 @@ event NewBorrow:
     user: indexed(address)
     newLoan: uint256
     daowry: uint256
-    didStake: bool
+    didReceiveSavingsGreen: bool
     outstandingUserDebt: uint256
     userCollateralVal: uint256
     maxUserDebt: uint256
@@ -124,7 +125,7 @@ event RepayDebt:
     repayValue: uint256
     repayType: RepayType
     refundAmount: uint256
-    didStakeRefund: bool
+    refundWasSavingsGreen: bool
     outstandingUserDebt: uint256
     userCollateralVal: uint256
     maxUserDebt: uint256
@@ -152,7 +153,7 @@ def __init__(_ripeHq: address):
 def borrowForUser(
     _user: address,
     _greenAmount: uint256,
-    _shouldStake: bool,
+    _wantsSavingsGreen: bool,
     _caller: address,
     _a: addys.Addys = empty(addys.Addys),
 ) -> uint256:
@@ -213,9 +214,9 @@ def borrowForUser(
 
     # borrower gets their green now -- do this AFTER sending green to stakers
     forBorrower: uint256 = newBorrowAmount - daowry
-    self._handleGreenForUser(_user, forBorrower, _shouldStake, a.greenToken)
+    self._handleGreenForUser(_user, forBorrower, _wantsSavingsGreen, a.greenToken, a.savingsGreen)
 
-    log NewBorrow(user=_user, newLoan=forBorrower, daowry=daowry, didStake=_shouldStake, outstandingUserDebt=userDebt.amount, userCollateralVal=bt.collateralVal, maxUserDebt=bt.totalMaxDebt, globalYieldRealized=unrealizedYield)
+    log NewBorrow(user=_user, newLoan=forBorrower, daowry=daowry, didReceiveSavingsGreen=_wantsSavingsGreen, outstandingUserDebt=userDebt.amount, userCollateralVal=bt.collateralVal, maxUserDebt=bt.totalMaxDebt, globalYieldRealized=unrealizedYield)
     return forBorrower
 
 
@@ -355,7 +356,7 @@ def getMaxBorrowAmount(_user: address) -> uint256:
 def repayForUser(
     _user: address,
     _greenAmount: uint256,
-    _shouldStakeRefund: bool,
+    _wantsSavingsGreen: bool,
     _caller: address,
     _a: addys.Addys = empty(addys.Addys),
 ) -> bool:
@@ -375,7 +376,7 @@ def repayForUser(
     repayAmount, refundAmount = self._validateOnRepay(_user, _caller, _greenAmount, userDebt.amount, a.controlRoom, a.greenToken)
     assert repayAmount != 0 # dev: cannot repay with 0 green
 
-    return self._repayDebt(_user, userDebt, d.numUserVaults, repayAmount, refundAmount, newInterest, True, _shouldStakeRefund, RepayType.STANDARD, a)
+    return self._repayDebt(_user, userDebt, d.numUserVaults, repayAmount, refundAmount, newInterest, True, _wantsSavingsGreen, RepayType.STANDARD, a)
 
 
 # repay during liquidation
@@ -393,7 +394,7 @@ def repayDuringLiquidation(
     assert deptBasics.isActivated # dev: contract paused
     a: addys.Addys = addys._getAddys(_a)
     numVaults: uint256 = staticcall Ledger(a.ledger).numUserVaults(_liqUser)
-    return self._repayDebt(_liqUser, _userDebt, numVaults, _repayValue, 0, _newInterest, False, True, RepayType.LIQUIDATION, a)
+    return self._repayDebt(_liqUser, _userDebt, numVaults, _repayValue, 0, _newInterest, False, False, RepayType.LIQUIDATION, a)
 
 
 # repay during auction purchase
@@ -431,7 +432,7 @@ def _repayDebt(
     _refundAmount: uint256,
     _newInterest: uint256,
     _shouldBurnGreen: bool,
-    _shouldStakeRefund: bool,
+    _wantsSavingsGreen: bool,
     _repayType: RepayType,
     _a: addys.Addys,
 ) -> bool:
@@ -456,9 +457,9 @@ def _repayDebt(
 
     # handle refund
     if _refundAmount != 0:
-        self._handleGreenForUser(_user, _refundAmount, _shouldStakeRefund, _a.greenToken)
+        self._handleGreenForUser(_user, _refundAmount, _wantsSavingsGreen, _a.greenToken, _a.savingsGreen)
 
-    log RepayDebt(user=_user, repayValue=_repayValue, repayType=_repayType, refundAmount=_refundAmount, didStakeRefund=_shouldStakeRefund, outstandingUserDebt=userDebt.amount, userCollateralVal=bt.collateralVal, maxUserDebt=bt.totalMaxDebt, hasGoodDebtHealth=hasGoodDebtHealth)
+    log RepayDebt(user=_user, repayValue=_repayValue, repayType=_repayType, refundAmount=_refundAmount, refundWasSavingsGreen=_wantsSavingsGreen, outstandingUserDebt=userDebt.amount, userCollateralVal=bt.collateralVal, maxUserDebt=bt.totalMaxDebt, hasGoodDebtHealth=hasGoodDebtHealth)
     return hasGoodDebtHealth
 
 
@@ -529,7 +530,7 @@ def redeemCollateralFromMany(
     _redemptions: DynArray[CollateralRedemption, MAX_COLLATERAL_REDEMPTIONS],
     _greenAmount: uint256,
     _redeemer: address,
-    _shouldStakeRefund: bool,
+    _wantsSavingsGreen: bool,
     _a: addys.Addys = empty(addys.Addys),
 ) -> uint256:
     assert msg.sender == addys._getTellerAddr() # dev: only Teller allowed
@@ -547,11 +548,9 @@ def redeemCollateralFromMany(
         totalGreenRemaining -= greenSpent
         totalGreenSpent += greenSpent
 
-    # transfer leftover green back to redeemer
+    # handle leftover green
     if totalGreenRemaining != 0:
-        assert extcall IERC20(a.greenToken).transfer(_redeemer, totalGreenRemaining, default_return_value=True) # dev: green transfer failed
-
-        # TODO: handle refund staking --> `_shouldStakeRefund`
+        self._handleGreenForUser(_redeemer, totalGreenRemaining, _wantsSavingsGreen, a.greenToken, a.savingsGreen)
 
     return totalGreenSpent
 
@@ -563,7 +562,7 @@ def redeemCollateral(
     _asset: address,
     _greenAmount: uint256,
     _redeemer: address,
-    _shouldStakeRefund: bool,
+    _wantsSavingsGreen: bool,
     _a: addys.Addys = empty(addys.Addys),
 ) -> uint256:
     assert msg.sender == addys._getTellerAddr() # dev: only Teller allowed
@@ -574,11 +573,9 @@ def redeemCollateral(
     assert greenAmount != 0 # dev: no green to redeem
     greenSpent: uint256 = self._redeemCollateral(_user, _vaultId, _asset, max_value(uint256), greenAmount, _redeemer, a)
 
-    # transfer leftover green back to redeemer
+    # handle leftover green
     if greenAmount > greenSpent:
-        assert extcall IERC20(a.greenToken).transfer(_redeemer, greenAmount - greenSpent, default_return_value=True) # dev: green transfer failed
-
-        # TODO: handle refund staking --> `_shouldStakeRefund`
+        self._handleGreenForUser(_redeemer, greenAmount - greenSpent, _wantsSavingsGreen, a.greenToken, a.savingsGreen)
 
     return greenSpent
 
@@ -899,6 +896,29 @@ def _canLiquidateUser(_userDebtAmount: uint256, _collateralVal: uint256, _liqThr
     return _collateralVal <= collateralLiqThreshold
 
 
+##################
+# Green Handling #
+##################
+
+
+@internal
+def _handleGreenForUser(
+    _recipient: address,
+    _greenAmount: uint256,
+    _wantsSavingsGreen: bool,
+    _greenToken: address,
+    _savingsGreen: address,
+):
+    amount: uint256 = min(_greenAmount, staticcall IERC20(_greenToken).balanceOf(self))
+    if amount == 0:
+        return
+
+    if _wantsSavingsGreen:
+        extcall IERC4626(_savingsGreen).deposit(amount, _recipient)
+    else:
+        assert extcall IERC20(_greenToken).transfer(_recipient, amount, default_return_value=True) # dev: green transfer failed
+
+
 #############
 # Utilities #
 #############
@@ -933,22 +953,6 @@ def getMaxWithdrawableForAsset(_user: address, _asset: address, _a: addys.Addys 
 
     # based stricly on total ltvs, not taking into consideration how much user actually has deposited
     return staticcall PriceDesk(a.priceDesk).getAssetAmount(_asset, maxTransferUsdValue, False)
-
-
-# green for user
-
-
-@internal
-def _handleGreenForUser(
-    _user: address,
-    _amount: uint256,
-    _shouldStake: bool,
-    _greenToken: address,
-):
-    amount: uint256 = min(_amount, staticcall IERC20(_greenToken).balanceOf(self))
-    assert extcall IERC20(_greenToken).transfer(_user, amount) # dev: could not transfer
-
-    # TODO: handle staking
 
 
 # accrue interest
