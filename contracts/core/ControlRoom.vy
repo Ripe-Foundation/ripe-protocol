@@ -16,8 +16,6 @@ import contracts.modules.DeptBasics as deptBasics
 from interfaces import Department
 
 struct GenConfig:
-    perUserMaxAssetsPerVault: uint256
-    perUserMaxVaults: uint256
     canDeposit: bool
     canWithdraw: bool
     canBorrow: bool
@@ -28,6 +26,8 @@ struct GenConfig:
     canBuyAuction: bool
     canLiquidate: bool
     canClaimLoot: bool
+    perUserMaxAssetsPerVault: uint256
+    perUserMaxVaults: uint256
 
 struct GenDebtConfig:
     numAllowedBorrowers: uint256
@@ -41,6 +41,26 @@ struct GenDebtConfig:
     minKeeperFee: uint256
     genAuctionParams: AuctionParams
     genStabPoolIds: DynArray[uint256, MAX_GEN_STAB_POOLS]
+
+struct AssetConfig:
+    canDeposit: bool
+    canWithdraw: bool
+    canRedeemCollateral: bool
+    canLiquidate: bool
+    canAuctionInstantly: bool
+    canBuyAuction: bool
+    whitelist: address
+    perUserDepositLimit: uint256
+    globalDepositLimit: uint256
+    debtTerms: DebtTerms
+    isStable: bool
+    isNft: bool
+    specialStabPoolId: uint256
+    customAuctionParams: AuctionParams
+
+
+
+
 
 
 ##########
@@ -179,8 +199,6 @@ def setGeneralConfig(
     # TODO: add time lock, validation, event
 
     self.genConfig = GenConfig(
-        perUserMaxAssetsPerVault=_perUserMaxAssetsPerVault,
-        perUserMaxVaults=_perUserMaxVaults,
         canDeposit=_canDeposit,
         canWithdraw=_canWithdraw,
         canBorrow=_canBorrow,
@@ -191,6 +209,8 @@ def setGeneralConfig(
         canBuyAuction=_canBuyAuction,
         canLiquidate=_canLiquidate,
         canClaimLoot=_canClaimLoot,
+        perUserMaxAssetsPerVault=_perUserMaxAssetsPerVault,
+        perUserMaxVaults=_perUserMaxVaults,
     )
     return True
 
