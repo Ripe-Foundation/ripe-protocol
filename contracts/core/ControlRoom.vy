@@ -18,6 +18,10 @@ from interfaces import Department
 interface Whitelist:
     def isUserAllowed(_user: address, _asset: address) -> bool: view
 
+interface VaultBook:
+    def getAddr(_regId: uint256) -> address: view
+
+
 struct GenConfig:
     canDeposit: bool
     canWithdraw: bool
@@ -52,7 +56,8 @@ struct AssetConfig:
     canRedeemCollateral: bool
     canRedeemInStabPool: bool
     canBuyInAuction: bool
-    shouldSwapInStabPool: bool
+    shouldTransferToEndaoment: bool
+    shouldSwapInStabPools: bool
     shouldAuctionInstantly: bool
     whitelist: address
     perUserDepositLimit: uint256
@@ -123,19 +128,15 @@ struct GenLiqConfig:
     genAuctionParams: AuctionParams
     genStabPools: DynArray[VaultData, MAX_GEN_STAB_POOLS]
 
-##########
-
-
 struct AssetLiqConfig:
     hasConfig: bool
-    hasLtv: bool
-    hasWhitelist: bool
-    isNft: bool
-    isStable: bool
-    specialStabPool: VaultData
-    canAuctionInstantly: bool
+    shouldTransferToEndaoment: bool
+    shouldSwapInStabPools: bool
+    shouldAuctionInstantly: bool
     customAuctionParams: AuctionParams
+    specialStabPool: VaultData
 
+##########
 
 
 struct DebtTerms:
@@ -293,7 +294,8 @@ def setAssetConfig(
     _canRedeemCollateral: bool,
     _canRedeemInStabPool: bool,
     _canBuyInAuction: bool,
-    _shouldSwapInStabPool: bool,
+    _shouldTransferToEndaoment: bool,
+    _shouldSwapInStabPools: bool,
     _shouldAuctionInstantly: bool,
     _whitelist: address,
     _perUserDepositLimit: uint256,
@@ -314,7 +316,8 @@ def setAssetConfig(
         canRedeemCollateral=_canRedeemCollateral,
         canRedeemInStabPool=_canRedeemInStabPool,
         canBuyInAuction=_canBuyInAuction,
-        shouldSwapInStabPool=_shouldSwapInStabPool,
+        shouldTransferToEndaoment=_shouldTransferToEndaoment,
+        shouldSwapInStabPools=_shouldSwapInStabPools,
         shouldAuctionInstantly=_shouldAuctionInstantly,
         whitelist=_whitelist,
         perUserDepositLimit=_perUserDepositLimit,
@@ -373,6 +376,18 @@ def setUserDelegation(
 ###########
 
 
+# is user allowed
+
+
+@view
+@internal
+def _isUserAllowed(_whitelist: address, _user: address, _asset: address) -> bool:
+    isUserAllowed: bool = True 
+    if _whitelist != empty(address):
+        isUserAllowed = staticcall Whitelist(_whitelist).isUserAllowed(_user, _asset)
+    return isUserAllowed
+
+
 # deposits
 
 
@@ -382,14 +397,10 @@ def getTellerDepositConfig(_asset: address, _user: address) -> TellerDepositConf
     genConfig: GenConfig = self.genConfig
     assetConfig: AssetConfig = self.assetConfig[_asset]
 
-    isUserAllowed: bool = True 
-    if assetConfig.whitelist != empty(address):
-        isUserAllowed = staticcall Whitelist(assetConfig.whitelist).isUserAllowed(_user, _asset)
-
     return TellerDepositConfig(
         canDepositGeneral=genConfig.canDeposit,
         canDepositAsset=assetConfig.canDeposit,
-        isUserAllowed=isUserAllowed,
+        isUserAllowed=self._isUserAllowed(assetConfig.whitelist, _user, _asset),
         perUserDepositLimit=assetConfig.perUserDepositLimit,
         globalDepositLimit=assetConfig.globalDepositLimit,
         perUserMaxAssetsPerVault=genConfig.perUserMaxAssetsPerVault,
@@ -407,10 +418,6 @@ def getTellerWithdrawConfig(_asset: address, _user: address, _caller: address) -
     genConfig: GenConfig = self.genConfig
     assetConfig: AssetConfig = self.assetConfig[_asset]
 
-    isUserAllowed: bool = True 
-    if assetConfig.whitelist != empty(address):
-        isUserAllowed = staticcall Whitelist(assetConfig.whitelist).isUserAllowed(_user, _asset)
-
     canWithdrawForUser: bool = True
     if _user != _caller:
         canWithdrawForUser = self.userDelegation[_user][_caller].canWithdraw
@@ -418,7 +425,7 @@ def getTellerWithdrawConfig(_asset: address, _user: address, _caller: address) -
     return TellerWithdrawConfig(
         canWithdrawGeneral=genConfig.canWithdraw,
         canWithdrawAsset=assetConfig.canWithdraw,
-        isUserAllowed=isUserAllowed,
+        isUserAllowed=self._isUserAllowed(assetConfig.whitelist, _user, _asset),
         canWithdrawForUser=canWithdrawForUser,
     )
 
@@ -476,16 +483,12 @@ def getRedeemCollateralConfig(_asset: address, _redeemer: address) -> RedeemColl
     genConfig: GenConfig = self.genConfig
     assetConfig: AssetConfig = self.assetConfig[_asset]
 
-    isUserAllowed: bool = True 
-    if assetConfig.whitelist != empty(address):
-        isUserAllowed = staticcall Whitelist(assetConfig.whitelist).isUserAllowed(_redeemer, _asset)
-
     # TODO: when setting asset config -> canRedeemCollateral, make sure: has LTV, not stable, not NFT
 
     return RedeemCollateralConfig(
         canRedeemCollateralGeneral=genConfig.canRedeemCollateral,
         canRedeemCollateralAsset=assetConfig.canRedeemCollateral,
-        isUserAllowed=isUserAllowed,
+        isUserAllowed=self._isUserAllowed(assetConfig.whitelist, _redeemer, _asset),
         ltvPaybackBuffer=self.genDebtConfig.ltvPaybackBuffer,
     )
 
@@ -499,14 +502,10 @@ def getAuctionBuyConfig(_asset: address, _buyer: address) -> AuctionBuyConfig:
     genConfig: GenConfig = self.genConfig
     assetConfig: AssetConfig = self.assetConfig[_asset]
 
-    isUserAllowed: bool = True 
-    if assetConfig.whitelist != empty(address):
-        isUserAllowed = staticcall Whitelist(assetConfig.whitelist).isUserAllowed(_buyer, _asset)
-
     return AuctionBuyConfig(
         canBuyInAuctionGeneral=genConfig.canBuyInAuction,
         canBuyInAuctionAsset=assetConfig.canBuyInAuction,
-        isUserAllowed=isUserAllowed,
+        isUserAllowed=self._isUserAllowed(assetConfig.whitelist, _buyer, _asset),
     )
 
 
@@ -534,27 +533,32 @@ def getGenLiqConfig() -> GenLiqConfig:
 # asset liquidation config
 
 
-# TODO: WIP WIP WIP
-
-# struct AssetLiqConfig:
-#     hasConfig: bool
-#     hasLtv: bool
-#     hasWhitelist: bool
-#     isNft: bool
-#     isStable: bool
-#     specialStabPool: VaultData
-#     canAuctionInstantly: bool
-#     customAuctionParams: AuctionParams
-
-
 @view
 @external
 def getAssetLiqConfig(_asset: address) -> AssetLiqConfig:
-    # TODO: implement
-    return empty(AssetLiqConfig)
+    assetConfig: AssetConfig = self.assetConfig[_asset]
+
+    # TODO: when setting asset config...
+    # shouldTransferToEndaoment -- needs to be stable-ish, etc. Or Stab pool asset (LP token, etc)
+    # shouldSwapInStabPools -- check LTV, whitelist/specialStabPoolId, NFT status
+
+    # TODO: handle special stab pool
+    specialStabPool: VaultData = empty(VaultData)
+
+    return AssetLiqConfig(
+        hasConfig=True,
+        shouldTransferToEndaoment=assetConfig.shouldTransferToEndaoment,
+        shouldSwapInStabPools=assetConfig.shouldSwapInStabPools,
+        shouldAuctionInstantly=assetConfig.shouldAuctionInstantly,
+        customAuctionParams=assetConfig.customAuctionParams,
+        specialStabPool=specialStabPool,
+    )
 
 
-# TODO: liquidate user, stab pool stuff, claim loot stuff
+# stability pool
+
+
+# TODO: stab pool stuff, claim loot stuff
 
 
 
