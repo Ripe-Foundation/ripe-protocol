@@ -308,7 +308,7 @@ def getMaxBorrowAmount(_user: address) -> uint256:
 
     # get borrow config
     config: BorrowConfig = staticcall ControlRoom(a.controlRoom).getBorrowConfig(_user, _user)
-    if not config.isBorrowEnabled:
+    if not config.canBorrow:
         return 0
 
     # check num allowed borrowers
