@@ -21,7 +21,6 @@ interface Whitelist:
 interface VaultBook:
     def getAddr(_regId: uint256) -> address: view
 
-
 struct GenConfig:
     canDeposit: bool
     canWithdraw: bool
@@ -55,6 +54,7 @@ struct AssetConfig:
     canWithdraw: bool
     canRedeemCollateral: bool
     canRedeemInStabPool: bool
+    canClaimInStabPool: bool
     canBuyInAuction: bool
     shouldTransferToEndaoment: bool
     shouldSwapInStabPools: bool
@@ -135,6 +135,16 @@ struct AssetLiqConfig:
     shouldAuctionInstantly: bool
     customAuctionParams: AuctionParams
     specialStabPool: VaultData
+
+struct StabPoolClaimsConfig:
+    canClaimInStabPoolGeneral: bool
+    canClaimInStabPoolAsset: bool
+    isUserAllowed: bool
+
+struct StabPoolRedemptionsConfig:
+    canRedeemInStabPoolGeneral: bool
+    canRedeemInStabPoolAsset: bool
+    isUserAllowed: bool
 
 ##########
 
@@ -293,6 +303,7 @@ def setAssetConfig(
     _canWithdraw: bool,
     _canRedeemCollateral: bool,
     _canRedeemInStabPool: bool,
+    _canClaimInStabPool: bool,
     _canBuyInAuction: bool,
     _shouldTransferToEndaoment: bool,
     _shouldSwapInStabPools: bool,
@@ -315,6 +326,7 @@ def setAssetConfig(
         canWithdraw=_canWithdraw,
         canRedeemCollateral=_canRedeemCollateral,
         canRedeemInStabPool=_canRedeemInStabPool,
+        canClaimInStabPool=_canClaimInStabPool,
         canBuyInAuction=_canBuyInAuction,
         shouldTransferToEndaoment=_shouldTransferToEndaoment,
         shouldSwapInStabPools=_shouldSwapInStabPools,
@@ -555,11 +567,39 @@ def getAssetLiqConfig(_asset: address) -> AssetLiqConfig:
     )
 
 
-# stability pool
+# stability pool claims
 
 
-# TODO: stab pool stuff, claim loot stuff
+@view
+@external
+def getStabPoolClaimsConfig(_asset: address, _claimer: address) -> StabPoolClaimsConfig:
+    genConfig: GenConfig = self.genConfig
+    assetConfig: AssetConfig = self.assetConfig[_asset]
 
+    return StabPoolClaimsConfig(
+        canClaimInStabPoolGeneral=genConfig.canClaimInStabPool,
+        canClaimInStabPoolAsset=assetConfig.canClaimInStabPool,
+        isUserAllowed=self._isUserAllowed(assetConfig.whitelist, _claimer, _asset),
+    )
+
+
+# stability pool redemptions
+
+
+@view
+@external
+def getStabPoolRedemptionsConfig(_asset: address, _redeemer: address) -> StabPoolRedemptionsConfig:
+    genConfig: GenConfig = self.genConfig
+    assetConfig: AssetConfig = self.assetConfig[_asset]
+
+    return StabPoolRedemptionsConfig(
+        canRedeemInStabPoolGeneral=genConfig.canRedeemInStabPool,
+        canRedeemInStabPoolAsset=assetConfig.canRedeemInStabPool,
+        isUserAllowed=self._isUserAllowed(assetConfig.whitelist, _redeemer, _asset),
+    )
+
+
+# TODO: claim loot stuff
 
 
 ####################

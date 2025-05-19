@@ -10,6 +10,10 @@ from interfaces import Vault
 from ethereum.ercs import IERC4626
 from ethereum.ercs import IERC20
 
+interface ControlRoom:
+    def getStabPoolRedemptionsConfig(_asset: address, _redeemer: address) -> StabPoolRedemptionsConfig: view
+    def getStabPoolClaimsConfig(_asset: address, _claimer: address) -> StabPoolClaimsConfig: view
+
 interface PriceDesk:
     def getAssetAmount(_asset: address, _usdValue: uint256, _shouldRaise: bool = False) -> uint256: view
     def getUsdValue(_asset: address, _amount: uint256, _shouldRaise: bool = False) -> uint256: view
@@ -25,6 +29,16 @@ struct StabPoolClaim:
 struct StabPoolRedemption:
     claimAsset: address
     maxGreenAmount: uint256
+
+struct StabPoolClaimsConfig:
+    canClaimInStabPoolGeneral: bool
+    canClaimInStabPoolAsset: bool
+    isUserAllowed: bool
+
+struct StabPoolRedemptionsConfig:
+    canRedeemInStabPoolGeneral: bool
+    canRedeemInStabPoolAsset: bool
+    isUserAllowed: bool
 
 event AssetClaimedInStabilityPool:
     user: indexed(address)
@@ -426,9 +440,9 @@ def _getValueOfClaimableAssets(_stabAsset: address, _priceDesk: address) -> uint
     return totalValue
 
 
-#####################
-# Claims via Shares #
-#####################
+############################
+# Claims (already in pool) #
+############################
 
 
 @external
@@ -442,7 +456,7 @@ def claimFromStabilityPool(
     assert msg.sender == addys._getTellerAddr() # dev: only Teller allowed
     assert vaultData.isActivated # dev: contract paused
     a: addys.Addys = addys._getAddys(_a)
-    return self._claimFromStabilityPool(_claimer, _stabAsset, _claimAsset, _maxUsdValue, a.priceDesk)
+    return self._claimFromStabilityPool(_claimer, _stabAsset, _claimAsset, _maxUsdValue, a.priceDesk, a.controlRoom)
 
 
 @external
@@ -457,7 +471,7 @@ def claimManyFromStabilityPool(
 
     totalUsdValue: uint256 = 0
     for c: StabPoolClaim in _claims:
-        totalUsdValue += self._claimFromStabilityPool(_claimer, c.stabAsset, c.claimAsset, c.maxUsdValue, a.priceDesk)
+        totalUsdValue += self._claimFromStabilityPool(_claimer, c.stabAsset, c.claimAsset, c.maxUsdValue, a.priceDesk, a.controlRoom)
     return totalUsdValue
 
 
@@ -468,8 +482,14 @@ def _claimFromStabilityPool(
     _claimAsset: address,
     _maxUsdValue: uint256,
     _priceDesk: address,
+    _controlRoom: address,
 ) -> uint256:
     if empty(address) in [_claimer, _stabAsset, _claimAsset] or _maxUsdValue == 0:
+        return 0
+
+    # check claims config
+    config: StabPoolClaimsConfig = staticcall ControlRoom(_controlRoom).getStabPoolClaimsConfig(_stabAsset, _claimer)
+    if not config.canClaimInStabPoolGeneral or not config.canClaimInStabPoolAsset or not config.isUserAllowed:
         return 0
 
     # max claimable asset
@@ -554,7 +574,7 @@ def _calcClaimSharesAndAmount(
 
 @external
 def redeemFromStabilityPool(
-    _claimAsset: address,
+    _asset: address,
     _greenAmount: uint256,
     _redeemer: address,
     _wantsSavingsGreen: bool,
@@ -563,11 +583,12 @@ def redeemFromStabilityPool(
     assert msg.sender == addys._getTellerAddr() # dev: only Teller allowed
     assert vaultData.isActivated # dev: contract paused
     a: addys.Addys = addys._getAddys(_a)
+
     assert self._canRedeemInThisVault(a.greenToken) # dev: redemptions not allowed
 
     greenAmount: uint256 = min(_greenAmount, staticcall IERC20(a.greenToken).balanceOf(self))
     assert greenAmount != 0 # dev: no green to redeem
-    greenSpent: uint256 = self._redeemFromStabilityPool(_redeemer, _claimAsset, max_value(uint256), greenAmount, a.greenToken, a.priceDesk)
+    greenSpent: uint256 = self._redeemFromStabilityPool(_redeemer, _asset, max_value(uint256), greenAmount, a.greenToken, a.priceDesk, a.controlRoom)
 
     # handle leftover green
     if greenAmount > greenSpent:
@@ -587,6 +608,7 @@ def redeemManyFromStabilityPool(
     assert msg.sender == addys._getTellerAddr() # dev: only Teller allowed
     assert vaultData.isActivated # dev: contract paused
     a: addys.Addys = addys._getAddys(_a)
+
     assert self._canRedeemInThisVault(a.greenToken) # dev: redemptions not allowed
 
     totalGreenSpent: uint256 = 0
@@ -596,7 +618,7 @@ def redeemManyFromStabilityPool(
     for r: StabPoolRedemption in _redemptions:
         if totalGreenRemaining == 0:
             break
-        greenSpent: uint256 = self._redeemFromStabilityPool(_redeemer, r.claimAsset, r.maxGreenAmount, totalGreenRemaining, a.greenToken, a.priceDesk)
+        greenSpent: uint256 = self._redeemFromStabilityPool(_redeemer, r.claimAsset, r.maxGreenAmount, totalGreenRemaining, a.greenToken, a.priceDesk, a.controlRoom)
         totalGreenRemaining -= greenSpent
         totalGreenSpent += greenSpent
 
@@ -619,21 +641,27 @@ def _canRedeemInThisVault(_greenToken: address) -> bool:
 @internal
 def _redeemFromStabilityPool(
     _redeemer: address,
-    _claimAsset: address,
+    _asset: address,
     _maxGreenForAsset: uint256,
     _totalGreenRemaining: uint256,
     _greenToken: address,
     _priceDesk: address,
+    _controlRoom: address,
 ) -> uint256:
 
     # NOTE: failing gracefully here, in case of many redemptions at same time
 
     # invalid inputs
-    if empty(address) in [_redeemer, _claimAsset] or 0 in [_maxGreenForAsset, _totalGreenRemaining]:
+    if empty(address) in [_redeemer, _asset] or 0 in [_maxGreenForAsset, _totalGreenRemaining]:
+        return 0
+
+    # check redemption config
+    config: StabPoolRedemptionsConfig = staticcall ControlRoom(_controlRoom).getStabPoolRedemptionsConfig(_asset, _redeemer)
+    if not config.canRedeemInStabPoolGeneral or not config.canRedeemInStabPoolAsset or not config.isUserAllowed:
         return 0
 
     # cannot redeem green token
-    if _claimAsset == _greenToken:
+    if _asset == _greenToken:
         return 0
 
     # treating green as $1
@@ -643,12 +671,12 @@ def _redeemFromStabilityPool(
         return 0
 
     # max claimable amount
-    maxClaimableAmount: uint256 = staticcall PriceDesk(_priceDesk).getAssetAmount(_claimAsset, maxRedeemValue, True)
+    maxClaimableAmount: uint256 = staticcall PriceDesk(_priceDesk).getAssetAmount(_asset, maxRedeemValue, True)
     if maxClaimableAmount == 0:
         return 0
 
     # total claimable asset
-    actualClaimableAmount: uint256 = min(self.totalClaimableBalances[_claimAsset], staticcall IERC20(_claimAsset).balanceOf(self))
+    actualClaimableAmount: uint256 = min(self.totalClaimableBalances[_asset], staticcall IERC20(_asset).balanceOf(self))
     if actualClaimableAmount == 0:
         return 0
 
@@ -674,14 +702,14 @@ def _redeemFromStabilityPool(
             continue
 
         # claimable balance
-        claimableBalance: uint256 = self.claimableBalances[stabAsset][_claimAsset]
+        claimableBalance: uint256 = self.claimableBalances[stabAsset][_asset]
         if claimableBalance == 0:
             continue
 
         # reduce claimable balances
         claimAmount: uint256 = min(remainingClaimAmount, claimableBalance)
-        self._reduceClaimableBalances(stabAsset, _claimAsset, claimAmount, claimableBalance)
-        assert extcall IERC20(_claimAsset).transfer(_redeemer, claimAmount, default_return_value=True) # dev: transfer failed
+        self._reduceClaimableBalances(stabAsset, _asset, claimAmount, claimableBalance)
+        assert extcall IERC20(_asset).transfer(_redeemer, claimAmount, default_return_value=True) # dev: transfer failed
         remainingClaimAmount -= claimAmount
 
         # add green to claimable
