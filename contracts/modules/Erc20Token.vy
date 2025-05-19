@@ -48,6 +48,9 @@ event HqChangeCancelled:
     initiatedBlock: uint256
     confirmBlock: uint256
 
+event TokenPauseModified:
+    isPaused: bool
+
 event InitialRipeHqSet:
     hq: indexed(address)
     timeLock: uint256
@@ -59,6 +62,7 @@ event HqChangeTimeLockModified:
 ripeHq: public(address)
 
 # config
+isPaused: public(bool)
 pendingHq: public(PendingHq)
 hqChangeTimeLock: public(uint256)
 tempGov: address
@@ -137,6 +141,7 @@ def transferFrom(_sender: address, _recipient: address, _amount: uint256) -> boo
 
 @internal
 def _transfer(_sender: address, _recipient: address, _amount: uint256):
+    assert not self.isPaused # dev: token paused
     assert _amount != 0 # dev: cannot transfer 0 amount
     assert _recipient not in [self, empty(address)] # dev: invalid recipient
 
@@ -224,6 +229,7 @@ def decreaseAllowance(_spender: address, _amount: uint256) -> bool:
 def _mint(_recipient: address, _amount: uint256) -> bool:
     assert _recipient not in [self, empty(address)] # dev: invalid recipient
     assert not self.blacklisted[_recipient] # dev: blacklisted
+    assert not self.isPaused # dev: token paused
 
     self.balanceOf[_recipient] = unsafe_add(self.balanceOf[_recipient], _amount)
     self.totalSupply += _amount
@@ -242,6 +248,7 @@ def burn(_amount: uint256) -> bool:
 
 @internal
 def _burn(_owner: address, _amount: uint256):
+    assert not self.isPaused # dev: token paused
     self.balanceOf[_owner] -= _amount
     self.totalSupply = unsafe_sub(self.totalSupply, _amount)
     log Transfer(sender=_owner, recipient=empty(address), amount=_amount)
@@ -503,6 +510,18 @@ def minHqTimeLock() -> uint256:
 @external
 def maxHqTimeLock() -> uint256:
     return MAX_HQ_TIME_LOCK
+
+
+#########
+# Pause #
+#########
+
+
+@external
+def pause(_shouldPause: bool):
+    assert msg.sender == staticcall RipeHq(self.ripeHq).governance() # dev: no perms
+    self.isPaused = _shouldPause
+    log TokenPauseModified(isPaused=_shouldPause)
 
 
 ###############
