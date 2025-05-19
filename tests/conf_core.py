@@ -259,6 +259,7 @@ def ledger(ripe_hq_deploy):
     return boa.load(
         "contracts/core/Ledger.vy",
         ripe_hq_deploy,
+        0,
         name="ledger",
     )
 

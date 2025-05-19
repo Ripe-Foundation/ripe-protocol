@@ -26,8 +26,9 @@ interface Ledger:
     def numUserVaults(_user: address) -> uint256: view
 
 interface ControlRoom:
-    def getDepositPointsAllocs(_vaultId: uint256, _asset: address) -> DepositPointsAllocs: view
-    def canCallerClaimLootForUser(_user: address, _caller: address) -> bool: view
+    def getDepositPointsConfig(_user: address, _asset: address) -> DepositPointsConfig: view
+    def getClaimLootConfig(_user: address, _caller: address) -> ClaimLootConfig: view
+    def areBorrowPointsEnabled(_user: address) -> bool: view
     def getRipeRewardsConfig() -> RipeRewardsConfig: view
 
 interface VaultBook:
@@ -42,12 +43,11 @@ interface RipeToken:
 
 struct RipeRewards:
     stakers: uint256
-    borrowers: uint256
     voteDepositors: uint256
     genDepositors: uint256
+    borrowers: uint256
     newRipeRewards: uint256
     lastUpdate: uint256
-    lastRewardsBlock: uint256
 
 struct GlobalDepositPoints:
     lastUsdValue: uint256
@@ -97,21 +97,24 @@ struct UserDepositLoot:
 
 struct RipeRewardsAllocs:
     stakers: uint256
-    borrowers: uint256
     voteDepositors: uint256
     genDepositors: uint256
-    total: uint256
+    borrowers: uint256
 
 struct RipeRewardsConfig:
     ripeRewardsAllocs: RipeRewardsAllocs
-    ripeRewardsStartBlock: uint256
     ripePerBlock: uint256
 
-struct DepositPointsAllocs:
+struct DepositPointsConfig:
+    arePointsEnabled: bool
     stakers: uint256
     stakersTotal: uint256
     voteDepositor: uint256
     voteDepositorTotal: uint256
+
+struct ClaimLootConfig:
+    canClaimLoot: bool
+    canClaimLootForUser: bool
 
 event DepositLootClaimed:
     user: indexed(address)
@@ -186,8 +189,10 @@ def _claimLoot(
         return 0
 
     # check if caller can claim for user
+    config: ClaimLootConfig = staticcall ControlRoom(_a.controlRoom).getClaimLootConfig(_user, _caller)
+    assert config.canClaimLoot # dev: loot claims disabled
     if _user != _caller:
-        assert staticcall ControlRoom(_a.controlRoom).canCallerClaimLootForUser(_user, _caller) # dev: cannot claim for user
+        assert config.canClaimLootForUser # dev: cannot claim for user
 
     # total loot -- start with borrow loot
     totalRipeForUser: uint256 = self._claimBorrowLoot(_user, _a)
@@ -287,7 +292,7 @@ def updateDepositPoints(
     up: UserDepositPoints = empty(UserDepositPoints)
     ap: AssetDepositPoints = empty(AssetDepositPoints)
     gp: GlobalDepositPoints = empty(GlobalDepositPoints)
-    up, ap, gp = self._getLatestDepositPoints(_user, _vaultId, _vaultAddr, _asset, globalRewards.lastRewardsBlock, a)
+    up, ap, gp = self._getLatestDepositPoints(_user, _vaultId, _vaultAddr, _asset, a)
 
     # update points
     extcall Ledger(a.ledger).setDepositPointsAndRipeRewards(_user, _vaultId, _asset, up, ap, gp, globalRewards)
@@ -300,26 +305,31 @@ def updateDepositPoints(
 @internal
 def _getLatestGlobalDepositPoints(
     _globalPoints: GlobalDepositPoints,
-    _lastRipeRewardsBlock: uint256,
+    _arePointsEnabled: bool,
     _stakersTotalAlloc: uint256,
     _voteDepositorTotalAlloc: uint256,
 ) -> GlobalDepositPoints:
     globalPoints: GlobalDepositPoints = _globalPoints
 
+    # elapsed blocks
+    elapsedBlocks: uint256 = 0
+    if globalPoints.lastUpdate != 0 and block.number > globalPoints.lastUpdate:
+        elapsedBlocks = block.number - globalPoints.lastUpdate
+
+    # update last update
+    globalPoints.lastUpdate = block.number
+
     # nothing to do here
-    if globalPoints.lastUpdate == 0 or _lastRipeRewardsBlock <= globalPoints.lastUpdate:
-        globalPoints.lastUpdate = block.number
+    if not _arePointsEnabled or elapsedBlocks == 0:
         return globalPoints
 
     # update ripe rewards points
-    elapsedBlocks: uint256 = _lastRipeRewardsBlock - globalPoints.lastUpdate
     globalPoints.ripeStakerPoints += _stakersTotalAlloc * elapsedBlocks
     globalPoints.ripeVotePoints += _voteDepositorTotalAlloc * elapsedBlocks
     globalPoints.ripeGenPoints += globalPoints.lastUsdValue * elapsedBlocks
 
     # Note: will update `lastUsdValue` later in flow (after knowing AssetDepositPoints changes in usd value)
 
-    globalPoints.lastUpdate = block.number
     return globalPoints
 
 
@@ -330,32 +340,34 @@ def _getLatestGlobalDepositPoints(
 @internal
 def _getLatestAssetDepositPoints(
     _assetPoints: AssetDepositPoints,
-    _lastRipeRewardsBlock: uint256,
+    _arePointsEnabled: bool,
     _stakersAlloc: uint256,
     _voteDepositorAlloc: uint256,
 ) -> AssetDepositPoints:
     assetPoints: AssetDepositPoints = _assetPoints
 
-    # balance points - how each user will split rewards for this vault/asset
+    # elapsed blocks
     elapsedBlocks: uint256 = 0
     if assetPoints.lastUpdate != 0 and block.number > assetPoints.lastUpdate:
         elapsedBlocks = block.number - assetPoints.lastUpdate
-        assetPoints.balancePoints += assetPoints.lastBalance * elapsedBlocks
 
-    # nothing else to do here
-    if assetPoints.lastUpdate == 0 or _lastRipeRewardsBlock <= assetPoints.lastUpdate:
-        assetPoints.lastUpdate = block.number
+    # update last update
+    assetPoints.lastUpdate = block.number
+
+    # nothing to do here
+    if not _arePointsEnabled or elapsedBlocks == 0:
         return assetPoints
 
     # update ripe rewards points
-    elapsedBlocks = _lastRipeRewardsBlock - assetPoints.lastUpdate
     assetPoints.ripeStakerPoints += _stakersAlloc * elapsedBlocks
     assetPoints.ripeVotePoints += _voteDepositorAlloc * elapsedBlocks
     assetPoints.ripeGenPoints += assetPoints.lastUsdValue * elapsedBlocks
 
+    # balance points - how each user will split rewards for this vault/asset
+    assetPoints.balancePoints += assetPoints.lastBalance * elapsedBlocks
+
     # Note: will update `lastUsdValue` later in flow
 
-    assetPoints.lastUpdate = block.number
     return assetPoints
 
 
@@ -364,17 +376,29 @@ def _getLatestAssetDepositPoints(
 
 @view
 @internal
-def _getLatestUserDepositPoints(_userPoints: UserDepositPoints) -> UserDepositPoints:
+def _getLatestUserDepositPoints(
+    _userPoints: UserDepositPoints,
+    _arePointsEnabled: bool,
+) -> UserDepositPoints:
     userPoints: UserDepositPoints = _userPoints
 
-    # add user balance points
+    # elapsed blocks
+    elapsedBlocks: uint256 = 0
     if userPoints.lastUpdate != 0 and block.number > userPoints.lastUpdate:
-        elapsedBlocks: uint256 = block.number - userPoints.lastUpdate
-        userPoints.balancePoints += userPoints.lastBalance * elapsedBlocks
+        elapsedBlocks = block.number - userPoints.lastUpdate
+
+    # update last update
+    userPoints.lastUpdate = block.number
+
+    # nothing to do here
+    if not _arePointsEnabled or elapsedBlocks == 0:
+        return userPoints
+
+    # add user balance points
+    userPoints.balancePoints += userPoints.lastBalance * elapsedBlocks
 
     # Note: will update `lastBalance` later in flow (if necessary)
 
-    userPoints.lastUpdate = block.number
     return userPoints
 
 
@@ -388,25 +412,24 @@ def _getLatestDepositPoints(
     _vaultId: uint256,
     _vaultAddr: address,
     _asset: address,
-    _lastRipeRewardsBlock: uint256,
     _a: addys.Addys,
 ) -> (UserDepositPoints, AssetDepositPoints, GlobalDepositPoints):
 
     # get data
     p: DepositPointsBundle = staticcall Ledger(_a.ledger).getDepositPointsBundle(_user, _vaultId, _asset)
-    allocs: DepositPointsAllocs = staticcall ControlRoom(_a.controlRoom).getDepositPointsAllocs(_vaultId, _asset) 
+    config: DepositPointsConfig = staticcall ControlRoom(_a.controlRoom).getDepositPointsConfig(_user, _asset) 
 
     # latest global points
-    globalPoints: GlobalDepositPoints = self._getLatestGlobalDepositPoints(p.globalPoints, _lastRipeRewardsBlock, allocs.stakersTotal, allocs.voteDepositorTotal)
+    globalPoints: GlobalDepositPoints = self._getLatestGlobalDepositPoints(p.globalPoints, config.arePointsEnabled, config.stakersTotal, config.voteDepositorTotal)
 
     # latest asset points
-    assetPoints: AssetDepositPoints = self._getLatestAssetDepositPoints(p.assetPoints, _lastRipeRewardsBlock, allocs.stakers, allocs.voteDepositor)
+    assetPoints: AssetDepositPoints = self._getLatestAssetDepositPoints(p.assetPoints, config.arePointsEnabled, config.stakers, config.voteDepositor)
     if assetPoints.precision == 0:
         assetPoints.precision = self._getAssetPrecision(_vaultId, _asset, _a.vaultBook)
 
     # latest asset value (staked assets not eligible for gen deposit rewards)
     newAssetUsdValue: uint256 = 0
-    if allocs.stakers == 0:
+    if config.stakers == 0:
         newAssetUsdValue = self._refreshAssetUsdValue(_asset, _vaultAddr, _a.priceDesk)
 
     # update `lastUsdValue` for global + asset
@@ -420,7 +443,7 @@ def _getLatestDepositPoints(
         return empty(UserDepositPoints), assetPoints, globalPoints
 
     # latest user points
-    userPoints: UserDepositPoints = self._getLatestUserDepositPoints(p.userPoints)
+    userPoints: UserDepositPoints = self._getLatestUserDepositPoints(p.userPoints, config.arePointsEnabled)
 
     # get user loot share
     userLootShare: uint256 = staticcall Vault(_vaultAddr).getUserLootBoxShare(_user, _asset)
@@ -482,7 +505,7 @@ def _getClaimableDepositLootData(
     up: UserDepositPoints = empty(UserDepositPoints)
     ap: AssetDepositPoints = empty(AssetDepositPoints)
     gp: GlobalDepositPoints = empty(GlobalDepositPoints)
-    up, ap, gp = self._getLatestDepositPoints(_user, _vaultId, _vaultAddr, _asset, globalRewards.lastRewardsBlock, _a)
+    up, ap, gp = self._getLatestDepositPoints(_user, _vaultId, _vaultAddr, _asset, _a)
 
     # user has no points
     if up.balancePoints == 0:
@@ -644,7 +667,7 @@ def updateBorrowPoints(_user: address, _a: addys.Addys = empty(addys.Addys)):
     globalRewards: RipeRewards = self._getLatestGlobalRipeRewards(a)
     up: BorrowPoints = empty(BorrowPoints)
     gp: BorrowPoints = empty(BorrowPoints)
-    up, gp = self._getLatestBorrowPoints(_user, globalRewards.lastRewardsBlock, a.ledger)
+    up, gp = self._getLatestBorrowPoints(_user, a.ledger, a.controlRoom)
     extcall Ledger(a.ledger).setBorrowPointsAndRipeRewards(_user, up, gp, globalRewards)
 
 
@@ -653,47 +676,69 @@ def updateBorrowPoints(_user: address, _a: addys.Addys = empty(addys.Addys)):
 
 @view 
 @internal 
-def _getLatestGlobalBorrowPoints(_globalPoints: BorrowPoints, _lastRipeRewardsBlock: uint256) -> BorrowPoints:
+def _getLatestGlobalBorrowPoints(_globalPoints: BorrowPoints, _arePointsEnabled: bool) -> BorrowPoints:
     globalPoints: BorrowPoints = _globalPoints
 
-    if globalPoints.lastUpdate != 0 and _lastRipeRewardsBlock > globalPoints.lastUpdate:
-        newBorrowPoints: uint256 = globalPoints.lastPrincipal * (_lastRipeRewardsBlock - globalPoints.lastUpdate)
-        globalPoints.points += newBorrowPoints
+    # elapsed blocks
+    elapsedBlocks: uint256 = 0
+    if globalPoints.lastUpdate != 0 and block.number > globalPoints.lastUpdate:
+        elapsedBlocks = block.number - globalPoints.lastUpdate
+
+    # update last update
+    globalPoints.lastUpdate = block.number
+
+    # nothing to do here
+    if not _arePointsEnabled or elapsedBlocks == 0:
+        return globalPoints
+
+    # update borrow points
+    globalPoints.points += globalPoints.lastPrincipal * elapsedBlocks
 
     # Note: will update `lastPrincipal` later in flow
 
-    globalPoints.lastUpdate = block.number
     return globalPoints
 
 
 @view 
 @internal 
-def _getLatestUserBorrowPoints(_userPoints: BorrowPoints, _lastRipeRewardsBlock: uint256) -> BorrowPoints:
+def _getLatestUserBorrowPoints(_userPoints: BorrowPoints, _arePointsEnabled: bool) -> BorrowPoints:
     userPoints: BorrowPoints = _userPoints
 
+    # elapsed blocks
+    elapsedBlocks: uint256 = 0
+    if userPoints.lastUpdate != 0 and block.number > userPoints.lastUpdate:
+        elapsedBlocks = block.number - userPoints.lastUpdate
+
+    # update last update
+    userPoints.lastUpdate = block.number
+
+    # nothing to do here
+    if not _arePointsEnabled or elapsedBlocks == 0:
+        return userPoints
+
     # update borrow points
-    if userPoints.lastUpdate != 0 and _lastRipeRewardsBlock > userPoints.lastUpdate:
-        elapsedBlocks: uint256 = _lastRipeRewardsBlock - userPoints.lastUpdate
-        userPoints.points += userPoints.lastPrincipal * elapsedBlocks
+    userPoints.points += userPoints.lastPrincipal * elapsedBlocks
 
     # Note: will update `lastPrincipal` later in flow (if necessary)
 
-    userPoints.lastUpdate = block.number
     return userPoints
 
 
 @view 
 @internal 
-def _getLatestBorrowPoints(_user: address, _lastRipeRewardsBlock: uint256, _ledger: address) -> (BorrowPoints, BorrowPoints):
+def _getLatestBorrowPoints(_user: address, _ledger: address, _controlRoom: address) -> (BorrowPoints, BorrowPoints):
     p: BorrowPointsBundle = staticcall Ledger(_ledger).getBorrowPointsBundle(_user)
-    globalPoints: BorrowPoints = self._getLatestGlobalBorrowPoints(p.globalPoints, _lastRipeRewardsBlock)
+    arePointsEnabled: bool = staticcall ControlRoom(_controlRoom).areBorrowPointsEnabled(_user)
+    
+    # global points
+    globalPoints: BorrowPoints = self._getLatestGlobalBorrowPoints(p.globalPoints, arePointsEnabled)
 
     # if no user, return global points
     if _user == empty(address):
         return empty(BorrowPoints), globalPoints
     
-    # get user points
-    userPoints: BorrowPoints = self._getLatestUserBorrowPoints(p.userPoints, _lastRipeRewardsBlock)
+    # user points
+    userPoints: BorrowPoints = self._getLatestUserBorrowPoints(p.userPoints, arePointsEnabled)
 
     # normalize user debt -- reduce risk of integer overflow
     userDebt: uint256 = p.userDebtPrincipal
@@ -737,7 +782,7 @@ def _getClaimableBorrowLootData(_user: address, _a: addys.Addys) -> (uint256, Bo
     # get latest borrow points
     up: BorrowPoints = empty(BorrowPoints)
     gp: BorrowPoints = empty(BorrowPoints)
-    up, gp = self._getLatestBorrowPoints(_user, globalRewards.lastRewardsBlock, _a.ledger)
+    up, gp = self._getLatestBorrowPoints(_user, _a.ledger, _a.controlRoom)
 
     # user has no points
     if up.points == 0:
@@ -811,38 +856,39 @@ def getLatestGlobalRipeRewards() -> RipeRewards:
 @internal
 def _getLatestGlobalRipeRewards(_a: addys.Addys) -> RipeRewards:
     b: RipeRewardsBundle = staticcall Ledger(_a.ledger).getRipeRewardsBundle()
-    globalRewards: RipeRewards = b.ripeRewards
-    globalRewards.newRipeRewards = 0 # important to reset!
+    rewards: RipeRewards = b.ripeRewards
+    rewards.newRipeRewards = 0 # important to reset!
 
     # get rewards config
     config: RipeRewardsConfig = staticcall ControlRoom(_a.controlRoom).getRipeRewardsConfig()
 
-    # use most recent time between `lastUpdate` and `ripeRewardsStartBlock`
-    lastUpdateAdjusted: uint256 = max(globalRewards.lastUpdate, config.ripeRewardsStartBlock)
+    # elapsed blocks
+    elapsedBlocks: uint256 = 0
+    if rewards.lastUpdate != 0 and block.number > rewards.lastUpdate:
+        elapsedBlocks = block.number - rewards.lastUpdate
 
-    newRipeDistro: uint256 = 0
-    if lastUpdateAdjusted != 0 and block.number > lastUpdateAdjusted:
-        elapsedBlocks: uint256 = block.number - lastUpdateAdjusted
-        newRipeDistro = min(elapsedBlocks * config.ripePerBlock, b.ripeAvailForRewards)
+    # update last update
+    rewards.lastUpdate = block.number
 
     # nothing to do here
-    if newRipeDistro == 0:
-        globalRewards.lastUpdate = block.number
-        return globalRewards
+    if elapsedBlocks == 0 or config.ripePerBlock == 0 or b.ripeAvailForRewards == 0:
+        return rewards
+
+    # new Ripe rewards
+    newRipeDistro: uint256 = min(elapsedBlocks * config.ripePerBlock, b.ripeAvailForRewards)
 
     # allocate ripe rewards to global buckets
-    if config.ripeRewardsAllocs.total != 0:
-        globalRewards.stakers += newRipeDistro * config.ripeRewardsAllocs.stakers // config.ripeRewardsAllocs.total
-        globalRewards.borrowers += newRipeDistro * config.ripeRewardsAllocs.borrowers // config.ripeRewardsAllocs.total
-        globalRewards.voteDepositors += newRipeDistro * config.ripeRewardsAllocs.voteDepositors // config.ripeRewardsAllocs.total
-        globalRewards.genDepositors += newRipeDistro * config.ripeRewardsAllocs.genDepositors // config.ripeRewardsAllocs.total
+    total: uint256 = config.ripeRewardsAllocs.stakers + config.ripeRewardsAllocs.voteDepositors + config.ripeRewardsAllocs.genDepositors + config.ripeRewardsAllocs.borrowers
+    if total != 0:
+        rewards.stakers += newRipeDistro * config.ripeRewardsAllocs.stakers // total
+        rewards.voteDepositors += newRipeDistro * config.ripeRewardsAllocs.voteDepositors // total
+        rewards.genDepositors += newRipeDistro * config.ripeRewardsAllocs.genDepositors // total
+        rewards.borrowers += newRipeDistro * config.ripeRewardsAllocs.borrowers // total
 
         # rewards were distro'd, save important data
-        globalRewards.newRipeRewards = newRipeDistro
-        globalRewards.lastRewardsBlock = block.number
+        rewards.newRipeRewards = newRipeDistro
 
-    globalRewards.lastUpdate = block.number
-    return globalRewards
+    return rewards
 
 
 #########

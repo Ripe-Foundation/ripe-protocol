@@ -21,6 +21,30 @@ interface Whitelist:
 interface VaultBook:
     def getAddr(_regId: uint256) -> address: view
 
+struct DebtTerms:
+    ltv: uint256
+    redemptionThreshold: uint256
+    liqThreshold: uint256
+    liqFee: uint256
+    borrowRate: uint256
+    daowry: uint256
+
+struct VaultData:
+    vaultId: uint256
+    vaultAddr: address
+    asset: address
+
+struct AuctionParams:
+    hasParams: bool
+    startDiscount: uint256
+    minEntitled: uint256
+    maxDiscount: uint256
+    minBidIncrement: uint256
+    maxBidIncrement: uint256
+    delay: uint256
+    duration: uint256
+    extension: uint256
+
 struct GenConfig:
     canDeposit: bool
     canWithdraw: bool
@@ -50,6 +74,8 @@ struct GenDebtConfig:
     genStabPoolIds: DynArray[uint256, MAX_GEN_STAB_POOLS]
 
 struct AssetConfig:
+    stakersAlloc: uint256
+    voteDepositorAlloc: uint256
     canDeposit: bool
     canWithdraw: bool
     canRedeemCollateral: bool
@@ -146,50 +172,26 @@ struct StabPoolRedemptionsConfig:
     canRedeemInStabPoolAsset: bool
     isUserAllowed: bool
 
-##########
+struct ClaimLootConfig:
+    canClaimLoot: bool
+    canClaimLootForUser: bool
 
-
-struct DebtTerms:
-    ltv: uint256
-    redemptionThreshold: uint256
-    liqThreshold: uint256
-    liqFee: uint256
-    borrowRate: uint256
-    daowry: uint256
-
-struct RipeRewardsAllocs:
-    stakers: uint256
-    borrowers: uint256
-    voteDepositors: uint256
-    genDepositors: uint256
-    total: uint256
-
-struct RipeRewardsConfig:
-    ripeRewardsAllocs: RipeRewardsAllocs
-    ripeRewardsStartBlock: uint256
-    ripePerBlock: uint256
-
-struct DepositPointsAllocs:
+struct DepositPointsConfig:
+    arePointsEnabled: bool
     stakers: uint256
     stakersTotal: uint256
     voteDepositor: uint256
     voteDepositorTotal: uint256
 
-struct VaultData:
-    vaultId: uint256
-    vaultAddr: address
-    asset: address
+struct RipeRewardsAllocs:
+    stakers: uint256
+    voteDepositors: uint256
+    genDepositors: uint256
+    borrowers: uint256
 
-struct AuctionParams:
-    hasParams: bool
-    startDiscount: uint256
-    minEntitled: uint256
-    maxDiscount: uint256
-    minBidIncrement: uint256
-    maxBidIncrement: uint256
-    delay: uint256
-    duration: uint256
-    extension: uint256
+struct RipeRewardsConfig:
+    ripeRewardsAllocs: RipeRewardsAllocs
+    ripePerBlock: uint256
 
 # global config
 genConfig: public(GenConfig)
@@ -199,6 +201,15 @@ assetConfig: public(HashMap[address, AssetConfig]) # asset -> config
 # user config
 userConfig: public(HashMap[address, UserConfig]) # user -> config
 userDelegation: public(HashMap[address, HashMap[address, ActionDelegation]]) # user -> caller -> config
+
+# ripe rewards
+ripeAllocs: public(RipeRewardsAllocs)
+ripePerBlock: public(uint256)
+arePointsEnabled: public(bool)
+
+# deposit points allocs
+stakersAllocTotal: public(uint256)
+voteDepositorAllocTotal: public(uint256)
 
 MAX_GEN_STAB_POOLS: constant(uint256) = 10
 
@@ -299,6 +310,8 @@ def setGenDebtConfig(
 @external
 def setAssetConfig(
     _asset: address,
+    _stakersAlloc: uint256,
+    _voteDepositorAlloc: uint256,
     _canDeposit: bool,
     _canWithdraw: bool,
     _canRedeemCollateral: bool,
@@ -321,7 +334,14 @@ def setAssetConfig(
 
     # TODO: add time lock, validation, event
 
+    # update total allocs
+    prevConfig: AssetConfig = self.assetConfig[_asset]
+    self.stakersAllocTotal += _stakersAlloc - prevConfig.stakersAlloc
+    self.voteDepositorAllocTotal += _voteDepositorAlloc - prevConfig.voteDepositorAlloc
+
     self.assetConfig[_asset] = AssetConfig(
+        stakersAlloc=_stakersAlloc,
+        voteDepositorAlloc=_voteDepositorAlloc,
         canDeposit=_canDeposit,
         canWithdraw=_canWithdraw,
         canRedeemCollateral=_canRedeemCollateral,
@@ -380,6 +400,27 @@ def setUserDelegation(
         canClaimFromStabPool=_canClaimFromStabPool,
         canClaimLoot=_canClaimLoot,
     )
+    return True
+
+
+####################
+# Rewards / Points #
+####################
+
+
+@external
+def setRipeRewardsConfig(
+    _ripeRewardsAllocs: RipeRewardsAllocs,
+    _ripePerBlock: uint256,
+    _arePointsEnabled: bool,
+) -> bool:
+    assert gov._canGovern(msg.sender) # dev: no perms
+
+    # TODO: add time lock, validation, event
+
+    self.ripeAllocs = _ripeRewardsAllocs
+    self.ripePerBlock = _ripePerBlock
+    self.arePointsEnabled = _arePointsEnabled
     return True
 
 
@@ -599,30 +640,60 @@ def getStabPoolRedemptionsConfig(_asset: address, _redeemer: address) -> StabPoo
     )
 
 
-# TODO: claim loot stuff
+# loot claims
 
 
-####################
-# Rewards / Points #
-####################
+@view
+@external
+def getClaimLootConfig(_user: address, _caller: address) -> ClaimLootConfig:
+    genConfig: GenConfig = self.genConfig
+
+    canClaimLootForUser: bool = True
+    if _user != _caller:
+        canClaimLootForUser = self.userDelegation[_user][_caller].canClaimLoot
+
+    return ClaimLootConfig(
+        canClaimLoot=genConfig.canClaimLoot,
+        canClaimLootForUser=canClaimLootForUser,
+    )
+
+
+# ripe rewards
 
 
 @view
 @external
 def getRipeRewardsConfig() -> RipeRewardsConfig:
-    # TODO: implement
-    return empty(RipeRewardsConfig)
+    return RipeRewardsConfig(
+        ripeRewardsAllocs=self.ripeAllocs,
+        ripePerBlock=self.ripePerBlock,
+    )
+
+
+# deposit points
 
 
 @view
 @external
-def getDepositPointsAllocs(_vaultId: uint256, _asset: address) -> DepositPointsAllocs:
-    # TODO: implement
-    return empty(DepositPointsAllocs)
+def getDepositPointsConfig(_user: address, _asset: address) -> DepositPointsConfig:
+    assetConfig: AssetConfig = self.assetConfig[_asset]
+
+    # eventually we could turn off points for specific users or assets
+
+    return DepositPointsConfig(
+        arePointsEnabled=self.arePointsEnabled,
+        stakers=assetConfig.stakersAlloc,
+        stakersTotal=self.stakersAllocTotal,
+        voteDepositor=assetConfig.voteDepositorAlloc,
+        voteDepositorTotal=self.voteDepositorAllocTotal,
+    )
+
+
+# borrow points
 
 
 @view
 @external
-def canCallerClaimLootForUser(_user: address, _caller: address) -> bool:
-    # TODO: implement
-    return False
+def areBorrowPointsEnabled(_user: address) -> bool:
+    # eventually we could turn off points for specific users or assets
+    return self.arePointsEnabled

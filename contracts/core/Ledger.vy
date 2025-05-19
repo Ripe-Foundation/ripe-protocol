@@ -22,12 +22,11 @@ struct DepositLedgerData:
 
 struct RipeRewards:
     stakers: uint256
-    borrowers: uint256
     voteDepositors: uint256
     genDepositors: uint256
+    borrowers: uint256
     newRipeRewards: uint256
     lastUpdate: uint256
-    lastRewardsBlock: uint256
 
 struct GlobalDepositPoints:
     lastUsdValue: uint256
@@ -151,9 +150,12 @@ numFungLiqUsers: public(uint256) # num liq users
 
 
 @deploy
-def __init__(_ripeHq: address):
+def __init__(_ripeHq: address, _ripeAvailForRewards: uint256):
     addys.__init__(_ripeHq)
     deptBasics.__init__(False, False) # no minting
+
+    if _ripeAvailForRewards != 0:
+        self.ripeAvailForRewards = _ripeAvailForRewards
 
 
 ###############
@@ -378,7 +380,6 @@ def isUserInLiquidation(_user: address) -> bool:
 def setRipeRewards(_ripeRewards: RipeRewards):
     assert msg.sender == addys._getLootboxAddr() # dev: only Lootbox allowed
     assert deptBasics.isActivated # dev: not activated
-
     self._setRipeRewards(_ripeRewards)
 
 
@@ -387,6 +388,13 @@ def _setRipeRewards(_ripeRewards: RipeRewards):
     self.ripeRewards = _ripeRewards
     if _ripeRewards.newRipeRewards != 0:
         self.ripeAvailForRewards -= min(self.ripeAvailForRewards, _ripeRewards.newRipeRewards)
+
+
+@external
+def setRipeAvailForRewards(_amount: uint256):
+    assert msg.sender == addys._getLootboxAddr() # dev: only Lootbox allowed
+    assert deptBasics.isActivated # dev: not activated
+    self.ripeAvailForRewards = _amount
 
 
 # deposit points
