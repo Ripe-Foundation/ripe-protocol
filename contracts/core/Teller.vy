@@ -40,7 +40,7 @@ interface Lootbox:
     def claimLootForUser(_user: address, _caller: address, _shouldStake: bool, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
 
 interface ControlRoom:
-    def getWithdrawConfig(_asset: address, _user: address, _caller: address) -> WithdrawConfig: view
+    def getTellerWithdrawConfig(_asset: address, _user: address, _caller: address) -> TellerWithdrawConfig: view
     def getTellerDepositConfig(_asset: address, _user: address) -> TellerDepositConfig: view
 
 interface Ledger:
@@ -71,7 +71,7 @@ struct DepositAction:
     vaultAddr: address
     vaultId: uint256
 
-struct WithdrawConfig:
+struct TellerWithdrawConfig:
     canWithdrawGeneral: bool
     canWithdrawAsset: bool
     isUserAllowed: bool
@@ -354,7 +354,7 @@ def _validateOnWithdrawal(
 ) -> uint256:
     assert _amount != 0 # dev: cannot withdraw 0
 
-    config: WithdrawConfig = staticcall ControlRoom(_a.controlRoom).getWithdrawConfig(_asset, _user, _caller)
+    config: TellerWithdrawConfig = staticcall ControlRoom(_a.controlRoom).getTellerWithdrawConfig(_asset, _user, _caller)
     assert config.canWithdrawGeneral # dev: protocol withdrawals disabled
     assert config.canWithdrawAsset # dev: asset withdrawals disabled
     assert config.isUserAllowed # dev: user not on whitelist

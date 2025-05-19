@@ -26,7 +26,7 @@ struct GenConfig:
     canRedeemCollateral: bool
     canRedeemInStabPool: bool
     canClaimInStabPool: bool
-    canBuyAuction: bool
+    canBuyInAuction: bool
     canLiquidate: bool
     canClaimLoot: bool
     perUserMaxAssetsPerVault: uint256
@@ -39,6 +39,7 @@ struct GenDebtConfig:
     perUserDebtLimit: uint256
     globalDebtLimit: uint256
     minDebtAmount: uint256
+    isDaowryEnabled: bool
     ltvPaybackBuffer: uint256
     keeperFeeRatio: uint256
     minKeeperFee: uint256
@@ -49,6 +50,7 @@ struct AssetConfig:
     canDeposit: bool
     canWithdraw: bool
     canRedeemCollateral: bool
+    canRedeemInStabPool: bool
     canBuyInAuction: bool
     shouldSwapInStabPool: bool
     shouldAuctionInstantly: bool
@@ -81,7 +83,7 @@ struct TellerDepositConfig:
     perUserMaxVaults: uint256
     canAnyoneDeposit: bool
 
-struct WithdrawConfig:
+struct TellerWithdrawConfig:
     canWithdrawGeneral: bool
     canWithdrawAsset: bool
     isUserAllowed: bool
@@ -96,12 +98,43 @@ struct BorrowConfig:
     perUserDebtLimit: uint256
     globalDebtLimit: uint256
     minDebtAmount: uint256
+    isDaowryEnabled: bool
 
+struct RepayConfig:
+    canRepay: bool
+    canAnyoneRepayDebt: bool
+
+struct RedeemCollateralConfig:
+    canRedeemCollateralGeneral: bool
+    canRedeemCollateralAsset: bool
+    isUserAllowed: bool
+    ltvPaybackBuffer: uint256
+
+struct AuctionBuyConfig:
+    canBuyInAuctionGeneral: bool
+    canBuyInAuctionAsset: bool
+    isUserAllowed: bool
+
+struct GenLiqConfig:
+    canLiquidate: bool
+    keeperFeeRatio: uint256
+    minKeeperFee: uint256
+    ltvPaybackBuffer: uint256
+    genAuctionParams: AuctionParams
+    genStabPools: DynArray[VaultData, MAX_GEN_STAB_POOLS]
 
 ##########
 
 
-
+struct AssetLiqConfig:
+    hasConfig: bool
+    hasLtv: bool
+    hasWhitelist: bool
+    isNft: bool
+    isStable: bool
+    specialStabPool: VaultData
+    canAuctionInstantly: bool
+    customAuctionParams: AuctionParams
 
 
 
@@ -112,14 +145,6 @@ struct DebtTerms:
     liqFee: uint256
     borrowRate: uint256
     daowry: uint256
-
-struct RepayConfig:
-    isRepayEnabled: bool
-    canOthersRepayForUser: bool
-
-struct RedeemCollateralConfig:
-    canRedeemCollateral: bool
-    ltvPaybackBuffer: uint256
 
 struct RipeRewardsAllocs:
     stakers: uint256
@@ -143,23 +168,6 @@ struct VaultData:
     vaultId: uint256
     vaultAddr: address
     asset: address
-
-struct GenLiqConfig:
-    keeperFeeRatio: uint256
-    minKeeperFee: uint256
-    ltvPaybackBuffer: uint256
-    genAuctionParams: AuctionParams
-    genStabPools: DynArray[VaultData, MAX_GEN_STAB_POOLS]
-
-struct AssetLiqConfig:
-    hasConfig: bool
-    hasLtv: bool
-    hasWhitelist: bool
-    isNft: bool
-    isStable: bool
-    specialStabPool: VaultData
-    canAuctionInstantly: bool
-    customAuctionParams: AuctionParams
 
 struct AuctionParams:
     hasParams: bool
@@ -208,7 +216,7 @@ def setGeneralConfig(
     _canRedeemCollateral: bool,
     _canRedeemInStabPool: bool,
     _canClaimInStabPool: bool,
-    _canBuyAuction: bool,
+    _canBuyInAuction: bool,
     _canLiquidate: bool,
     _canClaimLoot: bool,
 ) -> bool:
@@ -224,7 +232,7 @@ def setGeneralConfig(
         canRedeemCollateral=_canRedeemCollateral,
         canRedeemInStabPool=_canRedeemInStabPool,
         canClaimInStabPool=_canClaimInStabPool,
-        canBuyAuction=_canBuyAuction,
+        canBuyInAuction=_canBuyInAuction,
         canLiquidate=_canLiquidate,
         canClaimLoot=_canClaimLoot,
         perUserMaxAssetsPerVault=_perUserMaxAssetsPerVault,
@@ -244,6 +252,7 @@ def setGenDebtConfig(
     _perUserDebtLimit: uint256,
     _globalDebtLimit: uint256,
     _minDebtAmount: uint256,
+    _isDaowryEnabled: bool,
     _ltvPaybackBuffer: uint256,
     _keeperFeeRatio: uint256,
     _minKeeperFee: uint256,
@@ -261,6 +270,7 @@ def setGenDebtConfig(
         perUserDebtLimit=_perUserDebtLimit,
         globalDebtLimit=_globalDebtLimit,
         minDebtAmount=_minDebtAmount,
+        isDaowryEnabled=_isDaowryEnabled,
         ltvPaybackBuffer=_ltvPaybackBuffer,
         keeperFeeRatio=_keeperFeeRatio,
         minKeeperFee=_minKeeperFee,
@@ -281,6 +291,7 @@ def setAssetConfig(
     _canDeposit: bool,
     _canWithdraw: bool,
     _canRedeemCollateral: bool,
+    _canRedeemInStabPool: bool,
     _canBuyInAuction: bool,
     _shouldSwapInStabPool: bool,
     _shouldAuctionInstantly: bool,
@@ -301,6 +312,7 @@ def setAssetConfig(
         canDeposit=_canDeposit,
         canWithdraw=_canWithdraw,
         canRedeemCollateral=_canRedeemCollateral,
+        canRedeemInStabPool=_canRedeemInStabPool,
         canBuyInAuction=_canBuyInAuction,
         shouldSwapInStabPool=_shouldSwapInStabPool,
         shouldAuctionInstantly=_shouldAuctionInstantly,
@@ -356,9 +368,12 @@ def setUserDelegation(
     return True
 
 
-##########################
-# Deposits / Withdrawals #
-##########################
+###########
+# Helpers #
+###########
+
+
+# deposits
 
 
 @view
@@ -383,9 +398,12 @@ def getTellerDepositConfig(_asset: address, _user: address) -> TellerDepositConf
     )
 
 
+# withdrawals
+
+
 @view
 @external
-def getTellerWithdrawConfig(_asset: address, _user: address, _caller: address) -> WithdrawConfig:
+def getTellerWithdrawConfig(_asset: address, _user: address, _caller: address) -> TellerWithdrawConfig:
     genConfig: GenConfig = self.genConfig
     assetConfig: AssetConfig = self.assetConfig[_asset]
 
@@ -397,7 +415,7 @@ def getTellerWithdrawConfig(_asset: address, _user: address, _caller: address) -
     if _user != _caller:
         canWithdrawForUser = self.userDelegation[_user][_caller].canWithdraw
 
-    return WithdrawConfig(
+    return TellerWithdrawConfig(
         canWithdrawGeneral=genConfig.canWithdraw,
         canWithdrawAsset=assetConfig.canWithdraw,
         isUserAllowed=isUserAllowed,
@@ -405,9 +423,13 @@ def getTellerWithdrawConfig(_asset: address, _user: address, _caller: address) -
     )
 
 
-########
-# Debt #
-########
+# borrow
+
+
+@view
+@external
+def getDebtTerms(_asset: address) -> DebtTerms:
+    return self.assetConfig[_asset].debtTerms
 
 
 @view
@@ -429,70 +451,111 @@ def getBorrowConfig(_user: address, _caller: address) -> BorrowConfig:
         perUserDebtLimit=genDebtConfig.perUserDebtLimit,
         globalDebtLimit=genDebtConfig.globalDebtLimit,
         minDebtAmount=genDebtConfig.minDebtAmount,
+        isDaowryEnabled=genDebtConfig.isDaowryEnabled,
     )
 
 
-@view
-@external
-def getDebtTerms(_vaultId: uint256, _asset: address) -> DebtTerms:
-    # TODO: implement
-    return empty(DebtTerms)
+# repay
 
 
 @view
 @external
 def getRepayConfig(_user: address) -> RepayConfig:
-    # TODO: implement
-    return empty(RepayConfig)
+    return RepayConfig(
+        canRepay=self.genConfig.canRepay,
+        canAnyoneRepayDebt=self.userConfig[_user].canAnyoneRepayDebt,
+    )
+
+
+# redeem collateral
 
 
 @view
 @external
-def isDaowryEnabled() -> bool:
-    # TODO: implement
-    return False
+def getRedeemCollateralConfig(_asset: address, _redeemer: address) -> RedeemCollateralConfig:
+    genConfig: GenConfig = self.genConfig
+    assetConfig: AssetConfig = self.assetConfig[_asset]
+
+    isUserAllowed: bool = True 
+    if assetConfig.whitelist != empty(address):
+        isUserAllowed = staticcall Whitelist(assetConfig.whitelist).isUserAllowed(_redeemer, _asset)
+
+    # TODO: when setting asset config -> canRedeemCollateral, make sure: has LTV, not stable, not NFT
+
+    return RedeemCollateralConfig(
+        canRedeemCollateralGeneral=genConfig.canRedeemCollateral,
+        canRedeemCollateralAsset=assetConfig.canRedeemCollateral,
+        isUserAllowed=isUserAllowed,
+        ltvPaybackBuffer=self.genDebtConfig.ltvPaybackBuffer,
+    )
+
+
+# auction purchases
 
 
 @view
 @external
-def getRedeemCollateralConfig(_vaultId: uint256, _asset: address) -> RedeemCollateralConfig:
-    # check general canRedeem 
-    # check if has LTV
-    # check whitelist
-    # check if asset is stable
-    # check if NFT
-    return empty(RedeemCollateralConfig)
+def getAuctionBuyConfig(_asset: address, _buyer: address) -> AuctionBuyConfig:
+    genConfig: GenConfig = self.genConfig
+    assetConfig: AssetConfig = self.assetConfig[_asset]
+
+    isUserAllowed: bool = True 
+    if assetConfig.whitelist != empty(address):
+        isUserAllowed = staticcall Whitelist(assetConfig.whitelist).isUserAllowed(_buyer, _asset)
+
+    return AuctionBuyConfig(
+        canBuyInAuctionGeneral=genConfig.canBuyInAuction,
+        canBuyInAuctionAsset=assetConfig.canBuyInAuction,
+        isUserAllowed=isUserAllowed,
+    )
 
 
-
-#################
-# Auction House #
-#################
+# general liquidation config
 
 
 @view
 @external
 def getGenLiqConfig() -> GenLiqConfig:
-    # TODO: implement
-    return empty(GenLiqConfig)
+    genDebtConfig: GenDebtConfig = self.genDebtConfig
+
+    # TODO: put together all this data
+    genStabPools: DynArray[VaultData, MAX_GEN_STAB_POOLS] = []
+
+    return GenLiqConfig(
+        canLiquidate=self.genConfig.canLiquidate,
+        keeperFeeRatio=genDebtConfig.keeperFeeRatio,
+        minKeeperFee=genDebtConfig.minKeeperFee,
+        ltvPaybackBuffer=genDebtConfig.ltvPaybackBuffer,
+        genAuctionParams=genDebtConfig.genAuctionParams,
+        genStabPools=genStabPools,
+    )
+
+
+# asset liquidation config
+
+
+# TODO: WIP WIP WIP
+
+# struct AssetLiqConfig:
+#     hasConfig: bool
+#     hasLtv: bool
+#     hasWhitelist: bool
+#     isNft: bool
+#     isStable: bool
+#     specialStabPool: VaultData
+#     canAuctionInstantly: bool
+#     customAuctionParams: AuctionParams
 
 
 @view
 @external
-def getAssetLiqConfig(_vaultId: uint256, _asset: address) -> AssetLiqConfig:
+def getAssetLiqConfig(_asset: address) -> AssetLiqConfig:
     # TODO: implement
     return empty(AssetLiqConfig)
 
 
-@view
-@external
-def canBuyAuction(_vaultId: uint256, _asset: address, _buyer: address) -> bool:
+# TODO: liquidate user, stab pool stuff, claim loot stuff
 
-    # check global setting (if auctions enabled)
-    # check whitelist (if it exists)
-
-    # TODO: implement
-    return True
 
 
 ####################

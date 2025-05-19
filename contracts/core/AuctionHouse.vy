@@ -16,11 +16,10 @@ from ethereum.ercs import IERC4626
 from ethereum.ercs import IERC20
 
 interface Ledger:
-    def getFungibleAuction(_liqUser: address, _vaultId: uint256, _asset: address) -> FungibleAuction: view
+    def getFungibleAuctionDuringPurchase(_liqUser: address, _vaultId: uint256, _asset: address) -> FungibleAuction: view
     def removeFungibleAuction(_liqUser: address, _vaultId: uint256, _asset: address): nonpayable
     def createNewFungibleAuction(_auc: FungibleAuction) -> uint256: nonpayable
     def userVaults(_user: address, _index: uint256) -> uint256: view
-    def isUserInLiquidation(_user: address) -> bool: view
     def numUserVaults(_user: address) -> uint256: view
 
 interface CreditEngine:
@@ -29,23 +28,28 @@ interface CreditEngine:
     def repayDuringAuctionPurchase(_liqUser: address, _repayAmount: uint256, _a: addys.Addys = empty(addys.Addys)) -> bool: nonpayable
 
 interface ControlRoom:
-    def getAssetLiqConfig(_vaultId: uint256, _asset: address) -> AssetLiqConfig: view
-    def canBuyAuction(_vaultId: uint256, _asset: address, _buyer: address) -> bool: view
+    def getAuctionBuyConfig(_asset: address, _buyer: address) -> AuctionBuyConfig: view
+    def getAssetLiqConfig(_asset: address) -> AssetLiqConfig: view
     def getGenLiqConfig() -> GenLiqConfig: view
 
 interface PriceDesk:
     def getAssetAmount(_asset: address, _usdValue: uint256, _shouldRaise: bool = False) -> uint256: view
     def getUsdValue(_asset: address, _amount: uint256, _shouldRaise: bool = False) -> uint256: view
 
-interface StabilityPool:
-    def swapForLiquidatedCollateral(_stabAsset: address, _stabAmountToRemove: uint256, _liqAsset: address, _liqAmountSent: uint256, _recipient: address, _greenToken: address) -> uint256: nonpayable
-
 interface GreenToken:
     def mint(_to: address, _amount: uint256): nonpayable
     def burn(_amount: uint256): nonpayable
 
+interface StabilityPool:
+    def swapForLiquidatedCollateral(_stabAsset: address, _stabAmountToRemove: uint256, _liqAsset: address, _liqAmountSent: uint256, _recipient: address, _greenToken: address) -> uint256: nonpayable
+
 interface VaultBook:
     def getAddr(_vaultId: uint256) -> address: view
+
+struct AuctionBuyConfig:
+    canBuyInAuctionGeneral: bool
+    canBuyInAuctionAsset: bool
+    isUserAllowed: bool
 
 struct DebtTerms:
     ltv: uint256
@@ -73,6 +77,7 @@ struct VaultData:
     asset: address
 
 struct GenLiqConfig:
+    canLiquidate: bool
     keeperFeeRatio: uint256
     minKeeperFee: uint256
     ltvPaybackBuffer: uint256
@@ -157,7 +162,7 @@ event NewFungibleAuctionCreated:
 
 # cache
 vaultAddrs: transient(HashMap[uint256, address]) # vaultId -> vaultAddr
-assetLiqConfig: transient(HashMap[uint256, HashMap[address, AssetLiqConfig]]) # vaultId -> asset -> config
+assetLiqConfig: transient(HashMap[address, AssetLiqConfig]) # asset -> config
 numUserAssetsForAuction: transient(HashMap[address, uint256]) # user -> num assets
 userAssetForAuction: transient(HashMap[address, HashMap[uint256, VaultData]]) # user -> index -> asset
 
@@ -190,6 +195,8 @@ def liquidateUser(
     a: addys.Addys = addys._getAddys(_a)
 
     config: GenLiqConfig = staticcall ControlRoom(a.controlRoom).getGenLiqConfig()
+    assert config.canLiquidate # dev: cannot liquidate
+
     keeperRewards: uint256 = self._liquidateUser(_liqUser, config, a)
     assert keeperRewards != 0 # dev: no keeper rewards
 
@@ -211,6 +218,8 @@ def liquidateManyUsers(
     a: addys.Addys = addys._getAddys(_a)
 
     config: GenLiqConfig = staticcall ControlRoom(a.controlRoom).getGenLiqConfig()
+    assert config.canLiquidate # dev: cannot liquidate
+
     totalKeeperRewards: uint256 = 0
     for liqUser: address in _liqUsers:
         totalKeeperRewards += self._liquidateUser(liqUser, config, a)
@@ -348,11 +357,11 @@ def _handleLiqUserCollateral(
             # get asset liq config
             config: AssetLiqConfig = empty(AssetLiqConfig)
             isConfigCached: bool = False
-            config, isConfigCached = self._getAssetLiqConfig(vaultId, liqAsset, _a.controlRoom)
+            config, isConfigCached = self._getAssetLiqConfig(liqAsset, _a.controlRoom)
 
             # cache asset liq config
             if not isConfigCached:
-                self.assetLiqConfig[vaultId][liqAsset] = config
+                self.assetLiqConfig[liqAsset] = config
 
             # no ltv, skip
             if not config.hasLtv:
@@ -542,11 +551,11 @@ def _initiateAuctions(_liqUser: address, _genAuctionParams: AuctionParams, _a: a
         # get asset liq config
         config: AssetLiqConfig = empty(AssetLiqConfig)
         isConfigCached: bool = False
-        config, isConfigCached = self._getAssetLiqConfig(d.vaultId, d.asset, _a.controlRoom)
+        config, isConfigCached = self._getAssetLiqConfig(d.asset, _a.controlRoom)
 
         # cache asset liq config
         if not isConfigCached:
-            self.assetLiqConfig[d.vaultId][d.asset] = config
+            self.assetLiqConfig[d.asset] = config
 
         # some assets can't be auctioned instantly, not handling NFTs right now
         if not config.canAuctionInstantly or config.isNft:
@@ -681,11 +690,8 @@ def _buyFungibleAuction(
 
     # NOTE: faililng gracefully in case there are many purchases at same time
 
-    # user is not in liquidation, this is invalid
-    if not staticcall Ledger(_a.ledger).isUserInLiquidation(_liqUser):
-        return 0
-
-    auc: FungibleAuction = staticcall Ledger(_a.ledger).getFungibleAuction(_liqUser, _vaultId, _asset)
+    # this also verifies that user is in liquidation
+    auc: FungibleAuction = staticcall Ledger(_a.ledger).getFungibleAuctionDuringPurchase(_liqUser, _vaultId, _asset)
     if not auc.isActive:
         return 0
 
@@ -693,8 +699,9 @@ def _buyFungibleAuction(
     if block.number < auc.startBlock or block.number >= auc.endBlock:
         return 0
 
-    # cannot buy auction, skip
-    if not staticcall ControlRoom(_a.controlRoom).canBuyAuction(_vaultId, _asset, _buyer):
+    # check auction config
+    config: AuctionBuyConfig = staticcall ControlRoom(_a.controlRoom).getAuctionBuyConfig(_asset, _buyer)
+    if not config.canBuyInAuctionGeneral or not config.canBuyInAuctionAsset or not config.isUserAllowed:
         return 0
 
     # finalize green amount
@@ -787,11 +794,11 @@ def _handleGreenForUser(
 
 @view
 @internal
-def _getAssetLiqConfig(_vaultId: uint256, _asset: address, _controlRoom: address) -> (AssetLiqConfig, bool):
-    config: AssetLiqConfig = self.assetLiqConfig[_vaultId][_asset]
+def _getAssetLiqConfig(_asset: address, _controlRoom: address) -> (AssetLiqConfig, bool):
+    config: AssetLiqConfig = self.assetLiqConfig[_asset]
     if config.hasConfig:
         return config, True
-    return staticcall ControlRoom(_controlRoom).getAssetLiqConfig(_vaultId, _asset), False
+    return staticcall ControlRoom(_controlRoom).getAssetLiqConfig(_asset), False
 
 
 @view

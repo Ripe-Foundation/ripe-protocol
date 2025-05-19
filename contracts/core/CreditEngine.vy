@@ -24,11 +24,10 @@ interface Ledger:
     def flushUnrealizedYield() -> uint256: nonpayable
 
 interface ControlRoom:
-    def getRedeemCollateralConfig(_vaultId: uint256, _asset: address) -> RedeemCollateralConfig: view
+    def getRedeemCollateralConfig(_asset: address, _redeemer: address) -> RedeemCollateralConfig: view
     def getBorrowConfig(_user: address, _caller: address) -> BorrowConfig: view
-    def getDebtTerms(_vaultId: uint256, _asset: address) -> DebtTerms: view
     def getRepayConfig(_user: address) -> RepayConfig: view
-    def isDaowryEnabled() -> bool: view
+    def getDebtTerms(_asset: address) -> DebtTerms: view
 
 interface PriceDesk:
     def getAssetAmount(_asset: address, _usdValue: uint256, _shouldRaise: bool = False) -> uint256: view
@@ -58,34 +57,6 @@ struct BorrowDataBundle:
     totalDebt: uint256
     numBorrowers: uint256
 
-struct RepayDataBundle:
-    userDebt: UserDebt
-    numUserVaults: uint256
-
-struct BorrowConfig:
-    canBorrow: bool
-    canBorrowForUser: bool
-    numAllowedBorrowers: uint256
-    maxBorrowPerInterval: uint256
-    numBlocksPerInterval: uint256
-    perUserDebtLimit: uint256
-    globalDebtLimit: uint256
-    minDebtAmount: uint256
-
-struct RepayConfig:
-    isRepayEnabled: bool
-    canOthersRepayForUser: bool
-
-struct RedeemCollateralConfig:
-    canRedeemCollateral: bool
-    ltvPaybackBuffer: uint256
-
-struct CollateralRedemption:
-    user: address
-    vaultId: uint256
-    asset: address
-    maxGreenAmount: uint256
-
 struct DebtTerms:
     ltv: uint256
     redemptionThreshold: uint256
@@ -109,6 +80,37 @@ struct UserDebt:
 struct IntervalBorrow:
     start: uint256
     amount: uint256
+
+struct RepayDataBundle:
+    userDebt: UserDebt
+    numUserVaults: uint256
+
+struct BorrowConfig:
+    canBorrow: bool
+    canBorrowForUser: bool
+    numAllowedBorrowers: uint256
+    maxBorrowPerInterval: uint256
+    numBlocksPerInterval: uint256
+    perUserDebtLimit: uint256
+    globalDebtLimit: uint256
+    minDebtAmount: uint256
+    isDaowryEnabled: bool
+
+struct RepayConfig:
+    canRepay: bool
+    canAnyoneRepayDebt: bool
+
+struct RedeemCollateralConfig:
+    canRedeemCollateralGeneral: bool
+    canRedeemCollateralAsset: bool
+    isUserAllowed: bool
+    ltvPaybackBuffer: uint256
+
+struct CollateralRedemption:
+    user: address
+    vaultId: uint256
+    asset: address
+    maxGreenAmount: uint256
 
 event NewBorrow:
     user: indexed(address)
@@ -176,10 +178,13 @@ def borrowForUser(
     # get borrow data (debt terms for user)
     bt: UserBorrowTerms = self._getUserBorrowTerms(_user, d.numUserVaults, True, a)
 
+    # get config
+    config: BorrowConfig = staticcall ControlRoom(a.controlRoom).getBorrowConfig(_user, _caller)
+
     # validation
     newBorrowAmount: uint256 = 0
     isFreshInterval: bool = False
-    newBorrowAmount, isFreshInterval = self._validateOnBorrow(_user, _caller, _greenAmount, userDebt, bt.totalMaxDebt, d.userBorrowInterval, d.isUserBorrower, d.numBorrowers, d.totalDebt, a.controlRoom)
+    newBorrowAmount, isFreshInterval = self._validateOnBorrow(_greenAmount, userDebt, bt.totalMaxDebt, d, config)
     assert newBorrowAmount != 0 # dev: cannot borrow
 
     # update borrow interval
@@ -212,7 +217,7 @@ def borrowForUser(
     extcall GreenToken(a.greenToken).mint(self, totalGreenMint)
 
     # origination fee
-    daowry: uint256 = self._getDaowryAmount(newBorrowAmount, bt.debtTerms.daowry, a.controlRoom)
+    daowry: uint256 = self._getDaowryAmount(newBorrowAmount, bt.debtTerms.daowry, config.isDaowryEnabled)
 
     # dao revenue
     forDao: uint256 = daowry + unrealizedYield
@@ -233,28 +238,22 @@ def borrowForUser(
 @view
 @internal
 def _validateOnBorrow(
-    _user: address,
-    _caller: address,
     _greenAmount: uint256,
     _userDebt: UserDebt,
     _maxUserDebt: uint256,
-    _userBorrowInterval: IntervalBorrow,
-    _isUserBorrower: bool,
-    _numBorrowers: uint256,
-    _totalDebt: uint256,
-    _controlRoom: address,
+    _d: BorrowDataBundle,
+    _config: BorrowConfig,
 ) -> (uint256, bool):
     assert not _userDebt.inLiquidation # dev: cannot borrow in liquidation
     assert _greenAmount != 0 # dev: cannot borrow 0 amount
 
     # get borrow config
-    config: BorrowConfig = staticcall ControlRoom(_controlRoom).getBorrowConfig(_user, _caller)
-    assert config.canBorrow # dev: borrow not enabled
-    assert config.canBorrowForUser # dev: cannot borrow for user
+    assert _config.canBorrow # dev: borrow not enabled
+    assert _config.canBorrowForUser # dev: cannot borrow for user
 
     # check num allowed borrowers
-    if not _isUserBorrower:
-        numAvailBorrowers: uint256 = self._getAvailNumBorrowers(_numBorrowers, config.numAllowedBorrowers)
+    if not _d.isUserBorrower:
+        numAvailBorrowers: uint256 = self._getAvailNumBorrowers(_d.numBorrowers, _config.numAllowedBorrowers)
         assert numAvailBorrowers != 0 # dev: max num borrowers reached
 
     # main var
@@ -268,22 +267,22 @@ def _validateOnBorrow(
     # check borrow interval
     availInInterval: uint256 = 0
     isFreshInterval: bool = False
-    availInInterval, isFreshInterval = self._getAvailDebtInInterval(_userBorrowInterval, config.maxBorrowPerInterval, config.numBlocksPerInterval)
+    availInInterval, isFreshInterval = self._getAvailDebtInInterval(_d.userBorrowInterval, _config.maxBorrowPerInterval, _config.numBlocksPerInterval)
     assert availInInterval != 0 # dev: interval borrow limit reached
     newBorrowAmount = min(newBorrowAmount, availInInterval)
 
     # check per user debt limit
-    availPerUser: uint256 = self._getAvailPerUserDebt(_userDebt.amount, config.perUserDebtLimit)
+    availPerUser: uint256 = self._getAvailPerUserDebt(_userDebt.amount, _config.perUserDebtLimit)
     assert availPerUser != 0 # dev: per user debt limit reached
     newBorrowAmount = min(newBorrowAmount, availPerUser)
 
     # check global debt limit
-    availGlobal: uint256 = self._getAvailGlobalDebt(_totalDebt, config.globalDebtLimit)
+    availGlobal: uint256 = self._getAvailGlobalDebt(_d.totalDebt, _config.globalDebtLimit)
     assert availGlobal != 0 # dev: global debt limit reached
     newBorrowAmount = min(newBorrowAmount, availGlobal)
 
     # must reach minimum debt threshold
-    assert _userDebt.amount + newBorrowAmount >= config.minDebtAmount # dev: debt too small
+    assert _userDebt.amount + newBorrowAmount >= _config.minDebtAmount # dev: debt too small
 
     return newBorrowAmount, isFreshInterval
 
@@ -487,9 +486,9 @@ def _validateOnRepay(
 
     # repay config
     repayConfig: RepayConfig = staticcall ControlRoom(_controlRoom).getRepayConfig(_user)
-    assert repayConfig.isRepayEnabled # dev: repay paused
+    assert repayConfig.canRepay # dev: repay paused
     if _user != _caller:
-        assert repayConfig.canOthersRepayForUser # dev: cannot repay for user
+        assert repayConfig.canAnyoneRepayDebt # dev: cannot repay for user
 
     return self._getRepayAmountAndRefundAmount(_userDebtAmount, _greenAmount, _greenToken)
 
@@ -605,8 +604,8 @@ def _redeemCollateral(
         return 0
 
     # redemptions not allowed on asset
-    config: RedeemCollateralConfig = staticcall ControlRoom(_a.controlRoom).getRedeemCollateralConfig(_vaultId, _asset)
-    if not config.canRedeemCollateral:
+    config: RedeemCollateralConfig = staticcall ControlRoom(_a.controlRoom).getRedeemCollateralConfig(_asset, _redeemer)
+    if not config.canRedeemCollateralGeneral or not config.canRedeemCollateralAsset or not config.isUserAllowed:
         return 0
 
     # get latest user debt
@@ -734,7 +733,7 @@ def _getUserBorrowTerms(
                 continue
 
             # debt terms
-            debtTerms: DebtTerms = staticcall ControlRoom(_a.controlRoom).getDebtTerms(vaultId, asset)
+            debtTerms: DebtTerms = staticcall ControlRoom(_a.controlRoom).getDebtTerms(asset)
 
             # skip if no ltv (staked green, staked ripe, etc)
             if debtTerms.ltv == 0:
@@ -996,9 +995,13 @@ def _getLatestUserDebtWithInterest(_userDebt: UserDebt) -> (UserDebt, uint256):
 
 @view
 @internal
-def _getDaowryAmount(_borrowAmount: uint256, _daowryFee: uint256, _controlRoom: address) -> uint256:
+def _getDaowryAmount(
+    _borrowAmount: uint256,
+    _daowryFee: uint256,
+    _isDaowryEnabled: bool,
+) -> uint256:
     daowry: uint256 = 0
-    if _daowryFee != 0 and staticcall ControlRoom(_controlRoom).isDaowryEnabled():
+    if _daowryFee != 0 and _isDaowryEnabled:
         daowry = _borrowAmount * _daowryFee // HUNDRED_PERCENT
     return daowry
 

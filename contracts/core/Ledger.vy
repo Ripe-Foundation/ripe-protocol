@@ -614,5 +614,14 @@ def getFungibleAuction(_liqUser: address, _vaultId: uint256, _asset: address) ->
 
 @view
 @external
+def getFungibleAuctionDuringPurchase(_liqUser: address, _vaultId: uint256, _asset: address) -> FungibleAuction:
+    if not self.userDebt[_liqUser].inLiquidation:
+        return empty(FungibleAuction)
+    aid: uint256 = self.fungibleAuctionIndex[_liqUser][_vaultId][_asset]
+    return self.fungibleAuctions[_liqUser][aid]
+
+
+@view
+@external
 def hasFungibleAuction(_liqUser: address, _vaultId: uint256, _asset: address) -> bool:
     return self.fungibleAuctionIndex[_liqUser][_vaultId][_asset] != 0
