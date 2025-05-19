@@ -58,7 +58,7 @@ def __init__(
     gov.__init__(_ripeHq, empty(address), 0, 0, 0)
     registry.__init__(_minRegistryTimeLock, _maxRegistryTimeLock, 0, "PriceDesk.vy")
     addys.__init__(_ripeHq)
-    deptBasics.__init__(False, False) # no minting
+    deptBasics.__init__(False, False, False) # no minting
 
 
 #############################
@@ -208,7 +208,7 @@ def hasPriceFeed(_asset: address) -> bool:
 @external
 def setPriorityPriceSourceIds(_priorityIds: DynArray[uint256, MAX_PRIORITY_PARTNERS]) -> bool:
     assert gov._canGovern(msg.sender) # dev: no perms
-    assert deptBasics.isActivated # dev: not activated
+    assert not deptBasics.isPaused # dev: not activated
 
     priorityIds: DynArray[uint256, MAX_PRIORITY_PARTNERS] = self._sanitizePrioritySources(_priorityIds)
     assert self._areValidPriorityPriceSourceIds(priorityIds) # dev: invalid priority sources
@@ -264,7 +264,7 @@ def _sanitizePrioritySources(_priorityIds: DynArray[uint256, MAX_PRIORITY_PARTNE
 @external
 def setStaleTime(_staleTime: uint256) -> bool:
     assert gov._canGovern(msg.sender) # dev: no perms
-    assert deptBasics.isActivated # dev: not activated
+    assert not deptBasics.isPaused # dev: not activated
 
     assert self._isValidStaleTime(_staleTime) # dev: invalid stale time
     self.staleTime = _staleTime

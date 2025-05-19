@@ -5,8 +5,8 @@ uses: addys
 import contracts.modules.Addys as addys
 from ethereum.ercs import IERC20
 
-event PriceSourceActivated:
-    isActivated: bool
+event PriceSourcePauseModified:
+    isPaused: bool
 
 event PriceSourceFundsRecovered:
     asset: indexed(address)
@@ -14,7 +14,7 @@ event PriceSourceFundsRecovered:
     balance: uint256
 
 # config
-isActivated: public(bool)
+isPaused: public(bool)
 
 # priced assets
 assets: public(HashMap[uint256, address]) # index -> asset
@@ -26,8 +26,8 @@ MAX_RECOVER_ASSETS: constant(uint256) = 20
 
 
 @deploy
-def __init__():
-    self.isActivated = True
+def __init__(_shouldPause: bool):
+    self.isPaused = _shouldPause
 
 
 ##############
@@ -97,10 +97,10 @@ def getPricedAssets() -> DynArray[address, MAX_ASSETS]:
 
 
 @external
-def activate(_shouldActivate: bool):
+def pause(_shouldPause: bool):
     assert msg.sender == addys._getControlRoomAddr() # dev: only ControlRoom allowed
-    self.isActivated = _shouldActivate
-    log PriceSourceActivated(isActivated=_shouldActivate)
+    self.isPaused = _shouldPause
+    log PriceSourcePauseModified(isPaused=_shouldPause)
 
 
 # recover funds

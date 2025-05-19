@@ -25,7 +25,7 @@ def _depositTokensInVault(
     _asset: address,
     _amount: uint256,
 ) -> (uint256, uint256):
-    assert vaultData.isActivated # dev: contract paused
+    assert not vaultData.isPaused # dev: contract paused
 
     # validation
     assert empty(address) not in [_user, _asset] # dev: invalid user or asset
@@ -50,7 +50,7 @@ def _withdrawTokensFromVault(
     _amount: uint256,
     _recipient: address,
 ) -> (uint256, uint256, bool):
-    assert vaultData.isActivated # dev: contract paused
+    assert not vaultData.isPaused # dev: contract paused
     assert empty(address) not in [_user, _asset, _recipient] # dev: invalid user, asset, or recipient
 
     # calc shares + amount to withdraw
@@ -74,7 +74,7 @@ def _transferBalanceWithinVault(
     _toUser: address,
     _transferAmount: uint256,
 ) -> (uint256, uint256, bool):
-    assert vaultData.isActivated # dev: contract paused
+    assert not vaultData.isPaused # dev: contract paused
     assert empty(address) not in [_fromUser, _toUser, _asset] # dev: invalid users or asset
 
     # calc shares + amount to transfer

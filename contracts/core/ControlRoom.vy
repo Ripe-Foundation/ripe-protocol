@@ -219,7 +219,7 @@ MAX_GEN_STAB_POOLS: constant(uint256) = 10
 def __init__(_ripeHq: address):
     gov.__init__(_ripeHq, empty(address), 0, 0, 0)
     addys.__init__(_ripeHq)
-    deptBasics.__init__(False, False) # no minting
+    deptBasics.__init__(False, False, False) # no minting
 
 
 #################

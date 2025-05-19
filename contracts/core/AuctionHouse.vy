@@ -175,7 +175,7 @@ MAX_AUCTION_PURCHASES: constant(uint256) = 20
 @deploy
 def __init__(_ripeHq: address):
     addys.__init__(_ripeHq)
-    deptBasics.__init__(True, False) # can mint green (keeper rewards)
+    deptBasics.__init__(False, True, False) # can mint green (keeper rewards)
 
 
 ###############
@@ -191,7 +191,7 @@ def liquidateUser(
     _a: addys.Addys = empty(addys.Addys),
 ) -> uint256:
     assert msg.sender == addys._getTellerAddr() # dev: only teller allowed
-    assert deptBasics.isActivated # dev: contract paused
+    assert not deptBasics.isPaused # dev: contract paused
     a: addys.Addys = addys._getAddys(_a)
 
     config: GenLiqConfig = staticcall ControlRoom(a.controlRoom).getGenLiqConfig()
@@ -214,7 +214,7 @@ def liquidateManyUsers(
     _a: addys.Addys = empty(addys.Addys),
 ) -> uint256:
     assert msg.sender == addys._getTellerAddr() # dev: only teller allowed
-    assert deptBasics.isActivated # dev: contract paused
+    assert not deptBasics.isPaused # dev: contract paused
     a: addys.Addys = addys._getAddys(_a)
 
     config: GenLiqConfig = staticcall ControlRoom(a.controlRoom).getGenLiqConfig()
@@ -634,7 +634,7 @@ def buyFungibleAuction(
     _a: addys.Addys = empty(addys.Addys),
 ) -> uint256:
     assert msg.sender == addys._getTellerAddr() # dev: only teller allowed
-    assert deptBasics.isActivated # dev: contract paused
+    assert not deptBasics.isPaused # dev: contract paused
     a: addys.Addys = addys._getAddys(_a)
 
     greenAmount: uint256 = min(_greenAmount, staticcall IERC20(a.greenToken).balanceOf(self))
@@ -658,7 +658,7 @@ def buyManyFungibleAuctions(
     _a: addys.Addys = empty(addys.Addys),
 ) -> uint256:
     assert msg.sender == addys._getTellerAddr() # dev: only teller allowed
-    assert deptBasics.isActivated # dev: contract paused
+    assert not deptBasics.isPaused # dev: contract paused
     a: addys.Addys = addys._getAddys(_a)
 
     totalGreenSpent: uint256 = 0

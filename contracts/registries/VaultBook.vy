@@ -29,7 +29,7 @@ def __init__(
     gov.__init__(_ripeHq, empty(address), 0, 0, 0)
     registry.__init__(_minRegistryTimeLock, _maxRegistryTimeLock, 0, "VaultBook.vy")
     addys.__init__(_ripeHq)
-    deptBasics.__init__(False, False) # no minting
+    deptBasics.__init__(False, False, False) # no minting
 
 
 @view

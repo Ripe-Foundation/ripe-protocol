@@ -120,7 +120,7 @@ def __init__(
 ):
     gov.__init__(_ripeHq, empty(address), 0, 0, 0)
     addys.__init__(_ripeHq)
-    priceData.__init__()
+    priceData.__init__(False)
     timeLock.__init__(_minPriceChangeTimeLock, _maxPriceChangeTimeLock, 0)
 
     # set default assets
@@ -278,7 +278,7 @@ def addNewPriceFeed(
     _needsBtcToUsd: bool = False,
 ) -> bool:
     assert gov._canGovern(msg.sender) # dev: no perms
-    assert priceData.isActivated # dev: contract paused
+    assert not priceData.isPaused # dev: contract paused
 
     # validation
     decimals: uint256 = convert(staticcall ChainlinkFeed(_newFeed).decimals(), uint256)
@@ -306,7 +306,7 @@ def addNewPriceFeed(
 @external
 def confirmNewPriceFeed(_asset: address) -> bool:
     assert gov._canGovern(msg.sender) # dev: no perms
-    assert priceData.isActivated # dev: contract paused
+    assert not priceData.isPaused # dev: contract paused
 
     # validate again
     d: PendingChainlinkConfig = self.pendingUpdates[_asset]
@@ -332,7 +332,7 @@ def confirmNewPriceFeed(_asset: address) -> bool:
 @external
 def cancelNewPendingPriceFeed(_asset: address) -> bool:
     assert gov._canGovern(msg.sender) # dev: no perms
-    assert priceData.isActivated # dev: contract paused
+    assert not priceData.isPaused # dev: contract paused
 
     d: PendingChainlinkConfig = self.pendingUpdates[_asset]
     self._cancelNewPendingPriceFeed(_asset, d.actionId)
@@ -379,7 +379,7 @@ def updatePriceFeed(
     _needsBtcToUsd: bool = False,
 ) -> bool:
     assert gov._canGovern(msg.sender) # dev: no perms
-    assert priceData.isActivated # dev: contract paused
+    assert not priceData.isPaused # dev: contract paused
 
     # validation
     oldFeed: address = self.feedConfig[_asset].feed
@@ -407,7 +407,7 @@ def updatePriceFeed(
 @external
 def confirmPriceFeedUpdate(_asset: address) -> bool:
     assert gov._canGovern(msg.sender) # dev: no perms
-    assert priceData.isActivated # dev: contract paused
+    assert not priceData.isPaused # dev: contract paused
 
     # validate again
     oldFeed: address = self.feedConfig[_asset].feed
@@ -433,7 +433,7 @@ def confirmPriceFeedUpdate(_asset: address) -> bool:
 @external
 def cancelPriceFeedUpdate(_asset: address) -> bool:
     assert gov._canGovern(msg.sender) # dev: no perms
-    assert priceData.isActivated # dev: contract paused
+    assert not priceData.isPaused # dev: contract paused
 
     d: PendingChainlinkConfig = self.pendingUpdates[_asset]
     self._cancelPriceFeedUpdate(_asset, d.actionId)
@@ -493,7 +493,7 @@ def _isValidFeedConfig(
 @external
 def disablePriceFeed(_asset: address) -> bool:
     assert gov._canGovern(msg.sender) # dev: no perms
-    assert priceData.isActivated # dev: contract paused
+    assert not priceData.isPaused # dev: contract paused
 
     # validation
     oldFeed: address = self.feedConfig[_asset].feed
@@ -516,7 +516,7 @@ def disablePriceFeed(_asset: address) -> bool:
 @external
 def confirmDisablePriceFeed(_asset: address) -> bool:
     assert gov._canGovern(msg.sender) # dev: no perms
-    assert priceData.isActivated # dev: contract paused
+    assert not priceData.isPaused # dev: contract paused
 
     # validate again
     oldFeed: address = self.feedConfig[_asset].feed
@@ -543,7 +543,7 @@ def confirmDisablePriceFeed(_asset: address) -> bool:
 @external
 def cancelDisablePriceFeed(_asset: address) -> bool:
     assert gov._canGovern(msg.sender) # dev: no perms
-    assert priceData.isActivated # dev: contract paused
+    assert not priceData.isPaused # dev: contract paused
 
     self._cancelDisablePriceFeed(_asset, self.pendingUpdates[_asset].actionId)
     log DisableChainlinkFeedCancelled(asset=_asset, feed=self.feedConfig[_asset].feed)

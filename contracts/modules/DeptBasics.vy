@@ -5,8 +5,8 @@ uses: addys
 import contracts.modules.Addys as addys
 from ethereum.ercs import IERC20
 
-event DepartmentActivated:
-    isActivated: bool
+event DepartmentPauseModified:
+    isPaused: bool
 
 event DepartmentFundsRecovered:
     asset: indexed(address)
@@ -14,7 +14,7 @@ event DepartmentFundsRecovered:
     balance: uint256
 
 # config
-isActivated: public(bool)
+isPaused: public(bool)
 
 CAN_MINT_GREEN: immutable(bool)
 CAN_MINT_RIPE: immutable(bool)
@@ -23,8 +23,8 @@ MAX_RECOVER_ASSETS: constant(uint256) = 20
 
 
 @deploy
-def __init__(_canMintGreen: bool, _canMintRipe: bool):
-    self.isActivated = True
+def __init__(_shouldPause: bool, _canMintGreen: bool, _canMintRipe: bool):
+    self.isPaused = _shouldPause
 
     CAN_MINT_GREEN = _canMintGreen
     CAN_MINT_RIPE = _canMintRipe
@@ -56,10 +56,10 @@ def canMintRipe() -> bool:
 
 
 @external
-def activate(_shouldActivate: bool):
+def pause(_shouldPause: bool):
     assert msg.sender == addys._getControlRoomAddr() # dev: only ControlRoom allowed
-    self.isActivated = _shouldActivate
-    log DepartmentActivated(isActivated=_shouldActivate)
+    self.isPaused = _shouldPause
+    log DepartmentPauseModified(isPaused=_shouldPause)
 
 
 # recover funds

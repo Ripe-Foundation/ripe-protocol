@@ -5,8 +5,8 @@ uses: addys
 import contracts.modules.Addys as addys
 from ethereum.ercs import IERC20
 
-event VaultActivated:
-    isActivated: bool
+event VaultPauseModified:
+    isPaused: bool
 
 event VaultFundsRecovered:
     asset: indexed(address)
@@ -14,7 +14,7 @@ event VaultFundsRecovered:
     balance: uint256
 
 # config
-isActivated: public(bool)
+isPaused: public(bool)
 
 # balances (may be shares or actual balance)
 userBalances: public(HashMap[address, HashMap[address, uint256]]) # user -> asset -> balance
@@ -34,8 +34,8 @@ MAX_RECOVER_ASSETS: constant(uint256) = 20
 
 
 @deploy
-def __init__():
-    self.isActivated = True
+def __init__(_shouldPause: bool):
+    self.isPaused = _shouldPause
 
 
 ###################
@@ -254,10 +254,10 @@ def _getNumVaultAssets() -> uint256:
 
 
 @external
-def activate(_shouldActivate: bool):
+def pause(_shouldPause: bool):
     assert msg.sender == addys._getControlRoomAddr() # dev: only ControlRoom allowed
-    self.isActivated = _shouldActivate
-    log VaultActivated(isActivated=_shouldActivate)
+    self.isPaused = _shouldPause
+    log VaultPauseModified(isPaused=_shouldPause)
 
 
 # recover funds

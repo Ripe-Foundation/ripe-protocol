@@ -80,7 +80,7 @@ def _depositTokensInVault(
     _amount: uint256,
     _priceDesk: address,
 ) -> (uint256, uint256):
-    assert vaultData.isActivated # dev: contract paused
+    assert not vaultData.isPaused # dev: contract paused
 
     # validation
     assert empty(address) not in [_user, _asset] # dev: invalid user or asset
@@ -116,7 +116,7 @@ def _withdrawTokensFromVault(
     _recipient: address,
     _priceDesk: address,
 ) -> (uint256, uint256, bool):
-    assert vaultData.isActivated # dev: contract paused
+    assert not vaultData.isPaused # dev: contract paused
     assert empty(address) not in [_user, _asset, _recipient] # dev: invalid user, asset, or recipient
 
     # calc shares + amount to withdraw
@@ -140,7 +140,7 @@ def _transferBalanceWithinVault(
     _transferAmount: uint256,
     _priceDesk: address,
 ) -> (uint256, uint256, bool):
-    assert vaultData.isActivated # dev: contract paused
+    assert not vaultData.isPaused # dev: contract paused
     assert empty(address) not in [_fromUser, _toUser, _asset] # dev: invalid users or asset
 
     # calc shares + amount to transfer
@@ -368,7 +368,7 @@ def swapForLiquidatedCollateral(
     _recipient: address,
     _greenToken: address,
 ) -> uint256:
-    assert vaultData.isActivated # dev: contract paused
+    assert not vaultData.isPaused # dev: contract paused
     assert msg.sender == addys._getAuctionHouseAddr() # dev: only AuctionHouse allowed
     assert vaultData.indexOfAsset[_liqAsset] == 0 # dev: liq asset cannot be stab asset
 
@@ -454,7 +454,7 @@ def claimFromStabilityPool(
     _a: addys.Addys = empty(addys.Addys),
 ) -> uint256:
     assert msg.sender == addys._getTellerAddr() # dev: only Teller allowed
-    assert vaultData.isActivated # dev: contract paused
+    assert not vaultData.isPaused # dev: contract paused
     a: addys.Addys = addys._getAddys(_a)
     return self._claimFromStabilityPool(_claimer, _stabAsset, _claimAsset, _maxUsdValue, a.priceDesk, a.controlRoom)
 
@@ -466,7 +466,7 @@ def claimManyFromStabilityPool(
     _a: addys.Addys = empty(addys.Addys),
 ) -> uint256:
     assert msg.sender == addys._getTellerAddr() # dev: only Teller allowed
-    assert vaultData.isActivated # dev: contract paused
+    assert not vaultData.isPaused # dev: contract paused
     a: addys.Addys = addys._getAddys(_a)
 
     totalUsdValue: uint256 = 0
@@ -581,7 +581,7 @@ def redeemFromStabilityPool(
     _a: addys.Addys = empty(addys.Addys),
 ) -> uint256:
     assert msg.sender == addys._getTellerAddr() # dev: only Teller allowed
-    assert vaultData.isActivated # dev: contract paused
+    assert not vaultData.isPaused # dev: contract paused
     a: addys.Addys = addys._getAddys(_a)
 
     assert self._canRedeemInThisVault(a.greenToken) # dev: redemptions not allowed
@@ -606,7 +606,7 @@ def redeemManyFromStabilityPool(
     _a: addys.Addys = empty(addys.Addys),
 ) -> uint256:
     assert msg.sender == addys._getTellerAddr() # dev: only Teller allowed
-    assert vaultData.isActivated # dev: contract paused
+    assert not vaultData.isPaused # dev: contract paused
     a: addys.Addys = addys._getAddys(_a)
 
     assert self._canRedeemInThisVault(a.greenToken) # dev: redemptions not allowed

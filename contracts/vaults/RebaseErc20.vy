@@ -41,7 +41,7 @@ event RebaseErc20VaultTransfer:
 @deploy
 def __init__(_ripeHq: address):
     addys.__init__(_ripeHq)
-    vaultData.__init__()
+    vaultData.__init__(False)
     sharesVault.__init__()
 
 

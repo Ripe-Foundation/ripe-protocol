@@ -27,12 +27,12 @@ def canMintRipe() -> bool:
 
 @view
 @external
-def isActivated() -> bool:
+def isPaused() -> bool:
     ...
 
 
 @external
-def activate(_shouldActivate: bool):
+def pause(_shouldPause: bool):
     ...
 
 

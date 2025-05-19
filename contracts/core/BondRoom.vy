@@ -16,6 +16,6 @@ from interfaces import Department
 @deploy
 def __init__(_ripeHq: address):
     addys.__init__(_ripeHq)
-    deptBasics.__init__(False, False) # no minting
+    deptBasics.__init__(False, False, False) # no minting
 
     # NOTE: This is a temporary BondRoom contract. Real one coming soon.
