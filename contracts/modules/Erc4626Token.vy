@@ -103,7 +103,7 @@ def _deposit(_asset: address, _amount: uint256, _shares: uint256, _recipient: ad
     assert _shares != 0 # dev: cannot receive 0 shares
     assert _recipient != empty(address) # dev: invalid recipient
 
-    assert extcall IERC20(_asset).transferFrom(msg.sender, self, _amount) # dev: deposit failed
+    assert extcall IERC20(_asset).transferFrom(msg.sender, self, _amount, default_return_value=True) # dev: deposit failed
     token._mint(_recipient, _shares)
     log Deposit(sender=msg.sender, owner=_recipient, assets=_amount, shares=_shares)
 
@@ -182,7 +182,7 @@ def _redeem(
         token._spendAllowance(_owner, _sender, _shares)
 
     token._burn(_owner, _shares)
-    assert extcall IERC20(_asset).transfer(_recipient, _amount) # dev: withdrawal failed
+    assert extcall IERC20(_asset).transfer(_recipient, _amount, default_return_value=True) # dev: withdrawal failed
 
     log Withdraw(sender=_sender, receiver=_recipient, owner=_owner, assets=_amount, shares=_shares)
     return _amount

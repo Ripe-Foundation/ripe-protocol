@@ -730,7 +730,7 @@ def _buyFungibleAuction(
 
     # repay debt for liq user
     greenSpent: uint256 = min(amountNeededFromBuyer, greenAmount)
-    assert extcall IERC20(_a.greenToken).transfer(_a.creditEngine, greenSpent) # dev: could not transfer
+    assert extcall IERC20(_a.greenToken).transfer(_a.creditEngine, greenSpent, default_return_value=True) # dev: could not transfer
     hasGoodDebtHealth: bool = extcall CreditEngine(_a.creditEngine).repayDuringAuctionPurchase(_liqUser, greenSpent, _a)
 
     # TODO: event

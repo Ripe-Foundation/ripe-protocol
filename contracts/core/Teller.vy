@@ -39,13 +39,13 @@ interface Lootbox:
     def updateDepositPoints(_user: address, _vaultId: uint256, _vaultAddr: address, _asset: address, _a: addys.Addys = empty(addys.Addys)): nonpayable
     def claimLootForUser(_user: address, _caller: address, _shouldStake: bool, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
 
+interface ControlRoom:
+    def getWithdrawConfig(_asset: address, _user: address, _caller: address) -> WithdrawConfig: view
+    def getTellerDepositConfig(_asset: address, _user: address) -> TellerDepositConfig: view
+
 interface Ledger:
     def getDepositLedgerData(_user: address, _vaultId: uint256) -> DepositLedgerData: view
     def addVaultToUser(_user: address, _vaultId: uint256): nonpayable
-
-interface ControlRoom:
-    def getWithdrawConfig(_vaultId: uint256, _asset: address, _user: address, _caller: address) -> WithdrawConfig: view
-    def getDepositConfig(_vaultId: uint256, _asset: address, _user: address) -> DepositConfig: view
 
 interface VaultBook:
     def getRegId(_vaultAddr: address) -> uint256: view
@@ -55,14 +55,15 @@ struct DepositLedgerData:
     isParticipatingInVault: bool
     numUserVaults: uint256
 
-struct DepositConfig:
-    canDeposit: bool
+struct TellerDepositConfig:
+    canDepositGeneral: bool
+    canDepositAsset: bool
     isUserAllowed: bool
     perUserDepositLimit: uint256
     globalDepositLimit: uint256
-    maxDepositAssetsPerVault: uint256
-    maxDepositVaults: uint256
-    canOthersDepositForUser: bool
+    perUserMaxAssetsPerVault: uint256
+    perUserMaxVaults: uint256
+    canAnyoneDeposit: bool
 
 struct DepositAction:
     asset: address
@@ -71,7 +72,8 @@ struct DepositAction:
     vaultId: uint256
 
 struct WithdrawConfig:
-    canWithdraw: bool
+    canWithdrawGeneral: bool
+    canWithdrawAsset: bool
     isUserAllowed: bool
     canWithdrawForUser: bool
 
@@ -188,7 +190,7 @@ def _deposit(
     amount: uint256 = self._validateOnDeposit(_asset, _amount, _user, vaultAddr, vaultId, _depositor, d, _a.controlRoom)
 
     # deposit tokens
-    assert extcall IERC20(_asset).transferFrom(_depositor, vaultAddr, amount) # dev: token transfer failed
+    assert extcall IERC20(_asset).transferFrom(_depositor, vaultAddr, amount, default_return_value=True) # dev: token transfer failed
     amount = extcall Vault(vaultAddr).depositTokensInVault(_user, _asset, amount, _a)
 
     # register vault participation
@@ -217,20 +219,21 @@ def _validateOnDeposit(
     _d: DepositLedgerData,
     _controlRoom: address,
 ) -> uint256:
-    config: DepositConfig = staticcall ControlRoom(_controlRoom).getDepositConfig(_vaultId, _asset, _user)
-    assert config.canDeposit # dev: cannot deposit
-    assert config.isUserAllowed # dev: user not allowed
+    config: TellerDepositConfig = staticcall ControlRoom(_controlRoom).getTellerDepositConfig(_asset, _user)
+    assert config.canDepositGeneral # dev: protocol deposits disabled
+    assert config.canDepositAsset # dev: asset deposits disabled
+    assert config.isUserAllowed # dev: user not on whitelist
 
     # make sure depositor is allowed to deposit for user
     if _user != _depositor:
-        assert config.canOthersDepositForUser # dev: others cannot deposit for user
+        assert config.canAnyoneDeposit # dev: others cannot deposit for user
 
     # check max vaults, max assets per vault
     vd: Vault.VaultDataOnDeposit = staticcall Vault(_vaultAddr).getVaultDataOnDeposit(_user, _asset)
     if not _d.isParticipatingInVault:
-        assert _d.numUserVaults < config.maxDepositVaults # dev: reached max vaults
+        assert _d.numUserVaults < config.perUserMaxVaults # dev: reached max vaults
     elif not vd.hasPosition:
-        assert vd.numAssets < config.maxDepositAssetsPerVault # dev: reached max assets per vault
+        assert vd.numAssets < config.perUserMaxAssetsPerVault # dev: reached max assets per vault
 
     # avail amount
     amount: uint256 = min(_amount, staticcall IERC20(_asset).balanceOf(_depositor))
@@ -351,13 +354,14 @@ def _validateOnWithdrawal(
 ) -> uint256:
     assert _amount != 0 # dev: cannot withdraw 0
 
-    config: WithdrawConfig = staticcall ControlRoom(_a.controlRoom).getWithdrawConfig(_vaultId, _asset, _user, _caller)
-    assert config.canWithdraw # dev: cannot withdraw
-    assert config.isUserAllowed # dev: user not allowed
+    config: WithdrawConfig = staticcall ControlRoom(_a.controlRoom).getWithdrawConfig(_asset, _user, _caller)
+    assert config.canWithdrawGeneral # dev: protocol withdrawals disabled
+    assert config.canWithdrawAsset # dev: asset withdrawals disabled
+    assert config.isUserAllowed # dev: user not on whitelist
 
     # make sure caller is allowed to withdraw for user
     if _user != _caller:
-        assert config.canWithdrawForUser # dev: invalid caller
+        assert config.canWithdrawForUser # dev: caller not allowed to withdraw for user
 
     # max withdrawable
     maxWithdrawable: uint256 = staticcall CreditEngine(_a.creditEngine).getMaxWithdrawableForAsset(_user, _asset, _a)
@@ -655,5 +659,5 @@ def _transferTokensToDepartment(
 ) -> uint256:
     tokenAmount: uint256 = min(_amount, staticcall IERC20(_asset).balanceOf(msg.sender))
     assert tokenAmount != 0 # dev: cannot transfer 0 amount
-    assert extcall IERC20(_asset).transferFrom(msg.sender, _recipient, tokenAmount) # dev: token transfer failed
+    assert extcall IERC20(_asset).transferFrom(msg.sender, _recipient, tokenAmount, default_return_value=True) # dev: token transfer failed
     return tokenAmount

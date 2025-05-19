@@ -63,7 +63,7 @@ struct RepayDataBundle:
     numUserVaults: uint256
 
 struct BorrowConfig:
-    isBorrowEnabled: bool
+    canBorrow: bool
     canBorrowForUser: bool
     numAllowedBorrowers: uint256
     maxBorrowPerInterval: uint256
@@ -217,7 +217,7 @@ def borrowForUser(
     # dao revenue
     forDao: uint256 = daowry + unrealizedYield
     if forDao != 0:
-        assert extcall IERC20(a.greenToken).transfer(a.endaoment, forDao) # dev: could not transfer
+        assert extcall IERC20(a.greenToken).transfer(a.endaoment, forDao, default_return_value=True) # dev: could not transfer
 
     # borrower gets their green now -- do this AFTER sending green to stakers
     forBorrower: uint256 = newBorrowAmount - daowry
@@ -249,7 +249,7 @@ def _validateOnBorrow(
 
     # get borrow config
     config: BorrowConfig = staticcall ControlRoom(_controlRoom).getBorrowConfig(_user, _caller)
-    assert config.isBorrowEnabled # dev: borrow not enabled
+    assert config.canBorrow # dev: borrow not enabled
     assert config.canBorrowForUser # dev: cannot borrow for user
 
     # check num allowed borrowers

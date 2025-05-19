@@ -15,6 +15,9 @@ import contracts.modules.Addys as addys
 import contracts.modules.DeptBasics as deptBasics
 from interfaces import Department
 
+interface Whitelist:
+    def isUserAllowed(_user: address, _asset: address) -> bool: view
+
 struct GenConfig:
     canDeposit: bool
     canWithdraw: bool
@@ -46,9 +49,9 @@ struct AssetConfig:
     canDeposit: bool
     canWithdraw: bool
     canRedeemCollateral: bool
-    canLiquidate: bool
-    canAuctionInstantly: bool
-    canBuyAuction: bool
+    canBuyInAuction: bool
+    shouldSwapInStabPool: bool
+    shouldAuctionInstantly: bool
     whitelist: address
     perUserDepositLimit: uint256
     globalDepositLimit: uint256
@@ -58,27 +61,49 @@ struct AssetConfig:
     specialStabPoolId: uint256
     customAuctionParams: AuctionParams
 
+struct UserConfig:
+    canAnyoneDeposit: bool
+    canAnyoneRepayDebt: bool
 
+struct ActionDelegation:
+    canWithdraw: bool
+    canBorrow: bool
+    canClaimFromStabPool: bool
+    canClaimLoot: bool
 
+struct TellerDepositConfig:
+    canDepositGeneral: bool
+    canDepositAsset: bool
+    isUserAllowed: bool
+    perUserDepositLimit: uint256
+    globalDepositLimit: uint256
+    perUserMaxAssetsPerVault: uint256
+    perUserMaxVaults: uint256
+    canAnyoneDeposit: bool
 
+struct WithdrawConfig:
+    canWithdrawGeneral: bool
+    canWithdrawAsset: bool
+    isUserAllowed: bool
+    canWithdrawForUser: bool
+
+struct BorrowConfig:
+    canBorrow: bool
+    canBorrowForUser: bool
+    numAllowedBorrowers: uint256
+    maxBorrowPerInterval: uint256
+    numBlocksPerInterval: uint256
+    perUserDebtLimit: uint256
+    globalDebtLimit: uint256
+    minDebtAmount: uint256
 
 
 ##########
 
 
-struct DepositConfig:
-    canDeposit: bool
-    isUserAllowed: bool
-    perUserDepositLimit: uint256
-    globalDepositLimit: uint256
-    maxDepositAssetsPerVault: uint256
-    maxDepositVaults: uint256
-    canOthersDepositForUser: bool
 
-struct WithdrawConfig:
-    canWithdraw: bool
-    isUserAllowed: bool
-    canWithdrawForUser: bool
+
+
 
 struct DebtTerms:
     ltv: uint256
@@ -87,16 +112,6 @@ struct DebtTerms:
     liqFee: uint256
     borrowRate: uint256
     daowry: uint256
-
-struct BorrowConfig:
-    isBorrowEnabled: bool
-    canBorrowForUser: bool
-    numAllowedBorrowers: uint256
-    maxBorrowPerInterval: uint256
-    numBlocksPerInterval: uint256
-    perUserDebtLimit: uint256
-    globalDebtLimit: uint256
-    minDebtAmount: uint256
 
 struct RepayConfig:
     isRepayEnabled: bool
@@ -157,13 +172,16 @@ struct AuctionParams:
     duration: uint256
     extension: uint256
 
-MAX_GEN_STAB_POOLS: constant(uint256) = 10
-
-
-# config
+# global config
 genConfig: public(GenConfig)
 genDebtConfig: public(GenDebtConfig)
+assetConfig: public(HashMap[address, AssetConfig]) # asset -> config
 
+# user config
+userConfig: public(HashMap[address, UserConfig]) # user -> config
+userDelegation: public(HashMap[address, HashMap[address, ActionDelegation]]) # user -> caller -> config
+
+MAX_GEN_STAB_POOLS: constant(uint256) = 10
 
 
 # init
@@ -174,25 +192,25 @@ def __init__(_ripeHq: address):
     deptBasics.__init__(False, False) # no minting
 
 
-##################
-# General Config #
-##################
+#################
+# Global Config #
+#################
 
 
 @external
 def setGeneralConfig(
     _perUserMaxAssetsPerVault: uint256,
     _perUserMaxVaults: uint256,
-    _canDeposit: bool = True,
-    _canWithdraw: bool = True,
-    _canBorrow: bool = True,
-    _canRepay: bool = True,
-    _canRedeemCollateral: bool = True,
-    _canRedeemInStabPool: bool = True,
-    _canClaimInStabPool: bool = True,
-    _canBuyAuction: bool = True,
-    _canLiquidate: bool = True,
-    _canClaimLoot: bool = True,
+    _canDeposit: bool,
+    _canWithdraw: bool,
+    _canBorrow: bool,
+    _canRepay: bool,
+    _canRedeemCollateral: bool,
+    _canRedeemInStabPool: bool,
+    _canClaimInStabPool: bool,
+    _canBuyAuction: bool,
+    _canLiquidate: bool,
+    _canClaimLoot: bool,
 ) -> bool:
     assert gov._canGovern(msg.sender) # dev: no perms
 
@@ -252,6 +270,92 @@ def setGenDebtConfig(
     return True
 
 
+################
+# Asset Config #
+################
+
+
+@external
+def setAssetConfig(
+    _asset: address,
+    _canDeposit: bool,
+    _canWithdraw: bool,
+    _canRedeemCollateral: bool,
+    _canBuyInAuction: bool,
+    _shouldSwapInStabPool: bool,
+    _shouldAuctionInstantly: bool,
+    _whitelist: address,
+    _perUserDepositLimit: uint256,
+    _globalDepositLimit: uint256,
+    _debtTerms: DebtTerms,
+    _isStable: bool,
+    _isNft: bool,
+    _specialStabPoolId: uint256,
+    _customAuctionParams: AuctionParams,
+) -> bool:
+    assert gov._canGovern(msg.sender) # dev: no perms
+
+    # TODO: add time lock, validation, event
+
+    self.assetConfig[_asset] = AssetConfig(
+        canDeposit=_canDeposit,
+        canWithdraw=_canWithdraw,
+        canRedeemCollateral=_canRedeemCollateral,
+        canBuyInAuction=_canBuyInAuction,
+        shouldSwapInStabPool=_shouldSwapInStabPool,
+        shouldAuctionInstantly=_shouldAuctionInstantly,
+        whitelist=_whitelist,
+        perUserDepositLimit=_perUserDepositLimit,
+        globalDepositLimit=_globalDepositLimit,
+        debtTerms=_debtTerms,
+        isStable=_isStable,
+        isNft=_isNft,
+        specialStabPoolId=_specialStabPoolId,
+        customAuctionParams=_customAuctionParams,
+    )
+    return True
+
+
+###############
+# User Config #
+###############
+
+
+@external
+def setUserConfig(
+    _canAnyoneDeposit: bool = True,
+    _canAnyoneRepayDebt: bool = True,
+) -> bool:
+
+    # TODO: add time lock, validation, event
+
+    self.userConfig[msg.sender] = UserConfig(
+        canAnyoneDeposit=_canAnyoneDeposit,
+        canAnyoneRepayDebt=_canAnyoneRepayDebt,
+    )
+    return True
+
+
+@external
+def setUserDelegation(
+    _user: address,
+    _canWithdraw: bool = True,
+    _canBorrow: bool = True,
+    _canClaimFromStabPool: bool = True,
+    _canClaimLoot: bool = True,
+) -> bool:
+
+    # TODO: add time lock, validation, event
+
+    self.userDelegation[msg.sender][_user] = ActionDelegation(
+        canWithdraw=_canWithdraw,
+        canBorrow=_canBorrow,
+        canClaimFromStabPool=_canClaimFromStabPool,
+        canClaimLoot=_canClaimLoot,
+    )
+    return True
+
+
 ##########################
 # Deposits / Withdrawals #
 ##########################
@@ -259,16 +363,46 @@ def setGenDebtConfig(
 
 @view
 @external
-def getDepositConfig(_vaultId: uint256, _asset: address, _user: address) -> DepositConfig:
-    # TODO: implement
-    return empty(DepositConfig)
+def getTellerDepositConfig(_asset: address, _user: address) -> TellerDepositConfig:
+    genConfig: GenConfig = self.genConfig
+    assetConfig: AssetConfig = self.assetConfig[_asset]
+
+    isUserAllowed: bool = True 
+    if assetConfig.whitelist != empty(address):
+        isUserAllowed = staticcall Whitelist(assetConfig.whitelist).isUserAllowed(_user, _asset)
+
+    return TellerDepositConfig(
+        canDepositGeneral=genConfig.canDeposit,
+        canDepositAsset=assetConfig.canDeposit,
+        isUserAllowed=isUserAllowed,
+        perUserDepositLimit=assetConfig.perUserDepositLimit,
+        globalDepositLimit=assetConfig.globalDepositLimit,
+        perUserMaxAssetsPerVault=genConfig.perUserMaxAssetsPerVault,
+        perUserMaxVaults=genConfig.perUserMaxVaults,
+        canAnyoneDeposit=self.userConfig[_user].canAnyoneDeposit,
+    )
 
 
 @view
 @external
-def getWithdrawConfig(_vaultId: uint256, _asset: address, _user: address, _caller: address) -> WithdrawConfig:
-    # TODO: implement
-    return empty(WithdrawConfig)
+def getTellerWithdrawConfig(_asset: address, _user: address, _caller: address) -> WithdrawConfig:
+    genConfig: GenConfig = self.genConfig
+    assetConfig: AssetConfig = self.assetConfig[_asset]
+
+    isUserAllowed: bool = True 
+    if assetConfig.whitelist != empty(address):
+        isUserAllowed = staticcall Whitelist(assetConfig.whitelist).isUserAllowed(_user, _asset)
+
+    canWithdrawForUser: bool = True
+    if _user != _caller:
+        canWithdrawForUser = self.userDelegation[_user][_caller].canWithdraw
+
+    return WithdrawConfig(
+        canWithdrawGeneral=genConfig.canWithdraw,
+        canWithdrawAsset=assetConfig.canWithdraw,
+        isUserAllowed=isUserAllowed,
+        canWithdrawForUser=canWithdrawForUser,
+    )
 
 
 ########
@@ -278,16 +412,31 @@ def getWithdrawConfig(_vaultId: uint256, _asset: address, _user: address, _calle
 
 @view
 @external
-def getDebtTerms(_vaultId: uint256, _asset: address) -> DebtTerms:
-    # TODO: implement
-    return empty(DebtTerms)
+def getBorrowConfig(_user: address, _caller: address) -> BorrowConfig:
+    genConfig: GenConfig = self.genConfig
+    genDebtConfig: GenDebtConfig = self.genDebtConfig
+
+    canBorrowForUser: bool = True
+    if _user != _caller:
+        canBorrowForUser = self.userDelegation[_user][_caller].canBorrow
+
+    return BorrowConfig(
+        canBorrow=genConfig.canBorrow,
+        canBorrowForUser=canBorrowForUser,
+        numAllowedBorrowers=genDebtConfig.numAllowedBorrowers,
+        maxBorrowPerInterval=genDebtConfig.maxBorrowPerInterval,
+        numBlocksPerInterval=genDebtConfig.numBlocksPerInterval,
+        perUserDebtLimit=genDebtConfig.perUserDebtLimit,
+        globalDebtLimit=genDebtConfig.globalDebtLimit,
+        minDebtAmount=genDebtConfig.minDebtAmount,
+    )
 
 
 @view
 @external
-def getBorrowConfig(_user: address, _caller: address) -> BorrowConfig:
+def getDebtTerms(_vaultId: uint256, _asset: address) -> DebtTerms:
     # TODO: implement
-    return empty(BorrowConfig)
+    return empty(DebtTerms)
 
 
 @view
