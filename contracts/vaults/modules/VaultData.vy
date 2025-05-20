@@ -164,19 +164,19 @@ def _registerVaultAsset(_asset: address):
 
 
 @external
-def deregisterVaultAsset(_asset: address):
+def deregisterVaultAsset(_asset: address) -> bool:
     assert msg.sender == addys._getControlRoomAddr() # dev: only ControlRoom allowed
 
     if self.totalBalances[_asset] != 0:
-        return
+        return False
 
     numAssets: uint256 = self.numAssets
     if numAssets == 0:
-        return
+        return False
 
     targetIndex: uint256 = self.indexOfAsset[_asset]
     if targetIndex == 0:
-        return
+        return False
 
     # update data
     lastIndex: uint256 = numAssets - 1
@@ -188,6 +188,8 @@ def deregisterVaultAsset(_asset: address):
         lastItem: address = self.vaultAssets[lastIndex]
         self.vaultAssets[targetIndex] = lastItem
         self.indexOfAsset[lastItem] = targetIndex
+
+    return True
 
 
 ##############
@@ -202,6 +204,8 @@ def deregisterVaultAsset(_asset: address):
 @external
 def doesVaultHaveAnyFunds() -> bool:
     numAssets: uint256 = self.numAssets
+    if numAssets == 0:
+        return False
     for i: uint256 in range(1, numAssets, bound=max_value(uint256)):
         asset: address = self.vaultAssets[i]
         if self.totalBalances[asset] != 0:

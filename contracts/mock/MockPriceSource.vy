@@ -14,7 +14,7 @@ initializes: timeLock[gov := gov]
 
 import contracts.modules.LocalGov as gov
 import contracts.modules.Addys as addys
-import contracts.modules.PriceSourceData as priceData
+import contracts.priceSources.modules.PriceSourceData as priceData
 import contracts.modules.TimeLock as timeLock
 
 import interfaces.PriceSource as PriceSource

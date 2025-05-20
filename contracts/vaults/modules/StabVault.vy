@@ -178,7 +178,7 @@ def _getVaultDataOnDeposit(_user: address, _asset: address) -> Vault.VaultDataOn
 @internal
 def _getUserLootBoxShare(_user: address, _asset: address) -> uint256:
     # used in Lootbox.vy
-    return vaultData.userBalances[_user][_asset]
+    return vaultData.userBalances[_user][_asset] // DECIMAL_OFFSET
 
 
 @view

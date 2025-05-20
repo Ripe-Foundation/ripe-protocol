@@ -136,7 +136,7 @@ def deregisterUserAsset(_user: address, _asset: address) -> bool:
 
 
 @external
-def deregisterVaultAsset(_asset: address):
+def deregisterVaultAsset(_asset: address) -> bool:
     ...
 
 

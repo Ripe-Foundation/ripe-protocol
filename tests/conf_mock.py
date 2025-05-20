@@ -51,13 +51,13 @@ def whale(env):
 
 @pytest.fixture(scope="session")
 def alpha_token(governance):
-    return boa.load("contracts/mock/MockErc20.vy", governance, "Alpha Token", "ALPHA", 18, 10_000_000, name="alpha_token")
+    return boa.load("contracts/mock/MockErc20.vy", governance, "Alpha Token", "ALPHA", 18, 1_000_000_000, name="alpha_token")
 
 
 @pytest.fixture(scope="session")
 def alpha_token_whale(env, alpha_token, governance):
     whale = env.generate_address("alpha_token_whale")
-    alpha_token.mint(whale, 1_000_000 * (10 ** alpha_token.decimals()), sender=governance.address)
+    alpha_token.mint(whale, 100_000_000 * (10 ** alpha_token.decimals()), sender=governance.address)
     return whale
 
 
@@ -71,13 +71,13 @@ def alpha_token_vault(alpha_token):
 
 @pytest.fixture(scope="session")
 def bravo_token(governance):
-    return boa.load("contracts/mock/MockErc20.vy", governance, "Bravo Token", "BRAVO", 18, 10_000_000, name="bravo_token")
+    return boa.load("contracts/mock/MockErc20.vy", governance, "Bravo Token", "BRAVO", 18, 1_000_000_000, name="bravo_token")
 
 
 @pytest.fixture(scope="session")
 def bravo_token_whale(env, bravo_token, governance):
     whale = env.generate_address("bravo_token_whale")
-    bravo_token.mint(whale, 1_000_000 * (10 ** bravo_token.decimals()), sender=governance.address)
+    bravo_token.mint(whale, 100_000_000 * (10 ** bravo_token.decimals()), sender=governance.address)
     return whale
 
 
@@ -91,13 +91,13 @@ def bravo_token_vault(bravo_token):
 
 @pytest.fixture(scope="session")
 def charlie_token(governance):
-    return boa.load("contracts/mock/MockErc20.vy", governance, "Charlie Token", "CHARLIE", 6, 10_000_000, name="charlie_token")
+    return boa.load("contracts/mock/MockErc20.vy", governance, "Charlie Token", "CHARLIE", 6, 1_000_000_000, name="charlie_token")
 
 
 @pytest.fixture(scope="session")
 def charlie_token_whale(env, charlie_token, governance):
     whale = env.generate_address("charlie_token_whale")
-    charlie_token.mint(whale, 1_000_000 * (10 ** charlie_token.decimals()), sender=governance.address)
+    charlie_token.mint(whale, 100_000_000 * (10 ** charlie_token.decimals()), sender=governance.address)
     return whale
 
 
