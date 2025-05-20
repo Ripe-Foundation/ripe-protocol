@@ -23,13 +23,13 @@ def test_teller_basic_deposit(
     alpha_token.approve(teller.address, deposit_amount, sender=bob)
 
     # deposit
-    teller.deposit(alpha_token, deposit_amount, bob, simple_erc20_vault, sender=bob)
+    amount = teller.deposit(alpha_token, deposit_amount, bob, simple_erc20_vault, sender=bob)
 
     log = filter_logs(teller, "TellerDeposit")[0]
     assert log.user == bob
     assert log.depositor == bob
     assert log.asset == alpha_token.address
-    assert log.amount == deposit_amount
+    assert log.amount == deposit_amount == amount
     assert log.vaultAddr == simple_erc20_vault.address
     assert log.vaultId != 0
 
@@ -389,3 +389,122 @@ def test_teller_deposit_teller_paused(
     # verify deposit was successful
     assert alpha_token.balanceOf(bob) == 0
     assert alpha_token.balanceOf(simple_erc20_vault) == deposit_amount
+
+
+def test_teller_deposit_many(
+    simple_erc20_vault,
+    alpha_token,
+    bravo_token,
+    alpha_token_whale,
+    bravo_token_whale,
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    teller,
+    vault_book,
+):
+    # basic setup
+    setGeneralConfig()
+    setAssetConfig(alpha_token)
+    setAssetConfig(bravo_token)
+
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    
+    # Setup alpha token
+    alpha_token.transfer(bob, deposit_amount, sender=alpha_token_whale)
+    alpha_token.approve(teller.address, deposit_amount, sender=bob)
+    
+    # Setup bravo token
+    bravo_token.transfer(bob, deposit_amount, sender=bravo_token_whale)
+    bravo_token.approve(teller.address, deposit_amount, sender=bob)
+
+    # Create deposit actions
+    vault_id = vault_book.getRegId(simple_erc20_vault)
+    deposits = [
+        (alpha_token.address, deposit_amount, simple_erc20_vault.address, vault_id),
+        (bravo_token.address, deposit_amount, simple_erc20_vault.address, vault_id)
+    ]
+
+    # Execute multiple deposits
+    num_deposits = teller.depositMany(bob, deposits, sender=bob)
+
+    # Get deposit logs
+    logs = filter_logs(teller, "TellerDeposit")
+    assert len(logs) == 2
+
+    # Verify number of deposits
+    assert num_deposits == 2
+
+    # Verify alpha token deposit
+    alpha_log = logs[0]
+    assert alpha_log.user == bob
+    assert alpha_log.depositor == bob
+    assert alpha_log.asset == alpha_token.address
+    assert alpha_log.amount == deposit_amount
+    assert alpha_log.vaultAddr == simple_erc20_vault.address
+    assert alpha_log.vaultId == vault_id
+
+    # Verify bravo token deposit
+    bravo_log = logs[1]
+    assert bravo_log.user == bob
+    assert bravo_log.depositor == bob
+    assert bravo_log.asset == bravo_token.address
+    assert bravo_log.amount == deposit_amount
+    assert bravo_log.vaultAddr == simple_erc20_vault.address
+    assert bravo_log.vaultId == vault_id
+
+    # Verify balances
+    assert alpha_token.balanceOf(bob) == 0
+    assert bravo_token.balanceOf(bob) == 0
+    assert alpha_token.balanceOf(simple_erc20_vault) == deposit_amount
+    assert bravo_token.balanceOf(simple_erc20_vault) == deposit_amount
+
+
+def test_teller_deposit_nonexistent_vault(
+    simple_erc20_vault,
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    teller,
+):
+    # basic setup
+    setGeneralConfig()
+    setAssetConfig(alpha_token)
+
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    alpha_token.transfer(bob, deposit_amount, sender=alpha_token_whale)
+    alpha_token.approve(teller.address, deposit_amount, sender=bob)
+
+    # Attempt deposit to non-existent vault should fail
+    bad_vault_id = 9999
+    with boa.reverts("invalid vault id"):
+        teller.deposit(alpha_token, deposit_amount, bob, simple_erc20_vault, bad_vault_id, sender=bob)
+
+
+def test_teller_deposit_vault_mismatch(
+    simple_erc20_vault,
+    rebase_erc20_vault,
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    teller,
+    vault_book,
+):
+    # basic setup
+    setGeneralConfig()
+    setAssetConfig(alpha_token)
+
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    alpha_token.transfer(bob, deposit_amount, sender=alpha_token_whale)
+    alpha_token.approve(teller.address, deposit_amount, sender=bob)
+
+    # Get vault IDs
+    simple_vault_id = vault_book.getRegId(simple_erc20_vault)
+
+    # Attempt deposit with mismatched vault ID and address should fail
+    with boa.reverts("vault id and vault addr mismatch"):
+        teller.deposit(alpha_token, deposit_amount, bob, rebase_erc20_vault, simple_vault_id, sender=bob)

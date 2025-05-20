@@ -705,6 +705,10 @@ def _getUserBorrowTerms(
     _a: addys.Addys,
 ) -> UserBorrowTerms:
 
+    # nothing to do here
+    if _numUserVaults == 0:
+        return empty(UserBorrowTerms)
+
     # sum vars
     bt: UserBorrowTerms = empty(UserBorrowTerms)
     redemptionThresholdSum: uint256 = 0
