@@ -219,11 +219,21 @@ def bond_room(ripe_hq_deploy):
 
 
 @pytest.fixture(scope="session")
-def control_room(ripe_hq_deploy):
+def control_room(ripe_hq_deploy, control_room_data):
     return boa.load(
         "contracts/core/ControlRoom.vy",
         ripe_hq_deploy,
+        control_room_data,
         name="control_room",
+    )
+
+
+@pytest.fixture(scope="session")
+def control_room_data(ripe_hq_deploy):
+    return boa.load(
+        "contracts/core/ControlRoomData.vy",
+        ripe_hq_deploy,
+        name="control_room_data",
     )
 
 

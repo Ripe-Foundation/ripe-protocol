@@ -139,7 +139,7 @@ def setGeneralConfig(_genConfig: GenConfig):
 
 
 @external
-def setGenDebtConfig(_genDebtConfig: GenDebtConfig):
+def setGeneralDebtConfig(_genDebtConfig: GenDebtConfig):
     assert msg.sender == self._getControlRoomAddr() # dev: no perms
     self.genDebtConfig = _genDebtConfig
 
@@ -199,9 +199,9 @@ def setUserDelegation(_user: address, _delegate: address, _config: ActionDelegat
     self.userDelegation[_user][_delegate] = _config
 
 
-##############
-# Batch Call #
-##############
+#############
+# Batch Get #
+#############
 
 
 @view

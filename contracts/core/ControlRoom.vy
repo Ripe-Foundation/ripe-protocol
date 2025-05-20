@@ -22,7 +22,7 @@ interface ControlRoomData:
     def setAssetConfig(_asset: address, _assetConfig: AssetConfig): nonpayable
     def setRipeRewardsConfig(_rewardsConfig: RipeRewardsConfig): nonpayable
     def setUserConfig(_user: address, _userConfig: UserConfig): nonpayable
-    def setGenDebtConfig(_genDebtConfig: GenDebtConfig): nonpayable
+    def setGeneralDebtConfig(_genDebtConfig: GenDebtConfig): nonpayable
     def setGeneralConfig(_genConfig: GenConfig): nonpayable
     def assetConfig(_asset: address) -> AssetConfig: view
     def getControlRoomId() -> uint256: view
@@ -287,7 +287,7 @@ def setGeneralConfig(
 
 
 @external
-def setGenDebtConfig(
+def setGeneralDebtConfig(
     _perUserDebtLimit: uint256,
     _globalDebtLimit: uint256,
     _minDebtAmount: uint256,
@@ -318,7 +318,7 @@ def setGenDebtConfig(
         ltvPaybackBuffer=_ltvPaybackBuffer,
         genAuctionParams=_genAuctionParams,
     )
-    extcall ControlRoomData(self.data).setGenDebtConfig(genDebtConfig)
+    extcall ControlRoomData(self.data).setGeneralDebtConfig(genDebtConfig)
     return True
 
 
