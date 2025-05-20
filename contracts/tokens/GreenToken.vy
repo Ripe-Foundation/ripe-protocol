@@ -1,20 +1,12 @@
 # @version 0.4.1
 
-implements: IERC20
-
 exports: token.__interface__
 initializes: token
 
-from ethereum.ercs import IERC20
 from contracts.modules import Erc20Token as token
 
 interface RipeHq:
     def canMintGreen(_addr: address) -> bool: view
-
-# token details
-NAME: constant(String[25]) = "Green USD Stablecoin"
-SYMBOL: constant(String[5]) = "GREEN"
-DECIMALS: constant(uint8) = 18
 
 
 @deploy
@@ -26,30 +18,7 @@ def __init__(
     _initialSupply: uint256,
     _initialSupplyRecipient: address,
 ):
-    token.__init__(NAME, _ripeHq, _initialGov, _minHqTimeLock, _maxHqTimeLock, _initialSupply, _initialSupplyRecipient)
-
-
-##############
-# Token Info #
-##############
-
-
-@pure
-@external
-def name() -> String[25]:
-    return NAME
-
-
-@pure
-@external
-def symbol() -> String[5]:
-    return SYMBOL
-
-
-@pure
-@external
-def decimals() -> uint8:
-    return DECIMALS
+    token.__init__("Green USD Stablecoin", "GREEN", 18, _ripeHq, _initialGov, _minHqTimeLock, _maxHqTimeLock, _initialSupply, _initialSupplyRecipient)
 
 
 ###########

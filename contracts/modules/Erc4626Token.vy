@@ -1,5 +1,8 @@
 # @version 0.4.1
 
+implements: IERC4626
+from ethereum.ercs import IERC4626
+
 uses: token
 from contracts.modules import Erc20Token as token
 from ethereum.ercs import IERC20
