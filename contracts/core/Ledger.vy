@@ -21,10 +21,10 @@ struct DepositLedgerData:
 # points / rewards
 
 struct RipeRewards:
-    stakers: uint256
-    voteDepositors: uint256
-    genDepositors: uint256
     borrowers: uint256
+    stakers: uint256
+    voters: uint256
+    genDepositors: uint256
     newRipeRewards: uint256
     lastUpdate: uint256
 

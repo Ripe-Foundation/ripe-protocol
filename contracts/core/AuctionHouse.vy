@@ -96,13 +96,9 @@ struct AssetLiqConfig:
 struct AuctionParams:
     hasParams: bool
     startDiscount: uint256
-    minEntitled: uint256
     maxDiscount: uint256
-    minBidIncrement: uint256
-    maxBidIncrement: uint256
     delay: uint256
     duration: uint256
-    extension: uint256
 
 struct FungibleAuction:
     liqUser: address

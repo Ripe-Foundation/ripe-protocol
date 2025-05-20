@@ -28,8 +28,7 @@ interface Ledger:
 interface ControlRoom:
     def getDepositPointsConfig(_user: address, _asset: address) -> DepositPointsConfig: view
     def getClaimLootConfig(_user: address, _caller: address) -> ClaimLootConfig: view
-    def areBorrowPointsEnabled(_user: address) -> bool: view
-    def getRipeRewardsConfig() -> RipeRewardsConfig: view
+    def getRewardsConfig() -> RewardsConfig: view
 
 interface PriceDesk:
     def getUsdValue(_asset: address, _amount: uint256, _shouldRaise: bool = False) -> uint256: view
@@ -41,10 +40,10 @@ interface VaultBook:
     def getAddr(_vaultId: uint256) -> address: view
 
 struct RipeRewards:
-    stakers: uint256
-    voteDepositors: uint256
-    genDepositors: uint256
     borrowers: uint256
+    stakers: uint256
+    voters: uint256
+    genDepositors: uint256
     newRipeRewards: uint256
     lastUpdate: uint256
 
@@ -94,23 +93,20 @@ struct UserDepositLoot:
     ripeVoteLoot: uint256
     ripeGenLoot: uint256
 
-struct RipeRewardsAllocs:
-    stakers: uint256
-    voteDepositors: uint256
-    genDepositors: uint256
-    borrowers: uint256
-
-struct RipeRewardsConfig:
-    ripeRewardsAllocs: RipeRewardsAllocs
+struct RewardsConfig:
+    arePointsEnabled: bool
     ripePerBlock: uint256
+    borrowersAlloc: uint256
+    stakersAlloc: uint256
+    votersAlloc: uint256
+    genDepositorsAlloc: uint256
+    stakersPointsAllocTotal: uint256
+    voterPointsAllocTotal: uint256
 
 struct DepositPointsConfig:
+    stakersPointsAlloc: uint256
+    voterPointsAlloc: uint256
     isNft: bool
-    arePointsEnabled: bool
-    stakers: uint256
-    stakersTotal: uint256
-    voteDepositor: uint256
-    voteDepositorTotal: uint256
 
 struct ClaimLootConfig:
     canClaimLoot: bool
@@ -286,13 +282,14 @@ def updateDepositPoints(
     a: addys.Addys = addys._getAddys(_a)
 
     # get latest global rewards
-    globalRewards: RipeRewards = self._getLatestGlobalRipeRewards(a)
+    config: RewardsConfig = staticcall ControlRoom(a.controlRoom).getRewardsConfig()
+    globalRewards: RipeRewards = self._getLatestGlobalRipeRewards(config, a)
 
     # get latest deposit points
     up: UserDepositPoints = empty(UserDepositPoints)
     ap: AssetDepositPoints = empty(AssetDepositPoints)
     gp: GlobalDepositPoints = empty(GlobalDepositPoints)
-    up, ap, gp = self._getLatestDepositPoints(_user, _vaultId, _vaultAddr, _asset, a)
+    up, ap, gp = self._getLatestDepositPoints(_user, _vaultId, _vaultAddr, _asset, config, a)
 
     # update points
     extcall Ledger(a.ledger).setDepositPointsAndRipeRewards(_user, _vaultId, _asset, up, ap, gp, globalRewards)
@@ -412,24 +409,23 @@ def _getLatestDepositPoints(
     _vaultId: uint256,
     _vaultAddr: address,
     _asset: address,
+    _c: RewardsConfig,
     _a: addys.Addys,
 ) -> (UserDepositPoints, AssetDepositPoints, GlobalDepositPoints):
-
-    # get data
     p: DepositPointsBundle = staticcall Ledger(_a.ledger).getDepositPointsBundle(_user, _vaultId, _asset)
-    config: DepositPointsConfig = staticcall ControlRoom(_a.controlRoom).getDepositPointsConfig(_user, _asset) 
 
     # latest global points
-    globalPoints: GlobalDepositPoints = self._getLatestGlobalDepositPoints(p.globalPoints, config.arePointsEnabled, config.stakersTotal, config.voteDepositorTotal)
+    globalPoints: GlobalDepositPoints = self._getLatestGlobalDepositPoints(p.globalPoints, _c.arePointsEnabled, _c.stakersPointsAllocTotal, _c.voterPointsAllocTotal)
 
     # latest asset points
-    assetPoints: AssetDepositPoints = self._getLatestAssetDepositPoints(p.assetPoints, config.arePointsEnabled, config.stakers, config.voteDepositor)
+    assetConfig: DepositPointsConfig = staticcall ControlRoom(_a.controlRoom).getDepositPointsConfig(_user, _asset) 
+    assetPoints: AssetDepositPoints = self._getLatestAssetDepositPoints(p.assetPoints, _c.arePointsEnabled, assetConfig.stakersPointsAlloc, assetConfig.voterPointsAlloc)
     if assetPoints.precision == 0:
-        assetPoints.precision = self._getAssetPrecision(config.isNft, _asset)
+        assetPoints.precision = self._getAssetPrecision(assetConfig.isNft, _asset)
 
     # latest asset value (staked assets not eligible for gen deposit rewards)
     newAssetUsdValue: uint256 = 0
-    if config.stakers == 0:
+    if assetConfig.stakersPointsAlloc == 0:
         newAssetUsdValue = self._refreshAssetUsdValue(_asset, _vaultAddr, _a.priceDesk)
 
     # update `lastUsdValue` for global + asset
@@ -443,7 +439,7 @@ def _getLatestDepositPoints(
         return empty(UserDepositPoints), assetPoints, globalPoints
 
     # latest user points
-    userPoints: UserDepositPoints = self._getLatestUserDepositPoints(p.userPoints, config.arePointsEnabled)
+    userPoints: UserDepositPoints = self._getLatestUserDepositPoints(p.userPoints, _c.arePointsEnabled)
 
     # get user loot share
     userLootShare: uint256 = staticcall Vault(_vaultAddr).getUserLootBoxShare(_user, _asset)
@@ -499,13 +495,14 @@ def _getClaimableDepositLootData(
 ) -> (UserDepositLoot, UserDepositPoints, AssetDepositPoints, GlobalDepositPoints, RipeRewards):
 
     # need to get this with each iteration because state may have changed (during claim)
-    globalRewards: RipeRewards = self._getLatestGlobalRipeRewards(_a)
+    config: RewardsConfig = staticcall ControlRoom(_a.controlRoom).getRewardsConfig()
+    globalRewards: RipeRewards = self._getLatestGlobalRipeRewards(config, _a)
 
     # get latest deposit points
     up: UserDepositPoints = empty(UserDepositPoints)
     ap: AssetDepositPoints = empty(AssetDepositPoints)
     gp: GlobalDepositPoints = empty(GlobalDepositPoints)
-    up, ap, gp = self._getLatestDepositPoints(_user, _vaultId, _vaultAddr, _asset, _a)
+    up, ap, gp = self._getLatestDepositPoints(_user, _vaultId, _vaultAddr, _asset, config, _a)
 
     # user has no points
     if up.balancePoints == 0:
@@ -525,7 +522,7 @@ def _getClaimableDepositLootData(
     # calc user's share of loot, per category
     userLoot: UserDepositLoot = empty(UserDepositLoot)
     ap.ripeStakerPoints, gp.ripeStakerPoints, globalRewards.stakers, userLoot.ripeStakerLoot = self._calcSpecificLoot(userShareOfAsset, ap.ripeStakerPoints, gp.ripeStakerPoints, globalRewards.stakers)
-    ap.ripeVotePoints, gp.ripeVotePoints, globalRewards.voteDepositors, userLoot.ripeVoteLoot = self._calcSpecificLoot(userShareOfAsset, ap.ripeVotePoints, gp.ripeVotePoints, globalRewards.voteDepositors)
+    ap.ripeVotePoints, gp.ripeVotePoints, globalRewards.voters, userLoot.ripeVoteLoot = self._calcSpecificLoot(userShareOfAsset, ap.ripeVotePoints, gp.ripeVotePoints, globalRewards.voters)
     ap.ripeGenPoints, gp.ripeGenPoints, globalRewards.genDepositors, userLoot.ripeGenLoot = self._calcSpecificLoot(userShareOfAsset, ap.ripeGenPoints, gp.ripeGenPoints, globalRewards.genDepositors)
 
     # only zero out points if they actually received loot -- asset or user may not always have sufficient points (yet) to get loot
@@ -664,10 +661,11 @@ def updateBorrowPoints(_user: address, _a: addys.Addys = empty(addys.Addys)):
     assert not deptBasics.isPaused # dev: contract paused
     a: addys.Addys = addys._getAddys(_a)
 
-    globalRewards: RipeRewards = self._getLatestGlobalRipeRewards(a)
+    config: RewardsConfig = staticcall ControlRoom(a.controlRoom).getRewardsConfig()
+    globalRewards: RipeRewards = self._getLatestGlobalRipeRewards(config, a)
     up: BorrowPoints = empty(BorrowPoints)
     gp: BorrowPoints = empty(BorrowPoints)
-    up, gp = self._getLatestBorrowPoints(_user, a.ledger, a.controlRoom)
+    up, gp = self._getLatestBorrowPoints(_user, config.arePointsEnabled, a.ledger)
     extcall Ledger(a.ledger).setBorrowPointsAndRipeRewards(_user, up, gp, globalRewards)
 
 
@@ -726,19 +724,22 @@ def _getLatestUserBorrowPoints(_userPoints: BorrowPoints, _arePointsEnabled: boo
 
 @view 
 @internal 
-def _getLatestBorrowPoints(_user: address, _ledger: address, _controlRoom: address) -> (BorrowPoints, BorrowPoints):
+def _getLatestBorrowPoints(
+    _user: address,
+    _arePointsEnabled: bool,
+    _ledger: address,
+) -> (BorrowPoints, BorrowPoints):
     p: BorrowPointsBundle = staticcall Ledger(_ledger).getBorrowPointsBundle(_user)
-    arePointsEnabled: bool = staticcall ControlRoom(_controlRoom).areBorrowPointsEnabled(_user)
     
     # global points
-    globalPoints: BorrowPoints = self._getLatestGlobalBorrowPoints(p.globalPoints, arePointsEnabled)
+    globalPoints: BorrowPoints = self._getLatestGlobalBorrowPoints(p.globalPoints, _arePointsEnabled)
 
     # if no user, return global points
     if _user == empty(address):
         return empty(BorrowPoints), globalPoints
     
     # user points
-    userPoints: BorrowPoints = self._getLatestUserBorrowPoints(p.userPoints, arePointsEnabled)
+    userPoints: BorrowPoints = self._getLatestUserBorrowPoints(p.userPoints, _arePointsEnabled)
 
     # normalize user debt -- reduce risk of integer overflow
     userDebt: uint256 = p.userDebtPrincipal
@@ -775,14 +776,15 @@ def _claimBorrowLoot(_user: address, _a: addys.Addys) -> uint256:
 @view 
 @internal 
 def _getClaimableBorrowLootData(_user: address, _a: addys.Addys) -> (uint256, BorrowPoints, BorrowPoints, RipeRewards):
-    globalRewards: RipeRewards = self._getLatestGlobalRipeRewards(_a)
+    config: RewardsConfig = staticcall ControlRoom(_a.controlRoom).getRewardsConfig()
+    globalRewards: RipeRewards = self._getLatestGlobalRipeRewards(config, _a)
     if globalRewards.borrowers == 0:
         return 0, empty(BorrowPoints), empty(BorrowPoints), empty(RipeRewards)
 
     # get latest borrow points
     up: BorrowPoints = empty(BorrowPoints)
     gp: BorrowPoints = empty(BorrowPoints)
-    up, gp = self._getLatestBorrowPoints(_user, _a.ledger, _a.controlRoom)
+    up, gp = self._getLatestBorrowPoints(_user, config.arePointsEnabled, _a.ledger)
 
     # user has no points
     if up.points == 0:
@@ -839,7 +841,8 @@ def updateRipeRewards(_a: addys.Addys = empty(addys.Addys)):
     assert addys._isValidRipeHqAddr(msg.sender) # dev: no perms
     assert not deptBasics.isPaused # dev: contract paused
     a: addys.Addys = addys._getAddys(_a)
-    ripeRewards: RipeRewards = self._getLatestGlobalRipeRewards(a)
+    config: RewardsConfig = staticcall ControlRoom(a.controlRoom).getRewardsConfig()
+    ripeRewards: RipeRewards = self._getLatestGlobalRipeRewards(config, a)
     extcall Ledger(a.ledger).setRipeRewards(ripeRewards)
 
 
@@ -849,18 +852,17 @@ def updateRipeRewards(_a: addys.Addys = empty(addys.Addys)):
 @view
 @external
 def getLatestGlobalRipeRewards() -> RipeRewards:
-    return self._getLatestGlobalRipeRewards(addys._getAddys())
+    a: addys.Addys = addys._getAddys()
+    config: RewardsConfig = staticcall ControlRoom(a.controlRoom).getRewardsConfig()
+    return self._getLatestGlobalRipeRewards(config, a)
 
 
 @view
 @internal
-def _getLatestGlobalRipeRewards(_a: addys.Addys) -> RipeRewards:
+def _getLatestGlobalRipeRewards(_config: RewardsConfig, _a: addys.Addys) -> RipeRewards:
     b: RipeRewardsBundle = staticcall Ledger(_a.ledger).getRipeRewardsBundle()
     rewards: RipeRewards = b.ripeRewards
     rewards.newRipeRewards = 0 # important to reset!
-
-    # get rewards config
-    config: RipeRewardsConfig = staticcall ControlRoom(_a.controlRoom).getRipeRewardsConfig()
 
     # elapsed blocks
     elapsedBlocks: uint256 = 0
@@ -871,19 +873,19 @@ def _getLatestGlobalRipeRewards(_a: addys.Addys) -> RipeRewards:
     rewards.lastUpdate = block.number
 
     # nothing to do here
-    if elapsedBlocks == 0 or config.ripePerBlock == 0 or b.ripeAvailForRewards == 0:
+    if elapsedBlocks == 0 or _config.ripePerBlock == 0 or b.ripeAvailForRewards == 0:
         return rewards
 
     # new Ripe rewards
-    newRipeDistro: uint256 = min(elapsedBlocks * config.ripePerBlock, b.ripeAvailForRewards)
+    newRipeDistro: uint256 = min(elapsedBlocks * _config.ripePerBlock, b.ripeAvailForRewards)
 
     # allocate ripe rewards to global buckets
-    total: uint256 = config.ripeRewardsAllocs.stakers + config.ripeRewardsAllocs.voteDepositors + config.ripeRewardsAllocs.genDepositors + config.ripeRewardsAllocs.borrowers
+    total: uint256 = _config.borrowersAlloc + _config.stakersAlloc + _config.votersAlloc + _config.genDepositorsAlloc
     if total != 0:
-        rewards.stakers += newRipeDistro * config.ripeRewardsAllocs.stakers // total
-        rewards.voteDepositors += newRipeDistro * config.ripeRewardsAllocs.voteDepositors // total
-        rewards.genDepositors += newRipeDistro * config.ripeRewardsAllocs.genDepositors // total
-        rewards.borrowers += newRipeDistro * config.ripeRewardsAllocs.borrowers // total
+        rewards.borrowers += newRipeDistro * _config.borrowersAlloc // total
+        rewards.stakers += newRipeDistro * _config.stakersAlloc // total
+        rewards.voters += newRipeDistro * _config.votersAlloc // total
+        rewards.genDepositors += newRipeDistro * _config.genDepositorsAlloc // total
 
         # rewards were distro'd, save important data
         rewards.newRipeRewards = newRipeDistro
