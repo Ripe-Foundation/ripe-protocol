@@ -285,3 +285,71 @@ def isValidStaleTime(_staleTime: uint256) -> bool:
 @internal
 def _isValidStaleTime(_staleTime: uint256) -> bool:
     return _staleTime >= MIN_STALE_TIME and _staleTime <= MAX_STALE_TIME
+
+
+############
+# Registry #
+############
+
+
+# new address
+
+
+@external
+def startAddNewAddressToRegistry(_addr: address, _description: String[64]) -> bool:
+    assert gov._canGovern(msg.sender) # dev: no perms
+    return registry._startAddNewAddressToRegistry(_addr, _description)
+
+
+@external
+def confirmNewAddressToRegistry(_addr: address) -> uint256:
+    assert gov._canGovern(msg.sender) # dev: no perms
+    return registry._confirmNewAddressToRegistry(_addr)
+
+
+@external
+def cancelNewAddressToRegistry(_addr: address) -> bool:
+    assert gov._canGovern(msg.sender) # dev: no perms
+    return registry._cancelNewAddressToRegistry(_addr)
+
+
+# address update
+
+
+@external
+def startAddressUpdateToRegistry(_regId: uint256, _newAddr: address) -> bool:
+    assert gov._canGovern(msg.sender) # dev: no perms
+    return registry._startAddressUpdateToRegistry(_regId, _newAddr)
+
+
+@external
+def confirmAddressUpdateToRegistry(_regId: uint256) -> bool:
+    assert gov._canGovern(msg.sender) # dev: no perms
+    return registry._confirmAddressUpdateToRegistry(_regId)
+
+
+@external
+def cancelAddressUpdateToRegistry(_regId: uint256) -> bool:
+    assert gov._canGovern(msg.sender) # dev: no perms
+    return registry._cancelAddressUpdateToRegistry(_regId)
+
+
+# address disable
+
+
+@external
+def startAddressDisableInRegistry(_regId: uint256) -> bool:
+    assert gov._canGovern(msg.sender) # dev: no perms
+    return registry._startAddressDisableInRegistry(_regId)
+
+
+@external
+def confirmAddressDisableInRegistry(_regId: uint256) -> bool:
+    assert gov._canGovern(msg.sender) # dev: no perms
+    return registry._confirmAddressDisableInRegistry(_regId)
+
+
+@external
+def cancelAddressDisableInRegistry(_regId: uint256) -> bool:
+    assert gov._canGovern(msg.sender) # dev: no perms
+    return registry._cancelAddressDisableInRegistry(_regId)

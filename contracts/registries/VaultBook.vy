@@ -17,6 +17,7 @@ import contracts.modules.AddressRegistry as registry
 import contracts.modules.Addys as addys
 import contracts.modules.DeptBasics as deptBasics
 
+from interfaces import Vault
 from interfaces import Department
 
 
@@ -32,8 +33,83 @@ def __init__(
     deptBasics.__init__(False, False, False) # no minting
 
 
-@view
+############
+# Registry #
+############
+
+
+# new address
+
+
 @external
-def isNftVault(_vaultId: uint256) -> bool:
-    # used in Lootbox.vy -- when we introduce NFTs, we'll need to add config for this
-    return False
+def startAddNewAddressToRegistry(_addr: address, _description: String[64]) -> bool:
+    assert gov._canGovern(msg.sender) # dev: no perms
+    return registry._startAddNewAddressToRegistry(_addr, _description)
+
+
+@external
+def confirmNewAddressToRegistry(_addr: address) -> uint256:
+    assert gov._canGovern(msg.sender) # dev: no perms
+    return registry._confirmNewAddressToRegistry(_addr)
+
+
+@external
+def cancelNewAddressToRegistry(_addr: address) -> bool:
+    assert gov._canGovern(msg.sender) # dev: no perms
+    return registry._cancelNewAddressToRegistry(_addr)
+
+
+# address update
+
+
+@external
+def startAddressUpdateToRegistry(_regId: uint256, _newAddr: address) -> bool:
+    assert not self._doesVaultIdHaveAnyFunds(_regId) # dev: vault has funds
+
+    assert gov._canGovern(msg.sender) # dev: no perms
+    return registry._startAddressUpdateToRegistry(_regId, _newAddr)
+
+
+@external
+def confirmAddressUpdateToRegistry(_regId: uint256) -> bool:
+    assert gov._canGovern(msg.sender) # dev: no perms
+    return registry._confirmAddressUpdateToRegistry(_regId)
+
+
+@external
+def cancelAddressUpdateToRegistry(_regId: uint256) -> bool:
+    assert gov._canGovern(msg.sender) # dev: no perms
+    return registry._cancelAddressUpdateToRegistry(_regId)
+
+
+# address disable
+
+
+@external
+def startAddressDisableInRegistry(_regId: uint256) -> bool:
+    assert not self._doesVaultIdHaveAnyFunds(_regId) # dev: vault has funds
+
+    assert gov._canGovern(msg.sender) # dev: no perms
+    return registry._startAddressDisableInRegistry(_regId)
+
+
+@external
+def confirmAddressDisableInRegistry(_regId: uint256) -> bool:
+    assert gov._canGovern(msg.sender) # dev: no perms
+    return registry._confirmAddressDisableInRegistry(_regId)
+
+
+@external
+def cancelAddressDisableInRegistry(_regId: uint256) -> bool:
+    assert gov._canGovern(msg.sender) # dev: no perms
+    return registry._cancelAddressDisableInRegistry(_regId)
+
+
+# check if vault has funds
+
+
+@view
+@internal
+def _doesVaultIdHaveAnyFunds(_vaultId: uint256) -> bool:
+    vaultAddr: address = registry._getAddr(_vaultId)
+    return staticcall Vault(vaultAddr).doesVaultHaveAnyFunds()

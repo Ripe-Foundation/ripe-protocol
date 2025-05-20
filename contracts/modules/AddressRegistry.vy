@@ -149,12 +149,6 @@ def getRegistryDescription() -> String[28]:
 # register new address
 
 
-@external
-def startAddNewAddressToRegistry(_addr: address, _description: String[64]) -> bool:
-    assert gov._canGovern(msg.sender) # dev: no perms
-    return self._startAddNewAddressToRegistry(_addr, _description)
-
-
 @internal
 def _startAddNewAddressToRegistry(_addr: address, _description: String[64]) -> bool:
     assert self._isValidNewAddress(_addr) # dev: invalid addy
@@ -171,12 +165,6 @@ def _startAddNewAddressToRegistry(_addr: address, _description: String[64]) -> b
 
 
 # confirm new address
-
-
-@external
-def confirmNewAddressToRegistry(_addr: address) -> uint256:
-    assert gov._canGovern(msg.sender) # dev: no perms
-    return self._confirmNewAddressToRegistry(_addr)
 
 
 @internal
@@ -207,12 +195,6 @@ def _confirmNewAddressToRegistry(_addr: address) -> uint256:
 
 
 # cancel new address
-
-
-@external
-def cancelNewAddressToRegistry(_addr: address) -> bool:
-    assert gov._canGovern(msg.sender) # dev: no perms
-    return self._cancelNewAddressToRegistry(_addr)
 
 
 @internal
@@ -250,12 +232,6 @@ def _isValidNewAddress(_addr: address) -> bool:
 # update address
 
 
-@external
-def startAddressUpdateToRegistry(_regId: uint256, _newAddr: address) -> bool:
-    assert gov._canGovern(msg.sender) # dev: no perms
-    return self._startAddressUpdateToRegistry(_regId, _newAddr)
-
-
 @internal
 def _startAddressUpdateToRegistry(_regId: uint256, _newAddr: address) -> bool:
     data: AddressInfo = self.addrInfo[_regId]
@@ -274,12 +250,6 @@ def _startAddressUpdateToRegistry(_regId: uint256, _newAddr: address) -> bool:
 
 
 # confirm update address
-
-
-@external
-def confirmAddressUpdateToRegistry(_regId: uint256) -> bool:
-    assert gov._canGovern(msg.sender) # dev: no perms
-    return self._confirmAddressUpdateToRegistry(_regId)
 
 
 @internal
@@ -312,12 +282,6 @@ def _confirmAddressUpdateToRegistry(_regId: uint256) -> bool:
 
 
 # cancel update address
-
-
-@external
-def cancelAddressUpdateToRegistry(_regId: uint256) -> bool:
-    assert gov._canGovern(msg.sender) # dev: no perms
-    return self._cancelAddressUpdateToRegistry(_regId)
 
 
 @internal
@@ -358,12 +322,6 @@ def _isValidAddressUpdate(_regId: uint256, _newAddr: address, _prevAddr: address
 # start disable address
 
 
-@external
-def startAddressDisableInRegistry(_regId: uint256) -> bool:
-    assert gov._canGovern(msg.sender) # dev: no perms
-    return self._startAddressDisableInRegistry(_regId)
-
-
 @internal
 def _startAddressDisableInRegistry(_regId: uint256) -> bool:
     data: AddressInfo = self.addrInfo[_regId]
@@ -381,12 +339,6 @@ def _startAddressDisableInRegistry(_regId: uint256) -> bool:
 
 
 # confirm disable address
-
-
-@external
-def confirmAddressDisableInRegistry(_regId: uint256) -> bool:
-    assert gov._canGovern(msg.sender) # dev: no perms
-    return self._confirmAddressDisableInRegistry(_regId)
 
 
 @internal
@@ -415,12 +367,6 @@ def _confirmAddressDisableInRegistry(_regId: uint256) -> bool:
 
 
 # cancel disable address
-
-
-@external
-def cancelAddressDisableInRegistry(_regId: uint256) -> bool:
-    assert gov._canGovern(msg.sender) # dev: no perms
-    return self._cancelAddressDisableInRegistry(_regId)
 
 
 @internal

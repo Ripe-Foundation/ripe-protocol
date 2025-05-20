@@ -31,15 +31,14 @@ interface ControlRoom:
     def areBorrowPointsEnabled(_user: address) -> bool: view
     def getRipeRewardsConfig() -> RipeRewardsConfig: view
 
-interface VaultBook:
-    def getAddr(_vaultId: uint256) -> address: view
-    def isNftVault(_vaultId: uint256) -> bool: view
-
 interface PriceDesk:
     def getUsdValue(_asset: address, _amount: uint256, _shouldRaise: bool = False) -> uint256: view
 
 interface RipeToken:
     def mint(_to: address, _amount: uint256): nonpayable
+
+interface VaultBook:
+    def getAddr(_vaultId: uint256) -> address: view
 
 struct RipeRewards:
     stakers: uint256
@@ -106,6 +105,7 @@ struct RipeRewardsConfig:
     ripePerBlock: uint256
 
 struct DepositPointsConfig:
+    isNft: bool
     arePointsEnabled: bool
     stakers: uint256
     stakersTotal: uint256
@@ -425,7 +425,7 @@ def _getLatestDepositPoints(
     # latest asset points
     assetPoints: AssetDepositPoints = self._getLatestAssetDepositPoints(p.assetPoints, config.arePointsEnabled, config.stakers, config.voteDepositor)
     if assetPoints.precision == 0:
-        assetPoints.precision = self._getAssetPrecision(_vaultId, _asset, _a.vaultBook)
+        assetPoints.precision = self._getAssetPrecision(config.isNft, _asset)
 
     # latest asset value (staked assets not eligible for gen deposit rewards)
     newAssetUsdValue: uint256 = 0
@@ -641,8 +641,8 @@ def _refreshAssetUsdValue(_asset: address, _vaultAddr: address, _priceDesk: addr
 
 @view
 @internal
-def _getAssetPrecision(_vaultId: uint256, _asset: address, _vaultBook: address) -> uint256:
-    if staticcall VaultBook(_vaultBook).isNftVault(_vaultId):
+def _getAssetPrecision(_isNft: bool, _asset: address) -> uint256:
+    if _isNft:
         return 1
     decimals: uint256 = convert(staticcall IERC20Detailed(_asset).decimals(), uint256)
     if decimals >= 8: # wbtc has 8 decimals

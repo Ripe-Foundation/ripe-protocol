@@ -177,6 +177,7 @@ struct ClaimLootConfig:
     canClaimLootForUser: bool
 
 struct DepositPointsConfig:
+    isNft: bool
     arePointsEnabled: bool
     stakers: uint256
     stakersTotal: uint256
@@ -681,6 +682,7 @@ def getDepositPointsConfig(_user: address, _asset: address) -> DepositPointsConf
     # eventually we could turn off points for specific users or assets
 
     return DepositPointsConfig(
+        isNft=assetConfig.isNft,
         arePointsEnabled=self.arePointsEnabled,
         stakers=assetConfig.stakersAlloc,
         stakersTotal=self.stakersAllocTotal,
