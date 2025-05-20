@@ -6,8 +6,8 @@ exports: erc4626.__interface__
 initializes: token
 initializes: erc4626[token := token]
 
-from contracts.modules import Erc20Token as token
-import contracts.modules.Erc4626Token as erc4626
+from contracts.tokens.modules import Erc20Token as token
+import contracts.tokens.modules.Erc4626Token as erc4626
 
 from ethereum.ercs import IERC20Detailed
 

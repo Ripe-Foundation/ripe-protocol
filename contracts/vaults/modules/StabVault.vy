@@ -3,7 +3,7 @@
 uses: vaultData
 uses: addys
 
-import contracts.modules.VaultData as vaultData
+import contracts.vaults.modules.VaultData as vaultData
 import contracts.modules.Addys as addys
 
 from interfaces import Vault

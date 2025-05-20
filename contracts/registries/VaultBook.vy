@@ -13,7 +13,7 @@ initializes: addys
 initializes: deptBasics[addys := addys]
 
 import contracts.modules.LocalGov as gov
-import contracts.modules.AddressRegistry as registry
+import contracts.registries.modules.AddressRegistry as registry
 import contracts.modules.Addys as addys
 import contracts.modules.DeptBasics as deptBasics
 

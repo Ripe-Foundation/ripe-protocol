@@ -11,8 +11,8 @@ initializes: basicVault[vaultData := vaultData]
 
 from interfaces import Vault
 import contracts.modules.Addys as addys
-import contracts.modules.VaultData as vaultData
-import contracts.modules.BasicVault as basicVault
+import contracts.vaults.modules.VaultData as vaultData
+import contracts.vaults.modules.BasicVault as basicVault
 from ethereum.ercs import IERC20
 
 event SimpleErc20VaultDeposit:

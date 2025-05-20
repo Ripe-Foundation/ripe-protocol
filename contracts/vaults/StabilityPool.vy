@@ -12,8 +12,8 @@ initializes: stabVault[addys := addys, vaultData := vaultData]
 
 from interfaces import Vault
 import contracts.modules.Addys as addys
-import contracts.modules.VaultData as vaultData
-import contracts.modules.StabVault as stabVault
+import contracts.vaults.modules.VaultData as vaultData
+import contracts.vaults.modules.StabVault as stabVault
 from ethereum.ercs import IERC20
 
 event StabilityPoolDeposit:

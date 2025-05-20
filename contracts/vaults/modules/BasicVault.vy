@@ -1,7 +1,7 @@
 # @version 0.4.1
 
 uses: vaultData
-import contracts.modules.VaultData as vaultData
+import contracts.vaults.modules.VaultData as vaultData
 
 from interfaces import Vault
 from ethereum.ercs import IERC20

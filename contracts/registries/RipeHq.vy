@@ -7,7 +7,7 @@ initializes: gov
 initializes: registry[gov := gov]
 
 import contracts.modules.LocalGov as gov
-import contracts.modules.AddressRegistry as registry
+import contracts.registries.modules.AddressRegistry as registry
 
 from interfaces import Department
 from ethereum.ercs import IERC20

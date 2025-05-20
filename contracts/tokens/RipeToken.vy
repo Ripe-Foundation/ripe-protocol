@@ -3,7 +3,7 @@
 exports: token.__interface__
 initializes: token
 
-from contracts.modules import Erc20Token as token
+from contracts.tokens.modules import Erc20Token as token
 
 interface RipeHq:
     def canMintRipe(_addr: address) -> bool: view
