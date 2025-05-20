@@ -138,3 +138,13 @@ def mock_chainlink_feed_two():
         EIGHTEEN_DECIMALS, # $1
         name="mock_chainlink_feed_two",
     )
+
+
+#############
+# Whitelist #
+#############
+
+
+@pytest.fixture(scope="session")
+def mock_whitelist():
+    return boa.load("contracts/mock/MockWhitelist.vy", name="mock_whitelist")

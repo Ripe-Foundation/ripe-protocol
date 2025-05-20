@@ -170,6 +170,12 @@ def isParticipatingInVault(_user: address, _vaultId: uint256) -> bool:
 
 
 @view
+@external
+def getNumUserVaults(_user: address) -> uint256:
+    return self._getNumUserVaults(_user)
+
+
+@view
 @internal
 def _getNumUserVaults(_user: address) -> uint256:
     numVaults: uint256 = self.numUserVaults[_user]

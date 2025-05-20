@@ -116,8 +116,8 @@ def createAuctionParams():
 def setAssetConfig(control_room_data, control_room, createDebtTerms):
     def setAssetConfig(
         _asset,
-        _stakersPointsAlloc,
-        _voterPointsAlloc,
+        _stakersPointsAlloc = 10,
+        _voterPointsAlloc = 10,
         _perUserDepositLimit = MAX_UINT256,
         _globalDepositLimit = MAX_UINT256,
         _debtTerms = createDebtTerms(),
@@ -205,3 +205,43 @@ def setRipeRewardsConfig(control_room_data, control_room):
         )
         control_room_data.setRipeRewardsConfig(config, sender=control_room.address)
     yield setRipeRewardsConfig
+
+
+###############
+# User Config #
+###############
+
+
+@pytest.fixture(scope="session")
+def setUserConfig(control_room_data, control_room):
+    def setUserConfig(
+        _user,
+        _canAnyoneDeposit = True,
+        _canAnyoneRepayDebt = True,
+    ):
+        config = (
+            _canAnyoneDeposit,
+            _canAnyoneRepayDebt,
+        )
+        control_room_data.setUserConfig(_user, config, sender=control_room.address)
+    yield setUserConfig
+
+
+@pytest.fixture(scope="session")
+def setUserDelegation(control_room_data, control_room):
+    def setUserDelegation(
+        _user,
+        _delegate,
+        _canWithdraw = True,
+        _canBorrow = True,
+        _canClaimFromStabPool = True,
+        _canClaimLoot = True,
+    ):
+        config = (
+            _canWithdraw,
+            _canBorrow,
+            _canClaimFromStabPool,
+            _canClaimLoot,
+        )
+        control_room_data.setUserDelegation(_user, _delegate, config, sender=control_room.address)
+    yield setUserDelegation

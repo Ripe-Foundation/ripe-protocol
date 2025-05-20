@@ -26,8 +26,8 @@ interface Ledger:
     def numUserVaults(_user: address) -> uint256: view
 
 interface ControlRoom:
-    def getDepositPointsConfig(_user: address, _asset: address) -> DepositPointsConfig: view
     def getClaimLootConfig(_user: address, _caller: address) -> ClaimLootConfig: view
+    def getDepositPointsConfig(_asset: address) -> DepositPointsConfig: view
     def getRewardsConfig() -> RewardsConfig: view
 
 interface PriceDesk:
@@ -418,7 +418,7 @@ def _getLatestDepositPoints(
     globalPoints: GlobalDepositPoints = self._getLatestGlobalDepositPoints(p.globalPoints, _c.arePointsEnabled, _c.stakersPointsAllocTotal, _c.voterPointsAllocTotal)
 
     # latest asset points
-    assetConfig: DepositPointsConfig = staticcall ControlRoom(_a.controlRoom).getDepositPointsConfig(_user, _asset) 
+    assetConfig: DepositPointsConfig = staticcall ControlRoom(_a.controlRoom).getDepositPointsConfig(_asset) 
     assetPoints: AssetDepositPoints = self._getLatestAssetDepositPoints(p.assetPoints, _c.arePointsEnabled, assetConfig.stakersPointsAlloc, assetConfig.voterPointsAlloc)
     if assetPoints.precision == 0:
         assetPoints.precision = self._getAssetPrecision(assetConfig.isNft, _asset)
