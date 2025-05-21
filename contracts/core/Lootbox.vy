@@ -403,6 +403,20 @@ def _getLatestUserDepositPoints(
 
 
 @view
+@external
+def getLatestDepositPoints(
+    _user: address,
+    _vaultId: uint256,
+    _asset: address,
+    _a: addys.Addys = empty(addys.Addys),
+) -> (UserDepositPoints, AssetDepositPoints, GlobalDepositPoints):
+    a: addys.Addys = addys._getAddys(_a)
+    c: RewardsConfig = staticcall ControlRoom(a.controlRoom).getRewardsConfig()
+    vaultAddr: address = staticcall VaultBook(a.vaultBook).getAddr(_vaultId)
+    return self._getLatestDepositPoints(_user, _vaultId, vaultAddr, _asset, c, a)
+
+
+@view
 @internal
 def _getLatestDepositPoints(
     _user: address,
@@ -837,13 +851,14 @@ def getClaimableBorrowLoot(_user: address) -> uint256:
 
 
 @external
-def updateRipeRewards(_a: addys.Addys = empty(addys.Addys)):
+def updateRipeRewards(_a: addys.Addys = empty(addys.Addys)) -> RipeRewards:
     assert addys._isValidRipeHqAddr(msg.sender) # dev: no perms
     assert not deptBasics.isPaused # dev: contract paused
     a: addys.Addys = addys._getAddys(_a)
     config: RewardsConfig = staticcall ControlRoom(a.controlRoom).getRewardsConfig()
     ripeRewards: RipeRewards = self._getLatestGlobalRipeRewards(config, a)
     extcall Ledger(a.ledger).setRipeRewards(ripeRewards)
+    return ripeRewards
 
 
 # get latest global ripe rewards

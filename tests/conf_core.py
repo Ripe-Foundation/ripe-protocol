@@ -269,7 +269,7 @@ def ledger(ripe_hq_deploy):
     return boa.load(
         "contracts/core/Ledger.vy",
         ripe_hq_deploy,
-        0,
+        100 * (1_000_000 * EIGHTEEN_DECIMALS), # 100 million
         name="ledger",
     )
 
