@@ -795,3 +795,516 @@ def test_borrow_savings_green(
     # verify balances
     assert green_token.balanceOf(bob) == 0  # no regular green tokens
     assert savings_green.balanceOf(bob) != 0  # received savings_green instead
+
+
+################
+# Borrow Terms #
+################
+
+
+def test_get_user_borrow_terms_single_asset(
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    setGeneralDebtConfig,
+    performDeposit,
+    mock_price_source,
+    credit_engine,
+    createDebtTerms,
+):
+    # basic setup
+    setGeneralConfig()
+    debt_terms = createDebtTerms(
+        _ltv=50_00,  # 50%
+        _redemptionThreshold=60_00,  # 60%
+        _liqThreshold=70_00,  # 70%
+        _liqFee=10_00,  # 10%
+        _borrowRate=5_00,  # 5%
+        _daowry=1_00,  # 1%
+    )
+    setAssetConfig(alpha_token, _debtTerms=debt_terms)
+    setGeneralDebtConfig()
+
+    # deposits
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    performDeposit(bob, deposit_amount, alpha_token, alpha_token_whale)
+
+    # set mock prices
+    alpha_price = 1 * EIGHTEEN_DECIMALS
+    mock_price_source.setPrice(alpha_token, alpha_price)
+
+    # get borrow terms
+    terms = credit_engine.getUserBorrowTerms(bob, True)
+
+    # verify terms match the single asset's terms
+    assert terms.debtTerms.ltv == 50_00
+    assert terms.debtTerms.redemptionThreshold == 60_00
+    assert terms.debtTerms.liqThreshold == 70_00
+    assert terms.debtTerms.liqFee == 10_00
+    assert terms.debtTerms.borrowRate == 5_00
+    assert terms.debtTerms.daowry == 1_00
+
+    # verify collateral value and max debt
+    assert terms.collateralVal == 100 * EIGHTEEN_DECIMALS  # 100 tokens at $1 each
+    assert terms.totalMaxDebt == 50 * EIGHTEEN_DECIMALS  # 50% of collateral value
+
+
+def test_get_user_borrow_terms_multiple_assets(
+    alpha_token,
+    alpha_token_whale,
+    bravo_token,
+    bravo_token_whale,
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    setGeneralDebtConfig,
+    performDeposit,
+    mock_price_source,
+    credit_engine,
+    createDebtTerms,
+):
+    # basic setup
+    setGeneralConfig()
+    
+    # Asset 1: 50% LTV, 100 tokens at $1 each = $100 collateral, $50 max debt
+    alpha_debt_terms = createDebtTerms(
+        _ltv=50_00,  # 50%
+        _redemptionThreshold=60_00,  # 60%
+        _liqThreshold=70_00,  # 70%
+        _liqFee=10_00,  # 10%
+        _borrowRate=5_00,  # 5%
+        _daowry=1_00,  # 1%
+    )
+    
+    # Asset 2: 75% LTV, 100 tokens at $2 each = $200 collateral, $150 max debt
+    bravo_debt_terms = createDebtTerms(
+        _ltv=75_00,  # 75%
+        _redemptionThreshold=80_00,  # 80%
+        _liqThreshold=85_00,  # 85%
+        _liqFee=15_00,  # 15%
+        _borrowRate=7_00,  # 7%
+        _daowry=2_00,  # 2%
+    )
+    
+    setAssetConfig(alpha_token, _debtTerms=alpha_debt_terms)
+    setAssetConfig(bravo_token, _debtTerms=bravo_debt_terms)
+    setGeneralDebtConfig()
+
+    # deposits
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    performDeposit(bob, deposit_amount, alpha_token, alpha_token_whale)
+    performDeposit(bob, deposit_amount, bravo_token, bravo_token_whale)
+
+    # set mock prices
+    alpha_price = 1 * EIGHTEEN_DECIMALS
+    bravo_price = 2 * EIGHTEEN_DECIMALS
+    mock_price_source.setPrice(alpha_token, alpha_price)
+    mock_price_source.setPrice(bravo_token, bravo_price)
+
+    # get borrow terms
+    terms = credit_engine.getUserBorrowTerms(bob, True)
+
+    # Total collateral value = $100 + $200 = $300
+    # Total max debt = $50 + $150 = $200
+    # Weighted terms:
+    # - LTV: (50 * 50 + 150 * 75) / 200 = 68.75%
+    # - Redemption: (50 * 60 + 150 * 80) / 200 = 75%
+    # - Liq Threshold: (50 * 70 + 150 * 85) / 200 = 81.25%
+    # - Liq Fee: (50 * 10 + 150 * 15) / 200 = 13.75%
+    # - Borrow Rate: (50 * 5 + 150 * 7) / 200 = 6.5%
+    # - Daowry: (50 * 1 + 150 * 2) / 200 = 1.75%
+
+    assert terms.collateralVal == 300 * EIGHTEEN_DECIMALS  # $300 total collateral
+    assert terms.totalMaxDebt == 200 * EIGHTEEN_DECIMALS  # $200 total max debt
+    assert terms.debtTerms.ltv == 66_66  # 66.66% (200 * 100_00 / 300)
+    assert terms.debtTerms.redemptionThreshold == 75_00  # 75%
+    assert terms.debtTerms.liqThreshold == 81_25  # 81.25%
+    assert terms.debtTerms.liqFee == 13_75  # 13.75%
+    assert terms.debtTerms.borrowRate == 6_50  # 6.5%
+    assert terms.debtTerms.daowry == 1_75  # 1.75%
+
+
+def test_get_user_borrow_terms_liq_threshold_fee_adjustment(
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    setGeneralDebtConfig,
+    performDeposit,
+    mock_price_source,
+    credit_engine,
+    createDebtTerms,
+):
+    # Set up asset with high liqThreshold and liqFee so their sum exceeds 100%
+    setGeneralConfig()
+    # liqThreshold = 90%, liqFee = 20%
+    debt_terms = createDebtTerms(
+        _ltv=50_00,
+        _redemptionThreshold=60_00,
+        _liqThreshold=90_00,  # 90%
+        _liqFee=20_00,        # 20%
+        _borrowRate=5_00,
+        _daowry=1_00,
+    )
+    setAssetConfig(alpha_token, _debtTerms=debt_terms)
+    setGeneralDebtConfig()
+
+    # deposit
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    performDeposit(bob, deposit_amount, alpha_token, alpha_token_whale)
+
+    # set mock price
+    alpha_price = 1 * EIGHTEEN_DECIMALS
+    mock_price_source.setPrice(alpha_token, alpha_price)
+
+    # get borrow terms
+    terms = credit_engine.getUserBorrowTerms(bob, True)
+
+    # The contract should adjust liqFee so that liqThreshold + (liqThreshold * liqFee // 100_00) <= 100_00
+    # adjustedLiqFee = (100_00 - liqThreshold) * 100_00 // liqThreshold
+    expected_adjusted_liq_fee = (100_00 - 90_00) * 100_00 // 90_00  # = 11_11
+    assert terms.debtTerms.liqThreshold == 90_00
+    assert terms.debtTerms.liqFee == expected_adjusted_liq_fee
+    # The sum should not exceed 100_00
+    liq_sum = terms.debtTerms.liqThreshold + (terms.debtTerms.liqThreshold * terms.debtTerms.liqFee // 100_00)
+    assert liq_sum <= 100_00
+
+
+def test_get_user_borrow_terms_no_vaults(
+    bob,
+    credit_engine,
+):
+    # User has no vaults/collateral
+    terms = credit_engine.getUserBorrowTerms(bob, True)
+    assert terms.collateralVal == 0
+    assert terms.totalMaxDebt == 0
+    assert terms.debtTerms.ltv == 0
+    assert terms.debtTerms.redemptionThreshold == 0
+    assert terms.debtTerms.liqThreshold == 0
+    assert terms.debtTerms.liqFee == 0
+    assert terms.debtTerms.borrowRate == 0
+    assert terms.debtTerms.daowry == 0
+
+
+def test_get_user_borrow_terms_asset_with_zero_ltv(
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    setGeneralDebtConfig,
+    performDeposit,
+    mock_price_source,
+    credit_engine,
+    createDebtTerms,
+):
+    setGeneralConfig()
+    # ltv=0, should be ignored
+    debt_terms = createDebtTerms(_ltv=0, _redemptionThreshold=60_00, _liqThreshold=70_00, _liqFee=10_00, _borrowRate=5_00, _daowry=1_00)
+    setAssetConfig(alpha_token, _debtTerms=debt_terms)
+    setGeneralDebtConfig()
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    performDeposit(bob, deposit_amount, alpha_token, alpha_token_whale)
+    mock_price_source.setPrice(alpha_token, 1 * EIGHTEEN_DECIMALS)
+    terms = credit_engine.getUserBorrowTerms(bob, True)
+    assert terms.collateralVal == 0
+    assert terms.totalMaxDebt == 0
+    assert terms.debtTerms.ltv == 0
+
+
+def test_get_user_borrow_terms_multiple_assets_some_zero_ltv(
+    alpha_token,
+    alpha_token_whale,
+    bravo_token,
+    bravo_token_whale,
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    setGeneralDebtConfig,
+    performDeposit,
+    mock_price_source,
+    credit_engine,
+    createDebtTerms,
+):
+    setGeneralConfig()
+    # alpha: ltv=0, bravo: ltv=50%
+    alpha_debt_terms = createDebtTerms(_ltv=0, _redemptionThreshold=60_00, _liqThreshold=70_00, _liqFee=10_00, _borrowRate=5_00, _daowry=1_00)
+    bravo_debt_terms = createDebtTerms(_ltv=50_00, _redemptionThreshold=80_00, _liqThreshold=85_00, _liqFee=15_00, _borrowRate=7_00, _daowry=2_00)
+    setAssetConfig(alpha_token, _debtTerms=alpha_debt_terms)
+    setAssetConfig(bravo_token, _debtTerms=bravo_debt_terms)
+    setGeneralDebtConfig()
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    performDeposit(bob, deposit_amount, alpha_token, alpha_token_whale)
+    performDeposit(bob, deposit_amount, bravo_token, bravo_token_whale)
+    mock_price_source.setPrice(alpha_token, 1 * EIGHTEEN_DECIMALS)
+    mock_price_source.setPrice(bravo_token, 2 * EIGHTEEN_DECIMALS)
+    terms = credit_engine.getUserBorrowTerms(bob, True)
+    # Only bravo_token should be counted
+    assert terms.collateralVal == 200 * EIGHTEEN_DECIMALS
+    assert terms.totalMaxDebt == 100 * EIGHTEEN_DECIMALS
+    assert terms.debtTerms.ltv == 50_00
+    assert terms.debtTerms.redemptionThreshold == 80_00
+    assert terms.debtTerms.liqThreshold == 85_00
+    assert terms.debtTerms.liqFee == 15_00
+    assert terms.debtTerms.borrowRate == 700
+    assert terms.debtTerms.daowry == 2_00
+
+
+def test_get_user_borrow_terms_asset_with_zero_amount(
+    alpha_token,
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    setGeneralDebtConfig,
+    credit_engine,
+    createDebtTerms,
+):
+    setGeneralConfig()
+    debt_terms = createDebtTerms(_ltv=50_00, _redemptionThreshold=60_00, _liqThreshold=70_00, _liqFee=10_00, _borrowRate=5_00, _daowry=1_00)
+    setAssetConfig(alpha_token, _debtTerms=debt_terms)
+    setGeneralDebtConfig()
+    # Manually ensure user has a vault but zero amount (simulate)
+    # This requires direct manipulation or a fixture that allows it; here we just check that zero amount is ignored
+    # (Assume the vault returns zero for getUserAssetAndAmountAtIndex)
+    # So, no deposit is made
+    terms = credit_engine.getUserBorrowTerms(bob, True)
+    assert terms.collateralVal == 0
+    assert terms.totalMaxDebt == 0
+    assert terms.debtTerms.ltv == 0
+
+
+def test_get_user_borrow_terms_asset_with_no_price(
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    setGeneralDebtConfig,
+    performDeposit,
+    mock_price_source,
+    credit_engine,
+    createDebtTerms,
+):
+    setGeneralConfig()
+    debt_terms = createDebtTerms(_ltv=50_00, _redemptionThreshold=60_00, _liqThreshold=70_00, _liqFee=10_00, _borrowRate=5_00, _daowry=1_00)
+    setAssetConfig(alpha_token, _debtTerms=debt_terms)
+    setGeneralDebtConfig()
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    performDeposit(bob, deposit_amount, alpha_token, alpha_token_whale)
+    # Set price to zero
+    mock_price_source.setPrice(alpha_token, 0)
+    terms = credit_engine.getUserBorrowTerms(bob, True)
+    assert terms.collateralVal == 0
+    assert terms.totalMaxDebt == 0
+    assert terms.debtTerms.ltv == 0
+
+
+#########
+# Other #
+#########
+
+
+def test_borrow_interest_calculation(
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    setGeneralDebtConfig,
+    performDeposit,
+    mock_price_source,
+    teller,
+    credit_engine,
+    createDebtTerms,
+):
+    # basic setup with high interest rate
+    setGeneralConfig()
+    debt_terms = createDebtTerms(
+        _ltv=50_00,
+        _redemptionThreshold=60_00,
+        _liqThreshold=70_00,
+        _liqFee=10_00,
+        _borrowRate=100_00,  # 100% annual interest
+        _daowry=1_00,
+    )
+    setAssetConfig(alpha_token, _debtTerms=debt_terms)
+    setGeneralDebtConfig()
+
+    # deposits
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    performDeposit(bob, deposit_amount, alpha_token, alpha_token_whale)
+
+    # set mock prices
+    alpha_price = 1 * EIGHTEEN_DECIMALS
+    mock_price_source.setPrice(alpha_token, alpha_price)
+
+    # borrow
+    borrow_amount = 50 * EIGHTEEN_DECIMALS
+    teller.borrow(borrow_amount, bob, False, sender=bob)
+
+    # time_travel forward by 1 year (31536000 seconds)
+    boa.env.time_travel(seconds=31536000)
+
+    # get latest user debt and terms
+    user_debt, terms, new_interest = credit_engine.getLatestUserDebtAndTerms(bob, True)
+
+    # userDebt should be original borrow amount
+    assert user_debt.amount == borrow_amount + new_interest
+
+    # newInterest should be approximately borrow_amount (100% annual interest)
+    assert new_interest == borrow_amount
+
+
+def test_update_debt_for_user(
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    setGeneralDebtConfig,
+    performDeposit,
+    mock_price_source,
+    teller,
+    credit_engine,
+    ledger,
+    createDebtTerms,
+    control_room,
+):
+    # basic setup with high interest rate
+    setGeneralConfig()
+    debt_terms = createDebtTerms(
+        _ltv=50_00,
+        _redemptionThreshold=60_00,
+        _liqThreshold=70_00,
+        _liqFee=10_00,
+        _borrowRate=100_00,  # 100% annual interest
+        _daowry=1_00,
+    )
+    setAssetConfig(alpha_token, _debtTerms=debt_terms)
+    setGeneralDebtConfig()
+
+    # deposits
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    performDeposit(bob, deposit_amount, alpha_token, alpha_token_whale)
+
+    # set mock prices
+    alpha_price = 1 * EIGHTEEN_DECIMALS
+    mock_price_source.setPrice(alpha_token, alpha_price)
+
+    # borrow
+    borrow_amount = 50 * EIGHTEEN_DECIMALS
+    teller.borrow(borrow_amount, bob, False, sender=bob)
+
+    # time_travel forward by 1 year (31536000 seconds)
+    boa.env.time_travel(seconds=31536000)
+
+    # update debt for user
+    with boa.reverts("no perms"):
+        credit_engine.updateDebtForUser(bob, sender=bob)
+
+    credit_engine.updateDebtForUser(bob, sender=control_room.address)
+
+    # get user debt directly from ledger
+    user_debt = ledger.userDebt(bob)
+    assert user_debt.amount == borrow_amount + borrow_amount  # borrow_amount + new_interest (100% annual interest)
+
+    # verify totalDebt is updated
+    assert ledger.totalDebt() == borrow_amount + borrow_amount
+
+    # verify unrealizedYield is updated
+    assert ledger.unrealizedYield() == borrow_amount
+
+
+def test_has_good_debt_health(
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    setGeneralDebtConfig,
+    performDeposit,
+    mock_price_source,
+    teller,
+    credit_engine,
+    createDebtTerms,
+):
+    # basic setup
+    setGeneralConfig()
+    debt_terms = createDebtTerms(
+        _ltv=50_00,
+        _redemptionThreshold=60_00,
+        _liqThreshold=70_00,
+        _liqFee=10_00,
+        _borrowRate=5_00,
+        _daowry=1_00,
+    )
+    setAssetConfig(alpha_token, _debtTerms=debt_terms)
+    setGeneralDebtConfig()
+
+    # deposits
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    performDeposit(bob, deposit_amount, alpha_token, alpha_token_whale)
+
+    # set mock prices
+    alpha_price = 1 * EIGHTEEN_DECIMALS
+    mock_price_source.setPrice(alpha_token, alpha_price)
+
+    # borrow
+    borrow_amount = 50 * EIGHTEEN_DECIMALS
+    teller.borrow(borrow_amount, bob, False, sender=bob)
+
+    # hasGoodDebtHealth should be True
+    assert credit_engine.hasGoodDebtHealth(bob)
+
+    # lower price to trigger bad health
+    mock_price_source.setPrice(alpha_token, alpha_price // 2)
+    assert not credit_engine.hasGoodDebtHealth(bob)
+
+
+def test_can_liquidate_user(
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    setGeneralDebtConfig,
+    performDeposit,
+    mock_price_source,
+    teller,
+    credit_engine,
+    createDebtTerms,
+):
+    # basic setup
+    setGeneralConfig()
+    debt_terms = createDebtTerms(
+        _ltv=50_00,
+        _redemptionThreshold=60_00,
+        _liqThreshold=70_00,
+        _liqFee=10_00,
+        _borrowRate=5_00,
+        _daowry=1_00,
+    )
+    setAssetConfig(alpha_token, _debtTerms=debt_terms)
+    setGeneralDebtConfig()
+
+    # deposits
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    performDeposit(bob, deposit_amount, alpha_token, alpha_token_whale)
+
+    # set mock prices
+    alpha_price = 1 * EIGHTEEN_DECIMALS
+    mock_price_source.setPrice(alpha_token, alpha_price)
+
+    # borrow
+    borrow_amount = 50 * EIGHTEEN_DECIMALS
+    teller.borrow(borrow_amount, bob, False, sender=bob)
+
+    # canLiquidateUser should be False
+    assert not credit_engine.canLiquidateUser(bob)
+
+    # lower price to trigger liquidation
+    mock_price_source.setPrice(alpha_token, alpha_price // 2)
+    assert credit_engine.canLiquidateUser(bob)

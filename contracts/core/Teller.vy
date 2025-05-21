@@ -17,7 +17,7 @@ from ethereum.ercs import IERC20
 interface CreditEngine:
     def redeemCollateralFromMany(_redemptions: DynArray[CollateralRedemption, MAX_COLLATERAL_REDEMPTIONS], _greenAmount: uint256, _redeemer: address, _shouldStakeRefund: bool, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
     def redeemCollateral(_user: address, _vaultId: uint256, _asset: address, _greenAmount: uint256, _redeemer: address, _shouldStakeRefund: bool, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
-    def repayForUser(_user: address, _greenAmount: uint256, _shouldStakeRefund: bool, _caller: address, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
+    def repayForUser(_user: address, _greenAmount: uint256, _shouldStakeRefund: bool, _caller: address, _a: addys.Addys = empty(addys.Addys)) -> bool: nonpayable
     def borrowForUser(_user: address, _greenAmount: uint256, _shouldStake: bool, _caller: address, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
     def getMaxWithdrawableForAsset(_user: address, _asset: address, _a: addys.Addys = empty(addys.Addys)) -> uint256: view
     def updateDebtForUser(_user: address, _a: addys.Addys = empty(addys.Addys)) -> bool: nonpayable
@@ -399,7 +399,7 @@ def repay(
     _greenAmount: uint256 = max_value(uint256),
     _user: address = msg.sender,
     _wantsSavingsGreenForRefund: bool = True,
-) -> uint256:
+) -> bool:
     assert not deptBasics.isPaused # dev: contract paused
     a: addys.Addys = addys._getAddys()
     greenAmount: uint256 = self._transferTokensToDepartment(_greenAmount, a.greenToken, a.creditEngine)

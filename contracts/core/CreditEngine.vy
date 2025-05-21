@@ -420,6 +420,7 @@ def repayDuringAuctionPurchase(_liqUser: address, _repayValue: uint256, _a: addy
     repayAmount: uint256 = 0
     refundAmount: uint256 = 0
     repayAmount, refundAmount = self._getRepayAmountAndRefundAmount(userDebt.amount, _repayValue, a.greenToken)
+    assert repayAmount != 0 # dev: cannot repay with 0 green
 
     return self._repayDebt(_liqUser, userDebt, d.numUserVaults, repayAmount, refundAmount, newInterest, True, True, RepayType.AUCTION, a)
 
