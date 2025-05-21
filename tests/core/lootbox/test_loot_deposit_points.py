@@ -1,8 +1,7 @@
 import pytest
 import boa
 
-from constants import EIGHTEEN_DECIMALS, ZERO_ADDRESS
-from conf_utils import filter_logs
+from constants import EIGHTEEN_DECIMALS
 
 
 def test_loot_deposit_points_first_save(
