@@ -18,6 +18,22 @@ def _test():
     yield _test
 
 
+@pytest.fixture(scope="session")
+def performDeposit(teller, simple_erc20_vault, alpha_token, alpha_token_whale):
+    def performDeposit(
+        _user,
+        _amount,
+        _token = alpha_token,
+        _tokenWhale = alpha_token_whale,
+        _vault = simple_erc20_vault,
+    ):
+        _token.transfer(_user, _amount, sender=_tokenWhale)
+        _token.approve(teller.address, _amount, sender=_user)
+        teller.deposit(_token, _amount, _user, _vault, sender=_user)
+
+    yield performDeposit
+
+
 #################
 # Global Config #
 #################

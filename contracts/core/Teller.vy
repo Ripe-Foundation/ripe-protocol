@@ -383,11 +383,11 @@ def _validateOnWithdrawal(
 def borrow(
     _greenAmount: uint256 = max_value(uint256),
     _user: address = msg.sender,
-    _shouldStake: bool = True,
+    _wantsSavingsGreen: bool = True,
 ) -> uint256:
     assert not deptBasics.isPaused # dev: contract paused
     a: addys.Addys = addys._getAddys()
-    return extcall CreditEngine(a.creditEngine).borrowForUser(_user, _greenAmount, _shouldStake, msg.sender, a)
+    return extcall CreditEngine(a.creditEngine).borrowForUser(_user, _greenAmount, _wantsSavingsGreen, msg.sender, a)
 
 
 # repay
@@ -398,12 +398,12 @@ def borrow(
 def repay(
     _greenAmount: uint256 = max_value(uint256),
     _user: address = msg.sender,
-    _shouldStakeRefund: bool = True,
+    _wantsSavingsGreenForRefund: bool = True,
 ) -> uint256:
     assert not deptBasics.isPaused # dev: contract paused
     a: addys.Addys = addys._getAddys()
     greenAmount: uint256 = self._transferTokensToDepartment(_greenAmount, a.greenToken, a.creditEngine)
-    return extcall CreditEngine(a.creditEngine).repayForUser(_user, greenAmount, _shouldStakeRefund, msg.sender, a)
+    return extcall CreditEngine(a.creditEngine).repayForUser(_user, greenAmount, _wantsSavingsGreenForRefund, msg.sender, a)
 
 
 # redeem collateral

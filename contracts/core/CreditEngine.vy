@@ -163,9 +163,7 @@ def borrowForUser(
     assert not deptBasics.isPaused # dev: contract paused
     a: addys.Addys = addys._getAddys(_a)
 
-    # nothing to do here
-    if _user == empty(address):
-        return 0
+    assert _user != empty(address) # dev: cannot borrow for 0x0
 
     # get borrow data
     d: BorrowDataBundle = staticcall Ledger(a.ledger).getBorrowDataBundle(_user)
@@ -687,6 +685,14 @@ def _calcAmountToPay(_debtAmount: uint256, _collateralValue: uint256, _targetLtv
 
 @view
 @external
+def getCollateralValue(_user: address) -> uint256:
+    a: addys.Addys = addys._getAddys()
+    bt: UserBorrowTerms = self._getUserBorrowTerms(_user, staticcall Ledger(a.ledger).numUserVaults(_user), True, a)
+    return bt.collateralVal
+
+
+@view
+@external
 def getUserBorrowTerms(
     _user: address,
     _shouldRaise: bool,
@@ -931,7 +937,10 @@ def _handleGreenForUser(
         return
 
     if _wantsSavingsGreen:
+        assert extcall IERC20(_greenToken).approve(_savingsGreen, amount, default_return_value=True) # dev: green approval failed
         extcall IERC4626(_savingsGreen).deposit(amount, _recipient)
+        assert extcall IERC20(_greenToken).approve(_savingsGreen, 0, default_return_value=True) # dev: green approval failed
+
     else:
         assert extcall IERC20(_greenToken).transfer(_recipient, amount, default_return_value=True) # dev: green transfer failed
 

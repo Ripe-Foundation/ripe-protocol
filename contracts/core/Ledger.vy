@@ -342,6 +342,21 @@ def hasDebt(_user: address) -> bool:
 
 @view
 @external
+def getNumBorrowers() -> uint256:
+    return self._getNumBorrowers()
+
+
+@view
+@internal
+def _getNumBorrowers() -> uint256:
+    numBorrowers: uint256 = self.numBorrowers
+    if numBorrowers == 0:
+        return 0
+    return numBorrowers - 1
+
+
+@view
+@external
 def getBorrowDataBundle(_user: address) -> BorrowDataBundle:
     return BorrowDataBundle(
         userDebt=self.userDebt[_user],
@@ -349,7 +364,7 @@ def getBorrowDataBundle(_user: address) -> BorrowDataBundle:
         isUserBorrower=self.indexOfBorrower[_user] != 0,
         numUserVaults=self.numUserVaults[_user],
         totalDebt=self.totalDebt,
-        numBorrowers=self.numBorrowers,
+        numBorrowers=self._getNumBorrowers(),
     )
 
 
