@@ -30,7 +30,6 @@ def performDeposit(teller, simple_erc20_vault, alpha_token, alpha_token_whale):
         _token.transfer(_user, _amount, sender=_tokenWhale)
         _token.approve(teller.address, _amount, sender=_user)
         teller.deposit(_token, _amount, _user, _vault, sender=_user)
-
     yield performDeposit
 
 

@@ -26,8 +26,8 @@ def bob(env):
 
 
 @pytest.fixture(scope="session")
-def sally(env):
-    return env.generate_address("sally")
+def alice(env):
+    return env.generate_address("alice")
 
 
 @pytest.fixture(scope="session")
@@ -104,6 +104,26 @@ def charlie_token_whale(env, charlie_token, governance):
 @pytest.fixture(scope="session")
 def charlie_token_vault(charlie_token):
     return boa.load("contracts/mock/MockErc4626Vault.vy", charlie_token, name="charlie_erc4626_vault")
+
+
+# delta token (8 decimals)
+
+
+@pytest.fixture(scope="session")
+def delta_token(governance):
+    return boa.load("contracts/mock/MockErc20.vy", governance, "Delta Token", "DELTA", 8, 1_000_000_000, name="delta_token")
+
+
+@pytest.fixture(scope="session")
+def delta_token_whale(env, delta_token, governance):
+    whale = env.generate_address("delta_token_whale")
+    delta_token.mint(whale, 100_000_000 * (10 ** delta_token.decimals()), sender=governance.address)
+    return whale
+
+
+@pytest.fixture(scope="session")
+def delta_token_vault(delta_token):
+    return boa.load("contracts/mock/MockErc4626Vault.vy", delta_token, name="delta_erc4626_vault")
 
 
 #################
