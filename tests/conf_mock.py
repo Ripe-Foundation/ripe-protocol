@@ -33,7 +33,7 @@ def sally(env):
 @pytest.fixture(scope="session")
 def governance():
     # cannot be EOA
-    return boa.load("contracts/mock/MockGov.vy", name="mock_gov")
+    return boa.load("contracts/mock/MockRando.vy", name="mock_gov")
 
 
 @pytest.fixture(scope="session")
@@ -140,11 +140,28 @@ def mock_chainlink_feed_two():
     )
 
 
-#############
-# Whitelist #
-#############
+###############
+# Other Mocks #
+###############
+
+
+@pytest.fixture(scope="session")
+def mock_rando_contract():
+    return boa.load("contracts/mock/MockRando.vy", name="rando_contract")
 
 
 @pytest.fixture(scope="session")
 def mock_whitelist():
     return boa.load("contracts/mock/MockWhitelist.vy", name="mock_whitelist")
+
+
+@pytest.fixture(scope="session")
+def mock_registry(ripe_hq_deploy, fork):
+    return boa.load(
+        "contracts/mock/MockRegistry.vy",
+        ripe_hq_deploy,
+        PARAMS[fork]["MIN_HQ_CHANGE_TIMELOCK"], # initial time lock
+        PARAMS[fork]["MIN_HQ_CHANGE_TIMELOCK"],
+        PARAMS[fork]["MAX_HQ_CHANGE_TIMELOCK"],
+        name="mock_registry",
+    )

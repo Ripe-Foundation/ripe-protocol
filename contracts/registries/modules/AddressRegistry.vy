@@ -92,7 +92,8 @@ event AddressDisableCancelled:
     registry: String[28]
 
 event RegistryTimeLockModified:
-    numBlocks: uint256
+    newTimeLock: uint256
+    prevTimeLock: uint256
     registry: String[28]
 
 # time lock
@@ -410,9 +411,10 @@ def setRegistryTimeLock(_numBlocks: uint256) -> bool:
 
 @internal
 def _setRegistryTimeLock(_numBlocks: uint256) -> bool:
-    assert self._isValidRegistryTimeLock(_numBlocks) # dev: invalid time lock
+    prevTimeLock: uint256 = self.registryChangeTimeLock
+    assert self._isValidRegistryTimeLock(_numBlocks, prevTimeLock) # dev: invalid time lock
     self.registryChangeTimeLock = _numBlocks
-    log RegistryTimeLockModified(numBlocks=_numBlocks, registry=REGISTRY_STR)
+    log RegistryTimeLockModified(newTimeLock=_numBlocks, prevTimeLock=prevTimeLock, registry=REGISTRY_STR)
     return True
 
 
@@ -422,13 +424,15 @@ def _setRegistryTimeLock(_numBlocks: uint256) -> bool:
 @view
 @external
 def isValidRegistryTimeLock(_numBlocks: uint256) -> bool:
-    return self._isValidRegistryTimeLock(_numBlocks)
+    return self._isValidRegistryTimeLock(_numBlocks, self.registryChangeTimeLock)
 
 
 @view
 @internal
-def _isValidRegistryTimeLock(_numBlocks: uint256) -> bool:
-    return _numBlocks >= MIN_REG_TIME_LOCK and _numBlocks <= MAX_REG_TIME_LOCK
+def _isValidRegistryTimeLock(_newTimeLock: uint256, _prevTimeLock: uint256) -> bool:
+    if _newTimeLock == _prevTimeLock:
+        return False
+    return _newTimeLock >= MIN_REG_TIME_LOCK and _newTimeLock <= MAX_REG_TIME_LOCK
 
 
 # finish setup
