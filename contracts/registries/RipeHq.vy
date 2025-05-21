@@ -43,6 +43,9 @@ event HqConfigChangeConfirmed:
 event HqConfigChangeCancelled:
     regId: uint256
     description: String[64]
+    canMintGreen: bool
+    canMintRipe: bool
+    canSetTokenBlacklist: bool
     initiatedBlock: uint256
     confirmBlock: uint256
 
@@ -230,7 +233,15 @@ def cancelHqConfigChange(_regId: uint256) -> bool:
     assert data.confirmBlock != 0 # dev: no pending change
 
     self.pendingHqConfig[_regId] = empty(PendingHqConfig)
-    log HqConfigChangeCancelled(regId=_regId, description=data.newHqConfig.description, initiatedBlock=data.initiatedBlock, confirmBlock=data.confirmBlock)
+    log HqConfigChangeCancelled(
+        regId=_regId,
+        description=data.newHqConfig.description,
+        canMintGreen=data.newHqConfig.canMintGreen,
+        canMintRipe=data.newHqConfig.canMintRipe,
+        canSetTokenBlacklist=data.newHqConfig.canSetTokenBlacklist,
+        initiatedBlock=data.initiatedBlock,
+        confirmBlock=data.confirmBlock
+    )
     return True
 
 

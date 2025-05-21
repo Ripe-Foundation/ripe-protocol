@@ -165,3 +165,14 @@ def mock_registry(ripe_hq_deploy, fork):
         PARAMS[fork]["MAX_HQ_CHANGE_TIMELOCK"],
         name="mock_registry",
     )
+
+
+@pytest.fixture(scope="session")
+def mock_dept_can_mint_green(ripe_hq_deploy):
+    return boa.load("contracts/mock/MockDepartment.vy", ripe_hq_deploy, True, False, name="mock_dept_can_mint_green")
+
+
+@pytest.fixture(scope="session")
+def mock_dept_can_mint_ripe(ripe_hq_deploy):
+    return boa.load("contracts/mock/MockDepartment.vy", ripe_hq_deploy, False, True, name="mock_dept_can_mint_ripe")
+    
