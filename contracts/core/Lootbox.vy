@@ -172,6 +172,9 @@ def claimLootForManyUsers(
     return totalRipeForUsers
 
 
+# core
+
+
 @internal
 def _claimLoot(
     _user: address,
@@ -230,6 +233,44 @@ def _claimLoot(
     if totalRipeForUser != 0:
         self._handleRipeMint(_user, totalRipeForUser, _shouldStake, _a.ripeToken)
 
+    return totalRipeForUser
+
+
+# claim deposit loot
+
+
+@external
+def claimDepositLootForAsset(_user: address, _vaultId: uint256, _asset: address) -> uint256:
+    assert addys._isValidRipeHqAddr(msg.sender) # dev: no perms
+    assert not deptBasics.isPaused # dev: contract paused
+    a: addys.Addys = addys._getAddys()
+    vaultAddr: address = staticcall VaultBook(a.vaultBook).getAddr(_vaultId)
+    totalRipeForUser: uint256 = self._claimDepositLoot(_user, _vaultId, vaultAddr, _asset, False, a)
+    if totalRipeForUser != 0:
+        self._handleRipeMint(_user, totalRipeForUser, False, a.ripeToken)
+    return totalRipeForUser
+
+
+@internal
+def _claimDepositLoot(
+    _user: address,
+    _vaultId: uint256,
+    _vaultAddr: address,
+    _asset: address,
+    _shouldFlush: bool,
+    _a: addys.Addys,
+) -> uint256:
+    userRipeRewards: UserDepositLoot = empty(UserDepositLoot)
+    up: UserDepositPoints = empty(UserDepositPoints)
+    ap: AssetDepositPoints = empty(AssetDepositPoints)
+    gp: GlobalDepositPoints = empty(GlobalDepositPoints)
+    globalRipeRewards: RipeRewards = empty(RipeRewards)
+    userRipeRewards, up, ap, gp, globalRipeRewards = self._getClaimableDepositLootData(_user, _vaultId, _vaultAddr, _asset, _shouldFlush, _a)
+
+    totalRipeForUser: uint256 = userRipeRewards.ripeStakerLoot + userRipeRewards.ripeVoteLoot + userRipeRewards.ripeGenLoot
+    extcall Ledger(_a.ledger).setDepositPointsAndRipeRewards(_user, _vaultId, _asset, up, ap, gp, globalRipeRewards)
+    if totalRipeForUser != 0:
+        log DepositLootClaimed(user=_user, vaultId=_vaultId, asset=_asset, ripeStakerLoot=userRipeRewards.ripeStakerLoot, ripeVoteLoot=userRipeRewards.ripeVoteLoot, ripeGenLoot=userRipeRewards.ripeGenLoot)
     return totalRipeForUser
 
 
@@ -466,32 +507,6 @@ def _getLatestDepositPoints(
     userPoints.lastBalance = userLootShare
 
     return userPoints, assetPoints, globalPoints
-
-
-# claim deposit loot
-
-
-@internal
-def _claimDepositLoot(
-    _user: address,
-    _vaultId: uint256,
-    _vaultAddr: address,
-    _asset: address,
-    _shouldFlush: bool,
-    _a: addys.Addys,
-) -> uint256:
-    userRipeRewards: UserDepositLoot = empty(UserDepositLoot)
-    up: UserDepositPoints = empty(UserDepositPoints)
-    ap: AssetDepositPoints = empty(AssetDepositPoints)
-    gp: GlobalDepositPoints = empty(GlobalDepositPoints)
-    globalRipeRewards: RipeRewards = empty(RipeRewards)
-    userRipeRewards, up, ap, gp, globalRipeRewards = self._getClaimableDepositLootData(_user, _vaultId, _vaultAddr, _asset, _shouldFlush, _a)
-
-    totalRipeForUser: uint256 = userRipeRewards.ripeStakerLoot + userRipeRewards.ripeVoteLoot + userRipeRewards.ripeGenLoot
-    extcall Ledger(_a.ledger).setDepositPointsAndRipeRewards(_user, _vaultId, _asset, up, ap, gp, globalRipeRewards)
-    if totalRipeForUser != 0:
-        log DepositLootClaimed(user=_user, vaultId=_vaultId, asset=_asset, ripeStakerLoot=userRipeRewards.ripeStakerLoot, ripeVoteLoot=userRipeRewards.ripeVoteLoot, ripeGenLoot=userRipeRewards.ripeGenLoot)
-    return totalRipeForUser
 
 
 # claimable deposit loot
@@ -792,26 +807,16 @@ def _claimBorrowLoot(_user: address, _a: addys.Addys) -> uint256:
 def _getClaimableBorrowLootData(_user: address, _a: addys.Addys) -> (uint256, BorrowPoints, BorrowPoints, RipeRewards):
     config: RewardsConfig = staticcall ControlRoom(_a.controlRoom).getRewardsConfig()
     globalRewards: RipeRewards = self._getLatestGlobalRipeRewards(config, _a)
-    if globalRewards.borrowers == 0:
-        return 0, empty(BorrowPoints), empty(BorrowPoints), empty(RipeRewards)
 
-    # get latest borrow points
+    # latest borrow points
     up: BorrowPoints = empty(BorrowPoints)
     gp: BorrowPoints = empty(BorrowPoints)
     up, gp = self._getLatestBorrowPoints(_user, config.arePointsEnabled, _a.ledger)
-
-    # user has no points
-    if up.points == 0:
-        return 0, empty(BorrowPoints), empty(BorrowPoints), empty(RipeRewards)
 
     # calc user's share
     userShare: uint256 = 0
     if gp.points != 0:
         userShare = min(up.points * HUNDRED_PERCENT // gp.points, HUNDRED_PERCENT)
-
-    # insufficient user share, may need to wait longer to claim
-    if userShare == 0:
-        return 0, empty(BorrowPoints), empty(BorrowPoints), empty(RipeRewards)
 
     # calc borrower rewards
     userRipeRewards: uint256 = globalRewards.borrowers * userShare // HUNDRED_PERCENT
