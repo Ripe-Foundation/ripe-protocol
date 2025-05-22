@@ -2,7 +2,6 @@ import pytest
 import boa
 
 from constants import EIGHTEEN_DECIMALS, ZERO_ADDRESS, MAX_UINT256
-from conf_utils import filter_logs
 
 
 def test_loot_borrow_points_basic(

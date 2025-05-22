@@ -786,6 +786,17 @@ def _getLatestBorrowPoints(
 # claim loot
 
 
+@external
+def claimBorrowLoot(_user: address) -> uint256:
+    assert addys._isValidRipeHqAddr(msg.sender) # dev: no perms
+    assert not deptBasics.isPaused # dev: contract paused
+    a: addys.Addys = addys._getAddys()
+    totalRipeForUser: uint256 = self._claimBorrowLoot(_user, a)
+    if totalRipeForUser != 0:
+        self._handleRipeMint(_user, totalRipeForUser, False, a.ripeToken)
+    return totalRipeForUser
+
+
 @internal 
 def _claimBorrowLoot(_user: address, _a: addys.Addys) -> uint256:
     userRipeRewards: uint256 = 0
