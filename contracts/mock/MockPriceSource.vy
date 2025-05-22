@@ -41,6 +41,19 @@ def __init__(
 def setPrice(_asset: address, _price: uint256):
     self.price[_asset] = _price
 
+    if priceData.indexOfAsset[_asset] == 0:
+        priceData._addPricedAsset(_asset)
+
+
+@external
+def disablePriceFeed(_asset: address) -> bool:
+    self.price[_asset] = 0
+
+    if priceData.indexOfAsset[_asset] != 0:
+        priceData._removePricedAsset(_asset)
+
+    return True
+
 
 ########
 # Core #
@@ -94,11 +107,6 @@ def confirmPriceFeedUpdate(_asset: address) -> bool:
 
 @external
 def cancelPriceFeedUpdate(_asset: address) -> bool:
-    return True
-
-
-@external
-def disablePriceFeed(_asset: address) -> bool:
     return True
 
 
