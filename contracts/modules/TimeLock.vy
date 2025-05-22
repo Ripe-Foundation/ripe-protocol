@@ -8,7 +8,8 @@ struct PendingAction:
     confirmBlock: uint256
 
 event ActionTimeLockSet:
-    timeLock: uint256
+    newTimeLock: uint256
+    prevTimeLock: uint256
 
 # core data
 pendingActions: public(HashMap[uint256, PendingAction])
@@ -31,14 +32,14 @@ def __init__(
     self.actionId = 1
 
     # set time lock boundaries
-    assert _minActionTimeLock < _maxActionTimeLock # dev: invalid delay
-    assert _minActionTimeLock != 0 and _maxActionTimeLock != max_value(uint256) # dev: invalid time lock
+    assert _minActionTimeLock < _maxActionTimeLock # dev: invalid time lock boundaries
+    assert _minActionTimeLock != 0 and _maxActionTimeLock != max_value(uint256) # dev: invalid time lock boundaries
     MIN_ACTION_TIMELOCK = _minActionTimeLock
     MAX_ACTION_TIMELOCK = _maxActionTimeLock
 
     # set initial time lock
     if _initialTimeLock != 0:
-        assert self._setActionTimeLock(_initialTimeLock) # dev: failed to set initial time lock
+        assert self._setActionTimeLock(_initialTimeLock, 0) # dev: failed to set initial time lock
 
 
 ########
@@ -126,16 +127,16 @@ def _getActionConfirmationBlock(_actionId: uint256) -> uint256:
 
 
 @external
-def setActionTimeLock(_numBlocks: uint256) -> bool:
+def setActionTimeLock(_newTimeLock: uint256) -> bool:
     assert gov._canGovern(msg.sender) # dev: no perms
-    return self._setActionTimeLock(_numBlocks)
+    return self._setActionTimeLock(_newTimeLock, self.actionTimeLock)
 
 
 @internal
-def _setActionTimeLock(_numBlocks: uint256) -> bool:
-    assert self._isValidActionTimeLock(_numBlocks) # dev: invalid time lock
-    self.actionTimeLock = _numBlocks
-    log ActionTimeLockSet(timeLock=_numBlocks)
+def _setActionTimeLock(_newTimeLock: uint256, _prevTimeLock: uint256) -> bool:
+    assert self._isValidActionTimeLock(_newTimeLock, _prevTimeLock) # dev: invalid time lock
+    self.actionTimeLock = _newTimeLock
+    log ActionTimeLockSet(newTimeLock=_newTimeLock, prevTimeLock=_prevTimeLock)
     return True
 
 
@@ -144,14 +145,16 @@ def _setActionTimeLock(_numBlocks: uint256) -> bool:
 
 @view
 @external
-def isValidActionTimeLock(_numBlocks: uint256) -> bool:
-    return self._isValidActionTimeLock(_numBlocks)
+def isValidActionTimeLock(_newTimeLock: uint256) -> bool:
+    return self._isValidActionTimeLock(_newTimeLock, self.actionTimeLock)
 
 
 @view
 @internal
-def _isValidActionTimeLock(_numBlocks: uint256) -> bool:
-    return _numBlocks >= MIN_ACTION_TIMELOCK and _numBlocks <= MAX_ACTION_TIMELOCK
+def _isValidActionTimeLock(_newTimeLock: uint256, _prevTimeLock: uint256) -> bool:
+    if _newTimeLock == _prevTimeLock:
+        return False # no change
+    return _newTimeLock >= MIN_ACTION_TIMELOCK and _newTimeLock <= MAX_ACTION_TIMELOCK
 
 
 # utils
@@ -173,11 +176,13 @@ def maxActionTimeLock() -> uint256:
 
 
 @external
-def setActionTimeLockAfterSetup(_numBlocks: uint256 = 0) -> bool:
+def setActionTimeLockAfterSetup(_newTimeLock: uint256 = 0) -> bool:
     assert gov._canGovern(msg.sender) # dev: no perms
-    assert self.actionTimeLock == 0 # dev: already set
 
-    timeLock: uint256 = _numBlocks
+    prevTimeLock: uint256 = self.actionTimeLock
+    assert prevTimeLock == 0 # dev: already set
+
+    timeLock: uint256 = _newTimeLock
     if timeLock == 0:
         timeLock = MIN_ACTION_TIMELOCK
-    return self._setActionTimeLock(timeLock)
+    return self._setActionTimeLock(timeLock, prevTimeLock)
