@@ -58,6 +58,7 @@ def canMintRipe() -> bool:
 @external
 def pause(_shouldPause: bool):
     assert msg.sender == addys._getControlRoomAddr() # dev: only ControlRoom allowed
+    assert _shouldPause != self.isPaused # dev: no change
     self.isPaused = _shouldPause
     log DepartmentPauseModified(isPaused=_shouldPause)
 

@@ -99,6 +99,7 @@ def getPricedAssets() -> DynArray[address, MAX_ASSETS]:
 @external
 def pause(_shouldPause: bool):
     assert msg.sender == addys._getControlRoomAddr() # dev: only ControlRoom allowed
+    assert _shouldPause != self.isPaused # dev: no change
     self.isPaused = _shouldPause
     log PriceSourcePauseModified(isPaused=_shouldPause)
 
