@@ -219,11 +219,13 @@ def bond_room(ripe_hq_deploy):
 
 
 @pytest.fixture(scope="session")
-def control_room(ripe_hq_deploy, control_room_data):
+def control_room(ripe_hq_deploy, control_room_data, fork):
     return boa.load(
         "contracts/core/ControlRoom.vy",
         ripe_hq_deploy,
         control_room_data,
+        PARAMS[fork]["PRICE_DESK_MIN_STALE_TIME"],
+        PARAMS[fork]["PRICE_DESK_MAX_STALE_TIME"],
         name="control_room",
     )
 
@@ -389,8 +391,6 @@ def price_desk_deploy(ripe_hq_deploy, fork):
         "contracts/registries/PriceDesk.vy",
         ripe_hq_deploy,
         ETH,
-        PARAMS[fork]["PRICE_DESK_MIN_STALE_TIME"],
-        PARAMS[fork]["PRICE_DESK_MAX_STALE_TIME"],
         PARAMS[fork]["PRICE_DESK_MIN_REG_TIMELOCK"],
         PARAMS[fork]["PRICE_DESK_MAX_REG_TIMELOCK"],
         name="price_desk",

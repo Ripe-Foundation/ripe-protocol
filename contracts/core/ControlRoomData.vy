@@ -6,6 +6,7 @@ interface RipeHq:
 struct GenConfig:
     perUserMaxVaults: uint256
     perUserMaxAssetsPerVault: uint256
+    priceStaleTime: uint256
     canDeposit: bool
     canWithdraw: bool
     canBorrow: bool
@@ -108,8 +109,12 @@ userDelegation: public(HashMap[address, HashMap[address, ActionDelegation]]) # u
 rewardsConfig: public(RipeRewardsConfig)
 totalPointsAllocs: public(TotalPointsAllocs)
 
+# price config
+priorityPriceSourceIds: public(DynArray[uint256, MAX_PRIORITY_PARTNERS])
+
 RIPE_HQ: immutable(address)
 CONTROL_ROOM_ID: constant(uint256) = 9
+MAX_PRIORITY_PARTNERS: constant(uint256) = 10
 
 
 @deploy
@@ -197,6 +202,23 @@ def setUserConfig(_user: address,_userConfig: UserConfig):
 def setUserDelegation(_user: address, _delegate: address, _config: ActionDelegation):
     assert msg.sender == self._getControlRoomAddr() # dev: no perms
     self.userDelegation[_user][_delegate] = _config
+
+
+##########################
+# Priority Price Sources #
+##########################
+
+
+@external
+def setPriorityPriceSourceIds(_priorityIds: DynArray[uint256, MAX_PRIORITY_PARTNERS]):
+    assert msg.sender == self._getControlRoomAddr() # dev: no perms
+    self.priorityPriceSourceIds = _priorityIds
+
+
+@view 
+@external 
+def getPriorityPriceSourceIds() -> DynArray[uint256, MAX_PRIORITY_PARTNERS]:
+    return self.priorityPriceSourceIds
 
 
 #############

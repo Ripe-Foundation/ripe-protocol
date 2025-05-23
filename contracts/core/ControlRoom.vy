@@ -17,7 +17,9 @@ from interfaces import Department
 
 interface ControlRoomData:
     def getManyConfigs(_getGenConfig: bool, _getDebtConfig: bool, _getRewardsConfig: bool, _asset: address = empty(address), _user: address = empty(address)) -> MetaConfig: view
+    def setPriorityPriceSourceIds(_priorityIds: DynArray[uint256, MAX_PRIORITY_PARTNERS]): nonpayable
     def setUserDelegation(_user: address, _delegate: address, _config: ActionDelegation): nonpayable
+    def getPriorityPriceSourceIds() -> DynArray[uint256, MAX_PRIORITY_PARTNERS]: view
     def userDelegation(_user: address, _delegate: address) -> ActionDelegation: view
     def setAssetConfig(_asset: address, _assetConfig: AssetConfig): nonpayable
     def setRipeRewardsConfig(_rewardsConfig: RipeRewardsConfig): nonpayable
@@ -26,10 +28,14 @@ interface ControlRoomData:
     def setGeneralConfig(_genConfig: GenConfig): nonpayable
     def assetConfig(_asset: address) -> AssetConfig: view
     def getControlRoomId() -> uint256: view
+    def genConfig() -> GenConfig: view
     def ripeHq() -> address: view
 
 interface Whitelist:
     def isUserAllowed(_user: address, _asset: address) -> bool: view
+
+interface PriceDesk:
+    def isValidRegId(_regId: uint256) -> bool: view
 
 interface VaultBook:
     def getAddr(_regId: uint256) -> address: view
@@ -39,6 +45,7 @@ interface VaultBook:
 struct GenConfig:
     perUserMaxVaults: uint256
     perUserMaxAssetsPerVault: uint256
+    priceStaleTime: uint256
     canDeposit: bool
     canWithdraw: bool
     canBorrow: bool
@@ -209,6 +216,10 @@ struct RewardsConfig:
     stakersPointsAllocTotal: uint256
     voterPointsAllocTotal: uint256
 
+struct PriceConfig:
+    staleTime: uint256
+    priorityPriceSourceIds: DynArray[uint256, MAX_PRIORITY_PARTNERS]
+
 struct VaultData:
     vaultId: uint256
     vaultAddr: address
@@ -222,14 +233,29 @@ struct MetaConfig:
     rewardsConfig: RipeRewardsConfig
     totalPointsAllocs: TotalPointsAllocs
 
+event PriorityPriceSourceIdsModified:
+    numIds: uint256
+
+event StaleTimeSet:
+    staleTime: uint256
+
 # control room data
 data: public(address)
 
+MIN_STALE_TIME: public(immutable(uint256))
+MAX_STALE_TIME: public(immutable(uint256))
+
+MAX_PRIORITY_PARTNERS: constant(uint256) = 10
 MAX_GEN_STAB_POOLS: constant(uint256) = 10
 
 
 @deploy
-def __init__(_ripeHq: address, _controlRoomData: address):
+def __init__(
+    _ripeHq: address,
+    _controlRoomData: address,
+    _minStaleTime: uint256,
+    _maxStaleTime: uint256,
+):
     gov.__init__(_ripeHq, empty(address), 0, 0, 0)
     addys.__init__(_ripeHq)
     deptBasics.__init__(False, False, False) # no minting
@@ -238,6 +264,10 @@ def __init__(_ripeHq: address, _controlRoomData: address):
     assert staticcall ControlRoomData(_controlRoomData).ripeHq() == _ripeHq # dev: invalid ripe hq
     assert staticcall ControlRoomData(_controlRoomData).getControlRoomId() == addys._getControlRoomId() # dev: invalid control room id
     self.data = _controlRoomData
+
+    assert _minStaleTime < _maxStaleTime # dev: invalid stale time range
+    MIN_STALE_TIME = _minStaleTime
+    MAX_STALE_TIME = _maxStaleTime
 
 
 #################
@@ -249,6 +279,7 @@ def __init__(_ripeHq: address, _controlRoomData: address):
 def setGeneralConfig(
     _perUserMaxVaults: uint256,
     _perUserMaxAssetsPerVault: uint256,
+    _priceStaleTime: uint256,
     _canDeposit: bool,
     _canWithdraw: bool,
     _canBorrow: bool,
@@ -268,6 +299,7 @@ def setGeneralConfig(
     genConfig: GenConfig = GenConfig(
         perUserMaxVaults=_perUserMaxVaults,
         perUserMaxAssetsPerVault=_perUserMaxAssetsPerVault,
+        priceStaleTime=_priceStaleTime,
         canDeposit=_canDeposit,
         canWithdraw=_canWithdraw,
         canBorrow=_canBorrow,
@@ -453,6 +485,102 @@ def setUserDelegation(
     )
     extcall ControlRoomData(self.data).setUserDelegation(msg.sender, _delegate, config)
     return True
+
+
+##########################
+# Priority Price Sources #
+##########################
+
+
+@external
+def setPriorityPriceSourceIds(_priorityIds: DynArray[uint256, MAX_PRIORITY_PARTNERS]) -> bool:
+    assert gov._canGovern(msg.sender) # dev: no perms
+    assert not deptBasics.isPaused # dev: contract paused
+
+    priorityIds: DynArray[uint256, MAX_PRIORITY_PARTNERS] = self._sanitizePrioritySources(_priorityIds)
+    assert self._areValidPriorityPriceSourceIds(priorityIds) # dev: invalid priority sources
+    extcall ControlRoomData(self.data).setPriorityPriceSourceIds(priorityIds)
+
+    log PriorityPriceSourceIdsModified(numIds=len(priorityIds))
+    return True
+
+
+# validation
+
+
+@view
+@external
+def areValidPriorityPriceSourceIds(_priorityIds: DynArray[uint256, MAX_PRIORITY_PARTNERS]) -> bool:
+    priorityIds: DynArray[uint256, MAX_PRIORITY_PARTNERS] = self._sanitizePrioritySources(_priorityIds)
+    return self._areValidPriorityPriceSourceIds(priorityIds)
+
+
+@view
+@internal
+def _areValidPriorityPriceSourceIds(_priorityIds: DynArray[uint256, MAX_PRIORITY_PARTNERS]) -> bool:
+    return len(_priorityIds) != 0
+
+
+# utilities
+
+
+@view
+@internal
+def _sanitizePrioritySources(_priorityIds: DynArray[uint256, MAX_PRIORITY_PARTNERS]) -> DynArray[uint256, MAX_PRIORITY_PARTNERS]:
+    sanitizedIds: DynArray[uint256, MAX_PRIORITY_PARTNERS] = []
+    priceDesk: address = addys._getPriceDeskAddr()
+    for pid: uint256 in _priorityIds:
+        if not staticcall PriceDesk(priceDesk).isValidRegId(pid):
+            continue
+        if pid in sanitizedIds:
+            continue
+        sanitizedIds.append(pid)
+    return sanitizedIds
+
+
+#######################
+# Prices - Stale Time #
+#######################
+
+
+@external
+def setStaleTime(_staleTime: uint256) -> bool:
+    assert gov._canGovern(msg.sender) # dev: no perms
+    assert not deptBasics.isPaused # dev: not activated
+
+    assert self._isValidStaleTime(_staleTime) # dev: invalid stale time
+
+    # update data
+    data: address = self.data
+    genConfig: GenConfig = staticcall ControlRoomData(data).genConfig()
+    genConfig.priceStaleTime = _staleTime
+    extcall ControlRoomData(data).setGeneralConfig(genConfig)
+
+    log StaleTimeSet(staleTime=_staleTime)
+    return True
+
+
+@view
+@external
+def getPriceStaleTime() -> uint256:
+    # used by Chainlink.vy
+    genConfig: GenConfig = staticcall ControlRoomData(self.data).genConfig()
+    return genConfig.priceStaleTime
+
+
+# validation
+
+
+@view
+@external
+def isValidStaleTime(_staleTime: uint256) -> bool:
+    return self._isValidStaleTime(_staleTime)
+
+
+@view
+@internal
+def _isValidStaleTime(_staleTime: uint256) -> bool:
+    return _staleTime >= MIN_STALE_TIME and _staleTime <= MAX_STALE_TIME
 
 
 ###################
@@ -716,4 +844,18 @@ def getDepositPointsConfig(_asset: address) -> DepositPointsConfig:
         stakersPointsAlloc=c.assetConfig.stakersPointsAlloc,
         voterPointsAlloc=c.assetConfig.voterPointsAlloc,
         isNft=c.assetConfig.isNft,
+    )
+
+
+# price config
+
+
+@view
+@external
+def getPriceConfig() -> PriceConfig:
+    data: address = self.data
+    genConfig: GenConfig = staticcall ControlRoomData(data).genConfig()
+    return PriceConfig(
+        staleTime=genConfig.priceStaleTime,
+        priorityPriceSourceIds=staticcall ControlRoomData(data).getPriorityPriceSourceIds(),
     )

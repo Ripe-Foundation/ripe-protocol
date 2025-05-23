@@ -45,7 +45,7 @@ def test_control_room_utils(
     alpha_token,
 ):
     # general config
-    setGeneralConfig(7, 14, False, True)
+    setGeneralConfig(7, 14, 0, False, True)
     gen_config = control_room_data.genConfig()
     assert gen_config.perUserMaxVaults == 7
     assert gen_config.perUserMaxAssetsPerVault == 14

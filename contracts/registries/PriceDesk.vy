@@ -21,20 +21,14 @@ from interfaces import PriceSource
 from interfaces import Department
 from ethereum.ercs import IERC20Detailed
 
-event PriorityPriceSourceIdsModified:
-    numIds: uint256
+interface ControlRoom:
+    def getPriceConfig() -> PriceConfig: view
 
-event StaleTimeSet:
+struct PriceConfig:
     staleTime: uint256
-
-# config
-priorityPriceSourceIds: public(DynArray[uint256, MAX_PRIORITY_PARTNERS])
-staleTime: public(uint256)
+    priorityPriceSourceIds: DynArray[uint256, MAX_PRIORITY_PARTNERS]
 
 ETH: public(immutable(address))
-MIN_STALE_TIME: public(immutable(uint256))
-MAX_STALE_TIME: public(immutable(uint256))
-
 MAX_PRIORITY_PARTNERS: constant(uint256) = 10
 
 
@@ -42,17 +36,11 @@ MAX_PRIORITY_PARTNERS: constant(uint256) = 10
 def __init__(
     _ripeHq: address,
     _ethAddr: address,
-    _minStaleTime: uint256,
-    _maxStaleTime: uint256,
     _minRegistryTimeLock: uint256,
     _maxRegistryTimeLock: uint256,
 ):
     assert _ethAddr != empty(address) # dev: invalid eth addr
     ETH = _ethAddr
-
-    assert _minStaleTime < _maxStaleTime # dev: invalid stale time range
-    MIN_STALE_TIME = _minStaleTime
-    MAX_STALE_TIME = _maxStaleTime
 
     # modules
     gov.__init__(_ripeHq, empty(address), 0, 0, 0)
@@ -114,13 +102,14 @@ def _getPrice(_asset: address, _shouldRaise: bool = False) -> uint256:
     price: uint256 = 0
     hasFeedConfig: bool = False
     alreadyLooked: DynArray[uint256, MAX_PRIORITY_PARTNERS] = []
-    staleTime: uint256 = self.staleTime
+
+    # config
+    config: PriceConfig = staticcall ControlRoom(addys._getControlRoomAddr()).getPriceConfig()
 
     # go thru priority partners first
-    priorityIds: DynArray[uint256, MAX_PRIORITY_PARTNERS] = self.priorityPriceSourceIds
-    for pid: uint256 in priorityIds:
+    for pid: uint256 in config.priorityPriceSourceIds:
         hasFeed: bool = False
-        price, hasFeed = self._getPriceFromPriceSource(pid, _asset, staleTime)
+        price, hasFeed = self._getPriceFromPriceSource(pid, _asset, config.staleTime)
         if price != 0:
             break
         if hasFeed:
@@ -135,7 +124,7 @@ def _getPrice(_asset: address, _shouldRaise: bool = False) -> uint256:
                 if pid in alreadyLooked:
                     continue
                 hasFeed: bool = False
-                price, hasFeed = self._getPriceFromPriceSource(pid, _asset, staleTime)
+                price, hasFeed = self._getPriceFromPriceSource(pid, _asset, config.staleTime)
                 if price != 0:
                     break
                 if hasFeed:
@@ -198,93 +187,6 @@ def hasPriceFeed(_asset: address) -> bool:
         if staticcall PriceSource(priceSource).hasPriceFeed(_asset):
             return True
     return False
-
-
-##########################
-# Priority Price Sources #
-##########################
-
-
-@external
-def setPriorityPriceSourceIds(_priorityIds: DynArray[uint256, MAX_PRIORITY_PARTNERS]) -> bool:
-    assert gov._canGovern(msg.sender) # dev: no perms
-    assert not deptBasics.isPaused # dev: not activated
-
-    priorityIds: DynArray[uint256, MAX_PRIORITY_PARTNERS] = self._sanitizePrioritySources(_priorityIds)
-    assert self._areValidPriorityPriceSourceIds(priorityIds) # dev: invalid priority sources
-
-    self.priorityPriceSourceIds = priorityIds
-    log PriorityPriceSourceIdsModified(numIds=len(priorityIds))
-    return True
-
-
-# validation
-
-
-@view
-@external
-def areValidPriorityPriceSourceIds(_priorityIds: DynArray[uint256, MAX_PRIORITY_PARTNERS]) -> bool:
-    priorityIds: DynArray[uint256, MAX_PRIORITY_PARTNERS] = self._sanitizePrioritySources(_priorityIds)
-    return self._areValidPriorityPriceSourceIds(priorityIds)
-
-
-@view
-@internal
-def _areValidPriorityPriceSourceIds(_priorityIds: DynArray[uint256, MAX_PRIORITY_PARTNERS]) -> bool:
-    return len(_priorityIds) != 0
-
-
-# utilities
-
-
-@view 
-@external 
-def getPriorityPriceSourceIds() -> DynArray[uint256, MAX_PRIORITY_PARTNERS]:
-    return self.priorityPriceSourceIds
-
-
-@view
-@internal
-def _sanitizePrioritySources(_priorityIds: DynArray[uint256, MAX_PRIORITY_PARTNERS]) -> DynArray[uint256, MAX_PRIORITY_PARTNERS]:
-    sanitizedIds: DynArray[uint256, MAX_PRIORITY_PARTNERS] = []
-    for pid: uint256 in _priorityIds:
-        if not registry._isValidRegId(pid):
-            continue
-        if pid in sanitizedIds:
-            continue
-        sanitizedIds.append(pid)
-    return sanitizedIds
-
-
-##############
-# Stale Time #
-##############
-
-
-@external
-def setStaleTime(_staleTime: uint256) -> bool:
-    assert gov._canGovern(msg.sender) # dev: no perms
-    assert not deptBasics.isPaused # dev: not activated
-
-    assert self._isValidStaleTime(_staleTime) # dev: invalid stale time
-    self.staleTime = _staleTime
-    log StaleTimeSet(staleTime=_staleTime)
-    return True
-
-
-# validation
-
-
-@view
-@external
-def isValidStaleTime(_staleTime: uint256) -> bool:
-    return self._isValidStaleTime(_staleTime)
-
-
-@view
-@internal
-def _isValidStaleTime(_staleTime: uint256) -> bool:
-    return _staleTime >= MIN_STALE_TIME and _staleTime <= MAX_STALE_TIME
 
 
 ############

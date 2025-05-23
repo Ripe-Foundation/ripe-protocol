@@ -710,7 +710,7 @@ def test_chainlink_price_feed_timestamp_validation(
     alpha_token,
     mock_chainlink_alpha,
     governance,
-    price_desk,
+    control_room,
 ):
     """Test validation of price feed timestamps"""
     boa.env.evm.patch.timestamp += ONE_YEAR
@@ -722,8 +722,8 @@ def test_chainlink_price_feed_timestamp_validation(
         mock_chainlink.addNewPriceFeed(alpha_token, mock_chainlink_alpha, sender=governance.address)
 
     # set stale time to 1 day
-    price_desk.setStaleTime(ONE_DAY_IN_SECS, sender=governance.address)
-    assert price_desk.staleTime() == ONE_DAY_IN_SECS
+    control_room.setStaleTime(ONE_DAY_IN_SECS, sender=governance.address)
+    assert control_room.getPriceStaleTime() == ONE_DAY_IN_SECS
 
     # Test with old timestamp
     mock_chainlink_alpha.setMockData(500 * CHAINLINK_DECIMALS, 1, 1, 1, current_time - (ONE_DAY_IN_SECS * 2))

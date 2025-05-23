@@ -43,6 +43,7 @@ def setGeneralConfig(control_room_data, control_room):
     def setGeneralConfig(
         _perUserMaxVaults = 5,
         _perUserMaxAssetsPerVault = 10,
+        _priceStaleTime = 0,
         _canDeposit = True,
         _canWithdraw = True,
         _canBorrow = True,
@@ -57,6 +58,7 @@ def setGeneralConfig(control_room_data, control_room):
         gen_config = (
             _perUserMaxVaults,
             _perUserMaxAssetsPerVault,
+            _priceStaleTime,
             _canDeposit,
             _canWithdraw,
             _canBorrow,
