@@ -62,7 +62,8 @@ event InitialRipeHqSet:
     timeLock: uint256
 
 event HqChangeTimeLockModified:
-    numBlocks: uint256
+    prevTimeLock: uint256
+    newTimeLock: uint256
 
 # ripe hq
 ripeHq: public(address)
@@ -90,7 +91,7 @@ VERSION: public(constant(String[8])) = "v1.0.0"
 
 # eip-712
 nonces: public(HashMap[address, uint256])
-EIP712_TYPEHASH: constant(bytes32) = keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract,bytes32 salt)")
+EIP712_TYPEHASH: constant(bytes32) = keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)")
 EIP2612_TYPEHASH: constant(bytes32) = keccak256("Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)")
 ECRECOVER_PRECOMPILE: constant(address) = 0x0000000000000000000000000000000000000001
 ERC1271_MAGIC_VAL: constant(bytes4) = 0x1626ba7e
@@ -99,7 +100,6 @@ CACHED_DOMAIN_SEPARATOR: immutable(bytes32)
 NAME_HASH: immutable(bytes32)
 VERSION_HASH: constant(bytes32) = keccak256(VERSION)
 CACHED_CHAIN_ID: immutable(uint256)
-SALT: immutable(bytes32)
 
 
 @deploy
@@ -142,7 +142,6 @@ def __init__(
     # domain separator
     NAME_HASH = keccak256(_tokenName)
     CACHED_CHAIN_ID = chain.id
-    SALT = block.prevhash
     CACHED_DOMAIN_SEPARATOR = keccak256(
         abi_encode(
             EIP712_TYPEHASH,
@@ -150,7 +149,6 @@ def __init__(
             VERSION_HASH,
             CACHED_CHAIN_ID,
             self,
-            SALT,
         )
     )
 
@@ -338,7 +336,6 @@ def _domainSeparator() -> bytes32:
                 VERSION_HASH,
                 chain.id,
                 self,
-                SALT,
             )
         )
     return CACHED_DOMAIN_SEPARATOR
@@ -522,18 +519,18 @@ def _isValidNewRipeHq(_newHq: address, _prevHq: address) -> bool:
 
 
 @external
-def setHqChangeTimeLock(_numBlocks: uint256) -> bool:
+def setHqChangeTimeLock(_newTimeLock: uint256) -> bool:
     ripeHq: address = self.ripeHq
     assert msg.sender == staticcall RipeHq(ripeHq).governance() # dev: no perms
     assert not staticcall RipeHq(ripeHq).hasPendingGovChange() # dev: pending gov change
-    return self._setHqChangeTimeLock(_numBlocks)
+    return self._setHqChangeTimeLock(_newTimeLock, self.hqChangeTimeLock)
 
 
 @internal
-def _setHqChangeTimeLock(_numBlocks: uint256) -> bool:
-    assert self._isValidHqChangeTimeLock(_numBlocks) # dev: invalid time lock
-    self.hqChangeTimeLock = _numBlocks
-    log HqChangeTimeLockModified(numBlocks=_numBlocks)
+def _setHqChangeTimeLock(_newTimeLock: uint256, _prevTimeLock: uint256) -> bool:
+    assert self._isValidHqChangeTimeLock(_newTimeLock, _prevTimeLock) # dev: invalid time lock
+    self.hqChangeTimeLock = _newTimeLock
+    log HqChangeTimeLockModified(prevTimeLock=_prevTimeLock, newTimeLock=_newTimeLock)
     return True
 
 
@@ -542,14 +539,16 @@ def _setHqChangeTimeLock(_numBlocks: uint256) -> bool:
 
 @view
 @external
-def isValidHqChangeTimeLock(_numBlocks: uint256) -> bool:
-    return self._isValidHqChangeTimeLock(_numBlocks)
+def isValidHqChangeTimeLock(_newTimeLock: uint256) -> bool:
+    return self._isValidHqChangeTimeLock(_newTimeLock, self.hqChangeTimeLock)
 
 
 @view
 @internal
-def _isValidHqChangeTimeLock(_numBlocks: uint256) -> bool:
-    return _numBlocks >= MIN_HQ_TIME_LOCK and _numBlocks <= MAX_HQ_TIME_LOCK
+def _isValidHqChangeTimeLock(_newTimeLock: uint256, _prevTimeLock: uint256) -> bool:
+    if _newTimeLock == _prevTimeLock:
+        return False
+    return _newTimeLock >= MIN_HQ_TIME_LOCK and _newTimeLock <= MAX_HQ_TIME_LOCK
 
 
 # views
@@ -600,7 +599,9 @@ def finishTokenSetup(_newHq: address, _timeLock: uint256 = 0) -> bool:
     timeLock: uint256 = _timeLock
     if timeLock == 0:
         timeLock = MIN_HQ_TIME_LOCK
-    assert self._setHqChangeTimeLock(timeLock) # dev: invalid time lock
+    prevTimeLock: uint256 = self.hqChangeTimeLock
+    if timeLock != prevTimeLock:
+        assert self._setHqChangeTimeLock(timeLock, prevTimeLock) # dev: invalid time lock
 
     self.tempGov = empty(address)
     log InitialRipeHqSet(hq=_newHq, timeLock=timeLock)
