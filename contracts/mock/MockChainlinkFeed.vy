@@ -8,10 +8,12 @@ struct ChainlinkRound:
     answeredInRound: uint80
 
 mockData: ChainlinkRound
+_decimals: uint8
 
 
 @deploy
 def __init__(_localPrice: uint256): # should be 18 decimals
+    self._decimals = 8
     if _localPrice != 0:
         self.mockData = ChainlinkRound(
             roundId=1,
@@ -31,7 +33,14 @@ def latestRoundData() -> ChainlinkRound:
 @view
 @external
 def decimals() -> uint8:
-    return 8
+    return self._decimals
+
+
+@external
+def setDecimals(
+    _decimals: uint8,
+):
+    self._decimals = _decimals
 
 
 @external

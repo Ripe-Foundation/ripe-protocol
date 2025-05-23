@@ -23,6 +23,9 @@ interface ChainlinkFeed:
     def latestRoundData() -> ChainlinkRound: view
     def decimals() -> uint8: view 
 
+interface PriceDesk:
+    def staleTime() -> uint256: view
+
 struct ChainlinkRound:
     roundId: uint80
     answer: int256
@@ -131,10 +134,10 @@ def __init__(
 
     # set default feeds
     if _ethUsdFeed != empty(address):
-        assert self._setDefaultFeedOnDeploy(_ethAddr, _ethUsdFeed)
-        assert self._setDefaultFeedOnDeploy(_wethAddr, _ethUsdFeed)
+        assert self._setDefaultFeedOnDeploy(_ethAddr, _ethUsdFeed) # dev: invalid feed
+        assert self._setDefaultFeedOnDeploy(_wethAddr, _ethUsdFeed) # dev: invalid feed
     if _btcUsdFeed != empty(address):
-        assert self._setDefaultFeedOnDeploy(_btcAddr, _btcUsdFeed)
+        assert self._setDefaultFeedOnDeploy(_btcAddr, _btcUsdFeed) # dev: invalid feed
 
 
 # set default feeds
@@ -248,6 +251,16 @@ def _getChainlinkData(_feed: address, _decimals: uint256, _staleTime: uint256) -
     if _decimals > NORMALIZED_DECIMALS:
         return 0
 
+    # cannot have future timestamp
+    if oracle.updatedAt > block.timestamp:
+        return 0
+
+    # validate round ID
+    if oracle.roundId == 0:
+        return 0
+    if oracle.answeredInRound < oracle.roundId:
+        return 0
+
     # price is too stale
     if _staleTime != 0 and block.timestamp - oracle.updatedAt > _staleTime:
         return 0
@@ -281,7 +294,9 @@ def addNewPriceFeed(
     assert not priceData.isPaused # dev: contract paused
 
     # validation
-    decimals: uint256 = convert(staticcall ChainlinkFeed(_newFeed).decimals(), uint256)
+    decimals: uint256 = 0
+    if _newFeed != empty(address):
+        decimals = convert(staticcall ChainlinkFeed(_newFeed).decimals(), uint256)
     assert self._isValidNewFeed(_asset, _newFeed, decimals, _needsEthToUsd, _needsBtcToUsd) # dev: invalid feed
 
     # set to pending state
@@ -310,6 +325,7 @@ def confirmNewPriceFeed(_asset: address) -> bool:
 
     # validate again
     d: PendingChainlinkConfig = self.pendingUpdates[_asset]
+    assert d.config.feed != empty(address) # dev: no pending new feed
     if not self._isValidNewFeed(_asset, d.config.feed, d.config.decimals, d.config.needsEthToUsd, d.config.needsBtcToUsd):
         self._cancelNewPendingPriceFeed(_asset, d.actionId)
         return False
@@ -382,8 +398,10 @@ def updatePriceFeed(
     assert not priceData.isPaused # dev: contract paused
 
     # validation
+    decimals: uint256 = 0
+    if _newFeed != empty(address):
+        decimals = convert(staticcall ChainlinkFeed(_newFeed).decimals(), uint256)
     oldFeed: address = self.feedConfig[_asset].feed
-    decimals: uint256 = convert(staticcall ChainlinkFeed(_newFeed).decimals(), uint256)
     assert self._isValidUpdateFeed(_asset, _newFeed, oldFeed, decimals, _needsEthToUsd, _needsBtcToUsd) # dev: invalid feed
 
     # set to pending state
@@ -410,8 +428,9 @@ def confirmPriceFeedUpdate(_asset: address) -> bool:
     assert not priceData.isPaused # dev: contract paused
 
     # validate again
-    oldFeed: address = self.feedConfig[_asset].feed
     d: PendingChainlinkConfig = self.pendingUpdates[_asset]
+    assert d.config.feed != empty(address) # dev: no pending update feed
+    oldFeed: address = self.feedConfig[_asset].feed
     if not self._isValidUpdateFeed(_asset, d.config.feed, oldFeed, d.config.decimals, d.config.needsEthToUsd, d.config.needsBtcToUsd):
         self._cancelPriceFeedUpdate(_asset, d.actionId)
         return False
@@ -479,7 +498,13 @@ def _isValidFeedConfig(
         return False
     if _needsEthToUsd and _needsBtcToUsd:
         return False
-    return self._getPrice(_feed, _decimals, _needsEthToUsd, _needsBtcToUsd, 0) != 0
+
+    staleTime: uint256 = 0
+    priceDesk: address = addys._getPriceDeskAddr()
+    if priceDesk != empty(address):
+        staleTime = staticcall PriceDesk(priceDesk).staleTime()
+
+    return self._getPrice(_feed, _decimals, _needsEthToUsd, _needsBtcToUsd, staleTime) != 0
 
 
 ################
@@ -521,6 +546,7 @@ def confirmDisablePriceFeed(_asset: address) -> bool:
     # validate again
     oldFeed: address = self.feedConfig[_asset].feed
     d: PendingChainlinkConfig = self.pendingUpdates[_asset]
+    assert d.actionId != 0 # dev: no pending disable feed
     if not self._isValidDisablePriceFeed(_asset, oldFeed):
         self._cancelDisablePriceFeed(_asset, d.actionId)
         return False
@@ -557,6 +583,12 @@ def _cancelDisablePriceFeed(_asset: address, _aid: uint256):
 
 
 # validation
+
+
+@view
+@external
+def isValidDisablePriceFeed(_asset: address) -> bool:
+    return self._isValidDisablePriceFeed(_asset, self.feedConfig[_asset].feed)
 
 
 @view
