@@ -370,7 +370,10 @@ def swapForLiquidatedCollateral(
 ) -> uint256:
     assert not vaultData.isPaused # dev: contract paused
     assert msg.sender == addys._getAuctionHouseAddr() # dev: only AuctionHouse allowed
-    assert vaultData.indexOfAsset[_liqAsset] == 0 # dev: liq asset cannot be stab asset
+
+    assert vaultData.indexOfAsset[_stabAsset] != 0 # dev: stab asset not supported
+    assert vaultData.indexOfAsset[_liqAsset] == 0 # dev: liq asset cannot be vault asset
+    assert _liqAsset != empty(address) # dev: invalid liq asset
 
     # add claimable balance
     self._addClaimableBalance(_stabAsset, _liqAsset, _liqAmountSent)
