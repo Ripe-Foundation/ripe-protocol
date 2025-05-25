@@ -656,7 +656,7 @@ def test_borrow_mints_unrealized_yield(
     mock_price_source,
     teller,
     ledger,
-    endaoment,
+    savings_green,
     green_token,
     createDebtTerms,
     credit_engine,
@@ -682,16 +682,16 @@ def test_borrow_mints_unrealized_yield(
     assert ledger.unrealizedYield() == unrealized_yield
 
     # verify initial balances
-    assert green_token.balanceOf(endaoment) == 0
+    assert green_token.balanceOf(savings_green) == 0
 
     # borrow
     borrow_amount = 50 * EIGHTEEN_DECIMALS
     amount = teller.borrow(borrow_amount, bob, False, sender=bob)
     assert amount == borrow_amount
 
-    # verify unrealized yield was minted and sent to endaoment
+    # verify unrealized yield was minted and sent to savings_green
     assert ledger.unrealizedYield() == 0
-    assert green_token.balanceOf(endaoment) == unrealized_yield
+    assert green_token.balanceOf(savings_green) == unrealized_yield
 
     # verify borrow amount was also minted
     assert green_token.balanceOf(bob) == borrow_amount
@@ -707,7 +707,7 @@ def test_borrow_daowry(
     performDeposit,
     mock_price_source,
     teller,
-    endaoment,
+    savings_green,
     green_token,
     createDebtTerms,
 ):
@@ -726,7 +726,7 @@ def test_borrow_daowry(
     mock_price_source.setPrice(alpha_token, alpha_price)
 
     # verify initial balances
-    assert green_token.balanceOf(endaoment) == 0
+    assert green_token.balanceOf(savings_green) == 0
     assert green_token.balanceOf(bob) == 0
 
     # borrow
@@ -747,7 +747,7 @@ def test_borrow_daowry(
     assert log.globalYieldRealized == 0
 
     # verify balances
-    assert green_token.balanceOf(endaoment) == expected_daowry
+    assert green_token.balanceOf(savings_green) == expected_daowry
     assert green_token.balanceOf(bob) == expected_borrower_amount
 
 

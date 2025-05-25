@@ -178,7 +178,7 @@ struct GenLiqConfig:
     minKeeperFee: uint256
     ltvPaybackBuffer: uint256
     genAuctionParams: AuctionParams
-    priorityLiqAssets: DynArray[address, PRIORITY_LIQ_ASSETS]
+    priorityLiqAssets: DynArray[VaultData, PRIORITY_LIQ_ASSETS]
     genStabPools: DynArray[VaultData, MAX_GEN_STAB_POOLS]
 
 struct AssetLiqConfig:
@@ -249,7 +249,7 @@ MIN_STALE_TIME: public(immutable(uint256))
 MAX_STALE_TIME: public(immutable(uint256))
 
 MAX_PRIORITY_PARTNERS: constant(uint256) = 10
-MAX_GEN_STAB_POOLS: constant(uint256) = 10
+MAX_GEN_STAB_POOLS: constant(uint256) = 5
 PRIORITY_LIQ_ASSETS: constant(uint256) = 20
 
 
@@ -735,7 +735,7 @@ def getGenLiqConfig() -> GenLiqConfig:
     c: MetaConfig = staticcall ControlRoomData(self.data).getManyConfigs(True, True, False)
 
     # TODO: put together all this data
-    priorityLiqAssets: DynArray[address, PRIORITY_LIQ_ASSETS] = []
+    priorityLiqAssets: DynArray[VaultData, PRIORITY_LIQ_ASSETS] = []
     genStabPools: DynArray[VaultData, MAX_GEN_STAB_POOLS] = []
 
     return GenLiqConfig(

@@ -220,7 +220,7 @@ def borrowForUser(
     # dao revenue
     forDao: uint256 = daowry + unrealizedYield
     if forDao != 0:
-        assert extcall IERC20(a.greenToken).transfer(a.endaoment, forDao, default_return_value=True) # dev: could not transfer
+        assert extcall IERC20(a.greenToken).transfer(a.savingsGreen, forDao, default_return_value=True) # dev: could not transfer
 
     # borrower gets their green now -- do this AFTER sending green to stakers
     forBorrower: uint256 = newBorrowAmount - daowry
