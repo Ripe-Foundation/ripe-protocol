@@ -87,8 +87,8 @@ struct GenLiqConfig:
     minKeeperFee: uint256
     ltvPaybackBuffer: uint256
     genAuctionParams: AuctionParams
-    priorityLiqAssets: DynArray[VaultData, PRIORITY_LIQ_ASSETS]
-    genStabPools: DynArray[VaultData, MAX_GEN_STAB_POOLS]
+    priorityLiqAssetVaults: DynArray[VaultData, PRIORITY_LIQ_VAULT_DATA]
+    priorityStabVaults: DynArray[VaultData, MAX_STAB_VAULT_DATA]
 
 struct AssetLiqConfig:
     hasConfig: bool
@@ -181,8 +181,8 @@ userAssetForAuction: transient(HashMap[address, HashMap[uint256, VaultData]]) # 
 
 HUNDRED_PERCENT: constant(uint256) = 100_00 # 100.00%
 ONE_PERCENT: constant(uint256) = 1_00 # 1%
-MAX_GEN_STAB_POOLS: constant(uint256) = 5
-PRIORITY_LIQ_ASSETS: constant(uint256) = 20
+MAX_STAB_VAULT_DATA: constant(uint256) = 10
+PRIORITY_LIQ_VAULT_DATA: constant(uint256) = 20
 MAX_LIQ_USERS: constant(uint256) = 50
 MAX_AUCTION_PURCHASES: constant(uint256) = 20
 
@@ -329,7 +329,7 @@ def _performLiquidationPhases(
 
     # PHASE 1 -- If liq user is in stability pool, use those assets first to pay off debt
 
-    for stabPool: VaultData in _config.genStabPools:
+    for stabPool: VaultData in _config.priorityStabVaults:
         if remainingToRepay == 0:
             break
 
@@ -345,14 +345,14 @@ def _performLiquidationPhases(
     # PHASE 2 -- Go thru priority liq assets (set in control room)
 
     if remainingToRepay != 0:
-        for pData: VaultData in _config.priorityLiqAssets:
+        for pData: VaultData in _config.priorityLiqAssetVaults:
             if remainingToRepay == 0:
                 break
 
             if not staticcall Vault(pData.vaultAddr).isUserInVaultAsset(_liqUser, pData.asset):
                 continue
 
-            remainingToRepay, collateralValueOut = self._handleSpecificLiqAsset(_liqUser, pData.vaultId, pData.vaultAddr, pData.asset, remainingToRepay, collateralValueOut, _liqFeeRatio, _config.genStabPools, _a)
+            remainingToRepay, collateralValueOut = self._handleSpecificLiqAsset(_liqUser, pData.vaultId, pData.vaultAddr, pData.asset, remainingToRepay, collateralValueOut, _liqFeeRatio, _config.priorityStabVaults, _a)
 
             # cache vault addr for later
             if self.vaultAddrs[pData.vaultId] == empty(address):
@@ -361,7 +361,7 @@ def _performLiquidationPhases(
     # PHASE 3 -- Go thru user's vaults (top to bottom as saved in ledger / vaults)
 
     if remainingToRepay != 0:
-        remainingToRepay, collateralValueOut = self._iterateThruAllUserVaults(_liqUser, remainingToRepay, collateralValueOut, _liqFeeRatio, _config.genStabPools, _a)
+        remainingToRepay, collateralValueOut = self._iterateThruAllUserVaults(_liqUser, remainingToRepay, collateralValueOut, _liqFeeRatio, _config.priorityStabVaults, _a)
 
     return _targetRepayAmount - remainingToRepay, collateralValueOut
 
@@ -377,7 +377,7 @@ def _iterateThruAllUserVaults(
     _remainingToRepay: uint256,
     _collateralValueOut: uint256,
     _liqFeeRatio: uint256,
-    _genStabPools: DynArray[VaultData, MAX_GEN_STAB_POOLS],
+    _genStabPools: DynArray[VaultData, MAX_STAB_VAULT_DATA],
     _a: addys.Addys,
 ) -> (uint256, uint256):
     remainingToRepay: uint256 = _remainingToRepay
@@ -420,7 +420,7 @@ def _iterateThruAssetsWithinVault(
     _remainingToRepay: uint256,
     _collateralValueOut: uint256,
     _liqFeeRatio: uint256,
-    _genStabPools: DynArray[VaultData, MAX_GEN_STAB_POOLS],
+    _genStabPools: DynArray[VaultData, MAX_STAB_VAULT_DATA],
     _a: addys.Addys,
 ) -> (uint256, uint256):
 
@@ -468,7 +468,7 @@ def _handleSpecificLiqAsset(
     _remainingToRepay: uint256,
     _collateralValueOut: uint256,
     _liqFeeRatio: uint256,
-    _genStabPools: DynArray[VaultData, MAX_GEN_STAB_POOLS],
+    _genStabPools: DynArray[VaultData, MAX_STAB_VAULT_DATA],
     _a: addys.Addys,
 ) -> (uint256, uint256):
 
@@ -613,12 +613,12 @@ def _swapWithStabPools(
     _remainingToRepay: uint256,
     _collateralValueOut: uint256,
     _specialStabPool: VaultData,
-    _genStabPools: DynArray[VaultData, MAX_GEN_STAB_POOLS],
+    _genStabPools: DynArray[VaultData, MAX_STAB_VAULT_DATA],
     _a: addys.Addys,
 ) -> (uint256, uint256, bool):
 
     # stability pools to use
-    stabPoolsToUse: DynArray[VaultData, MAX_GEN_STAB_POOLS] = _genStabPools
+    stabPoolsToUse: DynArray[VaultData, MAX_STAB_VAULT_DATA] = _genStabPools
     if _specialStabPool.vaultAddr != empty(address):
         stabPoolsToUse = [_specialStabPool]
 

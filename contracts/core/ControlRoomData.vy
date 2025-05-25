@@ -97,6 +97,10 @@ struct MetaConfig:
     rewardsConfig: RipeRewardsConfig
     totalPointsAllocs: TotalPointsAllocs
 
+struct VaultLite:
+    vaultId: uint256
+    asset: address
+
 # global config
 genConfig: public(GenConfig)
 genDebtConfig: public(GenDebtConfig)
@@ -113,9 +117,16 @@ totalPointsAllocs: public(TotalPointsAllocs)
 # price config
 priorityPriceSourceIds: public(DynArray[uint256, MAX_PRIORITY_PARTNERS])
 
-RIPE_HQ: immutable(address)
-CONTROL_ROOM_ID: constant(uint256) = 9
+# special vault data
+priorityLiqAssetVaults: public(DynArray[VaultLite, PRIORITY_LIQ_VAULT_DATA])
+priorityStabVaults: public(DynArray[VaultLite, MAX_STAB_VAULT_DATA])
+
 MAX_PRIORITY_PARTNERS: constant(uint256) = 10
+MAX_STAB_VAULT_DATA: constant(uint256) = 10
+PRIORITY_LIQ_VAULT_DATA: constant(uint256) = 20
+CONTROL_ROOM_ID: constant(uint256) = 9
+
+RIPE_HQ: immutable(address)
 
 
 @deploy
@@ -220,6 +231,41 @@ def setPriorityPriceSourceIds(_priorityIds: DynArray[uint256, MAX_PRIORITY_PARTN
 @external 
 def getPriorityPriceSourceIds() -> DynArray[uint256, MAX_PRIORITY_PARTNERS]:
     return self.priorityPriceSourceIds
+
+
+######################
+# Special Vault Data #
+######################
+
+
+# priority liq asset vaults
+
+
+@external
+def setPriorityLiqAssetVaults(_priorityLiqAssetVaults: DynArray[VaultLite, PRIORITY_LIQ_VAULT_DATA]):
+    assert msg.sender == self._getControlRoomAddr() # dev: no perms
+    self.priorityLiqAssetVaults = _priorityLiqAssetVaults
+
+
+@view 
+@external 
+def getPriorityLiqAssetVaults() -> DynArray[VaultLite, PRIORITY_LIQ_VAULT_DATA]:
+    return self.priorityLiqAssetVaults
+
+
+# stability pool vaults
+
+
+@external
+def setPriorityStabVaults(_priorityStabVaults: DynArray[VaultLite, MAX_STAB_VAULT_DATA]):
+    assert msg.sender == self._getControlRoomAddr() # dev: no perms
+    self.priorityStabVaults = _priorityStabVaults
+
+
+@view 
+@external 
+def getPriorityStabVaults() -> DynArray[VaultLite, MAX_STAB_VAULT_DATA]:
+    return self.priorityStabVaults
 
 
 #############

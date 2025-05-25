@@ -17,10 +17,14 @@ from interfaces import Department
 
 interface ControlRoomData:
     def getManyConfigs(_getGenConfig: bool, _getDebtConfig: bool, _getRewardsConfig: bool, _asset: address = empty(address), _user: address = empty(address)) -> MetaConfig: view
+    def setPriorityLiqAssetVaults(_priorityLiqAssetVaults: DynArray[VaultLite, PRIORITY_LIQ_VAULT_DATA]): nonpayable
+    def setPriorityStabVaults(_priorityStabVaults: DynArray[VaultLite, MAX_STAB_VAULT_DATA]): nonpayable
     def setPriorityPriceSourceIds(_priorityIds: DynArray[uint256, MAX_PRIORITY_PARTNERS]): nonpayable
     def setUserDelegation(_user: address, _delegate: address, _config: ActionDelegation): nonpayable
+    def getPriorityLiqAssetVaults() -> DynArray[VaultLite, PRIORITY_LIQ_VAULT_DATA]: view
     def getPriorityPriceSourceIds() -> DynArray[uint256, MAX_PRIORITY_PARTNERS]: view
     def userDelegation(_user: address, _delegate: address) -> ActionDelegation: view
+    def getPriorityStabVaults() -> DynArray[VaultLite, MAX_STAB_VAULT_DATA]: view
     def setAssetConfig(_asset: address, _assetConfig: AssetConfig): nonpayable
     def setRipeRewardsConfig(_rewardsConfig: RipeRewardsConfig): nonpayable
     def setUserConfig(_user: address, _userConfig: UserConfig): nonpayable
@@ -38,7 +42,7 @@ interface PriceDesk:
     def isValidRegId(_regId: uint256) -> bool: view
 
 interface VaultBook:
-    def getAddr(_regId: uint256) -> address: view
+    def getAddr(_vaultId: uint256) -> address: view
 
 # core structs
 
@@ -178,8 +182,8 @@ struct GenLiqConfig:
     minKeeperFee: uint256
     ltvPaybackBuffer: uint256
     genAuctionParams: AuctionParams
-    priorityLiqAssets: DynArray[VaultData, PRIORITY_LIQ_ASSETS]
-    genStabPools: DynArray[VaultData, MAX_GEN_STAB_POOLS]
+    priorityLiqAssetVaults: DynArray[VaultData, PRIORITY_LIQ_VAULT_DATA]
+    priorityStabVaults: DynArray[VaultData, MAX_STAB_VAULT_DATA]
 
 struct AssetLiqConfig:
     hasConfig: bool
@@ -228,6 +232,10 @@ struct VaultData:
     vaultAddr: address
     asset: address
 
+struct VaultLite:
+    vaultId: uint256
+    asset: address
+
 struct MetaConfig:
     genConfig: GenConfig
     genDebtConfig: GenDebtConfig
@@ -249,8 +257,8 @@ MIN_STALE_TIME: public(immutable(uint256))
 MAX_STALE_TIME: public(immutable(uint256))
 
 MAX_PRIORITY_PARTNERS: constant(uint256) = 10
-MAX_GEN_STAB_POOLS: constant(uint256) = 5
-PRIORITY_LIQ_ASSETS: constant(uint256) = 20
+MAX_STAB_VAULT_DATA: constant(uint256) = 10
+PRIORITY_LIQ_VAULT_DATA: constant(uint256) = 20
 
 
 @deploy
@@ -589,6 +597,33 @@ def _isValidStaleTime(_staleTime: uint256) -> bool:
     return _staleTime >= MIN_STALE_TIME and _staleTime <= MAX_STALE_TIME
 
 
+######################
+# Special Vault Data #
+######################
+
+
+@external
+def setPriorityLiqAssetVaults(_priorityLiqAssetVaults: DynArray[VaultLite, PRIORITY_LIQ_VAULT_DATA]) -> bool:
+    assert gov._canGovern(msg.sender) # dev: no perms
+    assert not deptBasics.isPaused # dev: contract paused
+
+    # TODO: add time lock, validation, event
+
+    extcall ControlRoomData(self.data).setPriorityLiqAssetVaults(_priorityLiqAssetVaults)
+    return True
+
+
+@external
+def setPriorityStabVaults(_priorityStabVaults: DynArray[VaultLite, MAX_STAB_VAULT_DATA]) -> bool:
+    assert gov._canGovern(msg.sender) # dev: no perms
+    assert not deptBasics.isPaused # dev: contract paused
+
+    # TODO: add time lock, validation, event
+
+    extcall ControlRoomData(self.data).setPriorityStabVaults(_priorityStabVaults)
+    return True
+
+
 ###################
 # Helpers / Views #
 ###################
@@ -732,11 +767,23 @@ def getAuctionBuyConfig(_asset: address, _buyer: address) -> AuctionBuyConfig:
 @view
 @external
 def getGenLiqConfig() -> GenLiqConfig:
-    c: MetaConfig = staticcall ControlRoomData(self.data).getManyConfigs(True, True, False)
+    data: address = self.data
+    c: MetaConfig = staticcall ControlRoomData(data).getManyConfigs(True, True, False)
+    vaultBook: address = addys._getVaultBookAddr()
 
-    # TODO: put together all this data
-    priorityLiqAssets: DynArray[VaultData, PRIORITY_LIQ_ASSETS] = []
-    genStabPools: DynArray[VaultData, MAX_GEN_STAB_POOLS] = []
+    # priority liq asset vault data
+    priorityLiqAssetVaults: DynArray[VaultData, PRIORITY_LIQ_VAULT_DATA] = []
+    priorityLiqAssetData: DynArray[VaultLite, PRIORITY_LIQ_VAULT_DATA] = staticcall ControlRoomData(data).getPriorityLiqAssetVaults()
+    for pData: VaultLite in priorityLiqAssetData:
+        vaultAddr: address = staticcall VaultBook(vaultBook).getAddr(pData.vaultId)
+        priorityLiqAssetVaults.append(VaultData(vaultId=pData.vaultId, vaultAddr=vaultAddr, asset=pData.asset))
+
+    # stability pool vault data
+    priorityStabVaults: DynArray[VaultData, MAX_STAB_VAULT_DATA] = []
+    priorityStabData: DynArray[VaultLite, MAX_STAB_VAULT_DATA] = staticcall ControlRoomData(data).getPriorityStabVaults()
+    for pData: VaultLite in priorityStabData:
+        vaultAddr: address = staticcall VaultBook(vaultBook).getAddr(pData.vaultId)
+        priorityStabVaults.append(VaultData(vaultId=pData.vaultId, vaultAddr=vaultAddr, asset=pData.asset))
 
     return GenLiqConfig(
         canLiquidate=c.genConfig.canLiquidate,
@@ -744,8 +791,8 @@ def getGenLiqConfig() -> GenLiqConfig:
         minKeeperFee=c.genDebtConfig.minKeeperFee,
         ltvPaybackBuffer=c.genDebtConfig.ltvPaybackBuffer,
         genAuctionParams=c.genDebtConfig.genAuctionParams,
-        priorityLiqAssets=priorityLiqAssets,
-        genStabPools=genStabPools,
+        priorityLiqAssetVaults=priorityLiqAssetVaults,
+        priorityStabVaults=priorityStabVaults,
     )
 
 
