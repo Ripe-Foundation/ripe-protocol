@@ -37,6 +37,7 @@ struct AssetConfig:
     perUserDepositLimit: uint256
     globalDepositLimit: uint256
     debtTerms: DebtTerms
+    shouldBurnAsPayment: bool
     shouldTransferToEndaoment: bool
     shouldSwapInStabPools: bool
     shouldAuctionInstantly: bool

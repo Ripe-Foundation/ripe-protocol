@@ -76,6 +76,7 @@ struct AssetConfig:
     perUserDepositLimit: uint256
     globalDepositLimit: uint256
     debtTerms: DebtTerms
+    shouldBurnAsPayment: bool
     shouldTransferToEndaoment: bool
     shouldSwapInStabPools: bool
     shouldAuctionInstantly: bool
@@ -177,10 +178,12 @@ struct GenLiqConfig:
     minKeeperFee: uint256
     ltvPaybackBuffer: uint256
     genAuctionParams: AuctionParams
+    priorityLiqAssets: DynArray[address, PRIORITY_LIQ_ASSETS]
     genStabPools: DynArray[VaultData, MAX_GEN_STAB_POOLS]
 
 struct AssetLiqConfig:
     hasConfig: bool
+    shouldBurnAsPayment: bool
     shouldTransferToEndaoment: bool
     shouldSwapInStabPools: bool
     shouldAuctionInstantly: bool
@@ -247,6 +250,7 @@ MAX_STALE_TIME: public(immutable(uint256))
 
 MAX_PRIORITY_PARTNERS: constant(uint256) = 10
 MAX_GEN_STAB_POOLS: constant(uint256) = 10
+PRIORITY_LIQ_ASSETS: constant(uint256) = 20
 
 
 @deploy
@@ -367,6 +371,7 @@ def setAssetConfig(
     _perUserDepositLimit: uint256,
     _globalDepositLimit: uint256,
     _debtTerms: DebtTerms,
+    _shouldBurnAsPayment: bool,
     _shouldTransferToEndaoment: bool,
     _shouldSwapInStabPools: bool,
     _shouldAuctionInstantly: bool,
@@ -392,6 +397,7 @@ def setAssetConfig(
         perUserDepositLimit=_perUserDepositLimit,
         globalDepositLimit=_globalDepositLimit,
         debtTerms=_debtTerms,
+        shouldBurnAsPayment=_shouldBurnAsPayment,
         shouldTransferToEndaoment=_shouldTransferToEndaoment,
         shouldSwapInStabPools=_shouldSwapInStabPools,
         shouldAuctionInstantly=_shouldAuctionInstantly,
@@ -729,6 +735,7 @@ def getGenLiqConfig() -> GenLiqConfig:
     c: MetaConfig = staticcall ControlRoomData(self.data).getManyConfigs(True, True, False)
 
     # TODO: put together all this data
+    priorityLiqAssets: DynArray[address, PRIORITY_LIQ_ASSETS] = []
     genStabPools: DynArray[VaultData, MAX_GEN_STAB_POOLS] = []
 
     return GenLiqConfig(
@@ -737,6 +744,7 @@ def getGenLiqConfig() -> GenLiqConfig:
         minKeeperFee=c.genDebtConfig.minKeeperFee,
         ltvPaybackBuffer=c.genDebtConfig.ltvPaybackBuffer,
         genAuctionParams=c.genDebtConfig.genAuctionParams,
+        priorityLiqAssets=priorityLiqAssets,
         genStabPools=genStabPools,
     )
 
@@ -758,6 +766,7 @@ def getAssetLiqConfig(_asset: address) -> AssetLiqConfig:
 
     return AssetLiqConfig(
         hasConfig=True,
+        shouldBurnAsPayment=c.assetConfig.shouldBurnAsPayment,
         shouldTransferToEndaoment=c.assetConfig.shouldTransferToEndaoment,
         shouldSwapInStabPools=c.assetConfig.shouldSwapInStabPools,
         shouldAuctionInstantly=c.assetConfig.shouldAuctionInstantly,
