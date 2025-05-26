@@ -920,6 +920,20 @@ def _canLiquidateUser(_userDebtAmount: uint256, _collateralVal: uint256, _liqThr
     return _collateralVal <= collateralLiqThreshold
 
 
+@view
+@external
+def getLiquidationThreshold(_user: address) -> uint256:
+    a: addys.Addys = addys._getAddys()
+
+    # get latest user debt and terms
+    userDebt: UserDebt = empty(UserDebt)
+    bt: UserBorrowTerms = empty(UserBorrowTerms)
+    na: uint256 = 0
+    userDebt, bt, na = self._getLatestUserDebtAndTerms(_user, False, a)
+
+    return userDebt.amount * HUNDRED_PERCENT // bt.debtTerms.liqThreshold
+
+
 ##################
 # Green Handling #
 ##################

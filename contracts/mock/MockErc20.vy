@@ -141,12 +141,13 @@ def _burn(_to: address, _value: uint256):
 
 
 @external
-def burn(_value: uint256):
+def burn(_value: uint256) -> bool:
     """
     @dev Burn an amount of the token of msg.sender.
     @param _value The amount that will be burned.
     """
     self._burn(msg.sender, _value)
+    return True
 
 
 @external

@@ -212,11 +212,12 @@ def liquidateUser(
     config: GenLiqConfig = staticcall ControlRoom(a.controlRoom).getGenLiqConfig()
     assert config.canLiquidate # dev: cannot liquidate
 
+    # liquidate user
     keeperRewards: uint256 = self._liquidateUser(_liqUser, config, a)
-    assert keeperRewards != 0 # dev: no keeper rewards
 
     # handle keeper rewards
-    self._handleGreenForUser(_keeper, keeperRewards, True, _wantsSavingsGreen, a.greenToken, a.savingsGreen)
+    if keeperRewards != 0:
+        self._handleGreenForUser(_keeper, keeperRewards, True, _wantsSavingsGreen, a.greenToken, a.savingsGreen)
 
     return keeperRewards
 
@@ -238,10 +239,10 @@ def liquidateManyUsers(
     totalKeeperRewards: uint256 = 0
     for liqUser: address in _liqUsers:
         totalKeeperRewards += self._liquidateUser(liqUser, config, a)
-    assert totalKeeperRewards != 0 # dev: no keeper rewards
 
     # handle keeper rewards
-    self._handleGreenForUser(_keeper, totalKeeperRewards, True, _wantsSavingsGreen, a.greenToken, a.savingsGreen)
+    if totalKeeperRewards != 0:
+        self._handleGreenForUser(_keeper, totalKeeperRewards, True, _wantsSavingsGreen, a.greenToken, a.savingsGreen)
 
     return totalKeeperRewards
 
@@ -1021,6 +1022,28 @@ def _isPaymentCloseEnough(_requestedAmount: uint256, _actualAmount: uint256) -> 
 
 
 # calc amount of debt to repay
+
+
+@view
+@external
+def calcAmountOfDebtToRepayDuringLiq(_user: address) -> uint256:
+    a: addys.Addys = addys._getAddys()
+    config: GenLiqConfig = staticcall ControlRoom(a.controlRoom).getGenLiqConfig()
+
+    # user debt
+    userDebt: UserDebt = empty(UserDebt)
+    bt: UserBorrowTerms = empty(UserBorrowTerms)
+    na: uint256 = 0
+    userDebt, bt, na = staticcall CreditEngine(a.creditEngine).getLatestUserDebtAndTerms(_user, True, a)
+
+    # liquidation fees
+    totalLiqFees: uint256 = userDebt.amount * bt.debtTerms.liqFee // HUNDRED_PERCENT
+    totalLiqFees += max(config.minKeeperFee, userDebt.amount * config.keeperFeeRatio // HUNDRED_PERCENT)
+    userDebt.amount += totalLiqFees
+
+    # calc amount of debt to repay
+    targetLtv: uint256 = bt.debtTerms.ltv * (HUNDRED_PERCENT - config.ltvPaybackBuffer) // HUNDRED_PERCENT
+    return self._calcAmountOfDebtToRepay(userDebt.amount, bt.collateralVal, targetLtv)
 
 
 @pure
