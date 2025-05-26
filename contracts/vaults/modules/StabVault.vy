@@ -19,7 +19,7 @@ interface PriceDesk:
     def getUsdValue(_asset: address, _amount: uint256, _shouldRaise: bool = False) -> uint256: view
 
 interface GreenToken:
-    def burn(_amount: uint256): nonpayable
+    def burn(_amount: uint256) -> bool: nonpayable
 
 struct StabPoolClaim:
     stabAsset: address
@@ -367,6 +367,7 @@ def swapForLiquidatedCollateral(
     _liqAmountSent: uint256,
     _recipient: address,
     _greenToken: address,
+    _savingsGreenToken: address,
 ) -> uint256:
     assert not vaultData.isPaused # dev: contract paused
     assert msg.sender == addys._getAuctionHouseAddr() # dev: only AuctionHouse allowed
@@ -384,8 +385,8 @@ def swapForLiquidatedCollateral(
 
     # burn green token
     if _recipient == empty(address):
-        assert _stabAsset == _greenToken # dev: must be green token
-        extcall GreenToken(_greenToken).burn(amount) # dev: burn failed
+        assert _stabAsset in [_greenToken, _savingsGreenToken] # dev: must be green token or savings green token
+        assert extcall GreenToken(_greenToken).burn(amount) # dev: burn failed
 
     else:
         assert extcall IERC20(_stabAsset).transfer(_recipient, amount, default_return_value=True) # dev: transfer failed

@@ -43,7 +43,7 @@ interface GreenToken:
     def burn(_amount: uint256): nonpayable
 
 interface StabilityPool:
-    def swapForLiquidatedCollateral(_stabAsset: address, _stabAmountToRemove: uint256, _liqAsset: address, _liqAmountSent: uint256, _recipient: address, _greenToken: address) -> uint256: nonpayable
+    def swapForLiquidatedCollateral(_stabAsset: address, _stabAmountToRemove: uint256, _liqAsset: address, _liqAmountSent: uint256, _recipient: address, _greenToken: address, _savingsGreenToken: address) -> uint256: nonpayable
 
 interface VaultBook:
     def getAddr(_vaultId: uint256) -> address: view
@@ -288,19 +288,24 @@ def _liquidateUser(
         totalLiqFees += keeperFee
         liqFeeRatio = totalLiqFees * HUNDRED_PERCENT // userDebt.amount
 
-    # update user debt
-    userDebt.amount += totalLiqFees
-
     # how much to achieve safe LTV -- won't be exact because depends on which collateral is liquidated (LTV changes)
     targetLtv: uint256 = bt.debtTerms.ltv * (HUNDRED_PERCENT - _config.ltvPaybackBuffer) // HUNDRED_PERCENT
-    targetRepayAmount: uint256 = self._calcAmountOfDebtToRepay(userDebt.amount, bt.collateralVal, targetLtv)
+    targetRepayAmount: uint256 = self._calcAmountOfDebtToRepay(userDebt.amount, bt.collateralVal, targetLtv, liqFeeRatio, totalLiqFees)
 
     # perform liquidation phases
     repayValueIn: uint256 = 0
     collateralValueOut: uint256 = 0
     repayValueIn, collateralValueOut = self._performLiquidationPhases(_liqUser, targetRepayAmount, liqFeeRatio, _config, _a)
 
+    # check if liq fees were already covered (stability pool swaps)
+    liqFeesUnpaid: uint256 = totalLiqFees
+    if collateralValueOut > repayValueIn:
+        paidLiqFees: uint256 = collateralValueOut - repayValueIn
+        liqFeesUnpaid -= min(paidLiqFees, liqFeesUnpaid)
+
     # repayValueIn may be zero, but need to update debt
+    userDebt.amount += liqFeesUnpaid
+    repayValueIn = min(repayValueIn, userDebt.amount)
     didRestoreDebtHealth: bool = extcall CreditEngine(_a.creditEngine).repayDuringLiquidation(_liqUser, userDebt, repayValueIn, newInterest, _a)
 
     # start auctions (if necessary)
@@ -676,16 +681,17 @@ def _swapWithSpecificStabPool(
         return remainingToRepay, collateralValueOut, False, False
 
     # max usd value in stability pool
-    maxUsdValueInStabPool: uint256 = maxAmountInStabPool # green treated as $1
-    stabProceedsAddr: address = empty(address)
-    if _stabPool.asset != _a.greenToken:
-        stabProceedsAddr = _a.endaoment # non-green assets, move to Endaoment
-        maxUsdValueInStabPool = staticcall PriceDesk(_a.priceDesk).getUsdValue(_stabPool.asset, maxAmountInStabPool, True)     
-        if maxUsdValueInStabPool == 0:
-            return remainingToRepay, collateralValueOut, False, False # can't get price of stab asset, skip      
+    maxUsdValueInStabPool: uint256 = staticcall PriceDesk(_a.priceDesk).getUsdValue(_stabPool.asset, maxAmountInStabPool, True)     
+    if maxUsdValueInStabPool == 0:
+        return remainingToRepay, collateralValueOut, False, False # can't get price of stab asset, skip      
+
+    # where to move stab asset
+    stabProceedsAddr: address = _a.endaoment # non-green assets, move to Endaoment
+    if _stabPool.asset in [_a.greenToken, _a.savingsGreen]:
+        stabProceedsAddr = empty(address)
 
     # max collateral usd value (to take from liq user)
-    maxCollateralUsdValue: uint256 = min(maxUsdValueInStabPool * HUNDRED_PERCENT // (HUNDRED_PERCENT - _liqFeeRatio), remainingToRepay)
+    maxCollateralUsdValue: uint256 = min(maxUsdValueInStabPool, remainingToRepay) * HUNDRED_PERCENT // (HUNDRED_PERCENT - _liqFeeRatio)
 
     # transfer collateral to stability pool
     collateralUsdValueSent: uint256 = 0
@@ -699,7 +705,7 @@ def _swapWithSpecificStabPool(
     # take stab asset amount out of stability pool
     targetStabPoolUsdValue: uint256 = collateralUsdValueSent * (HUNDRED_PERCENT - _liqFeeRatio) // HUNDRED_PERCENT
     targetStabPoolAmount: uint256 = targetStabPoolUsdValue * maxAmountInStabPool // maxUsdValueInStabPool
-    stabPoolAmount: uint256 = extcall StabilityPool(_stabPool.vaultAddr).swapForLiquidatedCollateral(_stabPool.asset, targetStabPoolAmount, _liqAsset, collateralAmountSent, stabProceedsAddr, _a.greenToken)
+    stabPoolAmount: uint256 = extcall StabilityPool(_stabPool.vaultAddr).swapForLiquidatedCollateral(_stabPool.asset, targetStabPoolAmount, _liqAsset, collateralAmountSent, stabProceedsAddr, _a.greenToken, _a.savingsGreen)
     assert self._isPaymentCloseEnough(targetStabPoolAmount, stabPoolAmount) # dev: invalid stability pool swap
 
     # update overall values
@@ -1039,22 +1045,40 @@ def calcAmountOfDebtToRepayDuringLiq(_user: address) -> uint256:
     # liquidation fees
     totalLiqFees: uint256 = userDebt.amount * bt.debtTerms.liqFee // HUNDRED_PERCENT
     totalLiqFees += max(config.minKeeperFee, userDebt.amount * config.keeperFeeRatio // HUNDRED_PERCENT)
-    userDebt.amount += totalLiqFees
+    liqFeeRatio: uint256 = totalLiqFees * HUNDRED_PERCENT // userDebt.amount
 
     # calc amount of debt to repay
     targetLtv: uint256 = bt.debtTerms.ltv * (HUNDRED_PERCENT - config.ltvPaybackBuffer) // HUNDRED_PERCENT
-    return self._calcAmountOfDebtToRepay(userDebt.amount, bt.collateralVal, targetLtv)
+    return self._calcAmountOfDebtToRepay(userDebt.amount, bt.collateralVal, targetLtv, liqFeeRatio, totalLiqFees)
 
 
 @pure
 @internal
-def _calcAmountOfDebtToRepay(_debtAmount: uint256, _collateralValue: uint256, _targetLtv: uint256) -> uint256:
+def _calcAmountOfDebtToRepay(
+    _debtAmount: uint256,
+    _collateralValue: uint256,
+    _targetLtv: uint256,
+    _liqFeeRatio: uint256,
+    _totalLiqFees: uint256,
+) -> uint256:
     # goal here is to only reduce the debt necessary to get LTV back to safe position
     # it will never be perfectly precise because depending on what assets are taken, the LTV might slightly change
-    collValueAdjusted: uint256 =_collateralValue * _targetLtv // HUNDRED_PERCENT
 
-    toPay: uint256 = (_debtAmount - collValueAdjusted) * HUNDRED_PERCENT // (HUNDRED_PERCENT - _targetLtv)
-    return min(toPay, _debtAmount)
+    if _targetLtv == 0:
+        return _debtAmount + _totalLiqFees # repay everything to achieve 0% LTV
+
+    # calculate the coefficient for repay amount
+    oneMinusLiqFeeRatio: uint256 = HUNDRED_PERCENT - _liqFeeRatio
+    if oneMinusLiqFeeRatio == 0:
+        return _debtAmount + _totalLiqFees # edge case: 100% liquidation fee
+
+    numerator: uint256 = (_debtAmount + _totalLiqFees) * HUNDRED_PERCENT - (_targetLtv * _collateralValue)
+    denominator: uint256 = HUNDRED_PERCENT - _targetLtv
+    if denominator == 0:
+        return _debtAmount + _totalLiqFees # edge case: 100% target LTV
+
+    X: uint256 = numerator // denominator
+    return X * oneMinusLiqFeeRatio // HUNDRED_PERCENT
 
 
 #########
