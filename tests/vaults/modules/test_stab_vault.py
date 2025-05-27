@@ -216,6 +216,7 @@ def test_stab_vault_share_value_with_claimable_assets(
     teller,
     auction_house,
     mock_price_source,
+    savings_green,
 ):
     """Test share value changes when claimable assets are added/removed"""
     # Set mock prices
@@ -246,6 +247,7 @@ def test_stab_vault_share_value_with_claimable_assets(
         claimable_amount,  # liq amount
         ZERO_ADDRESS,  # recipient (burn)
         alpha_token,  # green token
+        savings_green,
         sender=auction_house.address
     )
 
@@ -470,6 +472,7 @@ def test_stab_vault_liquidation_profit(
     teller,
     auction_house,
     mock_price_source,
+    savings_green,
 ):
     """Test liquidation when claimable asset is worth more than stability pool asset"""
     # Set mock prices
@@ -500,6 +503,7 @@ def test_stab_vault_liquidation_profit(
         claimable_amount,  # liq amount
         ZERO_ADDRESS,  # recipient (burn)
         alpha_token,  # green token
+        savings_green,
         sender=auction_house.address
     )
 
@@ -523,6 +527,7 @@ def test_stab_vault_liquidation_loss(
     sally,
     teller,
     auction_house,
+    savings_green,
     mock_price_source,
 ):
     """Test liquidation when claimable asset is worth less than stability pool asset"""
@@ -554,6 +559,7 @@ def test_stab_vault_liquidation_loss(
         claimable_amount,  # liq amount
         ZERO_ADDRESS,  # recipient (burn)
         alpha_token,  # green token
+        savings_green,
         sender=auction_house.address
     )
 
@@ -578,6 +584,7 @@ def test_stab_vault_liquidation_sequence(
     teller,
     auction_house,
     mock_price_source,
+    savings_green,
 ):
     """Test that multiple liquidations accumulate correctly"""
     # Set mock prices
@@ -608,6 +615,7 @@ def test_stab_vault_liquidation_sequence(
         claimable_amount1,  # liq amount
         ZERO_ADDRESS,  # recipient (burn)
         alpha_token,  # green token
+        savings_green,
         sender=auction_house.address
     )
 
@@ -626,6 +634,7 @@ def test_stab_vault_liquidation_sequence(
         claimable_amount2,  # liq amount
         ZERO_ADDRESS,  # recipient (burn)
         alpha_token,  # green token
+        savings_green,
         sender=auction_house.address
     )
 
@@ -654,6 +663,7 @@ def test_stab_vault_liquidation_tiny_amount(
     teller,
     auction_house,
     mock_price_source,
+    savings_green,
 ):
     """Test liquidation with a very small amount (1 wei)"""
     # Set mock prices
@@ -679,6 +689,7 @@ def test_stab_vault_liquidation_tiny_amount(
         tiny_amount,  # liq amount
         ZERO_ADDRESS,  # recipient (burn)
         alpha_token,  # green token
+        savings_green,
         sender=auction_house.address
     )
 
@@ -703,6 +714,7 @@ def test_stab_vault_swap_validation(
     teller,
     auction_house,
     mock_price_source,
+    savings_green,
 ):
     """Test validation checks in swapForLiquidatedCollateral"""
     # Set mock prices
@@ -724,6 +736,7 @@ def test_stab_vault_swap_validation(
             deposit,
             ZERO_ADDRESS,
             alpha_token,
+            savings_green,
             sender=auction_house.address
         )
 
@@ -736,13 +749,14 @@ def test_stab_vault_swap_validation(
             deposit,
             ZERO_ADDRESS,
             alpha_token,
+            savings_green,
             sender=auction_house.address
         )
 
     bravo_token.transfer(stability_pool, deposit, sender=bravo_token_whale)
 
     # Test invalid green token
-    with boa.reverts("must be green token"):
+    with boa.reverts("must be green token or savings green token"):
         stability_pool.swapForLiquidatedCollateral(
             alpha_token,
             deposit,
@@ -750,6 +764,7 @@ def test_stab_vault_swap_validation(
             deposit,
             ZERO_ADDRESS,
             ZERO_ADDRESS, # invalid green token
+            savings_green,
             sender=auction_house.address
         )
 
@@ -762,6 +777,7 @@ def test_stab_vault_swap_validation(
             deposit,
             ZERO_ADDRESS,
             alpha_token,
+            savings_green,
             sender=bob  # unauthorized sender
         )
 
@@ -777,6 +793,7 @@ def test_stab_vault_swap_claimable_balance(
     teller,
     auction_house,
     mock_price_source,
+    savings_green,
 ):
     """Test that claimable balances are properly registered"""
     # Set mock prices
@@ -805,6 +822,7 @@ def test_stab_vault_swap_claimable_balance(
         claimable_amount,  # liq amount
         ZERO_ADDRESS,  # recipient (burn)
         alpha_token,  # green token
+        savings_green,
         sender=auction_house.address
     )
 
@@ -827,6 +845,7 @@ def test_stab_vault_swap_burn(
     teller,
     auction_house,
     mock_price_source,
+    savings_green,
 ):
     """Test burn behavior in swapForLiquidatedCollateral when recipient is ZERO_ADDRESS"""
     # Set mock prices
@@ -850,6 +869,7 @@ def test_stab_vault_swap_burn(
         claimable_amount,  # liq amount
         ZERO_ADDRESS,  # recipient (burn)
         alpha_token,  # green token
+        savings_green,
         sender=auction_house.address
     )
 
@@ -869,6 +889,7 @@ def test_stab_vault_swap_transfer(
     teller,
     auction_house,
     mock_price_source,
+    savings_green,
 ):
     """Test transfer behavior in swapForLiquidatedCollateral when recipient is non-zero"""
     # Set mock prices
@@ -891,6 +912,7 @@ def test_stab_vault_swap_transfer(
         claimable_amount,  # liq amount
         sally,        # recipient (transfer)
         alpha_token,  # green token
+        savings_green,
         sender=auction_house.address
     )
 
@@ -911,6 +933,7 @@ def test_stab_vault_swap_share_calculation(
     teller,
     auction_house,
     mock_price_source,
+    savings_green,
 ):
     """Test share calculations during swapForLiquidatedCollateral"""
     # Set mock prices
@@ -941,6 +964,7 @@ def test_stab_vault_swap_share_calculation(
         claimable_amount,  # liq amount
         ZERO_ADDRESS,  # recipient (burn)
         alpha_token,  # green token
+        savings_green,
         sender=auction_house.address
     )
 
@@ -970,6 +994,7 @@ def test_stab_vault_claimable_asset_data(
     teller,
     auction_house,
     mock_price_source,
+    savings_green,
 ):
     """Test that claimable asset data structures are properly updated"""
     # Set mock prices
@@ -1000,6 +1025,7 @@ def test_stab_vault_claimable_asset_data(
         claimable_amount1,  # liq amount
         ZERO_ADDRESS,  # recipient (burn)
         alpha_token,  # green token
+        savings_green,
         sender=auction_house.address
     )
 
@@ -1018,6 +1044,7 @@ def test_stab_vault_claimable_asset_data(
         claimable_amount2,  # liq amount
         ZERO_ADDRESS,  # recipient (burn)
         alpha_token,  # green token
+        savings_green,
         sender=auction_house.address
     )
 

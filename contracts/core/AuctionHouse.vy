@@ -1064,18 +1064,19 @@ def _calcAmountOfDebtToRepay(
     # goal here is to only reduce the debt necessary to get LTV back to safe position
     # it will never be perfectly precise because depending on what assets are taken, the LTV might slightly change
 
+    effectiveDebt: uint256 = _debtAmount + _totalLiqFees
     if _targetLtv == 0:
-        return _debtAmount + _totalLiqFees # repay everything to achieve 0% LTV
+        return effectiveDebt # repay everything to achieve 0% LTV
 
     # calculate the coefficient for repay amount
     oneMinusLiqFeeRatio: uint256 = HUNDRED_PERCENT - _liqFeeRatio
     if oneMinusLiqFeeRatio == 0:
-        return _debtAmount + _totalLiqFees # edge case: 100% liquidation fee
+        return effectiveDebt # edge case: 100% liquidation fee
 
-    numerator: uint256 = (_debtAmount + _totalLiqFees) * HUNDRED_PERCENT - (_targetLtv * _collateralValue)
+    numerator: uint256 = effectiveDebt * HUNDRED_PERCENT - (_targetLtv * _collateralValue)
     denominator: uint256 = HUNDRED_PERCENT - _targetLtv
     if denominator == 0:
-        return _debtAmount + _totalLiqFees # edge case: 100% target LTV
+        return effectiveDebt # edge case: 100% target LTV
 
     X: uint256 = numerator // denominator
     return X * oneMinusLiqFeeRatio // HUNDRED_PERCENT
