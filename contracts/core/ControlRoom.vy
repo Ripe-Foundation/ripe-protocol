@@ -38,11 +38,14 @@ interface ControlRoomData:
 interface Whitelist:
     def isUserAllowed(_user: address, _asset: address) -> bool: view
 
-interface PriceDesk:
-    def isValidRegId(_regId: uint256) -> bool: view
+interface Vault:
+    def vaultAssets(_index: uint256) -> address: view
 
 interface VaultBook:
     def getAddr(_vaultId: uint256) -> address: view
+
+interface PriceDesk:
+    def isValidRegId(_regId: uint256) -> bool: view
 
 # core structs
 
@@ -808,8 +811,18 @@ def getAssetLiqConfig(_asset: address) -> AssetLiqConfig:
     # shouldTransferToEndaoment -- needs to be stable-ish, etc. Or Stab pool asset (LP token, etc)
     # shouldSwapInStabPools -- check LTV, whitelist/specialStabPoolId, NFT status
 
-    # TODO: handle special stab pool
+    # handle special stab pool
     specialStabPool: VaultData = empty(VaultData)
+    if c.assetConfig.specialStabPoolId != 0:
+        specialVaultAddr: address = staticcall VaultBook(addys._getVaultBookAddr()).getAddr(c.assetConfig.specialStabPoolId)
+        if specialVaultAddr != empty(address):
+            firstAsset: address = staticcall Vault(specialVaultAddr).vaultAssets(1) # get first asset
+            if firstAsset != empty(address):
+                specialStabPool = VaultData(
+                    vaultId=c.assetConfig.specialStabPoolId,
+                    vaultAddr=specialVaultAddr,
+                    asset=firstAsset
+                )
 
     return AssetLiqConfig(
         hasConfig=True,

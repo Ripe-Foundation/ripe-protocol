@@ -1009,7 +1009,10 @@ def _handleGreenForUser(
         return
 
     if _wantsSavingsGreen:
+        assert extcall IERC20(_greenToken).approve(_savingsGreen, amount, default_return_value=True) # dev: green approval failed
         extcall IERC4626(_savingsGreen).deposit(amount, _recipient)
+        assert extcall IERC20(_greenToken).approve(_savingsGreen, 0, default_return_value=True) # dev: green approval failed
+
     else:
         assert extcall IERC20(_greenToken).transfer(_recipient, amount, default_return_value=True) # dev: green transfer failed
 
