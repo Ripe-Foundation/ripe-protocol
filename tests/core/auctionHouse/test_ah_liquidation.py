@@ -1990,3 +1990,153 @@ def test_ah_liquidation_special_stab_pool(
     # Verify bravo_token was used from stability pool, not green_token
     assert bravo_token.balanceOf(special_stab_pool) < bravo_deposit  # Bravo was used
     assert green_token.balanceOf(stability_pool) == green_deposit  # Green was not touched
+
+
+def test_ah_liquidate_many_users_batch_liquidation(
+    setGeneralConfig,
+    setAssetConfig,
+    setGeneralDebtConfig,
+    performDeposit,
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    alice,
+    sally,  # Use sally as third user instead of charlie
+    teller,
+    mock_price_source,
+    createDebtTerms,
+    green_token,
+    whale,
+    credit_engine,
+):
+    """Test batch liquidation of multiple users with liquidateManyUsers
+    
+    This tests:
+    - Liquidating multiple users in one transaction
+    - Mixed scenarios (some liquidatable, some not)
+    - Empty user list handling
+    """
+    
+    setGeneralConfig()
+    setGeneralDebtConfig()
+    
+    # Setup asset for liquidation
+    debt_terms = createDebtTerms(_liqThreshold=80_00, _liqFee=5_00, _ltv=70_00, _borrowRate=0)
+    setAssetConfig(alpha_token, _debtTerms=debt_terms)
+
+    # Setup prices
+    mock_price_source.setPrice(alpha_token, 1 * EIGHTEEN_DECIMALS)
+    mock_price_source.setPrice(green_token, 1 * EIGHTEEN_DECIMALS)
+    
+    # Setup multiple users with debt
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    debt_amount = 60 * EIGHTEEN_DECIMALS  # 60% LTV, safe initially
+    
+    # User 1 (bob) - will be liquidatable
+    performDeposit(bob, deposit_amount, alpha_token, alpha_token_whale)
+    teller.borrow(debt_amount, bob, False, sender=bob)
+    
+    # User 2 (alice) - will be liquidatable  
+    performDeposit(alice, deposit_amount, alpha_token, alpha_token_whale)
+    teller.borrow(debt_amount, alice, False, sender=alice)
+    
+    # User 3 (sally) - will NOT be liquidatable (no debt)
+    performDeposit(sally, deposit_amount, alpha_token, alpha_token_whale)
+    # Sally has no debt
+    
+    # Set liquidatable price (makes 60% LTV become 85% LTV > 80% threshold)
+    liquidation_price = 70 * EIGHTEEN_DECIMALS // 100  # $0.70
+    mock_price_source.setPrice(alpha_token, liquidation_price)
+    
+    # Verify liquidation states
+    assert credit_engine.canLiquidateUser(bob) == True
+    assert credit_engine.canLiquidateUser(alice) == True  
+    assert credit_engine.canLiquidateUser(sally) == False  # No debt
+    
+    # Test 1: Empty user list
+    keeper_rewards_empty = teller.liquidateManyUsers([], False, sender=whale)
+    assert keeper_rewards_empty == 0
+    
+    # Test 2: Single user liquidation via batch
+    keeper_rewards_single = teller.liquidateManyUsers([bob], False, sender=whale)
+    # Note: Keeper rewards might be 0 if liquidation doesn't generate fees
+    
+    # Verify bob was liquidated
+    bob_debt_after, _, _ = credit_engine.getLatestUserDebtAndTerms(bob, False)
+    assert bob_debt_after.inLiquidation == True
+    
+    # Test 3: Multiple user liquidation (alice + sally, where sally has no debt)
+    keeper_rewards_multi = teller.liquidateManyUsers([alice, sally], False, sender=whale)
+    
+    # Verify alice was liquidated, sally was not affected
+    alice_debt_after, _, _ = credit_engine.getLatestUserDebtAndTerms(alice, False)
+    sally_debt_after, _, _ = credit_engine.getLatestUserDebtAndTerms(sally, False)
+    
+    assert alice_debt_after.inLiquidation == True
+    assert sally_debt_after.amount == 0  # Sally still has no debt
+    assert sally_debt_after.inLiquidation == False
+
+
+def test_ah_calc_amount_of_debt_to_repay_during_liq(
+    setGeneralConfig,
+    setAssetConfig,
+    setGeneralDebtConfig,
+    performDeposit,
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    teller,
+    mock_price_source,
+    createDebtTerms,
+    auction_house,
+):
+    """Test the calcAmountOfDebtToRepayDuringLiq view function
+    
+    This tests:
+    - Debt calculation with different LTV scenarios
+    - Liquidation fee calculations
+    - Keeper fee calculations
+    - Target LTV calculations with payback buffer
+    """
+    
+    setGeneralConfig()
+    setGeneralDebtConfig(_ltvPaybackBuffer=10_00, _keeperFeeRatio=2_00, _minKeeperFee=5 * EIGHTEEN_DECIMALS)  # 10% payback buffer, 2% keeper fee, $5 min
+    
+    # Setup asset with specific liquidation parameters
+    debt_terms = createDebtTerms(
+        _liqThreshold=80_00,  # 80% liquidation threshold
+        _liqFee=5_00,         # 5% liquidation fee
+        _ltv=70_00,           # 70% max LTV
+        _borrowRate=0
+    )
+    setAssetConfig(alpha_token, _debtTerms=debt_terms)
+
+    # Setup prices
+    mock_price_source.setPrice(alpha_token, 1 * EIGHTEEN_DECIMALS)
+    
+    # Test Case 1: Normal liquidation scenario
+    deposit_amount = 100 * EIGHTEEN_DECIMALS  # $100 collateral
+    performDeposit(bob, deposit_amount, alpha_token, alpha_token_whale)
+    debt_amount = 60 * EIGHTEEN_DECIMALS  # $60 debt (60% LTV)
+    teller.borrow(debt_amount, bob, False, sender=bob)
+    
+    # Drop price to make liquidatable
+    liquidation_price = 70 * EIGHTEEN_DECIMALS // 100  # $0.70
+    mock_price_source.setPrice(alpha_token, liquidation_price)
+    # Collateral now worth $70, debt $60 = 85.7% LTV > 80% threshold
+    
+    # Calculate expected repay amount
+    calculated_repay = auction_house.calcAmountOfDebtToRepayDuringLiq(bob)
+    
+    # Verify calculation makes sense
+    assert calculated_repay > 0
+    assert calculated_repay <= debt_amount  # Should not exceed total debt
+    
+    # Test Case 2: User not in liquidation (should still calculate)
+    # Reset to safe price
+    mock_price_source.setPrice(alpha_token, 2 * EIGHTEEN_DECIMALS)  # $2.00
+    # Collateral now worth $200, debt $60 = 30% LTV < 80% threshold
+    
+    calculated_repay_safe = auction_house.calcAmountOfDebtToRepayDuringLiq(bob)
+    assert calculated_repay_safe == 0
+

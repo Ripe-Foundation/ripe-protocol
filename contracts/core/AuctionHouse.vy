@@ -1044,6 +1044,10 @@ def calcAmountOfDebtToRepayDuringLiq(_user: address) -> uint256:
     bt: UserBorrowTerms = empty(UserBorrowTerms)
     na: uint256 = 0
     userDebt, bt, na = staticcall CreditEngine(a.creditEngine).getLatestUserDebtAndTerms(_user, True, a)
+    
+    # No debt to repay
+    if userDebt.amount == 0:
+        return 0
 
     # liquidation fees
     totalLiqFees: uint256 = userDebt.amount * bt.debtTerms.liqFee // HUNDRED_PERCENT
@@ -1076,7 +1080,13 @@ def _calcAmountOfDebtToRepay(
     if oneMinusLiqFeeRatio == 0:
         return effectiveDebt # edge case: 100% liquidation fee
 
-    numerator: uint256 = effectiveDebt * HUNDRED_PERCENT - (_targetLtv * _collateralValue)
+    # check if user is already in safe position (prevent underflow)
+    targetDebtValue: uint256 = _targetLtv * _collateralValue
+    effectiveDebtValue: uint256 = effectiveDebt * HUNDRED_PERCENT
+    if effectiveDebtValue <= targetDebtValue:
+        return 0 # User is already safe, no repayment needed
+
+    numerator: uint256 = effectiveDebtValue - targetDebtValue
     denominator: uint256 = HUNDRED_PERCENT - _targetLtv
     if denominator == 0:
         return effectiveDebt # edge case: 100% target LTV
