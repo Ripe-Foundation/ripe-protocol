@@ -416,7 +416,10 @@ def _getTotalValue(_asset: address, _priceDesk: address = empty(address)) -> uin
     priceDesk: address = _priceDesk
     if priceDesk == empty(address):
         priceDesk = addys._getPriceDeskAddr()
-    totalStabValue: uint256 = staticcall PriceDesk(priceDesk).getUsdValue(_asset, staticcall IERC20(_asset).balanceOf(self), True)
+    totalStabValue: uint256 = 0
+    stabAssetBalance: uint256 = staticcall IERC20(_asset).balanceOf(self)
+    if stabAssetBalance != 0:
+        totalStabValue = staticcall PriceDesk(priceDesk).getUsdValue(_asset, stabAssetBalance, True)
     claimableValue: uint256 = self._getValueOfClaimableAssets(_asset, priceDesk)
     return totalStabValue + claimableValue
 
@@ -585,7 +588,7 @@ def redeemFromStabilityPool(
     _asset: address,
     _greenAmount: uint256,
     _redeemer: address,
-    _wantsSavingsGreen: bool,
+    _shouldStakeRefund: bool,
     _a: addys.Addys = empty(addys.Addys),
 ) -> uint256:
     assert msg.sender == addys._getTellerAddr() # dev: only Teller allowed
@@ -597,10 +600,11 @@ def redeemFromStabilityPool(
     greenAmount: uint256 = min(_greenAmount, staticcall IERC20(a.greenToken).balanceOf(self))
     assert greenAmount != 0 # dev: no green to redeem
     greenSpent: uint256 = self._redeemFromStabilityPool(_redeemer, _asset, max_value(uint256), greenAmount, a.greenToken, a.priceDesk, a.controlRoom)
+    assert greenSpent != 0 # dev: no redemptions occurred
 
     # handle leftover green
     if greenAmount > greenSpent:
-        self._handleGreenForUser(_redeemer, greenAmount - greenSpent, _wantsSavingsGreen, a.greenToken, a.savingsGreen)
+        self._handleGreenForUser(_redeemer, greenAmount - greenSpent, _shouldStakeRefund, a.greenToken, a.savingsGreen)
 
     return greenSpent
 
@@ -610,7 +614,7 @@ def redeemManyFromStabilityPool(
     _redemptions: DynArray[StabPoolRedemption, MAX_STAB_REDEMPTIONS],
     _greenAmount: uint256,
     _redeemer: address,
-    _wantsSavingsGreen: bool,
+    _shouldStakeRefund: bool,
     _a: addys.Addys = empty(addys.Addys),
 ) -> uint256:
     assert msg.sender == addys._getTellerAddr() # dev: only Teller allowed
@@ -630,9 +634,11 @@ def redeemManyFromStabilityPool(
         totalGreenRemaining -= greenSpent
         totalGreenSpent += greenSpent
 
+    assert totalGreenSpent != 0 # dev: no redemptions occurred
+
     # handle leftover green
     if totalGreenRemaining != 0:
-        self._handleGreenForUser(_redeemer, totalGreenRemaining, _wantsSavingsGreen, a.greenToken, a.savingsGreen)
+        self._handleGreenForUser(_redeemer, totalGreenRemaining, _shouldStakeRefund, a.greenToken, a.savingsGreen)
 
     return totalGreenSpent
 
@@ -747,7 +753,10 @@ def _handleGreenForUser(
         return
 
     if _wantsSavingsGreen:
+        assert extcall IERC20(_greenToken).approve(_savingsGreen, amount, default_return_value=True) # dev: green approval failed
         extcall IERC4626(_savingsGreen).deposit(amount, _recipient)
+        assert extcall IERC20(_greenToken).approve(_savingsGreen, 0, default_return_value=True) # dev: green approval failed
+
     else:
         assert extcall IERC20(_greenToken).transfer(_recipient, amount, default_return_value=True) # dev: green transfer failed
 
