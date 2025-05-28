@@ -20,6 +20,8 @@ event Withdraw:
     assets: uint256
     shares: uint256
 
+lastPricePerShare: public(uint256)
+
 ASSET: immutable(address)
 DECIMAL_OFFSET: constant(uint256) = 10 ** 8
 
@@ -108,6 +110,10 @@ def _deposit(_asset: address, _amount: uint256, _shares: uint256, _recipient: ad
 
     assert extcall IERC20(_asset).transferFrom(msg.sender, self, _amount, default_return_value=True) # dev: deposit failed
     token._mint(_recipient, _shares)
+
+    # update last price per share
+    self._updateLastPricePerShare(_asset)
+
     log Deposit(sender=msg.sender, owner=_recipient, assets=_amount, shares=_shares)
 
 
@@ -187,6 +193,9 @@ def _redeem(
     token._burn(_owner, _shares)
     assert extcall IERC20(_asset).transfer(_recipient, _amount, default_return_value=True) # dev: withdrawal failed
 
+    # update last price per share
+    self._updateLastPricePerShare(_asset)
+
     log Withdraw(sender=_sender, receiver=_recipient, owner=_owner, assets=_amount, shares=_shares)
     return _amount
 
@@ -262,3 +271,24 @@ def _sharesToAmount(
         amount += 1
 
     return amount
+
+
+# price per share
+
+
+@internal
+def _updateLastPricePerShare(_asset: address):
+    newLastPricePerShare: uint256 = self._sharesToAmount(10 ** convert(token.TOKEN_DECIMALS, uint256), token.totalSupply, staticcall IERC20(_asset).balanceOf(self), False)
+    self.lastPricePerShare = newLastPricePerShare
+
+
+@view
+@external
+def getLastUnderlying(_shares: uint256) -> uint256:
+    return self.lastPricePerShare * _shares // (10 ** convert(token.TOKEN_DECIMALS, uint256))
+
+
+@view
+@external
+def pricePerShare() -> uint256:
+    return self._sharesToAmount(10 ** convert(token.TOKEN_DECIMALS, uint256), token.totalSupply, staticcall IERC20(ASSET).balanceOf(self), False)

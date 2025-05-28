@@ -823,3 +823,283 @@ def test_erc4626_share_value_with_extreme_balance_changes(
     final_share_value = savings_green.convertToAssets(shares) / shares
     assert final_share_value > new_share_value
     assert final_share_value == (deposit_amount + profit + tiny_profit) / shares
+
+
+def test_erc4626_price_per_share_after_first_deposit(
+    savings_green,
+    green_token,
+    whale,
+    bob,
+):
+    green_token.approve(savings_green, MAX_UINT256, sender=whale)
+    
+    # Initial deposit
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    savings_green.deposit(deposit_amount, bob, sender=whale)
+    
+    # After first deposit, both prices should be equal and represent the initial price
+    last_price = savings_green.lastPricePerShare()
+    current_price = savings_green.pricePerShare()
+    
+    assert last_price > 0
+    assert current_price > 0
+    assert last_price == current_price
+    
+    # Price should account for the decimal offset protection
+    # The implementation adds DECIMAL_OFFSET (10**8) to totalShares and 1 to totalBalance
+    # So the price will be slightly less than 1 token per share due to this protection
+    DECIMAL_OFFSET = 10 ** 8
+    total_shares = savings_green.totalSupply() + DECIMAL_OFFSET
+    total_balance = savings_green.totalAssets() + 1
+    expected_price = (EIGHTEEN_DECIMALS * total_balance) // total_shares
+    
+    # The price should match our calculation accounting for the offset
+    assert abs(last_price - expected_price) <= 1  # Allow for rounding differences
+
+
+def test_erc4626_price_per_share_updates_on_deposit(
+    savings_green,
+    green_token,
+    whale,
+    bob,
+    sally,
+):
+    """Test that lastPricePerShare updates on deposits"""
+    green_token.approve(savings_green, MAX_UINT256, sender=whale)
+    
+    # First deposit
+    deposit1 = 100 * EIGHTEEN_DECIMALS
+    savings_green.deposit(deposit1, bob, sender=whale)
+    price_after_first = savings_green.lastPricePerShare()
+    
+    # Second deposit
+    deposit2 = 200 * EIGHTEEN_DECIMALS
+    savings_green.deposit(deposit2, sally, sender=whale)
+    price_after_second = savings_green.lastPricePerShare()
+    
+    # Price should update (though it might be similar due to proportional deposits)
+    assert price_after_second > 0
+    # Both prices should be close since no external profit was added
+    # Allow for small rounding differences due to decimal offset
+    assert abs(price_after_first - price_after_second) < 1000  # Small wei tolerance
+
+
+def test_erc4626_price_per_share_updates_on_withdrawal(
+    savings_green,
+    green_token,
+    whale,
+    bob,
+):
+    """Test that lastPricePerShare updates on withdrawals"""
+    green_token.approve(savings_green, MAX_UINT256, sender=whale)
+    
+    # Initial deposit
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    shares = savings_green.deposit(deposit_amount, bob, sender=whale)
+    price_after_deposit = savings_green.lastPricePerShare()
+    
+    # Withdraw half
+    withdraw_amount = deposit_amount // 2
+    savings_green.withdraw(withdraw_amount, bob, bob, sender=bob)
+    price_after_withdrawal = savings_green.lastPricePerShare()
+    
+    # Price should update
+    assert price_after_withdrawal > 0
+    # Price should be similar since no external changes occurred
+    # Allow for small rounding differences
+    assert abs(price_after_deposit - price_after_withdrawal) < 1000  # Small wei tolerance
+
+
+def test_erc4626_price_per_share_with_profit(
+    savings_green,
+    green_token,
+    whale,
+    bob,
+    credit_engine,
+):
+    """Test price per share behavior when underlying assets increase (profit)"""
+    green_token.approve(savings_green, MAX_UINT256, sender=whale)
+    
+    # Initial deposit
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    shares = savings_green.deposit(deposit_amount, bob, sender=whale)
+    last_price_after_deposit = savings_green.lastPricePerShare()
+    current_price_after_deposit = savings_green.pricePerShare()
+    
+    # Add profit by directly transferring tokens to the contract
+    profit_amount = 50 * EIGHTEEN_DECIMALS
+    green_token.mint(savings_green, profit_amount, sender=credit_engine.address)
+    
+    # Current price should reflect the profit immediately
+    current_price_after_profit = savings_green.pricePerShare()
+    assert current_price_after_profit > current_price_after_deposit
+    
+    # Last price should still be the historical value (not updated until next transaction)
+    assert savings_green.lastPricePerShare() == last_price_after_deposit
+    
+    # Make another deposit to trigger lastPricePerShare update
+    small_deposit = 1 * EIGHTEEN_DECIMALS
+    savings_green.deposit(small_deposit, bob, sender=whale)
+    
+    # Now lastPricePerShare should be updated to reflect the profit
+    last_price_after_update = savings_green.lastPricePerShare()
+    assert last_price_after_update > last_price_after_deposit
+    assert abs(last_price_after_update - current_price_after_profit) < EIGHTEEN_DECIMALS // 1000  # 0.001 token tolerance
+
+
+def test_erc4626_price_per_share_with_loss(
+    savings_green,
+    green_token,
+    whale,
+    bob,
+    sally,
+):
+    """Test price per share behavior when underlying assets decrease (loss)"""
+    green_token.approve(savings_green, MAX_UINT256, sender=whale)
+    
+    # Initial deposit
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    shares = savings_green.deposit(deposit_amount, bob, sender=whale)
+    last_price_after_deposit = savings_green.lastPricePerShare()
+    current_price_after_deposit = savings_green.pricePerShare()
+    
+    # Simulate loss by transferring tokens out of the contract
+    loss_amount = 25 * EIGHTEEN_DECIMALS
+    green_token.transfer(sally, loss_amount, sender=savings_green.address)
+    
+    # Current price should reflect the loss immediately
+    current_price_after_loss = savings_green.pricePerShare()
+    assert current_price_after_loss < current_price_after_deposit
+    
+    # Last price should still be the historical value
+    assert savings_green.lastPricePerShare() == last_price_after_deposit
+    
+    # Make another deposit to trigger lastPricePerShare update
+    small_deposit = 1 * EIGHTEEN_DECIMALS
+    savings_green.deposit(small_deposit, bob, sender=whale)
+    
+    # Now lastPricePerShare should be updated to reflect the loss
+    last_price_after_update = savings_green.lastPricePerShare()
+    assert last_price_after_update < last_price_after_deposit
+    assert abs(last_price_after_update - current_price_after_loss) < EIGHTEEN_DECIMALS // 1000  # 0.001 token tolerance
+
+
+def test_erc4626_price_per_share_manipulation_resistance(
+    savings_green,
+    green_token,
+    whale,
+    bob,
+    sally,
+    credit_engine,
+):
+    """Test that lastPricePerShare is resistant to manipulation attacks"""
+    green_token.approve(savings_green, MAX_UINT256, sender=whale)
+    
+    # Initial deposit
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    shares = savings_green.deposit(deposit_amount, bob, sender=whale)
+    initial_last_price = savings_green.lastPricePerShare()
+    
+    # Attacker tries to manipulate by adding large amount of assets directly
+    manipulation_amount = 1000 * EIGHTEEN_DECIMALS
+    green_token.mint(savings_green, manipulation_amount, sender=credit_engine.address)
+    
+    # Current price is affected by manipulation
+    manipulated_current_price = savings_green.pricePerShare()
+    assert manipulated_current_price > initial_last_price
+    
+    # But lastPricePerShare is still the historical value
+    assert savings_green.lastPricePerShare() == initial_last_price
+    
+    # Even after a small transaction, the update is based on the actual state
+    small_deposit = 1 * EIGHTEEN_DECIMALS
+    savings_green.deposit(small_deposit, sally, sender=whale)
+    
+    # lastPricePerShare now reflects the manipulated state, but this is expected behavior
+    # The key is that it wasn't immediately affected by the manipulation
+    updated_last_price = savings_green.lastPricePerShare()
+    assert updated_last_price > initial_last_price
+    assert abs(updated_last_price - manipulated_current_price) < EIGHTEEN_DECIMALS // 1000  # 0.001 token tolerance
+
+
+def test_erc4626_price_per_share_precision(
+    savings_green,
+    green_token,
+    whale,
+    bob,
+    credit_engine,
+):
+    """Test price per share precision with small changes"""
+    green_token.approve(savings_green, MAX_UINT256, sender=whale)
+    
+    # Initial deposit
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    savings_green.deposit(deposit_amount, bob, sender=whale)
+    initial_price = savings_green.lastPricePerShare()
+    
+    # Add very small profit
+    tiny_profit = 1 * EIGHTEEN_DECIMALS
+    green_token.mint(savings_green, tiny_profit, sender=credit_engine.address)
+    
+    # Current price should reflect even tiny changes
+    current_price = savings_green.pricePerShare()
+    assert current_price > initial_price
+
+
+def test_erc4626_price_per_share_with_redeem_operations(
+    savings_green,
+    green_token,
+    whale,
+    bob,
+    credit_engine,
+):
+    """Test price per share updates with redeem operations"""
+    green_token.approve(savings_green, MAX_UINT256, sender=whale)
+    
+    # Initial deposit
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    shares = savings_green.deposit(deposit_amount, bob, sender=whale)
+    price_after_deposit = savings_green.lastPricePerShare()
+    
+    # Add some profit
+    profit = 25 * EIGHTEEN_DECIMALS
+    green_token.mint(savings_green, profit, sender=credit_engine.address)
+    
+    assert savings_green.pricePerShare() > price_after_deposit
+
+    # Redeem some shares (this should trigger price update)
+    redeem_shares = shares // 4
+    savings_green.redeem(redeem_shares, bob, bob, sender=bob)
+    
+    # lastPricePerShare should now reflect the profit
+    price_after_redeem = savings_green.lastPricePerShare()
+    assert price_after_redeem > price_after_deposit
+
+
+def test_erc4626_price_per_share_specific(
+    savings_green,
+    green_token,
+    whale,
+    bob,
+    credit_engine,
+    _test,
+):
+    green_token.approve(savings_green, MAX_UINT256, sender=whale)
+
+    # Initial deposit
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    shares = savings_green.deposit(deposit_amount, bob, sender=whale)
+    last_price_after_deposit = savings_green.lastPricePerShare()
+    
+    # Add profit by directly transferring tokens to the contract
+    profit_amount = 100 * EIGHTEEN_DECIMALS
+    green_token.mint(savings_green, profit_amount, sender=credit_engine.address)
+
+    current_price_after_profit = savings_green.pricePerShare()
+    assert current_price_after_profit > last_price_after_deposit
+
+    last_bal = savings_green.getLastUnderlying(shares)
+    _test(last_bal, deposit_amount)
+
+    current_bal = shares * current_price_after_profit // EIGHTEEN_DECIMALS
+    _test(current_bal, 200 * EIGHTEEN_DECIMALS)

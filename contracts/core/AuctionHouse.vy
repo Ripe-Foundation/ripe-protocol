@@ -178,7 +178,6 @@ didHandleVaultId: transient(HashMap[address, HashMap[uint256, bool]]) # user -> 
 numUserAssetsForAuction: transient(HashMap[address, uint256]) # user -> num assets
 userAssetForAuction: transient(HashMap[address, HashMap[uint256, VaultData]]) # user -> index -> asset
 
-
 HUNDRED_PERCENT: constant(uint256) = 100_00 # 100.00%
 ONE_PERCENT: constant(uint256) = 1_00 # 1%
 MAX_STAB_VAULT_DATA: constant(uint256) = 10
