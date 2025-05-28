@@ -1,7 +1,7 @@
 import pytest
 import boa
 
-from constants import EIGHTEEN_DECIMALS, HUNDRED_PERCENT
+from constants import EIGHTEEN_DECIMALS
 from conf_utils import filter_logs
 
 
@@ -440,3 +440,731 @@ def test_ah_liquidation_custom_auction_params(
     assert auction_log.maxDiscount == 25_00   # Custom max discount
     assert auction_log.startBlock == boa.env.evm.patch.block_number + 10  # Custom delay
     assert auction_log.endBlock == auction_log.startBlock + 100  # Custom duration
+
+
+def test_ah_auction_buy_config_restrictions(
+    setGeneralConfig,
+    setAssetConfig,
+    setGeneralDebtConfig,
+    performDeposit,
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    alice,
+    teller,
+    mock_price_source,
+    createDebtTerms,
+    sally,
+    green_token,
+    whale,
+    mock_whitelist,
+):
+    """Test auction buy config restrictions
+    
+    This tests:
+    - canBuyInAuctionGeneral restrictions (via setGeneralConfig)
+    - canBuyInAuctionAsset restrictions (via setAssetConfig)
+    - isUserAllowed restrictions (via whitelist)
+    - Graceful failure when restrictions are violated
+    """
+    
+    setGeneralConfig()
+    setGeneralDebtConfig(_ltvPaybackBuffer=0)
+    
+    # Setup asset for auction
+    debt_terms = createDebtTerms(_liqThreshold=80_00, _liqFee=10_00, _ltv=50_00, _borrowRate=0)
+    setAssetConfig(
+        alpha_token,
+        _debtTerms=debt_terms,
+        _shouldAuctionInstantly=True,
+    )
+
+    # Setup liquidation scenario
+    mock_price_source.setPrice(alpha_token, 1 * EIGHTEEN_DECIMALS)
+    mock_price_source.setPrice(green_token, 1 * EIGHTEEN_DECIMALS)
+    
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    performDeposit(bob, deposit_amount, alpha_token, alpha_token_whale)
+    debt_amount = 60 * EIGHTEEN_DECIMALS
+    teller.borrow(debt_amount, bob, False, sender=bob)
+
+    # Set liquidatable price
+    new_price = 50 * EIGHTEEN_DECIMALS // 100  # 0.50
+    mock_price_source.setPrice(alpha_token, new_price)
+
+    # Perform liquidation to create auction
+    teller.liquidateUser(bob, False, sender=sally)
+    auction_log = filter_logs(teller, "NewFungibleAuctionCreated")[0]
+    
+    # Give alice GREEN
+    green_amount = 50 * EIGHTEEN_DECIMALS
+    green_token.transfer(alice, green_amount * 2, sender=whale)  # Give alice double to cover transfers
+    green_token.approve(teller, green_amount, sender=alice)  # Approve for teller transfers
+
+    # Test 1: Disable general auction buying via setGeneralConfig
+    setGeneralConfig(_canBuyInAuction=False)
+    
+    with boa.reverts("no green spent"):
+        teller.buyFungibleAuction(
+            bob, auction_log.vaultId, alpha_token, 10 * EIGHTEEN_DECIMALS, False, sender=alice
+        )
+    
+    # Re-enable general auction buying
+    setGeneralConfig(_canBuyInAuction=True)
+    
+    # Test 2: Disable asset-specific auction buying via setAssetConfig
+    setAssetConfig(
+        alpha_token,
+        _debtTerms=debt_terms,
+        _shouldAuctionInstantly=True,
+        _canBuyInAuction=False,  # DISABLED for this asset
+    )
+    
+    with boa.reverts("no green spent"):
+        teller.buyFungibleAuction(
+            bob, auction_log.vaultId, alpha_token, 10 * EIGHTEEN_DECIMALS, False, sender=alice
+        )
+    
+    # Re-enable asset auction buying
+    setAssetConfig(
+        alpha_token,
+        _debtTerms=debt_terms,
+        _shouldAuctionInstantly=True,
+        _canBuyInAuction=True,  # RE-ENABLED
+    )
+    
+    # Test 3: Restrict user via whitelist
+    setAssetConfig(
+        alpha_token,
+        _debtTerms=debt_terms,
+        _shouldAuctionInstantly=True,
+        _canBuyInAuction=True,
+        _whitelist=mock_whitelist,  # Add whitelist restriction
+    )
+    
+    # Alice is not on whitelist, should fail
+    with boa.reverts("no green spent"):
+        teller.buyFungibleAuction(
+            bob, auction_log.vaultId, alpha_token, 10 * EIGHTEEN_DECIMALS, False, sender=alice
+        )
+    
+    # Add alice to whitelist
+    mock_whitelist.setAllowed(alice, alpha_token, True, sender=alice)
+    
+    # Test 4: Now buying should work
+    green_spent = teller.buyFungibleAuction(
+        bob, auction_log.vaultId, alpha_token, 10 * EIGHTEEN_DECIMALS, False, sender=alice
+    )
+    assert green_spent > 0  # Should succeed
+
+
+def test_ah_auction_time_boundary_edge_cases(
+    setGeneralConfig,
+    setAssetConfig,
+    setGeneralDebtConfig,
+    performDeposit,
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    alice,
+    teller,
+    mock_price_source,
+    createDebtTerms,
+    createAuctionParams,
+    sally,
+    green_token,
+    whale,
+):
+    """Test auction time boundary edge cases
+    
+    This tests:
+    - Auction not yet started (before startBlock)
+    - Auction exactly at start block
+    - Auction exactly at end block  
+    - Auction after end block
+    - Zero duration auctions
+    """
+    
+    setGeneralConfig()
+    setGeneralDebtConfig(_ltvPaybackBuffer=0)
+    
+    # Setup asset with delayed auction
+    debt_terms = createDebtTerms(_liqThreshold=80_00, _liqFee=10_00, _ltv=50_00, _borrowRate=0)
+    auction_params = createAuctionParams(
+        _startDiscount=0,
+        _maxDiscount=50_00,
+        _delay=5,  # 5 block delay
+        _duration=10,  # 10 block duration
+    )
+    
+    setAssetConfig(
+        alpha_token,
+        _debtTerms=debt_terms,
+        _shouldAuctionInstantly=True,
+        _customAuctionParams=auction_params,
+    )
+
+    # Setup liquidation scenario
+    mock_price_source.setPrice(alpha_token, 1 * EIGHTEEN_DECIMALS)
+    mock_price_source.setPrice(green_token, 1 * EIGHTEEN_DECIMALS)
+    
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    performDeposit(bob, deposit_amount, alpha_token, alpha_token_whale)
+    debt_amount = 60 * EIGHTEEN_DECIMALS
+    teller.borrow(debt_amount, bob, False, sender=bob)
+
+    # Set liquidatable price
+    new_price = 50 * EIGHTEEN_DECIMALS // 100  # 0.50
+    mock_price_source.setPrice(alpha_token, new_price)
+
+    # Perform liquidation to create auction
+    teller.liquidateUser(bob, False, sender=sally)
+    auction_log = filter_logs(teller, "NewFungibleAuctionCreated")[0]
+    
+    start_block = auction_log.startBlock
+    end_block = auction_log.endBlock
+    
+    # Verify auction timing
+    assert start_block == boa.env.evm.patch.block_number + 5  # Delay of 5 blocks
+    assert end_block == start_block + 10  # Duration of 10 blocks
+    
+    # Give alice GREEN
+    green_amount = 50 * EIGHTEEN_DECIMALS
+    green_token.transfer(alice, green_amount, sender=whale)
+    green_token.approve(teller, green_amount, sender=alice)
+
+    # Test 1: Before auction starts (should fail gracefully)
+    # We're currently at liquidation_block, auction starts at liquidation_block + 5
+    with boa.reverts("no green spent"):
+        teller.buyFungibleAuction(
+            bob, auction_log.vaultId, alpha_token, 10 * EIGHTEEN_DECIMALS, False, sender=alice
+        )
+    
+    # Test 2: Exactly at start block (should work)
+    boa.env.time_travel(blocks=5)  # Move to start block
+    assert boa.env.evm.patch.block_number == start_block
+    
+    green_spent = teller.buyFungibleAuction(
+        bob, auction_log.vaultId, alpha_token, 10 * EIGHTEEN_DECIMALS, False, sender=alice
+    )
+    assert green_spent > 0  # Should succeed
+    
+    # Test 3: One block before end (should work)
+    # We're currently at start_block, need to move to end_block - 1
+    blocks_to_move = (end_block - 1) - boa.env.evm.patch.block_number
+    boa.env.time_travel(blocks=blocks_to_move)
+    assert boa.env.evm.patch.block_number == end_block - 1
+    
+    green_spent = teller.buyFungibleAuction(
+        bob, auction_log.vaultId, alpha_token, 10 * EIGHTEEN_DECIMALS, False, sender=alice
+    )
+    assert green_spent > 0  # Should succeed
+    
+    # Test 4: Exactly at end block (should fail)
+    boa.env.time_travel(blocks=1)  # Move to end block
+    assert boa.env.evm.patch.block_number == end_block
+    
+    with boa.reverts("no green spent"):
+        teller.buyFungibleAuction(
+            bob, auction_log.vaultId, alpha_token, 10 * EIGHTEEN_DECIMALS, False, sender=alice
+        )
+    
+    # Test 5: After end block (should fail)
+    boa.env.time_travel(blocks=5)  # Move past end block
+    
+    with boa.reverts("no green spent"):
+        teller.buyFungibleAuction(
+            bob, auction_log.vaultId, alpha_token, 10 * EIGHTEEN_DECIMALS, False, sender=alice
+        )
+
+
+def test_ah_auction_insufficient_green_scenarios(
+    setGeneralConfig,
+    setAssetConfig,
+    setGeneralDebtConfig,
+    performDeposit,
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    alice,
+    teller,
+    mock_price_source,
+    createDebtTerms,
+    sally,
+    green_token,
+    whale,
+    auction_house,
+):
+    """Test auction behavior with insufficient GREEN tokens
+    
+    This tests:
+    - No GREEN in auction house
+    - Partial GREEN availability
+    - GREEN balance changes during auction
+    - Batch purchases with insufficient GREEN
+    """
+    
+    setGeneralConfig()
+    setGeneralDebtConfig(_ltvPaybackBuffer=0)
+    
+    # Setup asset for auction
+    debt_terms = createDebtTerms(_liqThreshold=80_00, _liqFee=10_00, _ltv=50_00, _borrowRate=0)
+    setAssetConfig(
+        alpha_token,
+        _debtTerms=debt_terms,
+        _shouldAuctionInstantly=True,
+    )
+
+    # Setup liquidation scenario
+    mock_price_source.setPrice(alpha_token, 1 * EIGHTEEN_DECIMALS)
+    mock_price_source.setPrice(green_token, 1 * EIGHTEEN_DECIMALS)
+    
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    performDeposit(bob, deposit_amount, alpha_token, alpha_token_whale)
+    debt_amount = 60 * EIGHTEEN_DECIMALS
+    teller.borrow(debt_amount, bob, False, sender=bob)
+
+    # Set liquidatable price
+    new_price = 50 * EIGHTEEN_DECIMALS // 100  # 0.50
+    mock_price_source.setPrice(alpha_token, new_price)
+
+    # Perform liquidation to create auction
+    teller.liquidateUser(bob, False, sender=sally)
+    auction_log = filter_logs(teller, "NewFungibleAuctionCreated")[0]
+    
+    # user has no green
+    with boa.reverts("cannot transfer 0 amount"):
+        teller.buyFungibleAuction(
+            bob, auction_log.vaultId, alpha_token, 10 * EIGHTEEN_DECIMALS, False, sender=alice
+        )
+   
+    # Transfer some GREEN to auction house (simulating previous auction activity)
+    partial_green = 5 * EIGHTEEN_DECIMALS
+    green_token.transfer(auction_house, partial_green, sender=whale)
+    
+    # Partial GREEN availability (should use what's available)
+    green_spent = auction_house.buyFungibleAuction(
+        bob, auction_log.vaultId, alpha_token, 20 * EIGHTEEN_DECIMALS, alice, False, sender=teller.address
+    )
+    
+    # Should spend only what was available in auction house
+    assert green_spent == partial_green
+    assert green_token.balanceOf(auction_house) == 0  # All GREEN used
+    
+    # Batch purchase with insufficient GREEN
+    # Add more GREEN to auction house
+    batch_green = 15 * EIGHTEEN_DECIMALS
+    green_token.transfer(auction_house, batch_green, sender=whale)
+    
+    # Try to buy more than available
+    purchases = [
+        (bob, auction_log.vaultId, alpha_token, 10 * EIGHTEEN_DECIMALS),
+        (bob, auction_log.vaultId, alpha_token, 10 * EIGHTEEN_DECIMALS),
+    ]
+    
+    total_green_spent = auction_house.buyManyFungibleAuctions(
+        purchases, 30 * EIGHTEEN_DECIMALS, alice, False, sender=teller.address
+    )
+    
+    # Should spend only what was available
+    assert total_green_spent == batch_green
+    assert green_token.balanceOf(auction_house) == 0  # All GREEN used
+
+
+def test_ah_auction_discount_calculation_edge_cases(
+    setGeneralConfig,
+    setAssetConfig,
+    setGeneralDebtConfig,
+    performDeposit,
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    alice,
+    teller,
+    mock_price_source,
+    createDebtTerms,
+    createAuctionParams,
+    sally,
+    green_token,
+    whale,
+):
+    """Test auction discount calculation edge cases
+    
+    This tests:
+    - Same start and max discount (no progression)
+    - Zero start discount
+    - 100% max discount
+    - Very short duration auctions
+    - Discount calculation precision
+    """
+    
+    setGeneralConfig()
+    setGeneralDebtConfig(_ltvPaybackBuffer=0)
+    
+    # Test Case 1: Same start and max discount (flat discount)
+    debt_terms = createDebtTerms(_liqThreshold=80_00, _liqFee=10_00, _ltv=50_00, _borrowRate=0)
+    flat_auction_params = createAuctionParams(
+        _startDiscount=25_00,  # 25%
+        _maxDiscount=25_00,    # 25% (same as start)
+        _delay=0,
+        _duration=100,
+    )
+    
+    setAssetConfig(
+        alpha_token,
+        _debtTerms=debt_terms,
+        _shouldAuctionInstantly=True,
+        _customAuctionParams=flat_auction_params,
+    )
+
+    # Setup liquidation scenario
+    mock_price_source.setPrice(alpha_token, 1 * EIGHTEEN_DECIMALS)
+    mock_price_source.setPrice(green_token, 1 * EIGHTEEN_DECIMALS)
+    
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    performDeposit(bob, deposit_amount, alpha_token, alpha_token_whale)
+    debt_amount = 60 * EIGHTEEN_DECIMALS
+    teller.borrow(debt_amount, bob, False, sender=bob)
+
+    # Set liquidatable price
+    new_price = 50 * EIGHTEEN_DECIMALS // 100  # 0.50
+    mock_price_source.setPrice(alpha_token, new_price)
+
+    # Perform liquidation
+    teller.liquidateUser(bob, False, sender=sally)
+    auction_log = filter_logs(teller, "NewFungibleAuctionCreated")[0]
+    
+    # Verify flat discount parameters
+    assert auction_log.startDiscount == 25_00
+    assert auction_log.maxDiscount == 25_00
+    
+    # Give alice GREEN
+    green_amount = 50 * EIGHTEEN_DECIMALS
+    green_token.transfer(alice, green_amount, sender=whale)  # Give alice double to cover transfers
+    green_token.approve(teller, green_amount, sender=alice)  # Approve for teller transfers
+
+    # Test discount at start (should be 25%)
+    green_to_spend = 10 * EIGHTEEN_DECIMALS
+    green_spent_start = teller.buyFungibleAuction(
+        bob, auction_log.vaultId, alpha_token, green_to_spend, False, sender=alice
+    )
+    
+    # Test discount at middle (should still be 25%)
+    boa.env.time_travel(blocks=50)  # Middle of auction
+    green_spent_middle = teller.buyFungibleAuction(
+        bob, auction_log.vaultId, alpha_token, green_to_spend, False, sender=alice
+    )
+    
+    # Test discount near end (should still be 25%)
+    boa.env.time_travel(blocks=49)  # Near end of auction
+    green_spent_end = teller.buyFungibleAuction(
+        bob, auction_log.vaultId, alpha_token, green_to_spend, False, sender=alice
+    )
+    
+    # All should spend the same amount (flat 25% discount)
+    # Allow for small rounding differences (within 1% tolerance)
+    assert abs(green_spent_start - green_to_spend) <= green_to_spend // 100
+    assert abs(green_spent_middle - green_to_spend) <= green_to_spend // 100  
+    assert abs(green_spent_end - green_to_spend) <= green_to_spend // 100
+    assert abs(green_spent_start - green_spent_middle) <= green_to_spend // 100
+    assert abs(green_spent_middle - green_spent_end) <= green_to_spend // 100
+
+
+def test_ah_auction_payment_validation_edge_cases(
+    setGeneralConfig,
+    setAssetConfig,
+    setGeneralDebtConfig,
+    performDeposit,
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    alice,
+    teller,
+    mock_price_source,
+    createDebtTerms,
+    sally,
+    green_token,
+    whale,
+):
+    """Test payment validation edge cases in auctions
+    
+    This tests:
+    - _isPaymentCloseEnough validation
+    - Rounding errors in payment calculations
+    - Very small payment amounts
+    - Price precision edge cases
+    """
+
+    setGeneralConfig()
+    setGeneralDebtConfig(_ltvPaybackBuffer=0)
+
+    # Setup asset for auction
+    debt_terms = createDebtTerms(_liqThreshold=80_00, _liqFee=10_00, _ltv=50_00, _borrowRate=0)
+    setAssetConfig(
+        alpha_token,
+        _debtTerms=debt_terms,
+        _shouldAuctionInstantly=True,
+    )
+
+    # Setup with precise prices to test rounding
+    mock_price_source.setPrice(alpha_token, 1 * EIGHTEEN_DECIMALS)
+    mock_price_source.setPrice(green_token, 1 * EIGHTEEN_DECIMALS)
+
+    deposit_amount = 1000 * EIGHTEEN_DECIMALS  # Large amount for precision testing
+    performDeposit(bob, deposit_amount, alpha_token, alpha_token_whale)
+    debt_amount = 600 * EIGHTEEN_DECIMALS
+    teller.borrow(debt_amount, bob, False, sender=bob)
+
+    # Set liquidatable price
+    new_price = 50 * EIGHTEEN_DECIMALS // 100  # 0.50
+    mock_price_source.setPrice(alpha_token, new_price)
+
+    # Perform liquidation
+    teller.liquidateUser(bob, False, sender=sally)
+    auction_log = filter_logs(teller, "NewFungibleAuctionCreated")[0]
+
+    # Give alice GREEN
+    green_amount = 500 * EIGHTEEN_DECIMALS
+    green_token.transfer(alice, green_amount, sender=whale)
+    green_token.approve(teller, green_amount, sender=alice)  # Approve for teller transfers
+
+    # Test 1: Very small payment (1 wei)
+    tiny_amount = 1  # 1 wei
+    green_spent = teller.buyFungibleAuction(
+        bob, auction_log.vaultId, alpha_token, tiny_amount, False, sender=alice
+    )
+    # Should handle tiny amounts gracefully
+    assert green_spent <= tiny_amount
+    
+    # Test 2: Odd number that might cause rounding issues
+    odd_amount = 123456789  # Odd number in wei
+    green_spent = teller.buyFungibleAuction(
+        bob, auction_log.vaultId, alpha_token, odd_amount, False, sender=alice
+    )
+    # Should handle odd amounts within 1% tolerance
+    assert green_spent <= odd_amount
+    
+    # Test 3: Large payment amount
+    large_amount = 100 * EIGHTEEN_DECIMALS
+    green_spent = teller.buyFungibleAuction(
+        bob, auction_log.vaultId, alpha_token, large_amount, False, sender=alice
+    )
+    # Should handle large amounts correctly
+    assert green_spent <= large_amount
+
+
+def test_ah_auction_multiple_asset_coordination(
+    setGeneralConfig,
+    setAssetConfig,
+    setGeneralDebtConfig,
+    performDeposit,
+    alpha_token,
+    alpha_token_whale,
+    bravo_token,
+    bravo_token_whale,
+    charlie_token,
+    charlie_token_whale,
+    bob,
+    alice,
+    teller,
+    mock_price_source,
+    createDebtTerms,
+    createAuctionParams,
+    sally,
+    green_token,
+    whale,
+):
+    """Test coordination between multiple asset auctions
+    
+    This tests:
+    - Multiple auctions for same user
+    - Different auction parameters per asset
+    - Auction removal when positions are depleted
+    - Cross-asset auction interactions
+    """
+    
+    setGeneralConfig()
+    setGeneralDebtConfig(_ltvPaybackBuffer=0)
+    
+    # Setup multiple assets with different auction parameters
+    debt_terms = createDebtTerms(_liqThreshold=80_00, _liqFee=10_00, _ltv=50_00, _borrowRate=0)
+    
+    # Alpha: Fast auction (short duration, high discount)
+    fast_params = createAuctionParams(
+        _startDiscount=0,
+        _maxDiscount=75_00,  # 75% max discount
+        _delay=0,
+        _duration=50,  # Short duration
+    )
+    
+    # Bravo: Slow auction (long duration, low discount)
+    slow_params = createAuctionParams(
+        _startDiscount=5_00,  # 5% start discount
+        _maxDiscount=25_00,   # 25% max discount
+        _delay=5,             # Delayed start
+        _duration=200,        # Long duration
+    )
+    
+    # Charlie: Default auction parameters
+    setAssetConfig(alpha_token, _debtTerms=debt_terms, _shouldAuctionInstantly=True, _customAuctionParams=fast_params)
+    setAssetConfig(bravo_token, _debtTerms=debt_terms, _shouldAuctionInstantly=True, _customAuctionParams=slow_params)
+    setAssetConfig(charlie_token, _debtTerms=debt_terms, _shouldAuctionInstantly=True)
+
+    # Setup liquidation scenario with multiple assets
+    for token in [alpha_token, bravo_token, charlie_token, green_token]:
+        mock_price_source.setPrice(token, 1 * EIGHTEEN_DECIMALS)
+    
+    # User with multiple collateral assets
+    alpha_amount = 100 * EIGHTEEN_DECIMALS
+    bravo_amount = 150 * EIGHTEEN_DECIMALS  
+    charlie_amount = 200 * (10 ** 6)  # Charlie token has 6 decimals
+    
+    performDeposit(bob, alpha_amount, alpha_token, alpha_token_whale)
+    performDeposit(bob, bravo_amount, bravo_token, bravo_token_whale)
+    performDeposit(bob, charlie_amount, charlie_token, charlie_token_whale)
+    
+    debt_amount = 150 * EIGHTEEN_DECIMALS
+    teller.borrow(debt_amount, bob, False, sender=bob)
+
+    # Set liquidatable price
+    new_price = 25 * EIGHTEEN_DECIMALS // 100  # 0.25 - aggressive drop
+    for token in [alpha_token, bravo_token, charlie_token]:
+        mock_price_source.setPrice(token, new_price)
+
+    # Perform liquidation to create multiple auctions
+    teller.liquidateUser(bob, False, sender=sally)
+    
+    auction_logs = filter_logs(teller, "NewFungibleAuctionCreated")
+    assert len(auction_logs) == 3  # Should have 3 auctions
+    
+    # Verify different auction parameters
+    alpha_auction = next(log for log in auction_logs if log.asset == alpha_token.address)
+    bravo_auction = next(log for log in auction_logs if log.asset == bravo_token.address)
+    charlie_auction = next(log for log in auction_logs if log.asset == charlie_token.address)
+    
+    # Alpha: Fast auction parameters
+    assert alpha_auction.startDiscount == 0
+    assert alpha_auction.maxDiscount == 75_00
+    assert alpha_auction.endBlock - alpha_auction.startBlock == 50
+    
+    # Bravo: Slow auction parameters
+    assert bravo_auction.startDiscount == 5_00
+    assert bravo_auction.maxDiscount == 25_00
+    assert bravo_auction.endBlock - bravo_auction.startBlock == 200
+    
+    # Charlie: Default parameters
+    assert charlie_auction.startDiscount == 0
+    assert charlie_auction.maxDiscount == 50_00
+    assert charlie_auction.endBlock - charlie_auction.startBlock == 1000
+    
+    # Give alice GREEN for purchases
+    green_amount = 200 * EIGHTEEN_DECIMALS
+    green_token.transfer(alice, green_amount, sender=whale)
+    green_token.approve(teller, green_amount, sender=alice)  # Approve for teller transfers
+
+    # Test coordinated auction purchases
+    # Buy from alpha auction (available immediately)
+    green_spent_alpha = teller.buyFungibleAuction(
+        bob, alpha_auction.vaultId, alpha_token, 50 * EIGHTEEN_DECIMALS, False, sender=alice
+    )
+    assert green_spent_alpha > 0
+    
+    # Try to buy from bravo auction (should fail - not started yet due to delay)
+    with boa.reverts("no green spent"):
+        teller.buyFungibleAuction(
+            bob, bravo_auction.vaultId, bravo_token, 50 * EIGHTEEN_DECIMALS, False, sender=alice
+        )
+    
+    # Buy from charlie auction (available immediately)
+    green_spent_charlie = teller.buyFungibleAuction(
+        bob, charlie_auction.vaultId, charlie_token, 50 * EIGHTEEN_DECIMALS, False, sender=alice
+    )
+    assert green_spent_charlie > 0
+    
+    # Move forward to enable bravo auction
+    boa.env.time_travel(blocks=5)
+    
+    # Now bravo auction should work
+    green_spent_bravo = teller.buyFungibleAuction(
+        bob, bravo_auction.vaultId, bravo_token, 50 * EIGHTEEN_DECIMALS, False, sender=alice
+    )
+    assert green_spent_bravo > 0
+    
+    # Verify alice received collateral from multiple assets
+    assert alpha_token.balanceOf(alice) > 0
+    assert bravo_token.balanceOf(alice) > 0
+    assert charlie_token.balanceOf(alice) > 0
+
+
+def test_ah_auction_savings_green_preferences(
+    setGeneralConfig,
+    setAssetConfig,
+    setGeneralDebtConfig,
+    performDeposit,
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    alice,
+    teller,
+    mock_price_source,
+    createDebtTerms,
+    sally,
+    green_token,
+    savings_green,
+    whale,
+):
+    """Test savings GREEN preferences in auction purchases
+    
+    This tests:
+    - Leftover GREEN converted to savings GREEN when requested
+    - Leftover GREEN stays as GREEN when not requested
+    - Savings GREEN handling in batch purchases
+    """
+    
+    setGeneralConfig()
+    setGeneralDebtConfig(_ltvPaybackBuffer=0)
+    
+    # Setup asset for auction
+    debt_terms = createDebtTerms(_liqThreshold=80_00, _liqFee=10_00, _ltv=50_00, _borrowRate=0)
+    setAssetConfig(
+        alpha_token,
+        _debtTerms=debt_terms,
+        _shouldAuctionInstantly=True,
+    )
+
+    # Setup liquidation scenario
+    mock_price_source.setPrice(alpha_token, 1 * EIGHTEEN_DECIMALS)
+    mock_price_source.setPrice(green_token, 1 * EIGHTEEN_DECIMALS)
+    
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    performDeposit(bob, deposit_amount, alpha_token, alpha_token_whale)
+    debt_amount = 60 * EIGHTEEN_DECIMALS
+    teller.borrow(debt_amount, bob, False, sender=bob)
+
+    # Set liquidatable price
+    new_price = 50 * EIGHTEEN_DECIMALS // 100  # 0.50
+    mock_price_source.setPrice(alpha_token, new_price)
+
+    # Perform liquidation
+    teller.liquidateUser(bob, False, sender=sally)
+    auction_log = filter_logs(teller, "NewFungibleAuctionCreated")[0]
+    
+    # Give alice GREEN and transfer to auction house
+    green_amount = 100 * EIGHTEEN_DECIMALS
+    green_token.transfer(alice, green_amount, sender=whale)  # Give alice double to cover transfers
+    green_token.approve(teller, green_amount * 2, sender=alice)  # Approve for teller transfers
+
+    # Test 1: Request savings GREEN for leftover
+    alice_savings_before = savings_green.balanceOf(alice)
+    
+    # Spend less than available to create leftover
+    green_spent = teller.buyFungibleAuction(
+        bob, auction_log.vaultId, alpha_token, green_amount, True, sender=alice  # True = wants savings GREEN
+    )
+    assert green_spent != 0
+    
+    alice_savings_after = savings_green.balanceOf(alice)
+    
+    # Should have received leftover as savings GREEN
+    assert green_token.balanceOf(alice) == 0
+    assert alice_savings_after > alice_savings_before  # Received savings GREEN

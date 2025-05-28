@@ -832,7 +832,7 @@ def buyFungibleAuction(
     a: addys.Addys = addys._getAddys(_a)
 
     greenAmount: uint256 = min(_greenAmount, staticcall IERC20(a.greenToken).balanceOf(self))
-    assert greenAmount != 0 # dev: no green to redeem
+    assert greenAmount != 0 # dev: no green to spend
     greenSpent: uint256 = self._buyFungibleAuction(_liqUser, _vaultId, _asset, max_value(uint256), greenAmount, _buyer, a)
     assert greenSpent != 0 # dev: no green spent
 
@@ -857,7 +857,7 @@ def buyManyFungibleAuctions(
 
     totalGreenSpent: uint256 = 0
     totalGreenRemaining: uint256 = min(_greenAmount, staticcall IERC20(a.greenToken).balanceOf(self))
-    assert totalGreenRemaining != 0 # dev: no green to redeem
+    assert totalGreenRemaining != 0 # dev: no green to spend
 
     for p: FungAuctionPurchase in _purchases:
         if totalGreenRemaining == 0:
