@@ -4,6 +4,8 @@ import boa
 from constants import EIGHTEEN_DECIMALS
 from conf_utils import filter_logs
 
+SIX_DECIMALS = 10**6  # For tokens like USDC/Charlie that have 6 decimals
+
 
 def test_ah_liquidation_auction_creation(
     setGeneralConfig,
@@ -256,7 +258,7 @@ def test_ah_liquidation_auction_batch_purchase(
     teller.liquidateUser(bob, False, sender=sally)
     
     auction_logs = filter_logs(teller, "NewFungibleAuctionCreated")
-    assert len(auction_logs) >= 2  # Should have multiple auctions
+    assert len(auction_logs) == 2  # Should have exactly 2 auctions (alpha, bravo)
     
     # Give alice GREEN to buy auctions
     green_amount = 100 * EIGHTEEN_DECIMALS
@@ -265,7 +267,7 @@ def test_ah_liquidation_auction_batch_purchase(
 
     # Prepare batch purchase
     purchases = []
-    for log in auction_logs[:2]:  # Buy first 2 auctions
+    for log in auction_logs:
         purchases.append((
             log.liqUser,
             log.vaultId,
@@ -280,7 +282,7 @@ def test_ah_liquidation_auction_batch_purchase(
     )
 
     # Verify batch purchase worked
-    _test(total_green_spent, 40 * EIGHTEEN_DECIMALS)
+    assert total_green_spent == 40 * EIGHTEEN_DECIMALS  # Exactly 20 GREEN per auction × 2 auctions
     assert total_green_spent <= total_green_to_spend
     
     # Verify alice received collateral from multiple auctions
@@ -366,7 +368,8 @@ def test_ah_liquidation_auction_position_depletion(
     assert not ledger.hasFungibleAuction(bob, auction_log.vaultId, alpha_token)
     
     # Verify alice received the collateral
-    assert alpha_token.balanceOf(alice) != 0
+    alice_alpha_balance = alpha_token.balanceOf(alice)
+    assert alice_alpha_balance > 0  # Should have received some collateral from the depleted position
 
 
 def test_ah_liquidation_custom_auction_params(
@@ -647,7 +650,8 @@ def test_ah_auction_time_boundary_edge_cases(
     green_spent = teller.buyFungibleAuction(
         bob, auction_log.vaultId, alpha_token, 10 * EIGHTEEN_DECIMALS, False, sender=alice
     )
-    assert green_spent > 0  # Should succeed
+    # At start of auction (0% discount), should spend exactly what we requested
+    assert green_spent == 10 * EIGHTEEN_DECIMALS  # Should spend exactly what we requested (0% discount at start)
     
     # Test 3: One block before end (should work)
     # We're currently at start_block, need to move to end_block - 1
@@ -658,7 +662,10 @@ def test_ah_auction_time_boundary_edge_cases(
     green_spent = teller.buyFungibleAuction(
         bob, auction_log.vaultId, alpha_token, 10 * EIGHTEEN_DECIMALS, False, sender=alice
     )
-    assert green_spent > 0  # Should succeed
+    # At end of auction, should get some discount (spend less than at start)
+    # The exact amount depends on collateral availability and pricing
+    assert green_spent > 0  # Should successfully purchase
+    assert green_spent < 10 * EIGHTEEN_DECIMALS  # Should spend less due to discount
     
     # Test 4: Exactly at end block (should fail)
     boa.env.time_travel(blocks=1)  # Move to end block
@@ -840,8 +847,8 @@ def test_ah_auction_discount_calculation_edge_cases(
     
     # Give alice GREEN
     green_amount = 50 * EIGHTEEN_DECIMALS
-    green_token.transfer(alice, green_amount, sender=whale)  # Give alice double to cover transfers
-    green_token.approve(teller, green_amount, sender=alice)  # Approve for teller transfers
+    green_token.transfer(alice, green_amount, sender=whale)
+    green_token.approve(teller, green_amount, sender=alice)
 
     # Test discount at start (should be 25%)
     green_to_spend = 10 * EIGHTEEN_DECIMALS
@@ -862,12 +869,14 @@ def test_ah_auction_discount_calculation_edge_cases(
     )
     
     # All should spend the same amount (flat 25% discount)
-    # Allow for small rounding differences (within 1% tolerance)
-    assert abs(green_spent_start - green_to_spend) <= green_to_spend // 100
-    assert abs(green_spent_middle - green_to_spend) <= green_to_spend // 100  
-    assert abs(green_spent_end - green_to_spend) <= green_to_spend // 100
-    assert abs(green_spent_start - green_spent_middle) <= green_to_spend // 100
-    assert abs(green_spent_middle - green_spent_end) <= green_to_spend // 100
+    # The discount affects how much collateral we get, not how much GREEN we spend
+    # We request 10 GREEN, and at 25% discount we get more collateral for that 10 GREEN
+    # So we should spend exactly (or very close to) 10 GREEN each time
+    
+    # Allow for tiny rounding differences (1 wei tolerance)
+    assert abs(green_spent_start - green_to_spend) <= 1  # Within 1 wei
+    assert abs(green_spent_middle - green_to_spend) <= 1  # Within 1 wei
+    assert abs(green_spent_end - green_to_spend) <= 1  # Within 1 wei
 
 
 def test_ah_auction_payment_validation_edge_cases(
@@ -933,24 +942,24 @@ def test_ah_auction_payment_validation_edge_cases(
     green_spent = teller.buyFungibleAuction(
         bob, auction_log.vaultId, alpha_token, tiny_amount, False, sender=alice
     )
-    # Should handle tiny amounts gracefully
-    assert green_spent <= tiny_amount
+    # Should spend exactly the tiny amount (no discount at start)
+    assert green_spent == tiny_amount
     
     # Test 2: Odd number that might cause rounding issues
     odd_amount = 123456789  # Odd number in wei
     green_spent = teller.buyFungibleAuction(
         bob, auction_log.vaultId, alpha_token, odd_amount, False, sender=alice
     )
-    # Should handle odd amounts within 1% tolerance
-    assert green_spent <= odd_amount
+    # Should spend exactly the odd amount (no discount at start)
+    assert green_spent == odd_amount
     
     # Test 3: Large payment amount
     large_amount = 100 * EIGHTEEN_DECIMALS
     green_spent = teller.buyFungibleAuction(
         bob, auction_log.vaultId, alpha_token, large_amount, False, sender=alice
     )
-    # Should handle large amounts correctly
-    assert green_spent <= large_amount
+    # Should spend exactly the large amount (no discount at start)
+    assert green_spent == large_amount
 
 
 def test_ah_auction_multiple_asset_coordination(
@@ -1035,7 +1044,7 @@ def test_ah_auction_multiple_asset_coordination(
     teller.liquidateUser(bob, False, sender=sally)
     
     auction_logs = filter_logs(teller, "NewFungibleAuctionCreated")
-    assert len(auction_logs) == 3  # Should have 3 auctions
+    assert len(auction_logs) == 3  # Should have exactly 3 auctions (alpha, bravo, charlie)
     
     # Verify different auction parameters
     alpha_auction = next(log for log in auction_logs if log.asset == alpha_token.address)
@@ -1067,7 +1076,7 @@ def test_ah_auction_multiple_asset_coordination(
     green_spent_alpha = teller.buyFungibleAuction(
         bob, alpha_auction.vaultId, alpha_token, 50 * EIGHTEEN_DECIMALS, False, sender=alice
     )
-    assert green_spent_alpha > 0
+    assert green_spent_alpha > 0  # Should successfully purchase from alpha auction
     
     # Try to buy from bravo auction (should fail - not started yet due to delay)
     with boa.reverts("no green spent"):
@@ -1079,7 +1088,7 @@ def test_ah_auction_multiple_asset_coordination(
     green_spent_charlie = teller.buyFungibleAuction(
         bob, charlie_auction.vaultId, charlie_token, 50 * EIGHTEEN_DECIMALS, False, sender=alice
     )
-    assert green_spent_charlie > 0
+    assert green_spent_charlie > 0  # Should successfully purchase from charlie auction
     
     # Move forward to enable bravo auction
     boa.env.time_travel(blocks=5)
@@ -1088,7 +1097,7 @@ def test_ah_auction_multiple_asset_coordination(
     green_spent_bravo = teller.buyFungibleAuction(
         bob, bravo_auction.vaultId, bravo_token, 50 * EIGHTEEN_DECIMALS, False, sender=alice
     )
-    assert green_spent_bravo > 0
+    assert green_spent_bravo > 0  # Should successfully purchase from bravo auction
     
     # Verify alice received collateral from multiple assets
     assert alpha_token.balanceOf(alice) > 0
@@ -1168,3 +1177,372 @@ def test_ah_auction_savings_green_preferences(
     # Should have received leftover as savings GREEN
     assert green_token.balanceOf(alice) == 0
     assert alice_savings_after > alice_savings_before  # Received savings GREEN
+
+
+def test_ah_liquidation_multiple_auctions(
+    setGeneralConfig,
+    setAssetConfig,
+    setGeneralDebtConfig,
+    performDeposit,
+    alpha_token,
+    alpha_token_whale,
+    bravo_token,
+    bravo_token_whale,
+    charlie_token,
+    charlie_token_whale,
+    bob,
+    teller,
+    mock_price_source,
+    createDebtTerms,
+    credit_engine,
+    sally,
+    ledger,
+    green_token,
+    whale,
+):
+    """Test liquidation of user with multiple collateral assets"""
+    
+    setGeneralConfig()
+    setGeneralDebtConfig(_ltvPaybackBuffer=0)
+    
+    # Setup multiple collateral assets with different liquidation configs
+    debt_terms = createDebtTerms(_liqThreshold=80_00, _liqFee=10_00, _ltv=50_00, _borrowRate=0)
+    
+    setAssetConfig(
+        alpha_token,
+        _debtTerms=debt_terms,
+        _shouldBurnAsPayment=False,
+        _shouldTransferToEndaoment=False,
+        _shouldSwapInStabPools=False,
+        _shouldAuctionInstantly=True,
+    )
+    
+    setAssetConfig(
+        bravo_token,
+        _debtTerms=debt_terms,
+        _shouldBurnAsPayment=False,
+        _shouldTransferToEndaoment=False,
+        _shouldSwapInStabPools=False,
+        _shouldAuctionInstantly=True,
+    )
+    
+    setAssetConfig(
+        charlie_token,
+        _debtTerms=debt_terms,
+        _shouldBurnAsPayment=False,
+        _shouldTransferToEndaoment=False,
+        _shouldSwapInStabPools=False,
+        _shouldAuctionInstantly=True,
+    )
+
+    # Setup prices
+    mock_price_source.setPrice(alpha_token, 1 * EIGHTEEN_DECIMALS)
+    mock_price_source.setPrice(bravo_token, 1 * EIGHTEEN_DECIMALS)
+    mock_price_source.setPrice(charlie_token, 1 * EIGHTEEN_DECIMALS)
+
+    # Setup user with multiple collateral assets
+    alpha_amount = 100 * EIGHTEEN_DECIMALS
+    bravo_amount = 150 * EIGHTEEN_DECIMALS
+    charlie_amount = 200 * 10**6  # Charlie token has 6 decimals, not 18
+    
+    performDeposit(bob, alpha_amount, alpha_token, alpha_token_whale)
+    performDeposit(bob, bravo_amount, bravo_token, bravo_token_whale)
+    performDeposit(bob, charlie_amount, charlie_token, charlie_token_whale)
+    
+    # Borrow against total collateral
+    debt_amount = 200 * EIGHTEEN_DECIMALS  # Borrow $200 against $450 collateral
+    teller.borrow(debt_amount, bob, False, sender=bob)
+
+    # Set liquidatable prices (drop all assets to trigger liquidation)
+    # Liquidation threshold: $200 * 100 / 80 = $250
+    # Need collateral value <= $250, so drop to $0.55 each: $450 * 0.55 = $247.5 < $250
+    new_price = 55 * EIGHTEEN_DECIMALS // 100  # Drop to $0.55 each
+    mock_price_source.setPrice(alpha_token, new_price)
+    mock_price_source.setPrice(bravo_token, new_price)
+    mock_price_source.setPrice(charlie_token, new_price)
+    
+    assert credit_engine.canLiquidateUser(bob) == True
+
+    # Perform liquidation
+    teller.liquidateUser(bob, False, sender=sally)
+    
+    # Verify multiple auctions were created
+    auction_logs = filter_logs(teller, "NewFungibleAuctionCreated")
+    assert len(auction_logs) == 3  # Should have exactly 3 auctions (alpha, bravo, charlie)
+    
+    # Verify user is in liquidation with auctions
+    user_debt_after_liq, _, _ = credit_engine.getLatestUserDebtAndTerms(bob, False)
+    assert user_debt_after_liq.inLiquidation == True
+    
+    # Verify auctions exist for all 3 assets
+    auction_count = 0
+    for log in auction_logs:
+        if ledger.hasFungibleAuction(bob, log.vaultId, log.asset):
+            auction_count += 1
+    assert auction_count == 3  # All 3 auctions active
+    
+    # Now: whale sends bob GREEN tokens to repay debt directly
+    repay_amount = user_debt_after_liq.amount  # Repay full debt
+    green_token.transfer(bob, repay_amount, sender=whale)
+    green_token.approve(teller, repay_amount, sender=bob)
+    
+    # Bob repays debt directly (not through auctions)
+    teller.repay(repay_amount, bob, False, sender=bob)
+    
+    # Verify user exited liquidation
+    user_debt_final, _, _ = credit_engine.getLatestUserDebtAndTerms(bob, False)
+    assert user_debt_final.inLiquidation == False  # User exited liquidation
+    
+    # CORRECT BEHAVIOR: Auction is removed when user exits liquidation
+    # This happens in Ledger.setUserDebt when inLiquidation changes from True to False
+    # The Ledger calls _removeAllFungibleAuctions(_user) automatically
+    for log in auction_logs:
+        assert ledger.hasFungibleAuction(bob, log.vaultId, log.asset) == False  # All auctions disabled
+    
+
+def test_ah_auction_user_exits_liquidation_via_auction_purchases(
+    setGeneralConfig,
+    setAssetConfig,
+    setGeneralDebtConfig,
+    performDeposit,
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    alice,
+    sally,
+    teller,
+    mock_price_source,
+    credit_engine,
+    ledger,
+    green_token,
+    whale,
+    createDebtTerms,
+):
+    """Test that user exits liquidation when sufficient debt is repaid via auction purchases
+    
+    This demonstrates the correct system behavior:
+    - User exits liquidation when debt health is restored through auction purchases
+    - Auctions are automatically removed when user exits liquidation (handled by Ledger)
+    - The flow: AuctionHouse → CreditEngine.repayDuringAuctionPurchase → Ledger.setUserDebt → _removeAllFungibleAuctions
+    """
+    # Setup
+    setGeneralConfig()
+    debt_terms = createDebtTerms(
+        _ltv=80_00,  # 80% LTV
+        _liqThreshold=80_00,  # 80% liquidation threshold
+        _liqFee=5_00,  # 5% liquidation fee
+    )
+    setAssetConfig(alpha_token, _debtTerms=debt_terms)
+    setGeneralDebtConfig()
+
+    # Deposit and borrow
+    deposit_amount = 100 * EIGHTEEN_DECIMALS  # $100 at $1 price
+    performDeposit(bob, deposit_amount, alpha_token, alpha_token_whale)
+    mock_price_source.setPrice(alpha_token, 1 * EIGHTEEN_DECIMALS)
+    debt_amount = 70 * EIGHTEEN_DECIMALS  # $70 debt (70% LTV, safe)
+    teller.borrow(debt_amount, bob, False, sender=bob)
+
+    # Trigger liquidation by dropping price to $0.85
+    # Collateral value: $100 * 0.85 = $85
+    # Debt: $70, LTV = 70/85 = 82.35% > 80% threshold
+    liquidation_price = 85 * EIGHTEEN_DECIMALS // 100  # $0.85
+    mock_price_source.setPrice(alpha_token, liquidation_price)
+
+    # Perform liquidation
+    teller.liquidateUser(bob, False, sender=sally)
+    auction_log = filter_logs(teller, "NewFungibleAuctionCreated")[0]
+    
+    # Verify user is in liquidation with auction
+    user_debt_after_liq, bt_after_liq, _ = credit_engine.getLatestUserDebtAndTerms(bob, False)
+    assert user_debt_after_liq.inLiquidation == True
+    assert ledger.hasFungibleAuction(bob, auction_log.vaultId, alpha_token) == True
+
+    # Calculate amount needed to restore health based on actual values
+    current_debt = user_debt_after_liq.amount
+    current_collateral_value = bt_after_liq.collateralVal
+    
+    # Simple approach: buy enough to definitely get out of liquidation
+    # Since buying reduces both debt and collateral equally, we need to buy more
+    # Let's buy 50% of the current debt to be safe
+    amount_to_repay = current_debt // 2  # 50% of debt
+    
+    # Give alice GREEN
+    green_token.transfer(alice, amount_to_repay, sender=whale)
+    green_token.approve(teller, amount_to_repay, sender=alice)
+
+    # Purchase auction with amount to restore health
+    green_spent = teller.buyFungibleAuction(
+        bob, auction_log.vaultId, alpha_token, amount_to_repay, False, sender=alice
+    )
+    
+    # Verify user exited liquidation through auction purchase
+    user_debt_final, bt_final, _ = credit_engine.getLatestUserDebtAndTerms(bob, False)
+    assert user_debt_final.inLiquidation == False  # User exited liquidation via auction purchase
+    
+    # CORRECT BEHAVIOR: Auction is removed when user exits liquidation
+    # This happens in Ledger.setUserDebt when inLiquidation changes from True to False
+    # The Ledger calls _removeAllFungibleAuctions(_user) automatically
+    assert ledger.hasFungibleAuction(bob, auction_log.vaultId, alpha_token) == False  # Auction REMOVED
+    
+    # Verify debt health is restored
+    final_ltv = user_debt_final.amount * 100 // bt_final.collateralVal if bt_final.collateralVal > 0 else 0
+    assert final_ltv < 80  # LTV is definitely safe (should be around 76% based on our calculation)
+    
+
+def test_ah_auction_collateral_amounts_and_discount_verification(
+    setGeneralConfig,
+    setAssetConfig,
+    setGeneralDebtConfig,
+    performDeposit,
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    alice,
+    sally,
+    teller,
+    mock_price_source,
+    createDebtTerms,
+    createAuctionParams,
+    green_token,
+    whale,
+    _test,
+):
+    """Test that buyers receive correct collateral amounts based on auction discounts
+    
+    This tests:
+    - Exact collateral amounts received at different discount levels
+    - Discount calculations are properly applied
+    - Price relationships between GREEN spent and collateral received
+    - Progressive discount increases over time
+    """
+    
+    setGeneralConfig()
+    setGeneralDebtConfig(_ltvPaybackBuffer=0)
+    
+    # Setup asset with progressive discount (0% to 50% over 100 blocks)
+    debt_terms = createDebtTerms(_liqThreshold=80_00, _liqFee=10_00, _ltv=50_00, _borrowRate=0)
+    auction_params = createAuctionParams(
+        _startDiscount=0,      # 0% start discount
+        _maxDiscount=50_00,    # 50% max discount
+        _delay=0,              # Start immediately
+        _duration=100,         # 100 blocks duration
+    )
+    
+    setAssetConfig(
+        alpha_token,
+        _debtTerms=debt_terms,
+        _shouldAuctionInstantly=True,
+        _customAuctionParams=auction_params,
+    )
+
+    # Setup prices: $1 per token for both alpha and GREEN
+    mock_price_source.setPrice(alpha_token, 1 * EIGHTEEN_DECIMALS)
+    mock_price_source.setPrice(green_token, 1 * EIGHTEEN_DECIMALS)
+    
+    # Large position to ensure we don't deplete during testing
+    deposit_amount = 1000 * EIGHTEEN_DECIMALS  # $1000 worth
+    performDeposit(bob, deposit_amount, alpha_token, alpha_token_whale)
+    debt_amount = 600 * EIGHTEEN_DECIMALS  # $600 debt
+    teller.borrow(debt_amount, bob, False, sender=bob)
+
+    # Set liquidatable price to $0.50 (makes collateral worth $500, debt $600 = 120% LTV)
+    liquidation_price = 50 * EIGHTEEN_DECIMALS // 100  # $0.50
+    mock_price_source.setPrice(alpha_token, liquidation_price)
+
+    # Perform liquidation
+    teller.liquidateUser(bob, False, sender=sally)
+    auction_log = filter_logs(teller, "NewFungibleAuctionCreated")[0]
+    
+    # Give alice plenty of GREEN
+    green_amount = 200 * EIGHTEEN_DECIMALS
+    green_token.transfer(alice, green_amount, sender=whale)
+    green_token.approve(teller, green_amount, sender=alice)
+
+    # Test 1: Purchase at start (0% discount)
+    # Spend 10 GREEN, should get exactly $10 worth of collateral at current price
+    # At $0.50 per alpha token, $10 = 20 alpha tokens
+    green_to_spend = 10 * EIGHTEEN_DECIMALS
+    alice_alpha_before = alpha_token.balanceOf(alice)
+    
+    green_spent_start = teller.buyFungibleAuction(
+        bob, auction_log.vaultId, alpha_token, green_to_spend, False, sender=alice
+    )
+    
+    alice_alpha_after_start = alpha_token.balanceOf(alice)
+    collateral_received_start = alice_alpha_after_start - alice_alpha_before
+    
+    # At 0% discount: 10 GREEN = $10 = 20 alpha tokens (at $0.50 each)
+    expected_collateral_start = 20 * EIGHTEEN_DECIMALS
+    _test(green_spent_start, green_to_spend)  # Should spend exactly what we requested
+    _test(collateral_received_start, expected_collateral_start)  # Should receive exact amount
+    
+    # Test 2: Purchase at 25% progress (12.5% discount)
+    # Move to 25% through auction (25 blocks)
+    boa.env.time_travel(blocks=25)
+    
+    green_spent_quarter = teller.buyFungibleAuction(
+        bob, auction_log.vaultId, alpha_token, green_to_spend, False, sender=alice
+    )
+    
+    alice_alpha_after_quarter = alpha_token.balanceOf(alice)
+    collateral_received_quarter = alice_alpha_after_quarter - alice_alpha_after_start
+    
+    # At 12.5% discount: 10 GREEN buys $11.43 worth of collateral
+    # $11.43 / $0.50 = 22.86 alpha tokens
+    # 10 GREEN / (1 - 0.125) = 10 / 0.875 = 11.43 GREEN worth of collateral
+    expected_collateral_quarter = (green_to_spend * EIGHTEEN_DECIMALS) // (liquidation_price * 875 // 1000)
+    _test(green_spent_quarter, green_to_spend)  # Should spend exactly what we requested
+    _test(collateral_received_quarter, expected_collateral_quarter)  # Should receive calculated amount
+    
+    # Test 3: Purchase at 50% progress (25% discount)
+    # Move to 50% through auction (25 more blocks = 50 total)
+    boa.env.time_travel(blocks=25)
+    
+    green_spent_half = teller.buyFungibleAuction(
+        bob, auction_log.vaultId, alpha_token, green_to_spend, False, sender=alice
+    )
+    
+    alice_alpha_after_half = alpha_token.balanceOf(alice)
+    collateral_received_half = alice_alpha_after_half - alice_alpha_after_quarter
+    
+    # At 25% discount: 10 GREEN buys $13.33 worth of collateral
+    # $13.33 / $0.50 = 26.67 alpha tokens
+    # 10 GREEN / (1 - 0.25) = 10 / 0.75 = 13.33 GREEN worth of collateral
+    expected_collateral_half = (green_to_spend * EIGHTEEN_DECIMALS) // (liquidation_price * 75 // 100)
+    _test(green_spent_half, green_to_spend)  # Should spend exactly what we requested
+    _test(collateral_received_half, expected_collateral_half)  # Should receive calculated amount
+    
+    # Test 4: Purchase at 100% progress (50% discount)
+    # Move to end of auction (50 more blocks = 100 total)
+    boa.env.time_travel(blocks=49)  # 99 blocks total (1 before end)
+    
+    green_spent_end = teller.buyFungibleAuction(
+        bob, auction_log.vaultId, alpha_token, green_to_spend, False, sender=alice
+    )
+    
+    alice_alpha_after_end = alpha_token.balanceOf(alice)
+    collateral_received_end = alice_alpha_after_end - alice_alpha_after_half
+    
+    # At 50% discount: 10 GREEN buys $20 worth of collateral
+    # $20 / $0.50 = 40 alpha tokens
+    # 10 GREEN / (1 - 0.50) = 10 / 0.50 = 20 GREEN worth of collateral
+    # Note: At 99% progress, discount is 49.5%, not exactly 50%
+    
+    # Instead of exact calculation, verify the relationship
+    _test(green_spent_end, green_to_spend)  # Should spend exactly what we requested
+    
+    # Verify we got significantly more collateral than at start (due to discount)
+    assert collateral_received_end > collateral_received_start * 150 // 100  # At least 50% more collateral
+    
+    # Verify progressive increase in collateral received
+    assert collateral_received_quarter > collateral_received_start  # More collateral at higher discount
+    assert collateral_received_half > collateral_received_quarter   # Even more collateral
+    assert collateral_received_end > collateral_received_half       # Maximum collateral at max discount
+    
+    # Verify total collateral received
+    total_collateral_received = alice_alpha_after_end - alice_alpha_before
+    
+    # Verify total is sum of individual purchases
+    calculated_total = collateral_received_start + collateral_received_quarter + collateral_received_half + collateral_received_end
+    assert total_collateral_received == calculated_total  # Total should match sum of individual purchases
+    
