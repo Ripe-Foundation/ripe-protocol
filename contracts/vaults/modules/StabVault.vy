@@ -12,7 +12,7 @@ from ethereum.ercs import IERC20
 
 interface ControlRoom:
     def getStabPoolRedemptionsConfig(_asset: address, _redeemer: address) -> StabPoolRedemptionsConfig: view
-    def getStabPoolClaimsConfig(_asset: address, _claimer: address) -> StabPoolClaimsConfig: view
+    def getStabPoolClaimsConfig(_claimAsset: address, _claimer: address) -> StabPoolClaimsConfig: view
 
 interface PriceDesk:
     def getAssetAmount(_asset: address, _usdValue: uint256, _shouldRaise: bool = False) -> uint256: view
@@ -460,7 +460,9 @@ def claimFromStabilityPool(
     assert msg.sender == addys._getTellerAddr() # dev: only Teller allowed
     assert not vaultData.isPaused # dev: contract paused
     a: addys.Addys = addys._getAddys(_a)
-    return self._claimFromStabilityPool(_claimer, _stabAsset, _claimAsset, _maxUsdValue, a.priceDesk, a.controlRoom)
+    claimUsdValue: uint256 = self._claimFromStabilityPool(_claimer, _stabAsset, _claimAsset, _maxUsdValue, a.priceDesk, a.controlRoom)
+    assert claimUsdValue != 0 # dev: nothing claimed
+    return claimUsdValue
 
 
 @external
@@ -476,6 +478,8 @@ def claimManyFromStabilityPool(
     totalUsdValue: uint256 = 0
     for c: StabPoolClaim in _claims:
         totalUsdValue += self._claimFromStabilityPool(_claimer, c.stabAsset, c.claimAsset, c.maxUsdValue, a.priceDesk, a.controlRoom)
+    assert totalUsdValue != 0 # dev: nothing claimed
+
     return totalUsdValue
 
 
@@ -492,7 +496,7 @@ def _claimFromStabilityPool(
         return 0
 
     # check claims config
-    config: StabPoolClaimsConfig = staticcall ControlRoom(_controlRoom).getStabPoolClaimsConfig(_stabAsset, _claimer)
+    config: StabPoolClaimsConfig = staticcall ControlRoom(_controlRoom).getStabPoolClaimsConfig(_claimAsset, _claimer)
     if not config.canClaimInStabPoolGeneral or not config.canClaimInStabPoolAsset or not config.isUserAllowed:
         return 0
 

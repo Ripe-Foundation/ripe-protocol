@@ -848,12 +848,12 @@ def getAssetLiqConfig(_asset: address) -> AssetLiqConfig:
 
 @view
 @external
-def getStabPoolClaimsConfig(_asset: address, _claimer: address) -> StabPoolClaimsConfig:
-    c: MetaConfig = staticcall ControlRoomData(self.data).getManyConfigs(True, False, False, _asset)
+def getStabPoolClaimsConfig(_claimAsset: address, _claimer: address) -> StabPoolClaimsConfig:
+    c: MetaConfig = staticcall ControlRoomData(self.data).getManyConfigs(True, False, False, _claimAsset)
     return StabPoolClaimsConfig(
         canClaimInStabPoolGeneral=c.genConfig.canClaimInStabPool,
         canClaimInStabPoolAsset=c.assetConfig.canClaimInStabPool,
-        isUserAllowed=self._isUserAllowed(c.assetConfig.whitelist, _claimer, _asset),
+        isUserAllowed=self._isUserAllowed(c.assetConfig.whitelist, _claimer, _claimAsset),
     )
 
 
