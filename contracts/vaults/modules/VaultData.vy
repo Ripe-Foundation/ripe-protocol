@@ -103,6 +103,12 @@ def isUserInVaultAsset(_user: address, _asset: address) -> bool:
     return self.indexOfUserAsset[_user][_asset] != 0
 
 
+@view
+@external
+def doesUserHaveBalance(_user: address, _asset: address) -> bool:
+    return self.userBalances[_user][_asset] != 0
+
+
 @internal
 def _registerUserAsset(_user: address, _asset: address):
     aid: uint256 = self.numUserAssets[_user]

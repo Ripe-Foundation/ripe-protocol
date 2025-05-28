@@ -16,23 +16,26 @@ from ethereum.ercs import IERC4626
 from ethereum.ercs import IERC20
 
 interface Ledger:
+    def setFungibleAuction(_liqUser: address, _vaultId: uint256, _asset: address, _auc: FungibleAuction) -> bool: nonpayable
     def getFungibleAuctionDuringPurchase(_liqUser: address, _vaultId: uint256, _asset: address) -> FungibleAuction: view
     def removeFungibleAuction(_liqUser: address, _vaultId: uint256, _asset: address): nonpayable
     def hasFungibleAuction(_liqUser: address, _vaultId: uint256, _asset: address) -> bool: view
     def isParticipatingInVault(_user: address, _vaultId: uint256) -> bool: view
     def createNewFungibleAuction(_auc: FungibleAuction) -> uint256: nonpayable
     def userVaults(_user: address, _index: uint256) -> uint256: view
+    def isUserInLiquidation(_user: address) -> bool: view
     def numUserVaults(_user: address) -> uint256: view
+
+interface ControlRoom:
+    def getAuctionBuyConfig(_asset: address, _buyer: address) -> AuctionBuyConfig: view
+    def getAssetLiqConfig(_asset: address) -> AssetLiqConfig: view
+    def getGenAuctionParams() -> AuctionParams: view
+    def getGenLiqConfig() -> GenLiqConfig: view
 
 interface CreditEngine:
     def repayDuringLiquidation(_liqUser: address, _userDebt: UserDebt, _repayAmount: uint256, _newInterest: uint256, _a: addys.Addys = empty(addys.Addys)) -> bool: nonpayable
     def getLatestUserDebtAndTerms(_user: address, _shouldRaise: bool, _a: addys.Addys = empty(addys.Addys)) -> (UserDebt, UserBorrowTerms, uint256): view
     def repayDuringAuctionPurchase(_liqUser: address, _repayAmount: uint256, _a: addys.Addys = empty(addys.Addys)) -> bool: nonpayable
-
-interface ControlRoom:
-    def getAuctionBuyConfig(_asset: address, _buyer: address) -> AuctionBuyConfig: view
-    def getAssetLiqConfig(_asset: address) -> AssetLiqConfig: view
-    def getGenLiqConfig() -> GenLiqConfig: view
 
 interface PriceDesk:
     def getAssetAmount(_asset: address, _usdValue: uint256, _shouldRaise: bool = False) -> uint256: view
@@ -122,6 +125,11 @@ struct FungAuctionPurchase:
     asset: address
     maxGreenAmount: uint256
 
+struct FungAuctionConfig:
+    liqUser: address
+    vaultId: uint256
+    asset: address
+
 event LiquidateUser:
     user: indexed(address)
     totalLiqFees: uint256
@@ -129,6 +137,7 @@ event LiquidateUser:
     repayAmount: uint256
     didRestoreDebtHealth: bool
     collateralValueOut: uint256
+    liqFeesUnpaid: uint256
     numAuctionsStarted: uint256
     keeperFee: uint256
 
@@ -159,7 +168,7 @@ event CollateralSwappedWithStabPool:
     stabAmountSwapped: uint256
     stabValueSwapped: uint256
 
-event NewFungibleAuctionCreated:
+event FungibleAuctionUpdated:
     liqUser: indexed(address)
     vaultId: uint256
     asset: indexed(address)
@@ -167,14 +176,29 @@ event NewFungibleAuctionCreated:
     maxDiscount: uint256
     startBlock: uint256
     endBlock: uint256
-    auctionId: uint256
+    isNewAuction: bool
+
+event FungibleAuctionPaused:
+    liqUser: indexed(address)
+    vaultId: uint256
+    asset: indexed(address)
+
+event FungAuctionPurchased:
+    liqUser: indexed(address)
+    liqVaultId: uint256
+    liqAsset: indexed(address)
+    greenSpent: uint256
+    buyer: indexed(address)
+    collateralAmountSent: uint256
+    collateralUsdValueSent: uint256
+    isPositionDepleted: bool
+    hasGoodDebtHealth: bool
 
 # cache
 vaultAddrs: transient(HashMap[uint256, address]) # vaultId -> vaultAddr
 assetLiqConfig: transient(HashMap[address, AssetLiqConfig]) # asset -> config
 didHandleLiqAsset: transient(HashMap[address, HashMap[uint256, HashMap[address, bool]]]) # user -> vaultId -> asset -> did handle
 didHandleVaultId: transient(HashMap[address, HashMap[uint256, bool]]) # user -> vaultId -> did handle
-
 numUserAssetsForAuction: transient(HashMap[address, uint256]) # user -> num assets
 userAssetForAuction: transient(HashMap[address, HashMap[uint256, VaultData]]) # user -> index -> asset
 
@@ -183,7 +207,7 @@ ONE_PERCENT: constant(uint256) = 1_00 # 1%
 MAX_STAB_VAULT_DATA: constant(uint256) = 10
 PRIORITY_LIQ_VAULT_DATA: constant(uint256) = 20
 MAX_LIQ_USERS: constant(uint256) = 50
-MAX_AUCTION_PURCHASES: constant(uint256) = 20
+MAX_AUCTIONS: constant(uint256) = 20
 
 
 @deploy
@@ -310,9 +334,19 @@ def _liquidateUser(
     # start auctions (if necessary)
     numAuctionsStarted: uint256 = 0
     if not didRestoreDebtHealth:
-        numAuctionsStarted = self._initiateAuctions(_liqUser, _config.genAuctionParams, _a.controlRoom, _a.ledger)
+        numAuctionsStarted = self._startAuctionsDuringLiq(_liqUser, _config.genAuctionParams, _a.controlRoom, _a.ledger)
 
-    log LiquidateUser(user=_liqUser, totalLiqFees=totalLiqFees, targetRepayAmount=targetRepayAmount, repayAmount=repayValueIn, didRestoreDebtHealth=didRestoreDebtHealth, collateralValueOut=collateralValueOut, numAuctionsStarted=numAuctionsStarted, keeperFee=keeperFee)
+    log LiquidateUser(
+        user=_liqUser,
+        totalLiqFees=totalLiqFees,
+        targetRepayAmount=targetRepayAmount,
+        repayAmount=repayValueIn,
+        didRestoreDebtHealth=didRestoreDebtHealth,
+        collateralValueOut=collateralValueOut,
+        liqFeesUnpaid=liqFeesUnpaid,
+        numAuctionsStarted=numAuctionsStarted,
+        keeperFee=keeperFee,
+    )
     return keeperFee
 
 
@@ -342,10 +376,8 @@ def _performLiquidationPhases(
             continue
 
         remainingToRepay, collateralValueOut = self._iterateThruAssetsWithinVault(_liqUser, stabPool.vaultId, stabPool.vaultAddr, remainingToRepay, collateralValueOut, _liqFeeRatio, [], _a)
-
-        # cache vault addr for later
         if self.vaultAddrs[stabPool.vaultId] == empty(address):
-            self.vaultAddrs[stabPool.vaultId] = stabPool.vaultAddr
+            self.vaultAddrs[stabPool.vaultId] = stabPool.vaultAddr # cache
 
     # PHASE 2 -- Go thru priority liq assets (set in control room)
 
@@ -354,14 +386,12 @@ def _performLiquidationPhases(
             if remainingToRepay == 0:
                 break
 
-            if not staticcall Vault(pData.vaultAddr).isUserInVaultAsset(_liqUser, pData.asset):
+            if not staticcall Vault(pData.vaultAddr).doesUserHaveBalance(_liqUser, pData.asset):
                 continue
 
             remainingToRepay, collateralValueOut = self._handleSpecificLiqAsset(_liqUser, pData.vaultId, pData.vaultAddr, pData.asset, remainingToRepay, collateralValueOut, _liqFeeRatio, _config.priorityStabVaults, _a)
-
-            # cache vault addr for later
             if self.vaultAddrs[pData.vaultId] == empty(address):
-                self.vaultAddrs[pData.vaultId] = pData.vaultAddr
+                self.vaultAddrs[pData.vaultId] = pData.vaultAddr # cache
 
     # PHASE 3 -- Go thru user's vaults (top to bottom as saved in ledger / vaults)
 
@@ -735,78 +765,209 @@ def _swapWithSpecificStabPool(
 
 
 @internal
-def _initiateAuctions(
+def _startAuctionsDuringLiq(
     _liqUser: address,
     _genAuctionParams: AuctionParams,
     _controlRoom: address,
     _ledger: address,
 ) -> uint256:
-    numAuctionsStarted: uint256 = 0
     numAssets: uint256 = self.numUserAssetsForAuction[_liqUser]
     if numAssets == 0:
         return 0
 
+    numAuctionsStarted: uint256 = 0
     for i: uint256 in range(numAssets, bound=max_value(uint256)):
         d: VaultData = self.userAssetForAuction[_liqUser][i]
-
-        # get asset liq config
-        config: AssetLiqConfig = empty(AssetLiqConfig)
-        isConfigCached: bool = False
-        config, isConfigCached = self._getAssetLiqConfig(d.asset, _controlRoom)
-
-        # cache asset liq config
-        if not isConfigCached:
-            self.assetLiqConfig[d.asset] = config
-
-        # finalize auction params
-        params: AuctionParams = _genAuctionParams
-        if config.customAuctionParams.hasParams:
-            params = config.customAuctionParams
-
-        # create auction
-        didCreateAuction: bool = self._createNewFungibleAuction(_liqUser, d.vaultId, d.asset, params, _ledger)
+        didCreateAuction: bool = self._createOrUpdateFungAuction(_liqUser, d.vaultId, d.asset, False, _genAuctionParams, _controlRoom, _ledger)
         if didCreateAuction:
             numAuctionsStarted += 1
 
     return numAuctionsStarted
 
 
+# start / restart (via control room)
+
+
+@external
+def startAuction(
+    _liqUser: address,
+    _liqVaultId: uint256,
+    _liqAsset: address,
+    _a: addys.Addys = empty(addys.Addys),
+) -> bool:
+    assert msg.sender == addys._getControlRoomAddr() # dev: only control room allowed
+    assert not deptBasics.isPaused # dev: contract paused
+    a: addys.Addys = addys._getAddys(_a)
+    genParams: AuctionParams = staticcall ControlRoom(a.controlRoom).getGenAuctionParams()
+    return self._startAuction(_liqUser, _liqVaultId, _liqAsset, genParams, a)
+
+
+@external
+def startManyAuctions(
+    _auctions: DynArray[FungAuctionConfig, MAX_AUCTIONS],
+    _a: addys.Addys = empty(addys.Addys),
+) -> uint256:
+    assert msg.sender == addys._getControlRoomAddr() # dev: only control room allowed
+    assert not deptBasics.isPaused # dev: contract paused
+    a: addys.Addys = addys._getAddys(_a)
+
+    genParams: AuctionParams = staticcall ControlRoom(a.controlRoom).getGenAuctionParams()
+    numAuctionsStarted: uint256 = 0
+    for auc: FungAuctionConfig in _auctions:
+        didStart: bool = self._startAuction(auc.liqUser, auc.vaultId, auc.asset, genParams, a)
+        if didStart:
+            numAuctionsStarted += 1
+
+    return numAuctionsStarted
+
+
+@internal
+def _startAuction(
+    _liqUser: address,
+    _liqVaultId: uint256,
+    _liqAsset: address,
+    _genParams: AuctionParams,
+    _a: addys.Addys,
+) -> bool:
+    if not self._canStartAuction(_liqUser, _liqVaultId, _liqAsset, _a.vaultBook, _a.ledger):
+        return False
+    hasAuction: bool = staticcall Ledger(_a.ledger).hasFungibleAuction(_liqUser, _liqVaultId, _liqAsset)
+    return self._createOrUpdateFungAuction(_liqUser, _liqVaultId, _liqAsset, hasAuction, _genParams, _a.controlRoom, _a.ledger)
+
+
+# validation
+
+
+@view
+@internal
+def _canStartAuction(
+    _liqUser: address,
+    _liqVaultId: uint256,
+    _liqAsset: address,
+    _vaultBook: address,
+    _ledger: address,
+) -> bool:
+    vaultAddr: address = staticcall VaultBook(_vaultBook).getAddr(_liqVaultId)
+    if vaultAddr == empty(address):
+        return False
+    if not staticcall Vault(vaultAddr).doesUserHaveBalance(_liqUser, _liqAsset):
+        return False
+    return staticcall Ledger(_ledger).isUserInLiquidation(_liqUser)
+
+
 # create auction
 
 
 @internal
-def _createNewFungibleAuction(
+def _createOrUpdateFungAuction(
     _liqUser: address,
     _vaultId: uint256,
     _asset: address,
-    _params: AuctionParams,
+    _alreadyExists: bool,
+    _genAuctionParams: AuctionParams,
+    _controlRoom: address,
     _ledger: address,
 ) -> bool:
-    startBlock: uint256 = block.number + _params.delay
-    endBlock: uint256 = startBlock + _params.duration
-    newAuction: FungibleAuction = FungibleAuction(
+
+    # get asset liq config
+    config: AssetLiqConfig = empty(AssetLiqConfig)
+    isConfigCached: bool = False
+    config, isConfigCached = self._getAssetLiqConfig(_asset, _controlRoom)
+    if not isConfigCached:
+        self.assetLiqConfig[_asset] = config # cache
+
+    # finalize auction params
+    params: AuctionParams = _genAuctionParams
+    if config.customAuctionParams.hasParams:
+        params = config.customAuctionParams
+
+    startBlock: uint256 = block.number + params.delay
+    endBlock: uint256 = startBlock + params.duration
+    auctionData: FungibleAuction = FungibleAuction(
         liqUser=_liqUser,
         vaultId=_vaultId,
         asset=_asset,
-        startDiscount=_params.startDiscount,
-        maxDiscount=_params.maxDiscount,
+        startDiscount=params.startDiscount,
+        maxDiscount=params.maxDiscount,
         startBlock=startBlock,
         endBlock=endBlock,
         isActive=True,
     )
-    aid: uint256 = extcall Ledger(_ledger).createNewFungibleAuction(newAuction)
-    if aid == 0:
-        return False
 
-    log NewFungibleAuctionCreated(
+    # update existing auction data
+    if _alreadyExists:
+        assert extcall Ledger(_ledger).setFungibleAuction(_liqUser, _vaultId, _asset, auctionData) # dev: failed to set auction
+
+    # create new auction
+    else:
+        aid: uint256 = extcall Ledger(_ledger).createNewFungibleAuction(auctionData)
+        if aid == 0:
+            return False # fail gracefully, though this should never happen
+
+    log FungibleAuctionUpdated(
         liqUser=_liqUser,
         vaultId=_vaultId,
         asset=_asset,
-        startDiscount=_params.startDiscount,
-        maxDiscount=_params.maxDiscount,
+        startDiscount=params.startDiscount,
+        maxDiscount=params.maxDiscount,
         startBlock=startBlock,
         endBlock=endBlock,
-        auctionId=aid,
+        isNewAuction=not _alreadyExists,
+    )
+    return True
+
+
+# pause
+
+
+@external
+def pauseAuction(
+    _liqUser: address,
+    _liqVaultId: uint256,
+    _liqAsset: address,
+    _a: addys.Addys = empty(addys.Addys),
+) -> bool:
+    assert msg.sender == addys._getControlRoomAddr() # dev: only control room allowed
+    assert not deptBasics.isPaused # dev: contract paused
+    a: addys.Addys = addys._getAddys(_a)
+    return self._pauseAuction(_liqUser, _liqVaultId, _liqAsset, a.ledger)
+
+
+@external
+def pauseManyAuctions(
+    _auctions: DynArray[FungAuctionConfig, MAX_AUCTIONS],
+    _a: addys.Addys = empty(addys.Addys),
+) -> uint256:
+    assert msg.sender == addys._getControlRoomAddr() # dev: only control room allowed
+    assert not deptBasics.isPaused # dev: contract paused
+    a: addys.Addys = addys._getAddys(_a)
+
+    numAuctionsPaused: uint256 = 0
+    for auc: FungAuctionConfig in _auctions:
+        didPause: bool = self._pauseAuction(auc.liqUser, auc.vaultId, auc.asset, a.ledger)
+        if didPause:
+            numAuctionsPaused += 1
+
+    return numAuctionsPaused
+
+
+@internal
+def _pauseAuction(
+    _liqUser: address,
+    _liqVaultId: uint256,
+    _liqAsset: address,
+    _ledger: address,
+) -> bool:
+    auc: FungibleAuction = staticcall Ledger(_ledger).getFungibleAuctionDuringPurchase(_liqUser, _liqVaultId, _liqAsset)
+    if not auc.isActive:
+        return False
+
+    auc.isActive = False
+    assert extcall Ledger(_ledger).setFungibleAuction(_liqUser, _liqVaultId, _liqAsset, auc) # dev: failed to set auction
+    log FungibleAuctionPaused(
+        liqUser=_liqUser,
+        vaultId=_liqVaultId,
+        asset=_liqAsset,
     )
     return True
 
@@ -844,7 +1005,7 @@ def buyFungibleAuction(
 
 @external
 def buyManyFungibleAuctions(
-    _purchases: DynArray[FungAuctionPurchase, MAX_AUCTION_PURCHASES],
+    _purchases: DynArray[FungAuctionPurchase, MAX_AUCTIONS],
     _greenAmount: uint256,
     _buyer: address,
     _wantsSavingsGreen: bool,
@@ -939,7 +1100,17 @@ def _buyFungibleAuction(
     if isPositionDepleted and staticcall Ledger(_a.ledger).hasFungibleAuction(_liqUser, _liqVaultId, _liqAsset):
         extcall Ledger(_a.ledger).removeFungibleAuction(_liqUser, _liqVaultId, _liqAsset)
 
-    # TODO: event
+    log FungAuctionPurchased(
+        liqUser=_liqUser,
+        liqVaultId=_liqVaultId,
+        liqAsset=_liqAsset,
+        greenSpent=greenSpent,
+        buyer=_buyer,
+        collateralAmountSent=collateralAmountSent,
+        collateralUsdValueSent=collateralUsdValueSent,
+        isPositionDepleted=isPositionDepleted,
+        hasGoodDebtHealth=hasGoodDebtHealth,
+    )
     return greenSpent
 
 

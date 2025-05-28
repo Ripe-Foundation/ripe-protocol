@@ -757,7 +757,7 @@ def test_ah_liquidation_multiple_collateral_assets(
     # Verify different liquidation methods were used based on asset configs
     stab_pool_logs = filter_logs(teller, "CollateralSwappedWithStabPool")
     endaoment_logs = filter_logs(teller, "CollateralSentToEndaoment")
-    auction_logs = filter_logs(teller, "NewFungibleAuctionCreated")
+    auction_logs = filter_logs(teller, "FungibleAuctionUpdated")
     
     # Should have exactly one of each liquidation type
     assert len(stab_pool_logs) == 1  # Alpha via stability pool
@@ -1491,7 +1491,7 @@ def test_ah_liquidation_shared_stability_pool_depletion(
     
     # Filter logs immediately after liquidation
     first_stab_logs = filter_logs(teller, "CollateralSwappedWithStabPool")
-    first_auction_logs = filter_logs(teller, "NewFungibleAuctionCreated")
+    first_auction_logs = filter_logs(teller, "FungibleAuctionUpdated")
     
     pool_balance_after = green_token.balanceOf(stability_pool)
     

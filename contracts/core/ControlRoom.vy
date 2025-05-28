@@ -32,6 +32,7 @@ interface ControlRoomData:
     def setGeneralConfig(_genConfig: GenConfig): nonpayable
     def assetConfig(_asset: address) -> AssetConfig: view
     def getControlRoomId() -> uint256: view
+    def genDebtConfig() -> GenDebtConfig: view
     def genConfig() -> GenConfig: view
     def ripeHq() -> address: view
 
@@ -797,6 +798,13 @@ def getGenLiqConfig() -> GenLiqConfig:
         priorityLiqAssetVaults=priorityLiqAssetVaults,
         priorityStabVaults=priorityStabVaults,
     )
+
+
+@view
+@external
+def getGenAuctionParams() -> AuctionParams:
+    genDebtConfig: GenDebtConfig = staticcall ControlRoomData(self.data).genDebtConfig()
+    return genDebtConfig.genAuctionParams
 
 
 # asset liquidation config

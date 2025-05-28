@@ -26,7 +26,7 @@ def test_ah_liquidation_auction_creation(
     This tests:
     - Auctions are created when shouldAuctionInstantly=True
     - Auction parameters are set correctly
-    - NewFungibleAuctionCreated event is emitted
+    - FungibleAuctionUpdated event is emitted
     - User remains in liquidation when auctions are created
     """
     
@@ -60,7 +60,7 @@ def test_ah_liquidation_auction_creation(
     teller.liquidateUser(bob, False, sender=sally)
 
     # Verify auction was created
-    auction_logs = filter_logs(teller, "NewFungibleAuctionCreated")
+    auction_logs = filter_logs(teller, "FungibleAuctionUpdated")
     assert len(auction_logs) == 1
     
     auction_log = auction_logs[0]
@@ -72,7 +72,7 @@ def test_ah_liquidation_auction_creation(
     assert auction_log.maxDiscount == 50_00    # Default max discount (50%)
     assert auction_log.startBlock == boa.env.evm.patch.block_number  # Default delay = 0 (starts immediately)
     assert auction_log.endBlock == boa.env.evm.patch.block_number + 1000  # Default duration = 1000 blocks
-    assert auction_log.auctionId > 0
+    assert auction_log.isNewAuction == True
 
     # Verify liquidation event shows auction was started
     liquidation_log = filter_logs(teller, "LiquidateUser")[0]
@@ -141,7 +141,7 @@ def test_ah_liquidation_auction_discount_calculation(
     # Perform liquidation to create auction
     teller.liquidateUser(bob, False, sender=sally)
     
-    auction_log = filter_logs(teller, "NewFungibleAuctionCreated")[0]
+    auction_log = filter_logs(teller, "FungibleAuctionUpdated")[0]
     start_block = auction_log.startBlock
     end_block = auction_log.endBlock
     start_discount = auction_log.startDiscount
@@ -257,7 +257,7 @@ def test_ah_liquidation_auction_batch_purchase(
     # Perform liquidation to create multiple auctions
     teller.liquidateUser(bob, False, sender=sally)
     
-    auction_logs = filter_logs(teller, "NewFungibleAuctionCreated")
+    auction_logs = filter_logs(teller, "FungibleAuctionUpdated")
     assert len(auction_logs) == 2  # Should have exactly 2 auctions (alpha, bravo)
     
     # Give alice GREEN to buy auctions
@@ -349,7 +349,7 @@ def test_ah_liquidation_auction_position_depletion(
     # Perform liquidation to create auction
     teller.liquidateUser(bob, False, sender=sally)
     
-    auction_log = filter_logs(teller, "NewFungibleAuctionCreated")[0]
+    auction_log = filter_logs(teller, "FungibleAuctionUpdated")[0]
     
     # Give alice GREEN to buy entire position
     green_amount = 100 * EIGHTEEN_DECIMALS  # More than enough
@@ -431,7 +431,7 @@ def test_ah_liquidation_custom_auction_params(
     teller.liquidateUser(bob, False, sender=sally)
 
     # Verify auction was created with custom parameters
-    auction_logs = filter_logs(teller, "NewFungibleAuctionCreated")
+    auction_logs = filter_logs(teller, "FungibleAuctionUpdated")
     assert len(auction_logs) == 1
     
     auction_log = auction_logs[0]
@@ -497,7 +497,7 @@ def test_ah_auction_buy_config_restrictions(
 
     # Perform liquidation to create auction
     teller.liquidateUser(bob, False, sender=sally)
-    auction_log = filter_logs(teller, "NewFungibleAuctionCreated")[0]
+    auction_log = filter_logs(teller, "FungibleAuctionUpdated")[0]
     
     # Give alice GREEN
     green_amount = 50 * EIGHTEEN_DECIMALS
@@ -622,7 +622,7 @@ def test_ah_auction_time_boundary_edge_cases(
 
     # Perform liquidation to create auction
     teller.liquidateUser(bob, False, sender=sally)
-    auction_log = filter_logs(teller, "NewFungibleAuctionCreated")[0]
+    auction_log = filter_logs(teller, "FungibleAuctionUpdated")[0]
     
     start_block = auction_log.startBlock
     end_block = auction_log.endBlock
@@ -737,7 +737,7 @@ def test_ah_auction_insufficient_green_scenarios(
 
     # Perform liquidation to create auction
     teller.liquidateUser(bob, False, sender=sally)
-    auction_log = filter_logs(teller, "NewFungibleAuctionCreated")[0]
+    auction_log = filter_logs(teller, "FungibleAuctionUpdated")[0]
     
     # user has no green
     with boa.reverts("cannot transfer 0 amount"):
@@ -839,7 +839,7 @@ def test_ah_auction_discount_calculation_edge_cases(
 
     # Perform liquidation
     teller.liquidateUser(bob, False, sender=sally)
-    auction_log = filter_logs(teller, "NewFungibleAuctionCreated")[0]
+    auction_log = filter_logs(teller, "FungibleAuctionUpdated")[0]
     
     # Verify flat discount parameters
     assert auction_log.startDiscount == 25_00
@@ -930,7 +930,7 @@ def test_ah_auction_payment_validation_edge_cases(
 
     # Perform liquidation
     teller.liquidateUser(bob, False, sender=sally)
-    auction_log = filter_logs(teller, "NewFungibleAuctionCreated")[0]
+    auction_log = filter_logs(teller, "FungibleAuctionUpdated")[0]
 
     # Give alice GREEN
     green_amount = 500 * EIGHTEEN_DECIMALS
@@ -1043,7 +1043,7 @@ def test_ah_auction_multiple_asset_coordination(
     # Perform liquidation to create multiple auctions
     teller.liquidateUser(bob, False, sender=sally)
     
-    auction_logs = filter_logs(teller, "NewFungibleAuctionCreated")
+    auction_logs = filter_logs(teller, "FungibleAuctionUpdated")
     assert len(auction_logs) == 3  # Should have exactly 3 auctions (alpha, bravo, charlie)
     
     # Verify different auction parameters
@@ -1156,7 +1156,7 @@ def test_ah_auction_savings_green_preferences(
 
     # Perform liquidation
     teller.liquidateUser(bob, False, sender=sally)
-    auction_log = filter_logs(teller, "NewFungibleAuctionCreated")[0]
+    auction_log = filter_logs(teller, "FungibleAuctionUpdated")[0]
     
     # Give alice GREEN and transfer to auction house
     green_amount = 100 * EIGHTEEN_DECIMALS
@@ -1267,7 +1267,7 @@ def test_ah_liquidation_multiple_auctions(
     teller.liquidateUser(bob, False, sender=sally)
     
     # Verify multiple auctions were created
-    auction_logs = filter_logs(teller, "NewFungibleAuctionCreated")
+    auction_logs = filter_logs(teller, "FungibleAuctionUpdated")
     assert len(auction_logs) == 3  # Should have exactly 3 auctions (alpha, bravo, charlie)
     
     # Verify user is in liquidation with auctions
@@ -1350,7 +1350,7 @@ def test_ah_auction_user_exits_liquidation_via_auction_purchases(
 
     # Perform liquidation
     teller.liquidateUser(bob, False, sender=sally)
-    auction_log = filter_logs(teller, "NewFungibleAuctionCreated")[0]
+    auction_log = filter_logs(teller, "FungibleAuctionUpdated")[0]
     
     # Verify user is in liquidation with auction
     user_debt_after_liq, bt_after_liq, _ = credit_engine.getLatestUserDebtAndTerms(bob, False)
@@ -1451,7 +1451,7 @@ def test_ah_auction_collateral_amounts_and_discount_verification(
 
     # Perform liquidation
     teller.liquidateUser(bob, False, sender=sally)
-    auction_log = filter_logs(teller, "NewFungibleAuctionCreated")[0]
+    auction_log = filter_logs(teller, "FungibleAuctionUpdated")[0]
     
     # Give alice plenty of GREEN
     green_amount = 200 * EIGHTEEN_DECIMALS

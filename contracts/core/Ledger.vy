@@ -579,6 +579,27 @@ def removeFungibleAuction(_liqUser: address, _vaultId: uint256, _asset: address)
         self._removeFungLiqUser(_liqUser)
 
 
+# update auction
+
+
+@external
+def setFungibleAuction(
+    _liqUser: address,
+    _vaultId: uint256,
+    _asset: address,
+    _auc: FungibleAuction,
+) -> bool:
+    assert msg.sender == addys._getAuctionHouseAddr() # dev: only AuctionHouse allowed
+    assert not deptBasics.isPaused # dev: not activated
+
+    aid: uint256 = self.fungibleAuctionIndex[_liqUser][_vaultId][_asset]
+    if aid == 0:
+        return False # this does not yet exist
+
+    self.fungibleAuctions[_liqUser][aid] = _auc
+    return True
+
+
 # remove liq user
 
 

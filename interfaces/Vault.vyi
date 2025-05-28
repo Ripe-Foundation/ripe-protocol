@@ -123,6 +123,12 @@ def isUserInVaultAsset(_user: address, _asset: address) -> bool:
 
 @view
 @external
+def doesUserHaveBalance(_user: address, _asset: address) -> bool:
+    ...
+
+
+@view
+@external
 def isSupportedVaultAsset(_asset: address) -> bool:
     ...
 
