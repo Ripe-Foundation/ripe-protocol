@@ -18,7 +18,7 @@ def test_ripe_hq_and_tokens_setup(
     auction_house,
     credit_engine,
     lootbox,
-    control_room,
+    mission_control,
     teller,
 ):
     # ripe hq tokens
@@ -59,7 +59,7 @@ def test_ripe_hq_and_tokens_setup(
     assert ripe_hq.canMintGreen(auction_house)
     assert ripe_hq.canMintGreen(credit_engine)
     assert ripe_hq.canMintRipe(lootbox)
-    assert ripe_hq.canSetTokenBlacklist(control_room)
+    assert ripe_hq.canSetTokenBlacklist(mission_control)
 
     # cannot mint or set token blacklist
     assert not ripe_hq.canMintGreen(teller)

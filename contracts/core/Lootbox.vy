@@ -25,7 +25,7 @@ interface Ledger:
     def getRipeRewardsBundle() -> RipeRewardsBundle: view
     def numUserVaults(_user: address) -> uint256: view
 
-interface ControlRoom:
+interface MissionControl:
     def getClaimLootConfig(_user: address, _caller: address) -> ClaimLootConfig: view
     def getDepositPointsConfig(_asset: address) -> DepositPointsConfig: view
     def getRewardsConfig() -> RewardsConfig: view
@@ -188,7 +188,7 @@ def _claimLoot(
         return 0
 
     # check if caller can claim for user
-    config: ClaimLootConfig = staticcall ControlRoom(_a.controlRoom).getClaimLootConfig(_user, _caller)
+    config: ClaimLootConfig = staticcall MissionControl(_a.missionControl).getClaimLootConfig(_user, _caller)
     assert config.canClaimLoot # dev: loot claims disabled
     if _user != _caller:
         assert config.canClaimLootForUser # dev: cannot claim for user
@@ -323,7 +323,7 @@ def updateDepositPoints(
     a: addys.Addys = addys._getAddys(_a)
 
     # get latest global rewards
-    config: RewardsConfig = staticcall ControlRoom(a.controlRoom).getRewardsConfig()
+    config: RewardsConfig = staticcall MissionControl(a.missionControl).getRewardsConfig()
     globalRewards: RipeRewards = self._getLatestGlobalRipeRewards(config, a)
 
     # get latest deposit points
@@ -452,7 +452,7 @@ def getLatestDepositPoints(
     _a: addys.Addys = empty(addys.Addys),
 ) -> (UserDepositPoints, AssetDepositPoints, GlobalDepositPoints):
     a: addys.Addys = addys._getAddys(_a)
-    c: RewardsConfig = staticcall ControlRoom(a.controlRoom).getRewardsConfig()
+    c: RewardsConfig = staticcall MissionControl(a.missionControl).getRewardsConfig()
     vaultAddr: address = staticcall VaultBook(a.vaultBook).getAddr(_vaultId)
     return self._getLatestDepositPoints(_user, _vaultId, vaultAddr, _asset, c, a)
 
@@ -473,7 +473,7 @@ def _getLatestDepositPoints(
     globalPoints: GlobalDepositPoints = self._getLatestGlobalDepositPoints(p.globalPoints, _c.arePointsEnabled, _c.stakersPointsAllocTotal, _c.voterPointsAllocTotal)
 
     # latest asset points
-    assetConfig: DepositPointsConfig = staticcall ControlRoom(_a.controlRoom).getDepositPointsConfig(_asset) 
+    assetConfig: DepositPointsConfig = staticcall MissionControl(_a.missionControl).getDepositPointsConfig(_asset) 
     assetPoints: AssetDepositPoints = self._getLatestAssetDepositPoints(p.assetPoints, _c.arePointsEnabled, assetConfig.stakersPointsAlloc, assetConfig.voterPointsAlloc)
     if assetPoints.precision == 0:
         assetPoints.precision = self._getAssetPrecision(assetConfig.isNft, _asset)
@@ -524,7 +524,7 @@ def _getClaimableDepositLootData(
 ) -> (UserDepositLoot, UserDepositPoints, AssetDepositPoints, GlobalDepositPoints, RipeRewards):
 
     # need to get this with each iteration because state may have changed (during claim)
-    config: RewardsConfig = staticcall ControlRoom(_a.controlRoom).getRewardsConfig()
+    config: RewardsConfig = staticcall MissionControl(_a.missionControl).getRewardsConfig()
     globalRewards: RipeRewards = self._getLatestGlobalRipeRewards(config, _a)
 
     # get latest deposit points
@@ -690,7 +690,7 @@ def updateBorrowPoints(_user: address, _a: addys.Addys = empty(addys.Addys)):
     assert not deptBasics.isPaused # dev: contract paused
     a: addys.Addys = addys._getAddys(_a)
 
-    config: RewardsConfig = staticcall ControlRoom(a.controlRoom).getRewardsConfig()
+    config: RewardsConfig = staticcall MissionControl(a.missionControl).getRewardsConfig()
     globalRewards: RipeRewards = self._getLatestGlobalRipeRewards(config, a)
     up: BorrowPoints = empty(BorrowPoints)
     gp: BorrowPoints = empty(BorrowPoints)
@@ -816,7 +816,7 @@ def _claimBorrowLoot(_user: address, _a: addys.Addys) -> uint256:
 @view 
 @internal 
 def _getClaimableBorrowLootData(_user: address, _a: addys.Addys) -> (uint256, BorrowPoints, BorrowPoints, RipeRewards):
-    config: RewardsConfig = staticcall ControlRoom(_a.controlRoom).getRewardsConfig()
+    config: RewardsConfig = staticcall MissionControl(_a.missionControl).getRewardsConfig()
     globalRewards: RipeRewards = self._getLatestGlobalRipeRewards(config, _a)
 
     # latest borrow points
@@ -871,7 +871,7 @@ def updateRipeRewards(_a: addys.Addys = empty(addys.Addys)) -> RipeRewards:
     assert addys._isValidRipeHqAddr(msg.sender) # dev: no perms
     assert not deptBasics.isPaused # dev: contract paused
     a: addys.Addys = addys._getAddys(_a)
-    config: RewardsConfig = staticcall ControlRoom(a.controlRoom).getRewardsConfig()
+    config: RewardsConfig = staticcall MissionControl(a.missionControl).getRewardsConfig()
     ripeRewards: RipeRewards = self._getLatestGlobalRipeRewards(config, a)
     extcall Ledger(a.ledger).setRipeRewards(ripeRewards)
     return ripeRewards
@@ -884,7 +884,7 @@ def updateRipeRewards(_a: addys.Addys = empty(addys.Addys)) -> RipeRewards:
 @external
 def getLatestGlobalRipeRewards() -> RipeRewards:
     a: addys.Addys = addys._getAddys()
-    config: RewardsConfig = staticcall ControlRoom(a.controlRoom).getRewardsConfig()
+    config: RewardsConfig = staticcall MissionControl(a.missionControl).getRewardsConfig()
     return self._getLatestGlobalRipeRewards(config, a)
 
 

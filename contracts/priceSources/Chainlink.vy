@@ -23,7 +23,7 @@ interface ChainlinkFeed:
     def latestRoundData() -> ChainlinkRound: view
     def decimals() -> uint8: view 
 
-interface ControlRoom:
+interface MissionControl:
     def getPriceStaleTime() -> uint256: view
 
 struct ChainlinkRound:
@@ -500,9 +500,9 @@ def _isValidFeedConfig(
         return False
 
     staleTime: uint256 = 0
-    controlRoom: address = addys._getControlRoomAddr()
-    if controlRoom != empty(address):
-        staleTime = staticcall ControlRoom(controlRoom).getPriceStaleTime()
+    missionControl: address = addys._getMissionControlAddr()
+    if missionControl != empty(address):
+        staleTime = staticcall MissionControl(missionControl).getPriceStaleTime()
 
     return self._getPrice(_feed, _decimals, _needsEthToUsd, _needsBtcToUsd, staleTime) != 0
 

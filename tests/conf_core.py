@@ -37,7 +37,7 @@ def ripe_hq(
     auction_house,
     auction_house_nft,
     bond_room,
-    control_room,
+    mission_control,
     credit_engine,
     endaoment,
     ledger,
@@ -76,8 +76,8 @@ def ripe_hq(
     assert ripe_hq_deploy.confirmNewAddressToRegistry(bond_room, sender=deploy3r) == 8
 
     # 9
-    assert ripe_hq_deploy.startAddNewAddressToRegistry(control_room, "Control Room", sender=deploy3r)
-    assert ripe_hq_deploy.confirmNewAddressToRegistry(control_room, sender=deploy3r) == 9
+    assert ripe_hq_deploy.startAddNewAddressToRegistry(mission_control, "Mission Control", sender=deploy3r)
+    assert ripe_hq_deploy.confirmNewAddressToRegistry(mission_control, sender=deploy3r) == 9
 
     # 10
     assert ripe_hq_deploy.startAddNewAddressToRegistry(credit_engine, "Credit Engine", sender=deploy3r)
@@ -113,11 +113,9 @@ def ripe_hq(
     ripe_hq_deploy.initiateHqConfigChange(13, False, True, False, sender=deploy3r)
     assert ripe_hq_deploy.confirmHqConfigChange(13, sender=deploy3r)
 
-    # control room can set token blacklists
+    # mission control can set token blacklists
     ripe_hq_deploy.initiateHqConfigChange(9, False, False, True, sender=deploy3r)
     assert ripe_hq_deploy.confirmHqConfigChange(9, sender=deploy3r)
-
-    # finish up
 
     # finish ripe hq setup
     assert ripe_hq_deploy.setRegistryTimeLockAfterSetup(sender=deploy3r)
@@ -215,27 +213,27 @@ def bond_room(ripe_hq_deploy):
     )
 
 
-# control room
+# mission control
 
 
 @pytest.fixture(scope="session")
-def control_room(ripe_hq_deploy, control_room_data, fork):
+def mission_control(ripe_hq_deploy, mission_control_data, fork):
     return boa.load(
-        "contracts/core/ControlRoom.vy",
+        "contracts/core/MissionControl.vy",
         ripe_hq_deploy,
-        control_room_data,
+        mission_control_data,
         PARAMS[fork]["PRICE_DESK_MIN_STALE_TIME"],
         PARAMS[fork]["PRICE_DESK_MAX_STALE_TIME"],
-        name="control_room",
+        name="mission_control",
     )
 
 
 @pytest.fixture(scope="session")
-def control_room_data(ripe_hq_deploy):
+def mission_control_data(ripe_hq_deploy):
     return boa.load(
-        "contracts/core/ControlRoomData.vy",
+        "contracts/core/MissionControlData.vy",
         ripe_hq_deploy,
-        name="control_room_data",
+        name="mission_control_data",
     )
 
 

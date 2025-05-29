@@ -14,7 +14,7 @@ struct Addys:
     auctionHouse: address
     auctionHouseNft: address
     bondRoom: address
-    controlRoom: address
+    missionControl: address
     creditEngine: address
     endaoment: address
     ledger: address
@@ -33,7 +33,7 @@ VAULT_BOOK_ID: constant(uint256) = 5
 AUCTION_HOUSE_ID: constant(uint256) = 6
 AUCTION_HOUSE_NFT_ID: constant(uint256) = 7
 BOND_ROOM_ID: constant(uint256) = 8
-CONTROL_ROOM_ID: constant(uint256) = 9
+MISSION_CONTROL_ID: constant(uint256) = 9
 CREDIT_ENGINE_ID: constant(uint256) = 10
 ENDAOMENT_ID: constant(uint256) = 11
 LEDGER_ID: constant(uint256) = 12
@@ -80,7 +80,7 @@ def _generateAddys() -> Addys:
         auctionHouse=staticcall RipeHq(hq).getAddr(AUCTION_HOUSE_ID),
         auctionHouseNft=staticcall RipeHq(hq).getAddr(AUCTION_HOUSE_NFT_ID),
         bondRoom=staticcall RipeHq(hq).getAddr(BOND_ROOM_ID),
-        controlRoom=staticcall RipeHq(hq).getAddr(CONTROL_ROOM_ID),
+        missionControl=staticcall RipeHq(hq).getAddr(MISSION_CONTROL_ID),
         creditEngine=staticcall RipeHq(hq).getAddr(CREDIT_ENGINE_ID),
         endaoment=staticcall RipeHq(hq).getAddr(ENDAOMENT_ID),
         ledger=staticcall RipeHq(hq).getAddr(LEDGER_ID),
@@ -211,19 +211,19 @@ def _getBondRoomAddr() -> address:
     return staticcall RipeHq(RIPE_HQ_FOR_ADDYS).getAddr(BOND_ROOM_ID)
 
 
-# control room
+# mission control
 
 
 @view
 @internal
-def _getControlRoomId() -> uint256:
-    return CONTROL_ROOM_ID
+def _getMissionControlId() -> uint256:
+    return MISSION_CONTROL_ID
 
 
 @view
 @internal
-def _getControlRoomAddr() -> address:
-    return staticcall RipeHq(RIPE_HQ_FOR_ADDYS).getAddr(CONTROL_ROOM_ID)
+def _getMissionControlAddr() -> address:
+    return staticcall RipeHq(RIPE_HQ_FOR_ADDYS).getAddr(MISSION_CONTROL_ID)
 
 
 # credit engine

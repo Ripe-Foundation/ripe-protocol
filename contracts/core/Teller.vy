@@ -40,7 +40,7 @@ interface Lootbox:
     def updateDepositPoints(_user: address, _vaultId: uint256, _vaultAddr: address, _asset: address, _a: addys.Addys = empty(addys.Addys)): nonpayable
     def claimLootForUser(_user: address, _caller: address, _shouldStake: bool, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
 
-interface ControlRoom:
+interface MissionControl:
     def getTellerWithdrawConfig(_asset: address, _user: address, _caller: address) -> TellerWithdrawConfig: view
     def getTellerDepositConfig(_asset: address, _user: address) -> TellerDepositConfig: view
 
@@ -188,7 +188,7 @@ def _deposit(
 
     # get ledger data
     d: DepositLedgerData = staticcall Ledger(_a.ledger).getDepositLedgerData(_user, vaultId)
-    amount: uint256 = self._validateOnDeposit(_asset, _amount, _user, vaultAddr, vaultId, _depositor, d, _a.controlRoom)
+    amount: uint256 = self._validateOnDeposit(_asset, _amount, _user, vaultAddr, vaultId, _depositor, d, _a.missionControl)
 
     # deposit tokens
     assert extcall IERC20(_asset).transferFrom(_depositor, vaultAddr, amount, default_return_value=True) # dev: token transfer failed
@@ -218,9 +218,9 @@ def _validateOnDeposit(
     _vaultId: uint256,
     _depositor: address,
     _d: DepositLedgerData,
-    _controlRoom: address,
+    _missionControl: address,
 ) -> uint256:
-    config: TellerDepositConfig = staticcall ControlRoom(_controlRoom).getTellerDepositConfig(_asset, _user)
+    config: TellerDepositConfig = staticcall MissionControl(_missionControl).getTellerDepositConfig(_asset, _user)
     assert config.canDepositGeneral # dev: protocol deposits disabled
     assert config.canDepositAsset # dev: asset deposits disabled
     assert config.isUserAllowed # dev: user not on whitelist
@@ -355,7 +355,7 @@ def _validateOnWithdrawal(
 ) -> uint256:
     assert _amount != 0 # dev: cannot withdraw 0
 
-    config: TellerWithdrawConfig = staticcall ControlRoom(_a.controlRoom).getTellerWithdrawConfig(_asset, _user, _caller)
+    config: TellerWithdrawConfig = staticcall MissionControl(_a.missionControl).getTellerWithdrawConfig(_asset, _user, _caller)
     assert config.canWithdrawGeneral # dev: protocol withdrawals disabled
     assert config.canWithdrawAsset # dev: asset withdrawals disabled
     assert config.isUserAllowed # dev: user not on whitelist

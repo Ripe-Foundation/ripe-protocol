@@ -15,7 +15,7 @@ import contracts.modules.Addys as addys
 import contracts.modules.DeptBasics as deptBasics
 from interfaces import Department
 
-interface ControlRoomData:
+interface MissionControlData:
     def getManyConfigs(_getGenConfig: bool, _getDebtConfig: bool, _getRewardsConfig: bool, _asset: address = empty(address), _user: address = empty(address)) -> MetaConfig: view
     def setPriorityLiqAssetVaults(_priorityLiqAssetVaults: DynArray[VaultLite, PRIORITY_LIQ_VAULT_DATA]): nonpayable
     def setPriorityStabVaults(_priorityStabVaults: DynArray[VaultLite, MAX_STAB_VAULT_DATA]): nonpayable
@@ -31,7 +31,7 @@ interface ControlRoomData:
     def setGeneralDebtConfig(_genDebtConfig: GenDebtConfig): nonpayable
     def setGeneralConfig(_genConfig: GenConfig): nonpayable
     def assetConfig(_asset: address) -> AssetConfig: view
-    def getControlRoomId() -> uint256: view
+    def getMissionControlId() -> uint256: view
     def genDebtConfig() -> GenDebtConfig: view
     def genConfig() -> GenConfig: view
     def ripeHq() -> address: view
@@ -254,7 +254,7 @@ event PriorityPriceSourceIdsModified:
 event StaleTimeSet:
     staleTime: uint256
 
-# control room data
+# mission control data
 data: public(address)
 
 MIN_STALE_TIME: public(immutable(uint256))
@@ -268,7 +268,7 @@ PRIORITY_LIQ_VAULT_DATA: constant(uint256) = 20
 @deploy
 def __init__(
     _ripeHq: address,
-    _controlRoomData: address,
+    _missionControlData: address,
     _minStaleTime: uint256,
     _maxStaleTime: uint256,
 ):
@@ -276,10 +276,10 @@ def __init__(
     addys.__init__(_ripeHq)
     deptBasics.__init__(False, False, False) # no minting
 
-    # control room data
-    assert staticcall ControlRoomData(_controlRoomData).ripeHq() == _ripeHq # dev: invalid ripe hq
-    assert staticcall ControlRoomData(_controlRoomData).getControlRoomId() == addys._getControlRoomId() # dev: invalid control room id
-    self.data = _controlRoomData
+    # mission control data
+    assert staticcall MissionControlData(_missionControlData).ripeHq() == _ripeHq # dev: invalid ripe hq
+    assert staticcall MissionControlData(_missionControlData).getMissionControlId() == addys._getMissionControlId() # dev: invalid mission control id
+    self.data = _missionControlData
 
     assert _minStaleTime < _maxStaleTime # dev: invalid stale time range
     MIN_STALE_TIME = _minStaleTime
@@ -327,7 +327,7 @@ def setGeneralConfig(
         canBuyInAuction=_canBuyInAuction,
         canClaimInStabPool=_canClaimInStabPool,
     )
-    extcall ControlRoomData(self.data).setGeneralConfig(genConfig)
+    extcall MissionControlData(self.data).setGeneralConfig(genConfig)
     return True
 
 
@@ -366,7 +366,7 @@ def setGeneralDebtConfig(
         ltvPaybackBuffer=_ltvPaybackBuffer,
         genAuctionParams=_genAuctionParams,
     )
-    extcall ControlRoomData(self.data).setGeneralDebtConfig(genDebtConfig)
+    extcall MissionControlData(self.data).setGeneralDebtConfig(genDebtConfig)
     return True
 
 
@@ -424,7 +424,7 @@ def setAssetConfig(
         whitelist=_whitelist,
         isNft=_isNft,
     )
-    extcall ControlRoomData(self.data).setAssetConfig(_asset, assetConfig)
+    extcall MissionControlData(self.data).setAssetConfig(_asset, assetConfig)
     return True
 
 
@@ -455,7 +455,7 @@ def setRipeRewardsConfig(
         votersAlloc=_votersAlloc,
         genDepositorsAlloc=_genDepositorsAlloc,
     )
-    extcall ControlRoomData(self.data).setRipeRewardsConfig(rewardsConfig)
+    extcall MissionControlData(self.data).setRipeRewardsConfig(rewardsConfig)
     return True
 
 
@@ -477,7 +477,7 @@ def setUserConfig(
         canAnyoneDeposit=_canAnyoneDeposit,
         canAnyoneRepayDebt=_canAnyoneRepayDebt,
     )
-    extcall ControlRoomData(self.data).setUserConfig(msg.sender, userConfig)
+    extcall MissionControlData(self.data).setUserConfig(msg.sender, userConfig)
     return True
 
 
@@ -501,7 +501,7 @@ def setUserDelegation(
         canClaimFromStabPool=_canClaimFromStabPool,
         canClaimLoot=_canClaimLoot,
     )
-    extcall ControlRoomData(self.data).setUserDelegation(msg.sender, _delegate, config)
+    extcall MissionControlData(self.data).setUserDelegation(msg.sender, _delegate, config)
     return True
 
 
@@ -517,7 +517,7 @@ def setPriorityPriceSourceIds(_priorityIds: DynArray[uint256, MAX_PRIORITY_PARTN
 
     priorityIds: DynArray[uint256, MAX_PRIORITY_PARTNERS] = self._sanitizePrioritySources(_priorityIds)
     assert self._areValidPriorityPriceSourceIds(priorityIds) # dev: invalid priority sources
-    extcall ControlRoomData(self.data).setPriorityPriceSourceIds(priorityIds)
+    extcall MissionControlData(self.data).setPriorityPriceSourceIds(priorityIds)
 
     log PriorityPriceSourceIdsModified(numIds=len(priorityIds))
     return True
@@ -570,9 +570,9 @@ def setStaleTime(_staleTime: uint256) -> bool:
 
     # update data
     data: address = self.data
-    genConfig: GenConfig = staticcall ControlRoomData(data).genConfig()
+    genConfig: GenConfig = staticcall MissionControlData(data).genConfig()
     genConfig.priceStaleTime = _staleTime
-    extcall ControlRoomData(data).setGeneralConfig(genConfig)
+    extcall MissionControlData(data).setGeneralConfig(genConfig)
 
     log StaleTimeSet(staleTime=_staleTime)
     return True
@@ -582,7 +582,7 @@ def setStaleTime(_staleTime: uint256) -> bool:
 @external
 def getPriceStaleTime() -> uint256:
     # used by Chainlink.vy
-    genConfig: GenConfig = staticcall ControlRoomData(self.data).genConfig()
+    genConfig: GenConfig = staticcall MissionControlData(self.data).genConfig()
     return genConfig.priceStaleTime
 
 
@@ -613,7 +613,7 @@ def setPriorityLiqAssetVaults(_priorityLiqAssetVaults: DynArray[VaultLite, PRIOR
 
     # TODO: add time lock, validation, event
 
-    extcall ControlRoomData(self.data).setPriorityLiqAssetVaults(_priorityLiqAssetVaults)
+    extcall MissionControlData(self.data).setPriorityLiqAssetVaults(_priorityLiqAssetVaults)
     return True
 
 
@@ -624,7 +624,7 @@ def setPriorityStabVaults(_priorityStabVaults: DynArray[VaultLite, MAX_STAB_VAUL
 
     # TODO: add time lock, validation, event
 
-    extcall ControlRoomData(self.data).setPriorityStabVaults(_priorityStabVaults)
+    extcall MissionControlData(self.data).setPriorityStabVaults(_priorityStabVaults)
     return True
 
 
@@ -651,7 +651,7 @@ def _isUserAllowed(_whitelist: address, _user: address, _asset: address) -> bool
 @view
 @external
 def getTellerDepositConfig(_asset: address, _user: address) -> TellerDepositConfig:
-    c: MetaConfig = staticcall ControlRoomData(self.data).getManyConfigs(True, False, False, _asset, _user)
+    c: MetaConfig = staticcall MissionControlData(self.data).getManyConfigs(True, False, False, _asset, _user)
     return TellerDepositConfig(
         canDepositGeneral=c.genConfig.canDeposit,
         canDepositAsset=c.assetConfig.canDeposit,
@@ -671,11 +671,11 @@ def getTellerDepositConfig(_asset: address, _user: address) -> TellerDepositConf
 @external
 def getTellerWithdrawConfig(_asset: address, _user: address, _caller: address) -> TellerWithdrawConfig:
     data: address = self.data
-    c: MetaConfig = staticcall ControlRoomData(data).getManyConfigs(True, False, False, _asset)
+    c: MetaConfig = staticcall MissionControlData(data).getManyConfigs(True, False, False, _asset)
 
     canWithdrawForUser: bool = True
     if _user != _caller:
-        delegation: ActionDelegation = staticcall ControlRoomData(data).userDelegation(_user, _caller)
+        delegation: ActionDelegation = staticcall MissionControlData(data).userDelegation(_user, _caller)
         canWithdrawForUser = delegation.canWithdraw
 
     return TellerWithdrawConfig(
@@ -692,7 +692,7 @@ def getTellerWithdrawConfig(_asset: address, _user: address, _caller: address) -
 @view
 @external
 def getDebtTerms(_asset: address) -> DebtTerms:
-    assetConfig: AssetConfig = staticcall ControlRoomData(self.data).assetConfig(_asset)
+    assetConfig: AssetConfig = staticcall MissionControlData(self.data).assetConfig(_asset)
     return assetConfig.debtTerms
 
 
@@ -700,11 +700,11 @@ def getDebtTerms(_asset: address) -> DebtTerms:
 @external
 def getBorrowConfig(_user: address, _caller: address) -> BorrowConfig:
     data: address = self.data
-    c: MetaConfig = staticcall ControlRoomData(data).getManyConfigs(True, True, False)
+    c: MetaConfig = staticcall MissionControlData(data).getManyConfigs(True, True, False)
 
     canBorrowForUser: bool = True
     if _user != _caller:
-        delegation: ActionDelegation = staticcall ControlRoomData(data).userDelegation(_user, _caller)
+        delegation: ActionDelegation = staticcall MissionControlData(data).userDelegation(_user, _caller)
         canBorrowForUser = delegation.canBorrow
 
     return BorrowConfig(
@@ -726,7 +726,7 @@ def getBorrowConfig(_user: address, _caller: address) -> BorrowConfig:
 @view
 @external
 def getRepayConfig(_user: address) -> RepayConfig:
-    c: MetaConfig = staticcall ControlRoomData(self.data).getManyConfigs(True, False, False, empty(address), _user)
+    c: MetaConfig = staticcall MissionControlData(self.data).getManyConfigs(True, False, False, empty(address), _user)
     return RepayConfig(
         canRepay=c.genConfig.canRepay,
         canAnyoneRepayDebt=c.userConfig.canAnyoneRepayDebt,
@@ -739,7 +739,7 @@ def getRepayConfig(_user: address) -> RepayConfig:
 @view
 @external
 def getRedeemCollateralConfig(_asset: address, _redeemer: address) -> RedeemCollateralConfig:
-    c: MetaConfig = staticcall ControlRoomData(self.data).getManyConfigs(True, True, False, _asset)
+    c: MetaConfig = staticcall MissionControlData(self.data).getManyConfigs(True, True, False, _asset)
 
     # TODO: when setting asset config -> canRedeemCollateral, make sure: has LTV, not stable, not NFT
 
@@ -754,7 +754,7 @@ def getRedeemCollateralConfig(_asset: address, _redeemer: address) -> RedeemColl
 @view
 @external
 def getLtvPaybackBuffer() -> uint256:
-    genDebtConfig: GenDebtConfig = staticcall ControlRoomData(self.data).genDebtConfig()
+    genDebtConfig: GenDebtConfig = staticcall MissionControlData(self.data).genDebtConfig()
     return genDebtConfig.ltvPaybackBuffer
 
 
@@ -764,7 +764,7 @@ def getLtvPaybackBuffer() -> uint256:
 @view
 @external
 def getAuctionBuyConfig(_asset: address, _buyer: address) -> AuctionBuyConfig:
-    c: MetaConfig = staticcall ControlRoomData(self.data).getManyConfigs(True, False, False, _asset)
+    c: MetaConfig = staticcall MissionControlData(self.data).getManyConfigs(True, False, False, _asset)
     return AuctionBuyConfig(
         canBuyInAuctionGeneral=c.genConfig.canBuyInAuction,
         canBuyInAuctionAsset=c.assetConfig.canBuyInAuction,
@@ -779,19 +779,19 @@ def getAuctionBuyConfig(_asset: address, _buyer: address) -> AuctionBuyConfig:
 @external
 def getGenLiqConfig() -> GenLiqConfig:
     data: address = self.data
-    c: MetaConfig = staticcall ControlRoomData(data).getManyConfigs(True, True, False)
+    c: MetaConfig = staticcall MissionControlData(data).getManyConfigs(True, True, False)
     vaultBook: address = addys._getVaultBookAddr()
 
     # priority liq asset vault data
     priorityLiqAssetVaults: DynArray[VaultData, PRIORITY_LIQ_VAULT_DATA] = []
-    priorityLiqAssetData: DynArray[VaultLite, PRIORITY_LIQ_VAULT_DATA] = staticcall ControlRoomData(data).getPriorityLiqAssetVaults()
+    priorityLiqAssetData: DynArray[VaultLite, PRIORITY_LIQ_VAULT_DATA] = staticcall MissionControlData(data).getPriorityLiqAssetVaults()
     for pData: VaultLite in priorityLiqAssetData:
         vaultAddr: address = staticcall VaultBook(vaultBook).getAddr(pData.vaultId)
         priorityLiqAssetVaults.append(VaultData(vaultId=pData.vaultId, vaultAddr=vaultAddr, asset=pData.asset))
 
     # stability pool vault data
     priorityStabVaults: DynArray[VaultData, MAX_STAB_VAULT_DATA] = []
-    priorityStabData: DynArray[VaultLite, MAX_STAB_VAULT_DATA] = staticcall ControlRoomData(data).getPriorityStabVaults()
+    priorityStabData: DynArray[VaultLite, MAX_STAB_VAULT_DATA] = staticcall MissionControlData(data).getPriorityStabVaults()
     for pData: VaultLite in priorityStabData:
         vaultAddr: address = staticcall VaultBook(vaultBook).getAddr(pData.vaultId)
         priorityStabVaults.append(VaultData(vaultId=pData.vaultId, vaultAddr=vaultAddr, asset=pData.asset))
@@ -810,7 +810,7 @@ def getGenLiqConfig() -> GenLiqConfig:
 @view
 @external
 def getGenAuctionParams() -> AuctionParams:
-    genDebtConfig: GenDebtConfig = staticcall ControlRoomData(self.data).genDebtConfig()
+    genDebtConfig: GenDebtConfig = staticcall MissionControlData(self.data).genDebtConfig()
     return genDebtConfig.genAuctionParams
 
 
@@ -820,7 +820,7 @@ def getGenAuctionParams() -> AuctionParams:
 @view
 @external
 def getAssetLiqConfig(_asset: address) -> AssetLiqConfig:
-    c: MetaConfig = staticcall ControlRoomData(self.data).getManyConfigs(False, False, False, _asset)
+    c: MetaConfig = staticcall MissionControlData(self.data).getManyConfigs(False, False, False, _asset)
 
     # TODO: when setting asset config...
     # shouldTransferToEndaoment -- needs to be stable-ish, etc. Or Stab pool asset (LP token, etc)
@@ -856,7 +856,7 @@ def getAssetLiqConfig(_asset: address) -> AssetLiqConfig:
 @view
 @external
 def getStabPoolClaimsConfig(_claimAsset: address, _claimer: address) -> StabPoolClaimsConfig:
-    c: MetaConfig = staticcall ControlRoomData(self.data).getManyConfigs(True, False, False, _claimAsset)
+    c: MetaConfig = staticcall MissionControlData(self.data).getManyConfigs(True, False, False, _claimAsset)
     return StabPoolClaimsConfig(
         canClaimInStabPoolGeneral=c.genConfig.canClaimInStabPool,
         canClaimInStabPoolAsset=c.assetConfig.canClaimInStabPool,
@@ -870,7 +870,7 @@ def getStabPoolClaimsConfig(_claimAsset: address, _claimer: address) -> StabPool
 @view
 @external
 def getStabPoolRedemptionsConfig(_asset: address, _redeemer: address) -> StabPoolRedemptionsConfig:
-    c: MetaConfig = staticcall ControlRoomData(self.data).getManyConfigs(True, False, False, _asset)
+    c: MetaConfig = staticcall MissionControlData(self.data).getManyConfigs(True, False, False, _asset)
     return StabPoolRedemptionsConfig(
         canRedeemInStabPoolGeneral=c.genConfig.canRedeemInStabPool,
         canRedeemInStabPoolAsset=c.assetConfig.canRedeemInStabPool,
@@ -885,11 +885,11 @@ def getStabPoolRedemptionsConfig(_asset: address, _redeemer: address) -> StabPoo
 @external
 def getClaimLootConfig(_user: address, _caller: address) -> ClaimLootConfig:
     data: address = self.data
-    c: MetaConfig = staticcall ControlRoomData(data).getManyConfigs(True, False, False)
+    c: MetaConfig = staticcall MissionControlData(data).getManyConfigs(True, False, False)
 
     canClaimLootForUser: bool = True
     if _user != _caller:
-        delegation: ActionDelegation = staticcall ControlRoomData(data).userDelegation(_user, _caller)
+        delegation: ActionDelegation = staticcall MissionControlData(data).userDelegation(_user, _caller)
         canClaimLootForUser = delegation.canClaimLoot
 
     return ClaimLootConfig(
@@ -904,7 +904,7 @@ def getClaimLootConfig(_user: address, _caller: address) -> ClaimLootConfig:
 @view
 @external
 def getRewardsConfig() -> RewardsConfig:
-    c: MetaConfig = staticcall ControlRoomData(self.data).getManyConfigs(False, False, True)
+    c: MetaConfig = staticcall MissionControlData(self.data).getManyConfigs(False, False, True)
     return RewardsConfig(
         arePointsEnabled=c.rewardsConfig.arePointsEnabled,
         ripePerBlock=c.rewardsConfig.ripePerBlock,
@@ -923,7 +923,7 @@ def getRewardsConfig() -> RewardsConfig:
 @view
 @external
 def getDepositPointsConfig(_asset: address) -> DepositPointsConfig:
-    c: MetaConfig = staticcall ControlRoomData(self.data).getManyConfigs(False, False, False, _asset)
+    c: MetaConfig = staticcall MissionControlData(self.data).getManyConfigs(False, False, False, _asset)
     return DepositPointsConfig(
         stakersPointsAlloc=c.assetConfig.stakersPointsAlloc,
         voterPointsAlloc=c.assetConfig.voterPointsAlloc,
@@ -938,8 +938,8 @@ def getDepositPointsConfig(_asset: address) -> DepositPointsConfig:
 @external
 def getPriceConfig() -> PriceConfig:
     data: address = self.data
-    genConfig: GenConfig = staticcall ControlRoomData(data).genConfig()
+    genConfig: GenConfig = staticcall MissionControlData(data).genConfig()
     return PriceConfig(
         staleTime=genConfig.priceStaleTime,
-        priorityPriceSourceIds=staticcall ControlRoomData(data).getPriorityPriceSourceIds(),
+        priorityPriceSourceIds=staticcall MissionControlData(data).getPriorityPriceSourceIds(),
     )

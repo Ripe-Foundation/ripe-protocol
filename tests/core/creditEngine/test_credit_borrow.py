@@ -425,7 +425,7 @@ def test_borrow_credit_engine_paused(
     performDeposit,
     mock_price_source,
     teller,
-    control_room,
+    mission_control,
 ):
     # basic setup
     setGeneralConfig()
@@ -441,7 +441,7 @@ def test_borrow_credit_engine_paused(
     mock_price_source.setPrice(alpha_token, alpha_price)
 
     # pause the credit engine
-    teller.pause(True, sender=control_room.address)
+    teller.pause(True, sender=mission_control.address)
     assert teller.isPaused()
 
     # Attempt borrow should fail
@@ -450,7 +450,7 @@ def test_borrow_credit_engine_paused(
         teller.borrow(borrow_amount, bob, False, sender=bob)
 
     # unpause the credit engine
-    teller.pause(False, sender=control_room.address)
+    teller.pause(False, sender=mission_control.address)
     assert not teller.isPaused()
 
     # borrow should now succeed
@@ -1171,7 +1171,7 @@ def test_update_debt_for_user(
     credit_engine,
     ledger,
     createDebtTerms,
-    control_room,
+    mission_control,
 ):
     # basic setup with high interest rate
     setGeneralConfig()
@@ -1205,7 +1205,7 @@ def test_update_debt_for_user(
     with boa.reverts("no perms"):
         credit_engine.updateDebtForUser(bob, sender=bob)
 
-    credit_engine.updateDebtForUser(bob, sender=control_room.address)
+    credit_engine.updateDebtForUser(bob, sender=mission_control.address)
 
     # get user debt directly from ledger
     user_debt = ledger.userDebt(bob)

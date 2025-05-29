@@ -21,7 +21,7 @@ from interfaces import PriceSource
 from interfaces import Department
 from ethereum.ercs import IERC20Detailed
 
-interface ControlRoom:
+interface MissionControl:
     def getPriceConfig() -> PriceConfig: view
 
 struct PriceConfig:
@@ -104,7 +104,7 @@ def _getPrice(_asset: address, _shouldRaise: bool = False) -> uint256:
     alreadyLooked: DynArray[uint256, MAX_PRIORITY_PARTNERS] = []
 
     # config
-    config: PriceConfig = staticcall ControlRoom(addys._getControlRoomAddr()).getPriceConfig()
+    config: PriceConfig = staticcall MissionControl(addys._getMissionControlAddr()).getPriceConfig()
 
     # go thru priority partners first
     for pid: uint256 in config.priorityPriceSourceIds:

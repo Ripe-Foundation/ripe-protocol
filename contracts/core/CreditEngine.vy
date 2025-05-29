@@ -23,7 +23,7 @@ interface Ledger:
     def numUserVaults(_user: address) -> uint256: view
     def flushUnrealizedYield() -> uint256: nonpayable
 
-interface ControlRoom:
+interface MissionControl:
     def getRedeemCollateralConfig(_asset: address, _redeemer: address) -> RedeemCollateralConfig: view
     def getBorrowConfig(_user: address, _caller: address) -> BorrowConfig: view
     def getRepayConfig(_user: address) -> RepayConfig: view
@@ -187,7 +187,7 @@ def borrowForUser(
     bt: UserBorrowTerms = self._getUserBorrowTerms(_user, d.numUserVaults, True, a)
 
     # get config
-    config: BorrowConfig = staticcall ControlRoom(a.controlRoom).getBorrowConfig(_user, _caller)
+    config: BorrowConfig = staticcall MissionControl(a.missionControl).getBorrowConfig(_user, _caller)
 
     # validation
     newBorrowAmount: uint256 = 0
@@ -314,7 +314,7 @@ def getMaxBorrowAmount(_user: address) -> uint256:
         return 0
 
     # get borrow config
-    config: BorrowConfig = staticcall ControlRoom(a.controlRoom).getBorrowConfig(_user, _user)
+    config: BorrowConfig = staticcall MissionControl(a.missionControl).getBorrowConfig(_user, _user)
     if not config.canBorrow:
         return 0
 
@@ -387,7 +387,7 @@ def repayForUser(
     # validation
     repayAmount: uint256 = 0
     refundAmount: uint256 = 0
-    repayAmount, refundAmount = self._validateOnRepay(_user, _caller, _greenAmount, userDebt.amount, a.controlRoom, a.greenToken)
+    repayAmount, refundAmount = self._validateOnRepay(_user, _caller, _greenAmount, userDebt.amount, a.missionControl, a.greenToken)
     assert repayAmount != 0 # dev: cannot repay with 0 green
 
     return self._repayDebt(_user, userDebt, d.numUserVaults, repayAmount, refundAmount, newInterest, True, _shouldRefundSavingsGreen, RepayType.STANDARD, a)
@@ -488,13 +488,13 @@ def _validateOnRepay(
     _caller: address,
     _greenAmount: uint256,
     _userDebtAmount: uint256,
-    _controlRoom: address,
+    _missionControl: address,
     _greenToken: address,
 ) -> (uint256, uint256):
     assert _userDebtAmount != 0 # dev: no debt outstanding
 
     # repay config
-    repayConfig: RepayConfig = staticcall ControlRoom(_controlRoom).getRepayConfig(_user)
+    repayConfig: RepayConfig = staticcall MissionControl(_missionControl).getRepayConfig(_user)
     assert repayConfig.canRepay # dev: repay paused
     if _user != _caller:
         assert repayConfig.canAnyoneRepayDebt # dev: cannot repay for user
@@ -625,7 +625,7 @@ def _redeemCollateral(
         return 0
 
     # redemptions not allowed on asset
-    config: RedeemCollateralConfig = staticcall ControlRoom(_a.controlRoom).getRedeemCollateralConfig(_asset, _redeemer)
+    config: RedeemCollateralConfig = staticcall MissionControl(_a.missionControl).getRedeemCollateralConfig(_asset, _redeemer)
     if not config.canRedeemCollateralGeneral or not config.canRedeemCollateralAsset or not config.isUserAllowed:
         return 0
 
@@ -705,7 +705,7 @@ def getMaxRedeemValue(_user: address) -> uint256:
     if not self._canRedeemUserCollateral(userDebt.amount, bt.collateralVal, bt.debtTerms.redemptionThreshold):
         return 0
     
-    ltvPaybackBuffer: uint256 = staticcall ControlRoom(a.controlRoom).getLtvPaybackBuffer()
+    ltvPaybackBuffer: uint256 = staticcall MissionControl(a.missionControl).getLtvPaybackBuffer()
     targetLtv: uint256 = bt.debtTerms.ltv * (HUNDRED_PERCENT - ltvPaybackBuffer) // HUNDRED_PERCENT
     return self._calcAmountToPay(userDebt.amount, bt.collateralVal, targetLtv)
 
@@ -786,7 +786,7 @@ def _getUserBorrowTerms(
                 continue
 
             # debt terms
-            debtTerms: DebtTerms = staticcall ControlRoom(_a.controlRoom).getDebtTerms(asset)
+            debtTerms: DebtTerms = staticcall MissionControl(_a.missionControl).getDebtTerms(asset)
 
             # skip if no ltv (staked green, staked ripe, etc)
             if debtTerms.ltv == 0:

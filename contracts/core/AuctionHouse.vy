@@ -26,7 +26,7 @@ interface Ledger:
     def isUserInLiquidation(_user: address) -> bool: view
     def numUserVaults(_user: address) -> uint256: view
 
-interface ControlRoom:
+interface MissionControl:
     def getAuctionBuyConfig(_asset: address, _buyer: address) -> AuctionBuyConfig: view
     def getAssetLiqConfig(_asset: address) -> AssetLiqConfig: view
     def getGenAuctionParams() -> AuctionParams: view
@@ -232,7 +232,7 @@ def liquidateUser(
     assert not deptBasics.isPaused # dev: contract paused
     a: addys.Addys = addys._getAddys(_a)
 
-    config: GenLiqConfig = staticcall ControlRoom(a.controlRoom).getGenLiqConfig()
+    config: GenLiqConfig = staticcall MissionControl(a.missionControl).getGenLiqConfig()
     assert config.canLiquidate # dev: cannot liquidate
 
     # liquidate user
@@ -256,7 +256,7 @@ def liquidateManyUsers(
     assert not deptBasics.isPaused # dev: contract paused
     a: addys.Addys = addys._getAddys(_a)
 
-    config: GenLiqConfig = staticcall ControlRoom(a.controlRoom).getGenLiqConfig()
+    config: GenLiqConfig = staticcall MissionControl(a.missionControl).getGenLiqConfig()
     assert config.canLiquidate # dev: cannot liquidate
 
     totalKeeperRewards: uint256 = 0
@@ -334,7 +334,7 @@ def _liquidateUser(
     # start auctions (if necessary)
     numAuctionsStarted: uint256 = 0
     if not didRestoreDebtHealth:
-        numAuctionsStarted = self._startAuctionsDuringLiq(_liqUser, _config.genAuctionParams, _a.controlRoom, _a.ledger)
+        numAuctionsStarted = self._startAuctionsDuringLiq(_liqUser, _config.genAuctionParams, _a.missionControl, _a.ledger)
 
     log LiquidateUser(
         user=_liqUser,
@@ -379,7 +379,7 @@ def _performLiquidationPhases(
         if self.vaultAddrs[stabPool.vaultId] == empty(address):
             self.vaultAddrs[stabPool.vaultId] = stabPool.vaultAddr # cache
 
-    # PHASE 2 -- Go thru priority liq assets (set in control room)
+    # PHASE 2 -- Go thru priority liq assets (set in mission control)
 
     if remainingToRepay != 0:
         for pData: VaultData in _config.priorityLiqAssetVaults:
@@ -515,7 +515,7 @@ def _handleSpecificLiqAsset(
     # asset liq config
     config: AssetLiqConfig = empty(AssetLiqConfig)
     isConfigCached: bool = False
-    config, isConfigCached = self._getAssetLiqConfig(_liqAsset, _a.controlRoom)
+    config, isConfigCached = self._getAssetLiqConfig(_liqAsset, _a.missionControl)
     if not isConfigCached:
         self.assetLiqConfig[_liqAsset] = config
 
@@ -768,7 +768,7 @@ def _swapWithSpecificStabPool(
 def _startAuctionsDuringLiq(
     _liqUser: address,
     _genAuctionParams: AuctionParams,
-    _controlRoom: address,
+    _missionControl: address,
     _ledger: address,
 ) -> uint256:
     numAssets: uint256 = self.numUserAssetsForAuction[_liqUser]
@@ -778,14 +778,14 @@ def _startAuctionsDuringLiq(
     numAuctionsStarted: uint256 = 0
     for i: uint256 in range(numAssets, bound=max_value(uint256)):
         d: VaultData = self.userAssetForAuction[_liqUser][i]
-        didCreateAuction: bool = self._createOrUpdateFungAuction(_liqUser, d.vaultId, d.asset, False, _genAuctionParams, _controlRoom, _ledger)
+        didCreateAuction: bool = self._createOrUpdateFungAuction(_liqUser, d.vaultId, d.asset, False, _genAuctionParams, _missionControl, _ledger)
         if didCreateAuction:
             numAuctionsStarted += 1
 
     return numAuctionsStarted
 
 
-# start / restart (via control room)
+# start / restart (via mission control)
 
 
 @external
@@ -795,10 +795,10 @@ def startAuction(
     _liqAsset: address,
     _a: addys.Addys = empty(addys.Addys),
 ) -> bool:
-    assert msg.sender == addys._getControlRoomAddr() # dev: only control room allowed
+    assert msg.sender == addys._getMissionControlAddr() # dev: only mission control allowed
     assert not deptBasics.isPaused # dev: contract paused
     a: addys.Addys = addys._getAddys(_a)
-    genParams: AuctionParams = staticcall ControlRoom(a.controlRoom).getGenAuctionParams()
+    genParams: AuctionParams = staticcall MissionControl(a.missionControl).getGenAuctionParams()
     return self._startAuction(_liqUser, _liqVaultId, _liqAsset, genParams, a)
 
 
@@ -807,11 +807,11 @@ def startManyAuctions(
     _auctions: DynArray[FungAuctionConfig, MAX_AUCTIONS],
     _a: addys.Addys = empty(addys.Addys),
 ) -> uint256:
-    assert msg.sender == addys._getControlRoomAddr() # dev: only control room allowed
+    assert msg.sender == addys._getMissionControlAddr() # dev: only mission control allowed
     assert not deptBasics.isPaused # dev: contract paused
     a: addys.Addys = addys._getAddys(_a)
 
-    genParams: AuctionParams = staticcall ControlRoom(a.controlRoom).getGenAuctionParams()
+    genParams: AuctionParams = staticcall MissionControl(a.missionControl).getGenAuctionParams()
     numAuctionsStarted: uint256 = 0
     for auc: FungAuctionConfig in _auctions:
         didStart: bool = self._startAuction(auc.liqUser, auc.vaultId, auc.asset, genParams, a)
@@ -832,7 +832,7 @@ def _startAuction(
     if not self._canStartAuction(_liqUser, _liqVaultId, _liqAsset, _a.vaultBook, _a.ledger):
         return False
     hasAuction: bool = staticcall Ledger(_a.ledger).hasFungibleAuction(_liqUser, _liqVaultId, _liqAsset)
-    return self._createOrUpdateFungAuction(_liqUser, _liqVaultId, _liqAsset, hasAuction, _genParams, _a.controlRoom, _a.ledger)
+    return self._createOrUpdateFungAuction(_liqUser, _liqVaultId, _liqAsset, hasAuction, _genParams, _a.missionControl, _a.ledger)
 
 
 # validation
@@ -865,14 +865,14 @@ def _createOrUpdateFungAuction(
     _asset: address,
     _alreadyExists: bool,
     _genAuctionParams: AuctionParams,
-    _controlRoom: address,
+    _missionControl: address,
     _ledger: address,
 ) -> bool:
 
     # get asset liq config
     config: AssetLiqConfig = empty(AssetLiqConfig)
     isConfigCached: bool = False
-    config, isConfigCached = self._getAssetLiqConfig(_asset, _controlRoom)
+    config, isConfigCached = self._getAssetLiqConfig(_asset, _missionControl)
     if not isConfigCached:
         self.assetLiqConfig[_asset] = config # cache
 
@@ -927,7 +927,7 @@ def pauseAuction(
     _liqAsset: address,
     _a: addys.Addys = empty(addys.Addys),
 ) -> bool:
-    assert msg.sender == addys._getControlRoomAddr() # dev: only control room allowed
+    assert msg.sender == addys._getMissionControlAddr() # dev: only mission control allowed
     assert not deptBasics.isPaused # dev: contract paused
     a: addys.Addys = addys._getAddys(_a)
     return self._pauseAuction(_liqUser, _liqVaultId, _liqAsset, a.ledger)
@@ -938,7 +938,7 @@ def pauseManyAuctions(
     _auctions: DynArray[FungAuctionConfig, MAX_AUCTIONS],
     _a: addys.Addys = empty(addys.Addys),
 ) -> uint256:
-    assert msg.sender == addys._getControlRoomAddr() # dev: only control room allowed
+    assert msg.sender == addys._getMissionControlAddr() # dev: only mission control allowed
     assert not deptBasics.isPaused # dev: contract paused
     a: addys.Addys = addys._getAddys(_a)
 
@@ -1058,7 +1058,7 @@ def _buyFungibleAuction(
         return 0
 
     # check auction config
-    config: AuctionBuyConfig = staticcall ControlRoom(_a.controlRoom).getAuctionBuyConfig(_liqAsset, _buyer)
+    config: AuctionBuyConfig = staticcall MissionControl(_a.missionControl).getAuctionBuyConfig(_liqAsset, _buyer)
     if not config.canBuyInAuctionGeneral or not config.canBuyInAuctionAsset or not config.isUserAllowed:
         return 0
 
@@ -1207,7 +1207,7 @@ def _isPaymentCloseEnough(_requestedAmount: uint256, _actualAmount: uint256) -> 
 @external
 def calcAmountOfDebtToRepayDuringLiq(_user: address) -> uint256:
     a: addys.Addys = addys._getAddys()
-    config: GenLiqConfig = staticcall ControlRoom(a.controlRoom).getGenLiqConfig()
+    config: GenLiqConfig = staticcall MissionControl(a.missionControl).getGenLiqConfig()
 
     # user debt
     userDebt: UserDebt = empty(UserDebt)
@@ -1272,11 +1272,11 @@ def _calcAmountOfDebtToRepay(
 
 @view
 @internal
-def _getAssetLiqConfig(_asset: address, _controlRoom: address) -> (AssetLiqConfig, bool):
+def _getAssetLiqConfig(_asset: address, _missionControl: address) -> (AssetLiqConfig, bool):
     config: AssetLiqConfig = self.assetLiqConfig[_asset]
     if config.hasConfig:
         return config, True
-    return staticcall ControlRoom(_controlRoom).getAssetLiqConfig(_asset), False
+    return staticcall MissionControl(_missionControl).getAssetLiqConfig(_asset), False
 
 
 @view

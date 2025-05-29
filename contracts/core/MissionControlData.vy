@@ -124,7 +124,7 @@ priorityStabVaults: public(DynArray[VaultLite, MAX_STAB_VAULT_DATA])
 MAX_PRIORITY_PARTNERS: constant(uint256) = 10
 MAX_STAB_VAULT_DATA: constant(uint256) = 10
 PRIORITY_LIQ_VAULT_DATA: constant(uint256) = 20
-CONTROL_ROOM_ID: constant(uint256) = 9
+MISSION_CONTROL_ID: constant(uint256) = 9
 
 RIPE_HQ: immutable(address)
 
@@ -135,13 +135,13 @@ def __init__(_ripeHq: address):
     RIPE_HQ = _ripeHq
 
 
-# only control room has access
+# only mission control has access
 
 
 @view
 @internal
-def _getControlRoomAddr() -> address:
-    return staticcall RipeHq(RIPE_HQ).getAddr(CONTROL_ROOM_ID)
+def _getMissionControlAddr() -> address:
+    return staticcall RipeHq(RIPE_HQ).getAddr(MISSION_CONTROL_ID)
 
 
 #################
@@ -151,13 +151,13 @@ def _getControlRoomAddr() -> address:
 
 @external
 def setGeneralConfig(_genConfig: GenConfig):
-    assert msg.sender == self._getControlRoomAddr() # dev: no perms
+    assert msg.sender == self._getMissionControlAddr() # dev: no perms
     self.genConfig = _genConfig
 
 
 @external
 def setGeneralDebtConfig(_genDebtConfig: GenDebtConfig):
-    assert msg.sender == self._getControlRoomAddr() # dev: no perms
+    assert msg.sender == self._getMissionControlAddr() # dev: no perms
     self.genDebtConfig = _genDebtConfig
 
 
@@ -168,7 +168,7 @@ def setGeneralDebtConfig(_genDebtConfig: GenDebtConfig):
 
 @external
 def setAssetConfig(_asset: address, _assetConfig: AssetConfig):
-    assert msg.sender == self._getControlRoomAddr() # dev: no perms
+    assert msg.sender == self._getMissionControlAddr() # dev: no perms
     self._updatePointsAllocs(_asset, _assetConfig.stakersPointsAlloc, _assetConfig.voterPointsAlloc)
     self.assetConfig[_asset] = _assetConfig
 
@@ -195,7 +195,7 @@ def _updatePointsAllocs(_asset: address, _newStakersPointsAlloc: uint256, _newVo
 
 @external
 def setRipeRewardsConfig(_rewardsConfig: RipeRewardsConfig):
-    assert msg.sender == self._getControlRoomAddr() # dev: no perms
+    assert msg.sender == self._getMissionControlAddr() # dev: no perms
     self.rewardsConfig = _rewardsConfig
 
 
@@ -206,13 +206,13 @@ def setRipeRewardsConfig(_rewardsConfig: RipeRewardsConfig):
 
 @external
 def setUserConfig(_user: address,_userConfig: UserConfig):
-    assert msg.sender == self._getControlRoomAddr() # dev: no perms
+    assert msg.sender == self._getMissionControlAddr() # dev: no perms
     self.userConfig[_user] = _userConfig
 
 
 @external
 def setUserDelegation(_user: address, _delegate: address, _config: ActionDelegation):
-    assert msg.sender == self._getControlRoomAddr() # dev: no perms
+    assert msg.sender == self._getMissionControlAddr() # dev: no perms
     self.userDelegation[_user][_delegate] = _config
 
 
@@ -223,7 +223,7 @@ def setUserDelegation(_user: address, _delegate: address, _config: ActionDelegat
 
 @external
 def setPriorityPriceSourceIds(_priorityIds: DynArray[uint256, MAX_PRIORITY_PARTNERS]):
-    assert msg.sender == self._getControlRoomAddr() # dev: no perms
+    assert msg.sender == self._getMissionControlAddr() # dev: no perms
     self.priorityPriceSourceIds = _priorityIds
 
 
@@ -243,7 +243,7 @@ def getPriorityPriceSourceIds() -> DynArray[uint256, MAX_PRIORITY_PARTNERS]:
 
 @external
 def setPriorityLiqAssetVaults(_priorityLiqAssetVaults: DynArray[VaultLite, PRIORITY_LIQ_VAULT_DATA]):
-    assert msg.sender == self._getControlRoomAddr() # dev: no perms
+    assert msg.sender == self._getMissionControlAddr() # dev: no perms
     self.priorityLiqAssetVaults = _priorityLiqAssetVaults
 
 
@@ -258,7 +258,7 @@ def getPriorityLiqAssetVaults() -> DynArray[VaultLite, PRIORITY_LIQ_VAULT_DATA]:
 
 @external
 def setPriorityStabVaults(_priorityStabVaults: DynArray[VaultLite, MAX_STAB_VAULT_DATA]):
-    assert msg.sender == self._getControlRoomAddr() # dev: no perms
+    assert msg.sender == self._getMissionControlAddr() # dev: no perms
     self.priorityStabVaults = _priorityStabVaults
 
 
@@ -328,5 +328,5 @@ def ripeHq() -> address:
 
 @view
 @external
-def getControlRoomId() -> uint256:
-    return CONTROL_ROOM_ID
+def getMissionControlId() -> uint256:
+    return MISSION_CONTROL_ID

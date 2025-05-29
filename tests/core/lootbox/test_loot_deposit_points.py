@@ -773,7 +773,7 @@ def test_loot_deposit_points_permission_checks(
     vault_book,
     lootbox,
     teller,
-    control_room,
+    mission_control,
 ):
     # basic setup
     setGeneralConfig()
@@ -795,12 +795,12 @@ def test_loot_deposit_points_permission_checks(
         lootbox.updateDepositPoints(bob, vault_id, simple_erc20_vault, alpha_token, sender=alice)
 
     # Test paused state
-    lootbox.pause(True, sender=control_room.address)
+    lootbox.pause(True, sender=mission_control.address)
     with boa.reverts("contract paused"):
         lootbox.updateDepositPoints(bob, vault_id, simple_erc20_vault, alpha_token, sender=teller.address)
 
     # Unpause and verify it works
-    lootbox.pause(False, sender=control_room.address)
+    lootbox.pause(False, sender=mission_control.address)
     lootbox.updateDepositPoints(bob, vault_id, simple_erc20_vault, alpha_token, sender=teller.address)
 
 

@@ -8,7 +8,7 @@ def test_stab_vault_deposit_validation(
     stability_pool,
     alpha_token,
     alpha_token_whale,
-    control_room,
+    mission_control,
     bob,
     teller,
     mock_price_source,
@@ -29,10 +29,10 @@ def test_stab_vault_deposit_validation(
         stability_pool.depositTokensInVault(bob, alpha_token, 0, sender=teller.address)
 
     # Test deposit when paused
-    stability_pool.pause(True, sender=control_room.address)
+    stability_pool.pause(True, sender=mission_control.address)
     with boa.reverts("contract paused"):
         stability_pool.depositTokensInVault(bob, alpha_token, 100, sender=teller.address)
-    stability_pool.pause(False, sender=control_room.address)
+    stability_pool.pause(False, sender=mission_control.address)
 
     # Test deposit with amount larger than balance
     large_amount = 1000000 * EIGHTEEN_DECIMALS

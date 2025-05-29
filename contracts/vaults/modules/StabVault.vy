@@ -10,7 +10,7 @@ from interfaces import Vault
 from ethereum.ercs import IERC4626
 from ethereum.ercs import IERC20
 
-interface ControlRoom:
+interface MissionControl:
     def getStabPoolRedemptionsConfig(_asset: address, _redeemer: address) -> StabPoolRedemptionsConfig: view
     def getStabPoolClaimsConfig(_claimAsset: address, _claimer: address) -> StabPoolClaimsConfig: view
 
@@ -463,7 +463,7 @@ def claimFromStabilityPool(
     assert msg.sender == addys._getTellerAddr() # dev: only Teller allowed
     assert not vaultData.isPaused # dev: contract paused
     a: addys.Addys = addys._getAddys(_a)
-    claimUsdValue: uint256 = self._claimFromStabilityPool(_claimer, _stabAsset, _claimAsset, _maxUsdValue, a.priceDesk, a.controlRoom)
+    claimUsdValue: uint256 = self._claimFromStabilityPool(_claimer, _stabAsset, _claimAsset, _maxUsdValue, a.priceDesk, a.missionControl)
     assert claimUsdValue != 0 # dev: nothing claimed
     return claimUsdValue
 
@@ -480,7 +480,7 @@ def claimManyFromStabilityPool(
 
     totalUsdValue: uint256 = 0
     for c: StabPoolClaim in _claims:
-        totalUsdValue += self._claimFromStabilityPool(_claimer, c.stabAsset, c.claimAsset, c.maxUsdValue, a.priceDesk, a.controlRoom)
+        totalUsdValue += self._claimFromStabilityPool(_claimer, c.stabAsset, c.claimAsset, c.maxUsdValue, a.priceDesk, a.missionControl)
     assert totalUsdValue != 0 # dev: nothing claimed
 
     return totalUsdValue
@@ -493,13 +493,13 @@ def _claimFromStabilityPool(
     _claimAsset: address,
     _maxUsdValue: uint256,
     _priceDesk: address,
-    _controlRoom: address,
+    _missionControl: address,
 ) -> uint256:
     if empty(address) in [_claimer, _stabAsset, _claimAsset] or _maxUsdValue == 0:
         return 0
 
     # check claims config
-    config: StabPoolClaimsConfig = staticcall ControlRoom(_controlRoom).getStabPoolClaimsConfig(_claimAsset, _claimer)
+    config: StabPoolClaimsConfig = staticcall MissionControl(_missionControl).getStabPoolClaimsConfig(_claimAsset, _claimer)
     if not config.canClaimInStabPoolGeneral or not config.canClaimInStabPoolAsset or not config.isUserAllowed:
         return 0
 
@@ -599,7 +599,7 @@ def redeemFromStabilityPool(
 
     greenAmount: uint256 = min(_greenAmount, staticcall IERC20(a.greenToken).balanceOf(self))
     assert greenAmount != 0 # dev: no green to redeem
-    greenSpent: uint256 = self._redeemFromStabilityPool(_redeemer, _asset, max_value(uint256), greenAmount, a.greenToken, a.priceDesk, a.controlRoom)
+    greenSpent: uint256 = self._redeemFromStabilityPool(_redeemer, _asset, max_value(uint256), greenAmount, a.greenToken, a.priceDesk, a.missionControl)
     assert greenSpent != 0 # dev: no redemptions occurred
 
     # handle leftover green
@@ -630,7 +630,7 @@ def redeemManyFromStabilityPool(
     for r: StabPoolRedemption in _redemptions:
         if totalGreenRemaining == 0:
             break
-        greenSpent: uint256 = self._redeemFromStabilityPool(_redeemer, r.claimAsset, r.maxGreenAmount, totalGreenRemaining, a.greenToken, a.priceDesk, a.controlRoom)
+        greenSpent: uint256 = self._redeemFromStabilityPool(_redeemer, r.claimAsset, r.maxGreenAmount, totalGreenRemaining, a.greenToken, a.priceDesk, a.missionControl)
         totalGreenRemaining -= greenSpent
         totalGreenSpent += greenSpent
 
@@ -660,7 +660,7 @@ def _redeemFromStabilityPool(
     _totalGreenRemaining: uint256,
     _greenToken: address,
     _priceDesk: address,
-    _controlRoom: address,
+    _missionControl: address,
 ) -> uint256:
 
     # NOTE: failing gracefully here, in case of many redemptions at same time
@@ -670,7 +670,7 @@ def _redeemFromStabilityPool(
         return 0
 
     # check redemption config
-    config: StabPoolRedemptionsConfig = staticcall ControlRoom(_controlRoom).getStabPoolRedemptionsConfig(_asset, _redeemer)
+    config: StabPoolRedemptionsConfig = staticcall MissionControl(_missionControl).getStabPoolRedemptionsConfig(_asset, _redeemer)
     if not config.canRedeemInStabPoolGeneral or not config.canRedeemInStabPoolAsset or not config.isUserAllowed:
         return 0
 

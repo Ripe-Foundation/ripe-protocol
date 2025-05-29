@@ -39,7 +39,7 @@ def performDeposit(teller, simple_erc20_vault, alpha_token, alpha_token_whale):
 
 
 @pytest.fixture(scope="session")
-def setGeneralConfig(control_room_data, control_room):
+def setGeneralConfig(mission_control_data, mission_control):
     def setGeneralConfig(
         _perUserMaxVaults = 5,
         _perUserMaxAssetsPerVault = 10,
@@ -70,12 +70,12 @@ def setGeneralConfig(control_room_data, control_room):
             _canBuyInAuction,
             _canClaimInStabPool,
         )
-        control_room_data.setGeneralConfig(gen_config, sender=control_room.address)
+        mission_control_data.setGeneralConfig(gen_config, sender=mission_control.address)
     yield setGeneralConfig
 
 
 @pytest.fixture(scope="session")
-def setGeneralDebtConfig(control_room_data, control_room, createAuctionParams):
+def setGeneralDebtConfig(mission_control_data, mission_control, createAuctionParams):
     def setGeneralDebtConfig(
         _perUserDebtLimit = MAX_UINT256,
         _globalDebtLimit = MAX_UINT256,
@@ -102,7 +102,7 @@ def setGeneralDebtConfig(control_room_data, control_room, createAuctionParams):
             _ltvPaybackBuffer,
             _genAuctionParams,
         )
-        control_room_data.setGeneralDebtConfig(debt_config, sender=control_room.address)
+        mission_control_data.setGeneralDebtConfig(debt_config, sender=mission_control.address)
     yield setGeneralDebtConfig
 
 
@@ -130,7 +130,7 @@ def createAuctionParams():
 
 
 @pytest.fixture(scope="session")
-def setAssetConfig(control_room_data, control_room, createDebtTerms):
+def setAssetConfig(mission_control_data, mission_control, createDebtTerms):
     def setAssetConfig(
         _asset,
         _stakersPointsAlloc = 10,
@@ -174,7 +174,7 @@ def setAssetConfig(control_room_data, control_room, createDebtTerms):
             _whitelist,
             _isNft,
         )
-        control_room_data.setAssetConfig(_asset, asset_config, sender=control_room.address)
+        mission_control_data.setAssetConfig(_asset, asset_config, sender=mission_control.address)
     yield setAssetConfig
 
 
@@ -205,7 +205,7 @@ def createDebtTerms():
 
 
 @pytest.fixture(scope="session")
-def setRipeRewardsConfig(control_room_data, control_room):
+def setRipeRewardsConfig(mission_control_data, mission_control):
     def setRipeRewardsConfig(
         _arePointsEnabled = True,
         _ripePerBlock = 10,
@@ -222,7 +222,7 @@ def setRipeRewardsConfig(control_room_data, control_room):
             _votersAlloc,
             _genDepositorsAlloc,
         )
-        control_room_data.setRipeRewardsConfig(config, sender=control_room.address)
+        mission_control_data.setRipeRewardsConfig(config, sender=mission_control.address)
     yield setRipeRewardsConfig
 
 
@@ -232,7 +232,7 @@ def setRipeRewardsConfig(control_room_data, control_room):
 
 
 @pytest.fixture(scope="session")
-def setUserConfig(control_room_data, control_room):
+def setUserConfig(mission_control_data, mission_control):
     def setUserConfig(
         _user,
         _canAnyoneDeposit = True,
@@ -242,12 +242,12 @@ def setUserConfig(control_room_data, control_room):
             _canAnyoneDeposit,
             _canAnyoneRepayDebt,
         )
-        control_room_data.setUserConfig(_user, config, sender=control_room.address)
+        mission_control_data.setUserConfig(_user, config, sender=mission_control.address)
     yield setUserConfig
 
 
 @pytest.fixture(scope="session")
-def setUserDelegation(control_room_data, control_room):
+def setUserDelegation(mission_control_data, mission_control):
     def setUserDelegation(
         _user,
         _delegate,
@@ -262,5 +262,5 @@ def setUserDelegation(control_room_data, control_room):
             _canClaimFromStabPool,
             _canClaimLoot,
         )
-        control_room_data.setUserDelegation(_user, _delegate, config, sender=control_room.address)
+        mission_control_data.setUserDelegation(_user, _delegate, config, sender=mission_control.address)
     yield setUserDelegation

@@ -115,20 +115,20 @@ def test_vault_data_transfer(
 
 def test_vault_data_pause(
     simple_erc20_vault,
-    control_room,
+    mission_control,
     sally,
 ):
     """Test pause functionality"""
     # Pause vault
-    simple_erc20_vault.pause(True, sender=control_room.address)
+    simple_erc20_vault.pause(True, sender=mission_control.address)
     assert simple_erc20_vault.isPaused()
 
     # Unpause vault
-    simple_erc20_vault.pause(False, sender=control_room.address)
+    simple_erc20_vault.pause(False, sender=mission_control.address)
     assert not simple_erc20_vault.isPaused()
 
     # Test unauthorized pause
-    with boa.reverts("only ControlRoom allowed"):
+    with boa.reverts("only MissionControl allowed"):
         simple_erc20_vault.pause(True, sender=sally)
 
 
@@ -136,7 +136,7 @@ def test_vault_data_recover_funds(
     simple_erc20_vault,
     alpha_token,
     alpha_token_whale,
-    control_room,
+    mission_control,
     bob,
     sally,
     teller,
@@ -147,11 +147,11 @@ def test_vault_data_recover_funds(
     alpha_token.transfer(simple_erc20_vault, recover_amount, sender=alpha_token_whale)
 
     # Recover funds
-    simple_erc20_vault.recoverFunds(bob, alpha_token, sender=control_room.address)
+    simple_erc20_vault.recoverFunds(bob, alpha_token, sender=mission_control.address)
     assert alpha_token.balanceOf(bob) == recover_amount
 
     # Test unauthorized recovery
-    with boa.reverts("only ControlRoom allowed"):
+    with boa.reverts("only MissionControl allowed"):
         simple_erc20_vault.recoverFunds(bob, alpha_token, sender=sally)
 
     # Test recovery of registered asset
@@ -162,14 +162,14 @@ def test_vault_data_recover_funds(
     # Now try to recover - should fail since asset is registered
     alpha_token.transfer(simple_erc20_vault, recover_amount, sender=alpha_token_whale)
     with boa.reverts("invalid recovery"):
-        simple_erc20_vault.recoverFunds(bob, alpha_token, sender=control_room.address)
+        simple_erc20_vault.recoverFunds(bob, alpha_token, sender=mission_control.address)
 
 
 def test_vault_data_asset_registration(
     simple_erc20_vault,
     alpha_token,
     bravo_token,
-    control_room,
+    mission_control,
     bob,
     alpha_token_whale,
     teller,
@@ -181,18 +181,18 @@ def test_vault_data_asset_registration(
     simple_erc20_vault.depositTokensInVault(bob, alpha_token, deposit_amount, sender=teller.address)
 
     # Try deregistering with balance
-    assert not simple_erc20_vault.deregisterVaultAsset(alpha_token, sender=control_room.address)
+    assert not simple_erc20_vault.deregisterVaultAsset(alpha_token, sender=mission_control.address)
     assert simple_erc20_vault.isSupportedVaultAsset(alpha_token)
 
     # Withdraw all funds
     simple_erc20_vault.withdrawTokensFromVault(bob, alpha_token, deposit_amount, bob, sender=teller.address)
 
     # Now deregister should work
-    assert simple_erc20_vault.deregisterVaultAsset(alpha_token, sender=control_room.address)
+    assert simple_erc20_vault.deregisterVaultAsset(alpha_token, sender=mission_control.address)
     assert not simple_erc20_vault.isSupportedVaultAsset(alpha_token)
 
     # Test unauthorized deregistration
-    with boa.reverts("only ControlRoom allowed"):
+    with boa.reverts("only MissionControl allowed"):
         simple_erc20_vault.deregisterVaultAsset(bravo_token, sender=bob)
 
 

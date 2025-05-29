@@ -158,7 +158,7 @@ def test_repay_protocol_paused(
     mock_price_source,
     teller,
     green_token,
-    control_room,
+    mission_control,
 ):
     # basic setup
     setGeneralConfig()
@@ -172,7 +172,7 @@ def test_repay_protocol_paused(
     teller.borrow(MAX_UINT256, bob, False, sender=bob)
 
     # pause protocol
-    teller.pause(True, sender=control_room.address)
+    teller.pause(True, sender=mission_control.address)
     assert teller.isPaused()
 
     # attempt to repay
@@ -182,7 +182,7 @@ def test_repay_protocol_paused(
         teller.repay(repay_amount, bob, False, sender=bob)
 
     # unpause and try again
-    teller.pause(False, sender=control_room.address)
+    teller.pause(False, sender=mission_control.address)
     assert teller.repay(repay_amount, bob, False, sender=bob)
 
 

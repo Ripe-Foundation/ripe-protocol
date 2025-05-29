@@ -185,14 +185,14 @@ def test_green_token_pause_functionality(green_token, whale, bob, governance):
     assert green_token.approve(bob, 100 * EIGHTEEN_DECIMALS, sender=whale)
 
 
-def test_green_token_blacklist_functionality(green_token, whale, bob, control_room, governance):
+def test_green_token_blacklist_functionality(green_token, whale, bob, mission_control, governance):
     """Test token blacklist functionality"""
     # Test initial state
     assert not green_token.blacklisted(whale)
     assert not green_token.blacklisted(bob)
 
     # Test blacklist
-    green_token.setBlacklist(whale, True, sender=control_room.address)
+    green_token.setBlacklist(whale, True, sender=mission_control.address)
     assert green_token.blacklisted(whale)
 
     # Test operations when blacklisted
@@ -203,16 +203,16 @@ def test_green_token_blacklist_functionality(green_token, whale, bob, control_ro
         green_token.approve(bob, 100 * EIGHTEEN_DECIMALS, sender=whale)
 
     # Test blacklist spender
-    green_token.setBlacklist(bob, True, sender=control_room.address)
+    green_token.setBlacklist(bob, True, sender=mission_control.address)
     assert green_token.blacklisted(bob)
 
-    green_token.setBlacklist(whale, False, sender=control_room.address)
+    green_token.setBlacklist(whale, False, sender=mission_control.address)
 
     # Test operations with blacklisted spender
     with boa.reverts("spender blacklisted"):
         green_token.approve(bob, 100 * EIGHTEEN_DECIMALS, sender=whale)
 
-    green_token.setBlacklist(whale, True, sender=control_room.address)
+    green_token.setBlacklist(whale, True, sender=mission_control.address)
 
     # Test burn blacklisted tokens
     initial_balance = green_token.balanceOf(whale)
@@ -221,7 +221,7 @@ def test_green_token_blacklist_functionality(green_token, whale, bob, control_ro
     assert green_token.totalSupply() == initial_balance - initial_balance
 
     # Test unblacklist
-    green_token.setBlacklist(whale, False, sender=control_room.address)
+    green_token.setBlacklist(whale, False, sender=mission_control.address)
     assert not green_token.blacklisted(whale)
 
 
@@ -310,7 +310,7 @@ def test_green_token_edge_cases(green_token, whale, bob, alice):
     assert green_token.totalSupply() == initial_supply
 
 
-def test_green_token_minting_edge_cases(green_token, governance, whale, credit_engine, control_room, alice):
+def test_green_token_minting_edge_cases(green_token, governance, whale, credit_engine, mission_control, alice):
     """Test minting edge cases"""
     # Test minting to zero address
     with boa.reverts("invalid recipient"):
@@ -321,7 +321,7 @@ def test_green_token_minting_edge_cases(green_token, governance, whale, credit_e
         green_token.mint(green_token.address, 100 * EIGHTEEN_DECIMALS, sender=credit_engine.address)
     
     # Test minting to blacklisted address
-    green_token.setBlacklist(whale, True, sender=control_room.address)
+    green_token.setBlacklist(whale, True, sender=mission_control.address)
     with boa.reverts("blacklisted"):
         green_token.mint(whale, 100 * EIGHTEEN_DECIMALS, sender=credit_engine.address)
     
@@ -331,7 +331,7 @@ def test_green_token_minting_edge_cases(green_token, governance, whale, credit_e
         green_token.mint(alice, 100 * EIGHTEEN_DECIMALS, sender=credit_engine.address)
 
 
-def test_green_token_transfer_edge_cases(green_token, whale, bob, governance, control_room):
+def test_green_token_transfer_edge_cases(green_token, whale, bob, governance, mission_control):
     """Test transfer edge cases"""
     # Test transfer with insufficient balance
     with boa.reverts("insufficient funds"):
@@ -344,18 +344,18 @@ def test_green_token_transfer_edge_cases(green_token, whale, bob, governance, co
     green_token.pause(False, sender=governance.address)
 
     # Test transfer when sender is blacklisted
-    green_token.setBlacklist(whale, True, sender=control_room.address)
+    green_token.setBlacklist(whale, True, sender=mission_control.address)
     with boa.reverts("sender blacklisted"):
         green_token.transfer(bob, 100 * EIGHTEEN_DECIMALS, sender=whale)
     
     # Test transfer when recipient is blacklisted
-    green_token.setBlacklist(whale, False, sender=control_room.address)
-    green_token.setBlacklist(bob, True, sender=control_room.address)
+    green_token.setBlacklist(whale, False, sender=mission_control.address)
+    green_token.setBlacklist(bob, True, sender=mission_control.address)
     with boa.reverts("recipient blacklisted"):
         green_token.transfer(bob, 100 * EIGHTEEN_DECIMALS, sender=whale)
 
 
-def test_green_token_transfer_from_edge_cases(green_token, whale, bob, alice, governance, control_room):
+def test_green_token_transfer_from_edge_cases(green_token, whale, bob, alice, governance, mission_control):
     """Test transferFrom edge cases"""
     # Set up initial state
     transfer_amount = 100 * EIGHTEEN_DECIMALS
@@ -367,12 +367,12 @@ def test_green_token_transfer_from_edge_cases(green_token, whale, bob, alice, go
     assert green_token.allowance(whale, bob) == MAX_UINT256
     
     # Test transferFrom when spender is blacklisted
-    green_token.setBlacklist(bob, True, sender=control_room.address)
+    green_token.setBlacklist(bob, True, sender=mission_control.address)
     with boa.reverts("spender blacklisted"):
         green_token.transferFrom(whale, alice, transfer_amount, sender=bob)
     
     # Test transferFrom when paused
-    green_token.setBlacklist(bob, False, sender=control_room.address)
+    green_token.setBlacklist(bob, False, sender=mission_control.address)
     green_token.pause(True, sender=governance.address)
     with boa.reverts("token paused"):
         green_token.transferFrom(whale, alice, transfer_amount, sender=bob)
@@ -408,20 +408,20 @@ def test_green_token_ripe_hq_edge_cases(green_token, governance, bob, mock_ripe_
         green_token.initiateHqChange(mock_ripe_hq, sender=governance.address)
 
 
-def test_green_token_blacklist_edge_cases(green_token, governance, control_room, credit_engine):
+def test_green_token_blacklist_edge_cases(green_token, governance, mission_control, credit_engine):
     """Test blacklist edge cases"""
     # Test blacklisting self
     with boa.reverts("invalid blacklist recipient"):
-        green_token.setBlacklist(green_token.address, True, sender=control_room.address)
+        green_token.setBlacklist(green_token.address, True, sender=mission_control.address)
     
     # Test blacklisting zero address
     with boa.reverts("invalid blacklist recipient"):
-        green_token.setBlacklist(ZERO_ADDRESS, True, sender=control_room.address)
+        green_token.setBlacklist(ZERO_ADDRESS, True, sender=mission_control.address)
     
     # Test burning blacklisted tokens with specific amount
     test_address = boa.env.generate_address()
     green_token.mint(test_address, 1000 * EIGHTEEN_DECIMALS, sender=credit_engine.address)
-    green_token.setBlacklist(test_address, True, sender=control_room.address)
+    green_token.setBlacklist(test_address, True, sender=mission_control.address)
     
     burn_amount = 500 * EIGHTEEN_DECIMALS
     green_token.burnBlacklistTokens(test_address, burn_amount, sender=governance.address)
@@ -451,7 +451,7 @@ def test_green_token_time_lock_edge_cases(green_token, governance):
     assert green_token.hqChangeTimeLock() == new_time_lock
 
 
-def test_green_token_events(green_token, whale, bob, governance, control_room, mock_ripe_hq):
+def test_green_token_events(green_token, whale, bob, governance, mission_control, mock_ripe_hq):
     """Test token events"""
     # Test Transfer event
     transfer_amount = 100 * EIGHTEEN_DECIMALS
@@ -472,7 +472,7 @@ def test_green_token_events(green_token, whale, bob, governance, control_room, m
     assert approval_log.amount == approve_amount
     
     # Test BlacklistModified event
-    assert green_token.setBlacklist(bob, True, sender=control_room.address)
+    assert green_token.setBlacklist(bob, True, sender=mission_control.address)
     
     blacklist_log = filter_logs(green_token, "BlacklistModified")[0]
     assert blacklist_log.addr == bob
