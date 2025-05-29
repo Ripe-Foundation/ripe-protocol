@@ -28,6 +28,7 @@ interface ControlRoom:
     def getBorrowConfig(_user: address, _caller: address) -> BorrowConfig: view
     def getRepayConfig(_user: address) -> RepayConfig: view
     def getDebtTerms(_asset: address) -> DebtTerms: view
+    def getLtvPaybackBuffer() -> uint256: view
 
 interface PriceDesk:
     def getAssetAmount(_asset: address, _usdValue: uint256, _shouldRaise: bool = False) -> uint256: view
@@ -131,6 +132,15 @@ event RepayDebt:
     outstandingUserDebt: uint256
     userCollateralVal: uint256
     maxUserDebt: uint256
+    hasGoodDebtHealth: bool
+
+event CollateralRedeemed:
+    user: indexed(address)
+    vaultId: uint256
+    asset: indexed(address)
+    amount: uint256
+    redeemer: indexed(address)
+    repayValue: uint256
     hasGoodDebtHealth: bool
 
 ONE_YEAR: constant(uint256) = 60 * 60 * 24 * 365
@@ -553,6 +563,8 @@ def redeemCollateralFromMany(
         totalGreenRemaining -= greenSpent
         totalGreenSpent += greenSpent
 
+    assert totalGreenSpent != 0 # dev: no redemptions occurred
+
     # handle leftover green
     if totalGreenRemaining != 0:
         self._handleGreenForUser(_redeemer, totalGreenRemaining, _wantsSavingsGreen, a.greenToken, a.savingsGreen)
@@ -577,6 +589,7 @@ def redeemCollateral(
     greenAmount: uint256 = min(_greenAmount, staticcall IERC20(a.greenToken).balanceOf(self))
     assert greenAmount != 0 # dev: no green to redeem
     greenSpent: uint256 = self._redeemCollateral(_user, _vaultId, _asset, max_value(uint256), greenAmount, _redeemer, a)
+    assert greenSpent != 0 # dev: no redemptions occurred
 
     # handle leftover green
     if greenAmount > greenSpent:
@@ -602,6 +615,15 @@ def _redeemCollateral(
     if empty(address) in [_redeemer, _asset, _user] or 0 in [_maxGreenForAsset, _totalGreenRemaining, _vaultId]:
         return 0
 
+    # vault address
+    vaultAddr: address = staticcall VaultBook(_a.vaultBook).getAddr(_vaultId)
+    if vaultAddr == empty(address):
+        return 0
+
+    # user must have balance
+    if not staticcall Vault(vaultAddr).doesUserHaveBalance(_user, _asset):
+        return 0
+
     # redemptions not allowed on asset
     config: RedeemCollateralConfig = staticcall ControlRoom(_a.controlRoom).getRedeemCollateralConfig(_asset, _redeemer)
     if not config.canRedeemCollateralGeneral or not config.canRedeemCollateralAsset or not config.isUserAllowed:
@@ -623,8 +645,7 @@ def _redeemCollateral(
         return 0
 
     # user has not reached redemption threshold
-    currentRatio: uint256 = userDebt.amount * HUNDRED_PERCENT // bt.collateralVal
-    if currentRatio < bt.debtTerms.redemptionThreshold:
+    if not self._canRedeemUserCollateral(userDebt.amount, bt.collateralVal, bt.debtTerms.redemptionThreshold):
         return 0
 
     # estimated debt to pay back to achieve safe LTV
@@ -644,28 +665,49 @@ def _redeemCollateral(
     if maxAssetAmount == 0:
         return 0
 
-    # vault address
-    vaultAddr: address = staticcall VaultBook(_a.vaultBook).getAddr(_vaultId)
-    if vaultAddr == empty(address):
-        return 0
-
-    # user must have this asset in vault
-    if not staticcall Vault(vaultAddr).isUserInVaultAsset(_user, _asset):
-        return 0
-
     # withdraw from vault, transfer to redeemer
     amountSent: uint256 = 0
     na: bool = False
     amountSent, na = extcall Vault(vaultAddr).withdrawTokensFromVault(_user, _asset, maxAssetAmount, _redeemer, _a)
 
     # repay debt
-    repayAmount: uint256 = min(maxRedeemValue, amountSent * maxRedeemValue // maxAssetAmount)
-    repayAmount = min(repayAmount, userDebt.amount)
-    hasGoodDebtHealth: bool = self._repayDebt(_user, userDebt, d.numUserVaults, repayAmount, 0, newInterest, True, False, RepayType.REDEMPTION, _a)
+    repayValue: uint256 = amountSent * maxRedeemValue // maxAssetAmount
+    hasGoodDebtHealth: bool = self._repayDebt(_user, userDebt, d.numUserVaults, min(repayValue, userDebt.amount), 0, newInterest, True, False, RepayType.REDEMPTION, _a)
 
-    # TODO: add event
+    log CollateralRedeemed(
+        user=_user,
+        vaultId=_vaultId,
+        asset=_asset,
+        amount=amountSent,
+        redeemer=_redeemer,
+        repayValue=repayValue,
+        hasGoodDebtHealth=hasGoodDebtHealth,
+    )
+    return min(repayValue, maxRedeemValue)
 
-    return repayAmount
+
+# utils
+
+
+@view
+@external
+def getMaxRedeemValue(_user: address) -> uint256:
+    a: addys.Addys = addys._getAddys()
+
+    # get latest user debt and terms
+    userDebt: UserDebt = empty(UserDebt)
+    bt: UserBorrowTerms = empty(UserBorrowTerms)
+    na: uint256 = 0
+    userDebt, bt, na = self._getLatestUserDebtAndTerms(_user, False, a)
+    if userDebt.amount == 0 or userDebt.inLiquidation or bt.collateralVal == 0:
+        return 0
+
+    if not self._canRedeemUserCollateral(userDebt.amount, bt.collateralVal, bt.debtTerms.redemptionThreshold):
+        return 0
+    
+    ltvPaybackBuffer: uint256 = staticcall ControlRoom(a.controlRoom).getLtvPaybackBuffer()
+    targetLtv: uint256 = bt.debtTerms.ltv * (HUNDRED_PERCENT - ltvPaybackBuffer) // HUNDRED_PERCENT
+    return self._calcAmountToPay(userDebt.amount, bt.collateralVal, targetLtv)
 
 
 @view
@@ -754,13 +796,18 @@ def _getUserBorrowTerms(
             collateralVal: uint256 = staticcall PriceDesk(_a.priceDesk).getUsdValue(asset, amount, _shouldRaise)
             maxDebt: uint256 = collateralVal * debtTerms.ltv // HUNDRED_PERCENT
 
+            # need to return some debt terms, even if not getting any price
+            debtTermsWeight: uint256 = maxDebt
+            if debtTermsWeight == 0:
+                debtTermsWeight = 1
+
             # debt terms sums -- weight is based on max debt (ltv)
-            redemptionThresholdSum += maxDebt * debtTerms.redemptionThreshold
-            liqThresholdSum += maxDebt * debtTerms.liqThreshold
-            liqFeeSum += maxDebt * debtTerms.liqFee
-            borrowRateSum += maxDebt * debtTerms.borrowRate
-            daowrySum += maxDebt * debtTerms.daowry
-            totalSum += maxDebt
+            redemptionThresholdSum += debtTermsWeight * debtTerms.redemptionThreshold
+            liqThresholdSum += debtTermsWeight * debtTerms.liqThreshold
+            liqFeeSum += debtTermsWeight * debtTerms.liqFee
+            borrowRateSum += debtTermsWeight * debtTerms.borrowRate
+            daowrySum += debtTermsWeight * debtTerms.daowry
+            totalSum += debtTermsWeight
 
             # totals
             bt.collateralVal += collateralVal
@@ -875,18 +922,24 @@ def _updateDebtForUser(_user: address, _a: addys.Addys) -> bool:
 @view
 @external
 def hasGoodDebtHealth(_user: address, _a: addys.Addys = empty(addys.Addys)) -> bool:
-    return self._checkDebtHealth(_user, True, _a)
+    return self._checkDebtHealth(_user, 1, _a)
 
 
 @view
 @external
 def canLiquidateUser(_user: address, _a: addys.Addys = empty(addys.Addys)) -> bool:
-    return self._checkDebtHealth(_user, False, _a)
+    return self._checkDebtHealth(_user, 2, _a)
+
+
+@view
+@external
+def canRedeemUserCollateral(_user: address, _a: addys.Addys = empty(addys.Addys)) -> bool:
+    return self._checkDebtHealth(_user, 3, _a)
 
 
 @view
 @internal
-def _checkDebtHealth(_user: address, _shouldCheckLtv: bool, _a: addys.Addys) -> bool:
+def _checkDebtHealth(_user: address, _debtType: uint256, _a: addys.Addys) -> bool:
     a: addys.Addys = addys._getAddys(_a)
 
     # get latest user debt and terms
@@ -894,15 +947,18 @@ def _checkDebtHealth(_user: address, _shouldCheckLtv: bool, _a: addys.Addys) -> 
     bt: UserBorrowTerms = empty(UserBorrowTerms)
     na: uint256 = 0
     userDebt, bt, na = self._getLatestUserDebtAndTerms(_user, False, a)
-
     if userDebt.amount == 0:
-        return _shouldCheckLtv # nothing to check, use that var to return correct value
+        return _debtType == 1 # nothing to check
 
     # check debt health
-    if _shouldCheckLtv:
+    if _debtType == 1:
         return self._hasGoodDebtHealth(userDebt.amount, bt.collateralVal, bt.debtTerms.ltv)
-    else:
+    elif _debtType == 2:
         return self._canLiquidateUser(userDebt.amount, bt.collateralVal, bt.debtTerms.liqThreshold)
+    elif _debtType == 3:
+        return self._canRedeemUserCollateral(userDebt.amount, bt.collateralVal, bt.debtTerms.redemptionThreshold)
+    else:
+        return False
 
 
 @view
@@ -921,8 +977,31 @@ def _canLiquidateUser(_userDebtAmount: uint256, _collateralVal: uint256, _liqThr
 
 
 @view
+@internal
+def _canRedeemUserCollateral(_userDebtAmount: uint256, _collateralVal: uint256, _redemptionThreshold: uint256) -> bool:
+    # check if collateral value is below (or equal) to redemption threshold
+    redemptionThreshold: uint256 = _userDebtAmount * HUNDRED_PERCENT // _redemptionThreshold
+    return _collateralVal <= redemptionThreshold
+
+
+# thresholds
+
+
+@view
 @external
 def getLiquidationThreshold(_user: address) -> uint256:
+    return self._getThreshold(_user, 2)
+
+
+@view
+@external
+def getRedemptionThreshold(_user: address) -> uint256:
+    return self._getThreshold(_user, 3)
+
+
+@view
+@internal
+def _getThreshold(_user: address, _debtType: uint256) -> uint256:
     a: addys.Addys = addys._getAddys()
 
     # get latest user debt and terms
@@ -930,8 +1009,15 @@ def getLiquidationThreshold(_user: address) -> uint256:
     bt: UserBorrowTerms = empty(UserBorrowTerms)
     na: uint256 = 0
     userDebt, bt, na = self._getLatestUserDebtAndTerms(_user, False, a)
+    if userDebt.amount == 0:
+        return 0
 
-    return userDebt.amount * HUNDRED_PERCENT // bt.debtTerms.liqThreshold
+    if _debtType == 2:
+        return userDebt.amount * HUNDRED_PERCENT // bt.debtTerms.liqThreshold
+    elif _debtType == 3:
+        return userDebt.amount * HUNDRED_PERCENT // bt.debtTerms.redemptionThreshold
+    else:
+        return 0
 
 
 ##################

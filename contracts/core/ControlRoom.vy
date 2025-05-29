@@ -751,6 +751,13 @@ def getRedeemCollateralConfig(_asset: address, _redeemer: address) -> RedeemColl
     )
 
 
+@view
+@external
+def getLtvPaybackBuffer() -> uint256:
+    genDebtConfig: GenDebtConfig = staticcall ControlRoomData(self.data).genDebtConfig()
+    return genDebtConfig.ltvPaybackBuffer
+
+
 # auction purchases
 
 
