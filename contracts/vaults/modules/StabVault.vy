@@ -11,8 +11,8 @@ from ethereum.ercs import IERC4626
 from ethereum.ercs import IERC20
 
 interface MissionControl:
+    def getStabPoolClaimsConfig(_claimAsset: address, _claimer: address, _caller: address) -> StabPoolClaimsConfig: view
     def getStabPoolRedemptionsConfig(_asset: address, _redeemer: address) -> StabPoolRedemptionsConfig: view
-    def getStabPoolClaimsConfig(_claimAsset: address, _claimer: address) -> StabPoolClaimsConfig: view
 
 interface PriceDesk:
     def getAssetAmount(_asset: address, _usdValue: uint256, _shouldRaise: bool = False) -> uint256: view
@@ -33,6 +33,7 @@ struct StabPoolRedemption:
 struct StabPoolClaimsConfig:
     canClaimInStabPoolGeneral: bool
     canClaimInStabPoolAsset: bool
+    canClaimFromStabPoolForUser: bool
     isUserAllowed: bool
 
 struct StabPoolRedemptionsConfig:
@@ -458,12 +459,13 @@ def claimFromStabilityPool(
     _stabAsset: address,
     _claimAsset: address,
     _maxUsdValue: uint256,
+    _caller: address,
     _a: addys.Addys = empty(addys.Addys),
 ) -> uint256:
     assert msg.sender == addys._getTellerAddr() # dev: only Teller allowed
     assert not vaultData.isPaused # dev: contract paused
     a: addys.Addys = addys._getAddys(_a)
-    claimUsdValue: uint256 = self._claimFromStabilityPool(_claimer, _stabAsset, _claimAsset, _maxUsdValue, a.priceDesk, a.missionControl)
+    claimUsdValue: uint256 = self._claimFromStabilityPool(_claimer, _stabAsset, _claimAsset, _maxUsdValue, _caller, a.priceDesk, a.missionControl)
     assert claimUsdValue != 0 # dev: nothing claimed
     return claimUsdValue
 
@@ -472,6 +474,7 @@ def claimFromStabilityPool(
 def claimManyFromStabilityPool(
     _claimer: address,
     _claims: DynArray[StabPoolClaim, MAX_STAB_CLAIMS],
+    _caller: address,
     _a: addys.Addys = empty(addys.Addys),
 ) -> uint256:
     assert msg.sender == addys._getTellerAddr() # dev: only Teller allowed
@@ -480,7 +483,7 @@ def claimManyFromStabilityPool(
 
     totalUsdValue: uint256 = 0
     for c: StabPoolClaim in _claims:
-        totalUsdValue += self._claimFromStabilityPool(_claimer, c.stabAsset, c.claimAsset, c.maxUsdValue, a.priceDesk, a.missionControl)
+        totalUsdValue += self._claimFromStabilityPool(_claimer, c.stabAsset, c.claimAsset, c.maxUsdValue, _caller, a.priceDesk, a.missionControl)
     assert totalUsdValue != 0 # dev: nothing claimed
 
     return totalUsdValue
@@ -492,6 +495,7 @@ def _claimFromStabilityPool(
     _stabAsset: address,
     _claimAsset: address,
     _maxUsdValue: uint256,
+    _caller: address,
     _priceDesk: address,
     _missionControl: address,
 ) -> uint256:
@@ -499,9 +503,12 @@ def _claimFromStabilityPool(
         return 0
 
     # check claims config
-    config: StabPoolClaimsConfig = staticcall MissionControl(_missionControl).getStabPoolClaimsConfig(_claimAsset, _claimer)
+    config: StabPoolClaimsConfig = staticcall MissionControl(_missionControl).getStabPoolClaimsConfig(_claimAsset, _claimer, _caller)
     if not config.canClaimInStabPoolGeneral or not config.canClaimInStabPoolAsset or not config.isUserAllowed:
         return 0
+
+    if _claimer != _caller:
+        assert config.canClaimFromStabPoolForUser # dev: cannot claim for user
 
     # max claimable asset
     maxClaimableAsset: uint256 = self.claimableBalances[_stabAsset][_claimAsset]

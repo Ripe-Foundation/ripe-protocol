@@ -201,6 +201,7 @@ struct AssetLiqConfig:
 struct StabPoolClaimsConfig:
     canClaimInStabPoolGeneral: bool
     canClaimInStabPoolAsset: bool
+    canClaimFromStabPoolForUser: bool
     isUserAllowed: bool
 
 struct StabPoolRedemptionsConfig:
@@ -855,11 +856,19 @@ def getAssetLiqConfig(_asset: address) -> AssetLiqConfig:
 
 @view
 @external
-def getStabPoolClaimsConfig(_claimAsset: address, _claimer: address) -> StabPoolClaimsConfig:
-    c: MetaConfig = staticcall MissionControlData(self.data).getManyConfigs(True, False, False, _claimAsset)
+def getStabPoolClaimsConfig(_claimAsset: address, _claimer: address, _caller: address) -> StabPoolClaimsConfig:
+    data: address = self.data
+    c: MetaConfig = staticcall MissionControlData(data).getManyConfigs(True, False, False, _claimAsset)
+
+    canClaimFromStabPoolForUser: bool = True
+    if _claimer != _caller:
+        delegation: ActionDelegation = staticcall MissionControlData(data).userDelegation(_claimer, _caller)
+        canClaimFromStabPoolForUser = delegation.canClaimFromStabPool
+
     return StabPoolClaimsConfig(
         canClaimInStabPoolGeneral=c.genConfig.canClaimInStabPool,
         canClaimInStabPoolAsset=c.assetConfig.canClaimInStabPool,
+        canClaimFromStabPoolForUser=canClaimFromStabPoolForUser,
         isUserAllowed=self._isUserAllowed(c.assetConfig.whitelist, _claimer, _claimAsset),
     )
 
