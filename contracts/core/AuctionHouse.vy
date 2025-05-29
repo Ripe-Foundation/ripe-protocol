@@ -22,6 +22,7 @@ interface Ledger:
     def hasFungibleAuction(_liqUser: address, _vaultId: uint256, _asset: address) -> bool: view
     def isParticipatingInVault(_user: address, _vaultId: uint256) -> bool: view
     def createNewFungibleAuction(_auc: FungibleAuction) -> uint256: nonpayable
+    def addVaultToUser(_user: address, _vaultId: uint256): nonpayable
     def userVaults(_user: address, _index: uint256) -> uint256: view
     def isUserInLiquidation(_user: address) -> bool: view
     def numUserVaults(_user: address) -> uint256: view
@@ -47,6 +48,9 @@ interface GreenToken:
 
 interface StabilityPool:
     def swapForLiquidatedCollateral(_stabAsset: address, _stabAmountToRemove: uint256, _liqAsset: address, _liqAmountSent: uint256, _recipient: address, _greenToken: address, _savingsGreenToken: address) -> uint256: nonpayable
+
+interface LootBox:
+    def updateDepositPoints(_user: address, _vaultId: uint256, _vaultAddr: address, _asset: address, _a: addys.Addys = empty(addys.Addys)): nonpayable
 
 interface VaultBook:
     def getAddr(_vaultId: uint256) -> address: view
@@ -567,7 +571,7 @@ def _transferToEndaoment(
     collateralAmountSent: uint256 = 0
     isPositionDepleted: bool = False
     na: bool = False
-    collateralUsdValueSent, collateralAmountSent, isPositionDepleted, na = self._transferCollateral(_liqUser, _a.endaoment, _liqVaultAddr, _liqAsset, remainingToRepay, _a)
+    collateralUsdValueSent, collateralAmountSent, isPositionDepleted, na = self._transferCollateral(_liqUser, _a.endaoment, _liqVaultId, _liqVaultAddr, _liqAsset, False, remainingToRepay, _a)
     if collateralUsdValueSent == 0:
         return remainingToRepay, collateralValueOut
 
@@ -608,7 +612,7 @@ def _burnLiqUserStabAsset(
     amountReceived: uint256 = 0
     isPositionDepleted: bool = False
     na: bool = False
-    usdValue, amountReceived, isPositionDepleted, na = self._transferCollateral(_liqUser, self, _liqVaultAddr, _liqStabAsset, remainingToRepay, _a)
+    usdValue, amountReceived, isPositionDepleted, na = self._transferCollateral(_liqUser, self, _liqVaultId, _liqVaultAddr, _liqStabAsset, False, remainingToRepay, _a)
     if usdValue == 0:
         return remainingToRepay, collateralValueOut
 
@@ -727,7 +731,7 @@ def _swapWithSpecificStabPool(
     collateralAmountSent: uint256 = 0
     isPositionDepleted: bool = False
     shouldGoToNextAsset: bool = False
-    collateralUsdValueSent, collateralAmountSent, isPositionDepleted, shouldGoToNextAsset = self._transferCollateral(_liqUser, _stabPool.vaultAddr, _liqVaultAddr, _liqAsset, maxCollateralUsdValue, _a)
+    collateralUsdValueSent, collateralAmountSent, isPositionDepleted, shouldGoToNextAsset = self._transferCollateral(_liqUser, _stabPool.vaultAddr, _liqVaultId, _liqVaultAddr, _liqAsset, False, maxCollateralUsdValue, _a)
     if collateralUsdValueSent == 0 or collateralAmountSent == 0:
         return remainingToRepay, collateralValueOut, isPositionDepleted, shouldGoToNextAsset
 
@@ -984,6 +988,7 @@ def buyFungibleAuction(
     _asset: address,
     _greenAmount: uint256,
     _buyer: address,
+    _shouldTransferBalance: bool,
     _shouldRefundSavingsGreen: bool,
     _a: addys.Addys = empty(addys.Addys),
 ) -> uint256:
@@ -993,7 +998,7 @@ def buyFungibleAuction(
 
     greenAmount: uint256 = min(_greenAmount, staticcall IERC20(a.greenToken).balanceOf(self))
     assert greenAmount != 0 # dev: no green to spend
-    greenSpent: uint256 = self._buyFungibleAuction(_liqUser, _vaultId, _asset, max_value(uint256), greenAmount, _buyer, a)
+    greenSpent: uint256 = self._buyFungibleAuction(_liqUser, _vaultId, _asset, max_value(uint256), greenAmount, _buyer, _shouldTransferBalance, a)
     assert greenSpent != 0 # dev: no green spent
 
     # handle leftover green
@@ -1008,6 +1013,7 @@ def buyManyFungibleAuctions(
     _purchases: DynArray[FungAuctionPurchase, MAX_AUCTIONS],
     _greenAmount: uint256,
     _buyer: address,
+    _shouldTransferBalance: bool,
     _shouldRefundSavingsGreen: bool,
     _a: addys.Addys = empty(addys.Addys),
 ) -> uint256:
@@ -1022,7 +1028,7 @@ def buyManyFungibleAuctions(
     for p: FungAuctionPurchase in _purchases:
         if totalGreenRemaining == 0:
             break
-        greenSpent: uint256 = self._buyFungibleAuction(p.liqUser, p.vaultId, p.asset, p.maxGreenAmount, totalGreenRemaining, _buyer, a)
+        greenSpent: uint256 = self._buyFungibleAuction(p.liqUser, p.vaultId, p.asset, p.maxGreenAmount, totalGreenRemaining, _buyer, _shouldTransferBalance, a)
         totalGreenRemaining -= greenSpent
         totalGreenSpent += greenSpent
 
@@ -1043,6 +1049,7 @@ def _buyFungibleAuction(
     _maxGreenForAsset: uint256,
     _totalGreenRemaining: uint256,
     _buyer: address,
+    _shouldTransferBalance: bool,
     _a: addys.Addys,
 ) -> uint256:
 
@@ -1085,7 +1092,7 @@ def _buyFungibleAuction(
     collateralAmountSent: uint256 = 0
     isPositionDepleted: bool = False
     shouldGoToNextAsset: bool = False
-    collateralUsdValueSent, collateralAmountSent, isPositionDepleted, shouldGoToNextAsset = self._transferCollateral(_liqUser, _buyer, liqVaultAddr, _liqAsset, maxCollateralUsdValue, _a)
+    collateralUsdValueSent, collateralAmountSent, isPositionDepleted, shouldGoToNextAsset = self._transferCollateral(_liqUser, _buyer, _liqVaultId, liqVaultAddr, _liqAsset, _shouldTransferBalance, maxCollateralUsdValue, _a)
     if collateralUsdValueSent == 0 or collateralAmountSent == 0:
         return 0
 
@@ -1136,8 +1143,10 @@ def _calculateAuctionDiscount(_progress: uint256, _startDiscount: uint256, _maxD
 def _transferCollateral(
     _fromUser: address,
     _toUser: address,
+    _vaultId: uint256,
     _vaultAddr: address,
     _asset: address,
+    _shouldTransferBalance: bool,
     _targetUsdValue: uint256,
     _a: addys.Addys,
 ) -> (uint256, uint256, bool, bool):
@@ -1145,10 +1154,18 @@ def _transferCollateral(
     if maxAssetAmount == 0:
         return 0, 0, False, True # skip if cannot get price for this asset
 
-    # withdraw from vault, transfer to recipient
     amountSent: uint256 = 0
     isPositionDepleted: bool = False
-    amountSent, isPositionDepleted = extcall Vault(_vaultAddr).withdrawTokensFromVault(_fromUser, _asset, maxAssetAmount, _toUser, _a)
+
+    # transfer balance within vault
+    if _shouldTransferBalance:
+        amountSent, isPositionDepleted = extcall Vault(_vaultAddr).transferBalanceWithinVault(_asset, _fromUser, _toUser, maxAssetAmount, _a)
+        extcall Ledger(_a.ledger).addVaultToUser(_toUser, _vaultId)
+        extcall LootBox(_a.lootbox).updateDepositPoints(_toUser, _vaultId, _vaultAddr, _asset, _a)
+
+    # withdraw and transfer to recipient
+    else:
+        amountSent, isPositionDepleted = extcall Vault(_vaultAddr).withdrawTokensFromVault(_fromUser, _asset, maxAssetAmount, _toUser, _a)
 
     usdValue: uint256 = amountSent * _targetUsdValue // maxAssetAmount
     return usdValue, amountSent, isPositionDepleted, isPositionDepleted
