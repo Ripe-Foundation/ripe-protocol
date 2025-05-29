@@ -172,7 +172,7 @@ def claimLootForManyUsers(
     return totalRipeForUsers
 
 
-# core
+# core -- gets borrow loot AND deposit loot
 
 
 @internal
@@ -236,7 +236,40 @@ def _claimLoot(
     return totalRipeForUser
 
 
-# claim deposit loot
+# view / helper
+
+
+@view
+@external
+def getClaimableLoot(_user: address) -> uint256:
+    a: addys.Addys = addys._getAddys()
+
+    # total loot -- start with borrow loot
+    totalRipeForUser: uint256 = self._getClaimableBorrowLoot(_user, a)
+
+    # now look at deposit loot
+    numUserVaults: uint256 = staticcall Ledger(a.ledger).numUserVaults(_user)
+    for i: uint256 in range(1, numUserVaults, bound=max_value(uint256)):
+        vaultId: uint256 = staticcall Ledger(a.ledger).userVaults(_user, i)
+        vaultAddr: address = staticcall VaultBook(a.vaultBook).getAddr(vaultId)
+        if vaultAddr == empty(address):
+            continue
+        numUserAssets: uint256 = staticcall Vault(vaultAddr).numUserAssets(_user)
+        for y: uint256 in range(1, numUserAssets, bound=max_value(uint256)):
+            asset: address = staticcall Vault(vaultAddr).userAssets(_user, y)
+            if asset == empty(address):
+                continue
+            totalRipeForUser += self._getClaimableDepositLootForAsset(_user, vaultId, vaultAddr, asset, a)
+
+    return totalRipeForUser
+
+
+##############################
+# Claim Loot - Deposit Asset #
+##############################
+
+
+# claims
 
 
 @external
@@ -265,7 +298,7 @@ def _claimDepositLoot(
     ap: AssetDepositPoints = empty(AssetDepositPoints)
     gp: GlobalDepositPoints = empty(GlobalDepositPoints)
     globalRipeRewards: RipeRewards = empty(RipeRewards)
-    userRipeRewards, up, ap, gp, globalRipeRewards = self._getClaimableDepositLootData(_user, _vaultId, _vaultAddr, _asset, _shouldFlush, _a)
+    userRipeRewards, up, ap, gp, globalRipeRewards = self._getDepositLootData(_user, _vaultId, _vaultAddr, _asset, _shouldFlush, _a)
 
     totalRipeForUser: uint256 = userRipeRewards.ripeStakerLoot + userRipeRewards.ripeVoteLoot + userRipeRewards.ripeGenLoot
     extcall Ledger(_a.ledger).setDepositPointsAndRipeRewards(_user, _vaultId, _asset, up, ap, gp, globalRipeRewards)
@@ -274,32 +307,151 @@ def _claimDepositLoot(
     return totalRipeForUser
 
 
-# view claimable
+# core logic (claimable loot for asset)
+
+
+@view
+@internal
+def _getDepositLootData(
+    _user: address,
+    _vaultId: uint256,
+    _vaultAddr: address,
+    _asset: address,
+    _shouldFlush: bool,
+    _a: addys.Addys,
+) -> (UserDepositLoot, UserDepositPoints, AssetDepositPoints, GlobalDepositPoints, RipeRewards):
+
+    # need to get this with each iteration because state may have changed (during claim)
+    config: RewardsConfig = staticcall MissionControl(_a.missionControl).getRewardsConfig()
+    globalRewards: RipeRewards = self._getLatestGlobalRipeRewards(config, _a)
+
+    # get latest deposit points
+    up: UserDepositPoints = empty(UserDepositPoints)
+    ap: AssetDepositPoints = empty(AssetDepositPoints)
+    gp: GlobalDepositPoints = empty(GlobalDepositPoints)
+    up, ap, gp = self._getLatestDepositPoints(_user, _vaultId, _vaultAddr, _asset, config, _a)
+
+    # user has no points
+    if up.balancePoints == 0:
+        return empty(UserDepositLoot), up, ap, gp, globalRewards
+
+    # calc user's share
+    userShareOfAsset: uint256 = 0
+    if ap.balancePoints != 0:
+        userShareOfAsset = min(up.balancePoints * HUNDRED_PERCENT // ap.balancePoints, HUNDRED_PERCENT)
+
+    # insufficient user share, may need to wait longer to claim
+    if userShareOfAsset == 0:
+        if _shouldFlush:
+            up, ap = self._flushDepositPoints(up, ap)
+        return empty(UserDepositLoot), up, ap, gp, globalRewards
+
+    # calc user's share of loot, per category
+    userLoot: UserDepositLoot = empty(UserDepositLoot)
+    ap.ripeStakerPoints, gp.ripeStakerPoints, globalRewards.stakers, userLoot.ripeStakerLoot = self._calcSpecificLoot(userShareOfAsset, ap.ripeStakerPoints, gp.ripeStakerPoints, globalRewards.stakers)
+    ap.ripeVotePoints, gp.ripeVotePoints, globalRewards.voters, userLoot.ripeVoteLoot = self._calcSpecificLoot(userShareOfAsset, ap.ripeVotePoints, gp.ripeVotePoints, globalRewards.voters)
+    ap.ripeGenPoints, gp.ripeGenPoints, globalRewards.genDepositors, userLoot.ripeGenLoot = self._calcSpecificLoot(userShareOfAsset, ap.ripeGenPoints, gp.ripeGenPoints, globalRewards.genDepositors)
+
+    # only zero out points if they actually received loot -- asset or user may not always have sufficient points (yet) to get loot
+    didReceiveLoot: bool = (
+        userLoot.ripeStakerLoot != 0 or
+        userLoot.ripeVoteLoot != 0 or
+        userLoot.ripeGenLoot != 0
+    )
+    if didReceiveLoot:
+        ap.balancePoints -= up.balancePoints # do first
+        up.balancePoints = 0
+
+    return userLoot, up, ap, gp, globalRewards
+
+
+# helper / views
 
 
 @view
 @external
-def getClaimableLoot(_user: address) -> uint256:
+def getClaimableDepositLootForAsset(_user: address, _vaultId: uint256, _asset: address) -> uint256:
     a: addys.Addys = addys._getAddys()
+    vaultAddr: address = staticcall VaultBook(a.vaultBook).getAddr(_vaultId)
+    return self._getClaimableDepositLootForAsset(_user, _vaultId, vaultAddr, _asset, a)
 
-    # total loot -- start with borrow loot
-    totalRipeForUser: uint256 = self._getClaimableBorrowLoot(_user, a)
 
-    # now look at deposit loot
-    numUserVaults: uint256 = staticcall Ledger(a.ledger).numUserVaults(_user)
-    for i: uint256 in range(1, numUserVaults, bound=max_value(uint256)):
-        vaultId: uint256 = staticcall Ledger(a.ledger).userVaults(_user, i)
-        vaultAddr: address = staticcall VaultBook(a.vaultBook).getAddr(vaultId)
-        if vaultAddr == empty(address):
-            continue
-        numUserAssets: uint256 = staticcall Vault(vaultAddr).numUserAssets(_user)
-        for y: uint256 in range(1, numUserAssets, bound=max_value(uint256)):
-            asset: address = staticcall Vault(vaultAddr).userAssets(_user, y)
-            if asset == empty(address):
-                continue
-            totalRipeForUser += self._getClaimableDepositLoot(_user, vaultId, vaultAddr, asset, a)
+@view
+@internal
+def _getClaimableDepositLootForAsset(
+    _user: address,
+    _vaultId: uint256,
+    _vaultAddr: address,
+    _asset: address,
+    _a: addys.Addys,
+) -> uint256:
+    userRipeRewards: UserDepositLoot = empty(UserDepositLoot)
+    up: UserDepositPoints = empty(UserDepositPoints)
+    ap: AssetDepositPoints = empty(AssetDepositPoints)
+    gp: GlobalDepositPoints = empty(GlobalDepositPoints)
+    globalRipeRewards: RipeRewards = empty(RipeRewards)
+    userRipeRewards, up, ap, gp, globalRipeRewards = self._getDepositLootData(_user, _vaultId, _vaultAddr, _asset, False, _a)
+    return userRipeRewards.ripeStakerLoot + userRipeRewards.ripeVoteLoot + userRipeRewards.ripeGenLoot
 
-    return totalRipeForUser
+
+# claim utils
+
+
+@view
+@internal
+def _calcSpecificLoot(
+    _userShareOfAsset: uint256,
+    _assetPoints: uint256,
+    _globalPoints: uint256,
+    _rewardsAvailable: uint256,
+) -> (uint256, uint256, uint256, uint256):
+
+    # nothing to do here
+    if _assetPoints == 0 or _globalPoints == 0 or _rewardsAvailable == 0:
+        return _assetPoints, _globalPoints, _rewardsAvailable, 0
+
+    # calc asset rewards
+    assetRewards: uint256 = 0
+    if _assetPoints * HUNDRED_PERCENT > _globalPoints:
+        assetShareOfGlobal: uint256 = min(_assetPoints * HUNDRED_PERCENT // _globalPoints, HUNDRED_PERCENT)
+        assetRewards = _rewardsAvailable * assetShareOfGlobal // HUNDRED_PERCENT
+    else:
+        assetRewards = _rewardsAvailable * _assetPoints // _globalPoints
+
+    # calc user rewards (for asset)
+    userRewards: uint256 = assetRewards * _userShareOfAsset // HUNDRED_PERCENT
+    if userRewards == 0:
+        return _assetPoints, _globalPoints, _rewardsAvailable, 0
+
+    # calc how many points to reduce (from asset and global)
+    pointsToReduce: uint256 = 0
+    if _assetPoints * _userShareOfAsset > HUNDRED_PERCENT:
+        pointsToReduce = _assetPoints * _userShareOfAsset // HUNDRED_PERCENT
+    else:
+        remainingRewards: uint256 = assetRewards - userRewards
+        pointsRemaining: uint256 = _assetPoints
+        if _assetPoints * remainingRewards > assetRewards:
+            pointsRemaining = _assetPoints * remainingRewards // assetRewards
+        pointsToReduce = _assetPoints - pointsRemaining
+
+    if pointsToReduce == 0:
+        return _assetPoints, _globalPoints, _rewardsAvailable, 0
+
+    # updated data
+    newAssetPoints: uint256 = _assetPoints - pointsToReduce
+    newGlobalPoints: uint256 = _globalPoints - pointsToReduce
+    newRewardsAvail: uint256 = _rewardsAvailable - userRewards
+    return newAssetPoints, newGlobalPoints, newRewardsAvail, userRewards
+
+
+@view
+@internal
+def _flushDepositPoints(_userPoints: UserDepositPoints, _assetPoints: AssetDepositPoints) -> (UserDepositPoints, AssetDepositPoints):
+    up: UserDepositPoints = _userPoints
+    ap: AssetDepositPoints = _assetPoints
+    ap.balancePoints -= up.balancePoints
+    up.balancePoints = 0
+    return up, ap
 
 
 ##################
@@ -509,148 +661,7 @@ def _getLatestDepositPoints(
     return userPoints, assetPoints, globalPoints
 
 
-# claimable deposit loot
-
-
-@view
-@internal
-def _getClaimableDepositLootData(
-    _user: address,
-    _vaultId: uint256,
-    _vaultAddr: address,
-    _asset: address,
-    _shouldFlush: bool,
-    _a: addys.Addys,
-) -> (UserDepositLoot, UserDepositPoints, AssetDepositPoints, GlobalDepositPoints, RipeRewards):
-
-    # need to get this with each iteration because state may have changed (during claim)
-    config: RewardsConfig = staticcall MissionControl(_a.missionControl).getRewardsConfig()
-    globalRewards: RipeRewards = self._getLatestGlobalRipeRewards(config, _a)
-
-    # get latest deposit points
-    up: UserDepositPoints = empty(UserDepositPoints)
-    ap: AssetDepositPoints = empty(AssetDepositPoints)
-    gp: GlobalDepositPoints = empty(GlobalDepositPoints)
-    up, ap, gp = self._getLatestDepositPoints(_user, _vaultId, _vaultAddr, _asset, config, _a)
-
-    # user has no points
-    if up.balancePoints == 0:
-        return empty(UserDepositLoot), up, ap, gp, globalRewards
-
-    # calc user's share
-    userShareOfAsset: uint256 = 0
-    if ap.balancePoints != 0:
-        userShareOfAsset = min(up.balancePoints * HUNDRED_PERCENT // ap.balancePoints, HUNDRED_PERCENT)
-
-    # insufficient user share, may need to wait longer to claim
-    if userShareOfAsset == 0:
-        if _shouldFlush:
-            up, ap = self._flushDepositPoints(up, ap)
-        return empty(UserDepositLoot), up, ap, gp, globalRewards
-
-    # calc user's share of loot, per category
-    userLoot: UserDepositLoot = empty(UserDepositLoot)
-    ap.ripeStakerPoints, gp.ripeStakerPoints, globalRewards.stakers, userLoot.ripeStakerLoot = self._calcSpecificLoot(userShareOfAsset, ap.ripeStakerPoints, gp.ripeStakerPoints, globalRewards.stakers)
-    ap.ripeVotePoints, gp.ripeVotePoints, globalRewards.voters, userLoot.ripeVoteLoot = self._calcSpecificLoot(userShareOfAsset, ap.ripeVotePoints, gp.ripeVotePoints, globalRewards.voters)
-    ap.ripeGenPoints, gp.ripeGenPoints, globalRewards.genDepositors, userLoot.ripeGenLoot = self._calcSpecificLoot(userShareOfAsset, ap.ripeGenPoints, gp.ripeGenPoints, globalRewards.genDepositors)
-
-    # only zero out points if they actually received loot -- asset or user may not always have sufficient points (yet) to get loot
-    didReceiveLoot: bool = (
-        userLoot.ripeStakerLoot != 0 or
-        userLoot.ripeVoteLoot != 0 or
-        userLoot.ripeGenLoot != 0
-    )
-    if didReceiveLoot:
-        ap.balancePoints -= up.balancePoints # do first
-        up.balancePoints = 0
-
-    return userLoot, up, ap, gp, globalRewards
-
-
-@view
-@internal
-def _flushDepositPoints(_userPoints: UserDepositPoints, _assetPoints: AssetDepositPoints) -> (UserDepositPoints, AssetDepositPoints):
-    up: UserDepositPoints = _userPoints
-    ap: AssetDepositPoints = _assetPoints
-    ap.balancePoints -= up.balancePoints
-    up.balancePoints = 0
-    return up, ap
-
-
-@view
-@internal
-def _getClaimableDepositLoot(
-    _user: address,
-    _vaultId: uint256,
-    _vaultAddr: address,
-    _asset: address,
-    _a: addys.Addys,
-) -> uint256:
-    userRipeRewards: UserDepositLoot = empty(UserDepositLoot)
-    up: UserDepositPoints = empty(UserDepositPoints)
-    ap: AssetDepositPoints = empty(AssetDepositPoints)
-    gp: GlobalDepositPoints = empty(GlobalDepositPoints)
-    globalRipeRewards: RipeRewards = empty(RipeRewards)
-    userRipeRewards, up, ap, gp, globalRipeRewards = self._getClaimableDepositLootData(_user, _vaultId, _vaultAddr, _asset, False, _a)
-    return userRipeRewards.ripeStakerLoot + userRipeRewards.ripeVoteLoot + userRipeRewards.ripeGenLoot
-
-
-@view
-@external
-def getClaimableDepositLootForAsset(_user: address, _vaultId: uint256, _asset: address) -> uint256:
-    a: addys.Addys = addys._getAddys()
-    vaultAddr: address = staticcall VaultBook(a.vaultBook).getAddr(_vaultId)
-    return self._getClaimableDepositLoot(_user, _vaultId, vaultAddr, _asset, a)
-
-
-# deposit points utils
-
-
-@view
-@internal
-def _calcSpecificLoot(
-    _userShareOfAsset: uint256,
-    _assetPoints: uint256,
-    _globalPoints: uint256,
-    _rewardsAvailable: uint256,
-) -> (uint256, uint256, uint256, uint256):
-
-    # nothing to do here
-    if _assetPoints == 0 or _globalPoints == 0 or _rewardsAvailable == 0:
-        return _assetPoints, _globalPoints, _rewardsAvailable, 0
-
-    # calc asset rewards
-    assetRewards: uint256 = 0
-    if _assetPoints * HUNDRED_PERCENT > _globalPoints:
-        assetShareOfGlobal: uint256 = min(_assetPoints * HUNDRED_PERCENT // _globalPoints, HUNDRED_PERCENT)
-        assetRewards = _rewardsAvailable * assetShareOfGlobal // HUNDRED_PERCENT
-    else:
-        assetRewards = _rewardsAvailable * _assetPoints // _globalPoints
-
-    # calc user rewards (for asset)
-    userRewards: uint256 = assetRewards * _userShareOfAsset // HUNDRED_PERCENT
-    if userRewards == 0:
-        return _assetPoints, _globalPoints, _rewardsAvailable, 0
-
-    # calc how many points to reduce (from asset and global)
-    pointsToReduce: uint256 = 0
-    if _assetPoints * _userShareOfAsset > HUNDRED_PERCENT:
-        pointsToReduce = _assetPoints * _userShareOfAsset // HUNDRED_PERCENT
-    else:
-        remainingRewards: uint256 = assetRewards - userRewards
-        pointsRemaining: uint256 = _assetPoints
-        if _assetPoints * remainingRewards > assetRewards:
-            pointsRemaining = _assetPoints * remainingRewards // assetRewards
-        pointsToReduce = _assetPoints - pointsRemaining
-
-    if pointsToReduce == 0:
-        return _assetPoints, _globalPoints, _rewardsAvailable, 0
-
-    # updated data
-    newAssetPoints: uint256 = _assetPoints - pointsToReduce
-    newGlobalPoints: uint256 = _globalPoints - pointsToReduce
-    newRewardsAvail: uint256 = _rewardsAvailable - userRewards
-    return newAssetPoints, newGlobalPoints, newRewardsAvail, userRewards
+# utils
 
 
 @view
@@ -676,9 +687,9 @@ def _getAssetPrecision(_isNft: bool, _asset: address) -> uint256:
     return 10 ** decimals
 
 
-#################
-# Borrower Loot #
-#################
+##########################
+# Borrower Loot - Points #
+##########################
 
 
 # update borrow points
@@ -783,7 +794,9 @@ def _getLatestBorrowPoints(
     return userPoints, globalPoints
 
 
-# claim loot
+##########################
+# Borrower Loot - Claims #
+##########################
 
 
 @external
