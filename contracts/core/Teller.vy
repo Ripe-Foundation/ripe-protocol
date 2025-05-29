@@ -16,8 +16,8 @@ from ethereum.ercs import IERC20
 from ethereum.ercs import IERC4626
 
 interface CreditEngine:
-    def redeemCollateralFromMany(_redemptions: DynArray[CollateralRedemption, MAX_COLLATERAL_REDEMPTIONS], _greenAmount: uint256, _redeemer: address, _shouldRefundSavingsGreen: bool, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
-    def redeemCollateral(_user: address, _vaultId: uint256, _asset: address, _greenAmount: uint256, _redeemer: address, _shouldRefundSavingsGreen: bool, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
+    def redeemCollateralFromMany(_redemptions: DynArray[CollateralRedemption, MAX_COLLATERAL_REDEMPTIONS], _greenAmount: uint256, _redeemer: address, _shouldTransferBalance: bool, _shouldRefundSavingsGreen: bool, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
+    def redeemCollateral(_user: address, _vaultId: uint256, _asset: address, _greenAmount: uint256, _redeemer: address, _shouldTransferBalance: bool, _shouldRefundSavingsGreen: bool, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
     def repayForUser(_user: address, _greenAmount: uint256, _shouldRefundSavingsGreen: bool, _caller: address, _a: addys.Addys = empty(addys.Addys)) -> bool: nonpayable
     def borrowForUser(_user: address, _greenAmount: uint256, _wantsSavingsGreen: bool, _caller: address, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
     def getMaxWithdrawableForAsset(_user: address, _asset: address, _a: addys.Addys = empty(addys.Addys)) -> uint256: view
@@ -419,12 +419,13 @@ def redeemCollateral(
     _asset: address,
     _paymentAmount: uint256 = max_value(uint256),
     _isPaymentSavingsGreen: bool = False,
+    _shouldTransferBalance: bool = False,
     _shouldRefundSavingsGreen: bool = True,
 ) -> uint256:
     assert not deptBasics.isPaused # dev: contract paused
     a: addys.Addys = addys._getAddys()
     greenAmount: uint256 = self._handleGreenPayment(_isPaymentSavingsGreen, _paymentAmount, a.creditEngine, a.greenToken, a.savingsGreen)
-    greenSpent: uint256 = extcall CreditEngine(a.creditEngine).redeemCollateral(_user, _vaultId, _asset, greenAmount, msg.sender, _shouldRefundSavingsGreen, a)
+    greenSpent: uint256 = extcall CreditEngine(a.creditEngine).redeemCollateral(_user, _vaultId, _asset, greenAmount, msg.sender, _shouldTransferBalance, _shouldRefundSavingsGreen, a)
     extcall CreditEngine(a.creditEngine).updateDebtForUser(msg.sender, a)
     return greenSpent
 
@@ -435,12 +436,13 @@ def redeemCollateralFromMany(
     _redemptions: DynArray[CollateralRedemption, MAX_COLLATERAL_REDEMPTIONS],
     _paymentAmount: uint256 = max_value(uint256),
     _isPaymentSavingsGreen: bool = False,
+    _shouldTransferBalance: bool = False,
     _shouldRefundSavingsGreen: bool = True,
 ) -> uint256:
     assert not deptBasics.isPaused # dev: contract paused
     a: addys.Addys = addys._getAddys()
     greenAmount: uint256 = self._handleGreenPayment(_isPaymentSavingsGreen, _paymentAmount, a.creditEngine, a.greenToken, a.savingsGreen)
-    greenSpent: uint256 = extcall CreditEngine(a.creditEngine).redeemCollateralFromMany(_redemptions, greenAmount, msg.sender, _shouldRefundSavingsGreen, a)
+    greenSpent: uint256 = extcall CreditEngine(a.creditEngine).redeemCollateralFromMany(_redemptions, greenAmount, msg.sender, _shouldTransferBalance, _shouldRefundSavingsGreen, a)
     extcall CreditEngine(a.creditEngine).updateDebtForUser(msg.sender, a)
     return greenSpent
 
@@ -534,7 +536,7 @@ def claimFromStabilityPool(
 ) -> uint256:
     assert not deptBasics.isPaused # dev: contract paused
     a: addys.Addys = addys._getAddys()
-    vaultAddr: address = staticcall VaultBook(a.vaultBook).getAddr(_vaultId) # dev: invalid vault id
+    vaultAddr: address = staticcall VaultBook(a.vaultBook).getAddr(_vaultId)
     claimUsdValue: uint256 = extcall StabVault(vaultAddr).claimFromStabilityPool(msg.sender, _stabAsset, _claimAsset, _maxUsdValue, a)
     assert extcall CreditEngine(a.creditEngine).updateDebtForUser(msg.sender, a) # dev: bad debt health
     return claimUsdValue
@@ -548,7 +550,7 @@ def claimManyFromStabilityPool(
 ) -> uint256:
     assert not deptBasics.isPaused # dev: contract paused
     a: addys.Addys = addys._getAddys()
-    vaultAddr: address = staticcall VaultBook(a.vaultBook).getAddr(_vaultId) # dev: invalid vault id
+    vaultAddr: address = staticcall VaultBook(a.vaultBook).getAddr(_vaultId)
     claimUsdValue: uint256 = extcall StabVault(vaultAddr).claimManyFromStabilityPool(msg.sender, _claims, a)
     assert extcall CreditEngine(a.creditEngine).updateDebtForUser(msg.sender, a) # dev: bad debt health
     return claimUsdValue
@@ -568,7 +570,7 @@ def redeemFromStabilityPool(
 ) -> uint256:
     assert not deptBasics.isPaused # dev: contract paused
     a: addys.Addys = addys._getAddys()
-    vaultAddr: address = staticcall VaultBook(a.vaultBook).getAddr(_vaultId) # dev: invalid vault id
+    vaultAddr: address = staticcall VaultBook(a.vaultBook).getAddr(_vaultId)
     greenAmount: uint256 = self._handleGreenPayment(_isPaymentSavingsGreen, _paymentAmount, vaultAddr, a.greenToken, a.savingsGreen)
     greenSpent: uint256 = extcall StabVault(vaultAddr).redeemFromStabilityPool(_claimAsset, greenAmount, msg.sender, _shouldRefundSavingsGreen, a)
     extcall CreditEngine(a.creditEngine).updateDebtForUser(msg.sender, a)
@@ -586,7 +588,7 @@ def redeemManyFromStabilityPool(
 ) -> uint256:
     assert not deptBasics.isPaused # dev: contract paused
     a: addys.Addys = addys._getAddys()
-    vaultAddr: address = staticcall VaultBook(a.vaultBook).getAddr(_vaultId) # dev: invalid vault id
+    vaultAddr: address = staticcall VaultBook(a.vaultBook).getAddr(_vaultId)
     greenAmount: uint256 = self._handleGreenPayment(_isPaymentSavingsGreen, _paymentAmount, vaultAddr, a.greenToken, a.savingsGreen)
     greenSpent: uint256 = extcall StabVault(vaultAddr).redeemManyFromStabilityPool(_redemptions, greenAmount, msg.sender, _shouldRefundSavingsGreen, a)
     extcall CreditEngine(a.creditEngine).updateDebtForUser(msg.sender, a)
@@ -642,7 +644,7 @@ def _getVaultAddrAndId(
 
     # validate vault id
     if _vaultId != 0:
-        vaultAddr = staticcall VaultBook(_vaultBook).getAddr(_vaultId) # dev: invalid vault id
+        vaultAddr = staticcall VaultBook(_vaultBook).getAddr(_vaultId)
         assert vaultAddr != empty(address) # dev: invalid vault id
         vaultId = _vaultId
         if _vaultAddr != empty(address):

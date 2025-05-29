@@ -18,6 +18,7 @@ from ethereum.ercs import IERC20
 interface Ledger:
     def setUserDebt(_user: address, _userDebt: UserDebt, _newInterest: uint256, _interval: IntervalBorrow): nonpayable
     def getBorrowDataBundle(_user: address) -> BorrowDataBundle: view
+    def addVaultToUser(_user: address, _vaultId: uint256): nonpayable
     def userVaults(_user: address, _index: uint256) -> uint256: view
     def getRepayDataBundle(_user: address) -> RepayDataBundle: view
     def numUserVaults(_user: address) -> uint256: view
@@ -30,6 +31,10 @@ interface MissionControl:
     def getDebtTerms(_asset: address) -> DebtTerms: view
     def getLtvPaybackBuffer() -> uint256: view
 
+interface LootBox:
+    def updateDepositPoints(_user: address, _vaultId: uint256, _vaultAddr: address, _asset: address, _a: addys.Addys = empty(addys.Addys)): nonpayable
+    def updateBorrowPoints(_user: address, _a: addys.Addys = empty(addys.Addys)): nonpayable
+
 interface PriceDesk:
     def getAssetAmount(_asset: address, _usdValue: uint256, _shouldRaise: bool = False) -> uint256: view
     def getUsdValue(_asset: address, _amount: uint256, _shouldRaise: bool) -> uint256: view
@@ -37,9 +42,6 @@ interface PriceDesk:
 interface GreenToken:
     def mint(_to: address, _amount: uint256): nonpayable
     def burn(_amount: uint256): nonpayable
-
-interface LootBox:
-    def updateBorrowPoints(_user: address, _a: addys.Addys = empty(addys.Addys)): nonpayable
 
 interface VaultBook:
     def getAddr(_vaultId: uint256) -> address: view
@@ -545,6 +547,7 @@ def redeemCollateralFromMany(
     _redemptions: DynArray[CollateralRedemption, MAX_COLLATERAL_REDEMPTIONS],
     _greenAmount: uint256,
     _redeemer: address,
+    _shouldTransferBalance: bool,
     _shouldRefundSavingsGreen: bool,
     _a: addys.Addys = empty(addys.Addys),
 ) -> uint256:
@@ -559,7 +562,7 @@ def redeemCollateralFromMany(
     for r: CollateralRedemption in _redemptions:
         if totalGreenRemaining == 0:
             break
-        greenSpent: uint256 = self._redeemCollateral(r.user, r.vaultId, r.asset, r.maxGreenAmount, totalGreenRemaining, _redeemer, a)
+        greenSpent: uint256 = self._redeemCollateral(r.user, r.vaultId, r.asset, r.maxGreenAmount, totalGreenRemaining, _redeemer, _shouldTransferBalance, a)
         totalGreenRemaining -= greenSpent
         totalGreenSpent += greenSpent
 
@@ -579,6 +582,7 @@ def redeemCollateral(
     _asset: address,
     _greenAmount: uint256,
     _redeemer: address,
+    _shouldTransferBalance: bool,
     _shouldRefundSavingsGreen: bool,
     _a: addys.Addys = empty(addys.Addys),
 ) -> uint256:
@@ -588,7 +592,7 @@ def redeemCollateral(
 
     greenAmount: uint256 = min(_greenAmount, staticcall IERC20(a.greenToken).balanceOf(self))
     assert greenAmount != 0 # dev: no green to redeem
-    greenSpent: uint256 = self._redeemCollateral(_user, _vaultId, _asset, max_value(uint256), greenAmount, _redeemer, a)
+    greenSpent: uint256 = self._redeemCollateral(_user, _vaultId, _asset, max_value(uint256), greenAmount, _redeemer, _shouldTransferBalance, a)
     assert greenSpent != 0 # dev: no redemptions occurred
 
     # handle leftover green
@@ -606,6 +610,7 @@ def _redeemCollateral(
     _maxGreenForAsset: uint256,
     _totalGreenRemaining: uint256,
     _redeemer: address,
+    _shouldTransferBalance: bool,
     _a: addys.Addys,
 ) -> uint256:
 
@@ -665,10 +670,16 @@ def _redeemCollateral(
     if maxAssetAmount == 0:
         return 0
 
-    # withdraw from vault, transfer to redeemer
+    # withdraw or transfer balance to redeemer
     amountSent: uint256 = 0
     na: bool = False
-    amountSent, na = extcall Vault(vaultAddr).withdrawTokensFromVault(_user, _asset, maxAssetAmount, _redeemer, _a)
+    if _shouldTransferBalance:
+        amountSent, na = extcall Vault(vaultAddr).transferBalanceWithinVault(_asset, _user, _redeemer, maxAssetAmount, _a)
+        extcall Ledger(_a.ledger).addVaultToUser(_redeemer, _vaultId)
+        extcall LootBox(_a.lootbox).updateDepositPoints(_redeemer, _vaultId, vaultAddr, _asset, _a)
+
+    else:
+        amountSent, na = extcall Vault(vaultAddr).withdrawTokensFromVault(_user, _asset, maxAssetAmount, _redeemer, _a)
 
     # repay debt
     repayValue: uint256 = amountSent * maxRedeemValue // maxAssetAmount

@@ -94,7 +94,7 @@ def transferBalanceWithinVault(
     _transferAmount: uint256,
     _a: addys.Addys = empty(addys.Addys),
 ) -> (uint256, bool):
-    assert msg.sender == addys._getAuctionHouseAddr() # dev: only AuctionHouse allowed
+    assert msg.sender in [addys._getAuctionHouseAddr(), addys._getCreditEngineAddr()] # dev: not allowed
     a: addys.Addys = addys._getAddys(_a)
 
     transferAmount: uint256 = 0

@@ -841,7 +841,7 @@ def test_credit_redemption_refund_regular(
     initial_green_balance = green_token.balanceOf(alice)
 
     # Redeem with shouldStakeRefund=False
-    green_spent = teller.redeemCollateral(bob, vault_id, alpha_token, green_amount, False, False, sender=alice)
+    green_spent = teller.redeemCollateral(bob, vault_id, alpha_token, green_amount, False, False, False, sender=alice)
 
     # Alice should get refund as regular GREEN
     final_green_balance = green_token.balanceOf(alice)
@@ -1417,3 +1417,337 @@ def test_can_redeem_vs_can_liquidate(
     # Ratio = 100/100 = 100%
     assert credit_engine.canRedeemUserCollateral(bob)
     assert credit_engine.canLiquidateUser(bob)
+
+
+def test_credit_redemption_transfer_balance_basic(
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    alice,
+    setGeneralConfig,
+    setAssetConfig,
+    setGeneralDebtConfig,
+    performDeposit,
+    mock_price_source,
+    teller,
+    green_token,
+    whale,
+    simple_erc20_vault,
+    vault_book,
+    createDebtTerms,
+    ledger,
+    _test,
+):
+    """Test collateral redemption with balance transfer within vault"""
+    setGeneralConfig()
+    
+    debt_terms = createDebtTerms(
+        _ltv=50_00,
+        _redemptionThreshold=70_00,
+    )
+    setAssetConfig(alpha_token, _debtTerms=debt_terms)
+    setGeneralDebtConfig()
+
+    mock_price_source.setPrice(alpha_token, 1 * EIGHTEEN_DECIMALS)
+
+    # Bob deposits and borrows
+    collateral_amount = 200 * EIGHTEEN_DECIMALS
+    performDeposit(bob, collateral_amount, alpha_token, alpha_token_whale)
+    debt_amount = 100 * EIGHTEEN_DECIMALS
+    teller.borrow(debt_amount, bob, False, sender=bob)
+
+    # Make redeemable
+    mock_price_source.setPrice(alpha_token, 70 * EIGHTEEN_DECIMALS // 100)
+
+    vault_id = vault_book.getRegId(simple_erc20_vault)
+    vault = simple_erc20_vault
+
+    # Get initial balances
+    initial_vault_balance = alpha_token.balanceOf(vault)
+    initial_alice_token_balance = alpha_token.balanceOf(alice)
+    initial_bob_vault_balance = vault.userBalances(bob, alpha_token)
+    initial_alice_vault_balance = vault.userBalances(alice, alpha_token)
+    initial_vault_total = vault.totalBalances(alpha_token)
+
+    # Alice prepares to redeem with balance transfer
+    green_amount = 50 * EIGHTEEN_DECIMALS
+    green_token.transfer(alice, green_amount, sender=whale)
+    green_token.approve(teller, green_amount, sender=alice)
+
+    # Redeem with _shouldTransferBalance=True
+    green_spent = teller.redeemCollateral(
+        bob, vault_id, alpha_token, green_amount, 
+        False, True, False,  # _shouldTransferBalance=True
+        sender=alice
+    )
+
+    # Verify redemption occurred
+    assert green_spent > 0
+
+    # Check that assets stayed in vault
+    final_vault_balance = alpha_token.balanceOf(vault)
+    assert initial_vault_balance == final_vault_balance
+
+    # Check that Alice didn't receive tokens directly
+    final_alice_token_balance = alpha_token.balanceOf(alice)
+    assert final_alice_token_balance == initial_alice_token_balance
+
+    # Check vault balances updated correctly
+    final_bob_vault_balance = vault.userBalances(bob, alpha_token)
+    final_alice_vault_balance = vault.userBalances(alice, alpha_token)
+    
+    # Bob's vault balance should decrease
+    assert final_bob_vault_balance < initial_bob_vault_balance
+    
+    # Alice's vault balance should increase
+    assert final_alice_vault_balance > initial_alice_vault_balance
+    
+    # The amount transferred should match
+    amount_transferred = initial_bob_vault_balance - final_bob_vault_balance
+    _test(amount_transferred, final_alice_vault_balance - initial_alice_vault_balance)
+
+    # Total vault balance should remain the same
+    final_vault_total = vault.totalBalances(alpha_token)
+    _test(initial_vault_total, final_vault_total)
+
+    # Verify Alice is now participating in the vault
+    assert ledger.isParticipatingInVault(alice, vault_id)
+
+    # Check CollateralRedeemed event
+    logs = filter_logs(teller, "CollateralRedeemed")
+    assert len(logs) == 1
+    log = logs[0]
+    assert log.user == bob
+    assert log.redeemer == alice
+    assert log.amount == amount_transferred
+
+
+def test_credit_redeem_many_with_transfer_balance(
+    alpha_token,
+    bravo_token,
+    alpha_token_whale,
+    bravo_token_whale,
+    bob,
+    sally,
+    alice,
+    setGeneralConfig,
+    setAssetConfig,
+    setGeneralDebtConfig,
+    performDeposit,
+    mock_price_source,
+    teller,
+    green_token,
+    whale,
+    simple_erc20_vault,
+    vault_book,
+    createDebtTerms,
+    ledger,
+):
+    """Test redeemCollateralFromMany with balance transfers"""
+    setGeneralConfig()
+    
+    debt_terms = createDebtTerms(
+        _ltv=50_00,
+        _redemptionThreshold=70_00,
+    )
+    setAssetConfig(alpha_token, _debtTerms=debt_terms)
+    setAssetConfig(bravo_token, _debtTerms=debt_terms)
+    setGeneralDebtConfig()
+
+    mock_price_source.setPrice(alpha_token, 1 * EIGHTEEN_DECIMALS)
+    mock_price_source.setPrice(bravo_token, 1 * EIGHTEEN_DECIMALS)
+
+    vault_id = vault_book.getRegId(simple_erc20_vault)
+    vault = simple_erc20_vault
+
+    # Setup positions
+    performDeposit(bob, 200 * EIGHTEEN_DECIMALS, alpha_token, alpha_token_whale)
+    performDeposit(sally, 200 * EIGHTEEN_DECIMALS, bravo_token, bravo_token_whale)
+    
+    teller.borrow(100 * EIGHTEEN_DECIMALS, bob, False, sender=bob)
+    teller.borrow(100 * EIGHTEEN_DECIMALS, sally, False, sender=sally)
+
+    # Make redeemable
+    mock_price_source.setPrice(alpha_token, 70 * EIGHTEEN_DECIMALS // 100)
+    mock_price_source.setPrice(bravo_token, 70 * EIGHTEEN_DECIMALS // 100)
+
+    # Track initial vault balances
+    initial_vault_alpha = alpha_token.balanceOf(vault)
+    initial_vault_bravo = bravo_token.balanceOf(vault)
+    initial_alice_alpha = alpha_token.balanceOf(alice)
+    initial_alice_bravo = bravo_token.balanceOf(alice)
+
+    # Prepare redemptions
+    redemptions = [
+        (bob, vault_id, alpha_token.address, 30 * EIGHTEEN_DECIMALS),
+        (sally, vault_id, bravo_token.address, 40 * EIGHTEEN_DECIMALS),
+    ]
+
+    green_amount = 100 * EIGHTEEN_DECIMALS
+    green_token.transfer(alice, green_amount, sender=whale)
+    green_token.approve(teller, green_amount, sender=alice)
+
+    # Redeem with balance transfer
+    total_green_spent = teller.redeemCollateralFromMany(
+        redemptions, green_amount,
+        False, True, False,  # _shouldTransferBalance=True
+        sender=alice
+    )
+
+    assert total_green_spent == 70 * EIGHTEEN_DECIMALS
+
+    # Verify assets stayed in vault
+    assert alpha_token.balanceOf(vault) == initial_vault_alpha
+    assert bravo_token.balanceOf(vault) == initial_vault_bravo
+
+    # Verify Alice didn't receive tokens directly
+    assert alpha_token.balanceOf(alice) == initial_alice_alpha
+    assert bravo_token.balanceOf(alice) == initial_alice_bravo
+
+    # Verify Alice has vault balances
+    assert vault.userBalances(alice, alpha_token) > 0
+    assert vault.userBalances(alice, bravo_token) > 0
+
+    # Verify Alice is participating in vault
+    assert ledger.isParticipatingInVault(alice, vault_id)
+
+    # Check events
+    logs = filter_logs(teller, "CollateralRedeemed")
+    assert len(logs) == 2
+
+
+def test_credit_redemption_transfer_balance_edge_cases(
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    alice,
+    setGeneralConfig,
+    setAssetConfig,
+    setGeneralDebtConfig,
+    performDeposit,
+    mock_price_source,
+    teller,
+    green_token,
+    whale,
+    simple_erc20_vault,
+    vault_book,
+    createDebtTerms,
+):
+    """Test edge cases for balance transfer redemptions"""
+    setGeneralConfig()
+    
+    debt_terms = createDebtTerms(
+        _ltv=50_00,
+        _redemptionThreshold=70_00,
+    )
+    setAssetConfig(alpha_token, _debtTerms=debt_terms)
+    setGeneralDebtConfig()
+
+    mock_price_source.setPrice(alpha_token, 1 * EIGHTEEN_DECIMALS)
+
+    # Bob deposits and borrows
+    collateral_amount = 200 * EIGHTEEN_DECIMALS
+    performDeposit(bob, collateral_amount, alpha_token, alpha_token_whale)
+    debt_amount = 100 * EIGHTEEN_DECIMALS
+    teller.borrow(debt_amount, bob, False, sender=bob)
+
+    # Make redeemable
+    mock_price_source.setPrice(alpha_token, 70 * EIGHTEEN_DECIMALS // 100)
+
+    vault_id = vault_book.getRegId(simple_erc20_vault)
+    vault = simple_erc20_vault
+
+    # Test 1: Alice already has a position in the vault
+    # Give Alice some initial balance
+    performDeposit(alice, 50 * EIGHTEEN_DECIMALS, alpha_token, alpha_token_whale)
+    initial_alice_vault_balance = vault.userBalances(alice, alpha_token)
+    assert initial_alice_vault_balance > 0
+
+    bob_balance_before = vault.userBalances(bob, alpha_token)
+
+    green_amount = 30 * EIGHTEEN_DECIMALS
+    green_token.transfer(alice, green_amount, sender=whale)
+    green_token.approve(teller, green_amount, sender=alice)
+
+    # Redeem with transfer
+    green_spent = teller.redeemCollateral(
+        bob, vault_id, alpha_token, green_amount,
+        False, True, False,
+        sender=alice
+    )
+
+    # Alice's vault balance should increase
+    final_alice_vault_balance = vault.userBalances(alice, alpha_token)
+    assert final_alice_vault_balance > initial_alice_vault_balance
+
+    # Bob should still have some balance left
+    bob_balance_after = vault.userBalances(bob, alpha_token)
+    assert bob_balance_after < bob_balance_before
+
+
+def test_credit_redemption_transfer_refund_handling(
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    alice,
+    setGeneralConfig,
+    setAssetConfig,
+    setGeneralDebtConfig,
+    performDeposit,
+    mock_price_source,
+    teller,
+    green_token,
+    whale,
+    simple_erc20_vault,
+    vault_book,
+    createDebtTerms,
+    savings_green,
+    _test,
+):
+    """Test refund handling with balance transfers"""
+    setGeneralConfig()
+    
+    debt_terms = createDebtTerms(
+        _ltv=50_00,
+        _redemptionThreshold=70_00,
+    )
+    setAssetConfig(alpha_token, _debtTerms=debt_terms)
+    setGeneralDebtConfig()
+
+    mock_price_source.setPrice(alpha_token, 1 * EIGHTEEN_DECIMALS)
+
+    # Small position for easy full redemption
+    performDeposit(bob, 100 * EIGHTEEN_DECIMALS, alpha_token, alpha_token_whale)
+    teller.borrow(50 * EIGHTEEN_DECIMALS, bob, False, sender=bob)
+
+    # Make redeemable
+    mock_price_source.setPrice(alpha_token, 70 * EIGHTEEN_DECIMALS // 100)
+
+    vault_id = vault_book.getRegId(simple_erc20_vault)
+
+    # Provide excess green
+    green_amount = 200 * EIGHTEEN_DECIMALS
+    green_token.transfer(alice, green_amount, sender=whale)
+    green_token.approve(teller, green_amount, sender=alice)
+
+    initial_savings_balance = savings_green.balanceOf(alice)
+
+    # Redeem with transfer and savings green refund
+    green_spent = teller.redeemCollateral(
+        bob, vault_id, alpha_token, green_amount,
+        False, True, True,  # _shouldTransferBalance=True, _shouldRefundSavingsGreen=True
+        sender=alice
+    )
+
+    # Should have received refund as savings green
+    final_savings_balance = savings_green.balanceOf(alice)
+    assert final_savings_balance > initial_savings_balance
+    
+    # Verify refund amount
+    refund_amount = green_amount - green_spent
+    savings_received = final_savings_balance - initial_savings_balance
+    _test(refund_amount, savings_green.getLastUnderlying(savings_received))
+
+    # Verify Alice has vault balance from transfer
+    assert simple_erc20_vault.userBalances(alice, alpha_token) > 0
+
