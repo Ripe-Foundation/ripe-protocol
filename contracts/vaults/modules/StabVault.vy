@@ -588,7 +588,7 @@ def redeemFromStabilityPool(
     _asset: address,
     _greenAmount: uint256,
     _redeemer: address,
-    _shouldStakeRefund: bool,
+    _shouldRefundSavingsGreen: bool,
     _a: addys.Addys = empty(addys.Addys),
 ) -> uint256:
     assert msg.sender == addys._getTellerAddr() # dev: only Teller allowed
@@ -604,7 +604,7 @@ def redeemFromStabilityPool(
 
     # handle leftover green
     if greenAmount > greenSpent:
-        self._handleGreenForUser(_redeemer, greenAmount - greenSpent, _shouldStakeRefund, a.greenToken, a.savingsGreen)
+        self._handleGreenForUser(_redeemer, greenAmount - greenSpent, _shouldRefundSavingsGreen, a.greenToken, a.savingsGreen)
 
     return greenSpent
 
@@ -614,7 +614,7 @@ def redeemManyFromStabilityPool(
     _redemptions: DynArray[StabPoolRedemption, MAX_STAB_REDEMPTIONS],
     _greenAmount: uint256,
     _redeemer: address,
-    _shouldStakeRefund: bool,
+    _shouldRefundSavingsGreen: bool,
     _a: addys.Addys = empty(addys.Addys),
 ) -> uint256:
     assert msg.sender == addys._getTellerAddr() # dev: only Teller allowed
@@ -638,7 +638,7 @@ def redeemManyFromStabilityPool(
 
     # handle leftover green
     if totalGreenRemaining != 0:
-        self._handleGreenForUser(_redeemer, totalGreenRemaining, _shouldStakeRefund, a.greenToken, a.savingsGreen)
+        self._handleGreenForUser(_redeemer, totalGreenRemaining, _shouldRefundSavingsGreen, a.greenToken, a.savingsGreen)
 
     return totalGreenSpent
 

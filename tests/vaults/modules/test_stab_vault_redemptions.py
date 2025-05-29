@@ -134,7 +134,7 @@ def test_stab_vault_redemptions_refund(
     redeem_amount = 200 * EIGHTEEN_DECIMALS
     green_token.transfer(bob, redeem_amount, sender=whale)
     green_token.approve(teller, redeem_amount, sender=bob)
-    usd_value = teller.redeemFromStabilityPool(vault_id, bravo_token, redeem_amount, False, sender=bob)
+    usd_value = teller.redeemFromStabilityPool(vault_id, bravo_token, redeem_amount, False, False, sender=bob)
 
     # results
     _test(claimable_amount, usd_value)
@@ -876,7 +876,7 @@ def test_stab_vault_redemptions_refund_staking(
     green_token.transfer(bob, redeem_amount, sender=whale)
     green_token.approve(teller, redeem_amount, sender=bob)
     
-    usd_value = teller.redeemFromStabilityPool(vault_id, bravo_token, redeem_amount, True, sender=bob)
+    usd_value = teller.redeemFromStabilityPool(vault_id, bravo_token, redeem_amount, False, True, sender=bob)
 
     # Check results
     _test(claimable_amount, usd_value)

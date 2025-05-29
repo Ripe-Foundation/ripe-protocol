@@ -841,7 +841,7 @@ def test_credit_redemption_refund_regular(
     initial_green_balance = green_token.balanceOf(alice)
 
     # Redeem with shouldStakeRefund=False
-    green_spent = teller.redeemCollateral(bob, vault_id, alpha_token, green_amount, False, sender=alice)
+    green_spent = teller.redeemCollateral(bob, vault_id, alpha_token, green_amount, False, False, sender=alice)
 
     # Alice should get refund as regular GREEN
     final_green_balance = green_token.balanceOf(alice)

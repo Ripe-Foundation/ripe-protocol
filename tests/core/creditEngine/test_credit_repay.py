@@ -38,7 +38,7 @@ def test_basic_repay(
     # repay
     repay_amount = 25 * EIGHTEEN_DECIMALS
     assert green_token.approve(teller, repay_amount, sender=bob)
-    assert teller.repay(repay_amount, bob, False, sender=bob)
+    assert teller.repay(repay_amount, bob, False, False, sender=bob)
 
     log = filter_logs(teller, "RepayDebt")[0]
     assert log.user == bob
@@ -308,7 +308,7 @@ def test_repay_with_savings_green_refund(
     # give bob 2x amount
     green_token.transfer(bob, borrow_amount, sender=whale)
     green_token.approve(teller, MAX_UINT256, sender=bob)
-    assert teller.repay(MAX_UINT256, bob, True, sender=bob)
+    assert teller.repay(MAX_UINT256, bob, False, True, sender=bob)
 
     assert ledger.userDebt(bob).amount == 0
 
@@ -611,5 +611,125 @@ def test_repay_during_auction_purchase_unauthorized(
     # attempt to repay during auction purchase as unauthorized sender
     with boa.reverts("only auction house allowed"):
         credit_engine.repayDuringAuctionPurchase(bob, 10 * EIGHTEEN_DECIMALS, sender=bob)
+
+
+def test_repay_with_savings_green_payment(
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    setGeneralDebtConfig,
+    performDeposit,
+    mock_price_source,
+    teller,
+    green_token,
+    savings_green,
+    ledger,
+    credit_engine,
+    _test,
+):
+    """Test repaying debt using Savings Green tokens instead of Green tokens"""
+    # basic setup
+    setGeneralConfig()
+    setAssetConfig(alpha_token)
+    setGeneralDebtConfig()
+
+    # deposit and borrow
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    performDeposit(bob, deposit_amount, alpha_token, alpha_token_whale)
+    mock_price_source.setPrice(alpha_token, 1 * EIGHTEEN_DECIMALS)
+    borrow_amount = teller.borrow(MAX_UINT256, bob, False, sender=bob)
+    assert borrow_amount == 50 * EIGHTEEN_DECIMALS
+
+    # deposit green tokens into savings green to get savings green tokens
+    green_token.approve(savings_green, borrow_amount, sender=bob)
+    shares = savings_green.deposit(borrow_amount, bob, sender=bob)
+    
+    # verify bob has savings green tokens
+    assert savings_green.balanceOf(bob) == shares
+    _test(borrow_amount, savings_green.convertToAssets(shares))
+
+    # record initial debt
+    initial_debt = ledger.userDebt(bob).amount
+    assert initial_debt == borrow_amount
+
+    # approve teller to spend savings green tokens
+    repay_amount = shares // 2
+    savings_green.approve(teller, MAX_UINT256, sender=bob)
+    
+    # repay using savings green tokens
+    assert teller.repay(
+        repay_amount, 
+        bob, 
+        True,   # _isPaymentSavingsGreen - this is the key parameter
+        False,  # _shouldRefundSavingsGreen
+        sender=bob
+    )
+
+    # verify debt was reduced
+    remaining_debt = ledger.userDebt(bob).amount
+    _test(remaining_debt, initial_debt // 2)
+
+    # verify savings green tokens were used
+    # The teller should have redeemed the exact amount needed
+    _test(savings_green.balanceOf(bob), shares // 2)
+
+    # verify green tokens were sent to credit engine
+    assert green_token.balanceOf(credit_engine) == 0  # credit engine burns them immediately
+
+
+def test_repay_with_savings_green_payment_max_amount(
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    setGeneralDebtConfig,
+    performDeposit,
+    mock_price_source,
+    teller,
+    green_token,
+    savings_green,
+    ledger,
+    credit_engine,
+):
+    """Test repaying max debt using Savings Green tokens"""
+    # basic setup
+    setGeneralConfig()
+    setAssetConfig(alpha_token)
+    setGeneralDebtConfig()
+
+    # deposit and borrow
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    performDeposit(bob, deposit_amount, alpha_token, alpha_token_whale)
+    mock_price_source.setPrice(alpha_token, 1 * EIGHTEEN_DECIMALS)
+    borrow_amount = teller.borrow(MAX_UINT256, bob, False, sender=bob)
+
+    # deposit all green tokens into savings green
+    green_token.approve(savings_green, borrow_amount, sender=bob)
+    shares = savings_green.deposit(borrow_amount, bob, sender=bob)
+
+    # approve teller to spend savings green tokens
+    savings_green.approve(teller, MAX_UINT256, sender=bob)
+    
+    # repay max amount using savings green tokens
+    assert teller.repay(
+        MAX_UINT256,
+        bob,
+        True,   # _isPaymentSavingsGreen
+        False,  # _shouldRefundSavingsGreen
+        sender=bob
+    )
+
+    # verify debt is fully repaid
+    assert ledger.userDebt(bob).amount == 0
+
+    # verify all savings green tokens were used
+    assert savings_green.balanceOf(bob) == 0
+
+    # verify no regular green tokens remain with bob
+    assert green_token.balanceOf(bob) == 0
+    assert green_token.balanceOf(credit_engine) == 0
 
 

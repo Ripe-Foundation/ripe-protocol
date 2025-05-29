@@ -370,7 +370,7 @@ def getMaxBorrowAmount(_user: address) -> uint256:
 def repayForUser(
     _user: address,
     _greenAmount: uint256,
-    _wantsSavingsGreen: bool,
+    _shouldRefundSavingsGreen: bool,
     _caller: address,
     _a: addys.Addys = empty(addys.Addys),
 ) -> bool:
@@ -390,7 +390,7 @@ def repayForUser(
     repayAmount, refundAmount = self._validateOnRepay(_user, _caller, _greenAmount, userDebt.amount, a.controlRoom, a.greenToken)
     assert repayAmount != 0 # dev: cannot repay with 0 green
 
-    return self._repayDebt(_user, userDebt, d.numUserVaults, repayAmount, refundAmount, newInterest, True, _wantsSavingsGreen, RepayType.STANDARD, a)
+    return self._repayDebt(_user, userDebt, d.numUserVaults, repayAmount, refundAmount, newInterest, True, _shouldRefundSavingsGreen, RepayType.STANDARD, a)
 
 
 # repay during liquidation
@@ -545,7 +545,7 @@ def redeemCollateralFromMany(
     _redemptions: DynArray[CollateralRedemption, MAX_COLLATERAL_REDEMPTIONS],
     _greenAmount: uint256,
     _redeemer: address,
-    _wantsSavingsGreen: bool,
+    _shouldRefundSavingsGreen: bool,
     _a: addys.Addys = empty(addys.Addys),
 ) -> uint256:
     assert msg.sender == addys._getTellerAddr() # dev: only Teller allowed
@@ -567,7 +567,7 @@ def redeemCollateralFromMany(
 
     # handle leftover green
     if totalGreenRemaining != 0:
-        self._handleGreenForUser(_redeemer, totalGreenRemaining, _wantsSavingsGreen, a.greenToken, a.savingsGreen)
+        self._handleGreenForUser(_redeemer, totalGreenRemaining, _shouldRefundSavingsGreen, a.greenToken, a.savingsGreen)
 
     return totalGreenSpent
 
@@ -579,7 +579,7 @@ def redeemCollateral(
     _asset: address,
     _greenAmount: uint256,
     _redeemer: address,
-    _wantsSavingsGreen: bool,
+    _shouldRefundSavingsGreen: bool,
     _a: addys.Addys = empty(addys.Addys),
 ) -> uint256:
     assert msg.sender == addys._getTellerAddr() # dev: only Teller allowed
@@ -593,7 +593,7 @@ def redeemCollateral(
 
     # handle leftover green
     if greenAmount > greenSpent:
-        self._handleGreenForUser(_redeemer, greenAmount - greenSpent, _wantsSavingsGreen, a.greenToken, a.savingsGreen)
+        self._handleGreenForUser(_redeemer, greenAmount - greenSpent, _shouldRefundSavingsGreen, a.greenToken, a.savingsGreen)
 
     return greenSpent
 

@@ -984,7 +984,7 @@ def buyFungibleAuction(
     _asset: address,
     _greenAmount: uint256,
     _buyer: address,
-    _wantsSavingsGreen: bool,
+    _shouldRefundSavingsGreen: bool,
     _a: addys.Addys = empty(addys.Addys),
 ) -> uint256:
     assert msg.sender == addys._getTellerAddr() # dev: only teller allowed
@@ -998,7 +998,7 @@ def buyFungibleAuction(
 
     # handle leftover green
     if greenAmount > greenSpent:
-        self._handleGreenForUser(_buyer, greenAmount - greenSpent, False, _wantsSavingsGreen, a.greenToken, a.savingsGreen)
+        self._handleGreenForUser(_buyer, greenAmount - greenSpent, False, _shouldRefundSavingsGreen, a.greenToken, a.savingsGreen)
 
     return greenSpent
 
@@ -1008,7 +1008,7 @@ def buyManyFungibleAuctions(
     _purchases: DynArray[FungAuctionPurchase, MAX_AUCTIONS],
     _greenAmount: uint256,
     _buyer: address,
-    _wantsSavingsGreen: bool,
+    _shouldRefundSavingsGreen: bool,
     _a: addys.Addys = empty(addys.Addys),
 ) -> uint256:
     assert msg.sender == addys._getTellerAddr() # dev: only teller allowed
@@ -1030,7 +1030,7 @@ def buyManyFungibleAuctions(
 
     # handle leftover green
     if totalGreenRemaining != 0:
-        self._handleGreenForUser(_buyer, totalGreenRemaining, False, _wantsSavingsGreen, a.greenToken, a.savingsGreen)
+        self._handleGreenForUser(_buyer, totalGreenRemaining, False, _shouldRefundSavingsGreen, a.greenToken, a.savingsGreen)
 
     return totalGreenSpent
 

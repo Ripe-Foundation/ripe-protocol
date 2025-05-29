@@ -1168,7 +1168,7 @@ def test_ah_auction_savings_green_preferences(
     
     # Spend less than available to create leftover
     green_spent = teller.buyFungibleAuction(
-        bob, auction_log.vaultId, alpha_token, green_amount, True, sender=alice  # True = wants savings GREEN
+        bob, auction_log.vaultId, alpha_token, green_amount, False, True, sender=alice  # True = wants savings GREEN
     )
     assert green_spent != 0
     
