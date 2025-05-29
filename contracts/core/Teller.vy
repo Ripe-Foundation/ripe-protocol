@@ -18,9 +18,9 @@ from ethereum.ercs import IERC4626
 interface CreditEngine:
     def redeemCollateralFromMany(_redemptions: DynArray[CollateralRedemption, MAX_COLLATERAL_REDEMPTIONS], _greenAmount: uint256, _redeemer: address, _shouldTransferBalance: bool, _shouldRefundSavingsGreen: bool, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
     def redeemCollateral(_user: address, _vaultId: uint256, _asset: address, _greenAmount: uint256, _redeemer: address, _shouldTransferBalance: bool, _shouldRefundSavingsGreen: bool, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
+    def getMaxWithdrawableForAsset(_user: address, _vaultId: uint256, _asset: address, _vaultAddr: address = empty(address), _a: addys.Addys = empty(addys.Addys)) -> uint256: view
     def repayForUser(_user: address, _greenAmount: uint256, _shouldRefundSavingsGreen: bool, _caller: address, _a: addys.Addys = empty(addys.Addys)) -> bool: nonpayable
     def borrowForUser(_user: address, _greenAmount: uint256, _wantsSavingsGreen: bool, _caller: address, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
-    def getMaxWithdrawableForAsset(_user: address, _asset: address, _a: addys.Addys = empty(addys.Addys)) -> uint256: view
     def updateDebtForUser(_user: address, _a: addys.Addys = empty(addys.Addys)) -> bool: nonpayable
 
 interface AuctionHouse:
@@ -188,7 +188,7 @@ def _deposit(
 
     # get ledger data
     d: DepositLedgerData = staticcall Ledger(_a.ledger).getDepositLedgerData(_user, vaultId)
-    amount: uint256 = self._validateOnDeposit(_asset, _amount, _user, vaultAddr, vaultId, _depositor, d, _a.missionControl)
+    amount: uint256 = self._validateOnDeposit(_asset, _amount, _user, vaultAddr, _depositor, d, _a.missionControl)
 
     # deposit tokens
     assert extcall IERC20(_asset).transferFrom(_depositor, vaultAddr, amount, default_return_value=True) # dev: token transfer failed
@@ -215,7 +215,6 @@ def _validateOnDeposit(
     _amount: uint256,
     _user: address,
     _vaultAddr: address,
-    _vaultId: uint256,
     _depositor: address,
     _d: DepositLedgerData,
     _missionControl: address,
@@ -326,7 +325,7 @@ def _withdraw(
     vaultAddr, vaultId = self._getVaultAddrAndId(_vaultAddr, _vaultId, _a.vaultBook)
 
     # validation
-    amount: uint256 = self._validateOnWithdrawal(_asset, _amount, _user, _vaultAddr, _vaultId, _caller, _a)
+    amount: uint256 = self._validateOnWithdrawal(_asset, _amount, _user, vaultAddr, vaultId, _caller, _a)
 
     # withdraw tokens
     isDepleted: bool = False
@@ -365,7 +364,7 @@ def _validateOnWithdrawal(
         assert config.canWithdrawForUser # dev: caller not allowed to withdraw for user
 
     # max withdrawable
-    maxWithdrawable: uint256 = staticcall CreditEngine(_a.creditEngine).getMaxWithdrawableForAsset(_user, _asset, _a)
+    maxWithdrawable: uint256 = staticcall CreditEngine(_a.creditEngine).getMaxWithdrawableForAsset(_user, _vaultId, _asset, _vaultAddr, _a)
     assert maxWithdrawable != 0 # dev: cannot withdraw anything
 
     return min(_amount, maxWithdrawable)

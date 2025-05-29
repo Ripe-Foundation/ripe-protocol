@@ -186,7 +186,7 @@ def borrowForUser(
     userDebt, newInterest = self._getLatestUserDebtWithInterest(d.userDebt)
 
     # get borrow data (debt terms for user)
-    bt: UserBorrowTerms = self._getUserBorrowTerms(_user, d.numUserVaults, True, a)
+    bt: UserBorrowTerms = self._getUserBorrowTerms(_user, d.numUserVaults, True, 0, empty(address), a)
 
     # get config
     config: BorrowConfig = staticcall MissionControl(a.missionControl).getBorrowConfig(_user, _caller)
@@ -330,7 +330,7 @@ def getMaxBorrowAmount(_user: address) -> uint256:
     newBorrowAmount: uint256 = max_value(uint256)
 
     # avail debt based on collateral value / ltv
-    bt: UserBorrowTerms = self._getUserBorrowTerms(_user, d.numUserVaults, False, a)
+    bt: UserBorrowTerms = self._getUserBorrowTerms(_user, d.numUserVaults, False, 0, empty(address), a)
     availDebtPerLtv: uint256 = self._getAvailBasedOnLtv(userDebt.amount, bt.totalMaxDebt)
     if availDebtPerLtv == 0:
         return 0
@@ -456,7 +456,7 @@ def _repayDebt(
     userDebt: UserDebt = self._reduceDebtAmount(_userDebt, _repayValue)
 
     # get latest debt terms
-    bt: UserBorrowTerms = self._getUserBorrowTerms(_user, _numUserVaults, True, _a)
+    bt: UserBorrowTerms = self._getUserBorrowTerms(_user, _numUserVaults, True, 0, empty(address), _a)
     userDebt.debtTerms = bt.debtTerms
 
     # check debt health
@@ -645,7 +645,7 @@ def _redeemCollateral(
         return 0
     
     # get latest debt terms
-    bt: UserBorrowTerms = self._getUserBorrowTerms(_user, d.numUserVaults, True, _a)
+    bt: UserBorrowTerms = self._getUserBorrowTerms(_user, d.numUserVaults, True, 0, empty(address), _a)
     if bt.collateralVal == 0:
         return 0
 
@@ -741,7 +741,7 @@ def _calcAmountToPay(_debtAmount: uint256, _collateralValue: uint256, _targetLtv
 @external
 def getCollateralValue(_user: address) -> uint256:
     a: addys.Addys = addys._getAddys()
-    bt: UserBorrowTerms = self._getUserBorrowTerms(_user, staticcall Ledger(a.ledger).numUserVaults(_user), True, a)
+    bt: UserBorrowTerms = self._getUserBorrowTerms(_user, staticcall Ledger(a.ledger).numUserVaults(_user), True, 0, empty(address), a)
     return bt.collateralVal
 
 
@@ -750,10 +750,12 @@ def getCollateralValue(_user: address) -> uint256:
 def getUserBorrowTerms(
     _user: address,
     _shouldRaise: bool,
+    _skipVaultId: uint256 = 0,
+    _skipAsset: address = empty(address),
     _a: addys.Addys = empty(addys.Addys),
 ) -> UserBorrowTerms:
     a: addys.Addys = addys._getAddys(_a)
-    return self._getUserBorrowTerms(_user, staticcall Ledger(a.ledger).numUserVaults(_user), _shouldRaise, a)
+    return self._getUserBorrowTerms(_user, staticcall Ledger(a.ledger).numUserVaults(_user), _shouldRaise, _skipVaultId, _skipAsset, a)
 
 
 @view
@@ -762,6 +764,8 @@ def _getUserBorrowTerms(
     _user: address,
     _numUserVaults: uint256,
     _shouldRaise: bool,
+    _skipVaultId: uint256,
+    _skipAsset: address,
     _a: addys.Addys,
 ) -> UserBorrowTerms:
 
@@ -769,8 +773,11 @@ def _getUserBorrowTerms(
     if _numUserVaults == 0:
         return empty(UserBorrowTerms)
 
+    hasSkip: bool = (_skipVaultId != 0 and _skipAsset != empty(address))
+
     # sum vars
     bt: UserBorrowTerms = empty(UserBorrowTerms)
+    ltvSum: uint256 = 0
     redemptionThresholdSum: uint256 = 0
     liqThresholdSum: uint256 = 0
     liqFeeSum: uint256 = 0
@@ -813,6 +820,7 @@ def _getUserBorrowTerms(
                 debtTermsWeight = 1
 
             # debt terms sums -- weight is based on max debt (ltv)
+            ltvSum += debtTermsWeight * debtTerms.ltv
             redemptionThresholdSum += debtTermsWeight * debtTerms.redemptionThreshold
             liqThresholdSum += debtTermsWeight * debtTerms.liqThreshold
             liqFeeSum += debtTermsWeight * debtTerms.liqFee
@@ -821,18 +829,20 @@ def _getUserBorrowTerms(
             totalSum += debtTermsWeight
 
             # totals
-            bt.collateralVal += collateralVal
-            bt.totalMaxDebt += maxDebt
+            if not (hasSkip and asset == _skipAsset and vaultId == _skipVaultId):
+                bt.collateralVal += collateralVal
+                bt.totalMaxDebt += maxDebt
 
     # finalize debt terms (weighted)
     if totalSum != 0:
+        bt.debtTerms.ltv = ltvSum // totalSum
         bt.debtTerms.redemptionThreshold = redemptionThresholdSum // totalSum
         bt.debtTerms.liqThreshold = liqThresholdSum // totalSum
         bt.debtTerms.liqFee = liqFeeSum // totalSum
         bt.debtTerms.borrowRate = borrowRateSum // totalSum
         bt.debtTerms.daowry = daowrySum // totalSum
 
-    # finalize overall ltv
+    # overwrite ltv if collateral value is available
     if bt.collateralVal != 0:
         bt.debtTerms.ltv = bt.totalMaxDebt * HUNDRED_PERCENT // bt.collateralVal
 
@@ -875,7 +885,7 @@ def _getLatestUserDebtAndTerms(
     userDebt, newInterest = self._getLatestUserDebtWithInterest(d.userDebt)
 
     # debt terms for user
-    bt: UserBorrowTerms = self._getUserBorrowTerms(_user, d.numUserVaults, _shouldRaise, _a)
+    bt: UserBorrowTerms = self._getUserBorrowTerms(_user, d.numUserVaults, _shouldRaise, 0, empty(address), _a)
 
     return userDebt, bt, newInterest
 
@@ -1067,30 +1077,72 @@ def _handleGreenForUser(
 
 @view
 @external
-def getMaxWithdrawableForAsset(_user: address, _asset: address, _a: addys.Addys = empty(addys.Addys)) -> uint256:
+def getMaxWithdrawableForAsset(
+    _user: address,
+    _vaultId: uint256,
+    _asset: address,
+    _vaultAddr: address = empty(address),
+    _a: addys.Addys = empty(addys.Addys),
+) -> uint256:
     a: addys.Addys = addys._getAddys(_a)
 
-    # get latest user debt and terms
-    userDebt: UserDebt = empty(UserDebt)
-    bt: UserBorrowTerms = empty(UserBorrowTerms)
-    na: uint256 = 0
-    userDebt, bt, na = self._getLatestUserDebtAndTerms(_user, False, a)
+    vaultAddr: address = _vaultAddr
+    if vaultAddr == empty(address):
+        vaultAddr = staticcall VaultBook(a.vaultBook).getAddr(_vaultId)
 
+    # get latest user debt
+    d: RepayDataBundle = staticcall Ledger(a.ledger).getRepayDataBundle(_user)
+    userDebt: UserDebt = empty(UserDebt)
+    na: uint256 = 0
+    userDebt, na = self._getLatestUserDebtWithInterest(d.userDebt)
+
+    # no debt, can do max withdraw
     if userDebt.amount == 0:
         return max_value(uint256)
 
-    # calculate max transferable usd value
-    usdValueMustRemain: uint256 = max_value(uint256)
-    if bt.debtTerms.ltv != 0:
-        usdValueMustRemain = userDebt.amount * (HUNDRED_PERCENT + ONE_PERCENT) // bt.debtTerms.ltv # extra 1% buffer
-    maxTransferUsdValue: uint256 = bt.collateralVal - min(usdValueMustRemain, bt.collateralVal)
-
-    # cannot withdraw anything
-    if maxTransferUsdValue == 0:
+    # cannot withdraw if in liquidation
+    if userDebt.inLiquidation:
         return 0
 
-    # based stricly on total ltvs, not taking into consideration how much user actually has deposited
-    return staticcall PriceDesk(a.priceDesk).getAssetAmount(_asset, maxTransferUsdValue, False)
+    # get current asset value for user
+    userBalance: uint256 = staticcall Vault(vaultAddr).getTotalAmountForUser(_user, _asset)
+    userUsdValue: uint256 = staticcall PriceDesk(a.priceDesk).getUsdValue(_asset, userBalance, False)
+    if userUsdValue == 0:
+        return 0 # cannot determine value
+
+    # get the asset's debt terms
+    assetDebtTerms: DebtTerms = staticcall MissionControl(a.missionControl).getDebtTerms(_asset)
+    if assetDebtTerms.ltv == 0:
+        return max_value(uint256) # asset doesn't contribute to borrowing power
+
+    # get borrow terms excluding the asset to withdraw
+    btExcluding: UserBorrowTerms = self._getUserBorrowTerms(_user, d.numUserVaults, True, _vaultId, _asset, a)
+
+    # calculate minimum asset value that must remain
+    minAssetValueToRemain: uint256 = 0
+    
+    if btExcluding.collateralVal == 0:
+
+        # entire debt must be supported by this asset
+        minAssetValueToRemain = userDebt.amount * (HUNDRED_PERCENT + ONE_PERCENT) // assetDebtTerms.ltv
+
+    # multi-asset case: check if remaining collateral is sufficient
+    else:
+        minCollateralNeeded: uint256 = userDebt.amount * (HUNDRED_PERCENT + ONE_PERCENT) // btExcluding.debtTerms.ltv
+        if btExcluding.collateralVal >= minCollateralNeeded:
+            return max_value(uint256) # remaining collateral is sufficient
+        
+        # calculate additional value needed from this asset
+        additionalCollateralNeeded: uint256 = minCollateralNeeded - btExcluding.collateralVal
+        minAssetValueToRemain = additionalCollateralNeeded * HUNDRED_PERCENT // assetDebtTerms.ltv
+
+    # cannot withdraw if user has less than the minimum required
+    if userUsdValue <= minAssetValueToRemain:
+        return 0
+    
+    # convert to asset amount
+    maxWithdrawableValue: uint256 = userUsdValue - minAssetValueToRemain
+    return userBalance * maxWithdrawableValue // userUsdValue
 
 
 # accrue interest
