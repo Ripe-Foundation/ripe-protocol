@@ -33,6 +33,11 @@ interface MissionControl:
     def getGenAuctionParams() -> AuctionParams: view
     def getGenLiqConfig() -> GenLiqConfig: view
 
+interface StabilityPool:
+    def swapForLiquidatedCollateral(_stabAsset: address, _stabAmountToRemove: uint256, _liqAsset: address, _liqAmountSent: uint256, _recipient: address, _greenToken: address, _savingsGreenToken: address) -> uint256: nonpayable
+    def swapWithClaimableGreen(_stabAsset: address, _greenAmount: uint256, _liqAsset: address, _liqAmountSent: uint256, _greenToken: address) -> uint256: nonpayable
+    def claimableBalances(_stabAsset: address, _greenToken: address) -> uint256: view
+
 interface CreditEngine:
     def repayDuringLiquidation(_liqUser: address, _userDebt: UserDebt, _repayAmount: uint256, _newInterest: uint256, _a: addys.Addys = empty(addys.Addys)) -> bool: nonpayable
     def getLatestUserDebtAndTerms(_user: address, _shouldRaise: bool, _a: addys.Addys = empty(addys.Addys)) -> (UserDebt, UserBorrowTerms, uint256): view
@@ -45,9 +50,6 @@ interface PriceDesk:
 interface GreenToken:
     def mint(_to: address, _amount: uint256): nonpayable
     def burn(_amount: uint256): nonpayable
-
-interface StabilityPool:
-    def swapForLiquidatedCollateral(_stabAsset: address, _stabAmountToRemove: uint256, _liqAsset: address, _liqAmountSent: uint256, _recipient: address, _greenToken: address, _savingsGreenToken: address) -> uint256: nonpayable
 
 interface LootBox:
     def updateDepositPoints(_user: address, _vaultId: uint256, _vaultAddr: address, _asset: address, _a: addys.Addys = empty(addys.Addys)): nonpayable
@@ -169,8 +171,9 @@ event CollateralSwappedWithStabPool:
     collateralValueOut: uint256
     stabVaultId: uint256
     stabAsset: indexed(address)
-    stabAmountSwapped: uint256
-    stabValueSwapped: uint256
+    assetSwapped: address
+    amountSwapped: uint256
+    valueSwapped: uint256
 
 event FungibleAuctionUpdated:
     liqUser: indexed(address)
@@ -708,6 +711,13 @@ def _swapWithSpecificStabPool(
     if staticcall Vault(_stabPool.vaultAddr).isSupportedVaultAsset(_liqAsset):
         return remainingToRepay, collateralValueOut, False, False
 
+    # check for green redemptions for this stab asset
+    isPositionDepleted: bool = False
+    shouldGoToNextAsset: bool = False
+    remainingToRepay, collateralValueOut, isPositionDepleted, shouldGoToNextAsset = self._swapWithGreenRedemptions(_stabPool, _liqUser, _liqVaultId, _liqVaultAddr, _liqAsset, _liqFeeRatio, remainingToRepay, collateralValueOut, _a)
+    if remainingToRepay == 0 or isPositionDepleted or shouldGoToNextAsset:
+        return remainingToRepay, collateralValueOut, isPositionDepleted, shouldGoToNextAsset
+
     # no balance in stability pool, skip
     maxAmountInStabPool: uint256 = staticcall IERC20(_stabPool.asset).balanceOf(_stabPool.vaultAddr)
     if maxAmountInStabPool == 0:
@@ -723,8 +733,49 @@ def _swapWithSpecificStabPool(
     if _stabPool.asset in [_a.greenToken, _a.savingsGreen]:
         stabProceedsAddr = empty(address)
 
+    # swap with stability pool
+    return self._swapAssetsWithStabPool(True, _liqUser, _liqVaultId, _liqVaultAddr, _liqAsset, _liqFeeRatio, maxAmountInStabPool, maxUsdValueInStabPool, remainingToRepay, collateralValueOut, _stabPool, stabProceedsAddr, _a)
+
+
+@internal
+def _swapWithGreenRedemptions(
+    _stabPool: VaultData,
+    _liqUser: address,
+    _liqVaultId: uint256,
+    _liqVaultAddr: address,
+    _liqAsset: address,
+    _liqFeeRatio: uint256,
+    _remainingToRepay: uint256,
+    _collateralValueOut: uint256,
+    _a: addys.Addys,
+) -> (uint256, uint256, bool, bool):
+    maxClaimableGreen: uint256 = staticcall StabilityPool(_stabPool.vaultAddr).claimableBalances(_stabPool.asset, _a.greenToken)
+    if maxClaimableGreen == 0:
+        return _remainingToRepay, _collateralValueOut, False, False
+    return self._swapAssetsWithStabPool(False, _liqUser, _liqVaultId, _liqVaultAddr, _liqAsset, _liqFeeRatio, maxClaimableGreen, maxClaimableGreen, _remainingToRepay, _collateralValueOut, _stabPool, empty(address), _a)
+
+
+@internal
+def _swapAssetsWithStabPool(
+    _isNormalStabSwap: bool,
+    _liqUser: address,
+    _liqVaultId: uint256,
+    _liqVaultAddr: address,
+    _liqAsset: address,
+    _liqFeeRatio: uint256,
+    _maxAmountInStabPool: uint256,
+    _maxUsdValueInStabPool: uint256,
+    _remainingToRepay: uint256,
+    _collateralValueOut: uint256,
+    _stabPool: VaultData,
+    _stabProceedsAddr: address,
+    _a: addys.Addys,
+) -> (uint256, uint256, bool, bool):
+    remainingToRepay: uint256 = _remainingToRepay
+    collateralValueOut: uint256 = _collateralValueOut
+
     # max collateral usd value (to take from liq user)
-    maxCollateralUsdValue: uint256 = min(maxUsdValueInStabPool, remainingToRepay) * HUNDRED_PERCENT // (HUNDRED_PERCENT - _liqFeeRatio)
+    maxCollateralUsdValue: uint256 = min(_maxUsdValueInStabPool, remainingToRepay) * HUNDRED_PERCENT // (HUNDRED_PERCENT - _liqFeeRatio)
 
     # transfer collateral to stability pool
     collateralUsdValueSent: uint256 = 0
@@ -735,14 +786,25 @@ def _swapWithSpecificStabPool(
     if collateralUsdValueSent == 0 or collateralAmountSent == 0:
         return remainingToRepay, collateralValueOut, isPositionDepleted, shouldGoToNextAsset
 
-    # take stab asset amount out of stability pool
+    # calc target stab pool values
     targetStabPoolUsdValue: uint256 = collateralUsdValueSent * (HUNDRED_PERCENT - _liqFeeRatio) // HUNDRED_PERCENT
-    targetStabPoolAmount: uint256 = targetStabPoolUsdValue * maxAmountInStabPool // maxUsdValueInStabPool
-    stabPoolAmount: uint256 = extcall StabilityPool(_stabPool.vaultAddr).swapForLiquidatedCollateral(_stabPool.asset, targetStabPoolAmount, _liqAsset, collateralAmountSent, stabProceedsAddr, _a.greenToken, _a.savingsGreen)
+    targetStabPoolAmount: uint256 = targetStabPoolUsdValue * _maxAmountInStabPool // _maxUsdValueInStabPool
+
+    # take asset out of stability pool
+    stabPoolAmount: uint256 = 0
+    assetSwapped: address = empty(address)
+    if _isNormalStabSwap:
+        stabPoolAmount = extcall StabilityPool(_stabPool.vaultAddr).swapForLiquidatedCollateral(_stabPool.asset, targetStabPoolAmount, _liqAsset, collateralAmountSent, _stabProceedsAddr, _a.greenToken, _a.savingsGreen)
+        assetSwapped = _stabPool.asset
+    else:
+        stabPoolAmount = extcall StabilityPool(_stabPool.vaultAddr).swapWithClaimableGreen(_stabPool.asset, targetStabPoolAmount, _liqAsset, collateralAmountSent, _a.greenToken)
+        assetSwapped = _a.greenToken
+
+    # verify it's a fair swap
     assert self._isPaymentCloseEnough(targetStabPoolAmount, stabPoolAmount) # dev: invalid stability pool swap
 
     # update overall values
-    stabValueSwapped: uint256 = maxUsdValueInStabPool * stabPoolAmount // maxAmountInStabPool
+    stabValueSwapped: uint256 = _maxUsdValueInStabPool * stabPoolAmount // _maxAmountInStabPool
     remainingToRepay -= min(stabValueSwapped, remainingToRepay)
     collateralValueOut += collateralUsdValueSent
 
@@ -754,8 +816,9 @@ def _swapWithSpecificStabPool(
         collateralValueOut=collateralUsdValueSent,
         stabVaultId=_stabPool.vaultId,
         stabAsset=_stabPool.asset,
-        stabAmountSwapped=stabPoolAmount,
-        stabValueSwapped=stabValueSwapped,
+        assetSwapped=assetSwapped,
+        amountSwapped=stabPoolAmount,
+        valueSwapped=stabValueSwapped,
     )
     return remainingToRepay, collateralValueOut, isPositionDepleted, shouldGoToNextAsset
 

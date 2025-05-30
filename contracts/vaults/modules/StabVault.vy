@@ -395,6 +395,37 @@ def swapForLiquidatedCollateral(
     return amount
 
 
+@external
+def swapWithClaimableGreen(
+    _stabAsset: address,
+    _greenAmount: uint256,
+    _liqAsset: address,
+    _liqAmountSent: uint256,
+    _greenToken: address,
+) -> uint256:
+    assert not vaultData.isPaused # dev: contract paused
+    assert msg.sender == addys._getAuctionHouseAddr() # dev: only AuctionHouse allowed
+
+    assert vaultData.indexOfAsset[_stabAsset] != 0 # dev: stab asset not supported
+    assert vaultData.indexOfAsset[_liqAsset] == 0 # dev: liq asset cannot be vault asset
+    assert _liqAsset != empty(address) # dev: invalid liq asset
+
+    # add claimable balance
+    self._addClaimableBalance(_stabAsset, _liqAsset, _liqAmountSent)
+
+    # finalize amount
+    maxClaimableGreen: uint256 = self.claimableBalances[_stabAsset][_greenToken]
+    greenAvailable: uint256 = min(maxClaimableGreen, staticcall IERC20(_greenToken).balanceOf(self))
+    amount: uint256 = min(_greenAmount, greenAvailable)
+    assert amount != 0 # dev: no green
+
+    # reduce green from claimable, and burn
+    self._reduceClaimableBalances(_stabAsset, _greenToken, amount, maxClaimableGreen)
+    assert extcall GreenToken(_greenToken).burn(amount) # dev: burn failed
+
+    return amount
+
+
 # utilities
 
 

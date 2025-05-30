@@ -87,7 +87,7 @@ def verifyStabPoolLiqResults(
     """Helper function to verify liquidation results"""
     
     # Calculate expected debt based on actual liquidation mechanics
-    actual_repay_amount = _log.stabValueSwapped
+    actual_repay_amount = _log.valueSwapped
     actual_collateral_taken = _log.collateralValueOut
     liq_fees_paid = actual_collateral_taken - actual_repay_amount
     unpaid_liq_fees = max(0, _exp_liq_fees - liq_fees_paid)
@@ -346,11 +346,11 @@ def test_ah_liquidation_stab_pool_swap(
     assert log.collateralValueOut == target_collateral_val
     assert log.stabVaultId == stab_id
     assert log.stabAsset == green_token.address  # fixture uses green_token for stab pool
-    _test(target_repay_amount, log.stabAmountSwapped)
-    _test(target_repay_amount, log.stabValueSwapped)
+    _test(target_repay_amount, log.amountSwapped)
+    _test(target_repay_amount, log.valueSwapped)
 
     # funds
-    assert green_token.balanceOf(stability_pool) == stab_deposit_amount - log.stabAmountSwapped
+    assert green_token.balanceOf(stability_pool) == stab_deposit_amount - log.amountSwapped
     assert green_token.balanceOf(endaoment) == 0 # green burned
     assert alpha_token.balanceOf(stability_pool) == log.collateralAmountOut
 
@@ -422,7 +422,7 @@ def test_ah_liquidation_stab_pool_various_scenarios(
     assert log.liqUser == bob
     assert log.stabVaultId == stab_id
     assert log.stabAsset == green_token.address
-    _test(target_repay_amount, log.stabValueSwapped)
+    _test(target_repay_amount, log.valueSwapped)
 
     # Get post-liquidation state
     user_debt, bt, _ = credit_engine.getLatestUserDebtAndTerms(bob, False)
@@ -536,11 +536,11 @@ def test_ah_liquidation_multiple_stab_assets_same_pool(
     
     # First swap should consume ALL green tokens since green_deposit < target_repay_amount
     assert green_deposit < target_repay_amount
-    _test(green_deposit, first_log.stabValueSwapped)
+    _test(green_deposit, first_log.valueSwapped)
     
     # Verify green tokens were burned (not sent to endaoment)
     assert green_token.balanceOf(endaoment) == 0
-    assert green_token.balanceOf(stability_pool) == green_deposit - first_log.stabAmountSwapped
+    assert green_token.balanceOf(stability_pool) == green_deposit - first_log.amountSwapped
 
     # Since target repay amount > green pool liquidity, we should definitely have a second swap
     remaining_to_repay = target_repay_amount - green_deposit
@@ -551,17 +551,17 @@ def test_ah_liquidation_multiple_stab_assets_same_pool(
     assert second_log.stabVaultId == stab_pool_id
     
     # Verify bravo tokens went to endaoment (non-green asset)
-    assert bravo_token.balanceOf(endaoment) == second_log.stabAmountSwapped
-    assert bravo_token.balanceOf(stability_pool) == bravo_deposit - second_log.stabAmountSwapped
+    assert bravo_token.balanceOf(endaoment) == second_log.amountSwapped
+    assert bravo_token.balanceOf(stability_pool) == bravo_deposit - second_log.amountSwapped
     
     # Verify the second swap covers the remaining amount
-    _test(remaining_to_repay, second_log.stabValueSwapped)
+    _test(remaining_to_repay, second_log.valueSwapped)
     
     # Verify total liquidation results
     user_debt, bt, _ = credit_engine.getLatestUserDebtAndTerms(bob, False)
     
     # Calculate total swapped value
-    total_swapped = sum(log.stabValueSwapped for log in logs)
+    total_swapped = sum(log.valueSwapped for log in logs)
     total_collateral_taken = sum(log.collateralValueOut for log in logs)
     
     # Verify liquidation math
@@ -625,10 +625,10 @@ def test_ah_liquidation_insufficient_stab_pool_liquidity(
     log = logs[0]
     
     # Verify swap was limited by available liquidity (should consume all remaining tokens)
-    _test(remaining_balance, log.stabValueSwapped)
+    _test(remaining_balance, log.valueSwapped)
        
     # Since insufficient liquidity, swap should be less than target repay amount
-    assert log.stabValueSwapped < target_repay_amount
+    assert log.valueSwapped < target_repay_amount
     
     # Verify final state - user should still be in liquidation
     user_debt, bt, _ = credit_engine.getLatestUserDebtAndTerms(bob, False)
@@ -638,7 +638,7 @@ def test_ah_liquidation_insufficient_stab_pool_liquidity(
     
     # Verify the partial liquidation math
     exp_liq_fees = debt_amount * liq_fee // HUNDRED_PERCENT
-    actual_repay = log.stabValueSwapped
+    actual_repay = log.valueSwapped
     actual_collateral_taken = log.collateralValueOut
     liq_fees_paid = actual_collateral_taken - actual_repay
     unpaid_liq_fees = max(0, exp_liq_fees - liq_fees_paid)
@@ -774,7 +774,7 @@ def test_ah_liquidation_multiple_collateral_assets(
     assert charlie_log.asset == charlie_token.address
     
     # Calculate total liquidated value (excluding charlie which goes to auction)
-    total_liquidated_value = alpha_log.stabValueSwapped + bravo_log.usdValue
+    total_liquidated_value = alpha_log.valueSwapped + bravo_log.usdValue
     
     # Verify final state
     user_debt, bt, _ = credit_engine.getLatestUserDebtAndTerms(bob, False)
@@ -1521,7 +1521,7 @@ def test_ah_liquidation_shared_stability_pool_depletion(
     # VERIFY DEPLETION IMPACT
     
     # Total stability pool usage should be limited by available liquidity
-    total_stab_value_used = sum(log.stabValueSwapped for log in first_stab_logs)
+    total_stab_value_used = sum(log.valueSwapped for log in first_stab_logs)
     assert total_stab_value_used <= initial_pool_balance, "Can't use more than pool had"
     
     # Pool should be significantly depleted (we know swaps occurred)
