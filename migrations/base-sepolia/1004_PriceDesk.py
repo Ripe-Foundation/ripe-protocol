@@ -1,0 +1,87 @@
+from scripts.utils import log
+from scripts.utils.migration import Migration
+from tests.constants import EIGHTEEN_DECIMALS
+
+
+def migrate(migration: Migration):
+    deployer = migration.account()
+    blueprint = migration.blueprint()
+    hq = migration.get_contract("RipeHq")
+
+    log.h1("Deploying Price Desk")
+
+    price_desk = migration.deploy(
+        "PriceDesk",
+        hq,
+        blueprint.ADDYS["ETH"],
+        blueprint.PARAMS["PRICE_DESK_MIN_REG_TIMELOCK"],
+        blueprint.PARAMS["PRICE_DESK_MAX_REG_TIMELOCK"],
+    )
+
+    # Set up chainlink feeds
+
+    mock_usdc_feed = migration.deploy(
+        "MockChainlinkFeed",
+        1*EIGHTEEN_DECIMALS,
+        deployer,
+        label="MockUsdcFeed",
+    )
+    mock_btc_feed = migration.deploy(
+        "MockChainlinkFeed",
+        100_000*EIGHTEEN_DECIMALS,
+        deployer,
+        label="MockBtcFeed",
+    )
+    mock_weth_feed = migration.deploy(
+        "MockChainlinkFeed",
+        2_500*EIGHTEEN_DECIMALS,
+        deployer,
+        label="MockEthFeed",
+    )
+
+    # Deploy chainlink
+
+    chainlink = migration.deploy(
+        "Chainlink",
+        hq,
+        blueprint.PARAMS["PRICE_DESK_MIN_REG_TIMELOCK"],
+        blueprint.PARAMS["PRICE_DESK_MAX_REG_TIMELOCK"],
+        blueprint.ADDYS["WETH"],
+        blueprint.ADDYS["ETH"],
+        blueprint.ADDYS["BTC"],
+        mock_weth_feed.address,
+        mock_btc_feed.address,
+    )
+
+    migration.execute(chainlink.addNewPriceFeed, blueprint.ADDYS["USDC"], mock_usdc_feed.address)
+    migration.execute(chainlink.confirmNewPriceFeed, blueprint.ADDYS["USDC"])
+
+    migration.execute(chainlink.addNewPriceFeed, blueprint.ADDYS["CBBTC"], mock_btc_feed.address)
+    migration.execute(chainlink.confirmNewPriceFeed, blueprint.ADDYS["CBBTC"])
+
+    migration.execute(chainlink.setActionTimeLockAfterSetup)
+
+    migration.execute(price_desk.startAddNewAddressToRegistry, chainlink, "Chainlink")
+    migration.execute(price_desk.confirmNewAddressToRegistry, chainlink)
+
+    # Set up Mock Price Source
+
+    mock_price_source = migration.deploy(
+        "MockPriceSource",
+        hq,
+        blueprint.PARAMS["PRICE_DESK_MIN_REG_TIMELOCK"],
+        blueprint.PARAMS["PRICE_DESK_MAX_REG_TIMELOCK"],
+    )
+
+    migration.execute(mock_price_source.setPrice, migration.get_address("GreenToken"), EIGHTEEN_DECIMALS)
+    migration.execute(mock_price_source.setPrice, migration.get_address("SavingsGreen"), EIGHTEEN_DECIMALS)
+    migration.execute(mock_price_source.setPrice, migration.get_address("RipeToken"), EIGHTEEN_DECIMALS // 10)
+
+    migration.execute(price_desk.startAddNewAddressToRegistry, mock_price_source, "Mock Price Source")
+    migration.execute(price_desk.confirmNewAddressToRegistry, mock_price_source)
+
+    # finish registry setup
+    migration.execute(price_desk.setRegistryTimeLockAfterSetup)
+
+    migration.execute(hq.startAddNewAddressToRegistry, price_desk, "Price Desk")
+    migration.execute(hq.confirmNewAddressToRegistry, price_desk)

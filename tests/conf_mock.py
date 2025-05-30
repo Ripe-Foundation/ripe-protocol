@@ -143,19 +143,21 @@ def mock_price_source(ripe_hq_deploy, fork):
 
 
 @pytest.fixture(scope="session")
-def mock_chainlink_feed_one():
+def mock_chainlink_feed_one(governance):
     return boa.load(
         "contracts/mock/MockChainlinkFeed.vy",
-        EIGHTEEN_DECIMALS, # $1
+        EIGHTEEN_DECIMALS,  # $1
+        governance,
         name="mock_chainlink_feed_one",
     )
 
 
 @pytest.fixture(scope="session")
-def mock_chainlink_feed_two():
+def mock_chainlink_feed_two(governance):
     return boa.load(
         "contracts/mock/MockChainlinkFeed.vy",
-        EIGHTEEN_DECIMALS, # $1
+        EIGHTEEN_DECIMALS,  # $1
+        governance,
         name="mock_chainlink_feed_two",
     )
 
@@ -180,7 +182,7 @@ def mock_registry(ripe_hq_deploy, fork):
     return boa.load(
         "contracts/mock/MockRegistry.vy",
         ripe_hq_deploy,
-        PARAMS[fork]["MIN_HQ_CHANGE_TIMELOCK"], # initial time lock
+        PARAMS[fork]["MIN_HQ_CHANGE_TIMELOCK"],  # initial time lock
         PARAMS[fork]["MIN_HQ_CHANGE_TIMELOCK"],
         PARAMS[fork]["MAX_HQ_CHANGE_TIMELOCK"],
         name="mock_registry",
@@ -195,4 +197,3 @@ def mock_dept_can_mint_green(ripe_hq_deploy):
 @pytest.fixture(scope="session")
 def mock_dept_can_mint_ripe(ripe_hq_deploy):
     return boa.load("contracts/mock/MockDepartment.vy", ripe_hq_deploy, False, True, name="mock_dept_can_mint_ripe")
-    
