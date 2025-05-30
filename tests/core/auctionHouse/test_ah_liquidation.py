@@ -21,7 +21,7 @@ def setupStabPoolLiquidation(
     createDebtTerms,
     stability_pool,
     vault_book,
-    mission_control,
+    mission_control_gov,
     governance,
     sally,
 ):
@@ -50,7 +50,7 @@ def setupStabPoolLiquidation(
         stab_debt_terms = createDebtTerms(0, 0, 0, 0, 0, 0)
         setAssetConfig(green_token, _debtTerms=stab_debt_terms, _shouldBurnAsPayment=True)
         stab_id = vault_book.getRegId(stability_pool)
-        mission_control.setPriorityStabVaults([(stab_id, green_token)], sender=governance.address)
+        mission_control_gov.setPriorityStabVaults([(stab_id, green_token)], sender=governance.address)
 
         # stab pool deposit (ensure enough liquidity)
         mock_price_source.setPrice(green_token, 1 * EIGHTEEN_DECIMALS)
@@ -455,7 +455,7 @@ def test_ah_liquidation_multiple_stab_assets_same_pool(
     alice,
     stability_pool,
     vault_book,
-    mission_control,
+    mission_control_gov,
     governance,
     endaoment,
     _test,
@@ -485,7 +485,7 @@ def test_ah_liquidation_multiple_stab_assets_same_pool(
     stab_pool_id = vault_book.getRegId(stability_pool)
     
     # Set priority: green_token first, then bravo_token
-    mission_control.setPriorityStabVaults([
+    mission_control_gov.setPriorityStabVaults([
         (stab_pool_id, green_token),      # Priority 1 - will be exhausted
         (stab_pool_id, bravo_token),      # Priority 2 - will handle remainder
     ], sender=governance.address)
@@ -668,7 +668,7 @@ def test_ah_liquidation_multiple_collateral_assets(
     sally,
     stability_pool,
     vault_book,
-    mission_control,
+    mission_control_gov,
     governance,
     _test,
 ):
@@ -714,7 +714,7 @@ def test_ah_liquidation_multiple_collateral_assets(
     stab_debt_terms = createDebtTerms(0, 0, 0, 0, 0, 0)
     setAssetConfig(green_token, _debtTerms=stab_debt_terms)
     stab_id = vault_book.getRegId(stability_pool)
-    mission_control.setPriorityStabVaults([(stab_id, green_token)], sender=governance.address)
+    mission_control_gov.setPriorityStabVaults([(stab_id, green_token)], sender=governance.address)
 
     # Setup prices
     mock_price_source.setPrice(alpha_token, 1 * EIGHTEEN_DECIMALS)
@@ -811,7 +811,7 @@ def test_ah_liquidation_priority_asset_order(
     credit_engine,
     sally,
     vault_book,
-    mission_control,
+    mission_control_gov,
     governance,
     endaoment,
     _test,
@@ -855,7 +855,7 @@ def test_ah_liquidation_priority_asset_order(
     # Set priority liquidation assets in DIFFERENT order than deposit order
     # Priority: charlie first, then alpha (bravo will be natural order last)
     vault_id = vault_book.getRegId(simple_erc20_vault)
-    mission_control.setPriorityLiqAssetVaults([
+    mission_control_gov.setPriorityLiqAssetVaults([
         (vault_id, charlie_token),  # Priority 1: charlie (deposited 3rd)
         (vault_id, alpha_token),      # Priority 2: alpha (deposited 1st)
         # bravo not in priority list, so it goes in natural order (last)
@@ -1028,7 +1028,7 @@ def test_ah_liquidation_phase_1_liq_user_in_stability_pool(
     sally,
     stability_pool,
     vault_book,
-    mission_control,
+    mission_control_gov,
     governance,
     _test,
 ):
@@ -1061,7 +1061,7 @@ def test_ah_liquidation_phase_1_liq_user_in_stability_pool(
     
     # Configure priority stability pools
     stab_pool_id = vault_book.getRegId(stability_pool)
-    mission_control.setPriorityStabVaults([
+    mission_control_gov.setPriorityStabVaults([
         (stab_pool_id, green_token),   # Priority 1
         (stab_pool_id, bravo_token),   # Priority 2
     ], sender=governance.address)
@@ -1180,7 +1180,7 @@ def test_ah_liquidation_caching_single_user_all_phases(
     sally,
     stability_pool,
     vault_book,
-    mission_control,
+    mission_control_gov,
     governance,
     endaoment,
     _test,
@@ -1236,14 +1236,14 @@ def test_ah_liquidation_caching_single_user_all_phases(
     
     # Configure Phase 1: Priority stability pools
     stab_pool_id = vault_book.getRegId(stability_pool)
-    mission_control.setPriorityStabVaults([
+    mission_control_gov.setPriorityStabVaults([
         (stab_pool_id, green_token),
     ], sender=governance.address)
     
     # Configure Phase 2: Priority liquidation assets (alpha only)
     # Use the simple_erc20_vault for priority assets since alpha/bravo/charlie are in that vault
     simple_vault_id = vault_book.getRegId(stability_pool)  # This will be different from stab pool
-    mission_control.setPriorityLiqAssetVaults([
+    mission_control_gov.setPriorityLiqAssetVaults([
         (simple_vault_id, alpha_token),  # Only alpha in priority list
         # bravo and charlie will be handled in Phase 3
     ], sender=governance.address)
@@ -1902,7 +1902,7 @@ def test_ah_liquidation_special_stab_pool(
     sally,
     stability_pool,
     vault_book,
-    mission_control,
+    mission_control_gov,
     governance,
     ripe_hq,
 ):
@@ -1944,7 +1944,7 @@ def test_ah_liquidation_special_stab_pool(
 
     # Setup general stability pools (should be ignored due to special pool)
     normal_stab_id = vault_book.getRegId(stability_pool)
-    mission_control.setPriorityStabVaults([
+    mission_control_gov.setPriorityStabVaults([
         (normal_stab_id, green_token),  # This should be ignored
     ], sender=governance.address)
 

@@ -38,6 +38,7 @@ def ripe_hq(
     auction_house_nft,
     bond_room,
     mission_control,
+    mission_control_gov,
     credit_engine,
     endaoment,
     ledger,
@@ -80,42 +81,46 @@ def ripe_hq(
     assert ripe_hq_deploy.confirmNewAddressToRegistry(mission_control, sender=deploy3r) == 9
 
     # 10
-    assert ripe_hq_deploy.startAddNewAddressToRegistry(credit_engine, "Credit Engine", sender=deploy3r)
-    assert ripe_hq_deploy.confirmNewAddressToRegistry(credit_engine, sender=deploy3r) == 10
+    assert ripe_hq_deploy.startAddNewAddressToRegistry(mission_control_gov, "Mission Control Gov", sender=deploy3r)
+    assert ripe_hq_deploy.confirmNewAddressToRegistry(mission_control_gov, sender=deploy3r) == 10
 
     # 11
-    assert ripe_hq_deploy.startAddNewAddressToRegistry(endaoment, "Endaoment", sender=deploy3r)
-    assert ripe_hq_deploy.confirmNewAddressToRegistry(endaoment, sender=deploy3r) == 11
+    assert ripe_hq_deploy.startAddNewAddressToRegistry(credit_engine, "Credit Engine", sender=deploy3r)
+    assert ripe_hq_deploy.confirmNewAddressToRegistry(credit_engine, sender=deploy3r) == 11
 
     # 12
-    assert ripe_hq_deploy.startAddNewAddressToRegistry(ledger, "Ledger", sender=deploy3r)
-    assert ripe_hq_deploy.confirmNewAddressToRegistry(ledger, sender=deploy3r) == 12
+    assert ripe_hq_deploy.startAddNewAddressToRegistry(endaoment, "Endaoment", sender=deploy3r)
+    assert ripe_hq_deploy.confirmNewAddressToRegistry(endaoment, sender=deploy3r) == 12
 
     # 13
-    assert ripe_hq_deploy.startAddNewAddressToRegistry(lootbox, "Lootbox", sender=deploy3r)
-    assert ripe_hq_deploy.confirmNewAddressToRegistry(lootbox, sender=deploy3r) == 13
+    assert ripe_hq_deploy.startAddNewAddressToRegistry(ledger, "Ledger", sender=deploy3r)
+    assert ripe_hq_deploy.confirmNewAddressToRegistry(ledger, sender=deploy3r) == 13
 
     # 14
+    assert ripe_hq_deploy.startAddNewAddressToRegistry(lootbox, "Lootbox", sender=deploy3r)
+    assert ripe_hq_deploy.confirmNewAddressToRegistry(lootbox, sender=deploy3r) == 14
+
+    # 15
     assert ripe_hq_deploy.startAddNewAddressToRegistry(teller, "Teller", sender=deploy3r)
-    assert ripe_hq_deploy.confirmNewAddressToRegistry(teller, sender=deploy3r) == 14
+    assert ripe_hq_deploy.confirmNewAddressToRegistry(teller, sender=deploy3r) == 15
 
     # set minting / blacklist capabilities
 
     # auction house can mint green
-    ripe_hq_deploy.initiateHqConfigChange(6, True, False, False, sender=deploy3r)
+    ripe_hq_deploy.initiateHqConfigChange(6, True, False, False, False, sender=deploy3r)
     assert ripe_hq_deploy.confirmHqConfigChange(6, sender=deploy3r)
 
     # credit engine can mint green
-    ripe_hq_deploy.initiateHqConfigChange(10, True, False, False, sender=deploy3r)
-    assert ripe_hq_deploy.confirmHqConfigChange(10, sender=deploy3r)
+    ripe_hq_deploy.initiateHqConfigChange(11, True, False, False, False, sender=deploy3r)
+    assert ripe_hq_deploy.confirmHqConfigChange(11, sender=deploy3r)
 
     # lootbox can mint ripe
-    ripe_hq_deploy.initiateHqConfigChange(13, False, True, False, sender=deploy3r)
-    assert ripe_hq_deploy.confirmHqConfigChange(13, sender=deploy3r)
+    ripe_hq_deploy.initiateHqConfigChange(14, False, True, False, False, sender=deploy3r)
+    assert ripe_hq_deploy.confirmHqConfigChange(14, sender=deploy3r)
 
-    # mission control can set token blacklists
-    ripe_hq_deploy.initiateHqConfigChange(9, False, False, True, sender=deploy3r)
-    assert ripe_hq_deploy.confirmHqConfigChange(9, sender=deploy3r)
+    # mission control gov can set token blacklists and modify mission control
+    ripe_hq_deploy.initiateHqConfigChange(10, False, False, True, True, sender=deploy3r)
+    assert ripe_hq_deploy.confirmHqConfigChange(10, sender=deploy3r)
 
     # finish ripe hq setup
     assert ripe_hq_deploy.setRegistryTimeLockAfterSetup(sender=deploy3r)
@@ -217,23 +222,25 @@ def bond_room(ripe_hq_deploy):
 
 
 @pytest.fixture(scope="session")
-def mission_control(ripe_hq_deploy, mission_control_data, fork):
+def mission_control(ripe_hq_deploy):
     return boa.load(
         "contracts/core/MissionControl.vy",
         ripe_hq_deploy,
-        mission_control_data,
-        PARAMS[fork]["PRICE_DESK_MIN_STALE_TIME"],
-        PARAMS[fork]["PRICE_DESK_MAX_STALE_TIME"],
         name="mission_control",
     )
 
 
+# mission control gov
+
+
 @pytest.fixture(scope="session")
-def mission_control_data(ripe_hq_deploy):
+def mission_control_gov(ripe_hq_deploy, fork):
     return boa.load(
-        "contracts/core/MissionControlData.vy",
+        "contracts/core/MissionControlGov.vy",
         ripe_hq_deploy,
-        name="mission_control_data",
+        PARAMS[fork]["PRICE_DESK_MIN_STALE_TIME"],
+        PARAMS[fork]["PRICE_DESK_MAX_STALE_TIME"],
+        name="mission_control_gov",
     )
 
 

@@ -648,9 +648,7 @@ def test_chainlink_governance_edge_cases(
     mock_chainlink_alpha,
     mock_chainlink_bravo,
     governance,
-    bob,
-    alice,
-    mission_control,
+    mission_control_gov,
 ):
     # Test multiple governance actions in sequence
     assert mock_chainlink.addNewPriceFeed(alpha_token, mock_chainlink_alpha, sender=governance.address)
@@ -663,7 +661,7 @@ def test_chainlink_governance_edge_cases(
     assert mock_chainlink.confirmPriceFeedUpdate(alpha_token, sender=governance.address)
 
     # Test governance actions during pause (using MissionControl address)
-    mock_chainlink.pause(True, sender=mission_control.address)
+    mock_chainlink.pause(True, sender=mission_control_gov.address)
     with boa.reverts("contract paused"):
         mock_chainlink.addNewPriceFeed(alpha_token, mock_chainlink_alpha, sender=governance.address)
     with boa.reverts("contract paused"):
@@ -672,7 +670,7 @@ def test_chainlink_governance_edge_cases(
         mock_chainlink.disablePriceFeed(alpha_token, sender=governance.address)
 
     # Test governance actions after pause
-    mock_chainlink.pause(False, sender=mission_control.address)
+    mock_chainlink.pause(False, sender=mission_control_gov.address)
     # First disable the existing feed
     assert mock_chainlink.disablePriceFeed(alpha_token, sender=governance.address)
     boa.env.time_travel(blocks=mock_chainlink.actionTimeLock() + 1)
@@ -710,6 +708,7 @@ def test_chainlink_price_feed_timestamp_validation(
     alpha_token,
     mock_chainlink_alpha,
     governance,
+    mission_control_gov,
     mission_control,
 ):
     """Test validation of price feed timestamps"""
@@ -722,7 +721,7 @@ def test_chainlink_price_feed_timestamp_validation(
         mock_chainlink.addNewPriceFeed(alpha_token, mock_chainlink_alpha, sender=governance.address)
 
     # set stale time to 1 day
-    mission_control.setStaleTime(ONE_DAY_IN_SECS, sender=governance.address)
+    mission_control_gov.setStaleTime(ONE_DAY_IN_SECS, sender=governance.address)
     assert mission_control.getPriceStaleTime() == ONE_DAY_IN_SECS
 
     # Test with old timestamp

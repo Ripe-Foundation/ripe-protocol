@@ -8,7 +8,7 @@ def test_shares_vault_deposit_validation(
     rebase_erc20_vault,
     alpha_token,
     alpha_token_whale,
-    mission_control,
+    mission_control_gov,
     bob,
     teller,
 ):
@@ -24,10 +24,10 @@ def test_shares_vault_deposit_validation(
         rebase_erc20_vault.depositTokensInVault(bob, alpha_token, 0, sender=teller.address)
 
     # Test deposit when paused
-    rebase_erc20_vault.pause(True, sender=mission_control.address)
+    rebase_erc20_vault.pause(True, sender=mission_control_gov.address)
     with boa.reverts("contract paused"):
         rebase_erc20_vault.depositTokensInVault(bob, alpha_token, 100, sender=teller.address)
-    rebase_erc20_vault.pause(False, sender=mission_control.address)
+    rebase_erc20_vault.pause(False, sender=mission_control_gov.address)
 
     # Test deposit with amount larger than balance
     large_amount = 1000000 * EIGHTEEN_DECIMALS
