@@ -19,7 +19,11 @@ from interfaces import Department
 interface MissionControl:
     def setAssetConfig(_asset: address, _assetConfig: AssetConfig): nonpayable
     def assetConfig(_asset: address) -> AssetConfig: view
+    def isSupportedAsset(_asset: address) -> bool: view
     def canDisable(_user: address) -> bool: view
+
+interface Whitelist:
+    def isUserAllowed(_user: address, _asset: address) -> bool: view
 
 interface VaultBook:
     def isValidRegId(_regId: uint256) -> bool: view
@@ -72,6 +76,27 @@ event AssetLiqConfigSet:
     auctionMaxDiscount: uint256
     auctionDelay: uint256
     auctionDuration: uint256
+
+event AssetDepositParamsSet:
+    asset: indexed(address)
+    numVaultIds: uint256
+    stakersPointsAlloc: uint256
+    voterPointsAlloc: uint256
+    perUserDepositLimit: uint256
+    globalDepositLimit: uint256
+
+event AssetDebtTermsSet:
+    asset: indexed(address)
+    ltv: uint256
+    redemptionThreshold: uint256
+    liqThreshold: uint256
+    liqFee: uint256
+    borrowRate: uint256
+    daowry: uint256
+
+event WhitelistAssetSet:
+    asset: indexed(address)
+    whitelist: indexed(address)
 
 event CanDepositAssetSet:
     asset: indexed(address)
@@ -162,8 +187,21 @@ def setAssetConfig(
     # TODO: add time lock, validation
 
     assert _asset != empty(address) # dev: invalid asset
-    assert self._isValidAssetLiqConfig(_asset, _shouldBurnAsPayment, _shouldTransferToEndaoment, _shouldSwapInStabPools, _shouldAuctionInstantly, _specialStabPoolId, _customAuctionParams, _isNft, _whitelist, _debtTerms.ltv) # dev: invalid asset liq config
-    assert self._isValidRedeemCollateralConfig(_asset, _canRedeemCollateral, _isNft, _debtTerms.ltv, _shouldTransferToEndaoment) # dev: invalid redeem collateral config
+
+    debtTerms: DebtTerms = empty(DebtTerms)
+    if _debtTerms.ltv != 0:
+        assert self._isValidDebtTerms(_debtTerms) # dev: invalid debt terms
+        debtTerms = _debtTerms
+
+    assert self._isValidAssetDepositParams(_asset, _vaultIds, _stakersPointsAlloc, _voterPointsAlloc, _perUserDepositLimit, _globalDepositLimit) # dev: invalid asset deposit params
+    assert self._isValidAssetLiqConfig(_asset, _shouldBurnAsPayment, _shouldTransferToEndaoment, _shouldSwapInStabPools, _shouldAuctionInstantly, _specialStabPoolId, _isNft, _whitelist, debtTerms.ltv) # dev: invalid asset liq config
+    assert self._isValidRedeemCollateralConfig(_asset, _canRedeemCollateral, _isNft, debtTerms.ltv, _shouldTransferToEndaoment) # dev: invalid redeem collateral config
+    assert self._isValidWhitelist(_whitelist) # dev: invalid whitelist
+
+    customAuctionParams: AuctionParams = empty(AuctionParams)
+    if _customAuctionParams.hasParams:
+        assert self._areValidAuctionParams(_customAuctionParams) # dev: invalid auction params
+        customAuctionParams = _customAuctionParams
 
     mc: address = addys._getMissionControlAddr()
     assetConfig: AssetConfig = AssetConfig(
@@ -172,7 +210,7 @@ def setAssetConfig(
         voterPointsAlloc=_voterPointsAlloc,
         perUserDepositLimit=_perUserDepositLimit,
         globalDepositLimit=_globalDepositLimit,
-        debtTerms=_debtTerms,
+        debtTerms=debtTerms,
         shouldBurnAsPayment=_shouldBurnAsPayment,
         shouldTransferToEndaoment=_shouldTransferToEndaoment,
         shouldSwapInStabPools=_shouldSwapInStabPools,
@@ -184,11 +222,73 @@ def setAssetConfig(
         canBuyInAuction=_canBuyInAuction,
         canClaimInStabPool=_canClaimInStabPool,
         specialStabPoolId=_specialStabPoolId,
-        customAuctionParams=_customAuctionParams,
+        customAuctionParams=customAuctionParams,
         whitelist=_whitelist,
         isNft=_isNft,
     )
     extcall MissionControl(mc).setAssetConfig(_asset, assetConfig)
+    return True
+
+
+# asset deposit params
+
+
+@external
+def setAssetDepositParams(
+    _asset: address,
+    _vaultIds: DynArray[uint256, MAX_VAULTS_PER_ASSET],
+    _stakersPointsAlloc: uint256,
+    _voterPointsAlloc: uint256,
+    _perUserDepositLimit: uint256,
+    _globalDepositLimit: uint256,
+) -> bool:
+    assert gov._canGovern(msg.sender) # dev: no perms
+    assert not deptBasics.isPaused # dev: contract paused
+
+    # TODO: add time lock
+
+    mc: address = addys._getMissionControlAddr()
+    assert staticcall MissionControl(mc).isSupportedAsset(_asset) # dev: invalid asset
+    assert self._isValidAssetDepositParams(_asset, _vaultIds, _stakersPointsAlloc, _voterPointsAlloc, _perUserDepositLimit, _globalDepositLimit) # dev: invalid asset deposit params
+    assetConfig: AssetConfig = staticcall MissionControl(mc).assetConfig(_asset)
+    assetConfig.vaultIds = _vaultIds
+    assetConfig.stakersPointsAlloc = _stakersPointsAlloc
+    assetConfig.voterPointsAlloc = _voterPointsAlloc
+    assetConfig.perUserDepositLimit = _perUserDepositLimit
+    assetConfig.globalDepositLimit = _globalDepositLimit
+    extcall MissionControl(mc).setAssetConfig(_asset, assetConfig)
+
+    log AssetDepositParamsSet(
+        asset=_asset,
+        numVaultIds=len(_vaultIds),
+        stakersPointsAlloc=_stakersPointsAlloc,
+        voterPointsAlloc=_voterPointsAlloc,
+        perUserDepositLimit=_perUserDepositLimit,
+        globalDepositLimit=_globalDepositLimit,
+    )
+    return True
+
+
+@view
+@internal
+def _isValidAssetDepositParams(
+    _asset: address,
+    _vaultIds: DynArray[uint256, MAX_VAULTS_PER_ASSET],
+    _stakersPointsAlloc: uint256,
+    _voterPointsAlloc: uint256,
+    _perUserDepositLimit: uint256,
+    _globalDepositLimit: uint256,
+) -> bool:
+    vaultBook: address = addys._getVaultBookAddr()
+    if 0 in [_perUserDepositLimit, _globalDepositLimit]:
+        return False
+    if max_value(uint256) in [_perUserDepositLimit, _globalDepositLimit, _stakersPointsAlloc, _voterPointsAlloc]:
+        return False
+    if _perUserDepositLimit > _globalDepositLimit:
+        return False
+    for vaultId: uint256 in _vaultIds:
+        if not staticcall VaultBook(vaultBook).isValidRegId(vaultId):
+            return False
     return True
 
 
@@ -210,15 +310,21 @@ def setAssetLiqConfig(
 
     # TODO: add time lock
 
+    customAuctionParams: AuctionParams = empty(AuctionParams)
+    if _customAuctionParams.hasParams:
+        assert self._areValidAuctionParams(_customAuctionParams) # dev: invalid auction params
+        customAuctionParams = _customAuctionParams
+
     mc: address = addys._getMissionControlAddr()
+    assert staticcall MissionControl(mc).isSupportedAsset(_asset) # dev: invalid asset
     assetConfig: AssetConfig = staticcall MissionControl(mc).assetConfig(_asset)
-    assert self._isValidAssetLiqConfig(_asset, _shouldBurnAsPayment, _shouldTransferToEndaoment, _shouldSwapInStabPools, _shouldAuctionInstantly, _specialStabPoolId, _customAuctionParams, assetConfig.isNft, assetConfig.whitelist, assetConfig.debtTerms.ltv) # dev: invalid asset liq config
+    assert self._isValidAssetLiqConfig(_asset, _shouldBurnAsPayment, _shouldTransferToEndaoment, _shouldSwapInStabPools, _shouldAuctionInstantly, _specialStabPoolId, assetConfig.isNft, assetConfig.whitelist, assetConfig.debtTerms.ltv) # dev: invalid asset liq config
     assetConfig.shouldBurnAsPayment = _shouldBurnAsPayment
     assetConfig.shouldTransferToEndaoment = _shouldTransferToEndaoment
     assetConfig.shouldSwapInStabPools = _shouldSwapInStabPools
     assetConfig.shouldAuctionInstantly = _shouldAuctionInstantly
     assetConfig.specialStabPoolId = _specialStabPoolId
-    assetConfig.customAuctionParams = _customAuctionParams
+    assetConfig.customAuctionParams = customAuctionParams
     extcall MissionControl(mc).setAssetConfig(_asset, assetConfig)
 
     log AssetLiqConfigSet(
@@ -228,10 +334,10 @@ def setAssetLiqConfig(
         shouldSwapInStabPools=_shouldSwapInStabPools,
         shouldAuctionInstantly=_shouldAuctionInstantly,
         specialStabPoolId=_specialStabPoolId,
-        auctionStartDiscount=_customAuctionParams.startDiscount,
-        auctionMaxDiscount=_customAuctionParams.maxDiscount,
-        auctionDelay=_customAuctionParams.delay,
-        auctionDuration=_customAuctionParams.duration,
+        auctionStartDiscount=customAuctionParams.startDiscount,
+        auctionMaxDiscount=customAuctionParams.maxDiscount,
+        auctionDelay=customAuctionParams.delay,
+        auctionDuration=customAuctionParams.duration,
     )
     return True
 
@@ -245,7 +351,6 @@ def _isValidAssetLiqConfig(
     _shouldSwapInStabPools: bool,
     _shouldAuctionInstantly: bool,
     _specialStabPoolId: uint256,
-    _customAuctionParams: AuctionParams,
     _isNft: bool,
     _whitelist: address,
     _debtTermsLtv: uint256,
@@ -278,21 +383,11 @@ def _isValidAssetLiqConfig(
         if _debtTermsLtv == 0:
             return False
 
-    # validate custom auction params
-    if _customAuctionParams.hasParams and not self._areValidAuctionParams(_customAuctionParams):
-        return False
-
     # make sure special stab pool is valid
     if _specialStabPoolId != 0 and not staticcall VaultBook(a.vaultBook).isValidRegId(_specialStabPoolId):
         return False
 
     return True
-
-
-# TODO:
-# deposit params (vault ids, points, limits)
-# debt terms
-# random: whitelist, isNft, etc.
 
 
 @view
@@ -313,6 +408,105 @@ def _areValidAuctionParams(_params: AuctionParams) -> bool:
     return True
 
 
+# asset debt terms
+
+
+@external
+def setAssetDebtTerms(
+    _asset: address,
+    _ltv: uint256,
+    _redemptionThreshold: uint256,
+    _liqThreshold: uint256,
+    _liqFee: uint256,
+    _borrowRate: uint256,
+    _daowry: uint256,
+) -> bool:
+    assert gov._canGovern(msg.sender) # dev: no perms
+    assert not deptBasics.isPaused # dev: contract paused
+
+    # TODO: add time lock
+
+    mc: address = addys._getMissionControlAddr()
+    assert staticcall MissionControl(mc).isSupportedAsset(_asset) # dev: invalid asset
+
+    debtTerms: DebtTerms = empty(DebtTerms)
+    if _ltv != 0:
+        debtTerms = DebtTerms(
+            ltv=_ltv,
+            redemptionThreshold=_redemptionThreshold,
+            liqThreshold=_liqThreshold,
+            liqFee=_liqFee,
+            borrowRate=_borrowRate,
+            daowry=_daowry,
+        )
+        assert self._isValidDebtTerms(debtTerms) # dev: invalid debt terms
+
+    assetConfig: AssetConfig = staticcall MissionControl(mc).assetConfig(_asset)
+    assetConfig.debtTerms = debtTerms
+    extcall MissionControl(mc).setAssetConfig(_asset, assetConfig)
+
+    log AssetDebtTermsSet(
+        asset=_asset,
+        ltv=debtTerms.ltv,
+        redemptionThreshold=debtTerms.redemptionThreshold,
+        liqThreshold=debtTerms.liqThreshold,
+        liqFee=debtTerms.liqFee,
+        borrowRate=debtTerms.borrowRate,
+        daowry=debtTerms.daowry,
+    )
+    return True
+
+
+@view
+@internal
+def _isValidDebtTerms(_debtTerms: DebtTerms) -> bool:
+    if _debtTerms.liqThreshold > HUNDRED_PERCENT:
+        return False
+    if _debtTerms.redemptionThreshold > _debtTerms.liqThreshold:
+        return False
+    if _debtTerms.ltv > _debtTerms.redemptionThreshold:
+        return False
+    if _debtTerms.liqFee > HUNDRED_PERCENT or _debtTerms.borrowRate > HUNDRED_PERCENT or _debtTerms.daowry > HUNDRED_PERCENT:
+        return False
+    if 0 in [_debtTerms.liqFee, _debtTerms.borrowRate]:
+        return False
+
+    # make liq threshold and liq bonus work together
+    liqSum: uint256 = _debtTerms.liqThreshold + (_debtTerms.liqThreshold * _debtTerms.liqFee // HUNDRED_PERCENT)
+    return liqSum <= HUNDRED_PERCENT
+
+
+# whitelist for asset
+
+
+@external
+def setWhitelistForAsset(_asset: address, _whitelist: address) -> bool:
+    assert gov._canGovern(msg.sender) # dev: no perms
+    assert not deptBasics.isPaused # dev: contract paused
+    
+    # TODO: add time lock
+    
+    mc: address = addys._getMissionControlAddr()
+    assert staticcall MissionControl(mc).isSupportedAsset(_asset) # dev: invalid asset
+    assert self._isValidWhitelist(_whitelist) # dev: invalid whitelist
+    assetConfig: AssetConfig = staticcall MissionControl(mc).assetConfig(_asset)
+    assert assetConfig.whitelist != _whitelist # dev: already set
+    assetConfig.whitelist = _whitelist
+    extcall MissionControl(mc).setAssetConfig(_asset, assetConfig)
+
+    log WhitelistAssetSet(asset=_asset, whitelist=_whitelist)
+    return True
+    
+
+@view
+@internal
+def _isValidWhitelist(_whitelist: address) -> bool:
+    # make sure has interface
+    if _whitelist != empty(address):
+        assert not staticcall Whitelist(_whitelist).isUserAllowed(empty(address), empty(address)) # dev: invalid whitelist
+    return True
+
+
 # enable / disable
 
 
@@ -322,6 +516,7 @@ def setCanDepositAsset(_asset: address, _shouldEnable: bool) -> bool:
     assert self._hasPermsToEnable(msg.sender, _shouldEnable) # dev: no perms
 
     mc: address = addys._getMissionControlAddr()
+    assert staticcall MissionControl(mc).isSupportedAsset(_asset) # dev: invalid asset
     assetConfig: AssetConfig = staticcall MissionControl(mc).assetConfig(_asset)
     assert assetConfig.canDeposit != _shouldEnable # dev: already set
     assetConfig.canDeposit = _shouldEnable
@@ -337,6 +532,7 @@ def setCanWithdrawAsset(_asset: address, _shouldEnable: bool) -> bool:
     assert self._hasPermsToEnable(msg.sender, _shouldEnable) # dev: no perms
 
     mc: address = addys._getMissionControlAddr()
+    assert staticcall MissionControl(mc).isSupportedAsset(_asset) # dev: invalid asset
     assetConfig: AssetConfig = staticcall MissionControl(mc).assetConfig(_asset)
     assert assetConfig.canWithdraw != _shouldEnable # dev: already set
     assetConfig.canWithdraw = _shouldEnable
@@ -352,6 +548,7 @@ def setCanRedeemInStabPoolAsset(_asset: address, _shouldEnable: bool) -> bool:
     assert self._hasPermsToEnable(msg.sender, _shouldEnable) # dev: no perms
 
     mc: address = addys._getMissionControlAddr()
+    assert staticcall MissionControl(mc).isSupportedAsset(_asset) # dev: invalid asset
     assetConfig: AssetConfig = staticcall MissionControl(mc).assetConfig(_asset)
     assert assetConfig.canRedeemInStabPool != _shouldEnable # dev: already set
     assetConfig.canRedeemInStabPool = _shouldEnable
@@ -367,6 +564,7 @@ def setCanBuyInAuctionAsset(_asset: address, _shouldEnable: bool) -> bool:
     assert self._hasPermsToEnable(msg.sender, _shouldEnable) # dev: no perms
 
     mc: address = addys._getMissionControlAddr()
+    assert staticcall MissionControl(mc).isSupportedAsset(_asset) # dev: invalid asset
     assetConfig: AssetConfig = staticcall MissionControl(mc).assetConfig(_asset)
     assert assetConfig.canBuyInAuction != _shouldEnable # dev: already set
     assetConfig.canBuyInAuction = _shouldEnable
@@ -382,6 +580,7 @@ def setCanClaimInStabPoolAsset(_asset: address, _shouldEnable: bool) -> bool:
     assert self._hasPermsToEnable(msg.sender, _shouldEnable) # dev: no perms
 
     mc: address = addys._getMissionControlAddr()
+    assert staticcall MissionControl(mc).isSupportedAsset(_asset) # dev: invalid asset
     assetConfig: AssetConfig = staticcall MissionControl(mc).assetConfig(_asset)
     assert assetConfig.canClaimInStabPool != _shouldEnable # dev: already set
     assetConfig.canClaimInStabPool = _shouldEnable
@@ -400,6 +599,7 @@ def setCanRedeemCollateralAsset(_asset: address, _shouldEnable: bool) -> bool:
     assert self._hasPermsToEnable(msg.sender, _shouldEnable) # dev: no perms
 
     mc: address = addys._getMissionControlAddr()
+    assert staticcall MissionControl(mc).isSupportedAsset(_asset) # dev: invalid asset
     assetConfig: AssetConfig = staticcall MissionControl(mc).assetConfig(_asset)
     assert assetConfig.canRedeemCollateral != _shouldEnable # dev: already set
     assert self._isValidRedeemCollateralConfig(_asset, _shouldEnable, assetConfig.isNft, assetConfig.debtTerms.ltv, assetConfig.shouldTransferToEndaoment) # dev: invalid redeem collateral config
