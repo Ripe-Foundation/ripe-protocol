@@ -24,12 +24,13 @@ interface MissionControl:
     def setRipeRewardsConfig(_rewardsConfig: RipeRewardsConfig): nonpayable
     def setGeneralDebtConfig(_genDebtConfig: GenDebtConfig): nonpayable
     def setUnderscoreRegistry(_underscoreRegistry: address): nonpayable
+    def setCanDisable(_user: address, _canDisable: bool): nonpayable
     def setGeneralConfig(_genConfig: GenConfig): nonpayable
     def rewardsConfig() -> RipeRewardsConfig: view
+    def canDisable(_user: address) -> bool: view
+    def genDebtConfig() -> GenDebtConfig: view
     def underscoreRegistry() -> address: view
     def genConfig() -> GenConfig: view
-    def setCanDisable(_user: address, _canDisable: bool): nonpayable
-    def canDisable(_user: address) -> bool: view
 
 interface VaultBook:
     def isValidRegId(_regId: uint256) -> bool: view
@@ -186,6 +187,33 @@ event CanClaimInStabPoolSet:
     canClaimInStabPool: bool
     caller: indexed(address)
 
+event GlobalDebtLimitsSet:
+    perUserDebtLimit: uint256
+    globalDebtLimit: uint256
+    minDebtAmount: uint256
+    numAllowedBorrowers: uint256
+
+event BorrowIntervalConfigSet:
+    maxBorrowPerInterval: uint256
+    numBlocksPerInterval: uint256
+
+event KeeperConfigSet:
+    keeperFeeRatio: uint256
+    minKeeperFee: uint256
+
+event LtvPaybackBufferSet:
+    ltvPaybackBuffer: uint256
+
+event GenAuctionParamsSet:
+    startDiscount: uint256
+    maxDiscount: uint256
+    delay: uint256
+    duration: uint256
+
+event IsDaowryEnabledSet:
+    isDaowryEnabled: bool
+    caller: indexed(address)
+
 # temp data
 vaultDedupe: transient(HashMap[uint256, HashMap[address, bool]]) # vault id -> asset
 
@@ -195,6 +223,7 @@ MAX_STALE_TIME: public(immutable(uint256))
 MAX_PRIORITY_PRICE_SOURCES: constant(uint256) = 10
 PRIORITY_VAULT_DATA: constant(uint256) = 20
 UNDERSCORE_AGENT_FACTORY_ID: constant(uint256) = 1
+HUNDRED_PERCENT: constant(uint256) = 100_00 # 100%
 
 
 @deploy
@@ -253,8 +282,8 @@ def setGeneralConfig(
 
     mc: address = addys._getMissionControlAddr()
     config: GenConfig = staticcall MissionControl(mc).genConfig()
-    assert self._areValidVaultLimits(_perUserMaxVaults, _perUserMaxAssetsPerVault, config.perUserMaxVaults, config.perUserMaxAssetsPerVault) # dev: invalid vault limits
-    assert self._isValidStaleTime(_priceStaleTime, config.priceStaleTime) # dev: invalid stale time
+    assert self._areValidVaultLimits(_perUserMaxVaults, _perUserMaxAssetsPerVault, max_value(uint256), max_value(uint256)) # dev: invalid vault limits
+    assert self._isValidStaleTime(_priceStaleTime, max_value(uint256)) # dev: invalid stale time
 
     config.perUserMaxVaults = _perUserMaxVaults
     config.perUserMaxAssetsPerVault = _perUserMaxAssetsPerVault
@@ -271,32 +300,6 @@ def setGeneralConfig(
     config.canClaimInStabPool = _canClaimInStabPool
     extcall MissionControl(mc).setGeneralConfig(config)
     return True
-
-
-# prices - stale time
-
-
-@external
-def setStaleTime(_staleTime: uint256) -> bool:
-    assert gov._canGovern(msg.sender) # dev: no perms
-    assert not deptBasics.isPaused # dev: not activated
-
-    mc: address = addys._getMissionControlAddr()
-    config: GenConfig = staticcall MissionControl(mc).genConfig()
-    assert self._isValidStaleTime(_staleTime, config.priceStaleTime) # dev: invalid stale time
-    config.priceStaleTime = _staleTime
-    extcall MissionControl(mc).setGeneralConfig(config)
-
-    log StaleTimeSet(staleTime=_staleTime)
-    return True
-
-
-@view
-@internal
-def _isValidStaleTime(_staleTime: uint256, _prevStaleTime: uint256) -> bool:
-    if _staleTime == _prevStaleTime:
-        return False
-    return _staleTime >= MIN_STALE_TIME and _staleTime <= MAX_STALE_TIME
 
 
 # vault limits
@@ -335,6 +338,32 @@ def _areValidVaultLimits(
     if max_value(uint256) in [_perUserMaxVaults, _perUserMaxAssetsPerVault]:
         return False
     return True
+
+
+# stale time for prices
+
+
+@external
+def setStaleTime(_staleTime: uint256) -> bool:
+    assert gov._canGovern(msg.sender) # dev: no perms
+    assert not deptBasics.isPaused # dev: not activated
+
+    mc: address = addys._getMissionControlAddr()
+    config: GenConfig = staticcall MissionControl(mc).genConfig()
+    assert self._isValidStaleTime(_staleTime, config.priceStaleTime) # dev: invalid stale time
+    config.priceStaleTime = _staleTime
+    extcall MissionControl(mc).setGeneralConfig(config)
+
+    log StaleTimeSet(staleTime=_staleTime)
+    return True
+
+
+@view
+@internal
+def _isValidStaleTime(_staleTime: uint256, _prevStaleTime: uint256) -> bool:
+    if _staleTime == _prevStaleTime:
+        return False
+    return _staleTime >= MIN_STALE_TIME and _staleTime <= MAX_STALE_TIME
 
 
 # enable / disable
@@ -512,7 +541,13 @@ def setGeneralDebtConfig(
     assert gov._canGovern(msg.sender) # dev: no perms
     assert not deptBasics.isPaused # dev: contract paused
 
-    # TODO: add time lock, validation, event
+    # TODO: add time lock
+
+    assert self._areValidDebtLimits(_perUserDebtLimit, _globalDebtLimit, _minDebtAmount, _numAllowedBorrowers) # dev: invalid debt limits
+    assert self._areValidBorrowIntervalConfig(_maxBorrowPerInterval, _numBlocksPerInterval, _minDebtAmount) # dev: invalid borrow interval config
+    assert self._isValidKeeperConfig(_keeperFeeRatio, _minKeeperFee) # dev: invalid keeper config
+    assert self._isValidLtvPaybackBuffer(_ltvPaybackBuffer) # dev: invalid ltv payback buffer
+    assert self._areValidAuctionParams(_genAuctionParams) # dev: invalid auction params
 
     genDebtConfig: GenDebtConfig = GenDebtConfig(
         perUserDebtLimit=_perUserDebtLimit,
@@ -528,6 +563,228 @@ def setGeneralDebtConfig(
         genAuctionParams=_genAuctionParams,
     )
     extcall MissionControl(addys._getMissionControlAddr()).setGeneralDebtConfig(genDebtConfig)
+    return True
+
+
+# global debt limits
+
+
+@external
+def setGlobalDebtLimits(
+    _perUserDebtLimit: uint256,
+    _globalDebtLimit: uint256,
+    _minDebtAmount: uint256,
+    _numAllowedBorrowers: uint256,
+) -> bool:
+    assert gov._canGovern(msg.sender) # dev: no perms
+    assert not deptBasics.isPaused # dev: contract paused
+
+    # TODO: add time lock
+
+    assert self._areValidDebtLimits(_perUserDebtLimit, _globalDebtLimit, _minDebtAmount, _numAllowedBorrowers) # dev: invalid debt limits
+    mc: address = addys._getMissionControlAddr()
+    config: GenDebtConfig = staticcall MissionControl(mc).genDebtConfig()
+    config.perUserDebtLimit = _perUserDebtLimit
+    config.globalDebtLimit = _globalDebtLimit
+    config.minDebtAmount = _minDebtAmount
+    config.numAllowedBorrowers = _numAllowedBorrowers
+    extcall MissionControl(mc).setGeneralDebtConfig(config)
+
+    log GlobalDebtLimitsSet(perUserDebtLimit=_perUserDebtLimit, globalDebtLimit=_globalDebtLimit, minDebtAmount=_minDebtAmount, numAllowedBorrowers=_numAllowedBorrowers)
+    return True
+
+
+@view
+@internal
+def _areValidDebtLimits(
+    _perUserDebtLimit: uint256,
+    _globalDebtLimit: uint256,
+    _minDebtAmount: uint256,
+    _numAllowedBorrowers: uint256,
+) -> bool:
+    if 0 in [_perUserDebtLimit, _globalDebtLimit, _numAllowedBorrowers]:
+        return False
+    if max_value(uint256) in [_perUserDebtLimit, _globalDebtLimit, _minDebtAmount, _numAllowedBorrowers]:
+        return False
+    if _perUserDebtLimit > _globalDebtLimit:
+        return False
+    if _minDebtAmount > _perUserDebtLimit:
+        return False
+    return True
+
+
+# borrow intervals
+
+
+@external
+def setBorrowIntervalConfig(
+    _maxBorrowPerInterval: uint256,
+    _numBlocksPerInterval: uint256,
+) -> bool:
+    assert gov._canGovern(msg.sender) # dev: no perms
+    assert not deptBasics.isPaused # dev: contract paused
+
+    # TODO: add time lock
+
+    mc: address = addys._getMissionControlAddr()
+    config: GenDebtConfig = staticcall MissionControl(mc).genDebtConfig()
+    assert self._areValidBorrowIntervalConfig(_maxBorrowPerInterval, _numBlocksPerInterval, config.minDebtAmount) # dev: invalid borrow interval config
+    config.maxBorrowPerInterval = _maxBorrowPerInterval
+    config.numBlocksPerInterval = _numBlocksPerInterval
+    extcall MissionControl(mc).setGeneralDebtConfig(config)
+
+    log BorrowIntervalConfigSet(maxBorrowPerInterval=_maxBorrowPerInterval, numBlocksPerInterval=_numBlocksPerInterval)
+    return True
+
+
+@view
+@internal
+def _areValidBorrowIntervalConfig(
+    _maxBorrowPerInterval: uint256,
+    _numBlocksPerInterval: uint256,
+    _minDebtAmount: uint256,
+) -> bool:
+    if 0 in [_maxBorrowPerInterval, _numBlocksPerInterval]:
+        return False
+    if max_value(uint256) in [_maxBorrowPerInterval, _numBlocksPerInterval]:
+        return False
+    if _maxBorrowPerInterval < _minDebtAmount:
+        return False
+    return True
+
+
+# keeper config
+
+
+@external
+def setKeeperConfig(
+    _keeperFeeRatio: uint256,
+    _minKeeperFee: uint256,
+) -> bool:
+    assert gov._canGovern(msg.sender) # dev: no perms
+    assert not deptBasics.isPaused # dev: contract paused
+
+    # TODO: add time lock
+
+    assert self._isValidKeeperConfig(_keeperFeeRatio, _minKeeperFee) # dev: invalid keeper config
+    mc: address = addys._getMissionControlAddr()
+    config: GenDebtConfig = staticcall MissionControl(mc).genDebtConfig()
+    config.keeperFeeRatio = _keeperFeeRatio
+    config.minKeeperFee = _minKeeperFee
+    extcall MissionControl(mc).setGeneralDebtConfig(config)
+
+    log KeeperConfigSet(keeperFeeRatio=_keeperFeeRatio, minKeeperFee=_minKeeperFee)
+    return True
+
+
+@view
+@internal
+def _isValidKeeperConfig(_keeperFeeRatio: uint256, _minKeeperFee: uint256) -> bool:
+    if max_value(uint256) in [_keeperFeeRatio, _minKeeperFee]:
+        return False
+    if _keeperFeeRatio > 10_00: # 10% max
+        return False
+    if _minKeeperFee > 100 * (10 ** 18): # $100 max
+        return False
+    return True
+
+
+# daowry
+
+
+@external
+def setIsDaowryEnabled(_shouldEnable: bool) -> bool:
+    assert not deptBasics.isPaused # dev: contract paused
+    assert self._hasPermsToEnable(msg.sender, _shouldEnable) # dev: no perms
+
+    mc: address = addys._getMissionControlAddr()
+    config: GenDebtConfig = staticcall MissionControl(mc).genDebtConfig()
+    assert config.isDaowryEnabled != _shouldEnable # dev: already set
+    config.isDaowryEnabled = _shouldEnable
+    extcall MissionControl(mc).setGeneralDebtConfig(config)
+
+    log IsDaowryEnabledSet(isDaowryEnabled=_shouldEnable, caller=msg.sender)
+    return True
+
+
+# ltv payback buffer
+
+
+@external
+def setLtvPaybackBuffer(_ltvPaybackBuffer: uint256) -> bool:
+    assert gov._canGovern(msg.sender) # dev: no perms
+    assert not deptBasics.isPaused # dev: contract paused
+
+    # TODO: add time lock
+
+    assert self._isValidLtvPaybackBuffer(_ltvPaybackBuffer) # dev: invalid ltv payback buffer
+    mc: address = addys._getMissionControlAddr()
+    config: GenDebtConfig = staticcall MissionControl(mc).genDebtConfig()
+    config.ltvPaybackBuffer = _ltvPaybackBuffer
+    extcall MissionControl(mc).setGeneralDebtConfig(config)
+
+    log LtvPaybackBufferSet(ltvPaybackBuffer=_ltvPaybackBuffer)
+    return True
+
+
+@view
+@internal
+def _isValidLtvPaybackBuffer(_ltvPaybackBuffer: uint256) -> bool:
+    if _ltvPaybackBuffer == 0:
+        return False
+    if _ltvPaybackBuffer > 10_00: # 10% max
+        return False
+    return True
+
+
+# gen auction params
+
+
+@external
+def setGenAuctionParams(
+    _startDiscount: uint256,
+    _maxDiscount: uint256,
+    _delay: uint256,
+    _duration: uint256,
+) -> bool:
+    assert gov._canGovern(msg.sender) # dev: no perms
+    assert not deptBasics.isPaused # dev: contract paused
+
+    # TODO: add time lock
+
+    params: AuctionParams= AuctionParams(
+        hasParams=True,
+        startDiscount=_startDiscount,
+        maxDiscount=_maxDiscount,
+        delay=_delay,
+        duration=_duration,
+    )
+    assert self._areValidAuctionParams(params) # dev: invalid auction params
+
+    mc: address = addys._getMissionControlAddr()
+    config: GenDebtConfig = staticcall MissionControl(mc).genDebtConfig()
+    config.genAuctionParams = params
+    extcall MissionControl(mc).setGeneralDebtConfig(config)
+
+    log GenAuctionParamsSet(startDiscount=_startDiscount, maxDiscount=_maxDiscount, delay=_delay, duration=_duration)
+    return True
+
+
+@view
+@internal
+def _areValidAuctionParams(_params: AuctionParams) -> bool:
+    if not _params.hasParams:
+        return False
+    if _params.startDiscount >= HUNDRED_PERCENT:
+        return False
+    if _params.maxDiscount >= HUNDRED_PERCENT:
+        return False
+    if _params.startDiscount >= _params.maxDiscount:
+        return False
+    if _params.delay >= _params.duration:
+        return False
+    if _params.duration == 0 or _params.duration == max_value(uint256):
+        return False
     return True
 
 
