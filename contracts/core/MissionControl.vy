@@ -71,6 +71,7 @@ struct RipeRewardsConfig:
     genDepositorsAlloc: uint256
 
 struct AssetConfig:
+    vaultIds: DynArray[uint256, MAX_VAULTS_PER_ASSET]
     stakersPointsAlloc: uint256
     voterPointsAlloc: uint256
     perUserDepositLimit: uint256
@@ -134,6 +135,7 @@ struct VaultData:
 struct TellerDepositConfig:
     canDepositGeneral: bool
     canDepositAsset: bool
+    doesVaultSupportAsset: bool
     isUserAllowed: bool
     perUserDepositLimit: uint256
     globalDepositLimit: uint256
@@ -265,6 +267,7 @@ event RewardsConfigSet:
 
 event AssetConfigSet:
     asset: indexed(address)
+    numVaults: uint256
     stakersPointsAlloc: uint256
     voterPointsAlloc: uint256
     perUserDepositLimit: uint256
@@ -310,7 +313,12 @@ event UserDelegationSet:
 # global config
 genConfig: public(GenConfig)
 genDebtConfig: public(GenDebtConfig)
+
+# asset config
 assetConfig: public(HashMap[address, AssetConfig]) # asset -> config
+assets: public(HashMap[uint256, address]) # index -> asset
+indexOfAsset: public(HashMap[address, uint256]) # asset -> index
+numAssets: public(uint256) # num assets
 
 # user config
 userConfig: public(HashMap[address, UserConfig]) # user -> config
@@ -329,6 +337,7 @@ priorityStabVaults: public(DynArray[VaultLite, PRIORITY_VAULT_DATA])
 underscoreRegistry: public(address)
 canDisable: public(HashMap[address, bool]) # user -> canDisable
 
+MAX_VAULTS_PER_ASSET: constant(uint256) = 10
 MAX_PRIORITY_PRICE_SOURCES: constant(uint256) = 10
 PRIORITY_VAULT_DATA: constant(uint256) = 20
 UNDERSCORE_AGENT_FACTORY_ID: constant(uint256) = 1
@@ -338,6 +347,8 @@ UNDERSCORE_AGENT_FACTORY_ID: constant(uint256) = 1
 def __init__(_ripeHq: address):
     addys.__init__(_ripeHq)
     deptBasics.__init__(False, False, False) # no minting
+
+    self.numAssets = 1 # not using 0 index
 
 
 #################
@@ -422,8 +433,13 @@ def setAssetConfig(_asset: address, _config: AssetConfig):
     self._updatePointsAllocs(_asset, _config.stakersPointsAlloc, _config.voterPointsAlloc) # do first!
     self.assetConfig[_asset] = _config
 
+    # register asset (if necessary)
+    if self.indexOfAsset[_asset] == 0:
+        self._registerAsset(_asset)
+
     log AssetConfigSet(
         asset=_asset,
+        numVaults=len(_config.vaultIds),
         stakersPointsAlloc=_config.stakersPointsAlloc,
         voterPointsAlloc=_config.voterPointsAlloc,
         perUserDepositLimit=_config.perUserDepositLimit,
@@ -454,6 +470,9 @@ def setAssetConfig(_asset: address, _config: AssetConfig):
     )
 
 
+# points allocs
+
+
 @internal
 def _updatePointsAllocs(_asset: address, _newStakersPointsAlloc: uint256, _newVoterPointsAlloc: uint256):
     totalPointsAllocs: TotalPointsAllocs = self.totalPointsAllocs
@@ -467,6 +486,73 @@ def _updatePointsAllocs(_asset: address, _newStakersPointsAlloc: uint256, _newVo
     totalPointsAllocs.stakersPointsAllocTotal += _newStakersPointsAlloc
     totalPointsAllocs.voterPointsAllocTotal += _newVoterPointsAlloc
     self.totalPointsAllocs = totalPointsAllocs
+
+
+# asset registration
+
+
+@internal
+def _registerAsset(_asset: address):
+    aid: uint256 = self.numAssets
+    self.assets[aid] = _asset
+    self.indexOfAsset[_asset] = aid
+    self.numAssets = aid + 1
+
+
+@external
+def deregisterAsset(_asset: address) -> bool:
+    assert addys._canModifyMissionControl(msg.sender) # dev: no perms
+
+    numAssets: uint256 = self.numAssets
+    if numAssets == 0:
+        return False
+
+    targetIndex: uint256 = self.indexOfAsset[_asset]
+    if targetIndex == 0:
+        return False
+
+    # update data
+    lastIndex: uint256 = numAssets - 1
+    self.numAssets = lastIndex
+    self.indexOfAsset[_asset] = 0
+
+    # get last item, replace the removed item
+    if targetIndex != lastIndex:
+        lastItem: address = self.assets[lastIndex]
+        self.assets[targetIndex] = lastItem
+        self.indexOfAsset[lastItem] = targetIndex
+
+    return True
+
+
+# utils
+
+
+@view
+@external
+def isSupportedAsset(_asset: address) -> bool:
+    return self.indexOfAsset[_asset] != 0
+
+
+@view
+@external
+def isSupportedAssetInVault(_vaultId: uint256, _asset: address) -> bool:
+    return _vaultId in self.assetConfig[_asset].vaultIds
+
+
+@view
+@external
+def getNumAssets() -> uint256:
+    return self._getNumAssets()
+
+
+@view
+@internal
+def _getNumAssets() -> uint256:
+    numAssets: uint256 = self.numAssets
+    if numAssets == 0:
+        return 0
+    return numAssets - 1
 
 
 #################
@@ -650,12 +736,13 @@ def _isUserAllowed(_whitelist: address, _user: address, _asset: address) -> bool
 
 @view
 @external
-def getTellerDepositConfig(_asset: address, _user: address) -> TellerDepositConfig:
+def getTellerDepositConfig(_vaultId: uint256, _asset: address, _user: address) -> TellerDepositConfig:
     assetConfig: AssetConfig = self.assetConfig[_asset]
     genConfig: GenConfig = self.genConfig
     return TellerDepositConfig(
         canDepositGeneral=genConfig.canDeposit,
         canDepositAsset=assetConfig.canDeposit,
+        doesVaultSupportAsset=_vaultId in assetConfig.vaultIds,
         isUserAllowed=self._isUserAllowed(assetConfig.whitelist, _user, _asset),
         perUserDepositLimit=assetConfig.perUserDepositLimit,
         globalDepositLimit=assetConfig.globalDepositLimit,

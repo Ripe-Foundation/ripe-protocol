@@ -57,9 +57,9 @@ def test_ah_liquidation_with_claimable_green_basic(
     
     # Setup stability pool with bravo token (NOT green token)
     stab_debt_terms = createDebtTerms(0, 0, 0, 0, 0, 0)
-    setAssetConfig(bravo_token, _debtTerms=stab_debt_terms, _shouldBurnAsPayment=False)
-    setAssetConfig(charlie_token)  # Enable charlie for creating claimable assets
-    setAssetConfig(green_token, _debtTerms=stab_debt_terms, _shouldBurnAsPayment=True)
+    setAssetConfig(bravo_token, _vaultIds=[1], _debtTerms=stab_debt_terms, _shouldBurnAsPayment=False)
+    setAssetConfig(charlie_token, _vaultIds=[1])  # Enable charlie for creating claimable assets
+    setAssetConfig(green_token, _vaultIds=[1], _debtTerms=stab_debt_terms, _shouldBurnAsPayment=True)
     
     stab_id = vault_book.getRegId(stability_pool)
     mission_control_gov.setPriorityStabVaults([(stab_id, bravo_token)], sender=governance.address)
@@ -190,7 +190,7 @@ def test_ah_liquidation_claimable_green_insufficient(
     )
     
     stab_debt_terms = createDebtTerms(0, 0, 0, 0, 0, 0)
-    setAssetConfig(bravo_token, _debtTerms=stab_debt_terms, _shouldBurnAsPayment=False)
+    setAssetConfig(bravo_token, _vaultIds=[1], _debtTerms=stab_debt_terms, _shouldBurnAsPayment=False)
     setAssetConfig(charlie_token)  # For creating claimable assets
     setAssetConfig(green_token, _debtTerms=stab_debt_terms, _shouldBurnAsPayment=True)
     
@@ -330,7 +330,7 @@ def test_ah_liquidation_multiple_stab_assets_with_claimable_green(
     
     # Setup stability pool assets (not green)
     stab_debt_terms = createDebtTerms(0, 0, 0, 0, 0, 0)
-    setAssetConfig(bravo_token, _debtTerms=stab_debt_terms)
+    setAssetConfig(bravo_token, _vaultIds=[1], _debtTerms=stab_debt_terms)
     setAssetConfig(charlie_token)  # For creating claimable assets
     setAssetConfig(green_token, _debtTerms=stab_debt_terms, _shouldBurnAsPayment=True)
     
@@ -467,7 +467,7 @@ def test_ah_liquidation_claimable_green_exact_amount(
     )
     
     stab_debt_terms = createDebtTerms(0, 0, 0, 0, 0, 0)
-    setAssetConfig(charlie_token, _debtTerms=stab_debt_terms)  # Use charlie as stability pool asset
+    setAssetConfig(charlie_token, _vaultIds=[1], _debtTerms=stab_debt_terms)  # Use charlie as stability pool asset
     setAssetConfig(bravo_token)  # For creating claimable assets
     setAssetConfig(green_token, _debtTerms=stab_debt_terms, _shouldBurnAsPayment=True)
     
@@ -603,7 +603,7 @@ def test_ah_liquidation_no_claimable_green_fallback(
     
     # Setup stability pool with charlie (NOT green)
     stab_debt_terms = createDebtTerms(0, 0, 0, 0, 0, 0)
-    setAssetConfig(charlie_token, _debtTerms=stab_debt_terms, _shouldBurnAsPayment=False)
+    setAssetConfig(charlie_token, _vaultIds=[1], _debtTerms=stab_debt_terms, _shouldBurnAsPayment=False)
     setAssetConfig(green_token, _debtTerms=stab_debt_terms, _shouldBurnAsPayment=True)
     
     stab_id = vault_book.getRegId(stability_pool)
@@ -711,7 +711,7 @@ def test_ah_liquidation_claimable_green_price_discrepancy(
     )
     
     stab_debt_terms = createDebtTerms(0, 0, 0, 0, 0, 0)
-    setAssetConfig(bravo_token, _debtTerms=stab_debt_terms)
+    setAssetConfig(bravo_token, _vaultIds=[1], _debtTerms=stab_debt_terms)
     setAssetConfig(charlie_token)
     setAssetConfig(green_token, _debtTerms=stab_debt_terms, _shouldBurnAsPayment=True)
     
@@ -836,7 +836,7 @@ def test_ah_liquidation_claimable_green_with_keeper_fees(
     )
     
     stab_debt_terms = createDebtTerms(0, 0, 0, 0, 0, 0)
-    setAssetConfig(bravo_token, _debtTerms=stab_debt_terms)
+    setAssetConfig(bravo_token, _vaultIds=[1], _debtTerms=stab_debt_terms)
     setAssetConfig(charlie_token)
     setAssetConfig(green_token, _debtTerms=stab_debt_terms, _shouldBurnAsPayment=True)
     
@@ -966,7 +966,7 @@ def test_ah_liquidation_claimable_green_depletion_edge_case(
     )
     
     stab_debt_terms = createDebtTerms(0, 0, 0, 0, 0, 0)
-    setAssetConfig(bravo_token, _debtTerms=stab_debt_terms)
+    setAssetConfig(bravo_token, _vaultIds=[1], _debtTerms=stab_debt_terms)
     setAssetConfig(charlie_token)
     setAssetConfig(green_token, _debtTerms=stab_debt_terms, _shouldBurnAsPayment=True)
     

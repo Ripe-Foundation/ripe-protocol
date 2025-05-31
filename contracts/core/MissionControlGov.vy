@@ -73,6 +73,7 @@ struct GenDebtConfig:
     genAuctionParams: AuctionParams
 
 struct AssetConfig:
+    vaultIds: DynArray[uint256, MAX_VAULTS_PER_ASSET]
     stakersPointsAlloc: uint256
     voterPointsAlloc: uint256
     perUserDepositLimit: uint256
@@ -220,6 +221,7 @@ vaultDedupe: transient(HashMap[uint256, HashMap[address, bool]]) # vault id -> a
 MIN_STALE_TIME: public(immutable(uint256))
 MAX_STALE_TIME: public(immutable(uint256))
 
+MAX_VAULTS_PER_ASSET: constant(uint256) = 10
 MAX_PRIORITY_PRICE_SOURCES: constant(uint256) = 10
 PRIORITY_VAULT_DATA: constant(uint256) = 20
 UNDERSCORE_AGENT_FACTORY_ID: constant(uint256) = 1
@@ -796,6 +798,7 @@ def _areValidAuctionParams(_params: AuctionParams) -> bool:
 @external
 def setAssetConfig(
     _asset: address,
+    _vaultIds: DynArray[uint256, MAX_VAULTS_PER_ASSET],
     _stakersPointsAlloc: uint256,
     _voterPointsAlloc: uint256,
     _perUserDepositLimit: uint256,
@@ -819,9 +822,11 @@ def setAssetConfig(
     assert gov._canGovern(msg.sender) # dev: no perms
     assert not deptBasics.isPaused # dev: contract paused
 
-    # TODO: add time lock, validation, event
+    # TODO: add time lock, validation
 
+    mc: address = addys._getMissionControlAddr()
     assetConfig: AssetConfig = AssetConfig(
+        vaultIds=_vaultIds,
         stakersPointsAlloc=_stakersPointsAlloc,
         voterPointsAlloc=_voterPointsAlloc,
         perUserDepositLimit=_perUserDepositLimit,
@@ -842,7 +847,7 @@ def setAssetConfig(
         whitelist=_whitelist,
         isNft=_isNft,
     )
-    extcall MissionControl(addys._getMissionControlAddr()).setAssetConfig(_asset, assetConfig)
+    extcall MissionControl(mc).setAssetConfig(_asset, assetConfig)
     return True
 
 

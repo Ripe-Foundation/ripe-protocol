@@ -48,7 +48,7 @@ def setupStabPoolLiquidation(
 
         # stab pool config
         stab_debt_terms = createDebtTerms(0, 0, 0, 0, 0, 0)
-        setAssetConfig(green_token, _debtTerms=stab_debt_terms, _shouldBurnAsPayment=True)
+        setAssetConfig(green_token, _vaultIds=[1], _debtTerms=stab_debt_terms, _shouldBurnAsPayment=True)
         stab_id = vault_book.getRegId(stability_pool)
         mission_control_gov.setPriorityStabVaults([(stab_id, green_token)], sender=governance.address)
 
@@ -478,8 +478,8 @@ def test_ah_liquidation_multiple_stab_assets_same_pool(
 
     # Setup multiple stability pool assets
     stab_debt_terms = createDebtTerms(0, 0, 0, 0, 0, 0)
-    setAssetConfig(green_token, _debtTerms=stab_debt_terms)
-    setAssetConfig(bravo_token, _debtTerms=stab_debt_terms)
+    setAssetConfig(green_token, _vaultIds=[1], _debtTerms=stab_debt_terms)
+    setAssetConfig(bravo_token, _vaultIds=[1], _debtTerms=stab_debt_terms)
 
     # Setup multiple stability assets with priority order (same pool, different assets)
     stab_pool_id = vault_book.getRegId(stability_pool)
@@ -712,7 +712,7 @@ def test_ah_liquidation_multiple_collateral_assets(
 
     # Setup stability pool for alpha_token liquidation
     stab_debt_terms = createDebtTerms(0, 0, 0, 0, 0, 0)
-    setAssetConfig(green_token, _debtTerms=stab_debt_terms)
+    setAssetConfig(green_token, _vaultIds=[1], _debtTerms=stab_debt_terms)
     stab_id = vault_book.getRegId(stability_pool)
     mission_control_gov.setPriorityStabVaults([(stab_id, green_token)], sender=governance.address)
 
@@ -1056,8 +1056,8 @@ def test_ah_liquidation_phase_1_liq_user_in_stability_pool(
     
     # Setup stability pool assets
     stab_debt_terms = createDebtTerms(0, 0, 0, 0, 0, 0)
-    setAssetConfig(green_token, _debtTerms=stab_debt_terms, _shouldBurnAsPayment=True)
-    setAssetConfig(bravo_token, _debtTerms=stab_debt_terms, _shouldTransferToEndaoment=True)
+    setAssetConfig(green_token, _vaultIds=[1], _debtTerms=stab_debt_terms, _shouldBurnAsPayment=True)
+    setAssetConfig(bravo_token, _vaultIds=[1], _debtTerms=stab_debt_terms, _shouldTransferToEndaoment=True)
     
     # Configure priority stability pools
     stab_pool_id = vault_book.getRegId(stability_pool)
@@ -1182,7 +1182,6 @@ def test_ah_liquidation_caching_single_user_all_phases(
     vault_book,
     mission_control_gov,
     governance,
-    endaoment,
     _test,
 ):
     """Test caching works when single user goes through all 3 liquidation phases
@@ -1232,7 +1231,7 @@ def test_ah_liquidation_caching_single_user_all_phases(
     
     # Setup stability pool assets (Phase 1)
     stab_debt_terms = createDebtTerms(0, 0, 0, 0, 0, 0)
-    setAssetConfig(green_token, _debtTerms=stab_debt_terms, _shouldBurnAsPayment=True)
+    setAssetConfig(green_token, _vaultIds=[1], _debtTerms=stab_debt_terms, _shouldBurnAsPayment=True)
     
     # Configure Phase 1: Priority stability pools
     stab_pool_id = vault_book.getRegId(stability_pool)
@@ -1939,8 +1938,8 @@ def test_ah_liquidation_special_stab_pool(
 
     # Setup stability pool assets
     stab_debt_terms = createDebtTerms(0, 0, 0, 0, 0, 0)
-    setAssetConfig(green_token, _debtTerms=stab_debt_terms)
-    setAssetConfig(bravo_token, _debtTerms=stab_debt_terms)
+    setAssetConfig(green_token, _vaultIds=[1], _debtTerms=stab_debt_terms)
+    setAssetConfig(bravo_token, _vaultIds=[stab_pool_id], _debtTerms=stab_debt_terms)
 
     # Setup general stability pools (should be ignored due to special pool)
     normal_stab_id = vault_book.getRegId(stability_pool)

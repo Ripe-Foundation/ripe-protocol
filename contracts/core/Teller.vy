@@ -42,7 +42,7 @@ interface Lootbox:
 
 interface MissionControl:
     def getTellerWithdrawConfig(_asset: address, _user: address, _caller: address) -> TellerWithdrawConfig: view
-    def getTellerDepositConfig(_asset: address, _user: address) -> TellerDepositConfig: view
+    def getTellerDepositConfig(_vaultId: uint256, _asset: address, _user: address) -> TellerDepositConfig: view
 
 interface Ledger:
     def getDepositLedgerData(_user: address, _vaultId: uint256) -> DepositLedgerData: view
@@ -59,6 +59,7 @@ struct DepositLedgerData:
 struct TellerDepositConfig:
     canDepositGeneral: bool
     canDepositAsset: bool
+    doesVaultSupportAsset: bool
     isUserAllowed: bool
     perUserDepositLimit: uint256
     globalDepositLimit: uint256
@@ -188,7 +189,7 @@ def _deposit(
 
     # get ledger data
     d: DepositLedgerData = staticcall Ledger(_a.ledger).getDepositLedgerData(_user, vaultId)
-    amount: uint256 = self._validateOnDeposit(_asset, _amount, _user, vaultAddr, _depositor, d, _a.missionControl)
+    amount: uint256 = self._validateOnDeposit(_asset, _amount, _user, vaultId, vaultAddr, _depositor, d, _a.missionControl)
 
     # deposit tokens
     assert extcall IERC20(_asset).transferFrom(_depositor, vaultAddr, amount, default_return_value=True) # dev: token transfer failed
@@ -214,14 +215,16 @@ def _validateOnDeposit(
     _asset: address,
     _amount: uint256,
     _user: address,
+    _vaultId: uint256,
     _vaultAddr: address,
     _depositor: address,
     _d: DepositLedgerData,
     _missionControl: address,
 ) -> uint256:
-    config: TellerDepositConfig = staticcall MissionControl(_missionControl).getTellerDepositConfig(_asset, _user)
+    config: TellerDepositConfig = staticcall MissionControl(_missionControl).getTellerDepositConfig(_vaultId, _asset, _user)
     assert config.canDepositGeneral # dev: protocol deposits disabled
     assert config.canDepositAsset # dev: asset deposits disabled
+    assert config.doesVaultSupportAsset # dev: vault does not support asset
     assert config.isUserAllowed # dev: user not on whitelist
 
     # make sure depositor is allowed to deposit for user

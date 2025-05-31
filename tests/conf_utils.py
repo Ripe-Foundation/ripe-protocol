@@ -133,6 +133,7 @@ def createAuctionParams():
 def setAssetConfig(mission_control, mission_control_gov, createDebtTerms):
     def setAssetConfig(
         _asset,
+        _vaultIds = [2], # default simple erc20 vault
         _stakersPointsAlloc = 10,
         _voterPointsAlloc = 10,
         _perUserDepositLimit = MAX_UINT256,
@@ -154,6 +155,7 @@ def setAssetConfig(mission_control, mission_control_gov, createDebtTerms):
         _isNft = False,
     ):
         asset_config = (
+            _vaultIds,
             _stakersPointsAlloc,
             _voterPointsAlloc,
             _perUserDepositLimit,
