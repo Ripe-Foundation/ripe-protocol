@@ -565,7 +565,7 @@ def test_loot_claim_borrow_permission_checks(
     teller,
     credit_engine,
     createDebtTerms,
-    mission_control_gov,
+    switchboard,
 ):
     # basic setup
     setGeneralConfig()
@@ -591,12 +591,12 @@ def test_loot_claim_borrow_permission_checks(
         lootbox.claimBorrowLoot(bob, sender=alice)
 
     # Test paused state
-    lootbox.pause(True, sender=mission_control_gov.address)
+    lootbox.pause(True, sender=switchboard.address)
     with boa.reverts("contract paused"):
         lootbox.claimBorrowLoot(bob, sender=teller.address)
 
     # Unpause and verify it works
-    lootbox.pause(False, sender=mission_control_gov.address)
+    lootbox.pause(False, sender=switchboard.address)
     total_ripe = lootbox.claimBorrowLoot(bob, sender=teller.address)
     assert total_ripe > 0
 

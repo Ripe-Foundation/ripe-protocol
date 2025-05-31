@@ -18,9 +18,9 @@ from interfaces import Department
 
 interface MissionControl:
     def setPriorityLiqAssetVaults(_priorityLiqAssetVaults: DynArray[VaultLite, PRIORITY_VAULT_DATA]): nonpayable
-    def setPriorityStabVaults(_priorityStabVaults: DynArray[VaultLite, PRIORITY_VAULT_DATA]): nonpayable
     def setPriorityPriceSourceIds(_priorityIds: DynArray[uint256, MAX_PRIORITY_PRICE_SOURCES]): nonpayable
-    def setAssetConfig(_asset: address, _assetConfig: AssetConfig): nonpayable
+    def setPriorityStabVaults(_priorityStabVaults: DynArray[VaultLite, PRIORITY_VAULT_DATA]): nonpayable
+    def isSupportedAssetInVault(_vaultId: uint256, _asset: address) -> bool: view
     def setRipeRewardsConfig(_rewardsConfig: RipeRewardsConfig): nonpayable
     def setGeneralDebtConfig(_genDebtConfig: GenDebtConfig): nonpayable
     def setUnderscoreRegistry(_underscoreRegistry: address): nonpayable
@@ -72,28 +72,6 @@ struct GenDebtConfig:
     ltvPaybackBuffer: uint256
     genAuctionParams: AuctionParams
 
-struct AssetConfig:
-    vaultIds: DynArray[uint256, MAX_VAULTS_PER_ASSET]
-    stakersPointsAlloc: uint256
-    voterPointsAlloc: uint256
-    perUserDepositLimit: uint256
-    globalDepositLimit: uint256
-    debtTerms: DebtTerms
-    shouldBurnAsPayment: bool
-    shouldTransferToEndaoment: bool
-    shouldSwapInStabPools: bool
-    shouldAuctionInstantly: bool
-    canDeposit: bool
-    canWithdraw: bool
-    canRedeemCollateral: bool
-    canRedeemInStabPool: bool
-    canBuyInAuction: bool
-    canClaimInStabPool: bool
-    specialStabPoolId: uint256
-    customAuctionParams: AuctionParams
-    whitelist: address
-    isNft: bool
-
 struct RipeRewardsConfig:
     arePointsEnabled: bool
     ripePerBlock: uint256
@@ -101,14 +79,6 @@ struct RipeRewardsConfig:
     stakersAlloc: uint256
     votersAlloc: uint256
     genDepositorsAlloc: uint256
-
-struct DebtTerms:
-    ltv: uint256
-    redemptionThreshold: uint256
-    liqThreshold: uint256
-    liqFee: uint256
-    borrowRate: uint256
-    daowry: uint256
 
 struct AuctionParams:
     hasParams: bool
@@ -790,67 +760,6 @@ def _areValidAuctionParams(_params: AuctionParams) -> bool:
     return True
 
 
-################
-# Asset Config #
-################
-
-
-@external
-def setAssetConfig(
-    _asset: address,
-    _vaultIds: DynArray[uint256, MAX_VAULTS_PER_ASSET],
-    _stakersPointsAlloc: uint256,
-    _voterPointsAlloc: uint256,
-    _perUserDepositLimit: uint256,
-    _globalDepositLimit: uint256,
-    _debtTerms: DebtTerms,
-    _shouldBurnAsPayment: bool,
-    _shouldTransferToEndaoment: bool,
-    _shouldSwapInStabPools: bool,
-    _shouldAuctionInstantly: bool,
-    _canDeposit: bool,
-    _canWithdraw: bool,
-    _canRedeemCollateral: bool,
-    _canRedeemInStabPool: bool,
-    _canBuyInAuction: bool,
-    _canClaimInStabPool: bool,
-    _specialStabPoolId: uint256,
-    _customAuctionParams: AuctionParams,
-    _whitelist: address,
-    _isNft: bool,
-) -> bool:
-    assert gov._canGovern(msg.sender) # dev: no perms
-    assert not deptBasics.isPaused # dev: contract paused
-
-    # TODO: add time lock, validation
-
-    mc: address = addys._getMissionControlAddr()
-    assetConfig: AssetConfig = AssetConfig(
-        vaultIds=_vaultIds,
-        stakersPointsAlloc=_stakersPointsAlloc,
-        voterPointsAlloc=_voterPointsAlloc,
-        perUserDepositLimit=_perUserDepositLimit,
-        globalDepositLimit=_globalDepositLimit,
-        debtTerms=_debtTerms,
-        shouldBurnAsPayment=_shouldBurnAsPayment,
-        shouldTransferToEndaoment=_shouldTransferToEndaoment,
-        shouldSwapInStabPools=_shouldSwapInStabPools,
-        shouldAuctionInstantly=_shouldAuctionInstantly,
-        canDeposit=_canDeposit,
-        canWithdraw=_canWithdraw,
-        canRedeemCollateral=_canRedeemCollateral,
-        canRedeemInStabPool=_canRedeemInStabPool,
-        canBuyInAuction=_canBuyInAuction,
-        canClaimInStabPool=_canClaimInStabPool,
-        specialStabPoolId=_specialStabPoolId,
-        customAuctionParams=_customAuctionParams,
-        whitelist=_whitelist,
-        isNft=_isNft,
-    )
-    extcall MissionControl(mc).setAssetConfig(_asset, assetConfig)
-    return True
-
-
 #######################
 # Priority Vault Data #
 #######################
@@ -899,14 +808,14 @@ def setPriorityStabVaults(_priorityStabVaults: DynArray[VaultLite, PRIORITY_VAUL
 def _sanitizePriorityVaults(_priorityVaults: DynArray[VaultLite, PRIORITY_VAULT_DATA]) -> DynArray[VaultLite, PRIORITY_VAULT_DATA]:
     sanitizedVaults: DynArray[VaultLite, PRIORITY_VAULT_DATA] = []
     vaultBook: address = addys._getVaultBookAddr()
+    mc: address = addys._getMissionControlAddr()
     for vault: VaultLite in _priorityVaults:
         if self.vaultDedupe[vault.vaultId][vault.asset]:
             continue
         if not staticcall VaultBook(vaultBook).isValidRegId(vault.vaultId):
             continue
-
-        # TODO: once asset config is complete do a check here that asset is supported by vault
-
+        if not staticcall MissionControl(mc).isSupportedAssetInVault(vault.vaultId, vault.asset):
+            continue
         sanitizedVaults.append(vault)
         self.vaultDedupe[vault.vaultId][vault.asset] = True
     return sanitizedVaults

@@ -159,17 +159,17 @@ def test_stab_vault_redemptions_validation(
     bob,
     alice,
     teller,
-    mission_control_gov,
+    switchboard,
     green_token,
     whale,
 ):
     """Test validation logic for redemptions"""
 
     # Test redemption when paused
-    stability_pool.pause(True, sender=mission_control_gov.address)
+    stability_pool.pause(True, sender=switchboard.address)
     with boa.reverts("contract paused"):
         stability_pool.redeemFromStabilityPool(bravo_token, 100 * EIGHTEEN_DECIMALS, bob, False, sender=teller.address)
-    stability_pool.pause(False, sender=mission_control_gov.address)
+    stability_pool.pause(False, sender=switchboard.address)
 
     # Test redemption with no green tokens
     with boa.reverts("no green to redeem"):

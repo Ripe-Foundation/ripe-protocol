@@ -366,7 +366,7 @@ def test_loot_ripe_rewards_permissions(
 def test_loot_ripe_rewards_pause(
     setRipeRewardsConfig,
     lootbox,
-    mission_control_gov,
+    switchboard,
     teller,
 ):
     ripe_per_block = 5
@@ -375,7 +375,7 @@ def test_loot_ripe_rewards_pause(
     setRipeRewardsConfig(True, ripe_per_block, alloc, alloc, alloc, alloc)
     
     # Pause the contract
-    lootbox.pause(True, sender=mission_control_gov.address)
+    lootbox.pause(True, sender=switchboard.address)
     
     # Cannot update rewards when paused
     with boa.reverts("contract paused"):

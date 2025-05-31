@@ -824,9 +824,6 @@ def getRepayConfig(_user: address) -> RepayConfig:
 @external
 def getRedeemCollateralConfig(_asset: address, _redeemer: address) -> RedeemCollateralConfig:
     assetConfig: AssetConfig = self.assetConfig[_asset]
-
-    # TODO: when setting asset config -> canRedeemCollateral, make sure: has LTV, not stable, not NFT
-
     return RedeemCollateralConfig(
         canRedeemCollateralGeneral=self.genConfig.canRedeemCollateral,
         canRedeemCollateralAsset=assetConfig.canRedeemCollateral,
@@ -901,10 +898,6 @@ def getGenAuctionParams() -> AuctionParams:
 def getAssetLiqConfig(_asset: address) -> AssetLiqConfig:
     assetConfig: AssetConfig = self.assetConfig[_asset]
     vaultBook: address = addys._getVaultBookAddr()
-
-    # TODO: when setting asset config...
-    # shouldTransferToEndaoment -- needs to be stable-ish, etc. Or Stab pool asset (LP token, etc)
-    # shouldSwapInStabPools -- check LTV, whitelist/specialStabPoolId, NFT status
 
     # handle special stab pool
     specialStabPool: VaultData = empty(VaultData)

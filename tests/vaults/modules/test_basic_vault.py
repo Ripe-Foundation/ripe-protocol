@@ -8,7 +8,7 @@ def test_basic_vault_deposit_validation(
     simple_erc20_vault,
     alpha_token,
     alpha_token_whale,
-    mission_control_gov,
+    switchboard,
     bob,
     teller,
 ):
@@ -24,10 +24,10 @@ def test_basic_vault_deposit_validation(
         simple_erc20_vault.depositTokensInVault(bob, alpha_token, 0, sender=teller.address)
 
     # Test deposit when paused
-    simple_erc20_vault.pause(True, sender=mission_control_gov.address)
+    simple_erc20_vault.pause(True, sender=switchboard.address)
     with boa.reverts("contract paused"):
         simple_erc20_vault.depositTokensInVault(bob, alpha_token, 100, sender=teller.address)
-    simple_erc20_vault.pause(False, sender=mission_control_gov.address)
+    simple_erc20_vault.pause(False, sender=switchboard.address)
 
     # Test deposit with amount larger than balance
     large_amount = 1000000 * EIGHTEEN_DECIMALS
@@ -41,7 +41,7 @@ def test_basic_vault_withdrawal_validation(
     simple_erc20_vault,
     alpha_token,
     alpha_token_whale,
-    mission_control_gov,
+    switchboard,
     bob,
     teller,
 ):
@@ -64,10 +64,10 @@ def test_basic_vault_withdrawal_validation(
         simple_erc20_vault.withdrawTokensFromVault(bob, alpha_token, 0, bob, sender=teller.address)
 
     # Test withdrawal when paused
-    simple_erc20_vault.pause(True, sender=mission_control_gov.address)
+    simple_erc20_vault.pause(True, sender=switchboard.address)
     with boa.reverts("contract paused"):
         simple_erc20_vault.withdrawTokensFromVault(bob, alpha_token, 50, bob, sender=teller.address)
-    simple_erc20_vault.pause(False, sender=mission_control_gov.address)
+    simple_erc20_vault.pause(False, sender=switchboard.address)
 
     # Test withdrawal with amount larger than balance
     large_withdraw = 200 * EIGHTEEN_DECIMALS
@@ -84,7 +84,7 @@ def test_basic_vault_transfer_validation(
     alpha_token_whale,
     bob,
     sally,
-    mission_control_gov,
+    switchboard,
     teller,
     auction_house,
 ):
@@ -107,10 +107,10 @@ def test_basic_vault_transfer_validation(
         simple_erc20_vault.transferBalanceWithinVault(alpha_token, bob, sally, 0, sender=auction_house.address)
 
     # Test transfer when paused
-    simple_erc20_vault.pause(True, sender=mission_control_gov.address)
+    simple_erc20_vault.pause(True, sender=switchboard.address)
     with boa.reverts("contract paused"):
         simple_erc20_vault.transferBalanceWithinVault(alpha_token, bob, sally, 50, sender=auction_house.address)
-    simple_erc20_vault.pause(False, sender=mission_control_gov.address)
+    simple_erc20_vault.pause(False, sender=switchboard.address)
 
     # Test transfer with amount larger than balance
     large_transfer = 200 * EIGHTEEN_DECIMALS
