@@ -31,7 +31,7 @@ def __init__(
     gov.__init__(_ripeHq, empty(address), 0, 0, 0)
     addys.__init__(_ripeHq)
     priceData.__init__(False)
-    timeLock.__init__(_minPriceChangeTimeLock, _maxPriceChangeTimeLock, 0)
+    timeLock.__init__(_minPriceChangeTimeLock, _maxPriceChangeTimeLock, 0, _maxPriceChangeTimeLock)
 
 
 # MOCK CONFIG

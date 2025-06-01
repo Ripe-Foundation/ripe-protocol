@@ -23,9 +23,10 @@ def __init__(
     _minTimeLock: uint256,
     _maxTimeLock: uint256,
     _initialTimeLock: uint256,
+    _expiration: uint256,
 ):
     gov.__init__(_ripeHq, empty(address), 0, 0, 0)
-    timeLock.__init__(_minTimeLock, _maxTimeLock, _initialTimeLock)
+    timeLock.__init__(_minTimeLock, _maxTimeLock, _initialTimeLock, _expiration)
 
 
 # add thing

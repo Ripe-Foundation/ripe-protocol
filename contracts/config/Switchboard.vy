@@ -341,7 +341,7 @@ def __init__(
     gov.__init__(_ripeHq, empty(address), 0, 0, 0)
     addys.__init__(_ripeHq)
     deptBasics.__init__(False, False, False) # no minting
-    timeLock.__init__(_minConfigTimeLock, _maxConfigTimeLock, 0)
+    timeLock.__init__(_minConfigTimeLock, _maxConfigTimeLock, 0, _maxConfigTimeLock)
 
     assert _minStaleTime < _maxStaleTime # dev: invalid stale time range
     MIN_STALE_TIME = _minStaleTime
@@ -1106,8 +1106,11 @@ def executePendingAction(_aid: uint256) -> bool:
     assert gov._canGovern(msg.sender) # dev: no perms
     assert not deptBasics.isPaused # dev: contract paused
 
-    # time lock !
-    assert timeLock._confirmAction(_aid) # dev: time lock not reached
+    # check time lock
+    if not timeLock._confirmAction(_aid):
+        if timeLock._isExpired(_aid):
+            self._cancelPendingAction(_aid)
+        return False
 
     actionType: ActionType = self.actionType[_aid]
     mc: address = addys._getMissionControlAddr()
@@ -1210,11 +1213,18 @@ def executePendingAction(_aid: uint256) -> bool:
     return True
 
 
+# cancel action
+
+
 @external
 def cancelPendingAction(_aid: uint256) -> bool:
     assert gov._canGovern(msg.sender) # dev: no perms
     assert not deptBasics.isPaused # dev: contract paused
+    self._cancelPendingAction(_aid)
+    return True
 
+
+@internal
+def _cancelPendingAction(_aid: uint256):
     assert timeLock._cancelAction(_aid) # dev: cannot cancel action
     self.actionType[_aid] = empty(ActionType)
-    return True
