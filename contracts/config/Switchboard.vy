@@ -57,6 +57,11 @@ flag ActionType:
     DEBT_AUCTION_PARAMS
     RIPE_REWARDS_BLOCK
     RIPE_REWARDS_ALLOCS
+    OTHER_PRIORITY_LIQ_ASSET_VAULTS
+    OTHER_PRIORITY_STAB_VAULTS
+    OTHER_PRIORITY_PRICE_SOURCE_IDS
+    OTHER_UNDERSCORE_REGISTRY
+    OTHER_CAN_DISABLE
 
 struct GenConfig:
     perUserMaxVaults: uint256
@@ -109,6 +114,10 @@ struct AuctionParams:
 struct VaultLite:
     vaultId: uint256
     asset: address
+
+struct CanDisable:
+    user: address
+    canDisable: bool
 
 event PendingVaultLimitsChange:
     perUserMaxVaults: uint256
@@ -215,6 +224,32 @@ event RewardsPointsEnabledModified:
     arePointsEnabled: bool
     caller: indexed(address)
 
+event PendingPriorityLiqAssetVaultsChange:
+    numPriorityLiqAssetVaults: uint256
+    confirmationBlock: uint256
+    actionId: uint256
+
+event PendingPriorityStabVaultsChange:
+    numPriorityStabVaults: uint256
+    confirmationBlock: uint256
+    actionId: uint256
+
+event PendingPriorityPriceSourceIdsChange:
+    numPriorityPriceSourceIds: uint256
+    confirmationBlock: uint256
+    actionId: uint256
+
+event PendingUnderscoreRegistryChange:
+    underscoreRegistry: address
+    confirmationBlock: uint256
+    actionId: uint256
+
+event PendingCanDisableChange:
+    user: address
+    canDisable: bool
+    confirmationBlock: uint256
+    actionId: uint256
+
 event VaultLimitsSet:
     perUserMaxVaults: uint256
     perUserMaxAssetsPerVault: uint256
@@ -270,11 +305,17 @@ event CanDisableSet:
     user: indexed(address)
     canDisable: bool
 
-# pending changes
+# pending config changes
 actionType: public(HashMap[uint256, ActionType]) # aid -> type
 pendingRipeRewardsConfig: public(HashMap[uint256, RipeRewardsConfig]) # aid -> config
 pendingGeneralConfig: public(HashMap[uint256, GenConfigLite]) # aid -> config
 pendingDebtConfig: public(HashMap[uint256, GenDebtConfig]) # aid -> config
+
+pendingPriorityLiqAssetVaults: public(HashMap[uint256, DynArray[VaultLite, PRIORITY_VAULT_DATA]])
+pendingPriorityStabVaults: public(HashMap[uint256, DynArray[VaultLite, PRIORITY_VAULT_DATA]])
+pendingPriorityPriceSourceIds: public(HashMap[uint256, DynArray[uint256, MAX_PRIORITY_PRICE_SOURCES]])
+pendingUnderscoreRegistry: public(HashMap[uint256, address])
+pendingCanDisable: public(HashMap[uint256, CanDisable])
 
 # temp data
 vaultDedupe: transient(HashMap[uint256, HashMap[address, bool]]) # vault id -> asset
@@ -817,7 +858,16 @@ def setRipeRewardsAllocs(
 ) -> uint256:
     assert gov._canGovern(msg.sender) # dev: no perms
     assert not deptBasics.isPaused # dev: contract paused
+    assert self._areValidRipeRewardsAllocs(_borrowersAlloc, _stakersAlloc, _votersAlloc, _genDepositorsAlloc) # dev: invalid rewards allocs
     return self._setPendingRipeRewardsConfig(ActionType.RIPE_REWARDS_ALLOCS, 0, _borrowersAlloc, _stakersAlloc, _votersAlloc, _genDepositorsAlloc)
+
+
+@view
+@internal
+def _areValidRipeRewardsAllocs(_borrowersAlloc: uint256, _stakersAlloc: uint256, _votersAlloc: uint256, _genDepositorsAlloc: uint256) -> bool:
+    if _borrowersAlloc + _stakersAlloc + _votersAlloc + _genDepositorsAlloc > HUNDRED_PERCENT:
+        return False
+    return True
 
 
 # set pending ripe rewards config
@@ -892,36 +942,46 @@ def setRewardsPointsEnabled(_shouldEnable: bool) -> bool:
 
 
 @external
-def setPriorityLiqAssetVaults(_priorityLiqAssetVaults: DynArray[VaultLite, PRIORITY_VAULT_DATA]) -> bool:
+def setPriorityLiqAssetVaults(_priorityLiqAssetVaults: DynArray[VaultLite, PRIORITY_VAULT_DATA]) -> uint256:
     assert gov._canGovern(msg.sender) # dev: no perms
     assert not deptBasics.isPaused # dev: contract paused
 
-    # TODO: add time lock
-
     priorityVaults: DynArray[VaultLite, PRIORITY_VAULT_DATA] = self._sanitizePriorityVaults(_priorityLiqAssetVaults)
     assert len(priorityVaults) != 0 # dev: invalid priority vaults
-    extcall MissionControl(addys._getMissionControlAddr()).setPriorityLiqAssetVaults(priorityVaults)
 
-    log PriorityLiqAssetVaultsSet(numVaults=len(priorityVaults))
-    return True
+    aid: uint256 = timeLock._initiateAction()
+    self.actionType[aid] = ActionType.OTHER_PRIORITY_LIQ_ASSET_VAULTS
+    self.pendingPriorityLiqAssetVaults[aid] = priorityVaults
+    confirmationBlock: uint256 = timeLock._getActionConfirmationBlock(aid)
+    log PendingPriorityLiqAssetVaultsChange(
+        numPriorityLiqAssetVaults=len(priorityVaults),
+        confirmationBlock=confirmationBlock,
+        actionId=aid,
+    )
+    return aid
 
 
 # priority stability pools
 
 
 @external
-def setPriorityStabVaults(_priorityStabVaults: DynArray[VaultLite, PRIORITY_VAULT_DATA]) -> bool:
+def setPriorityStabVaults(_priorityStabVaults: DynArray[VaultLite, PRIORITY_VAULT_DATA]) -> uint256:
     assert gov._canGovern(msg.sender) # dev: no perms
     assert not deptBasics.isPaused # dev: contract paused
 
-    # TODO: add time lock
-
     priorityVaults: DynArray[VaultLite, PRIORITY_VAULT_DATA] = self._sanitizePriorityVaults(_priorityStabVaults)
     assert len(priorityVaults) != 0 # dev: invalid priority vaults
-    extcall MissionControl(addys._getMissionControlAddr()).setPriorityStabVaults(priorityVaults)
 
-    log PriorityStabVaultsSet(numVaults=len(priorityVaults))
-    return True
+    aid: uint256 = timeLock._initiateAction()
+    self.actionType[aid] = ActionType.OTHER_PRIORITY_STAB_VAULTS
+    self.pendingPriorityStabVaults[aid] = priorityVaults
+    confirmationBlock: uint256 = timeLock._getActionConfirmationBlock(aid)
+    log PendingPriorityStabVaultsChange(
+        numPriorityStabVaults=len(priorityVaults),
+        confirmationBlock=confirmationBlock,
+        actionId=aid,
+    )
+    return aid
 
 
 # sanitize
@@ -950,18 +1010,23 @@ def _sanitizePriorityVaults(_priorityVaults: DynArray[VaultLite, PRIORITY_VAULT_
 
 
 @external
-def setPriorityPriceSourceIds(_priorityIds: DynArray[uint256, MAX_PRIORITY_PRICE_SOURCES]) -> bool:
+def setPriorityPriceSourceIds(_priorityIds: DynArray[uint256, MAX_PRIORITY_PRICE_SOURCES]) -> uint256:
     assert gov._canGovern(msg.sender) # dev: no perms
     assert not deptBasics.isPaused # dev: contract paused
 
-    # TODO: add time lock
-
     priorityIds: DynArray[uint256, MAX_PRIORITY_PRICE_SOURCES] = self._sanitizePrioritySources(_priorityIds)
     assert len(priorityIds) != 0 # dev: invalid priority sources
-    extcall MissionControl(addys._getMissionControlAddr()).setPriorityPriceSourceIds(priorityIds)
 
-    log PriorityPriceSourceIdsModified(numIds=len(priorityIds))
-    return True
+    aid: uint256 = timeLock._initiateAction()
+    self.actionType[aid] = ActionType.OTHER_PRIORITY_PRICE_SOURCE_IDS
+    self.pendingPriorityPriceSourceIds[aid] = priorityIds
+    confirmationBlock: uint256 = timeLock._getActionConfirmationBlock(aid)
+    log PendingPriorityPriceSourceIdsChange(
+        numPriorityPriceSourceIds=len(priorityIds),
+        confirmationBlock=confirmationBlock,
+        actionId=aid,
+    )
+    return aid
 
 
 @view
@@ -984,19 +1049,22 @@ def _sanitizePrioritySources(_priorityIds: DynArray[uint256, MAX_PRIORITY_PRICE_
 
 
 @external
-def setUnderscoreRegistry(_underscoreRegistry: address) -> bool:
+def setUnderscoreRegistry(_underscoreRegistry: address) -> uint256:
     assert gov._canGovern(msg.sender) # dev: no perms
     assert not deptBasics.isPaused # dev: contract paused
 
-    # TODO: add time lock
-
-    mc: address = addys._getMissionControlAddr()
-    assert staticcall MissionControl(mc).underscoreRegistry() != _underscoreRegistry # dev: already set
     assert self._isValidUnderscoreAddr(_underscoreRegistry) # dev: invalid underscore registry
-    extcall MissionControl(mc).setUnderscoreRegistry(_underscoreRegistry)
 
-    log UnderscoreRegistrySet(addr=_underscoreRegistry)
-    return True
+    aid: uint256 = timeLock._initiateAction()
+    self.actionType[aid] = ActionType.OTHER_UNDERSCORE_REGISTRY
+    self.pendingUnderscoreRegistry[aid] = _underscoreRegistry
+    confirmationBlock: uint256 = timeLock._getActionConfirmationBlock(aid)
+    log PendingUnderscoreRegistryChange(
+        underscoreRegistry=_underscoreRegistry,
+        confirmationBlock=confirmationBlock,
+        actionId=aid,
+    )
+    return aid
 
 
 @view
@@ -1016,19 +1084,16 @@ def _isValidUnderscoreAddr(_addr: address) -> bool:
 
 
 @external
-def setCanDisable(_user: address, _canDisable: bool) -> bool:
+def setCanDisable(_user: address, _canDisable: bool) -> uint256:
     assert gov._canGovern(msg.sender) # dev: no perms
     assert not deptBasics.isPaused # dev: contract paused
 
-    # TODO: add time lock
-
-    mc: address = addys._getMissionControlAddr()
-    assert _user != empty(address) # dev: invalid user
-    assert staticcall MissionControl(mc).canDisable(_user) != _canDisable # dev: already set
-    extcall MissionControl(mc).setCanDisable(_user, _canDisable)
-
-    log CanDisableSet(user=_user, canDisable=_canDisable)
-    return True
+    aid: uint256 = timeLock._initiateAction()
+    self.actionType[aid] = ActionType.OTHER_CAN_DISABLE
+    self.pendingCanDisable[aid] = CanDisable(user=_user, canDisable=_canDisable)
+    confirmationBlock: uint256 = timeLock._getActionConfirmationBlock(aid)
+    log PendingCanDisableChange(user=_user, canDisable=_canDisable, confirmationBlock=confirmationBlock, actionId=aid)
+    return aid
 
 
 #############
@@ -1115,6 +1180,31 @@ def executePendingAction(_aid: uint256) -> bool:
         config.genDepositorsAlloc = p.genDepositorsAlloc
         extcall MissionControl(mc).setRipeRewardsConfig(config)
         log RipeRewardsAllocsSet(borrowersAlloc=p.borrowersAlloc, stakersAlloc=p.stakersAlloc, votersAlloc=p.votersAlloc, genDepositorsAlloc=p.genDepositorsAlloc)
+
+    elif actionType == ActionType.OTHER_PRIORITY_LIQ_ASSET_VAULTS:
+        priorityVaults: DynArray[VaultLite, PRIORITY_VAULT_DATA] = self.pendingPriorityLiqAssetVaults[_aid]
+        extcall MissionControl(mc).setPriorityLiqAssetVaults(priorityVaults)
+        log PriorityLiqAssetVaultsSet(numVaults=len(priorityVaults))
+
+    elif actionType == ActionType.OTHER_PRIORITY_STAB_VAULTS:
+        priorityVaults: DynArray[VaultLite, PRIORITY_VAULT_DATA] = self.pendingPriorityStabVaults[_aid]
+        extcall MissionControl(mc).setPriorityStabVaults(priorityVaults)
+        log PriorityStabVaultsSet(numVaults=len(priorityVaults))
+
+    elif actionType == ActionType.OTHER_PRIORITY_PRICE_SOURCE_IDS:
+        priorityIds: DynArray[uint256, MAX_PRIORITY_PRICE_SOURCES] = self.pendingPriorityPriceSourceIds[_aid]
+        extcall MissionControl(mc).setPriorityPriceSourceIds(priorityIds)
+        log PriorityPriceSourceIdsModified(numIds=len(priorityIds))
+
+    elif actionType == ActionType.OTHER_UNDERSCORE_REGISTRY:
+        underscoreRegistry: address = self.pendingUnderscoreRegistry[_aid]
+        extcall MissionControl(mc).setUnderscoreRegistry(underscoreRegistry)
+        log UnderscoreRegistrySet(addr=underscoreRegistry)
+
+    elif actionType == ActionType.OTHER_CAN_DISABLE:
+        data: CanDisable = self.pendingCanDisable[_aid]
+        extcall MissionControl(mc).setCanDisable(data.user, data.canDisable)
+        log CanDisableSet(user=data.user, canDisable=data.canDisable)
 
     self.actionType[_aid] = empty(ActionType)
     return True

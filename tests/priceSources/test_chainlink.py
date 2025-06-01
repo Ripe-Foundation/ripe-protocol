@@ -721,7 +721,9 @@ def test_chainlink_price_feed_timestamp_validation(
         mock_chainlink.addNewPriceFeed(alpha_token, mock_chainlink_alpha, sender=governance.address)
 
     # set stale time to 1 day
-    switchboard.setStaleTime(ONE_DAY_IN_SECS, sender=governance.address)
+    aid = switchboard.setStaleTime(ONE_DAY_IN_SECS, sender=governance.address)
+    boa.env.time_travel(blocks=switchboard.actionTimeLock() + 1)
+    assert switchboard.executePendingAction(aid, sender=governance.address)
     assert mission_control.getPriceStaleTime() == ONE_DAY_IN_SECS
 
     # Test with old timestamp
