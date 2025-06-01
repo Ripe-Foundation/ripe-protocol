@@ -229,73 +229,6 @@ struct PriceConfig:
 
 # events
 
-event GeneralConfigModified:
-    perUserMaxVaults: uint256
-    perUserMaxAssetsPerVault: uint256
-    priceStaleTime: uint256
-    canDeposit: bool
-    canWithdraw: bool
-    canBorrow: bool
-    canRepay: bool
-    canClaimLoot: bool
-    canLiquidate: bool
-    canRedeemCollateral: bool
-    canRedeemInStabPool: bool
-    canBuyInAuction: bool
-    canClaimInStabPool: bool
-
-event GeneralDebtConfigSet:
-    perUserDebtLimit: uint256
-    globalDebtLimit: uint256
-    minDebtAmount: uint256
-    numAllowedBorrowers: uint256
-    maxBorrowPerInterval: uint256
-    numBlocksPerInterval: uint256
-    keeperFeeRatio: uint256
-    minKeeperFee: uint256
-    isDaowryEnabled: bool
-    ltvPaybackBuffer: uint256
-    genAuctionParams: AuctionParams
-
-event RewardsConfigSet:
-    arePointsEnabled: bool
-    ripePerBlock: uint256
-    borrowersAlloc: uint256
-    stakersAlloc: uint256
-    votersAlloc: uint256
-    genDepositorsAlloc: uint256
-
-event AssetConfigSet:
-    asset: indexed(address)
-    numVaults: uint256
-    stakersPointsAlloc: uint256
-    voterPointsAlloc: uint256
-    perUserDepositLimit: uint256
-    globalDepositLimit: uint256
-    debtTermsLtv: uint256
-    debtTermsRedemptionThreshold: uint256
-    debtTermsLiqThreshold: uint256
-    debtTermsLiqFee: uint256
-    debtTermsBorrowRate: uint256
-    debtTermsDaowry: uint256
-    shouldBurnAsPayment: bool
-    shouldTransferToEndaoment: bool
-    shouldSwapInStabPools: bool
-    shouldAuctionInstantly: bool
-    canDeposit: bool
-    canWithdraw: bool
-    canRedeemCollateral: bool
-    canRedeemInStabPool: bool
-    canBuyInAuction: bool
-    canClaimInStabPool: bool
-    specialStabPoolId: uint256
-    auctionStartDiscount: uint256
-    auctionMaxDiscount: uint256
-    auctionDelay: uint256
-    auctionDuration: uint256
-    whitelist: address
-    isNft: bool
-
 event UserConfigSet:
     user: indexed(address)
     canAnyoneDeposit: bool
@@ -364,22 +297,6 @@ def setGeneralConfig(_config: GenConfig):
     assert addys._canModifyMissionControl(msg.sender) # dev: no perms
     self.genConfig = _config
 
-    log GeneralConfigModified(
-        perUserMaxVaults=_config.perUserMaxVaults,
-        perUserMaxAssetsPerVault=_config.perUserMaxAssetsPerVault,
-        priceStaleTime=_config.priceStaleTime,
-        canDeposit=_config.canDeposit,
-        canWithdraw=_config.canWithdraw,
-        canBorrow=_config.canBorrow,
-        canRepay=_config.canRepay,
-        canClaimLoot=_config.canClaimLoot,
-        canLiquidate=_config.canLiquidate,
-        canRedeemCollateral=_config.canRedeemCollateral,
-        canRedeemInStabPool=_config.canRedeemInStabPool,
-        canBuyInAuction=_config.canBuyInAuction,
-        canClaimInStabPool=_config.canClaimInStabPool,
-    )
-
 
 # debt
 
@@ -389,20 +306,6 @@ def setGeneralDebtConfig(_config: GenDebtConfig):
     assert addys._canModifyMissionControl(msg.sender) # dev: no perms
     self.genDebtConfig = _config
 
-    log GeneralDebtConfigSet(
-        perUserDebtLimit=_config.perUserDebtLimit,
-        globalDebtLimit=_config.globalDebtLimit,
-        minDebtAmount=_config.minDebtAmount,
-        numAllowedBorrowers=_config.numAllowedBorrowers,
-        maxBorrowPerInterval=_config.maxBorrowPerInterval,
-        numBlocksPerInterval=_config.numBlocksPerInterval,
-        keeperFeeRatio=_config.keeperFeeRatio,
-        minKeeperFee=_config.minKeeperFee,
-        isDaowryEnabled=_config.isDaowryEnabled,
-        ltvPaybackBuffer=_config.ltvPaybackBuffer,
-        genAuctionParams=_config.genAuctionParams,
-    )
-
 
 # rewards
 
@@ -411,15 +314,6 @@ def setGeneralDebtConfig(_config: GenDebtConfig):
 def setRipeRewardsConfig(_config: RipeRewardsConfig):
     assert addys._canModifyMissionControl(msg.sender) # dev: no perms
     self.rewardsConfig = _config
-
-    log RewardsConfigSet(
-        arePointsEnabled=_config.arePointsEnabled,
-        ripePerBlock=_config.ripePerBlock,
-        borrowersAlloc=_config.borrowersAlloc,
-        stakersAlloc=_config.stakersAlloc,
-        votersAlloc=_config.votersAlloc,
-        genDepositorsAlloc=_config.genDepositorsAlloc,
-    )
 
 
 ################
@@ -436,38 +330,6 @@ def setAssetConfig(_asset: address, _config: AssetConfig):
     # register asset (if necessary)
     if self.indexOfAsset[_asset] == 0:
         self._registerAsset(_asset)
-
-    log AssetConfigSet(
-        asset=_asset,
-        numVaults=len(_config.vaultIds),
-        stakersPointsAlloc=_config.stakersPointsAlloc,
-        voterPointsAlloc=_config.voterPointsAlloc,
-        perUserDepositLimit=_config.perUserDepositLimit,
-        globalDepositLimit=_config.globalDepositLimit,
-        debtTermsLtv=_config.debtTerms.ltv,
-        debtTermsRedemptionThreshold=_config.debtTerms.redemptionThreshold,
-        debtTermsLiqThreshold=_config.debtTerms.liqThreshold,
-        debtTermsLiqFee=_config.debtTerms.liqFee,
-        debtTermsBorrowRate=_config.debtTerms.borrowRate,
-        debtTermsDaowry=_config.debtTerms.daowry,
-        shouldBurnAsPayment=_config.shouldBurnAsPayment,
-        shouldTransferToEndaoment=_config.shouldTransferToEndaoment,
-        shouldSwapInStabPools=_config.shouldSwapInStabPools,
-        shouldAuctionInstantly=_config.shouldAuctionInstantly,
-        canDeposit=_config.canDeposit,
-        canWithdraw=_config.canWithdraw,
-        canRedeemCollateral=_config.canRedeemCollateral,
-        canRedeemInStabPool=_config.canRedeemInStabPool,
-        canBuyInAuction=_config.canBuyInAuction,
-        canClaimInStabPool=_config.canClaimInStabPool,
-        specialStabPoolId=_config.specialStabPoolId,
-        auctionStartDiscount=_config.customAuctionParams.startDiscount,
-        auctionMaxDiscount=_config.customAuctionParams.maxDiscount,
-        auctionDelay=_config.customAuctionParams.delay,
-        auctionDuration=_config.customAuctionParams.duration,
-        whitelist=_config.whitelist,
-        isNft=_config.isNft,
-    )
 
 
 # points allocs

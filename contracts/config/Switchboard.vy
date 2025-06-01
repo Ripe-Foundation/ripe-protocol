@@ -1,23 +1,17 @@
 # @version 0.4.1
 # pragma optimize codesize
 
-implements: Department
-
 exports: gov.__interface__
 exports: addys.__interface__
-exports: deptBasics.__interface__
 exports: timeLock.__interface__
 
 initializes: gov
 initializes: addys
-initializes: deptBasics[addys := addys]
 initializes: timeLock[gov := gov]
 
 import contracts.modules.LocalGov as gov
 import contracts.modules.Addys as addys
-import contracts.modules.DeptBasics as deptBasics
 import contracts.modules.TimeLock as timeLock
-from interfaces import Department
 
 interface MissionControl:
     def setPriorityLiqAssetVaults(_priorityLiqAssetVaults: DynArray[VaultLite, PRIORITY_VAULT_DATA]): nonpayable
@@ -340,7 +334,6 @@ def __init__(
 ):
     gov.__init__(_ripeHq, empty(address), 0, 0, 0)
     addys.__init__(_ripeHq)
-    deptBasics.__init__(False, False, False) # no minting
     timeLock.__init__(_minConfigTimeLock, _maxConfigTimeLock, 0, _maxConfigTimeLock)
 
     assert _minStaleTime < _maxStaleTime # dev: invalid stale time range
@@ -372,7 +365,6 @@ def _hasPermsToEnable(_caller: address, _shouldEnable: bool) -> bool:
 @external
 def setVaultLimits(_perUserMaxVaults: uint256, _perUserMaxAssetsPerVault: uint256) -> uint256:
     assert gov._canGovern(msg.sender) # dev: no perms
-    assert not deptBasics.isPaused # dev: contract paused
 
     assert self._areValidVaultLimits(_perUserMaxVaults, _perUserMaxAssetsPerVault) # dev: invalid vault limits
     return self._setPendingGenConfig(ActionType.GEN_CONFIG_VAULT_LIMITS, _perUserMaxVaults, _perUserMaxAssetsPerVault)
@@ -394,7 +386,6 @@ def _areValidVaultLimits(_perUserMaxVaults: uint256, _perUserMaxAssetsPerVault: 
 @external
 def setStaleTime(_staleTime: uint256) -> uint256:
     assert gov._canGovern(msg.sender) # dev: no perms
-    assert not deptBasics.isPaused # dev: not activated
 
     assert self._isValidStaleTime(_staleTime) # dev: invalid stale time
     return self._setPendingGenConfig(ActionType.GEN_CONFIG_STALE_TIME, 0, 0, _staleTime)
@@ -447,7 +438,6 @@ def _setPendingGenConfig(
 
 @external
 def setCanDeposit(_shouldEnable: bool) -> bool:
-    assert not deptBasics.isPaused # dev: contract paused
     assert self._hasPermsToEnable(msg.sender, _shouldEnable) # dev: no perms
 
     mc: address = addys._getMissionControlAddr()
@@ -462,7 +452,6 @@ def setCanDeposit(_shouldEnable: bool) -> bool:
 
 @external
 def setCanWithdraw(_shouldEnable: bool) -> bool:
-    assert not deptBasics.isPaused # dev: contract paused
     assert self._hasPermsToEnable(msg.sender, _shouldEnable) # dev: no perms
 
     mc: address = addys._getMissionControlAddr()
@@ -477,7 +466,6 @@ def setCanWithdraw(_shouldEnable: bool) -> bool:
 
 @external
 def setCanBorrow(_shouldEnable: bool) -> bool:
-    assert not deptBasics.isPaused # dev: contract paused
     assert self._hasPermsToEnable(msg.sender, _shouldEnable) # dev: no perms
 
     mc: address = addys._getMissionControlAddr()
@@ -492,7 +480,6 @@ def setCanBorrow(_shouldEnable: bool) -> bool:
 
 @external
 def setCanRepay(_shouldEnable: bool) -> bool:
-    assert not deptBasics.isPaused # dev: contract paused
     assert self._hasPermsToEnable(msg.sender, _shouldEnable) # dev: no perms
 
     mc: address = addys._getMissionControlAddr()
@@ -507,7 +494,6 @@ def setCanRepay(_shouldEnable: bool) -> bool:
 
 @external
 def setCanClaimLoot(_shouldEnable: bool) -> bool:
-    assert not deptBasics.isPaused # dev: contract paused
     assert self._hasPermsToEnable(msg.sender, _shouldEnable) # dev: no perms
 
     mc: address = addys._getMissionControlAddr()
@@ -522,7 +508,6 @@ def setCanClaimLoot(_shouldEnable: bool) -> bool:
 
 @external
 def setCanLiquidate(_shouldEnable: bool) -> bool:
-    assert not deptBasics.isPaused # dev: contract paused
     assert self._hasPermsToEnable(msg.sender, _shouldEnable) # dev: no perms
 
     mc: address = addys._getMissionControlAddr()
@@ -537,7 +522,6 @@ def setCanLiquidate(_shouldEnable: bool) -> bool:
 
 @external
 def setCanRedeemCollateral(_shouldEnable: bool) -> bool:
-    assert not deptBasics.isPaused # dev: contract paused
     assert self._hasPermsToEnable(msg.sender, _shouldEnable) # dev: no perms
 
     mc: address = addys._getMissionControlAddr()
@@ -552,7 +536,6 @@ def setCanRedeemCollateral(_shouldEnable: bool) -> bool:
 
 @external
 def setCanRedeemInStabPool(_shouldEnable: bool) -> bool:
-    assert not deptBasics.isPaused # dev: contract paused
     assert self._hasPermsToEnable(msg.sender, _shouldEnable) # dev: no perms
 
     mc: address = addys._getMissionControlAddr()
@@ -567,7 +550,6 @@ def setCanRedeemInStabPool(_shouldEnable: bool) -> bool:
 
 @external
 def setCanBuyInAuction(_shouldEnable: bool) -> bool:
-    assert not deptBasics.isPaused # dev: contract paused
     assert self._hasPermsToEnable(msg.sender, _shouldEnable) # dev: no perms
 
     mc: address = addys._getMissionControlAddr()
@@ -582,7 +564,6 @@ def setCanBuyInAuction(_shouldEnable: bool) -> bool:
 
 @external
 def setCanClaimInStabPool(_shouldEnable: bool) -> bool:
-    assert not deptBasics.isPaused # dev: contract paused
     assert self._hasPermsToEnable(msg.sender, _shouldEnable) # dev: no perms
 
     mc: address = addys._getMissionControlAddr()
@@ -606,7 +587,6 @@ def setCanClaimInStabPool(_shouldEnable: bool) -> bool:
 @external
 def setGlobalDebtLimits(_perUserDebtLimit: uint256, _globalDebtLimit: uint256, _minDebtAmount: uint256, _numAllowedBorrowers: uint256) -> uint256:
     assert gov._canGovern(msg.sender) # dev: no perms
-    assert not deptBasics.isPaused # dev: contract paused
 
     assert self._areValidDebtLimits(_perUserDebtLimit, _globalDebtLimit, _minDebtAmount, _numAllowedBorrowers) # dev: invalid debt limits
     return self._setPendingDebtConfig(ActionType.DEBT_GLOBAL_LIMITS, _perUserDebtLimit, _globalDebtLimit, _minDebtAmount, _numAllowedBorrowers)
@@ -632,7 +612,6 @@ def _areValidDebtLimits(_perUserDebtLimit: uint256, _globalDebtLimit: uint256, _
 @external
 def setBorrowIntervalConfig(_maxBorrowPerInterval: uint256, _numBlocksPerInterval: uint256) -> uint256:
     assert gov._canGovern(msg.sender) # dev: no perms
-    assert not deptBasics.isPaused # dev: contract paused
 
     assert self._areValidBorrowIntervalConfig(_maxBorrowPerInterval, _numBlocksPerInterval) # dev: invalid borrow interval config
     return self._setPendingDebtConfig(ActionType.DEBT_BORROW_INTERVAL, 0, 0, 0, 0, _maxBorrowPerInterval, _numBlocksPerInterval)
@@ -657,7 +636,6 @@ def _areValidBorrowIntervalConfig(_maxBorrowPerInterval: uint256, _numBlocksPerI
 @external
 def setKeeperConfig(_keeperFeeRatio: uint256, _minKeeperFee: uint256) -> uint256:
     assert gov._canGovern(msg.sender) # dev: no perms
-    assert not deptBasics.isPaused # dev: contract paused
 
     assert self._isValidKeeperConfig(_keeperFeeRatio, _minKeeperFee) # dev: invalid keeper config
     return self._setPendingDebtConfig(ActionType.DEBT_KEEPER_CONFIG, 0, 0, 0, 0, 0, 0, _keeperFeeRatio, _minKeeperFee)
@@ -681,7 +659,6 @@ def _isValidKeeperConfig(_keeperFeeRatio: uint256, _minKeeperFee: uint256) -> bo
 @external
 def setLtvPaybackBuffer(_ltvPaybackBuffer: uint256) -> uint256:
     assert gov._canGovern(msg.sender) # dev: no perms
-    assert not deptBasics.isPaused # dev: contract paused
 
     assert self._isValidLtvPaybackBuffer(_ltvPaybackBuffer) # dev: invalid ltv payback buffer
     return self._setPendingDebtConfig(ActionType.DEBT_LTV_PAYBACK_BUFFER, 0, 0, 0, 0, 0, 0, 0, 0, _ltvPaybackBuffer)
@@ -706,7 +683,6 @@ def setGenAuctionParams(
     _duration: uint256,
 ) -> uint256:
     assert gov._canGovern(msg.sender) # dev: no perms
-    assert not deptBasics.isPaused # dev: contract paused
 
     params: AuctionParams= AuctionParams(
         hasParams=True,
@@ -818,7 +794,6 @@ def _setPendingDebtConfig(
 
 @external
 def setIsDaowryEnabled(_shouldEnable: bool) -> bool:
-    assert not deptBasics.isPaused # dev: contract paused
     assert self._hasPermsToEnable(msg.sender, _shouldEnable) # dev: no perms
 
     mc: address = addys._getMissionControlAddr()
@@ -842,7 +817,6 @@ def setIsDaowryEnabled(_shouldEnable: bool) -> bool:
 @external
 def setRipePerBlock(_ripePerBlock: uint256) -> uint256:
     assert gov._canGovern(msg.sender) # dev: no perms
-    assert not deptBasics.isPaused # dev: contract paused
     return self._setPendingRipeRewardsConfig(ActionType.RIPE_REWARDS_BLOCK, _ripePerBlock)
 
 
@@ -857,7 +831,6 @@ def setRipeRewardsAllocs(
     _genDepositorsAlloc: uint256,
 ) -> uint256:
     assert gov._canGovern(msg.sender) # dev: no perms
-    assert not deptBasics.isPaused # dev: contract paused
     assert self._areValidRipeRewardsAllocs(_borrowersAlloc, _stakersAlloc, _votersAlloc, _genDepositorsAlloc) # dev: invalid rewards allocs
     return self._setPendingRipeRewardsConfig(ActionType.RIPE_REWARDS_ALLOCS, 0, _borrowersAlloc, _stakersAlloc, _votersAlloc, _genDepositorsAlloc)
 
@@ -920,7 +893,6 @@ def _setPendingRipeRewardsConfig(
 
 @external
 def setRewardsPointsEnabled(_shouldEnable: bool) -> bool:
-    assert not deptBasics.isPaused # dev: contract paused
     assert self._hasPermsToEnable(msg.sender, _shouldEnable) # dev: no perms
 
     mc: address = addys._getMissionControlAddr()
@@ -944,7 +916,6 @@ def setRewardsPointsEnabled(_shouldEnable: bool) -> bool:
 @external
 def setPriorityLiqAssetVaults(_priorityLiqAssetVaults: DynArray[VaultLite, PRIORITY_VAULT_DATA]) -> uint256:
     assert gov._canGovern(msg.sender) # dev: no perms
-    assert not deptBasics.isPaused # dev: contract paused
 
     priorityVaults: DynArray[VaultLite, PRIORITY_VAULT_DATA] = self._sanitizePriorityVaults(_priorityLiqAssetVaults)
     assert len(priorityVaults) != 0 # dev: invalid priority vaults
@@ -967,7 +938,6 @@ def setPriorityLiqAssetVaults(_priorityLiqAssetVaults: DynArray[VaultLite, PRIOR
 @external
 def setPriorityStabVaults(_priorityStabVaults: DynArray[VaultLite, PRIORITY_VAULT_DATA]) -> uint256:
     assert gov._canGovern(msg.sender) # dev: no perms
-    assert not deptBasics.isPaused # dev: contract paused
 
     priorityVaults: DynArray[VaultLite, PRIORITY_VAULT_DATA] = self._sanitizePriorityVaults(_priorityStabVaults)
     assert len(priorityVaults) != 0 # dev: invalid priority vaults
@@ -1012,7 +982,6 @@ def _sanitizePriorityVaults(_priorityVaults: DynArray[VaultLite, PRIORITY_VAULT_
 @external
 def setPriorityPriceSourceIds(_priorityIds: DynArray[uint256, MAX_PRIORITY_PRICE_SOURCES]) -> uint256:
     assert gov._canGovern(msg.sender) # dev: no perms
-    assert not deptBasics.isPaused # dev: contract paused
 
     priorityIds: DynArray[uint256, MAX_PRIORITY_PRICE_SOURCES] = self._sanitizePrioritySources(_priorityIds)
     assert len(priorityIds) != 0 # dev: invalid priority sources
@@ -1051,7 +1020,6 @@ def _sanitizePrioritySources(_priorityIds: DynArray[uint256, MAX_PRIORITY_PRICE_
 @external
 def setUnderscoreRegistry(_underscoreRegistry: address) -> uint256:
     assert gov._canGovern(msg.sender) # dev: no perms
-    assert not deptBasics.isPaused # dev: contract paused
 
     assert self._isValidUnderscoreAddr(_underscoreRegistry) # dev: invalid underscore registry
 
@@ -1086,7 +1054,6 @@ def _isValidUnderscoreAddr(_addr: address) -> bool:
 @external
 def setCanDisable(_user: address, _canDisable: bool) -> uint256:
     assert gov._canGovern(msg.sender) # dev: no perms
-    assert not deptBasics.isPaused # dev: contract paused
 
     aid: uint256 = timeLock._initiateAction()
     self.actionType[aid] = ActionType.OTHER_CAN_DISABLE
@@ -1104,7 +1071,6 @@ def setCanDisable(_user: address, _canDisable: bool) -> uint256:
 @external
 def executePendingAction(_aid: uint256) -> bool:
     assert gov._canGovern(msg.sender) # dev: no perms
-    assert not deptBasics.isPaused # dev: contract paused
 
     # check time lock
     if not timeLock._confirmAction(_aid):
@@ -1219,7 +1185,6 @@ def executePendingAction(_aid: uint256) -> bool:
 @external
 def cancelPendingAction(_aid: uint256) -> bool:
     assert gov._canGovern(msg.sender) # dev: no perms
-    assert not deptBasics.isPaused # dev: contract paused
     self._cancelPendingAction(_aid)
     return True
 

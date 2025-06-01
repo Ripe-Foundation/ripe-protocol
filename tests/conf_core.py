@@ -226,10 +226,12 @@ def switchboard(ripe_hq_deploy, fork):
 
 
 @pytest.fixture(scope="session")
-def mainframe(ripe_hq_deploy):
+def mainframe(ripe_hq_deploy, fork):
     return boa.load(
         "contracts/config/Mainframe.vy",
         ripe_hq_deploy,
+        PARAMS[fork]["MIN_HQ_CHANGE_TIMELOCK"],
+        PARAMS[fork]["MAX_HQ_CHANGE_TIMELOCK"],
         name="mainframe",
     )
 
