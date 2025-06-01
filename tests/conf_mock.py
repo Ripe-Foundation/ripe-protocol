@@ -31,6 +31,11 @@ def alice(env):
 
 
 @pytest.fixture(scope="session")
+def charlie(env):
+    return env.generate_address("charlie")
+
+
+@pytest.fixture(scope="session")
 def governance():
     # cannot be EOA
     return boa.load("contracts/mock/MockRando.vy", name="mock_gov")
