@@ -6,14 +6,17 @@ implements: Department
 exports: gov.__interface__
 exports: addys.__interface__
 exports: deptBasics.__interface__
+exports: timeLock.__interface__
 
 initializes: gov
 initializes: addys
 initializes: deptBasics[addys := addys]
+initializes: timeLock[gov := gov]
 
 import contracts.modules.LocalGov as gov
 import contracts.modules.Addys as addys
 import contracts.modules.DeptBasics as deptBasics
+import contracts.modules.TimeLock as timeLock
 from interfaces import Department
 
 interface MissionControl:
@@ -43,6 +46,21 @@ interface UnderscoreAgentFactory:
 
 interface UnderscoreRegistry:
     def getAddy(_addyId: uint256) -> address: view
+
+flag ActionType:
+    RIPE_REWARDS_FULL
+    RIPE_REWARDS_BLOCK
+    RIPE_REWARDS_ALLOCS
+    GEN_CONFIG_FULL
+    GEN_CONFIG_VAULT_LIMITS
+    GEN_CONFIG_STALE_TIME
+    DEBT_CONFIG_FULL
+    DEBT_GLOBAL_LIMITS
+    DEBT_BORROW_INTERVAL
+    DEBT_KEEPER_CONFIG
+    DEBT_DAOWRY_CONFIG
+    DEBT_LTV_PAYBACK_BUFFER
+    DEBT_AUCTION_PARAMS
 
 struct GenConfig:
     perUserMaxVaults: uint256
@@ -91,11 +109,94 @@ struct VaultLite:
     vaultId: uint256
     asset: address
 
+event PendingGeneralConfigChange:
+    perUserMaxVaults: uint256
+    perUserMaxAssetsPerVault: uint256
+    priceStaleTime: uint256
+    canDeposit: bool
+    canWithdraw: bool
+    canBorrow: bool
+    canRepay: bool
+    canClaimLoot: bool
+    canLiquidate: bool
+    canRedeemCollateral: bool
+    canRedeemInStabPool: bool
+    canBuyInAuction: bool
+    canClaimInStabPool: bool
+    confirmationBlock: uint256
+    actionId: uint256
+
+event PendingVaultLimitsChange:
+    perUserMaxVaults: uint256
+    perUserMaxAssetsPerVault: uint256
+    confirmationBlock: uint256
+    actionId: uint256
+
+event PendingStaleTimeChange:
+    priceStaleTime: uint256
+    confirmationBlock: uint256
+    actionId: uint256
+
 event PriorityLiqAssetVaultsSet:
     numVaults: uint256
 
 event PriorityStabVaultsSet:
     numVaults: uint256
+
+event RipeRewardsConfigSet:
+    arePointsEnabled: bool
+    ripePerBlock: uint256
+    borrowersAlloc: uint256
+    stakersAlloc: uint256
+    votersAlloc: uint256
+    genDepositorsAlloc: uint256
+
+event PendingRipeRewardsConfigChange:
+    arePointsEnabled: bool
+    ripePerBlock: uint256
+    borrowersAlloc: uint256
+    stakersAlloc: uint256
+    votersAlloc: uint256
+    genDepositorsAlloc: uint256
+    confirmationBlock: uint256
+    actionId: uint256
+
+event RipeRewardsPerBlockSet:
+    ripePerBlock: uint256
+
+event PendingRipeRewardsPerBlockChange:
+    ripePerBlock: uint256
+    confirmationBlock: uint256
+    actionId: uint256
+
+event PendingRipeRewardsAllocsChange:
+    borrowersAlloc: uint256
+    stakersAlloc: uint256
+    votersAlloc: uint256
+    genDepositorsAlloc: uint256
+    confirmationBlock: uint256
+    actionId: uint256
+
+event RipeRewardsAllocsSet:
+    borrowersAlloc: uint256
+    stakersAlloc: uint256
+    votersAlloc: uint256
+    genDepositorsAlloc: uint256
+
+event GeneralConfigSet:
+    perUserMaxVaults: uint256
+    perUserMaxAssetsPerVault: uint256
+    priceStaleTime: uint256
+    canDeposit: bool
+    canWithdraw: bool
+    canBorrow: bool
+    canRepay: bool
+    canClaimLoot: bool
+    canLiquidate: bool
+    canRedeemCollateral: bool
+    canRedeemInStabPool: bool
+    canBuyInAuction: bool
+    canClaimInStabPool: bool
 
 event RewardsPointsEnabledModified:
     arePointsEnabled: bool
@@ -185,6 +286,12 @@ event IsDaowryEnabledSet:
     isDaowryEnabled: bool
     caller: indexed(address)
 
+# pending changes
+actionType: public(HashMap[uint256, ActionType]) # aid -> type
+pendingRipeRewardsConfig: public(HashMap[uint256, RipeRewardsConfig]) # aid -> config
+pendingGeneralConfig: public(HashMap[uint256, GenConfig]) # aid -> config
+pendingDebtConfig: public(HashMap[uint256, GenDebtConfig]) # aid -> config
+
 # temp data
 vaultDedupe: transient(HashMap[uint256, HashMap[address, bool]]) # vault id -> asset
 
@@ -203,10 +310,13 @@ def __init__(
     _ripeHq: address,
     _minStaleTime: uint256,
     _maxStaleTime: uint256,
+    _minConfigTimeLock: uint256,
+    _maxConfigTimeLock: uint256,
 ):
     gov.__init__(_ripeHq, empty(address), 0, 0, 0)
     addys.__init__(_ripeHq)
     deptBasics.__init__(False, False, False) # no minting
+    timeLock.__init__(_minConfigTimeLock, _maxConfigTimeLock, 0)
 
     assert _minStaleTime < _maxStaleTime # dev: invalid stale time range
     MIN_STALE_TIME = _minStaleTime
@@ -246,65 +356,46 @@ def setGeneralConfig(
     _canRedeemInStabPool: bool,
     _canBuyInAuction: bool,
     _canClaimInStabPool: bool,
-) -> bool:
+) -> uint256:
     assert gov._canGovern(msg.sender) # dev: no perms
     assert not deptBasics.isPaused # dev: contract paused
 
-    # TODO: add time lock
+    assert self._areValidVaultLimits(_perUserMaxVaults, _perUserMaxAssetsPerVault) # dev: invalid vault limits
+    assert self._isValidStaleTime(_priceStaleTime) # dev: invalid stale time
 
-    mc: address = addys._getMissionControlAddr()
-    config: GenConfig = staticcall MissionControl(mc).genConfig()
-    assert self._areValidVaultLimits(_perUserMaxVaults, _perUserMaxAssetsPerVault, max_value(uint256), max_value(uint256)) # dev: invalid vault limits
-    assert self._isValidStaleTime(_priceStaleTime, max_value(uint256)) # dev: invalid stale time
-
-    config.perUserMaxVaults = _perUserMaxVaults
-    config.perUserMaxAssetsPerVault = _perUserMaxAssetsPerVault
-    config.priceStaleTime = _priceStaleTime
-    config.canDeposit = _canDeposit
-    config.canWithdraw = _canWithdraw
-    config.canBorrow = _canBorrow
-    config.canRepay = _canRepay
-    config.canClaimLoot = _canClaimLoot
-    config.canLiquidate = _canLiquidate
-    config.canRedeemCollateral = _canRedeemCollateral
-    config.canRedeemInStabPool = _canRedeemInStabPool
-    config.canBuyInAuction = _canBuyInAuction
-    config.canClaimInStabPool = _canClaimInStabPool
-    extcall MissionControl(mc).setGeneralConfig(config)
-    return True
+    return self._setPendingGeneralConfig(
+        ActionType.GEN_CONFIG_FULL,
+        _perUserMaxVaults,
+        _perUserMaxAssetsPerVault,
+        _priceStaleTime,
+        _canDeposit,
+        _canWithdraw,
+        _canBorrow,
+        _canRepay,
+        _canClaimLoot,
+        _canLiquidate,
+        _canRedeemCollateral,
+        _canRedeemInStabPool,
+        _canBuyInAuction,
+        _canClaimInStabPool,
+    )
 
 
 # vault limits
 
 
 @external
-def setVaultLimits(_perUserMaxVaults: uint256, _perUserMaxAssetsPerVault: uint256) -> bool:
+def setVaultLimits(_perUserMaxVaults: uint256, _perUserMaxAssetsPerVault: uint256) -> uint256:
     assert gov._canGovern(msg.sender) # dev: no perms
     assert not deptBasics.isPaused # dev: contract paused
 
-    # TODO: add time lock
-
-    mc: address = addys._getMissionControlAddr()
-    config: GenConfig = staticcall MissionControl(mc).genConfig()
-    assert self._areValidVaultLimits(_perUserMaxVaults, _perUserMaxAssetsPerVault, config.perUserMaxVaults, config.perUserMaxAssetsPerVault) # dev: invalid vault limits
-    config.perUserMaxVaults = _perUserMaxVaults
-    config.perUserMaxAssetsPerVault = _perUserMaxAssetsPerVault
-    extcall MissionControl(mc).setGeneralConfig(config)
-
-    log VaultLimitsSet(perUserMaxVaults=_perUserMaxVaults, perUserMaxAssetsPerVault=_perUserMaxAssetsPerVault)
-    return True
+    assert self._areValidVaultLimits(_perUserMaxVaults, _perUserMaxAssetsPerVault) # dev: invalid vault limits
+    return self._setPendingGeneralConfig(ActionType.GEN_CONFIG_VAULT_LIMITS, _perUserMaxVaults, _perUserMaxAssetsPerVault)
 
 
 @view
 @internal
-def _areValidVaultLimits(
-    _perUserMaxVaults: uint256,
-    _perUserMaxAssetsPerVault: uint256,
-    _prevPerUserMaxVaults: uint256,
-    _prevPerUserMaxAssetsPerVault: uint256,
-) -> bool:
-    if _perUserMaxVaults == _prevPerUserMaxVaults and _perUserMaxAssetsPerVault == _prevPerUserMaxAssetsPerVault:
-        return False
+def _areValidVaultLimits(_perUserMaxVaults: uint256, _perUserMaxAssetsPerVault: uint256) -> bool:
     if 0 in [_perUserMaxVaults, _perUserMaxAssetsPerVault]:
         return False
     if max_value(uint256) in [_perUserMaxVaults, _perUserMaxAssetsPerVault]:
@@ -316,26 +407,92 @@ def _areValidVaultLimits(
 
 
 @external
-def setStaleTime(_staleTime: uint256) -> bool:
+def setStaleTime(_staleTime: uint256) -> uint256:
     assert gov._canGovern(msg.sender) # dev: no perms
     assert not deptBasics.isPaused # dev: not activated
 
-    mc: address = addys._getMissionControlAddr()
-    config: GenConfig = staticcall MissionControl(mc).genConfig()
-    assert self._isValidStaleTime(_staleTime, config.priceStaleTime) # dev: invalid stale time
-    config.priceStaleTime = _staleTime
-    extcall MissionControl(mc).setGeneralConfig(config)
-
-    log StaleTimeSet(staleTime=_staleTime)
-    return True
+    assert self._isValidStaleTime(_staleTime) # dev: invalid stale time
+    return self._setPendingGeneralConfig(ActionType.GEN_CONFIG_STALE_TIME, 0, 0, _staleTime)
 
 
 @view
 @internal
-def _isValidStaleTime(_staleTime: uint256, _prevStaleTime: uint256) -> bool:
-    if _staleTime == _prevStaleTime:
-        return False
+def _isValidStaleTime(_staleTime: uint256) -> bool:
     return _staleTime >= MIN_STALE_TIME and _staleTime <= MAX_STALE_TIME
+
+
+# set pending general config
+
+
+@internal
+def _setPendingGeneralConfig(
+    _actionType: ActionType,
+    _perUserMaxVaults: uint256 = 0,
+    _perUserMaxAssetsPerVault: uint256 = 0,
+    _priceStaleTime: uint256 = 0,
+    _canDeposit: bool = False,
+    _canWithdraw: bool = False,
+    _canBorrow: bool = False,
+    _canRepay: bool = False,
+    _canClaimLoot: bool = False,
+    _canLiquidate: bool = False,
+    _canRedeemCollateral: bool = False,
+    _canRedeemInStabPool: bool = False,
+    _canBuyInAuction: bool = False,
+    _canClaimInStabPool: bool = False,
+) -> uint256:
+    aid: uint256 = timeLock._initiateAction()
+
+    self.actionType[aid] = _actionType
+    self.pendingGeneralConfig[aid] = GenConfig(
+        perUserMaxVaults=_perUserMaxVaults,
+        perUserMaxAssetsPerVault=_perUserMaxAssetsPerVault,
+        priceStaleTime=_priceStaleTime,
+        canDeposit=_canDeposit,
+        canWithdraw=_canWithdraw,
+        canBorrow=_canBorrow,
+        canRepay=_canRepay,
+        canClaimLoot=_canClaimLoot,
+        canLiquidate=_canLiquidate,
+        canRedeemCollateral=_canRedeemCollateral,
+        canRedeemInStabPool=_canRedeemInStabPool,
+        canBuyInAuction=_canBuyInAuction,
+        canClaimInStabPool=_canClaimInStabPool,
+    )
+
+    confirmationBlock: uint256 = timeLock._getActionConfirmationBlock(aid)
+    if _actionType == ActionType.GEN_CONFIG_FULL:
+        log PendingGeneralConfigChange(
+            perUserMaxVaults=_perUserMaxVaults,
+            perUserMaxAssetsPerVault=_perUserMaxAssetsPerVault,
+            priceStaleTime=_priceStaleTime,
+            canDeposit=_canDeposit,
+            canWithdraw=_canWithdraw,
+            canBorrow=_canBorrow,
+            canRepay=_canRepay,
+            canClaimLoot=_canClaimLoot,
+            canLiquidate=_canLiquidate,
+            canRedeemCollateral=_canRedeemCollateral,
+            canRedeemInStabPool=_canRedeemInStabPool,
+            canBuyInAuction=_canBuyInAuction,
+            canClaimInStabPool=_canClaimInStabPool,
+            confirmationBlock=confirmationBlock,
+            actionId=aid,
+        )
+    elif _actionType == ActionType.GEN_CONFIG_VAULT_LIMITS:
+        log PendingVaultLimitsChange(
+            perUserMaxVaults=_perUserMaxVaults,
+            perUserMaxAssetsPerVault=_perUserMaxAssetsPerVault,
+            confirmationBlock=confirmationBlock,
+            actionId=aid,
+        )
+    elif _actionType == ActionType.GEN_CONFIG_STALE_TIME:
+        log PendingStaleTimeChange(
+            priceStaleTime=_priceStaleTime,
+            confirmationBlock=confirmationBlock,
+            actionId=aid,
+        )
+    return aid
 
 
 # enable / disable
@@ -509,11 +666,9 @@ def setGeneralDebtConfig(
     _isDaowryEnabled: bool,
     _ltvPaybackBuffer: uint256,
     _genAuctionParams: AuctionParams,
-) -> bool:
+) -> uint256:
     assert gov._canGovern(msg.sender) # dev: no perms
     assert not deptBasics.isPaused # dev: contract paused
-
-    # TODO: add time lock
 
     assert self._areValidDebtLimits(_perUserDebtLimit, _globalDebtLimit, _minDebtAmount, _numAllowedBorrowers) # dev: invalid debt limits
     assert self._areValidBorrowIntervalConfig(_maxBorrowPerInterval, _numBlocksPerInterval, _minDebtAmount) # dev: invalid borrow interval config
@@ -521,21 +676,20 @@ def setGeneralDebtConfig(
     assert self._isValidLtvPaybackBuffer(_ltvPaybackBuffer) # dev: invalid ltv payback buffer
     assert self._areValidAuctionParams(_genAuctionParams) # dev: invalid auction params
 
-    genDebtConfig: GenDebtConfig = GenDebtConfig(
-        perUserDebtLimit=_perUserDebtLimit,
-        globalDebtLimit=_globalDebtLimit,
-        minDebtAmount=_minDebtAmount,
-        numAllowedBorrowers=_numAllowedBorrowers,
-        maxBorrowPerInterval=_maxBorrowPerInterval,
-        numBlocksPerInterval=_numBlocksPerInterval,
-        keeperFeeRatio=_keeperFeeRatio,
-        minKeeperFee=_minKeeperFee,
-        isDaowryEnabled=_isDaowryEnabled,
-        ltvPaybackBuffer=_ltvPaybackBuffer,
-        genAuctionParams=_genAuctionParams,
+    return self._setPendingDebtConfig(
+        ActionType.DEBT_CONFIG_FULL,
+        _perUserDebtLimit,
+        _globalDebtLimit,
+        _minDebtAmount,
+        _numAllowedBorrowers,
+        _maxBorrowPerInterval,
+        _numBlocksPerInterval,
+        _keeperFeeRatio,
+        _minKeeperFee,
+        _isDaowryEnabled,
+        _ltvPaybackBuffer,
+        _genAuctionParams,
     )
-    extcall MissionControl(addys._getMissionControlAddr()).setGeneralDebtConfig(genDebtConfig)
-    return True
 
 
 # global debt limits
@@ -547,23 +701,18 @@ def setGlobalDebtLimits(
     _globalDebtLimit: uint256,
     _minDebtAmount: uint256,
     _numAllowedBorrowers: uint256,
-) -> bool:
+) -> uint256:
     assert gov._canGovern(msg.sender) # dev: no perms
     assert not deptBasics.isPaused # dev: contract paused
 
-    # TODO: add time lock
-
     assert self._areValidDebtLimits(_perUserDebtLimit, _globalDebtLimit, _minDebtAmount, _numAllowedBorrowers) # dev: invalid debt limits
-    mc: address = addys._getMissionControlAddr()
-    config: GenDebtConfig = staticcall MissionControl(mc).genDebtConfig()
-    config.perUserDebtLimit = _perUserDebtLimit
-    config.globalDebtLimit = _globalDebtLimit
-    config.minDebtAmount = _minDebtAmount
-    config.numAllowedBorrowers = _numAllowedBorrowers
-    extcall MissionControl(mc).setGeneralDebtConfig(config)
-
-    log GlobalDebtLimitsSet(perUserDebtLimit=_perUserDebtLimit, globalDebtLimit=_globalDebtLimit, minDebtAmount=_minDebtAmount, numAllowedBorrowers=_numAllowedBorrowers)
-    return True
+    return self._setPendingDebtConfig(
+        ActionType.DEBT_GLOBAL_LIMITS,
+        _perUserDebtLimit,
+        _globalDebtLimit,
+        _minDebtAmount,
+        _numAllowedBorrowers,
+    )
 
 
 @view
@@ -592,21 +741,24 @@ def _areValidDebtLimits(
 def setBorrowIntervalConfig(
     _maxBorrowPerInterval: uint256,
     _numBlocksPerInterval: uint256,
-) -> bool:
+) -> uint256:
     assert gov._canGovern(msg.sender) # dev: no perms
     assert not deptBasics.isPaused # dev: contract paused
-
-    # TODO: add time lock
 
     mc: address = addys._getMissionControlAddr()
     config: GenDebtConfig = staticcall MissionControl(mc).genDebtConfig()
     assert self._areValidBorrowIntervalConfig(_maxBorrowPerInterval, _numBlocksPerInterval, config.minDebtAmount) # dev: invalid borrow interval config
-    config.maxBorrowPerInterval = _maxBorrowPerInterval
-    config.numBlocksPerInterval = _numBlocksPerInterval
-    extcall MissionControl(mc).setGeneralDebtConfig(config)
-
-    log BorrowIntervalConfigSet(maxBorrowPerInterval=_maxBorrowPerInterval, numBlocksPerInterval=_numBlocksPerInterval)
-    return True
+    return self._setPendingDebtConfig(
+        ActionType.DEBT_BORROW_INTERVAL,
+        0,
+        0,
+        0,
+        0,
+        _maxBorrowPerInterval,
+        _numBlocksPerInterval,
+        0,
+        0,
+    )
 
 
 @view
@@ -632,21 +784,22 @@ def _areValidBorrowIntervalConfig(
 def setKeeperConfig(
     _keeperFeeRatio: uint256,
     _minKeeperFee: uint256,
-) -> bool:
+) -> uint256:
     assert gov._canGovern(msg.sender) # dev: no perms
     assert not deptBasics.isPaused # dev: contract paused
 
-    # TODO: add time lock
-
     assert self._isValidKeeperConfig(_keeperFeeRatio, _minKeeperFee) # dev: invalid keeper config
-    mc: address = addys._getMissionControlAddr()
-    config: GenDebtConfig = staticcall MissionControl(mc).genDebtConfig()
-    config.keeperFeeRatio = _keeperFeeRatio
-    config.minKeeperFee = _minKeeperFee
-    extcall MissionControl(mc).setGeneralDebtConfig(config)
-
-    log KeeperConfigSet(keeperFeeRatio=_keeperFeeRatio, minKeeperFee=_minKeeperFee)
-    return True
+    return self._setPendingDebtConfig(
+        ActionType.DEBT_KEEPER_CONFIG,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        _keeperFeeRatio,
+        _minKeeperFee,
+    )
 
 
 @view
@@ -683,20 +836,23 @@ def setIsDaowryEnabled(_shouldEnable: bool) -> bool:
 
 
 @external
-def setLtvPaybackBuffer(_ltvPaybackBuffer: uint256) -> bool:
+def setLtvPaybackBuffer(_ltvPaybackBuffer: uint256) -> uint256:
     assert gov._canGovern(msg.sender) # dev: no perms
     assert not deptBasics.isPaused # dev: contract paused
 
     # TODO: add time lock
 
     assert self._isValidLtvPaybackBuffer(_ltvPaybackBuffer) # dev: invalid ltv payback buffer
-    mc: address = addys._getMissionControlAddr()
-    config: GenDebtConfig = staticcall MissionControl(mc).genDebtConfig()
-    config.ltvPaybackBuffer = _ltvPaybackBuffer
-    extcall MissionControl(mc).setGeneralDebtConfig(config)
-
-    log LtvPaybackBufferSet(ltvPaybackBuffer=_ltvPaybackBuffer)
-    return True
+    return self._setPendingDebtConfig(
+        ActionType.DEBT_LTV_PAYBACK_BUFFER,
+        0,
+        0,
+        0,
+        0,
+        0,
+        _ltvPaybackBuffer,
+        0,
+    )
 
 
 @view
@@ -718,11 +874,9 @@ def setGenAuctionParams(
     _maxDiscount: uint256,
     _delay: uint256,
     _duration: uint256,
-) -> bool:
+) -> uint256:
     assert gov._canGovern(msg.sender) # dev: no perms
     assert not deptBasics.isPaused # dev: contract paused
-
-    # TODO: add time lock
 
     params: AuctionParams= AuctionParams(
         hasParams=True,
@@ -732,14 +886,20 @@ def setGenAuctionParams(
         duration=_duration,
     )
     assert self._areValidAuctionParams(params) # dev: invalid auction params
-
-    mc: address = addys._getMissionControlAddr()
-    config: GenDebtConfig = staticcall MissionControl(mc).genDebtConfig()
-    config.genAuctionParams = params
-    extcall MissionControl(mc).setGeneralDebtConfig(config)
-
-    log GenAuctionParamsSet(startDiscount=_startDiscount, maxDiscount=_maxDiscount, delay=_delay, duration=_duration)
-    return True
+    return self._setPendingDebtConfig(
+        ActionType.DEBT_AUCTION_PARAMS,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        False,
+        0,
+        params,
+    )
 
 
 @view
@@ -758,6 +918,46 @@ def _areValidAuctionParams(_params: AuctionParams) -> bool:
     if _params.duration == 0 or _params.duration == max_value(uint256):
         return False
     return True
+
+
+# set pending debt config
+
+
+@internal
+def _setPendingDebtConfig(
+    _actionType: ActionType,
+    _perUserDebtLimit: uint256 = 0,
+    _globalDebtLimit: uint256 = 0,
+    _minDebtAmount: uint256 = 0,
+    _numAllowedBorrowers: uint256 = 0,
+    _maxBorrowPerInterval: uint256 = 0,
+    _numBlocksPerInterval: uint256 = 0,
+    _keeperFeeRatio: uint256 = 0,
+    _minKeeperFee: uint256 = 0,
+    _isDaowryEnabled: bool = False,
+    _ltvPaybackBuffer: uint256 = 0,
+    _genAuctionParams: AuctionParams = empty(AuctionParams),
+) -> uint256:
+    aid: uint256 = timeLock._initiateAction()
+
+    self.actionType[aid] = _actionType
+    self.pendingDebtConfig[aid] = GenDebtConfig(
+        perUserDebtLimit=_perUserDebtLimit,
+        globalDebtLimit=_globalDebtLimit,
+        minDebtAmount=_minDebtAmount,
+        numAllowedBorrowers=_numAllowedBorrowers,
+        maxBorrowPerInterval=_maxBorrowPerInterval,
+        numBlocksPerInterval=_numBlocksPerInterval,
+        keeperFeeRatio=_keeperFeeRatio,
+        minKeeperFee=_minKeeperFee,
+        isDaowryEnabled=_isDaowryEnabled,
+        ltvPaybackBuffer=_ltvPaybackBuffer,
+        genAuctionParams=_genAuctionParams,
+    )
+
+    confirmationBlock: uint256 = timeLock._getActionConfirmationBlock(aid)
+
+    return aid
 
 
 #######################
@@ -887,6 +1087,27 @@ def _isValidUnderscoreAddr(_addr: address) -> bool:
     return not staticcall UnderscoreAgentFactory(agentFactory).isUserWallet(empty(address))
 
 
+###############
+# Can Disable #
+###############
+
+
+@external
+def setCanDisable(_user: address, _canDisable: bool) -> bool:
+    assert gov._canGovern(msg.sender) # dev: no perms
+    assert not deptBasics.isPaused # dev: contract paused
+
+    # TODO: add time lock
+
+    mc: address = addys._getMissionControlAddr()
+    assert _user != empty(address) # dev: invalid user
+    assert staticcall MissionControl(mc).canDisable(_user) != _canDisable # dev: already set
+    extcall MissionControl(mc).setCanDisable(_user, _canDisable)
+
+    log CanDisableSet(user=_user, canDisable=_canDisable)
+    return True
+
+
 ####################
 # Rewards / Points #
 ####################
@@ -900,22 +1121,35 @@ def setRipeRewardsConfig(
     _stakersAlloc: uint256,
     _votersAlloc: uint256,
     _genDepositorsAlloc: uint256,
-) -> bool:
+) -> uint256:
     assert gov._canGovern(msg.sender) # dev: no perms
     assert not deptBasics.isPaused # dev: contract paused
+    return self._setPendingRipeRewardsConfig(ActionType.RIPE_REWARDS_FULL, _arePointsEnabled, _ripePerBlock, _borrowersAlloc, _stakersAlloc, _votersAlloc, _genDepositorsAlloc)
 
-    # TODO: add time lock
 
-    rewardsConfig: RipeRewardsConfig = RipeRewardsConfig(
-        arePointsEnabled=_arePointsEnabled,
-        ripePerBlock=_ripePerBlock,
-        borrowersAlloc=_borrowersAlloc,
-        stakersAlloc=_stakersAlloc,
-        votersAlloc=_votersAlloc,
-        genDepositorsAlloc=_genDepositorsAlloc,
-    )
-    extcall MissionControl(addys._getMissionControlAddr()).setRipeRewardsConfig(rewardsConfig)
-    return True
+# ripe per block
+
+
+@external
+def setRipePerBlock(_ripePerBlock: uint256) -> uint256:
+    assert gov._canGovern(msg.sender) # dev: no perms
+    assert not deptBasics.isPaused # dev: contract paused
+    return self._setPendingRipeRewardsConfig(ActionType.RIPE_REWARDS_BLOCK, False, _ripePerBlock)
+
+
+# allocs
+
+
+@external
+def setRipeRewardsAllocs(
+    _borrowersAlloc: uint256,
+    _stakersAlloc: uint256,
+    _votersAlloc: uint256,
+    _genDepositorsAlloc: uint256,
+) -> uint256:
+    assert gov._canGovern(msg.sender) # dev: no perms
+    assert not deptBasics.isPaused # dev: contract paused
+    return self._setPendingRipeRewardsConfig(ActionType.RIPE_REWARDS_ALLOCS, False, 0, _borrowersAlloc, _stakersAlloc, _votersAlloc, _genDepositorsAlloc)
 
 
 # enable points
@@ -936,22 +1170,110 @@ def setRewardsPointsEnabled(_shouldEnable: bool) -> bool:
     return True
 
 
-###############
-# Can Disable #
-###############
+# set pending ripe rewards config
+
+
+@internal
+def _setPendingRipeRewardsConfig(
+    _actionType: ActionType,
+    _arePointsEnabled: bool = False,
+    _ripePerBlock: uint256 = 0,
+    _borrowersAlloc: uint256 = 0,
+    _stakersAlloc: uint256 = 0,
+    _votersAlloc: uint256 = 0,
+    _genDepositorsAlloc: uint256 = 0,
+) -> uint256:
+    aid: uint256 = timeLock._initiateAction()
+
+    self.actionType[aid] = _actionType
+    self.pendingRipeRewardsConfig[aid] = RipeRewardsConfig(
+        arePointsEnabled=_arePointsEnabled,
+        ripePerBlock=_ripePerBlock,
+        borrowersAlloc=_borrowersAlloc,
+        stakersAlloc=_stakersAlloc,
+        votersAlloc=_votersAlloc,
+        genDepositorsAlloc=_genDepositorsAlloc,
+    )
+
+    confirmationBlock: uint256 = timeLock._getActionConfirmationBlock(aid)
+    if _actionType == ActionType.RIPE_REWARDS_FULL:
+        log PendingRipeRewardsConfigChange(arePointsEnabled=_arePointsEnabled, ripePerBlock=_ripePerBlock, borrowersAlloc=_borrowersAlloc, stakersAlloc=_stakersAlloc, votersAlloc=_votersAlloc, genDepositorsAlloc=_genDepositorsAlloc, confirmationBlock=confirmationBlock, actionId=aid)
+    elif _actionType == ActionType.RIPE_REWARDS_BLOCK:
+        log PendingRipeRewardsPerBlockChange(ripePerBlock=_ripePerBlock, confirmationBlock=confirmationBlock, actionId=aid)
+    elif _actionType == ActionType.RIPE_REWARDS_ALLOCS:
+        log PendingRipeRewardsAllocsChange(borrowersAlloc=_borrowersAlloc, stakersAlloc=_stakersAlloc, votersAlloc=_votersAlloc, genDepositorsAlloc=_genDepositorsAlloc, confirmationBlock=confirmationBlock, actionId=aid)
+
+    return aid
+
+
+#############
+# Execution #
+#############
 
 
 @external
-def setCanDisable(_user: address, _canDisable: bool) -> bool:
+def executePendingAction(_aid: uint256) -> bool:
     assert gov._canGovern(msg.sender) # dev: no perms
     assert not deptBasics.isPaused # dev: contract paused
+    assert timeLock._confirmAction(_aid) # dev: time lock not reached
 
-    # TODO: add time lock
-
+    actionType: ActionType = self.actionType[_aid]
     mc: address = addys._getMissionControlAddr()
-    assert _user != empty(address) # dev: invalid user
-    assert staticcall MissionControl(mc).canDisable(_user) != _canDisable # dev: already set
-    extcall MissionControl(mc).setCanDisable(_user, _canDisable)
 
-    log CanDisableSet(user=_user, canDisable=_canDisable)
+    if actionType == ActionType.RIPE_REWARDS_FULL:
+        config: RipeRewardsConfig = self.pendingRipeRewardsConfig[_aid]
+        extcall MissionControl(mc).setRipeRewardsConfig(config)
+        log RipeRewardsConfigSet(arePointsEnabled=config.arePointsEnabled, ripePerBlock=config.ripePerBlock, borrowersAlloc=config.borrowersAlloc, stakersAlloc=config.stakersAlloc, votersAlloc=config.votersAlloc, genDepositorsAlloc=config.genDepositorsAlloc)
+
+    elif actionType == ActionType.RIPE_REWARDS_BLOCK:
+        config: RipeRewardsConfig = staticcall MissionControl(mc).rewardsConfig()
+        config.ripePerBlock = self.pendingRipeRewardsConfig[_aid].ripePerBlock
+        extcall MissionControl(mc).setRipeRewardsConfig(config)
+        log RipeRewardsPerBlockSet(ripePerBlock=config.ripePerBlock)
+
+    elif actionType == ActionType.RIPE_REWARDS_ALLOCS:
+        config: RipeRewardsConfig = staticcall MissionControl(mc).rewardsConfig()
+        pending: RipeRewardsConfig = self.pendingRipeRewardsConfig[_aid]
+        config.borrowersAlloc = pending.borrowersAlloc
+        config.stakersAlloc = pending.stakersAlloc
+        config.votersAlloc = pending.votersAlloc
+        config.genDepositorsAlloc = pending.genDepositorsAlloc
+        extcall MissionControl(mc).setRipeRewardsConfig(config)
+        log RipeRewardsAllocsSet(borrowersAlloc=pending.borrowersAlloc, stakersAlloc=pending.stakersAlloc, votersAlloc=pending.votersAlloc, genDepositorsAlloc=pending.genDepositorsAlloc)
+
+    elif actionType == ActionType.GEN_CONFIG_FULL:
+        config: GenConfig = self.pendingGeneralConfig[_aid]
+        extcall MissionControl(mc).setGeneralConfig(config)
+        log GeneralConfigSet(
+            perUserMaxVaults=config.perUserMaxVaults,
+            perUserMaxAssetsPerVault=config.perUserMaxAssetsPerVault,
+            priceStaleTime=config.priceStaleTime,
+            canDeposit=config.canDeposit,
+            canWithdraw=config.canWithdraw,
+            canBorrow=config.canBorrow,
+            canRepay=config.canRepay,
+            canClaimLoot=config.canClaimLoot,
+            canLiquidate=config.canLiquidate,
+            canRedeemCollateral=config.canRedeemCollateral,
+            canRedeemInStabPool=config.canRedeemInStabPool,
+            canBuyInAuction=config.canBuyInAuction,
+            canClaimInStabPool=config.canClaimInStabPool,
+        )
+
+    elif actionType == ActionType.GEN_CONFIG_VAULT_LIMITS:
+        config: GenConfig = staticcall MissionControl(mc).genConfig()
+        pending: GenConfig = self.pendingGeneralConfig[_aid]
+        config.perUserMaxVaults = pending.perUserMaxVaults
+        config.perUserMaxAssetsPerVault = pending.perUserMaxAssetsPerVault
+        extcall MissionControl(mc).setGeneralConfig(config)
+        log VaultLimitsSet(perUserMaxVaults=pending.perUserMaxVaults, perUserMaxAssetsPerVault=pending.perUserMaxAssetsPerVault)
+
+    elif actionType == ActionType.GEN_CONFIG_STALE_TIME:
+        config: GenConfig = staticcall MissionControl(mc).genConfig()
+        pending: GenConfig = self.pendingGeneralConfig[_aid]
+        config.priceStaleTime = pending.priceStaleTime
+        extcall MissionControl(mc).setGeneralConfig(config)
+        log StaleTimeSet(staleTime=pending.priceStaleTime)
+
+    self.actionType[_aid] = empty(ActionType)
     return True

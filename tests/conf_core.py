@@ -216,6 +216,8 @@ def switchboard(ripe_hq_deploy, fork):
         ripe_hq_deploy,
         PARAMS[fork]["PRICE_DESK_MIN_STALE_TIME"],
         PARAMS[fork]["PRICE_DESK_MAX_STALE_TIME"],
+        PARAMS[fork]["MIN_HQ_CHANGE_TIMELOCK"],
+        PARAMS[fork]["MAX_HQ_CHANGE_TIMELOCK"],
         name="switchboard",
     )
 
