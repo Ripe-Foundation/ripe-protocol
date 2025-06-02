@@ -289,7 +289,7 @@ def test_loot_borrow_points_permission_checks(
     teller,
     credit_engine,
     createDebtTerms,
-    switchboard,
+    switchboard_one,
 ):
     # basic setup
     setGeneralConfig()
@@ -305,12 +305,12 @@ def test_loot_borrow_points_permission_checks(
         lootbox.updateBorrowPoints(bob, sender=alice)
 
     # Test paused state
-    lootbox.pause(True, sender=switchboard.address)
+    lootbox.pause(True, sender=switchboard_one.address)
     with boa.reverts("contract paused"):
         lootbox.updateBorrowPoints(bob, sender=teller.address)
 
     # Unpause and verify it works
-    lootbox.pause(False, sender=switchboard.address)
+    lootbox.pause(False, sender=switchboard_one.address)
     lootbox.updateBorrowPoints(bob, sender=teller.address)
 
 

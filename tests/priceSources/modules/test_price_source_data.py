@@ -213,7 +213,7 @@ def test_price_source_data_add_duplicate_asset(
 
 def test_price_source_data_pause(
     price_source_mock,
-    switchboard,
+    switchboard_one,
     bob,
 ):
     # Test initial state
@@ -224,7 +224,7 @@ def test_price_source_data_pause(
         price_source_mock.pause(True, sender=bob)
     
     # Test pause
-    price_source_mock.pause(True, sender=switchboard.address)
+    price_source_mock.pause(True, sender=switchboard_one.address)
     
     # Verify pause event
     pause_log = filter_logs(price_source_mock, "PriceSourcePauseModified")[0]
@@ -233,7 +233,7 @@ def test_price_source_data_pause(
     assert price_source_mock.isPaused()
 
     # Test unpause
-    price_source_mock.pause(False, sender=switchboard.address)
+    price_source_mock.pause(False, sender=switchboard_one.address)
     
     # Verify unpause event
     unpause_log = filter_logs(price_source_mock, "PriceSourcePauseModified")[0]
@@ -243,12 +243,12 @@ def test_price_source_data_pause(
 
     # Test no change
     with boa.reverts("no change"):
-        price_source_mock.pause(False, sender=switchboard.address)
+        price_source_mock.pause(False, sender=switchboard_one.address)
 
 
 def test_price_source_data_recover_funds(
     price_source_mock,
-    switchboard,
+    switchboard_one,
     bob,
     alpha_token,
     alpha_token_whale,
@@ -259,22 +259,22 @@ def test_price_source_data_recover_funds(
     
     # Test recovery with zero balance
     with boa.reverts("nothing to recover"):
-        price_source_mock.recoverFunds(bob, alpha_token, sender=switchboard.address)
+        price_source_mock.recoverFunds(bob, alpha_token, sender=switchboard_one.address)
     
     # Test recovery with invalid recipient
     with boa.reverts("invalid recipient or asset"):
-        price_source_mock.recoverFunds(ZERO_ADDRESS, alpha_token, sender=switchboard.address)
+        price_source_mock.recoverFunds(ZERO_ADDRESS, alpha_token, sender=switchboard_one.address)
     
     # Test recovery with invalid asset
     with boa.reverts("invalid recipient or asset"):
-        price_source_mock.recoverFunds(bob, ZERO_ADDRESS, sender=switchboard.address)
+        price_source_mock.recoverFunds(bob, ZERO_ADDRESS, sender=switchboard_one.address)
     
     # Transfer tokens to price source
     amount = 1000
     alpha_token.transfer(price_source_mock, amount, sender=alpha_token_whale)
     
     # Test successful recovery
-    price_source_mock.recoverFunds(bob, alpha_token, sender=switchboard.address)
+    price_source_mock.recoverFunds(bob, alpha_token, sender=switchboard_one.address)
     
     # Verify recovery event
     recovery_log = filter_logs(price_source_mock, "PriceSourceFundsRecovered")[0]
@@ -289,7 +289,7 @@ def test_price_source_data_recover_funds(
 
 def test_price_source_data_recover_funds_many(
     price_source_mock,
-    switchboard,
+    switchboard_one,
     bob,
     alpha_token,
     bravo_token,
@@ -301,16 +301,16 @@ def test_price_source_data_recover_funds_many(
         price_source_mock.recoverFundsMany(bob, [alpha_token, bravo_token], sender=bob)
     
     # Test recovery with empty array
-    price_source_mock.recoverFundsMany(bob, [], sender=switchboard.address)
+    price_source_mock.recoverFundsMany(bob, [], sender=switchboard_one.address)
     # No events should be emitted for empty array
     
     # Test recovery with zero balances
     with boa.reverts("nothing to recover"):
-        price_source_mock.recoverFundsMany(bob, [alpha_token, bravo_token], sender=switchboard.address)
+        price_source_mock.recoverFundsMany(bob, [alpha_token, bravo_token], sender=switchboard_one.address)
     
     # Test recovery with invalid recipient
     with boa.reverts("invalid recipient or asset"):
-        price_source_mock.recoverFundsMany(ZERO_ADDRESS, [alpha_token, bravo_token], sender=switchboard.address)
+        price_source_mock.recoverFundsMany(ZERO_ADDRESS, [alpha_token, bravo_token], sender=switchboard_one.address)
 
     # Transfer tokens to price source
     amount1 = 1000
@@ -320,15 +320,15 @@ def test_price_source_data_recover_funds_many(
 
     # Test recovery with invalid asset
     with boa.reverts("invalid recipient or asset"):
-        price_source_mock.recoverFundsMany(bob, [alpha_token, ZERO_ADDRESS], sender=switchboard.address)
+        price_source_mock.recoverFundsMany(bob, [alpha_token, ZERO_ADDRESS], sender=switchboard_one.address)
     
     # Test recovery with too many assets
     too_many_assets = [alpha_token] * 21  # MAX_RECOVER_ASSETS is 20
     with boa.reverts():
-        price_source_mock.recoverFundsMany(bob, too_many_assets, sender=switchboard.address)
+        price_source_mock.recoverFundsMany(bob, too_many_assets, sender=switchboard_one.address)
     
     # Test successful recovery of multiple assets
-    price_source_mock.recoverFundsMany(bob, [alpha_token, bravo_token], sender=switchboard.address)
+    price_source_mock.recoverFundsMany(bob, [alpha_token, bravo_token], sender=switchboard_one.address)
     
     # Verify recovery events
     recovery_logs = filter_logs(price_source_mock, "PriceSourceFundsRecovered")

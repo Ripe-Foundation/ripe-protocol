@@ -112,7 +112,7 @@ def test_credit_redemption_validation(
     simple_erc20_vault,
     vault_book,
     createDebtTerms,
-    switchboard,
+    switchboard_one,
 ):
     """Test validation logic for redemptions"""
     setGeneralConfig()
@@ -145,10 +145,10 @@ def test_credit_redemption_validation(
     green_token.approve(teller, green_amount, sender=alice)
 
     # Test paused state
-    teller.pause(True, sender=switchboard.address)
+    teller.pause(True, sender=switchboard_one.address)
     with boa.reverts("contract paused"):
         teller.redeemCollateral(bob, vault_id, alpha_token, green_amount, sender=alice)
-    teller.pause(False, sender=switchboard.address)
+    teller.pause(False, sender=switchboard_one.address)
 
     # Test zero address user
     with boa.reverts("no redemptions occurred"):

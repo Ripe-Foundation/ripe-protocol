@@ -18,7 +18,7 @@ def test_ripe_hq_and_tokens_setup(
     auction_house,
     credit_engine,
     lootbox,
-    switchboard,
+    switchboard_one,
     teller,
 ):
     # ripe hq tokens
@@ -28,7 +28,7 @@ def test_ripe_hq_and_tokens_setup(
 
     # registry
     assert ripe_hq.registryChangeTimeLock() != 0
-    assert ripe_hq.getNumAddrs() == 16
+    assert ripe_hq.getNumAddrs() == 17
 
     # governance
     assert ripe_hq.governance() == governance.address
@@ -59,8 +59,8 @@ def test_ripe_hq_and_tokens_setup(
     assert ripe_hq.canMintGreen(auction_house)
     assert ripe_hq.canMintGreen(credit_engine)
     assert ripe_hq.canMintRipe(lootbox)
-    assert ripe_hq.canSetTokenBlacklist(switchboard)
-    assert ripe_hq.canModifyMissionControl(switchboard)
+    assert ripe_hq.canSetTokenBlacklist(switchboard_one)
+    assert ripe_hq.canModifyMissionControl(switchboard_one)
 
     # cannot mint or set token blacklist
     assert not ripe_hq.canMintGreen(teller)

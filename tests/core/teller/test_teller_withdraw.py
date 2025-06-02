@@ -228,7 +228,7 @@ def test_teller_withdraw_teller_paused(
     setGeneralConfig,
     setAssetConfig,
     teller,
-    switchboard,
+    switchboard_one,
     performDeposit,
 ):
     # basic setup
@@ -239,7 +239,7 @@ def test_teller_withdraw_teller_paused(
     performDeposit(bob, deposit_amount, alpha_token, alpha_token_whale)
 
     # pause the teller
-    teller.pause(True, sender=switchboard.address)
+    teller.pause(True, sender=switchboard_one.address)
     assert teller.isPaused()
 
     # attempt withdrawal should fail
@@ -247,7 +247,7 @@ def test_teller_withdraw_teller_paused(
         teller.withdraw(alpha_token, deposit_amount, bob, simple_erc20_vault, sender=bob)
 
     # unpause the teller
-    teller.pause(False, sender=switchboard.address)
+    teller.pause(False, sender=switchboard_one.address)
     assert not teller.isPaused()
 
     # withdrawal should now succeed
