@@ -14,7 +14,7 @@ interface MissionControl:
     def setAssetConfig(_asset: address, _assetConfig: AssetConfig): nonpayable
     def assetConfig(_asset: address) -> AssetConfig: view
     def isSupportedAsset(_asset: address) -> bool: view
-    def canDisable(_user: address) -> bool: view
+    def canPerformLiteAction(_user: address) -> bool: view
     def maxLtvDeviation() -> uint256: view
 
 interface Whitelist:
@@ -256,7 +256,7 @@ def _hasPermsToEnable(_caller: address, _shouldEnable: bool) -> bool:
     if gov._canGovern(_caller):
         return True
     if not _shouldEnable:
-        return staticcall MissionControl(self._getMissionControlAddr()).canDisable(_caller)
+        return staticcall MissionControl(self._getMissionControlAddr()).canPerformLiteAction(_caller)
     return False
 
 

@@ -906,6 +906,17 @@ def _startAuction(
 
 
 @view
+@external
+def canStartAuction(
+    _liqUser: address,
+    _liqVaultId: uint256,
+    _liqAsset: address,
+) -> bool:
+    a: addys.Addys = addys._getAddys()
+    return self._canStartAuction(_liqUser, _liqVaultId, _liqAsset, a.vaultBook, a.ledger)
+
+
+@view
 @internal
 def _canStartAuction(
     _liqUser: address,

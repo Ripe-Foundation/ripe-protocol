@@ -57,7 +57,7 @@ def test_enable_disable_permissions(switchboard_one, governance, bob):
     switchboard_one.setCanDeposit(True, sender=governance.address)
     
     # Set bob as someone who can disable
-    switchboard_one.setCanDisable(bob, True, sender=governance.address)
+    switchboard_one.setCanPerformLiteAction(bob, True, sender=governance.address)
     
     # Time travel to execute the action
     boa.env.time_travel(blocks=switchboard_one.actionTimeLock())
@@ -508,32 +508,32 @@ def test_set_underscore_registry_success(switchboard_one, governance, mock_rando
 
 
 def test_set_can_disable(switchboard_one, governance, bob):
-    action_id = switchboard_one.setCanDisable(bob, True, sender=governance.address)
+    action_id = switchboard_one.setCanPerformLiteAction(bob, True, sender=governance.address)
     assert action_id > 0
     
     # Check event
-    logs = filter_logs(switchboard_one, "PendingCanDisableChange")
+    logs = filter_logs(switchboard_one, "PendingCanPerformLiteAction")
     assert len(logs) == 1
     log = logs[0]
     assert log.user == bob
-    assert log.canDisable == True
+    assert log.canDo == True
 
 
 def test_execute_can_disable(switchboard_one, mission_control, governance, bob):
     # Set can disable
-    action_id = switchboard_one.setCanDisable(bob, True, sender=governance.address)
+    action_id = switchboard_one.setCanPerformLiteAction(bob, True, sender=governance.address)
     boa.env.time_travel(blocks=switchboard_one.actionTimeLock())
     assert switchboard_one.executePendingAction(action_id, sender=governance.address)
     
     # Verify it was applied
-    assert mission_control.canDisable(bob) == True
+    assert mission_control.canPerformLiteAction(bob) == True
     
     # Check event
-    logs = filter_logs(switchboard_one, "CanDisableSet")
+    logs = filter_logs(switchboard_one, "CanPerformLiteAction")
     assert len(logs) == 1
     log = logs[0]
     assert log.user == bob
-    assert log.canDisable == True
+    assert log.canDo == True
 
 
 def test_execute_invalid_action(switchboard_one, governance):
@@ -715,7 +715,7 @@ def test_has_perms_to_enable_complex_scenarios(switchboard_one, governance, bob)
     """Test complex permission scenarios for _hasPermsToEnable logic"""
     
     # Set bob as someone who can disable
-    action_id = switchboard_one.setCanDisable(bob, True, sender=governance.address)
+    action_id = switchboard_one.setCanPerformLiteAction(bob, True, sender=governance.address)
     boa.env.time_travel(blocks=switchboard_one.actionTimeLock())
     switchboard_one.executePendingAction(action_id, sender=governance.address)
     
@@ -730,7 +730,7 @@ def test_has_perms_to_enable_complex_scenarios(switchboard_one, governance, bob)
         switchboard_one.setCanDeposit(True, sender=bob)
     
     # Remove bob's disable permission
-    action_id = switchboard_one.setCanDisable(bob, False, sender=governance.address)
+    action_id = switchboard_one.setCanPerformLiteAction(bob, False, sender=governance.address)
     boa.env.time_travel(blocks=switchboard_one.actionTimeLock())
     switchboard_one.executePendingAction(action_id, sender=governance.address)
     
@@ -1068,8 +1068,8 @@ def test_comprehensive_permission_matrix(switchboard_one, governance, bob, alice
     assert switchboard_one.setCanDeposit(True, sender=governance.address)
     
     # Test with multiple users having disable permissions
-    action_id1 = switchboard_one.setCanDisable(bob, True, sender=governance.address)
-    action_id2 = switchboard_one.setCanDisable(alice, True, sender=governance.address)
+    action_id1 = switchboard_one.setCanPerformLiteAction(bob, True, sender=governance.address)
+    action_id2 = switchboard_one.setCanPerformLiteAction(alice, True, sender=governance.address)
     
     boa.env.time_travel(blocks=switchboard_one.actionTimeLock())
     switchboard_one.executePendingAction(action_id1, sender=governance.address)
@@ -1082,7 +1082,7 @@ def test_comprehensive_permission_matrix(switchboard_one, governance, bob, alice
     switchboard_one.setCanWithdraw(False, sender=alice)  # Alice disables
     
     # Remove bob's permission
-    action_id = switchboard_one.setCanDisable(bob, False, sender=governance.address)
+    action_id = switchboard_one.setCanPerformLiteAction(bob, False, sender=governance.address)
     boa.env.time_travel(blocks=switchboard_one.actionTimeLock())
     switchboard_one.executePendingAction(action_id, sender=governance.address)
     
@@ -1233,11 +1233,11 @@ def test_action_expiration_boundary_conditions(switchboard_one, governance):
     assert not switchboard_one.executePendingAction(action_id2, sender=governance.address)
 
 
-def test_multi_user_complex_permission_scenarios(switchboard_one, mission_control, governance, bob, alice, charlie):
+def test_multi_user_complex_permission_scenarios(switchboard_one, governance, bob, alice, charlie):
     """Test complex scenarios with multiple users having different permissions"""
     # Setup: Give different users different permissions
-    action_id1 = switchboard_one.setCanDisable(bob, True, sender=governance.address)
-    action_id2 = switchboard_one.setCanDisable(alice, True, sender=governance.address)
+    action_id1 = switchboard_one.setCanPerformLiteAction(bob, True, sender=governance.address)
+    action_id2 = switchboard_one.setCanPerformLiteAction(alice, True, sender=governance.address)
     
     boa.env.time_travel(blocks=switchboard_one.actionTimeLock())
     switchboard_one.executePendingAction(action_id1, sender=governance.address)
@@ -1258,7 +1258,7 @@ def test_multi_user_complex_permission_scenarios(switchboard_one, mission_contro
         switchboard_one.setCanBorrow(False, sender=charlie)
     
     # Test removing permissions while actions are pending
-    action_id3 = switchboard_one.setCanDisable(bob, False, sender=governance.address)
+    action_id3 = switchboard_one.setCanPerformLiteAction(bob, False, sender=governance.address)
     
     # Bob should still be able to disable before the action executes
     switchboard_one.setCanDeposit(True, sender=governance.address)  # Re-enable
@@ -1327,7 +1327,7 @@ def test_rapid_sequential_actions_same_type(switchboard_one, governance):
 def test_all_enable_disable_concurrent_state_changes(switchboard_one, mission_control, governance, bob):
     """Test all enable/disable functions with concurrent state changes"""
     # Give bob disable permissions
-    action_id = switchboard_one.setCanDisable(bob, True, sender=governance.address)
+    action_id = switchboard_one.setCanPerformLiteAction(bob, True, sender=governance.address)
     boa.env.time_travel(blocks=switchboard_one.actionTimeLock())
     switchboard_one.executePendingAction(action_id, sender=governance.address)
     
@@ -1360,7 +1360,7 @@ def test_all_enable_disable_concurrent_state_changes(switchboard_one, mission_co
     assert config.canClaimLoot == True  # Never disabled
 
 
-def test_debt_config_interdependencies(switchboard_one, mission_control, governance):
+def test_debt_config_interdependencies(switchboard_one, governance):
     """Test debt config settings that have interdependencies"""
     # Set initial debt limits
     action_id = switchboard_one.setGlobalDebtLimits(5000, 50000, 100, 100, sender=governance.address)
@@ -1540,7 +1540,7 @@ def test_invalid_caller_scenarios(switchboard_one, governance, bob, alice):
         switchboard_one.executePendingAction(action_id, sender=bob)
     
     # Give alice disable permissions
-    action_id2 = switchboard_one.setCanDisable(alice, True, sender=governance.address)
+    action_id2 = switchboard_one.setCanPerformLiteAction(alice, True, sender=governance.address)
     boa.env.time_travel(blocks=switchboard_one.actionTimeLock())
     switchboard_one.executePendingAction(action_id2, sender=governance.address)
     
@@ -1744,7 +1744,7 @@ def test_max_ltv_deviation_success(switchboard_one, governance):
     assert action_id3 == action_id2 + 1  # Should increment
 
 
-def test_execute_max_ltv_deviation(switchboard_one, mission_control, governance):
+def test_execute_max_ltv_deviation(switchboard_one, governance):
     """Test executing max LTV deviation action"""
     # Set max LTV deviation
     deviation = 15_00  # 15%
@@ -1789,7 +1789,7 @@ def test_max_ltv_deviation_boundary_conditions(switchboard_one, governance):
         assert pending == value
 
 
-def test_max_ltv_deviation_full_workflow(switchboard_one, mission_control, governance):
+def test_max_ltv_deviation_full_workflow(switchboard_one, governance):
     """Test complete workflow of setting and executing max LTV deviation"""
     time_lock = switchboard_one.actionTimeLock()
     

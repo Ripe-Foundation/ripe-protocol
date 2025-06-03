@@ -1265,7 +1265,7 @@ def test_permission_can_disable_logic(switchboard_two, switchboard_one, governan
     switchboard_two.executePendingAction(action_id, sender=governance.address)
     
     # Give bob canDisable permission via switchboard_one
-    action_id = switchboard_one.setCanDisable(bob, True, sender=governance.address)
+    action_id = switchboard_one.setCanPerformLiteAction(bob, True, sender=governance.address)
     boa.env.time_travel(blocks=switchboard_one.actionTimeLock())
     switchboard_one.executePendingAction(action_id, sender=governance.address)
     

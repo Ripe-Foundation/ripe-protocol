@@ -18,11 +18,11 @@ interface MissionControl:
     def setRipeRewardsConfig(_rewardsConfig: RipeRewardsConfig): nonpayable
     def setGeneralDebtConfig(_genDebtConfig: GenDebtConfig): nonpayable
     def setUnderscoreRegistry(_underscoreRegistry: address): nonpayable
-    def setCanDisable(_user: address, _canDisable: bool): nonpayable
+    def setCanPerformLiteAction(_user: address, _canDisable: bool): nonpayable
     def setMaxLtvDeviation(_maxLtvDeviation: uint256): nonpayable
     def setGeneralConfig(_genConfig: GenConfig): nonpayable
     def rewardsConfig() -> RipeRewardsConfig: view
-    def canDisable(_user: address) -> bool: view
+    def canPerformLiteAction(_user: address) -> bool: view
     def genDebtConfig() -> GenDebtConfig: view
     def underscoreRegistry() -> address: view
     def genConfig() -> GenConfig: view
@@ -56,7 +56,7 @@ flag ActionType:
     OTHER_PRIORITY_STAB_VAULTS
     OTHER_PRIORITY_PRICE_SOURCE_IDS
     OTHER_UNDERSCORE_REGISTRY
-    OTHER_CAN_DISABLE
+    OTHER_CAN_PERFORM_LITE_ACTION
     MAX_LTV_DEVIATION
 
 flag GenConfigFlag:
@@ -123,9 +123,9 @@ struct VaultLite:
     vaultId: uint256
     asset: address
 
-struct CanDisable:
+struct CanPerform:
     user: address
-    canDisable: bool
+    canDo: bool
 
 event PendingVaultLimitsChange:
     perUserMaxVaults: uint256
@@ -252,9 +252,9 @@ event PendingUnderscoreRegistryChange:
     confirmationBlock: uint256
     actionId: uint256
 
-event PendingCanDisableChange:
+event PendingCanPerformLiteAction:
     user: address
-    canDisable: bool
+    canDo: bool
     confirmationBlock: uint256
     actionId: uint256
 
@@ -314,9 +314,9 @@ event PriorityPriceSourceIdsModified:
 event UnderscoreRegistrySet:
     addr: indexed(address)
 
-event CanDisableSet:
+event CanPerformLiteAction:
     user: indexed(address)
-    canDisable: bool
+    canDo: bool
 
 event MaxLtvDeviationSet:
     newDeviation: uint256
@@ -331,7 +331,7 @@ pendingPriorityLiqAssetVaults: public(HashMap[uint256, DynArray[VaultLite, PRIOR
 pendingPriorityStabVaults: public(HashMap[uint256, DynArray[VaultLite, PRIORITY_VAULT_DATA]])
 pendingPriorityPriceSourceIds: public(HashMap[uint256, DynArray[uint256, MAX_PRIORITY_PRICE_SOURCES]])
 pendingUnderscoreRegistry: public(HashMap[uint256, address])
-pendingCanDisable: public(HashMap[uint256, CanDisable])
+pendingCanPerformLiteAction: public(HashMap[uint256, CanPerform])
 pendingMaxLtvDeviation: public(HashMap[uint256, uint256])
 
 # temp data
@@ -375,7 +375,7 @@ def _hasPermsToEnable(_caller: address, _shouldEnable: bool) -> bool:
     if gov._canGovern(_caller):
         return True
     if not _shouldEnable:
-        return staticcall MissionControl(self._getMissionControlAddr()).canDisable(_caller)
+        return staticcall MissionControl(self._getMissionControlAddr()).canPerformLiteAction(_caller)
     return False
 
 
@@ -1071,20 +1071,20 @@ def _isValidUnderscoreAddr(_addr: address) -> bool:
     return not staticcall UnderscoreAgentFactory(agentFactory).isUserWallet(empty(address))
 
 
-###############
-# Can Disable #
-###############
+###########################
+# Can Perform Lite Action #
+###########################
 
 
 @external
-def setCanDisable(_user: address, _canDisable: bool) -> uint256:
+def setCanPerformLiteAction(_user: address, _canDo: bool) -> uint256:
     assert gov._canGovern(msg.sender) # dev: no perms
 
     aid: uint256 = timeLock._initiateAction()
-    self.actionType[aid] = ActionType.OTHER_CAN_DISABLE
-    self.pendingCanDisable[aid] = CanDisable(user=_user, canDisable=_canDisable)
+    self.actionType[aid] = ActionType.OTHER_CAN_PERFORM_LITE_ACTION
+    self.pendingCanPerformLiteAction[aid] = CanPerform(user=_user, canDo=_canDo)
     confirmationBlock: uint256 = timeLock._getActionConfirmationBlock(aid)
-    log PendingCanDisableChange(user=_user, canDisable=_canDisable, confirmationBlock=confirmationBlock, actionId=aid)
+    log PendingCanPerformLiteAction(user=_user, canDo=_canDo, confirmationBlock=confirmationBlock, actionId=aid)
     return aid
 
 
@@ -1226,10 +1226,10 @@ def executePendingAction(_aid: uint256) -> bool:
         extcall MissionControl(mc).setUnderscoreRegistry(underscoreRegistry)
         log UnderscoreRegistrySet(addr=underscoreRegistry)
 
-    elif actionType == ActionType.OTHER_CAN_DISABLE:
-        data: CanDisable = self.pendingCanDisable[_aid]
-        extcall MissionControl(mc).setCanDisable(data.user, data.canDisable)
-        log CanDisableSet(user=data.user, canDisable=data.canDisable)
+    elif actionType == ActionType.OTHER_CAN_PERFORM_LITE_ACTION:
+        data: CanPerform = self.pendingCanPerformLiteAction[_aid]
+        extcall MissionControl(mc).setCanPerformLiteAction(data.user, data.canDo)
+        log CanPerformLiteAction(user=data.user, canDo=data.canDo)
 
     elif actionType == ActionType.MAX_LTV_DEVIATION:
         p: uint256 = self.pendingMaxLtvDeviation[_aid]

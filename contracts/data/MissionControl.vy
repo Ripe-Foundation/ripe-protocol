@@ -268,7 +268,7 @@ priorityStabVaults: public(DynArray[VaultLite, PRIORITY_VAULT_DATA])
 
 # other
 underscoreRegistry: public(address)
-canDisable: public(HashMap[address, bool]) # user -> canDisable
+canPerformLiteAction: public(HashMap[address, bool]) # user -> canPerformLiteAction
 maxLtvDeviation: public(uint256)
 
 MAX_VAULTS_PER_ASSET: constant(uint256) = 10
@@ -483,13 +483,13 @@ def setUnderscoreRegistry(_underscoreRegistry: address):
     self.underscoreRegistry = _underscoreRegistry
 
 
-# can disable
+# can perform lite action
 
 
 @external
-def setCanDisable(_user: address, _canDisable: bool):
+def setCanPerformLiteAction(_user: address, _canDo: bool):
     assert addys._canModifyMissionControl(msg.sender) # dev: no perms
-    self.canDisable[_user] = _canDisable
+    self.canPerformLiteAction[_user] = _canDo
 
 
 # max ltv deviation

@@ -355,14 +355,14 @@ def switchboard_two(ripe_hq_deploy, fork):
 
 # switchboard three
 
-# TODO update
-
 
 @pytest.fixture(scope="session")
-def switchboard_three(ripe_hq_deploy):
+def switchboard_three(ripe_hq_deploy, fork):
     return boa.load(
         "contracts/config/SwitchboardThree.vy",
         ripe_hq_deploy,
+        PARAMS[fork]["MIN_HQ_CHANGE_TIMELOCK"],
+        PARAMS[fork]["MAX_HQ_CHANGE_TIMELOCK"],
         name="switchboard_three",
     )
 
