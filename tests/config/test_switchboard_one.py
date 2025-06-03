@@ -273,7 +273,7 @@ def test_keeper_config_validation(switchboard_one, governance):
         switchboard_one.setKeeperConfig(11_00, 1000, sender=governance.address)  # > 10% fee ratio
     
     with boa.reverts("invalid keeper config"):
-        switchboard_one.setKeeperConfig(5_00, 101 * 10**18, sender=governance.address)  # > $100 min fee
+        switchboard_one.setKeeperConfig(5_00, 201 * 10**18, sender=governance.address)  # > $200 min fee
     
     with boa.reverts("invalid keeper config"):
         switchboard_one.setKeeperConfig(MAX_UINT256, 1000, sender=governance.address)  # max uint256
@@ -291,16 +291,16 @@ def test_ltv_payback_buffer_validation(switchboard_one, governance):
 def test_auction_params_validation(switchboard_one, governance):
     # Test invalid auction params
     with boa.reverts("invalid auction params"):
-        switchboard_one.setGenAuctionParams(100_00, 50_00, 1000, 2000, sender=governance.address)  # start >= 100%
+        switchboard_one.setGenAuctionParams(100_01, 50_00, 1000, 2000, sender=governance.address)  # start >= 100%
     
     with boa.reverts("invalid auction params"):
-        switchboard_one.setGenAuctionParams(50_00, 100_00, 1000, 2000, sender=governance.address)  # max >= 100%
+        switchboard_one.setGenAuctionParams(50_00, 100_01, 1000, 2000, sender=governance.address)  # max >= 100%
     
     with boa.reverts("invalid auction params"):
         switchboard_one.setGenAuctionParams(60_00, 50_00, 1000, 2000, sender=governance.address)  # start >= max
     
     with boa.reverts("invalid auction params"):
-        switchboard_one.setGenAuctionParams(30_00, 50_00, 2000, 1000, sender=governance.address)  # delay >= duration
+        switchboard_one.setGenAuctionParams(30_00, 50_00, MAX_UINT256, 1000, sender=governance.address)  # invalid delay
     
     with boa.reverts("invalid auction params"):
         switchboard_one.setGenAuctionParams(30_00, 50_00, 1000, 0, sender=governance.address)  # zero duration
@@ -920,6 +920,16 @@ def test_execution_all_action_types_comprehensive(switchboard_one, mission_contr
     logs = filter_logs(switchboard_one, "GenAuctionParamsSet")
     assert len(logs) == 1
     assert logs[0].startDiscount == 20_00
+    
+    # Test max LTV deviation execution
+    action_id = switchboard_one.setMaxLtvDeviation(8_00, sender=governance.address)
+    boa.env.time_travel(blocks=time_lock)
+    assert switchboard_one.executePendingAction(action_id, sender=governance.address)
+    
+    # Check event
+    logs = filter_logs(switchboard_one, "MaxLtvDeviationSet")
+    assert len(logs) == 1
+    assert logs[0].newDeviation == 8_00
 
 
 def test_cancel_action_edge_cases(switchboard_one, governance):
@@ -1506,8 +1516,12 @@ def test_action_type_enum_coverage(switchboard_one, governance):
     action_id = switchboard_one.setRipeRewardsAllocs(25_00, 25_00, 25_00, 25_00, sender=governance.address)
     action_types_tested.add("RIPE_REWARDS_ALLOCS")
     
+    # MAX_LTV_DEVIATION
+    action_id = switchboard_one.setMaxLtvDeviation(10_00, sender=governance.address)
+    action_types_tested.add("MAX_LTV_DEVIATION")
+    
     # Verify we've tested all main action types
-    assert len(action_types_tested) >= 9
+    assert len(action_types_tested) >= 10
 
 
 def test_invalid_caller_scenarios(switchboard_one, governance, bob, alice):
@@ -1685,3 +1699,157 @@ def test_pending_action_data_persistence(switchboard_one, governance):
     # Verify action types are cleared appropriately
     assert switchboard_one.actionType(action1) == 0  # Cancelled
     assert switchboard_one.actionType(action2) == 0  # Executed
+
+
+def test_max_ltv_deviation_validation(switchboard_one, governance, bob):
+    """Test max LTV deviation validation"""
+    # Test invalid deviation - zero value
+    with boa.reverts("invalid max deviation"):
+        switchboard_one.setMaxLtvDeviation(0, sender=governance.address)
+    
+    # Test invalid deviation - greater than 100%
+    with boa.reverts("invalid max deviation"):
+        switchboard_one.setMaxLtvDeviation(101_00, sender=governance.address)  # 101%
+    
+    # Test non-governance cannot set
+    with boa.reverts("no perms"):
+        switchboard_one.setMaxLtvDeviation(10_00, sender=bob)
+
+
+def test_max_ltv_deviation_success(switchboard_one, governance):
+    """Test successful max LTV deviation setting"""
+    # Test valid deviation - 5%
+    action_id = switchboard_one.setMaxLtvDeviation(5_00, sender=governance.address)
+    assert action_id > 0  # Should return a valid action ID
+    
+    # Check event was emitted
+    logs = filter_logs(switchboard_one, "PendingMaxLtvDeviationChange")
+    assert len(logs) == 1
+    log = logs[0]
+    assert log.newDeviation == 5_00
+    assert log.actionId == action_id
+    
+    # Check pending data was stored
+    pending_deviation = switchboard_one.pendingMaxLtvDeviation(action_id)
+    assert pending_deviation == 5_00
+    
+    # Test at exact boundary - 100%
+    action_id2 = switchboard_one.setMaxLtvDeviation(100_00, sender=governance.address)
+    assert action_id2 > 0
+    assert action_id2 == action_id + 1  # Should increment
+    
+    # Test minimum valid value - 1
+    action_id3 = switchboard_one.setMaxLtvDeviation(1, sender=governance.address)
+    assert action_id3 > 0
+    assert action_id3 == action_id2 + 1  # Should increment
+
+
+def test_execute_max_ltv_deviation(switchboard_one, mission_control, governance):
+    """Test executing max LTV deviation action"""
+    # Set max LTV deviation
+    deviation = 15_00  # 15%
+    action_id = switchboard_one.setMaxLtvDeviation(deviation, sender=governance.address)
+    assert action_id > 0  # Should return action ID
+    
+    # Time travel past timelock
+    time_lock = switchboard_one.actionTimeLock()
+    boa.env.time_travel(blocks=time_lock)
+    
+    # Execute the action
+    assert switchboard_one.executePendingAction(action_id, sender=governance.address)
+    
+    # Check event was emitted
+    logs = filter_logs(switchboard_one, "MaxLtvDeviationSet")
+    assert len(logs) == 1
+    log = logs[0]
+    assert log.newDeviation == deviation
+    
+    # Verify the action was cleaned up
+    assert switchboard_one.actionType(action_id) == 0
+    assert not switchboard_one.hasPendingAction(action_id)
+
+
+def test_max_ltv_deviation_boundary_conditions(switchboard_one, governance):
+    """Test max LTV deviation at exact boundary values"""
+    # Test at exactly 100% (should be valid)
+    action_id = switchboard_one.setMaxLtvDeviation(100_00, sender=governance.address)
+    assert action_id > 0
+    
+    # Test at 1 (minimum valid value)
+    action_id = switchboard_one.setMaxLtvDeviation(1, sender=governance.address)
+    assert action_id > 0
+    
+    # Test common percentage values
+    common_values = [1_00, 5_00, 10_00, 25_00, 50_00, 75_00, 99_99]
+    for value in common_values:
+        action_id = switchboard_one.setMaxLtvDeviation(value, sender=governance.address)
+        assert action_id > 0
+        
+        pending = switchboard_one.pendingMaxLtvDeviation(action_id)
+        assert pending == value
+
+
+def test_max_ltv_deviation_full_workflow(switchboard_one, mission_control, governance):
+    """Test complete workflow of setting and executing max LTV deviation"""
+    time_lock = switchboard_one.actionTimeLock()
+    
+    # Create multiple max LTV deviation changes
+    deviations = [10_00, 20_00, 5_00]  # 10%, 20%, 5%
+    action_ids = []
+    
+    for deviation in deviations:
+        action_id = switchboard_one.setMaxLtvDeviation(deviation, sender=governance.address)
+        assert action_id > 0
+        action_ids.append(action_id)
+    
+    # Verify all actions are pending
+    for i, action_id in enumerate(action_ids):
+        assert switchboard_one.hasPendingAction(action_id)
+        assert switchboard_one.pendingMaxLtvDeviation(action_id) == deviations[i]
+    
+    # Execute them in order after timelock
+    boa.env.time_travel(blocks=time_lock)
+    
+    for i, action_id in enumerate(action_ids):
+        # Clear previous events by getting current count
+        logs_before = filter_logs(switchboard_one, "MaxLtvDeviationSet")
+        events_before = len(logs_before)
+        
+        assert switchboard_one.executePendingAction(action_id, sender=governance.address)
+        
+        # Verify new event was emitted
+        logs_after = filter_logs(switchboard_one, "MaxLtvDeviationSet")
+        assert len(logs_after) == events_before + 1  # Should have one more event
+        assert logs_after[-1].newDeviation == deviations[i]  # Check the latest event
+        
+        # Verify cleanup
+        assert not switchboard_one.hasPendingAction(action_id)
+        assert switchboard_one.actionType(action_id) == 0
+
+
+def test_max_ltv_deviation_cancel_and_expire(switchboard_one, governance):
+    """Test canceling and expiring max LTV deviation actions"""
+    # Create an action
+    action_id = switchboard_one.setMaxLtvDeviation(25_00, sender=governance.address)
+    assert action_id > 0
+    
+    # Cancel it
+    assert switchboard_one.cancelPendingAction(action_id, sender=governance.address)
+    assert not switchboard_one.hasPendingAction(action_id)
+    assert switchboard_one.actionType(action_id) == 0
+    
+    # Create another action and let it expire
+    action_id2 = switchboard_one.setMaxLtvDeviation(30_00, sender=governance.address)
+    assert action_id2 > 0
+    
+    # Time travel past expiration
+    time_lock = switchboard_one.actionTimeLock()
+    expiration = switchboard_one.expiration()
+    boa.env.time_travel(blocks=time_lock + expiration + 1)
+    
+    # Try to execute expired action
+    assert not switchboard_one.executePendingAction(action_id2, sender=governance.address)
+    
+    # Verify cleanup occurred
+    assert not switchboard_one.hasPendingAction(action_id2)
+    assert switchboard_one.actionType(action_id2) == 0

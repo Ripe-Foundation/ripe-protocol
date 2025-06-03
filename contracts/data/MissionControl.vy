@@ -269,6 +269,7 @@ priorityStabVaults: public(DynArray[VaultLite, PRIORITY_VAULT_DATA])
 # other
 underscoreRegistry: public(address)
 canDisable: public(HashMap[address, bool]) # user -> canDisable
+maxLtvDeviation: public(uint256)
 
 MAX_VAULTS_PER_ASSET: constant(uint256) = 10
 MAX_PRIORITY_PRICE_SOURCES: constant(uint256) = 10
@@ -282,6 +283,7 @@ def __init__(_ripeHq: address):
     deptBasics.__init__(False, False, False) # no minting
 
     self.numAssets = 1 # not using 0 index
+    self.maxLtvDeviation = 10_00 # 10% default
 
 
 #################
@@ -488,6 +490,15 @@ def setUnderscoreRegistry(_underscoreRegistry: address):
 def setCanDisable(_user: address, _canDisable: bool):
     assert addys._canModifyMissionControl(msg.sender) # dev: no perms
     self.canDisable[_user] = _canDisable
+
+
+# max ltv deviation
+
+
+@external
+def setMaxLtvDeviation(_maxLtvDeviation: uint256):
+    assert addys._canModifyMissionControl(msg.sender) # dev: no perms
+    self.maxLtvDeviation = _maxLtvDeviation
 
 
 # stale price time

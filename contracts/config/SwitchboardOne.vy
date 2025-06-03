@@ -2,15 +2,12 @@
 # pragma optimize codesize
 
 exports: gov.__interface__
-exports: addys.__interface__
 exports: timeLock.__interface__
 
 initializes: gov
-initializes: addys
 initializes: timeLock[gov := gov]
 
 import contracts.modules.LocalGov as gov
-import contracts.modules.Addys as addys
 import contracts.modules.TimeLock as timeLock
 
 interface MissionControl:
@@ -22,6 +19,7 @@ interface MissionControl:
     def setGeneralDebtConfig(_genDebtConfig: GenDebtConfig): nonpayable
     def setUnderscoreRegistry(_underscoreRegistry: address): nonpayable
     def setCanDisable(_user: address, _canDisable: bool): nonpayable
+    def setMaxLtvDeviation(_maxLtvDeviation: uint256): nonpayable
     def setGeneralConfig(_genConfig: GenConfig): nonpayable
     def rewardsConfig() -> RipeRewardsConfig: view
     def canDisable(_user: address) -> bool: view
@@ -41,6 +39,9 @@ interface UnderscoreAgentFactory:
 interface UnderscoreRegistry:
     def getAddy(_addyId: uint256) -> address: view
 
+interface RipeHq:
+    def getAddr(_regId: uint256) -> address: view
+
 flag ActionType:
     GEN_CONFIG_VAULT_LIMITS
     GEN_CONFIG_STALE_TIME
@@ -56,6 +57,19 @@ flag ActionType:
     OTHER_PRIORITY_PRICE_SOURCE_IDS
     OTHER_UNDERSCORE_REGISTRY
     OTHER_CAN_DISABLE
+    MAX_LTV_DEVIATION
+
+flag GenConfigFlag:
+    CAN_DEPOSIT
+    CAN_WITHDRAW
+    CAN_BORROW
+    CAN_REPAY
+    CAN_CLAIM_LOOT
+    CAN_LIQUIDATE
+    CAN_REDEEM_COLLATERAL
+    CAN_REDEEM_IN_STAB_POOL
+    CAN_BUY_IN_AUCTION
+    CAN_CLAIM_IN_STAB_POOL
 
 struct GenConfig:
     perUserMaxVaults: uint256
@@ -244,6 +258,11 @@ event PendingCanDisableChange:
     confirmationBlock: uint256
     actionId: uint256
 
+event PendingMaxLtvDeviationChange:
+    newDeviation: uint256
+    confirmationBlock: uint256
+    actionId: uint256
+
 event VaultLimitsSet:
     perUserMaxVaults: uint256
     perUserMaxAssetsPerVault: uint256
@@ -299,6 +318,9 @@ event CanDisableSet:
     user: indexed(address)
     canDisable: bool
 
+event MaxLtvDeviationSet:
+    newDeviation: uint256
+
 # pending config changes
 actionType: public(HashMap[uint256, ActionType]) # aid -> type
 pendingRipeRewardsConfig: public(HashMap[uint256, RipeRewardsConfig]) # aid -> config
@@ -310,6 +332,7 @@ pendingPriorityStabVaults: public(HashMap[uint256, DynArray[VaultLite, PRIORITY_
 pendingPriorityPriceSourceIds: public(HashMap[uint256, DynArray[uint256, MAX_PRIORITY_PRICE_SOURCES]])
 pendingUnderscoreRegistry: public(HashMap[uint256, address])
 pendingCanDisable: public(HashMap[uint256, CanDisable])
+pendingMaxLtvDeviation: public(HashMap[uint256, uint256])
 
 # temp data
 vaultDedupe: transient(HashMap[uint256, HashMap[address, bool]]) # vault id -> asset
@@ -317,11 +340,14 @@ vaultDedupe: transient(HashMap[uint256, HashMap[address, bool]]) # vault id -> a
 MIN_STALE_TIME: public(immutable(uint256))
 MAX_STALE_TIME: public(immutable(uint256))
 
-MAX_VAULTS_PER_ASSET: constant(uint256) = 10
 MAX_PRIORITY_PRICE_SOURCES: constant(uint256) = 10
 PRIORITY_VAULT_DATA: constant(uint256) = 20
 UNDERSCORE_AGENT_FACTORY_ID: constant(uint256) = 1
 HUNDRED_PERCENT: constant(uint256) = 100_00 # 100%
+
+MISSION_CONTROL_ID: constant(uint256) = 5
+PRICE_DESK_ID: constant(uint256) = 6
+VAULT_BOOK_ID: constant(uint256) = 7
 
 
 @deploy
@@ -333,7 +359,6 @@ def __init__(
     _maxConfigTimeLock: uint256,
 ):
     gov.__init__(_ripeHq, empty(address), 0, 0, 0)
-    addys.__init__(_ripeHq)
     timeLock.__init__(_minConfigTimeLock, _maxConfigTimeLock, 0, _maxConfigTimeLock)
 
     assert _minStaleTime < _maxStaleTime # dev: invalid stale time range
@@ -350,8 +375,29 @@ def _hasPermsToEnable(_caller: address, _shouldEnable: bool) -> bool:
     if gov._canGovern(_caller):
         return True
     if not _shouldEnable:
-        return staticcall MissionControl(addys._getMissionControlAddr()).canDisable(_caller)
+        return staticcall MissionControl(self._getMissionControlAddr()).canDisable(_caller)
     return False
+
+
+# addys lite
+
+
+@view
+@internal
+def _getMissionControlAddr() -> address:
+    return staticcall RipeHq(gov._getRipeHqFromGov()).getAddr(MISSION_CONTROL_ID)
+
+
+@view
+@internal
+def _getPriceDeskAddr() -> address:
+    return staticcall RipeHq(gov._getRipeHqFromGov()).getAddr(PRICE_DESK_ID)
+
+
+@view
+@internal
+def _getVaultBookAddr() -> address:
+    return staticcall RipeHq(gov._getRipeHqFromGov()).getAddr(VAULT_BOOK_ID)
 
 
 ##################
@@ -438,141 +484,113 @@ def _setPendingGenConfig(
 
 @external
 def setCanDeposit(_shouldEnable: bool) -> bool:
-    assert self._hasPermsToEnable(msg.sender, _shouldEnable) # dev: no perms
-
-    mc: address = addys._getMissionControlAddr()
-    config: GenConfig = staticcall MissionControl(mc).genConfig()
-    assert config.canDeposit != _shouldEnable # dev: already set
-    config.canDeposit = _shouldEnable
-    extcall MissionControl(mc).setGeneralConfig(config)
-
-    log CanDepositSet(canDeposit=_shouldEnable, caller=msg.sender)
-    return True
+    return self._setGenConfigFlag(GenConfigFlag.CAN_DEPOSIT, _shouldEnable)
 
 
 @external
 def setCanWithdraw(_shouldEnable: bool) -> bool:
-    assert self._hasPermsToEnable(msg.sender, _shouldEnable) # dev: no perms
-
-    mc: address = addys._getMissionControlAddr()
-    config: GenConfig = staticcall MissionControl(mc).genConfig()
-    assert config.canWithdraw != _shouldEnable # dev: already set
-    config.canWithdraw = _shouldEnable
-    extcall MissionControl(mc).setGeneralConfig(config)
-
-    log CanWithdrawSet(canWithdraw=_shouldEnable, caller=msg.sender)
-    return True
+    return self._setGenConfigFlag(GenConfigFlag.CAN_WITHDRAW, _shouldEnable)
 
 
 @external
 def setCanBorrow(_shouldEnable: bool) -> bool:
-    assert self._hasPermsToEnable(msg.sender, _shouldEnable) # dev: no perms
-
-    mc: address = addys._getMissionControlAddr()
-    config: GenConfig = staticcall MissionControl(mc).genConfig()
-    assert config.canBorrow != _shouldEnable # dev: already set
-    config.canBorrow = _shouldEnable
-    extcall MissionControl(mc).setGeneralConfig(config)
-
-    log CanBorrowSet(canBorrow=_shouldEnable, caller=msg.sender)
-    return True
+    return self._setGenConfigFlag(GenConfigFlag.CAN_BORROW, _shouldEnable)
 
 
 @external
 def setCanRepay(_shouldEnable: bool) -> bool:
-    assert self._hasPermsToEnable(msg.sender, _shouldEnable) # dev: no perms
-
-    mc: address = addys._getMissionControlAddr()
-    config: GenConfig = staticcall MissionControl(mc).genConfig()
-    assert config.canRepay != _shouldEnable # dev: already set
-    config.canRepay = _shouldEnable
-    extcall MissionControl(mc).setGeneralConfig(config)
-
-    log CanRepaySet(canRepay=_shouldEnable, caller=msg.sender)
-    return True
+    return self._setGenConfigFlag(GenConfigFlag.CAN_REPAY, _shouldEnable)
 
 
 @external
 def setCanClaimLoot(_shouldEnable: bool) -> bool:
-    assert self._hasPermsToEnable(msg.sender, _shouldEnable) # dev: no perms
-
-    mc: address = addys._getMissionControlAddr()
-    config: GenConfig = staticcall MissionControl(mc).genConfig()
-    assert config.canClaimLoot != _shouldEnable # dev: already set
-    config.canClaimLoot = _shouldEnable
-    extcall MissionControl(mc).setGeneralConfig(config)
-
-    log CanClaimLootSet(canClaimLoot=_shouldEnable, caller=msg.sender)
-    return True
+    return self._setGenConfigFlag(GenConfigFlag.CAN_CLAIM_LOOT, _shouldEnable)
 
 
 @external
 def setCanLiquidate(_shouldEnable: bool) -> bool:
-    assert self._hasPermsToEnable(msg.sender, _shouldEnable) # dev: no perms
-
-    mc: address = addys._getMissionControlAddr()
-    config: GenConfig = staticcall MissionControl(mc).genConfig()
-    assert config.canLiquidate != _shouldEnable # dev: already set
-    config.canLiquidate = _shouldEnable
-    extcall MissionControl(mc).setGeneralConfig(config)
-
-    log CanLiquidateSet(canLiquidate=_shouldEnable, caller=msg.sender)
-    return True
+    return self._setGenConfigFlag(GenConfigFlag.CAN_LIQUIDATE, _shouldEnable)
 
 
 @external
 def setCanRedeemCollateral(_shouldEnable: bool) -> bool:
-    assert self._hasPermsToEnable(msg.sender, _shouldEnable) # dev: no perms
-
-    mc: address = addys._getMissionControlAddr()
-    config: GenConfig = staticcall MissionControl(mc).genConfig()
-    assert config.canRedeemCollateral != _shouldEnable # dev: already set
-    config.canRedeemCollateral = _shouldEnable
-    extcall MissionControl(mc).setGeneralConfig(config)
-
-    log CanRedeemCollateralSet(canRedeemCollateral=_shouldEnable, caller=msg.sender)
-    return True
+    return self._setGenConfigFlag(GenConfigFlag.CAN_REDEEM_COLLATERAL, _shouldEnable)
 
 
 @external
 def setCanRedeemInStabPool(_shouldEnable: bool) -> bool:
-    assert self._hasPermsToEnable(msg.sender, _shouldEnable) # dev: no perms
-
-    mc: address = addys._getMissionControlAddr()
-    config: GenConfig = staticcall MissionControl(mc).genConfig()
-    assert config.canRedeemInStabPool != _shouldEnable # dev: already set
-    config.canRedeemInStabPool = _shouldEnable
-    extcall MissionControl(mc).setGeneralConfig(config)
-
-    log CanRedeemInStabPoolSet(canRedeemInStabPool=_shouldEnable, caller=msg.sender)
-    return True
+    return self._setGenConfigFlag(GenConfigFlag.CAN_REDEEM_IN_STAB_POOL, _shouldEnable)
 
 
 @external
 def setCanBuyInAuction(_shouldEnable: bool) -> bool:
-    assert self._hasPermsToEnable(msg.sender, _shouldEnable) # dev: no perms
-
-    mc: address = addys._getMissionControlAddr()
-    config: GenConfig = staticcall MissionControl(mc).genConfig()
-    assert config.canBuyInAuction != _shouldEnable # dev: already set
-    config.canBuyInAuction = _shouldEnable
-    extcall MissionControl(mc).setGeneralConfig(config)
-
-    log CanBuyInAuctionSet(canBuyInAuction=_shouldEnable, caller=msg.sender)
-    return True
+    return self._setGenConfigFlag(GenConfigFlag.CAN_BUY_IN_AUCTION, _shouldEnable)
 
 
 @external
 def setCanClaimInStabPool(_shouldEnable: bool) -> bool:
+    return self._setGenConfigFlag(GenConfigFlag.CAN_CLAIM_IN_STAB_POOL, _shouldEnable)
+
+
+@internal
+def _setGenConfigFlag(_flag: GenConfigFlag, _shouldEnable: bool) -> bool:
     assert self._hasPermsToEnable(msg.sender, _shouldEnable) # dev: no perms
 
-    mc: address = addys._getMissionControlAddr()
+    mc: address = self._getMissionControlAddr()
     config: GenConfig = staticcall MissionControl(mc).genConfig()
-    assert config.canClaimInStabPool != _shouldEnable # dev: already set
-    config.canClaimInStabPool = _shouldEnable
-    extcall MissionControl(mc).setGeneralConfig(config)
+    
+    # get current value and validate
+    if _flag == GenConfigFlag.CAN_DEPOSIT:
+        assert config.canDeposit != _shouldEnable # dev: already set
+        config.canDeposit = _shouldEnable
+        log CanDepositSet(canDeposit=_shouldEnable, caller=msg.sender)
 
-    log CanClaimInStabPoolSet(canClaimInStabPool=_shouldEnable, caller=msg.sender)
+    elif _flag == GenConfigFlag.CAN_WITHDRAW:
+        assert config.canWithdraw != _shouldEnable # dev: already set
+        config.canWithdraw = _shouldEnable
+        log CanWithdrawSet(canWithdraw=_shouldEnable, caller=msg.sender)
+
+    elif _flag == GenConfigFlag.CAN_BORROW:
+        assert config.canBorrow != _shouldEnable # dev: already set
+        config.canBorrow = _shouldEnable
+        log CanBorrowSet(canBorrow=_shouldEnable, caller=msg.sender)
+
+    elif _flag == GenConfigFlag.CAN_REPAY:
+        assert config.canRepay != _shouldEnable # dev: already set
+        config.canRepay = _shouldEnable
+        log CanRepaySet(canRepay=_shouldEnable, caller=msg.sender)
+
+    elif _flag == GenConfigFlag.CAN_CLAIM_LOOT:
+        assert config.canClaimLoot != _shouldEnable # dev: already set
+        config.canClaimLoot = _shouldEnable
+        log CanClaimLootSet(canClaimLoot=_shouldEnable, caller=msg.sender)
+
+    elif _flag == GenConfigFlag.CAN_LIQUIDATE:
+        assert config.canLiquidate != _shouldEnable # dev: already set
+        config.canLiquidate = _shouldEnable
+        log CanLiquidateSet(canLiquidate=_shouldEnable, caller=msg.sender)
+
+    elif _flag == GenConfigFlag.CAN_REDEEM_COLLATERAL:
+        assert config.canRedeemCollateral != _shouldEnable # dev: already set
+        config.canRedeemCollateral = _shouldEnable
+        log CanRedeemCollateralSet(canRedeemCollateral=_shouldEnable, caller=msg.sender)
+
+    elif _flag == GenConfigFlag.CAN_REDEEM_IN_STAB_POOL:
+        assert config.canRedeemInStabPool != _shouldEnable # dev: already set
+        config.canRedeemInStabPool = _shouldEnable
+        log CanRedeemInStabPoolSet(canRedeemInStabPool=_shouldEnable, caller=msg.sender)
+
+    elif _flag == GenConfigFlag.CAN_BUY_IN_AUCTION:
+        assert config.canBuyInAuction != _shouldEnable # dev: already set
+        config.canBuyInAuction = _shouldEnable
+        log CanBuyInAuctionSet(canBuyInAuction=_shouldEnable, caller=msg.sender)
+
+    elif _flag == GenConfigFlag.CAN_CLAIM_IN_STAB_POOL:
+        assert config.canClaimInStabPool != _shouldEnable # dev: already set
+        config.canClaimInStabPool = _shouldEnable
+        log CanClaimInStabPoolSet(canClaimInStabPool=_shouldEnable, caller=msg.sender)
+    
+    extcall MissionControl(mc).setGeneralConfig(config)
     return True
 
 
@@ -624,7 +642,7 @@ def _areValidBorrowIntervalConfig(_maxBorrowPerInterval: uint256, _numBlocksPerI
         return False
     if max_value(uint256) in [_maxBorrowPerInterval, _numBlocksPerInterval]:
         return False
-    config: GenDebtConfig = staticcall MissionControl(addys._getMissionControlAddr()).genDebtConfig()
+    config: GenDebtConfig = staticcall MissionControl(self._getMissionControlAddr()).genDebtConfig()
     if _maxBorrowPerInterval < config.minDebtAmount:
         return False
     return True
@@ -648,7 +666,7 @@ def _isValidKeeperConfig(_keeperFeeRatio: uint256, _minKeeperFee: uint256) -> bo
         return False
     if _keeperFeeRatio > 10_00: # 10% max
         return False
-    if _minKeeperFee > 100 * (10 ** 18): # $100 max
+    if _minKeeperFee > 200 * (10 ** 18): # $200 max
         return False
     return True
 
@@ -696,17 +714,23 @@ def setGenAuctionParams(
 
 
 @view
+@external
+def areValidAuctionParams(_params: AuctionParams) -> bool:
+    return self._areValidAuctionParams(_params)
+
+
+@view
 @internal
 def _areValidAuctionParams(_params: AuctionParams) -> bool:
     if not _params.hasParams:
         return False
-    if _params.startDiscount >= HUNDRED_PERCENT:
+    if _params.startDiscount > HUNDRED_PERCENT:
         return False
-    if _params.maxDiscount >= HUNDRED_PERCENT:
+    if _params.maxDiscount > HUNDRED_PERCENT:
         return False
     if _params.startDiscount >= _params.maxDiscount:
         return False
-    if _params.delay >= _params.duration:
+    if _params.delay == max_value(uint256):
         return False
     if _params.duration == 0 or _params.duration == max_value(uint256):
         return False
@@ -796,7 +820,7 @@ def _setPendingDebtConfig(
 def setIsDaowryEnabled(_shouldEnable: bool) -> bool:
     assert self._hasPermsToEnable(msg.sender, _shouldEnable) # dev: no perms
 
-    mc: address = addys._getMissionControlAddr()
+    mc: address = self._getMissionControlAddr()
     config: GenDebtConfig = staticcall MissionControl(mc).genDebtConfig()
     assert config.isDaowryEnabled != _shouldEnable # dev: already set
     config.isDaowryEnabled = _shouldEnable
@@ -817,6 +841,7 @@ def setIsDaowryEnabled(_shouldEnable: bool) -> bool:
 @external
 def setRipePerBlock(_ripePerBlock: uint256) -> uint256:
     assert gov._canGovern(msg.sender) # dev: no perms
+    assert _ripePerBlock != max_value(uint256) # dev: invalid ripe per block
     return self._setPendingRipeRewardsConfig(ActionType.RIPE_REWARDS_BLOCK, _ripePerBlock)
 
 
@@ -895,7 +920,7 @@ def _setPendingRipeRewardsConfig(
 def setRewardsPointsEnabled(_shouldEnable: bool) -> bool:
     assert self._hasPermsToEnable(msg.sender, _shouldEnable) # dev: no perms
 
-    mc: address = addys._getMissionControlAddr()
+    mc: address = self._getMissionControlAddr()
     rewardsConfig: RipeRewardsConfig = staticcall MissionControl(mc).rewardsConfig()
     assert rewardsConfig.arePointsEnabled != _shouldEnable # dev: already set
     rewardsConfig.arePointsEnabled = _shouldEnable
@@ -960,8 +985,8 @@ def setPriorityStabVaults(_priorityStabVaults: DynArray[VaultLite, PRIORITY_VAUL
 @internal
 def _sanitizePriorityVaults(_priorityVaults: DynArray[VaultLite, PRIORITY_VAULT_DATA]) -> DynArray[VaultLite, PRIORITY_VAULT_DATA]:
     sanitizedVaults: DynArray[VaultLite, PRIORITY_VAULT_DATA] = []
-    vaultBook: address = addys._getVaultBookAddr()
-    mc: address = addys._getMissionControlAddr()
+    vaultBook: address = self._getVaultBookAddr()
+    mc: address = self._getMissionControlAddr()
     for vault: VaultLite in _priorityVaults:
         if self.vaultDedupe[vault.vaultId][vault.asset]:
             continue
@@ -1002,7 +1027,7 @@ def setPriorityPriceSourceIds(_priorityIds: DynArray[uint256, MAX_PRIORITY_PRICE
 @internal
 def _sanitizePrioritySources(_priorityIds: DynArray[uint256, MAX_PRIORITY_PRICE_SOURCES]) -> DynArray[uint256, MAX_PRIORITY_PRICE_SOURCES]:
     sanitizedIds: DynArray[uint256, MAX_PRIORITY_PRICE_SOURCES] = []
-    priceDesk: address = addys._getPriceDeskAddr()
+    priceDesk: address = self._getPriceDeskAddr()
     for pid: uint256 in _priorityIds:
         if not staticcall PriceDesk(priceDesk).isValidRegId(pid):
             continue
@@ -1063,6 +1088,37 @@ def setCanDisable(_user: address, _canDisable: bool) -> uint256:
     return aid
 
 
+#####################
+# Max LTV Deviation #
+#####################
+
+
+@external
+def setMaxLtvDeviation(_newDeviation: uint256) -> uint256:
+    assert gov._canGovern(msg.sender) # dev: no perms
+
+    assert self._isValidMaxDeviation(_newDeviation) # dev: invalid max deviation
+
+    aid: uint256 = timeLock._initiateAction()
+    self.actionType[aid] = ActionType.MAX_LTV_DEVIATION
+    self.pendingMaxLtvDeviation[aid] = _newDeviation
+
+    log PendingMaxLtvDeviationChange(
+        newDeviation=_newDeviation,
+        confirmationBlock=timeLock._getActionConfirmationBlock(aid),
+        actionId=aid,
+    )
+    return aid
+
+
+@view
+@internal
+def _isValidMaxDeviation(_newDeviation: uint256) -> bool:
+    if _newDeviation == 0:
+        return False
+    return _newDeviation <= HUNDRED_PERCENT
+
+
 #############
 # Execution #
 #############
@@ -1079,7 +1135,7 @@ def executePendingAction(_aid: uint256) -> bool:
         return False
 
     actionType: ActionType = self.actionType[_aid]
-    mc: address = addys._getMissionControlAddr()
+    mc: address = self._getMissionControlAddr()
 
     if actionType == ActionType.GEN_CONFIG_VAULT_LIMITS:
         config: GenConfig = staticcall MissionControl(mc).genConfig()
@@ -1174,6 +1230,11 @@ def executePendingAction(_aid: uint256) -> bool:
         data: CanDisable = self.pendingCanDisable[_aid]
         extcall MissionControl(mc).setCanDisable(data.user, data.canDisable)
         log CanDisableSet(user=data.user, canDisable=data.canDisable)
+
+    elif actionType == ActionType.MAX_LTV_DEVIATION:
+        p: uint256 = self.pendingMaxLtvDeviation[_aid]
+        extcall MissionControl(mc).setMaxLtvDeviation(p)
+        log MaxLtvDeviationSet(newDeviation=p)
 
     self.actionType[_aid] = empty(ActionType)
     return True

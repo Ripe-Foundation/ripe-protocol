@@ -93,6 +93,18 @@ def __init__(
     assert self._setGovTimeLock(initialTimeLock) # dev: invalid time lock
 
 
+@view
+@external
+def getRipeHqFromGov() -> address:
+    return self._getRipeHqFromGov()
+
+
+@view
+@internal
+def _getRipeHqFromGov() -> address:
+    return RIPE_HQ_FOR_GOV
+
+
 ##############
 # Gov Access #
 ##############
