@@ -171,7 +171,7 @@ def _registerVaultAsset(_asset: address):
 
 @external
 def deregisterVaultAsset(_asset: address) -> bool:
-    assert msg.sender == addys._getMissionControlAddr() # dev: only MissionControl allowed
+    assert addys._canModifyMissionControl(msg.sender) # dev: no perms
 
     if self.totalBalances[_asset] != 0:
         return False
@@ -265,7 +265,7 @@ def _getNumVaultAssets() -> uint256:
 
 @external
 def pause(_shouldPause: bool):
-    assert msg.sender == addys._getMissionControlAddr() # dev: only MissionControl allowed
+    assert addys._canModifyMissionControl(msg.sender) # dev: no perms
     assert _shouldPause != self.isPaused # dev: no change
     self.isPaused = _shouldPause
     log VaultPauseModified(isPaused=_shouldPause)
@@ -276,13 +276,13 @@ def pause(_shouldPause: bool):
 
 @external
 def recoverFunds(_recipient: address, _asset: address):
-    assert msg.sender == addys._getMissionControlAddr() # dev: only MissionControl allowed
+    assert addys._canModifyMissionControl(msg.sender) # dev: no perms
     self._recoverFunds(_recipient, _asset)
 
 
 @external
 def recoverFundsMany(_recipient: address, _assets: DynArray[address, MAX_RECOVER_ASSETS]):
-    assert msg.sender == addys._getMissionControlAddr() # dev: only MissionControl allowed
+    assert addys._canModifyMissionControl(msg.sender) # dev: no perms
     for a: address in _assets:
         self._recoverFunds(_recipient, a)
 

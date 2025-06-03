@@ -88,7 +88,7 @@ def setupAuctionMgmntTest(
 def test_ah_auction_mgmt_only_mission_control_access(
     setupAuctionMgmntTest,
     auction_house,
-    mission_control,
+    switchboard_one,
     alpha_token,
     bob,
     alice,
@@ -101,33 +101,33 @@ def test_ah_auction_mgmt_only_mission_control_access(
     setupAuctionMgmntTest(num_users=1, create_liquidations=True)
     vault_id = vault_book.getRegId(simple_erc20_vault)
     
-    # Test startAuction - only mission control allowed
-    with boa.reverts("only mission control allowed"):
+    # Test startAuction - no perms
+    with boa.reverts("no perms"):
         auction_house.startAuction(bob, vault_id, alpha_token, sender=alice)
     
-    # Test startManyAuctions - only mission control allowed
+    # Test startManyAuctions - no perms
     auctions = [(bob, vault_id, alpha_token)]
-    with boa.reverts("only mission control allowed"):
+    with boa.reverts("no perms"):
         auction_house.startManyAuctions(auctions, sender=alice)
     
-    # Test pauseAuction - only mission control allowed
-    with boa.reverts("only mission control allowed"):
+    # Test pauseAuction - no perms
+    with boa.reverts("no perms"):
         auction_house.pauseAuction(bob, vault_id, alpha_token, sender=alice)
     
-    # Test pauseManyAuctions - only mission control allowed
-    with boa.reverts("only mission control allowed"):
+    # Test pauseManyAuctions - no perms
+    with boa.reverts("no perms"):
         auction_house.pauseManyAuctions(auctions, sender=alice)
     
-    auction_house.startAuction(bob, vault_id, alpha_token, sender=mission_control.address)
-    auction_house.startManyAuctions(auctions, sender=mission_control.address)
-    auction_house.pauseAuction(bob, vault_id, alpha_token, sender=mission_control.address)
-    auction_house.pauseManyAuctions(auctions, sender=mission_control.address)
+    auction_house.startAuction(bob, vault_id, alpha_token, sender=switchboard_one.address)
+    auction_house.startManyAuctions(auctions, sender=switchboard_one.address)
+    auction_house.pauseAuction(bob, vault_id, alpha_token, sender=switchboard_one.address)
+    auction_house.pauseManyAuctions(auctions, sender=switchboard_one.address)
 
 
 def test_ah_auction_mgmt_paused_contract(
     setupAuctionMgmntTest,
     auction_house,
-    mission_control,
+    switchboard_one,
     alpha_token,
     bob,
     vault_book,
@@ -140,22 +140,22 @@ def test_ah_auction_mgmt_paused_contract(
     vault_id = vault_book.getRegId(simple_erc20_vault)
     
     # Pause the contract - auction_house.pause takes a boolean parameter and only mission control can call it
-    auction_house.pause(True, sender=mission_control.address)
+    auction_house.pause(True, sender=switchboard_one.address)
     
     auctions = [(bob, vault_id, alpha_token)]
     
     # All functions should revert when contract is paused
     with boa.reverts("contract paused"):
-        auction_house.startAuction(bob, vault_id, alpha_token, sender=mission_control.address)
+        auction_house.startAuction(bob, vault_id, alpha_token, sender=switchboard_one.address)
     
     with boa.reverts("contract paused"):
-        auction_house.startManyAuctions(auctions, sender=mission_control.address)
+        auction_house.startManyAuctions(auctions, sender=switchboard_one.address)
     
     with boa.reverts("contract paused"):
-        auction_house.pauseAuction(bob, vault_id, alpha_token, sender=mission_control.address)
+        auction_house.pauseAuction(bob, vault_id, alpha_token, sender=switchboard_one.address)
     
     with boa.reverts("contract paused"):
-        auction_house.pauseManyAuctions(auctions, sender=mission_control.address)
+        auction_house.pauseManyAuctions(auctions, sender=switchboard_one.address)
 
 
 # start auction tests
@@ -164,7 +164,7 @@ def test_ah_auction_mgmt_paused_contract(
 def test_ah_start_auction_success(
     setupAuctionMgmntTest,
     auction_house,
-    mission_control,
+    switchboard_one,
     ledger,
     alpha_token,
     bob,
@@ -180,14 +180,14 @@ def test_ah_start_auction_success(
     assert ledger.hasFungibleAuction(bob, vault_id, alpha_token) == True
     
     # Pause the auction first so we can test restarting
-    auction_house.pauseAuction(bob, vault_id, alpha_token, sender=mission_control.address)
+    auction_house.pauseAuction(bob, vault_id, alpha_token, sender=switchboard_one.address)
     
     # Verify auction is paused
     auction_data = ledger.getFungibleAuctionDuringPurchase(bob, vault_id, alpha_token)
     assert auction_data.isActive == False
     
     # Start/restart the auction
-    result = auction_house.startAuction(bob, vault_id, alpha_token, sender=mission_control.address)
+    result = auction_house.startAuction(bob, vault_id, alpha_token, sender=switchboard_one.address)
     assert result == True  # Should return True for successful start
     
     # Verify auction is now active
@@ -209,7 +209,7 @@ def test_ah_start_auction_success(
 def test_ah_start_auction_invalid_conditions(
     setupAuctionMgmntTest,
     auction_house,
-    mission_control,
+    switchboard_one,
     alpha_token,
     bob,
     alice,
@@ -225,12 +225,12 @@ def test_ah_start_auction_invalid_conditions(
     
     # Test 1: User not in liquidation (should return False)
     # Users have safe LTV at current prices
-    result = auction_house.startAuction(bob, vault_id, alpha_token, sender=mission_control.address)
+    result = auction_house.startAuction(bob, vault_id, alpha_token, sender=switchboard_one.address)
     assert result == False  # Should return False, not create auction
     
     # Test 2: Invalid vault ID (should return False)
     invalid_vault_id = 999999
-    result = auction_house.startAuction(bob, invalid_vault_id, alpha_token, sender=mission_control.address)
+    result = auction_house.startAuction(bob, invalid_vault_id, alpha_token, sender=switchboard_one.address)
     assert result == False
     
     # Test 3: User with no balance in asset (should return False)
@@ -241,14 +241,14 @@ def test_ah_start_auction_invalid_conditions(
     
     # Alice has no alpha_token balance (only bravo_token from setup)
     # So starting auction for alpha_token should fail
-    result = auction_house.startAuction(alice, vault_id, alpha_token, sender=mission_control.address)
+    result = auction_house.startAuction(alice, vault_id, alpha_token, sender=switchboard_one.address)
     assert result == False
 
 
 def test_ah_start_many_auctions_success(
     setupAuctionMgmntTest,
     auction_house,
-    mission_control,
+    switchboard_one,
     ledger,
     alpha_token,
     bravo_token,
@@ -276,7 +276,7 @@ def test_ah_start_many_auctions_success(
         (alice, vault_id, alpha_token),
         (alice, vault_id, bravo_token),
     ]
-    num_paused = auction_house.pauseManyAuctions(auctions_to_pause, sender=mission_control.address)
+    num_paused = auction_house.pauseManyAuctions(auctions_to_pause, sender=switchboard_one.address)
     assert num_paused == 4
     
     # Restart multiple auctions
@@ -285,7 +285,7 @@ def test_ah_start_many_auctions_success(
         (alice, vault_id, bravo_token),
     ]
     
-    num_started = auction_house.startManyAuctions(auctions_to_start, sender=mission_control.address)
+    num_started = auction_house.startManyAuctions(auctions_to_start, sender=switchboard_one.address)
     assert num_started == 2  # Should start 2 auctions
     
     # Verify specific auctions are active
@@ -314,7 +314,7 @@ def test_ah_start_many_auctions_success(
 def test_ah_start_many_auctions_mixed_validity(
     setupAuctionMgmntTest,
     auction_house,
-    mission_control,
+    switchboard_one,
     alpha_token,
     bravo_token,
     bob,
@@ -338,7 +338,7 @@ def test_ah_start_many_auctions_mixed_validity(
         (ZERO_ADDRESS, vault_id, alpha_token),  # Invalid - zero address
     ]
     
-    num_started = auction_house.startManyAuctions(auctions_to_start, sender=mission_control.address)
+    num_started = auction_house.startManyAuctions(auctions_to_start, sender=switchboard_one.address)
     assert num_started == 2  # Only bob's auctions should start
     
     # Check for FungibleAuctionUpdated events (should be more than 2 from liquidation + restart)
@@ -348,12 +348,12 @@ def test_ah_start_many_auctions_mixed_validity(
 
 def test_ah_start_many_auctions_empty_list(
     auction_house,
-    mission_control,
+    switchboard_one,
 ):
     """Test starting auctions with empty list"""
     
     # Empty list should return 0
-    num_started = auction_house.startManyAuctions([], sender=mission_control.address)
+    num_started = auction_house.startManyAuctions([], sender=switchboard_one.address)
     assert num_started == 0
 
 
@@ -363,7 +363,7 @@ def test_ah_start_many_auctions_empty_list(
 def test_ah_pause_auction_success(
     setupAuctionMgmntTest,
     auction_house,
-    mission_control,
+    switchboard_one,
     ledger,
     alpha_token,
     bob,
@@ -381,7 +381,7 @@ def test_ah_pause_auction_success(
     assert auction_data.isActive == True
     
     # Pause the auction
-    result = auction_house.pauseAuction(bob, vault_id, alpha_token, sender=mission_control.address)
+    result = auction_house.pauseAuction(bob, vault_id, alpha_token, sender=switchboard_one.address)
     assert result == True  # Should return True for successful pause
     
     # Verify auction is now paused
@@ -400,7 +400,7 @@ def test_ah_pause_auction_success(
 def test_ah_pause_auction_invalid_conditions(
     setupAuctionMgmntTest,
     auction_house,
-    mission_control,
+    switchboard_one,
     alpha_token,
     bob,
     vault_book,
@@ -413,23 +413,23 @@ def test_ah_pause_auction_invalid_conditions(
     vault_id = vault_book.getRegId(simple_erc20_vault)
     
     # Test 1: Pause active auction (should work)
-    result = auction_house.pauseAuction(bob, vault_id, alpha_token, sender=mission_control.address)
+    result = auction_house.pauseAuction(bob, vault_id, alpha_token, sender=switchboard_one.address)
     assert result == True
     
     # Test 2: Pause already paused auction (should return False)
-    result = auction_house.pauseAuction(bob, vault_id, alpha_token, sender=mission_control.address)
+    result = auction_house.pauseAuction(bob, vault_id, alpha_token, sender=switchboard_one.address)
     assert result == False  # Already paused
     
     # Test 3: Pause non-existent auction (should return False)
     invalid_vault_id = 999999
-    result = auction_house.pauseAuction(bob, invalid_vault_id, alpha_token, sender=mission_control.address)
+    result = auction_house.pauseAuction(bob, invalid_vault_id, alpha_token, sender=switchboard_one.address)
     assert result == False
 
 
 def test_ah_pause_many_auctions_success(
     setupAuctionMgmntTest,
     auction_house,
-    mission_control,
+    switchboard_one,
     ledger,
     alpha_token,
     bravo_token,
@@ -456,7 +456,7 @@ def test_ah_pause_many_auctions_success(
         (alice, vault_id, bravo_token),
     ]
     
-    num_paused = auction_house.pauseManyAuctions(auctions_to_pause, sender=mission_control.address)
+    num_paused = auction_house.pauseManyAuctions(auctions_to_pause, sender=switchboard_one.address)
     assert num_paused == 2
     
     # Verify specific auctions are paused
@@ -484,7 +484,7 @@ def test_ah_pause_many_auctions_success(
 def test_ah_pause_many_auctions_mixed_validity(
     setupAuctionMgmntTest,
     auction_house,
-    mission_control,
+    switchboard_one,
     ledger,
     alpha_token,
     bravo_token,
@@ -500,7 +500,7 @@ def test_ah_pause_many_auctions_mixed_validity(
     vault_id = vault_book.getRegId(simple_erc20_vault)
     
     # Pause one auction manually first
-    auction_house.pauseAuction(bob, vault_id, alpha_token, sender=mission_control.address)
+    auction_house.pauseAuction(bob, vault_id, alpha_token, sender=switchboard_one.address)
     
     # Mix of valid and invalid pause requests
     auctions_to_pause = [
@@ -511,7 +511,7 @@ def test_ah_pause_many_auctions_mixed_validity(
         (ZERO_ADDRESS, vault_id, alpha_token),  # Invalid - zero address
     ]
     
-    num_paused = auction_house.pauseManyAuctions(auctions_to_pause, sender=mission_control.address)
+    num_paused = auction_house.pauseManyAuctions(auctions_to_pause, sender=switchboard_one.address)
     assert num_paused == 2  # Only 2 valid pauses
     
     # Verify final states
@@ -523,12 +523,12 @@ def test_ah_pause_many_auctions_mixed_validity(
 
 def test_ah_pause_many_auctions_empty_list(
     auction_house,
-    mission_control,
+    switchboard_one,
 ):
     """Test pausing auctions with empty list"""
     
     # Empty list should return 0
-    num_paused = auction_house.pauseManyAuctions([], sender=mission_control.address)
+    num_paused = auction_house.pauseManyAuctions([], sender=switchboard_one.address)
     assert num_paused == 0
 
 
@@ -538,7 +538,7 @@ def test_ah_pause_many_auctions_empty_list(
 def test_ah_auction_mgmt_start_pause_restart_flow(
     setupAuctionMgmntTest,
     auction_house,
-    mission_control,
+    switchboard_one,
     ledger,
     alpha_token,
     bob,
@@ -557,7 +557,7 @@ def test_ah_auction_mgmt_start_pause_restart_flow(
     original_start_block = auction_data.startBlock
     
     # Step 1: Pause the auction
-    result = auction_house.pauseAuction(bob, vault_id, alpha_token, sender=mission_control.address)
+    result = auction_house.pauseAuction(bob, vault_id, alpha_token, sender=switchboard_one.address)
     assert result == True
     
     auction_data = ledger.getFungibleAuctionDuringPurchase(bob, vault_id, alpha_token)
@@ -567,7 +567,7 @@ def test_ah_auction_mgmt_start_pause_restart_flow(
     boa.env.time_travel(blocks=10)
     
     # Step 2: Restart the auction
-    result = auction_house.startAuction(bob, vault_id, alpha_token, sender=mission_control.address)
+    result = auction_house.startAuction(bob, vault_id, alpha_token, sender=switchboard_one.address)
     assert result == True
     
     auction_data = ledger.getFungibleAuctionDuringPurchase(bob, vault_id, alpha_token)
@@ -577,7 +577,7 @@ def test_ah_auction_mgmt_start_pause_restart_flow(
     assert auction_data.startBlock == original_start_block + 10
     
     # Step 3: Pause again to verify it still works
-    result = auction_house.pauseAuction(bob, vault_id, alpha_token, sender=mission_control.address)
+    result = auction_house.pauseAuction(bob, vault_id, alpha_token, sender=switchboard_one.address)
     assert result == True
     
     auction_data = ledger.getFungibleAuctionDuringPurchase(bob, vault_id, alpha_token)
@@ -587,7 +587,7 @@ def test_ah_auction_mgmt_start_pause_restart_flow(
 def test_ah_auction_mgmt_batch_operations(
     setupAuctionMgmntTest,
     auction_house,
-    mission_control,
+    switchboard_one,
     ledger,
     alpha_token,
     bravo_token,
@@ -616,7 +616,7 @@ def test_ah_auction_mgmt_batch_operations(
     
     # Batch pause some auctions
     auctions_to_pause = auctions[:2]  # Pause bob's auctions
-    num_paused = auction_house.pauseManyAuctions(auctions_to_pause, sender=mission_control.address)
+    num_paused = auction_house.pauseManyAuctions(auctions_to_pause, sender=switchboard_one.address)
     assert num_paused == 2
     
     # Verify states
@@ -628,7 +628,7 @@ def test_ah_auction_mgmt_batch_operations(
     # Batch restart bob's auctions + try to start alice's 
     # Note: startManyAuctions will restart paused auctions (bob's) AND update active auctions (alice's)
     auctions_to_start = auctions  # Try to start all
-    num_started = auction_house.startManyAuctions(auctions_to_start, sender=mission_control.address)
+    num_started = auction_house.startManyAuctions(auctions_to_start, sender=switchboard_one.address)
     assert num_started == 4  # All 4 auctions get updated/restarted (this is the actual behavior)
     
     # Verify all are now active again
@@ -639,7 +639,7 @@ def test_ah_auction_mgmt_batch_operations(
 def test_ah_auction_mgmt_event_verification(
     setupAuctionMgmntTest,
     auction_house,
-    mission_control,
+    switchboard_one,
     alpha_token,
     bravo_token,
     bob,
@@ -653,7 +653,7 @@ def test_ah_auction_mgmt_event_verification(
     vault_id = vault_book.getRegId(simple_erc20_vault)
     
     # Pause auction
-    auction_house.pauseAuction(bob, vault_id, alpha_token, sender=mission_control.address)
+    auction_house.pauseAuction(bob, vault_id, alpha_token, sender=switchboard_one.address)
     
     # Check pause event immediately after transaction
     pause_logs = filter_logs(auction_house, "FungibleAuctionPaused")
@@ -665,7 +665,7 @@ def test_ah_auction_mgmt_event_verification(
     assert pause_log.asset == alpha_token.address
     
     # Restart auction
-    auction_house.startAuction(bob, vault_id, alpha_token, sender=mission_control.address)
+    auction_house.startAuction(bob, vault_id, alpha_token, sender=switchboard_one.address)
     
     # Check updated event immediately after transaction
     update_logs = filter_logs(auction_house, "FungibleAuctionUpdated")
@@ -681,7 +681,7 @@ def test_ah_auction_mgmt_event_verification(
     auctions = [(bob, vault_id, alpha_token), (bob, vault_id, bravo_token)]
     
     # Batch pause should emit 2 events
-    auction_house.pauseManyAuctions(auctions, sender=mission_control.address)
+    auction_house.pauseManyAuctions(auctions, sender=switchboard_one.address)
     batch_pause_logs = filter_logs(auction_house, "FungibleAuctionPaused")
     assert len(batch_pause_logs) == 2  # Should have exactly 2 pause events
     
@@ -691,7 +691,7 @@ def test_ah_auction_mgmt_event_verification(
     assert bravo_token.address in pause_assets
     
     # Batch start should emit 2 events
-    auction_house.startManyAuctions(auctions, sender=mission_control.address)
+    auction_house.startManyAuctions(auctions, sender=switchboard_one.address)
     batch_update_logs = filter_logs(auction_house, "FungibleAuctionUpdated")
     assert len(batch_update_logs) == 2  # Should have exactly 2 update events
     

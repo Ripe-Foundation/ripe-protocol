@@ -129,7 +129,7 @@ def test_stab_vault_claims_validation(
     teller,
     mock_price_source,
     vault_book,
-    mission_control,
+    switchboard_one,
     setGeneralConfig,
     setAssetConfig,
 ):
@@ -145,10 +145,10 @@ def test_stab_vault_claims_validation(
     vault_id = vault_book.getRegId(stability_pool)
 
     # Test claim when paused
-    stability_pool.pause(True, sender=mission_control.address)
+    stability_pool.pause(True, sender=switchboard_one.address)
     with boa.reverts("contract paused"):
         teller.claimFromStabilityPool(vault_id, alpha_token, bravo_token, sender=bob)
-    stability_pool.pause(False, sender=mission_control.address)
+    stability_pool.pause(False, sender=switchboard_one.address)
 
     # Test claim with no position - should revert with "nothing claimed"
     with boa.reverts("nothing claimed"):
@@ -168,7 +168,7 @@ def test_stab_vault_claims_validation(
 
     # Test unauthorized caller
     with boa.reverts("only Teller allowed"):
-        stability_pool.claimFromStabilityPool(bob, alpha_token, bravo_token, 100, sender=alice)
+        stability_pool.claimFromStabilityPool(bob, alpha_token, bravo_token, 100, bob, sender=alice)
 
 
 def test_stab_vault_claims_no_shares(
@@ -861,7 +861,7 @@ def test_stab_vault_claims_config_disabled(
     mock_price_source,
     vault_book,
     savings_green,
-    mission_control,
+    switchboard_one,
     setGeneralConfig,
     setAssetConfig,
 ):
@@ -1353,3 +1353,162 @@ def test_stab_vault_claims_zero_total_shares_edge_case(
     usd_value = teller.claimFromStabilityPool(vault_id, alpha_token, bravo_token, sender=bob)
     assert usd_value > 0
     assert bravo_token.balanceOf(bob) > 0
+
+
+def test_stab_vault_claims_with_delegation_permission(
+    stability_pool,
+    alpha_token,
+    bravo_token,
+    alpha_token_whale,
+    bravo_token_whale,
+    bob,
+    alice,
+    teller,
+    auction_house,
+    mock_price_source,
+    vault_book,
+    savings_green,
+    _test,
+    setGeneralConfig,
+    setAssetConfig,
+    setUserDelegation,
+):
+    """Test that a delegate with permission can claim from stability pool for another user"""
+    setGeneralConfig()
+    setAssetConfig(bravo_token)
+
+    # Set mock prices
+    price = 1 * EIGHTEEN_DECIMALS
+    mock_price_source.setPrice(alpha_token, price)
+    mock_price_source.setPrice(bravo_token, price)
+
+    # Bob deposits into stability pool
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    alpha_token.transfer(stability_pool, deposit_amount, sender=alpha_token_whale)
+    stability_pool.depositTokensInVault(bob, alpha_token, deposit_amount, sender=teller.address)
+
+    # Add claimable assets
+    claimable_amount = 150 * EIGHTEEN_DECIMALS
+    bravo_token.transfer(stability_pool, claimable_amount, sender=bravo_token_whale)
+    stability_pool.swapForLiquidatedCollateral(
+        alpha_token, deposit_amount, bravo_token, claimable_amount,
+        ZERO_ADDRESS, alpha_token, savings_green, sender=auction_house.address
+    )
+
+    vault_id = vault_book.getRegId(stability_pool)
+
+    # Before delegation, Alice cannot claim for Bob
+    with boa.reverts("cannot claim for user"):
+        teller.claimFromStabilityPool(vault_id, alpha_token, bravo_token, MAX_UINT256, bob, sender=alice)
+
+    # Bob delegates claim permission to Alice
+    setUserDelegation(bob, alice, _canClaimFromStabPool=True)
+
+    # Now Alice can claim for Bob
+    usd_value = teller.claimFromStabilityPool(vault_id, alpha_token, bravo_token, MAX_UINT256, bob, sender=alice)
+    _test(claimable_amount, usd_value)
+    
+    # Verify the tokens went to Bob (not Alice)
+    _test(claimable_amount, bravo_token.balanceOf(bob))
+    assert bravo_token.balanceOf(alice) == 0
+
+    # Verify Bob's position is depleted
+    assert stability_pool.getTotalUserValue(bob, alpha_token) <= 1
+
+
+def test_stab_vault_claims_without_delegation_permission(
+    stability_pool,
+    alpha_token,
+    bravo_token,
+    alpha_token_whale,
+    bravo_token_whale,
+    bob,
+    alice,
+    sally,
+    teller,
+    auction_house,
+    mock_price_source,
+    vault_book,
+    savings_green,
+    _test,
+    setGeneralConfig,
+    setAssetConfig,
+    setUserDelegation,
+):
+    """Test that users without delegation permission cannot claim for others"""
+    setGeneralConfig()
+    setAssetConfig(bravo_token)
+
+    # Set mock prices
+    price = 1 * EIGHTEEN_DECIMALS
+    mock_price_source.setPrice(alpha_token, price)
+    mock_price_source.setPrice(bravo_token, price)
+
+    # Bob deposits into stability pool
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    alpha_token.transfer(stability_pool, deposit_amount, sender=alpha_token_whale)
+    stability_pool.depositTokensInVault(bob, alpha_token, deposit_amount, sender=teller.address)
+
+    # Add claimable assets
+    claimable_amount = 150 * EIGHTEEN_DECIMALS
+    bravo_token.transfer(stability_pool, claimable_amount, sender=bravo_token_whale)
+    stability_pool.swapForLiquidatedCollateral(
+        alpha_token, deposit_amount, bravo_token, claimable_amount,
+        ZERO_ADDRESS, alpha_token, savings_green, sender=auction_house.address
+    )
+
+    vault_id = vault_book.getRegId(stability_pool)
+
+    # Alice has no delegation permission - should fail
+    with boa.reverts("cannot claim for user"):
+        teller.claimFromStabilityPool(vault_id, alpha_token, bravo_token, MAX_UINT256, bob, sender=alice)
+
+    # Bob gives Alice delegation but NOT for claiming from stability pool
+    setUserDelegation(
+        bob, 
+        alice, 
+        _canWithdraw=True,
+        _canBorrow=True,
+        _canClaimFromStabPool=False,  # Explicitly NO permission for stability pool claims
+        _canClaimLoot=True
+    )
+
+    # Alice still cannot claim for Bob (no stability pool claim permission)
+    with boa.reverts("cannot claim for user"):
+        teller.claimFromStabilityPool(vault_id, alpha_token, bravo_token, MAX_UINT256, bob, sender=alice)
+
+    # Bob gives Sally full delegation including stability pool claims
+    setUserDelegation(bob, sally, _canClaimFromStabPool=True)
+
+    # Sally can claim for Bob
+    usd_value = teller.claimFromStabilityPool(vault_id, alpha_token, bravo_token, MAX_UINT256, bob, sender=sally)
+    _test(claimable_amount, usd_value)
+    
+    # Verify the tokens went to Bob (not Sally)
+    _test(claimable_amount, bravo_token.balanceOf(bob))
+    assert bravo_token.balanceOf(sally) == 0
+    
+    # Alice still has no tokens
+    assert bravo_token.balanceOf(alice) == 0
+
+    # Test claim many with delegation
+    # First setup another claimable asset
+    deposit_amount2 = 50 * EIGHTEEN_DECIMALS
+    alpha_token.transfer(stability_pool, deposit_amount2, sender=alpha_token_whale)
+    stability_pool.depositTokensInVault(alice, alpha_token, deposit_amount2, sender=teller.address)
+    
+    charlie_amount = 75 * EIGHTEEN_DECIMALS
+    bravo_token.transfer(stability_pool, charlie_amount, sender=bravo_token_whale)
+    stability_pool.swapForLiquidatedCollateral(
+        alpha_token, deposit_amount2, bravo_token, charlie_amount,
+        ZERO_ADDRESS, alpha_token, savings_green, sender=auction_house.address
+    )
+
+    # Sally can use claimManyFromStabilityPool for Alice with delegation
+    setUserDelegation(alice, sally, _canClaimFromStabPool=True)
+    
+    claims = [(alpha_token.address, bravo_token.address, MAX_UINT256)]
+    total_usd_value = teller.claimManyFromStabilityPool(vault_id, claims, alice, sender=sally)
+    
+    _test(charlie_amount, total_usd_value)
+    _test(charlie_amount, bravo_token.balanceOf(alice))

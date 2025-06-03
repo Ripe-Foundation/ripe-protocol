@@ -17,6 +17,7 @@ struct HqConfig:
     canMintGreen: bool
     canMintRipe: bool
     canSetTokenBlacklist: bool
+    canModifyMissionControl: bool
 
 struct PendingHqConfig:
     newHqConfig: HqConfig
@@ -29,6 +30,7 @@ event HqConfigChangeInitiated:
     canMintGreen: bool
     canMintRipe: bool
     canSetTokenBlacklist: bool
+    canModifyMissionControl: bool
     confirmBlock: uint256
 
 event HqConfigChangeConfirmed:
@@ -37,6 +39,7 @@ event HqConfigChangeConfirmed:
     canMintGreen: bool
     canMintRipe: bool
     canSetTokenBlacklist: bool
+    canModifyMissionControl: bool
     initiatedBlock: uint256
     confirmBlock: uint256
 
@@ -46,6 +49,7 @@ event HqConfigChangeCancelled:
     canMintGreen: bool
     canMintRipe: bool
     canSetTokenBlacklist: bool
+    canModifyMissionControl: bool
     initiatedBlock: uint256
     confirmBlock: uint256
 
@@ -178,6 +182,7 @@ def initiateHqConfigChange(
     _canMintGreen: bool,
     _canMintRipe: bool,
     _canSetTokenBlacklist: bool,
+    _canModifyMissionControl: bool,
 ):
     assert msg.sender == gov.governance # dev: no perms
 
@@ -187,6 +192,7 @@ def initiateHqConfigChange(
         canMintGreen= _canMintGreen,
         canMintRipe= _canMintRipe,
         canSetTokenBlacklist= _canSetTokenBlacklist,
+        canModifyMissionControl= _canModifyMissionControl,
     )
 
     # set pending hq config
@@ -196,7 +202,15 @@ def initiateHqConfigChange(
         initiatedBlock= block.number,
         confirmBlock= confirmBlock,
     )
-    log HqConfigChangeInitiated(regId=_regId, description=hqConfig.description, canMintGreen=_canMintGreen, canMintRipe=_canMintRipe, canSetTokenBlacklist=_canSetTokenBlacklist, confirmBlock=confirmBlock)
+    log HqConfigChangeInitiated(
+        regId=_regId,
+        description=hqConfig.description,
+        canMintGreen=_canMintGreen,
+        canMintRipe=_canMintRipe,
+        canSetTokenBlacklist=_canSetTokenBlacklist,
+        canModifyMissionControl=_canModifyMissionControl,
+        confirmBlock=confirmBlock,
+    )
 
 
 # confirm hq config change
@@ -210,15 +224,25 @@ def confirmHqConfigChange(_regId: uint256) -> bool:
     assert data.confirmBlock != 0 and block.number >= data.confirmBlock # dev: time lock not reached
 
     # invalid hq config
-    if not self._isValidHqConfig(_regId, data.newHqConfig.canMintGreen, data.newHqConfig.canMintRipe):
+    newConfig: HqConfig = data.newHqConfig
+    if not self._isValidHqConfig(_regId, newConfig.canMintGreen, newConfig.canMintRipe):
         self.pendingHqConfig[_regId] = empty(PendingHqConfig)
         return False
 
     # set hq config
-    self.hqConfig[_regId] = data.newHqConfig
+    self.hqConfig[_regId] = newConfig
     self.pendingHqConfig[_regId] = empty(PendingHqConfig)
 
-    log HqConfigChangeConfirmed(regId=_regId, description=data.newHqConfig.description, canMintGreen=data.newHqConfig.canMintGreen, canMintRipe=data.newHqConfig.canMintRipe, canSetTokenBlacklist=data.newHqConfig.canSetTokenBlacklist, initiatedBlock=data.initiatedBlock, confirmBlock=data.confirmBlock)
+    log HqConfigChangeConfirmed(
+        regId=_regId,
+        description=newConfig.description,
+        canMintGreen=newConfig.canMintGreen,
+        canMintRipe=newConfig.canMintRipe,
+        canSetTokenBlacklist=newConfig.canSetTokenBlacklist,
+        canModifyMissionControl=newConfig.canModifyMissionControl,
+        initiatedBlock=data.initiatedBlock,
+        confirmBlock=data.confirmBlock,
+    )
     return True
 
 
@@ -239,6 +263,7 @@ def cancelHqConfigChange(_regId: uint256) -> bool:
         canMintGreen=data.newHqConfig.canMintGreen,
         canMintRipe=data.newHqConfig.canMintRipe,
         canSetTokenBlacklist=data.newHqConfig.canSetTokenBlacklist,
+        canModifyMissionControl=data.newHqConfig.canModifyMissionControl,
         initiatedBlock=data.initiatedBlock,
         confirmBlock=data.confirmBlock
     )
@@ -253,7 +278,6 @@ def isValidHqConfig(
     _regId: uint256,
     _canMintGreen: bool,
     _canMintRipe: bool,
-    _canSetTokenBlacklist: bool,
 ) -> bool:
     return self._isValidHqConfig(_regId, _canMintGreen, _canMintRipe)
 
@@ -265,7 +289,7 @@ def _isValidHqConfig(
     _canMintRipe: bool,
 ) -> bool:
 
-    # tokens cannot mint, cannot set their own blacklist
+    # tokens cannot mint, cannot set their own blacklist, cannot modify mission control
     if self._isTokenId(_regId):
         return False
 
@@ -348,6 +372,17 @@ def canSetTokenBlacklist(_addr: address) -> bool:
     if regId == 0:
         return False
     return self.hqConfig[regId].canSetTokenBlacklist
+
+
+@view
+@external
+def canModifyMissionControl(_addr: address) -> bool:
+    if _addr == empty(address):
+        return False
+    regId: uint256 = registry._getRegId(_addr)
+    if regId == 0:
+        return False
+    return self.hqConfig[regId].canModifyMissionControl
 
 
 ############

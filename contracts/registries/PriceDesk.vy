@@ -26,10 +26,10 @@ interface MissionControl:
 
 struct PriceConfig:
     staleTime: uint256
-    priorityPriceSourceIds: DynArray[uint256, MAX_PRIORITY_PARTNERS]
+    priorityPriceSourceIds: DynArray[uint256, MAX_PRIORITY_PRICE_SOURCES]
 
 ETH: public(immutable(address))
-MAX_PRIORITY_PARTNERS: constant(uint256) = 10
+MAX_PRIORITY_PRICE_SOURCES: constant(uint256) = 10
 
 
 @deploy
@@ -101,7 +101,7 @@ def getPrice(_asset: address, _shouldRaise: bool = False) -> uint256:
 def _getPrice(_asset: address, _shouldRaise: bool = False) -> uint256:
     price: uint256 = 0
     hasFeedConfig: bool = False
-    alreadyLooked: DynArray[uint256, MAX_PRIORITY_PARTNERS] = []
+    alreadyLooked: DynArray[uint256, MAX_PRIORITY_PRICE_SOURCES] = []
 
     # config
     config: PriceConfig = staticcall MissionControl(addys._getMissionControlAddr()).getPriceConfig()

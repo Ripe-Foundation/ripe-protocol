@@ -172,13 +172,13 @@ def test_permit_signature_malleability(green_token, special_signer, bob, signPer
 
 
 # 10. Permit for Blacklisted or Paused Accounts
-def test_permit_blacklisted_or_paused(green_token, special_signer, bob, mission_control, governance, signPermit):
+def test_permit_blacklisted_or_paused(green_token, special_signer, bob, switchboard_one, governance, signPermit):
     amount = 100 * EIGHTEEN_DECIMALS
     signature, deadline = signPermit(green_token, special_signer, bob, amount)
-    green_token.setBlacklist(special_signer, True, sender=mission_control.address)
+    green_token.setBlacklist(special_signer, True, sender=switchboard_one.address)
     with boa.reverts():
         green_token.permit(special_signer, bob, amount, deadline, signature)
-    green_token.setBlacklist(special_signer, False, sender=mission_control.address)
+    green_token.setBlacklist(special_signer, False, sender=switchboard_one.address)
     green_token.pause(True, sender=governance.address)
     with boa.reverts():
         green_token.permit(special_signer, bob, amount, deadline, signature)

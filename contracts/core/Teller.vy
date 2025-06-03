@@ -18,9 +18,9 @@ from ethereum.ercs import IERC4626
 interface CreditEngine:
     def redeemCollateralFromMany(_redemptions: DynArray[CollateralRedemption, MAX_COLLATERAL_REDEMPTIONS], _greenAmount: uint256, _redeemer: address, _shouldTransferBalance: bool, _shouldRefundSavingsGreen: bool, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
     def redeemCollateral(_user: address, _vaultId: uint256, _asset: address, _greenAmount: uint256, _redeemer: address, _shouldTransferBalance: bool, _shouldRefundSavingsGreen: bool, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
+    def getMaxWithdrawableForAsset(_user: address, _vaultId: uint256, _asset: address, _vaultAddr: address = empty(address), _a: addys.Addys = empty(addys.Addys)) -> uint256: view
     def repayForUser(_user: address, _greenAmount: uint256, _shouldRefundSavingsGreen: bool, _caller: address, _a: addys.Addys = empty(addys.Addys)) -> bool: nonpayable
     def borrowForUser(_user: address, _greenAmount: uint256, _wantsSavingsGreen: bool, _caller: address, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
-    def getMaxWithdrawableForAsset(_user: address, _asset: address, _a: addys.Addys = empty(addys.Addys)) -> uint256: view
     def updateDebtForUser(_user: address, _a: addys.Addys = empty(addys.Addys)) -> bool: nonpayable
 
 interface AuctionHouse:
@@ -32,8 +32,8 @@ interface AuctionHouse:
 interface StabVault:
     def redeemManyFromStabilityPool(_redemptions: DynArray[StabPoolRedemption, MAX_STAB_REDEMPTIONS], _greenAmount: uint256, _redeemer: address, _shouldRefundSavingsGreen: bool, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
     def redeemFromStabilityPool(_claimAsset: address, _greenAmount: uint256, _redeemer: address, _shouldRefundSavingsGreen: bool, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
-    def claimFromStabilityPool(_claimer: address, _stabAsset: address, _claimAsset: address, _maxUsdValue: uint256, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
-    def claimManyFromStabilityPool(_claimer: address, _claims: DynArray[StabPoolClaim, MAX_STAB_CLAIMS], _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
+    def claimFromStabilityPool(_claimer: address, _stabAsset: address, _claimAsset: address, _maxUsdValue: uint256, _caller: address, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
+    def claimManyFromStabilityPool(_claimer: address, _claims: DynArray[StabPoolClaim, MAX_STAB_CLAIMS], _caller: address, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
 
 interface Lootbox:
     def claimLootForManyUsers(_users: DynArray[address, MAX_CLAIM_USERS], _caller: address, _shouldStake: bool, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
@@ -42,7 +42,7 @@ interface Lootbox:
 
 interface MissionControl:
     def getTellerWithdrawConfig(_asset: address, _user: address, _caller: address) -> TellerWithdrawConfig: view
-    def getTellerDepositConfig(_asset: address, _user: address) -> TellerDepositConfig: view
+    def getTellerDepositConfig(_vaultId: uint256, _asset: address, _user: address) -> TellerDepositConfig: view
 
 interface Ledger:
     def getDepositLedgerData(_user: address, _vaultId: uint256) -> DepositLedgerData: view
@@ -59,6 +59,7 @@ struct DepositLedgerData:
 struct TellerDepositConfig:
     canDepositGeneral: bool
     canDepositAsset: bool
+    doesVaultSupportAsset: bool
     isUserAllowed: bool
     perUserDepositLimit: uint256
     globalDepositLimit: uint256
@@ -188,7 +189,7 @@ def _deposit(
 
     # get ledger data
     d: DepositLedgerData = staticcall Ledger(_a.ledger).getDepositLedgerData(_user, vaultId)
-    amount: uint256 = self._validateOnDeposit(_asset, _amount, _user, vaultAddr, vaultId, _depositor, d, _a.missionControl)
+    amount: uint256 = self._validateOnDeposit(_asset, _amount, _user, vaultId, vaultAddr, _depositor, d, _a.missionControl)
 
     # deposit tokens
     assert extcall IERC20(_asset).transferFrom(_depositor, vaultAddr, amount, default_return_value=True) # dev: token transfer failed
@@ -214,15 +215,16 @@ def _validateOnDeposit(
     _asset: address,
     _amount: uint256,
     _user: address,
-    _vaultAddr: address,
     _vaultId: uint256,
+    _vaultAddr: address,
     _depositor: address,
     _d: DepositLedgerData,
     _missionControl: address,
 ) -> uint256:
-    config: TellerDepositConfig = staticcall MissionControl(_missionControl).getTellerDepositConfig(_asset, _user)
+    config: TellerDepositConfig = staticcall MissionControl(_missionControl).getTellerDepositConfig(_vaultId, _asset, _user)
     assert config.canDepositGeneral # dev: protocol deposits disabled
     assert config.canDepositAsset # dev: asset deposits disabled
+    assert config.doesVaultSupportAsset # dev: vault does not support asset
     assert config.isUserAllowed # dev: user not on whitelist
 
     # make sure depositor is allowed to deposit for user
@@ -326,7 +328,7 @@ def _withdraw(
     vaultAddr, vaultId = self._getVaultAddrAndId(_vaultAddr, _vaultId, _a.vaultBook)
 
     # validation
-    amount: uint256 = self._validateOnWithdrawal(_asset, _amount, _user, _vaultAddr, _vaultId, _caller, _a)
+    amount: uint256 = self._validateOnWithdrawal(_asset, _amount, _user, vaultAddr, vaultId, _caller, _a)
 
     # withdraw tokens
     isDepleted: bool = False
@@ -365,7 +367,7 @@ def _validateOnWithdrawal(
         assert config.canWithdrawForUser # dev: caller not allowed to withdraw for user
 
     # max withdrawable
-    maxWithdrawable: uint256 = staticcall CreditEngine(_a.creditEngine).getMaxWithdrawableForAsset(_user, _asset, _a)
+    maxWithdrawable: uint256 = staticcall CreditEngine(_a.creditEngine).getMaxWithdrawableForAsset(_user, _vaultId, _asset, _vaultAddr, _a)
     assert maxWithdrawable != 0 # dev: cannot withdraw anything
 
     return min(_amount, maxWithdrawable)
@@ -535,11 +537,12 @@ def claimFromStabilityPool(
     _stabAsset: address,
     _claimAsset: address,
     _maxUsdValue: uint256 = max_value(uint256),
+    _user: address = msg.sender,
 ) -> uint256:
     assert not deptBasics.isPaused # dev: contract paused
     a: addys.Addys = addys._getAddys()
     vaultAddr: address = staticcall VaultBook(a.vaultBook).getAddr(_vaultId)
-    claimUsdValue: uint256 = extcall StabVault(vaultAddr).claimFromStabilityPool(msg.sender, _stabAsset, _claimAsset, _maxUsdValue, a)
+    claimUsdValue: uint256 = extcall StabVault(vaultAddr).claimFromStabilityPool(_user, _stabAsset, _claimAsset, _maxUsdValue, msg.sender, a)
     assert extcall CreditEngine(a.creditEngine).updateDebtForUser(msg.sender, a) # dev: bad debt health
     return claimUsdValue
 
@@ -549,11 +552,12 @@ def claimFromStabilityPool(
 def claimManyFromStabilityPool(
     _vaultId: uint256,
     _claims: DynArray[StabPoolClaim, MAX_STAB_CLAIMS],
+    _user: address = msg.sender,
 ) -> uint256:
     assert not deptBasics.isPaused # dev: contract paused
     a: addys.Addys = addys._getAddys()
     vaultAddr: address = staticcall VaultBook(a.vaultBook).getAddr(_vaultId)
-    claimUsdValue: uint256 = extcall StabVault(vaultAddr).claimManyFromStabilityPool(msg.sender, _claims, a)
+    claimUsdValue: uint256 = extcall StabVault(vaultAddr).claimManyFromStabilityPool(_user, _claims, msg.sender, a)
     assert extcall CreditEngine(a.creditEngine).updateDebtForUser(msg.sender, a) # dev: bad debt health
     return claimUsdValue
 

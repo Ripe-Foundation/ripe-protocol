@@ -152,7 +152,8 @@ def claimLootForUser(
     assert addys._isValidRipeHqAddr(msg.sender) # dev: no perms
     assert not deptBasics.isPaused # dev: contract paused
     a: addys.Addys = addys._getAddys(_a)
-    return self._claimLoot(_user, _caller, _shouldStake, a)
+    isSwitchboard: bool = addys._canModifyMissionControl(msg.sender)
+    return self._claimLoot(_user, _caller, _shouldStake, not isSwitchboard, a)
 
 
 @external
@@ -165,10 +166,11 @@ def claimLootForManyUsers(
     assert addys._isValidRipeHqAddr(msg.sender) # dev: no perms
     assert not deptBasics.isPaused # dev: contract paused
     a: addys.Addys = addys._getAddys(_a)
+    isSwitchboard: bool = addys._canModifyMissionControl(msg.sender)
 
     totalRipeForUsers: uint256 = 0
     for u: address in _users:
-        totalRipeForUsers += self._claimLoot(u, _caller, _shouldStake, a)
+        totalRipeForUsers += self._claimLoot(u, _caller, _shouldStake, not isSwitchboard, a)
     return totalRipeForUsers
 
 
@@ -180,6 +182,7 @@ def _claimLoot(
     _user: address,
     _caller: address,
     _shouldStake: bool,
+    _shouldCheckCaller: bool,
     _a: addys.Addys,
 ) -> uint256:
 
@@ -190,7 +193,7 @@ def _claimLoot(
     # check if caller can claim for user
     config: ClaimLootConfig = staticcall MissionControl(_a.missionControl).getClaimLootConfig(_user, _caller)
     assert config.canClaimLoot # dev: loot claims disabled
-    if _user != _caller:
+    if _shouldCheckCaller and _user != _caller:
         assert config.canClaimLootForUser # dev: cannot claim for user
 
     # total loot -- start with borrow loot

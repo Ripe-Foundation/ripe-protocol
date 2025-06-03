@@ -148,7 +148,7 @@ def test_teller_deposit_max_vaults(
 ):
     # Setup with max vaults = 1
     setGeneralConfig(_perUserMaxVaults=1)
-    setAssetConfig(alpha_token)
+    setAssetConfig(alpha_token, _vaultIds=[2, 3])
 
     deposit_amount = 100 * EIGHTEEN_DECIMALS
     alpha_token.transfer(bob, deposit_amount, sender=alpha_token_whale)
@@ -361,7 +361,7 @@ def test_teller_deposit_teller_paused(
     setGeneralConfig,
     setAssetConfig,
     teller,
-    mission_control,
+    switchboard_one,
 ):
     # basic setup
     setGeneralConfig()
@@ -372,7 +372,7 @@ def test_teller_deposit_teller_paused(
     alpha_token.approve(teller.address, deposit_amount, sender=bob)
 
     # pause the teller
-    teller.pause(True, sender=mission_control.address)
+    teller.pause(True, sender=switchboard_one.address)
     assert teller.isPaused()
 
     # attempt deposit should fail
@@ -380,7 +380,7 @@ def test_teller_deposit_teller_paused(
         teller.deposit(alpha_token, deposit_amount, bob, simple_erc20_vault, sender=bob)
 
     # unpause the teller
-    teller.pause(False, sender=mission_control.address)
+    teller.pause(False, sender=switchboard_one.address)
     assert not teller.isPaused()
 
     # deposit should now succeed

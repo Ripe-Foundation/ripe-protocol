@@ -1,6 +1,7 @@
 # @version 0.4.1
 
 interface RipeHq:
+    def canModifyMissionControl(_addr: address) -> bool: view
     def isValidAddr(_addr: address) -> bool: view
     def getAddr(_regId: uint256) -> address: view
 
@@ -9,17 +10,20 @@ struct Addys:
     greenToken: address
     savingsGreen: address
     ripeToken: address
+    ledger: address
+    missionControl: address
     priceDesk: address
     vaultBook: address
     auctionHouse: address
     auctionHouseNft: address
     bondRoom: address
-    missionControl: address
     creditEngine: address
     endaoment: address
-    ledger: address
     lootbox: address
     teller: address
+    switchboardOne: address
+    switchboardTwo: address
+    switchboardThree: address
 
 # hq
 RIPE_HQ_FOR_ADDYS: immutable(address)
@@ -28,17 +32,20 @@ RIPE_HQ_FOR_ADDYS: immutable(address)
 GREEN_TOKEN_ID: constant(uint256) = 1
 SAVINGS_GREEN_ID: constant(uint256) = 2
 RIPE_TOKEN_ID: constant(uint256) = 3
-PRICE_DESK_ID: constant(uint256) = 4
-VAULT_BOOK_ID: constant(uint256) = 5
-AUCTION_HOUSE_ID: constant(uint256) = 6
-AUCTION_HOUSE_NFT_ID: constant(uint256) = 7
-BOND_ROOM_ID: constant(uint256) = 8
-MISSION_CONTROL_ID: constant(uint256) = 9
-CREDIT_ENGINE_ID: constant(uint256) = 10
-ENDAOMENT_ID: constant(uint256) = 11
-LEDGER_ID: constant(uint256) = 12
+LEDGER_ID: constant(uint256) = 4
+MISSION_CONTROL_ID: constant(uint256) = 5
+PRICE_DESK_ID: constant(uint256) = 6
+VAULT_BOOK_ID: constant(uint256) = 7
+AUCTION_HOUSE_ID: constant(uint256) = 8
+AUCTION_HOUSE_NFT_ID: constant(uint256) = 9
+BOND_ROOM_ID: constant(uint256) = 10
+CREDIT_ENGINE_ID: constant(uint256) = 11
+ENDAOMENT_ID: constant(uint256) = 12
 LOOTBOX_ID: constant(uint256) = 13
 TELLER_ID: constant(uint256) = 14
+SWITCHBOARD_ONE_ID: constant(uint256) = 15
+SWITCHBOARD_TWO_ID: constant(uint256) = 16
+SWITCHBOARD_THREE_ID: constant(uint256) = 17
 
 
 @deploy
@@ -75,17 +82,20 @@ def _generateAddys() -> Addys:
         greenToken=staticcall RipeHq(hq).getAddr(GREEN_TOKEN_ID),
         savingsGreen=staticcall RipeHq(hq).getAddr(SAVINGS_GREEN_ID),
         ripeToken=staticcall RipeHq(hq).getAddr(RIPE_TOKEN_ID),
+        ledger=staticcall RipeHq(hq).getAddr(LEDGER_ID),
+        missionControl=staticcall RipeHq(hq).getAddr(MISSION_CONTROL_ID),
         priceDesk=staticcall RipeHq(hq).getAddr(PRICE_DESK_ID),
         vaultBook=staticcall RipeHq(hq).getAddr(VAULT_BOOK_ID),
         auctionHouse=staticcall RipeHq(hq).getAddr(AUCTION_HOUSE_ID),
         auctionHouseNft=staticcall RipeHq(hq).getAddr(AUCTION_HOUSE_NFT_ID),
         bondRoom=staticcall RipeHq(hq).getAddr(BOND_ROOM_ID),
-        missionControl=staticcall RipeHq(hq).getAddr(MISSION_CONTROL_ID),
         creditEngine=staticcall RipeHq(hq).getAddr(CREDIT_ENGINE_ID),
         endaoment=staticcall RipeHq(hq).getAddr(ENDAOMENT_ID),
-        ledger=staticcall RipeHq(hq).getAddr(LEDGER_ID),
         lootbox=staticcall RipeHq(hq).getAddr(LOOTBOX_ID),
         teller=staticcall RipeHq(hq).getAddr(TELLER_ID),
+        switchboardOne=staticcall RipeHq(hq).getAddr(SWITCHBOARD_ONE_ID),
+        switchboardTwo=staticcall RipeHq(hq).getAddr(SWITCHBOARD_TWO_ID),
+        switchboardThree=staticcall RipeHq(hq).getAddr(SWITCHBOARD_THREE_ID),
     )
 
 
@@ -107,6 +117,15 @@ def getRipeHq() -> address:
 @internal
 def _getRipeHq() -> address:
     return RIPE_HQ_FOR_ADDYS
+
+
+# utils
+
+
+@view
+@internal
+def _canModifyMissionControl(_addr: address) -> bool:
+    return staticcall RipeHq(RIPE_HQ_FOR_ADDYS).canModifyMissionControl(_addr)
 
 
 @view
@@ -134,6 +153,36 @@ def _getSavingsGreen() -> address:
 @internal
 def _getRipeToken() -> address:
     return staticcall RipeHq(RIPE_HQ_FOR_ADDYS).getAddr(RIPE_TOKEN_ID)
+
+
+# ledger
+
+
+@view
+@internal
+def _getLedgerId() -> uint256:
+    return LEDGER_ID
+
+
+@view
+@internal
+def _getLedgerAddr() -> address:
+    return staticcall RipeHq(RIPE_HQ_FOR_ADDYS).getAddr(LEDGER_ID)
+
+
+# mission control
+
+
+@view
+@internal
+def _getMissionControlId() -> uint256:
+    return MISSION_CONTROL_ID
+
+
+@view
+@internal
+def _getMissionControlAddr() -> address:
+    return staticcall RipeHq(RIPE_HQ_FOR_ADDYS).getAddr(MISSION_CONTROL_ID)
 
 
 # price desk
@@ -211,21 +260,6 @@ def _getBondRoomAddr() -> address:
     return staticcall RipeHq(RIPE_HQ_FOR_ADDYS).getAddr(BOND_ROOM_ID)
 
 
-# mission control
-
-
-@view
-@internal
-def _getMissionControlId() -> uint256:
-    return MISSION_CONTROL_ID
-
-
-@view
-@internal
-def _getMissionControlAddr() -> address:
-    return staticcall RipeHq(RIPE_HQ_FOR_ADDYS).getAddr(MISSION_CONTROL_ID)
-
-
 # credit engine
 
 
@@ -256,21 +290,6 @@ def _getEndaomentAddr() -> address:
     return staticcall RipeHq(RIPE_HQ_FOR_ADDYS).getAddr(ENDAOMENT_ID)
 
 
-# ledger
-
-
-@view
-@internal
-def _getLedgerId() -> uint256:
-    return LEDGER_ID
-
-
-@view
-@internal
-def _getLedgerAddr() -> address:
-    return staticcall RipeHq(RIPE_HQ_FOR_ADDYS).getAddr(LEDGER_ID)
-
-
 # lootbox
 
 
@@ -299,3 +318,48 @@ def _getTellerId() -> uint256:
 @internal
 def _getTellerAddr() -> address:
     return staticcall RipeHq(RIPE_HQ_FOR_ADDYS).getAddr(TELLER_ID)
+
+
+# switchboard one
+
+
+@view
+@internal
+def _getSwitchboardOneId() -> uint256:
+    return SWITCHBOARD_ONE_ID
+
+
+@view
+@internal
+def _getSwitchboardOneAddr() -> address:
+    return staticcall RipeHq(RIPE_HQ_FOR_ADDYS).getAddr(SWITCHBOARD_ONE_ID)
+
+
+# switchboard two
+
+
+@view
+@internal
+def _getSwitchboardTwoId() -> uint256:
+    return SWITCHBOARD_TWO_ID
+
+
+@view
+@internal
+def _getSwitchboardTwoAddr() -> address:
+    return staticcall RipeHq(RIPE_HQ_FOR_ADDYS).getAddr(SWITCHBOARD_TWO_ID)
+
+
+# switchboard three
+
+
+@view
+@internal
+def _getSwitchboardThreeId() -> uint256:
+    return SWITCHBOARD_THREE_ID
+
+
+@view
+@internal
+def _getSwitchboardThreeAddr() -> address:
+    return staticcall RipeHq(RIPE_HQ_FOR_ADDYS).getAddr(SWITCHBOARD_THREE_ID)

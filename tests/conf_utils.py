@@ -39,7 +39,7 @@ def performDeposit(teller, simple_erc20_vault, alpha_token, alpha_token_whale):
 
 
 @pytest.fixture(scope="session")
-def setGeneralConfig(mission_control_data, mission_control):
+def setGeneralConfig(mission_control, switchboard_one):
     def setGeneralConfig(
         _perUserMaxVaults = 5,
         _perUserMaxAssetsPerVault = 10,
@@ -70,12 +70,12 @@ def setGeneralConfig(mission_control_data, mission_control):
             _canBuyInAuction,
             _canClaimInStabPool,
         )
-        mission_control_data.setGeneralConfig(gen_config, sender=mission_control.address)
+        mission_control.setGeneralConfig(gen_config, sender=switchboard_one.address)
     yield setGeneralConfig
 
 
 @pytest.fixture(scope="session")
-def setGeneralDebtConfig(mission_control_data, mission_control, createAuctionParams):
+def setGeneralDebtConfig(mission_control, switchboard_one, createAuctionParams):
     def setGeneralDebtConfig(
         _perUserDebtLimit = MAX_UINT256,
         _globalDebtLimit = MAX_UINT256,
@@ -102,7 +102,7 @@ def setGeneralDebtConfig(mission_control_data, mission_control, createAuctionPar
             _ltvPaybackBuffer,
             _genAuctionParams,
         )
-        mission_control_data.setGeneralDebtConfig(debt_config, sender=mission_control.address)
+        mission_control.setGeneralDebtConfig(debt_config, sender=switchboard_one.address)
     yield setGeneralDebtConfig
 
 
@@ -130,9 +130,10 @@ def createAuctionParams():
 
 
 @pytest.fixture(scope="session")
-def setAssetConfig(mission_control_data, mission_control, createDebtTerms):
+def setAssetConfig(mission_control, switchboard_two, createDebtTerms):
     def setAssetConfig(
         _asset,
+        _vaultIds = [2], # default simple erc20 vault
         _stakersPointsAlloc = 10,
         _voterPointsAlloc = 10,
         _perUserDepositLimit = MAX_UINT256,
@@ -154,6 +155,7 @@ def setAssetConfig(mission_control_data, mission_control, createDebtTerms):
         _isNft = False,
     ):
         asset_config = (
+            _vaultIds,
             _stakersPointsAlloc,
             _voterPointsAlloc,
             _perUserDepositLimit,
@@ -174,7 +176,7 @@ def setAssetConfig(mission_control_data, mission_control, createDebtTerms):
             _whitelist,
             _isNft,
         )
-        mission_control_data.setAssetConfig(_asset, asset_config, sender=mission_control.address)
+        mission_control.setAssetConfig(_asset, asset_config, sender=switchboard_two.address)
     yield setAssetConfig
 
 
@@ -205,7 +207,7 @@ def createDebtTerms():
 
 
 @pytest.fixture(scope="session")
-def setRipeRewardsConfig(mission_control_data, mission_control):
+def setRipeRewardsConfig(mission_control, switchboard_one):
     def setRipeRewardsConfig(
         _arePointsEnabled = True,
         _ripePerBlock = 10,
@@ -222,7 +224,7 @@ def setRipeRewardsConfig(mission_control_data, mission_control):
             _votersAlloc,
             _genDepositorsAlloc,
         )
-        mission_control_data.setRipeRewardsConfig(config, sender=mission_control.address)
+        mission_control.setRipeRewardsConfig(config, sender=switchboard_one.address)
     yield setRipeRewardsConfig
 
 
@@ -232,22 +234,18 @@ def setRipeRewardsConfig(mission_control_data, mission_control):
 
 
 @pytest.fixture(scope="session")
-def setUserConfig(mission_control_data, mission_control):
+def setUserConfig(mission_control):
     def setUserConfig(
         _user,
         _canAnyoneDeposit = True,
         _canAnyoneRepayDebt = True,
     ):
-        config = (
-            _canAnyoneDeposit,
-            _canAnyoneRepayDebt,
-        )
-        mission_control_data.setUserConfig(_user, config, sender=mission_control.address)
+        mission_control.setUserConfig(_canAnyoneDeposit, _canAnyoneRepayDebt, sender=_user)
     yield setUserConfig
 
 
 @pytest.fixture(scope="session")
-def setUserDelegation(mission_control_data, mission_control):
+def setUserDelegation(mission_control):
     def setUserDelegation(
         _user,
         _delegate,
@@ -256,11 +254,5 @@ def setUserDelegation(mission_control_data, mission_control):
         _canClaimFromStabPool = True,
         _canClaimLoot = True,
     ):
-        config = (
-            _canWithdraw,
-            _canBorrow,
-            _canClaimFromStabPool,
-            _canClaimLoot,
-        )
-        mission_control_data.setUserDelegation(_user, _delegate, config, sender=mission_control.address)
+        mission_control.setUserDelegation(_delegate, _canWithdraw, _canBorrow, _canClaimFromStabPool, _canClaimLoot, sender=_user)
     yield setUserDelegation
