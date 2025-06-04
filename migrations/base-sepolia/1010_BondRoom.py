@@ -13,4 +13,4 @@ def migrate(migration: Migration):
     )
 
     migration.execute(hq.startAddNewAddressToRegistry, bond_room, "Bond Room")
-    migration.execute(hq.confirmNewAddressToRegistry, bond_room)
+    assert migration.execute(hq.confirmNewAddressToRegistry, bond_room) == 10

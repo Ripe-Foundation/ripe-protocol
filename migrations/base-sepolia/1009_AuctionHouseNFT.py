@@ -13,4 +13,4 @@ def migrate(migration: Migration):
     )
 
     migration.execute(hq.startAddNewAddressToRegistry, auction_house_nft, "Auction House NFT")
-    migration.execute(hq.confirmNewAddressToRegistry, auction_house_nft)
+    assert migration.execute(hq.confirmNewAddressToRegistry, auction_house_nft) == 9

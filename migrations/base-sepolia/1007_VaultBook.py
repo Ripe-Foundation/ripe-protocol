@@ -42,4 +42,4 @@ def migrate(migration: Migration):
     migration.execute(vault_book.setRegistryTimeLockAfterSetup)
 
     migration.execute(hq.startAddNewAddressToRegistry, vault_book, "Vault Book")
-    migration.execute(hq.confirmNewAddressToRegistry, vault_book)
+    assert migration.execute(hq.confirmNewAddressToRegistry, vault_book) == 7

@@ -15,4 +15,4 @@ def migrate(migration: Migration):
     )
 
     migration.execute(hq.startAddNewAddressToRegistry, ledger, "Ledger")
-    migration.execute(hq.confirmNewAddressToRegistry, ledger)
+    assert migration.execute(hq.confirmNewAddressToRegistry, ledger) == 4

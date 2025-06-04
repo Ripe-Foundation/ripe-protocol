@@ -13,8 +13,8 @@ def migrate(migration: Migration):
     )
 
     migration.execute(hq.startAddNewAddressToRegistry, auction_house, "Auction House")
-    migration.execute(hq.confirmNewAddressToRegistry, auction_house)
+    assert migration.execute(hq.confirmNewAddressToRegistry, auction_house) == 8
 
     # auction house can mint green
-    migration.execute(hq.initiateHqConfigChange, 6, True, False, False)
-    migration.execute(hq.confirmHqConfigChange, 6)
+    migration.execute(hq.initiateHqConfigChange, 8, True, False, False, False)
+    migration.execute(hq.confirmHqConfigChange, 8)

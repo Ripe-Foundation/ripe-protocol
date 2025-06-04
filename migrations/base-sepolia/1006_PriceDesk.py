@@ -84,4 +84,4 @@ def migrate(migration: Migration):
     migration.execute(price_desk.setRegistryTimeLockAfterSetup)
 
     migration.execute(hq.startAddNewAddressToRegistry, price_desk, "Price Desk")
-    migration.execute(hq.confirmNewAddressToRegistry, price_desk)
+    assert migration.execute(hq.confirmNewAddressToRegistry, price_desk) == 6

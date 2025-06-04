@@ -30132,6 +30132,2499 @@
         "integrity": "6691cf143bbfc17758ffc6470facf9b00475b8d84a43a3bc47437b71a1d78d94"
       },
       "args": "000000000000000000000000a14bceb2c0086acdee1b01e47c7ef3de49ed996e"
+    },
+    "SwitchboardOne": {
+      "address": "0xD9D73Cb2BECE9F4be67Fa7cd0A30A131Af92f127",
+      "abi": [
+        {
+          "name": "PendingVaultLimitsChange",
+          "inputs": [
+            {
+              "name": "perUserMaxVaults",
+              "type": "uint256",
+              "indexed": false
+            },
+            {
+              "name": "perUserMaxAssetsPerVault",
+              "type": "uint256",
+              "indexed": false
+            },
+            {
+              "name": "confirmationBlock",
+              "type": "uint256",
+              "indexed": false
+            },
+            {
+              "name": "actionId",
+              "type": "uint256",
+              "indexed": false
+            }
+          ],
+          "anonymous": false,
+          "type": "event"
+        },
+        {
+          "name": "PendingStaleTimeChange",
+          "inputs": [
+            {
+              "name": "priceStaleTime",
+              "type": "uint256",
+              "indexed": false
+            },
+            {
+              "name": "confirmationBlock",
+              "type": "uint256",
+              "indexed": false
+            },
+            {
+              "name": "actionId",
+              "type": "uint256",
+              "indexed": false
+            }
+          ],
+          "anonymous": false,
+          "type": "event"
+        },
+        {
+          "name": "CanDepositSet",
+          "inputs": [
+            {
+              "name": "canDeposit",
+              "type": "bool",
+              "indexed": false
+            },
+            {
+              "name": "caller",
+              "type": "address",
+              "indexed": true
+            }
+          ],
+          "anonymous": false,
+          "type": "event"
+        },
+        {
+          "name": "CanWithdrawSet",
+          "inputs": [
+            {
+              "name": "canWithdraw",
+              "type": "bool",
+              "indexed": false
+            },
+            {
+              "name": "caller",
+              "type": "address",
+              "indexed": true
+            }
+          ],
+          "anonymous": false,
+          "type": "event"
+        },
+        {
+          "name": "CanBorrowSet",
+          "inputs": [
+            {
+              "name": "canBorrow",
+              "type": "bool",
+              "indexed": false
+            },
+            {
+              "name": "caller",
+              "type": "address",
+              "indexed": true
+            }
+          ],
+          "anonymous": false,
+          "type": "event"
+        },
+        {
+          "name": "CanRepaySet",
+          "inputs": [
+            {
+              "name": "canRepay",
+              "type": "bool",
+              "indexed": false
+            },
+            {
+              "name": "caller",
+              "type": "address",
+              "indexed": true
+            }
+          ],
+          "anonymous": false,
+          "type": "event"
+        },
+        {
+          "name": "CanClaimLootSet",
+          "inputs": [
+            {
+              "name": "canClaimLoot",
+              "type": "bool",
+              "indexed": false
+            },
+            {
+              "name": "caller",
+              "type": "address",
+              "indexed": true
+            }
+          ],
+          "anonymous": false,
+          "type": "event"
+        },
+        {
+          "name": "CanLiquidateSet",
+          "inputs": [
+            {
+              "name": "canLiquidate",
+              "type": "bool",
+              "indexed": false
+            },
+            {
+              "name": "caller",
+              "type": "address",
+              "indexed": true
+            }
+          ],
+          "anonymous": false,
+          "type": "event"
+        },
+        {
+          "name": "CanRedeemCollateralSet",
+          "inputs": [
+            {
+              "name": "canRedeemCollateral",
+              "type": "bool",
+              "indexed": false
+            },
+            {
+              "name": "caller",
+              "type": "address",
+              "indexed": true
+            }
+          ],
+          "anonymous": false,
+          "type": "event"
+        },
+        {
+          "name": "CanRedeemInStabPoolSet",
+          "inputs": [
+            {
+              "name": "canRedeemInStabPool",
+              "type": "bool",
+              "indexed": false
+            },
+            {
+              "name": "caller",
+              "type": "address",
+              "indexed": true
+            }
+          ],
+          "anonymous": false,
+          "type": "event"
+        },
+        {
+          "name": "CanBuyInAuctionSet",
+          "inputs": [
+            {
+              "name": "canBuyInAuction",
+              "type": "bool",
+              "indexed": false
+            },
+            {
+              "name": "caller",
+              "type": "address",
+              "indexed": true
+            }
+          ],
+          "anonymous": false,
+          "type": "event"
+        },
+        {
+          "name": "CanClaimInStabPoolSet",
+          "inputs": [
+            {
+              "name": "canClaimInStabPool",
+              "type": "bool",
+              "indexed": false
+            },
+            {
+              "name": "caller",
+              "type": "address",
+              "indexed": true
+            }
+          ],
+          "anonymous": false,
+          "type": "event"
+        },
+        {
+          "name": "PendingGlobalDebtLimitsChange",
+          "inputs": [
+            {
+              "name": "perUserDebtLimit",
+              "type": "uint256",
+              "indexed": false
+            },
+            {
+              "name": "globalDebtLimit",
+              "type": "uint256",
+              "indexed": false
+            },
+            {
+              "name": "minDebtAmount",
+              "type": "uint256",
+              "indexed": false
+            },
+            {
+              "name": "numAllowedBorrowers",
+              "type": "uint256",
+              "indexed": false
+            },
+            {
+              "name": "confirmationBlock",
+              "type": "uint256",
+              "indexed": false
+            },
+            {
+              "name": "actionId",
+              "type": "uint256",
+              "indexed": false
+            }
+          ],
+          "anonymous": false,
+          "type": "event"
+        },
+        {
+          "name": "PendingBorrowIntervalConfigChange",
+          "inputs": [
+            {
+              "name": "maxBorrowPerInterval",
+              "type": "uint256",
+              "indexed": false
+            },
+            {
+              "name": "numBlocksPerInterval",
+              "type": "uint256",
+              "indexed": false
+            },
+            {
+              "name": "confirmationBlock",
+              "type": "uint256",
+              "indexed": false
+            },
+            {
+              "name": "actionId",
+              "type": "uint256",
+              "indexed": false
+            }
+          ],
+          "anonymous": false,
+          "type": "event"
+        },
+        {
+          "name": "PendingKeeperConfigChange",
+          "inputs": [
+            {
+              "name": "keeperFeeRatio",
+              "type": "uint256",
+              "indexed": false
+            },
+            {
+              "name": "minKeeperFee",
+              "type": "uint256",
+              "indexed": false
+            },
+            {
+              "name": "confirmationBlock",
+              "type": "uint256",
+              "indexed": false
+            },
+            {
+              "name": "actionId",
+              "type": "uint256",
+              "indexed": false
+            }
+          ],
+          "anonymous": false,
+          "type": "event"
+        },
+        {
+          "name": "PendingLtvPaybackBufferChange",
+          "inputs": [
+            {
+              "name": "ltvPaybackBuffer",
+              "type": "uint256",
+              "indexed": false
+            },
+            {
+              "name": "confirmationBlock",
+              "type": "uint256",
+              "indexed": false
+            },
+            {
+              "name": "actionId",
+              "type": "uint256",
+              "indexed": false
+            }
+          ],
+          "anonymous": false,
+          "type": "event"
+        },
+        {
+          "name": "PendingDefaultAuctionParamsChange",
+          "inputs": [
+            {
+              "name": "startDiscount",
+              "type": "uint256",
+              "indexed": false
+            },
+            {
+              "name": "maxDiscount",
+              "type": "uint256",
+              "indexed": false
+            },
+            {
+              "name": "delay",
+              "type": "uint256",
+              "indexed": false
+            },
+            {
+              "name": "duration",
+              "type": "uint256",
+              "indexed": false
+            },
+            {
+              "name": "confirmationBlock",
+              "type": "uint256",
+              "indexed": false
+            },
+            {
+              "name": "actionId",
+              "type": "uint256",
+              "indexed": false
+            }
+          ],
+          "anonymous": false,
+          "type": "event"
+        },
+        {
+          "name": "IsDaowryEnabledSet",
+          "inputs": [
+            {
+              "name": "isDaowryEnabled",
+              "type": "bool",
+              "indexed": false
+            },
+            {
+              "name": "caller",
+              "type": "address",
+              "indexed": true
+            }
+          ],
+          "anonymous": false,
+          "type": "event"
+        },
+        {
+          "name": "PendingRipeRewardsPerBlockChange",
+          "inputs": [
+            {
+              "name": "ripePerBlock",
+              "type": "uint256",
+              "indexed": false
+            },
+            {
+              "name": "confirmationBlock",
+              "type": "uint256",
+              "indexed": false
+            },
+            {
+              "name": "actionId",
+              "type": "uint256",
+              "indexed": false
+            }
+          ],
+          "anonymous": false,
+          "type": "event"
+        },
+        {
+          "name": "PendingRipeRewardsAllocsChange",
+          "inputs": [
+            {
+              "name": "borrowersAlloc",
+              "type": "uint256",
+              "indexed": false
+            },
+            {
+              "name": "stakersAlloc",
+              "type": "uint256",
+              "indexed": false
+            },
+            {
+              "name": "votersAlloc",
+              "type": "uint256",
+              "indexed": false
+            },
+            {
+              "name": "genDepositorsAlloc",
+              "type": "uint256",
+              "indexed": false
+            },
+            {
+              "name": "confirmationBlock",
+              "type": "uint256",
+              "indexed": false
+            },
+            {
+              "name": "actionId",
+              "type": "uint256",
+              "indexed": false
+            }
+          ],
+          "anonymous": false,
+          "type": "event"
+        },
+        {
+          "name": "RewardsPointsEnabledModified",
+          "inputs": [
+            {
+              "name": "arePointsEnabled",
+              "type": "bool",
+              "indexed": false
+            },
+            {
+              "name": "caller",
+              "type": "address",
+              "indexed": true
+            }
+          ],
+          "anonymous": false,
+          "type": "event"
+        },
+        {
+          "name": "PendingPriorityLiqAssetVaultsChange",
+          "inputs": [
+            {
+              "name": "numPriorityLiqAssetVaults",
+              "type": "uint256",
+              "indexed": false
+            },
+            {
+              "name": "confirmationBlock",
+              "type": "uint256",
+              "indexed": false
+            },
+            {
+              "name": "actionId",
+              "type": "uint256",
+              "indexed": false
+            }
+          ],
+          "anonymous": false,
+          "type": "event"
+        },
+        {
+          "name": "PendingPriorityStabVaultsChange",
+          "inputs": [
+            {
+              "name": "numPriorityStabVaults",
+              "type": "uint256",
+              "indexed": false
+            },
+            {
+              "name": "confirmationBlock",
+              "type": "uint256",
+              "indexed": false
+            },
+            {
+              "name": "actionId",
+              "type": "uint256",
+              "indexed": false
+            }
+          ],
+          "anonymous": false,
+          "type": "event"
+        },
+        {
+          "name": "PendingPriorityPriceSourceIdsChange",
+          "inputs": [
+            {
+              "name": "numPriorityPriceSourceIds",
+              "type": "uint256",
+              "indexed": false
+            },
+            {
+              "name": "confirmationBlock",
+              "type": "uint256",
+              "indexed": false
+            },
+            {
+              "name": "actionId",
+              "type": "uint256",
+              "indexed": false
+            }
+          ],
+          "anonymous": false,
+          "type": "event"
+        },
+        {
+          "name": "PendingUnderscoreRegistryChange",
+          "inputs": [
+            {
+              "name": "underscoreRegistry",
+              "type": "address",
+              "indexed": false
+            },
+            {
+              "name": "confirmationBlock",
+              "type": "uint256",
+              "indexed": false
+            },
+            {
+              "name": "actionId",
+              "type": "uint256",
+              "indexed": false
+            }
+          ],
+          "anonymous": false,
+          "type": "event"
+        },
+        {
+          "name": "PendingCanPerformLiteAction",
+          "inputs": [
+            {
+              "name": "user",
+              "type": "address",
+              "indexed": false
+            },
+            {
+              "name": "canDo",
+              "type": "bool",
+              "indexed": false
+            },
+            {
+              "name": "confirmationBlock",
+              "type": "uint256",
+              "indexed": false
+            },
+            {
+              "name": "actionId",
+              "type": "uint256",
+              "indexed": false
+            }
+          ],
+          "anonymous": false,
+          "type": "event"
+        },
+        {
+          "name": "PendingMaxLtvDeviationChange",
+          "inputs": [
+            {
+              "name": "newDeviation",
+              "type": "uint256",
+              "indexed": false
+            },
+            {
+              "name": "confirmationBlock",
+              "type": "uint256",
+              "indexed": false
+            },
+            {
+              "name": "actionId",
+              "type": "uint256",
+              "indexed": false
+            }
+          ],
+          "anonymous": false,
+          "type": "event"
+        },
+        {
+          "name": "VaultLimitsSet",
+          "inputs": [
+            {
+              "name": "perUserMaxVaults",
+              "type": "uint256",
+              "indexed": false
+            },
+            {
+              "name": "perUserMaxAssetsPerVault",
+              "type": "uint256",
+              "indexed": false
+            }
+          ],
+          "anonymous": false,
+          "type": "event"
+        },
+        {
+          "name": "StaleTimeSet",
+          "inputs": [
+            {
+              "name": "staleTime",
+              "type": "uint256",
+              "indexed": false
+            }
+          ],
+          "anonymous": false,
+          "type": "event"
+        },
+        {
+          "name": "GlobalDebtLimitsSet",
+          "inputs": [
+            {
+              "name": "perUserDebtLimit",
+              "type": "uint256",
+              "indexed": false
+            },
+            {
+              "name": "globalDebtLimit",
+              "type": "uint256",
+              "indexed": false
+            },
+            {
+              "name": "minDebtAmount",
+              "type": "uint256",
+              "indexed": false
+            },
+            {
+              "name": "numAllowedBorrowers",
+              "type": "uint256",
+              "indexed": false
+            }
+          ],
+          "anonymous": false,
+          "type": "event"
+        },
+        {
+          "name": "BorrowIntervalConfigSet",
+          "inputs": [
+            {
+              "name": "maxBorrowPerInterval",
+              "type": "uint256",
+              "indexed": false
+            },
+            {
+              "name": "numBlocksPerInterval",
+              "type": "uint256",
+              "indexed": false
+            }
+          ],
+          "anonymous": false,
+          "type": "event"
+        },
+        {
+          "name": "KeeperConfigSet",
+          "inputs": [
+            {
+              "name": "keeperFeeRatio",
+              "type": "uint256",
+              "indexed": false
+            },
+            {
+              "name": "minKeeperFee",
+              "type": "uint256",
+              "indexed": false
+            }
+          ],
+          "anonymous": false,
+          "type": "event"
+        },
+        {
+          "name": "LtvPaybackBufferSet",
+          "inputs": [
+            {
+              "name": "ltvPaybackBuffer",
+              "type": "uint256",
+              "indexed": false
+            }
+          ],
+          "anonymous": false,
+          "type": "event"
+        },
+        {
+          "name": "GenAuctionParamsSet",
+          "inputs": [
+            {
+              "name": "startDiscount",
+              "type": "uint256",
+              "indexed": false
+            },
+            {
+              "name": "maxDiscount",
+              "type": "uint256",
+              "indexed": false
+            },
+            {
+              "name": "delay",
+              "type": "uint256",
+              "indexed": false
+            },
+            {
+              "name": "duration",
+              "type": "uint256",
+              "indexed": false
+            }
+          ],
+          "anonymous": false,
+          "type": "event"
+        },
+        {
+          "name": "RipeRewardsPerBlockSet",
+          "inputs": [
+            {
+              "name": "ripePerBlock",
+              "type": "uint256",
+              "indexed": false
+            }
+          ],
+          "anonymous": false,
+          "type": "event"
+        },
+        {
+          "name": "RipeRewardsAllocsSet",
+          "inputs": [
+            {
+              "name": "borrowersAlloc",
+              "type": "uint256",
+              "indexed": false
+            },
+            {
+              "name": "stakersAlloc",
+              "type": "uint256",
+              "indexed": false
+            },
+            {
+              "name": "votersAlloc",
+              "type": "uint256",
+              "indexed": false
+            },
+            {
+              "name": "genDepositorsAlloc",
+              "type": "uint256",
+              "indexed": false
+            }
+          ],
+          "anonymous": false,
+          "type": "event"
+        },
+        {
+          "name": "PriorityLiqAssetVaultsSet",
+          "inputs": [
+            {
+              "name": "numVaults",
+              "type": "uint256",
+              "indexed": false
+            }
+          ],
+          "anonymous": false,
+          "type": "event"
+        },
+        {
+          "name": "PriorityStabVaultsSet",
+          "inputs": [
+            {
+              "name": "numVaults",
+              "type": "uint256",
+              "indexed": false
+            }
+          ],
+          "anonymous": false,
+          "type": "event"
+        },
+        {
+          "name": "PriorityPriceSourceIdsModified",
+          "inputs": [
+            {
+              "name": "numIds",
+              "type": "uint256",
+              "indexed": false
+            }
+          ],
+          "anonymous": false,
+          "type": "event"
+        },
+        {
+          "name": "UnderscoreRegistrySet",
+          "inputs": [
+            {
+              "name": "addr",
+              "type": "address",
+              "indexed": true
+            }
+          ],
+          "anonymous": false,
+          "type": "event"
+        },
+        {
+          "name": "CanPerformLiteAction",
+          "inputs": [
+            {
+              "name": "user",
+              "type": "address",
+              "indexed": true
+            },
+            {
+              "name": "canDo",
+              "type": "bool",
+              "indexed": false
+            }
+          ],
+          "anonymous": false,
+          "type": "event"
+        },
+        {
+          "name": "MaxLtvDeviationSet",
+          "inputs": [
+            {
+              "name": "newDeviation",
+              "type": "uint256",
+              "indexed": false
+            }
+          ],
+          "anonymous": false,
+          "type": "event"
+        },
+        {
+          "name": "GovChangeTimeLockModified",
+          "inputs": [
+            {
+              "name": "prevTimeLock",
+              "type": "uint256",
+              "indexed": false
+            },
+            {
+              "name": "newTimeLock",
+              "type": "uint256",
+              "indexed": false
+            }
+          ],
+          "anonymous": false,
+          "type": "event"
+        },
+        {
+          "name": "ExpirationSet",
+          "inputs": [
+            {
+              "name": "expiration",
+              "type": "uint256",
+              "indexed": false
+            }
+          ],
+          "anonymous": false,
+          "type": "event"
+        },
+        {
+          "name": "ActionTimeLockSet",
+          "inputs": [
+            {
+              "name": "newTimeLock",
+              "type": "uint256",
+              "indexed": false
+            },
+            {
+              "name": "prevTimeLock",
+              "type": "uint256",
+              "indexed": false
+            }
+          ],
+          "anonymous": false,
+          "type": "event"
+        },
+        {
+          "name": "GovChangeStarted",
+          "inputs": [
+            {
+              "name": "prevGov",
+              "type": "address",
+              "indexed": true
+            },
+            {
+              "name": "newGov",
+              "type": "address",
+              "indexed": true
+            },
+            {
+              "name": "confirmBlock",
+              "type": "uint256",
+              "indexed": false
+            }
+          ],
+          "anonymous": false,
+          "type": "event"
+        },
+        {
+          "name": "GovChangeConfirmed",
+          "inputs": [
+            {
+              "name": "prevGov",
+              "type": "address",
+              "indexed": true
+            },
+            {
+              "name": "newGov",
+              "type": "address",
+              "indexed": true
+            },
+            {
+              "name": "initiatedBlock",
+              "type": "uint256",
+              "indexed": false
+            },
+            {
+              "name": "confirmBlock",
+              "type": "uint256",
+              "indexed": false
+            }
+          ],
+          "anonymous": false,
+          "type": "event"
+        },
+        {
+          "name": "GovChangeCancelled",
+          "inputs": [
+            {
+              "name": "cancelledGov",
+              "type": "address",
+              "indexed": true
+            },
+            {
+              "name": "initiatedBlock",
+              "type": "uint256",
+              "indexed": false
+            },
+            {
+              "name": "confirmBlock",
+              "type": "uint256",
+              "indexed": false
+            }
+          ],
+          "anonymous": false,
+          "type": "event"
+        },
+        {
+          "name": "RipeHqSetupFinished",
+          "inputs": [
+            {
+              "name": "prevGov",
+              "type": "address",
+              "indexed": true
+            },
+            {
+              "name": "newGov",
+              "type": "address",
+              "indexed": true
+            },
+            {
+              "name": "timeLock",
+              "type": "uint256",
+              "indexed": false
+            }
+          ],
+          "anonymous": false,
+          "type": "event"
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "getRipeHqFromGov",
+          "inputs": [],
+          "outputs": [
+            {
+              "name": "",
+              "type": "address"
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "canGovern",
+          "inputs": [
+            {
+              "name": "_addr",
+              "type": "address"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "bool"
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "getGovernors",
+          "inputs": [],
+          "outputs": [
+            {
+              "name": "",
+              "type": "address[]"
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "hasPendingGovChange",
+          "inputs": [],
+          "outputs": [
+            {
+              "name": "",
+              "type": "bool"
+            }
+          ]
+        },
+        {
+          "stateMutability": "nonpayable",
+          "type": "function",
+          "name": "startGovernanceChange",
+          "inputs": [
+            {
+              "name": "_newGov",
+              "type": "address"
+            }
+          ],
+          "outputs": []
+        },
+        {
+          "stateMutability": "nonpayable",
+          "type": "function",
+          "name": "confirmGovernanceChange",
+          "inputs": [],
+          "outputs": []
+        },
+        {
+          "stateMutability": "nonpayable",
+          "type": "function",
+          "name": "cancelGovernanceChange",
+          "inputs": [],
+          "outputs": []
+        },
+        {
+          "stateMutability": "nonpayable",
+          "type": "function",
+          "name": "setGovTimeLock",
+          "inputs": [
+            {
+              "name": "_numBlocks",
+              "type": "uint256"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "bool"
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "isValidGovTimeLock",
+          "inputs": [
+            {
+              "name": "_newTimeLock",
+              "type": "uint256"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "bool"
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "minGovChangeTimeLock",
+          "inputs": [],
+          "outputs": [
+            {
+              "name": "",
+              "type": "uint256"
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "maxGovChangeTimeLock",
+          "inputs": [],
+          "outputs": [
+            {
+              "name": "",
+              "type": "uint256"
+            }
+          ]
+        },
+        {
+          "stateMutability": "nonpayable",
+          "type": "function",
+          "name": "finishRipeHqSetup",
+          "inputs": [
+            {
+              "name": "_newGov",
+              "type": "address"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "bool"
+            }
+          ]
+        },
+        {
+          "stateMutability": "nonpayable",
+          "type": "function",
+          "name": "finishRipeHqSetup",
+          "inputs": [
+            {
+              "name": "_newGov",
+              "type": "address"
+            },
+            {
+              "name": "_timeLock",
+              "type": "uint256"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "bool"
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "governance",
+          "inputs": [],
+          "outputs": [
+            {
+              "name": "",
+              "type": "address"
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "pendingGov",
+          "inputs": [],
+          "outputs": [
+            {
+              "name": "",
+              "type": "tuple",
+              "components": [
+                {
+                  "name": "newGov",
+                  "type": "address"
+                },
+                {
+                  "name": "initiatedBlock",
+                  "type": "uint256"
+                },
+                {
+                  "name": "confirmBlock",
+                  "type": "uint256"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "numGovChanges",
+          "inputs": [],
+          "outputs": [
+            {
+              "name": "",
+              "type": "uint256"
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "govChangeTimeLock",
+          "inputs": [],
+          "outputs": [
+            {
+              "name": "",
+              "type": "uint256"
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "canConfirmAction",
+          "inputs": [
+            {
+              "name": "_actionId",
+              "type": "uint256"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "bool"
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "isExpired",
+          "inputs": [
+            {
+              "name": "_actionId",
+              "type": "uint256"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "bool"
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "hasPendingAction",
+          "inputs": [
+            {
+              "name": "_actionId",
+              "type": "uint256"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "bool"
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "getActionConfirmationBlock",
+          "inputs": [
+            {
+              "name": "_actionId",
+              "type": "uint256"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "uint256"
+            }
+          ]
+        },
+        {
+          "stateMutability": "nonpayable",
+          "type": "function",
+          "name": "setActionTimeLock",
+          "inputs": [
+            {
+              "name": "_newTimeLock",
+              "type": "uint256"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "bool"
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "isValidActionTimeLock",
+          "inputs": [
+            {
+              "name": "_newTimeLock",
+              "type": "uint256"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "bool"
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "minActionTimeLock",
+          "inputs": [],
+          "outputs": [
+            {
+              "name": "",
+              "type": "uint256"
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "maxActionTimeLock",
+          "inputs": [],
+          "outputs": [
+            {
+              "name": "",
+              "type": "uint256"
+            }
+          ]
+        },
+        {
+          "stateMutability": "nonpayable",
+          "type": "function",
+          "name": "setExpiration",
+          "inputs": [
+            {
+              "name": "_expiration",
+              "type": "uint256"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "bool"
+            }
+          ]
+        },
+        {
+          "stateMutability": "nonpayable",
+          "type": "function",
+          "name": "setActionTimeLockAfterSetup",
+          "inputs": [],
+          "outputs": [
+            {
+              "name": "",
+              "type": "bool"
+            }
+          ]
+        },
+        {
+          "stateMutability": "nonpayable",
+          "type": "function",
+          "name": "setActionTimeLockAfterSetup",
+          "inputs": [
+            {
+              "name": "_newTimeLock",
+              "type": "uint256"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "bool"
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "pendingActions",
+          "inputs": [
+            {
+              "name": "arg0",
+              "type": "uint256"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "tuple",
+              "components": [
+                {
+                  "name": "initiatedBlock",
+                  "type": "uint256"
+                },
+                {
+                  "name": "confirmBlock",
+                  "type": "uint256"
+                },
+                {
+                  "name": "expiration",
+                  "type": "uint256"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "actionId",
+          "inputs": [],
+          "outputs": [
+            {
+              "name": "",
+              "type": "uint256"
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "actionTimeLock",
+          "inputs": [],
+          "outputs": [
+            {
+              "name": "",
+              "type": "uint256"
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "expiration",
+          "inputs": [],
+          "outputs": [
+            {
+              "name": "",
+              "type": "uint256"
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "MIN_ACTION_TIMELOCK",
+          "inputs": [],
+          "outputs": [
+            {
+              "name": "",
+              "type": "uint256"
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "MAX_ACTION_TIMELOCK",
+          "inputs": [],
+          "outputs": [
+            {
+              "name": "",
+              "type": "uint256"
+            }
+          ]
+        },
+        {
+          "stateMutability": "nonpayable",
+          "type": "function",
+          "name": "setVaultLimits",
+          "inputs": [
+            {
+              "name": "_perUserMaxVaults",
+              "type": "uint256"
+            },
+            {
+              "name": "_perUserMaxAssetsPerVault",
+              "type": "uint256"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "uint256"
+            }
+          ]
+        },
+        {
+          "stateMutability": "nonpayable",
+          "type": "function",
+          "name": "setStaleTime",
+          "inputs": [
+            {
+              "name": "_staleTime",
+              "type": "uint256"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "uint256"
+            }
+          ]
+        },
+        {
+          "stateMutability": "nonpayable",
+          "type": "function",
+          "name": "setCanDeposit",
+          "inputs": [
+            {
+              "name": "_shouldEnable",
+              "type": "bool"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "bool"
+            }
+          ]
+        },
+        {
+          "stateMutability": "nonpayable",
+          "type": "function",
+          "name": "setCanWithdraw",
+          "inputs": [
+            {
+              "name": "_shouldEnable",
+              "type": "bool"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "bool"
+            }
+          ]
+        },
+        {
+          "stateMutability": "nonpayable",
+          "type": "function",
+          "name": "setCanBorrow",
+          "inputs": [
+            {
+              "name": "_shouldEnable",
+              "type": "bool"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "bool"
+            }
+          ]
+        },
+        {
+          "stateMutability": "nonpayable",
+          "type": "function",
+          "name": "setCanRepay",
+          "inputs": [
+            {
+              "name": "_shouldEnable",
+              "type": "bool"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "bool"
+            }
+          ]
+        },
+        {
+          "stateMutability": "nonpayable",
+          "type": "function",
+          "name": "setCanClaimLoot",
+          "inputs": [
+            {
+              "name": "_shouldEnable",
+              "type": "bool"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "bool"
+            }
+          ]
+        },
+        {
+          "stateMutability": "nonpayable",
+          "type": "function",
+          "name": "setCanLiquidate",
+          "inputs": [
+            {
+              "name": "_shouldEnable",
+              "type": "bool"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "bool"
+            }
+          ]
+        },
+        {
+          "stateMutability": "nonpayable",
+          "type": "function",
+          "name": "setCanRedeemCollateral",
+          "inputs": [
+            {
+              "name": "_shouldEnable",
+              "type": "bool"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "bool"
+            }
+          ]
+        },
+        {
+          "stateMutability": "nonpayable",
+          "type": "function",
+          "name": "setCanRedeemInStabPool",
+          "inputs": [
+            {
+              "name": "_shouldEnable",
+              "type": "bool"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "bool"
+            }
+          ]
+        },
+        {
+          "stateMutability": "nonpayable",
+          "type": "function",
+          "name": "setCanBuyInAuction",
+          "inputs": [
+            {
+              "name": "_shouldEnable",
+              "type": "bool"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "bool"
+            }
+          ]
+        },
+        {
+          "stateMutability": "nonpayable",
+          "type": "function",
+          "name": "setCanClaimInStabPool",
+          "inputs": [
+            {
+              "name": "_shouldEnable",
+              "type": "bool"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "bool"
+            }
+          ]
+        },
+        {
+          "stateMutability": "nonpayable",
+          "type": "function",
+          "name": "setGlobalDebtLimits",
+          "inputs": [
+            {
+              "name": "_perUserDebtLimit",
+              "type": "uint256"
+            },
+            {
+              "name": "_globalDebtLimit",
+              "type": "uint256"
+            },
+            {
+              "name": "_minDebtAmount",
+              "type": "uint256"
+            },
+            {
+              "name": "_numAllowedBorrowers",
+              "type": "uint256"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "uint256"
+            }
+          ]
+        },
+        {
+          "stateMutability": "nonpayable",
+          "type": "function",
+          "name": "setBorrowIntervalConfig",
+          "inputs": [
+            {
+              "name": "_maxBorrowPerInterval",
+              "type": "uint256"
+            },
+            {
+              "name": "_numBlocksPerInterval",
+              "type": "uint256"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "uint256"
+            }
+          ]
+        },
+        {
+          "stateMutability": "nonpayable",
+          "type": "function",
+          "name": "setKeeperConfig",
+          "inputs": [
+            {
+              "name": "_keeperFeeRatio",
+              "type": "uint256"
+            },
+            {
+              "name": "_minKeeperFee",
+              "type": "uint256"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "uint256"
+            }
+          ]
+        },
+        {
+          "stateMutability": "nonpayable",
+          "type": "function",
+          "name": "setLtvPaybackBuffer",
+          "inputs": [
+            {
+              "name": "_ltvPaybackBuffer",
+              "type": "uint256"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "uint256"
+            }
+          ]
+        },
+        {
+          "stateMutability": "nonpayable",
+          "type": "function",
+          "name": "setGenAuctionParams",
+          "inputs": [
+            {
+              "name": "_startDiscount",
+              "type": "uint256"
+            },
+            {
+              "name": "_maxDiscount",
+              "type": "uint256"
+            },
+            {
+              "name": "_delay",
+              "type": "uint256"
+            },
+            {
+              "name": "_duration",
+              "type": "uint256"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "uint256"
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "areValidAuctionParams",
+          "inputs": [
+            {
+              "name": "_params",
+              "type": "tuple",
+              "components": [
+                {
+                  "name": "hasParams",
+                  "type": "bool"
+                },
+                {
+                  "name": "startDiscount",
+                  "type": "uint256"
+                },
+                {
+                  "name": "maxDiscount",
+                  "type": "uint256"
+                },
+                {
+                  "name": "delay",
+                  "type": "uint256"
+                },
+                {
+                  "name": "duration",
+                  "type": "uint256"
+                }
+              ]
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "bool"
+            }
+          ]
+        },
+        {
+          "stateMutability": "nonpayable",
+          "type": "function",
+          "name": "setIsDaowryEnabled",
+          "inputs": [
+            {
+              "name": "_shouldEnable",
+              "type": "bool"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "bool"
+            }
+          ]
+        },
+        {
+          "stateMutability": "nonpayable",
+          "type": "function",
+          "name": "setRipePerBlock",
+          "inputs": [
+            {
+              "name": "_ripePerBlock",
+              "type": "uint256"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "uint256"
+            }
+          ]
+        },
+        {
+          "stateMutability": "nonpayable",
+          "type": "function",
+          "name": "setRipeRewardsAllocs",
+          "inputs": [
+            {
+              "name": "_borrowersAlloc",
+              "type": "uint256"
+            },
+            {
+              "name": "_stakersAlloc",
+              "type": "uint256"
+            },
+            {
+              "name": "_votersAlloc",
+              "type": "uint256"
+            },
+            {
+              "name": "_genDepositorsAlloc",
+              "type": "uint256"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "uint256"
+            }
+          ]
+        },
+        {
+          "stateMutability": "nonpayable",
+          "type": "function",
+          "name": "setRewardsPointsEnabled",
+          "inputs": [
+            {
+              "name": "_shouldEnable",
+              "type": "bool"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "bool"
+            }
+          ]
+        },
+        {
+          "stateMutability": "nonpayable",
+          "type": "function",
+          "name": "setPriorityLiqAssetVaults",
+          "inputs": [
+            {
+              "name": "_priorityLiqAssetVaults",
+              "type": "tuple[]",
+              "components": [
+                {
+                  "name": "vaultId",
+                  "type": "uint256"
+                },
+                {
+                  "name": "asset",
+                  "type": "address"
+                }
+              ]
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "uint256"
+            }
+          ]
+        },
+        {
+          "stateMutability": "nonpayable",
+          "type": "function",
+          "name": "setPriorityStabVaults",
+          "inputs": [
+            {
+              "name": "_priorityStabVaults",
+              "type": "tuple[]",
+              "components": [
+                {
+                  "name": "vaultId",
+                  "type": "uint256"
+                },
+                {
+                  "name": "asset",
+                  "type": "address"
+                }
+              ]
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "uint256"
+            }
+          ]
+        },
+        {
+          "stateMutability": "nonpayable",
+          "type": "function",
+          "name": "setPriorityPriceSourceIds",
+          "inputs": [
+            {
+              "name": "_priorityIds",
+              "type": "uint256[]"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "uint256"
+            }
+          ]
+        },
+        {
+          "stateMutability": "nonpayable",
+          "type": "function",
+          "name": "setUnderscoreRegistry",
+          "inputs": [
+            {
+              "name": "_underscoreRegistry",
+              "type": "address"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "uint256"
+            }
+          ]
+        },
+        {
+          "stateMutability": "nonpayable",
+          "type": "function",
+          "name": "setCanPerformLiteAction",
+          "inputs": [
+            {
+              "name": "_user",
+              "type": "address"
+            },
+            {
+              "name": "_canDo",
+              "type": "bool"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "uint256"
+            }
+          ]
+        },
+        {
+          "stateMutability": "nonpayable",
+          "type": "function",
+          "name": "setMaxLtvDeviation",
+          "inputs": [
+            {
+              "name": "_newDeviation",
+              "type": "uint256"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "uint256"
+            }
+          ]
+        },
+        {
+          "stateMutability": "nonpayable",
+          "type": "function",
+          "name": "executePendingAction",
+          "inputs": [
+            {
+              "name": "_aid",
+              "type": "uint256"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "bool"
+            }
+          ]
+        },
+        {
+          "stateMutability": "nonpayable",
+          "type": "function",
+          "name": "cancelPendingAction",
+          "inputs": [
+            {
+              "name": "_aid",
+              "type": "uint256"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "bool"
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "actionType",
+          "inputs": [
+            {
+              "name": "arg0",
+              "type": "uint256"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "uint256"
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "pendingRipeRewardsConfig",
+          "inputs": [
+            {
+              "name": "arg0",
+              "type": "uint256"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "tuple",
+              "components": [
+                {
+                  "name": "arePointsEnabled",
+                  "type": "bool"
+                },
+                {
+                  "name": "ripePerBlock",
+                  "type": "uint256"
+                },
+                {
+                  "name": "borrowersAlloc",
+                  "type": "uint256"
+                },
+                {
+                  "name": "stakersAlloc",
+                  "type": "uint256"
+                },
+                {
+                  "name": "votersAlloc",
+                  "type": "uint256"
+                },
+                {
+                  "name": "genDepositorsAlloc",
+                  "type": "uint256"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "pendingGeneralConfig",
+          "inputs": [
+            {
+              "name": "arg0",
+              "type": "uint256"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "tuple",
+              "components": [
+                {
+                  "name": "perUserMaxVaults",
+                  "type": "uint256"
+                },
+                {
+                  "name": "perUserMaxAssetsPerVault",
+                  "type": "uint256"
+                },
+                {
+                  "name": "priceStaleTime",
+                  "type": "uint256"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "pendingDebtConfig",
+          "inputs": [
+            {
+              "name": "arg0",
+              "type": "uint256"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "tuple",
+              "components": [
+                {
+                  "name": "perUserDebtLimit",
+                  "type": "uint256"
+                },
+                {
+                  "name": "globalDebtLimit",
+                  "type": "uint256"
+                },
+                {
+                  "name": "minDebtAmount",
+                  "type": "uint256"
+                },
+                {
+                  "name": "numAllowedBorrowers",
+                  "type": "uint256"
+                },
+                {
+                  "name": "maxBorrowPerInterval",
+                  "type": "uint256"
+                },
+                {
+                  "name": "numBlocksPerInterval",
+                  "type": "uint256"
+                },
+                {
+                  "name": "keeperFeeRatio",
+                  "type": "uint256"
+                },
+                {
+                  "name": "minKeeperFee",
+                  "type": "uint256"
+                },
+                {
+                  "name": "isDaowryEnabled",
+                  "type": "bool"
+                },
+                {
+                  "name": "ltvPaybackBuffer",
+                  "type": "uint256"
+                },
+                {
+                  "name": "genAuctionParams",
+                  "type": "tuple",
+                  "components": [
+                    {
+                      "name": "hasParams",
+                      "type": "bool"
+                    },
+                    {
+                      "name": "startDiscount",
+                      "type": "uint256"
+                    },
+                    {
+                      "name": "maxDiscount",
+                      "type": "uint256"
+                    },
+                    {
+                      "name": "delay",
+                      "type": "uint256"
+                    },
+                    {
+                      "name": "duration",
+                      "type": "uint256"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "pendingPriorityLiqAssetVaults",
+          "inputs": [
+            {
+              "name": "arg0",
+              "type": "uint256"
+            },
+            {
+              "name": "arg1",
+              "type": "uint256"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "tuple",
+              "components": [
+                {
+                  "name": "vaultId",
+                  "type": "uint256"
+                },
+                {
+                  "name": "asset",
+                  "type": "address"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "pendingPriorityStabVaults",
+          "inputs": [
+            {
+              "name": "arg0",
+              "type": "uint256"
+            },
+            {
+              "name": "arg1",
+              "type": "uint256"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "tuple",
+              "components": [
+                {
+                  "name": "vaultId",
+                  "type": "uint256"
+                },
+                {
+                  "name": "asset",
+                  "type": "address"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "pendingPriorityPriceSourceIds",
+          "inputs": [
+            {
+              "name": "arg0",
+              "type": "uint256"
+            },
+            {
+              "name": "arg1",
+              "type": "uint256"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "uint256"
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "pendingUnderscoreRegistry",
+          "inputs": [
+            {
+              "name": "arg0",
+              "type": "uint256"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "address"
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "pendingCanPerformLiteAction",
+          "inputs": [
+            {
+              "name": "arg0",
+              "type": "uint256"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "tuple",
+              "components": [
+                {
+                  "name": "user",
+                  "type": "address"
+                },
+                {
+                  "name": "canDo",
+                  "type": "bool"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "pendingMaxLtvDeviation",
+          "inputs": [
+            {
+              "name": "arg0",
+              "type": "uint256"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "uint256"
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "MIN_STALE_TIME",
+          "inputs": [],
+          "outputs": [
+            {
+              "name": "",
+              "type": "uint256"
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "MAX_STALE_TIME",
+          "inputs": [],
+          "outputs": [
+            {
+              "name": "",
+              "type": "uint256"
+            }
+          ]
+        },
+        {
+          "stateMutability": "nonpayable",
+          "type": "constructor",
+          "inputs": [
+            {
+              "name": "_ripeHq",
+              "type": "address"
+            },
+            {
+              "name": "_minStaleTime",
+              "type": "uint256"
+            },
+            {
+              "name": "_maxStaleTime",
+              "type": "uint256"
+            },
+            {
+              "name": "_minConfigTimeLock",
+              "type": "uint256"
+            },
+            {
+              "name": "_maxConfigTimeLock",
+              "type": "uint256"
+            }
+          ],
+          "outputs": []
+        }
+      ],
+      "solc_json": {
+        "language": "Vyper",
+        "sources": {
+          "contracts/modules/LocalGov.vy": {
+            "content": "# @version 0.4.1\n\ninterface RipeHq:\n    def minGovChangeTimeLock() -> uint256: view\n    def maxGovChangeTimeLock() -> uint256: view\n    def governance() -> address: view\n\nstruct PendingGovernance:\n    newGov: address\n    initiatedBlock: uint256\n    confirmBlock: uint256\n\nevent GovChangeStarted:\n    prevGov: indexed(address)\n    newGov: indexed(address)\n    confirmBlock: uint256\n\nevent GovChangeConfirmed:\n    prevGov: indexed(address)\n    newGov: indexed(address)\n    initiatedBlock: uint256\n    confirmBlock: uint256\n\nevent GovChangeCancelled:\n    cancelledGov: indexed(address)\n    initiatedBlock: uint256\n    confirmBlock: uint256\n\nevent GovChangeTimeLockModified:\n    prevTimeLock: uint256\n    newTimeLock: uint256\n\nevent RipeHqSetupFinished:\n    prevGov: indexed(address)\n    newGov: indexed(address)\n    timeLock: uint256\n\n# governance\ngovernance: public(address)\npendingGov: public(PendingGovernance)\nnumGovChanges: public(uint256)\n\n# time lock\ngovChangeTimeLock: public(uint256)\n\n# config\nRIPE_HQ_FOR_GOV: immutable(address)\nMIN_GOV_TIME_LOCK: immutable(uint256)\nMAX_GOV_TIME_LOCK: immutable(uint256)\n\n\n@deploy\ndef __init__(\n    _ripeHq: address,\n    _initialGov: address,\n    _minTimeLock: uint256,\n    _maxTimeLock: uint256,\n    _initialTimeLock: uint256,\n):\n    RIPE_HQ_FOR_GOV = _ripeHq\n    self.governance = _initialGov\n\n    # ripe hq\n    if _ripeHq == empty(address):\n        assert _initialGov != empty(address) # dev: ripe hq must have gov\n\n    # local gov (department, other smart contracts)\n    else:\n        hqGov: address = staticcall RipeHq(_ripeHq).governance()\n        assert hqGov != empty(address) # dev: ripe hq must have gov\n        assert _initialGov != hqGov # dev: ripe hq cannot set same gov\n\n    # time locks\n    minTimeLock: uint256 = _minTimeLock\n    maxTimeLock: uint256 = _maxTimeLock\n    if minTimeLock == 0 or maxTimeLock == 0:\n        assert _ripeHq != empty(address) # dev: need ripe hq if no time locks\n        minTimeLock = staticcall RipeHq(_ripeHq).minGovChangeTimeLock()\n        maxTimeLock = staticcall RipeHq(_ripeHq).maxGovChangeTimeLock()\n\n    # set min and max time locks\n    assert minTimeLock < maxTimeLock # dev: invalid time lock\n    assert minTimeLock != 0 and maxTimeLock != max_value(uint256) # dev: invalid time lock\n    MIN_GOV_TIME_LOCK = minTimeLock\n    MAX_GOV_TIME_LOCK = maxTimeLock\n\n    # this contract is top level governance from Ripe HQ -- not setting initial time lock during setup\n    if _ripeHq == empty(address):\n        return\n\n    # set initial time lock (for local gov)\n    initialTimeLock: uint256 = max(minTimeLock, _initialTimeLock)\n    assert self._setGovTimeLock(initialTimeLock) # dev: invalid time lock\n\n\n@view\n@external\ndef getRipeHqFromGov() -> address:\n    return self._getRipeHqFromGov()\n\n\n@view\n@internal\ndef _getRipeHqFromGov() -> address:\n    return RIPE_HQ_FOR_GOV\n\n\n##############\n# Gov Access #\n##############\n\n\n@view\n@external\ndef canGovern(_addr: address) -> bool:\n    return self._canGovern(_addr)\n\n\n@view\n@internal\ndef _canGovern(_addr: address) -> bool:\n    if _addr == empty(address):\n        return False\n    return _addr in self._getGovernors()\n\n\n@view\n@external\ndef getGovernors() -> DynArray[address, 2]:\n    return self._getGovernors()\n\n\n@view\n@internal\ndef _getGovernors() -> DynArray[address, 2]:\n    governors: DynArray[address, 2] = []\n\n    # local governance\n    localGov: address = self.governance\n    if localGov != empty(address):\n        governors.append(localGov)\n\n    # ripe hq governance\n    ripeHq: address = RIPE_HQ_FOR_GOV\n    if ripeHq == empty(address):\n        return governors\n\n    hqGov: address = staticcall RipeHq(ripeHq).governance()\n    if hqGov != empty(address):\n        governors.append(hqGov)\n\n    return governors\n\n\n######################\n# Governance Changes #\n######################\n\n\n@view\n@external\ndef hasPendingGovChange() -> bool:\n    return self.pendingGov.confirmBlock != 0\n\n\n@view\n@internal\ndef _isRipeHqGov() -> bool:\n    return RIPE_HQ_FOR_GOV == empty(address)\n\n\n# start gov change\n\n\n@external\ndef startGovernanceChange(_newGov: address):\n    governors: DynArray[address, 2] = self._getGovernors()\n    assert msg.sender in governors # dev: no perms\n\n    # validation\n    if _newGov != empty(address):\n        assert _newGov not in governors # dev: invalid _newGov\n        assert _newGov.is_contract # dev: _newGov must be a contract\n    else:\n        assert not self._isRipeHqGov() # dev: ripe hq cannot set 0x0\n\n    confirmBlock: uint256 = block.number + self.govChangeTimeLock\n    self.pendingGov = PendingGovernance(\n        newGov= _newGov,\n        initiatedBlock= block.number,\n        confirmBlock= confirmBlock,\n    )\n    log GovChangeStarted(prevGov=self.governance, newGov=_newGov, confirmBlock=confirmBlock)\n\n\n# confirm gov change\n\n\n@external\ndef confirmGovernanceChange():\n    data: PendingGovernance = self.pendingGov\n    assert data.confirmBlock != 0 and block.number >= data.confirmBlock # dev: time lock not reached\n\n    # check permissions\n    if data.newGov != empty(address):\n        assert msg.sender == data.newGov # dev: only new gov can confirm\n    else:\n        assert self._canGovern(msg.sender) # dev: no perms\n        assert not self._isRipeHqGov() # dev: ripe hq cannot set 0x0\n\n    # set new governance\n    prevGov: address = self.governance\n    self.governance = data.newGov\n    self.numGovChanges += 1\n    self.pendingGov = empty(PendingGovernance)\n    log GovChangeConfirmed(prevGov=prevGov, newGov=data.newGov, initiatedBlock=data.initiatedBlock, confirmBlock=data.confirmBlock)\n\n\n# cancel gov change\n\n\n@external\ndef cancelGovernanceChange():\n    assert self._canGovern(msg.sender) # dev: no perms\n    data: PendingGovernance = self.pendingGov\n    assert data.confirmBlock != 0 # dev: no pending change\n    self.pendingGov = empty(PendingGovernance)\n    log GovChangeCancelled(cancelledGov=data.newGov, initiatedBlock=data.initiatedBlock, confirmBlock=data.confirmBlock)\n\n\n####################\n# Time Lock Config #\n####################\n\n\n# set time lock\n\n\n@external\ndef setGovTimeLock(_numBlocks: uint256) -> bool:\n    assert self._canGovern(msg.sender) # dev: no perms\n    return self._setGovTimeLock(_numBlocks)\n\n\n@internal\ndef _setGovTimeLock(_numBlocks: uint256) -> bool:\n    prevTimeLock: uint256 = self.govChangeTimeLock\n    assert self._isValidGovTimeLock(_numBlocks, prevTimeLock) # dev: invalid time lock\n    self.govChangeTimeLock = _numBlocks\n    log GovChangeTimeLockModified(prevTimeLock=prevTimeLock, newTimeLock=_numBlocks)\n    return True\n\n\n# validation\n\n\n@view\n@external\ndef isValidGovTimeLock(_newTimeLock: uint256) -> bool:\n    return self._isValidGovTimeLock(_newTimeLock, self.govChangeTimeLock)\n\n\n@view\n@internal\ndef _isValidGovTimeLock(_newTimeLock: uint256, _prevTimeLock: uint256) -> bool:\n    if _newTimeLock == _prevTimeLock:\n        return False # no change\n    if self.pendingGov.confirmBlock != 0:\n        return False # cannot change while pending gov change\n    return _newTimeLock >= MIN_GOV_TIME_LOCK and _newTimeLock <= MAX_GOV_TIME_LOCK\n\n\n# utils\n\n\n@view\n@external\ndef minGovChangeTimeLock() -> uint256:\n    return MIN_GOV_TIME_LOCK\n\n\n@view\n@external\ndef maxGovChangeTimeLock() -> uint256:\n    return MAX_GOV_TIME_LOCK\n\n\n#################\n# Ripe Hq Setup #\n#################\n\n\n@external\ndef finishRipeHqSetup(_newGov: address, _timeLock: uint256 = 0) -> bool:\n    assert self._isRipeHqGov() # dev: only ripe hq\n    assert msg.sender == self.governance # dev: no perms\n    assert self.numGovChanges == 0 # dev: already changed gov\n\n    # validation\n    assert _newGov != empty(address) and _newGov.is_contract # dev: invalid _newGov\n    prevGov: address = self.governance\n\n    # set new gov\n    self.governance = _newGov\n    self.numGovChanges += 1\n\n    # set time lock\n    timeLock: uint256 = _timeLock\n    if timeLock == 0:\n        timeLock = MIN_GOV_TIME_LOCK\n    assert self._setGovTimeLock(timeLock) # dev: invalid time lock\n\n    log RipeHqSetupFinished(prevGov=prevGov, newGov=_newGov, timeLock=timeLock)\n    return True",
+            "sha256sum": "c5fc8cc15c29232eac82b0ad2919828f13b3c5d343dee552e4643d010405c20d"
+          },
+          "contracts/modules/TimeLock.vy": {
+            "content": "# @version 0.4.1\n\nuses: gov\nimport contracts.modules.LocalGov as gov\n\nstruct PendingAction:\n    initiatedBlock: uint256\n    confirmBlock: uint256\n    expiration: uint256\n\nevent ActionTimeLockSet:\n    newTimeLock: uint256\n    prevTimeLock: uint256\n\nevent ExpirationSet:\n    expiration: uint256\n\n# core data\npendingActions: public(HashMap[uint256, PendingAction])\nactionId: public(uint256)\n\n# config\nactionTimeLock: public(uint256)\nexpiration: public(uint256)\n\nMIN_ACTION_TIMELOCK: public(immutable(uint256))\nMAX_ACTION_TIMELOCK: public(immutable(uint256))\n\n\n@deploy\ndef __init__(\n    _minActionTimeLock: uint256,\n    _maxActionTimeLock: uint256,\n    _initialTimeLock: uint256,\n    _expiration: uint256,\n):\n    # start at 1 index\n    self.actionId = 1\n\n    # set time lock boundaries\n    assert _minActionTimeLock < _maxActionTimeLock # dev: invalid time lock boundaries\n    assert _minActionTimeLock != 0 and _maxActionTimeLock != max_value(uint256) # dev: invalid time lock boundaries\n    MIN_ACTION_TIMELOCK = _minActionTimeLock\n    MAX_ACTION_TIMELOCK = _maxActionTimeLock\n\n    # set expiration time\n    self._setExpiration(_expiration, _initialTimeLock)\n\n    # set initial time lock\n    if _initialTimeLock != 0:\n        assert self._setActionTimeLock(_initialTimeLock, 0) # dev: failed to set initial time lock\n\n\n########\n# Core #\n########\n\n\n# initiate\n\n\n@internal\ndef _initiateAction() -> uint256:\n    actionId: uint256 = self.actionId\n    confirmBlock: uint256 = block.number + self.actionTimeLock\n    self.pendingActions[actionId] = PendingAction(\n        initiatedBlock= block.number,\n        confirmBlock= confirmBlock,\n        expiration= confirmBlock + self.expiration,\n    )\n    self.actionId += 1\n    return actionId\n\n\n# confirm\n\n\n@internal\ndef _confirmAction(_actionId: uint256) -> bool:\n    if not self._canConfirmAction(_actionId):\n        return False\n    self.pendingActions[_actionId] = empty(PendingAction)\n    return True\n\n\n# cancel\n\n\n@internal\ndef _cancelAction(_actionId: uint256) -> bool:\n    data: PendingAction = self.pendingActions[_actionId]\n    if data.confirmBlock == 0:\n        return False\n    self.pendingActions[_actionId] = empty(PendingAction)\n    return True\n\n\n#########\n# Utils #\n#########\n\n\n# can confirm\n\n\n@view\n@external\ndef canConfirmAction(_actionId: uint256) -> bool:\n    return self._canConfirmAction(_actionId)\n\n\n@view\n@internal\ndef _canConfirmAction(_actionId: uint256) -> bool:\n    data: PendingAction = self.pendingActions[_actionId]\n    if data.confirmBlock == 0 or block.number < data.confirmBlock:\n        return False\n    if block.number >= data.expiration:\n        return False\n    return True\n\n\n# is expired\n\n\n@view\n@external\ndef isExpired(_actionId: uint256) -> bool:\n    return self._isExpired(_actionId)\n\n\n@view\n@internal\ndef _isExpired(_actionId: uint256) -> bool:\n    data: PendingAction = self.pendingActions[_actionId]\n    if data.confirmBlock == 0:\n        return False\n    return block.number >= data.expiration\n\n\n# pending action\n\n\n@view\n@external\ndef hasPendingAction(_actionId: uint256) -> bool:\n    return self._hasPendingAction(_actionId)\n\n\n@view\n@internal\ndef _hasPendingAction(_actionId: uint256) -> bool:\n    return self.pendingActions[_actionId].confirmBlock != 0\n\n\n# confirmation block\n\n\n@view\n@external\ndef getActionConfirmationBlock(_actionId: uint256) -> uint256:\n    return self._getActionConfirmationBlock(_actionId)\n\n\n@view\n@internal\ndef _getActionConfirmationBlock(_actionId: uint256) -> uint256:\n    return self.pendingActions[_actionId].confirmBlock\n\n\n######################\n# Config - Time Lock #\n######################\n\n\n@external\ndef setActionTimeLock(_newTimeLock: uint256) -> bool:\n    assert gov._canGovern(msg.sender) # dev: no perms\n    return self._setActionTimeLock(_newTimeLock, self.actionTimeLock)\n\n\n@internal\ndef _setActionTimeLock(_newTimeLock: uint256, _prevTimeLock: uint256) -> bool:\n    assert self._isValidActionTimeLock(_newTimeLock, _prevTimeLock) # dev: invalid time lock\n    self.actionTimeLock = _newTimeLock\n    log ActionTimeLockSet(newTimeLock=_newTimeLock, prevTimeLock=_prevTimeLock)\n    return True\n\n\n# validation\n\n\n@view\n@external\ndef isValidActionTimeLock(_newTimeLock: uint256) -> bool:\n    return self._isValidActionTimeLock(_newTimeLock, self.actionTimeLock)\n\n\n@view\n@internal\ndef _isValidActionTimeLock(_newTimeLock: uint256, _prevTimeLock: uint256) -> bool:\n    if _newTimeLock == _prevTimeLock:\n        return False # no change\n    return _newTimeLock >= MIN_ACTION_TIMELOCK and _newTimeLock <= MAX_ACTION_TIMELOCK\n\n\n# utils\n\n\n@view\n@external\ndef minActionTimeLock() -> uint256:\n    return MIN_ACTION_TIMELOCK\n\n\n@view\n@external\ndef maxActionTimeLock() -> uint256:\n    return MAX_ACTION_TIMELOCK\n\n\n#######################\n# Config - Expiration #\n#######################\n\n\n@external\ndef setExpiration(_expiration: uint256) -> bool:\n    assert gov._canGovern(msg.sender) # dev: no perms\n    return self._setExpiration(_expiration, self.actionTimeLock)\n\n\n@internal\ndef _setExpiration(_expiration: uint256, _timeLock: uint256) -> bool:\n    assert self._isValidExpiration(_expiration, _timeLock) # dev: invalid expiration\n    self.expiration = _expiration\n    log ExpirationSet(expiration=_expiration)\n    return True\n\n\n# validation\n\n\n@view\n@internal\ndef _isValidExpiration(_expiration: uint256, _timeLock: uint256) -> bool:\n    if _expiration == 0 or _expiration == max_value(uint256):\n        return False\n    if _expiration < _timeLock:\n        return False\n    return True\n\n\n################\n# Finish Setup #\n################\n\n\n@external\ndef setActionTimeLockAfterSetup(_newTimeLock: uint256 = 0) -> bool:\n    assert gov._canGovern(msg.sender) # dev: no perms\n\n    prevTimeLock: uint256 = self.actionTimeLock\n    assert prevTimeLock == 0 # dev: already set\n\n    timeLock: uint256 = _newTimeLock\n    if timeLock == 0:\n        timeLock = MIN_ACTION_TIMELOCK\n    return self._setActionTimeLock(timeLock, prevTimeLock)",
+            "sha256sum": "a46b5a99a1f326aaa7280f656bd284c654cfd5afb2dd208b79e701f9028ee605"
+          },
+          "contracts/config/SwitchboardOne.vy": {
+            "content": "# @version 0.4.1\n# pragma optimize codesize\n\nexports: gov.__interface__\nexports: timeLock.__interface__\n\ninitializes: gov\ninitializes: timeLock[gov := gov]\n\nimport contracts.modules.LocalGov as gov\nimport contracts.modules.TimeLock as timeLock\n\ninterface MissionControl:\n    def setPriorityLiqAssetVaults(_priorityLiqAssetVaults: DynArray[VaultLite, PRIORITY_VAULT_DATA]): nonpayable\n    def setPriorityPriceSourceIds(_priorityIds: DynArray[uint256, MAX_PRIORITY_PRICE_SOURCES]): nonpayable\n    def setPriorityStabVaults(_priorityStabVaults: DynArray[VaultLite, PRIORITY_VAULT_DATA]): nonpayable\n    def isSupportedAssetInVault(_vaultId: uint256, _asset: address) -> bool: view\n    def setRipeRewardsConfig(_rewardsConfig: RipeRewardsConfig): nonpayable\n    def setGeneralDebtConfig(_genDebtConfig: GenDebtConfig): nonpayable\n    def setUnderscoreRegistry(_underscoreRegistry: address): nonpayable\n    def setCanPerformLiteAction(_user: address, _canDisable: bool): nonpayable\n    def setMaxLtvDeviation(_maxLtvDeviation: uint256): nonpayable\n    def setGeneralConfig(_genConfig: GenConfig): nonpayable\n    def rewardsConfig() -> RipeRewardsConfig: view\n    def canPerformLiteAction(_user: address) -> bool: view\n    def genDebtConfig() -> GenDebtConfig: view\n    def underscoreRegistry() -> address: view\n    def genConfig() -> GenConfig: view\n\ninterface VaultBook:\n    def isValidRegId(_regId: uint256) -> bool: view\n\ninterface PriceDesk:\n    def isValidRegId(_regId: uint256) -> bool: view\n\ninterface UnderscoreAgentFactory:\n    def isUserWallet(_addr: address) -> bool: view\n\ninterface UnderscoreRegistry:\n    def getAddy(_addyId: uint256) -> address: view\n\ninterface RipeHq:\n    def getAddr(_regId: uint256) -> address: view\n\nflag ActionType:\n    GEN_CONFIG_VAULT_LIMITS\n    GEN_CONFIG_STALE_TIME\n    DEBT_GLOBAL_LIMITS\n    DEBT_BORROW_INTERVAL\n    DEBT_KEEPER_CONFIG\n    DEBT_LTV_PAYBACK_BUFFER\n    DEBT_AUCTION_PARAMS\n    RIPE_REWARDS_BLOCK\n    RIPE_REWARDS_ALLOCS\n    OTHER_PRIORITY_LIQ_ASSET_VAULTS\n    OTHER_PRIORITY_STAB_VAULTS\n    OTHER_PRIORITY_PRICE_SOURCE_IDS\n    OTHER_UNDERSCORE_REGISTRY\n    OTHER_CAN_PERFORM_LITE_ACTION\n    MAX_LTV_DEVIATION\n\nflag GenConfigFlag:\n    CAN_DEPOSIT\n    CAN_WITHDRAW\n    CAN_BORROW\n    CAN_REPAY\n    CAN_CLAIM_LOOT\n    CAN_LIQUIDATE\n    CAN_REDEEM_COLLATERAL\n    CAN_REDEEM_IN_STAB_POOL\n    CAN_BUY_IN_AUCTION\n    CAN_CLAIM_IN_STAB_POOL\n\nstruct GenConfig:\n    perUserMaxVaults: uint256\n    perUserMaxAssetsPerVault: uint256\n    priceStaleTime: uint256\n    canDeposit: bool\n    canWithdraw: bool\n    canBorrow: bool\n    canRepay: bool\n    canClaimLoot: bool\n    canLiquidate: bool\n    canRedeemCollateral: bool\n    canRedeemInStabPool: bool\n    canBuyInAuction: bool\n    canClaimInStabPool: bool\n\nstruct GenConfigLite:\n    perUserMaxVaults: uint256\n    perUserMaxAssetsPerVault: uint256\n    priceStaleTime: uint256\n\nstruct GenDebtConfig:\n    perUserDebtLimit: uint256\n    globalDebtLimit: uint256\n    minDebtAmount: uint256\n    numAllowedBorrowers: uint256\n    maxBorrowPerInterval: uint256\n    numBlocksPerInterval: uint256\n    keeperFeeRatio: uint256\n    minKeeperFee: uint256\n    isDaowryEnabled: bool\n    ltvPaybackBuffer: uint256\n    genAuctionParams: AuctionParams\n\nstruct RipeRewardsConfig:\n    arePointsEnabled: bool\n    ripePerBlock: uint256\n    borrowersAlloc: uint256\n    stakersAlloc: uint256\n    votersAlloc: uint256\n    genDepositorsAlloc: uint256\n\nstruct AuctionParams:\n    hasParams: bool\n    startDiscount: uint256\n    maxDiscount: uint256\n    delay: uint256\n    duration: uint256\n\nstruct VaultLite:\n    vaultId: uint256\n    asset: address\n\nstruct CanPerform:\n    user: address\n    canDo: bool\n\nevent PendingVaultLimitsChange:\n    perUserMaxVaults: uint256\n    perUserMaxAssetsPerVault: uint256\n    confirmationBlock: uint256\n    actionId: uint256\n\nevent PendingStaleTimeChange:\n    priceStaleTime: uint256\n    confirmationBlock: uint256\n    actionId: uint256\n\nevent CanDepositSet:\n    canDeposit: bool\n    caller: indexed(address)\n\nevent CanWithdrawSet:\n    canWithdraw: bool\n    caller: indexed(address)\n\nevent CanBorrowSet:\n    canBorrow: bool\n    caller: indexed(address)\n\nevent CanRepaySet:\n    canRepay: bool\n    caller: indexed(address)\n\nevent CanClaimLootSet:\n    canClaimLoot: bool\n    caller: indexed(address)\n\nevent CanLiquidateSet:\n    canLiquidate: bool\n    caller: indexed(address)\n\nevent CanRedeemCollateralSet:\n    canRedeemCollateral: bool\n    caller: indexed(address)\n\nevent CanRedeemInStabPoolSet:\n    canRedeemInStabPool: bool\n    caller: indexed(address)\n\nevent CanBuyInAuctionSet:\n    canBuyInAuction: bool\n    caller: indexed(address)\n\nevent CanClaimInStabPoolSet:\n    canClaimInStabPool: bool\n    caller: indexed(address)\n\nevent PendingGlobalDebtLimitsChange:\n    perUserDebtLimit: uint256\n    globalDebtLimit: uint256\n    minDebtAmount: uint256\n    numAllowedBorrowers: uint256\n    confirmationBlock: uint256\n    actionId: uint256\n\nevent PendingBorrowIntervalConfigChange:\n    maxBorrowPerInterval: uint256\n    numBlocksPerInterval: uint256\n    confirmationBlock: uint256\n    actionId: uint256\n\nevent PendingKeeperConfigChange:\n    keeperFeeRatio: uint256\n    minKeeperFee: uint256\n    confirmationBlock: uint256\n    actionId: uint256\n\nevent PendingLtvPaybackBufferChange:\n    ltvPaybackBuffer: uint256\n    confirmationBlock: uint256\n    actionId: uint256\n\nevent PendingDefaultAuctionParamsChange:\n    startDiscount: uint256\n    maxDiscount: uint256\n    delay: uint256\n    duration: uint256\n    confirmationBlock: uint256\n    actionId: uint256\n\nevent IsDaowryEnabledSet:\n    isDaowryEnabled: bool\n    caller: indexed(address)\n\nevent PendingRipeRewardsPerBlockChange:\n    ripePerBlock: uint256\n    confirmationBlock: uint256\n    actionId: uint256\n\nevent PendingRipeRewardsAllocsChange:\n    borrowersAlloc: uint256\n    stakersAlloc: uint256\n    votersAlloc: uint256\n    genDepositorsAlloc: uint256\n    confirmationBlock: uint256\n    actionId: uint256\n\nevent RewardsPointsEnabledModified:\n    arePointsEnabled: bool\n    caller: indexed(address)\n\nevent PendingPriorityLiqAssetVaultsChange:\n    numPriorityLiqAssetVaults: uint256\n    confirmationBlock: uint256\n    actionId: uint256\n\nevent PendingPriorityStabVaultsChange:\n    numPriorityStabVaults: uint256\n    confirmationBlock: uint256\n    actionId: uint256\n\nevent PendingPriorityPriceSourceIdsChange:\n    numPriorityPriceSourceIds: uint256\n    confirmationBlock: uint256\n    actionId: uint256\n\nevent PendingUnderscoreRegistryChange:\n    underscoreRegistry: address\n    confirmationBlock: uint256\n    actionId: uint256\n\nevent PendingCanPerformLiteAction:\n    user: address\n    canDo: bool\n    confirmationBlock: uint256\n    actionId: uint256\n\nevent PendingMaxLtvDeviationChange:\n    newDeviation: uint256\n    confirmationBlock: uint256\n    actionId: uint256\n\nevent VaultLimitsSet:\n    perUserMaxVaults: uint256\n    perUserMaxAssetsPerVault: uint256\n\nevent StaleTimeSet:\n    staleTime: uint256\n\nevent GlobalDebtLimitsSet:\n    perUserDebtLimit: uint256\n    globalDebtLimit: uint256\n    minDebtAmount: uint256\n    numAllowedBorrowers: uint256\n\nevent BorrowIntervalConfigSet:\n    maxBorrowPerInterval: uint256\n    numBlocksPerInterval: uint256\n\nevent KeeperConfigSet:\n    keeperFeeRatio: uint256\n    minKeeperFee: uint256\n\nevent LtvPaybackBufferSet:\n    ltvPaybackBuffer: uint256\n\nevent GenAuctionParamsSet:\n    startDiscount: uint256\n    maxDiscount: uint256\n    delay: uint256\n    duration: uint256\n\nevent RipeRewardsPerBlockSet:\n    ripePerBlock: uint256\n\nevent RipeRewardsAllocsSet:\n    borrowersAlloc: uint256\n    stakersAlloc: uint256\n    votersAlloc: uint256\n    genDepositorsAlloc: uint256\n\nevent PriorityLiqAssetVaultsSet:\n    numVaults: uint256\n\nevent PriorityStabVaultsSet:\n    numVaults: uint256\n\nevent PriorityPriceSourceIdsModified:\n    numIds: uint256\n\nevent UnderscoreRegistrySet:\n    addr: indexed(address)\n\nevent CanPerformLiteAction:\n    user: indexed(address)\n    canDo: bool\n\nevent MaxLtvDeviationSet:\n    newDeviation: uint256\n\n# pending config changes\nactionType: public(HashMap[uint256, ActionType]) # aid -> type\npendingRipeRewardsConfig: public(HashMap[uint256, RipeRewardsConfig]) # aid -> config\npendingGeneralConfig: public(HashMap[uint256, GenConfigLite]) # aid -> config\npendingDebtConfig: public(HashMap[uint256, GenDebtConfig]) # aid -> config\n\npendingPriorityLiqAssetVaults: public(HashMap[uint256, DynArray[VaultLite, PRIORITY_VAULT_DATA]])\npendingPriorityStabVaults: public(HashMap[uint256, DynArray[VaultLite, PRIORITY_VAULT_DATA]])\npendingPriorityPriceSourceIds: public(HashMap[uint256, DynArray[uint256, MAX_PRIORITY_PRICE_SOURCES]])\npendingUnderscoreRegistry: public(HashMap[uint256, address])\npendingCanPerformLiteAction: public(HashMap[uint256, CanPerform])\npendingMaxLtvDeviation: public(HashMap[uint256, uint256])\n\n# temp data\nvaultDedupe: transient(HashMap[uint256, HashMap[address, bool]]) # vault id -> asset\n\nMIN_STALE_TIME: public(immutable(uint256))\nMAX_STALE_TIME: public(immutable(uint256))\n\nMAX_PRIORITY_PRICE_SOURCES: constant(uint256) = 10\nPRIORITY_VAULT_DATA: constant(uint256) = 20\nUNDERSCORE_AGENT_FACTORY_ID: constant(uint256) = 1\nHUNDRED_PERCENT: constant(uint256) = 100_00 # 100%\n\nMISSION_CONTROL_ID: constant(uint256) = 5\nPRICE_DESK_ID: constant(uint256) = 6\nVAULT_BOOK_ID: constant(uint256) = 7\n\n\n@deploy\ndef __init__(\n    _ripeHq: address,\n    _minStaleTime: uint256,\n    _maxStaleTime: uint256,\n    _minConfigTimeLock: uint256,\n    _maxConfigTimeLock: uint256,\n):\n    gov.__init__(_ripeHq, empty(address), 0, 0, 0)\n    timeLock.__init__(_minConfigTimeLock, _maxConfigTimeLock, 0, _maxConfigTimeLock)\n\n    assert _minStaleTime < _maxStaleTime # dev: invalid stale time range\n    MIN_STALE_TIME = _minStaleTime\n    MAX_STALE_TIME = _maxStaleTime\n\n\n# access control\n\n\n@view\n@internal\ndef _hasPermsToEnable(_caller: address, _shouldEnable: bool) -> bool:\n    if gov._canGovern(_caller):\n        return True\n    if not _shouldEnable:\n        return staticcall MissionControl(self._getMissionControlAddr()).canPerformLiteAction(_caller)\n    return False\n\n\n# addys lite\n\n\n@view\n@internal\ndef _getMissionControlAddr() -> address:\n    return staticcall RipeHq(gov._getRipeHqFromGov()).getAddr(MISSION_CONTROL_ID)\n\n\n@view\n@internal\ndef _getPriceDeskAddr() -> address:\n    return staticcall RipeHq(gov._getRipeHqFromGov()).getAddr(PRICE_DESK_ID)\n\n\n@view\n@internal\ndef _getVaultBookAddr() -> address:\n    return staticcall RipeHq(gov._getRipeHqFromGov()).getAddr(VAULT_BOOK_ID)\n\n\n##################\n# General Config #\n##################\n\n\n# vault limits\n\n\n@external\ndef setVaultLimits(_perUserMaxVaults: uint256, _perUserMaxAssetsPerVault: uint256) -> uint256:\n    assert gov._canGovern(msg.sender) # dev: no perms\n\n    assert self._areValidVaultLimits(_perUserMaxVaults, _perUserMaxAssetsPerVault) # dev: invalid vault limits\n    return self._setPendingGenConfig(ActionType.GEN_CONFIG_VAULT_LIMITS, _perUserMaxVaults, _perUserMaxAssetsPerVault)\n\n\n@view\n@internal\ndef _areValidVaultLimits(_perUserMaxVaults: uint256, _perUserMaxAssetsPerVault: uint256) -> bool:\n    if 0 in [_perUserMaxVaults, _perUserMaxAssetsPerVault]:\n        return False\n    if max_value(uint256) in [_perUserMaxVaults, _perUserMaxAssetsPerVault]:\n        return False\n    return True\n\n\n# stale time for prices\n\n\n@external\ndef setStaleTime(_staleTime: uint256) -> uint256:\n    assert gov._canGovern(msg.sender) # dev: no perms\n\n    assert self._isValidStaleTime(_staleTime) # dev: invalid stale time\n    return self._setPendingGenConfig(ActionType.GEN_CONFIG_STALE_TIME, 0, 0, _staleTime)\n\n\n@view\n@internal\ndef _isValidStaleTime(_staleTime: uint256) -> bool:\n    return _staleTime >= MIN_STALE_TIME and _staleTime <= MAX_STALE_TIME\n\n\n# set pending general config\n\n\n@internal\ndef _setPendingGenConfig(\n    _actionType: ActionType,\n    _perUserMaxVaults: uint256 = 0,\n    _perUserMaxAssetsPerVault: uint256 = 0,\n    _priceStaleTime: uint256 = 0,\n) -> uint256:\n    aid: uint256 = timeLock._initiateAction()\n\n    self.actionType[aid] = _actionType\n    self.pendingGeneralConfig[aid] = GenConfigLite(\n        perUserMaxVaults=_perUserMaxVaults,\n        perUserMaxAssetsPerVault=_perUserMaxAssetsPerVault,\n        priceStaleTime=_priceStaleTime,\n    )\n\n    confirmationBlock: uint256 = timeLock._getActionConfirmationBlock(aid)\n    if _actionType == ActionType.GEN_CONFIG_VAULT_LIMITS:\n        log PendingVaultLimitsChange(\n            perUserMaxVaults=_perUserMaxVaults,\n            perUserMaxAssetsPerVault=_perUserMaxAssetsPerVault,\n            confirmationBlock=confirmationBlock,\n            actionId=aid,\n        )\n    elif _actionType == ActionType.GEN_CONFIG_STALE_TIME:\n        log PendingStaleTimeChange(\n            priceStaleTime=_priceStaleTime,\n            confirmationBlock=confirmationBlock,\n            actionId=aid,\n        )\n    return aid\n\n\n# enable / disable\n\n\n@external\ndef setCanDeposit(_shouldEnable: bool) -> bool:\n    return self._setGenConfigFlag(GenConfigFlag.CAN_DEPOSIT, _shouldEnable)\n\n\n@external\ndef setCanWithdraw(_shouldEnable: bool) -> bool:\n    return self._setGenConfigFlag(GenConfigFlag.CAN_WITHDRAW, _shouldEnable)\n\n\n@external\ndef setCanBorrow(_shouldEnable: bool) -> bool:\n    return self._setGenConfigFlag(GenConfigFlag.CAN_BORROW, _shouldEnable)\n\n\n@external\ndef setCanRepay(_shouldEnable: bool) -> bool:\n    return self._setGenConfigFlag(GenConfigFlag.CAN_REPAY, _shouldEnable)\n\n\n@external\ndef setCanClaimLoot(_shouldEnable: bool) -> bool:\n    return self._setGenConfigFlag(GenConfigFlag.CAN_CLAIM_LOOT, _shouldEnable)\n\n\n@external\ndef setCanLiquidate(_shouldEnable: bool) -> bool:\n    return self._setGenConfigFlag(GenConfigFlag.CAN_LIQUIDATE, _shouldEnable)\n\n\n@external\ndef setCanRedeemCollateral(_shouldEnable: bool) -> bool:\n    return self._setGenConfigFlag(GenConfigFlag.CAN_REDEEM_COLLATERAL, _shouldEnable)\n\n\n@external\ndef setCanRedeemInStabPool(_shouldEnable: bool) -> bool:\n    return self._setGenConfigFlag(GenConfigFlag.CAN_REDEEM_IN_STAB_POOL, _shouldEnable)\n\n\n@external\ndef setCanBuyInAuction(_shouldEnable: bool) -> bool:\n    return self._setGenConfigFlag(GenConfigFlag.CAN_BUY_IN_AUCTION, _shouldEnable)\n\n\n@external\ndef setCanClaimInStabPool(_shouldEnable: bool) -> bool:\n    return self._setGenConfigFlag(GenConfigFlag.CAN_CLAIM_IN_STAB_POOL, _shouldEnable)\n\n\n@internal\ndef _setGenConfigFlag(_flag: GenConfigFlag, _shouldEnable: bool) -> bool:\n    assert self._hasPermsToEnable(msg.sender, _shouldEnable) # dev: no perms\n\n    mc: address = self._getMissionControlAddr()\n    config: GenConfig = staticcall MissionControl(mc).genConfig()\n\n    # get current value and validate\n    if _flag == GenConfigFlag.CAN_DEPOSIT:\n        assert config.canDeposit != _shouldEnable # dev: already set\n        config.canDeposit = _shouldEnable\n        log CanDepositSet(canDeposit=_shouldEnable, caller=msg.sender)\n\n    elif _flag == GenConfigFlag.CAN_WITHDRAW:\n        assert config.canWithdraw != _shouldEnable # dev: already set\n        config.canWithdraw = _shouldEnable\n        log CanWithdrawSet(canWithdraw=_shouldEnable, caller=msg.sender)\n\n    elif _flag == GenConfigFlag.CAN_BORROW:\n        assert config.canBorrow != _shouldEnable # dev: already set\n        config.canBorrow = _shouldEnable\n        log CanBorrowSet(canBorrow=_shouldEnable, caller=msg.sender)\n\n    elif _flag == GenConfigFlag.CAN_REPAY:\n        assert config.canRepay != _shouldEnable # dev: already set\n        config.canRepay = _shouldEnable\n        log CanRepaySet(canRepay=_shouldEnable, caller=msg.sender)\n\n    elif _flag == GenConfigFlag.CAN_CLAIM_LOOT:\n        assert config.canClaimLoot != _shouldEnable # dev: already set\n        config.canClaimLoot = _shouldEnable\n        log CanClaimLootSet(canClaimLoot=_shouldEnable, caller=msg.sender)\n\n    elif _flag == GenConfigFlag.CAN_LIQUIDATE:\n        assert config.canLiquidate != _shouldEnable # dev: already set\n        config.canLiquidate = _shouldEnable\n        log CanLiquidateSet(canLiquidate=_shouldEnable, caller=msg.sender)\n\n    elif _flag == GenConfigFlag.CAN_REDEEM_COLLATERAL:\n        assert config.canRedeemCollateral != _shouldEnable # dev: already set\n        config.canRedeemCollateral = _shouldEnable\n        log CanRedeemCollateralSet(canRedeemCollateral=_shouldEnable, caller=msg.sender)\n\n    elif _flag == GenConfigFlag.CAN_REDEEM_IN_STAB_POOL:\n        assert config.canRedeemInStabPool != _shouldEnable # dev: already set\n        config.canRedeemInStabPool = _shouldEnable\n        log CanRedeemInStabPoolSet(canRedeemInStabPool=_shouldEnable, caller=msg.sender)\n\n    elif _flag == GenConfigFlag.CAN_BUY_IN_AUCTION:\n        assert config.canBuyInAuction != _shouldEnable # dev: already set\n        config.canBuyInAuction = _shouldEnable\n        log CanBuyInAuctionSet(canBuyInAuction=_shouldEnable, caller=msg.sender)\n\n    elif _flag == GenConfigFlag.CAN_CLAIM_IN_STAB_POOL:\n        assert config.canClaimInStabPool != _shouldEnable # dev: already set\n        config.canClaimInStabPool = _shouldEnable\n        log CanClaimInStabPoolSet(canClaimInStabPool=_shouldEnable, caller=msg.sender)\n\n    extcall MissionControl(mc).setGeneralConfig(config)\n    return True\n\n\n###############\n# Debt Config #\n###############\n\n\n# global debt limits\n\n\n@external\ndef setGlobalDebtLimits(_perUserDebtLimit: uint256, _globalDebtLimit: uint256, _minDebtAmount: uint256, _numAllowedBorrowers: uint256) -> uint256:\n    assert gov._canGovern(msg.sender) # dev: no perms\n\n    assert self._areValidDebtLimits(_perUserDebtLimit, _globalDebtLimit, _minDebtAmount, _numAllowedBorrowers) # dev: invalid debt limits\n    return self._setPendingDebtConfig(ActionType.DEBT_GLOBAL_LIMITS, _perUserDebtLimit, _globalDebtLimit, _minDebtAmount, _numAllowedBorrowers)\n\n\n@view\n@internal\ndef _areValidDebtLimits(_perUserDebtLimit: uint256, _globalDebtLimit: uint256, _minDebtAmount: uint256, _numAllowedBorrowers: uint256) -> bool:\n    if 0 in [_perUserDebtLimit, _globalDebtLimit, _numAllowedBorrowers]:\n        return False\n    if max_value(uint256) in [_perUserDebtLimit, _globalDebtLimit, _minDebtAmount, _numAllowedBorrowers]:\n        return False\n    if _perUserDebtLimit > _globalDebtLimit:\n        return False\n    if _minDebtAmount > _perUserDebtLimit:\n        return False\n    return True\n\n\n# borrow intervals\n\n\n@external\ndef setBorrowIntervalConfig(_maxBorrowPerInterval: uint256, _numBlocksPerInterval: uint256) -> uint256:\n    assert gov._canGovern(msg.sender) # dev: no perms\n\n    assert self._areValidBorrowIntervalConfig(_maxBorrowPerInterval, _numBlocksPerInterval) # dev: invalid borrow interval config\n    return self._setPendingDebtConfig(ActionType.DEBT_BORROW_INTERVAL, 0, 0, 0, 0, _maxBorrowPerInterval, _numBlocksPerInterval)\n\n\n@view\n@internal\ndef _areValidBorrowIntervalConfig(_maxBorrowPerInterval: uint256, _numBlocksPerInterval: uint256) -> bool:\n    if 0 in [_maxBorrowPerInterval, _numBlocksPerInterval]:\n        return False\n    if max_value(uint256) in [_maxBorrowPerInterval, _numBlocksPerInterval]:\n        return False\n    config: GenDebtConfig = staticcall MissionControl(self._getMissionControlAddr()).genDebtConfig()\n    if _maxBorrowPerInterval < config.minDebtAmount:\n        return False\n    return True\n\n\n# keeper config\n\n\n@external\ndef setKeeperConfig(_keeperFeeRatio: uint256, _minKeeperFee: uint256) -> uint256:\n    assert gov._canGovern(msg.sender) # dev: no perms\n\n    assert self._isValidKeeperConfig(_keeperFeeRatio, _minKeeperFee) # dev: invalid keeper config\n    return self._setPendingDebtConfig(ActionType.DEBT_KEEPER_CONFIG, 0, 0, 0, 0, 0, 0, _keeperFeeRatio, _minKeeperFee)\n\n\n@view\n@internal\ndef _isValidKeeperConfig(_keeperFeeRatio: uint256, _minKeeperFee: uint256) -> bool:\n    if max_value(uint256) in [_keeperFeeRatio, _minKeeperFee]:\n        return False\n    if _keeperFeeRatio > 10_00: # 10% max\n        return False\n    if _minKeeperFee > 200 * (10 ** 18): # $200 max\n        return False\n    return True\n\n\n# ltv payback buffer\n\n\n@external\ndef setLtvPaybackBuffer(_ltvPaybackBuffer: uint256) -> uint256:\n    assert gov._canGovern(msg.sender) # dev: no perms\n\n    assert self._isValidLtvPaybackBuffer(_ltvPaybackBuffer) # dev: invalid ltv payback buffer\n    return self._setPendingDebtConfig(ActionType.DEBT_LTV_PAYBACK_BUFFER, 0, 0, 0, 0, 0, 0, 0, 0, _ltvPaybackBuffer)\n\n\n@view\n@internal\ndef _isValidLtvPaybackBuffer(_ltvPaybackBuffer: uint256) -> bool:\n    if _ltvPaybackBuffer == 0 or _ltvPaybackBuffer > 10_00: # 10% max\n        return False\n    return True\n\n\n# gen auction params\n\n\n@external\ndef setGenAuctionParams(\n    _startDiscount: uint256,\n    _maxDiscount: uint256,\n    _delay: uint256,\n    _duration: uint256,\n) -> uint256:\n    assert gov._canGovern(msg.sender) # dev: no perms\n\n    params: AuctionParams= AuctionParams(\n        hasParams=True,\n        startDiscount=_startDiscount,\n        maxDiscount=_maxDiscount,\n        delay=_delay,\n        duration=_duration,\n    )\n    assert self._areValidAuctionParams(params) # dev: invalid auction params\n    return self._setPendingDebtConfig(ActionType.DEBT_AUCTION_PARAMS, 0, 0, 0, 0, 0, 0, 0, 0, 0, params)\n\n\n@view\n@external\ndef areValidAuctionParams(_params: AuctionParams) -> bool:\n    return self._areValidAuctionParams(_params)\n\n\n@view\n@internal\ndef _areValidAuctionParams(_params: AuctionParams) -> bool:\n    if not _params.hasParams:\n        return False\n    if _params.startDiscount > HUNDRED_PERCENT:\n        return False\n    if _params.maxDiscount > HUNDRED_PERCENT:\n        return False\n    if _params.startDiscount >= _params.maxDiscount:\n        return False\n    if _params.delay == max_value(uint256):\n        return False\n    if _params.duration == 0 or _params.duration == max_value(uint256):\n        return False\n    return True\n\n\n# set pending debt config\n\n\n@internal\ndef _setPendingDebtConfig(\n    _actionType: ActionType,\n    _perUserDebtLimit: uint256 = 0,\n    _globalDebtLimit: uint256 = 0,\n    _minDebtAmount: uint256 = 0,\n    _numAllowedBorrowers: uint256 = 0,\n    _maxBorrowPerInterval: uint256 = 0,\n    _numBlocksPerInterval: uint256 = 0,\n    _keeperFeeRatio: uint256 = 0,\n    _minKeeperFee: uint256 = 0,\n    _ltvPaybackBuffer: uint256 = 0,\n    _genAuctionParams: AuctionParams = empty(AuctionParams),\n) -> uint256:\n    aid: uint256 = timeLock._initiateAction()\n\n    self.actionType[aid] = _actionType\n    self.pendingDebtConfig[aid] = GenDebtConfig(\n        perUserDebtLimit=_perUserDebtLimit,\n        globalDebtLimit=_globalDebtLimit,\n        minDebtAmount=_minDebtAmount,\n        numAllowedBorrowers=_numAllowedBorrowers,\n        maxBorrowPerInterval=_maxBorrowPerInterval,\n        numBlocksPerInterval=_numBlocksPerInterval,\n        keeperFeeRatio=_keeperFeeRatio,\n        minKeeperFee=_minKeeperFee,\n        isDaowryEnabled=False,\n        ltvPaybackBuffer=_ltvPaybackBuffer,\n        genAuctionParams=_genAuctionParams,\n    )\n\n    confirmationBlock: uint256 = timeLock._getActionConfirmationBlock(aid)\n    if _actionType == ActionType.DEBT_GLOBAL_LIMITS:\n        log PendingGlobalDebtLimitsChange(\n            perUserDebtLimit=_perUserDebtLimit,\n            globalDebtLimit=_globalDebtLimit,\n            minDebtAmount=_minDebtAmount,\n            numAllowedBorrowers=_numAllowedBorrowers,\n            confirmationBlock=confirmationBlock,\n            actionId=aid,\n        )\n    elif _actionType == ActionType.DEBT_BORROW_INTERVAL:\n        log PendingBorrowIntervalConfigChange(\n            maxBorrowPerInterval=_maxBorrowPerInterval,\n            numBlocksPerInterval=_numBlocksPerInterval,\n            confirmationBlock=confirmationBlock,\n            actionId=aid,\n        )\n    elif _actionType == ActionType.DEBT_KEEPER_CONFIG:\n        log PendingKeeperConfigChange(\n            keeperFeeRatio=_keeperFeeRatio,\n            minKeeperFee=_minKeeperFee,\n            confirmationBlock=confirmationBlock,\n            actionId=aid,\n        )\n    elif _actionType == ActionType.DEBT_LTV_PAYBACK_BUFFER:\n        log PendingLtvPaybackBufferChange(\n            ltvPaybackBuffer=_ltvPaybackBuffer,\n            confirmationBlock=confirmationBlock,\n            actionId=aid,\n        )\n    elif _actionType == ActionType.DEBT_AUCTION_PARAMS:\n        log PendingDefaultAuctionParamsChange(\n            startDiscount=_genAuctionParams.startDiscount,\n            maxDiscount=_genAuctionParams.maxDiscount,\n            delay=_genAuctionParams.delay,\n            duration=_genAuctionParams.duration,\n            confirmationBlock=confirmationBlock,\n            actionId=aid,\n        )\n    return aid\n\n\n# daowry\n\n\n@external\ndef setIsDaowryEnabled(_shouldEnable: bool) -> bool:\n    assert self._hasPermsToEnable(msg.sender, _shouldEnable) # dev: no perms\n\n    mc: address = self._getMissionControlAddr()\n    config: GenDebtConfig = staticcall MissionControl(mc).genDebtConfig()\n    assert config.isDaowryEnabled != _shouldEnable # dev: already set\n    config.isDaowryEnabled = _shouldEnable\n    extcall MissionControl(mc).setGeneralDebtConfig(config)\n\n    log IsDaowryEnabledSet(isDaowryEnabled=_shouldEnable, caller=msg.sender)\n    return True\n\n\n####################\n# Rewards / Points #\n####################\n\n\n# ripe per block\n\n\n@external\ndef setRipePerBlock(_ripePerBlock: uint256) -> uint256:\n    assert gov._canGovern(msg.sender) # dev: no perms\n    assert _ripePerBlock != max_value(uint256) # dev: invalid ripe per block\n    return self._setPendingRipeRewardsConfig(ActionType.RIPE_REWARDS_BLOCK, _ripePerBlock)\n\n\n# allocs\n\n\n@external\ndef setRipeRewardsAllocs(\n    _borrowersAlloc: uint256,\n    _stakersAlloc: uint256,\n    _votersAlloc: uint256,\n    _genDepositorsAlloc: uint256,\n) -> uint256:\n    assert gov._canGovern(msg.sender) # dev: no perms\n    assert self._areValidRipeRewardsAllocs(_borrowersAlloc, _stakersAlloc, _votersAlloc, _genDepositorsAlloc) # dev: invalid rewards allocs\n    return self._setPendingRipeRewardsConfig(ActionType.RIPE_REWARDS_ALLOCS, 0, _borrowersAlloc, _stakersAlloc, _votersAlloc, _genDepositorsAlloc)\n\n\n@view\n@internal\ndef _areValidRipeRewardsAllocs(_borrowersAlloc: uint256, _stakersAlloc: uint256, _votersAlloc: uint256, _genDepositorsAlloc: uint256) -> bool:\n    if _borrowersAlloc + _stakersAlloc + _votersAlloc + _genDepositorsAlloc > HUNDRED_PERCENT:\n        return False\n    return True\n\n\n# set pending ripe rewards config\n\n\n@internal\ndef _setPendingRipeRewardsConfig(\n    _actionType: ActionType,\n    _ripePerBlock: uint256 = 0,\n    _borrowersAlloc: uint256 = 0,\n    _stakersAlloc: uint256 = 0,\n    _votersAlloc: uint256 = 0,\n    _genDepositorsAlloc: uint256 = 0,\n) -> uint256:\n    aid: uint256 = timeLock._initiateAction()\n\n    self.actionType[aid] = _actionType\n    self.pendingRipeRewardsConfig[aid] = RipeRewardsConfig(\n        arePointsEnabled=False,\n        ripePerBlock=_ripePerBlock,\n        borrowersAlloc=_borrowersAlloc,\n        stakersAlloc=_stakersAlloc,\n        votersAlloc=_votersAlloc,\n        genDepositorsAlloc=_genDepositorsAlloc,\n    )\n\n    confirmationBlock: uint256 = timeLock._getActionConfirmationBlock(aid)\n    if _actionType == ActionType.RIPE_REWARDS_BLOCK:\n        log PendingRipeRewardsPerBlockChange(\n            ripePerBlock=_ripePerBlock,\n            confirmationBlock=confirmationBlock,\n            actionId=aid,\n        )\n\n    elif _actionType == ActionType.RIPE_REWARDS_ALLOCS:\n        log PendingRipeRewardsAllocsChange(\n            borrowersAlloc=_borrowersAlloc,\n            stakersAlloc=_stakersAlloc,\n            votersAlloc=_votersAlloc,\n            genDepositorsAlloc=_genDepositorsAlloc,\n            confirmationBlock=confirmationBlock,\n            actionId=aid,\n        )\n\n    return aid\n\n\n# enable points\n\n\n@external\ndef setRewardsPointsEnabled(_shouldEnable: bool) -> bool:\n    assert self._hasPermsToEnable(msg.sender, _shouldEnable) # dev: no perms\n\n    mc: address = self._getMissionControlAddr()\n    rewardsConfig: RipeRewardsConfig = staticcall MissionControl(mc).rewardsConfig()\n    assert rewardsConfig.arePointsEnabled != _shouldEnable # dev: already set\n    rewardsConfig.arePointsEnabled = _shouldEnable\n    extcall MissionControl(mc).setRipeRewardsConfig(rewardsConfig)\n\n    log RewardsPointsEnabledModified(arePointsEnabled=_shouldEnable, caller=msg.sender)\n    return True\n\n\n#######################\n# Priority Vault Data #\n#######################\n\n\n# priority liquidation\n\n\n@external\ndef setPriorityLiqAssetVaults(_priorityLiqAssetVaults: DynArray[VaultLite, PRIORITY_VAULT_DATA]) -> uint256:\n    assert gov._canGovern(msg.sender) # dev: no perms\n\n    priorityVaults: DynArray[VaultLite, PRIORITY_VAULT_DATA] = self._sanitizePriorityVaults(_priorityLiqAssetVaults)\n    assert len(priorityVaults) != 0 # dev: invalid priority vaults\n\n    aid: uint256 = timeLock._initiateAction()\n    self.actionType[aid] = ActionType.OTHER_PRIORITY_LIQ_ASSET_VAULTS\n    self.pendingPriorityLiqAssetVaults[aid] = priorityVaults\n    confirmationBlock: uint256 = timeLock._getActionConfirmationBlock(aid)\n    log PendingPriorityLiqAssetVaultsChange(\n        numPriorityLiqAssetVaults=len(priorityVaults),\n        confirmationBlock=confirmationBlock,\n        actionId=aid,\n    )\n    return aid\n\n\n# priority stability pools\n\n\n@external\ndef setPriorityStabVaults(_priorityStabVaults: DynArray[VaultLite, PRIORITY_VAULT_DATA]) -> uint256:\n    assert gov._canGovern(msg.sender) # dev: no perms\n\n    priorityVaults: DynArray[VaultLite, PRIORITY_VAULT_DATA] = self._sanitizePriorityVaults(_priorityStabVaults)\n    assert len(priorityVaults) != 0 # dev: invalid priority vaults\n\n    aid: uint256 = timeLock._initiateAction()\n    self.actionType[aid] = ActionType.OTHER_PRIORITY_STAB_VAULTS\n    self.pendingPriorityStabVaults[aid] = priorityVaults\n    confirmationBlock: uint256 = timeLock._getActionConfirmationBlock(aid)\n    log PendingPriorityStabVaultsChange(\n        numPriorityStabVaults=len(priorityVaults),\n        confirmationBlock=confirmationBlock,\n        actionId=aid,\n    )\n    return aid\n\n\n# sanitize\n\n\n@internal\ndef _sanitizePriorityVaults(_priorityVaults: DynArray[VaultLite, PRIORITY_VAULT_DATA]) -> DynArray[VaultLite, PRIORITY_VAULT_DATA]:\n    sanitizedVaults: DynArray[VaultLite, PRIORITY_VAULT_DATA] = []\n    vaultBook: address = self._getVaultBookAddr()\n    mc: address = self._getMissionControlAddr()\n    for vault: VaultLite in _priorityVaults:\n        if self.vaultDedupe[vault.vaultId][vault.asset]:\n            continue\n        if not staticcall VaultBook(vaultBook).isValidRegId(vault.vaultId):\n            continue\n        if not staticcall MissionControl(mc).isSupportedAssetInVault(vault.vaultId, vault.asset):\n            continue\n        sanitizedVaults.append(vault)\n        self.vaultDedupe[vault.vaultId][vault.asset] = True\n    return sanitizedVaults\n\n\n#############################\n# Prices - Priority Sources #\n#############################\n\n\n@external\ndef setPriorityPriceSourceIds(_priorityIds: DynArray[uint256, MAX_PRIORITY_PRICE_SOURCES]) -> uint256:\n    assert gov._canGovern(msg.sender) # dev: no perms\n\n    priorityIds: DynArray[uint256, MAX_PRIORITY_PRICE_SOURCES] = self._sanitizePrioritySources(_priorityIds)\n    assert len(priorityIds) != 0 # dev: invalid priority sources\n\n    aid: uint256 = timeLock._initiateAction()\n    self.actionType[aid] = ActionType.OTHER_PRIORITY_PRICE_SOURCE_IDS\n    self.pendingPriorityPriceSourceIds[aid] = priorityIds\n    confirmationBlock: uint256 = timeLock._getActionConfirmationBlock(aid)\n    log PendingPriorityPriceSourceIdsChange(\n        numPriorityPriceSourceIds=len(priorityIds),\n        confirmationBlock=confirmationBlock,\n        actionId=aid,\n    )\n    return aid\n\n\n@view\n@internal\ndef _sanitizePrioritySources(_priorityIds: DynArray[uint256, MAX_PRIORITY_PRICE_SOURCES]) -> DynArray[uint256, MAX_PRIORITY_PRICE_SOURCES]:\n    sanitizedIds: DynArray[uint256, MAX_PRIORITY_PRICE_SOURCES] = []\n    priceDesk: address = self._getPriceDeskAddr()\n    for pid: uint256 in _priorityIds:\n        if not staticcall PriceDesk(priceDesk).isValidRegId(pid):\n            continue\n        if pid in sanitizedIds:\n            continue\n        sanitizedIds.append(pid)\n    return sanitizedIds\n\n\n#######################\n# Underscore Registry #\n#######################\n\n\n@external\ndef setUnderscoreRegistry(_underscoreRegistry: address) -> uint256:\n    assert gov._canGovern(msg.sender) # dev: no perms\n\n    assert self._isValidUnderscoreAddr(_underscoreRegistry) # dev: invalid underscore registry\n\n    aid: uint256 = timeLock._initiateAction()\n    self.actionType[aid] = ActionType.OTHER_UNDERSCORE_REGISTRY\n    self.pendingUnderscoreRegistry[aid] = _underscoreRegistry\n    confirmationBlock: uint256 = timeLock._getActionConfirmationBlock(aid)\n    log PendingUnderscoreRegistryChange(\n        underscoreRegistry=_underscoreRegistry,\n        confirmationBlock=confirmationBlock,\n        actionId=aid,\n    )\n    return aid\n\n\n@view\n@internal\ndef _isValidUnderscoreAddr(_addr: address) -> bool:\n    agentFactory: address = staticcall UnderscoreRegistry(_addr).getAddy(UNDERSCORE_AGENT_FACTORY_ID)\n    if agentFactory == empty(address):\n        return False\n\n    # make sure has interface\n    return not staticcall UnderscoreAgentFactory(agentFactory).isUserWallet(empty(address))\n\n\n###########################\n# Can Perform Lite Action #\n###########################\n\n\n@external\ndef setCanPerformLiteAction(_user: address, _canDo: bool) -> uint256:\n    assert gov._canGovern(msg.sender) # dev: no perms\n\n    aid: uint256 = timeLock._initiateAction()\n    self.actionType[aid] = ActionType.OTHER_CAN_PERFORM_LITE_ACTION\n    self.pendingCanPerformLiteAction[aid] = CanPerform(user=_user, canDo=_canDo)\n    confirmationBlock: uint256 = timeLock._getActionConfirmationBlock(aid)\n    log PendingCanPerformLiteAction(user=_user, canDo=_canDo, confirmationBlock=confirmationBlock, actionId=aid)\n    return aid\n\n\n#####################\n# Max LTV Deviation #\n#####################\n\n\n@external\ndef setMaxLtvDeviation(_newDeviation: uint256) -> uint256:\n    assert gov._canGovern(msg.sender) # dev: no perms\n\n    assert self._isValidMaxDeviation(_newDeviation) # dev: invalid max deviation\n\n    aid: uint256 = timeLock._initiateAction()\n    self.actionType[aid] = ActionType.MAX_LTV_DEVIATION\n    self.pendingMaxLtvDeviation[aid] = _newDeviation\n\n    log PendingMaxLtvDeviationChange(\n        newDeviation=_newDeviation,\n        confirmationBlock=timeLock._getActionConfirmationBlock(aid),\n        actionId=aid,\n    )\n    return aid\n\n\n@view\n@internal\ndef _isValidMaxDeviation(_newDeviation: uint256) -> bool:\n    if _newDeviation == 0:\n        return False\n    return _newDeviation <= HUNDRED_PERCENT\n\n\n#############\n# Execution #\n#############\n\n\n@external\ndef executePendingAction(_aid: uint256) -> bool:\n    assert gov._canGovern(msg.sender) # dev: no perms\n\n    # check time lock\n    if not timeLock._confirmAction(_aid):\n        if timeLock._isExpired(_aid):\n            self._cancelPendingAction(_aid)\n        return False\n\n    actionType: ActionType = self.actionType[_aid]\n    mc: address = self._getMissionControlAddr()\n\n    if actionType == ActionType.GEN_CONFIG_VAULT_LIMITS:\n        config: GenConfig = staticcall MissionControl(mc).genConfig()\n        p: GenConfigLite = self.pendingGeneralConfig[_aid]\n        config.perUserMaxVaults = p.perUserMaxVaults\n        config.perUserMaxAssetsPerVault = p.perUserMaxAssetsPerVault\n        extcall MissionControl(mc).setGeneralConfig(config)\n        log VaultLimitsSet(perUserMaxVaults=p.perUserMaxVaults, perUserMaxAssetsPerVault=p.perUserMaxAssetsPerVault)\n\n    elif actionType == ActionType.GEN_CONFIG_STALE_TIME:\n        config: GenConfig = staticcall MissionControl(mc).genConfig()\n        config.priceStaleTime = self.pendingGeneralConfig[_aid].priceStaleTime\n        extcall MissionControl(mc).setGeneralConfig(config)\n        log StaleTimeSet(staleTime=config.priceStaleTime)\n\n    elif actionType == ActionType.DEBT_GLOBAL_LIMITS:\n        config: GenDebtConfig = staticcall MissionControl(mc).genDebtConfig()\n        p: GenDebtConfig = self.pendingDebtConfig[_aid]\n        config.perUserDebtLimit = p.perUserDebtLimit\n        config.globalDebtLimit = p.globalDebtLimit\n        config.minDebtAmount = p.minDebtAmount\n        config.numAllowedBorrowers = p.numAllowedBorrowers\n        extcall MissionControl(mc).setGeneralDebtConfig(config)\n        log GlobalDebtLimitsSet(perUserDebtLimit=p.perUserDebtLimit, globalDebtLimit=p.globalDebtLimit, minDebtAmount=p.minDebtAmount, numAllowedBorrowers=p.numAllowedBorrowers)\n\n    elif actionType == ActionType.DEBT_BORROW_INTERVAL:\n        config: GenDebtConfig = staticcall MissionControl(mc).genDebtConfig()\n        p: GenDebtConfig = self.pendingDebtConfig[_aid]\n        config.maxBorrowPerInterval = p.maxBorrowPerInterval\n        config.numBlocksPerInterval = p.numBlocksPerInterval\n        extcall MissionControl(mc).setGeneralDebtConfig(config)\n        log BorrowIntervalConfigSet(maxBorrowPerInterval=p.maxBorrowPerInterval, numBlocksPerInterval=p.numBlocksPerInterval)\n\n    elif actionType == ActionType.DEBT_KEEPER_CONFIG:\n        config: GenDebtConfig = staticcall MissionControl(mc).genDebtConfig()\n        p: GenDebtConfig = self.pendingDebtConfig[_aid]\n        config.keeperFeeRatio = p.keeperFeeRatio\n        config.minKeeperFee = p.minKeeperFee\n        extcall MissionControl(mc).setGeneralDebtConfig(config)\n        log KeeperConfigSet(keeperFeeRatio=p.keeperFeeRatio, minKeeperFee=p.minKeeperFee)\n\n    elif actionType == ActionType.DEBT_LTV_PAYBACK_BUFFER:\n        config: GenDebtConfig = staticcall MissionControl(mc).genDebtConfig()\n        config.ltvPaybackBuffer = self.pendingDebtConfig[_aid].ltvPaybackBuffer\n        extcall MissionControl(mc).setGeneralDebtConfig(config)\n        log LtvPaybackBufferSet(ltvPaybackBuffer=config.ltvPaybackBuffer)\n\n    elif actionType == ActionType.DEBT_AUCTION_PARAMS:\n        config: GenDebtConfig = staticcall MissionControl(mc).genDebtConfig()\n        p: GenDebtConfig = self.pendingDebtConfig[_aid]\n        config.genAuctionParams = p.genAuctionParams\n        extcall MissionControl(mc).setGeneralDebtConfig(config)\n        log GenAuctionParamsSet(startDiscount=p.genAuctionParams.startDiscount, maxDiscount=p.genAuctionParams.maxDiscount, delay=p.genAuctionParams.delay, duration=p.genAuctionParams.duration)\n\n    elif actionType == ActionType.RIPE_REWARDS_BLOCK:\n        config: RipeRewardsConfig = staticcall MissionControl(mc).rewardsConfig()\n        config.ripePerBlock = self.pendingRipeRewardsConfig[_aid].ripePerBlock\n        extcall MissionControl(mc).setRipeRewardsConfig(config)\n        log RipeRewardsPerBlockSet(ripePerBlock=config.ripePerBlock)\n\n    elif actionType == ActionType.RIPE_REWARDS_ALLOCS:\n        config: RipeRewardsConfig = staticcall MissionControl(mc).rewardsConfig()\n        p: RipeRewardsConfig = self.pendingRipeRewardsConfig[_aid]\n        config.borrowersAlloc = p.borrowersAlloc\n        config.stakersAlloc = p.stakersAlloc\n        config.votersAlloc = p.votersAlloc\n        config.genDepositorsAlloc = p.genDepositorsAlloc\n        extcall MissionControl(mc).setRipeRewardsConfig(config)\n        log RipeRewardsAllocsSet(borrowersAlloc=p.borrowersAlloc, stakersAlloc=p.stakersAlloc, votersAlloc=p.votersAlloc, genDepositorsAlloc=p.genDepositorsAlloc)\n\n    elif actionType == ActionType.OTHER_PRIORITY_LIQ_ASSET_VAULTS:\n        priorityVaults: DynArray[VaultLite, PRIORITY_VAULT_DATA] = self.pendingPriorityLiqAssetVaults[_aid]\n        extcall MissionControl(mc).setPriorityLiqAssetVaults(priorityVaults)\n        log PriorityLiqAssetVaultsSet(numVaults=len(priorityVaults))\n\n    elif actionType == ActionType.OTHER_PRIORITY_STAB_VAULTS:\n        priorityVaults: DynArray[VaultLite, PRIORITY_VAULT_DATA] = self.pendingPriorityStabVaults[_aid]\n        extcall MissionControl(mc).setPriorityStabVaults(priorityVaults)\n        log PriorityStabVaultsSet(numVaults=len(priorityVaults))\n\n    elif actionType == ActionType.OTHER_PRIORITY_PRICE_SOURCE_IDS:\n        priorityIds: DynArray[uint256, MAX_PRIORITY_PRICE_SOURCES] = self.pendingPriorityPriceSourceIds[_aid]\n        extcall MissionControl(mc).setPriorityPriceSourceIds(priorityIds)\n        log PriorityPriceSourceIdsModified(numIds=len(priorityIds))\n\n    elif actionType == ActionType.OTHER_UNDERSCORE_REGISTRY:\n        underscoreRegistry: address = self.pendingUnderscoreRegistry[_aid]\n        extcall MissionControl(mc).setUnderscoreRegistry(underscoreRegistry)\n        log UnderscoreRegistrySet(addr=underscoreRegistry)\n\n    elif actionType == ActionType.OTHER_CAN_PERFORM_LITE_ACTION:\n        data: CanPerform = self.pendingCanPerformLiteAction[_aid]\n        extcall MissionControl(mc).setCanPerformLiteAction(data.user, data.canDo)\n        log CanPerformLiteAction(user=data.user, canDo=data.canDo)\n\n    elif actionType == ActionType.MAX_LTV_DEVIATION:\n        p: uint256 = self.pendingMaxLtvDeviation[_aid]\n        extcall MissionControl(mc).setMaxLtvDeviation(p)\n        log MaxLtvDeviationSet(newDeviation=p)\n\n    self.actionType[_aid] = empty(ActionType)\n    return True\n\n\n# cancel action\n\n\n@external\ndef cancelPendingAction(_aid: uint256) -> bool:\n    assert gov._canGovern(msg.sender) # dev: no perms\n    self._cancelPendingAction(_aid)\n    return True\n\n\n@internal\ndef _cancelPendingAction(_aid: uint256):\n    assert timeLock._cancelAction(_aid) # dev: cannot cancel action\n    self.actionType[_aid] = empty(ActionType)",
+            "sha256sum": "9fdf219e0459fdd11b5191e6d96f9359d3a286c1eb7148863a3bd94854feffc0"
+          }
+        },
+        "settings": {
+          "outputSelection": {
+            "contracts/config/SwitchboardOne.vy": [
+              "*"
+            ]
+          },
+          "search_paths": [
+            "."
+          ]
+        },
+        "compiler_version": "v0.4.1+commit.8a93dd27",
+        "integrity": "0afe3ff1cd5c18cf58143e2e3bca717807f7140f0876f91c047c77207638530e"
+      },
+      "args": "000000000000000000000000a14bceb2c0086acdee1b01e47c7ef3de49ed996e000000000000000000000000000000000000000000000000000000000000012c000000000000000000000000000000000000000000000000000000000003f480000000000000000000000000000000000000000000000000000000000000a8c00000000000000000000000000000000000000000000000000000000000049d40"
     }
   }
 }
