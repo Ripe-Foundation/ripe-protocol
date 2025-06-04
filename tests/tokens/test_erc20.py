@@ -27,7 +27,7 @@ def test_green_token_basic_info(green_token):
     assert green_token.name() == "Green USD Stablecoin"
     assert green_token.symbol() == "GREEN"
     assert green_token.decimals() == 18
-    assert green_token.totalSupply() == 1_000_000 * EIGHTEEN_DECIMALS
+    assert green_token.totalSupply() == 10_000_000 * EIGHTEEN_DECIMALS
 
 
 def test_green_token_transfer(green_token, whale, bob, alice):

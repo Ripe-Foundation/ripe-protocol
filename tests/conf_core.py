@@ -164,7 +164,7 @@ def green_token(deploy3r, fork, whale):
         deploy3r,
         PARAMS[fork]["MIN_HQ_CHANGE_TIMELOCK"],
         PARAMS[fork]["MAX_HQ_CHANGE_TIMELOCK"],
-        1_000_000 * EIGHTEEN_DECIMALS,
+        10_000_000 * EIGHTEEN_DECIMALS,
         whale,
         name="green_token",
     )
@@ -178,7 +178,7 @@ def ripe_token(deploy3r, fork, whale):
         deploy3r,
         PARAMS[fork]["MIN_HQ_CHANGE_TIMELOCK"],
         PARAMS[fork]["MAX_HQ_CHANGE_TIMELOCK"],
-        1_000_000 * EIGHTEEN_DECIMALS,
+        1_000_000_000 * EIGHTEEN_DECIMALS,
         whale,
         name="ripe_token",
     )
@@ -465,15 +465,19 @@ def price_desk_deploy(ripe_hq_deploy, fork):
 
 
 @pytest.fixture(scope="session")
-def price_desk(price_desk_deploy, deploy3r, chainlink, mock_price_source):
+def price_desk(price_desk_deploy, deploy3r, chainlink, mock_price_source, curve_prices):
 
     # register chainlink
     assert price_desk_deploy.startAddNewAddressToRegistry(chainlink, "Chainlink", sender=deploy3r)
     assert price_desk_deploy.confirmNewAddressToRegistry(chainlink, sender=deploy3r) == 1
 
+    # register curve prices
+    assert price_desk_deploy.startAddNewAddressToRegistry(curve_prices, "Curve Prices", sender=deploy3r)
+    assert price_desk_deploy.confirmNewAddressToRegistry(curve_prices, sender=deploy3r) == 2
+
     # register mock price source
     assert price_desk_deploy.startAddNewAddressToRegistry(mock_price_source, "Mock Price Source", sender=deploy3r)
-    assert price_desk_deploy.confirmNewAddressToRegistry(mock_price_source, sender=deploy3r) == 2
+    assert price_desk_deploy.confirmNewAddressToRegistry(mock_price_source, sender=deploy3r) == 3
 
     # finish registry setup
     assert price_desk_deploy.setRegistryTimeLockAfterSetup(sender=deploy3r)
@@ -512,4 +516,23 @@ def chainlink(ripe_hq_deploy, fork, sally, bob, deploy3r, mock_chainlink_feed_on
     # finish setup
     assert c.setActionTimeLockAfterSetup(sender=deploy3r)
 
+    return c
+
+
+# curve prices
+
+
+@pytest.fixture(scope="session")
+def curve_prices(ripe_hq_deploy, fork, deploy3r):
+    curve_address_provider = ZERO_ADDRESS if fork == "local" else ADDYS[fork]["CURVE_ADDRESS_PROVIDER"]
+
+    c = boa.load(
+        "contracts/priceSources/CurvePrices.vy",
+        ripe_hq_deploy,
+        curve_address_provider,
+        PARAMS[fork]["PRICE_DESK_MIN_REG_TIMELOCK"],
+        PARAMS[fork]["PRICE_DESK_MAX_REG_TIMELOCK"],
+        name="curve_prices",
+    )
+    assert c.setActionTimeLockAfterSetup(sender=deploy3r)
     return c
