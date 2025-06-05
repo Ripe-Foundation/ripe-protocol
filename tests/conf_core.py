@@ -46,6 +46,7 @@ def ripe_hq(
     ledger,
     lootbox,
     teller,
+    boardroom,
     deploy3r,
     governance
 ):
@@ -104,19 +105,23 @@ def ripe_hq(
     assert ripe_hq_deploy.startAddNewAddressToRegistry(teller, "Teller", sender=deploy3r)
     assert ripe_hq_deploy.confirmNewAddressToRegistry(teller, sender=deploy3r) == 14
 
+    # 15
+    assert ripe_hq_deploy.startAddNewAddressToRegistry(boardroom, "Boardroom", sender=deploy3r)
+    assert ripe_hq_deploy.confirmNewAddressToRegistry(boardroom, sender=deploy3r) == 15
+
     # config
 
-    # 15
-    assert ripe_hq_deploy.startAddNewAddressToRegistry(switchboard_one, "Switchboard One", sender=deploy3r)
-    assert ripe_hq_deploy.confirmNewAddressToRegistry(switchboard_one, sender=deploy3r) == 15
-
     # 16
-    assert ripe_hq_deploy.startAddNewAddressToRegistry(switchboard_two, "Switchboard Two", sender=deploy3r)
-    assert ripe_hq_deploy.confirmNewAddressToRegistry(switchboard_two, sender=deploy3r) == 16
+    assert ripe_hq_deploy.startAddNewAddressToRegistry(switchboard_one, "Switchboard One", sender=deploy3r)
+    assert ripe_hq_deploy.confirmNewAddressToRegistry(switchboard_one, sender=deploy3r) == 16
 
     # 17
+    assert ripe_hq_deploy.startAddNewAddressToRegistry(switchboard_two, "Switchboard Two", sender=deploy3r)
+    assert ripe_hq_deploy.confirmNewAddressToRegistry(switchboard_two, sender=deploy3r) == 17
+
+    # 18
     assert ripe_hq_deploy.startAddNewAddressToRegistry(switchboard_three, "Switchboard Three", sender=deploy3r)
-    assert ripe_hq_deploy.confirmNewAddressToRegistry(switchboard_three, sender=deploy3r) == 17
+    assert ripe_hq_deploy.confirmNewAddressToRegistry(switchboard_three, sender=deploy3r) == 18
 
     # set minting / blacklist capabilities
 
@@ -133,16 +138,16 @@ def ripe_hq(
     assert ripe_hq_deploy.confirmHqConfigChange(13, sender=deploy3r)
 
     # switchboard one can set token blacklists and modify mission control
-    ripe_hq_deploy.initiateHqConfigChange(15, False, False, True, True, sender=deploy3r)
-    assert ripe_hq_deploy.confirmHqConfigChange(15, sender=deploy3r)
-
-    # switchboard two can modify mission control
-    ripe_hq_deploy.initiateHqConfigChange(16, False, False, True, True, sender=deploy3r)
+    ripe_hq_deploy.initiateHqConfigChange(16, False, False, False, True, sender=deploy3r)
     assert ripe_hq_deploy.confirmHqConfigChange(16, sender=deploy3r)
 
-    # switchboard three can modify mission control
-    ripe_hq_deploy.initiateHqConfigChange(17, False, False, True, True, sender=deploy3r)
+    # switchboard two can modify mission control
+    ripe_hq_deploy.initiateHqConfigChange(17, False, False, False, True, sender=deploy3r)
     assert ripe_hq_deploy.confirmHqConfigChange(17, sender=deploy3r)
+
+    # switchboard three can modify mission control
+    ripe_hq_deploy.initiateHqConfigChange(18, False, False, True, True, sender=deploy3r)
+    assert ripe_hq_deploy.confirmHqConfigChange(18, sender=deploy3r)
 
     # finish ripe hq setup
     assert ripe_hq_deploy.setRegistryTimeLockAfterSetup(sender=deploy3r)
@@ -315,6 +320,18 @@ def teller(ripe_hq_deploy):
         "contracts/core/Teller.vy",
         ripe_hq_deploy,
         name="teller",
+    )
+
+
+# boardroom
+
+
+@pytest.fixture(scope="session")
+def boardroom(ripe_hq_deploy):
+    return boa.load(
+        "contracts/core/Boardroom.vy",
+        ripe_hq_deploy,
+        name="boardroom",
     )
 
 

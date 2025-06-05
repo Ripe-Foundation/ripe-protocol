@@ -99,9 +99,7 @@ def test_switchboard_three_access_control_lite_actions(
     # Give sally lite access
     mission_control.setCanPerformLiteAction(sally, True, sender=switchboard_three.address)
     
-    # Now sally should be able to call lite actions (will fail at contract level but pass access control)
-    with boa.reverts():  # Will fail in underlying contract, but access control passes
-        switchboard_three.updateDebtForUser(user_addr, sender=sally)
+    switchboard_three.updateDebtForUser(user_addr, sender=sally)
 
 
 def test_switchboard_three_blacklist_special_permissions(
@@ -525,9 +523,7 @@ def test_switchboard_three_deposit_points_vault_lookup(
     with boa.reverts("invalid vault"):
         switchboard_three.updateDepositPoints(user_addr, 999, asset_addr, sender=governance.address)
     
-    # Should succeed with valid vault ID (will fail in lootbox but pass vault lookup)
-    with boa.reverts():  # Will fail in lootbox call, but vault lookup passes
-        switchboard_three.updateDepositPoints(user_addr, vault_id, asset_addr, sender=governance.address)
+    switchboard_three.updateDepositPoints(user_addr, vault_id, asset_addr, sender=governance.address)
 
 
 def test_switchboard_three_event_emission_immediate_actions(

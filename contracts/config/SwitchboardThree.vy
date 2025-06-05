@@ -213,8 +213,8 @@ MAX_CLAIM_USERS: constant(uint256) = 50
 MISSION_CONTROL_ID: constant(uint256) = 5
 VAULT_BOOK_ID: constant(uint256) = 7
 AUCTION_HOUSE_ID: constant(uint256) = 8
-CREDIT_ENGINE_ID: constant(uint256) = 9
-LOOTBOX_ID: constant(uint256) = 10
+CREDIT_ENGINE_ID: constant(uint256) = 11
+LOOTBOX_ID: constant(uint256) = 13
 
 
 @deploy

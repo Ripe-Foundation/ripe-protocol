@@ -130,6 +130,13 @@ struct VaultData:
     vaultAddr: address
     asset: address
 
+struct LockTerms:
+    minLockDuration: uint256
+    maxLockDuration: uint256
+    maxLockBoost: uint256
+    canExit: bool
+    exitFee: uint256
+
 # helpers
 
 struct TellerDepositConfig:
@@ -226,6 +233,10 @@ struct DepositPointsConfig:
 struct PriceConfig:
     staleTime: uint256
     priorityPriceSourceIds: DynArray[uint256, MAX_PRIORITY_PRICE_SOURCES]
+
+struct RipeGovVaultConfig:
+    lockTerms: LockTerms
+    assetWeight: uint256
 
 # events
 
@@ -890,4 +901,19 @@ def getPriceConfig() -> PriceConfig:
     return PriceConfig(
         staleTime=self.genConfig.priceStaleTime,
         priorityPriceSourceIds=self.priorityPriceSourceIds,
+    )
+
+
+# ripe gov vault config
+
+
+@view
+@external
+def getRipeGovVaultConfig(_asset: address) -> RipeGovVaultConfig:
+
+    # TODO: hook up all this config / params
+
+    return RipeGovVaultConfig(
+        lockTerms=empty(LockTerms),
+        assetWeight=0,
     )

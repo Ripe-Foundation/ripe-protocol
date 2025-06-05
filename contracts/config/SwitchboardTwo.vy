@@ -234,7 +234,7 @@ GREEN_TOKEN_ID: constant(uint256) = 1
 SAVINGS_GREEN_ID: constant(uint256) = 2
 MISSION_CONTROL_ID: constant(uint256) = 5
 VAULT_BOOK_ID: constant(uint256) = 7
-SWITCHBOARD_ONE_ID: constant(uint256) = 15
+SWITCHBOARD_ONE_ID: constant(uint256) = 16
 
 
 @deploy
