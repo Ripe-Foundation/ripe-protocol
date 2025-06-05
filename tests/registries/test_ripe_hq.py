@@ -42,7 +42,7 @@ def test_ripe_hq_and_tokens_setup(
     
     # vault book
     assert vault_book.registryChangeTimeLock() != 0
-    assert vault_book.getNumAddrs() == 3
+    assert vault_book.getNumAddrs() == 4
     assert vault_book.governance() == ZERO_ADDRESS
 
     # price desk

@@ -148,7 +148,7 @@ def test_teller_deposit_max_vaults(
 ):
     # Setup with max vaults = 1
     setGeneralConfig(_perUserMaxVaults=1)
-    setAssetConfig(alpha_token, _vaultIds=[2, 3])
+    setAssetConfig(alpha_token, _vaultIds=[3, 4])
 
     deposit_amount = 100 * EIGHTEEN_DECIMALS
     alpha_token.transfer(bob, deposit_amount, sender=alpha_token_whale)

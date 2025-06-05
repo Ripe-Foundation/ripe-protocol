@@ -387,19 +387,23 @@ def vault_book_deploy(ripe_hq_deploy, fork):
 
 
 @pytest.fixture(scope="session")
-def vault_book(vault_book_deploy, deploy3r, stability_pool, simple_erc20_vault, rebase_erc20_vault):
+def vault_book(vault_book_deploy, deploy3r, stability_pool, ripe_gov_vault, simple_erc20_vault, rebase_erc20_vault):
 
     # register stability pool
     assert vault_book_deploy.startAddNewAddressToRegistry(stability_pool, "Stability Pool", sender=deploy3r)
     assert vault_book_deploy.confirmNewAddressToRegistry(stability_pool, sender=deploy3r) == 1
 
+    # register ripe gov vault
+    assert vault_book_deploy.startAddNewAddressToRegistry(ripe_gov_vault, "Ripe Gov Vault", sender=deploy3r)
+    assert vault_book_deploy.confirmNewAddressToRegistry(ripe_gov_vault, sender=deploy3r) == 2
+
     # register simple erc20 vault
     assert vault_book_deploy.startAddNewAddressToRegistry(simple_erc20_vault, "Simple ERC20 Vault", sender=deploy3r)
-    assert vault_book_deploy.confirmNewAddressToRegistry(simple_erc20_vault, sender=deploy3r) == 2
+    assert vault_book_deploy.confirmNewAddressToRegistry(simple_erc20_vault, sender=deploy3r) == 3
 
     # register rebase erc20 vault
     assert vault_book_deploy.startAddNewAddressToRegistry(rebase_erc20_vault, "Rebase ERC20 Vault", sender=deploy3r)
-    assert vault_book_deploy.confirmNewAddressToRegistry(rebase_erc20_vault, sender=deploy3r) == 3
+    assert vault_book_deploy.confirmNewAddressToRegistry(rebase_erc20_vault, sender=deploy3r) == 4
 
     # finish registry setup
     assert vault_book_deploy.setRegistryTimeLockAfterSetup(sender=deploy3r)
@@ -440,6 +444,18 @@ def stability_pool(ripe_hq_deploy):
         "contracts/vaults/StabilityPool.vy",
         ripe_hq_deploy,
         name="stability_pool",
+    )
+
+
+# ripe gov vault
+
+
+@pytest.fixture(scope="session")
+def ripe_gov_vault(ripe_hq_deploy):
+    return boa.load(
+        "contracts/vaults/RipeGov.vy",
+        ripe_hq_deploy,
+        name="ripe_gov_vault",
     )
 
 

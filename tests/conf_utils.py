@@ -133,7 +133,7 @@ def createAuctionParams():
 def setAssetConfig(mission_control, switchboard_two, createDebtTerms):
     def setAssetConfig(
         _asset,
-        _vaultIds = [2], # default simple erc20 vault
+        _vaultIds = [3], # default simple erc20 vault
         _stakersPointsAlloc = 10,
         _voterPointsAlloc = 10,
         _perUserDepositLimit = MAX_UINT256,
