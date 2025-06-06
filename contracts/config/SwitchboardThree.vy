@@ -211,9 +211,9 @@ MAX_DEBT_UPDATES: constant(uint256) = 50
 MAX_CLAIM_USERS: constant(uint256) = 50
 
 MISSION_CONTROL_ID: constant(uint256) = 5
-VAULT_BOOK_ID: constant(uint256) = 8
-AUCTION_HOUSE_ID: constant(uint256) = 9
-CREDIT_ENGINE_ID: constant(uint256) = 13
+VAULT_BOOK_ID: constant(uint256) = 7
+AUCTION_HOUSE_ID: constant(uint256) = 8
+CREDIT_ENGINE_ID: constant(uint256) = 12
 LOOTBOX_ID: constant(uint256) = 15
 
 

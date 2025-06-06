@@ -29,7 +29,7 @@ def test_ripe_hq_and_tokens_setup(
 
     # registry
     assert ripe_hq.registryChangeTimeLock() != 0
-    assert ripe_hq.getNumAddrs() == 19
+    assert ripe_hq.getNumAddrs() == 20
 
     # governance
     assert ripe_hq.governance() == governance.address

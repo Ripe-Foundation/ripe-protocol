@@ -3,7 +3,7 @@
 interface HumanResources:
     def transferContributorRipeTokens(_owner: address, _lockDuration: uint256) -> uint256: nonpayable
     def refundAfterCancelPaycheck(_amount: uint256, _shouldBurnPosition: bool): nonpayable
-    def cashCheck(_amount: uint256, _lockDuration: uint256) -> bool: nonpayable
+    def cashRipeCheck(_amount: uint256, _lockDuration: uint256) -> bool: nonpayable
     def hasRipeBalance(_contributor: address) -> bool: view
 
 interface RipeGovernance:
@@ -189,7 +189,7 @@ def _cashRipeCheck(
         return 0 # can fail gracefully
 
     # mint ripe, stake in Ripe Gov Vault
-    assert extcall HumanResources(_hr).cashCheck(amount, self.depositLockDuration) # dev: could not cash check
+    assert extcall HumanResources(_hr).cashRipeCheck(amount, self.depositLockDuration) # dev: could not cash check
     self.totalClaimed += amount
 
     log RipeCheckCashed(owner=_owner, cashedBy=_caller, amount=amount)
@@ -206,11 +206,11 @@ def _cashRipeCheck(
 def initiateRipeTransfer(_shouldCashCheck: bool = True):
     assert not self.isFrozen # dev: contract frozen
 
-    hr: address = self._getHrAddr()
     owner: address = self.owner
-    assert msg.sender in [owner, self.manager, hr] # dev: no perms
+    assert msg.sender in [owner, self.manager] # dev: no perms
 
     # cash latest paycheck (doing this first)
+    hr: address = self._getHrAddr()
     if _shouldCashCheck:
         self._cashRipeCheck(owner, msg.sender, hr)
 
@@ -235,8 +235,7 @@ def confirmRipeTransfer(_shouldCashCheck: bool = True):
     assert not self.isFrozen # dev: contract frozen
 
     owner: address = self.owner
-    hr: address = self._getHrAddr()
-    assert msg.sender in [owner, self.manager, hr] # dev: no perms
+    assert msg.sender in [owner, self.manager] # dev: no perms
 
     # validation
     assert not self._hasPendingOwnerChange() # dev: cannot do with pending ownership change
@@ -244,6 +243,7 @@ def confirmRipeTransfer(_shouldCashCheck: bool = True):
     assert pending.confirmBlock != 0 and block.number >= pending.confirmBlock # dev: time delay not reached
 
     # cash latest paycheck
+    hr: address = self._getHrAddr()
     if _shouldCashCheck:
         self._cashRipeCheck(owner, msg.sender, hr)
 

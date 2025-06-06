@@ -148,6 +148,11 @@ fungLiqUsers: public(HashMap[uint256, address]) # index -> liq user
 indexOfFungLiqUser: public(HashMap[address, uint256]) # liq user -> index
 numFungLiqUsers: public(uint256) # num liq users
 
+# hr contributors
+contributors: public(HashMap[uint256, address]) # index -> contributor addr
+indexOfContributor: public(HashMap[address, uint256]) # contributor -> index
+numContributors: public(uint256) # num contributors
+
 
 @deploy
 def __init__(_ripeHq: address, _ripeAvailForRewards: uint256):
@@ -675,3 +680,30 @@ def getFungibleAuctionDuringPurchase(_liqUser: address, _vaultId: uint256, _asse
 @external
 def hasFungibleAuction(_liqUser: address, _vaultId: uint256, _asset: address) -> bool:
     return self.fungibleAuctionIndex[_liqUser][_vaultId][_asset] != 0
+
+
+###################
+# Human Resources #
+###################
+
+
+@view
+@external
+def isHrContributor(_contributor: address) -> bool:
+    return self.indexOfContributor[_contributor] != 0
+
+
+@external
+def addHrContributor(_contributor: address):
+    assert msg.sender == addys._getHumanResourcesAddr() # dev: only hr allowed
+    assert not deptBasics.isPaused # dev: not activated
+
+    if self.indexOfContributor[_contributor] != 0:
+        return
+
+    uid: uint256 = self.numContributors
+    if uid == 0:
+        uid = 1
+    self.contributors[uid] = _contributor
+    self.indexOfContributor[_contributor] = uid
+    self.numContributors = uid + 1

@@ -233,7 +233,7 @@ HUNDRED_PERCENT: constant(uint256) = 100_00 # 100%
 GREEN_TOKEN_ID: constant(uint256) = 1
 SAVINGS_GREEN_ID: constant(uint256) = 2
 MISSION_CONTROL_ID: constant(uint256) = 5
-VAULT_BOOK_ID: constant(uint256) = 8
+VAULT_BOOK_ID: constant(uint256) = 7
 SWITCHBOARD_ONE_ID: constant(uint256) = 17
 
 
