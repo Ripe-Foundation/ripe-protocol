@@ -69,6 +69,11 @@ event RipeGovVaultTransfer:
     isFromUserDepleted: bool
     transferShares: uint256
 
+event RipeTokensTransferred:
+    fromUser: indexed(address)
+    toUser: indexed(address)
+    amount: uint256
+
 event LockModified:
     user: indexed(address)
     asset: indexed(address)
@@ -274,7 +279,8 @@ def transferBalanceWithinVault(
     transferAmount, transferShares, isFromUserDepleted = sharesVault._transferBalanceWithinVault(_asset, _fromUser, _toUser, _transferAmount)
 
     # handle gov data/points
-    self._handleGovDataOnTransfer(_fromUser, _toUser, _asset, transferShares, False, a.missionControl, a.boardroom)
+    config: RipeGovVaultConfig = staticcall MissionControl(a.missionControl).ripeGovVaultConfig(_asset)
+    self._handleGovDataOnTransfer(_fromUser, _toUser, _asset, transferShares, config.lockTerms.minLockDuration, False, config, a.missionControl, a.boardroom)
 
     log RipeGovVaultTransfer(fromUser=_fromUser, toUser=_toUser, asset=_asset, transferAmount=transferAmount, isFromUserDepleted=isFromUserDepleted, transferShares=transferShares)
     return transferAmount, isFromUserDepleted
@@ -286,23 +292,52 @@ def _handleGovDataOnTransfer(
     _toUser: address,
     _asset: address,
     _transferShares: uint256,
+    _lockDuration: uint256,
     _shouldTransferPoints: bool,
+    _config: RipeGovVaultConfig,
     _missionControl: address,
     _boardroom: address,
 ):
-    config: RipeGovVaultConfig = staticcall MissionControl(_missionControl).ripeGovVaultConfig(_asset)
-
     # from user
-    transferPoints: uint256 = self._handleGovDataOnWithdrawal(_fromUser, _asset, _transferShares, False, config)
+    transferPoints: uint256 = self._handleGovDataOnWithdrawal(_fromUser, _asset, _transferShares, False, _config)
     if not _shouldTransferPoints:
         transferPoints = 0
 
     # to user
-    self._handleGovDataOnDeposit(_toUser, _asset, _transferShares, config.lockTerms.minLockDuration, transferPoints, config)
+    self._handleGovDataOnDeposit(_toUser, _asset, _transferShares, _lockDuration, transferPoints, _config)
 
     # update other gov points / boardroom
     self._updateUserGovPoints(_fromUser, _asset, _missionControl, _boardroom)
     self._updateUserGovPoints(_toUser, _asset, _missionControl, _boardroom)
+
+
+# transfer contributor tokens
+
+
+@external
+def transferContributorRipeTokens(
+    _contributor: address,
+    _toUser: address,
+    _lockDuration: uint256,
+    _a: addys.Addys = empty(addys.Addys),
+) -> uint256:
+    assert msg.sender == addys._getHumanResourcesAddr() # dev: not allowed
+    a: addys.Addys = addys._getAddys(_a)
+
+    # config
+    config: RipeGovVaultConfig = staticcall MissionControl(a.missionControl).ripeGovVaultConfig(a.ripeToken)
+
+    # transfer tokens (using shares module)
+    ripeAmount: uint256 = 0
+    transferShares: uint256 = 0
+    na: bool = False
+    ripeAmount, transferShares, na = sharesVault._transferBalanceWithinVault(a.ripeToken, _contributor, _toUser, max_value(uint256))
+
+    # handle gov data/points
+    self._handleGovDataOnTransfer(_contributor, _toUser, a.ripeToken, transferShares, _lockDuration, True, config, a.missionControl, a.boardroom)
+
+    log RipeTokensTransferred(fromUser=_contributor, toUser=_toUser, amount=ripeAmount)
+    return ripeAmount
 
 
 ####################

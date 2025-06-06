@@ -12,16 +12,17 @@ struct Addys:
     ripeToken: address
     ledger: address
     missionControl: address
+    humanResources: address
     priceDesk: address
     vaultBook: address
     auctionHouse: address
     auctionHouseNft: address
+    boardroom: address
     bondRoom: address
     creditEngine: address
     endaoment: address
     lootbox: address
     teller: address
-    boardroom: address
     switchboardOne: address
     switchboardTwo: address
     switchboardThree: address
@@ -35,19 +36,20 @@ SAVINGS_GREEN_ID: constant(uint256) = 2
 RIPE_TOKEN_ID: constant(uint256) = 3
 LEDGER_ID: constant(uint256) = 4
 MISSION_CONTROL_ID: constant(uint256) = 5
-PRICE_DESK_ID: constant(uint256) = 6
-VAULT_BOOK_ID: constant(uint256) = 7
-AUCTION_HOUSE_ID: constant(uint256) = 8
-AUCTION_HOUSE_NFT_ID: constant(uint256) = 9
-BOND_ROOM_ID: constant(uint256) = 10
-CREDIT_ENGINE_ID: constant(uint256) = 11
-ENDAOMENT_ID: constant(uint256) = 12
-LOOTBOX_ID: constant(uint256) = 13
-TELLER_ID: constant(uint256) = 14
-BOARDROOM_ID: constant(uint256) = 15
-SWITCHBOARD_ONE_ID: constant(uint256) = 16
-SWITCHBOARD_TWO_ID: constant(uint256) = 17
-SWITCHBOARD_THREE_ID: constant(uint256) = 18
+HUMAN_RESOURCES_ID: constant(uint256) = 6
+PRICE_DESK_ID: constant(uint256) = 7
+VAULT_BOOK_ID: constant(uint256) = 8
+AUCTION_HOUSE_ID: constant(uint256) = 9
+AUCTION_HOUSE_NFT_ID: constant(uint256) = 10
+BOARDROOM_ID: constant(uint256) = 11
+BOND_ROOM_ID: constant(uint256) = 12
+CREDIT_ENGINE_ID: constant(uint256) = 13
+ENDAOMENT_ID: constant(uint256) = 14
+LOOTBOX_ID: constant(uint256) = 15
+TELLER_ID: constant(uint256) = 16
+SWITCHBOARD_ONE_ID: constant(uint256) = 17
+SWITCHBOARD_TWO_ID: constant(uint256) = 18
+SWITCHBOARD_THREE_ID: constant(uint256) = 19
 
 
 @deploy
@@ -86,16 +88,17 @@ def _generateAddys() -> Addys:
         ripeToken=staticcall RipeHq(hq).getAddr(RIPE_TOKEN_ID),
         ledger=staticcall RipeHq(hq).getAddr(LEDGER_ID),
         missionControl=staticcall RipeHq(hq).getAddr(MISSION_CONTROL_ID),
+        humanResources=staticcall RipeHq(hq).getAddr(HUMAN_RESOURCES_ID),
         priceDesk=staticcall RipeHq(hq).getAddr(PRICE_DESK_ID),
         vaultBook=staticcall RipeHq(hq).getAddr(VAULT_BOOK_ID),
         auctionHouse=staticcall RipeHq(hq).getAddr(AUCTION_HOUSE_ID),
         auctionHouseNft=staticcall RipeHq(hq).getAddr(AUCTION_HOUSE_NFT_ID),
+        boardroom=staticcall RipeHq(hq).getAddr(BOARDROOM_ID),
         bondRoom=staticcall RipeHq(hq).getAddr(BOND_ROOM_ID),
         creditEngine=staticcall RipeHq(hq).getAddr(CREDIT_ENGINE_ID),
         endaoment=staticcall RipeHq(hq).getAddr(ENDAOMENT_ID),
         lootbox=staticcall RipeHq(hq).getAddr(LOOTBOX_ID),
         teller=staticcall RipeHq(hq).getAddr(TELLER_ID),
-        boardroom=staticcall RipeHq(hq).getAddr(BOARDROOM_ID),
         switchboardOne=staticcall RipeHq(hq).getAddr(SWITCHBOARD_ONE_ID),
         switchboardTwo=staticcall RipeHq(hq).getAddr(SWITCHBOARD_TWO_ID),
         switchboardThree=staticcall RipeHq(hq).getAddr(SWITCHBOARD_THREE_ID),
@@ -158,6 +161,11 @@ def _getRipeToken() -> address:
     return staticcall RipeHq(RIPE_HQ_FOR_ADDYS).getAddr(RIPE_TOKEN_ID)
 
 
+###############
+# Departments #
+###############
+
+
 # ledger
 
 
@@ -186,6 +194,21 @@ def _getMissionControlId() -> uint256:
 @internal
 def _getMissionControlAddr() -> address:
     return staticcall RipeHq(RIPE_HQ_FOR_ADDYS).getAddr(MISSION_CONTROL_ID)
+
+
+# human resources
+
+
+@view
+@internal
+def _getHumanResourcesId() -> uint256:
+    return HUMAN_RESOURCES_ID
+
+
+@view
+@internal
+def _getHumanResourcesAddr() -> address:
+    return staticcall RipeHq(RIPE_HQ_FOR_ADDYS).getAddr(HUMAN_RESOURCES_ID)
 
 
 # price desk
@@ -246,6 +269,21 @@ def _getAuctionHouseNftId() -> uint256:
 @internal
 def _getAuctionHouseNftAddr() -> address:
     return staticcall RipeHq(RIPE_HQ_FOR_ADDYS).getAddr(AUCTION_HOUSE_NFT_ID)
+
+
+# boardroom
+
+
+@view
+@internal
+def _getBoardroomId() -> uint256:
+    return BOARDROOM_ID
+
+
+@view
+@internal
+def _getBoardroomAddr() -> address:
+    return staticcall RipeHq(RIPE_HQ_FOR_ADDYS).getAddr(BOARDROOM_ID)
 
 
 # bond room
@@ -321,21 +359,6 @@ def _getTellerId() -> uint256:
 @internal
 def _getTellerAddr() -> address:
     return staticcall RipeHq(RIPE_HQ_FOR_ADDYS).getAddr(TELLER_ID)
-
-
-# boardroom
-
-
-@view
-@internal
-def _getBoardroomId() -> uint256:
-    return BOARDROOM_ID
-
-
-@view
-@internal
-def _getBoardroomAddr() -> address:
-    return staticcall RipeHq(RIPE_HQ_FOR_ADDYS).getAddr(BOARDROOM_ID)
 
 
 # switchboard one

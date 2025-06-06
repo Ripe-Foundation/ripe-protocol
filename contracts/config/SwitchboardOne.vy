@@ -397,8 +397,8 @@ UNDERSCORE_AGENT_FACTORY_ID: constant(uint256) = 1
 HUNDRED_PERCENT: constant(uint256) = 100_00 # 100%
 
 MISSION_CONTROL_ID: constant(uint256) = 5
-PRICE_DESK_ID: constant(uint256) = 6
-VAULT_BOOK_ID: constant(uint256) = 7
+PRICE_DESK_ID: constant(uint256) = 7
+VAULT_BOOK_ID: constant(uint256) = 8
 
 
 @deploy
