@@ -892,697 +892,585 @@ def test_loot_claim_borrow_zero_rewards(
     assert up.points > 0  # Points should still accumulate even with no rewards
 
 
-# ######################################
-# # Auto-Staking Tests for Ripe Claims #
-# ######################################
+# auto-staking ripe claims
 
 
-# def test_debug_auto_staking_setup(
-#     bob,
-#     setGeneralConfig,
-#     setAssetConfig,
-#     setRipeRewardsConfig,
-#     performDeposit,
-#     simple_erc20_vault,
-#     vault_book,
-#     lootbox,
-#     teller,
-#     ripe_token,
-#     alpha_token,
-#     alpha_token_whale,
-#     mission_control,
-#     switchboard_one,
-#     ripe_gov_vault,
-# ):
-#     """Debug test to check auto-staking setup step by step"""
-#     print(f"RipeGov vault address: {ripe_gov_vault.address}")
-#     print(f"Ripe token address: {ripe_token.address}")
+def test_loot_claim_no_auto_staking(
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    setRipeRewardsConfig,
+    performDeposit,
+    simple_erc20_vault,
+    vault_book,
+    lootbox,
+    teller,
+    ripe_token,
+    alpha_token,
+    alpha_token_whale,
+    mission_control,
+    switchboard_one,
+    ripe_gov_vault,
+):
+    """Test that with autoStakeRatio=0, all rewards go directly to user"""
+    # Setup with no auto-staking
+    setGeneralConfig()
+    setAssetConfig(alpha_token)
+    setRipeRewardsConfig(_autoStakeRatio=0, _autoStakeDurationRatio=0)
     
-#     # Check vault book registration
-#     ripe_gov_vault_id = vault_book.getRegId(ripe_gov_vault.address)
-#     print(f"RipeGov vault registered at ID: {ripe_gov_vault_id}")
+    # Configure RipeGov vault for ripe token
+    mission_control.setRipeGovVaultConfig(
+        ripe_token,
+        100_00,  # 100% asset weight
+        (86400, 2592000, 200_00, True, 5_00),  # 1 day min, 30 days max, 200% boost, can exit, 5% fee
+        sender=switchboard_one.address
+    )
+
+    # Setup deposit to earn rewards
+    performDeposit(bob, 100 * EIGHTEEN_DECIMALS, alpha_token, alpha_token_whale)
+    vault_id = vault_book.getRegId(simple_erc20_vault)
     
-#     # Setup with no auto-staking first to test basic claim
-#     setGeneralConfig()
-#     setAssetConfig(alpha_token)
-#     setRipeRewardsConfig(_autoStakeRatio=0, _autoStakeDurationRatio=0)
+    # Accumulate rewards
+    boa.env.time_travel(blocks=20)
+    lootbox.updateDepositPoints(bob, vault_id, simple_erc20_vault, alpha_token, sender=teller.address)
+
+    # Record balances before claim
+    initial_wallet_balance = ripe_token.balanceOf(bob)
+    initial_vault_balance = ripe_gov_vault.getTotalAmountForUser(bob, ripe_token)
+
+    # Claim loot without staking
+    total_ripe = teller.claimLoot(bob, False, sender=bob)
+    assert total_ripe > 0
+
+    # Verify all rewards went to wallet, none to vault
+    final_wallet_balance = ripe_token.balanceOf(bob)
+    final_vault_balance = ripe_gov_vault.getTotalAmountForUser(bob, ripe_token)
     
-#     # Setup deposit to earn rewards
-#     performDeposit(bob, 100 * EIGHTEEN_DECIMALS, alpha_token, alpha_token_whale)
-#     vault_id = vault_book.getRegId(simple_erc20_vault)
+    assert final_wallet_balance == initial_wallet_balance + total_ripe
+    assert final_vault_balance == initial_vault_balance  # No change in vault
+
+
+def test_loot_claim_full_auto_staking(
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    setRipeRewardsConfig,
+    performDeposit,
+    simple_erc20_vault,
+    vault_book,
+    lootbox,
+    teller,
+    ripe_token,
+    alpha_token,
+    alpha_token_whale,
+    mission_control,
+    switchboard_one,
+    ripe_gov_vault,
+    _test,
+):
+    """Test that with autoStakeRatio=100%, all rewards get staked"""
+    # Setup with full auto-staking
+    setGeneralConfig()
+    setAssetConfig(alpha_token)
+    setAssetConfig(ripe_token, _vaultIds=[2])  # Configure ripe token for vault 2
+    setRipeRewardsConfig(_autoStakeRatio=100_00, _autoStakeDurationRatio=50_00)  # 100% stake, 50% duration
     
-#     # Accumulate rewards
-#     boa.env.time_travel(blocks=20)
-#     lootbox.updateDepositPoints(bob, vault_id, simple_erc20_vault, alpha_token, sender=teller.address)
+    # Configure RipeGov vault for ripe token
+    mission_control.setRipeGovVaultConfig(
+        ripe_token,
+        100_00,  # 100% asset weight
+        (86400, 2592000, 200_00, True, 5_00),  # 1 day min, 30 days max, 200% boost, can exit, 5% fee
+        sender=switchboard_one.address
+    )
 
-#     # Test basic claim without auto-staking (should work)
-#     total_ripe = teller.claimLoot(bob, False, sender=bob)
-#     print(f"Basic claim (no auto-staking) returned: {total_ripe}")
-#     assert total_ripe > 0
-#     assert ripe_token.balanceOf(bob) == total_ripe
-
-
-# def test_loot_claim_no_auto_staking(
-#     bob,
-#     setGeneralConfig,
-#     setAssetConfig,
-#     setRipeRewardsConfig,
-#     performDeposit,
-#     simple_erc20_vault,
-#     vault_book,
-#     lootbox,
-#     teller,
-#     ripe_token,
-#     alpha_token,
-#     alpha_token_whale,
-#     mission_control,
-#     switchboard_one,
-#     ripe_gov_vault,
-# ):
-#     """Test that with autoStakeRatio=0, all rewards go directly to user"""
-#     # Setup with no auto-staking
-#     setGeneralConfig()
-#     setAssetConfig(alpha_token)
-#     setRipeRewardsConfig(_autoStakeRatio=0, _autoStakeDurationRatio=0)
+    # Setup deposit to earn rewards
+    performDeposit(bob, 100 * EIGHTEEN_DECIMALS, alpha_token, alpha_token_whale)
+    vault_id = vault_book.getRegId(simple_erc20_vault)
     
-#     # Configure RipeGov vault for ripe token
-#     mission_control.setRipeGovVaultConfig(
-#         ripe_token.address,
-#         100_00,  # 100% asset weight
-#         (86400, 2592000, 200_00, True, 5_00),  # 1 day min, 30 days max, 200% boost, can exit, 5% fee
-#         sender=switchboard_one.address
-#     )
+    # Accumulate rewards
+    boa.env.time_travel(blocks=20)
+    lootbox.updateDepositPoints(bob, vault_id, simple_erc20_vault, alpha_token, sender=teller.address)
 
-#     # Setup deposit to earn rewards
-#     performDeposit(bob, 100 * EIGHTEEN_DECIMALS, alpha_token, alpha_token_whale)
-#     vault_id = vault_book.getRegId(simple_erc20_vault)
+    # Record balances before claim
+    initial_wallet_balance = ripe_token.balanceOf(bob)
+    initial_vault_balance = ripe_gov_vault.getTotalAmountForUser(bob, ripe_token)
+
+    # Claim loot without explicit staking (auto-staking should kick in)
+    total_ripe = teller.claimLoot(bob, False, sender=bob)
+    assert total_ripe > 0
+
+    # Verify all rewards went to vault, none to wallet
+    final_wallet_balance = ripe_token.balanceOf(bob)
+    final_vault_balance = ripe_gov_vault.getTotalAmountForUser(bob, ripe_token)
     
-#     # Accumulate rewards
-#     boa.env.time_travel(blocks=20)
-#     lootbox.updateDepositPoints(bob, vault_id, simple_erc20_vault, alpha_token, sender=teller.address)
+    assert final_wallet_balance == initial_wallet_balance  # No change in wallet
+    assert final_vault_balance > initial_vault_balance  # Increased vault balance
+    _test(final_vault_balance, initial_vault_balance + total_ripe)
 
-#     # Record balances before claim
-#     initial_wallet_balance = ripe_token.balanceOf(bob)
-#     initial_vault_balance = ripe_gov_vault.getTotalAmountForUser(bob, ripe_token)
-
-#     # Claim loot without staking
-#     total_ripe = teller.claimLoot(bob, False, sender=bob)
-#     assert total_ripe > 0
-
-#     # Verify all rewards went to wallet, none to vault
-#     final_wallet_balance = ripe_token.balanceOf(bob)
-#     final_vault_balance = ripe_gov_vault.getTotalAmountForUser(bob, ripe_token)
+    # Verify the lock duration was calculated correctly
+    # Expected: 50% of (30 days - 1 day) = 50% of 29 days = ~14.5 days = ~1,252,800 blocks
+    userData = ripe_gov_vault.userGovData(bob, ripe_token)
+    expected_duration_range = 2592000 - 86400  # max - min
+    expected_lock_duration = expected_duration_range * 50_00 // 100_00  # 50% of range
+    _test(expected_lock_duration, userData.unlock)
     
-#     assert final_wallet_balance == initial_wallet_balance + total_ripe
-#     assert final_vault_balance == initial_vault_balance  # No change in vault
 
-
-# def test_loot_claim_full_auto_staking(
-#     bob,
-#     setGeneralConfig,
-#     setAssetConfig,
-#     setRipeRewardsConfig,
-#     performDeposit,
-#     simple_erc20_vault,
-#     vault_book,
-#     lootbox,
-#     teller,
-#     ripe_token,
-#     alpha_token,
-#     alpha_token_whale,
-#     mission_control,
-#     switchboard_one,
-#     ripe_gov_vault,
-# ):
-#     """Test that with autoStakeRatio=100%, all rewards get staked"""
-#     # Setup with full auto-staking
-#     setGeneralConfig()
-#     setAssetConfig(alpha_token)
-#     setAssetConfig(ripe_token.address, _vaultIds=[2])  # Configure ripe token for vault 2
-#     setRipeRewardsConfig(_autoStakeRatio=100_00, _autoStakeDurationRatio=50_00)  # 100% stake, 50% duration
+def test_loot_claim_partial_auto_staking(
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    setRipeRewardsConfig,
+    performDeposit,
+    simple_erc20_vault,
+    vault_book,
+    lootbox,
+    teller,
+    ripe_token,
+    alpha_token,
+    alpha_token_whale,
+    mission_control,
+    switchboard_one,
+    ripe_gov_vault,
+    _test,
+):
+    """Test that with autoStakeRatio=60%, 60% gets staked and 40% sent to user"""
+    # Setup with partial auto-staking
+    setGeneralConfig()
+    setAssetConfig(alpha_token)
+    setAssetConfig(ripe_token, _vaultIds=[2])  # Configure ripe token for vault 2
+    setRipeRewardsConfig(_autoStakeRatio=60_00, _autoStakeDurationRatio=25_00)  # 60% stake, 25% duration
     
-#     # Configure RipeGov vault for ripe token
-#     mission_control.setRipeGovVaultConfig(
-#         ripe_token.address,
-#         100_00,  # 100% asset weight
-#         (86400, 2592000, 200_00, True, 5_00),  # 1 day min, 30 days max, 200% boost, can exit, 5% fee
-#         sender=switchboard_one.address
-#     )
+    # Configure RipeGov vault for ripe token
+    mission_control.setRipeGovVaultConfig(
+        ripe_token,
+        100_00,  # 100% asset weight
+        (100, 1000, 100_00, False, 0),  # 100 min, 1000 max, 100% boost, cannot exit, 0% fee
+        sender=switchboard_one.address
+    )
 
-#     # Setup deposit to earn rewards
-#     performDeposit(bob, 100 * EIGHTEEN_DECIMALS, alpha_token, alpha_token_whale)
-#     vault_id = vault_book.getRegId(simple_erc20_vault)
+    # Setup deposit to earn rewards
+    performDeposit(bob, 100 * EIGHTEEN_DECIMALS, alpha_token, alpha_token_whale)
+    vault_id = vault_book.getRegId(simple_erc20_vault)
     
-#     # Accumulate rewards
-#     boa.env.time_travel(blocks=20)
-#     lootbox.updateDepositPoints(bob, vault_id, simple_erc20_vault, alpha_token, sender=teller.address)
+    # Accumulate rewards
+    boa.env.time_travel(blocks=20)
+    lootbox.updateDepositPoints(bob, vault_id, simple_erc20_vault, alpha_token, sender=teller.address)
 
-#     # Record balances before claim
-#     initial_wallet_balance = ripe_token.balanceOf(bob)
-#     initial_vault_balance = ripe_gov_vault.getTotalAmountForUser(bob, ripe_token)
+    # Record balances before claim
+    initial_wallet_balance = ripe_token.balanceOf(bob)
+    initial_vault_balance = ripe_gov_vault.getTotalAmountForUser(bob, ripe_token)
 
-#     # Claim loot without explicit staking (auto-staking should kick in)
-#     total_ripe = teller.claimLoot(bob, False, sender=bob)
-#     assert total_ripe > 0
+    # Claim loot without explicit staking
+    total_ripe = teller.claimLoot(bob, False, sender=bob)
+    assert total_ripe > 0
 
-#     # Verify all rewards went to vault, none to wallet
-#     final_wallet_balance = ripe_token.balanceOf(bob)
-#     final_vault_balance = ripe_gov_vault.getTotalAmountForUser(bob, ripe_token)
+    # Verify correct split between wallet and vault
+    final_wallet_balance = ripe_token.balanceOf(bob)
+    final_vault_balance = ripe_gov_vault.getTotalAmountForUser(bob, ripe_token)
     
-#     assert final_wallet_balance == initial_wallet_balance  # No change in wallet
-#     assert final_vault_balance > initial_vault_balance  # Increased vault balance
-
-#     # Verify the lock duration was calculated correctly
-#     # Expected: 50% of (30 days - 1 day) = 50% of 29 days = ~14.5 days = ~1,252,800 blocks
-#     userData = ripe_gov_vault.userGovData(bob, ripe_token)
-#     expected_duration_range = 2592000 - 86400  # max - min
-#     expected_lock_duration = expected_duration_range * 50_00 // 100_00  # 50% of range
+    expected_staked = total_ripe * 60_00 // 100_00  # 60% staked
+    expected_to_wallet = total_ripe - expected_staked  # 40% to wallet
     
-#     # Lock should be set to current block + calculated duration
-#     current_block = boa.env.vm.state.block_number
-#     assert userData.unlock > current_block
-#     assert userData.unlock <= current_block + expected_lock_duration + 86400  # Allow some buffer
-
-
-# def test_loot_claim_partial_auto_staking(
-#     bob,
-#     setGeneralConfig,
-#     setAssetConfig,
-#     setRipeRewardsConfig,
-#     performDeposit,
-#     simple_erc20_vault,
-#     vault_book,
-#     lootbox,
-#     teller,
-#     ripe_token,
-#     alpha_token,
-#     alpha_token_whale,
-#     mission_control,
-#     switchboard_one,
-#     ripe_gov_vault,
-#     _test,
-# ):
-#     """Test that with autoStakeRatio=60%, 60% gets staked and 40% sent to user"""
-#     # Setup with partial auto-staking
-#     setGeneralConfig()
-#     setAssetConfig(alpha_token)
-#     setAssetConfig(ripe_token.address, _vaultIds=[2])  # Configure ripe token for vault 2
-#     setRipeRewardsConfig(_autoStakeRatio=60_00, _autoStakeDurationRatio=25_00)  # 60% stake, 25% duration
+    actual_to_wallet = final_wallet_balance - initial_wallet_balance
+    actual_vault_increase = final_vault_balance - initial_vault_balance
     
-#     # Configure RipeGov vault for ripe token
-#     mission_control.setRipeGovVaultConfig(
-#         ripe_token.address,
-#         100_00,  # 100% asset weight
-#         (100, 1000, 100_00, False, 0),  # 100 min, 1000 max, 100% boost, cannot exit, 0% fee
-#         sender=switchboard_one.address
-#     )
+    # Use _test for approximate comparisons (allowing small rounding differences)
+    _test(expected_to_wallet, actual_to_wallet)
+    _test(expected_staked, actual_vault_increase)
 
-#     # Setup deposit to earn rewards
-#     performDeposit(bob, 100 * EIGHTEEN_DECIMALS, alpha_token, alpha_token_whale)
-#     vault_id = vault_book.getRegId(simple_erc20_vault)
+    # Verify the lock duration was calculated correctly
+    # Expected: 25% of (1000 - 100) = 25% of 900 = 225 blocks
+    userData = ripe_gov_vault.userGovData(bob, ripe_token)
+    expected_duration_range = 1000 - 100  # max - min
+    expected_lock_duration = expected_duration_range * 25_00 // 100_00  # 25% of range
     
-#     # Accumulate rewards
-#     boa.env.time_travel(blocks=20)
-#     lootbox.updateDepositPoints(bob, vault_id, simple_erc20_vault, alpha_token, sender=teller.address)
-
-#     # Record balances before claim
-#     initial_wallet_balance = ripe_token.balanceOf(bob)
-#     initial_vault_balance = ripe_gov_vault.getTotalAmountForUser(bob, ripe_token)
-
-#     # Claim loot without explicit staking
-#     total_ripe = teller.claimLoot(bob, False, sender=bob)
-#     assert total_ripe > 0
-
-#     # Verify correct split between wallet and vault
-#     final_wallet_balance = ripe_token.balanceOf(bob)
-#     final_vault_balance = ripe_gov_vault.getTotalAmountForUser(bob, ripe_token)
+    # Calculate the actual lock duration by looking at what was set
+    current_block = boa.env.evm.patch.block_number
+    actual_lock_duration = userData.unlock - current_block
     
-#     expected_staked = total_ripe * 60_00 // 100_00  # 60% staked
-#     expected_to_wallet = total_ripe - expected_staked  # 40% to wallet
+    # The lock duration should be exactly what we expect (225 blocks)
+    assert actual_lock_duration == expected_lock_duration
+
+
+def test_loot_claim_explicit_staking_overrides_auto(
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    setRipeRewardsConfig,
+    performDeposit,
+    simple_erc20_vault,
+    vault_book,
+    lootbox,
+    teller,
+    ripe_token,
+    alpha_token,
+    alpha_token_whale,
+    mission_control,
+    switchboard_one,
+    ripe_gov_vault,
+):
+    """Test that _shouldStake=True overrides autoStakeRatio and stakes everything"""
+    # Setup with low auto-staking
+    setGeneralConfig()
+    setAssetConfig(alpha_token)
+    setAssetConfig(ripe_token.address, _vaultIds=[2])  # Configure ripe token for vault 2
+    setRipeRewardsConfig(_autoStakeRatio=20_00, _autoStakeDurationRatio=30_00)  # Only 20% auto-stake
     
-#     actual_to_wallet = final_wallet_balance - initial_wallet_balance
-#     actual_vault_increase = final_vault_balance - initial_vault_balance
+    # Configure RipeGov vault for ripe token
+    mission_control.setRipeGovVaultConfig(
+        ripe_token.address,
+        100_00,  # 100% asset weight
+        (100, 1000, 100_00, False, 0),  # 100 min, 1000 max, 100% boost, cannot exit, 0% fee
+        sender=switchboard_one.address
+    )
+
+    # Setup deposit to earn rewards
+    performDeposit(bob, 100 * EIGHTEEN_DECIMALS, alpha_token, alpha_token_whale)
+    vault_id = vault_book.getRegId(simple_erc20_vault)
     
-#     # Use _test for approximate comparisons (allowing small rounding differences)
-#     _test(expected_to_wallet, actual_to_wallet)
-#     _test(expected_staked, actual_vault_increase)
+    # Accumulate rewards
+    boa.env.time_travel(blocks=20)
+    lootbox.updateDepositPoints(bob, vault_id, simple_erc20_vault, alpha_token, sender=teller.address)
 
-#     # Verify the lock duration was calculated correctly
-#     # Expected: 25% of (1000 - 100) = 25% of 900 = 225 blocks
-#     userData = ripe_gov_vault.userGovData(bob, ripe_token)
-#     expected_duration_range = 1000 - 100  # max - min
-#     expected_lock_duration = expected_duration_range * 25_00 // 100_00  # 25% of range
+    # Record balances before claim
+    initial_wallet_balance = ripe_token.balanceOf(bob)
+    initial_vault_balance = ripe_gov_vault.getTotalAmountForUser(bob, ripe_token)
+
+    # Claim loot WITH explicit staking - should override autoStakeRatio
+    total_ripe = teller.claimLoot(bob, True, sender=bob)  # _shouldStake=True
+    assert total_ripe > 0
+
+    # Verify ALL rewards went to vault (despite low autoStakeRatio)
+    final_wallet_balance = ripe_token.balanceOf(bob)
+    final_vault_balance = ripe_gov_vault.getTotalAmountForUser(bob, ripe_token)
     
-#     current_block = boa.env.vm.state.block_number
-#     expected_unlock = current_block + expected_lock_duration
-#     assert userData.unlock == expected_unlock
+    assert final_wallet_balance == initial_wallet_balance  # No change in wallet
+    assert final_vault_balance > initial_vault_balance  # All rewards went to vault
 
 
-# def test_loot_claim_explicit_staking_overrides_auto(
-#     bob,
-#     setGeneralConfig,
-#     setAssetConfig,
-#     setRipeRewardsConfig,
-#     performDeposit,
-#     simple_erc20_vault,
-#     vault_book,
-#     lootbox,
-#     teller,
-#     ripe_token,
-#     alpha_token,
-#     alpha_token_whale,
-#     mission_control,
-#     switchboard_one,
-#     ripe_gov_vault,
-# ):
-#     """Test that _shouldStake=True overrides autoStakeRatio and stakes everything"""
-#     # Setup with low auto-staking
-#     setGeneralConfig()
-#     setAssetConfig(alpha_token)
-#     setAssetConfig(ripe_token.address, _vaultIds=[2])  # Configure ripe token for vault 2
-#     setRipeRewardsConfig(_autoStakeRatio=20_00, _autoStakeDurationRatio=30_00)  # Only 20% auto-stake
+def test_loot_claim_zero_lock_duration_range(
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    setRipeRewardsConfig,
+    performDeposit,
+    simple_erc20_vault,
+    vault_book,
+    lootbox,
+    teller,
+    ripe_token,
+    alpha_token,
+    alpha_token_whale,
+    mission_control,
+    switchboard_one,
+    ripe_gov_vault,
+):
+    """Test that when min=max lock duration, vault still enforces minimum lock duration"""
+    # Setup with auto-staking but zero duration range
+    setGeneralConfig()
+    setAssetConfig(alpha_token)
+    setAssetConfig(ripe_token.address, _vaultIds=[2])  # Configure ripe token for vault 2
+    setRipeRewardsConfig(_autoStakeRatio=100_00, _autoStakeDurationRatio=50_00)
     
-#     # Configure RipeGov vault for ripe token
-#     mission_control.setRipeGovVaultConfig(
-#         ripe_token.address,
-#         100_00,  # 100% asset weight
-#         (100, 1000, 100_00, False, 0),  # 100 min, 1000 max, 100% boost, cannot exit, 0% fee
-#         sender=switchboard_one.address
-#     )
+    # Configure RipeGov vault with same min/max lock duration
+    mission_control.setRipeGovVaultConfig(
+        ripe_token.address,
+        100_00,  # 100% asset weight
+        (500, 500, 200_00, True, 5_00),  # min = max = 500 blocks
+        sender=switchboard_one.address
+    )
 
-#     # Setup deposit to earn rewards
-#     performDeposit(bob, 100 * EIGHTEEN_DECIMALS, alpha_token, alpha_token_whale)
-#     vault_id = vault_book.getRegId(simple_erc20_vault)
+    # Setup deposit to earn rewards
+    performDeposit(bob, 100 * EIGHTEEN_DECIMALS, alpha_token, alpha_token_whale)
+    vault_id = vault_book.getRegId(simple_erc20_vault)
     
-#     # Accumulate rewards
-#     boa.env.time_travel(blocks=20)
-#     lootbox.updateDepositPoints(bob, vault_id, simple_erc20_vault, alpha_token, sender=teller.address)
+    # Accumulate rewards
+    boa.env.time_travel(blocks=20)
+    lootbox.updateDepositPoints(bob, vault_id, simple_erc20_vault, alpha_token, sender=teller.address)
 
-#     # Record balances before claim
-#     initial_wallet_balance = ripe_token.balanceOf(bob)
-#     initial_vault_balance = ripe_gov_vault.getTotalAmountForUser(bob, ripe_token)
+    # Claim loot
+    total_ripe = teller.claimLoot(bob, False, sender=bob)
+    assert total_ripe > 0
 
-#     # Claim loot WITH explicit staking - should override autoStakeRatio
-#     total_ripe = teller.claimLoot(bob, True, sender=bob)  # _shouldStake=True
-#     assert total_ripe > 0
+    # Verify tokens were staked with minimum lock duration (vault enforces minimum)
+    # When min=max, the vault still enforces the minimum lock duration for security
+    userData = ripe_gov_vault.userGovData(bob, ripe_token)
+    current_block = boa.env.evm.patch.block_number
+    expected_unlock = current_block + 500  # Minimum lock duration of 500 blocks
+    assert userData.unlock == expected_unlock
 
-#     # Verify ALL rewards went to vault (despite low autoStakeRatio)
-#     final_wallet_balance = ripe_token.balanceOf(bob)
-#     final_vault_balance = ripe_gov_vault.getTotalAmountForUser(bob, ripe_token)
+
+def test_loot_claim_max_lock_duration_ratio(
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    setRipeRewardsConfig,
+    performDeposit,
+    simple_erc20_vault,
+    vault_book,
+    lootbox,
+    teller,
+    ripe_token,
+    alpha_token,
+    alpha_token_whale,
+    mission_control,
+    switchboard_one,
+    ripe_gov_vault,
+):
+    """Test that autoStakeDurationRatio=100% uses the full lock duration range"""
+    # Setup with auto-staking and max duration ratio
+    setGeneralConfig()
+    setAssetConfig(alpha_token)
+    setAssetConfig(ripe_token.address, _vaultIds=[2])  # Configure ripe token for vault 2
+    setRipeRewardsConfig(_autoStakeRatio=100_00, _autoStakeDurationRatio=100_00)  # Max duration
     
-#     assert final_wallet_balance == initial_wallet_balance  # No change in wallet
-#     assert final_vault_balance > initial_vault_balance  # All rewards went to vault
+    # Configure RipeGov vault
+    mission_control.setRipeGovVaultConfig(
+        ripe_token.address,
+        100_00,  # 100% asset weight
+        (200, 1000, 200_00, True, 5_00),  # 200 min, 1000 max
+        sender=switchboard_one.address
+    )
 
-
-# def test_loot_claim_zero_lock_duration_range(
-#     bob,
-#     setGeneralConfig,
-#     setAssetConfig,
-#     setRipeRewardsConfig,
-#     performDeposit,
-#     simple_erc20_vault,
-#     vault_book,
-#     lootbox,
-#     teller,
-#     ripe_token,
-#     alpha_token,
-#     alpha_token_whale,
-#     mission_control,
-#     switchboard_one,
-#     ripe_gov_vault,
-# ):
-#     """Test that when min=max lock duration, lock duration is 0"""
-#     # Setup with auto-staking but zero duration range
-#     setGeneralConfig()
-#     setAssetConfig(alpha_token)
-#     setAssetConfig(ripe_token.address, _vaultIds=[2])  # Configure ripe token for vault 2
-#     setRipeRewardsConfig(_autoStakeRatio=100_00, _autoStakeDurationRatio=50_00)
+    # Setup deposit to earn rewards
+    performDeposit(bob, 100 * EIGHTEEN_DECIMALS, alpha_token, alpha_token_whale)
+    vault_id = vault_book.getRegId(simple_erc20_vault)
     
-#     # Configure RipeGov vault with same min/max lock duration
-#     mission_control.setRipeGovVaultConfig(
-#         ripe_token.address,
-#         100_00,  # 100% asset weight
-#         (500, 500, 200_00, True, 5_00),  # min = max = 500 blocks
-#         sender=switchboard_one.address
-#     )
+    # Accumulate rewards
+    boa.env.time_travel(blocks=20)
+    lootbox.updateDepositPoints(bob, vault_id, simple_erc20_vault, alpha_token, sender=teller.address)
 
-#     # Setup deposit to earn rewards
-#     performDeposit(bob, 100 * EIGHTEEN_DECIMALS, alpha_token, alpha_token_whale)
-#     vault_id = vault_book.getRegId(simple_erc20_vault)
+    # Claim loot
+    total_ripe = teller.claimLoot(bob, False, sender=bob)
+    assert total_ripe > 0
+
+    # Verify tokens were staked with maximum lock duration
+    userData = ripe_gov_vault.userGovData(bob, ripe_token)
+    expected_duration_range = 1000 - 200  # max - min = 800
+    expected_lock_duration = expected_duration_range  # 100% of range
     
-#     # Accumulate rewards
-#     boa.env.time_travel(blocks=20)
-#     lootbox.updateDepositPoints(bob, vault_id, simple_erc20_vault, alpha_token, sender=teller.address)
-
-#     # Claim loot
-#     total_ripe = teller.claimLoot(bob, False, sender=bob)
-#     assert total_ripe > 0
-
-#     # Verify tokens were staked with 0 lock duration (immediate unlock)
-#     userData = ripe_gov_vault.userGovData(bob, ripe_token)
-#     current_block = boa.env.vm.state.block_number
-#     assert userData.unlock == current_block  # No lock applied
+    current_block = boa.env.evm.patch.block_number
+    expected_unlock = current_block + expected_lock_duration
+    assert userData.unlock == expected_unlock
 
 
-# def test_loot_claim_max_lock_duration_ratio(
-#     bob,
-#     setGeneralConfig,
-#     setAssetConfig,
-#     setRipeRewardsConfig,
-#     performDeposit,
-#     simple_erc20_vault,
-#     vault_book,
-#     lootbox,
-#     teller,
-#     ripe_token,
-#     alpha_token,
-#     alpha_token_whale,
-#     mission_control,
-#     switchboard_one,
-#     ripe_gov_vault,
-# ):
-#     """Test that autoStakeDurationRatio=100% uses the full lock duration range"""
-#     # Setup with auto-staking and max duration ratio
-#     setGeneralConfig()
-#     setAssetConfig(alpha_token)
-#     setAssetConfig(ripe_token.address, _vaultIds=[2])  # Configure ripe token for vault 2
-#     setRipeRewardsConfig(_autoStakeRatio=100_00, _autoStakeDurationRatio=100_00)  # Max duration
+def test_loot_claim_zero_rewards_no_staking_calls(
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    setRipeRewardsConfig,
+    teller,
+    ripe_token,
+    alpha_token,
+    mission_control,
+    switchboard_one,
+    ripe_gov_vault,
+):
+    """Test that zero rewards don't trigger any staking operations"""
+    # Setup with auto-staking
+    setGeneralConfig()
+    setAssetConfig(alpha_token)
+    setAssetConfig(ripe_token.address, _vaultIds=[2])  # Configure ripe token for vault 2
+    setRipeRewardsConfig(_autoStakeRatio=100_00, _autoStakeDurationRatio=50_00)
     
-#     # Configure RipeGov vault
-#     mission_control.setRipeGovVaultConfig(
-#         ripe_token.address,
-#         100_00,  # 100% asset weight
-#         (200, 1000, 200_00, True, 5_00),  # 200 min, 1000 max
-#         sender=switchboard_one.address
-#     )
+    # Configure RipeGov vault
+    mission_control.setRipeGovVaultConfig(
+        ripe_token.address,
+        100_00,  # 100% asset weight
+        (100, 1000, 200_00, True, 5_00),
+        sender=switchboard_one.address
+    )
 
-#     # Setup deposit to earn rewards
-#     performDeposit(bob, 100 * EIGHTEEN_DECIMALS, alpha_token, alpha_token_whale)
-#     vault_id = vault_book.getRegId(simple_erc20_vault)
+    # Don't setup any deposits or debt - no rewards to claim
     
-#     # Accumulate rewards
-#     boa.env.time_travel(blocks=20)
-#     lootbox.updateDepositPoints(bob, vault_id, simple_erc20_vault, alpha_token, sender=teller.address)
+    # Record balances before claim
+    initial_wallet_balance = ripe_token.balanceOf(bob)
+    initial_vault_balance = ripe_gov_vault.getTotalAmountForUser(bob, ripe_token)
 
-#     # Claim loot
-#     total_ripe = teller.claimLoot(bob, False, sender=bob)
-#     assert total_ripe > 0
+    # Attempt to claim loot
+    total_ripe = teller.claimLoot(bob, False, sender=bob)
+    assert total_ripe == 0
 
-#     # Verify tokens were staked with maximum lock duration
-#     userData = ripe_gov_vault.userGovData(bob, ripe_token)
-#     expected_duration_range = 1000 - 200  # max - min = 800
-#     expected_lock_duration = expected_duration_range  # 100% of range
+    # Verify no changes occurred
+    final_wallet_balance = ripe_token.balanceOf(bob)
+    final_vault_balance = ripe_gov_vault.getTotalAmountForUser(bob, ripe_token)
     
-#     current_block = boa.env.vm.state.block_number
-#     expected_unlock = current_block + expected_lock_duration
-#     assert userData.unlock == expected_unlock
+    assert final_wallet_balance == initial_wallet_balance
+    assert final_vault_balance == initial_vault_balance
 
 
-# def test_loot_claim_zero_rewards_no_staking_calls(
-#     bob,
-#     setGeneralConfig,
-#     setAssetConfig,
-#     setRipeRewardsConfig,
-#     teller,
-#     ripe_token,
-#     alpha_token,
-#     mission_control,
-#     switchboard_one,
-#     ripe_gov_vault,
-# ):
-#     """Test that zero rewards don't trigger any staking operations"""
-#     # Setup with auto-staking
-#     setGeneralConfig()
-#     setAssetConfig(alpha_token)
-#     setAssetConfig(ripe_token.address, _vaultIds=[2])  # Configure ripe token for vault 2
-#     setRipeRewardsConfig(_autoStakeRatio=100_00, _autoStakeDurationRatio=50_00)
+def test_loot_claim_calculation_consistency_with_partial_auto_staking(
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    setRipeRewardsConfig,
+    performDeposit,
+    simple_erc20_vault,
+    vault_book,
+    lootbox,
+    teller,
+    ripe_token,
+    alpha_token,
+    alpha_token_whale,
+    mission_control,
+    switchboard_one,
+):
+    """Test that getClaimableLoot() matches actual claimLoot() returns with partial auto-staking"""
+    # Setup with partial auto-staking
+    setGeneralConfig()
+    setAssetConfig(alpha_token)
+    setAssetConfig(ripe_token.address, _vaultIds=[2])  # Configure ripe token for vault 2
+    setRipeRewardsConfig(_autoStakeRatio=50_00, _autoStakeDurationRatio=50_00)  # 50% stake, 50% send
     
-#     # Configure RipeGov vault
-#     mission_control.setRipeGovVaultConfig(
-#         ripe_token.address,
-#         100_00,  # 100% asset weight
-#         (100, 1000, 200_00, True, 5_00),
-#         sender=switchboard_one.address
-#     )
+    # Configure RipeGov vault
+    mission_control.setRipeGovVaultConfig(
+        ripe_token.address,
+        100_00,  # 100% asset weight
+        (100, 1000, 100_00, False, 0),
+        sender=switchboard_one.address
+    )
 
-#     # Don't setup any deposits or debt - no rewards to claim
+    # Setup deposit to earn rewards
+    performDeposit(bob, 100 * EIGHTEEN_DECIMALS, alpha_token, alpha_token_whale)
+    vault_id = vault_book.getRegId(simple_erc20_vault)
     
-#     # Record balances before claim
-#     initial_wallet_balance = ripe_token.balanceOf(bob)
-#     initial_vault_balance = ripe_gov_vault.getTotalAmountForUser(bob, ripe_token)
+    # Accumulate rewards
+    boa.env.time_travel(blocks=20)
+    lootbox.updateDepositPoints(bob, vault_id, simple_erc20_vault, alpha_token, sender=teller.address)
 
-#     # Attempt to claim loot
-#     total_ripe = teller.claimLoot(bob, False, sender=bob)
-#     assert total_ripe == 0
+    # Get expected claimable amount
+    claimable = lootbox.getClaimableLoot(bob)
+    assert claimable > 0
 
-#     # Verify no changes occurred
-#     final_wallet_balance = ripe_token.balanceOf(bob)
-#     final_vault_balance = ripe_gov_vault.getTotalAmountForUser(bob, ripe_token)
+    # Claim loot - should match the calculated claimable amount
+    total_ripe = teller.claimLoot(bob, False, sender=bob)
+    assert total_ripe == claimable
+
+    # Verify the user received some tokens (50% should go to wallet with partial auto-staking)
+    final_wallet_balance = ripe_token.balanceOf(bob)
+    assert final_wallet_balance > 0  # Should have received 50% of claimed tokens
+
+
+def test_loot_claim_multiple_claims_with_staking(
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    setRipeRewardsConfig,
+    performDeposit,
+    simple_erc20_vault,
+    vault_book,
+    lootbox,
+    teller,
+    ripe_token,
+    alpha_token,
+    alpha_token_whale,
+    mission_control,
+    switchboard_one,
+    ripe_gov_vault,
+):
+    """Test multiple claims with auto-staking to verify cumulative behavior"""
+    # Setup with auto-staking
+    setGeneralConfig()
+    setAssetConfig(alpha_token)
+    setAssetConfig(ripe_token.address, _vaultIds=[2])  # Configure ripe token for vault 2
+    setRipeRewardsConfig(_autoStakeRatio=100_00, _autoStakeDurationRatio=50_00)
     
-#     assert final_wallet_balance == initial_wallet_balance
-#     assert final_vault_balance == initial_vault_balance
+    # Configure RipeGov vault
+    mission_control.setRipeGovVaultConfig(
+        ripe_token.address,
+        100_00,  # 100% asset weight
+        (100, 1000, 200_00, True, 5_00),
+        sender=switchboard_one.address
+    )
 
-
-# def test_loot_claim_ripe_token_balance_edge_case(
-#     bob,
-#     setGeneralConfig,
-#     setAssetConfig,
-#     setRipeRewardsConfig,
-#     performDeposit,
-#     simple_erc20_vault,
-#     vault_book,
-#     lootbox,
-#     teller,
-#     ripe_token,
-#     alpha_token,
-#     alpha_token_whale,
-#     mission_control,
-#     switchboard_one,
-# ):
-#     """Test edge case where lootbox has insufficient balance for transfer"""
-#     # Setup with partial auto-staking
-#     setGeneralConfig()
-#     setAssetConfig(alpha_token)
-#     setAssetConfig(ripe_token.address, _vaultIds=[2])  # Configure ripe token for vault 2
-#     setRipeRewardsConfig(_autoStakeRatio=50_00, _autoStakeDurationRatio=50_00)  # 50% stake, 50% send
+    # Setup deposit to earn rewards
+    performDeposit(bob, 100 * EIGHTEEN_DECIMALS, alpha_token, alpha_token_whale)
+    vault_id = vault_book.getRegId(simple_erc20_vault)
     
-#     # Configure RipeGov vault
-#     mission_control.setRipeGovVaultConfig(
-#         ripe_token.address,
-#         100_00,  # 100% asset weight
-#         (100, 1000, 100_00, False, 0),
-#         sender=switchboard_one.address
-#     )
-
-#     # Setup deposit to earn rewards
-#     performDeposit(bob, 100 * EIGHTEEN_DECIMALS, alpha_token, alpha_token_whale)
-#     vault_id = vault_book.getRegId(simple_erc20_vault)
+    # First claim cycle
+    boa.env.time_travel(blocks=20)
+    lootbox.updateDepositPoints(bob, vault_id, simple_erc20_vault, alpha_token, sender=teller.address)
     
-#     # Accumulate rewards
-#     boa.env.time_travel(blocks=20)
-#     lootbox.updateDepositPoints(bob, vault_id, simple_erc20_vault, alpha_token, sender=teller.address)
-
-#     # Get expected claimable amount
-#     claimable = lootbox.getClaimableLoot(bob)
-#     assert claimable > 0
-
-#     # Claim loot - should handle the balance check gracefully
-#     total_ripe = teller.claimLoot(bob, False, sender=bob)
-#     assert total_ripe == claimable
-
-#     # Verify the user received some tokens (even if there was a balance discrepancy)
-#     final_wallet_balance = ripe_token.balanceOf(bob)
-#     assert final_wallet_balance > 0  # Should have received something
-
-
-# def test_loot_claim_multiple_claims_with_staking(
-#     bob,
-#     setGeneralConfig,
-#     setAssetConfig,
-#     setRipeRewardsConfig,
-#     performDeposit,
-#     simple_erc20_vault,
-#     vault_book,
-#     lootbox,
-#     teller,
-#     ripe_token,
-#     alpha_token,
-#     alpha_token_whale,
-#     mission_control,
-#     switchboard_one,
-#     ripe_gov_vault,
-# ):
-#     """Test multiple claims with auto-staking to verify cumulative behavior"""
-#     # Setup with auto-staking
-#     setGeneralConfig()
-#     setAssetConfig(alpha_token)
-#     setAssetConfig(ripe_token.address, _vaultIds=[2])  # Configure ripe token for vault 2
-#     setRipeRewardsConfig(_autoStakeRatio=100_00, _autoStakeDurationRatio=50_00)
+    first_vault_balance = ripe_gov_vault.getTotalAmountForUser(bob, ripe_token)
+    first_claim = teller.claimLoot(bob, False, sender=bob)
+    assert first_claim > 0
     
-#     # Configure RipeGov vault
-#     mission_control.setRipeGovVaultConfig(
-#         ripe_token.address,
-#         100_00,  # 100% asset weight
-#         (100, 1000, 200_00, True, 5_00),
-#         sender=switchboard_one.address
-#     )
+    after_first_vault_balance = ripe_gov_vault.getTotalAmountForUser(bob, ripe_token)
+    assert after_first_vault_balance > first_vault_balance
 
-#     # Setup deposit to earn rewards
-#     performDeposit(bob, 100 * EIGHTEEN_DECIMALS, alpha_token, alpha_token_whale)
-#     vault_id = vault_book.getRegId(simple_erc20_vault)
+    # Second claim cycle - accumulate more rewards
+    boa.env.time_travel(blocks=20)
+    lootbox.updateDepositPoints(bob, vault_id, simple_erc20_vault, alpha_token, sender=teller.address)
     
-#     # First claim cycle
-#     boa.env.time_travel(blocks=20)
-#     lootbox.updateDepositPoints(bob, vault_id, simple_erc20_vault, alpha_token, sender=teller.address)
+    second_claim = teller.claimLoot(bob, False, sender=bob)
+    assert second_claim > 0
     
-#     first_vault_balance = ripe_gov_vault.getTotalAmountForUser(bob, ripe_token)
-#     first_claim = teller.claimLoot(bob, False, sender=bob)
-#     assert first_claim > 0
-    
-#     after_first_vault_balance = ripe_gov_vault.getTotalAmountForUser(bob, ripe_token)
-#     assert after_first_vault_balance > first_vault_balance
+    final_vault_balance = ripe_gov_vault.getTotalAmountForUser(bob, ripe_token)
+    assert final_vault_balance > after_first_vault_balance
 
-#     # Second claim cycle - accumulate more rewards
-#     boa.env.time_travel(blocks=20)
-#     lootbox.updateDepositPoints(bob, vault_id, simple_erc20_vault, alpha_token, sender=teller.address)
-    
-#     second_claim = teller.claimLoot(bob, False, sender=bob)
-#     assert second_claim > 0
-    
-#     final_vault_balance = ripe_gov_vault.getTotalAmountForUser(bob, ripe_token)
-#     assert final_vault_balance > after_first_vault_balance
+    # Verify cumulative staking worked
+    total_expected_staked = first_claim + second_claim
+    total_actual_staked = final_vault_balance - first_vault_balance
+    assert total_actual_staked == total_expected_staked
 
-#     # Verify cumulative staking worked
-#     total_expected_staked = first_claim + second_claim
-#     total_actual_staked = final_vault_balance - first_vault_balance
-#     assert total_actual_staked == total_expected_staked
-
-#     # Verify wallet balance remained unchanged (all auto-staked)
-#     wallet_balance = ripe_token.balanceOf(bob)
-#     assert wallet_balance == 0
+    # Verify wallet balance remained unchanged (all auto-staked)
+    wallet_balance = ripe_token.balanceOf(bob)
+    assert wallet_balance == 0
 
 
-# def test_loot_claim_auto_stake_configuration_updates(
-#     bob,
-#     setGeneralConfig,
-#     setAssetConfig,
-#     setRipeRewardsConfig,
-#     performDeposit,
-#     simple_erc20_vault,
-#     vault_book,
-#     lootbox,
-#     teller,
-#     ripe_token,
-#     alpha_token,
-#     alpha_token_whale,
-#     mission_control,
-#     switchboard_one,
-#     ripe_gov_vault,
-# ):
-#     """Test that configuration changes affect subsequent claims correctly"""
-#     # Initial setup with no auto-staking
-#     setGeneralConfig()
-#     setAssetConfig(alpha_token)
-#     setAssetConfig(ripe_token.address, _vaultIds=[2])  # Configure ripe token for vault 2
-#     setRipeRewardsConfig(_autoStakeRatio=0, _autoStakeDurationRatio=0)
+def test_loot_claim_auto_stake_configuration_updates(
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    setRipeRewardsConfig,
+    performDeposit,
+    simple_erc20_vault,
+    vault_book,
+    lootbox,
+    teller,
+    ripe_token,
+    alpha_token,
+    alpha_token_whale,
+    mission_control,
+    switchboard_one,
+    ripe_gov_vault,
+):
+    """Test that configuration changes affect subsequent claims correctly"""
+    # Initial setup with no auto-staking
+    setGeneralConfig()
+    setAssetConfig(alpha_token)
+    setAssetConfig(ripe_token.address, _vaultIds=[2])  # Configure ripe token for vault 2
+    setRipeRewardsConfig(_autoStakeRatio=0, _autoStakeDurationRatio=0)
     
-#     # Configure RipeGov vault
-#     mission_control.setRipeGovVaultConfig(
-#         ripe_token.address,
-#         100_00,  # 100% asset weight
-#         (100, 1000, 100_00, False, 0),
-#         sender=switchboard_one.address
-#     )
+    # Configure RipeGov vault
+    mission_control.setRipeGovVaultConfig(
+        ripe_token.address,
+        100_00,  # 100% asset weight
+        (100, 1000, 100_00, False, 0),
+        sender=switchboard_one.address
+    )
 
-#     # Setup deposit to earn rewards
-#     performDeposit(bob, 100 * EIGHTEEN_DECIMALS, alpha_token, alpha_token_whale)
-#     vault_id = vault_book.getRegId(simple_erc20_vault)
+    # Setup deposit to earn rewards
+    performDeposit(bob, 100 * EIGHTEEN_DECIMALS, alpha_token, alpha_token_whale)
+    vault_id = vault_book.getRegId(simple_erc20_vault)
     
-#     # First claim with no auto-staking
-#     boa.env.time_travel(blocks=20)
-#     lootbox.updateDepositPoints(bob, vault_id, simple_erc20_vault, alpha_token, sender=teller.address)
+    # First claim with no auto-staking
+    boa.env.time_travel(blocks=20)
+    lootbox.updateDepositPoints(bob, vault_id, simple_erc20_vault, alpha_token, sender=teller.address)
     
-#     first_claim = teller.claimLoot(bob, False, sender=bob)
-#     assert first_claim > 0
-#     assert ripe_token.balanceOf(bob) == first_claim  # All to wallet
-#     assert ripe_gov_vault.getTotalAmountForUser(bob, ripe_token) == 0  # None to vault
+    first_claim = teller.claimLoot(bob, False, sender=bob)
+    assert first_claim > 0
+    assert ripe_token.balanceOf(bob) == first_claim  # All to wallet
+    assert ripe_gov_vault.getTotalAmountForUser(bob, ripe_token) == 0  # None to vault
 
-#     # Update configuration to enable auto-staking
-#     setRipeRewardsConfig(_autoStakeRatio=100_00, _autoStakeDurationRatio=50_00)
+    # Update configuration to enable auto-staking
+    setRipeRewardsConfig(_autoStakeRatio=100_00, _autoStakeDurationRatio=50_00)
     
-#     # Second claim with auto-staking enabled
-#     boa.env.time_travel(blocks=20)
-#     lootbox.updateDepositPoints(bob, vault_id, simple_erc20_vault, alpha_token, sender=teller.address)
+    # Second claim with auto-staking enabled
+    boa.env.time_travel(blocks=20)
+    lootbox.updateDepositPoints(bob, vault_id, simple_erc20_vault, alpha_token, sender=teller.address)
     
-#     second_claim = teller.claimLoot(bob, False, sender=bob)
-#     assert second_claim > 0
-#     assert ripe_token.balanceOf(bob) == first_claim  # Wallet unchanged from first claim
-#     assert ripe_gov_vault.getTotalAmountForUser(bob, ripe_token) > 0  # Second claim went to vault
-
-
-# def test_debug_basic_auto_staking(
-#     bob,
-#     setGeneralConfig,
-#     setAssetConfig,
-#     setRipeRewardsConfig,
-#     performDeposit,
-#     simple_erc20_vault,
-#     vault_book,
-#     lootbox,
-#     teller,
-#     ripe_token,
-#     alpha_token,
-#     alpha_token_whale,
-#     mission_control,
-#     switchboard_one,
-#     ripe_gov_vault,
-# ):
-#     """Debug test for basic auto-staking functionality"""
-#     print(f"Testing basic auto-staking...")
-    
-#     # Setup basic configuration
-#     setGeneralConfig()
-#     setAssetConfig(alpha_token)
-    
-#     # CRITICAL: Configure ripe token for RipeGov vault (vault ID 2)
-#     setAssetConfig(ripe_token.address, _vaultIds=[2])
-    
-#     # Setup auto-staking with simple parameters
-#     setRipeRewardsConfig(_autoStakeRatio=100_00, _autoStakeDurationRatio=0)  # 100% stake, 0% duration
-    
-#     # Configure RipeGov vault for ripe token with simple parameters
-#     mission_control.setRipeGovVaultConfig(
-#         ripe_token.address,
-#         100_00,  # 100% asset weight
-#         (100, 1000, 100_00, False, 0),  # 100 min, 1000 max, 100% boost, cannot exit, 0% fee
-#         sender=switchboard_one.address
-#     )
-    
-#     # Setup deposit to earn rewards
-#     performDeposit(bob, 100 * EIGHTEEN_DECIMALS, alpha_token, alpha_token_whale)
-#     vault_id = vault_book.getRegId(simple_erc20_vault)
-    
-#     # Accumulate rewards
-#     boa.env.time_travel(blocks=20)
-#     lootbox.updateDepositPoints(bob, vault_id, simple_erc20_vault, alpha_token, sender=teller.address)
-
-#     # Record balances before claim
-#     initial_wallet_balance = ripe_token.balanceOf(bob)
-#     initial_vault_balance = ripe_gov_vault.getTotalAmountForUser(bob, ripe_token)
-#     print(f"Initial wallet balance: {initial_wallet_balance}")
-#     print(f"Initial vault balance: {initial_vault_balance}")
-
-#     # Test auto-staking claim
-#     total_ripe = teller.claimLoot(bob, False, sender=bob)
-#     print(f"Total ripe claimed: {total_ripe}")
-#     assert total_ripe > 0
-
-#     # Check final balances
-#     final_wallet_balance = ripe_token.balanceOf(bob)
-#     final_vault_balance = ripe_gov_vault.getTotalAmountForUser(bob, ripe_token)
-#     print(f"Final wallet balance: {final_wallet_balance}")
-#     print(f"Final vault balance: {final_vault_balance}")
-    
-#     # With 100% auto-staking, all should go to vault
-#     assert final_wallet_balance == initial_wallet_balance  # No change in wallet
-#     assert final_vault_balance > initial_vault_balance  # Increased vault balance
+    second_claim = teller.claimLoot(bob, False, sender=bob)
+    assert second_claim > 0
+    assert ripe_token.balanceOf(bob) == first_claim  # Wallet unchanged from first claim
+    assert ripe_gov_vault.getTotalAmountForUser(bob, ripe_token) > 0  # Second claim went to vault

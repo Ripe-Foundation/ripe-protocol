@@ -211,6 +211,11 @@ def _claimLoot(
     # now look at deposit loot
     vaultsToRemove: DynArray[uint256, MAX_VAULTS_TO_CLEAN] = []
     numUserVaults: uint256 = staticcall Ledger(_a.ledger).numUserVaults(_user)
+
+    # if no vaults, return 0
+    if numUserVaults == 0:
+        return totalRipeForUser
+
     for i: uint256 in range(1, numUserVaults, bound=max_value(uint256)):
         vaultId: uint256 = staticcall Ledger(_a.ledger).userVaults(_user, i)
         vaultAddr: address = staticcall VaultBook(_a.vaultBook).getAddr(vaultId)
@@ -261,6 +266,9 @@ def getClaimableLoot(_user: address) -> uint256:
 
     # now look at deposit loot
     numUserVaults: uint256 = staticcall Ledger(a.ledger).numUserVaults(_user)
+    if numUserVaults == 0:
+        return totalRipeForUser
+
     for i: uint256 in range(1, numUserVaults, bound=max_value(uint256)):
         vaultId: uint256 = staticcall Ledger(a.ledger).userVaults(_user, i)
         vaultAddr: address = staticcall VaultBook(a.vaultBook).getAddr(vaultId)

@@ -664,7 +664,6 @@ def releaseLock(_vaultId: uint256, _asset: address):
     extcall RipeGovVault(vaultAddr).releaseLock(msg.sender, _asset, a)
 
 
-@nonreentrant
 @external
 def depositIntoGovVaultFromTrusted(
     _user: address,
