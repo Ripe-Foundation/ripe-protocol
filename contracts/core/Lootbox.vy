@@ -12,6 +12,8 @@ import contracts.modules.Addys as addys
 import contracts.modules.DeptBasics as deptBasics
 from interfaces import Department
 from interfaces import Vault
+
+from ethereum.ercs import IERC20
 from ethereum.ercs import IERC20Detailed
 
 interface Ledger:
@@ -26,9 +28,12 @@ interface Ledger:
     def numUserVaults(_user: address) -> uint256: view
 
 interface MissionControl:
-    def getClaimLootConfig(_user: address, _caller: address) -> ClaimLootConfig: view
+    def getClaimLootConfig(_user: address, _caller: address, _ripeToken: address) -> ClaimLootConfig: view
     def getDepositPointsConfig(_asset: address) -> DepositPointsConfig: view
     def getRewardsConfig() -> RewardsConfig: view
+
+interface Teller:
+    def depositIntoGovVaultFromTrusted(_user: address, _asset: address, _amount: uint256, _lockDuration: uint256, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
 
 interface PriceDesk:
     def getUsdValue(_asset: address, _amount: uint256, _shouldRaise: bool = False) -> uint256: view
@@ -111,6 +116,10 @@ struct DepositPointsConfig:
 struct ClaimLootConfig:
     canClaimLoot: bool
     canClaimLootForUser: bool
+    autoStakeRatio: uint256
+    autoStakeDurationRatio: uint256
+    minLockDuration: uint256
+    maxLockDuration: uint256
 
 event DepositLootClaimed:
     user: indexed(address)
@@ -191,7 +200,7 @@ def _claimLoot(
         return 0
 
     # check if caller can claim for user
-    config: ClaimLootConfig = staticcall MissionControl(_a.missionControl).getClaimLootConfig(_user, _caller)
+    config: ClaimLootConfig = staticcall MissionControl(_a.missionControl).getClaimLootConfig(_user, _caller, _a.ripeToken)
     assert config.canClaimLoot # dev: loot claims disabled
     if _shouldCheckCaller and _user != _caller:
         assert config.canClaimLootForUser # dev: cannot claim for user
@@ -234,7 +243,7 @@ def _claimLoot(
 
     # mint ripe, then stake or transfer to user
     if totalRipeForUser != 0:
-        self._handleRipeMint(_user, totalRipeForUser, _shouldStake, _a.ripeToken)
+        self._handleRipeMint(_user, totalRipeForUser, _shouldStake, config, _a)
 
     return totalRipeForUser
 
@@ -283,7 +292,8 @@ def claimDepositLootForAsset(_user: address, _vaultId: uint256, _asset: address)
     vaultAddr: address = staticcall VaultBook(a.vaultBook).getAddr(_vaultId)
     totalRipeForUser: uint256 = self._claimDepositLoot(_user, _vaultId, vaultAddr, _asset, False, a)
     if totalRipeForUser != 0:
-        self._handleRipeMint(_user, totalRipeForUser, False, a.ripeToken)
+        config: ClaimLootConfig = staticcall MissionControl(a.missionControl).getClaimLootConfig(_user, _user, a.ripeToken)
+        self._handleRipeMint(_user, totalRipeForUser, False, config, a)
     return totalRipeForUser
 
 
@@ -473,7 +483,7 @@ def updateDepositPoints(
     _asset: address,
     _a: addys.Addys = empty(addys.Addys),
 ):
-    assert addys._isValidRipeHqAddr(msg.sender) # dev: no perms
+    assert addys._isValidRipeHqAddr(msg.sender) or msg.sender == staticcall VaultBook(addys._getVaultBookAddr()).getAddr(_vaultId) # dev: no perms
     assert not deptBasics.isPaused # dev: contract paused
     a: addys.Addys = addys._getAddys(_a)
 
@@ -809,7 +819,8 @@ def claimBorrowLoot(_user: address) -> uint256:
     a: addys.Addys = addys._getAddys()
     totalRipeForUser: uint256 = self._claimBorrowLoot(_user, a)
     if totalRipeForUser != 0:
-        self._handleRipeMint(_user, totalRipeForUser, False, a.ripeToken)
+        config: ClaimLootConfig = staticcall MissionControl(a.missionControl).getClaimLootConfig(_user, _user, a.ripeToken)
+        self._handleRipeMint(_user, totalRipeForUser, False, config, a)
     return totalRipeForUser
 
 
@@ -953,11 +964,40 @@ def _handleRipeMint(
     _user: address,
     _amount: uint256,
     _shouldStake: bool,
-    _ripeToken: address,
+    _config: ClaimLootConfig,
+    _a: addys.Addys,
 ):
-    extcall RipeToken(_ripeToken).mint(_user, _amount)
+    # if no auto stake, just mint to user
+    if not _shouldStake and _config.autoStakeRatio == 0:
+        extcall RipeToken(_a.ripeToken).mint(_user, _amount)
+        return
 
-    # TODO: handle staking
+    # mint ripe tokens here
+    extcall RipeToken(_a.ripeToken).mint(self, _amount)
+
+    # finalize amounts
+    amountToStake: uint256 = _amount
+    amountToSend: uint256 = 0
+    if not _shouldStake:
+        amountToStake = min(_amount * _config.autoStakeRatio // HUNDRED_PERCENT, _amount)
+        amountToSend = _amount - amountToStake
+
+    # finalize lock duration
+    lockDuration: uint256 = 0
+    if _config.maxLockDuration > _config.minLockDuration:
+        durationRange: uint256 = _config.maxLockDuration - _config.minLockDuration
+        lockDuration = durationRange * _config.autoStakeDurationRatio // HUNDRED_PERCENT
+
+    # stake ripe tokens
+    if amountToStake != 0:
+        assert extcall IERC20(_a.ripeToken).approve(_a.teller, amountToStake, default_return_value=True) # dev: ripe approval failed
+        extcall Teller(_a.teller).depositIntoGovVaultFromTrusted(_user, _a.ripeToken, amountToStake, lockDuration, _a)
+        assert extcall IERC20(_a.ripeToken).approve(_a.teller, 0, default_return_value=True) # dev: ripe approval failed
+
+    # transfer ripe to user
+    if amountToSend != 0:
+        amount: uint256 = min(amountToSend, staticcall IERC20(_a.ripeToken).balanceOf(self))
+        assert extcall IERC20(_a.ripeToken).transfer(_user, amount, default_return_value=True) # dev: ripe transfer failed
 
 
 # storage clean up

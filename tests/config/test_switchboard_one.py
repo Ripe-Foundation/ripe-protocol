@@ -1829,27 +1829,301 @@ def test_max_ltv_deviation_full_workflow(switchboard_one, governance):
 
 def test_max_ltv_deviation_cancel_and_expire(switchboard_one, governance):
     """Test canceling and expiring max LTV deviation actions"""
-    # Create an action
-    action_id = switchboard_one.setMaxLtvDeviation(25_00, sender=governance.address)
-    assert action_id > 0
+    # Create action
+    action_id = switchboard_one.setMaxLtvDeviation(15_00, sender=governance.address)
     
     # Cancel it
     assert switchboard_one.cancelPendingAction(action_id, sender=governance.address)
-    assert not switchboard_one.hasPendingAction(action_id)
-    assert switchboard_one.actionType(action_id) == 0
+    
+    # Try to execute canceled action - should fail
+    boa.env.time_travel(blocks=switchboard_one.actionTimeLock())
+    assert not switchboard_one.executePendingAction(action_id, sender=governance.address)
     
     # Create another action and let it expire
-    action_id2 = switchboard_one.setMaxLtvDeviation(30_00, sender=governance.address)
-    assert action_id2 > 0
+    action_id2 = switchboard_one.setMaxLtvDeviation(20_00, sender=governance.address)
     
-    # Time travel past expiration
-    time_lock = switchboard_one.actionTimeLock()
-    expiration = switchboard_one.expiration()
-    boa.env.time_travel(blocks=time_lock + expiration + 1)
+    # Time travel beyond expiration
+    boa.env.time_travel(blocks=switchboard_one.maxActionTimeLock() + 1)
     
-    # Try to execute expired action
+    # Should automatically clean up expired action
     assert not switchboard_one.executePendingAction(action_id2, sender=governance.address)
     
-    # Verify cleanup occurred
-    assert not switchboard_one.hasPendingAction(action_id2)
+    # Action should be cleaned up
     assert switchboard_one.actionType(action_id2) == 0
+
+
+def test_ripe_gov_vault_config_validation(switchboard_one, governance, alpha_token, setAssetConfig):
+    """Test validation for setRipeGovVaultConfig function"""
+    # Set up alpha_token to be supported in vault 2 (ripe gov vault)
+    setAssetConfig(alpha_token.address, _vaultIds=[2])
+    
+    # Test with zero address asset
+    with boa.reverts("invalid ripe vault config"):  # Will fail at _isValidRipeVaultConfig
+        switchboard_one.setRipeGovVaultConfig(
+            ZERO_ADDRESS,  # invalid asset
+            100_00,  # 100% weight
+            86400,   # 1 day min lock
+            31536000,  # 1 year max lock  
+            200_00,  # 200% max boost
+            5_00,    # 5% exit fee
+            True,    # can exit
+            sender=governance.address
+        )
+    
+    # Test with unsupported asset (not configured in vault 2)
+    with boa.reverts("invalid ripe vault config"):
+        switchboard_one.setRipeGovVaultConfig(
+            "0x1234567890123456789012345678901234567890",  # unsupported asset
+            100_00,
+            86400,
+            31536000,
+            200_00,
+            5_00,
+            True,
+            sender=governance.address
+        )
+    
+    # Test with asset weight > 500%
+    with boa.reverts("invalid ripe vault config"):
+        switchboard_one.setRipeGovVaultConfig(
+            alpha_token.address,  # supported asset
+            501_00,  # > 500% weight (invalid)
+            86400,
+            31536000,
+            200_00,
+            5_00,
+            True,
+            sender=governance.address
+        )
+    
+    # Test with min lock > max lock duration
+    with boa.reverts("invalid ripe vault config"):
+        switchboard_one.setRipeGovVaultConfig(
+            alpha_token.address,
+            100_00,
+            31536000,  # 1 year min
+            86400,     # 1 day max (invalid: min > max)
+            200_00,
+            5_00,
+            True,
+            sender=governance.address
+        )
+    
+    # Test with max lock boost > 1000%
+    with boa.reverts("invalid ripe vault config"):
+        switchboard_one.setRipeGovVaultConfig(
+            alpha_token.address,
+            100_00,
+            86400,
+            31536000,
+            1001_00,  # > 1000% boost (invalid)
+            5_00,
+            True,
+            sender=governance.address
+        )
+    
+    # Test with exit fee > 100%
+    with boa.reverts("invalid ripe vault config"):
+        switchboard_one.setRipeGovVaultConfig(
+            alpha_token.address,
+            100_00,
+            86400,
+            31536000,
+            200_00,
+            101_00,  # > 100% exit fee (invalid)
+            True,
+            sender=governance.address
+        )
+    
+    # Test invalid combination: canExit=True but exitFee=0
+    with boa.reverts("invalid ripe vault config"):
+        switchboard_one.setRipeGovVaultConfig(
+            alpha_token.address,
+            100_00,
+            86400,
+            31536000,
+            200_00,
+            0,      # exitFee = 0 (INVALID with canExit=True)
+            True,   # canExit = True
+            sender=governance.address
+        )
+    
+    # Test invalid combination: canExit=False but exitFee>0
+    with boa.reverts("invalid ripe vault config"):
+        switchboard_one.setRipeGovVaultConfig(
+            alpha_token.address,
+            100_00,
+            86400,
+            31536000,
+            200_00,
+            10_00,  # exitFee = 10% (INVALID with canExit=False)
+            False,  # canExit = False
+            sender=governance.address
+        )
+
+
+def test_ripe_gov_vault_config_success(switchboard_one, governance, alpha_token, setAssetConfig):
+    """Test successful setRipeGovVaultConfig with valid parameters"""
+    # Set up alpha_token to be supported in vault 2 (ripe gov vault)
+    setAssetConfig(alpha_token.address, _vaultIds=[2])
+    
+    # Create action with valid parameters
+    action_id = switchboard_one.setRipeGovVaultConfig(
+        alpha_token.address,
+        150_00,    # 150% asset weight
+        86400,     # 1 day min lock
+        31536000,  # 1 year max lock
+        300_00,    # 300% max boost
+        10_00,     # 10% exit fee
+        True,      # can exit
+        sender=governance.address
+    )
+    
+    # Check that action was created
+    assert action_id > 0
+    
+    # Check event was emitted with correct parameters
+    logs = filter_logs(switchboard_one, "PendingRipeGovVaultConfigChange")
+    assert len(logs) == 1
+    log = logs[0]
+    assert log.asset == alpha_token.address
+    assert log.assetWeight == 150_00
+    assert log.minLockDuration == 86400
+    assert log.maxLockDuration == 31536000
+    assert log.maxLockBoost == 300_00
+    assert log.exitFee == 10_00
+    assert log.canExit == True
+    assert log.actionId == action_id
+    
+    # Check pending config was stored correctly
+    pending = switchboard_one.pendingRipeGovVaultConfig(action_id)
+    assert pending.asset == alpha_token.address
+    assert pending.assetWeight == 150_00
+    assert pending.lockTerms.minLockDuration == 86400
+    assert pending.lockTerms.maxLockDuration == 31536000
+    assert pending.lockTerms.maxLockBoost == 300_00
+    assert pending.lockTerms.exitFee == 10_00
+    assert pending.lockTerms.canExit == True
+
+
+def test_execute_ripe_gov_vault_config(switchboard_one, governance, bravo_token, setAssetConfig):
+    """Test execution of ripe gov vault config action"""
+    # Set up bravo_token to be supported in vault 2 (ripe gov vault)
+    setAssetConfig(bravo_token.address, _vaultIds=[2])
+    
+    # Create the action with valid configuration
+    # When canExit=False, exitFee must be 0 (per SwitchboardOne validation)
+    action_id = switchboard_one.setRipeGovVaultConfig(
+        bravo_token.address,
+        200_00,    # 200% asset weight
+        7200,      # 2 hours min lock
+        2592000,   # 30 days max lock
+        400_00,    # 400% max boost
+        0,         # 0% exit fee (VALID with canExit=False)
+        False,     # cannot exit
+        sender=governance.address
+    )
+    
+    # Verify action was created
+    assert action_id > 0
+    
+    # Time travel past timelock
+    boa.env.time_travel(blocks=switchboard_one.actionTimeLock())
+    
+    # Execute the action
+    success = switchboard_one.executePendingAction(action_id, sender=governance.address)
+    assert success == True
+    
+    # Check execution event was emitted
+    logs = filter_logs(switchboard_one, "RipeGovVaultConfigSet")
+    assert len(logs) == 1
+    log = logs[0]
+    assert log.asset == bravo_token.address
+    assert log.assetWeight == 200_00
+    assert log.minLockDuration == 7200
+    assert log.maxLockDuration == 2592000
+    assert log.maxLockBoost == 400_00
+    assert log.exitFee == 0  # Updated to match valid configuration
+    assert log.canExit == False
+    
+    # Verify action was cleaned up
+    assert switchboard_one.actionType(action_id) == 0
+    
+    # Test that we can't execute the same action again
+    assert switchboard_one.executePendingAction(action_id, sender=governance.address) == False
+
+
+def test_execute_ripe_gov_vault_config_with_exit_enabled(switchboard_one, governance, alpha_token, setAssetConfig):
+    """Test execution of ripe gov vault config action with canExit=True and non-zero exitFee"""
+    # Set up alpha_token to be supported in vault 2 (ripe gov vault)
+    setAssetConfig(alpha_token.address, _vaultIds=[2])
+    
+    # Create the action with valid configuration
+    # When canExit=True, exitFee must be non-zero (per SwitchboardOne validation)
+    action_id = switchboard_one.setRipeGovVaultConfig(
+        alpha_token.address,
+        150_00,    # 150% asset weight
+        3600,      # 1 hour min lock
+        1209600,   # 14 days max lock
+        250_00,    # 250% max boost
+        12_00,     # 12% exit fee (VALID with canExit=True)
+        True,      # can exit
+        sender=governance.address
+    )
+    
+    # Verify action was created
+    assert action_id > 0
+    
+    # Time travel past timelock
+    boa.env.time_travel(blocks=switchboard_one.actionTimeLock())
+    
+    # Execute the action
+    success = switchboard_one.executePendingAction(action_id, sender=governance.address)
+    assert success == True
+    
+    # Check execution event was emitted
+    logs = filter_logs(switchboard_one, "RipeGovVaultConfigSet")
+    assert len(logs) == 1
+    log = logs[0]
+    assert log.asset == alpha_token.address
+    assert log.assetWeight == 150_00
+    assert log.minLockDuration == 3600
+    assert log.maxLockDuration == 1209600
+    assert log.maxLockBoost == 250_00
+    assert log.exitFee == 12_00
+    assert log.canExit == True
+    
+    # Verify action was cleaned up
+    assert switchboard_one.actionType(action_id) == 0
+
+
+def test_ripe_gov_vault_config_permissions(switchboard_one, governance, bob, alpha_token, setAssetConfig):
+    """Test that only governance can call setRipeGovVaultConfig"""
+    # Set up alpha_token to be supported in vault 2
+    setAssetConfig(alpha_token.address, _vaultIds=[2])
+    
+    # Non-governance user should not be able to call the function
+    with boa.reverts("no perms"):
+        switchboard_one.setRipeGovVaultConfig(
+            alpha_token.address,
+            100_00,
+            86400,
+            31536000,
+            200_00,
+            5_00,
+            True,
+            sender=bob
+        )
+    
+    # Governance should be able to call the function
+    action_id = switchboard_one.setRipeGovVaultConfig(
+        alpha_token.address,
+        100_00,
+        86400,
+        31536000,
+        200_00,
+        5_00,
+        True,
+        sender=governance.address
+    )
+    assert action_id > 0

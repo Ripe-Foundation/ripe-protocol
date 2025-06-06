@@ -9,11 +9,13 @@ initializes: timeLock[gov := gov]
 
 import contracts.modules.LocalGov as gov
 import contracts.modules.TimeLock as timeLock
+from interfaces import Vault
 
 interface MissionControl:
     def setPriorityLiqAssetVaults(_priorityLiqAssetVaults: DynArray[VaultLite, PRIORITY_VAULT_DATA]): nonpayable
     def setPriorityPriceSourceIds(_priorityIds: DynArray[uint256, MAX_PRIORITY_PRICE_SOURCES]): nonpayable
     def setPriorityStabVaults(_priorityStabVaults: DynArray[VaultLite, PRIORITY_VAULT_DATA]): nonpayable
+    def setRipeGovVaultConfig(_asset: address, _assetWeight: uint256, _lockTerms: LockTerms): nonpayable
     def isSupportedAssetInVault(_vaultId: uint256, _asset: address) -> bool: view
     def setRipeRewardsConfig(_rewardsConfig: RipeRewardsConfig): nonpayable
     def setGeneralDebtConfig(_genDebtConfig: GenDebtConfig): nonpayable
@@ -21,14 +23,16 @@ interface MissionControl:
     def setCanPerformLiteAction(_user: address, _canDisable: bool): nonpayable
     def setMaxLtvDeviation(_maxLtvDeviation: uint256): nonpayable
     def setGeneralConfig(_genConfig: GenConfig): nonpayable
-    def rewardsConfig() -> RipeRewardsConfig: view
     def canPerformLiteAction(_user: address) -> bool: view
+    def isSupportedAsset(_asset: address) -> bool: view
+    def rewardsConfig() -> RipeRewardsConfig: view
     def genDebtConfig() -> GenDebtConfig: view
     def underscoreRegistry() -> address: view
     def genConfig() -> GenConfig: view
 
 interface VaultBook:
     def isValidRegId(_regId: uint256) -> bool: view
+    def getAddr(_regId: uint256) -> address: view
 
 interface PriceDesk:
     def isValidRegId(_regId: uint256) -> bool: view
@@ -52,12 +56,14 @@ flag ActionType:
     DEBT_AUCTION_PARAMS
     RIPE_REWARDS_BLOCK
     RIPE_REWARDS_ALLOCS
+    RIPE_REWARDS_AUTO_STAKE_PARAMS
     OTHER_PRIORITY_LIQ_ASSET_VAULTS
     OTHER_PRIORITY_STAB_VAULTS
     OTHER_PRIORITY_PRICE_SOURCE_IDS
     OTHER_UNDERSCORE_REGISTRY
     OTHER_CAN_PERFORM_LITE_ACTION
     MAX_LTV_DEVIATION
+    RIPE_VAULT_CONFIG
 
 flag GenConfigFlag:
     CAN_DEPOSIT
@@ -111,6 +117,8 @@ struct RipeRewardsConfig:
     stakersAlloc: uint256
     votersAlloc: uint256
     genDepositorsAlloc: uint256
+    autoStakeRatio: uint256
+    autoStakeDurationRatio: uint256
 
 struct AuctionParams:
     hasParams: bool
@@ -126,6 +134,18 @@ struct VaultLite:
 struct CanPerform:
     user: address
     canDo: bool
+
+struct LockTerms:
+    minLockDuration: uint256
+    maxLockDuration: uint256
+    maxLockBoost: uint256
+    canExit: bool
+    exitFee: uint256
+
+struct PendingRipeGovVaultConfig:
+    asset: address
+    assetWeight: uint256
+    lockTerms: LockTerms
 
 event PendingVaultLimitsChange:
     perUserMaxVaults: uint256
@@ -228,6 +248,12 @@ event PendingRipeRewardsAllocsChange:
     confirmationBlock: uint256
     actionId: uint256
 
+event PendingRipeRewardsAutoStakeParamsChange:
+    autoStakeRatio: uint256
+    autoStakeDurationRatio: uint256
+    confirmationBlock: uint256
+    actionId: uint256
+
 event RewardsPointsEnabledModified:
     arePointsEnabled: bool
     caller: indexed(address)
@@ -260,6 +286,17 @@ event PendingCanPerformLiteAction:
 
 event PendingMaxLtvDeviationChange:
     newDeviation: uint256
+    confirmationBlock: uint256
+    actionId: uint256
+
+event PendingRipeGovVaultConfigChange:
+    asset: address
+    assetWeight: uint256
+    minLockDuration: uint256
+    maxLockDuration: uint256
+    maxLockBoost: uint256
+    canExit: bool
+    exitFee: uint256
     confirmationBlock: uint256
     actionId: uint256
 
@@ -302,6 +339,10 @@ event RipeRewardsAllocsSet:
     votersAlloc: uint256
     genDepositorsAlloc: uint256
 
+event RipeRewardsAutoStakeParamsSet:
+    autoStakeRatio: uint256
+    autoStakeDurationRatio: uint256
+
 event PriorityLiqAssetVaultsSet:
     numVaults: uint256
 
@@ -321,6 +362,15 @@ event CanPerformLiteAction:
 event MaxLtvDeviationSet:
     newDeviation: uint256
 
+event RipeGovVaultConfigSet:
+    asset: address
+    assetWeight: uint256
+    minLockDuration: uint256
+    maxLockDuration: uint256
+    maxLockBoost: uint256
+    canExit: bool
+    exitFee: uint256
+
 # pending config changes
 actionType: public(HashMap[uint256, ActionType]) # aid -> type
 pendingRipeRewardsConfig: public(HashMap[uint256, RipeRewardsConfig]) # aid -> config
@@ -333,6 +383,7 @@ pendingPriorityPriceSourceIds: public(HashMap[uint256, DynArray[uint256, MAX_PRI
 pendingUnderscoreRegistry: public(HashMap[uint256, address])
 pendingCanPerformLiteAction: public(HashMap[uint256, CanPerform])
 pendingMaxLtvDeviation: public(HashMap[uint256, uint256])
+pendingRipeGovVaultConfig: public(HashMap[uint256, PendingRipeGovVaultConfig]) # aid -> config
 
 # temp data
 vaultDedupe: transient(HashMap[uint256, HashMap[address, bool]]) # vault id -> asset
@@ -868,6 +919,26 @@ def _areValidRipeRewardsAllocs(_borrowersAlloc: uint256, _stakersAlloc: uint256,
     return True
 
 
+# auto stake ratios
+
+
+@external
+def setAutoStakeParams(_autoStakeRatio: uint256, _autoStakeDurationRatio: uint256) -> uint256:
+    assert gov._canGovern(msg.sender) # dev: no perms
+    assert self._areValidAutoStakeParams(_autoStakeRatio, _autoStakeDurationRatio) # dev: invalid auto stake params
+    return self._setPendingRipeRewardsConfig(ActionType.RIPE_REWARDS_AUTO_STAKE_PARAMS, 0, 0, 0, 0, 0, _autoStakeRatio, _autoStakeDurationRatio)
+
+
+@view
+@internal
+def _areValidAutoStakeParams(_autoStakeRatio: uint256, _autoStakeDurationRatio: uint256) -> bool:
+    if _autoStakeRatio > HUNDRED_PERCENT:
+        return False
+    if _autoStakeDurationRatio > HUNDRED_PERCENT:
+        return False
+    return True
+
+
 # set pending ripe rewards config
 
 
@@ -879,6 +950,8 @@ def _setPendingRipeRewardsConfig(
     _stakersAlloc: uint256 = 0,
     _votersAlloc: uint256 = 0,
     _genDepositorsAlloc: uint256 = 0,
+    _autoStakeRatio: uint256 = 0,
+    _autoStakeDurationRatio: uint256 = 0,
 ) -> uint256:
     aid: uint256 = timeLock._initiateAction()
 
@@ -890,6 +963,8 @@ def _setPendingRipeRewardsConfig(
         stakersAlloc=_stakersAlloc,
         votersAlloc=_votersAlloc,
         genDepositorsAlloc=_genDepositorsAlloc,
+        autoStakeRatio=_autoStakeRatio,
+        autoStakeDurationRatio=_autoStakeDurationRatio,
     )
 
     confirmationBlock: uint256 = timeLock._getActionConfirmationBlock(aid)
@@ -909,7 +984,13 @@ def _setPendingRipeRewardsConfig(
             confirmationBlock=confirmationBlock,
             actionId=aid,
         )
-
+    elif _actionType == ActionType.RIPE_REWARDS_AUTO_STAKE_PARAMS:
+        log PendingRipeRewardsAutoStakeParamsChange(
+            autoStakeRatio=_autoStakeRatio,
+            autoStakeDurationRatio=_autoStakeDurationRatio,
+            confirmationBlock=confirmationBlock,
+            actionId=aid,
+        )
     return aid
 
 
@@ -1119,6 +1200,89 @@ def _isValidMaxDeviation(_newDeviation: uint256) -> bool:
     return _newDeviation <= HUNDRED_PERCENT
 
 
+#########################
+# Ripe Gov Vault Config #
+#########################
+
+
+@external
+def setRipeGovVaultConfig(
+    _asset: address,
+    _assetWeight: uint256,
+    _minLockDuration: uint256,
+    _maxLockDuration: uint256,
+    _maxLockBoost: uint256,
+    _exitFee: uint256,
+    _canExit: bool,
+) -> uint256:
+    assert gov._canGovern(msg.sender) # dev: no perms
+
+    lockTerms: LockTerms = LockTerms(
+        minLockDuration=_minLockDuration,
+        maxLockDuration=_maxLockDuration,
+        maxLockBoost=_maxLockBoost,
+        canExit=_canExit,
+        exitFee=_exitFee,
+    )
+    assert self._isValidRipeVaultConfig(_asset, _assetWeight, lockTerms) # dev: invalid ripe vault config
+
+    aid: uint256 = timeLock._initiateAction()
+    self.actionType[aid] = ActionType.RIPE_VAULT_CONFIG
+    self.pendingRipeGovVaultConfig[aid] = PendingRipeGovVaultConfig(
+        asset=_asset,
+        assetWeight=_assetWeight,
+        lockTerms=lockTerms,
+    )
+
+    log PendingRipeGovVaultConfigChange(
+        asset=_asset,
+        assetWeight=_assetWeight,
+        minLockDuration=_minLockDuration,
+        maxLockDuration=_maxLockDuration,
+        maxLockBoost=_maxLockBoost,
+        canExit=_canExit,
+        exitFee=_exitFee,
+        confirmationBlock=timeLock._getActionConfirmationBlock(aid),
+        actionId=aid,
+    )
+    return aid
+
+
+@view
+@internal
+def _isValidRipeVaultConfig(_asset: address, _assetWeight: uint256, _lockTerms: LockTerms) -> bool:
+    if _asset == empty(address):
+        return False
+
+    mc: address = self._getMissionControlAddr()
+    if not staticcall MissionControl(mc).isSupportedAsset(_asset):
+        return False
+
+    # NOTE: this assumes that vault id 2 is ripe gov vault !!
+    if not staticcall MissionControl(mc).isSupportedAssetInVault(2, _asset):
+        return False
+
+    if _assetWeight > 500_00: # max 500%
+        return False
+
+    if _lockTerms.minLockDuration > _lockTerms.maxLockDuration:
+        return False
+
+    if _lockTerms.maxLockBoost > 1000_00: # max 1000%
+        return False
+
+    if _lockTerms.exitFee > HUNDRED_PERCENT:
+        return False
+
+    if _lockTerms.canExit and _lockTerms.exitFee == 0:
+        return False
+
+    if not _lockTerms.canExit and _lockTerms.exitFee != 0:
+        return False
+
+    return True
+
+
 #############
 # Execution #
 #############
@@ -1206,6 +1370,14 @@ def executePendingAction(_aid: uint256) -> bool:
         extcall MissionControl(mc).setRipeRewardsConfig(config)
         log RipeRewardsAllocsSet(borrowersAlloc=p.borrowersAlloc, stakersAlloc=p.stakersAlloc, votersAlloc=p.votersAlloc, genDepositorsAlloc=p.genDepositorsAlloc)
 
+    elif actionType == ActionType.RIPE_REWARDS_AUTO_STAKE_PARAMS:
+        config: RipeRewardsConfig = staticcall MissionControl(mc).rewardsConfig()
+        p: RipeRewardsConfig = self.pendingRipeRewardsConfig[_aid]
+        config.autoStakeRatio = p.autoStakeRatio
+        config.autoStakeDurationRatio = p.autoStakeDurationRatio
+        extcall MissionControl(mc).setRipeRewardsConfig(config)
+        log RipeRewardsAutoStakeParamsSet(autoStakeRatio=p.autoStakeRatio, autoStakeDurationRatio=p.autoStakeDurationRatio)
+
     elif actionType == ActionType.OTHER_PRIORITY_LIQ_ASSET_VAULTS:
         priorityVaults: DynArray[VaultLite, PRIORITY_VAULT_DATA] = self.pendingPriorityLiqAssetVaults[_aid]
         extcall MissionControl(mc).setPriorityLiqAssetVaults(priorityVaults)
@@ -1235,6 +1407,11 @@ def executePendingAction(_aid: uint256) -> bool:
         p: uint256 = self.pendingMaxLtvDeviation[_aid]
         extcall MissionControl(mc).setMaxLtvDeviation(p)
         log MaxLtvDeviationSet(newDeviation=p)
+
+    elif actionType == ActionType.RIPE_VAULT_CONFIG:
+        p: PendingRipeGovVaultConfig = self.pendingRipeGovVaultConfig[_aid]
+        extcall MissionControl(mc).setRipeGovVaultConfig(p.asset, p.assetWeight, p.lockTerms)
+        log RipeGovVaultConfigSet(asset=p.asset, assetWeight=p.assetWeight, minLockDuration=p.lockTerms.minLockDuration, maxLockDuration=p.lockTerms.maxLockDuration, maxLockBoost=p.lockTerms.maxLockBoost, canExit=p.lockTerms.canExit, exitFee=p.lockTerms.exitFee)
 
     self.actionType[_aid] = empty(ActionType)
     return True

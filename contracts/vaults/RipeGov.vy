@@ -17,11 +17,17 @@ import contracts.vaults.modules.SharesVault as sharesVault
 from ethereum.ercs import IERC20
 from ethereum.ercs import IERC20Detailed
 
+interface Lootbox:
+    def updateDepositPoints(_user: address, _vaultId: uint256, _vaultAddr: address, _asset: address, _a: addys.Addys = empty(addys.Addys)): nonpayable
+
 interface BoardRoom:
     def govPowerDidChangeForUser(_user: address, _userGovPoints: uint256, _totalGovPoints: uint256): nonpayable
 
 interface MissionControl:
-    def getRipeGovVaultConfig(_asset: address) -> RipeGovVaultConfig: view
+    def ripeGovVaultConfig(_asset: address) -> RipeGovVaultConfig: view
+
+interface VaultBook:
+    def getRegId(_vaultAddr: address) -> uint256: view
 
 struct LockTerms:
     minLockDuration: uint256
@@ -62,6 +68,16 @@ event RipeGovVaultTransfer:
     transferAmount: uint256
     isFromUserDepleted: bool
     transferShares: uint256
+
+event LockModified:
+    user: indexed(address)
+    asset: indexed(address)
+    newLockDuration: uint256
+
+event LockReleased:
+    user: indexed(address)
+    asset: indexed(address)
+    exitFee: uint256
 
 # user gov data
 userGovData: public(HashMap[address, HashMap[address, GovData]]) # user -> asset -> GovData
@@ -126,7 +142,7 @@ def _depositTokensInRipeGovVault(
     depositAmount, newShares = sharesVault._depositTokensInVault(_user, _asset, _amount)
 
     # handle gov data/points
-    config: RipeGovVaultConfig = staticcall MissionControl(a.missionControl).getRipeGovVaultConfig(_asset)
+    config: RipeGovVaultConfig = staticcall MissionControl(a.missionControl).ripeGovVaultConfig(_asset)
     lockDuration: uint256 = max(config.lockTerms.minLockDuration, _lockDuration)
     lockDuration = min(lockDuration, config.lockTerms.maxLockDuration)
     self._handleGovDataOnDeposit(_user, _asset, newShares, lockDuration, 0, config)
@@ -186,7 +202,7 @@ def withdrawTokensFromVault(
     withdrawalAmount, withdrawalShares, isDepleted = sharesVault._withdrawTokensFromVault(_user, _asset, _amount, _recipient)
 
     # handle gov data/points
-    config: RipeGovVaultConfig = staticcall MissionControl(a.missionControl).getRipeGovVaultConfig(_asset)
+    config: RipeGovVaultConfig = staticcall MissionControl(a.missionControl).ripeGovVaultConfig(_asset)
     self._handleGovDataOnWithdrawal(_user, _asset, withdrawalShares, True, config)
     self._updateUserGovPoints(_user, _asset, a.missionControl, a.boardroom)
 
@@ -274,7 +290,7 @@ def _handleGovDataOnTransfer(
     _missionControl: address,
     _boardroom: address,
 ):
-    config: RipeGovVaultConfig = staticcall MissionControl(_missionControl).getRipeGovVaultConfig(_asset)
+    config: RipeGovVaultConfig = staticcall MissionControl(_missionControl).ripeGovVaultConfig(_asset)
 
     # from user
     transferPoints: uint256 = self._handleGovDataOnWithdrawal(_fromUser, _asset, _transferShares, False, config)
@@ -308,9 +324,12 @@ def getUserLootBoxShare(_user: address, _asset: address) -> uint256:
     userData: GovData = self.userGovData[_user][_asset]
     if userData.lastShares == 0:
         return 0
-    base: uint256 = userData.lastShares // PRECISION
-    bonus: uint256 = self._getLockBonusPoints(base, userData.unlock, userData.lastTerms)
-    return base + bonus
+
+    points: uint256 = userData.lastShares // PRECISION
+    if userData.lastTerms.maxLockDuration != 0:
+        points += self._getLockBonusPoints(points, userData.unlock, userData.lastTerms)
+
+    return points
 
 
 @view
@@ -382,7 +401,7 @@ def _updateGovPointsForUserAsset(
     _asset: address,
     _missionControl: address,
 ):
-    config: RipeGovVaultConfig = staticcall MissionControl(_missionControl).getRipeGovVaultConfig(_asset)
+    config: RipeGovVaultConfig = staticcall MissionControl(_missionControl).ripeGovVaultConfig(_asset)
 
     userData: GovData = self.userGovData[_user][_asset]
     newPoints: uint256 = self._getLatestGovPoints(userData.lastShares, userData.lastPointsUpdate, userData.unlock, config.lockTerms, config.assetWeight)
@@ -401,12 +420,101 @@ def _updateGovPointsForUserAsset(
     self.totalGovPoints += newPoints
 
 
+####################
+# Lock Adjustments #
+####################
+
+
+@external
+def adjustLock(
+    _user: address,
+    _asset: address,
+    _newLockDuration: uint256,
+    _a: addys.Addys = empty(addys.Addys),
+):
+    assert addys._isValidRipeHqAddr(msg.sender) # dev: no perms
+    a: addys.Addys = addys._getAddys(_a)
+
+    # do a full update first
+    self._updateUserGovPoints(_user, empty(address), a.missionControl, a.boardroom)
+
+    # validation
+    userData: GovData = self.userGovData[_user][_asset]
+    assert userData.lastTerms.maxLockDuration != 0 # dev: no lock terms
+    assert userData.lastShares != 0 # dev: no position
+
+    # update lootbox points
+    vaultId: uint256 = staticcall VaultBook(a.vaultBook).getRegId(self) # dev: invalid vault addr
+    extcall Lootbox(a.lootbox).updateDepositPoints(_user, vaultId, self, _asset, a)
+
+    # update lock duration
+    lockDuration: uint256 = max(_newLockDuration, userData.lastTerms.minLockDuration)
+    lockDuration = min(lockDuration, userData.lastTerms.maxLockDuration)
+    newUnlockBlock: uint256 = block.number + lockDuration
+    assert newUnlockBlock > userData.unlock # dev: new lock cannot be earlier
+    userData.unlock = newUnlockBlock
+    self.userGovData[_user][_asset] = userData
+
+    log LockModified(user=_user, asset=_asset, newLockDuration=lockDuration)
+
+
+@external
+def releaseLock(
+    _user: address,
+    _asset: address,
+    _a: addys.Addys = empty(addys.Addys),
+):
+    assert addys._isValidRipeHqAddr(msg.sender) # dev: no perms
+    a: addys.Addys = addys._getAddys(_a)
+
+    # do a full update first
+    self._updateUserGovPoints(_user, empty(address), a.missionControl, a.boardroom)
+
+    # validation
+    userData: GovData = self.userGovData[_user][_asset]
+    assert userData.unlock > block.number # dev: no release needed
+    assert userData.lastTerms.canExit # dev: cannot exit
+    assert userData.lastShares != 0 # dev: no position
+
+    # update lootbox points
+    vaultId: uint256 = staticcall VaultBook(a.vaultBook).getRegId(self) # dev: invalid vault addr
+    extcall Lootbox(a.lootbox).updateDepositPoints(_user, vaultId, self, _asset, a)
+
+    # handle payment
+    exitFee: uint256 = userData.lastTerms.exitFee
+    assert exitFee != 0 # dev: no exit fee
+
+    # remove shares (cost to exit early)
+    userShares: uint256 = vaultData.userBalances[_user][_asset]
+    sharesToRemove: uint256 = min(userShares, userShares * exitFee // HUNDRED_PERCENT)
+    vaultData._reduceBalanceOnWithdrawal(_user, _asset, sharesToRemove, True)
+    userData.lastShares -= sharesToRemove
+
+    # update lock duration
+    userData.unlock = 0
+    self.userGovData[_user][_asset] = userData
+
+    log LockReleased(user=_user, asset=_asset, exitFee=exitFee)
+
+
 ################
 # Points Utils #
 ################
 
 
 # latest gov points
+
+
+@view
+@external
+def getLatestGovPoints(
+    _lastShares: uint256,
+    _lastPointsUpdate: uint256,
+    _unlock: uint256,
+    _terms: LockTerms,
+    _weight: uint256,
+) -> uint256:
+    return self._getLatestGovPoints(_lastShares, _lastPointsUpdate, _unlock, _terms, _weight)
 
 
 @view
@@ -434,12 +542,24 @@ def _getLatestGovPoints(
     if _weight != 0:
         newPoints = newPoints * _weight // HUNDRED_PERCENT
 
-    # lock boost bonus
-    newPoints += self._getLockBonusPoints(newPoints, _unlock, _terms)
+    # lock boost bonus (only if terms are set)
+    if _terms.maxLockDuration != 0:
+        newPoints += self._getLockBonusPoints(newPoints, _unlock, _terms)
+
     return newPoints
 
 
 # lock bonus points
+
+
+@view
+@external
+def getLockBonusPoints(
+    _points: uint256,
+    _unlock: uint256,
+    _terms: LockTerms,
+) -> uint256:
+    return self._getLockBonusPoints(_points, _unlock, _terms)
 
 
 @view
@@ -464,6 +584,18 @@ def _getLockBonusPoints(
 
 
 @view
+@external
+def getWeightedLockOnTokenDeposit(
+    _newShares: uint256,
+    _newLockDuration: uint256,
+    _lockTerms: LockTerms,
+    _prevShares: uint256,
+    _prevUnlock: uint256,
+) -> uint256:
+    return self._getWeightedLockOnTokenDeposit(_newShares, _newLockDuration, _lockTerms, _prevShares, _prevUnlock)
+
+
+@view
 @internal
 def _getWeightedLockOnTokenDeposit(
     _newShares: uint256,
@@ -479,7 +611,7 @@ def _getWeightedLockOnTokenDeposit(
 
     # previous lock duration
     prevDuration: uint256 = 1
-    if _prevUnlock > block.number:
+    if _prevUnlock > block.number and _lockTerms.maxLockDuration != 0:
         prevDuration = min(_prevUnlock - block.number, _lockTerms.maxLockDuration)
 
     # not allowing zero on `newNormalized` or `newLockDuration` -- or else new deposit won't get any weight
@@ -494,6 +626,12 @@ def _getWeightedLockOnTokenDeposit(
 
 
 # same terms
+
+
+@view
+@external
+def areKeyTermsSame(_newTerms: LockTerms, _prevTerms: LockTerms) -> bool:
+    return self._areKeyTermsSame(_newTerms, _prevTerms)
 
 
 @view
@@ -519,6 +657,12 @@ def _areKeyTermsSame(_newTerms: LockTerms, _prevTerms: LockTerms) -> bool:
 
 
 # refresh unlock
+
+
+@view
+@external
+def refreshUnlock(_prevUnlock: uint256, _newTerms: LockTerms, _prevTerms: LockTerms) -> uint256:
+    return self._refreshUnlock(_prevUnlock, _newTerms, _prevTerms)
 
 
 @view

@@ -12,9 +12,9 @@ import contracts.modules.TimeLock as timeLock
 
 interface MissionControl:
     def setAssetConfig(_asset: address, _assetConfig: AssetConfig): nonpayable
+    def canPerformLiteAction(_user: address) -> bool: view
     def assetConfig(_asset: address) -> AssetConfig: view
     def isSupportedAsset(_asset: address) -> bool: view
-    def canPerformLiteAction(_user: address) -> bool: view
     def maxLtvDeviation() -> uint256: view
 
 interface Whitelist:

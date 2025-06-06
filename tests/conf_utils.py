@@ -215,6 +215,8 @@ def setRipeRewardsConfig(mission_control, switchboard_one):
         _stakersAlloc = 25_00,
         _votersAlloc = 25_00,
         _genDepositorsAlloc = 25_00,
+        _autoStakeRatio = 0,
+        _autoStakeDurationRatio = 0,
     ):
         config = (
             _arePointsEnabled,
@@ -223,6 +225,8 @@ def setRipeRewardsConfig(mission_control, switchboard_one):
             _stakersAlloc,
             _votersAlloc,
             _genDepositorsAlloc,
+            _autoStakeRatio,
+            _autoStakeDurationRatio,
         )
         mission_control.setRipeRewardsConfig(config, sender=switchboard_one.address)
     yield setRipeRewardsConfig

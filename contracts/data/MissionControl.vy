@@ -69,6 +69,8 @@ struct RipeRewardsConfig:
     stakersAlloc: uint256
     votersAlloc: uint256
     genDepositorsAlloc: uint256
+    autoStakeRatio: uint256
+    autoStakeDurationRatio: uint256
 
 struct AssetConfig:
     vaultIds: DynArray[uint256, MAX_VAULTS_PER_ASSET]
@@ -214,6 +216,10 @@ struct StabPoolRedemptionsConfig:
 struct ClaimLootConfig:
     canClaimLoot: bool
     canClaimLootForUser: bool
+    autoStakeRatio: uint256
+    autoStakeDurationRatio: uint256
+    minLockDuration: uint256
+    maxLockDuration: uint256
 
 struct RewardsConfig:
     arePointsEnabled: bool
@@ -281,6 +287,7 @@ priorityStabVaults: public(DynArray[VaultLite, PRIORITY_VAULT_DATA])
 underscoreRegistry: public(address)
 canPerformLiteAction: public(HashMap[address, bool]) # user -> canPerformLiteAction
 maxLtvDeviation: public(uint256)
+ripeGovVaultConfig: public(HashMap[address, RipeGovVaultConfig]) # asset -> config
 
 MAX_VAULTS_PER_ASSET: constant(uint256) = 10
 MAX_PRIORITY_PRICE_SOURCES: constant(uint256) = 10
@@ -598,6 +605,20 @@ def _isUnderscoreWalletOwner(_user: address, _caller: address) -> bool:
     return staticcall UnderscoreWalletConfig(walletConfig).owner() == _caller
 
 
+#########################
+# Ripe Gov Vault Config #
+#########################
+
+
+@external
+def setRipeGovVaultConfig(_asset: address, _assetWeight: uint256, _lockTerms: LockTerms):
+    assert addys._canModifyMissionControl(msg.sender) # dev: no perms
+    self.ripeGovVaultConfig[_asset] = RipeGovVaultConfig(
+        lockTerms=_lockTerms,
+        assetWeight=_assetWeight,
+    )
+
+
 ###################
 # Helpers / Views #
 ###################
@@ -847,14 +868,22 @@ def getStabPoolRedemptionsConfig(_asset: address, _redeemer: address) -> StabPoo
 
 @view
 @external
-def getClaimLootConfig(_user: address, _caller: address) -> ClaimLootConfig:
+def getClaimLootConfig(_user: address, _caller: address, _ripeToken: address) -> ClaimLootConfig:
     canClaimLootForUser: bool = True
     if _user != _caller:
         delegation: ActionDelegation = self.userDelegation[_user][_caller]
         canClaimLootForUser = delegation.canClaimLoot
+
+    ripeTokenVaultConfig: RipeGovVaultConfig = self.ripeGovVaultConfig[_ripeToken]
+    rewardsConfig: RipeRewardsConfig = self.rewardsConfig
+
     return ClaimLootConfig(
         canClaimLoot=self.genConfig.canClaimLoot,
         canClaimLootForUser=canClaimLootForUser,
+        autoStakeRatio=rewardsConfig.autoStakeRatio,
+        autoStakeDurationRatio=rewardsConfig.autoStakeDurationRatio,
+        minLockDuration=ripeTokenVaultConfig.lockTerms.minLockDuration,
+        maxLockDuration=ripeTokenVaultConfig.lockTerms.maxLockDuration,
     )
 
 
@@ -901,19 +930,4 @@ def getPriceConfig() -> PriceConfig:
     return PriceConfig(
         staleTime=self.genConfig.priceStaleTime,
         priorityPriceSourceIds=self.priorityPriceSourceIds,
-    )
-
-
-# ripe gov vault config
-
-
-@view
-@external
-def getRipeGovVaultConfig(_asset: address) -> RipeGovVaultConfig:
-
-    # TODO: hook up all this config / params
-
-    return RipeGovVaultConfig(
-        lockTerms=empty(LockTerms),
-        assetWeight=0,
     )
