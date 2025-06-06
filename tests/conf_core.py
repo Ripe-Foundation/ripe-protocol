@@ -329,10 +329,12 @@ def endaoment(ripe_hq_deploy):
 
 
 @pytest.fixture(scope="session")
-def human_resources(ripe_hq_deploy):
+def human_resources(ripe_hq_deploy, fork):
     return boa.load(
         "contracts/core/HumanResources.vy",
         ripe_hq_deploy,
+        PARAMS[fork]["MIN_HQ_CHANGE_TIMELOCK"],
+        PARAMS[fork]["MAX_HQ_CHANGE_TIMELOCK"],
         name="human_resources",
     )
 
