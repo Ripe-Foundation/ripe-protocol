@@ -23,8 +23,8 @@ actionId: public(uint256)
 actionTimeLock: public(uint256)
 expiration: public(uint256)
 
-MIN_ACTION_TIMELOCK: public(immutable(uint256))
-MAX_ACTION_TIMELOCK: public(immutable(uint256))
+MIN_ACTION_TIMELOCK: immutable(uint256)
+MAX_ACTION_TIMELOCK: immutable(uint256)
 
 
 @deploy

@@ -122,7 +122,7 @@ def __init__(
     _owner: address,
     _manager: address,
     _compensation: uint256,
-    _startTime: uint256,
+    _startDelay: uint256,
     _vestingLength: uint256,
     _cliffLength: uint256,
     _unlockLength: uint256,
@@ -136,17 +136,17 @@ def __init__(
     # key terms validation
     assert empty(address) not in [_owner, _manager] # dev: invalid owner / manager
     assert _compensation != 0 # dev: invalid compensation
-    assert _startTime != 0 # dev: invalid start time
     assert _vestingLength != 0 # dev: invalid vesting length
     assert _unlockLength <= _vestingLength # dev: unlock must be <= vesting
     assert _cliffLength <= _unlockLength # dev: cliff must be <= unlock
 
     # set terms
     self.compensation = _compensation
-    self.startTime = _startTime
-    self.endTime = _startTime + _vestingLength
-    self.cliffTime = _startTime + _cliffLength
-    self.unlockTime = _startTime + _unlockLength
+    startTime: uint256 = block.timestamp + _startDelay
+    self.startTime = startTime
+    self.endTime = startTime + _vestingLength
+    self.cliffTime = startTime + _cliffLength
+    self.unlockTime = startTime + _unlockLength
     self.depositLockDuration = _depositLockDuration
 
     # key action delays

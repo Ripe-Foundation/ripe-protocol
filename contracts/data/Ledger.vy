@@ -149,18 +149,26 @@ indexOfFungLiqUser: public(HashMap[address, uint256]) # liq user -> index
 numFungLiqUsers: public(uint256) # num liq users
 
 # hr contributors
+ripeAvailForHr: public(uint256)
 contributors: public(HashMap[uint256, address]) # index -> contributor addr
 indexOfContributor: public(HashMap[address, uint256]) # contributor -> index
 numContributors: public(uint256) # num contributors
 
 
 @deploy
-def __init__(_ripeHq: address, _ripeAvailForRewards: uint256):
+def __init__(
+    _ripeHq: address,
+    _ripeAvailForRewards: uint256,
+    _ripeAvailForHr: uint256,
+):
     addys.__init__(_ripeHq)
     deptBasics.__init__(False, False, False) # no minting
 
     if _ripeAvailForRewards != 0:
         self.ripeAvailForRewards = _ripeAvailForRewards
+
+    if _ripeAvailForHr != 0:
+        self.ripeAvailForHr = _ripeAvailForHr
 
 
 ###############
@@ -418,7 +426,7 @@ def _setRipeRewards(_ripeRewards: RipeRewards):
 
 @external
 def setRipeAvailForRewards(_amount: uint256):
-    assert msg.sender == addys._getLootboxAddr() # dev: only Lootbox allowed
+    assert addys._canModifyMissionControl(msg.sender) # dev: no perms
     assert not deptBasics.isPaused # dev: not activated
     self.ripeAvailForRewards = _amount
 
@@ -694,7 +702,7 @@ def isHrContributor(_contributor: address) -> bool:
 
 
 @external
-def addHrContributor(_contributor: address):
+def addHrContributor(_contributor: address, _compensation: uint256):
     assert msg.sender == addys._getHumanResourcesAddr() # dev: only hr allowed
     assert not deptBasics.isPaused # dev: not activated
 
@@ -707,3 +715,13 @@ def addHrContributor(_contributor: address):
     self.contributors[uid] = _contributor
     self.indexOfContributor[_contributor] = uid
     self.numContributors = uid + 1
+
+    # update ripe avail for hr
+    self.ripeAvailForHr -= _compensation
+
+
+@external
+def setRipeAvailForHr(_amount: uint256):
+    assert addys._canModifyMissionControl(msg.sender) # dev: no perms
+    assert not deptBasics.isPaused # dev: not activated
+    self.ripeAvailForHr = _amount
