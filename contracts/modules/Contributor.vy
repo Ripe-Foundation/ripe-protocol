@@ -110,7 +110,7 @@ isFrozen: public(bool)
 pendingOwner: public(PendingOwnerChange)
 pendingRipeTransfer: public(PendingRipeTransfer)
 
-HUMAN_RESOURCES_ID: constant(uint256) = 6
+HUMAN_RESOURCES_ID: constant(uint256) = 15
 
 RIPE_HQ: immutable(address)
 MIN_KEY_ACTION_DELAY: immutable(uint256)
@@ -142,6 +142,8 @@ def __init__(
     assert _cliffLength <= _unlockLength # dev: cliff must be <= unlock
 
     # set terms
+    self.owner = _owner
+    self.manager = _manager
     self.compensation = _compensation
     startTime: uint256 = block.timestamp + _startDelay
     self.startTime = startTime
@@ -354,7 +356,7 @@ def _hasPendingOwnerChange() -> bool:
 
 @external 
 def setManager(_newManager: address):
-    if msg.sender not in [self.owner, self.manager]:
+    if msg.sender != self.owner:
         assert staticcall HumanResources(self._getHrAddr()).canModifyHrContributor(msg.sender) # dev: no perms
 
     assert not self._hasPendingOwnerChange() # dev: cannot do with pending ownership change

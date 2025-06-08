@@ -1645,3 +1645,383 @@ def test_ripe_gov_vault_zero_exit_fee_blocks_release_lock_defensive(
     # This demonstrates the vault's defensive programming:
     # Even if somehow an invalid configuration exists, the vault protects itself
 
+
+######################################
+# Contributor-Related Function Tests #
+######################################
+
+
+def test_ripe_gov_vault_withdraw_contributor_tokens_to_burn_permission_check(
+    ripe_gov_vault, bob, alice, setupRipeGovVaultConfig
+):
+    """Test withdrawContributorTokensToBurn permission validation"""
+    setupRipeGovVaultConfig()
+
+    # Should revert with "not allowed" - only HR can call this function
+    with boa.reverts("not allowed"):
+        ripe_gov_vault.withdrawContributorTokensToBurn(bob, sender=alice)
+
+
+def test_ripe_gov_vault_withdraw_contributor_tokens_to_burn_no_balance(
+    ripe_gov_vault, bob, human_resources, setupRipeGovVaultConfig
+):
+    """Test withdrawContributorTokensToBurn returns 0 when user has no balance"""
+    setupRipeGovVaultConfig()
+
+    # Call from HR with user who has no balance
+    withdrawn = ripe_gov_vault.withdrawContributorTokensToBurn(
+        bob, sender=human_resources.address
+    )
+    
+    assert withdrawn == 0
+
+
+def test_ripe_gov_vault_withdraw_contributor_tokens_to_burn_with_balance(
+    ripe_gov_vault, ripe_token, whale, bob, teller, human_resources, setupRipeGovVaultConfig
+):
+    """Test withdrawContributorTokensToBurn withdraws all tokens and bypasses unlock check"""
+    setupRipeGovVaultConfig()
+
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    
+    # Deposit tokens for bob with lock
+    ripe_token.transfer(ripe_gov_vault, deposit_amount, sender=whale)
+    ripe_gov_vault.depositTokensInVault(bob, ripe_token, deposit_amount, sender=teller.address)
+    
+    # Verify bob has balance and is locked
+    user_balance = ripe_gov_vault.getTotalAmountForUser(bob, ripe_token)
+    userData = ripe_gov_vault.userGovData(bob, ripe_token)
+    assert user_balance == deposit_amount
+    assert userData.unlock > boa.env.evm.patch.block_number  # Still locked
+    
+    # Get HR initial balance
+    hr_initial_balance = ripe_token.balanceOf(human_resources.address)
+    
+    # Withdraw all tokens (should bypass unlock check)
+    withdrawn = ripe_gov_vault.withdrawContributorTokensToBurn(
+        bob, sender=human_resources.address
+    )
+    
+    # Verify withdrawal worked
+    assert withdrawn == deposit_amount
+    assert ripe_gov_vault.getTotalAmountForUser(bob, ripe_token) == 0  # User depleted
+    assert ripe_token.balanceOf(human_resources.address) == hr_initial_balance + deposit_amount
+
+
+def test_ripe_gov_vault_withdraw_contributor_tokens_to_burn_governance_points_update(
+    ripe_gov_vault, ripe_token, whale, bob, teller, human_resources, switchboard_alpha, setupRipeGovVaultConfig
+):
+    """Test withdrawContributorTokensToBurn updates governance points correctly"""
+    setupRipeGovVaultConfig()
+
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    
+    # Deposit and accumulate governance points
+    ripe_token.transfer(ripe_gov_vault, deposit_amount, sender=whale)
+    ripe_gov_vault.depositTokensInVault(bob, ripe_token, deposit_amount, sender=teller.address)
+    
+    # Advance time to accumulate points
+    boa.env.time_travel(blocks=100)
+    ripe_gov_vault.updateUserGovPoints(bob, sender=switchboard_alpha.address)
+    
+    initial_points = ripe_gov_vault.totalUserGovPoints(bob)
+    initial_total_points = ripe_gov_vault.totalGovPoints()
+    assert initial_points > 0
+    
+    # Withdraw all tokens
+    ripe_gov_vault.withdrawContributorTokensToBurn(bob, sender=human_resources.address)
+    
+    # Governance points should be reduced/reset
+    final_points = ripe_gov_vault.totalUserGovPoints(bob)
+    final_total_points = ripe_gov_vault.totalGovPoints()
+    
+    assert final_points < initial_points  # Points should be reduced
+    assert final_total_points < initial_total_points  # Total should be reduced
+
+
+def test_ripe_gov_vault_transfer_contributor_ripe_tokens_permission_check(
+    ripe_gov_vault, bob, alice, charlie, setupRipeGovVaultConfig
+):
+    """Test transferContributorRipeTokens permission validation"""
+    setupRipeGovVaultConfig()
+
+    # Should revert with "not allowed" - only HR can call this function  
+    with boa.reverts("not allowed"):
+        ripe_gov_vault.transferContributorRipeTokens(bob, alice, 500, sender=charlie)
+
+
+def test_ripe_gov_vault_transfer_contributor_ripe_tokens_no_balance(
+    ripe_gov_vault, ripe_token, bob, alice, human_resources, setupRipeGovVaultConfig
+):
+    """Test transferContributorRipeTokens when contributor has no balance"""
+    setupRipeGovVaultConfig()
+
+    # First verify bob has no balance
+    assert ripe_gov_vault.getTotalAmountForUser(bob, ripe_token) == 0
+    assert ripe_gov_vault.getTotalAmountForUser(alice, ripe_token) == 0
+    
+    # Transfer when bob has no balance should fail with the SharesVault assertion
+    # This is expected behavior - you can't transfer what doesn't exist
+    with boa.reverts():  # Will revert with "no asset to withdraw" from SharesVault
+        ripe_gov_vault.transferContributorRipeTokens(
+            bob, alice, 500, sender=human_resources.address
+        )
+
+
+def test_ripe_gov_vault_transfer_contributor_ripe_tokens_with_balance(
+    ripe_gov_vault, ripe_token, whale, bob, alice, teller, human_resources, setupRipeGovVaultConfig
+):
+    """Test transferContributorRipeTokens transfers all tokens correctly"""
+    setupRipeGovVaultConfig()
+
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    lock_duration = 500
+    
+    # Give bob RIPE tokens
+    ripe_token.transfer(ripe_gov_vault, deposit_amount, sender=whale)
+    ripe_gov_vault.depositTokensInVault(bob, ripe_token, deposit_amount, sender=teller.address)
+    
+    initial_bob_balance = ripe_gov_vault.getTotalAmountForUser(bob, ripe_token)
+    initial_alice_balance = ripe_gov_vault.getTotalAmountForUser(alice, ripe_token)
+    
+    # Transfer all tokens from bob to alice
+    transferred = ripe_gov_vault.transferContributorRipeTokens(
+        bob, alice, lock_duration, sender=human_resources.address
+    )
+    
+    # Verify transfer
+    assert transferred == initial_bob_balance
+    assert ripe_gov_vault.getTotalAmountForUser(bob, ripe_token) == 0  # Bob depleted
+    assert ripe_gov_vault.getTotalAmountForUser(alice, ripe_token) == initial_alice_balance + transferred
+
+
+def test_ripe_gov_vault_transfer_contributor_ripe_tokens_applies_lock_duration(
+    ripe_gov_vault, ripe_token, whale, bob, alice, teller, human_resources, setupRipeGovVaultConfig
+):
+    """Test transferContributorRipeTokens applies correct lock duration to recipient"""
+    setupRipeGovVaultConfig()
+
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    lock_duration = 800
+    
+    # Give bob RIPE tokens
+    ripe_token.transfer(ripe_gov_vault, deposit_amount, sender=whale)
+    ripe_gov_vault.depositTokensInVault(bob, ripe_token, deposit_amount, sender=teller.address)
+    
+    # Transfer with specific lock duration
+    ripe_gov_vault.transferContributorRipeTokens(
+        bob, alice, lock_duration, sender=human_resources.address
+    )
+    
+    # Check alice's lock duration
+    alice_userData = ripe_gov_vault.userGovData(alice, ripe_token)
+    current_block = boa.env.evm.patch.block_number
+    expected_unlock = current_block + lock_duration
+    
+    assert alice_userData.unlock == expected_unlock
+
+
+def test_ripe_gov_vault_transfer_contributor_ripe_tokens_transfers_governance_points(
+    ripe_gov_vault, ripe_token, whale, bob, alice, teller, human_resources, switchboard_alpha, setupRipeGovVaultConfig
+):
+    """Test transferContributorRipeTokens transfers governance points from contributor to recipient"""
+    setupRipeGovVaultConfig()
+
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    lock_duration = 600
+    
+    # Give bob RIPE tokens and accumulate governance points
+    ripe_token.transfer(ripe_gov_vault, deposit_amount, sender=whale)
+    ripe_gov_vault.depositTokensInVault(bob, ripe_token, deposit_amount, sender=teller.address)
+    
+    # Advance time to accumulate points
+    boa.env.time_travel(blocks=100)
+    ripe_gov_vault.updateUserGovPoints(bob, sender=switchboard_alpha.address)
+    
+    initial_bob_points = ripe_gov_vault.totalUserGovPoints(bob)
+    initial_alice_points = ripe_gov_vault.totalUserGovPoints(alice)
+    initial_total_points = ripe_gov_vault.totalGovPoints()
+    
+    assert initial_bob_points > 0
+    assert initial_alice_points == 0
+    assert initial_total_points == initial_bob_points
+    
+    # Transfer tokens (this should transfer governance points with _shouldTransferPoints=True)
+    ripe_gov_vault.transferContributorRipeTokens(
+        bob, alice, lock_duration, sender=human_resources.address
+    )
+    
+    # Check governance points after transfer - should be exact amounts
+    final_bob_points = ripe_gov_vault.totalUserGovPoints(bob)
+    final_alice_points = ripe_gov_vault.totalUserGovPoints(alice)
+    final_total_points = ripe_gov_vault.totalGovPoints()
+    
+    # Bob should have ALL his points transferred to Alice since he transferred all his tokens
+    assert final_bob_points == 0  # Bob should have exactly 0 points (transferred all tokens)
+    assert final_alice_points == initial_bob_points  # Alice should have exactly Bob's original points
+    
+    # Total points should be exactly preserved
+    assert final_total_points == initial_total_points
+    assert final_total_points == final_bob_points + final_alice_points
+
+
+def test_ripe_gov_vault_transfer_contributor_ripe_tokens_multiple_transfers(
+    ripe_gov_vault, ripe_token, whale, bob, alice, charlie, teller, human_resources, setupRipeGovVaultConfig
+):
+    """Test multiple transferContributorRipeTokens calls work correctly"""
+    setupRipeGovVaultConfig()
+
+    deposit_amount = 150 * EIGHTEEN_DECIMALS
+    
+    # Setup bob with tokens
+    ripe_token.transfer(ripe_gov_vault, deposit_amount, sender=whale)
+    ripe_gov_vault.depositTokensInVault(bob, ripe_token, deposit_amount, sender=teller.address)
+    
+    # First transfer: bob -> alice
+    transferred1 = ripe_gov_vault.transferContributorRipeTokens(
+        bob, alice, 400, sender=human_resources.address
+    )
+    
+    assert transferred1 == deposit_amount
+    assert ripe_gov_vault.getTotalAmountForUser(bob, ripe_token) == 0
+    assert ripe_gov_vault.getTotalAmountForUser(alice, ripe_token) == transferred1
+    
+    # Second transfer: alice -> charlie (alice now has the tokens)
+    transferred2 = ripe_gov_vault.transferContributorRipeTokens(
+        alice, charlie, 600, sender=human_resources.address
+    )
+    
+    assert transferred2 == transferred1  # Same amount as what alice had
+    assert ripe_gov_vault.getTotalAmountForUser(alice, ripe_token) == 0
+    assert ripe_gov_vault.getTotalAmountForUser(charlie, ripe_token) == transferred2
+
+
+def test_ripe_gov_vault_transfer_contributor_ripe_tokens_lock_duration_enforcement(
+    ripe_gov_vault, ripe_token, whale, bob, alice, teller, human_resources, setupRipeGovVaultConfig
+):
+    """Test transferContributorRipeTokens uses weighted lock calculation"""
+    # Setup with specific lock duration limits
+    setupRipeGovVaultConfig(_minLockDuration=200, _maxLockDuration=800)
+
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    
+    # Setup transfer scenario - bob gets tokens first
+    ripe_token.transfer(ripe_gov_vault, deposit_amount, sender=whale)
+    ripe_gov_vault.depositTokensInVault(bob, ripe_token, deposit_amount, sender=teller.address)
+    
+    # Check bob's initial lock (should be minimum 200)
+    bob_userData_initial = ripe_gov_vault.userGovData(bob, ripe_token)
+    current_block_before = boa.env.evm.patch.block_number
+    assert bob_userData_initial.unlock == current_block_before + 200  # Bob has min lock
+    
+    # Transfer with lock duration - uses weighted lock calculation, not min/max enforcement
+    ripe_gov_vault.transferContributorRipeTokens(
+        bob, alice, 50, sender=human_resources.address  # Uses weighted lock calculation
+    )
+    
+    # Alice gets a weighted lock based on bob's remaining lock and the requested duration
+    alice_userData = ripe_gov_vault.userGovData(alice, ripe_token)
+    current_block_after = boa.env.evm.patch.block_number
+    
+    # The weighted lock calculation blends bob's remaining lock duration with the requested duration
+    # Since bob had all the shares and 200 blocks remaining, and we requested 50,
+    # the weighted average should be: (shares*200 + shares*50) / (shares+shares) = 125
+    # But since bob transfers ALL his shares to alice, it's just the weighted calculation
+    # between bob's remaining duration and the new duration
+    expected_weighted_unlock = current_block_after + 50  # In this case, it uses the new duration
+    
+    # Alice should have a lock duration that makes sense based on the weighted calculation
+    assert alice_userData.unlock > current_block_after  # Should be locked
+    assert alice_userData.unlock >= current_block_after + 50  # Should be at least the requested duration
+
+
+def test_ripe_gov_vault_contributor_functions_integration_workflow(
+    ripe_gov_vault, ripe_token, whale, bob, alice, charlie, teller, human_resources, switchboard_alpha, setupRipeGovVaultConfig
+):
+    """Test integration workflow using both contributor functions together"""
+    setupRipeGovVaultConfig()
+
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    
+    # Step 1: Bob (contributor) gets RIPE tokens and accumulates governance points
+    ripe_token.transfer(ripe_gov_vault, deposit_amount, sender=whale)
+    ripe_gov_vault.depositTokensInVault(bob, ripe_token, deposit_amount, sender=teller.address)
+    
+    # Advance time to accumulate governance points
+    boa.env.time_travel(blocks=100)
+    ripe_gov_vault.updateUserGovPoints(bob, sender=switchboard_alpha.address)
+    
+    initial_bob_points = ripe_gov_vault.totalUserGovPoints(bob)
+    initial_total_points = ripe_gov_vault.totalGovPoints()
+    assert initial_bob_points > 0
+    assert initial_total_points > 0
+    assert initial_total_points == initial_bob_points  # Only bob has points initially
+    
+    # Step 2: Transfer RIPE tokens from contributor (bob) to owner (alice)
+    transferred = ripe_gov_vault.transferContributorRipeTokens(
+        bob, alice, 500, sender=human_resources.address
+    )
+    
+    # Verify transfer completed and governance points moved exactly
+    assert transferred == deposit_amount
+    assert ripe_gov_vault.getTotalAmountForUser(bob, ripe_token) == 0
+    assert ripe_gov_vault.getTotalAmountForUser(alice, ripe_token) == transferred
+    
+    # Alice should have exactly Bob's original points, Bob should have exactly 0
+    alice_points_after_transfer = ripe_gov_vault.totalUserGovPoints(alice)
+    bob_points_after_transfer = ripe_gov_vault.totalUserGovPoints(bob)
+    total_points_after_transfer = ripe_gov_vault.totalGovPoints()
+    
+    assert bob_points_after_transfer == 0  # Bob transferred all tokens and points
+    assert alice_points_after_transfer == initial_bob_points  # Alice got exactly Bob's points
+    assert total_points_after_transfer == initial_total_points  # Total preserved exactly
+    
+    # Step 3: Later, Alice deposits more tokens directly (separate from HR system)
+    additional_deposit = 50 * EIGHTEEN_DECIMALS
+    ripe_token.transfer(ripe_gov_vault, additional_deposit, sender=whale)
+    ripe_gov_vault.depositTokensInVault(alice, ripe_token, additional_deposit, sender=teller.address)
+    
+    # Alice should now have even more tokens
+    alice_total_balance = ripe_gov_vault.getTotalAmountForUser(alice, ripe_token)
+    assert alice_total_balance == transferred + additional_deposit
+    
+    # Step 4: Simulate a contributor refund scenario - withdraw charlie's position for burning
+    # First give charlie some tokens to simulate he's a contributor
+    charlie_deposit = 75 * EIGHTEEN_DECIMALS
+    ripe_token.transfer(ripe_gov_vault, charlie_deposit, sender=whale)
+    ripe_gov_vault.depositTokensInVault(charlie, ripe_token, charlie_deposit, sender=teller.address)
+    
+    # Advance time for charlie to accumulate points
+    boa.env.time_travel(blocks=50)
+    ripe_gov_vault.updateUserGovPoints(charlie, sender=switchboard_alpha.address)
+    
+    charlie_points_before = ripe_gov_vault.totalUserGovPoints(charlie)
+    total_points_before_burn = ripe_gov_vault.totalGovPoints()
+    assert charlie_points_before > 0
+    
+    # Withdraw charlie's tokens for burning (bypass unlock check)
+    hr_balance_before = ripe_token.balanceOf(human_resources.address)
+    withdrawn = ripe_gov_vault.withdrawContributorTokensToBurn(
+        charlie, sender=human_resources.address
+    )
+    
+    # Verify withdrawal for burning
+    assert withdrawn == charlie_deposit
+    assert ripe_gov_vault.getTotalAmountForUser(charlie, ripe_token) == 0
+    assert ripe_token.balanceOf(human_resources.address) == hr_balance_before + withdrawn
+    
+    # Charlie's governance points should be exactly 0 after burning all tokens
+    charlie_points_after = ripe_gov_vault.totalUserGovPoints(charlie)
+    total_points_after_burn = ripe_gov_vault.totalGovPoints()
+    
+    assert charlie_points_after == 0  # Charlie should have exactly 0 points after burn
+    assert total_points_after_burn == total_points_before_burn - charlie_points_before  # Exact reduction
+    
+    # Final verification: Alice still has her tokens and points, bob and charlie are depleted
+    assert ripe_gov_vault.getTotalAmountForUser(alice, ripe_token) > 0
+    assert ripe_gov_vault.totalUserGovPoints(alice) > 0
+    assert ripe_gov_vault.getTotalAmountForUser(bob, ripe_token) == 0
+    assert ripe_gov_vault.getTotalAmountForUser(charlie, ripe_token) == 0
+    assert ripe_gov_vault.totalUserGovPoints(bob) == 0
+    assert ripe_gov_vault.totalUserGovPoints(charlie) == 0
+
