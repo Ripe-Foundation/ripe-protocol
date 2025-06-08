@@ -61,6 +61,12 @@ event RipeGovVaultWithdrawal:
     isDepleted: bool
     shares: uint256
 
+event RipeGovVaultBurnContributorTokens:
+    user: indexed(address)
+    asset: indexed(address)
+    amount: uint256
+    shares: uint256
+
 event RipeGovVaultTransfer:
     fromUser: indexed(address)
     toUser: indexed(address)
@@ -199,6 +205,31 @@ def withdrawTokensFromVault(
 ) -> (uint256, bool):
     assert msg.sender in [addys._getTellerAddr(), addys._getAuctionHouseAddr(), addys._getCreditEngineAddr(), addys._getHumanResourcesAddr()] # dev: not allowed
     a: addys.Addys = addys._getAddys(_a)
+    return self._withdrawTokensFromVault(_user, _asset, _amount, _recipient, True, a)
+
+
+@external
+def withdrawContributorTokensToBurn(_user: address, _a: addys.Addys = empty(addys.Addys)) -> uint256:
+    hr: address = addys._getHumanResourcesAddr()
+    assert msg.sender == hr # dev: not allowed
+    a: addys.Addys = addys._getAddys(_a)
+    if vaultData.userBalances[_user][a.ripeToken] == 0:
+        return 0
+    withdrawalAmount: uint256 = 0
+    isDepleted: bool = False
+    withdrawalAmount, isDepleted = self._withdrawTokensFromVault(_user, a.ripeToken, max_value(uint256), hr, False, a)
+    return withdrawalAmount
+
+
+@internal
+def _withdrawTokensFromVault(
+    _user: address,
+    _asset: address,
+    _amount: uint256,
+    _recipient: address,
+    _shouldCheckUnlock: bool,
+    _a: addys.Addys,
+) -> (uint256, bool):
 
     # withdraw tokens (using shares module)
     withdrawalAmount: uint256 = 0
@@ -207,9 +238,9 @@ def withdrawTokensFromVault(
     withdrawalAmount, withdrawalShares, isDepleted = sharesVault._withdrawTokensFromVault(_user, _asset, _amount, _recipient)
 
     # handle gov data/points
-    config: RipeGovVaultConfig = staticcall MissionControl(a.missionControl).ripeGovVaultConfig(_asset)
-    self._handleGovDataOnWithdrawal(_user, _asset, withdrawalShares, True, config)
-    self._updateUserGovPoints(_user, _asset, a.missionControl, a.boardroom)
+    config: RipeGovVaultConfig = staticcall MissionControl(_a.missionControl).ripeGovVaultConfig(_asset)
+    self._handleGovDataOnWithdrawal(_user, _asset, withdrawalShares, _shouldCheckUnlock, config)
+    self._updateUserGovPoints(_user, _asset, _a.missionControl, _a.boardroom)
 
     log RipeGovVaultWithdrawal(user=_user, asset=_asset, amount=withdrawalAmount, isDepleted=isDepleted, shares=withdrawalShares)
     return withdrawalAmount, isDepleted

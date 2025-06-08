@@ -31,8 +31,8 @@ interface Ledger:
     def ripeAvailForHr() -> uint256: view
 
 interface RipeGovVault:
-    def withdrawTokensFromVault(_user: address, _asset: address, _amount: uint256, _recipient: address, _a: addys.Addys = empty(addys.Addys)) -> (uint256, bool): nonpayable
     def transferContributorRipeTokens(_contributor: address, _toUser: address, _lockDuration: uint256, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
+    def withdrawContributorTokensToBurn(_user: address, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
 
 interface RipeToken:
     def mint(_to: address, _amount: uint256): nonpayable
@@ -431,16 +431,12 @@ def refundAfterCancelPaycheck(_amount: uint256, _shouldBurnPosition: bool):
     if not _shouldBurnPosition:
         return
 
-    ripeGovVaultAddr: address = staticcall VaultBook(a.vaultBook).getAddr(RIPE_GOV_VAULT_ID)
-    if not staticcall Vault(ripeGovVaultAddr).doesUserHaveBalance(msg.sender, a.ripeToken):
-        return
-
     # withdraw and burn position
-    withdrawalAmount: uint256 = 0
-    na: bool = False
-    withdrawalAmount, na = extcall RipeGovVault(ripeGovVaultAddr).withdrawTokensFromVault(msg.sender, a.ripeToken, max_value(uint256), self, a)
+    ripeGovVaultAddr: address = staticcall VaultBook(a.vaultBook).getAddr(RIPE_GOV_VAULT_ID)
+    withdrawalAmount: uint256 = extcall RipeGovVault(ripeGovVaultAddr).withdrawContributorTokensToBurn(msg.sender, a)
     burnAmount: uint256 = min(withdrawalAmount, staticcall IERC20(a.ripeToken).balanceOf(self))
-    extcall RipeToken(a.ripeToken).burn(burnAmount)
+    if burnAmount != 0:
+        extcall RipeToken(a.ripeToken).burn(burnAmount)
 
 
 #########
