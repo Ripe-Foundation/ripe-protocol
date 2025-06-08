@@ -1,7 +1,7 @@
 import pytest
 import boa
 
-from constants import EIGHTEEN_DECIMALS, ZERO_ADDRESS, HUNDRED_PERCENT
+from constants import EIGHTEEN_DECIMALS
 
 
 @pytest.fixture(scope="module")

@@ -1,7 +1,7 @@
 import pytest
 import boa
 
-from constants import EIGHTEEN_DECIMALS, MAX_UINT256, ZERO_ADDRESS
+from constants import EIGHTEEN_DECIMALS, MAX_UINT256
 from conf_utils import filter_logs
 
 
