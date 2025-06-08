@@ -139,6 +139,14 @@ struct LockTerms:
     canExit: bool
     exitFee: uint256
 
+struct HrConfig:
+    contribTemplate: address
+    maxCompensation: uint256
+    minCliffLength: uint256
+    maxStartDelay: uint256
+    minVestingLength: uint256
+    maxVestingLength: uint256
+
 # helpers
 
 struct TellerDepositConfig:
@@ -288,6 +296,7 @@ underscoreRegistry: public(address)
 canPerformLiteAction: public(HashMap[address, bool]) # user -> canPerformLiteAction
 maxLtvDeviation: public(uint256)
 ripeGovVaultConfig: public(HashMap[address, RipeGovVaultConfig]) # asset -> config
+hrConfig: public(HrConfig)
 
 MAX_VAULTS_PER_ASSET: constant(uint256) = 10
 MAX_PRIORITY_PRICE_SOURCES: constant(uint256) = 10
@@ -617,6 +626,17 @@ def setRipeGovVaultConfig(_asset: address, _assetWeight: uint256, _lockTerms: Lo
         lockTerms=_lockTerms,
         assetWeight=_assetWeight,
     )
+
+
+#############
+# HR Config #
+#############
+
+
+@external
+def setHrConfig(_config: HrConfig):
+    assert addys._canModifyMissionControl(msg.sender) # dev: no perms
+    self.hrConfig = _config
 
 
 ###################

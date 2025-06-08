@@ -434,8 +434,7 @@ def cancelPaycheck():
     self.endTime = block.timestamp
 
     # tell HR forfeited amount
-    shouldBurnPosition: bool = not didReachCliff and self.totalClaimed != 0
-    extcall HumanResources(hr).refundAfterCancelPaycheck(forfeitedAmount, shouldBurnPosition) # dev: could not refund
+    extcall HumanResources(hr).refundAfterCancelPaycheck(forfeitedAmount, not didReachCliff)
 
     log RipePaycheckCancelled(owner=owner, forfeitedAmount=forfeitedAmount, didReachCliff=didReachCliff)
 

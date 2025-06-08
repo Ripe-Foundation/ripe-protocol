@@ -143,6 +143,10 @@ def ripe_hq(
     ripe_hq_deploy.initiateHqConfigChange(12, True, False, False, False, sender=deploy3r)
     assert ripe_hq_deploy.confirmHqConfigChange(12, sender=deploy3r)
 
+    # human resources can mint ripe
+    ripe_hq_deploy.initiateHqConfigChange(14, False, True, False, False, sender=deploy3r)
+    assert ripe_hq_deploy.confirmHqConfigChange(14, sender=deploy3r)
+
     # lootbox can mint ripe
     ripe_hq_deploy.initiateHqConfigChange(15, False, True, False, False, sender=deploy3r)
     assert ripe_hq_deploy.confirmHqConfigChange(15, sender=deploy3r)
@@ -168,6 +172,11 @@ def ripe_hq(
     assert ripe_hq_deploy.finishRipeHqSetup(governance, sender=deploy3r)
 
     return ripe_hq_deploy
+
+
+@pytest.fixture(scope="session")
+def contributor_template():
+    return boa.load_partial("contracts/modules/Contributor.vy").deploy_as_blueprint()
 
 
 ##########

@@ -135,6 +135,7 @@ MAX_AUCTION_PURCHASES: constant(uint256) = 20
 MAX_LIQ_USERS: constant(uint256) = 50
 MAX_STAB_CLAIMS: constant(uint256) = 15
 MAX_STAB_REDEMPTIONS: constant(uint256) = 15
+RIPE_GOV_VAULT_ID: constant(uint256) = 2
 
 
 @deploy
@@ -648,19 +649,19 @@ def claimLootForManyUsers(_users: DynArray[address, MAX_CLAIM_USERS], _shouldSta
 
 @nonreentrant
 @external
-def adjustLock(_vaultId: uint256, _asset: address, _newLockDuration: uint256):
+def adjustLock(_asset: address, _newLockDuration: uint256):
     assert not deptBasics.isPaused # dev: contract paused
     a: addys.Addys = addys._getAddys()
-    vaultAddr: address = staticcall VaultBook(a.vaultBook).getAddr(_vaultId)
+    vaultAddr: address = staticcall VaultBook(a.vaultBook).getAddr(RIPE_GOV_VAULT_ID)
     extcall RipeGovVault(vaultAddr).adjustLock(msg.sender, _asset, _newLockDuration, a)
 
 
 @nonreentrant
 @external
-def releaseLock(_vaultId: uint256, _asset: address):
+def releaseLock(_asset: address):
     assert not deptBasics.isPaused # dev: contract paused
     a: addys.Addys = addys._getAddys()
-    vaultAddr: address = staticcall VaultBook(a.vaultBook).getAddr(_vaultId)
+    vaultAddr: address = staticcall VaultBook(a.vaultBook).getAddr(RIPE_GOV_VAULT_ID)
     extcall RipeGovVault(vaultAddr).releaseLock(msg.sender, _asset, a)
 
 
@@ -674,8 +675,7 @@ def depositIntoGovVaultFromTrusted(
 ) -> uint256:
     assert addys._isValidRipeHqAddr(msg.sender) # dev: no perms
     a: addys.Addys = addys._getAddys(_a)
-    ripeGovVaultId: uint256 = 2 # NOTE: ripe gov vault id must be 2 !!
-    amount: uint256 = self._deposit(_asset, _amount, _user, empty(address), ripeGovVaultId, msg.sender, _lockDuration, a)
+    amount: uint256 = self._deposit(_asset, _amount, _user, empty(address), RIPE_GOV_VAULT_ID, msg.sender, _lockDuration, a)
     extcall CreditEngine(a.creditEngine).updateDebtForUser(_user, a)
     return amount
 

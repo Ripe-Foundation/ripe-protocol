@@ -199,7 +199,12 @@ def _getNumUserVaults(_user: address) -> uint256:
 
 @external
 def addVaultToUser(_user: address, _vaultId: uint256):
-    assert msg.sender in [addys._getTellerAddr(), addys._getCreditEngineAddr(), addys._getAuctionHouseAddr()] # dev: not allowed
+    assert msg.sender in [
+        addys._getTellerAddr(),
+        addys._getCreditEngineAddr(),
+        addys._getAuctionHouseAddr(),
+        addys._getHumanResourcesAddr(),
+    ] # dev: not allowed
     assert not deptBasics.isPaused # dev: not activated
 
     # already participating - fail gracefully

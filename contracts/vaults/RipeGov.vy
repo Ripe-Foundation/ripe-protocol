@@ -197,7 +197,7 @@ def withdrawTokensFromVault(
     _recipient: address,
     _a: addys.Addys = empty(addys.Addys),
 ) -> (uint256, bool):
-    assert msg.sender in [addys._getTellerAddr(), addys._getAuctionHouseAddr(), addys._getCreditEngineAddr()] # dev: not allowed
+    assert msg.sender in [addys._getTellerAddr(), addys._getAuctionHouseAddr(), addys._getCreditEngineAddr(), addys._getHumanResourcesAddr()] # dev: not allowed
     a: addys.Addys = addys._getAddys(_a)
 
     # withdraw tokens (using shares module)

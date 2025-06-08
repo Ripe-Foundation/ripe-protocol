@@ -17,14 +17,42 @@ import contracts.modules.DeptBasics as deptBasics
 import contracts.modules.LocalGov as gov
 import contracts.modules.TimeLock as timeLock
 
+from interfaces import Vault
 from interfaces import Department
+from ethereum.ercs import IERC20
 
 interface Ledger:
     def addHrContributor(_contributor: address, _compensation: uint256): nonpayable
+    def addVaultToUser(_user: address, _vaultId: uint256): nonpayable
+    def isHrContributor(_contributor: address) -> bool: view
+    def setRipeAvailForHr(_amount: uint256): nonpayable
+    def contributors(i: uint256) -> address: view
+    def numContributors() -> uint256: view
     def ripeAvailForHr() -> uint256: view
 
+interface RipeGovVault:
+    def withdrawTokensFromVault(_user: address, _asset: address, _amount: uint256, _recipient: address, _a: addys.Addys = empty(addys.Addys)) -> (uint256, bool): nonpayable
+    def transferContributorRipeTokens(_contributor: address, _toUser: address, _lockDuration: uint256, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
+
+interface RipeToken:
+    def mint(_to: address, _amount: uint256): nonpayable
+    def burn(_amount: uint256) -> bool: nonpayable
+
+interface HrContributor:
+    def totalClaimed() -> uint256: view
+    def compensation() -> uint256: view
+
+interface Teller:
+    def depositIntoGovVaultFromTrusted(_user: address, _asset: address, _amount: uint256, _lockDuration: uint256, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
+
+interface Lootbox:
+    def updateDepositPoints(_user: address, _vaultId: uint256, _vaultAddr: address, _asset: address, _a: addys.Addys = empty(addys.Addys)): nonpayable
+
+interface VaultBook:
+    def getAddr(_vaultId: uint256) -> address: view
+
 interface MissionControl:
-    def getHrConfig() -> HrConfig: view
+    def hrConfig() -> HrConfig: view
 
 struct ContributorTerms:
     owner: address
@@ -43,7 +71,6 @@ struct HrConfig:
     maxStartDelay: uint256
     minVestingLength: uint256
     maxVestingLength: uint256
-    ripeAvailForHr: uint256
 
 event NewContributorInitiated:
     owner: indexed(address)
@@ -84,6 +111,8 @@ event NewContributorCancelled:
 # pending
 pendingContributor: public(HashMap[uint256, ContributorTerms]) # aid -> terms
 
+RIPE_GOV_VAULT_ID: constant(uint256) = 2
+
 
 @deploy
 def __init__(
@@ -95,14 +124,6 @@ def __init__(
     deptBasics.__init__(False, False, True) # can mint ripe only
     gov.__init__(_ripeHq, empty(address), 0, 0, 0)
     timeLock.__init__(_minConfigTimeLock, _maxConfigTimeLock, 0, _maxConfigTimeLock)
-
-
-@view
-@internal
-def _getHrConfig(_missionControl: address, _ledger: address) -> HrConfig:
-    hrConfig: HrConfig = staticcall MissionControl(_missionControl).getHrConfig()
-    hrConfig.ripeAvailForHr = staticcall Ledger(_ledger).ripeAvailForHr()
-    return hrConfig
 
 
 ####################
@@ -138,8 +159,8 @@ def initiateNewContributor(
         unlockLength=_unlockLength,
         depositLockDuration=_depositLockDuration,
     )
-    hrConfig: HrConfig = self._getHrConfig(a.missionControl, a.ledger)
-    assert self._areValidContributorTerms(terms, hrConfig) # dev: invalid terms
+    hrConfig: HrConfig = staticcall MissionControl(a.missionControl).hrConfig()
+    assert self._areValidContributorTerms(terms, hrConfig, a.ledger) # dev: invalid terms
 
     aid: uint256 = timeLock._initiateAction()
     self.pendingContributor[aid] = terms
@@ -171,8 +192,8 @@ def confirmNewContributor(_aid: uint256) -> bool:
     terms: ContributorTerms = self.pendingContributor[_aid]
     assert terms.owner != empty(address) # dev: no pending contributor
 
-    hrConfig: HrConfig = self._getHrConfig(a.missionControl, a.ledger)
-    if not self._areValidContributorTerms(terms, hrConfig):
+    hrConfig: HrConfig = staticcall MissionControl(a.missionControl).hrConfig()
+    if not self._areValidContributorTerms(terms, hrConfig, a.ledger):
         self._cancelNewPendingContributor(_aid)
         return False
 
@@ -277,13 +298,13 @@ def areValidContributorTerms(
         unlockLength=_unlockLength,
         depositLockDuration=_depositLockDuration,
     )
-    hrConfig: HrConfig = self._getHrConfig(a.missionControl, a.ledger)
-    return self._areValidContributorTerms(terms, hrConfig)
+    hrConfig: HrConfig = staticcall MissionControl(a.missionControl).hrConfig()
+    return self._areValidContributorTerms(terms, hrConfig, a.ledger)
 
 
 @view
 @internal
-def _areValidContributorTerms(_terms: ContributorTerms, _hrConfig: HrConfig) -> bool:
+def _areValidContributorTerms(_terms: ContributorTerms, _hrConfig: HrConfig, _ledger: address) -> bool:
 
     # must have a template
     if _hrConfig.contribTemplate == empty(address):
@@ -294,7 +315,7 @@ def _areValidContributorTerms(_terms: ContributorTerms, _hrConfig: HrConfig) -> 
         return False
 
     # check what's available for HR
-    if _terms.compensation > _hrConfig.ripeAvailForHr:
+    if _terms.compensation > staticcall Ledger(_ledger).ripeAvailForHr():
         return False
 
     if _hrConfig.maxCompensation != 0 and _terms.compensation > _hrConfig.maxCompensation:
@@ -334,45 +355,114 @@ def _areValidContributorTerms(_terms: ContributorTerms, _hrConfig: HrConfig) -> 
     return True
 
 
-#####################
-# TO DO TO DO TO DO #
-#####################
+####################
+# From Contributor #
+####################
 
 
 @external
 def transferContributorRipeTokens(_owner: address, _lockDuration: uint256) -> uint256:
-    # TODO: add vault to ledger, update deposit points, do all the things teller would do
-    return 0
+    assert not deptBasics.isPaused # dev: contract paused
+    a: addys.Addys = addys._getAddys()
+    assert staticcall Ledger(a.ledger).isHrContributor(msg.sender) # dev: not a contributor
+
+    # transfer tokens in ripe gov vault
+    vaultId: uint256 = RIPE_GOV_VAULT_ID
+    ripeGovVaultAddr: address = staticcall VaultBook(a.vaultBook).getAddr(vaultId) 
+    amount: uint256 = extcall RipeGovVault(ripeGovVaultAddr).transferContributorRipeTokens(msg.sender, _owner, _lockDuration, a)
+
+    extcall Ledger(a.ledger).addVaultToUser(_owner, vaultId)
+    extcall Lootbox(a.lootbox).updateDepositPoints(_owner, vaultId, ripeGovVaultAddr, a.ripeToken, a)
+    return amount
 
 
 @external
 def cashRipeCheck(_amount: uint256, _lockDuration: uint256) -> bool:
-    # mint, deposit (similar to lootbox deposit)
+    assert not deptBasics.isPaused # dev: contract paused
+    a: addys.Addys = addys._getAddys()
+    assert staticcall Ledger(a.ledger).isHrContributor(msg.sender) # dev: not a contributor
+
+    # mint ripe tokens here
+    extcall RipeToken(a.ripeToken).mint(self, _amount)
+
+    # deposit into gov vault
+    assert extcall IERC20(a.ripeToken).approve(a.teller, _amount, default_return_value=True) # dev: ripe approval failed
+    extcall Teller(a.teller).depositIntoGovVaultFromTrusted(msg.sender, a.ripeToken, _amount, _lockDuration, a)
+    assert extcall IERC20(a.ripeToken).approve(a.teller, 0, default_return_value=True) # dev: ripe approval failed
     return True
 
 
 @external
 def refundAfterCancelPaycheck(_amount: uint256, _shouldBurnPosition: bool):
-    # TODO: refund after cancel paycheck
-    # burn position in ripe gov vault if _shouldBurnPosition
-    pass
+    assert not deptBasics.isPaused # dev: contract paused
+    a: addys.Addys = addys._getAddys()
+    assert staticcall Ledger(a.ledger).isHrContributor(msg.sender) # dev: not a contributor
+
+    # refund ledger 
+    currentRipeAvail: uint256 = staticcall Ledger(a.ledger).ripeAvailForHr()
+    extcall Ledger(a.ledger).setRipeAvailForHr(currentRipeAvail + _amount)
+
+    if not _shouldBurnPosition:
+        return
+
+    ripeGovVaultAddr: address = staticcall VaultBook(a.vaultBook).getAddr(RIPE_GOV_VAULT_ID)
+    if not staticcall Vault(ripeGovVaultAddr).doesUserHaveBalance(msg.sender, a.ripeToken):
+        return
+
+    # withdraw and burn position
+    withdrawalAmount: uint256 = 0
+    na: bool = False
+    withdrawalAmount, na = extcall RipeGovVault(ripeGovVaultAddr).withdrawTokensFromVault(msg.sender, a.ripeToken, max_value(uint256), self, a)
+    burnAmount: uint256 = min(withdrawalAmount, staticcall IERC20(a.ripeToken).balanceOf(self))
+    extcall RipeToken(a.ripeToken).burn(burnAmount)
 
 
 @view
 @external
 def hasRipeBalance(_contributor: address) -> bool:
-    # TODO: get balance from vault
-    return True
+    a: addys.Addys = addys._getAddys()
+    ripeGovVaultAddr: address = staticcall VaultBook(a.vaultBook).getAddr(RIPE_GOV_VAULT_ID) 
+    return staticcall Vault(ripeGovVaultAddr).doesUserHaveBalance(_contributor, a.ripeToken)
 
 
-# THINGS TO ADD TO SWITCHBOARD FOUR
+#########
+# Other #
+#########
 
-# OTHER CONTRIBUTOR THINGS
-# cashRipeCheck for contributor
-# cancelRipeTransfer for contributor
-# cancelOwnershipChange for contributor
-# setManager for contributor
 
-# THINGS ONLY HR CAN DO
-# setIsFrozen
-# cancelPaycheck
+@view
+@external
+def getTotalClaimed() -> uint256:
+    ledger: address = addys._getLedgerAddr()
+
+    numContributors: uint256 = staticcall Ledger(ledger).numContributors()
+    if numContributors == 0:
+        return 0
+
+    totalClaimed: uint256 = 0
+    for i: uint256 in range(1, numContributors, bound=max_value(uint256)):
+        contributorAddr: address = staticcall Ledger(ledger).contributors(i)
+        if contributorAddr == empty(address):
+            continue
+        totalClaimed += staticcall HrContributor(contributorAddr).totalClaimed()
+
+    return totalClaimed
+
+
+@view
+@external
+def getTotalCompensation() -> uint256:
+    ledger: address = addys._getLedgerAddr()
+
+    numContributors: uint256 = staticcall Ledger(ledger).numContributors()
+    if numContributors == 0:
+        return 0
+
+    totalCompensation: uint256 = 0
+    for i: uint256 in range(1, numContributors, bound=max_value(uint256)):
+        contributorAddr: address = staticcall Ledger(ledger).contributors(i)
+        if contributorAddr == empty(address):
+            continue
+        totalCompensation += staticcall HrContributor(contributorAddr).compensation()
+
+    return totalCompensation
