@@ -323,7 +323,7 @@ def __init__(_ripeHq: address):
 
 @external
 def setGeneralConfig(_config: GenConfig):
-    assert addys._canModifyMissionControl(msg.sender) # dev: no perms
+    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
     self.genConfig = _config
 
 
@@ -332,7 +332,7 @@ def setGeneralConfig(_config: GenConfig):
 
 @external
 def setGeneralDebtConfig(_config: GenDebtConfig):
-    assert addys._canModifyMissionControl(msg.sender) # dev: no perms
+    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
     self.genDebtConfig = _config
 
 
@@ -341,7 +341,7 @@ def setGeneralDebtConfig(_config: GenDebtConfig):
 
 @external
 def setRipeRewardsConfig(_config: RipeRewardsConfig):
-    assert addys._canModifyMissionControl(msg.sender) # dev: no perms
+    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
     self.rewardsConfig = _config
 
 
@@ -352,7 +352,7 @@ def setRipeRewardsConfig(_config: RipeRewardsConfig):
 
 @external
 def setAssetConfig(_asset: address, _config: AssetConfig):
-    assert addys._canModifyMissionControl(msg.sender) # dev: no perms
+    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
     self._updatePointsAllocs(_asset, _config.stakersPointsAlloc, _config.voterPointsAlloc) # do first!
     self.assetConfig[_asset] = _config
 
@@ -392,7 +392,7 @@ def _registerAsset(_asset: address):
 
 @external
 def deregisterAsset(_asset: address) -> bool:
-    assert addys._canModifyMissionControl(msg.sender) # dev: no perms
+    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
 
     numAssets: uint256 = self.numAssets
     if numAssets == 0:
@@ -456,7 +456,7 @@ def _getNumAssets() -> uint256:
 
 @external
 def setPriorityPriceSourceIds(_priorityIds: DynArray[uint256, MAX_PRIORITY_PRICE_SOURCES]):
-    assert addys._canModifyMissionControl(msg.sender) # dev: no perms
+    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
     self.priorityPriceSourceIds = _priorityIds
 
 
@@ -471,7 +471,7 @@ def getPriorityPriceSourceIds() -> DynArray[uint256, MAX_PRIORITY_PRICE_SOURCES]
 
 @external
 def setPriorityLiqAssetVaults(_priorityLiqAssetVaults: DynArray[VaultLite, PRIORITY_VAULT_DATA]):
-    assert addys._canModifyMissionControl(msg.sender) # dev: no perms
+    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
     self.priorityLiqAssetVaults = _priorityLiqAssetVaults
 
 
@@ -486,7 +486,7 @@ def getPriorityLiqAssetVaults() -> DynArray[VaultLite, PRIORITY_VAULT_DATA]:
 
 @external
 def setPriorityStabVaults(_priorityStabVaults: DynArray[VaultLite, PRIORITY_VAULT_DATA]):
-    assert addys._canModifyMissionControl(msg.sender) # dev: no perms
+    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
     self.priorityStabVaults = _priorityStabVaults
 
 
@@ -506,7 +506,7 @@ def getPriorityStabVaults() -> DynArray[VaultLite, PRIORITY_VAULT_DATA]:
 
 @external
 def setUnderscoreRegistry(_underscoreRegistry: address):
-    assert addys._canModifyMissionControl(msg.sender) # dev: no perms
+    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
     self.underscoreRegistry = _underscoreRegistry
 
 
@@ -515,7 +515,7 @@ def setUnderscoreRegistry(_underscoreRegistry: address):
 
 @external
 def setCanPerformLiteAction(_user: address, _canDo: bool):
-    assert addys._canModifyMissionControl(msg.sender) # dev: no perms
+    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
     self.canPerformLiteAction[_user] = _canDo
 
 
@@ -524,7 +524,7 @@ def setCanPerformLiteAction(_user: address, _canDo: bool):
 
 @external
 def setMaxLtvDeviation(_maxLtvDeviation: uint256):
-    assert addys._canModifyMissionControl(msg.sender) # dev: no perms
+    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
     self.maxLtvDeviation = _maxLtvDeviation
 
 
@@ -621,7 +621,7 @@ def _isUnderscoreWalletOwner(_user: address, _caller: address) -> bool:
 
 @external
 def setRipeGovVaultConfig(_asset: address, _assetWeight: uint256, _lockTerms: LockTerms):
-    assert addys._canModifyMissionControl(msg.sender) # dev: no perms
+    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
     self.ripeGovVaultConfig[_asset] = RipeGovVaultConfig(
         lockTerms=_lockTerms,
         assetWeight=_assetWeight,
@@ -635,7 +635,7 @@ def setRipeGovVaultConfig(_asset: address, _assetWeight: uint256, _lockTerms: Lo
 
 @external
 def setHrConfig(_config: HrConfig):
-    assert addys._canModifyMissionControl(msg.sender) # dev: no perms
+    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
     self.hrConfig = _config
 
 

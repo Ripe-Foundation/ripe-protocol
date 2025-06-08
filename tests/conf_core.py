@@ -39,10 +39,7 @@ def ripe_hq(
     bond_room,
     human_resources,
     mission_control,
-    switchboard_one,
-    switchboard_two,
-    switchboard_three,
-    switchboard_four,
+    switchboard,
     credit_engine,
     endaoment,
     ledger,
@@ -70,102 +67,76 @@ def ripe_hq(
     # registries
 
     # 6
-    assert ripe_hq_deploy.startAddNewAddressToRegistry(price_desk, "Price Desk", sender=deploy3r)
-    assert ripe_hq_deploy.confirmNewAddressToRegistry(price_desk, sender=deploy3r) == 6
+    assert ripe_hq_deploy.startAddNewAddressToRegistry(switchboard, "Switchboard", sender=deploy3r)
+    assert ripe_hq_deploy.confirmNewAddressToRegistry(switchboard, sender=deploy3r) == 6
 
     # 7
+    assert ripe_hq_deploy.startAddNewAddressToRegistry(price_desk, "Price Desk", sender=deploy3r)
+    assert ripe_hq_deploy.confirmNewAddressToRegistry(price_desk, sender=deploy3r) == 7
+
+    # 8
     assert ripe_hq_deploy.startAddNewAddressToRegistry(vault_book, "Vault Book", sender=deploy3r)
-    assert ripe_hq_deploy.confirmNewAddressToRegistry(vault_book, sender=deploy3r) == 7
+    assert ripe_hq_deploy.confirmNewAddressToRegistry(vault_book, sender=deploy3r) == 8
 
     # departments
 
-    # 8
-    assert ripe_hq_deploy.startAddNewAddressToRegistry(auction_house, "Auction House", sender=deploy3r)
-    assert ripe_hq_deploy.confirmNewAddressToRegistry(auction_house, sender=deploy3r) == 8
-
     # 9
-    assert ripe_hq_deploy.startAddNewAddressToRegistry(auction_house_nft, "Auction House NFT", sender=deploy3r)
-    assert ripe_hq_deploy.confirmNewAddressToRegistry(auction_house_nft, sender=deploy3r) == 9
+    assert ripe_hq_deploy.startAddNewAddressToRegistry(auction_house, "Auction House", sender=deploy3r)
+    assert ripe_hq_deploy.confirmNewAddressToRegistry(auction_house, sender=deploy3r) == 9
 
     # 10
-    assert ripe_hq_deploy.startAddNewAddressToRegistry(boardroom, "Boardroom", sender=deploy3r)
-    assert ripe_hq_deploy.confirmNewAddressToRegistry(boardroom, sender=deploy3r) == 10
+    assert ripe_hq_deploy.startAddNewAddressToRegistry(auction_house_nft, "Auction House NFT", sender=deploy3r)
+    assert ripe_hq_deploy.confirmNewAddressToRegistry(auction_house_nft, sender=deploy3r) == 10
 
     # 11
-    assert ripe_hq_deploy.startAddNewAddressToRegistry(bond_room, "Bond Room", sender=deploy3r)
-    assert ripe_hq_deploy.confirmNewAddressToRegistry(bond_room, sender=deploy3r) == 11
+    assert ripe_hq_deploy.startAddNewAddressToRegistry(boardroom, "Boardroom", sender=deploy3r)
+    assert ripe_hq_deploy.confirmNewAddressToRegistry(boardroom, sender=deploy3r) == 11
 
     # 12
-    assert ripe_hq_deploy.startAddNewAddressToRegistry(credit_engine, "Credit Engine", sender=deploy3r)
-    assert ripe_hq_deploy.confirmNewAddressToRegistry(credit_engine, sender=deploy3r) == 12
+    assert ripe_hq_deploy.startAddNewAddressToRegistry(bond_room, "Bond Room", sender=deploy3r)
+    assert ripe_hq_deploy.confirmNewAddressToRegistry(bond_room, sender=deploy3r) == 12
 
     # 13
-    assert ripe_hq_deploy.startAddNewAddressToRegistry(endaoment, "Endaoment", sender=deploy3r)
-    assert ripe_hq_deploy.confirmNewAddressToRegistry(endaoment, sender=deploy3r) == 13
+    assert ripe_hq_deploy.startAddNewAddressToRegistry(credit_engine, "Credit Engine", sender=deploy3r)
+    assert ripe_hq_deploy.confirmNewAddressToRegistry(credit_engine, sender=deploy3r) == 13
 
     # 14
-    assert ripe_hq_deploy.startAddNewAddressToRegistry(human_resources, "Human Resources", sender=deploy3r)
-    assert ripe_hq_deploy.confirmNewAddressToRegistry(human_resources, sender=deploy3r) == 14
+    assert ripe_hq_deploy.startAddNewAddressToRegistry(endaoment, "Endaoment", sender=deploy3r)
+    assert ripe_hq_deploy.confirmNewAddressToRegistry(endaoment, sender=deploy3r) == 14
 
     # 15
-    assert ripe_hq_deploy.startAddNewAddressToRegistry(lootbox, "Lootbox", sender=deploy3r)
-    assert ripe_hq_deploy.confirmNewAddressToRegistry(lootbox, sender=deploy3r) == 15
+    assert ripe_hq_deploy.startAddNewAddressToRegistry(human_resources, "Human Resources", sender=deploy3r)
+    assert ripe_hq_deploy.confirmNewAddressToRegistry(human_resources, sender=deploy3r) == 15
 
     # 16
-    assert ripe_hq_deploy.startAddNewAddressToRegistry(teller, "Teller", sender=deploy3r)
-    assert ripe_hq_deploy.confirmNewAddressToRegistry(teller, sender=deploy3r) == 16
-
-    # config
+    assert ripe_hq_deploy.startAddNewAddressToRegistry(lootbox, "Lootbox", sender=deploy3r)
+    assert ripe_hq_deploy.confirmNewAddressToRegistry(lootbox, sender=deploy3r) == 16
 
     # 17
-    assert ripe_hq_deploy.startAddNewAddressToRegistry(switchboard_one, "Switchboard One", sender=deploy3r)
-    assert ripe_hq_deploy.confirmNewAddressToRegistry(switchboard_one, sender=deploy3r) == 17
+    assert ripe_hq_deploy.startAddNewAddressToRegistry(teller, "Teller", sender=deploy3r)
+    assert ripe_hq_deploy.confirmNewAddressToRegistry(teller, sender=deploy3r) == 17
 
-    # 18
-    assert ripe_hq_deploy.startAddNewAddressToRegistry(switchboard_two, "Switchboard Two", sender=deploy3r)
-    assert ripe_hq_deploy.confirmNewAddressToRegistry(switchboard_two, sender=deploy3r) == 18
+    # special permission setup
 
-    # 19
-    assert ripe_hq_deploy.startAddNewAddressToRegistry(switchboard_three, "Switchboard Three", sender=deploy3r)
-    assert ripe_hq_deploy.confirmNewAddressToRegistry(switchboard_three, sender=deploy3r) == 19
-
-    # 20
-    assert ripe_hq_deploy.startAddNewAddressToRegistry(switchboard_four, "Switchboard Four", sender=deploy3r)
-    assert ripe_hq_deploy.confirmNewAddressToRegistry(switchboard_four, sender=deploy3r) == 20
-
-    # set minting / blacklist capabilities
+    # switchboard can set token blacklists
+    ripe_hq_deploy.initiateHqConfigChange(6, False, False, True, sender=deploy3r)
+    assert ripe_hq_deploy.confirmHqConfigChange(6, sender=deploy3r)
 
     # auction house can mint green
-    ripe_hq_deploy.initiateHqConfigChange(8, True, False, False, False, sender=deploy3r)
-    assert ripe_hq_deploy.confirmHqConfigChange(8, sender=deploy3r)
+    ripe_hq_deploy.initiateHqConfigChange(9, True, False, False, sender=deploy3r)
+    assert ripe_hq_deploy.confirmHqConfigChange(9, sender=deploy3r)
 
     # credit engine can mint green
-    ripe_hq_deploy.initiateHqConfigChange(12, True, False, False, False, sender=deploy3r)
-    assert ripe_hq_deploy.confirmHqConfigChange(12, sender=deploy3r)
+    ripe_hq_deploy.initiateHqConfigChange(13, True, False, False, sender=deploy3r)
+    assert ripe_hq_deploy.confirmHqConfigChange(13, sender=deploy3r)
 
     # human resources can mint ripe
-    ripe_hq_deploy.initiateHqConfigChange(14, False, True, False, False, sender=deploy3r)
-    assert ripe_hq_deploy.confirmHqConfigChange(14, sender=deploy3r)
-
-    # lootbox can mint ripe
-    ripe_hq_deploy.initiateHqConfigChange(15, False, True, False, False, sender=deploy3r)
+    ripe_hq_deploy.initiateHqConfigChange(15, False, True, False, sender=deploy3r)
     assert ripe_hq_deploy.confirmHqConfigChange(15, sender=deploy3r)
 
-    # switchboard one - modify mission control
-    ripe_hq_deploy.initiateHqConfigChange(17, False, False, False, True, sender=deploy3r)
-    assert ripe_hq_deploy.confirmHqConfigChange(17, sender=deploy3r)
-
-    # switchboard two - modify mission control
-    ripe_hq_deploy.initiateHqConfigChange(18, False, False, False, True, sender=deploy3r)
-    assert ripe_hq_deploy.confirmHqConfigChange(18, sender=deploy3r)
-
-    # switchboard three - can set token blacklists and modify mission control
-    ripe_hq_deploy.initiateHqConfigChange(19, False, False, True, True, sender=deploy3r)
-    assert ripe_hq_deploy.confirmHqConfigChange(19, sender=deploy3r)
-
-    # switchboard four - modify mission control
-    ripe_hq_deploy.initiateHqConfigChange(20, False, False, False, True, sender=deploy3r)
-    assert ripe_hq_deploy.confirmHqConfigChange(20, sender=deploy3r)
+    # lootbox can mint ripe
+    ripe_hq_deploy.initiateHqConfigChange(16, False, True, False, sender=deploy3r)
+    assert ripe_hq_deploy.confirmHqConfigChange(16, sender=deploy3r)
 
     # finish ripe hq setup
     assert ripe_hq_deploy.setRegistryTimeLockAfterSetup(sender=deploy3r)
@@ -374,66 +345,108 @@ def teller(ripe_hq_deploy):
     )
 
 
-##########
-# Config #
-##########
-
-
-# switchboard one
+######################
+# Switchboard Config #
+######################
 
 
 @pytest.fixture(scope="session")
-def switchboard_one(ripe_hq_deploy, fork):
+def switchboard_deploy(ripe_hq_deploy, fork):
     return boa.load(
-        "contracts/config/SwitchboardOne.vy",
+        "contracts/registries/Switchboard.vy",
+        ripe_hq_deploy,
+        PARAMS[fork]["MIN_HQ_CHANGE_TIMELOCK"],
+        PARAMS[fork]["MAX_HQ_CHANGE_TIMELOCK"],
+        name="switchboard",
+    )
+
+
+@pytest.fixture(scope="session")
+def switchboard(switchboard_deploy, deploy3r, switchboard_alpha, switchboard_bravo, switchboard_charlie, switchboard_delta):
+
+    # alpha
+    assert switchboard_deploy.startAddNewAddressToRegistry(switchboard_alpha, "Alpha", sender=deploy3r)
+    assert switchboard_deploy.confirmNewAddressToRegistry(switchboard_alpha, sender=deploy3r) == 1
+
+    # bravo
+    assert switchboard_deploy.startAddNewAddressToRegistry(switchboard_bravo, "Bravo", sender=deploy3r)
+    assert switchboard_deploy.confirmNewAddressToRegistry(switchboard_bravo, sender=deploy3r) == 2
+
+    # charlie
+    assert switchboard_deploy.startAddNewAddressToRegistry(switchboard_charlie, "Charlie", sender=deploy3r)
+    assert switchboard_deploy.confirmNewAddressToRegistry(switchboard_charlie, sender=deploy3r) == 3
+
+    # delta
+    assert switchboard_deploy.startAddNewAddressToRegistry(switchboard_delta, "Delta", sender=deploy3r)
+    assert switchboard_deploy.confirmNewAddressToRegistry(switchboard_delta, sender=deploy3r) == 4
+
+    # finish setup
+    assert switchboard_deploy.setRegistryTimeLockAfterSetup(sender=deploy3r)
+
+    # finish setup on switchboard config contracts
+    assert switchboard_alpha.setActionTimeLockAfterSetup(sender=deploy3r)
+    assert switchboard_bravo.setActionTimeLockAfterSetup(sender=deploy3r)
+    assert switchboard_charlie.setActionTimeLockAfterSetup(sender=deploy3r)
+    assert switchboard_delta.setActionTimeLockAfterSetup(sender=deploy3r)
+
+    return switchboard_deploy
+
+
+# switchboard alpha
+
+
+@pytest.fixture(scope="session")
+def switchboard_alpha(ripe_hq_deploy, fork):
+    return boa.load(
+        "contracts/config/SwitchboardAlpha.vy",
         ripe_hq_deploy,
         PARAMS[fork]["PRICE_DESK_MIN_STALE_TIME"],
         PARAMS[fork]["PRICE_DESK_MAX_STALE_TIME"],
         PARAMS[fork]["MIN_HQ_CHANGE_TIMELOCK"],
         PARAMS[fork]["MAX_HQ_CHANGE_TIMELOCK"],
-        name="switchboard_one",
+        name="switchboard_alpha",
     )
 
 
-# switchboard two
+# switchboard bravo
 
 
 @pytest.fixture(scope="session")
-def switchboard_two(ripe_hq_deploy, fork):
+def switchboard_bravo(ripe_hq_deploy, fork):
     return boa.load(
-        "contracts/config/SwitchboardTwo.vy",
+        "contracts/config/SwitchboardBravo.vy",
         ripe_hq_deploy,
         PARAMS[fork]["MIN_HQ_CHANGE_TIMELOCK"],
         PARAMS[fork]["MAX_HQ_CHANGE_TIMELOCK"],
-        name="switchboard_two",
+        name="switchboard_bravo",
     )
 
 
-# switchboard three
+# switchboard charlie
 
 
 @pytest.fixture(scope="session")
-def switchboard_three(ripe_hq_deploy, fork):
+def switchboard_charlie(ripe_hq_deploy, fork):
     return boa.load(
-        "contracts/config/SwitchboardThree.vy",
+        "contracts/config/SwitchboardCharlie.vy",
         ripe_hq_deploy,
         PARAMS[fork]["MIN_HQ_CHANGE_TIMELOCK"],
         PARAMS[fork]["MAX_HQ_CHANGE_TIMELOCK"],
-        name="switchboard_three",
+        name="switchboard_charlie",
     )
 
 
-# switchboard four
+# switchboard delta
 
 
 @pytest.fixture(scope="session")
-def switchboard_four(ripe_hq_deploy, fork):
+def switchboard_delta(ripe_hq_deploy, fork):
     return boa.load(
-        "contracts/config/SwitchboardFour.vy",
+        "contracts/config/SwitchboardDelta.vy",
         ripe_hq_deploy,
         PARAMS[fork]["MIN_HQ_CHANGE_TIMELOCK"],
         PARAMS[fork]["MAX_HQ_CHANGE_TIMELOCK"],
-        name="switchboard_four",
+        name="switchboard_delta",
     )
 
 

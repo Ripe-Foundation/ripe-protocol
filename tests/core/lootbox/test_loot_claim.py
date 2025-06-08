@@ -565,7 +565,7 @@ def test_loot_claim_borrow_permission_checks(
     teller,
     credit_engine,
     createDebtTerms,
-    switchboard_one,
+    switchboard_alpha,
 ):
     # basic setup
     setGeneralConfig()
@@ -591,12 +591,12 @@ def test_loot_claim_borrow_permission_checks(
         lootbox.claimBorrowLoot(bob, sender=alice)
 
     # Test paused state
-    lootbox.pause(True, sender=switchboard_one.address)
+    lootbox.pause(True, sender=switchboard_alpha.address)
     with boa.reverts("contract paused"):
         lootbox.claimBorrowLoot(bob, sender=teller.address)
 
     # Unpause and verify it works
-    lootbox.pause(False, sender=switchboard_one.address)
+    lootbox.pause(False, sender=switchboard_alpha.address)
     total_ripe = lootbox.claimBorrowLoot(bob, sender=teller.address)
     assert total_ripe > 0
 
@@ -909,7 +909,7 @@ def test_loot_claim_no_auto_staking(
     alpha_token,
     alpha_token_whale,
     mission_control,
-    switchboard_one,
+    switchboard_alpha,
     ripe_gov_vault,
 ):
     """Test that with autoStakeRatio=0, all rewards go directly to user"""
@@ -923,7 +923,7 @@ def test_loot_claim_no_auto_staking(
         ripe_token,
         100_00,  # 100% asset weight
         (86400, 2592000, 200_00, True, 5_00),  # 1 day min, 30 days max, 200% boost, can exit, 5% fee
-        sender=switchboard_one.address
+        sender=switchboard_alpha.address
     )
 
     # Setup deposit to earn rewards
@@ -964,7 +964,7 @@ def test_loot_claim_full_auto_staking(
     alpha_token,
     alpha_token_whale,
     mission_control,
-    switchboard_one,
+    switchboard_alpha,
     ripe_gov_vault,
     _test,
 ):
@@ -980,7 +980,7 @@ def test_loot_claim_full_auto_staking(
         ripe_token,
         100_00,  # 100% asset weight
         (86400, 2592000, 200_00, True, 5_00),  # 1 day min, 30 days max, 200% boost, can exit, 5% fee
-        sender=switchboard_one.address
+        sender=switchboard_alpha.address
     )
 
     # Setup deposit to earn rewards
@@ -1029,7 +1029,7 @@ def test_loot_claim_partial_auto_staking(
     alpha_token,
     alpha_token_whale,
     mission_control,
-    switchboard_one,
+    switchboard_alpha,
     ripe_gov_vault,
     _test,
 ):
@@ -1045,7 +1045,7 @@ def test_loot_claim_partial_auto_staking(
         ripe_token,
         100_00,  # 100% asset weight
         (100, 1000, 100_00, False, 0),  # 100 min, 1000 max, 100% boost, cannot exit, 0% fee
-        sender=switchboard_one.address
+        sender=switchboard_alpha.address
     )
 
     # Setup deposit to earn rewards
@@ -1106,7 +1106,7 @@ def test_loot_claim_explicit_staking_overrides_auto(
     alpha_token,
     alpha_token_whale,
     mission_control,
-    switchboard_one,
+    switchboard_alpha,
     ripe_gov_vault,
 ):
     """Test that _shouldStake=True overrides autoStakeRatio and stakes everything"""
@@ -1121,7 +1121,7 @@ def test_loot_claim_explicit_staking_overrides_auto(
         ripe_token.address,
         100_00,  # 100% asset weight
         (100, 1000, 100_00, False, 0),  # 100 min, 1000 max, 100% boost, cannot exit, 0% fee
-        sender=switchboard_one.address
+        sender=switchboard_alpha.address
     )
 
     # Setup deposit to earn rewards
@@ -1162,7 +1162,7 @@ def test_loot_claim_zero_lock_duration_range(
     alpha_token,
     alpha_token_whale,
     mission_control,
-    switchboard_one,
+    switchboard_alpha,
     ripe_gov_vault,
 ):
     """Test that when min=max lock duration, vault still enforces minimum lock duration"""
@@ -1177,7 +1177,7 @@ def test_loot_claim_zero_lock_duration_range(
         ripe_token.address,
         100_00,  # 100% asset weight
         (500, 500, 200_00, True, 5_00),  # min = max = 500 blocks
-        sender=switchboard_one.address
+        sender=switchboard_alpha.address
     )
 
     # Setup deposit to earn rewards
@@ -1214,7 +1214,7 @@ def test_loot_claim_max_lock_duration_ratio(
     alpha_token,
     alpha_token_whale,
     mission_control,
-    switchboard_one,
+    switchboard_alpha,
     ripe_gov_vault,
 ):
     """Test that autoStakeDurationRatio=100% uses the full lock duration range"""
@@ -1229,7 +1229,7 @@ def test_loot_claim_max_lock_duration_ratio(
         ripe_token.address,
         100_00,  # 100% asset weight
         (200, 1000, 200_00, True, 5_00),  # 200 min, 1000 max
-        sender=switchboard_one.address
+        sender=switchboard_alpha.address
     )
 
     # Setup deposit to earn rewards
@@ -1263,7 +1263,7 @@ def test_loot_claim_zero_rewards_no_staking_calls(
     ripe_token,
     alpha_token,
     mission_control,
-    switchboard_one,
+    switchboard_alpha,
     ripe_gov_vault,
 ):
     """Test that zero rewards don't trigger any staking operations"""
@@ -1278,7 +1278,7 @@ def test_loot_claim_zero_rewards_no_staking_calls(
         ripe_token.address,
         100_00,  # 100% asset weight
         (100, 1000, 200_00, True, 5_00),
-        sender=switchboard_one.address
+        sender=switchboard_alpha.address
     )
 
     # Don't setup any deposits or debt - no rewards to claim
@@ -1313,7 +1313,7 @@ def test_loot_claim_calculation_consistency_with_partial_auto_staking(
     alpha_token,
     alpha_token_whale,
     mission_control,
-    switchboard_one,
+    switchboard_alpha,
 ):
     """Test that getClaimableLoot() matches actual claimLoot() returns with partial auto-staking"""
     # Setup with partial auto-staking
@@ -1327,7 +1327,7 @@ def test_loot_claim_calculation_consistency_with_partial_auto_staking(
         ripe_token.address,
         100_00,  # 100% asset weight
         (100, 1000, 100_00, False, 0),
-        sender=switchboard_one.address
+        sender=switchboard_alpha.address
     )
 
     # Setup deposit to earn rewards
@@ -1365,7 +1365,7 @@ def test_loot_claim_multiple_claims_with_staking(
     alpha_token,
     alpha_token_whale,
     mission_control,
-    switchboard_one,
+    switchboard_alpha,
     ripe_gov_vault,
 ):
     """Test multiple claims with auto-staking to verify cumulative behavior"""
@@ -1380,7 +1380,7 @@ def test_loot_claim_multiple_claims_with_staking(
         ripe_token.address,
         100_00,  # 100% asset weight
         (100, 1000, 200_00, True, 5_00),
-        sender=switchboard_one.address
+        sender=switchboard_alpha.address
     )
 
     # Setup deposit to earn rewards
@@ -1432,7 +1432,7 @@ def test_loot_claim_auto_stake_configuration_updates(
     alpha_token,
     alpha_token_whale,
     mission_control,
-    switchboard_one,
+    switchboard_alpha,
     ripe_gov_vault,
 ):
     """Test that configuration changes affect subsequent claims correctly"""
@@ -1447,7 +1447,7 @@ def test_loot_claim_auto_stake_configuration_updates(
         ripe_token.address,
         100_00,  # 100% asset weight
         (100, 1000, 100_00, False, 0),
-        sender=switchboard_one.address
+        sender=switchboard_alpha.address
     )
 
     # Setup deposit to earn rewards

@@ -139,9 +139,9 @@ pendingHrConfig: public(HashMap[uint256, HrConfig]) # aid -> config
 pendingManager: public(HashMap[uint256, PendingManager]) # aid -> pending manager
 pendingCancelPaycheck: public(HashMap[uint256, address]) # aid -> contributor
 
-EIGHTEEN_DECIMALS: constant(uint256) = 10 ** 18
 LEDGER_ID: constant(uint256) = 4
 MISSION_CONTROL_ID: constant(uint256) = 5
+EIGHTEEN_DECIMALS: constant(uint256) = 10 ** 18
 
 # timestamp units (not blocks!)
 DAY_IN_SECONDS: constant(uint256) = 60 * 60 * 24

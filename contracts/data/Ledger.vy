@@ -431,7 +431,7 @@ def _setRipeRewards(_ripeRewards: RipeRewards):
 
 @external
 def setRipeAvailForRewards(_amount: uint256):
-    assert addys._canModifyMissionControl(msg.sender) # dev: no perms
+    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
     assert not deptBasics.isPaused # dev: not activated
     self.ripeAvailForRewards = _amount
 
@@ -727,6 +727,6 @@ def addHrContributor(_contributor: address, _compensation: uint256):
 
 @external
 def setRipeAvailForHr(_amount: uint256):
-    assert addys._canModifyMissionControl(msg.sender) # dev: no perms
+    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
     assert not deptBasics.isPaused # dev: not activated
     self.ripeAvailForHr = _amount

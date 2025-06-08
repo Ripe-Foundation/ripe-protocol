@@ -34,8 +34,8 @@ interface CreditEngine:
     def updateDebtForManyUsers(_users: DynArray[address, MAX_DEBT_UPDATES], _a: addys.Addys = empty(addys.Addys)) -> bool: nonpayable
     def updateDebtForUser(_user: address, _a: addys.Addys = empty(addys.Addys)) -> bool: nonpayable
 
-interface TokenContract:
-    def setBlacklist(_addr: address, _shouldBlacklist: bool) -> bool: nonpayable
+interface Switchboard:
+    def setBlacklist(_tokenAddr: address, _addr: address, _shouldBlacklist: bool) -> bool: nonpayable
 
 interface MissionControl:
     def canPerformLiteAction(_user: address) -> bool: view
@@ -211,10 +211,11 @@ MAX_DEBT_UPDATES: constant(uint256) = 50
 MAX_CLAIM_USERS: constant(uint256) = 50
 
 MISSION_CONTROL_ID: constant(uint256) = 5
-VAULT_BOOK_ID: constant(uint256) = 7
-AUCTION_HOUSE_ID: constant(uint256) = 8
-CREDIT_ENGINE_ID: constant(uint256) = 12
-LOOTBOX_ID: constant(uint256) = 15
+SWITCHBOARD_ID: constant(uint256) = 6
+VAULT_BOOK_ID: constant(uint256) = 8
+AUCTION_HOUSE_ID: constant(uint256) = 9
+CREDIT_ENGINE_ID: constant(uint256) = 13
+LOOTBOX_ID: constant(uint256) = 16
 
 
 @deploy
@@ -364,7 +365,8 @@ def setBlacklist(_tokenAddr: address, _addr: address, _shouldBlacklist: bool) ->
     assert self.hasPermsForLiteAction(msg.sender, _shouldBlacklist) # dev: no perms
     assert empty(address) not in [_tokenAddr, _addr] # dev: invalid parameters
 
-    extcall TokenContract(_tokenAddr).setBlacklist(_addr, _shouldBlacklist)
+    switchboard: address = staticcall RipeHq(gov._getRipeHqFromGov()).getAddr(SWITCHBOARD_ID)
+    extcall Switchboard(switchboard).setBlacklist(_tokenAddr, _addr, _shouldBlacklist)
     log BlacklistSet(tokenAddr=_tokenAddr, addr=_addr, isBlacklisted=_shouldBlacklist, caller=msg.sender)
     return True
 

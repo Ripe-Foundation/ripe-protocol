@@ -360,6 +360,26 @@ def _areValidContributorTerms(_terms: ContributorTerms, _hrConfig: HrConfig, _le
 ####################
 
 
+# views
+
+
+@view
+@external
+def canModifyHrContributor(_addr: address) -> bool:
+    return addys._isSwitchboardAddr(_addr)
+
+
+@view
+@external
+def hasRipeBalance(_contributor: address) -> bool:
+    a: addys.Addys = addys._getAddys()
+    ripeGovVaultAddr: address = staticcall VaultBook(a.vaultBook).getAddr(RIPE_GOV_VAULT_ID) 
+    return staticcall Vault(ripeGovVaultAddr).doesUserHaveBalance(_contributor, a.ripeToken)
+
+
+# transfer ripe tokens
+
+
 @external
 def transferContributorRipeTokens(_owner: address, _lockDuration: uint256) -> uint256:
     assert not deptBasics.isPaused # dev: contract paused
@@ -376,6 +396,9 @@ def transferContributorRipeTokens(_owner: address, _lockDuration: uint256) -> ui
     return amount
 
 
+# cash ripe check
+
+
 @external
 def cashRipeCheck(_amount: uint256, _lockDuration: uint256) -> bool:
     assert not deptBasics.isPaused # dev: contract paused
@@ -390,6 +413,9 @@ def cashRipeCheck(_amount: uint256, _lockDuration: uint256) -> bool:
     extcall Teller(a.teller).depositIntoGovVaultFromTrusted(msg.sender, a.ripeToken, _amount, _lockDuration, a)
     assert extcall IERC20(a.ripeToken).approve(a.teller, 0, default_return_value=True) # dev: ripe approval failed
     return True
+
+
+# refund after cancel paycheck
 
 
 @external
@@ -415,14 +441,6 @@ def refundAfterCancelPaycheck(_amount: uint256, _shouldBurnPosition: bool):
     withdrawalAmount, na = extcall RipeGovVault(ripeGovVaultAddr).withdrawTokensFromVault(msg.sender, a.ripeToken, max_value(uint256), self, a)
     burnAmount: uint256 = min(withdrawalAmount, staticcall IERC20(a.ripeToken).balanceOf(self))
     extcall RipeToken(a.ripeToken).burn(burnAmount)
-
-
-@view
-@external
-def hasRipeBalance(_contributor: address) -> bool:
-    a: addys.Addys = addys._getAddys()
-    ripeGovVaultAddr: address = staticcall VaultBook(a.vaultBook).getAddr(RIPE_GOV_VAULT_ID) 
-    return staticcall Vault(ripeGovVaultAddr).doesUserHaveBalance(_contributor, a.ripeToken)
 
 
 #########

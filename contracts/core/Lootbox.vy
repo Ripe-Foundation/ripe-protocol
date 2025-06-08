@@ -158,10 +158,10 @@ def claimLootForUser(
     _shouldStake: bool,
     _a: addys.Addys = empty(addys.Addys),
 ) -> uint256:
-    assert addys._isValidRipeHqAddr(msg.sender) # dev: no perms
+    assert addys._isValidRipeAddr(msg.sender) # dev: no perms
     assert not deptBasics.isPaused # dev: contract paused
     a: addys.Addys = addys._getAddys(_a)
-    isSwitchboard: bool = addys._canModifyMissionControl(msg.sender)
+    isSwitchboard: bool = addys._isSwitchboardAddr(msg.sender)
     return self._claimLoot(_user, _caller, _shouldStake, not isSwitchboard, a)
 
 
@@ -172,10 +172,10 @@ def claimLootForManyUsers(
     _shouldStake: bool,
     _a: addys.Addys = empty(addys.Addys),
 ) -> uint256:
-    assert addys._isValidRipeHqAddr(msg.sender) # dev: no perms
+    assert addys._isValidRipeAddr(msg.sender) # dev: no perms
     assert not deptBasics.isPaused # dev: contract paused
     a: addys.Addys = addys._getAddys(_a)
-    isSwitchboard: bool = addys._canModifyMissionControl(msg.sender)
+    isSwitchboard: bool = addys._isSwitchboardAddr(msg.sender)
 
     totalRipeForUsers: uint256 = 0
     for u: address in _users:
@@ -294,7 +294,7 @@ def getClaimableLoot(_user: address) -> uint256:
 
 @external
 def claimDepositLootForAsset(_user: address, _vaultId: uint256, _asset: address) -> uint256:
-    assert addys._isValidRipeHqAddr(msg.sender) # dev: no perms
+    assert addys._isValidRipeAddr(msg.sender) # dev: no perms
     assert not deptBasics.isPaused # dev: contract paused
     a: addys.Addys = addys._getAddys()
     vaultAddr: address = staticcall VaultBook(a.vaultBook).getAddr(_vaultId)
@@ -491,7 +491,7 @@ def updateDepositPoints(
     _asset: address,
     _a: addys.Addys = empty(addys.Addys),
 ):
-    assert addys._isValidRipeHqAddr(msg.sender) or msg.sender == staticcall VaultBook(addys._getVaultBookAddr()).getAddr(_vaultId) # dev: no perms
+    assert addys._isValidRipeAddr(msg.sender) # dev: no perms
     assert not deptBasics.isPaused # dev: contract paused
     a: addys.Addys = addys._getAddys(_a)
 
@@ -718,7 +718,7 @@ def _getAssetPrecision(_isNft: bool, _asset: address) -> uint256:
 
 @external
 def updateBorrowPoints(_user: address, _a: addys.Addys = empty(addys.Addys)):
-    assert addys._isValidRipeHqAddr(msg.sender) # dev: no perms
+    assert addys._isValidRipeAddr(msg.sender) # dev: no perms
     assert not deptBasics.isPaused # dev: contract paused
     a: addys.Addys = addys._getAddys(_a)
 
@@ -822,7 +822,7 @@ def _getLatestBorrowPoints(
 
 @external
 def claimBorrowLoot(_user: address) -> uint256:
-    assert addys._isValidRipeHqAddr(msg.sender) # dev: no perms
+    assert addys._isValidRipeAddr(msg.sender) # dev: no perms
     assert not deptBasics.isPaused # dev: contract paused
     a: addys.Addys = addys._getAddys()
     totalRipeForUser: uint256 = self._claimBorrowLoot(_user, a)
@@ -903,7 +903,7 @@ def getClaimableBorrowLoot(_user: address) -> uint256:
 
 @external
 def updateRipeRewards(_a: addys.Addys = empty(addys.Addys)) -> RipeRewards:
-    assert addys._isValidRipeHqAddr(msg.sender) # dev: no perms
+    assert addys._isValidRipeAddr(msg.sender) # dev: no perms
     assert not deptBasics.isPaused # dev: contract paused
     a: addys.Addys = addys._getAddys(_a)
     config: RewardsConfig = staticcall MissionControl(a.missionControl).getRewardsConfig()

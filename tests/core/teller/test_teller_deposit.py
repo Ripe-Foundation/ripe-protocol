@@ -361,7 +361,7 @@ def test_teller_deposit_teller_paused(
     setGeneralConfig,
     setAssetConfig,
     teller,
-    switchboard_one,
+    switchboard_alpha,
 ):
     # basic setup
     setGeneralConfig()
@@ -372,7 +372,7 @@ def test_teller_deposit_teller_paused(
     alpha_token.approve(teller.address, deposit_amount, sender=bob)
 
     # pause the teller
-    teller.pause(True, sender=switchboard_one.address)
+    teller.pause(True, sender=switchboard_alpha.address)
     assert teller.isPaused()
 
     # attempt deposit should fail
@@ -380,7 +380,7 @@ def test_teller_deposit_teller_paused(
         teller.deposit(alpha_token, deposit_amount, bob, simple_erc20_vault, sender=bob)
 
     # unpause the teller
-    teller.pause(False, sender=switchboard_one.address)
+    teller.pause(False, sender=switchboard_alpha.address)
     assert not teller.isPaused()
 
     # deposit should now succeed

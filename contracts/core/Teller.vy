@@ -238,7 +238,7 @@ def _validateOnDeposit(
     assert config.isUserAllowed # dev: user not on whitelist
 
     # make sure depositor is allowed to deposit for user
-    if _user != _depositor and not addys._isValidRipeHqAddr(_depositor):
+    if _user != _depositor and not addys._isValidRipeAddr(_depositor):
         assert config.canAnyoneDeposit # dev: others cannot deposit for user
 
     # check max vaults, max assets per vault
@@ -673,7 +673,7 @@ def depositIntoGovVaultFromTrusted(
     _lockDuration: uint256,
     _a: addys.Addys = empty(addys.Addys),
 ) -> uint256:
-    assert addys._isValidRipeHqAddr(msg.sender) # dev: no perms
+    assert addys._isValidRipeAddr(msg.sender) # dev: no perms
     a: addys.Addys = addys._getAddys(_a)
     amount: uint256 = self._deposit(_asset, _amount, _user, empty(address), RIPE_GOV_VAULT_ID, msg.sender, _lockDuration, a)
     extcall CreditEngine(a.creditEngine).updateDebtForUser(_user, a)

@@ -897,14 +897,14 @@ def _getLatestUserDebtAndTerms(
 
 @external
 def updateDebtForUser(_user: address, _a: addys.Addys = empty(addys.Addys)) -> bool:
-    assert addys._isValidRipeHqAddr(msg.sender) # dev: no perms
+    assert addys._isValidRipeAddr(msg.sender) # dev: no perms
     assert not deptBasics.isPaused # dev: contract paused
     return self._updateDebtForUser(_user, addys._getAddys(_a))
 
 
 @external
 def updateDebtForManyUsers(_users: DynArray[address, MAX_DEBT_UPDATES], _a: addys.Addys = empty(addys.Addys)) -> bool:
-    assert addys._isValidRipeHqAddr(msg.sender) # dev: no perms
+    assert addys._isValidRipeAddr(msg.sender) # dev: no perms
     assert not deptBasics.isPaused # dev: contract paused
     a: addys.Addys = addys._getAddys(_a)
     for u: address in _users:

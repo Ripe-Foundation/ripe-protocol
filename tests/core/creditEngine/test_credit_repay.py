@@ -158,7 +158,7 @@ def test_repay_protocol_paused(
     mock_price_source,
     teller,
     green_token,
-    switchboard_one,
+    switchboard_alpha,
 ):
     # basic setup
     setGeneralConfig()
@@ -172,7 +172,7 @@ def test_repay_protocol_paused(
     teller.borrow(MAX_UINT256, bob, False, sender=bob)
 
     # pause protocol
-    teller.pause(True, sender=switchboard_one.address)
+    teller.pause(True, sender=switchboard_alpha.address)
     assert teller.isPaused()
 
     # attempt to repay
@@ -182,7 +182,7 @@ def test_repay_protocol_paused(
         teller.repay(repay_amount, bob, False, sender=bob)
 
     # unpause and try again
-    teller.pause(False, sender=switchboard_one.address)
+    teller.pause(False, sender=switchboard_alpha.address)
     assert teller.repay(repay_amount, bob, False, sender=bob)
 
 

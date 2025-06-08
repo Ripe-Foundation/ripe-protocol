@@ -4,6 +4,7 @@ interface HumanResources:
     def transferContributorRipeTokens(_owner: address, _lockDuration: uint256) -> uint256: nonpayable
     def refundAfterCancelPaycheck(_amount: uint256, _shouldBurnPosition: bool): nonpayable
     def cashRipeCheck(_amount: uint256, _lockDuration: uint256) -> bool: nonpayable
+    def canModifyHrContributor(_addr: address) -> bool: view
     def hasRipeBalance(_contributor: address) -> bool: view
 
 interface RipeGovernance:
@@ -174,7 +175,8 @@ def _getHrAddr() -> address:
 def cashRipeCheck() -> uint256:
     hr: address = self._getHrAddr()
     owner: address = self.owner
-    assert msg.sender in [owner, self.manager, hr] # dev: no perms
+    if msg.sender not in [owner, self.manager]:
+        assert staticcall HumanResources(hr).canModifyHrContributor(msg.sender) # dev: no perms
     return self._cashRipeCheck(owner, msg.sender, hr)
 
 
@@ -258,7 +260,8 @@ def confirmRipeTransfer(_shouldCashCheck: bool = True):
 @nonreentrant
 @external
 def cancelRipeTransfer():
-    assert msg.sender in [self.owner, self.manager, self._getHrAddr()] # dev: no perms
+    if msg.sender not in [self.owner, self.manager]:
+        assert staticcall HumanResources(self._getHrAddr()).canModifyHrContributor(msg.sender) # dev: no perms
 
     pending: PendingRipeTransfer = self.pendingRipeTransfer
     assert pending.confirmBlock != 0 # dev: no pending transfer
@@ -317,9 +320,8 @@ def confirmOwnershipChange():
 
 @external
 def cancelOwnershipChange():
-    hr: address = self._getHrAddr()
-    owner: address = self.owner
-    assert msg.sender in [owner, self.manager, hr] # dev: no perms
+    if msg.sender not in [self.owner, self.manager]:
+        assert staticcall HumanResources(self._getHrAddr()).canModifyHrContributor(msg.sender) # dev: no perms
 
     data: PendingOwnerChange = self.pendingOwner
     assert data.confirmBlock != 0 # dev: no pending change
@@ -352,7 +354,9 @@ def _hasPendingOwnerChange() -> bool:
 
 @external 
 def setManager(_newManager: address):
-    assert msg.sender in [self.owner, self.manager, self._getHrAddr()] # dev: no perms
+    if msg.sender not in [self.owner, self.manager]:
+        assert staticcall HumanResources(self._getHrAddr()).canModifyHrContributor(msg.sender) # dev: no perms
+
     assert not self._hasPendingOwnerChange() # dev: cannot do with pending ownership change
     assert _newManager != empty(address) # dev: cannot be 0x0
     self.manager = _newManager
@@ -401,7 +405,7 @@ def removeDelegationFor(_govAddr: address, _recipient: address = empty(address))
 
 @external 
 def setIsFrozen(_shouldFreeze: bool) -> bool:
-    assert msg.sender == self._getHrAddr() # dev: no perms
+    assert staticcall HumanResources(self._getHrAddr()).canModifyHrContributor(msg.sender) # dev: no perms
     self.isFrozen = _shouldFreeze
     log FreezeModified(isFrozen=_shouldFreeze)
     return True
@@ -413,7 +417,7 @@ def setIsFrozen(_shouldFreeze: bool) -> bool:
 @external
 def cancelPaycheck():
     hr: address = self._getHrAddr()
-    assert msg.sender == hr # dev: no perms
+    assert staticcall HumanResources(hr).canModifyHrContributor(msg.sender) # dev: no perms
 
     owner: address = self.owner
     totalComp: uint256 = self.compensation

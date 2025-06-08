@@ -20,13 +20,16 @@ interface MissionControl:
 interface Whitelist:
     def isUserAllowed(_user: address, _asset: address) -> bool: view
 
-interface SwitchboardOne:
+interface SwitchboardAlpha:
     def areValidAuctionParams(_params: AuctionParams) -> bool: view
 
 interface VaultBook:
     def isValidRegId(_regId: uint256) -> bool: view
 
 interface RipeHq:
+    def getAddr(_regId: uint256) -> address: view
+
+interface Switchboard:
     def getAddr(_regId: uint256) -> address: view
 
 flag ActionType:
@@ -233,8 +236,9 @@ HUNDRED_PERCENT: constant(uint256) = 100_00 # 100%
 GREEN_TOKEN_ID: constant(uint256) = 1
 SAVINGS_GREEN_ID: constant(uint256) = 2
 MISSION_CONTROL_ID: constant(uint256) = 5
-VAULT_BOOK_ID: constant(uint256) = 7
-SWITCHBOARD_ONE_ID: constant(uint256) = 17
+VAULT_BOOK_ID: constant(uint256) = 8
+SWITCHBOARD_ID: constant(uint256) = 6
+SWITCHBOARD_ALPHA_ID: constant(uint256) = 1
 
 
 @deploy
@@ -518,8 +522,9 @@ def _isValidAssetLiqConfig(
 @view
 @internal
 def _areValidAuctionParams(_params: AuctionParams) -> bool:
-    switchboardOne: address = staticcall RipeHq(gov._getRipeHqFromGov()).getAddr(SWITCHBOARD_ONE_ID)
-    return staticcall SwitchboardOne(switchboardOne).areValidAuctionParams(_params)
+    switchboard: address = staticcall RipeHq(gov._getRipeHqFromGov()).getAddr(SWITCHBOARD_ID)
+    switchboardAlpha: address = staticcall Switchboard(switchboard).getAddr(SWITCHBOARD_ALPHA_ID)
+    return staticcall SwitchboardAlpha(switchboardAlpha).areValidAuctionParams(_params)
 
 
 ######################

@@ -127,7 +127,7 @@ def depositTokensWithLockDuration(
     _lockDuration: uint256,
     _a: addys.Addys = empty(addys.Addys),
 ) -> uint256:
-    assert addys._isValidRipeHqAddr(msg.sender) # dev: no perms
+    assert addys._isValidRipeAddr(msg.sender) # dev: no perms
     return self._depositTokensInRipeGovVault(_user, _asset, _amount, _lockDuration, _a)
 
 
@@ -405,7 +405,7 @@ def getTotalAmountForVault(_asset: address) -> uint256:
 
 @external
 def updateUserGovPoints(_user: address, _a: addys.Addys = empty(addys.Addys)):
-    assert addys._isValidRipeHqAddr(msg.sender) # dev: no perms
+    assert addys._isValidRipeAddr(msg.sender) # dev: no perms
     a: addys.Addys = addys._getAddys(_a)
     self._updateUserGovPoints(_user, empty(address), a.missionControl, a.boardroom)
 
@@ -467,7 +467,7 @@ def adjustLock(
     _newLockDuration: uint256,
     _a: addys.Addys = empty(addys.Addys),
 ):
-    assert addys._isValidRipeHqAddr(msg.sender) # dev: no perms
+    assert addys._isValidRipeAddr(msg.sender) # dev: no perms
     a: addys.Addys = addys._getAddys(_a)
 
     # do a full update first
@@ -499,7 +499,7 @@ def releaseLock(
     _asset: address,
     _a: addys.Addys = empty(addys.Addys),
 ):
-    assert addys._isValidRipeHqAddr(msg.sender) # dev: no perms
+    assert addys._isValidRipeAddr(msg.sender) # dev: no perms
     a: addys.Addys = addys._getAddys(_a)
 
     # do a full update first
