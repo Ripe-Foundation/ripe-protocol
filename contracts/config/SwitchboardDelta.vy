@@ -13,11 +13,11 @@ from interfaces import Vault
 
 interface HrContributor:
     def setIsFrozen(_shouldFreeze: bool) -> bool: nonpayable
-    def setManager(_manager: address) -> bool: nonpayable
-    def cancelOwnershipChange() -> bool: nonpayable
-    def cancelRipeTransfer() -> bool: nonpayable
+    def setManager(_manager: address): nonpayable
     def cashRipeCheck() -> uint256: nonpayable
-    def cancelPaycheck() -> bool: nonpayable
+    def cancelOwnershipChange(): nonpayable
+    def cancelRipeTransfer(): nonpayable
+    def cancelPaycheck(): nonpayable
 
 interface MissionControl:
     def canPerformLiteAction(_user: address) -> bool: view
@@ -372,7 +372,7 @@ def cancelOwnershipChangeForContributor(_contributor: address) -> bool:
 @external
 def freezeContributor(_contributor: address, _shouldFreeze: bool) -> bool:
     assert self._hasPermsToEnable(msg.sender, _shouldFreeze) # dev: no perms
-    extcall HrContributor(_contributor).setIsFrozen(_shouldFreeze)
+    assert extcall HrContributor(_contributor).setIsFrozen(_shouldFreeze) # dev: could not freeze
     log ContributorFrozenFromSwitchboard(contributor=_contributor, frozenBy=msg.sender, shouldFreeze=_shouldFreeze)
     return True
 

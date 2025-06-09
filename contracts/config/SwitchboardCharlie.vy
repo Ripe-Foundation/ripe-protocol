@@ -47,7 +47,6 @@ interface RipeHq:
     def getAddr(_regId: uint256) -> address: view
 
 flag ActionType:
-    PAUSE
     RECOVER_FUNDS
     RECOVER_FUNDS_MANY
     START_AUCTION
@@ -73,12 +72,6 @@ struct FungAuctionConfig:
     liqUser: address
     vaultId: uint256
     asset: address
-
-event PendingPauseAction:
-    contractAddr: indexed(address)
-    shouldPause: bool
-    confirmationBlock: uint256
-    actionId: uint256
 
 event PendingRecoverFundsAction:
     contractAddr: indexed(address)
@@ -280,25 +273,12 @@ def _getVaultBookAddr() -> address:
 
 
 @external
-def pause(_contractAddr: address, _shouldPause: bool) -> uint256:
-    assert gov._canGovern(msg.sender) # dev: no perms
-    assert _contractAddr != empty(address) # dev: invalid contract address
-    
-    aid: uint256 = timeLock._initiateAction()
-    self.actionType[aid] = ActionType.PAUSE
-    self.pendingPauseActions[aid] = PauseAction(
-        contractAddr=_contractAddr,
-        shouldPause=_shouldPause
-    )
-    
-    confirmationBlock: uint256 = timeLock._getActionConfirmationBlock(aid)
-    log PendingPauseAction(
-        contractAddr=_contractAddr,
-        shouldPause=_shouldPause,
-        confirmationBlock=confirmationBlock,
-        actionId=aid
-    )
-    return aid
+def pause(_contractAddr: address, _shouldPause: bool) -> bool:
+    assert self.hasPermsForLiteAction(msg.sender, _shouldPause) # dev: no perms
+
+    extcall RipeEcoContract(_contractAddr).pause(_shouldPause)
+    log PauseExecuted(contractAddr=_contractAddr, shouldPause=_shouldPause)
+    return True
 
 
 #########################
@@ -575,12 +555,7 @@ def executePendingAction(_aid: uint256) -> bool:
 
     actionType: ActionType = self.actionType[_aid]
 
-    if actionType == ActionType.PAUSE:
-        p: PauseAction = self.pendingPauseActions[_aid]
-        extcall RipeEcoContract(p.contractAddr).pause(p.shouldPause)
-        log PauseExecuted(contractAddr=p.contractAddr, shouldPause=p.shouldPause)
-
-    elif actionType == ActionType.RECOVER_FUNDS:
+    if actionType == ActionType.RECOVER_FUNDS:
         p: RecoverFundsAction = self.pendingRecoverFundsActions[_aid]
         extcall RipeEcoContract(p.contractAddr).recoverFunds(p.recipient, p.asset)
         log RecoverFundsExecuted(contractAddr=p.contractAddr, recipient=p.recipient, asset=p.asset)

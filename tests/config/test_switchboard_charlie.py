@@ -21,22 +21,23 @@ def mock_auction_house():
 ###############
 
 
-def test_switchboard_three_access_control_timelock_actions(
+def test_switchboard_three_access_control_governance_actions(
     switchboard_charlie,
     alice,
     bob,
     teller,
-    alpha_token,
+    ripe_token,
 ):
-    """Test that only governance can perform timelock actions"""
+    """Test that only governance can perform governance actions (both immediate and timelock)"""
     contract_addr = teller.address
     user_addr = alice
-    asset_addr = alpha_token.address
+    asset_addr = ripe_token.address
     
-    # Non-governance users should be rejected
+    # Non-governance users should be rejected for immediate governance actions
     with boa.reverts("no perms"):
         switchboard_charlie.pause(contract_addr, True, sender=alice)
     
+    # Non-governance users should be rejected for timelock governance actions
     with boa.reverts("no perms"):
         switchboard_charlie.recoverFunds(contract_addr, user_addr, asset_addr, sender=bob)
     
@@ -107,11 +108,12 @@ def test_switchboard_three_blacklist_special_permissions(
     alice,
     bob,
     sally,
+    governance,
     mission_control,
-    alpha_token,
+    ripe_token,
 ):
     """Test special blacklist permissions: lite users can add, only governance can remove"""
-    token_addr = alpha_token.address
+    token_addr = ripe_token.address
     user_addr = alice
     
     # Non-lite users can't add to blacklist
@@ -121,9 +123,23 @@ def test_switchboard_three_blacklist_special_permissions(
     # Give sally lite access
     mission_control.setCanPerformLiteAction(sally, True, sender=switchboard_charlie.address)
     
-    # Sally can add to blacklist (will fail at underlying contract but pass access control)
-    with boa.reverts():  # Will fail in underlying contract, but access control passes
-        switchboard_charlie.setBlacklist(token_addr, user_addr, True, sender=sally)
+    # Sally can add to blacklist (immediate action)
+    result = switchboard_charlie.setBlacklist(token_addr, user_addr, True, sender=sally)
+    assert result == True
+    
+    # Verify event was emitted immediately
+    logs = filter_logs(switchboard_charlie, "BlacklistSet")
+    assert len(logs) == 1
+    assert logs[0].isBlacklisted == True
+    
+    # Governance can remove from blacklist (immediate action)
+    result2 = switchboard_charlie.setBlacklist(token_addr, user_addr, False, sender=governance.address)
+    assert result2 == True
+    
+    # Verify removal event
+    logs2 = filter_logs(switchboard_charlie, "BlacklistSet")
+    assert len(logs2) == 1
+    assert logs2[0].isBlacklisted == False
     
     # But sally can't remove from blacklist (only governance can)
     with boa.reverts("no perms"):
@@ -147,8 +163,9 @@ def test_switchboard_three_parameter_validation(
     user_addr = alice
     asset_addr = alpha_token.address
     
-    # Test pause with invalid contract address
-    with boa.reverts("invalid contract address"):
+    # Test pause with invalid contract address (zero address) - this will fail during execution, not validation
+    # The pause function executes immediately and tries to call the zero address contract
+    with boa.reverts():  # Generic revert due to calling zero address contract
         switchboard_charlie.pause(ZERO_ADDRESS, True, sender=governance.address)
     
     # Test recoverFunds with invalid parameters
@@ -260,48 +277,24 @@ def test_switchboard_three_array_limits(
 ###############
 
 
-def test_switchboard_three_pause_action_timelock(
+def test_switchboard_three_pause_action_immediate(
     switchboard_charlie,
     governance,
     teller,
 ):
-    """Test pause action timelock functionality"""
+    """Test pause action immediate functionality (no longer timelock)"""
     contract_addr = teller.address
     
-    # Create pending pause action
-    action_id = switchboard_charlie.pause(contract_addr, True, sender=governance.address)
+    # Pause action now executes immediately
+    result = switchboard_charlie.pause(contract_addr, True, sender=governance.address)
+    assert result == True
     
-    # Verify action is stored
-    assert switchboard_charlie.actionType(action_id) == 1  # ActionType.PAUSE
-    stored_action = switchboard_charlie.pendingPauseActions(action_id)
-    assert stored_action.contractAddr == contract_addr
-    assert stored_action.shouldPause == True
-    
-    # Verify event was emitted (optional check)
-    logs = filter_logs(switchboard_charlie, "PendingPauseAction")
-    # Event emission may vary by test environment, so this is optional
-    # # assert len(logs) == 1  # Optional event check
-    if len(logs) > 0:
-        log = logs[0]
-        assert log.contractAddr == contract_addr
-        assert log.shouldPause == True
-        assert log.actionId == action_id
-    
-    # Test execution - may succeed immediately if timelock delay is 0/short
-    result = switchboard_charlie.executePendingAction(action_id, sender=governance.address)
-    # In test environment, timelock may be configured with minimal delay
-    # so we test that the function executes without error
-    assert isinstance(result, bool)
-    
-    # If execution succeeded, verify action was cleared
-    if result:
-        assert switchboard_charlie.actionType(action_id) == 0  # Cleared to empty
-    else:
-        # If blocked by timelock, try again after time travel
-        boa.env.time_travel(blocks=50)
-        success = switchboard_charlie.executePendingAction(action_id, sender=governance.address)
-        if success:
-            assert switchboard_charlie.actionType(action_id) == 0  # Cleared to empty
+    # Verify event was emitted immediately (no pending action)
+    logs = filter_logs(switchboard_charlie, "PauseExecuted")
+    assert len(logs) == 1
+    log = logs[0]
+    assert log.contractAddr == contract_addr
+    assert log.shouldPause == True
 
 
 def test_switchboard_three_recover_funds_action_timelock(
@@ -319,22 +312,21 @@ def test_switchboard_three_recover_funds_action_timelock(
     # Create pending recover funds action
     action_id = switchboard_charlie.recoverFunds(contract_addr, recipient, asset, sender=governance.address)
     
+    # Verify event was emitted (immediately after transaction)
+    logs = filter_logs(switchboard_charlie, "PendingRecoverFundsAction")
+    assert len(logs) == 1
+    log = logs[0]
+    assert log.contractAddr == contract_addr
+    assert log.recipient == recipient
+    assert log.asset == asset
+    assert log.actionId == action_id
+    
     # Verify action is stored
-    assert switchboard_charlie.actionType(action_id) == 2  # ActionType.RECOVER_FUNDS
+    assert switchboard_charlie.actionType(action_id) == 1  # ActionType.RECOVER_FUNDS
     stored_action = switchboard_charlie.pendingRecoverFundsActions(action_id)
     assert stored_action.contractAddr == contract_addr
     assert stored_action.recipient == recipient
     assert stored_action.asset == asset
-    
-    # Verify event was emitted (optional check)
-    logs = filter_logs(switchboard_charlie, "PendingRecoverFundsAction")
-    # # assert len(logs) == 1  # Optional event check
-    if len(logs) > 0:
-        log = logs[0]
-        assert log.contractAddr == contract_addr
-        assert log.recipient == recipient
-        assert log.asset == asset
-        assert log.actionId == action_id
 
 
 def test_switchboard_three_recover_funds_many_action_timelock(
@@ -353,22 +345,21 @@ def test_switchboard_three_recover_funds_many_action_timelock(
     # Create pending recover funds many action
     action_id = switchboard_charlie.recoverFundsMany(contract_addr, recipient, assets, sender=governance.address)
     
+    # Verify event was emitted (immediately after transaction)
+    logs = filter_logs(switchboard_charlie, "PendingRecoverFundsManyAction")
+    assert len(logs) == 1
+    log = logs[0]
+    assert log.contractAddr == contract_addr
+    assert log.recipient == recipient
+    assert log.numAssets == len(assets)
+    assert log.actionId == action_id
+    
     # Verify action is stored
-    assert switchboard_charlie.actionType(action_id) == 4  # ActionType.RECOVER_FUNDS_MANY
+    assert switchboard_charlie.actionType(action_id) == 2  # ActionType.RECOVER_FUNDS_MANY
     stored_action = switchboard_charlie.pendingRecoverFundsManyActions(action_id)
     assert stored_action.contractAddr == contract_addr
     assert stored_action.recipient == recipient
     assert stored_action.assets == assets
-    
-    # Verify event was emitted (optional check)
-    logs = filter_logs(switchboard_charlie, "PendingRecoverFundsManyAction")
-    # # assert len(logs) == 1  # Optional event check
-    if len(logs) > 0:
-        log = logs[0]
-        assert log.contractAddr == contract_addr
-        assert log.recipient == recipient
-        assert log.numAssets == len(assets)
-        assert log.actionId == action_id
 
 
 def test_switchboard_three_auction_actions_timelock(
@@ -382,37 +373,24 @@ def test_switchboard_three_auction_actions_timelock(
     vault_id = 1
     asset_addr = alpha_token.address
     
-    # Test auction actions with the existing auction house
-    # This will likely fail validation, but tests the switchboard logic
-    try:
-        action_id = switchboard_charlie.startAuction(user_addr, vault_id, asset_addr, sender=governance.address)
-        
-        # If successful, verify action is stored
-        assert switchboard_charlie.actionType(action_id) == 8  # ActionType.START_AUCTION
-        stored_action = switchboard_charlie.pendingStartAuctionActions(action_id)
-        assert stored_action.liqUser == user_addr
-        assert stored_action.vaultId == vault_id
-        assert stored_action.asset == asset_addr
-        
-        # Verify event was emitted (optional check)
-        logs = filter_logs(switchboard_charlie, "PendingStartAuctionAction")
-        if len(logs) > 0:
-            log = logs[0]
-            assert log.liqUser == user_addr
-            assert log.vaultId == vault_id
-            assert log.asset == asset_addr
-            assert log.actionId == action_id
-        
-    except Exception as e:
-        # Expected to fail due to auction validation, but that's OK
-        # The important thing is the access control and parameter validation worked
-        assert "cannot start auction" in str(e) or "no perms" in str(e)
+    # Test auction start action - should fail auction validation but create action first
+    with boa.reverts("cannot start auction"):
+        switchboard_charlie.startAuction(user_addr, vault_id, asset_addr, sender=governance.address)
     
-    # Test auction pause (doesn't require validation)
+    # Test auction pause (should work fine)
     pause_action_id = switchboard_charlie.pauseAuction(user_addr, vault_id, asset_addr, sender=governance.address)
     
+    # Verify event was emitted (immediately after transaction)
+    logs = filter_logs(switchboard_charlie, "PendingPauseAuctionAction")
+    assert len(logs) == 1
+    log = logs[0]
+    assert log.liqUser == user_addr
+    assert log.vaultId == vault_id
+    assert log.asset == asset_addr
+    assert log.actionId == pause_action_id
+    
     # Verify action is stored
-    assert switchboard_charlie.actionType(pause_action_id) == 32  # ActionType.PAUSE_AUCTION
+    assert switchboard_charlie.actionType(pause_action_id) == 16  # ActionType.PAUSE_AUCTION
     stored_pause_action = switchboard_charlie.pendingPauseAuctionActions(pause_action_id)
     assert stored_pause_action.liqUser == user_addr
     assert stored_pause_action.vaultId == vault_id
@@ -448,15 +426,19 @@ def test_switchboard_three_action_cancellation(
     switchboard_charlie,
     governance,
     teller,
+    alice,
+    ripe_token,
 ):
     """Test action cancellation functionality"""
     contract_addr = teller.address
+    recipient = alice
+    asset = ripe_token.address
     
-    # Create pending action
-    action_id = switchboard_charlie.pause(contract_addr, True, sender=governance.address)
+    # Create pending timelock action
+    action_id = switchboard_charlie.recoverFunds(contract_addr, recipient, asset, sender=governance.address)
     
     # Verify action exists
-    assert switchboard_charlie.actionType(action_id) == 1  # ActionType.PAUSE
+    assert switchboard_charlie.actionType(action_id) == 1  # ActionType.RECOVER_FUNDS
     
     # Cancel action
     success = switchboard_charlie.cancelPendingAction(action_id, sender=governance.address)
@@ -474,27 +456,27 @@ def test_switchboard_three_action_expiration(
     switchboard_charlie,
     governance,
     teller,
+    alice,
+    ripe_token,
 ):
     """Test action expiration and automatic cleanup"""
     contract_addr = teller.address
+    recipient = alice
+    asset = ripe_token.address
     
-    # Create pending action
-    action_id = switchboard_charlie.pause(contract_addr, True, sender=governance.address)
+    # Create pending timelock action (recoverFunds creates a timelock action)
+    action_id = switchboard_charlie.recoverFunds(contract_addr, recipient, asset, sender=governance.address)
     
-    # Time travel past expiration
-    boa.env.time_travel(blocks=10000)  # Well past expiration
+    # Verify action was created
+    assert switchboard_charlie.actionType(action_id) == 1  # ActionType.RECOVER_FUNDS
     
-    # Execution behavior depends on timelock configuration
-    # In test environment, might succeed due to minimal timelock delay
-    success = switchboard_charlie.executePendingAction(action_id, sender=governance.address)
+    # Time travel past expiration (way beyond max timelock)
+    boa.env.time_travel(blocks=100000)  # Far past any reasonable timelock
     
-    # Test that the function executes without error
-    assert isinstance(success, bool)
-    
-    # If the action was cleared (either by execution or expiration), verify it
-    final_action_type = switchboard_charlie.actionType(action_id)
-    # Action should either be cleared (0) or still pending based on timelock config
-    assert final_action_type in [0, 1]  # Either cleared or still PAUSE type
+    # Execution should auto-cancel expired action, but first try will revert due to no balance
+    # Let me test the expiration logic indirectly by checking if action can be executed
+    with boa.reverts("nothing to recover"):
+        switchboard_charlie.executePendingAction(action_id, sender=governance.address)
 
 
 ###############
@@ -523,37 +505,38 @@ def test_switchboard_three_deposit_points_vault_lookup(
     with boa.reverts("invalid vault"):
         switchboard_charlie.updateDepositPoints(user_addr, 999, asset_addr, sender=governance.address)
     
-    switchboard_charlie.updateDepositPoints(user_addr, vault_id, asset_addr, sender=governance.address)
+    # Should succeed with valid vault ID
+    result = switchboard_charlie.updateDepositPoints(user_addr, vault_id, asset_addr, sender=governance.address)
+    assert result == True
 
 
 def test_switchboard_three_event_emission_immediate_actions(
     switchboard_charlie,
     governance,
     alice,
-    alpha_token,
+    ripe_token,
     mission_control,
 ):
     """Test that immediate actions emit proper events"""
     user_addr = alice
-    asset_addr = alpha_token.address
+    asset_addr = ripe_token.address  # Use ripe_token which has setBlacklist function
     
     # Give switchboard lite access for this test
     mission_control.setCanPerformLiteAction(governance, True, sender=switchboard_charlie.address)
     
-    # Test blacklist event - this might succeed since we have governance permissions
-    try:
-        switchboard_charlie.setBlacklist(asset_addr, user_addr, True, sender=governance.address)
-        # Should have emitted BlacklistSet event
-        logs = filter_logs(switchboard_charlie, "BlacklistSet")
-        if len(logs) > 0:
-            log = logs[0]
-            assert log.tokenAddr == asset_addr
-            assert log.addr == user_addr
-            assert log.isBlacklisted == True
-            assert log.caller == governance
-    except Exception:
-        # If it fails, that's also acceptable for this test
-        pass
+    # Test blacklist event - should succeed with governance permissions (immediate action)
+    result = switchboard_charlie.setBlacklist(asset_addr, user_addr, True, sender=governance.address)
+    
+    # Should have emitted BlacklistSet event (immediately after transaction)
+    logs = filter_logs(switchboard_charlie, "BlacklistSet")
+    assert len(logs) == 1
+    log = logs[0]
+    assert log.tokenAddr == asset_addr
+    assert log.addr == user_addr
+    assert log.isBlacklisted == True
+    assert log.caller == governance.address
+    
+    assert result == True
 
 
 def test_switchboard_three_execution_with_different_action_types(
@@ -561,42 +544,35 @@ def test_switchboard_three_execution_with_different_action_types(
     governance,
     teller,
     alice,
-    alpha_token,
+    ripe_token,
 ):
-    """Test execution of different action types (simplified)"""
+    """Test execution of different action types"""
     contract_addr = teller.address
     user_addr = alice
-    asset_addr = alpha_token.address
+    asset_addr = ripe_token.address
     
-    # Create different types of pending actions
+    # Create different types of pending actions (timelock actions only)
     
-    # 1. Pause action
-    pause_id = switchboard_charlie.pause(contract_addr, True, sender=governance.address)
-    
-    # 2. Recover funds action
+    # 1. Recover funds action
     recover_id = switchboard_charlie.recoverFunds(contract_addr, user_addr, asset_addr, sender=governance.address)
     
+    # 2. Pause auction action
+    pause_auction_id = switchboard_charlie.pauseAuction(user_addr, 1, asset_addr, sender=governance.address)
+    
     # Verify actions were created
-    assert switchboard_charlie.actionType(pause_id) == 1  # ActionType.PAUSE
-    assert switchboard_charlie.actionType(recover_id) == 2  # ActionType.RECOVER_FUNDS
+    assert switchboard_charlie.actionType(recover_id) == 1  # ActionType.RECOVER_FUNDS
+    assert switchboard_charlie.actionType(pause_auction_id) == 16  # ActionType.PAUSE_AUCTION
     
-    # Time travel past timelock (if any)
-    boa.env.time_travel(blocks=50)
+    # Time travel past timelock
+    boa.env.time_travel(blocks=switchboard_charlie.actionTimeLock())
     
-    # Test execution (may succeed depending on target contract implementation)
-    try:
-        pause_result = switchboard_charlie.executePendingAction(pause_id, sender=governance.address)
-        assert isinstance(pause_result, bool)
-    except Exception:
-        # May fail if target contract doesn't support pause, that's OK
-        pass
+    # Test execution - recover should fail (no balance), but will revert instead of returning False
+    with boa.reverts("nothing to recover"):
+        switchboard_charlie.executePendingAction(recover_id, sender=governance.address)
     
-    try:
-        recover_result = switchboard_charlie.executePendingAction(recover_id, sender=governance.address)
-        assert isinstance(recover_result, bool)
-    except Exception:
-        # May fail if target contract doesn't support recoverFunds, that's OK
-        pass
+    pause_auction_result = switchboard_charlie.executePendingAction(pause_auction_id, sender=governance.address)
+    assert pause_auction_result == True
+    assert switchboard_charlie.actionType(pause_auction_id) == 0  # Action cleared
 
 
 ###############
@@ -625,24 +601,27 @@ def test_switchboard_three_governance_integration(
     switchboard_charlie,
     governance,
     teller,
+    alice,
+    ripe_token,
 ):
     """Test governance integration and permissions"""
     contract_addr = teller.address
+    user_addr = alice
+    asset_addr = ripe_token.address
     
     # Test that governance functions work with proper sender
     # The switchboard should inherit governance from LocalGov module
     
-    # Create action as governance
-    action_id = switchboard_charlie.pause(contract_addr, True, sender=governance.address)
+    # Test immediate action as governance
+    result = switchboard_charlie.pause(contract_addr, True, sender=governance.address)
+    assert result == True
+    
+    # Test timelock action as governance
+    action_id = switchboard_charlie.recoverFunds(contract_addr, user_addr, asset_addr, sender=governance.address)
     assert action_id > 0
     
-    # Verify governance can execute
-    boa.env.time_travel(blocks=50)
-    success = switchboard_charlie.executePendingAction(action_id, sender=governance.address)
-    
-    # Verify governance can cancel
-    action_id_2 = switchboard_charlie.pause(contract_addr, False, sender=governance.address)
-    success = switchboard_charlie.cancelPendingAction(action_id_2, sender=governance.address)
+    # Verify governance can cancel timelock actions
+    success = switchboard_charlie.cancelPendingAction(action_id, sender=governance.address)
     assert success == True
 
 
@@ -658,11 +637,10 @@ def test_switchboard_three_address_getters(
     # The fact that other tests pass shows that the address getters work,
     # but we can also test by trying operations that would use these addresses
     
-    contract_addr = ripe_hq.address  # Use ripe_hq as a mock contract to pause
-    
-    # This should work if _getAuctionHouseAddr() works
-    action_id = switchboard_charlie.pause(contract_addr, True, sender=governance.address)
+    # Test address getters work by creating a timelock action (doesn't call external contracts immediately)
+    action_id = switchboard_charlie.recoverFunds(ripe_hq.address, governance.address, ripe_hq.address, sender=governance.address)
     assert action_id > 0
+    assert switchboard_charlie.actionType(action_id) == 1
 
 
 ###############
@@ -676,18 +654,16 @@ def test_switchboard_three_access_control_hasperms_logic(
     alice,
     bob,
     mission_control,
-    alpha_token,
+    ripe_token,
 ):
     """Test the internal hasPermsForLiteAction logic thoroughly"""
-    token_addr = alpha_token.address
+    token_addr = ripe_token.address  # Use ripe_token which has setBlacklist function
     user_addr = alice
     
     # Test 1: Governance always passes regardless of _hasLiteAccess parameter
-    # Governance should be able to remove from blacklist even though _hasLiteAccess=False
-    try:
-        switchboard_charlie.setBlacklist(token_addr, user_addr, False, sender=governance.address)
-    except:
-        pass  # May fail due to underlying contract, but access control should pass
+    # Governance should be able to remove from blacklist even though _hasLiteAccess=False (immediate action)
+    result = switchboard_charlie.setBlacklist(token_addr, user_addr, False, sender=governance.address)
+    assert result == True
     
     # Test 2: Non-governance user without lite access fails for _hasLiteAccess=True operations  
     with boa.reverts("no perms"):
@@ -695,10 +671,8 @@ def test_switchboard_three_access_control_hasperms_logic(
     
     # Test 3: Give bob lite access and test _hasLiteAccess=True operations
     mission_control.setCanPerformLiteAction(bob, True, sender=switchboard_charlie.address)
-    try:
-        switchboard_charlie.updateDebtForUser(user_addr, sender=bob)
-    except:
-        pass  # May fail due to underlying contract, but access control should pass
+    result = switchboard_charlie.updateDebtForUser(user_addr, sender=bob)
+    assert result == True
     
     # Test 4: Bob with lite access still can't do _hasLiteAccess=False operations (remove blacklist)
     with boa.reverts("no perms"):
@@ -717,19 +691,22 @@ def test_switchboard_three_action_type_flag_values(
     user_addr = alice
     asset_addr = alpha_token.address
     
-    # Create different action types and verify flag values
-    pause_id = switchboard_charlie.pause(contract_addr, True, sender=governance.address)
-    assert switchboard_charlie.actionType(pause_id) == 1  # ActionType.PAUSE = 1
+    # Create different action types and verify flag values - pause is NOT a flag-stored action
+    # pause() function is immediate and doesn't store ActionType
+    # Only timelock actions store ActionType values
     
     recover_id = switchboard_charlie.recoverFunds(contract_addr, user_addr, asset_addr, sender=governance.address)
-    assert switchboard_charlie.actionType(recover_id) == 2  # ActionType.RECOVER_FUNDS = 2
+    assert switchboard_charlie.actionType(recover_id) == 1  # ActionType.RECOVER_FUNDS = 1
     
     recover_many_id = switchboard_charlie.recoverFundsMany(contract_addr, user_addr, [asset_addr], sender=governance.address)
-    assert switchboard_charlie.actionType(recover_many_id) == 4  # ActionType.RECOVER_FUNDS_MANY = 4
+    assert switchboard_charlie.actionType(recover_many_id) == 2  # ActionType.RECOVER_FUNDS_MANY = 2
+    
+    pause_auction_id = switchboard_charlie.pauseAuction(user_addr, 1, asset_addr, sender=governance.address)
+    assert switchboard_charlie.actionType(pause_auction_id) == 16  # ActionType.PAUSE_AUCTION = 16
     
     # Test that different actions have different IDs and ActionTypes
-    assert pause_id != recover_id != recover_many_id
-    assert switchboard_charlie.actionType(pause_id) != switchboard_charlie.actionType(recover_id)
+    assert recover_id != recover_many_id != pause_auction_id
+    assert switchboard_charlie.actionType(recover_id) != switchboard_charlie.actionType(recover_many_id)
 
 
 def test_switchboard_three_multiple_pending_actions_storage(
@@ -746,30 +723,31 @@ def test_switchboard_three_multiple_pending_actions_storage(
     asset1 = alpha_token.address
     asset2 = bravo_token.address
     
-    # Create multiple different pending actions
-    action1 = switchboard_charlie.pause(contract_addr, True, sender=governance.address)
-    action2 = switchboard_charlie.recoverFunds(contract_addr, user_addr, asset1, sender=governance.address)
-    action3 = switchboard_charlie.recoverFundsMany(contract_addr, user_addr, [asset1, asset2], sender=governance.address)
+    # Create multiple different pending actions - only timelock actions store ActionType
+    action1 = switchboard_charlie.recoverFunds(contract_addr, user_addr, asset1, sender=governance.address)
+    action2 = switchboard_charlie.recoverFundsMany(contract_addr, user_addr, [asset1, asset2], sender=governance.address)
+    action3 = switchboard_charlie.pauseAuction(user_addr, 1, asset1, sender=governance.address)
     
     # Verify each action is stored correctly and independently
-    assert switchboard_charlie.actionType(action1) == 1
-    assert switchboard_charlie.actionType(action2) == 2
-    assert switchboard_charlie.actionType(action3) == 4
+    assert switchboard_charlie.actionType(action1) == 1  # RECOVER_FUNDS
+    assert switchboard_charlie.actionType(action2) == 2  # RECOVER_FUNDS_MANY
+    assert switchboard_charlie.actionType(action3) == 16  # PAUSE_AUCTION
     
     # Verify action data integrity
-    pause_data = switchboard_charlie.pendingPauseActions(action1)
-    assert pause_data.contractAddr == contract_addr
-    assert pause_data.shouldPause == True
-    
-    recover_data = switchboard_charlie.pendingRecoverFundsActions(action2)
+    recover_data = switchboard_charlie.pendingRecoverFundsActions(action1)
     assert recover_data.contractAddr == contract_addr
     assert recover_data.recipient == user_addr
     assert recover_data.asset == asset1
     
-    recover_many_data = switchboard_charlie.pendingRecoverFundsManyActions(action3)
+    recover_many_data = switchboard_charlie.pendingRecoverFundsManyActions(action2)
     assert recover_many_data.contractAddr == contract_addr
     assert recover_many_data.recipient == user_addr
     assert recover_many_data.assets == [asset1, asset2]
+    
+    pause_data = switchboard_charlie.pendingPauseAuctionActions(action3)
+    assert pause_data.liqUser == user_addr
+    assert pause_data.vaultId == 1
+    assert pause_data.asset == asset1
 
 
 def test_switchboard_three_immediate_actions_return_values(
@@ -778,57 +756,47 @@ def test_switchboard_three_immediate_actions_return_values(
     alice,
     alpha_token,
     mission_control,
+    setGeneralConfig,
 ):
     """Test return value handling for immediate actions"""
     user_addr = alice
     asset_addr = alpha_token.address
     
+    # Enable loot claiming
+    setGeneralConfig()
+    
     # Give governance lite access
     mission_control.setCanPerformLiteAction(governance.address, True, sender=switchboard_charlie.address)
     
-    # Test functions that return bool
-    try:
-        result = switchboard_charlie.updateDebtForUser(user_addr, sender=governance.address)
-        assert isinstance(result, bool)
-    except:
-        pass  # May fail due to underlying contract implementation
+    # Test functions that return bool - these should work deterministically
+    result = switchboard_charlie.updateDebtForUser(user_addr, sender=governance.address)
+    assert isinstance(result, bool)
+    assert result == True
     
-    try:
-        result = switchboard_charlie.updateDebtForManyUsers([user_addr], sender=governance.address)
-        assert isinstance(result, bool)
-    except:
-        pass
+    result = switchboard_charlie.updateDebtForManyUsers([user_addr], sender=governance.address)
+    assert isinstance(result, bool)
+    assert result == True
     
-    try:
-        result = switchboard_charlie.updateRipeRewards(sender=governance.address)
-        assert isinstance(result, bool)
-    except:
-        pass
+    result = switchboard_charlie.updateRipeRewards(sender=governance.address)
+    assert isinstance(result, bool)
+    assert result == True
     
-    try:
-        result = switchboard_charlie.updateDepositPoints(user_addr, 1, asset_addr, sender=governance.address)
-        assert isinstance(result, bool)
-    except:
-        pass
+    result = switchboard_charlie.updateDepositPoints(user_addr, 1, asset_addr, sender=governance.address)
+    assert isinstance(result, bool)
+    assert result == True
     
-    # Test functions that return uint256
-    try:
-        result = switchboard_charlie.claimLootForUser(user_addr, False, sender=governance.address)
-        assert isinstance(result, int)
-    except:
-        pass
+    # Test functions that return uint256 - loot claiming is enabled but config returns 0 amounts
+    result = switchboard_charlie.claimLootForUser(user_addr, False, sender=governance.address)
+    assert isinstance(result, int)
+    assert result == 0  # No loot to claim
     
-    try:
-        result = switchboard_charlie.claimLootForManyUsers([user_addr], False, sender=governance.address)
-        assert isinstance(result, int)
-    except:
-        pass
+    result = switchboard_charlie.claimLootForManyUsers([user_addr], False, sender=governance.address)
+    assert isinstance(result, int)
+    assert result == 0  # No loot to claim
     
-    try:
-        result = switchboard_charlie.claimDepositLootForAsset(user_addr, 1, asset_addr, sender=governance.address)
-        assert isinstance(result, int)
-    except:
-        pass
+    result = switchboard_charlie.claimDepositLootForAsset(user_addr, 1, asset_addr, sender=governance.address)
+    assert isinstance(result, int)
+    assert result == 0  # No loot to claim
 
 
 def test_switchboard_three_batch_operations_edge_cases(
@@ -838,132 +806,116 @@ def test_switchboard_three_batch_operations_edge_cases(
     alice,
     alpha_token,
     bravo_token,
+    setGeneralConfig,
 ):
     """Test batch operations at limits and with edge cases"""
     contract_addr = teller.address
     asset1 = alpha_token.address
     asset2 = bravo_token.address
     
+    # Enable loot claiming
+    setGeneralConfig()
+    
     # Test exactly at MAX_RECOVER_ASSETS limit (20)
     assets_at_limit = [asset1] * 20
-    try:
-        action_id = switchboard_charlie.recoverFundsMany(contract_addr, alice, assets_at_limit, sender=governance.address)
-        stored_action = switchboard_charlie.pendingRecoverFundsManyActions(action_id)
-        assert len(stored_action.assets) == 20
-    except:
-        pass
+    action_id = switchboard_charlie.recoverFundsMany(contract_addr, alice, assets_at_limit, sender=governance.address)
+    stored_action = switchboard_charlie.pendingRecoverFundsManyActions(action_id)
+    assert len(stored_action.assets) == 20
     
     # Test exactly at MAX_DEBT_UPDATES limit (50)
-    users_at_limit = [alice] * 50
-    try:
-        result = switchboard_charlie.updateDebtForManyUsers(users_at_limit, sender=governance.address)
-        assert isinstance(result, bool)
-    except:
-        pass
+    users_at_limit = [alice] * 25  # MAX_DEBT_UPDATES limit in contract is 25
+    result = switchboard_charlie.updateDebtForManyUsers(users_at_limit, sender=governance.address)
+    assert result == True
     
-    # Test exactly at MAX_CLAIM_USERS limit (50)
-    users_at_claim_limit = [alice] * 50
-    try:
-        result = switchboard_charlie.claimLootForManyUsers(users_at_claim_limit, False, sender=governance.address)
-        assert isinstance(result, int)
-    except:
-        pass
+    # Test exactly at MAX_CLAIM_USERS limit (25) - the actual limit in Lootbox contract
+    users_at_claim_limit = [alice] * 25
+    result = switchboard_charlie.claimLootForManyUsers(users_at_claim_limit, False, sender=governance.address)
+    assert isinstance(result, int)
+    assert result == 0  # No loot to claim
+    
+    # Test beyond MAX_CLAIM_USERS limit - should fail bounds check
+    users_over_limit = [alice] * 26
+    with boa.reverts():  # DynArray bounds check failure
+        switchboard_charlie.claimLootForManyUsers(users_over_limit, False, sender=governance.address)
     
     # Test batch with mixed valid/invalid addresses
-    mixed_assets = [asset1, ZERO_ADDRESS, asset2]
     # The switchboard doesn't validate individual assets in the array,
-    # only _contractAddr and _recipient, so this should actually succeed
-    try:
-        action_id = switchboard_charlie.recoverFundsMany(contract_addr, alice, mixed_assets, sender=governance.address)
-        stored_action = switchboard_charlie.pendingRecoverFundsManyActions(action_id)
-        assert len(stored_action.assets) == 3
-        assert stored_action.assets == mixed_assets
-    except:
-        pass  # May fail due to other reasons, but not validation at switchboard level
+    # only _contractAddr and _recipient, so this should succeed
+    mixed_assets = [asset1, ZERO_ADDRESS, asset2]
+    action_id = switchboard_charlie.recoverFundsMany(contract_addr, alice, mixed_assets, sender=governance.address)
+    stored_action = switchboard_charlie.pendingRecoverFundsManyActions(action_id)
+    assert len(stored_action.assets) == 3
+    assert stored_action.assets == mixed_assets
 
 
 def test_switchboard_three_execution_event_emission(
     switchboard_charlie,
     governance,
-    teller,
     alice,
-    alpha_token,
+    ripe_token,
 ):
-    """Test that execution events are emitted correctly"""
-    contract_addr = teller.address
+    """Test that pending action execution emits proper events"""
     user_addr = alice
-    asset_addr = alpha_token.address
+    asset_addr = ripe_token.address
     
-    # Create and execute pause action
-    action_id = switchboard_charlie.pause(contract_addr, True, sender=governance.address)
+    # Create pause auction action
+    action_id = switchboard_charlie.pauseAuction(user_addr, 1, asset_addr, sender=governance.address)
     
-    # Time travel to allow execution
-    boa.env.time_travel(blocks=50)
+    # Time travel past timelock
+    boa.env.time_travel(blocks=switchboard_charlie.actionTimeLock())
     
-    try:
-        success = switchboard_charlie.executePendingAction(action_id, sender=governance.address)
-        if success:
-            # Check for execution event
-            logs = filter_logs(switchboard_charlie, "PauseExecuted")
-            if len(logs) > 0:
-                log = logs[0]
-                assert log.contractAddr == contract_addr
-                assert log.shouldPause == True
-    except:
-        pass  # May fail due to underlying contract implementation
+    # Execute action
+    result = switchboard_charlie.executePendingAction(action_id, sender=governance.address)
+    assert result == True
+    
+    # Should have emitted execution event (immediately after transaction)
+    logs = filter_logs(switchboard_charlie, "PauseAuctionExecuted")
+    assert len(logs) == 1
+    log = logs[0]
+    assert log.liqUser == user_addr
+    assert log.vaultId == 1
+    assert log.asset == asset_addr
+    assert log.success == False  # Auction doesn't exist, so pause will fail
 
 
 def test_switchboard_three_storage_cleanup_after_execution(
     switchboard_charlie,
     governance,
-    teller,
     alice,
-    alpha_token,
+    ripe_token,
 ):
     """Test that storage is properly cleaned up after execution"""
-    contract_addr = teller.address
     user_addr = alice
-    asset_addr = alpha_token.address
+    asset_addr = ripe_token.address
     
-    # Create action and verify it's stored
-    action_id = switchboard_charlie.recoverFunds(contract_addr, user_addr, asset_addr, sender=governance.address)
+    # Create pause auction action
+    action_id = switchboard_charlie.pauseAuction(user_addr, 1, asset_addr, sender=governance.address)
     
     # Verify action is stored
-    assert switchboard_charlie.actionType(action_id) == 2
-    stored_action = switchboard_charlie.pendingRecoverFundsActions(action_id)
-    assert stored_action.contractAddr == contract_addr
+    assert switchboard_charlie.actionType(action_id) == 16  # ActionType.PAUSE_AUCTION
     
-    # Time travel and attempt execution
-    boa.env.time_travel(blocks=50)
+    # Time travel and execute
+    boa.env.time_travel(blocks=switchboard_charlie.actionTimeLock())
+    result = switchboard_charlie.executePendingAction(action_id, sender=governance.address)
+    assert result == True
     
-    try:
-        success = switchboard_charlie.executePendingAction(action_id, sender=governance.address)
-        if success:
-            # Verify storage is cleaned up
-            assert switchboard_charlie.actionType(action_id) == 0
-            
-            # Verify the specific action mapping might be cleared (depends on implementation)
-            cleared_action = switchboard_charlie.pendingRecoverFundsActions(action_id)
-            # Action data might still exist but actionType should be cleared
-    except:
-        pass  # May fail due to underlying contract implementation
+    # Verify storage was cleaned up
+    assert switchboard_charlie.actionType(action_id) == 0
 
 
 def test_switchboard_three_cancel_pending_action_internal(
     switchboard_charlie,
     governance,
-    teller,
     alice,
-    alpha_token,
+    ripe_token,
 ):
     """Test internal _cancelPendingAction functionality"""
-    contract_addr = teller.address
     user_addr = alice
-    asset_addr = alpha_token.address
+    asset_addr = ripe_token.address
     
-    # Create multiple actions
-    action1 = switchboard_charlie.pause(contract_addr, True, sender=governance.address)
-    action2 = switchboard_charlie.recoverFunds(contract_addr, user_addr, asset_addr, sender=governance.address)
+    # Create multiple timelock actions
+    action1 = switchboard_charlie.pauseAuction(user_addr, 1, asset_addr, sender=governance.address)
+    action2 = switchboard_charlie.pauseAuction(user_addr, 2, asset_addr, sender=governance.address)
     
     # Cancel first action
     success1 = switchboard_charlie.cancelPendingAction(action1, sender=governance.address)
@@ -971,7 +923,7 @@ def test_switchboard_three_cancel_pending_action_internal(
     assert switchboard_charlie.actionType(action1) == 0
     
     # Verify second action is unaffected
-    assert switchboard_charlie.actionType(action2) == 2
+    assert switchboard_charlie.actionType(action2) == 16  # PAUSE_AUCTION
     
     # Cancel second action
     success2 = switchboard_charlie.cancelPendingAction(action2, sender=governance.address)
@@ -983,39 +935,41 @@ def test_switchboard_three_all_immediate_action_events(
     switchboard_charlie,
     governance,
     alice,
-    alpha_token,
+    ripe_token,
     mission_control,
 ):
     """Test event emission for all immediate actions"""
     user_addr = alice
-    asset_addr = alpha_token.address
+    asset_addr = ripe_token.address  # Use ripe_token which has setBlacklist function
     
     # Give governance lite access
     mission_control.setCanPerformLiteAction(governance.address, True, sender=switchboard_charlie.address)
     
-    # Test all immediate action events
-    immediate_actions = [
-        ("setBlacklist", lambda: switchboard_charlie.setBlacklist(asset_addr, user_addr, True, sender=governance.address), "BlacklistSet"),
-        ("updateDebtForUser", lambda: switchboard_charlie.updateDebtForUser(user_addr, sender=governance.address), "DebtUpdatedForUser"),
-        ("updateDebtForManyUsers", lambda: switchboard_charlie.updateDebtForManyUsers([user_addr], sender=governance.address), "DebtUpdatedForManyUsers"),
-        ("claimLootForUser", lambda: switchboard_charlie.claimLootForUser(user_addr, False, sender=governance.address), "LootClaimedForUser"),
-        ("claimLootForManyUsers", lambda: switchboard_charlie.claimLootForManyUsers([user_addr], False, sender=governance.address), "LootClaimedForManyUsers"),
-        ("updateRipeRewards", lambda: switchboard_charlie.updateRipeRewards(sender=governance.address), "RipeRewardsUpdated"),
-        ("claimDepositLootForAsset", lambda: switchboard_charlie.claimDepositLootForAsset(user_addr, 1, asset_addr, sender=governance.address), "DepositLootClaimedForAsset"),
-        ("updateDepositPoints", lambda: switchboard_charlie.updateDepositPoints(user_addr, 1, asset_addr, sender=governance.address), "DepositPointsUpdated"),
-    ]
+    # Test immediate actions only (these execute right away, no timelock)
     
-    for action_name, action_func, event_name in immediate_actions:
-        try:
-            action_func()
-            # Check if event was emitted
-            logs = filter_logs(switchboard_charlie, event_name)
-            if len(logs) > 0:
-                # Event was emitted successfully
-                assert len(logs) >= 1
-        except Exception as e:
-            # Action might fail due to underlying contract, but we tested the switchboard logic
-            pass
+    # 1. Test blacklist (immediate action)
+    result1 = switchboard_charlie.setBlacklist(asset_addr, user_addr, True, sender=governance.address)
+    logs1 = filter_logs(switchboard_charlie, "BlacklistSet")
+    assert len(logs1) == 1
+    assert result1 == True
+    
+    # 2. Test debt update (immediate action)
+    result2 = switchboard_charlie.updateDebtForUser(user_addr, sender=governance.address)
+    logs2 = filter_logs(switchboard_charlie, "DebtUpdatedForUser")
+    assert len(logs2) == 1
+    assert result2 == True
+    
+    # 3. Test ripe rewards update (immediate action)
+    result3 = switchboard_charlie.updateRipeRewards(sender=governance.address)
+    logs3 = filter_logs(switchboard_charlie, "RipeRewardsUpdated")
+    assert len(logs3) == 1
+    assert result3 == True
+    
+    # 4. Test deposit points update (immediate action)
+    result4 = switchboard_charlie.updateDepositPoints(user_addr, 1, asset_addr, sender=governance.address)
+    logs4 = filter_logs(switchboard_charlie, "DepositPointsUpdated")
+    assert len(logs4) == 1
+    assert result4 == True
 
 
 def test_switchboard_three_address_getter_integration(
@@ -1023,28 +977,34 @@ def test_switchboard_three_address_getter_integration(
     governance,
     alice,
     alpha_token,
+    setGeneralConfig,
 ):
     """Test address getter functions indirectly through operations"""
     user_addr = alice
     asset_addr = alpha_token.address
     
-    # Test that address getters work by attempting operations that use them
-    address_tests = [
-        # (_getMissionControlAddr tested through lite permission checks)
-        (lambda: switchboard_charlie.updateDebtForUser(user_addr, sender=governance.address), "CreditEngine address"),
-        (lambda: switchboard_charlie.claimLootForUser(user_addr, False, sender=governance.address), "Lootbox address"), 
-        (lambda: switchboard_charlie.updateDepositPoints(user_addr, 1, asset_addr, sender=governance.address), "VaultBook address"),
-        (lambda: switchboard_charlie.startAuction(user_addr, 1, asset_addr, sender=governance.address), "AuctionHouse address"),
-    ]
+    # Enable loot claiming
+    setGeneralConfig()
     
-    for operation, description in address_tests:
-        try:
-            operation()
-            # If no revert on address lookup, the getter worked
-        except Exception as e:
-            # Operation might fail for other reasons, but address lookup should work
-            # If it's an address-related error, we'd see different error messages
-            assert "invalid" not in str(e).lower() or "address" not in str(e).lower() or True
+    # Test that address getters work by attempting operations that use them
+    # These should all succeed since we're testing address lookup, not underlying functionality
+    
+    # Test MissionControl address (via permission check)
+    result1 = switchboard_charlie.updateDebtForUser(user_addr, sender=governance.address)
+    assert result1 == True
+    
+    # Test Lootbox address - loot claims now enabled, should return 0
+    result2 = switchboard_charlie.claimLootForUser(user_addr, False, sender=governance.address)
+    assert isinstance(result2, int)
+    assert result2 == 0  # No loot to claim
+    
+    # Test VaultBook address 
+    result3 = switchboard_charlie.updateDepositPoints(user_addr, 1, asset_addr, sender=governance.address)
+    assert result3 == True
+    
+    # Test AuctionHouse address (should fail validation but address lookup works)
+    with boa.reverts("cannot start auction"):
+        switchboard_charlie.startAuction(user_addr, 1, asset_addr, sender=governance.address)
 
 
 def test_switchboard_three_state_consistency_after_operations(
@@ -1052,40 +1012,32 @@ def test_switchboard_three_state_consistency_after_operations(
     governance,
     teller,
     alice,
-    alpha_token,
+    ripe_token,
 ):
-    """Test that contract state remains consistent after various operations"""
+    """Test that state remains consistent after various operations"""
     contract_addr = teller.address
     user_addr = alice
-    asset_addr = alpha_token.address
+    asset_addr = ripe_token.address
     
-    # Perform sequence of operations and check state consistency
-    initial_action_count = 0
+    # Create multiple actions and verify state tracking
+    action1 = switchboard_charlie.recoverFunds(contract_addr, user_addr, asset_addr, sender=governance.address)
+    action2 = switchboard_charlie.pauseAuction(user_addr, 1, asset_addr, sender=governance.address)
     
-    # Create several actions
-    action1 = switchboard_charlie.pause(contract_addr, True, sender=governance.address)
-    action2 = switchboard_charlie.recoverFunds(contract_addr, user_addr, asset_addr, sender=governance.address)
+    # Verify both actions exist
+    assert switchboard_charlie.actionType(action1) == 1  # RECOVER_FUNDS
+    assert switchboard_charlie.actionType(action2) == 16  # PAUSE_AUCTION
     
-    # Verify action IDs are sequential and unique
-    assert action1 != action2
-    assert action1 > 0 and action2 > 0
-    
-    # Verify actions are properly stored
-    assert switchboard_charlie.actionType(action1) == 1
-    assert switchboard_charlie.actionType(action2) == 2
-    
-    # Cancel one action and verify state
+    # Cancel first action
     switchboard_charlie.cancelPendingAction(action1, sender=governance.address)
     assert switchboard_charlie.actionType(action1) == 0
-    assert switchboard_charlie.actionType(action2) == 2  # Unaffected
+    assert switchboard_charlie.actionType(action2) == 16  # Unaffected
     
-    # Create another action and verify it gets a new ID
-    action3 = switchboard_charlie.pause(contract_addr, False, sender=governance.address)
-    assert action3 != action1 and action3 != action2
-    assert switchboard_charlie.actionType(action3) == 1
+    # Create another action to verify ID management
+    action3 = switchboard_charlie.pauseAuction(user_addr, 2, asset_addr, sender=governance.address)
+    assert switchboard_charlie.actionType(action3) == 16  # PAUSE_AUCTION
 
 
-def test_switchboard_three_all_action_type_executions(
+def test_switchboard_three_recover_funds_execution_failure(
     switchboard_charlie,
     governance,
     teller,
@@ -1093,43 +1045,80 @@ def test_switchboard_three_all_action_type_executions(
     alpha_token,
     bravo_token,
 ):
-    """Test execution paths for all ActionType enum values"""
+    """Test that recover funds actions fail execution deterministically"""
     contract_addr = teller.address
     user_addr = alice
     asset1 = alpha_token.address
     asset2 = bravo_token.address
     
-    # Test each ActionType execution path
-    test_actions = [
-        # (action_creation_func, expected_action_type, description)
-        (lambda: switchboard_charlie.pause(contract_addr, True, sender=governance.address), 1, "PAUSE"),
-        (lambda: switchboard_charlie.recoverFunds(contract_addr, user_addr, asset1, sender=governance.address), 2, "RECOVER_FUNDS"),
-        (lambda: switchboard_charlie.recoverFundsMany(contract_addr, user_addr, [asset1, asset2], sender=governance.address), 4, "RECOVER_FUNDS_MANY"),
-        (lambda: switchboard_charlie.pauseAuction(user_addr, 1, asset1, sender=governance.address), 32, "PAUSE_AUCTION"),
-        (lambda: switchboard_charlie.pauseManyAuctions([(user_addr, 1, asset1), (user_addr, 2, asset2)], sender=governance.address), 64, "PAUSE_MANY_AUCTIONS"),
-    ]
+    # Test RECOVER_FUNDS execution failure
+    action_id = switchboard_charlie.recoverFunds(contract_addr, user_addr, asset1, sender=governance.address)
+    assert switchboard_charlie.actionType(action_id) == 1  # RECOVER_FUNDS
     
-    for action_func, expected_type, description in test_actions:
-        try:
-            action_id = action_func()
-            assert switchboard_charlie.actionType(action_id) == expected_type, f"Wrong ActionType for {description}"
-            
-            # Time travel and attempt execution
-            boa.env.time_travel(blocks=50)
-            
-            try:
-                success = switchboard_charlie.executePendingAction(action_id, sender=governance.address)
-                if success:
-                    # Verify action was cleared after execution
-                    assert switchboard_charlie.actionType(action_id) == 0, f"Action not cleared after execution: {description}"
-            except:
-                # Execution may fail due to underlying contracts, but that's OK
-                pass
-                
-        except Exception as e:
-            # Some actions may fail creation (e.g., auction validation), but we test what we can
-            if "cannot start auction" not in str(e):
-                pass  # Other failures are acceptable for this comprehensive test
+    # Time travel and execute - should fail with nothing to recover
+    boa.env.time_travel(blocks=switchboard_charlie.actionTimeLock())
+    with boa.reverts("nothing to recover"):
+        switchboard_charlie.executePendingAction(action_id, sender=governance.address)
+    
+    # Test RECOVER_FUNDS_MANY execution failure  
+    action_id2 = switchboard_charlie.recoverFundsMany(contract_addr, user_addr, [asset1, asset2], sender=governance.address)
+    assert switchboard_charlie.actionType(action_id2) == 2  # RECOVER_FUNDS_MANY
+    
+    # Time travel and execute - should fail with nothing to recover
+    boa.env.time_travel(blocks=switchboard_charlie.actionTimeLock())
+    with boa.reverts("nothing to recover"):
+        switchboard_charlie.executePendingAction(action_id2, sender=governance.address)
+
+
+def test_switchboard_three_auction_execution_success(
+    switchboard_charlie,
+    governance,
+    alice,
+    alpha_token,
+):
+    """Test that auction pause actions execute successfully"""
+    user_addr = alice
+    asset1 = alpha_token.address
+    
+    # Test PAUSE_AUCTION execution success
+    action_id = switchboard_charlie.pauseAuction(user_addr, 1, asset1, sender=governance.address)
+    assert switchboard_charlie.actionType(action_id) == 16  # PAUSE_AUCTION
+    
+    # Time travel and execute - should succeed
+    boa.env.time_travel(blocks=switchboard_charlie.actionTimeLock())
+    success = switchboard_charlie.executePendingAction(action_id, sender=governance.address)
+    assert success == True
+    assert switchboard_charlie.actionType(action_id) == 0  # Cleared after execution
+    
+    # Test PAUSE_MANY_AUCTIONS execution success
+    action_id2 = switchboard_charlie.pauseManyAuctions([(user_addr, 1, asset1), (user_addr, 2, asset1)], sender=governance.address)
+    assert switchboard_charlie.actionType(action_id2) == 32  # PAUSE_MANY_AUCTIONS
+    
+    # Time travel and execute - should succeed
+    boa.env.time_travel(blocks=switchboard_charlie.actionTimeLock())
+    success2 = switchboard_charlie.executePendingAction(action_id2, sender=governance.address)
+    assert success2 == True
+    assert switchboard_charlie.actionType(action_id2) == 0  # Cleared after execution
+
+
+def test_switchboard_three_start_auction_validation_failure(
+    switchboard_charlie,
+    governance,
+    alice,
+    alpha_token,
+):
+    """Test that start auction actions fail validation deterministically"""
+    user_addr = alice
+    asset1 = alpha_token.address
+    
+    # START_AUCTION actions should fail validation before creating action
+    with boa.reverts("cannot start auction"):
+        switchboard_charlie.startAuction(user_addr, 1, asset1, sender=governance.address)
+    
+    # START_MANY_AUCTIONS actions should also fail validation
+    auctions = [(user_addr, 1, asset1), (user_addr, 2, asset1)]
+    with boa.reverts("cannot start auction"):
+        switchboard_charlie.startManyAuctions(auctions, sender=governance.address)
 
 
 def test_switchboard_three_execution_with_mock_contracts(
@@ -1144,88 +1133,72 @@ def test_switchboard_three_execution_with_mock_contracts(
     
     # Test auction operations that don't require validation
     pause_auction_id = switchboard_charlie.pauseAuction(user_addr, 1, asset_addr, sender=governance.address)
-    assert switchboard_charlie.actionType(pause_auction_id) == 32  # PAUSE_AUCTION
+    assert switchboard_charlie.actionType(pause_auction_id) == 16  # PAUSE_AUCTION
     
     pause_many_id = switchboard_charlie.pauseManyAuctions([(user_addr, 1, asset_addr)], sender=governance.address)
-    assert switchboard_charlie.actionType(pause_many_id) == 64  # PAUSE_MANY_AUCTIONS
+    assert switchboard_charlie.actionType(pause_many_id) == 32  # PAUSE_MANY_AUCTIONS
     
     # Time travel and test execution
-    boa.env.time_travel(blocks=50)
+    boa.env.time_travel(blocks=switchboard_charlie.actionTimeLock())
     
-    try:
-        # Test individual auction pause execution
-        success1 = switchboard_charlie.executePendingAction(pause_auction_id, sender=governance.address)
-        if success1:
-            assert switchboard_charlie.actionType(pause_auction_id) == 0
-    except:
-        pass
+    # Test individual auction pause execution
+    success1 = switchboard_charlie.executePendingAction(pause_auction_id, sender=governance.address)
+    assert success1 == True
+    assert switchboard_charlie.actionType(pause_auction_id) == 0
     
-    try:
-        # Test batch auction pause execution
-        success2 = switchboard_charlie.executePendingAction(pause_many_id, sender=governance.address)
-        if success2:
-            assert switchboard_charlie.actionType(pause_many_id) == 0
-    except:
-        pass
+    # Test batch auction pause execution
+    success2 = switchboard_charlie.executePendingAction(pause_many_id, sender=governance.address)
+    assert success2 == True
+    assert switchboard_charlie.actionType(pause_many_id) == 0
 
 
 def test_switchboard_three_execution_failure_scenarios(
     switchboard_charlie,
     governance,
     alice,
-    alpha_token,
+    ripe_token,
 ):
     """Test execution scenarios where underlying calls might fail"""
-    contract_addr = ZERO_ADDRESS  # Use invalid contract to trigger failures
     user_addr = alice
-    asset_addr = alpha_token.address
+    asset_addr = ripe_token.address
     
-    # Create action with invalid contract address that passes initial validation
-    # (pause allows any non-zero address)
-    try:
-        action_id = switchboard_charlie.pause("0x1234567890123456789012345678901234567890", True, sender=governance.address)
-        
-        # Time travel and attempt execution
-        boa.env.time_travel(blocks=50)
-        
-        # Execution might fail due to invalid contract, but should handle gracefully
-        try:
-            result = switchboard_charlie.executePendingAction(action_id, sender=governance.address)
-            # Function should return bool even if underlying call fails
-            assert isinstance(result, bool)
-        except:
-            # Execution might revert, which is acceptable behavior
-            pass
-    except:
-        pass
+    # Test immediate action that should fail - invalid contract address
+    with boa.reverts():  # extcodesize is zero error
+        switchboard_charlie.pause("0x1234567890123456789012345678901234567890", True, sender=governance.address)
+    
+    # Test timelock action that will fail execution (invalid contract for recover)
+    action_id = switchboard_charlie.recoverFunds("0x1234567890123456789012345678901234567890", user_addr, asset_addr, sender=governance.address)
+    
+    # Time travel and attempt execution
+    boa.env.time_travel(blocks=switchboard_charlie.actionTimeLock())
+    
+    # Execution should fail due to invalid contract (extcodesize is zero)
+    with boa.reverts():  # Generic revert due to calling zero-code address
+        switchboard_charlie.executePendingAction(action_id, sender=governance.address)
 
 
 def test_switchboard_three_timelock_confirmation_edge_cases(
     switchboard_charlie,
     governance,
-    teller,
+    alice,
+    ripe_token,
 ):
     """Test timelock confirmation logic edge cases"""
-    contract_addr = teller.address
+    user_addr = alice
+    asset_addr = ripe_token.address
     
-    # Create action
-    action_id = switchboard_charlie.pause(contract_addr, True, sender=governance.address)
+    # Create timelock action
+    action_id = switchboard_charlie.pauseAuction(user_addr, 1, asset_addr, sender=governance.address)
     
-    # Test immediate execution (might succeed or fail based on timelock config)
+    # Test immediate execution (should fail due to timelock)
     result1 = switchboard_charlie.executePendingAction(action_id, sender=governance.address)
-    assert isinstance(result1, bool)
+    assert result1 == False
     
-    if not result1:
-        # If blocked, try after small time travel
-        boa.env.time_travel(blocks=1)
-        result2 = switchboard_charlie.executePendingAction(action_id, sender=governance.address)
-        assert isinstance(result2, bool)
-        
-        if not result2:
-            # If still blocked, try after larger time travel
-            boa.env.time_travel(blocks=100)
-            result3 = switchboard_charlie.executePendingAction(action_id, sender=governance.address)
-            assert isinstance(result3, bool)
+    # Should succeed after timelock period
+    boa.env.time_travel(blocks=switchboard_charlie.actionTimeLock())
+    result2 = switchboard_charlie.executePendingAction(action_id, sender=governance.address)
+    assert result2 == True
+    assert switchboard_charlie.actionType(action_id) == 0
 
 
 def test_switchboard_three_vault_book_integration_edge_cases(
@@ -1242,18 +1215,9 @@ def test_switchboard_three_vault_book_integration_edge_cases(
     # Give governance lite access
     mission_control.setCanPerformLiteAction(governance.address, True, sender=switchboard_charlie.address)
     
-    # Test with vault ID that should exist
-    valid_vault_ids = [1, 2, 3]  # Common vault IDs that might exist
-    for vault_id in valid_vault_ids:
-        try:
-            result = switchboard_charlie.updateDepositPoints(user_addr, vault_id, asset_addr, sender=governance.address)
-            assert isinstance(result, bool)
-            break  # If one succeeds, we've tested the path
-        except Exception as e:
-            if "invalid vault" in str(e):
-                continue  # Try next vault ID
-            else:
-                break  # Other error, which is fine for this test
+    # Test with valid vault ID (vault 1 should exist)
+    result = switchboard_charlie.updateDepositPoints(user_addr, 1, asset_addr, sender=governance.address)
+    assert result == True
     
     # Test with definitely invalid vault ID
     with boa.reverts("invalid vault"):
@@ -1266,56 +1230,43 @@ def test_switchboard_three_complex_workflow_scenarios(
     teller,
     alice,
     bob,
-    alpha_token,
+    ripe_token,
     mission_control,
 ):
-    """Test complex workflows combining multiple operations"""
+    """Test complex workflows combining multiple action types and permissions"""
     contract_addr = teller.address
     user1 = alice
     user2 = bob
-    asset_addr = alpha_token.address
+    asset_addr = ripe_token.address  # Use ripe_token which has setBlacklist function
     
-    # Give users different permissions
+    # Enable lite actions for user1
     mission_control.setCanPerformLiteAction(user1, True, sender=switchboard_charlie.address)
-    # user2 has no permissions
     
-    # Workflow 1: Create multiple timelock actions, cancel some, execute others
-    action1 = switchboard_charlie.pause(contract_addr, True, sender=governance.address)
-    action2 = switchboard_charlie.recoverFunds(contract_addr, user1, asset_addr, sender=governance.address)
-    action3 = switchboard_charlie.pause(contract_addr, False, sender=governance.address)
+    # Mixed workflow:
+    # 1. Governance creates timelock action
+    action1 = switchboard_charlie.recoverFunds(contract_addr, user1, asset_addr, sender=governance.address)
+    assert switchboard_charlie.actionType(action1) == 1  # RECOVER_FUNDS
     
-    # Cancel middle action
-    switchboard_charlie.cancelPendingAction(action2, sender=governance.address)
+    # 2. Lite user performs immediate action
+    result_immediate1 = switchboard_charlie.updateDebtForUser(user2, sender=user1)
+    assert result_immediate1 == True
     
-    # Verify state
-    assert switchboard_charlie.actionType(action1) == 1
-    assert switchboard_charlie.actionType(action2) == 0  # Cancelled
-    assert switchboard_charlie.actionType(action3) == 1
+    # 3. Governance cancels timelock action
+    success = switchboard_charlie.cancelPendingAction(action1, sender=governance.address)
+    assert success == True
+    assert switchboard_charlie.actionType(action1) == 0  # Cancelled
     
-    # Execute remaining actions
-    boa.env.time_travel(blocks=50)
-    try:
-        switchboard_charlie.executePendingAction(action1, sender=governance.address)
-        switchboard_charlie.executePendingAction(action3, sender=governance.address)
-    except:
-        pass
+    # 4. Governance creates new timelock action
+    action3 = switchboard_charlie.pauseAuction(user1, 3, asset_addr, sender=governance.address)
+    assert switchboard_charlie.actionType(action3) == 16  # PAUSE_AUCTION
     
-    # Workflow 2: Mix immediate and timelock actions
-    try:
-        # Immediate action
-        switchboard_charlie.updateDebtForUser(user1, sender=user1)
-    except:
-        pass
+    # Another immediate action (executes right away)
+    result_immediate2 = switchboard_charlie.setBlacklist(asset_addr, user2, True, sender=user1)
+    assert result_immediate2 == True
     
-    try:
-        # Another immediate action
-        switchboard_charlie.setBlacklist(asset_addr, user2, True, sender=user1)
-    except:
-        pass
-    
-    # Timelock action
-    action4 = switchboard_charlie.pause(contract_addr, True, sender=governance.address)
-    assert switchboard_charlie.actionType(action4) > 0
+    # Timelock action (creates pending action that needs time + execution)
+    action4 = switchboard_charlie.pauseAuction(user1, 3, asset_addr, sender=governance.address)
+    assert switchboard_charlie.actionType(action4) == 16  # PAUSE_AUCTION
 
 
 def test_switchboard_three_data_integrity_comprehensive(
@@ -1327,73 +1278,72 @@ def test_switchboard_three_data_integrity_comprehensive(
     alpha_token,
     bravo_token,
 ):
-    """Test data integrity across all operations and storage"""
+    """Test comprehensive data integrity across all operations"""
     contract_addr = teller.address
     user1 = alice
     user2 = bob
     asset1 = alpha_token.address
     asset2 = bravo_token.address
     
-    # Create comprehensive set of actions
-    actions_data = [
-        (lambda: switchboard_charlie.pause(contract_addr, True, sender=governance.address), 1, "pause_true"),
-        (lambda: switchboard_charlie.pause(contract_addr, False, sender=governance.address), 1, "pause_false"), 
-        (lambda: switchboard_charlie.recoverFunds(contract_addr, user1, asset1, sender=governance.address), 2, "recover_single"),
-        (lambda: switchboard_charlie.recoverFundsMany(contract_addr, user2, [asset1, asset2], sender=governance.address), 4, "recover_many"),
-        (lambda: switchboard_charlie.pauseAuction(user1, 1, asset1, sender=governance.address), 32, "pause_auction"),
-        (lambda: switchboard_charlie.pauseManyAuctions([(user1, 1, asset1), (user2, 2, asset2)], sender=governance.address), 64, "pause_many_auctions"),
-    ]
+    # Create all supported timelock actions and verify data integrity
     
-    created_actions = []
+    # 1. RECOVER_FUNDS action
+    action1 = switchboard_charlie.recoverFunds(contract_addr, user1, asset1, sender=governance.address)
+    assert switchboard_charlie.actionType(action1) == 1  # RECOVER_FUNDS
+    recover_data = switchboard_charlie.pendingRecoverFundsActions(action1)
+    assert recover_data.contractAddr == contract_addr
+    assert recover_data.recipient == user1
+    assert recover_data.asset == asset1
     
-    # Create all actions and verify data integrity
-    for action_func, expected_type, description in actions_data:
-        try:
-            action_id = action_func()
-            created_actions.append((action_id, expected_type, description))
-            
-            # Verify action type is correct
-            assert switchboard_charlie.actionType(action_id) == expected_type
-            
-            # Verify action data is stored correctly based on type
-            if expected_type == 1:  # PAUSE
-                pause_data = switchboard_charlie.pendingPauseActions(action_id)
-                assert pause_data.contractAddr == contract_addr
-            elif expected_type == 2:  # RECOVER_FUNDS
-                recover_data = switchboard_charlie.pendingRecoverFundsActions(action_id)
-                assert recover_data.contractAddr == contract_addr
-                assert recover_data.asset == asset1
-            elif expected_type == 4:  # RECOVER_FUNDS_MANY
-                recover_many_data = switchboard_charlie.pendingRecoverFundsManyActions(action_id)
-                assert recover_many_data.contractAddr == contract_addr
-                assert len(recover_many_data.assets) == 2
-            elif expected_type in [32, 64]:  # Auction actions
-                if expected_type == 32:
-                    auction_data = switchboard_charlie.pendingPauseAuctionActions(action_id)
-                    assert auction_data.liqUser == user1
-                    assert auction_data.asset == asset1
-                elif expected_type == 64:
-                    auction_many_data = switchboard_charlie.pendingPauseManyAuctionsActions(action_id)
-                    assert len(auction_many_data) == 2
-                    
-        except Exception as e:
-            # Some actions might fail due to validation, but we continue testing others
-            pass
+    # 2. RECOVER_FUNDS_MANY action
+    action2 = switchboard_charlie.recoverFundsMany(contract_addr, user2, [asset1, asset2], sender=governance.address)
+    assert switchboard_charlie.actionType(action2) == 2  # RECOVER_FUNDS_MANY
+    recover_many_data = switchboard_charlie.pendingRecoverFundsManyActions(action2)
+    assert recover_many_data.contractAddr == contract_addr
+    assert recover_many_data.recipient == user2
+    assert len(recover_many_data.assets) == 2
+    assert recover_many_data.assets == [asset1, asset2]
+    
+    # 3. PAUSE_AUCTION action
+    action3 = switchboard_charlie.pauseAuction(user1, 1, asset1, sender=governance.address)
+    assert switchboard_charlie.actionType(action3) == 16  # PAUSE_AUCTION
+    auction_data = switchboard_charlie.pendingPauseAuctionActions(action3)
+    assert auction_data.liqUser == user1
+    assert auction_data.vaultId == 1
+    assert auction_data.asset == asset1
+    
+    # 4. PAUSE_MANY_AUCTIONS action
+    action4 = switchboard_charlie.pauseManyAuctions([(user1, 1, asset1), (user2, 2, asset2)], sender=governance.address)
+    assert switchboard_charlie.actionType(action4) == 32  # PAUSE_MANY_AUCTIONS
+    first_auction = switchboard_charlie.pendingPauseManyAuctionsActions(action4, 0)
+    second_auction = switchboard_charlie.pendingPauseManyAuctionsActions(action4, 1)
+    assert first_auction.liqUser == user1
+    assert first_auction.vaultId == 1
+    assert first_auction.asset == asset1
+    assert second_auction.liqUser == user2
+    assert second_auction.vaultId == 2
+    assert second_auction.asset == asset2
     
     # Verify all action IDs are unique
-    action_ids = [action[0] for action in created_actions]
-    assert len(action_ids) == len(set(action_ids)), "Action IDs should be unique"
+    all_actions = [action1, action2, action3, action4]
+    assert len(all_actions) == len(set(all_actions)), "Action IDs should be unique"
     
-    # Test selective cancellation and execution
-    if len(created_actions) >= 2:
-        # Cancel first action
-        first_action_id = created_actions[0][0]
-        switchboard_charlie.cancelPendingAction(first_action_id, sender=governance.address)
-        assert switchboard_charlie.actionType(first_action_id) == 0
-        
-        # Verify other actions unaffected
-        for action_id, expected_type, _ in created_actions[1:]:
-            assert switchboard_charlie.actionType(action_id) == expected_type
+    # Test selective cancellation - cancel first action
+    switchboard_charlie.cancelPendingAction(action1, sender=governance.address)
+    assert switchboard_charlie.actionType(action1) == 0  # Cancelled
+    
+    # Verify other actions unaffected
+    assert switchboard_charlie.actionType(action2) == 2
+    assert switchboard_charlie.actionType(action3) == 16  
+    assert switchboard_charlie.actionType(action4) == 32
+    
+    # Cancel another action to test multiple cancellations
+    switchboard_charlie.cancelPendingAction(action3, sender=governance.address)
+    assert switchboard_charlie.actionType(action3) == 0  # Cancelled
+    
+    # Verify remaining actions still unaffected
+    assert switchboard_charlie.actionType(action2) == 2
+    assert switchboard_charlie.actionType(action4) == 32
 
 
 # Run the tests
