@@ -971,6 +971,10 @@ def _checkDebtHealth(_user: address, _debtType: uint256, _a: addys.Addys) -> boo
     if userDebt.amount == 0:
         return _debtType == 1 # nothing to check
 
+    # in liquidation, can't do anything
+    if userDebt.inLiquidation:
+        return False
+
     # check debt health
     if _debtType == 1:
         return self._hasGoodDebtHealth(userDebt.amount, bt.collateralVal, bt.debtTerms.ltv)

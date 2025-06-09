@@ -243,8 +243,9 @@ def setUserConfig(mission_control):
         _user,
         _canAnyoneDeposit = True,
         _canAnyoneRepayDebt = True,
+        _canAnyoneBondForUser = False,
     ):
-        mission_control.setUserConfig(_canAnyoneDeposit, _canAnyoneRepayDebt, sender=_user)
+        mission_control.setUserConfig(_canAnyoneDeposit, _canAnyoneRepayDebt, _canAnyoneBondForUser, sender=_user)
     yield setUserConfig
 
 

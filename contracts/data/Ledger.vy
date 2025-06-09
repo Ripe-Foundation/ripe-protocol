@@ -114,6 +114,7 @@ struct FungibleAuction:
     endBlock: uint256
     isActive: bool
 
+
 # user vault participation
 userVaults: public(HashMap[address, HashMap[uint256, uint256]]) # user -> index -> vault id
 indexOfVault: public(HashMap[address, HashMap[uint256, uint256]]) # user -> vault id -> index
@@ -154,12 +155,19 @@ contributors: public(HashMap[uint256, address]) # index -> contributor addr
 indexOfContributor: public(HashMap[address, uint256]) # contributor -> index
 numContributors: public(uint256) # num contributors
 
+# bond data
+epochStart: public(uint256)
+epochEnd: public(uint256)
+paymentAmountAvailInEpoch: public(uint256)
+ripeAvailForBonds: public(uint256)
+
 
 @deploy
 def __init__(
     _ripeHq: address,
     _ripeAvailForRewards: uint256,
     _ripeAvailForHr: uint256,
+    _ripeAvailForBonds: uint256,
 ):
     addys.__init__(_ripeHq)
     deptBasics.__init__(False, False, False) # no minting
@@ -169,6 +177,9 @@ def __init__(
 
     if _ripeAvailForHr != 0:
         self.ripeAvailForHr = _ripeAvailForHr
+
+    if _ripeAvailForBonds != 0:
+        self.ripeAvailForBonds = _ripeAvailForBonds
 
 
 ###############
@@ -730,3 +741,46 @@ def setRipeAvailForHr(_amount: uint256):
     assert addys._isSwitchboardAddr(msg.sender) or msg.sender == addys._getHumanResourcesAddr() # dev: no perms
     assert not deptBasics.isPaused # dev: not activated
     self.ripeAvailForHr = _amount
+
+
+#########
+# Bonds #
+#########
+
+
+@view
+@external
+def getEpochData() -> (uint256, uint256):
+    return self.epochStart, self.epochEnd
+
+
+@view
+@external
+def getRipeBondData() -> (uint256, uint256):
+    return self.paymentAmountAvailInEpoch, self.ripeAvailForBonds
+
+
+@external
+def setRipeAvailForBonds(_amount: uint256):
+    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
+    assert not deptBasics.isPaused # dev: not activated
+    self.ripeAvailForBonds = _amount
+
+
+@external
+def didPurchaseRipeBond(_amountPaid: uint256, _ripePayout: uint256):
+    assert msg.sender == addys._getBondRoomAddr() # dev: no perms
+    assert not deptBasics.isPaused # dev: not activated
+
+    self.paymentAmountAvailInEpoch -= _amountPaid
+    self.ripeAvailForBonds -= _ripePayout
+
+
+@external
+def setEpochData(_epochStart: uint256, _epochEnd: uint256, _amountAvailInEpoch: uint256):
+    assert msg.sender == addys._getBondRoomAddr() # dev: no perms
+    assert not deptBasics.isPaused # dev: not activated
+
+    self.epochStart = _epochStart
+    self.epochEnd = _epochEnd
+    self.paymentAmountAvailInEpoch = _amountAvailInEpoch

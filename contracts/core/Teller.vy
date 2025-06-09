@@ -57,6 +57,9 @@ interface VaultBook:
     def getRegId(_vaultAddr: address) -> uint256: view
     def getAddr(_vaultId: uint256) -> address: view
 
+interface BondRoom:
+    def purchaseRipeBond(_user: address, _paymentAsset: address, _paymentAmount: uint256, _lockDuration: uint256, _caller: address, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
+
 struct DepositLedgerData:
     isParticipatingInVault: bool
     numUserVaults: uint256
@@ -654,6 +657,7 @@ def adjustLock(_asset: address, _newLockDuration: uint256):
     a: addys.Addys = addys._getAddys()
     vaultAddr: address = staticcall VaultBook(a.vaultBook).getAddr(RIPE_GOV_VAULT_ID)
     extcall RipeGovVault(vaultAddr).adjustLock(msg.sender, _asset, _newLockDuration, a)
+    extcall CreditEngine(a.creditEngine).updateDebtForUser(msg.sender, a)
 
 
 @nonreentrant
@@ -663,6 +667,7 @@ def releaseLock(_asset: address):
     a: addys.Addys = addys._getAddys()
     vaultAddr: address = staticcall VaultBook(a.vaultBook).getAddr(RIPE_GOV_VAULT_ID)
     extcall RipeGovVault(vaultAddr).releaseLock(msg.sender, _asset, a)
+    extcall CreditEngine(a.creditEngine).updateDebtForUser(msg.sender, a)
 
 
 @external
@@ -678,6 +683,28 @@ def depositIntoGovVaultFromTrusted(
     amount: uint256 = self._deposit(_asset, _amount, _user, empty(address), RIPE_GOV_VAULT_ID, msg.sender, _lockDuration, a)
     extcall CreditEngine(a.creditEngine).updateDebtForUser(_user, a)
     return amount
+
+
+##################
+# Bond Purchases #
+##################
+
+
+@nonreentrant
+@external
+def purchaseRipeBond(
+    _paymentAsset: address,
+    _paymentAmount: uint256 = max_value(uint256),
+    _lockDuration: uint256 = 0,
+    _user: address = msg.sender,
+) -> uint256:
+    assert not deptBasics.isPaused # dev: contract paused
+    a: addys.Addys = addys._getAddys()
+    paymentAmount: uint256 = min(_paymentAmount, staticcall IERC20(_paymentAsset).balanceOf(msg.sender))
+    assert extcall IERC20(_paymentAsset).transferFrom(msg.sender, a.bondRoom, paymentAmount, default_return_value=True) # dev: token transfer failed
+    ripePayout: uint256 = extcall BondRoom(a.bondRoom).purchaseRipeBond(_user, _paymentAsset, paymentAmount, _lockDuration, msg.sender, a)
+    extcall CreditEngine(a.creditEngine).updateDebtForUser(msg.sender, a)
+    return ripePayout
 
 
 #############

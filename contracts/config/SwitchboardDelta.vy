@@ -20,12 +20,17 @@ interface HrContributor:
     def cancelPaycheck(): nonpayable
 
 interface MissionControl:
+    def setRipeBondConfig(_config: RipeBondConfig): nonpayable
     def canPerformLiteAction(_user: address) -> bool: view
     def setHrConfig(_config: HrConfig): nonpayable
+    def ripeBondConfig() -> RipeBondConfig: view
     def hrConfig() -> HrConfig: view
 
 interface Ledger:
     def isHrContributor(_contributor: address) -> bool: view
+
+interface BondRoom:
+    def startBondEpochAtBlock(_block: uint256): nonpayable
 
 interface RipeHq:
     def getAddr(_regId: uint256) -> address: view
@@ -38,6 +43,9 @@ flag ActionType:
     HR_CONFIG_VESTING
     HR_MANAGER
     HR_CANCEL_PAYCHECK
+    RIPE_BOND_CONFIG
+    RIPE_BOND_EPOCH_LENGTH
+    RIPE_BOND_START_EPOCH
 
 struct HrConfig:
     contribTemplate: address
@@ -54,6 +62,18 @@ struct PendingManager:
 struct PendingCancelPaycheck:
     contributor: address
     pendingShouldCancel: bool
+
+struct RipeBondConfig:
+    asset: address
+    amountPerEpoch: uint256
+    canBond: bool
+    maxRipePerUnit: uint256
+    maxRipePerUnitLockBonus: uint256
+    epochLength: uint256
+    minLockDuration: uint256
+    maxLockDuration: uint256
+    shouldAutoRestart: bool
+    canAnyoneBondForUser: bool
 
 event PendingHrContribTemplateChange:
     contribTemplate: indexed(address)
@@ -110,6 +130,29 @@ event ContributorFrozenFromSwitchboard:
     frozenBy: indexed(address)
     shouldFreeze: bool
 
+event PendingRipeBondConfigSet:
+    asset: indexed(address)
+    amountPerEpoch: uint256
+    maxRipePerUnit: uint256
+    maxRipePerUnitLockBonus: uint256
+    shouldAutoRestart: bool
+    confirmationBlock: uint256
+    actionId: uint256
+
+event PendingRipeBondEpochLengthSet:
+    epochLength: uint256
+    confirmationBlock: uint256
+    actionId: uint256
+
+event PendingStartEpochAtBlockSet:
+    startBlock: uint256
+    confirmationBlock: uint256
+    actionId: uint256
+
+event CanPurchaseRipeBondModified:
+    canPurchaseRipeBond: bool
+    modifier: indexed(address)
+
 event HrContribTemplateSet:
     contribTemplate: indexed(address)
 
@@ -133,14 +176,30 @@ event HrContributorManagerSet:
 event HrContributorCancelPaycheckSet:
     contributor: indexed(address)
 
+event RipeBondConfigSet:
+    asset: indexed(address)
+    amountPerEpoch: uint256
+    maxRipePerUnit: uint256
+    maxRipePerUnitLockBonus: uint256
+    shouldAutoRestart: bool
+
+event RipeBondEpochLengthSet:
+    epochLength: uint256
+
+event RipeBondStartEpochAtBlockSet:
+    startBlock: uint256
+
 # pending config changes
 actionType: public(HashMap[uint256, ActionType]) # aid -> type
 pendingHrConfig: public(HashMap[uint256, HrConfig]) # aid -> config
 pendingManager: public(HashMap[uint256, PendingManager]) # aid -> pending manager
 pendingCancelPaycheck: public(HashMap[uint256, address]) # aid -> contributor
+pendingRipeBondConfig: public(HashMap[uint256, RipeBondConfig]) # aid -> config
+pendingRipeBondConfigValue: public(HashMap[uint256, uint256]) # aid -> block
 
 LEDGER_ID: constant(uint256) = 4
 MISSION_CONTROL_ID: constant(uint256) = 5
+BOND_ROOM_ID: constant(uint256) = 12
 EIGHTEEN_DECIMALS: constant(uint256) = 10 ** 18
 
 # timestamp units (not blocks!)
@@ -187,6 +246,12 @@ def _getMissionControlAddr() -> address:
 @internal
 def _getLedgerAddr() -> address:
     return staticcall RipeHq(gov._getRipeHqFromGov()).getAddr(LEDGER_ID)
+
+
+@view
+@internal
+def _getBondRoomAddr() -> address:
+    return staticcall RipeHq(gov._getRipeHqFromGov()).getAddr(BOND_ROOM_ID)
 
 
 #############
@@ -377,6 +442,95 @@ def freezeContributor(_contributor: address, _shouldFreeze: bool) -> bool:
     return True
 
 
+####################
+# Ripe Bond Config #
+####################
+
+
+# main config
+
+
+@external
+def setRipeBondConfig(
+    _asset: address,
+    _amountPerEpoch: uint256,
+    _maxRipePerUnit: uint256,
+    _maxRipePerUnitLockBonus: uint256,
+    _shouldAutoRestart: bool,
+) -> bool:
+    assert gov._canGovern(msg.sender) # dev: no perms
+    aid: uint256 = timeLock._initiateAction()
+    self.actionType[aid] = ActionType.RIPE_BOND_CONFIG
+    self.pendingRipeBondConfig[aid] = RipeBondConfig(
+        asset=_asset,
+        amountPerEpoch=_amountPerEpoch,
+        canBond=False,
+        maxRipePerUnit=_maxRipePerUnit,
+        maxRipePerUnitLockBonus=_maxRipePerUnitLockBonus,
+        epochLength=0,
+        minLockDuration=0,
+        maxLockDuration=0,
+        shouldAutoRestart=_shouldAutoRestart,
+        canAnyoneBondForUser=False,
+    )
+    confirmationBlock: uint256 = timeLock._getActionConfirmationBlock(aid)
+    log PendingRipeBondConfigSet(
+        asset=_asset,
+        amountPerEpoch=_amountPerEpoch,
+        maxRipePerUnit=_maxRipePerUnit,
+        maxRipePerUnitLockBonus=_maxRipePerUnitLockBonus,
+        shouldAutoRestart=_shouldAutoRestart,
+        confirmationBlock=confirmationBlock,
+        actionId=aid,
+    )
+    return True
+
+
+# epoch length
+
+
+@external
+def setRipeBondEpochLength(_epochLength: uint256) -> bool:
+    assert gov._canGovern(msg.sender) # dev: no perms
+    assert _epochLength > timeLock.MIN_ACTION_TIMELOCK and _epochLength <= timeLock.MAX_ACTION_TIMELOCK # dev: invalid epoch length
+    aid: uint256 = timeLock._initiateAction()
+    self.actionType[aid] = ActionType.RIPE_BOND_EPOCH_LENGTH
+    self.pendingRipeBondConfigValue[aid] = _epochLength
+    confirmationBlock: uint256 = timeLock._getActionConfirmationBlock(aid)
+    log PendingRipeBondEpochLengthSet(epochLength=_epochLength, confirmationBlock=confirmationBlock, actionId=aid)
+    return True
+
+
+# start epoch at block
+
+
+@external
+def setStartEpochAtBlock(_block: uint256) -> bool:
+    assert gov._canGovern(msg.sender) # dev: no perms
+    aid: uint256 = timeLock._initiateAction()
+    self.actionType[aid] = ActionType.RIPE_BOND_START_EPOCH
+    assert _block > block.number # dev: invalid start block
+    self.pendingRipeBondConfigValue[aid] = _block
+    confirmationBlock: uint256 = timeLock._getActionConfirmationBlock(aid)
+    log PendingStartEpochAtBlockSet(startBlock=_block, confirmationBlock=confirmationBlock, actionId=aid)
+    return True
+
+
+# disable / enable bonding
+
+
+@external
+def setCanPurchaseRipeBond(_canBond: bool) -> bool:
+    assert self._hasPermsToEnable(msg.sender, not _canBond) # dev: no perms
+    mc: address = self._getMissionControlAddr()
+    config: RipeBondConfig = staticcall MissionControl(mc).ripeBondConfig()
+    assert config.canBond != _canBond # dev: no change
+    config.canBond = _canBond
+    extcall MissionControl(mc).setRipeBondConfig(config)
+    log CanPurchaseRipeBondModified(canPurchaseRipeBond=_canBond, modifier=msg.sender)
+    return True
+
+
 #############
 # Execution #
 #############
@@ -439,6 +593,30 @@ def executePendingAction(_aid: uint256) -> bool:
         p: address = self.pendingCancelPaycheck[_aid]
         extcall HrContributor(p).cancelPaycheck()
         log HrContributorCancelPaycheckSet(contributor=p)
+
+    elif actionType == ActionType.RIPE_BOND_CONFIG:
+        p: RipeBondConfig = self.pendingRipeBondConfig[_aid]
+        config: RipeBondConfig = staticcall MissionControl(mc).ripeBondConfig()
+        config.asset = p.asset
+        config.amountPerEpoch = p.amountPerEpoch
+        config.maxRipePerUnit = p.maxRipePerUnit
+        config.maxRipePerUnitLockBonus = p.maxRipePerUnitLockBonus
+        config.shouldAutoRestart = p.shouldAutoRestart
+        extcall MissionControl(mc).setRipeBondConfig(config)
+        extcall BondRoom(self._getBondRoomAddr()).startBondEpochAtBlock(0) # reset epoch
+        log RipeBondConfigSet(asset=p.asset, amountPerEpoch=p.amountPerEpoch, maxRipePerUnit=p.maxRipePerUnit, maxRipePerUnitLockBonus=p.maxRipePerUnitLockBonus, shouldAutoRestart=p.shouldAutoRestart)
+
+    elif actionType == ActionType.RIPE_BOND_EPOCH_LENGTH:
+        config: RipeBondConfig = staticcall MissionControl(mc).ripeBondConfig()
+        config.epochLength = self.pendingRipeBondConfigValue[_aid]
+        extcall MissionControl(mc).setRipeBondConfig(config)
+        extcall BondRoom(self._getBondRoomAddr()).startBondEpochAtBlock(0) # reset epoch
+        log RipeBondEpochLengthSet(epochLength=config.epochLength)
+
+    elif actionType == ActionType.RIPE_BOND_START_EPOCH:
+        startBlock: uint256 = self.pendingRipeBondConfigValue[_aid]
+        extcall BondRoom(self._getBondRoomAddr()).startBondEpochAtBlock(startBlock)
+        log RipeBondStartEpochAtBlockSet(startBlock=startBlock)
 
     self.actionType[_aid] = empty(ActionType)
     return True

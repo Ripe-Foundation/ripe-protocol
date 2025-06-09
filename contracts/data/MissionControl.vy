@@ -101,6 +101,7 @@ struct TotalPointsAllocs:
 struct UserConfig:
     canAnyoneDeposit: bool
     canAnyoneRepayDebt: bool
+    canAnyoneBondForUser: bool
 
 struct ActionDelegation:
     canWithdraw: bool
@@ -252,12 +253,25 @@ struct RipeGovVaultConfig:
     lockTerms: LockTerms
     assetWeight: uint256
 
+struct RipeBondConfig:
+    asset: address
+    amountPerEpoch: uint256
+    canBond: bool
+    maxRipePerUnit: uint256
+    maxRipePerUnitLockBonus: uint256
+    epochLength: uint256
+    minLockDuration: uint256
+    maxLockDuration: uint256
+    shouldAutoRestart: bool
+    canAnyoneBondForUser: bool
+
 # events
 
 event UserConfigSet:
     user: indexed(address)
     canAnyoneDeposit: bool
     canAnyoneRepayDebt: bool
+    canAnyoneBondForUser: bool
 
 event UserDelegationSet:
     user: indexed(address)
@@ -297,6 +311,7 @@ canPerformLiteAction: public(HashMap[address, bool]) # user -> canPerformLiteAct
 maxLtvDeviation: public(uint256)
 ripeGovVaultConfig: public(HashMap[address, RipeGovVaultConfig]) # asset -> config
 hrConfig: public(HrConfig)
+ripeBondConfig: public(RipeBondConfig)
 
 MAX_VAULTS_PER_ASSET: constant(uint256) = 10
 MAX_PRIORITY_PRICE_SOURCES: constant(uint256) = 10
@@ -547,14 +562,16 @@ def getPriceStaleTime() -> uint256:
 def setUserConfig(
     _canAnyoneDeposit: bool = True,
     _canAnyoneRepayDebt: bool = True,
+    _canAnyoneBondForUser: bool = False,
 ) -> bool:
     assert not deptBasics.isPaused # dev: contract paused
     userConfig: UserConfig = UserConfig(
         canAnyoneDeposit=_canAnyoneDeposit,
         canAnyoneRepayDebt=_canAnyoneRepayDebt,
+        canAnyoneBondForUser=_canAnyoneBondForUser,
     )
     self.userConfig[msg.sender] = userConfig
-    log UserConfigSet(user=msg.sender, canAnyoneDeposit=_canAnyoneDeposit, canAnyoneRepayDebt=_canAnyoneRepayDebt)
+    log UserConfigSet(user=msg.sender, canAnyoneDeposit=_canAnyoneDeposit, canAnyoneRepayDebt=_canAnyoneRepayDebt, canAnyoneBondForUser=_canAnyoneBondForUser)
     return True
 
 
@@ -637,6 +654,17 @@ def setRipeGovVaultConfig(_asset: address, _assetWeight: uint256, _lockTerms: Lo
 def setHrConfig(_config: HrConfig):
     assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
     self.hrConfig = _config
+
+
+####################
+# Ripe Bond Config #
+####################
+
+
+@external
+def setRipeBondConfig(_config: RipeBondConfig):
+    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
+    self.ripeBondConfig = _config
 
 
 ###################
@@ -951,3 +979,19 @@ def getPriceConfig() -> PriceConfig:
         staleTime=self.genConfig.priceStaleTime,
         priorityPriceSourceIds=self.priorityPriceSourceIds,
     )
+
+
+# ripe bond config
+
+
+@view
+@external
+def getRipeBondConfig(_user: address) -> RipeBondConfig:
+    config: RipeBondConfig = self.ripeBondConfig
+    config.canAnyoneBondForUser = self.userConfig[_user].canAnyoneBondForUser
+
+    ripeVaultConfig: RipeGovVaultConfig = self.ripeGovVaultConfig[addys._getRipeToken()]
+    config.minLockDuration = ripeVaultConfig.lockTerms.minLockDuration
+    config.maxLockDuration = ripeVaultConfig.lockTerms.maxLockDuration
+
+    return config

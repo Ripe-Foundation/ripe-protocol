@@ -126,6 +126,10 @@ def ripe_hq(
     ripe_hq_deploy.initiateHqConfigChange(9, True, False, False, sender=deploy3r)
     assert ripe_hq_deploy.confirmHqConfigChange(9, sender=deploy3r)
 
+    # bond room can mint ripe
+    ripe_hq_deploy.initiateHqConfigChange(12, False, True, False, sender=deploy3r)
+    assert ripe_hq_deploy.confirmHqConfigChange(12, sender=deploy3r)
+
     # credit engine can mint green
     ripe_hq_deploy.initiateHqConfigChange(13, True, False, False, sender=deploy3r)
     assert ripe_hq_deploy.confirmHqConfigChange(13, sender=deploy3r)
@@ -212,6 +216,7 @@ def ledger(ripe_hq_deploy):
         "contracts/data/Ledger.vy",
         ripe_hq_deploy,
         # TODO: get actual values here
+        100 * (1_000_000 * EIGHTEEN_DECIMALS), # 100 million
         100 * (1_000_000 * EIGHTEEN_DECIMALS), # 100 million
         100 * (1_000_000 * EIGHTEEN_DECIMALS), # 100 million
         name="ledger",
