@@ -153,7 +153,6 @@ def test_ah_liquidation_auction_discount_calculation(
     green_token.transfer(alice, green_amount, sender=whale)
     green_token.approve(teller, green_amount, sender=alice)
 
-
     # Test auction purchase at start (minimum discount)
     # Auction starts immediately (delay=0), so we're already at start
     green_to_spend = 10 * EIGHTEEN_DECIMALS

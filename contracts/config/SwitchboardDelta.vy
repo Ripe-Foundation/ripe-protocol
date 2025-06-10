@@ -67,13 +67,11 @@ struct RipeBondConfig:
     asset: address
     amountPerEpoch: uint256
     canBond: bool
+    minRipePerUnit: uint256
     maxRipePerUnit: uint256
     maxRipePerUnitLockBonus: uint256
     epochLength: uint256
-    minLockDuration: uint256
-    maxLockDuration: uint256
     shouldAutoRestart: bool
-    canAnyoneBondForUser: bool
 
 event PendingHrContribTemplateChange:
     contribTemplate: indexed(address)
@@ -133,6 +131,7 @@ event ContributorFrozenFromSwitchboard:
 event PendingRipeBondConfigSet:
     asset: indexed(address)
     amountPerEpoch: uint256
+    minRipePerUnit: uint256
     maxRipePerUnit: uint256
     maxRipePerUnitLockBonus: uint256
     shouldAutoRestart: bool
@@ -179,6 +178,7 @@ event HrContributorCancelPaycheckSet:
 event RipeBondConfigSet:
     asset: indexed(address)
     amountPerEpoch: uint256
+    minRipePerUnit: uint256
     maxRipePerUnit: uint256
     maxRipePerUnitLockBonus: uint256
     shouldAutoRestart: bool
@@ -454,6 +454,7 @@ def freezeContributor(_contributor: address, _shouldFreeze: bool) -> bool:
 def setRipeBondConfig(
     _asset: address,
     _amountPerEpoch: uint256,
+    _minRipePerUnit: uint256,
     _maxRipePerUnit: uint256,
     _maxRipePerUnitLockBonus: uint256,
     _shouldAutoRestart: bool,
@@ -461,22 +462,26 @@ def setRipeBondConfig(
     assert gov._canGovern(msg.sender) # dev: no perms
     aid: uint256 = timeLock._initiateAction()
     self.actionType[aid] = ActionType.RIPE_BOND_CONFIG
+
+    assert _asset != empty(address) # dev: invalid asset
+    assert 0 not in [_amountPerEpoch, _maxRipePerUnit] # dev: invalid config
+    assert _minRipePerUnit < _maxRipePerUnit # dev: invalid min/max ripe per unit
+    
     self.pendingRipeBondConfig[aid] = RipeBondConfig(
         asset=_asset,
         amountPerEpoch=_amountPerEpoch,
         canBond=False,
+        minRipePerUnit=_minRipePerUnit,
         maxRipePerUnit=_maxRipePerUnit,
         maxRipePerUnitLockBonus=_maxRipePerUnitLockBonus,
         epochLength=0,
-        minLockDuration=0,
-        maxLockDuration=0,
         shouldAutoRestart=_shouldAutoRestart,
-        canAnyoneBondForUser=False,
     )
     confirmationBlock: uint256 = timeLock._getActionConfirmationBlock(aid)
     log PendingRipeBondConfigSet(
         asset=_asset,
         amountPerEpoch=_amountPerEpoch,
+        minRipePerUnit=_minRipePerUnit,
         maxRipePerUnit=_maxRipePerUnit,
         maxRipePerUnitLockBonus=_maxRipePerUnitLockBonus,
         shouldAutoRestart=_shouldAutoRestart,
@@ -492,7 +497,7 @@ def setRipeBondConfig(
 @external
 def setRipeBondEpochLength(_epochLength: uint256) -> bool:
     assert gov._canGovern(msg.sender) # dev: no perms
-    assert _epochLength > timeLock.MIN_ACTION_TIMELOCK and _epochLength <= timeLock.MAX_ACTION_TIMELOCK # dev: invalid epoch length
+    assert _epochLength != 0 # dev: invalid epoch length
     aid: uint256 = timeLock._initiateAction()
     self.actionType[aid] = ActionType.RIPE_BOND_EPOCH_LENGTH
     self.pendingRipeBondConfigValue[aid] = _epochLength
@@ -599,12 +604,13 @@ def executePendingAction(_aid: uint256) -> bool:
         config: RipeBondConfig = staticcall MissionControl(mc).ripeBondConfig()
         config.asset = p.asset
         config.amountPerEpoch = p.amountPerEpoch
+        config.minRipePerUnit = p.minRipePerUnit
         config.maxRipePerUnit = p.maxRipePerUnit
         config.maxRipePerUnitLockBonus = p.maxRipePerUnitLockBonus
         config.shouldAutoRestart = p.shouldAutoRestart
         extcall MissionControl(mc).setRipeBondConfig(config)
         extcall BondRoom(self._getBondRoomAddr()).startBondEpochAtBlock(0) # reset epoch
-        log RipeBondConfigSet(asset=p.asset, amountPerEpoch=p.amountPerEpoch, maxRipePerUnit=p.maxRipePerUnit, maxRipePerUnitLockBonus=p.maxRipePerUnitLockBonus, shouldAutoRestart=p.shouldAutoRestart)
+        log RipeBondConfigSet(asset=p.asset, amountPerEpoch=p.amountPerEpoch, minRipePerUnit=p.minRipePerUnit, maxRipePerUnit=p.maxRipePerUnit, maxRipePerUnitLockBonus=p.maxRipePerUnitLockBonus, shouldAutoRestart=p.shouldAutoRestart)
 
     elif actionType == ActionType.RIPE_BOND_EPOCH_LENGTH:
         config: RipeBondConfig = staticcall MissionControl(mc).ripeBondConfig()

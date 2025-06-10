@@ -25,21 +25,22 @@ interface Teller:
     def depositIntoGovVaultFromTrusted(_user: address, _asset: address, _amount: uint256, _lockDuration: uint256, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
 
 interface MissionControl:
-    def getRipeBondConfig(_user: address) -> RipeBondConfig: view
+    def getPurchaseRipeBondConfig(_user: address) -> PurchaseRipeBondConfig: view
 
 interface RipeToken:
     def mint(_to: address, _amount: uint256): nonpayable
 
-struct RipeBondConfig:
+struct PurchaseRipeBondConfig:
     asset: address
     amountPerEpoch: uint256
     canBond: bool
+    minRipePerUnit: uint256
     maxRipePerUnit: uint256
     maxRipePerUnitLockBonus: uint256
     epochLength: uint256
+    shouldAutoRestart: bool
     minLockDuration: uint256
     maxLockDuration: uint256
-    shouldAutoRestart: bool
     canAnyoneBondForUser: bool
 
 event RipeBondPurchased:
@@ -96,7 +97,7 @@ def _purchaseRipeBond(
     maxUserAmount: uint256 = min(_paymentAmount, staticcall IERC20(_paymentAsset).balanceOf(self))
     assert maxUserAmount != 0 # dev: user has no asset balance (or zero specified)
 
-    config: RipeBondConfig = staticcall MissionControl(_a.missionControl).getRipeBondConfig(_user)
+    config: PurchaseRipeBondConfig = staticcall MissionControl(_a.missionControl).getPurchaseRipeBondConfig(_user)
     assert config.asset == _paymentAsset # dev: asset mismatch
     assert config.canBond # dev: bonds disabled
     if _user != _caller:
@@ -117,12 +118,12 @@ def _purchaseRipeBond(
 
     # base ripe payout
     epochProgress: uint256 = (block.number - epochStart) * HUNDRED_PERCENT // (epochEnd - epochStart)
-    baseRipePerUnit: uint256 = config.maxRipePerUnit * epochProgress // HUNDRED_PERCENT
+    baseRipePerUnit: uint256 = self._calcRipePerUnit(epochProgress, config.minRipePerUnit, config.maxRipePerUnit)
 
     # bonus for lock duration
     ripePerUnitBonus: uint256 = 0
     lockDuration: uint256 = min(_lockDuration, config.maxLockDuration)
-    if lockDuration > config.minLockDuration:
+    if lockDuration >= config.minLockDuration:
         ripePerUnitBonus = config.maxRipePerUnitLockBonus * (lockDuration - config.minLockDuration) // (config.maxLockDuration - config.minLockDuration)
     else:
         lockDuration = 0
@@ -162,6 +163,16 @@ def _purchaseRipeBond(
     return ripePayout
 
 
+@pure
+@internal
+def _calcRipePerUnit(_ratio: uint256, _minRipePerUnit: uint256, _maxRipePerUnit: uint256) -> uint256:
+    if _ratio == 0 or _minRipePerUnit == _maxRipePerUnit:
+        return _minRipePerUnit
+    valRange: uint256 = _maxRipePerUnit - _minRipePerUnit
+    adjustment: uint256 =  _ratio * valRange // HUNDRED_PERCENT
+    return _minRipePerUnit + adjustment
+
+
 ##########
 # Epochs #
 ##########
@@ -176,7 +187,7 @@ def startBondEpochAtBlock(_block: uint256):
     assert not deptBasics.isPaused # dev: contract paused
     a: addys.Addys = addys._getAddys()
 
-    config: RipeBondConfig = staticcall MissionControl(a.missionControl).getRipeBondConfig(empty(address))
+    config: PurchaseRipeBondConfig = staticcall MissionControl(a.missionControl).getPurchaseRipeBondConfig(empty(address))
     startBlock: uint256 = max(_block, block.number)
     extcall Ledger(a.ledger).setEpochData(startBlock, startBlock + config.epochLength, config.amountPerEpoch)
 
@@ -190,7 +201,7 @@ def refreshBondEpoch() -> (uint256, uint256):
     assert not deptBasics.isPaused # dev: contract paused
     a: addys.Addys = addys._getAddys()
 
-    config: RipeBondConfig = staticcall MissionControl(a.missionControl).getRipeBondConfig(empty(address))
+    config: PurchaseRipeBondConfig = staticcall MissionControl(a.missionControl).getPurchaseRipeBondConfig(empty(address))
     return self._refreshBondEpoch(a.ledger, config.amountPerEpoch, config.epochLength)
 
 

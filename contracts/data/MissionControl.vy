@@ -257,12 +257,23 @@ struct RipeBondConfig:
     asset: address
     amountPerEpoch: uint256
     canBond: bool
+    minRipePerUnit: uint256
     maxRipePerUnit: uint256
     maxRipePerUnitLockBonus: uint256
     epochLength: uint256
+    shouldAutoRestart: bool
+
+struct PurchaseRipeBondConfig:
+    asset: address
+    amountPerEpoch: uint256
+    canBond: bool
+    minRipePerUnit: uint256
+    maxRipePerUnit: uint256
+    maxRipePerUnitLockBonus: uint256
+    epochLength: uint256
+    shouldAutoRestart: bool
     minLockDuration: uint256
     maxLockDuration: uint256
-    shouldAutoRestart: bool
     canAnyoneBondForUser: bool
 
 # events
@@ -986,12 +997,20 @@ def getPriceConfig() -> PriceConfig:
 
 @view
 @external
-def getRipeBondConfig(_user: address) -> RipeBondConfig:
+def getPurchaseRipeBondConfig(_user: address) -> PurchaseRipeBondConfig:
     config: RipeBondConfig = self.ripeBondConfig
-    config.canAnyoneBondForUser = self.userConfig[_user].canAnyoneBondForUser
+    vaultConfig: RipeGovVaultConfig = self.ripeGovVaultConfig[addys._getRipeToken()]
 
-    ripeVaultConfig: RipeGovVaultConfig = self.ripeGovVaultConfig[addys._getRipeToken()]
-    config.minLockDuration = ripeVaultConfig.lockTerms.minLockDuration
-    config.maxLockDuration = ripeVaultConfig.lockTerms.maxLockDuration
-
-    return config
+    return PurchaseRipeBondConfig(
+        asset=config.asset,
+        amountPerEpoch=config.amountPerEpoch,
+        canBond=config.canBond,
+        minRipePerUnit=config.minRipePerUnit,
+        maxRipePerUnit=config.maxRipePerUnit,
+        maxRipePerUnitLockBonus=config.maxRipePerUnitLockBonus,
+        epochLength=config.epochLength,
+        shouldAutoRestart=config.shouldAutoRestart,
+        minLockDuration=vaultConfig.lockTerms.minLockDuration,
+        maxLockDuration=vaultConfig.lockTerms.maxLockDuration,
+        canAnyoneBondForUser=self.userConfig[_user].canAnyoneBondForUser,
+    )
