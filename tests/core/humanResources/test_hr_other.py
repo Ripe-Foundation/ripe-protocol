@@ -86,6 +86,7 @@ def setupRipeGovVaultConfig(mission_control, setAssetConfig, setGeneralConfig, s
         mission_control.setRipeGovVaultConfig(
             ripe_token, 
             _assetWeight,
+            False,
             lock_terms, 
             sender=switchboard_alpha.address
         )

@@ -12,10 +12,10 @@ import contracts.modules.TimeLock as timeLock
 from interfaces import Vault
 
 interface MissionControl:
+    def setRipeGovVaultConfig(_asset: address, _assetWeight: uint256, _shouldFreezeWhenBadDebt: bool, _lockTerms: LockTerms): nonpayable
     def setPriorityLiqAssetVaults(_priorityLiqAssetVaults: DynArray[VaultLite, PRIORITY_VAULT_DATA]): nonpayable
     def setPriorityPriceSourceIds(_priorityIds: DynArray[uint256, MAX_PRIORITY_PRICE_SOURCES]): nonpayable
     def setPriorityStabVaults(_priorityStabVaults: DynArray[VaultLite, PRIORITY_VAULT_DATA]): nonpayable
-    def setRipeGovVaultConfig(_asset: address, _assetWeight: uint256, _lockTerms: LockTerms): nonpayable
     def isSupportedAssetInVault(_vaultId: uint256, _asset: address) -> bool: view
     def setRipeRewardsConfig(_rewardsConfig: RipeRewardsConfig): nonpayable
     def setGeneralDebtConfig(_genDebtConfig: GenDebtConfig): nonpayable
@@ -145,6 +145,7 @@ struct LockTerms:
 struct PendingRipeGovVaultConfig:
     asset: address
     assetWeight: uint256
+    shouldFreezeWhenBadDebt: bool
     lockTerms: LockTerms
 
 event PendingVaultLimitsChange:
@@ -292,6 +293,7 @@ event PendingMaxLtvDeviationChange:
 event PendingRipeGovVaultConfigChange:
     asset: address
     assetWeight: uint256
+    shouldFreezeWhenBadDebt: bool
     minLockDuration: uint256
     maxLockDuration: uint256
     maxLockBoost: uint256
@@ -365,6 +367,7 @@ event MaxLtvDeviationSet:
 event RipeGovVaultConfigSet:
     asset: address
     assetWeight: uint256
+    shouldFreezeWhenBadDebt: bool
     minLockDuration: uint256
     maxLockDuration: uint256
     maxLockBoost: uint256
@@ -1209,6 +1212,7 @@ def _isValidMaxDeviation(_newDeviation: uint256) -> bool:
 def setRipeGovVaultConfig(
     _asset: address,
     _assetWeight: uint256,
+    _shouldFreezeWhenBadDebt: bool,
     _minLockDuration: uint256,
     _maxLockDuration: uint256,
     _maxLockBoost: uint256,
@@ -1231,12 +1235,14 @@ def setRipeGovVaultConfig(
     self.pendingRipeGovVaultConfig[aid] = PendingRipeGovVaultConfig(
         asset=_asset,
         assetWeight=_assetWeight,
+        shouldFreezeWhenBadDebt=_shouldFreezeWhenBadDebt,
         lockTerms=lockTerms,
     )
 
     log PendingRipeGovVaultConfigChange(
         asset=_asset,
         assetWeight=_assetWeight,
+        shouldFreezeWhenBadDebt=_shouldFreezeWhenBadDebt,
         minLockDuration=_minLockDuration,
         maxLockDuration=_maxLockDuration,
         maxLockBoost=_maxLockBoost,
@@ -1410,8 +1416,8 @@ def executePendingAction(_aid: uint256) -> bool:
 
     elif actionType == ActionType.RIPE_VAULT_CONFIG:
         p: PendingRipeGovVaultConfig = self.pendingRipeGovVaultConfig[_aid]
-        extcall MissionControl(mc).setRipeGovVaultConfig(p.asset, p.assetWeight, p.lockTerms)
-        log RipeGovVaultConfigSet(asset=p.asset, assetWeight=p.assetWeight, minLockDuration=p.lockTerms.minLockDuration, maxLockDuration=p.lockTerms.maxLockDuration, maxLockBoost=p.lockTerms.maxLockBoost, canExit=p.lockTerms.canExit, exitFee=p.lockTerms.exitFee)
+        extcall MissionControl(mc).setRipeGovVaultConfig(p.asset, p.assetWeight, p.shouldFreezeWhenBadDebt, p.lockTerms)
+        log RipeGovVaultConfigSet(asset=p.asset, assetWeight=p.assetWeight, shouldFreezeWhenBadDebt=p.shouldFreezeWhenBadDebt, minLockDuration=p.lockTerms.minLockDuration, maxLockDuration=p.lockTerms.maxLockDuration, maxLockBoost=p.lockTerms.maxLockBoost, canExit=p.lockTerms.canExit, exitFee=p.lockTerms.exitFee)
 
     self.actionType[_aid] = empty(ActionType)
     return True

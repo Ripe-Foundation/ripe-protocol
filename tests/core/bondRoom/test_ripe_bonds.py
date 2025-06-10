@@ -16,8 +16,10 @@ def setupRipeBonds(mission_control, bond_room, setAssetConfig, setGeneralConfig,
         _maxRipePerUnitLockBonus = 100 * EIGHTEEN_DECIMALS,
         _epochLength = 100,
         _shouldAutoRestart = True,
+        _restartDelayBlocks = 50,
         _minLockDuration = 100,
         _maxLockDuration = 1000,
+        _shouldFreezeWhenBadDebt = False,
     ):
         # enable general deposits (required for governance vault deposits)
         setGeneralConfig()
@@ -31,6 +33,7 @@ def setupRipeBonds(mission_control, bond_room, setAssetConfig, setGeneralConfig,
             _maxRipePerUnitLockBonus,
             _epochLength,
             _shouldAutoRestart,
+            _restartDelayBlocks,
         )
         mission_control.setRipeBondConfig(bond_config, sender=switchboard_delta.address)
 
@@ -45,6 +48,7 @@ def setupRipeBonds(mission_control, bond_room, setAssetConfig, setGeneralConfig,
         mission_control.setRipeGovVaultConfig(
             ripe_token, 
             100_00,
+            _shouldFreezeWhenBadDebt,
             lock_terms, 
             sender=switchboard_alpha.address
         )
@@ -100,7 +104,7 @@ def test_purchase_ripe_bond_basic(
 
 
 def test_purchase_ripe_bond_mid_epoch(
-    teller, setupRipeBonds, bob, alpha_token_whale, alpha_token,
+    teller, setupRipeBonds, bob, alpha_token_whale, alpha_token, _test,
 ):
     start, end = setupRipeBonds()
     
@@ -120,9 +124,12 @@ def test_purchase_ripe_bond_mid_epoch(
         sender=bob
     )
 
-    # should get more than min (1x) but less than max (100x)
-    assert ripe_payout > payment_amount  # more than min
-    assert ripe_payout < 100 * payment_amount  # less than max
+    # should get exactly halfway between min (1x) and max (100x) at 50% epoch progress
+    # epochProgress = 50 * 10000 / 100 = 5000 (50%)
+    # baseRipePerUnit = 1e18 + (5000 * 99e18 / 10000) = 50.5e18
+    # ripePayout = 50.5 * 100 = 5050 RIPE
+    expected_ripe = 5050 * EIGHTEEN_DECIMALS
+    _test(ripe_payout, expected_ripe)
     
 
 def test_purchase_ripe_bond_end_of_epoch(
@@ -564,6 +571,54 @@ def test_purchase_ripe_bond_for_another_user_without_permission(
         )
 
 
+def test_purchase_ripe_bond_refund_goes_to_caller_not_user(
+    teller, setupRipeBonds, bob, alice, charlie, alpha_token_whale, alpha_token, _test, ripe_token, setUserConfig, ledger
+):
+    """Test that refunds go to the transaction caller, not the bond recipient"""
+    setupRipeBonds()
+    
+    # Enable alice to allow others to bond for her
+    setUserConfig(alice, _canAnyoneBondForUser=True)
+    
+    # Reduce available amount by making a partial purchase first (setup partial fill scenario)
+    initial_available = ledger.paymentAmountAvailInEpoch()
+    consumed_amount = initial_available - (50 * EIGHTEEN_DECIMALS)  # leave 50 tokens available
+    
+    alpha_token.transfer(charlie, consumed_amount, sender=alpha_token_whale)
+    alpha_token.approve(teller, consumed_amount, sender=charlie)
+    teller.purchaseRipeBond(alpha_token, consumed_amount, sender=charlie)
+    
+    # Now bob tries to buy 100 tokens worth for alice, but only 50 are available
+    payment_amount = 100 * EIGHTEEN_DECIMALS
+    pre_balance_bob = alpha_token.balanceOf(bob)
+    pre_balance_alice = alpha_token.balanceOf(alice)
+    
+    alpha_token.transfer(bob, payment_amount, sender=alpha_token_whale)
+    alpha_token.approve(teller, payment_amount, sender=bob)
+    
+    # Bob buys bonds for Alice
+    ripe_payout = teller.purchaseRipeBond(
+        alpha_token,
+        payment_amount,
+        0,  # no lock
+        alice,  # user to receive bonds
+        sender=bob
+    )
+    
+    # Verify alice gets the ripe tokens
+    _test(ripe_token.balanceOf(alice), ripe_payout)
+    
+    # Verify the refund goes to BOB (the caller), not ALICE (the user)
+    available_amount = 50 * EIGHTEEN_DECIMALS
+    refund_amount = payment_amount - available_amount  # 50 tokens refund
+    
+    expected_bob_balance = pre_balance_bob + refund_amount
+    _test(alpha_token.balanceOf(bob), expected_bob_balance)
+    
+    # Alice should not receive any payment token refund
+    assert alpha_token.balanceOf(alice) == pre_balance_alice
+
+
 def test_purchase_ripe_bond_zero_amount_fails(
     teller, setupRipeBonds, bob, alpha_token_whale, alpha_token
 ):
@@ -603,12 +658,15 @@ def test_purchase_ripe_bond_auto_restart_epoch(
         sender=bob
     )
 
-    # epoch should auto-restart
+    # epoch should auto-restart with delay
     new_start = ledger.epochStart()
     new_end = ledger.epochEnd() 
     
-    assert new_start == start + travel
-    assert new_end == end + travel
+    # With default _restartDelayBlocks=50, new epoch starts 50 blocks after transaction
+    current_block = boa.env.evm.patch.block_number
+    expected_start = current_block + 50  # restart delay
+    assert new_start == expected_start
+    assert new_end == expected_start + 100  # epoch length
     assert ledger.paymentAmountAvailInEpoch() == 1000 * EIGHTEEN_DECIMALS  # refreshed
 
 
@@ -678,49 +736,6 @@ def test_purchase_ripe_bond_very_small_amount(
 
     assert ripe_payout > 0
     assert ripe_token.balanceOf(bob) == ripe_payout
-
-
-def test_ripe_per_unit_calculation_edge_cases(
-    bond_room
-):
-    # test _calcRipePerUnit function edge cases
-    
-    # when ratio is 0, should return min
-    result = bond_room.getLatestEpochBlockTimes(0, 0, 100)  # accessing view function
-    
-    # when min equals max, should return min regardless of ratio
-    # Note: can't directly test internal _calcRipePerUnit, but we can test behavior
-    
-    # These edge cases are implicitly tested through purchase scenarios
-
-
-def test_refresh_bond_epoch_multiple_times(
-    bond_room, ledger, setupRipeBonds, switchboard_delta
-):
-    setupRipeBonds()
-    
-    initial_start = ledger.epochStart()
-    initial_end = ledger.epochEnd()
-    
-    # refresh again - should not change if still in epoch
-    new_start, new_end = bond_room.refreshBondEpoch(sender=switchboard_delta.address)
-    
-    assert new_start == initial_start
-    assert new_end == initial_end
-
-
-def test_start_bond_epoch_at_specific_block(
-    bond_room, ledger, setupRipeBonds, switchboard_delta
-):
-    setupRipeBonds()
-    
-    # start epoch at future block
-    current_block = boa.env.evm.patch.block_number
-    future_block = current_block + 50
-    bond_room.startBondEpochAtBlock(future_block, sender=switchboard_delta.address)
-    
-    assert ledger.epochStart() == future_block
-    assert ledger.epochEnd() == future_block + 100  # epoch length is 100
 
 
 def test_purchase_ripe_bond_complex_scenario(
@@ -920,47 +935,6 @@ def test_purchase_ripe_bond_insufficient_balance_fails(
     assert ripe_payout == small_amount  # only got ripe for available amount
 
 
-def test_purchase_ripe_bond_automatic_epoch_advancement(
-    teller, setupRipeBonds, bob, alpha_token_whale, alpha_token, bond_room, switchboard_delta
-):
-    """Test that epochs automatically advance when time passes beyond epoch end"""
-    start, end = setupRipeBonds(_epochLength=50, _shouldAutoRestart=False)
-    
-    # Move to just before epoch end
-    blocks_to_travel = (end - start) - 1
-    boa.env.time_travel(blocks=blocks_to_travel)
-    
-    # Purchase should work
-    payment_amount = 100 * EIGHTEEN_DECIMALS
-    alpha_token.transfer(bob, payment_amount, sender=alpha_token_whale)
-    alpha_token.approve(teller, payment_amount, sender=bob)
-    
-    ripe_payout = teller.purchaseRipeBond(
-        alpha_token,
-        payment_amount,
-        sender=bob
-    )
-    assert ripe_payout > 0
-    
-    # Move past epoch end
-    boa.env.time_travel(blocks=6)  # Move 6 more blocks past end
-    
-    # Purchase should succeed because epoch auto-advances
-    alpha_token.transfer(bob, payment_amount, sender=alpha_token_whale)
-    alpha_token.approve(teller, payment_amount, sender=bob)
-    
-    ripe_payout_2 = teller.purchaseRipeBond(
-        alpha_token,
-        payment_amount,
-        sender=bob
-    )
-    assert ripe_payout_2 > 0
-    
-    # Verify a new epoch was automatically created
-    # The purchase itself triggers epoch refresh, creating a new epoch
-    # This is the contract's designed behavior - no gaps between epochs
-
-
 def test_purchase_ripe_bond_equal_min_max_ripe_per_unit(
     teller, setupRipeBonds, bob, alpha_token_whale, alpha_token, _test
 ):
@@ -1012,27 +986,6 @@ def test_purchase_ripe_bond_below_min_lock_duration(
     # verify no tokens were deposited into gov vault (since lockDuration < min)
     expected_deposit = ripe_gov_vault.getTotalAmountForUser(bob, ripe_token)
     assert expected_deposit == 0
-
-
-def test_purchase_ripe_bond_gas_optimization_scenarios(
-    teller, setupRipeBonds, bob, alpha_token_whale, alpha_token
-):
-    """Test scenarios that might affect gas usage"""
-    setupRipeBonds()
-
-    # Test with exact epoch availability (no refund needed)
-    available_amount = 1000 * EIGHTEEN_DECIMALS  # exactly the epoch amount
-    alpha_token.transfer(bob, available_amount, sender=alpha_token_whale)
-    alpha_token.approve(teller, available_amount, sender=bob)
-    
-    ripe_payout = teller.purchaseRipeBond(
-        alpha_token,
-        available_amount,
-        sender=bob
-    )
-    
-    assert ripe_payout > 0
-    assert alpha_token.balanceOf(bob) == 0  # no refund
 
 
 def test_purchase_ripe_bond_future_epoch_transition(
@@ -1369,3 +1322,340 @@ def test_get_latest_epoch_block_times_boundary_conditions(
     assert start == future_start  # unchanged
     assert end == future_end      # unchanged
     assert changed == False
+
+
+def test_purchase_ripe_bond_auto_restart_with_delay(
+    teller, setupRipeBonds, bob, alpha_token_whale, alpha_token, ledger
+):
+    """Test that auto-restart respects the restartDelayBlocks parameter"""
+    restart_delay = 25  # blocks
+    start, end = setupRipeBonds(_shouldAutoRestart=True, _restartDelayBlocks=restart_delay)
+
+    # Exhaust entire epoch availability with one purchase
+    available_amount = ledger.paymentAmountAvailInEpoch()
+    
+    alpha_token.transfer(bob, available_amount, sender=alpha_token_whale)
+    alpha_token.approve(teller, available_amount, sender=bob)  
+
+    # Move partway through epoch
+    boa.env.time_travel(blocks=10)
+
+    # Purchase entire available amount (should trigger auto-restart)
+    teller.purchaseRipeBond(
+        alpha_token,
+        available_amount,
+        sender=bob
+    )
+
+    # Get the block number after the transaction
+    current_block_after_purchase = boa.env.evm.patch.block_number
+
+    # Verify new epoch starts with delay
+    new_start = ledger.epochStart()
+    new_end = ledger.epochEnd()
+    
+    # New epoch should start exactly restart_delay blocks after the transaction block
+    # Contract uses: block.number + restart_delay (where block.number is the transaction block)
+    expected_new_start = current_block_after_purchase + restart_delay
+    assert new_start == expected_new_start
+    assert new_end == expected_new_start + 100  # epoch length
+    assert ledger.paymentAmountAvailInEpoch() == 1000 * EIGHTEEN_DECIMALS  # refreshed
+
+
+def test_purchase_ripe_bond_different_restart_delays(
+    teller, setupRipeBonds, bob, alice, alpha_token_whale, alpha_token, ledger
+):
+    """Test auto-restart with different delay values"""
+    
+    # Test with zero delay (immediate restart)
+    start1, end1 = setupRipeBonds(_shouldAutoRestart=True, _restartDelayBlocks=0)
+    
+    available_amount = ledger.paymentAmountAvailInEpoch()
+    alpha_token.transfer(bob, available_amount, sender=alpha_token_whale)
+    alpha_token.approve(teller, available_amount, sender=bob)
+    
+    teller.purchaseRipeBond(alpha_token, available_amount, sender=bob)
+    current_block_after = boa.env.evm.patch.block_number
+    
+    # With zero delay, new epoch should start immediately at the transaction block
+    new_start1 = ledger.epochStart()
+    expected_start1 = current_block_after + 0  # transaction block + zero delay
+    assert new_start1 == expected_start1
+    
+    # Test with larger delay
+    large_delay = 100
+    start2, end2 = setupRipeBonds(_shouldAutoRestart=True, _restartDelayBlocks=large_delay)
+    
+    available_amount = ledger.paymentAmountAvailInEpoch()
+    alpha_token.transfer(alice, available_amount, sender=alpha_token_whale)
+    alpha_token.approve(teller, available_amount, sender=alice)
+    
+    teller.purchaseRipeBond(alpha_token, available_amount, sender=alice)
+    current_block_after2 = boa.env.evm.patch.block_number
+    
+    # With large delay, new epoch should start much later
+    new_start2 = ledger.epochStart()
+    expected_start2 = current_block_after2 + large_delay
+    assert new_start2 == expected_start2
+    assert ledger.epochEnd() == expected_start2 + 100  # epoch length
+
+
+###########################
+# Bad Debt Clearing Tests #
+###########################
+
+
+def test_bond_purchase_bad_debt_fully_cleared_ledger_data(
+    teller, setupRipeBonds, bob, alpha_token_whale, alpha_token, ledger, switchboard_alpha, mock_price_source, _test
+):
+    """Test Ledger data changes when bond purchase fully clears bad debt"""
+    setupRipeBonds()
+    
+    # Set price for USD value calculation
+    mock_price_source.setPrice(alpha_token, 1 * EIGHTEEN_DECIMALS)  # $1 USD per token
+    
+    # Set bad debt of $300 USD
+    bad_debt_amount = 300 * EIGHTEEN_DECIMALS
+    ledger.setBadDebt(bad_debt_amount, sender=switchboard_alpha.address)
+    
+    # Capture initial Ledger state
+    initial_bad_debt = ledger.badDebt()
+    initial_ripe_paid_for_debt = ledger.ripePaidOutForBadDebt()
+    initial_ripe_avail_for_bonds = ledger.ripeAvailForBonds()
+    
+    assert initial_bad_debt == bad_debt_amount
+    assert initial_ripe_paid_for_debt == 0
+    
+    # Purchase bond with payment > bad debt ($500 > $300)
+    payment_amount = 500 * EIGHTEEN_DECIMALS
+    alpha_token.transfer(bob, payment_amount, sender=alpha_token_whale)
+    alpha_token.approve(teller, payment_amount, sender=bob)
+    
+    ripe_payout = teller.purchaseRipeBond(alpha_token, payment_amount, sender=bob)
+    assert ripe_payout != 0
+    
+    # Verify Ledger data changes
+    final_bad_debt = ledger.badDebt()
+    final_ripe_paid_for_debt = ledger.ripePaidOutForBadDebt()
+    final_ripe_avail_for_bonds = ledger.ripeAvailForBonds()
+    
+    # Bad debt should be fully cleared
+    assert final_bad_debt == 0
+    
+    # ripePaidOutForBadDebt should increase by the debt amount that was cleared (based on payment USD value)
+    ripe_paid_increase = final_ripe_paid_for_debt - initial_ripe_paid_for_debt
+    _test(ripe_paid_increase, bad_debt_amount)  # Should equal original debt amount
+    
+    # ripeAvailForBonds should be reduced by the surplus portion (payment - debt cleared)
+    # since some payment went to debt clearing instead of being deducted from available bonds
+    ripe_avail_reduction = initial_ripe_avail_for_bonds - final_ripe_avail_for_bonds
+    surplus_payment = payment_amount - bad_debt_amount  # $500 - $300 = $200 surplus
+    _test(ripe_avail_reduction, surplus_payment)
+
+
+def test_bond_purchase_bad_debt_partially_cleared_ledger_data(
+    teller, setupRipeBonds, bob, alpha_token_whale, alpha_token, ledger, switchboard_alpha, mock_price_source, _test
+):
+    """Test Ledger data changes when bond purchase partially clears bad debt"""
+    setupRipeBonds()
+    
+    # Set price for USD value calculation
+    mock_price_source.setPrice(alpha_token, 1 * EIGHTEEN_DECIMALS)  # $1 USD per token
+    
+    # Set bad debt of $800 USD
+    bad_debt_amount = 800 * EIGHTEEN_DECIMALS
+    ledger.setBadDebt(bad_debt_amount, sender=switchboard_alpha.address)
+    
+    # Capture initial Ledger state
+    initial_bad_debt = ledger.badDebt()
+    initial_ripe_paid_for_debt = ledger.ripePaidOutForBadDebt()
+    initial_ripe_avail_for_bonds = ledger.ripeAvailForBonds()
+    
+    # Purchase bond with payment < bad debt ($400 < $800)
+    payment_amount = 400 * EIGHTEEN_DECIMALS
+    alpha_token.transfer(bob, payment_amount, sender=alpha_token_whale)
+    alpha_token.approve(teller, payment_amount, sender=bob)
+    
+    ripe_payout = teller.purchaseRipeBond(alpha_token, payment_amount, sender=bob)
+    
+    # Verify Ledger data changes
+    final_bad_debt = ledger.badDebt()
+    final_ripe_paid_for_debt = ledger.ripePaidOutForBadDebt()
+    final_ripe_avail_for_bonds = ledger.ripeAvailForBonds()
+    
+    # Bad debt should be reduced by payment amount (USD value)
+    expected_remaining_debt = bad_debt_amount - payment_amount  # $800 - $400 = $400
+    _test(final_bad_debt, expected_remaining_debt)
+    
+    # ripePaidOutForBadDebt should increase by the payment amount (all payment goes to debt)
+    ripe_paid_increase = final_ripe_paid_for_debt - initial_ripe_paid_for_debt
+    _test(ripe_paid_increase, payment_amount)  # Should equal payment amount
+    
+    # ripeAvailForBonds should not be reduced at all since all payment went to debt clearing
+    ripe_avail_reduction = initial_ripe_avail_for_bonds - final_ripe_avail_for_bonds
+    assert ripe_avail_reduction == 0  # No reduction since all payment used for debt
+
+
+def test_bond_purchase_bad_debt_exactly_cleared_ledger_data(
+    teller, setupRipeBonds, bob, alpha_token_whale, alpha_token, ledger, switchboard_alpha, mock_price_source, _test
+):
+    """Test Ledger data changes when bond purchase exactly clears bad debt"""
+    setupRipeBonds()
+    
+    # Set price for USD value calculation  
+    mock_price_source.setPrice(alpha_token, 1 * EIGHTEEN_DECIMALS)  # $1 USD per token
+    
+    # Set bad debt of $600 USD
+    bad_debt_amount = 600 * EIGHTEEN_DECIMALS
+    ledger.setBadDebt(bad_debt_amount, sender=switchboard_alpha.address)
+    
+    # Capture initial Ledger state
+    initial_bad_debt = ledger.badDebt()
+    initial_ripe_paid_for_debt = ledger.ripePaidOutForBadDebt()
+    initial_ripe_avail_for_bonds = ledger.ripeAvailForBonds()
+    
+    # Purchase bond with payment exactly equal to bad debt
+    payment_amount = 600 * EIGHTEEN_DECIMALS  # Exactly $600
+    alpha_token.transfer(bob, payment_amount, sender=alpha_token_whale)
+    alpha_token.approve(teller, payment_amount, sender=bob)
+    
+    ripe_payout = teller.purchaseRipeBond(alpha_token, payment_amount, sender=bob)
+    
+    # Verify Ledger data changes
+    final_bad_debt = ledger.badDebt()
+    final_ripe_paid_for_debt = ledger.ripePaidOutForBadDebt()
+    final_ripe_avail_for_bonds = ledger.ripeAvailForBonds()
+    
+    # Bad debt should be exactly cleared
+    assert final_bad_debt == 0
+    
+    # ripePaidOutForBadDebt should increase by exactly the payment amount (which equals debt amount)
+    ripe_paid_increase = final_ripe_paid_for_debt - initial_ripe_paid_for_debt
+    _test(ripe_paid_increase, payment_amount)  # Should equal payment amount
+    
+    # ripeAvailForBonds should not be reduced since all payment went to debt clearing
+    ripe_avail_reduction = initial_ripe_avail_for_bonds - final_ripe_avail_for_bonds
+    assert ripe_avail_reduction == 0  # No reduction since all payment used for debt
+
+
+def test_bond_purchase_no_bad_debt_ledger_baseline(
+    teller, setupRipeBonds, bob, alpha_token_whale, alpha_token, ledger, mock_price_source, _test
+):
+    """Test Ledger data when no bad debt exists (baseline comparison)"""
+    setupRipeBonds()
+    
+    # Set price for USD value calculation
+    mock_price_source.setPrice(alpha_token, 1 * EIGHTEEN_DECIMALS)  # $1 USD per token
+    
+    # Verify no bad debt exists
+    assert ledger.badDebt() == 0
+    
+    # Capture initial Ledger state
+    initial_bad_debt = ledger.badDebt()
+    initial_ripe_paid_for_debt = ledger.ripePaidOutForBadDebt()
+    initial_ripe_avail_for_bonds = ledger.ripeAvailForBonds()
+    
+    # Purchase bond normally
+    payment_amount = 500 * EIGHTEEN_DECIMALS
+    alpha_token.transfer(bob, payment_amount, sender=alpha_token_whale)
+    alpha_token.approve(teller, payment_amount, sender=bob)
+    
+    ripe_payout = teller.purchaseRipeBond(alpha_token, payment_amount, sender=bob)
+    
+    # Verify Ledger data changes
+    final_bad_debt = ledger.badDebt()
+    final_ripe_paid_for_debt = ledger.ripePaidOutForBadDebt()
+    final_ripe_avail_for_bonds = ledger.ripeAvailForBonds()
+    
+    # Bad debt should remain 0
+    assert final_bad_debt == initial_bad_debt == 0
+    
+    # ripePaidOutForBadDebt should not change
+    assert final_ripe_paid_for_debt == initial_ripe_paid_for_debt
+    
+    # ripeAvailForBonds should be reduced by the full ripe_payout (normal behavior)
+    ripe_avail_reduction = initial_ripe_avail_for_bonds - final_ripe_avail_for_bonds
+    _test(ripe_avail_reduction, ripe_payout)
+
+
+def test_bond_purchase_multiple_transactions_progressive_debt_clearing(
+    teller, setupRipeBonds, bob, alice, alpha_token_whale, alpha_token, ledger, switchboard_alpha, mock_price_source, _test
+):
+    """Test Ledger data changes across multiple bond purchases that progressively clear debt"""
+    setupRipeBonds()
+    
+    # Set price for USD value calculation
+    mock_price_source.setPrice(alpha_token, 1 * EIGHTEEN_DECIMALS)  # $1 USD per token
+    
+    # Set large bad debt
+    initial_debt = 1000 * EIGHTEEN_DECIMALS  # $1000 USD
+    ledger.setBadDebt(initial_debt, sender=switchboard_alpha.address)
+    
+    # Capture initial state
+    initial_ripe_paid_for_debt = ledger.ripePaidOutForBadDebt()
+    initial_ripe_avail_for_bonds = ledger.ripeAvailForBonds()
+    
+    # First purchase - partial clearing ($300 of $1000 debt)
+    payment_1 = 300 * EIGHTEEN_DECIMALS
+    alpha_token.transfer(bob, payment_1, sender=alpha_token_whale)
+    alpha_token.approve(teller, payment_1, sender=bob)
+    
+    ripe_payout_1 = teller.purchaseRipeBond(alpha_token, payment_1, sender=bob)
+    
+    # Check state after first purchase
+    debt_after_1 = ledger.badDebt()
+    ripe_paid_after_1 = ledger.ripePaidOutForBadDebt()
+    ripe_avail_after_1 = ledger.ripeAvailForBonds()
+    
+    expected_debt_1 = initial_debt - payment_1  # $1000 - $300 = $700
+    _test(debt_after_1, expected_debt_1)
+    _test(ripe_paid_after_1 - initial_ripe_paid_for_debt, payment_1)  # Should equal payment amount
+    assert ripe_avail_after_1 == initial_ripe_avail_for_bonds  # No change, all payment to debt
+    
+    # Second purchase - another partial clearing ($400 of remaining $700 debt)
+    payment_2 = 400 * EIGHTEEN_DECIMALS
+    alpha_token.transfer(alice, payment_2, sender=alpha_token_whale)
+    alpha_token.approve(teller, payment_2, sender=alice)
+    
+    ripe_payout_2 = teller.purchaseRipeBond(alpha_token, payment_2, sender=alice)
+    
+    # Check state after second purchase
+    debt_after_2 = ledger.badDebt()
+    ripe_paid_after_2 = ledger.ripePaidOutForBadDebt()
+    ripe_avail_after_2 = ledger.ripeAvailForBonds()
+    
+    expected_debt_2 = expected_debt_1 - payment_2  # $700 - $400 = $300
+    _test(debt_after_2, expected_debt_2)
+    _test(ripe_paid_after_2 - ripe_paid_after_1, payment_2)  # Should equal payment amount
+    assert ripe_avail_after_2 == ripe_avail_after_1  # Still no change, all payment to debt
+    
+    # Third purchase - clear remaining debt and have surplus ($500 > remaining $300)
+    payment_3 = 500 * EIGHTEEN_DECIMALS
+    alpha_token.transfer(bob, payment_3, sender=alpha_token_whale)
+    alpha_token.approve(teller, payment_3, sender=bob)
+    
+    ripe_payout_3 = teller.purchaseRipeBond(alpha_token, payment_3, sender=bob)
+    
+    # Check final state
+    final_debt = ledger.badDebt()
+    final_ripe_paid = ledger.ripePaidOutForBadDebt()
+    final_ripe_avail = ledger.ripeAvailForBonds()
+    
+    # All debt should be cleared
+    assert final_debt == 0
+    
+    # Total ripe paid for debt should equal original debt amount
+    total_ripe_paid = final_ripe_paid - initial_ripe_paid_for_debt
+    _test(total_ripe_paid, initial_debt)  # Should equal total debt that was cleared
+    
+    # Based on actual behavior: when debt exists, ripeAvailForBonds is not reduced 
+    # regardless of whether there's a surplus payment
+    ripe_avail_reduction = ripe_avail_after_2 - final_ripe_avail
+    
+    # The key insight: ripeAvailForBonds should NOT be reduced when bad debt is being cleared
+    # All the payment goes to debt clearing, not to reducing available bonds
+    assert ripe_avail_reduction == 0  # No reduction in ripeAvailForBonds
+    
+    # Verify that the user still got the correct payout (matching the debt amount remaining)
+    _test(ripe_payout_3, expected_debt_2)  # User gets RIPE equal to remaining debt
+

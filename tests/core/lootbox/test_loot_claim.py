@@ -922,6 +922,7 @@ def test_loot_claim_no_auto_staking(
     mission_control.setRipeGovVaultConfig(
         ripe_token,
         100_00,  # 100% asset weight
+        False,
         (86400, 2592000, 200_00, True, 5_00),  # 1 day min, 30 days max, 200% boost, can exit, 5% fee
         sender=switchboard_alpha.address
     )
@@ -979,6 +980,7 @@ def test_loot_claim_full_auto_staking(
     mission_control.setRipeGovVaultConfig(
         ripe_token,
         100_00,  # 100% asset weight
+        False,
         (86400, 2592000, 200_00, True, 5_00),  # 1 day min, 30 days max, 200% boost, can exit, 5% fee
         sender=switchboard_alpha.address
     )
@@ -1044,6 +1046,7 @@ def test_loot_claim_partial_auto_staking(
     mission_control.setRipeGovVaultConfig(
         ripe_token,
         100_00,  # 100% asset weight
+        False,
         (100, 1000, 100_00, False, 0),  # 100 min, 1000 max, 100% boost, cannot exit, 0% fee
         sender=switchboard_alpha.address
     )
@@ -1120,6 +1123,7 @@ def test_loot_claim_explicit_staking_overrides_auto(
     mission_control.setRipeGovVaultConfig(
         ripe_token.address,
         100_00,  # 100% asset weight
+        False,
         (100, 1000, 100_00, False, 0),  # 100 min, 1000 max, 100% boost, cannot exit, 0% fee
         sender=switchboard_alpha.address
     )
@@ -1176,6 +1180,7 @@ def test_loot_claim_zero_lock_duration_range(
     mission_control.setRipeGovVaultConfig(
         ripe_token.address,
         100_00,  # 100% asset weight
+        False,
         (500, 500, 200_00, True, 5_00),  # min = max = 500 blocks
         sender=switchboard_alpha.address
     )
@@ -1228,6 +1233,7 @@ def test_loot_claim_max_lock_duration_ratio(
     mission_control.setRipeGovVaultConfig(
         ripe_token.address,
         100_00,  # 100% asset weight
+        False,
         (200, 1000, 200_00, True, 5_00),  # 200 min, 1000 max
         sender=switchboard_alpha.address
     )
@@ -1277,6 +1283,7 @@ def test_loot_claim_zero_rewards_no_staking_calls(
     mission_control.setRipeGovVaultConfig(
         ripe_token.address,
         100_00,  # 100% asset weight
+        False,
         (100, 1000, 200_00, True, 5_00),
         sender=switchboard_alpha.address
     )
@@ -1326,6 +1333,7 @@ def test_loot_claim_calculation_consistency_with_partial_auto_staking(
     mission_control.setRipeGovVaultConfig(
         ripe_token.address,
         100_00,  # 100% asset weight
+        False,
         (100, 1000, 100_00, False, 0),
         sender=switchboard_alpha.address
     )
@@ -1379,6 +1387,7 @@ def test_loot_claim_multiple_claims_with_staking(
     mission_control.setRipeGovVaultConfig(
         ripe_token.address,
         100_00,  # 100% asset weight
+        False,
         (100, 1000, 200_00, True, 5_00),
         sender=switchboard_alpha.address
     )
@@ -1446,6 +1455,7 @@ def test_loot_claim_auto_stake_configuration_updates(
     mission_control.setRipeGovVaultConfig(
         ripe_token.address,
         100_00,  # 100% asset weight
+        False,
         (100, 1000, 100_00, False, 0),
         sender=switchboard_alpha.address
     )

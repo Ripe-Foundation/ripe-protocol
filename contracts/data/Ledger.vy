@@ -114,6 +114,12 @@ struct FungibleAuction:
     endBlock: uint256
     isActive: bool
 
+# ripe bonds
+
+struct RipeBondData:
+    paymentAmountAvailInEpoch: uint256
+    ripeAvailForBonds: uint256
+    badDebt: uint256
 
 # user vault participation
 userVaults: public(HashMap[address, HashMap[uint256, uint256]]) # user -> index -> vault id
@@ -158,6 +164,8 @@ numContributors: public(uint256) # num contributors
 # bond data
 epochStart: public(uint256)
 epochEnd: public(uint256)
+badDebt: public(uint256)
+ripePaidOutForBadDebt: public(uint256)
 paymentAmountAvailInEpoch: public(uint256)
 ripeAvailForBonds: public(uint256)
 
@@ -756,8 +764,12 @@ def getEpochData() -> (uint256, uint256):
 
 @view
 @external
-def getRipeBondData() -> (uint256, uint256):
-    return self.paymentAmountAvailInEpoch, self.ripeAvailForBonds
+def getRipeBondData() -> RipeBondData:
+    return RipeBondData(
+        paymentAmountAvailInEpoch=self.paymentAmountAvailInEpoch,
+        ripeAvailForBonds=self.ripeAvailForBonds,
+        badDebt=self.badDebt,
+    )
 
 
 @external
@@ -768,12 +780,27 @@ def setRipeAvailForBonds(_amount: uint256):
 
 
 @external
+def setBadDebt(_amount: uint256):
+    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
+    assert not deptBasics.isPaused # dev: not activated
+    self.badDebt = _amount
+
+
+@external
+def didClearBadDebt(_amount: uint256, _ripeAmount: uint256):
+    assert msg.sender == addys._getBondRoomAddr() # dev: no perms
+    assert not deptBasics.isPaused # dev: not activated
+    self.badDebt -= _amount
+    self.ripePaidOutForBadDebt += _ripeAmount
+
+
+@external
 def didPurchaseRipeBond(_amountPaid: uint256, _ripePayout: uint256):
     assert msg.sender == addys._getBondRoomAddr() # dev: no perms
     assert not deptBasics.isPaused # dev: not activated
-
     self.paymentAmountAvailInEpoch -= _amountPaid
-    self.ripeAvailForBonds -= _ripePayout
+    if _ripePayout != 0:
+        self.ripeAvailForBonds -= _ripePayout
 
 
 @external

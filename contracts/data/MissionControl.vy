@@ -252,6 +252,7 @@ struct PriceConfig:
 struct RipeGovVaultConfig:
     lockTerms: LockTerms
     assetWeight: uint256
+    shouldFreezeWhenBadDebt: bool
 
 struct RipeBondConfig:
     asset: address
@@ -262,6 +263,7 @@ struct RipeBondConfig:
     maxRipePerUnitLockBonus: uint256
     epochLength: uint256
     shouldAutoRestart: bool
+    restartDelayBlocks: uint256
 
 struct PurchaseRipeBondConfig:
     asset: address
@@ -272,6 +274,7 @@ struct PurchaseRipeBondConfig:
     maxRipePerUnitLockBonus: uint256
     epochLength: uint256
     shouldAutoRestart: bool
+    restartDelayBlocks: uint256
     minLockDuration: uint256
     maxLockDuration: uint256
     canAnyoneBondForUser: bool
@@ -648,11 +651,17 @@ def _isUnderscoreWalletOwner(_user: address, _caller: address) -> bool:
 
 
 @external
-def setRipeGovVaultConfig(_asset: address, _assetWeight: uint256, _lockTerms: LockTerms):
+def setRipeGovVaultConfig(
+    _asset: address,
+    _assetWeight: uint256,
+    _shouldFreezeWhenBadDebt: bool,
+    _lockTerms: LockTerms,
+):
     assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
     self.ripeGovVaultConfig[_asset] = RipeGovVaultConfig(
         lockTerms=_lockTerms,
         assetWeight=_assetWeight,
+        shouldFreezeWhenBadDebt=_shouldFreezeWhenBadDebt,
     )
 
 
@@ -1010,6 +1019,7 @@ def getPurchaseRipeBondConfig(_user: address) -> PurchaseRipeBondConfig:
         maxRipePerUnitLockBonus=config.maxRipePerUnitLockBonus,
         epochLength=config.epochLength,
         shouldAutoRestart=config.shouldAutoRestart,
+        restartDelayBlocks=config.restartDelayBlocks,
         minLockDuration=vaultConfig.lockTerms.minLockDuration,
         maxLockDuration=vaultConfig.lockTerms.maxLockDuration,
         canAnyoneBondForUser=self.userConfig[_user].canAnyoneBondForUser,

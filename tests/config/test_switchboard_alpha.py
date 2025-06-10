@@ -1863,6 +1863,7 @@ def test_ripe_gov_vault_config_validation(switchboard_alpha, governance, alpha_t
         switchboard_alpha.setRipeGovVaultConfig(
             ZERO_ADDRESS,  # invalid asset
             100_00,  # 100% weight
+            False,   # shouldFreezeWhenBadDebt
             86400,   # 1 day min lock
             31536000,  # 1 year max lock  
             200_00,  # 200% max boost
@@ -1876,6 +1877,7 @@ def test_ripe_gov_vault_config_validation(switchboard_alpha, governance, alpha_t
         switchboard_alpha.setRipeGovVaultConfig(
             "0x1234567890123456789012345678901234567890",  # unsupported asset
             100_00,
+            False,   # shouldFreezeWhenBadDebt
             86400,
             31536000,
             200_00,
@@ -1889,6 +1891,7 @@ def test_ripe_gov_vault_config_validation(switchboard_alpha, governance, alpha_t
         switchboard_alpha.setRipeGovVaultConfig(
             alpha_token.address,  # supported asset
             501_00,  # > 500% weight (invalid)
+            False,   # shouldFreezeWhenBadDebt
             86400,
             31536000,
             200_00,
@@ -1902,6 +1905,7 @@ def test_ripe_gov_vault_config_validation(switchboard_alpha, governance, alpha_t
         switchboard_alpha.setRipeGovVaultConfig(
             alpha_token.address,
             100_00,
+            False,   # shouldFreezeWhenBadDebt
             31536000,  # 1 year min
             86400,     # 1 day max (invalid: min > max)
             200_00,
@@ -1915,6 +1919,7 @@ def test_ripe_gov_vault_config_validation(switchboard_alpha, governance, alpha_t
         switchboard_alpha.setRipeGovVaultConfig(
             alpha_token.address,
             100_00,
+            False,   # shouldFreezeWhenBadDebt
             86400,
             31536000,
             1001_00,  # > 1000% boost (invalid)
@@ -1928,6 +1933,7 @@ def test_ripe_gov_vault_config_validation(switchboard_alpha, governance, alpha_t
         switchboard_alpha.setRipeGovVaultConfig(
             alpha_token.address,
             100_00,
+            False,   # shouldFreezeWhenBadDebt
             86400,
             31536000,
             200_00,
@@ -1941,6 +1947,7 @@ def test_ripe_gov_vault_config_validation(switchboard_alpha, governance, alpha_t
         switchboard_alpha.setRipeGovVaultConfig(
             alpha_token.address,
             100_00,
+            False,   # shouldFreezeWhenBadDebt
             86400,
             31536000,
             200_00,
@@ -1954,6 +1961,7 @@ def test_ripe_gov_vault_config_validation(switchboard_alpha, governance, alpha_t
         switchboard_alpha.setRipeGovVaultConfig(
             alpha_token.address,
             100_00,
+            False,   # shouldFreezeWhenBadDebt
             86400,
             31536000,
             200_00,
@@ -1972,6 +1980,7 @@ def test_ripe_gov_vault_config_success(switchboard_alpha, governance, alpha_toke
     action_id = switchboard_alpha.setRipeGovVaultConfig(
         alpha_token.address,
         150_00,    # 150% asset weight
+        True,      # shouldFreezeWhenBadDebt
         86400,     # 1 day min lock
         31536000,  # 1 year max lock
         300_00,    # 300% max boost
@@ -1989,6 +1998,7 @@ def test_ripe_gov_vault_config_success(switchboard_alpha, governance, alpha_toke
     log = logs[0]
     assert log.asset == alpha_token.address
     assert log.assetWeight == 150_00
+    assert log.shouldFreezeWhenBadDebt == True
     assert log.minLockDuration == 86400
     assert log.maxLockDuration == 31536000
     assert log.maxLockBoost == 300_00
@@ -2000,6 +2010,7 @@ def test_ripe_gov_vault_config_success(switchboard_alpha, governance, alpha_toke
     pending = switchboard_alpha.pendingRipeGovVaultConfig(action_id)
     assert pending.asset == alpha_token.address
     assert pending.assetWeight == 150_00
+    assert pending.shouldFreezeWhenBadDebt == True
     assert pending.lockTerms.minLockDuration == 86400
     assert pending.lockTerms.maxLockDuration == 31536000
     assert pending.lockTerms.maxLockBoost == 300_00
@@ -2017,6 +2028,7 @@ def test_execute_ripe_gov_vault_config(switchboard_alpha, governance, bravo_toke
     action_id = switchboard_alpha.setRipeGovVaultConfig(
         bravo_token.address,
         200_00,    # 200% asset weight
+        False,     # shouldFreezeWhenBadDebt
         7200,      # 2 hours min lock
         2592000,   # 30 days max lock
         400_00,    # 400% max boost
@@ -2041,6 +2053,7 @@ def test_execute_ripe_gov_vault_config(switchboard_alpha, governance, bravo_toke
     log = logs[0]
     assert log.asset == bravo_token.address
     assert log.assetWeight == 200_00
+    assert log.shouldFreezeWhenBadDebt == False
     assert log.minLockDuration == 7200
     assert log.maxLockDuration == 2592000
     assert log.maxLockBoost == 400_00
@@ -2064,6 +2077,7 @@ def test_execute_ripe_gov_vault_config_with_exit_enabled(switchboard_alpha, gove
     action_id = switchboard_alpha.setRipeGovVaultConfig(
         alpha_token.address,
         150_00,    # 150% asset weight
+        True,      # shouldFreezeWhenBadDebt
         3600,      # 1 hour min lock
         1209600,   # 14 days max lock
         250_00,    # 250% max boost
@@ -2088,6 +2102,7 @@ def test_execute_ripe_gov_vault_config_with_exit_enabled(switchboard_alpha, gove
     log = logs[0]
     assert log.asset == alpha_token.address
     assert log.assetWeight == 150_00
+    assert log.shouldFreezeWhenBadDebt == True
     assert log.minLockDuration == 3600
     assert log.maxLockDuration == 1209600
     assert log.maxLockBoost == 250_00
@@ -2108,6 +2123,7 @@ def test_ripe_gov_vault_config_permissions(switchboard_alpha, governance, bob, a
         switchboard_alpha.setRipeGovVaultConfig(
             alpha_token.address,
             100_00,
+            False,   # shouldFreezeWhenBadDebt
             86400,
             31536000,
             200_00,
@@ -2120,6 +2136,7 @@ def test_ripe_gov_vault_config_permissions(switchboard_alpha, governance, bob, a
     action_id = switchboard_alpha.setRipeGovVaultConfig(
         alpha_token.address,
         100_00,
+        False,   # shouldFreezeWhenBadDebt
         86400,
         31536000,
         200_00,
@@ -2128,3 +2145,79 @@ def test_ripe_gov_vault_config_permissions(switchboard_alpha, governance, bob, a
         sender=governance.address
     )
     assert action_id > 0
+
+
+def test_ripe_gov_vault_config_freeze_when_bad_debt_parameter(switchboard_alpha, governance, alpha_token, setAssetConfig):
+    """Test the shouldFreezeWhenBadDebt parameter works correctly"""
+    # Set up alpha_token to be supported in vault 2
+    setAssetConfig(alpha_token.address, _vaultIds=[2])
+    
+    # Test with shouldFreezeWhenBadDebt=True
+    action_id_freeze = switchboard_alpha.setRipeGovVaultConfig(
+        alpha_token.address,
+        100_00,    # 100% asset weight
+        True,      # shouldFreezeWhenBadDebt = True
+        86400,     # 1 day min lock
+        31536000,  # 1 year max lock
+        200_00,    # 200% max boost
+        10_00,     # 10% exit fee
+        True,      # can exit
+        sender=governance.address
+    )
+    
+    assert action_id_freeze > 0
+    
+    # Check event was emitted with correct freeze parameter
+    logs = filter_logs(switchboard_alpha, "PendingRipeGovVaultConfigChange")
+    freeze_log = [log for log in logs if log.actionId == action_id_freeze][0]
+    assert freeze_log.shouldFreezeWhenBadDebt == True
+    
+    # Check pending config stores the correct value
+    pending_freeze = switchboard_alpha.pendingRipeGovVaultConfig(action_id_freeze)
+    assert pending_freeze.shouldFreezeWhenBadDebt == True
+    
+    # Test with shouldFreezeWhenBadDebt=False
+    action_id_no_freeze = switchboard_alpha.setRipeGovVaultConfig(
+        alpha_token.address,
+        150_00,    # 150% asset weight
+        False,     # shouldFreezeWhenBadDebt = False
+        3600,      # 1 hour min lock
+        2592000,   # 30 days max lock
+        300_00,    # 300% max boost
+        8_00,      # 8% exit fee
+        True,      # can exit
+        sender=governance.address
+    )
+    
+    assert action_id_no_freeze > 0
+    assert action_id_no_freeze != action_id_freeze
+    
+    # Check event was emitted with correct freeze parameter
+    logs = filter_logs(switchboard_alpha, "PendingRipeGovVaultConfigChange")
+    no_freeze_log = [log for log in logs if log.actionId == action_id_no_freeze][0]
+    assert no_freeze_log.shouldFreezeWhenBadDebt == False
+    
+    # Check pending config stores the correct value
+    pending_no_freeze = switchboard_alpha.pendingRipeGovVaultConfig(action_id_no_freeze)
+    assert pending_no_freeze.shouldFreezeWhenBadDebt == False
+    
+    # Execute both actions to verify they work properly
+    boa.env.time_travel(blocks=switchboard_alpha.actionTimeLock())
+    
+    # Execute freeze enabled action
+    success_freeze = switchboard_alpha.executePendingAction(action_id_freeze, sender=governance.address)
+    assert success_freeze == True
+    
+    # Check execution event for freeze enabled
+    execution_logs = filter_logs(switchboard_alpha, "RipeGovVaultConfigSet")
+    freeze_execution_log = [log for log in execution_logs if log.asset == alpha_token.address and log.assetWeight == 100_00][0]
+    assert freeze_execution_log.shouldFreezeWhenBadDebt == True
+    
+    # Execute no freeze action  
+    success_no_freeze = switchboard_alpha.executePendingAction(action_id_no_freeze, sender=governance.address)
+    assert success_no_freeze == True
+    
+    # Check execution event for no freeze (this should overwrite the previous config)
+    execution_logs = filter_logs(switchboard_alpha, "RipeGovVaultConfigSet")
+    no_freeze_execution_log = [log for log in execution_logs if log.asset == alpha_token.address and log.assetWeight == 150_00][0]
+    assert no_freeze_execution_log.shouldFreezeWhenBadDebt == False

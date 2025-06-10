@@ -28,6 +28,7 @@ interface MissionControl:
 
 interface Ledger:
     def isHrContributor(_contributor: address) -> bool: view
+    def setBadDebt(_amount: uint256): nonpayable
 
 interface BondRoom:
     def startBondEpochAtBlock(_block: uint256): nonpayable
@@ -46,6 +47,7 @@ flag ActionType:
     RIPE_BOND_CONFIG
     RIPE_BOND_EPOCH_LENGTH
     RIPE_BOND_START_EPOCH
+    RIPE_BAD_DEBT
 
 struct HrConfig:
     contribTemplate: address
@@ -72,6 +74,7 @@ struct RipeBondConfig:
     maxRipePerUnitLockBonus: uint256
     epochLength: uint256
     shouldAutoRestart: bool
+    restartDelayBlocks: uint256
 
 event PendingHrContribTemplateChange:
     contribTemplate: indexed(address)
@@ -135,6 +138,7 @@ event PendingRipeBondConfigSet:
     maxRipePerUnit: uint256
     maxRipePerUnitLockBonus: uint256
     shouldAutoRestart: bool
+    restartDelayBlocks: uint256
     confirmationBlock: uint256
     actionId: uint256
 
@@ -151,6 +155,11 @@ event PendingStartEpochAtBlockSet:
 event CanPurchaseRipeBondModified:
     canPurchaseRipeBond: bool
     modifier: indexed(address)
+
+event PendingBadDebtSet:
+    badDebt: uint256
+    confirmationBlock: uint256
+    actionId: uint256
 
 event HrContribTemplateSet:
     contribTemplate: indexed(address)
@@ -188,6 +197,9 @@ event RipeBondEpochLengthSet:
 
 event RipeBondStartEpochAtBlockSet:
     startBlock: uint256
+
+event BadDebtSet:
+    badDebt: uint256
 
 # pending config changes
 actionType: public(HashMap[uint256, ActionType]) # aid -> type
@@ -458,6 +470,7 @@ def setRipeBondConfig(
     _maxRipePerUnit: uint256,
     _maxRipePerUnitLockBonus: uint256,
     _shouldAutoRestart: bool,
+    _restartDelayBlocks: uint256,
 ) -> bool:
     assert gov._canGovern(msg.sender) # dev: no perms
     aid: uint256 = timeLock._initiateAction()
@@ -476,6 +489,7 @@ def setRipeBondConfig(
         maxRipePerUnitLockBonus=_maxRipePerUnitLockBonus,
         epochLength=0,
         shouldAutoRestart=_shouldAutoRestart,
+        restartDelayBlocks=_restartDelayBlocks,
     )
     confirmationBlock: uint256 = timeLock._getActionConfirmationBlock(aid)
     log PendingRipeBondConfigSet(
@@ -485,6 +499,7 @@ def setRipeBondConfig(
         maxRipePerUnit=_maxRipePerUnit,
         maxRipePerUnitLockBonus=_maxRipePerUnitLockBonus,
         shouldAutoRestart=_shouldAutoRestart,
+        restartDelayBlocks=_restartDelayBlocks,
         confirmationBlock=confirmationBlock,
         actionId=aid,
     )
@@ -533,6 +548,20 @@ def setCanPurchaseRipeBond(_canBond: bool) -> bool:
     config.canBond = _canBond
     extcall MissionControl(mc).setRipeBondConfig(config)
     log CanPurchaseRipeBondModified(canPurchaseRipeBond=_canBond, modifier=msg.sender)
+    return True
+
+
+# set bad debt
+
+
+@external
+def setBadDebt(_amount: uint256) -> bool:
+    assert gov._canGovern(msg.sender) # dev: no perms
+    aid: uint256 = timeLock._initiateAction()
+    self.actionType[aid] = ActionType.RIPE_BAD_DEBT
+    self.pendingRipeBondConfigValue[aid] = _amount
+    confirmationBlock: uint256 = timeLock._getActionConfirmationBlock(aid)
+    log PendingBadDebtSet(badDebt=_amount, confirmationBlock=confirmationBlock, actionId=aid)
     return True
 
 
@@ -608,6 +637,7 @@ def executePendingAction(_aid: uint256) -> bool:
         config.maxRipePerUnit = p.maxRipePerUnit
         config.maxRipePerUnitLockBonus = p.maxRipePerUnitLockBonus
         config.shouldAutoRestart = p.shouldAutoRestart
+        config.restartDelayBlocks = p.restartDelayBlocks
         extcall MissionControl(mc).setRipeBondConfig(config)
         extcall BondRoom(self._getBondRoomAddr()).startBondEpochAtBlock(0) # reset epoch
         log RipeBondConfigSet(asset=p.asset, amountPerEpoch=p.amountPerEpoch, minRipePerUnit=p.minRipePerUnit, maxRipePerUnit=p.maxRipePerUnit, maxRipePerUnitLockBonus=p.maxRipePerUnitLockBonus, shouldAutoRestart=p.shouldAutoRestart)
@@ -623,6 +653,11 @@ def executePendingAction(_aid: uint256) -> bool:
         startBlock: uint256 = self.pendingRipeBondConfigValue[_aid]
         extcall BondRoom(self._getBondRoomAddr()).startBondEpochAtBlock(startBlock)
         log RipeBondStartEpochAtBlockSet(startBlock=startBlock)
+
+    elif actionType == ActionType.RIPE_BAD_DEBT:
+        amount: uint256 = self.pendingRipeBondConfigValue[_aid]
+        extcall Ledger(self._getLedgerAddr()).setBadDebt(amount)
+        log BadDebtSet(badDebt=amount)
 
     self.actionType[_aid] = empty(ActionType)
     return True

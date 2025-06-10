@@ -18,11 +18,15 @@ from ethereum.ercs import IERC20Detailed
 interface Ledger:
     def setEpochData(_epochStart: uint256, _epochEnd: uint256, _amountAvailInEpoch: uint256): nonpayable
     def didPurchaseRipeBond(_amountPaid: uint256, _ripePayout: uint256): nonpayable
-    def getRipeBondData() -> (uint256, uint256): view
+    def didClearBadDebt(_amount: uint256, _ripeAmount: uint256): nonpayable
     def getEpochData() -> (uint256, uint256): view
+    def getRipeBondData() -> RipeBondData: view
 
 interface Teller:
     def depositIntoGovVaultFromTrusted(_user: address, _asset: address, _amount: uint256, _lockDuration: uint256, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
+
+interface PriceDesk:
+    def getUsdValue(_asset: address, _amount: uint256, _shouldRaise: bool = False) -> uint256: view
 
 interface MissionControl:
     def getPurchaseRipeBondConfig(_user: address) -> PurchaseRipeBondConfig: view
@@ -39,9 +43,15 @@ struct PurchaseRipeBondConfig:
     maxRipePerUnitLockBonus: uint256
     epochLength: uint256
     shouldAutoRestart: bool
+    restartDelayBlocks: uint256
     minLockDuration: uint256
     maxLockDuration: uint256
     canAnyoneBondForUser: bool
+
+struct RipeBondData:
+    paymentAmountAvailInEpoch: uint256
+    ripeAvailForBonds: uint256
+    badDebt: uint256
 
 event RipeBondPurchased:
     user: indexed(address)
@@ -49,6 +59,7 @@ event RipeBondPurchased:
     paymentAmount: uint256
     lockDuration: uint256
     ripePayout: uint256
+    ripeForBadDebt: uint256
     baseRipePerUnit: uint256
     ripePerUnitBonus: uint256
     epochProgress: uint256
@@ -110,11 +121,9 @@ def _purchaseRipeBond(
     assert block.number >= epochStart and block.number < epochEnd # dev: not within epoch window
 
     # check availability - do after epoch refresh!
-    paymentAmountAvailInEpoch: uint256 = 0
-    ripeAvailForBonds: uint256 = 0
-    paymentAmountAvailInEpoch, ripeAvailForBonds = staticcall Ledger(_a.ledger).getRipeBondData()
-    assert paymentAmountAvailInEpoch != 0 # dev: no more available in epoch
-    paymentAmount: uint256 = min(maxUserAmount, paymentAmountAvailInEpoch)
+    data: RipeBondData = staticcall Ledger(_a.ledger).getRipeBondData()
+    assert data.paymentAmountAvailInEpoch != 0 # dev: no more available in epoch
+    paymentAmount: uint256 = min(maxUserAmount, data.paymentAmountAvailInEpoch)
 
     # base ripe payout
     epochProgress: uint256 = (block.number - epochStart) * HUNDRED_PERCENT // (epochEnd - epochStart)
@@ -132,10 +141,21 @@ def _purchaseRipeBond(
     ripePerUnit: uint256 = baseRipePerUnit + ripePerUnitBonus
     ripePayout: uint256 = ripePerUnit * paymentAmount // (10 ** convert(staticcall IERC20Detailed(_paymentAsset).decimals(), uint256))
     assert ripePayout != 0 # dev: bad deal, user is not getting fair amount of Ripe
-    assert ripePayout <= ripeAvailForBonds # dev: not enough ripe avail
+    assert ripePayout <= data.ripeAvailForBonds # dev: not enough ripe avail
 
-    # update ledger
-    extcall Ledger(_a.ledger).didPurchaseRipeBond(paymentAmount, ripePayout)
+    # handle bad debt (if applicable)
+    ripeForBadDebt: uint256 = 0
+    if data.badDebt != 0:
+        paymentUsdValue: uint256 = staticcall PriceDesk(_a.priceDesk).getUsdValue(_paymentAsset, paymentAmount, False)
+        if paymentUsdValue != 0:
+            ripeForBadDebt = ripePayout
+            debtRepaymentValue: uint256 = min(paymentUsdValue, data.badDebt)
+            if debtRepaymentValue < paymentUsdValue:
+                ripeForBadDebt = ripePayout * debtRepaymentValue // paymentUsdValue
+            extcall Ledger(_a.ledger).didClearBadDebt(debtRepaymentValue, ripeForBadDebt)
+
+    # update bond data -- amount avail in epoch is reduced even if bad debt is repaid
+    extcall Ledger(_a.ledger).didPurchaseRipeBond(paymentAmount, ripePayout - ripeForBadDebt)
 
     # transfer payment proceeds to endaoment
     assert extcall IERC20(_paymentAsset).transfer(_a.endaoment, paymentAmount, default_return_value=True) # dev: asset transfer failed
@@ -153,13 +173,14 @@ def _purchaseRipeBond(
     refundAmount: uint256 = 0
     if _paymentAmount > paymentAmount:
         refundAmount = min(_paymentAmount - paymentAmount, staticcall IERC20(_paymentAsset).balanceOf(self))
-        assert extcall IERC20(_paymentAsset).transfer(_user, refundAmount, default_return_value=True) # dev: asset transfer failed
+        assert extcall IERC20(_paymentAsset).transfer(_caller, refundAmount, default_return_value=True) # dev: asset transfer failed
 
     # start next epoch (if applicable)
-    if paymentAmount == paymentAmountAvailInEpoch and config.shouldAutoRestart:
-        extcall Ledger(_a.ledger).setEpochData(block.number, block.number + config.epochLength, config.amountPerEpoch)
+    if paymentAmount == data.paymentAmountAvailInEpoch and config.shouldAutoRestart:
+        newStartBlock: uint256 = block.number + config.restartDelayBlocks
+        extcall Ledger(_a.ledger).setEpochData(newStartBlock, newStartBlock + config.epochLength, config.amountPerEpoch)
 
-    log RipeBondPurchased(user=_user, paymentAsset=_paymentAsset, paymentAmount=paymentAmount, lockDuration=lockDuration, ripePayout=ripePayout, baseRipePerUnit=baseRipePerUnit, ripePerUnitBonus=ripePerUnitBonus, epochProgress=epochProgress, refundAmount=refundAmount, caller=_caller)
+    log RipeBondPurchased(user=_user, paymentAsset=_paymentAsset, paymentAmount=paymentAmount, lockDuration=lockDuration, ripePayout=ripePayout, ripeForBadDebt=ripeForBadDebt, baseRipePerUnit=baseRipePerUnit, ripePerUnitBonus=ripePerUnitBonus, epochProgress=epochProgress, refundAmount=refundAmount, caller=_caller)
     return ripePayout
 
 

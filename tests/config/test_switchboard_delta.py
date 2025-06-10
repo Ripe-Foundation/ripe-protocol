@@ -87,6 +87,7 @@ def setupRipeGovVaultConfig(mission_control, setGeneralConfig, setAssetConfig, s
         mission_control.setRipeGovVaultConfig(
             ripe_token, 
             _assetWeight,
+            False,
             lock_terms, 
             sender=switchboard_alpha.address
         )
@@ -925,4 +926,64 @@ def test_switchboard_delta_mixed_permissions_scenario(
     
     # Governance can create timelock actions
     aid = switchboard_delta.setManagerForContributor(contributor.address, bob, sender=governance.address)
-    assert aid > 0 
+    assert aid > 0
+
+
+def test_switchboard_delta_set_bad_debt(switchboard_delta, ledger, governance, alice):
+    """Test setBadDebt creates timelock action and executes properly"""
+    bad_debt_amount = 50000 * EIGHTEEN_DECIMALS  # 50K tokens
+    
+    # Non-governance cannot set bad debt
+    with boa.reverts("no perms"):
+        switchboard_delta.setBadDebt(bad_debt_amount, sender=alice)
+    
+    # Governance can create pending bad debt action
+    success = switchboard_delta.setBadDebt(bad_debt_amount, sender=governance.address)
+    assert success == True
+    
+    # Check pending event was emitted
+    logs = filter_logs(switchboard_delta, "PendingBadDebtSet")
+    assert len(logs) == 1
+    log = logs[0]
+    assert log.badDebt == bad_debt_amount
+    
+    # Get the action ID from the event
+    aid = log.actionId
+    assert aid > 0
+    
+    # Check action was stored
+    action_type = switchboard_delta.actionType(aid)
+    assert action_type == 1024  # ActionType.RIPE_BAD_DEBT (bit 10 set)
+    
+    # Check pending value was stored
+    pending_value = switchboard_delta.pendingRipeBondConfigValue(aid)
+    assert pending_value == bad_debt_amount
+    
+    # Verify initial ledger bad debt is 0
+    initial_bad_debt = ledger.badDebt()
+    assert initial_bad_debt == 0
+    
+    # Try to execute before timelock (should fail)
+    success_early = switchboard_delta.executePendingAction(aid, sender=governance.address)
+    assert success_early == False
+    
+    # Advance time past timelock
+    boa.env.time_travel(blocks=switchboard_delta.actionTimeLock())
+    
+    # Execute the action
+    success_execute = switchboard_delta.executePendingAction(aid, sender=governance.address)
+    assert success_execute == True
+    
+    # Check execution event was emitted
+    execution_logs = filter_logs(switchboard_delta, "BadDebtSet")
+    assert len(execution_logs) == 1
+    execution_log = execution_logs[0]
+    assert execution_log.badDebt == bad_debt_amount
+    
+    # Verify ledger bad debt was actually set
+    final_bad_debt = ledger.badDebt()
+    assert final_bad_debt == bad_debt_amount
+    
+    # Check action was cleared after execution
+    final_action_type = switchboard_delta.actionType(aid)
+    assert final_action_type == 0  # Should be cleared 

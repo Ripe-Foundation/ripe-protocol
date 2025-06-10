@@ -29,6 +29,9 @@ interface MissionControl:
 interface VaultBook:
     def getRegId(_vaultAddr: address) -> uint256: view
 
+interface Ledger:
+    def badDebt() -> uint256: view
+
 struct LockTerms:
     minLockDuration: uint256
     maxLockDuration: uint256
@@ -46,6 +49,7 @@ struct GovData:
 struct RipeGovVaultConfig:
     lockTerms: LockTerms
     assetWeight: uint256
+    shouldFreezeWhenBadDebt: bool
 
 event RipeGovVaultDeposit:
     user: indexed(address)
@@ -227,7 +231,7 @@ def _withdrawTokensFromVault(
     _asset: address,
     _amount: uint256,
     _recipient: address,
-    _shouldCheckUnlock: bool,
+    _shouldCheckRestrictions: bool,
     _a: addys.Addys,
 ) -> (uint256, bool):
 
@@ -239,7 +243,7 @@ def _withdrawTokensFromVault(
 
     # handle gov data/points
     config: RipeGovVaultConfig = staticcall MissionControl(_a.missionControl).ripeGovVaultConfig(_asset)
-    self._handleGovDataOnWithdrawal(_user, _asset, withdrawalShares, _shouldCheckUnlock, config)
+    self._handleGovDataOnWithdrawal(_user, _asset, withdrawalShares, _shouldCheckRestrictions, config, _a.ledger)
     self._updateUserGovPoints(_user, _asset, _a.missionControl, _a.boardroom)
 
     log RipeGovVaultWithdrawal(user=_user, asset=_asset, amount=withdrawalAmount, isDepleted=isDepleted, shares=withdrawalShares)
@@ -251,8 +255,9 @@ def _handleGovDataOnWithdrawal(
     _user: address,
     _asset: address,
     _withdrawalShares: uint256,
-    _shouldCheckUnlock: bool,
+    _shouldCheckRestrictions: bool,
     _config: RipeGovVaultConfig,
+    _ledger: address,
 ) -> uint256:
     userData: GovData = self.userGovData[_user][_asset]
     newPoints: uint256 = self._getLatestGovPoints(userData.lastShares, userData.lastPointsUpdate, userData.unlock, _config.lockTerms, _config.assetWeight)
@@ -261,8 +266,10 @@ def _handleGovDataOnWithdrawal(
     # refresh unlock / terms
     userData.unlock = self._refreshUnlock(userData.unlock, _config.lockTerms, userData.lastTerms)
     userData.lastTerms = _config.lockTerms
-    if _shouldCheckUnlock:
+    if _shouldCheckRestrictions:
         assert block.number >= userData.unlock # dev: not reached unlock
+        if _config.shouldFreezeWhenBadDebt:
+            assert staticcall Ledger(_ledger).badDebt() == 0 # dev: cannot withdraw when bad debt
 
     # handle points penalty for withdrawal
     newUserPoints: uint256 = userData.govPoints + newPoints
@@ -311,7 +318,7 @@ def transferBalanceWithinVault(
 
     # handle gov data/points
     config: RipeGovVaultConfig = staticcall MissionControl(a.missionControl).ripeGovVaultConfig(_asset)
-    self._handleGovDataOnTransfer(_fromUser, _toUser, _asset, transferShares, config.lockTerms.minLockDuration, False, config, a.missionControl, a.boardroom)
+    self._handleGovDataOnTransfer(_fromUser, _toUser, _asset, transferShares, config.lockTerms.minLockDuration, False, config, a.missionControl, a.boardroom, a.ledger)
 
     log RipeGovVaultTransfer(fromUser=_fromUser, toUser=_toUser, asset=_asset, transferAmount=transferAmount, isFromUserDepleted=isFromUserDepleted, transferShares=transferShares)
     return transferAmount, isFromUserDepleted
@@ -328,9 +335,10 @@ def _handleGovDataOnTransfer(
     _config: RipeGovVaultConfig,
     _missionControl: address,
     _boardroom: address,
+    _ledger: address,
 ):
     # from user
-    transferPoints: uint256 = self._handleGovDataOnWithdrawal(_fromUser, _asset, _transferShares, False, _config)
+    transferPoints: uint256 = self._handleGovDataOnWithdrawal(_fromUser, _asset, _transferShares, False, _config, _ledger)
     if not _shouldTransferPoints:
         transferPoints = 0
 
@@ -365,7 +373,7 @@ def transferContributorRipeTokens(
     ripeAmount, transferShares, na = sharesVault._transferBalanceWithinVault(a.ripeToken, _contributor, _toUser, max_value(uint256))
 
     # handle gov data/points
-    self._handleGovDataOnTransfer(_contributor, _toUser, a.ripeToken, transferShares, _lockDuration, True, config, a.missionControl, a.boardroom)
+    self._handleGovDataOnTransfer(_contributor, _toUser, a.ripeToken, transferShares, _lockDuration, True, config, a.missionControl, a.boardroom, a.ledger)
 
     log RipeTokensTransferred(fromUser=_contributor, toUser=_toUser, amount=ripeAmount)
     return ripeAmount
@@ -532,6 +540,12 @@ def releaseLock(
 ):
     assert addys._isValidRipeAddr(msg.sender) # dev: no perms
     a: addys.Addys = addys._getAddys(_a)
+
+    # they are probably wanting to exit early because of bad debt, crisis of confidence
+    # if they won't be able to withdraw anyway, don't let them exit early (it will cost them for no reason!)
+    config: RipeGovVaultConfig = staticcall MissionControl(a.missionControl).ripeGovVaultConfig(_asset)
+    if staticcall Ledger(a.ledger).badDebt() != 0:
+        assert not config.shouldFreezeWhenBadDebt # dev: saving user money
 
     # do a full update first
     self._updateUserGovPoints(_user, empty(address), a.missionControl, a.boardroom)

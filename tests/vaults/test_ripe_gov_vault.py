@@ -13,6 +13,7 @@ def setupRipeGovVaultConfig(mission_control, setAssetConfig, switchboard_alpha, 
         _maxLockBoost = 200_00,
         _exitFee = 10_00,
         _canExit = True,
+        _shouldFreezeWhenBadDebt = False,
     ):
         # Set up lock terms
         lock_terms = (
@@ -27,6 +28,7 @@ def setupRipeGovVaultConfig(mission_control, setAssetConfig, switchboard_alpha, 
         mission_control.setRipeGovVaultConfig(
             ripe_token, 
             _assetWeight,
+            _shouldFreezeWhenBadDebt,
             lock_terms, 
             sender=switchboard_alpha.address
         )
@@ -659,7 +661,8 @@ def test_ripe_gov_vault_configuration_updates_after_deposit(
         _maxLockDuration=2000,  # increased (doesn't affect unlock reset)
         _maxLockBoost=300_00,  # increased (doesn't affect unlock reset)
         _exitFee=20_00,  # INCREASED from 10_00 - makes terms worse
-        _canExit=False  # DISABLED from True - makes terms worse
+        _canExit=False,  # DISABLED from True - makes terms worse
+        _shouldFreezeWhenBadDebt=False,  # Added new parameter
     )
     
     # Update user points (should refresh terms and reset unlock)
@@ -1487,6 +1490,7 @@ def test_ripe_gov_vault_multi_asset_governance_points_tracking(
     mission_control.setRipeGovVaultConfig(
         alpha_token,
         200_00,  # 200% asset weight vs 100% for ripe_token
+        False,
         lock_terms_alpha,
         sender=switchboard_alpha.address
     )
@@ -1542,6 +1546,7 @@ def test_ripe_gov_vault_multi_asset_governance_points_update_all(
     mission_control.setRipeGovVaultConfig(
         alpha_token,
         150_00,  # 150% asset weight
+        False,
         lock_terms_alpha,
         sender=switchboard_alpha.address
     )
@@ -1620,7 +1625,8 @@ def test_ripe_gov_vault_zero_exit_fee_blocks_release_lock_defensive(
         _minLockDuration=100, 
         _maxLockDuration=1000, 
         _canExit=True,  # Exit is allowed
-        _exitFee=0      # No exit fee (invalid combination, but testing vault's defense)
+        _exitFee=0,      # No exit fee (invalid combination, but testing vault's defense)
+        _shouldFreezeWhenBadDebt=False,  # Added new parameter
     )
     
     deposit_amount = 100 * EIGHTEEN_DECIMALS
@@ -2024,4 +2030,253 @@ def test_ripe_gov_vault_contributor_functions_integration_workflow(
     assert ripe_gov_vault.getTotalAmountForUser(charlie, ripe_token) == 0
     assert ripe_gov_vault.totalUserGovPoints(bob) == 0
     assert ripe_gov_vault.totalUserGovPoints(charlie) == 0
+
+
+######################################
+# Bad Debt Withdrawal Freeze Tests   #
+######################################
+
+
+def test_ripe_gov_vault_withdrawal_frozen_when_bad_debt_exists(
+    ripe_gov_vault, ripe_token, whale, bob, alice, teller, mission_control, ledger, switchboard_alpha, setupRipeGovVaultConfig
+):
+    """Test that withdrawals are frozen when shouldFreezeWhenBadDebt=True and bad debt exists"""
+    setupRipeGovVaultConfig()
+
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    
+    # Deposit tokens
+    ripe_token.transfer(ripe_gov_vault, deposit_amount, sender=whale)
+    ripe_gov_vault.depositTokensInVault(bob, ripe_token, deposit_amount, sender=teller.address)
+    
+    # Fast forward past unlock time
+    unlock_block = ripe_gov_vault.userGovData(bob, ripe_token).unlock
+    current_block = boa.env.evm.patch.block_number
+    blocks_to_advance = unlock_block - current_block + 1
+    boa.env.time_travel(blocks=blocks_to_advance)
+    
+    # First verify withdrawal works normally without bad debt
+    withdraw_amount = 25 * EIGHTEEN_DECIMALS
+    initial_balance = ripe_token.balanceOf(alice)
+    
+    withdrawn, is_depleted = ripe_gov_vault.withdrawTokensFromVault(
+        bob, ripe_token, withdraw_amount, alice, sender=teller.address
+    )
+    assert withdrawn == withdraw_amount
+    assert ripe_token.balanceOf(alice) == initial_balance + withdraw_amount
+    
+    # Now enable bad debt freeze and set bad debt
+    lock_terms = (100, 1000, 200_00, True, 10_00)
+    mission_control.setRipeGovVaultConfig(
+        ripe_token, 
+        100_00,  # assetWeight
+        True,    # shouldFreezeWhenBadDebt = True
+        lock_terms,
+        sender=switchboard_alpha.address
+    )
+    
+    # Set bad debt in ledger
+    bad_debt_amount = 50 * EIGHTEEN_DECIMALS
+    ledger.setBadDebt(bad_debt_amount, sender=switchboard_alpha.address)
+    
+    # Verify bad debt was set
+    assert ledger.badDebt() == bad_debt_amount
+    
+    # Now withdrawal should fail due to bad debt
+    with boa.reverts("cannot withdraw when bad debt"):
+        ripe_gov_vault.withdrawTokensFromVault(
+            bob, ripe_token, withdraw_amount, alice, sender=teller.address
+        )
+
+
+def test_ripe_gov_vault_withdrawal_works_when_bad_debt_freeze_disabled(
+    ripe_gov_vault, ripe_token, whale, bob, alice, teller, mission_control, ledger, switchboard_alpha, setupRipeGovVaultConfig
+):
+    """Test that withdrawals work when shouldFreezeWhenBadDebt=False even with bad debt"""
+    setupRipeGovVaultConfig()
+
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    
+    # Deposit tokens
+    ripe_token.transfer(ripe_gov_vault, deposit_amount, sender=whale)
+    ripe_gov_vault.depositTokensInVault(bob, ripe_token, deposit_amount, sender=teller.address)
+    
+    # Fast forward past unlock time
+    unlock_block = ripe_gov_vault.userGovData(bob, ripe_token).unlock
+    current_block = boa.env.evm.patch.block_number
+    blocks_to_advance = unlock_block - current_block + 1
+    boa.env.time_travel(blocks=blocks_to_advance)
+    
+    # Set bad debt freeze to disabled and set bad debt
+    lock_terms = (100, 1000, 200_00, True, 10_00)
+    mission_control.setRipeGovVaultConfig(
+        ripe_token, 
+        100_00,  # assetWeight
+        False,   # shouldFreezeWhenBadDebt = False
+        lock_terms,
+        sender=switchboard_alpha.address
+    )
+    
+    # Set bad debt in ledger
+    bad_debt_amount = 50 * EIGHTEEN_DECIMALS
+    ledger.setBadDebt(bad_debt_amount, sender=switchboard_alpha.address)
+    
+    # Verify bad debt exists
+    assert ledger.badDebt() == bad_debt_amount
+    
+    # Withdrawal should still work because freeze is disabled
+    withdraw_amount = 25 * EIGHTEEN_DECIMALS
+    initial_balance = ripe_token.balanceOf(alice)
+    
+    withdrawn, is_depleted = ripe_gov_vault.withdrawTokensFromVault(
+        bob, ripe_token, withdraw_amount, alice, sender=teller.address
+    )
+    
+    assert withdrawn == withdraw_amount
+    assert ripe_token.balanceOf(alice) == initial_balance + withdraw_amount
+
+
+def test_ripe_gov_vault_release_lock_blocked_when_bad_debt_and_freeze_enabled(
+    ripe_gov_vault, ripe_token, whale, bob, ledger, switchboard_alpha, setupRipeGovVaultConfig
+):
+    """Test that releaseLock() is blocked when bad debt exists and shouldFreezeWhenBadDebt=True to save users money"""
+    # Setup with exit enabled and exit fee, and freeze enabled
+    setupRipeGovVaultConfig(
+        _minLockDuration=100, 
+        _maxLockDuration=1000, 
+        _canExit=True, 
+        _exitFee=10_00,  # 10% exit fee
+        _shouldFreezeWhenBadDebt=True,  # Enable freeze when bad debt
+    )
+    
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    
+    # Deposit tokens with lock duration
+    ripe_token.transfer(ripe_gov_vault, deposit_amount, sender=whale)
+    ripe_gov_vault.depositTokensWithLockDuration(
+        bob, ripe_token, deposit_amount, 500, sender=switchboard_alpha.address
+    )
+    
+    # Verify user is locked and can normally release lock without bad debt
+    userData_before = ripe_gov_vault.userGovData(bob, ripe_token)
+    current_block = boa.env.evm.patch.block_number
+    assert userData_before.unlock == current_block + 500  # Still locked
+    assert userData_before.lastTerms.canExit == True       # Exit is allowed
+    assert userData_before.lastTerms.exitFee == 10_00     # Has exit fee
+    
+    # Verify release lock works normally without bad debt
+    # First test that it would work (we'll revert this)
+    # We need to capture initial state
+    initial_shares = userData_before.lastShares
+    
+    # Create bad debt
+    bad_debt_amount = 50 * EIGHTEEN_DECIMALS
+    ledger.setBadDebt(bad_debt_amount, sender=switchboard_alpha.address)
+    
+    # Verify bad debt exists
+    assert ledger.badDebt() == bad_debt_amount
+    
+    # Now releaseLock should fail to save user money since withdrawals would be frozen anyway
+    with boa.reverts("saving user money"):
+        ripe_gov_vault.releaseLock(bob, ripe_token, sender=switchboard_alpha.address)
+    
+    # User's position should remain unchanged (not charged exit fee)
+    userData_after = ripe_gov_vault.userGovData(bob, ripe_token)
+    assert userData_after.lastShares == initial_shares  # No shares were removed
+    assert userData_after.unlock == userData_before.unlock  # Still locked
+
+
+def test_ripe_gov_vault_release_lock_works_when_bad_debt_but_freeze_disabled(
+    ripe_gov_vault, ripe_token, whale, bob, ledger, switchboard_alpha, setupRipeGovVaultConfig
+):
+    """Test that releaseLock() works when bad debt exists but shouldFreezeWhenBadDebt=False"""
+    # Setup with exit enabled and exit fee, but freeze disabled
+    setupRipeGovVaultConfig(
+        _minLockDuration=100, 
+        _maxLockDuration=1000, 
+        _canExit=True, 
+        _exitFee=8_00,  # 8% exit fee
+        _shouldFreezeWhenBadDebt=False,  # Disable freeze when bad debt
+    )
+    
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    
+    # Deposit tokens with lock duration
+    ripe_token.transfer(ripe_gov_vault, deposit_amount, sender=whale)
+    ripe_gov_vault.depositTokensWithLockDuration(
+        bob, ripe_token, deposit_amount, 400, sender=switchboard_alpha.address
+    )
+    
+    # Verify user is locked
+    userData_before = ripe_gov_vault.userGovData(bob, ripe_token)
+    current_block = boa.env.evm.patch.block_number
+    assert userData_before.unlock == current_block + 400  # Still locked
+    assert userData_before.lastTerms.canExit == True       # Exit is allowed
+    assert userData_before.lastTerms.exitFee == 8_00      # Has exit fee
+    initial_shares = userData_before.lastShares
+    
+    # Create bad debt
+    bad_debt_amount = 30 * EIGHTEEN_DECIMALS
+    ledger.setBadDebt(bad_debt_amount, sender=switchboard_alpha.address)
+    
+    # Verify bad debt exists
+    assert ledger.badDebt() == bad_debt_amount
+    
+    # Release lock should work because freeze is disabled (even with bad debt)
+    ripe_gov_vault.releaseLock(bob, ripe_token, sender=switchboard_alpha.address)
+    
+    # Verify lock was released and exit fee was charged
+    userData_after = ripe_gov_vault.userGovData(bob, ripe_token)
+    assert userData_after.unlock == 0  # Lock released
+    
+    # Verify exit fee was charged (8% of shares should be removed)
+    expected_shares_after = initial_shares * 92 // 100  # 92% remaining after 8% fee
+    assert userData_after.lastShares == expected_shares_after
+    
+    # Verify the shares fee was charged correctly
+    shares_fee_charged = initial_shares - userData_after.lastShares
+    expected_shares_fee = initial_shares * 8 // 100  # 8% fee
+    assert shares_fee_charged == expected_shares_fee
+
+
+def test_ripe_gov_vault_release_lock_works_when_no_bad_debt_regardless_of_freeze_setting(
+    ripe_gov_vault, ripe_token, whale, bob, ledger, switchboard_alpha, setupRipeGovVaultConfig
+):
+    """Test that releaseLock() works normally when there's no bad debt, regardless of shouldFreezeWhenBadDebt setting"""
+    # Test with freeze enabled first
+    setupRipeGovVaultConfig(
+        _minLockDuration=100, 
+        _maxLockDuration=1000, 
+        _canExit=True, 
+        _exitFee=12_00,  # 12% exit fee
+        _shouldFreezeWhenBadDebt=True,  # Enable freeze when bad debt
+    )
+    
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    
+    # Deposit tokens with lock duration
+    ripe_token.transfer(ripe_gov_vault, deposit_amount, sender=whale)
+    ripe_gov_vault.depositTokensWithLockDuration(
+        bob, ripe_token, deposit_amount, 600, sender=switchboard_alpha.address
+    )
+    
+    # Verify user is locked
+    userData_before = ripe_gov_vault.userGovData(bob, ripe_token)
+    current_block = boa.env.evm.patch.block_number
+    assert userData_before.unlock == current_block + 600  # Still locked
+    initial_shares = userData_before.lastShares
+    
+    # Verify no bad debt exists
+    assert ledger.badDebt() == 0
+    
+    # Release lock should work normally since there's no bad debt
+    ripe_gov_vault.releaseLock(bob, ripe_token, sender=switchboard_alpha.address)
+    
+    # Verify lock was released and exit fee was charged
+    userData_after = ripe_gov_vault.userGovData(bob, ripe_token)
+    assert userData_after.unlock == 0  # Lock released
+    
+    # Verify exit fee was charged (12% of shares should be removed)
+    expected_shares_after = initial_shares * 88 // 100  # 88% remaining after 12% fee
+    assert userData_after.lastShares == expected_shares_after
 
