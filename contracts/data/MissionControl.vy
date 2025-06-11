@@ -316,26 +316,27 @@ assets: public(HashMap[uint256, address]) # index -> asset
 indexOfAsset: public(HashMap[address, uint256]) # asset -> index
 numAssets: public(uint256) # num assets
 
-# user config
-userConfig: public(HashMap[address, UserConfig]) # user -> config
-userDelegation: public(HashMap[address, HashMap[address, ActionDelegation]]) # user -> caller -> config
-
 # ripe rewards
 rewardsConfig: public(RipeRewardsConfig)
 totalPointsAllocs: public(TotalPointsAllocs)
 
-# priority data
-priorityPriceSourceIds: public(DynArray[uint256, MAX_PRIORITY_PRICE_SOURCES])
-priorityLiqAssetVaults: public(DynArray[VaultLite, PRIORITY_VAULT_DATA])
-priorityStabVaults: public(DynArray[VaultLite, PRIORITY_VAULT_DATA])
-
-# other
+# random configs
 underscoreRegistry: public(address)
 canPerformLiteAction: public(HashMap[address, bool]) # user -> canPerformLiteAction
 maxLtvDeviation: public(uint256)
 ripeGovVaultConfig: public(HashMap[address, RipeGovVaultConfig]) # asset -> config
 hrConfig: public(HrConfig)
 ripeBondConfig: public(RipeBondConfig)
+
+# priority data
+priorityPriceSourceIds: public(DynArray[uint256, MAX_PRIORITY_PRICE_SOURCES])
+priorityLiqAssetVaults: public(DynArray[VaultLite, PRIORITY_VAULT_DATA])
+priorityStabVaults: public(DynArray[VaultLite, PRIORITY_VAULT_DATA])
+
+# user config
+userConfig: public(HashMap[address, UserConfig]) # user -> config
+userDelegation: public(HashMap[address, HashMap[address, ActionDelegation]]) # user -> caller -> config
+
 
 MAX_VAULTS_PER_ASSET: constant(uint256) = 10
 MAX_PRIORITY_PRICE_SOURCES: constant(uint256) = 10
@@ -382,6 +383,69 @@ def setGeneralDebtConfig(_config: GenDebtConfig):
 def setRipeRewardsConfig(_config: RipeRewardsConfig):
     assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
     self.rewardsConfig = _config
+
+
+# underscore registry
+
+
+@external
+def setUnderscoreRegistry(_underscoreRegistry: address):
+    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
+    self.underscoreRegistry = _underscoreRegistry
+
+
+# can perform lite action
+
+
+@external
+def setCanPerformLiteAction(_user: address, _canDo: bool):
+    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
+    self.canPerformLiteAction[_user] = _canDo
+
+
+# max ltv deviation
+
+
+@external
+def setMaxLtvDeviation(_maxLtvDeviation: uint256):
+    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
+    self.maxLtvDeviation = _maxLtvDeviation
+
+
+# ripe gov vault config
+
+
+@external
+def setRipeGovVaultConfig(
+    _asset: address,
+    _assetWeight: uint256,
+    _shouldFreezeWhenBadDebt: bool,
+    _lockTerms: LockTerms,
+):
+    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
+    self.ripeGovVaultConfig[_asset] = RipeGovVaultConfig(
+        lockTerms=_lockTerms,
+        assetWeight=_assetWeight,
+        shouldFreezeWhenBadDebt=_shouldFreezeWhenBadDebt,
+    )
+
+
+# hr config
+
+
+@external
+def setHrConfig(_config: HrConfig):
+    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
+    self.hrConfig = _config
+
+
+# ripe bond config
+
+
+@external
+def setRipeBondConfig(_config: RipeBondConfig):
+    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
+    self.ripeBondConfig = _config
 
 
 ################
@@ -455,36 +519,6 @@ def deregisterAsset(_asset: address) -> bool:
     return True
 
 
-# utils
-
-
-@view
-@external
-def isSupportedAsset(_asset: address) -> bool:
-    return self.indexOfAsset[_asset] != 0
-
-
-@view
-@external
-def isSupportedAssetInVault(_vaultId: uint256, _asset: address) -> bool:
-    return _vaultId in self.assetConfig[_asset].vaultIds
-
-
-@view
-@external
-def getNumAssets() -> uint256:
-    return self._getNumAssets()
-
-
-@view
-@internal
-def _getNumAssets() -> uint256:
-    numAssets: uint256 = self.numAssets
-    if numAssets == 0:
-        return 0
-    return numAssets - 1
-
-
 #################
 # Priority Data #
 #################
@@ -499,12 +533,6 @@ def setPriorityPriceSourceIds(_priorityIds: DynArray[uint256, MAX_PRIORITY_PRICE
     self.priorityPriceSourceIds = _priorityIds
 
 
-@view 
-@external 
-def getPriorityPriceSourceIds() -> DynArray[uint256, MAX_PRIORITY_PRICE_SOURCES]:
-    return self.priorityPriceSourceIds
-
-
 # priority liq asset vaults
 
 
@@ -514,12 +542,6 @@ def setPriorityLiqAssetVaults(_priorityLiqAssetVaults: DynArray[VaultLite, PRIOR
     self.priorityLiqAssetVaults = _priorityLiqAssetVaults
 
 
-@view 
-@external 
-def getPriorityLiqAssetVaults() -> DynArray[VaultLite, PRIORITY_VAULT_DATA]:
-    return self.priorityLiqAssetVaults
-
-
 # stability pool vaults
 
 
@@ -527,54 +549,6 @@ def getPriorityLiqAssetVaults() -> DynArray[VaultLite, PRIORITY_VAULT_DATA]:
 def setPriorityStabVaults(_priorityStabVaults: DynArray[VaultLite, PRIORITY_VAULT_DATA]):
     assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
     self.priorityStabVaults = _priorityStabVaults
-
-
-@view 
-@external 
-def getPriorityStabVaults() -> DynArray[VaultLite, PRIORITY_VAULT_DATA]:
-    return self.priorityStabVaults
-
-
-#########
-# Other #
-#########
-
-
-# underscore registry
-
-
-@external
-def setUnderscoreRegistry(_underscoreRegistry: address):
-    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
-    self.underscoreRegistry = _underscoreRegistry
-
-
-# can perform lite action
-
-
-@external
-def setCanPerformLiteAction(_user: address, _canDo: bool):
-    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
-    self.canPerformLiteAction[_user] = _canDo
-
-
-# max ltv deviation
-
-
-@external
-def setMaxLtvDeviation(_maxLtvDeviation: uint256):
-    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
-    self.maxLtvDeviation = _maxLtvDeviation
-
-
-# stale price time
-
-
-@view
-@external
-def getPriceStaleTime() -> uint256:
-    # used by Chainlink.vy
-    return self.genConfig.priceStaleTime
 
 
 ###############
@@ -655,51 +629,39 @@ def _isUnderscoreWalletOwner(_user: address, _caller: address) -> bool:
     return staticcall UnderscoreWalletConfig(walletConfig).owner() == _caller
 
 
-#########################
-# Ripe Gov Vault Config #
-#########################
-
-
-@external
-def setRipeGovVaultConfig(
-    _asset: address,
-    _assetWeight: uint256,
-    _shouldFreezeWhenBadDebt: bool,
-    _lockTerms: LockTerms,
-):
-    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
-    self.ripeGovVaultConfig[_asset] = RipeGovVaultConfig(
-        lockTerms=_lockTerms,
-        assetWeight=_assetWeight,
-        shouldFreezeWhenBadDebt=_shouldFreezeWhenBadDebt,
-    )
-
-
-#############
-# HR Config #
-#############
-
-
-@external
-def setHrConfig(_config: HrConfig):
-    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
-    self.hrConfig = _config
-
-
-####################
-# Ripe Bond Config #
-####################
-
-
-@external
-def setRipeBondConfig(_config: RipeBondConfig):
-    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
-    self.ripeBondConfig = _config
-
-
 ###################
 # Helpers / Views #
 ###################
+
+
+# asset utils
+
+
+@view
+@external
+def isSupportedAsset(_asset: address) -> bool:
+    return self.indexOfAsset[_asset] != 0
+
+
+@view
+@external
+def isSupportedAssetInVault(_vaultId: uint256, _asset: address) -> bool:
+    return _vaultId in self.assetConfig[_asset].vaultIds
+
+
+@view
+@external
+def getNumAssets() -> uint256:
+    return self._getNumAssets()
+
+
+@view
+@internal
+def _getNumAssets() -> uint256:
+    numAssets: uint256 = self.numAssets
+    if numAssets == 0:
+        return 0
+    return numAssets - 1
 
 
 # is user allowed
@@ -1049,3 +1011,34 @@ def getDynamicBorrowRateConfig() -> DynamicBorrowRateConfig:
         increasePerDangerBlock=genDebtConfig.increasePerDangerBlock,
         maxBorrowRate=genDebtConfig.maxBorrowRate,
     )
+
+
+# stale price time
+
+
+@view
+@external
+def getPriceStaleTime() -> uint256:
+    # used by Chainlink.vy
+    return self.genConfig.priceStaleTime
+
+
+# priority data
+
+
+@view 
+@external 
+def getPriorityPriceSourceIds() -> DynArray[uint256, MAX_PRIORITY_PRICE_SOURCES]:
+    return self.priorityPriceSourceIds
+
+
+@view 
+@external 
+def getPriorityLiqAssetVaults() -> DynArray[VaultLite, PRIORITY_VAULT_DATA]:
+    return self.priorityLiqAssetVaults
+
+
+@view 
+@external 
+def getPriorityStabVaults() -> DynArray[VaultLite, PRIORITY_VAULT_DATA]:
+    return self.priorityStabVaults
