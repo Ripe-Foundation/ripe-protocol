@@ -18,6 +18,7 @@ import contracts.priceSources.modules.PriceSourceData as priceData
 import contracts.modules.TimeLock as timeLock
 
 import interfaces.PriceSource as PriceSource
+from ethereum.ercs import IERC20Detailed
 
 interface CurveMetaRegistry:
     def get_registry_handlers_from_pool(_pool: address) -> address[10]: view
@@ -28,6 +29,7 @@ interface CurveMetaRegistry:
     def is_registered(_pool: address) -> bool: view
 
 interface CurvePool:
+    def balances(_index: uint256) -> uint256: view
     def get_virtual_price() -> uint256: view
     def price_oracle() -> uint256: view
     def totalSupply() -> uint256: view
@@ -68,6 +70,31 @@ struct CurveRegistries:
     TricryptoNg: address
     TwoCrypto: address
     MetaPool: address
+
+struct GreenRefPoolConfig:
+    pool: address
+    greenIndex: uint256
+    altAsset: address
+    altAssetDecimals: uint256
+    maxNumSnapshots: uint256
+    dangerTrigger: uint256
+    staleBlocks: uint256
+
+struct RefPoolSnapshot:
+    greenBalance: uint256
+    ratio: uint256
+    update: uint256
+    inDanger: bool
+
+struct GreenRefPoolData:
+    lastSnapshot: RefPoolSnapshot
+    numBlocksInDanger: uint256
+    nextIndex: uint256
+
+struct CurrentGreenPoolStatus:
+    weightedRatio: uint256
+    dangerTrigger: uint256
+    numBlocksInDanger: uint256
 
 event NewCurvePricePending:
     asset: indexed(address)
@@ -114,9 +141,41 @@ event DisableCurvePriceCancelled:
     asset: indexed(address)
     prevPool: indexed(address)
 
+event GreenRefPoolConfigPending:
+    pool: indexed(address)
+    maxNumSnapshots: uint256
+    dangerTrigger: uint256
+    staleBlocks: uint256
+    confirmationBlock: uint256
+    actionId: uint256
+
+event GreenRefPoolConfigUpdated:
+    pool: indexed(address)
+    maxNumSnapshots: uint256
+    dangerTrigger: uint256
+    staleBlocks: uint256
+
+event GreenRefPoolConfigUpdateCancelled:
+    pool: indexed(address)
+    maxNumSnapshots: uint256
+    dangerTrigger: uint256
+    staleBlocks: uint256
+
+event GreenRefPoolSnapshotAdded:
+    pool: indexed(address)
+    greenBalance: uint256
+    greenRatio: uint256
+    inDanger: bool
+
 # config
 curveConfig: public(HashMap[address, CurvePriceConfig]) # asset -> config
 pendingUpdates: public(HashMap[address, PendingCurvePrice]) # asset -> config
+
+# green reference pool
+greenRefPoolConfig: public(GreenRefPoolConfig)
+greenRefPoolData: public(GreenRefPoolData)
+snapShots: public(HashMap[uint256, RefPoolSnapshot]) # index -> snapshot
+pendingGreenRefPoolConfig: public(HashMap[uint256, GreenRefPoolConfig]) # actionId -> config
 
 # curve
 CURVE_META_REGISTRY: public(immutable(address))
@@ -132,6 +191,7 @@ TWO_CRYPTO_NG_FACTORY_ID: constant(uint256) = 13
 
 MAX_POOLS: constant(uint256) = 50
 EIGHTEEN_DECIMALS: constant(uint256) = 10 ** 18
+HUNDRED_PERCENT: constant(uint256) = 100_00 # 100.00%
 
 
 @deploy
@@ -362,7 +422,7 @@ def addNewPriceFeed(_asset: address, _pool: address) -> bool:
     assert not priceData.isPaused # dev: contract paused
 
     # validation
-    config: CurvePriceConfig = self._getCurvePoolConfig(_asset, _pool)
+    config: CurvePriceConfig = self._getCurvePoolConfig(_pool)
     assert self._isValidNewFeed(_asset, config) # dev: invalid pool
 
     # set to pending state
@@ -429,7 +489,7 @@ def _cancelNewPendingPriceFeed(_asset: address, _aid: uint256):
 @view
 @external
 def isValidNewFeed(_asset: address, _pool: address) -> bool:
-    config: CurvePriceConfig = self._getCurvePoolConfig(_asset, _pool)
+    config: CurvePriceConfig = self._getCurvePoolConfig(_pool)
     return self._isValidNewFeed(_asset, config)
 
 
@@ -456,7 +516,7 @@ def updatePriceFeed(_asset: address, _pool: address) -> bool:
 
     # validation
     prevPool: address = self.curveConfig[_asset].pool
-    config: CurvePriceConfig = self._getCurvePoolConfig(_asset, _pool)
+    config: CurvePriceConfig = self._getCurvePoolConfig(_pool)
     assert self._isValidUpdateFeed(_asset, config, prevPool) # dev: invalid feed
 
     # set to pending state
@@ -522,7 +582,7 @@ def _cancelPriceFeedUpdate(_asset: address, _aid: uint256):
 @view
 @external
 def isValidUpdateFeed(_asset: address, _newPool: address) -> bool:
-    config: CurvePriceConfig = self._getCurvePoolConfig(_asset, _newPool)
+    config: CurvePriceConfig = self._getCurvePoolConfig(_newPool)
     return self._isValidUpdateFeed(_asset, config, self.curveConfig[_asset].pool)
 
 
@@ -651,13 +711,13 @@ def _isValidDisablePriceFeed(_asset: address, _prevPool: address) -> bool:
 
 @view
 @external
-def getCurvePoolConfig(_asset: address, _pool: address) -> CurvePriceConfig:
-    return self._getCurvePoolConfig(_asset, _pool)
+def getCurvePoolConfig(_pool: address) -> CurvePriceConfig:
+    return self._getCurvePoolConfig(_pool)
 
 
 @view
 @internal
-def _getCurvePoolConfig(_asset: address, _pool: address) -> CurvePriceConfig:
+def _getCurvePoolConfig(_pool: address) -> CurvePriceConfig:
     mr: address = CURVE_META_REGISTRY
     if not staticcall CurveMetaRegistry(mr).is_registered(_pool):
         return empty(CurvePriceConfig)
@@ -704,3 +764,254 @@ def _getPoolType(_pool: address, _mr: address) -> PoolType:
     else:
         poolType = PoolType.CRYPTO
     return poolType
+
+
+#########################
+# Green Ref Pool Config #
+#########################
+
+
+@external
+def setGreenRefPoolConfig(
+    _pool: address,
+    _maxNumSnapshots: uint256,
+    _dangerTrigger: uint256,
+    _staleBlocks: uint256,
+) -> uint256:
+    assert gov._canGovern(msg.sender) # dev: no perms
+    assert not priceData.isPaused # dev: contract paused
+
+    # pool data
+    poolConfig: CurvePriceConfig = self._getCurvePoolConfig(_pool)
+    greenToken: address = addys._getGreenToken()
+    greenIndex: uint256 = 0
+    if greenToken == poolConfig.underlying[1]:
+        greenIndex = 1
+    altAsset: address = poolConfig.underlying[1 - greenIndex]
+    refConfig: GreenRefPoolConfig = GreenRefPoolConfig(
+        pool=_pool,
+        greenIndex=greenIndex,
+        altAsset=altAsset,
+        altAssetDecimals=convert(staticcall IERC20Detailed(altAsset).decimals(), uint256),
+        maxNumSnapshots=_maxNumSnapshots,
+        dangerTrigger=_dangerTrigger,
+        staleBlocks=_staleBlocks,
+    )
+    assert self._isValidGreenRefPoolConfig(poolConfig, refConfig, _maxNumSnapshots, _dangerTrigger, _staleBlocks, greenToken) # dev: invalid ref pool config
+
+    # set to pending state
+    aid: uint256 = timeLock._initiateAction()
+    self.pendingGreenRefPoolConfig[aid] = refConfig
+    log GreenRefPoolConfigPending(pool=_pool, maxNumSnapshots=_maxNumSnapshots, dangerTrigger=_dangerTrigger, staleBlocks=_staleBlocks, confirmationBlock=timeLock._getActionConfirmationBlock(aid), actionId=aid)
+    return aid
+
+
+# confirm green ref pool config
+
+
+@external
+def confirmGreenRefPoolConfig(_aid: uint256) -> bool:
+    assert gov._canGovern(msg.sender) # dev: no perms
+    assert not priceData.isPaused # dev: contract paused
+
+    # validate again
+    d: GreenRefPoolConfig = self.pendingGreenRefPoolConfig[_aid]
+    assert d.pool != empty(address) # dev: no pending update
+
+    # check time lock
+    assert timeLock._confirmAction(_aid) # dev: time lock not reached
+
+    # save new ref pool config
+    self.greenRefPoolConfig = d
+    self.pendingGreenRefPoolConfig[_aid] = empty(GreenRefPoolConfig)
+    log GreenRefPoolConfigUpdated(pool=d.pool, maxNumSnapshots=d.maxNumSnapshots, dangerTrigger=d.dangerTrigger, staleBlocks=d.staleBlocks)
+
+    # add snapshot
+    self._addGreenRefPoolSnapshot()
+    return True
+
+
+# cancel update feed
+
+
+@external
+def cancelGreenRefPoolConfig(_aid: uint256) -> bool:
+    assert gov._canGovern(msg.sender) # dev: no perms
+    assert not priceData.isPaused # dev: contract paused
+
+    d: GreenRefPoolConfig = self.pendingGreenRefPoolConfig[_aid]
+    assert d.pool != empty(address) # dev: no pending update
+    
+    assert timeLock._cancelAction(_aid) # dev: cannot cancel action
+    self.pendingGreenRefPoolConfig[_aid] = empty(GreenRefPoolConfig)
+
+    log GreenRefPoolConfigUpdateCancelled(pool=d.pool, maxNumSnapshots=d.maxNumSnapshots, dangerTrigger=d.dangerTrigger, staleBlocks=d.staleBlocks)
+    return True
+
+
+# validation
+
+
+@view
+@internal
+def _isValidGreenRefPoolConfig(
+    _poolConfig: CurvePriceConfig,
+    _refConfig: GreenRefPoolConfig,
+    _maxNumSnapshots: uint256,
+    _dangerTrigger: uint256,
+    _staleBlocks: uint256,
+    _greenToken: address,
+) -> bool:
+    if _greenToken not in _poolConfig.underlying:
+        return False
+
+    if _poolConfig.numUnderlying != 2: # only 2 underlying tokens
+        return False
+
+    if _maxNumSnapshots == 0 or _maxNumSnapshots > 100: # 100 max
+        return False
+
+    if _dangerTrigger < 50_00 or _dangerTrigger > 100_00: # 50% - 100%
+        return False
+
+    # make sure this curve integration works
+    greenBalance: uint256 = 0
+    greenRatio: uint256 = 0
+    greenBalance, greenRatio = self._getCurvePoolData(_refConfig.pool, _refConfig.greenIndex, _refConfig.altAssetDecimals)
+    if greenRatio == 0:
+        return False
+
+    return True
+
+
+########################
+# Green Ref Pool Utils #
+########################
+
+
+# get ref pool data
+
+
+@view
+@external
+def getCurrentGreenPoolStatus() -> CurrentGreenPoolStatus:
+    config: GreenRefPoolConfig = self.greenRefPoolConfig
+    if config.pool == empty(address) or config.maxNumSnapshots == 0:
+        return empty(CurrentGreenPoolStatus)
+
+    data: GreenRefPoolData = self.greenRefPoolData
+
+    # calculate weighted ratio using all valid snapshots
+    numerator: uint256 = 0
+    denominator: uint256 = 0
+    for i: uint256 in range(config.maxNumSnapshots, bound=max_value(uint256)):
+
+        snapShot: RefPoolSnapshot = self.snapShots[i]
+        if snapShot.greenBalance == 0 or snapShot.ratio == 0 or snapShot.update == 0:
+            continue
+
+        # too stale, skip
+        if config.staleBlocks != 0 and block.number > snapShot.update + config.staleBlocks:
+            continue
+
+        numerator += (snapShot.greenBalance * snapShot.ratio)
+        denominator += snapShot.greenBalance
+
+    # weighted ratio
+    weightedRatio: uint256 = 0
+    if numerator != 0:
+        weightedRatio = numerator // denominator
+    else:
+        weightedRatio = data.lastSnapshot.ratio
+
+    return CurrentGreenPoolStatus(
+        weightedRatio=weightedRatio,
+        dangerTrigger=config.dangerTrigger,
+        numBlocksInDanger=data.numBlocksInDanger,
+    )
+
+
+# add snapshot
+
+
+@external 
+def addGreenRefPoolSnapshot() -> bool:
+    assert addys._isValidRipeAddr(msg.sender) # dev: no perms
+    assert not priceData.isPaused # dev: contract paused
+    return self._addGreenRefPoolSnapshot()
+
+
+@internal 
+def _addGreenRefPoolSnapshot() -> bool:
+    data: GreenRefPoolData = self.greenRefPoolData
+    if data.lastSnapshot.update == block.number:
+        return False
+
+    # balance data
+    greenBalance: uint256 = 0
+    greenRatio: uint256 = 0
+    config: GreenRefPoolConfig = self.greenRefPoolConfig
+    greenBalance, greenRatio = self._getCurvePoolData(config.pool, config.greenIndex, config.altAssetDecimals)
+    if greenBalance == 0 or greenRatio == 0:
+        return False
+
+    inDanger: bool = greenRatio >= config.dangerTrigger
+    
+    # update danger data (using OLD snapshot before overwriting)
+    if not inDanger:
+        data.numBlocksInDanger = 0
+    elif data.lastSnapshot.inDanger and data.lastSnapshot.update != 0:
+        elapsedBlocks: uint256 = block.number - data.lastSnapshot.update
+        data.numBlocksInDanger += elapsedBlocks
+
+    # create and store new snapshot
+    newSnapshot: RefPoolSnapshot = RefPoolSnapshot(
+        greenBalance=greenBalance,
+        ratio=greenRatio,
+        update=block.number,
+        inDanger=inDanger,
+    )
+    data.lastSnapshot = newSnapshot
+    self.snapShots[data.nextIndex] = newSnapshot
+
+    # update index
+    data.nextIndex += 1
+    if data.nextIndex >= config.maxNumSnapshots:
+        data.nextIndex = 0
+
+    # save data
+    self.greenRefPoolData = data
+
+    log GreenRefPoolSnapshotAdded(pool=config.pool, greenBalance=greenBalance, greenRatio=greenRatio, inDanger=inDanger)
+    return True
+
+
+# curve pool balance
+
+
+@view
+@external 
+def getCurvePoolData() -> (uint256, uint256):
+    config: GreenRefPoolConfig = self.greenRefPoolConfig
+    return self._getCurvePoolData(config.pool, config.greenIndex, config.altAssetDecimals)
+
+
+@view
+@internal 
+def _getCurvePoolData(
+    _pool: address,
+    _greenIndex: uint256,
+    _altAssetDecimals: uint256,
+) -> (uint256, uint256):
+    normalize: uint256 = 10 ** (18 - _altAssetDecimals)
+
+    # get balances
+    greenBalance: uint256 = staticcall CurvePool(_pool).balances(_greenIndex)
+    altAssetBalance: uint256 = staticcall CurvePool(_pool).balances(1 - _greenIndex) * normalize
+
+    totalSupply: uint256 = greenBalance + altAssetBalance
+    ratio: uint256 = 50_00 # 50%
+    if totalSupply != 0:
+        ratio = greenBalance * HUNDRED_PERCENT // totalSupply
+
+    return greenBalance, ratio
