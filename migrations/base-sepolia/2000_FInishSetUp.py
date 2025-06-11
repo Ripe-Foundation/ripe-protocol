@@ -9,44 +9,44 @@ def migrate(migration: Migration):
 
     log.h1("Finishing Ripe Hq Setup")
 
-    # # finish ripe hq setup
-    # migration.execute(hq.setRegistryTimeLockAfterSetup)
+    # finish ripe hq setup
+    migration.execute(hq.setRegistryTimeLockAfterSetup)
 
-    # log.h1("Setting Mission Control Config")
+    log.h1("Setting Mission Control Config")
 
     sb_alpha = migration.get_contract("SwitchboardAlpha")
 
-    # # Set general config
-    # actionId = migration.execute(sb_alpha.setVaultLimits, 5, 10)
-    # assert migration.execute(sb_alpha.executePendingAction, actionId)
+    # Set general config
+    actionId = migration.execute(sb_alpha.setVaultLimits, 5, 10)
+    assert migration.execute(sb_alpha.executePendingAction, actionId)
 
-    # assert migration.execute(sb_alpha.setCanDeposit, True)
-    # assert migration.execute(sb_alpha.setCanWithdraw, True)
-    # assert migration.execute(sb_alpha.setCanBorrow, True)
-    # assert migration.execute(sb_alpha.setCanRepay, True)
-    # assert migration.execute(sb_alpha.setCanClaimLoot, True)
-    # assert migration.execute(sb_alpha.setCanLiquidate, True)
-    # assert migration.execute(sb_alpha.setCanRedeemCollateral, True)
-    # assert migration.execute(sb_alpha.setCanRedeemInStabPool, True)
-    # assert migration.execute(sb_alpha.setCanBuyInAuction, True)
-    # assert migration.execute(sb_alpha.setCanClaimInStabPool, True)
+    assert migration.execute(sb_alpha.setCanDeposit, True)
+    assert migration.execute(sb_alpha.setCanWithdraw, True)
+    assert migration.execute(sb_alpha.setCanBorrow, True)
+    assert migration.execute(sb_alpha.setCanRepay, True)
+    assert migration.execute(sb_alpha.setCanClaimLoot, True)
+    assert migration.execute(sb_alpha.setCanLiquidate, True)
+    assert migration.execute(sb_alpha.setCanRedeemCollateral, True)
+    assert migration.execute(sb_alpha.setCanRedeemInStabPool, True)
+    assert migration.execute(sb_alpha.setCanBuyInAuction, True)
+    assert migration.execute(sb_alpha.setCanClaimInStabPool, True)
 
-    # # Set general debt config
-    # actionId = migration.execute(
-    #     sb_alpha.setGlobalDebtLimits,
-    #     10_000 * EIGHTEEN_DECIMALS,
-    #     1_000_000 * EIGHTEEN_DECIMALS,
-    #     100 * EIGHTEEN_DECIMALS,
-    #     100,
-    # )
-    # assert migration.execute(sb_alpha.executePendingAction, actionId)
+    # Set general debt config
+    actionId = migration.execute(
+        sb_alpha.setGlobalDebtLimits,
+        10_000 * EIGHTEEN_DECIMALS,
+        1_000_000 * EIGHTEEN_DECIMALS,
+        100 * EIGHTEEN_DECIMALS,
+        100,
+    )
+    assert migration.execute(sb_alpha.executePendingAction, actionId)
 
-    # actionId = migration.execute(
-    #     sb_alpha.setBorrowIntervalConfig,
-    #     1_000 * EIGHTEEN_DECIMALS,
-    #     100,
-    # )
-    # assert migration.execute(sb_alpha.executePendingAction, actionId)
+    actionId = migration.execute(
+        sb_alpha.setBorrowIntervalConfig,
+        1_000 * EIGHTEEN_DECIMALS,
+        100,
+    )
+    assert migration.execute(sb_alpha.executePendingAction, actionId)
 
     actionId = migration.execute(
         sb_alpha.setKeeperConfig,
