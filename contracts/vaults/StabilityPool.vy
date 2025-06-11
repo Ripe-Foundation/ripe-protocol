@@ -62,7 +62,7 @@ def depositTokensInVault(
 
     depositAmount: uint256 = 0
     newShares: uint256 = 0
-    depositAmount, newShares = stabVault._depositTokensInVault(_user, _asset, _amount, a.priceDesk)
+    depositAmount, newShares = stabVault._depositTokensInVault(_user, _asset, _amount, a)
     log StabilityPoolDeposit(user=_user, asset=_asset, amount=depositAmount, shares=newShares)
     return depositAmount
 
@@ -81,7 +81,7 @@ def withdrawTokensFromVault(
     withdrawalAmount: uint256 = 0
     withdrawalShares: uint256 = 0
     isDepleted: bool = False
-    withdrawalAmount, withdrawalShares, isDepleted = stabVault._withdrawTokensFromVault(_user, _asset, _amount, _recipient, a.priceDesk)
+    withdrawalAmount, withdrawalShares, isDepleted = stabVault._withdrawTokensFromVault(_user, _asset, _amount, _recipient, a)
     log StabilityPoolWithdrawal(user=_user, asset=_asset, amount=withdrawalAmount, isDepleted=isDepleted, shares=withdrawalShares)
     return withdrawalAmount, isDepleted
 
@@ -100,7 +100,7 @@ def transferBalanceWithinVault(
     transferAmount: uint256 = 0
     transferShares: uint256 = 0
     isFromUserDepleted: bool = False
-    transferAmount, transferShares, isFromUserDepleted = stabVault._transferBalanceWithinVault(_asset, _fromUser, _toUser, _transferAmount, a.priceDesk)
+    transferAmount, transferShares, isFromUserDepleted = stabVault._transferBalanceWithinVault(_asset, _fromUser, _toUser, _transferAmount, a)
     log StabilityPoolTransfer(fromUser=_fromUser, toUser=_toUser, asset=_asset, transferAmount=transferAmount, isFromUserDepleted=isFromUserDepleted, transferShares=transferShares)
     return transferAmount, isFromUserDepleted
 

@@ -1,7 +1,7 @@
 import pytest
 import boa
 
-from constants import EIGHTEEN_DECIMALS, ZERO_ADDRESS
+from constants import EIGHTEEN_DECIMALS, ZERO_ADDRESS, MAX_UINT256
 
 
 def test_stab_vault_deposit_validation(
@@ -1769,3 +1769,136 @@ def test_stab_vault_swap_with_claimable_green_depletion(
     # Verify green is removed from claimable assets
     assert stability_pool.claimableBalances(alpha_token, green_token) == 0
     assert stability_pool.indexOfClaimableAsset(alpha_token, green_token) == 0
+
+
+def test_stab_vault_green_always_one_dollar(
+    stability_pool,
+    alpha_token,
+    bravo_token,
+    green_token,
+    alpha_token_whale,
+    bravo_token_whale,
+    whale,
+    bob,
+    alice,
+    teller,
+    auction_house,
+    vault_book,
+    mock_price_source,
+    savings_green,
+    setGeneralConfig,
+    setAssetConfig,
+    _test,
+):
+    """Test that StabVault treats Green as $1 regardless of mock price source"""
+    setGeneralConfig()
+    setAssetConfig(bravo_token)
+
+    # Setup - Set Green price to something OTHER than $1 in mock price source
+    mock_green_price = 5 * EIGHTEEN_DECIMALS  # $5.00 - should be ignored by StabVault!
+    mock_price_source.setPrice(alpha_token, 1 * EIGHTEEN_DECIMALS)
+    mock_price_source.setPrice(bravo_token, 1 * EIGHTEEN_DECIMALS)
+    mock_price_source.setPrice(green_token, mock_green_price)
+
+    # Setup stability pool with alpha tokens
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    alpha_token.transfer(stability_pool, deposit_amount, sender=alpha_token_whale)
+    stability_pool.depositTokensInVault(alice, alpha_token, deposit_amount, sender=teller.address)
+
+    # Create claimable bravo through normal liquidation
+    claimable_bravo = 150 * EIGHTEEN_DECIMALS
+    bravo_token.transfer(stability_pool, claimable_bravo, sender=bravo_token_whale)
+    stability_pool.swapForLiquidatedCollateral(
+        alpha_token, deposit_amount, bravo_token, claimable_bravo,
+        ZERO_ADDRESS, alpha_token, savings_green, sender=auction_house.address
+    )
+
+    # Create claimable Green through redemption
+    vault_id = vault_book.getRegId(stability_pool)
+    redeem_amount = 50 * EIGHTEEN_DECIMALS  # $50 worth
+    green_token.transfer(bob, redeem_amount, sender=whale)
+    green_token.approve(teller, redeem_amount, sender=bob)
+    teller.redeemFromStabilityPool(vault_id, bravo_token, redeem_amount, sender=bob)
+
+    # Verify Green is now claimable
+    initial_claimable_green = stability_pool.claimableBalances(alpha_token, green_token)
+    assert initial_claimable_green == redeem_amount
+
+    # Use swapWithClaimableGreen to test Green = $1 behavior
+    # This is the key function that should treat Green as $1
+    liquidated_collateral_amount = 30 * EIGHTEEN_DECIMALS
+    bravo_token.transfer(stability_pool, liquidated_collateral_amount, sender=bravo_token_whale)
+    
+    green_requested = 30 * EIGHTEEN_DECIMALS  # Request $30 worth of Green
+    amount_swapped = stability_pool.swapWithClaimableGreen(
+        alpha_token,
+        green_requested,
+        bravo_token,
+        liquidated_collateral_amount,
+        green_token,
+        sender=auction_house.address
+    )
+
+    # CORE ASSERTION: StabVault should treat Green as $1, ignoring mock price
+    # At $1 per Green: swap 30 GREEN = get 30 GREEN (1:1)
+    # At $5 per Green: swap 30 GREEN = get 6 GREEN (30/5)
+    expected_swapped_at_one_dollar = green_requested
+    expected_swapped_at_mock_price = green_requested * EIGHTEEN_DECIMALS // mock_green_price
+    
+    # StabVault should treat Green as $1, not use mock price
+    _test(expected_swapped_at_one_dollar, amount_swapped)
+    assert amount_swapped != expected_swapped_at_mock_price  # Should NOT equal mock price calculation
+    
+    # Verify claimable Green balance reduced by exactly the amount swapped
+    final_claimable_green = stability_pool.claimableBalances(alpha_token, green_token)
+    _test(initial_claimable_green - amount_swapped, final_claimable_green)
+
+
+def test_stab_vault_savings_green_always_one_dollar_underlying(
+    stability_pool,
+    green_token,
+    savings_green,
+    alpha_token,
+    whale,
+    teller,
+    mock_price_source,
+):
+    """Test that StabVault treats Savings Green based on underlying Green at $1"""
+    
+    # Setup mock prices - should be ignored by StabVault 
+    mock_green_price = 3 * EIGHTEEN_DECIMALS  # $3.00 - should be ignored!
+    mock_savings_green_price = 10 * EIGHTEEN_DECIMALS  # $10.00 - should be ignored!
+    mock_price_source.setPrice(green_token, mock_green_price)
+    mock_price_source.setPrice(savings_green, mock_savings_green_price)
+    mock_price_source.setPrice(alpha_token, 1 * EIGHTEEN_DECIMALS)
+    
+    # Setup Savings Green shares via ERC4626 pattern (whale deposits Green into Savings Green)
+    green_deposit_amount = 50 * EIGHTEEN_DECIMALS
+    green_token.approve(savings_green, green_deposit_amount, sender=whale)
+    savings_shares = savings_green.deposit(green_deposit_amount, whale, sender=whale)
+    
+    # Deposit Savings Green shares into StabVault (via proper teller pattern)
+    savings_green.transfer(stability_pool, savings_shares, sender=whale)
+    deposited_shares = stability_pool.depositTokensInVault(whale, savings_green, savings_shares, sender=teller.address)
+    assert deposited_shares == savings_shares
+    
+    # Test USD value calculation for Savings Green in StabVault
+    # This tests the internal _getUsdValue logic that treats Savings Green based on underlying Green at $1
+    total_value = stability_pool.getTotalValue(savings_green)
+    user_value = stability_pool.getTotalUserValue(whale, savings_green)
+    
+    # CORE ASSERTION: StabVault should treat Savings Green based on underlying Green at $1
+    # With 50 GREEN deposited in Savings Green, value should be 50 USD regardless of mock prices
+    expected_usd_value = green_deposit_amount  # 50 * 10^18 (50 USD)
+    assert total_value == expected_usd_value
+    assert user_value == expected_usd_value
+    
+    # Verify mock prices were ignored
+    # If using mock Savings Green price ($10): 50 shares * $10 = $500
+    # If using mock Green price ($3): 50 Green * $3 = $150  
+    if_using_mock_savings_price = savings_shares * mock_savings_green_price // EIGHTEEN_DECIMALS
+    if_using_mock_green_price = green_deposit_amount * mock_green_price // EIGHTEEN_DECIMALS
+    
+    assert total_value != if_using_mock_savings_price  # Should not equal $500
+    assert total_value != if_using_mock_green_price    # Should not equal $150
+    assert total_value == green_deposit_amount         # Should equal $50 (Green = $1)

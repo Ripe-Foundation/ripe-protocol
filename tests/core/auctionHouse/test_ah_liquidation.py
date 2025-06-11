@@ -1,7 +1,7 @@
 import pytest
 import boa
 
-from constants import EIGHTEEN_DECIMALS, HUNDRED_PERCENT, ZERO_ADDRESS
+from constants import EIGHTEEN_DECIMALS, HUNDRED_PERCENT, ZERO_ADDRESS, MAX_UINT256
 from conf_utils import filter_logs
 
 
@@ -161,8 +161,8 @@ def test_ah_liquidation_burn_asset(
     setAssetConfig,
     setGeneralDebtConfig,
     performDeposit,
-    green_token,
-    whale,
+    alpha_token,
+    alpha_token_whale,
     bob,
     teller,
     mock_price_source,
@@ -175,7 +175,7 @@ def test_ah_liquidation_burn_asset(
     setGeneralDebtConfig(_ltvPaybackBuffer=0) # no payback buffer
     debt_terms = createDebtTerms(_liqThreshold=80_00, _liqFee=10_00, _borrowRate=0)
     setAssetConfig(
-        green_token,
+        alpha_token,
         _debtTerms=debt_terms,
         _shouldBurnAsPayment=True, # testing this!
         _shouldTransferToEndaoment=False,
@@ -184,15 +184,15 @@ def test_ah_liquidation_burn_asset(
     )
 
     # setup
-    mock_price_source.setPrice(green_token, 1 * EIGHTEEN_DECIMALS)
+    mock_price_source.setPrice(alpha_token, 1 * EIGHTEEN_DECIMALS)
     deposit_amount = 200 * EIGHTEEN_DECIMALS
-    performDeposit(bob, deposit_amount, green_token, whale)
+    performDeposit(bob, deposit_amount, alpha_token, alpha_token_whale)
     orig_debt_amount = 100 * EIGHTEEN_DECIMALS
     teller.borrow(orig_debt_amount, bob, False, sender=bob)
 
     # set liquidatable price
     new_price = 125 * EIGHTEEN_DECIMALS // 200
-    mock_price_source.setPrice(green_token, new_price)
+    mock_price_source.setPrice(alpha_token, new_price)
     assert credit_engine.canLiquidateUser(bob) == True
 
     target_repay_amount = auction_house.calcAmountOfDebtToRepayDuringLiq(bob)
@@ -205,7 +205,7 @@ def test_ah_liquidation_burn_asset(
     log = filter_logs(teller, "StabAssetBurntAsRepayment")[0]
     assert log.liqUser == bob
     assert log.vaultId != 0
-    assert log.liqStabAsset == green_token.address
+    assert log.liqStabAsset == alpha_token.address
     assert log.amountBurned == target_repay_amount * EIGHTEEN_DECIMALS // new_price
     assert log.usdValue == target_repay_amount
     assert log.isDepleted == False
@@ -221,6 +221,145 @@ def test_ah_liquidation_burn_asset(
 
 
 # endaoment transfer
+
+
+def test_ah_liquidation_green_always_one_dollar(
+    setGeneralConfig,
+    setAssetConfig,
+    setGeneralDebtConfig,
+    performDeposit,
+    green_token,
+    whale,
+    bob,
+    teller,
+    mock_price_source,
+    createDebtTerms,
+    credit_engine,
+    sally,
+):
+    """Test that AuctionHouse treats Green as $1 regardless of mock price source"""
+    setGeneralConfig()
+    setGeneralDebtConfig(_ltvPaybackBuffer=0)
+    debt_terms = createDebtTerms(_liqThreshold=80_00, _liqFee=10_00, _borrowRate=0)
+    setAssetConfig(
+        green_token,
+        _debtTerms=debt_terms,
+        _shouldBurnAsPayment=True,
+        _shouldTransferToEndaoment=False,
+        _shouldSwapInStabPools=False,
+        _shouldAuctionInstantly=False,
+    )
+
+    # Setup - Set Green price to something OTHER than $1 in mock price source
+    mock_green_price = 2 * EIGHTEEN_DECIMALS  # $2.00 - should be ignored by AuctionHouse!
+    mock_price_source.setPrice(green_token, mock_green_price)
+    
+    # Setup liquidatable scenario with Green collateral
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    performDeposit(bob, deposit_amount, green_token, whale)
+    
+    # Borrow close to max to make liquidation possible
+    user_debt, bt, _ = credit_engine.getLatestUserDebtAndTerms(bob, False)
+    max_borrowable = bt.totalMaxDebt
+    borrow_amount = max_borrowable - (1 * EIGHTEEN_DECIMALS)
+    teller.borrow(borrow_amount, bob, False, sender=bob)
+    
+    # Trigger liquidation by lowering Green price
+    low_green_price = 1 * EIGHTEEN_DECIMALS // 10  # $0.10
+    mock_price_source.setPrice(green_token, low_green_price)
+    
+    assert credit_engine.canLiquidateUser(bob) == True
+
+    # Liquidate user
+    teller.liquidateUser(bob, False, sender=sally)
+
+    # Verify Green was burned during liquidation
+    logs = filter_logs(teller, "StabAssetBurntAsRepayment")
+    assert len(logs) == 1
+    log = logs[0]
+    assert log.liqUser == bob
+    assert log.liqStabAsset == green_token.address
+    
+    # CORE ASSERTION: AuctionHouse treats Green as $1, ignoring mock price
+    assert log.usdValue == log.amountBurned  # USD value equals amount burned proves Green = $1
+    
+    # Verify AuctionHouse ignored the mock price ($0.10)
+    if_using_mock_price = log.amountBurned * low_green_price // EIGHTEEN_DECIMALS
+    assert log.usdValue != if_using_mock_price  # Would be much smaller if using mock price
+
+
+def test_ah_liquidation_savings_green_always_one_dollar_underlying(
+    setGeneralConfig,
+    setAssetConfig,
+    setGeneralDebtConfig,
+    performDeposit,
+    green_token,
+    savings_green,
+    whale,
+    bob,
+    teller,
+    mock_price_source,
+    createDebtTerms,
+    credit_engine,
+    auction_house,
+    sally,
+):
+    """Test that AuctionHouse treats Savings Green based on underlying Green at $1 regardless of mock price source"""
+    setGeneralConfig()
+    setGeneralDebtConfig(_ltvPaybackBuffer=0)
+    debt_terms = createDebtTerms(_liqThreshold=80_00, _liqFee=10_00, _borrowRate=0)
+    setAssetConfig(
+        savings_green,
+        _debtTerms=debt_terms,
+        _shouldBurnAsPayment=True,
+        _shouldTransferToEndaoment=False,
+        _shouldSwapInStabPools=False,
+        _shouldAuctionInstantly=False,
+    )
+
+    # Setup mock prices - should be ignored by AuctionHouse
+    mock_green_price = 3 * EIGHTEEN_DECIMALS  # $3.00 - should be ignored!
+    mock_savings_green_price = 10 * EIGHTEEN_DECIMALS  # $10.00 - should be ignored!
+    mock_price_source.setPrice(green_token, mock_green_price)
+    mock_price_source.setPrice(savings_green, mock_savings_green_price)
+    
+    # Setup Savings Green collateral via ERC4626 pattern
+    green_token.approve(savings_green, MAX_UINT256, sender=whale)
+    deposit_amount = 50 * EIGHTEEN_DECIMALS
+    shares_received = savings_green.deposit(deposit_amount, bob, sender=whale)
+    
+    # Bob deposits his Savings Green shares as collateral
+    performDeposit(bob, shares_received, savings_green, bob)
+    
+    # Borrow close to max to enable liquidation
+    user_debt, bt, _ = credit_engine.getLatestUserDebtAndTerms(bob, False)
+    max_borrowable = bt.totalMaxDebt
+    borrow_amount = max_borrowable - (1 * EIGHTEEN_DECIMALS)
+    teller.borrow(borrow_amount, bob, False, sender=bob)
+
+    # Trigger liquidation by lowering Savings Green price
+    low_price = 1 * EIGHTEEN_DECIMALS // 20  # $0.05
+    mock_price_source.setPrice(savings_green, low_price)
+    
+    assert credit_engine.canLiquidateUser(bob) == True
+
+    # Liquidate user
+    teller.liquidateUser(bob, False, sender=sally)
+
+    # Verify Savings Green was burned during liquidation
+    logs = filter_logs(teller, "StabAssetBurntAsRepayment")
+    assert len(logs) == 1
+    log = logs[0]
+    assert log.liqUser == bob
+    assert log.liqStabAsset == savings_green.address
+    
+    # CORE ASSERTION: AuctionHouse treats Savings Green based on underlying Green at $1
+    # The usdValue should equal the underlying Green value (which is the deposit amount since shares ≈ assets at 1:1)
+    assert log.usdValue == deposit_amount  # USD value equals underlying Green deposit amount
+    
+    # Verify AuctionHouse ignored the mock price ($0.05)
+    if_using_mock_price = log.amountBurned * low_price // EIGHTEEN_DECIMALS
+    assert log.usdValue < if_using_mock_price  # Much lower than if using mock price
 
 
 def test_ah_liquidation_endaoment_transfer(

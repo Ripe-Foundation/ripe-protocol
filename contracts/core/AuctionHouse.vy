@@ -724,7 +724,7 @@ def _swapWithSpecificStabPool(
         return remainingToRepay, collateralValueOut, False, False
 
     # max usd value in stability pool
-    maxUsdValueInStabPool: uint256 = staticcall PriceDesk(_a.priceDesk).getUsdValue(_stabPool.asset, maxAmountInStabPool, True)     
+    maxUsdValueInStabPool: uint256 = self._getUsdValue(_stabPool.asset, maxAmountInStabPool, _a.greenToken, _a.savingsGreen, _a.priceDesk)  
     if maxUsdValueInStabPool == 0:
         return remainingToRepay, collateralValueOut, False, False # can't get price of stab asset, skip      
 
@@ -735,6 +735,25 @@ def _swapWithSpecificStabPool(
 
     # swap with stability pool
     return self._swapAssetsWithStabPool(True, _liqUser, _liqVaultId, _liqVaultAddr, _liqAsset, _liqFeeRatio, maxAmountInStabPool, maxUsdValueInStabPool, remainingToRepay, collateralValueOut, _stabPool, stabProceedsAddr, _a)
+
+
+@view
+@internal
+def _getUsdValue(
+    _asset: address,
+    _amount: uint256,
+    _greenToken: address,
+    _savingsGreen: address,
+    _priceDesk: address,
+) -> uint256:
+    usdValue: uint256 = 0
+    if _asset == _greenToken:
+        usdValue = _amount
+    elif _asset == _savingsGreen:
+        usdValue = staticcall IERC4626(_savingsGreen).convertToAssets(_amount)
+    else:
+        usdValue = staticcall PriceDesk(_priceDesk).getUsdValue(_asset, _amount, True)
+    return usdValue
 
 
 @internal
@@ -1224,7 +1243,7 @@ def _transferCollateral(
     _targetUsdValue: uint256,
     _a: addys.Addys,
 ) -> (uint256, uint256, bool, bool):
-    maxAssetAmount: uint256 = staticcall PriceDesk(_a.priceDesk).getAssetAmount(_asset, _targetUsdValue, True)
+    maxAssetAmount: uint256 = self._getAssetAmount(_asset, _targetUsdValue, _a.greenToken, _a.savingsGreen, _a.priceDesk)
     if maxAssetAmount == 0:
         return 0, 0, False, True # skip if cannot get price for this asset
 
@@ -1243,6 +1262,25 @@ def _transferCollateral(
 
     usdValue: uint256 = amountSent * _targetUsdValue // maxAssetAmount
     return usdValue, amountSent, isPositionDepleted, isPositionDepleted
+
+
+@view
+@internal
+def _getAssetAmount(
+    _asset: address,
+    _targetUsdValue: uint256,
+    _greenToken: address,
+    _savingsGreen: address,
+    _priceDesk: address,
+) -> uint256:
+    amount: uint256 = 0
+    if _asset == _greenToken:
+        amount = _targetUsdValue
+    elif _asset == _savingsGreen:
+        amount = staticcall IERC4626(_savingsGreen).convertToShares(_targetUsdValue)
+    else:
+        amount = staticcall PriceDesk(_priceDesk).getAssetAmount(_asset, _targetUsdValue, True)
+    return amount
 
 
 # green handling

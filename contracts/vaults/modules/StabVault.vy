@@ -79,7 +79,7 @@ def _depositTokensInVault(
     _user: address,
     _asset: address,
     _amount: uint256,
-    _priceDesk: address,
+    _a: addys.Addys,
 ) -> (uint256, uint256):
     assert not vaultData.isPaused # dev: contract paused
 
@@ -90,7 +90,7 @@ def _depositTokensInVault(
     assert depositAmount != 0 # dev: invalid deposit amount
 
     # calc usd values
-    totalStabValue: uint256 = staticcall PriceDesk(_priceDesk).getUsdValue(_asset, totalAssetBalance, True)
+    totalStabValue: uint256 = self._getUsdValue(_asset, totalAssetBalance, _a.greenToken, _a.savingsGreen, _a.priceDesk)
     assert totalStabValue != 0 # dev: no price for stab asset
 
     newUserValue: uint256 = totalStabValue
@@ -100,7 +100,7 @@ def _depositTokensInVault(
         prevStabValue = (totalAssetBalance - depositAmount) * totalStabValue // totalAssetBalance # remove the deposited amount to calc shares accurately
 
     # calc shares
-    claimableValue: uint256 = self._getValueOfClaimableAssets(_asset, _priceDesk)
+    claimableValue: uint256 = self._getValueOfClaimableAssets(_asset, _a.greenToken, _a.savingsGreen, _a.priceDesk)
     newShares: uint256 = self._valueToShares(newUserValue, vaultData.totalBalances[_asset], prevStabValue + claimableValue, False)
 
     # add balance on deposit
@@ -115,7 +115,7 @@ def _withdrawTokensFromVault(
     _asset: address,
     _amount: uint256,
     _recipient: address,
-    _priceDesk: address,
+    _a: addys.Addys,
 ) -> (uint256, uint256, bool):
     assert not vaultData.isPaused # dev: contract paused
     assert empty(address) not in [_user, _asset, _recipient] # dev: invalid user, asset, or recipient
@@ -123,7 +123,7 @@ def _withdrawTokensFromVault(
     # calc shares + amount to withdraw
     withdrawalShares: uint256 = 0
     withdrawalAmount: uint256 = 0
-    withdrawalShares, withdrawalAmount = self._calcWithdrawalSharesAndAmount(_user, _asset, _amount, _priceDesk)
+    withdrawalShares, withdrawalAmount = self._calcWithdrawalSharesAndAmount(_user, _asset, _amount, _a)
 
     # reduce balance on withdrawal
     isDepleted: bool = False
@@ -139,7 +139,7 @@ def _transferBalanceWithinVault(
     _fromUser: address,
     _toUser: address,
     _transferAmount: uint256,
-    _priceDesk: address,
+    _a: addys.Addys,
 ) -> (uint256, uint256, bool):
     assert not vaultData.isPaused # dev: contract paused
     assert empty(address) not in [_fromUser, _toUser, _asset] # dev: invalid users or asset
@@ -147,7 +147,7 @@ def _transferBalanceWithinVault(
     # calc shares + amount to transfer
     transferShares: uint256 = 0
     transferAmount: uint256 = 0
-    transferShares, transferAmount = self._calcWithdrawalSharesAndAmount(_fromUser, _asset, _transferAmount, _priceDesk)
+    transferShares, transferAmount = self._calcWithdrawalSharesAndAmount(_fromUser, _asset, _transferAmount, _a)
 
     # transfer shares
     isFromUserDepleted: bool = False
@@ -227,16 +227,59 @@ def _getTotalAmountForUserWithTotalBal(_user: address, _asset: address, _totalAm
 def _getTotalAmountForVault(_asset: address) -> uint256:
     # NOTE: converting usd value to amount, even though vault may not actually have this asset balance!!
 
-    # get total value of asset
+    # addys
+    greenToken: address = addys._getGreenToken()
+    savingsGreen: address = addys._getSavingsGreen()
     priceDesk: address = addys._getPriceDeskAddr()
+
+    # get total value of asset
     stabAssetBalance: uint256 = staticcall IERC20(_asset).balanceOf(self)
-    totalStabValue: uint256 = staticcall PriceDesk(priceDesk).getUsdValue(_asset, stabAssetBalance, True)
-    claimableValue: uint256 = self._getValueOfClaimableAssets(_asset, priceDesk)
+    totalStabValue: uint256 = self._getUsdValue(_asset, stabAssetBalance, greenToken, savingsGreen, priceDesk)
+    claimableValue: uint256 = self._getValueOfClaimableAssets(_asset, greenToken, savingsGreen, priceDesk)
 
     # return amount if there is claimable value
     if claimableValue != 0:
-        return staticcall PriceDesk(priceDesk).getAssetAmount(_asset, totalStabValue + claimableValue, True)
+        return self._getAssetAmount(_asset, totalStabValue + claimableValue, greenToken, savingsGreen, priceDesk)
+
     return stabAssetBalance
+
+
+@view
+@internal
+def _getAssetAmount(
+    _asset: address,
+    _targetUsdValue: uint256,
+    _greenToken: address,
+    _savingsGreen: address,
+    _priceDesk: address,
+) -> uint256:
+    amount: uint256 = 0
+    if _asset == _greenToken:
+        amount = _targetUsdValue
+    elif _asset == _savingsGreen:
+        amount = staticcall IERC4626(_savingsGreen).convertToShares(_targetUsdValue)
+    else:
+        amount = staticcall PriceDesk(_priceDesk).getAssetAmount(_asset, _targetUsdValue, True)
+    return amount
+
+
+@view
+@internal
+def _getUsdValue(
+    _asset: address,
+    _amount: uint256,
+    _greenToken: address,
+    _savingsGreen: address,
+    _priceDesk: address,
+) -> uint256:
+    usdValue: uint256 = 0
+    if _asset == _greenToken:
+        usdValue = _amount
+    elif _asset == _savingsGreen:
+        usdValue = staticcall IERC4626(_savingsGreen).convertToAssets(_amount)
+    else:
+        usdValue = staticcall PriceDesk(_priceDesk).getUsdValue(_asset, _amount, True)
+    return usdValue
 
 
 ##########
@@ -250,7 +293,7 @@ def _calcWithdrawalSharesAndAmount(
     _user: address,
     _asset: address,
     _amount: uint256,
-    _priceDesk: address,
+    _a: addys.Addys,
 ) -> (uint256, uint256):
     totalShares: uint256 = vaultData.totalBalances[_asset]
     totalStabAssetBalance: uint256 = staticcall IERC20(_asset).balanceOf(self)
@@ -261,9 +304,9 @@ def _calcWithdrawalSharesAndAmount(
     assert withdrawalShares != 0 # dev: user has no shares
 
     # calc usd values
-    totalStabValue: uint256 = staticcall PriceDesk(_priceDesk).getUsdValue(_asset, totalStabAssetBalance, True)
+    totalStabValue: uint256 = self._getUsdValue(_asset, totalStabAssetBalance, _a.greenToken, _a.savingsGreen, _a.priceDesk)
     assert totalStabValue != 0 # dev: no price for stab asset
-    claimableValue: uint256 = self._getValueOfClaimableAssets(_asset, _priceDesk)
+    claimableValue: uint256 = self._getValueOfClaimableAssets(_asset, _a.greenToken, _a.savingsGreen, _a.priceDesk)
     totalValue: uint256 = totalStabValue + claimableValue
 
     # max withdraw usd value
@@ -291,7 +334,10 @@ def _calcWithdrawalSharesAndAmount(
 @view
 @external
 def valueToShares(_asset: address, _usdValue: uint256, _shouldRoundUp: bool) -> uint256:
-    totalValue: uint256 = self._getTotalValue(_asset)
+    greenToken: address = addys._getGreenToken()
+    savingsGreen: address = addys._getSavingsGreen()
+    priceDesk: address = addys._getPriceDeskAddr()
+    totalValue: uint256 = self._getTotalValue(_asset, greenToken, savingsGreen, priceDesk)
     return self._valueToShares(_usdValue, vaultData.totalBalances[_asset], totalValue, _shouldRoundUp)
 
 
@@ -326,7 +372,10 @@ def _valueToShares(
 @view
 @external
 def sharesToValue(_asset: address, _shares: uint256, _shouldRoundUp: bool) -> uint256:
-    totalValue: uint256 = self._getTotalValue(_asset)
+    greenToken: address = addys._getGreenToken()
+    savingsGreen: address = addys._getSavingsGreen()
+    priceDesk: address = addys._getPriceDeskAddr()
+    totalValue: uint256 = self._getTotalValue(_asset, greenToken, savingsGreen, priceDesk)
     return self._sharesToValue(_shares, vaultData.totalBalances[_asset], totalValue, _shouldRoundUp)
 
 
@@ -432,33 +481,46 @@ def swapWithClaimableGreen(
 @view
 @external
 def getTotalValue(_asset: address) -> uint256:
-    return self._getTotalValue(_asset)
+    greenToken: address = addys._getGreenToken()
+    savingsGreen: address = addys._getSavingsGreen()
+    priceDesk: address = addys._getPriceDeskAddr()
+    return self._getTotalValue(_asset, greenToken, savingsGreen, priceDesk)
 
 
 @view
 @external
 def getTotalUserValue(_user: address, _asset: address) -> uint256:
-    totalValue: uint256 = self._getTotalValue(_asset)
+    greenToken: address = addys._getGreenToken()
+    savingsGreen: address = addys._getSavingsGreen()
+    priceDesk: address = addys._getPriceDeskAddr()
+    totalValue: uint256 = self._getTotalValue(_asset, greenToken, savingsGreen, priceDesk)
     return self._sharesToValue(vaultData.userBalances[_user][_asset], vaultData.totalBalances[_asset], totalValue, False)
 
 
 @view
 @internal
-def _getTotalValue(_asset: address, _priceDesk: address = empty(address)) -> uint256:
-    priceDesk: address = _priceDesk
-    if priceDesk == empty(address):
-        priceDesk = addys._getPriceDeskAddr()
+def _getTotalValue(
+    _asset: address,
+    _greenToken: address,
+    _savingsGreen: address,
+    _priceDesk: address,
+) -> uint256:
     totalStabValue: uint256 = 0
     stabAssetBalance: uint256 = staticcall IERC20(_asset).balanceOf(self)
     if stabAssetBalance != 0:
-        totalStabValue = staticcall PriceDesk(priceDesk).getUsdValue(_asset, stabAssetBalance, True)
-    claimableValue: uint256 = self._getValueOfClaimableAssets(_asset, priceDesk)
+        totalStabValue = self._getUsdValue(_asset, stabAssetBalance, _greenToken, _savingsGreen, _priceDesk)
+    claimableValue: uint256 = self._getValueOfClaimableAssets(_asset, _greenToken, _savingsGreen, _priceDesk)
     return totalStabValue + claimableValue
 
 
 @view
 @internal
-def _getValueOfClaimableAssets(_stabAsset: address, _priceDesk: address) -> uint256:
+def _getValueOfClaimableAssets(
+    _stabAsset: address,
+    _greenToken: address,
+    _savingsGreen: address,
+    _priceDesk: address,
+) -> uint256:
     totalValue: uint256 = 0
     numClaimableAssets: uint256 = self.numClaimableAssets[_stabAsset]
     if numClaimableAssets == 0:
@@ -472,7 +534,7 @@ def _getValueOfClaimableAssets(_stabAsset: address, _priceDesk: address) -> uint
         if balance == 0:
             continue
 
-        claimValue: uint256 = staticcall PriceDesk(_priceDesk).getUsdValue(asset, balance, True)
+        claimValue: uint256 = self._getUsdValue(asset, balance, _greenToken, _savingsGreen, _priceDesk)
         assert claimValue != 0 # dev: claimable asset has no value
         totalValue += claimValue
 
@@ -496,7 +558,7 @@ def claimFromStabilityPool(
     assert msg.sender == addys._getTellerAddr() # dev: only Teller allowed
     assert not vaultData.isPaused # dev: contract paused
     a: addys.Addys = addys._getAddys(_a)
-    claimUsdValue: uint256 = self._claimFromStabilityPool(_claimer, _stabAsset, _claimAsset, _maxUsdValue, _caller, a.priceDesk, a.missionControl)
+    claimUsdValue: uint256 = self._claimFromStabilityPool(_claimer, _stabAsset, _claimAsset, _maxUsdValue, _caller, a)
     assert claimUsdValue != 0 # dev: nothing claimed
     return claimUsdValue
 
@@ -514,7 +576,7 @@ def claimManyFromStabilityPool(
 
     totalUsdValue: uint256 = 0
     for c: StabPoolClaim in _claims:
-        totalUsdValue += self._claimFromStabilityPool(_claimer, c.stabAsset, c.claimAsset, c.maxUsdValue, _caller, a.priceDesk, a.missionControl)
+        totalUsdValue += self._claimFromStabilityPool(_claimer, c.stabAsset, c.claimAsset, c.maxUsdValue, _caller, a)
     assert totalUsdValue != 0 # dev: nothing claimed
 
     return totalUsdValue
@@ -527,14 +589,13 @@ def _claimFromStabilityPool(
     _claimAsset: address,
     _maxUsdValue: uint256,
     _caller: address,
-    _priceDesk: address,
-    _missionControl: address,
+    _a: addys.Addys,
 ) -> uint256:
     if empty(address) in [_claimer, _stabAsset, _claimAsset] or _maxUsdValue == 0:
         return 0
 
     # check claims config
-    config: StabPoolClaimsConfig = staticcall MissionControl(_missionControl).getStabPoolClaimsConfig(_claimAsset, _claimer, _caller)
+    config: StabPoolClaimsConfig = staticcall MissionControl(_a.missionControl).getStabPoolClaimsConfig(_claimAsset, _claimer, _caller)
     if not config.canClaimInStabPoolGeneral or not config.canClaimInStabPoolAsset or not config.isUserAllowed:
         return 0
 
@@ -550,7 +611,7 @@ def _claimFromStabilityPool(
     claimShares: uint256 = 0
     claimAmount: uint256 = 0
     claimUsdValue: uint256 = 0
-    claimShares, claimAmount, claimUsdValue = self._calcClaimSharesAndAmount(_claimer, _stabAsset, _claimAsset, _maxUsdValue, maxClaimableAsset, _priceDesk)
+    claimShares, claimAmount, claimUsdValue = self._calcClaimSharesAndAmount(_claimer, _stabAsset, _claimAsset, _maxUsdValue, maxClaimableAsset, _a)
     if claimShares == 0:
         return 0
 
@@ -576,7 +637,7 @@ def _calcClaimSharesAndAmount(
     _claimAsset: address,
     _maxUsdValue: uint256,
     _maxClaimableAsset: uint256,
-    _priceDesk: address,
+    _a: addys.Addys,
 ) -> (uint256, uint256, uint256):
 
     # NOTE: failing gracefully here, in case of many claims at same time
@@ -593,11 +654,11 @@ def _calcClaimSharesAndAmount(
 
     # totals
     totalShares: uint256 = vaultData.totalBalances[_stabAsset]
-    totalValue: uint256 = self._getTotalValue(_stabAsset)
+    totalValue: uint256 = self._getTotalValue(_stabAsset, _a.greenToken, _a.savingsGreen, _a.priceDesk)
 
     # max claim values for user
     maxClaimUsdValue: uint256 = self._sharesToValue(maxUserShares, totalShares, totalValue, False)
-    maxClaimAmount: uint256 = staticcall PriceDesk(_priceDesk).getAssetAmount(_claimAsset, maxClaimUsdValue, True)
+    maxClaimAmount: uint256 = self._getAssetAmount(_claimAsset, maxClaimUsdValue, _a.greenToken, _a.savingsGreen, _a.priceDesk)
     if maxClaimAmount == 0:
         return 0, 0, 0 # not getting price for claim asset
 
@@ -637,7 +698,7 @@ def redeemFromStabilityPool(
 
     greenAmount: uint256 = min(_greenAmount, staticcall IERC20(a.greenToken).balanceOf(self))
     assert greenAmount != 0 # dev: no green to redeem
-    greenSpent: uint256 = self._redeemFromStabilityPool(_redeemer, _asset, max_value(uint256), greenAmount, a.greenToken, a.priceDesk, a.missionControl)
+    greenSpent: uint256 = self._redeemFromStabilityPool(_redeemer, _asset, max_value(uint256), greenAmount, a.greenToken, a.savingsGreen, a.priceDesk, a.missionControl)
     assert greenSpent != 0 # dev: no redemptions occurred
 
     # handle leftover green
@@ -668,7 +729,7 @@ def redeemManyFromStabilityPool(
     for r: StabPoolRedemption in _redemptions:
         if totalGreenRemaining == 0:
             break
-        greenSpent: uint256 = self._redeemFromStabilityPool(_redeemer, r.claimAsset, r.maxGreenAmount, totalGreenRemaining, a.greenToken, a.priceDesk, a.missionControl)
+        greenSpent: uint256 = self._redeemFromStabilityPool(_redeemer, r.claimAsset, r.maxGreenAmount, totalGreenRemaining, a.greenToken, a.savingsGreen, a.priceDesk, a.missionControl)
         totalGreenRemaining -= greenSpent
         totalGreenSpent += greenSpent
 
@@ -697,6 +758,7 @@ def _redeemFromStabilityPool(
     _maxGreenForAsset: uint256,
     _totalGreenRemaining: uint256,
     _greenToken: address,
+    _savingsGreen: address,
     _priceDesk: address,
     _missionControl: address,
 ) -> uint256:
@@ -723,7 +785,7 @@ def _redeemFromStabilityPool(
         return 0
 
     # max claimable amount
-    maxClaimableAmount: uint256 = staticcall PriceDesk(_priceDesk).getAssetAmount(_asset, maxRedeemValue, True)
+    maxClaimableAmount: uint256 = self._getAssetAmount(_asset, maxRedeemValue, _greenToken, _savingsGreen, _priceDesk)
     if maxClaimableAmount == 0:
         return 0
 
