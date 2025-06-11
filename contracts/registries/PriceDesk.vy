@@ -21,12 +21,21 @@ from interfaces import PriceSource
 from interfaces import Department
 from ethereum.ercs import IERC20Detailed
 
+interface GreenRefPoolSource:
+    def getCurrentGreenPoolStatus() -> CurrentGreenPoolStatus: view
+    def addGreenRefPoolSnapshot() -> bool: nonpayable
+
 interface MissionControl:
     def getPriceConfig() -> PriceConfig: view
 
 struct PriceConfig:
     staleTime: uint256
     priorityPriceSourceIds: DynArray[uint256, MAX_PRIORITY_PRICE_SOURCES]
+
+struct CurrentGreenPoolStatus:
+    weightedRatio: uint256
+    dangerTrigger: uint256
+    numBlocksInDanger: uint256
 
 ETH: public(immutable(address))
 MAX_PRIORITY_PRICE_SOURCES: constant(uint256) = 10
@@ -180,6 +189,8 @@ def getEthAmount(_usdValue: uint256, _shouldRaise: bool = False) -> uint256:
 @external
 def hasPriceFeed(_asset: address) -> bool:
     numSources: uint256 = registry.numAddrs
+    if numSources == 0:
+        return False
     for pid: uint256 in range(1, numSources, bound=max_value(uint256)):
         priceSource: address = registry._getAddr(pid)
         if priceSource == empty(address):
@@ -255,3 +266,44 @@ def confirmAddressDisableInRegistry(_regId: uint256) -> bool:
 def cancelAddressDisableInRegistry(_regId: uint256) -> bool:
     assert gov._canGovern(msg.sender) # dev: no perms
     return registry._cancelAddressDisableInRegistry(_regId)
+
+
+##################
+# Green Ref Pool #
+##################
+
+
+@external 
+def addGreenRefPoolSnapshot() -> bool:
+    assert addys._isValidRipeAddr(msg.sender) # dev: no perms
+
+    numSources: uint256 = registry.numAddrs
+    if numSources == 0:
+        return False
+
+    for pid: uint256 in range(1, numSources, bound=max_value(uint256)):
+        priceSource: address = registry._getAddr(pid)
+        if priceSource == empty(address):
+            continue
+
+        if staticcall PriceSource(priceSource).hasGreenRefPool():
+            return extcall GreenRefPoolSource(priceSource).addGreenRefPoolSnapshot()
+
+    return False
+
+
+@view
+@external
+def getCurrentGreenPoolStatus() -> CurrentGreenPoolStatus:
+    numSources: uint256 = registry.numAddrs
+    if numSources == 0:
+        return empty(CurrentGreenPoolStatus)
+
+    for pid: uint256 in range(1, numSources, bound=max_value(uint256)):
+        priceSource: address = registry._getAddr(pid)
+        if priceSource == empty(address):
+            continue
+        if staticcall PriceSource(priceSource).hasGreenRefPool():
+            return staticcall GreenRefPoolSource(priceSource).getCurrentGreenPoolStatus()
+
+    return empty(CurrentGreenPoolStatus)

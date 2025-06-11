@@ -2221,3 +2221,376 @@ def test_ripe_gov_vault_config_freeze_when_bad_debt_parameter(switchboard_alpha,
     execution_logs = filter_logs(switchboard_alpha, "RipeGovVaultConfigSet")
     no_freeze_execution_log = [log for log in execution_logs if log.asset == alpha_token.address and log.assetWeight == 150_00][0]
     assert no_freeze_execution_log.shouldFreezeWhenBadDebt == False
+
+
+# Dynamic Rate Config Tests
+
+
+def test_dynamic_rate_config_validation_zero_values(switchboard_alpha, governance):
+    """Test dynamic rate config validation with zero values"""
+    # Test minDynamicRateBoost = 0
+    with boa.reverts("invalid dynamic rate config"):
+        switchboard_alpha.setDynamicRateConfig(0, 500_00, 10, 100_00, sender=governance.address)
+    
+    # Test maxDynamicRateBoost = 0
+    with boa.reverts("invalid dynamic rate config"):
+        switchboard_alpha.setDynamicRateConfig(100_00, 0, 10, 100_00, sender=governance.address)
+    
+    # Test increasePerDangerBlock = 0
+    with boa.reverts("invalid dynamic rate config"):
+        switchboard_alpha.setDynamicRateConfig(100_00, 500_00, 0, 100_00, sender=governance.address)
+    
+    # Test maxBorrowRate = 0
+    with boa.reverts("invalid dynamic rate config"):
+        switchboard_alpha.setDynamicRateConfig(100_00, 500_00, 10, 0, sender=governance.address)
+
+
+def test_dynamic_rate_config_validation_max_values(switchboard_alpha, governance):
+    """Test dynamic rate config validation with maximum uint256 values"""
+    # Test minDynamicRateBoost = max_value
+    with boa.reverts("invalid dynamic rate config"):
+        switchboard_alpha.setDynamicRateConfig(MAX_UINT256, 500_00, 10, 100_00, sender=governance.address)
+    
+    # Test maxDynamicRateBoost = max_value
+    with boa.reverts("invalid dynamic rate config"):
+        switchboard_alpha.setDynamicRateConfig(100_00, MAX_UINT256, 10, 100_00, sender=governance.address)
+    
+    # Test increasePerDangerBlock = max_value
+    with boa.reverts("invalid dynamic rate config"):
+        switchboard_alpha.setDynamicRateConfig(100_00, 500_00, MAX_UINT256, 100_00, sender=governance.address)
+    
+    # Test maxBorrowRate = max_value
+    with boa.reverts("invalid dynamic rate config"):
+        switchboard_alpha.setDynamicRateConfig(100_00, 500_00, 10, MAX_UINT256, sender=governance.address)
+
+
+def test_dynamic_rate_config_validation_boost_ordering(switchboard_alpha, governance):
+    """Test dynamic rate config validation with min > max boost"""
+    # Test minDynamicRateBoost > maxDynamicRateBoost
+    with boa.reverts("invalid dynamic rate config"):
+        switchboard_alpha.setDynamicRateConfig(600_00, 500_00, 10, 100_00, sender=governance.address)
+    
+    # Test equal values (should be valid)
+    action_id = switchboard_alpha.setDynamicRateConfig(500_00, 500_00, 10, 100_00, sender=governance.address)
+    assert action_id > 0
+
+
+def test_dynamic_rate_config_validation_max_boost_limit(switchboard_alpha, governance):
+    """Test dynamic rate config validation with maxDynamicRateBoost > 1000%"""
+    # Test maxDynamicRateBoost > 1000%
+    with boa.reverts("invalid dynamic rate config"):
+        switchboard_alpha.setDynamicRateConfig(100_00, 1001_00, 10, 100_00, sender=governance.address)
+    
+    # Test exactly at 1000% (should be valid)
+    action_id = switchboard_alpha.setDynamicRateConfig(100_00, 1000_00, 10, 100_00, sender=governance.address)
+    assert action_id > 0
+
+
+def test_dynamic_rate_config_validation_max_borrow_rate_limit(switchboard_alpha, governance):
+    """Test dynamic rate config validation with maxBorrowRate > 200%"""
+    # Test maxBorrowRate > 200%
+    with boa.reverts("invalid dynamic rate config"):
+        switchboard_alpha.setDynamicRateConfig(100_00, 500_00, 10, 201_00, sender=governance.address)
+    
+    # Test exactly at 200% (should be valid)
+    action_id = switchboard_alpha.setDynamicRateConfig(100_00, 500_00, 10, 200_00, sender=governance.address)
+    assert action_id > 0
+
+
+def test_dynamic_rate_config_permissions(switchboard_alpha, governance, bob):
+    """Test that only governance can call setDynamicRateConfig"""
+    # Non-governance user should not be able to call the function
+    with boa.reverts("no perms"):
+        switchboard_alpha.setDynamicRateConfig(100_00, 500_00, 10, 100_00, sender=bob)
+    
+    # Governance should be able to call the function
+    action_id = switchboard_alpha.setDynamicRateConfig(100_00, 500_00, 10, 100_00, sender=governance.address)
+    assert action_id > 0
+
+
+def test_dynamic_rate_config_success(switchboard_alpha, governance):
+    """Test successful dynamic rate config creation with valid parameters"""
+    # Test with valid parameters
+    action_id = switchboard_alpha.setDynamicRateConfig(150_00, 750_00, 25, 180_00, sender=governance.address)
+    assert action_id > 0
+    
+    # Check event was emitted with correct parameters
+    logs = filter_logs(switchboard_alpha, "PendingDynamicRateConfigChange")
+    assert len(logs) == 1
+    log = logs[0]
+    assert log.minDynamicRateBoost == 150_00
+    assert log.maxDynamicRateBoost == 750_00
+    assert log.increasePerDangerBlock == 25
+    assert log.maxBorrowRate == 180_00
+    assert log.actionId == action_id
+    
+    # Check pending config was stored correctly
+    pending = switchboard_alpha.pendingDebtConfig(action_id)
+    assert pending.minDynamicRateBoost == 150_00
+    assert pending.maxDynamicRateBoost == 750_00
+    assert pending.increasePerDangerBlock == 25
+    assert pending.maxBorrowRate == 180_00
+
+
+def test_dynamic_rate_config_boundary_conditions(switchboard_alpha, governance):
+    """Test dynamic rate config at exact boundary values"""
+    # Test at minimum valid values (all = 1)
+    action_id = switchboard_alpha.setDynamicRateConfig(1, 1, 1, 1, sender=governance.address)
+    assert action_id > 0
+    
+    # Test at maximum valid boost (1000%)
+    action_id = switchboard_alpha.setDynamicRateConfig(1, 1000_00, 1, 1, sender=governance.address)
+    assert action_id > 0
+    
+    # Test at maximum valid borrow rate (200%)
+    action_id = switchboard_alpha.setDynamicRateConfig(1, 100_00, 1, 200_00, sender=governance.address)
+    assert action_id > 0
+    
+    # Test just under limits
+    action_id = switchboard_alpha.setDynamicRateConfig(999_99, 1000_00, MAX_UINT256 - 1, 199_99, sender=governance.address)
+    assert action_id > 0
+
+
+def test_execute_dynamic_rate_config(switchboard_alpha, mission_control, governance):
+    """Test execution of dynamic rate config action"""
+    # Create the action
+    action_id = switchboard_alpha.setDynamicRateConfig(200_00, 800_00, 15, 150_00, sender=governance.address)
+    assert action_id > 0
+    
+    # Time travel past timelock
+    boa.env.time_travel(blocks=switchboard_alpha.actionTimeLock())
+    
+    # Execute the action
+    success = switchboard_alpha.executePendingAction(action_id, sender=governance.address)
+    assert success == True
+    
+    # Verify the config was applied to MissionControl
+    config = mission_control.genDebtConfig()
+    assert config.minDynamicRateBoost == 200_00
+    assert config.maxDynamicRateBoost == 800_00
+    assert config.increasePerDangerBlock == 15
+    assert config.maxBorrowRate == 150_00
+    
+    # Check execution event was emitted
+    logs = filter_logs(switchboard_alpha, "DynamicRateConfigSet")
+    assert len(logs) == 1
+    log = logs[0]
+    assert log.minDynamicRateBoost == 200_00
+    assert log.maxDynamicRateBoost == 800_00
+    assert log.increasePerDangerBlock == 15
+    assert log.maxBorrowRate == 150_00
+    
+    # Verify action was cleaned up
+    assert switchboard_alpha.actionType(action_id) == 0
+    assert not switchboard_alpha.hasPendingAction(action_id)
+
+
+def test_multiple_dynamic_rate_config_actions(switchboard_alpha, governance):
+    """Test creating multiple dynamic rate config actions"""
+    # Create multiple actions with different parameters
+    configs = [
+        (100_00, 500_00, 10, 100_00),
+        (200_00, 600_00, 20, 120_00),
+        (300_00, 700_00, 30, 140_00),
+    ]
+    
+    action_ids = []
+    for min_boost, max_boost, danger_increase, max_rate in configs:
+        action_id = switchboard_alpha.setDynamicRateConfig(
+            min_boost, max_boost, danger_increase, max_rate, 
+            sender=governance.address
+        )
+        assert action_id > 0
+        action_ids.append(action_id)
+    
+    # Verify all actions are unique and sequential
+    assert len(set(action_ids)) == 3  # All unique
+    for i in range(1, 3):
+        assert action_ids[i] == action_ids[i-1] + 1  # Sequential
+    
+    # Verify all pending configs are stored correctly
+    for i, (min_boost, max_boost, danger_increase, max_rate) in enumerate(configs):
+        pending = switchboard_alpha.pendingDebtConfig(action_ids[i])
+        assert pending.minDynamicRateBoost == min_boost
+        assert pending.maxDynamicRateBoost == max_boost
+        assert pending.increasePerDangerBlock == danger_increase
+        assert pending.maxBorrowRate == max_rate
+
+
+def test_execute_multiple_dynamic_rate_configs(switchboard_alpha, mission_control, governance):
+    """Test executing multiple dynamic rate config actions"""
+    # Create multiple actions
+    action_id1 = switchboard_alpha.setDynamicRateConfig(100_00, 400_00, 5, 80_00, sender=governance.address)
+    action_id2 = switchboard_alpha.setDynamicRateConfig(250_00, 750_00, 35, 175_00, sender=governance.address)
+    
+    # Time travel and execute first action
+    boa.env.time_travel(blocks=switchboard_alpha.actionTimeLock())
+    assert switchboard_alpha.executePendingAction(action_id1, sender=governance.address)
+    
+    # Verify first config was applied
+    config = mission_control.genDebtConfig()
+    assert config.minDynamicRateBoost == 100_00
+    assert config.maxDynamicRateBoost == 400_00
+    assert config.increasePerDangerBlock == 5
+    assert config.maxBorrowRate == 80_00
+    
+    # Execute second action (should override first)
+    assert switchboard_alpha.executePendingAction(action_id2, sender=governance.address)
+    
+    # Verify second config was applied
+    config = mission_control.genDebtConfig()
+    assert config.minDynamicRateBoost == 250_00
+    assert config.maxDynamicRateBoost == 750_00
+    assert config.increasePerDangerBlock == 35
+    assert config.maxBorrowRate == 175_00
+    
+    # Verify both actions were cleaned up
+    assert switchboard_alpha.actionType(action_id1) == 0
+    assert switchboard_alpha.actionType(action_id2) == 0
+
+
+def test_dynamic_rate_config_with_existing_debt_config(switchboard_alpha, mission_control, governance):
+    """Test that dynamic rate config only modifies the specific fields"""
+    # First set some other debt config fields
+    debt_action = switchboard_alpha.setGlobalDebtLimits(5000, 50000, 100, 100, sender=governance.address)
+    keeper_action = switchboard_alpha.setKeeperConfig(5_00, 50 * 10**18, sender=governance.address)
+    
+    # Execute them
+    boa.env.time_travel(blocks=switchboard_alpha.actionTimeLock())
+    switchboard_alpha.executePendingAction(debt_action, sender=governance.address)
+    switchboard_alpha.executePendingAction(keeper_action, sender=governance.address)
+    
+    # Verify initial config
+    config = mission_control.genDebtConfig()
+    assert config.perUserDebtLimit == 5000
+    assert config.globalDebtLimit == 50000
+    assert config.keeperFeeRatio == 5_00
+    assert config.minKeeperFee == 50 * 10**18
+    
+    # Now set dynamic rate config
+    dynamic_action = switchboard_alpha.setDynamicRateConfig(300_00, 900_00, 40, 190_00, sender=governance.address)
+    boa.env.time_travel(blocks=switchboard_alpha.actionTimeLock())
+    switchboard_alpha.executePendingAction(dynamic_action, sender=governance.address)
+    
+    # Verify dynamic fields were updated but others preserved
+    config = mission_control.genDebtConfig()
+    assert config.minDynamicRateBoost == 300_00  # Updated
+    assert config.maxDynamicRateBoost == 900_00  # Updated
+    assert config.increasePerDangerBlock == 40   # Updated
+    assert config.maxBorrowRate == 190_00        # Updated
+    assert config.perUserDebtLimit == 5000       # Preserved
+    assert config.globalDebtLimit == 50000       # Preserved
+    assert config.keeperFeeRatio == 5_00         # Preserved
+    assert config.minKeeperFee == 50 * 10**18    # Preserved
+
+
+def test_dynamic_rate_config_cancel_and_expire(switchboard_alpha, governance):
+    """Test canceling and expiring dynamic rate config actions"""
+    # Create action
+    action_id = switchboard_alpha.setDynamicRateConfig(150_00, 650_00, 20, 160_00, sender=governance.address)
+    
+    # Cancel it
+    assert switchboard_alpha.cancelPendingAction(action_id, sender=governance.address)
+    
+    # Verify it's cleaned up
+    assert switchboard_alpha.actionType(action_id) == 0
+    assert not switchboard_alpha.hasPendingAction(action_id)
+    
+    # Try to execute canceled action - should fail
+    boa.env.time_travel(blocks=switchboard_alpha.actionTimeLock())
+    assert not switchboard_alpha.executePendingAction(action_id, sender=governance.address)
+    
+    # Create another action and let it expire
+    action_id2 = switchboard_alpha.setDynamicRateConfig(200_00, 700_00, 25, 170_00, sender=governance.address)
+    
+    # Time travel beyond expiration
+    boa.env.time_travel(blocks=switchboard_alpha.actionTimeLock() + switchboard_alpha.maxActionTimeLock() + 1)
+    
+    # Should automatically clean up expired action
+    assert not switchboard_alpha.executePendingAction(action_id2, sender=governance.address)
+    assert switchboard_alpha.actionType(action_id2) == 0
+
+
+def test_dynamic_rate_config_edge_case_combinations(switchboard_alpha, governance):
+    """Test edge case parameter combinations for dynamic rate config"""
+    # Test with very large increasePerDangerBlock value
+    # Note: denominator is 100_0000 according to the contract comment
+    large_increase = 50000  # This would be 50000/100_0000 = 0.5%
+    action_id = switchboard_alpha.setDynamicRateConfig(50_00, 200_00, large_increase, 100_00, sender=governance.address)
+    assert action_id > 0
+    
+    # Test with min boost very close to max boost
+    action_id = switchboard_alpha.setDynamicRateConfig(999_00, 1000_00, 1, 50_00, sender=governance.address)
+    assert action_id > 0
+    
+    # Test with small borrow rate and large boosts
+    action_id = switchboard_alpha.setDynamicRateConfig(800_00, 1000_00, 100, 1, sender=governance.address)
+    assert action_id > 0
+    
+    # Test with all parameters at their respective maximums
+    action_id = switchboard_alpha.setDynamicRateConfig(1000_00, 1000_00, MAX_UINT256 - 1, 200_00, sender=governance.address)
+    assert action_id > 0
+
+
+def test_dynamic_rate_config_action_type_consistency(switchboard_alpha, governance):
+    """Test that action type is properly managed for dynamic rate config"""
+    # Create action and verify it's stored with correct type
+    action_id = switchboard_alpha.setDynamicRateConfig(120_00, 520_00, 12, 110_00, sender=governance.address)
+    
+    # Verify action type is set (not empty)
+    assert switchboard_alpha.actionType(action_id) != 0
+    assert switchboard_alpha.hasPendingAction(action_id)
+    
+    # Verify pending config is stored
+    pending = switchboard_alpha.pendingDebtConfig(action_id)
+    assert pending.minDynamicRateBoost == 120_00
+    assert pending.maxDynamicRateBoost == 520_00
+    assert pending.increasePerDangerBlock == 12
+    assert pending.maxBorrowRate == 110_00
+    
+    # Execute action
+    boa.env.time_travel(blocks=switchboard_alpha.actionTimeLock())
+    switchboard_alpha.executePendingAction(action_id, sender=governance.address)
+    
+    # Verify cleanup
+    assert switchboard_alpha.actionType(action_id) == 0
+    assert not switchboard_alpha.hasPendingAction(action_id)
+
+
+def test_dynamic_rate_config_event_emissions(switchboard_alpha, governance):
+    """Test that correct events are emitted for dynamic rate config"""
+    # Clear any existing events by getting current count
+    logs_before = filter_logs(switchboard_alpha, "PendingDynamicRateConfigChange")
+    events_before = len(logs_before)
+    
+    # Create action
+    action_id = switchboard_alpha.setDynamicRateConfig(180_00, 680_00, 18, 145_00, sender=governance.address)
+    
+    # Check pending event was emitted
+    logs_after = filter_logs(switchboard_alpha, "PendingDynamicRateConfigChange")
+    assert len(logs_after) == events_before + 1
+    
+    pending_log = logs_after[-1]  # Get the latest event
+    assert pending_log.minDynamicRateBoost == 180_00
+    assert pending_log.maxDynamicRateBoost == 680_00
+    assert pending_log.increasePerDangerBlock == 18
+    assert pending_log.maxBorrowRate == 145_00
+    assert pending_log.actionId == action_id
+    assert pending_log.confirmationBlock > 0
+    
+    # Execute and check execution event
+    logs_before_exec = filter_logs(switchboard_alpha, "DynamicRateConfigSet")
+    events_before_exec = len(logs_before_exec)
+    
+    boa.env.time_travel(blocks=switchboard_alpha.actionTimeLock())
+    switchboard_alpha.executePendingAction(action_id, sender=governance.address)
+    
+    # Check execution event was emitted
+    logs_after_exec = filter_logs(switchboard_alpha, "DynamicRateConfigSet")
+    assert len(logs_after_exec) == events_before_exec + 1
+    
+    exec_log = logs_after_exec[-1]  # Get the latest event
+    assert exec_log.minDynamicRateBoost == 180_00
+    assert exec_log.maxDynamicRateBoost == 680_00
+    assert exec_log.increasePerDangerBlock == 18
+    assert exec_log.maxBorrowRate == 145_00

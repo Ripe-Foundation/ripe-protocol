@@ -56,6 +56,10 @@ struct GenDebtConfig:
     numAllowedBorrowers: uint256
     maxBorrowPerInterval: uint256
     numBlocksPerInterval: uint256
+    minDynamicRateBoost: uint256
+    maxDynamicRateBoost: uint256
+    increasePerDangerBlock: uint256
+    maxBorrowRate: uint256
     keeperFeeRatio: uint256
     minKeeperFee: uint256
     isDaowryEnabled: bool
@@ -278,6 +282,12 @@ struct PurchaseRipeBondConfig:
     minLockDuration: uint256
     maxLockDuration: uint256
     canAnyoneBondForUser: bool
+
+struct DynamicBorrowRateConfig:
+    minDynamicRateBoost: uint256
+    maxDynamicRateBoost: uint256
+    increasePerDangerBlock: uint256
+    maxBorrowRate: uint256
 
 # events
 
@@ -1023,4 +1033,19 @@ def getPurchaseRipeBondConfig(_user: address) -> PurchaseRipeBondConfig:
         minLockDuration=vaultConfig.lockTerms.minLockDuration,
         maxLockDuration=vaultConfig.lockTerms.maxLockDuration,
         canAnyoneBondForUser=self.userConfig[_user].canAnyoneBondForUser,
+    )
+
+
+# dynamic borrow rate config
+
+
+@view
+@external
+def getDynamicBorrowRateConfig() -> DynamicBorrowRateConfig:
+    genDebtConfig: GenDebtConfig = self.genDebtConfig
+    return DynamicBorrowRateConfig(
+        minDynamicRateBoost=genDebtConfig.minDynamicRateBoost,
+        maxDynamicRateBoost=genDebtConfig.maxDynamicRateBoost,
+        increasePerDangerBlock=genDebtConfig.increasePerDangerBlock,
+        maxBorrowRate=genDebtConfig.maxBorrowRate,
     )

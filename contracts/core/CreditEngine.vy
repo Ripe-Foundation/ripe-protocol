@@ -1,4 +1,5 @@
 # @version 0.4.1
+# pragma optimize codesize
 
 implements: Department
 
@@ -27,24 +28,26 @@ interface Ledger:
 interface MissionControl:
     def getRedeemCollateralConfig(_asset: address, _redeemer: address) -> RedeemCollateralConfig: view
     def getBorrowConfig(_user: address, _caller: address) -> BorrowConfig: view
+    def getDynamicBorrowRateConfig() -> DynamicBorrowRateConfig: view
     def getRepayConfig(_user: address) -> RepayConfig: view
     def getDebtTerms(_asset: address) -> DebtTerms: view
     def getLtvPaybackBuffer() -> uint256: view
+
+interface PriceDesk:
+    def getAssetAmount(_asset: address, _usdValue: uint256, _shouldRaise: bool = False) -> uint256: view
+    def getUsdValue(_asset: address, _amount: uint256, _shouldRaise: bool) -> uint256: view
+    def getCurrentGreenPoolStatus() -> CurrentGreenPoolStatus: view
 
 interface LootBox:
     def updateDepositPoints(_user: address, _vaultId: uint256, _vaultAddr: address, _asset: address, _a: addys.Addys = empty(addys.Addys)): nonpayable
     def updateBorrowPoints(_user: address, _a: addys.Addys = empty(addys.Addys)): nonpayable
 
-interface PriceDesk:
-    def getAssetAmount(_asset: address, _usdValue: uint256, _shouldRaise: bool = False) -> uint256: view
-    def getUsdValue(_asset: address, _amount: uint256, _shouldRaise: bool) -> uint256: view
-
 interface GreenToken:
     def mint(_to: address, _amount: uint256): nonpayable
     def burn(_amount: uint256): nonpayable
 
-interface VaultBook:
-    def getAddr(_vaultId: uint256) -> address: view
+interface AddressRegistry:
+    def getAddr(_regId: uint256) -> address: view
 
 flag RepayType:
     STANDARD
@@ -115,6 +118,17 @@ struct CollateralRedemption:
     asset: address
     maxGreenAmount: uint256
 
+struct CurrentGreenPoolStatus:
+    weightedRatio: uint256
+    dangerTrigger: uint256
+    numBlocksInDanger: uint256
+
+struct DynamicBorrowRateConfig:
+    minDynamicRateBoost: uint256
+    maxDynamicRateBoost: uint256
+    increasePerDangerBlock: uint256
+    maxBorrowRate: uint256
+
 event NewBorrow:
     user: indexed(address)
     newLoan: uint256
@@ -147,6 +161,7 @@ event CollateralRedeemed:
 
 ONE_YEAR: constant(uint256) = 60 * 60 * 24 * 365
 HUNDRED_PERCENT: constant(uint256) = 100_00 # 100.00%
+DANGER_BLOCKS_DENOMINATOR: constant(uint256) = 100_0000 # 100.0000%
 ONE_PERCENT: constant(uint256) = 1_00 # 1.00%
 MAX_DEBT_UPDATES: constant(uint256) = 25
 MAX_COLLATERAL_REDEMPTIONS: constant(uint256) = 20
@@ -227,7 +242,9 @@ def borrowForUser(
     extcall GreenToken(a.greenToken).mint(self, totalGreenMint)
 
     # origination fee
-    daowry: uint256 = self._getDaowryAmount(newBorrowAmount, bt.debtTerms.daowry, config.isDaowryEnabled)
+    daowry: uint256 = 0
+    if config.isDaowryEnabled:
+        daowry = newBorrowAmount * bt.debtTerms.daowry // HUNDRED_PERCENT
 
     # dao revenue
     forDao: uint256 = daowry + unrealizedYield
@@ -263,14 +280,15 @@ def _validateOnBorrow(
 
     # check num allowed borrowers
     if not _d.isUserBorrower:
-        numAvailBorrowers: uint256 = self._getAvailNumBorrowers(_d.numBorrowers, _config.numAllowedBorrowers)
-        assert numAvailBorrowers != 0 # dev: max num borrowers reached
+        assert _config.numAllowedBorrowers > _d.numBorrowers # dev: max num borrowers reached
 
     # main var
     newBorrowAmount: uint256 = _greenAmount
 
     # avail debt based on collateral value / ltv
-    availDebtPerLtv: uint256 = self._getAvailBasedOnLtv(_userDebt.amount, _maxUserDebt)
+    availDebtPerLtv: uint256 = 0
+    if _maxUserDebt > _userDebt.amount:
+        availDebtPerLtv = _maxUserDebt - _userDebt.amount
     assert availDebtPerLtv != 0 # dev: no debt available
     newBorrowAmount = min(newBorrowAmount, availDebtPerLtv)
 
@@ -282,12 +300,16 @@ def _validateOnBorrow(
     newBorrowAmount = min(newBorrowAmount, availInInterval)
 
     # check per user debt limit
-    availPerUser: uint256 = self._getAvailPerUserDebt(_userDebt.amount, _config.perUserDebtLimit)
+    availPerUser: uint256 = 0
+    if _config.perUserDebtLimit > _userDebt.amount:
+        availPerUser = _config.perUserDebtLimit - _userDebt.amount
     assert availPerUser != 0 # dev: per user debt limit reached
     newBorrowAmount = min(newBorrowAmount, availPerUser)
 
     # check global debt limit
-    availGlobal: uint256 = self._getAvailGlobalDebt(_d.totalDebt, _config.globalDebtLimit)
+    availGlobal: uint256 = 0
+    if _config.globalDebtLimit > _d.totalDebt:
+        availGlobal = _config.globalDebtLimit - _d.totalDebt
     assert availGlobal != 0 # dev: global debt limit reached
     newBorrowAmount = min(newBorrowAmount, availGlobal)
 
@@ -321,39 +343,35 @@ def getMaxBorrowAmount(_user: address) -> uint256:
         return 0
 
     # check num allowed borrowers
-    if not d.isUserBorrower:
-        numAvailBorrowers: uint256 = self._getAvailNumBorrowers(d.numBorrowers, config.numAllowedBorrowers)
-        if numAvailBorrowers == 0:
-            return 0
+    if not d.isUserBorrower and config.numAllowedBorrowers <= d.numBorrowers:
+        return 0
 
     # main var
     newBorrowAmount: uint256 = max_value(uint256)
 
     # avail debt based on collateral value / ltv
     bt: UserBorrowTerms = self._getUserBorrowTerms(_user, d.numUserVaults, False, 0, empty(address), a)
-    availDebtPerLtv: uint256 = self._getAvailBasedOnLtv(userDebt.amount, bt.totalMaxDebt)
-    if availDebtPerLtv == 0:
-        return 0
+    availDebtPerLtv: uint256 = 0
+    if bt.totalMaxDebt > userDebt.amount:
+        availDebtPerLtv = bt.totalMaxDebt - userDebt.amount
     newBorrowAmount = min(newBorrowAmount, availDebtPerLtv)
 
     # check borrow interval
     availInInterval: uint256 = 0
     na2: bool = False
     availInInterval, na2 = self._getAvailDebtInInterval(d.userBorrowInterval, config.maxBorrowPerInterval, config.numBlocksPerInterval)
-    if availInInterval == 0:
-        return 0
     newBorrowAmount = min(newBorrowAmount, availInInterval)
 
     # check per user debt limit
-    availPerUser: uint256 = self._getAvailPerUserDebt(userDebt.amount, config.perUserDebtLimit)
-    if availPerUser == 0:
-        return 0
+    availPerUser: uint256 = 0
+    if config.perUserDebtLimit > userDebt.amount:
+        availPerUser = config.perUserDebtLimit - userDebt.amount
     newBorrowAmount = min(newBorrowAmount, availPerUser)
 
     # check global debt limit
-    availGlobal: uint256 = self._getAvailGlobalDebt(d.totalDebt, config.globalDebtLimit)
-    if availGlobal == 0:
-        return 0
+    availGlobal: uint256 = 0
+    if config.globalDebtLimit > d.totalDebt:
+        availGlobal = config.globalDebtLimit - d.totalDebt
     newBorrowAmount = min(newBorrowAmount, availGlobal)
 
     # must reach minimum debt threshold
@@ -621,7 +639,7 @@ def _redeemCollateral(
         return 0
 
     # vault address
-    vaultAddr: address = staticcall VaultBook(_a.vaultBook).getAddr(_vaultId)
+    vaultAddr: address = staticcall AddressRegistry(_a.vaultBook).getAddr(_vaultId)
     if vaultAddr == empty(address):
         return 0
 
@@ -788,7 +806,7 @@ def _getUserBorrowTerms(
     # iterate thru each user vault
     for i: uint256 in range(1, _numUserVaults, bound=max_value(uint256)):
         vaultId: uint256 = staticcall Ledger(_a.ledger).userVaults(_user, i)
-        vaultAddr: address = staticcall VaultBook(_a.vaultBook).getAddr(vaultId)
+        vaultAddr: address = staticcall AddressRegistry(_a.vaultBook).getAddr(vaultId)
         if vaultAddr == empty(address):
             continue
 
@@ -852,6 +870,8 @@ def _getUserBorrowTerms(
         adjustedLiqFee: uint256 = (HUNDRED_PERCENT - bt.debtTerms.liqThreshold) * HUNDRED_PERCENT // bt.debtTerms.liqThreshold
         bt.debtTerms.liqFee = adjustedLiqFee
 
+    # dynamic borrow rate
+    bt.debtTerms.borrowRate = self._getDynamicBorrowRate(bt.debtTerms.borrowRate, _a.missionControl, _a.priceDesk)
     return bt
 
 
@@ -888,6 +908,49 @@ def _getLatestUserDebtAndTerms(
     bt: UserBorrowTerms = self._getUserBorrowTerms(_user, d.numUserVaults, _shouldRaise, 0, empty(address), _a)
 
     return userDebt, bt, newInterest
+
+
+# dynamic interest rate adjustments
+
+
+@view
+@external
+def getDynamicBorrowRate(_baseRate: uint256) -> uint256:
+    return self._getDynamicBorrowRate(_baseRate, addys._getMissionControlAddr(), addys._getPriceDeskAddr())
+
+
+@view
+@internal
+def _getDynamicBorrowRate(_baseRate: uint256, _missionControl: address, _priceDesk: address) -> uint256:
+    status: CurrentGreenPoolStatus = staticcall PriceDesk(_priceDesk).getCurrentGreenPoolStatus()
+    if status.weightedRatio == 0 or status.weightedRatio < status.dangerTrigger:
+        return _baseRate
+
+    config: DynamicBorrowRateConfig = staticcall MissionControl(_missionControl).getDynamicBorrowRateConfig()
+
+    # dynamic rate boost (depending on pool health)
+    rateBoost: uint256 = 0
+    if config.maxDynamicRateBoost != 0:
+        dynamicRatio: uint256 = (status.weightedRatio - status.dangerTrigger) * HUNDRED_PERCENT // (HUNDRED_PERCENT - status.dangerTrigger)
+        rateMultiplier: uint256 = self._calcDynamicRateBoost(dynamicRatio, config.minDynamicRateBoost, config.maxDynamicRateBoost)
+        rateBoost = _baseRate * rateMultiplier // HUNDRED_PERCENT
+
+    # danger boost (longer pool health imbalanced, higher rate keeps getting)
+    dangerBoost: uint256 = 0
+    if status.numBlocksInDanger != 0 and config.increasePerDangerBlock != 0:
+        dangerBoost = (config.increasePerDangerBlock * status.numBlocksInDanger) * HUNDRED_PERCENT // DANGER_BLOCKS_DENOMINATOR
+
+    return min(_baseRate + rateBoost + dangerBoost, config.maxBorrowRate)
+
+
+@pure
+@internal
+def _calcDynamicRateBoost(_ratio: uint256, _minBoost: uint256, _maxBoost: uint256) -> uint256:
+    if _ratio == 0 or _minBoost == _maxBoost:
+        return _minBoost
+    valRange: uint256 = _maxBoost - _minBoost
+    adjustment: uint256 =  _ratio * valRange // HUNDRED_PERCENT
+    return _minBoost + adjustment
 
 
 ###############
@@ -1092,7 +1155,7 @@ def getMaxWithdrawableForAsset(
 
     vaultAddr: address = _vaultAddr
     if vaultAddr == empty(address):
-        vaultAddr = staticcall VaultBook(a.vaultBook).getAddr(_vaultId)
+        vaultAddr = staticcall AddressRegistry(a.vaultBook).getAddr(_vaultId)
 
     # get latest user debt
     d: RepayDataBundle = staticcall Ledger(a.ledger).getRepayDataBundle(_user)
@@ -1171,46 +1234,6 @@ def _getLatestUserDebtWithInterest(_userDebt: UserDebt) -> (UserDebt, uint256):
     return userDebt, newInterest
 
 
-# daowry (origination fee)
-
-
-@view
-@internal
-def _getDaowryAmount(
-    _borrowAmount: uint256,
-    _daowryFee: uint256,
-    _isDaowryEnabled: bool,
-) -> uint256:
-    daowry: uint256 = 0
-    if _daowryFee != 0 and _isDaowryEnabled:
-        daowry = _borrowAmount * _daowryFee // HUNDRED_PERCENT
-    return daowry
-
-
-# ltv
-
-
-@view
-@internal
-def _getAvailBasedOnLtv(_currentUserDebt: uint256, _maxUserDebt: uint256) -> uint256:
-    availDebt: uint256 = 0
-    if _maxUserDebt > _currentUserDebt:
-        availDebt = _maxUserDebt - _currentUserDebt
-    return availDebt
-
-
-# num borrowers
-
-
-@view
-@internal
-def _getAvailNumBorrowers(_numBorrowers: uint256, _numAllowedBorrowers: uint256) -> uint256:
-    numAllowed: uint256 = 0
-    if _numAllowedBorrowers > _numBorrowers:
-        numAllowed = _numAllowedBorrowers - _numBorrowers
-    return numAllowed
-
-
 # borrow interval
 
 
@@ -1227,29 +1250,3 @@ def _getAvailDebtInInterval(
         availToBorrow = _maxBorrowPerInterval - min(_userInterval.amount, _maxBorrowPerInterval)
         isFreshInterval = False
     return availToBorrow, isFreshInterval
-
-
-# per user debt limit
-
-
-@view 
-@internal 
-def _getAvailPerUserDebt(_currentUserDebt: uint256, _perUserDebtLimit: uint256) -> uint256:
-    if _perUserDebtLimit == max_value(uint256):
-        return max_value(uint256)
-    availableDebt: uint256 = 0
-    if _perUserDebtLimit > _currentUserDebt:
-        availableDebt = _perUserDebtLimit - _currentUserDebt
-    return availableDebt
-
-
-# global debt limit
-
-
-@view 
-@internal 
-def _getAvailGlobalDebt(_totalDebt: uint256, _globalDebtLimit: uint256) -> uint256:
-    availableDebt: uint256 = 0
-    if _globalDebtLimit > _totalDebt:
-        availableDebt = _globalDebtLimit - _totalDebt
-    return availableDebt

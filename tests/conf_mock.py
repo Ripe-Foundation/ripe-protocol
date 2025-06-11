@@ -148,6 +148,17 @@ def mock_price_source(ripe_hq_deploy, fork):
 
 
 @pytest.fixture(scope="session")
+def mock_curve_prices(ripe_hq_deploy, fork):
+    return boa.load(
+        "contracts/mock/MockCurvePrices.vy",
+        ripe_hq_deploy,
+        PARAMS[fork]["PRICE_DESK_MIN_REG_TIMELOCK"],
+        PARAMS[fork]["PRICE_DESK_MAX_REG_TIMELOCK"],
+        name="mock_curve_prices",
+    )
+
+
+@pytest.fixture(scope="session")
 def mock_chainlink_feed_one():
     return boa.load(
         "contracts/mock/MockChainlinkFeed.vy",

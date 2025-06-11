@@ -1,4 +1,5 @@
 # @version 0.4.1
+# pragma optimize codesize
 
 implements: Department
 
