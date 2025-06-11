@@ -1307,7 +1307,7 @@ def _handleGreenForUser(
     if amount == 0:
         return
 
-    if _wantsSavingsGreen:
+    if _wantsSavingsGreen and amount > 10 ** 9: # small dust will fail
         assert extcall IERC20(_greenToken).approve(_savingsGreen, amount, default_return_value=True) # dev: green approval failed
         extcall IERC4626(_savingsGreen).deposit(amount, _recipient)
         assert extcall IERC20(_greenToken).approve(_savingsGreen, 0, default_return_value=True) # dev: green approval failed
