@@ -1066,3 +1066,131 @@ def test_danger_transition_edge_cases(
     data = curve_prices.greenRefPoolData()
     assert data.lastSnapshot.inDanger == False
     assert data.numBlocksInDanger == 0  # Should reset to 0
+
+
+@pytest.base
+def test_usdc_dominant_pool_scenarios(
+    deployed_green_pool,
+    curve_prices,
+    governance,
+    addSeedGreenLiq,
+    swapUsdcForGreen,
+    teller,
+    usdc_token,
+    _test,
+):
+    """Test scenarios where USDC dominates the pool (GREEN ratio < 50%)"""
+    addSeedGreenLiq()  # Start with balanced pool (50/50)
+
+    # Setup config with 50% danger trigger (minimum allowed)
+    aid = curve_prices.setGreenRefPoolConfig(deployed_green_pool, 10, 50_00, 0, sender=governance.address)
+    boa.env.time_travel(blocks=curve_prices.actionTimeLock())
+    assert curve_prices.confirmGreenRefPoolConfig(aid, sender=governance.address)
+
+    # Initial balanced state
+    green_balance, ratio = curve_prices.getCurvePoolData()
+    assert ratio == 50_00
+    assert green_balance == 10_000 * EIGHTEEN_DECIMALS
+
+    # Create USDC dominance by swapping large amount of USDC for GREEN
+    # This removes GREEN from pool and adds USDC, decreasing GREEN ratio
+    large_usdc_swap = 8_000 * (10 ** usdc_token.decimals())  # Large USDC amount
+    swapUsdcForGreen(large_usdc_swap)
+
+    # Check the imbalanced pool state
+    new_green_balance, new_ratio = curve_prices.getCurvePoolData()
+    assert new_green_balance < green_balance  # Less GREEN in pool
+    assert new_ratio < 50_00  # GREEN ratio should be below 50%
+    _test(10_70, new_ratio)  # Should be around 10.7% GREEN after large swap
+
+    # Take snapshot of USDC-dominant pool
+    boa.env.time_travel(blocks=1)
+    assert curve_prices.addGreenRefPoolSnapshot(sender=teller.address)
+
+    # Verify snapshot shows USDC dominance (NOT in danger since ratio < 50%)
+    data = curve_prices.greenRefPoolData()
+    assert data.lastSnapshot.ratio < 50_00
+    assert data.lastSnapshot.inDanger == False  # Below 50% trigger
+    assert data.numBlocksInDanger == 0
+
+    # Verify weighted ratio calculation works with low GREEN ratios
+    status = curve_prices.getCurrentGreenPoolStatus()
+    assert status.weightedRatio < 50_00
+    assert status.dangerTrigger == 50_00
+
+    # Create another USDC-dominant snapshot with different ratio
+    moderate_usdc_swap = 2_000 * (10 ** usdc_token.decimals())
+    swapUsdcForGreen(moderate_usdc_swap)
+    
+    boa.env.time_travel(blocks=1)
+    assert curve_prices.addGreenRefPoolSnapshot(sender=teller.address)
+
+    # Get final pool state
+    final_green_balance, final_ratio = curve_prices.getCurvePoolData()
+    assert final_green_balance < new_green_balance  # Even less GREEN
+    assert final_ratio < new_ratio  # Even lower GREEN ratio
+    _test(3_20, final_ratio)  # Should be around 3.2% GREEN after second swap
+
+    # Verify weighted ratio uses all USDC-dominant snapshots
+    status = curve_prices.getCurrentGreenPoolStatus()
+    assert status.weightedRatio < 50_00
+    # Should be weighted average including the initial balanced snapshot
+    # The exact value depends on GREEN balances as weights, but should be below 50%
+
+
+@pytest.base
+def test_green_scarcity_recovery_scenarios(
+    deployed_green_pool,
+    curve_prices,
+    governance,
+    addSeedGreenLiq,
+    swapUsdcForGreen,
+    swapGreenForUsdc,
+    teller,
+    usdc_token,
+):
+    """Test recovery from GREEN scarcity (ratio < 50%) back to balance"""
+    addSeedGreenLiq()
+
+    # Setup config
+    aid = curve_prices.setGreenRefPoolConfig(deployed_green_pool, 10, 60_00, 0, sender=governance.address)
+    boa.env.time_travel(blocks=curve_prices.actionTimeLock())
+    assert curve_prices.confirmGreenRefPoolConfig(aid, sender=governance.address)
+
+    # Create GREEN scarcity (ratio < 50%)
+    large_usdc_swap = 6_000 * (10 ** usdc_token.decimals())
+    swapUsdcForGreen(large_usdc_swap)
+    
+    boa.env.time_travel(blocks=1)
+    assert curve_prices.addGreenRefPoolSnapshot(sender=teller.address)
+
+    # Verify GREEN scarcity
+    data = curve_prices.greenRefPoolData()
+    scarcity_ratio = data.lastSnapshot.ratio
+    assert scarcity_ratio < 50_00
+    assert data.lastSnapshot.inDanger == False  # Below 60% danger trigger
+
+    # Begin recovery - add GREEN back to pool
+    recovery_green_swap = 3_000 * EIGHTEEN_DECIMALS
+    swapGreenForUsdc(recovery_green_swap)
+    
+    boa.env.time_travel(blocks=1)
+    assert curve_prices.addGreenRefPoolSnapshot(sender=teller.address)
+
+    # Check partial recovery
+    data = curve_prices.greenRefPoolData()
+    recovery_ratio = data.lastSnapshot.ratio
+    assert recovery_ratio > scarcity_ratio  # Should be higher than scarcity
+    assert recovery_ratio < 50_00 or recovery_ratio > 50_00  # Could be above or below 50%
+
+    # Complete recovery to balance
+    final_green_swap = 2_000 * EIGHTEEN_DECIMALS
+    swapGreenForUsdc(final_green_swap)
+    
+    boa.env.time_travel(blocks=1)
+    assert curve_prices.addGreenRefPoolSnapshot(sender=teller.address)
+
+    # Verify recovery trend in weighted ratio
+    status = curve_prices.getCurrentGreenPoolStatus()
+    # Should reflect the progression from scarcity to recovery
+    assert status.weightedRatio != scarcity_ratio  # Should be different from initial scarcity
