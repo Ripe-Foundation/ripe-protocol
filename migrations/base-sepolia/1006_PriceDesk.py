@@ -74,11 +74,15 @@ def migrate(migration: Migration):
     )
 
     migration.execute(mock_price_source.setPrice, migration.get_address("GreenToken"), EIGHTEEN_DECIMALS)
-    migration.execute(mock_price_source.setPrice, migration.get_address("SavingsGreen"), EIGHTEEN_DECIMALS)
     migration.execute(mock_price_source.setPrice, migration.get_address("RipeToken"), EIGHTEEN_DECIMALS // 10)
 
-    migration.execute(price_desk.startAddNewAddressToRegistry, mock_price_source, "Mock Price Source")
-    migration.execute(price_desk.confirmNewAddressToRegistry, mock_price_source)
+    mock_s_green_price = migration.deploy(
+        "MockSGreenPrice",
+        migration.get_address("SavingsGreen"),
+    )
+
+    migration.execute(price_desk.startAddNewAddressToRegistry, mock_s_green_price, "Mock SavingsGreen Price")
+    migration.execute(price_desk.confirmNewAddressToRegistry, mock_s_green_price)
 
     # finish registry setup
     migration.execute(price_desk.setRegistryTimeLockAfterSetup)

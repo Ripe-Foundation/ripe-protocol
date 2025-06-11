@@ -161,4 +161,7 @@ def migrate(migration: Migration):
     )
     assert migration.execute(switchboard_two.executePendingAction, actionId)
 
-    migration.execute(hq.finishRipeHqSetup, migration.blueprint().ADDYS["GOVERNANCE"])
+    actionId = migration.execute(switchboard_one.setPriorityStabVaults, [(1,  migration.get_contract("SavingsGreen"))])
+    assert migration.execute(switchboard_one.executePendingAction, actionId)
+
+    # migration.execute(hq.finishRipeHqSetup, migration.blueprint().ADDYS["GOVERNANCE"])
