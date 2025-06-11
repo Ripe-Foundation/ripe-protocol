@@ -57,7 +57,7 @@ def canMintRipe() -> bool:
 
 @external
 def pause(_shouldPause: bool):
-    assert addys._canModifyMissionControl(msg.sender) # dev: no perms
+    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
     assert _shouldPause != self.isPaused # dev: no change
     self.isPaused = _shouldPause
     log DepartmentPauseModified(isPaused=_shouldPause)
@@ -68,13 +68,13 @@ def pause(_shouldPause: bool):
 
 @external
 def recoverFunds(_recipient: address, _asset: address):
-    assert addys._canModifyMissionControl(msg.sender) # dev: no perms
+    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
     self._recoverFunds(_recipient, _asset)
 
 
 @external
 def recoverFundsMany(_recipient: address, _assets: DynArray[address, MAX_RECOVER_ASSETS]):
-    assert addys._canModifyMissionControl(msg.sender) # dev: no perms
+    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
     for a: address in _assets:
         self._recoverFunds(_recipient, a)
 

@@ -114,6 +114,13 @@ struct FungibleAuction:
     endBlock: uint256
     isActive: bool
 
+# ripe bonds
+
+struct RipeBondData:
+    paymentAmountAvailInEpoch: uint256
+    ripeAvailForBonds: uint256
+    badDebt: uint256
+
 # user vault participation
 userVaults: public(HashMap[address, HashMap[uint256, uint256]]) # user -> index -> vault id
 indexOfVault: public(HashMap[address, HashMap[uint256, uint256]]) # user -> vault id -> index
@@ -148,14 +155,39 @@ fungLiqUsers: public(HashMap[uint256, address]) # index -> liq user
 indexOfFungLiqUser: public(HashMap[address, uint256]) # liq user -> index
 numFungLiqUsers: public(uint256) # num liq users
 
+# hr contributors
+ripeAvailForHr: public(uint256)
+contributors: public(HashMap[uint256, address]) # index -> contributor addr
+indexOfContributor: public(HashMap[address, uint256]) # contributor -> index
+numContributors: public(uint256) # num contributors
+
+# bond data
+epochStart: public(uint256)
+epochEnd: public(uint256)
+badDebt: public(uint256)
+ripePaidOutForBadDebt: public(uint256)
+paymentAmountAvailInEpoch: public(uint256)
+ripeAvailForBonds: public(uint256)
+
 
 @deploy
-def __init__(_ripeHq: address, _ripeAvailForRewards: uint256):
+def __init__(
+    _ripeHq: address,
+    _ripeAvailForRewards: uint256,
+    _ripeAvailForHr: uint256,
+    _ripeAvailForBonds: uint256,
+):
     addys.__init__(_ripeHq)
     deptBasics.__init__(False, False, False) # no minting
 
     if _ripeAvailForRewards != 0:
         self.ripeAvailForRewards = _ripeAvailForRewards
+
+    if _ripeAvailForHr != 0:
+        self.ripeAvailForHr = _ripeAvailForHr
+
+    if _ripeAvailForBonds != 0:
+        self.ripeAvailForBonds = _ripeAvailForBonds
 
 
 ###############
@@ -186,7 +218,12 @@ def _getNumUserVaults(_user: address) -> uint256:
 
 @external
 def addVaultToUser(_user: address, _vaultId: uint256):
-    assert msg.sender in [addys._getTellerAddr(), addys._getCreditEngineAddr(), addys._getAuctionHouseAddr()] # dev: not allowed
+    assert msg.sender in [
+        addys._getTellerAddr(),
+        addys._getCreditEngineAddr(),
+        addys._getAuctionHouseAddr(),
+        addys._getHumanResourcesAddr(),
+    ] # dev: not allowed
     assert not deptBasics.isPaused # dev: not activated
 
     # already participating - fail gracefully
@@ -413,7 +450,7 @@ def _setRipeRewards(_ripeRewards: RipeRewards):
 
 @external
 def setRipeAvailForRewards(_amount: uint256):
-    assert msg.sender == addys._getLootboxAddr() # dev: only Lootbox allowed
+    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
     assert not deptBasics.isPaused # dev: not activated
     self.ripeAvailForRewards = _amount
 
@@ -675,3 +712,102 @@ def getFungibleAuctionDuringPurchase(_liqUser: address, _vaultId: uint256, _asse
 @external
 def hasFungibleAuction(_liqUser: address, _vaultId: uint256, _asset: address) -> bool:
     return self.fungibleAuctionIndex[_liqUser][_vaultId][_asset] != 0
+
+
+###################
+# Human Resources #
+###################
+
+
+@view
+@external
+def isHrContributor(_contributor: address) -> bool:
+    return self.indexOfContributor[_contributor] != 0
+
+
+@external
+def addHrContributor(_contributor: address, _compensation: uint256):
+    assert msg.sender == addys._getHumanResourcesAddr() # dev: only hr allowed
+    assert not deptBasics.isPaused # dev: not activated
+
+    if self.indexOfContributor[_contributor] != 0:
+        return
+
+    uid: uint256 = self.numContributors
+    if uid == 0:
+        uid = 1
+    self.contributors[uid] = _contributor
+    self.indexOfContributor[_contributor] = uid
+    self.numContributors = uid + 1
+
+    # update ripe avail for hr
+    self.ripeAvailForHr -= _compensation
+
+
+@external
+def setRipeAvailForHr(_amount: uint256):
+    assert addys._isSwitchboardAddr(msg.sender) or msg.sender == addys._getHumanResourcesAddr() # dev: no perms
+    assert not deptBasics.isPaused # dev: not activated
+    self.ripeAvailForHr = _amount
+
+
+#########
+# Bonds #
+#########
+
+
+@view
+@external
+def getEpochData() -> (uint256, uint256):
+    return self.epochStart, self.epochEnd
+
+
+@view
+@external
+def getRipeBondData() -> RipeBondData:
+    return RipeBondData(
+        paymentAmountAvailInEpoch=self.paymentAmountAvailInEpoch,
+        ripeAvailForBonds=self.ripeAvailForBonds,
+        badDebt=self.badDebt,
+    )
+
+
+@external
+def setRipeAvailForBonds(_amount: uint256):
+    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
+    assert not deptBasics.isPaused # dev: not activated
+    self.ripeAvailForBonds = _amount
+
+
+@external
+def setBadDebt(_amount: uint256):
+    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
+    assert not deptBasics.isPaused # dev: not activated
+    self.badDebt = _amount
+
+
+@external
+def didClearBadDebt(_amount: uint256, _ripeAmount: uint256):
+    assert msg.sender == addys._getBondRoomAddr() # dev: no perms
+    assert not deptBasics.isPaused # dev: not activated
+    self.badDebt -= _amount
+    self.ripePaidOutForBadDebt += _ripeAmount
+
+
+@external
+def didPurchaseRipeBond(_amountPaid: uint256, _ripePayout: uint256):
+    assert msg.sender == addys._getBondRoomAddr() # dev: no perms
+    assert not deptBasics.isPaused # dev: not activated
+    self.paymentAmountAvailInEpoch -= _amountPaid
+    if _ripePayout != 0:
+        self.ripeAvailForBonds -= _ripePayout
+
+
+@external
+def setEpochData(_epochStart: uint256, _epochEnd: uint256, _amountAvailInEpoch: uint256):
+    assert msg.sender == addys._getBondRoomAddr() # dev: no perms
+    assert not deptBasics.isPaused # dev: not activated
+
+    self.epochStart = _epochStart
+    self.epochEnd = _epochEnd
+    self.paymentAmountAvailInEpoch = _amountAvailInEpoch

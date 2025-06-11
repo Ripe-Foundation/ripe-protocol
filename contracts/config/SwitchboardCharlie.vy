@@ -34,8 +34,8 @@ interface CreditEngine:
     def updateDebtForManyUsers(_users: DynArray[address, MAX_DEBT_UPDATES], _a: addys.Addys = empty(addys.Addys)) -> bool: nonpayable
     def updateDebtForUser(_user: address, _a: addys.Addys = empty(addys.Addys)) -> bool: nonpayable
 
-interface TokenContract:
-    def setBlacklist(_addr: address, _shouldBlacklist: bool) -> bool: nonpayable
+interface Switchboard:
+    def setBlacklist(_tokenAddr: address, _addr: address, _shouldBlacklist: bool) -> bool: nonpayable
 
 interface MissionControl:
     def canPerformLiteAction(_user: address) -> bool: view
@@ -47,7 +47,6 @@ interface RipeHq:
     def getAddr(_regId: uint256) -> address: view
 
 flag ActionType:
-    PAUSE
     RECOVER_FUNDS
     RECOVER_FUNDS_MANY
     START_AUCTION
@@ -73,12 +72,6 @@ struct FungAuctionConfig:
     liqUser: address
     vaultId: uint256
     asset: address
-
-event PendingPauseAction:
-    contractAddr: indexed(address)
-    shouldPause: bool
-    confirmationBlock: uint256
-    actionId: uint256
 
 event PendingRecoverFundsAction:
     contractAddr: indexed(address)
@@ -211,10 +204,11 @@ MAX_DEBT_UPDATES: constant(uint256) = 50
 MAX_CLAIM_USERS: constant(uint256) = 50
 
 MISSION_CONTROL_ID: constant(uint256) = 5
-VAULT_BOOK_ID: constant(uint256) = 7
-AUCTION_HOUSE_ID: constant(uint256) = 8
-CREDIT_ENGINE_ID: constant(uint256) = 9
-LOOTBOX_ID: constant(uint256) = 10
+SWITCHBOARD_ID: constant(uint256) = 6
+VAULT_BOOK_ID: constant(uint256) = 8
+AUCTION_HOUSE_ID: constant(uint256) = 9
+CREDIT_ENGINE_ID: constant(uint256) = 13
+LOOTBOX_ID: constant(uint256) = 16
 
 
 @deploy
@@ -279,25 +273,12 @@ def _getVaultBookAddr() -> address:
 
 
 @external
-def pause(_contractAddr: address, _shouldPause: bool) -> uint256:
-    assert gov._canGovern(msg.sender) # dev: no perms
-    assert _contractAddr != empty(address) # dev: invalid contract address
-    
-    aid: uint256 = timeLock._initiateAction()
-    self.actionType[aid] = ActionType.PAUSE
-    self.pendingPauseActions[aid] = PauseAction(
-        contractAddr=_contractAddr,
-        shouldPause=_shouldPause
-    )
-    
-    confirmationBlock: uint256 = timeLock._getActionConfirmationBlock(aid)
-    log PendingPauseAction(
-        contractAddr=_contractAddr,
-        shouldPause=_shouldPause,
-        confirmationBlock=confirmationBlock,
-        actionId=aid
-    )
-    return aid
+def pause(_contractAddr: address, _shouldPause: bool) -> bool:
+    assert self.hasPermsForLiteAction(msg.sender, _shouldPause) # dev: no perms
+
+    extcall RipeEcoContract(_contractAddr).pause(_shouldPause)
+    log PauseExecuted(contractAddr=_contractAddr, shouldPause=_shouldPause)
+    return True
 
 
 #########################
@@ -364,7 +345,8 @@ def setBlacklist(_tokenAddr: address, _addr: address, _shouldBlacklist: bool) ->
     assert self.hasPermsForLiteAction(msg.sender, _shouldBlacklist) # dev: no perms
     assert empty(address) not in [_tokenAddr, _addr] # dev: invalid parameters
 
-    extcall TokenContract(_tokenAddr).setBlacklist(_addr, _shouldBlacklist)
+    switchboard: address = staticcall RipeHq(gov._getRipeHqFromGov()).getAddr(SWITCHBOARD_ID)
+    extcall Switchboard(switchboard).setBlacklist(_tokenAddr, _addr, _shouldBlacklist)
     log BlacklistSet(tokenAddr=_tokenAddr, addr=_addr, isBlacklisted=_shouldBlacklist, caller=msg.sender)
     return True
 
@@ -573,12 +555,7 @@ def executePendingAction(_aid: uint256) -> bool:
 
     actionType: ActionType = self.actionType[_aid]
 
-    if actionType == ActionType.PAUSE:
-        p: PauseAction = self.pendingPauseActions[_aid]
-        extcall RipeEcoContract(p.contractAddr).pause(p.shouldPause)
-        log PauseExecuted(contractAddr=p.contractAddr, shouldPause=p.shouldPause)
-
-    elif actionType == ActionType.RECOVER_FUNDS:
+    if actionType == ActionType.RECOVER_FUNDS:
         p: RecoverFundsAction = self.pendingRecoverFundsActions[_aid]
         extcall RipeEcoContract(p.contractAddr).recoverFunds(p.recipient, p.asset)
         log RecoverFundsExecuted(contractAddr=p.contractAddr, recipient=p.recipient, asset=p.asset)

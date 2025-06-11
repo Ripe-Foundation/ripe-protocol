@@ -40,6 +40,11 @@ interface Lootbox:
     def updateDepositPoints(_user: address, _vaultId: uint256, _vaultAddr: address, _asset: address, _a: addys.Addys = empty(addys.Addys)): nonpayable
     def claimLootForUser(_user: address, _caller: address, _shouldStake: bool, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
 
+interface RipeGovVault:
+    def depositTokensWithLockDuration(_user: address, _asset: address, _amount: uint256, _lockDuration: uint256, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
+    def adjustLock(_user: address, _asset: address, _newLockDuration: uint256, _a: addys.Addys = empty(addys.Addys)): nonpayable
+    def releaseLock(_user: address, _asset: address, _a: addys.Addys = empty(addys.Addys)): nonpayable
+
 interface MissionControl:
     def getTellerWithdrawConfig(_asset: address, _user: address, _caller: address) -> TellerWithdrawConfig: view
     def getTellerDepositConfig(_vaultId: uint256, _asset: address, _user: address) -> TellerDepositConfig: view
@@ -51,6 +56,9 @@ interface Ledger:
 interface VaultBook:
     def getRegId(_vaultAddr: address) -> uint256: view
     def getAddr(_vaultId: uint256) -> address: view
+
+interface BondRoom:
+    def purchaseRipeBond(_user: address, _paymentAsset: address, _paymentAmount: uint256, _lockDuration: uint256, _caller: address, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
 
 struct DepositLedgerData:
     isParticipatingInVault: bool
@@ -130,6 +138,7 @@ MAX_AUCTION_PURCHASES: constant(uint256) = 20
 MAX_LIQ_USERS: constant(uint256) = 50
 MAX_STAB_CLAIMS: constant(uint256) = 15
 MAX_STAB_REDEMPTIONS: constant(uint256) = 15
+RIPE_GOV_VAULT_ID: constant(uint256) = 2
 
 
 @deploy
@@ -154,7 +163,7 @@ def deposit(
 ) -> uint256:
     assert not deptBasics.isPaused # dev: contract paused
     a: addys.Addys = addys._getAddys()
-    amount: uint256 = self._deposit(_asset, _amount, _user, _vaultAddr, _vaultId, msg.sender, a)
+    amount: uint256 = self._deposit(_asset, _amount, _user, _vaultAddr, _vaultId, msg.sender, 0, a)
     extcall CreditEngine(a.creditEngine).updateDebtForUser(_user, a)
     return amount
 
@@ -165,7 +174,7 @@ def depositMany(_user: address, _deposits: DynArray[DepositAction, MAX_BALANCE_A
     assert not deptBasics.isPaused # dev: contract paused
     a: addys.Addys = addys._getAddys()
     for d: DepositAction in _deposits:
-        self._deposit(d.asset, d.amount, _user, d.vaultAddr, d.vaultId, msg.sender, a)
+        self._deposit(d.asset, d.amount, _user, d.vaultAddr, d.vaultId, msg.sender, 0, a)
     extcall CreditEngine(a.creditEngine).updateDebtForUser(_user, a)
     return len(_deposits)
 
@@ -181,6 +190,7 @@ def _deposit(
     _vaultAddr: address,
     _vaultId: uint256,
     _depositor: address,
+    _lockDuration: uint256,
     _a: addys.Addys,
 ) -> uint256:
     vaultAddr: address = empty(address)
@@ -193,7 +203,10 @@ def _deposit(
 
     # deposit tokens
     assert extcall IERC20(_asset).transferFrom(_depositor, vaultAddr, amount, default_return_value=True) # dev: token transfer failed
-    amount = extcall Vault(vaultAddr).depositTokensInVault(_user, _asset, amount, _a)
+    if _lockDuration != 0:
+        amount = extcall RipeGovVault(vaultAddr).depositTokensWithLockDuration(_user, _asset, amount, _lockDuration, _a)
+    else:
+        amount = extcall Vault(vaultAddr).depositTokensInVault(_user, _asset, amount, _a)
 
     # register vault participation
     if not d.isParticipatingInVault:
@@ -228,7 +241,7 @@ def _validateOnDeposit(
     assert config.isUserAllowed # dev: user not on whitelist
 
     # make sure depositor is allowed to deposit for user
-    if _user != _depositor:
+    if _user != _depositor and not addys._isValidRipeAddr(_depositor):
         assert config.canAnyoneDeposit # dev: others cannot deposit for user
 
     # check max vaults, max assets per vault
@@ -630,6 +643,68 @@ def claimLootForManyUsers(_users: DynArray[address, MAX_CLAIM_USERS], _shouldSta
     totalRipe: uint256 = extcall Lootbox(a.lootbox).claimLootForManyUsers(_users, msg.sender, _shouldStake, a)
     extcall CreditEngine(a.creditEngine).updateDebtForUser(msg.sender, a)
     return totalRipe
+
+
+##################
+# Ripe Gov Vault #
+##################
+
+
+@nonreentrant
+@external
+def adjustLock(_asset: address, _newLockDuration: uint256):
+    assert not deptBasics.isPaused # dev: contract paused
+    a: addys.Addys = addys._getAddys()
+    vaultAddr: address = staticcall VaultBook(a.vaultBook).getAddr(RIPE_GOV_VAULT_ID)
+    extcall RipeGovVault(vaultAddr).adjustLock(msg.sender, _asset, _newLockDuration, a)
+    extcall CreditEngine(a.creditEngine).updateDebtForUser(msg.sender, a)
+
+
+@nonreentrant
+@external
+def releaseLock(_asset: address):
+    assert not deptBasics.isPaused # dev: contract paused
+    a: addys.Addys = addys._getAddys()
+    vaultAddr: address = staticcall VaultBook(a.vaultBook).getAddr(RIPE_GOV_VAULT_ID)
+    extcall RipeGovVault(vaultAddr).releaseLock(msg.sender, _asset, a)
+    extcall CreditEngine(a.creditEngine).updateDebtForUser(msg.sender, a)
+
+
+@external
+def depositIntoGovVaultFromTrusted(
+    _user: address,
+    _asset: address,
+    _amount: uint256,
+    _lockDuration: uint256,
+    _a: addys.Addys = empty(addys.Addys),
+) -> uint256:
+    assert addys._isValidRipeAddr(msg.sender) # dev: no perms
+    a: addys.Addys = addys._getAddys(_a)
+    amount: uint256 = self._deposit(_asset, _amount, _user, empty(address), RIPE_GOV_VAULT_ID, msg.sender, _lockDuration, a)
+    extcall CreditEngine(a.creditEngine).updateDebtForUser(_user, a)
+    return amount
+
+
+##################
+# Bond Purchases #
+##################
+
+
+@nonreentrant
+@external
+def purchaseRipeBond(
+    _paymentAsset: address,
+    _paymentAmount: uint256 = max_value(uint256),
+    _lockDuration: uint256 = 0,
+    _user: address = msg.sender,
+) -> uint256:
+    assert not deptBasics.isPaused # dev: contract paused
+    a: addys.Addys = addys._getAddys()
+    paymentAmount: uint256 = min(_paymentAmount, staticcall IERC20(_paymentAsset).balanceOf(msg.sender))
+    assert extcall IERC20(_paymentAsset).transferFrom(msg.sender, a.bondRoom, paymentAmount, default_return_value=True) # dev: token transfer failed
+    ripePayout: uint256 = extcall BondRoom(a.bondRoom).purchaseRipeBond(_user, _paymentAsset, paymentAmount, _lockDuration, msg.sender, a)
+    extcall CreditEngine(a.creditEngine).updateDebtForUser(msg.sender, a)
+    return ripePayout
 
 
 #############

@@ -129,7 +129,7 @@ def test_stab_vault_claims_validation(
     teller,
     mock_price_source,
     vault_book,
-    switchboard_one,
+    switchboard_alpha,
     setGeneralConfig,
     setAssetConfig,
 ):
@@ -145,10 +145,10 @@ def test_stab_vault_claims_validation(
     vault_id = vault_book.getRegId(stability_pool)
 
     # Test claim when paused
-    stability_pool.pause(True, sender=switchboard_one.address)
+    stability_pool.pause(True, sender=switchboard_alpha.address)
     with boa.reverts("contract paused"):
         teller.claimFromStabilityPool(vault_id, alpha_token, bravo_token, sender=bob)
-    stability_pool.pause(False, sender=switchboard_one.address)
+    stability_pool.pause(False, sender=switchboard_alpha.address)
 
     # Test claim with no position - should revert with "nothing claimed"
     with boa.reverts("nothing claimed"):
@@ -861,7 +861,7 @@ def test_stab_vault_claims_config_disabled(
     mock_price_source,
     vault_book,
     savings_green,
-    switchboard_one,
+    switchboard_alpha,
     setGeneralConfig,
     setAssetConfig,
 ):

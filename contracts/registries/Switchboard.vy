@@ -17,8 +17,10 @@ import contracts.registries.modules.AddressRegistry as registry
 import contracts.modules.Addys as addys
 import contracts.modules.DeptBasics as deptBasics
 
-from interfaces import Vault
 from interfaces import Department
+
+interface TokenContract:
+    def setBlacklist(_addr: address, _shouldBlacklist: bool) -> bool: nonpayable
 
 
 @deploy
@@ -28,14 +30,14 @@ def __init__(
     _maxRegistryTimeLock: uint256,
 ):
     gov.__init__(_ripeHq, empty(address), 0, 0, 0)
-    registry.__init__(_minRegistryTimeLock, _maxRegistryTimeLock, 0, "VaultBook.vy")
+    registry.__init__(_minRegistryTimeLock, _maxRegistryTimeLock, 0, "Switchboard.vy")
     addys.__init__(_ripeHq)
     deptBasics.__init__(False, False, False) # no minting
 
 
 @view
 @external
-def isVaultBookAddr(_addr: address) -> bool:
+def isSwitchboardAddr(_addr: address) -> bool:
     return registry._isValidAddr(_addr)
 
 
@@ -70,8 +72,6 @@ def cancelNewAddressToRegistry(_addr: address) -> bool:
 
 @external
 def startAddressUpdateToRegistry(_regId: uint256, _newAddr: address) -> bool:
-    assert not self._doesVaultIdHaveAnyFunds(_regId) # dev: vault has funds
-
     assert gov._canGovern(msg.sender) # dev: no perms
     return registry._startAddressUpdateToRegistry(_regId, _newAddr)
 
@@ -93,8 +93,6 @@ def cancelAddressUpdateToRegistry(_regId: uint256) -> bool:
 
 @external
 def startAddressDisableInRegistry(_regId: uint256) -> bool:
-    assert not self._doesVaultIdHaveAnyFunds(_regId) # dev: vault has funds
-
     assert gov._canGovern(msg.sender) # dev: no perms
     return registry._startAddressDisableInRegistry(_regId)
 
@@ -111,11 +109,16 @@ def cancelAddressDisableInRegistry(_regId: uint256) -> bool:
     return registry._cancelAddressDisableInRegistry(_regId)
 
 
-# check if vault has funds
+#############
+# Blacklist #
+#############
 
 
-@view
-@internal
-def _doesVaultIdHaveAnyFunds(_vaultId: uint256) -> bool:
-    vaultAddr: address = registry._getAddr(_vaultId)
-    return staticcall Vault(vaultAddr).doesVaultHaveAnyFunds()
+# pass thru from specific switchboard contract
+
+
+@external
+def setBlacklist(_tokenAddr: address, _addr: address, _shouldBlacklist: bool) -> bool:
+    assert registry._isValidAddr(msg.sender) # dev: no perms
+    extcall TokenContract(_tokenAddr).setBlacklist(_addr, _shouldBlacklist)
+    return True

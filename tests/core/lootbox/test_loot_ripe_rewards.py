@@ -235,6 +235,7 @@ def test_loot_ripe_rewards_ledger_state(
     lootbox,
     teller,
     ledger,
+    switchboard_alpha,
 ):
     ripe_per_block = 5
     alloc = 25_00  # 25% each
@@ -243,7 +244,7 @@ def test_loot_ripe_rewards_ledger_state(
 
     # Set initial available rewards
     initial_avail = 1000
-    ledger.setRipeAvailForRewards(initial_avail, sender=lootbox.address)
+    ledger.setRipeAvailForRewards(initial_avail, sender=switchboard_alpha.address)
 
     # Set config and update
     setRipeRewardsConfig(True, ripe_per_block, alloc, alloc, alloc, alloc)
@@ -275,6 +276,7 @@ def test_loot_ripe_rewards_ledger_accumulation(
     lootbox,
     teller,
     ledger,
+    switchboard_alpha,
 ):
     ripe_per_block = 5
     alloc = 25_00  # 25% each
@@ -283,7 +285,7 @@ def test_loot_ripe_rewards_ledger_accumulation(
 
     # Set initial available rewards
     initial_avail = 1000
-    ledger.setRipeAvailForRewards(initial_avail, sender=lootbox.address)
+    ledger.setRipeAvailForRewards(initial_avail, sender=switchboard_alpha.address)
 
     # Set config and do multiple updates
     setRipeRewardsConfig(True, ripe_per_block, alloc, alloc, alloc, alloc)
@@ -316,6 +318,7 @@ def test_loot_ripe_rewards_limits(
     lootbox,
     teller,
     ledger,
+    switchboard_alpha,
 ):
     ripe_per_block = 5
     alloc = 25_00  # 25% each
@@ -324,7 +327,7 @@ def test_loot_ripe_rewards_limits(
 
     # Set available rewards less than what would be distributed
     initial_avail = expected_total // 2
-    ledger.setRipeAvailForRewards(initial_avail, sender=lootbox.address)
+    ledger.setRipeAvailForRewards(initial_avail, sender=switchboard_alpha.address)
 
     setRipeRewardsConfig(True, ripe_per_block, alloc, alloc, alloc, alloc)
     lootbox.updateRipeRewards(sender=teller.address)  # Initial update
@@ -358,15 +361,15 @@ def test_loot_ripe_rewards_permissions(
     with boa.reverts("only Lootbox allowed"):
         ledger.setRipeRewards((0, 0, 0, 0, 0, 0), sender=bob)
 
-    # Only Lootbox can call setRipeAvailForRewards
-    with boa.reverts("only Lootbox allowed"):
+    # Only switchboards can call setRipeAvailForRewards
+    with boa.reverts("no perms"):
         ledger.setRipeAvailForRewards(1000, sender=bob)
 
 
 def test_loot_ripe_rewards_pause(
     setRipeRewardsConfig,
     lootbox,
-    switchboard_one,
+    switchboard_alpha,
     teller,
 ):
     ripe_per_block = 5
@@ -375,7 +378,7 @@ def test_loot_ripe_rewards_pause(
     setRipeRewardsConfig(True, ripe_per_block, alloc, alloc, alloc, alloc)
     
     # Pause the contract
-    lootbox.pause(True, sender=switchboard_one.address)
+    lootbox.pause(True, sender=switchboard_alpha.address)
     
     # Cannot update rewards when paused
     with boa.reverts("contract paused"):

@@ -39,7 +39,7 @@ def performDeposit(teller, simple_erc20_vault, alpha_token, alpha_token_whale):
 
 
 @pytest.fixture(scope="session")
-def setGeneralConfig(mission_control, switchboard_one):
+def setGeneralConfig(mission_control, switchboard_alpha):
     def setGeneralConfig(
         _perUserMaxVaults = 5,
         _perUserMaxAssetsPerVault = 10,
@@ -70,12 +70,12 @@ def setGeneralConfig(mission_control, switchboard_one):
             _canBuyInAuction,
             _canClaimInStabPool,
         )
-        mission_control.setGeneralConfig(gen_config, sender=switchboard_one.address)
+        mission_control.setGeneralConfig(gen_config, sender=switchboard_alpha.address)
     yield setGeneralConfig
 
 
 @pytest.fixture(scope="session")
-def setGeneralDebtConfig(mission_control, switchboard_one, createAuctionParams):
+def setGeneralDebtConfig(mission_control, switchboard_alpha, createAuctionParams):
     def setGeneralDebtConfig(
         _perUserDebtLimit = MAX_UINT256,
         _globalDebtLimit = MAX_UINT256,
@@ -102,7 +102,7 @@ def setGeneralDebtConfig(mission_control, switchboard_one, createAuctionParams):
             _ltvPaybackBuffer,
             _genAuctionParams,
         )
-        mission_control.setGeneralDebtConfig(debt_config, sender=switchboard_one.address)
+        mission_control.setGeneralDebtConfig(debt_config, sender=switchboard_alpha.address)
     yield setGeneralDebtConfig
 
 
@@ -130,10 +130,10 @@ def createAuctionParams():
 
 
 @pytest.fixture(scope="session")
-def setAssetConfig(mission_control, switchboard_two, createDebtTerms):
+def setAssetConfig(mission_control, switchboard_bravo, createDebtTerms):
     def setAssetConfig(
         _asset,
-        _vaultIds = [2], # default simple erc20 vault
+        _vaultIds = [3], # default simple erc20 vault
         _stakersPointsAlloc = 10,
         _voterPointsAlloc = 10,
         _perUserDepositLimit = MAX_UINT256,
@@ -176,7 +176,7 @@ def setAssetConfig(mission_control, switchboard_two, createDebtTerms):
             _whitelist,
             _isNft,
         )
-        mission_control.setAssetConfig(_asset, asset_config, sender=switchboard_two.address)
+        mission_control.setAssetConfig(_asset, asset_config, sender=switchboard_bravo.address)
     yield setAssetConfig
 
 
@@ -207,7 +207,7 @@ def createDebtTerms():
 
 
 @pytest.fixture(scope="session")
-def setRipeRewardsConfig(mission_control, switchboard_one):
+def setRipeRewardsConfig(mission_control, switchboard_alpha):
     def setRipeRewardsConfig(
         _arePointsEnabled = True,
         _ripePerBlock = 10,
@@ -215,6 +215,8 @@ def setRipeRewardsConfig(mission_control, switchboard_one):
         _stakersAlloc = 25_00,
         _votersAlloc = 25_00,
         _genDepositorsAlloc = 25_00,
+        _autoStakeRatio = 0,
+        _autoStakeDurationRatio = 0,
     ):
         config = (
             _arePointsEnabled,
@@ -223,8 +225,10 @@ def setRipeRewardsConfig(mission_control, switchboard_one):
             _stakersAlloc,
             _votersAlloc,
             _genDepositorsAlloc,
+            _autoStakeRatio,
+            _autoStakeDurationRatio,
         )
-        mission_control.setRipeRewardsConfig(config, sender=switchboard_one.address)
+        mission_control.setRipeRewardsConfig(config, sender=switchboard_alpha.address)
     yield setRipeRewardsConfig
 
 
@@ -239,8 +243,9 @@ def setUserConfig(mission_control):
         _user,
         _canAnyoneDeposit = True,
         _canAnyoneRepayDebt = True,
+        _canAnyoneBondForUser = False,
     ):
-        mission_control.setUserConfig(_canAnyoneDeposit, _canAnyoneRepayDebt, sender=_user)
+        mission_control.setUserConfig(_canAnyoneDeposit, _canAnyoneRepayDebt, _canAnyoneBondForUser, sender=_user)
     yield setUserConfig
 
 

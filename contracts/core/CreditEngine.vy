@@ -897,14 +897,14 @@ def _getLatestUserDebtAndTerms(
 
 @external
 def updateDebtForUser(_user: address, _a: addys.Addys = empty(addys.Addys)) -> bool:
-    assert addys._isValidRipeHqAddr(msg.sender) # dev: no perms
+    assert addys._isValidRipeAddr(msg.sender) # dev: no perms
     assert not deptBasics.isPaused # dev: contract paused
     return self._updateDebtForUser(_user, addys._getAddys(_a))
 
 
 @external
 def updateDebtForManyUsers(_users: DynArray[address, MAX_DEBT_UPDATES], _a: addys.Addys = empty(addys.Addys)) -> bool:
-    assert addys._isValidRipeHqAddr(msg.sender) # dev: no perms
+    assert addys._isValidRipeAddr(msg.sender) # dev: no perms
     assert not deptBasics.isPaused # dev: contract paused
     a: addys.Addys = addys._getAddys(_a)
     for u: address in _users:
@@ -970,6 +970,10 @@ def _checkDebtHealth(_user: address, _debtType: uint256, _a: addys.Addys) -> boo
     userDebt, bt, na = self._getLatestUserDebtAndTerms(_user, False, a)
     if userDebt.amount == 0:
         return _debtType == 1 # nothing to check
+
+    # in liquidation, can't do anything
+    if userDebt.inLiquidation:
+        return False
 
     # check debt health
     if _debtType == 1:

@@ -69,6 +69,8 @@ struct RipeRewardsConfig:
     stakersAlloc: uint256
     votersAlloc: uint256
     genDepositorsAlloc: uint256
+    autoStakeRatio: uint256
+    autoStakeDurationRatio: uint256
 
 struct AssetConfig:
     vaultIds: DynArray[uint256, MAX_VAULTS_PER_ASSET]
@@ -99,6 +101,7 @@ struct TotalPointsAllocs:
 struct UserConfig:
     canAnyoneDeposit: bool
     canAnyoneRepayDebt: bool
+    canAnyoneBondForUser: bool
 
 struct ActionDelegation:
     canWithdraw: bool
@@ -129,6 +132,21 @@ struct VaultData:
     vaultId: uint256
     vaultAddr: address
     asset: address
+
+struct LockTerms:
+    minLockDuration: uint256
+    maxLockDuration: uint256
+    maxLockBoost: uint256
+    canExit: bool
+    exitFee: uint256
+
+struct HrConfig:
+    contribTemplate: address
+    maxCompensation: uint256
+    minCliffLength: uint256
+    maxStartDelay: uint256
+    minVestingLength: uint256
+    maxVestingLength: uint256
 
 # helpers
 
@@ -207,6 +225,10 @@ struct StabPoolRedemptionsConfig:
 struct ClaimLootConfig:
     canClaimLoot: bool
     canClaimLootForUser: bool
+    autoStakeRatio: uint256
+    autoStakeDurationRatio: uint256
+    minLockDuration: uint256
+    maxLockDuration: uint256
 
 struct RewardsConfig:
     arePointsEnabled: bool
@@ -227,12 +249,43 @@ struct PriceConfig:
     staleTime: uint256
     priorityPriceSourceIds: DynArray[uint256, MAX_PRIORITY_PRICE_SOURCES]
 
+struct RipeGovVaultConfig:
+    lockTerms: LockTerms
+    assetWeight: uint256
+    shouldFreezeWhenBadDebt: bool
+
+struct RipeBondConfig:
+    asset: address
+    amountPerEpoch: uint256
+    canBond: bool
+    minRipePerUnit: uint256
+    maxRipePerUnit: uint256
+    maxRipePerUnitLockBonus: uint256
+    epochLength: uint256
+    shouldAutoRestart: bool
+    restartDelayBlocks: uint256
+
+struct PurchaseRipeBondConfig:
+    asset: address
+    amountPerEpoch: uint256
+    canBond: bool
+    minRipePerUnit: uint256
+    maxRipePerUnit: uint256
+    maxRipePerUnitLockBonus: uint256
+    epochLength: uint256
+    shouldAutoRestart: bool
+    restartDelayBlocks: uint256
+    minLockDuration: uint256
+    maxLockDuration: uint256
+    canAnyoneBondForUser: bool
+
 # events
 
 event UserConfigSet:
     user: indexed(address)
     canAnyoneDeposit: bool
     canAnyoneRepayDebt: bool
+    canAnyoneBondForUser: bool
 
 event UserDelegationSet:
     user: indexed(address)
@@ -270,6 +323,9 @@ priorityStabVaults: public(DynArray[VaultLite, PRIORITY_VAULT_DATA])
 underscoreRegistry: public(address)
 canPerformLiteAction: public(HashMap[address, bool]) # user -> canPerformLiteAction
 maxLtvDeviation: public(uint256)
+ripeGovVaultConfig: public(HashMap[address, RipeGovVaultConfig]) # asset -> config
+hrConfig: public(HrConfig)
+ripeBondConfig: public(RipeBondConfig)
 
 MAX_VAULTS_PER_ASSET: constant(uint256) = 10
 MAX_PRIORITY_PRICE_SOURCES: constant(uint256) = 10
@@ -296,7 +352,7 @@ def __init__(_ripeHq: address):
 
 @external
 def setGeneralConfig(_config: GenConfig):
-    assert addys._canModifyMissionControl(msg.sender) # dev: no perms
+    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
     self.genConfig = _config
 
 
@@ -305,7 +361,7 @@ def setGeneralConfig(_config: GenConfig):
 
 @external
 def setGeneralDebtConfig(_config: GenDebtConfig):
-    assert addys._canModifyMissionControl(msg.sender) # dev: no perms
+    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
     self.genDebtConfig = _config
 
 
@@ -314,7 +370,7 @@ def setGeneralDebtConfig(_config: GenDebtConfig):
 
 @external
 def setRipeRewardsConfig(_config: RipeRewardsConfig):
-    assert addys._canModifyMissionControl(msg.sender) # dev: no perms
+    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
     self.rewardsConfig = _config
 
 
@@ -325,7 +381,7 @@ def setRipeRewardsConfig(_config: RipeRewardsConfig):
 
 @external
 def setAssetConfig(_asset: address, _config: AssetConfig):
-    assert addys._canModifyMissionControl(msg.sender) # dev: no perms
+    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
     self._updatePointsAllocs(_asset, _config.stakersPointsAlloc, _config.voterPointsAlloc) # do first!
     self.assetConfig[_asset] = _config
 
@@ -365,7 +421,7 @@ def _registerAsset(_asset: address):
 
 @external
 def deregisterAsset(_asset: address) -> bool:
-    assert addys._canModifyMissionControl(msg.sender) # dev: no perms
+    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
 
     numAssets: uint256 = self.numAssets
     if numAssets == 0:
@@ -429,7 +485,7 @@ def _getNumAssets() -> uint256:
 
 @external
 def setPriorityPriceSourceIds(_priorityIds: DynArray[uint256, MAX_PRIORITY_PRICE_SOURCES]):
-    assert addys._canModifyMissionControl(msg.sender) # dev: no perms
+    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
     self.priorityPriceSourceIds = _priorityIds
 
 
@@ -444,7 +500,7 @@ def getPriorityPriceSourceIds() -> DynArray[uint256, MAX_PRIORITY_PRICE_SOURCES]
 
 @external
 def setPriorityLiqAssetVaults(_priorityLiqAssetVaults: DynArray[VaultLite, PRIORITY_VAULT_DATA]):
-    assert addys._canModifyMissionControl(msg.sender) # dev: no perms
+    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
     self.priorityLiqAssetVaults = _priorityLiqAssetVaults
 
 
@@ -459,7 +515,7 @@ def getPriorityLiqAssetVaults() -> DynArray[VaultLite, PRIORITY_VAULT_DATA]:
 
 @external
 def setPriorityStabVaults(_priorityStabVaults: DynArray[VaultLite, PRIORITY_VAULT_DATA]):
-    assert addys._canModifyMissionControl(msg.sender) # dev: no perms
+    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
     self.priorityStabVaults = _priorityStabVaults
 
 
@@ -479,7 +535,7 @@ def getPriorityStabVaults() -> DynArray[VaultLite, PRIORITY_VAULT_DATA]:
 
 @external
 def setUnderscoreRegistry(_underscoreRegistry: address):
-    assert addys._canModifyMissionControl(msg.sender) # dev: no perms
+    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
     self.underscoreRegistry = _underscoreRegistry
 
 
@@ -488,7 +544,7 @@ def setUnderscoreRegistry(_underscoreRegistry: address):
 
 @external
 def setCanPerformLiteAction(_user: address, _canDo: bool):
-    assert addys._canModifyMissionControl(msg.sender) # dev: no perms
+    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
     self.canPerformLiteAction[_user] = _canDo
 
 
@@ -497,7 +553,7 @@ def setCanPerformLiteAction(_user: address, _canDo: bool):
 
 @external
 def setMaxLtvDeviation(_maxLtvDeviation: uint256):
-    assert addys._canModifyMissionControl(msg.sender) # dev: no perms
+    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
     self.maxLtvDeviation = _maxLtvDeviation
 
 
@@ -520,14 +576,16 @@ def getPriceStaleTime() -> uint256:
 def setUserConfig(
     _canAnyoneDeposit: bool = True,
     _canAnyoneRepayDebt: bool = True,
+    _canAnyoneBondForUser: bool = False,
 ) -> bool:
     assert not deptBasics.isPaused # dev: contract paused
     userConfig: UserConfig = UserConfig(
         canAnyoneDeposit=_canAnyoneDeposit,
         canAnyoneRepayDebt=_canAnyoneRepayDebt,
+        canAnyoneBondForUser=_canAnyoneBondForUser,
     )
     self.userConfig[msg.sender] = userConfig
-    log UserConfigSet(user=msg.sender, canAnyoneDeposit=_canAnyoneDeposit, canAnyoneRepayDebt=_canAnyoneRepayDebt)
+    log UserConfigSet(user=msg.sender, canAnyoneDeposit=_canAnyoneDeposit, canAnyoneRepayDebt=_canAnyoneRepayDebt, canAnyoneBondForUser=_canAnyoneBondForUser)
     return True
 
 
@@ -585,6 +643,48 @@ def _isUnderscoreWalletOwner(_user: address, _caller: address) -> bool:
 
     # caller must be owner!
     return staticcall UnderscoreWalletConfig(walletConfig).owner() == _caller
+
+
+#########################
+# Ripe Gov Vault Config #
+#########################
+
+
+@external
+def setRipeGovVaultConfig(
+    _asset: address,
+    _assetWeight: uint256,
+    _shouldFreezeWhenBadDebt: bool,
+    _lockTerms: LockTerms,
+):
+    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
+    self.ripeGovVaultConfig[_asset] = RipeGovVaultConfig(
+        lockTerms=_lockTerms,
+        assetWeight=_assetWeight,
+        shouldFreezeWhenBadDebt=_shouldFreezeWhenBadDebt,
+    )
+
+
+#############
+# HR Config #
+#############
+
+
+@external
+def setHrConfig(_config: HrConfig):
+    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
+    self.hrConfig = _config
+
+
+####################
+# Ripe Bond Config #
+####################
+
+
+@external
+def setRipeBondConfig(_config: RipeBondConfig):
+    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
+    self.ripeBondConfig = _config
 
 
 ###################
@@ -836,14 +936,22 @@ def getStabPoolRedemptionsConfig(_asset: address, _redeemer: address) -> StabPoo
 
 @view
 @external
-def getClaimLootConfig(_user: address, _caller: address) -> ClaimLootConfig:
+def getClaimLootConfig(_user: address, _caller: address, _ripeToken: address) -> ClaimLootConfig:
     canClaimLootForUser: bool = True
     if _user != _caller:
         delegation: ActionDelegation = self.userDelegation[_user][_caller]
         canClaimLootForUser = delegation.canClaimLoot
+
+    ripeTokenVaultConfig: RipeGovVaultConfig = self.ripeGovVaultConfig[_ripeToken]
+    rewardsConfig: RipeRewardsConfig = self.rewardsConfig
+
     return ClaimLootConfig(
         canClaimLoot=self.genConfig.canClaimLoot,
         canClaimLootForUser=canClaimLootForUser,
+        autoStakeRatio=rewardsConfig.autoStakeRatio,
+        autoStakeDurationRatio=rewardsConfig.autoStakeDurationRatio,
+        minLockDuration=ripeTokenVaultConfig.lockTerms.minLockDuration,
+        maxLockDuration=ripeTokenVaultConfig.lockTerms.maxLockDuration,
     )
 
 
@@ -890,4 +998,29 @@ def getPriceConfig() -> PriceConfig:
     return PriceConfig(
         staleTime=self.genConfig.priceStaleTime,
         priorityPriceSourceIds=self.priorityPriceSourceIds,
+    )
+
+
+# ripe bond config
+
+
+@view
+@external
+def getPurchaseRipeBondConfig(_user: address) -> PurchaseRipeBondConfig:
+    config: RipeBondConfig = self.ripeBondConfig
+    vaultConfig: RipeGovVaultConfig = self.ripeGovVaultConfig[addys._getRipeToken()]
+
+    return PurchaseRipeBondConfig(
+        asset=config.asset,
+        amountPerEpoch=config.amountPerEpoch,
+        canBond=config.canBond,
+        minRipePerUnit=config.minRipePerUnit,
+        maxRipePerUnit=config.maxRipePerUnit,
+        maxRipePerUnitLockBonus=config.maxRipePerUnitLockBonus,
+        epochLength=config.epochLength,
+        shouldAutoRestart=config.shouldAutoRestart,
+        restartDelayBlocks=config.restartDelayBlocks,
+        minLockDuration=vaultConfig.lockTerms.minLockDuration,
+        maxLockDuration=vaultConfig.lockTerms.maxLockDuration,
+        canAnyoneBondForUser=self.userConfig[_user].canAnyoneBondForUser,
     )

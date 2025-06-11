@@ -8,7 +8,7 @@ def test_stab_vault_deposit_validation(
     stability_pool,
     alpha_token,
     alpha_token_whale,
-    switchboard_one,
+    switchboard_alpha,
     bob,
     teller,
     mock_price_source,
@@ -29,10 +29,10 @@ def test_stab_vault_deposit_validation(
         stability_pool.depositTokensInVault(bob, alpha_token, 0, sender=teller.address)
 
     # Test deposit when paused
-    stability_pool.pause(True, sender=switchboard_one.address)
+    stability_pool.pause(True, sender=switchboard_alpha.address)
     with boa.reverts("contract paused"):
         stability_pool.depositTokensInVault(bob, alpha_token, 100, sender=teller.address)
-    stability_pool.pause(False, sender=switchboard_one.address)
+    stability_pool.pause(False, sender=switchboard_alpha.address)
 
     # Test deposit with amount larger than balance
     large_amount = 1000000 * EIGHTEEN_DECIMALS
@@ -1223,7 +1223,7 @@ def test_stab_vault_swap_with_claimable_green_validation(
     alice,
     teller,
     auction_house,
-    switchboard_one,
+    switchboard_alpha,
     mock_price_source,
     green_token,
     setGeneralConfig,
@@ -1246,13 +1246,13 @@ def test_stab_vault_swap_with_claimable_green_validation(
     stability_pool.depositTokensInVault(alice, alpha_token, deposit_amount, sender=teller.address)
 
     # Test when paused
-    stability_pool.pause(True, sender=switchboard_one.address)
+    stability_pool.pause(True, sender=switchboard_alpha.address)
     with boa.reverts("contract paused"):
         stability_pool.swapWithClaimableGreen(
             alpha_token, 50 * EIGHTEEN_DECIMALS, charlie_token, 50 * (10 ** charlie_token.decimals()),
             green_token, sender=auction_house.address
         )
-    stability_pool.pause(False, sender=switchboard_one.address)
+    stability_pool.pause(False, sender=switchboard_alpha.address)
 
     # Test unauthorized caller
     with boa.reverts("only AuctionHouse allowed"):

@@ -28,7 +28,7 @@ def test_ah_liquidation_with_claimable_green_basic(
     auction_house,
     stability_pool,
     vault_book,
-    switchboard_one,
+    switchboard_alpha,
     mission_control,
     _test,
 ):
@@ -62,7 +62,7 @@ def test_ah_liquidation_with_claimable_green_basic(
     setAssetConfig(green_token, _vaultIds=[1], _debtTerms=stab_debt_terms, _shouldBurnAsPayment=True)
     
     stab_id = vault_book.getRegId(stability_pool)
-    mission_control.setPriorityStabVaults([(stab_id, bravo_token)], sender=switchboard_one.address)
+    mission_control.setPriorityStabVaults([(stab_id, bravo_token)], sender=switchboard_alpha.address)
     
     # Setup prices
     mock_price_source.setPrice(alpha_token, 1 * EIGHTEEN_DECIMALS)
@@ -163,7 +163,7 @@ def test_ah_liquidation_claimable_green_insufficient(
     auction_house,
     stability_pool,
     vault_book,
-    switchboard_one,
+    switchboard_alpha,
     mission_control,
     _test,
 ):
@@ -195,7 +195,7 @@ def test_ah_liquidation_claimable_green_insufficient(
     setAssetConfig(green_token, _debtTerms=stab_debt_terms, _shouldBurnAsPayment=True)
     
     stab_id = vault_book.getRegId(stability_pool)
-    mission_control.setPriorityStabVaults([(stab_id, bravo_token)], sender=switchboard_one.address)
+    mission_control.setPriorityStabVaults([(stab_id, bravo_token)], sender=switchboard_alpha.address)
     
     # Setup prices
     mock_price_source.setPrice(alpha_token, 1 * EIGHTEEN_DECIMALS)
@@ -303,7 +303,7 @@ def test_ah_liquidation_multiple_stab_assets_with_claimable_green(
     auction_house,
     stability_pool,
     vault_book,
-    switchboard_one,
+    switchboard_alpha,
     mission_control,
     _test,
 ):
@@ -335,7 +335,7 @@ def test_ah_liquidation_multiple_stab_assets_with_claimable_green(
     setAssetConfig(green_token, _debtTerms=stab_debt_terms, _shouldBurnAsPayment=True)
     
     stab_id = vault_book.getRegId(stability_pool)
-    mission_control.setPriorityStabVaults([(stab_id, bravo_token)], sender=switchboard_one.address)
+    mission_control.setPriorityStabVaults([(stab_id, bravo_token)], sender=switchboard_alpha.address)
     
     # Setup prices
     mock_price_source.setPrice(alpha_token, 1 * EIGHTEEN_DECIMALS)
@@ -440,7 +440,7 @@ def test_ah_liquidation_claimable_green_exact_amount(
     auction_house,
     stability_pool,
     vault_book,
-    switchboard_one,
+    switchboard_alpha,
     mission_control,
     _test,
 ):
@@ -472,7 +472,7 @@ def test_ah_liquidation_claimable_green_exact_amount(
     setAssetConfig(green_token, _debtTerms=stab_debt_terms, _shouldBurnAsPayment=True)
     
     stab_id = vault_book.getRegId(stability_pool)
-    mission_control.setPriorityStabVaults([(stab_id, charlie_token)], sender=switchboard_one.address)
+    mission_control.setPriorityStabVaults([(stab_id, charlie_token)], sender=switchboard_alpha.address)
     
     # Setup prices
     mock_price_source.setPrice(alpha_token, 1 * EIGHTEEN_DECIMALS)
@@ -576,7 +576,7 @@ def test_ah_liquidation_no_claimable_green_fallback(
     auction_house,
     stability_pool,
     vault_book,
-    switchboard_one,
+    switchboard_alpha,
     mission_control,
     _test,
 ):
@@ -607,7 +607,7 @@ def test_ah_liquidation_no_claimable_green_fallback(
     setAssetConfig(green_token, _debtTerms=stab_debt_terms, _shouldBurnAsPayment=True)
     
     stab_id = vault_book.getRegId(stability_pool)
-    mission_control.setPriorityStabVaults([(stab_id, charlie_token)], sender=switchboard_one.address)
+    mission_control.setPriorityStabVaults([(stab_id, charlie_token)], sender=switchboard_alpha.address)
     
     # Setup prices
     mock_price_source.setPrice(alpha_token, 1 * EIGHTEEN_DECIMALS)
@@ -684,7 +684,7 @@ def test_ah_liquidation_claimable_green_price_discrepancy(
     auction_house,
     stability_pool,
     vault_book,
-    switchboard_one,
+    switchboard_alpha,
     mission_control,
     _test,
 ):
@@ -716,7 +716,7 @@ def test_ah_liquidation_claimable_green_price_discrepancy(
     setAssetConfig(green_token, _debtTerms=stab_debt_terms, _shouldBurnAsPayment=True)
     
     stab_id = vault_book.getRegId(stability_pool)
-    mission_control.setPriorityStabVaults([(stab_id, bravo_token)], sender=switchboard_one.address)
+    mission_control.setPriorityStabVaults([(stab_id, bravo_token)], sender=switchboard_alpha.address)
     
     # Setup initial prices
     mock_price_source.setPrice(alpha_token, 1 * EIGHTEEN_DECIMALS)
@@ -805,7 +805,7 @@ def test_ah_liquidation_claimable_green_with_keeper_fees(
     auction_house,
     stability_pool,
     vault_book,
-    switchboard_one,
+    switchboard_alpha,
     mission_control,
     _test,
 ):
@@ -841,7 +841,7 @@ def test_ah_liquidation_claimable_green_with_keeper_fees(
     setAssetConfig(green_token, _debtTerms=stab_debt_terms, _shouldBurnAsPayment=True)
     
     stab_id = vault_book.getRegId(stability_pool)
-    mission_control.setPriorityStabVaults([(stab_id, bravo_token)], sender=switchboard_one.address)
+    mission_control.setPriorityStabVaults([(stab_id, bravo_token)], sender=switchboard_alpha.address)
     
     # Setup prices
     mock_price_source.setPrice(alpha_token, 1 * EIGHTEEN_DECIMALS)
@@ -939,7 +939,7 @@ def test_ah_liquidation_claimable_green_depletion_edge_case(
     auction_house,
     stability_pool,
     vault_book,
-    switchboard_one,
+    switchboard_alpha,
     mission_control,
     _test,
 ):
@@ -971,7 +971,7 @@ def test_ah_liquidation_claimable_green_depletion_edge_case(
     setAssetConfig(green_token, _debtTerms=stab_debt_terms, _shouldBurnAsPayment=True)
     
     stab_id = vault_book.getRegId(stability_pool)
-    mission_control.setPriorityStabVaults([(stab_id, bravo_token)], sender=switchboard_one.address)
+    mission_control.setPriorityStabVaults([(stab_id, bravo_token)], sender=switchboard_alpha.address)
     
     # Setup prices
     mock_price_source.setPrice(alpha_token, 1 * EIGHTEEN_DECIMALS)

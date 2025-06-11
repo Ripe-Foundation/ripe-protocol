@@ -862,7 +862,7 @@ def startAuction(
     _liqAsset: address,
     _a: addys.Addys = empty(addys.Addys),
 ) -> bool:
-    assert addys._canModifyMissionControl(msg.sender) # dev: no perms
+    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
     assert not deptBasics.isPaused # dev: contract paused
     a: addys.Addys = addys._getAddys(_a)
     genParams: AuctionParams = staticcall MissionControl(a.missionControl).getGenAuctionParams()
@@ -874,7 +874,7 @@ def startManyAuctions(
     _auctions: DynArray[FungAuctionConfig, MAX_AUCTIONS],
     _a: addys.Addys = empty(addys.Addys),
 ) -> uint256:
-    assert addys._canModifyMissionControl(msg.sender) # dev: no perms
+    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
     assert not deptBasics.isPaused # dev: contract paused
     a: addys.Addys = addys._getAddys(_a)
 
@@ -1005,7 +1005,7 @@ def pauseAuction(
     _liqAsset: address,
     _a: addys.Addys = empty(addys.Addys),
 ) -> bool:
-    assert addys._canModifyMissionControl(msg.sender) # dev: no perms
+    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
     assert not deptBasics.isPaused # dev: contract paused
     a: addys.Addys = addys._getAddys(_a)
     return self._pauseAuction(_liqUser, _liqVaultId, _liqAsset, a.ledger)
@@ -1016,7 +1016,7 @@ def pauseManyAuctions(
     _auctions: DynArray[FungAuctionConfig, MAX_AUCTIONS],
     _a: addys.Addys = empty(addys.Addys),
 ) -> uint256:
-    assert addys._canModifyMissionControl(msg.sender) # dev: no perms
+    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
     assert not deptBasics.isPaused # dev: contract paused
     a: addys.Addys = addys._getAddys(_a)
 
