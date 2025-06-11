@@ -110,6 +110,7 @@ def _purchaseRipeBond(
 
     config: PurchaseRipeBondConfig = staticcall MissionControl(_a.missionControl).getPurchaseRipeBondConfig(_user)
     assert config.asset == _paymentAsset # dev: asset mismatch
+    assert config.maxRipePerUnit != 0 # dev: max ripe per unit is zero
     assert config.canBond # dev: bonds disabled
     if _user != _caller:
         assert config.canAnyoneBondForUser # dev: cannot bond for user
@@ -120,7 +121,7 @@ def _purchaseRipeBond(
     epochStart, epochEnd = self._refreshBondEpoch(_a.ledger, config.amountPerEpoch, config.epochLength)
     assert block.number >= epochStart and block.number < epochEnd # dev: not within epoch window
 
-    # check availability - do after epoch refresh!
+    # check availability - do AFTER epoch refresh!
     data: RipeBondData = staticcall Ledger(_a.ledger).getRipeBondData()
     assert data.paymentAmountAvailInEpoch != 0 # dev: no more available in epoch
     paymentAmount: uint256 = min(maxUserAmount, data.paymentAmountAvailInEpoch)
@@ -192,6 +193,62 @@ def _calcRipePerUnit(_ratio: uint256, _minRipePerUnit: uint256, _maxRipePerUnit:
     valRange: uint256 = _maxRipePerUnit - _minRipePerUnit
     adjustment: uint256 =  _ratio * valRange // HUNDRED_PERCENT
     return _minRipePerUnit + adjustment
+
+
+# views / helpers
+
+ 
+@view
+@external
+def previewRipeBondPayout(_lockDuration: uint256 = 0, _paymentAmount: uint256 = max_value(uint256)) -> uint256:
+    config: PurchaseRipeBondConfig = staticcall MissionControl(addys._getMissionControlAddr()).getPurchaseRipeBondConfig(empty(address))
+    if config.maxRipePerUnit == 0 or not config.canBond:
+        return 0
+
+    # get epoch data
+    ledger: address = addys._getLedgerAddr()
+    epochStart: uint256 = 0
+    epochEnd: uint256 = 0
+    epochStart, epochEnd = staticcall Ledger(ledger).getEpochData()
+    didChange: bool = False
+    epochStart, epochEnd, didChange = self._getLatestEpochBlockTimes(epochStart, epochEnd, config.epochLength)
+
+    # check availability
+    data: RipeBondData = staticcall Ledger(ledger).getRipeBondData()
+    paymentAmountAvailInEpoch: uint256 = data.paymentAmountAvailInEpoch
+    if didChange:
+        paymentAmountAvailInEpoch = config.amountPerEpoch
+
+    paymentAmount: uint256 = min(_paymentAmount, paymentAmountAvailInEpoch)
+    if paymentAmount == 0:
+        return 0
+
+    # base ripe payout
+    epochProgress: uint256 = (block.number - epochStart) * HUNDRED_PERCENT // (epochEnd - epochStart)
+    baseRipePerUnit: uint256 = self._calcRipePerUnit(epochProgress, config.minRipePerUnit, config.maxRipePerUnit)
+
+    # bonus for lock duration
+    ripePerUnitBonus: uint256 = 0
+    lockDuration: uint256 = min(_lockDuration, config.maxLockDuration)
+    if lockDuration >= config.minLockDuration:
+        ripePerUnitBonus = config.maxRipePerUnitLockBonus * (lockDuration - config.minLockDuration) // (config.maxLockDuration - config.minLockDuration)
+
+    # finalize ripe payout
+    ripePerUnit: uint256 = baseRipePerUnit + ripePerUnitBonus
+    ripePayout: uint256 = ripePerUnit * paymentAmount // (10 ** convert(staticcall IERC20Detailed(config.asset).decimals(), uint256))
+    return ripePayout
+
+
+@view
+@external
+def previewNextEpoch() -> (uint256, uint256):
+    config: PurchaseRipeBondConfig = staticcall MissionControl(addys._getMissionControlAddr()).getPurchaseRipeBondConfig(empty(address))
+    epochStart: uint256 = 0
+    epochEnd: uint256 = 0
+    epochStart, epochEnd = staticcall Ledger(addys._getLedgerAddr()).getEpochData()
+    na: bool = False
+    epochStart, epochEnd, na = self._getLatestEpochBlockTimes(epochStart, epochEnd, config.epochLength)
+    return epochStart, epochEnd
 
 
 ##########
