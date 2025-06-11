@@ -1,7 +1,7 @@
 {
   "contracts": {
     "GreenToken": {
-      "address": "0xB2d9B97fd379a91f4ba4457BB2dcD162D9676576",
+      "address": "0xE780e53e463eC4176fCCfbc22300587BbAe54FC0",
       "abi": [
         {
           "name": "Transfer",
@@ -890,7 +890,7 @@
       "args": "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000003fbe79100d2b637d577f1d2d8d14c9825f869db7000000000000000000000000000000000000000000000000000000000000a8c00000000000000000000000000000000000000000000000000000000000049d4000000000000000000000000000000000000000000000003635c9adc5dea000000000000000000000000000003fbe79100d2b637d577f1d2d8d14c9825f869db7"
     },
     "RipeToken": {
-      "address": "0x7563dE9626990658111Ed4AC21fA0149e49C6AAe",
+      "address": "0x78D36Af95385f99022aAf4E4CABd48c686512B81",
       "abi": [
         {
           "name": "Transfer",
@@ -1779,7 +1779,7 @@
       "args": "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000003fbe79100d2b637d577f1d2d8d14c9825f869db7000000000000000000000000000000000000000000000000000000000000a8c00000000000000000000000000000000000000000000000000000000000049d4000000000000000000000000000000000000000000000d3c21bcecceda10000000000000000000000000000003fbe79100d2b637d577f1d2d8d14c9825f869db7"
     },
     "SavingsGreen": {
-      "address": "0x39A976A0Eb2094F20078E8AD352f6cd18b532fF8",
+      "address": "0xdFef3c8513809B6F9dD5549D6d97899C6ca0Ef4A",
       "abi": [
         {
           "name": "Transfer",
@@ -3148,10 +3148,10 @@
         "compiler_version": "v0.4.1+commit.8a93dd27",
         "integrity": "7fb8ece2c6259f6929a4cfa9b76761cdc968993ffb302d69f365789c1771369c"
       },
-      "args": "000000000000000000000000b2d9b97fd379a91f4ba4457bb2dcd162d967657600000000000000000000000000000000000000000000000000000000000000000000000000000000000000003fbe79100d2b637d577f1d2d8d14c9825f869db7000000000000000000000000000000000000000000000000000000000000a8c00000000000000000000000000000000000000000000000000000000000049d4000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+      "args": "000000000000000000000000e780e53e463ec4176fccfbc22300587bbae54fc000000000000000000000000000000000000000000000000000000000000000000000000000000000000000003fbe79100d2b637d577f1d2d8d14c9825f869db7000000000000000000000000000000000000000000000000000000000000a8c00000000000000000000000000000000000000000000000000000000000049d4000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
     },
     "RipeHq": {
-      "address": "0xA14bceB2C0086Acdee1b01e47C7EF3dE49ed996E",
+      "address": "0x5314ac3880F15DdC87d3600FE47e5ee11b93A777",
       "abi": [
         {
           "name": "HqConfigChangeInitiated",
@@ -3178,11 +3178,6 @@
             },
             {
               "name": "canSetTokenBlacklist",
-              "type": "bool",
-              "indexed": false
-            },
-            {
-              "name": "canModifyMissionControl",
               "type": "bool",
               "indexed": false
             },
@@ -3220,11 +3215,6 @@
             },
             {
               "name": "canSetTokenBlacklist",
-              "type": "bool",
-              "indexed": false
-            },
-            {
-              "name": "canModifyMissionControl",
               "type": "bool",
               "indexed": false
             },
@@ -3267,11 +3257,6 @@
             },
             {
               "name": "canSetTokenBlacklist",
-              "type": "bool",
-              "indexed": false
-            },
-            {
-              "name": "canModifyMissionControl",
               "type": "bool",
               "indexed": false
             },
@@ -4666,10 +4651,6 @@
             {
               "name": "_canSetTokenBlacklist",
               "type": "bool"
-            },
-            {
-              "name": "_canModifyMissionControl",
-              "type": "bool"
             }
           ],
           "outputs": []
@@ -4821,23 +4802,6 @@
           ]
         },
         {
-          "stateMutability": "view",
-          "type": "function",
-          "name": "canModifyMissionControl",
-          "inputs": [
-            {
-              "name": "_addr",
-              "type": "address"
-            }
-          ],
-          "outputs": [
-            {
-              "name": "",
-              "type": "bool"
-            }
-          ]
-        },
-        {
           "stateMutability": "nonpayable",
           "type": "function",
           "name": "recoverFunds",
@@ -4899,10 +4863,6 @@
                 {
                   "name": "canSetTokenBlacklist",
                   "type": "bool"
-                },
-                {
-                  "name": "canModifyMissionControl",
-                  "type": "bool"
                 }
               ]
             }
@@ -4941,10 +4901,6 @@
                     },
                     {
                       "name": "canSetTokenBlacklist",
-                      "type": "bool"
-                    },
-                    {
-                      "name": "canModifyMissionControl",
                       "type": "bool"
                     }
                   ]
@@ -5017,8 +4973,8 @@
             "sha256sum": "23bcd020a90f5839bdf5eff3040e8256d601bedbfd6e021fb8755416e5026422"
           },
           "contracts/registries/RipeHq.vy": {
-            "content": "# @version 0.4.1\n\nexports: gov.__interface__\nexports: registry.__interface__\n\ninitializes: gov\ninitializes: registry[gov := gov]\n\nimport contracts.modules.LocalGov as gov\nimport contracts.registries.modules.AddressRegistry as registry\n\nfrom interfaces import Department\nfrom ethereum.ercs import IERC20\n\nstruct HqConfig:\n    description: String[64]\n    canMintGreen: bool\n    canMintRipe: bool\n    canSetTokenBlacklist: bool\n    canModifyMissionControl: bool\n\nstruct PendingHqConfig:\n    newHqConfig: HqConfig\n    initiatedBlock: uint256\n    confirmBlock: uint256\n\nevent HqConfigChangeInitiated:\n    regId: uint256\n    description: String[64]\n    canMintGreen: bool\n    canMintRipe: bool\n    canSetTokenBlacklist: bool\n    canModifyMissionControl: bool\n    confirmBlock: uint256\n\nevent HqConfigChangeConfirmed:\n    regId: uint256\n    description: String[64]\n    canMintGreen: bool\n    canMintRipe: bool\n    canSetTokenBlacklist: bool\n    canModifyMissionControl: bool\n    initiatedBlock: uint256\n    confirmBlock: uint256\n\nevent HqConfigChangeCancelled:\n    regId: uint256\n    description: String[64]\n    canMintGreen: bool\n    canMintRipe: bool\n    canSetTokenBlacklist: bool\n    canModifyMissionControl: bool\n    initiatedBlock: uint256\n    confirmBlock: uint256\n\nevent RipeHqFundsRecovered:\n    asset: indexed(address)\n    recipient: indexed(address)\n    balance: uint256\n\n# hq config\nhqConfig: public(HashMap[uint256, HqConfig]) # reg id -> hq config\npendingHqConfig: public(HashMap[uint256, PendingHqConfig]) # reg id -> pending hq config\n\nMAX_RECOVER_ASSETS: constant(uint256) = 20\n\n\n@deploy\ndef __init__(\n    _greenToken: address,\n    _savingsGreen: address,\n    _ripeToken: address,\n    _initialGov: address,\n    _minGovTimeLock: uint256,\n    _maxGovTimeLock: uint256,\n    _minRegistryTimeLock: uint256,\n    _maxRegistryTimeLock: uint256,\n):\n    gov.__init__(empty(address), _initialGov, _minGovTimeLock, _maxGovTimeLock, 0)\n    registry.__init__(_minRegistryTimeLock, _maxRegistryTimeLock, 0, \"RipeHq.vy\")\n\n    # green token\n    assert registry._startAddNewAddressToRegistry(_greenToken, \"Green Token\") # dev: failed to register green token\n    assert registry._confirmNewAddressToRegistry(_greenToken) == 1 # dev: failed to confirm green token\n\n    # savings green\n    assert registry._startAddNewAddressToRegistry(_savingsGreen, \"Savings Green\") # dev: failed to register savings green\n    assert registry._confirmNewAddressToRegistry(_savingsGreen) == 2 # dev: failed to confirm savings green\n\n    # ripe token\n    assert registry._startAddNewAddressToRegistry(_ripeToken, \"Ripe Token\") # dev: failed to register ripe token\n    assert registry._confirmNewAddressToRegistry(_ripeToken) == 3 # dev: failed to confirm ripe token\n\n\n############\n# Registry #\n############\n\n\n# new address\n\n\n@external\ndef startAddNewAddressToRegistry(_addr: address, _description: String[64]) -> bool:\n    assert msg.sender == gov.governance # dev: no perms\n    return registry._startAddNewAddressToRegistry(_addr, _description)\n\n\n@external\ndef confirmNewAddressToRegistry(_addr: address) -> uint256:\n    assert msg.sender == gov.governance # dev: no perms\n    return registry._confirmNewAddressToRegistry(_addr)\n\n\n@external\ndef cancelNewAddressToRegistry(_addr: address) -> bool:\n    assert msg.sender == gov.governance # dev: no perms\n    return registry._cancelNewAddressToRegistry(_addr)\n\n\n# address update\n\n\n@external\ndef startAddressUpdateToRegistry(_regId: uint256, _newAddr: address) -> bool:\n    assert msg.sender == gov.governance # dev: no perms\n    return registry._startAddressUpdateToRegistry(_regId, _newAddr)\n\n\n@external\ndef confirmAddressUpdateToRegistry(_regId: uint256) -> bool:\n    assert msg.sender == gov.governance # dev: no perms\n    return registry._confirmAddressUpdateToRegistry(_regId)\n\n\n@external\ndef cancelAddressUpdateToRegistry(_regId: uint256) -> bool:\n    assert msg.sender == gov.governance # dev: no perms\n    return registry._cancelAddressUpdateToRegistry(_regId)\n\n\n# address disable\n\n\n@external\ndef startAddressDisableInRegistry(_regId: uint256) -> bool:\n    assert not self._isTokenId(_regId) # dev: cannot disable token\n\n    assert msg.sender == gov.governance # dev: no perms\n    return registry._startAddressDisableInRegistry(_regId)\n\n\n@external\ndef confirmAddressDisableInRegistry(_regId: uint256) -> bool:\n    assert msg.sender == gov.governance # dev: no perms\n    return registry._confirmAddressDisableInRegistry(_regId)\n\n\n@external\ndef cancelAddressDisableInRegistry(_regId: uint256) -> bool:\n    assert msg.sender == gov.governance # dev: no perms\n    return registry._cancelAddressDisableInRegistry(_regId)\n\n\n#############\n# Hq Config #\n#############\n\n\n@view\n@external\ndef hasPendingHqConfigChange(_regId: uint256) -> bool:\n    return self.pendingHqConfig[_regId].confirmBlock != 0\n\n\n# start hq config change\n\n\n@external\ndef initiateHqConfigChange(\n    _regId: uint256,\n    _canMintGreen: bool,\n    _canMintRipe: bool,\n    _canSetTokenBlacklist: bool,\n    _canModifyMissionControl: bool,\n):\n    assert msg.sender == gov.governance # dev: no perms\n\n    assert self._isValidHqConfig(_regId, _canMintGreen, _canMintRipe) # dev: invalid hq config\n    hqConfig: HqConfig = HqConfig(\n        description= registry._getAddrDescription(_regId),\n        canMintGreen= _canMintGreen,\n        canMintRipe= _canMintRipe,\n        canSetTokenBlacklist= _canSetTokenBlacklist,\n        canModifyMissionControl= _canModifyMissionControl,\n    )\n\n    # set pending hq config\n    confirmBlock: uint256 = block.number + registry.registryChangeTimeLock\n    self.pendingHqConfig[_regId] = PendingHqConfig(\n        newHqConfig= hqConfig,\n        initiatedBlock= block.number,\n        confirmBlock= confirmBlock,\n    )\n    log HqConfigChangeInitiated(\n        regId=_regId,\n        description=hqConfig.description,\n        canMintGreen=_canMintGreen,\n        canMintRipe=_canMintRipe,\n        canSetTokenBlacklist=_canSetTokenBlacklist,\n        canModifyMissionControl=_canModifyMissionControl,\n        confirmBlock=confirmBlock,\n    )\n\n\n# confirm hq config change\n\n\n@external\ndef confirmHqConfigChange(_regId: uint256) -> bool:\n    assert msg.sender == gov.governance # dev: no perms\n\n    data: PendingHqConfig = self.pendingHqConfig[_regId]\n    assert data.confirmBlock != 0 and block.number >= data.confirmBlock # dev: time lock not reached\n\n    # invalid hq config\n    newConfig: HqConfig = data.newHqConfig\n    if not self._isValidHqConfig(_regId, newConfig.canMintGreen, newConfig.canMintRipe):\n        self.pendingHqConfig[_regId] = empty(PendingHqConfig)\n        return False\n\n    # set hq config\n    self.hqConfig[_regId] = newConfig\n    self.pendingHqConfig[_regId] = empty(PendingHqConfig)\n\n    log HqConfigChangeConfirmed(\n        regId=_regId,\n        description=newConfig.description,\n        canMintGreen=newConfig.canMintGreen,\n        canMintRipe=newConfig.canMintRipe,\n        canSetTokenBlacklist=newConfig.canSetTokenBlacklist,\n        canModifyMissionControl=newConfig.canModifyMissionControl,\n        initiatedBlock=data.initiatedBlock,\n        confirmBlock=data.confirmBlock,\n    )\n    return True\n\n\n# cancel hq config change\n\n\n@external\ndef cancelHqConfigChange(_regId: uint256) -> bool:\n    assert msg.sender == gov.governance # dev: no perms\n\n    data: PendingHqConfig = self.pendingHqConfig[_regId]\n    assert data.confirmBlock != 0 # dev: no pending change\n\n    self.pendingHqConfig[_regId] = empty(PendingHqConfig)\n    log HqConfigChangeCancelled(\n        regId=_regId,\n        description=data.newHqConfig.description,\n        canMintGreen=data.newHqConfig.canMintGreen,\n        canMintRipe=data.newHqConfig.canMintRipe,\n        canSetTokenBlacklist=data.newHqConfig.canSetTokenBlacklist,\n        canModifyMissionControl=data.newHqConfig.canModifyMissionControl,\n        initiatedBlock=data.initiatedBlock,\n        confirmBlock=data.confirmBlock\n    )\n    return True\n\n\n# validation\n\n\n@external\ndef isValidHqConfig(\n    _regId: uint256,\n    _canMintGreen: bool,\n    _canMintRipe: bool,\n) -> bool:\n    return self._isValidHqConfig(_regId, _canMintGreen, _canMintRipe)\n\n\n@internal\ndef _isValidHqConfig(\n    _regId: uint256,\n    _canMintGreen: bool,\n    _canMintRipe: bool,\n) -> bool:\n\n    # tokens cannot mint, cannot set their own blacklist, cannot modify mission control\n    if self._isTokenId(_regId):\n        return False\n\n    # invalid reg id\n    if not registry._isValidRegId(_regId):\n        return False\n\n    # no addr\n    addr: address = registry._getAddr(_regId)\n    if addr == empty(address):\n        return False\n\n    # two-factor auth on minting\n    if _canMintGreen and not staticcall Department(addr).canMintGreen():\n        return False\n\n    if _canMintRipe and not staticcall Department(addr).canMintRipe():\n        return False\n\n    return True\n\n\n@view\n@internal\ndef _isTokenId(_regId: uint256) -> bool:\n    return _regId in [1, 2, 3]\n\n\n##########\n# Tokens #\n##########\n\n\n@view\n@external\ndef greenToken() -> address:\n    return registry._getAddr(1)\n\n\n@view\n@external\ndef savingsGreen() -> address:\n    return registry._getAddr(2)\n\n\n@view\n@external\ndef ripeToken() -> address:\n    return registry._getAddr(3)\n\n\n@view\n@external\ndef canMintGreen(_addr: address) -> bool:\n    if _addr == empty(address):\n        return False\n    regId: uint256 = registry._getRegId(_addr)\n    if regId == 0 or not self.hqConfig[regId].canMintGreen:\n        return False\n    return staticcall Department(_addr).canMintGreen()\n\n\n@view\n@external\ndef canMintRipe(_addr: address) -> bool:\n    if _addr == empty(address):\n        return False\n    regId: uint256 = registry._getRegId(_addr)\n    if regId == 0 or not self.hqConfig[regId].canMintRipe:\n        return False\n    return staticcall Department(_addr).canMintRipe()\n\n\n@view\n@external\ndef canSetTokenBlacklist(_addr: address) -> bool:\n    if _addr == empty(address):\n        return False\n    regId: uint256 = registry._getRegId(_addr)\n    if regId == 0:\n        return False\n    return self.hqConfig[regId].canSetTokenBlacklist\n\n\n@view\n@external\ndef canModifyMissionControl(_addr: address) -> bool:\n    if _addr == empty(address):\n        return False\n    regId: uint256 = registry._getRegId(_addr)\n    if regId == 0:\n        return False\n    return self.hqConfig[regId].canModifyMissionControl\n\n\n############\n# Recovery #\n############\n\n\n@external\ndef recoverFunds(_recipient: address, _asset: address):\n    assert msg.sender == gov.governance # dev: no perms\n    self._recoverFunds(_recipient, _asset)\n\n\n@external\ndef recoverFundsMany(_recipient: address, _assets: DynArray[address, MAX_RECOVER_ASSETS]):\n    assert msg.sender == gov.governance # dev: no perms\n    for a: address in _assets:\n        self._recoverFunds(_recipient, a)\n\n\n@internal\ndef _recoverFunds(_recipient: address, _asset: address):\n    assert empty(address) not in [_recipient, _asset] # dev: invalid recipient or asset\n    balance: uint256 = staticcall IERC20(_asset).balanceOf(self)\n    assert balance != 0 # dev: nothing to recover\n\n    assert extcall IERC20(_asset).transfer(_recipient, balance, default_return_value=True) # dev: recovery failed\n    log RipeHqFundsRecovered(asset=_asset, recipient=_recipient, balance=balance)",
-            "sha256sum": "f92b8cf8f35d5b37a9d93b7520f0816fe9ecfc74298485cf6b5431bc218cc58a"
+            "content": "# @version 0.4.1\n\nexports: gov.__interface__\nexports: registry.__interface__\n\ninitializes: gov\ninitializes: registry[gov := gov]\n\nimport contracts.modules.LocalGov as gov\nimport contracts.registries.modules.AddressRegistry as registry\n\nfrom interfaces import Department\nfrom ethereum.ercs import IERC20\n\nstruct HqConfig:\n    description: String[64]\n    canMintGreen: bool\n    canMintRipe: bool\n    canSetTokenBlacklist: bool\n\nstruct PendingHqConfig:\n    newHqConfig: HqConfig\n    initiatedBlock: uint256\n    confirmBlock: uint256\n\nevent HqConfigChangeInitiated:\n    regId: uint256\n    description: String[64]\n    canMintGreen: bool\n    canMintRipe: bool\n    canSetTokenBlacklist: bool\n    confirmBlock: uint256\n\nevent HqConfigChangeConfirmed:\n    regId: uint256\n    description: String[64]\n    canMintGreen: bool\n    canMintRipe: bool\n    canSetTokenBlacklist: bool\n    initiatedBlock: uint256\n    confirmBlock: uint256\n\nevent HqConfigChangeCancelled:\n    regId: uint256\n    description: String[64]\n    canMintGreen: bool\n    canMintRipe: bool\n    canSetTokenBlacklist: bool\n    initiatedBlock: uint256\n    confirmBlock: uint256\n\nevent RipeHqFundsRecovered:\n    asset: indexed(address)\n    recipient: indexed(address)\n    balance: uint256\n\n# hq config\nhqConfig: public(HashMap[uint256, HqConfig]) # reg id -> hq config\npendingHqConfig: public(HashMap[uint256, PendingHqConfig]) # reg id -> pending hq config\n\nMAX_RECOVER_ASSETS: constant(uint256) = 20\n\n\n@deploy\ndef __init__(\n    _greenToken: address,\n    _savingsGreen: address,\n    _ripeToken: address,\n    _initialGov: address,\n    _minGovTimeLock: uint256,\n    _maxGovTimeLock: uint256,\n    _minRegistryTimeLock: uint256,\n    _maxRegistryTimeLock: uint256,\n):\n    gov.__init__(empty(address), _initialGov, _minGovTimeLock, _maxGovTimeLock, 0)\n    registry.__init__(_minRegistryTimeLock, _maxRegistryTimeLock, 0, \"RipeHq.vy\")\n\n    # green token\n    assert registry._startAddNewAddressToRegistry(_greenToken, \"Green Token\") # dev: failed to register green token\n    assert registry._confirmNewAddressToRegistry(_greenToken) == 1 # dev: failed to confirm green token\n\n    # savings green\n    assert registry._startAddNewAddressToRegistry(_savingsGreen, \"Savings Green\") # dev: failed to register savings green\n    assert registry._confirmNewAddressToRegistry(_savingsGreen) == 2 # dev: failed to confirm savings green\n\n    # ripe token\n    assert registry._startAddNewAddressToRegistry(_ripeToken, \"Ripe Token\") # dev: failed to register ripe token\n    assert registry._confirmNewAddressToRegistry(_ripeToken) == 3 # dev: failed to confirm ripe token\n\n\n############\n# Registry #\n############\n\n\n# new address\n\n\n@external\ndef startAddNewAddressToRegistry(_addr: address, _description: String[64]) -> bool:\n    assert msg.sender == gov.governance # dev: no perms\n    return registry._startAddNewAddressToRegistry(_addr, _description)\n\n\n@external\ndef confirmNewAddressToRegistry(_addr: address) -> uint256:\n    assert msg.sender == gov.governance # dev: no perms\n    return registry._confirmNewAddressToRegistry(_addr)\n\n\n@external\ndef cancelNewAddressToRegistry(_addr: address) -> bool:\n    assert msg.sender == gov.governance # dev: no perms\n    return registry._cancelNewAddressToRegistry(_addr)\n\n\n# address update\n\n\n@external\ndef startAddressUpdateToRegistry(_regId: uint256, _newAddr: address) -> bool:\n    assert msg.sender == gov.governance # dev: no perms\n    return registry._startAddressUpdateToRegistry(_regId, _newAddr)\n\n\n@external\ndef confirmAddressUpdateToRegistry(_regId: uint256) -> bool:\n    assert msg.sender == gov.governance # dev: no perms\n    return registry._confirmAddressUpdateToRegistry(_regId)\n\n\n@external\ndef cancelAddressUpdateToRegistry(_regId: uint256) -> bool:\n    assert msg.sender == gov.governance # dev: no perms\n    return registry._cancelAddressUpdateToRegistry(_regId)\n\n\n# address disable\n\n\n@external\ndef startAddressDisableInRegistry(_regId: uint256) -> bool:\n    assert not self._isTokenId(_regId) # dev: cannot disable token\n\n    assert msg.sender == gov.governance # dev: no perms\n    return registry._startAddressDisableInRegistry(_regId)\n\n\n@external\ndef confirmAddressDisableInRegistry(_regId: uint256) -> bool:\n    assert msg.sender == gov.governance # dev: no perms\n    return registry._confirmAddressDisableInRegistry(_regId)\n\n\n@external\ndef cancelAddressDisableInRegistry(_regId: uint256) -> bool:\n    assert msg.sender == gov.governance # dev: no perms\n    return registry._cancelAddressDisableInRegistry(_regId)\n\n\n#############\n# Hq Config #\n#############\n\n\n@view\n@external\ndef hasPendingHqConfigChange(_regId: uint256) -> bool:\n    return self.pendingHqConfig[_regId].confirmBlock != 0\n\n\n# start hq config change\n\n\n@external\ndef initiateHqConfigChange(\n    _regId: uint256,\n    _canMintGreen: bool,\n    _canMintRipe: bool,\n    _canSetTokenBlacklist: bool,\n):\n    assert msg.sender == gov.governance # dev: no perms\n\n    assert self._isValidHqConfig(_regId, _canMintGreen, _canMintRipe) # dev: invalid hq config\n    hqConfig: HqConfig = HqConfig(\n        description= registry._getAddrDescription(_regId),\n        canMintGreen= _canMintGreen,\n        canMintRipe= _canMintRipe,\n        canSetTokenBlacklist= _canSetTokenBlacklist,\n    )\n\n    # set pending hq config\n    confirmBlock: uint256 = block.number + registry.registryChangeTimeLock\n    self.pendingHqConfig[_regId] = PendingHqConfig(\n        newHqConfig= hqConfig,\n        initiatedBlock= block.number,\n        confirmBlock= confirmBlock,\n    )\n    log HqConfigChangeInitiated(\n        regId=_regId,\n        description=hqConfig.description,\n        canMintGreen=_canMintGreen,\n        canMintRipe=_canMintRipe,\n        canSetTokenBlacklist=_canSetTokenBlacklist,\n        confirmBlock=confirmBlock,\n    )\n\n\n# confirm hq config change\n\n\n@external\ndef confirmHqConfigChange(_regId: uint256) -> bool:\n    assert msg.sender == gov.governance # dev: no perms\n\n    data: PendingHqConfig = self.pendingHqConfig[_regId]\n    assert data.confirmBlock != 0 and block.number >= data.confirmBlock # dev: time lock not reached\n\n    # invalid hq config\n    newConfig: HqConfig = data.newHqConfig\n    if not self._isValidHqConfig(_regId, newConfig.canMintGreen, newConfig.canMintRipe):\n        self.pendingHqConfig[_regId] = empty(PendingHqConfig)\n        return False\n\n    # set hq config\n    self.hqConfig[_regId] = newConfig\n    self.pendingHqConfig[_regId] = empty(PendingHqConfig)\n\n    log HqConfigChangeConfirmed(\n        regId=_regId,\n        description=newConfig.description,\n        canMintGreen=newConfig.canMintGreen,\n        canMintRipe=newConfig.canMintRipe,\n        canSetTokenBlacklist=newConfig.canSetTokenBlacklist,\n        initiatedBlock=data.initiatedBlock,\n        confirmBlock=data.confirmBlock,\n    )\n    return True\n\n\n# cancel hq config change\n\n\n@external\ndef cancelHqConfigChange(_regId: uint256) -> bool:\n    assert msg.sender == gov.governance # dev: no perms\n\n    data: PendingHqConfig = self.pendingHqConfig[_regId]\n    assert data.confirmBlock != 0 # dev: no pending change\n\n    self.pendingHqConfig[_regId] = empty(PendingHqConfig)\n    log HqConfigChangeCancelled(\n        regId=_regId,\n        description=data.newHqConfig.description,\n        canMintGreen=data.newHqConfig.canMintGreen,\n        canMintRipe=data.newHqConfig.canMintRipe,\n        canSetTokenBlacklist=data.newHqConfig.canSetTokenBlacklist,\n        initiatedBlock=data.initiatedBlock,\n        confirmBlock=data.confirmBlock\n    )\n    return True\n\n\n# validation\n\n\n@external\ndef isValidHqConfig(\n    _regId: uint256,\n    _canMintGreen: bool,\n    _canMintRipe: bool,\n) -> bool:\n    return self._isValidHqConfig(_regId, _canMintGreen, _canMintRipe)\n\n\n@internal\ndef _isValidHqConfig(\n    _regId: uint256,\n    _canMintGreen: bool,\n    _canMintRipe: bool,\n) -> bool:\n\n    # tokens cannot mint, cannot set their own blacklist, cannot modify mission control\n    if self._isTokenId(_regId):\n        return False\n\n    # invalid reg id\n    if not registry._isValidRegId(_regId):\n        return False\n\n    # no addr\n    addr: address = registry._getAddr(_regId)\n    if addr == empty(address):\n        return False\n\n    # two-factor auth on minting\n    if _canMintGreen and not staticcall Department(addr).canMintGreen():\n        return False\n\n    if _canMintRipe and not staticcall Department(addr).canMintRipe():\n        return False\n\n    return True\n\n\n@view\n@internal\ndef _isTokenId(_regId: uint256) -> bool:\n    return _regId in [1, 2, 3]\n\n\n##########\n# Tokens #\n##########\n\n\n@view\n@external\ndef greenToken() -> address:\n    return registry._getAddr(1)\n\n\n@view\n@external\ndef savingsGreen() -> address:\n    return registry._getAddr(2)\n\n\n@view\n@external\ndef ripeToken() -> address:\n    return registry._getAddr(3)\n\n\n@view\n@external\ndef canMintGreen(_addr: address) -> bool:\n    if _addr == empty(address):\n        return False\n    regId: uint256 = registry._getRegId(_addr)\n    if regId == 0 or not self.hqConfig[regId].canMintGreen:\n        return False\n    return staticcall Department(_addr).canMintGreen()\n\n\n@view\n@external\ndef canMintRipe(_addr: address) -> bool:\n    if _addr == empty(address):\n        return False\n    regId: uint256 = registry._getRegId(_addr)\n    if regId == 0 or not self.hqConfig[regId].canMintRipe:\n        return False\n    return staticcall Department(_addr).canMintRipe()\n\n\n@view\n@external\ndef canSetTokenBlacklist(_addr: address) -> bool:\n    if _addr == empty(address):\n        return False\n    regId: uint256 = registry._getRegId(_addr)\n    if regId == 0:\n        return False\n    return self.hqConfig[regId].canSetTokenBlacklist\n\n\n############\n# Recovery #\n############\n\n\n@external\ndef recoverFunds(_recipient: address, _asset: address):\n    assert msg.sender == gov.governance # dev: no perms\n    self._recoverFunds(_recipient, _asset)\n\n\n@external\ndef recoverFundsMany(_recipient: address, _assets: DynArray[address, MAX_RECOVER_ASSETS]):\n    assert msg.sender == gov.governance # dev: no perms\n    for a: address in _assets:\n        self._recoverFunds(_recipient, a)\n\n\n@internal\ndef _recoverFunds(_recipient: address, _asset: address):\n    assert empty(address) not in [_recipient, _asset] # dev: invalid recipient or asset\n    balance: uint256 = staticcall IERC20(_asset).balanceOf(self)\n    assert balance != 0 # dev: nothing to recover\n\n    assert extcall IERC20(_asset).transfer(_recipient, balance, default_return_value=True) # dev: recovery failed\n    log RipeHqFundsRecovered(asset=_asset, recipient=_recipient, balance=balance)",
+            "sha256sum": "5936e8b3c8b182237944bbbb0944420093520589de2f6ab095a5561cae175718"
           }
         },
         "settings": {
@@ -5032,12 +4988,12 @@
           ]
         },
         "compiler_version": "v0.4.1+commit.8a93dd27",
-        "integrity": "b5cfac580c32186e165b0787c148f5f94279f29f3ac8207c515c126cfa617a71"
+        "integrity": "15e9a176c311e7651c93ea0f77bcdd13e975a1e363783a3c7b0e102955de3273"
       },
-      "args": "000000000000000000000000b2d9b97fd379a91f4ba4457bb2dcd162d967657600000000000000000000000039a976a0eb2094f20078e8ad352f6cd18b532ff80000000000000000000000007563de9626990658111ed4ac21fa0149e49c6aae0000000000000000000000003fbe79100d2b637d577f1d2d8d14c9825f869db7000000000000000000000000000000000000000000000000000000000000a8c00000000000000000000000000000000000000000000000000000000000049d4000000000000000000000000000000000000000000000000000000000000054600000000000000000000000000000000000000000000000000000000000049d40"
+      "args": "000000000000000000000000e780e53e463ec4176fccfbc22300587bbae54fc0000000000000000000000000dfef3c8513809b6f9dd5549d6d97899c6ca0ef4a00000000000000000000000078d36af95385f99022aaf4e4cabd48c686512b810000000000000000000000003fbe79100d2b637d577f1d2d8d14c9825f869db7000000000000000000000000000000000000000000000000000000000000a8c00000000000000000000000000000000000000000000000000000000000049d4000000000000000000000000000000000000000000000000000000000000054600000000000000000000000000000000000000000000000000000000000049d40"
     },
     "Ledger": {
-      "address": "0x9D3c008b105c3E0897612dF5FC41bcCf297040C8",
+      "address": "0x504773B2224c699560807B8b0A7cf9813b5B8216",
       "abi": [
         {
           "name": "DepartmentPauseModified",
@@ -5108,6 +5064,10 @@
                   "type": "address"
                 },
                 {
+                  "name": "switchboard",
+                  "type": "address"
+                },
+                {
                   "name": "priceDesk",
                   "type": "address"
                 },
@@ -5124,6 +5084,10 @@
                   "type": "address"
                 },
                 {
+                  "name": "boardroom",
+                  "type": "address"
+                },
+                {
                   "name": "bondRoom",
                   "type": "address"
                 },
@@ -5136,23 +5100,15 @@
                   "type": "address"
                 },
                 {
+                  "name": "humanResources",
+                  "type": "address"
+                },
+                {
                   "name": "lootbox",
                   "type": "address"
                 },
                 {
                   "name": "teller",
-                  "type": "address"
-                },
-                {
-                  "name": "switchboardOne",
-                  "type": "address"
-                },
-                {
-                  "name": "switchboardTwo",
-                  "type": "address"
-                },
-                {
-                  "name": "switchboardThree",
                   "type": "address"
                 }
               ]
@@ -6470,6 +6426,169 @@
         {
           "stateMutability": "view",
           "type": "function",
+          "name": "isHrContributor",
+          "inputs": [
+            {
+              "name": "_contributor",
+              "type": "address"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "bool"
+            }
+          ]
+        },
+        {
+          "stateMutability": "nonpayable",
+          "type": "function",
+          "name": "addHrContributor",
+          "inputs": [
+            {
+              "name": "_contributor",
+              "type": "address"
+            },
+            {
+              "name": "_compensation",
+              "type": "uint256"
+            }
+          ],
+          "outputs": []
+        },
+        {
+          "stateMutability": "nonpayable",
+          "type": "function",
+          "name": "setRipeAvailForHr",
+          "inputs": [
+            {
+              "name": "_amount",
+              "type": "uint256"
+            }
+          ],
+          "outputs": []
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "getEpochData",
+          "inputs": [],
+          "outputs": [
+            {
+              "name": "",
+              "type": "uint256"
+            },
+            {
+              "name": "",
+              "type": "uint256"
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "getRipeBondData",
+          "inputs": [],
+          "outputs": [
+            {
+              "name": "",
+              "type": "tuple",
+              "components": [
+                {
+                  "name": "paymentAmountAvailInEpoch",
+                  "type": "uint256"
+                },
+                {
+                  "name": "ripeAvailForBonds",
+                  "type": "uint256"
+                },
+                {
+                  "name": "badDebt",
+                  "type": "uint256"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stateMutability": "nonpayable",
+          "type": "function",
+          "name": "setRipeAvailForBonds",
+          "inputs": [
+            {
+              "name": "_amount",
+              "type": "uint256"
+            }
+          ],
+          "outputs": []
+        },
+        {
+          "stateMutability": "nonpayable",
+          "type": "function",
+          "name": "setBadDebt",
+          "inputs": [
+            {
+              "name": "_amount",
+              "type": "uint256"
+            }
+          ],
+          "outputs": []
+        },
+        {
+          "stateMutability": "nonpayable",
+          "type": "function",
+          "name": "didClearBadDebt",
+          "inputs": [
+            {
+              "name": "_amount",
+              "type": "uint256"
+            },
+            {
+              "name": "_ripeAmount",
+              "type": "uint256"
+            }
+          ],
+          "outputs": []
+        },
+        {
+          "stateMutability": "nonpayable",
+          "type": "function",
+          "name": "didPurchaseRipeBond",
+          "inputs": [
+            {
+              "name": "_amountPaid",
+              "type": "uint256"
+            },
+            {
+              "name": "_ripePayout",
+              "type": "uint256"
+            }
+          ],
+          "outputs": []
+        },
+        {
+          "stateMutability": "nonpayable",
+          "type": "function",
+          "name": "setEpochData",
+          "inputs": [
+            {
+              "name": "_epochStart",
+              "type": "uint256"
+            },
+            {
+              "name": "_epochEnd",
+              "type": "uint256"
+            },
+            {
+              "name": "_amountAvailInEpoch",
+              "type": "uint256"
+            }
+          ],
+          "outputs": []
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
           "name": "userVaults",
           "inputs": [
             {
@@ -7067,6 +7186,136 @@
           ]
         },
         {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "ripeAvailForHr",
+          "inputs": [],
+          "outputs": [
+            {
+              "name": "",
+              "type": "uint256"
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "contributors",
+          "inputs": [
+            {
+              "name": "arg0",
+              "type": "uint256"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "address"
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "indexOfContributor",
+          "inputs": [
+            {
+              "name": "arg0",
+              "type": "address"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "uint256"
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "numContributors",
+          "inputs": [],
+          "outputs": [
+            {
+              "name": "",
+              "type": "uint256"
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "epochStart",
+          "inputs": [],
+          "outputs": [
+            {
+              "name": "",
+              "type": "uint256"
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "epochEnd",
+          "inputs": [],
+          "outputs": [
+            {
+              "name": "",
+              "type": "uint256"
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "badDebt",
+          "inputs": [],
+          "outputs": [
+            {
+              "name": "",
+              "type": "uint256"
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "ripePaidOutForBadDebt",
+          "inputs": [],
+          "outputs": [
+            {
+              "name": "",
+              "type": "uint256"
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "paymentAmountAvailInEpoch",
+          "inputs": [],
+          "outputs": [
+            {
+              "name": "",
+              "type": "uint256"
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "ripeAvailForBonds",
+          "inputs": [],
+          "outputs": [
+            {
+              "name": "",
+              "type": "uint256"
+            }
+          ]
+        },
+        {
           "stateMutability": "nonpayable",
           "type": "constructor",
           "inputs": [
@@ -7077,6 +7326,14 @@
             {
               "name": "_ripeAvailForRewards",
               "type": "uint256"
+            },
+            {
+              "name": "_ripeAvailForHr",
+              "type": "uint256"
+            },
+            {
+              "name": "_ripeAvailForBonds",
+              "type": "uint256"
             }
           ],
           "outputs": []
@@ -7086,20 +7343,20 @@
         "language": "Vyper",
         "sources": {
           "contracts/modules/Addys.vy": {
-            "content": "# @version 0.4.1\n\ninterface RipeHq:\n    def canModifyMissionControl(_addr: address) -> bool: view\n    def isValidAddr(_addr: address) -> bool: view\n    def getAddr(_regId: uint256) -> address: view\n\nstruct Addys:\n    hq: address\n    greenToken: address\n    savingsGreen: address\n    ripeToken: address\n    ledger: address\n    missionControl: address\n    priceDesk: address\n    vaultBook: address\n    auctionHouse: address\n    auctionHouseNft: address\n    bondRoom: address\n    creditEngine: address\n    endaoment: address\n    lootbox: address\n    teller: address\n    switchboardOne: address\n    switchboardTwo: address\n    switchboardThree: address\n\n# hq\nRIPE_HQ_FOR_ADDYS: immutable(address)\n\n# core addys\nGREEN_TOKEN_ID: constant(uint256) = 1\nSAVINGS_GREEN_ID: constant(uint256) = 2\nRIPE_TOKEN_ID: constant(uint256) = 3\nLEDGER_ID: constant(uint256) = 4\nMISSION_CONTROL_ID: constant(uint256) = 5\nPRICE_DESK_ID: constant(uint256) = 6\nVAULT_BOOK_ID: constant(uint256) = 7\nAUCTION_HOUSE_ID: constant(uint256) = 8\nAUCTION_HOUSE_NFT_ID: constant(uint256) = 9\nBOND_ROOM_ID: constant(uint256) = 10\nCREDIT_ENGINE_ID: constant(uint256) = 11\nENDAOMENT_ID: constant(uint256) = 12\nLOOTBOX_ID: constant(uint256) = 13\nTELLER_ID: constant(uint256) = 14\nSWITCHBOARD_ONE_ID: constant(uint256) = 15\nSWITCHBOARD_TWO_ID: constant(uint256) = 16\nSWITCHBOARD_THREE_ID: constant(uint256) = 17\n\n\n@deploy\ndef __init__(_ripeHq: address):\n    assert _ripeHq != empty(address) # dev: invalid ripe hq\n    RIPE_HQ_FOR_ADDYS = _ripeHq\n\n\n########\n# Core #\n########\n\n\n@view\n@external\ndef getAddys() -> Addys:\n    return self._generateAddys()\n\n\n@view\n@internal\ndef _getAddys(_addys: Addys = empty(Addys)) -> Addys:\n    if _addys.hq != empty(address):\n        return _addys\n    return self._generateAddys()\n\n\n@view\n@internal\ndef _generateAddys() -> Addys:\n    hq: address = RIPE_HQ_FOR_ADDYS\n    return Addys(\n        hq=hq,\n        greenToken=staticcall RipeHq(hq).getAddr(GREEN_TOKEN_ID),\n        savingsGreen=staticcall RipeHq(hq).getAddr(SAVINGS_GREEN_ID),\n        ripeToken=staticcall RipeHq(hq).getAddr(RIPE_TOKEN_ID),\n        ledger=staticcall RipeHq(hq).getAddr(LEDGER_ID),\n        missionControl=staticcall RipeHq(hq).getAddr(MISSION_CONTROL_ID),\n        priceDesk=staticcall RipeHq(hq).getAddr(PRICE_DESK_ID),\n        vaultBook=staticcall RipeHq(hq).getAddr(VAULT_BOOK_ID),\n        auctionHouse=staticcall RipeHq(hq).getAddr(AUCTION_HOUSE_ID),\n        auctionHouseNft=staticcall RipeHq(hq).getAddr(AUCTION_HOUSE_NFT_ID),\n        bondRoom=staticcall RipeHq(hq).getAddr(BOND_ROOM_ID),\n        creditEngine=staticcall RipeHq(hq).getAddr(CREDIT_ENGINE_ID),\n        endaoment=staticcall RipeHq(hq).getAddr(ENDAOMENT_ID),\n        lootbox=staticcall RipeHq(hq).getAddr(LOOTBOX_ID),\n        teller=staticcall RipeHq(hq).getAddr(TELLER_ID),\n        switchboardOne=staticcall RipeHq(hq).getAddr(SWITCHBOARD_ONE_ID),\n        switchboardTwo=staticcall RipeHq(hq).getAddr(SWITCHBOARD_TWO_ID),\n        switchboardThree=staticcall RipeHq(hq).getAddr(SWITCHBOARD_THREE_ID),\n    )\n\n\n###########\n# Helpers #\n###########\n\n\n# ripe hq\n\n\n@view\n@external\ndef getRipeHq() -> address:\n    return self._getRipeHq()\n\n\n@view\n@internal\ndef _getRipeHq() -> address:\n    return RIPE_HQ_FOR_ADDYS\n\n\n# utils\n\n\n@view\n@internal\ndef _canModifyMissionControl(_addr: address) -> bool:\n    return staticcall RipeHq(RIPE_HQ_FOR_ADDYS).canModifyMissionControl(_addr)\n\n\n@view\n@internal\ndef _isValidRipeHqAddr(_addr: address) -> bool:\n    return staticcall RipeHq(RIPE_HQ_FOR_ADDYS).isValidAddr(_addr)\n\n\n# tokens\n\n\n@view\n@internal\ndef _getGreenToken() -> address:\n    return staticcall RipeHq(RIPE_HQ_FOR_ADDYS).getAddr(GREEN_TOKEN_ID)\n\n\n@view\n@internal\ndef _getSavingsGreen() -> address:\n    return staticcall RipeHq(RIPE_HQ_FOR_ADDYS).getAddr(SAVINGS_GREEN_ID)\n\n\n@view\n@internal\ndef _getRipeToken() -> address:\n    return staticcall RipeHq(RIPE_HQ_FOR_ADDYS).getAddr(RIPE_TOKEN_ID)\n\n\n# ledger\n\n\n@view\n@internal\ndef _getLedgerId() -> uint256:\n    return LEDGER_ID\n\n\n@view\n@internal\ndef _getLedgerAddr() -> address:\n    return staticcall RipeHq(RIPE_HQ_FOR_ADDYS).getAddr(LEDGER_ID)\n\n\n# mission control\n\n\n@view\n@internal\ndef _getMissionControlId() -> uint256:\n    return MISSION_CONTROL_ID\n\n\n@view\n@internal\ndef _getMissionControlAddr() -> address:\n    return staticcall RipeHq(RIPE_HQ_FOR_ADDYS).getAddr(MISSION_CONTROL_ID)\n\n\n# price desk\n\n\n@view\n@internal\ndef _getPriceDeskId() -> uint256:\n    return PRICE_DESK_ID\n\n\n@view\n@internal\ndef _getPriceDeskAddr() -> address:\n    return staticcall RipeHq(RIPE_HQ_FOR_ADDYS).getAddr(PRICE_DESK_ID)\n\n\n# vault book\n\n\n@view\n@internal\ndef _getVaultBookId() -> uint256:\n    return VAULT_BOOK_ID\n\n\n@view\n@internal\ndef _getVaultBookAddr() -> address:\n    return staticcall RipeHq(RIPE_HQ_FOR_ADDYS).getAddr(VAULT_BOOK_ID)\n\n\n# auction house\n\n\n@view\n@internal\ndef _getAuctionHouseId() -> uint256:\n    return AUCTION_HOUSE_ID\n\n\n@view\n@internal\ndef _getAuctionHouseAddr() -> address:\n    return staticcall RipeHq(RIPE_HQ_FOR_ADDYS).getAddr(AUCTION_HOUSE_ID)\n\n\n# auction house nft\n\n\n@view\n@internal\ndef _getAuctionHouseNftId() -> uint256:\n    return AUCTION_HOUSE_NFT_ID\n\n\n@view\n@internal\ndef _getAuctionHouseNftAddr() -> address:\n    return staticcall RipeHq(RIPE_HQ_FOR_ADDYS).getAddr(AUCTION_HOUSE_NFT_ID)\n\n\n# bond room\n\n\n@view\n@internal\ndef _getBondRoomId() -> uint256:\n    return BOND_ROOM_ID\n\n\n@view\n@internal\ndef _getBondRoomAddr() -> address:\n    return staticcall RipeHq(RIPE_HQ_FOR_ADDYS).getAddr(BOND_ROOM_ID)\n\n\n# credit engine\n\n\n@view\n@internal\ndef _getCreditEngineId() -> uint256:\n    return CREDIT_ENGINE_ID\n\n\n@view\n@internal\ndef _getCreditEngineAddr() -> address:\n    return staticcall RipeHq(RIPE_HQ_FOR_ADDYS).getAddr(CREDIT_ENGINE_ID)\n\n\n# endaoment\n\n\n@view\n@internal\ndef _getEndaomentId() -> uint256:\n    return ENDAOMENT_ID\n\n\n@view\n@internal\ndef _getEndaomentAddr() -> address:\n    return staticcall RipeHq(RIPE_HQ_FOR_ADDYS).getAddr(ENDAOMENT_ID)\n\n\n# lootbox\n\n\n@view\n@internal\ndef _getLootboxId() -> uint256:\n    return LOOTBOX_ID\n\n\n@view\n@internal\ndef _getLootboxAddr() -> address:\n    return staticcall RipeHq(RIPE_HQ_FOR_ADDYS).getAddr(LOOTBOX_ID)\n\n\n# teller\n\n\n@view\n@internal\ndef _getTellerId() -> uint256:\n    return TELLER_ID\n\n\n@view\n@internal\ndef _getTellerAddr() -> address:\n    return staticcall RipeHq(RIPE_HQ_FOR_ADDYS).getAddr(TELLER_ID)\n\n\n# switchboard one\n\n\n@view\n@internal\ndef _getSwitchboardOneId() -> uint256:\n    return SWITCHBOARD_ONE_ID\n\n\n@view\n@internal\ndef _getSwitchboardOneAddr() -> address:\n    return staticcall RipeHq(RIPE_HQ_FOR_ADDYS).getAddr(SWITCHBOARD_ONE_ID)\n\n\n# switchboard two\n\n\n@view\n@internal\ndef _getSwitchboardTwoId() -> uint256:\n    return SWITCHBOARD_TWO_ID\n\n\n@view\n@internal\ndef _getSwitchboardTwoAddr() -> address:\n    return staticcall RipeHq(RIPE_HQ_FOR_ADDYS).getAddr(SWITCHBOARD_TWO_ID)\n\n\n# switchboard three\n\n\n@view\n@internal\ndef _getSwitchboardThreeId() -> uint256:\n    return SWITCHBOARD_THREE_ID\n\n\n@view\n@internal\ndef _getSwitchboardThreeAddr() -> address:\n    return staticcall RipeHq(RIPE_HQ_FOR_ADDYS).getAddr(SWITCHBOARD_THREE_ID)\n",
-            "sha256sum": "f90b1e0a6881703b428fb7091514cf2f6559d80f97be1dfc1e321ca8ab9d4581"
+            "content": "# @version 0.4.1\n\ninterface RipeHq:\n    def canModifyMissionControl(_addr: address) -> bool: view\n    def isValidAddr(_addr: address) -> bool: view\n    def getAddr(_regId: uint256) -> address: view\n\ninterface Switchboard:\n    def isSwitchboardAddr(_addr: address) -> bool: view\n\ninterface VaultBook:\n    def isVaultBookAddr(_addr: address) -> bool: view\n\nstruct Addys:\n    hq: address\n    greenToken: address\n    savingsGreen: address\n    ripeToken: address\n    ledger: address\n    missionControl: address\n    switchboard: address\n    priceDesk: address\n    vaultBook: address\n    auctionHouse: address\n    auctionHouseNft: address\n    boardroom: address\n    bondRoom: address\n    creditEngine: address\n    endaoment: address\n    humanResources: address\n    lootbox: address\n    teller: address\n\n# hq\nRIPE_HQ_FOR_ADDYS: immutable(address)\n\n# core addys\nGREEN_TOKEN_ID: constant(uint256) = 1\nSAVINGS_GREEN_ID: constant(uint256) = 2\nRIPE_TOKEN_ID: constant(uint256) = 3\nLEDGER_ID: constant(uint256) = 4\nMISSION_CONTROL_ID: constant(uint256) = 5\nSWITCHBOARD_ID: constant(uint256) = 6\nPRICE_DESK_ID: constant(uint256) = 7\nVAULT_BOOK_ID: constant(uint256) = 8\nAUCTION_HOUSE_ID: constant(uint256) = 9\nAUCTION_HOUSE_NFT_ID: constant(uint256) = 10\nBOARDROOM_ID: constant(uint256) = 11\nBOND_ROOM_ID: constant(uint256) = 12\nCREDIT_ENGINE_ID: constant(uint256) = 13\nENDAOMENT_ID: constant(uint256) = 14\nHUMAN_RESOURCES_ID: constant(uint256) = 15\nLOOTBOX_ID: constant(uint256) = 16\nTELLER_ID: constant(uint256) = 17\n\n\n@deploy\ndef __init__(_ripeHq: address):\n    assert _ripeHq != empty(address) # dev: invalid ripe hq\n    RIPE_HQ_FOR_ADDYS = _ripeHq\n\n\n########\n# Core #\n########\n\n\n@view\n@external\ndef getAddys() -> Addys:\n    return self._generateAddys()\n\n\n@view\n@internal\ndef _getAddys(_addys: Addys = empty(Addys)) -> Addys:\n    if _addys.hq != empty(address):\n        return _addys\n    return self._generateAddys()\n\n\n@view\n@internal\ndef _generateAddys() -> Addys:\n    hq: address = RIPE_HQ_FOR_ADDYS\n    return Addys(\n        hq=hq,\n        greenToken=staticcall RipeHq(hq).getAddr(GREEN_TOKEN_ID),\n        savingsGreen=staticcall RipeHq(hq).getAddr(SAVINGS_GREEN_ID),\n        ripeToken=staticcall RipeHq(hq).getAddr(RIPE_TOKEN_ID),\n        ledger=staticcall RipeHq(hq).getAddr(LEDGER_ID),\n        missionControl=staticcall RipeHq(hq).getAddr(MISSION_CONTROL_ID),\n        switchboard=staticcall RipeHq(hq).getAddr(SWITCHBOARD_ID),\n        priceDesk=staticcall RipeHq(hq).getAddr(PRICE_DESK_ID),\n        vaultBook=staticcall RipeHq(hq).getAddr(VAULT_BOOK_ID),\n        auctionHouse=staticcall RipeHq(hq).getAddr(AUCTION_HOUSE_ID),\n        auctionHouseNft=staticcall RipeHq(hq).getAddr(AUCTION_HOUSE_NFT_ID),\n        boardroom=staticcall RipeHq(hq).getAddr(BOARDROOM_ID),\n        bondRoom=staticcall RipeHq(hq).getAddr(BOND_ROOM_ID),\n        creditEngine=staticcall RipeHq(hq).getAddr(CREDIT_ENGINE_ID),\n        endaoment=staticcall RipeHq(hq).getAddr(ENDAOMENT_ID),\n        humanResources=staticcall RipeHq(hq).getAddr(HUMAN_RESOURCES_ID),\n        lootbox=staticcall RipeHq(hq).getAddr(LOOTBOX_ID),\n        teller=staticcall RipeHq(hq).getAddr(TELLER_ID),\n    )\n\n\n##########\n# Tokens #\n##########\n\n\n@view\n@internal\ndef _getGreenToken() -> address:\n    return staticcall RipeHq(RIPE_HQ_FOR_ADDYS).getAddr(GREEN_TOKEN_ID)\n\n\n@view\n@internal\ndef _getSavingsGreen() -> address:\n    return staticcall RipeHq(RIPE_HQ_FOR_ADDYS).getAddr(SAVINGS_GREEN_ID)\n\n\n@view\n@internal\ndef _getRipeToken() -> address:\n    return staticcall RipeHq(RIPE_HQ_FOR_ADDYS).getAddr(RIPE_TOKEN_ID)\n\n\n###########\n# Helpers #\n###########\n\n\n# ripe hq\n\n\n@view\n@external\ndef getRipeHq() -> address:\n    return self._getRipeHq()\n\n\n@view\n@internal\ndef _getRipeHq() -> address:\n    return RIPE_HQ_FOR_ADDYS\n\n\n# utils\n\n\n@view\n@internal\ndef _isValidRipeAddr(_addr: address) -> bool:\n    hq: address = RIPE_HQ_FOR_ADDYS\n    \n    # core departments\n    if staticcall RipeHq(hq).isValidAddr(_addr):\n        return True\n\n    # vault book\n    vaultBook: address = staticcall RipeHq(hq).getAddr(VAULT_BOOK_ID)\n    if vaultBook != empty(address) and staticcall VaultBook(vaultBook).isVaultBookAddr(_addr):\n        return True\n\n    # switchboard config\n    switchboard: address = staticcall RipeHq(hq).getAddr(SWITCHBOARD_ID)\n    if switchboard != empty(address) and staticcall Switchboard(switchboard).isSwitchboardAddr(_addr):\n        return True\n\n    return False\n\n\n@view\n@internal\ndef _isSwitchboardAddr(_addr: address) -> bool:\n    switchboard: address = staticcall RipeHq(RIPE_HQ_FOR_ADDYS).getAddr(SWITCHBOARD_ID)\n    if switchboard == empty(address):\n        return False\n    return staticcall Switchboard(switchboard).isSwitchboardAddr(_addr)\n\n\n###############\n# Departments #\n###############\n\n\n# ledger\n\n\n@view\n@internal\ndef _getLedgerId() -> uint256:\n    return LEDGER_ID\n\n\n@view\n@internal\ndef _getLedgerAddr() -> address:\n    return staticcall RipeHq(RIPE_HQ_FOR_ADDYS).getAddr(LEDGER_ID)\n\n\n# mission control\n\n\n@view\n@internal\ndef _getMissionControlId() -> uint256:\n    return MISSION_CONTROL_ID\n\n\n@view\n@internal\ndef _getMissionControlAddr() -> address:\n    return staticcall RipeHq(RIPE_HQ_FOR_ADDYS).getAddr(MISSION_CONTROL_ID)\n\n\n# switchboard\n\n\n@view\n@internal\ndef _getSwitchboardId() -> uint256:\n    return SWITCHBOARD_ID\n\n\n@view\n@internal\ndef _getSwitchboardAddr() -> address:\n    return staticcall RipeHq(RIPE_HQ_FOR_ADDYS).getAddr(SWITCHBOARD_ID)\n\n\n# price desk\n\n\n@view\n@internal\ndef _getPriceDeskId() -> uint256:\n    return PRICE_DESK_ID\n\n\n@view\n@internal\ndef _getPriceDeskAddr() -> address:\n    return staticcall RipeHq(RIPE_HQ_FOR_ADDYS).getAddr(PRICE_DESK_ID)\n\n\n# vault book\n\n\n@view\n@internal\ndef _getVaultBookId() -> uint256:\n    return VAULT_BOOK_ID\n\n\n@view\n@internal\ndef _getVaultBookAddr() -> address:\n    return staticcall RipeHq(RIPE_HQ_FOR_ADDYS).getAddr(VAULT_BOOK_ID)\n\n\n# auction house\n\n\n@view\n@internal\ndef _getAuctionHouseId() -> uint256:\n    return AUCTION_HOUSE_ID\n\n\n@view\n@internal\ndef _getAuctionHouseAddr() -> address:\n    return staticcall RipeHq(RIPE_HQ_FOR_ADDYS).getAddr(AUCTION_HOUSE_ID)\n\n\n# auction house nft\n\n\n@view\n@internal\ndef _getAuctionHouseNftId() -> uint256:\n    return AUCTION_HOUSE_NFT_ID\n\n\n@view\n@internal\ndef _getAuctionHouseNftAddr() -> address:\n    return staticcall RipeHq(RIPE_HQ_FOR_ADDYS).getAddr(AUCTION_HOUSE_NFT_ID)\n\n\n# boardroom\n\n\n@view\n@internal\ndef _getBoardroomId() -> uint256:\n    return BOARDROOM_ID\n\n\n@view\n@internal\ndef _getBoardroomAddr() -> address:\n    return staticcall RipeHq(RIPE_HQ_FOR_ADDYS).getAddr(BOARDROOM_ID)\n\n\n# bond room\n\n\n@view\n@internal\ndef _getBondRoomId() -> uint256:\n    return BOND_ROOM_ID\n\n\n@view\n@internal\ndef _getBondRoomAddr() -> address:\n    return staticcall RipeHq(RIPE_HQ_FOR_ADDYS).getAddr(BOND_ROOM_ID)\n\n\n# credit engine\n\n\n@view\n@internal\ndef _getCreditEngineId() -> uint256:\n    return CREDIT_ENGINE_ID\n\n\n@view\n@internal\ndef _getCreditEngineAddr() -> address:\n    return staticcall RipeHq(RIPE_HQ_FOR_ADDYS).getAddr(CREDIT_ENGINE_ID)\n\n\n# endaoment\n\n\n@view\n@internal\ndef _getEndaomentId() -> uint256:\n    return ENDAOMENT_ID\n\n\n@view\n@internal\ndef _getEndaomentAddr() -> address:\n    return staticcall RipeHq(RIPE_HQ_FOR_ADDYS).getAddr(ENDAOMENT_ID)\n\n\n# human resources\n\n\n@view\n@internal\ndef _getHumanResourcesId() -> uint256:\n    return HUMAN_RESOURCES_ID\n\n\n@view\n@internal\ndef _getHumanResourcesAddr() -> address:\n    return staticcall RipeHq(RIPE_HQ_FOR_ADDYS).getAddr(HUMAN_RESOURCES_ID)\n\n\n# lootbox\n\n\n@view\n@internal\ndef _getLootboxId() -> uint256:\n    return LOOTBOX_ID\n\n\n@view\n@internal\ndef _getLootboxAddr() -> address:\n    return staticcall RipeHq(RIPE_HQ_FOR_ADDYS).getAddr(LOOTBOX_ID)\n\n\n# teller\n\n\n@view\n@internal\ndef _getTellerId() -> uint256:\n    return TELLER_ID\n\n\n@view\n@internal\ndef _getTellerAddr() -> address:\n    return staticcall RipeHq(RIPE_HQ_FOR_ADDYS).getAddr(TELLER_ID)\n",
+            "sha256sum": "b38221d30f321e01b01ff830477474d005cf2063c23b8d06e88cc51e09f01208"
           },
           "contracts/modules/DeptBasics.vy": {
-            "content": "# @version 0.4.1\n\nuses: addys\n\nimport contracts.modules.Addys as addys\nfrom ethereum.ercs import IERC20\n\nevent DepartmentPauseModified:\n    isPaused: bool\n\nevent DepartmentFundsRecovered:\n    asset: indexed(address)\n    recipient: indexed(address)\n    balance: uint256\n\n# config\nisPaused: public(bool)\n\nCAN_MINT_GREEN: immutable(bool)\nCAN_MINT_RIPE: immutable(bool)\n\nMAX_RECOVER_ASSETS: constant(uint256) = 20\n\n\n@deploy\ndef __init__(_shouldPause: bool, _canMintGreen: bool, _canMintRipe: bool):\n    self.isPaused = _shouldPause\n\n    CAN_MINT_GREEN = _canMintGreen\n    CAN_MINT_RIPE = _canMintRipe\n\n\n###########\n# Minting #\n###########\n\n\n@view\n@external\ndef canMintGreen() -> bool:\n    return CAN_MINT_GREEN\n\n\n@view\n@external\ndef canMintRipe() -> bool:\n    return CAN_MINT_RIPE\n\n\n########\n# Ripe #\n########\n\n\n# activate\n\n\n@external\ndef pause(_shouldPause: bool):\n    assert addys._canModifyMissionControl(msg.sender) # dev: no perms\n    assert _shouldPause != self.isPaused # dev: no change\n    self.isPaused = _shouldPause\n    log DepartmentPauseModified(isPaused=_shouldPause)\n\n\n# recover funds\n\n\n@external\ndef recoverFunds(_recipient: address, _asset: address):\n    assert addys._canModifyMissionControl(msg.sender) # dev: no perms\n    self._recoverFunds(_recipient, _asset)\n\n\n@external\ndef recoverFundsMany(_recipient: address, _assets: DynArray[address, MAX_RECOVER_ASSETS]):\n    assert addys._canModifyMissionControl(msg.sender) # dev: no perms\n    for a: address in _assets:\n        self._recoverFunds(_recipient, a)\n\n\n@internal\ndef _recoverFunds(_recipient: address, _asset: address):\n    assert empty(address) not in [_recipient, _asset] # dev: invalid recipient or asset\n    balance: uint256 = staticcall IERC20(_asset).balanceOf(self)\n    assert balance != 0 # dev: nothing to recover\n\n    assert extcall IERC20(_asset).transfer(_recipient, balance, default_return_value=True) # dev: recovery failed\n    log DepartmentFundsRecovered(asset=_asset, recipient=_recipient, balance=balance)\n",
-            "sha256sum": "cdcbc1c83a0ffa09166c89d2698097b5dee00d2ebebf714134ab8faa6e9ff685"
+            "content": "# @version 0.4.1\n\nuses: addys\n\nimport contracts.modules.Addys as addys\nfrom ethereum.ercs import IERC20\n\nevent DepartmentPauseModified:\n    isPaused: bool\n\nevent DepartmentFundsRecovered:\n    asset: indexed(address)\n    recipient: indexed(address)\n    balance: uint256\n\n# config\nisPaused: public(bool)\n\nCAN_MINT_GREEN: immutable(bool)\nCAN_MINT_RIPE: immutable(bool)\n\nMAX_RECOVER_ASSETS: constant(uint256) = 20\n\n\n@deploy\ndef __init__(_shouldPause: bool, _canMintGreen: bool, _canMintRipe: bool):\n    self.isPaused = _shouldPause\n\n    CAN_MINT_GREEN = _canMintGreen\n    CAN_MINT_RIPE = _canMintRipe\n\n\n###########\n# Minting #\n###########\n\n\n@view\n@external\ndef canMintGreen() -> bool:\n    return CAN_MINT_GREEN\n\n\n@view\n@external\ndef canMintRipe() -> bool:\n    return CAN_MINT_RIPE\n\n\n########\n# Ripe #\n########\n\n\n# activate\n\n\n@external\ndef pause(_shouldPause: bool):\n    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms\n    assert _shouldPause != self.isPaused # dev: no change\n    self.isPaused = _shouldPause\n    log DepartmentPauseModified(isPaused=_shouldPause)\n\n\n# recover funds\n\n\n@external\ndef recoverFunds(_recipient: address, _asset: address):\n    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms\n    self._recoverFunds(_recipient, _asset)\n\n\n@external\ndef recoverFundsMany(_recipient: address, _assets: DynArray[address, MAX_RECOVER_ASSETS]):\n    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms\n    for a: address in _assets:\n        self._recoverFunds(_recipient, a)\n\n\n@internal\ndef _recoverFunds(_recipient: address, _asset: address):\n    assert empty(address) not in [_recipient, _asset] # dev: invalid recipient or asset\n    balance: uint256 = staticcall IERC20(_asset).balanceOf(self)\n    assert balance != 0 # dev: nothing to recover\n\n    assert extcall IERC20(_asset).transfer(_recipient, balance, default_return_value=True) # dev: recovery failed\n    log DepartmentFundsRecovered(asset=_asset, recipient=_recipient, balance=balance)\n",
+            "sha256sum": "b1fa12f29ec93430bc5589d35706081a6ea4459ba2fd535de9099b03abeee63b"
           },
           "interfaces/Department.vyi": {
             "content": "# @version 0.4.1\n\n\n###########\n# Minting #\n###########\n\n\n@view\n@external\ndef canMintGreen() -> bool:\n    # used in RipeHq.vy\n    ...\n\n\n@view\n@external\ndef canMintRipe() -> bool:\n    # used in RipeHq.vy\n    ...\n\n\n########\n# Ripe #\n########\n\n\n@view\n@external\ndef isPaused() -> bool:\n    ...\n\n\n@external\ndef pause(_shouldPause: bool):\n    ...\n\n\n@external\ndef recoverFunds(_recipient: address, _asset: address):\n    ...\n\n@external\ndef recoverFundsMany(_recipient: address, _assets: DynArray[address, 20]):\n    ...",
             "sha256sum": "23bcd020a90f5839bdf5eff3040e8256d601bedbfd6e021fb8755416e5026422"
           },
           "contracts/data/Ledger.vy": {
-            "content": "# @version 0.4.1\n\nimplements: Department\n\nexports: addys.__interface__\nexports: deptBasics.__interface__\n\ninitializes: addys\ninitializes: deptBasics[addys := addys]\n\nimport contracts.modules.Addys as addys\nimport contracts.modules.DeptBasics as deptBasics\nfrom interfaces import Department\n\n# deposit / withdrawals\n\nstruct DepositLedgerData:\n    isParticipatingInVault: bool\n    numUserVaults: uint256\n\n# points / rewards\n\nstruct RipeRewards:\n    borrowers: uint256\n    stakers: uint256\n    voters: uint256\n    genDepositors: uint256\n    newRipeRewards: uint256\n    lastUpdate: uint256\n\nstruct GlobalDepositPoints:\n    lastUsdValue: uint256\n    ripeStakerPoints: uint256\n    ripeVotePoints: uint256\n    ripeGenPoints: uint256\n    lastUpdate: uint256\n\nstruct AssetDepositPoints:\n    balancePoints: uint256\n    lastBalance: uint256\n    lastUsdValue: uint256\n    ripeStakerPoints: uint256\n    ripeVotePoints: uint256\n    ripeGenPoints: uint256\n    lastUpdate: uint256\n    precision: uint256\n\nstruct UserDepositPoints:\n    balancePoints: uint256\n    lastBalance: uint256\n    lastUpdate: uint256\n\nstruct BorrowPoints:\n    lastPrincipal: uint256\n    points: uint256\n    lastUpdate: uint256\n\nstruct BorrowPointsBundle:\n    userPoints: BorrowPoints\n    globalPoints: BorrowPoints\n    userDebtPrincipal: uint256\n\nstruct DepositPointsBundle:\n    userPoints: UserDepositPoints\n    assetPoints: AssetDepositPoints\n    globalPoints: GlobalDepositPoints\n\nstruct RipeRewardsBundle:\n    ripeRewards: RipeRewards\n    ripeAvailForRewards: uint256\n\n# debt\n\nstruct BorrowDataBundle:\n    userDebt: UserDebt\n    userBorrowInterval: IntervalBorrow\n    isUserBorrower: bool\n    numUserVaults: uint256\n    totalDebt: uint256\n    numBorrowers: uint256\n\nstruct RepayDataBundle:\n    userDebt: UserDebt\n    numUserVaults: uint256\n\nstruct DebtTerms:\n    ltv: uint256\n    redemptionThreshold: uint256\n    liqThreshold: uint256\n    liqFee: uint256\n    borrowRate: uint256\n    daowry: uint256\n\nstruct UserDebt:\n    amount: uint256\n    principal: uint256\n    debtTerms: DebtTerms\n    lastTimestamp: uint256\n    inLiquidation: bool\n\nstruct IntervalBorrow:\n    start: uint256\n    amount: uint256\n\n# auctions\n\nstruct FungibleAuction:\n    liqUser: address\n    vaultId: uint256\n    asset: address \n    startDiscount: uint256\n    maxDiscount: uint256\n    startBlock: uint256\n    endBlock: uint256\n    isActive: bool\n\n# user vault participation\nuserVaults: public(HashMap[address, HashMap[uint256, uint256]]) # user -> index -> vault id\nindexOfVault: public(HashMap[address, HashMap[uint256, uint256]]) # user -> vault id -> index\nnumUserVaults: public(HashMap[address, uint256]) # user -> num vaults\n\n# borrow data\nuserDebt: public(HashMap[address, UserDebt]) # user -> user debt\ntotalDebt: public(uint256) # total debt\nborrowers: public(HashMap[uint256, address]) # index -> borrower\nindexOfBorrower: public(HashMap[address, uint256]) # borrower -> index\nnumBorrowers: public(uint256) # num borrowers\nborrowIntervals: public(HashMap[address, IntervalBorrow]) # user -> borrow interval\nunrealizedYield: public(uint256) # unrealized yield\n\n# ripe rewards\nripeRewards: public(RipeRewards)\nripeAvailForRewards: public(uint256)\n\n# points\nglobalDepositPoints: public(GlobalDepositPoints)\nassetDepositPoints: public(HashMap[uint256, HashMap[address, AssetDepositPoints]]) # vault id -> asset -> points\nuserDepositPoints: public(HashMap[address, HashMap[uint256, HashMap[address, UserDepositPoints]]]) # user -> vault id -> asset -> points\nuserBorrowPoints:  public(HashMap[address, BorrowPoints]) # user -> BorrowPoints\nglobalBorrowPoints: public(BorrowPoints)\n\n# auctions\nfungibleAuctions: public(HashMap[address, HashMap[uint256, FungibleAuction]]) # liq user -> auction index -> FungibleAuction\nfungibleAuctionIndex: public(HashMap[address, HashMap[uint256, HashMap[address, uint256]]]) # liq user -> vault id -> asset -> auction index\nnumFungibleAuctions: public(HashMap[address, uint256]) # liq user -> num fungible auctions\n\nfungLiqUsers: public(HashMap[uint256, address]) # index -> liq user\nindexOfFungLiqUser: public(HashMap[address, uint256]) # liq user -> index\nnumFungLiqUsers: public(uint256) # num liq users\n\n\n@deploy\ndef __init__(_ripeHq: address, _ripeAvailForRewards: uint256):\n    addys.__init__(_ripeHq)\n    deptBasics.__init__(False, False, False) # no minting\n\n    if _ripeAvailForRewards != 0:\n        self.ripeAvailForRewards = _ripeAvailForRewards\n\n\n###############\n# User Vaults #\n###############\n\n\n@view\n@external\ndef isParticipatingInVault(_user: address, _vaultId: uint256) -> bool:\n    return self.indexOfVault[_user][_vaultId] != 0\n\n\n@view\n@external\ndef getNumUserVaults(_user: address) -> uint256:\n    return self._getNumUserVaults(_user)\n\n\n@view\n@internal\ndef _getNumUserVaults(_user: address) -> uint256:\n    numVaults: uint256 = self.numUserVaults[_user]\n    if numVaults == 0:\n        return 0\n    return numVaults - 1\n\n\n@external\ndef addVaultToUser(_user: address, _vaultId: uint256):\n    assert msg.sender in [addys._getTellerAddr(), addys._getCreditEngineAddr(), addys._getAuctionHouseAddr()] # dev: not allowed\n    assert not deptBasics.isPaused # dev: not activated\n\n    # already participating - fail gracefully\n    if self.indexOfVault[_user][_vaultId] != 0:\n        return\n\n    # register vault\n    vid: uint256 = self.numUserVaults[_user]\n    if vid == 0:\n        vid = 1 # not using 0 index\n\n    self.userVaults[_user][vid] = _vaultId\n    self.indexOfVault[_user][_vaultId] = vid\n    self.numUserVaults[_user] = vid + 1\n\n\n@external\ndef removeVaultFromUser(_user: address, _vaultId: uint256):\n    assert msg.sender == addys._getLootboxAddr() # dev: only Lootbox allowed\n    assert not deptBasics.isPaused # dev: not activated\n\n    numUserVaults: uint256 = self.numUserVaults[_user]\n    if numUserVaults == 0:\n        return\n\n    targetIndex: uint256 = self.indexOfVault[_user][_vaultId]\n    if targetIndex == 0:\n        return\n\n    # update data\n    lastIndex: uint256 = numUserVaults - 1\n    self.numUserVaults[_user] = lastIndex\n    self.indexOfVault[_user][_vaultId] = 0\n\n    # have last vault replace the target vault\n    if targetIndex != lastIndex:\n        lastVaultId: uint256 = self.userVaults[_user][lastIndex]\n        self.userVaults[_user][targetIndex] = lastVaultId\n        self.indexOfVault[_user][lastVaultId] = targetIndex\n\n\n# utils\n\n\n@view\n@external\ndef getDepositLedgerData(_user: address, _vaultId: uint256) -> DepositLedgerData:\n    return DepositLedgerData(\n        isParticipatingInVault=self.indexOfVault[_user][_vaultId] != 0,\n        numUserVaults=self._getNumUserVaults(_user),\n    )\n\n\n########\n# Debt #\n########\n\n\n@external\ndef setUserDebt(_user: address, _userDebt: UserDebt, _newYield: uint256, _interval: IntervalBorrow):\n    assert msg.sender == addys._getCreditEngineAddr() # dev: only CreditEngine allowed\n    assert not deptBasics.isPaused # dev: not activated\n\n    # reduce prev user debt\n    totalDebt: uint256 = self.totalDebt\n    prevUserDebt: UserDebt = self.userDebt[_user]\n    if prevUserDebt.amount != 0:\n        totalDebt -= prevUserDebt.amount\n\n    # save new user debt\n    self.userDebt[_user] = _userDebt\n    if _userDebt.amount != 0:\n        totalDebt += _userDebt.amount\n    self.totalDebt = totalDebt\n\n    # update intervals -- during repay, we pass in empty interval\n    if _interval.start != 0:\n        self.borrowIntervals[_user] = _interval\n\n    # update unrealized yield\n    if _newYield != 0:\n        self.unrealizedYield += _newYield\n\n    # update fung auctions (if they exist)\n    if prevUserDebt.inLiquidation and not _userDebt.inLiquidation:\n        self._removeAllFungibleAuctions(_user)\n\n    # remove borrower\n    if _userDebt.amount == 0:\n        self._removeBorrower(_user)\n\n    # add borrower (if necessary)\n    elif self.indexOfBorrower[_user] == 0:\n        self._addNewBorrower(_user)\n\n\n# realize yield\n\n\n@external\ndef flushUnrealizedYield() -> uint256:\n    assert msg.sender == addys._getCreditEngineAddr() # dev: only CreditEngine allowed\n    assert not deptBasics.isPaused # dev: not activated\n\n    unrealizedYield: uint256 = self.unrealizedYield\n    self.unrealizedYield = 0\n    return unrealizedYield\n\n\n# registration\n\n\n@internal\ndef _addNewBorrower(_user: address):\n    bid: uint256 = self.numBorrowers\n    if bid == 0:\n        bid = 1 # not using 0 index\n    self.borrowers[bid] = _user\n    self.indexOfBorrower[_user] = bid\n    self.numBorrowers = bid + 1\n\n\n@internal\ndef _removeBorrower(_user: address):\n    numBorrowers: uint256 = self.numBorrowers\n    if numBorrowers == 0:\n        return\n\n    targetIndex: uint256 = self.indexOfBorrower[_user]\n    if targetIndex == 0:\n        return\n\n    # update data\n    lastIndex: uint256 = numBorrowers - 1\n    self.numBorrowers = lastIndex\n    self.indexOfBorrower[_user] = 0\n\n    # shift users to replace the removed one\n    if targetIndex != lastIndex:\n        lastUser: address = self.borrowers[lastIndex]\n        self.borrowers[targetIndex] = lastUser\n        self.indexOfBorrower[lastUser] = targetIndex\n\n\n# utils\n\n\n@view\n@external\ndef hasDebt(_user: address) -> bool:\n    return self.userDebt[_user].amount != 0\n\n\n@view\n@external\ndef getNumBorrowers() -> uint256:\n    return self._getNumBorrowers()\n\n\n@view\n@internal\ndef _getNumBorrowers() -> uint256:\n    numBorrowers: uint256 = self.numBorrowers\n    if numBorrowers == 0:\n        return 0\n    return numBorrowers - 1\n\n\n@view\n@external\ndef getBorrowDataBundle(_user: address) -> BorrowDataBundle:\n    return BorrowDataBundle(\n        userDebt=self.userDebt[_user],\n        userBorrowInterval=self.borrowIntervals[_user],\n        isUserBorrower=self.indexOfBorrower[_user] != 0,\n        numUserVaults=self.numUserVaults[_user],\n        totalDebt=self.totalDebt,\n        numBorrowers=self._getNumBorrowers(),\n    )\n\n\n@view\n@external\ndef getRepayDataBundle(_user: address) -> RepayDataBundle:\n    return RepayDataBundle(\n        userDebt=self.userDebt[_user],\n        numUserVaults=self.numUserVaults[_user],\n    )\n\n\n@view\n@external\ndef isBorrower(_user: address) -> bool:\n    return self.indexOfBorrower[_user] != 0\n\n\n@view\n@external\ndef isUserInLiquidation(_user: address) -> bool:\n    return self.userDebt[_user].inLiquidation\n\n\n####################\n# Rewards / Points #\n####################\n\n\n# ripe rewards\n\n\n@external\ndef setRipeRewards(_ripeRewards: RipeRewards):\n    assert msg.sender == addys._getLootboxAddr() # dev: only Lootbox allowed\n    assert not deptBasics.isPaused # dev: not activated\n    self._setRipeRewards(_ripeRewards)\n\n\n@internal\ndef _setRipeRewards(_ripeRewards: RipeRewards):\n    self.ripeRewards = _ripeRewards\n    if _ripeRewards.newRipeRewards != 0:\n        self.ripeAvailForRewards -= min(self.ripeAvailForRewards, _ripeRewards.newRipeRewards)\n\n\n@external\ndef setRipeAvailForRewards(_amount: uint256):\n    assert msg.sender == addys._getLootboxAddr() # dev: only Lootbox allowed\n    assert not deptBasics.isPaused # dev: not activated\n    self.ripeAvailForRewards = _amount\n\n\n# deposit points\n\n\n@external\ndef setDepositPointsAndRipeRewards(\n    _user: address,\n    _vaultId: uint256,\n    _asset: address,\n    _userPoints: UserDepositPoints,\n    _assetPoints: AssetDepositPoints,\n    _globalPoints: GlobalDepositPoints,\n    _ripeRewards: RipeRewards,\n):\n    assert msg.sender == addys._getLootboxAddr() # dev: only Lootbox allowed\n    assert not deptBasics.isPaused # dev: not activated\n\n    if _user != empty(address):\n        self.userDepositPoints[_user][_vaultId][_asset] = _userPoints\n    self.assetDepositPoints[_vaultId][_asset] = _assetPoints\n    self.globalDepositPoints = _globalPoints\n    self._setRipeRewards(_ripeRewards)\n\n\n# borrow points\n\n\n@external\ndef setBorrowPointsAndRipeRewards(\n    _user: address,\n    _userPoints: BorrowPoints,\n    _globalPoints: BorrowPoints,\n    _ripeRewards: RipeRewards,\n):\n    assert msg.sender == addys._getLootboxAddr() # dev: only Lootbox allowed\n    assert not deptBasics.isPaused # dev: not activated\n\n    self.globalBorrowPoints = _globalPoints\n    if _user != empty(address):\n        self.userBorrowPoints[_user] = _userPoints\n    self._setRipeRewards(_ripeRewards)\n\n\n# utils\n\n\n@view\n@external\ndef getRipeRewardsBundle() -> RipeRewardsBundle:\n    return RipeRewardsBundle(\n        ripeRewards=self.ripeRewards,\n        ripeAvailForRewards=self.ripeAvailForRewards,\n    )\n\n\n@view\n@external\ndef getBorrowPointsBundle(_user: address) -> BorrowPointsBundle:\n    return BorrowPointsBundle(\n        userPoints=self.userBorrowPoints[_user],\n        globalPoints=self.globalBorrowPoints,\n        userDebtPrincipal=self.userDebt[_user].principal,\n    )\n\n\n@view\n@external\ndef getDepositPointsBundle(_user: address, _vaultId: uint256, _asset: address) -> DepositPointsBundle:\n    userPoints: UserDepositPoints = empty(UserDepositPoints)\n    if _user != empty(address):\n        userPoints = self.userDepositPoints[_user][_vaultId][_asset]\n    return DepositPointsBundle(\n        userPoints=userPoints,\n        assetPoints=self.assetDepositPoints[_vaultId][_asset],\n        globalPoints=self.globalDepositPoints,\n    )\n\n\n############\n# Auctions #\n############\n\n\n@view\n@external\ndef hasFungibleAuctions(_liqUser: address) -> bool:\n    return self.numFungibleAuctions[_liqUser] != 0\n\n\n# create new auction\n\n\n@external\ndef createNewFungibleAuction(_auc: FungibleAuction) -> uint256:\n    assert msg.sender == addys._getAuctionHouseAddr() # dev: only AuctionHouse allowed\n    assert not deptBasics.isPaused # dev: not activated\n\n    # fail gracefully if auction already exists\n    if self.fungibleAuctionIndex[_auc.liqUser][_auc.vaultId][_auc.asset] != 0:\n        return 0\n\n    # create new auction\n    aid: uint256 = self.numFungibleAuctions[_auc.liqUser]\n    if aid == 0:\n        aid = 1\n    self.fungibleAuctions[_auc.liqUser][aid] = _auc\n    self.fungibleAuctionIndex[_auc.liqUser][_auc.vaultId][_auc.asset] = aid\n    self.numFungibleAuctions[_auc.liqUser] = aid + 1\n\n    # register fungible liq user (if applicable)\n    if self.indexOfFungLiqUser[_auc.liqUser] == 0:\n        self._registerFungibleLiqUser(_auc.liqUser)\n\n    return aid\n\n\n# register fungible liq user\n\n\n@internal\ndef _registerFungibleLiqUser(_liqUser: address):\n    uid: uint256 = self.numFungLiqUsers\n    if uid == 0:\n        uid = 1\n    self.fungLiqUsers[uid] = _liqUser\n    self.indexOfFungLiqUser[_liqUser] = uid\n    self.numFungLiqUsers = uid + 1\n\n\n# removal fungible auction\n\n\n@external\ndef removeFungibleAuction(_liqUser: address, _vaultId: uint256, _asset: address):\n    assert msg.sender == addys._getAuctionHouseAddr() # dev: only AuctionHouse allowed\n    assert not deptBasics.isPaused # dev: not activated\n\n    numAuctions: uint256 = self.numFungibleAuctions[_liqUser]\n    if numAuctions == 0:\n        return\n\n    targetIndex: uint256 = self.fungibleAuctionIndex[_liqUser][_vaultId][_asset]\n    if targetIndex == 0:\n        return\n\n    # update data\n    lastIndex: uint256 = numAuctions - 1\n    self.numFungibleAuctions[_liqUser] = lastIndex\n    self.fungibleAuctionIndex[_liqUser][_vaultId][_asset] = 0\n\n    # have last auction replace the target auction\n    if targetIndex != lastIndex:\n        lastItem: FungibleAuction = self.fungibleAuctions[_liqUser][lastIndex]\n        self.fungibleAuctions[_liqUser][targetIndex] = lastItem\n        self.fungibleAuctionIndex[_liqUser][lastItem.vaultId][lastItem.asset] = targetIndex\n\n    # no more fungible auctions\n    if lastIndex <= 1:\n        self.numFungibleAuctions[_liqUser] = 0\n        self._removeFungLiqUser(_liqUser)\n\n\n# update auction\n\n\n@external\ndef setFungibleAuction(\n    _liqUser: address,\n    _vaultId: uint256,\n    _asset: address,\n    _auc: FungibleAuction,\n) -> bool:\n    assert msg.sender == addys._getAuctionHouseAddr() # dev: only AuctionHouse allowed\n    assert not deptBasics.isPaused # dev: not activated\n\n    aid: uint256 = self.fungibleAuctionIndex[_liqUser][_vaultId][_asset]\n    if aid == 0:\n        return False # this does not yet exist\n\n    self.fungibleAuctions[_liqUser][aid] = _auc\n    return True\n\n\n# remove liq user\n\n\n@internal\ndef _removeFungLiqUser(_liqUser: address):\n    numUsers: uint256 = self.numFungLiqUsers\n    if numUsers == 0:\n        return\n\n    targetIndex: uint256 = self.indexOfFungLiqUser[_liqUser]\n    if targetIndex == 0:\n        return\n\n    # update data\n    lastIndex: uint256 = numUsers - 1\n    self.numFungLiqUsers = lastIndex\n    self.indexOfFungLiqUser[_liqUser] = 0\n\n    # have last liq user replace the target liq user\n    if targetIndex != lastIndex:\n        lastUser: address = self.fungLiqUsers[lastIndex]\n        self.fungLiqUsers[targetIndex] = lastUser\n        self.indexOfFungLiqUser[lastUser] = targetIndex\n\n\n# remove all fungible auctions\n\n\n@external\ndef removeAllFungibleAuctions(_liqUser: address):\n    assert msg.sender in [addys._getAuctionHouseAddr(), addys._getCreditEngineAddr()] # dev: only AuctionHouse or CreditEngine allowed\n    assert not deptBasics.isPaused # dev: not activated\n    self._removeAllFungibleAuctions(_liqUser)\n\n\n@internal\ndef _removeAllFungibleAuctions(_liqUser: address):\n    self._removeFungLiqUser(_liqUser)\n\n    numAuctions: uint256 = self.numFungibleAuctions[_liqUser]\n    if numAuctions == 0:\n        return\n\n    # zero out the auction indexes\n    for i: uint256 in range(1, numAuctions, bound=max_value(uint256)):\n        auc: FungibleAuction = self.fungibleAuctions[_liqUser][i]\n        self.fungibleAuctionIndex[_liqUser][auc.vaultId][auc.asset] = 0\n\n    # zero out total num\n    self.numFungibleAuctions[_liqUser] = 0\n\n\n# utils\n\n\n@view\n@external\ndef getFungibleAuction(_liqUser: address, _vaultId: uint256, _asset: address) -> FungibleAuction:\n    aid: uint256 = self.fungibleAuctionIndex[_liqUser][_vaultId][_asset]\n    return self.fungibleAuctions[_liqUser][aid]\n\n\n@view\n@external\ndef getFungibleAuctionDuringPurchase(_liqUser: address, _vaultId: uint256, _asset: address) -> FungibleAuction:\n    if not self.userDebt[_liqUser].inLiquidation:\n        return empty(FungibleAuction)\n    aid: uint256 = self.fungibleAuctionIndex[_liqUser][_vaultId][_asset]\n    return self.fungibleAuctions[_liqUser][aid]\n\n\n@view\n@external\ndef hasFungibleAuction(_liqUser: address, _vaultId: uint256, _asset: address) -> bool:\n    return self.fungibleAuctionIndex[_liqUser][_vaultId][_asset] != 0\n",
-            "sha256sum": "c4c70c0c6bc44487a424c6c8698cd4872540e88d99b6513faaa62ad679c9e247"
+            "content": "# @version 0.4.1\n\nimplements: Department\n\nexports: addys.__interface__\nexports: deptBasics.__interface__\n\ninitializes: addys\ninitializes: deptBasics[addys := addys]\n\nimport contracts.modules.Addys as addys\nimport contracts.modules.DeptBasics as deptBasics\nfrom interfaces import Department\n\n# deposit / withdrawals\n\nstruct DepositLedgerData:\n    isParticipatingInVault: bool\n    numUserVaults: uint256\n\n# points / rewards\n\nstruct RipeRewards:\n    borrowers: uint256\n    stakers: uint256\n    voters: uint256\n    genDepositors: uint256\n    newRipeRewards: uint256\n    lastUpdate: uint256\n\nstruct GlobalDepositPoints:\n    lastUsdValue: uint256\n    ripeStakerPoints: uint256\n    ripeVotePoints: uint256\n    ripeGenPoints: uint256\n    lastUpdate: uint256\n\nstruct AssetDepositPoints:\n    balancePoints: uint256\n    lastBalance: uint256\n    lastUsdValue: uint256\n    ripeStakerPoints: uint256\n    ripeVotePoints: uint256\n    ripeGenPoints: uint256\n    lastUpdate: uint256\n    precision: uint256\n\nstruct UserDepositPoints:\n    balancePoints: uint256\n    lastBalance: uint256\n    lastUpdate: uint256\n\nstruct BorrowPoints:\n    lastPrincipal: uint256\n    points: uint256\n    lastUpdate: uint256\n\nstruct BorrowPointsBundle:\n    userPoints: BorrowPoints\n    globalPoints: BorrowPoints\n    userDebtPrincipal: uint256\n\nstruct DepositPointsBundle:\n    userPoints: UserDepositPoints\n    assetPoints: AssetDepositPoints\n    globalPoints: GlobalDepositPoints\n\nstruct RipeRewardsBundle:\n    ripeRewards: RipeRewards\n    ripeAvailForRewards: uint256\n\n# debt\n\nstruct BorrowDataBundle:\n    userDebt: UserDebt\n    userBorrowInterval: IntervalBorrow\n    isUserBorrower: bool\n    numUserVaults: uint256\n    totalDebt: uint256\n    numBorrowers: uint256\n\nstruct RepayDataBundle:\n    userDebt: UserDebt\n    numUserVaults: uint256\n\nstruct DebtTerms:\n    ltv: uint256\n    redemptionThreshold: uint256\n    liqThreshold: uint256\n    liqFee: uint256\n    borrowRate: uint256\n    daowry: uint256\n\nstruct UserDebt:\n    amount: uint256\n    principal: uint256\n    debtTerms: DebtTerms\n    lastTimestamp: uint256\n    inLiquidation: bool\n\nstruct IntervalBorrow:\n    start: uint256\n    amount: uint256\n\n# auctions\n\nstruct FungibleAuction:\n    liqUser: address\n    vaultId: uint256\n    asset: address \n    startDiscount: uint256\n    maxDiscount: uint256\n    startBlock: uint256\n    endBlock: uint256\n    isActive: bool\n\n# ripe bonds\n\nstruct RipeBondData:\n    paymentAmountAvailInEpoch: uint256\n    ripeAvailForBonds: uint256\n    badDebt: uint256\n\n# user vault participation\nuserVaults: public(HashMap[address, HashMap[uint256, uint256]]) # user -> index -> vault id\nindexOfVault: public(HashMap[address, HashMap[uint256, uint256]]) # user -> vault id -> index\nnumUserVaults: public(HashMap[address, uint256]) # user -> num vaults\n\n# borrow data\nuserDebt: public(HashMap[address, UserDebt]) # user -> user debt\ntotalDebt: public(uint256) # total debt\nborrowers: public(HashMap[uint256, address]) # index -> borrower\nindexOfBorrower: public(HashMap[address, uint256]) # borrower -> index\nnumBorrowers: public(uint256) # num borrowers\nborrowIntervals: public(HashMap[address, IntervalBorrow]) # user -> borrow interval\nunrealizedYield: public(uint256) # unrealized yield\n\n# ripe rewards\nripeRewards: public(RipeRewards)\nripeAvailForRewards: public(uint256)\n\n# points\nglobalDepositPoints: public(GlobalDepositPoints)\nassetDepositPoints: public(HashMap[uint256, HashMap[address, AssetDepositPoints]]) # vault id -> asset -> points\nuserDepositPoints: public(HashMap[address, HashMap[uint256, HashMap[address, UserDepositPoints]]]) # user -> vault id -> asset -> points\nuserBorrowPoints:  public(HashMap[address, BorrowPoints]) # user -> BorrowPoints\nglobalBorrowPoints: public(BorrowPoints)\n\n# auctions\nfungibleAuctions: public(HashMap[address, HashMap[uint256, FungibleAuction]]) # liq user -> auction index -> FungibleAuction\nfungibleAuctionIndex: public(HashMap[address, HashMap[uint256, HashMap[address, uint256]]]) # liq user -> vault id -> asset -> auction index\nnumFungibleAuctions: public(HashMap[address, uint256]) # liq user -> num fungible auctions\n\nfungLiqUsers: public(HashMap[uint256, address]) # index -> liq user\nindexOfFungLiqUser: public(HashMap[address, uint256]) # liq user -> index\nnumFungLiqUsers: public(uint256) # num liq users\n\n# hr contributors\nripeAvailForHr: public(uint256)\ncontributors: public(HashMap[uint256, address]) # index -> contributor addr\nindexOfContributor: public(HashMap[address, uint256]) # contributor -> index\nnumContributors: public(uint256) # num contributors\n\n# bond data\nepochStart: public(uint256)\nepochEnd: public(uint256)\nbadDebt: public(uint256)\nripePaidOutForBadDebt: public(uint256)\npaymentAmountAvailInEpoch: public(uint256)\nripeAvailForBonds: public(uint256)\n\n\n@deploy\ndef __init__(\n    _ripeHq: address,\n    _ripeAvailForRewards: uint256,\n    _ripeAvailForHr: uint256,\n    _ripeAvailForBonds: uint256,\n):\n    addys.__init__(_ripeHq)\n    deptBasics.__init__(False, False, False) # no minting\n\n    if _ripeAvailForRewards != 0:\n        self.ripeAvailForRewards = _ripeAvailForRewards\n\n    if _ripeAvailForHr != 0:\n        self.ripeAvailForHr = _ripeAvailForHr\n\n    if _ripeAvailForBonds != 0:\n        self.ripeAvailForBonds = _ripeAvailForBonds\n\n\n###############\n# User Vaults #\n###############\n\n\n@view\n@external\ndef isParticipatingInVault(_user: address, _vaultId: uint256) -> bool:\n    return self.indexOfVault[_user][_vaultId] != 0\n\n\n@view\n@external\ndef getNumUserVaults(_user: address) -> uint256:\n    return self._getNumUserVaults(_user)\n\n\n@view\n@internal\ndef _getNumUserVaults(_user: address) -> uint256:\n    numVaults: uint256 = self.numUserVaults[_user]\n    if numVaults == 0:\n        return 0\n    return numVaults - 1\n\n\n@external\ndef addVaultToUser(_user: address, _vaultId: uint256):\n    assert msg.sender in [\n        addys._getTellerAddr(),\n        addys._getCreditEngineAddr(),\n        addys._getAuctionHouseAddr(),\n        addys._getHumanResourcesAddr(),\n    ] # dev: not allowed\n    assert not deptBasics.isPaused # dev: not activated\n\n    # already participating - fail gracefully\n    if self.indexOfVault[_user][_vaultId] != 0:\n        return\n\n    # register vault\n    vid: uint256 = self.numUserVaults[_user]\n    if vid == 0:\n        vid = 1 # not using 0 index\n\n    self.userVaults[_user][vid] = _vaultId\n    self.indexOfVault[_user][_vaultId] = vid\n    self.numUserVaults[_user] = vid + 1\n\n\n@external\ndef removeVaultFromUser(_user: address, _vaultId: uint256):\n    assert msg.sender == addys._getLootboxAddr() # dev: only Lootbox allowed\n    assert not deptBasics.isPaused # dev: not activated\n\n    numUserVaults: uint256 = self.numUserVaults[_user]\n    if numUserVaults == 0:\n        return\n\n    targetIndex: uint256 = self.indexOfVault[_user][_vaultId]\n    if targetIndex == 0:\n        return\n\n    # update data\n    lastIndex: uint256 = numUserVaults - 1\n    self.numUserVaults[_user] = lastIndex\n    self.indexOfVault[_user][_vaultId] = 0\n\n    # have last vault replace the target vault\n    if targetIndex != lastIndex:\n        lastVaultId: uint256 = self.userVaults[_user][lastIndex]\n        self.userVaults[_user][targetIndex] = lastVaultId\n        self.indexOfVault[_user][lastVaultId] = targetIndex\n\n\n# utils\n\n\n@view\n@external\ndef getDepositLedgerData(_user: address, _vaultId: uint256) -> DepositLedgerData:\n    return DepositLedgerData(\n        isParticipatingInVault=self.indexOfVault[_user][_vaultId] != 0,\n        numUserVaults=self._getNumUserVaults(_user),\n    )\n\n\n########\n# Debt #\n########\n\n\n@external\ndef setUserDebt(_user: address, _userDebt: UserDebt, _newYield: uint256, _interval: IntervalBorrow):\n    assert msg.sender == addys._getCreditEngineAddr() # dev: only CreditEngine allowed\n    assert not deptBasics.isPaused # dev: not activated\n\n    # reduce prev user debt\n    totalDebt: uint256 = self.totalDebt\n    prevUserDebt: UserDebt = self.userDebt[_user]\n    if prevUserDebt.amount != 0:\n        totalDebt -= prevUserDebt.amount\n\n    # save new user debt\n    self.userDebt[_user] = _userDebt\n    if _userDebt.amount != 0:\n        totalDebt += _userDebt.amount\n    self.totalDebt = totalDebt\n\n    # update intervals -- during repay, we pass in empty interval\n    if _interval.start != 0:\n        self.borrowIntervals[_user] = _interval\n\n    # update unrealized yield\n    if _newYield != 0:\n        self.unrealizedYield += _newYield\n\n    # update fung auctions (if they exist)\n    if prevUserDebt.inLiquidation and not _userDebt.inLiquidation:\n        self._removeAllFungibleAuctions(_user)\n\n    # remove borrower\n    if _userDebt.amount == 0:\n        self._removeBorrower(_user)\n\n    # add borrower (if necessary)\n    elif self.indexOfBorrower[_user] == 0:\n        self._addNewBorrower(_user)\n\n\n# realize yield\n\n\n@external\ndef flushUnrealizedYield() -> uint256:\n    assert msg.sender == addys._getCreditEngineAddr() # dev: only CreditEngine allowed\n    assert not deptBasics.isPaused # dev: not activated\n\n    unrealizedYield: uint256 = self.unrealizedYield\n    self.unrealizedYield = 0\n    return unrealizedYield\n\n\n# registration\n\n\n@internal\ndef _addNewBorrower(_user: address):\n    bid: uint256 = self.numBorrowers\n    if bid == 0:\n        bid = 1 # not using 0 index\n    self.borrowers[bid] = _user\n    self.indexOfBorrower[_user] = bid\n    self.numBorrowers = bid + 1\n\n\n@internal\ndef _removeBorrower(_user: address):\n    numBorrowers: uint256 = self.numBorrowers\n    if numBorrowers == 0:\n        return\n\n    targetIndex: uint256 = self.indexOfBorrower[_user]\n    if targetIndex == 0:\n        return\n\n    # update data\n    lastIndex: uint256 = numBorrowers - 1\n    self.numBorrowers = lastIndex\n    self.indexOfBorrower[_user] = 0\n\n    # shift users to replace the removed one\n    if targetIndex != lastIndex:\n        lastUser: address = self.borrowers[lastIndex]\n        self.borrowers[targetIndex] = lastUser\n        self.indexOfBorrower[lastUser] = targetIndex\n\n\n# utils\n\n\n@view\n@external\ndef hasDebt(_user: address) -> bool:\n    return self.userDebt[_user].amount != 0\n\n\n@view\n@external\ndef getNumBorrowers() -> uint256:\n    return self._getNumBorrowers()\n\n\n@view\n@internal\ndef _getNumBorrowers() -> uint256:\n    numBorrowers: uint256 = self.numBorrowers\n    if numBorrowers == 0:\n        return 0\n    return numBorrowers - 1\n\n\n@view\n@external\ndef getBorrowDataBundle(_user: address) -> BorrowDataBundle:\n    return BorrowDataBundle(\n        userDebt=self.userDebt[_user],\n        userBorrowInterval=self.borrowIntervals[_user],\n        isUserBorrower=self.indexOfBorrower[_user] != 0,\n        numUserVaults=self.numUserVaults[_user],\n        totalDebt=self.totalDebt,\n        numBorrowers=self._getNumBorrowers(),\n    )\n\n\n@view\n@external\ndef getRepayDataBundle(_user: address) -> RepayDataBundle:\n    return RepayDataBundle(\n        userDebt=self.userDebt[_user],\n        numUserVaults=self.numUserVaults[_user],\n    )\n\n\n@view\n@external\ndef isBorrower(_user: address) -> bool:\n    return self.indexOfBorrower[_user] != 0\n\n\n@view\n@external\ndef isUserInLiquidation(_user: address) -> bool:\n    return self.userDebt[_user].inLiquidation\n\n\n####################\n# Rewards / Points #\n####################\n\n\n# ripe rewards\n\n\n@external\ndef setRipeRewards(_ripeRewards: RipeRewards):\n    assert msg.sender == addys._getLootboxAddr() # dev: only Lootbox allowed\n    assert not deptBasics.isPaused # dev: not activated\n    self._setRipeRewards(_ripeRewards)\n\n\n@internal\ndef _setRipeRewards(_ripeRewards: RipeRewards):\n    self.ripeRewards = _ripeRewards\n    if _ripeRewards.newRipeRewards != 0:\n        self.ripeAvailForRewards -= min(self.ripeAvailForRewards, _ripeRewards.newRipeRewards)\n\n\n@external\ndef setRipeAvailForRewards(_amount: uint256):\n    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms\n    assert not deptBasics.isPaused # dev: not activated\n    self.ripeAvailForRewards = _amount\n\n\n# deposit points\n\n\n@external\ndef setDepositPointsAndRipeRewards(\n    _user: address,\n    _vaultId: uint256,\n    _asset: address,\n    _userPoints: UserDepositPoints,\n    _assetPoints: AssetDepositPoints,\n    _globalPoints: GlobalDepositPoints,\n    _ripeRewards: RipeRewards,\n):\n    assert msg.sender == addys._getLootboxAddr() # dev: only Lootbox allowed\n    assert not deptBasics.isPaused # dev: not activated\n\n    if _user != empty(address):\n        self.userDepositPoints[_user][_vaultId][_asset] = _userPoints\n    self.assetDepositPoints[_vaultId][_asset] = _assetPoints\n    self.globalDepositPoints = _globalPoints\n    self._setRipeRewards(_ripeRewards)\n\n\n# borrow points\n\n\n@external\ndef setBorrowPointsAndRipeRewards(\n    _user: address,\n    _userPoints: BorrowPoints,\n    _globalPoints: BorrowPoints,\n    _ripeRewards: RipeRewards,\n):\n    assert msg.sender == addys._getLootboxAddr() # dev: only Lootbox allowed\n    assert not deptBasics.isPaused # dev: not activated\n\n    self.globalBorrowPoints = _globalPoints\n    if _user != empty(address):\n        self.userBorrowPoints[_user] = _userPoints\n    self._setRipeRewards(_ripeRewards)\n\n\n# utils\n\n\n@view\n@external\ndef getRipeRewardsBundle() -> RipeRewardsBundle:\n    return RipeRewardsBundle(\n        ripeRewards=self.ripeRewards,\n        ripeAvailForRewards=self.ripeAvailForRewards,\n    )\n\n\n@view\n@external\ndef getBorrowPointsBundle(_user: address) -> BorrowPointsBundle:\n    return BorrowPointsBundle(\n        userPoints=self.userBorrowPoints[_user],\n        globalPoints=self.globalBorrowPoints,\n        userDebtPrincipal=self.userDebt[_user].principal,\n    )\n\n\n@view\n@external\ndef getDepositPointsBundle(_user: address, _vaultId: uint256, _asset: address) -> DepositPointsBundle:\n    userPoints: UserDepositPoints = empty(UserDepositPoints)\n    if _user != empty(address):\n        userPoints = self.userDepositPoints[_user][_vaultId][_asset]\n    return DepositPointsBundle(\n        userPoints=userPoints,\n        assetPoints=self.assetDepositPoints[_vaultId][_asset],\n        globalPoints=self.globalDepositPoints,\n    )\n\n\n############\n# Auctions #\n############\n\n\n@view\n@external\ndef hasFungibleAuctions(_liqUser: address) -> bool:\n    return self.numFungibleAuctions[_liqUser] != 0\n\n\n# create new auction\n\n\n@external\ndef createNewFungibleAuction(_auc: FungibleAuction) -> uint256:\n    assert msg.sender == addys._getAuctionHouseAddr() # dev: only AuctionHouse allowed\n    assert not deptBasics.isPaused # dev: not activated\n\n    # fail gracefully if auction already exists\n    if self.fungibleAuctionIndex[_auc.liqUser][_auc.vaultId][_auc.asset] != 0:\n        return 0\n\n    # create new auction\n    aid: uint256 = self.numFungibleAuctions[_auc.liqUser]\n    if aid == 0:\n        aid = 1\n    self.fungibleAuctions[_auc.liqUser][aid] = _auc\n    self.fungibleAuctionIndex[_auc.liqUser][_auc.vaultId][_auc.asset] = aid\n    self.numFungibleAuctions[_auc.liqUser] = aid + 1\n\n    # register fungible liq user (if applicable)\n    if self.indexOfFungLiqUser[_auc.liqUser] == 0:\n        self._registerFungibleLiqUser(_auc.liqUser)\n\n    return aid\n\n\n# register fungible liq user\n\n\n@internal\ndef _registerFungibleLiqUser(_liqUser: address):\n    uid: uint256 = self.numFungLiqUsers\n    if uid == 0:\n        uid = 1\n    self.fungLiqUsers[uid] = _liqUser\n    self.indexOfFungLiqUser[_liqUser] = uid\n    self.numFungLiqUsers = uid + 1\n\n\n# removal fungible auction\n\n\n@external\ndef removeFungibleAuction(_liqUser: address, _vaultId: uint256, _asset: address):\n    assert msg.sender == addys._getAuctionHouseAddr() # dev: only AuctionHouse allowed\n    assert not deptBasics.isPaused # dev: not activated\n\n    numAuctions: uint256 = self.numFungibleAuctions[_liqUser]\n    if numAuctions == 0:\n        return\n\n    targetIndex: uint256 = self.fungibleAuctionIndex[_liqUser][_vaultId][_asset]\n    if targetIndex == 0:\n        return\n\n    # update data\n    lastIndex: uint256 = numAuctions - 1\n    self.numFungibleAuctions[_liqUser] = lastIndex\n    self.fungibleAuctionIndex[_liqUser][_vaultId][_asset] = 0\n\n    # have last auction replace the target auction\n    if targetIndex != lastIndex:\n        lastItem: FungibleAuction = self.fungibleAuctions[_liqUser][lastIndex]\n        self.fungibleAuctions[_liqUser][targetIndex] = lastItem\n        self.fungibleAuctionIndex[_liqUser][lastItem.vaultId][lastItem.asset] = targetIndex\n\n    # no more fungible auctions\n    if lastIndex <= 1:\n        self.numFungibleAuctions[_liqUser] = 0\n        self._removeFungLiqUser(_liqUser)\n\n\n# update auction\n\n\n@external\ndef setFungibleAuction(\n    _liqUser: address,\n    _vaultId: uint256,\n    _asset: address,\n    _auc: FungibleAuction,\n) -> bool:\n    assert msg.sender == addys._getAuctionHouseAddr() # dev: only AuctionHouse allowed\n    assert not deptBasics.isPaused # dev: not activated\n\n    aid: uint256 = self.fungibleAuctionIndex[_liqUser][_vaultId][_asset]\n    if aid == 0:\n        return False # this does not yet exist\n\n    self.fungibleAuctions[_liqUser][aid] = _auc\n    return True\n\n\n# remove liq user\n\n\n@internal\ndef _removeFungLiqUser(_liqUser: address):\n    numUsers: uint256 = self.numFungLiqUsers\n    if numUsers == 0:\n        return\n\n    targetIndex: uint256 = self.indexOfFungLiqUser[_liqUser]\n    if targetIndex == 0:\n        return\n\n    # update data\n    lastIndex: uint256 = numUsers - 1\n    self.numFungLiqUsers = lastIndex\n    self.indexOfFungLiqUser[_liqUser] = 0\n\n    # have last liq user replace the target liq user\n    if targetIndex != lastIndex:\n        lastUser: address = self.fungLiqUsers[lastIndex]\n        self.fungLiqUsers[targetIndex] = lastUser\n        self.indexOfFungLiqUser[lastUser] = targetIndex\n\n\n# remove all fungible auctions\n\n\n@external\ndef removeAllFungibleAuctions(_liqUser: address):\n    assert msg.sender in [addys._getAuctionHouseAddr(), addys._getCreditEngineAddr()] # dev: only AuctionHouse or CreditEngine allowed\n    assert not deptBasics.isPaused # dev: not activated\n    self._removeAllFungibleAuctions(_liqUser)\n\n\n@internal\ndef _removeAllFungibleAuctions(_liqUser: address):\n    self._removeFungLiqUser(_liqUser)\n\n    numAuctions: uint256 = self.numFungibleAuctions[_liqUser]\n    if numAuctions == 0:\n        return\n\n    # zero out the auction indexes\n    for i: uint256 in range(1, numAuctions, bound=max_value(uint256)):\n        auc: FungibleAuction = self.fungibleAuctions[_liqUser][i]\n        self.fungibleAuctionIndex[_liqUser][auc.vaultId][auc.asset] = 0\n\n    # zero out total num\n    self.numFungibleAuctions[_liqUser] = 0\n\n\n# utils\n\n\n@view\n@external\ndef getFungibleAuction(_liqUser: address, _vaultId: uint256, _asset: address) -> FungibleAuction:\n    aid: uint256 = self.fungibleAuctionIndex[_liqUser][_vaultId][_asset]\n    return self.fungibleAuctions[_liqUser][aid]\n\n\n@view\n@external\ndef getFungibleAuctionDuringPurchase(_liqUser: address, _vaultId: uint256, _asset: address) -> FungibleAuction:\n    if not self.userDebt[_liqUser].inLiquidation:\n        return empty(FungibleAuction)\n    aid: uint256 = self.fungibleAuctionIndex[_liqUser][_vaultId][_asset]\n    return self.fungibleAuctions[_liqUser][aid]\n\n\n@view\n@external\ndef hasFungibleAuction(_liqUser: address, _vaultId: uint256, _asset: address) -> bool:\n    return self.fungibleAuctionIndex[_liqUser][_vaultId][_asset] != 0\n\n\n###################\n# Human Resources #\n###################\n\n\n@view\n@external\ndef isHrContributor(_contributor: address) -> bool:\n    return self.indexOfContributor[_contributor] != 0\n\n\n@external\ndef addHrContributor(_contributor: address, _compensation: uint256):\n    assert msg.sender == addys._getHumanResourcesAddr() # dev: only hr allowed\n    assert not deptBasics.isPaused # dev: not activated\n\n    if self.indexOfContributor[_contributor] != 0:\n        return\n\n    uid: uint256 = self.numContributors\n    if uid == 0:\n        uid = 1\n    self.contributors[uid] = _contributor\n    self.indexOfContributor[_contributor] = uid\n    self.numContributors = uid + 1\n\n    # update ripe avail for hr\n    self.ripeAvailForHr -= _compensation\n\n\n@external\ndef setRipeAvailForHr(_amount: uint256):\n    assert addys._isSwitchboardAddr(msg.sender) or msg.sender == addys._getHumanResourcesAddr() # dev: no perms\n    assert not deptBasics.isPaused # dev: not activated\n    self.ripeAvailForHr = _amount\n\n\n#########\n# Bonds #\n#########\n\n\n@view\n@external\ndef getEpochData() -> (uint256, uint256):\n    return self.epochStart, self.epochEnd\n\n\n@view\n@external\ndef getRipeBondData() -> RipeBondData:\n    return RipeBondData(\n        paymentAmountAvailInEpoch=self.paymentAmountAvailInEpoch,\n        ripeAvailForBonds=self.ripeAvailForBonds,\n        badDebt=self.badDebt,\n    )\n\n\n@external\ndef setRipeAvailForBonds(_amount: uint256):\n    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms\n    assert not deptBasics.isPaused # dev: not activated\n    self.ripeAvailForBonds = _amount\n\n\n@external\ndef setBadDebt(_amount: uint256):\n    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms\n    assert not deptBasics.isPaused # dev: not activated\n    self.badDebt = _amount\n\n\n@external\ndef didClearBadDebt(_amount: uint256, _ripeAmount: uint256):\n    assert msg.sender == addys._getBondRoomAddr() # dev: no perms\n    assert not deptBasics.isPaused # dev: not activated\n    self.badDebt -= _amount\n    self.ripePaidOutForBadDebt += _ripeAmount\n\n\n@external\ndef didPurchaseRipeBond(_amountPaid: uint256, _ripePayout: uint256):\n    assert msg.sender == addys._getBondRoomAddr() # dev: no perms\n    assert not deptBasics.isPaused # dev: not activated\n    self.paymentAmountAvailInEpoch -= _amountPaid\n    if _ripePayout != 0:\n        self.ripeAvailForBonds -= _ripePayout\n\n\n@external\ndef setEpochData(_epochStart: uint256, _epochEnd: uint256, _amountAvailInEpoch: uint256):\n    assert msg.sender == addys._getBondRoomAddr() # dev: no perms\n    assert not deptBasics.isPaused # dev: not activated\n\n    self.epochStart = _epochStart\n    self.epochEnd = _epochEnd\n    self.paymentAmountAvailInEpoch = _amountAvailInEpoch",
+            "sha256sum": "8a50af1d97a5a270fa72bad8b3fa7a93fdf5b19228b3e13f3b7101c20f7c5ecd"
           }
         },
         "settings": {
@@ -7113,9 +7370,9 @@
           ]
         },
         "compiler_version": "v0.4.1+commit.8a93dd27",
-        "integrity": "dd7250ddb71a5c273b27537a820446eba86cd4f93938d22d39c5ffa5bbe432aa"
+        "integrity": "543d479f89fcf11bbeab89cfee064f8186332a24f0e3d08f5b2349df95a566c4"
       },
-      "args": "000000000000000000000000a14bceb2c0086acdee1b01e47c7ef3de49ed996e00000000000000000000000000000000000000000052b7d2dcc80cd2e4000000"
+      "args": "0000000000000000000000005314ac3880f15ddc87d3600fe47e5ee11b93a77700000000000000000000000000000000000000000052b7d2dcc80cd2e400000000000000000000000000000000000000000000000052b7d2dcc80cd2e400000000000000000000000000000000000000000000000052b7d2dcc80cd2e4000000"
     }
   }
 }

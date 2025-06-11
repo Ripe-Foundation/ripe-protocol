@@ -14,65 +14,67 @@ def migrate(migration: Migration):
 
     log.h1("Setting Mission Control Config")
 
-    switchboard_one = migration.get_contract("SwitchboardOne")
+    sb_alpha = migration.get_contract("SwitchboardAlpha")
 
     # Set general config
-    actionId = migration.execute(switchboard_one.setVaultLimits, 5, 10)
-    assert migration.execute(switchboard_one.executePendingAction, actionId)
+    actionId = migration.execute(sb_alpha.setVaultLimits, 5, 10)
+    assert migration.execute(sb_alpha.executePendingAction, actionId)
 
-    assert migration.execute(switchboard_one.setCanDeposit, True)
-    assert migration.execute(switchboard_one.setCanWithdraw, True)
-    assert migration.execute(switchboard_one.setCanBorrow, True)
-    assert migration.execute(switchboard_one.setCanRepay, True)
-    assert migration.execute(switchboard_one.setCanClaimLoot, True)
-    assert migration.execute(switchboard_one.setCanLiquidate, True)
-    assert migration.execute(switchboard_one.setCanRedeemCollateral, True)
-    assert migration.execute(switchboard_one.setCanRedeemInStabPool, True)
-    assert migration.execute(switchboard_one.setCanBuyInAuction, True)
-    assert migration.execute(switchboard_one.setCanClaimInStabPool, True)
+    assert migration.execute(sb_alpha.setCanDeposit, True)
+    assert migration.execute(sb_alpha.setCanWithdraw, True)
+    assert migration.execute(sb_alpha.setCanBorrow, True)
+    assert migration.execute(sb_alpha.setCanRepay, True)
+    assert migration.execute(sb_alpha.setCanClaimLoot, True)
+    assert migration.execute(sb_alpha.setCanLiquidate, True)
+    assert migration.execute(sb_alpha.setCanRedeemCollateral, True)
+    assert migration.execute(sb_alpha.setCanRedeemInStabPool, True)
+    assert migration.execute(sb_alpha.setCanBuyInAuction, True)
+    assert migration.execute(sb_alpha.setCanClaimInStabPool, True)
 
     # Set general debt config
     actionId = migration.execute(
-        switchboard_one.setGlobalDebtLimits,
+        sb_alpha.setGlobalDebtLimits,
         10_000 * EIGHTEEN_DECIMALS,
         1_000_000 * EIGHTEEN_DECIMALS,
         100 * EIGHTEEN_DECIMALS,
         100,
     )
-    assert migration.execute(switchboard_one.executePendingAction, actionId)
+    assert migration.execute(sb_alpha.executePendingAction, actionId)
 
     actionId = migration.execute(
-        switchboard_one.setBorrowIntervalConfig,
+        sb_alpha.setBorrowIntervalConfig,
         1_000 * EIGHTEEN_DECIMALS,
         100,
     )
-    assert migration.execute(switchboard_one.executePendingAction, actionId)
+    assert migration.execute(sb_alpha.executePendingAction, actionId)
 
     actionId = migration.execute(
-        switchboard_one.setKeeperConfig,
+        sb_alpha.setKeeperConfig,
         100,
         100,
     )
-    assert migration.execute(switchboard_one.executePendingAction, actionId)
+    assert migration.execute(sb_alpha.executePendingAction, actionId)
 
-    assert migration.execute(switchboard_one.setIsDaowryEnabled, True)
+    assert migration.execute(sb_alpha.setIsDaowryEnabled, True)
 
-    actionId = migration.execute(switchboard_one.setLtvPaybackBuffer, 100)
-    assert migration.execute(switchboard_one.executePendingAction, actionId)
+    actionId = migration.execute(sb_alpha.setLtvPaybackBuffer, 100)
+    assert migration.execute(sb_alpha.executePendingAction, actionId)
 
-    actionId = migration.execute(switchboard_one.setGenAuctionParams, 10_00, 50_00, 10, 1_000)
-    assert migration.execute(switchboard_one.executePendingAction, actionId)
+    actionId = migration.execute(sb_alpha.setGenAuctionParams, 10_00, 50_00, 10, 1_000)
+    assert migration.execute(sb_alpha.executePendingAction, actionId)
 
-    switchboard_two = migration.get_contract("SwitchboardTwo")
+    sb_bravo = migration.get_contract("SwitchboardBravo")
 
     vault_book = migration.get_contract("VaultBook")
     simple_erc20 = migration.get_contract("SimpleErc20")
-    simple_erc20_vault_id = migration.execute(vault_book.addrToRegId, simple_erc20)
+    simple_erc20_vault_id = vault_book.addrToRegId(simple_erc20)
     stability_pool = migration.get_contract("StabilityPool")
-    stability_pool_vault_id = migration.execute(vault_book.addrToRegId, stability_pool)
+    stability_pool_vault_id = vault_book.addrToRegId(stability_pool)
+    ripe_gov_vault = migration.get_contract("RipeGov")
+    ripe_gov_vault_id = vault_book.addrToRegId(ripe_gov_vault)
 
     actionId = migration.execute(
-        switchboard_two.addAsset,
+        sb_bravo.addAsset,
         blueprint.ADDYS["USDC"],
         [simple_erc20_vault_id],
         100,  # _stakersPointsAlloc
@@ -95,10 +97,10 @@ def migrate(migration: Migration):
         True,  # _canWithdraw
         False,  # _canRedeemCollateral
     )
-    assert migration.execute(switchboard_two.executePendingAction, actionId)
+    assert migration.execute(sb_bravo.executePendingAction, actionId)
 
     actionId = migration.execute(
-        switchboard_two.addAsset,
+        sb_bravo.addAsset,
         blueprint.ADDYS["CBBTC"],
         [simple_erc20_vault_id],
         100,  # _stakersPointsAlloc
@@ -114,10 +116,10 @@ def migrate(migration: Migration):
             1,  # daowry
         ),  # _debtTerms
     )
-    assert migration.execute(switchboard_two.executePendingAction, actionId)
+    assert migration.execute(sb_bravo.executePendingAction, actionId)
 
     actionId = migration.execute(
-        switchboard_two.addAsset,
+        sb_bravo.addAsset,
         blueprint.ADDYS["WETH"],
         [simple_erc20_vault_id],
         100,  # _stakersPointsAlloc
@@ -133,10 +135,10 @@ def migrate(migration: Migration):
             1,  # daowry
         ),  # _debtTerms
     )
-    assert migration.execute(switchboard_two.executePendingAction, actionId)
+    assert migration.execute(sb_bravo.executePendingAction, actionId)
 
     actionId = migration.execute(
-        switchboard_two.addAsset,
+        sb_bravo.addAsset,
         migration.get_address("SavingsGreen"),
         [stability_pool_vault_id],
         10_00,  # _stakersPointsAlloc
@@ -159,9 +161,41 @@ def migrate(migration: Migration):
         True,  # _canWithdraw
         False,  # _canRedeemCollateral
     )
-    assert migration.execute(switchboard_two.executePendingAction, actionId)
+    assert migration.execute(sb_bravo.executePendingAction, actionId)
 
-    actionId = migration.execute(switchboard_one.setPriorityStabVaults, [(1,  migration.get_contract("SavingsGreen"))])
-    assert migration.execute(switchboard_one.executePendingAction, actionId)
+    actionId = migration.execute(
+        sb_bravo.addAsset,
+        migration.get_address("RipeToken"),
+        [ripe_gov_vault_id],
+        10_00,  # _stakersPointsAlloc
+        10_00,  # _voterPointsAlloc
+        1_000_000 * EIGHTEEN_DECIMALS,  # _perUserDepositLimit
+        100_000_000 * EIGHTEEN_DECIMALS,  # _globalDepositLimit
+        (
+            0,  # ltv
+            0,  # redemptionThreshold
+            0,  # liqThreshold
+            0,  # liqFee
+            0,  # borrowRate
+            0,  # daowry
+        ),  # _debtTerms
+        False,  # _shouldBurnAsPayment
+        False,  # _shouldTransferToEndaoment
+        False,  # _shouldSwapInStabPools
+        False,  # _shouldAuctionInstantly
+        True,  # _canDeposit
+        True,  # _canWithdraw
+        False,  # _canRedeemCollateral
+        False,  # _canRedeemInStabPool
+        False,  # _canBuyInAuction
+        False,  # _canClaimInStabPool
+    )
+    assert migration.execute(sb_bravo.executePendingAction, actionId)
+
+    actionId = migration.execute(
+        sb_alpha.setPriorityStabVaults,
+        [(stability_pool_vault_id, migration.get_address("SavingsGreen"))],
+    )
+    assert migration.execute(sb_alpha.executePendingAction, actionId)
 
     # migration.execute(hq.finishRipeHqSetup, migration.blueprint().ADDYS["GOVERNANCE"])

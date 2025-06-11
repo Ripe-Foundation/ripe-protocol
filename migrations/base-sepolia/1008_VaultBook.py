@@ -30,8 +30,16 @@ def migrate(migration: Migration):
         hq,
     )
 
+    ripe_gov_vault = migration.deploy(
+        "RipeGov",
+        hq,
+    )
+
     migration.execute(vault_book.startAddNewAddressToRegistry, stability_pool, "Stability Pool")
     migration.execute(vault_book.confirmNewAddressToRegistry, stability_pool)
+
+    migration.execute(vault_book.startAddNewAddressToRegistry, ripe_gov_vault, "Ripe Gov Vault")
+    migration.execute(vault_book.confirmNewAddressToRegistry, ripe_gov_vault)
 
     migration.execute(vault_book.startAddNewAddressToRegistry, simple_erc20_vault, "Simple ERC20 Vault")
     migration.execute(vault_book.confirmNewAddressToRegistry, simple_erc20_vault)
@@ -42,4 +50,4 @@ def migrate(migration: Migration):
     migration.execute(vault_book.setRegistryTimeLockAfterSetup)
 
     migration.execute(hq.startAddNewAddressToRegistry, vault_book, "Vault Book")
-    assert migration.execute(hq.confirmNewAddressToRegistry, vault_book) == 7
+    assert migration.execute(hq.confirmNewAddressToRegistry, vault_book) == 8

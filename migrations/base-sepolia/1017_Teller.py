@@ -13,4 +13,4 @@ def migrate(migration: Migration):
     )
 
     migration.execute(hq.startAddNewAddressToRegistry, teller, "Teller")
-    assert migration.execute(hq.confirmNewAddressToRegistry, teller) == 14
+    assert migration.execute(hq.confirmNewAddressToRegistry, teller) == 17

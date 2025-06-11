@@ -1,7 +1,7 @@
 {
   "contracts": {
     "GreenToken": {
-      "address": "0xB2d9B97fd379a91f4ba4457BB2dcD162D9676576",
+      "address": "0xE780e53e463eC4176fCCfbc22300587BbAe54FC0",
       "abi": [
         {
           "name": "Transfer",
@@ -890,7 +890,7 @@
       "args": "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000003fbe79100d2b637d577f1d2d8d14c9825f869db7000000000000000000000000000000000000000000000000000000000000a8c00000000000000000000000000000000000000000000000000000000000049d4000000000000000000000000000000000000000000000003635c9adc5dea000000000000000000000000000003fbe79100d2b637d577f1d2d8d14c9825f869db7"
     },
     "RipeToken": {
-      "address": "0x7563dE9626990658111Ed4AC21fA0149e49C6AAe",
+      "address": "0x78D36Af95385f99022aAf4E4CABd48c686512B81",
       "abi": [
         {
           "name": "Transfer",
@@ -1779,7 +1779,7 @@
       "args": "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000003fbe79100d2b637d577f1d2d8d14c9825f869db7000000000000000000000000000000000000000000000000000000000000a8c00000000000000000000000000000000000000000000000000000000000049d4000000000000000000000000000000000000000000000d3c21bcecceda10000000000000000000000000000003fbe79100d2b637d577f1d2d8d14c9825f869db7"
     },
     "SavingsGreen": {
-      "address": "0x39A976A0Eb2094F20078E8AD352f6cd18b532fF8",
+      "address": "0xdFef3c8513809B6F9dD5549D6d97899C6ca0Ef4A",
       "abi": [
         {
           "name": "Transfer",
@@ -3148,10 +3148,10 @@
         "compiler_version": "v0.4.1+commit.8a93dd27",
         "integrity": "7fb8ece2c6259f6929a4cfa9b76761cdc968993ffb302d69f365789c1771369c"
       },
-      "args": "000000000000000000000000b2d9b97fd379a91f4ba4457bb2dcd162d967657600000000000000000000000000000000000000000000000000000000000000000000000000000000000000003fbe79100d2b637d577f1d2d8d14c9825f869db7000000000000000000000000000000000000000000000000000000000000a8c00000000000000000000000000000000000000000000000000000000000049d4000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+      "args": "000000000000000000000000e780e53e463ec4176fccfbc22300587bbae54fc000000000000000000000000000000000000000000000000000000000000000000000000000000000000000003fbe79100d2b637d577f1d2d8d14c9825f869db7000000000000000000000000000000000000000000000000000000000000a8c00000000000000000000000000000000000000000000000000000000000049d4000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
     },
     "RipeHq": {
-      "address": "0xA14bceB2C0086Acdee1b01e47C7EF3dE49ed996E",
+      "address": "0x5314ac3880F15DdC87d3600FE47e5ee11b93A777",
       "abi": [
         {
           "name": "HqConfigChangeInitiated",
@@ -3178,11 +3178,6 @@
             },
             {
               "name": "canSetTokenBlacklist",
-              "type": "bool",
-              "indexed": false
-            },
-            {
-              "name": "canModifyMissionControl",
               "type": "bool",
               "indexed": false
             },
@@ -3220,11 +3215,6 @@
             },
             {
               "name": "canSetTokenBlacklist",
-              "type": "bool",
-              "indexed": false
-            },
-            {
-              "name": "canModifyMissionControl",
               "type": "bool",
               "indexed": false
             },
@@ -3267,11 +3257,6 @@
             },
             {
               "name": "canSetTokenBlacklist",
-              "type": "bool",
-              "indexed": false
-            },
-            {
-              "name": "canModifyMissionControl",
               "type": "bool",
               "indexed": false
             },
@@ -4666,10 +4651,6 @@
             {
               "name": "_canSetTokenBlacklist",
               "type": "bool"
-            },
-            {
-              "name": "_canModifyMissionControl",
-              "type": "bool"
             }
           ],
           "outputs": []
@@ -4821,23 +4802,6 @@
           ]
         },
         {
-          "stateMutability": "view",
-          "type": "function",
-          "name": "canModifyMissionControl",
-          "inputs": [
-            {
-              "name": "_addr",
-              "type": "address"
-            }
-          ],
-          "outputs": [
-            {
-              "name": "",
-              "type": "bool"
-            }
-          ]
-        },
-        {
           "stateMutability": "nonpayable",
           "type": "function",
           "name": "recoverFunds",
@@ -4899,10 +4863,6 @@
                 {
                   "name": "canSetTokenBlacklist",
                   "type": "bool"
-                },
-                {
-                  "name": "canModifyMissionControl",
-                  "type": "bool"
                 }
               ]
             }
@@ -4941,10 +4901,6 @@
                     },
                     {
                       "name": "canSetTokenBlacklist",
-                      "type": "bool"
-                    },
-                    {
-                      "name": "canModifyMissionControl",
                       "type": "bool"
                     }
                   ]
@@ -5017,8 +4973,8 @@
             "sha256sum": "23bcd020a90f5839bdf5eff3040e8256d601bedbfd6e021fb8755416e5026422"
           },
           "contracts/registries/RipeHq.vy": {
-            "content": "# @version 0.4.1\n\nexports: gov.__interface__\nexports: registry.__interface__\n\ninitializes: gov\ninitializes: registry[gov := gov]\n\nimport contracts.modules.LocalGov as gov\nimport contracts.registries.modules.AddressRegistry as registry\n\nfrom interfaces import Department\nfrom ethereum.ercs import IERC20\n\nstruct HqConfig:\n    description: String[64]\n    canMintGreen: bool\n    canMintRipe: bool\n    canSetTokenBlacklist: bool\n    canModifyMissionControl: bool\n\nstruct PendingHqConfig:\n    newHqConfig: HqConfig\n    initiatedBlock: uint256\n    confirmBlock: uint256\n\nevent HqConfigChangeInitiated:\n    regId: uint256\n    description: String[64]\n    canMintGreen: bool\n    canMintRipe: bool\n    canSetTokenBlacklist: bool\n    canModifyMissionControl: bool\n    confirmBlock: uint256\n\nevent HqConfigChangeConfirmed:\n    regId: uint256\n    description: String[64]\n    canMintGreen: bool\n    canMintRipe: bool\n    canSetTokenBlacklist: bool\n    canModifyMissionControl: bool\n    initiatedBlock: uint256\n    confirmBlock: uint256\n\nevent HqConfigChangeCancelled:\n    regId: uint256\n    description: String[64]\n    canMintGreen: bool\n    canMintRipe: bool\n    canSetTokenBlacklist: bool\n    canModifyMissionControl: bool\n    initiatedBlock: uint256\n    confirmBlock: uint256\n\nevent RipeHqFundsRecovered:\n    asset: indexed(address)\n    recipient: indexed(address)\n    balance: uint256\n\n# hq config\nhqConfig: public(HashMap[uint256, HqConfig]) # reg id -> hq config\npendingHqConfig: public(HashMap[uint256, PendingHqConfig]) # reg id -> pending hq config\n\nMAX_RECOVER_ASSETS: constant(uint256) = 20\n\n\n@deploy\ndef __init__(\n    _greenToken: address,\n    _savingsGreen: address,\n    _ripeToken: address,\n    _initialGov: address,\n    _minGovTimeLock: uint256,\n    _maxGovTimeLock: uint256,\n    _minRegistryTimeLock: uint256,\n    _maxRegistryTimeLock: uint256,\n):\n    gov.__init__(empty(address), _initialGov, _minGovTimeLock, _maxGovTimeLock, 0)\n    registry.__init__(_minRegistryTimeLock, _maxRegistryTimeLock, 0, \"RipeHq.vy\")\n\n    # green token\n    assert registry._startAddNewAddressToRegistry(_greenToken, \"Green Token\") # dev: failed to register green token\n    assert registry._confirmNewAddressToRegistry(_greenToken) == 1 # dev: failed to confirm green token\n\n    # savings green\n    assert registry._startAddNewAddressToRegistry(_savingsGreen, \"Savings Green\") # dev: failed to register savings green\n    assert registry._confirmNewAddressToRegistry(_savingsGreen) == 2 # dev: failed to confirm savings green\n\n    # ripe token\n    assert registry._startAddNewAddressToRegistry(_ripeToken, \"Ripe Token\") # dev: failed to register ripe token\n    assert registry._confirmNewAddressToRegistry(_ripeToken) == 3 # dev: failed to confirm ripe token\n\n\n############\n# Registry #\n############\n\n\n# new address\n\n\n@external\ndef startAddNewAddressToRegistry(_addr: address, _description: String[64]) -> bool:\n    assert msg.sender == gov.governance # dev: no perms\n    return registry._startAddNewAddressToRegistry(_addr, _description)\n\n\n@external\ndef confirmNewAddressToRegistry(_addr: address) -> uint256:\n    assert msg.sender == gov.governance # dev: no perms\n    return registry._confirmNewAddressToRegistry(_addr)\n\n\n@external\ndef cancelNewAddressToRegistry(_addr: address) -> bool:\n    assert msg.sender == gov.governance # dev: no perms\n    return registry._cancelNewAddressToRegistry(_addr)\n\n\n# address update\n\n\n@external\ndef startAddressUpdateToRegistry(_regId: uint256, _newAddr: address) -> bool:\n    assert msg.sender == gov.governance # dev: no perms\n    return registry._startAddressUpdateToRegistry(_regId, _newAddr)\n\n\n@external\ndef confirmAddressUpdateToRegistry(_regId: uint256) -> bool:\n    assert msg.sender == gov.governance # dev: no perms\n    return registry._confirmAddressUpdateToRegistry(_regId)\n\n\n@external\ndef cancelAddressUpdateToRegistry(_regId: uint256) -> bool:\n    assert msg.sender == gov.governance # dev: no perms\n    return registry._cancelAddressUpdateToRegistry(_regId)\n\n\n# address disable\n\n\n@external\ndef startAddressDisableInRegistry(_regId: uint256) -> bool:\n    assert not self._isTokenId(_regId) # dev: cannot disable token\n\n    assert msg.sender == gov.governance # dev: no perms\n    return registry._startAddressDisableInRegistry(_regId)\n\n\n@external\ndef confirmAddressDisableInRegistry(_regId: uint256) -> bool:\n    assert msg.sender == gov.governance # dev: no perms\n    return registry._confirmAddressDisableInRegistry(_regId)\n\n\n@external\ndef cancelAddressDisableInRegistry(_regId: uint256) -> bool:\n    assert msg.sender == gov.governance # dev: no perms\n    return registry._cancelAddressDisableInRegistry(_regId)\n\n\n#############\n# Hq Config #\n#############\n\n\n@view\n@external\ndef hasPendingHqConfigChange(_regId: uint256) -> bool:\n    return self.pendingHqConfig[_regId].confirmBlock != 0\n\n\n# start hq config change\n\n\n@external\ndef initiateHqConfigChange(\n    _regId: uint256,\n    _canMintGreen: bool,\n    _canMintRipe: bool,\n    _canSetTokenBlacklist: bool,\n    _canModifyMissionControl: bool,\n):\n    assert msg.sender == gov.governance # dev: no perms\n\n    assert self._isValidHqConfig(_regId, _canMintGreen, _canMintRipe) # dev: invalid hq config\n    hqConfig: HqConfig = HqConfig(\n        description= registry._getAddrDescription(_regId),\n        canMintGreen= _canMintGreen,\n        canMintRipe= _canMintRipe,\n        canSetTokenBlacklist= _canSetTokenBlacklist,\n        canModifyMissionControl= _canModifyMissionControl,\n    )\n\n    # set pending hq config\n    confirmBlock: uint256 = block.number + registry.registryChangeTimeLock\n    self.pendingHqConfig[_regId] = PendingHqConfig(\n        newHqConfig= hqConfig,\n        initiatedBlock= block.number,\n        confirmBlock= confirmBlock,\n    )\n    log HqConfigChangeInitiated(\n        regId=_regId,\n        description=hqConfig.description,\n        canMintGreen=_canMintGreen,\n        canMintRipe=_canMintRipe,\n        canSetTokenBlacklist=_canSetTokenBlacklist,\n        canModifyMissionControl=_canModifyMissionControl,\n        confirmBlock=confirmBlock,\n    )\n\n\n# confirm hq config change\n\n\n@external\ndef confirmHqConfigChange(_regId: uint256) -> bool:\n    assert msg.sender == gov.governance # dev: no perms\n\n    data: PendingHqConfig = self.pendingHqConfig[_regId]\n    assert data.confirmBlock != 0 and block.number >= data.confirmBlock # dev: time lock not reached\n\n    # invalid hq config\n    newConfig: HqConfig = data.newHqConfig\n    if not self._isValidHqConfig(_regId, newConfig.canMintGreen, newConfig.canMintRipe):\n        self.pendingHqConfig[_regId] = empty(PendingHqConfig)\n        return False\n\n    # set hq config\n    self.hqConfig[_regId] = newConfig\n    self.pendingHqConfig[_regId] = empty(PendingHqConfig)\n\n    log HqConfigChangeConfirmed(\n        regId=_regId,\n        description=newConfig.description,\n        canMintGreen=newConfig.canMintGreen,\n        canMintRipe=newConfig.canMintRipe,\n        canSetTokenBlacklist=newConfig.canSetTokenBlacklist,\n        canModifyMissionControl=newConfig.canModifyMissionControl,\n        initiatedBlock=data.initiatedBlock,\n        confirmBlock=data.confirmBlock,\n    )\n    return True\n\n\n# cancel hq config change\n\n\n@external\ndef cancelHqConfigChange(_regId: uint256) -> bool:\n    assert msg.sender == gov.governance # dev: no perms\n\n    data: PendingHqConfig = self.pendingHqConfig[_regId]\n    assert data.confirmBlock != 0 # dev: no pending change\n\n    self.pendingHqConfig[_regId] = empty(PendingHqConfig)\n    log HqConfigChangeCancelled(\n        regId=_regId,\n        description=data.newHqConfig.description,\n        canMintGreen=data.newHqConfig.canMintGreen,\n        canMintRipe=data.newHqConfig.canMintRipe,\n        canSetTokenBlacklist=data.newHqConfig.canSetTokenBlacklist,\n        canModifyMissionControl=data.newHqConfig.canModifyMissionControl,\n        initiatedBlock=data.initiatedBlock,\n        confirmBlock=data.confirmBlock\n    )\n    return True\n\n\n# validation\n\n\n@external\ndef isValidHqConfig(\n    _regId: uint256,\n    _canMintGreen: bool,\n    _canMintRipe: bool,\n) -> bool:\n    return self._isValidHqConfig(_regId, _canMintGreen, _canMintRipe)\n\n\n@internal\ndef _isValidHqConfig(\n    _regId: uint256,\n    _canMintGreen: bool,\n    _canMintRipe: bool,\n) -> bool:\n\n    # tokens cannot mint, cannot set their own blacklist, cannot modify mission control\n    if self._isTokenId(_regId):\n        return False\n\n    # invalid reg id\n    if not registry._isValidRegId(_regId):\n        return False\n\n    # no addr\n    addr: address = registry._getAddr(_regId)\n    if addr == empty(address):\n        return False\n\n    # two-factor auth on minting\n    if _canMintGreen and not staticcall Department(addr).canMintGreen():\n        return False\n\n    if _canMintRipe and not staticcall Department(addr).canMintRipe():\n        return False\n\n    return True\n\n\n@view\n@internal\ndef _isTokenId(_regId: uint256) -> bool:\n    return _regId in [1, 2, 3]\n\n\n##########\n# Tokens #\n##########\n\n\n@view\n@external\ndef greenToken() -> address:\n    return registry._getAddr(1)\n\n\n@view\n@external\ndef savingsGreen() -> address:\n    return registry._getAddr(2)\n\n\n@view\n@external\ndef ripeToken() -> address:\n    return registry._getAddr(3)\n\n\n@view\n@external\ndef canMintGreen(_addr: address) -> bool:\n    if _addr == empty(address):\n        return False\n    regId: uint256 = registry._getRegId(_addr)\n    if regId == 0 or not self.hqConfig[regId].canMintGreen:\n        return False\n    return staticcall Department(_addr).canMintGreen()\n\n\n@view\n@external\ndef canMintRipe(_addr: address) -> bool:\n    if _addr == empty(address):\n        return False\n    regId: uint256 = registry._getRegId(_addr)\n    if regId == 0 or not self.hqConfig[regId].canMintRipe:\n        return False\n    return staticcall Department(_addr).canMintRipe()\n\n\n@view\n@external\ndef canSetTokenBlacklist(_addr: address) -> bool:\n    if _addr == empty(address):\n        return False\n    regId: uint256 = registry._getRegId(_addr)\n    if regId == 0:\n        return False\n    return self.hqConfig[regId].canSetTokenBlacklist\n\n\n@view\n@external\ndef canModifyMissionControl(_addr: address) -> bool:\n    if _addr == empty(address):\n        return False\n    regId: uint256 = registry._getRegId(_addr)\n    if regId == 0:\n        return False\n    return self.hqConfig[regId].canModifyMissionControl\n\n\n############\n# Recovery #\n############\n\n\n@external\ndef recoverFunds(_recipient: address, _asset: address):\n    assert msg.sender == gov.governance # dev: no perms\n    self._recoverFunds(_recipient, _asset)\n\n\n@external\ndef recoverFundsMany(_recipient: address, _assets: DynArray[address, MAX_RECOVER_ASSETS]):\n    assert msg.sender == gov.governance # dev: no perms\n    for a: address in _assets:\n        self._recoverFunds(_recipient, a)\n\n\n@internal\ndef _recoverFunds(_recipient: address, _asset: address):\n    assert empty(address) not in [_recipient, _asset] # dev: invalid recipient or asset\n    balance: uint256 = staticcall IERC20(_asset).balanceOf(self)\n    assert balance != 0 # dev: nothing to recover\n\n    assert extcall IERC20(_asset).transfer(_recipient, balance, default_return_value=True) # dev: recovery failed\n    log RipeHqFundsRecovered(asset=_asset, recipient=_recipient, balance=balance)",
-            "sha256sum": "f92b8cf8f35d5b37a9d93b7520f0816fe9ecfc74298485cf6b5431bc218cc58a"
+            "content": "# @version 0.4.1\n\nexports: gov.__interface__\nexports: registry.__interface__\n\ninitializes: gov\ninitializes: registry[gov := gov]\n\nimport contracts.modules.LocalGov as gov\nimport contracts.registries.modules.AddressRegistry as registry\n\nfrom interfaces import Department\nfrom ethereum.ercs import IERC20\n\nstruct HqConfig:\n    description: String[64]\n    canMintGreen: bool\n    canMintRipe: bool\n    canSetTokenBlacklist: bool\n\nstruct PendingHqConfig:\n    newHqConfig: HqConfig\n    initiatedBlock: uint256\n    confirmBlock: uint256\n\nevent HqConfigChangeInitiated:\n    regId: uint256\n    description: String[64]\n    canMintGreen: bool\n    canMintRipe: bool\n    canSetTokenBlacklist: bool\n    confirmBlock: uint256\n\nevent HqConfigChangeConfirmed:\n    regId: uint256\n    description: String[64]\n    canMintGreen: bool\n    canMintRipe: bool\n    canSetTokenBlacklist: bool\n    initiatedBlock: uint256\n    confirmBlock: uint256\n\nevent HqConfigChangeCancelled:\n    regId: uint256\n    description: String[64]\n    canMintGreen: bool\n    canMintRipe: bool\n    canSetTokenBlacklist: bool\n    initiatedBlock: uint256\n    confirmBlock: uint256\n\nevent RipeHqFundsRecovered:\n    asset: indexed(address)\n    recipient: indexed(address)\n    balance: uint256\n\n# hq config\nhqConfig: public(HashMap[uint256, HqConfig]) # reg id -> hq config\npendingHqConfig: public(HashMap[uint256, PendingHqConfig]) # reg id -> pending hq config\n\nMAX_RECOVER_ASSETS: constant(uint256) = 20\n\n\n@deploy\ndef __init__(\n    _greenToken: address,\n    _savingsGreen: address,\n    _ripeToken: address,\n    _initialGov: address,\n    _minGovTimeLock: uint256,\n    _maxGovTimeLock: uint256,\n    _minRegistryTimeLock: uint256,\n    _maxRegistryTimeLock: uint256,\n):\n    gov.__init__(empty(address), _initialGov, _minGovTimeLock, _maxGovTimeLock, 0)\n    registry.__init__(_minRegistryTimeLock, _maxRegistryTimeLock, 0, \"RipeHq.vy\")\n\n    # green token\n    assert registry._startAddNewAddressToRegistry(_greenToken, \"Green Token\") # dev: failed to register green token\n    assert registry._confirmNewAddressToRegistry(_greenToken) == 1 # dev: failed to confirm green token\n\n    # savings green\n    assert registry._startAddNewAddressToRegistry(_savingsGreen, \"Savings Green\") # dev: failed to register savings green\n    assert registry._confirmNewAddressToRegistry(_savingsGreen) == 2 # dev: failed to confirm savings green\n\n    # ripe token\n    assert registry._startAddNewAddressToRegistry(_ripeToken, \"Ripe Token\") # dev: failed to register ripe token\n    assert registry._confirmNewAddressToRegistry(_ripeToken) == 3 # dev: failed to confirm ripe token\n\n\n############\n# Registry #\n############\n\n\n# new address\n\n\n@external\ndef startAddNewAddressToRegistry(_addr: address, _description: String[64]) -> bool:\n    assert msg.sender == gov.governance # dev: no perms\n    return registry._startAddNewAddressToRegistry(_addr, _description)\n\n\n@external\ndef confirmNewAddressToRegistry(_addr: address) -> uint256:\n    assert msg.sender == gov.governance # dev: no perms\n    return registry._confirmNewAddressToRegistry(_addr)\n\n\n@external\ndef cancelNewAddressToRegistry(_addr: address) -> bool:\n    assert msg.sender == gov.governance # dev: no perms\n    return registry._cancelNewAddressToRegistry(_addr)\n\n\n# address update\n\n\n@external\ndef startAddressUpdateToRegistry(_regId: uint256, _newAddr: address) -> bool:\n    assert msg.sender == gov.governance # dev: no perms\n    return registry._startAddressUpdateToRegistry(_regId, _newAddr)\n\n\n@external\ndef confirmAddressUpdateToRegistry(_regId: uint256) -> bool:\n    assert msg.sender == gov.governance # dev: no perms\n    return registry._confirmAddressUpdateToRegistry(_regId)\n\n\n@external\ndef cancelAddressUpdateToRegistry(_regId: uint256) -> bool:\n    assert msg.sender == gov.governance # dev: no perms\n    return registry._cancelAddressUpdateToRegistry(_regId)\n\n\n# address disable\n\n\n@external\ndef startAddressDisableInRegistry(_regId: uint256) -> bool:\n    assert not self._isTokenId(_regId) # dev: cannot disable token\n\n    assert msg.sender == gov.governance # dev: no perms\n    return registry._startAddressDisableInRegistry(_regId)\n\n\n@external\ndef confirmAddressDisableInRegistry(_regId: uint256) -> bool:\n    assert msg.sender == gov.governance # dev: no perms\n    return registry._confirmAddressDisableInRegistry(_regId)\n\n\n@external\ndef cancelAddressDisableInRegistry(_regId: uint256) -> bool:\n    assert msg.sender == gov.governance # dev: no perms\n    return registry._cancelAddressDisableInRegistry(_regId)\n\n\n#############\n# Hq Config #\n#############\n\n\n@view\n@external\ndef hasPendingHqConfigChange(_regId: uint256) -> bool:\n    return self.pendingHqConfig[_regId].confirmBlock != 0\n\n\n# start hq config change\n\n\n@external\ndef initiateHqConfigChange(\n    _regId: uint256,\n    _canMintGreen: bool,\n    _canMintRipe: bool,\n    _canSetTokenBlacklist: bool,\n):\n    assert msg.sender == gov.governance # dev: no perms\n\n    assert self._isValidHqConfig(_regId, _canMintGreen, _canMintRipe) # dev: invalid hq config\n    hqConfig: HqConfig = HqConfig(\n        description= registry._getAddrDescription(_regId),\n        canMintGreen= _canMintGreen,\n        canMintRipe= _canMintRipe,\n        canSetTokenBlacklist= _canSetTokenBlacklist,\n    )\n\n    # set pending hq config\n    confirmBlock: uint256 = block.number + registry.registryChangeTimeLock\n    self.pendingHqConfig[_regId] = PendingHqConfig(\n        newHqConfig= hqConfig,\n        initiatedBlock= block.number,\n        confirmBlock= confirmBlock,\n    )\n    log HqConfigChangeInitiated(\n        regId=_regId,\n        description=hqConfig.description,\n        canMintGreen=_canMintGreen,\n        canMintRipe=_canMintRipe,\n        canSetTokenBlacklist=_canSetTokenBlacklist,\n        confirmBlock=confirmBlock,\n    )\n\n\n# confirm hq config change\n\n\n@external\ndef confirmHqConfigChange(_regId: uint256) -> bool:\n    assert msg.sender == gov.governance # dev: no perms\n\n    data: PendingHqConfig = self.pendingHqConfig[_regId]\n    assert data.confirmBlock != 0 and block.number >= data.confirmBlock # dev: time lock not reached\n\n    # invalid hq config\n    newConfig: HqConfig = data.newHqConfig\n    if not self._isValidHqConfig(_regId, newConfig.canMintGreen, newConfig.canMintRipe):\n        self.pendingHqConfig[_regId] = empty(PendingHqConfig)\n        return False\n\n    # set hq config\n    self.hqConfig[_regId] = newConfig\n    self.pendingHqConfig[_regId] = empty(PendingHqConfig)\n\n    log HqConfigChangeConfirmed(\n        regId=_regId,\n        description=newConfig.description,\n        canMintGreen=newConfig.canMintGreen,\n        canMintRipe=newConfig.canMintRipe,\n        canSetTokenBlacklist=newConfig.canSetTokenBlacklist,\n        initiatedBlock=data.initiatedBlock,\n        confirmBlock=data.confirmBlock,\n    )\n    return True\n\n\n# cancel hq config change\n\n\n@external\ndef cancelHqConfigChange(_regId: uint256) -> bool:\n    assert msg.sender == gov.governance # dev: no perms\n\n    data: PendingHqConfig = self.pendingHqConfig[_regId]\n    assert data.confirmBlock != 0 # dev: no pending change\n\n    self.pendingHqConfig[_regId] = empty(PendingHqConfig)\n    log HqConfigChangeCancelled(\n        regId=_regId,\n        description=data.newHqConfig.description,\n        canMintGreen=data.newHqConfig.canMintGreen,\n        canMintRipe=data.newHqConfig.canMintRipe,\n        canSetTokenBlacklist=data.newHqConfig.canSetTokenBlacklist,\n        initiatedBlock=data.initiatedBlock,\n        confirmBlock=data.confirmBlock\n    )\n    return True\n\n\n# validation\n\n\n@external\ndef isValidHqConfig(\n    _regId: uint256,\n    _canMintGreen: bool,\n    _canMintRipe: bool,\n) -> bool:\n    return self._isValidHqConfig(_regId, _canMintGreen, _canMintRipe)\n\n\n@internal\ndef _isValidHqConfig(\n    _regId: uint256,\n    _canMintGreen: bool,\n    _canMintRipe: bool,\n) -> bool:\n\n    # tokens cannot mint, cannot set their own blacklist, cannot modify mission control\n    if self._isTokenId(_regId):\n        return False\n\n    # invalid reg id\n    if not registry._isValidRegId(_regId):\n        return False\n\n    # no addr\n    addr: address = registry._getAddr(_regId)\n    if addr == empty(address):\n        return False\n\n    # two-factor auth on minting\n    if _canMintGreen and not staticcall Department(addr).canMintGreen():\n        return False\n\n    if _canMintRipe and not staticcall Department(addr).canMintRipe():\n        return False\n\n    return True\n\n\n@view\n@internal\ndef _isTokenId(_regId: uint256) -> bool:\n    return _regId in [1, 2, 3]\n\n\n##########\n# Tokens #\n##########\n\n\n@view\n@external\ndef greenToken() -> address:\n    return registry._getAddr(1)\n\n\n@view\n@external\ndef savingsGreen() -> address:\n    return registry._getAddr(2)\n\n\n@view\n@external\ndef ripeToken() -> address:\n    return registry._getAddr(3)\n\n\n@view\n@external\ndef canMintGreen(_addr: address) -> bool:\n    if _addr == empty(address):\n        return False\n    regId: uint256 = registry._getRegId(_addr)\n    if regId == 0 or not self.hqConfig[regId].canMintGreen:\n        return False\n    return staticcall Department(_addr).canMintGreen()\n\n\n@view\n@external\ndef canMintRipe(_addr: address) -> bool:\n    if _addr == empty(address):\n        return False\n    regId: uint256 = registry._getRegId(_addr)\n    if regId == 0 or not self.hqConfig[regId].canMintRipe:\n        return False\n    return staticcall Department(_addr).canMintRipe()\n\n\n@view\n@external\ndef canSetTokenBlacklist(_addr: address) -> bool:\n    if _addr == empty(address):\n        return False\n    regId: uint256 = registry._getRegId(_addr)\n    if regId == 0:\n        return False\n    return self.hqConfig[regId].canSetTokenBlacklist\n\n\n############\n# Recovery #\n############\n\n\n@external\ndef recoverFunds(_recipient: address, _asset: address):\n    assert msg.sender == gov.governance # dev: no perms\n    self._recoverFunds(_recipient, _asset)\n\n\n@external\ndef recoverFundsMany(_recipient: address, _assets: DynArray[address, MAX_RECOVER_ASSETS]):\n    assert msg.sender == gov.governance # dev: no perms\n    for a: address in _assets:\n        self._recoverFunds(_recipient, a)\n\n\n@internal\ndef _recoverFunds(_recipient: address, _asset: address):\n    assert empty(address) not in [_recipient, _asset] # dev: invalid recipient or asset\n    balance: uint256 = staticcall IERC20(_asset).balanceOf(self)\n    assert balance != 0 # dev: nothing to recover\n\n    assert extcall IERC20(_asset).transfer(_recipient, balance, default_return_value=True) # dev: recovery failed\n    log RipeHqFundsRecovered(asset=_asset, recipient=_recipient, balance=balance)",
+            "sha256sum": "5936e8b3c8b182237944bbbb0944420093520589de2f6ab095a5561cae175718"
           }
         },
         "settings": {
@@ -5032,9 +4988,9 @@
           ]
         },
         "compiler_version": "v0.4.1+commit.8a93dd27",
-        "integrity": "b5cfac580c32186e165b0787c148f5f94279f29f3ac8207c515c126cfa617a71"
+        "integrity": "15e9a176c311e7651c93ea0f77bcdd13e975a1e363783a3c7b0e102955de3273"
       },
-      "args": "000000000000000000000000b2d9b97fd379a91f4ba4457bb2dcd162d967657600000000000000000000000039a976a0eb2094f20078e8ad352f6cd18b532ff80000000000000000000000007563de9626990658111ed4ac21fa0149e49c6aae0000000000000000000000003fbe79100d2b637d577f1d2d8d14c9825f869db7000000000000000000000000000000000000000000000000000000000000a8c00000000000000000000000000000000000000000000000000000000000049d4000000000000000000000000000000000000000000000000000000000000054600000000000000000000000000000000000000000000000000000000000049d40"
+      "args": "000000000000000000000000e780e53e463ec4176fccfbc22300587bbae54fc0000000000000000000000000dfef3c8513809b6f9dd5549d6d97899c6ca0ef4a00000000000000000000000078d36af95385f99022aaf4e4cabd48c686512b810000000000000000000000003fbe79100d2b637d577f1d2d8d14c9825f869db7000000000000000000000000000000000000000000000000000000000000a8c00000000000000000000000000000000000000000000000000000000000049d4000000000000000000000000000000000000000000000000000000000000054600000000000000000000000000000000000000000000000000000000000049d40"
     }
   }
 }
