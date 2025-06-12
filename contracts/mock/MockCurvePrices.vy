@@ -19,7 +19,12 @@ import contracts.modules.TimeLock as timeLock
 
 import interfaces.PriceSource as PriceSource
 
-price: public(HashMap[address, uint256])
+struct CurrentGreenPoolStatus:
+    weightedRatio: uint256
+    dangerTrigger: uint256
+    numBlocksInDanger: uint256
+
+mockData: public(CurrentGreenPoolStatus)
 
 
 @deploy
@@ -30,7 +35,7 @@ def __init__(
 ):
     gov.__init__(_ripeHq, empty(address), 0, 0, 0)
     addys.__init__(_ripeHq)
-    priceData.__init__(False, False)
+    priceData.__init__(True, False)
     timeLock.__init__(_minPriceChangeTimeLock, _maxPriceChangeTimeLock, 0, _maxPriceChangeTimeLock)
 
 
@@ -38,20 +43,31 @@ def __init__(
 
 
 @external
-def setPrice(_asset: address, _price: uint256):
-    self.price[_asset] = _price
+def setMockGreenPoolData(
+    _weightedRatio: uint256,
+    _dangerTrigger: uint256,
+    _numBlocksInDanger: uint256,
+):
+    self.mockData = CurrentGreenPoolStatus(
+        weightedRatio=_weightedRatio,
+        dangerTrigger=_dangerTrigger,
+        numBlocksInDanger=_numBlocksInDanger,
+    )
 
-    if priceData.indexOfAsset[_asset] == 0:
-        priceData._addPricedAsset(_asset)
+
+@view
+@external
+def getCurrentGreenPoolStatus() -> CurrentGreenPoolStatus:
+    mockData: CurrentGreenPoolStatus = self.mockData
+    return CurrentGreenPoolStatus(
+        weightedRatio=mockData.weightedRatio,
+        dangerTrigger=mockData.dangerTrigger,
+        numBlocksInDanger=mockData.numBlocksInDanger,
+    )
 
 
 @external
-def disablePriceFeed(_asset: address) -> bool:
-    self.price[_asset] = 0
-
-    if priceData.indexOfAsset[_asset] != 0:
-        priceData._removePricedAsset(_asset)
-
+def addGreenRefPoolSnapshot() -> bool:
     return True
 
 
@@ -63,20 +79,19 @@ def disablePriceFeed(_asset: address) -> bool:
 @view
 @external
 def getPrice(_asset: address, _staleTime: uint256 = 0, _priceDesk: address = empty(address)) -> uint256:
-    return self.price[_asset]
+    return 0
 
 
 @view
 @external
 def getPriceAndHasFeed(_asset: address, _staleTime: uint256 = 0, _priceDesk: address = empty(address)) -> (uint256, bool):
-    price: uint256 = self.price[_asset]
-    return price, price != 0
+    return 0, False
 
 
 @view
 @external
 def hasPriceFeed(_asset: address) -> bool:
-    return self.price[_asset] != 0
+    return False
 
 
 #########
@@ -117,4 +132,9 @@ def confirmDisablePriceFeed(_asset: address) -> bool:
 
 @external
 def cancelDisablePriceFeed(_asset: address) -> bool:
+    return True
+
+
+@external
+def disablePriceFeed(_asset: address) -> bool:
     return True

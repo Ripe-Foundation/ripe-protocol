@@ -203,7 +203,7 @@ def __init__(
 ):
     gov.__init__(_ripeHq, empty(address), 0, 0, 0)
     addys.__init__(_ripeHq)
-    priceData.__init__(False)
+    priceData.__init__(True, False)
     timeLock.__init__(_minPriceChangeTimeLock, _maxPriceChangeTimeLock, 0, _maxPriceChangeTimeLock)
 
     # set curve address provider
@@ -871,7 +871,7 @@ def _isValidGreenRefPoolConfig(
     if _maxNumSnapshots == 0 or _maxNumSnapshots > 100: # 100 max
         return False
 
-    if _dangerTrigger < 50_00 or _dangerTrigger > 100_00: # 50% - 100%
+    if _dangerTrigger < 50_00 or _dangerTrigger >= 100_00: # 50% - 99.99%
         return False
 
     # make sure this curve integration works
@@ -948,9 +948,13 @@ def _addGreenRefPoolSnapshot() -> bool:
         return False
 
     # balance data
+    config: GreenRefPoolConfig = self.greenRefPoolConfig
+    if config.pool == empty(address):
+        return False
+
+    # curve pool data
     greenBalance: uint256 = 0
     greenRatio: uint256 = 0
-    config: GreenRefPoolConfig = self.greenRefPoolConfig
     greenBalance, greenRatio = self._getCurvePoolData(config.pool, config.greenIndex, config.altAssetDecimals)
     if greenBalance == 0 or greenRatio == 0:
         return False

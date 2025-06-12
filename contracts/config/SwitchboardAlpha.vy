@@ -51,6 +51,7 @@ flag ActionType:
     GEN_CONFIG_STALE_TIME
     DEBT_GLOBAL_LIMITS
     DEBT_BORROW_INTERVAL
+    DEBT_DYNAMIC_RATE_CONFIG
     DEBT_KEEPER_CONFIG
     DEBT_LTV_PAYBACK_BUFFER
     DEBT_AUCTION_PARAMS
@@ -104,6 +105,10 @@ struct GenDebtConfig:
     numAllowedBorrowers: uint256
     maxBorrowPerInterval: uint256
     numBlocksPerInterval: uint256
+    minDynamicRateBoost: uint256
+    maxDynamicRateBoost: uint256
+    increasePerDangerBlock: uint256
+    maxBorrowRate: uint256
     keeperFeeRatio: uint256
     minKeeperFee: uint256
     isDaowryEnabled: bool
@@ -213,6 +218,14 @@ event PendingBorrowIntervalConfigChange:
     confirmationBlock: uint256
     actionId: uint256
 
+event PendingDynamicRateConfigChange:
+    minDynamicRateBoost: uint256
+    maxDynamicRateBoost: uint256
+    increasePerDangerBlock: uint256
+    maxBorrowRate: uint256
+    confirmationBlock: uint256
+    actionId: uint256
+
 event PendingKeeperConfigChange:
     keeperFeeRatio: uint256
     minKeeperFee: uint256
@@ -318,6 +331,12 @@ event GlobalDebtLimitsSet:
 event BorrowIntervalConfigSet:
     maxBorrowPerInterval: uint256
     numBlocksPerInterval: uint256
+
+event DynamicRateConfigSet:
+    minDynamicRateBoost: uint256
+    maxDynamicRateBoost: uint256
+    increasePerDangerBlock: uint256
+    maxBorrowRate: uint256
 
 event KeeperConfigSet:
     keeperFeeRatio: uint256
@@ -702,6 +721,34 @@ def _areValidBorrowIntervalConfig(_maxBorrowPerInterval: uint256, _numBlocksPerI
     return True
 
 
+# dynamic rate config
+
+
+@external
+def setDynamicRateConfig(_minDynamicRateBoost: uint256, _maxDynamicRateBoost: uint256, _increasePerDangerBlock: uint256, _maxBorrowRate: uint256) -> uint256:
+    assert gov._canGovern(msg.sender) # dev: no perms
+    assert self._isValidDynamicRateConfig(_minDynamicRateBoost, _maxDynamicRateBoost, _increasePerDangerBlock, _maxBorrowRate) # dev: invalid dynamic rate config
+    return self._setPendingDebtConfig(ActionType.DEBT_DYNAMIC_RATE_CONFIG, 0, 0, 0, 0, 0, 0, _minDynamicRateBoost, _maxDynamicRateBoost, _increasePerDangerBlock, _maxBorrowRate)
+
+
+@view
+@internal
+def _isValidDynamicRateConfig(_minDynamicRateBoost: uint256, _maxDynamicRateBoost: uint256, _increasePerDangerBlock: uint256, _maxBorrowRate: uint256) -> bool:
+    # NOTE: denominator for `_increasePerDangerBlock` is 100_0000 (100.0000%)
+
+    if 0 in [_minDynamicRateBoost, _maxDynamicRateBoost, _increasePerDangerBlock, _maxBorrowRate]:
+        return False
+    if max_value(uint256) in [_minDynamicRateBoost, _maxDynamicRateBoost, _increasePerDangerBlock, _maxBorrowRate]:
+        return False
+    if _minDynamicRateBoost > _maxDynamicRateBoost:
+        return False
+    if _maxDynamicRateBoost > 1000_00: # 1000% max
+        return False
+    if _maxBorrowRate > 200_00: # 200% max
+        return False
+    return True
+
+
 # keeper config
 
 
@@ -710,7 +757,7 @@ def setKeeperConfig(_keeperFeeRatio: uint256, _minKeeperFee: uint256) -> uint256
     assert gov._canGovern(msg.sender) # dev: no perms
 
     assert self._isValidKeeperConfig(_keeperFeeRatio, _minKeeperFee) # dev: invalid keeper config
-    return self._setPendingDebtConfig(ActionType.DEBT_KEEPER_CONFIG, 0, 0, 0, 0, 0, 0, _keeperFeeRatio, _minKeeperFee)
+    return self._setPendingDebtConfig(ActionType.DEBT_KEEPER_CONFIG, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, _keeperFeeRatio, _minKeeperFee)
 
 
 @view
@@ -733,7 +780,7 @@ def setLtvPaybackBuffer(_ltvPaybackBuffer: uint256) -> uint256:
     assert gov._canGovern(msg.sender) # dev: no perms
 
     assert self._isValidLtvPaybackBuffer(_ltvPaybackBuffer) # dev: invalid ltv payback buffer
-    return self._setPendingDebtConfig(ActionType.DEBT_LTV_PAYBACK_BUFFER, 0, 0, 0, 0, 0, 0, 0, 0, _ltvPaybackBuffer)
+    return self._setPendingDebtConfig(ActionType.DEBT_LTV_PAYBACK_BUFFER, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, _ltvPaybackBuffer)
 
 
 @view
@@ -764,7 +811,7 @@ def setGenAuctionParams(
         duration=_duration,
     )
     assert self._areValidAuctionParams(params) # dev: invalid auction params
-    return self._setPendingDebtConfig(ActionType.DEBT_AUCTION_PARAMS, 0, 0, 0, 0, 0, 0, 0, 0, 0, params)
+    return self._setPendingDebtConfig(ActionType.DEBT_AUCTION_PARAMS, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, params)
 
 
 @view
@@ -803,6 +850,10 @@ def _setPendingDebtConfig(
     _numAllowedBorrowers: uint256 = 0,
     _maxBorrowPerInterval: uint256 = 0,
     _numBlocksPerInterval: uint256 = 0,
+    _minDynamicRateBoost: uint256 = 0,
+    _maxDynamicRateBoost: uint256 = 0,
+    _increasePerDangerBlock: uint256 = 0,
+    _maxBorrowRate: uint256 = 0,
     _keeperFeeRatio: uint256 = 0,
     _minKeeperFee: uint256 = 0,
     _ltvPaybackBuffer: uint256 = 0,
@@ -818,6 +869,10 @@ def _setPendingDebtConfig(
         numAllowedBorrowers=_numAllowedBorrowers,
         maxBorrowPerInterval=_maxBorrowPerInterval,
         numBlocksPerInterval=_numBlocksPerInterval,
+        minDynamicRateBoost=_minDynamicRateBoost,
+        maxDynamicRateBoost=_maxDynamicRateBoost,
+        increasePerDangerBlock=_increasePerDangerBlock,
+        maxBorrowRate=_maxBorrowRate,
         keeperFeeRatio=_keeperFeeRatio,
         minKeeperFee=_minKeeperFee,
         isDaowryEnabled=False,
@@ -839,6 +894,15 @@ def _setPendingDebtConfig(
         log PendingBorrowIntervalConfigChange(
             maxBorrowPerInterval=_maxBorrowPerInterval,
             numBlocksPerInterval=_numBlocksPerInterval,
+            confirmationBlock=confirmationBlock,
+            actionId=aid,
+        )
+    elif _actionType == ActionType.DEBT_DYNAMIC_RATE_CONFIG:
+        log PendingDynamicRateConfigChange(
+            minDynamicRateBoost=_minDynamicRateBoost,
+            maxDynamicRateBoost=_maxDynamicRateBoost,
+            increasePerDangerBlock=_increasePerDangerBlock,
+            maxBorrowRate=_maxBorrowRate,
             confirmationBlock=confirmationBlock,
             actionId=aid,
         )
@@ -1338,6 +1402,16 @@ def executePendingAction(_aid: uint256) -> bool:
         config.numBlocksPerInterval = p.numBlocksPerInterval
         extcall MissionControl(mc).setGeneralDebtConfig(config)
         log BorrowIntervalConfigSet(maxBorrowPerInterval=p.maxBorrowPerInterval, numBlocksPerInterval=p.numBlocksPerInterval)
+
+    elif actionType == ActionType.DEBT_DYNAMIC_RATE_CONFIG:
+        config: GenDebtConfig = staticcall MissionControl(mc).genDebtConfig()
+        p: GenDebtConfig = self.pendingDebtConfig[_aid]
+        config.minDynamicRateBoost = p.minDynamicRateBoost
+        config.maxDynamicRateBoost = p.maxDynamicRateBoost
+        config.increasePerDangerBlock = p.increasePerDangerBlock
+        config.maxBorrowRate = p.maxBorrowRate
+        extcall MissionControl(mc).setGeneralDebtConfig(config)
+        log DynamicRateConfigSet(minDynamicRateBoost=p.minDynamicRateBoost, maxDynamicRateBoost=p.maxDynamicRateBoost, increasePerDangerBlock=p.increasePerDangerBlock, maxBorrowRate=p.maxBorrowRate)
 
     elif actionType == ActionType.DEBT_KEEPER_CONFIG:
         config: GenDebtConfig = staticcall MissionControl(mc).genDebtConfig()

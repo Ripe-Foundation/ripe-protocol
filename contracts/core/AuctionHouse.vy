@@ -1,4 +1,5 @@
 # @version 0.4.1
+# pragma optimize codesize
 
 implements: Department
 
@@ -620,7 +621,11 @@ def _burnLiqUserStabAsset(
         return remainingToRepay, collateralValueOut
 
     # burn stab asset
-    assert extcall StabAsset(_liqStabAsset).burn(amountReceived) # dev: failed to burn stab asset
+    if _liqStabAsset == _a.savingsGreen:
+        usdValue = extcall IERC4626(_a.savingsGreen).redeem(amountReceived, self, self) # dev: savings green redeem failed
+        assert extcall StabAsset(_a.greenToken).burn(usdValue) # dev: failed to burn green
+    else:
+        assert extcall StabAsset(_liqStabAsset).burn(amountReceived) # dev: failed to burn stab asset
 
     # update totals
     remainingToRepay -= min(usdValue, remainingToRepay)
@@ -1307,7 +1312,7 @@ def _handleGreenForUser(
     if amount == 0:
         return
 
-    if _wantsSavingsGreen:
+    if _wantsSavingsGreen and amount > 10 ** 9: # small dust will fail
         assert extcall IERC20(_greenToken).approve(_savingsGreen, amount, default_return_value=True) # dev: green approval failed
         extcall IERC4626(_savingsGreen).deposit(amount, _recipient)
         assert extcall IERC20(_greenToken).approve(_savingsGreen, 0, default_return_value=True) # dev: green approval failed

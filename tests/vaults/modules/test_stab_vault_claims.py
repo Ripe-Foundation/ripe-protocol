@@ -715,13 +715,33 @@ def test_stab_vault_claim_many_max_claims(
     # Get the MAX_STAB_CLAIMS constant (15)
     max_claims = 15
     
-    # Create max number of claims (all invalid to avoid setup complexity)
+    # Create exactly max number of claims (all invalid to avoid setup complexity)
     claims = [(ZERO_ADDRESS, ZERO_ADDRESS, 0) for _ in range(max_claims)]
     
     vault_id = vault_book.getRegId(stability_pool)
     
     # Should revert with "nothing claimed" since all claims are invalid
     with boa.reverts("nothing claimed"):
+        teller.claimManyFromStabilityPool(vault_id, claims, sender=bob)
+
+
+def test_stab_vault_claim_many_exceeds_limit(
+    stability_pool,
+    bob,
+    teller,
+    vault_book,
+):
+    """Test claimManyFromStabilityPool fails when exceeding maximum number of claims"""
+    # Get the MAX_STAB_CLAIMS constant (15)
+    max_claims = 15
+    
+    # Create MORE than max number of claims (this should fail at bounds check)
+    claims = [(ZERO_ADDRESS, ZERO_ADDRESS, 0) for _ in range(max_claims + 1)]
+    
+    vault_id = vault_book.getRegId(stability_pool)
+    
+    # Should fail with bounds check error when trying to pass 16 claims to DynArray[StabPoolClaim, 15]
+    with boa.reverts():  # Generic revert since it's a compiler bounds check
         teller.claimManyFromStabilityPool(vault_id, claims, sender=bob)
 
 
@@ -1512,3 +1532,748 @@ def test_stab_vault_claims_without_delegation_permission(
     
     _test(charlie_amount, total_usd_value)
     _test(charlie_amount, bravo_token.balanceOf(alice))
+
+
+##########################
+# Stability Pool Rewards #
+##########################
+
+
+@pytest.fixture(scope="module")
+def setupStabPoolClaimsRewards(mission_control, setAssetConfig, setGeneralConfig, switchboard_alpha, ripe_token):
+    def setupStabPoolClaimsRewards(
+        _ripePerDollar = 1 * EIGHTEEN_DECIMALS,
+        _stabRewardsLockDuration = 500,
+        _minLockDuration = 0,
+        _maxLockDuration = 1000,
+    ):
+        setGeneralConfig()
+
+        stab_rewards_config = (
+            _stabRewardsLockDuration,
+            _ripePerDollar,
+        )
+        mission_control.setStabClaimRewardsConfig(stab_rewards_config, sender=switchboard_alpha.address)
+
+        # setup ripe gov vault
+        lock_terms = (
+            _minLockDuration,
+            _maxLockDuration,
+            100_00,
+            False,
+            0,
+        )
+        mission_control.setRipeGovVaultConfig(
+            ripe_token, 
+            100_00,
+            False,
+            lock_terms, 
+            sender=switchboard_alpha.address
+        )
+        setAssetConfig(ripe_token, _vaultIds=[2])
+
+    yield setupStabPoolClaimsRewards
+
+
+def test_stab_vault_claim_rewards_basic(
+    stability_pool,
+    alpha_token,
+    bravo_token,
+    alpha_token_whale,
+    bravo_token_whale,
+    bob,
+    teller,
+    auction_house,
+    mock_price_source,
+    vault_book,
+    savings_green,
+    ripe_token,
+    ripe_gov_vault,
+    ledger,
+    _test,
+    setAssetConfig,
+    setupStabPoolClaimsRewards,
+):
+    """Test basic Ripe rewards functionality when claiming from stability pool"""
+    # Set up stability pool claim rewards configuration
+    # 0.1 Ripe per dollar claimed, 30-day lock (assuming ~12 sec blocks)
+    setupStabPoolClaimsRewards(
+        _ripePerDollar = EIGHTEEN_DECIMALS // 10,  # 0.1 Ripe per dollar
+        _stabRewardsLockDuration = 216000,  # ~30 days in blocks (30*24*60*60/12)
+    )
+    setAssetConfig(bravo_token)
+
+    # Set mock prices
+    price = 1 * EIGHTEEN_DECIMALS
+    mock_price_source.setPrice(alpha_token, price)
+    mock_price_source.setPrice(bravo_token, price)
+    mock_price_source.setPrice(ripe_token, price)
+
+    # Initial deposit
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    alpha_token.transfer(stability_pool, deposit_amount, sender=alpha_token_whale)
+    stability_pool.depositTokensInVault(bob, alpha_token, deposit_amount, sender=teller.address)
+
+    # Add claimable assets
+    claimable_amount = 150 * EIGHTEEN_DECIMALS
+    bravo_token.transfer(stability_pool, claimable_amount, sender=bravo_token_whale)
+    stability_pool.swapForLiquidatedCollateral(
+        alpha_token, deposit_amount, bravo_token, claimable_amount,
+        ZERO_ADDRESS, alpha_token, savings_green, sender=auction_house.address
+    )
+
+    # Record Bob's initial balance in gov vault
+    initial_gov_balance = ripe_gov_vault.getTotalAmountForUser(bob, ripe_token)
+
+    # Claim from stability pool
+    vault_id = vault_book.getRegId(stability_pool)
+    claim_usd_value = teller.claimFromStabilityPool(vault_id, alpha_token, bravo_token, sender=bob)
+
+    # Verify claim worked
+    _test(claimable_amount, claim_usd_value)
+    _test(claimable_amount, bravo_token.balanceOf(bob))
+
+    # Calculate expected Ripe rewards: 150 USD * 0.1 = 15 Ripe
+    expected_ripe_rewards = claimable_amount * EIGHTEEN_DECIMALS // 10 // EIGHTEEN_DECIMALS
+    
+    # Verify Bob received Ripe rewards in gov vault
+    final_gov_balance = ripe_gov_vault.getTotalAmountForUser(bob, ripe_token)
+    actual_ripe_rewards = final_gov_balance - initial_gov_balance
+    _test(expected_ripe_rewards, actual_ripe_rewards)
+
+    # Verify the Ripe tokens are locked (Bob should have a position in gov vault)
+    assert ripe_gov_vault.userBalances(bob, ripe_token) > 0
+
+
+def test_stab_vault_claim_rewards_different_rates(
+    stability_pool,
+    alpha_token,
+    bravo_token,
+    alpha_token_whale,
+    bravo_token_whale,
+    bob,
+    alice,
+    teller,
+    auction_house,
+    mock_price_source,
+    vault_book,
+    savings_green,
+    mission_control,
+    switchboard_alpha,
+    ripe_token,
+    ripe_gov_vault,
+    _test,
+    setAssetConfig,
+    setupStabPoolClaimsRewards,
+):
+    """Test Ripe rewards with different reward rates"""
+    # Test 1: High reward rate (1 Ripe per dollar)
+    setupStabPoolClaimsRewards(
+        _ripePerDollar = EIGHTEEN_DECIMALS,  # 1 Ripe per dollar
+        _stabRewardsLockDuration = 50400,  # ~7 days in blocks (7*24*60*60/12)
+    )
+    setAssetConfig(bravo_token)
+
+    # Set mock prices
+    price = 1 * EIGHTEEN_DECIMALS
+    mock_price_source.setPrice(alpha_token, price)
+    mock_price_source.setPrice(bravo_token, price)
+    mock_price_source.setPrice(ripe_token, price)
+
+    # Setup for Bob
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    alpha_token.transfer(stability_pool, deposit_amount, sender=alpha_token_whale)
+    stability_pool.depositTokensInVault(bob, alpha_token, deposit_amount, sender=teller.address)
+
+    claimable_amount = 50 * EIGHTEEN_DECIMALS
+    bravo_token.transfer(stability_pool, claimable_amount, sender=bravo_token_whale)
+    stability_pool.swapForLiquidatedCollateral(
+        alpha_token, deposit_amount // 2, bravo_token, claimable_amount,
+        ZERO_ADDRESS, alpha_token, savings_green, sender=auction_house.address
+    )
+
+    initial_bob_balance = ripe_gov_vault.getTotalAmountForUser(bob, ripe_token)
+    vault_id = vault_book.getRegId(stability_pool)
+    claim_usd_value = teller.claimFromStabilityPool(vault_id, alpha_token, bravo_token, sender=bob)
+
+    final_bob_balance = ripe_gov_vault.getTotalAmountForUser(bob, ripe_token)
+    bob_rewards = final_bob_balance - initial_bob_balance
+    expected_bob_rewards = claim_usd_value  # 1:1 ratio
+    _test(expected_bob_rewards, bob_rewards)
+
+    # Test 2: Low reward rate (0.01 Ripe per dollar)
+    low_rewards_config = (
+        2628000,  # ~1 year in blocks (365*24*60*60/12)
+        EIGHTEEN_DECIMALS // 100,  # 0.01 Ripe per dollar
+    )
+    mission_control.setStabClaimRewardsConfig(low_rewards_config, sender=switchboard_alpha.address)
+
+    # Setup for Alice
+    alpha_token.transfer(stability_pool, deposit_amount // 2, sender=alpha_token_whale)
+    stability_pool.depositTokensInVault(alice, alpha_token, deposit_amount // 2, sender=teller.address)
+
+    bravo_token.transfer(stability_pool, claimable_amount, sender=bravo_token_whale)
+    stability_pool.swapForLiquidatedCollateral(
+        alpha_token, deposit_amount // 2, bravo_token, claimable_amount,
+        ZERO_ADDRESS, alpha_token, savings_green, sender=auction_house.address
+    )
+
+    initial_alice_balance = ripe_gov_vault.getTotalAmountForUser(alice, ripe_token)
+    alice_claim_usd_value = teller.claimFromStabilityPool(vault_id, alpha_token, bravo_token, sender=alice)
+
+    final_alice_balance = ripe_gov_vault.getTotalAmountForUser(alice, ripe_token)
+    alice_rewards = final_alice_balance - initial_alice_balance
+    expected_alice_rewards = alice_claim_usd_value // 100  # 0.01 ratio
+    _test(expected_alice_rewards, alice_rewards)
+
+    # Bob should get 100x more rewards per dollar than Alice due to config change
+    # Bob: 1 Ripe per dollar, Alice: 0.01 Ripe per dollar
+    assert bob_rewards > 0, "Bob should have received rewards"
+    assert alice_rewards > 0, "Alice should have received rewards"
+    
+    bob_rate = bob_rewards / claim_usd_value
+    alice_rate = alice_rewards / alice_claim_usd_value
+    actual_ratio = bob_rate / alice_rate
+    
+    # Bob gets 100x more per dollar (1.0 vs 0.01)
+    _test(100, actual_ratio)
+
+
+def test_stab_vault_claim_rewards_zero_config(
+    stability_pool,
+    alpha_token,
+    bravo_token,
+    alpha_token_whale,
+    bravo_token_whale,
+    bob,
+    teller,
+    auction_house,
+    mock_price_source,
+    vault_book,
+    savings_green,
+    ripe_token,
+    ripe_gov_vault,
+    setAssetConfig,
+    setupStabPoolClaimsRewards,
+):
+    """Test that no rewards are given when reward rate is zero"""
+    # Set up rewards configuration with zero rate
+    setupStabPoolClaimsRewards(
+        _ripePerDollar = 0,  # 0 Ripe per dollar (no rewards)
+        _stabRewardsLockDuration = 216000,  # ~30 days in blocks
+    )
+    setAssetConfig(bravo_token)
+
+    # Set mock prices
+    price = 1 * EIGHTEEN_DECIMALS
+    mock_price_source.setPrice(alpha_token, price)
+    mock_price_source.setPrice(bravo_token, price)
+    mock_price_source.setPrice(ripe_token, price)
+
+    # Setup
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    alpha_token.transfer(stability_pool, deposit_amount, sender=alpha_token_whale)
+    stability_pool.depositTokensInVault(bob, alpha_token, deposit_amount, sender=teller.address)
+
+    claimable_amount = 150 * EIGHTEEN_DECIMALS
+    bravo_token.transfer(stability_pool, claimable_amount, sender=bravo_token_whale)
+    stability_pool.swapForLiquidatedCollateral(
+        alpha_token, deposit_amount, bravo_token, claimable_amount,
+        ZERO_ADDRESS, alpha_token, savings_green, sender=auction_house.address
+    )
+
+    # Record initial gov vault balance
+    initial_gov_balance = ripe_gov_vault.getTotalAmountForUser(bob, ripe_token)
+
+    # Claim from stability pool
+    vault_id = vault_book.getRegId(stability_pool)
+    claim_usd_value = teller.claimFromStabilityPool(vault_id, alpha_token, bravo_token, sender=bob)
+
+    # Verify claim worked but no rewards given
+    assert claim_usd_value > 0
+    final_gov_balance = ripe_gov_vault.getTotalAmountForUser(bob, ripe_token)
+    assert final_gov_balance == initial_gov_balance  # No change in gov vault balance
+
+
+def test_stab_vault_claim_rewards_many_claims(
+    stability_pool,
+    alpha_token,
+    bravo_token,
+    charlie_token,
+    alpha_token_whale,
+    bravo_token_whale,
+    charlie_token_whale,
+    bob,
+    teller,
+    auction_house,
+    mock_price_source,
+    vault_book,
+    savings_green,
+    ripe_token,
+    ripe_gov_vault,
+    _test,
+    setAssetConfig,
+    setupStabPoolClaimsRewards,
+):
+    """Test Ripe rewards with claimManyFromStabilityPool"""
+    # Set up rewards configuration
+    setupStabPoolClaimsRewards(
+        _ripePerDollar = EIGHTEEN_DECIMALS // 5,  # 0.2 Ripe per dollar
+        _stabRewardsLockDuration = 100800,  # ~14 days in blocks (14*24*60*60/12)
+    )
+    setAssetConfig(bravo_token)
+    setAssetConfig(charlie_token)
+
+    # Set mock prices
+    price = 1 * EIGHTEEN_DECIMALS
+    mock_price_source.setPrice(alpha_token, price)
+    mock_price_source.setPrice(bravo_token, price)
+    mock_price_source.setPrice(charlie_token, price)
+    mock_price_source.setPrice(ripe_token, price)
+
+    # Setup
+    deposit_amount = 200 * EIGHTEEN_DECIMALS
+    alpha_token.transfer(stability_pool, deposit_amount, sender=alpha_token_whale)
+    stability_pool.depositTokensInVault(bob, alpha_token, deposit_amount, sender=teller.address)
+
+    # Add multiple claimable assets
+    bravo_amount = 80 * EIGHTEEN_DECIMALS  # 80 tokens with 18 decimals
+    charlie_amount = 120 * (10 ** charlie_token.decimals())  # 120 tokens with 6 decimals
+    
+    bravo_token.transfer(stability_pool, bravo_amount, sender=bravo_token_whale)
+    stability_pool.swapForLiquidatedCollateral(
+        alpha_token, deposit_amount // 2, bravo_token, bravo_amount,
+        ZERO_ADDRESS, alpha_token, savings_green, sender=auction_house.address
+    )
+    
+    charlie_token.transfer(stability_pool, charlie_amount, sender=charlie_token_whale)
+    stability_pool.swapForLiquidatedCollateral(
+        alpha_token, deposit_amount // 2, charlie_token, charlie_amount,
+        ZERO_ADDRESS, alpha_token, savings_green, sender=auction_house.address
+    )
+
+    # Record initial gov vault balance
+    initial_gov_balance = ripe_gov_vault.getTotalAmountForUser(bob, ripe_token)
+
+    # Create claims array
+    claims = [
+        (alpha_token.address, bravo_token.address, MAX_UINT256),
+        (alpha_token.address, charlie_token.address, MAX_UINT256)
+    ]
+
+    # Claim many
+    vault_id = vault_book.getRegId(stability_pool)
+    total_usd_value = teller.claimManyFromStabilityPool(vault_id, claims, sender=bob)
+
+    # Verify total claim value
+    # Since both tokens are priced at $1: 80 tokens + 120 tokens = $200 USD value
+    expected_total_usd_value = 200 * EIGHTEEN_DECIMALS
+    _test(expected_total_usd_value, total_usd_value)
+
+    # Calculate expected total Ripe rewards: $200 * 0.2 = 40 Ripe
+    expected_total_ripe_rewards = total_usd_value // 5  # 0.2 Ripe per dollar
+    
+    # Verify Bob received the claimed tokens
+    _test(bravo_amount, bravo_token.balanceOf(bob))
+    _test(charlie_amount, charlie_token.balanceOf(bob))
+    
+    # Verify Bob received total Ripe rewards in gov vault
+    final_gov_balance = ripe_gov_vault.getTotalAmountForUser(bob, ripe_token)
+    actual_ripe_rewards = final_gov_balance - initial_gov_balance
+    _test(expected_total_ripe_rewards, actual_ripe_rewards)
+
+
+def test_stab_vault_claim_rewards_insufficient_ripe(
+    stability_pool,
+    alpha_token,
+    bravo_token,
+    alpha_token_whale,
+    bravo_token_whale,
+    bob,
+    teller,
+    auction_house,
+    mock_price_source,
+    vault_book,
+    savings_green,
+    ripe_token,
+    ripe_gov_vault,
+    ledger,
+    setAssetConfig,
+    setupStabPoolClaimsRewards,
+    switchboard_alpha,
+):
+    """Test rewards are limited by available Ripe in ledger"""
+    # Set up high rewards configuration
+    setupStabPoolClaimsRewards(
+        _ripePerDollar = 10 * EIGHTEEN_DECIMALS,  # 10 Ripe per dollar (very high)
+        _stabRewardsLockDuration = 216000,  # ~30 days in blocks
+    )
+    setAssetConfig(bravo_token)
+
+    # Set mock prices
+    price = 1 * EIGHTEEN_DECIMALS
+    mock_price_source.setPrice(alpha_token, price)
+    mock_price_source.setPrice(bravo_token, price)
+    mock_price_source.setPrice(ripe_token, price)
+
+    # Setup
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    alpha_token.transfer(stability_pool, deposit_amount, sender=alpha_token_whale)
+    stability_pool.depositTokensInVault(bob, alpha_token, deposit_amount, sender=teller.address)
+
+    claimable_amount = 50 * EIGHTEEN_DECIMALS
+    bravo_token.transfer(stability_pool, claimable_amount, sender=bravo_token_whale)
+    stability_pool.swapForLiquidatedCollateral(
+        alpha_token, deposit_amount, bravo_token, claimable_amount,
+        ZERO_ADDRESS, alpha_token, savings_green, sender=auction_house.address
+    )
+
+    # Set limited Ripe available for rewards (less than what would be needed)
+    theoretical_rewards = claimable_amount * 10  # 50 * 10 = 500 Ripe demanded
+    limited_ripe_available = 100 * EIGHTEEN_DECIMALS  # Only 100 Ripe available
+    ledger.setRipeAvailForRewards(limited_ripe_available, sender=switchboard_alpha.address)
+    
+    # Verify the limit was set correctly
+    ripe_available = ledger.ripeAvailForRewards()
+    assert ripe_available == limited_ripe_available, "Ledger should have limited Ripe available"
+    
+    expected_actual_rewards = min(theoretical_rewards, ripe_available)
+
+    # Record initial balance
+    initial_gov_balance = ripe_gov_vault.getTotalAmountForUser(bob, ripe_token)
+
+    # Claim from stability pool
+    vault_id = vault_book.getRegId(stability_pool)
+    claim_usd_value = teller.claimFromStabilityPool(vault_id, alpha_token, bravo_token, sender=bob)
+
+    # Verify rewards are limited by available amount
+    final_gov_balance = ripe_gov_vault.getTotalAmountForUser(bob, ripe_token)
+    actual_rewards = final_gov_balance - initial_gov_balance
+    
+    # Should be limited to available Ripe (100 Ripe instead of 500 Ripe demanded)
+    assert actual_rewards <= expected_actual_rewards
+    assert actual_rewards == min(theoretical_rewards, ripe_available)
+    assert actual_rewards == limited_ripe_available, "Should receive exactly the limited amount available"
+
+
+def test_stab_vault_claim_rewards_partial_claims(
+    stability_pool,
+    alpha_token,
+    bravo_token,
+    alpha_token_whale,
+    bravo_token_whale,
+    bob,
+    teller,
+    auction_house,
+    mock_price_source,
+    vault_book,
+    savings_green,
+    ripe_token,
+    ripe_gov_vault,
+    _test,
+    setAssetConfig,
+    setupStabPoolClaimsRewards,
+):
+    """Test Ripe rewards scale correctly with partial claims"""
+    # Set up rewards configuration
+    setupStabPoolClaimsRewards(
+        _ripePerDollar = EIGHTEEN_DECIMALS // 4,  # 0.25 Ripe per dollar
+        _stabRewardsLockDuration = 216000,  # ~30 days in blocks
+    )
+    setAssetConfig(bravo_token)
+
+    # Set mock prices
+    price = 1 * EIGHTEEN_DECIMALS
+    mock_price_source.setPrice(alpha_token, price)
+    mock_price_source.setPrice(bravo_token, price)
+    mock_price_source.setPrice(ripe_token, price)
+
+    # Setup
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    alpha_token.transfer(stability_pool, deposit_amount, sender=alpha_token_whale)
+    stability_pool.depositTokensInVault(bob, alpha_token, deposit_amount, sender=teller.address)
+
+    claimable_amount = 100 * EIGHTEEN_DECIMALS
+    bravo_token.transfer(stability_pool, claimable_amount, sender=bravo_token_whale)
+    stability_pool.swapForLiquidatedCollateral(
+        alpha_token, deposit_amount, bravo_token, claimable_amount,
+        ZERO_ADDRESS, alpha_token, savings_green, sender=auction_house.address
+    )
+
+    vault_id = vault_book.getRegId(stability_pool)
+
+    # First partial claim (25% of total)
+    partial_claim_amount = 25 * EIGHTEEN_DECIMALS
+    initial_gov_balance = ripe_gov_vault.getTotalAmountForUser(bob, ripe_token)
+    
+    claim_usd_value_1 = teller.claimFromStabilityPool(vault_id, alpha_token, bravo_token, partial_claim_amount, sender=bob)
+    
+    mid_gov_balance = ripe_gov_vault.getTotalAmountForUser(bob, ripe_token)
+    rewards_1 = mid_gov_balance - initial_gov_balance
+    expected_rewards_1 = claim_usd_value_1 // 4  # 0.25 ratio
+    _test(expected_rewards_1, rewards_1)
+
+    # Second partial claim (remaining 75%)
+    claim_usd_value_2 = teller.claimFromStabilityPool(vault_id, alpha_token, bravo_token, sender=bob)
+    
+    final_gov_balance = ripe_gov_vault.getTotalAmountForUser(bob, ripe_token)
+    rewards_2 = final_gov_balance - mid_gov_balance
+    expected_rewards_2 = claim_usd_value_2 // 4  # 0.25 ratio
+    _test(expected_rewards_2, rewards_2)
+
+    # Total rewards should equal what we'd get from claiming everything at once
+    total_rewards = rewards_1 + rewards_2
+    total_claim_value = claim_usd_value_1 + claim_usd_value_2
+    expected_total_rewards = total_claim_value // 4
+    _test(expected_total_rewards, total_rewards)
+
+
+def test_stab_vault_claim_rewards_config_changes(
+    stability_pool,
+    alpha_token,
+    bravo_token,
+    alpha_token_whale,
+    bravo_token_whale,
+    bob,
+    alice,
+    teller,
+    auction_house,
+    mock_price_source,
+    vault_book,
+    savings_green,
+    mission_control,
+    switchboard_alpha,
+    ripe_token,
+    ripe_gov_vault,
+    _test,
+    setAssetConfig,
+    setupStabPoolClaimsRewards,
+):
+    """Test that reward configuration changes take effect immediately"""
+    # Initial rewards configuration
+    setupStabPoolClaimsRewards(
+        _ripePerDollar = EIGHTEEN_DECIMALS // 10,  # 0.1 Ripe per dollar
+        _stabRewardsLockDuration = 50400,  # ~7 days in blocks
+    )
+    setAssetConfig(bravo_token)
+
+    # Set mock prices
+    price = 1 * EIGHTEEN_DECIMALS
+    mock_price_source.setPrice(alpha_token, price)
+    mock_price_source.setPrice(bravo_token, price)
+    mock_price_source.setPrice(ripe_token, price)
+
+    # Setup for both users
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    
+    # Bob setup
+    alpha_token.transfer(stability_pool, deposit_amount, sender=alpha_token_whale)
+    stability_pool.depositTokensInVault(bob, alpha_token, deposit_amount, sender=teller.address)
+    
+    # Alice setup  
+    alpha_token.transfer(stability_pool, deposit_amount, sender=alpha_token_whale)
+    stability_pool.depositTokensInVault(alice, alpha_token, deposit_amount, sender=teller.address)
+
+    # Add claimable assets for both
+    claimable_amount = 50 * EIGHTEEN_DECIMALS
+    
+    bravo_token.transfer(stability_pool, claimable_amount, sender=bravo_token_whale)
+    stability_pool.swapForLiquidatedCollateral(
+        alpha_token, deposit_amount, bravo_token, claimable_amount,
+        ZERO_ADDRESS, alpha_token, savings_green, sender=auction_house.address
+    )
+    
+    bravo_token.transfer(stability_pool, claimable_amount, sender=bravo_token_whale)
+    stability_pool.swapForLiquidatedCollateral(
+        alpha_token, deposit_amount, bravo_token, claimable_amount,
+        ZERO_ADDRESS, alpha_token, savings_green, sender=auction_house.address
+    )
+
+    vault_id = vault_book.getRegId(stability_pool)
+
+    # Bob claims with initial config
+    initial_bob_balance = ripe_gov_vault.getTotalAmountForUser(bob, ripe_token)
+    bob_claim_value = teller.claimFromStabilityPool(vault_id, alpha_token, bravo_token, sender=bob)
+    mid_bob_balance = ripe_gov_vault.getTotalAmountForUser(bob, ripe_token)
+    bob_rewards = mid_bob_balance - initial_bob_balance
+    expected_bob_rewards = bob_claim_value // 10  # 0.1 ratio
+    _test(expected_bob_rewards, bob_rewards)
+
+    # Change rewards configuration
+    new_config = (
+        216000,  # ~30 days in blocks (different lock duration)
+        EIGHTEEN_DECIMALS // 2,  # 0.5 Ripe per dollar (higher rate)
+    )
+    mission_control.setStabClaimRewardsConfig(new_config, sender=switchboard_alpha.address)
+
+    # Alice claims with new config
+    initial_alice_balance = ripe_gov_vault.getTotalAmountForUser(alice, ripe_token)
+    alice_claim_value = teller.claimFromStabilityPool(vault_id, alpha_token, bravo_token, sender=alice)
+    final_alice_balance = ripe_gov_vault.getTotalAmountForUser(alice, ripe_token)
+    alice_rewards = final_alice_balance - initial_alice_balance
+    expected_alice_rewards = alice_claim_value // 2  # 0.5 ratio (new config)
+    _test(expected_alice_rewards, alice_rewards)
+
+    # Alice should get 5x more rewards per dollar than Bob due to config change
+    # Bob: 0.1 Ripe per dollar, Alice: 0.5 Ripe per dollar
+    assert bob_claim_value > 0, "Bob should have claimed value"
+    assert alice_claim_value > 0, "Alice should have claimed value"
+    assert bob_rewards > 0, "Bob should have received rewards"
+    assert alice_rewards > 0, "Alice should have received rewards"
+    
+    bob_rate = bob_rewards / bob_claim_value
+    alice_rate = alice_rewards / alice_claim_value
+    actual_ratio = alice_rate / bob_rate
+    
+    # Alice gets 5x more per dollar (0.5 vs 0.1)
+    _test(5, actual_ratio)
+
+
+def test_stab_vault_claim_rewards_integration(
+    stability_pool,
+    alpha_token,
+    bravo_token,
+    alpha_token_whale,
+    bravo_token_whale,
+    bob,
+    teller,
+    auction_house,
+    mock_price_source,
+    vault_book,
+    savings_green,
+    ripe_token,
+    ripe_gov_vault,
+    _test,
+    setAssetConfig,
+    setupStabPoolClaimsRewards,
+):
+    """Integration test for rewards - verifies the complete flow from claim to locked rewards"""
+    # Set up moderate rewards configuration
+    setupStabPoolClaimsRewards(
+        _ripePerDollar = EIGHTEEN_DECIMALS // 2,  # 0.5 Ripe per dollar
+        _stabRewardsLockDuration = 648000,  # ~90 days in blocks (90*24*60*60/12)
+    )
+    setAssetConfig(bravo_token)
+
+    # Set mock prices
+    price = 1 * EIGHTEEN_DECIMALS
+    mock_price_source.setPrice(alpha_token, price)
+    mock_price_source.setPrice(bravo_token, price)
+    mock_price_source.setPrice(ripe_token, price)
+
+    # Setup
+    deposit_amount = 200 * EIGHTEEN_DECIMALS
+    alpha_token.transfer(stability_pool, deposit_amount, sender=alpha_token_whale)
+    stability_pool.depositTokensInVault(bob, alpha_token, deposit_amount, sender=teller.address)
+
+    claimable_amount = 100 * EIGHTEEN_DECIMALS
+    bravo_token.transfer(stability_pool, claimable_amount, sender=bravo_token_whale)
+    stability_pool.swapForLiquidatedCollateral(
+        alpha_token, deposit_amount, bravo_token, claimable_amount,
+        ZERO_ADDRESS, alpha_token, savings_green, sender=auction_house.address
+    )
+
+    # Record initial state
+    initial_ripe_balance = ripe_token.balanceOf(bob)
+    initial_gov_balance = ripe_gov_vault.getTotalAmountForUser(bob, ripe_token)
+    initial_gov_shares = ripe_gov_vault.userBalances(bob, ripe_token)
+    initial_bravo_balance = bravo_token.balanceOf(bob)
+
+    # Verify Bob initially has no Ripe or gov vault position
+    assert initial_ripe_balance == 0
+    assert initial_gov_balance == 0
+    assert initial_gov_shares == 0
+    assert initial_bravo_balance == 0
+
+    # Claim from stability pool
+    vault_id = vault_book.getRegId(stability_pool)
+    claim_usd_value = teller.claimFromStabilityPool(vault_id, alpha_token, bravo_token, sender=bob)
+
+    # Verify the claim itself worked
+    _test(claimable_amount, claim_usd_value)
+    _test(claimable_amount, bravo_token.balanceOf(bob))
+
+    # Verify rewards were processed correctly
+    expected_ripe_rewards = claim_usd_value // 2  # 0.5 ratio
+    final_gov_balance = ripe_gov_vault.getTotalAmountForUser(bob, ripe_token)
+    final_gov_shares = ripe_gov_vault.userBalances(bob, ripe_token)
+    final_ripe_balance = ripe_token.balanceOf(bob)
+
+    # Bob should have received rewards in the gov vault, not as liquid tokens
+    _test(expected_ripe_rewards, final_gov_balance)
+    assert final_gov_shares > 0  # Bob should have shares in gov vault
+    assert final_ripe_balance == 0  # Bob should not have liquid Ripe tokens
+
+    # Verify the rewards are locked (Bob can't immediately withdraw)
+    # This would typically require checking lock duration, but for the test we just
+    # verify Bob has a position in the gov vault
+    assert ripe_gov_vault.getTotalAmountForUser(bob, ripe_token) > initial_gov_balance
+
+
+def test_stab_vault_claim_rewards_no_ripe_available(
+    stability_pool,
+    alpha_token,
+    bravo_token,
+    alpha_token_whale,
+    bravo_token_whale,
+    bob,
+    teller,
+    auction_house,
+    mock_price_source,
+    vault_book,
+    savings_green,
+    ripe_token,
+    ripe_gov_vault,
+    ledger,
+    setAssetConfig,
+    setupStabPoolClaimsRewards,
+    switchboard_alpha,
+):
+    """Test that no rewards are given when no Ripe is available in ledger"""
+    # Set up high rewards configuration
+    setupStabPoolClaimsRewards(
+        _ripePerDollar = 5 * EIGHTEEN_DECIMALS,  # 5 Ripe per dollar (very high rate)
+        _stabRewardsLockDuration = 216000,  # ~30 days in blocks
+    )
+    setAssetConfig(bravo_token)
+
+    # Set mock prices
+    price = 1 * EIGHTEEN_DECIMALS
+    mock_price_source.setPrice(alpha_token, price)
+    mock_price_source.setPrice(bravo_token, price)
+    mock_price_source.setPrice(ripe_token, price)
+
+    # Setup
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    alpha_token.transfer(stability_pool, deposit_amount, sender=alpha_token_whale)
+    stability_pool.depositTokensInVault(bob, alpha_token, deposit_amount, sender=teller.address)
+
+    claimable_amount = 50 * EIGHTEEN_DECIMALS
+    bravo_token.transfer(stability_pool, claimable_amount, sender=bravo_token_whale)
+    stability_pool.swapForLiquidatedCollateral(
+        alpha_token, deposit_amount, bravo_token, claimable_amount,
+        ZERO_ADDRESS, alpha_token, savings_green, sender=auction_house.address
+    )
+
+    # Set NO Ripe available for rewards
+    ledger.setRipeAvailForRewards(0, sender=switchboard_alpha.address)
+    
+    # Verify no Ripe is available
+    ripe_available = ledger.ripeAvailForRewards()
+    assert ripe_available == 0, "No Ripe should be available for rewards"
+
+    # Record initial balance
+    initial_gov_balance = ripe_gov_vault.getTotalAmountForUser(bob, ripe_token)
+
+    # Claim from stability pool
+    vault_id = vault_book.getRegId(stability_pool)
+    claim_usd_value = teller.claimFromStabilityPool(vault_id, alpha_token, bravo_token, sender=bob)
+
+    # Verify claim worked but no rewards given
+    assert claim_usd_value > 0, "Claim should have worked"
+    final_gov_balance = ripe_gov_vault.getTotalAmountForUser(bob, ripe_token)
+    actual_rewards = final_gov_balance - initial_gov_balance
+    
+    # Should receive no rewards when no Ripe is available
+    assert actual_rewards == 0, "User should receive no rewards when no Ripe available"
+    assert final_gov_balance == initial_gov_balance, "Gov vault balance should be unchanged"

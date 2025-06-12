@@ -986,4 +986,60 @@ def test_switchboard_delta_set_bad_debt(switchboard_delta, ledger, governance, a
     
     # Check action was cleared after execution
     final_action_type = switchboard_delta.actionType(aid)
-    assert final_action_type == 0  # Should be cleared 
+    assert final_action_type == 0  # Should be cleared
+
+
+def test_switchboard_delta_set_stab_claim_rewards_config(switchboard_delta, governance):
+    """Test setStabClaimRewardsConfig creates timelock action"""
+    rewards_lock_duration = 7 * 24 * 3600  # 7 days in seconds
+    ripe_per_dollar_claimed = 5 * EIGHTEEN_DECIMALS  # 5 RIPE per dollar
+    
+    aid = switchboard_delta.setStabClaimRewardsConfig(rewards_lock_duration, ripe_per_dollar_claimed, sender=governance.address)
+    
+    # Check event was emitted
+    logs = filter_logs(switchboard_delta, "PendingStabClaimRewardsConfigSet")
+    assert len(logs) == 1
+    log = logs[0]
+    assert log.rewardsLockDuration == rewards_lock_duration
+    assert log.ripePerDollarClaimed == ripe_per_dollar_claimed
+    assert log.actionId == aid
+    
+    assert aid > 0
+    
+    # Check action was stored
+    action_type = switchboard_delta.actionType(aid)
+    assert action_type == 2048  # ActionType.STAB_CLAIM_REWARDS
+    
+    # Check pending config was stored
+    pending_config = switchboard_delta.pendingStabClaimRewardsConfig(aid)
+    assert pending_config[0] == rewards_lock_duration  # rewardsLockDuration
+    assert pending_config[1] == ripe_per_dollar_claimed  # ripePerDollarClaimed
+    
+    # Advance time and execute
+    boa.env.time_travel(blocks=switchboard_delta.actionTimeLock())
+    success = switchboard_delta.executePendingAction(aid, sender=governance.address)
+    assert success == True
+    
+    # Check execution event was emitted
+    execution_logs = filter_logs(switchboard_delta, "StabClaimRewardsConfigSet")
+    assert len(execution_logs) == 1
+    execution_log = execution_logs[0]
+    assert execution_log.rewardsLockDuration == rewards_lock_duration
+    assert execution_log.ripePerDollarClaimed == ripe_per_dollar_claimed
+
+
+def test_switchboard_delta_set_stab_claim_rewards_config_validation(switchboard_delta, governance, alice):
+    """Test setStabClaimRewardsConfig validation"""
+    rewards_lock_duration = 7 * 24 * 3600  # 7 days in seconds
+    
+    # Non-governance cannot set config
+    with boa.reverts("no perms"):
+        switchboard_delta.setStabClaimRewardsConfig(rewards_lock_duration, 1 * EIGHTEEN_DECIMALS, sender=alice)
+    
+    # Zero ripe per dollar claimed should fail
+    with boa.reverts("invalid ripe per dollar claimed"):
+        switchboard_delta.setStabClaimRewardsConfig(rewards_lock_duration, 0, sender=governance.address)
+    
+    # Valid config should succeed
+    aid = switchboard_delta.setStabClaimRewardsConfig(rewards_lock_duration, 1 * EIGHTEEN_DECIMALS, sender=governance.address)
+    assert aid > 0 

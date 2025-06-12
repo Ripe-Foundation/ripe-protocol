@@ -36,6 +36,12 @@ def getPricedAssets() -> DynArray[address, 50]:
     ...
 
 
+@view
+@external
+def hasGreenRefPool() -> bool:
+    ...
+
+
 ################
 # Feed Changes #
 ################

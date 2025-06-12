@@ -1659,3 +1659,454 @@ def test_bond_purchase_multiple_transactions_progressive_debt_clearing(
     # Verify that the user still got the correct payout (matching the debt amount remaining)
     _test(ripe_payout_3, expected_debt_2)  # User gets RIPE equal to remaining debt
 
+
+#########################
+# Preview Helper Tests  #
+#########################
+
+
+def test_preview_ripe_bond_payout_basic(
+    bond_room, setupRipeBonds, _test
+):
+    """Test basic preview functionality at epoch start"""
+    setupRipeBonds()
+    
+    # Preview at epoch start with no lock
+    payment_amount = 100 * EIGHTEEN_DECIMALS
+    preview_payout = bond_room.previewRipeBondPayout(0, payment_amount)
+    
+    # Should get minimum rate (1x) at epoch start
+    expected_payout = payment_amount  # min ripe per unit at epoch start
+    _test(preview_payout, expected_payout)
+
+
+def test_preview_ripe_bond_payout_epoch_progress(
+    bond_room, setupRipeBonds, _test
+):
+    """Test preview payout changes with epoch progress"""
+    start, end = setupRipeBonds()
+    
+    # Test at epoch start (0% progress)
+    payment_amount = 100 * EIGHTEEN_DECIMALS
+    preview_start = bond_room.previewRipeBondPayout(0, payment_amount)
+    _test(preview_start, payment_amount)  # min rate (1x)
+    
+    # Move to middle of epoch (50% progress)
+    blocks_to_travel = (end - start) // 2
+    boa.env.time_travel(blocks=blocks_to_travel)
+    
+    preview_mid = bond_room.previewRipeBondPayout(0, payment_amount)
+    # Should be halfway between min (1x) and max (100x) = 50.5x
+    expected_mid = 5050 * EIGHTEEN_DECIMALS
+    _test(preview_mid, expected_mid)
+    
+    # Move near end of epoch (~99% progress)
+    additional_blocks = (end - start) - blocks_to_travel - 1
+    boa.env.time_travel(blocks=additional_blocks)
+    
+    preview_end = bond_room.previewRipeBondPayout(0, payment_amount)
+    # Should be near maximum rate (~99.01x)
+    expected_end = 9901 * EIGHTEEN_DECIMALS
+    _test(preview_end, expected_end)
+    
+    # Verify progression
+    assert preview_start < preview_mid < preview_end
+
+
+def test_preview_ripe_bond_payout_lock_durations(
+    bond_room, setupRipeBonds, _test
+):
+    """Test preview with different lock durations"""
+    setupRipeBonds()
+    
+    payment_amount = 100 * EIGHTEEN_DECIMALS
+    
+    # No lock
+    preview_no_lock = bond_room.previewRipeBondPayout(0, payment_amount)
+    _test(preview_no_lock, payment_amount)  # base rate only
+    
+    # Below minimum lock (should be treated as no lock)
+    preview_below_min = bond_room.previewRipeBondPayout(50, payment_amount)
+    _test(preview_below_min, payment_amount)  # same as no lock
+    
+    # Minimum lock (gets zero bonus since lockDuration - minLockDuration = 0)
+    preview_min_lock = bond_room.previewRipeBondPayout(100, payment_amount)
+    _test(preview_min_lock, payment_amount)  # base rate only
+    
+    # Mid-range lock (50% of max lock bonus)
+    preview_mid_lock = bond_room.previewRipeBondPayout(550, payment_amount)
+    # Lock bonus ratio = (550 - 100) / (1000 - 100) = 450/900 = 50%
+    # Bonus = 50% of 100 RIPE per unit = 50 RIPE per unit
+    expected_mid = payment_amount + 50 * payment_amount  # base + 50x bonus
+    _test(preview_mid_lock, expected_mid)
+    
+    # Maximum lock
+    preview_max_lock = bond_room.previewRipeBondPayout(1000, payment_amount)
+    expected_max = payment_amount + 100 * payment_amount  # base + 100x bonus
+    _test(preview_max_lock, expected_max)
+    
+    # Above maximum lock (should cap at max)
+    preview_above_max = bond_room.previewRipeBondPayout(2000, payment_amount)
+    _test(preview_above_max, expected_max)  # same as max lock
+    
+    # Verify progression
+    assert preview_no_lock == preview_below_min == preview_min_lock
+    assert preview_min_lock < preview_mid_lock < preview_max_lock
+    assert preview_max_lock == preview_above_max
+
+
+def test_preview_ripe_bond_payout_payment_amounts(
+    bond_room, setupRipeBonds, _test
+):
+    """Test preview with different payment amounts"""
+    setupRipeBonds()
+    
+    # Small payment amount
+    small_amount = 10 * EIGHTEEN_DECIMALS
+    preview_small = bond_room.previewRipeBondPayout(0, small_amount)
+    _test(preview_small, small_amount)
+    
+    # Large payment amount (within available)
+    large_amount = 500 * EIGHTEEN_DECIMALS
+    preview_large = bond_room.previewRipeBondPayout(0, large_amount)
+    _test(preview_large, large_amount)
+    
+    # Payment amount exceeding epoch availability (should be capped)
+    excessive_amount = 5000 * EIGHTEEN_DECIMALS  # more than 1000 available
+    preview_excessive = bond_room.previewRipeBondPayout(0, excessive_amount)
+    expected_capped = 1000 * EIGHTEEN_DECIMALS  # should be capped to available amount
+    _test(preview_excessive, expected_capped)
+    
+    # Zero payment amount (should return 0)
+    preview_zero = bond_room.previewRipeBondPayout(0, 0)
+    assert preview_zero == 0
+    
+    # Default max_value parameter (should use available amount)
+    preview_default = bond_room.previewRipeBondPayout(0)  # using default max_value
+    _test(preview_default, expected_capped)
+
+
+def test_preview_ripe_bond_payout_disabled_bonds(
+    bond_room, setupRipeBonds
+):
+    """Test preview returns 0 when bonds are disabled"""
+    setupRipeBonds(_canBond=False)
+    
+    payment_amount = 100 * EIGHTEEN_DECIMALS
+    preview_payout = bond_room.previewRipeBondPayout(0, payment_amount)
+    
+    assert preview_payout == 0
+
+
+def test_preview_ripe_bond_payout_no_ripe_per_unit(
+    bond_room, setupRipeBonds
+):
+    """Test preview returns 0 when max ripe per unit is 0"""
+    setupRipeBonds(_maxRipePerUnit=0)
+    
+    payment_amount = 100 * EIGHTEEN_DECIMALS
+    preview_payout = bond_room.previewRipeBondPayout(0, payment_amount)
+    
+    assert preview_payout == 0
+
+
+def test_preview_ripe_bond_payout_6_decimal_token(
+    bond_room, setupRipeBonds, charlie_token, _test
+):
+    """Test preview with 6 decimal token"""
+    charlie_amount_per_epoch = 1000 * (10 ** 6)
+    setupRipeBonds(_asset=charlie_token, _amountPerEpoch=charlie_amount_per_epoch)
+    
+    payment_amount_6dec = 100 * (10 ** 6)
+    preview_6dec = bond_room.previewRipeBondPayout(0, payment_amount_6dec)
+    # Ripe per unit is 1e18, so 100 * 1e6 * 1e18 / 1e6 = 100e18
+    expected_6dec = 100 * EIGHTEEN_DECIMALS
+    _test(preview_6dec, expected_6dec)
+
+
+def test_preview_ripe_bond_payout_8_decimal_token(
+    bond_room, setupRipeBonds, delta_token, _test
+):
+    """Test preview with 8 decimal token"""
+    delta_amount_per_epoch = 1000 * (10 ** 8)
+    setupRipeBonds(_asset=delta_token, _amountPerEpoch=delta_amount_per_epoch)
+    
+    payment_amount_8dec = 100 * (10 ** 8)
+    preview_8dec = bond_room.previewRipeBondPayout(0, payment_amount_8dec)
+    # Ripe per unit is 1e18, so 100 * 1e8 * 1e18 / 1e8 = 100e18
+    expected_8dec = 100 * EIGHTEEN_DECIMALS
+    _test(preview_8dec, expected_8dec)
+
+
+def test_preview_ripe_bond_payout_epoch_auto_advance(
+    bond_room, setupRipeBonds, _test
+):
+    """Test preview when epoch would auto-advance"""
+    start, end = setupRipeBonds()
+    
+    # Move past epoch end to trigger auto-advance scenario
+    blocks_past_end = (end - start) + 10
+    boa.env.time_travel(blocks=blocks_past_end)
+    
+    current_block = boa.env.evm.patch.block_number
+    payment_amount = 100 * EIGHTEEN_DECIMALS
+    preview_payout = bond_room.previewRipeBondPayout(0, payment_amount)
+    
+    # When epoch auto-advances, new epoch starts at old epoch end (which is in the past)
+    # So we're actually partway through the new epoch, which gives higher rate
+    # Epoch progress = (current_block - end) * 10000 / epoch_length
+    # Let's calculate what we should expect
+    epoch_length = end - start  # 100 blocks
+    new_epoch_start = end  # new epoch starts where old ended
+    progress_in_new_epoch = (current_block - new_epoch_start) * 10000 // epoch_length
+    # progress_in_new_epoch = 10 * 10000 / 100 = 1000 (10%)
+    # baseRipePerUnit = 1e18 + (1000 * 99e18 / 10000) = 1e18 + 9.9e18 = 10.9e18
+    expected_rate = 1 * EIGHTEEN_DECIMALS + (progress_in_new_epoch * 99 * EIGHTEEN_DECIMALS // 10000)
+    expected_payout = expected_rate * payment_amount // EIGHTEEN_DECIMALS
+    _test(preview_payout, expected_payout)
+
+
+def test_preview_ripe_bond_payout_exhausted_epoch(
+    bond_room, setupRipeBonds, teller, bob, alpha_token_whale, alpha_token
+):
+    """Test preview when current epoch is exhausted"""
+    setupRipeBonds(_shouldAutoRestart=False)
+    
+    # Exhaust current epoch
+    available_amount = 1000 * EIGHTEEN_DECIMALS  # full epoch amount
+    alpha_token.transfer(bob, available_amount, sender=alpha_token_whale)
+    alpha_token.approve(teller, available_amount, sender=bob)
+    teller.purchaseRipeBond(alpha_token, available_amount, sender=bob)
+    
+    # Preview should return 0 since no more available in current epoch
+    payment_amount = 100 * EIGHTEEN_DECIMALS
+    preview_payout = bond_room.previewRipeBondPayout(0, payment_amount)
+    
+    assert preview_payout == 0
+
+
+def test_preview_ripe_bond_payout_complex_scenario(
+    bond_room, setupRipeBonds, _test
+):
+    """Test preview with complex scenario combining multiple factors"""
+    start, end = setupRipeBonds(
+        _minRipePerUnit=5 * EIGHTEEN_DECIMALS,
+        _maxRipePerUnit=50 * EIGHTEEN_DECIMALS,
+        _maxRipePerUnitLockBonus=25 * EIGHTEEN_DECIMALS,
+        _minLockDuration=200,
+        _maxLockDuration=2000
+    )
+    
+    # Move to 75% through epoch
+    blocks_to_travel = (end - start) * 3 // 4
+    boa.env.time_travel(blocks=blocks_to_travel)
+    
+    # Preview with lock duration at 60% of range
+    payment_amount = 200 * EIGHTEEN_DECIMALS
+    lock_duration = 1280  # 200 + (0.6 * (2000 - 200)) = 1280
+    
+    preview_payout = bond_room.previewRipeBondPayout(lock_duration, payment_amount)
+    
+    # Calculate expected values
+    # Epoch progress = 75% = 7500/10000
+    # Base rate = 5 + (7500 * 45 / 10000) = 5 + 33.75 = 38.75 RIPE per unit
+    # Lock bonus = 60% of 25 = 15 RIPE per unit  
+    # Total rate = 38.75 + 15 = 53.75 RIPE per unit
+    expected_base = 5 * EIGHTEEN_DECIMALS + (7500 * 45 * EIGHTEEN_DECIMALS // 10000)
+    expected_bonus = 15 * EIGHTEEN_DECIMALS  # 60% of 25
+    expected_rate = expected_base + expected_bonus
+    expected_payout = expected_rate * payment_amount // EIGHTEEN_DECIMALS
+    
+    _test(preview_payout, expected_payout)
+
+
+def test_preview_next_epoch_during_active_epoch(
+    bond_room, setupRipeBonds
+):
+    """Test preview next epoch during active epoch"""
+    start, end = setupRipeBonds()
+    
+    # Move partway through epoch
+    boa.env.time_travel(blocks=30)
+    
+    preview_start, preview_end = bond_room.previewNextEpoch()
+    
+    # Should return current epoch since it's still active
+    assert preview_start == start
+    assert preview_end == end
+
+
+def test_preview_next_epoch_past_expiration(
+    bond_room, setupRipeBonds
+):
+    """Test preview next epoch when current epoch has expired"""
+    start, end = setupRipeBonds(_epochLength=100)
+    
+    # Move past epoch end
+    blocks_past_end = (end - start) + 10
+    boa.env.time_travel(blocks=blocks_past_end)
+    
+    preview_start, preview_end = bond_room.previewNextEpoch()
+    
+    # Should return new epoch that starts where old one ended
+    assert preview_start == end  # new epoch starts exactly where old ended
+    assert preview_end == end + 100  # epoch length
+
+
+def test_preview_next_epoch_no_epoch_set(
+    bond_room, setupRipeBonds, switchboard_delta
+):
+    """Test preview next epoch when no epoch is currently set"""
+    setupRipeBonds()
+    
+    # Clear epoch data by setting both start and end to 0 using bond room
+    bond_room.startBondEpochAtBlock(0, sender=switchboard_delta.address)
+    
+    current_block = boa.env.evm.patch.block_number
+    preview_start, preview_end = bond_room.previewNextEpoch()
+    
+    # Should return new epoch starting at current block
+    assert preview_start == current_block
+    assert preview_end == current_block + 100  # default epoch length
+
+
+def test_preview_next_epoch_multiple_epochs_ahead(
+    bond_room, setupRipeBonds
+):
+    """Test preview next epoch when far past expiration"""
+    start, end = setupRipeBonds(_epochLength=50)
+    
+    # Move far past epoch end (multiple epochs ahead)
+    blocks_past_end = (end - start) * 3 + 25  # 3.5 epochs past
+    boa.env.time_travel(blocks=blocks_past_end)
+    
+    current_block = boa.env.evm.patch.block_number
+    preview_start, preview_end = bond_room.previewNextEpoch()
+    
+    # Should calculate how many epochs ahead we are
+    epochs_ahead = (current_block - end) // 50
+    expected_start = 50 * epochs_ahead + end
+    expected_end = expected_start + 50
+    
+    assert preview_start == expected_start
+    assert preview_end == expected_end
+
+
+def test_preview_next_epoch_different_epoch_lengths(
+    bond_room, setupRipeBonds
+):
+    """Test preview next epoch with different epoch lengths"""
+    # Test with short epoch
+    start_short, end_short = setupRipeBonds(_epochLength=25)
+    
+    # Move past short epoch
+    boa.env.time_travel(blocks=30)
+    
+    preview_start_short, preview_end_short = bond_room.previewNextEpoch()
+    assert preview_start_short == end_short
+    assert preview_end_short == end_short + 25
+    
+    # Test with long epoch
+    start_long, end_long = setupRipeBonds(_epochLength=500)
+    
+    # Move past long epoch  
+    boa.env.time_travel(blocks=520)
+    
+    preview_start_long, preview_end_long = bond_room.previewNextEpoch()
+    assert preview_start_long == end_long
+    assert preview_end_long == end_long + 500
+
+
+def test_preview_next_epoch_boundary_conditions(
+    bond_room, setupRipeBonds
+):
+    """Test preview next epoch at exact boundaries"""
+    start, end = setupRipeBonds(_epochLength=100)
+    
+    # Test exactly at epoch end
+    blocks_to_end = end - start
+    boa.env.time_travel(blocks=blocks_to_end)
+    
+    current_block = boa.env.evm.patch.block_number
+    assert current_block == end
+    
+    preview_start, preview_end = bond_room.previewNextEpoch()
+    
+    # Should return new epoch since we're at the boundary (current block >= end)
+    assert preview_start == end
+    assert preview_end == end + 100
+    
+    # Test one block before epoch end
+    boa.env.time_travel(blocks=-1)  # go back one block
+    
+    preview_start_before, preview_end_before = bond_room.previewNextEpoch()
+    
+    # Should return current epoch since we're still within it
+    assert preview_start_before == start
+    assert preview_end_before == end
+
+
+def test_preview_functions_consistency(
+    bond_room, setupRipeBonds, teller, bob, alpha_token_whale, alpha_token, switchboard_delta, _test
+):
+    """Test that preview functions match actual execution results"""
+    setupRipeBonds()
+    
+    # Setup for actual purchase
+    payment_amount = 150 * EIGHTEEN_DECIMALS
+    lock_duration = 300
+    
+    # Get preview values before purchase
+    preview_payout = bond_room.previewRipeBondPayout(lock_duration, payment_amount)
+    preview_start, preview_end = bond_room.previewNextEpoch()
+    
+    # Execute actual purchase
+    alpha_token.transfer(bob, payment_amount, sender=alpha_token_whale)
+    alpha_token.approve(teller, payment_amount, sender=bob)
+    
+    actual_payout = teller.purchaseRipeBond(
+        alpha_token,
+        payment_amount,
+        lock_duration,
+        sender=bob
+    )
+    
+    # Preview should match actual result
+    _test(preview_payout, actual_payout)
+    
+    # Test epoch preview consistency
+    # Move to scenario where epoch would change
+    boa.env.time_travel(blocks=110)  # past epoch end
+    
+    preview_start_new, preview_end_new = bond_room.previewNextEpoch()
+    
+    # Execute refresh to see actual new epoch (using valid ripe address)
+    actual_start, actual_end = bond_room.refreshBondEpoch(sender=switchboard_delta.address)
+    
+    # Preview should match actual epoch calculation
+    assert preview_start_new == actual_start
+    assert preview_end_new == actual_end
+
+
+def test_preview_ripe_bond_payout_gas_efficiency(
+    bond_room, setupRipeBonds
+):
+    """Test that preview functions are gas efficient (view functions)"""
+    setupRipeBonds()
+    
+    # Multiple calls should not affect state or cost significant gas
+    payment_amount = 100 * EIGHTEEN_DECIMALS
+    
+    # Call preview multiple times - should be consistent
+    preview_1 = bond_room.previewRipeBondPayout(0, payment_amount)
+    preview_2 = bond_room.previewRipeBondPayout(0, payment_amount)
+    preview_3 = bond_room.previewRipeBondPayout(0, payment_amount)
+    
+    assert preview_1 == preview_2 == preview_3
+    
+    # Same for epoch preview
+    epoch_1 = bond_room.previewNextEpoch()
+    epoch_2 = bond_room.previewNextEpoch()
+    
+    assert epoch_1 == epoch_2
+
