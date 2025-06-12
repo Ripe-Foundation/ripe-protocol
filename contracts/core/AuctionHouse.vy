@@ -621,7 +621,11 @@ def _burnLiqUserStabAsset(
         return remainingToRepay, collateralValueOut
 
     # burn stab asset
-    assert extcall StabAsset(_liqStabAsset).burn(amountReceived) # dev: failed to burn stab asset
+    if _liqStabAsset == _a.savingsGreen:
+        usdValue = extcall IERC4626(_a.savingsGreen).redeem(amountReceived, self, self) # dev: savings green redeem failed
+        assert extcall StabAsset(_a.greenToken).burn(usdValue) # dev: failed to burn green
+    else:
+        assert extcall StabAsset(_liqStabAsset).burn(amountReceived) # dev: failed to burn stab asset
 
     # update totals
     remainingToRepay -= min(usdValue, remainingToRepay)
