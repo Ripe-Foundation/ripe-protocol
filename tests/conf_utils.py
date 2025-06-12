@@ -1,5 +1,5 @@
 import pytest
-from constants import HUNDRED_PERCENT, MAX_UINT256, ZERO_ADDRESS
+from constants import HUNDRED_PERCENT, MAX_UINT256, ZERO_ADDRESS, EIGHTEEN_DECIMALS
 
 
 def filter_logs(contract, event_name, _strict=False):
@@ -238,6 +238,20 @@ def setRipeRewardsConfig(mission_control, switchboard_alpha):
         )
         mission_control.setRipeRewardsConfig(config, sender=switchboard_alpha.address)
     yield setRipeRewardsConfig
+
+
+@pytest.fixture(scope="session")
+def setStabClaimRewardsConfig(mission_control, switchboard_alpha):
+    def setStabClaimRewardsConfig(
+        _rewardsLockDuration = 30 * 24 * 60 * 60,  # 30 days in seconds
+        _ripePerDollarClaimed = EIGHTEEN_DECIMALS // 10,  # 0.1 Ripe per dollar
+    ):
+        config = (
+            _rewardsLockDuration,
+            _ripePerDollarClaimed,
+        )
+        mission_control.setStabClaimRewardsConfig(config, sender=switchboard_alpha.address)
+    yield setStabClaimRewardsConfig
 
 
 ###############

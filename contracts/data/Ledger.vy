@@ -455,6 +455,13 @@ def setRipeAvailForRewards(_amount: uint256):
     self.ripeAvailForRewards = _amount
 
 
+@external
+def didGetRewardsFromStabClaims(_amount: uint256):
+    assert msg.sender == addys._getVaultBookAddr() # dev: no perms
+    assert not deptBasics.isPaused # dev: not activated
+    self.ripeAvailForRewards -= _amount
+
+
 # deposit points
 
 

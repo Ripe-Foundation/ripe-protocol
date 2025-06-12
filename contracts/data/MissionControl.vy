@@ -66,16 +66,6 @@ struct GenDebtConfig:
     ltvPaybackBuffer: uint256
     genAuctionParams: AuctionParams
 
-struct RipeRewardsConfig:
-    arePointsEnabled: bool
-    ripePerBlock: uint256
-    borrowersAlloc: uint256
-    stakersAlloc: uint256
-    votersAlloc: uint256
-    genDepositorsAlloc: uint256
-    autoStakeRatio: uint256
-    autoStakeDurationRatio: uint256
-
 struct AssetConfig:
     vaultIds: DynArray[uint256, MAX_VAULTS_PER_ASSET]
     stakersPointsAlloc: uint256
@@ -98,9 +88,47 @@ struct AssetConfig:
     whitelist: address
     isNft: bool
 
+struct RipeRewardsConfig:
+    arePointsEnabled: bool
+    ripePerBlock: uint256
+    borrowersAlloc: uint256
+    stakersAlloc: uint256
+    votersAlloc: uint256
+    genDepositorsAlloc: uint256
+    autoStakeRatio: uint256
+    autoStakeDurationRatio: uint256
+
 struct TotalPointsAllocs:
     stakersPointsAllocTotal: uint256
     voterPointsAllocTotal: uint256
+
+struct RipeGovVaultConfig:
+    lockTerms: LockTerms
+    assetWeight: uint256
+    shouldFreezeWhenBadDebt: bool
+
+struct HrConfig:
+    contribTemplate: address
+    maxCompensation: uint256
+    minCliffLength: uint256
+    maxStartDelay: uint256
+    minVestingLength: uint256
+    maxVestingLength: uint256
+
+struct RipeBondConfig:
+    asset: address
+    amountPerEpoch: uint256
+    canBond: bool
+    minRipePerUnit: uint256
+    maxRipePerUnit: uint256
+    maxRipePerUnitLockBonus: uint256
+    epochLength: uint256
+    shouldAutoRestart: bool
+    restartDelayBlocks: uint256
+
+struct VaultLite:
+    vaultId: uint256
+    asset: address
 
 struct UserConfig:
     canAnyoneDeposit: bool
@@ -113,44 +141,12 @@ struct ActionDelegation:
     canClaimFromStabPool: bool
     canClaimLoot: bool
 
-struct DebtTerms:
-    ltv: uint256
-    redemptionThreshold: uint256
-    liqThreshold: uint256
-    liqFee: uint256
-    borrowRate: uint256
-    daowry: uint256
-
-struct AuctionParams:
-    hasParams: bool
-    startDiscount: uint256
-    maxDiscount: uint256
-    delay: uint256
-    duration: uint256
-
-struct VaultLite:
-    vaultId: uint256
-    asset: address
-
-struct VaultData:
-    vaultId: uint256
-    vaultAddr: address
-    asset: address
-
 struct LockTerms:
     minLockDuration: uint256
     maxLockDuration: uint256
     maxLockBoost: uint256
     canExit: bool
     exitFee: uint256
-
-struct HrConfig:
-    contribTemplate: address
-    maxCompensation: uint256
-    minCliffLength: uint256
-    maxStartDelay: uint256
-    minVestingLength: uint256
-    maxVestingLength: uint256
 
 # helpers
 
@@ -170,6 +166,14 @@ struct TellerWithdrawConfig:
     canWithdrawAsset: bool
     isUserAllowed: bool
     canWithdrawForUser: bool
+
+struct DebtTerms:
+    ltv: uint256
+    redemptionThreshold: uint256
+    liqThreshold: uint256
+    liqFee: uint256
+    borrowRate: uint256
+    daowry: uint256
 
 struct BorrowConfig:
     canBorrow: bool
@@ -206,6 +210,18 @@ struct GenLiqConfig:
     priorityLiqAssetVaults: DynArray[VaultData, PRIORITY_VAULT_DATA]
     priorityStabVaults: DynArray[VaultData, PRIORITY_VAULT_DATA]
 
+struct VaultData:
+    vaultId: uint256
+    vaultAddr: address
+    asset: address
+
+struct AuctionParams:
+    hasParams: bool
+    startDiscount: uint256
+    maxDiscount: uint256
+    delay: uint256
+    duration: uint256
+
 struct AssetLiqConfig:
     hasConfig: bool
     shouldBurnAsPayment: bool
@@ -215,11 +231,17 @@ struct AssetLiqConfig:
     customAuctionParams: AuctionParams
     specialStabPool: VaultData
 
+struct StabClaimRewardsConfig:
+    rewardsLockDuration: uint256
+    ripePerDollarClaimed: uint256
+
 struct StabPoolClaimsConfig:
     canClaimInStabPoolGeneral: bool
     canClaimInStabPoolAsset: bool
     canClaimFromStabPoolForUser: bool
     isUserAllowed: bool
+    rewardsLockDuration: uint256
+    ripePerDollarClaimed: uint256
 
 struct StabPoolRedemptionsConfig:
     canRedeemInStabPoolGeneral: bool
@@ -252,22 +274,6 @@ struct DepositPointsConfig:
 struct PriceConfig:
     staleTime: uint256
     priorityPriceSourceIds: DynArray[uint256, MAX_PRIORITY_PRICE_SOURCES]
-
-struct RipeGovVaultConfig:
-    lockTerms: LockTerms
-    assetWeight: uint256
-    shouldFreezeWhenBadDebt: bool
-
-struct RipeBondConfig:
-    asset: address
-    amountPerEpoch: uint256
-    canBond: bool
-    minRipePerUnit: uint256
-    maxRipePerUnit: uint256
-    maxRipePerUnitLockBonus: uint256
-    epochLength: uint256
-    shouldAutoRestart: bool
-    restartDelayBlocks: uint256
 
 struct PurchaseRipeBondConfig:
     asset: address
@@ -327,6 +333,7 @@ maxLtvDeviation: public(uint256)
 ripeGovVaultConfig: public(HashMap[address, RipeGovVaultConfig]) # asset -> config
 hrConfig: public(HrConfig)
 ripeBondConfig: public(RipeBondConfig)
+stabClaimRewardsConfig: public(StabClaimRewardsConfig)
 
 # priority data
 priorityPriceSourceIds: public(DynArray[uint256, MAX_PRIORITY_PRICE_SOURCES])
@@ -446,6 +453,15 @@ def setHrConfig(_config: HrConfig):
 def setRipeBondConfig(_config: RipeBondConfig):
     assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
     self.ripeBondConfig = _config
+
+
+# stab claims config
+
+
+@external
+def setStabClaimRewardsConfig(_config: StabClaimRewardsConfig):
+    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
+    self.stabClaimRewardsConfig = _config
 
 
 ################
@@ -881,11 +897,14 @@ def getStabPoolClaimsConfig(_claimAsset: address, _claimer: address, _caller: ad
         delegation: ActionDelegation = self.userDelegation[_claimer][_caller]
         canClaimFromStabPoolForUser = delegation.canClaimFromStabPool
 
+    rewardsConfig: StabClaimRewardsConfig = self.stabClaimRewardsConfig
     return StabPoolClaimsConfig(
         canClaimInStabPoolGeneral=self.genConfig.canClaimInStabPool,
         canClaimInStabPoolAsset=assetConfig.canClaimInStabPool,
         canClaimFromStabPoolForUser=canClaimFromStabPoolForUser,
         isUserAllowed=self._isUserAllowed(assetConfig.whitelist, _claimer, _claimAsset),
+        rewardsLockDuration=rewardsConfig.rewardsLockDuration,
+        ripePerDollarClaimed=rewardsConfig.ripePerDollarClaimed,
     )
 
 

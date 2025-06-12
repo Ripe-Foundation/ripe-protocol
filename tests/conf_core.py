@@ -122,6 +122,10 @@ def ripe_hq(
     ripe_hq_deploy.initiateHqConfigChange(6, False, False, True, sender=deploy3r)
     assert ripe_hq_deploy.confirmHqConfigChange(6, sender=deploy3r)
 
+    # vault book can mint ripe
+    ripe_hq_deploy.initiateHqConfigChange(8, False, True, False, sender=deploy3r)
+    assert ripe_hq_deploy.confirmHqConfigChange(8, sender=deploy3r)
+
     # auction house can mint green
     ripe_hq_deploy.initiateHqConfigChange(9, True, False, False, sender=deploy3r)
     assert ripe_hq_deploy.confirmHqConfigChange(9, sender=deploy3r)

@@ -20,6 +20,11 @@ import contracts.modules.DeptBasics as deptBasics
 from interfaces import Vault
 from interfaces import Department
 
+interface Ledger:
+    def didGetRewardsFromStabClaims(_amount: uint256): nonpayable
+
+interface RipeToken:
+    def mint(_to: address, _amount: uint256): nonpayable
 
 @deploy
 def __init__(
@@ -30,7 +35,7 @@ def __init__(
     gov.__init__(_ripeHq, empty(address), 0, 0, 0)
     registry.__init__(_minRegistryTimeLock, _maxRegistryTimeLock, 0, "VaultBook.vy")
     addys.__init__(_ripeHq)
-    deptBasics.__init__(False, False, False) # no minting
+    deptBasics.__init__(False, False, True) # can mint ripe only
 
 
 @view
@@ -119,3 +124,19 @@ def cancelAddressDisableInRegistry(_regId: uint256) -> bool:
 def _doesVaultIdHaveAnyFunds(_vaultId: uint256) -> bool:
     vaultAddr: address = registry._getAddr(_vaultId)
     return staticcall Vault(vaultAddr).doesVaultHaveAnyFunds()
+
+
+######################
+# Stab Claim Rewards #
+######################
+
+
+# pass thru from stability pool
+
+
+@external
+def mintRipeForStabPoolClaims(_amount: uint256, _ripeToken: address, _ledger: address) -> bool:
+    assert registry._isValidAddr(msg.sender) # dev: no perms
+    extcall RipeToken(_ripeToken).mint(msg.sender, _amount)
+    extcall Ledger(_ledger).didGetRewardsFromStabClaims(_amount)
+    return True

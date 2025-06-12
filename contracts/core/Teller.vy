@@ -705,9 +705,7 @@ def depositIntoGovVaultFromTrusted(
 ) -> uint256:
     assert addys._isValidRipeAddr(msg.sender) # dev: no perms
     a: addys.Addys = addys._getAddys(_a)
-    amount: uint256 = self._deposit(_asset, _amount, _user, empty(address), RIPE_GOV_VAULT_ID, msg.sender, _lockDuration, a)
-    extcall CreditEngine(a.creditEngine).updateDebtForUser(_user, a)
-    return amount
+    return self._deposit(_asset, _amount, _user, empty(address), RIPE_GOV_VAULT_ID, msg.sender, _lockDuration, a)
 
 
 ##################

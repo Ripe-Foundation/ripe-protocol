@@ -18,8 +18,17 @@ interface PriceDesk:
     def getAssetAmount(_asset: address, _usdValue: uint256, _shouldRaise: bool = False) -> uint256: view
     def getUsdValue(_asset: address, _amount: uint256, _shouldRaise: bool = False) -> uint256: view
 
+interface Teller:
+    def depositIntoGovVaultFromTrusted(_user: address, _asset: address, _amount: uint256, _lockDuration: uint256, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
+
+interface VaultBook:
+    def mintRipeForStabPoolClaims(_amount: uint256, _ripeToken: address, _ledger: address) -> bool: nonpayable
+
 interface GreenToken:
     def burn(_amount: uint256) -> bool: nonpayable
+
+interface Ledger:
+    def ripeAvailForRewards() -> uint256: view
 
 struct StabPoolClaim:
     stabAsset: address
@@ -35,6 +44,8 @@ struct StabPoolClaimsConfig:
     canClaimInStabPoolAsset: bool
     canClaimFromStabPoolForUser: bool
     isUserAllowed: bool
+    rewardsLockDuration: uint256
+    ripePerDollarClaimed: uint256
 
 struct StabPoolRedemptionsConfig:
     canRedeemInStabPoolGeneral: bool
@@ -62,6 +73,7 @@ numClaimableAssets: public(HashMap[address, uint256]) # stab asset -> num claima
 MAX_STAB_CLAIMS: constant(uint256) = 15
 MAX_STAB_REDEMPTIONS: constant(uint256) = 15
 DECIMAL_OFFSET: constant(uint256) = 10 ** 8
+EIGHTEEN_DECIMALS: constant(uint256) = 10 ** 18
 
 
 @deploy
@@ -558,8 +570,10 @@ def claimFromStabilityPool(
     assert msg.sender == addys._getTellerAddr() # dev: only Teller allowed
     assert not vaultData.isPaused # dev: contract paused
     a: addys.Addys = addys._getAddys(_a)
-    claimUsdValue: uint256 = self._claimFromStabilityPool(_claimer, _stabAsset, _claimAsset, _maxUsdValue, _caller, a)
+    config: StabPoolClaimsConfig = staticcall MissionControl(a.missionControl).getStabPoolClaimsConfig(_claimAsset, _claimer, _caller)
+    claimUsdValue: uint256 = self._claimFromStabilityPool(_claimer, _stabAsset, _claimAsset, _maxUsdValue, _caller, config, a)
     assert claimUsdValue != 0 # dev: nothing claimed
+    self._handleClaimRewards(_claimer, claimUsdValue, config.rewardsLockDuration, config.ripePerDollarClaimed, a)
     return claimUsdValue
 
 
@@ -573,12 +587,14 @@ def claimManyFromStabilityPool(
     assert msg.sender == addys._getTellerAddr() # dev: only Teller allowed
     assert not vaultData.isPaused # dev: contract paused
     a: addys.Addys = addys._getAddys(_a)
+    config: StabPoolClaimsConfig = empty(StabPoolClaimsConfig)
 
     totalUsdValue: uint256 = 0
     for c: StabPoolClaim in _claims:
-        totalUsdValue += self._claimFromStabilityPool(_claimer, c.stabAsset, c.claimAsset, c.maxUsdValue, _caller, a)
+        config = staticcall MissionControl(a.missionControl).getStabPoolClaimsConfig(c.claimAsset, _claimer, _caller)
+        totalUsdValue += self._claimFromStabilityPool(_claimer, c.stabAsset, c.claimAsset, c.maxUsdValue, _caller, config, a)
     assert totalUsdValue != 0 # dev: nothing claimed
-
+    self._handleClaimRewards(_claimer, totalUsdValue, config.rewardsLockDuration, config.ripePerDollarClaimed, a)
     return totalUsdValue
 
 
@@ -589,18 +605,18 @@ def _claimFromStabilityPool(
     _claimAsset: address,
     _maxUsdValue: uint256,
     _caller: address,
+    _config: StabPoolClaimsConfig,
     _a: addys.Addys,
 ) -> uint256:
     if empty(address) in [_claimer, _stabAsset, _claimAsset] or _maxUsdValue == 0:
         return 0
 
     # check claims config
-    config: StabPoolClaimsConfig = staticcall MissionControl(_a.missionControl).getStabPoolClaimsConfig(_claimAsset, _claimer, _caller)
-    if not config.canClaimInStabPoolGeneral or not config.canClaimInStabPoolAsset or not config.isUserAllowed:
+    if not _config.canClaimInStabPoolGeneral or not _config.canClaimInStabPoolAsset or not _config.isUserAllowed:
         return 0
 
     if _claimer != _caller:
-        assert config.canClaimFromStabPoolForUser # dev: cannot claim for user
+        assert _config.canClaimFromStabPoolForUser # dev: cannot claim for user
 
     # max claimable asset
     maxClaimableAsset: uint256 = self.claimableBalances[_stabAsset][_claimAsset]
@@ -675,6 +691,31 @@ def _calcClaimSharesAndAmount(
     claimUsdValue: uint256 = claimAmount * maxClaimUsdValue // maxClaimAmount
     claimShares: uint256 = min(maxUserShares, self._valueToShares(claimUsdValue, totalShares, totalValue, True))
     return claimShares, claimAmount, claimUsdValue
+
+
+@internal
+def _handleClaimRewards(
+    _claimer: address,
+    _claimUsdValue: uint256,
+    _lockDuration: uint256,
+    _ripePerDollarClaimed: uint256,
+    _a: addys.Addys,
+):
+    if _ripePerDollarClaimed == 0:
+        return
+
+    ripeClaimRewards: uint256 = _claimUsdValue * _ripePerDollarClaimed // EIGHTEEN_DECIMALS
+    ripeAvailable: uint256 = min(ripeClaimRewards, staticcall Ledger(_a.ledger).ripeAvailForRewards())
+    if ripeAvailable == 0:
+        return
+
+    # mint ripe
+    assert extcall VaultBook(_a.vaultBook).mintRipeForStabPoolClaims(ripeAvailable, _a.ripeToken, _a.ledger) # dev: mint failed
+
+    # deposit into gov vault
+    assert extcall IERC20(_a.ripeToken).approve(_a.teller, ripeAvailable, default_return_value=True) # dev: ripe approval failed
+    extcall Teller(_a.teller).depositIntoGovVaultFromTrusted(_claimer, _a.ripeToken, ripeAvailable, _lockDuration, _a)
+    assert extcall IERC20(_a.ripeToken).approve(_a.teller, 0, default_return_value=True) # dev: ripe approval failed
 
 
 ###############
