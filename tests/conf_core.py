@@ -574,7 +574,7 @@ def price_desk_deploy(ripe_hq_deploy, fork):
 
 
 @pytest.fixture(scope="session")
-def price_desk(price_desk_deploy, deploy3r, chainlink, mock_price_source, curve_prices):
+def price_desk(price_desk_deploy, deploy3r, chainlink, mock_price_source, curve_prices, blue_chip_prices):
 
     # register chainlink
     assert price_desk_deploy.startAddNewAddressToRegistry(chainlink, "Chainlink", sender=deploy3r)
@@ -584,9 +584,13 @@ def price_desk(price_desk_deploy, deploy3r, chainlink, mock_price_source, curve_
     assert price_desk_deploy.startAddNewAddressToRegistry(curve_prices, "Curve Prices", sender=deploy3r)
     assert price_desk_deploy.confirmNewAddressToRegistry(curve_prices, sender=deploy3r) == 2
 
+    # register blue chip prices
+    assert price_desk_deploy.startAddNewAddressToRegistry(blue_chip_prices, "Blue Chip Prices", sender=deploy3r)
+    assert price_desk_deploy.confirmNewAddressToRegistry(blue_chip_prices, sender=deploy3r) == 3
+
     # register mock price source
     assert price_desk_deploy.startAddNewAddressToRegistry(mock_price_source, "Mock Price Source", sender=deploy3r)
-    assert price_desk_deploy.confirmNewAddressToRegistry(mock_price_source, sender=deploy3r) == 3
+    assert price_desk_deploy.confirmNewAddressToRegistry(mock_price_source, sender=deploy3r) == 4
 
     # finish registry setup
     assert price_desk_deploy.setRegistryTimeLockAfterSetup(sender=deploy3r)
@@ -642,6 +646,26 @@ def curve_prices(ripe_hq_deploy, fork, deploy3r):
         PARAMS[fork]["PRICE_DESK_MIN_REG_TIMELOCK"],
         PARAMS[fork]["PRICE_DESK_MAX_REG_TIMELOCK"],
         name="curve_prices",
+    )
+    assert c.setActionTimeLockAfterSetup(sender=deploy3r)
+    return c
+
+
+# blue chip vault token prices
+
+
+@pytest.fixture(scope="session")
+def blue_chip_prices(ripe_hq_deploy, fork, deploy3r, mock_yield_registry):
+    MORPHO_FACTORY = mock_yield_registry if fork == "local" else ADDYS[fork]["MORPHO_FACTORY"]
+    MORPHO_FACTORY_LEGACY = mock_yield_registry if fork == "local" else ADDYS[fork]["MORPHO_FACTORY_LEGACY"]
+
+    c = boa.load(
+        "contracts/priceSources/BlueChipYieldPrices.vy",
+        ripe_hq_deploy,
+        PARAMS[fork]["PRICE_DESK_MIN_REG_TIMELOCK"],
+        PARAMS[fork]["PRICE_DESK_MAX_REG_TIMELOCK"],
+        [MORPHO_FACTORY, MORPHO_FACTORY_LEGACY],
+        name="blue_chip_prices",
     )
     assert c.setActionTimeLockAfterSetup(sender=deploy3r)
     return c
