@@ -656,15 +656,24 @@ def curve_prices(ripe_hq_deploy, fork, deploy3r):
 
 @pytest.fixture(scope="session")
 def blue_chip_prices(ripe_hq_deploy, fork, deploy3r, mock_yield_registry):
-    MORPHO_FACTORY = mock_yield_registry if fork == "local" else ADDYS[fork]["MORPHO_FACTORY"]
-    MORPHO_FACTORY_LEGACY = mock_yield_registry if fork == "local" else ADDYS[fork]["MORPHO_FACTORY_LEGACY"]
+    MORPHO_A = mock_yield_registry if fork == "local" else ADDYS[fork]["MORPHO_FACTORY"]
+    MORPHO_B = mock_yield_registry if fork == "local" else ADDYS[fork]["MORPHO_FACTORY_LEGACY"]
+    EULER_A = mock_yield_registry if fork == "local" else ADDYS[fork]["EULER_EVAULT_FACTORY"]
+    EULER_B = mock_yield_registry if fork == "local" else ADDYS[fork]["EULER_EARN_FACTORY"]
+    FLUID = mock_yield_registry if fork == "local" else ADDYS[fork]["FLUID_RESOLVER"]
+    COMPOUND_V3 = mock_yield_registry if fork == "local" else ADDYS[fork]["COMPOUND_V3_CONFIGURATOR"]
+    MOONWELL = mock_yield_registry if fork == "local" else ADDYS[fork]["MOONWELL_COMPTROLLER"]
 
     c = boa.load(
         "contracts/priceSources/BlueChipYieldPrices.vy",
         ripe_hq_deploy,
         PARAMS[fork]["PRICE_DESK_MIN_REG_TIMELOCK"],
         PARAMS[fork]["PRICE_DESK_MAX_REG_TIMELOCK"],
-        [MORPHO_FACTORY, MORPHO_FACTORY_LEGACY],
+        [MORPHO_A, MORPHO_B],
+        [EULER_A, EULER_B],
+        FLUID,
+        COMPOUND_V3,
+        MOONWELL,
         name="blue_chip_prices",
     )
     assert c.setActionTimeLockAfterSetup(sender=deploy3r)

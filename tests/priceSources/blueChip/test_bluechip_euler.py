@@ -1,7 +1,7 @@
 import pytest
 import boa
 
-from constants import BLUE_CHIP_PROTOCOL_MORPHO, EIGHTEEN_DECIMALS
+from constants import BLUE_CHIP_PROTOCOL_EULER, EIGHTEEN_DECIMALS
 from config.BluePrint import YIELD_TOKENS, CORE_TOKENS
 from conf_utils import filter_logs
 
@@ -31,13 +31,13 @@ def cbbtc_token(fork, chainlink, governance):
     return cbbtc
 
 
-######################
-# Morpho Integration #
-######################
+#####################
+# Euler Integration #
+#####################
 
 
 @pytest.base
-def test_add_morpho_vault_token_usdc(
+def test_add_euler_vault_token_usdc(
     blue_chip_prices,
     governance,
     usdc_token,
@@ -45,22 +45,22 @@ def test_add_morpho_vault_token_usdc(
     price_desk,
     _test,
 ):
-    morpho_usdc = YIELD_TOKENS[fork]["MORPHO_MOONWELL_USDC"]
-    assert blue_chip_prices.isValidNewFeed(morpho_usdc, BLUE_CHIP_PROTOCOL_MORPHO, 3600, 20, 20_00, 0)
+    euler_usdc = YIELD_TOKENS[fork]["EULER_USDC"]
+    assert blue_chip_prices.isValidNewFeed(euler_usdc, BLUE_CHIP_PROTOCOL_EULER, 3600, 20, 20_00, 0)
 
     # add new price feed
-    assert blue_chip_prices.addNewPriceFeed(morpho_usdc, BLUE_CHIP_PROTOCOL_MORPHO, 3600, 20, 20_00, 0, sender=governance.address)
+    assert blue_chip_prices.addNewPriceFeed(euler_usdc, BLUE_CHIP_PROTOCOL_EULER, 3600, 20, 20_00, 0, sender=governance.address)
     boa.env.time_travel(blocks=blue_chip_prices.actionTimeLock() + 1)
-    assert blue_chip_prices.confirmNewPriceFeed(morpho_usdc, sender=governance.address)
+    assert blue_chip_prices.confirmNewPriceFeed(euler_usdc, sender=governance.address)
 
     log = filter_logs(blue_chip_prices, "NewPriceConfigAdded")[0]
 
     # verify config
-    config = blue_chip_prices.priceConfigs(morpho_usdc)
-    assert config.protocol == BLUE_CHIP_PROTOCOL_MORPHO
+    config = blue_chip_prices.priceConfigs(euler_usdc)
+    assert config.protocol == BLUE_CHIP_PROTOCOL_EULER
     assert config.underlyingAsset == usdc_token.address
     assert config.underlyingDecimals == 6
-    assert config.vaultTokenDecimals == 18
+    assert config.vaultTokenDecimals == 6
     assert config.minSnapshotDelay == 3600
     assert config.maxNumSnapshots == 20
     assert config.maxUpsideDeviation == 20_00
@@ -68,8 +68,8 @@ def test_add_morpho_vault_token_usdc(
     assert config.nextIndex == 1 # snapshot taken during registration
 
     # verify event
-    assert log.asset == morpho_usdc
-    assert log.protocol == BLUE_CHIP_PROTOCOL_MORPHO
+    assert log.asset == euler_usdc
+    assert log.protocol == BLUE_CHIP_PROTOCOL_EULER
     assert log.underlyingAsset == usdc_token.address
     assert log.minSnapshotDelay == 3600
     assert log.maxNumSnapshots == 20
@@ -80,12 +80,12 @@ def test_add_morpho_vault_token_usdc(
     assert usdc_price != 0
 
     # test price
-    morpho_usdc_price = blue_chip_prices.getPrice(morpho_usdc)
-    _test(morpho_usdc_price, int(1.03 * EIGHTEEN_DECIMALS))
+    euler_usdc_price = blue_chip_prices.getPrice(euler_usdc)
+    _test(euler_usdc_price, usdc_price, 2_00)
 
 
 @pytest.base
-def test_add_morpho_vault_token_weth(
+def test_add_euler_vault_token_weth(
     blue_chip_prices,
     governance,
     weth_token,
@@ -93,19 +93,19 @@ def test_add_morpho_vault_token_weth(
     price_desk,
     _test,
 ):
-    morpho_weth = YIELD_TOKENS[fork]["MORPHO_SEAMLESS_WETH"]
-    assert blue_chip_prices.isValidNewFeed(morpho_weth, BLUE_CHIP_PROTOCOL_MORPHO, 3600, 20, 20_00, 0)
+    euler_weth = YIELD_TOKENS[fork]["EULER_WETH"]
+    assert blue_chip_prices.isValidNewFeed(euler_weth, BLUE_CHIP_PROTOCOL_EULER, 3600, 20, 20_00, 0)
 
     # add new price feed
-    assert blue_chip_prices.addNewPriceFeed(morpho_weth, BLUE_CHIP_PROTOCOL_MORPHO, 3600, 20, 20_00, 0, sender=governance.address)
+    assert blue_chip_prices.addNewPriceFeed(euler_weth, BLUE_CHIP_PROTOCOL_EULER, 3600, 20, 20_00, 0, sender=governance.address)
     boa.env.time_travel(blocks=blue_chip_prices.actionTimeLock() + 1)
-    assert blue_chip_prices.confirmNewPriceFeed(morpho_weth, sender=governance.address)
+    assert blue_chip_prices.confirmNewPriceFeed(euler_weth, sender=governance.address)
 
     log = filter_logs(blue_chip_prices, "NewPriceConfigAdded")[0]
 
     # verify config
-    config = blue_chip_prices.priceConfigs(morpho_weth)
-    assert config.protocol == BLUE_CHIP_PROTOCOL_MORPHO
+    config = blue_chip_prices.priceConfigs(euler_weth)
+    assert config.protocol == BLUE_CHIP_PROTOCOL_EULER
     assert config.underlyingAsset == weth_token.address
     assert config.underlyingDecimals == 18
     assert config.vaultTokenDecimals == 18
@@ -116,8 +116,8 @@ def test_add_morpho_vault_token_weth(
     assert config.nextIndex == 1 # snapshot taken during registration
 
     # verify event
-    assert log.asset == morpho_weth
-    assert log.protocol == BLUE_CHIP_PROTOCOL_MORPHO
+    assert log.asset == euler_weth
+    assert log.protocol == BLUE_CHIP_PROTOCOL_EULER
     assert log.underlyingAsset == weth_token.address
     assert log.minSnapshotDelay == 3600
     assert log.maxNumSnapshots == 20
@@ -129,12 +129,12 @@ def test_add_morpho_vault_token_weth(
     assert weth_price != 0
 
     # vault token price
-    morpho_weth_price = blue_chip_prices.getPrice(morpho_weth)
-    _test(morpho_weth_price, weth_price, 1_00)
+    euler_weth_price = blue_chip_prices.getPrice(euler_weth)
+    _test(euler_weth_price, weth_price, 2_00)
 
 
 @pytest.base
-def test_add_morpho_vault_token_cbbtc(
+def test_add_euler_vault_token_cbbtc(
     blue_chip_prices,
     governance,
     cbbtc_token,
@@ -142,22 +142,22 @@ def test_add_morpho_vault_token_cbbtc(
     price_desk,
     _test,
 ):
-    morpho_cbbtc = YIELD_TOKENS[fork]["MORPHO_SEAMLESS_CBBTC"]
-    assert blue_chip_prices.isValidNewFeed(morpho_cbbtc, BLUE_CHIP_PROTOCOL_MORPHO, 3600, 20, 20_00, 0)
+    euler_cbbtc = YIELD_TOKENS[fork]["EULER_CBBTC"]
+    assert blue_chip_prices.isValidNewFeed(euler_cbbtc, BLUE_CHIP_PROTOCOL_EULER, 3600, 20, 20_00, 0)
 
     # add new price feed
-    assert blue_chip_prices.addNewPriceFeed(morpho_cbbtc, BLUE_CHIP_PROTOCOL_MORPHO, 3600, 20, 20_00, 0, sender=governance.address)
+    assert blue_chip_prices.addNewPriceFeed(euler_cbbtc, BLUE_CHIP_PROTOCOL_EULER, 3600, 20, 20_00, 0, sender=governance.address)
     boa.env.time_travel(blocks=blue_chip_prices.actionTimeLock() + 1)
-    assert blue_chip_prices.confirmNewPriceFeed(morpho_cbbtc, sender=governance.address)
+    assert blue_chip_prices.confirmNewPriceFeed(euler_cbbtc, sender=governance.address)
 
     log = filter_logs(blue_chip_prices, "NewPriceConfigAdded")[0]
 
     # verify config
-    config = blue_chip_prices.priceConfigs(morpho_cbbtc)
-    assert config.protocol == BLUE_CHIP_PROTOCOL_MORPHO
+    config = blue_chip_prices.priceConfigs(euler_cbbtc)
+    assert config.protocol == BLUE_CHIP_PROTOCOL_EULER
     assert config.underlyingAsset == cbbtc_token.address
     assert config.underlyingDecimals == 8
-    assert config.vaultTokenDecimals == 18
+    assert config.vaultTokenDecimals == 8
     assert config.minSnapshotDelay == 3600
     assert config.maxNumSnapshots == 20
     assert config.maxUpsideDeviation == 20_00
@@ -165,8 +165,8 @@ def test_add_morpho_vault_token_cbbtc(
     assert config.nextIndex == 1 # snapshot taken during registration
 
     # verify event
-    assert log.asset == morpho_cbbtc
-    assert log.protocol == BLUE_CHIP_PROTOCOL_MORPHO
+    assert log.asset == euler_cbbtc
+    assert log.protocol == BLUE_CHIP_PROTOCOL_EULER
     assert log.underlyingAsset == cbbtc_token.address
     assert log.minSnapshotDelay == 3600
     assert log.maxNumSnapshots == 20
@@ -178,6 +178,5 @@ def test_add_morpho_vault_token_cbbtc(
     assert cbbtc_price != 0
 
     # vault token price
-    morpho_cbbtc_price = blue_chip_prices.getPrice(morpho_cbbtc)
-
-    _test(morpho_cbbtc_price, cbbtc_price, 1_00)
+    euler_cbbtc_price = blue_chip_prices.getPrice(euler_cbbtc)
+    _test(euler_cbbtc_price, cbbtc_price, 2_00)

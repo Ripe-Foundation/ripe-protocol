@@ -167,8 +167,8 @@ def deposit(
     assert not deptBasics.isPaused # dev: contract paused
     a: addys.Addys = addys._getAddys()
     amount: uint256 = self._deposit(_asset, _amount, _user, _vaultAddr, _vaultId, msg.sender, 0, a)
-    extcall CreditEngine(a.creditEngine).updateDebtForUser(_user, a)
     extcall PriceDesk(a.priceDesk).addGreenRefPoolSnapshot()
+    extcall CreditEngine(a.creditEngine).updateDebtForUser(_user, a)
     return amount
 
 
@@ -179,8 +179,8 @@ def depositMany(_user: address, _deposits: DynArray[DepositAction, MAX_BALANCE_A
     a: addys.Addys = addys._getAddys()
     for d: DepositAction in _deposits:
         self._deposit(d.asset, d.amount, _user, d.vaultAddr, d.vaultId, msg.sender, 0, a)
-    extcall CreditEngine(a.creditEngine).updateDebtForUser(_user, a)
     extcall PriceDesk(a.priceDesk).addGreenRefPoolSnapshot()
+    extcall CreditEngine(a.creditEngine).updateDebtForUser(_user, a)
     return len(_deposits)
 
 
@@ -316,8 +316,8 @@ def withdraw(
     assert not deptBasics.isPaused # dev: contract paused
     a: addys.Addys = addys._getAddys()
     amount: uint256 = self._withdraw(_asset, _amount, _user, _vaultAddr, _vaultId, msg.sender, a)
-    assert extcall CreditEngine(a.creditEngine).updateDebtForUser(_user, a) # dev: bad debt health
     extcall PriceDesk(a.priceDesk).addGreenRefPoolSnapshot()
+    assert extcall CreditEngine(a.creditEngine).updateDebtForUser(_user, a) # dev: bad debt health
     return amount
 
 
@@ -328,8 +328,8 @@ def withdrawMany(_user: address, _withdrawals: DynArray[WithdrawalAction, MAX_BA
     a: addys.Addys = addys._getAddys()
     for w: WithdrawalAction in _withdrawals:
         self._withdraw(w.asset, w.amount, _user, w.vaultAddr, w.vaultId, msg.sender, a)
-    assert extcall CreditEngine(a.creditEngine).updateDebtForUser(_user, a) # dev: bad debt health
     extcall PriceDesk(a.priceDesk).addGreenRefPoolSnapshot()
+    assert extcall CreditEngine(a.creditEngine).updateDebtForUser(_user, a) # dev: bad debt health
     return len(_withdrawals)
 
 
@@ -410,9 +410,8 @@ def borrow(
 ) -> uint256:
     assert not deptBasics.isPaused # dev: contract paused
     a: addys.Addys = addys._getAddys()
-    greenAmount: uint256 = extcall CreditEngine(a.creditEngine).borrowForUser(_user, _greenAmount, _wantsSavingsGreen, msg.sender, a)
-    extcall PriceDesk(a.priceDesk).addGreenRefPoolSnapshot()
-    return greenAmount
+    extcall PriceDesk(a.priceDesk).addGreenRefPoolSnapshot() # do before borrow
+    return extcall CreditEngine(a.creditEngine).borrowForUser(_user, _greenAmount, _wantsSavingsGreen, msg.sender, a)
 
 
 # repay
@@ -428,10 +427,9 @@ def repay(
 ) -> bool:
     assert not deptBasics.isPaused # dev: contract paused
     a: addys.Addys = addys._getAddys()
+    extcall PriceDesk(a.priceDesk).addGreenRefPoolSnapshot() # do before
     greenAmount: uint256 = self._handleGreenPayment(_isPaymentSavingsGreen, _paymentAmount, a.creditEngine, a.greenToken, a.savingsGreen)
-    hasGoodDebtHealth: bool = extcall CreditEngine(a.creditEngine).repayForUser(_user, greenAmount, _shouldRefundSavingsGreen, msg.sender, a)
-    extcall PriceDesk(a.priceDesk).addGreenRefPoolSnapshot()
-    return hasGoodDebtHealth
+    return extcall CreditEngine(a.creditEngine).repayForUser(_user, greenAmount, _shouldRefundSavingsGreen, msg.sender, a)
 
 
 # redeem collateral
@@ -452,8 +450,8 @@ def redeemCollateral(
     a: addys.Addys = addys._getAddys()
     greenAmount: uint256 = self._handleGreenPayment(_isPaymentSavingsGreen, _paymentAmount, a.creditEngine, a.greenToken, a.savingsGreen)
     greenSpent: uint256 = extcall CreditEngine(a.creditEngine).redeemCollateral(_user, _vaultId, _asset, greenAmount, msg.sender, _shouldTransferBalance, _shouldRefundSavingsGreen, a)
-    extcall CreditEngine(a.creditEngine).updateDebtForUser(msg.sender, a)
     extcall PriceDesk(a.priceDesk).addGreenRefPoolSnapshot()
+    extcall CreditEngine(a.creditEngine).updateDebtForUser(msg.sender, a)
     return greenSpent
 
 
@@ -470,8 +468,8 @@ def redeemCollateralFromMany(
     a: addys.Addys = addys._getAddys()
     greenAmount: uint256 = self._handleGreenPayment(_isPaymentSavingsGreen, _paymentAmount, a.creditEngine, a.greenToken, a.savingsGreen)
     greenSpent: uint256 = extcall CreditEngine(a.creditEngine).redeemCollateralFromMany(_redemptions, greenAmount, msg.sender, _shouldTransferBalance, _shouldRefundSavingsGreen, a)
-    extcall CreditEngine(a.creditEngine).updateDebtForUser(msg.sender, a)
     extcall PriceDesk(a.priceDesk).addGreenRefPoolSnapshot()
+    extcall CreditEngine(a.creditEngine).updateDebtForUser(msg.sender, a)
     return greenSpent
 
 
@@ -492,8 +490,8 @@ def liquidateUser(
     assert not deptBasics.isPaused # dev: contract paused
     a: addys.Addys = addys._getAddys()
     keeperRewards: uint256 = extcall AuctionHouse(a.auctionHouse).liquidateUser(_liqUser, msg.sender, _wantsSavingsGreen, a)
-    extcall CreditEngine(a.creditEngine).updateDebtForUser(msg.sender, a)
     extcall PriceDesk(a.priceDesk).addGreenRefPoolSnapshot()
+    extcall CreditEngine(a.creditEngine).updateDebtForUser(msg.sender, a)
     return keeperRewards
 
 
@@ -506,8 +504,8 @@ def liquidateManyUsers(
     assert not deptBasics.isPaused # dev: contract paused
     a: addys.Addys = addys._getAddys()
     keeperRewards: uint256 = extcall AuctionHouse(a.auctionHouse).liquidateManyUsers(_liqUsers, msg.sender, _wantsSavingsGreen, a)
-    extcall CreditEngine(a.creditEngine).updateDebtForUser(msg.sender, a)
     extcall PriceDesk(a.priceDesk).addGreenRefPoolSnapshot()
+    extcall CreditEngine(a.creditEngine).updateDebtForUser(msg.sender, a)
     return keeperRewards
 
 
@@ -529,8 +527,8 @@ def buyFungibleAuction(
     a: addys.Addys = addys._getAddys()
     greenAmount: uint256 = self._handleGreenPayment(_isPaymentSavingsGreen, _paymentAmount, a.auctionHouse, a.greenToken, a.savingsGreen)
     greenSpent: uint256 = extcall AuctionHouse(a.auctionHouse).buyFungibleAuction(_liqUser, _vaultId, _asset, greenAmount, msg.sender, _shouldTransferBalance, _shouldRefundSavingsGreen, a)
-    extcall CreditEngine(a.creditEngine).updateDebtForUser(msg.sender, a)
     extcall PriceDesk(a.priceDesk).addGreenRefPoolSnapshot()
+    extcall CreditEngine(a.creditEngine).updateDebtForUser(msg.sender, a)
     return greenSpent
 
 
@@ -573,8 +571,8 @@ def claimFromStabilityPool(
     a: addys.Addys = addys._getAddys()
     vaultAddr: address = staticcall AddressRegistry(a.vaultBook).getAddr(_vaultId)
     claimUsdValue: uint256 = extcall StabVault(vaultAddr).claimFromStabilityPool(_user, _stabAsset, _claimAsset, _maxUsdValue, msg.sender, a)
-    assert extcall CreditEngine(a.creditEngine).updateDebtForUser(msg.sender, a) # dev: bad debt health
     extcall PriceDesk(a.priceDesk).addGreenRefPoolSnapshot()
+    assert extcall CreditEngine(a.creditEngine).updateDebtForUser(msg.sender, a) # dev: bad debt health
     return claimUsdValue
 
 
@@ -589,8 +587,8 @@ def claimManyFromStabilityPool(
     a: addys.Addys = addys._getAddys()
     vaultAddr: address = staticcall AddressRegistry(a.vaultBook).getAddr(_vaultId)
     claimUsdValue: uint256 = extcall StabVault(vaultAddr).claimManyFromStabilityPool(_user, _claims, msg.sender, a)
-    assert extcall CreditEngine(a.creditEngine).updateDebtForUser(msg.sender, a) # dev: bad debt health
     extcall PriceDesk(a.priceDesk).addGreenRefPoolSnapshot()
+    assert extcall CreditEngine(a.creditEngine).updateDebtForUser(msg.sender, a) # dev: bad debt health
     return claimUsdValue
 
 
@@ -611,8 +609,8 @@ def redeemFromStabilityPool(
     vaultAddr: address = staticcall AddressRegistry(a.vaultBook).getAddr(_vaultId)
     greenAmount: uint256 = self._handleGreenPayment(_isPaymentSavingsGreen, _paymentAmount, vaultAddr, a.greenToken, a.savingsGreen)
     greenSpent: uint256 = extcall StabVault(vaultAddr).redeemFromStabilityPool(_claimAsset, greenAmount, msg.sender, _shouldRefundSavingsGreen, a)
-    extcall CreditEngine(a.creditEngine).updateDebtForUser(msg.sender, a)
     extcall PriceDesk(a.priceDesk).addGreenRefPoolSnapshot()
+    extcall CreditEngine(a.creditEngine).updateDebtForUser(msg.sender, a)
     return greenSpent
 
 
@@ -630,8 +628,8 @@ def redeemManyFromStabilityPool(
     vaultAddr: address = staticcall AddressRegistry(a.vaultBook).getAddr(_vaultId)
     greenAmount: uint256 = self._handleGreenPayment(_isPaymentSavingsGreen, _paymentAmount, vaultAddr, a.greenToken, a.savingsGreen)
     greenSpent: uint256 = extcall StabVault(vaultAddr).redeemManyFromStabilityPool(_redemptions, greenAmount, msg.sender, _shouldRefundSavingsGreen, a)
-    extcall CreditEngine(a.creditEngine).updateDebtForUser(msg.sender, a)
     extcall PriceDesk(a.priceDesk).addGreenRefPoolSnapshot()
+    extcall CreditEngine(a.creditEngine).updateDebtForUser(msg.sender, a)
     return greenSpent
 
 
@@ -649,8 +647,8 @@ def claimLoot(_user: address = msg.sender, _shouldStake: bool = True) -> uint256
     assert not deptBasics.isPaused # dev: contract paused
     a: addys.Addys = addys._getAddys()
     totalRipe: uint256 = extcall Lootbox(a.lootbox).claimLootForUser(_user, msg.sender, _shouldStake, a)
-    extcall CreditEngine(a.creditEngine).updateDebtForUser(_user, a)
     extcall PriceDesk(a.priceDesk).addGreenRefPoolSnapshot()
+    extcall CreditEngine(a.creditEngine).updateDebtForUser(_user, a)
     return totalRipe
 
 
@@ -663,8 +661,8 @@ def claimLootForManyUsers(_users: DynArray[address, MAX_CLAIM_USERS], _shouldSta
     assert not deptBasics.isPaused # dev: contract paused
     a: addys.Addys = addys._getAddys()
     totalRipe: uint256 = extcall Lootbox(a.lootbox).claimLootForManyUsers(_users, msg.sender, _shouldStake, a)
-    extcall CreditEngine(a.creditEngine).updateDebtForUser(msg.sender, a)
     extcall PriceDesk(a.priceDesk).addGreenRefPoolSnapshot()
+    extcall CreditEngine(a.creditEngine).updateDebtForUser(msg.sender, a)
     return totalRipe
 
 
@@ -680,8 +678,8 @@ def adjustLock(_asset: address, _newLockDuration: uint256):
     a: addys.Addys = addys._getAddys()
     vaultAddr: address = staticcall AddressRegistry(a.vaultBook).getAddr(RIPE_GOV_VAULT_ID)
     extcall RipeGovVault(vaultAddr).adjustLock(msg.sender, _asset, _newLockDuration, a)
-    extcall CreditEngine(a.creditEngine).updateDebtForUser(msg.sender, a)
     extcall PriceDesk(a.priceDesk).addGreenRefPoolSnapshot()
+    extcall CreditEngine(a.creditEngine).updateDebtForUser(msg.sender, a)
 
 
 @nonreentrant
@@ -691,8 +689,8 @@ def releaseLock(_asset: address):
     a: addys.Addys = addys._getAddys()
     vaultAddr: address = staticcall AddressRegistry(a.vaultBook).getAddr(RIPE_GOV_VAULT_ID)
     extcall RipeGovVault(vaultAddr).releaseLock(msg.sender, _asset, a)
-    extcall CreditEngine(a.creditEngine).updateDebtForUser(msg.sender, a)
     extcall PriceDesk(a.priceDesk).addGreenRefPoolSnapshot()
+    extcall CreditEngine(a.creditEngine).updateDebtForUser(msg.sender, a)
 
 
 @external
@@ -726,8 +724,8 @@ def purchaseRipeBond(
     paymentAmount: uint256 = min(_paymentAmount, staticcall IERC20(_paymentAsset).balanceOf(msg.sender))
     assert extcall IERC20(_paymentAsset).transferFrom(msg.sender, a.bondRoom, paymentAmount, default_return_value=True) # dev: token transfer failed
     ripePayout: uint256 = extcall BondRoom(a.bondRoom).purchaseRipeBond(_user, _paymentAsset, paymentAmount, _lockDuration, msg.sender, a)
-    extcall CreditEngine(a.creditEngine).updateDebtForUser(msg.sender, a)
     extcall PriceDesk(a.priceDesk).addGreenRefPoolSnapshot()
+    extcall CreditEngine(a.creditEngine).updateDebtForUser(msg.sender, a)
     return ripePayout
 
 

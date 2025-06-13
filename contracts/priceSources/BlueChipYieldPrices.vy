@@ -22,13 +22,33 @@ from ethereum.ercs import IERC20Detailed
 from ethereum.ercs import IERC4626
 from ethereum.ercs import IERC20
 
+interface EulerRegistry:
+    def isValidDeployment(_vault: address) -> bool: view
+    def isProxy(_vault: address) -> bool: view
+
+interface Moonwell:
+    def exchangeRateStored() -> uint256: view
+    def underlying() -> address: view
+
 interface PriceDesk:
     def getPrice(_asset: address, _shouldRaise: bool = False) -> uint256: view
 
-interface MetaMorphoFactory:
+interface FluidRegistry:
+    def getAllFTokens() -> DynArray[address, MAX_MARKETS]: view
+
+interface MoonwellRegistry:
+    def getAllMarkets() -> DynArray[address, MAX_MARKETS]: view
+
+interface CompoundV3Registry:
+    def factory(_cometAsset: address) -> address: view
+
+interface MorphoRegistry:
     def isMetaMorpho(_vault: address) -> bool: view
 
-flag BlueChipProtocol:
+interface CompoundV3:
+    def baseToken() -> address: view
+
+flag Protocol:
     MORPHO
     EULER
     MOONWELL
@@ -38,7 +58,7 @@ flag BlueChipProtocol:
     COMPOUND_V3
 
 struct PriceConfig:
-    protocol: BlueChipProtocol
+    protocol: Protocol
     underlyingAsset: address
     underlyingDecimals: uint256
     vaultTokenDecimals: uint256
@@ -60,7 +80,7 @@ struct PendingPriceConfig:
 
 event NewPriceConfigPending:
     asset: indexed(address)
-    protocol: BlueChipProtocol
+    protocol: Protocol
     underlyingAsset: indexed(address)
     minSnapshotDelay: uint256
     maxNumSnapshots: uint256
@@ -71,7 +91,7 @@ event NewPriceConfigPending:
 
 event NewPriceConfigAdded:
     asset: indexed(address)
-    protocol: BlueChipProtocol
+    protocol: Protocol
     underlyingAsset: indexed(address)
     minSnapshotDelay: uint256
     maxNumSnapshots: uint256
@@ -80,12 +100,12 @@ event NewPriceConfigAdded:
 
 event NewPriceConfigCancelled:
     asset: indexed(address)
-    protocol: BlueChipProtocol
+    protocol: Protocol
     underlyingAsset: indexed(address)
 
 event PriceConfigUpdatePending:
     asset: indexed(address)
-    protocol: BlueChipProtocol
+    protocol: Protocol
     underlyingAsset: indexed(address)
     minSnapshotDelay: uint256
     maxNumSnapshots: uint256
@@ -96,7 +116,7 @@ event PriceConfigUpdatePending:
 
 event PriceConfigUpdated:
     asset: indexed(address)
-    protocol: BlueChipProtocol
+    protocol: Protocol
     underlyingAsset: indexed(address)
     minSnapshotDelay: uint256
     maxNumSnapshots: uint256
@@ -105,29 +125,29 @@ event PriceConfigUpdated:
 
 event PriceConfigUpdateCancelled:
     asset: indexed(address)
-    protocol: BlueChipProtocol
+    protocol: Protocol
     underlyingAsset: indexed(address)
 
 event DisablePriceConfigPending:
     asset: indexed(address)
-    protocol: BlueChipProtocol
+    protocol: Protocol
     underlyingAsset: indexed(address)
     confirmationBlock: uint256
     actionId: uint256
 
 event DisablePriceConfigConfirmed:
     asset: indexed(address)
-    protocol: BlueChipProtocol
+    protocol: Protocol
     underlyingAsset: indexed(address)
 
 event DisablePriceConfigCancelled:
     asset: indexed(address)
-    protocol: BlueChipProtocol
+    protocol: Protocol
     underlyingAsset: indexed(address)
 
 event PricePerShareSnapshotAdded:
     asset: indexed(address)
-    protocol: BlueChipProtocol
+    protocol: Protocol
     underlyingAsset: indexed(address)
     totalSupply: uint256
     pricePerShare: uint256
@@ -138,9 +158,14 @@ snapShots: public(HashMap[address, HashMap[uint256, PriceSnapshot]]) # asset -> 
 pendingPriceConfigs: public(HashMap[address, PendingPriceConfig]) # asset -> pending config
 
 HUNDRED_PERCENT: constant(uint256) = 100_00 # 100%
+MAX_MARKETS: constant(uint256) = 50
 
 # registries
-MORPHO_FACTORIES: public(immutable(address[2]))
+MORPHO_ADDRS: public(immutable(address[2]))
+EULER_ADDRS: public(immutable(address[2]))
+FLUID_ADDR: public(immutable(address))
+COMPOUND_V3_ADDR: public(immutable(address))
+MOONWELL_ADDR: public(immutable(address))
 
 
 @deploy
@@ -148,7 +173,11 @@ def __init__(
     _ripeHq: address,
     _minPriceChangeTimeLock: uint256,
     _maxPriceChangeTimeLock: uint256,
-    _morphoFactories: address[2],
+    _morphoAddrs: address[2],
+    _eulerAddrs: address[2],
+    _fluidAddr: address,
+    _compoundV3Addr: address,
+    _moonwellAddr: address,
 ):
     gov.__init__(_ripeHq, empty(address), 0, 0, 0)
     addys.__init__(_ripeHq)
@@ -156,7 +185,11 @@ def __init__(
     timeLock.__init__(_minPriceChangeTimeLock, _maxPriceChangeTimeLock, 0, _maxPriceChangeTimeLock)
 
     # factories / registries
-    MORPHO_FACTORIES = _morphoFactories
+    MORPHO_ADDRS = _morphoAddrs
+    EULER_ADDRS = _eulerAddrs
+    FLUID_ADDR = _fluidAddr
+    COMPOUND_V3_ADDR = _compoundV3Addr
+    MOONWELL_ADDR = _moonwellAddr
 
 
 ###############
@@ -199,12 +232,24 @@ def _getPrice(
     if priceDesk == empty(address):
         priceDesk = addys._getPriceDeskAddr()
 
-    weightedPricePerShare: uint256 = self._getWeightedPrice(_asset, _config)
+    # undelrying price
     underlyingPrice: uint256 = staticcall PriceDesk(priceDesk).getPrice(_config.underlyingAsset, False)
 
+    # compound v3 -- just use underlying price
+    if _config.protocol == Protocol.COMPOUND_V3:
+        return underlyingPrice
+
+    # weighted price per share
+    weightedPricePerShare: uint256 = self._getWeightedPrice(_asset, _config)
+
+    # erc4626 vaults
     price: uint256 = 0
-    if _config.protocol == BlueChipProtocol.MORPHO:
-        price = self._getMorphoPrice(_asset, _config, weightedPricePerShare, underlyingPrice)
+    if _config.protocol == Protocol.MORPHO or _config.protocol == Protocol.EULER or _config.protocol == Protocol.FLUID:
+        price = self._getErc4626Price(_asset, _config, weightedPricePerShare, underlyingPrice)
+
+    # moonwell
+    elif _config.protocol == Protocol.MOONWELL:
+        price = self._getMoonwellPrice(_asset, _config, weightedPricePerShare, underlyingPrice)
 
     # TODO: implement rest of protocols
 
@@ -237,7 +282,7 @@ def hasPendingPriceFeedUpdate(_asset: address) -> bool:
 @external
 def addNewPriceFeed(
     _asset: address,
-    _protocol: BlueChipProtocol,
+    _protocol: Protocol,
     _minSnapshotDelay: uint256 = 60 * 5, # 5 minutes
     _maxNumSnapshots: uint256 = 20,
     _maxUpsideDeviation: uint256 = 10_00, # 10%
@@ -335,7 +380,7 @@ def _cancelNewPendingPriceFeed(_asset: address, _aid: uint256):
 @external
 def isValidNewFeed(
     _asset: address,
-    _protocol: BlueChipProtocol,
+    _protocol: Protocol,
     _minSnapshotDelay: uint256,
     _maxNumSnapshots: uint256,
     _maxUpsideDeviation: uint256,
@@ -376,7 +421,7 @@ def _isValidFeedConfig(_asset: address, _config: PriceConfig) -> bool:
 @internal
 def _getPriceConfig(
     _asset: address,
-    _protocol: BlueChipProtocol,
+    _protocol: Protocol,
     _minSnapshotDelay: uint256,
     _maxNumSnapshots: uint256,
     _maxUpsideDeviation: uint256,
@@ -385,8 +430,20 @@ def _getPriceConfig(
 
     # underlying asset
     underlyingAsset: address = empty(address)
-    if _protocol == BlueChipProtocol.MORPHO:
+    if _protocol == Protocol.MORPHO:
         underlyingAsset = self._getMorphoUnderlyingAsset(_asset)
+
+    elif _protocol == Protocol.EULER:
+        underlyingAsset = self._getEulerUnderlyingAsset(_asset)
+
+    elif _protocol == Protocol.FLUID:
+        underlyingAsset = self._getFluidUnderlyingAsset(_asset)
+
+    elif _protocol == Protocol.COMPOUND_V3:
+        underlyingAsset = self._getCompoundV3UnderlyingAsset(_asset)
+
+    elif _protocol == Protocol.MOONWELL:
+        underlyingAsset = self._getMoonwellUnderlyingAsset(_asset)
 
     # TODO: implement rest of protocols
 
@@ -701,6 +758,10 @@ def _addPriceSnapshot(_asset: address, _config: PriceConfig) -> bool:
     if config.underlyingAsset == empty(address):
         return False
 
+    # compound v3 - not using snapshots
+    if _config.protocol == Protocol.COMPOUND_V3:
+        return False
+
     # already have snapshot for this time
     if config.lastSnapshot.lastUpdate == block.timestamp:
         return False
@@ -710,7 +771,7 @@ def _addPriceSnapshot(_asset: address, _config: PriceConfig) -> bool:
         return False
 
     # create and store new snapshot
-    newSnapshot: PriceSnapshot = self._createNewSnapshot(_asset, config)
+    newSnapshot: PriceSnapshot = self._getLatestSnapshot(_asset, config)
     config.lastSnapshot = newSnapshot
     self.snapShots[_asset][config.nextIndex] = newSnapshot
 
@@ -738,17 +799,22 @@ def _addPriceSnapshot(_asset: address, _config: PriceConfig) -> bool:
 @view
 @external
 def getLatestSnapshot(_asset: address) -> PriceSnapshot:
-    return self._createNewSnapshot(_asset, self.priceConfigs[_asset])
+    return self._getLatestSnapshot(_asset, self.priceConfigs[_asset])
 
 
 @view
 @internal
-def _createNewSnapshot(_asset: address, _config: PriceConfig) -> PriceSnapshot:
+def _getLatestSnapshot(_asset: address, _config: PriceConfig) -> PriceSnapshot:
     totalSupply: uint256 = staticcall IERC20(_asset).totalSupply() // (10 ** _config.vaultTokenDecimals)
-
     pricePerShare: uint256 = 0
-    if _config.protocol == BlueChipProtocol.MORPHO:
-        pricePerShare = self._getMorphoCurrentPricePerShare(_asset, _config.vaultTokenDecimals)
+
+    # erc4626 vaults
+    if _config.protocol == Protocol.MORPHO or _config.protocol == Protocol.EULER or _config.protocol == Protocol.FLUID:
+        pricePerShare = self._getCurrentErc4626PricePerShare(_asset, _config.vaultTokenDecimals)
+
+    # moonwell
+    elif _config.protocol == Protocol.MOONWELL:
+        pricePerShare = self._getCurrentMoonwellPricePerShare(_asset, _config.vaultTokenDecimals)
 
     # TODO: implement rest of protocols
 
@@ -771,14 +837,14 @@ def _throttleUpside(_newValue: uint256, _prevValue: uint256, _maxUpside: uint256
     return min(_newValue, maxPricePerShare)
 
 
-##########
-# Morpho #
-##########
+##################
+# Erc4626 Vaults #
+##################
 
 
 @view
 @internal
-def _getMorphoPrice(
+def _getErc4626Price(
     _asset: address,
     _config: PriceConfig,
     _weightedPricePerShare: uint256,
@@ -789,7 +855,7 @@ def _getMorphoPrice(
         return 0
 
     # allow downside if current price per share is lower
-    currentPricePerShare: uint256 = self._getMorphoCurrentPricePerShare(_asset, _config.vaultTokenDecimals)
+    currentPricePerShare: uint256 = self._getCurrentErc4626PricePerShare(_asset, _config.vaultTokenDecimals)
     if currentPricePerShare != 0:
         pricePerShare = min(pricePerShare, currentPricePerShare)
 
@@ -798,13 +864,98 @@ def _getMorphoPrice(
 
 @view
 @internal
-def _getMorphoCurrentPricePerShare(_asset: address, _decimals: uint256) -> uint256:
+def _getCurrentErc4626PricePerShare(_asset: address, _decimals: uint256) -> uint256:
     return staticcall IERC4626(_asset).convertToAssets(10 ** _decimals)
+
+
+##########
+# Morpho #
+##########
 
 
 @view
 @internal
 def _getMorphoUnderlyingAsset(_asset: address) -> address:
-    if not staticcall MetaMorphoFactory(MORPHO_FACTORIES[0]).isMetaMorpho(_asset) and not staticcall MetaMorphoFactory(MORPHO_FACTORIES[1]).isMetaMorpho(_asset):
+    if not staticcall MorphoRegistry(MORPHO_ADDRS[0]).isMetaMorpho(_asset) and not staticcall MorphoRegistry(MORPHO_ADDRS[1]).isMetaMorpho(_asset):
         return empty(address)
     return staticcall IERC4626(_asset).asset()
+
+
+#########
+# Euler #
+#########
+
+
+@view
+@internal
+def _getEulerUnderlyingAsset(_asset: address) -> address:
+    if not staticcall EulerRegistry(EULER_ADDRS[0]).isProxy(_asset) and not staticcall EulerRegistry(EULER_ADDRS[1]).isValidDeployment(_asset):
+        return empty(address)
+    return staticcall IERC4626(_asset).asset()
+
+
+#########
+# Fluid #
+#########
+
+
+@view
+@internal
+def _getFluidUnderlyingAsset(_asset: address) -> address:
+    fTokens: DynArray[address, MAX_MARKETS] = staticcall FluidRegistry(FLUID_ADDR).getAllFTokens()
+    if _asset not in fTokens:
+        return empty(address)
+    return staticcall IERC4626(_asset).asset()
+
+
+###############
+# Compound v3 #
+###############
+
+
+@view
+@internal
+def _getCompoundV3UnderlyingAsset(_asset: address) -> address:
+    if staticcall CompoundV3Registry(COMPOUND_V3_ADDR).factory(_asset) == empty(address):
+        return empty(address)
+    return staticcall CompoundV3(_asset).baseToken()
+
+
+############
+# Moonwell #
+############
+
+
+@view
+@internal
+def _getMoonwellPrice(
+    _asset: address,
+    _config: PriceConfig,
+    _weightedPricePerShare: uint256,
+    _underlyingPrice: uint256,
+) -> uint256:
+    pricePerShare: uint256 = _weightedPricePerShare
+    if pricePerShare == 0 or _underlyingPrice == 0:
+        return 0
+
+    # allow downside if current price per share is lower
+    currentPricePerShare: uint256 = self._getCurrentMoonwellPricePerShare(_asset, _config.vaultTokenDecimals)
+    if currentPricePerShare != 0:
+        pricePerShare = min(pricePerShare, currentPricePerShare)
+
+    return _underlyingPrice * pricePerShare // (10 ** _config.underlyingDecimals)
+
+
+@view
+@internal
+def _getCurrentMoonwellPricePerShare(_asset: address, _decimals: uint256) -> uint256:
+    return (10 ** _decimals) * staticcall Moonwell(_asset).exchangeRateStored() // (10 ** 18)
+
+
+@view
+@internal
+def _getMoonwellUnderlyingAsset(_asset: address) -> address:
+    compMarkets: DynArray[address, MAX_MARKETS] = staticcall MoonwellRegistry(MOONWELL_ADDR).getAllMarkets()
+    if _asset not in compMarkets:
+        return empty(address)
+    return staticcall Moonwell(_asset).underlying()
