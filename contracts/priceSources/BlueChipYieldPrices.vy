@@ -28,9 +28,6 @@ interface PriceDesk:
 interface MetaMorphoFactory:
     def isMetaMorpho(_vault: address) -> bool: view
 
-interface MissionControl:
-    def getPriceStaleTime() -> uint256: view
-
 flag BlueChipProtocol:
     MORPHO
     EULER
@@ -202,7 +199,7 @@ def _getPrice(
     if priceDesk == empty(address):
         priceDesk = addys._getPriceDeskAddr()
 
-    weightedPricePerShare: uint256 = self._getWeightedPrice(_asset, _config, _config.staleTime)
+    weightedPricePerShare: uint256 = self._getWeightedPrice(_asset, _config)
     underlyingPrice: uint256 = staticcall PriceDesk(priceDesk).getPrice(_config.underlyingAsset, False)
 
     price: uint256 = 0
@@ -646,26 +643,19 @@ def _isValidDisablePriceFeed(_asset: address, _underlyingAsset: address) -> bool
 ###################
 
 
-# get weighted price per share
+# get weighted price
 
 
 @view
 @external
 def getWeightedPrice(_asset: address) -> uint256:
     config: PriceConfig = self.priceConfigs[_asset]
-
-    staleTime: uint256 = config.staleTime
-    if staleTime == 0:
-        missionControl: address = addys._getMissionControlAddr()
-        if missionControl != empty(address):
-            staleTime = staticcall MissionControl(missionControl).getPriceStaleTime()
-
-    return self._getWeightedPrice(_asset, config, staleTime)
+    return self._getWeightedPrice(_asset, config)
 
 
 @view
 @internal
-def _getWeightedPrice(_asset: address, _config: PriceConfig, _staleTime: uint256) -> uint256:
+def _getWeightedPrice(_asset: address, _config: PriceConfig) -> uint256:
     if _config.underlyingAsset == empty(address) or _config.maxNumSnapshots == 0:
         return 0
 
@@ -679,7 +669,7 @@ def _getWeightedPrice(_asset: address, _config: PriceConfig, _staleTime: uint256
             continue
 
         # too stale, skip
-        if _staleTime != 0 and block.timestamp > snapShot.lastUpdate + _staleTime:
+        if _config.staleTime != 0 and block.timestamp > snapShot.lastUpdate + _config.staleTime:
             continue
 
         numerator += (snapShot.totalSupply * snapShot.pricePerShare)
@@ -740,6 +730,9 @@ def _addPriceSnapshot(_asset: address, _config: PriceConfig) -> bool:
         pricePerShare=newSnapshot.pricePerShare,
     )
     return True
+
+
+# latest snapshot
 
 
 @view
