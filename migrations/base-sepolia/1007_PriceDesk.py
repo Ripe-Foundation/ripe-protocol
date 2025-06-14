@@ -81,7 +81,7 @@ def migrate(migration: Migration):
 
     # Add Green Prices
     green_token = migration.get_address("GreenToken")
-    green_pool = migration.get_address("GreenPoool")
+    green_pool = migration.get_address("GreenPool")
     migration.execute(curve_prices.addNewPriceFeed, green_token, green_pool)
     migration.execute(curve_prices.confirmNewPriceFeed, green_token)
     migration.execute(curve_prices.addNewPriceFeed, green_pool, green_pool)
@@ -89,7 +89,7 @@ def migrate(migration: Migration):
 
     # Add Ripe Prices
     ripe_token = migration.get_address("RipeToken")
-    ripe_pool = migration.get_address("RipePoool")
+    ripe_pool = migration.get_address("RipePool")
     migration.execute(curve_prices.addNewPriceFeed, ripe_token, ripe_pool)
     migration.execute(curve_prices.confirmNewPriceFeed, ripe_token)
     migration.execute(curve_prices.addNewPriceFeed, ripe_pool, ripe_pool)

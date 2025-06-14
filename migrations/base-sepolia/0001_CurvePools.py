@@ -27,7 +27,7 @@ def migrate(migration: Migration):
         [ZERO_ADDRESS, ZERO_ADDRESS],
 
     )
-    migration.include_contract("GreenPoool", green_pool_deploy)
+    migration.include_contract("GreenPool", green_pool_deploy)
 
     log.h2(f"Green Pool deployed at {green_pool_deploy}")
 
@@ -62,7 +62,7 @@ def migrate(migration: Migration):
         blueprint.CURVE_PARAMS["RIPE_POOL_MA_EXP_TIME"],
         blueprint.CURVE_PARAMS["RIPE_POOL_INIT_PRICE"],
     )
-    migration.include_contract("RipePoool", ripe_pool_deploy)
+    migration.include_contract("RipePool", ripe_pool_deploy)
 
     log.h2(f"Ripe Pool deployed at {ripe_pool_deploy}")
 

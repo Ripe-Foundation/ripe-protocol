@@ -34,8 +34,8 @@ def migrate(migration: Migration):
     # Set general debt config
     actionId = migration.execute(
         sb_alpha.setGlobalDebtLimits,
-        10_000 * EIGHTEEN_DECIMALS,
         1_000_000 * EIGHTEEN_DECIMALS,
+        100_000_000 * EIGHTEEN_DECIMALS,
         100 * EIGHTEEN_DECIMALS,
         100,
     )
@@ -43,7 +43,7 @@ def migrate(migration: Migration):
 
     actionId = migration.execute(
         sb_alpha.setBorrowIntervalConfig,
-        1_000 * EIGHTEEN_DECIMALS,
+        100_000 * EIGHTEEN_DECIMALS,
         100,
     )
     assert migration.execute(sb_alpha.executePendingAction, actionId)
@@ -193,8 +193,66 @@ def migrate(migration: Migration):
     assert migration.execute(sb_bravo.executePendingAction, actionId)
 
     actionId = migration.execute(
+        sb_bravo.addAsset,
+        migration.get_address("GreenPool"),
+        [stability_pool_vault_id],
+        10_00,  # _stakersPointsAlloc
+        10_00,  # _voterPointsAlloc
+        1_000_000 * EIGHTEEN_DECIMALS,  # _perUserDepositLimit
+        100_000_000 * EIGHTEEN_DECIMALS,  # _globalDepositLimit
+        (
+            0,  # ltv
+            0,  # redemptionThreshold
+            0,  # liqThreshold
+            0,  # liqFee
+            0,  # borrowRate
+            0,  # daowry
+        ),  # _debtTerms
+        False,  # _shouldBurnAsPayment
+        True,  # _shouldTransferToEndaoment
+        False,  # _shouldSwapInStabPools
+        False,  # _shouldAuctionInstantly
+        True,  # _canDeposit
+        True,  # _canWithdraw
+        False,  # _canRedeemCollateral
+    )
+    assert migration.execute(sb_bravo.executePendingAction, actionId)
+
+    actionId = migration.execute(
+        sb_bravo.addAsset,
+        migration.get_address("RipePool"),
+        [ripe_gov_vault_id],
+        10_00,  # _stakersPointsAlloc
+        10_00,  # _voterPointsAlloc
+        1_000_000 * EIGHTEEN_DECIMALS,  # _perUserDepositLimit
+        100_000_000 * EIGHTEEN_DECIMALS,  # _globalDepositLimit
+        (
+            0,  # ltv
+            0,  # redemptionThreshold
+            0,  # liqThreshold
+            0,  # liqFee
+            0,  # borrowRate
+            0,  # daowry
+        ),  # _debtTerms
+        False,  # _shouldBurnAsPayment
+        False,  # _shouldTransferToEndaoment
+        False,  # _shouldSwapInStabPools
+        False,  # _shouldAuctionInstantly
+        True,  # _canDeposit
+        True,  # _canWithdraw
+        False,  # _canRedeemCollateral
+        False,  # _canRedeemInStabPool
+        False,  # _canBuyInAuction
+        False,  # _canClaimInStabPool
+    )
+    assert migration.execute(sb_bravo.executePendingAction, actionId)
+
+    actionId = migration.execute(
         sb_alpha.setPriorityStabVaults,
-        [(stability_pool_vault_id, migration.get_address("SavingsGreen"))],
+        [
+            (stability_pool_vault_id, migration.get_address("SavingsGreen")),
+            (stability_pool_vault_id, migration.get_address("GreenPool")),
+        ],
     )
     assert migration.execute(sb_alpha.executePendingAction, actionId)
 
