@@ -1,4 +1,4 @@
-from config.BluePrint import PARAMS, ADDYS
+from config.BluePrint import PARAMS, ADDYS, CURVE_PARAMS
 
 
 class BluePrint:
@@ -6,6 +6,7 @@ class BluePrint:
         self.blueprint = blueprint
         self.PARAMS = PARAMS[blueprint]
         self.ADDYS = ADDYS[blueprint]
+        self.CURVE_PARAMS = CURVE_PARAMS[blueprint]
 
 
 class DeployArgs:

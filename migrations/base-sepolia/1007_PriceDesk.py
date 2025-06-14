@@ -18,6 +18,9 @@ def migrate(migration: Migration):
         blueprint.PARAMS["PRICE_DESK_MAX_REG_TIMELOCK"],
     )
 
+    migration.execute(hq.startAddNewAddressToRegistry, price_desk, "Price Desk")
+    assert migration.execute(hq.confirmNewAddressToRegistry, price_desk) == 7
+
     # Set up chainlink feeds
 
     mock_usdc_feed = migration.deploy(
@@ -64,19 +67,33 @@ def migrate(migration: Migration):
     migration.execute(price_desk.startAddNewAddressToRegistry, chainlink, "Chainlink")
     migration.execute(price_desk.confirmNewAddressToRegistry, chainlink)
 
-    # Set up Mock Price Source
+    # Set up Curve Prices
 
-    mock_price_source = migration.deploy(
-        "MockPriceSource",
+    curve_prices = migration.deploy(
+        "CurvePrices",
         hq,
+        blueprint.ADDYS["CURVE_ADDRESS_PROVIDER"],
         blueprint.PARAMS["PRICE_DESK_MIN_REG_TIMELOCK"],
         blueprint.PARAMS["PRICE_DESK_MAX_REG_TIMELOCK"],
     )
+    migration.execute(price_desk.startAddNewAddressToRegistry, curve_prices, "Curve Prices")
+    migration.execute(price_desk.confirmNewAddressToRegistry, curve_prices)
 
-    migration.execute(mock_price_source.setPrice, migration.get_address("GreenToken"), EIGHTEEN_DECIMALS)
-    migration.execute(mock_price_source.setPrice, migration.get_address("RipeToken"), EIGHTEEN_DECIMALS // 10)
-    migration.execute(price_desk.startAddNewAddressToRegistry, mock_price_source, "Mock Price Source")
-    migration.execute(price_desk.confirmNewAddressToRegistry, mock_price_source)
+    # Add Green Prices
+    green_token = migration.get_address("GreenToken")
+    green_pool = migration.get_address("GreenPoool")
+    migration.execute(curve_prices.addNewPriceFeed, green_token, green_pool)
+    migration.execute(curve_prices.confirmNewPriceFeed, green_token)
+    migration.execute(curve_prices.addNewPriceFeed, green_pool, green_pool)
+    migration.execute(curve_prices.confirmNewPriceFeed, green_pool)
+
+    # Add Ripe Prices
+    ripe_token = migration.get_address("RipeToken")
+    ripe_pool = migration.get_address("RipePoool")
+    migration.execute(curve_prices.addNewPriceFeed, ripe_token, ripe_pool)
+    migration.execute(curve_prices.confirmNewPriceFeed, ripe_token)
+    migration.execute(curve_prices.addNewPriceFeed, ripe_pool, ripe_pool)
+    migration.execute(curve_prices.confirmNewPriceFeed, ripe_pool)
 
     mock_s_green_price = migration.deploy(
         "MockSGreenPrice",
@@ -88,6 +105,3 @@ def migrate(migration: Migration):
 
     # finish registry setup
     migration.execute(price_desk.setRegistryTimeLockAfterSetup)
-
-    migration.execute(hq.startAddNewAddressToRegistry, price_desk, "Price Desk")
-    assert migration.execute(hq.confirmNewAddressToRegistry, price_desk) == 7

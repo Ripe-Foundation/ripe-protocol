@@ -25,6 +25,9 @@ ADDYS = {
         "USDC": "0x611ce0729f6C052f49536c84a8fD717E619D5dc6",
         "CBBTC": "0x003d1beA6B9C5193cDA8d747A5362eD2932a35d0",
         "GOVERNANCE": "0xa6AC77Fb1Ac34d35F852456560bAef2d77239dcF",
+        "CURVE_ADDRESS_PROVIDER": "0x88953B3eBA73d6B5252b00B1827769b5a5617599",
+        "CURVE_STABLE_FACTORY": "0xa1ABe9e8F3C516c66F48cb318B62bFfa2CB5D1Cc",
+        "CURVE_CRYPTO_FACTORY": "0xe11286024334D79f8bA8d621dA8bCB177C7F988C",
     },
 }
 
@@ -93,7 +96,6 @@ PARAMS = {
 }
 
 
-
 CORE_TOKENS = {
     "base": {
         # stables
@@ -127,6 +129,27 @@ CORE_TOKENS = {
 
 CURVE_PARAMS = {
     "base": {
+        # green pool parameters
+        "GREEN_POOL_NAME": "GREEN/USDC Pool",
+        "GREEN_POOL_SYMBOL": "GREEN/USDC",
+        "GREEN_POOL_A": 100,
+        "GREEN_POOL_FEE": 4000000,
+        "GREEN_POOL_OFFPEG_MULTIPLIER": 20000000000,
+        "GREEN_POOL_MA_EXP_TIME": 600,
+        # ripe pool params
+        "RIPE_POOL_NAME": "RIPE/WETH Pool",
+        "RIPE_POOL_SYMBOL": "RIPE/WETH",
+        "RIPE_POOL_A": 2700000,
+        "RIPE_POOL_GAMMA": 1300000000000,
+        "RIPE_POOL_MID_FEE": 2999999,
+        "RIPE_POOL_OUT_FEE": 80000000,
+        "RIPE_POOL_FEE_GAMMA": 350000000000000,
+        "RIPE_POOL_EXTRA_PROFIT": 100000000000,
+        "RIPE_POOL_ADJ_STEP": 100000000000,
+        "RIPE_POOL_MA_EXP_TIME": 600,
+        "RIPE_POOL_INIT_PRICE": 10 ** 13,
+    },
+    "sepolia": {
         # green pool parameters
         "GREEN_POOL_NAME": "GREEN/USDC Pool",
         "GREEN_POOL_SYMBOL": "GREEN/USDC",

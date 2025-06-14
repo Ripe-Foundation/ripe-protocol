@@ -159,11 +159,14 @@ def deployed_contracts_manifest(contracts: dict, contract_files: dict, args: dic
     manifest = {}
 
     for contract_name in contracts.keys():
-        manifest[contract_name] = {
-            "address": contracts[contract_name].address,
-            "abi": get_vyper_abi(files[contract_files[contract_name]]),
-            "solc_json": contracts[contract_name].deployer.solc_json,
-            "args": encode_constructor_args(get_vyper_abi(files[contract_files[contract_name]]), args[contract_name])
-        }
+        if not hasattr(contracts[contract_name], "address"):
+            manifest[contract_name] = {"address": contracts[contract_name]}
+        else:
+            manifest[contract_name] = {
+                "address": contracts[contract_name].address,
+                "abi": get_vyper_abi(files[contract_files[contract_name]]),
+                "solc_json": contracts[contract_name].deployer.solc_json,
+                "args": encode_constructor_args(get_vyper_abi(files[contract_files[contract_name]]), args[contract_name])
+            }
 
     return {"contracts": manifest}

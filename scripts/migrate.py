@@ -68,6 +68,20 @@ CLICK_PROMPTS = {
 }
 
 
+ETHERSCAN_API_KEYS = {
+    "base": os.environ["BASESCAN_API_KEY"],
+    "base-sepolia": os.environ["BASESCAN_API_KEY"],
+}
+ETHERSCAN_URLS = {
+    "eth-mainnet": "https://api.etherscan.io/api",
+    "eth-goerli": "https://api-goerli.etherscan.io/api",
+    "eth-sepolia": "https://api-sepolia.etherscan.io/api",
+    "base-mainnet": "https://api.basescan.org/api",
+    "base-goerli": "https://api-goerli.basescan.org/api",
+    "base-sepolia": "https://api-sepolia.basescan.org/api",
+}
+
+
 def param_prompt(ctx, param, value):
     param_config = CLICK_PROMPTS[param.name]
     is_configured_param = not (param_config is None)
@@ -241,6 +255,8 @@ def cli(
     )
 
     boa.deployments.set_deployments_db(boa.deployments.DeploymentsDB(":memory:"))
+    boa.set_etherscan(api_key=ETHERSCAN_API_KEYS[chain], uri=ETHERSCAN_URLS[chain])
+
     if final_rpc == 'boa':
         with boa.set_env(Env()) as env:
             total_gas = migrations.run(
