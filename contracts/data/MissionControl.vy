@@ -19,20 +19,8 @@ interface Whitelist:
 interface Vault:
     def vaultAssets(_index: uint256) -> address: view
 
-interface UnderscoreAgentFactory:
-    def isUserWallet(_addr: address) -> bool: view
-
-interface UnderscoreRegistry:
-    def getAddy(_addyId: uint256) -> address: view
-
 interface VaultBook:
     def getAddr(_regId: uint256) -> address: view
-
-interface UnderscoreWallet:
-    def walletConfig() -> address: view
-
-interface UnderscoreWalletConfig:
-    def owner() -> address: view
 
 struct GenConfig:
     perUserMaxVaults: uint256
@@ -295,23 +283,6 @@ struct DynamicBorrowRateConfig:
     increasePerDangerBlock: uint256
     maxBorrowRate: uint256
 
-# events
-
-event UserConfigSet:
-    user: indexed(address)
-    canAnyoneDeposit: bool
-    canAnyoneRepayDebt: bool
-    canAnyoneBondForUser: bool
-
-event UserDelegationSet:
-    user: indexed(address)
-    delegate: indexed(address)
-    setter: indexed(address)
-    canWithdraw: bool
-    canBorrow: bool
-    canClaimFromStabPool: bool
-    canClaimLoot: bool
-
 # global config
 genConfig: public(GenConfig)
 genDebtConfig: public(GenDebtConfig)
@@ -348,7 +319,6 @@ userDelegation: public(HashMap[address, HashMap[address, ActionDelegation]]) # u
 MAX_VAULTS_PER_ASSET: constant(uint256) = 10
 MAX_PRIORITY_PRICE_SOURCES: constant(uint256) = 10
 PRIORITY_VAULT_DATA: constant(uint256) = 20
-UNDERSCORE_AGENT_FACTORY_ID: constant(uint256) = 1
 
 
 @deploy
@@ -573,76 +543,15 @@ def setPriorityStabVaults(_priorityStabVaults: DynArray[VaultLite, PRIORITY_VAUL
 
 
 @external
-def setUserConfig(
-    _canAnyoneDeposit: bool = True,
-    _canAnyoneRepayDebt: bool = True,
-    _canAnyoneBondForUser: bool = False,
-) -> bool:
-    assert not deptBasics.isPaused # dev: contract paused
-    userConfig: UserConfig = UserConfig(
-        canAnyoneDeposit=_canAnyoneDeposit,
-        canAnyoneRepayDebt=_canAnyoneRepayDebt,
-        canAnyoneBondForUser=_canAnyoneBondForUser,
-    )
-    self.userConfig[msg.sender] = userConfig
-    log UserConfigSet(user=msg.sender, canAnyoneDeposit=_canAnyoneDeposit, canAnyoneRepayDebt=_canAnyoneRepayDebt, canAnyoneBondForUser=_canAnyoneBondForUser)
-    return True
-
-
-# delegation
+def setUserConfig(_user: address, _config: UserConfig):
+    assert addys._isSwitchboardAddr(msg.sender) or msg.sender == addys._getTellerAddr() # dev: no perms
+    self.userConfig[_user] = _config
 
 
 @external
-def setUserDelegation(
-    _delegate: address,
-    _canWithdraw: bool,
-    _canBorrow: bool,
-    _canClaimFromStabPool: bool,
-    _canClaimLoot: bool,
-    _user: address = msg.sender,
-) -> bool:
-    assert not deptBasics.isPaused # dev: contract paused
-    assert _delegate != empty(address) # dev: invalid delegate
-
-    # validate underscore wallet
-    if _user != msg.sender:
-        assert self._isUnderscoreWalletOwner(_user, msg.sender) # dev: not owner of underscore wallet
-
-    config: ActionDelegation = ActionDelegation(
-        canWithdraw=_canWithdraw,
-        canBorrow=_canBorrow,
-        canClaimFromStabPool=_canClaimFromStabPool,
-        canClaimLoot=_canClaimLoot,
-    )
-    self.userDelegation[_user][_delegate] = config
-    log UserDelegationSet(user=_user, delegate=_delegate, setter=msg.sender, canWithdraw=_canWithdraw, canBorrow=_canBorrow, canClaimFromStabPool=_canClaimFromStabPool, canClaimLoot=_canClaimLoot)
-    return True
-
-
-# underscore ownership check
-
-
-@view
-@internal
-def _isUnderscoreWalletOwner(_user: address, _caller: address) -> bool:
-    underscore: address = self.underscoreRegistry
-    if underscore == empty(address):
-        return False
-
-    agentFactory: address = staticcall UnderscoreRegistry(underscore).getAddy(UNDERSCORE_AGENT_FACTORY_ID)
-    if agentFactory == empty(address):
-        return False
-
-    # must be underscore wallet
-    if not staticcall UnderscoreAgentFactory(agentFactory).isUserWallet(_user):
-        return False
-
-    walletConfig: address = staticcall UnderscoreWallet(_user).walletConfig()
-    if walletConfig == empty(address):
-        return False
-
-    # caller must be owner!
-    return staticcall UnderscoreWalletConfig(walletConfig).owner() == _caller
+def setUserDelegation(_user: address, _delegate: address, _config: ActionDelegation):
+    assert addys._isSwitchboardAddr(msg.sender) or msg.sender == addys._getTellerAddr() # dev: no perms
+    self.userDelegation[_user][_delegate] = _config
 
 
 ###################

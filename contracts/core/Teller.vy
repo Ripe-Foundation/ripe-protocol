@@ -23,6 +23,13 @@ interface CreditEngine:
     def borrowForUser(_user: address, _greenAmount: uint256, _wantsSavingsGreen: bool, _caller: address, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
     def updateDebtForUser(_user: address, _a: addys.Addys = empty(addys.Addys)) -> bool: nonpayable
 
+interface MissionControl:
+    def getTellerWithdrawConfig(_asset: address, _user: address, _caller: address) -> TellerWithdrawConfig: view
+    def getTellerDepositConfig(_vaultId: uint256, _asset: address, _user: address) -> TellerDepositConfig: view
+    def setUserDelegation(_user: address, _delegate: address, _config: ActionDelegation): nonpayable
+    def setUserConfig(_user: address, _config: UserConfig): nonpayable
+    def underscoreRegistry() -> address: view
+
 interface AuctionHouse:
     def buyManyFungibleAuctions(_purchases: DynArray[FungAuctionPurchase, MAX_AUCTION_PURCHASES], _greenAmount: uint256, _buyer: address, _shouldTransferBalance: bool, _shouldRefundSavingsGreen: bool, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
     def buyFungibleAuction(_liqUser: address, _vaultId: uint256, _asset: address, _greenAmount: uint256, _buyer: address, _shouldTransferBalance: bool, _shouldRefundSavingsGreen: bool, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
@@ -45,10 +52,6 @@ interface RipeGovVault:
     def adjustLock(_user: address, _asset: address, _newLockDuration: uint256, _a: addys.Addys = empty(addys.Addys)): nonpayable
     def releaseLock(_user: address, _asset: address, _a: addys.Addys = empty(addys.Addys)): nonpayable
 
-interface MissionControl:
-    def getTellerWithdrawConfig(_asset: address, _user: address, _caller: address) -> TellerWithdrawConfig: view
-    def getTellerDepositConfig(_vaultId: uint256, _asset: address, _user: address) -> TellerDepositConfig: view
-
 interface Ledger:
     def getDepositLedgerData(_user: address, _vaultId: uint256) -> DepositLedgerData: view
     def addVaultToUser(_user: address, _vaultId: uint256): nonpayable
@@ -62,6 +65,18 @@ interface BondRoom:
 
 interface PriceDesk:
     def addGreenRefPoolSnapshot() -> bool: nonpayable
+
+interface UnderscoreAgentFactory:
+    def isUserWallet(_addr: address) -> bool: view
+
+interface UnderscoreRegistry:
+    def getAddy(_addyId: uint256) -> address: view
+
+interface UnderscoreWallet:
+    def walletConfig() -> address: view
+
+interface UnderscoreWalletConfig:
+    def owner() -> address: view
 
 struct DepositLedgerData:
     isParticipatingInVault: bool
@@ -117,6 +132,17 @@ struct StabPoolRedemption:
     claimAsset: address
     maxGreenAmount: uint256
 
+struct UserConfig:
+    canAnyoneDeposit: bool
+    canAnyoneRepayDebt: bool
+    canAnyoneBondForUser: bool
+
+struct ActionDelegation:
+    canWithdraw: bool
+    canBorrow: bool
+    canClaimFromStabPool: bool
+    canClaimLoot: bool
+
 event TellerDeposit:
     user: indexed(address)
     depositor: indexed(address)
@@ -134,6 +160,22 @@ event TellerWithdrawal:
     vaultId: uint256
     isDepleted: bool
 
+event UserConfigSet:
+    user: indexed(address)
+    canAnyoneDeposit: bool
+    canAnyoneRepayDebt: bool
+    canAnyoneBondForUser: bool
+    caller: indexed(address)
+
+event UserDelegationSet:
+    user: indexed(address) 
+    delegate: indexed(address)
+    canWithdraw: bool
+    canBorrow: bool
+    canClaimFromStabPool: bool 
+    canClaimLoot: bool
+    caller: indexed(address)
+
 MAX_BALANCE_ACTION: constant(uint256) = 20
 MAX_CLAIM_USERS: constant(uint256) = 25
 MAX_COLLATERAL_REDEMPTIONS: constant(uint256) = 20
@@ -142,6 +184,7 @@ MAX_LIQ_USERS: constant(uint256) = 50
 MAX_STAB_CLAIMS: constant(uint256) = 15
 MAX_STAB_REDEMPTIONS: constant(uint256) = 15
 RIPE_GOV_VAULT_ID: constant(uint256) = 2
+UNDERSCORE_AGENT_FACTORY_ID: constant(uint256) = 1
 
 
 @deploy
@@ -727,6 +770,92 @@ def purchaseRipeBond(
     extcall PriceDesk(a.priceDesk).addGreenRefPoolSnapshot()
     extcall CreditEngine(a.creditEngine).updateDebtForUser(msg.sender, a)
     return ripePayout
+
+
+###############
+# User Config #
+###############
+
+
+@external
+def setUserConfig(
+    _user: address = msg.sender,
+    _canAnyoneDeposit: bool = True,
+    _canAnyoneRepayDebt: bool = True,
+    _canAnyoneBondForUser: bool = True,
+) -> bool:
+    assert not deptBasics.isPaused # dev: contract paused
+    userConfig: UserConfig = UserConfig(
+        canAnyoneDeposit=_canAnyoneDeposit,
+        canAnyoneRepayDebt=_canAnyoneRepayDebt,
+        canAnyoneBondForUser=_canAnyoneBondForUser,
+    )
+
+    # validate underscore wallet
+    if _user != msg.sender:
+        assert self._isUnderscoreWalletOwner(_user, msg.sender) # dev: not owner of underscore wallet
+
+    extcall MissionControl(addys._getMissionControlAddr()).setUserConfig(_user, userConfig)
+    log UserConfigSet(user=_user, canAnyoneDeposit=_canAnyoneDeposit, canAnyoneRepayDebt=_canAnyoneRepayDebt, canAnyoneBondForUser=_canAnyoneBondForUser, caller=msg.sender)
+    return True
+
+
+# delegation
+
+
+@external
+def setUserDelegation(
+    _delegate: address,
+    _user: address = msg.sender,
+    _canWithdraw: bool = True,
+    _canBorrow: bool = True,
+    _canClaimFromStabPool: bool = True,
+    _canClaimLoot: bool = True,
+) -> bool:
+    assert not deptBasics.isPaused # dev: contract paused
+    assert _delegate != empty(address) # dev: invalid delegate
+    assert _delegate != _user # dev: cannot delegate to self
+
+    # validate underscore wallet
+    if _user != msg.sender:
+        assert self._isUnderscoreWalletOwner(_user, msg.sender) # dev: not owner of underscore wallet
+        assert _delegate != msg.sender # dev: cannot delegate to owner
+
+    config: ActionDelegation = ActionDelegation(
+        canWithdraw=_canWithdraw,
+        canBorrow=_canBorrow,
+        canClaimFromStabPool=_canClaimFromStabPool,
+        canClaimLoot=_canClaimLoot,
+    )
+    extcall MissionControl(addys._getMissionControlAddr()).setUserDelegation(_user, _delegate, config)
+    log UserDelegationSet(user=_user, delegate=_delegate, canWithdraw=_canWithdraw, canBorrow=_canBorrow, canClaimFromStabPool=_canClaimFromStabPool, canClaimLoot=_canClaimLoot, caller=msg.sender)
+    return True
+
+
+# underscore ownership check
+
+
+@view
+@internal
+def _isUnderscoreWalletOwner(_user: address, _caller: address) -> bool:
+    underscore: address = staticcall MissionControl(addys._getMissionControlAddr()).underscoreRegistry()
+    if underscore == empty(address):
+        return False
+
+    agentFactory: address = staticcall UnderscoreRegistry(underscore).getAddy(UNDERSCORE_AGENT_FACTORY_ID)
+    if agentFactory == empty(address):
+        return False
+
+    # must be underscore wallet
+    if not staticcall UnderscoreAgentFactory(agentFactory).isUserWallet(_user):
+        return False
+
+    walletConfig: address = staticcall UnderscoreWallet(_user).walletConfig()
+    if walletConfig == empty(address):
+        return False
+
+    # caller must be owner!
+    return staticcall UnderscoreWalletConfig(walletConfig).owner() == _caller
 
 
 #############
