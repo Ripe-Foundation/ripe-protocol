@@ -663,6 +663,7 @@ def blue_chip_prices(ripe_hq_deploy, fork, deploy3r, mock_yield_registry):
     FLUID = mock_yield_registry if fork == "local" else ADDYS[fork]["FLUID_RESOLVER"]
     COMPOUND_V3 = mock_yield_registry if fork == "local" else ADDYS[fork]["COMPOUND_V3_CONFIGURATOR"]
     MOONWELL = mock_yield_registry if fork == "local" else ADDYS[fork]["MOONWELL_COMPTROLLER"]
+    AAVE_V3 = mock_yield_registry if fork == "local" else ADDYS[fork]["AAVE_V3_ADDRESS_PROVIDER"]
 
     c = boa.load(
         "contracts/priceSources/BlueChipYieldPrices.vy",
@@ -674,6 +675,7 @@ def blue_chip_prices(ripe_hq_deploy, fork, deploy3r, mock_yield_registry):
         FLUID,
         COMPOUND_V3,
         MOONWELL,
+        AAVE_V3,
         name="blue_chip_prices",
     )
     assert c.setActionTimeLockAfterSetup(sender=deploy3r)

@@ -22,6 +22,8 @@ ADDYS = {
         "COMPOUND_V3_CONFIGURATOR": "0x45939657d1CA34A8FA39A924B71D28Fe8431e581",
         # moonwell
         "MOONWELL_COMPTROLLER": "0xfBb21d0380beE3312B33c4353c8936a0F13EF26C",
+        # aave v3
+        "AAVE_V3_ADDRESS_PROVIDER": "0xe20fCBdBfFC4Dd138cE8b2E6FBb6CB49777ad64D",
     },
     "local": {
         # important tokens / representations

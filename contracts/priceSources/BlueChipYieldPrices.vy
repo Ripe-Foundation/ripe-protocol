@@ -26,6 +26,10 @@ interface EulerRegistry:
     def isValidDeployment(_vault: address) -> bool: view
     def isProxy(_vault: address) -> bool: view
 
+interface AaveRegistry:
+    def getAllATokens() -> DynArray[TokenData, MAX_MARKETS]: view
+    def getPoolDataProvider() -> address: view
+
 interface Moonwell:
     def exchangeRateStored() -> uint256: view
     def underlying() -> address: view
@@ -44,6 +48,9 @@ interface CompoundV3Registry:
 
 interface MorphoRegistry:
     def isMetaMorpho(_vault: address) -> bool: view
+
+interface AaveToken:
+    def UNDERLYING_ASSET_ADDRESS() -> address: view
 
 interface CompoundV3:
     def baseToken() -> address: view
@@ -77,6 +84,10 @@ struct PriceSnapshot:
 struct PendingPriceConfig:
     actionId: uint256
     config: PriceConfig
+
+struct TokenData:
+    symbol: String[32]
+    tokenAddress: address
 
 event NewPriceConfigPending:
     asset: indexed(address)
@@ -166,6 +177,7 @@ EULER_ADDRS: public(immutable(address[2]))
 FLUID_ADDR: public(immutable(address))
 COMPOUND_V3_ADDR: public(immutable(address))
 MOONWELL_ADDR: public(immutable(address))
+AAVE_V3_ADDR: public(immutable(address))
 
 
 @deploy
@@ -178,6 +190,7 @@ def __init__(
     _fluidAddr: address,
     _compoundV3Addr: address,
     _moonwellAddr: address,
+    _aaveV3Addr: address,
 ):
     gov.__init__(_ripeHq, empty(address), 0, 0, 0)
     addys.__init__(_ripeHq)
@@ -190,6 +203,7 @@ def __init__(
     FLUID_ADDR = _fluidAddr
     COMPOUND_V3_ADDR = _compoundV3Addr
     MOONWELL_ADDR = _moonwellAddr
+    AAVE_V3_ADDR = _aaveV3Addr
 
 
 ###############
@@ -235,8 +249,8 @@ def _getPrice(
     # undelrying price
     underlyingPrice: uint256 = staticcall PriceDesk(priceDesk).getPrice(_config.underlyingAsset, False)
 
-    # compound v3 -- just use underlying price
-    if _config.protocol == Protocol.COMPOUND_V3:
+    # aave v3 and compound v3 -- just use underlying price
+    if _config.protocol == Protocol.COMPOUND_V3 or _config.protocol == Protocol.AAVE_V3:
         return underlyingPrice
 
     # weighted price per share
@@ -444,6 +458,9 @@ def _getPriceConfig(
 
     elif _protocol == Protocol.MOONWELL:
         underlyingAsset = self._getMoonwellUnderlyingAsset(_asset)
+
+    elif _protocol == Protocol.AAVE_V3:
+        underlyingAsset = self._getAaveV3UnderlyingAsset(_asset)
 
     # TODO: implement rest of protocols
 
@@ -758,8 +775,8 @@ def _addPriceSnapshot(_asset: address, _config: PriceConfig) -> bool:
     if config.underlyingAsset == empty(address):
         return False
 
-    # compound v3 - not using snapshots
-    if _config.protocol == Protocol.COMPOUND_V3:
+    # aave v3 and compound v3 - not using snapshots
+    if _config.protocol == Protocol.COMPOUND_V3 or _config.protocol == Protocol.AAVE_V3:
         return False
 
     # already have snapshot for this time
@@ -919,6 +936,22 @@ def _getCompoundV3UnderlyingAsset(_asset: address) -> address:
     if staticcall CompoundV3Registry(COMPOUND_V3_ADDR).factory(_asset) == empty(address):
         return empty(address)
     return staticcall CompoundV3(_asset).baseToken()
+
+
+###########
+# Aave v3 #
+###########
+
+
+@view
+@internal
+def _getAaveV3UnderlyingAsset(_asset: address) -> address:
+    dataProvider: address = staticcall AaveRegistry(AAVE_V3_ADDR).getPoolDataProvider()
+    aTokens: DynArray[TokenData, MAX_MARKETS] = staticcall AaveRegistry(dataProvider).getAllATokens()
+    for a: TokenData in aTokens:
+        if a.tokenAddress == _asset:
+            return staticcall AaveToken(_asset).UNDERLYING_ASSET_ADDRESS()
+    return empty(address)
 
 
 ############
