@@ -217,7 +217,7 @@ def test_repay_unauthorized_sender(
     green_token.transfer(sally, repay_amount, sender=whale)
 
     green_token.approve(teller, repay_amount, sender=sally)
-    with boa.reverts("cannot repay for user"):
+    with boa.reverts("not allowed to repay for user"):
         teller.repay(repay_amount, bob, False, sender=sally)
 
     # success

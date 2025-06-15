@@ -183,11 +183,13 @@ struct RedeemCollateralConfig:
     canRedeemCollateralAsset: bool
     isUserAllowed: bool
     ltvPaybackBuffer: uint256
+    canAnyoneDeposit: bool
 
 struct AuctionBuyConfig:
     canBuyInAuctionGeneral: bool
     canBuyInAuctionAsset: bool
     isUserAllowed: bool
+    canAnyoneDeposit: bool
 
 struct GenLiqConfig:
     canLiquidate: bool
@@ -692,13 +694,14 @@ def getRepayConfig(_user: address) -> RepayConfig:
 
 @view
 @external
-def getRedeemCollateralConfig(_asset: address, _redeemer: address) -> RedeemCollateralConfig:
+def getRedeemCollateralConfig(_asset: address, _recipient: address) -> RedeemCollateralConfig:
     assetConfig: AssetConfig = self.assetConfig[_asset]
     return RedeemCollateralConfig(
         canRedeemCollateralGeneral=self.genConfig.canRedeemCollateral,
         canRedeemCollateralAsset=assetConfig.canRedeemCollateral,
-        isUserAllowed=self._isUserAllowed(assetConfig.whitelist, _redeemer, _asset),
+        isUserAllowed=self._isUserAllowed(assetConfig.whitelist, _recipient, _asset),
         ltvPaybackBuffer=self.genDebtConfig.ltvPaybackBuffer,
+        canAnyoneDeposit=self.userConfig[_recipient].canAnyoneDeposit,
     )
 
 
@@ -713,12 +716,13 @@ def getLtvPaybackBuffer() -> uint256:
 
 @view
 @external
-def getAuctionBuyConfig(_asset: address, _buyer: address) -> AuctionBuyConfig:
+def getAuctionBuyConfig(_asset: address, _recipient: address) -> AuctionBuyConfig:
     assetConfig: AssetConfig = self.assetConfig[_asset]
     return AuctionBuyConfig(
         canBuyInAuctionGeneral=self.genConfig.canBuyInAuction,
         canBuyInAuctionAsset=assetConfig.canBuyInAuction,
-        isUserAllowed=self._isUserAllowed(assetConfig.whitelist, _buyer, _asset),
+        isUserAllowed=self._isUserAllowed(assetConfig.whitelist, _recipient, _asset),
+        canAnyoneDeposit=self.userConfig[_recipient].canAnyoneDeposit,
     )
 
 

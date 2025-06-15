@@ -132,7 +132,7 @@ def test_teller_deposit_others_not_allowed(
     alpha_token.approve(teller.address, deposit_amount, sender=sally)
 
     # Attempt deposit by sally for bob should fail
-    with boa.reverts("others cannot deposit for user"):
+    with boa.reverts("cannot deposit for user"):
         teller.deposit(alpha_token, deposit_amount, bob, simple_erc20_vault, sender=sally)
 
 

@@ -117,7 +117,7 @@ def test_borrow_user_not_allowed(
 
     # Attempt borrow should fail
     borrow_amount = 100 * EIGHTEEN_DECIMALS
-    with boa.reverts("cannot borrow for user"):
+    with boa.reverts("not allowed to borrow for user"):
         teller.borrow(borrow_amount, bob, False, sender=sally)
 
     # allow sally to withdraw for bob

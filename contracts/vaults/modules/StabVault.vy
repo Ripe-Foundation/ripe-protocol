@@ -14,12 +14,13 @@ interface MissionControl:
     def getStabPoolClaimsConfig(_claimAsset: address, _claimer: address, _caller: address) -> StabPoolClaimsConfig: view
     def getStabPoolRedemptionsConfig(_asset: address, _redeemer: address) -> StabPoolRedemptionsConfig: view
 
+interface Teller:
+    def depositIntoGovVaultFromTrusted(_user: address, _asset: address, _amount: uint256, _lockDuration: uint256, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
+    def isUnderscoreWalletOwner(_user: address, _caller: address, _mc: address = empty(address)) -> bool: view
+
 interface PriceDesk:
     def getAssetAmount(_asset: address, _usdValue: uint256, _shouldRaise: bool = False) -> uint256: view
     def getUsdValue(_asset: address, _amount: uint256, _shouldRaise: bool = False) -> uint256: view
-
-interface Teller:
-    def depositIntoGovVaultFromTrusted(_user: address, _asset: address, _amount: uint256, _lockDuration: uint256, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
 
 interface VaultBook:
     def mintRipeForStabPoolClaims(_amount: uint256, _ripeToken: address, _ledger: address) -> bool: nonpayable
@@ -615,8 +616,9 @@ def _claimFromStabilityPool(
     if not _config.canClaimInStabPoolGeneral or not _config.canClaimInStabPoolAsset or not _config.isUserAllowed:
         return 0
 
-    if _claimer != _caller:
-        assert _config.canClaimFromStabPoolForUser # dev: cannot claim for user
+    # can others claim for user
+    if _claimer != _caller and not _config.canClaimFromStabPoolForUser:
+        assert staticcall Teller(_a.teller).isUnderscoreWalletOwner(_claimer, _caller, _a.missionControl) # dev: cannot claim for user
 
     # max claimable asset
     maxClaimableAsset: uint256 = self.claimableBalances[_stabAsset][_claimAsset]

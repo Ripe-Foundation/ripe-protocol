@@ -750,7 +750,7 @@ def test_ah_auction_insufficient_green_scenarios(
     
     # Partial GREEN availability (should use what's available)
     green_spent = auction_house.buyFungibleAuction(
-        bob, auction_log.vaultId, alpha_token, 20 * EIGHTEEN_DECIMALS, alice, False, False, sender=teller.address
+        bob, auction_log.vaultId, alpha_token, 20 * EIGHTEEN_DECIMALS, alice, alice, False, False, sender=teller.address
     )
     
     # Should spend only what was available in auction house
@@ -769,7 +769,7 @@ def test_ah_auction_insufficient_green_scenarios(
     ]
     
     total_green_spent = auction_house.buyManyFungibleAuctions(
-        purchases, 30 * EIGHTEEN_DECIMALS, alice, False, False, sender=teller.address
+        purchases, 30 * EIGHTEEN_DECIMALS, alice, alice, False, False, sender=teller.address
     )
     
     # Should spend only what was available
@@ -1665,7 +1665,7 @@ def test_ah_auction_buy_with_balance_transfer_basic(
     assert len(purchase_logs) == 1
     log = purchase_logs[0]
     assert log.liqUser == bob
-    assert log.buyer == alice
+    assert log.recipient == alice
     assert log.collateralAmountSent == amount_transferred
 
 

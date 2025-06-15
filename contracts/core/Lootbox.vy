@@ -34,6 +34,7 @@ interface MissionControl:
 
 interface Teller:
     def depositIntoGovVaultFromTrusted(_user: address, _asset: address, _amount: uint256, _lockDuration: uint256, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
+    def isUnderscoreWalletOwner(_user: address, _caller: address, _mc: address = empty(address)) -> bool: view
 
 interface PriceDesk:
     def getUsdValue(_asset: address, _amount: uint256, _shouldRaise: bool = False) -> uint256: view
@@ -202,8 +203,11 @@ def _claimLoot(
     # check if caller can claim for user
     config: ClaimLootConfig = staticcall MissionControl(_a.missionControl).getClaimLootConfig(_user, _caller, _a.ripeToken)
     assert config.canClaimLoot # dev: loot claims disabled
-    if _shouldCheckCaller and _user != _caller:
-        assert config.canClaimLootForUser # dev: cannot claim for user
+
+    # can others claim for user
+    if _shouldCheckCaller:
+        if _user != _caller and not config.canClaimLootForUser:
+            assert staticcall Teller(_a.teller).isUnderscoreWalletOwner(_user, _caller, _a.missionControl) # dev: cannot claim for user
 
     # total loot -- start with borrow loot
     totalRipeForUser: uint256 = self._claimBorrowLoot(_user, _a)

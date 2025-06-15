@@ -26,7 +26,7 @@ interface Ledger:
     def flushUnrealizedYield() -> uint256: nonpayable
 
 interface MissionControl:
-    def getRedeemCollateralConfig(_asset: address, _redeemer: address) -> RedeemCollateralConfig: view
+    def getRedeemCollateralConfig(_asset: address, _recipient: address) -> RedeemCollateralConfig: view
     def getBorrowConfig(_user: address, _caller: address) -> BorrowConfig: view
     def getDynamicBorrowRateConfig() -> DynamicBorrowRateConfig: view
     def getRepayConfig(_user: address) -> RepayConfig: view
@@ -45,6 +45,9 @@ interface LootBox:
 interface GreenToken:
     def mint(_to: address, _amount: uint256): nonpayable
     def burn(_amount: uint256): nonpayable
+
+interface Teller:
+    def isUnderscoreWalletOwner(_user: address, _caller: address, _mc: address = empty(address)) -> bool: view
 
 interface AddressRegistry:
     def getAddr(_regId: uint256) -> address: view
@@ -111,6 +114,7 @@ struct RedeemCollateralConfig:
     canRedeemCollateralAsset: bool
     isUserAllowed: bool
     ltvPaybackBuffer: uint256
+    canAnyoneDeposit: bool
 
 struct CollateralRedemption:
     user: address
@@ -155,7 +159,8 @@ event CollateralRedeemed:
     vaultId: uint256
     asset: indexed(address)
     amount: uint256
-    redeemer: indexed(address)
+    recipient: indexed(address)
+    caller: address
     repayValue: uint256
     hasGoodDebtHealth: bool
 
@@ -205,6 +210,10 @@ def borrowForUser(
 
     # get config
     config: BorrowConfig = staticcall MissionControl(a.missionControl).getBorrowConfig(_user, _caller)
+
+    # check perms
+    if _user != _caller and not config.canBorrowForUser:
+        assert staticcall Teller(a.teller).isUnderscoreWalletOwner(_user, _caller, a.missionControl) # dev: not allowed to borrow for user
 
     # validation
     newBorrowAmount: uint256 = 0
@@ -276,7 +285,6 @@ def _validateOnBorrow(
 
     # get borrow config
     assert _config.canBorrow # dev: borrow not enabled
-    assert _config.canBorrowForUser # dev: cannot borrow for user
 
     # check num allowed borrowers
     if not _d.isUserBorrower:
@@ -407,7 +415,7 @@ def repayForUser(
     # validation
     repayAmount: uint256 = 0
     refundAmount: uint256 = 0
-    repayAmount, refundAmount = self._validateOnRepay(_user, _caller, _greenAmount, userDebt.amount, a.missionControl, a.greenToken)
+    repayAmount, refundAmount = self._validateOnRepay(_user, _caller, _greenAmount, userDebt.amount, a.missionControl, a.greenToken, a.teller)
     assert repayAmount != 0 # dev: cannot repay with 0 green
 
     return self._repayDebt(_user, userDebt, d.numUserVaults, repayAmount, refundAmount, newInterest, True, _shouldRefundSavingsGreen, RepayType.STANDARD, a)
@@ -510,14 +518,17 @@ def _validateOnRepay(
     _userDebtAmount: uint256,
     _missionControl: address,
     _greenToken: address,
+    _teller: address,
 ) -> (uint256, uint256):
     assert _userDebtAmount != 0 # dev: no debt outstanding
 
     # repay config
     repayConfig: RepayConfig = staticcall MissionControl(_missionControl).getRepayConfig(_user)
     assert repayConfig.canRepay # dev: repay paused
-    if _user != _caller:
-        assert repayConfig.canAnyoneRepayDebt # dev: cannot repay for user
+
+    # others repaying for user
+    if _user != _caller and not repayConfig.canAnyoneRepayDebt:
+        assert staticcall Teller(_teller).isUnderscoreWalletOwner(_user, _caller, _missionControl) # dev: not allowed to repay for user
 
     return self._getRepayAmountAndRefundAmount(_userDebtAmount, _greenAmount, _greenToken)
 
@@ -564,7 +575,8 @@ def _reduceDebtAmount(_userDebt: UserDebt, _repayAmount: uint256) -> UserDebt:
 def redeemCollateralFromMany(
     _redemptions: DynArray[CollateralRedemption, MAX_COLLATERAL_REDEMPTIONS],
     _greenAmount: uint256,
-    _redeemer: address,
+    _recipient: address,
+    _caller: address,
     _shouldTransferBalance: bool,
     _shouldRefundSavingsGreen: bool,
     _a: addys.Addys = empty(addys.Addys),
@@ -580,7 +592,7 @@ def redeemCollateralFromMany(
     for r: CollateralRedemption in _redemptions:
         if totalGreenRemaining == 0:
             break
-        greenSpent: uint256 = self._redeemCollateral(r.user, r.vaultId, r.asset, r.maxGreenAmount, totalGreenRemaining, _redeemer, _shouldTransferBalance, a)
+        greenSpent: uint256 = self._redeemCollateral(r.user, r.vaultId, r.asset, r.maxGreenAmount, totalGreenRemaining, _recipient, _caller, _shouldTransferBalance, a)
         totalGreenRemaining -= greenSpent
         totalGreenSpent += greenSpent
 
@@ -588,7 +600,7 @@ def redeemCollateralFromMany(
 
     # handle leftover green
     if totalGreenRemaining != 0:
-        self._handleGreenForUser(_redeemer, totalGreenRemaining, _shouldRefundSavingsGreen, a.greenToken, a.savingsGreen)
+        self._handleGreenForUser(_caller, totalGreenRemaining, _shouldRefundSavingsGreen, a.greenToken, a.savingsGreen)
 
     return totalGreenSpent
 
@@ -599,7 +611,8 @@ def redeemCollateral(
     _vaultId: uint256,
     _asset: address,
     _greenAmount: uint256,
-    _redeemer: address,
+    _recipient: address,
+    _caller: address,
     _shouldTransferBalance: bool,
     _shouldRefundSavingsGreen: bool,
     _a: addys.Addys = empty(addys.Addys),
@@ -610,12 +623,12 @@ def redeemCollateral(
 
     greenAmount: uint256 = min(_greenAmount, staticcall IERC20(a.greenToken).balanceOf(self))
     assert greenAmount != 0 # dev: no green to redeem
-    greenSpent: uint256 = self._redeemCollateral(_user, _vaultId, _asset, max_value(uint256), greenAmount, _redeemer, _shouldTransferBalance, a)
+    greenSpent: uint256 = self._redeemCollateral(_user, _vaultId, _asset, max_value(uint256), greenAmount, _recipient, _caller, _shouldTransferBalance, a)
     assert greenSpent != 0 # dev: no redemptions occurred
 
     # handle leftover green
     if greenAmount > greenSpent:
-        self._handleGreenForUser(_redeemer, greenAmount - greenSpent, _shouldRefundSavingsGreen, a.greenToken, a.savingsGreen)
+        self._handleGreenForUser(_caller, greenAmount - greenSpent, _shouldRefundSavingsGreen, a.greenToken, a.savingsGreen)
 
     return greenSpent
 
@@ -627,7 +640,8 @@ def _redeemCollateral(
     _asset: address,
     _maxGreenForAsset: uint256,
     _totalGreenRemaining: uint256,
-    _redeemer: address,
+    _recipient: address,
+    _caller: address,
     _shouldTransferBalance: bool,
     _a: addys.Addys,
 ) -> uint256:
@@ -635,7 +649,7 @@ def _redeemCollateral(
     # NOTE: failing gracefully here, in case of many redemptions at same time
 
     # invalid inputs
-    if empty(address) in [_redeemer, _asset, _user] or 0 in [_maxGreenForAsset, _totalGreenRemaining, _vaultId]:
+    if empty(address) in [_recipient, _asset, _user] or 0 in [_maxGreenForAsset, _totalGreenRemaining, _vaultId]:
         return 0
 
     # vault address
@@ -648,9 +662,13 @@ def _redeemCollateral(
         return 0
 
     # redemptions not allowed on asset
-    config: RedeemCollateralConfig = staticcall MissionControl(_a.missionControl).getRedeemCollateralConfig(_asset, _redeemer)
+    config: RedeemCollateralConfig = staticcall MissionControl(_a.missionControl).getRedeemCollateralConfig(_asset, _recipient)
     if not config.canRedeemCollateralGeneral or not config.canRedeemCollateralAsset or not config.isUserAllowed:
         return 0
+
+    # make sure caller can deposit to recipient
+    if _recipient != _caller and not config.canAnyoneDeposit:
+        assert staticcall Teller(_a.teller).isUnderscoreWalletOwner(_recipient, _caller, _a.missionControl) # dev: not allowed to deposit for user
 
     # get latest user debt
     d: RepayDataBundle = staticcall Ledger(_a.ledger).getRepayDataBundle(_user)
@@ -692,12 +710,12 @@ def _redeemCollateral(
     amountSent: uint256 = 0
     na: bool = False
     if _shouldTransferBalance:
-        amountSent, na = extcall Vault(vaultAddr).transferBalanceWithinVault(_asset, _user, _redeemer, maxAssetAmount, _a)
-        extcall Ledger(_a.ledger).addVaultToUser(_redeemer, _vaultId)
-        extcall LootBox(_a.lootbox).updateDepositPoints(_redeemer, _vaultId, vaultAddr, _asset, _a)
+        amountSent, na = extcall Vault(vaultAddr).transferBalanceWithinVault(_asset, _user, _recipient, maxAssetAmount, _a)
+        extcall Ledger(_a.ledger).addVaultToUser(_recipient, _vaultId)
+        extcall LootBox(_a.lootbox).updateDepositPoints(_recipient, _vaultId, vaultAddr, _asset, _a)
 
     else:
-        amountSent, na = extcall Vault(vaultAddr).withdrawTokensFromVault(_user, _asset, maxAssetAmount, _redeemer, _a)
+        amountSent, na = extcall Vault(vaultAddr).withdrawTokensFromVault(_user, _asset, maxAssetAmount, _recipient, _a)
 
     # repay debt
     repayValue: uint256 = amountSent * maxRedeemValue // maxAssetAmount
@@ -708,7 +726,8 @@ def _redeemCollateral(
         vaultId=_vaultId,
         asset=_asset,
         amount=amountSent,
-        redeemer=_redeemer,
+        recipient=_recipient,
+        caller=_caller,
         repayValue=repayValue,
         hasGoodDebtHealth=hasGoodDebtHealth,
     )

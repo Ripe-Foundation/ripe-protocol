@@ -830,7 +830,7 @@ def test_purchase_ripe_bond_event_emission(
     assert len(logs) == 1
     
     event = logs[0]
-    assert event.user == bob
+    assert event.recipient == bob
     assert event.paymentAsset == alpha_token.address
     assert event.paymentAmount == payment_amount
     assert event.lockDuration == lock_duration
