@@ -785,16 +785,16 @@ def setUserConfig(
     _canAnyoneBondForUser: bool = True,
 ) -> bool:
     assert not deptBasics.isPaused # dev: contract paused
-    userConfig: UserConfig = UserConfig(
-        canAnyoneDeposit=_canAnyoneDeposit,
-        canAnyoneRepayDebt=_canAnyoneRepayDebt,
-        canAnyoneBondForUser=_canAnyoneBondForUser,
-    )
 
     # validate underscore wallet
     if _user != msg.sender:
         assert self._isUnderscoreWalletOwner(_user, msg.sender) # dev: not owner of underscore wallet
 
+    userConfig: UserConfig = UserConfig(
+        canAnyoneDeposit=_canAnyoneDeposit,
+        canAnyoneRepayDebt=_canAnyoneRepayDebt,
+        canAnyoneBondForUser=_canAnyoneBondForUser,
+    )
     extcall MissionControl(addys._getMissionControlAddr()).setUserConfig(_user, userConfig)
     log UserConfigSet(user=_user, canAnyoneDeposit=_canAnyoneDeposit, canAnyoneRepayDebt=_canAnyoneRepayDebt, canAnyoneBondForUser=_canAnyoneBondForUser, caller=msg.sender)
     return True
