@@ -591,6 +591,15 @@ def _getNumAssets() -> uint256:
     return numAssets - 1
 
 
+@view
+@external
+def getFirstVaultIdForAsset(_asset: address) -> uint256:
+    vaultIds: DynArray[uint256, MAX_VAULTS_PER_ASSET] = self.assetConfig[_asset].vaultIds
+    if len(vaultIds) == 0:
+        return 0
+    return vaultIds[0]
+
+
 # is user allowed
 
 

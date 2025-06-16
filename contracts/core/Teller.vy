@@ -28,6 +28,7 @@ interface MissionControl:
     def getTellerDepositConfig(_vaultId: uint256, _asset: address, _user: address) -> TellerDepositConfig: view
     def setUserDelegation(_user: address, _delegate: address, _config: ActionDelegation): nonpayable
     def setUserConfig(_user: address, _config: UserConfig): nonpayable
+    def getFirstVaultIdForAsset(_asset: address) -> uint256: view
     def underscoreRegistry() -> address: view
 
 interface AuctionHouse:
@@ -243,7 +244,7 @@ def _deposit(
 ) -> uint256:
     vaultAddr: address = empty(address)
     vaultId: uint256 = 0
-    vaultAddr, vaultId = self._getVaultAddrAndId(_vaultAddr, _vaultId, _a.vaultBook)
+    vaultAddr, vaultId = self._getVaultAddrAndId(_asset, _vaultAddr, _vaultId, _a.vaultBook, _a.missionControl)
 
     # get ledger data
     d: DepositLedgerData = staticcall Ledger(_a.ledger).getDepositLedgerData(_user, vaultId)
@@ -388,7 +389,7 @@ def _withdraw(
 ) -> uint256:
     vaultAddr: address = empty(address)
     vaultId: uint256 = 0
-    vaultAddr, vaultId = self._getVaultAddrAndId(_vaultAddr, _vaultId, _a.vaultBook)
+    vaultAddr, vaultId = self._getVaultAddrAndId(_asset, _vaultAddr, _vaultId, _a.vaultBook, _a.missionControl)
 
     # validation
     amount: uint256 = self._validateOnWithdrawal(_asset, _amount, _user, vaultAddr, vaultId, _caller, _a)
@@ -862,23 +863,31 @@ def setUserDelegation(
 @view
 @internal
 def _getVaultAddrAndId(
+    _asset: address,
     _vaultAddr: address,
     _vaultId: uint256,
     _vaultBook: address,
+    _missionControl: address,
 ) -> (address, uint256):
-    assert _vaultId != 0 or _vaultAddr != empty(address) # dev: invalid vault id or vault addr
     vaultAddr: address = empty(address)
     vaultId: uint256 = 0
 
-    # validate vault id
-    if _vaultId != 0:
+    # if no vault data specified, get first vault id for asset
+    if _vaultAddr == empty(address) and _vaultId == 0:
+        vaultId = staticcall MissionControl(_missionControl).getFirstVaultIdForAsset(_asset)
+        assert vaultId != 0 # dev: invalid asset
+        vaultAddr = staticcall AddressRegistry(_vaultBook).getAddr(vaultId)
+        assert vaultAddr != empty(address) # dev: invalid vault id
+
+    # vault id
+    elif _vaultId != 0:
         vaultAddr = staticcall AddressRegistry(_vaultBook).getAddr(_vaultId)
         assert vaultAddr != empty(address) # dev: invalid vault id
         vaultId = _vaultId
         if _vaultAddr != empty(address):
             assert vaultAddr == _vaultAddr # dev: vault id and vault addr mismatch
 
-    # validate vault addr
+    # vault addr
     elif _vaultAddr != empty(address):
         vaultId = staticcall AddressRegistry(_vaultBook).getRegId(_vaultAddr) # dev: invalid vault addr
         assert vaultId != 0 # dev: invalid vault addr
