@@ -315,7 +315,7 @@ priorityStabVaults: public(DynArray[VaultLite, PRIORITY_VAULT_DATA])
 
 # user config
 userConfig: public(HashMap[address, UserConfig]) # user -> config
-userDelegation: public(HashMap[address, HashMap[address, ActionDelegation]]) # user -> caller -> config
+userDelegation: public(HashMap[address, HashMap[address, ActionDelegation]]) # user -> delegate -> config
 
 
 MAX_VAULTS_PER_ASSET: constant(uint256) = 10

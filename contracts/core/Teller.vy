@@ -1,4 +1,5 @@
 # @version 0.4.1
+# pragma optimize codesize
 
 implements: Department
 
@@ -15,6 +16,16 @@ from interfaces import Vault
 from ethereum.ercs import IERC20
 from ethereum.ercs import IERC4626
 
+interface MissionControl:
+    def getTellerWithdrawConfig(_asset: address, _user: address, _caller: address) -> TellerWithdrawConfig: view
+    def getTellerDepositConfig(_vaultId: uint256, _asset: address, _user: address) -> TellerDepositConfig: view
+    def setUserDelegation(_user: address, _delegate: address, _config: ActionDelegation): nonpayable
+    def userDelegation(_user: address, _caller: address) -> ActionDelegation: view
+    def setUserConfig(_user: address, _config: UserConfig): nonpayable
+    def getFirstVaultIdForAsset(_asset: address) -> uint256: view
+    def userConfig(_user: address) -> UserConfig: view
+    def underscoreRegistry() -> address: view
+
 interface CreditEngine:
     def redeemCollateralFromMany(_redemptions: DynArray[CollateralRedemption, MAX_COLLATERAL_REDEMPTIONS], _greenAmount: uint256, _recipient: address, _caller: address, _shouldTransferBalance: bool, _shouldRefundSavingsGreen: bool, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
     def redeemCollateral(_user: address, _vaultId: uint256, _asset: address, _greenAmount: uint256, _recipient: address, _caller: address, _shouldTransferBalance: bool, _shouldRefundSavingsGreen: bool, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
@@ -22,14 +33,6 @@ interface CreditEngine:
     def repayForUser(_user: address, _greenAmount: uint256, _shouldRefundSavingsGreen: bool, _caller: address, _a: addys.Addys = empty(addys.Addys)) -> bool: nonpayable
     def borrowForUser(_user: address, _greenAmount: uint256, _wantsSavingsGreen: bool, _caller: address, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
     def updateDebtForUser(_user: address, _a: addys.Addys = empty(addys.Addys)) -> bool: nonpayable
-
-interface MissionControl:
-    def getTellerWithdrawConfig(_asset: address, _user: address, _caller: address) -> TellerWithdrawConfig: view
-    def getTellerDepositConfig(_vaultId: uint256, _asset: address, _user: address) -> TellerDepositConfig: view
-    def setUserDelegation(_user: address, _delegate: address, _config: ActionDelegation): nonpayable
-    def setUserConfig(_user: address, _config: UserConfig): nonpayable
-    def getFirstVaultIdForAsset(_asset: address) -> uint256: view
-    def underscoreRegistry() -> address: view
 
 interface AuctionHouse:
     def buyManyFungibleAuctions(_purchases: DynArray[FungAuctionPurchase, MAX_AUCTION_PURCHASES], _greenAmount: uint256, _recipient: address, _caller: address, _shouldTransferBalance: bool, _shouldRefundSavingsGreen: bool, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
@@ -809,12 +812,23 @@ def setUserConfig(
     if _user != msg.sender:
         assert self._isUnderscoreWalletOwner(_user, msg.sender, mc) # dev: not owner of underscore wallet
 
+    return self._setUserConfig(_user, _canAnyoneDeposit, _canAnyoneRepayDebt, _canAnyoneBondForUser, mc)
+
+
+@internal
+def _setUserConfig(
+    _user: address,
+    _canAnyoneDeposit: bool,
+    _canAnyoneRepayDebt: bool,
+    _canAnyoneBondForUser: bool,
+    _mc: address
+) -> bool:
     userConfig: UserConfig = UserConfig(
         canAnyoneDeposit=_canAnyoneDeposit,
         canAnyoneRepayDebt=_canAnyoneRepayDebt,
         canAnyoneBondForUser=_canAnyoneBondForUser,
     )
-    extcall MissionControl(mc).setUserConfig(_user, userConfig)
+    extcall MissionControl(_mc).setUserConfig(_user, userConfig)
     log UserConfigSet(user=_user, canAnyoneDeposit=_canAnyoneDeposit, canAnyoneRepayDebt=_canAnyoneRepayDebt, canAnyoneBondForUser=_canAnyoneBondForUser, caller=msg.sender)
     return True
 
@@ -841,14 +855,68 @@ def setUserDelegation(
         assert self._isUnderscoreWalletOwner(_user, msg.sender, mc) # dev: not owner of underscore wallet
         assert _delegate != msg.sender # dev: cannot delegate to owner
 
+    return self._setUserDelegation(_delegate, _user, _canWithdraw, _canBorrow, _canClaimFromStabPool, _canClaimLoot, mc)
+
+
+@internal
+def _setUserDelegation(
+    _delegate: address,
+    _user: address,
+    _canWithdraw: bool,
+    _canBorrow: bool,
+    _canClaimFromStabPool: bool,
+    _canClaimLoot: bool,
+    _mc: address
+) -> bool:
     config: ActionDelegation = ActionDelegation(
         canWithdraw=_canWithdraw,
         canBorrow=_canBorrow,
         canClaimFromStabPool=_canClaimFromStabPool,
         canClaimLoot=_canClaimLoot,
     )
-    extcall MissionControl(mc).setUserDelegation(_user, _delegate, config)
+    extcall MissionControl(_mc).setUserDelegation(_user, _delegate, config)
     log UserDelegationSet(user=_user, delegate=_delegate, canWithdraw=_canWithdraw, canBorrow=_canBorrow, canClaimFromStabPool=_canClaimFromStabPool, canClaimLoot=_canClaimLoot, caller=msg.sender)
+    return True
+
+
+# underscore helpers
+
+
+@view
+@external
+def doesUndyLegoHaveAccess(_wallet: address, _legoAddr: address) -> bool:
+    mc: address = addys._getMissionControlAddr()
+
+    # look at basic config
+    config: UserConfig = staticcall MissionControl(mc).userConfig(_wallet)
+    if not config.canAnyoneDeposit or not config.canAnyoneRepayDebt:
+        return False
+
+    # look at delegation
+    delegation: ActionDelegation = staticcall MissionControl(mc).userDelegation(_wallet, _legoAddr)
+    if not delegation.canWithdraw or not delegation.canBorrow or not delegation.canClaimLoot:
+        return False
+    
+    return True
+
+
+@external
+def setUndyLegoAccess(_legoAddr: address) -> bool:
+    # NOTE: failing gracefully here to not brick underscore wallets
+
+    mc: address = addys._getMissionControlAddr()
+    if mc == empty(address):
+        return False
+
+    if _legoAddr == empty(address):
+        return False
+
+    if not self._isUnderscoreWallet(msg.sender, mc):
+        return False
+
+    # set config
+    self._setUserConfig(msg.sender, True, True, True, mc)
+    self._setUserDelegation(_legoAddr, msg.sender, True, True, True, True, mc)
     return True
 
 
@@ -941,7 +1009,7 @@ def isUnderscoreWalletOwner(_user: address, _caller: address, _mc: address = emp
 
 @view
 @internal
-def _isUnderscoreWalletOwner(_user: address, _caller: address, _mc: address) -> bool:
+def _isUnderscoreWallet(_user: address, _mc: address) -> bool:
     underscore: address = staticcall MissionControl(_mc).underscoreRegistry()
     if underscore == empty(address):
         return False
@@ -950,8 +1018,14 @@ def _isUnderscoreWalletOwner(_user: address, _caller: address, _mc: address) -> 
     if agentFactory == empty(address):
         return False
 
-    # must be underscore wallet
-    if not staticcall UnderscoreAgentFactory(agentFactory).isUserWallet(_user):
+    # check if user is underscore wallet
+    return staticcall UnderscoreAgentFactory(agentFactory).isUserWallet(_user)
+
+
+@view
+@internal
+def _isUnderscoreWalletOwner(_user: address, _caller: address, _mc: address) -> bool:
+    if not self._isUnderscoreWallet(_user, _mc):
         return False
 
     walletConfig: address = staticcall UnderscoreWallet(_user).walletConfig()
