@@ -1,6 +1,6 @@
 from scripts.utils import log
 from scripts.utils.migration import Migration
-from tests.constants import EIGHTEEN_DECIMALS, ZERO_ADDRESS
+from tests.constants import EIGHTEEN_DECIMALS, MAX_UINT256
 
 
 def migrate(migration: Migration):
@@ -143,8 +143,8 @@ def migrate(migration: Migration):
         [stability_pool_vault_id],
         10_00,  # _stakersPointsAlloc
         10_00,  # _voterPointsAlloc
-        1_000_000 * EIGHTEEN_DECIMALS,  # _perUserDepositLimit
-        100_000_000 * EIGHTEEN_DECIMALS,  # _globalDepositLimit
+        MAX_UINT256 - 1,  # _perUserDepositLimit
+        MAX_UINT256 - 1,  # _globalDepositLimit
         (
             0,  # ltv
             0,  # redemptionThreshold
@@ -169,8 +169,8 @@ def migrate(migration: Migration):
         [ripe_gov_vault_id],
         10_00,  # _stakersPointsAlloc
         10_00,  # _voterPointsAlloc
-        1_000_000 * EIGHTEEN_DECIMALS,  # _perUserDepositLimit
-        100_000_000 * EIGHTEEN_DECIMALS,  # _globalDepositLimit
+        MAX_UINT256 - 1,  # _perUserDepositLimit
+        MAX_UINT256 - 1,  # _globalDepositLimit
         (
             0,  # ltv
             0,  # redemptionThreshold
@@ -185,8 +185,8 @@ def migrate(migration: Migration):
         False,  # _shouldAuctionInstantly
         True,  # _canDeposit
         True,  # _canWithdraw
-        False,  # _canRedeemCollateral
         False,  # _canRedeemInStabPool
+        False,  # _canRedeemCollateral
         False,  # _canBuyInAuction
         False,  # _canClaimInStabPool
     )
@@ -198,8 +198,8 @@ def migrate(migration: Migration):
         [stability_pool_vault_id],
         10_00,  # _stakersPointsAlloc
         10_00,  # _voterPointsAlloc
-        1_000_000 * EIGHTEEN_DECIMALS,  # _perUserDepositLimit
-        100_000_000 * EIGHTEEN_DECIMALS,  # _globalDepositLimit
+        MAX_UINT256 - 1,  # _perUserDepositLimit
+        MAX_UINT256 - 1,  # _globalDepositLimit
         (
             0,  # ltv
             0,  # redemptionThreshold
@@ -224,8 +224,8 @@ def migrate(migration: Migration):
         [ripe_gov_vault_id],
         10_00,  # _stakersPointsAlloc
         10_00,  # _voterPointsAlloc
-        1_000_000 * EIGHTEEN_DECIMALS,  # _perUserDepositLimit
-        100_000_000 * EIGHTEEN_DECIMALS,  # _globalDepositLimit
+        MAX_UINT256 - 1,  # _perUserDepositLimit
+        MAX_UINT256 - 1,  # _globalDepositLimit
         (
             0,  # ltv
             0,  # redemptionThreshold
