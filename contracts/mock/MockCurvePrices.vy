@@ -71,6 +71,11 @@ def addGreenRefPoolSnapshot() -> bool:
     return True
 
 
+@external 
+def addPriceSnapshot(_asset: address) -> bool:
+    return False
+    
+
 ########
 # Core #
 ########
