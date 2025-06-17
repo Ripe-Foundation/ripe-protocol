@@ -301,7 +301,6 @@ def test_ah_liquidation_savings_green_always_one_dollar_underlying(
     mock_price_source,
     createDebtTerms,
     credit_engine,
-    auction_house,
     sally,
 ):
     """Test that AuctionHouse treats Savings Green based on underlying Green at $1 regardless of mock price source"""
@@ -359,7 +358,7 @@ def test_ah_liquidation_savings_green_always_one_dollar_underlying(
     
     # Verify AuctionHouse ignored the mock price ($0.05)
     if_using_mock_price = log.amountBurned * low_price // EIGHTEEN_DECIMALS
-    assert log.usdValue < if_using_mock_price  # Much lower than if using mock price
+    assert log.usdValue > if_using_mock_price  # Much higher than if using mock price
 
 
 def test_ah_liquidation_endaoment_transfer(
