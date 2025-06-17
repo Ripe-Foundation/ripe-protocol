@@ -1,0 +1,133 @@
+# @version 0.4.1
+
+MAX_VAULTS_PER_ASSET: constant(uint256) = 10
+
+struct GenConfig:
+    perUserMaxVaults: uint256
+    perUserMaxAssetsPerVault: uint256
+    priceStaleTime: uint256
+    canDeposit: bool
+    canWithdraw: bool
+    canBorrow: bool
+    canRepay: bool
+    canClaimLoot: bool
+    canLiquidate: bool
+    canRedeemCollateral: bool
+    canRedeemInStabPool: bool
+    canBuyInAuction: bool
+    canClaimInStabPool: bool
+
+struct GenDebtConfig:
+    perUserDebtLimit: uint256
+    globalDebtLimit: uint256
+    minDebtAmount: uint256
+    numAllowedBorrowers: uint256
+    maxBorrowPerInterval: uint256
+    numBlocksPerInterval: uint256
+    minDynamicRateBoost: uint256
+    maxDynamicRateBoost: uint256
+    increasePerDangerBlock: uint256
+    maxBorrowRate: uint256
+    maxLtvDeviation: uint256
+    keeperFeeRatio: uint256
+    minKeeperFee: uint256
+    isDaowryEnabled: bool
+    ltvPaybackBuffer: uint256
+    genAuctionParams: AuctionParams
+
+struct HrConfig:
+    contribTemplate: address
+    maxCompensation: uint256
+    minCliffLength: uint256
+    maxStartDelay: uint256
+    minVestingLength: uint256
+    maxVestingLength: uint256
+
+struct RipeBondConfig:
+    asset: address
+    amountPerEpoch: uint256
+    canBond: bool
+    minRipePerUnit: uint256
+    maxRipePerUnit: uint256
+    maxRipePerUnitLockBonus: uint256
+    epochLength: uint256
+    shouldAutoRestart: bool
+    restartDelayBlocks: uint256
+
+struct RipeRewardsConfig:
+    arePointsEnabled: bool
+    ripePerBlock: uint256
+    borrowersAlloc: uint256
+    stakersAlloc: uint256
+    votersAlloc: uint256
+    genDepositorsAlloc: uint256
+    autoStakeRatio: uint256
+    autoStakeDurationRatio: uint256
+
+struct RipeGovVaultConfig:
+    lockTerms: LockTerms
+    assetWeight: uint256
+    shouldFreezeWhenBadDebt: bool
+
+struct StabClaimRewardsConfig:
+    rewardsLockDuration: uint256
+    ripePerDollarClaimed: uint256
+
+struct LockTerms:
+    minLockDuration: uint256
+    maxLockDuration: uint256
+    maxLockBoost: uint256
+    canExit: bool
+    exitFee: uint256
+
+struct AuctionParams:
+    hasParams: bool
+    startDiscount: uint256
+    maxDiscount: uint256
+    delay: uint256
+    duration: uint256
+
+struct AssetConfig:
+    vaultIds: DynArray[uint256, MAX_VAULTS_PER_ASSET]
+    stakersPointsAlloc: uint256
+    voterPointsAlloc: uint256
+    perUserDepositLimit: uint256
+    globalDepositLimit: uint256
+    debtTerms: DebtTerms
+    shouldBurnAsPayment: bool
+    shouldTransferToEndaoment: bool
+    shouldSwapInStabPools: bool
+    shouldAuctionInstantly: bool
+    canDeposit: bool
+    canWithdraw: bool
+    canRedeemCollateral: bool
+    canRedeemInStabPool: bool
+    canBuyInAuction: bool
+    canClaimInStabPool: bool
+    specialStabPoolId: uint256
+    customAuctionParams: AuctionParams
+    whitelist: address
+    isNft: bool
+
+struct DebtTerms:
+    ltv: uint256
+    redemptionThreshold: uint256
+    liqThreshold: uint256
+    liqFee: uint256
+    borrowRate: uint256
+    daowry: uint256
+
+struct UserConfig:
+    canAnyoneDeposit: bool
+    canAnyoneRepayDebt: bool
+    canAnyoneBondForUser: bool
+
+struct ActionDelegation:
+    canWithdraw: bool
+    canBorrow: bool
+    canClaimFromStabPool: bool
+    canClaimLoot: bool
+
+struct VaultLite:
+    vaultId: uint256
+    asset: address

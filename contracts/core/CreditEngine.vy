@@ -13,6 +13,8 @@ import contracts.modules.Addys as addys
 import contracts.modules.DeptBasics as deptBasics
 from interfaces import Department
 from interfaces import Vault
+import interfaces.ConfigStructs as cs
+
 from ethereum.ercs import IERC4626
 from ethereum.ercs import IERC20
 
@@ -30,7 +32,7 @@ interface MissionControl:
     def getBorrowConfig(_user: address, _caller: address) -> BorrowConfig: view
     def getDynamicBorrowRateConfig() -> DynamicBorrowRateConfig: view
     def getRepayConfig(_user: address) -> RepayConfig: view
-    def getDebtTerms(_asset: address) -> DebtTerms: view
+    def getDebtTerms(_asset: address) -> cs.DebtTerms: view
     def getLtvPaybackBuffer() -> uint256: view
 
 interface PriceDesk:
@@ -66,23 +68,15 @@ struct BorrowDataBundle:
     totalDebt: uint256
     numBorrowers: uint256
 
-struct DebtTerms:
-    ltv: uint256
-    redemptionThreshold: uint256
-    liqThreshold: uint256
-    liqFee: uint256
-    borrowRate: uint256
-    daowry: uint256
-
 struct UserBorrowTerms:
     collateralVal: uint256
     totalMaxDebt: uint256
-    debtTerms: DebtTerms
+    debtTerms: cs.DebtTerms
 
 struct UserDebt:
     amount: uint256
     principal: uint256
-    debtTerms: DebtTerms
+    debtTerms: cs.DebtTerms
     lastTimestamp: uint256
     inLiquidation: bool
 
@@ -841,7 +835,7 @@ def _getUserBorrowTerms(
                 continue
 
             # debt terms
-            debtTerms: DebtTerms = staticcall MissionControl(_a.missionControl).getDebtTerms(asset)
+            debtTerms: cs.DebtTerms = staticcall MissionControl(_a.missionControl).getDebtTerms(asset)
 
             # skip if no ltv (staked green, staked ripe, etc)
             if debtTerms.ltv == 0:
@@ -1197,7 +1191,7 @@ def getMaxWithdrawableForAsset(
         return 0 # cannot determine value
 
     # get the asset's debt terms
-    assetDebtTerms: DebtTerms = staticcall MissionControl(a.missionControl).getDebtTerms(_asset)
+    assetDebtTerms: cs.DebtTerms = staticcall MissionControl(a.missionControl).getDebtTerms(_asset)
     if assetDebtTerms.ltv == 0:
         return max_value(uint256) # asset doesn't contribute to borrowing power
 

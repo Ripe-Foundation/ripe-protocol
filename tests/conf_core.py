@@ -215,14 +215,11 @@ def savings_green(fork, green_token, deploy3r):
 
 
 @pytest.fixture(scope="session")
-def ledger(ripe_hq_deploy):
+def ledger(ripe_hq_deploy, defaults):
     return boa.load(
         "contracts/data/Ledger.vy",
         ripe_hq_deploy,
-        # TODO: get actual values here
-        100 * (1_000_000 * EIGHTEEN_DECIMALS), # 100 million
-        100 * (1_000_000 * EIGHTEEN_DECIMALS), # 100 million
-        100 * (1_000_000 * EIGHTEEN_DECIMALS), # 100 million
+        defaults,
         name="ledger",
     )
 
@@ -231,10 +228,11 @@ def ledger(ripe_hq_deploy):
 
 
 @pytest.fixture(scope="session")
-def mission_control(ripe_hq_deploy):
+def mission_control(ripe_hq_deploy, defaults):
     return boa.load(
         "contracts/data/MissionControl.vy",
         ripe_hq_deploy,
+        defaults,
         name="mission_control",
     )
 
@@ -458,6 +456,19 @@ def switchboard_delta(ripe_hq_deploy, fork):
         PARAMS[fork]["MAX_HQ_CHANGE_TIMELOCK"],
         name="switchboard_delta",
     )
+
+
+# defaults
+
+
+@pytest.fixture(scope="session")
+def defaults(fork):
+    d = ZERO_ADDRESS
+    if fork == "local":
+        d = boa.load("contracts/config/DefaultsLocal.vy")
+    elif fork == "base":
+        d = boa.load("contracts/config/DefaultsBase.vy")
+    return d
 
 
 ##########

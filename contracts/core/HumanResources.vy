@@ -16,6 +16,7 @@ import contracts.modules.Addys as addys
 import contracts.modules.DeptBasics as deptBasics
 import contracts.modules.LocalGov as gov
 import contracts.modules.TimeLock as timeLock
+import interfaces.ConfigStructs as cs
 
 from interfaces import Vault
 from interfaces import Department
@@ -52,7 +53,7 @@ interface VaultBook:
     def getAddr(_vaultId: uint256) -> address: view
 
 interface MissionControl:
-    def hrConfig() -> HrConfig: view
+    def hrConfig() -> cs.HrConfig: view
 
 struct ContributorTerms:
     owner: address
@@ -63,14 +64,6 @@ struct ContributorTerms:
     cliffLength: uint256
     unlockLength: uint256
     depositLockDuration: uint256
-
-struct HrConfig:
-    contribTemplate: address
-    maxCompensation: uint256
-    minCliffLength: uint256
-    maxStartDelay: uint256
-    minVestingLength: uint256
-    maxVestingLength: uint256
 
 event NewContributorInitiated:
     owner: indexed(address)
@@ -159,7 +152,7 @@ def initiateNewContributor(
         unlockLength=_unlockLength,
         depositLockDuration=_depositLockDuration,
     )
-    hrConfig: HrConfig = staticcall MissionControl(a.missionControl).hrConfig()
+    hrConfig: cs.HrConfig = staticcall MissionControl(a.missionControl).hrConfig()
     assert self._areValidContributorTerms(terms, hrConfig, a.ledger) # dev: invalid terms
 
     aid: uint256 = timeLock._initiateAction()
@@ -192,7 +185,7 @@ def confirmNewContributor(_aid: uint256) -> bool:
     terms: ContributorTerms = self.pendingContributor[_aid]
     assert terms.owner != empty(address) # dev: no pending contributor
 
-    hrConfig: HrConfig = staticcall MissionControl(a.missionControl).hrConfig()
+    hrConfig: cs.HrConfig = staticcall MissionControl(a.missionControl).hrConfig()
     if not self._areValidContributorTerms(terms, hrConfig, a.ledger):
         self._cancelNewPendingContributor(_aid)
         return False
@@ -298,13 +291,13 @@ def areValidContributorTerms(
         unlockLength=_unlockLength,
         depositLockDuration=_depositLockDuration,
     )
-    hrConfig: HrConfig = staticcall MissionControl(a.missionControl).hrConfig()
+    hrConfig: cs.HrConfig = staticcall MissionControl(a.missionControl).hrConfig()
     return self._areValidContributorTerms(terms, hrConfig, a.ledger)
 
 
 @view
 @internal
-def _areValidContributorTerms(_terms: ContributorTerms, _hrConfig: HrConfig, _ledger: address) -> bool:
+def _areValidContributorTerms(_terms: ContributorTerms, _hrConfig: cs.HrConfig, _ledger: address) -> bool:
 
     # must have a template
     if _hrConfig.contribTemplate == empty(address):

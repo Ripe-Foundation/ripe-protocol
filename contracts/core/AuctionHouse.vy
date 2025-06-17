@@ -13,6 +13,8 @@ import contracts.modules.Addys as addys
 import contracts.modules.DeptBasics as deptBasics
 from interfaces import Department
 from interfaces import Vault
+import interfaces.ConfigStructs as cs
+
 from ethereum.ercs import IERC4626
 from ethereum.ercs import IERC20
 
@@ -31,7 +33,7 @@ interface Ledger:
 interface MissionControl:
     def getAuctionBuyConfig(_asset: address, _recipient: address) -> AuctionBuyConfig: view
     def getAssetLiqConfig(_asset: address) -> AssetLiqConfig: view
-    def getGenAuctionParams() -> AuctionParams: view
+    def getGenAuctionParams() -> cs.AuctionParams: view
     def getGenLiqConfig() -> GenLiqConfig: view
 
 interface StabilityPool:
@@ -70,23 +72,15 @@ struct AuctionBuyConfig:
     isUserAllowed: bool
     canAnyoneDeposit: bool
 
-struct DebtTerms:
-    ltv: uint256
-    redemptionThreshold: uint256
-    liqThreshold: uint256
-    liqFee: uint256
-    borrowRate: uint256
-    daowry: uint256
-
 struct UserBorrowTerms:
     collateralVal: uint256
     totalMaxDebt: uint256
-    debtTerms: DebtTerms
+    debtTerms: cs.DebtTerms
 
 struct UserDebt:
     amount: uint256
     principal: uint256
-    debtTerms: DebtTerms
+    debtTerms: cs.DebtTerms
     lastTimestamp: uint256
     inLiquidation: bool
 
@@ -100,7 +94,7 @@ struct GenLiqConfig:
     keeperFeeRatio: uint256
     minKeeperFee: uint256
     ltvPaybackBuffer: uint256
-    genAuctionParams: AuctionParams
+    genAuctionParams: cs.AuctionParams
     priorityLiqAssetVaults: DynArray[VaultData, PRIORITY_LIQ_VAULT_DATA]
     priorityStabVaults: DynArray[VaultData, MAX_STAB_VAULT_DATA]
 
@@ -110,15 +104,8 @@ struct AssetLiqConfig:
     shouldTransferToEndaoment: bool
     shouldSwapInStabPools: bool
     shouldAuctionInstantly: bool
-    customAuctionParams: AuctionParams
+    customAuctionParams: cs.AuctionParams
     specialStabPool: VaultData
-
-struct AuctionParams:
-    hasParams: bool
-    startDiscount: uint256
-    maxDiscount: uint256
-    delay: uint256
-    duration: uint256
 
 struct FungibleAuction:
     liqUser: address
@@ -863,7 +850,7 @@ def _swapAssetsWithStabPool(
 @internal
 def _startAuctionsDuringLiq(
     _liqUser: address,
-    _genAuctionParams: AuctionParams,
+    _genAuctionParams: cs.AuctionParams,
     _missionControl: address,
     _ledger: address,
 ) -> uint256:
@@ -894,7 +881,7 @@ def startAuction(
     assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
     assert not deptBasics.isPaused # dev: contract paused
     a: addys.Addys = addys._getAddys(_a)
-    genParams: AuctionParams = staticcall MissionControl(a.missionControl).getGenAuctionParams()
+    genParams: cs.AuctionParams = staticcall MissionControl(a.missionControl).getGenAuctionParams()
     return self._startAuction(_liqUser, _liqVaultId, _liqAsset, genParams, a)
 
 
@@ -907,7 +894,7 @@ def startManyAuctions(
     assert not deptBasics.isPaused # dev: contract paused
     a: addys.Addys = addys._getAddys(_a)
 
-    genParams: AuctionParams = staticcall MissionControl(a.missionControl).getGenAuctionParams()
+    genParams: cs.AuctionParams = staticcall MissionControl(a.missionControl).getGenAuctionParams()
     numAuctionsStarted: uint256 = 0
     for auc: FungAuctionConfig in _auctions:
         didStart: bool = self._startAuction(auc.liqUser, auc.vaultId, auc.asset, genParams, a)
@@ -922,7 +909,7 @@ def _startAuction(
     _liqUser: address,
     _liqVaultId: uint256,
     _liqAsset: address,
-    _genParams: AuctionParams,
+    _genParams: cs.AuctionParams,
     _a: addys.Addys,
 ) -> bool:
     if not self._canStartAuction(_liqUser, _liqVaultId, _liqAsset, _a.vaultBook, _a.ledger):
@@ -971,7 +958,7 @@ def _createOrUpdateFungAuction(
     _vaultId: uint256,
     _asset: address,
     _alreadyExists: bool,
-    _genAuctionParams: AuctionParams,
+    _genAuctionParams: cs.AuctionParams,
     _missionControl: address,
     _ledger: address,
 ) -> bool:
@@ -984,7 +971,7 @@ def _createOrUpdateFungAuction(
         self.assetLiqConfig[_asset] = config # cache
 
     # finalize auction params
-    params: AuctionParams = _genAuctionParams
+    params: cs.AuctionParams = _genAuctionParams
     if config.customAuctionParams.hasParams:
         params = config.customAuctionParams
 

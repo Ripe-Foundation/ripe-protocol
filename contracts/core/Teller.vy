@@ -13,17 +13,19 @@ import contracts.modules.Addys as addys
 import contracts.modules.DeptBasics as deptBasics
 from interfaces import Department
 from interfaces import Vault
+import interfaces.ConfigStructs as cs
+
 from ethereum.ercs import IERC20
 from ethereum.ercs import IERC4626
 
 interface MissionControl:
     def getTellerWithdrawConfig(_asset: address, _user: address, _caller: address) -> TellerWithdrawConfig: view
     def getTellerDepositConfig(_vaultId: uint256, _asset: address, _user: address) -> TellerDepositConfig: view
-    def setUserDelegation(_user: address, _delegate: address, _config: ActionDelegation): nonpayable
-    def userDelegation(_user: address, _caller: address) -> ActionDelegation: view
-    def setUserConfig(_user: address, _config: UserConfig): nonpayable
+    def setUserDelegation(_user: address, _delegate: address, _config: cs.ActionDelegation): nonpayable
+    def userDelegation(_user: address, _caller: address) -> cs.ActionDelegation: view
+    def setUserConfig(_user: address, _config: cs.UserConfig): nonpayable
     def getFirstVaultIdForAsset(_asset: address) -> uint256: view
-    def userConfig(_user: address) -> UserConfig: view
+    def userConfig(_user: address) -> cs.UserConfig: view
     def underscoreRegistry() -> address: view
 
 interface CreditEngine:
@@ -135,17 +137,6 @@ struct StabPoolClaim:
 struct StabPoolRedemption:
     claimAsset: address
     maxGreenAmount: uint256
-
-struct UserConfig:
-    canAnyoneDeposit: bool
-    canAnyoneRepayDebt: bool
-    canAnyoneBondForUser: bool
-
-struct ActionDelegation:
-    canWithdraw: bool
-    canBorrow: bool
-    canClaimFromStabPool: bool
-    canClaimLoot: bool
 
 event TellerDeposit:
     user: indexed(address)
@@ -823,7 +814,7 @@ def _setUserConfig(
     _canAnyoneBondForUser: bool,
     _mc: address
 ) -> bool:
-    userConfig: UserConfig = UserConfig(
+    userConfig: cs.UserConfig = cs.UserConfig(
         canAnyoneDeposit=_canAnyoneDeposit,
         canAnyoneRepayDebt=_canAnyoneRepayDebt,
         canAnyoneBondForUser=_canAnyoneBondForUser,
@@ -868,7 +859,7 @@ def _setUserDelegation(
     _canClaimLoot: bool,
     _mc: address
 ) -> bool:
-    config: ActionDelegation = ActionDelegation(
+    config: cs.ActionDelegation = cs.ActionDelegation(
         canWithdraw=_canWithdraw,
         canBorrow=_canBorrow,
         canClaimFromStabPool=_canClaimFromStabPool,
@@ -888,12 +879,12 @@ def doesUndyLegoHaveAccess(_wallet: address, _legoAddr: address) -> bool:
     mc: address = addys._getMissionControlAddr()
 
     # look at basic config
-    config: UserConfig = staticcall MissionControl(mc).userConfig(_wallet)
+    config: cs.UserConfig = staticcall MissionControl(mc).userConfig(_wallet)
     if not config.canAnyoneDeposit or not config.canAnyoneRepayDebt:
         return False
 
     # look at delegation
-    delegation: ActionDelegation = staticcall MissionControl(mc).userDelegation(_wallet, _legoAddr)
+    delegation: cs.ActionDelegation = staticcall MissionControl(mc).userDelegation(_wallet, _legoAddr)
     if not delegation.canWithdraw or not delegation.canBorrow or not delegation.canClaimLoot:
         return False
     

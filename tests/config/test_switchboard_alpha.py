@@ -1730,8 +1730,8 @@ def test_max_ltv_deviation_success(switchboard_alpha, governance):
     assert log.actionId == action_id
     
     # Check pending data was stored
-    pending_deviation = switchboard_alpha.pendingMaxLtvDeviation(action_id)
-    assert pending_deviation == 5_00
+    pending_debt = switchboard_alpha.pendingDebtConfig(action_id)
+    assert pending_debt.maxLtvDeviation == 5_00
     
     # Test at exact boundary - 100%
     action_id2 = switchboard_alpha.setMaxLtvDeviation(100_00, sender=governance.address)
@@ -1785,8 +1785,8 @@ def test_max_ltv_deviation_boundary_conditions(switchboard_alpha, governance):
         action_id = switchboard_alpha.setMaxLtvDeviation(value, sender=governance.address)
         assert action_id > 0
         
-        pending = switchboard_alpha.pendingMaxLtvDeviation(action_id)
-        assert pending == value
+        pending_debt = switchboard_alpha.pendingDebtConfig(action_id)
+        assert pending_debt.maxLtvDeviation == value
 
 
 def test_max_ltv_deviation_full_workflow(switchboard_alpha, governance):
@@ -1805,7 +1805,8 @@ def test_max_ltv_deviation_full_workflow(switchboard_alpha, governance):
     # Verify all actions are pending
     for i, action_id in enumerate(action_ids):
         assert switchboard_alpha.hasPendingAction(action_id)
-        assert switchboard_alpha.pendingMaxLtvDeviation(action_id) == deviations[i]
+        pending_debt = switchboard_alpha.pendingDebtConfig(action_id)
+        assert pending_debt.maxLtvDeviation == deviations[i]
     
     # Execute them in order after timelock
     boa.env.time_travel(blocks=time_lock)
