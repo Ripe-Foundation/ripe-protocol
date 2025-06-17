@@ -227,6 +227,11 @@ def hasPendingPriceFeedUpdate(_asset: address) -> bool:
     return timeLock._hasPendingAction(self.pendingUpdates[_asset].actionId)
 
 
+@external 
+def addPriceSnapshot(_asset: address) -> bool:
+    return False
+
+
 ##################
 # Chainlink Data #
 ##################

@@ -27,6 +27,13 @@ interface GreenRefPoolSource:
 
 interface MissionControl:
     def getPriceConfig() -> PriceConfig: view
+    def underscoreRegistry() -> address: view
+
+interface LegoRegistry:
+    def isValidLegoAddr(_addr: address) -> bool: view
+
+interface UnderscoreRegistry:
+    def getAddy(_addyId: uint256) -> address: view
 
 struct PriceConfig:
     staleTime: uint256
@@ -39,6 +46,7 @@ struct CurrentGreenPoolStatus:
 
 ETH: public(immutable(address))
 MAX_PRIORITY_PRICE_SOURCES: constant(uint256) = 10
+LEGO_REGISTRY_ID: constant(uint256) = 2
 
 
 @deploy
@@ -307,3 +315,44 @@ def getCurrentGreenPoolStatus() -> CurrentGreenPoolStatus:
             return staticcall GreenRefPoolSource(priceSource).getCurrentGreenPoolStatus()
 
     return empty(CurrentGreenPoolStatus)
+
+
+###################
+# Price Snapshots #
+###################
+
+
+@external 
+def addPriceSnapshot(_asset: address) -> bool:
+    if not addys._isValidRipeAddr(msg.sender):
+        assert self._isUnderscoreLego(msg.sender) # dev: no perms
+
+    numSources: uint256 = registry.numAddrs
+    if numSources == 0:
+        return False
+
+    didUpdate: bool = False
+    for pid: uint256 in range(1, numSources, bound=max_value(uint256)):
+        priceSource: address = registry._getAddr(pid)
+        if priceSource == empty(address):
+            continue
+
+        if staticcall PriceSource(priceSource).hasPriceFeed(_asset):
+            extcall PriceSource(priceSource).addPriceSnapshot(_asset)
+            didUpdate = True
+
+    return didUpdate
+
+
+@view
+@internal
+def _isUnderscoreLego(_addr: address) -> bool:
+    underscore: address = staticcall MissionControl(addys._getMissionControlAddr()).underscoreRegistry()
+    if underscore == empty(address):
+        return False
+
+    legoRegistry: address = staticcall UnderscoreRegistry(underscore).getAddy(LEGO_REGISTRY_ID)
+    if legoRegistry == empty(address):
+        return False
+
+    return staticcall LegoRegistry(legoRegistry).isValidLegoAddr(_addr)

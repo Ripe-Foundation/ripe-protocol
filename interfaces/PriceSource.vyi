@@ -42,6 +42,11 @@ def hasGreenRefPool() -> bool:
     ...
 
 
+@external 
+def addPriceSnapshot(_asset: address) -> bool:
+    ...
+
+
 ################
 # Feed Changes #
 ################
