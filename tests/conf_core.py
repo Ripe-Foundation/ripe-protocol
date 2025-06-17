@@ -574,7 +574,7 @@ def price_desk_deploy(ripe_hq_deploy, fork):
 
 
 @pytest.fixture(scope="session")
-def price_desk(price_desk_deploy, deploy3r, chainlink, mock_price_source, curve_prices, blue_chip_prices):
+def price_desk(price_desk_deploy, deploy3r, chainlink, mock_price_source, curve_prices, blue_chip_prices, pyth_prices):
 
     # register chainlink
     assert price_desk_deploy.startAddNewAddressToRegistry(chainlink, "Chainlink", sender=deploy3r)
@@ -588,9 +588,13 @@ def price_desk(price_desk_deploy, deploy3r, chainlink, mock_price_source, curve_
     assert price_desk_deploy.startAddNewAddressToRegistry(blue_chip_prices, "Blue Chip Prices", sender=deploy3r)
     assert price_desk_deploy.confirmNewAddressToRegistry(blue_chip_prices, sender=deploy3r) == 3
 
+    # register pyth prices
+    assert price_desk_deploy.startAddNewAddressToRegistry(pyth_prices, "Pyth Prices", sender=deploy3r)
+    assert price_desk_deploy.confirmNewAddressToRegistry(pyth_prices, sender=deploy3r) == 4
+
     # register mock price source
     assert price_desk_deploy.startAddNewAddressToRegistry(mock_price_source, "Mock Price Source", sender=deploy3r)
-    assert price_desk_deploy.confirmNewAddressToRegistry(mock_price_source, sender=deploy3r) == 4
+    assert price_desk_deploy.confirmNewAddressToRegistry(mock_price_source, sender=deploy3r) == 5
 
     # finish registry setup
     assert price_desk_deploy.setRegistryTimeLockAfterSetup(sender=deploy3r)
@@ -677,6 +681,25 @@ def blue_chip_prices(ripe_hq_deploy, fork, deploy3r, mock_yield_registry):
         MOONWELL,
         AAVE_V3,
         name="blue_chip_prices",
+    )
+    assert c.setActionTimeLockAfterSetup(sender=deploy3r)
+    return c
+
+
+# pyth prices
+
+
+@pytest.fixture(scope="session")
+def pyth_prices(ripe_hq_deploy, fork, deploy3r, mock_pyth):
+    pyth_network = mock_pyth if fork == "local" else ADDYS[fork]["PYTH_NETWORK"]
+
+    c = boa.load(
+        "contracts/priceSources/PythPrices.vy",
+        ripe_hq_deploy,
+        pyth_network,
+        PARAMS[fork]["PRICE_DESK_MIN_REG_TIMELOCK"],
+        PARAMS[fork]["PRICE_DESK_MAX_REG_TIMELOCK"],
+        name="pyth_prices",
     )
     assert c.setActionTimeLockAfterSetup(sender=deploy3r)
     return c

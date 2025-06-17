@@ -24,6 +24,9 @@ ADDYS = {
         "MOONWELL_COMPTROLLER": "0xfBb21d0380beE3312B33c4353c8936a0F13EF26C",
         # aave v3
         "AAVE_V3_ADDRESS_PROVIDER": "0xe20fCBdBfFC4Dd138cE8b2E6FBb6CB49777ad64D",
+        # oracles
+        "PYTH_NETWORK": "0x8250f4aF4B972684F7b336503E2D6dFeDeB1487a",
+        "STORK_NETWORK": "0x647DFd812BC1e116c6992CB2bC353b2112176fD6",
     },
     "local": {
         # important tokens / representations

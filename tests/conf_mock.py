@@ -216,3 +216,8 @@ def mock_dept_can_mint_ripe(ripe_hq_deploy):
 @pytest.fixture(scope="session")
 def mock_yield_registry(alpha_token_vault, bravo_token_vault, charlie_token_vault, delta_token_vault):
     return boa.load("contracts/mock/MockYieldRegistry.vy", [alpha_token_vault, bravo_token_vault, charlie_token_vault, delta_token_vault], name="mock_yield_registry")
+
+
+@pytest.fixture(scope="session")
+def mock_pyth():
+    return boa.load("contracts/mock/MockPyth.vy", name="mock_pyth")
