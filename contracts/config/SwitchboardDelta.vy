@@ -466,7 +466,7 @@ def setRipeBondConfig(
     _maxRipePerUnitLockBonus: uint256,
     _shouldAutoRestart: bool,
     _restartDelayBlocks: uint256,
-) -> bool:
+) -> uint256:
     assert gov._canGovern(msg.sender) # dev: no perms
     aid: uint256 = timeLock._initiateAction()
     self.actionType[aid] = ActionType.RIPE_BOND_CONFIG
@@ -498,14 +498,14 @@ def setRipeBondConfig(
         confirmationBlock=confirmationBlock,
         actionId=aid,
     )
-    return True
+    return aid
 
 
 # epoch length
 
 
 @external
-def setRipeBondEpochLength(_epochLength: uint256) -> bool:
+def setRipeBondEpochLength(_epochLength: uint256) -> uint256:
     assert gov._canGovern(msg.sender) # dev: no perms
     assert _epochLength != 0 # dev: invalid epoch length
     aid: uint256 = timeLock._initiateAction()
@@ -513,14 +513,14 @@ def setRipeBondEpochLength(_epochLength: uint256) -> bool:
     self.pendingRipeBondConfigValue[aid] = _epochLength
     confirmationBlock: uint256 = timeLock._getActionConfirmationBlock(aid)
     log PendingRipeBondEpochLengthSet(epochLength=_epochLength, confirmationBlock=confirmationBlock, actionId=aid)
-    return True
+    return aid
 
 
 # start epoch at block
 
 
 @external
-def setStartEpochAtBlock(_block: uint256 = 0) -> bool:
+def setStartEpochAtBlock(_block: uint256 = 0) -> uint256:
     assert gov._canGovern(msg.sender) # dev: no perms
     aid: uint256 = timeLock._initiateAction()
     self.actionType[aid] = ActionType.RIPE_BOND_START_EPOCH
@@ -528,7 +528,7 @@ def setStartEpochAtBlock(_block: uint256 = 0) -> bool:
     self.pendingRipeBondConfigValue[aid] = blockNum
     confirmationBlock: uint256 = timeLock._getActionConfirmationBlock(aid)
     log PendingStartEpochAtBlockSet(startBlock=blockNum, confirmationBlock=confirmationBlock, actionId=aid)
-    return True
+    return aid
 
 
 # disable / enable bonding
@@ -550,14 +550,14 @@ def setCanPurchaseRipeBond(_canBond: bool) -> bool:
 
 
 @external
-def setBadDebt(_amount: uint256) -> bool:
+def setBadDebt(_amount: uint256) -> uint256:
     assert gov._canGovern(msg.sender) # dev: no perms
     aid: uint256 = timeLock._initiateAction()
     self.actionType[aid] = ActionType.RIPE_BAD_DEBT
     self.pendingRipeBondConfigValue[aid] = _amount
     confirmationBlock: uint256 = timeLock._getActionConfirmationBlock(aid)
     log PendingBadDebtSet(badDebt=_amount, confirmationBlock=confirmationBlock, actionId=aid)
-    return True
+    return aid
 
 
 ###########################
