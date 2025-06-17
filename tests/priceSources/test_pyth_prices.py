@@ -1,7 +1,7 @@
 import boa
 import pytest
 
-from constants import ZERO_ADDRESS, EIGHTEEN_DECIMALS, ONE_DAY_IN_SECS
+from constants import ZERO_ADDRESS, EIGHTEEN_DECIMALS
 from conf_utils import filter_logs
 from config.BluePrint import CORE_TOKENS
 
@@ -580,7 +580,6 @@ def test_pyth_update_feed_validation_functions(
     mock_pyth,
     alpha_token,
     bravo_token,
-    governance,
     addPythFeed,
 ):
     data_feed_id_1 = bytes.fromhex("eaa020c61cc479712813461ce153894a96a6c00b21ed0cfc2798d1f9a9e9c94a")
@@ -842,35 +841,27 @@ def test_pyth_feed_validation_edge_cases(
     mock_pyth,
     alpha_token,
     governance,
-    switchboard_alpha,
-    mission_control,
 ):
     data_feed_id = bytes.fromhex("eaa020c61cc479712813461ce153894a96a6c00b21ed0cfc2798d1f9a9e9c94a")
 
-    # Test with stale time configured via mission control
-    aid = switchboard_alpha.setStaleTime(ONE_DAY_IN_SECS, sender=governance.address)
-    boa.env.time_travel(blocks=switchboard_alpha.actionTimeLock() + 1)
-    assert switchboard_alpha.executePendingAction(aid, sender=governance.address)
-    assert mission_control.getPriceStaleTime() == ONE_DAY_IN_SECS
-
-    # Test feed validation with stale time - create a new feed with old timestamp
-    stale_feed_id = bytes.fromhex("caa020c61cc479712813461ce153894a96a6c00b21ed0cfc2798d1f9a9e9c94c")
-    old_publish_time = boa.env.evm.patch.timestamp - (ONE_DAY_IN_SECS * 2)
+    # Test basic feed validation - feed exists and has valid price
+    new_feed_id = bytes.fromhex("caa020c61cc479712813461ce153894a96a6c00b21ed0cfc2798d1f9a9e9c94c")
     
-    # Create a feed with stale timestamp
-    stale_payload = mock_pyth.createPriceFeedUpdateData(stale_feed_id, 98000000, 50000, -8, old_publish_time)
+    # Create a feed with valid data
+    payload = mock_pyth.createPriceFeedUpdateData(new_feed_id, 98000000, 50000, -8, boa.env.evm.patch.timestamp)
     boa.env.set_balance(boa.env.eoa, EIGHTEEN_DECIMALS)  # Add ETH for fee payment
-    mock_pyth.updatePriceFeeds(stale_payload, value=len(stale_payload))
+    mock_pyth.updatePriceFeeds(payload, value=len(payload))
 
-    # Should fail validation due to staleness
-    with boa.reverts("invalid feed"):
-        pyth_prices.addNewPriceFeed(alpha_token, stale_feed_id, sender=governance.address)
-
-    # Fix the timestamp and it should work
-    fresh_payload = mock_pyth.createPriceFeedUpdateData(stale_feed_id, 98000000, 50000, -8, boa.env.evm.patch.timestamp)
-    boa.env.set_balance(boa.env.eoa, EIGHTEEN_DECIMALS)  # Add ETH for fee payment
-    mock_pyth.updatePriceFeeds(fresh_payload, value=len(fresh_payload))
-    assert pyth_prices.addNewPriceFeed(alpha_token, stale_feed_id, sender=governance.address)
+    # Should work regardless of timestamp since staleness check is removed for adding feeds
+    assert pyth_prices.addNewPriceFeed(alpha_token, new_feed_id, sender=governance.address)
+    
+    # Travel past time lock and confirm
+    boa.env.time_travel(blocks=pyth_prices.actionTimeLock() + 1)
+    assert pyth_prices.confirmNewPriceFeed(alpha_token, sender=governance.address)
+    
+    # Verify feed is active
+    assert pyth_prices.hasPriceFeed(alpha_token)
+    assert pyth_prices.feedConfig(alpha_token) == new_feed_id
 
 
 @pytest.base

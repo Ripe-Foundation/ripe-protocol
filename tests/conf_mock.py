@@ -221,3 +221,8 @@ def mock_yield_registry(alpha_token_vault, bravo_token_vault, charlie_token_vaul
 @pytest.fixture(scope="session")
 def mock_pyth():
     return boa.load("contracts/mock/MockPyth.vy", name="mock_pyth")
+
+
+@pytest.fixture(scope="session")
+def mock_stork():
+    return boa.load("contracts/mock/MockStork.vy", name="mock_stork")

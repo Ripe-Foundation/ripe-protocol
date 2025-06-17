@@ -574,7 +574,7 @@ def price_desk_deploy(ripe_hq_deploy, fork):
 
 
 @pytest.fixture(scope="session")
-def price_desk(price_desk_deploy, deploy3r, chainlink, mock_price_source, curve_prices, blue_chip_prices, pyth_prices):
+def price_desk(price_desk_deploy, deploy3r, chainlink, mock_price_source, curve_prices, blue_chip_prices, pyth_prices, stork_prices):
 
     # register chainlink
     assert price_desk_deploy.startAddNewAddressToRegistry(chainlink, "Chainlink", sender=deploy3r)
@@ -592,9 +592,13 @@ def price_desk(price_desk_deploy, deploy3r, chainlink, mock_price_source, curve_
     assert price_desk_deploy.startAddNewAddressToRegistry(pyth_prices, "Pyth Prices", sender=deploy3r)
     assert price_desk_deploy.confirmNewAddressToRegistry(pyth_prices, sender=deploy3r) == 4
 
+    # register stork prices
+    assert price_desk_deploy.startAddNewAddressToRegistry(stork_prices, "Stork Prices", sender=deploy3r)
+    assert price_desk_deploy.confirmNewAddressToRegistry(stork_prices, sender=deploy3r) == 5
+
     # register mock price source
     assert price_desk_deploy.startAddNewAddressToRegistry(mock_price_source, "Mock Price Source", sender=deploy3r)
-    assert price_desk_deploy.confirmNewAddressToRegistry(mock_price_source, sender=deploy3r) == 5
+    assert price_desk_deploy.confirmNewAddressToRegistry(mock_price_source, sender=deploy3r) == 6
 
     # finish registry setup
     assert price_desk_deploy.setRegistryTimeLockAfterSetup(sender=deploy3r)
@@ -611,7 +615,7 @@ def chainlink(ripe_hq_deploy, fork, sally, bob, deploy3r, mock_chainlink_feed_on
     CHAINLINK_BTC_USD = ZERO_ADDRESS if fork == "local" else ADDYS[fork]["CHAINLINK_BTC_USD"]
 
     c = boa.load(
-        "contracts/priceSources/Chainlink.vy",
+        "contracts/priceSources/ChainlinkPrices.vy",
         ripe_hq_deploy,
         PARAMS[fork]["PRICE_DESK_MIN_REG_TIMELOCK"],
         PARAMS[fork]["PRICE_DESK_MAX_REG_TIMELOCK"],
@@ -700,6 +704,25 @@ def pyth_prices(ripe_hq_deploy, fork, deploy3r, mock_pyth):
         PARAMS[fork]["PRICE_DESK_MIN_REG_TIMELOCK"],
         PARAMS[fork]["PRICE_DESK_MAX_REG_TIMELOCK"],
         name="pyth_prices",
+    )
+    assert c.setActionTimeLockAfterSetup(sender=deploy3r)
+    return c
+
+
+# stork prices
+
+
+@pytest.fixture(scope="session")
+def stork_prices(ripe_hq_deploy, fork, deploy3r, mock_stork):
+    stork_network = mock_stork if fork == "local" else ADDYS[fork]["STORK_NETWORK"]
+
+    c = boa.load(
+        "contracts/priceSources/StorkPrices.vy",
+        ripe_hq_deploy,
+        stork_network,
+        PARAMS[fork]["PRICE_DESK_MIN_REG_TIMELOCK"],
+        PARAMS[fork]["PRICE_DESK_MAX_REG_TIMELOCK"],
+        name="stork_prices",
     )
     assert c.setActionTimeLockAfterSetup(sender=deploy3r)
     return c

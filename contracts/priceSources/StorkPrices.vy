@@ -19,95 +19,91 @@ import contracts.modules.TimeLock as timeLock
 
 import interfaces.PriceSource as PriceSource
 
-interface PythNetwork:
-    def getPriceUnsafe(_priceFeedId: bytes32) -> PythPrice: view
-    def priceFeedExists(_priceFeedId: bytes32) -> bool: view
-    def getUpdateFee(_payLoad: Bytes[2048]) -> uint256: view
-    def updatePriceFeeds(_payLoad: Bytes[2048]): payable
+interface StorkNetwork:
+    def getTemporalNumericValueUnsafeV1(_feedId: bytes32) -> TemporalNumericValue: view
+    def updateTemporalNumericValuesV1(_payload: Bytes[2048]): payable
+    def getUpdateFeeV1(_payload: Bytes[2048]) -> uint256: view
 
-struct PythPrice:
-    price: int64
-    confidence: uint64
-    exponent: int32
-    publishTime: uint64
+struct TemporalNumericValue:
+    timestampNs: uint64
+    quantizedValue: uint256
 
-struct PendingPythFeed:
+struct PendingStorkFeed:
     actionId: uint256
     feedId: bytes32
 
-event NewPythFeedPending:
+event NewStorkFeedPending:
     asset: indexed(address)
     feedId: bytes32
     confirmationBlock: uint256
     actionId: uint256
 
-event NewPythFeedAdded:
+event NewStorkFeedAdded:
     asset: indexed(address)
     feedId: bytes32
 
-event NewPythFeedCancelled:
+event NewStorkFeedCancelled:
     asset: indexed(address)
     feedId: bytes32
 
-event PythFeedUpdatePending:
+event StorkFeedUpdatePending:
     asset: indexed(address)
     feedId: bytes32
     confirmationBlock: uint256
     oldFeedId: bytes32
     actionId: uint256
 
-event PythFeedUpdated:
+event StorkFeedUpdated:
     asset: indexed(address)
     feedId: bytes32
     oldFeedId: bytes32
 
-event PythFeedUpdateCancelled:
+event StorkFeedUpdateCancelled:
     asset: indexed(address)
     feedId: bytes32
     oldFeedId: bytes32
 
-event DisablePythFeedPending:
+event DisableStorkFeedPending:
     asset: indexed(address)
     feedId: bytes32
     confirmationBlock: uint256
     actionId: uint256
 
-event PythFeedDisabled:
+event StorkFeedDisabled:
     asset: indexed(address)
     feedId: bytes32
 
-event DisablePythFeedCancelled:
+event DisableStorkFeedCancelled:
     asset: indexed(address)
     feedId: bytes32
 
-event PythPriceUpdated:
+event StorkPriceUpdated:
     payload: Bytes[2048]
     feeAmount: uint256
     caller: indexed(address)
 
-event EthRecoveredFromPyth:
+event EthRecoveredFromStork:
     recipient: indexed(address)
     amount: uint256
 
 # data
 feedConfig: public(HashMap[address, bytes32]) # asset -> feed
-pendingUpdates: public(HashMap[address, PendingPythFeed]) # asset -> feed
+pendingUpdates: public(HashMap[address, PendingStorkFeed]) # asset -> feed
 
-PYTH: public(immutable(address))
+STORK: public(immutable(address))
 
-NORMALIZED_DECIMALS: constant(uint256) = 18
 MAX_PRICE_UPDATES: constant(uint256) = 20
 
 
 @deploy
 def __init__(
     _ripeHq: address,
-    _pythNetwork: address,
+    _stork: address,
     _minPriceChangeTimeLock: uint256,
     _maxPriceChangeTimeLock: uint256,
 ):
-    assert _pythNetwork != empty(address) # dev: invalid pyth network
-    PYTH = _pythNetwork
+    assert _stork != empty(address) # dev: invalid stork network
+    STORK = _stork
 
     gov.__init__(_ripeHq, empty(address), 0, 0, 0)
     addys.__init__(_ripeHq)
@@ -144,39 +140,18 @@ def getPriceAndHasFeed(_asset: address, _staleTime: uint256 = 0, _priceDesk: add
 @view
 @internal
 def _getPrice(_feedId: bytes32, _staleTime: uint256) -> uint256:
-    data: PythPrice = staticcall PythNetwork(PYTH).getPriceUnsafe(_feedId)
+    data: TemporalNumericValue = staticcall StorkNetwork(STORK).getTemporalNumericValueUnsafeV1(_feedId)
 
     # no price
-    if data.price <= 0:
+    if data.quantizedValue == 0:
         return 0
 
     # price is too stale
-    publishTime: uint256 = convert(data.publishTime, uint256)
+    publishTime: uint256 = convert(data.timestampNs, uint256) // 1_000_000_000
     if _staleTime != 0 and block.timestamp - publishTime > _staleTime:
         return 0
 
-    price: uint256 = convert(data.price, uint256)
-    confidence: uint256 = convert(data.confidence, uint256)
-    scale: uint256 = 10 ** NORMALIZED_DECIMALS
-    exponent: uint256 = 0
-
-    # negative exponent: multiply by 10^(18-|exponent|)
-    if data.exponent < 0:
-        exponent = convert(-data.exponent, uint256)
-        price = price * scale // (10 ** exponent)
-        confidence = confidence * scale // (10 ** exponent)
-
-    # positive exponent: multiply by 10^(18+exponent)
-    else:
-        exponent = convert(data.exponent, uint256)
-        price = price * scale * (10 ** exponent)
-        confidence = confidence * scale * (10 ** exponent)
-
-    # invalid price
-    if confidence >= price:
-        return 0
-
-    return price - confidence
+    return data.quantizedValue
 
 
 # utilities
@@ -212,9 +187,9 @@ def addNewPriceFeed(_asset: address, _feedId: bytes32) -> bool:
 
     # set to pending state
     aid: uint256 = timeLock._initiateAction()
-    self.pendingUpdates[_asset] = PendingPythFeed(actionId=aid, feedId=_feedId)
+    self.pendingUpdates[_asset] = PendingStorkFeed(actionId=aid, feedId=_feedId)
 
-    log NewPythFeedPending(asset=_asset, feedId=_feedId, confirmationBlock=timeLock._getActionConfirmationBlock(aid), actionId=aid)
+    log NewStorkFeedPending(asset=_asset, feedId=_feedId, confirmationBlock=timeLock._getActionConfirmationBlock(aid), actionId=aid)
     return True
 
 
@@ -227,7 +202,7 @@ def confirmNewPriceFeed(_asset: address) -> bool:
     assert not priceData.isPaused # dev: contract paused
 
     # validate again
-    d: PendingPythFeed = self.pendingUpdates[_asset]
+    d: PendingStorkFeed = self.pendingUpdates[_asset]
     assert d.feedId != empty(bytes32) # dev: no pending new feed
     if not self._isValidNewFeed(_asset, d.feedId):
         self._cancelNewPendingPriceFeed(_asset, d.actionId)
@@ -238,10 +213,10 @@ def confirmNewPriceFeed(_asset: address) -> bool:
 
     # save new feed
     self.feedConfig[_asset] = d.feedId
-    self.pendingUpdates[_asset] = empty(PendingPythFeed)
+    self.pendingUpdates[_asset] = empty(PendingStorkFeed)
     priceData._addPricedAsset(_asset)
 
-    log NewPythFeedAdded(asset=_asset, feedId=d.feedId)
+    log NewStorkFeedAdded(asset=_asset, feedId=d.feedId)
     return True
 
 
@@ -253,16 +228,16 @@ def cancelNewPendingPriceFeed(_asset: address) -> bool:
     assert gov._canGovern(msg.sender) # dev: no perms
     assert not priceData.isPaused # dev: contract paused
 
-    d: PendingPythFeed = self.pendingUpdates[_asset]
+    d: PendingStorkFeed = self.pendingUpdates[_asset]
     self._cancelNewPendingPriceFeed(_asset, d.actionId)
-    log NewPythFeedCancelled(asset=_asset, feedId=d.feedId)
+    log NewStorkFeedCancelled(asset=_asset, feedId=d.feedId)
     return True
 
 
 @internal
 def _cancelNewPendingPriceFeed(_asset: address, _aid: uint256):
     assert timeLock._cancelAction(_aid) # dev: cannot cancel action
-    self.pendingUpdates[_asset] = empty(PendingPythFeed)
+    self.pendingUpdates[_asset] = empty(PendingStorkFeed)
 
 
 # validation
@@ -301,9 +276,9 @@ def updatePriceFeed(_asset: address, _feedId: bytes32) -> bool:
 
     # set to pending state
     aid: uint256 = timeLock._initiateAction()
-    self.pendingUpdates[_asset] = PendingPythFeed(actionId=aid, feedId=_feedId)
+    self.pendingUpdates[_asset] = PendingStorkFeed(actionId=aid, feedId=_feedId)
 
-    log PythFeedUpdatePending(asset=_asset, feedId=_feedId, confirmationBlock=timeLock._getActionConfirmationBlock(aid), oldFeedId=oldFeedId, actionId=aid)
+    log StorkFeedUpdatePending(asset=_asset, feedId=_feedId, confirmationBlock=timeLock._getActionConfirmationBlock(aid), oldFeedId=oldFeedId, actionId=aid)
     return True
 
 
@@ -316,7 +291,7 @@ def confirmPriceFeedUpdate(_asset: address) -> bool:
     assert not priceData.isPaused # dev: contract paused
 
     # validate again
-    d: PendingPythFeed = self.pendingUpdates[_asset]
+    d: PendingStorkFeed = self.pendingUpdates[_asset]
     assert d.feedId != empty(bytes32) # dev: no pending update feed
     oldFeedId: bytes32 = self.feedConfig[_asset]
     if not self._isValidUpdateFeed(_asset, d.feedId, oldFeedId):
@@ -328,9 +303,9 @@ def confirmPriceFeedUpdate(_asset: address) -> bool:
 
     # save new feed
     self.feedConfig[_asset] = d.feedId
-    self.pendingUpdates[_asset] = empty(PendingPythFeed)
+    self.pendingUpdates[_asset] = empty(PendingStorkFeed)
 
-    log PythFeedUpdated(asset=_asset, feedId=d.feedId, oldFeedId=oldFeedId)
+    log StorkFeedUpdated(asset=_asset, feedId=d.feedId, oldFeedId=oldFeedId)
     return True
 
 
@@ -342,16 +317,16 @@ def cancelPriceFeedUpdate(_asset: address) -> bool:
     assert gov._canGovern(msg.sender) # dev: no perms
     assert not priceData.isPaused # dev: contract paused
 
-    d: PendingPythFeed = self.pendingUpdates[_asset]
+    d: PendingStorkFeed = self.pendingUpdates[_asset]
     self._cancelPriceFeedUpdate(_asset, d.actionId)
-    log PythFeedUpdateCancelled(asset=_asset, feedId=d.feedId, oldFeedId=self.feedConfig[_asset])
+    log StorkFeedUpdateCancelled(asset=_asset, feedId=d.feedId, oldFeedId=self.feedConfig[_asset])
     return True
 
 
 @internal
 def _cancelPriceFeedUpdate(_asset: address, _aid: uint256):
     assert timeLock._cancelAction(_aid) # dev: cannot cancel action
-    self.pendingUpdates[_asset] = empty(PendingPythFeed)
+    self.pendingUpdates[_asset] = empty(PendingStorkFeed)
 
 
 # validation
@@ -379,11 +354,8 @@ def _isValidFeedConfig(_asset: address, _feedId: bytes32) -> bool:
     if _asset == empty(address):
         return False
 
-    if not staticcall PythNetwork(PYTH).priceFeedExists(_feedId):
-        return False
-
-    # not looking at staleness here
-    return self._getPrice(_feedId, 0) != 0
+    data: TemporalNumericValue = staticcall StorkNetwork(STORK).getTemporalNumericValueUnsafeV1(_feedId)
+    return data.timestampNs != 0
 
 
 ################
@@ -405,9 +377,9 @@ def disablePriceFeed(_asset: address) -> bool:
 
     # set to pending state
     aid: uint256 = timeLock._initiateAction()
-    self.pendingUpdates[_asset] = PendingPythFeed(actionId=aid, feedId=empty(bytes32))
+    self.pendingUpdates[_asset] = PendingStorkFeed(actionId=aid, feedId=empty(bytes32))
 
-    log DisablePythFeedPending(asset=_asset, feedId=oldFeedId, confirmationBlock=timeLock._getActionConfirmationBlock(aid), actionId=aid)
+    log DisableStorkFeedPending(asset=_asset, feedId=oldFeedId, confirmationBlock=timeLock._getActionConfirmationBlock(aid), actionId=aid)
     return True
 
 
@@ -421,7 +393,7 @@ def confirmDisablePriceFeed(_asset: address) -> bool:
 
     # validate again
     oldFeedId: bytes32 = self.feedConfig[_asset]
-    d: PendingPythFeed = self.pendingUpdates[_asset]
+    d: PendingStorkFeed = self.pendingUpdates[_asset]
     assert d.actionId != 0 # dev: no pending disable feed
     if not self._isValidDisablePriceFeed(_asset, oldFeedId):
         self._cancelDisablePriceFeed(_asset, d.actionId)
@@ -432,10 +404,10 @@ def confirmDisablePriceFeed(_asset: address) -> bool:
 
     # disable feed
     self.feedConfig[_asset] = empty(bytes32)
-    self.pendingUpdates[_asset] = empty(PendingPythFeed)
+    self.pendingUpdates[_asset] = empty(PendingStorkFeed)
     priceData._removePricedAsset(_asset)
     
-    log PythFeedDisabled(asset=_asset, feedId=oldFeedId)
+    log StorkFeedDisabled(asset=_asset, feedId=oldFeedId)
     return True
 
 
@@ -448,14 +420,14 @@ def cancelDisablePriceFeed(_asset: address) -> bool:
     assert not priceData.isPaused # dev: contract paused
 
     self._cancelDisablePriceFeed(_asset, self.pendingUpdates[_asset].actionId)
-    log DisablePythFeedCancelled(asset=_asset, feedId=self.feedConfig[_asset])
+    log DisableStorkFeedCancelled(asset=_asset, feedId=self.feedConfig[_asset])
     return True
 
 
 @internal
 def _cancelDisablePriceFeed(_asset: address, _aid: uint256):
     assert timeLock._cancelAction(_aid) # dev: cannot cancel action
-    self.pendingUpdates[_asset] = empty(PendingPythFeed)
+    self.pendingUpdates[_asset] = empty(PendingStorkFeed)
 
 
 # validation
@@ -481,11 +453,11 @@ def _isValidDisablePriceFeed(_asset: address, _oldFeedId: bytes32) -> bool:
 
 
 @external
-def updateManyPythPrices(_payloads: DynArray[Bytes[2048], MAX_PRICE_UPDATES]) -> uint256:
-    pythNetwork: address = PYTH
+def updateManyStorkPrices(_payloads: DynArray[Bytes[2048], MAX_PRICE_UPDATES]) -> uint256:
+    stork: address = STORK
     numUpdated: uint256 = 0
     for p: Bytes[2048] in _payloads:
-        didUpdate: bool = self._updatePythPrice(p, pythNetwork)
+        didUpdate: bool = self._updateStorkPrice(p, stork)
         if didUpdate:
             numUpdated += 1
         else:
@@ -494,17 +466,17 @@ def updateManyPythPrices(_payloads: DynArray[Bytes[2048], MAX_PRICE_UPDATES]) ->
 
 
 @external
-def updatePythPrice(_payload: Bytes[2048]) -> bool:
-    return self._updatePythPrice(_payload, PYTH)
+def updateStorkPrice(_payload: Bytes[2048]) -> bool:
+    return self._updateStorkPrice(_payload, STORK)
 
 
 @internal
-def _updatePythPrice(_payload: Bytes[2048], _pythNetwork: address) -> bool:
-    feeAmount: uint256 = staticcall PythNetwork(_pythNetwork).getUpdateFee(_payload)
+def _updateStorkPrice(_payload: Bytes[2048], _stork: address) -> bool:
+    feeAmount: uint256 = staticcall StorkNetwork(_stork).getUpdateFeeV1(_payload)
     if self.balance < feeAmount:
         return False
-    extcall PythNetwork(_pythNetwork).updatePriceFeeds(_payload, value=feeAmount)
-    log PythPriceUpdated(payload=_payload, feeAmount=feeAmount, caller=msg.sender)
+    extcall StorkNetwork(_stork).updateTemporalNumericValuesV1(_payload, value=feeAmount)
+    log StorkPriceUpdated(payload=_payload, feeAmount=feeAmount, caller=msg.sender)
     return True
 
 
@@ -519,5 +491,5 @@ def recoverEthBalance(_recipient: address) -> bool:
     balance: uint256 = self.balance
     assert _recipient != empty(address) and balance != 0 # dev: invalid recipient or balance
     send(_recipient, balance)
-    log EthRecoveredFromPyth(recipient=_recipient, amount=balance)
+    log EthRecoveredFromStork(recipient=_recipient, amount=balance)
     return True
