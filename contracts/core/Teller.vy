@@ -18,16 +18,6 @@ import interfaces.ConfigStructs as cs
 from ethereum.ercs import IERC20
 from ethereum.ercs import IERC4626
 
-interface MissionControl:
-    def getTellerWithdrawConfig(_asset: address, _user: address, _caller: address) -> TellerWithdrawConfig: view
-    def getTellerDepositConfig(_vaultId: uint256, _asset: address, _user: address) -> TellerDepositConfig: view
-    def setUserDelegation(_user: address, _delegate: address, _config: cs.ActionDelegation): nonpayable
-    def userDelegation(_user: address, _caller: address) -> cs.ActionDelegation: view
-    def setUserConfig(_user: address, _config: cs.UserConfig): nonpayable
-    def getFirstVaultIdForAsset(_asset: address) -> uint256: view
-    def userConfig(_user: address) -> cs.UserConfig: view
-    def underscoreRegistry() -> address: view
-
 interface CreditEngine:
     def redeemCollateralFromMany(_redemptions: DynArray[CollateralRedemption, MAX_COLLATERAL_REDEMPTIONS], _greenAmount: uint256, _recipient: address, _caller: address, _shouldTransferBalance: bool, _shouldRefundSavingsGreen: bool, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
     def redeemCollateral(_user: address, _vaultId: uint256, _asset: address, _greenAmount: uint256, _recipient: address, _caller: address, _shouldTransferBalance: bool, _shouldRefundSavingsGreen: bool, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
@@ -35,6 +25,14 @@ interface CreditEngine:
     def repayForUser(_user: address, _greenAmount: uint256, _shouldRefundSavingsGreen: bool, _caller: address, _a: addys.Addys = empty(addys.Addys)) -> bool: nonpayable
     def borrowForUser(_user: address, _greenAmount: uint256, _wantsSavingsGreen: bool, _shouldEnterStabPool: bool, _caller: address, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
     def updateDebtForUser(_user: address, _a: addys.Addys = empty(addys.Addys)) -> bool: nonpayable
+
+interface MissionControl:
+    def getTellerWithdrawConfig(_asset: address, _user: address, _caller: address) -> TellerWithdrawConfig: view
+    def getTellerDepositConfig(_vaultId: uint256, _asset: address, _user: address) -> TellerDepositConfig: view
+    def setUserDelegation(_user: address, _delegate: address, _config: cs.ActionDelegation): nonpayable
+    def setUserConfig(_user: address, _config: cs.UserConfig): nonpayable
+    def getFirstVaultIdForAsset(_asset: address) -> uint256: view
+    def underscoreRegistry() -> address: view
 
 interface AuctionHouse:
     def buyManyFungibleAuctions(_purchases: DynArray[FungAuctionPurchase, MAX_AUCTION_PURCHASES], _greenAmount: uint256, _recipient: address, _caller: address, _shouldTransferBalance: bool, _shouldRefundSavingsGreen: bool, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
