@@ -155,11 +155,11 @@ def test_teller_deposit_max_vaults(
     alpha_token.approve(teller.address, deposit_amount, sender=bob)
 
     # First deposit should succeed
-    teller.deposit(alpha_token, deposit_amount, bob, simple_erc20_vault, sender=bob)
+    teller.deposit(alpha_token, deposit_amount // 2, bob, simple_erc20_vault, sender=bob)
 
     # Second deposit to a different vault should fail
     with boa.reverts("reached max vaults"):
-        teller.deposit(alpha_token, deposit_amount, bob, rebase_erc20_vault, sender=bob)
+        teller.deposit(alpha_token, deposit_amount // 2, bob, rebase_erc20_vault, sender=bob)
 
 
 def test_teller_deposit_max_assets(

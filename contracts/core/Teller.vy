@@ -283,20 +283,30 @@ def _validateOnDeposit(
     assert config.doesVaultSupportAsset # dev: vault does not support asset
     assert config.isUserAllowed # dev: user not on whitelist
 
+    # trusted depositor
+    isRipeDepartment: bool = addys._isValidRipeAddr(_depositor)
+
     # make sure depositor is allowed to deposit for user
     if _user != _depositor and not config.canAnyoneDeposit:
-        assert addys._isValidRipeAddr(_depositor) or self._isUnderscoreWalletOwner(_user, _depositor, _missionControl) # dev: cannot deposit for user
-
-    # check max vaults, max assets per vault
-    vd: Vault.VaultDataOnDeposit = staticcall Vault(_vaultAddr).getVaultDataOnDeposit(_user, _asset)
-    if not _d.isParticipatingInVault:
-        assert _d.numUserVaults < config.perUserMaxVaults # dev: reached max vaults
-    elif not vd.hasPosition:
-        assert vd.numAssets < config.perUserMaxAssetsPerVault # dev: reached max assets per vault
+        assert isRipeDepartment or self._isUnderscoreWalletOwner(_user, _depositor, _missionControl) # dev: cannot deposit for user
 
     # avail amount
     amount: uint256 = min(_amount, staticcall IERC20(_asset).balanceOf(_depositor))
     assert amount != 0 # dev: cannot deposit 0
+
+    # if depositing from ripe dept, skip these limits
+    if isRipeDepartment:
+        return amount
+    
+    # vault data
+    vd: Vault.VaultDataOnDeposit = staticcall Vault(_vaultAddr).getVaultDataOnDeposit(_user, _asset)
+
+    # check max vaults, max assets per vault
+    if not _d.isParticipatingInVault:
+        assert _d.numUserVaults < config.perUserMaxVaults # dev: reached max vaults
+
+    elif not vd.hasPosition:
+        assert vd.numAssets < config.perUserMaxAssetsPerVault # dev: reached max assets per vault
 
     # per user deposit limit
     availPerUserDeposit: uint256 = self._getAvailPerUserDepositLimit(vd.userBalance, config.perUserDepositLimit)
