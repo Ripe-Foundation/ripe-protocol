@@ -161,8 +161,8 @@ def test_ah_liquidation_burn_asset(
     setAssetConfig,
     setGeneralDebtConfig,
     performDeposit,
-    alpha_token,
-    alpha_token_whale,
+    green_token,
+    whale,
     bob,
     teller,
     mock_price_source,
@@ -175,7 +175,7 @@ def test_ah_liquidation_burn_asset(
     setGeneralDebtConfig(_ltvPaybackBuffer=0) # no payback buffer
     debt_terms = createDebtTerms(_liqThreshold=80_00, _liqFee=10_00, _borrowRate=0)
     setAssetConfig(
-        alpha_token,
+        green_token,
         _debtTerms=debt_terms,
         _shouldBurnAsPayment=True, # testing this!
         _shouldTransferToEndaoment=False,
@@ -184,15 +184,15 @@ def test_ah_liquidation_burn_asset(
     )
 
     # setup
-    mock_price_source.setPrice(alpha_token, 1 * EIGHTEEN_DECIMALS)
+    mock_price_source.setPrice(green_token, 1 * EIGHTEEN_DECIMALS)
     deposit_amount = 200 * EIGHTEEN_DECIMALS
-    performDeposit(bob, deposit_amount, alpha_token, alpha_token_whale)
+    performDeposit(bob, deposit_amount, green_token, whale)
     orig_debt_amount = 100 * EIGHTEEN_DECIMALS
     teller.borrow(orig_debt_amount, bob, False, sender=bob)
 
     # set liquidatable price
     new_price = 125 * EIGHTEEN_DECIMALS // 200
-    mock_price_source.setPrice(alpha_token, new_price)
+    mock_price_source.setPrice(green_token, new_price)
     assert credit_engine.canLiquidateUser(bob) == True
 
     target_repay_amount = auction_house.calcAmountOfDebtToRepayDuringLiq(bob)
@@ -205,8 +205,8 @@ def test_ah_liquidation_burn_asset(
     log = filter_logs(teller, "StabAssetBurntAsRepayment")[0]
     assert log.liqUser == bob
     assert log.vaultId != 0
-    assert log.liqStabAsset == alpha_token.address
-    assert log.amountBurned == target_repay_amount * EIGHTEEN_DECIMALS // new_price
+    assert log.liqStabAsset == green_token.address
+    assert log.amountBurned == target_repay_amount  # GREEN is always $1.00 in AuctionHouse
     assert log.usdValue == target_repay_amount
     assert log.isDepleted == False
 
@@ -217,7 +217,10 @@ def test_ah_liquidation_burn_asset(
     # Note: User may still be in liquidation if debt health wasn't fully restored
     # This is expected behavior with the new precise calculation
     assert user_debt.amount == orig_debt_amount - target_repay_amount + expected_liq_fees
-    assert bt.collateralVal == orig_bt.collateralVal - target_repay_amount
+    
+    # Correct calculation: remaining collateral value = (original_amount - burned_amount) * current_price
+    expected_remaining_collateral = (deposit_amount - log.amountBurned) * new_price // EIGHTEEN_DECIMALS
+    assert bt.collateralVal == expected_remaining_collateral
 
 
 # endaoment transfer

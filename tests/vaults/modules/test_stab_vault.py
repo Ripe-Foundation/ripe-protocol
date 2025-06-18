@@ -756,7 +756,7 @@ def test_stab_vault_swap_validation(
     bravo_token.transfer(stability_pool, deposit, sender=bravo_token_whale)
 
     # Test invalid green token
-    with boa.reverts("must be green token or savings green token"):
+    with boa.reverts("must be green or savings green"):
         stability_pool.swapForLiquidatedCollateral(
             alpha_token,
             deposit,
