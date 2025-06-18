@@ -40,6 +40,10 @@ interface PriceDesk:
     def getUsdValue(_asset: address, _amount: uint256, _shouldRaise: bool) -> uint256: view
     def getCurrentGreenPoolStatus() -> CurrentGreenPoolStatus: view
 
+interface Teller:
+    def deposit(_asset: address, _amount: uint256 = max_value(uint256), _user: address = msg.sender, _vaultAddr: address = empty(address), _vaultId: uint256 = 0) -> uint256: nonpayable
+    def isUnderscoreWalletOwner(_user: address, _caller: address, _mc: address = empty(address)) -> bool: view
+
 interface LootBox:
     def updateDepositPoints(_user: address, _vaultId: uint256, _vaultAddr: address, _asset: address, _a: addys.Addys = empty(addys.Addys)): nonpayable
     def updateBorrowPoints(_user: address, _a: addys.Addys = empty(addys.Addys)): nonpayable
@@ -47,9 +51,6 @@ interface LootBox:
 interface GreenToken:
     def mint(_to: address, _amount: uint256): nonpayable
     def burn(_amount: uint256) -> bool: nonpayable
-
-interface Teller:
-    def isUnderscoreWalletOwner(_user: address, _caller: address, _mc: address = empty(address)) -> bool: view
 
 interface AddressRegistry:
     def getAddr(_regId: uint256) -> address: view
@@ -164,6 +165,7 @@ DANGER_BLOCKS_DENOMINATOR: constant(uint256) = 100_0000 # 100.0000%
 ONE_PERCENT: constant(uint256) = 1_00 # 1.00%
 MAX_DEBT_UPDATES: constant(uint256) = 25
 MAX_COLLATERAL_REDEMPTIONS: constant(uint256) = 20
+STABILITY_POOL_ID: constant(uint256) = 1
 
 
 @deploy
@@ -182,6 +184,7 @@ def borrowForUser(
     _user: address,
     _greenAmount: uint256,
     _wantsSavingsGreen: bool,
+    _shouldEnterStabPool: bool,
     _caller: address,
     _a: addys.Addys = empty(addys.Addys),
 ) -> uint256:
@@ -256,7 +259,7 @@ def borrowForUser(
 
     # borrower gets their green now -- do this AFTER sending green to stakers
     forBorrower: uint256 = newBorrowAmount - daowry
-    self._handleGreenForUser(_user, forBorrower, _wantsSavingsGreen, a.greenToken, a.savingsGreen)
+    self._handleGreenForUser(_user, forBorrower, _wantsSavingsGreen, _shouldEnterStabPool, a.greenToken, a.savingsGreen, a.teller)
 
     log NewBorrow(user=_user, newLoan=forBorrower, daowry=daowry, didReceiveSavingsGreen=_wantsSavingsGreen, outstandingUserDebt=userDebt.amount, userCollateralVal=bt.collateralVal, maxUserDebt=bt.totalMaxDebt, globalYieldRealized=unrealizedYield)
     return forBorrower
@@ -494,7 +497,7 @@ def _repayDebt(
 
     # handle refund
     if _refundAmount != 0:
-        self._handleGreenForUser(_user, _refundAmount, _wantsSavingsGreen, _a.greenToken, _a.savingsGreen)
+        self._handleGreenForUser(_user, _refundAmount, _wantsSavingsGreen, False, _a.greenToken, _a.savingsGreen, _a.teller)
 
     log RepayDebt(user=_user, repayValue=_repayValue, repayType=_repayType, refundAmount=_refundAmount, refundWasSavingsGreen=_wantsSavingsGreen, outstandingUserDebt=userDebt.amount, userCollateralVal=bt.collateralVal, maxUserDebt=bt.totalMaxDebt, hasGoodDebtHealth=hasGoodDebtHealth)
     return hasGoodDebtHealth
@@ -594,7 +597,7 @@ def redeemCollateralFromMany(
 
     # handle leftover green
     if totalGreenRemaining != 0:
-        self._handleGreenForUser(_caller, totalGreenRemaining, _shouldRefundSavingsGreen, a.greenToken, a.savingsGreen)
+        self._handleGreenForUser(_caller, totalGreenRemaining, _shouldRefundSavingsGreen, False, a.greenToken, a.savingsGreen, a.teller)
 
     return totalGreenSpent
 
@@ -622,7 +625,7 @@ def redeemCollateral(
 
     # handle leftover green
     if greenAmount > greenSpent:
-        self._handleGreenForUser(_caller, greenAmount - greenSpent, _shouldRefundSavingsGreen, a.greenToken, a.savingsGreen)
+        self._handleGreenForUser(_caller, greenAmount - greenSpent, _shouldRefundSavingsGreen, False, a.greenToken, a.savingsGreen, a.teller)
 
     return greenSpent
 
@@ -975,25 +978,12 @@ def _calcDynamicRateBoost(_ratio: uint256, _minBoost: uint256, _maxBoost: uint25
 def updateDebtForUser(_user: address, _a: addys.Addys = empty(addys.Addys)) -> bool:
     assert addys._isValidRipeAddr(msg.sender) # dev: no perms
     assert not deptBasics.isPaused # dev: contract paused
-    return self._updateDebtForUser(_user, addys._getAddys(_a))
-
-
-@external
-def updateDebtForManyUsers(_users: DynArray[address, MAX_DEBT_UPDATES], _a: addys.Addys = empty(addys.Addys)) -> bool:
-    assert addys._isValidRipeAddr(msg.sender) # dev: no perms
-    assert not deptBasics.isPaused # dev: contract paused
     a: addys.Addys = addys._getAddys(_a)
-    for u: address in _users:
-        self._updateDebtForUser(u, a)
-    return True
 
-
-@internal
-def _updateDebtForUser(_user: address, _a: addys.Addys) -> bool:
     userDebt: UserDebt = empty(UserDebt)
     bt: UserBorrowTerms = empty(UserBorrowTerms)
     newInterest: uint256 = 0
-    userDebt, bt, newInterest = self._getLatestUserDebtAndTerms(_user, True, _a)
+    userDebt, bt, newInterest = self._getLatestUserDebtAndTerms(_user, True, a)
     if userDebt.amount == 0:
         return True
 
@@ -1003,10 +993,10 @@ def _updateDebtForUser(_user: address, _a: addys.Addys) -> bool:
         userDebt.inLiquidation = False
 
     userDebt.debtTerms = bt.debtTerms
-    extcall Ledger(_a.ledger).setUserDebt(_user, userDebt, newInterest, empty(IntervalBorrow))
+    extcall Ledger(a.ledger).setUserDebt(_user, userDebt, newInterest, empty(IntervalBorrow))
 
     # update borrow points
-    extcall LootBox(_a.lootbox).updateBorrowPoints(_user, _a)
+    extcall LootBox(a.lootbox).updateBorrowPoints(_user, a)
 
     return hasGoodDebtHealth
 
@@ -1131,17 +1121,31 @@ def _handleGreenForUser(
     _recipient: address,
     _greenAmount: uint256,
     _wantsSavingsGreen: bool,
+    _shouldEnterStabPool: bool,
     _greenToken: address,
     _savingsGreen: address,
+    _teller: address,
 ):
     amount: uint256 = min(_greenAmount, staticcall IERC20(_greenToken).balanceOf(self))
     if amount == 0:
         return
 
     if _wantsSavingsGreen and amount > 10 ** 9: # small dust will fail
+
+        sgreenRecipient: address = _recipient
+        if _shouldEnterStabPool:
+            sgreenRecipient = self
+
+        # put GREEN into sGREEN
         assert extcall IERC20(_greenToken).approve(_savingsGreen, amount, default_return_value=True) # dev: green approval failed
-        extcall IERC4626(_savingsGreen).deposit(amount, _recipient)
+        sGreenAmount: uint256 = extcall IERC4626(_savingsGreen).deposit(amount, sgreenRecipient)
         assert extcall IERC20(_greenToken).approve(_savingsGreen, 0, default_return_value=True) # dev: green approval failed
+
+        # put sGREEN into stability pool
+        if _shouldEnterStabPool:
+            assert extcall IERC20(_savingsGreen).approve(_teller, sGreenAmount, default_return_value=True) # dev: sgreen approval failed
+            extcall Teller(_teller).deposit(_savingsGreen, sGreenAmount, _recipient, empty(address), STABILITY_POOL_ID)
+            assert extcall IERC20(_savingsGreen).approve(_teller, 0, default_return_value=True) # dev: sgreen approval failed
 
     else:
         assert extcall IERC20(_greenToken).transfer(_recipient, amount, default_return_value=True) # dev: green transfer failed

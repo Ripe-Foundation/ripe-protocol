@@ -156,7 +156,6 @@ event DebtUpdatedForUser:
 
 event DebtUpdatedForManyUsers:
     numUsers: uint256
-    success: bool
     caller: indexed(address)
 
 event LootClaimedForUser:
@@ -371,9 +370,12 @@ def updateDebtForManyUsers(_users: DynArray[address, MAX_DEBT_UPDATES]) -> bool:
     assert self.hasPermsForLiteAction(msg.sender, True) # dev: no perms
     assert len(_users) != 0 # dev: no users provided
 
-    success: bool = extcall CreditEngine(self._getCreditEngineAddr()).updateDebtForManyUsers(_users)
-    log DebtUpdatedForManyUsers(numUsers=len(_users), success=success, caller=msg.sender)
-    return success
+    creditEngineAddr: address = self._getCreditEngineAddr()
+    for u: address in _users:
+        extcall CreditEngine(creditEngineAddr).updateDebtForUser(u)
+
+    log DebtUpdatedForManyUsers(numUsers=len(_users), caller=msg.sender)
+    return True
 
 
 ###############

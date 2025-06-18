@@ -33,7 +33,7 @@ interface CreditEngine:
     def redeemCollateral(_user: address, _vaultId: uint256, _asset: address, _greenAmount: uint256, _recipient: address, _caller: address, _shouldTransferBalance: bool, _shouldRefundSavingsGreen: bool, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
     def getMaxWithdrawableForAsset(_user: address, _vaultId: uint256, _asset: address, _vaultAddr: address = empty(address), _a: addys.Addys = empty(addys.Addys)) -> uint256: view
     def repayForUser(_user: address, _greenAmount: uint256, _shouldRefundSavingsGreen: bool, _caller: address, _a: addys.Addys = empty(addys.Addys)) -> bool: nonpayable
-    def borrowForUser(_user: address, _greenAmount: uint256, _wantsSavingsGreen: bool, _caller: address, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
+    def borrowForUser(_user: address, _greenAmount: uint256, _wantsSavingsGreen: bool, _shouldEnterStabPool: bool, _caller: address, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
     def updateDebtForUser(_user: address, _a: addys.Addys = empty(addys.Addys)) -> bool: nonpayable
 
 interface AuctionHouse:
@@ -193,7 +193,6 @@ def __init__(_ripeHq: address):
 ############
 
 
-@nonreentrant
 @external
 def deposit(
     _asset: address,
@@ -210,7 +209,6 @@ def deposit(
     return amount
 
 
-@nonreentrant
 @external
 def depositMany(_user: address, _deposits: DynArray[DepositAction, MAX_BALANCE_ACTION]) -> uint256:
     assert not deptBasics.isPaused # dev: contract paused
@@ -455,11 +453,12 @@ def borrow(
     _greenAmount: uint256 = max_value(uint256),
     _user: address = msg.sender,
     _wantsSavingsGreen: bool = True,
+    _shouldEnterStabPool: bool = False,
 ) -> uint256:
     assert not deptBasics.isPaused # dev: contract paused
     a: addys.Addys = addys._getAddys()
     extcall PriceDesk(a.priceDesk).addGreenRefPoolSnapshot() # do before borrow
-    return extcall CreditEngine(a.creditEngine).borrowForUser(_user, _greenAmount, _wantsSavingsGreen, msg.sender, a)
+    return extcall CreditEngine(a.creditEngine).borrowForUser(_user, _greenAmount, _wantsSavingsGreen, _shouldEnterStabPool, msg.sender, a)
 
 
 # repay
