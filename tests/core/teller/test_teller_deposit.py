@@ -508,3 +508,97 @@ def test_teller_deposit_vault_mismatch(
     # Attempt deposit with mismatched vault ID and address should fail
     with boa.reverts("vault id and vault addr mismatch"):
         teller.deposit(alpha_token, deposit_amount, bob, rebase_erc20_vault, simple_vault_id, sender=bob)
+
+
+def test_teller_deposit_trusted_contract_bypasses_user_limit(
+    simple_erc20_vault,
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    teller,
+    credit_engine,
+):
+    # Setup with per user deposit limit
+    user_limit = 50 * EIGHTEEN_DECIMALS
+    setGeneralConfig()
+    setAssetConfig(alpha_token, _perUserDepositLimit=user_limit)
+
+    # First, make a deposit up to the user limit
+    alpha_token.transfer(bob, user_limit, sender=alpha_token_whale)
+    alpha_token.approve(teller.address, user_limit, sender=bob)
+    teller.deposit(alpha_token, user_limit, bob, simple_erc20_vault, sender=bob)
+    
+    # Now try to deposit more - should fail for regular user since limit is reached
+    additional_amount = 25 * EIGHTEEN_DECIMALS
+    alpha_token.transfer(bob, additional_amount, sender=alpha_token_whale)
+    alpha_token.approve(teller.address, additional_amount, sender=bob)
+    with boa.reverts("cannot deposit, reached user limit"):
+        teller.deposit(alpha_token, additional_amount, bob, simple_erc20_vault, sender=bob)
+
+    # Transfer tokens to trusted contract (credit_engine) and approve
+    alpha_token.transfer(credit_engine.address, additional_amount, sender=alpha_token_whale)
+    alpha_token.approve(teller.address, additional_amount, sender=credit_engine.address)
+    
+    # Trusted contract deposit should succeed despite user limit being reached
+    amount = teller.deposit(alpha_token, additional_amount, bob, simple_erc20_vault, sender=credit_engine.address)
+
+    # Verify the log shows the trusted contract as depositor
+    logs = filter_logs(teller, "TellerDeposit")
+    trusted_contract_log = logs[0]
+    assert trusted_contract_log.user == bob
+    assert trusted_contract_log.depositor == credit_engine.address
+    assert trusted_contract_log.amount == additional_amount
+
+    # Verify the deposit was successful
+    assert amount == additional_amount
+    assert alpha_token.balanceOf(simple_erc20_vault) == user_limit + additional_amount
+
+
+def test_teller_deposit_trusted_contract_bypasses_global_limit(
+    simple_erc20_vault,
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    sally,
+    setGeneralConfig,
+    setAssetConfig,
+    teller,
+    auction_house,
+):
+    # Setup with global deposit limit
+    global_limit = 75 * EIGHTEEN_DECIMALS
+    setGeneralConfig()
+    setAssetConfig(alpha_token, _globalDepositLimit=global_limit)
+    
+    # Setup for bob - first deposit up to global limit
+    alpha_token.transfer(bob, global_limit, sender=alpha_token_whale)
+    alpha_token.approve(teller.address, global_limit, sender=bob)
+    teller.deposit(alpha_token, global_limit, bob, simple_erc20_vault, sender=bob)
+    
+    # Setup for sally - regular user deposit should fail due to global limit being reached
+    additional_amount = 25 * EIGHTEEN_DECIMALS
+    alpha_token.transfer(sally, additional_amount, sender=alpha_token_whale)
+    alpha_token.approve(teller.address, additional_amount, sender=sally)
+    with boa.reverts("cannot deposit, reached global limit"):
+        teller.deposit(alpha_token, additional_amount, sally, simple_erc20_vault, sender=sally)
+
+    # Transfer tokens to trusted contract (auction_house) and approve
+    alpha_token.transfer(auction_house.address, additional_amount, sender=alpha_token_whale)
+    alpha_token.approve(teller.address, additional_amount, sender=auction_house.address)
+    
+    # Trusted contract deposit should succeed despite global limit being reached
+    amount = teller.deposit(alpha_token, additional_amount, sally, simple_erc20_vault, sender=auction_house.address)
+    
+    # Verify the log shows the trusted contract as depositor
+    logs = filter_logs(teller, "TellerDeposit")
+    trusted_contract_log = logs[0]
+    assert trusted_contract_log.user == sally
+    assert trusted_contract_log.depositor == auction_house.address
+    assert trusted_contract_log.amount == additional_amount
+
+    # Verify the deposit was successful
+    assert amount == additional_amount
+    assert alpha_token.balanceOf(simple_erc20_vault) == global_limit + additional_amount
+
