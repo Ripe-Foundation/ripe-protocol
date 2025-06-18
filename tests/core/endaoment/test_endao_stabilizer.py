@@ -398,9 +398,11 @@ def test_endao_stabilizer_remove_with_debt_repayment(
     assert log.debtRepaid > 0
     assert log.greenAmountRemoved > 0
     
-    # Pool debt should be reduced
+    # Pool debt should be reduced by exactly the amount repaid
     new_pool_debt = ledger.greenPoolDebt(deployed_green_pool)
-    assert new_pool_debt < pool_debt
+    expected_new_debt = pool_debt - log.debtRepaid
+    assert new_pool_debt == expected_new_debt
+    assert new_pool_debt < pool_debt  # Additional safety check
 
 
 @pytest.base
@@ -512,3 +514,102 @@ def test_endao_stabilizer_paused_contract(
     # Should revert when contract is paused
     with boa.reverts("contract paused"):
         endaoment.stabilizeGreenRefPool(sender=switchboard_delta.address)
+
+
+@pytest.base
+def test_endao_repay_pool_debt_directly(
+    setGreenRefConfig,
+    endaoment,
+    addSeedGreenLiq,
+    swapUsdcForGreen,
+    usdc_token,
+    switchboard_delta,
+    green_token,
+    whale,
+    deployed_green_pool,
+    ledger,
+    _test,
+):
+    # Test the repayPoolDebt function directly
+    addSeedGreenLiq()
+    setGreenRefConfig(_stabilizerAdjustWeight=100_00)
+    
+    # Create debt by stabilizing an imbalanced pool
+    large_usdc_swap = 5_000 * (10 ** usdc_token.decimals())
+    swapUsdcForGreen(large_usdc_swap)
+    assert endaoment.stabilizeGreenRefPool(sender=switchboard_delta.address)
+    
+    # Check debt was created
+    initial_debt = ledger.greenPoolDebt(deployed_green_pool)
+    assert initial_debt > 0
+    
+    # Give endaoment extra green for repayment
+    extra_green = 5_000 * EIGHTEEN_DECIMALS  # Enough to cover any repayment
+    green_token.transfer(endaoment, extra_green, sender=whale)
+    green_balance_before = green_token.balanceOf(endaoment)
+    
+    # Repay partial debt (request more than we plan to actually repay)
+    requested_repay = min(3_000 * EIGHTEEN_DECIMALS, initial_debt)
+    assert endaoment.repayPoolDebt(deployed_green_pool, requested_repay, sender=switchboard_delta.address)
+
+    # Check event was emitted
+    log = filter_logs(endaoment, "PoolDebtRepaid")[0]
+    assert log.pool == deployed_green_pool
+    actual_repay_amount = log.amount  # This is what was actually repaid
+    
+    # The actual repay amount should be the minimum of requested, available green, and debt
+    expected_repay = min(requested_repay, green_balance_before, initial_debt)
+    _test(log.amount, expected_repay)
+
+    # Check debt was reduced by exactly the actual repay amount
+    final_debt = ledger.greenPoolDebt(deployed_green_pool)
+    expected_debt = initial_debt - actual_repay_amount
+    assert final_debt == expected_debt
+    
+    # Check green was burned (balance should decrease)
+    green_balance_after = green_token.balanceOf(endaoment)
+    green_burned = green_balance_before - green_balance_after
+    _test(green_burned, actual_repay_amount)
+
+
+@pytest.base 
+def test_endao_repay_pool_debt_max_amount(
+    setGreenRefConfig,
+    endaoment,
+    addSeedGreenLiq,
+    swapUsdcForGreen,
+    usdc_token,
+    switchboard_delta,
+    green_token,
+    whale,
+    deployed_green_pool,
+    ledger,
+    _test,
+):
+    # Test repaying more than the debt (should only repay what's owed)
+    addSeedGreenLiq()
+    setGreenRefConfig(_stabilizerAdjustWeight=100_00)
+    
+    # Create debt
+    large_usdc_swap = 3_000 * (10 ** usdc_token.decimals())
+    swapUsdcForGreen(large_usdc_swap)
+    assert endaoment.stabilizeGreenRefPool(sender=switchboard_delta.address)
+    
+    initial_debt = ledger.greenPoolDebt(deployed_green_pool)
+    assert initial_debt > 0
+    
+    # Give endaoment way more green than needed
+    excess_green = initial_debt + (5_000 * EIGHTEEN_DECIMALS)
+    green_token.transfer(endaoment, excess_green, sender=whale)
+    
+    # Try to repay more than the debt
+    huge_repay_amount = initial_debt * 2
+    assert endaoment.repayPoolDebt(deployed_green_pool, huge_repay_amount, sender=switchboard_delta.address)
+
+    # Check that only the actual debt amount was burned
+    log = filter_logs(endaoment, "PoolDebtRepaid")[0]
+    _test(log.amount, initial_debt)  # Should equal initial debt, not huge_repay_amount
+
+    # Should only repay the actual debt amount
+    final_debt = ledger.greenPoolDebt(deployed_green_pool)
+    assert final_debt == 0  # All debt should be repaid
