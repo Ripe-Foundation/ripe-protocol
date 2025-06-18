@@ -602,3 +602,121 @@ def test_teller_deposit_trusted_contract_bypasses_global_limit(
     assert amount == additional_amount
     assert alpha_token.balanceOf(simple_erc20_vault) == global_limit + additional_amount
 
+
+def test_teller_get_savings_green_and_enter_stab_pool_basic(
+    stability_pool,
+    green_token,
+    savings_green,
+    whale,
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    teller,
+    ledger,
+):
+    # Basic setup
+    setGeneralConfig()
+    setAssetConfig(savings_green, [1])  # Configure savings_green for stability pool (vault ID 1)
+
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    green_token.transfer(bob, deposit_amount, sender=whale)
+    green_token.approve(teller.address, deposit_amount, sender=bob)
+
+    # Record initial balances
+    initial_bob_green = green_token.balanceOf(bob)
+    initial_bob_sgreen = savings_green.balanceOf(bob)
+    initial_stability_pool_sgreen = savings_green.balanceOf(stability_pool)
+
+    # Execute convertToSavingsGreenAndDepositIntoStabPool
+    sgreen_amount = teller.convertToSavingsGreenAndDepositIntoStabPool(bob, deposit_amount, sender=bob)
+
+    # Verify TellerDeposit event was emitted
+    logs = filter_logs(teller, "TellerDeposit")
+    assert len(logs) == 1
+    log = logs[0]
+    assert log.user == bob
+    assert log.depositor == bob
+    assert log.asset == savings_green.address
+    assert log.amount == sgreen_amount
+    assert log.vaultAddr == stability_pool.address
+    assert log.vaultId == 1  # STABILITY_POOL_ID
+
+    # Check that the function returned a reasonable amount
+    assert sgreen_amount > 0
+
+    # Verify GREEN was transferred from bob
+    assert green_token.balanceOf(bob) == initial_bob_green - deposit_amount
+
+    # Verify sGREEN was deposited into stability pool on behalf of bob
+    assert savings_green.balanceOf(stability_pool) == initial_stability_pool_sgreen + sgreen_amount
+
+    # Verify bob is now participating in the stability pool vault
+    assert ledger.getNumUserVaults(bob) == 1
+
+
+def test_teller_get_savings_green_and_enter_stab_pool_insufficient_funds(
+    stability_pool,
+    green_token,
+    savings_green,
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    teller,
+):
+    # Basic setup
+    setGeneralConfig()
+    setAssetConfig(savings_green, [1])
+
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    
+    # Don't transfer any GREEN to bob, so he has 0 balance
+    green_token.approve(teller.address, deposit_amount, sender=bob)
+
+    # Attempt to deposit should fail
+    with boa.reverts("cannot deposit 0 green"):
+        teller.convertToSavingsGreenAndDepositIntoStabPool(bob, deposit_amount, sender=bob)
+
+    # Verify no balances changed
+    assert green_token.balanceOf(bob) == 0
+    assert savings_green.balanceOf(stability_pool) == 0
+
+
+def test_teller_get_savings_green_and_enter_stab_pool_contract_paused(
+    stability_pool,
+    green_token,
+    savings_green,
+    whale,
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    teller,
+    switchboard_alpha,
+):
+    # Basic setup
+    setGeneralConfig()
+    setAssetConfig(savings_green, [1])
+
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    green_token.transfer(bob, deposit_amount, sender=whale)
+    green_token.approve(teller.address, deposit_amount, sender=bob)
+
+    # Pause the teller
+    teller.pause(True, sender=switchboard_alpha.address)
+    assert teller.isPaused()
+
+    # Attempt to deposit should fail
+    with boa.reverts("contract paused"):
+        teller.convertToSavingsGreenAndDepositIntoStabPool(bob, deposit_amount, sender=bob)
+
+    # Unpause the teller
+    teller.pause(False, sender=switchboard_alpha.address)
+    assert not teller.isPaused()
+
+    # Function should now succeed
+    sgreen_amount = teller.convertToSavingsGreenAndDepositIntoStabPool(bob, deposit_amount, sender=bob)
+    assert sgreen_amount > 0
+
+    # Verify the deposit was successful
+    assert green_token.balanceOf(bob) == 0
+    assert savings_green.balanceOf(stability_pool) == sgreen_amount
+

@@ -860,3 +860,20 @@ def getPriorityLiqAssetVaults() -> DynArray[cs.VaultLite, PRIORITY_VAULT_DATA]:
 @external 
 def getPriorityStabVaults() -> DynArray[cs.VaultLite, PRIORITY_VAULT_DATA]:
     return self.priorityStabVaults
+
+
+# underscore helper
+
+
+@view
+@external
+def doesUndyLegoHaveAccess(_wallet: address, _legoAddr: address) -> bool:
+    config: cs.UserConfig = self.userConfig[_wallet]
+    if not config.canAnyoneDeposit or not config.canAnyoneRepayDebt:
+        return False
+
+    delegation: cs.ActionDelegation = self.userDelegation[_wallet][_legoAddr]
+    if not delegation.canWithdraw or not delegation.canBorrow or not delegation.canClaimLoot:
+        return False
+    
+    return True

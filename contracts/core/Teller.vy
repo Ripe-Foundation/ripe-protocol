@@ -178,6 +178,7 @@ MAX_AUCTION_PURCHASES: constant(uint256) = 20
 MAX_LIQ_USERS: constant(uint256) = 50
 MAX_STAB_CLAIMS: constant(uint256) = 15
 MAX_STAB_REDEMPTIONS: constant(uint256) = 15
+STABILITY_POOL_ID: constant(uint256) = 1
 RIPE_GOV_VAULT_ID: constant(uint256) = 2
 UNDERSCORE_AGENT_FACTORY_ID: constant(uint256) = 1
 
@@ -203,7 +204,7 @@ def deposit(
 ) -> uint256:
     assert not deptBasics.isPaused # dev: contract paused
     a: addys.Addys = addys._getAddys()
-    amount: uint256 = self._deposit(_asset, _amount, _user, _vaultAddr, _vaultId, msg.sender, 0, a)
+    amount: uint256 = self._deposit(_asset, _amount, _user, _vaultAddr, _vaultId, msg.sender, 0, False, a)
     extcall PriceDesk(a.priceDesk).addGreenRefPoolSnapshot()
     extcall CreditEngine(a.creditEngine).updateDebtForUser(_user, a)
     return amount
@@ -214,7 +215,7 @@ def depositMany(_user: address, _deposits: DynArray[DepositAction, MAX_BALANCE_A
     assert not deptBasics.isPaused # dev: contract paused
     a: addys.Addys = addys._getAddys()
     for d: DepositAction in _deposits:
-        self._deposit(d.asset, d.amount, _user, d.vaultAddr, d.vaultId, msg.sender, 0, a)
+        self._deposit(d.asset, d.amount, _user, d.vaultAddr, d.vaultId, msg.sender, 0, False, a)
     extcall PriceDesk(a.priceDesk).addGreenRefPoolSnapshot()
     extcall CreditEngine(a.creditEngine).updateDebtForUser(_user, a)
     return len(_deposits)
@@ -232,6 +233,7 @@ def _deposit(
     _vaultId: uint256,
     _depositor: address,
     _lockDuration: uint256,
+    _areFundsHereAlready: bool,
     _a: addys.Addys,
 ) -> uint256:
     vaultAddr: address = empty(address)
@@ -240,10 +242,15 @@ def _deposit(
 
     # get ledger data
     d: DepositLedgerData = staticcall Ledger(_a.ledger).getDepositLedgerData(_user, vaultId)
-    amount: uint256 = self._validateOnDeposit(_asset, _amount, _user, vaultId, vaultAddr, _depositor, d, _a.missionControl)
+    amount: uint256 = self._validateOnDeposit(_asset, _amount, _user, vaultId, vaultAddr, _depositor, _areFundsHereAlready, d, _a.missionControl)
+
+    # transfer tokens
+    if _areFundsHereAlready:
+        assert extcall IERC20(_asset).transfer(vaultAddr, amount, default_return_value=True) # dev: could not transfer
+    else:
+        assert extcall IERC20(_asset).transferFrom(_depositor, vaultAddr, amount, default_return_value=True) # dev: token transfer failed
 
     # deposit tokens
-    assert extcall IERC20(_asset).transferFrom(_depositor, vaultAddr, amount, default_return_value=True) # dev: token transfer failed
     if _lockDuration != 0:
         amount = extcall RipeGovVault(vaultAddr).depositTokensWithLockDuration(_user, _asset, amount, _lockDuration, _a)
     else:
@@ -272,6 +279,7 @@ def _validateOnDeposit(
     _vaultId: uint256,
     _vaultAddr: address,
     _depositor: address,
+    _areFundsHereAlready: bool,
     _d: DepositLedgerData,
     _missionControl: address,
 ) -> uint256:
@@ -289,7 +297,10 @@ def _validateOnDeposit(
         assert isRipeDepartment or self._isUnderscoreWalletOwner(_user, _depositor, _missionControl) # dev: cannot deposit for user
 
     # avail amount
-    amount: uint256 = min(_amount, staticcall IERC20(_asset).balanceOf(_depositor))
+    holder: address = _depositor
+    if _areFundsHereAlready:
+        holder = self
+    amount: uint256 = min(_amount, staticcall IERC20(_asset).balanceOf(holder))
     assert amount != 0 # dev: cannot deposit 0
 
     # if depositing from ripe dept, skip these limits
@@ -606,6 +617,30 @@ def buyManyFungibleAuctions(
 ###################
 
 
+# deposit green into stab pool
+
+
+@external
+def convertToSavingsGreenAndDepositIntoStabPool(_user: address = msg.sender, _greenAmount: uint256 = max_value(uint256)) -> uint256:
+    assert not deptBasics.isPaused # dev: contract paused
+    a: addys.Addys = addys._getAddys()
+
+    # transfer GREEN to this contract
+    greenAmount: uint256 = min(_greenAmount, staticcall IERC20(a.greenToken).balanceOf(msg.sender))
+    assert greenAmount != 0 # dev: cannot deposit 0 green
+    assert extcall IERC20(a.greenToken).transferFrom(msg.sender, self, greenAmount, default_return_value=True) # dev: token transfer failed
+
+    # put GREEN into sGREEN
+    assert extcall IERC20(a.greenToken).approve(a.savingsGreen, greenAmount, default_return_value=True) # dev: green approval failed
+    sGreenAmount: uint256 = extcall IERC4626(a.savingsGreen).deposit(greenAmount, self)
+    assert extcall IERC20(a.greenToken).approve(a.savingsGreen, 0, default_return_value=True) # dev: green approval failed
+
+    sGreenAmount = self._deposit(a.savingsGreen, sGreenAmount, _user, empty(address), STABILITY_POOL_ID, msg.sender, 0, True, a)
+    extcall PriceDesk(a.priceDesk).addGreenRefPoolSnapshot()
+    extcall CreditEngine(a.creditEngine).updateDebtForUser(_user, a)
+    return sGreenAmount
+
+
 # claims
 
 
@@ -767,7 +802,7 @@ def depositIntoGovVaultFromTrusted(
 ) -> uint256:
     assert addys._isValidRipeAddr(msg.sender) # dev: no perms
     a: addys.Addys = addys._getAddys(_a)
-    return self._deposit(_asset, _amount, _user, empty(address), RIPE_GOV_VAULT_ID, msg.sender, _lockDuration, a)
+    return self._deposit(_asset, _amount, _user, empty(address), RIPE_GOV_VAULT_ID, msg.sender, _lockDuration, False, a)
 
 
 ##################
@@ -880,24 +915,6 @@ def _setUserDelegation(
 
 
 # underscore helpers
-
-
-@view
-@external
-def doesUndyLegoHaveAccess(_wallet: address, _legoAddr: address) -> bool:
-    mc: address = addys._getMissionControlAddr()
-
-    # look at basic config
-    config: cs.UserConfig = staticcall MissionControl(mc).userConfig(_wallet)
-    if not config.canAnyoneDeposit or not config.canAnyoneRepayDebt:
-        return False
-
-    # look at delegation
-    delegation: cs.ActionDelegation = staticcall MissionControl(mc).userDelegation(_wallet, _legoAddr)
-    if not delegation.canWithdraw or not delegation.canBorrow or not delegation.canClaimLoot:
-        return False
-    
-    return True
 
 
 @external
