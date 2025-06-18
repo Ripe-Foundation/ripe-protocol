@@ -33,7 +33,7 @@ interface MissionControl:
     def getRewardsConfig() -> RewardsConfig: view
 
 interface Teller:
-    def depositIntoGovVaultFromTrusted(_user: address, _asset: address, _amount: uint256, _lockDuration: uint256, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
+    def depositFromTrusted(_user: address, _vaultId: uint256, _asset: address, _amount: uint256, _lockDuration: uint256, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
     def isUnderscoreWalletOwner(_user: address, _caller: address, _mc: address = empty(address)) -> bool: view
 
 interface PriceDesk:
@@ -139,6 +139,7 @@ HUNDRED_PERCENT: constant(uint256) = 100_00 # 100.00%
 MAX_ASSETS_TO_CLEAN: constant(uint256) = 20
 MAX_VAULTS_TO_CLEAN: constant(uint256) = 10
 MAX_CLAIM_USERS: constant(uint256) = 25
+RIPE_GOV_VAULT_ID: constant(uint256) = 2
 
 
 @deploy
@@ -1003,7 +1004,7 @@ def _handleRipeMint(
     # stake ripe tokens
     if amountToStake != 0:
         assert extcall IERC20(_a.ripeToken).approve(_a.teller, amountToStake, default_return_value=True) # dev: ripe approval failed
-        extcall Teller(_a.teller).depositIntoGovVaultFromTrusted(_user, _a.ripeToken, amountToStake, lockDuration, _a)
+        extcall Teller(_a.teller).depositFromTrusted(_user, RIPE_GOV_VAULT_ID, _a.ripeToken, amountToStake, lockDuration, _a)
         assert extcall IERC20(_a.ripeToken).approve(_a.teller, 0, default_return_value=True) # dev: ripe approval failed
 
     # transfer ripe to user

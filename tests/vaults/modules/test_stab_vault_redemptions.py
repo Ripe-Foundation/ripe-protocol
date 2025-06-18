@@ -168,17 +168,17 @@ def test_stab_vault_redemptions_validation(
     # Test redemption when paused
     stability_pool.pause(True, sender=switchboard_alpha.address)
     with boa.reverts("contract paused"):
-        stability_pool.redeemFromStabilityPool(bravo_token, 100 * EIGHTEEN_DECIMALS, bob, False, sender=teller.address)
+        stability_pool.redeemFromStabilityPool(bravo_token, 100 * EIGHTEEN_DECIMALS, bob, False, False, sender=teller.address)
     stability_pool.pause(False, sender=switchboard_alpha.address)
 
     # Test redemption with no green tokens
     with boa.reverts("no green to redeem"):
-        stability_pool.redeemFromStabilityPool(bravo_token, 100 * EIGHTEEN_DECIMALS, bob, False, sender=teller.address)
+        stability_pool.redeemFromStabilityPool(bravo_token, 100 * EIGHTEEN_DECIMALS, bob, False, False, sender=teller.address)
 
     # Test unauthorized caller
     green_token.transfer(stability_pool, 100 * EIGHTEEN_DECIMALS, sender=whale)
     with boa.reverts("only Teller allowed"):
-        stability_pool.redeemFromStabilityPool(bravo_token, 100 * EIGHTEEN_DECIMALS, bob, False, sender=alice)
+        stability_pool.redeemFromStabilityPool(bravo_token, 100 * EIGHTEEN_DECIMALS, bob, False, False, sender=alice)
 
 
 def test_stab_vault_redemptions_no_claimable_assets(
@@ -1045,4 +1045,589 @@ def test_stab_vault_redemptions_over_limit(
     except Exception:
         # Expected to fail
         pass
+
+
+#################################
+# Auto-Deposit Redemption Tests #
+#################################
+
+
+def test_stab_vault_redemptions_auto_deposit_basic(
+    stability_pool,
+    alpha_token,
+    bravo_token,
+    alpha_token_whale,
+    bravo_token_whale,
+    bob,
+    alice,
+    teller,
+    auction_house,
+    mock_price_source,
+    vault_book,
+    savings_green,
+    simple_erc20_vault,
+    green_token,
+    whale,
+    _test,
+    setGeneralConfig,
+    setAssetConfig,
+):
+    """Test basic auto-deposit functionality when redeeming from stability pool"""
+    setGeneralConfig()
+    setAssetConfig(bravo_token)
+
+    # Set mock prices
+    price = 1 * EIGHTEEN_DECIMALS
+    mock_price_source.setPrice(alpha_token, price)
+    mock_price_source.setPrice(bravo_token, price)
+    mock_price_source.setPrice(green_token, price)
+
+    # Setup stability pool
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    alpha_token.transfer(stability_pool, deposit_amount, sender=alpha_token_whale)
+    stability_pool.depositTokensInVault(alice, alpha_token, deposit_amount, sender=teller.address)
+
+    # Create claimable assets
+    claimable_amount = 150 * EIGHTEEN_DECIMALS
+    bravo_token.transfer(stability_pool, claimable_amount, sender=bravo_token_whale)
+    stability_pool.swapForLiquidatedCollateral(
+        alpha_token, deposit_amount, bravo_token, claimable_amount,
+        ZERO_ADDRESS, alpha_token, savings_green, sender=auction_house.address
+    )
+
+    # Record initial balances
+    initial_bob_bravo_balance = bravo_token.balanceOf(bob)
+    initial_bob_vault_balance = simple_erc20_vault.getTotalAmountForUser(bob, bravo_token)
+
+    vault_id = vault_book.getRegId(stability_pool)
+
+    # Redeem with auto-deposit enabled
+    redeem_amount = 80 * EIGHTEEN_DECIMALS
+    green_token.transfer(bob, redeem_amount, sender=whale)
+    green_token.approve(teller, redeem_amount, sender=bob)
+    
+    usd_value = teller.redeemFromStabilityPool(
+        vault_id, bravo_token, redeem_amount, False, False, True, sender=bob  # _shouldAutoDeposit=True
+    )
+
+    # Verify redemption worked
+    _test(redeem_amount, usd_value)
+
+    # Verify tokens were auto-deposited (not sent directly to Bob)
+    final_bob_bravo_balance = bravo_token.balanceOf(bob)
+    final_bob_vault_balance = simple_erc20_vault.getTotalAmountForUser(bob, bravo_token)
+
+    assert final_bob_bravo_balance == initial_bob_bravo_balance  # No direct token transfer
+    _test(redeem_amount, final_bob_vault_balance - initial_bob_vault_balance)  # Auto-deposited
+
+
+def test_stab_vault_redemptions_auto_deposit_disabled(
+    stability_pool,
+    alpha_token,
+    bravo_token,
+    alpha_token_whale,
+    bravo_token_whale,
+    bob,
+    alice,
+    teller,
+    auction_house,
+    mock_price_source,
+    vault_book,
+    savings_green,
+    simple_erc20_vault,
+    green_token,
+    whale,
+    _test,
+    setGeneralConfig,
+    setAssetConfig,
+):
+    """Test that auto-deposit is disabled when _shouldAutoDeposit=False"""
+    setGeneralConfig()
+    setAssetConfig(bravo_token)
+
+    # Set mock prices
+    price = 1 * EIGHTEEN_DECIMALS
+    mock_price_source.setPrice(alpha_token, price)
+    mock_price_source.setPrice(bravo_token, price)
+    mock_price_source.setPrice(green_token, price)
+
+    # Setup stability pool
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    alpha_token.transfer(stability_pool, deposit_amount, sender=alpha_token_whale)
+    stability_pool.depositTokensInVault(alice, alpha_token, deposit_amount, sender=teller.address)
+
+    # Create claimable assets
+    claimable_amount = 150 * EIGHTEEN_DECIMALS
+    bravo_token.transfer(stability_pool, claimable_amount, sender=bravo_token_whale)
+    stability_pool.swapForLiquidatedCollateral(
+        alpha_token, deposit_amount, bravo_token, claimable_amount,
+        ZERO_ADDRESS, alpha_token, savings_green, sender=auction_house.address
+    )
+
+    # Record initial balances
+    initial_bob_bravo_balance = bravo_token.balanceOf(bob)
+    initial_bob_vault_balance = simple_erc20_vault.getTotalAmountForUser(bob, bravo_token)
+
+    vault_id = vault_book.getRegId(stability_pool)
+
+    # Redeem with auto-deposit disabled
+    redeem_amount = 80 * EIGHTEEN_DECIMALS
+    green_token.transfer(bob, redeem_amount, sender=whale)
+    green_token.approve(teller, redeem_amount, sender=bob)
+    
+    usd_value = teller.redeemFromStabilityPool(
+        vault_id, bravo_token, redeem_amount, False, False, False, sender=bob  # _shouldAutoDeposit=False
+    )
+
+    # Verify redemption worked
+    _test(redeem_amount, usd_value)
+
+    # Verify tokens were sent directly to Bob (not auto-deposited)
+    final_bob_bravo_balance = bravo_token.balanceOf(bob)
+    final_bob_vault_balance = simple_erc20_vault.getTotalAmountForUser(bob, bravo_token)
+
+    _test(redeem_amount, final_bob_bravo_balance - initial_bob_bravo_balance)  # Direct transfer
+    assert final_bob_vault_balance == initial_bob_vault_balance  # No auto-deposit
+
+
+def test_stab_vault_redemptions_auto_deposit_no_vault(
+    stability_pool,
+    alpha_token,
+    bravo_token,
+    alpha_token_whale,
+    bravo_token_whale,
+    bob,
+    alice,
+    teller,
+    auction_house,
+    mock_price_source,
+    vault_book,
+    savings_green,
+    green_token,
+    whale,
+    _test,
+    setGeneralConfig,
+    setAssetConfig,
+):
+    """Test auto-deposit fallback when no vault exists for the asset"""
+    setGeneralConfig()
+    setAssetConfig(bravo_token, _vaultIds=[])  # Configure for redemptions but no vault
+
+    # Set mock prices
+    price = 1 * EIGHTEEN_DECIMALS
+    mock_price_source.setPrice(alpha_token, price)
+    mock_price_source.setPrice(bravo_token, price)
+    mock_price_source.setPrice(green_token, price)
+
+    # Setup stability pool
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    alpha_token.transfer(stability_pool, deposit_amount, sender=alpha_token_whale)
+    stability_pool.depositTokensInVault(alice, alpha_token, deposit_amount, sender=teller.address)
+
+    # Create claimable assets
+    claimable_amount = 150 * EIGHTEEN_DECIMALS
+    bravo_token.transfer(stability_pool, claimable_amount, sender=bravo_token_whale)
+    stability_pool.swapForLiquidatedCollateral(
+        alpha_token, deposit_amount, bravo_token, claimable_amount,
+        ZERO_ADDRESS, alpha_token, savings_green, sender=auction_house.address
+    )
+
+    # Record initial balance
+    initial_bob_bravo_balance = bravo_token.balanceOf(bob)
+
+    vault_id = vault_book.getRegId(stability_pool)
+
+    # Redeem with auto-deposit enabled (should fallback to direct transfer)
+    redeem_amount = 80 * EIGHTEEN_DECIMALS
+    green_token.transfer(bob, redeem_amount, sender=whale)
+    green_token.approve(teller, redeem_amount, sender=bob)
+    
+    usd_value = teller.redeemFromStabilityPool(
+        vault_id, bravo_token, redeem_amount, False, False, True, sender=bob  # _shouldAutoDeposit=True
+    )
+
+    # Verify redemption worked
+    _test(redeem_amount, usd_value)
+
+    # Verify tokens were sent directly to Bob (fallback due to no vault)
+    final_bob_bravo_balance = bravo_token.balanceOf(bob)
+    _test(redeem_amount, final_bob_bravo_balance - initial_bob_bravo_balance)
+
+
+def test_stab_vault_redemptions_auto_deposit_stability_pool_vault(
+    stability_pool,
+    alpha_token,
+    bravo_token,
+    alpha_token_whale,
+    bravo_token_whale,
+    bob,
+    alice,
+    teller,
+    auction_house,
+    mock_price_source,
+    vault_book,
+    savings_green,
+    green_token,
+    whale,
+    _test,
+    setGeneralConfig,
+    setAssetConfig,
+):
+    """Test auto-deposit fallback when vault ID is 1 (stability pool itself)"""
+    setGeneralConfig()
+    setAssetConfig(bravo_token, _vaultIds=[1])  # Vault ID 1 is stability pool
+
+    # Set mock prices
+    price = 1 * EIGHTEEN_DECIMALS
+    mock_price_source.setPrice(alpha_token, price)
+    mock_price_source.setPrice(bravo_token, price)
+    mock_price_source.setPrice(green_token, price)
+
+    # Setup stability pool
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    alpha_token.transfer(stability_pool, deposit_amount, sender=alpha_token_whale)
+    stability_pool.depositTokensInVault(alice, alpha_token, deposit_amount, sender=teller.address)
+
+    # Create claimable assets
+    claimable_amount = 150 * EIGHTEEN_DECIMALS
+    bravo_token.transfer(stability_pool, claimable_amount, sender=bravo_token_whale)
+    stability_pool.swapForLiquidatedCollateral(
+        alpha_token, deposit_amount, bravo_token, claimable_amount,
+        ZERO_ADDRESS, alpha_token, savings_green, sender=auction_house.address
+    )
+
+    # Record initial balance
+    initial_bob_bravo_balance = bravo_token.balanceOf(bob)
+
+    vault_id = vault_book.getRegId(stability_pool)
+
+    # Redeem with auto-deposit enabled (should fallback to direct transfer)
+    redeem_amount = 80 * EIGHTEEN_DECIMALS
+    green_token.transfer(bob, redeem_amount, sender=whale)
+    green_token.approve(teller, redeem_amount, sender=bob)
+    
+    usd_value = teller.redeemFromStabilityPool(
+        vault_id, bravo_token, redeem_amount, False, False, True, sender=bob  # _shouldAutoDeposit=True
+    )
+
+    # Verify redemption worked
+    _test(redeem_amount, usd_value)
+
+    # Verify tokens were sent directly to Bob (fallback due to stability pool vault ID)
+    final_bob_bravo_balance = bravo_token.balanceOf(bob)
+    _test(redeem_amount, final_bob_bravo_balance - initial_bob_bravo_balance)
+
+
+def test_stab_vault_redemptions_auto_deposit_config_disabled(
+    stability_pool,
+    alpha_token,
+    bravo_token,
+    alpha_token_whale,
+    bravo_token_whale,
+    bob,
+    alice,
+    teller,
+    auction_house,
+    mock_price_source,
+    vault_book,
+    savings_green,
+    green_token,
+    whale,
+    _test,
+    setGeneralConfig,
+    setAssetConfig,
+):
+    """Test auto-deposit fallback when deposit config is disabled"""
+    setGeneralConfig()
+    setAssetConfig(bravo_token, _canDeposit=False)  # Deposit disabled
+
+    # Set mock prices
+    price = 1 * EIGHTEEN_DECIMALS
+    mock_price_source.setPrice(alpha_token, price)
+    mock_price_source.setPrice(bravo_token, price)
+    mock_price_source.setPrice(green_token, price)
+
+    # Setup stability pool
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    alpha_token.transfer(stability_pool, deposit_amount, sender=alpha_token_whale)
+    stability_pool.depositTokensInVault(alice, alpha_token, deposit_amount, sender=teller.address)
+
+    # Create claimable assets
+    claimable_amount = 150 * EIGHTEEN_DECIMALS
+    bravo_token.transfer(stability_pool, claimable_amount, sender=bravo_token_whale)
+    stability_pool.swapForLiquidatedCollateral(
+        alpha_token, deposit_amount, bravo_token, claimable_amount,
+        ZERO_ADDRESS, alpha_token, savings_green, sender=auction_house.address
+    )
+
+    # Record initial balance
+    initial_bob_bravo_balance = bravo_token.balanceOf(bob)
+
+    vault_id = vault_book.getRegId(stability_pool)
+
+    # Redeem with auto-deposit enabled (should fallback to direct transfer)
+    redeem_amount = 80 * EIGHTEEN_DECIMALS
+    green_token.transfer(bob, redeem_amount, sender=whale)
+    green_token.approve(teller, redeem_amount, sender=bob)
+    
+    usd_value = teller.redeemFromStabilityPool(
+        vault_id, bravo_token, redeem_amount, False, False, True, sender=bob  # _shouldAutoDeposit=True
+    )
+
+    # Verify redemption worked
+    _test(redeem_amount, usd_value)
+
+    # Verify tokens were sent directly to Bob (fallback due to deposit config)
+    final_bob_bravo_balance = bravo_token.balanceOf(bob)
+    _test(redeem_amount, final_bob_bravo_balance - initial_bob_bravo_balance)
+
+
+def test_stab_vault_redemptions_auto_deposit_many_basic(
+    stability_pool,
+    alpha_token,
+    bravo_token,
+    charlie_token,
+    alpha_token_whale,
+    bravo_token_whale,
+    charlie_token_whale,
+    bob,
+    alice,
+    teller,
+    auction_house,
+    mock_price_source,
+    vault_book,
+    savings_green,
+    simple_erc20_vault,
+    green_token,
+    whale,
+    _test,
+    setGeneralConfig,
+    setAssetConfig,
+):
+    """Test auto-deposit with redeemManyFromStabilityPool"""
+    setGeneralConfig()
+    setAssetConfig(bravo_token)
+    setAssetConfig(charlie_token)
+
+    # Set mock prices
+    price = 1 * EIGHTEEN_DECIMALS
+    mock_price_source.setPrice(alpha_token, price)
+    mock_price_source.setPrice(bravo_token, price)
+    mock_price_source.setPrice(charlie_token, price)
+    mock_price_source.setPrice(green_token, price)
+
+    # Setup stability pool
+    deposit_amount = 200 * EIGHTEEN_DECIMALS
+    alpha_token.transfer(stability_pool, deposit_amount, sender=alpha_token_whale)
+    stability_pool.depositTokensInVault(alice, alpha_token, deposit_amount, sender=teller.address)
+
+    # Create claimable assets
+    bravo_amount = 100 * EIGHTEEN_DECIMALS
+    charlie_amount = 120 * (10 ** charlie_token.decimals())
+    
+    bravo_token.transfer(stability_pool, bravo_amount, sender=bravo_token_whale)
+    stability_pool.swapForLiquidatedCollateral(
+        alpha_token, deposit_amount // 2, bravo_token, bravo_amount,
+        ZERO_ADDRESS, alpha_token, savings_green, sender=auction_house.address
+    )
+    
+    charlie_token.transfer(stability_pool, charlie_amount, sender=charlie_token_whale)
+    stability_pool.swapForLiquidatedCollateral(
+        alpha_token, deposit_amount // 2, charlie_token, charlie_amount,
+        ZERO_ADDRESS, alpha_token, savings_green, sender=auction_house.address
+    )
+
+    # Record initial balances
+    initial_bob_bravo_balance = bravo_token.balanceOf(bob)
+    initial_bob_charlie_balance = charlie_token.balanceOf(bob)
+    initial_bob_bravo_vault_balance = simple_erc20_vault.getTotalAmountForUser(bob, bravo_token)
+    initial_bob_charlie_vault_balance = simple_erc20_vault.getTotalAmountForUser(bob, charlie_token)
+
+    # Create redemptions array
+    redemptions = [
+        (bravo_token.address, MAX_UINT256),
+        (charlie_token.address, MAX_UINT256)
+    ]
+
+    vault_id = vault_book.getRegId(stability_pool)
+    total_redeem_amount = 220 * EIGHTEEN_DECIMALS
+    green_token.transfer(bob, total_redeem_amount, sender=whale)
+    green_token.approve(teller, total_redeem_amount, sender=bob)
+
+    # Redeem many with auto-deposit enabled
+    total_green_spent = teller.redeemManyFromStabilityPool(
+        vault_id, redemptions, total_redeem_amount, False, False, True, sender=bob  # _shouldAutoDeposit=True
+    )
+
+    # Verify redemptions worked
+    _test(220 * EIGHTEEN_DECIMALS, total_green_spent)
+
+    # Verify tokens were auto-deposited (not sent directly to Bob)
+    final_bob_bravo_balance = bravo_token.balanceOf(bob)
+    final_bob_charlie_balance = charlie_token.balanceOf(bob)
+    final_bob_bravo_vault_balance = simple_erc20_vault.getTotalAmountForUser(bob, bravo_token)
+    final_bob_charlie_vault_balance = simple_erc20_vault.getTotalAmountForUser(bob, charlie_token)
+
+    assert final_bob_bravo_balance == initial_bob_bravo_balance  # No direct transfer
+    assert final_bob_charlie_balance == initial_bob_charlie_balance  # No direct transfer
+    _test(bravo_amount, final_bob_bravo_vault_balance - initial_bob_bravo_vault_balance)  # Auto-deposited
+    _test(charlie_amount, final_bob_charlie_vault_balance - initial_bob_charlie_vault_balance)  # Auto-deposited
+
+
+def test_stab_vault_redemptions_auto_deposit_many_mixed(
+    stability_pool,
+    alpha_token,
+    bravo_token,
+    charlie_token,
+    alpha_token_whale,
+    bravo_token_whale,
+    charlie_token_whale,
+    bob,
+    alice,
+    teller,
+    auction_house,
+    mock_price_source,
+    vault_book,
+    savings_green,
+    simple_erc20_vault,
+    green_token,
+    whale,
+    _test,
+    setGeneralConfig,
+    setAssetConfig,
+):
+    """Test auto-deposit with redeemManyFromStabilityPool where some assets auto-deposit and others don't"""
+    setGeneralConfig()
+    setAssetConfig(bravo_token)
+    setAssetConfig(charlie_token, _vaultIds=[])  # Configure for redemptions but no vault
+
+    # Set mock prices
+    price = 1 * EIGHTEEN_DECIMALS
+    mock_price_source.setPrice(alpha_token, price)
+    mock_price_source.setPrice(bravo_token, price)
+    mock_price_source.setPrice(charlie_token, price)
+    mock_price_source.setPrice(green_token, price)
+
+    # Setup stability pool
+    deposit_amount = 200 * EIGHTEEN_DECIMALS
+    alpha_token.transfer(stability_pool, deposit_amount, sender=alpha_token_whale)
+    stability_pool.depositTokensInVault(alice, alpha_token, deposit_amount, sender=teller.address)
+
+    # Create claimable assets
+    bravo_amount = 100 * EIGHTEEN_DECIMALS
+    charlie_amount = 120 * (10 ** charlie_token.decimals())
+    
+    bravo_token.transfer(stability_pool, bravo_amount, sender=bravo_token_whale)
+    stability_pool.swapForLiquidatedCollateral(
+        alpha_token, deposit_amount // 2, bravo_token, bravo_amount,
+        ZERO_ADDRESS, alpha_token, savings_green, sender=auction_house.address
+    )
+    
+    charlie_token.transfer(stability_pool, charlie_amount, sender=charlie_token_whale)
+    stability_pool.swapForLiquidatedCollateral(
+        alpha_token, deposit_amount // 2, charlie_token, charlie_amount,
+        ZERO_ADDRESS, alpha_token, savings_green, sender=auction_house.address
+    )
+
+    # Record initial balances
+    initial_bob_bravo_balance = bravo_token.balanceOf(bob)
+    initial_bob_charlie_balance = charlie_token.balanceOf(bob)
+    initial_bob_vault_balance = simple_erc20_vault.getTotalAmountForUser(bob, bravo_token)
+
+    # Create redemptions array
+    redemptions = [
+        (bravo_token.address, MAX_UINT256),
+        (charlie_token.address, MAX_UINT256)
+    ]
+
+    vault_id = vault_book.getRegId(stability_pool)
+    total_redeem_amount = 220 * EIGHTEEN_DECIMALS
+    green_token.transfer(bob, total_redeem_amount, sender=whale)
+    green_token.approve(teller, total_redeem_amount, sender=bob)
+
+    # Redeem many with auto-deposit enabled
+    total_green_spent = teller.redeemManyFromStabilityPool(
+        vault_id, redemptions, total_redeem_amount, False, False, True, sender=bob  # _shouldAutoDeposit=True
+    )
+
+    # Verify redemptions worked
+    _test(220 * EIGHTEEN_DECIMALS, total_green_spent)
+
+    # Verify bravo was auto-deposited, charlie was sent directly
+    final_bob_bravo_balance = bravo_token.balanceOf(bob)
+    final_bob_charlie_balance = charlie_token.balanceOf(bob)
+    final_bob_vault_balance = simple_erc20_vault.getTotalAmountForUser(bob, bravo_token)
+
+    assert final_bob_bravo_balance == initial_bob_bravo_balance  # No direct transfer for bravo
+    _test(charlie_amount, final_bob_charlie_balance - initial_bob_charlie_balance)  # Direct transfer for charlie
+    _test(bravo_amount, final_bob_vault_balance - initial_bob_vault_balance)  # Auto-deposited bravo
+
+
+def test_stab_vault_redemptions_auto_deposit_partial_redeem(
+    stability_pool,
+    alpha_token,
+    bravo_token,
+    alpha_token_whale,
+    bravo_token_whale,
+    bob,
+    alice,
+    teller,
+    auction_house,
+    mock_price_source,
+    vault_book,
+    savings_green,
+    simple_erc20_vault,
+    green_token,
+    whale,
+    _test,
+    setGeneralConfig,
+    setAssetConfig,
+):
+    """Test auto-deposit works correctly with partial redemptions"""
+    setGeneralConfig()
+    setAssetConfig(bravo_token)
+
+    # Set mock prices
+    price = 1 * EIGHTEEN_DECIMALS
+    mock_price_source.setPrice(alpha_token, price)
+    mock_price_source.setPrice(bravo_token, price)
+    mock_price_source.setPrice(green_token, price)
+
+    # Setup stability pool
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    alpha_token.transfer(stability_pool, deposit_amount, sender=alpha_token_whale)
+    stability_pool.depositTokensInVault(alice, alpha_token, deposit_amount, sender=teller.address)
+
+    # Create claimable assets
+    claimable_amount = 100 * EIGHTEEN_DECIMALS
+    bravo_token.transfer(stability_pool, claimable_amount, sender=bravo_token_whale)
+    stability_pool.swapForLiquidatedCollateral(
+        alpha_token, deposit_amount, bravo_token, claimable_amount,
+        ZERO_ADDRESS, alpha_token, savings_green, sender=auction_house.address
+    )
+
+    # Record initial balance
+    initial_bob_vault_balance = simple_erc20_vault.getTotalAmountForUser(bob, bravo_token)
+
+    vault_id = vault_book.getRegId(stability_pool)
+
+    # Partial redemption with auto-deposit enabled
+    partial_redeem_amount = 40 * EIGHTEEN_DECIMALS
+    green_token.transfer(bob, partial_redeem_amount, sender=whale)
+    green_token.approve(teller, partial_redeem_amount, sender=bob)
+    
+    usd_value = teller.redeemFromStabilityPool(
+        vault_id, bravo_token, partial_redeem_amount, False, False, True, sender=bob  # _shouldAutoDeposit=True
+    )
+
+    # Verify partial redemption worked
+    _test(partial_redeem_amount, usd_value)
+
+    # Verify tokens were auto-deposited
+    final_bob_vault_balance = simple_erc20_vault.getTotalAmountForUser(bob, bravo_token)
+    _test(partial_redeem_amount, final_bob_vault_balance - initial_bob_vault_balance)
+
+    # Verify some claimable assets remain
+    remaining_claimable = stability_pool.claimableBalances(alpha_token, bravo_token)
+    assert remaining_claimable == claimable_amount - partial_redeem_amount
 

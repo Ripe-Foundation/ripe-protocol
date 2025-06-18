@@ -23,7 +23,7 @@ interface Ledger:
     def getRipeBondData() -> RipeBondData: view
 
 interface Teller:
-    def depositIntoGovVaultFromTrusted(_user: address, _asset: address, _amount: uint256, _lockDuration: uint256, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
+    def depositFromTrusted(_user: address, _vaultId: uint256, _asset: address, _amount: uint256, _lockDuration: uint256, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
     def isUnderscoreWalletOwner(_user: address, _caller: address, _mc: address = empty(address)) -> bool: view
 
 interface PriceDesk:
@@ -68,6 +68,7 @@ event RipeBondPurchased:
     caller: indexed(address)
 
 HUNDRED_PERCENT: constant(uint256) = 100_00 # 100.00%
+RIPE_GOV_VAULT_ID: constant(uint256) = 2
 
 
 @deploy
@@ -157,7 +158,7 @@ def purchaseRipeBond(
     if lockDuration != 0:
         extcall RipeToken(a.ripeToken).mint(self, ripePayout)
         assert extcall IERC20(a.ripeToken).approve(a.teller, ripePayout, default_return_value=True) # dev: ripe approval failed
-        extcall Teller(a.teller).depositIntoGovVaultFromTrusted(_recipient, a.ripeToken, ripePayout, lockDuration, a)
+        extcall Teller(a.teller).depositFromTrusted(_recipient, RIPE_GOV_VAULT_ID, a.ripeToken, ripePayout, lockDuration, a)
         assert extcall IERC20(a.ripeToken).approve(a.teller, 0, default_return_value=True) # dev: ripe approval failed
     else:
         extcall RipeToken(a.ripeToken).mint(_recipient, ripePayout)

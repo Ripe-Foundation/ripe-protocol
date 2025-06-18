@@ -44,7 +44,7 @@ interface HrContributor:
     def compensation() -> uint256: view
 
 interface Teller:
-    def depositIntoGovVaultFromTrusted(_user: address, _asset: address, _amount: uint256, _lockDuration: uint256, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
+    def depositFromTrusted(_user: address, _vaultId: uint256, _asset: address, _amount: uint256, _lockDuration: uint256, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
 
 interface Lootbox:
     def updateDepositPoints(_user: address, _vaultId: uint256, _vaultAddr: address, _asset: address, _a: addys.Addys = empty(addys.Addys)): nonpayable
@@ -403,7 +403,7 @@ def cashRipeCheck(_amount: uint256, _lockDuration: uint256) -> bool:
 
     # deposit into gov vault
     assert extcall IERC20(a.ripeToken).approve(a.teller, _amount, default_return_value=True) # dev: ripe approval failed
-    extcall Teller(a.teller).depositIntoGovVaultFromTrusted(msg.sender, a.ripeToken, _amount, _lockDuration, a)
+    extcall Teller(a.teller).depositFromTrusted(msg.sender, RIPE_GOV_VAULT_ID, a.ripeToken, _amount, _lockDuration, a)
     assert extcall IERC20(a.ripeToken).approve(a.teller, 0, default_return_value=True) # dev: ripe approval failed
     return True
 

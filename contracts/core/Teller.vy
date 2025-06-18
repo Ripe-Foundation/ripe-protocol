@@ -41,10 +41,10 @@ interface AuctionHouse:
     def liquidateUser(_liqUser: address, _keeper: address, _wantsSavingsGreen: bool, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
 
 interface StabVault:
-    def redeemManyFromStabilityPool(_redemptions: DynArray[StabPoolRedemption, MAX_STAB_REDEMPTIONS], _greenAmount: uint256, _redeemer: address, _shouldRefundSavingsGreen: bool, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
-    def claimFromStabilityPool(_claimer: address, _stabAsset: address, _claimAsset: address, _maxUsdValue: uint256, _caller: address, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
-    def redeemFromStabilityPool(_claimAsset: address, _greenAmount: uint256, _redeemer: address, _shouldRefundSavingsGreen: bool, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
-    def claimManyFromStabilityPool(_claimer: address, _claims: DynArray[StabPoolClaim, MAX_STAB_CLAIMS], _caller: address, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
+    def redeemManyFromStabilityPool(_redemptions: DynArray[StabPoolRedemption, MAX_STAB_REDEMPTIONS], _greenAmount: uint256, _redeemer: address, _shouldRefundSavingsGreen: bool, _shouldAutoDeposit: bool, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
+    def claimFromStabilityPool(_claimer: address, _stabAsset: address, _claimAsset: address, _maxUsdValue: uint256, _caller: address, _shouldAutoDeposit: bool, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
+    def redeemFromStabilityPool(_claimAsset: address, _greenAmount: uint256, _redeemer: address, _shouldRefundSavingsGreen: bool, _shouldAutoDeposit: bool, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
+    def claimManyFromStabilityPool(_claimer: address, _claims: DynArray[StabPoolClaim, MAX_STAB_CLAIMS], _caller: address, _shouldAutoDeposit: bool, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
 
 interface Lootbox:
     def claimLootForManyUsers(_users: DynArray[address, MAX_CLAIM_USERS], _caller: address, _shouldStake: bool, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
@@ -192,6 +192,7 @@ def __init__(_ripeHq: address):
 ############
 
 
+@nonreentrant
 @external
 def deposit(
     _asset: address,
@@ -202,21 +203,33 @@ def deposit(
 ) -> uint256:
     assert not deptBasics.isPaused # dev: contract paused
     a: addys.Addys = addys._getAddys()
-    amount: uint256 = self._deposit(_asset, _amount, _user, _vaultAddr, _vaultId, msg.sender, 0, False, a)
-    extcall PriceDesk(a.priceDesk).addGreenRefPoolSnapshot()
-    extcall CreditEngine(a.creditEngine).updateDebtForUser(_user, a)
-    return amount
+    return self._deposit(_asset, _amount, _user, _vaultAddr, _vaultId, msg.sender, 0, False, True, a)
 
 
+@nonreentrant
 @external
 def depositMany(_user: address, _deposits: DynArray[DepositAction, MAX_BALANCE_ACTION]) -> uint256:
     assert not deptBasics.isPaused # dev: contract paused
     a: addys.Addys = addys._getAddys()
     for d: DepositAction in _deposits:
-        self._deposit(d.asset, d.amount, _user, d.vaultAddr, d.vaultId, msg.sender, 0, False, a)
+        self._deposit(d.asset, d.amount, _user, d.vaultAddr, d.vaultId, msg.sender, 0, False, False, a)
     extcall PriceDesk(a.priceDesk).addGreenRefPoolSnapshot()
     extcall CreditEngine(a.creditEngine).updateDebtForUser(_user, a)
     return len(_deposits)
+
+
+@external
+def depositFromTrusted(
+    _user: address,
+    _vaultId: uint256,
+    _asset: address,
+    _amount: uint256,
+    _lockDuration: uint256,
+    _a: addys.Addys = empty(addys.Addys),
+) -> uint256:
+    assert addys._isValidRipeAddr(msg.sender) # dev: no perms
+    a: addys.Addys = addys._getAddys(_a)
+    return self._deposit(_asset, _amount, _user, empty(address), _vaultId, msg.sender, _lockDuration, False, False, a)
 
 
 # core logic
@@ -232,6 +245,7 @@ def _deposit(
     _depositor: address,
     _lockDuration: uint256,
     _areFundsHereAlready: bool,
+    _shouldPerformHouseKeeping: bool,
     _a: addys.Addys,
 ) -> uint256:
     vaultAddr: address = empty(address)
@@ -260,6 +274,11 @@ def _deposit(
 
     # update lootbox points
     extcall Lootbox(_a.lootbox).updateDepositPoints(_user, vaultId, vaultAddr, _asset, _a)
+
+    # perform house keeping
+    if _shouldPerformHouseKeeping:
+        extcall PriceDesk(_a.priceDesk).addGreenRefPoolSnapshot()
+        extcall CreditEngine(_a.creditEngine).updateDebtForUser(_user, _a)
 
     log TellerDeposit(user=_user, depositor=_depositor, asset=_asset, amount=amount, vaultAddr=vaultAddr, vaultId=vaultId)
     return amount
@@ -618,6 +637,7 @@ def buyManyFungibleAuctions(
 # deposit green into stab pool
 
 
+@nonreentrant
 @external
 def convertToSavingsGreenAndDepositIntoStabPool(_user: address = msg.sender, _greenAmount: uint256 = max_value(uint256)) -> uint256:
     assert not deptBasics.isPaused # dev: contract paused
@@ -633,10 +653,7 @@ def convertToSavingsGreenAndDepositIntoStabPool(_user: address = msg.sender, _gr
     sGreenAmount: uint256 = extcall IERC4626(a.savingsGreen).deposit(greenAmount, self)
     assert extcall IERC20(a.greenToken).approve(a.savingsGreen, 0, default_return_value=True) # dev: green approval failed
 
-    sGreenAmount = self._deposit(a.savingsGreen, sGreenAmount, _user, empty(address), STABILITY_POOL_ID, msg.sender, 0, True, a)
-    extcall PriceDesk(a.priceDesk).addGreenRefPoolSnapshot()
-    extcall CreditEngine(a.creditEngine).updateDebtForUser(_user, a)
-    return sGreenAmount
+    return self._deposit(a.savingsGreen, sGreenAmount, _user, empty(address), STABILITY_POOL_ID, msg.sender, 0, True, True, a)
 
 
 # claims
@@ -650,11 +667,12 @@ def claimFromStabilityPool(
     _claimAsset: address,
     _maxUsdValue: uint256 = max_value(uint256),
     _user: address = msg.sender,
+    _shouldAutoDeposit: bool = False,
 ) -> uint256:
     assert not deptBasics.isPaused # dev: contract paused
     a: addys.Addys = addys._getAddys()
     vaultAddr: address = staticcall AddressRegistry(a.vaultBook).getAddr(_vaultId)
-    claimUsdValue: uint256 = extcall StabVault(vaultAddr).claimFromStabilityPool(_user, _stabAsset, _claimAsset, _maxUsdValue, msg.sender, a)
+    claimUsdValue: uint256 = extcall StabVault(vaultAddr).claimFromStabilityPool(_user, _stabAsset, _claimAsset, _maxUsdValue, msg.sender, _shouldAutoDeposit, a)
     extcall PriceDesk(a.priceDesk).addGreenRefPoolSnapshot()
     assert extcall CreditEngine(a.creditEngine).updateDebtForUser(msg.sender, a) # dev: bad debt health
     return claimUsdValue
@@ -666,11 +684,12 @@ def claimManyFromStabilityPool(
     _vaultId: uint256,
     _claims: DynArray[StabPoolClaim, MAX_STAB_CLAIMS],
     _user: address = msg.sender,
+    _shouldAutoDeposit: bool = False,
 ) -> uint256:
     assert not deptBasics.isPaused # dev: contract paused
     a: addys.Addys = addys._getAddys()
     vaultAddr: address = staticcall AddressRegistry(a.vaultBook).getAddr(_vaultId)
-    claimUsdValue: uint256 = extcall StabVault(vaultAddr).claimManyFromStabilityPool(_user, _claims, msg.sender, a)
+    claimUsdValue: uint256 = extcall StabVault(vaultAddr).claimManyFromStabilityPool(_user, _claims, msg.sender, _shouldAutoDeposit, a)
     extcall PriceDesk(a.priceDesk).addGreenRefPoolSnapshot()
     assert extcall CreditEngine(a.creditEngine).updateDebtForUser(msg.sender, a) # dev: bad debt health
     return claimUsdValue
@@ -687,12 +706,13 @@ def redeemFromStabilityPool(
     _paymentAmount: uint256 = max_value(uint256),
     _isPaymentSavingsGreen: bool = False,
     _shouldRefundSavingsGreen: bool = True,
+    _shouldAutoDeposit: bool = False,
 ) -> uint256:
     assert not deptBasics.isPaused # dev: contract paused
     a: addys.Addys = addys._getAddys()
     vaultAddr: address = staticcall AddressRegistry(a.vaultBook).getAddr(_vaultId)
     greenAmount: uint256 = self._handleGreenPayment(_isPaymentSavingsGreen, _paymentAmount, vaultAddr, a.greenToken, a.savingsGreen)
-    greenSpent: uint256 = extcall StabVault(vaultAddr).redeemFromStabilityPool(_claimAsset, greenAmount, msg.sender, _shouldRefundSavingsGreen, a)
+    greenSpent: uint256 = extcall StabVault(vaultAddr).redeemFromStabilityPool(_claimAsset, greenAmount, msg.sender, _shouldRefundSavingsGreen, _shouldAutoDeposit, a)
     extcall PriceDesk(a.priceDesk).addGreenRefPoolSnapshot()
     extcall CreditEngine(a.creditEngine).updateDebtForUser(msg.sender, a)
     return greenSpent
@@ -706,12 +726,13 @@ def redeemManyFromStabilityPool(
     _paymentAmount: uint256 = max_value(uint256),
     _isPaymentSavingsGreen: bool = False,
     _shouldRefundSavingsGreen: bool = True,
+    _shouldAutoDeposit: bool = False,
 ) -> uint256:
     assert not deptBasics.isPaused # dev: contract paused
     a: addys.Addys = addys._getAddys()
     vaultAddr: address = staticcall AddressRegistry(a.vaultBook).getAddr(_vaultId)
     greenAmount: uint256 = self._handleGreenPayment(_isPaymentSavingsGreen, _paymentAmount, vaultAddr, a.greenToken, a.savingsGreen)
-    greenSpent: uint256 = extcall StabVault(vaultAddr).redeemManyFromStabilityPool(_redemptions, greenAmount, msg.sender, _shouldRefundSavingsGreen, a)
+    greenSpent: uint256 = extcall StabVault(vaultAddr).redeemManyFromStabilityPool(_redemptions, greenAmount, msg.sender, _shouldRefundSavingsGreen, _shouldAutoDeposit, a)
     extcall PriceDesk(a.priceDesk).addGreenRefPoolSnapshot()
     extcall CreditEngine(a.creditEngine).updateDebtForUser(msg.sender, a)
     return greenSpent
@@ -785,22 +806,6 @@ def releaseLock(_asset: address, _user: address = msg.sender):
     extcall RipeGovVault(vaultAddr).releaseLock(_user, _asset, a)
     extcall PriceDesk(a.priceDesk).addGreenRefPoolSnapshot()
     extcall CreditEngine(a.creditEngine).updateDebtForUser(_user, a)
-
-
-# deposit from other departments
-
-
-@external
-def depositIntoGovVaultFromTrusted(
-    _user: address,
-    _asset: address,
-    _amount: uint256,
-    _lockDuration: uint256,
-    _a: addys.Addys = empty(addys.Addys),
-) -> uint256:
-    assert addys._isValidRipeAddr(msg.sender) # dev: no perms
-    a: addys.Addys = addys._getAddys(_a)
-    return self._deposit(_asset, _amount, _user, empty(address), RIPE_GOV_VAULT_ID, msg.sender, _lockDuration, False, a)
 
 
 ##################
