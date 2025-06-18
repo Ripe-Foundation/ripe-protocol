@@ -50,6 +50,10 @@ interface PriceDesk:
     def getAssetAmount(_asset: address, _usdValue: uint256, _shouldRaise: bool = False) -> uint256: view
     def getUsdValue(_asset: address, _amount: uint256, _shouldRaise: bool = False) -> uint256: view
 
+interface GreenToken:
+    def mint(_to: address, _amount: uint256): nonpayable
+    def burn(_amount: uint256) -> bool: nonpayable
+
 interface LootBox:
     def updateDepositPoints(_user: address, _vaultId: uint256, _vaultAddr: address, _asset: address, _a: addys.Addys = empty(addys.Addys)): nonpayable
 
@@ -58,12 +62,6 @@ interface Teller:
 
 interface VaultBook:
     def getAddr(_vaultId: uint256) -> address: view
-
-interface GreenToken:
-    def mint(_to: address, _amount: uint256): nonpayable
-
-interface StabAsset:
-    def burn(_amount: uint256) -> bool: nonpayable
 
 struct AuctionBuyConfig:
     canBuyInAuctionGeneral: bool
@@ -611,12 +609,14 @@ def _burnLiqUserStabAsset(
     if usdValue == 0:
         return remainingToRepay, collateralValueOut
 
+    assert _liqStabAsset in [_a.greenToken, _a.savingsGreen] # dev: must be green or savings green
+
     # burn stab asset
     if _liqStabAsset == _a.savingsGreen:
-        usdValue = extcall IERC4626(_a.savingsGreen).redeem(amountReceived, self, self) # dev: savings green redeem failed
-        assert extcall StabAsset(_a.greenToken).burn(usdValue) # dev: failed to burn green
+        greenAmount: uint256 = extcall IERC4626(_a.savingsGreen).redeem(amountReceived, self, self) # dev: savings green redeem failed
+        assert extcall GreenToken(_a.greenToken).burn(greenAmount) # dev: failed to burn green
     else:
-        assert extcall StabAsset(_liqStabAsset).burn(amountReceived) # dev: failed to burn stab asset
+        assert extcall GreenToken(_a.greenToken).burn(amountReceived) # dev: failed to burn green
 
     # update totals
     remainingToRepay -= min(usdValue, remainingToRepay)
