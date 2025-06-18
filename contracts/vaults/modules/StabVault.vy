@@ -463,7 +463,7 @@ def swapForLiquidatedCollateral(
     # burn green token
     if _recipient == empty(address):
         assert _stabAsset in [_greenToken, _savingsGreenToken] # dev: must be green token or savings green token
-        assert extcall GreenToken(_greenToken).burn(amount) # dev: burn failed
+        assert extcall GreenToken(_stabAsset).burn(amount) # dev: burn failed
 
     else:
         assert extcall IERC20(_stabAsset).transfer(_recipient, amount, default_return_value=True) # dev: transfer failed
