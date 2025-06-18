@@ -46,7 +46,7 @@ interface LootBox:
 
 interface GreenToken:
     def mint(_to: address, _amount: uint256): nonpayable
-    def burn(_amount: uint256): nonpayable
+    def burn(_amount: uint256) -> bool: nonpayable
 
 interface Teller:
     def isUnderscoreWalletOwner(_user: address, _caller: address, _mc: address = empty(address)) -> bool: view
@@ -490,7 +490,7 @@ def _repayDebt(
 
     # burn green repayment
     if _shouldBurnGreen:
-        extcall GreenToken(_a.greenToken).burn(_repayValue)
+        assert extcall GreenToken(_a.greenToken).burn(_repayValue) # dev: could not burn green
 
     # handle refund
     if _refundAmount != 0:

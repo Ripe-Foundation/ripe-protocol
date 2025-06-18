@@ -138,6 +138,10 @@ def ripe_hq(
     ripe_hq_deploy.initiateHqConfigChange(13, True, False, False, sender=deploy3r)
     assert ripe_hq_deploy.confirmHqConfigChange(13, sender=deploy3r)
 
+    # endaoment can mint green
+    ripe_hq_deploy.initiateHqConfigChange(14, True, False, False, sender=deploy3r)
+    assert ripe_hq_deploy.confirmHqConfigChange(14, sender=deploy3r)
+
     # human resources can mint ripe
     ripe_hq_deploy.initiateHqConfigChange(15, False, True, False, sender=deploy3r)
     assert ripe_hq_deploy.confirmHqConfigChange(15, sender=deploy3r)
@@ -306,10 +310,11 @@ def credit_engine(ripe_hq_deploy):
 
 
 @pytest.fixture(scope="session")
-def endaoment(ripe_hq_deploy):
+def endaoment(ripe_hq_deploy, fork):
     return boa.load(
         "contracts/core/Endaoment.vy",
         ripe_hq_deploy,
+        ADDYS[fork]["WETH"],
         name="endaoment",
     )
 

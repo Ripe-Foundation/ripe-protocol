@@ -154,6 +154,9 @@ ripePaidOutForBadDebt: public(uint256)
 paymentAmountAvailInEpoch: public(uint256)
 ripeAvailForBonds: public(uint256)
 
+# endaoment
+greenPoolDebt: public(HashMap[address, uint256]) # pool -> debt
+
 
 @deploy
 def __init__(_ripeHq: address, _defaults: address):
@@ -794,3 +797,21 @@ def setEpochData(_epochStart: uint256, _epochEnd: uint256, _amountAvailInEpoch: 
     self.epochStart = _epochStart
     self.epochEnd = _epochEnd
     self.paymentAmountAvailInEpoch = _amountAvailInEpoch
+
+
+#############
+# Endaoment #
+#############
+
+
+@external
+def updateGreenPoolDebt(_pool: address, _amount: uint256, _isIncrement: bool):
+    assert msg.sender == addys._getEndaomentAddr() # dev: no perms
+    assert not deptBasics.isPaused # dev: not activated
+
+    greenPoolDebt: uint256 = self.greenPoolDebt[_pool]
+    if _isIncrement:
+        greenPoolDebt += _amount
+    else:
+        greenPoolDebt -= min(greenPoolDebt, _amount)
+    self.greenPoolDebt[_pool] = greenPoolDebt

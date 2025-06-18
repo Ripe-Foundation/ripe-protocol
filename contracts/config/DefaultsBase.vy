@@ -167,10 +167,13 @@ def stabClaimRewardsConfig() -> cs.StabClaimRewardsConfig:
 # underscore registry
 
 
+UNDERSCORE_REGISTRY: constant(address) = 0x7BcD6d471D1A068012A79347C7a944d1Df01a1AE
+
+
 @view
 @external
 def underscoreRegistry() -> address:
-    return empty(address) # TODO: add this
+    return UNDERSCORE_REGISTRY
 
 
 # ripe available

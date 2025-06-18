@@ -50,10 +50,6 @@ interface PriceDesk:
     def getAssetAmount(_asset: address, _usdValue: uint256, _shouldRaise: bool = False) -> uint256: view
     def getUsdValue(_asset: address, _amount: uint256, _shouldRaise: bool = False) -> uint256: view
 
-interface GreenToken:
-    def mint(_to: address, _amount: uint256): nonpayable
-    def burn(_amount: uint256): nonpayable
-
 interface LootBox:
     def updateDepositPoints(_user: address, _vaultId: uint256, _vaultAddr: address, _asset: address, _a: addys.Addys = empty(addys.Addys)): nonpayable
 
@@ -62,6 +58,9 @@ interface Teller:
 
 interface VaultBook:
     def getAddr(_vaultId: uint256) -> address: view
+
+interface GreenToken:
+    def mint(_to: address, _amount: uint256): nonpayable
 
 interface StabAsset:
     def burn(_amount: uint256) -> bool: nonpayable

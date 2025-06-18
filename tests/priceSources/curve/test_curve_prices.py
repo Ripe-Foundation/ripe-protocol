@@ -646,7 +646,7 @@ def test_get_price_two_crypto_ng(
     assert price != 0
 
     # may need to update this every once in awhile
-    _test(price, int(0.046 * EIGHTEEN_DECIMALS), 1_00)
+    _test(price, int(0.044 * EIGHTEEN_DECIMALS), 1_00)
 
 
 #################
@@ -801,15 +801,15 @@ def test_eco_token_detection(
 ):
     """Test that eco tokens are correctly detected in pools"""
     # Green pool should have eco token
-    green_config = curve_prices.getCurvePoolConfig(green_token.address, deployed_green_pool)
+    green_config = curve_prices.getCurvePoolConfig(deployed_green_pool)
     assert green_config.hasEcoToken == True
     
     # Ripe pool should have eco token  
-    ripe_config = curve_prices.getCurvePoolConfig(ripe_token.address, deployed_ripe_pool)
+    ripe_config = curve_prices.getCurvePoolConfig(deployed_ripe_pool)
     assert ripe_config.hasEcoToken == True
     
     # External pool should not have eco token
-    external_config = curve_prices.getCurvePoolConfig(scrvusd_token.address, base_usdc_scrvusd_pool.address)
+    external_config = curve_prices.getCurvePoolConfig(base_usdc_scrvusd_pool.address)
     assert external_config.hasEcoToken == False
 
 

@@ -128,7 +128,7 @@ def test_reference_pool_basic(
     addSeedGreenLiq() # need to add liquidity to pool
 
     # setup
-    aid = curve_prices.setGreenRefPoolConfig(deployed_green_pool, 10, 60_00, 0, sender=governance.address)
+    aid = curve_prices.setGreenRefPoolConfig(deployed_green_pool, 10, 60_00, 0, 10_00, 100_000 * EIGHTEEN_DECIMALS, sender=governance.address)
     boa.env.time_travel(blocks=curve_prices.actionTimeLock())
     assert curve_prices.confirmGreenRefPoolConfig(aid, sender=governance.address)
 
@@ -148,6 +148,8 @@ def test_reference_pool_basic(
     assert config.maxNumSnapshots == 10
     assert config.dangerTrigger == 60_00
     assert config.staleBlocks == 0
+    assert config.stabilizerAdjustWeight == 10_00
+    assert config.stabilizerMaxPoolDebt == 100_000 * EIGHTEEN_DECIMALS
 
     # verify data
     data = curve_prices.greenRefPoolData()
@@ -175,23 +177,43 @@ def test_invalid_green_ref_pool_configs(
 
     # Test invalid maxNumSnapshots (0)
     with boa.reverts("invalid ref pool config"):
-        curve_prices.setGreenRefPoolConfig(deployed_green_pool, 0, 60_00, 0, sender=governance.address)
+        curve_prices.setGreenRefPoolConfig(deployed_green_pool, 0, 60_00, 0, 10_00, 100_000 * EIGHTEEN_DECIMALS, sender=governance.address)
 
     # Test invalid maxNumSnapshots (>100)
     with boa.reverts("invalid ref pool config"):
-        curve_prices.setGreenRefPoolConfig(deployed_green_pool, 101, 60_00, 0, sender=governance.address)
+        curve_prices.setGreenRefPoolConfig(deployed_green_pool, 101, 60_00, 0, 10_00, 100_000 * EIGHTEEN_DECIMALS, sender=governance.address)
 
     # Test invalid dangerTrigger (<50%)
     with boa.reverts("invalid ref pool config"):
-        curve_prices.setGreenRefPoolConfig(deployed_green_pool, 10, 49_99, 0, sender=governance.address)
+        curve_prices.setGreenRefPoolConfig(deployed_green_pool, 10, 49_99, 0, 10_00, 100_000 * EIGHTEEN_DECIMALS, sender=governance.address)
+
+    # Test invalid dangerTrigger (>=100%)
+    with boa.reverts("invalid ref pool config"):
+        curve_prices.setGreenRefPoolConfig(deployed_green_pool, 10, 100_00, 0, 10_00, 100_000 * EIGHTEEN_DECIMALS, sender=governance.address)
 
     # Test invalid dangerTrigger (>100%)
     with boa.reverts("invalid ref pool config"):
-        curve_prices.setGreenRefPoolConfig(deployed_green_pool, 10, 100_01, 0, sender=governance.address)
+        curve_prices.setGreenRefPoolConfig(deployed_green_pool, 10, 100_01, 0, 10_00, 100_000 * EIGHTEEN_DECIMALS, sender=governance.address)
+
+    # Test invalid stabilizerAdjustWeight (0)
+    with boa.reverts("invalid ref pool config"):
+        curve_prices.setGreenRefPoolConfig(deployed_green_pool, 10, 60_00, 0, 0, 100_000 * EIGHTEEN_DECIMALS, sender=governance.address)
+
+    # Test invalid stabilizerAdjustWeight (>100%)
+    with boa.reverts("invalid ref pool config"):
+        curve_prices.setGreenRefPoolConfig(deployed_green_pool, 10, 60_00, 0, 100_01, 100_000 * EIGHTEEN_DECIMALS, sender=governance.address)
+
+    # Test invalid stabilizerMaxPoolDebt (0)
+    with boa.reverts("invalid ref pool config"):
+        curve_prices.setGreenRefPoolConfig(deployed_green_pool, 10, 60_00, 0, 10_00, 0, sender=governance.address)
+
+    # Test invalid stabilizerMaxPoolDebt (>1 million)
+    with boa.reverts("invalid ref pool config"):
+        curve_prices.setGreenRefPoolConfig(deployed_green_pool, 10, 60_00, 0, 10_00, 1_000_001 * EIGHTEEN_DECIMALS, sender=governance.address)
 
     # Test valid edge cases
-    aid1 = curve_prices.setGreenRefPoolConfig(deployed_green_pool, 1, 50_00, 0, sender=governance.address)
-    aid2 = curve_prices.setGreenRefPoolConfig(deployed_green_pool, 100, 100_00, 0, sender=governance.address)
+    aid1 = curve_prices.setGreenRefPoolConfig(deployed_green_pool, 1, 50_00, 0, 1, 1, sender=governance.address)  # Minimum valid values
+    aid2 = curve_prices.setGreenRefPoolConfig(deployed_green_pool, 100, 99_99, 0, 100_00, 1_000_000 * EIGHTEEN_DECIMALS, sender=governance.address)  # Maximum valid values
     
     # Should be able to set these
     assert aid1 != 0
@@ -208,7 +230,7 @@ def test_green_ref_pool_config_timelock(
     addSeedGreenLiq()
 
     # Set config
-    aid = curve_prices.setGreenRefPoolConfig(deployed_green_pool, 10, 60_00, 0, sender=governance.address)
+    aid = curve_prices.setGreenRefPoolConfig(deployed_green_pool, 10, 60_00, 0, 10_00, 100_000 * EIGHTEEN_DECIMALS, sender=governance.address)
     
     # Verify pending config event
     log = filter_logs(curve_prices, "GreenRefPoolConfigPending")[0]
@@ -247,7 +269,7 @@ def test_green_ref_pool_config_cancellation(
     addSeedGreenLiq()
 
     # Set config
-    aid = curve_prices.setGreenRefPoolConfig(deployed_green_pool, 10, 60_00, 0, sender=governance.address)
+    aid = curve_prices.setGreenRefPoolConfig(deployed_green_pool, 10, 60_00, 0, 10_00, 100_000 * EIGHTEEN_DECIMALS, sender=governance.address)
     
     # Cancel before timelock
     assert curve_prices.cancelGreenRefPoolConfig(aid, sender=governance.address)
@@ -278,7 +300,7 @@ def test_multiple_snapshots_balanced_pool(
     addSeedGreenLiq()
 
     # Setup config
-    aid = curve_prices.setGreenRefPoolConfig(deployed_green_pool, 5, 60_00, 0, sender=governance.address)
+    aid = curve_prices.setGreenRefPoolConfig(deployed_green_pool, 5, 60_00, 0, 10_00, 100_000 * EIGHTEEN_DECIMALS, sender=governance.address)
     boa.env.time_travel(blocks=curve_prices.actionTimeLock())
     assert curve_prices.confirmGreenRefPoolConfig(aid, sender=governance.address)
 
@@ -319,7 +341,7 @@ def test_snapshots_with_imbalanced_pool(
     addSeedGreenLiq()
 
     # Setup config with 70% danger trigger
-    aid = curve_prices.setGreenRefPoolConfig(deployed_green_pool, 10, 70_00, 0, sender=governance.address)
+    aid = curve_prices.setGreenRefPoolConfig(deployed_green_pool, 10, 70_00, 0, 10_00, 100_000 * EIGHTEEN_DECIMALS, sender=governance.address)
     boa.env.time_travel(blocks=curve_prices.actionTimeLock())
     assert curve_prices.confirmGreenRefPoolConfig(aid, sender=governance.address)
 
@@ -358,7 +380,7 @@ def test_danger_block_counting(
     addSeedGreenLiq()
 
     # Setup config
-    aid = curve_prices.setGreenRefPoolConfig(deployed_green_pool, 10, 65_00, 0, sender=governance.address)
+    aid = curve_prices.setGreenRefPoolConfig(deployed_green_pool, 10, 65_00, 0, 10_00, 100_000 * EIGHTEEN_DECIMALS, sender=governance.address)
     boa.env.time_travel(blocks=curve_prices.actionTimeLock())
     assert curve_prices.confirmGreenRefPoolConfig(aid, sender=governance.address)
 
@@ -411,7 +433,7 @@ def test_snapshot_index_wrapping(
     addSeedGreenLiq()
 
     # Setup config with only 3 max snapshots
-    aid = curve_prices.setGreenRefPoolConfig(deployed_green_pool, 3, 60_00, 0, sender=governance.address)
+    aid = curve_prices.setGreenRefPoolConfig(deployed_green_pool, 3, 60_00, 0, 10_00, 100_000 * EIGHTEEN_DECIMALS, sender=governance.address)
     boa.env.time_travel(blocks=curve_prices.actionTimeLock())
     assert curve_prices.confirmGreenRefPoolConfig(aid, sender=governance.address)
 
@@ -447,7 +469,7 @@ def test_same_block_snapshot_prevention(
     addSeedGreenLiq()
 
     # Setup config
-    aid = curve_prices.setGreenRefPoolConfig(deployed_green_pool, 10, 60_00, 0, sender=governance.address)
+    aid = curve_prices.setGreenRefPoolConfig(deployed_green_pool, 10, 60_00, 0, 10_00, 100_000 * EIGHTEEN_DECIMALS, sender=governance.address)
     boa.env.time_travel(blocks=curve_prices.actionTimeLock())
     assert curve_prices.confirmGreenRefPoolConfig(aid, sender=governance.address)
 
@@ -476,7 +498,7 @@ def test_weighted_ratio_calculation(
     addSeedGreenLiq()
 
     # Setup config
-    aid = curve_prices.setGreenRefPoolConfig(deployed_green_pool, 10, 60_00, 0, sender=governance.address)
+    aid = curve_prices.setGreenRefPoolConfig(deployed_green_pool, 10, 60_00, 0, 10_00, 100_000 * EIGHTEEN_DECIMALS, sender=governance.address)
     boa.env.time_travel(blocks=curve_prices.actionTimeLock())
     assert curve_prices.confirmGreenRefPoolConfig(aid, sender=governance.address)
 
@@ -522,7 +544,7 @@ def test_stale_snapshots_excluded(
     addSeedGreenLiq()
 
     # Setup config with stale blocks = 10
-    aid = curve_prices.setGreenRefPoolConfig(deployed_green_pool, 10, 60_00, 10, sender=governance.address)
+    aid = curve_prices.setGreenRefPoolConfig(deployed_green_pool, 10, 60_00, 10, 10_00, 100_000 * EIGHTEEN_DECIMALS, sender=governance.address)
     boa.env.time_travel(blocks=curve_prices.actionTimeLock())
     assert curve_prices.confirmGreenRefPoolConfig(aid, sender=governance.address)
 
@@ -567,10 +589,10 @@ def test_permission_checks(
 
     # Test non-governance cannot set config
     with boa.reverts("no perms"):
-        curve_prices.setGreenRefPoolConfig(deployed_green_pool, 10, 60_00, 0, sender=bob)
+        curve_prices.setGreenRefPoolConfig(deployed_green_pool, 10, 60_00, 0, 10_00, 100_000 * EIGHTEEN_DECIMALS, sender=bob)
 
     # Setup valid config first
-    aid = curve_prices.setGreenRefPoolConfig(deployed_green_pool, 10, 60_00, 0, sender=governance.address)
+    aid = curve_prices.setGreenRefPoolConfig(deployed_green_pool, 10, 60_00, 0, 10_00, 100_000 * EIGHTEEN_DECIMALS, sender=governance.address)
     
     # Test non-governance cannot confirm
     boa.env.time_travel(blocks=curve_prices.actionTimeLock())
@@ -615,7 +637,7 @@ def test_empty_pool_scenarios(
     # Try to setup config on empty pool (no liquidity)
     # This should actually succeed because empty pools return 50% ratio by default
     # The contract considers this valid since ratio != 0
-    aid = curve_prices.setGreenRefPoolConfig(deployed_green_pool, 10, 60_00, 0, sender=governance.address)
+    aid = curve_prices.setGreenRefPoolConfig(deployed_green_pool, 10, 60_00, 0, 10_00, 100_000 * EIGHTEEN_DECIMALS, sender=governance.address)
     assert aid != 0
     
     # Should be able to confirm it too
@@ -639,7 +661,7 @@ def test_maximum_snapshots_config(
     addSeedGreenLiq()
 
     # Test that maximum allowed maxNumSnapshots (100) can be configured and used
-    aid = curve_prices.setGreenRefPoolConfig(deployed_green_pool, 100, 60_00, 0, sender=governance.address)
+    aid = curve_prices.setGreenRefPoolConfig(deployed_green_pool, 100, 60_00, 0, 10_00, 100_000 * EIGHTEEN_DECIMALS, sender=governance.address)
     boa.env.time_travel(blocks=curve_prices.actionTimeLock())
     assert curve_prices.confirmGreenRefPoolConfig(aid, sender=governance.address)
 
@@ -679,7 +701,7 @@ def test_curve_pool_data_accuracy(
     addSeedGreenLiq()
 
     # Setup config to enable getCurvePoolData
-    aid = curve_prices.setGreenRefPoolConfig(deployed_green_pool, 10, 60_00, 0, sender=governance.address)
+    aid = curve_prices.setGreenRefPoolConfig(deployed_green_pool, 10, 60_00, 0, 10_00, 100_000 * EIGHTEEN_DECIMALS, sender=governance.address)
     boa.env.time_travel(blocks=curve_prices.actionTimeLock())
     assert curve_prices.confirmGreenRefPoolConfig(aid, sender=governance.address)
 
@@ -714,7 +736,7 @@ def test_config_update_overwrites_data(
     addSeedGreenLiq()
 
     # Setup initial config
-    aid1 = curve_prices.setGreenRefPoolConfig(deployed_green_pool, 5, 60_00, 0, sender=governance.address)
+    aid1 = curve_prices.setGreenRefPoolConfig(deployed_green_pool, 5, 60_00, 0, 10_00, 100_000 * EIGHTEEN_DECIMALS, sender=governance.address)
     boa.env.time_travel(blocks=curve_prices.actionTimeLock())
     assert curve_prices.confirmGreenRefPoolConfig(aid1, sender=governance.address)
 
@@ -728,7 +750,7 @@ def test_config_update_overwrites_data(
     assert data.nextIndex == 4  # Should be 4 after adding 3 snapshots (started at 1)
 
     # Update config with different parameters
-    aid2 = curve_prices.setGreenRefPoolConfig(deployed_green_pool, 8, 70_00, 5, sender=governance.address)
+    aid2 = curve_prices.setGreenRefPoolConfig(deployed_green_pool, 8, 70_00, 5, 20_00, 200_000 * EIGHTEEN_DECIMALS, sender=governance.address)
     boa.env.time_travel(blocks=curve_prices.actionTimeLock())
     assert curve_prices.confirmGreenRefPoolConfig(aid2, sender=governance.address)
 
@@ -737,6 +759,14 @@ def test_config_update_overwrites_data(
     assert config.maxNumSnapshots == 8
     assert config.dangerTrigger == 70_00
     assert config.staleBlocks == 5
+    assert config.stabilizerAdjustWeight == 20_00
+    assert config.stabilizerMaxPoolDebt == 200_000 * EIGHTEEN_DECIMALS
+
+    # Test that stabilizer config is also updated
+    stabilizer_config = curve_prices.getGreenStabilizerConfig()
+    assert stabilizer_config.pool == deployed_green_pool
+    assert stabilizer_config.stabilizerAdjustWeight == 20_00
+    assert stabilizer_config.stabilizerMaxPoolDebt == 200_000 * EIGHTEEN_DECIMALS
 
     # Verify new snapshot was added during confirmation and nextIndex continues
     data = curve_prices.greenRefPoolData()
@@ -754,7 +784,7 @@ def test_green_token_index_detection(
     addSeedGreenLiq()
     
     # Test current setup (GREEN at index 1)
-    aid = curve_prices.setGreenRefPoolConfig(deployed_green_pool, 10, 60_00, 0, sender=governance.address)
+    aid = curve_prices.setGreenRefPoolConfig(deployed_green_pool, 10, 60_00, 0, 10_00, 100_000 * EIGHTEEN_DECIMALS, sender=governance.address)
     boa.env.time_travel(blocks=curve_prices.actionTimeLock())
     assert curve_prices.confirmGreenRefPoolConfig(aid, sender=governance.address)
     
@@ -793,7 +823,7 @@ def test_invalid_pool_no_green_token(
     
     # Should fail because GREEN token not in pool
     with boa.reverts("invalid ref pool config"):
-        curve_prices.setGreenRefPoolConfig(no_green_pool, 10, 60_00, 0, sender=governance.address)
+        curve_prices.setGreenRefPoolConfig(no_green_pool, 10, 60_00, 0, 10_00, 100_000 * EIGHTEEN_DECIMALS, sender=governance.address)
 
 
 @pytest.base
@@ -806,7 +836,7 @@ def test_decimal_handling_edge_cases(
     addSeedGreenLiq()
     
     # Test with current setup (USDC = 6 decimals)
-    aid = curve_prices.setGreenRefPoolConfig(deployed_green_pool, 10, 60_00, 0, sender=governance.address)
+    aid = curve_prices.setGreenRefPoolConfig(deployed_green_pool, 10, 60_00, 0, 10_00, 100_000 * EIGHTEEN_DECIMALS, sender=governance.address)
     boa.env.time_travel(blocks=curve_prices.actionTimeLock())
     assert curve_prices.confirmGreenRefPoolConfig(aid, sender=governance.address)
     
@@ -831,7 +861,7 @@ def test_weighted_ratio_edge_cases(
     addSeedGreenLiq()
     
     # Setup config with stale blocks = 3
-    aid = curve_prices.setGreenRefPoolConfig(deployed_green_pool, 10, 60_00, 3, sender=governance.address)
+    aid = curve_prices.setGreenRefPoolConfig(deployed_green_pool, 10, 60_00, 3, 10_00, 100_000 * EIGHTEEN_DECIMALS, sender=governance.address)
     boa.env.time_travel(blocks=curve_prices.actionTimeLock())
     initial_block = boa.env.evm.patch.block_number
     assert curve_prices.confirmGreenRefPoolConfig(aid, sender=governance.address)
@@ -885,7 +915,7 @@ def test_stale_blocks_exact_threshold(
     addSeedGreenLiq()
     
     # Setup config with stale blocks = 3 (shorter for clearer testing)
-    aid = curve_prices.setGreenRefPoolConfig(deployed_green_pool, 10, 60_00, 3, sender=governance.address)
+    aid = curve_prices.setGreenRefPoolConfig(deployed_green_pool, 10, 60_00, 3, 10_00, 100_000 * EIGHTEEN_DECIMALS, sender=governance.address)
     boa.env.time_travel(blocks=curve_prices.actionTimeLock())
     assert curve_prices.confirmGreenRefPoolConfig(aid, sender=governance.address)
     
@@ -941,7 +971,7 @@ def test_contract_pause_blocks_functions(
     addSeedGreenLiq()
     
     # Setup config first
-    aid = curve_prices.setGreenRefPoolConfig(deployed_green_pool, 10, 60_00, 0, sender=governance.address)
+    aid = curve_prices.setGreenRefPoolConfig(deployed_green_pool, 10, 60_00, 0, 10_00, 100_000 * EIGHTEEN_DECIMALS, sender=governance.address)
     boa.env.time_travel(blocks=curve_prices.actionTimeLock())
     assert curve_prices.confirmGreenRefPoolConfig(aid, sender=governance.address)
     
@@ -950,7 +980,7 @@ def test_contract_pause_blocks_functions(
     
     # All functions should be blocked when paused
     with boa.reverts("contract paused"):
-        curve_prices.setGreenRefPoolConfig(deployed_green_pool, 5, 70_00, 0, sender=governance.address)
+        curve_prices.setGreenRefPoolConfig(deployed_green_pool, 5, 70_00, 0, 15_00, 150_000 * EIGHTEEN_DECIMALS, sender=governance.address)
     
     with boa.reverts("contract paused"):
         curve_prices.confirmGreenRefPoolConfig(123, sender=governance.address)
@@ -999,7 +1029,7 @@ def test_snapshot_with_zero_balance_edge_case(
     green_pool.add_liquidity([usdc_amount, green_amount], 0, bob, sender=bob)
     
     # Setup config
-    aid = curve_prices.setGreenRefPoolConfig(deployed_green_pool, 10, 60_00, 0, sender=governance.address)
+    aid = curve_prices.setGreenRefPoolConfig(deployed_green_pool, 10, 60_00, 0, 10_00, 100_000 * EIGHTEEN_DECIMALS, sender=governance.address)
     boa.env.time_travel(blocks=curve_prices.actionTimeLock())
     assert curve_prices.confirmGreenRefPoolConfig(aid, sender=governance.address)
     
@@ -1041,7 +1071,7 @@ def test_danger_transition_edge_cases(
     addSeedGreenLiq()
     
     # Setup config with 60% danger trigger
-    aid = curve_prices.setGreenRefPoolConfig(deployed_green_pool, 10, 60_00, 0, sender=governance.address)
+    aid = curve_prices.setGreenRefPoolConfig(deployed_green_pool, 10, 60_00, 0, 10_00, 100_000 * EIGHTEEN_DECIMALS, sender=governance.address)
     boa.env.time_travel(blocks=curve_prices.actionTimeLock())
     assert curve_prices.confirmGreenRefPoolConfig(aid, sender=governance.address)
     
@@ -1083,7 +1113,7 @@ def test_usdc_dominant_pool_scenarios(
     addSeedGreenLiq()  # Start with balanced pool (50/50)
 
     # Setup config with 50% danger trigger (minimum allowed)
-    aid = curve_prices.setGreenRefPoolConfig(deployed_green_pool, 10, 50_00, 0, sender=governance.address)
+    aid = curve_prices.setGreenRefPoolConfig(deployed_green_pool, 10, 50_00, 0, 10_00, 100_000 * EIGHTEEN_DECIMALS, sender=governance.address)
     boa.env.time_travel(blocks=curve_prices.actionTimeLock())
     assert curve_prices.confirmGreenRefPoolConfig(aid, sender=governance.address)
 
@@ -1153,7 +1183,7 @@ def test_green_scarcity_recovery_scenarios(
     addSeedGreenLiq()
 
     # Setup config
-    aid = curve_prices.setGreenRefPoolConfig(deployed_green_pool, 10, 60_00, 0, sender=governance.address)
+    aid = curve_prices.setGreenRefPoolConfig(deployed_green_pool, 10, 60_00, 0, 10_00, 100_000 * EIGHTEEN_DECIMALS, sender=governance.address)
     boa.env.time_travel(blocks=curve_prices.actionTimeLock())
     assert curve_prices.confirmGreenRefPoolConfig(aid, sender=governance.address)
 
