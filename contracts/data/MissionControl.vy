@@ -211,6 +211,7 @@ def __init__(_ripeHq: address, _defaults: address):
         self.rewardsConfig = staticcall Defaults(_defaults).rewardsConfig()
         self.stabClaimRewardsConfig = staticcall Defaults(_defaults).stabClaimRewardsConfig()
         self.underscoreRegistry = staticcall Defaults(_defaults).underscoreRegistry()
+        self.shouldCheckLastTouch = staticcall Defaults(_defaults).shouldCheckLastTouch()
 
         ripeGovVaultConfig: cs.RipeGovVaultConfig = staticcall Defaults(_defaults).ripeGovVaultConfig()
         if ripeGovVaultConfig.assetWeight != 0:
