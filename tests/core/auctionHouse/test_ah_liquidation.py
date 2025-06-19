@@ -1703,6 +1703,7 @@ def test_ah_liquidation_keeper_fee_ratio(
         _ltvPaybackBuffer=0,
         _keeperFeeRatio=2_00,  # 2.00% keeper fee
         _minKeeperFee=0,       # No minimum fee for this test
+        _maxKeeperFee=100 * EIGHTEEN_DECIMALS,  # High max to not interfere
     )
     
     debt_terms = createDebtTerms(_liqThreshold=80_00, _liqFee=10_00, _ltv=50_00, _borrowRate=0)
@@ -1799,6 +1800,7 @@ def test_ah_liquidation_keeper_minimum_fee(
         _ltvPaybackBuffer=0,
         _keeperFeeRatio=50,        # 0.50% keeper fee (very small)
         _minKeeperFee=5 * EIGHTEEN_DECIMALS,  # 5 GREEN minimum (should override percentage)
+        _maxKeeperFee=100 * EIGHTEEN_DECIMALS,  # High max to not interfere
     )
     
     debt_terms = createDebtTerms(_liqThreshold=80_00, _liqFee=10_00, _ltv=50_00, _borrowRate=0)
@@ -1872,6 +1874,114 @@ def test_ah_liquidation_keeper_minimum_fee(
     _test(expected_final_debt, user_debt.amount)
 
 
+def test_ah_liquidation_keeper_maximum_fee(
+    setGeneralConfig,
+    setAssetConfig,
+    setGeneralDebtConfig,
+    performDeposit,
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    teller,
+    mock_price_source,
+    createDebtTerms,
+    credit_engine,
+    sally,
+    green_token,
+    _test,
+):
+    """Test keeper rewards with maximum fee cap (_maxKeeperFee)
+    
+    This tests:
+    - When percentage fee exceeds maximum, maximum fee is used
+    - Keeper receives GREEN tokens equal to maximum fee
+    - Total liquidation fees include the capped keeper fee
+    - Maximum fee overrides percentage calculation when higher
+    """
+    
+    setGeneralConfig()
+    # Configure high percentage but low maximum fee
+    setGeneralDebtConfig(
+        _ltvPaybackBuffer=0,
+        _keeperFeeRatio=10_00,        # 10% keeper fee (very high)
+        _minKeeperFee=1 * EIGHTEEN_DECIMALS,   # 1 GREEN minimum (low)
+        _maxKeeperFee=3 * EIGHTEEN_DECIMALS,   # 3 GREEN maximum (should cap the 10%)
+    )
+    
+    debt_terms = createDebtTerms(_liqThreshold=80_00, _liqFee=10_00, _ltv=50_00, _borrowRate=0)
+    setAssetConfig(
+        alpha_token,
+        _debtTerms=debt_terms,
+        _shouldBurnAsPayment=False,
+        _shouldTransferToEndaoment=True,
+        _shouldSwapInStabPools=False,
+        _shouldAuctionInstantly=False,
+    )
+
+    # Setup
+    mock_price_source.setPrice(alpha_token, 1 * EIGHTEEN_DECIMALS)
+    deposit_amount = 200 * EIGHTEEN_DECIMALS
+    performDeposit(bob, deposit_amount, alpha_token, alpha_token_whale)
+    debt_amount = 100 * EIGHTEEN_DECIMALS
+    teller.borrow(debt_amount, bob, False, sender=bob)
+
+    # Set liquidatable price
+    new_price = 125 * EIGHTEEN_DECIMALS // 200  # 0.625
+    mock_price_source.setPrice(alpha_token, new_price)
+    assert credit_engine.canLiquidateUser(bob)
+
+    # Calculate fees
+    percentage_keeper_fee = debt_amount * 10_00 // HUNDRED_PERCENT  # 10% = 10 GREEN
+    min_keeper_fee = 1 * EIGHTEEN_DECIMALS                          # 1 GREEN minimum
+    max_keeper_fee = 3 * EIGHTEEN_DECIMALS                          # 3 GREEN maximum
+    
+    # Expected keeper fee should be capped at maximum
+    expected_keeper_fee = min(max(percentage_keeper_fee, min_keeper_fee), max_keeper_fee)
+    expected_liq_fee = debt_amount * 10_00 // HUNDRED_PERCENT       # 10% liquidation fee
+    expected_total_fees = expected_keeper_fee + expected_liq_fee
+
+    # Verify our assumption: maximum fee should cap the high percentage
+    assert expected_keeper_fee == max_keeper_fee, "Maximum fee should cap high percentage"
+    assert expected_keeper_fee < percentage_keeper_fee, "Maximum should be smaller than uncapped percentage"
+
+    # Get keeper's GREEN balance before liquidation
+    keeper_green_before = green_token.balanceOf(sally)
+
+    # Perform liquidation with sally as keeper
+    keeper_rewards = teller.liquidateUser(bob, False, sender=sally)
+
+    # Verify keeper rewards returned (should be maximum fee)
+    _test(expected_keeper_fee, keeper_rewards)
+    _test(max_keeper_fee, keeper_rewards)
+
+    # Verify keeper received GREEN tokens
+    keeper_green_after = green_token.balanceOf(sally)
+    keeper_green_received = keeper_green_after - keeper_green_before
+    _test(expected_keeper_fee, keeper_green_received)
+    _test(max_keeper_fee, keeper_green_received)
+
+    # Verify liquidation event includes correct keeper fee
+    liquidation_log = filter_logs(teller, "LiquidateUser")[0]
+    assert liquidation_log.user == bob
+    _test(expected_keeper_fee, liquidation_log.keeperFee)
+    _test(expected_total_fees, liquidation_log.totalLiqFees)
+
+    # Verify endaoment transfer happened
+    endaoment_logs = filter_logs(teller, "CollateralSentToEndaoment")
+    assert len(endaoment_logs) == 1
+    endaoment_log = endaoment_logs[0]
+    assert endaoment_log.liqUser == bob
+    assert endaoment_log.liqAsset == alpha_token.address
+
+    # Verify final debt includes unpaid fees
+    user_debt, bt, _ = credit_engine.getLatestUserDebtAndTerms(bob, False)
+    
+    # Calculate expected final debt
+    repay_amount = endaoment_log.usdValue
+    expected_final_debt = debt_amount - repay_amount + expected_total_fees
+    _test(expected_final_debt, user_debt.amount)
+
+
 def test_ah_liquidation_savings_green_keeper_rewards(
     setGeneralConfig,
     setAssetConfig,
@@ -1901,6 +2011,7 @@ def test_ah_liquidation_savings_green_keeper_rewards(
         _ltvPaybackBuffer=0,
         _keeperFeeRatio=2_00,  # 2% keeper fee
         _minKeeperFee=0,
+        _maxKeeperFee=100 * EIGHTEEN_DECIMALS,  # High max to not interfere
     )
     
     debt_terms = createDebtTerms(_liqThreshold=80_00, _liqFee=10_00, _ltv=50_00, _borrowRate=0)
@@ -1977,6 +2088,7 @@ def test_ah_liquidation_edge_cases(
         _ltvPaybackBuffer=0,
         _keeperFeeRatio=1_00,  # 1% keeper fee
         _minKeeperFee=1 * EIGHTEEN_DECIMALS,  # 1 GREEN minimum
+        _maxKeeperFee=100 * EIGHTEEN_DECIMALS,  # High max to not interfere
     )
     
     debt_terms = createDebtTerms(_liqThreshold=80_00, _liqFee=10_00, _ltv=50_00, _borrowRate=0)
@@ -2242,7 +2354,7 @@ def test_ah_calc_amount_of_debt_to_repay_during_liq(
     """
     
     setGeneralConfig()
-    setGeneralDebtConfig(_ltvPaybackBuffer=10_00, _keeperFeeRatio=2_00, _minKeeperFee=5 * EIGHTEEN_DECIMALS)  # 10% payback buffer, 2% keeper fee, $5 min
+    setGeneralDebtConfig(_ltvPaybackBuffer=10_00, _keeperFeeRatio=2_00, _minKeeperFee=5 * EIGHTEEN_DECIMALS, _maxKeeperFee=100 * EIGHTEEN_DECIMALS)  # 10% payback buffer, 2% keeper fee, $5 min
     
     # Setup asset with specific liquidation parameters
     debt_terms = createDebtTerms(

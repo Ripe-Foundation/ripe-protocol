@@ -42,6 +42,7 @@ def sample_gen_debt_config():
         5000,                    # maxLtvDeviation (50%)
         1000,                    # keeperFeeRatio (10%)
         10 * EIGHTEEN_DECIMALS,  # minKeeperFee
+        1000 * EIGHTEEN_DECIMALS, # maxKeeperFee
         True,                    # isDaowryEnabled
         500,                     # ltvPaybackBuffer (5%)
         (True, 1000, 5000, 1000, 2000), # genAuctionParams
@@ -151,6 +152,22 @@ def test_mission_control_set_general_debt_config_unauthorized(mission_control, a
     """Test that only Switchboard can set general debt config."""
     with boa.reverts("no perms"):
         mission_control.setGeneralDebtConfig(sample_gen_debt_config, sender=alice)
+
+def test_mission_control_keeper_config_validation(mission_control, switchboard_alpha, sample_gen_debt_config):
+    """Test that keeper config with all three parameters is properly stored and retrieved."""
+    # Set the debt config
+    mission_control.setGeneralDebtConfig(sample_gen_debt_config, sender=switchboard_alpha.address)
+    
+    # Retrieve and validate all keeper fee parameters
+    stored_config = mission_control.genDebtConfig()
+    assert stored_config.keeperFeeRatio == sample_gen_debt_config[11]  # 1000 (10%)
+    assert stored_config.minKeeperFee == sample_gen_debt_config[12]   # 10 * EIGHTEEN_DECIMALS
+    assert stored_config.maxKeeperFee == sample_gen_debt_config[13]   # 1000 * EIGHTEEN_DECIMALS
+    
+    # Verify the values are what we expect
+    assert stored_config.keeperFeeRatio == 1000
+    assert stored_config.minKeeperFee == 10 * EIGHTEEN_DECIMALS  
+    assert stored_config.maxKeeperFee == 1000 * EIGHTEEN_DECIMALS
 
 def test_mission_control_set_hr_config(mission_control, switchboard_alpha, alice):
     """Test setting HR configuration."""
@@ -646,6 +663,7 @@ def test_mission_control_get_gen_liq_config(mission_control, switchboard_alpha, 
     assert config.canLiquidate
     assert config.keeperFeeRatio == sample_gen_debt_config[11]
     assert config.minKeeperFee == sample_gen_debt_config[12]
+    assert config.maxKeeperFee == sample_gen_debt_config[13]
     assert len(config.priorityLiqAssetVaults) == 1
     assert len(config.priorityStabVaults) == 1
 

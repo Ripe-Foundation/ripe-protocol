@@ -269,13 +269,141 @@ def test_borrow_interval_config_validation(switchboard_alpha, governance):
 def test_keeper_config_validation(switchboard_alpha, governance):
     # Test invalid keeper config
     with boa.reverts("invalid keeper config"):
-        switchboard_alpha.setKeeperConfig(11_00, 1000, sender=governance.address)  # > 10% fee ratio
+        switchboard_alpha.setKeeperConfig(11_00, 1000, 5000, sender=governance.address)  # > 10% fee ratio
     
     with boa.reverts("invalid keeper config"):
-        switchboard_alpha.setKeeperConfig(5_00, 201 * 10**18, sender=governance.address)  # > $200 min fee
+        switchboard_alpha.setKeeperConfig(5_00, 201 * 10**18, 300 * 10**18, sender=governance.address)  # > $200 min fee
     
     with boa.reverts("invalid keeper config"):
-        switchboard_alpha.setKeeperConfig(MAX_UINT256, 1000, sender=governance.address)  # max uint256
+        switchboard_alpha.setKeeperConfig(MAX_UINT256, 1000, 5000, sender=governance.address)  # max uint256
+    
+    # Test minKeeperFee > maxKeeperFee
+    with boa.reverts("invalid keeper config"):
+        switchboard_alpha.setKeeperConfig(5_00, 100 * 10**18, 50 * 10**18, sender=governance.address)  # min > max
+    
+    # Test maxKeeperFee > 100k limit
+    with boa.reverts("invalid keeper config"):
+        switchboard_alpha.setKeeperConfig(5_00, 1000, 100_001 * 10**18, sender=governance.address)  # > 100k max
+    
+    # Test maxKeeperFee = max_value
+    with boa.reverts("invalid keeper config"):
+        switchboard_alpha.setKeeperConfig(5_00, 1000, MAX_UINT256, sender=governance.address)  # max uint256
+
+
+def test_keeper_config_success(switchboard_alpha, governance):
+    """Test successful keeper config with valid parameters"""
+    # Test with valid parameters
+    action_id = switchboard_alpha.setKeeperConfig(5_00, 50 * 10**18, 1000 * 10**18, sender=governance.address)
+    assert action_id > 0
+    
+    # Check event was emitted
+    logs = filter_logs(switchboard_alpha, "PendingKeeperConfigChange")
+    assert len(logs) == 1
+    log = logs[0]
+    assert log.keeperFeeRatio == 5_00
+    assert log.minKeeperFee == 50 * 10**18
+    assert log.maxKeeperFee == 1000 * 10**18
+    assert log.actionId == action_id
+    
+    # Check pending config was stored correctly
+    pending = switchboard_alpha.pendingDebtConfig(action_id)
+    assert pending.keeperFeeRatio == 5_00
+    assert pending.minKeeperFee == 50 * 10**18
+    assert pending.maxKeeperFee == 1000 * 10**18
+
+
+def test_keeper_config_boundary_conditions(switchboard_alpha, governance):
+    """Test keeper config at boundary values"""
+    # Test at exactly 10% fee ratio (should be valid)
+    action_id = switchboard_alpha.setKeeperConfig(10_00, 1000, 5000, sender=governance.address)
+    assert action_id > 0
+    
+    # Test at exactly $200 min fee (should be valid)
+    action_id = switchboard_alpha.setKeeperConfig(5_00, 200 * 10**18, 1000 * 10**18, sender=governance.address)
+    assert action_id > 0
+    
+    # Test at exactly 100k max fee (should be valid)
+    action_id = switchboard_alpha.setKeeperConfig(5_00, 100 * 10**18, 100_000 * 10**18, sender=governance.address)
+    assert action_id > 0
+    
+    # Test with zero fee ratio and equal min/max fees (should be valid)
+    action_id = switchboard_alpha.setKeeperConfig(0, 0, 0, sender=governance.address)
+    assert action_id > 0
+    
+    # Test with minKeeperFee = maxKeeperFee (should be valid)
+    action_id = switchboard_alpha.setKeeperConfig(3_00, 75 * 10**18, 75 * 10**18, sender=governance.address)
+    assert action_id > 0
+
+
+def test_execute_keeper_config(switchboard_alpha, mission_control, governance):
+    """Test execution of keeper config action with all three parameters"""
+    # Create the action
+    action_id = switchboard_alpha.setKeeperConfig(7_00, 100 * 10**18, 2500 * 10**18, sender=governance.address)
+    assert action_id > 0
+    
+    # Time travel past timelock
+    boa.env.time_travel(blocks=switchboard_alpha.actionTimeLock())
+    
+    # Execute the action
+    success = switchboard_alpha.executePendingAction(action_id, sender=governance.address)
+    assert success
+    
+    # Verify the config was applied to MissionControl
+    config = mission_control.genDebtConfig()
+    assert config.keeperFeeRatio == 7_00
+    assert config.minKeeperFee == 100 * 10**18
+    assert config.maxKeeperFee == 2500 * 10**18
+    
+    # Check execution event was emitted with all three parameters
+    logs = filter_logs(switchboard_alpha, "KeeperConfigSet")
+    assert len(logs) == 1
+    log = logs[0]
+    assert log.keeperFeeRatio == 7_00
+    assert log.minKeeperFee == 100 * 10**18
+    assert log.maxKeeperFee == 2500 * 10**18
+    
+    # Verify action was cleaned up
+    assert switchboard_alpha.actionType(action_id) == 0
+    assert not switchboard_alpha.hasPendingAction(action_id)
+
+
+def test_keeper_config_permissions(switchboard_alpha, governance, bob):
+    """Test that only governance can call setKeeperConfig"""
+    # Non-governance user should not be able to call the function
+    with boa.reverts("no perms"):
+        switchboard_alpha.setKeeperConfig(5_00, 50 * 10**18, 1000 * 10**18, sender=bob)
+    
+    # Governance should be able to call the function
+    action_id = switchboard_alpha.setKeeperConfig(5_00, 50 * 10**18, 1000 * 10**18, sender=governance.address)
+    assert action_id > 0
+
+
+def test_keeper_config_with_existing_debt_config(switchboard_alpha, mission_control, governance):
+    """Test that keeper config only modifies the specific fields"""
+    # First set some other debt config fields
+    debt_action = switchboard_alpha.setGlobalDebtLimits(6000, 60000, 200, 120, sender=governance.address)
+    
+    # Execute them
+    boa.env.time_travel(blocks=switchboard_alpha.actionTimeLock())
+    switchboard_alpha.executePendingAction(debt_action, sender=governance.address)
+    
+    # Verify initial config
+    config = mission_control.genDebtConfig()
+    assert config.perUserDebtLimit == 6000
+    assert config.globalDebtLimit == 60000
+    
+    # Now set keeper config
+    keeper_action = switchboard_alpha.setKeeperConfig(9_00, 150 * 10**18, 3000 * 10**18, sender=governance.address)
+    boa.env.time_travel(blocks=switchboard_alpha.actionTimeLock())
+    switchboard_alpha.executePendingAction(keeper_action, sender=governance.address)
+    
+    # Verify keeper fields were updated but others preserved
+    config = mission_control.genDebtConfig()
+    assert config.keeperFeeRatio == 9_00        # Updated
+    assert config.minKeeperFee == 150 * 10**18  # Updated
+    assert config.maxKeeperFee == 3000 * 10**18 # Updated
+    assert config.perUserDebtLimit == 6000      # Preserved
+    assert config.globalDebtLimit == 60000      # Preserved
 
 
 def test_ltv_payback_buffer_validation(switchboard_alpha, governance):
@@ -330,13 +458,14 @@ def test_execute_debt_configs(switchboard_alpha, mission_control, governance):
     assert config.numBlocksPerInterval == 100
     
     # Test executing keeper config
-    action_id = switchboard_alpha.setKeeperConfig(5_00, 50 * 10**18, sender=governance.address)
+    action_id = switchboard_alpha.setKeeperConfig(5_00, 50 * 10**18, 1000 * 10**18, sender=governance.address)
     boa.env.time_travel(blocks=switchboard_alpha.actionTimeLock())
     assert switchboard_alpha.executePendingAction(action_id, sender=governance.address)
     
     config = mission_control.genDebtConfig()
     assert config.keeperFeeRatio == 5_00
     assert config.minKeeperFee == 50 * 10**18
+    assert config.maxKeeperFee == 1000 * 10**18
 
 
 def test_daowry_enable_disable(switchboard_alpha, mission_control, governance):
@@ -819,22 +948,6 @@ def test_debt_limits_boundary_conditions(switchboard_alpha, governance):
     assert action_id > 0
 
 
-def test_keeper_config_boundary_conditions(switchboard_alpha, governance):
-    """Test keeper config validation at boundary values"""
-    
-    # Test at exactly 10% fee ratio (should be valid)
-    action_id = switchboard_alpha.setKeeperConfig(10_00, 1000, sender=governance.address)
-    assert action_id > 0
-    
-    # Test at exactly $100 min fee (should be valid)
-    action_id = switchboard_alpha.setKeeperConfig(5_00, 100 * 10**18, sender=governance.address)
-    assert action_id > 0
-    
-    # Test with zero fee ratio (should be valid)
-    action_id = switchboard_alpha.setKeeperConfig(0, 0, sender=governance.address)
-    assert action_id > 0
-
-
 def test_ltv_payback_buffer_boundary_conditions(switchboard_alpha, governance):
     """Test LTV payback buffer at boundary values"""
     
@@ -972,7 +1085,7 @@ def test_complex_workflow_multiple_pending_actions(switchboard_alpha, governance
     vault_action = switchboard_alpha.setVaultLimits(15, 8, sender=governance.address)
     debt_action = switchboard_alpha.setGlobalDebtLimits(3000, 30000, 150, 75, sender=governance.address)
     rewards_action = switchboard_alpha.setRipePerBlock(1500, sender=governance.address)
-    keeper_action = switchboard_alpha.setKeeperConfig(3_00, 25 * 10**18, sender=governance.address)
+    keeper_action = switchboard_alpha.setKeeperConfig(3_00, 25 * 10**18, 500 * 10**18, sender=governance.address)
     buffer_action = switchboard_alpha.setLtvPaybackBuffer(7_00, sender=governance.address)
     
     # Verify all actions are pending
@@ -1495,7 +1608,7 @@ def test_action_type_enum_coverage(switchboard_alpha, governance):
     action_types_tested.add("DEBT_BORROW_INTERVAL")
     
     # DEBT_KEEPER_CONFIG
-    switchboard_alpha.setKeeperConfig(5_00, 50 * 10**18, sender=governance.address)
+    switchboard_alpha.setKeeperConfig(5_00, 50 * 10**18, 1000 * 10**18, sender=governance.address)
     action_types_tested.add("DEBT_KEEPER_CONFIG")
     
     # DEBT_LTV_PAYBACK_BUFFER
@@ -1636,7 +1749,7 @@ def test_all_debt_config_fields_modified(switchboard_alpha, mission_control, gov
     actions.append(switchboard_alpha.setBorrowIntervalConfig(1000, 50, sender=governance.address))
     
     # Keeper config
-    actions.append(switchboard_alpha.setKeeperConfig(8_00, 80 * 10**18, sender=governance.address))
+    actions.append(switchboard_alpha.setKeeperConfig(8_00, 80 * 10**18, 2000 * 10**18, sender=governance.address))
     
     # LTV payback buffer
     actions.append(switchboard_alpha.setLtvPaybackBuffer(9_00, sender=governance.address))
@@ -2452,7 +2565,7 @@ def test_dynamic_rate_config_with_existing_debt_config(switchboard_alpha, missio
     """Test that dynamic rate config only modifies the specific fields"""
     # First set some other debt config fields
     debt_action = switchboard_alpha.setGlobalDebtLimits(5000, 50000, 100, 100, sender=governance.address)
-    keeper_action = switchboard_alpha.setKeeperConfig(5_00, 50 * 10**18, sender=governance.address)
+    keeper_action = switchboard_alpha.setKeeperConfig(5_00, 50 * 10**18, 1000 * 10**18, sender=governance.address)
     
     # Execute them
     boa.env.time_travel(blocks=switchboard_alpha.actionTimeLock())

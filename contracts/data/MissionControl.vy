@@ -77,6 +77,7 @@ struct GenLiqConfig:
     canLiquidate: bool
     keeperFeeRatio: uint256
     minKeeperFee: uint256
+    maxKeeperFee: uint256
     ltvPaybackBuffer: uint256
     genAuctionParams: cs.AuctionParams
     priorityLiqAssetVaults: DynArray[VaultData, PRIORITY_VAULT_DATA]
@@ -649,6 +650,7 @@ def getGenLiqConfig() -> GenLiqConfig:
         canLiquidate=self.genConfig.canLiquidate,
         keeperFeeRatio=genDebtConfig.keeperFeeRatio,
         minKeeperFee=genDebtConfig.minKeeperFee,
+        maxKeeperFee=genDebtConfig.maxKeeperFee,
         ltvPaybackBuffer=genDebtConfig.ltvPaybackBuffer,
         genAuctionParams=genDebtConfig.genAuctionParams,
         priorityLiqAssetVaults=priorityLiqAssetVaults,

@@ -90,6 +90,7 @@ struct GenLiqConfig:
     canLiquidate: bool
     keeperFeeRatio: uint256
     minKeeperFee: uint256
+    maxKeeperFee: uint256
     ltvPaybackBuffer: uint256
     genAuctionParams: cs.AuctionParams
     priorityLiqAssetVaults: DynArray[VaultData, PRIORITY_LIQ_VAULT_DATA]
@@ -308,6 +309,9 @@ def _liquidateUser(
 
     # keeper fee (for liquidator)
     keeperFee: uint256 = max(_config.minKeeperFee, userDebt.amount * _config.keeperFeeRatio // HUNDRED_PERCENT)
+    if keeperFee != 0 and _config.maxKeeperFee != 0:
+        keeperFee = min(keeperFee, _config.maxKeeperFee)
+
     if keeperFee != 0:
         totalLiqFees += keeperFee
         liqFeeRatio = totalLiqFees * HUNDRED_PERCENT // userDebt.amount

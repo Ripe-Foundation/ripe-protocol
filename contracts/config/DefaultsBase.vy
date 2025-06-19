@@ -68,6 +68,7 @@ def genDebtConfig() -> cs.GenDebtConfig:
         maxLtvDeviation = 10_00,
         keeperFeeRatio = 0,
         minKeeperFee = 0,
+        maxKeeperFee = 25_000 * EIGHTEEN_DECIMALS,
         isDaowryEnabled = False,
         ltvPaybackBuffer = 1_00,
         genAuctionParams = cs.AuctionParams(
