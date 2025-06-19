@@ -1691,3 +1691,81 @@ def test_nft_asset_restrictions(switchboard_bravo, governance, mock_rando_contra
         sender=governance.address
     )
     assert action_id > 0
+
+
+def test_cannot_set_zero_thresholds_with_positive_ltv(
+    governance, switchboard_bravo, alpha_token, mission_control
+):
+    """Test that validation prevents setting zero thresholds when ltv > 0"""
+    
+    # First add alpha token as a supported asset
+    action_id = switchboard_bravo.addAsset(
+        alpha_token,
+        [1],  # vaultIds
+        50_00,  # stakersPointsAlloc (50%)
+        30_00,  # voterPointsAlloc (30%) - total 80% < 100%
+        10000 * 10**18,  # perUserDepositLimit
+        1000000 * 10**18,  # globalDepositLimit
+        (50_00, 60_00, 70_00, 10_00, 5_00, 1_00),  # Normal debt terms
+        False,  # shouldBurnAsPayment
+        False,  # shouldTransferToEndaoment
+        True,   # shouldSwapInStabPools
+        False,  # shouldAuctionInstantly
+        True,   # canDeposit
+        True,   # canWithdraw
+        True,   # canRedeemCollateral
+        True,   # canRedeemInStabPool
+        True,   # canBuyInAuction
+        True,   # canClaimInStabPool
+        0,      # specialStabPoolId
+        (False, 0, 0, 0, 0),  # customAuctionParams
+        ZERO_ADDRESS,  # whitelist
+        False,  # isNft
+        sender=governance.address
+    )
+    
+    # Fast forward and execute the pending action
+    boa.env.time_travel(blocks=switchboard_bravo.actionTimeLock())
+    switchboard_bravo.executePendingAction(action_id, sender=governance.address)
+    
+    # Verify asset is set up
+    assert mission_control.isSupportedAsset(alpha_token)
+    
+    # Try to set invalid debt terms: ltv > 0 but liqThreshold = 0
+    with boa.reverts("invalid debt terms"):
+        switchboard_bravo.setAssetDebtTerms(
+            alpha_token,
+            50_00,  # ltv = 50%
+            0,      # redemptionThreshold = 0 (invalid!)
+            0,      # liqThreshold = 0 (invalid!)
+            10_00,  # liqFee = 10%
+            5_00,   # borrowRate = 5%
+            1_00,   # daowry = 1%
+            sender=governance.address
+        )
+    
+    # Try to set invalid debt terms: ltv > 0 but only redemptionThreshold = 0
+    with boa.reverts("invalid debt terms"):
+        switchboard_bravo.setAssetDebtTerms(
+            alpha_token,
+            50_00,  # ltv = 50%
+            0,      # redemptionThreshold = 0 (invalid!)
+            70_00,  # liqThreshold = 70%
+            10_00,  # liqFee = 10%
+            5_00,   # borrowRate = 5%
+            1_00,   # daowry = 1%
+            sender=governance.address
+        )
+    
+    # Valid case: ltv > 0 with proper thresholds should work
+    action_id = switchboard_bravo.setAssetDebtTerms(
+        alpha_token,
+        55_00,  # ltv = 55% (valid change from 50%)
+        65_00,  # redemptionThreshold = 65% 
+        75_00,  # liqThreshold = 75%
+        10_00,  # liqFee = 10%
+        5_00,   # borrowRate = 5%
+        1_00,   # daowry = 1%
+        sender=governance.address
+    )
+    assert action_id > 0  # Should succeed

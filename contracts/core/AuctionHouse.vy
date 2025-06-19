@@ -290,6 +290,10 @@ def _liquidateUser(
     if userDebt.inLiquidation:
         return 0
 
+    # user has debt but no liquidation threshold - cannot liquidate
+    if bt.debtTerms.liqThreshold == 0:
+        return 0
+
     # not reached liquidation threshold
     collateralLiqThreshold: uint256 = userDebt.amount * HUNDRED_PERCENT // bt.debtTerms.liqThreshold
     if bt.collateralVal > collateralLiqThreshold:

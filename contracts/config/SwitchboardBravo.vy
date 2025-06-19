@@ -538,6 +538,10 @@ def _isValidDebtTerms(_debtTerms: cs.DebtTerms) -> bool:
         return False
     if _debtTerms.ltv != 0 and 0 in [_debtTerms.liqFee, _debtTerms.borrowRate]:
         return False
+    
+    # if ltv > 0, liq threshold and redemption threshold must be > 0
+    if _debtTerms.ltv != 0 and (_debtTerms.liqThreshold == 0 or _debtTerms.redemptionThreshold == 0):
+        return False
 
     # make liq threshold and liq bonus work together
     liqSum: uint256 = _debtTerms.liqThreshold + (_debtTerms.liqThreshold * _debtTerms.liqFee // HUNDRED_PERCENT)

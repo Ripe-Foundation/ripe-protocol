@@ -2282,3 +2282,91 @@ def test_ah_calc_amount_of_debt_to_repay_during_liq(
     calculated_repay_safe = auction_house.calcAmountOfDebtToRepayDuringLiq(bob)
     assert calculated_repay_safe == 0
 
+
+def test_liquidation_threshold_zero_protection(
+    alice, bob, credit_engine,
+    alpha_token, alpha_token_whale, bravo_token, bravo_token_whale,
+    teller, setGeneralConfig, setAssetConfig, setGeneralDebtConfig,
+    performDeposit, createDebtTerms, mock_price_source, whale,
+    auction_house
+):
+    """Test that division by zero is prevented when liquidation threshold is 0
+    
+    This test verifies our protection against division by zero in edge cases.
+    """
+    
+    # Setup
+    setGeneralConfig()
+    setGeneralDebtConfig()
+    
+    # Test Case 1: User with only non-borrowable collateral (zero thresholds)
+    # Configure alpha and bravo tokens as non-borrowable (all zeros)
+    zero_terms = createDebtTerms(0, 0, 0, 0, 0, 0)
+    setAssetConfig(alpha_token, _debtTerms=zero_terms)
+    setAssetConfig(bravo_token, _debtTerms=zero_terms)
+    
+    # Set prices
+    mock_price_source.setPrice(alpha_token, 1 * EIGHTEEN_DECIMALS)
+    mock_price_source.setPrice(bravo_token, 1 * EIGHTEEN_DECIMALS)
+    
+    # Bob deposits only zero-LTV collateral
+    performDeposit(bob, 1000 * EIGHTEEN_DECIMALS, alpha_token, alpha_token_whale)
+    performDeposit(bob, 1000 * EIGHTEEN_DECIMALS, bravo_token, bravo_token_whale)
+    
+    # All these operations should return 0 or False without reverting
+    # This tests our division by zero protection
+    assert credit_engine.canLiquidateUser(bob) == False
+    assert credit_engine.canRedeemUserCollateral(bob) == False
+    assert credit_engine.getLiquidationThreshold(bob) == 0
+    assert credit_engine.getRedemptionThreshold(bob) == 0
+    assert auction_house.calcAmountOfDebtToRepayDuringLiq(bob) == 0
+    
+    # Bob cannot borrow with zero-LTV collateral
+    with boa.reverts():
+        teller.borrow(1 * EIGHTEEN_DECIMALS, sender=bob)
+    
+    # Even if we try to liquidate Bob, it should fail gracefully
+    keeper_rewards = teller.liquidateUser(bob, sender=alice)
+    assert keeper_rewards == 0  # No liquidation occurred
+    
+    # Test Case 2: Test extremely low thresholds (near zero but not zero)
+    # Configure charlie token with extremely low thresholds
+    low_threshold_terms = createDebtTerms(
+        _ltv=1,  # 0.01% LTV
+        _redemptionThreshold=1,  # 0.01%
+        _liqThreshold=1,  # 0.01% - extremely low
+        _liqFee=1,  # 0.01%
+        _borrowRate=1,  # 0.01%
+        _daowry=0,  # 0%
+    )
+    
+    # Use a new token to avoid conflicts
+    charlie_token = alpha_token  # Reuse alpha for this test
+    setAssetConfig(charlie_token, _debtTerms=low_threshold_terms)
+    
+    # Alice deposits and borrows with extremely low LTV
+    performDeposit(alice, 1000000 * EIGHTEEN_DECIMALS, charlie_token, alpha_token_whale)
+    
+    # Alice can borrow a tiny amount (0.01% of 1M = 100)
+    teller.borrow(50 * EIGHTEEN_DECIMALS, sender=alice)
+    
+    # Verify calculations work with extremely low thresholds
+    debt_data = credit_engine.getLatestUserDebtAndTerms(alice, True)
+    assert debt_data[0].amount == 50 * EIGHTEEN_DECIMALS
+    assert debt_data[1].debtTerms.liqThreshold == 1  # 0.01%
+    
+    # These should work without division errors
+    can_liquidate = credit_engine.canLiquidateUser(alice)
+    assert isinstance(can_liquidate, bool)  # Should not revert
+    
+    # Drop price drastically to test liquidation with tiny threshold
+    mock_price_source.setPrice(charlie_token, 1 * EIGHTEEN_DECIMALS // 20000)  # $0.00005
+    
+    # Now liquidation should trigger (collateral worth $50 < debt/0.01% = $500,000)
+    can_liquidate_after = credit_engine.canLiquidateUser(alice)
+    assert can_liquidate_after == True
+    
+    # Liquidation should work even with tiny threshold
+    keeper_rewards = teller.liquidateUser(alice, sender=bob)
+    assert keeper_rewards >= 0  # Should not revert
+

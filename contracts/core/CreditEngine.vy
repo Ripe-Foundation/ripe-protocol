@@ -884,10 +884,13 @@ def _getUserBorrowTerms(
         bt.debtTerms.ltv = bt.totalMaxDebt * HUNDRED_PERCENT // bt.collateralVal
 
     # ensure liq threshold and liq fee can work together
-    liqSum: uint256 = bt.debtTerms.liqThreshold + (bt.debtTerms.liqThreshold * bt.debtTerms.liqFee // HUNDRED_PERCENT)
-    if liqSum > HUNDRED_PERCENT:
-        adjustedLiqFee: uint256 = (HUNDRED_PERCENT - bt.debtTerms.liqThreshold) * HUNDRED_PERCENT // bt.debtTerms.liqThreshold
-        bt.debtTerms.liqFee = adjustedLiqFee
+    if bt.debtTerms.liqThreshold != 0:
+        liqSum: uint256 = bt.debtTerms.liqThreshold + (bt.debtTerms.liqThreshold * bt.debtTerms.liqFee // HUNDRED_PERCENT)
+        if liqSum > HUNDRED_PERCENT:
+            adjustedLiqFee: uint256 = (HUNDRED_PERCENT - bt.debtTerms.liqThreshold) * HUNDRED_PERCENT // bt.debtTerms.liqThreshold
+            bt.debtTerms.liqFee = adjustedLiqFee
+    else:
+        bt.debtTerms.liqFee = 0
 
     # dynamic borrow rate
     bt.debtTerms.borrowRate = self._getDynamicBorrowRate(bt.debtTerms.borrowRate, _a.missionControl, _a.priceDesk)
@@ -1069,6 +1072,9 @@ def _hasGoodDebtHealth(_userDebtAmount: uint256, _collateralVal: uint256, _ltv: 
 @view
 @internal
 def _canLiquidateUser(_userDebtAmount: uint256, _collateralVal: uint256, _liqThreshold: uint256) -> bool:
+    if _liqThreshold == 0:
+        return False
+    
     # check if collateral value is below (or equal) to liquidation threshold
     collateralLiqThreshold: uint256 = _userDebtAmount * HUNDRED_PERCENT // _liqThreshold
     return _collateralVal <= collateralLiqThreshold
@@ -1077,6 +1083,9 @@ def _canLiquidateUser(_userDebtAmount: uint256, _collateralVal: uint256, _liqThr
 @view
 @internal
 def _canRedeemUserCollateral(_userDebtAmount: uint256, _collateralVal: uint256, _redemptionThreshold: uint256) -> bool:
+    if _redemptionThreshold == 0:
+        return False
+    
     # check if collateral value is below (or equal) to redemption threshold
     redemptionThreshold: uint256 = _userDebtAmount * HUNDRED_PERCENT // _redemptionThreshold
     return _collateralVal <= redemptionThreshold
@@ -1111,8 +1120,12 @@ def _getThreshold(_user: address, _debtType: uint256) -> uint256:
         return 0
 
     if _debtType == 2:
+        if bt.debtTerms.liqThreshold == 0:
+            return 0
         return userDebt.amount * HUNDRED_PERCENT // bt.debtTerms.liqThreshold
     elif _debtType == 3:
+        if bt.debtTerms.redemptionThreshold == 0:
+            return 0
         return userDebt.amount * HUNDRED_PERCENT // bt.debtTerms.redemptionThreshold
     else:
         return 0
