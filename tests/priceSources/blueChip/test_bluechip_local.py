@@ -1,4 +1,3 @@
-import pytest
 import boa
 
 from constants import BLUE_CHIP_PROTOCOL_MORPHO, EIGHTEEN_DECIMALS, ZERO_ADDRESS
@@ -738,7 +737,7 @@ def test_basic_snapshot_creation(
     
     # Add new snapshot
     result = blue_chip_prices.addPriceSnapshot(alpha_token_vault, sender=teller.address)
-    assert result == True  # Should succeed now
+    assert result  # Should succeed now
     
     # Check new snapshot
     new_snapshot = blue_chip_prices.getLatestSnapshot(alpha_token_vault)
@@ -960,8 +959,8 @@ def test_snapshot_prevents_duplicates_same_block(
     result2 = blue_chip_prices.addPriceSnapshot(alpha_token_vault, sender=teller.address)
     
     # First should succeed, second should fail/not add
-    assert result1 == True
-    assert result2 == False  # Should return False for duplicate in same timestamp
+    assert result1
+    assert not result2  # Should return False for duplicate in same timestamp
     
     # nextIndex should only increment once
     config_after = blue_chip_prices.priceConfigs(alpha_token_vault)
@@ -1383,7 +1382,7 @@ def test_min_snapshot_delay_prevents_spam(
     
     # Try to add snapshot immediately - should fail due to delay
     result1 = blue_chip_prices.addPriceSnapshot(alpha_token_vault, sender=teller.address)
-    assert result1 == False  # Should fail due to minSnapshotDelay
+    assert not result1  # Should fail due to minSnapshotDelay
     
     # nextIndex should not have changed
     config_after_fail = blue_chip_prices.priceConfigs(alpha_token_vault)
@@ -1392,12 +1391,12 @@ def test_min_snapshot_delay_prevents_spam(
     # Wait 5 seconds - still too early
     boa.env.time_travel(seconds=5)
     result2 = blue_chip_prices.addPriceSnapshot(alpha_token_vault, sender=teller.address)
-    assert result2 == False  # Should still fail
+    assert not result2  # Should still fail
     
     # Wait another 6 seconds (total 11 seconds) - should work now
     boa.env.time_travel(seconds=6)
     result3 = blue_chip_prices.addPriceSnapshot(alpha_token_vault, sender=teller.address)
-    assert result3 == True  # Should succeed now
+    assert result3  # Should succeed now
     
     # nextIndex should have incremented
     config_after_success = blue_chip_prices.priceConfigs(alpha_token_vault)
@@ -1430,7 +1429,7 @@ def test_min_snapshot_delay_zero_means_no_delay(
     
     # Should be able to add snapshot immediately (no minSnapshotDelay)
     result = blue_chip_prices.addPriceSnapshot(bravo_token_vault, sender=teller.address)
-    assert result == True  # Should succeed immediately
+    assert result  # Should succeed immediately
 
 
 def test_min_snapshot_delay_updated_config(
@@ -1457,7 +1456,7 @@ def test_min_snapshot_delay_updated_config(
     # Advance time to avoid duplicate timestamp
     boa.env.time_travel(seconds=1)
     result1 = blue_chip_prices.addPriceSnapshot(alpha_token_vault, sender=teller.address)
-    assert result1 == True
+    assert result1
     
     # Update config to add 5 second delay
     blue_chip_prices.updatePriceConfig(alpha_token_vault, 5, 5, 0, 0, sender=governance.address)
@@ -1472,12 +1471,12 @@ def test_min_snapshot_delay_updated_config(
     
     # Try immediately - should fail due to minSnapshotDelay (only 1 second passed, need >5)
     result2 = blue_chip_prices.addPriceSnapshot(alpha_token_vault, sender=teller.address)
-    assert result2 == False
+    assert not result2
     
     # Wait 5 more seconds (total 6 seconds) - should work
     boa.env.time_travel(seconds=5)
     result3 = blue_chip_prices.addPriceSnapshot(alpha_token_vault, sender=teller.address)
-    assert result3 == True
+    assert result3
 
 
 def test_min_snapshot_delay_resets_after_successful_snapshot(
@@ -1504,17 +1503,17 @@ def test_min_snapshot_delay_resets_after_successful_snapshot(
     # Wait and add first snapshot
     boa.env.time_travel(seconds=9)
     result1 = blue_chip_prices.addPriceSnapshot(charlie_token_vault, sender=teller.address)
-    assert result1 == True
+    assert result1
     
     # Change state and try again immediately - should fail
     charlie_token.transfer(charlie_token_vault, 50 * (10 ** charlie_token.decimals()), sender=charlie_token_whale)
     result2 = blue_chip_prices.addPriceSnapshot(charlie_token_vault, sender=teller.address)
-    assert result2 == False
+    assert not result2
     
     # Wait 8 seconds and try again - should work
     boa.env.time_travel(seconds=8)
     result3 = blue_chip_prices.addPriceSnapshot(charlie_token_vault, sender=teller.address)
-    assert result3 == True
+    assert result3
 
 
 def test_min_snapshot_delay_edge_cases(
@@ -1541,9 +1540,9 @@ def test_min_snapshot_delay_edge_cases(
     # 1 second should fail (less than 2 second delay)
     boa.env.time_travel(seconds=1)
     result1 = blue_chip_prices.addPriceSnapshot(alpha_token_vault, sender=teller.address)
-    assert result1 == False  # Should fail - need >= 2 seconds
+    assert not result1  # Should fail - need >= 2 seconds
     
     # Exactly 2 seconds should succeed (condition is >= not >)
     boa.env.time_travel(seconds=1)  # Total 2 seconds
     result2 = blue_chip_prices.addPriceSnapshot(alpha_token_vault, sender=teller.address)
-    assert result2 == True  # Should succeed - exactly matches the delay requirement
+    assert result2  # Should succeed - exactly matches the delay requirement

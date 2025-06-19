@@ -1,4 +1,3 @@
-import pytest
 import boa
 
 from constants import MAX_UINT256, ZERO_ADDRESS
@@ -176,10 +175,10 @@ def test_add_asset_with_custom_flags(switchboard_bravo, governance, alpha_token)
     logs = filter_logs(switchboard_bravo, "NewAssetPending")
     assert len(logs) == 1
     log = logs[0]
-    assert log.shouldBurnAsPayment == False  # Updated expectation
-    assert log.shouldTransferToEndaoment == False
-    assert log.canDeposit == False
-    assert log.canWithdraw == False
+    assert not log.shouldBurnAsPayment  # Updated expectation
+    assert not log.shouldTransferToEndaoment
+    assert not log.canDeposit
+    assert not log.canWithdraw
     assert log.specialStabPoolId == 0  # Updated expectation
 
 
@@ -432,7 +431,7 @@ def test_asset_enable_disable_flags(switchboard_bravo, mission_control, governan
     logs = filter_logs(switchboard_bravo, "CanDepositAssetSet")
     assert len(logs) == 1
     assert logs[0].asset == alpha_token.address
-    assert logs[0].canDeposit == True
+    assert logs[0].canDeposit
     
     # Test disabling deposits
     assert switchboard_bravo.setCanDepositAsset(alpha_token, False, sender=governance.address)
@@ -664,8 +663,8 @@ def test_execute_asset_liq_config(switchboard_bravo, mission_control, governance
     assert len(logs) == 1
     log = logs[0]
     assert log.asset == alpha_token.address
-    assert log.shouldBurnAsPayment == False
-    assert log.shouldTransferToEndaoment == False
+    assert not log.shouldBurnAsPayment
+    assert not log.shouldTransferToEndaoment
     assert log.specialStabPoolId == 0  # Updated expectation
 
 
@@ -914,13 +913,13 @@ def test_complex_asset_configuration(switchboard_bravo, governance, alpha_token)
     assert log.numVaults == 3
     assert log.stakersPointsAlloc == 45_00
     assert log.voterPointsAlloc == 35_00
-    assert log.shouldBurnAsPayment == False
-    assert log.shouldTransferToEndaoment == False
-    assert log.canDeposit == True
-    assert log.canWithdraw == True
+    assert not log.shouldBurnAsPayment
+    assert not log.shouldTransferToEndaoment
+    assert log.canDeposit
+    assert log.canWithdraw
     assert log.specialStabPoolId == 0  # Updated expectation
     assert log.auctionStartDiscount == 15_00
-    assert log.isNft == False
+    assert not log.isNft
 
 
 def test_execute_all_action_types(switchboard_bravo, mission_control, governance, alpha_token):

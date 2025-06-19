@@ -251,7 +251,7 @@ def test_ledger_set_user_debt_update_existing(ledger, alice, credit_engine, samp
     
     # Set initial debt
     ledger.setUserDebt(alice, sample_user_debt, new_yield, interval, sender=credit_engine.address)
-    initial_total = ledger.totalDebt()
+    ledger.totalDebt()
     
     # Update debt with higher amount
     updated_debt = list(sample_user_debt)

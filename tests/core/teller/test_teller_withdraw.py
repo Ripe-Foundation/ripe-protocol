@@ -1,4 +1,3 @@
-import pytest
 import boa
 
 from constants import EIGHTEEN_DECIMALS, MAX_UINT256
@@ -32,7 +31,7 @@ def test_teller_basic_withdraw(
     assert log.amount == deposit_amount == amount
     assert log.vaultAddr == simple_erc20_vault.address
     assert log.vaultId != 0
-    assert log.isDepleted == True
+    assert log.isDepleted
 
     # check balance
     assert alpha_token.balanceOf(simple_erc20_vault) == 0
@@ -201,7 +200,7 @@ def test_teller_withdraw_many(
     assert alpha_log.amount == deposit_amount
     assert alpha_log.vaultAddr == simple_erc20_vault.address
     assert alpha_log.vaultId == vault_id
-    assert alpha_log.isDepleted == True
+    assert alpha_log.isDepleted
 
     # Verify bravo token withdrawal
     bravo_log = logs[1]
@@ -211,7 +210,7 @@ def test_teller_withdraw_many(
     assert bravo_log.amount == deposit_amount
     assert bravo_log.vaultAddr == simple_erc20_vault.address
     assert bravo_log.vaultId == vault_id
-    assert bravo_log.isDepleted == True
+    assert bravo_log.isDepleted
 
     # Verify balances
     assert alpha_token.balanceOf(simple_erc20_vault) == 0

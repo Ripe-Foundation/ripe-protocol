@@ -94,8 +94,8 @@ def test_chainlink_add_price_feed(
     log = filter_logs(mock_chainlink, "NewChainlinkFeedPending")[0]
     assert log.asset == alpha_token.address
     assert log.feed == mock_chainlink_alpha.address
-    assert log.needsEthToUsd == False
-    assert log.needsBtcToUsd == False
+    assert not log.needsEthToUsd
+    assert not log.needsBtcToUsd
 
     # Test confirming before time lock
     with boa.reverts("time lock not reached"):
@@ -111,8 +111,8 @@ def test_chainlink_add_price_feed(
     log = filter_logs(mock_chainlink, "NewChainlinkFeedAdded")[0]
     assert log.asset == alpha_token.address
     assert log.feed == mock_chainlink_alpha.address
-    assert log.needsEthToUsd == False
-    assert log.needsBtcToUsd == False
+    assert not log.needsEthToUsd
+    assert not log.needsBtcToUsd
 
     # Verify feed is active
     assert mock_chainlink.hasPriceFeed(alpha_token)
@@ -140,8 +140,8 @@ def test_chainlink_add_price_feed_cancel(
     log = filter_logs(mock_chainlink, "NewChainlinkFeedPending")[0]
     assert log.asset == alpha_token.address
     assert log.feed == mock_chainlink_alpha.address
-    assert log.needsEthToUsd == False
-    assert log.needsBtcToUsd == False
+    assert not log.needsEthToUsd
+    assert not log.needsBtcToUsd
 
     # Cancel feed
     assert mock_chainlink.cancelNewPendingPriceFeed(alpha_token, sender=governance.address)
@@ -180,8 +180,8 @@ def test_chainlink_add_price_feed_eth_btc_conversion(
     log = filter_logs(mock_chainlink, "NewChainlinkFeedPending")[0]
     assert log.asset == alpha_token.address
     assert log.feed == mock_chainlink_alpha.address
-    assert log.needsEthToUsd == True
-    assert log.needsBtcToUsd == False
+    assert log.needsEthToUsd
+    assert not log.needsBtcToUsd
 
     # Confirm feed
     boa.env.time_travel(blocks=mock_chainlink.actionTimeLock() + 1)
@@ -205,8 +205,8 @@ def test_chainlink_add_price_feed_eth_btc_conversion(
     log = filter_logs(mock_chainlink, "ChainlinkFeedUpdatePending")[0]
     assert log.asset == alpha_token.address
     assert log.feed == mock_chainlink_delta.address
-    assert log.needsEthToUsd == False
-    assert log.needsBtcToUsd == True
+    assert not log.needsEthToUsd
+    assert log.needsBtcToUsd
 
     # Confirm update
     boa.env.time_travel(blocks=mock_chainlink.actionTimeLock() + 1)
@@ -263,8 +263,8 @@ def test_chainlink_update_price_feed(
     log = filter_logs(mock_chainlink, "ChainlinkFeedUpdatePending")[0]
     assert log.asset == alpha_token.address
     assert log.feed == mock_chainlink_bravo.address
-    assert log.needsEthToUsd == False
-    assert log.needsBtcToUsd == False
+    assert not log.needsEthToUsd
+    assert not log.needsBtcToUsd
 
     # Test confirming before time lock
     with boa.reverts("time lock not reached"):
@@ -280,8 +280,8 @@ def test_chainlink_update_price_feed(
     log = filter_logs(mock_chainlink, "ChainlinkFeedUpdated")[0]
     assert log.asset == alpha_token.address
     assert log.feed == mock_chainlink_bravo.address
-    assert log.needsEthToUsd == False
-    assert log.needsBtcToUsd == False
+    assert not log.needsEthToUsd
+    assert not log.needsBtcToUsd
 
     # Verify feed is updated
     assert mock_chainlink.hasPriceFeed(alpha_token)
@@ -311,8 +311,8 @@ def test_chainlink_update_price_feed_cancel(
     log = filter_logs(mock_chainlink, "ChainlinkFeedUpdatePending")[0]
     assert log.asset == alpha_token.address
     assert log.feed == mock_chainlink_bravo.address
-    assert log.needsEthToUsd == False
-    assert log.needsBtcToUsd == False
+    assert not log.needsEthToUsd
+    assert not log.needsBtcToUsd
 
     # Cancel update
     assert mock_chainlink.cancelPriceFeedUpdate(alpha_token, sender=governance.address)

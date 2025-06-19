@@ -1,5 +1,3 @@
-import pytest
-import boa
 
 from constants import EIGHTEEN_DECIMALS, HUNDRED_PERCENT
 from conf_utils import filter_logs
@@ -85,7 +83,7 @@ def test_ah_liquidation_with_claimable_green_basic(
     # Set liquidatable price
     new_price = 49 * EIGHTEEN_DECIMALS // 100  # 0.49
     mock_price_source.setPrice(alpha_token, new_price)
-    assert credit_engine.canLiquidateUser(bob) == True
+    assert credit_engine.canLiquidateUser(bob)
     
     # Calculate what we need to repay
     target_repay_amount = auction_house.calcAmountOfDebtToRepayDuringLiq(bob)
@@ -239,7 +237,7 @@ def test_ah_liquidation_claimable_green_insufficient(
     # price < 100 / (200 * 0.8) = 0.625
     new_price = 62 * EIGHTEEN_DECIMALS // 100  # 0.62
     mock_price_source.setPrice(alpha_token, new_price)
-    assert credit_engine.canLiquidateUser(bob) == True
+    assert credit_engine.canLiquidateUser(bob)
     
     target_repay_amount = auction_house.calcAmountOfDebtToRepayDuringLiq(bob)
     assert target_repay_amount > claimable_green_before  # Ensure claimable is insufficient
@@ -376,7 +374,7 @@ def test_ah_liquidation_multiple_stab_assets_with_claimable_green(
     # Set liquidatable price
     new_price = 28 * EIGHTEEN_DECIMALS // 100  # 0.28
     mock_price_source.setPrice(alpha_token, new_price)
-    assert credit_engine.canLiquidateUser(bob) == True
+    assert credit_engine.canLiquidateUser(bob)
     
     # Perform liquidation
     teller.liquidateUser(bob, False, sender=sally)
@@ -495,7 +493,7 @@ def test_ah_liquidation_claimable_green_exact_amount(
     # Set liquidatable price
     new_price = 125 * EIGHTEEN_DECIMALS // 200
     mock_price_source.setPrice(alpha_token, new_price)
-    assert credit_engine.canLiquidateUser(bob) == True
+    assert credit_engine.canLiquidateUser(bob)
     
     # Calculate exact repay amount before liquidation
     target_repay_amount = auction_house.calcAmountOfDebtToRepayDuringLiq(bob)
@@ -527,7 +525,7 @@ def test_ah_liquidation_claimable_green_exact_amount(
     _test(target_repay_amount, claimable_green_before)
     
     # Record pool balance after redemption (this is the baseline)
-    charlie_pool_balance_before = charlie_token.balanceOf(stability_pool)
+    charlie_token.balanceOf(stability_pool)
     
     # Perform liquidation
     teller.liquidateUser(bob, False, sender=sally)
@@ -546,7 +544,7 @@ def test_ah_liquidation_claimable_green_exact_amount(
     assert claimable_green_after <= 1
     
     # Verify that only claimable green was used for the liquidation
-    charlie_pool_balance_after = charlie_token.balanceOf(stability_pool)
+    charlie_token.balanceOf(stability_pool)
     # The key verification is that we used exactly target_repay_amount from claimable green
     claimable_green_used = claimable_green_before - claimable_green_after
     _test(target_repay_amount, claimable_green_used)
@@ -632,7 +630,7 @@ def test_ah_liquidation_no_claimable_green_fallback(
     # Set liquidatable price
     new_price = 125 * EIGHTEEN_DECIMALS // 200
     mock_price_source.setPrice(alpha_token, new_price)
-    assert credit_engine.canLiquidateUser(bob) == True
+    assert credit_engine.canLiquidateUser(bob)
     
     target_repay_amount = auction_house.calcAmountOfDebtToRepayDuringLiq(bob)
     
@@ -743,7 +741,7 @@ def test_ah_liquidation_claimable_green_price_discrepancy(
     # price < 40 / (200 * 0.8) = 0.25
     new_price = 24 * EIGHTEEN_DECIMALS // 100  # 0.24
     mock_price_source.setPrice(alpha_token, new_price)
-    assert credit_engine.canLiquidateUser(bob) == True
+    assert credit_engine.canLiquidateUser(bob)
     
     # Calculate exact liquidation need
     target_repay_amount = auction_house.calcAmountOfDebtToRepayDuringLiq(bob)
@@ -878,7 +876,7 @@ def test_ah_liquidation_claimable_green_with_keeper_fees(
     # Set liquidatable price
     new_price = 37 * EIGHTEEN_DECIMALS // 100  # 0.37
     mock_price_source.setPrice(alpha_token, new_price)
-    assert credit_engine.canLiquidateUser(bob) == True
+    assert credit_engine.canLiquidateUser(bob)
     
     # Calculate expected values
     target_repay_amount = auction_house.calcAmountOfDebtToRepayDuringLiq(bob)
@@ -1017,7 +1015,7 @@ def test_ah_liquidation_claimable_green_depletion_edge_case(
     # price < 100 / (200 * 0.8) = 0.625
     new_price = 62 * EIGHTEEN_DECIMALS // 100  # 0.62
     mock_price_source.setPrice(alpha_token, new_price)
-    assert credit_engine.canLiquidateUser(bob) == True
+    assert credit_engine.canLiquidateUser(bob)
     
     target_repay_amount = auction_house.calcAmountOfDebtToRepayDuringLiq(bob)
     assert target_repay_amount > small_redeem_amount  # Ensure we need more than available green

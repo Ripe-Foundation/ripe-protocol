@@ -164,7 +164,7 @@ def deployedContributor(
         
         # Confirm contributor
         success = human_resources.confirmNewContributor(aid, sender=governance.address)
-        assert success == True
+        assert success
         
         # Get the contributor address from logs
         logs = filter_logs(human_resources, "NewContributorConfirmed")
@@ -212,7 +212,7 @@ def test_switchboard_delta_lite_action_permissions(switchboard_delta, mission_co
     
     # Alice can now freeze (True)
     result = switchboard_delta.freezeContributor(contributor_addr, True, sender=alice)
-    assert result == True
+    assert result
     
     # Alice cannot unfreeze (False) - only governance can
     with boa.reverts("no perms"):
@@ -220,9 +220,9 @@ def test_switchboard_delta_lite_action_permissions(switchboard_delta, mission_co
     
     # Governance can both freeze and unfreeze
     result1 = switchboard_delta.freezeContributor(contributor_addr, True, sender=governance.address)
-    assert result1 == True
+    assert result1
     result2 = switchboard_delta.freezeContributor(contributor_addr, False, sender=governance.address)
-    assert result2 == True
+    assert result2
 
 
 ################################
@@ -486,7 +486,7 @@ def test_switchboard_delta_cash_ripe_check_for_contributor(switchboard_delta, mi
     
     # Cash ripe check - should return 0 but not fail (contributor has no claimable amount initially)
     result = switchboard_delta.cashRipeCheckForContributor(contributor_addr, sender=governance.address)
-    assert result == True
+    assert result
     
     # Check event emission
     logs = filter_logs(switchboard_delta, "RipeCheckCashedFromSwitchboard")
@@ -526,11 +526,11 @@ def test_switchboard_delta_cancel_ripe_transfer_for_contributor(
     contributor.initiateRipeTransfer(sender=alice)
     
     # Verify pending transfer exists
-    assert contributor.hasPendingRipeTransfer() == True
+    assert contributor.hasPendingRipeTransfer()
     
     # Cancel ripe transfer via switchboard - should succeed because SwitchboardDelta is registered
     result = switchboard_delta.cancelRipeTransferForContributor(contributor.address, sender=governance.address)
-    assert result == True
+    assert result
     
     # Check event emission
     logs = filter_logs(switchboard_delta, "RipeTransferCancelledFromSwitchboard")
@@ -540,7 +540,7 @@ def test_switchboard_delta_cancel_ripe_transfer_for_contributor(
     assert log.cancelledBy == governance.address
     
     # Verify transfer was cancelled
-    assert contributor.hasPendingRipeTransfer() == False
+    assert not contributor.hasPendingRipeTransfer()
 
 
 def test_switchboard_delta_cancel_ownership_change_for_contributor(
@@ -559,11 +559,11 @@ def test_switchboard_delta_cancel_ownership_change_for_contributor(
     contributor.changeOwnership(bob, sender=alice)
     
     # Verify pending ownership change exists
-    assert contributor.hasPendingOwnerChange() == True
+    assert contributor.hasPendingOwnerChange()
     
     # Cancel ownership change via switchboard - should succeed because SwitchboardDelta is registered
     result = switchboard_delta.cancelOwnershipChangeForContributor(contributor.address, sender=governance.address)
-    assert result == True
+    assert result
     
     # Check event emission
     logs = filter_logs(switchboard_delta, "OwnershipChangeCancelledFromSwitchboard")
@@ -573,7 +573,7 @@ def test_switchboard_delta_cancel_ownership_change_for_contributor(
     assert log.cancelledBy == governance.address
     
     # Verify ownership change was cancelled
-    assert contributor.hasPendingOwnerChange() == False
+    assert not contributor.hasPendingOwnerChange()
 
 
 def test_switchboard_delta_freeze_contributor(switchboard_delta, mission_control, governance, deployedContributor):
@@ -585,7 +585,7 @@ def test_switchboard_delta_freeze_contributor(switchboard_delta, mission_control
     
     # Freeze contributor
     result = switchboard_delta.freezeContributor(contributor_addr, True, sender=governance.address)
-    assert result == True
+    assert result
     
     # Check event emission
     logs = filter_logs(switchboard_delta, "ContributorFrozenFromSwitchboard")
@@ -593,11 +593,11 @@ def test_switchboard_delta_freeze_contributor(switchboard_delta, mission_control
     log = logs[0]
     assert log.contributor == contributor_addr
     assert log.frozenBy == governance.address
-    assert log.shouldFreeze == True
+    assert log.shouldFreeze
     
     # Unfreeze contributor
     result = switchboard_delta.freezeContributor(contributor_addr, False, sender=governance.address)
-    assert result == True
+    assert result
 
 
 ##########################
@@ -617,7 +617,7 @@ def test_switchboard_delta_execute_pending_hr_config_template(
     
     # Execute action
     success = switchboard_delta.executePendingAction(aid, sender=governance.address)
-    assert success == True
+    assert success
     
     # Check config was updated
     hr_config = mission_control.hrConfig()
@@ -648,7 +648,7 @@ def test_switchboard_delta_execute_pending_max_compensation(
     
     # Execute action
     success = switchboard_delta.executePendingAction(aid, sender=governance.address)
-    assert success == True
+    assert success
     
     # Check config was updated
     hr_config = mission_control.hrConfig()
@@ -675,7 +675,7 @@ def test_switchboard_delta_execute_pending_manager_change(
     
     # Execute action - should succeed because SwitchboardDelta is registered as a switchboard
     success = switchboard_delta.executePendingAction(aid, sender=governance.address)
-    assert success == True
+    assert success
 
 
 def test_switchboard_delta_execute_pending_cancel_paycheck(
@@ -715,7 +715,7 @@ def test_switchboard_delta_execute_pending_cancel_paycheck(
     
     # Execute action - should succeed because SwitchboardDelta is registered as a switchboard
     success = switchboard_delta.executePendingAction(aid, sender=governance.address)
-    assert success == True
+    assert success
     
     # Check execution event was emitted
     logs = filter_logs(switchboard_delta, "HrContributorCancelPaycheckSet")
@@ -733,7 +733,7 @@ def test_switchboard_delta_execute_before_timelock_fails(
     
     # Try to execute immediately (should fail)
     success = switchboard_delta.executePendingAction(aid, sender=governance.address)
-    assert success == False
+    assert not success
 
 
 def test_switchboard_delta_cancel_pending_action(
@@ -745,7 +745,7 @@ def test_switchboard_delta_cancel_pending_action(
     
     # Cancel action
     success = switchboard_delta.cancelPendingAction(aid, sender=governance.address)
-    assert success == True
+    assert success
     
     # Check action was cleared
     action_type = switchboard_delta.actionType(aid)
@@ -772,13 +772,13 @@ def test_switchboard_delta_complete_hr_config_workflow(
     
     # 3. Execute all actions
     success1 = switchboard_delta.executePendingAction(aid1, sender=governance.address)
-    assert success1 == True
+    assert success1
     success2 = switchboard_delta.executePendingAction(aid2, sender=governance.address)
-    assert success2 == True
+    assert success2
     success3 = switchboard_delta.executePendingAction(aid3, sender=governance.address)
-    assert success3 == True
+    assert success3
     success4 = switchboard_delta.executePendingAction(aid4, sender=governance.address)
-    assert success4 == True
+    assert success4
     
     # 4. Verify final config
     hr_config = mission_control.hrConfig()
@@ -829,30 +829,30 @@ def test_switchboard_delta_complete_contributor_management_workflow(
     
     # Freeze should work (returns bool)
     result1 = switchboard_delta.freezeContributor(contributor.address, True, sender=governance.address)
-    assert result1 == True
+    assert result1
     
     # Cash ripe check should work (returns uint256)
     result2 = switchboard_delta.cashRipeCheckForContributor(contributor.address, sender=governance.address)
-    assert result2 == True
+    assert result2
     
     # Set up pending ownership change to test cancellation (alice is the actual owner)
     contributor.changeOwnership(bob, sender=alice)
-    assert contributor.hasPendingOwnerChange() == True
+    assert contributor.hasPendingOwnerChange()
     
     # Cancel ownership change should work
     result3 = switchboard_delta.cancelOwnershipChangeForContributor(contributor.address, sender=governance.address)
-    assert result3 == True
-    assert contributor.hasPendingOwnerChange() == False
+    assert result3
+    assert not contributor.hasPendingOwnerChange()
     
     # 3. Advance time and attempt to execute timelock actions (these should succeed)
     boa.env.time_travel(blocks=switchboard_delta.actionTimeLock())
     
     # These should succeed because SwitchboardDelta is registered as a switchboard
     success1 = switchboard_delta.executePendingAction(manager_aid, sender=governance.address)
-    assert success1 == True
+    assert success1
     
     success2 = switchboard_delta.executePendingAction(cancel_aid, sender=governance.address)
-    assert success2 == True
+    assert success2
 
 
 ###################
@@ -879,7 +879,7 @@ def test_switchboard_delta_expired_action_auto_cancel(
     
     # Try to execute (should auto-cancel and return False)
     success = switchboard_delta.executePendingAction(aid, sender=governance.address)
-    assert success == False
+    assert not success
     
     # Check action was cleared
     action_type = switchboard_delta.actionType(aid)
@@ -900,21 +900,21 @@ def test_switchboard_delta_mixed_permissions_scenario(
     
     # Alice can freeze but not unfreeze
     result = switchboard_delta.freezeContributor(contributor.address, True, sender=alice)
-    assert result == True
+    assert result
     
     with boa.reverts("no perms"):
         switchboard_delta.freezeContributor(contributor.address, False, sender=alice)
     
     # Alice can do lite action that works
     result1 = switchboard_delta.cashRipeCheckForContributor(contributor.address, sender=alice)
-    assert result1 == True
+    assert result1
     
     # Set up pending ownership change to test cancellation (alice is the actual owner)
     contributor.changeOwnership(bob, sender=alice)
     
     # Alice can cancel ownership change
     result2 = switchboard_delta.cancelOwnershipChangeForContributor(contributor.address, sender=alice)
-    assert result2 == True
+    assert result2
     
     # Alice cannot do governance actions
     with boa.reverts("no perms"):
@@ -922,7 +922,7 @@ def test_switchboard_delta_mixed_permissions_scenario(
     
     # Governance can do everything (freeze/unfreeze)
     result3 = switchboard_delta.freezeContributor(contributor.address, False, sender=governance.address)
-    assert result3 == True
+    assert result3
     
     # Governance can create timelock actions
     aid = switchboard_delta.setManagerForContributor(contributor.address, bob, sender=governance.address)
@@ -939,7 +939,7 @@ def test_switchboard_delta_set_bad_debt(switchboard_delta, ledger, governance, a
     
     # Governance can create pending bad debt action
     success = switchboard_delta.setBadDebt(bad_debt_amount, sender=governance.address)
-    assert success == True
+    assert success
     
     # Check pending event was emitted
     logs = filter_logs(switchboard_delta, "PendingBadDebtSet")
@@ -965,14 +965,14 @@ def test_switchboard_delta_set_bad_debt(switchboard_delta, ledger, governance, a
     
     # Try to execute before timelock (should fail)
     success_early = switchboard_delta.executePendingAction(aid, sender=governance.address)
-    assert success_early == False
+    assert not success_early
     
     # Advance time past timelock
     boa.env.time_travel(blocks=switchboard_delta.actionTimeLock())
     
     # Execute the action
     success_execute = switchboard_delta.executePendingAction(aid, sender=governance.address)
-    assert success_execute == True
+    assert success_execute
     
     # Check execution event was emitted
     execution_logs = filter_logs(switchboard_delta, "BadDebtSet")
@@ -1018,7 +1018,7 @@ def test_switchboard_delta_set_stab_claim_rewards_config(switchboard_delta, gove
     # Advance time and execute
     boa.env.time_travel(blocks=switchboard_delta.actionTimeLock())
     success = switchboard_delta.executePendingAction(aid, sender=governance.address)
-    assert success == True
+    assert success
     
     # Check execution event was emitted
     execution_logs = filter_logs(switchboard_delta, "StabClaimRewardsConfigSet")

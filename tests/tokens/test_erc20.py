@@ -146,7 +146,7 @@ def test_green_token_increase_decrease_allowance(green_token, whale, bob):
     # Test increaseAllowance with max uint256
     max_uint = 2**256 - 1
     current_allowance = green_token.allowance(whale, bob)
-    max_increase = max_uint - current_allowance
+    max_uint - current_allowance
     assert green_token.increaseAllowance(bob, max_uint, sender=whale)
     assert green_token.allowance(whale, bob) == max_uint  # Should be capped at max_uint
 
@@ -476,13 +476,13 @@ def test_green_token_events(green_token, whale, bob, governance, switchboard, mo
     
     blacklist_log = filter_logs(green_token, "BlacklistModified")[0]
     assert blacklist_log.addr == bob
-    assert blacklist_log.isBlacklisted == True
+    assert blacklist_log.isBlacklisted
     
     # Test TokenPauseModified event
     green_token.pause(True, sender=governance.address)
     
     pause_log = filter_logs(green_token, "TokenPauseModified")[0]
-    assert pause_log.isPaused == True
+    assert pause_log.isPaused
       
     green_token.initiateHqChange(mock_ripe_hq, sender=governance.address)
     

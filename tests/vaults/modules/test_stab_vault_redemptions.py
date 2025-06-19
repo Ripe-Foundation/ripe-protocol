@@ -1,8 +1,6 @@
-import pytest
 import boa
 
 from constants import EIGHTEEN_DECIMALS, ZERO_ADDRESS, MAX_UINT256
-from conf_utils import filter_logs
 
 
 def test_stab_vault_redemptions_basic(
@@ -1043,7 +1041,7 @@ def test_stab_vault_redemptions_over_limit(
         redemptions = [(ZERO_ADDRESS, 0) for _ in range(max_redemptions + 1)]
         green_token.transfer(bob, 100 * EIGHTEEN_DECIMALS, sender=whale)
         green_token.approve(teller, 100 * EIGHTEEN_DECIMALS, sender=bob)
-        total_green_spent = teller.redeemManyFromStabilityPool(vault_id, redemptions, 100 * EIGHTEEN_DECIMALS, bob, sender=bob)
+        teller.redeemManyFromStabilityPool(vault_id, redemptions, 100 * EIGHTEEN_DECIMALS, bob, sender=bob)
         assert False, "Should have failed due to exceeding max redemptions"
     except Exception:
         # Expected to fail

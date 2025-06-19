@@ -1,4 +1,3 @@
-import pytest
 import boa
 
 from constants import EIGHTEEN_DECIMALS
@@ -54,7 +53,7 @@ def test_ah_liquidation_auction_creation(
     # Set liquidatable price
     new_price = 125 * EIGHTEEN_DECIMALS // 200  # 0.625
     mock_price_source.setPrice(alpha_token, new_price)
-    assert credit_engine.canLiquidateUser(bob) == True
+    assert credit_engine.canLiquidateUser(bob)
 
     # Perform liquidation
     teller.liquidateUser(bob, False, sender=sally)
@@ -72,17 +71,17 @@ def test_ah_liquidation_auction_creation(
     assert auction_log.maxDiscount == 50_00    # Default max discount (50%)
     assert auction_log.startBlock == boa.env.evm.patch.block_number  # Default delay = 0 (starts immediately)
     assert auction_log.endBlock == boa.env.evm.patch.block_number + 1000  # Default duration = 1000 blocks
-    assert auction_log.isNewAuction == True
+    assert auction_log.isNewAuction
 
     # Verify liquidation event shows auction was started
     liquidation_log = filter_logs(teller, "LiquidateUser")[0]
     assert liquidation_log.user == bob
     assert liquidation_log.numAuctionsStarted == 1
-    assert liquidation_log.didRestoreDebtHealth == False  # Still in liquidation
+    assert not liquidation_log.didRestoreDebtHealth  # Still in liquidation
 
     # Verify user is still in liquidation
     user_debt, bt, _ = credit_engine.getLatestUserDebtAndTerms(bob, False)
-    assert user_debt.inLiquidation == True
+    assert user_debt.inLiquidation
 
 
 def test_ah_liquidation_auction_discount_calculation(
@@ -144,8 +143,6 @@ def test_ah_liquidation_auction_discount_calculation(
     auction_log = filter_logs(teller, "FungibleAuctionUpdated")[0]
     start_block = auction_log.startBlock
     end_block = auction_log.endBlock
-    start_discount = auction_log.startDiscount
-    max_discount = auction_log.maxDiscount
     duration = end_block - start_block
     
     # Give alice some GREEN to buy auction
@@ -356,10 +353,10 @@ def test_ah_liquidation_auction_position_depletion(
     green_token.approve(teller, green_amount, sender=alice)
 
     # Verify auction exists
-    assert ledger.hasFungibleAuction(bob, auction_log.vaultId, alpha_token) == True
+    assert ledger.hasFungibleAuction(bob, auction_log.vaultId, alpha_token)
 
     # Buy enough to deplete position
-    green_spent = teller.buyFungibleAuction(
+    teller.buyFungibleAuction(
         bob, auction_log.vaultId, alpha_token, green_amount, False, sender=alice
     )
 
@@ -1260,7 +1257,7 @@ def test_ah_liquidation_multiple_auctions(
     mock_price_source.setPrice(bravo_token, new_price)
     mock_price_source.setPrice(charlie_token, new_price)
     
-    assert credit_engine.canLiquidateUser(bob) == True
+    assert credit_engine.canLiquidateUser(bob)
 
     # Perform liquidation
     teller.liquidateUser(bob, False, sender=sally)
@@ -1271,7 +1268,7 @@ def test_ah_liquidation_multiple_auctions(
     
     # Verify user is in liquidation with auctions
     user_debt_after_liq, _, _ = credit_engine.getLatestUserDebtAndTerms(bob, False)
-    assert user_debt_after_liq.inLiquidation == True
+    assert user_debt_after_liq.inLiquidation
     
     # Verify auctions exist for all 3 assets
     auction_count = 0
@@ -1290,13 +1287,13 @@ def test_ah_liquidation_multiple_auctions(
     
     # Verify user exited liquidation
     user_debt_final, _, _ = credit_engine.getLatestUserDebtAndTerms(bob, False)
-    assert user_debt_final.inLiquidation == False  # User exited liquidation
+    assert not user_debt_final.inLiquidation  # User exited liquidation
     
     # CORRECT BEHAVIOR: Auction is removed when user exits liquidation
     # This happens in Ledger.setUserDebt when inLiquidation changes from True to False
     # The Ledger calls _removeAllFungibleAuctions(_user) automatically
     for log in auction_logs:
-        assert ledger.hasFungibleAuction(bob, log.vaultId, log.asset) == False  # All auctions disabled
+        assert not ledger.hasFungibleAuction(bob, log.vaultId, log.asset)  # All auctions disabled
     
 
 def test_ah_auction_user_exits_liquidation_via_auction_purchases(
@@ -1353,12 +1350,11 @@ def test_ah_auction_user_exits_liquidation_via_auction_purchases(
     
     # Verify user is in liquidation with auction
     user_debt_after_liq, bt_after_liq, _ = credit_engine.getLatestUserDebtAndTerms(bob, False)
-    assert user_debt_after_liq.inLiquidation == True
-    assert ledger.hasFungibleAuction(bob, auction_log.vaultId, alpha_token) == True
+    assert user_debt_after_liq.inLiquidation
+    assert ledger.hasFungibleAuction(bob, auction_log.vaultId, alpha_token)
 
     # Calculate amount needed to restore health based on actual values
     current_debt = user_debt_after_liq.amount
-    current_collateral_value = bt_after_liq.collateralVal
     
     # Simple approach: buy enough to definitely get out of liquidation
     # Since buying reduces both debt and collateral equally, we need to buy more
@@ -1370,18 +1366,18 @@ def test_ah_auction_user_exits_liquidation_via_auction_purchases(
     green_token.approve(teller, amount_to_repay, sender=alice)
 
     # Purchase auction with amount to restore health
-    green_spent = teller.buyFungibleAuction(
+    teller.buyFungibleAuction(
         bob, auction_log.vaultId, alpha_token, amount_to_repay, False, sender=alice
     )
     
     # Verify user exited liquidation through auction purchase
     user_debt_final, bt_final, _ = credit_engine.getLatestUserDebtAndTerms(bob, False)
-    assert user_debt_final.inLiquidation == False  # User exited liquidation via auction purchase
+    assert not user_debt_final.inLiquidation  # User exited liquidation via auction purchase
     
     # CORRECT BEHAVIOR: Auction is removed when user exits liquidation
     # This happens in Ledger.setUserDebt when inLiquidation changes from True to False
     # The Ledger calls _removeAllFungibleAuctions(_user) automatically
-    assert ledger.hasFungibleAuction(bob, auction_log.vaultId, alpha_token) == False  # Auction REMOVED
+    assert not ledger.hasFungibleAuction(bob, auction_log.vaultId, alpha_token)  # Auction REMOVED
     
     # Verify debt health is restored
     final_ltv = user_debt_final.amount * 100 // bt_final.collateralVal if bt_final.collateralVal > 0 else 0
@@ -1602,7 +1598,7 @@ def test_ah_auction_buy_with_balance_transfer_basic(
 
     # Perform liquidation to create auction
     teller.liquidateUser(bob, False, sender=sally)
-    auction_log = filter_logs(teller, "FungibleAuctionUpdated")[0]
+    filter_logs(teller, "FungibleAuctionUpdated")[0]
     
     vault_id = vault_book.getRegId(simple_erc20_vault)
     vault = simple_erc20_vault
@@ -1736,7 +1732,7 @@ def test_ah_auction_buy_many_with_balance_transfer(
     # Check liquidation results
     liq_logs = filter_logs(teller, "LiquidateUser")
     assert len(liq_logs) == 1
-    liq_log = liq_logs[0]
+    liq_logs[0]
     
     auction_logs = filter_logs(teller, "FungibleAuctionUpdated")
     assert len(auction_logs) == 2  # Should have exactly 2 auctions
@@ -1861,7 +1857,7 @@ def test_ah_auction_balance_transfer_edge_cases(
 
     # Perform liquidation
     teller.liquidateUser(bob, False, sender=sally)
-    auction_log = filter_logs(teller, "FungibleAuctionUpdated")[0]
+    filter_logs(teller, "FungibleAuctionUpdated")[0]
     
     # Give alice GREEN
     green_amount = 30 * EIGHTEEN_DECIMALS
@@ -1869,7 +1865,7 @@ def test_ah_auction_balance_transfer_edge_cases(
     green_token.approve(teller, green_amount, sender=alice)
 
     # Buy with balance transfer
-    green_spent = teller.buyFungibleAuction(
+    teller.buyFungibleAuction(
         bob, vault_id, alpha_token, green_amount,
         False, True, False,
         sender=alice
@@ -1884,7 +1880,7 @@ def test_ah_auction_balance_transfer_edge_cases(
     # - Bob initially deposited 100 alpha tokens
     # - First purchase transferred some amount (from 30 GREEN purchase)
     # - Bob's remaining balance after first purchase
-    bob_balance_before = vault.userBalances(bob, alpha_token)
+    vault.userBalances(bob, alpha_token)
     
     # At current price ($0.50), and with no discount (auction just started),
     # we can calculate how much collateral remains and whether 100 GREEN
@@ -1896,7 +1892,7 @@ def test_ah_auction_balance_transfer_edge_cases(
     green_token.approve(teller, green_amount, sender=alice)
     
     # Buy with intent to deplete Bob's position
-    green_spent = teller.buyFungibleAuction(
+    teller.buyFungibleAuction(
         bob, vault_id, alpha_token, green_amount,
         False, True, False,
         sender=alice

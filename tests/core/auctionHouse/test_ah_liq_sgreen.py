@@ -1,8 +1,5 @@
-import pytest
-import boa
 
-from constants import EIGHTEEN_DECIMALS, HUNDRED_PERCENT, ZERO_ADDRESS, MAX_UINT256
-from conf_utils import filter_logs
+from constants import EIGHTEEN_DECIMALS
 
 
 def test_ah_liquidation_phase_1_pay_via_stab_pool(
@@ -71,7 +68,7 @@ def test_ah_liquidation_phase_1_pay_via_stab_pool(
     # set liquidatable price
     new_price = int(0.6 * EIGHTEEN_DECIMALS) # 60% of original price
     mock_price_source.setPrice(alpha_token, new_price)
-    assert credit_engine.canLiquidateUser(bob) == True
+    assert credit_engine.canLiquidateUser(bob)
 
     # pre liquidation
     orig_user_debt, orig_bt, _ = credit_engine.getLatestUserDebtAndTerms(bob, False)

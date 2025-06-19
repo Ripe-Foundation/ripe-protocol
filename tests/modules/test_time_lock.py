@@ -371,7 +371,7 @@ def test_time_lock_invalid_action_handling(
     
     # Start action
     mock.addThing(mock_rando_contract, 100, sender=governance.address)
-    pending = mock.pendingData(mock_rando_contract)
+    mock.pendingData(mock_rando_contract)
     
     # Try to confirm with wrong action ID
     with boa.reverts("time lock not reached"):
@@ -435,8 +435,8 @@ def test_time_lock_expiration_window(
     mock.addThing(mock_rando_contract, 100, sender=governance.address)
     mock.addThing(mock_whitelist, 200, sender=governance.address)
     
-    pending1 = mock.pendingData(mock_rando_contract)
-    pending2 = mock.pendingData(mock_whitelist)
+    mock.pendingData(mock_rando_contract)
+    mock.pendingData(mock_whitelist)
 
     # Time travel to middle of confirmation window
     boa.env.time_travel(blocks=time_lock + (expiration // 2))
@@ -513,7 +513,6 @@ def test_time_lock_expiration_edge_cases(
     assert mock.data(mock_rando_contract) == 100
 
     # Start another action to test exact expiration
-    start_block = boa.env.evm.patch.block_number
     mock.addThing(mock_rando_contract, 200, sender=governance.address)
     
     # Calculate blocks to reach exact expiration:
@@ -543,7 +542,7 @@ def test_time_lock_expiration_with_cancellation(
 
     # Start action
     mock.addThing(mock_rando_contract, 100, sender=governance.address)
-    pending = mock.pendingData(mock_rando_contract)
+    mock.pendingData(mock_rando_contract)
 
     # Time travel to middle of confirmation window
     boa.env.time_travel(blocks=time_lock + 50)
@@ -617,7 +616,6 @@ def test_time_lock_expiration_boundary_timing(
 
     # Start action
     mock.addThing(mock_rando_contract, 100, sender=governance.address)
-    start_block = boa.env.evm.patch.block_number
     
     # Time travel to one block before confirmation
     boa.env.time_travel(blocks=time_lock - 1)
@@ -634,7 +632,6 @@ def test_time_lock_expiration_boundary_timing(
     assert mock.data(mock_rando_contract) == 100
 
     # Start another action to test exact expiration
-    start_block2 = boa.env.evm.patch.block_number
     mock.addThing(mock_rando_contract, 200, sender=governance.address)
     
     # Time travel to one block before expiration
@@ -647,7 +644,6 @@ def test_time_lock_expiration_boundary_timing(
     assert mock.data(mock_rando_contract) == 200
 
     # Start a third action to test exact expiration
-    start_block3 = boa.env.evm.patch.block_number
     mock.addThing(mock_rando_contract, 300, sender=governance.address)
     
     # Time travel to exact expiration block

@@ -63,7 +63,7 @@ def test_local_gov_deploy(
     assert local_gov.canGovern(mock_rando_contract)
     assert local_gov.canGovern(governance) # ripe hq
 
-    assert local_gov.hasPendingGovChange() == False
+    assert not local_gov.hasPendingGovChange()
     assert local_gov.pendingGov() == (ZERO_ADDRESS, 0, 0)
 
     assert local_gov.govChangeTimeLock() == 150
@@ -112,7 +112,7 @@ def test_ripe_hq_gov_deploy(
     assert hq_gov.canGovern(deploy3r)
     assert not hq_gov.canGovern(governance)
 
-    assert hq_gov.hasPendingGovChange() == False
+    assert not hq_gov.hasPendingGovChange()
     assert hq_gov.pendingGov() == (ZERO_ADDRESS, 0, 0)
 
     assert hq_gov.govChangeTimeLock() == 0 # ignored on hq gov

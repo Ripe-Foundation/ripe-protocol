@@ -312,13 +312,13 @@ def test_stab_vault_claims_multiple_users(
     vault_id = vault_book.getRegId(stability_pool)
     
     # Bob claims first (should get 2/3 of claimable assets)
-    bob_value_before = stability_pool.getTotalUserValue(bob, alpha_token)
-    bob_usd_value = teller.claimFromStabilityPool(vault_id, alpha_token, bravo_token, sender=bob)
+    stability_pool.getTotalUserValue(bob, alpha_token)
+    teller.claimFromStabilityPool(vault_id, alpha_token, bravo_token, sender=bob)
     bob_claimed = bravo_token.balanceOf(bob)
     
     # Alice claims second (should get 1/3 of remaining claimable assets)
-    alice_value_before = stability_pool.getTotalUserValue(alice, alpha_token)
-    alice_usd_value = teller.claimFromStabilityPool(vault_id, alpha_token, bravo_token, sender=alice)
+    stability_pool.getTotalUserValue(alice, alpha_token)
+    teller.claimFromStabilityPool(vault_id, alpha_token, bravo_token, sender=alice)
     alice_claimed = bravo_token.balanceOf(alice)
 
     # Bob should get roughly 2/3, Alice should get roughly 1/3
@@ -385,12 +385,12 @@ def test_stab_vault_claims_multiple_assets(
     vault_id = vault_book.getRegId(stability_pool)
 
     # Claim bravo tokens
-    bravo_usd_value = teller.claimFromStabilityPool(vault_id, alpha_token, bravo_token, sender=bob)
+    teller.claimFromStabilityPool(vault_id, alpha_token, bravo_token, sender=bob)
     bravo_claimed = bravo_token.balanceOf(bob)
     _test(bravo_amount, bravo_claimed)
 
     # Claim charlie tokens  
-    charlie_usd_value = teller.claimFromStabilityPool(vault_id, alpha_token, charlie_token, sender=bob)
+    teller.claimFromStabilityPool(vault_id, alpha_token, charlie_token, sender=bob)
     charlie_claimed = charlie_token.balanceOf(bob)
     _test(charlie_amount, charlie_claimed)
 
@@ -486,7 +486,7 @@ def test_stab_vault_claims_depletion(
 
     # Claim everything
     vault_id = vault_book.getRegId(stability_pool)
-    usd_value = teller.claimFromStabilityPool(vault_id, alpha_token, bravo_token, sender=bob)
+    teller.claimFromStabilityPool(vault_id, alpha_token, bravo_token, sender=bob)
 
     # User should be depleted
     final_shares = stability_pool.userBalances(bob, alpha_token)
@@ -793,7 +793,7 @@ def test_stab_vault_claims_event_emission(
     _test(log.claimAmount, claimable_amount)
     _test(log.claimUsdValue, usd_value)
     assert log.claimShares != 0
-    assert log.isDepleted == True
+    assert log.isDepleted
 
 
 def test_stab_vault_claims_claimable_balance_update(
@@ -848,7 +848,7 @@ def test_stab_vault_claims_claimable_balance_update(
 
     # Bob claims half
     bob_claim_amount = claimable_amount // 2
-    bob_usd_value = teller.claimFromStabilityPool(vault_id, alpha_token, bravo_token, bob_claim_amount, sender=bob)
+    teller.claimFromStabilityPool(vault_id, alpha_token, bravo_token, bob_claim_amount, sender=bob)
 
     # Check balances after Bob's claim
     after_bob_claimable = stability_pool.claimableBalances(alpha_token, bravo_token)
@@ -859,7 +859,7 @@ def test_stab_vault_claims_claimable_balance_update(
     _test(expected_remaining, after_bob_total_claimable)
 
     # Alice claims the rest
-    alice_usd_value = teller.claimFromStabilityPool(vault_id, alpha_token, bravo_token, sender=alice)
+    teller.claimFromStabilityPool(vault_id, alpha_token, bravo_token, sender=alice)
 
     # Check balances after Alice's claim - should be near zero
     final_claimable = stability_pool.claimableBalances(alpha_token, bravo_token)
@@ -1102,7 +1102,7 @@ def test_stab_vault_claims_asset_registry_removal(
 
     # Partially claim charlie (should NOT remove from registry)
     partial_charlie_usd = 60 * EIGHTEEN_DECIMALS
-    charlie_usd_value = teller.claimFromStabilityPool(vault_id, alpha_token, charlie_token, partial_charlie_usd, sender=bob)
+    teller.claimFromStabilityPool(vault_id, alpha_token, charlie_token, partial_charlie_usd, sender=bob)
     
     # Charlie should still be in registry
     assert stability_pool.claimableBalances(alpha_token, charlie_token) > 0
@@ -1158,7 +1158,7 @@ def test_stab_vault_claims_precision_edge_cases(
     # Claim with both users and ensure total is preserved
     bob_initial_value = stability_pool.getTotalUserValue(bob, alpha_token)
     alice_initial_value = stability_pool.getTotalUserValue(alice, alpha_token)
-    total_initial_value = bob_initial_value + alice_initial_value
+    bob_initial_value + alice_initial_value
 
     bob_usd_value = teller.claimFromStabilityPool(vault_id, alpha_token, bravo_token, sender=bob)
     alice_usd_value = teller.claimFromStabilityPool(vault_id, alpha_token, bravo_token, sender=alice)
@@ -1323,7 +1323,7 @@ def test_stab_vault_claims_claim_many_over_limit(
     try:
         # This should fail at compile/runtime due to DynArray size limit
         claims = [(ZERO_ADDRESS, ZERO_ADDRESS, 0) for _ in range(max_claims + 1)]
-        total_usd_value = teller.claimManyFromStabilityPool(vault_id, claims, sender=bob)
+        teller.claimManyFromStabilityPool(vault_id, claims, sender=bob)
         assert False, "Should have failed due to exceeding max claims"
     except Exception:
         # Expected to fail
@@ -1944,7 +1944,7 @@ def test_stab_vault_claim_rewards_insufficient_ripe(
 
     # Claim from stability pool
     vault_id = vault_book.getRegId(stability_pool)
-    claim_usd_value = teller.claimFromStabilityPool(vault_id, alpha_token, bravo_token, sender=bob)
+    teller.claimFromStabilityPool(vault_id, alpha_token, bravo_token, sender=bob)
 
     # Verify rewards are limited by available amount
     final_gov_balance = ripe_gov_vault.getTotalAmountForUser(bob, ripe_token)

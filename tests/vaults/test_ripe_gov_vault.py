@@ -1316,7 +1316,7 @@ def test_ripe_gov_vault_are_key_terms_same_identical(ripe_gov_vault):
     terms1 = (100, 1000, 200_00, True, 10_00)
     terms2 = (100, 1000, 200_00, True, 10_00)
     
-    assert ripe_gov_vault.areKeyTermsSame(terms1, terms2) == True
+    assert ripe_gov_vault.areKeyTermsSame(terms1, terms2)
 
 
 def test_ripe_gov_vault_are_key_terms_same_can_exit_worse(ripe_gov_vault):
@@ -1325,7 +1325,7 @@ def test_ripe_gov_vault_are_key_terms_same_can_exit_worse(ripe_gov_vault):
     old_terms = (100, 1000, 200_00, True, 10_00)   # canExit = True
     new_terms = (100, 1000, 200_00, False, 10_00)  # canExit = False
     
-    assert ripe_gov_vault.areKeyTermsSame(new_terms, old_terms) == False
+    assert not ripe_gov_vault.areKeyTermsSame(new_terms, old_terms)
 
 
 def test_ripe_gov_vault_are_key_terms_same_can_exit_better(ripe_gov_vault):
@@ -1334,7 +1334,7 @@ def test_ripe_gov_vault_are_key_terms_same_can_exit_better(ripe_gov_vault):
     old_terms = (100, 1000, 200_00, False, 10_00)  # canExit = False
     new_terms = (100, 1000, 200_00, True, 10_00)   # canExit = True
     
-    assert ripe_gov_vault.areKeyTermsSame(new_terms, old_terms) == True
+    assert ripe_gov_vault.areKeyTermsSame(new_terms, old_terms)
 
 
 def test_ripe_gov_vault_are_key_terms_same_boost_worse(ripe_gov_vault):
@@ -1343,7 +1343,7 @@ def test_ripe_gov_vault_are_key_terms_same_boost_worse(ripe_gov_vault):
     old_terms = (100, 1000, 200_00, True, 10_00)  # boost = 200%
     new_terms = (100, 1000, 150_00, True, 10_00)  # boost = 150%
     
-    assert ripe_gov_vault.areKeyTermsSame(new_terms, old_terms) == False
+    assert not ripe_gov_vault.areKeyTermsSame(new_terms, old_terms)
 
 
 def test_ripe_gov_vault_are_key_terms_same_boost_better(ripe_gov_vault):
@@ -1352,7 +1352,7 @@ def test_ripe_gov_vault_are_key_terms_same_boost_better(ripe_gov_vault):
     old_terms = (100, 1000, 150_00, True, 10_00)  # boost = 150%
     new_terms = (100, 1000, 200_00, True, 10_00)  # boost = 200%
     
-    assert ripe_gov_vault.areKeyTermsSame(new_terms, old_terms) == True
+    assert ripe_gov_vault.areKeyTermsSame(new_terms, old_terms)
 
 
 def test_ripe_gov_vault_are_key_terms_same_min_lock_increase_allowed(ripe_gov_vault):
@@ -1361,7 +1361,7 @@ def test_ripe_gov_vault_are_key_terms_same_min_lock_increase_allowed(ripe_gov_va
     old_terms = (100, 1000, 200_00, True, 10_00)  # minLock = 100
     new_terms = (150, 1000, 200_00, True, 10_00)  # minLock = 150 (stricter)
     
-    assert ripe_gov_vault.areKeyTermsSame(new_terms, old_terms) == True
+    assert ripe_gov_vault.areKeyTermsSame(new_terms, old_terms)
 
 
 def test_ripe_gov_vault_are_key_terms_same_min_lock_decrease_worse(ripe_gov_vault):
@@ -1370,7 +1370,7 @@ def test_ripe_gov_vault_are_key_terms_same_min_lock_decrease_worse(ripe_gov_vaul
     old_terms = (150, 1000, 200_00, True, 10_00)  # minLock = 150
     new_terms = (100, 1000, 200_00, True, 10_00)  # minLock = 100 (looser, worse terms)
     
-    assert ripe_gov_vault.areKeyTermsSame(new_terms, old_terms) == False
+    assert not ripe_gov_vault.areKeyTermsSame(new_terms, old_terms)
 
 
 def test_ripe_gov_vault_are_key_terms_same_exit_fee_worse(ripe_gov_vault):
@@ -1379,7 +1379,7 @@ def test_ripe_gov_vault_are_key_terms_same_exit_fee_worse(ripe_gov_vault):
     old_terms = (100, 1000, 200_00, True, 10_00)  # exitFee = 10%
     new_terms = (100, 1000, 200_00, True, 20_00)  # exitFee = 20%
     
-    assert ripe_gov_vault.areKeyTermsSame(new_terms, old_terms) == False
+    assert not ripe_gov_vault.areKeyTermsSame(new_terms, old_terms)
 
 
 def test_ripe_gov_vault_are_key_terms_same_exit_fee_better(ripe_gov_vault):
@@ -1388,7 +1388,7 @@ def test_ripe_gov_vault_are_key_terms_same_exit_fee_better(ripe_gov_vault):
     old_terms = (100, 1000, 200_00, True, 20_00)  # exitFee = 20%
     new_terms = (100, 1000, 200_00, True, 10_00)  # exitFee = 10%
     
-    assert ripe_gov_vault.areKeyTermsSame(new_terms, old_terms) == True
+    assert ripe_gov_vault.areKeyTermsSame(new_terms, old_terms)
 
 
 def test_ripe_gov_vault_are_key_terms_same_max_lock_duration_change(ripe_gov_vault):
@@ -1398,7 +1398,7 @@ def test_ripe_gov_vault_are_key_terms_same_max_lock_duration_change(ripe_gov_vau
     new_terms = (100, 500, 200_00, True, 10_00)   # maxLock = 500
     
     # maxLockDuration changes are allowed (handled in refreshUnlock)
-    assert ripe_gov_vault.areKeyTermsSame(new_terms, old_terms) == True
+    assert ripe_gov_vault.areKeyTermsSame(new_terms, old_terms)
 
 
 def test_ripe_gov_vault_refresh_unlock_terms_same(ripe_gov_vault):
@@ -1641,7 +1641,7 @@ def test_ripe_gov_vault_zero_exit_fee_blocks_release_lock_defensive(
     userData = ripe_gov_vault.userGovData(bob, ripe_token)
     current_block = boa.env.evm.patch.block_number
     assert userData.unlock == current_block + 500  # Still locked
-    assert userData.lastTerms.canExit == True       # Exit is allowed
+    assert userData.lastTerms.canExit       # Exit is allowed
     assert userData.lastTerms.exitFee == 0          # But exit fee is zero
     
     # Try to release lock - vault should defensively reject this
@@ -1934,7 +1934,7 @@ def test_ripe_gov_vault_transfer_contributor_ripe_tokens_lock_duration_enforceme
     # the weighted average should be: (shares*200 + shares*50) / (shares+shares) = 125
     # But since bob transfers ALL his shares to alice, it's just the weighted calculation
     # between bob's remaining duration and the new duration
-    expected_weighted_unlock = current_block_after + 50  # In this case, it uses the new duration
+    current_block_after + 50  # In this case, it uses the new duration
     
     # Alice should have a lock duration that makes sense based on the weighted calculation
     assert alice_userData.unlock > current_block_after  # Should be locked
@@ -2161,7 +2161,7 @@ def test_ripe_gov_vault_release_lock_blocked_when_bad_debt_and_freeze_enabled(
     userData_before = ripe_gov_vault.userGovData(bob, ripe_token)
     current_block = boa.env.evm.patch.block_number
     assert userData_before.unlock == current_block + 500  # Still locked
-    assert userData_before.lastTerms.canExit == True       # Exit is allowed
+    assert userData_before.lastTerms.canExit       # Exit is allowed
     assert userData_before.lastTerms.exitFee == 10_00     # Has exit fee
     
     # Verify release lock works normally without bad debt
@@ -2211,7 +2211,7 @@ def test_ripe_gov_vault_release_lock_works_when_bad_debt_but_freeze_disabled(
     userData_before = ripe_gov_vault.userGovData(bob, ripe_token)
     current_block = boa.env.evm.patch.block_number
     assert userData_before.unlock == current_block + 400  # Still locked
-    assert userData_before.lastTerms.canExit == True       # Exit is allowed
+    assert userData_before.lastTerms.canExit       # Exit is allowed
     assert userData_before.lastTerms.exitFee == 8_00      # Has exit fee
     initial_shares = userData_before.lastShares
     

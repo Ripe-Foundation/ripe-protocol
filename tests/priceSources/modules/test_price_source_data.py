@@ -228,7 +228,7 @@ def test_price_source_data_pause(
     
     # Verify pause event
     pause_log = filter_logs(price_source_mock, "PriceSourcePauseModified")[0]
-    assert pause_log.isPaused == True
+    assert pause_log.isPaused
 
     assert price_source_mock.isPaused()
 
@@ -237,7 +237,7 @@ def test_price_source_data_pause(
     
     # Verify unpause event
     unpause_log = filter_logs(price_source_mock, "PriceSourcePauseModified")[0]
-    assert unpause_log.isPaused == False
+    assert not unpause_log.isPaused
 
     assert not price_source_mock.isPaused()
 

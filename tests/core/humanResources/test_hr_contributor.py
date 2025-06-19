@@ -190,9 +190,9 @@ def test_contributor_initialization_success(
     
     # Check initial states
     assert contributor_contract.totalClaimed() == 0
-    assert contributor_contract.isFrozen() == False
-    assert contributor_contract.hasPendingRipeTransfer() == False
-    assert contributor_contract.hasPendingOwnerChange() == False
+    assert not contributor_contract.isFrozen()
+    assert not contributor_contract.hasPendingRipeTransfer()
+    assert not contributor_contract.hasPendingOwnerChange()
 
 
 def test_contributor_initialization_invalid_terms(
@@ -371,7 +371,7 @@ def test_contributor_initiate_ripe_transfer_success(
     boa.env.time_travel(seconds=start_delay + unlock_length + 1)
     
     # Should not have pending transfer initially
-    assert contributor_contract.hasPendingRipeTransfer() == False
+    assert not contributor_contract.hasPendingRipeTransfer()
     
     # Initiate transfer
     contributor_contract.initiateRipeTransfer(sender=owner_address)
@@ -384,7 +384,7 @@ def test_contributor_initiate_ripe_transfer_success(
     assert event.initiatedBy == owner_address
     
     # Should now have pending transfer
-    assert contributor_contract.hasPendingRipeTransfer() == True
+    assert contributor_contract.hasPendingRipeTransfer()
 
 
 def test_contributor_initiate_ripe_transfer_before_unlock(
@@ -474,7 +474,7 @@ def test_contributor_confirm_ripe_transfer_success(
     assert event.confirmedBy == owner_address
     
     # Should no longer have pending transfer
-    assert contributor_contract.hasPendingRipeTransfer() == False
+    assert not contributor_contract.hasPendingRipeTransfer()
 
 
 def test_contributor_confirm_ripe_transfer_too_early(
@@ -544,7 +544,7 @@ def test_contributor_cancel_ripe_transfer_by_owner(
     assert len(events) == 1
     
     # Should no longer have pending transfer
-    assert contributor_contract.hasPendingRipeTransfer() == False
+    assert not contributor_contract.hasPendingRipeTransfer()
 
 
 def test_contributor_cancel_ripe_transfer_no_pending(
@@ -568,7 +568,7 @@ def test_contributor_change_ownership_success(
     """Test successful ownership change initiation"""
     
     # Should not have pending change initially
-    assert contributor_contract.hasPendingOwnerChange() == False
+    assert not contributor_contract.hasPendingOwnerChange()
     
     # Initiate ownership change
     contributor_contract.changeOwnership(alice, sender=owner_address)
@@ -581,7 +581,7 @@ def test_contributor_change_ownership_success(
     assert event.newOwner == alice
     
     # Should now have pending change
-    assert contributor_contract.hasPendingOwnerChange() == True
+    assert contributor_contract.hasPendingOwnerChange()
 
 
 def test_contributor_change_ownership_unauthorized(
@@ -636,7 +636,7 @@ def test_contributor_confirm_ownership_change_success(
     
     # Owner should be changed
     assert contributor_contract.owner() == alice
-    assert contributor_contract.hasPendingOwnerChange() == False
+    assert not contributor_contract.hasPendingOwnerChange()
 
 
 def test_contributor_confirm_ownership_change_wrong_user(
@@ -677,7 +677,7 @@ def test_contributor_cancel_ownership_change_success(
     assert len(events) == 1
     
     # Should no longer have pending change
-    assert contributor_contract.hasPendingOwnerChange() == False
+    assert not contributor_contract.hasPendingOwnerChange()
 
 
 # Test Admin Functions
@@ -768,7 +768,7 @@ def test_contributor_set_frozen_by_switchboard(
     """Test freezing contract by switchboard"""
     
     # Initially not frozen
-    assert contributor_contract.isFrozen() == False
+    assert not contributor_contract.isFrozen()
     
     # Freeze contract
     result = contributor_contract.setIsFrozen(True, sender=switchboard_alpha.address)
@@ -777,14 +777,14 @@ def test_contributor_set_frozen_by_switchboard(
     events = filter_logs(contributor_contract, "FreezeModified")
     assert len(events) == 1
     event = events[0]
-    assert event.isFrozen == True
+    assert event.isFrozen
     
-    assert result == True
-    assert contributor_contract.isFrozen() == True
+    assert result
+    assert contributor_contract.isFrozen()
     
     # Unfreeze contract
     contributor_contract.setIsFrozen(False, sender=switchboard_alpha.address)
-    assert contributor_contract.isFrozen() == False
+    assert not contributor_contract.isFrozen()
 
 
 def test_contributor_set_frozen_unauthorized(
@@ -833,7 +833,7 @@ def test_contributor_cancel_paycheck_success(
     # Verify all event fields comprehensively
     assert event.owner == owner_address
     assert event.forfeitedAmount == expected_forfeited
-    assert event.didReachCliff == True  # We're past cliff time
+    assert event.didReachCliff  # We're past cliff time
     
     # Verify contract state changes
     assert contributor_contract.compensation() == expected_total_claimed_after_cancel
@@ -875,7 +875,7 @@ def test_contributor_cancel_paycheck_before_cliff(
     # Verify all event fields comprehensively
     assert event.owner == owner_address
     assert event.forfeitedAmount == expected_forfeited
-    assert event.didReachCliff == False  # We're before cliff time
+    assert not event.didReachCliff  # We're before cliff time
     
     # Verify contract state changes
     assert contributor_contract.compensation() == 0  # All forfeited
@@ -1095,7 +1095,7 @@ def test_contributor_complex_vesting_and_claims_scenario(
     boa.env.time_travel(seconds=(vesting_length - cliff_length) // 2)
     
     # Final claim
-    final_claim = contributor_contract.cashRipeCheck(sender=owner_address)
+    contributor_contract.cashRipeCheck(sender=owner_address)
     total_claimed = contributor_contract.totalClaimed()
     
     # Total claimed should equal total compensation
@@ -1182,7 +1182,7 @@ def test_contributor_initiate_ripe_transfer_without_cashing(
     assert contributor_contract.totalClaimed() == total_claimed_before
     
     # Should still have pending transfer
-    assert contributor_contract.hasPendingRipeTransfer() == True
+    assert contributor_contract.hasPendingRipeTransfer()
 
 
 def test_contributor_confirm_ripe_transfer_without_cashing(
@@ -1230,7 +1230,7 @@ def test_contributor_confirm_ripe_transfer_without_cashing(
     assert contributor_contract.totalClaimed() == total_claimed_before
     
     # Should no longer have pending transfer
-    assert contributor_contract.hasPendingRipeTransfer() == False
+    assert not contributor_contract.hasPendingRipeTransfer()
 
 
 # Test Manager Permissions for Admin Functions
@@ -1243,7 +1243,7 @@ def test_contributor_set_manager_by_hr_admin(
 ):
     """Test that HR admin can set manager"""
     
-    original_manager = contributor_contract.manager()
+    contributor_contract.manager()
     
     # HR admin can set manager
     contributor_contract.setManager(alice, sender=switchboard_alpha.address)
@@ -1313,7 +1313,7 @@ def test_contributor_cancel_ripe_transfer_by_hr_admin(
     assert event.cancelledBy == switchboard_alpha.address
     
     # Should no longer have pending transfer
-    assert contributor_contract.hasPendingRipeTransfer() == False
+    assert not contributor_contract.hasPendingRipeTransfer()
 
 
 def test_contributor_cancel_ownership_change_by_hr_admin(
@@ -1337,7 +1337,7 @@ def test_contributor_cancel_ownership_change_by_hr_admin(
     assert event.cancelledBy == switchboard_alpha.address
     
     # Should no longer have pending change
-    assert contributor_contract.hasPendingOwnerChange() == False
+    assert not contributor_contract.hasPendingOwnerChange()
 
 
 # Test Enhanced Event Field Verification

@@ -1,4 +1,3 @@
-import pytest
 import boa
 
 from constants import EIGHTEEN_DECIMALS, HUNDRED_PERCENT, ZERO_ADDRESS
@@ -838,7 +837,7 @@ def test_credit_redemption_refund_regular(
     green_token.transfer(alice, green_amount, sender=whale)
     green_token.approve(teller, green_amount, sender=alice)
 
-    initial_green_balance = green_token.balanceOf(alice)
+    green_token.balanceOf(alice)
 
     # Redeem with shouldStakeRefund=False
     green_spent = teller.redeemCollateral(bob, vault_id, alpha_token, green_amount, False, False, False, sender=alice)
@@ -1670,7 +1669,7 @@ def test_credit_redemption_transfer_balance_edge_cases(
     green_token.approve(teller, green_amount, sender=alice)
 
     # Redeem with transfer
-    green_spent = teller.redeemCollateral(
+    teller.redeemCollateral(
         bob, vault_id, alpha_token, green_amount,
         False, True, False,
         sender=alice

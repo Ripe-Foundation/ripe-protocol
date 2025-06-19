@@ -1,4 +1,3 @@
-import pytest
 import boa
 
 from constants import MAX_UINT256, ZERO_ADDRESS
@@ -176,18 +175,18 @@ def test_enable_disable_deposit(switchboard_alpha, mission_control, governance):
     # Test enabling deposits
     assert switchboard_alpha.setCanDeposit(True, sender=governance.address)
     config = mission_control.genConfig()
-    assert config.canDeposit == True
+    assert config.canDeposit
     
     # Check event
     logs = filter_logs(switchboard_alpha, "CanDepositSet")
     assert len(logs) == 1
-    assert logs[0].canDeposit == True
+    assert logs[0].canDeposit
     assert logs[0].caller == governance.address
     
     # Test disabling deposits
     assert switchboard_alpha.setCanDeposit(False, sender=governance.address)
     config = mission_control.genConfig()
-    assert config.canDeposit == False
+    assert not config.canDeposit
     
     # Test setting same value fails
     with boa.reverts("already set"):
@@ -212,12 +211,12 @@ def test_all_enable_disable_functions(switchboard_alpha, mission_control, govern
         # Enable
         assert func(True, sender=governance.address)
         config = mission_control.genConfig()
-        assert getattr(config, field) == True
+        assert getattr(config, field)
         
         # Disable
         assert func(False, sender=governance.address)
         config = mission_control.genConfig()
-        assert getattr(config, field) == False
+        assert not getattr(config, field)
 
 
 def test_global_debt_limits_validation(switchboard_alpha, governance):
@@ -344,12 +343,12 @@ def test_daowry_enable_disable(switchboard_alpha, mission_control, governance):
     # Enable daowry
     assert switchboard_alpha.setIsDaowryEnabled(True, sender=governance.address)
     config = mission_control.genDebtConfig()
-    assert config.isDaowryEnabled == True
+    assert config.isDaowryEnabled
     
     # Check event
     logs = filter_logs(switchboard_alpha, "IsDaowryEnabledSet")
     assert len(logs) == 1
-    assert logs[0].isDaowryEnabled == True
+    assert logs[0].isDaowryEnabled
 
 
 def test_ripe_per_block(switchboard_alpha, governance):
@@ -407,12 +406,12 @@ def test_rewards_points_enable_disable(switchboard_alpha, mission_control, gover
     # Enable points
     assert switchboard_alpha.setRewardsPointsEnabled(True, sender=governance.address)
     config = mission_control.rewardsConfig()
-    assert config.arePointsEnabled == True
+    assert config.arePointsEnabled
     
     # Check event
     logs = filter_logs(switchboard_alpha, "RewardsPointsEnabledModified")
     assert len(logs) == 1
-    assert logs[0].arePointsEnabled == True
+    assert logs[0].arePointsEnabled
 
 
 def test_priority_liq_asset_vaults_filtered(switchboard_alpha, governance):
@@ -516,7 +515,7 @@ def test_set_can_disable(switchboard_alpha, governance, bob):
     assert len(logs) == 1
     log = logs[0]
     assert log.user == bob
-    assert log.canDo == True
+    assert log.canDo
 
 
 def test_execute_can_disable(switchboard_alpha, mission_control, governance, bob):
@@ -526,14 +525,14 @@ def test_execute_can_disable(switchboard_alpha, mission_control, governance, bob
     assert switchboard_alpha.executePendingAction(action_id, sender=governance.address)
     
     # Verify it was applied
-    assert mission_control.canPerformLiteAction(bob) == True
+    assert mission_control.canPerformLiteAction(bob)
     
     # Check event
     logs = filter_logs(switchboard_alpha, "CanPerformLiteAction")
     assert len(logs) == 1
     log = logs[0]
     assert log.user == bob
-    assert log.canDo == True
+    assert log.canDo
 
 
 def test_execute_invalid_action(switchboard_alpha, governance):
@@ -693,7 +692,7 @@ def test_mixed_immediate_and_timelock_actions(switchboard_alpha, mission_control
     
     # Verify immediate action took effect
     config = mission_control.genConfig()
-    assert config.canDeposit == True
+    assert config.canDeposit
     
     # Verify timelock action is pending
     assert switchboard_alpha.hasPendingAction(action_id)
@@ -704,7 +703,7 @@ def test_mixed_immediate_and_timelock_actions(switchboard_alpha, mission_control
     
     # Verify both configs are applied
     config = mission_control.genConfig()
-    assert config.canDeposit == True
+    assert config.canDeposit
     assert config.perUserMaxVaults == 25
     assert config.perUserMaxAssetsPerVault == 15
 
@@ -1222,7 +1221,7 @@ def test_action_expiration_boundary_conditions(switchboard_alpha, governance):
     boa.env.time_travel(blocks=time_lock + expiration)
     
     # Should still be executable at exact expiration
-    result = switchboard_alpha.executePendingAction(action_id, sender=governance.address)
+    switchboard_alpha.executePendingAction(action_id, sender=governance.address)
     # Depending on implementation, this might succeed or fail
     
     # Create another action and test just after expiration
@@ -1278,7 +1277,7 @@ def test_state_cleanup_on_failed_execution(switchboard_alpha, governance):
     """Test that state is properly cleaned up when execution fails"""
     # Create multiple actions
     action_id1 = switchboard_alpha.setVaultLimits(10, 5, sender=governance.address)
-    action_id2 = switchboard_alpha.setStaleTime(switchboard_alpha.MIN_STALE_TIME() + 100, sender=governance.address)
+    switchboard_alpha.setStaleTime(switchboard_alpha.MIN_STALE_TIME() + 100, sender=governance.address)
     
     # Cancel one action
     switchboard_alpha.cancelPendingAction(action_id1, sender=governance.address)
@@ -1353,11 +1352,11 @@ def test_all_enable_disable_concurrent_state_changes(switchboard_alpha, mission_
     
     # Verify final state
     config = mission_control.genConfig()
-    assert config.canDeposit == True  # Re-enabled by governance
-    assert config.canWithdraw == True  # Never disabled
-    assert config.canBorrow == False  # Disabled by bob
-    assert config.canRepay == True  # Never disabled
-    assert config.canClaimLoot == True  # Never disabled
+    assert config.canDeposit  # Re-enabled by governance
+    assert config.canWithdraw  # Never disabled
+    assert not config.canBorrow  # Disabled by bob
+    assert config.canRepay  # Never disabled
+    assert config.canClaimLoot  # Never disabled
 
 
 def test_debt_config_interdependencies(switchboard_alpha, governance):
@@ -1388,7 +1387,6 @@ def test_debt_config_interdependencies(switchboard_alpha, governance):
 
 def test_auction_params_comprehensive_validation(switchboard_alpha, governance):
     """Test auction parameters with comprehensive edge cases"""
-    HUNDRED_PERCENT = 100_00
     
     # Test with startDiscount = 0
     action_id = switchboard_alpha.setGenAuctionParams(0, 50_00, 100, 1000, sender=governance.address)
@@ -1481,43 +1479,43 @@ def test_action_type_enum_coverage(switchboard_alpha, governance):
     action_types_tested = set()
     
     # GEN_CONFIG_VAULT_LIMITS
-    action_id = switchboard_alpha.setVaultLimits(10, 5, sender=governance.address)
+    switchboard_alpha.setVaultLimits(10, 5, sender=governance.address)
     action_types_tested.add("GEN_CONFIG_VAULT_LIMITS")
     
     # GEN_CONFIG_STALE_TIME
-    action_id = switchboard_alpha.setStaleTime(switchboard_alpha.MIN_STALE_TIME() + 50, sender=governance.address)
+    switchboard_alpha.setStaleTime(switchboard_alpha.MIN_STALE_TIME() + 50, sender=governance.address)
     action_types_tested.add("GEN_CONFIG_STALE_TIME")
     
     # DEBT_GLOBAL_LIMITS
-    action_id = switchboard_alpha.setGlobalDebtLimits(5000, 50000, 100, 100, sender=governance.address)
+    switchboard_alpha.setGlobalDebtLimits(5000, 50000, 100, 100, sender=governance.address)
     action_types_tested.add("DEBT_GLOBAL_LIMITS")
     
     # DEBT_BORROW_INTERVAL
-    action_id = switchboard_alpha.setBorrowIntervalConfig(500, 100, sender=governance.address)
+    switchboard_alpha.setBorrowIntervalConfig(500, 100, sender=governance.address)
     action_types_tested.add("DEBT_BORROW_INTERVAL")
     
     # DEBT_KEEPER_CONFIG
-    action_id = switchboard_alpha.setKeeperConfig(5_00, 50 * 10**18, sender=governance.address)
+    switchboard_alpha.setKeeperConfig(5_00, 50 * 10**18, sender=governance.address)
     action_types_tested.add("DEBT_KEEPER_CONFIG")
     
     # DEBT_LTV_PAYBACK_BUFFER
-    action_id = switchboard_alpha.setLtvPaybackBuffer(5_00, sender=governance.address)
+    switchboard_alpha.setLtvPaybackBuffer(5_00, sender=governance.address)
     action_types_tested.add("DEBT_LTV_PAYBACK_BUFFER")
     
     # DEBT_AUCTION_PARAMS
-    action_id = switchboard_alpha.setGenAuctionParams(20_00, 50_00, 1000, 3000, sender=governance.address)
+    switchboard_alpha.setGenAuctionParams(20_00, 50_00, 1000, 3000, sender=governance.address)
     action_types_tested.add("DEBT_AUCTION_PARAMS")
     
     # RIPE_REWARDS_BLOCK
-    action_id = switchboard_alpha.setRipePerBlock(1000, sender=governance.address)
+    switchboard_alpha.setRipePerBlock(1000, sender=governance.address)
     action_types_tested.add("RIPE_REWARDS_BLOCK")
     
     # RIPE_REWARDS_ALLOCS
-    action_id = switchboard_alpha.setRipeRewardsAllocs(25_00, 25_00, 25_00, 25_00, sender=governance.address)
+    switchboard_alpha.setRipeRewardsAllocs(25_00, 25_00, 25_00, 25_00, sender=governance.address)
     action_types_tested.add("RIPE_REWARDS_ALLOCS")
     
     # MAX_LTV_DEVIATION
-    action_id = switchboard_alpha.setMaxLtvDeviation(10_00, sender=governance.address)
+    switchboard_alpha.setMaxLtvDeviation(10_00, sender=governance.address)
     action_types_tested.add("MAX_LTV_DEVIATION")
     
     # Verify we've tested all main action types
@@ -1616,12 +1614,12 @@ def test_enable_disable_rapid_toggle(switchboard_alpha, mission_control, governa
     
     # Final state should be False
     config = mission_control.genConfig()
-    assert config.canDeposit == False
+    assert not config.canDeposit
     
     # Set to True and verify
     switchboard_alpha.setCanDeposit(True, sender=governance.address)
     config = mission_control.genConfig()
-    assert config.canDeposit == True
+    assert config.canDeposit
 
 
 def test_all_debt_config_fields_modified(switchboard_alpha, mission_control, governance):
@@ -1999,24 +1997,24 @@ def test_ripe_gov_vault_config_success(switchboard_alpha, governance, alpha_toke
     log = logs[0]
     assert log.asset == alpha_token.address
     assert log.assetWeight == 150_00
-    assert log.shouldFreezeWhenBadDebt == True
+    assert log.shouldFreezeWhenBadDebt
     assert log.minLockDuration == 86400
     assert log.maxLockDuration == 31536000
     assert log.maxLockBoost == 300_00
     assert log.exitFee == 10_00
-    assert log.canExit == True
+    assert log.canExit
     assert log.actionId == action_id
     
     # Check pending config was stored correctly
     pending = switchboard_alpha.pendingRipeGovVaultConfig(action_id)
     assert pending.asset == alpha_token.address
     assert pending.assetWeight == 150_00
-    assert pending.shouldFreezeWhenBadDebt == True
+    assert pending.shouldFreezeWhenBadDebt
     assert pending.lockTerms.minLockDuration == 86400
     assert pending.lockTerms.maxLockDuration == 31536000
     assert pending.lockTerms.maxLockBoost == 300_00
     assert pending.lockTerms.exitFee == 10_00
-    assert pending.lockTerms.canExit == True
+    assert pending.lockTerms.canExit
 
 
 def test_execute_ripe_gov_vault_config(switchboard_alpha, governance, bravo_token, setAssetConfig):
@@ -2046,7 +2044,7 @@ def test_execute_ripe_gov_vault_config(switchboard_alpha, governance, bravo_toke
     
     # Execute the action
     success = switchboard_alpha.executePendingAction(action_id, sender=governance.address)
-    assert success == True
+    assert success
     
     # Check execution event was emitted
     logs = filter_logs(switchboard_alpha, "RipeGovVaultConfigSet")
@@ -2054,18 +2052,18 @@ def test_execute_ripe_gov_vault_config(switchboard_alpha, governance, bravo_toke
     log = logs[0]
     assert log.asset == bravo_token.address
     assert log.assetWeight == 200_00
-    assert log.shouldFreezeWhenBadDebt == False
+    assert not log.shouldFreezeWhenBadDebt
     assert log.minLockDuration == 7200
     assert log.maxLockDuration == 2592000
     assert log.maxLockBoost == 400_00
     assert log.exitFee == 0  # Updated to match valid configuration
-    assert log.canExit == False
+    assert not log.canExit
     
     # Verify action was cleaned up
     assert switchboard_alpha.actionType(action_id) == 0
     
     # Test that we can't execute the same action again
-    assert switchboard_alpha.executePendingAction(action_id, sender=governance.address) == False
+    assert not switchboard_alpha.executePendingAction(action_id, sender=governance.address)
 
 
 def test_execute_ripe_gov_vault_config_with_exit_enabled(switchboard_alpha, governance, alpha_token, setAssetConfig):
@@ -2095,7 +2093,7 @@ def test_execute_ripe_gov_vault_config_with_exit_enabled(switchboard_alpha, gove
     
     # Execute the action
     success = switchboard_alpha.executePendingAction(action_id, sender=governance.address)
-    assert success == True
+    assert success
     
     # Check execution event was emitted
     logs = filter_logs(switchboard_alpha, "RipeGovVaultConfigSet")
@@ -2103,12 +2101,12 @@ def test_execute_ripe_gov_vault_config_with_exit_enabled(switchboard_alpha, gove
     log = logs[0]
     assert log.asset == alpha_token.address
     assert log.assetWeight == 150_00
-    assert log.shouldFreezeWhenBadDebt == True
+    assert log.shouldFreezeWhenBadDebt
     assert log.minLockDuration == 3600
     assert log.maxLockDuration == 1209600
     assert log.maxLockBoost == 250_00
     assert log.exitFee == 12_00
-    assert log.canExit == True
+    assert log.canExit
     
     # Verify action was cleaned up
     assert switchboard_alpha.actionType(action_id) == 0
@@ -2171,11 +2169,11 @@ def test_ripe_gov_vault_config_freeze_when_bad_debt_parameter(switchboard_alpha,
     # Check event was emitted with correct freeze parameter
     logs = filter_logs(switchboard_alpha, "PendingRipeGovVaultConfigChange")
     freeze_log = [log for log in logs if log.actionId == action_id_freeze][0]
-    assert freeze_log.shouldFreezeWhenBadDebt == True
+    assert freeze_log.shouldFreezeWhenBadDebt
     
     # Check pending config stores the correct value
     pending_freeze = switchboard_alpha.pendingRipeGovVaultConfig(action_id_freeze)
-    assert pending_freeze.shouldFreezeWhenBadDebt == True
+    assert pending_freeze.shouldFreezeWhenBadDebt
     
     # Test with shouldFreezeWhenBadDebt=False
     action_id_no_freeze = switchboard_alpha.setRipeGovVaultConfig(
@@ -2196,32 +2194,32 @@ def test_ripe_gov_vault_config_freeze_when_bad_debt_parameter(switchboard_alpha,
     # Check event was emitted with correct freeze parameter
     logs = filter_logs(switchboard_alpha, "PendingRipeGovVaultConfigChange")
     no_freeze_log = [log for log in logs if log.actionId == action_id_no_freeze][0]
-    assert no_freeze_log.shouldFreezeWhenBadDebt == False
+    assert not no_freeze_log.shouldFreezeWhenBadDebt
     
     # Check pending config stores the correct value
     pending_no_freeze = switchboard_alpha.pendingRipeGovVaultConfig(action_id_no_freeze)
-    assert pending_no_freeze.shouldFreezeWhenBadDebt == False
+    assert not pending_no_freeze.shouldFreezeWhenBadDebt
     
     # Execute both actions to verify they work properly
     boa.env.time_travel(blocks=switchboard_alpha.actionTimeLock())
     
     # Execute freeze enabled action
     success_freeze = switchboard_alpha.executePendingAction(action_id_freeze, sender=governance.address)
-    assert success_freeze == True
+    assert success_freeze
     
     # Check execution event for freeze enabled
     execution_logs = filter_logs(switchboard_alpha, "RipeGovVaultConfigSet")
     freeze_execution_log = [log for log in execution_logs if log.asset == alpha_token.address and log.assetWeight == 100_00][0]
-    assert freeze_execution_log.shouldFreezeWhenBadDebt == True
+    assert freeze_execution_log.shouldFreezeWhenBadDebt
     
     # Execute no freeze action  
     success_no_freeze = switchboard_alpha.executePendingAction(action_id_no_freeze, sender=governance.address)
-    assert success_no_freeze == True
+    assert success_no_freeze
     
     # Check execution event for no freeze (this should overwrite the previous config)
     execution_logs = filter_logs(switchboard_alpha, "RipeGovVaultConfigSet")
     no_freeze_execution_log = [log for log in execution_logs if log.asset == alpha_token.address and log.assetWeight == 150_00][0]
-    assert no_freeze_execution_log.shouldFreezeWhenBadDebt == False
+    assert not no_freeze_execution_log.shouldFreezeWhenBadDebt
 
 
 # Dynamic Rate Config Tests
@@ -2363,7 +2361,7 @@ def test_execute_dynamic_rate_config(switchboard_alpha, mission_control, governa
     
     # Execute the action
     success = switchboard_alpha.executePendingAction(action_id, sender=governance.address)
-    assert success == True
+    assert success
     
     # Verify the config was applied to MissionControl
     config = mission_control.genDebtConfig()

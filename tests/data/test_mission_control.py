@@ -394,15 +394,15 @@ def test_mission_control_get_teller_deposit_config(mission_control, switchboard_
     
     # Test with vault that supports the asset
     config = mission_control.getTellerDepositConfig(1, alpha_token.address, alice)
-    assert config.canDepositGeneral == True
-    assert config.canDepositAsset == True
-    assert config.doesVaultSupportAsset == True  # vault 1 is in sample_asset_config vaultIds
-    assert config.isUserAllowed == True  # no whitelist set
+    assert config.canDepositGeneral
+    assert config.canDepositAsset
+    assert config.doesVaultSupportAsset  # vault 1 is in sample_asset_config vaultIds
+    assert config.isUserAllowed  # no whitelist set
     assert config.perUserDepositLimit == sample_asset_config[3]
     
     # Test with vault that doesn't support the asset
     config = mission_control.getTellerDepositConfig(999, alpha_token.address, alice)
-    assert config.doesVaultSupportAsset == False
+    assert not config.doesVaultSupportAsset
 
 def test_mission_control_get_teller_withdraw_config(mission_control, switchboard_alpha, alice, bob, alpha_token, sample_gen_config, sample_asset_config, sample_action_delegation):
     """Test getting teller withdraw configuration."""
@@ -412,19 +412,19 @@ def test_mission_control_get_teller_withdraw_config(mission_control, switchboard
     
     # Test withdrawal for self
     config = mission_control.getTellerWithdrawConfig(alpha_token.address, alice, alice)
-    assert config.canWithdrawGeneral == True
-    assert config.canWithdrawAsset == True
-    assert config.isUserAllowed == True
-    assert config.canWithdrawForUser == True
+    assert config.canWithdrawGeneral
+    assert config.canWithdrawAsset
+    assert config.isUserAllowed
+    assert config.canWithdrawForUser
     
     # Test withdrawal for another user without delegation
     config = mission_control.getTellerWithdrawConfig(alpha_token.address, alice, bob)
-    assert config.canWithdrawForUser == False  # no delegation set
+    assert not config.canWithdrawForUser  # no delegation set
     
     # Set delegation and test again
     mission_control.setUserDelegation(alice, bob, sample_action_delegation, sender=switchboard_alpha.address)
     config = mission_control.getTellerWithdrawConfig(alpha_token.address, alice, bob)
-    assert config.canWithdrawForUser == True
+    assert config.canWithdrawForUser
 
 def test_mission_control_get_borrow_config(mission_control, switchboard_alpha, alice, bob, sample_gen_config, sample_gen_debt_config, sample_action_delegation):
     """Test getting borrow configuration."""
@@ -434,19 +434,19 @@ def test_mission_control_get_borrow_config(mission_control, switchboard_alpha, a
     
     # Test borrowing for self
     config = mission_control.getBorrowConfig(alice, alice)
-    assert config.canBorrow == True
-    assert config.canBorrowForUser == True
+    assert config.canBorrow
+    assert config.canBorrowForUser
     assert config.numAllowedBorrowers == sample_gen_debt_config[3]
     assert config.globalDebtLimit == sample_gen_debt_config[1]
     
     # Test borrowing for another user without delegation
     config = mission_control.getBorrowConfig(alice, bob)
-    assert config.canBorrowForUser == False
+    assert not config.canBorrowForUser
     
     # Set delegation and test again
     mission_control.setUserDelegation(alice, bob, sample_action_delegation, sender=switchboard_alpha.address)
     config = mission_control.getBorrowConfig(alice, bob)
-    assert config.canBorrowForUser == True
+    assert config.canBorrowForUser
 
 def test_mission_control_get_debt_terms(mission_control, switchboard_alpha, alpha_token, sample_asset_config):
     """Test getting debt terms for an asset."""
@@ -465,8 +465,8 @@ def test_mission_control_get_repay_config(mission_control, alice):
     """Test getting repay configuration."""
     # Test with default user config
     config = mission_control.getRepayConfig(alice)
-    assert config.canRepay == False  # default gen config
-    assert config.canAnyoneRepayDebt == False  # default user config
+    assert not config.canRepay  # default gen config
+    assert not config.canAnyoneRepayDebt  # default user config
     
 
 def test_mission_control_get_repay_config_with_user_settings(mission_control, switchboard_alpha, alice, sample_gen_config, sample_user_config):
@@ -475,8 +475,8 @@ def test_mission_control_get_repay_config_with_user_settings(mission_control, sw
     mission_control.setUserConfig(alice, sample_user_config, sender=switchboard_alpha.address)
     
     config = mission_control.getRepayConfig(alice)
-    assert config.canRepay == True
-    assert config.canAnyoneRepayDebt == True
+    assert config.canRepay
+    assert config.canAnyoneRepayDebt
 
 
 ######################
@@ -503,7 +503,7 @@ def test_mission_control_set_ripe_gov_vault_config(mission_control, switchboard_
     
     stored_config = mission_control.ripeGovVaultConfig(ripe_token.address)
     assert stored_config.assetWeight == 1000
-    assert stored_config.shouldFreezeWhenBadDebt == True
+    assert stored_config.shouldFreezeWhenBadDebt
     assert stored_config.lockTerms.minLockDuration == 7200
     assert stored_config.lockTerms.maxLockDuration == 518400
 
@@ -643,7 +643,7 @@ def test_mission_control_get_gen_liq_config(mission_control, switchboard_alpha, 
     mission_control.setPriorityStabVaults(priority_stab_vaults, sender=switchboard_alpha.address)
     
     config = mission_control.getGenLiqConfig()
-    assert config.canLiquidate == True
+    assert config.canLiquidate
     assert config.keeperFeeRatio == sample_gen_debt_config[11]
     assert config.minKeeperFee == sample_gen_debt_config[12]
     assert len(config.priorityLiqAssetVaults) == 1
@@ -654,7 +654,7 @@ def test_mission_control_get_asset_liq_config(mission_control, switchboard_alpha
     mission_control.setAssetConfig(alpha_token.address, sample_asset_config, sender=switchboard_alpha.address)
     
     config = mission_control.getAssetLiqConfig(alpha_token.address)
-    assert config.hasConfig == True
+    assert config.hasConfig
     assert config.shouldBurnAsPayment == sample_asset_config[6]
     assert config.shouldTransferToEndaoment == sample_asset_config[7]
     assert config.shouldSwapInStabPools == sample_asset_config[8]
@@ -671,19 +671,19 @@ def test_mission_control_get_stab_pool_claims_config(mission_control, switchboar
     
     # Test claiming for self
     config = mission_control.getStabPoolClaimsConfig(alpha_token.address, alice, alice)
-    assert config.canClaimInStabPoolGeneral == True
-    assert config.canClaimInStabPoolAsset == True
-    assert config.canClaimFromStabPoolForUser == True
+    assert config.canClaimInStabPoolGeneral
+    assert config.canClaimInStabPoolAsset
+    assert config.canClaimFromStabPoolForUser
     assert config.rewardsLockDuration == 7200
     
     # Test claiming for another user without delegation
     config = mission_control.getStabPoolClaimsConfig(alpha_token.address, alice, bob)
-    assert config.canClaimFromStabPoolForUser == False
+    assert not config.canClaimFromStabPoolForUser
     
     # Set delegation and test again
     mission_control.setUserDelegation(alice, bob, sample_action_delegation, sender=switchboard_alpha.address)
     config = mission_control.getStabPoolClaimsConfig(alpha_token.address, alice, bob)
-    assert config.canClaimFromStabPoolForUser == True
+    assert config.canClaimFromStabPoolForUser
 
 def test_mission_control_get_claim_loot_config(mission_control, switchboard_alpha, alice, bob, ripe_token, sample_gen_config, sample_ripe_rewards_config, sample_action_delegation):
     """Test getting claim loot configuration."""
@@ -697,20 +697,20 @@ def test_mission_control_get_claim_loot_config(mission_control, switchboard_alph
     
     # Test claiming for self
     config = mission_control.getClaimLootConfig(alice, alice, ripe_token.address)
-    assert config.canClaimLoot == True
-    assert config.canClaimLootForUser == True
+    assert config.canClaimLoot
+    assert config.canClaimLootForUser
     assert config.autoStakeRatio == sample_ripe_rewards_config[6]
     assert config.minLockDuration == 7200
     assert config.maxLockDuration == 518400
     
     # Test claiming for another user without delegation
     config = mission_control.getClaimLootConfig(alice, bob, ripe_token.address)
-    assert config.canClaimLootForUser == False
+    assert not config.canClaimLootForUser
     
     # Set delegation and test again
     mission_control.setUserDelegation(alice, bob, sample_action_delegation, sender=switchboard_alpha.address)
     config = mission_control.getClaimLootConfig(alice, bob, ripe_token.address)
-    assert config.canClaimLootForUser == True
+    assert config.canClaimLootForUser
 
 def test_mission_control_get_rewards_config(mission_control, switchboard_alpha, alpha_token, sample_ripe_rewards_config, sample_asset_config):
     """Test getting rewards configuration."""
@@ -724,7 +724,7 @@ def test_mission_control_get_rewards_config(mission_control, switchboard_alpha, 
     mission_control.setAssetConfig(alpha_token.address, tuple(asset_config), sender=switchboard_alpha.address)
     
     config = mission_control.getRewardsConfig()
-    assert config.arePointsEnabled == True
+    assert config.arePointsEnabled
     assert config.ripePerBlock == 10 * EIGHTEEN_DECIMALS
     assert config.borrowersAlloc == 2500
     assert config.stakersPointsAllocTotal == 300
@@ -766,10 +766,10 @@ def test_mission_control_get_purchase_ripe_bond_config(mission_control, switchbo
     config = mission_control.getPurchaseRipeBondConfig(alice)
     assert config.asset == alpha_token.address
     assert config.amountPerEpoch == 1000 * EIGHTEEN_DECIMALS
-    assert config.canBond == True
+    assert config.canBond
     assert config.minLockDuration == 7200
     assert config.maxLockDuration == 518400
-    assert config.canAnyoneBondForUser == True
+    assert config.canAnyoneBondForUser
 
 def test_mission_control_get_dynamic_borrow_rate_config(mission_control, switchboard_alpha, sample_gen_debt_config):
     """Test getting dynamic borrow rate configuration."""

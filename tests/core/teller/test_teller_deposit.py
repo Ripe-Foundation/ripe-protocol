@@ -1,4 +1,3 @@
-import pytest
 import boa
 
 from constants import EIGHTEEN_DECIMALS
@@ -624,7 +623,7 @@ def test_teller_get_savings_green_and_enter_stab_pool_basic(
 
     # Record initial balances
     initial_bob_green = green_token.balanceOf(bob)
-    initial_bob_sgreen = savings_green.balanceOf(bob)
+    savings_green.balanceOf(bob)
     initial_stability_pool_sgreen = savings_green.balanceOf(stability_pool)
 
     # Execute convertToSavingsGreenAndDepositIntoStabPool

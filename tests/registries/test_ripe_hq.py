@@ -1,4 +1,3 @@
-import pytest
 import boa
 
 from constants import ZERO_ADDRESS
@@ -100,17 +99,17 @@ def test_hq_config_change_basic(
     pending_log = filter_logs(ripe_hq, "HqConfigChangeInitiated")[0]
     assert pending_log.regId == green_reg_id
     assert pending_log.description == "Green Minter"
-    assert pending_log.canMintGreen == True
-    assert pending_log.canMintRipe == False
-    assert pending_log.canSetTokenBlacklist == False
+    assert pending_log.canMintGreen
+    assert not pending_log.canMintRipe
+    assert not pending_log.canSetTokenBlacklist
     assert pending_log.confirmBlock == boa.env.evm.patch.block_number + time_lock
 
     # Verify pending state
     assert ripe_hq.hasPendingHqConfigChange(green_reg_id)
     pending = ripe_hq.pendingHqConfig(green_reg_id)
-    assert pending.newHqConfig.canMintGreen == True
-    assert pending.newHqConfig.canMintRipe == False
-    assert pending.newHqConfig.canSetTokenBlacklist == False
+    assert pending.newHqConfig.canMintGreen
+    assert not pending.newHqConfig.canMintRipe
+    assert not pending.newHqConfig.canSetTokenBlacklist
     assert pending.initiatedBlock == boa.env.evm.patch.block_number
     assert pending.confirmBlock == pending_log.confirmBlock
 
@@ -132,17 +131,17 @@ def test_hq_config_change_basic(
     confirmed_log = filter_logs(ripe_hq, "HqConfigChangeConfirmed")[0]
     assert confirmed_log.regId == green_reg_id
     assert confirmed_log.description == "Green Minter"
-    assert confirmed_log.canMintGreen == True
-    assert confirmed_log.canMintRipe == False
-    assert confirmed_log.canSetTokenBlacklist == False
+    assert confirmed_log.canMintGreen
+    assert not confirmed_log.canMintRipe
+    assert not confirmed_log.canSetTokenBlacklist
     assert confirmed_log.initiatedBlock == pending.initiatedBlock
     assert confirmed_log.confirmBlock == pending.confirmBlock
 
     # Verify config is set
     config = ripe_hq.hqConfig(green_reg_id)
-    assert config.canMintGreen == True
-    assert config.canMintRipe == False
-    assert config.canSetTokenBlacklist == False
+    assert config.canMintGreen
+    assert not config.canMintRipe
+    assert not config.canSetTokenBlacklist
 
     # Verify pending is cleared
     assert not ripe_hq.hasPendingHqConfigChange(green_reg_id)
@@ -217,9 +216,9 @@ def test_hq_config_change_cancel(
     cancel_log = filter_logs(ripe_hq, "HqConfigChangeCancelled")[0]
     assert cancel_log.regId == green_reg_id
     assert cancel_log.description == "Green Minter"
-    assert cancel_log.canMintGreen == True
-    assert cancel_log.canMintRipe == False
-    assert cancel_log.canSetTokenBlacklist == False
+    assert cancel_log.canMintGreen
+    assert not cancel_log.canMintRipe
+    assert not cancel_log.canSetTokenBlacklist
     assert cancel_log.initiatedBlock == boa.env.evm.patch.block_number
     assert cancel_log.confirmBlock == boa.env.evm.patch.block_number + time_lock
 
@@ -382,14 +381,14 @@ def test_multiple_pending_configs(
 
     # Verify pending configs have correct values
     pending_1 = ripe_hq.pendingHqConfig(reg_id_1)
-    assert pending_1.newHqConfig.canMintGreen == True
-    assert pending_1.newHqConfig.canMintRipe == False
-    assert pending_1.newHqConfig.canSetTokenBlacklist == False
+    assert pending_1.newHqConfig.canMintGreen
+    assert not pending_1.newHqConfig.canMintRipe
+    assert not pending_1.newHqConfig.canSetTokenBlacklist
 
     pending_2 = ripe_hq.pendingHqConfig(reg_id_2)
-    assert pending_2.newHqConfig.canMintGreen == False
-    assert pending_2.newHqConfig.canMintRipe == True
-    assert pending_2.newHqConfig.canSetTokenBlacklist == False
+    assert not pending_2.newHqConfig.canMintGreen
+    assert pending_2.newHqConfig.canMintRipe
+    assert not pending_2.newHqConfig.canSetTokenBlacklist
 
     # Confirm both configs
     boa.env.time_travel(blocks=time_lock)
@@ -398,14 +397,14 @@ def test_multiple_pending_configs(
 
     # Verify final configs are set correctly
     config_1 = ripe_hq.hqConfig(reg_id_1)
-    assert config_1.canMintGreen == True
-    assert config_1.canMintRipe == False
-    assert config_1.canSetTokenBlacklist == False
+    assert config_1.canMintGreen
+    assert not config_1.canMintRipe
+    assert not config_1.canSetTokenBlacklist
 
     config_2 = ripe_hq.hqConfig(reg_id_2)
-    assert config_2.canMintGreen == False
-    assert config_2.canMintRipe == True
-    assert config_2.canSetTokenBlacklist == False
+    assert not config_2.canMintGreen
+    assert config_2.canMintRipe
+    assert not config_2.canSetTokenBlacklist
 
 
 

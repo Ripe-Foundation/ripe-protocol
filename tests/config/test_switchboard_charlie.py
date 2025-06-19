@@ -1,7 +1,7 @@
 import pytest
 import boa
 
-from constants import EIGHTEEN_DECIMALS, ZERO_ADDRESS
+from constants import ZERO_ADDRESS
 from conf_utils import filter_logs
 
 
@@ -125,21 +125,21 @@ def test_switchboard_three_blacklist_special_permissions(
     
     # Sally can add to blacklist (immediate action)
     result = switchboard_charlie.setBlacklist(token_addr, user_addr, True, sender=sally)
-    assert result == True
+    assert result
     
     # Verify event was emitted immediately
     logs = filter_logs(switchboard_charlie, "BlacklistSet")
     assert len(logs) == 1
-    assert logs[0].isBlacklisted == True
+    assert logs[0].isBlacklisted
     
     # Governance can remove from blacklist (immediate action)
     result2 = switchboard_charlie.setBlacklist(token_addr, user_addr, False, sender=governance.address)
-    assert result2 == True
+    assert result2
     
     # Verify removal event
     logs2 = filter_logs(switchboard_charlie, "BlacklistSet")
     assert len(logs2) == 1
-    assert logs2[0].isBlacklisted == False
+    assert not logs2[0].isBlacklisted
     
     # But sally can't remove from blacklist (only governance can)
     with boa.reverts("no perms"):
@@ -287,14 +287,14 @@ def test_switchboard_three_pause_action_immediate(
     
     # Pause action now executes immediately
     result = switchboard_charlie.pause(contract_addr, True, sender=governance.address)
-    assert result == True
+    assert result
     
     # Verify event was emitted immediately (no pending action)
     logs = filter_logs(switchboard_charlie, "PauseExecuted")
     assert len(logs) == 1
     log = logs[0]
     assert log.contractAddr == contract_addr
-    assert log.shouldPause == True
+    assert log.shouldPause
 
 
 def test_switchboard_three_recover_funds_action_timelock(
@@ -442,7 +442,7 @@ def test_switchboard_three_action_cancellation(
     
     # Cancel action
     success = switchboard_charlie.cancelPendingAction(action_id, sender=governance.address)
-    assert success == True
+    assert success
     
     # Verify action was cleared
     assert switchboard_charlie.actionType(action_id) == 0  # Cleared to empty
@@ -507,7 +507,7 @@ def test_switchboard_three_deposit_points_vault_lookup(
     
     # Should succeed with valid vault ID
     result = switchboard_charlie.updateDepositPoints(user_addr, vault_id, asset_addr, sender=governance.address)
-    assert result == True
+    assert result
 
 
 def test_switchboard_three_event_emission_immediate_actions(
@@ -533,10 +533,10 @@ def test_switchboard_three_event_emission_immediate_actions(
     log = logs[0]
     assert log.tokenAddr == asset_addr
     assert log.addr == user_addr
-    assert log.isBlacklisted == True
+    assert log.isBlacklisted
     assert log.caller == governance.address
     
-    assert result == True
+    assert result
 
 
 def test_switchboard_three_execution_with_different_action_types(
@@ -571,7 +571,7 @@ def test_switchboard_three_execution_with_different_action_types(
         switchboard_charlie.executePendingAction(recover_id, sender=governance.address)
     
     pause_auction_result = switchboard_charlie.executePendingAction(pause_auction_id, sender=governance.address)
-    assert pause_auction_result == True
+    assert pause_auction_result
     assert switchboard_charlie.actionType(pause_auction_id) == 0  # Action cleared
 
 
@@ -587,7 +587,7 @@ def test_switchboard_three_edge_cases(
     """Test various edge cases"""
     
     # Test execution of non-existent action
-    assert switchboard_charlie.executePendingAction(999, sender=governance.address) == False
+    assert not switchboard_charlie.executePendingAction(999, sender=governance.address)
     
     # Test cancellation of non-existent action
     with boa.reverts("cannot cancel action"):
@@ -614,7 +614,7 @@ def test_switchboard_three_governance_integration(
     
     # Test immediate action as governance
     result = switchboard_charlie.pause(contract_addr, True, sender=governance.address)
-    assert result == True
+    assert result
     
     # Test timelock action as governance
     action_id = switchboard_charlie.recoverFunds(contract_addr, user_addr, asset_addr, sender=governance.address)
@@ -622,7 +622,7 @@ def test_switchboard_three_governance_integration(
     
     # Verify governance can cancel timelock actions
     success = switchboard_charlie.cancelPendingAction(action_id, sender=governance.address)
-    assert success == True
+    assert success
 
 
 def test_switchboard_three_address_getters(
@@ -663,7 +663,7 @@ def test_switchboard_three_access_control_hasperms_logic(
     # Test 1: Governance always passes regardless of _hasLiteAccess parameter
     # Governance should be able to remove from blacklist even though _hasLiteAccess=False (immediate action)
     result = switchboard_charlie.setBlacklist(token_addr, user_addr, False, sender=governance.address)
-    assert result == True
+    assert result
     
     # Test 2: Non-governance user without lite access fails for _hasLiteAccess=True operations  
     with boa.reverts("no perms"):
@@ -672,7 +672,7 @@ def test_switchboard_three_access_control_hasperms_logic(
     # Test 3: Give bob lite access and test _hasLiteAccess=True operations
     mission_control.setCanPerformLiteAction(bob, True, sender=switchboard_charlie.address)
     result = switchboard_charlie.updateDebtForUser(user_addr, sender=bob)
-    assert result == True
+    assert result
     
     # Test 4: Bob with lite access still can't do _hasLiteAccess=False operations (remove blacklist)
     with boa.reverts("no perms"):
@@ -771,19 +771,19 @@ def test_switchboard_three_immediate_actions_return_values(
     # Test functions that return bool - these should work deterministically
     result = switchboard_charlie.updateDebtForUser(user_addr, sender=governance.address)
     assert isinstance(result, bool)
-    assert result == True
+    assert result
     
     result = switchboard_charlie.updateDebtForManyUsers([user_addr], sender=governance.address)
     assert isinstance(result, bool)
-    assert result == True
+    assert result
     
     result = switchboard_charlie.updateRipeRewards(sender=governance.address)
     assert isinstance(result, bool)
-    assert result == True
+    assert result
     
     result = switchboard_charlie.updateDepositPoints(user_addr, 1, asset_addr, sender=governance.address)
     assert isinstance(result, bool)
-    assert result == True
+    assert result
     
     # Test functions that return uint256 - loot claiming is enabled but config returns 0 amounts
     result = switchboard_charlie.claimLootForUser(user_addr, False, sender=governance.address)
@@ -825,7 +825,7 @@ def test_switchboard_three_batch_operations_edge_cases(
     # Test exactly at MAX_DEBT_UPDATES limit (50)
     users_at_limit = [alice] * 25  # MAX_DEBT_UPDATES limit in contract is 25
     result = switchboard_charlie.updateDebtForManyUsers(users_at_limit, sender=governance.address)
-    assert result == True
+    assert result
     
     # Test exactly at MAX_CLAIM_USERS limit (25) - the actual limit in Lootbox contract
     users_at_claim_limit = [alice] * 25
@@ -866,7 +866,7 @@ def test_switchboard_three_execution_event_emission(
     
     # Execute action
     result = switchboard_charlie.executePendingAction(action_id, sender=governance.address)
-    assert result == True
+    assert result
     
     # Should have emitted execution event (immediately after transaction)
     logs = filter_logs(switchboard_charlie, "PauseAuctionExecuted")
@@ -875,7 +875,7 @@ def test_switchboard_three_execution_event_emission(
     assert log.liqUser == user_addr
     assert log.vaultId == 1
     assert log.asset == asset_addr
-    assert log.success == False  # Auction doesn't exist, so pause will fail
+    assert not log.success  # Auction doesn't exist, so pause will fail
 
 
 def test_switchboard_three_storage_cleanup_after_execution(
@@ -897,7 +897,7 @@ def test_switchboard_three_storage_cleanup_after_execution(
     # Time travel and execute
     boa.env.time_travel(blocks=switchboard_charlie.actionTimeLock())
     result = switchboard_charlie.executePendingAction(action_id, sender=governance.address)
-    assert result == True
+    assert result
     
     # Verify storage was cleaned up
     assert switchboard_charlie.actionType(action_id) == 0
@@ -919,7 +919,7 @@ def test_switchboard_three_cancel_pending_action_internal(
     
     # Cancel first action
     success1 = switchboard_charlie.cancelPendingAction(action1, sender=governance.address)
-    assert success1 == True
+    assert success1
     assert switchboard_charlie.actionType(action1) == 0
     
     # Verify second action is unaffected
@@ -927,7 +927,7 @@ def test_switchboard_three_cancel_pending_action_internal(
     
     # Cancel second action
     success2 = switchboard_charlie.cancelPendingAction(action2, sender=governance.address)
-    assert success2 == True
+    assert success2
     assert switchboard_charlie.actionType(action2) == 0
 
 
@@ -951,25 +951,25 @@ def test_switchboard_three_all_immediate_action_events(
     result1 = switchboard_charlie.setBlacklist(asset_addr, user_addr, True, sender=governance.address)
     logs1 = filter_logs(switchboard_charlie, "BlacklistSet")
     assert len(logs1) == 1
-    assert result1 == True
+    assert result1
     
     # 2. Test debt update (immediate action)
     result2 = switchboard_charlie.updateDebtForUser(user_addr, sender=governance.address)
     logs2 = filter_logs(switchboard_charlie, "DebtUpdatedForUser")
     assert len(logs2) == 1
-    assert result2 == True
+    assert result2
     
     # 3. Test ripe rewards update (immediate action)
     result3 = switchboard_charlie.updateRipeRewards(sender=governance.address)
     logs3 = filter_logs(switchboard_charlie, "RipeRewardsUpdated")
     assert len(logs3) == 1
-    assert result3 == True
+    assert result3
     
     # 4. Test deposit points update (immediate action)
     result4 = switchboard_charlie.updateDepositPoints(user_addr, 1, asset_addr, sender=governance.address)
     logs4 = filter_logs(switchboard_charlie, "DepositPointsUpdated")
     assert len(logs4) == 1
-    assert result4 == True
+    assert result4
 
 
 def test_switchboard_three_address_getter_integration(
@@ -991,7 +991,7 @@ def test_switchboard_three_address_getter_integration(
     
     # Test MissionControl address (via permission check)
     result1 = switchboard_charlie.updateDebtForUser(user_addr, sender=governance.address)
-    assert result1 == True
+    assert result1
     
     # Test Lootbox address - loot claims now enabled, should return 0
     result2 = switchboard_charlie.claimLootForUser(user_addr, False, sender=governance.address)
@@ -1000,7 +1000,7 @@ def test_switchboard_three_address_getter_integration(
     
     # Test VaultBook address 
     result3 = switchboard_charlie.updateDepositPoints(user_addr, 1, asset_addr, sender=governance.address)
-    assert result3 == True
+    assert result3
     
     # Test AuctionHouse address (should fail validation but address lookup works)
     with boa.reverts("cannot start auction"):
@@ -1087,7 +1087,7 @@ def test_switchboard_three_auction_execution_success(
     # Time travel and execute - should succeed
     boa.env.time_travel(blocks=switchboard_charlie.actionTimeLock())
     success = switchboard_charlie.executePendingAction(action_id, sender=governance.address)
-    assert success == True
+    assert success
     assert switchboard_charlie.actionType(action_id) == 0  # Cleared after execution
     
     # Test PAUSE_MANY_AUCTIONS execution success
@@ -1097,7 +1097,7 @@ def test_switchboard_three_auction_execution_success(
     # Time travel and execute - should succeed
     boa.env.time_travel(blocks=switchboard_charlie.actionTimeLock())
     success2 = switchboard_charlie.executePendingAction(action_id2, sender=governance.address)
-    assert success2 == True
+    assert success2
     assert switchboard_charlie.actionType(action_id2) == 0  # Cleared after execution
 
 
@@ -1143,12 +1143,12 @@ def test_switchboard_three_execution_with_mock_contracts(
     
     # Test individual auction pause execution
     success1 = switchboard_charlie.executePendingAction(pause_auction_id, sender=governance.address)
-    assert success1 == True
+    assert success1
     assert switchboard_charlie.actionType(pause_auction_id) == 0
     
     # Test batch auction pause execution
     success2 = switchboard_charlie.executePendingAction(pause_many_id, sender=governance.address)
-    assert success2 == True
+    assert success2
     assert switchboard_charlie.actionType(pause_many_id) == 0
 
 
@@ -1192,12 +1192,12 @@ def test_switchboard_three_timelock_confirmation_edge_cases(
     
     # Test immediate execution (should fail due to timelock)
     result1 = switchboard_charlie.executePendingAction(action_id, sender=governance.address)
-    assert result1 == False
+    assert not result1
     
     # Should succeed after timelock period
     boa.env.time_travel(blocks=switchboard_charlie.actionTimeLock())
     result2 = switchboard_charlie.executePendingAction(action_id, sender=governance.address)
-    assert result2 == True
+    assert result2
     assert switchboard_charlie.actionType(action_id) == 0
 
 
@@ -1217,7 +1217,7 @@ def test_switchboard_three_vault_book_integration_edge_cases(
     
     # Test with valid vault ID (vault 1 should exist)
     result = switchboard_charlie.updateDepositPoints(user_addr, 1, asset_addr, sender=governance.address)
-    assert result == True
+    assert result
     
     # Test with definitely invalid vault ID
     with boa.reverts("invalid vault"):
@@ -1249,11 +1249,11 @@ def test_switchboard_three_complex_workflow_scenarios(
     
     # 2. Lite user performs immediate action
     result_immediate1 = switchboard_charlie.updateDebtForUser(user2, sender=user1)
-    assert result_immediate1 == True
+    assert result_immediate1
     
     # 3. Governance cancels timelock action
     success = switchboard_charlie.cancelPendingAction(action1, sender=governance.address)
-    assert success == True
+    assert success
     assert switchboard_charlie.actionType(action1) == 0  # Cancelled
     
     # 4. Governance creates new timelock action
@@ -1262,7 +1262,7 @@ def test_switchboard_three_complex_workflow_scenarios(
     
     # Another immediate action (executes right away)
     result_immediate2 = switchboard_charlie.setBlacklist(asset_addr, user2, True, sender=user1)
-    assert result_immediate2 == True
+    assert result_immediate2
     
     # Timelock action (creates pending action that needs time + execution)
     action4 = switchboard_charlie.pauseAuction(user1, 3, asset_addr, sender=governance.address)

@@ -206,7 +206,7 @@ def test_stork_get_price_and_has_feed(
     # Test with no feed
     price, has_feed = stork_prices.getPriceAndHasFeed(bravo_token)
     assert price == 0
-    assert has_feed == False
+    assert not has_feed
 
     # Add feed
     addStorkFeed(alpha_token, data_feed_id)
@@ -214,7 +214,7 @@ def test_stork_get_price_and_has_feed(
     # Test with feed
     price, has_feed = stork_prices.getPriceAndHasFeed(alpha_token)
     assert price != 0
-    assert has_feed == True
+    assert has_feed
 
 
 def test_stork_get_price_stale(
@@ -789,7 +789,7 @@ def test_stork_feed_validation_edge_cases(
     alpha_token,
     governance,
 ):
-    data_feed_id = bytes.fromhex("7416a56f222e196d0487dce8a1a8003936862e7a15092a91898d69fa8bce290c")
+    bytes.fromhex("7416a56f222e196d0487dce8a1a8003936862e7a15092a91898d69fa8bce290c")
 
     # Test feed validation with zero timestampNs (invalid)
     zero_timestamp_feed_id = bytes.fromhex("9416a56f222e196d0487dce8a1a8003936862e7a15092a91898d69fa8bce290e")

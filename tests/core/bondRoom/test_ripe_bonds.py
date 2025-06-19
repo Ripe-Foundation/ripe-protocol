@@ -1197,7 +1197,7 @@ def test_get_latest_epoch_block_times_edge_cases(
     
     assert start == current_block
     assert end == current_block + epoch_length
-    assert changed == True
+    assert changed
     
     # Test 2: Future epoch (current block < start)
     future_start = current_block + 50
@@ -1206,7 +1206,7 @@ def test_get_latest_epoch_block_times_edge_cases(
     
     assert start == future_start  # unchanged
     assert end == future_end      # unchanged
-    assert changed == False
+    assert not changed
     
     # Test 3: Current epoch not expired (current block < end)
     active_start = current_block - 20
@@ -1215,7 +1215,7 @@ def test_get_latest_epoch_block_times_edge_cases(
     
     assert start == active_start  # unchanged
     assert end == active_end      # unchanged
-    assert changed == False
+    assert not changed
     
     # Test 4: Just past epoch end (within next epoch window)
     past_start = current_block - 150
@@ -1224,7 +1224,7 @@ def test_get_latest_epoch_block_times_edge_cases(
     
     assert start == past_end  # new epoch starts where old one ended
     assert end == past_end + epoch_length
-    assert changed == True
+    assert changed
     
     # Test 5: Way past epoch end (multiple epochs ahead)
     very_old_start = current_block - 350
@@ -1237,7 +1237,7 @@ def test_get_latest_epoch_block_times_edge_cases(
     
     assert start == expected_start
     assert end == expected_start + epoch_length
-    assert changed == True
+    assert changed
 
 
 def test_epoch_management_integration(
@@ -1303,7 +1303,7 @@ def test_get_latest_epoch_block_times_boundary_conditions(
     
     assert start == past_end
     assert end == past_end + epoch_length
-    assert changed == True
+    assert changed
     
     # Test with very small epoch length
     small_epoch = 1
@@ -1311,7 +1311,7 @@ def test_get_latest_epoch_block_times_boundary_conditions(
     
     assert start == current_block
     assert end == current_block + 1
-    assert changed == True
+    assert changed
     
     # Test with very large epoch length
     large_epoch = 1000000
@@ -1321,7 +1321,7 @@ def test_get_latest_epoch_block_times_boundary_conditions(
     
     assert start == future_start  # unchanged
     assert end == future_end      # unchanged
-    assert changed == False
+    assert not changed
 
 
 def test_purchase_ripe_bond_auto_restart_with_delay(
@@ -1467,7 +1467,7 @@ def test_bond_purchase_bad_debt_partially_cleared_ledger_data(
     ledger.setBadDebt(bad_debt_amount, sender=switchboard_alpha.address)
     
     # Capture initial Ledger state
-    initial_bad_debt = ledger.badDebt()
+    ledger.badDebt()
     initial_ripe_paid_for_debt = ledger.ripePaidOutForBadDebt()
     initial_ripe_avail_for_bonds = ledger.ripeAvailForBonds()
     
@@ -1476,7 +1476,7 @@ def test_bond_purchase_bad_debt_partially_cleared_ledger_data(
     alpha_token.transfer(bob, payment_amount, sender=alpha_token_whale)
     alpha_token.approve(teller, payment_amount, sender=bob)
     
-    ripe_payout = teller.purchaseRipeBond(alpha_token, payment_amount, sender=bob)
+    teller.purchaseRipeBond(alpha_token, payment_amount, sender=bob)
     
     # Verify Ledger data changes
     final_bad_debt = ledger.badDebt()
@@ -1510,7 +1510,7 @@ def test_bond_purchase_bad_debt_exactly_cleared_ledger_data(
     ledger.setBadDebt(bad_debt_amount, sender=switchboard_alpha.address)
     
     # Capture initial Ledger state
-    initial_bad_debt = ledger.badDebt()
+    ledger.badDebt()
     initial_ripe_paid_for_debt = ledger.ripePaidOutForBadDebt()
     initial_ripe_avail_for_bonds = ledger.ripeAvailForBonds()
     
@@ -1519,7 +1519,7 @@ def test_bond_purchase_bad_debt_exactly_cleared_ledger_data(
     alpha_token.transfer(bob, payment_amount, sender=alpha_token_whale)
     alpha_token.approve(teller, payment_amount, sender=bob)
     
-    ripe_payout = teller.purchaseRipeBond(alpha_token, payment_amount, sender=bob)
+    teller.purchaseRipeBond(alpha_token, payment_amount, sender=bob)
     
     # Verify Ledger data changes
     final_bad_debt = ledger.badDebt()
@@ -1600,7 +1600,7 @@ def test_bond_purchase_multiple_transactions_progressive_debt_clearing(
     alpha_token.transfer(bob, payment_1, sender=alpha_token_whale)
     alpha_token.approve(teller, payment_1, sender=bob)
     
-    ripe_payout_1 = teller.purchaseRipeBond(alpha_token, payment_1, sender=bob)
+    teller.purchaseRipeBond(alpha_token, payment_1, sender=bob)
     
     # Check state after first purchase
     debt_after_1 = ledger.badDebt()
@@ -1617,7 +1617,7 @@ def test_bond_purchase_multiple_transactions_progressive_debt_clearing(
     alpha_token.transfer(alice, payment_2, sender=alpha_token_whale)
     alpha_token.approve(teller, payment_2, sender=alice)
     
-    ripe_payout_2 = teller.purchaseRipeBond(alpha_token, payment_2, sender=alice)
+    teller.purchaseRipeBond(alpha_token, payment_2, sender=alice)
     
     # Check state after second purchase
     debt_after_2 = ledger.badDebt()

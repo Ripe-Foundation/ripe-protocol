@@ -1,7 +1,7 @@
 import pytest
 import boa
 
-from constants import BLUE_CHIP_PROTOCOL_EULER, EIGHTEEN_DECIMALS
+from constants import BLUE_CHIP_PROTOCOL_EULER
 from config.BluePrint import YIELD_TOKENS, CORE_TOKENS
 from conf_utils import filter_logs
 

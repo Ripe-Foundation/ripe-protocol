@@ -95,7 +95,7 @@ def test_add_curve_price_green_single_asset(
     assert config.underlying[0] == usdc_token.address
     assert config.underlying[1] == green_token.address
     assert config.poolType == CURVE_POOL_TYPE_STABLESWAP_NG
-    assert config.hasEcoToken == True
+    assert config.hasEcoToken
 
     # verify event
     assert log.asset == green_token.address
@@ -149,7 +149,7 @@ def test_add_curve_price_green_lp(
     assert config.underlying[0] == usdc_token.address
     assert config.underlying[1] == green_token.address
     assert config.poolType == CURVE_POOL_TYPE_STABLESWAP_NG
-    assert config.hasEcoToken == True
+    assert config.hasEcoToken
 
     # verify event
     assert log.asset == deployed_green_pool
@@ -311,7 +311,7 @@ def test_add_curve_price_ripe_single_asset(
     assert config.underlying[0] == weth_token.address
     assert config.underlying[1] == ripe_token.address
     assert config.poolType == CURVE_POOL_TYPE_TWO_CRYPTO_NG
-    assert config.hasEcoToken == True
+    assert config.hasEcoToken
 
     # verify event
     assert log.asset == ripe_token.address
@@ -363,7 +363,7 @@ def test_add_curve_price_ripe_lp(
     assert config.underlying[0] == weth_token.address
     assert config.underlying[1] == ripe_token.address
     assert config.poolType == CURVE_POOL_TYPE_TWO_CRYPTO_NG
-    assert config.hasEcoToken == True
+    assert config.hasEcoToken
 
     # verify event
     assert log.asset == deployed_ripe_pool
@@ -485,7 +485,7 @@ def test_add_curve_price_stable_ng(
     assert config.underlying[0] == usdc_token.address
     assert config.underlying[1] == scrvusd_token.address
     assert config.poolType == CURVE_POOL_TYPE_STABLESWAP_NG
-    assert config.hasEcoToken == False
+    assert not config.hasEcoToken
 
     # verify event
     assert log.asset == scrvusd_token.address
@@ -553,7 +553,7 @@ def test_add_curve_price_two_crypto(
     assert config.underlying[0] == weth_token.address
     assert config.underlying[1] == cbeth_token.address
     assert config.poolType == CURVE_POOL_TYPE_TWO_CRYPTO
-    assert config.hasEcoToken == False
+    assert not config.hasEcoToken
 
     # verify event
     assert log.asset == cbeth_token.address
@@ -621,7 +621,7 @@ def test_add_curve_price_two_crypto_ng(
     assert config.underlying[0] == frok_token.address
     assert config.underlying[1] == weth_token.address
     assert config.poolType == CURVE_POOL_TYPE_TWO_CRYPTO_NG
-    assert config.hasEcoToken == False
+    assert not config.hasEcoToken
 
     # verify event
     assert log.asset == frok_token.address
@@ -664,7 +664,7 @@ def test_get_price_no_feed(curve_prices):
     
     price, has_feed = curve_prices.getPriceAndHasFeed(fake_token)
     assert price == 0
-    assert has_feed == False
+    assert not has_feed
     
     assert not curve_prices.hasPriceFeed(fake_token)
 
@@ -802,15 +802,15 @@ def test_eco_token_detection(
     """Test that eco tokens are correctly detected in pools"""
     # Green pool should have eco token
     green_config = curve_prices.getCurvePoolConfig(deployed_green_pool)
-    assert green_config.hasEcoToken == True
+    assert green_config.hasEcoToken
     
     # Ripe pool should have eco token  
     ripe_config = curve_prices.getCurvePoolConfig(deployed_ripe_pool)
-    assert ripe_config.hasEcoToken == True
+    assert ripe_config.hasEcoToken
     
     # External pool should not have eco token
     external_config = curve_prices.getCurvePoolConfig(base_usdc_scrvusd_pool.address)
-    assert external_config.hasEcoToken == False
+    assert not external_config.hasEcoToken
 
 
 @pytest.base

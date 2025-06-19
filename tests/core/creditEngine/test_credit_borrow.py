@@ -1,4 +1,3 @@
-import pytest
 import boa
 
 from constants import EIGHTEEN_DECIMALS, ZERO_ADDRESS
@@ -49,7 +48,7 @@ def test_basic_borrow(
     assert log.user == bob
     assert log.newLoan == borrow_amount
     assert log.daowry == 0
-    assert log.didReceiveSavingsGreen == False
+    assert not log.didReceiveSavingsGreen
     assert log.outstandingUserDebt == borrow_amount == amount
     assert log.userCollateralVal == collateral_value
     assert log.maxUserDebt == 150 * EIGHTEEN_DECIMALS # default is 50% ltv
@@ -742,7 +741,7 @@ def test_borrow_daowry(
     assert log.user == bob
     assert log.newLoan == expected_borrower_amount
     assert log.daowry == expected_daowry
-    assert log.didReceiveSavingsGreen == False
+    assert not log.didReceiveSavingsGreen
     assert log.outstandingUserDebt == borrow_amount
     assert log.globalYieldRealized == 0
 
@@ -783,13 +782,13 @@ def test_borrow_savings_green(
 
     # borrow with savings_green
     borrow_amount = 50 * EIGHTEEN_DECIMALS
-    amount = teller.borrow(borrow_amount, bob, True, sender=bob)  # _wantsSavingsGreen=True
+    teller.borrow(borrow_amount, bob, True, sender=bob)  # _wantsSavingsGreen=True
 
     # verify borrow log
     log = filter_logs(teller, "NewBorrow")[0]
     assert log.user == bob
     assert log.newLoan == borrow_amount
-    assert log.didReceiveSavingsGreen == True
+    assert log.didReceiveSavingsGreen
     assert log.outstandingUserDebt == borrow_amount
 
     # verify balances
@@ -835,13 +834,13 @@ def test_borrow_savings_green_enter_stab_pool(
 
     # borrow with savings_green and enter stability pool
     borrow_amount = 50 * EIGHTEEN_DECIMALS
-    amount = teller.borrow(borrow_amount, bob, True, True, sender=bob)  # _wantsSavingsGreen=True, _shouldEnterStabPool=True
+    teller.borrow(borrow_amount, bob, True, True, sender=bob)  # _wantsSavingsGreen=True, _shouldEnterStabPool=True
 
     # verify borrow log
     log = filter_logs(teller, "NewBorrow")[0]
     assert log.user == bob
     assert log.newLoan == borrow_amount
-    assert log.didReceiveSavingsGreen == True
+    assert log.didReceiveSavingsGreen
     assert log.outstandingUserDebt == borrow_amount
 
     # verify balances - user should have no direct sGREEN balance
@@ -887,13 +886,13 @@ def test_borrow_savings_green_no_stab_pool(
 
     # borrow with savings_green but don't enter stability pool
     borrow_amount = 50 * EIGHTEEN_DECIMALS
-    amount = teller.borrow(borrow_amount, bob, True, False, sender=bob)  # _wantsSavingsGreen=True, _shouldEnterStabPool=False
+    teller.borrow(borrow_amount, bob, True, False, sender=bob)  # _wantsSavingsGreen=True, _shouldEnterStabPool=False
 
     # verify borrow log
     log = filter_logs(teller, "NewBorrow")[0]
     assert log.user == bob
     assert log.newLoan == borrow_amount
-    assert log.didReceiveSavingsGreen == True
+    assert log.didReceiveSavingsGreen
     assert log.outstandingUserDebt == borrow_amount
 
     # verify balances - user should have direct sGREEN balance

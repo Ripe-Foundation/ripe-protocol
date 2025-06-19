@@ -148,10 +148,10 @@ def test_hr_can_modify_hr_contributor_switchboard_address(
     bob,
 ):   
     result = human_resources.canModifyHrContributor(switchboard_alpha.address)
-    assert result == True
+    assert result
 
     result = human_resources.canModifyHrContributor(bob)
-    assert result == False
+    assert not result
 
 
 # Test hasRipeBalance
@@ -172,7 +172,7 @@ def test_hr_has_ripe_balance_no_balance(
     contributor_addr = deployedContributor()
     
     result = human_resources.hasRipeBalance(contributor_addr)
-    assert result == False
+    assert not result
 
     # Give contributor some RIPE tokens in the vault
     deposit_amount = 1000 * EIGHTEEN_DECIMALS
@@ -182,7 +182,7 @@ def test_hr_has_ripe_balance_no_balance(
     )
     
     result = human_resources.hasRipeBalance(contributor_addr)
-    assert result == True
+    assert result
 
 
 # Test transferContributorRipeTokens
@@ -298,7 +298,7 @@ def test_hr_cash_ripe_check_success(
         sender=contributor_addr
     )
     
-    assert result == True
+    assert result
     
     # Check that contributor now has more RIPE in vault
     final_balance = ripe_gov_vault.getTotalAmountForUser(contributor_addr, ripe_token)

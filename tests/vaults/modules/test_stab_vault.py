@@ -1,7 +1,6 @@
-import pytest
 import boa
 
-from constants import EIGHTEEN_DECIMALS, ZERO_ADDRESS, MAX_UINT256
+from constants import EIGHTEEN_DECIMALS, ZERO_ADDRESS
 
 
 def test_stab_vault_deposit_validation(
