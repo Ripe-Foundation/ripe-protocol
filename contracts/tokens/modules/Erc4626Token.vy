@@ -23,7 +23,6 @@ event Withdraw:
 lastPricePerShare: public(uint256)
 
 ASSET: immutable(address)
-DECIMAL_OFFSET: constant(uint256) = 10 ** 8
 
 
 @deploy
@@ -228,18 +227,23 @@ def _amountToShares(
     _totalBalance: uint256,
     _shouldRoundUp: bool,
 ) -> uint256:
-    totalBalance: uint256 = _totalBalance
+    if _amount == max_value(uint256) or _amount == 0:
+        return _amount
 
-    # dead shares / decimal offset -- preventing donation attacks
-    totalBalance += 1
-    totalShares: uint256 = _totalShares + DECIMAL_OFFSET
+    # first deposit, price per share = 1
+    if _totalShares == 0:
+        return _amount
+
+    # no underlying balance, price per share = 0
+    if _totalBalance == 0:
+        return 0
 
     # calc shares
-    numerator: uint256 = _amount * totalShares
-    shares: uint256 = numerator // totalBalance
+    numerator: uint256 = _amount * _totalShares
+    shares: uint256 = numerator // _totalBalance
 
     # rounding
-    if _shouldRoundUp and (numerator % totalBalance != 0):
+    if _shouldRoundUp and (numerator % _totalBalance != 0):
         shares += 1
 
     return shares
@@ -256,18 +260,19 @@ def _sharesToAmount(
     _totalBalance: uint256,
     _shouldRoundUp: bool,
 ) -> uint256:
-    totalBalance: uint256 = _totalBalance
+    if _shares == max_value(uint256) or _shares == 0:
+        return _shares
 
-    # dead shares / decimal offset -- preventing donation attacks
-    totalBalance += 1
-    totalShares: uint256 = _totalShares + DECIMAL_OFFSET
+    # first deposit, price per share = 1
+    if _totalShares == 0:
+        return _shares
 
     # calc amount
-    numerator: uint256 = _shares * totalBalance
-    amount: uint256 = numerator // totalShares
+    numerator: uint256 = _shares * _totalBalance
+    amount: uint256 = numerator // _totalShares
 
     # rounding
-    if _shouldRoundUp and (numerator % totalShares != 0):
+    if _shouldRoundUp and (numerator % _totalShares != 0):
         amount += 1
 
     return amount

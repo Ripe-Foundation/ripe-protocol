@@ -1170,8 +1170,10 @@ def test_ltv_deviation_from_zero_ltv(switchboard_bravo, switchboard_alpha, gover
     assert action_id > 0
 
 
-def test_ltv_deviation_with_default_values(switchboard_bravo, governance, alpha_token, bravo_token):
+def test_ltv_deviation_with_default_values(switchboard_bravo, governance, alpha_token, bravo_token, setGeneralDebtConfig):
     """Test LTV deviation validation with default max deviation (10%)"""
+    setGeneralDebtConfig()
+
     # Add first asset with LTV
     action_id = switchboard_bravo.addAsset(
         alpha_token, [1], 50_00, 30_00, 1000, 10000,

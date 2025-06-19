@@ -136,7 +136,7 @@ def test_teller_withdraw_others_not_allowed(
     performDeposit(bob, deposit_amount, alpha_token, alpha_token_whale)
 
     # Attempt withdrawal by sally for bob should fail
-    with boa.reverts("caller not allowed to withdraw for user"):
+    with boa.reverts("not allowed to withdraw for user"):
         teller.withdraw(alpha_token, deposit_amount, bob, simple_erc20_vault, sender=sally)
 
     # allow sally to withdraw for bob

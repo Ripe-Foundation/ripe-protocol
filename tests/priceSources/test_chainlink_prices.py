@@ -47,7 +47,7 @@ def mock_chainlink(ripe_hq, fork):
     CHAINLINK_ETH_USD = ZERO_ADDRESS if fork == "local" else ADDYS[fork]["CHAINLINK_ETH_USD"]
     CHAINLINK_BTC_USD = ZERO_ADDRESS if fork == "local" else ADDYS[fork]["CHAINLINK_BTC_USD"]
     c = boa.load(
-        "contracts/priceSources/Chainlink.vy",
+        "contracts/priceSources/ChainlinkPrices.vy",
         ripe_hq,
         PARAMS[fork]["PRICE_DESK_MIN_REG_TIMELOCK"],
         PARAMS[fork]["PRICE_DESK_MAX_REG_TIMELOCK"],

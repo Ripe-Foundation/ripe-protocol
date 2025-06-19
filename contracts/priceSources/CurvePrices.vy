@@ -73,12 +73,15 @@ struct CurveRegistries:
 
 struct GreenRefPoolConfig:
     pool: address
+    lpToken: address
     greenIndex: uint256
     altAsset: address
     altAssetDecimals: uint256
     maxNumSnapshots: uint256
     dangerTrigger: uint256
     staleBlocks: uint256
+    stabilizerAdjustWeight: uint256
+    stabilizerMaxPoolDebt: uint256
 
 struct RefPoolSnapshot:
     greenBalance: uint256
@@ -95,6 +98,15 @@ struct CurrentGreenPoolStatus:
     weightedRatio: uint256
     dangerTrigger: uint256
     numBlocksInDanger: uint256
+
+struct StabilizerConfig:
+    pool: address
+    lpToken: address
+    greenBalance: uint256
+    greenRatio: uint256
+    greenIndex: uint256
+    stabilizerAdjustWeight: uint256
+    stabilizerMaxPoolDebt: uint256
 
 event NewCurvePricePending:
     asset: indexed(address)
@@ -146,6 +158,8 @@ event GreenRefPoolConfigPending:
     maxNumSnapshots: uint256
     dangerTrigger: uint256
     staleBlocks: uint256
+    stabilizerAdjustWeight: uint256
+    stabilizerMaxPoolDebt: uint256
     confirmationBlock: uint256
     actionId: uint256
 
@@ -154,12 +168,16 @@ event GreenRefPoolConfigUpdated:
     maxNumSnapshots: uint256
     dangerTrigger: uint256
     staleBlocks: uint256
+    stabilizerAdjustWeight: uint256
+    stabilizerMaxPoolDebt: uint256
 
 event GreenRefPoolConfigUpdateCancelled:
     pool: indexed(address)
     maxNumSnapshots: uint256
     dangerTrigger: uint256
     staleBlocks: uint256
+    stabilizerAdjustWeight: uint256
+    stabilizerMaxPoolDebt: uint256
 
 event GreenRefPoolSnapshotAdded:
     pool: indexed(address)
@@ -203,7 +221,7 @@ def __init__(
 ):
     gov.__init__(_ripeHq, empty(address), 0, 0, 0)
     addys.__init__(_ripeHq)
-    priceData.__init__(True, False)
+    priceData.__init__(False)
     timeLock.__init__(_minPriceChangeTimeLock, _maxPriceChangeTimeLock, 0, _maxPriceChangeTimeLock)
 
     # set curve address provider
@@ -257,6 +275,11 @@ def hasPriceFeed(_asset: address) -> bool:
 @external
 def hasPendingPriceFeedUpdate(_asset: address) -> bool:
     return timeLock._hasPendingAction(self.pendingUpdates[_asset].actionId)
+
+
+@external 
+def addPriceSnapshot(_asset: address) -> bool:
+    return False
 
 
 ###############
@@ -777,6 +800,8 @@ def setGreenRefPoolConfig(
     _maxNumSnapshots: uint256,
     _dangerTrigger: uint256,
     _staleBlocks: uint256,
+    _stabilizerAdjustWeight: uint256,
+    _stabilizerMaxPoolDebt: uint256,
 ) -> uint256:
     assert gov._canGovern(msg.sender) # dev: no perms
     assert not priceData.isPaused # dev: contract paused
@@ -788,21 +813,25 @@ def setGreenRefPoolConfig(
     if greenToken == poolConfig.underlying[1]:
         greenIndex = 1
     altAsset: address = poolConfig.underlying[1 - greenIndex]
+
     refConfig: GreenRefPoolConfig = GreenRefPoolConfig(
         pool=_pool,
+        lpToken=poolConfig.lpToken,
         greenIndex=greenIndex,
         altAsset=altAsset,
         altAssetDecimals=convert(staticcall IERC20Detailed(altAsset).decimals(), uint256),
         maxNumSnapshots=_maxNumSnapshots,
         dangerTrigger=_dangerTrigger,
         staleBlocks=_staleBlocks,
+        stabilizerAdjustWeight=_stabilizerAdjustWeight,
+        stabilizerMaxPoolDebt=_stabilizerMaxPoolDebt,
     )
-    assert self._isValidGreenRefPoolConfig(poolConfig, refConfig, _maxNumSnapshots, _dangerTrigger, _staleBlocks, greenToken) # dev: invalid ref pool config
+    assert self._isValidGreenRefPoolConfig(poolConfig, refConfig, _maxNumSnapshots, _dangerTrigger, _staleBlocks, _stabilizerAdjustWeight, _stabilizerMaxPoolDebt, greenToken) # dev: invalid ref pool config
 
     # set to pending state
     aid: uint256 = timeLock._initiateAction()
     self.pendingGreenRefPoolConfig[aid] = refConfig
-    log GreenRefPoolConfigPending(pool=_pool, maxNumSnapshots=_maxNumSnapshots, dangerTrigger=_dangerTrigger, staleBlocks=_staleBlocks, confirmationBlock=timeLock._getActionConfirmationBlock(aid), actionId=aid)
+    log GreenRefPoolConfigPending(pool=_pool, maxNumSnapshots=_maxNumSnapshots, dangerTrigger=_dangerTrigger, staleBlocks=_staleBlocks, stabilizerAdjustWeight=_stabilizerAdjustWeight, stabilizerMaxPoolDebt=_stabilizerMaxPoolDebt, confirmationBlock=timeLock._getActionConfirmationBlock(aid), actionId=aid)
     return aid
 
 
@@ -824,7 +853,7 @@ def confirmGreenRefPoolConfig(_aid: uint256) -> bool:
     # save new ref pool config
     self.greenRefPoolConfig = d
     self.pendingGreenRefPoolConfig[_aid] = empty(GreenRefPoolConfig)
-    log GreenRefPoolConfigUpdated(pool=d.pool, maxNumSnapshots=d.maxNumSnapshots, dangerTrigger=d.dangerTrigger, staleBlocks=d.staleBlocks)
+    log GreenRefPoolConfigUpdated(pool=d.pool, maxNumSnapshots=d.maxNumSnapshots, dangerTrigger=d.dangerTrigger, staleBlocks=d.staleBlocks, stabilizerAdjustWeight=d.stabilizerAdjustWeight, stabilizerMaxPoolDebt=d.stabilizerMaxPoolDebt)
 
     # add snapshot
     self._addGreenRefPoolSnapshot()
@@ -845,7 +874,7 @@ def cancelGreenRefPoolConfig(_aid: uint256) -> bool:
     assert timeLock._cancelAction(_aid) # dev: cannot cancel action
     self.pendingGreenRefPoolConfig[_aid] = empty(GreenRefPoolConfig)
 
-    log GreenRefPoolConfigUpdateCancelled(pool=d.pool, maxNumSnapshots=d.maxNumSnapshots, dangerTrigger=d.dangerTrigger, staleBlocks=d.staleBlocks)
+    log GreenRefPoolConfigUpdateCancelled(pool=d.pool, maxNumSnapshots=d.maxNumSnapshots, dangerTrigger=d.dangerTrigger, staleBlocks=d.staleBlocks, stabilizerAdjustWeight=d.stabilizerAdjustWeight, stabilizerMaxPoolDebt=d.stabilizerMaxPoolDebt)
     return True
 
 
@@ -860,6 +889,8 @@ def _isValidGreenRefPoolConfig(
     _maxNumSnapshots: uint256,
     _dangerTrigger: uint256,
     _staleBlocks: uint256,
+    _stabilizerAdjustWeight: uint256,
+    _stabilizerMaxPoolDebt: uint256,
     _greenToken: address,
 ) -> bool:
     if _greenToken not in _poolConfig.underlying:
@@ -871,7 +902,13 @@ def _isValidGreenRefPoolConfig(
     if _maxNumSnapshots == 0 or _maxNumSnapshots > 100: # 100 max
         return False
 
-    if _dangerTrigger < 50_00 or _dangerTrigger >= 100_00: # 50% - 99.99%
+    if _dangerTrigger < 50_00 or _dangerTrigger >= HUNDRED_PERCENT: # 50% - 99.99%
+        return False
+
+    if _stabilizerAdjustWeight == 0 or _stabilizerAdjustWeight > HUNDRED_PERCENT:
+        return False
+
+    if _stabilizerMaxPoolDebt == 0 or _stabilizerMaxPoolDebt > 1_000_000 * EIGHTEEN_DECIMALS: # 1 million
         return False
 
     # make sure this curve integration works
@@ -937,7 +974,8 @@ def getCurrentGreenPoolStatus() -> CurrentGreenPoolStatus:
 @external 
 def addGreenRefPoolSnapshot() -> bool:
     assert addys._isValidRipeAddr(msg.sender) # dev: no perms
-    assert not priceData.isPaused # dev: contract paused
+    if priceData.isPaused:
+        return False # fail gracefully
     return self._addGreenRefPoolSnapshot()
 
 
@@ -1019,3 +1057,29 @@ def _getCurvePoolData(
         ratio = greenBalance * HUNDRED_PERCENT // totalSupply
 
     return greenBalance, ratio
+
+
+# stabilizer data / config
+
+
+@view
+@external
+def getGreenStabilizerConfig() -> StabilizerConfig:
+    config: GreenRefPoolConfig = self.greenRefPoolConfig
+    if config.pool == empty(address):
+        return empty(StabilizerConfig)
+
+    # green pool data
+    greenBalance: uint256 = 0
+    greenRatio: uint256 = 0
+    greenBalance, greenRatio = self._getCurvePoolData(config.pool, config.greenIndex, config.altAssetDecimals)
+
+    return StabilizerConfig(
+        pool=config.pool,
+        lpToken=config.lpToken,
+        greenBalance=greenBalance,
+        greenRatio=greenRatio,
+        greenIndex=config.greenIndex,
+        stabilizerAdjustWeight=config.stabilizerAdjustWeight,
+        stabilizerMaxPoolDebt=config.stabilizerMaxPoolDebt,
+    )

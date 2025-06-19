@@ -87,6 +87,7 @@ def setGeneralDebtConfig(mission_control, switchboard_alpha, createAuctionParams
         _maxDynamicRateBoost = 1000_00,
         _increasePerDangerBlock = 10,
         _maxBorrowRate = 100_00,
+        _maxLtvDeviation = 10_00,
         _keeperFeeRatio = 0,
         _minKeeperFee = 0,
         _isDaowryEnabled = False,
@@ -104,6 +105,7 @@ def setGeneralDebtConfig(mission_control, switchboard_alpha, createAuctionParams
             _maxDynamicRateBoost,
             _increasePerDangerBlock,
             _maxBorrowRate,
+            _maxLtvDeviation,
             _keeperFeeRatio,
             _minKeeperFee,
             _isDaowryEnabled,
@@ -260,19 +262,24 @@ def setStabClaimRewardsConfig(mission_control, switchboard_alpha):
 
 
 @pytest.fixture(scope="session")
-def setUserConfig(mission_control):
+def setUserConfig(mission_control, teller):
     def setUserConfig(
         _user,
         _canAnyoneDeposit = True,
         _canAnyoneRepayDebt = True,
         _canAnyoneBondForUser = False,
     ):
-        mission_control.setUserConfig(_canAnyoneDeposit, _canAnyoneRepayDebt, _canAnyoneBondForUser, sender=_user)
+        config = (
+            _canAnyoneDeposit,
+            _canAnyoneRepayDebt,
+            _canAnyoneBondForUser,
+        )
+        mission_control.setUserConfig(_user, config, sender=teller.address)
     yield setUserConfig
 
 
 @pytest.fixture(scope="session")
-def setUserDelegation(mission_control):
+def setUserDelegation(mission_control, teller):
     def setUserDelegation(
         _user,
         _delegate,
@@ -281,5 +288,11 @@ def setUserDelegation(mission_control):
         _canClaimFromStabPool = True,
         _canClaimLoot = True,
     ):
-        mission_control.setUserDelegation(_delegate, _canWithdraw, _canBorrow, _canClaimFromStabPool, _canClaimLoot, sender=_user)
+        config = (
+            _canWithdraw,
+            _canBorrow,
+            _canClaimFromStabPool,
+            _canClaimLoot,
+        )
+        mission_control.setUserDelegation(_user, _delegate, config, sender=teller.address)
     yield setUserDelegation

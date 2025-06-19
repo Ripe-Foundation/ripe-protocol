@@ -36,9 +36,8 @@ def getPricedAssets() -> DynArray[address, 50]:
     ...
 
 
-@view
-@external
-def hasGreenRefPool() -> bool:
+@external 
+def addPriceSnapshot(_asset: address) -> bool:
     ...
 
 

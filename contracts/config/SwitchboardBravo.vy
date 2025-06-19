@@ -9,11 +9,12 @@ initializes: timeLock[gov := gov]
 
 import contracts.modules.LocalGov as gov
 import contracts.modules.TimeLock as timeLock
+import interfaces.ConfigStructs as cs
 
 interface MissionControl:
-    def setAssetConfig(_asset: address, _assetConfig: AssetConfig): nonpayable
+    def setAssetConfig(_asset: address, _assetConfig: cs.AssetConfig): nonpayable
     def canPerformLiteAction(_user: address) -> bool: view
-    def assetConfig(_asset: address) -> AssetConfig: view
+    def assetConfig(_asset: address) -> cs.AssetConfig: view
     def isSupportedAsset(_asset: address) -> bool: view
     def maxLtvDeviation() -> uint256: view
 
@@ -21,7 +22,7 @@ interface Whitelist:
     def isUserAllowed(_user: address, _asset: address) -> bool: view
 
 interface SwitchboardAlpha:
-    def areValidAuctionParams(_params: AuctionParams) -> bool: view
+    def areValidAuctionParams(_params: cs.AuctionParams) -> bool: view
 
 interface VaultBook:
     def isValidRegId(_regId: uint256) -> bool: view
@@ -49,44 +50,7 @@ flag AssetFlag:
 
 struct AssetUpdate:
     asset: address
-    config: AssetConfig
-
-struct AssetConfig:
-    vaultIds: DynArray[uint256, MAX_VAULTS_PER_ASSET]
-    stakersPointsAlloc: uint256
-    voterPointsAlloc: uint256
-    perUserDepositLimit: uint256
-    globalDepositLimit: uint256
-    debtTerms: DebtTerms
-    shouldBurnAsPayment: bool
-    shouldTransferToEndaoment: bool
-    shouldSwapInStabPools: bool
-    shouldAuctionInstantly: bool
-    canDeposit: bool
-    canWithdraw: bool
-    canRedeemCollateral: bool
-    canRedeemInStabPool: bool
-    canBuyInAuction: bool
-    canClaimInStabPool: bool
-    specialStabPoolId: uint256
-    customAuctionParams: AuctionParams
-    whitelist: address
-    isNft: bool
-
-struct DebtTerms:
-    ltv: uint256
-    redemptionThreshold: uint256
-    liqThreshold: uint256
-    liqFee: uint256
-    borrowRate: uint256
-    daowry: uint256
-
-struct AuctionParams:
-    hasParams: bool
-    startDiscount: uint256
-    maxDiscount: uint256
-    delay: uint256
-    duration: uint256
+    config: cs.AssetConfig
 
 event NewAssetPending:
     asset: indexed(address)
@@ -286,7 +250,7 @@ def addAsset(
     _voterPointsAlloc: uint256,
     _perUserDepositLimit: uint256,
     _globalDepositLimit: uint256,
-    _debtTerms: DebtTerms = empty(DebtTerms),
+    _debtTerms: cs.DebtTerms = empty(cs.DebtTerms),
     _shouldBurnAsPayment: bool = False,
     _shouldTransferToEndaoment: bool = False,
     _shouldSwapInStabPools: bool = True,
@@ -298,18 +262,18 @@ def addAsset(
     _canBuyInAuction: bool = True,
     _canClaimInStabPool: bool = True,
     _specialStabPoolId: uint256 = 0,
-    _customAuctionParams: AuctionParams = empty(AuctionParams),
+    _customAuctionParams: cs.AuctionParams = empty(cs.AuctionParams),
     _whitelist: address = empty(address),
     _isNft: bool = False,
 ) -> uint256:
     assert gov._canGovern(msg.sender) # dev: no perms
     assert not staticcall MissionControl(self._getMissionControlAddr()).isSupportedAsset(_asset) # dev: must be new asset
 
-    customAuctionParams: AuctionParams = empty(AuctionParams)
+    customAuctionParams: cs.AuctionParams = empty(cs.AuctionParams)
     if _customAuctionParams.hasParams:
         customAuctionParams = _customAuctionParams
 
-    config: AssetConfig = AssetConfig(
+    config: cs.AssetConfig = cs.AssetConfig(
         vaultIds=_vaultIds,
         stakersPointsAlloc=_stakersPointsAlloc,
         voterPointsAlloc=_voterPointsAlloc,
@@ -376,7 +340,7 @@ def addAsset(
 
 @view
 @internal
-def _isValidAssetConfig(_asset: address, _config: AssetConfig) -> bool:
+def _isValidAssetConfig(_asset: address, _config: cs.AssetConfig) -> bool:
     if _asset == empty(address):
         return False
     if not self._isValidDebtTerms(_config.debtTerms):
@@ -453,20 +417,20 @@ def setAssetLiqConfig(
     _shouldSwapInStabPools: bool,
     _shouldAuctionInstantly: bool,
     _specialStabPoolId: uint256 = 0,
-    _customAuctionParams: AuctionParams = empty(AuctionParams),
+    _customAuctionParams: cs.AuctionParams = empty(cs.AuctionParams),
 ) -> uint256:
     assert gov._canGovern(msg.sender) # dev: no perms
 
-    customAuctionParams: AuctionParams = empty(AuctionParams)
+    customAuctionParams: cs.AuctionParams = empty(cs.AuctionParams)
     if _customAuctionParams.hasParams:
         assert self._areValidAuctionParams(_customAuctionParams) # dev: invalid auction params
         customAuctionParams = _customAuctionParams
 
     mc: address = self._getMissionControlAddr()
     assert staticcall MissionControl(mc).isSupportedAsset(_asset) # dev: invalid asset
-    assetConfig: AssetConfig = staticcall MissionControl(mc).assetConfig(_asset)
+    assetConfig: cs.AssetConfig = staticcall MissionControl(mc).assetConfig(_asset)
     assert self._isValidAssetLiqConfig(_asset, _shouldBurnAsPayment, _shouldTransferToEndaoment, _shouldSwapInStabPools, _shouldAuctionInstantly, _specialStabPoolId, assetConfig.isNft, assetConfig.whitelist, assetConfig.debtTerms.ltv) # dev: invalid asset liq config
-    return self._setPendingAssetConfig(ActionType.ASSET_LIQ_CONFIG, _asset, [], 0, 0, 0, 0, empty(DebtTerms), _shouldBurnAsPayment, _shouldTransferToEndaoment, _shouldSwapInStabPools, _shouldAuctionInstantly, _specialStabPoolId, customAuctionParams)
+    return self._setPendingAssetConfig(ActionType.ASSET_LIQ_CONFIG, _asset, [], 0, 0, 0, 0, empty(cs.DebtTerms), _shouldBurnAsPayment, _shouldTransferToEndaoment, _shouldSwapInStabPools, _shouldAuctionInstantly, _specialStabPoolId, customAuctionParams)
 
 
 @view
@@ -521,7 +485,7 @@ def _isValidAssetLiqConfig(
 
 @view
 @internal
-def _areValidAuctionParams(_params: AuctionParams) -> bool:
+def _areValidAuctionParams(_params: cs.AuctionParams) -> bool:
     switchboard: address = staticcall RipeHq(gov._getRipeHqFromGov()).getAddr(SWITCHBOARD_ID)
     switchboardAlpha: address = staticcall Switchboard(switchboard).getAddr(SWITCHBOARD_ALPHA_ID)
     return staticcall SwitchboardAlpha(switchboardAlpha).areValidAuctionParams(_params)
@@ -546,10 +510,10 @@ def setAssetDebtTerms(
 
     mc: address = self._getMissionControlAddr()
     assert staticcall MissionControl(mc).isSupportedAsset(_asset) # dev: invalid asset
-    assetConfig: AssetConfig = staticcall MissionControl(mc).assetConfig(_asset)
+    assetConfig: cs.AssetConfig = staticcall MissionControl(mc).assetConfig(_asset)
     assert self._isLtvWithinMaxDeviation(_ltv, assetConfig.debtTerms.ltv, staticcall MissionControl(mc).maxLtvDeviation()) # dev: ltv is outside max deviation
 
-    debtTerms: DebtTerms = DebtTerms(
+    debtTerms: cs.DebtTerms = cs.DebtTerms(
         ltv=_ltv,
         redemptionThreshold=_redemptionThreshold,
         liqThreshold=_liqThreshold,
@@ -563,7 +527,7 @@ def setAssetDebtTerms(
 
 @view
 @internal
-def _isValidDebtTerms(_debtTerms: DebtTerms) -> bool:
+def _isValidDebtTerms(_debtTerms: cs.DebtTerms) -> bool:
     if _debtTerms.liqThreshold > HUNDRED_PERCENT:
         return False
     if _debtTerms.redemptionThreshold > _debtTerms.liqThreshold:
@@ -607,7 +571,7 @@ def setWhitelistForAsset(_asset: address, _whitelist: address) -> uint256:
 
     assert staticcall MissionControl(self._getMissionControlAddr()).isSupportedAsset(_asset) # dev: invalid asset
     assert self._isValidWhitelist(_whitelist) # dev: invalid whitelist
-    return self._setPendingAssetConfig(ActionType.ASSET_WHITELIST, _asset, [], 0, 0, 0, 0, empty(DebtTerms), False, False, False, False, 0, empty(AuctionParams), _whitelist)
+    return self._setPendingAssetConfig(ActionType.ASSET_WHITELIST, _asset, [], 0, 0, 0, 0, empty(cs.DebtTerms), False, False, False, False, 0, empty(cs.AuctionParams), _whitelist)
 
 
 @view
@@ -633,19 +597,19 @@ def _setPendingAssetConfig(
     _voterPointsAlloc: uint256 = 0,
     _perUserDepositLimit: uint256 = 0,
     _globalDepositLimit: uint256 = 0,
-    _debtTerms: DebtTerms = empty(DebtTerms),
+    _debtTerms: cs.DebtTerms = empty(cs.DebtTerms),
     _shouldBurnAsPayment: bool = False,
     _shouldTransferToEndaoment: bool = False,
     _shouldSwapInStabPools: bool = False,
     _shouldAuctionInstantly: bool = False,
     _specialStabPoolId: uint256 = 0,
-    _customAuctionParams: AuctionParams = empty(AuctionParams),
+    _customAuctionParams: cs.AuctionParams = empty(cs.AuctionParams),
     _whitelist: address = empty(address),
 ) -> uint256:
 
     aid: uint256 = timeLock._initiateAction()
     self.actionType[aid] = _actionType
-    config: AssetConfig = AssetConfig(
+    config: cs.AssetConfig = cs.AssetConfig(
         vaultIds=_vaultIds,
         stakersPointsAlloc=_stakersPointsAlloc,
         voterPointsAlloc=_voterPointsAlloc,
@@ -762,7 +726,7 @@ def _setAssetFlag(_asset: address, _flag: AssetFlag, _shouldEnable: bool) -> boo
 
     mc: address = self._getMissionControlAddr()
     assert staticcall MissionControl(mc).isSupportedAsset(_asset) # dev: invalid asset
-    assetConfig: AssetConfig = staticcall MissionControl(mc).assetConfig(_asset)
+    assetConfig: cs.AssetConfig = staticcall MissionControl(mc).assetConfig(_asset)
     
     # get current value and validate
     if _flag == AssetFlag.CAN_DEPOSIT:
@@ -856,7 +820,7 @@ def executePendingAction(_aid: uint256) -> bool:
 
     elif actionType == ActionType.ASSET_DEPOSIT_PARAMS:
         p: AssetUpdate = self.pendingAssetConfig[_aid]
-        config: AssetConfig = staticcall MissionControl(mc).assetConfig(p.asset)
+        config: cs.AssetConfig = staticcall MissionControl(mc).assetConfig(p.asset)
         config.vaultIds = p.config.vaultIds
         config.stakersPointsAlloc = p.config.stakersPointsAlloc
         config.voterPointsAlloc = p.config.voterPointsAlloc
@@ -868,7 +832,7 @@ def executePendingAction(_aid: uint256) -> bool:
 
     elif actionType == ActionType.ASSET_LIQ_CONFIG:
         p: AssetUpdate = self.pendingAssetConfig[_aid]
-        config: AssetConfig = staticcall MissionControl(mc).assetConfig(p.asset)
+        config: cs.AssetConfig = staticcall MissionControl(mc).assetConfig(p.asset)
         config.shouldBurnAsPayment = p.config.shouldBurnAsPayment
         config.shouldTransferToEndaoment = p.config.shouldTransferToEndaoment
         config.shouldSwapInStabPools = p.config.shouldSwapInStabPools
@@ -881,7 +845,7 @@ def executePendingAction(_aid: uint256) -> bool:
 
     elif actionType == ActionType.ASSET_DEBT_TERMS:
         p: AssetUpdate = self.pendingAssetConfig[_aid]
-        config: AssetConfig = staticcall MissionControl(mc).assetConfig(p.asset)
+        config: cs.AssetConfig = staticcall MissionControl(mc).assetConfig(p.asset)
         config.debtTerms = p.config.debtTerms
         assert self._isValidAssetConfig(p.asset, config) # dev: invalid asset config
         extcall MissionControl(mc).setAssetConfig(p.asset, config)
@@ -889,7 +853,7 @@ def executePendingAction(_aid: uint256) -> bool:
 
     elif actionType == ActionType.ASSET_WHITELIST:
         p: AssetUpdate = self.pendingAssetConfig[_aid]
-        config: AssetConfig = staticcall MissionControl(mc).assetConfig(p.asset)
+        config: cs.AssetConfig = staticcall MissionControl(mc).assetConfig(p.asset)
         config.whitelist = p.config.whitelist
         assert self._isValidAssetConfig(p.asset, config) # dev: invalid asset config
         extcall MissionControl(mc).setAssetConfig(p.asset, config)

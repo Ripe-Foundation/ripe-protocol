@@ -133,3 +133,9 @@ def approve(_spender: address, _value: uint256) -> bool:
     self.allowance[msg.sender][_spender] = _value
     log Approval(owner=msg.sender, spender=_spender, value=_value)
     return True
+
+
+@view
+@external
+def decimals() -> uint8:
+    return staticcall IERC20Detailed(self.asset).decimals()

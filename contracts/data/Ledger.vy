@@ -12,13 +12,12 @@ import contracts.modules.Addys as addys
 import contracts.modules.DeptBasics as deptBasics
 from interfaces import Department
 
-# deposit / withdrawals
+import interfaces.ConfigStructs as cs
+from interfaces import Defaults
 
 struct DepositLedgerData:
     isParticipatingInVault: bool
     numUserVaults: uint256
-
-# points / rewards
 
 struct RipeRewards:
     borrowers: uint256
@@ -69,8 +68,6 @@ struct RipeRewardsBundle:
     ripeRewards: RipeRewards
     ripeAvailForRewards: uint256
 
-# debt
-
 struct BorrowDataBundle:
     userDebt: UserDebt
     userBorrowInterval: IntervalBorrow
@@ -83,26 +80,16 @@ struct RepayDataBundle:
     userDebt: UserDebt
     numUserVaults: uint256
 
-struct DebtTerms:
-    ltv: uint256
-    redemptionThreshold: uint256
-    liqThreshold: uint256
-    liqFee: uint256
-    borrowRate: uint256
-    daowry: uint256
-
 struct UserDebt:
     amount: uint256
     principal: uint256
-    debtTerms: DebtTerms
+    debtTerms: cs.DebtTerms
     lastTimestamp: uint256
     inLiquidation: bool
 
 struct IntervalBorrow:
     start: uint256
     amount: uint256
-
-# auctions
 
 struct FungibleAuction:
     liqUser: address
@@ -113,8 +100,6 @@ struct FungibleAuction:
     startBlock: uint256
     endBlock: uint256
     isActive: bool
-
-# ripe bonds
 
 struct RipeBondData:
     paymentAmountAvailInEpoch: uint256
@@ -169,25 +154,19 @@ ripePaidOutForBadDebt: public(uint256)
 paymentAmountAvailInEpoch: public(uint256)
 ripeAvailForBonds: public(uint256)
 
+# endaoment
+greenPoolDebt: public(HashMap[address, uint256]) # pool -> debt
+
 
 @deploy
-def __init__(
-    _ripeHq: address,
-    _ripeAvailForRewards: uint256,
-    _ripeAvailForHr: uint256,
-    _ripeAvailForBonds: uint256,
-):
+def __init__(_ripeHq: address, _defaults: address):
     addys.__init__(_ripeHq)
     deptBasics.__init__(False, False, False) # no minting
 
-    if _ripeAvailForRewards != 0:
-        self.ripeAvailForRewards = _ripeAvailForRewards
-
-    if _ripeAvailForHr != 0:
-        self.ripeAvailForHr = _ripeAvailForHr
-
-    if _ripeAvailForBonds != 0:
-        self.ripeAvailForBonds = _ripeAvailForBonds
+    if _defaults != empty(address):
+        self.ripeAvailForRewards = staticcall Defaults(_defaults).ripeAvailForRewards()
+        self.ripeAvailForHr = staticcall Defaults(_defaults).ripeAvailForHr()
+        self.ripeAvailForBonds = staticcall Defaults(_defaults).ripeAvailForBonds()
 
 
 ###############
@@ -818,3 +797,21 @@ def setEpochData(_epochStart: uint256, _epochEnd: uint256, _amountAvailInEpoch: 
     self.epochStart = _epochStart
     self.epochEnd = _epochEnd
     self.paymentAmountAvailInEpoch = _amountAvailInEpoch
+
+
+#############
+# Endaoment #
+#############
+
+
+@external
+def updateGreenPoolDebt(_pool: address, _amount: uint256, _isIncrement: bool):
+    assert msg.sender == addys._getEndaomentAddr() # dev: no perms
+    assert not deptBasics.isPaused # dev: not activated
+
+    greenPoolDebt: uint256 = self.greenPoolDebt[_pool]
+    if _isIncrement:
+        greenPoolDebt += _amount
+    else:
+        greenPoolDebt -= min(greenPoolDebt, _amount)
+    self.greenPoolDebt[_pool] = greenPoolDebt

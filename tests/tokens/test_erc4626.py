@@ -316,13 +316,13 @@ def test_erc4626_insufficient_allowance(
         savings_green.redeem(shares, sally, bob, sender=sally)
 
 
-def test_erc4626_decimal_offset(
+def test_erc4626_proportional_shares(
     savings_green,
     green_token,
     whale,
     bob,
 ):
-    """Test decimal offset protection against donation attacks"""
+    """Test proportional share distribution for different deposit sizes"""
     green_token.approve(savings_green, MAX_UINT256, sender=whale)
 
     # Initial deposit
@@ -845,16 +845,13 @@ def test_erc4626_price_per_share_after_first_deposit(
     assert current_price > 0
     assert last_price == current_price
     
-    # Price should account for the decimal offset protection
-    # The implementation adds DECIMAL_OFFSET (10**8) to totalShares and 1 to totalBalance
-    # So the price will be slightly less than 1 token per share due to this protection
-    DECIMAL_OFFSET = 10 ** 8
-    total_shares = savings_green.totalSupply() + DECIMAL_OFFSET
-    total_balance = savings_green.totalAssets() + 1
-    expected_price = (EIGHTEEN_DECIMALS * total_balance) // total_shares
+    # With simplified share calculation, price per share should be exactly 1:1
+    # The price per share calculation is: _sharesToAmount(10**18, totalSupply, totalAssets, False)
+    # For first deposit: (10**18 * totalAssets) / totalSupply = (10**18 * deposit_amount) / deposit_amount = 10**18
+    expected_price = EIGHTEEN_DECIMALS  # 1 token per share (with 18 decimals)
     
-    # The price should match our calculation accounting for the offset
-    assert abs(last_price - expected_price) <= 1  # Allow for rounding differences
+    assert last_price == expected_price
+    assert current_price == expected_price
 
 
 def test_erc4626_price_per_share_updates_on_deposit(
@@ -880,7 +877,7 @@ def test_erc4626_price_per_share_updates_on_deposit(
     # Price should update (though it might be similar due to proportional deposits)
     assert price_after_second > 0
     # Both prices should be close since no external profit was added
-    # Allow for small rounding differences due to decimal offset
+    # Allow for small rounding differences due to integer division
     assert abs(price_after_first - price_after_second) < 1000  # Small wei tolerance
 
 

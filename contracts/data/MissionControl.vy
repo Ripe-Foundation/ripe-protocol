@@ -11,7 +11,9 @@ initializes: deptBasics[addys := addys]
 
 import contracts.modules.Addys as addys
 import contracts.modules.DeptBasics as deptBasics
+import interfaces.ConfigStructs as cs
 from interfaces import Department
+from interfaces import Defaults
 
 interface Whitelist:
     def isUserAllowed(_user: address, _asset: address) -> bool: view
@@ -19,136 +21,12 @@ interface Whitelist:
 interface Vault:
     def vaultAssets(_index: uint256) -> address: view
 
-interface UnderscoreAgentFactory:
-    def isUserWallet(_addr: address) -> bool: view
-
-interface UnderscoreRegistry:
-    def getAddy(_addyId: uint256) -> address: view
-
 interface VaultBook:
     def getAddr(_regId: uint256) -> address: view
-
-interface UnderscoreWallet:
-    def walletConfig() -> address: view
-
-interface UnderscoreWalletConfig:
-    def owner() -> address: view
-
-struct GenConfig:
-    perUserMaxVaults: uint256
-    perUserMaxAssetsPerVault: uint256
-    priceStaleTime: uint256
-    canDeposit: bool
-    canWithdraw: bool
-    canBorrow: bool
-    canRepay: bool
-    canClaimLoot: bool
-    canLiquidate: bool
-    canRedeemCollateral: bool
-    canRedeemInStabPool: bool
-    canBuyInAuction: bool
-    canClaimInStabPool: bool
-
-struct GenDebtConfig:
-    perUserDebtLimit: uint256
-    globalDebtLimit: uint256
-    minDebtAmount: uint256
-    numAllowedBorrowers: uint256
-    maxBorrowPerInterval: uint256
-    numBlocksPerInterval: uint256
-    minDynamicRateBoost: uint256
-    maxDynamicRateBoost: uint256
-    increasePerDangerBlock: uint256
-    maxBorrowRate: uint256
-    keeperFeeRatio: uint256
-    minKeeperFee: uint256
-    isDaowryEnabled: bool
-    ltvPaybackBuffer: uint256
-    genAuctionParams: AuctionParams
-
-struct AssetConfig:
-    vaultIds: DynArray[uint256, MAX_VAULTS_PER_ASSET]
-    stakersPointsAlloc: uint256
-    voterPointsAlloc: uint256
-    perUserDepositLimit: uint256
-    globalDepositLimit: uint256
-    debtTerms: DebtTerms
-    shouldBurnAsPayment: bool
-    shouldTransferToEndaoment: bool
-    shouldSwapInStabPools: bool
-    shouldAuctionInstantly: bool
-    canDeposit: bool
-    canWithdraw: bool
-    canRedeemCollateral: bool
-    canRedeemInStabPool: bool
-    canBuyInAuction: bool
-    canClaimInStabPool: bool
-    specialStabPoolId: uint256
-    customAuctionParams: AuctionParams
-    whitelist: address
-    isNft: bool
-
-struct RipeRewardsConfig:
-    arePointsEnabled: bool
-    ripePerBlock: uint256
-    borrowersAlloc: uint256
-    stakersAlloc: uint256
-    votersAlloc: uint256
-    genDepositorsAlloc: uint256
-    autoStakeRatio: uint256
-    autoStakeDurationRatio: uint256
 
 struct TotalPointsAllocs:
     stakersPointsAllocTotal: uint256
     voterPointsAllocTotal: uint256
-
-struct RipeGovVaultConfig:
-    lockTerms: LockTerms
-    assetWeight: uint256
-    shouldFreezeWhenBadDebt: bool
-
-struct HrConfig:
-    contribTemplate: address
-    maxCompensation: uint256
-    minCliffLength: uint256
-    maxStartDelay: uint256
-    minVestingLength: uint256
-    maxVestingLength: uint256
-
-struct RipeBondConfig:
-    asset: address
-    amountPerEpoch: uint256
-    canBond: bool
-    minRipePerUnit: uint256
-    maxRipePerUnit: uint256
-    maxRipePerUnitLockBonus: uint256
-    epochLength: uint256
-    shouldAutoRestart: bool
-    restartDelayBlocks: uint256
-
-struct VaultLite:
-    vaultId: uint256
-    asset: address
-
-struct UserConfig:
-    canAnyoneDeposit: bool
-    canAnyoneRepayDebt: bool
-    canAnyoneBondForUser: bool
-
-struct ActionDelegation:
-    canWithdraw: bool
-    canBorrow: bool
-    canClaimFromStabPool: bool
-    canClaimLoot: bool
-
-struct LockTerms:
-    minLockDuration: uint256
-    maxLockDuration: uint256
-    maxLockBoost: uint256
-    canExit: bool
-    exitFee: uint256
-
-# helpers
 
 struct TellerDepositConfig:
     canDepositGeneral: bool
@@ -166,14 +44,6 @@ struct TellerWithdrawConfig:
     canWithdrawAsset: bool
     isUserAllowed: bool
     canWithdrawForUser: bool
-
-struct DebtTerms:
-    ltv: uint256
-    redemptionThreshold: uint256
-    liqThreshold: uint256
-    liqFee: uint256
-    borrowRate: uint256
-    daowry: uint256
 
 struct BorrowConfig:
     canBorrow: bool
@@ -195,18 +65,20 @@ struct RedeemCollateralConfig:
     canRedeemCollateralAsset: bool
     isUserAllowed: bool
     ltvPaybackBuffer: uint256
+    canAnyoneDeposit: bool
 
 struct AuctionBuyConfig:
     canBuyInAuctionGeneral: bool
     canBuyInAuctionAsset: bool
     isUserAllowed: bool
+    canAnyoneDeposit: bool
 
 struct GenLiqConfig:
     canLiquidate: bool
     keeperFeeRatio: uint256
     minKeeperFee: uint256
     ltvPaybackBuffer: uint256
-    genAuctionParams: AuctionParams
+    genAuctionParams: cs.AuctionParams
     priorityLiqAssetVaults: DynArray[VaultData, PRIORITY_VAULT_DATA]
     priorityStabVaults: DynArray[VaultData, PRIORITY_VAULT_DATA]
 
@@ -215,25 +87,14 @@ struct VaultData:
     vaultAddr: address
     asset: address
 
-struct AuctionParams:
-    hasParams: bool
-    startDiscount: uint256
-    maxDiscount: uint256
-    delay: uint256
-    duration: uint256
-
 struct AssetLiqConfig:
     hasConfig: bool
     shouldBurnAsPayment: bool
     shouldTransferToEndaoment: bool
     shouldSwapInStabPools: bool
     shouldAuctionInstantly: bool
-    customAuctionParams: AuctionParams
+    customAuctionParams: cs.AuctionParams
     specialStabPool: VaultData
-
-struct StabClaimRewardsConfig:
-    rewardsLockDuration: uint256
-    ripePerDollarClaimed: uint256
 
 struct StabPoolClaimsConfig:
     canClaimInStabPoolGeneral: bool
@@ -247,6 +108,7 @@ struct StabPoolRedemptionsConfig:
     canRedeemInStabPoolGeneral: bool
     canRedeemInStabPoolAsset: bool
     isUserAllowed: bool
+    canAnyoneDeposit: bool
 
 struct ClaimLootConfig:
     canClaimLoot: bool
@@ -295,69 +157,63 @@ struct DynamicBorrowRateConfig:
     increasePerDangerBlock: uint256
     maxBorrowRate: uint256
 
-# events
+# global cs
+genConfig: public(cs.GenConfig)
+genDebtConfig: public(cs.GenDebtConfig)
+hrConfig: public(cs.HrConfig)
+ripeBondConfig: public(cs.RipeBondConfig)
 
-event UserConfigSet:
-    user: indexed(address)
-    canAnyoneDeposit: bool
-    canAnyoneRepayDebt: bool
-    canAnyoneBondForUser: bool
-
-event UserDelegationSet:
-    user: indexed(address)
-    delegate: indexed(address)
-    setter: indexed(address)
-    canWithdraw: bool
-    canBorrow: bool
-    canClaimFromStabPool: bool
-    canClaimLoot: bool
-
-# global config
-genConfig: public(GenConfig)
-genDebtConfig: public(GenDebtConfig)
-
-# asset config
-assetConfig: public(HashMap[address, AssetConfig]) # asset -> config
+# asset cs
+assetConfig: public(HashMap[address, cs.AssetConfig]) # asset -> cs
 assets: public(HashMap[uint256, address]) # index -> asset
 indexOfAsset: public(HashMap[address, uint256]) # asset -> index
 numAssets: public(uint256) # num assets
 
+# user cs
+userConfig: public(HashMap[address, cs.UserConfig]) # user -> cs
+userDelegation: public(HashMap[address, HashMap[address, cs.ActionDelegation]]) # user -> delegate -> cs
+
 # ripe rewards
-rewardsConfig: public(RipeRewardsConfig)
+rewardsConfig: public(cs.RipeRewardsConfig)
 totalPointsAllocs: public(TotalPointsAllocs)
 
-# random configs
-underscoreRegistry: public(address)
+# vault cs
+ripeGovVaultConfig: public(HashMap[address, cs.RipeGovVaultConfig]) # asset -> cs
+stabClaimRewardsConfig: public(cs.StabClaimRewardsConfig)
+priorityLiqAssetVaults: public(DynArray[cs.VaultLite, PRIORITY_VAULT_DATA])
+priorityStabVaults: public(DynArray[cs.VaultLite, PRIORITY_VAULT_DATA])
+
+# access
 canPerformLiteAction: public(HashMap[address, bool]) # user -> canPerformLiteAction
-maxLtvDeviation: public(uint256)
-ripeGovVaultConfig: public(HashMap[address, RipeGovVaultConfig]) # asset -> config
-hrConfig: public(HrConfig)
-ripeBondConfig: public(RipeBondConfig)
-stabClaimRewardsConfig: public(StabClaimRewardsConfig)
 
-# priority data
+# other
 priorityPriceSourceIds: public(DynArray[uint256, MAX_PRIORITY_PRICE_SOURCES])
-priorityLiqAssetVaults: public(DynArray[VaultLite, PRIORITY_VAULT_DATA])
-priorityStabVaults: public(DynArray[VaultLite, PRIORITY_VAULT_DATA])
-
-# user config
-userConfig: public(HashMap[address, UserConfig]) # user -> config
-userDelegation: public(HashMap[address, HashMap[address, ActionDelegation]]) # user -> caller -> config
-
+underscoreRegistry: public(address)
 
 MAX_VAULTS_PER_ASSET: constant(uint256) = 10
 MAX_PRIORITY_PRICE_SOURCES: constant(uint256) = 10
 PRIORITY_VAULT_DATA: constant(uint256) = 20
-UNDERSCORE_AGENT_FACTORY_ID: constant(uint256) = 1
 
 
 @deploy
-def __init__(_ripeHq: address):
+def __init__(_ripeHq: address, _defaults: address):
     addys.__init__(_ripeHq)
     deptBasics.__init__(False, False, False) # no minting
-
     self.numAssets = 1 # not using 0 index
-    self.maxLtvDeviation = 10_00 # 10% default
+
+    # defaults
+    if _defaults != empty(address):
+        self.genConfig = staticcall Defaults(_defaults).genConfig()
+        self.genDebtConfig = staticcall Defaults(_defaults).genDebtConfig()
+        self.hrConfig = staticcall Defaults(_defaults).hrConfig()
+        self.ripeBondConfig = staticcall Defaults(_defaults).ripeBondConfig()
+        self.rewardsConfig = staticcall Defaults(_defaults).rewardsConfig()
+        self.stabClaimRewardsConfig = staticcall Defaults(_defaults).stabClaimRewardsConfig()
+        self.underscoreRegistry = staticcall Defaults(_defaults).underscoreRegistry()
+
+        ripeGovVaultConfig: cs.RipeGovVaultConfig = staticcall Defaults(_defaults).ripeGovVaultConfig()
+        if ripeGovVaultConfig.assetWeight != 0:
+            self.ripeGovVaultConfig[addys._getRipeToken()] = ripeGovVaultConfig
 
 
 #################
@@ -365,103 +221,28 @@ def __init__(_ripeHq: address):
 #################
 
 
-# general
-
-
 @external
-def setGeneralConfig(_config: GenConfig):
+def setGeneralConfig(_config: cs.GenConfig):
     assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
     self.genConfig = _config
 
 
-# debt
-
-
 @external
-def setGeneralDebtConfig(_config: GenDebtConfig):
+def setGeneralDebtConfig(_config: cs.GenDebtConfig):
     assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
     self.genDebtConfig = _config
 
 
-# rewards
-
-
 @external
-def setRipeRewardsConfig(_config: RipeRewardsConfig):
-    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
-    self.rewardsConfig = _config
-
-
-# underscore registry
-
-
-@external
-def setUnderscoreRegistry(_underscoreRegistry: address):
-    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
-    self.underscoreRegistry = _underscoreRegistry
-
-
-# can perform lite action
-
-
-@external
-def setCanPerformLiteAction(_user: address, _canDo: bool):
-    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
-    self.canPerformLiteAction[_user] = _canDo
-
-
-# max ltv deviation
-
-
-@external
-def setMaxLtvDeviation(_maxLtvDeviation: uint256):
-    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
-    self.maxLtvDeviation = _maxLtvDeviation
-
-
-# ripe gov vault config
-
-
-@external
-def setRipeGovVaultConfig(
-    _asset: address,
-    _assetWeight: uint256,
-    _shouldFreezeWhenBadDebt: bool,
-    _lockTerms: LockTerms,
-):
-    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
-    self.ripeGovVaultConfig[_asset] = RipeGovVaultConfig(
-        lockTerms=_lockTerms,
-        assetWeight=_assetWeight,
-        shouldFreezeWhenBadDebt=_shouldFreezeWhenBadDebt,
-    )
-
-
-# hr config
-
-
-@external
-def setHrConfig(_config: HrConfig):
+def setHrConfig(_config: cs.HrConfig):
     assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
     self.hrConfig = _config
 
 
-# ripe bond config
-
-
 @external
-def setRipeBondConfig(_config: RipeBondConfig):
+def setRipeBondConfig(_config: cs.RipeBondConfig):
     assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
     self.ripeBondConfig = _config
-
-
-# stab claims config
-
-
-@external
-def setStabClaimRewardsConfig(_config: StabClaimRewardsConfig):
-    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
-    self.stabClaimRewardsConfig = _config
 
 
 ################
@@ -470,7 +251,7 @@ def setStabClaimRewardsConfig(_config: StabClaimRewardsConfig):
 
 
 @external
-def setAssetConfig(_asset: address, _config: AssetConfig):
+def setAssetConfig(_asset: address, _config: cs.AssetConfig):
     assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
     self._updatePointsAllocs(_asset, _config.stakersPointsAlloc, _config.voterPointsAlloc) # do first!
     self.assetConfig[_asset] = _config
@@ -478,24 +259,6 @@ def setAssetConfig(_asset: address, _config: AssetConfig):
     # register asset (if necessary)
     if self.indexOfAsset[_asset] == 0:
         self._registerAsset(_asset)
-
-
-# points allocs
-
-
-@internal
-def _updatePointsAllocs(_asset: address, _newStakersPointsAlloc: uint256, _newVoterPointsAlloc: uint256):
-    totalPointsAllocs: TotalPointsAllocs = self.totalPointsAllocs
-
-    # remove old allocs
-    prevConfig: AssetConfig = self.assetConfig[_asset]
-    totalPointsAllocs.stakersPointsAllocTotal -= prevConfig.stakersPointsAlloc
-    totalPointsAllocs.voterPointsAllocTotal -= prevConfig.voterPointsAlloc
-
-    # add new allocs
-    totalPointsAllocs.stakersPointsAllocTotal += _newStakersPointsAlloc
-    totalPointsAllocs.voterPointsAllocTotal += _newVoterPointsAlloc
-    self.totalPointsAllocs = totalPointsAllocs
 
 
 # asset registration
@@ -535,9 +298,125 @@ def deregisterAsset(_asset: address) -> bool:
     return True
 
 
-#################
-# Priority Data #
-#################
+###############
+# User Config #
+###############
+
+
+@external
+def setUserConfig(_user: address, _config: cs.UserConfig):
+    assert addys._isSwitchboardAddr(msg.sender) or msg.sender == addys._getTellerAddr() # dev: no perms
+    self.userConfig[_user] = _config
+
+
+@external
+def setUserDelegation(_user: address, _delegate: address, _config: cs.ActionDelegation):
+    assert addys._isSwitchboardAddr(msg.sender) or msg.sender == addys._getTellerAddr() # dev: no perms
+    self.userDelegation[_user][_delegate] = _config
+
+
+##################
+# Rewards Config #
+##################
+
+
+@external
+def setRipeRewardsConfig(_config: cs.RipeRewardsConfig):
+    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
+    self.rewardsConfig = _config
+
+
+# points allocs
+
+
+@internal
+def _updatePointsAllocs(_asset: address, _newStakersPointsAlloc: uint256, _newVoterPointsAlloc: uint256):
+    totalPointsAllocs: TotalPointsAllocs = self.totalPointsAllocs
+
+    # remove old allocs
+    prevConfig: cs.AssetConfig = self.assetConfig[_asset]
+    totalPointsAllocs.stakersPointsAllocTotal -= prevConfig.stakersPointsAlloc
+    totalPointsAllocs.voterPointsAllocTotal -= prevConfig.voterPointsAlloc
+
+    # add new allocs
+    totalPointsAllocs.stakersPointsAllocTotal += _newStakersPointsAlloc
+    totalPointsAllocs.voterPointsAllocTotal += _newVoterPointsAlloc
+    self.totalPointsAllocs = totalPointsAllocs
+
+
+################
+# Vault Config #
+################
+
+
+# ripe gov vault
+
+
+@external
+def setRipeGovVaultConfig(
+    _asset: address,
+    _assetWeight: uint256,
+    _shouldFreezeWhenBadDebt: bool,
+    _lockTerms: cs.LockTerms,
+):
+    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
+    self.ripeGovVaultConfig[_asset] = cs.RipeGovVaultConfig(
+        lockTerms=_lockTerms,
+        assetWeight=_assetWeight,
+        shouldFreezeWhenBadDebt=_shouldFreezeWhenBadDebt,
+    )
+
+
+# stab pool claims
+
+
+@external
+def setStabClaimRewardsConfig(_config: cs.StabClaimRewardsConfig):
+    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
+    self.stabClaimRewardsConfig = _config
+
+
+# priority liq asset vaults
+
+
+@external
+def setPriorityLiqAssetVaults(_priorityLiqAssetVaults: DynArray[cs.VaultLite, PRIORITY_VAULT_DATA]):
+    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
+    self.priorityLiqAssetVaults = _priorityLiqAssetVaults
+
+
+# stability pool vaults
+
+
+@external
+def setPriorityStabVaults(_priorityStabVaults: DynArray[cs.VaultLite, PRIORITY_VAULT_DATA]):
+    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
+    self.priorityStabVaults = _priorityStabVaults
+
+
+##################
+# Access Control #
+##################
+
+
+@external
+def setCanPerformLiteAction(_user: address, _canDo: bool):
+    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
+    self.canPerformLiteAction[_user] = _canDo
+
+
+#########
+# Other #
+#########
+
+
+# underscore registry
+
+
+@external
+def setUnderscoreRegistry(_underscoreRegistry: address):
+    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
+    self.underscoreRegistry = _underscoreRegistry
 
 
 # price sources
@@ -547,102 +426,6 @@ def deregisterAsset(_asset: address) -> bool:
 def setPriorityPriceSourceIds(_priorityIds: DynArray[uint256, MAX_PRIORITY_PRICE_SOURCES]):
     assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
     self.priorityPriceSourceIds = _priorityIds
-
-
-# priority liq asset vaults
-
-
-@external
-def setPriorityLiqAssetVaults(_priorityLiqAssetVaults: DynArray[VaultLite, PRIORITY_VAULT_DATA]):
-    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
-    self.priorityLiqAssetVaults = _priorityLiqAssetVaults
-
-
-# stability pool vaults
-
-
-@external
-def setPriorityStabVaults(_priorityStabVaults: DynArray[VaultLite, PRIORITY_VAULT_DATA]):
-    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
-    self.priorityStabVaults = _priorityStabVaults
-
-
-###############
-# User Config #
-###############
-
-
-@external
-def setUserConfig(
-    _canAnyoneDeposit: bool = True,
-    _canAnyoneRepayDebt: bool = True,
-    _canAnyoneBondForUser: bool = False,
-) -> bool:
-    assert not deptBasics.isPaused # dev: contract paused
-    userConfig: UserConfig = UserConfig(
-        canAnyoneDeposit=_canAnyoneDeposit,
-        canAnyoneRepayDebt=_canAnyoneRepayDebt,
-        canAnyoneBondForUser=_canAnyoneBondForUser,
-    )
-    self.userConfig[msg.sender] = userConfig
-    log UserConfigSet(user=msg.sender, canAnyoneDeposit=_canAnyoneDeposit, canAnyoneRepayDebt=_canAnyoneRepayDebt, canAnyoneBondForUser=_canAnyoneBondForUser)
-    return True
-
-
-# delegation
-
-
-@external
-def setUserDelegation(
-    _delegate: address,
-    _canWithdraw: bool,
-    _canBorrow: bool,
-    _canClaimFromStabPool: bool,
-    _canClaimLoot: bool,
-    _user: address = msg.sender,
-) -> bool:
-    assert not deptBasics.isPaused # dev: contract paused
-    assert _delegate != empty(address) # dev: invalid delegate
-
-    # validate underscore wallet
-    if _user != msg.sender:
-        assert self._isUnderscoreWalletOwner(_user, msg.sender) # dev: not owner of underscore wallet
-
-    config: ActionDelegation = ActionDelegation(
-        canWithdraw=_canWithdraw,
-        canBorrow=_canBorrow,
-        canClaimFromStabPool=_canClaimFromStabPool,
-        canClaimLoot=_canClaimLoot,
-    )
-    self.userDelegation[_user][_delegate] = config
-    log UserDelegationSet(user=_user, delegate=_delegate, setter=msg.sender, canWithdraw=_canWithdraw, canBorrow=_canBorrow, canClaimFromStabPool=_canClaimFromStabPool, canClaimLoot=_canClaimLoot)
-    return True
-
-
-# underscore ownership check
-
-
-@view
-@internal
-def _isUnderscoreWalletOwner(_user: address, _caller: address) -> bool:
-    underscore: address = self.underscoreRegistry
-    if underscore == empty(address):
-        return False
-
-    agentFactory: address = staticcall UnderscoreRegistry(underscore).getAddy(UNDERSCORE_AGENT_FACTORY_ID)
-    if agentFactory == empty(address):
-        return False
-
-    # must be underscore wallet
-    if not staticcall UnderscoreAgentFactory(agentFactory).isUserWallet(_user):
-        return False
-
-    walletConfig: address = staticcall UnderscoreWallet(_user).walletConfig()
-    if walletConfig == empty(address):
-        return False
-
-    # caller must be owner!
-    return staticcall UnderscoreWalletConfig(walletConfig).owner() == _caller
 
 
 ###################
@@ -680,6 +463,15 @@ def _getNumAssets() -> uint256:
     return numAssets - 1
 
 
+@view
+@external
+def getFirstVaultIdForAsset(_asset: address) -> uint256:
+    vaultIds: DynArray[uint256, MAX_VAULTS_PER_ASSET] = self.assetConfig[_asset].vaultIds
+    if len(vaultIds) == 0:
+        return 0
+    return vaultIds[0]
+
+
 # is user allowed
 
 
@@ -698,8 +490,8 @@ def _isUserAllowed(_whitelist: address, _user: address, _asset: address) -> bool
 @view
 @external
 def getTellerDepositConfig(_vaultId: uint256, _asset: address, _user: address) -> TellerDepositConfig:
-    assetConfig: AssetConfig = self.assetConfig[_asset]
-    genConfig: GenConfig = self.genConfig
+    assetConfig: cs.AssetConfig = self.assetConfig[_asset]
+    genConfig: cs.GenConfig = self.genConfig
     return TellerDepositConfig(
         canDepositGeneral=genConfig.canDeposit,
         canDepositAsset=assetConfig.canDeposit,
@@ -719,11 +511,11 @@ def getTellerDepositConfig(_vaultId: uint256, _asset: address, _user: address) -
 @view
 @external
 def getTellerWithdrawConfig(_asset: address, _user: address, _caller: address) -> TellerWithdrawConfig:
-    assetConfig: AssetConfig = self.assetConfig[_asset]
+    assetConfig: cs.AssetConfig = self.assetConfig[_asset]
 
     canWithdrawForUser: bool = True
     if _user != _caller:
-        delegation: ActionDelegation = self.userDelegation[_user][_caller]
+        delegation: cs.ActionDelegation = self.userDelegation[_user][_caller]
         canWithdrawForUser = delegation.canWithdraw
 
     return TellerWithdrawConfig(
@@ -739,18 +531,18 @@ def getTellerWithdrawConfig(_asset: address, _user: address, _caller: address) -
 
 @view
 @external
-def getDebtTerms(_asset: address) -> DebtTerms:
+def getDebtTerms(_asset: address) -> cs.DebtTerms:
     return self.assetConfig[_asset].debtTerms
 
 
 @view
 @external
 def getBorrowConfig(_user: address, _caller: address) -> BorrowConfig:
-    genDebtConfig: GenDebtConfig = self.genDebtConfig
+    genDebtConfig: cs.GenDebtConfig = self.genDebtConfig
 
     canBorrowForUser: bool = True
     if _user != _caller:
-        delegation: ActionDelegation = self.userDelegation[_user][_caller]
+        delegation: cs.ActionDelegation = self.userDelegation[_user][_caller]
         canBorrowForUser = delegation.canBorrow
 
     return BorrowConfig(
@@ -764,6 +556,12 @@ def getBorrowConfig(_user: address, _caller: address) -> BorrowConfig:
         minDebtAmount=genDebtConfig.minDebtAmount,
         isDaowryEnabled=genDebtConfig.isDaowryEnabled,
     )
+
+
+@view
+@external
+def maxLtvDeviation() -> uint256:
+    return self.genDebtConfig.maxLtvDeviation
 
 
 # repay
@@ -783,13 +581,14 @@ def getRepayConfig(_user: address) -> RepayConfig:
 
 @view
 @external
-def getRedeemCollateralConfig(_asset: address, _redeemer: address) -> RedeemCollateralConfig:
-    assetConfig: AssetConfig = self.assetConfig[_asset]
+def getRedeemCollateralConfig(_asset: address, _recipient: address) -> RedeemCollateralConfig:
+    assetConfig: cs.AssetConfig = self.assetConfig[_asset]
     return RedeemCollateralConfig(
         canRedeemCollateralGeneral=self.genConfig.canRedeemCollateral,
         canRedeemCollateralAsset=assetConfig.canRedeemCollateral,
-        isUserAllowed=self._isUserAllowed(assetConfig.whitelist, _redeemer, _asset),
+        isUserAllowed=self._isUserAllowed(assetConfig.whitelist, _recipient, _asset),
         ltvPaybackBuffer=self.genDebtConfig.ltvPaybackBuffer,
+        canAnyoneDeposit=self.userConfig[_recipient].canAnyoneDeposit,
     )
 
 
@@ -804,33 +603,34 @@ def getLtvPaybackBuffer() -> uint256:
 
 @view
 @external
-def getAuctionBuyConfig(_asset: address, _buyer: address) -> AuctionBuyConfig:
-    assetConfig: AssetConfig = self.assetConfig[_asset]
+def getAuctionBuyConfig(_asset: address, _recipient: address) -> AuctionBuyConfig:
+    assetConfig: cs.AssetConfig = self.assetConfig[_asset]
     return AuctionBuyConfig(
         canBuyInAuctionGeneral=self.genConfig.canBuyInAuction,
         canBuyInAuctionAsset=assetConfig.canBuyInAuction,
-        isUserAllowed=self._isUserAllowed(assetConfig.whitelist, _buyer, _asset),
+        isUserAllowed=self._isUserAllowed(assetConfig.whitelist, _recipient, _asset),
+        canAnyoneDeposit=self.userConfig[_recipient].canAnyoneDeposit,
     )
 
 
-# general liquidation config
+# general liquidation cs
 
 
 @view
 @external
 def getGenLiqConfig() -> GenLiqConfig:
-    genDebtConfig: GenDebtConfig = self.genDebtConfig
+    genDebtConfig: cs.GenDebtConfig = self.genDebtConfig
     vaultBook: address = addys._getVaultBookAddr()
 
     # priority liq asset vault data
     priorityLiqAssetVaults: DynArray[VaultData, PRIORITY_VAULT_DATA] = []
-    for pData: VaultLite in self.priorityLiqAssetVaults:
+    for pData: cs.VaultLite in self.priorityLiqAssetVaults:
         vaultAddr: address = staticcall VaultBook(vaultBook).getAddr(pData.vaultId)
         priorityLiqAssetVaults.append(VaultData(vaultId=pData.vaultId, vaultAddr=vaultAddr, asset=pData.asset))
 
     # stability pool vault data
     priorityStabVaults: DynArray[VaultData, PRIORITY_VAULT_DATA] = []
-    for pData: VaultLite in self.priorityStabVaults:
+    for pData: cs.VaultLite in self.priorityStabVaults:
         vaultAddr: address = staticcall VaultBook(vaultBook).getAddr(pData.vaultId)
         priorityStabVaults.append(VaultData(vaultId=pData.vaultId, vaultAddr=vaultAddr, asset=pData.asset))
 
@@ -847,17 +647,17 @@ def getGenLiqConfig() -> GenLiqConfig:
 
 @view
 @external
-def getGenAuctionParams() -> AuctionParams:
+def getGenAuctionParams() -> cs.AuctionParams:
     return self.genDebtConfig.genAuctionParams
 
 
-# asset liquidation config
+# asset liquidation cs
 
 
 @view
 @external
 def getAssetLiqConfig(_asset: address) -> AssetLiqConfig:
-    assetConfig: AssetConfig = self.assetConfig[_asset]
+    assetConfig: cs.AssetConfig = self.assetConfig[_asset]
     vaultBook: address = addys._getVaultBookAddr()
 
     # handle special stab pool
@@ -890,14 +690,14 @@ def getAssetLiqConfig(_asset: address) -> AssetLiqConfig:
 @view
 @external
 def getStabPoolClaimsConfig(_claimAsset: address, _claimer: address, _caller: address) -> StabPoolClaimsConfig:
-    assetConfig: AssetConfig = self.assetConfig[_claimAsset]
+    assetConfig: cs.AssetConfig = self.assetConfig[_claimAsset]
 
     canClaimFromStabPoolForUser: bool = True
     if _claimer != _caller:
-        delegation: ActionDelegation = self.userDelegation[_claimer][_caller]
+        delegation: cs.ActionDelegation = self.userDelegation[_claimer][_caller]
         canClaimFromStabPoolForUser = delegation.canClaimFromStabPool
 
-    rewardsConfig: StabClaimRewardsConfig = self.stabClaimRewardsConfig
+    rewardsConfig: cs.StabClaimRewardsConfig = self.stabClaimRewardsConfig
     return StabPoolClaimsConfig(
         canClaimInStabPoolGeneral=self.genConfig.canClaimInStabPool,
         canClaimInStabPoolAsset=assetConfig.canClaimInStabPool,
@@ -913,12 +713,13 @@ def getStabPoolClaimsConfig(_claimAsset: address, _claimer: address, _caller: ad
 
 @view
 @external
-def getStabPoolRedemptionsConfig(_asset: address, _redeemer: address) -> StabPoolRedemptionsConfig:
-    assetConfig: AssetConfig = self.assetConfig[_asset]
+def getStabPoolRedemptionsConfig(_asset: address, _recipient: address) -> StabPoolRedemptionsConfig:
+    assetConfig: cs.AssetConfig = self.assetConfig[_asset]
     return StabPoolRedemptionsConfig(
         canRedeemInStabPoolGeneral=self.genConfig.canRedeemInStabPool,
         canRedeemInStabPoolAsset=assetConfig.canRedeemInStabPool,
-        isUserAllowed=self._isUserAllowed(assetConfig.whitelist, _redeemer, _asset),
+        isUserAllowed=self._isUserAllowed(assetConfig.whitelist, _recipient, _asset),
+        canAnyoneDeposit=self.userConfig[_recipient].canAnyoneDeposit,
     )
 
 
@@ -930,11 +731,11 @@ def getStabPoolRedemptionsConfig(_asset: address, _redeemer: address) -> StabPoo
 def getClaimLootConfig(_user: address, _caller: address, _ripeToken: address) -> ClaimLootConfig:
     canClaimLootForUser: bool = True
     if _user != _caller:
-        delegation: ActionDelegation = self.userDelegation[_user][_caller]
+        delegation: cs.ActionDelegation = self.userDelegation[_user][_caller]
         canClaimLootForUser = delegation.canClaimLoot
 
-    ripeTokenVaultConfig: RipeGovVaultConfig = self.ripeGovVaultConfig[_ripeToken]
-    rewardsConfig: RipeRewardsConfig = self.rewardsConfig
+    ripeTokenVaultConfig: cs.RipeGovVaultConfig = self.ripeGovVaultConfig[_ripeToken]
+    rewardsConfig: cs.RipeRewardsConfig = self.rewardsConfig
 
     return ClaimLootConfig(
         canClaimLoot=self.genConfig.canClaimLoot,
@@ -946,13 +747,13 @@ def getClaimLootConfig(_user: address, _caller: address, _ripeToken: address) ->
     )
 
 
-# rewards config
+# rewards cs
 
 
 @view
 @external
 def getRewardsConfig() -> RewardsConfig:
-    rewardsConfig: RipeRewardsConfig = self.rewardsConfig
+    rewardsConfig: cs.RipeRewardsConfig = self.rewardsConfig
     totalPointsAllocs: TotalPointsAllocs = self.totalPointsAllocs
     return RewardsConfig(
         arePointsEnabled=rewardsConfig.arePointsEnabled,
@@ -972,7 +773,7 @@ def getRewardsConfig() -> RewardsConfig:
 @view
 @external
 def getDepositPointsConfig(_asset: address) -> DepositPointsConfig:
-    assetConfig: AssetConfig = self.assetConfig[_asset]
+    assetConfig: cs.AssetConfig = self.assetConfig[_asset]
     return DepositPointsConfig(
         stakersPointsAlloc=assetConfig.stakersPointsAlloc,
         voterPointsAlloc=assetConfig.voterPointsAlloc,
@@ -980,7 +781,7 @@ def getDepositPointsConfig(_asset: address) -> DepositPointsConfig:
     )
 
 
-# price config
+# price cs
 
 
 @view
@@ -992,38 +793,38 @@ def getPriceConfig() -> PriceConfig:
     )
 
 
-# ripe bond config
+# ripe bond cs
 
 
 @view
 @external
 def getPurchaseRipeBondConfig(_user: address) -> PurchaseRipeBondConfig:
-    config: RipeBondConfig = self.ripeBondConfig
-    vaultConfig: RipeGovVaultConfig = self.ripeGovVaultConfig[addys._getRipeToken()]
+    bondConfig: cs.RipeBondConfig = self.ripeBondConfig
+    vaultConfig: cs.RipeGovVaultConfig = self.ripeGovVaultConfig[addys._getRipeToken()]
 
     return PurchaseRipeBondConfig(
-        asset=config.asset,
-        amountPerEpoch=config.amountPerEpoch,
-        canBond=config.canBond,
-        minRipePerUnit=config.minRipePerUnit,
-        maxRipePerUnit=config.maxRipePerUnit,
-        maxRipePerUnitLockBonus=config.maxRipePerUnitLockBonus,
-        epochLength=config.epochLength,
-        shouldAutoRestart=config.shouldAutoRestart,
-        restartDelayBlocks=config.restartDelayBlocks,
+        asset=bondConfig.asset,
+        amountPerEpoch=bondConfig.amountPerEpoch,
+        canBond=bondConfig.canBond,
+        minRipePerUnit=bondConfig.minRipePerUnit,
+        maxRipePerUnit=bondConfig.maxRipePerUnit,
+        maxRipePerUnitLockBonus=bondConfig.maxRipePerUnitLockBonus,
+        epochLength=bondConfig.epochLength,
+        shouldAutoRestart=bondConfig.shouldAutoRestart,
+        restartDelayBlocks=bondConfig.restartDelayBlocks,
         minLockDuration=vaultConfig.lockTerms.minLockDuration,
         maxLockDuration=vaultConfig.lockTerms.maxLockDuration,
         canAnyoneBondForUser=self.userConfig[_user].canAnyoneBondForUser,
     )
 
 
-# dynamic borrow rate config
+# dynamic borrow rate cs
 
 
 @view
 @external
 def getDynamicBorrowRateConfig() -> DynamicBorrowRateConfig:
-    genDebtConfig: GenDebtConfig = self.genDebtConfig
+    genDebtConfig: cs.GenDebtConfig = self.genDebtConfig
     return DynamicBorrowRateConfig(
         minDynamicRateBoost=genDebtConfig.minDynamicRateBoost,
         maxDynamicRateBoost=genDebtConfig.maxDynamicRateBoost,
@@ -1038,7 +839,7 @@ def getDynamicBorrowRateConfig() -> DynamicBorrowRateConfig:
 @view
 @external
 def getPriceStaleTime() -> uint256:
-    # used by Chainlink.vy
+    # used by some price sources
     return self.genConfig.priceStaleTime
 
 
@@ -1053,11 +854,28 @@ def getPriorityPriceSourceIds() -> DynArray[uint256, MAX_PRIORITY_PRICE_SOURCES]
 
 @view 
 @external 
-def getPriorityLiqAssetVaults() -> DynArray[VaultLite, PRIORITY_VAULT_DATA]:
+def getPriorityLiqAssetVaults() -> DynArray[cs.VaultLite, PRIORITY_VAULT_DATA]:
     return self.priorityLiqAssetVaults
 
 
 @view 
 @external 
-def getPriorityStabVaults() -> DynArray[VaultLite, PRIORITY_VAULT_DATA]:
+def getPriorityStabVaults() -> DynArray[cs.VaultLite, PRIORITY_VAULT_DATA]:
     return self.priorityStabVaults
+
+
+# underscore helper
+
+
+@view
+@external
+def doesUndyLegoHaveAccess(_wallet: address, _legoAddr: address) -> bool:
+    config: cs.UserConfig = self.userConfig[_wallet]
+    if not config.canAnyoneDeposit or not config.canAnyoneRepayDebt:
+        return False
+
+    delegation: cs.ActionDelegation = self.userDelegation[_wallet][_legoAddr]
+    if not delegation.canWithdraw or not delegation.canBorrow or not delegation.canClaimLoot:
+        return False
+    
+    return True

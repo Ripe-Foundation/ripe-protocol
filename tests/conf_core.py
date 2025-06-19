@@ -138,6 +138,10 @@ def ripe_hq(
     ripe_hq_deploy.initiateHqConfigChange(13, True, False, False, sender=deploy3r)
     assert ripe_hq_deploy.confirmHqConfigChange(13, sender=deploy3r)
 
+    # endaoment can mint green
+    ripe_hq_deploy.initiateHqConfigChange(14, True, False, False, sender=deploy3r)
+    assert ripe_hq_deploy.confirmHqConfigChange(14, sender=deploy3r)
+
     # human resources can mint ripe
     ripe_hq_deploy.initiateHqConfigChange(15, False, True, False, sender=deploy3r)
     assert ripe_hq_deploy.confirmHqConfigChange(15, sender=deploy3r)
@@ -215,14 +219,11 @@ def savings_green(fork, green_token, deploy3r):
 
 
 @pytest.fixture(scope="session")
-def ledger(ripe_hq_deploy):
+def ledger(ripe_hq_deploy, defaults):
     return boa.load(
         "contracts/data/Ledger.vy",
         ripe_hq_deploy,
-        # TODO: get actual values here
-        100 * (1_000_000 * EIGHTEEN_DECIMALS), # 100 million
-        100 * (1_000_000 * EIGHTEEN_DECIMALS), # 100 million
-        100 * (1_000_000 * EIGHTEEN_DECIMALS), # 100 million
+        defaults,
         name="ledger",
     )
 
@@ -231,10 +232,11 @@ def ledger(ripe_hq_deploy):
 
 
 @pytest.fixture(scope="session")
-def mission_control(ripe_hq_deploy):
+def mission_control(ripe_hq_deploy, defaults):
     return boa.load(
         "contracts/data/MissionControl.vy",
         ripe_hq_deploy,
+        defaults,
         name="mission_control",
     )
 
@@ -308,10 +310,11 @@ def credit_engine(ripe_hq_deploy):
 
 
 @pytest.fixture(scope="session")
-def endaoment(ripe_hq_deploy):
+def endaoment(ripe_hq_deploy, fork):
     return boa.load(
         "contracts/core/Endaoment.vy",
         ripe_hq_deploy,
+        ADDYS[fork]["WETH"],
         name="endaoment",
     )
 
@@ -460,6 +463,19 @@ def switchboard_delta(ripe_hq_deploy, fork):
     )
 
 
+# defaults
+
+
+@pytest.fixture(scope="session")
+def defaults(fork):
+    d = ZERO_ADDRESS
+    if fork == "local":
+        d = boa.load("contracts/config/DefaultsLocal.vy")
+    elif fork == "base":
+        d = boa.load("contracts/config/DefaultsBase.vy")
+    return d
+
+
 ##########
 # Vaults #
 ##########
@@ -574,7 +590,7 @@ def price_desk_deploy(ripe_hq_deploy, fork):
 
 
 @pytest.fixture(scope="session")
-def price_desk(price_desk_deploy, deploy3r, chainlink, mock_price_source, curve_prices):
+def price_desk(price_desk_deploy, deploy3r, chainlink, mock_price_source, curve_prices, blue_chip_prices, pyth_prices, stork_prices):
 
     # register chainlink
     assert price_desk_deploy.startAddNewAddressToRegistry(chainlink, "Chainlink", sender=deploy3r)
@@ -584,9 +600,21 @@ def price_desk(price_desk_deploy, deploy3r, chainlink, mock_price_source, curve_
     assert price_desk_deploy.startAddNewAddressToRegistry(curve_prices, "Curve Prices", sender=deploy3r)
     assert price_desk_deploy.confirmNewAddressToRegistry(curve_prices, sender=deploy3r) == 2
 
+    # register blue chip prices
+    assert price_desk_deploy.startAddNewAddressToRegistry(blue_chip_prices, "Blue Chip Prices", sender=deploy3r)
+    assert price_desk_deploy.confirmNewAddressToRegistry(blue_chip_prices, sender=deploy3r) == 3
+
+    # register pyth prices
+    assert price_desk_deploy.startAddNewAddressToRegistry(pyth_prices, "Pyth Prices", sender=deploy3r)
+    assert price_desk_deploy.confirmNewAddressToRegistry(pyth_prices, sender=deploy3r) == 4
+
+    # register stork prices
+    assert price_desk_deploy.startAddNewAddressToRegistry(stork_prices, "Stork Prices", sender=deploy3r)
+    assert price_desk_deploy.confirmNewAddressToRegistry(stork_prices, sender=deploy3r) == 5
+
     # register mock price source
     assert price_desk_deploy.startAddNewAddressToRegistry(mock_price_source, "Mock Price Source", sender=deploy3r)
-    assert price_desk_deploy.confirmNewAddressToRegistry(mock_price_source, sender=deploy3r) == 3
+    assert price_desk_deploy.confirmNewAddressToRegistry(mock_price_source, sender=deploy3r) == 6
 
     # finish registry setup
     assert price_desk_deploy.setRegistryTimeLockAfterSetup(sender=deploy3r)
@@ -603,7 +631,7 @@ def chainlink(ripe_hq_deploy, fork, sally, bob, deploy3r, mock_chainlink_feed_on
     CHAINLINK_BTC_USD = ZERO_ADDRESS if fork == "local" else ADDYS[fork]["CHAINLINK_BTC_USD"]
 
     c = boa.load(
-        "contracts/priceSources/Chainlink.vy",
+        "contracts/priceSources/ChainlinkPrices.vy",
         ripe_hq_deploy,
         PARAMS[fork]["PRICE_DESK_MIN_REG_TIMELOCK"],
         PARAMS[fork]["PRICE_DESK_MAX_REG_TIMELOCK"],
@@ -642,6 +670,75 @@ def curve_prices(ripe_hq_deploy, fork, deploy3r):
         PARAMS[fork]["PRICE_DESK_MIN_REG_TIMELOCK"],
         PARAMS[fork]["PRICE_DESK_MAX_REG_TIMELOCK"],
         name="curve_prices",
+    )
+    assert c.setActionTimeLockAfterSetup(sender=deploy3r)
+    return c
+
+
+# blue chip vault token prices
+
+
+@pytest.fixture(scope="session")
+def blue_chip_prices(ripe_hq_deploy, fork, deploy3r, mock_yield_registry):
+    MORPHO_A = mock_yield_registry if fork == "local" else ADDYS[fork]["MORPHO_FACTORY"]
+    MORPHO_B = mock_yield_registry if fork == "local" else ADDYS[fork]["MORPHO_FACTORY_LEGACY"]
+    EULER_A = mock_yield_registry if fork == "local" else ADDYS[fork]["EULER_EVAULT_FACTORY"]
+    EULER_B = mock_yield_registry if fork == "local" else ADDYS[fork]["EULER_EARN_FACTORY"]
+    FLUID = mock_yield_registry if fork == "local" else ADDYS[fork]["FLUID_RESOLVER"]
+    COMPOUND_V3 = mock_yield_registry if fork == "local" else ADDYS[fork]["COMPOUND_V3_CONFIGURATOR"]
+    MOONWELL = mock_yield_registry if fork == "local" else ADDYS[fork]["MOONWELL_COMPTROLLER"]
+    AAVE_V3 = mock_yield_registry if fork == "local" else ADDYS[fork]["AAVE_V3_ADDRESS_PROVIDER"]
+
+    c = boa.load(
+        "contracts/priceSources/BlueChipYieldPrices.vy",
+        ripe_hq_deploy,
+        PARAMS[fork]["PRICE_DESK_MIN_REG_TIMELOCK"],
+        PARAMS[fork]["PRICE_DESK_MAX_REG_TIMELOCK"],
+        [MORPHO_A, MORPHO_B],
+        [EULER_A, EULER_B],
+        FLUID,
+        COMPOUND_V3,
+        MOONWELL,
+        AAVE_V3,
+        name="blue_chip_prices",
+    )
+    assert c.setActionTimeLockAfterSetup(sender=deploy3r)
+    return c
+
+
+# pyth prices
+
+
+@pytest.fixture(scope="session")
+def pyth_prices(ripe_hq_deploy, fork, deploy3r, mock_pyth):
+    pyth_network = mock_pyth if fork == "local" else ADDYS[fork]["PYTH_NETWORK"]
+
+    c = boa.load(
+        "contracts/priceSources/PythPrices.vy",
+        ripe_hq_deploy,
+        pyth_network,
+        PARAMS[fork]["PRICE_DESK_MIN_REG_TIMELOCK"],
+        PARAMS[fork]["PRICE_DESK_MAX_REG_TIMELOCK"],
+        name="pyth_prices",
+    )
+    assert c.setActionTimeLockAfterSetup(sender=deploy3r)
+    return c
+
+
+# stork prices
+
+
+@pytest.fixture(scope="session")
+def stork_prices(ripe_hq_deploy, fork, deploy3r, mock_stork):
+    stork_network = mock_stork if fork == "local" else ADDYS[fork]["STORK_NETWORK"]
+
+    c = boa.load(
+        "contracts/priceSources/StorkPrices.vy",
+        ripe_hq_deploy,
+        stork_network,
+        PARAMS[fork]["PRICE_DESK_MIN_REG_TIMELOCK"],
+        PARAMS[fork]["PRICE_DESK_MAX_REG_TIMELOCK"],
+        name="stork_prices",
     )
     assert c.setActionTimeLockAfterSetup(sender=deploy3r)
     return c

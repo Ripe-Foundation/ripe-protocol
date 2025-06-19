@@ -10,6 +10,7 @@ initializes: timeLock[gov := gov]
 import contracts.modules.LocalGov as gov
 import contracts.modules.TimeLock as timeLock
 from interfaces import Vault
+import interfaces.ConfigStructs as cs
 
 interface HrContributor:
     def setIsFrozen(_shouldFreeze: bool) -> bool: nonpayable
@@ -20,12 +21,12 @@ interface HrContributor:
     def cancelPaycheck(): nonpayable
 
 interface MissionControl:
-    def setStabClaimRewardsConfig(_config: StabClaimRewardsConfig): nonpayable
-    def setRipeBondConfig(_config: RipeBondConfig): nonpayable
+    def setStabClaimRewardsConfig(_config: cs.StabClaimRewardsConfig): nonpayable
+    def setRipeBondConfig(_config: cs.RipeBondConfig): nonpayable
     def canPerformLiteAction(_user: address) -> bool: view
-    def setHrConfig(_config: HrConfig): nonpayable
-    def ripeBondConfig() -> RipeBondConfig: view
-    def hrConfig() -> HrConfig: view
+    def setHrConfig(_config: cs.HrConfig): nonpayable
+    def ripeBondConfig() -> cs.RipeBondConfig: view
+    def hrConfig() -> cs.HrConfig: view
 
 interface Ledger:
     def isHrContributor(_contributor: address) -> bool: view
@@ -51,14 +52,6 @@ flag ActionType:
     RIPE_BAD_DEBT
     STAB_CLAIM_REWARDS
 
-struct HrConfig:
-    contribTemplate: address
-    maxCompensation: uint256
-    minCliffLength: uint256
-    maxStartDelay: uint256
-    minVestingLength: uint256
-    maxVestingLength: uint256
-
 struct PendingManager:
     contributor: address
     pendingManager: address
@@ -66,21 +59,6 @@ struct PendingManager:
 struct PendingCancelPaycheck:
     contributor: address
     pendingShouldCancel: bool
-
-struct RipeBondConfig:
-    asset: address
-    amountPerEpoch: uint256
-    canBond: bool
-    minRipePerUnit: uint256
-    maxRipePerUnit: uint256
-    maxRipePerUnitLockBonus: uint256
-    epochLength: uint256
-    shouldAutoRestart: bool
-    restartDelayBlocks: uint256
-
-struct StabClaimRewardsConfig:
-    rewardsLockDuration: uint256
-    ripePerDollarClaimed: uint256
 
 event PendingHrContribTemplateChange:
     contribTemplate: indexed(address)
@@ -219,12 +197,12 @@ event StabClaimRewardsConfigSet:
 
 # pending config changes
 actionType: public(HashMap[uint256, ActionType]) # aid -> type
-pendingHrConfig: public(HashMap[uint256, HrConfig]) # aid -> config
+pendingHrConfig: public(HashMap[uint256, cs.HrConfig]) # aid -> config
 pendingManager: public(HashMap[uint256, PendingManager]) # aid -> pending manager
 pendingCancelPaycheck: public(HashMap[uint256, address]) # aid -> contributor
-pendingRipeBondConfig: public(HashMap[uint256, RipeBondConfig]) # aid -> config
+pendingRipeBondConfig: public(HashMap[uint256, cs.RipeBondConfig]) # aid -> config
 pendingRipeBondConfigValue: public(HashMap[uint256, uint256]) # aid -> block
-pendingStabClaimRewardsConfig: public(HashMap[uint256, StabClaimRewardsConfig]) # aid -> config
+pendingStabClaimRewardsConfig: public(HashMap[uint256, cs.StabClaimRewardsConfig]) # aid -> config
 
 LEDGER_ID: constant(uint256) = 4
 MISSION_CONTROL_ID: constant(uint256) = 5
@@ -356,7 +334,7 @@ def _setPendingHrConfig(
     aid: uint256 = timeLock._initiateAction()
 
     self.actionType[aid] = _actionType
-    self.pendingHrConfig[aid] = HrConfig(
+    self.pendingHrConfig[aid] = cs.HrConfig(
         contribTemplate=_contribTemplate,
         maxCompensation=_maxCompensation,
         minCliffLength=_minCliffLength,
@@ -488,7 +466,7 @@ def setRipeBondConfig(
     _maxRipePerUnitLockBonus: uint256,
     _shouldAutoRestart: bool,
     _restartDelayBlocks: uint256,
-) -> bool:
+) -> uint256:
     assert gov._canGovern(msg.sender) # dev: no perms
     aid: uint256 = timeLock._initiateAction()
     self.actionType[aid] = ActionType.RIPE_BOND_CONFIG
@@ -497,7 +475,7 @@ def setRipeBondConfig(
     assert 0 not in [_amountPerEpoch, _maxRipePerUnit] # dev: invalid config
     assert _minRipePerUnit < _maxRipePerUnit # dev: invalid min/max ripe per unit
     
-    self.pendingRipeBondConfig[aid] = RipeBondConfig(
+    self.pendingRipeBondConfig[aid] = cs.RipeBondConfig(
         asset=_asset,
         amountPerEpoch=_amountPerEpoch,
         canBond=False,
@@ -520,14 +498,14 @@ def setRipeBondConfig(
         confirmationBlock=confirmationBlock,
         actionId=aid,
     )
-    return True
+    return aid
 
 
 # epoch length
 
 
 @external
-def setRipeBondEpochLength(_epochLength: uint256) -> bool:
+def setRipeBondEpochLength(_epochLength: uint256) -> uint256:
     assert gov._canGovern(msg.sender) # dev: no perms
     assert _epochLength != 0 # dev: invalid epoch length
     aid: uint256 = timeLock._initiateAction()
@@ -535,22 +513,22 @@ def setRipeBondEpochLength(_epochLength: uint256) -> bool:
     self.pendingRipeBondConfigValue[aid] = _epochLength
     confirmationBlock: uint256 = timeLock._getActionConfirmationBlock(aid)
     log PendingRipeBondEpochLengthSet(epochLength=_epochLength, confirmationBlock=confirmationBlock, actionId=aid)
-    return True
+    return aid
 
 
 # start epoch at block
 
 
 @external
-def setStartEpochAtBlock(_block: uint256) -> bool:
+def setStartEpochAtBlock(_block: uint256 = 0) -> uint256:
     assert gov._canGovern(msg.sender) # dev: no perms
     aid: uint256 = timeLock._initiateAction()
     self.actionType[aid] = ActionType.RIPE_BOND_START_EPOCH
-    assert _block > block.number # dev: invalid start block
-    self.pendingRipeBondConfigValue[aid] = _block
+    blockNum: uint256 = max(_block, block.number)
+    self.pendingRipeBondConfigValue[aid] = blockNum
     confirmationBlock: uint256 = timeLock._getActionConfirmationBlock(aid)
-    log PendingStartEpochAtBlockSet(startBlock=_block, confirmationBlock=confirmationBlock, actionId=aid)
-    return True
+    log PendingStartEpochAtBlockSet(startBlock=blockNum, confirmationBlock=confirmationBlock, actionId=aid)
+    return aid
 
 
 # disable / enable bonding
@@ -560,7 +538,7 @@ def setStartEpochAtBlock(_block: uint256) -> bool:
 def setCanPurchaseRipeBond(_canBond: bool) -> bool:
     assert self._hasPermsToEnable(msg.sender, not _canBond) # dev: no perms
     mc: address = self._getMissionControlAddr()
-    config: RipeBondConfig = staticcall MissionControl(mc).ripeBondConfig()
+    config: cs.RipeBondConfig = staticcall MissionControl(mc).ripeBondConfig()
     assert config.canBond != _canBond # dev: no change
     config.canBond = _canBond
     extcall MissionControl(mc).setRipeBondConfig(config)
@@ -572,14 +550,14 @@ def setCanPurchaseRipeBond(_canBond: bool) -> bool:
 
 
 @external
-def setBadDebt(_amount: uint256) -> bool:
+def setBadDebt(_amount: uint256) -> uint256:
     assert gov._canGovern(msg.sender) # dev: no perms
     aid: uint256 = timeLock._initiateAction()
     self.actionType[aid] = ActionType.RIPE_BAD_DEBT
     self.pendingRipeBondConfigValue[aid] = _amount
     confirmationBlock: uint256 = timeLock._getActionConfirmationBlock(aid)
     log PendingBadDebtSet(badDebt=_amount, confirmationBlock=confirmationBlock, actionId=aid)
-    return True
+    return aid
 
 
 ###########################
@@ -594,7 +572,7 @@ def setStabClaimRewardsConfig(_rewardsLockDuration: uint256, _ripePerDollarClaim
 
     aid: uint256 = timeLock._initiateAction()
     self.actionType[aid] = ActionType.STAB_CLAIM_REWARDS
-    self.pendingStabClaimRewardsConfig[aid] = StabClaimRewardsConfig(
+    self.pendingStabClaimRewardsConfig[aid] = cs.StabClaimRewardsConfig(
         rewardsLockDuration=_rewardsLockDuration,
         ripePerDollarClaimed=_ripePerDollarClaimed,
     )
@@ -628,35 +606,35 @@ def executePendingAction(_aid: uint256) -> bool:
     mc: address = self._getMissionControlAddr()
 
     if actionType == ActionType.HR_CONFIG_TEMPLATE:
-        config: HrConfig = staticcall MissionControl(mc).hrConfig()
+        config: cs.HrConfig = staticcall MissionControl(mc).hrConfig()
         config.contribTemplate = self.pendingHrConfig[_aid].contribTemplate
         extcall MissionControl(mc).setHrConfig(config)
         log HrContribTemplateSet(contribTemplate=config.contribTemplate)
 
     elif actionType == ActionType.HR_CONFIG_MAX_COMP:
-        config: HrConfig = staticcall MissionControl(mc).hrConfig()
-        p: HrConfig = self.pendingHrConfig[_aid]
+        config: cs.HrConfig = staticcall MissionControl(mc).hrConfig()
+        p: cs.HrConfig = self.pendingHrConfig[_aid]
         config.maxCompensation = p.maxCompensation
         extcall MissionControl(mc).setHrConfig(config)
         log HrMaxCompensationSet(maxCompensation=p.maxCompensation)
 
     elif actionType == ActionType.HR_CONFIG_MIN_CLIFF:
-        config: HrConfig = staticcall MissionControl(mc).hrConfig()
-        p: HrConfig = self.pendingHrConfig[_aid]
+        config: cs.HrConfig = staticcall MissionControl(mc).hrConfig()
+        p: cs.HrConfig = self.pendingHrConfig[_aid]
         config.minCliffLength = p.minCliffLength
         extcall MissionControl(mc).setHrConfig(config)
         log HrMinCliffLengthSet(minCliffLength=p.minCliffLength)
 
     elif actionType == ActionType.HR_CONFIG_MAX_START_DELAY:
-        config: HrConfig = staticcall MissionControl(mc).hrConfig()
-        p: HrConfig = self.pendingHrConfig[_aid]
+        config: cs.HrConfig = staticcall MissionControl(mc).hrConfig()
+        p: cs.HrConfig = self.pendingHrConfig[_aid]
         config.maxStartDelay = p.maxStartDelay
         extcall MissionControl(mc).setHrConfig(config)
         log HrMaxStartDelaySet(maxStartDelay=p.maxStartDelay)
 
     elif actionType == ActionType.HR_CONFIG_VESTING:
-        config: HrConfig = staticcall MissionControl(mc).hrConfig()
-        p: HrConfig = self.pendingHrConfig[_aid]
+        config: cs.HrConfig = staticcall MissionControl(mc).hrConfig()
+        p: cs.HrConfig = self.pendingHrConfig[_aid]
         config.minVestingLength = p.minVestingLength
         config.maxVestingLength = p.maxVestingLength
         extcall MissionControl(mc).setHrConfig(config)
@@ -673,8 +651,8 @@ def executePendingAction(_aid: uint256) -> bool:
         log HrContributorCancelPaycheckSet(contributor=p)
 
     elif actionType == ActionType.RIPE_BOND_CONFIG:
-        p: RipeBondConfig = self.pendingRipeBondConfig[_aid]
-        config: RipeBondConfig = staticcall MissionControl(mc).ripeBondConfig()
+        p: cs.RipeBondConfig = self.pendingRipeBondConfig[_aid]
+        config: cs.RipeBondConfig = staticcall MissionControl(mc).ripeBondConfig()
         config.asset = p.asset
         config.amountPerEpoch = p.amountPerEpoch
         config.minRipePerUnit = p.minRipePerUnit
@@ -687,7 +665,7 @@ def executePendingAction(_aid: uint256) -> bool:
         log RipeBondConfigSet(asset=p.asset, amountPerEpoch=p.amountPerEpoch, minRipePerUnit=p.minRipePerUnit, maxRipePerUnit=p.maxRipePerUnit, maxRipePerUnitLockBonus=p.maxRipePerUnitLockBonus, shouldAutoRestart=p.shouldAutoRestart)
 
     elif actionType == ActionType.RIPE_BOND_EPOCH_LENGTH:
-        config: RipeBondConfig = staticcall MissionControl(mc).ripeBondConfig()
+        config: cs.RipeBondConfig = staticcall MissionControl(mc).ripeBondConfig()
         config.epochLength = self.pendingRipeBondConfigValue[_aid]
         extcall MissionControl(mc).setRipeBondConfig(config)
         extcall BondRoom(self._getBondRoomAddr()).startBondEpochAtBlock(0) # reset epoch
@@ -704,7 +682,7 @@ def executePendingAction(_aid: uint256) -> bool:
         log BadDebtSet(badDebt=amount)
 
     elif actionType == ActionType.STAB_CLAIM_REWARDS:
-        p: StabClaimRewardsConfig = self.pendingStabClaimRewardsConfig[_aid]
+        p: cs.StabClaimRewardsConfig = self.pendingStabClaimRewardsConfig[_aid]
         extcall MissionControl(mc).setStabClaimRewardsConfig(p)
         log StabClaimRewardsConfigSet(rewardsLockDuration=p.rewardsLockDuration, ripePerDollarClaimed=p.ripePerDollarClaimed)
 

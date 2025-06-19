@@ -23,19 +23,11 @@ numAssets: public(uint256) # number of assets
 
 MAX_ASSETS: constant(uint256) = 50
 MAX_RECOVER_ASSETS: constant(uint256) = 20
-HAS_GREEN_REF_POOL: immutable(bool)
 
 
 @deploy
-def __init__(_hasGreenRefPool: bool, _shouldPause: bool):
-    HAS_GREEN_REF_POOL = _hasGreenRefPool
+def __init__(_shouldPause: bool):
     self.isPaused = _shouldPause
-
-
-@view
-@external
-def hasGreenRefPool() -> bool:
-    return HAS_GREEN_REF_POOL
 
 
 ##############

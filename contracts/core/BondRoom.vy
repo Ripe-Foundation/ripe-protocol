@@ -23,7 +23,8 @@ interface Ledger:
     def getRipeBondData() -> RipeBondData: view
 
 interface Teller:
-    def depositIntoGovVaultFromTrusted(_user: address, _asset: address, _amount: uint256, _lockDuration: uint256, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
+    def depositFromTrusted(_user: address, _vaultId: uint256, _asset: address, _amount: uint256, _lockDuration: uint256, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
+    def isUnderscoreWalletOwner(_user: address, _caller: address, _mc: address = empty(address)) -> bool: view
 
 interface PriceDesk:
     def getUsdValue(_asset: address, _amount: uint256, _shouldRaise: bool = False) -> uint256: view
@@ -54,7 +55,7 @@ struct RipeBondData:
     badDebt: uint256
 
 event RipeBondPurchased:
-    user: indexed(address)
+    recipient: indexed(address)
     paymentAsset: indexed(address)
     paymentAmount: uint256
     lockDuration: uint256
@@ -67,6 +68,7 @@ event RipeBondPurchased:
     caller: indexed(address)
 
 HUNDRED_PERCENT: constant(uint256) = 100_00 # 100.00%
+RIPE_GOV_VAULT_ID: constant(uint256) = 2
 
 
 @deploy
@@ -82,7 +84,7 @@ def __init__(_ripeHq: address):
 
 @external
 def purchaseRipeBond(
-    _user: address,
+    _recipient: address,
     _paymentAsset: address,
     _paymentAmount: uint256,
     _lockDuration: uint256,
@@ -92,37 +94,28 @@ def purchaseRipeBond(
     assert msg.sender == addys._getTellerAddr() # dev: only Teller allowed
     assert not deptBasics.isPaused # dev: contract paused
     a: addys.Addys = addys._getAddys(_a)
-    return self._purchaseRipeBond(_user, _paymentAsset, _paymentAmount, _lockDuration, _caller, a)
 
-
-@internal
-def _purchaseRipeBond(
-    _user: address,
-    _paymentAsset: address,
-    _paymentAmount: uint256,
-    _lockDuration: uint256,
-    _caller: address,
-    _a: addys.Addys,
-) -> uint256:
-    assert _user != empty(address) # dev: invalid user
+    assert _recipient != empty(address) # dev: invalid user
     maxUserAmount: uint256 = min(_paymentAmount, staticcall IERC20(_paymentAsset).balanceOf(self))
     assert maxUserAmount != 0 # dev: user has no asset balance (or zero specified)
 
-    config: PurchaseRipeBondConfig = staticcall MissionControl(_a.missionControl).getPurchaseRipeBondConfig(_user)
+    config: PurchaseRipeBondConfig = staticcall MissionControl(a.missionControl).getPurchaseRipeBondConfig(_recipient)
     assert config.asset == _paymentAsset # dev: asset mismatch
     assert config.maxRipePerUnit != 0 # dev: max ripe per unit is zero
     assert config.canBond # dev: bonds disabled
-    if _user != _caller:
-        assert config.canAnyoneBondForUser # dev: cannot bond for user
+
+    # can others bond for user
+    if _recipient != _caller and not config.canAnyoneBondForUser:
+        assert staticcall Teller(a.teller).isUnderscoreWalletOwner(_recipient, _caller, a.missionControl) # dev: cannot bond for user
 
     # refresh epoch if necessary
     epochStart: uint256 = 0
     epochEnd: uint256 = 0
-    epochStart, epochEnd = self._refreshBondEpoch(_a.ledger, config.amountPerEpoch, config.epochLength)
+    epochStart, epochEnd = self._refreshBondEpoch(a.ledger, config.amountPerEpoch, config.epochLength)
     assert block.number >= epochStart and block.number < epochEnd # dev: not within epoch window
 
     # check availability - do AFTER epoch refresh!
-    data: RipeBondData = staticcall Ledger(_a.ledger).getRipeBondData()
+    data: RipeBondData = staticcall Ledger(a.ledger).getRipeBondData()
     assert data.paymentAmountAvailInEpoch != 0 # dev: no more available in epoch
     paymentAmount: uint256 = min(maxUserAmount, data.paymentAmountAvailInEpoch)
 
@@ -147,28 +140,28 @@ def _purchaseRipeBond(
     # handle bad debt (if applicable)
     ripeForBadDebt: uint256 = 0
     if data.badDebt != 0:
-        paymentUsdValue: uint256 = staticcall PriceDesk(_a.priceDesk).getUsdValue(_paymentAsset, paymentAmount, False)
+        paymentUsdValue: uint256 = staticcall PriceDesk(a.priceDesk).getUsdValue(_paymentAsset, paymentAmount, False)
         if paymentUsdValue != 0:
             ripeForBadDebt = ripePayout
             debtRepaymentValue: uint256 = min(paymentUsdValue, data.badDebt)
             if debtRepaymentValue < paymentUsdValue:
                 ripeForBadDebt = ripePayout * debtRepaymentValue // paymentUsdValue
-            extcall Ledger(_a.ledger).didClearBadDebt(debtRepaymentValue, ripeForBadDebt)
+            extcall Ledger(a.ledger).didClearBadDebt(debtRepaymentValue, ripeForBadDebt)
 
     # update bond data -- amount avail in epoch is reduced even if bad debt is repaid
-    extcall Ledger(_a.ledger).didPurchaseRipeBond(paymentAmount, ripePayout - ripeForBadDebt)
+    extcall Ledger(a.ledger).didPurchaseRipeBond(paymentAmount, ripePayout - ripeForBadDebt)
 
     # transfer payment proceeds to endaoment
-    assert extcall IERC20(_paymentAsset).transfer(_a.endaoment, paymentAmount, default_return_value=True) # dev: asset transfer failed
+    assert extcall IERC20(_paymentAsset).transfer(a.endaoment, paymentAmount, default_return_value=True) # dev: asset transfer failed
 
     # mint ripe tokens, deposit into gov vault or transfer tokens to user
     if lockDuration != 0:
-        extcall RipeToken(_a.ripeToken).mint(self, ripePayout)
-        assert extcall IERC20(_a.ripeToken).approve(_a.teller, ripePayout, default_return_value=True) # dev: ripe approval failed
-        extcall Teller(_a.teller).depositIntoGovVaultFromTrusted(_user, _a.ripeToken, ripePayout, lockDuration, _a)
-        assert extcall IERC20(_a.ripeToken).approve(_a.teller, 0, default_return_value=True) # dev: ripe approval failed
+        extcall RipeToken(a.ripeToken).mint(self, ripePayout)
+        assert extcall IERC20(a.ripeToken).approve(a.teller, ripePayout, default_return_value=True) # dev: ripe approval failed
+        extcall Teller(a.teller).depositFromTrusted(_recipient, RIPE_GOV_VAULT_ID, a.ripeToken, ripePayout, lockDuration, a)
+        assert extcall IERC20(a.ripeToken).approve(a.teller, 0, default_return_value=True) # dev: ripe approval failed
     else:
-        extcall RipeToken(_a.ripeToken).mint(_user, ripePayout)
+        extcall RipeToken(a.ripeToken).mint(_recipient, ripePayout)
 
     # refund user any extra payment amount
     refundAmount: uint256 = 0
@@ -179,9 +172,9 @@ def _purchaseRipeBond(
     # start next epoch (if applicable)
     if paymentAmount == data.paymentAmountAvailInEpoch and config.shouldAutoRestart:
         newStartBlock: uint256 = block.number + config.restartDelayBlocks
-        extcall Ledger(_a.ledger).setEpochData(newStartBlock, newStartBlock + config.epochLength, config.amountPerEpoch)
+        extcall Ledger(a.ledger).setEpochData(newStartBlock, newStartBlock + config.epochLength, config.amountPerEpoch)
 
-    log RipeBondPurchased(user=_user, paymentAsset=_paymentAsset, paymentAmount=paymentAmount, lockDuration=lockDuration, ripePayout=ripePayout, ripeForBadDebt=ripeForBadDebt, baseRipePerUnit=baseRipePerUnit, ripePerUnitBonus=ripePerUnitBonus, epochProgress=epochProgress, refundAmount=refundAmount, caller=_caller)
+    log RipeBondPurchased(recipient=_recipient, paymentAsset=_paymentAsset, paymentAmount=paymentAmount, lockDuration=lockDuration, ripePayout=ripePayout, ripeForBadDebt=ripeForBadDebt, baseRipePerUnit=baseRipePerUnit, ripePerUnitBonus=ripePerUnitBonus, epochProgress=epochProgress, refundAmount=refundAmount, caller=_caller)
     return ripePayout
 
 

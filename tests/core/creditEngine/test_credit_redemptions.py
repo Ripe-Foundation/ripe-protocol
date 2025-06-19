@@ -85,7 +85,7 @@ def test_credit_redemption_basic(
     assert log.user == bob
     assert log.vaultId == vault_id
     assert log.asset == alpha_token.address
-    assert log.redeemer == alice
+    assert log.recipient == alice
     assert log.repayValue == green_spent
     
     # Alice should have received collateral
@@ -1518,7 +1518,7 @@ def test_credit_redemption_transfer_balance_basic(
     assert len(logs) == 1
     log = logs[0]
     assert log.user == bob
-    assert log.redeemer == alice
+    assert log.recipient == alice
     assert log.amount == amount_transferred
 
 

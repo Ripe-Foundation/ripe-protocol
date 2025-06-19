@@ -16,6 +16,7 @@ import contracts.modules.Addys as addys
 import contracts.modules.DeptBasics as deptBasics
 import contracts.modules.LocalGov as gov
 import contracts.modules.TimeLock as timeLock
+import interfaces.ConfigStructs as cs
 
 from interfaces import Vault
 from interfaces import Department
@@ -43,7 +44,7 @@ interface HrContributor:
     def compensation() -> uint256: view
 
 interface Teller:
-    def depositIntoGovVaultFromTrusted(_user: address, _asset: address, _amount: uint256, _lockDuration: uint256, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
+    def depositFromTrusted(_user: address, _vaultId: uint256, _asset: address, _amount: uint256, _lockDuration: uint256, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
 
 interface Lootbox:
     def updateDepositPoints(_user: address, _vaultId: uint256, _vaultAddr: address, _asset: address, _a: addys.Addys = empty(addys.Addys)): nonpayable
@@ -52,7 +53,7 @@ interface VaultBook:
     def getAddr(_vaultId: uint256) -> address: view
 
 interface MissionControl:
-    def hrConfig() -> HrConfig: view
+    def hrConfig() -> cs.HrConfig: view
 
 struct ContributorTerms:
     owner: address
@@ -63,14 +64,6 @@ struct ContributorTerms:
     cliffLength: uint256
     unlockLength: uint256
     depositLockDuration: uint256
-
-struct HrConfig:
-    contribTemplate: address
-    maxCompensation: uint256
-    minCliffLength: uint256
-    maxStartDelay: uint256
-    minVestingLength: uint256
-    maxVestingLength: uint256
 
 event NewContributorInitiated:
     owner: indexed(address)
@@ -159,7 +152,7 @@ def initiateNewContributor(
         unlockLength=_unlockLength,
         depositLockDuration=_depositLockDuration,
     )
-    hrConfig: HrConfig = staticcall MissionControl(a.missionControl).hrConfig()
+    hrConfig: cs.HrConfig = staticcall MissionControl(a.missionControl).hrConfig()
     assert self._areValidContributorTerms(terms, hrConfig, a.ledger) # dev: invalid terms
 
     aid: uint256 = timeLock._initiateAction()
@@ -192,7 +185,7 @@ def confirmNewContributor(_aid: uint256) -> bool:
     terms: ContributorTerms = self.pendingContributor[_aid]
     assert terms.owner != empty(address) # dev: no pending contributor
 
-    hrConfig: HrConfig = staticcall MissionControl(a.missionControl).hrConfig()
+    hrConfig: cs.HrConfig = staticcall MissionControl(a.missionControl).hrConfig()
     if not self._areValidContributorTerms(terms, hrConfig, a.ledger):
         self._cancelNewPendingContributor(_aid)
         return False
@@ -298,13 +291,13 @@ def areValidContributorTerms(
         unlockLength=_unlockLength,
         depositLockDuration=_depositLockDuration,
     )
-    hrConfig: HrConfig = staticcall MissionControl(a.missionControl).hrConfig()
+    hrConfig: cs.HrConfig = staticcall MissionControl(a.missionControl).hrConfig()
     return self._areValidContributorTerms(terms, hrConfig, a.ledger)
 
 
 @view
 @internal
-def _areValidContributorTerms(_terms: ContributorTerms, _hrConfig: HrConfig, _ledger: address) -> bool:
+def _areValidContributorTerms(_terms: ContributorTerms, _hrConfig: cs.HrConfig, _ledger: address) -> bool:
 
     # must have a template
     if _hrConfig.contribTemplate == empty(address):
@@ -410,7 +403,7 @@ def cashRipeCheck(_amount: uint256, _lockDuration: uint256) -> bool:
 
     # deposit into gov vault
     assert extcall IERC20(a.ripeToken).approve(a.teller, _amount, default_return_value=True) # dev: ripe approval failed
-    extcall Teller(a.teller).depositIntoGovVaultFromTrusted(msg.sender, a.ripeToken, _amount, _lockDuration, a)
+    extcall Teller(a.teller).depositFromTrusted(msg.sender, RIPE_GOV_VAULT_ID, a.ripeToken, _amount, _lockDuration, a)
     assert extcall IERC20(a.ripeToken).approve(a.teller, 0, default_return_value=True) # dev: ripe approval failed
     return True
 

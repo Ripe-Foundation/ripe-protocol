@@ -117,7 +117,7 @@ def test_borrow_user_not_allowed(
 
     # Attempt borrow should fail
     borrow_amount = 100 * EIGHTEEN_DECIMALS
-    with boa.reverts("cannot borrow for user"):
+    with boa.reverts("not allowed to borrow for user"):
         teller.borrow(borrow_amount, bob, False, sender=sally)
 
     # allow sally to withdraw for bob
@@ -795,6 +795,114 @@ def test_borrow_savings_green(
     # verify balances
     assert green_token.balanceOf(bob) == 0  # no regular green tokens
     assert savings_green.balanceOf(bob) != 0  # received savings_green instead
+
+
+def test_borrow_savings_green_enter_stab_pool(
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    setGeneralDebtConfig,
+    performDeposit,
+    mock_price_source,
+    teller,
+    green_token,
+    savings_green,
+    stability_pool,
+):
+    # basic setup
+    setGeneralConfig()
+    setAssetConfig(alpha_token)
+    setAssetConfig(savings_green, [1])
+    setGeneralDebtConfig()
+
+    # deposits
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    performDeposit(bob, deposit_amount, alpha_token, alpha_token_whale)
+
+    # set mock prices
+    alpha_price = 1 * EIGHTEEN_DECIMALS
+    mock_price_source.setPrice(alpha_token, alpha_price)
+
+    # verify initial balances
+    assert green_token.balanceOf(bob) == 0
+    assert savings_green.balanceOf(bob) == 0
+    
+    # verify user has no balance in stability pool initially
+    initial_stab_pool_balance = stability_pool.getTotalAmountForUser(bob, savings_green.address)
+    assert initial_stab_pool_balance == 0
+
+    # borrow with savings_green and enter stability pool
+    borrow_amount = 50 * EIGHTEEN_DECIMALS
+    amount = teller.borrow(borrow_amount, bob, True, True, sender=bob)  # _wantsSavingsGreen=True, _shouldEnterStabPool=True
+
+    # verify borrow log
+    log = filter_logs(teller, "NewBorrow")[0]
+    assert log.user == bob
+    assert log.newLoan == borrow_amount
+    assert log.didReceiveSavingsGreen == True
+    assert log.outstandingUserDebt == borrow_amount
+
+    # verify balances - user should have no direct sGREEN balance
+    assert green_token.balanceOf(bob) == 0  # no regular green tokens
+    assert savings_green.balanceOf(bob) == 0  # no direct savings_green (it's in stab pool)
+
+    # verify user has sGREEN balance in stability pool
+    final_stab_pool_balance = stability_pool.getTotalAmountForUser(bob, savings_green.address)
+    assert final_stab_pool_balance > 0  # should have sGREEN deposited in stability pool
+
+
+def test_borrow_savings_green_no_stab_pool(
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    setGeneralDebtConfig,
+    performDeposit,
+    mock_price_source,
+    teller,
+    green_token,
+    savings_green,
+    stability_pool,
+):
+    # basic setup
+    setGeneralConfig()
+    setAssetConfig(alpha_token)
+    setAssetConfig(savings_green, [1])
+    setGeneralDebtConfig()
+
+    # deposits
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    performDeposit(bob, deposit_amount, alpha_token, alpha_token_whale)
+
+    # set mock prices
+    alpha_price = 1 * EIGHTEEN_DECIMALS
+    mock_price_source.setPrice(alpha_token, alpha_price)
+
+    # verify initial balances
+    assert green_token.balanceOf(bob) == 0
+    assert savings_green.balanceOf(bob) == 0
+
+    # borrow with savings_green but don't enter stability pool
+    borrow_amount = 50 * EIGHTEEN_DECIMALS
+    amount = teller.borrow(borrow_amount, bob, True, False, sender=bob)  # _wantsSavingsGreen=True, _shouldEnterStabPool=False
+
+    # verify borrow log
+    log = filter_logs(teller, "NewBorrow")[0]
+    assert log.user == bob
+    assert log.newLoan == borrow_amount
+    assert log.didReceiveSavingsGreen == True
+    assert log.outstandingUserDebt == borrow_amount
+
+    # verify balances - user should have direct sGREEN balance
+    assert green_token.balanceOf(bob) == 0  # no regular green tokens
+    assert savings_green.balanceOf(bob) > 0  # received savings_green directly
+
+    # verify user has no balance in stability pool
+    stab_pool_balance = stability_pool.getTotalAmountForUser(bob, savings_green.address)
+    assert stab_pool_balance == 0  # should have no sGREEN in stability pool
 
 
 ################

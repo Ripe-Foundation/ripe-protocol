@@ -12,14 +12,17 @@ from ethereum.ercs import IERC20
 
 interface MissionControl:
     def getStabPoolClaimsConfig(_claimAsset: address, _claimer: address, _caller: address) -> StabPoolClaimsConfig: view
-    def getStabPoolRedemptionsConfig(_asset: address, _redeemer: address) -> StabPoolRedemptionsConfig: view
+    def getTellerDepositConfig(_vaultId: uint256, _asset: address, _user: address) -> TellerDepositConfig: view
+    def getStabPoolRedemptionsConfig(_asset: address, _recipient: address) -> StabPoolRedemptionsConfig: view
+    def getFirstVaultIdForAsset(_asset: address) -> uint256: view
+
+interface Teller:
+    def depositFromTrusted(_user: address, _vaultId: uint256, _asset: address, _amount: uint256, _lockDuration: uint256, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
+    def isUnderscoreWalletOwner(_user: address, _caller: address, _mc: address = empty(address)) -> bool: view
 
 interface PriceDesk:
     def getAssetAmount(_asset: address, _usdValue: uint256, _shouldRaise: bool = False) -> uint256: view
     def getUsdValue(_asset: address, _amount: uint256, _shouldRaise: bool = False) -> uint256: view
-
-interface Teller:
-    def depositIntoGovVaultFromTrusted(_user: address, _asset: address, _amount: uint256, _lockDuration: uint256, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
 
 interface VaultBook:
     def mintRipeForStabPoolClaims(_amount: uint256, _ripeToken: address, _ledger: address) -> bool: nonpayable
@@ -51,6 +54,18 @@ struct StabPoolRedemptionsConfig:
     canRedeemInStabPoolGeneral: bool
     canRedeemInStabPoolAsset: bool
     isUserAllowed: bool
+    canAnyoneDeposit: bool
+
+struct TellerDepositConfig:
+    canDepositGeneral: bool
+    canDepositAsset: bool
+    doesVaultSupportAsset: bool
+    isUserAllowed: bool
+    perUserDepositLimit: uint256
+    globalDepositLimit: uint256
+    perUserMaxAssetsPerVault: uint256
+    perUserMaxVaults: uint256
+    canAnyoneDeposit: bool
 
 event AssetClaimedInStabilityPool:
     user: indexed(address)
@@ -74,6 +89,7 @@ MAX_STAB_CLAIMS: constant(uint256) = 15
 MAX_STAB_REDEMPTIONS: constant(uint256) = 15
 DECIMAL_OFFSET: constant(uint256) = 10 ** 8
 EIGHTEEN_DECIMALS: constant(uint256) = 10 ** 18
+RIPE_GOV_VAULT_ID: constant(uint256) = 2
 
 
 @deploy
@@ -447,8 +463,12 @@ def swapForLiquidatedCollateral(
 
     # burn green token
     if _recipient == empty(address):
-        assert _stabAsset in [_greenToken, _savingsGreenToken] # dev: must be green token or savings green token
-        assert extcall GreenToken(_greenToken).burn(amount) # dev: burn failed
+        assert _stabAsset in [_greenToken, _savingsGreenToken] # dev: must be green or savings green
+        if _stabAsset == _savingsGreenToken:
+            greenAmount: uint256 = extcall IERC4626(_savingsGreenToken).redeem(amount, self, self) # dev: savings green redeem failed
+            assert extcall GreenToken(_greenToken).burn(greenAmount) # dev: failed to burn green
+        else:
+            assert extcall GreenToken(_greenToken).burn(amount) # dev: failed to burn green
 
     else:
         assert extcall IERC20(_stabAsset).transfer(_recipient, amount, default_return_value=True) # dev: transfer failed
@@ -565,13 +585,14 @@ def claimFromStabilityPool(
     _claimAsset: address,
     _maxUsdValue: uint256,
     _caller: address,
+    _shouldAutoDeposit: bool,
     _a: addys.Addys = empty(addys.Addys),
 ) -> uint256:
     assert msg.sender == addys._getTellerAddr() # dev: only Teller allowed
     assert not vaultData.isPaused # dev: contract paused
     a: addys.Addys = addys._getAddys(_a)
     config: StabPoolClaimsConfig = staticcall MissionControl(a.missionControl).getStabPoolClaimsConfig(_claimAsset, _claimer, _caller)
-    claimUsdValue: uint256 = self._claimFromStabilityPool(_claimer, _stabAsset, _claimAsset, _maxUsdValue, _caller, config, a)
+    claimUsdValue: uint256 = self._claimFromStabilityPool(_claimer, _stabAsset, _claimAsset, _maxUsdValue, _caller, _shouldAutoDeposit, config, a)
     assert claimUsdValue != 0 # dev: nothing claimed
     self._handleClaimRewards(_claimer, claimUsdValue, config.rewardsLockDuration, config.ripePerDollarClaimed, a)
     return claimUsdValue
@@ -582,6 +603,7 @@ def claimManyFromStabilityPool(
     _claimer: address,
     _claims: DynArray[StabPoolClaim, MAX_STAB_CLAIMS],
     _caller: address,
+    _shouldAutoDeposit: bool,
     _a: addys.Addys = empty(addys.Addys),
 ) -> uint256:
     assert msg.sender == addys._getTellerAddr() # dev: only Teller allowed
@@ -592,7 +614,7 @@ def claimManyFromStabilityPool(
     totalUsdValue: uint256 = 0
     for c: StabPoolClaim in _claims:
         config = staticcall MissionControl(a.missionControl).getStabPoolClaimsConfig(c.claimAsset, _claimer, _caller)
-        totalUsdValue += self._claimFromStabilityPool(_claimer, c.stabAsset, c.claimAsset, c.maxUsdValue, _caller, config, a)
+        totalUsdValue += self._claimFromStabilityPool(_claimer, c.stabAsset, c.claimAsset, c.maxUsdValue, _caller, _shouldAutoDeposit, config, a)
     assert totalUsdValue != 0 # dev: nothing claimed
     self._handleClaimRewards(_claimer, totalUsdValue, config.rewardsLockDuration, config.ripePerDollarClaimed, a)
     return totalUsdValue
@@ -605,6 +627,7 @@ def _claimFromStabilityPool(
     _claimAsset: address,
     _maxUsdValue: uint256,
     _caller: address,
+    _shouldAutoDeposit: bool,
     _config: StabPoolClaimsConfig,
     _a: addys.Addys,
 ) -> uint256:
@@ -615,8 +638,9 @@ def _claimFromStabilityPool(
     if not _config.canClaimInStabPoolGeneral or not _config.canClaimInStabPoolAsset or not _config.isUserAllowed:
         return 0
 
-    if _claimer != _caller:
-        assert _config.canClaimFromStabPoolForUser # dev: cannot claim for user
+    # can others claim for user
+    if _claimer != _caller and not _config.canClaimFromStabPoolForUser:
+        assert staticcall Teller(_a.teller).isUnderscoreWalletOwner(_claimer, _caller, _a.missionControl) # dev: cannot claim for user
 
     # max claimable asset
     maxClaimableAsset: uint256 = self.claimableBalances[_stabAsset][_claimAsset]
@@ -639,7 +663,7 @@ def _claimFromStabilityPool(
     self._reduceClaimableBalances(_stabAsset, _claimAsset, claimAmount, maxClaimableAsset)
 
     # move tokens to recipient
-    assert extcall IERC20(_claimAsset).transfer(_claimer, claimAmount, default_return_value=True) # dev: token transfer failed
+    self._handleAssetForUser(_claimAsset, claimAmount, _claimer, _shouldAutoDeposit, _a)
 
     log AssetClaimedInStabilityPool(user=_claimer, stabAsset=_stabAsset, claimAsset=_claimAsset, claimAmount=claimAmount, claimUsdValue=claimUsdValue, claimShares=claimShares, isDepleted=isDepleted)
     return claimUsdValue
@@ -714,7 +738,7 @@ def _handleClaimRewards(
 
     # deposit into gov vault
     assert extcall IERC20(_a.ripeToken).approve(_a.teller, ripeAvailable, default_return_value=True) # dev: ripe approval failed
-    extcall Teller(_a.teller).depositIntoGovVaultFromTrusted(_claimer, _a.ripeToken, ripeAvailable, _lockDuration, _a)
+    extcall Teller(_a.teller).depositFromTrusted(_claimer, RIPE_GOV_VAULT_ID, _a.ripeToken, ripeAvailable, _lockDuration, _a)
     assert extcall IERC20(_a.ripeToken).approve(_a.teller, 0, default_return_value=True) # dev: ripe approval failed
 
 
@@ -727,7 +751,9 @@ def _handleClaimRewards(
 def redeemFromStabilityPool(
     _asset: address,
     _greenAmount: uint256,
-    _redeemer: address,
+    _recipient: address,
+    _caller: address,
+    _shouldAutoDeposit: bool,
     _shouldRefundSavingsGreen: bool,
     _a: addys.Addys = empty(addys.Addys),
 ) -> uint256:
@@ -739,12 +765,12 @@ def redeemFromStabilityPool(
 
     greenAmount: uint256 = min(_greenAmount, staticcall IERC20(a.greenToken).balanceOf(self))
     assert greenAmount != 0 # dev: no green to redeem
-    greenSpent: uint256 = self._redeemFromStabilityPool(_redeemer, _asset, max_value(uint256), greenAmount, a.greenToken, a.savingsGreen, a.priceDesk, a.missionControl)
+    greenSpent: uint256 = self._redeemFromStabilityPool(_recipient, _caller, _asset, max_value(uint256), greenAmount, _shouldAutoDeposit, a)
     assert greenSpent != 0 # dev: no redemptions occurred
 
     # handle leftover green
     if greenAmount > greenSpent:
-        self._handleGreenForUser(_redeemer, greenAmount - greenSpent, _shouldRefundSavingsGreen, a.greenToken, a.savingsGreen)
+        self._handleGreenForUser(_caller, greenAmount - greenSpent, _shouldRefundSavingsGreen, a.greenToken, a.savingsGreen)
 
     return greenSpent
 
@@ -753,7 +779,9 @@ def redeemFromStabilityPool(
 def redeemManyFromStabilityPool(
     _redemptions: DynArray[StabPoolRedemption, MAX_STAB_REDEMPTIONS],
     _greenAmount: uint256,
-    _redeemer: address,
+    _recipient: address,
+    _caller: address,
+    _shouldAutoDeposit: bool,
     _shouldRefundSavingsGreen: bool,
     _a: addys.Addys = empty(addys.Addys),
 ) -> uint256:
@@ -770,7 +798,7 @@ def redeemManyFromStabilityPool(
     for r: StabPoolRedemption in _redemptions:
         if totalGreenRemaining == 0:
             break
-        greenSpent: uint256 = self._redeemFromStabilityPool(_redeemer, r.claimAsset, r.maxGreenAmount, totalGreenRemaining, a.greenToken, a.savingsGreen, a.priceDesk, a.missionControl)
+        greenSpent: uint256 = self._redeemFromStabilityPool(_recipient, _caller, r.claimAsset, r.maxGreenAmount, totalGreenRemaining, _shouldAutoDeposit, a)
         totalGreenRemaining -= greenSpent
         totalGreenSpent += greenSpent
 
@@ -778,7 +806,7 @@ def redeemManyFromStabilityPool(
 
     # handle leftover green
     if totalGreenRemaining != 0:
-        self._handleGreenForUser(_redeemer, totalGreenRemaining, _shouldRefundSavingsGreen, a.greenToken, a.savingsGreen)
+        self._handleGreenForUser(_caller, totalGreenRemaining, _shouldRefundSavingsGreen, a.greenToken, a.savingsGreen)
 
     return totalGreenSpent
 
@@ -794,39 +822,42 @@ def _canRedeemInThisVault(_greenToken: address) -> bool:
 
 @internal
 def _redeemFromStabilityPool(
-    _redeemer: address,
+    _recipient: address,
+    _caller: address,
     _asset: address,
     _maxGreenForAsset: uint256,
     _totalGreenRemaining: uint256,
-    _greenToken: address,
-    _savingsGreen: address,
-    _priceDesk: address,
-    _missionControl: address,
+    _shouldAutoDeposit: bool,
+    _a: addys.Addys,
 ) -> uint256:
 
     # NOTE: failing gracefully here, in case of many redemptions at same time
 
     # invalid inputs
-    if empty(address) in [_redeemer, _asset] or 0 in [_maxGreenForAsset, _totalGreenRemaining]:
+    if empty(address) in [_recipient, _asset] or 0 in [_maxGreenForAsset, _totalGreenRemaining]:
+        return 0
+
+    # cannot redeem green token - don't be silly
+    if _asset == _a.greenToken:
         return 0
 
     # check redemption config
-    config: StabPoolRedemptionsConfig = staticcall MissionControl(_missionControl).getStabPoolRedemptionsConfig(_asset, _redeemer)
+    config: StabPoolRedemptionsConfig = staticcall MissionControl(_a.missionControl).getStabPoolRedemptionsConfig(_asset, _recipient)
     if not config.canRedeemInStabPoolGeneral or not config.canRedeemInStabPoolAsset or not config.isUserAllowed:
         return 0
 
-    # cannot redeem green token
-    if _asset == _greenToken:
-        return 0
+    # make sure caller can deposit to recipient
+    if _recipient != _caller and not config.canAnyoneDeposit:
+        assert staticcall Teller(_a.teller).isUnderscoreWalletOwner(_recipient, _caller, _a.missionControl) # dev: not allowed to deposit for user
 
     # treating green as $1
-    maxGreenAvailable: uint256 = min(_totalGreenRemaining, staticcall IERC20(_greenToken).balanceOf(self))
+    maxGreenAvailable: uint256 = min(_totalGreenRemaining, staticcall IERC20(_a.greenToken).balanceOf(self))
     maxRedeemValue: uint256 = min(_maxGreenForAsset, maxGreenAvailable)
     if maxRedeemValue == 0:
         return 0
 
     # max claimable amount
-    maxClaimableAmount: uint256 = self._getAssetAmount(_asset, maxRedeemValue, _greenToken, _savingsGreen, _priceDesk)
+    maxClaimableAmount: uint256 = self._getAssetAmount(_asset, maxRedeemValue, _a.greenToken, _a.savingsGreen, _a.priceDesk)
     if maxClaimableAmount == 0:
         return 0
 
@@ -864,12 +895,12 @@ def _redeemFromStabilityPool(
         # reduce claimable balances
         claimAmount: uint256 = min(remainingClaimAmount, claimableBalance)
         self._reduceClaimableBalances(stabAsset, _asset, claimAmount, claimableBalance)
-        assert extcall IERC20(_asset).transfer(_redeemer, claimAmount, default_return_value=True) # dev: transfer failed
+        self._handleAssetForUser(_asset, claimAmount, _recipient, _shouldAutoDeposit, _a)
         remainingClaimAmount -= claimAmount
 
         # add green to claimable
         redeemAmount: uint256 = min(claimAmount * maxRedeemValue // maxClaimableAmount, remainingRedeemValue)
-        self._addClaimableBalance(stabAsset, _greenToken, redeemAmount)
+        self._addClaimableBalance(stabAsset, _a.greenToken, redeemAmount)
         remainingRedeemValue -= redeemAmount
         greenSpent += redeemAmount
 
@@ -900,6 +931,45 @@ def _handleGreenForUser(
 
     else:
         assert extcall IERC20(_greenToken).transfer(_recipient, amount, default_return_value=True) # dev: green transfer failed
+
+
+##################
+# Asset Handling #
+##################
+
+
+@internal
+def _handleAssetForUser(
+    _asset: address,
+    _amount: uint256,
+    _recipient: address,
+    _shouldAutoDeposit: bool,
+    _a: addys.Addys,
+):
+    vaultId: uint256 = staticcall MissionControl(_a.missionControl).getFirstVaultIdForAsset(_asset)
+
+    # auto-deposit
+    if _shouldAutoDeposit and self._canPerformAutoDeposit(vaultId, _asset, _recipient, _a.missionControl):
+        assert extcall IERC20(_asset).approve(_a.teller, _amount, default_return_value=True) # dev: token approval failed
+        extcall Teller(_a.teller).depositFromTrusted(_recipient, vaultId, _asset, _amount, 0, _a)
+        assert extcall IERC20(_asset).approve(_a.teller, 0, default_return_value=True) # dev: token approval failed
+    else:
+        assert extcall IERC20(_asset).transfer(_recipient, _amount, default_return_value=True) # dev: transfer failed
+
+
+@view
+@internal
+def _canPerformAutoDeposit(
+    _vaultId: uint256,
+    _asset: address,
+    _recipient: address,
+    _missionControl: address,
+) -> bool:
+    # invalid vault or stability pool (can't deposit right back into it)
+    if _vaultId in [0, 1]:
+        return False
+    config: TellerDepositConfig = staticcall MissionControl(_missionControl).getTellerDepositConfig(_vaultId, _asset, _recipient)
+    return config.canDepositGeneral and config.canDepositAsset
 
 
 ##################

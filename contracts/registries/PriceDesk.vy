@@ -21,24 +21,20 @@ from interfaces import PriceSource
 from interfaces import Department
 from ethereum.ercs import IERC20Detailed
 
-interface GreenRefPoolSource:
-    def getCurrentGreenPoolStatus() -> CurrentGreenPoolStatus: view
-    def addGreenRefPoolSnapshot() -> bool: nonpayable
-
 interface MissionControl:
     def getPriceConfig() -> PriceConfig: view
+    def underscoreRegistry() -> address: view
+
+interface UnderscoreRegistry:
+    def getAddy(_addyId: uint256) -> address: view
 
 struct PriceConfig:
     staleTime: uint256
     priorityPriceSourceIds: DynArray[uint256, MAX_PRIORITY_PRICE_SOURCES]
 
-struct CurrentGreenPoolStatus:
-    weightedRatio: uint256
-    dangerTrigger: uint256
-    numBlocksInDanger: uint256
-
 ETH: public(immutable(address))
 MAX_PRIORITY_PRICE_SOURCES: constant(uint256) = 10
+LEGO_REGISTRY_ID: constant(uint256) = 2
 
 
 @deploy
@@ -268,42 +264,37 @@ def cancelAddressDisableInRegistry(_regId: uint256) -> bool:
     return registry._cancelAddressDisableInRegistry(_regId)
 
 
-##################
-# Green Ref Pool #
-##################
+###################
+# Price Snapshots #
+###################
 
 
 @external 
-def addGreenRefPoolSnapshot() -> bool:
-    assert addys._isValidRipeAddr(msg.sender) # dev: no perms
+def addPriceSnapshot(_asset: address) -> bool:
+    if not addys._isValidRipeAddr(msg.sender):
+        assert self._isUndyLegoRegistry(msg.sender) # dev: no perms
 
     numSources: uint256 = registry.numAddrs
     if numSources == 0:
         return False
 
+    didUpdate: bool = False
     for pid: uint256 in range(1, numSources, bound=max_value(uint256)):
         priceSource: address = registry._getAddr(pid)
         if priceSource == empty(address):
             continue
 
-        if staticcall PriceSource(priceSource).hasGreenRefPool():
-            return extcall GreenRefPoolSource(priceSource).addGreenRefPoolSnapshot()
+        if staticcall PriceSource(priceSource).hasPriceFeed(_asset):
+            extcall PriceSource(priceSource).addPriceSnapshot(_asset)
+            didUpdate = True
 
-    return False
+    return didUpdate
 
 
 @view
-@external
-def getCurrentGreenPoolStatus() -> CurrentGreenPoolStatus:
-    numSources: uint256 = registry.numAddrs
-    if numSources == 0:
-        return empty(CurrentGreenPoolStatus)
-
-    for pid: uint256 in range(1, numSources, bound=max_value(uint256)):
-        priceSource: address = registry._getAddr(pid)
-        if priceSource == empty(address):
-            continue
-        if staticcall PriceSource(priceSource).hasGreenRefPool():
-            return staticcall GreenRefPoolSource(priceSource).getCurrentGreenPoolStatus()
-
-    return empty(CurrentGreenPoolStatus)
+@internal
+def _isUndyLegoRegistry(_addr: address) -> bool:
+    underscore: address = staticcall MissionControl(addys._getMissionControlAddr()).underscoreRegistry()
+    if underscore == empty(address):
+        return False
+    return _addr == staticcall UnderscoreRegistry(underscore).getAddy(LEGO_REGISTRY_ID)

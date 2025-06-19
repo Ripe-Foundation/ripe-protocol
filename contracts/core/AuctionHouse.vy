@@ -13,6 +13,8 @@ import contracts.modules.Addys as addys
 import contracts.modules.DeptBasics as deptBasics
 from interfaces import Department
 from interfaces import Vault
+import interfaces.ConfigStructs as cs
+
 from ethereum.ercs import IERC4626
 from ethereum.ercs import IERC20
 
@@ -29,9 +31,9 @@ interface Ledger:
     def numUserVaults(_user: address) -> uint256: view
 
 interface MissionControl:
-    def getAuctionBuyConfig(_asset: address, _buyer: address) -> AuctionBuyConfig: view
+    def getAuctionBuyConfig(_asset: address, _recipient: address) -> AuctionBuyConfig: view
     def getAssetLiqConfig(_asset: address) -> AssetLiqConfig: view
-    def getGenAuctionParams() -> AuctionParams: view
+    def getGenAuctionParams() -> cs.AuctionParams: view
     def getGenLiqConfig() -> GenLiqConfig: view
 
 interface StabilityPool:
@@ -50,39 +52,32 @@ interface PriceDesk:
 
 interface GreenToken:
     def mint(_to: address, _amount: uint256): nonpayable
-    def burn(_amount: uint256): nonpayable
+    def burn(_amount: uint256) -> bool: nonpayable
 
 interface LootBox:
     def updateDepositPoints(_user: address, _vaultId: uint256, _vaultAddr: address, _asset: address, _a: addys.Addys = empty(addys.Addys)): nonpayable
 
+interface Teller:
+    def isUnderscoreWalletOwner(_user: address, _caller: address, _mc: address = empty(address)) -> bool: view
+
 interface VaultBook:
     def getAddr(_vaultId: uint256) -> address: view
-
-interface StabAsset:
-    def burn(_amount: uint256) -> bool: nonpayable
 
 struct AuctionBuyConfig:
     canBuyInAuctionGeneral: bool
     canBuyInAuctionAsset: bool
     isUserAllowed: bool
-
-struct DebtTerms:
-    ltv: uint256
-    redemptionThreshold: uint256
-    liqThreshold: uint256
-    liqFee: uint256
-    borrowRate: uint256
-    daowry: uint256
+    canAnyoneDeposit: bool
 
 struct UserBorrowTerms:
     collateralVal: uint256
     totalMaxDebt: uint256
-    debtTerms: DebtTerms
+    debtTerms: cs.DebtTerms
 
 struct UserDebt:
     amount: uint256
     principal: uint256
-    debtTerms: DebtTerms
+    debtTerms: cs.DebtTerms
     lastTimestamp: uint256
     inLiquidation: bool
 
@@ -96,7 +91,7 @@ struct GenLiqConfig:
     keeperFeeRatio: uint256
     minKeeperFee: uint256
     ltvPaybackBuffer: uint256
-    genAuctionParams: AuctionParams
+    genAuctionParams: cs.AuctionParams
     priorityLiqAssetVaults: DynArray[VaultData, PRIORITY_LIQ_VAULT_DATA]
     priorityStabVaults: DynArray[VaultData, MAX_STAB_VAULT_DATA]
 
@@ -106,15 +101,8 @@ struct AssetLiqConfig:
     shouldTransferToEndaoment: bool
     shouldSwapInStabPools: bool
     shouldAuctionInstantly: bool
-    customAuctionParams: AuctionParams
+    customAuctionParams: cs.AuctionParams
     specialStabPool: VaultData
-
-struct AuctionParams:
-    hasParams: bool
-    startDiscount: uint256
-    maxDiscount: uint256
-    delay: uint256
-    duration: uint256
 
 struct FungibleAuction:
     liqUser: address
@@ -196,7 +184,8 @@ event FungAuctionPurchased:
     liqVaultId: uint256
     liqAsset: indexed(address)
     greenSpent: uint256
-    buyer: indexed(address)
+    recipient: indexed(address)
+    caller: address
     collateralAmountSent: uint256
     collateralUsdValueSent: uint256
     isPositionDepleted: bool
@@ -620,12 +609,14 @@ def _burnLiqUserStabAsset(
     if usdValue == 0:
         return remainingToRepay, collateralValueOut
 
+    assert _liqStabAsset in [_a.greenToken, _a.savingsGreen] # dev: must be green or savings green
+
     # burn stab asset
     if _liqStabAsset == _a.savingsGreen:
-        usdValue = extcall IERC4626(_a.savingsGreen).redeem(amountReceived, self, self) # dev: savings green redeem failed
-        assert extcall StabAsset(_a.greenToken).burn(usdValue) # dev: failed to burn green
+        greenAmount: uint256 = extcall IERC4626(_a.savingsGreen).redeem(amountReceived, self, self) # dev: savings green redeem failed
+        assert extcall GreenToken(_a.greenToken).burn(greenAmount) # dev: failed to burn green
     else:
-        assert extcall StabAsset(_liqStabAsset).burn(amountReceived) # dev: failed to burn stab asset
+        assert extcall GreenToken(_a.greenToken).burn(amountReceived) # dev: failed to burn green
 
     # update totals
     remainingToRepay -= min(usdValue, remainingToRepay)
@@ -858,7 +849,7 @@ def _swapAssetsWithStabPool(
 @internal
 def _startAuctionsDuringLiq(
     _liqUser: address,
-    _genAuctionParams: AuctionParams,
+    _genAuctionParams: cs.AuctionParams,
     _missionControl: address,
     _ledger: address,
 ) -> uint256:
@@ -889,7 +880,7 @@ def startAuction(
     assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
     assert not deptBasics.isPaused # dev: contract paused
     a: addys.Addys = addys._getAddys(_a)
-    genParams: AuctionParams = staticcall MissionControl(a.missionControl).getGenAuctionParams()
+    genParams: cs.AuctionParams = staticcall MissionControl(a.missionControl).getGenAuctionParams()
     return self._startAuction(_liqUser, _liqVaultId, _liqAsset, genParams, a)
 
 
@@ -902,7 +893,7 @@ def startManyAuctions(
     assert not deptBasics.isPaused # dev: contract paused
     a: addys.Addys = addys._getAddys(_a)
 
-    genParams: AuctionParams = staticcall MissionControl(a.missionControl).getGenAuctionParams()
+    genParams: cs.AuctionParams = staticcall MissionControl(a.missionControl).getGenAuctionParams()
     numAuctionsStarted: uint256 = 0
     for auc: FungAuctionConfig in _auctions:
         didStart: bool = self._startAuction(auc.liqUser, auc.vaultId, auc.asset, genParams, a)
@@ -917,7 +908,7 @@ def _startAuction(
     _liqUser: address,
     _liqVaultId: uint256,
     _liqAsset: address,
-    _genParams: AuctionParams,
+    _genParams: cs.AuctionParams,
     _a: addys.Addys,
 ) -> bool:
     if not self._canStartAuction(_liqUser, _liqVaultId, _liqAsset, _a.vaultBook, _a.ledger):
@@ -966,7 +957,7 @@ def _createOrUpdateFungAuction(
     _vaultId: uint256,
     _asset: address,
     _alreadyExists: bool,
-    _genAuctionParams: AuctionParams,
+    _genAuctionParams: cs.AuctionParams,
     _missionControl: address,
     _ledger: address,
 ) -> bool:
@@ -979,7 +970,7 @@ def _createOrUpdateFungAuction(
         self.assetLiqConfig[_asset] = config # cache
 
     # finalize auction params
-    params: AuctionParams = _genAuctionParams
+    params: cs.AuctionParams = _genAuctionParams
     if config.customAuctionParams.hasParams:
         params = config.customAuctionParams
 
@@ -1085,7 +1076,8 @@ def buyFungibleAuction(
     _vaultId: uint256,
     _asset: address,
     _greenAmount: uint256,
-    _buyer: address,
+    _recipient: address,
+    _caller: address,
     _shouldTransferBalance: bool,
     _shouldRefundSavingsGreen: bool,
     _a: addys.Addys = empty(addys.Addys),
@@ -1096,12 +1088,12 @@ def buyFungibleAuction(
 
     greenAmount: uint256 = min(_greenAmount, staticcall IERC20(a.greenToken).balanceOf(self))
     assert greenAmount != 0 # dev: no green to spend
-    greenSpent: uint256 = self._buyFungibleAuction(_liqUser, _vaultId, _asset, max_value(uint256), greenAmount, _buyer, _shouldTransferBalance, a)
+    greenSpent: uint256 = self._buyFungibleAuction(_liqUser, _vaultId, _asset, max_value(uint256), greenAmount, _recipient, _caller, _shouldTransferBalance, a)
     assert greenSpent != 0 # dev: no green spent
 
     # handle leftover green
     if greenAmount > greenSpent:
-        self._handleGreenForUser(_buyer, greenAmount - greenSpent, False, _shouldRefundSavingsGreen, a.greenToken, a.savingsGreen)
+        self._handleGreenForUser(_caller, greenAmount - greenSpent, False, _shouldRefundSavingsGreen, a.greenToken, a.savingsGreen)
 
     return greenSpent
 
@@ -1110,7 +1102,8 @@ def buyFungibleAuction(
 def buyManyFungibleAuctions(
     _purchases: DynArray[FungAuctionPurchase, MAX_AUCTIONS],
     _greenAmount: uint256,
-    _buyer: address,
+    _recipient: address,
+    _caller: address,
     _shouldTransferBalance: bool,
     _shouldRefundSavingsGreen: bool,
     _a: addys.Addys = empty(addys.Addys),
@@ -1126,7 +1119,7 @@ def buyManyFungibleAuctions(
     for p: FungAuctionPurchase in _purchases:
         if totalGreenRemaining == 0:
             break
-        greenSpent: uint256 = self._buyFungibleAuction(p.liqUser, p.vaultId, p.asset, p.maxGreenAmount, totalGreenRemaining, _buyer, _shouldTransferBalance, a)
+        greenSpent: uint256 = self._buyFungibleAuction(p.liqUser, p.vaultId, p.asset, p.maxGreenAmount, totalGreenRemaining, _recipient, _caller, _shouldTransferBalance, a)
         totalGreenRemaining -= greenSpent
         totalGreenSpent += greenSpent
 
@@ -1134,7 +1127,7 @@ def buyManyFungibleAuctions(
 
     # handle leftover green
     if totalGreenRemaining != 0:
-        self._handleGreenForUser(_buyer, totalGreenRemaining, False, _shouldRefundSavingsGreen, a.greenToken, a.savingsGreen)
+        self._handleGreenForUser(_caller, totalGreenRemaining, False, _shouldRefundSavingsGreen, a.greenToken, a.savingsGreen)
 
     return totalGreenSpent
 
@@ -1146,7 +1139,8 @@ def _buyFungibleAuction(
     _liqAsset: address,
     _maxGreenForAsset: uint256,
     _totalGreenRemaining: uint256,
-    _buyer: address,
+    _recipient: address,
+    _caller: address,
     _shouldTransferBalance: bool,
     _a: addys.Addys,
 ) -> uint256:
@@ -1163,9 +1157,13 @@ def _buyFungibleAuction(
         return 0
 
     # check auction config
-    config: AuctionBuyConfig = staticcall MissionControl(_a.missionControl).getAuctionBuyConfig(_liqAsset, _buyer)
+    config: AuctionBuyConfig = staticcall MissionControl(_a.missionControl).getAuctionBuyConfig(_liqAsset, _recipient)
     if not config.canBuyInAuctionGeneral or not config.canBuyInAuctionAsset or not config.isUserAllowed:
         return 0
+
+    # make sure caller can deposit to recipient
+    if _recipient != _caller and not config.canAnyoneDeposit:
+        assert staticcall Teller(_a.teller).isUnderscoreWalletOwner(_recipient, _caller, _a.missionControl) # dev: not allowed to deposit for user
 
     # finalize green amount
     availGreen: uint256 = min(_totalGreenRemaining, staticcall IERC20(_a.greenToken).balanceOf(self))
@@ -1190,7 +1188,7 @@ def _buyFungibleAuction(
     collateralAmountSent: uint256 = 0
     isPositionDepleted: bool = False
     shouldGoToNextAsset: bool = False
-    collateralUsdValueSent, collateralAmountSent, isPositionDepleted, shouldGoToNextAsset = self._transferCollateral(_liqUser, _buyer, _liqVaultId, liqVaultAddr, _liqAsset, _shouldTransferBalance, maxCollateralUsdValue, _a)
+    collateralUsdValueSent, collateralAmountSent, isPositionDepleted, shouldGoToNextAsset = self._transferCollateral(_liqUser, _recipient, _liqVaultId, liqVaultAddr, _liqAsset, _shouldTransferBalance, maxCollateralUsdValue, _a)
     if collateralUsdValueSent == 0 or collateralAmountSent == 0:
         return 0
 
@@ -1210,7 +1208,8 @@ def _buyFungibleAuction(
         liqVaultId=_liqVaultId,
         liqAsset=_liqAsset,
         greenSpent=greenSpent,
-        buyer=_buyer,
+        recipient=_recipient,
+        caller=_caller,
         collateralAmountSent=collateralAmountSent,
         collateralUsdValueSent=collateralUsdValueSent,
         isPositionDepleted=isPositionDepleted,
