@@ -60,7 +60,7 @@ def test_stab_vault_redemptions_basic(
     redeem_amount = 50 * EIGHTEEN_DECIMALS
     green_token.transfer(bob, redeem_amount, sender=whale)
     green_token.approve(teller, redeem_amount, sender=bob)
-    usd_value = teller.redeemFromStabilityPool(vault_id, bravo_token, redeem_amount, sender=bob)
+    usd_value = teller.redeemFromStabilityPool(vault_id, bravo_token, redeem_amount, bob, sender=bob)
 
     # results
     _test(redeem_amount, usd_value)
@@ -134,14 +134,17 @@ def test_stab_vault_redemptions_refund(
     redeem_amount = 200 * EIGHTEEN_DECIMALS
     green_token.transfer(bob, redeem_amount, sender=whale)
     green_token.approve(teller, redeem_amount, sender=bob)
-    usd_value = teller.redeemFromStabilityPool(vault_id, bravo_token, redeem_amount, False, False, sender=bob)
+    usd_value = teller.redeemFromStabilityPool(vault_id, bravo_token, redeem_amount, bob, False, False, True, sender=bob)
 
     # results
     _test(claimable_amount, usd_value)
     _test(claimable_amount, bravo_token.balanceOf(bob))
 
-    # green balances
-    assert green_token.balanceOf(bob) == redeem_amount - claimable_amount
+    # green balances - refund goes to savings green when _shouldRefundSavingsGreen=True
+    assert green_token.balanceOf(bob) == 0
+    savings_green_bal = savings_green.balanceOf(bob)
+    assert savings_green_bal != 0
+    _test(redeem_amount - claimable_amount, savings_green.getLastUnderlying(savings_green_bal))
     assert green_token.balanceOf(stability_pool) == claimable_amount
 
     # claim data
@@ -168,17 +171,17 @@ def test_stab_vault_redemptions_validation(
     # Test redemption when paused
     stability_pool.pause(True, sender=switchboard_alpha.address)
     with boa.reverts("contract paused"):
-        stability_pool.redeemFromStabilityPool(bravo_token, 100 * EIGHTEEN_DECIMALS, bob, False, False, sender=teller.address)
+        stability_pool.redeemFromStabilityPool(bravo_token, 100 * EIGHTEEN_DECIMALS, bob, teller.address, False, False, sender=teller.address)
     stability_pool.pause(False, sender=switchboard_alpha.address)
 
     # Test redemption with no green tokens
     with boa.reverts("no green to redeem"):
-        stability_pool.redeemFromStabilityPool(bravo_token, 100 * EIGHTEEN_DECIMALS, bob, False, False, sender=teller.address)
+        stability_pool.redeemFromStabilityPool(bravo_token, 100 * EIGHTEEN_DECIMALS, bob, teller.address, False, False, sender=teller.address)
 
     # Test unauthorized caller
     green_token.transfer(stability_pool, 100 * EIGHTEEN_DECIMALS, sender=whale)
     with boa.reverts("only Teller allowed"):
-        stability_pool.redeemFromStabilityPool(bravo_token, 100 * EIGHTEEN_DECIMALS, bob, False, False, sender=alice)
+        stability_pool.redeemFromStabilityPool(bravo_token, 100 * EIGHTEEN_DECIMALS, bob, alice, False, False, sender=alice)
 
 
 def test_stab_vault_redemptions_no_claimable_assets(
@@ -218,7 +221,7 @@ def test_stab_vault_redemptions_no_claimable_assets(
     green_token.approve(teller, redeem_amount, sender=bob)
     
     with boa.reverts("no redemptions occurred"):
-        teller.redeemFromStabilityPool(vault_id, bravo_token, redeem_amount, sender=bob)
+        teller.redeemFromStabilityPool(vault_id, bravo_token, redeem_amount, bob, sender=bob)
 
 
 def test_stab_vault_redemptions_config_disabled(
@@ -270,7 +273,7 @@ def test_stab_vault_redemptions_config_disabled(
     # Test 1: Disable general redemption config
     setGeneralConfig(_canRedeemInStabPool=False)
     with boa.reverts("no redemptions occurred"):
-        teller.redeemFromStabilityPool(vault_id, bravo_token, redeem_amount, sender=bob)
+        teller.redeemFromStabilityPool(vault_id, bravo_token, redeem_amount, bob, sender=bob)
 
     # Re-enable general config
     setGeneralConfig()
@@ -278,13 +281,13 @@ def test_stab_vault_redemptions_config_disabled(
     # Test 2: Disable asset-specific redemption config
     setAssetConfig(bravo_token, _canRedeemInStabPool=False)
     with boa.reverts("no redemptions occurred"):
-        teller.redeemFromStabilityPool(vault_id, bravo_token, redeem_amount, sender=bob)
+        teller.redeemFromStabilityPool(vault_id, bravo_token, redeem_amount, bob, sender=bob)
 
     # Re-enable asset config for final test
     setAssetConfig(bravo_token)
     
     # Verify redemptions work again when config is restored
-    usd_value = teller.redeemFromStabilityPool(vault_id, bravo_token, redeem_amount, sender=bob)
+    usd_value = teller.redeemFromStabilityPool(vault_id, bravo_token, redeem_amount, bob, sender=bob)
     assert usd_value > 0
 
 
@@ -343,7 +346,7 @@ def test_stab_vault_redemptions_green_token_restriction(
     green_token.approve(teller, redeem_amount, sender=bob)
     
     with boa.reverts("redemptions not allowed"):
-        teller.redeemFromStabilityPool(vault_id, charlie_token, redeem_amount, sender=bob)
+        teller.redeemFromStabilityPool(vault_id, charlie_token, redeem_amount, bob, sender=bob)
 
 
 def test_stab_vault_redemptions_price_oracle_zero(
@@ -396,7 +399,7 @@ def test_stab_vault_redemptions_price_oracle_zero(
     
     # Should revert due to price oracle returning 0
     with boa.reverts():
-        teller.redeemFromStabilityPool(vault_id, bravo_token, redeem_amount, sender=bob)
+        teller.redeemFromStabilityPool(vault_id, bravo_token, redeem_amount, bob, sender=bob)
 
 
 def test_stab_vault_redemptions_cannot_redeem_green(
@@ -444,7 +447,7 @@ def test_stab_vault_redemptions_cannot_redeem_green(
     green_token.approve(teller, redeem_amount, sender=bob)
     
     with boa.reverts("no redemptions occurred"):
-        teller.redeemFromStabilityPool(vault_id, green_token, redeem_amount, sender=bob)
+        teller.redeemFromStabilityPool(vault_id, green_token, redeem_amount, bob, sender=bob)
 
 
 def test_stab_vault_redemptions_multiple_users(
@@ -496,13 +499,13 @@ def test_stab_vault_redemptions_multiple_users(
     bob_redeem = 80 * EIGHTEEN_DECIMALS
     green_token.transfer(bob, bob_redeem, sender=whale)
     green_token.approve(teller, bob_redeem, sender=bob)
-    bob_usd_value = teller.redeemFromStabilityPool(vault_id, bravo_token, bob_redeem, sender=bob)
+    bob_usd_value = teller.redeemFromStabilityPool(vault_id, bravo_token, bob_redeem, bob, sender=bob)
     
     # Alice redeems second
     alice_redeem = 120 * EIGHTEEN_DECIMALS
     green_token.transfer(alice, alice_redeem, sender=whale)
     green_token.approve(teller, alice_redeem, sender=alice)
-    alice_usd_value = teller.redeemFromStabilityPool(vault_id, bravo_token, alice_redeem, sender=alice)
+    alice_usd_value = teller.redeemFromStabilityPool(vault_id, bravo_token, alice_redeem, alice, sender=alice)
 
     # Check results
     _test(bob_redeem, bob_usd_value)
@@ -581,7 +584,7 @@ def test_stab_vault_redeem_many_basic(
     green_token.approve(teller, total_redeem_amount, sender=bob)
     
     # Redeem many
-    total_green_spent = teller.redeemManyFromStabilityPool(vault_id, redemptions, total_redeem_amount, sender=bob)
+    total_green_spent = teller.redeemManyFromStabilityPool(vault_id, redemptions, total_redeem_amount, bob, sender=bob)
 
     # Check results
     _test(bravo_amount, bravo_token.balanceOf(bob))
@@ -660,7 +663,7 @@ def test_stab_vault_redeem_many_partial(
     green_token.approve(teller, total_redeem_amount, sender=bob)
     
     # Redeem many
-    total_green_spent = teller.redeemManyFromStabilityPool(vault_id, redemptions, total_redeem_amount, sender=bob)
+    total_green_spent = teller.redeemManyFromStabilityPool(vault_id, redemptions, total_redeem_amount, bob, sender=bob)
 
     # Check results
     _test(60 * EIGHTEEN_DECIMALS, bravo_token.balanceOf(bob))
@@ -738,7 +741,7 @@ def test_stab_vault_redeem_many_insufficient_green(
     green_token.approve(teller, total_redeem_amount, sender=bob)
     
     # Redeem many
-    total_green_spent = teller.redeemManyFromStabilityPool(vault_id, redemptions, total_redeem_amount, False, sender=bob)
+    total_green_spent = teller.redeemManyFromStabilityPool(vault_id, redemptions, total_redeem_amount, bob, False, sender=bob)
 
     # Check results - should have redeemed all bravo and partial charlie
     _test(100 * EIGHTEEN_DECIMALS, bravo_token.balanceOf(bob))
@@ -766,7 +769,7 @@ def test_stab_vault_redeem_many_empty_array(
     
     # Empty redemptions array should revert
     with boa.reverts("no redemptions occurred"):
-        teller.redeemManyFromStabilityPool(vault_id, [], redeem_amount, sender=bob)
+        teller.redeemManyFromStabilityPool(vault_id, [], redeem_amount, bob, sender=bob)
 
 
 def test_stab_vault_redeem_many_all_invalid(
@@ -799,7 +802,7 @@ def test_stab_vault_redeem_many_all_invalid(
     green_token.approve(teller, redeem_amount, sender=bob)
     
     with boa.reverts("no redemptions occurred"):
-        teller.redeemManyFromStabilityPool(vault_id, redemptions, redeem_amount, sender=bob)
+        teller.redeemManyFromStabilityPool(vault_id, redemptions, redeem_amount, bob, sender=bob)
 
 
 def test_stab_vault_redeem_many_max_redemptions(
@@ -825,7 +828,7 @@ def test_stab_vault_redeem_many_max_redemptions(
     
     # Should revert with "no redemptions occurred" since all redemptions are invalid
     with boa.reverts("no redemptions occurred"):
-        teller.redeemManyFromStabilityPool(vault_id, redemptions, redeem_amount, sender=bob)
+        teller.redeemManyFromStabilityPool(vault_id, redemptions, redeem_amount, bob, sender=bob)
 
 
 def test_stab_vault_redemptions_refund_staking(
@@ -876,7 +879,7 @@ def test_stab_vault_redemptions_refund_staking(
     green_token.transfer(bob, redeem_amount, sender=whale)
     green_token.approve(teller, redeem_amount, sender=bob)
     
-    usd_value = teller.redeemFromStabilityPool(vault_id, bravo_token, redeem_amount, False, True, sender=bob)
+    usd_value = teller.redeemFromStabilityPool(vault_id, bravo_token, redeem_amount, bob, False, False, True, sender=bob)
 
     # Check results
     _test(claimable_amount, usd_value)
@@ -938,7 +941,7 @@ def test_stab_vault_redemptions_precision_edge_cases(
     green_token.transfer(bob, redeem_amount, sender=whale)
     green_token.approve(teller, redeem_amount, sender=bob)
     
-    usd_value = teller.redeemFromStabilityPool(vault_id, bravo_token, redeem_amount, sender=bob)
+    usd_value = teller.redeemFromStabilityPool(vault_id, bravo_token, redeem_amount, bob, sender=bob)
 
     # Check that redemption happened correctly
     assert usd_value == redeem_amount
@@ -1011,7 +1014,7 @@ def test_stab_vault_redemptions_multiple_stab_assets(
     green_token.transfer(bob, total_bravo, sender=whale)
     green_token.approve(teller, total_bravo, sender=bob)
     
-    usd_value = teller.redeemFromStabilityPool(vault_id, bravo_token, total_bravo, sender=bob)
+    usd_value = teller.redeemFromStabilityPool(vault_id, bravo_token, total_bravo, bob, sender=bob)
 
     # Check results
     _test(total_bravo, usd_value)
@@ -1040,7 +1043,7 @@ def test_stab_vault_redemptions_over_limit(
         redemptions = [(ZERO_ADDRESS, 0) for _ in range(max_redemptions + 1)]
         green_token.transfer(bob, 100 * EIGHTEEN_DECIMALS, sender=whale)
         green_token.approve(teller, 100 * EIGHTEEN_DECIMALS, sender=bob)
-        total_green_spent = teller.redeemManyFromStabilityPool(vault_id, redemptions, 100 * EIGHTEEN_DECIMALS, sender=bob)
+        total_green_spent = teller.redeemManyFromStabilityPool(vault_id, redemptions, 100 * EIGHTEEN_DECIMALS, bob, sender=bob)
         assert False, "Should have failed due to exceeding max redemptions"
     except Exception:
         # Expected to fail
@@ -1107,7 +1110,7 @@ def test_stab_vault_redemptions_auto_deposit_basic(
     green_token.approve(teller, redeem_amount, sender=bob)
     
     usd_value = teller.redeemFromStabilityPool(
-        vault_id, bravo_token, redeem_amount, False, False, True, sender=bob  # _shouldAutoDeposit=True
+        vault_id, bravo_token, redeem_amount, bob, True, False, True, sender=bob  # _shouldAutoDeposit=True
     )
 
     # Verify redemption worked
@@ -1176,7 +1179,7 @@ def test_stab_vault_redemptions_auto_deposit_disabled(
     green_token.approve(teller, redeem_amount, sender=bob)
     
     usd_value = teller.redeemFromStabilityPool(
-        vault_id, bravo_token, redeem_amount, False, False, False, sender=bob  # _shouldAutoDeposit=False
+        vault_id, bravo_token, redeem_amount, bob, False, False, False, sender=bob  # _shouldAutoDeposit=False
     )
 
     # Verify redemption worked
@@ -1243,7 +1246,7 @@ def test_stab_vault_redemptions_auto_deposit_no_vault(
     green_token.approve(teller, redeem_amount, sender=bob)
     
     usd_value = teller.redeemFromStabilityPool(
-        vault_id, bravo_token, redeem_amount, False, False, True, sender=bob  # _shouldAutoDeposit=True
+        vault_id, bravo_token, redeem_amount, bob, True, False, True, sender=bob  # _shouldAutoDeposit=True
     )
 
     # Verify redemption worked
@@ -1307,7 +1310,7 @@ def test_stab_vault_redemptions_auto_deposit_stability_pool_vault(
     green_token.approve(teller, redeem_amount, sender=bob)
     
     usd_value = teller.redeemFromStabilityPool(
-        vault_id, bravo_token, redeem_amount, False, False, True, sender=bob  # _shouldAutoDeposit=True
+        vault_id, bravo_token, redeem_amount, bob, True, False, True, sender=bob  # _shouldAutoDeposit=True
     )
 
     # Verify redemption worked
@@ -1371,7 +1374,7 @@ def test_stab_vault_redemptions_auto_deposit_config_disabled(
     green_token.approve(teller, redeem_amount, sender=bob)
     
     usd_value = teller.redeemFromStabilityPool(
-        vault_id, bravo_token, redeem_amount, False, False, True, sender=bob  # _shouldAutoDeposit=True
+        vault_id, bravo_token, redeem_amount, bob, True, False, True, sender=bob  # _shouldAutoDeposit=True
     )
 
     # Verify redemption worked
@@ -1456,7 +1459,7 @@ def test_stab_vault_redemptions_auto_deposit_many_basic(
 
     # Redeem many with auto-deposit enabled
     total_green_spent = teller.redeemManyFromStabilityPool(
-        vault_id, redemptions, total_redeem_amount, False, False, True, sender=bob  # _shouldAutoDeposit=True
+        vault_id, redemptions, total_redeem_amount, bob, True, False, True, sender=bob  # _shouldAutoDeposit=True
     )
 
     # Verify redemptions worked
@@ -1547,7 +1550,7 @@ def test_stab_vault_redemptions_auto_deposit_many_mixed(
 
     # Redeem many with auto-deposit enabled
     total_green_spent = teller.redeemManyFromStabilityPool(
-        vault_id, redemptions, total_redeem_amount, False, False, True, sender=bob  # _shouldAutoDeposit=True
+        vault_id, redemptions, total_redeem_amount, bob, True, False, True, sender=bob  # _shouldAutoDeposit=True
     )
 
     # Verify redemptions worked
@@ -1617,7 +1620,7 @@ def test_stab_vault_redemptions_auto_deposit_partial_redeem(
     green_token.approve(teller, partial_redeem_amount, sender=bob)
     
     usd_value = teller.redeemFromStabilityPool(
-        vault_id, bravo_token, partial_redeem_amount, False, False, True, sender=bob  # _shouldAutoDeposit=True
+        vault_id, bravo_token, partial_redeem_amount, bob, True, False, True, sender=bob  # _shouldAutoDeposit=True
     )
 
     # Verify partial redemption worked

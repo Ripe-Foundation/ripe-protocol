@@ -38,7 +38,6 @@ interface MissionControl:
 interface PriceDesk:
     def getAssetAmount(_asset: address, _usdValue: uint256, _shouldRaise: bool = False) -> uint256: view
     def getUsdValue(_asset: address, _amount: uint256, _shouldRaise: bool) -> uint256: view
-    def getCurrentGreenPoolStatus() -> CurrentGreenPoolStatus: view
 
 interface Teller:
     def depositFromTrusted(_user: address, _vaultId: uint256, _asset: address, _amount: uint256, _lockDuration: uint256, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
@@ -51,6 +50,9 @@ interface LootBox:
 interface GreenToken:
     def mint(_to: address, _amount: uint256): nonpayable
     def burn(_amount: uint256) -> bool: nonpayable
+
+interface CurvePrices:
+    def getCurrentGreenPoolStatus() -> CurrentGreenPoolStatus: view
 
 interface AddressRegistry:
     def getAddr(_regId: uint256) -> address: view
@@ -166,6 +168,7 @@ ONE_PERCENT: constant(uint256) = 1_00 # 1.00%
 MAX_DEBT_UPDATES: constant(uint256) = 25
 MAX_COLLATERAL_REDEMPTIONS: constant(uint256) = 20
 STABILITY_POOL_ID: constant(uint256) = 1
+CURVE_PRICES_ID: constant(uint256) = 2
 
 
 @deploy
@@ -938,7 +941,11 @@ def getDynamicBorrowRate(_baseRate: uint256) -> uint256:
 @view
 @internal
 def _getDynamicBorrowRate(_baseRate: uint256, _missionControl: address, _priceDesk: address) -> uint256:
-    status: CurrentGreenPoolStatus = staticcall PriceDesk(_priceDesk).getCurrentGreenPoolStatus()
+    curvePrices: address = staticcall AddressRegistry(_priceDesk).getAddr(CURVE_PRICES_ID)
+    if curvePrices == empty(address):
+        return _baseRate
+
+    status: CurrentGreenPoolStatus = staticcall CurvePrices(curvePrices).getCurrentGreenPoolStatus()
     if status.weightedRatio == 0 or status.weightedRatio < status.dangerTrigger:
         return _baseRate
 

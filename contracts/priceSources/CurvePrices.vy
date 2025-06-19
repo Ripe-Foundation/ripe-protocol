@@ -221,7 +221,7 @@ def __init__(
 ):
     gov.__init__(_ripeHq, empty(address), 0, 0, 0)
     addys.__init__(_ripeHq)
-    priceData.__init__(True, False)
+    priceData.__init__(False)
     timeLock.__init__(_minPriceChangeTimeLock, _maxPriceChangeTimeLock, 0, _maxPriceChangeTimeLock)
 
     # set curve address provider
@@ -974,7 +974,8 @@ def getCurrentGreenPoolStatus() -> CurrentGreenPoolStatus:
 @external 
 def addGreenRefPoolSnapshot() -> bool:
     assert addys._isValidRipeAddr(msg.sender) # dev: no perms
-    assert not priceData.isPaused # dev: contract paused
+    if priceData.isPaused:
+        return False # fail gracefully
     return self._addGreenRefPoolSnapshot()
 
 

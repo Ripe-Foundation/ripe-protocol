@@ -13,7 +13,7 @@ from ethereum.ercs import IERC20
 interface MissionControl:
     def getStabPoolClaimsConfig(_claimAsset: address, _claimer: address, _caller: address) -> StabPoolClaimsConfig: view
     def getTellerDepositConfig(_vaultId: uint256, _asset: address, _user: address) -> TellerDepositConfig: view
-    def getStabPoolRedemptionsConfig(_asset: address, _redeemer: address) -> StabPoolRedemptionsConfig: view
+    def getStabPoolRedemptionsConfig(_asset: address, _recipient: address) -> StabPoolRedemptionsConfig: view
     def getFirstVaultIdForAsset(_asset: address) -> uint256: view
 
 interface Teller:
@@ -54,6 +54,7 @@ struct StabPoolRedemptionsConfig:
     canRedeemInStabPoolGeneral: bool
     canRedeemInStabPoolAsset: bool
     isUserAllowed: bool
+    canAnyoneDeposit: bool
 
 struct TellerDepositConfig:
     canDepositGeneral: bool
@@ -750,9 +751,10 @@ def _handleClaimRewards(
 def redeemFromStabilityPool(
     _asset: address,
     _greenAmount: uint256,
-    _redeemer: address,
-    _shouldRefundSavingsGreen: bool,
+    _recipient: address,
+    _caller: address,
     _shouldAutoDeposit: bool,
+    _shouldRefundSavingsGreen: bool,
     _a: addys.Addys = empty(addys.Addys),
 ) -> uint256:
     assert msg.sender == addys._getTellerAddr() # dev: only Teller allowed
@@ -763,12 +765,12 @@ def redeemFromStabilityPool(
 
     greenAmount: uint256 = min(_greenAmount, staticcall IERC20(a.greenToken).balanceOf(self))
     assert greenAmount != 0 # dev: no green to redeem
-    greenSpent: uint256 = self._redeemFromStabilityPool(_redeemer, _asset, max_value(uint256), greenAmount, _shouldAutoDeposit, a)
+    greenSpent: uint256 = self._redeemFromStabilityPool(_recipient, _caller, _asset, max_value(uint256), greenAmount, _shouldAutoDeposit, a)
     assert greenSpent != 0 # dev: no redemptions occurred
 
     # handle leftover green
     if greenAmount > greenSpent:
-        self._handleGreenForUser(_redeemer, greenAmount - greenSpent, _shouldRefundSavingsGreen, a.greenToken, a.savingsGreen)
+        self._handleGreenForUser(_caller, greenAmount - greenSpent, _shouldRefundSavingsGreen, a.greenToken, a.savingsGreen)
 
     return greenSpent
 
@@ -777,9 +779,10 @@ def redeemFromStabilityPool(
 def redeemManyFromStabilityPool(
     _redemptions: DynArray[StabPoolRedemption, MAX_STAB_REDEMPTIONS],
     _greenAmount: uint256,
-    _redeemer: address,
-    _shouldRefundSavingsGreen: bool,
+    _recipient: address,
+    _caller: address,
     _shouldAutoDeposit: bool,
+    _shouldRefundSavingsGreen: bool,
     _a: addys.Addys = empty(addys.Addys),
 ) -> uint256:
     assert msg.sender == addys._getTellerAddr() # dev: only Teller allowed
@@ -795,7 +798,7 @@ def redeemManyFromStabilityPool(
     for r: StabPoolRedemption in _redemptions:
         if totalGreenRemaining == 0:
             break
-        greenSpent: uint256 = self._redeemFromStabilityPool(_redeemer, r.claimAsset, r.maxGreenAmount, totalGreenRemaining, _shouldAutoDeposit, a)
+        greenSpent: uint256 = self._redeemFromStabilityPool(_recipient, _caller, r.claimAsset, r.maxGreenAmount, totalGreenRemaining, _shouldAutoDeposit, a)
         totalGreenRemaining -= greenSpent
         totalGreenSpent += greenSpent
 
@@ -803,7 +806,7 @@ def redeemManyFromStabilityPool(
 
     # handle leftover green
     if totalGreenRemaining != 0:
-        self._handleGreenForUser(_redeemer, totalGreenRemaining, _shouldRefundSavingsGreen, a.greenToken, a.savingsGreen)
+        self._handleGreenForUser(_caller, totalGreenRemaining, _shouldRefundSavingsGreen, a.greenToken, a.savingsGreen)
 
     return totalGreenSpent
 
@@ -819,7 +822,8 @@ def _canRedeemInThisVault(_greenToken: address) -> bool:
 
 @internal
 def _redeemFromStabilityPool(
-    _redeemer: address,
+    _recipient: address,
+    _caller: address,
     _asset: address,
     _maxGreenForAsset: uint256,
     _totalGreenRemaining: uint256,
@@ -830,17 +834,21 @@ def _redeemFromStabilityPool(
     # NOTE: failing gracefully here, in case of many redemptions at same time
 
     # invalid inputs
-    if empty(address) in [_redeemer, _asset] or 0 in [_maxGreenForAsset, _totalGreenRemaining]:
-        return 0
-
-    # check redemption config
-    config: StabPoolRedemptionsConfig = staticcall MissionControl(_a.missionControl).getStabPoolRedemptionsConfig(_asset, _redeemer)
-    if not config.canRedeemInStabPoolGeneral or not config.canRedeemInStabPoolAsset or not config.isUserAllowed:
+    if empty(address) in [_recipient, _asset] or 0 in [_maxGreenForAsset, _totalGreenRemaining]:
         return 0
 
     # cannot redeem green token - don't be silly
     if _asset == _a.greenToken:
         return 0
+
+    # check redemption config
+    config: StabPoolRedemptionsConfig = staticcall MissionControl(_a.missionControl).getStabPoolRedemptionsConfig(_asset, _recipient)
+    if not config.canRedeemInStabPoolGeneral or not config.canRedeemInStabPoolAsset or not config.isUserAllowed:
+        return 0
+
+    # make sure caller can deposit to recipient
+    if _recipient != _caller and not config.canAnyoneDeposit:
+        assert staticcall Teller(_a.teller).isUnderscoreWalletOwner(_recipient, _caller, _a.missionControl) # dev: not allowed to deposit for user
 
     # treating green as $1
     maxGreenAvailable: uint256 = min(_totalGreenRemaining, staticcall IERC20(_a.greenToken).balanceOf(self))
@@ -887,7 +895,7 @@ def _redeemFromStabilityPool(
         # reduce claimable balances
         claimAmount: uint256 = min(remainingClaimAmount, claimableBalance)
         self._reduceClaimableBalances(stabAsset, _asset, claimAmount, claimableBalance)
-        self._handleAssetForUser(_asset, claimAmount, _redeemer, _shouldAutoDeposit, _a)
+        self._handleAssetForUser(_asset, claimAmount, _recipient, _shouldAutoDeposit, _a)
         remainingClaimAmount -= claimAmount
 
         # add green to claimable

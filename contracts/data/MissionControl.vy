@@ -108,6 +108,7 @@ struct StabPoolRedemptionsConfig:
     canRedeemInStabPoolGeneral: bool
     canRedeemInStabPoolAsset: bool
     isUserAllowed: bool
+    canAnyoneDeposit: bool
 
 struct ClaimLootConfig:
     canClaimLoot: bool
@@ -712,12 +713,13 @@ def getStabPoolClaimsConfig(_claimAsset: address, _claimer: address, _caller: ad
 
 @view
 @external
-def getStabPoolRedemptionsConfig(_asset: address, _redeemer: address) -> StabPoolRedemptionsConfig:
+def getStabPoolRedemptionsConfig(_asset: address, _recipient: address) -> StabPoolRedemptionsConfig:
     assetConfig: cs.AssetConfig = self.assetConfig[_asset]
     return StabPoolRedemptionsConfig(
         canRedeemInStabPoolGeneral=self.genConfig.canRedeemInStabPool,
         canRedeemInStabPoolAsset=assetConfig.canRedeemInStabPool,
-        isUserAllowed=self._isUserAllowed(assetConfig.whitelist, _redeemer, _asset),
+        isUserAllowed=self._isUserAllowed(assetConfig.whitelist, _recipient, _asset),
+        canAnyoneDeposit=self.userConfig[_recipient].canAnyoneDeposit,
     )
 
 
