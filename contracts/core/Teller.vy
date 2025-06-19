@@ -945,10 +945,10 @@ def _performHousekeeping(
     _a: addys.Addys,
 ):
     # one action per block
-    shouldCheck: bool = False
+    shouldCheckLastTouch: bool = False
     if staticcall MissionControl(_a.missionControl).shouldCheckLastTouch():
-        shouldCheck = _isHigherRisk and not self._isUnderscoreWallet(_caller, _a.missionControl)
-    extcall Ledger(_a.ledger).checkAndUpdateLastTouch(_user, shouldCheck)
+        shouldCheckLastTouch = _isHigherRisk and not self._isUnderscoreWallet(_caller, _a.missionControl)
+    extcall Ledger(_a.ledger).checkAndUpdateLastTouch(_user, shouldCheckLastTouch)
 
     # update green ref pool snapshot
     curvePrices: address = staticcall AddressRegistry(_a.priceDesk).getAddr(CURVE_PRICES_ID)
