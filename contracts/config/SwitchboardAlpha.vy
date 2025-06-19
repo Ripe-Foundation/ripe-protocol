@@ -19,15 +19,17 @@ interface MissionControl:
     def setPriorityStabVaults(_priorityStabVaults: DynArray[cs.VaultLite, PRIORITY_VAULT_DATA]): nonpayable
     def isSupportedAssetInVault(_vaultId: uint256, _asset: address) -> bool: view
     def setRipeRewardsConfig(_rewardsConfig: cs.RipeRewardsConfig): nonpayable
+    def setCanPerformLiteAction(_user: address, _canDisable: bool): nonpayable
     def setGeneralDebtConfig(_genDebtConfig: cs.GenDebtConfig): nonpayable
     def setUnderscoreRegistry(_underscoreRegistry: address): nonpayable
-    def setCanPerformLiteAction(_user: address, _canDisable: bool): nonpayable
+    def setShouldCheckLastTouch(_shouldCheck: bool): nonpayable
     def setGeneralConfig(_genConfig: cs.GenConfig): nonpayable
     def canPerformLiteAction(_user: address) -> bool: view
     def isSupportedAsset(_asset: address) -> bool: view
     def rewardsConfig() -> cs.RipeRewardsConfig: view
     def genDebtConfig() -> cs.GenDebtConfig: view
     def underscoreRegistry() -> address: view
+    def shouldCheckLastTouch() -> bool: view
     def genConfig() -> cs.GenConfig: view
 
 interface VaultBook:
@@ -64,6 +66,7 @@ flag ActionType:
     OTHER_PRIORITY_PRICE_SOURCE_IDS
     OTHER_UNDERSCORE_REGISTRY
     OTHER_CAN_PERFORM_LITE_ACTION
+    OTHER_SHOULD_CHECK_LAST_TOUCH
     RIPE_VAULT_CONFIG
 
 flag GenConfigFlag:
@@ -239,6 +242,11 @@ event PendingCanPerformLiteAction:
     confirmationBlock: uint256
     actionId: uint256
 
+event PendingShouldCheckLastTouchChange:
+    shouldCheck: bool
+    confirmationBlock: uint256
+    actionId: uint256
+
 event PendingMaxLtvDeviationChange:
     newDeviation: uint256
     confirmationBlock: uint256
@@ -322,6 +330,9 @@ event CanPerformLiteAction:
     user: indexed(address)
     canDo: bool
 
+event ShouldCheckLastTouchSet:
+    shouldCheck: bool
+
 event MaxLtvDeviationSet:
     newDeviation: uint256
 
@@ -346,6 +357,7 @@ pendingPriorityStabVaults: public(HashMap[uint256, DynArray[cs.VaultLite, PRIORI
 pendingPriorityPriceSourceIds: public(HashMap[uint256, DynArray[uint256, MAX_PRIORITY_PRICE_SOURCES]])
 pendingUnderscoreRegistry: public(HashMap[uint256, address])
 pendingCanPerformLiteAction: public(HashMap[uint256, CanPerform])
+pendingShouldCheckLastTouch: public(HashMap[uint256, bool])
 pendingRipeGovVaultConfig: public(HashMap[uint256, PendingRipeGovVaultConfig]) # aid -> config
 
 # temp data
@@ -1216,6 +1228,23 @@ def setCanPerformLiteAction(_user: address, _canDo: bool) -> uint256:
     return aid
 
 
+###########################
+# Should Check Last Touch #
+###########################
+
+
+@external
+def setShouldCheckLastTouch(_shouldCheck: bool) -> uint256:
+    assert gov._canGovern(msg.sender) # dev: no perms
+
+    aid: uint256 = timeLock._initiateAction()
+    self.actionType[aid] = ActionType.OTHER_SHOULD_CHECK_LAST_TOUCH
+    self.pendingShouldCheckLastTouch[aid] = _shouldCheck
+    confirmationBlock: uint256 = timeLock._getActionConfirmationBlock(aid)
+    log PendingShouldCheckLastTouchChange(shouldCheck=_shouldCheck, confirmationBlock=confirmationBlock, actionId=aid)
+    return aid
+
+
 #########################
 # Ripe Gov Vault Config #
 #########################
@@ -1438,6 +1467,11 @@ def executePendingAction(_aid: uint256) -> bool:
         data: CanPerform = self.pendingCanPerformLiteAction[_aid]
         extcall MissionControl(mc).setCanPerformLiteAction(data.user, data.canDo)
         log CanPerformLiteAction(user=data.user, canDo=data.canDo)
+
+    elif actionType == ActionType.OTHER_SHOULD_CHECK_LAST_TOUCH:
+        shouldCheck: bool = self.pendingShouldCheckLastTouch[_aid]
+        extcall MissionControl(mc).setShouldCheckLastTouch(shouldCheck)
+        log ShouldCheckLastTouchSet(shouldCheck=shouldCheck)
 
     elif actionType == ActionType.RIPE_VAULT_CONFIG:
         p: PendingRipeGovVaultConfig = self.pendingRipeGovVaultConfig[_aid]

@@ -2706,3 +2706,71 @@ def test_dynamic_rate_config_event_emissions(switchboard_alpha, governance):
     assert exec_log.maxDynamicRateBoost == 680_00
     assert exec_log.increasePerDangerBlock == 18
     assert exec_log.maxBorrowRate == 145_00
+
+
+def test_set_should_check_last_touch_permissions(switchboard_alpha, governance, bob):
+    """Test that only governance can call setShouldCheckLastTouch"""
+    # Non-governance user should not be able to call the function
+    with boa.reverts("no perms"):
+        switchboard_alpha.setShouldCheckLastTouch(True, sender=bob)
+    
+    # Governance should be able to call the function
+    action_id = switchboard_alpha.setShouldCheckLastTouch(True, sender=governance.address)
+    assert action_id > 0
+
+
+def test_set_should_check_last_touch_success_and_execute(switchboard_alpha, mission_control, governance):
+    """Test successful setShouldCheckLastTouch creation and execution"""
+    # Test setting to True
+    action_id = switchboard_alpha.setShouldCheckLastTouch(True, sender=governance.address)
+    assert action_id > 0
+    
+    # Check event was emitted
+    logs = filter_logs(switchboard_alpha, "PendingShouldCheckLastTouchChange")
+    assert len(logs) == 1
+    log = logs[0]  # Get the latest event
+    assert log.shouldCheck
+    assert log.actionId == action_id
+    assert log.confirmationBlock > 0
+    
+    # Check pending data was stored
+    pending_data = switchboard_alpha.pendingShouldCheckLastTouch(action_id)
+    assert pending_data
+    
+    # Verify action is pending
+    assert switchboard_alpha.hasPendingAction(action_id)
+    assert switchboard_alpha.actionType(action_id) != 0
+    
+    # Time travel past timelock
+    boa.env.time_travel(blocks=switchboard_alpha.actionTimeLock())
+    
+    # Execute the action
+    success = switchboard_alpha.executePendingAction(action_id, sender=governance.address)
+    assert success
+    
+    # Verify the config was applied to MissionControl
+    assert mission_control.shouldCheckLastTouch()
+    
+    # Check execution event was emitted
+    execution_logs = filter_logs(switchboard_alpha, "ShouldCheckLastTouchSet")
+    assert len(execution_logs) == 1
+    exec_log = execution_logs[0]  # Get the latest event
+    assert exec_log.shouldCheck
+    
+    # Verify action was cleaned up
+    assert switchboard_alpha.actionType(action_id) == 0
+    assert not switchboard_alpha.hasPendingAction(action_id)
+    
+    # Test setting to False in a separate action
+    action_id2 = switchboard_alpha.setShouldCheckLastTouch(False, sender=governance.address)
+    boa.env.time_travel(blocks=switchboard_alpha.actionTimeLock())
+    assert switchboard_alpha.executePendingAction(action_id2, sender=governance.address)
+    
+    # Verify False was applied
+    assert not mission_control.shouldCheckLastTouch()
+    
+    # Check that an execution event was emitted for False
+    final_logs = filter_logs(switchboard_alpha, "ShouldCheckLastTouchSet")
+    assert len(final_logs) == 1  # Should have at least 1 event
+    final_log = final_logs[0]  # Get the latest event
+    assert not final_log.shouldCheck
