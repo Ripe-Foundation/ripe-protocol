@@ -1151,6 +1151,10 @@ def _buyFungibleAuction(
 
     # NOTE: faililng gracefully in case there are many purchases at same time
 
+    # recipient cannot be user
+    if _liqUser == _recipient:
+        return 0
+
     # this also verifies that user is in liquidation
     auc: FungibleAuction = staticcall Ledger(_a.ledger).getFungibleAuctionDuringPurchase(_liqUser, _liqVaultId, _liqAsset)
     if not auc.isActive:

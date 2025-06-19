@@ -189,6 +189,7 @@ canPerformLiteAction: public(HashMap[address, bool]) # user -> canPerformLiteAct
 # other
 priorityPriceSourceIds: public(DynArray[uint256, MAX_PRIORITY_PRICE_SOURCES])
 underscoreRegistry: public(address)
+shouldCheckLastTouch: public(bool)
 
 MAX_VAULTS_PER_ASSET: constant(uint256) = 10
 MAX_PRIORITY_PRICE_SOURCES: constant(uint256) = 10
@@ -426,6 +427,15 @@ def setUnderscoreRegistry(_underscoreRegistry: address):
 def setPriorityPriceSourceIds(_priorityIds: DynArray[uint256, MAX_PRIORITY_PRICE_SOURCES]):
     assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
     self.priorityPriceSourceIds = _priorityIds
+
+
+# should check last touch
+
+
+@external
+def setShouldCheckLastTouch(_shouldCheck: bool):
+    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
+    self.shouldCheckLastTouch = _shouldCheck
 
 
 ###################

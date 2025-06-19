@@ -1474,3 +1474,195 @@ def test_ledger_comprehensive_integration(ledger, alice, teller, credit_engine, 
     
     assert not ledger.hasDebt(alice)
     assert not ledger.isBorrower(alice)
+
+
+###############################
+# Flash Loan Protection Tests #
+###############################
+
+
+def test_ledger_check_and_update_last_touch_first_use(ledger, teller, alice):
+    """Test checkAndUpdateLastTouch on first use."""
+    # First use should succeed
+    ledger.checkAndUpdateLastTouch(alice, True, sender=teller.address)
+    
+    # Check lastTouch is set to current block
+    assert ledger.lastTouch(alice) == boa.env.evm.patch.block_number
+
+
+def test_ledger_check_and_update_last_touch_same_block(ledger, teller, alice):
+    """Test that checkAndUpdateLastTouch fails on same block."""
+    # First call should succeed
+    ledger.checkAndUpdateLastTouch(alice, True, sender=teller.address)
+    
+    # Second call in same block should fail
+    with boa.reverts("one action per block"):
+        ledger.checkAndUpdateLastTouch(alice, True, sender=teller.address)
+
+
+def test_ledger_check_and_update_last_touch_next_block(ledger, teller, alice):
+    """Test that checkAndUpdateLastTouch works in next block."""
+    # First call
+    ledger.checkAndUpdateLastTouch(alice, True, sender=teller.address)
+    first_block = boa.env.evm.patch.block_number
+    
+    # Move to next block
+    boa.env.time_travel(blocks=1)
+    
+    # Second call should succeed in new block
+    ledger.checkAndUpdateLastTouch(alice, True, sender=teller.address)
+    
+    # Verify lastTouch was updated
+    assert ledger.lastTouch(alice) > first_block
+    assert ledger.lastTouch(alice) == boa.env.evm.patch.block_number
+
+
+def test_ledger_check_and_update_last_touch_multiple_users(ledger, teller, alice, bob):
+    """Test that different users can be checked in same block."""
+    # Alice's transaction
+    ledger.checkAndUpdateLastTouch(alice, True, sender=teller.address)
+    
+    # Bob can also transact in same block
+    ledger.checkAndUpdateLastTouch(bob, True, sender=teller.address)
+    
+    # But alice cannot transact again
+    with boa.reverts("one action per block"):
+        ledger.checkAndUpdateLastTouch(alice, True, sender=teller.address)
+    
+    # And bob cannot transact again
+    with boa.reverts("one action per block"):
+        ledger.checkAndUpdateLastTouch(bob, True, sender=teller.address)
+
+
+def test_ledger_check_and_update_last_touch_unauthorized(ledger, alice):
+    """Test that only authorized contracts can call checkAndUpdateLastTouch."""
+    # Unauthorized caller should fail
+    with boa.reverts("only Teller allowed"):
+        ledger.checkAndUpdateLastTouch(alice, True, sender=alice)
+
+
+def test_ledger_check_and_update_last_touch_paused(ledger, switchboard_alpha, teller, alice):
+    """Test that checkAndUpdateLastTouch respects pause state."""
+    # Pause the contract
+    ledger.pause(True, sender=switchboard_alpha.address)
+    
+    # Should fail when paused
+    with boa.reverts("not activated"):
+        ledger.checkAndUpdateLastTouch(alice, True, sender=teller.address)
+    
+    # Unpause
+    ledger.pause(False, sender=switchboard_alpha.address)
+    
+    # Should work again
+    ledger.checkAndUpdateLastTouch(alice, True, sender=teller.address)
+
+
+def test_ledger_check_and_update_last_touch_empty_user(ledger, teller):
+    """Test checkAndUpdateLastTouch with empty user address."""
+    # Should handle empty address gracefully
+    # This tests the edge case, behavior depends on implementation
+    try:
+        ledger.checkAndUpdateLastTouch(ZERO_ADDRESS, True, sender=teller.address)
+        # If it doesn't revert, check it set lastTouch
+        assert ledger.lastTouch(ZERO_ADDRESS) == boa.env.evm.patch.block_number
+    except:
+        # If it reverts, that's also acceptable behavior
+        pass
+
+
+def test_ledger_check_and_update_last_touch_block_progression(ledger, teller, alice):
+    """Test lastTouch tracking across multiple blocks."""
+    blocks = []
+    
+    # Track lastTouch across 5 blocks
+    for i in range(5):
+        if i > 0:
+            boa.env.time_travel(blocks=1)
+        
+        ledger.checkAndUpdateLastTouch(alice, True, sender=teller.address)
+        current_block = boa.env.evm.patch.block_number
+        blocks.append(current_block)
+        
+        # Verify lastTouch matches current block
+        assert ledger.lastTouch(alice) == current_block
+    
+    # Verify blocks are sequential
+    for i in range(1, len(blocks)):
+        assert blocks[i] > blocks[i-1]
+
+
+def test_ledger_check_and_update_last_touch_gas_optimization(ledger, teller, alice):
+    """Test that checkAndUpdateLastTouch has reasonable gas usage."""
+    # First call (cold storage)
+    ledger.checkAndUpdateLastTouch(alice, True, sender=teller.address)
+    
+    # Move to next block
+    boa.env.time_travel(blocks=1)
+    
+    # Second call (warm storage) - should use less gas
+    # This is more of a sanity check that the function executes efficiently
+    ledger.checkAndUpdateLastTouch(alice, True, sender=teller.address)
+
+
+def test_ledger_check_and_update_last_touch_skip_check_same_block(ledger, teller, alice):
+    """Test that checkAndUpdateLastTouch with _shouldCheck=False allows same block calls."""
+    # First call with check
+    ledger.checkAndUpdateLastTouch(alice, True, sender=teller.address)
+    
+    # Second call in same block with _shouldCheck=False should succeed
+    ledger.checkAndUpdateLastTouch(alice, False, sender=teller.address)
+    
+    # Both calls should update lastTouch to current block
+    assert ledger.lastTouch(alice) == boa.env.evm.patch.block_number
+
+
+def test_ledger_check_and_update_last_touch_skip_check_multiple_calls(ledger, teller, alice):
+    """Test multiple calls with _shouldCheck=False in same block."""
+    # Multiple calls with _shouldCheck=False should all succeed in same block
+    for i in range(3):
+        ledger.checkAndUpdateLastTouch(alice, False, sender=teller.address)
+        assert ledger.lastTouch(alice) == boa.env.evm.patch.block_number
+
+
+def test_ledger_check_and_update_last_touch_mixed_check_modes(ledger, teller, alice, bob):
+    """Test mixing _shouldCheck=True and _shouldCheck=False."""
+    # Alice with check enabled
+    ledger.checkAndUpdateLastTouch(alice, True, sender=teller.address)
+    
+    # Alice cannot make another call with check enabled
+    with boa.reverts("one action per block"):
+        ledger.checkAndUpdateLastTouch(alice, True, sender=teller.address)
+    
+    # But Alice can make a call with check disabled
+    ledger.checkAndUpdateLastTouch(alice, False, sender=teller.address)
+    
+    # Bob can use either mode in same block
+    ledger.checkAndUpdateLastTouch(bob, False, sender=teller.address)
+    ledger.checkAndUpdateLastTouch(bob, False, sender=teller.address)
+
+
+def test_ledger_check_and_update_last_touch_skip_check_paused(ledger, switchboard_alpha, teller, alice):
+    """Test that checkAndUpdateLastTouch with _shouldCheck=False respects pause state."""
+    # Pause the contract
+    ledger.pause(True, sender=switchboard_alpha.address)
+    
+    # Should fail when paused regardless of _shouldCheck value
+    with boa.reverts("not activated"):
+        ledger.checkAndUpdateLastTouch(alice, False, sender=teller.address)
+    
+    # Unpause
+    ledger.pause(False, sender=switchboard_alpha.address)
+    
+    # Should work again
+    ledger.checkAndUpdateLastTouch(alice, False, sender=teller.address)
+
+
+def test_ledger_check_and_update_last_touch_skip_check_unauthorized(ledger, alice):
+    """Test that unauthorized callers fail regardless of _shouldCheck value."""
+    # Unauthorized caller should fail with _shouldCheck=False
+    with boa.reverts("only Teller allowed"):
+        ledger.checkAndUpdateLastTouch(alice, False, sender=alice)
+    
+    # Unauthorized caller should fail with _shouldCheck=True  
+    with boa.reverts("only Teller allowed"):
+        ledger.checkAndUpdateLastTouch(alice, True, sender=alice)

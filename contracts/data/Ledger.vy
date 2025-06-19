@@ -106,6 +106,8 @@ struct RipeBondData:
     ripeAvailForBonds: uint256
     badDebt: uint256
 
+lastTouch: public(HashMap[address, uint256])  # user -> block number
+
 # user vault participation
 userVaults: public(HashMap[address, HashMap[uint256, uint256]]) # user -> index -> vault id
 indexOfVault: public(HashMap[address, HashMap[uint256, uint256]]) # user -> vault id -> index
@@ -167,6 +169,22 @@ def __init__(_ripeHq: address, _defaults: address):
         self.ripeAvailForRewards = staticcall Defaults(_defaults).ripeAvailForRewards()
         self.ripeAvailForHr = staticcall Defaults(_defaults).ripeAvailForHr()
         self.ripeAvailForBonds = staticcall Defaults(_defaults).ripeAvailForBonds()
+
+
+# one action per block
+
+
+@external
+def checkAndUpdateLastTouch(_user: address, _shouldCheck: bool, _mc: address = empty(address)):
+    assert msg.sender == addys._getTellerAddr() # dev: only Teller allowed
+    assert not deptBasics.isPaused # dev: not activated
+
+    # check if user already interacted in this block
+    if _shouldCheck:
+        assert self.lastTouch[_user] != block.number # dev: one action per block
+    
+    # update last touch
+    self.lastTouch[_user] = block.number
 
 
 ###############

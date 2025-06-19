@@ -605,34 +605,6 @@ def redeemCollateralFromMany(
     return totalGreenSpent
 
 
-@external
-def redeemCollateral(
-    _user: address,
-    _vaultId: uint256,
-    _asset: address,
-    _greenAmount: uint256,
-    _recipient: address,
-    _caller: address,
-    _shouldTransferBalance: bool,
-    _shouldRefundSavingsGreen: bool,
-    _a: addys.Addys = empty(addys.Addys),
-) -> uint256:
-    assert msg.sender == addys._getTellerAddr() # dev: only Teller allowed
-    assert not deptBasics.isPaused # dev: contract paused
-    a: addys.Addys = addys._getAddys(_a)
-
-    greenAmount: uint256 = min(_greenAmount, staticcall IERC20(a.greenToken).balanceOf(self))
-    assert greenAmount != 0 # dev: no green to redeem
-    greenSpent: uint256 = self._redeemCollateral(_user, _vaultId, _asset, max_value(uint256), greenAmount, _recipient, _caller, _shouldTransferBalance, a)
-    assert greenSpent != 0 # dev: no redemptions occurred
-
-    # handle leftover green
-    if greenAmount > greenSpent:
-        self._handleGreenForUser(_caller, greenAmount - greenSpent, _shouldRefundSavingsGreen, False, a)
-
-    return greenSpent
-
-
 @internal
 def _redeemCollateral(
     _user: address,
@@ -650,6 +622,10 @@ def _redeemCollateral(
 
     # invalid inputs
     if empty(address) in [_recipient, _asset, _user] or 0 in [_maxGreenForAsset, _totalGreenRemaining, _vaultId]:
+        return 0
+
+    # recipient cannot be user
+    if _recipient == _user:
         return 0
 
     # vault address
