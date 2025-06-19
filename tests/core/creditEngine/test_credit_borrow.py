@@ -1425,3 +1425,139 @@ def test_can_liquidate_user(
     # lower price to trigger liquidation
     mock_price_source.setPrice(alpha_token, alpha_price // 2)
     assert credit_engine.canLiquidateUser(bob)
+
+
+def test_interest_calculation_precision(
+    alice, green_token, credit_engine, 
+    alpha_token, alpha_token_whale, teller, setGeneralConfig,
+    setAssetConfig, setGeneralDebtConfig, performDeposit,
+    createDebtTerms, mock_price_source, whale
+):
+    """Test that interest calculation maintains precision for small amounts and time periods"""
+    
+    # Setup
+    setGeneralConfig()
+    debt_terms = createDebtTerms(
+        _ltv=80_00,
+        _redemptionThreshold=90_00,
+        _liqThreshold=95_00,
+        _liqFee=10_00,
+        _borrowRate=5_00,  # 5% APR
+        _daowry=1_00,
+    )
+    setAssetConfig(alpha_token, _debtTerms=debt_terms)
+    setGeneralDebtConfig()
+    
+    # Set alpha token price
+    mock_price_source.setPrice(alpha_token, 1 * EIGHTEEN_DECIMALS)
+    
+    # Alice deposits collateral
+    deposit_amount = 1000 * EIGHTEEN_DECIMALS  # 1000 alpha tokens
+    performDeposit(alice, deposit_amount, alpha_token, alpha_token_whale)
+    
+    # Alice borrows a small amount
+    borrow_amount = 100 * EIGHTEEN_DECIMALS  # 100 GREEN
+    with boa.env.prank(alice):
+        teller.borrow(borrow_amount)
+    
+    # Get initial debt
+    initial_debt_data = credit_engine.getLatestUserDebtAndTerms(alice, True)
+    initial_debt = initial_debt_data[0].amount
+    borrow_rate = initial_debt_data[0].debtTerms.borrowRate
+    
+    # Move forward by 1 second
+    boa.env.time_travel(seconds=1)
+    
+    # Calculate expected interest manually with high precision
+    time_elapsed = 1  # 1 second
+    one_year = 60 * 60 * 24 * 365
+    hundred_percent = 100_00
+    
+    # High precision calculation (what we expect with the fix)
+    expected_interest = (initial_debt * borrow_rate * time_elapsed) // (hundred_percent * one_year)
+    
+    # Get new debt after interest accrual
+    new_debt_data = credit_engine.getLatestUserDebtAndTerms(alice, True)
+    new_debt = new_debt_data[0].amount
+    actual_interest = new_debt - initial_debt
+    
+    # Interest should be calculated correctly even for 1 second
+    assert actual_interest == expected_interest, f"Interest mismatch: expected {expected_interest}, got {actual_interest}"
+    
+    # Test with very small principal amount
+    # First repay existing debt - get GREEN from whale
+    green_token.transfer(alice, new_debt, sender=whale)
+    with boa.env.prank(alice):
+        green_token.approve(teller, new_debt)
+        teller.repay(new_debt)
+    
+    # Borrow tiny amount
+    tiny_borrow = 1 * EIGHTEEN_DECIMALS  # 1 GREEN
+    with boa.env.prank(alice):
+        teller.borrow(tiny_borrow)
+    
+    initial_tiny_debt = credit_engine.getLatestUserDebtAndTerms(alice, True)[0].amount
+    
+    # Move forward 1 hour
+    boa.env.time_travel(seconds=3600)
+    
+    # Calculate expected interest for tiny amount
+    expected_tiny_interest = (initial_tiny_debt * borrow_rate * 3600) // (hundred_percent * one_year)
+    
+    new_tiny_debt = credit_engine.getLatestUserDebtAndTerms(alice, True)[0].amount
+    actual_tiny_interest = new_tiny_debt - initial_tiny_debt
+    
+    # Even tiny amounts should accrue interest correctly
+    assert actual_tiny_interest == expected_tiny_interest, f"Tiny interest mismatch: expected {expected_tiny_interest}, got {actual_tiny_interest}"
+
+
+def test_interest_precision_with_large_amounts(
+    alice, green_token, credit_engine, teller, 
+    setGeneralConfig, setAssetConfig, setGeneralDebtConfig, 
+    performDeposit, alpha_token, alpha_token_whale, createDebtTerms,
+    mock_price_source
+):
+    """Test precision doesn't cause overflow with large amounts"""
+    
+    # Setup
+    setGeneralConfig()
+    debt_terms = createDebtTerms(
+        _ltv=80_00,
+        _redemptionThreshold=90_00,
+        _liqThreshold=95_00,
+        _liqFee=10_00,
+        _borrowRate=10_00,  # 10% APR
+        _daowry=0,
+    )
+    setAssetConfig(alpha_token, _debtTerms=debt_terms)
+    setGeneralDebtConfig()
+    
+    # Set alpha token price
+    mock_price_source.setPrice(alpha_token, 1 * EIGHTEEN_DECIMALS)
+    
+    # Deposit large collateral
+    large_deposit = 1_000_000 * EIGHTEEN_DECIMALS  # 1M alpha tokens
+    performDeposit(alice, large_deposit, alpha_token, alpha_token_whale)
+    
+    # Borrow large amount
+    large_borrow = 500_000 * EIGHTEEN_DECIMALS  # 500k GREEN
+    with boa.env.prank(alice):
+        teller.borrow(large_borrow)
+    
+    initial_large_debt = credit_engine.getLatestUserDebtAndTerms(alice, True)[0].amount
+    borrow_rate = credit_engine.getLatestUserDebtAndTerms(alice, True)[0].debtTerms.borrowRate
+    
+    # Move forward 1 year
+    one_year = 60 * 60 * 24 * 365
+    boa.env.time_travel(seconds=one_year)
+    
+    # After 1 year, interest should be exactly the borrow rate percentage of the principal
+    hundred_percent = 100_00
+    expected_yearly_interest = (initial_large_debt * borrow_rate) // hundred_percent
+    
+    final_large_debt = credit_engine.getLatestUserDebtAndTerms(alice, True)[0].amount
+    actual_yearly_interest = final_large_debt - initial_large_debt
+    
+    # Allow small rounding difference due to leap year calculations
+    assert abs(actual_yearly_interest - expected_yearly_interest) <= 1, \
+        f"Yearly interest mismatch: expected {expected_yearly_interest}, got {actual_yearly_interest}"

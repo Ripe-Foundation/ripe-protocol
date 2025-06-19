@@ -1249,7 +1249,9 @@ def _getLatestUserDebtWithInterest(_userDebt: UserDebt) -> (UserDebt, uint256):
 
     # accrue latest interest
     timeElapsed: uint256 = block.timestamp - userDebt.lastTimestamp
-    newInterest: uint256 = userDebt.amount * userDebt.debtTerms.borrowRate * timeElapsed // HUNDRED_PERCENT // ONE_YEAR
+
+    # multiply all numerators first, then divide by combined denominators
+    newInterest: uint256 = (userDebt.amount * userDebt.debtTerms.borrowRate * timeElapsed) // (HUNDRED_PERCENT * ONE_YEAR)
     userDebt.amount += newInterest
 
     userDebt.lastTimestamp = block.timestamp
