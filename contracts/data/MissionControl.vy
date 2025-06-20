@@ -38,12 +38,14 @@ struct TellerDepositConfig:
     perUserMaxAssetsPerVault: uint256
     perUserMaxVaults: uint256
     canAnyoneDeposit: bool
+    minDepositBalance: uint256
 
 struct TellerWithdrawConfig:
     canWithdrawGeneral: bool
     canWithdrawAsset: bool
     isUserAllowed: bool
     canWithdrawForUser: bool
+    minDepositBalance: uint256
 
 struct BorrowConfig:
     canBorrow: bool
@@ -514,6 +516,7 @@ def getTellerDepositConfig(_vaultId: uint256, _asset: address, _user: address) -
         perUserMaxAssetsPerVault=genConfig.perUserMaxAssetsPerVault,
         perUserMaxVaults=genConfig.perUserMaxVaults,
         canAnyoneDeposit=self.userConfig[_user].canAnyoneDeposit,
+        minDepositBalance=assetConfig.minDepositBalance,
     )
 
 
@@ -535,6 +538,7 @@ def getTellerWithdrawConfig(_asset: address, _user: address, _caller: address) -
         canWithdrawAsset=assetConfig.canWithdraw,
         isUserAllowed=self._isUserAllowed(assetConfig.whitelist, _user, _asset),
         canWithdrawForUser=canWithdrawForUser,
+        minDepositBalance=assetConfig.minDepositBalance,
     )
 
 

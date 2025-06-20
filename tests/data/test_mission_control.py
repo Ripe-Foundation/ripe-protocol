@@ -56,6 +56,7 @@ def sample_asset_config():
         200,                     # voterPointsAlloc
         1000 * EIGHTEEN_DECIMALS, # perUserDepositLimit
         10000 * EIGHTEEN_DECIMALS, # globalDepositLimit
+        0,                         # minDepositBalance
         (5000, 6000, 7000, 1000, 500, 0), # debtTerms
         False,                   # shouldBurnAsPayment
         False,                   # shouldTransferToEndaoment
@@ -228,8 +229,8 @@ def test_mission_control_set_asset_config(mission_control, switchboard_alpha, al
     mission_control.setAssetConfig(alpha_token.address, sample_asset_config, sender=switchboard_alpha.address)
     
     stored_config = mission_control.assetConfig(alpha_token.address)
-    assert stored_config.canDeposit == sample_asset_config[10]
-    assert stored_config.canWithdraw == sample_asset_config[11]
+    assert stored_config.canDeposit == sample_asset_config[11]
+    assert stored_config.canWithdraw == sample_asset_config[12]
     assert stored_config.perUserDepositLimit == sample_asset_config[3]
     
     # Check asset was registered
@@ -470,7 +471,7 @@ def test_mission_control_get_debt_terms(mission_control, switchboard_alpha, alph
     mission_control.setAssetConfig(alpha_token.address, sample_asset_config, sender=switchboard_alpha.address)
     
     debt_terms = mission_control.getDebtTerms(alpha_token.address)
-    expected_terms = sample_asset_config[5]  # debtTerms
+    expected_terms = sample_asset_config[6]  # debtTerms
     assert debt_terms.ltv == expected_terms[0]
     assert debt_terms.redemptionThreshold == expected_terms[1]
     assert debt_terms.liqThreshold == expected_terms[2]
@@ -673,10 +674,10 @@ def test_mission_control_get_asset_liq_config(mission_control, switchboard_alpha
     
     config = mission_control.getAssetLiqConfig(alpha_token.address)
     assert config.hasConfig
-    assert config.shouldBurnAsPayment == sample_asset_config[6]
-    assert config.shouldTransferToEndaoment == sample_asset_config[7]
-    assert config.shouldSwapInStabPools == sample_asset_config[8]
-    assert config.shouldAuctionInstantly == sample_asset_config[9]
+    assert config.shouldBurnAsPayment == sample_asset_config[7]
+    assert config.shouldTransferToEndaoment == sample_asset_config[8]
+    assert config.shouldSwapInStabPools == sample_asset_config[9]
+    assert config.shouldAuctionInstantly == sample_asset_config[10]
 
 def test_mission_control_get_stab_pool_claims_config(mission_control, switchboard_alpha, alice, bob, alpha_token, sample_gen_config, sample_asset_config, sample_action_delegation):
     """Test getting stability pool claims configuration."""
@@ -755,7 +756,7 @@ def test_mission_control_get_deposit_points_config(mission_control, switchboard_
     config = mission_control.getDepositPointsConfig(alpha_token.address)
     assert config.stakersPointsAlloc == sample_asset_config[1]
     assert config.voterPointsAlloc == sample_asset_config[2]
-    assert config.isNft == sample_asset_config[19]
+    assert config.isNft == sample_asset_config[20]
 
 def test_mission_control_get_price_config(mission_control, switchboard_alpha, sample_gen_config):
     """Test getting price configuration."""

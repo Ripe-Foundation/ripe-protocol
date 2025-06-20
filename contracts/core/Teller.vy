@@ -98,6 +98,7 @@ struct TellerDepositConfig:
     perUserMaxAssetsPerVault: uint256
     perUserMaxVaults: uint256
     canAnyoneDeposit: bool
+    minDepositBalance: uint256
 
 struct DepositAction:
     asset: address
@@ -110,6 +111,7 @@ struct TellerWithdrawConfig:
     canWithdrawAsset: bool
     isUserAllowed: bool
     canWithdrawForUser: bool
+    minDepositBalance: uint256
 
 struct WithdrawalAction:
     asset: address
@@ -346,6 +348,9 @@ def _validateOnDeposit(
     assert availGlobalDeposit != 0 # dev: cannot deposit, reached global limit
     amount = min(amount, availGlobalDeposit)
 
+    # min balance
+    assert amount + vd.userBalance >= config.minDepositBalance # dev: too small a balance
+
     return amount
 
 
@@ -422,11 +427,17 @@ def _withdraw(
     vaultAddr, vaultId = self._getVaultAddrAndId(_asset, _vaultAddr, _vaultId, _a.vaultBook, _a.missionControl)
 
     # validation
-    amount: uint256 = self._validateOnWithdrawal(_asset, _amount, _user, vaultAddr, vaultId, _caller, _a)
+    config: TellerWithdrawConfig = staticcall MissionControl(_a.missionControl).getTellerWithdrawConfig(_asset, _user, _caller)
+    amount: uint256 = self._validateOnWithdrawal(_asset, _amount, _user, vaultAddr, vaultId, _caller, config, _a)
 
     # withdraw tokens
     isDepleted: bool = False
     amount, isDepleted = extcall Vault(vaultAddr).withdrawTokensFromVault(_user, _asset, amount, _user, _a)
+
+    # check min balance
+    if not isDepleted:
+        userBalance: uint256 = staticcall Vault(vaultAddr).getTotalAmountForUser(_user, _asset)
+        assert userBalance >= config.minDepositBalance # dev: too small a balance
 
     # update lootbox points
     extcall Lootbox(_a.lootbox).updateDepositPoints(_user, vaultId, vaultAddr, _asset, _a)
@@ -447,17 +458,17 @@ def _validateOnWithdrawal(
     _vaultAddr: address,
     _vaultId: uint256,
     _caller: address,
+    _config: TellerWithdrawConfig,
     _a: addys.Addys,
 ) -> uint256:
     assert _amount != 0 # dev: cannot withdraw 0
 
-    config: TellerWithdrawConfig = staticcall MissionControl(_a.missionControl).getTellerWithdrawConfig(_asset, _user, _caller)
-    assert config.canWithdrawGeneral # dev: protocol withdrawals disabled
-    assert config.canWithdrawAsset # dev: asset withdrawals disabled
-    assert config.isUserAllowed # dev: user not on whitelist
+    assert _config.canWithdrawGeneral # dev: protocol withdrawals disabled
+    assert _config.canWithdrawAsset # dev: asset withdrawals disabled
+    assert _config.isUserAllowed # dev: user not on whitelist
 
     # make sure caller is allowed to withdraw for user
-    if _user != _caller and not config.canWithdrawForUser:
+    if _user != _caller and not _config.canWithdrawForUser:
         assert self._isUnderscoreWalletOwner(_user, _caller, _a.missionControl) # dev: not allowed to withdraw for user
 
     # max withdrawable

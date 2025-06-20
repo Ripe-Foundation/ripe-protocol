@@ -94,6 +94,7 @@ struct AssetConfig:
     voterPointsAlloc: uint256
     perUserDepositLimit: uint256
     globalDepositLimit: uint256
+    minDepositBalance: uint256
     debtTerms: DebtTerms
     shouldBurnAsPayment: bool
     shouldTransferToEndaoment: bool

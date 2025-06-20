@@ -18,11 +18,11 @@ interface MissionControl:
     def isSupportedAsset(_asset: address) -> bool: view
     def maxLtvDeviation() -> uint256: view
 
-interface Whitelist:
-    def isUserAllowed(_user: address, _asset: address) -> bool: view
-
 interface SwitchboardAlpha:
     def areValidAuctionParams(_params: cs.AuctionParams) -> bool: view
+
+interface Whitelist:
+    def isUserAllowed(_user: address, _asset: address) -> bool: view
 
 interface VaultBook:
     def isValidRegId(_regId: uint256) -> bool: view
@@ -59,6 +59,7 @@ event NewAssetPending:
     voterPointsAlloc: uint256
     perUserDepositLimit: uint256
     globalDepositLimit: uint256
+    minDepositBalance: uint256
     debtTermsLtv: uint256
     debtTermsRedemptionThreshold: uint256
     debtTermsLiqThreshold: uint256
@@ -90,6 +91,7 @@ event PendingAssetDepositParamsChange:
     voterPointsAlloc: uint256
     perUserDepositLimit: uint256
     globalDepositLimit: uint256
+    minDepositBalance: uint256
     confirmationBlock: uint256
     actionId: uint256
 
@@ -164,6 +166,7 @@ event AssetDepositParamsSet:
     voterPointsAlloc: uint256
     perUserDepositLimit: uint256
     globalDepositLimit: uint256
+    minDepositBalance: uint256
 
 event AssetLiqConfigSet:
     asset: indexed(address)
@@ -250,6 +253,7 @@ def addAsset(
     _voterPointsAlloc: uint256,
     _perUserDepositLimit: uint256,
     _globalDepositLimit: uint256,
+    _minDepositBalance: uint256 = 0,
     _debtTerms: cs.DebtTerms = empty(cs.DebtTerms),
     _shouldBurnAsPayment: bool = False,
     _shouldTransferToEndaoment: bool = False,
@@ -279,6 +283,7 @@ def addAsset(
         voterPointsAlloc=_voterPointsAlloc,
         perUserDepositLimit=_perUserDepositLimit,
         globalDepositLimit=_globalDepositLimit,
+        minDepositBalance=_minDepositBalance,
         debtTerms=_debtTerms,
         shouldBurnAsPayment=_shouldBurnAsPayment,
         shouldTransferToEndaoment=_shouldTransferToEndaoment,
@@ -311,6 +316,7 @@ def addAsset(
         voterPointsAlloc=config.voterPointsAlloc,
         perUserDepositLimit=config.perUserDepositLimit,
         globalDepositLimit=config.globalDepositLimit,
+        minDepositBalance=config.minDepositBalance,
         debtTermsLtv=config.debtTerms.ltv,
         debtTermsRedemptionThreshold=config.debtTerms.redemptionThreshold,
         debtTermsLiqThreshold=config.debtTerms.liqThreshold,
@@ -345,7 +351,7 @@ def _isValidAssetConfig(_asset: address, _config: cs.AssetConfig) -> bool:
         return False
     if not self._isValidDebtTerms(_config.debtTerms):
         return False
-    if not self._isValidAssetDepositParams(_asset, _config.vaultIds, _config.stakersPointsAlloc, _config.voterPointsAlloc, _config.perUserDepositLimit, _config.globalDepositLimit):
+    if not self._isValidAssetDepositParams(_asset, _config.vaultIds, _config.stakersPointsAlloc, _config.voterPointsAlloc, _config.perUserDepositLimit, _config.globalDepositLimit, _config.minDepositBalance):
         return False
     if not self._isValidAssetLiqConfig(_asset, _config.shouldBurnAsPayment, _config.shouldTransferToEndaoment, _config.shouldSwapInStabPools, _config.shouldAuctionInstantly, _config.specialStabPoolId, _config.isNft, _config.whitelist, _config.debtTerms.ltv):
         return False
@@ -371,12 +377,13 @@ def setAssetDepositParams(
     _voterPointsAlloc: uint256,
     _perUserDepositLimit: uint256,
     _globalDepositLimit: uint256,
+    _minDepositBalance: uint256,
 ) -> uint256:
     assert gov._canGovern(msg.sender) # dev: no perms
 
     assert staticcall MissionControl(self._getMissionControlAddr()).isSupportedAsset(_asset) # dev: invalid asset
-    assert self._isValidAssetDepositParams(_asset, _vaultIds, _stakersPointsAlloc, _voterPointsAlloc, _perUserDepositLimit, _globalDepositLimit) # dev: invalid asset deposit params
-    return self._setPendingAssetConfig(ActionType.ASSET_DEPOSIT_PARAMS, _asset, _vaultIds, _stakersPointsAlloc, _voterPointsAlloc, _perUserDepositLimit, _globalDepositLimit)
+    assert self._isValidAssetDepositParams(_asset, _vaultIds, _stakersPointsAlloc, _voterPointsAlloc, _perUserDepositLimit, _globalDepositLimit, _minDepositBalance) # dev: invalid asset deposit params
+    return self._setPendingAssetConfig(ActionType.ASSET_DEPOSIT_PARAMS, _asset, _vaultIds, _stakersPointsAlloc, _voterPointsAlloc, _perUserDepositLimit, _globalDepositLimit, _minDepositBalance)
 
 
 @view
@@ -388,6 +395,7 @@ def _isValidAssetDepositParams(
     _voterPointsAlloc: uint256,
     _perUserDepositLimit: uint256,
     _globalDepositLimit: uint256,
+    _minDepositBalance: uint256,
 ) -> bool:
     vaultBook: address = staticcall RipeHq(gov._getRipeHqFromGov()).getAddr(VAULT_BOOK_ID)
     if 0 in [_perUserDepositLimit, _globalDepositLimit]:
@@ -397,6 +405,8 @@ def _isValidAssetDepositParams(
     if _stakersPointsAlloc + _voterPointsAlloc > HUNDRED_PERCENT:
         return False
     if _perUserDepositLimit > _globalDepositLimit:
+        return False
+    if _minDepositBalance > _perUserDepositLimit:
         return False
     for vaultId: uint256 in _vaultIds:
         if not staticcall VaultBook(vaultBook).isValidRegId(vaultId):
@@ -430,7 +440,7 @@ def setAssetLiqConfig(
     assert staticcall MissionControl(mc).isSupportedAsset(_asset) # dev: invalid asset
     assetConfig: cs.AssetConfig = staticcall MissionControl(mc).assetConfig(_asset)
     assert self._isValidAssetLiqConfig(_asset, _shouldBurnAsPayment, _shouldTransferToEndaoment, _shouldSwapInStabPools, _shouldAuctionInstantly, _specialStabPoolId, assetConfig.isNft, assetConfig.whitelist, assetConfig.debtTerms.ltv) # dev: invalid asset liq config
-    return self._setPendingAssetConfig(ActionType.ASSET_LIQ_CONFIG, _asset, [], 0, 0, 0, 0, empty(cs.DebtTerms), _shouldBurnAsPayment, _shouldTransferToEndaoment, _shouldSwapInStabPools, _shouldAuctionInstantly, _specialStabPoolId, customAuctionParams)
+    return self._setPendingAssetConfig(ActionType.ASSET_LIQ_CONFIG, _asset, [], 0, 0, 0, 0, 0, empty(cs.DebtTerms), _shouldBurnAsPayment, _shouldTransferToEndaoment, _shouldSwapInStabPools, _shouldAuctionInstantly, _specialStabPoolId, customAuctionParams)
 
 
 @view
@@ -522,7 +532,7 @@ def setAssetDebtTerms(
         daowry=_daowry,
     )
     assert self._isValidDebtTerms(debtTerms) # dev: invalid debt terms
-    return self._setPendingAssetConfig(ActionType.ASSET_DEBT_TERMS, _asset, [], 0, 0, 0, 0, debtTerms)
+    return self._setPendingAssetConfig(ActionType.ASSET_DEBT_TERMS, _asset, [], 0, 0, 0, 0, 0, debtTerms)
 
 
 @view
@@ -575,7 +585,7 @@ def setWhitelistForAsset(_asset: address, _whitelist: address) -> uint256:
 
     assert staticcall MissionControl(self._getMissionControlAddr()).isSupportedAsset(_asset) # dev: invalid asset
     assert self._isValidWhitelist(_whitelist) # dev: invalid whitelist
-    return self._setPendingAssetConfig(ActionType.ASSET_WHITELIST, _asset, [], 0, 0, 0, 0, empty(cs.DebtTerms), False, False, False, False, 0, empty(cs.AuctionParams), _whitelist)
+    return self._setPendingAssetConfig(ActionType.ASSET_WHITELIST, _asset, [], 0, 0, 0, 0, 0, empty(cs.DebtTerms), False, False, False, False, 0, empty(cs.AuctionParams), _whitelist)
 
 
 @view
@@ -601,6 +611,7 @@ def _setPendingAssetConfig(
     _voterPointsAlloc: uint256 = 0,
     _perUserDepositLimit: uint256 = 0,
     _globalDepositLimit: uint256 = 0,
+    _minDepositBalance: uint256 = 0,
     _debtTerms: cs.DebtTerms = empty(cs.DebtTerms),
     _shouldBurnAsPayment: bool = False,
     _shouldTransferToEndaoment: bool = False,
@@ -619,6 +630,7 @@ def _setPendingAssetConfig(
         voterPointsAlloc=_voterPointsAlloc,
         perUserDepositLimit=_perUserDepositLimit,
         globalDepositLimit=_globalDepositLimit,
+        minDepositBalance=_minDepositBalance,
         debtTerms=_debtTerms,
         shouldBurnAsPayment=_shouldBurnAsPayment,
         shouldTransferToEndaoment=_shouldTransferToEndaoment,
@@ -649,6 +661,7 @@ def _setPendingAssetConfig(
             voterPointsAlloc=_voterPointsAlloc,
             perUserDepositLimit=_perUserDepositLimit,
             globalDepositLimit=_globalDepositLimit,
+            minDepositBalance=_minDepositBalance,
             confirmationBlock=confirmationBlock,
             actionId=aid,
         )
@@ -830,9 +843,10 @@ def executePendingAction(_aid: uint256) -> bool:
         config.voterPointsAlloc = p.config.voterPointsAlloc
         config.perUserDepositLimit = p.config.perUserDepositLimit
         config.globalDepositLimit = p.config.globalDepositLimit
+        config.minDepositBalance = p.config.minDepositBalance
         assert self._isValidAssetConfig(p.asset, config) # dev: invalid asset config
         extcall MissionControl(mc).setAssetConfig(p.asset, config)
-        log AssetDepositParamsSet(asset=p.asset, numVaultIds=len(p.config.vaultIds), stakersPointsAlloc=p.config.stakersPointsAlloc, voterPointsAlloc=p.config.voterPointsAlloc, perUserDepositLimit=p.config.perUserDepositLimit, globalDepositLimit=p.config.globalDepositLimit)
+        log AssetDepositParamsSet(asset=p.asset, numVaultIds=len(p.config.vaultIds), stakersPointsAlloc=p.config.stakersPointsAlloc, voterPointsAlloc=p.config.voterPointsAlloc, perUserDepositLimit=p.config.perUserDepositLimit, globalDepositLimit=p.config.globalDepositLimit, minDepositBalance=p.config.minDepositBalance)
 
     elif actionType == ActionType.ASSET_LIQ_CONFIG:
         p: AssetUpdate = self.pendingAssetConfig[_aid]
