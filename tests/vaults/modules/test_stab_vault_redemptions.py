@@ -1632,3 +1632,246 @@ def test_stab_vault_redemptions_auto_deposit_partial_redeem(
     remaining_claimable = stability_pool.claimableBalances(alpha_token, bravo_token)
     assert remaining_claimable == claimable_amount - partial_redeem_amount
 
+
+def test_stab_vault_redemptions_basic_with_sgreen(
+    stability_pool,
+    savings_green,
+    bravo_token,
+    bravo_token_whale,
+    bob,
+    teller,
+    auction_house,
+    mock_price_source,
+    vault_book,
+    _test,
+    setGeneralConfig,
+    setAssetConfig,
+    green_token,
+    alice,
+    whale,
+):
+    setGeneralConfig()
+    setAssetConfig(bravo_token)
+
+    # Set mock price
+    mock_price_source.setPrice(bravo_token, 1 * EIGHTEEN_DECIMALS)
+
+    # stab pool deposit
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    green_token.transfer(alice, deposit_amount, sender=whale)
+    green_token.approve(savings_green, deposit_amount, sender=alice)
+    pre_sgreen_amount = savings_green.deposit(deposit_amount, stability_pool, sender=alice)
+    stability_pool.depositTokensInVault(alice, savings_green, pre_sgreen_amount, sender=teller.address)
+
+    # swap
+    claimable_amount = 150 * EIGHTEEN_DECIMALS
+    bravo_token.transfer(stability_pool, claimable_amount, sender=bravo_token_whale)
+    stability_pool.swapForLiquidatedCollateral(
+        savings_green,  # stab asset
+        pre_sgreen_amount,     # stab asset amount
+        bravo_token,  # liq asset
+        claimable_amount,  # liq amount
+        ZERO_ADDRESS,  # recipient (burn)
+        green_token,  # green token
+        savings_green, # savings green token
+        sender=auction_house.address
+    )
+
+    pre_user_value = stability_pool.getTotalUserValue(alice, savings_green)
+    pre_total_value = stability_pool.getTotalValue(savings_green)
+    vault_id = vault_book.getRegId(stability_pool)
+
+    # redeem!
+    redeem_amount = 50 * EIGHTEEN_DECIMALS
+    green_token.transfer(bob, redeem_amount, sender=whale)
+    green_token.approve(teller, redeem_amount, sender=bob)
+    usd_value = teller.redeemFromStabilityPool(vault_id, bravo_token, redeem_amount, bob, sender=bob)
+
+    # results
+    _test(redeem_amount, usd_value)
+    _test(redeem_amount, bravo_token.balanceOf(bob))
+
+    # green balances
+    assert green_token.balanceOf(bob) == 0
+    assert green_token.balanceOf(stability_pool) == 0 # was converted to sgreen
+
+    # claim data
+    assert stability_pool.claimableBalances(savings_green, bravo_token) == claimable_amount - redeem_amount
+    assert stability_pool.claimableBalances(savings_green, green_token) == 0
+
+    # these should stay the same!
+    _test(pre_user_value, stability_pool.getTotalUserValue(alice, savings_green))
+    _test(pre_total_value, stability_pool.getTotalValue(savings_green))
+
+    # sgreen basically only redeem amount
+    _test(savings_green.balanceOf(stability_pool), redeem_amount)
+
+
+def test_stab_vault_redeem_many_with_sgreen(
+    stability_pool,
+    savings_green,
+    bravo_token,
+    charlie_token,
+    bravo_token_whale,
+    charlie_token_whale,
+    bob,
+    teller,
+    auction_house,
+    mock_price_source,
+    vault_book,
+    _test,
+    setGeneralConfig,
+    setAssetConfig,
+    green_token,
+    alice,
+    whale,
+):
+    """Test redeemManyFromStabilityPool with sGREEN auto-conversion"""
+    setGeneralConfig()
+    setAssetConfig(bravo_token)
+    setAssetConfig(charlie_token)
+
+    # Set mock prices
+    price = 1 * EIGHTEEN_DECIMALS
+    mock_price_source.setPrice(bravo_token, price)
+    mock_price_source.setPrice(charlie_token, price)
+
+    # Setup sGREEN deposit in stability pool
+    deposit_amount = 200 * EIGHTEEN_DECIMALS
+    green_token.transfer(alice, deposit_amount, sender=whale)
+    green_token.approve(savings_green, deposit_amount, sender=alice)
+    sgreen_amount = savings_green.deposit(deposit_amount, stability_pool, sender=alice)
+    stability_pool.depositTokensInVault(alice, savings_green, sgreen_amount, sender=teller.address)
+
+    # Create claimable assets via liquidations
+    bravo_amount = 100 * EIGHTEEN_DECIMALS
+    charlie_amount = 120 * (10 ** charlie_token.decimals())
+    
+    bravo_token.transfer(stability_pool, bravo_amount, sender=bravo_token_whale)
+    stability_pool.swapForLiquidatedCollateral(
+        savings_green, sgreen_amount // 2, bravo_token, bravo_amount,
+        ZERO_ADDRESS, green_token, savings_green, sender=auction_house.address
+    )
+    
+    charlie_token.transfer(stability_pool, charlie_amount, sender=charlie_token_whale)
+    stability_pool.swapForLiquidatedCollateral(
+        savings_green, sgreen_amount // 2, charlie_token, charlie_amount,
+        ZERO_ADDRESS, green_token, savings_green, sender=auction_house.address
+    )
+
+    pre_sgreen_balance = savings_green.balanceOf(stability_pool)
+    vault_id = vault_book.getRegId(stability_pool)
+
+    # Create redemptions array
+    redemptions = [
+        (bravo_token.address, MAX_UINT256),
+        (charlie_token.address, MAX_UINT256)
+    ]
+
+    total_redeem_amount = 220 * EIGHTEEN_DECIMALS
+    green_token.transfer(bob, total_redeem_amount, sender=whale)
+    green_token.approve(teller, total_redeem_amount, sender=bob)
+    
+    # Redeem many
+    total_green_spent = teller.redeemManyFromStabilityPool(vault_id, redemptions, total_redeem_amount, bob, sender=bob)
+
+    # Check results
+    _test(bravo_amount, bravo_token.balanceOf(bob))
+    _test(charlie_amount, charlie_token.balanceOf(bob))
+    _test(total_redeem_amount, total_green_spent)
+
+    # Check that green was auto-converted to sGREEN (not made claimable)
+    assert green_token.balanceOf(stability_pool) == 0  # No green left in pool
+    assert stability_pool.claimableBalances(savings_green, green_token) == 0  # No green made claimable
+    
+    # sGREEN balance should have increased by the redemption amounts
+    final_sgreen_balance = savings_green.balanceOf(stability_pool)
+    _test(total_green_spent, final_sgreen_balance - pre_sgreen_balance)
+
+    # Claimable assets should be depleted
+    assert stability_pool.claimableBalances(savings_green, bravo_token) == 0
+    assert stability_pool.claimableBalances(savings_green, charlie_token) == 0
+
+
+def test_stab_vault_redemptions_mixed_assets_with_sgreen(
+    stability_pool,
+    alpha_token,
+    savings_green,
+    bravo_token,
+    alpha_token_whale,
+    bravo_token_whale,
+    bob,
+    alice,
+    sally,
+    teller,
+    auction_house,
+    mock_price_source,
+    vault_book,
+    _test,
+    setGeneralConfig,
+    setAssetConfig,
+    green_token,
+    whale,
+):
+    """Test redemption behavior with mixed stability assets (regular + sGREEN)"""
+    setGeneralConfig()
+    setAssetConfig(bravo_token)
+
+    # Set mock prices
+    price = 1 * EIGHTEEN_DECIMALS
+    mock_price_source.setPrice(alpha_token, price)
+    mock_price_source.setPrice(bravo_token, price)
+
+    # Setup deposits: Alice with regular alpha, Sally with sGREEN
+    alpha_deposit = 100 * EIGHTEEN_DECIMALS
+    alpha_token.transfer(stability_pool, alpha_deposit, sender=alpha_token_whale)
+    stability_pool.depositTokensInVault(alice, alpha_token, alpha_deposit, sender=teller.address)
+
+    sgreen_deposit_underlying = 100 * EIGHTEEN_DECIMALS
+    green_token.transfer(sally, sgreen_deposit_underlying, sender=whale)
+    green_token.approve(savings_green, sgreen_deposit_underlying, sender=sally)
+    sgreen_amount = savings_green.deposit(sgreen_deposit_underlying, stability_pool, sender=sally)
+    stability_pool.depositTokensInVault(sally, savings_green, sgreen_amount, sender=teller.address)
+
+    # Create claimable bravo for both stability assets
+    bravo_for_alpha = 80 * EIGHTEEN_DECIMALS
+    bravo_for_sgreen = 60 * EIGHTEEN_DECIMALS
+    
+    bravo_token.transfer(stability_pool, bravo_for_alpha, sender=bravo_token_whale)
+    stability_pool.swapForLiquidatedCollateral(
+        alpha_token, alpha_deposit, bravo_token, bravo_for_alpha,
+        ZERO_ADDRESS, alpha_token, savings_green, sender=auction_house.address
+    )
+    
+    bravo_token.transfer(stability_pool, bravo_for_sgreen, sender=bravo_token_whale)
+    stability_pool.swapForLiquidatedCollateral(
+        savings_green, sgreen_amount, bravo_token, bravo_for_sgreen,
+        ZERO_ADDRESS, green_token, savings_green, sender=auction_house.address
+    )
+
+    pre_sgreen_balance = savings_green.balanceOf(stability_pool)
+    vault_id = vault_book.getRegId(stability_pool)
+
+    # Redeem all bravo across both stability assets
+    total_bravo = bravo_for_alpha + bravo_for_sgreen
+    green_token.transfer(bob, total_bravo, sender=whale)
+    green_token.approve(teller, total_bravo, sender=bob)
+    
+    usd_value = teller.redeemFromStabilityPool(vault_id, bravo_token, total_bravo, bob, sender=bob)
+
+    # Check results
+    _test(total_bravo, usd_value)
+    _test(total_bravo, bravo_token.balanceOf(bob))
+
+    # Check green handling: 
+    # - Alpha redemption should create claimable green
+    # - sGREEN redemption should auto-convert to sGREEN
+    assert stability_pool.claimableBalances(alpha_token, green_token) == bravo_for_alpha
+    assert stability_pool.claimableBalances(savings_green, green_token) == 0  # Auto-converted, not claimable
+
+    # sGREEN balance should have increased by the sGREEN redemption amount
+    final_sgreen_balance = savings_green.balanceOf(stability_pool)
+    _test(bravo_for_sgreen, final_sgreen_balance - pre_sgreen_balance)
+
+    # No green should remain in the stability pool
+    assert green_token.balanceOf(stability_pool) == bravo_for_alpha  # Only from alpha redemption

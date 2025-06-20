@@ -898,9 +898,19 @@ def _redeemFromStabilityPool(
         self._handleAssetForUser(_asset, claimAmount, _recipient, _shouldAutoDeposit, _a)
         remainingClaimAmount -= claimAmount
 
-        # add green to claimable
+        # finalize redeem amount
         redeemAmount: uint256 = min(claimAmount * maxRedeemValue // maxClaimableAmount, remainingRedeemValue)
-        self._addClaimableBalance(stabAsset, _a.greenToken, redeemAmount)
+
+        # if stab asset is sGREEN, just convert directly, no need to make green claimable in this case
+        if stabAsset == _a.savingsGreen:
+            assert extcall IERC20(_a.greenToken).approve(_a.savingsGreen, redeemAmount, default_return_value=True) # dev: green approval failed
+            extcall IERC4626(_a.savingsGreen).deposit(redeemAmount, self)
+            assert extcall IERC20(_a.greenToken).approve(_a.savingsGreen, 0, default_return_value=True) # dev: green approval failed
+
+        # add green to claimable (i.e. GREEN LP)
+        else:
+            self._addClaimableBalance(stabAsset, _a.greenToken, redeemAmount)
+
         remainingRedeemValue -= redeemAmount
         greenSpent += redeemAmount
 
