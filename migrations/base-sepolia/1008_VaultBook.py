@@ -51,3 +51,6 @@ def migrate(migration: Migration):
 
     migration.execute(hq.startAddNewAddressToRegistry, vault_book, "Vault Book")
     assert int(migration.execute(hq.confirmNewAddressToRegistry, vault_book)) == 8
+
+    migration.execute(hq.initiateHqConfigChange, 8, False, True, False)
+    migration.execute(hq.confirmHqConfigChange, 8)
