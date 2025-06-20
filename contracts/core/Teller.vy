@@ -188,9 +188,9 @@ CURVE_PRICES_ID: constant(uint256) = 2
 
 
 @deploy
-def __init__(_ripeHq: address):
+def __init__(_ripeHq: address, _shouldPause: bool):
     addys.__init__(_ripeHq)
-    deptBasics.__init__(False, False, False) # no minting
+    deptBasics.__init__(_shouldPause, False, False) # no minting
 
 
 ############
