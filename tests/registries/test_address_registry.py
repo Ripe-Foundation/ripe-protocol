@@ -1,4 +1,3 @@
-import pytest
 import boa
 
 from constants import ZERO_ADDRESS

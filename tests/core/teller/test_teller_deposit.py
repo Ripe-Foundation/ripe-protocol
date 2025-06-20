@@ -1,4 +1,3 @@
-import pytest
 import boa
 
 from constants import EIGHTEEN_DECIMALS
@@ -624,7 +623,7 @@ def test_teller_get_savings_green_and_enter_stab_pool_basic(
 
     # Record initial balances
     initial_bob_green = green_token.balanceOf(bob)
-    initial_bob_sgreen = savings_green.balanceOf(bob)
+    savings_green.balanceOf(bob)
     initial_stability_pool_sgreen = savings_green.balanceOf(stability_pool)
 
     # Execute convertToSavingsGreenAndDepositIntoStabPool
@@ -719,4 +718,161 @@ def test_teller_get_savings_green_and_enter_stab_pool_contract_paused(
     # Verify the deposit was successful
     assert green_token.balanceOf(bob) == 0
     assert savings_green.balanceOf(stability_pool) == sgreen_amount
+
+
+def test_teller_deposit_min_balance_below_minimum(
+    simple_erc20_vault,
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    teller,
+):
+    """Test that deposits fail when they would result in a balance below minDepositBalance"""
+    # Setup with minDepositBalance = 50 tokens
+    min_balance = 50 * EIGHTEEN_DECIMALS
+    setGeneralConfig()
+    setAssetConfig(alpha_token, _minDepositBalance=min_balance)
+
+    # Try to deposit less than minimum balance - should fail
+    deposit_amount = 25 * EIGHTEEN_DECIMALS
+    alpha_token.transfer(bob, deposit_amount, sender=alpha_token_whale)
+    alpha_token.approve(teller.address, deposit_amount, sender=bob)
+
+    # Attempt deposit should fail
+    with boa.reverts("too small a balance"):
+        teller.deposit(alpha_token, deposit_amount, bob, simple_erc20_vault, sender=bob)
+
+    # Verify no tokens were transferred
+    assert alpha_token.balanceOf(bob) == deposit_amount
+    assert alpha_token.balanceOf(simple_erc20_vault) == 0
+
+
+def test_teller_deposit_min_balance_exactly_minimum(
+    simple_erc20_vault,
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    teller,
+):
+    """Test that deposits succeed when they result in exactly the minDepositBalance"""
+    # Setup with minDepositBalance = 50 tokens
+    min_balance = 50 * EIGHTEEN_DECIMALS
+    setGeneralConfig()
+    setAssetConfig(alpha_token, _minDepositBalance=min_balance)
+
+    # Deposit exactly the minimum balance - should succeed
+    deposit_amount = min_balance
+    alpha_token.transfer(bob, deposit_amount, sender=alpha_token_whale)
+    alpha_token.approve(teller.address, deposit_amount, sender=bob)
+
+    # Deposit should succeed
+    amount = teller.deposit(alpha_token, deposit_amount, bob, simple_erc20_vault, sender=bob)
+    assert amount == deposit_amount
+
+    # Verify tokens were transferred
+    assert alpha_token.balanceOf(bob) == 0
+    assert alpha_token.balanceOf(simple_erc20_vault) == deposit_amount
+
+
+def test_teller_deposit_min_balance_above_minimum(
+    simple_erc20_vault,
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    teller,
+):
+    """Test that deposits succeed when they result in a balance above minDepositBalance"""
+    # Setup with minDepositBalance = 50 tokens
+    min_balance = 50 * EIGHTEEN_DECIMALS
+    setGeneralConfig()
+    setAssetConfig(alpha_token, _minDepositBalance=min_balance)
+
+    # Deposit more than minimum balance - should succeed
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    alpha_token.transfer(bob, deposit_amount, sender=alpha_token_whale)
+    alpha_token.approve(teller.address, deposit_amount, sender=bob)
+
+    # Deposit should succeed
+    amount = teller.deposit(alpha_token, deposit_amount, bob, simple_erc20_vault, sender=bob)
+    assert amount == deposit_amount
+
+    # Verify tokens were transferred
+    assert alpha_token.balanceOf(bob) == 0
+    assert alpha_token.balanceOf(simple_erc20_vault) == deposit_amount
+
+
+def test_teller_deposit_min_balance_with_existing_balance(
+    simple_erc20_vault,
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    teller,
+):
+    """Test that minDepositBalance considers existing user balance"""
+    # Setup with minDepositBalance = 150 tokens
+    min_balance = 150 * EIGHTEEN_DECIMALS
+    setGeneralConfig()
+    setAssetConfig(alpha_token, _minDepositBalance=min_balance)
+
+    # First deposit 100 tokens (meets minimum) - should succeed
+    first_deposit = 100 * EIGHTEEN_DECIMALS
+    alpha_token.transfer(bob, first_deposit, sender=alpha_token_whale)
+    alpha_token.approve(teller.address, first_deposit, sender=bob)
+    
+    # This should fail because 100 < 150 minimum
+    with boa.reverts("too small a balance"):
+        teller.deposit(alpha_token, first_deposit, bob, simple_erc20_vault, sender=bob)
+
+    # Deposit 150 tokens (exactly meets minimum) - should succeed
+    first_deposit = 150 * EIGHTEEN_DECIMALS
+    alpha_token.transfer(bob, first_deposit, sender=alpha_token_whale)
+    alpha_token.approve(teller.address, first_deposit, sender=bob)
+    teller.deposit(alpha_token, first_deposit, bob, simple_erc20_vault, sender=bob)
+
+    # Second deposit of 30 tokens would bring total to 180 (above min 150) - should succeed
+    second_deposit = 30 * EIGHTEEN_DECIMALS
+    alpha_token.transfer(bob, second_deposit, sender=alpha_token_whale)
+    alpha_token.approve(teller.address, second_deposit, sender=bob)
+    
+    amount = teller.deposit(alpha_token, second_deposit, bob, simple_erc20_vault, sender=bob)
+    assert amount == second_deposit
+
+    # Verify final balance is above minimum
+    assert alpha_token.balanceOf(simple_erc20_vault) == first_deposit + second_deposit
+
+
+def test_teller_deposit_min_balance_zero_allows_any_amount(
+    simple_erc20_vault,
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    teller,
+):
+    """Test that minDepositBalance = 0 allows any deposit amount"""
+    # Setup with minDepositBalance = 0 (default)
+    setGeneralConfig()
+    setAssetConfig(alpha_token, _minDepositBalance=0)
+
+    # Even very small deposits should succeed
+    deposit_amount = 1  # 1 wei
+    alpha_token.transfer(bob, deposit_amount, sender=alpha_token_whale)  
+    alpha_token.approve(teller.address, deposit_amount, sender=bob)
+
+    # Deposit should succeed
+    amount = teller.deposit(alpha_token, deposit_amount, bob, simple_erc20_vault, sender=bob)
+    assert amount == deposit_amount
+
+    # Verify tokens were transferred
+    assert alpha_token.balanceOf(bob) == 0
+    assert alpha_token.balanceOf(simple_erc20_vault) == deposit_amount
 

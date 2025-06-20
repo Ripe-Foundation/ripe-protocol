@@ -90,6 +90,7 @@ struct GenLiqConfig:
     canLiquidate: bool
     keeperFeeRatio: uint256
     minKeeperFee: uint256
+    maxKeeperFee: uint256
     ltvPaybackBuffer: uint256
     genAuctionParams: cs.AuctionParams
     priorityLiqAssetVaults: DynArray[VaultData, PRIORITY_LIQ_VAULT_DATA]
@@ -290,6 +291,10 @@ def _liquidateUser(
     if userDebt.inLiquidation:
         return 0
 
+    # user has debt but no liquidation threshold - cannot liquidate
+    if bt.debtTerms.liqThreshold == 0:
+        return 0
+
     # not reached liquidation threshold
     collateralLiqThreshold: uint256 = userDebt.amount * HUNDRED_PERCENT // bt.debtTerms.liqThreshold
     if bt.collateralVal > collateralLiqThreshold:
@@ -304,13 +309,16 @@ def _liquidateUser(
 
     # keeper fee (for liquidator)
     keeperFee: uint256 = max(_config.minKeeperFee, userDebt.amount * _config.keeperFeeRatio // HUNDRED_PERCENT)
+    if keeperFee != 0 and _config.maxKeeperFee != 0:
+        keeperFee = min(keeperFee, _config.maxKeeperFee)
+
     if keeperFee != 0:
         totalLiqFees += keeperFee
         liqFeeRatio = totalLiqFees * HUNDRED_PERCENT // userDebt.amount
 
-    # how much to achieve safe LTV -- won't be exact because depends on which collateral is liquidated (LTV changes)
+    # how much to achieve safe LTV - use single robust formula for all liquidation types
     targetLtv: uint256 = bt.debtTerms.ltv * (HUNDRED_PERCENT - _config.ltvPaybackBuffer) // HUNDRED_PERCENT
-    targetRepayAmount: uint256 = self._calcAmountOfDebtToRepay(userDebt.amount, bt.collateralVal, targetLtv, liqFeeRatio, totalLiqFees)
+    targetRepayAmount: uint256 = self._calcTargetRepayAmount(userDebt.amount, bt.collateralVal, targetLtv, liqFeeRatio)
 
     # perform liquidation phases
     repayValueIn: uint256 = 0
@@ -521,7 +529,7 @@ def _handleSpecificLiqAsset(
     collateralValueOut: uint256 = _collateralValueOut
 
     # burn as payment (GREEN, sGREEN)
-    if config.shouldBurnAsPayment:
+    if config.shouldBurnAsPayment and _liqAsset in [_a.greenToken, _a.savingsGreen]:
         remainingToRepay, collateralValueOut = self._burnLiqUserStabAsset(_liqUser, _vaultId, _vaultAddr, _liqAsset, remainingToRepay, collateralValueOut, _a)
         return remainingToRepay, collateralValueOut
 
@@ -608,8 +616,6 @@ def _burnLiqUserStabAsset(
     usdValue, amountReceived, isPositionDepleted, na = self._transferCollateral(_liqUser, self, _liqVaultId, _liqVaultAddr, _liqStabAsset, False, remainingToRepay, _a)
     if usdValue == 0:
         return remainingToRepay, collateralValueOut
-
-    assert _liqStabAsset in [_a.greenToken, _a.savingsGreen] # dev: must be green or savings green
 
     # burn stab asset
     if _liqStabAsset == _a.savingsGreen:
@@ -1147,6 +1153,10 @@ def _buyFungibleAuction(
 
     # NOTE: faililng gracefully in case there are many purchases at same time
 
+    # recipient cannot be user
+    if _liqUser == _recipient:
+        return 0
+
     # this also verifies that user is in liquidation
     auc: FungibleAuction = staticcall Ledger(_a.ledger).getFungibleAuctionDuringPurchase(_liqUser, _liqVaultId, _liqAsset)
     if not auc.isActive:
@@ -1354,48 +1364,100 @@ def calcAmountOfDebtToRepayDuringLiq(_user: address) -> uint256:
 
     # liquidation fees
     totalLiqFees: uint256 = userDebt.amount * bt.debtTerms.liqFee // HUNDRED_PERCENT
-    totalLiqFees += max(config.minKeeperFee, userDebt.amount * config.keeperFeeRatio // HUNDRED_PERCENT)
-    liqFeeRatio: uint256 = totalLiqFees * HUNDRED_PERCENT // userDebt.amount
+    liqFeeRatio: uint256 = bt.debtTerms.liqFee
 
-    # calc amount of debt to repay
+    # keeper fee (for liquidator)
+    keeperFee: uint256 = max(config.minKeeperFee, userDebt.amount * config.keeperFeeRatio // HUNDRED_PERCENT)
+    if keeperFee != 0 and config.maxKeeperFee != 0:
+        keeperFee = min(keeperFee, config.maxKeeperFee)
+    if keeperFee != 0:
+        totalLiqFees += keeperFee
+        liqFeeRatio = totalLiqFees * HUNDRED_PERCENT // userDebt.amount
+
+    # calc amount of debt to repay using unified formula
     targetLtv: uint256 = bt.debtTerms.ltv * (HUNDRED_PERCENT - config.ltvPaybackBuffer) // HUNDRED_PERCENT
-    return self._calcAmountOfDebtToRepay(userDebt.amount, bt.collateralVal, targetLtv, liqFeeRatio, totalLiqFees)
+    return self._calcTargetRepayAmount(userDebt.amount, bt.collateralVal, targetLtv, liqFeeRatio)
 
 
 @pure
 @internal
-def _calcAmountOfDebtToRepay(
+def _calcTargetRepayAmount(
     _debtAmount: uint256,
     _collateralValue: uint256,
     _targetLtv: uint256,
     _liqFeeRatio: uint256,
-    _totalLiqFees: uint256,
 ) -> uint256:
-    # goal here is to only reduce the debt necessary to get LTV back to safe position
-    # it will never be perfectly precise because depending on what assets are taken, the LTV might slightly change
+    """
+    Calculate the optimal debt repay amount to restore user to target LTV.
 
-    effectiveDebt: uint256 = _debtAmount + _totalLiqFees
+    UNIFIED FORMULA FOR ALL LIQUIDATION TYPES
+    This function uses a single mathematical formula that works for both:
+    1. Stability pool swaps (where liquidation fees come from collateral-repay difference)
+    2. Claimable GREEN liquidations (where fees are added to debt)
+
+    MATHEMATICAL DERIVATION:
+    Goal: (newDebt) / (newCollateral) = targetLTV
+
+    For stability pool swaps:
+    - newDebt = originalDebt - repayAmount  
+    - newCollateral = originalCollateral - collateralTaken
+    - repayAmount = collateralTaken * (1 - liqFeeRatio)
+
+    Solving: R = (D - T*C) * (1-F) / (1 - F - T)
+    Where:
+    - R = repayAmount (what we solve for)
+    - D = _debtAmount  
+    - C = _collateralValue
+    - T = _targetLtv
+    - F = _liqFeeRatio
+
+    CONSERVATIVE NATURE:
+    This formula is conservative for claimable GREEN liquidations, meaning it may 
+    repay slightly more debt than strictly necessary. This is INTENTIONAL because:
+    - It guarantees debt health restoration in all cases
+    - Over-repayment is safe (just makes user "too healthy")
+    - Under-repayment is dangerous (triggers unnecessary auctions)
+
+    TRADE-OFFS:
+    ✅ Simple: One formula for all liquidation types
+    ✅ Safe: Guarantees debt health restoration  
+    ✅ Robust: Works for future liquidation mechanisms
+    ❌ Slightly over-conservative for claimable GREEN edge cases
+
+    PARAMETERS:
+    @param _debtAmount: User's current debt amount
+    @param _collateralValue: User's current collateral value in USD
+    @param _targetLtv: Target LTV to achieve (e.g., 49% for 50% max with 1% buffer)
+    @param _liqFeeRatio: Total liquidation fee ratio (liquidation fee + keeper fee)
+
+    @return: Amount of debt to repay to reach target LTV
+    """
+
     if _targetLtv == 0:
-        return effectiveDebt # repay everything to achieve 0% LTV
+        return _debtAmount # repay everything to achieve 0% LTV
 
-    # calculate the coefficient for repay amount
-    oneMinusLiqFeeRatio: uint256 = HUNDRED_PERCENT - _liqFeeRatio
-    if oneMinusLiqFeeRatio == 0:
-        return effectiveDebt # edge case: 100% liquidation fee
+    # calculate denominator: (1 - F - T)
+    if HUNDRED_PERCENT <= _liqFeeRatio + _targetLtv:
+        return _debtAmount # edge case: F + T >= 100%, need full repayment
 
-    # check if user is already in safe position (prevent underflow)
-    targetDebtValue: uint256 = _targetLtv * _collateralValue
-    effectiveDebtValue: uint256 = effectiveDebt * HUNDRED_PERCENT
-    if effectiveDebtValue <= targetDebtValue:
-        return 0 # User is already safe, no repayment needed
-
-    numerator: uint256 = effectiveDebtValue - targetDebtValue
-    denominator: uint256 = HUNDRED_PERCENT - _targetLtv
+    denominator: uint256 = HUNDRED_PERCENT - _liqFeeRatio - _targetLtv
     if denominator == 0:
-        return effectiveDebt # edge case: 100% target LTV
+        return _debtAmount
 
-    X: uint256 = numerator // denominator
-    return X * oneMinusLiqFeeRatio // HUNDRED_PERCENT
+    # calculate numerator: (D - T*C) * (1-F)
+    oneMinusF: uint256 = HUNDRED_PERCENT - _liqFeeRatio
+    debtValue: uint256 = _debtAmount * HUNDRED_PERCENT  
+    targetDebtValue: uint256 = _targetLtv * _collateralValue
+
+    # check if already at target LTV
+    if debtValue <= targetDebtValue:
+        return 0
+
+    # calculate numerator: (D*100% - T*C) * (1-F)
+    numerator: uint256 = (debtValue - targetDebtValue) * oneMinusF
+
+    # calculate repay amount: R = numerator / (denominator * HUNDRED_PERCENT)
+    return numerator // (denominator * HUNDRED_PERCENT)
 
 
 #########

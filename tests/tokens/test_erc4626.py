@@ -1,4 +1,3 @@
-import pytest
 from hypothesis import given, strategies as st
 import boa
 
@@ -199,7 +198,7 @@ def test_erc4626_redeem_max_value(
 
     # Initial deposit
     deposit_amount = 100 * EIGHTEEN_DECIMALS
-    shares = savings_green.deposit(deposit_amount, bob, sender=whale)
+    savings_green.deposit(deposit_amount, bob, sender=whale)
     
     # Redeem all shares
     redeemed_amount = savings_green.redeem(MAX_UINT256, bob, bob, sender=bob)
@@ -892,7 +891,7 @@ def test_erc4626_price_per_share_updates_on_withdrawal(
     
     # Initial deposit
     deposit_amount = 100 * EIGHTEEN_DECIMALS
-    shares = savings_green.deposit(deposit_amount, bob, sender=whale)
+    savings_green.deposit(deposit_amount, bob, sender=whale)
     price_after_deposit = savings_green.lastPricePerShare()
     
     # Withdraw half
@@ -919,7 +918,7 @@ def test_erc4626_price_per_share_with_profit(
     
     # Initial deposit
     deposit_amount = 100 * EIGHTEEN_DECIMALS
-    shares = savings_green.deposit(deposit_amount, bob, sender=whale)
+    savings_green.deposit(deposit_amount, bob, sender=whale)
     last_price_after_deposit = savings_green.lastPricePerShare()
     current_price_after_deposit = savings_green.pricePerShare()
     
@@ -956,7 +955,7 @@ def test_erc4626_price_per_share_with_loss(
     
     # Initial deposit
     deposit_amount = 100 * EIGHTEEN_DECIMALS
-    shares = savings_green.deposit(deposit_amount, bob, sender=whale)
+    savings_green.deposit(deposit_amount, bob, sender=whale)
     last_price_after_deposit = savings_green.lastPricePerShare()
     current_price_after_deposit = savings_green.pricePerShare()
     
@@ -994,7 +993,7 @@ def test_erc4626_price_per_share_manipulation_resistance(
     
     # Initial deposit
     deposit_amount = 100 * EIGHTEEN_DECIMALS
-    shares = savings_green.deposit(deposit_amount, bob, sender=whale)
+    savings_green.deposit(deposit_amount, bob, sender=whale)
     initial_last_price = savings_green.lastPricePerShare()
     
     # Attacker tries to manipulate by adding large amount of assets directly

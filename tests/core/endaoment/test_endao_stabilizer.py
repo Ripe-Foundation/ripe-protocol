@@ -239,7 +239,7 @@ def test_endao_stabilizer_balanced_pool(
     
     # Pool is already balanced (50/50), so stabilizer should return False
     result = endaoment.stabilizeGreenRefPool(sender=switchboard_delta.address)
-    assert result == False # No adjustment needed
+    assert not result # No adjustment needed
 
 
 @pytest.base
@@ -249,7 +249,7 @@ def test_endao_stabilizer_no_config(
 ):
     # Should return False when no stabilizer config is set
     result = endaoment.stabilizeGreenRefPool(sender=switchboard_delta.address)
-    assert result == False
+    assert not result
 
 
 @pytest.base
@@ -423,7 +423,7 @@ def test_endao_stabilizer_no_lp_tokens_to_remove(
     
     # Endaoment has no LP tokens, so should return False
     result = endaoment.stabilizeGreenRefPool(sender=switchboard_delta.address)
-    assert result == False
+    assert not result
 
 
 @pytest.base

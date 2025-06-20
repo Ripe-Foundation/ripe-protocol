@@ -84,6 +84,15 @@ def underscoreRegistry() -> address:
     return empty(address)
 
 
+# should check last touch
+
+
+@view
+@external
+def shouldCheckLastTouch() -> bool:
+    return False
+
+
 # ripe available
 
 

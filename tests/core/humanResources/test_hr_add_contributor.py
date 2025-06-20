@@ -249,7 +249,7 @@ def test_hr_confirm_new_contributor_success(
     assert event.contributorAddr != ZERO_ADDRESS  # Should have deployed address
     
     # Check return value
-    assert result == True
+    assert result
     
     # Check pending contributor was cleared
     pending = human_resources.pendingContributor(action_id)
@@ -372,7 +372,7 @@ def test_hr_cancel_new_contributor_success(
     assert event.actionId == action_id
     
     # Check return value
-    assert result == True
+    assert result
     
     # Check pending contributor was cleared
     pending = human_resources.pendingContributor(action_id)
@@ -466,7 +466,7 @@ def test_hr_confirm_new_contributor_ledger_state_updated(
     contributor_address = events[0].contributorAddr
     
     # Verify ledger state updates
-    assert result == True
+    assert result
     
     # Check ripeAvailForHr decreased by compensation amount
     final_ripe_avail = ledger.ripeAvailForHr()
@@ -487,7 +487,7 @@ def test_hr_confirm_new_contributor_ledger_state_updated(
     assert ledger.contributors(contributor_index) == contributor_address
     
     # Check isHrContributor returns True for the new contributor
-    assert ledger.isHrContributor(contributor_address) == True
+    assert ledger.isHrContributor(contributor_address)
 
 
 def test_hr_confirm_multiple_contributors_ledger_state(
@@ -540,7 +540,7 @@ def test_hr_confirm_multiple_contributors_ledger_state(
         contributor_address = events[0].contributorAddr
         contributor_addresses.append(contributor_address)
         
-        assert result == True
+        assert result
     
     # Verify final ledger state
     final_ripe_avail = ledger.ripeAvailForHr()
@@ -567,7 +567,7 @@ def test_hr_confirm_multiple_contributors_ledger_state(
         assert ledger.contributors(index) == contributor_addr
         
         # Check each contributor is recognized as HR contributor
-        assert ledger.isHrContributor(contributor_addr) == True
+        assert ledger.isHrContributor(contributor_addr)
 
 
 def test_hr_are_valid_contributor_terms_success(
@@ -593,7 +593,7 @@ def test_hr_are_valid_contributor_terms_success(
         valid_terms["depositLockDuration"]
     )
     
-    assert result == True
+    assert result
 
 
 def test_hr_are_valid_contributor_terms_no_template(
@@ -619,7 +619,7 @@ def test_hr_are_valid_contributor_terms_no_template(
         valid_terms["depositLockDuration"]
     )
     
-    assert result == False
+    assert not result
 
 
 def test_hr_are_valid_contributor_terms_zero_compensation(
@@ -645,7 +645,7 @@ def test_hr_are_valid_contributor_terms_zero_compensation(
         valid_terms["depositLockDuration"]
     )
     
-    assert result == False
+    assert not result
 
 
 def test_hr_are_valid_contributor_terms_insufficient_balance(
@@ -672,7 +672,7 @@ def test_hr_are_valid_contributor_terms_insufficient_balance(
         valid_terms["depositLockDuration"]
     )
     
-    assert result == False
+    assert not result
 
 
 def test_hr_are_valid_contributor_terms_exceeds_max_compensation(
@@ -698,7 +698,7 @@ def test_hr_are_valid_contributor_terms_exceeds_max_compensation(
         valid_terms["depositLockDuration"]
     )
     
-    assert result == False
+    assert not result
 
 
 def test_hr_are_valid_contributor_terms_zero_cliff(
@@ -724,7 +724,7 @@ def test_hr_are_valid_contributor_terms_zero_cliff(
         valid_terms["depositLockDuration"]
     )
     
-    assert result == False
+    assert not result
 
 
 def test_hr_are_valid_contributor_terms_cliff_below_minimum(
@@ -750,7 +750,7 @@ def test_hr_are_valid_contributor_terms_cliff_below_minimum(
         valid_terms["depositLockDuration"]
     )
     
-    assert result == False
+    assert not result
 
 
 def test_hr_are_valid_contributor_terms_zero_vesting(
@@ -776,7 +776,7 @@ def test_hr_are_valid_contributor_terms_zero_vesting(
         valid_terms["depositLockDuration"]
     )
     
-    assert result == False
+    assert not result
 
 
 def test_hr_are_valid_contributor_terms_unlock_greater_than_vesting(
@@ -802,7 +802,7 @@ def test_hr_are_valid_contributor_terms_unlock_greater_than_vesting(
         valid_terms["depositLockDuration"]
     )
     
-    assert result == False
+    assert not result
 
 
 def test_hr_are_valid_contributor_terms_cliff_greater_than_unlock(
@@ -828,7 +828,7 @@ def test_hr_are_valid_contributor_terms_cliff_greater_than_unlock(
         valid_terms["depositLockDuration"]
     )
     
-    assert result == False
+    assert not result
 
 
 def test_hr_are_valid_contributor_terms_empty_owner(
@@ -854,7 +854,7 @@ def test_hr_are_valid_contributor_terms_empty_owner(
         valid_terms["depositLockDuration"]
     )
     
-    assert result == False
+    assert not result
 
 
 def test_hr_are_valid_contributor_terms_empty_manager(
@@ -880,7 +880,7 @@ def test_hr_are_valid_contributor_terms_empty_manager(
         valid_terms["depositLockDuration"]
     )
     
-    assert result == False
+    assert not result
 
 
 def test_hr_are_valid_contributor_terms_start_delay_too_long(
@@ -906,7 +906,7 @@ def test_hr_are_valid_contributor_terms_start_delay_too_long(
         valid_terms["depositLockDuration"]
     )
     
-    assert result == False
+    assert not result
 
 
 def test_hr_are_valid_contributor_terms_vesting_below_minimum(
@@ -932,7 +932,7 @@ def test_hr_are_valid_contributor_terms_vesting_below_minimum(
         valid_terms["depositLockDuration"]
     )
     
-    assert result == False
+    assert not result
 
 
 def test_hr_are_valid_contributor_terms_vesting_above_maximum(
@@ -958,4 +958,4 @@ def test_hr_are_valid_contributor_terms_vesting_above_maximum(
         valid_terms["depositLockDuration"]
     )
     
-    assert result == False
+    assert not result

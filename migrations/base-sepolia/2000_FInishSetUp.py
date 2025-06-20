@@ -34,6 +34,7 @@ def migrate(migration: Migration):
         100,  # _voterPointsAlloc
         100_000 * EIGHTEEN_DECIMALS,  # _perUserDepositLimit
         10_000_000 * EIGHTEEN_DECIMALS,  # _globalDepositLimit
+        0,  # _minDepositBalance
         (
             85_00,  # ltv
             90_00,  # redemptionThreshold
@@ -60,6 +61,7 @@ def migrate(migration: Migration):
         100,  # _voterPointsAlloc
         100 * EIGHTEEN_DECIMALS,  # _perUserDepositLimit
         10_000 * EIGHTEEN_DECIMALS,  # _globalDepositLimit
+        0,  # _minDepositBalance
         (
             50_00,  # ltv
             60_00,  # redemptionThreshold
@@ -79,6 +81,7 @@ def migrate(migration: Migration):
         100,  # _voterPointsAlloc
         1_000 * EIGHTEEN_DECIMALS,  # _perUserDepositLimit
         100_000 * EIGHTEEN_DECIMALS,  # _globalDepositLimit
+        0,  # _minDepositBalance
         (
             50_00,  # ltv
             60_00,  # redemptionThreshold
@@ -98,6 +101,7 @@ def migrate(migration: Migration):
         10_00,  # _voterPointsAlloc
         MAX_UINT256 - 1,  # _perUserDepositLimit
         MAX_UINT256 - 1,  # _globalDepositLimit
+        0,  # _minDepositBalance
         (
             0,  # ltv
             0,  # redemptionThreshold
@@ -124,6 +128,7 @@ def migrate(migration: Migration):
         10_00,  # _voterPointsAlloc
         MAX_UINT256 - 1,  # _perUserDepositLimit
         MAX_UINT256 - 1,  # _globalDepositLimit
+        0,  # _minDepositBalance
         (
             0,  # ltv
             0,  # redemptionThreshold
@@ -153,6 +158,7 @@ def migrate(migration: Migration):
         10_00,  # _voterPointsAlloc
         MAX_UINT256 - 1,  # _perUserDepositLimit
         MAX_UINT256 - 1,  # _globalDepositLimit
+        0,  # _minDepositBalance
         (
             0,  # ltv
             0,  # redemptionThreshold
@@ -179,6 +185,7 @@ def migrate(migration: Migration):
         10_00,  # _voterPointsAlloc
         MAX_UINT256 - 1,  # _perUserDepositLimit
         MAX_UINT256 - 1,  # _globalDepositLimit
+        0,  # _minDepositBalance
         (
             0,  # ltv
             0,  # redemptionThreshold

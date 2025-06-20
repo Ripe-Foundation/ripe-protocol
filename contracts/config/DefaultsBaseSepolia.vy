@@ -67,9 +67,10 @@ def genDebtConfig() -> cs.GenDebtConfig:
         maxBorrowRate = HUNDRED_PERCENT,
         maxLtvDeviation = 10_00,
         keeperFeeRatio = 1_00,
-        minKeeperFee = 1_00,
+        minKeeperFee = EIGHTEEN_DECIMALS,
+        maxKeeperFee = 10_0000 * EIGHTEEN_DECIMALS,
         isDaowryEnabled = True,
-        ltvPaybackBuffer = 1_00,
+        ltvPaybackBuffer = 5_00,
         genAuctionParams = cs.AuctionParams(
             hasParams = True,
             startDiscount = 0,
@@ -174,6 +175,15 @@ UNDERSCORE_REGISTRY: constant(address) = 0xa89a59E14333187829528C50eBAaE6EC12Bae
 @external
 def underscoreRegistry() -> address:
     return UNDERSCORE_REGISTRY
+
+
+# should check last touch
+
+
+@view
+@external
+def shouldCheckLastTouch() -> bool:
+    return True
 
 
 # ripe available

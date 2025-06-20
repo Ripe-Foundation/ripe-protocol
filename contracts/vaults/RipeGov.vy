@@ -108,6 +108,7 @@ def __init__(_ripeHq: address):
 # deposit
 
 
+@nonreentrant
 @external
 def depositTokensInVault(
     _user: address,
@@ -119,6 +120,7 @@ def depositTokensInVault(
     return self._depositTokensInRipeGovVault(_user, _asset, _amount, 0, _a)
 
 
+@nonreentrant
 @external
 def depositTokensWithLockDuration(
     _user: address,
@@ -189,6 +191,7 @@ def _handleGovDataOnDeposit(
 # withdraw
 
 
+@nonreentrant
 @external
 def withdrawTokensFromVault(
     _user: address,
@@ -202,6 +205,7 @@ def withdrawTokensFromVault(
     return self._withdrawTokensFromVault(_user, _asset, _amount, _recipient, True, a)
 
 
+@nonreentrant
 @external
 def withdrawContributorTokensToBurn(_user: address, _a: addys.Addys = empty(addys.Addys)) -> uint256:
     hr: address = addys._getHumanResourcesAddr()
@@ -289,6 +293,7 @@ def _handleGovDataOnWithdrawal(
 # transfer
 
 
+@nonreentrant
 @external
 def transferBalanceWithinVault(
     _asset: address,
@@ -343,6 +348,7 @@ def _handleGovDataOnTransfer(
 # transfer contributor tokens
 
 
+@nonreentrant
 @external
 def transferContributorRipeTokens(
     _contributor: address,

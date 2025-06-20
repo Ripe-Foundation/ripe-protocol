@@ -31,6 +31,7 @@ struct GenDebtConfig:
     maxLtvDeviation: uint256
     keeperFeeRatio: uint256
     minKeeperFee: uint256
+    maxKeeperFee: uint256
     isDaowryEnabled: bool
     ltvPaybackBuffer: uint256
     genAuctionParams: AuctionParams
@@ -93,6 +94,7 @@ struct AssetConfig:
     voterPointsAlloc: uint256
     perUserDepositLimit: uint256
     globalDepositLimit: uint256
+    minDepositBalance: uint256
     debtTerms: DebtTerms
     shouldBurnAsPayment: bool
     shouldTransferToEndaoment: bool

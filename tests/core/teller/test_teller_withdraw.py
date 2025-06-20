@@ -1,4 +1,3 @@
-import pytest
 import boa
 
 from constants import EIGHTEEN_DECIMALS, MAX_UINT256
@@ -32,7 +31,7 @@ def test_teller_basic_withdraw(
     assert log.amount == deposit_amount == amount
     assert log.vaultAddr == simple_erc20_vault.address
     assert log.vaultId != 0
-    assert log.isDepleted == True
+    assert log.isDepleted
 
     # check balance
     assert alpha_token.balanceOf(simple_erc20_vault) == 0
@@ -201,7 +200,7 @@ def test_teller_withdraw_many(
     assert alpha_log.amount == deposit_amount
     assert alpha_log.vaultAddr == simple_erc20_vault.address
     assert alpha_log.vaultId == vault_id
-    assert alpha_log.isDepleted == True
+    assert alpha_log.isDepleted
 
     # Verify bravo token withdrawal
     bravo_log = logs[1]
@@ -211,7 +210,7 @@ def test_teller_withdraw_many(
     assert bravo_log.amount == deposit_amount
     assert bravo_log.vaultAddr == simple_erc20_vault.address
     assert bravo_log.vaultId == vault_id
-    assert bravo_log.isDepleted == True
+    assert bravo_log.isDepleted
 
     # Verify balances
     assert alpha_token.balanceOf(simple_erc20_vault) == 0
@@ -862,3 +861,192 @@ def test_teller_withdraw_single_asset_no_withdrawal_with_debt(
     withdraw_amount = 87 * EIGHTEEN_DECIMALS
     amount = teller.withdraw(alpha_token, withdraw_amount, bob, simple_erc20_vault, sender=bob)
     assert amount == withdraw_amount
+
+
+def test_teller_withdraw_min_balance_below_minimum(
+    simple_erc20_vault,
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    teller,
+    performDeposit,
+):
+    """Test that withdrawals fail when they would leave a balance below minDepositBalance"""
+    # Setup with minDepositBalance = 50 tokens
+    min_balance = 50 * EIGHTEEN_DECIMALS
+    setGeneralConfig()
+    setAssetConfig(alpha_token, _minDepositBalance=min_balance)
+
+    # Deposit 100 tokens
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    performDeposit(bob, deposit_amount, alpha_token, alpha_token_whale)
+
+    # Try to withdraw 75 tokens, leaving 25 (below minimum of 50) - should fail
+    withdraw_amount = 75 * EIGHTEEN_DECIMALS
+    with boa.reverts("too small a balance"):
+        teller.withdraw(alpha_token, withdraw_amount, bob, simple_erc20_vault, sender=bob)
+
+    # Verify no tokens were withdrawn
+    assert alpha_token.balanceOf(bob) == 0
+    assert alpha_token.balanceOf(simple_erc20_vault) == deposit_amount
+
+
+def test_teller_withdraw_min_balance_exactly_minimum(
+    simple_erc20_vault,
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    teller,
+    performDeposit,
+):
+    """Test that withdrawals succeed when they leave exactly the minDepositBalance"""
+    # Setup with minDepositBalance = 50 tokens
+    min_balance = 50 * EIGHTEEN_DECIMALS
+    setGeneralConfig()
+    setAssetConfig(alpha_token, _minDepositBalance=min_balance)
+
+    # Deposit 100 tokens
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    performDeposit(bob, deposit_amount, alpha_token, alpha_token_whale)
+
+    # Withdraw 50 tokens, leaving exactly 50 (meets minimum) - should succeed
+    withdraw_amount = 50 * EIGHTEEN_DECIMALS
+    amount = teller.withdraw(alpha_token, withdraw_amount, bob, simple_erc20_vault, sender=bob)
+    assert amount == withdraw_amount
+
+    # Verify correct amounts were withdrawn
+    assert alpha_token.balanceOf(bob) == withdraw_amount
+    assert alpha_token.balanceOf(simple_erc20_vault) == min_balance
+
+
+def test_teller_withdraw_min_balance_above_minimum(
+    simple_erc20_vault,
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    teller,
+    performDeposit,
+):
+    """Test that withdrawals succeed when they leave a balance above minDepositBalance"""
+    # Setup with minDepositBalance = 50 tokens
+    min_balance = 50 * EIGHTEEN_DECIMALS
+    setGeneralConfig()
+    setAssetConfig(alpha_token, _minDepositBalance=min_balance)
+
+    # Deposit 150 tokens
+    deposit_amount = 150 * EIGHTEEN_DECIMALS
+    performDeposit(bob, deposit_amount, alpha_token, alpha_token_whale)
+
+    # Withdraw 75 tokens, leaving 75 (above minimum of 50) - should succeed
+    withdraw_amount = 75 * EIGHTEEN_DECIMALS
+    amount = teller.withdraw(alpha_token, withdraw_amount, bob, simple_erc20_vault, sender=bob)
+    assert amount == withdraw_amount
+
+    # Verify correct amounts were withdrawn
+    assert alpha_token.balanceOf(bob) == withdraw_amount
+    assert alpha_token.balanceOf(simple_erc20_vault) == deposit_amount - withdraw_amount
+
+
+def test_teller_withdraw_min_balance_full_withdrawal_allowed(
+    simple_erc20_vault,
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    teller,
+    performDeposit,
+):
+    """Test that full withdrawal (depletion) is allowed regardless of minDepositBalance"""
+    # Setup with minDepositBalance = 50 tokens
+    min_balance = 50 * EIGHTEEN_DECIMALS
+    setGeneralConfig()
+    setAssetConfig(alpha_token, _minDepositBalance=min_balance)
+
+    # Deposit 100 tokens
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    performDeposit(bob, deposit_amount, alpha_token, alpha_token_whale)
+
+    # Withdraw all tokens - should succeed even though it goes below minimum
+    amount = teller.withdraw(alpha_token, deposit_amount, bob, simple_erc20_vault, sender=bob)
+    assert amount == deposit_amount
+
+    # Verify all tokens were withdrawn (position is depleted)
+    assert alpha_token.balanceOf(bob) == deposit_amount
+    assert alpha_token.balanceOf(simple_erc20_vault) == 0
+
+    # Verify the log shows isDepleted = True
+    logs = filter_logs(teller, "TellerWithdrawal")
+    assert len(logs) == 1
+    assert logs[0].isDepleted == True
+
+
+def test_teller_withdraw_min_balance_zero_allows_any_withdrawal(
+    simple_erc20_vault,
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    teller,
+    performDeposit,
+):
+    """Test that minDepositBalance = 0 allows any withdrawal amount"""
+    # Setup with minDepositBalance = 0 (default)
+    setGeneralConfig()
+    setAssetConfig(alpha_token, _minDepositBalance=0)
+
+    # Deposit 100 tokens
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    performDeposit(bob, deposit_amount, alpha_token, alpha_token_whale)
+
+    # Withdraw leaving only 1 wei - should succeed with no minimum balance
+    withdraw_amount = deposit_amount - 1
+    amount = teller.withdraw(alpha_token, withdraw_amount, bob, simple_erc20_vault, sender=bob)
+    assert amount == withdraw_amount
+
+    # Verify correct amounts
+    assert alpha_token.balanceOf(bob) == withdraw_amount
+    assert alpha_token.balanceOf(simple_erc20_vault) == 1
+
+
+def test_teller_withdraw_min_balance_partial_then_blocked(
+    simple_erc20_vault,
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    teller,
+    performDeposit,
+):
+    """Test partial withdrawal that brings balance to minimum, then further withdrawal is blocked"""
+    # Setup with minDepositBalance = 30 tokens
+    min_balance = 30 * EIGHTEEN_DECIMALS
+    setGeneralConfig()
+    setAssetConfig(alpha_token, _minDepositBalance=min_balance)
+
+    # Deposit 100 tokens
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    performDeposit(bob, deposit_amount, alpha_token, alpha_token_whale)
+
+    # First withdrawal: 70 tokens, leaving 30 (exactly minimum) - should succeed
+    first_withdraw = 70 * EIGHTEEN_DECIMALS
+    amount1 = teller.withdraw(alpha_token, first_withdraw, bob, simple_erc20_vault, sender=bob)
+    assert amount1 == first_withdraw
+    assert alpha_token.balanceOf(simple_erc20_vault) == min_balance
+
+    # Second withdrawal: any amount would go below minimum - should fail
+    with boa.reverts("too small a balance"):
+        teller.withdraw(alpha_token, 1, bob, simple_erc20_vault, sender=bob)
+
+    # Full withdrawal should still be allowed (depletion)
+    amount2 = teller.withdraw(alpha_token, min_balance, bob, simple_erc20_vault, sender=bob)
+    assert amount2 == min_balance
+    assert alpha_token.balanceOf(simple_erc20_vault) == 0

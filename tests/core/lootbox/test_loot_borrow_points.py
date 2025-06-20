@@ -1,7 +1,6 @@
-import pytest
 import boa
 
-from constants import EIGHTEEN_DECIMALS, ZERO_ADDRESS, MAX_UINT256
+from constants import EIGHTEEN_DECIMALS
 
 
 def test_loot_borrow_points_basic(

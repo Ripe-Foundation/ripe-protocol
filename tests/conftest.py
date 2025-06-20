@@ -1,4 +1,3 @@
-import pytest
 
 pytest_plugins = [
     "conf_core",

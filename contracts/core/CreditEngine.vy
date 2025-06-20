@@ -605,34 +605,6 @@ def redeemCollateralFromMany(
     return totalGreenSpent
 
 
-@external
-def redeemCollateral(
-    _user: address,
-    _vaultId: uint256,
-    _asset: address,
-    _greenAmount: uint256,
-    _recipient: address,
-    _caller: address,
-    _shouldTransferBalance: bool,
-    _shouldRefundSavingsGreen: bool,
-    _a: addys.Addys = empty(addys.Addys),
-) -> uint256:
-    assert msg.sender == addys._getTellerAddr() # dev: only Teller allowed
-    assert not deptBasics.isPaused # dev: contract paused
-    a: addys.Addys = addys._getAddys(_a)
-
-    greenAmount: uint256 = min(_greenAmount, staticcall IERC20(a.greenToken).balanceOf(self))
-    assert greenAmount != 0 # dev: no green to redeem
-    greenSpent: uint256 = self._redeemCollateral(_user, _vaultId, _asset, max_value(uint256), greenAmount, _recipient, _caller, _shouldTransferBalance, a)
-    assert greenSpent != 0 # dev: no redemptions occurred
-
-    # handle leftover green
-    if greenAmount > greenSpent:
-        self._handleGreenForUser(_caller, greenAmount - greenSpent, _shouldRefundSavingsGreen, False, a)
-
-    return greenSpent
-
-
 @internal
 def _redeemCollateral(
     _user: address,
@@ -650,6 +622,10 @@ def _redeemCollateral(
 
     # invalid inputs
     if empty(address) in [_recipient, _asset, _user] or 0 in [_maxGreenForAsset, _totalGreenRemaining, _vaultId]:
+        return 0
+
+    # recipient cannot be user
+    if _recipient == _user:
         return 0
 
     # vault address
@@ -884,10 +860,13 @@ def _getUserBorrowTerms(
         bt.debtTerms.ltv = bt.totalMaxDebt * HUNDRED_PERCENT // bt.collateralVal
 
     # ensure liq threshold and liq fee can work together
-    liqSum: uint256 = bt.debtTerms.liqThreshold + (bt.debtTerms.liqThreshold * bt.debtTerms.liqFee // HUNDRED_PERCENT)
-    if liqSum > HUNDRED_PERCENT:
-        adjustedLiqFee: uint256 = (HUNDRED_PERCENT - bt.debtTerms.liqThreshold) * HUNDRED_PERCENT // bt.debtTerms.liqThreshold
-        bt.debtTerms.liqFee = adjustedLiqFee
+    if bt.debtTerms.liqThreshold != 0:
+        liqSum: uint256 = bt.debtTerms.liqThreshold + (bt.debtTerms.liqThreshold * bt.debtTerms.liqFee // HUNDRED_PERCENT)
+        if liqSum > HUNDRED_PERCENT:
+            adjustedLiqFee: uint256 = (HUNDRED_PERCENT - bt.debtTerms.liqThreshold) * HUNDRED_PERCENT // bt.debtTerms.liqThreshold
+            bt.debtTerms.liqFee = adjustedLiqFee
+    else:
+        bt.debtTerms.liqFee = 0
 
     # dynamic borrow rate
     bt.debtTerms.borrowRate = self._getDynamicBorrowRate(bt.debtTerms.borrowRate, _a.missionControl, _a.priceDesk)
@@ -1069,6 +1048,9 @@ def _hasGoodDebtHealth(_userDebtAmount: uint256, _collateralVal: uint256, _ltv: 
 @view
 @internal
 def _canLiquidateUser(_userDebtAmount: uint256, _collateralVal: uint256, _liqThreshold: uint256) -> bool:
+    if _liqThreshold == 0:
+        return False
+    
     # check if collateral value is below (or equal) to liquidation threshold
     collateralLiqThreshold: uint256 = _userDebtAmount * HUNDRED_PERCENT // _liqThreshold
     return _collateralVal <= collateralLiqThreshold
@@ -1077,6 +1059,9 @@ def _canLiquidateUser(_userDebtAmount: uint256, _collateralVal: uint256, _liqThr
 @view
 @internal
 def _canRedeemUserCollateral(_userDebtAmount: uint256, _collateralVal: uint256, _redemptionThreshold: uint256) -> bool:
+    if _redemptionThreshold == 0:
+        return False
+    
     # check if collateral value is below (or equal) to redemption threshold
     redemptionThreshold: uint256 = _userDebtAmount * HUNDRED_PERCENT // _redemptionThreshold
     return _collateralVal <= redemptionThreshold
@@ -1111,8 +1096,12 @@ def _getThreshold(_user: address, _debtType: uint256) -> uint256:
         return 0
 
     if _debtType == 2:
+        if bt.debtTerms.liqThreshold == 0:
+            return 0
         return userDebt.amount * HUNDRED_PERCENT // bt.debtTerms.liqThreshold
     elif _debtType == 3:
+        if bt.debtTerms.redemptionThreshold == 0:
+            return 0
         return userDebt.amount * HUNDRED_PERCENT // bt.debtTerms.redemptionThreshold
     else:
         return 0
@@ -1249,7 +1238,9 @@ def _getLatestUserDebtWithInterest(_userDebt: UserDebt) -> (UserDebt, uint256):
 
     # accrue latest interest
     timeElapsed: uint256 = block.timestamp - userDebt.lastTimestamp
-    newInterest: uint256 = userDebt.amount * userDebt.debtTerms.borrowRate * timeElapsed // HUNDRED_PERCENT // ONE_YEAR
+
+    # multiply all numerators first, then divide by combined denominators
+    newInterest: uint256 = (userDebt.amount * userDebt.debtTerms.borrowRate * timeElapsed) // (HUNDRED_PERCENT * ONE_YEAR)
     userDebt.amount += newInterest
 
     userDebt.lastTimestamp = block.timestamp

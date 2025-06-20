@@ -54,9 +54,15 @@ event RipeHqFundsRecovered:
     recipient: indexed(address)
     balance: uint256
 
+event MintingEnabled:
+    isEnabled: bool
+
 # hq config
 hqConfig: public(HashMap[uint256, HqConfig]) # reg id -> hq config
 pendingHqConfig: public(HashMap[uint256, PendingHqConfig]) # reg id -> pending hq config
+
+# minting circuit breaker
+mintEnabled: public(bool)
 
 MAX_RECOVER_ASSETS: constant(uint256) = 20
 
@@ -86,6 +92,9 @@ def __init__(
     # ripe token
     assert registry._startAddNewAddressToRegistry(_ripeToken, "Ripe Token") # dev: failed to register ripe token
     assert registry._confirmNewAddressToRegistry(_ripeToken) == 3 # dev: failed to confirm ripe token
+    
+    # enable minting by default
+    self.mintEnabled = True
 
 
 ############
@@ -335,6 +344,8 @@ def ripeToken() -> address:
 @view
 @external
 def canMintGreen(_addr: address) -> bool:
+    if not self.mintEnabled:
+        return False
     if _addr == empty(address):
         return False
     regId: uint256 = registry._getRegId(_addr)
@@ -346,6 +357,8 @@ def canMintGreen(_addr: address) -> bool:
 @view
 @external
 def canMintRipe(_addr: address) -> bool:
+    if not self.mintEnabled:
+        return False
     if _addr == empty(address):
         return False
     regId: uint256 = registry._getRegId(_addr)
@@ -363,6 +376,20 @@ def canSetTokenBlacklist(_addr: address) -> bool:
     if regId == 0:
         return False
     return self.hqConfig[regId].canSetTokenBlacklist
+
+
+###########################
+# Minting Circuit Breaker #
+###########################
+
+
+@external
+def setMintingEnabled(_shouldEnable: bool):
+    assert msg.sender == gov.governance # dev: no perms
+    assert self.mintEnabled != _shouldEnable # dev: already set
+
+    self.mintEnabled = _shouldEnable
+    log MintingEnabled(isEnabled=_shouldEnable)
 
 
 ############

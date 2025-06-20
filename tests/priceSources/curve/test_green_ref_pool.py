@@ -160,7 +160,7 @@ def test_reference_pool_basic(
     assert data.lastSnapshot.greenBalance == 10_000 * EIGHTEEN_DECIMALS == lastSnapshot.greenBalance
     assert data.lastSnapshot.ratio == 50_00 == lastSnapshot.ratio
     assert data.lastSnapshot.update == boa.env.evm.patch.block_number == lastSnapshot.update
-    assert data.lastSnapshot.inDanger == False == lastSnapshot.inDanger
+    assert data.lastSnapshot.inDanger is False == lastSnapshot.inDanger
 
 
 # configuration tests
@@ -308,7 +308,7 @@ def test_multiple_snapshots_balanced_pool(
     data = curve_prices.greenRefPoolData()
     assert data.nextIndex == 1
     assert data.lastSnapshot.ratio == 50_00
-    assert data.lastSnapshot.inDanger == False
+    assert not data.lastSnapshot.inDanger
 
     # Add more snapshots in different blocks
     for i in range(4):
@@ -318,14 +318,14 @@ def test_multiple_snapshots_balanced_pool(
         data = curve_prices.greenRefPoolData()
         assert data.nextIndex == (i + 2) % 5
         assert data.lastSnapshot.ratio == 50_00
-        assert data.lastSnapshot.inDanger == False
+        assert not data.lastSnapshot.inDanger
 
     # Verify all snapshots are saved
     for i in range(5):
         snapshot = curve_prices.snapShots(i)
         assert snapshot.greenBalance == 10_000 * EIGHTEEN_DECIMALS
         assert snapshot.ratio == 50_00
-        assert snapshot.inDanger == False
+        assert not snapshot.inDanger
 
 
 @pytest.base
@@ -356,13 +356,13 @@ def test_snapshots_with_imbalanced_pool(
     # Verify snapshot event
     log = filter_logs(curve_prices, "GreenRefPoolSnapshotAdded")[0]
     assert log.pool == deployed_green_pool
-    assert log.inDanger == True
+    assert log.inDanger
     _test(75_00, log.greenRatio)
 
     # Verify snapshot shows danger
     data = curve_prices.greenRefPoolData()
     _test(75_00, data.lastSnapshot.ratio)
-    assert data.lastSnapshot.inDanger == True
+    assert data.lastSnapshot.inDanger
     assert data.numBlocksInDanger == 0  # No elapsed blocks yet
 
 
@@ -392,21 +392,21 @@ def test_danger_block_counting(
     boa.env.time_travel(blocks=1)
     assert curve_prices.addGreenRefPoolSnapshot(sender=teller.address)
     data = curve_prices.greenRefPoolData()
-    assert data.lastSnapshot.inDanger == True
+    assert data.lastSnapshot.inDanger
     assert data.numBlocksInDanger == 0
 
     # Wait 5 blocks and take another danger snapshot
     boa.env.time_travel(blocks=5)
     assert curve_prices.addGreenRefPoolSnapshot(sender=teller.address)
     data = curve_prices.greenRefPoolData()
-    assert data.lastSnapshot.inDanger == True
+    assert data.lastSnapshot.inDanger
     assert data.numBlocksInDanger == 5
 
     # Wait 3 more blocks and take another danger snapshot
     boa.env.time_travel(blocks=3)
     assert curve_prices.addGreenRefPoolSnapshot(sender=teller.address)
     data = curve_prices.greenRefPoolData()
-    assert data.lastSnapshot.inDanger == True
+    assert data.lastSnapshot.inDanger
     assert data.numBlocksInDanger == 8
 
     # Rebalance pool to exit danger by removing GREEN from pool
@@ -418,7 +418,7 @@ def test_danger_block_counting(
     assert curve_prices.addGreenRefPoolSnapshot(sender=teller.address)
 
     data = curve_prices.greenRefPoolData()
-    assert data.lastSnapshot.inDanger == False
+    assert not data.lastSnapshot.inDanger
     assert data.numBlocksInDanger == 0
 
 
@@ -475,12 +475,12 @@ def test_same_block_snapshot_prevention(
 
     # Try to add another snapshot in the same block - should return False
     result = curve_prices.addGreenRefPoolSnapshot(sender=teller.address)
-    assert result == False
+    assert not result
 
     # Move to next block - should work
     boa.env.time_travel(blocks=1)
     result = curve_prices.addGreenRefPoolSnapshot(sender=teller.address)
-    assert result == True
+    assert result
 
 
 # weighted ratio tests
@@ -863,7 +863,6 @@ def test_weighted_ratio_edge_cases(
     # Setup config with stale blocks = 3
     aid = curve_prices.setGreenRefPoolConfig(deployed_green_pool, 10, 60_00, 3, 10_00, 100_000 * EIGHTEEN_DECIMALS, sender=governance.address)
     boa.env.time_travel(blocks=curve_prices.actionTimeLock())
-    initial_block = boa.env.evm.patch.block_number
     assert curve_prices.confirmGreenRefPoolConfig(aid, sender=governance.address)
     
     # Initial snapshot created during config confirmation - should be balanced (50%)
@@ -921,7 +920,6 @@ def test_stale_blocks_exact_threshold(
     
     # Record the initial snapshot block (created during config confirmation)
     data = curve_prices.greenRefPoolData()
-    initial_snapshot_block = data.lastSnapshot.update
     
     # Add imbalanced snapshot 1 block later
     swap_amount = 2_000 * EIGHTEEN_DECIMALS
@@ -1083,7 +1081,7 @@ def test_danger_transition_edge_cases(
     assert curve_prices.addGreenRefPoolSnapshot(sender=teller.address)
     
     data = curve_prices.greenRefPoolData()
-    assert data.lastSnapshot.inDanger == True
+    assert data.lastSnapshot.inDanger
     assert data.numBlocksInDanger == 0
     
     # Exit danger immediately (within same block would be prevented)
@@ -1094,7 +1092,7 @@ def test_danger_transition_edge_cases(
     assert curve_prices.addGreenRefPoolSnapshot(sender=teller.address)
     
     data = curve_prices.greenRefPoolData()
-    assert data.lastSnapshot.inDanger == False
+    assert not data.lastSnapshot.inDanger
     assert data.numBlocksInDanger == 0  # Should reset to 0
 
 
@@ -1140,7 +1138,7 @@ def test_usdc_dominant_pool_scenarios(
     # Verify snapshot shows USDC dominance (NOT in danger since ratio < 50%)
     data = curve_prices.greenRefPoolData()
     assert data.lastSnapshot.ratio < 50_00
-    assert data.lastSnapshot.inDanger == False  # Below 50% trigger
+    assert not data.lastSnapshot.inDanger  # Below 50% trigger
     assert data.numBlocksInDanger == 0
 
     # Verify weighted ratio calculation works with low GREEN ratios
@@ -1198,7 +1196,7 @@ def test_green_scarcity_recovery_scenarios(
     data = curve_prices.greenRefPoolData()
     scarcity_ratio = data.lastSnapshot.ratio
     assert scarcity_ratio < 50_00
-    assert data.lastSnapshot.inDanger == False  # Below 60% danger trigger
+    assert not data.lastSnapshot.inDanger  # Below 60% danger trigger
 
     # Begin recovery - add GREEN back to pool
     recovery_green_swap = 3_000 * EIGHTEEN_DECIMALS

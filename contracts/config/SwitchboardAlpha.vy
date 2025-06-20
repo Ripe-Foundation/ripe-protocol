@@ -19,15 +19,17 @@ interface MissionControl:
     def setPriorityStabVaults(_priorityStabVaults: DynArray[cs.VaultLite, PRIORITY_VAULT_DATA]): nonpayable
     def isSupportedAssetInVault(_vaultId: uint256, _asset: address) -> bool: view
     def setRipeRewardsConfig(_rewardsConfig: cs.RipeRewardsConfig): nonpayable
+    def setCanPerformLiteAction(_user: address, _canDisable: bool): nonpayable
     def setGeneralDebtConfig(_genDebtConfig: cs.GenDebtConfig): nonpayable
     def setUnderscoreRegistry(_underscoreRegistry: address): nonpayable
-    def setCanPerformLiteAction(_user: address, _canDisable: bool): nonpayable
+    def setShouldCheckLastTouch(_shouldCheck: bool): nonpayable
     def setGeneralConfig(_genConfig: cs.GenConfig): nonpayable
     def canPerformLiteAction(_user: address) -> bool: view
     def isSupportedAsset(_asset: address) -> bool: view
     def rewardsConfig() -> cs.RipeRewardsConfig: view
     def genDebtConfig() -> cs.GenDebtConfig: view
     def underscoreRegistry() -> address: view
+    def shouldCheckLastTouch() -> bool: view
     def genConfig() -> cs.GenConfig: view
 
 interface VaultBook:
@@ -64,6 +66,7 @@ flag ActionType:
     OTHER_PRIORITY_PRICE_SOURCE_IDS
     OTHER_UNDERSCORE_REGISTRY
     OTHER_CAN_PERFORM_LITE_ACTION
+    OTHER_SHOULD_CHECK_LAST_TOUCH
     RIPE_VAULT_CONFIG
 
 flag GenConfigFlag:
@@ -169,6 +172,7 @@ event PendingDynamicRateConfigChange:
 event PendingKeeperConfigChange:
     keeperFeeRatio: uint256
     minKeeperFee: uint256
+    maxKeeperFee: uint256
     confirmationBlock: uint256
     actionId: uint256
 
@@ -238,6 +242,11 @@ event PendingCanPerformLiteAction:
     confirmationBlock: uint256
     actionId: uint256
 
+event PendingShouldCheckLastTouchChange:
+    shouldCheck: bool
+    confirmationBlock: uint256
+    actionId: uint256
+
 event PendingMaxLtvDeviationChange:
     newDeviation: uint256
     confirmationBlock: uint256
@@ -281,6 +290,7 @@ event DynamicRateConfigSet:
 event KeeperConfigSet:
     keeperFeeRatio: uint256
     minKeeperFee: uint256
+    maxKeeperFee: uint256
 
 event LtvPaybackBufferSet:
     ltvPaybackBuffer: uint256
@@ -320,6 +330,9 @@ event CanPerformLiteAction:
     user: indexed(address)
     canDo: bool
 
+event ShouldCheckLastTouchSet:
+    shouldCheck: bool
+
 event MaxLtvDeviationSet:
     newDeviation: uint256
 
@@ -344,6 +357,7 @@ pendingPriorityStabVaults: public(HashMap[uint256, DynArray[cs.VaultLite, PRIORI
 pendingPriorityPriceSourceIds: public(HashMap[uint256, DynArray[uint256, MAX_PRIORITY_PRICE_SOURCES]])
 pendingUnderscoreRegistry: public(HashMap[uint256, address])
 pendingCanPerformLiteAction: public(HashMap[uint256, CanPerform])
+pendingShouldCheckLastTouch: public(HashMap[uint256, bool])
 pendingRipeGovVaultConfig: public(HashMap[uint256, PendingRipeGovVaultConfig]) # aid -> config
 
 # temp data
@@ -356,6 +370,7 @@ MAX_PRIORITY_PRICE_SOURCES: constant(uint256) = 10
 PRIORITY_VAULT_DATA: constant(uint256) = 20
 UNDERSCORE_AGENT_FACTORY_ID: constant(uint256) = 1
 HUNDRED_PERCENT: constant(uint256) = 100_00 # 100%
+EIGHTEEN_DECIMALS: constant(uint256) = 10 ** 18
 
 MISSION_CONTROL_ID: constant(uint256) = 5
 PRICE_DESK_ID: constant(uint256) = 7
@@ -711,21 +726,29 @@ def _isValidMaxDeviation(_newDeviation: uint256) -> bool:
 
 
 @external
-def setKeeperConfig(_keeperFeeRatio: uint256, _minKeeperFee: uint256) -> uint256:
+def setKeeperConfig(
+    _keeperFeeRatio: uint256,
+    _minKeeperFee: uint256,
+    _maxKeeperFee: uint256,
+) -> uint256:
     assert gov._canGovern(msg.sender) # dev: no perms
 
-    assert self._isValidKeeperConfig(_keeperFeeRatio, _minKeeperFee) # dev: invalid keeper config
-    return self._setPendingDebtConfig(ActionType.DEBT_KEEPER_CONFIG, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, _keeperFeeRatio, _minKeeperFee)
+    assert self._isValidKeeperConfig(_keeperFeeRatio, _minKeeperFee, _maxKeeperFee) # dev: invalid keeper config
+    return self._setPendingDebtConfig(ActionType.DEBT_KEEPER_CONFIG, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, _keeperFeeRatio, _minKeeperFee, _maxKeeperFee)
 
 
 @view
 @internal
-def _isValidKeeperConfig(_keeperFeeRatio: uint256, _minKeeperFee: uint256) -> bool:
-    if max_value(uint256) in [_keeperFeeRatio, _minKeeperFee]:
+def _isValidKeeperConfig(_keeperFeeRatio: uint256, _minKeeperFee: uint256, _maxKeeperFee: uint256) -> bool:
+    if max_value(uint256) in [_keeperFeeRatio, _minKeeperFee, _maxKeeperFee]:
         return False
     if _keeperFeeRatio > 10_00: # 10% max
         return False
-    if _minKeeperFee > 200 * (10 ** 18): # $200 max
+    if _minKeeperFee > _maxKeeperFee:
+        return False
+    if _minKeeperFee > 200 * EIGHTEEN_DECIMALS: # $200 max
+        return False
+    if _maxKeeperFee > 100_000 * EIGHTEEN_DECIMALS: # 100k max
         return False
     return True
 
@@ -738,7 +761,7 @@ def setLtvPaybackBuffer(_ltvPaybackBuffer: uint256) -> uint256:
     assert gov._canGovern(msg.sender) # dev: no perms
 
     assert self._isValidLtvPaybackBuffer(_ltvPaybackBuffer) # dev: invalid ltv payback buffer
-    return self._setPendingDebtConfig(ActionType.DEBT_LTV_PAYBACK_BUFFER, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, _ltvPaybackBuffer)
+    return self._setPendingDebtConfig(ActionType.DEBT_LTV_PAYBACK_BUFFER, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, _ltvPaybackBuffer)
 
 
 @view
@@ -769,7 +792,7 @@ def setGenAuctionParams(
         duration=_duration,
     )
     assert self._areValidAuctionParams(params) # dev: invalid auction params
-    return self._setPendingDebtConfig(ActionType.DEBT_AUCTION_PARAMS, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, params)
+    return self._setPendingDebtConfig(ActionType.DEBT_AUCTION_PARAMS, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, params)
 
 
 @view
@@ -815,6 +838,7 @@ def _setPendingDebtConfig(
     _maxLtvDeviation: uint256 = 0,
     _keeperFeeRatio: uint256 = 0,
     _minKeeperFee: uint256 = 0,
+    _maxKeeperFee: uint256 = 0,
     _ltvPaybackBuffer: uint256 = 0,
     _genAuctionParams: cs.AuctionParams = empty(cs.AuctionParams),
 ) -> uint256:
@@ -835,6 +859,7 @@ def _setPendingDebtConfig(
         maxLtvDeviation=_maxLtvDeviation,
         keeperFeeRatio=_keeperFeeRatio,
         minKeeperFee=_minKeeperFee,
+        maxKeeperFee=_maxKeeperFee,
         isDaowryEnabled=False,
         ltvPaybackBuffer=_ltvPaybackBuffer,
         genAuctionParams=_genAuctionParams,
@@ -876,6 +901,7 @@ def _setPendingDebtConfig(
         log PendingKeeperConfigChange(
             keeperFeeRatio=_keeperFeeRatio,
             minKeeperFee=_minKeeperFee,
+            maxKeeperFee=_maxKeeperFee,
             confirmationBlock=confirmationBlock,
             actionId=aid,
         )
@@ -1202,6 +1228,23 @@ def setCanPerformLiteAction(_user: address, _canDo: bool) -> uint256:
     return aid
 
 
+###########################
+# Should Check Last Touch #
+###########################
+
+
+@external
+def setShouldCheckLastTouch(_shouldCheck: bool) -> uint256:
+    assert gov._canGovern(msg.sender) # dev: no perms
+
+    aid: uint256 = timeLock._initiateAction()
+    self.actionType[aid] = ActionType.OTHER_SHOULD_CHECK_LAST_TOUCH
+    self.pendingShouldCheckLastTouch[aid] = _shouldCheck
+    confirmationBlock: uint256 = timeLock._getActionConfirmationBlock(aid)
+    log PendingShouldCheckLastTouchChange(shouldCheck=_shouldCheck, confirmationBlock=confirmationBlock, actionId=aid)
+    return aid
+
+
 #########################
 # Ripe Gov Vault Config #
 #########################
@@ -1359,8 +1402,9 @@ def executePendingAction(_aid: uint256) -> bool:
         p: cs.GenDebtConfig = self.pendingDebtConfig[_aid]
         config.keeperFeeRatio = p.keeperFeeRatio
         config.minKeeperFee = p.minKeeperFee
+        config.maxKeeperFee = p.maxKeeperFee
         extcall MissionControl(mc).setGeneralDebtConfig(config)
-        log KeeperConfigSet(keeperFeeRatio=p.keeperFeeRatio, minKeeperFee=p.minKeeperFee)
+        log KeeperConfigSet(keeperFeeRatio=p.keeperFeeRatio, minKeeperFee=p.minKeeperFee, maxKeeperFee=p.maxKeeperFee)
 
     elif actionType == ActionType.DEBT_LTV_PAYBACK_BUFFER:
         config: cs.GenDebtConfig = staticcall MissionControl(mc).genDebtConfig()
@@ -1423,6 +1467,11 @@ def executePendingAction(_aid: uint256) -> bool:
         data: CanPerform = self.pendingCanPerformLiteAction[_aid]
         extcall MissionControl(mc).setCanPerformLiteAction(data.user, data.canDo)
         log CanPerformLiteAction(user=data.user, canDo=data.canDo)
+
+    elif actionType == ActionType.OTHER_SHOULD_CHECK_LAST_TOUCH:
+        shouldCheck: bool = self.pendingShouldCheckLastTouch[_aid]
+        extcall MissionControl(mc).setShouldCheckLastTouch(shouldCheck)
+        log ShouldCheckLastTouchSet(shouldCheck=shouldCheck)
 
     elif actionType == ActionType.RIPE_VAULT_CONFIG:
         p: PendingRipeGovVaultConfig = self.pendingRipeGovVaultConfig[_aid]

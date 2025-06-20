@@ -38,12 +38,14 @@ struct TellerDepositConfig:
     perUserMaxAssetsPerVault: uint256
     perUserMaxVaults: uint256
     canAnyoneDeposit: bool
+    minDepositBalance: uint256
 
 struct TellerWithdrawConfig:
     canWithdrawGeneral: bool
     canWithdrawAsset: bool
     isUserAllowed: bool
     canWithdrawForUser: bool
+    minDepositBalance: uint256
 
 struct BorrowConfig:
     canBorrow: bool
@@ -77,6 +79,7 @@ struct GenLiqConfig:
     canLiquidate: bool
     keeperFeeRatio: uint256
     minKeeperFee: uint256
+    maxKeeperFee: uint256
     ltvPaybackBuffer: uint256
     genAuctionParams: cs.AuctionParams
     priorityLiqAssetVaults: DynArray[VaultData, PRIORITY_VAULT_DATA]
@@ -189,6 +192,7 @@ canPerformLiteAction: public(HashMap[address, bool]) # user -> canPerformLiteAct
 # other
 priorityPriceSourceIds: public(DynArray[uint256, MAX_PRIORITY_PRICE_SOURCES])
 underscoreRegistry: public(address)
+shouldCheckLastTouch: public(bool)
 
 MAX_VAULTS_PER_ASSET: constant(uint256) = 10
 MAX_PRIORITY_PRICE_SOURCES: constant(uint256) = 10
@@ -210,6 +214,7 @@ def __init__(_ripeHq: address, _defaults: address):
         self.rewardsConfig = staticcall Defaults(_defaults).rewardsConfig()
         self.stabClaimRewardsConfig = staticcall Defaults(_defaults).stabClaimRewardsConfig()
         self.underscoreRegistry = staticcall Defaults(_defaults).underscoreRegistry()
+        self.shouldCheckLastTouch = staticcall Defaults(_defaults).shouldCheckLastTouch()
 
         ripeGovVaultConfig: cs.RipeGovVaultConfig = staticcall Defaults(_defaults).ripeGovVaultConfig()
         if ripeGovVaultConfig.assetWeight != 0:
@@ -428,6 +433,15 @@ def setPriorityPriceSourceIds(_priorityIds: DynArray[uint256, MAX_PRIORITY_PRICE
     self.priorityPriceSourceIds = _priorityIds
 
 
+# should check last touch
+
+
+@external
+def setShouldCheckLastTouch(_shouldCheck: bool):
+    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
+    self.shouldCheckLastTouch = _shouldCheck
+
+
 ###################
 # Helpers / Views #
 ###################
@@ -502,6 +516,7 @@ def getTellerDepositConfig(_vaultId: uint256, _asset: address, _user: address) -
         perUserMaxAssetsPerVault=genConfig.perUserMaxAssetsPerVault,
         perUserMaxVaults=genConfig.perUserMaxVaults,
         canAnyoneDeposit=self.userConfig[_user].canAnyoneDeposit,
+        minDepositBalance=assetConfig.minDepositBalance,
     )
 
 
@@ -523,6 +538,7 @@ def getTellerWithdrawConfig(_asset: address, _user: address, _caller: address) -
         canWithdrawAsset=assetConfig.canWithdraw,
         isUserAllowed=self._isUserAllowed(assetConfig.whitelist, _user, _asset),
         canWithdrawForUser=canWithdrawForUser,
+        minDepositBalance=assetConfig.minDepositBalance,
     )
 
 
@@ -638,6 +654,7 @@ def getGenLiqConfig() -> GenLiqConfig:
         canLiquidate=self.genConfig.canLiquidate,
         keeperFeeRatio=genDebtConfig.keeperFeeRatio,
         minKeeperFee=genDebtConfig.minKeeperFee,
+        maxKeeperFee=genDebtConfig.maxKeeperFee,
         ltvPaybackBuffer=genDebtConfig.ltvPaybackBuffer,
         genAuctionParams=genDebtConfig.genAuctionParams,
         priorityLiqAssetVaults=priorityLiqAssetVaults,

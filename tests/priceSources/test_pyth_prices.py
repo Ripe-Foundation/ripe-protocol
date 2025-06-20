@@ -257,7 +257,7 @@ def test_pyth_get_price_and_has_feed(
     # Test with no feed
     price, has_feed = pyth_prices.getPriceAndHasFeed(bravo_token)
     assert price == 0
-    assert has_feed == False
+    assert not has_feed
 
     # Add feed
     addPythFeed(alpha_token, data_feed_id)
@@ -265,7 +265,7 @@ def test_pyth_get_price_and_has_feed(
     # Test with feed
     price, has_feed = pyth_prices.getPriceAndHasFeed(alpha_token)
     assert price != 0
-    assert has_feed == True
+    assert has_feed
 
 
 def test_pyth_get_price_stale(
@@ -842,7 +842,7 @@ def test_pyth_feed_validation_edge_cases(
     alpha_token,
     governance,
 ):
-    data_feed_id = bytes.fromhex("eaa020c61cc479712813461ce153894a96a6c00b21ed0cfc2798d1f9a9e9c94a")
+    bytes.fromhex("eaa020c61cc479712813461ce153894a96a6c00b21ed0cfc2798d1f9a9e9c94a")
 
     # Test basic feed validation - feed exists and has valid price
     new_feed_id = bytes.fromhex("caa020c61cc479712813461ce153894a96a6c00b21ed0cfc2798d1f9a9e9c94c")

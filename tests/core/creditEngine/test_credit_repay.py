@@ -1,4 +1,3 @@
-import pytest
 import boa
 
 from constants import EIGHTEEN_DECIMALS, MAX_UINT256
@@ -45,11 +44,11 @@ def test_basic_repay(
     assert log.repayValue == repay_amount
     assert log.repayType == 1
     assert log.refundAmount == 0
-    assert log.refundWasSavingsGreen == False
+    assert not log.refundWasSavingsGreen
     assert log.outstandingUserDebt == borrow_amount - repay_amount
     assert log.userCollateralVal == 100 * EIGHTEEN_DECIMALS
     assert log.maxUserDebt == 50 * EIGHTEEN_DECIMALS
-    assert log.hasGoodDebtHealth == True
+    assert log.hasGoodDebtHealth
 
     # check balance
     assert green_token.balanceOf(bob) == borrow_amount - repay_amount
@@ -708,7 +707,7 @@ def test_repay_with_savings_green_payment_max_amount(
 
     # deposit all green tokens into savings green
     green_token.approve(savings_green, borrow_amount, sender=bob)
-    shares = savings_green.deposit(borrow_amount, bob, sender=bob)
+    savings_green.deposit(borrow_amount, bob, sender=bob)
 
     # approve teller to spend savings green tokens
     savings_green.approve(teller, MAX_UINT256, sender=bob)
