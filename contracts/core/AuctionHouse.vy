@@ -529,7 +529,7 @@ def _handleSpecificLiqAsset(
     collateralValueOut: uint256 = _collateralValueOut
 
     # burn as payment (GREEN, sGREEN)
-    if config.shouldBurnAsPayment:
+    if config.shouldBurnAsPayment and _liqAsset in [_a.greenToken, _a.savingsGreen]:
         remainingToRepay, collateralValueOut = self._burnLiqUserStabAsset(_liqUser, _vaultId, _vaultAddr, _liqAsset, remainingToRepay, collateralValueOut, _a)
         return remainingToRepay, collateralValueOut
 
@@ -616,8 +616,6 @@ def _burnLiqUserStabAsset(
     usdValue, amountReceived, isPositionDepleted, na = self._transferCollateral(_liqUser, self, _liqVaultId, _liqVaultAddr, _liqStabAsset, False, remainingToRepay, _a)
     if usdValue == 0:
         return remainingToRepay, collateralValueOut
-
-    assert _liqStabAsset in [_a.greenToken, _a.savingsGreen] # dev: must be green or savings green
 
     # burn stab asset
     if _liqStabAsset == _a.savingsGreen:
