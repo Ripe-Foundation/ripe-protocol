@@ -106,7 +106,9 @@ struct RipeBondData:
     ripeAvailForBonds: uint256
     badDebt: uint256
 
+# high level
 lastTouch: public(HashMap[address, uint256])  # user -> block number
+isLockedAccount: public(HashMap[address, bool]) # wallet -> is locked
 
 # user vault participation
 userVaults: public(HashMap[address, HashMap[uint256, uint256]]) # user -> index -> vault id
@@ -185,6 +187,19 @@ def checkAndUpdateLastTouch(_user: address, _shouldCheck: bool, _mc: address = e
     
     # update last touch
     self.lastTouch[_user] = block.number
+
+    # check locked account
+    assert not self.isLockedAccount[_user] # dev: account locked
+
+
+# locked account
+
+
+@external
+def setLockedAccount(_wallet: address, _shouldLock: bool):
+    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
+    assert not deptBasics.isPaused # dev: not activated
+    self.isLockedAccount[_wallet] = _shouldLock
 
 
 ###############
