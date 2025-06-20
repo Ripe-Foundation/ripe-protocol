@@ -50,6 +50,7 @@ def __init__(_ripeHq: address):
 ########
 
 
+@nonreentrant
 @external
 def depositTokensInVault(
     _user: address,
@@ -67,6 +68,7 @@ def depositTokensInVault(
     return depositAmount
 
 
+@nonreentrant
 @external
 def withdrawTokensFromVault(
     _user: address,
@@ -86,6 +88,7 @@ def withdrawTokensFromVault(
     return withdrawalAmount, isDepleted
 
 
+@nonreentrant
 @external
 def transferBalanceWithinVault(
     _asset: address,
