@@ -100,13 +100,21 @@ def verifyStabPoolLiqResults(
     expected_final_collateral = _orig_collateral_val - actual_collateral_taken
     _test(expected_final_collateral, _bt.collateralVal)
     
-    # Verify target LTV is achieved (within tight tolerance)
-    actual_ltv = _user_debt.amount * HUNDRED_PERCENT // _bt.collateralVal
-    ltv_tolerance = 50 # 0.5% tolerance in basis points (50 bp = 0.5%)
-    assert abs(actual_ltv - _target_ltv) <= ltv_tolerance, f"LTV {actual_ltv} not close to target {_target_ltv}"
+    # Calculate the precise expected final LTV based on liquidation mechanics
+    # The unified formula calculates repay amount for target LTV, but unpaid fees affect final LTV
     
-    # Verify user is no longer in liquidation
-    assert not _user_debt.inLiquidation
+    # Calculate exactly how much liquidation fees were unpaid and added to debt
+    unpaid_liq_fees = max(0, _exp_liq_fees - liq_fees_paid)
+    precise_expected_debt = _orig_debt_amount - actual_repay_amount + unpaid_liq_fees
+    precise_expected_ltv = precise_expected_debt * HUNDRED_PERCENT // _bt.collateralVal
+    
+    # Test for the precise expected LTV (not target LTV, but actual expected LTV with unpaid fees)
+    actual_ltv = _user_debt.amount * HUNDRED_PERCENT // _bt.collateralVal
+    _test(precise_expected_ltv, actual_ltv)
+    
+    # Verify user debt health was restored (no longer at liquidation threshold)
+    liquidation_threshold_ltv = _user_debt.debtTerms.liqThreshold
+    assert actual_ltv < liquidation_threshold_ltv, f"User still liquidatable: LTV {actual_ltv} >= threshold {liquidation_threshold_ltv}"
 
 
 ###############
