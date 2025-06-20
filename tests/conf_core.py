@@ -354,6 +354,7 @@ def teller(ripe_hq_deploy):
     return boa.load(
         "contracts/core/Teller.vy",
         ripe_hq_deploy,
+        False,
         name="teller",
     )
 
