@@ -13,7 +13,7 @@ def migrate(migration: Migration):
     )
 
     migration.execute(hq.startAddNewAddressToRegistry, bond_room, "Bond Room")
-    assert migration.execute(hq.confirmNewAddressToRegistry, bond_room) == 12
+    assert int(migration.execute(hq.confirmNewAddressToRegistry, bond_room)) == 12
 
     migration.execute(hq.initiateHqConfigChange, 12, False, True, False)
     migration.execute(hq.confirmHqConfigChange, 12)

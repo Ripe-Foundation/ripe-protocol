@@ -1,7 +1,467 @@
 {
   "contracts": {
+    "DefaultsBaseSepolia": {
+      "address": "0x32CCbF6d8A88ec64f2f493d136d1AD1e1257E708",
+      "abi": [
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "genConfig",
+          "inputs": [],
+          "outputs": [
+            {
+              "name": "",
+              "type": "tuple",
+              "components": [
+                {
+                  "name": "perUserMaxVaults",
+                  "type": "uint256"
+                },
+                {
+                  "name": "perUserMaxAssetsPerVault",
+                  "type": "uint256"
+                },
+                {
+                  "name": "priceStaleTime",
+                  "type": "uint256"
+                },
+                {
+                  "name": "canDeposit",
+                  "type": "bool"
+                },
+                {
+                  "name": "canWithdraw",
+                  "type": "bool"
+                },
+                {
+                  "name": "canBorrow",
+                  "type": "bool"
+                },
+                {
+                  "name": "canRepay",
+                  "type": "bool"
+                },
+                {
+                  "name": "canClaimLoot",
+                  "type": "bool"
+                },
+                {
+                  "name": "canLiquidate",
+                  "type": "bool"
+                },
+                {
+                  "name": "canRedeemCollateral",
+                  "type": "bool"
+                },
+                {
+                  "name": "canRedeemInStabPool",
+                  "type": "bool"
+                },
+                {
+                  "name": "canBuyInAuction",
+                  "type": "bool"
+                },
+                {
+                  "name": "canClaimInStabPool",
+                  "type": "bool"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "genDebtConfig",
+          "inputs": [],
+          "outputs": [
+            {
+              "name": "",
+              "type": "tuple",
+              "components": [
+                {
+                  "name": "perUserDebtLimit",
+                  "type": "uint256"
+                },
+                {
+                  "name": "globalDebtLimit",
+                  "type": "uint256"
+                },
+                {
+                  "name": "minDebtAmount",
+                  "type": "uint256"
+                },
+                {
+                  "name": "numAllowedBorrowers",
+                  "type": "uint256"
+                },
+                {
+                  "name": "maxBorrowPerInterval",
+                  "type": "uint256"
+                },
+                {
+                  "name": "numBlocksPerInterval",
+                  "type": "uint256"
+                },
+                {
+                  "name": "minDynamicRateBoost",
+                  "type": "uint256"
+                },
+                {
+                  "name": "maxDynamicRateBoost",
+                  "type": "uint256"
+                },
+                {
+                  "name": "increasePerDangerBlock",
+                  "type": "uint256"
+                },
+                {
+                  "name": "maxBorrowRate",
+                  "type": "uint256"
+                },
+                {
+                  "name": "maxLtvDeviation",
+                  "type": "uint256"
+                },
+                {
+                  "name": "keeperFeeRatio",
+                  "type": "uint256"
+                },
+                {
+                  "name": "minKeeperFee",
+                  "type": "uint256"
+                },
+                {
+                  "name": "isDaowryEnabled",
+                  "type": "bool"
+                },
+                {
+                  "name": "ltvPaybackBuffer",
+                  "type": "uint256"
+                },
+                {
+                  "name": "genAuctionParams",
+                  "type": "tuple",
+                  "components": [
+                    {
+                      "name": "hasParams",
+                      "type": "bool"
+                    },
+                    {
+                      "name": "startDiscount",
+                      "type": "uint256"
+                    },
+                    {
+                      "name": "maxDiscount",
+                      "type": "uint256"
+                    },
+                    {
+                      "name": "delay",
+                      "type": "uint256"
+                    },
+                    {
+                      "name": "duration",
+                      "type": "uint256"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "hrConfig",
+          "inputs": [],
+          "outputs": [
+            {
+              "name": "",
+              "type": "tuple",
+              "components": [
+                {
+                  "name": "contribTemplate",
+                  "type": "address"
+                },
+                {
+                  "name": "maxCompensation",
+                  "type": "uint256"
+                },
+                {
+                  "name": "minCliffLength",
+                  "type": "uint256"
+                },
+                {
+                  "name": "maxStartDelay",
+                  "type": "uint256"
+                },
+                {
+                  "name": "minVestingLength",
+                  "type": "uint256"
+                },
+                {
+                  "name": "maxVestingLength",
+                  "type": "uint256"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "ripeBondConfig",
+          "inputs": [],
+          "outputs": [
+            {
+              "name": "",
+              "type": "tuple",
+              "components": [
+                {
+                  "name": "asset",
+                  "type": "address"
+                },
+                {
+                  "name": "amountPerEpoch",
+                  "type": "uint256"
+                },
+                {
+                  "name": "canBond",
+                  "type": "bool"
+                },
+                {
+                  "name": "minRipePerUnit",
+                  "type": "uint256"
+                },
+                {
+                  "name": "maxRipePerUnit",
+                  "type": "uint256"
+                },
+                {
+                  "name": "maxRipePerUnitLockBonus",
+                  "type": "uint256"
+                },
+                {
+                  "name": "epochLength",
+                  "type": "uint256"
+                },
+                {
+                  "name": "shouldAutoRestart",
+                  "type": "bool"
+                },
+                {
+                  "name": "restartDelayBlocks",
+                  "type": "uint256"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "rewardsConfig",
+          "inputs": [],
+          "outputs": [
+            {
+              "name": "",
+              "type": "tuple",
+              "components": [
+                {
+                  "name": "arePointsEnabled",
+                  "type": "bool"
+                },
+                {
+                  "name": "ripePerBlock",
+                  "type": "uint256"
+                },
+                {
+                  "name": "borrowersAlloc",
+                  "type": "uint256"
+                },
+                {
+                  "name": "stakersAlloc",
+                  "type": "uint256"
+                },
+                {
+                  "name": "votersAlloc",
+                  "type": "uint256"
+                },
+                {
+                  "name": "genDepositorsAlloc",
+                  "type": "uint256"
+                },
+                {
+                  "name": "autoStakeRatio",
+                  "type": "uint256"
+                },
+                {
+                  "name": "autoStakeDurationRatio",
+                  "type": "uint256"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "ripeGovVaultConfig",
+          "inputs": [],
+          "outputs": [
+            {
+              "name": "",
+              "type": "tuple",
+              "components": [
+                {
+                  "name": "lockTerms",
+                  "type": "tuple",
+                  "components": [
+                    {
+                      "name": "minLockDuration",
+                      "type": "uint256"
+                    },
+                    {
+                      "name": "maxLockDuration",
+                      "type": "uint256"
+                    },
+                    {
+                      "name": "maxLockBoost",
+                      "type": "uint256"
+                    },
+                    {
+                      "name": "canExit",
+                      "type": "bool"
+                    },
+                    {
+                      "name": "exitFee",
+                      "type": "uint256"
+                    }
+                  ]
+                },
+                {
+                  "name": "assetWeight",
+                  "type": "uint256"
+                },
+                {
+                  "name": "shouldFreezeWhenBadDebt",
+                  "type": "bool"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "stabClaimRewardsConfig",
+          "inputs": [],
+          "outputs": [
+            {
+              "name": "",
+              "type": "tuple",
+              "components": [
+                {
+                  "name": "rewardsLockDuration",
+                  "type": "uint256"
+                },
+                {
+                  "name": "ripePerDollarClaimed",
+                  "type": "uint256"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "underscoreRegistry",
+          "inputs": [],
+          "outputs": [
+            {
+              "name": "",
+              "type": "address"
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "ripeAvailForRewards",
+          "inputs": [],
+          "outputs": [
+            {
+              "name": "",
+              "type": "uint256"
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "ripeAvailForHr",
+          "inputs": [],
+          "outputs": [
+            {
+              "name": "",
+              "type": "uint256"
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "ripeAvailForBonds",
+          "inputs": [],
+          "outputs": [
+            {
+              "name": "",
+              "type": "uint256"
+            }
+          ]
+        },
+        {
+          "stateMutability": "nonpayable",
+          "type": "constructor",
+          "inputs": [],
+          "outputs": []
+        }
+      ],
+      "solc_json": {
+        "language": "Vyper",
+        "sources": {
+          "interfaces/Defaults.vyi": {
+            "content": "# @version 0.4.1\n\nimport interfaces.ConfigStructs as cs\n\n\n# general config\n\n\n@view\n@external\ndef genConfig() -> cs.GenConfig:\n    ...\n\n\n# debt config\n\n\n@view\n@external\ndef genDebtConfig() -> cs.GenDebtConfig:\n    ...\n\n\n# hr config\n\n\n@view\n@external\ndef hrConfig() -> cs.HrConfig:\n    ...\n\n\n# ripe bond config\n\n\n@view\n@external\ndef ripeBondConfig() -> cs.RipeBondConfig:\n    ...\n\n\n# ripe rewards config\n\n\n@view\n@external\ndef rewardsConfig() -> cs.RipeRewardsConfig:\n    ...\n\n\n# ripe gov vault config\n\n\n@view\n@external\ndef ripeGovVaultConfig() -> cs.RipeGovVaultConfig:\n    ...\n\n\n# stab claim rewards config\n\n\n@view\n@external\ndef stabClaimRewardsConfig() -> cs.StabClaimRewardsConfig:\n    ...\n\n\n# underscore registry\n\n\n@view\n@external\ndef underscoreRegistry() -> address:\n    ...\n\n\n# ripe available\n\n\n@view\n@external\ndef ripeAvailForRewards() -> uint256:\n    ...\n\n\n@view\n@external\ndef ripeAvailForHr() -> uint256:\n    ...\n\n\n@view\n@external\ndef ripeAvailForBonds() -> uint256:\n    ...",
+            "sha256sum": "49830c5bdbeda7943ce397633a8418dd4119cfba16c83e55af127bb9696f7592"
+          },
+          "interfaces/ConfigStructs.vyi": {
+            "content": "# @version 0.4.1\n\nMAX_VAULTS_PER_ASSET: constant(uint256) = 10\n\nstruct GenConfig:\n    perUserMaxVaults: uint256\n    perUserMaxAssetsPerVault: uint256\n    priceStaleTime: uint256\n    canDeposit: bool\n    canWithdraw: bool\n    canBorrow: bool\n    canRepay: bool\n    canClaimLoot: bool\n    canLiquidate: bool\n    canRedeemCollateral: bool\n    canRedeemInStabPool: bool\n    canBuyInAuction: bool\n    canClaimInStabPool: bool\n\nstruct GenDebtConfig:\n    perUserDebtLimit: uint256\n    globalDebtLimit: uint256\n    minDebtAmount: uint256\n    numAllowedBorrowers: uint256\n    maxBorrowPerInterval: uint256\n    numBlocksPerInterval: uint256\n    minDynamicRateBoost: uint256\n    maxDynamicRateBoost: uint256\n    increasePerDangerBlock: uint256\n    maxBorrowRate: uint256\n    maxLtvDeviation: uint256\n    keeperFeeRatio: uint256\n    minKeeperFee: uint256\n    isDaowryEnabled: bool\n    ltvPaybackBuffer: uint256\n    genAuctionParams: AuctionParams\n\nstruct HrConfig:\n    contribTemplate: address\n    maxCompensation: uint256\n    minCliffLength: uint256\n    maxStartDelay: uint256\n    minVestingLength: uint256\n    maxVestingLength: uint256\n\nstruct RipeBondConfig:\n    asset: address\n    amountPerEpoch: uint256\n    canBond: bool\n    minRipePerUnit: uint256\n    maxRipePerUnit: uint256\n    maxRipePerUnitLockBonus: uint256\n    epochLength: uint256\n    shouldAutoRestart: bool\n    restartDelayBlocks: uint256\n\nstruct RipeRewardsConfig:\n    arePointsEnabled: bool\n    ripePerBlock: uint256\n    borrowersAlloc: uint256\n    stakersAlloc: uint256\n    votersAlloc: uint256\n    genDepositorsAlloc: uint256\n    autoStakeRatio: uint256\n    autoStakeDurationRatio: uint256\n\nstruct RipeGovVaultConfig:\n    lockTerms: LockTerms\n    assetWeight: uint256\n    shouldFreezeWhenBadDebt: bool\n\nstruct StabClaimRewardsConfig:\n    rewardsLockDuration: uint256\n    ripePerDollarClaimed: uint256\n\nstruct LockTerms:\n    minLockDuration: uint256\n    maxLockDuration: uint256\n    maxLockBoost: uint256\n    canExit: bool\n    exitFee: uint256\n\nstruct AuctionParams:\n    hasParams: bool\n    startDiscount: uint256\n    maxDiscount: uint256\n    delay: uint256\n    duration: uint256\n\nstruct AssetConfig:\n    vaultIds: DynArray[uint256, MAX_VAULTS_PER_ASSET]\n    stakersPointsAlloc: uint256\n    voterPointsAlloc: uint256\n    perUserDepositLimit: uint256\n    globalDepositLimit: uint256\n    debtTerms: DebtTerms\n    shouldBurnAsPayment: bool\n    shouldTransferToEndaoment: bool\n    shouldSwapInStabPools: bool\n    shouldAuctionInstantly: bool\n    canDeposit: bool\n    canWithdraw: bool\n    canRedeemCollateral: bool\n    canRedeemInStabPool: bool\n    canBuyInAuction: bool\n    canClaimInStabPool: bool\n    specialStabPoolId: uint256\n    customAuctionParams: AuctionParams\n    whitelist: address\n    isNft: bool\n\nstruct DebtTerms:\n    ltv: uint256\n    redemptionThreshold: uint256\n    liqThreshold: uint256\n    liqFee: uint256\n    borrowRate: uint256\n    daowry: uint256\n\nstruct UserConfig:\n    canAnyoneDeposit: bool\n    canAnyoneRepayDebt: bool\n    canAnyoneBondForUser: bool\n\nstruct ActionDelegation:\n    canWithdraw: bool\n    canBorrow: bool\n    canClaimFromStabPool: bool\n    canClaimLoot: bool\n\nstruct VaultLite:\n    vaultId: uint256\n    asset: address",
+            "sha256sum": "5995041633c8e364edeb10958b6d77f71424d14bba43323b99161d6525ea1651"
+          },
+          "contracts/config/DefaultsBaseSepolia.vy": {
+            "content": "# @version 0.4.1\n\nimplements: Defaults\nfrom interfaces import Defaults\nimport interfaces.ConfigStructs as cs\n\nEIGHTEEN_DECIMALS: constant(uint256) = 10 ** 18\nHUNDRED_PERCENT: constant(uint256) = 100_00\n\n# seconds\nDAY_IN_SECONDS: constant(uint256) = 60 * 60 * 24\nWEEK_IN_SECONDS: constant(uint256) = 7 * DAY_IN_SECONDS\nMONTH_IN_SECONDS: constant(uint256) = 30 * DAY_IN_SECONDS\nYEAR_IN_SECONDS: constant(uint256) = 365 * DAY_IN_SECONDS\n\n# blocks\nDAY_IN_BLOCKS: constant(uint256) = 43_200\nWEEK_IN_BLOCKS: constant(uint256) = 7 * DAY_IN_BLOCKS\nMONTH_IN_BLOCKS: constant(uint256) = 30 * DAY_IN_BLOCKS\nYEAR_IN_BLOCKS: constant(uint256) = 365 * DAY_IN_BLOCKS\n\n\n@deploy\ndef __init__():\n    pass\n\n\n# general config\n\n\n@view\n@external\ndef genConfig() -> cs.GenConfig:\n    return cs.GenConfig(\n        perUserMaxVaults = 5,\n        perUserMaxAssetsPerVault = 10,\n        priceStaleTime = 0,\n        canDeposit = True,\n        canWithdraw = True,\n        canBorrow = True,\n        canRepay = True,\n        canClaimLoot = True,\n        canLiquidate = True,\n        canRedeemCollateral = True,\n        canRedeemInStabPool = True,\n        canBuyInAuction = True,\n        canClaimInStabPool = True,\n    )\n\n\n# debt config\n\n\n@view\n@external\ndef genDebtConfig() -> cs.GenDebtConfig:\n    return cs.GenDebtConfig(\n        perUserDebtLimit = 1_000_000 * EIGHTEEN_DECIMALS,\n        globalDebtLimit = 100_000_000 * EIGHTEEN_DECIMALS,\n        minDebtAmount = 100 * EIGHTEEN_DECIMALS,\n        numAllowedBorrowers = 50,\n        maxBorrowPerInterval = 100_000 * EIGHTEEN_DECIMALS,\n        numBlocksPerInterval = 100,\n        minDynamicRateBoost = 50_00,\n        maxDynamicRateBoost = 5 * HUNDRED_PERCENT,\n        increasePerDangerBlock = 10,\n        maxBorrowRate = HUNDRED_PERCENT,\n        maxLtvDeviation = 10_00,\n        keeperFeeRatio = 1_00,\n        minKeeperFee = 1_00,\n        isDaowryEnabled = True,\n        ltvPaybackBuffer = 1_00,\n        genAuctionParams = cs.AuctionParams(\n            hasParams = True,\n            startDiscount = 0,\n            maxDiscount = 50_00,\n            delay = 0,\n            duration = DAY_IN_BLOCKS,\n        ),\n    )\n\n\n# hr config\n\n\n@view\n@external\ndef hrConfig() -> cs.HrConfig:\n    return cs.HrConfig(\n        contribTemplate = empty(address),\n        maxCompensation = 0, # set this later, after core contributor vesting setup\n        minCliffLength = 1 * WEEK_IN_SECONDS,\n        maxStartDelay = 1 * MONTH_IN_SECONDS,\n        minVestingLength = 1 * MONTH_IN_SECONDS,\n        maxVestingLength = 5 * YEAR_IN_SECONDS,\n    )\n\n\n# ripe bond config\n\n\n@view\n@external\ndef ripeBondConfig() -> cs.RipeBondConfig:\n    return cs.RipeBondConfig(\n        asset = 0x611ce0729f6C052f49536c84a8fD717E619D5dc6,\n        amountPerEpoch = 100_000 * (10 ** 6),\n        canBond = True,\n        minRipePerUnit = 1 * EIGHTEEN_DECIMALS,\n        maxRipePerUnit = 100 * EIGHTEEN_DECIMALS,\n        maxRipePerUnitLockBonus = 10 * EIGHTEEN_DECIMALS,\n        epochLength = 1000,\n        shouldAutoRestart = True,\n        restartDelayBlocks = 100,\n    )\n\n\n# ripe rewards config\n\n\n@view\n@external\ndef rewardsConfig() -> cs.RipeRewardsConfig:\n    return cs.RipeRewardsConfig(\n        arePointsEnabled = True,\n        ripePerBlock = 1 * EIGHTEEN_DECIMALS,\n        borrowersAlloc = 50_00,\n        stakersAlloc = 10_00,\n        votersAlloc = 0,\n        genDepositorsAlloc = 0,\n        autoStakeRatio = 90_00,\n        autoStakeDurationRatio = 10_00,\n    )\n\n\n# ripe gov vault config\n\n\n@view\n@external\ndef ripeGovVaultConfig() -> cs.RipeGovVaultConfig:\n    return cs.RipeGovVaultConfig(\n        lockTerms = cs.LockTerms(\n            minLockDuration = 1 * DAY_IN_BLOCKS,\n            maxLockDuration = 1 * MONTH_IN_BLOCKS,\n            maxLockBoost = 2 * HUNDRED_PERCENT,\n            canExit = True,\n            exitFee = 10_00,\n        ),\n        assetWeight = HUNDRED_PERCENT,\n        shouldFreezeWhenBadDebt = True,\n    )\n\n\n# stab claim rewards config\n\n\n@view\n@external\ndef stabClaimRewardsConfig() -> cs.StabClaimRewardsConfig:\n    return cs.StabClaimRewardsConfig(\n        rewardsLockDuration = 1 * DAY_IN_BLOCKS,\n        ripePerDollarClaimed = 1 * EIGHTEEN_DECIMALS,\n    )\n\n\n# underscore registry\n\n\nUNDERSCORE_REGISTRY: constant(address) = 0xa89a59E14333187829528C50eBAaE6EC12Bae95d\n\n\n@view\n@external\ndef underscoreRegistry() -> address:\n    return UNDERSCORE_REGISTRY\n\n\n# ripe available\n\n\n@view\n@external\ndef ripeAvailForRewards() -> uint256:\n    return 100_000_000 * EIGHTEEN_DECIMALS\n\n\n@view\n@external\ndef ripeAvailForHr() -> uint256:\n    return 100_000_000 * EIGHTEEN_DECIMALS\n\n\n@view\n@external\ndef ripeAvailForBonds() -> uint256:\n    return 100_000_000 * EIGHTEEN_DECIMALS",
+            "sha256sum": "2980a08a6273819896dd157e89bf0e5c330cf334ca5c2af2b8a7d8f5beb0198f"
+          }
+        },
+        "settings": {
+          "outputSelection": {
+            "contracts/config/DefaultsBaseSepolia.vy": [
+              "*"
+            ]
+          },
+          "search_paths": [
+            "."
+          ]
+        },
+        "compiler_version": "v0.4.1+commit.8a93dd27",
+        "integrity": "bd15548f9278efbb2ff0bcfdd1093d598cc3c59089af0a1a8510af141a974cc0"
+      },
+      "args": "",
+      "file": "contracts/config/DefaultsBaseSepolia.vy"
+    },
     "GreenToken": {
-      "address": "0x5c9FE32b826d1C84009e8a9B712693A87A8bF79f",
+      "address": "0x4970EA28f1d491D2E6f49f370b811248505279Bf",
       "abi": [
         {
           "name": "Transfer",
@@ -887,10 +1347,11 @@
         "compiler_version": "v0.4.1+commit.8a93dd27",
         "integrity": "df96d3ab4d7098847b91ca3a00a9259dae60db0827875969d8b9f935192ef555"
       },
-      "args": "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000003fbe79100d2b637d577f1d2d8d14c9825f869db7000000000000000000000000000000000000000000000000000000000000a8c00000000000000000000000000000000000000000000000000000000000049d4000000000000000000000000000000000000000000000003635c9adc5dea000000000000000000000000000003fbe79100d2b637d577f1d2d8d14c9825f869db7"
+      "args": "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000003fbe79100d2b637d577f1d2d8d14c9825f869db7000000000000000000000000000000000000000000000000000000000000a8c00000000000000000000000000000000000000000000000000000000000049d4000000000000000000000000000000000000000000000003635c9adc5dea000000000000000000000000000003fbe79100d2b637d577f1d2d8d14c9825f869db7",
+      "file": "contracts/tokens/GreenToken.vy"
     },
     "RipeToken": {
-      "address": "0x07A2693E29C76cd638921Af42773c09cb9a8a2DA",
+      "address": "0x0a05e23C43A8b7314C9D5437771e2455DE577B65",
       "abi": [
         {
           "name": "Transfer",
@@ -1776,10 +2237,11 @@
         "compiler_version": "v0.4.1+commit.8a93dd27",
         "integrity": "ba4ace1cf21b6b0be7e9384eaf102aa54e83efc82c5a35b529071281f6333e1a"
       },
-      "args": "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000003fbe79100d2b637d577f1d2d8d14c9825f869db7000000000000000000000000000000000000000000000000000000000000a8c00000000000000000000000000000000000000000000000000000000000049d4000000000000000000000000000000000000000000000d3c21bcecceda10000000000000000000000000000003fbe79100d2b637d577f1d2d8d14c9825f869db7"
+      "args": "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000003fbe79100d2b637d577f1d2d8d14c9825f869db7000000000000000000000000000000000000000000000000000000000000a8c00000000000000000000000000000000000000000000000000000000000049d4000000000000000000000000000000000000000000000d3c21bcecceda10000000000000000000000000000003fbe79100d2b637d577f1d2d8d14c9825f869db7",
+      "file": "contracts/tokens/RipeToken.vy"
     },
     "SavingsGreen": {
-      "address": "0x0bAe4c5B1b05B6DcB0f7A9C10910Ac66597286Fa",
+      "address": "0x66b1f45186D8a56e04Ace4F847a998573C3E948b",
       "abi": [
         {
           "name": "Transfer",
@@ -3127,8 +3589,8 @@
             "sha256sum": "66c2e657d9faa162b27fbb89751938175d9271c75685964781cfe37863b7806a"
           },
           "contracts/tokens/modules/Erc4626Token.vy": {
-            "content": "# @version 0.4.1\n\nimplements: IERC4626\nfrom ethereum.ercs import IERC4626\n\nuses: token\nfrom contracts.tokens.modules import Erc20Token as token\nfrom ethereum.ercs import IERC20\n\nevent Deposit:\n    sender: indexed(address)\n    owner: indexed(address)\n    assets: uint256\n    shares: uint256\n\nevent Withdraw:\n    sender: indexed(address)\n    receiver: indexed(address)\n    owner: indexed(address)\n    assets: uint256\n    shares: uint256\n\nlastPricePerShare: public(uint256)\n\nASSET: immutable(address)\nDECIMAL_OFFSET: constant(uint256) = 10 ** 8\n\n\n@deploy\ndef __init__(_asset: address):\n    assert _asset != empty(address) # dev: invalid asset\n    ASSET = _asset\n\n\n@view\n@external\ndef asset() -> address:\n    return ASSET\n\n\n@view\n@external\ndef totalAssets() -> uint256:\n    return staticcall IERC20(ASSET).balanceOf(self)\n\n\n############\n# Deposits #\n############\n\n\n@view\n@external\ndef maxDeposit(_receiver: address) -> uint256:\n    return max_value(uint256)\n\n\n@view\n@external\ndef previewDeposit(_assets: uint256) -> uint256:\n    return self._amountToShares(_assets, token.totalSupply, staticcall IERC20(ASSET).balanceOf(self), False)\n\n\n@nonreentrant\n@external\ndef deposit(_assets: uint256, _receiver: address = msg.sender) -> uint256:\n    asset: address = ASSET\n\n    amount: uint256 = _assets\n    if amount == max_value(uint256):\n        amount = staticcall IERC20(asset).balanceOf(msg.sender)\n\n    shares: uint256 = self._amountToShares(amount, token.totalSupply, staticcall IERC20(asset).balanceOf(self), False)\n    self._deposit(asset, amount, shares, _receiver)\n    return shares\n\n\n# mint\n\n\n@view\n@external\ndef maxMint(_receiver: address) -> uint256:\n    return max_value(uint256)\n\n\n@view\n@external\ndef previewMint(_shares: uint256) -> uint256:\n    return self._sharesToAmount(_shares, token.totalSupply, staticcall IERC20(ASSET).balanceOf(self), True)\n\n\n@nonreentrant\n@external\ndef mint(_shares: uint256, _receiver: address = msg.sender) -> uint256:\n    asset: address = ASSET\n    amount: uint256 = self._sharesToAmount(_shares, token.totalSupply, staticcall IERC20(asset).balanceOf(self), True)\n    self._deposit(asset, amount, _shares, _receiver)\n    return amount\n\n\n# shared deposit logic\n\n\n@internal\ndef _deposit(_asset: address, _amount: uint256, _shares: uint256, _recipient: address):\n    assert _amount != 0 # dev: cannot deposit 0 amount\n    assert _shares != 0 # dev: cannot receive 0 shares\n    assert _recipient != empty(address) # dev: invalid recipient\n\n    assert extcall IERC20(_asset).transferFrom(msg.sender, self, _amount, default_return_value=True) # dev: deposit failed\n    token._mint(_recipient, _shares)\n\n    # update last price per share\n    self._updateLastPricePerShare(_asset)\n\n    log Deposit(sender=msg.sender, owner=_recipient, assets=_amount, shares=_shares)\n\n\n###############\n# Withdrawals #\n###############\n\n\n@view\n@external\ndef maxWithdraw(_owner: address) -> uint256:\n    return staticcall IERC20(ASSET).balanceOf(self)\n\n\n@view\n@external\ndef previewWithdraw(_assets: uint256) -> uint256:\n    return self._amountToShares(_assets, token.totalSupply, staticcall IERC20(ASSET).balanceOf(self), True)\n\n\n@external\ndef withdraw(_assets: uint256, _receiver: address = msg.sender, _owner: address = msg.sender) -> uint256:\n    asset: address = ASSET\n    shares: uint256 = self._amountToShares(_assets, token.totalSupply, staticcall IERC20(asset).balanceOf(self), True)\n    self._redeem(asset, _assets, shares, msg.sender, _receiver, _owner)\n    return shares\n\n\n# redeem\n\n\n@view\n@external\ndef maxRedeem(_owner: address) -> uint256:\n    return token.balanceOf[_owner]\n\n\n@view\n@external\ndef previewRedeem(_shares: uint256) -> uint256:\n    return self._sharesToAmount(_shares, token.totalSupply, staticcall IERC20(ASSET).balanceOf(self), False)\n\n\n@external\ndef redeem(_shares: uint256, _receiver: address = msg.sender, _owner: address = msg.sender) -> uint256:\n    asset: address = ASSET\n\n    shares: uint256 = _shares\n    if shares == max_value(uint256):\n        shares = token.balanceOf[_owner]\n\n    amount: uint256 = self._sharesToAmount(shares, token.totalSupply, staticcall IERC20(asset).balanceOf(self), False)\n    return self._redeem(asset, amount, shares, msg.sender, _receiver, _owner)\n\n\n# shared redeem logic\n\n\n@internal\ndef _redeem(\n    _asset: address,\n    _amount: uint256,\n    _shares: uint256, \n    _sender: address, \n    _recipient: address, \n    _owner: address,\n) -> uint256:\n    assert _amount != 0 # dev: cannot withdraw 0 amount\n    assert _shares != 0 # dev: cannot redeem 0 shares\n    assert _recipient != empty(address) # dev: invalid recipient\n\n    assert token.balanceOf[_owner] >= _shares # dev: insufficient shares\n\n    if _sender != _owner:\n        token._spendAllowance(_owner, _sender, _shares)\n\n    token._burn(_owner, _shares)\n    assert extcall IERC20(_asset).transfer(_recipient, _amount, default_return_value=True) # dev: withdrawal failed\n\n    # update last price per share\n    self._updateLastPricePerShare(_asset)\n\n    log Withdraw(sender=_sender, receiver=_recipient, owner=_owner, assets=_amount, shares=_shares)\n    return _amount\n\n\n##########\n# Shares #\n##########\n\n\n@view\n@external\ndef convertToShares(_assets: uint256) -> uint256:\n    return self._amountToShares(_assets, token.totalSupply, staticcall IERC20(ASSET).balanceOf(self), False)\n\n\n@view\n@external\ndef convertToAssets(_shares: uint256) -> uint256:\n    return self._sharesToAmount(_shares, token.totalSupply, staticcall IERC20(ASSET).balanceOf(self), False)\n\n\n# amount -> shares\n\n\n@view\n@internal\ndef _amountToShares(\n    _amount: uint256,\n    _totalShares: uint256,\n    _totalBalance: uint256,\n    _shouldRoundUp: bool,\n) -> uint256:\n    totalBalance: uint256 = _totalBalance\n\n    # dead shares / decimal offset -- preventing donation attacks\n    totalBalance += 1\n    totalShares: uint256 = _totalShares + DECIMAL_OFFSET\n\n    # calc shares\n    numerator: uint256 = _amount * totalShares\n    shares: uint256 = numerator // totalBalance\n\n    # rounding\n    if _shouldRoundUp and (numerator % totalBalance != 0):\n        shares += 1\n\n    return shares\n\n\n# shares -> amount\n\n\n@view\n@internal\ndef _sharesToAmount(\n    _shares: uint256,\n    _totalShares: uint256,\n    _totalBalance: uint256,\n    _shouldRoundUp: bool,\n) -> uint256:\n    totalBalance: uint256 = _totalBalance\n\n    # dead shares / decimal offset -- preventing donation attacks\n    totalBalance += 1\n    totalShares: uint256 = _totalShares + DECIMAL_OFFSET\n\n    # calc amount\n    numerator: uint256 = _shares * totalBalance\n    amount: uint256 = numerator // totalShares\n\n    # rounding\n    if _shouldRoundUp and (numerator % totalShares != 0):\n        amount += 1\n\n    return amount\n\n\n# price per share\n\n\n@internal\ndef _updateLastPricePerShare(_asset: address):\n    newLastPricePerShare: uint256 = self._sharesToAmount(10 ** convert(token.TOKEN_DECIMALS, uint256), token.totalSupply, staticcall IERC20(_asset).balanceOf(self), False)\n    self.lastPricePerShare = newLastPricePerShare\n\n\n@view\n@external\ndef getLastUnderlying(_shares: uint256) -> uint256:\n    return self.lastPricePerShare * _shares // (10 ** convert(token.TOKEN_DECIMALS, uint256))\n\n\n@view\n@external\ndef pricePerShare() -> uint256:\n    return self._sharesToAmount(10 ** convert(token.TOKEN_DECIMALS, uint256), token.totalSupply, staticcall IERC20(ASSET).balanceOf(self), False)",
-            "sha256sum": "e927afad6e165faf4b77d79ff24323f20166f8eb153275dd1c4edda0ff3deab5"
+            "content": "# @version 0.4.1\n\nimplements: IERC4626\nfrom ethereum.ercs import IERC4626\n\nuses: token\nfrom contracts.tokens.modules import Erc20Token as token\nfrom ethereum.ercs import IERC20\n\nevent Deposit:\n    sender: indexed(address)\n    owner: indexed(address)\n    assets: uint256\n    shares: uint256\n\nevent Withdraw:\n    sender: indexed(address)\n    receiver: indexed(address)\n    owner: indexed(address)\n    assets: uint256\n    shares: uint256\n\nlastPricePerShare: public(uint256)\n\nASSET: immutable(address)\n\n\n@deploy\ndef __init__(_asset: address):\n    assert _asset != empty(address) # dev: invalid asset\n    ASSET = _asset\n\n\n@view\n@external\ndef asset() -> address:\n    return ASSET\n\n\n@view\n@external\ndef totalAssets() -> uint256:\n    return staticcall IERC20(ASSET).balanceOf(self)\n\n\n############\n# Deposits #\n############\n\n\n@view\n@external\ndef maxDeposit(_receiver: address) -> uint256:\n    return max_value(uint256)\n\n\n@view\n@external\ndef previewDeposit(_assets: uint256) -> uint256:\n    return self._amountToShares(_assets, token.totalSupply, staticcall IERC20(ASSET).balanceOf(self), False)\n\n\n@nonreentrant\n@external\ndef deposit(_assets: uint256, _receiver: address = msg.sender) -> uint256:\n    asset: address = ASSET\n\n    amount: uint256 = _assets\n    if amount == max_value(uint256):\n        amount = staticcall IERC20(asset).balanceOf(msg.sender)\n\n    shares: uint256 = self._amountToShares(amount, token.totalSupply, staticcall IERC20(asset).balanceOf(self), False)\n    self._deposit(asset, amount, shares, _receiver)\n    return shares\n\n\n# mint\n\n\n@view\n@external\ndef maxMint(_receiver: address) -> uint256:\n    return max_value(uint256)\n\n\n@view\n@external\ndef previewMint(_shares: uint256) -> uint256:\n    return self._sharesToAmount(_shares, token.totalSupply, staticcall IERC20(ASSET).balanceOf(self), True)\n\n\n@nonreentrant\n@external\ndef mint(_shares: uint256, _receiver: address = msg.sender) -> uint256:\n    asset: address = ASSET\n    amount: uint256 = self._sharesToAmount(_shares, token.totalSupply, staticcall IERC20(asset).balanceOf(self), True)\n    self._deposit(asset, amount, _shares, _receiver)\n    return amount\n\n\n# shared deposit logic\n\n\n@internal\ndef _deposit(_asset: address, _amount: uint256, _shares: uint256, _recipient: address):\n    assert _amount != 0 # dev: cannot deposit 0 amount\n    assert _shares != 0 # dev: cannot receive 0 shares\n    assert _recipient != empty(address) # dev: invalid recipient\n\n    assert extcall IERC20(_asset).transferFrom(msg.sender, self, _amount, default_return_value=True) # dev: deposit failed\n    token._mint(_recipient, _shares)\n\n    # update last price per share\n    self._updateLastPricePerShare(_asset)\n\n    log Deposit(sender=msg.sender, owner=_recipient, assets=_amount, shares=_shares)\n\n\n###############\n# Withdrawals #\n###############\n\n\n@view\n@external\ndef maxWithdraw(_owner: address) -> uint256:\n    return staticcall IERC20(ASSET).balanceOf(self)\n\n\n@view\n@external\ndef previewWithdraw(_assets: uint256) -> uint256:\n    return self._amountToShares(_assets, token.totalSupply, staticcall IERC20(ASSET).balanceOf(self), True)\n\n\n@external\ndef withdraw(_assets: uint256, _receiver: address = msg.sender, _owner: address = msg.sender) -> uint256:\n    asset: address = ASSET\n    shares: uint256 = self._amountToShares(_assets, token.totalSupply, staticcall IERC20(asset).balanceOf(self), True)\n    self._redeem(asset, _assets, shares, msg.sender, _receiver, _owner)\n    return shares\n\n\n# redeem\n\n\n@view\n@external\ndef maxRedeem(_owner: address) -> uint256:\n    return token.balanceOf[_owner]\n\n\n@view\n@external\ndef previewRedeem(_shares: uint256) -> uint256:\n    return self._sharesToAmount(_shares, token.totalSupply, staticcall IERC20(ASSET).balanceOf(self), False)\n\n\n@external\ndef redeem(_shares: uint256, _receiver: address = msg.sender, _owner: address = msg.sender) -> uint256:\n    asset: address = ASSET\n\n    shares: uint256 = _shares\n    if shares == max_value(uint256):\n        shares = token.balanceOf[_owner]\n\n    amount: uint256 = self._sharesToAmount(shares, token.totalSupply, staticcall IERC20(asset).balanceOf(self), False)\n    return self._redeem(asset, amount, shares, msg.sender, _receiver, _owner)\n\n\n# shared redeem logic\n\n\n@internal\ndef _redeem(\n    _asset: address,\n    _amount: uint256,\n    _shares: uint256, \n    _sender: address, \n    _recipient: address, \n    _owner: address,\n) -> uint256:\n    assert _amount != 0 # dev: cannot withdraw 0 amount\n    assert _shares != 0 # dev: cannot redeem 0 shares\n    assert _recipient != empty(address) # dev: invalid recipient\n\n    assert token.balanceOf[_owner] >= _shares # dev: insufficient shares\n\n    if _sender != _owner:\n        token._spendAllowance(_owner, _sender, _shares)\n\n    token._burn(_owner, _shares)\n    assert extcall IERC20(_asset).transfer(_recipient, _amount, default_return_value=True) # dev: withdrawal failed\n\n    # update last price per share\n    self._updateLastPricePerShare(_asset)\n\n    log Withdraw(sender=_sender, receiver=_recipient, owner=_owner, assets=_amount, shares=_shares)\n    return _amount\n\n\n##########\n# Shares #\n##########\n\n\n@view\n@external\ndef convertToShares(_assets: uint256) -> uint256:\n    return self._amountToShares(_assets, token.totalSupply, staticcall IERC20(ASSET).balanceOf(self), False)\n\n\n@view\n@external\ndef convertToAssets(_shares: uint256) -> uint256:\n    return self._sharesToAmount(_shares, token.totalSupply, staticcall IERC20(ASSET).balanceOf(self), False)\n\n\n# amount -> shares\n\n\n@view\n@internal\ndef _amountToShares(\n    _amount: uint256,\n    _totalShares: uint256,\n    _totalBalance: uint256,\n    _shouldRoundUp: bool,\n) -> uint256:\n    if _amount == max_value(uint256) or _amount == 0:\n        return _amount\n\n    # first deposit, price per share = 1\n    if _totalShares == 0:\n        return _amount\n\n    # no underlying balance, price per share = 0\n    if _totalBalance == 0:\n        return 0\n\n    # calc shares\n    numerator: uint256 = _amount * _totalShares\n    shares: uint256 = numerator // _totalBalance\n\n    # rounding\n    if _shouldRoundUp and (numerator % _totalBalance != 0):\n        shares += 1\n\n    return shares\n\n\n# shares -> amount\n\n\n@view\n@internal\ndef _sharesToAmount(\n    _shares: uint256,\n    _totalShares: uint256,\n    _totalBalance: uint256,\n    _shouldRoundUp: bool,\n) -> uint256:\n    if _shares == max_value(uint256) or _shares == 0:\n        return _shares\n\n    # first deposit, price per share = 1\n    if _totalShares == 0:\n        return _shares\n\n    # calc amount\n    numerator: uint256 = _shares * _totalBalance\n    amount: uint256 = numerator // _totalShares\n\n    # rounding\n    if _shouldRoundUp and (numerator % _totalShares != 0):\n        amount += 1\n\n    return amount\n\n\n# price per share\n\n\n@internal\ndef _updateLastPricePerShare(_asset: address):\n    newLastPricePerShare: uint256 = self._sharesToAmount(10 ** convert(token.TOKEN_DECIMALS, uint256), token.totalSupply, staticcall IERC20(_asset).balanceOf(self), False)\n    self.lastPricePerShare = newLastPricePerShare\n\n\n@view\n@external\ndef getLastUnderlying(_shares: uint256) -> uint256:\n    return self.lastPricePerShare * _shares // (10 ** convert(token.TOKEN_DECIMALS, uint256))\n\n\n@view\n@external\ndef pricePerShare() -> uint256:\n    return self._sharesToAmount(10 ** convert(token.TOKEN_DECIMALS, uint256), token.totalSupply, staticcall IERC20(ASSET).balanceOf(self), False)",
+            "sha256sum": "1e966f3816dbb8658389a592dbb9d63648521d960a66ae4c6691c42c0d6ed922"
           },
           "contracts/tokens/SavingsGreen.vy": {
             "content": "# @version 0.4.1\n\nexports: token.__interface__\nexports: erc4626.__interface__\n\ninitializes: token\ninitializes: erc4626[token := token]\n\nfrom contracts.tokens.modules import Erc20Token as token\nimport contracts.tokens.modules.Erc4626Token as erc4626\n\nfrom ethereum.ercs import IERC20Detailed\n\n\n@deploy\ndef __init__(\n    _asset: address,\n    _ripeHq: address,\n    _initialGov: address,\n    _minHqTimeLock: uint256,\n    _maxHqTimeLock: uint256,\n    _initialSupply: uint256,\n    _initialSupplyRecipient: address,\n):\n    token.__init__(\"Savings Green USD\", \"sGREEN\", staticcall IERC20Detailed(_asset).decimals(), _ripeHq, _initialGov, _minHqTimeLock, _maxHqTimeLock, _initialSupply, _initialSupplyRecipient)\n    erc4626.__init__(_asset)\n",
@@ -3146,12 +3608,13 @@
           ]
         },
         "compiler_version": "v0.4.1+commit.8a93dd27",
-        "integrity": "7fb8ece2c6259f6929a4cfa9b76761cdc968993ffb302d69f365789c1771369c"
+        "integrity": "c58d9a7eb3402ad0d726145e21aa0ca95e3ae58ab88f7a1260137f68bface2ee"
       },
-      "args": "0000000000000000000000005c9fe32b826d1c84009e8a9b712693a87a8bf79f00000000000000000000000000000000000000000000000000000000000000000000000000000000000000003fbe79100d2b637d577f1d2d8d14c9825f869db7000000000000000000000000000000000000000000000000000000000000a8c00000000000000000000000000000000000000000000000000000000000049d4000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+      "args": "0000000000000000000000004970ea28f1d491d2e6f49f370b811248505279bf00000000000000000000000000000000000000000000000000000000000000000000000000000000000000003fbe79100d2b637d577f1d2d8d14c9825f869db7000000000000000000000000000000000000000000000000000000000000a8c00000000000000000000000000000000000000000000000000000000000049d4000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+      "file": "contracts/tokens/SavingsGreen.vy"
     },
     "RipeHq": {
-      "address": "0x327AD9cf978F33703649C73801a385AfCdee5a4A",
+      "address": "0xedD777308d9B7181819665Ea04Ac8E782BFA71f9",
       "abi": [
         {
           "name": "HqConfigChangeInitiated",
@@ -4990,7 +5453,14 @@
         "compiler_version": "v0.4.1+commit.8a93dd27",
         "integrity": "15e9a176c311e7651c93ea0f77bcdd13e975a1e363783a3c7b0e102955de3273"
       },
-      "args": "0000000000000000000000005c9fe32b826d1c84009e8a9b712693a87a8bf79f0000000000000000000000000bae4c5b1b05b6dcb0f7a9c10910ac66597286fa00000000000000000000000007a2693e29c76cd638921af42773c09cb9a8a2da0000000000000000000000003fbe79100d2b637d577f1d2d8d14c9825f869db7000000000000000000000000000000000000000000000000000000000000a8c00000000000000000000000000000000000000000000000000000000000049d4000000000000000000000000000000000000000000000000000000000000054600000000000000000000000000000000000000000000000000000000000049d40"
+      "args": "0000000000000000000000004970ea28f1d491d2e6f49f370b811248505279bf00000000000000000000000066b1f45186d8a56e04ace4f847a998573c3e948b0000000000000000000000000a05e23c43a8b7314c9d5437771e2455de577b650000000000000000000000003fbe79100d2b637d577f1d2d8d14c9825f869db7000000000000000000000000000000000000000000000000000000000000a8c00000000000000000000000000000000000000000000000000000000000049d4000000000000000000000000000000000000000000000000000000000000054600000000000000000000000000000000000000000000000000000000000049d40",
+      "file": "contracts/registries/RipeHq.vy"
+    },
+    "GreenPool": {
+      "address": "0x372eA6710c9c7E57cF9Ad1148f994a106c0F60c5"
+    },
+    "RipePool": {
+      "address": "0x3fA041170cfb07c0fe3372C974ba917Fdb2a8f7f"
     }
   }
 }

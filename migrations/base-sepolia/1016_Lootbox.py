@@ -13,7 +13,7 @@ def migrate(migration: Migration):
     )
 
     migration.execute(hq.startAddNewAddressToRegistry, lootbox, "Lootbox")
-    assert migration.execute(hq.confirmNewAddressToRegistry, lootbox) == 16
+    assert int(migration.execute(hq.confirmNewAddressToRegistry, lootbox)) == 16
 
     # lootbox can mint ripe
     migration.execute(hq.initiateHqConfigChange, 16, False, True, False)

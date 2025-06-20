@@ -13,7 +13,7 @@ def migrate(migration: Migration):
     )
 
     migration.execute(hq.startAddNewAddressToRegistry, credit_engine, "Credit Engine")
-    assert migration.execute(hq.confirmNewAddressToRegistry, credit_engine) == 13
+    assert int(migration.execute(hq.confirmNewAddressToRegistry, credit_engine)) == 13
 
     # credit engine can mint green
     migration.execute(hq.initiateHqConfigChange, 13, True, False, False)

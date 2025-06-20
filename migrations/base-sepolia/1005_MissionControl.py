@@ -10,7 +10,8 @@ def migrate(migration: Migration):
     mission_control = migration.deploy(
         "MissionControl",
         hq,
+        migration.get_contract("DefaultsBaseSepolia"),
     )
 
     migration.execute(hq.startAddNewAddressToRegistry, mission_control, "Mission Control")
-    assert migration.execute(hq.confirmNewAddressToRegistry, mission_control) == 5
+    assert int(migration.execute(hq.confirmNewAddressToRegistry, mission_control)) == 5

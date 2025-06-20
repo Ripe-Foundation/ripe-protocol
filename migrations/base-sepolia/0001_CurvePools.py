@@ -13,7 +13,8 @@ def migrate(migration: Migration):
     green_token = migration.get_contract("GreenToken")
 
     factory = boa.from_etherscan(blueprint.ADDYS["CURVE_STABLE_FACTORY"])
-    green_pool_deploy = factory.deploy_plain_pool(
+    green_pool_deploy = migration.execute(
+        factory.deploy_plain_pool,
         blueprint.CURVE_PARAMS["GREEN_POOL_NAME"],
         blueprint.CURVE_PARAMS["GREEN_POOL_SYMBOL"],
         [blueprint.ADDYS["USDC"], green_token],
@@ -37,9 +38,9 @@ def migrate(migration: Migration):
 
     usdc_amount = 100 * 10**6
     green_amount = 100 * 10**18
-    usdc.approve(green_pool.address, usdc_amount, sender=migration.account().address)
-    green_token.approve(green_pool.address, green_amount, sender=migration.account().address)
-    green_pool.add_liquidity([usdc_amount, green_amount], 0, sender=migration.account().address)
+    migration.execute(usdc.approve, green_pool.address, usdc_amount)
+    migration.execute(green_token.approve, green_pool.address, green_amount)
+    migration.execute(green_pool.add_liquidity, [usdc_amount, green_amount], 0)
 
     log.h2(f"Deploying Ripe Pool")
 
@@ -47,7 +48,8 @@ def migrate(migration: Migration):
     ripe_token = migration.get_contract("RipeToken")
 
     factory = boa.from_etherscan(blueprint.ADDYS["CURVE_CRYPTO_FACTORY"])
-    ripe_pool_deploy = factory.deploy_pool(
+    ripe_pool_deploy = migration.execute(
+        factory.deploy_pool,
         blueprint.CURVE_PARAMS["RIPE_POOL_NAME"],
         blueprint.CURVE_PARAMS["RIPE_POOL_SYMBOL"],
         [weth, ripe_token],
@@ -72,6 +74,6 @@ def migrate(migration: Migration):
 
     weth_amount = 1 * 10**15
     ripe_amount = 1_000 * 10**18
-    weth.approve(ripe_pool.address, weth_amount, sender=migration.account().address)
-    ripe_token.approve(ripe_pool.address, ripe_amount, sender=migration.account().address)
-    ripe_pool.add_liquidity([weth_amount, ripe_amount], 0, sender=migration.account().address)
+    migration.execute(weth.approve, ripe_pool.address, weth_amount)
+    migration.execute(ripe_token.approve, ripe_pool.address, ripe_amount)
+    migration.execute(ripe_pool.add_liquidity, [weth_amount, ripe_amount], 0, no_retry=True)

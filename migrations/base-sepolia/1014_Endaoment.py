@@ -10,7 +10,8 @@ def migrate(migration: Migration):
     endaoment = migration.deploy(
         "Endaoment",
         hq,
+        migration.blueprint().ADDYS["WETH"],
     )
 
     migration.execute(hq.startAddNewAddressToRegistry, endaoment, "Endaoment")
-    assert migration.execute(hq.confirmNewAddressToRegistry, endaoment) == 14
+    assert int(migration.execute(hq.confirmNewAddressToRegistry, endaoment)) == 14

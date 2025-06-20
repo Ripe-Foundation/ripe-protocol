@@ -56,6 +56,10 @@ def execute_transaction(transaction, *args, **kwargs):
     max_attempts = 20
     if "max_attempts" in kwargs:
         max_attempts = kwargs["max_attempts"]
+        kwargs.pop("max_attempts")
+    if "no_retry" in kwargs:
+        max_attempts = 1
+        kwargs.pop("no_retry")
 
     while attempts < max_attempts:
         attempts += 1
@@ -63,6 +67,9 @@ def execute_transaction(transaction, *args, **kwargs):
             return transaction(*args, **kwargs)
 
         except Exception as exception:
+            if "NoneType" in str(exception):
+                return None
+
             log.info(
                 "\tTransaction Failed "
                 + str(attempts)
@@ -160,13 +167,16 @@ def deployed_contracts_manifest(contracts: dict, contract_files: dict, args: dic
 
     for contract_name in contracts.keys():
         if not hasattr(contracts[contract_name], "address"):
-            manifest[contract_name] = {"address": contracts[contract_name]}
+            manifest[contract_name] = {
+                "address": contracts[contract_name],
+            }
         else:
             manifest[contract_name] = {
                 "address": contracts[contract_name].address,
                 "abi": get_vyper_abi(files[contract_files[contract_name]]),
                 "solc_json": contracts[contract_name].deployer.solc_json,
-                "args": encode_constructor_args(get_vyper_abi(files[contract_files[contract_name]]), args[contract_name])
+                "args": encode_constructor_args(get_vyper_abi(files[contract_files[contract_name]]), args[contract_name]),
+                "file": files[contract_files[contract_name]]
             }
 
     return {"contracts": manifest}

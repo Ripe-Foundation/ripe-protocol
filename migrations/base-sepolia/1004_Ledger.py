@@ -11,11 +11,8 @@ def migrate(migration: Migration):
     ledger = migration.deploy(
         "Ledger",
         hq,
-        # TODO: get actual values here
-        100 * (1_000_000 * EIGHTEEN_DECIMALS),  # 100 million
-        100 * (1_000_000 * EIGHTEEN_DECIMALS),  # 100 million
-        100 * (1_000_000 * EIGHTEEN_DECIMALS),  # 100 million
+        migration.get_contract("DefaultsBaseSepolia"),
     )
 
     migration.execute(hq.startAddNewAddressToRegistry, ledger, "Ledger")
-    assert migration.execute(hq.confirmNewAddressToRegistry, ledger) == 4
+    assert int(migration.execute(hq.confirmNewAddressToRegistry, ledger)) == 4

@@ -19,7 +19,7 @@ def migrate(migration: Migration):
     )
 
     migration.execute(hq.startAddNewAddressToRegistry, price_desk, "Price Desk")
-    assert migration.execute(hq.confirmNewAddressToRegistry, price_desk) == 7
+    assert int(migration.execute(hq.confirmNewAddressToRegistry, price_desk)) == 7
 
     # Set up chainlink feeds
 
@@ -45,7 +45,7 @@ def migrate(migration: Migration):
     # Deploy chainlink
 
     chainlink = migration.deploy(
-        "Chainlink",
+        "ChainlinkPrices",
         hq,
         blueprint.PARAMS["PRICE_DESK_MIN_REG_TIMELOCK"],
         blueprint.PARAMS["PRICE_DESK_MAX_REG_TIMELOCK"],

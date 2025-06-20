@@ -16,53 +16,6 @@ def migrate(migration: Migration):
 
     sb_alpha = migration.get_contract("SwitchboardAlpha")
 
-    # Set general config
-    actionId = migration.execute(sb_alpha.setVaultLimits, 5, 10)
-    assert migration.execute(sb_alpha.executePendingAction, actionId)
-
-    assert migration.execute(sb_alpha.setCanDeposit, True)
-    assert migration.execute(sb_alpha.setCanWithdraw, True)
-    assert migration.execute(sb_alpha.setCanBorrow, True)
-    assert migration.execute(sb_alpha.setCanRepay, True)
-    assert migration.execute(sb_alpha.setCanClaimLoot, True)
-    assert migration.execute(sb_alpha.setCanLiquidate, True)
-    assert migration.execute(sb_alpha.setCanRedeemCollateral, True)
-    assert migration.execute(sb_alpha.setCanRedeemInStabPool, True)
-    assert migration.execute(sb_alpha.setCanBuyInAuction, True)
-    assert migration.execute(sb_alpha.setCanClaimInStabPool, True)
-
-    # Set general debt config
-    actionId = migration.execute(
-        sb_alpha.setGlobalDebtLimits,
-        1_000_000 * EIGHTEEN_DECIMALS,
-        100_000_000 * EIGHTEEN_DECIMALS,
-        100 * EIGHTEEN_DECIMALS,
-        100,
-    )
-    assert migration.execute(sb_alpha.executePendingAction, actionId)
-
-    actionId = migration.execute(
-        sb_alpha.setBorrowIntervalConfig,
-        100_000 * EIGHTEEN_DECIMALS,
-        100,
-    )
-    assert migration.execute(sb_alpha.executePendingAction, actionId)
-
-    actionId = migration.execute(
-        sb_alpha.setKeeperConfig,
-        100,
-        100,
-    )
-    assert migration.execute(sb_alpha.executePendingAction, actionId)
-
-    assert migration.execute(sb_alpha.setIsDaowryEnabled, True)
-
-    actionId = migration.execute(sb_alpha.setLtvPaybackBuffer, 100)
-    assert migration.execute(sb_alpha.executePendingAction, actionId)
-
-    actionId = migration.execute(sb_alpha.setGenAuctionParams, 10_00, 50_00, 10, 1_000)
-    assert migration.execute(sb_alpha.executePendingAction, actionId)
-
     sb_bravo = migration.get_contract("SwitchboardBravo")
 
     vault_book = migration.get_contract("VaultBook")
@@ -97,7 +50,7 @@ def migrate(migration: Migration):
         True,  # _canWithdraw
         False,  # _canRedeemCollateral
     )
-    assert migration.execute(sb_bravo.executePendingAction, actionId)
+    assert bool(migration.execute(sb_bravo.executePendingAction, actionId))
 
     actionId = migration.execute(
         sb_bravo.addAsset,
@@ -116,7 +69,7 @@ def migrate(migration: Migration):
             1,  # daowry
         ),  # _debtTerms
     )
-    assert migration.execute(sb_bravo.executePendingAction, actionId)
+    assert bool(migration.execute(sb_bravo.executePendingAction, actionId))
 
     actionId = migration.execute(
         sb_bravo.addAsset,
@@ -135,7 +88,7 @@ def migrate(migration: Migration):
             1,  # daowry
         ),  # _debtTerms
     )
-    assert migration.execute(sb_bravo.executePendingAction, actionId)
+    assert bool(migration.execute(sb_bravo.executePendingAction, actionId))
 
     actionId = migration.execute(
         sb_bravo.addAsset,
@@ -161,7 +114,7 @@ def migrate(migration: Migration):
         True,  # _canWithdraw
         False,  # _canRedeemCollateral
     )
-    assert migration.execute(sb_bravo.executePendingAction, actionId)
+    assert bool(migration.execute(sb_bravo.executePendingAction, actionId))
 
     actionId = migration.execute(
         sb_bravo.addAsset,
@@ -190,7 +143,7 @@ def migrate(migration: Migration):
         False,  # _canBuyInAuction
         False,  # _canClaimInStabPool
     )
-    assert migration.execute(sb_bravo.executePendingAction, actionId)
+    assert bool(migration.execute(sb_bravo.executePendingAction, actionId))
 
     actionId = migration.execute(
         sb_bravo.addAsset,
@@ -216,7 +169,7 @@ def migrate(migration: Migration):
         True,  # _canWithdraw
         False,  # _canRedeemCollateral
     )
-    assert migration.execute(sb_bravo.executePendingAction, actionId)
+    assert bool(migration.execute(sb_bravo.executePendingAction, actionId))
 
     actionId = migration.execute(
         sb_bravo.addAsset,
@@ -245,7 +198,7 @@ def migrate(migration: Migration):
         False,  # _canBuyInAuction
         False,  # _canClaimInStabPool
     )
-    assert migration.execute(sb_bravo.executePendingAction, actionId)
+    assert bool(migration.execute(sb_bravo.executePendingAction, actionId))
 
     actionId = migration.execute(
         sb_alpha.setPriorityStabVaults,
@@ -254,6 +207,6 @@ def migrate(migration: Migration):
             (stability_pool_vault_id, migration.get_address("GreenPool")),
         ],
     )
-    assert migration.execute(sb_alpha.executePendingAction, actionId)
+    assert bool(migration.execute(sb_alpha.executePendingAction, actionId))
 
     # migration.execute(hq.finishRipeHqSetup, migration.blueprint().ADDYS["GOVERNANCE"])

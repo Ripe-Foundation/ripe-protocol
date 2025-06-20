@@ -27,11 +27,12 @@ class Migration:
         self._args = {}
         self.gas = 0
 
-        self._previous_manifest = {}
-        if previous_timestamp:
+        try:
             filename = self._manifest_filename('current')
             log.h3(f"Loading previous manifest {filename}")
             self._previous_manifest = json_file.load(filename)
+        except:
+            self._previous_manifest = {}
 
         try:
             self._load_log_file()
@@ -64,6 +65,7 @@ class Migration:
         contract = self._run(name, deploy_bp_wrapper, *args, **kwargs)
         self._contracts[name] = contract
         self._args[name] = args
+        self._append_manifest(name)
         self._save_log_file()
         return contract
 
@@ -80,6 +82,7 @@ class Migration:
         self._contract_files[label] = name
         self._contracts[label] = contract
         self._args[label] = args
+        self._append_manifest(label)
         self._save_log_file()
         return contract
 
@@ -89,6 +92,7 @@ class Migration:
         Returns the deployed contract.
         """
         contract = self._run(name, boa.load, self._files[name], *args, name=name, **kwargs)
+        self._append_manifest(name)
         self._save_log_file()
         return contract
 
@@ -96,15 +100,13 @@ class Migration:
         return self._previous_manifest["contracts"][name]["address"]
 
     def get_contract(self, name):
-        return boa.load_partial(self._files[name]).at(self.get_address(name))
+        file = self._previous_manifest["contracts"][name]["file"]
+        return boa.load_partial(file).at(self.get_address(name))
 
     def end(self):
         """
         Ends the migration and saves the manifest file
         """
-
-        self._save_manifest()
-
         if os.path.exists(self._log_filename()):
             # Delete the log file
             os.remove(self._log_filename())
@@ -124,12 +126,14 @@ class Migration:
 
     def include_contract(self, name, address):
         self._contracts[name] = address
+        self._append_manifest(name)
 
     def include_abis(self, contracts):
         keys = self._contracts.keys()
         for contract in contracts:
             if not contract in keys:
                 self._contracts[contract] = ''
+            self._append_manifest(contract)
 
     def _curr_transaction(self):
         """
@@ -161,6 +165,7 @@ class Migration:
         """
         next_transaction = self._count + 1
         message = self._clean_message(str(transaction), contract_name, *args)
+
         log.h2(
             f"Transaction {next_transaction} for migration with timestamp {self._timestamp} - {message}"
         )
@@ -173,7 +178,7 @@ class Migration:
                 kwargs['sender'] = self._deploy_args.sender.address
 
             tx = execute_transaction(transaction, *args, **kwargs)
-            self._transactions.append(str(tx))
+            self._transactions.append(tx)
             gas = 0
             if contract_name != '':
                 if hasattr(tx, '_computation') and tx._computation is not None:
@@ -195,9 +200,11 @@ class Migration:
 
         else:
             log.h3(f"Skipping transaction {next_transaction}")
+            if contract_name != '':
+                self._count += 1
+                return self.get_contract(kwargs['name'])
 
         self._count += 1
-
         return tx
 
     def _log_filename(self):
@@ -206,14 +213,18 @@ class Migration:
     def _manifest_filename(self, name):
         return os.path.join(self._history_path, f"{name}-manifest.json")
 
-    def _save_manifest(self):
-        log.info(f"\n--- Generating manifest ---\n")
+    def _append_manifest(self, contract_name):
+        contract = self._contracts[contract_name]
+        contracts = {contract_name: contract}
 
-        manifest = deployed_contracts_manifest(self._contracts, self._contract_files, self._args, self._files)
+        manifest = deployed_contracts_manifest(contracts, self._contract_files, self._args, self._files)
         merged_manifest = merge({}, self._previous_manifest, manifest)
-        json_file.save(self._manifest_filename(
-            self._timestamp), merged_manifest)
+        self._previous_manifest = merged_manifest
+
+        json_file.save(self._manifest_filename(self._timestamp), merged_manifest)
         json_file.save(self._manifest_filename("current"), merged_manifest)
+
+        log.h3(f"{contract_name} added to manifest")
         return merged_manifest
 
     def _load_log_file(self):
@@ -221,14 +232,12 @@ class Migration:
             raise ('no logs')
         logs = json_file.load(self._log_filename())
         self._transactions = logs["transactions"]
-        self._contracts = logs["contracts"]
 
     def _save_log_file(self):
         json_file.save(
             self._log_filename(),
             {
                 "transactions": [str(tx) for tx in self._transactions],
-                "contracts": {k: v.address if hasattr(v, 'address') else v for k, v in self._contracts.items()}
             },
         )
 

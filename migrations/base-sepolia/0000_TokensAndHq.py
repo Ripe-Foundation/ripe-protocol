@@ -9,6 +9,8 @@ def migrate(migration: Migration):
 
     log.h1("Deploying Tokens")
 
+    migration.deploy("DefaultsBaseSepolia")
+
     green_token = migration.deploy(
         "GreenToken",
         ZERO_ADDRESS,
@@ -18,6 +20,7 @@ def migrate(migration: Migration):
         1_000 * EIGHTEEN_DECIMALS,
         deployer,
     )
+
     ripe_token = migration.deploy(
         "RipeToken",
         ZERO_ADDRESS,
