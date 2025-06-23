@@ -131,6 +131,7 @@ def rewardsConfig() -> cs.RipeRewardsConfig:
         genDepositorsAlloc = 0,
         autoStakeRatio = 90_00,
         autoStakeDurationRatio = 10_00,
+        stabPoolRipePerDollarClaimed = 1 * EIGHTEEN_DECIMALS,
     )
 
 
@@ -150,18 +151,6 @@ def ripeGovVaultConfig() -> cs.RipeGovVaultConfig:
         ),
         assetWeight = HUNDRED_PERCENT,
         shouldFreezeWhenBadDebt = True,
-    )
-
-
-# stab claim rewards config
-
-
-@view
-@external
-def stabClaimRewardsConfig() -> cs.StabClaimRewardsConfig:
-    return cs.StabClaimRewardsConfig(
-        rewardsLockDuration = 6 * MONTH_IN_BLOCKS,
-        ripePerDollarClaimed = 1 * EIGHTEEN_DECIMALS,
     )
 
 

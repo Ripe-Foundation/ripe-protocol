@@ -66,15 +66,6 @@ def ripeGovVaultConfig() -> cs.RipeGovVaultConfig:
     return empty(cs.RipeGovVaultConfig)
 
 
-# stab claim rewards config
-
-
-@view
-@external
-def stabClaimRewardsConfig() -> cs.StabClaimRewardsConfig:
-    return empty(cs.StabClaimRewardsConfig)
-
-
 # underscore registry
 
 

@@ -64,15 +64,12 @@ struct RipeRewardsConfig:
     genDepositorsAlloc: uint256
     autoStakeRatio: uint256
     autoStakeDurationRatio: uint256
+    stabPoolRipePerDollarClaimed: uint256
 
 struct RipeGovVaultConfig:
     lockTerms: LockTerms
     assetWeight: uint256
     shouldFreezeWhenBadDebt: bool
-
-struct StabClaimRewardsConfig:
-    rewardsLockDuration: uint256
-    ripePerDollarClaimed: uint256
 
 struct LockTerms:
     minLockDuration: uint256

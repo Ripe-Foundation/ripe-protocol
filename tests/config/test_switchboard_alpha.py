@@ -2774,3 +2774,93 @@ def test_set_should_check_last_touch_success_and_execute(switchboard_alpha, miss
     assert len(final_logs) == 1  # Should have at least 1 event
     final_log = final_logs[0]  # Get the latest event
     assert not final_log.shouldCheck
+
+
+def test_set_auto_stake_params_validation(switchboard_alpha, governance):
+    """Test validation of auto stake parameters"""
+    HUNDRED_PERCENT = 100_00
+    
+    # Test invalid auto stake ratio (over 100%)
+    with boa.reverts("invalid auto stake params"):
+        switchboard_alpha.setAutoStakeParams(HUNDRED_PERCENT + 1, 50_00, 1000, sender=governance.address)
+    
+    # Test invalid auto stake duration ratio (over 100%)
+    with boa.reverts("invalid auto stake params"):
+        switchboard_alpha.setAutoStakeParams(50_00, HUNDRED_PERCENT + 1, 1000, sender=governance.address)
+    
+    # Test both params over 100%
+    with boa.reverts("invalid auto stake params"):
+        switchboard_alpha.setAutoStakeParams(HUNDRED_PERCENT + 1, HUNDRED_PERCENT + 1, 1000, sender=governance.address)
+    
+    # Test valid params at boundaries
+    action_id = switchboard_alpha.setAutoStakeParams(HUNDRED_PERCENT, HUNDRED_PERCENT, 2000, sender=governance.address)
+    assert action_id > 0
+    
+    # Test with zero values (should be valid)
+    action_id = switchboard_alpha.setAutoStakeParams(0, 0, 0, sender=governance.address)
+    assert action_id > 0
+    
+    # Test with intermediate values
+    action_id = switchboard_alpha.setAutoStakeParams(50_00, 75_00, 1500, sender=governance.address)
+    assert action_id > 0
+
+
+def test_set_auto_stake_params_execution(switchboard_alpha, mission_control, governance):
+    """Test setting and executing auto stake params"""
+    # Set auto stake params
+    auto_stake_ratio = 80_00  # 80%
+    auto_stake_duration_ratio = 60_00  # 60%
+    stab_pool_ripe_per_dollar = 1500  # 1500 RIPE per dollar
+    
+    action_id = switchboard_alpha.setAutoStakeParams(
+        auto_stake_ratio, 
+        auto_stake_duration_ratio, 
+        stab_pool_ripe_per_dollar, 
+        sender=governance.address
+    )
+    
+    # Check event was emitted
+    logs = filter_logs(switchboard_alpha, "PendingRipeRewardsAutoStakeParamsChange")
+    assert len(logs) == 1
+    log = logs[0]
+    assert log.autoStakeRatio == auto_stake_ratio
+    assert log.autoStakeDurationRatio == auto_stake_duration_ratio
+    assert log.stabPoolRipePerDollarClaimed == stab_pool_ripe_per_dollar
+    assert log.actionId == action_id
+    assert log.confirmationBlock > 0
+    
+    # Check pending data was stored
+    pending_config = switchboard_alpha.pendingRipeRewardsConfig(action_id)
+    assert pending_config.autoStakeRatio == auto_stake_ratio
+    assert pending_config.autoStakeDurationRatio == auto_stake_duration_ratio
+    assert pending_config.stabPoolRipePerDollarClaimed == stab_pool_ripe_per_dollar
+    
+    # Verify action is pending
+    assert switchboard_alpha.hasPendingAction(action_id)
+    action_type = switchboard_alpha.actionType(action_id)
+    assert action_type != 0  # Should be RIPE_REWARDS_AUTO_STAKE_PARAMS
+    
+    # Time travel past timelock
+    boa.env.time_travel(blocks=switchboard_alpha.actionTimeLock())
+    
+    # Execute the action
+    success = switchboard_alpha.executePendingAction(action_id, sender=governance.address)
+    assert success
+    
+    # Check execution event was emitted
+    execution_logs = filter_logs(switchboard_alpha, "RipeRewardsAutoStakeParamsSet")
+    assert len(execution_logs) == 1
+    exec_log = execution_logs[0]
+    assert exec_log.autoStakeRatio == auto_stake_ratio
+    assert exec_log.autoStakeDurationRatio == auto_stake_duration_ratio
+    assert exec_log.stabPoolRipePerDollarClaimed == stab_pool_ripe_per_dollar
+
+    # Verify the config was applied to MissionControl
+    rewards_config = mission_control.rewardsConfig()
+    assert rewards_config.autoStakeRatio == auto_stake_ratio
+    assert rewards_config.autoStakeDurationRatio == auto_stake_duration_ratio
+    assert rewards_config.stabPoolRipePerDollarClaimed == stab_pool_ripe_per_dollar
+    
+    # Verify action was cleaned up
+    assert switchboard_alpha.actionType(action_id) == 0
+    assert not switchboard_alpha.hasPendingAction(action_id)

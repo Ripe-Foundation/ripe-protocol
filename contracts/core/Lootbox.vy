@@ -118,9 +118,7 @@ struct ClaimLootConfig:
     canClaimLoot: bool
     canClaimLootForUser: bool
     autoStakeRatio: uint256
-    autoStakeDurationRatio: uint256
-    minLockDuration: uint256
-    maxLockDuration: uint256
+    rewardsLockDuration: uint256
 
 event DepositLootClaimed:
     user: indexed(address)
@@ -995,16 +993,10 @@ def _handleRipeMint(
         amountToStake = min(_amount * _config.autoStakeRatio // HUNDRED_PERCENT, _amount)
         amountToSend = _amount - amountToStake
 
-    # finalize lock duration
-    lockDuration: uint256 = 0
-    if _config.maxLockDuration > _config.minLockDuration:
-        durationRange: uint256 = _config.maxLockDuration - _config.minLockDuration
-        lockDuration = durationRange * _config.autoStakeDurationRatio // HUNDRED_PERCENT
-
     # stake ripe tokens
     if amountToStake != 0:
         assert extcall IERC20(_a.ripeToken).approve(_a.teller, amountToStake, default_return_value=True) # dev: ripe approval failed
-        extcall Teller(_a.teller).depositFromTrusted(_user, RIPE_GOV_VAULT_ID, _a.ripeToken, amountToStake, lockDuration, _a)
+        extcall Teller(_a.teller).depositFromTrusted(_user, RIPE_GOV_VAULT_ID, _a.ripeToken, amountToStake, _config.rewardsLockDuration, _a)
         assert extcall IERC20(_a.ripeToken).approve(_a.teller, 0, default_return_value=True) # dev: ripe approval failed
 
     # transfer ripe to user

@@ -209,6 +209,7 @@ event PendingRipeRewardsAllocsChange:
 event PendingRipeRewardsAutoStakeParamsChange:
     autoStakeRatio: uint256
     autoStakeDurationRatio: uint256
+    stabPoolRipePerDollarClaimed: uint256
     confirmationBlock: uint256
     actionId: uint256
 
@@ -313,6 +314,7 @@ event RipeRewardsAllocsSet:
 event RipeRewardsAutoStakeParamsSet:
     autoStakeRatio: uint256
     autoStakeDurationRatio: uint256
+    stabPoolRipePerDollarClaimed: uint256
 
 event PriorityLiqAssetVaultsSet:
     numVaults: uint256
@@ -982,10 +984,10 @@ def _areValidRipeRewardsAllocs(_borrowersAlloc: uint256, _stakersAlloc: uint256,
 
 
 @external
-def setAutoStakeParams(_autoStakeRatio: uint256, _autoStakeDurationRatio: uint256) -> uint256:
+def setAutoStakeParams(_autoStakeRatio: uint256, _autoStakeDurationRatio: uint256, _stabPoolRipePerDollarClaimed: uint256) -> uint256:
     assert gov._canGovern(msg.sender) # dev: no perms
     assert self._areValidAutoStakeParams(_autoStakeRatio, _autoStakeDurationRatio) # dev: invalid auto stake params
-    return self._setPendingRipeRewardsConfig(ActionType.RIPE_REWARDS_AUTO_STAKE_PARAMS, 0, 0, 0, 0, 0, _autoStakeRatio, _autoStakeDurationRatio)
+    return self._setPendingRipeRewardsConfig(ActionType.RIPE_REWARDS_AUTO_STAKE_PARAMS, 0, 0, 0, 0, 0, _autoStakeRatio, _autoStakeDurationRatio, _stabPoolRipePerDollarClaimed)
 
 
 @view
@@ -1011,6 +1013,7 @@ def _setPendingRipeRewardsConfig(
     _genDepositorsAlloc: uint256 = 0,
     _autoStakeRatio: uint256 = 0,
     _autoStakeDurationRatio: uint256 = 0,
+    _stabPoolRipePerDollarClaimed: uint256 = 0,
 ) -> uint256:
     aid: uint256 = timeLock._initiateAction()
 
@@ -1024,6 +1027,7 @@ def _setPendingRipeRewardsConfig(
         genDepositorsAlloc=_genDepositorsAlloc,
         autoStakeRatio=_autoStakeRatio,
         autoStakeDurationRatio=_autoStakeDurationRatio,
+        stabPoolRipePerDollarClaimed=_stabPoolRipePerDollarClaimed,
     )
 
     confirmationBlock: uint256 = timeLock._getActionConfirmationBlock(aid)
@@ -1047,6 +1051,7 @@ def _setPendingRipeRewardsConfig(
         log PendingRipeRewardsAutoStakeParamsChange(
             autoStakeRatio=_autoStakeRatio,
             autoStakeDurationRatio=_autoStakeDurationRatio,
+            stabPoolRipePerDollarClaimed=_stabPoolRipePerDollarClaimed,
             confirmationBlock=confirmationBlock,
             actionId=aid,
         )
@@ -1440,8 +1445,9 @@ def executePendingAction(_aid: uint256) -> bool:
         p: cs.RipeRewardsConfig = self.pendingRipeRewardsConfig[_aid]
         config.autoStakeRatio = p.autoStakeRatio
         config.autoStakeDurationRatio = p.autoStakeDurationRatio
+        config.stabPoolRipePerDollarClaimed = p.stabPoolRipePerDollarClaimed
         extcall MissionControl(mc).setRipeRewardsConfig(config)
-        log RipeRewardsAutoStakeParamsSet(autoStakeRatio=p.autoStakeRatio, autoStakeDurationRatio=p.autoStakeDurationRatio)
+        log RipeRewardsAutoStakeParamsSet(autoStakeRatio=p.autoStakeRatio, autoStakeDurationRatio=p.autoStakeDurationRatio, stabPoolRipePerDollarClaimed=p.stabPoolRipePerDollarClaimed)
 
     elif actionType == ActionType.OTHER_PRIORITY_LIQ_ASSET_VAULTS:
         priorityVaults: DynArray[cs.VaultLite, PRIORITY_VAULT_DATA] = self.pendingPriorityLiqAssetVaults[_aid]
