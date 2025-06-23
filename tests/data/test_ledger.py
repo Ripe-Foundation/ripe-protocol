@@ -890,9 +890,9 @@ def test_ledger_set_ripe_avail_for_hr(ledger, switchboard_alpha, human_resources
     assert ledger.ripeAvailForHr() == new_amount
     
     # Test via HumanResources
-    new_amount_2 = 3000 * EIGHTEEN_DECIMALS
-    ledger.setRipeAvailForHr(new_amount_2, sender=human_resources.address)
-    assert ledger.ripeAvailForHr() == new_amount_2
+    refund_amount = 3000 * EIGHTEEN_DECIMALS
+    ledger.refundRipeAfterCancelPaycheck(refund_amount, sender=human_resources.address)
+    assert ledger.ripeAvailForHr() == new_amount + refund_amount
 
 def test_ledger_set_ripe_avail_for_hr_unauthorized(ledger, alice):
     """Test that only authorized contracts can set HR RIPE."""

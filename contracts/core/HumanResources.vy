@@ -25,8 +25,8 @@ from ethereum.ercs import IERC20
 interface Ledger:
     def addHrContributor(_contributor: address, _compensation: uint256): nonpayable
     def addVaultToUser(_user: address, _vaultId: uint256): nonpayable
+    def refundRipeAfterCancelPaycheck(_amount: uint256): nonpayable
     def isHrContributor(_contributor: address) -> bool: view
-    def setRipeAvailForHr(_amount: uint256): nonpayable
     def contributors(i: uint256) -> address: view
     def numContributors() -> uint256: view
     def ripeAvailForHr() -> uint256: view
@@ -418,8 +418,7 @@ def refundAfterCancelPaycheck(_amount: uint256, _shouldBurnPosition: bool):
     assert staticcall Ledger(a.ledger).isHrContributor(msg.sender) # dev: not a contributor
 
     # refund ledger 
-    currentRipeAvail: uint256 = staticcall Ledger(a.ledger).ripeAvailForHr()
-    extcall Ledger(a.ledger).setRipeAvailForHr(currentRipeAvail + _amount)
+    extcall Ledger(a.ledger).refundRipeAfterCancelPaycheck(_amount)
 
     if not _shouldBurnPosition:
         return

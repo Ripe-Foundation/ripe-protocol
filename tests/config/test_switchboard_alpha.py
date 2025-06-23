@@ -2864,3 +2864,236 @@ def test_set_auto_stake_params_execution(switchboard_alpha, mission_control, gov
     # Verify action was cleaned up
     assert switchboard_alpha.actionType(action_id) == 0
     assert not switchboard_alpha.hasPendingAction(action_id)
+
+
+def test_set_ripe_available_for_rewards(switchboard_alpha, ledger, governance):
+    """Test setting ripe available for rewards"""
+    # Set amount
+    amount = 1_000_000 * 10**18  # 1M RIPE
+    
+    action_id = switchboard_alpha.setRipeAvailableForRewards(amount, sender=governance.address)
+    
+    # Check event was emitted
+    logs = filter_logs(switchboard_alpha, "PendingRipeAvailableForRewardsChange")
+    assert len(logs) == 1
+    log = logs[0]
+    assert log.amount == amount
+    assert log.actionId == action_id
+    assert log.confirmationBlock > 0
+    
+    # Check pending data was stored
+    pending_amount = switchboard_alpha.pendingRipeAvailable(action_id)
+    assert pending_amount == amount
+    
+    # Verify action is pending
+    assert switchboard_alpha.hasPendingAction(action_id)
+    action_type = switchboard_alpha.actionType(action_id)
+    assert action_type != 0  # Should be RIPE_AVAIL_REWARDS
+    
+    # Get initial ledger value
+    initial_value = ledger.ripeAvailForRewards()
+    
+    # Time travel past timelock
+    boa.env.time_travel(blocks=switchboard_alpha.actionTimeLock())
+    
+    # Execute the action
+    success = switchboard_alpha.executePendingAction(action_id, sender=governance.address)
+    assert success
+    
+    # Verify the ledger was updated
+    assert ledger.ripeAvailForRewards() == amount
+    
+    # Check execution event was emitted
+    execution_logs = filter_logs(switchboard_alpha, "RipeAvailableForRewardsSet")
+    assert len(execution_logs) == 1
+    exec_log = execution_logs[0]
+    assert exec_log.amount == amount
+    
+    # Verify action was cleaned up
+    assert switchboard_alpha.actionType(action_id) == 0
+    assert not switchboard_alpha.hasPendingAction(action_id)
+    
+    # Test updating to a different value
+    new_amount = 500_000 * 10**18  # 500K RIPE
+    action_id2 = switchboard_alpha.setRipeAvailableForRewards(new_amount, sender=governance.address)
+    boa.env.time_travel(blocks=switchboard_alpha.actionTimeLock())
+    assert switchboard_alpha.executePendingAction(action_id2, sender=governance.address)
+    
+    # Verify ledger updated to new value
+    assert ledger.ripeAvailForRewards() == new_amount
+
+
+def test_set_ripe_available_for_hr(switchboard_alpha, ledger, governance):
+    """Test setting ripe available for HR"""
+    # Set amount
+    amount = 250_000 * 10**18  # 250K RIPE
+    
+    action_id = switchboard_alpha.setRipeAvailableForHr(amount, sender=governance.address)
+    
+    # Check event was emitted
+    logs = filter_logs(switchboard_alpha, "PendingRipeAvailableForHrChange")
+    assert len(logs) == 1
+    log = logs[0]
+    assert log.amount == amount
+    assert log.actionId == action_id
+    assert log.confirmationBlock > 0
+    
+    # Check pending data was stored
+    pending_amount = switchboard_alpha.pendingRipeAvailable(action_id)
+    assert pending_amount == amount
+    
+    # Verify action is pending
+    assert switchboard_alpha.hasPendingAction(action_id)
+    action_type = switchboard_alpha.actionType(action_id)
+    assert action_type != 0  # Should be RIPE_AVAIL_HR
+    
+    # Time travel past timelock
+    boa.env.time_travel(blocks=switchboard_alpha.actionTimeLock())
+    
+    # Execute the action
+    success = switchboard_alpha.executePendingAction(action_id, sender=governance.address)
+    assert success
+    
+    # Verify the ledger was updated
+    assert ledger.ripeAvailForHr() == amount
+    
+    # Check execution event was emitted
+    execution_logs = filter_logs(switchboard_alpha, "RipeAvailableForHrSet")
+    assert len(execution_logs) == 1
+    exec_log = execution_logs[0]
+    assert exec_log.amount == amount
+    
+    # Verify action was cleaned up
+    assert switchboard_alpha.actionType(action_id) == 0
+    assert not switchboard_alpha.hasPendingAction(action_id)
+    
+    # Test setting to zero
+    action_id2 = switchboard_alpha.setRipeAvailableForHr(0, sender=governance.address)
+    boa.env.time_travel(blocks=switchboard_alpha.actionTimeLock())
+    assert switchboard_alpha.executePendingAction(action_id2, sender=governance.address)
+    assert ledger.ripeAvailForHr() == 0
+
+
+def test_set_ripe_available_for_bonds(switchboard_alpha, ledger, governance):
+    """Test setting ripe available for bonds"""
+    # Set amount
+    amount = 750_000 * 10**18  # 750K RIPE
+    
+    action_id = switchboard_alpha.setRipeAvailableForBonds(amount, sender=governance.address)
+    
+    # Check event was emitted
+    logs = filter_logs(switchboard_alpha, "PendingRipeAvailableForBondsChange")
+    assert len(logs) == 1
+    log = logs[0]
+    assert log.amount == amount
+    assert log.actionId == action_id
+    assert log.confirmationBlock > 0
+    
+    # Check pending data was stored
+    pending_amount = switchboard_alpha.pendingRipeAvailable(action_id)
+    assert pending_amount == amount
+    
+    # Verify action is pending
+    assert switchboard_alpha.hasPendingAction(action_id)
+    action_type = switchboard_alpha.actionType(action_id)
+    assert action_type != 0  # Should be RIPE_AVAIL_BONDS
+    
+    # Time travel past timelock
+    boa.env.time_travel(blocks=switchboard_alpha.actionTimeLock())
+    
+    # Execute the action
+    success = switchboard_alpha.executePendingAction(action_id, sender=governance.address)
+    assert success
+    
+    # Verify the ledger was updated
+    assert ledger.ripeAvailForBonds() == amount
+    
+    # Check execution event was emitted
+    execution_logs = filter_logs(switchboard_alpha, "RipeAvailableForBondsSet")
+    assert len(execution_logs) == 1
+    exec_log = execution_logs[0]
+    assert exec_log.amount == amount
+    
+    # Verify action was cleaned up
+    assert switchboard_alpha.actionType(action_id) == 0
+    assert not switchboard_alpha.hasPendingAction(action_id)
+    
+    # Test with maximum uint256 value
+    max_amount = 2**256 - 1
+    action_id2 = switchboard_alpha.setRipeAvailableForBonds(max_amount, sender=governance.address)
+    boa.env.time_travel(blocks=switchboard_alpha.actionTimeLock())
+    assert switchboard_alpha.executePendingAction(action_id2, sender=governance.address)
+    assert ledger.ripeAvailForBonds() == max_amount
+
+
+def test_ripe_available_functions_permissions(switchboard_alpha, bob):
+    """Test that only governance can set ripe available values"""
+    # Test all three functions require governance permissions
+    with boa.reverts("no perms"):
+        switchboard_alpha.setRipeAvailableForRewards(1000, sender=bob)
+    
+    with boa.reverts("no perms"):
+        switchboard_alpha.setRipeAvailableForHr(1000, sender=bob)
+    
+    with boa.reverts("no perms"):
+        switchboard_alpha.setRipeAvailableForBonds(1000, sender=bob)
+
+
+def test_multiple_ripe_available_actions(switchboard_alpha, ledger, governance):
+    """Test creating multiple ripe available actions concurrently"""
+    # Create three different actions
+    rewards_amount = 1_000_000 * 10**18
+    hr_amount = 500_000 * 10**18
+    bonds_amount = 750_000 * 10**18
+    
+    action_id1 = switchboard_alpha.setRipeAvailableForRewards(rewards_amount, sender=governance.address)
+    action_id2 = switchboard_alpha.setRipeAvailableForHr(hr_amount, sender=governance.address)
+    action_id3 = switchboard_alpha.setRipeAvailableForBonds(bonds_amount, sender=governance.address)
+    
+    # Verify all are pending with correct data
+    assert switchboard_alpha.pendingRipeAvailable(action_id1) == rewards_amount
+    assert switchboard_alpha.pendingRipeAvailable(action_id2) == hr_amount
+    assert switchboard_alpha.pendingRipeAvailable(action_id3) == bonds_amount
+    
+    # Time travel past timelock
+    boa.env.time_travel(blocks=switchboard_alpha.actionTimeLock())
+    
+    # Execute in different order
+    assert switchboard_alpha.executePendingAction(action_id3, sender=governance.address)
+    assert ledger.ripeAvailForBonds() == bonds_amount
+    
+    assert switchboard_alpha.executePendingAction(action_id1, sender=governance.address)
+    assert ledger.ripeAvailForRewards() == rewards_amount
+    
+    assert switchboard_alpha.executePendingAction(action_id2, sender=governance.address)
+    assert ledger.ripeAvailForHr() == hr_amount
+    
+    # Verify all actions cleaned up
+    assert not switchboard_alpha.hasPendingAction(action_id1)
+    assert not switchboard_alpha.hasPendingAction(action_id2)
+    assert not switchboard_alpha.hasPendingAction(action_id3)
+
+
+def test_ripe_available_edge_cases(switchboard_alpha, ledger, governance):
+    """Test edge cases for ripe available functions"""
+    # Test setting all to zero
+    action_id1 = switchboard_alpha.setRipeAvailableForRewards(0, sender=governance.address)
+    action_id2 = switchboard_alpha.setRipeAvailableForHr(0, sender=governance.address)
+    action_id3 = switchboard_alpha.setRipeAvailableForBonds(0, sender=governance.address)
+    
+    boa.env.time_travel(blocks=switchboard_alpha.actionTimeLock())
+    
+    assert switchboard_alpha.executePendingAction(action_id1, sender=governance.address)
+    assert switchboard_alpha.executePendingAction(action_id2, sender=governance.address)
+    assert switchboard_alpha.executePendingAction(action_id3, sender=governance.address)
+    
+    assert ledger.ripeAvailForRewards() == 0
+    assert ledger.ripeAvailForHr() == 0
+    assert ledger.ripeAvailForBonds() == 0
+    
+    # Test very large values
+    large_amount = 10**30  # Very large amount
+    action_id4 = switchboard_alpha.setRipeAvailableForRewards(large_amount, sender=governance.address)
+    boa.env.time_travel(blocks=switchboard_alpha.actionTimeLock())
+    assert switchboard_alpha.executePendingAction(action_id4, sender=governance.address)
+    assert ledger.ripeAvailForRewards() == large_amount

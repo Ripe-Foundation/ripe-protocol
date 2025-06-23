@@ -765,9 +765,16 @@ def addHrContributor(_contributor: address, _compensation: uint256):
 
 @external
 def setRipeAvailForHr(_amount: uint256):
-    assert addys._isSwitchboardAddr(msg.sender) or msg.sender == addys._getHumanResourcesAddr() # dev: no perms
+    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
     assert not deptBasics.isPaused # dev: not activated
     self.ripeAvailForHr = _amount
+
+
+@external
+def refundRipeAfterCancelPaycheck(_amount: uint256):
+    assert msg.sender == addys._getHumanResourcesAddr() # dev: no perms
+    assert not deptBasics.isPaused # dev: not activated
+    self.ripeAvailForHr += _amount
 
 
 #########
