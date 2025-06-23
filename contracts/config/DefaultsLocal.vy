@@ -30,13 +30,25 @@ def genDebtConfig() -> cs.GenDebtConfig:
     return empty(cs.GenDebtConfig)
 
 
-# hr config
+# ripe available
 
 
 @view
 @external
-def hrConfig() -> cs.HrConfig:
-    return empty(cs.HrConfig)
+def ripeAvailForRewards() -> uint256:
+    return 100_000_000 * EIGHTEEN_DECIMALS
+
+
+@view
+@external
+def ripeAvailForHr() -> uint256:
+    return 100_000_000 * EIGHTEEN_DECIMALS
+
+
+@view
+@external
+def ripeAvailForBonds() -> uint256:
+    return 100_000_000 * EIGHTEEN_DECIMALS
 
 
 # ripe bond config
@@ -57,13 +69,22 @@ def rewardsConfig() -> cs.RipeRewardsConfig:
     return empty(cs.RipeRewardsConfig)
 
 
-# ripe gov vault config
+# ripe token config for ripe gov vault
 
 
 @view
 @external
-def ripeGovVaultConfig() -> cs.RipeGovVaultConfig:
+def ripeTokenVaultConfig() -> cs.RipeGovVaultConfig:
     return empty(cs.RipeGovVaultConfig)
+
+
+# hr config
+
+
+@view
+@external
+def hrConfig() -> cs.HrConfig:
+    return empty(cs.HrConfig)
 
 
 # underscore registry
@@ -83,23 +104,3 @@ def underscoreRegistry() -> address:
 def shouldCheckLastTouch() -> bool:
     return False
 
-
-# ripe available
-
-
-@view
-@external
-def ripeAvailForRewards() -> uint256:
-    return 100_000_000 * EIGHTEEN_DECIMALS
-
-
-@view
-@external
-def ripeAvailForHr() -> uint256:
-    return 100_000_000 * EIGHTEEN_DECIMALS
-
-
-@view
-@external
-def ripeAvailForBonds() -> uint256:
-    return 100_000_000 * EIGHTEEN_DECIMALS

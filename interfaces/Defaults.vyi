@@ -21,12 +21,24 @@ def genDebtConfig() -> cs.GenDebtConfig:
     ...
 
 
-# hr config
+# ripe available
 
 
 @view
 @external
-def hrConfig() -> cs.HrConfig:
+def ripeAvailForRewards() -> uint256:
+    ...
+
+
+@view
+@external
+def ripeAvailForHr() -> uint256:
+    ...
+
+
+@view
+@external
+def ripeAvailForBonds() -> uint256:
     ...
 
 
@@ -48,12 +60,21 @@ def rewardsConfig() -> cs.RipeRewardsConfig:
     ...
 
 
-# ripe gov vault config
+# ripe token config for ripe gov vault
 
 
 @view
 @external
-def ripeGovVaultConfig() -> cs.RipeGovVaultConfig:
+def ripeTokenVaultConfig() -> cs.RipeGovVaultConfig:
+    ...
+
+
+# hr config
+
+
+@view
+@external
+def hrConfig() -> cs.HrConfig:
     ...
 
 
@@ -72,25 +93,4 @@ def underscoreRegistry() -> address:
 @view
 @external
 def shouldCheckLastTouch() -> bool:
-    ...
-
-
-# ripe available
-
-
-@view
-@external
-def ripeAvailForRewards() -> uint256:
-    ...
-
-
-@view
-@external
-def ripeAvailForHr() -> uint256:
-    ...
-
-
-@view
-@external
-def ripeAvailForBonds() -> uint256:
     ...
