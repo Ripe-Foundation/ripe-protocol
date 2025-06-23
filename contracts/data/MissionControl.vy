@@ -153,6 +153,7 @@ struct PurchaseRipeBondConfig:
     minLockDuration: uint256
     maxLockDuration: uint256
     canAnyoneBondForUser: bool
+    isUserAllowed: bool
 
 struct DynamicBorrowRateConfig:
     minDynamicRateBoost: uint256
@@ -629,7 +630,7 @@ def getAuctionBuyConfig(_asset: address, _recipient: address) -> AuctionBuyConfi
     )
 
 
-# general liquidation cs
+# general liquidation config
 
 
 @view
@@ -668,7 +669,7 @@ def getGenAuctionParams() -> cs.AuctionParams:
     return self.genDebtConfig.genAuctionParams
 
 
-# asset liquidation cs
+# asset liquidation config
 
 
 @view
@@ -764,7 +765,7 @@ def getClaimLootConfig(_user: address, _caller: address, _ripeToken: address) ->
     )
 
 
-# rewards cs
+# rewards config
 
 
 @view
@@ -798,7 +799,7 @@ def getDepositPointsConfig(_asset: address) -> DepositPointsConfig:
     )
 
 
-# price cs
+# price config
 
 
 @view
@@ -810,7 +811,7 @@ def getPriceConfig() -> PriceConfig:
     )
 
 
-# ripe bond cs
+# ripe bond config
 
 
 @view
@@ -818,7 +819,7 @@ def getPriceConfig() -> PriceConfig:
 def getPurchaseRipeBondConfig(_user: address) -> PurchaseRipeBondConfig:
     bondConfig: cs.RipeBondConfig = self.ripeBondConfig
     vaultConfig: cs.RipeGovVaultConfig = self.ripeGovVaultConfig[addys._getRipeToken()]
-
+    assetConfig: cs.AssetConfig = self.assetConfig[bondConfig.asset]
     return PurchaseRipeBondConfig(
         asset=bondConfig.asset,
         amountPerEpoch=bondConfig.amountPerEpoch,
@@ -832,10 +833,11 @@ def getPurchaseRipeBondConfig(_user: address) -> PurchaseRipeBondConfig:
         minLockDuration=vaultConfig.lockTerms.minLockDuration,
         maxLockDuration=vaultConfig.lockTerms.maxLockDuration,
         canAnyoneBondForUser=self.userConfig[_user].canAnyoneBondForUser,
+        isUserAllowed=self._isUserAllowed(assetConfig.whitelist, _user, bondConfig.asset),
     )
 
 
-# dynamic borrow rate cs
+# dynamic borrow rate config
 
 
 @view

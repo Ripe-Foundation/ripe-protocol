@@ -48,6 +48,7 @@ struct PurchaseRipeBondConfig:
     minLockDuration: uint256
     maxLockDuration: uint256
     canAnyoneBondForUser: bool
+    isUserAllowed: bool
 
 struct RipeBondData:
     paymentAmountAvailInEpoch: uint256
@@ -103,6 +104,7 @@ def purchaseRipeBond(
     assert config.asset == _paymentAsset # dev: asset mismatch
     assert config.maxRipePerUnit != 0 # dev: max ripe per unit is zero
     assert config.canBond # dev: bonds disabled
+    assert config.isUserAllowed # dev: user not on whitelist
 
     # can others bond for user
     if _recipient != _caller and not config.canAnyoneBondForUser:
