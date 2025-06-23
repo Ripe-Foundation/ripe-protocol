@@ -1,8 +1,10 @@
 # @version 0.4.1
 
 uses: addys
+implements: dept
 
 import contracts.modules.Addys as addys
+import interfaces.Department as dept
 from ethereum.ercs import IERC20
 
 event DepartmentPauseModified:

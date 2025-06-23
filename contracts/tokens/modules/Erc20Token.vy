@@ -425,10 +425,10 @@ def hasPendingHqChange() -> bool:
 
 @external
 def initiateHqChange(_newHq: address):
-    assert msg.sender == staticcall RipeHq(self.ripeHq).governance() # dev: no perms
+    prevHq: address = self.ripeHq
+    assert msg.sender == staticcall RipeHq(prevHq).governance() # dev: no perms
 
     # validate new hq
-    prevHq: address = self.ripeHq
     assert self._isValidNewRipeHq(_newHq, prevHq) # dev: invalid new hq
 
     confirmBlock: uint256 = block.number + self.hqChangeTimeLock
@@ -445,13 +445,13 @@ def initiateHqChange(_newHq: address):
 
 @external
 def confirmHqChange() -> bool:
-    assert msg.sender == staticcall RipeHq(self.ripeHq).governance() # dev: no perms
+    prevHq: address = self.ripeHq
+    assert msg.sender == staticcall RipeHq(prevHq).governance() # dev: no perms
 
     data: PendingHq = self.pendingHq
     assert data.confirmBlock != 0 and block.number >= data.confirmBlock # dev: time lock not reached
 
     # validate new hq one more time
-    prevHq: address = self.ripeHq
     if not self._isValidNewRipeHq(data.newHq, prevHq):
         self.pendingHq = empty(PendingHq)
         return False

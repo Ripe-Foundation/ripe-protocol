@@ -1397,7 +1397,7 @@ def test_complex_multi_asset_configuration_scenarios(switchboard_bravo, governan
     
     # Add token with full debt functionality
     action_id3 = switchboard_bravo.addAsset(
-        bravo_token, [3], 50_00, 30_00, 2000, 20000, 0,
+        bravo_token, [1, 3], 50_00, 30_00, 2000, 20000, 0,  # include vault 1 for staker allocation
         (70_00, 75_00, 85_00, 8_00, 12_00, 3_00),  # full debt terms
         False,  # shouldBurnAsPayment
         False,  # shouldTransferToEndaoment

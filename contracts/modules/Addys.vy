@@ -1,7 +1,6 @@
 # @version 0.4.1
 
 interface RipeHq:
-    def canModifyMissionControl(_addr: address) -> bool: view
     def isValidAddr(_addr: address) -> bool: view
     def getAddr(_regId: uint256) -> address: view
 

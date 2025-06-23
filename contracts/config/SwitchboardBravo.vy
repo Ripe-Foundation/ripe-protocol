@@ -411,6 +411,17 @@ def _isValidAssetDepositParams(
     for vaultId: uint256 in _vaultIds:
         if not staticcall VaultBook(vaultBook).isValidRegId(vaultId):
             return False
+    
+    # staker allocs must be with staker vaults
+    if _stakersPointsAlloc != 0:
+        hasStakerVault: bool = False
+        for sid: uint256 in [1, 2]:
+            if sid in _vaultIds:
+                hasStakerVault = True
+                break
+        if not hasStakerVault:
+            return False
+
     return True
 
 
