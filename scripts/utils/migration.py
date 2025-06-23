@@ -4,7 +4,6 @@ import boa.contracts
 import boa.contracts.abi
 from mergedeep import merge
 import boa
-from boa.deployments import get_deployments_db
 from scripts.utils import log
 from scripts.utils import json_file
 from scripts.utils.deploy_args import DeployArgs

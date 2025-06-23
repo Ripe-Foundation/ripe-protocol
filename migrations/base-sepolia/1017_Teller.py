@@ -10,6 +10,7 @@ def migrate(migration: Migration):
     teller = migration.deploy(
         "Teller",
         hq,
+        False,
     )
 
     migration.execute(hq.startAddNewAddressToRegistry, teller, "Teller")
