@@ -30,6 +30,7 @@ ADDYS = {
         # oracles
         "PYTH_NETWORK": "0x8250f4aF4B972684F7b336503E2D6dFeDeB1487a",
         "STORK_NETWORK": "0x647DFd812BC1e116c6992CB2bC353b2112176fD6",
+        "USDC": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
     },
     "local": {
         # important tokens / representations

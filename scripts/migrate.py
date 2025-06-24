@@ -6,7 +6,7 @@ from scripts.utils import log
 from scripts.utils.migration_helpers import get_account, load_vyper_files
 from scripts.utils.migration_runner import MigrationRunner
 from scripts.utils.deploy_args import DeployArgs
-
+from scripts.utils.safe import SafeAccount
 from boa.environment import Env
 import os
 
@@ -15,6 +15,11 @@ MIGRATION_HISTORY_DIR = "./migration_history"
 
 
 CLICK_PROMPTS = {
+    "safe": {
+        "prompt": "What is the safe address?",
+        "default": "",
+        "help": "Safe address to use for the migration. Defaults to ``.",
+    },
     "rpc": {
         "prompt": "What is the desired rpc?",
         "default": "",
@@ -69,7 +74,7 @@ CLICK_PROMPTS = {
 
 
 ETHERSCAN_API_KEYS = {
-    "base": os.environ["BASESCAN_API_KEY"],
+    "base-mainnet": os.environ["BASESCAN_API_KEY"],
     "base-sepolia": os.environ["BASESCAN_API_KEY"],
 }
 ETHERSCAN_URLS = {
@@ -132,6 +137,12 @@ def param_prompt(ctx, param, value):
 
 @click.command()
 @click.option("--silent", is_flag=True, default=False, help="Run command without prompts.")
+@click.option(
+    "--safe",
+    default=CLICK_PROMPTS["safe"]["default"],
+    help=CLICK_PROMPTS["safe"]["help"],
+    callback=param_prompt,
+)
 @click.option("--fork", is_flag=True, default=False, help="Declare that the migration is running on a fork.")
 @click.option(
     "--rpc",
@@ -191,6 +202,7 @@ def param_prompt(ctx, param, value):
 )
 def cli(
     silent,
+    safe,
     fork,
     is_retry,
     rpc,
@@ -231,7 +243,13 @@ def cli(
     final_rpc = rpc if rpc else (
         'boa' if chain == 'local' else f"https://{chain}.g.alchemy.com/v2/{os.environ.get('WEB3_ALCHEMY_API_KEY')}")
 
-    sender = get_account(account)
+    if safe == "":
+        sender = get_account(account)
+    else:
+        sender = SafeAccount(
+            safe_address=safe,
+            rpc_url=final_rpc
+        )
 
     deploy_args = DeployArgs(sender, chain, ignore_logs=not is_retry, blueprint=blueprint)
 

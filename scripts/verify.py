@@ -26,7 +26,7 @@ def cli(environment, chain):
     print(f"Verifying contracts from environment: {environment}")
 
     # Load manifest
-    manifest_path = f"{MIGRATION_HISTORY_DIR}/{environment}/current-manifest.json"
+    manifest_path = f"{MIGRATION_HISTORY_DIR}/{chain}/{environment}/current-manifest.json"
     if not os.path.exists(manifest_path):
         print(f"No manifest found at {manifest_path}")
         return

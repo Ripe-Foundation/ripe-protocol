@@ -5,6 +5,7 @@ import requests
 import json
 import time
 import hashlib
+import webbrowser
 
 CREATE_CALL_ABI = [{
     "type": "function",
@@ -325,8 +326,10 @@ class SafeAccount:
             headers={'Content-Type': 'application/json'}
         )
         if response.status_code == 201:
+            url = self._generate_safe_transaction_link(safe_tx['contractTransactionHash'])
             print(f"\n📱 Open this link to view and sign the transaction in Safe web interface:")
-            print(self._generate_safe_transaction_link(safe_tx['contractTransactionHash']))
+            print(url)
+            webbrowser.open(url)
         else:
             print(f"❌ Failed to propose transaction: {response.status_code}")
             print(f"Response: {response.text}")
@@ -357,7 +360,7 @@ class SafeAccount:
         if not is_executed:
             raise Exception("No transaction found for this nonce after waiting!")
 
-        print(f"✅ Transaction executed")
+        print(f"✅ Safe Transaction executed")
         return tx
 
     def _gas_estimation(self, tx_data):
