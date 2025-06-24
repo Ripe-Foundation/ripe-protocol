@@ -6,6 +6,21 @@ import json
 import time
 import hashlib
 
+CREATE_CALL_ABI = [{
+    "type": "function",
+    "name": "performCreate",
+    "stateMutability": "payable",
+    "inputs": [
+        {"name": "value", "type": "uint256"},
+        {"name": "initCode", "type": "bytes"}
+    ],
+    "outputs": [{"name": "newContract", "type": "address"}],
+}]
+
+CREATE_CALL_ADDR = Web3.to_checksum_address(
+    "0x7cBB62EaA69F79e6873cD1ecB2392971036cFAa4"
+)
+
 
 class SafeAccount:
     def __init__(self, safe_address, rpc_url, safe_transaction_service_url=None, sender_address=None, sender_private_key=None):
@@ -98,6 +113,23 @@ class SafeAccount:
             abi=self.safe_abi
         )
 
+    def get_create_call_tx(self, init_code):
+        # Convert init code to bytes
+        init_code_bytes = bytes.fromhex(init_code[2:])
+
+        create_call = self.w3.eth.contract(
+            address=CREATE_CALL_ADDR, abi=CREATE_CALL_ABI
+        )
+        data = create_call.functions.performCreate(0, init_code_bytes).build_transaction({})["data"]
+
+        return {
+            "to": CREATE_CALL_ADDR,
+            "value": 0,
+            "data": data,
+            "operation": 1,          # DELEGATECALL!
+            "safeTxGas": 0           # let the service estimate
+        }
+
     def _verify_safe_owner(self, address):
         """Verify that an address is a Safe owner"""
         try:
@@ -117,64 +149,26 @@ class SafeAccount:
 
         return False
 
-    def sign_transaction(self, tx_data):
+    def send_transaction(self, tx_data):
         """
         Simulate signing a transaction by proposing it to the Safe and waiting for execution.
         Since Safe transactions are multi-sig, we propose the transaction and wait for it to be executed.
         """
+        if tx_data.get('to') is None:
+            tx_data = self.get_create_call_tx(tx_data.get('data'))
+
         # Propose the transaction to the Safe
-        safe_tx = self._create_safe_tx(tx_data)
+        safe_tx = self._create_safe_tx(tx_data, 0)
+
         # Actually propose the transaction (POST)
-        self._propose_transaction(tx_data)
+        self._propose_transaction(safe_tx)
 
         # Wait for execution by polling by nonce
         nonce = safe_tx['nonce']
         tx = self._wait_for_execution(nonce)
+        return {"hash": tx.get('transactionHash')}
 
-        # Create a signed transaction object that Titanoboa expects
-        # This represents the executed Safe transaction
-        class SafeSignedTransaction:
-            def __init__(self, receipt, tx_data, safe_address):
-                # Ensure all values are properly typed
-                self.hash = str(receipt.get('transactionHash', '0x'))
-                # Boa expects raw_transaction to be bytes, not a dict
-                self.raw_transaction = b'\x00' * 100  # Placeholder bytes
-                self.r = 0
-                self.s = 0
-                self.v = 27
-                # This is what Boa expects - raw transaction bytes
-                self.rawTransaction = b'\x00' * 100
-
-                # Add any other attributes that Boa might expect
-                self.from_address = str(safe_address)
-                self.to_address = str(safe_address)
-
-            def __getattr__(self, name):
-                # Handle any missing attributes gracefully
-                if name in ['blockNumber', 'gasUsed', 'status']:
-                    return 0
-                raise AttributeError(f"'{self.__class__.__name__}' object has no attribute '{name}'")
-
-        signed_tx = SafeSignedTransaction(tx, tx_data, self.address)
-        return signed_tx
-
-    def send_transaction(self, tx_data):
-        """
-        Send a transaction directly (for providers that don't support sign_transaction).
-        This is what Boa falls back to when sign_transaction is not available.
-        """
-        print(f"🔐 Safe Account: Sending transaction via Safe {self.address}")
-
-        # Propose the transaction to the Safe
-        safe_tx_hash = self._propose_transaction(tx_data)
-
-        # Wait for the transaction to be executed
-        receipt = self._wait_for_execution(safe_tx_hash)
-
-        # Return the transaction hash in the format Boa expects
-        return {"hash": receipt.get('transactionHash', '0x')}
-
-    def _create_safe_tx(self, tx_data):
+    def _create_safe_tx(self, tx_data, gas_estimate):
         """Create a Safe transaction from raw transaction data"""
         # Get Safe owners if sender not provided
         if not self.sender_address:
@@ -201,7 +195,7 @@ class SafeAccount:
             'value': str(tx_data.get('value', 0)),
             'data': tx_data.get('data', '0x'),
             'operation': 0,  # 0 = call, 1 = delegate call
-            'safeTxGas': '0',
+            'safeTxGas': int(gas_estimate * 1.5),
             'baseGas': '0',
             'gasPrice': '0',
             'gasToken': '0x0000000000000000000000000000000000000000',
@@ -301,11 +295,9 @@ class SafeAccount:
 
         return f"https://app.safe.global/transactions/tx?safe={chain_name}:{self.address}&id={tx_hash}"
 
-    def _propose_transaction(self, tx_data):
+    def _propose_transaction(self, safe_tx):
         """Propose transaction to Safe Transaction Service (reverted to previous working version)"""
-        safe_tx = self._create_safe_tx(tx_data)
         to_address = safe_tx['to'] if safe_tx['to'] is not None else '0x0000000000000000000000000000000000000000'
-        contract_tx_hash = self._get_contract_tx_hash(safe_tx)
         if not self.sender_address:
             owners = self._get_safe_owners()
             if owners:
@@ -323,7 +315,7 @@ class SafeAccount:
             'gasToken': safe_tx['gasToken'],
             'refundReceiver': safe_tx['refundReceiver'],
             'nonce': safe_tx['nonce'],
-            'contractTransactionHash': contract_tx_hash,
+            'contractTransactionHash': safe_tx['contractTransactionHash'],
             'sender': self.sender_address
         }
 
@@ -334,7 +326,7 @@ class SafeAccount:
         )
         if response.status_code == 201:
             print(f"\n📱 Open this link to view and sign the transaction in Safe web interface:")
-            print(self._generate_safe_transaction_link(contract_tx_hash))
+            print(self._generate_safe_transaction_link(safe_tx['contractTransactionHash']))
         else:
             print(f"❌ Failed to propose transaction: {response.status_code}")
             print(f"Response: {response.text}")
@@ -367,3 +359,22 @@ class SafeAccount:
 
         print(f"✅ Transaction executed")
         return tx
+
+    def _gas_estimation(self, tx_data):
+        """Test gas estimation for the transaction"""
+        # Try to estimate gas
+        gas_estimate = self.w3.eth.estimate_gas({
+            'from': self.address,
+            'to': tx_data.get('to', None),
+            'data': tx_data.get('data', '0x'),
+            'value': tx_data.get('value', 0)
+        })
+
+        # Try to simulate the transaction
+        self.w3.eth.call({
+            'from': self.address,
+            'to': tx_data.get('to', None),
+            'data': tx_data.get('data', '0x'),
+            'value': tx_data.get('value', 0)
+        })
+        return gas_estimate
