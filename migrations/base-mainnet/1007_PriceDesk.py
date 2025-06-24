@@ -18,9 +18,6 @@ def migrate(migration: Migration):
         blueprint.PARAMS["PRICE_DESK_MAX_REG_TIMELOCK"],
     )
 
-    migration.execute(hq.startAddNewAddressToRegistry, price_desk, "Price Desk")
-    assert int(migration.execute(hq.confirmNewAddressToRegistry, price_desk)) == 7
-
     # Deploy chainlink
 
     chainlink = migration.deploy(
@@ -105,3 +102,5 @@ def migrate(migration: Migration):
 
     # finish registry setup
     migration.execute(price_desk.setRegistryTimeLockAfterSetup)
+    migration.execute(hq.startAddNewAddressToRegistry, price_desk, "Price Desk")
+    assert int(migration.execute(hq.confirmNewAddressToRegistry, price_desk)) == 7

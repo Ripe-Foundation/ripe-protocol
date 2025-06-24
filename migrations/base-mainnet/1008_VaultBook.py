@@ -48,7 +48,6 @@ def migrate(migration: Migration):
     assert int(migration.execute(vault_book.confirmNewAddressToRegistry, rebase_erc20_vault)) == 4
 
     migration.execute(vault_book.setRegistryTimeLockAfterSetup)
-
     migration.execute(hq.startAddNewAddressToRegistry, vault_book, "Vault Book")
     assert int(migration.execute(hq.confirmNewAddressToRegistry, vault_book)) == 8
 

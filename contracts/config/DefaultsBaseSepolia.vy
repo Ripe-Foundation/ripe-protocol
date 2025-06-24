@@ -1,4 +1,7 @@
-# @version 0.4.1
+# Ripe Protocol License: https://github.com/ripe-foundation/ripe-protocol/blob/master/LICENSE.md
+# Ripe Foundation (C) 2025
+
+# @version 0.4.3
 
 implements: Defaults
 from interfaces import Defaults
@@ -131,6 +134,7 @@ def rewardsConfig() -> cs.RipeRewardsConfig:
         genDepositorsAlloc = 0,
         autoStakeRatio = 90_00,
         autoStakeDurationRatio = 10_00,
+        stabPoolRipePerDollarClaimed = 1 * EIGHTEEN_DECIMALS,
     )
 
 
@@ -139,7 +143,7 @@ def rewardsConfig() -> cs.RipeRewardsConfig:
 
 @view
 @external
-def ripeGovVaultConfig() -> cs.RipeGovVaultConfig:
+def ripeTokenVaultConfig() -> cs.RipeGovVaultConfig:
     return cs.RipeGovVaultConfig(
         lockTerms = cs.LockTerms(
             minLockDuration = 1 * DAY_IN_BLOCKS,
@@ -150,18 +154,6 @@ def ripeGovVaultConfig() -> cs.RipeGovVaultConfig:
         ),
         assetWeight = HUNDRED_PERCENT,
         shouldFreezeWhenBadDebt = True,
-    )
-
-
-# stab claim rewards config
-
-
-@view
-@external
-def stabClaimRewardsConfig() -> cs.StabClaimRewardsConfig:
-    return cs.StabClaimRewardsConfig(
-        rewardsLockDuration = 1 * DAY_IN_BLOCKS,
-        ripePerDollarClaimed = 1 * EIGHTEEN_DECIMALS,
     )
 
 

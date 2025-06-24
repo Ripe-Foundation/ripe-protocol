@@ -11,12 +11,36 @@ DEFAULT_AUCTION_PARAMS = (
 )
 
 
+WHITELIST = [
+    '0x9c340456e7E3450Ec254B5b82448fB60D3633F0B',
+    '0x2f537C2C1D263e66733DA492414359B6B70e1269',
+    '0xB13D7d316Ff8B9db9cE8CD93d4D2DfD54b7A5419',
+    '0x1567A3715C68c33383b375b07f39F9738a802C49',
+]
+
+
 def migrate(migration: Migration):
     blueprint = migration.blueprint()
 
     log.h1("Adding Initial Tokens")
 
+    # Assets
+    usdc = blueprint.CORE_TOKENS["USDC"]
+    cbbtc = blueprint.CORE_TOKENS["CBBTC"]
+    weth = blueprint.CORE_TOKENS["WETH"]
+    sgreen = migration.get_address("SavingsGreen")
+
     tw = migration.deploy("TrainingWheels", migration.get_address("RipeHq"))
+    token_list = [usdc, cbbtc, weth, sgreen]
+    final_tw = []
+    for user in WHITELIST:
+        for token in token_list:
+            final_tw.append((user, token, True))
+
+    sb_charlie = migration.get_contract("SwitchboardCharlie")
+    action_id = migration.execute(sb_charlie.addManyTrainingWheels, tw, final_tw)
+    assert bool(migration.execute(sb_charlie.executePendingAction, int(action_id)))
+    migration.execute(sb_charlie.setActionTimeLockAfterSetup)
 
     sb_bravo = migration.get_contract("SwitchboardBravo")
 
@@ -25,7 +49,7 @@ def migrate(migration: Migration):
 
     actionId = migration.execute(
         sb_bravo.addAsset,
-        blueprint.CORE_TOKENS["USDC"],
+        usdc,
         [simple_erc20_vault_id],
         0,  # _stakersPointsAlloc
         0,  # _voterPointsAlloc
@@ -34,7 +58,7 @@ def migrate(migration: Migration):
         25 * 10**4,  # _minDepositBalance 0.25 USDC
         (
             80_00,  # ltv
-            95_00,  # redemptionThreshold
+            85_00,  # redemptionThreshold
             90_00,  # liqThreshold
             5_00,  # liqFee
             5_00,  # borrowRate
@@ -59,7 +83,7 @@ def migrate(migration: Migration):
 
     actionId = migration.execute(
         sb_bravo.addAsset,
-        blueprint.CORE_TOKENS["CBBTC"],
+        cbbtc,
         [simple_erc20_vault_id],
         0,  # _stakersPointsAlloc
         0,  # _voterPointsAlloc
@@ -94,7 +118,7 @@ def migrate(migration: Migration):
 
     actionId = migration.execute(
         sb_bravo.addAsset,
-        blueprint.CORE_TOKENS["WETH"],
+        weth,
         [simple_erc20_vault_id],
         0,  # _stakersPointsAlloc
         0,  # _voterPointsAlloc
@@ -128,7 +152,7 @@ def migrate(migration: Migration):
 
     actionId = migration.execute(
         sb_bravo.addAsset,
-        migration.get_address("SavingsGreen"),
+        sgreen,
         [stability_pool_vault_id],
         10_00,  # _stakersPointsAlloc
         0,  # _voterPointsAlloc

@@ -17,7 +17,7 @@ def migrate(migration: Migration):
         factory.deploy_plain_pool,
         blueprint.CURVE_PARAMS["GREEN_POOL_NAME"],
         blueprint.CURVE_PARAMS["GREEN_POOL_SYMBOL"],
-        [blueprint.ADDYS["USDC"], green_token],
+        [blueprint.CORE_TOKENS["USDC"], green_token],
         blueprint.CURVE_PARAMS["GREEN_POOL_A"],
         blueprint.CURVE_PARAMS["GREEN_POOL_FEE"],
         blueprint.CURVE_PARAMS["GREEN_POOL_OFFPEG_MULTIPLIER"],

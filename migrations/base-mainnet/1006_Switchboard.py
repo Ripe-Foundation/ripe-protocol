@@ -46,7 +46,6 @@ def migrate(migration: Migration):
     )
     migration.execute(switchboard.startAddNewAddressToRegistry, switchboard_charlie, "Switchboard Charlie")
     assert int(migration.execute(switchboard.confirmNewAddressToRegistry, switchboard_charlie)) == 3
-    migration.execute(switchboard_charlie.setActionTimeLockAfterSetup)
 
     log.h1("Deploying Switchboard Delta")
     switchboard_delta = migration.deploy(
@@ -59,6 +58,7 @@ def migrate(migration: Migration):
     assert int(migration.execute(switchboard.confirmNewAddressToRegistry, switchboard_delta)) == 4
     migration.execute(switchboard_delta.setActionTimeLockAfterSetup)
 
+    assert migration.execute(switchboard.setRegistryTimeLockAfterSetup)
     migration.execute(hq.startAddNewAddressToRegistry, switchboard, "Switchboard")
     assert int(migration.execute(hq.confirmNewAddressToRegistry, switchboard)) == 6
 

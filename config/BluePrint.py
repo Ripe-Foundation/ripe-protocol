@@ -32,8 +32,8 @@ ADDYS = {
         # oracles
         "PYTH_NETWORK": "0x8250f4aF4B972684F7b336503E2D6dFeDeB1487a",
         "STORK_NETWORK": "0x647DFd812BC1e116c6992CB2bC353b2112176fD6",
-        # governance TODO: add this
-        "GOVERNANCE": "0x0000000000000000000000000000000000000000",
+        # governance
+        "GOVERNANCE": "0x13BEF4e90c8818Cd4bbdbA97085BA37a05F90580",
     },
     "local": {
         # important tokens / representations
