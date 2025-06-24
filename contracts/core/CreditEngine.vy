@@ -1,3 +1,23 @@
+#           _             _           _          _             _        _                _            _             _               _          _             _      
+#         /\ \           /\ \        /\ \       /\ \          /\ \     /\ \             /\ \         /\ \     _    /\ \            /\ \       /\ \     _    /\ \    
+#        /  \ \         /  \ \      /  \ \     /  \ \____     \ \ \    \_\ \           /  \ \       /  \ \   /\_\ /  \ \           \ \ \     /  \ \   /\_\ /  \ \   
+#       / /\ \ \       / /\ \ \    / /\ \ \   / /\ \_____\    /\ \_\   /\__ \         / /\ \ \     / /\ \ \_/ / // /\ \_\          /\ \_\   / /\ \ \_/ / // /\ \ \  
+#      / / /\ \ \     / / /\ \_\  / / /\ \_\ / / /\/___  /   / /\/_/  / /_ \ \       / / /\ \_\   / / /\ \___/ // / /\/_/         / /\/_/  / / /\ \___/ // / /\ \_\ 
+#     / / /  \ \_\   / / /_/ / / / /_/_ \/_// / /   / / /   / / /    / / /\ \ \     / /_/_ \/_/  / / /  \/____// / / ______      / / /    / / /  \/____// /_/_ \/_/ 
+#    / / /    \/_/  / / /__\/ / / /____/\  / / /   / / /   / / /    / / /  \/_/    / /____/\    / / /    / / // / / /\_____\    / / /    / / /    / / // /____/\    
+#   / / /          / / /_____/ / /\____\/ / / /   / / /   / / /    / / /          / /\____\/   / / /    / / // / /  \/____ /   / / /    / / /    / / // /\____\/    
+#  / / /________  / / /\ \ \  / / /______ \ \ \__/ / /___/ / /__  / / /          / / /______  / / /    / / // / /_____/ / /___/ / /__  / / /    / / // / /______    
+# / / /_________\/ / /  \ \ \/ / /_______\ \ \___\/ //\__\/_/___\/_/ /          / / /_______\/ / /    / / // / /______\/ //\__\/_/___\/ / /    / / // / /_______\   
+# \/____________/\/_/    \_\/\/__________/  \/_____/ \/_________/\_\/           \/__________/\/_/     \/_/ \/___________/ \/_________/\/_/     \/_/ \/__________/   
+#
+#     ╔══════════════════════════════════════════════════════════════╗
+#     ║  ** Credit Engine **                                         ║
+#     ║  Handles all credit-related actions (borrow, repay, redeem)  ║
+#     ╚══════════════════════════════════════════════════════════════╝
+#
+#     Ripe Protocol License: https://github.com/ripe-foundation/ripe-protocol/blob/master/LICENSE.md
+#     Ripe Foundation (C) 2025
+
 # @version 0.4.1
 # pragma optimize codesize
 
@@ -35,10 +55,6 @@ interface MissionControl:
     def getDebtTerms(_asset: address) -> cs.DebtTerms: view
     def getLtvPaybackBuffer() -> uint256: view
 
-interface PriceDesk:
-    def getAssetAmount(_asset: address, _usdValue: uint256, _shouldRaise: bool = False) -> uint256: view
-    def getUsdValue(_asset: address, _amount: uint256, _shouldRaise: bool) -> uint256: view
-
 interface Teller:
     def depositFromTrusted(_user: address, _vaultId: uint256, _asset: address, _amount: uint256, _lockDuration: uint256, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
     def isUnderscoreWalletOwner(_user: address, _caller: address, _mc: address = empty(address)) -> bool: view
@@ -46,6 +62,10 @@ interface Teller:
 interface LootBox:
     def updateDepositPoints(_user: address, _vaultId: uint256, _vaultAddr: address, _asset: address, _a: addys.Addys = empty(addys.Addys)): nonpayable
     def updateBorrowPoints(_user: address, _a: addys.Addys = empty(addys.Addys)): nonpayable
+
+interface PriceDesk:
+    def getAssetAmount(_asset: address, _usdValue: uint256, _shouldRaise: bool = False) -> uint256: view
+    def getUsdValue(_asset: address, _amount: uint256, _shouldRaise: bool) -> uint256: view
 
 interface GreenToken:
     def mint(_to: address, _amount: uint256): nonpayable

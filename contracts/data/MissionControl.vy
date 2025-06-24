@@ -1,3 +1,16 @@
+#
+#       __  __  _   ____   ____  _  ____  __  _     ____  ____  __  _  _____ _____  ____  _    
+#      |  \/  || | (_ (_` (_ (_`| |/ () \|  \| |   / (__`/ () \|  \| ||_   _|| () )/ () \| |__ 
+#      |_|\/|_||_|.__)__).__)__)|_|\____/|_|\__|   \____)\____/|_|\__|  |_|  |_|\_\\____/|____|
+#
+#     ╔═══════════════════════════════════════════════════╗
+#     ║  ** Mission Control **                            ║
+#     ║  Stores all configuration data for Ripe protocol  ║
+#     ╚═══════════════════════════════════════════════════╝
+#
+#     Ripe Protocol License: https://github.com/ripe-foundation/ripe-protocol/blob/master/LICENSE.md
+#     Ripe Foundation (C) 2025    
+
 # @version 0.4.1
 # pragma optimize codesize
 

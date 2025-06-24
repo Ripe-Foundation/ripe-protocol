@@ -1,3 +1,21 @@
+#               o                                   o        o                                 o         o                                                   
+#              <|>                                 <|>     _<|>_                              <|>       <|>                                                  
+#              / \                                 < >                                        < >       < >                                                  
+#            o/   \o        o       o       __o__   |        o      o__ __o    \o__ __o        |         |     o__ __o     o       o       __o__   o__  __o  
+#           <|__ __|>      <|>     <|>     />  \    o__/_   <|>    /v     v\    |     |>       o__/_ _\__o    /v     v\   <|>     <|>     />  \   /v      |> 
+#           /       \      < >     < >   o/         |       / \   />       <\  / \   / \       |         |   />       <\  < >     < >     \o     />      //  
+#         o/         \o     |       |   <|          |       \o/   \         /  \o/   \o/      <o>       <o>  \         /   |       |       v\    \o    o/    
+#        /v           v\    o       o    \\         o        |     o       o    |     |        |         |    o       o    o       o        <\    v\  /v __o 
+#       />             <\   <\__ __/>     _\o__</   <\__    / \    <\__ __/>   / \   / \      / \       / \   <\__ __/>    <\__ __/>   _\o__</     <\/> __/> 
+#
+#     ╔══════════════════════════════════════════╗
+#     ║  ** Auction House **                     ║
+#     ║  Handles all liquidation-related logic   ║
+#     ╚══════════════════════════════════════════╝
+#
+#     Ripe Protocol License: https://github.com/ripe-foundation/ripe-protocol/blob/master/LICENSE.md
+#     Ripe Foundation (C) 2025
+
 # @version 0.4.1
 # pragma optimize codesize
 
