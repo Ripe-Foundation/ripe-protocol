@@ -1283,3 +1283,12 @@ def _getAvailDebtInInterval(
         availToBorrow = _maxBorrowPerInterval - min(_userInterval.amount, _maxBorrowPerInterval)
         isFreshInterval = False
     return availToBorrow, isFreshInterval
+
+
+########   #######  ########  ########   #######  ##      ## 
+##     ## ##     ## ##     ## ##     ## ##     ## ##  ##  ## 
+##     ## ##     ## ##     ## ##     ## ##     ## ##  ##  ## 
+########  ##     ## ########  ########  ##     ## ##  ##  ## 
+##     ## ##     ## ##   ##   ##   ##   ##     ## ##  ##  ## 
+##     ## ##     ## ##    ##  ##    ##  ##     ## ##  ##  ## 
+########   #######  ##     ## ##     ##  #######   ###  ###  

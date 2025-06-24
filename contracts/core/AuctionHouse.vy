@@ -1506,3 +1506,12 @@ def _saveLiqAssetForAuction(_user: address, _vaultId: uint256, _vaultAddr: addre
     nextId: uint256 = self.numUserAssetsForAuction[_user]
     self.userAssetForAuction[_user][nextId] = VaultData(vaultId=_vaultId, vaultAddr=_vaultAddr, asset=_asset)
     self.numUserAssetsForAuction[_user] = nextId + 1
+
+
+##       ####  #######  ##     ## #### ########     ###    ######## ####  #######  ##    ## 
+##        ##  ##     ## ##     ##  ##  ##     ##   ## ##      ##     ##  ##     ## ###   ## 
+##        ##  ##     ## ##     ##  ##  ##     ##  ##   ##     ##     ##  ##     ## ####  ## 
+##        ##  ##     ## ##     ##  ##  ##     ## ##     ##    ##     ##  ##     ## ## ## ## 
+##        ##  ##  ## ## ##     ##  ##  ##     ## #########    ##     ##  ##     ## ##  #### 
+##        ##  ##    ##  ##     ##  ##  ##     ## ##     ##    ##     ##  ##     ## ##   ### 
+######## ####  ##### ##  #######  #### ########  ##     ##    ##    ####  #######  ##    ##
