@@ -11,11 +11,8 @@ mockData: ChainlinkRound
 _decimals: uint8
 
 
-governance: public(address)
-
 @deploy
-def __init__(_localPrice: uint256, _governance: address): # should be 18 decimals
-    self.governance = _governance
+def __init__(_localPrice: uint256): # should be 18 decimals
     self._decimals = 8
     if _localPrice != 0:
         self.mockData = ChainlinkRound(
@@ -26,15 +23,6 @@ def __init__(_localPrice: uint256, _governance: address): # should be 18 decimal
             answeredInRound=1,
         )
 
-    # set governance
-    self.governance = _governance
-
-@external
-def setGovernance(
-    _governance: address,
-):
-    assert msg.sender == self.governance
-    self.governance = _governance
 
 @view 
 @external 
@@ -63,7 +51,6 @@ def setMockData(
     _startedAt: uint256 = block.timestamp,
     _updatedAt: uint256 = block.timestamp,
 ):
-    assert msg.sender == self.governance
     self.mockData = ChainlinkRound(
         roundId=_roundId,
         answer=_price,

@@ -4,7 +4,6 @@ from tests.constants import EIGHTEEN_DECIMALS
 
 
 def migrate(migration: Migration):
-    deployer = migration.account()
     blueprint = migration.blueprint()
     hq = migration.get_contract("RipeHq")
 
@@ -26,19 +25,16 @@ def migrate(migration: Migration):
     mock_usdc_feed = migration.deploy(
         "MockChainlinkFeed",
         1*EIGHTEEN_DECIMALS,
-        deployer,
         label="MockUsdcFeed",
     )
     mock_btc_feed = migration.deploy(
         "MockChainlinkFeed",
         100_000*EIGHTEEN_DECIMALS,
-        deployer,
         label="MockBtcFeed",
     )
     mock_weth_feed = migration.deploy(
         "MockChainlinkFeed",
         2_500*EIGHTEEN_DECIMALS,
-        deployer,
         label="MockEthFeed",
     )
 

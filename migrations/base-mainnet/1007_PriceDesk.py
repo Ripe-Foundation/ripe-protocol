@@ -4,7 +4,6 @@ from tests.constants import EIGHTEEN_DECIMALS
 
 
 def migrate(migration: Migration):
-    deployer = migration.account()
     blueprint = migration.blueprint()
     hq = migration.get_contract("RipeHq")
 

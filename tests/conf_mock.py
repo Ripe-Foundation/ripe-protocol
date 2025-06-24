@@ -163,17 +163,15 @@ def mock_chainlink_feed_one():
     return boa.load(
         "contracts/mock/MockChainlinkFeed.vy",
         EIGHTEEN_DECIMALS,  # $1
-        governance,
         name="mock_chainlink_feed_one",
     )
 
 
 @pytest.fixture(scope="session")
-def mock_chainlink_feed_two(governance):
+def mock_chainlink_feed_two():
     return boa.load(
         "contracts/mock/MockChainlinkFeed.vy",
         EIGHTEEN_DECIMALS,  # $1
-        governance,
         name="mock_chainlink_feed_two",
     )
 
