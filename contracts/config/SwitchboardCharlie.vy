@@ -1,3 +1,15 @@
+#        ______   __     __   __   ______  ______   __  __   ______   ______   ______   ______   _____    
+#       /\  ___\ /\ \  _ \ \ /\ \ /\__  _\/\  ___\ /\ \_\ \ /\  == \ /\  __ \ /\  __ \ /\  == \ /\  __-.  
+#       \ \___  \\ \ \/ ".\ \\ \ \\/_/\ \/\ \ \____\ \  __ \\ \  __< \ \ \/\ \\ \  __ \\ \  __< \ \ \/\ \ 
+#        \/\_____\\ \__/".~\_\\ \_\  \ \_\ \ \_____\\ \_\ \_\\ \_____\\ \_____\\ \_\ \_\\ \_\ \_\\ \____- 
+#         \/_____/ \/_/   \/_/ \/_/   \/_/  \/_____/ \/_/\/_/ \/_____/ \/_____/ \/_/\/_/ \/_/ /_/ \/____/ 
+#                                                    ┏┓┓     ┓•  
+#                                                    ┃ ┣┓┏┓┏┓┃┓┏┓
+#                                                    ┗┛┛┗┗┻┛ ┗┗┗ 
+#
+#      Ripe Protocol License: https://github.com/ripe-foundation/ripe-protocol/blob/master/LICENSE.md
+#      Ripe Foundation (C) 2025 
+
 # @version 0.4.1
 # pragma optimize codesize
 
@@ -53,6 +65,12 @@ interface CreditEngine:
 interface Switchboard:
     def setBlacklist(_tokenAddr: address, _addr: address, _shouldBlacklist: bool) -> bool: nonpayable
 
+interface TrainingWheels:
+    def setAllowed(_user: address, _asset: address, _shouldAllow: bool): nonpayable
+
+interface Ledger:
+    def setLockedAccount(_wallet: address, _shouldLock: bool): nonpayable
+
 interface MissionControl:
     def canPerformLiteAction(_user: address) -> bool: view
 
@@ -76,6 +94,7 @@ flag ActionType:
     ENDAO_PARTNER_POOL
     ENDAO_REPAY
     ENDOA_RECOVER_NFT
+    ADD_MANY_TRAINING_WHEELS
 
 struct PauseAction:
     contractAddr: address
@@ -150,6 +169,15 @@ struct EndaoRecoverNftAction:
     collection: address
     nftTokenId: uint256
     recipient: address
+
+struct TrainingWheelBundle:
+    addr: address
+    trainingWheels: DynArray[TrainingWheelAccess, MAX_TRAINING_WHEEL_ACCESS]
+
+struct TrainingWheelAccess:
+    user: address
+    asset: address
+    isAllowed: bool
 
 event PendingRecoverFundsAction:
     contractAddr: indexed(address)
@@ -276,6 +304,17 @@ event BlacklistSet:
     isBlacklisted: bool
     caller: indexed(address)
 
+event LockedAccountSet:
+    wallet: indexed(address)
+    isLocked: bool
+    caller: indexed(address)
+
+event PendingAddManyTrainingWheelsAction:
+    addr: indexed(address)
+    numTrainingWheels: uint256
+    confirmationBlock: uint256
+    actionId: uint256
+
 event DebtUpdatedForUser:
     user: indexed(address)
     success: bool
@@ -397,6 +436,10 @@ event EndaoRecoverNftExecuted:
     recipient: indexed(address)
     success: bool
 
+event AddManyTrainingWheelsExecuted:
+    addr: indexed(address)
+    numTrainingWheels: uint256
+
 # pending actions storage
 actionType: public(HashMap[uint256, ActionType])
 pendingPauseActions: public(HashMap[uint256, PauseAction])
@@ -413,14 +456,17 @@ pendingEndaoPartnerMintActions: public(HashMap[uint256, EndaoPartnerMintAction])
 pendingEndaoPartnerPoolActions: public(HashMap[uint256, EndaoPartnerPoolAction])
 pendingEndaoRepayActions: public(HashMap[uint256, EndaoRepayAction])
 pendingEndaoRecoverNftActions: public(HashMap[uint256, EndaoRecoverNftAction])
+pendingTrainingWheelAccessActions: public(HashMap[uint256, TrainingWheelBundle])
 
 MAX_RECOVER_ASSETS: constant(uint256) = 20
 MAX_AUCTIONS: constant(uint256) = 20
+MAX_TRAINING_WHEEL_ACCESS: constant(uint256) = 25
 MAX_DEBT_UPDATES: constant(uint256) = 50
 MAX_CLAIM_USERS: constant(uint256) = 50
 MAX_SWAP_INSTRUCTIONS: constant(uint256) = 5
 MAX_TOKEN_PATH: constant(uint256) = 5
 
+LEDGER_ID: constant(uint256) = 4
 MISSION_CONTROL_ID: constant(uint256) = 5
 SWITCHBOARD_ID: constant(uint256) = 6
 VAULT_BOOK_ID: constant(uint256) = 8
@@ -492,6 +538,12 @@ def _getEndaomentAddr() -> address:
     return staticcall RipeHq(gov._getRipeHqFromGov()).getAddr(ENDAOMENT_ID)
 
 
+@view
+@internal
+def _getLedgerAddr() -> address:
+    return staticcall RipeHq(gov._getRipeHqFromGov()).getAddr(LEDGER_ID)
+
+
 #################
 # Pause Actions #
 #################
@@ -560,9 +612,9 @@ def recoverFundsMany(_contractAddr: address, _recipient: address, _assets: DynAr
     return aid
 
 
-#############
-# Blacklist #
-#############
+####################
+# Blacklist / Lock #
+####################
 
 
 @external
@@ -573,6 +625,16 @@ def setBlacklist(_tokenAddr: address, _addr: address, _shouldBlacklist: bool) ->
     switchboard: address = staticcall RipeHq(gov._getRipeHqFromGov()).getAddr(SWITCHBOARD_ID)
     extcall Switchboard(switchboard).setBlacklist(_tokenAddr, _addr, _shouldBlacklist)
     log BlacklistSet(tokenAddr=_tokenAddr, addr=_addr, isBlacklisted=_shouldBlacklist, caller=msg.sender)
+    return True
+
+
+@external
+def setLockedAccount(_wallet: address, _shouldLock: bool) -> bool:
+    assert self.hasPermsForLiteAction(msg.sender, _shouldLock) # dev: no perms
+    assert _wallet != empty(address) # dev: invalid wallet
+
+    extcall Ledger(self._getLedgerAddr()).setLockedAccount(_wallet, _shouldLock)
+    log LockedAccountSet(wallet=_wallet, isLocked=_shouldLock, caller=msg.sender)
     return True
 
 
@@ -1082,6 +1144,34 @@ def recoverNftInEndaoment(_collection: address, _nftTokenId: uint256, _recipient
     return aid
 
 
+###################
+# Training Wheels #
+###################
+
+
+@external
+def addManyTrainingWheels(_addr: address, _trainingWheels: DynArray[TrainingWheelAccess, MAX_TRAINING_WHEEL_ACCESS]) -> uint256:
+    assert gov._canGovern(msg.sender) # dev: no perms
+    assert len(_trainingWheels) != 0 # dev: no training wheels provided
+    assert _addr != empty(address) # dev: invalid address
+    
+    aid: uint256 = timeLock._initiateAction()
+    self.actionType[aid] = ActionType.ADD_MANY_TRAINING_WHEELS
+    self.pendingTrainingWheelAccessActions[aid] = TrainingWheelBundle(
+        addr=_addr,
+        trainingWheels=_trainingWheels
+    )
+
+    confirmationBlock: uint256 = timeLock._getActionConfirmationBlock(aid)
+    log PendingAddManyTrainingWheelsAction(
+        addr=_addr,
+        numTrainingWheels=len(_trainingWheels),
+        confirmationBlock=confirmationBlock,
+        actionId=aid
+    )
+    return aid
+
+
 #############
 # Execution #
 #############
@@ -1163,6 +1253,12 @@ def executePendingAction(_aid: uint256) -> bool:
         p: EndaoRecoverNftAction = self.pendingEndaoRecoverNftActions[_aid]
         success: bool = extcall Endaoment(self._getEndaomentAddr()).recoverNft(p.collection, p.nftTokenId, p.recipient)
         log EndaoRecoverNftExecuted(collection=p.collection, nftTokenId=p.nftTokenId, recipient=p.recipient, success=success)
+
+    elif actionType == ActionType.ADD_MANY_TRAINING_WHEELS:
+        p: TrainingWheelBundle = self.pendingTrainingWheelAccessActions[_aid]
+        for tw: TrainingWheelAccess in p.trainingWheels:
+            extcall TrainingWheels(p.addr).setAllowed(tw.user, tw.asset, tw.isAllowed)
+        log AddManyTrainingWheelsExecuted(addr=p.addr, numTrainingWheels=len(p.trainingWheels))
 
     self.actionType[_aid] = empty(ActionType)
     return True

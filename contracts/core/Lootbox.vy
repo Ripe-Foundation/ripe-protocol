@@ -1,3 +1,23 @@
+#       .----------------.  .----------------.  .----------------.  .----------------.  .----------------.  .----------------.  .----------------. 
+#      | .--------------. || .--------------. || .--------------. || .--------------. || .--------------. || .--------------. || .--------------. |
+#      | |   _____      | || |     ____     | || |     ____     | || |  _________   | || |   ______     | || |     ____     | || |  ____  ____  | |
+#      | |  |_   _|     | || |   .'    `.   | || |   .'    `.   | || | |  _   _  |  | || |  |_   _ \    | || |   .'    `.   | || | |_  _||_  _| | |
+#      | |    | |       | || |  /  .--.  \  | || |  /  .--.  \  | || | |_/ | | \_|  | || |    | |_) |   | || |  /  .--.  \  | || |   \ \  / /   | |
+#      | |    | |   _   | || |  | |    | |  | || |  | |    | |  | || |     | |      | || |    |  __'.   | || |  | |    | |  | || |    > `' <    | |
+#      | |   _| |__/ |  | || |  \  `--'  /  | || |  \  `--'  /  | || |    _| |_     | || |   _| |__) |  | || |  \  `--'  /  | || |  _/ /'`\ \_  | |
+#      | |  |________|  | || |   `.____.'   | || |   `.____.'   | || |   |_____|    | || |  |_______/   | || |   `.____.'   | || | |____||____| | |
+#      | |              | || |              | || |              | || |              | || |              | || |              | || |              | |
+#      | '--------------' || '--------------' || '--------------' || '--------------' || '--------------' || '--------------' || '--------------' |
+#       '----------------'  '----------------'  '----------------'  '----------------'  '----------------'  '----------------'  '----------------' 
+#
+#     ╔════════════════════════════════════════════════╗
+#     ║  ** Lootbox **                                 ║
+#     ║  Where all the Ripe token rewards logic lives  ║
+#     ╚════════════════════════════════════════════════╝
+#
+#     Ripe Protocol License: https://github.com/ripe-foundation/ripe-protocol/blob/master/LICENSE.md
+#     Ripe Foundation (C) 2025
+
 # @version 0.4.1
 
 implements: Department
@@ -118,9 +138,7 @@ struct ClaimLootConfig:
     canClaimLoot: bool
     canClaimLootForUser: bool
     autoStakeRatio: uint256
-    autoStakeDurationRatio: uint256
-    minLockDuration: uint256
-    maxLockDuration: uint256
+    rewardsLockDuration: uint256
 
 event DepositLootClaimed:
     user: indexed(address)
@@ -995,16 +1013,10 @@ def _handleRipeMint(
         amountToStake = min(_amount * _config.autoStakeRatio // HUNDRED_PERCENT, _amount)
         amountToSend = _amount - amountToStake
 
-    # finalize lock duration
-    lockDuration: uint256 = 0
-    if _config.maxLockDuration > _config.minLockDuration:
-        durationRange: uint256 = _config.maxLockDuration - _config.minLockDuration
-        lockDuration = durationRange * _config.autoStakeDurationRatio // HUNDRED_PERCENT
-
     # stake ripe tokens
     if amountToStake != 0:
         assert extcall IERC20(_a.ripeToken).approve(_a.teller, amountToStake, default_return_value=True) # dev: ripe approval failed
-        extcall Teller(_a.teller).depositFromTrusted(_user, RIPE_GOV_VAULT_ID, _a.ripeToken, amountToStake, lockDuration, _a)
+        extcall Teller(_a.teller).depositFromTrusted(_user, RIPE_GOV_VAULT_ID, _a.ripeToken, amountToStake, _config.rewardsLockDuration, _a)
         assert extcall IERC20(_a.ripeToken).approve(_a.teller, 0, default_return_value=True) # dev: ripe approval failed
 
     # transfer ripe to user

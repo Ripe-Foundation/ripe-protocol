@@ -1,3 +1,15 @@
+#        ______   __     __   __   ______  ______   __  __   ______   ______   ______   ______   _____    
+#       /\  ___\ /\ \  _ \ \ /\ \ /\__  _\/\  ___\ /\ \_\ \ /\  == \ /\  __ \ /\  __ \ /\  == \ /\  __-.  
+#       \ \___  \\ \ \/ ".\ \\ \ \\/_/\ \/\ \ \____\ \  __ \\ \  __< \ \ \/\ \\ \  __ \\ \  __< \ \ \/\ \ 
+#        \/\_____\\ \__/".~\_\\ \_\  \ \_\ \ \_____\\ \_\ \_\\ \_____\\ \_____\\ \_\ \_\\ \_\ \_\\ \____- 
+#         \/_____/ \/_/   \/_/ \/_/   \/_/  \/_____/ \/_/\/_/ \/_____/ \/_____/ \/_/\/_/ \/_/ /_/ \/____/ 
+#                                                  ┏┓┓  ┓   
+#                                                  ┣┫┃┏┓┣┓┏┓
+#                                                  ┛┗┗┣┛┛┗┗┻
+#                                                     ┛     
+#      Ripe Protocol License: https://github.com/ripe-foundation/ripe-protocol/blob/master/LICENSE.md
+#      Ripe Foundation (C) 2025 
+
 # @version 0.4.1
 # pragma optimize codesize
 
@@ -32,6 +44,11 @@ interface MissionControl:
     def shouldCheckLastTouch() -> bool: view
     def genConfig() -> cs.GenConfig: view
 
+interface Ledger:
+    def setRipeAvailForRewards(_amount: uint256): nonpayable
+    def setRipeAvailForBonds(_amount: uint256): nonpayable
+    def setRipeAvailForHr(_amount: uint256): nonpayable
+
 interface VaultBook:
     def isValidRegId(_regId: uint256) -> bool: view
     def getAddr(_regId: uint256) -> address: view
@@ -61,6 +78,9 @@ flag ActionType:
     RIPE_REWARDS_BLOCK
     RIPE_REWARDS_ALLOCS
     RIPE_REWARDS_AUTO_STAKE_PARAMS
+    RIPE_AVAIL_REWARDS
+    RIPE_AVAIL_HR
+    RIPE_AVAIL_BONDS
     OTHER_PRIORITY_LIQ_ASSET_VAULTS
     OTHER_PRIORITY_STAB_VAULTS
     OTHER_PRIORITY_PRICE_SOURCE_IDS
@@ -209,12 +229,28 @@ event PendingRipeRewardsAllocsChange:
 event PendingRipeRewardsAutoStakeParamsChange:
     autoStakeRatio: uint256
     autoStakeDurationRatio: uint256
+    stabPoolRipePerDollarClaimed: uint256
     confirmationBlock: uint256
     actionId: uint256
 
 event RewardsPointsEnabledModified:
     arePointsEnabled: bool
     caller: indexed(address)
+
+event PendingRipeAvailableForRewardsChange:
+    amount: uint256
+    confirmationBlock: uint256
+    actionId: uint256
+
+event PendingRipeAvailableForHrChange:
+    amount: uint256
+    confirmationBlock: uint256
+    actionId: uint256
+
+event PendingRipeAvailableForBondsChange:
+    amount: uint256
+    confirmationBlock: uint256
+    actionId: uint256
 
 event PendingPriorityLiqAssetVaultsChange:
     numPriorityLiqAssetVaults: uint256
@@ -313,6 +349,16 @@ event RipeRewardsAllocsSet:
 event RipeRewardsAutoStakeParamsSet:
     autoStakeRatio: uint256
     autoStakeDurationRatio: uint256
+    stabPoolRipePerDollarClaimed: uint256
+
+event RipeAvailableForRewardsSet:
+    amount: uint256
+
+event RipeAvailableForHrSet:
+    amount: uint256
+
+event RipeAvailableForBondsSet:
+    amount: uint256
 
 event PriorityLiqAssetVaultsSet:
     numVaults: uint256
@@ -351,7 +397,6 @@ actionType: public(HashMap[uint256, ActionType]) # aid -> type
 pendingRipeRewardsConfig: public(HashMap[uint256, cs.RipeRewardsConfig]) # aid -> config
 pendingGeneralConfig: public(HashMap[uint256, GenConfigLite]) # aid -> config
 pendingDebtConfig: public(HashMap[uint256, cs.GenDebtConfig]) # aid -> config
-
 pendingPriorityLiqAssetVaults: public(HashMap[uint256, DynArray[cs.VaultLite, PRIORITY_VAULT_DATA]])
 pendingPriorityStabVaults: public(HashMap[uint256, DynArray[cs.VaultLite, PRIORITY_VAULT_DATA]])
 pendingPriorityPriceSourceIds: public(HashMap[uint256, DynArray[uint256, MAX_PRIORITY_PRICE_SOURCES]])
@@ -359,6 +404,7 @@ pendingUnderscoreRegistry: public(HashMap[uint256, address])
 pendingCanPerformLiteAction: public(HashMap[uint256, CanPerform])
 pendingShouldCheckLastTouch: public(HashMap[uint256, bool])
 pendingRipeGovVaultConfig: public(HashMap[uint256, PendingRipeGovVaultConfig]) # aid -> config
+pendingRipeAvailable: public(HashMap[uint256, uint256]) # aid -> amount
 
 # temp data
 vaultDedupe: transient(HashMap[uint256, HashMap[address, bool]]) # vault id -> asset
@@ -372,6 +418,7 @@ UNDERSCORE_AGENT_FACTORY_ID: constant(uint256) = 1
 HUNDRED_PERCENT: constant(uint256) = 100_00 # 100%
 EIGHTEEN_DECIMALS: constant(uint256) = 10 ** 18
 
+LEDGER_ID: constant(uint256) = 4
 MISSION_CONTROL_ID: constant(uint256) = 5
 PRICE_DESK_ID: constant(uint256) = 7
 VAULT_BOOK_ID: constant(uint256) = 8
@@ -425,6 +472,12 @@ def _getPriceDeskAddr() -> address:
 @internal
 def _getVaultBookAddr() -> address:
     return staticcall RipeHq(gov._getRipeHqFromGov()).getAddr(VAULT_BOOK_ID)
+
+
+@view
+@internal
+def _getLedgerAddr() -> address:
+    return staticcall RipeHq(gov._getRipeHqFromGov()).getAddr(LEDGER_ID)
 
 
 ##################
@@ -982,10 +1035,10 @@ def _areValidRipeRewardsAllocs(_borrowersAlloc: uint256, _stakersAlloc: uint256,
 
 
 @external
-def setAutoStakeParams(_autoStakeRatio: uint256, _autoStakeDurationRatio: uint256) -> uint256:
+def setAutoStakeParams(_autoStakeRatio: uint256, _autoStakeDurationRatio: uint256, _stabPoolRipePerDollarClaimed: uint256) -> uint256:
     assert gov._canGovern(msg.sender) # dev: no perms
     assert self._areValidAutoStakeParams(_autoStakeRatio, _autoStakeDurationRatio) # dev: invalid auto stake params
-    return self._setPendingRipeRewardsConfig(ActionType.RIPE_REWARDS_AUTO_STAKE_PARAMS, 0, 0, 0, 0, 0, _autoStakeRatio, _autoStakeDurationRatio)
+    return self._setPendingRipeRewardsConfig(ActionType.RIPE_REWARDS_AUTO_STAKE_PARAMS, 0, 0, 0, 0, 0, _autoStakeRatio, _autoStakeDurationRatio, _stabPoolRipePerDollarClaimed)
 
 
 @view
@@ -1011,6 +1064,7 @@ def _setPendingRipeRewardsConfig(
     _genDepositorsAlloc: uint256 = 0,
     _autoStakeRatio: uint256 = 0,
     _autoStakeDurationRatio: uint256 = 0,
+    _stabPoolRipePerDollarClaimed: uint256 = 0,
 ) -> uint256:
     aid: uint256 = timeLock._initiateAction()
 
@@ -1024,6 +1078,7 @@ def _setPendingRipeRewardsConfig(
         genDepositorsAlloc=_genDepositorsAlloc,
         autoStakeRatio=_autoStakeRatio,
         autoStakeDurationRatio=_autoStakeDurationRatio,
+        stabPoolRipePerDollarClaimed=_stabPoolRipePerDollarClaimed,
     )
 
     confirmationBlock: uint256 = timeLock._getActionConfirmationBlock(aid)
@@ -1047,6 +1102,7 @@ def _setPendingRipeRewardsConfig(
         log PendingRipeRewardsAutoStakeParamsChange(
             autoStakeRatio=_autoStakeRatio,
             autoStakeDurationRatio=_autoStakeDurationRatio,
+            stabPoolRipePerDollarClaimed=_stabPoolRipePerDollarClaimed,
             confirmationBlock=confirmationBlock,
             actionId=aid,
         )
@@ -1068,6 +1124,59 @@ def setRewardsPointsEnabled(_shouldEnable: bool) -> bool:
 
     log RewardsPointsEnabledModified(arePointsEnabled=_shouldEnable, caller=msg.sender)
     return True
+
+
+##################
+# Ripe Available #
+##################
+
+
+@external
+def setRipeAvailableForRewards(_amount: uint256) -> uint256:
+    assert gov._canGovern(msg.sender) # dev: no perms
+
+    aid: uint256 = timeLock._initiateAction()
+    self.actionType[aid] = ActionType.RIPE_AVAIL_REWARDS
+    self.pendingRipeAvailable[aid] = _amount
+    confirmationBlock: uint256 = timeLock._getActionConfirmationBlock(aid)
+    log PendingRipeAvailableForRewardsChange(
+        amount=_amount,
+        confirmationBlock=confirmationBlock,
+        actionId=aid,
+    )
+    return aid
+
+
+@external
+def setRipeAvailableForHr(_amount: uint256) -> uint256:
+    assert gov._canGovern(msg.sender) # dev: no perms
+
+    aid: uint256 = timeLock._initiateAction()
+    self.actionType[aid] = ActionType.RIPE_AVAIL_HR
+    self.pendingRipeAvailable[aid] = _amount
+    confirmationBlock: uint256 = timeLock._getActionConfirmationBlock(aid)
+    log PendingRipeAvailableForHrChange(
+        amount=_amount,
+        confirmationBlock=confirmationBlock,
+        actionId=aid,
+    )
+    return aid
+
+
+@external
+def setRipeAvailableForBonds(_amount: uint256) -> uint256:
+    assert gov._canGovern(msg.sender) # dev: no perms
+
+    aid: uint256 = timeLock._initiateAction()
+    self.actionType[aid] = ActionType.RIPE_AVAIL_BONDS
+    self.pendingRipeAvailable[aid] = _amount
+    confirmationBlock: uint256 = timeLock._getActionConfirmationBlock(aid)
+    log PendingRipeAvailableForBondsChange(
+        amount=_amount,
+        confirmationBlock=confirmationBlock,
+        actionId=aid,
+    )
+    return aid
 
 
 #######################
@@ -1440,8 +1549,24 @@ def executePendingAction(_aid: uint256) -> bool:
         p: cs.RipeRewardsConfig = self.pendingRipeRewardsConfig[_aid]
         config.autoStakeRatio = p.autoStakeRatio
         config.autoStakeDurationRatio = p.autoStakeDurationRatio
+        config.stabPoolRipePerDollarClaimed = p.stabPoolRipePerDollarClaimed
         extcall MissionControl(mc).setRipeRewardsConfig(config)
-        log RipeRewardsAutoStakeParamsSet(autoStakeRatio=p.autoStakeRatio, autoStakeDurationRatio=p.autoStakeDurationRatio)
+        log RipeRewardsAutoStakeParamsSet(autoStakeRatio=p.autoStakeRatio, autoStakeDurationRatio=p.autoStakeDurationRatio, stabPoolRipePerDollarClaimed=p.stabPoolRipePerDollarClaimed)
+
+    elif actionType == ActionType.RIPE_AVAIL_REWARDS:
+        amount: uint256 = self.pendingRipeAvailable[_aid]
+        extcall Ledger(self._getLedgerAddr()).setRipeAvailForRewards(amount)
+        log RipeAvailableForRewardsSet(amount=amount)
+
+    elif actionType == ActionType.RIPE_AVAIL_HR:
+        amount: uint256 = self.pendingRipeAvailable[_aid]
+        extcall Ledger(self._getLedgerAddr()).setRipeAvailForHr(amount)
+        log RipeAvailableForHrSet(amount=amount)
+
+    elif actionType == ActionType.RIPE_AVAIL_BONDS:
+        amount: uint256 = self.pendingRipeAvailable[_aid]
+        extcall Ledger(self._getLedgerAddr()).setRipeAvailForBonds(amount)
+        log RipeAvailableForBondsSet(amount=amount)
 
     elif actionType == ActionType.OTHER_PRIORITY_LIQ_ASSET_VAULTS:
         priorityVaults: DynArray[cs.VaultLite, PRIORITY_VAULT_DATA] = self.pendingPriorityLiqAssetVaults[_aid]

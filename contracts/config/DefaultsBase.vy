@@ -1,3 +1,6 @@
+# Ripe Protocol License: https://github.com/ripe-foundation/ripe-protocol/blob/master/LICENSE.md
+# Ripe Foundation (C) 2025
+
 # @version 0.4.1
 
 implements: Defaults
@@ -57,44 +60,49 @@ def genDebtConfig() -> cs.GenDebtConfig:
     return cs.GenDebtConfig(
         perUserDebtLimit = 100 * EIGHTEEN_DECIMALS,
         globalDebtLimit = 1000 * EIGHTEEN_DECIMALS,
-        minDebtAmount = 5 * EIGHTEEN_DECIMALS,
+        minDebtAmount = 1 * EIGHTEEN_DECIMALS,
         numAllowedBorrowers = 50,
         maxBorrowPerInterval = 50 * EIGHTEEN_DECIMALS,
-        numBlocksPerInterval = DAY_IN_BLOCKS,
-        minDynamicRateBoost = 50_00,
+        numBlocksPerInterval = 1 * DAY_IN_BLOCKS,
+        minDynamicRateBoost = 1 * HUNDRED_PERCENT,
         maxDynamicRateBoost = 5 * HUNDRED_PERCENT,
         increasePerDangerBlock = 10,
         maxBorrowRate = HUNDRED_PERCENT,
         maxLtvDeviation = 10_00,
-        keeperFeeRatio = 0,
-        minKeeperFee = 0,
+        keeperFeeRatio = 1_00,
+        minKeeperFee = 1 * EIGHTEEN_DECIMALS,
         maxKeeperFee = 25_000 * EIGHTEEN_DECIMALS,
-        isDaowryEnabled = False,
-        ltvPaybackBuffer = 1_00,
+        isDaowryEnabled = True,
+        ltvPaybackBuffer = 5_00,
         genAuctionParams = cs.AuctionParams(
             hasParams = True,
-            startDiscount = 0,
+            startDiscount = 1_00,
             maxDiscount = 50_00,
             delay = 0,
-            duration = DAY_IN_BLOCKS,
+            duration = 1 * DAY_IN_BLOCKS,
         ),
     )
 
 
-# hr config
+# ripe available
 
 
 @view
 @external
-def hrConfig() -> cs.HrConfig:
-    return cs.HrConfig(
-        contribTemplate = empty(address),
-        maxCompensation = 0, # set this later, after core contributor vesting setup
-        minCliffLength = 1 * WEEK_IN_SECONDS,
-        maxStartDelay = 1 * MONTH_IN_SECONDS,
-        minVestingLength = 1 * MONTH_IN_SECONDS,
-        maxVestingLength = 5 * YEAR_IN_SECONDS,
-    )
+def ripeAvailForRewards() -> uint256:
+    return 1_000 * EIGHTEEN_DECIMALS
+
+
+@view
+@external
+def ripeAvailForHr() -> uint256:
+    return 1_000 * EIGHTEEN_DECIMALS
+
+
+@view
+@external
+def ripeAvailForBonds() -> uint256:
+    return 1_000 * EIGHTEEN_DECIMALS
 
 
 # ripe bond config
@@ -105,11 +113,11 @@ def hrConfig() -> cs.HrConfig:
 def ripeBondConfig() -> cs.RipeBondConfig:
     return cs.RipeBondConfig(
         asset = empty(address),
-        amountPerEpoch = 1_000 * (10 ** 6),
+        amountPerEpoch = 10 * (10 ** 6),
         canBond = False,
         minRipePerUnit = 1 * EIGHTEEN_DECIMALS,
-        maxRipePerUnit = 1_000 * EIGHTEEN_DECIMALS,
-        maxRipePerUnitLockBonus = 100 * EIGHTEEN_DECIMALS,
+        maxRipePerUnit = 100 * EIGHTEEN_DECIMALS,
+        maxRipePerUnitLockBonus = 1 * EIGHTEEN_DECIMALS,
         epochLength = 1 * DAY_IN_BLOCKS,
         shouldAutoRestart = False,
         restartDelayBlocks = 0,
@@ -124,26 +132,27 @@ def ripeBondConfig() -> cs.RipeBondConfig:
 def rewardsConfig() -> cs.RipeRewardsConfig:
     return cs.RipeRewardsConfig(
         arePointsEnabled = False,
-        ripePerBlock = 100 * EIGHTEEN_DECIMALS,
-        borrowersAlloc = 50_00,
-        stakersAlloc = 50_00,
+        ripePerBlock = 0,
+        borrowersAlloc = 10_00,
+        stakersAlloc = 90_00,
         votersAlloc = 0,
         genDepositorsAlloc = 0,
         autoStakeRatio = 90_00,
-        autoStakeDurationRatio = 10_00,
+        autoStakeDurationRatio = 25_00,
+        stabPoolRipePerDollarClaimed = 1 * EIGHTEEN_DECIMALS,
     )
 
 
-# ripe gov vault config
+# ripe token config for ripe gov vault
 
 
 @view
 @external
-def ripeGovVaultConfig() -> cs.RipeGovVaultConfig:
+def ripeTokenVaultConfig() -> cs.RipeGovVaultConfig:
     return cs.RipeGovVaultConfig(
         lockTerms = cs.LockTerms(
-            minLockDuration = 6 * MONTH_IN_BLOCKS,
-            maxLockDuration = 4 * YEAR_IN_BLOCKS,
+            minLockDuration = 1 * DAY_IN_BLOCKS,
+            maxLockDuration = 1 * WEEK_IN_BLOCKS,
             maxLockBoost = 5 * HUNDRED_PERCENT,
             canExit = True,
             exitFee = 50_00,
@@ -153,15 +162,19 @@ def ripeGovVaultConfig() -> cs.RipeGovVaultConfig:
     )
 
 
-# stab claim rewards config
+# hr config
 
 
 @view
 @external
-def stabClaimRewardsConfig() -> cs.StabClaimRewardsConfig:
-    return cs.StabClaimRewardsConfig(
-        rewardsLockDuration = 6 * MONTH_IN_BLOCKS,
-        ripePerDollarClaimed = 1 * EIGHTEEN_DECIMALS,
+def hrConfig() -> cs.HrConfig:
+    return cs.HrConfig(
+        contribTemplate = empty(address),
+        maxCompensation = 0, # set this later, after core contributor vesting setup
+        minCliffLength = 1 * WEEK_IN_SECONDS,
+        maxStartDelay = 3 * MONTH_IN_SECONDS,
+        minVestingLength = 1 * WEEK_IN_SECONDS,
+        maxVestingLength = 10 * YEAR_IN_SECONDS,
     )
 
 
@@ -184,24 +197,3 @@ def underscoreRegistry() -> address:
 @external
 def shouldCheckLastTouch() -> bool:
     return True
-
-
-# ripe available
-
-
-@view
-@external
-def ripeAvailForRewards() -> uint256:
-    return 100_000_000 * EIGHTEEN_DECIMALS
-
-
-@view
-@external
-def ripeAvailForHr() -> uint256:
-    return 100_000_000 * EIGHTEEN_DECIMALS
-
-
-@view
-@external
-def ripeAvailForBonds() -> uint256:
-    return 100_000_000 * EIGHTEEN_DECIMALS

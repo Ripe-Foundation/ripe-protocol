@@ -1,3 +1,6 @@
+# Ripe Protocol License: https://github.com/ripe-foundation/ripe-protocol/blob/master/LICENSE.md
+# Ripe Foundation (C) 2025
+
 # @version 0.4.1
 
 implements: Defaults
@@ -30,13 +33,25 @@ def genDebtConfig() -> cs.GenDebtConfig:
     return empty(cs.GenDebtConfig)
 
 
-# hr config
+# ripe available
 
 
 @view
 @external
-def hrConfig() -> cs.HrConfig:
-    return empty(cs.HrConfig)
+def ripeAvailForRewards() -> uint256:
+    return 100_000_000 * EIGHTEEN_DECIMALS
+
+
+@view
+@external
+def ripeAvailForHr() -> uint256:
+    return 100_000_000 * EIGHTEEN_DECIMALS
+
+
+@view
+@external
+def ripeAvailForBonds() -> uint256:
+    return 100_000_000 * EIGHTEEN_DECIMALS
 
 
 # ripe bond config
@@ -57,22 +72,22 @@ def rewardsConfig() -> cs.RipeRewardsConfig:
     return empty(cs.RipeRewardsConfig)
 
 
-# ripe gov vault config
+# ripe token config for ripe gov vault
 
 
 @view
 @external
-def ripeGovVaultConfig() -> cs.RipeGovVaultConfig:
+def ripeTokenVaultConfig() -> cs.RipeGovVaultConfig:
     return empty(cs.RipeGovVaultConfig)
 
 
-# stab claim rewards config
+# hr config
 
 
 @view
 @external
-def stabClaimRewardsConfig() -> cs.StabClaimRewardsConfig:
-    return empty(cs.StabClaimRewardsConfig)
+def hrConfig() -> cs.HrConfig:
+    return empty(cs.HrConfig)
 
 
 # underscore registry
@@ -92,23 +107,3 @@ def underscoreRegistry() -> address:
 def shouldCheckLastTouch() -> bool:
     return False
 
-
-# ripe available
-
-
-@view
-@external
-def ripeAvailForRewards() -> uint256:
-    return 100_000_000 * EIGHTEEN_DECIMALS
-
-
-@view
-@external
-def ripeAvailForHr() -> uint256:
-    return 100_000_000 * EIGHTEEN_DECIMALS
-
-
-@view
-@external
-def ripeAvailForBonds() -> uint256:
-    return 100_000_000 * EIGHTEEN_DECIMALS

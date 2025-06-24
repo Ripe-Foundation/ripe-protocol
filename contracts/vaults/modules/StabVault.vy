@@ -1,3 +1,6 @@
+# Ripe Protocol License: https://github.com/ripe-foundation/ripe-protocol/blob/master/LICENSE.md
+# Ripe Foundation (C) 2025
+
 # @version 0.4.1
 
 uses: vaultData
@@ -11,7 +14,7 @@ from ethereum.ercs import IERC4626
 from ethereum.ercs import IERC20
 
 interface MissionControl:
-    def getStabPoolClaimsConfig(_claimAsset: address, _claimer: address, _caller: address) -> StabPoolClaimsConfig: view
+    def getStabPoolClaimsConfig(_claimAsset: address, _claimer: address, _caller: address, _ripeToken: address) -> StabPoolClaimsConfig: view
     def getTellerDepositConfig(_vaultId: uint256, _asset: address, _user: address) -> TellerDepositConfig: view
     def getStabPoolRedemptionsConfig(_asset: address, _recipient: address) -> StabPoolRedemptionsConfig: view
     def getFirstVaultIdForAsset(_asset: address) -> uint256: view
@@ -591,7 +594,7 @@ def claimFromStabilityPool(
     assert msg.sender == addys._getTellerAddr() # dev: only Teller allowed
     assert not vaultData.isPaused # dev: contract paused
     a: addys.Addys = addys._getAddys(_a)
-    config: StabPoolClaimsConfig = staticcall MissionControl(a.missionControl).getStabPoolClaimsConfig(_claimAsset, _claimer, _caller)
+    config: StabPoolClaimsConfig = staticcall MissionControl(a.missionControl).getStabPoolClaimsConfig(_claimAsset, _claimer, _caller, a.ripeToken)
     claimUsdValue: uint256 = self._claimFromStabilityPool(_claimer, _stabAsset, _claimAsset, _maxUsdValue, _caller, _shouldAutoDeposit, config, a)
     assert claimUsdValue != 0 # dev: nothing claimed
     self._handleClaimRewards(_claimer, claimUsdValue, config.rewardsLockDuration, config.ripePerDollarClaimed, a)
@@ -613,7 +616,7 @@ def claimManyFromStabilityPool(
 
     totalUsdValue: uint256 = 0
     for c: StabPoolClaim in _claims:
-        config = staticcall MissionControl(a.missionControl).getStabPoolClaimsConfig(c.claimAsset, _claimer, _caller)
+        config = staticcall MissionControl(a.missionControl).getStabPoolClaimsConfig(c.claimAsset, _claimer, _caller, a.ripeToken)
         totalUsdValue += self._claimFromStabilityPool(_claimer, c.stabAsset, c.claimAsset, c.maxUsdValue, _caller, _shouldAutoDeposit, config, a)
     assert totalUsdValue != 0 # dev: nothing claimed
     self._handleClaimRewards(_claimer, totalUsdValue, config.rewardsLockDuration, config.ripePerDollarClaimed, a)

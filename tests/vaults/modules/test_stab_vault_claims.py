@@ -1540,20 +1540,21 @@ def test_stab_vault_claims_without_delegation_permission(
 
 
 @pytest.fixture(scope="module")
-def setupStabPoolClaimsRewards(mission_control, setAssetConfig, setGeneralConfig, switchboard_alpha, ripe_token):
+def setupStabPoolClaimsRewards(mission_control, setAssetConfig, setGeneralConfig, setRipeRewardsConfig, switchboard_alpha, ripe_token):
     def setupStabPoolClaimsRewards(
         _ripePerDollar = 1 * EIGHTEEN_DECIMALS,
         _stabRewardsLockDuration = 500,
         _minLockDuration = 0,
         _maxLockDuration = 1000,
+        _autoStakeDurationRatio = 0,
     ):
         setGeneralConfig()
 
-        stab_rewards_config = (
-            _stabRewardsLockDuration,
-            _ripePerDollar,
+        # Set RipeRewardsConfig with stab pool rewards
+        setRipeRewardsConfig(
+            _stabPoolRipePerDollarClaimed=_ripePerDollar,
+            _autoStakeDurationRatio=_autoStakeDurationRatio,
         )
-        mission_control.setStabClaimRewardsConfig(stab_rewards_config, sender=switchboard_alpha.address)
 
         # setup ripe gov vault
         lock_terms = (
@@ -1665,6 +1666,7 @@ def test_stab_vault_claim_rewards_different_rates(
     _test,
     setAssetConfig,
     setupStabPoolClaimsRewards,
+    setRipeRewardsConfig,
 ):
     """Test Ripe rewards with different reward rates"""
     # Test 1: High reward rate (1 Ripe per dollar)
@@ -1702,11 +1704,7 @@ def test_stab_vault_claim_rewards_different_rates(
     _test(expected_bob_rewards, bob_rewards)
 
     # Test 2: Low reward rate (0.01 Ripe per dollar)
-    low_rewards_config = (
-        2628000,  # ~1 year in blocks (365*24*60*60/12)
-        EIGHTEEN_DECIMALS // 100,  # 0.01 Ripe per dollar
-    )
-    mission_control.setStabClaimRewardsConfig(low_rewards_config, sender=switchboard_alpha.address)
+    setRipeRewardsConfig(_stabPoolRipePerDollarClaimed=EIGHTEEN_DECIMALS // 100)
 
     # Setup for Alice
     alpha_token.transfer(stability_pool, deposit_amount // 2, sender=alpha_token_whale)
@@ -2048,6 +2046,7 @@ def test_stab_vault_claim_rewards_config_changes(
     _test,
     setAssetConfig,
     setupStabPoolClaimsRewards,
+    setRipeRewardsConfig,
 ):
     """Test that reward configuration changes take effect immediately"""
     # Initial rewards configuration
@@ -2100,11 +2099,7 @@ def test_stab_vault_claim_rewards_config_changes(
     _test(expected_bob_rewards, bob_rewards)
 
     # Change rewards configuration
-    new_config = (
-        216000,  # ~30 days in blocks (different lock duration)
-        EIGHTEEN_DECIMALS // 2,  # 0.5 Ripe per dollar (higher rate)
-    )
-    mission_control.setStabClaimRewardsConfig(new_config, sender=switchboard_alpha.address)
+    setRipeRewardsConfig(_stabPoolRipePerDollarClaimed=EIGHTEEN_DECIMALS // 2)  # 0.5 Ripe per dollar (higher rate)
 
     # Alice claims with new config
     initial_alice_balance = ripe_gov_vault.getTotalAmountForUser(alice, ripe_token)

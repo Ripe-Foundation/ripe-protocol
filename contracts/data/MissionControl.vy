@@ -1,3 +1,16 @@
+#
+#       __  __  _   ____   ____  _  ____  __  _     ____  ____  __  _  _____ _____  ____  _    
+#      |  \/  || | (_ (_` (_ (_`| |/ () \|  \| |   / (__`/ () \|  \| ||_   _|| () )/ () \| |__ 
+#      |_|\/|_||_|.__)__).__)__)|_|\____/|_|\__|   \____)\____/|_|\__|  |_|  |_|\_\\____/|____|
+#
+#     ╔═══════════════════════════════════════════════════╗
+#     ║  ** Mission Control **                            ║
+#     ║  Stores all configuration data for Ripe protocol  ║
+#     ╚═══════════════════════════════════════════════════╝
+#
+#     Ripe Protocol License: https://github.com/ripe-foundation/ripe-protocol/blob/master/LICENSE.md
+#     Ripe Foundation (C) 2025    
+
 # @version 0.4.1
 # pragma optimize codesize
 
@@ -117,9 +130,7 @@ struct ClaimLootConfig:
     canClaimLoot: bool
     canClaimLootForUser: bool
     autoStakeRatio: uint256
-    autoStakeDurationRatio: uint256
-    minLockDuration: uint256
-    maxLockDuration: uint256
+    rewardsLockDuration: uint256
 
 struct RewardsConfig:
     arePointsEnabled: bool
@@ -153,6 +164,7 @@ struct PurchaseRipeBondConfig:
     minLockDuration: uint256
     maxLockDuration: uint256
     canAnyoneBondForUser: bool
+    isUserAllowed: bool
 
 struct DynamicBorrowRateConfig:
     minDynamicRateBoost: uint256
@@ -182,7 +194,6 @@ totalPointsAllocs: public(TotalPointsAllocs)
 
 # vault cs
 ripeGovVaultConfig: public(HashMap[address, cs.RipeGovVaultConfig]) # asset -> cs
-stabClaimRewardsConfig: public(cs.StabClaimRewardsConfig)
 priorityLiqAssetVaults: public(DynArray[cs.VaultLite, PRIORITY_VAULT_DATA])
 priorityStabVaults: public(DynArray[cs.VaultLite, PRIORITY_VAULT_DATA])
 
@@ -197,6 +208,7 @@ shouldCheckLastTouch: public(bool)
 MAX_VAULTS_PER_ASSET: constant(uint256) = 10
 MAX_PRIORITY_PRICE_SOURCES: constant(uint256) = 10
 PRIORITY_VAULT_DATA: constant(uint256) = 20
+HUNDRED_PERCENT: constant(uint256) = 100_00 # 100.00%
 
 
 @deploy
@@ -212,13 +224,12 @@ def __init__(_ripeHq: address, _defaults: address):
         self.hrConfig = staticcall Defaults(_defaults).hrConfig()
         self.ripeBondConfig = staticcall Defaults(_defaults).ripeBondConfig()
         self.rewardsConfig = staticcall Defaults(_defaults).rewardsConfig()
-        self.stabClaimRewardsConfig = staticcall Defaults(_defaults).stabClaimRewardsConfig()
         self.underscoreRegistry = staticcall Defaults(_defaults).underscoreRegistry()
         self.shouldCheckLastTouch = staticcall Defaults(_defaults).shouldCheckLastTouch()
 
-        ripeGovVaultConfig: cs.RipeGovVaultConfig = staticcall Defaults(_defaults).ripeGovVaultConfig()
-        if ripeGovVaultConfig.assetWeight != 0:
-            self.ripeGovVaultConfig[addys._getRipeToken()] = ripeGovVaultConfig
+        ripeTokenVaultConfig: cs.RipeGovVaultConfig = staticcall Defaults(_defaults).ripeTokenVaultConfig()
+        if ripeTokenVaultConfig.assetWeight != 0:
+            self.ripeGovVaultConfig[addys._getRipeToken()] = ripeTokenVaultConfig
 
 
 #################
@@ -372,15 +383,6 @@ def setRipeGovVaultConfig(
     )
 
 
-# stab pool claims
-
-
-@external
-def setStabClaimRewardsConfig(_config: cs.StabClaimRewardsConfig):
-    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
-    self.stabClaimRewardsConfig = _config
-
-
 # priority liq asset vaults
 
 
@@ -496,6 +498,18 @@ def _isUserAllowed(_whitelist: address, _user: address, _asset: address) -> bool
     if _whitelist != empty(address):
         isUserAllowed = staticcall Whitelist(_whitelist).isUserAllowed(_user, _asset)
     return isUserAllowed
+
+
+# auto stake lock duration
+
+
+@view
+@internal
+def _getLockDuration(_minLockDuration: uint256, _maxLockDuration: uint256, _autoStakeDurationRatio: uint256) -> uint256:
+    if _maxLockDuration <= _minLockDuration or _autoStakeDurationRatio == 0:
+        return _minLockDuration
+    durationRange: uint256 = _maxLockDuration - _minLockDuration
+    return durationRange * _autoStakeDurationRatio // HUNDRED_PERCENT
 
 
 # deposits
@@ -629,7 +643,7 @@ def getAuctionBuyConfig(_asset: address, _recipient: address) -> AuctionBuyConfi
     )
 
 
-# general liquidation cs
+# general liquidation config
 
 
 @view
@@ -668,7 +682,7 @@ def getGenAuctionParams() -> cs.AuctionParams:
     return self.genDebtConfig.genAuctionParams
 
 
-# asset liquidation cs
+# asset liquidation config
 
 
 @view
@@ -706,7 +720,7 @@ def getAssetLiqConfig(_asset: address) -> AssetLiqConfig:
 
 @view
 @external
-def getStabPoolClaimsConfig(_claimAsset: address, _claimer: address, _caller: address) -> StabPoolClaimsConfig:
+def getStabPoolClaimsConfig(_claimAsset: address, _claimer: address, _caller: address, _ripeToken: address) -> StabPoolClaimsConfig:
     assetConfig: cs.AssetConfig = self.assetConfig[_claimAsset]
 
     canClaimFromStabPoolForUser: bool = True
@@ -714,14 +728,17 @@ def getStabPoolClaimsConfig(_claimAsset: address, _claimer: address, _caller: ad
         delegation: cs.ActionDelegation = self.userDelegation[_claimer][_caller]
         canClaimFromStabPoolForUser = delegation.canClaimFromStabPool
 
-    rewardsConfig: cs.StabClaimRewardsConfig = self.stabClaimRewardsConfig
+    vaultConfig: cs.RipeGovVaultConfig = self.ripeGovVaultConfig[_ripeToken]
+    rewardsConfig: cs.RipeRewardsConfig = self.rewardsConfig
+    lockDuration: uint256 = self._getLockDuration(vaultConfig.lockTerms.minLockDuration, vaultConfig.lockTerms.maxLockDuration, rewardsConfig.autoStakeDurationRatio)
+
     return StabPoolClaimsConfig(
         canClaimInStabPoolGeneral=self.genConfig.canClaimInStabPool,
         canClaimInStabPoolAsset=assetConfig.canClaimInStabPool,
         canClaimFromStabPoolForUser=canClaimFromStabPoolForUser,
         isUserAllowed=self._isUserAllowed(assetConfig.whitelist, _claimer, _claimAsset),
-        rewardsLockDuration=rewardsConfig.rewardsLockDuration,
-        ripePerDollarClaimed=rewardsConfig.ripePerDollarClaimed,
+        rewardsLockDuration=lockDuration,
+        ripePerDollarClaimed=rewardsConfig.stabPoolRipePerDollarClaimed,
     )
 
 
@@ -751,20 +768,19 @@ def getClaimLootConfig(_user: address, _caller: address, _ripeToken: address) ->
         delegation: cs.ActionDelegation = self.userDelegation[_user][_caller]
         canClaimLootForUser = delegation.canClaimLoot
 
-    ripeTokenVaultConfig: cs.RipeGovVaultConfig = self.ripeGovVaultConfig[_ripeToken]
+    vaultConfig: cs.RipeGovVaultConfig = self.ripeGovVaultConfig[_ripeToken]
     rewardsConfig: cs.RipeRewardsConfig = self.rewardsConfig
+    lockDuration: uint256 = self._getLockDuration(vaultConfig.lockTerms.minLockDuration, vaultConfig.lockTerms.maxLockDuration, rewardsConfig.autoStakeDurationRatio)
 
     return ClaimLootConfig(
         canClaimLoot=self.genConfig.canClaimLoot,
         canClaimLootForUser=canClaimLootForUser,
         autoStakeRatio=rewardsConfig.autoStakeRatio,
-        autoStakeDurationRatio=rewardsConfig.autoStakeDurationRatio,
-        minLockDuration=ripeTokenVaultConfig.lockTerms.minLockDuration,
-        maxLockDuration=ripeTokenVaultConfig.lockTerms.maxLockDuration,
+        rewardsLockDuration=lockDuration,
     )
 
 
-# rewards cs
+# rewards config
 
 
 @view
@@ -798,7 +814,7 @@ def getDepositPointsConfig(_asset: address) -> DepositPointsConfig:
     )
 
 
-# price cs
+# price config
 
 
 @view
@@ -810,7 +826,7 @@ def getPriceConfig() -> PriceConfig:
     )
 
 
-# ripe bond cs
+# ripe bond config
 
 
 @view
@@ -818,7 +834,7 @@ def getPriceConfig() -> PriceConfig:
 def getPurchaseRipeBondConfig(_user: address) -> PurchaseRipeBondConfig:
     bondConfig: cs.RipeBondConfig = self.ripeBondConfig
     vaultConfig: cs.RipeGovVaultConfig = self.ripeGovVaultConfig[addys._getRipeToken()]
-
+    assetConfig: cs.AssetConfig = self.assetConfig[bondConfig.asset]
     return PurchaseRipeBondConfig(
         asset=bondConfig.asset,
         amountPerEpoch=bondConfig.amountPerEpoch,
@@ -832,10 +848,11 @@ def getPurchaseRipeBondConfig(_user: address) -> PurchaseRipeBondConfig:
         minLockDuration=vaultConfig.lockTerms.minLockDuration,
         maxLockDuration=vaultConfig.lockTerms.maxLockDuration,
         canAnyoneBondForUser=self.userConfig[_user].canAnyoneBondForUser,
+        isUserAllowed=self._isUserAllowed(assetConfig.whitelist, _user, bondConfig.asset),
     )
 
 
-# dynamic borrow rate cs
+# dynamic borrow rate config
 
 
 @view

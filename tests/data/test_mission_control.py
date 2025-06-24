@@ -102,6 +102,7 @@ def sample_ripe_rewards_config():
         2500,                    # genDepositorsAlloc (25%)
         1000,                    # autoStakeRatio (10%)
         5000,                    # autoStakeDurationRatio (50%)
+        1 * EIGHTEEN_DECIMALS,   # stabPoolRipePerDollarClaimed
     )
 
 
@@ -531,24 +532,18 @@ def test_mission_control_set_ripe_gov_vault_config_unauthorized(mission_control,
     with boa.reverts("no perms"):
         mission_control.setRipeGovVaultConfig(ripe_token.address, 1000, True, lock_terms, sender=alice)
 
-def test_mission_control_set_stab_claim_rewards_config(mission_control, switchboard_alpha):
+def test_mission_control_set_stab_claim_rewards_config(mission_control, setRipeRewardsConfig):
     """Test setting stability pool claim rewards configuration."""
-    stab_config = (
-        7200,                    # rewardsLockDuration
-        100 * EIGHTEEN_DECIMALS, # ripePerDollarClaimed
-    )
+    # Set up rewards config with stab pool rewards
+    setRipeRewardsConfig(_stabPoolRipePerDollarClaimed=100 * EIGHTEEN_DECIMALS)
     
-    mission_control.setStabClaimRewardsConfig(stab_config, sender=switchboard_alpha.address)
-    
-    stored_config = mission_control.stabClaimRewardsConfig()
-    assert stored_config.rewardsLockDuration == 7200
-    assert stored_config.ripePerDollarClaimed == 100 * EIGHTEEN_DECIMALS
+    stored_config = mission_control.rewardsConfig()
+    assert stored_config.stabPoolRipePerDollarClaimed == 100 * EIGHTEEN_DECIMALS
 
 def test_mission_control_set_stab_claim_rewards_config_unauthorized(mission_control, alice):
     """Test that only Switchboard can set stab claim rewards config."""
-    stab_config = (7200, 100 * EIGHTEEN_DECIMALS)
     with boa.reverts("no perms"):
-        mission_control.setStabClaimRewardsConfig(stab_config, sender=alice)
+        mission_control.setRipeRewardsConfig((True, 10, 25_00, 25_00, 25_00, 25_00, 0, 0, 100 * EIGHTEEN_DECIMALS), sender=alice)
 
 def test_mission_control_set_priority_liq_asset_vaults(mission_control, switchboard_alpha, alpha_token):
     """Test setting priority liquidation asset vaults."""
@@ -679,29 +674,33 @@ def test_mission_control_get_asset_liq_config(mission_control, switchboard_alpha
     assert config.shouldSwapInStabPools == sample_asset_config[9]
     assert config.shouldAuctionInstantly == sample_asset_config[10]
 
-def test_mission_control_get_stab_pool_claims_config(mission_control, switchboard_alpha, alice, bob, alpha_token, sample_gen_config, sample_asset_config, sample_action_delegation):
+def test_mission_control_get_stab_pool_claims_config(mission_control, switchboard_alpha, alice, bob, alpha_token, ripe_token, sample_gen_config, sample_asset_config, sample_action_delegation, setRipeRewardsConfig):
     """Test getting stability pool claims configuration."""
     # Set up configs
     mission_control.setGeneralConfig(sample_gen_config, sender=switchboard_alpha.address)
     mission_control.setAssetConfig(alpha_token.address, sample_asset_config, sender=switchboard_alpha.address)
     
-    stab_config = (7200, 100 * EIGHTEEN_DECIMALS)
-    mission_control.setStabClaimRewardsConfig(stab_config, sender=switchboard_alpha.address)
+    # Set RipeRewardsConfig with stab pool rewards and autoStakeDurationRatio=0
+    setRipeRewardsConfig(_stabPoolRipePerDollarClaimed=100 * EIGHTEEN_DECIMALS, _autoStakeDurationRatio=0)
+    
+    # Set RIPE gov vault config for lock duration calculation
+    lock_terms = (7200, 518400, 2000, True, 500)
+    mission_control.setRipeGovVaultConfig(ripe_token.address, 1000, True, lock_terms, sender=switchboard_alpha.address)
     
     # Test claiming for self
-    config = mission_control.getStabPoolClaimsConfig(alpha_token.address, alice, alice)
+    config = mission_control.getStabPoolClaimsConfig(alpha_token.address, alice, alice, ripe_token.address)
     assert config.canClaimInStabPoolGeneral
     assert config.canClaimInStabPoolAsset
     assert config.canClaimFromStabPoolForUser
-    assert config.rewardsLockDuration == 7200
+    assert config.rewardsLockDuration == 7200  # minLockDuration when autoStakeDurationRatio is 0
     
     # Test claiming for another user without delegation
-    config = mission_control.getStabPoolClaimsConfig(alpha_token.address, alice, bob)
+    config = mission_control.getStabPoolClaimsConfig(alpha_token.address, alice, bob, ripe_token.address)
     assert not config.canClaimFromStabPoolForUser
     
     # Set delegation and test again
     mission_control.setUserDelegation(alice, bob, sample_action_delegation, sender=switchboard_alpha.address)
-    config = mission_control.getStabPoolClaimsConfig(alpha_token.address, alice, bob)
+    config = mission_control.getStabPoolClaimsConfig(alpha_token.address, alice, bob, ripe_token.address)
     assert config.canClaimFromStabPoolForUser
 
 def test_mission_control_get_claim_loot_config(mission_control, switchboard_alpha, alice, bob, ripe_token, sample_gen_config, sample_ripe_rewards_config, sample_action_delegation):
@@ -719,8 +718,7 @@ def test_mission_control_get_claim_loot_config(mission_control, switchboard_alph
     assert config.canClaimLoot
     assert config.canClaimLootForUser
     assert config.autoStakeRatio == sample_ripe_rewards_config[6]
-    assert config.minLockDuration == 7200
-    assert config.maxLockDuration == 518400
+    assert config.rewardsLockDuration == 255600  # calculated: 7200 + (511200 * 50%)
     
     # Test claiming for another user without delegation
     config = mission_control.getClaimLootConfig(alice, bob, ripe_token.address)

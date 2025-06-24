@@ -1,3 +1,15 @@
+#        ______   __     __   __   ______  ______   __  __   ______   ______   ______   ______   _____    
+#       /\  ___\ /\ \  _ \ \ /\ \ /\__  _\/\  ___\ /\ \_\ \ /\  == \ /\  __ \ /\  __ \ /\  == \ /\  __-.  
+#       \ \___  \\ \ \/ ".\ \\ \ \\/_/\ \/\ \ \____\ \  __ \\ \  __< \ \ \/\ \\ \  __ \\ \  __< \ \ \/\ \ 
+#        \/\_____\\ \__/".~\_\\ \_\  \ \_\ \ \_____\\ \_\ \_\\ \_____\\ \_____\\ \_\ \_\\ \_\ \_\\ \____- 
+#         \/_____/ \/_/   \/_/ \/_/   \/_/  \/_____/ \/_/\/_/ \/_____/ \/_____/ \/_/\/_/ \/_/ /_/ \/____/ 
+#                                                   ┳┓        
+#                                                   ┣┫┏┓┏┓┓┏┏┓
+#                                                   ┻┛┛ ┗┻┗┛┗┛
+#
+#      Ripe Protocol License: https://github.com/ripe-foundation/ripe-protocol/blob/master/LICENSE.md
+#      Ripe Foundation (C) 2025 
+
 # @version 0.4.1
 # pragma optimize codesize
 
@@ -411,6 +423,17 @@ def _isValidAssetDepositParams(
     for vaultId: uint256 in _vaultIds:
         if not staticcall VaultBook(vaultBook).isValidRegId(vaultId):
             return False
+    
+    # staker allocs must be with staker vaults
+    if _stakersPointsAlloc != 0:
+        hasStakerVault: bool = False
+        for sid: uint256 in [1, 2]:
+            if sid in _vaultIds:
+                hasStakerVault = True
+                break
+        if not hasStakerVault:
+            return False
+
     return True
 
 
@@ -478,9 +501,10 @@ def _isValidAssetLiqConfig(
         if _isNft:
             return False
 
-        # cannot have whitelist if no special stab pool
-        if _whitelist != empty(address) and _specialStabPoolId == 0:
-            return False
+        # NOTE: removing this temporarily during initial deployment, training wheels period
+        # # cannot have whitelist if no special stab pool
+        # if _whitelist != empty(address) and _specialStabPoolId == 0:
+        #     return False
 
         # must have ltv
         if _debtTermsLtv == 0:

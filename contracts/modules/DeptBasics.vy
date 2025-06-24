@@ -1,8 +1,13 @@
+# Ripe Protocol License: https://github.com/ripe-foundation/ripe-protocol/blob/master/LICENSE.md
+# Ripe Foundation (C) 2025
+
 # @version 0.4.1
 
 uses: addys
+implements: dept
 
 import contracts.modules.Addys as addys
+import interfaces.Department as dept
 from ethereum.ercs import IERC20
 
 event DepartmentPauseModified:

@@ -231,6 +231,7 @@ def setRipeRewardsConfig(mission_control, switchboard_alpha):
         _genDepositorsAlloc = 25_00,
         _autoStakeRatio = 0,
         _autoStakeDurationRatio = 0,
+        _stabPoolRipePerDollarClaimed = 0,
     ):
         config = (
             _arePointsEnabled,
@@ -241,23 +242,10 @@ def setRipeRewardsConfig(mission_control, switchboard_alpha):
             _genDepositorsAlloc,
             _autoStakeRatio,
             _autoStakeDurationRatio,
+            _stabPoolRipePerDollarClaimed,
         )
         mission_control.setRipeRewardsConfig(config, sender=switchboard_alpha.address)
     yield setRipeRewardsConfig
-
-
-@pytest.fixture(scope="session")
-def setStabClaimRewardsConfig(mission_control, switchboard_alpha):
-    def setStabClaimRewardsConfig(
-        _rewardsLockDuration = 30 * 24 * 60 * 60,  # 30 days in seconds
-        _ripePerDollarClaimed = EIGHTEEN_DECIMALS // 10,  # 0.1 Ripe per dollar
-    ):
-        config = (
-            _rewardsLockDuration,
-            _ripePerDollarClaimed,
-        )
-        mission_control.setStabClaimRewardsConfig(config, sender=switchboard_alpha.address)
-    yield setStabClaimRewardsConfig
 
 
 ###############

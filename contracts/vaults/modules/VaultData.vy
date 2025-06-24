@@ -1,3 +1,6 @@
+# Ripe Protocol License: https://github.com/ripe-foundation/ripe-protocol/blob/master/LICENSE.md
+# Ripe Foundation (C) 2025
+
 # @version 0.4.1
 
 uses: addys

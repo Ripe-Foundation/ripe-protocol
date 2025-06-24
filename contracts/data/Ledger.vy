@@ -1,3 +1,24 @@
+#            ____             ______        _____         _____         ______        _____   
+#           |    |        ___|\     \   ___|\    \    ___|\    \    ___|\     \   ___|\    \  
+#           |    |       |     \     \ |    |\    \  /    /\    \  |     \     \ |    |\    \ 
+#           |    |       |     ,_____/||    | |    ||    |  |____| |     ,_____/||    | |    |
+#           |    |  ____ |     \--'\_|/|    | |    ||    |    ____ |     \--'\_|/|    |/____/ 
+#           |    | |    ||     /___/|  |    | |    ||    |   |    ||     /___/|  |    |\    \ 
+#           |    | |    ||     \____|\ |    | |    ||    |   |_,  ||     \____|\ |    | |    |
+#           |____|/____/||____ '     /||____|/____/||\ ___\___/  /||____ '     /||____| |____|
+#           |    |     |||    /_____/ ||    /    | || |   /____ / ||    /_____/ ||    | |    |
+#           |____|_____|/|____|     | /|____|____|/  \|___|    | / |____|     | /|____| |____|
+#             \(    )/     \( |_____|/   \(    )/      \( |____|/    \( |_____|/   \(     )/  
+#              '    '       '    )/       '    '        '   )/        '    )/       '     '   
+#                                '                          '              '                  
+#     ╔══════════════════════════════════════════════╗
+#     ║  ** Ledger **                                ║
+#     ║  Handles all data storage for the protocol   ║
+#     ╚══════════════════════════════════════════════╝
+#
+#     Ripe Protocol License: https://github.com/ripe-foundation/ripe-protocol/blob/master/LICENSE.md
+#     Ripe Foundation (C) 2025  
+
 # @version 0.4.1
 
 implements: Department
@@ -106,7 +127,9 @@ struct RipeBondData:
     ripeAvailForBonds: uint256
     badDebt: uint256
 
+# high level
 lastTouch: public(HashMap[address, uint256])  # user -> block number
+isLockedAccount: public(HashMap[address, bool]) # wallet -> is locked
 
 # user vault participation
 userVaults: public(HashMap[address, HashMap[uint256, uint256]]) # user -> index -> vault id
@@ -185,6 +208,19 @@ def checkAndUpdateLastTouch(_user: address, _shouldCheck: bool, _mc: address = e
     
     # update last touch
     self.lastTouch[_user] = block.number
+
+    # check locked account
+    assert not self.isLockedAccount[_user] # dev: account locked
+
+
+# locked account
+
+
+@external
+def setLockedAccount(_wallet: address, _shouldLock: bool):
+    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
+    assert not deptBasics.isPaused # dev: not activated
+    self.isLockedAccount[_wallet] = _shouldLock
 
 
 ###############
@@ -750,9 +786,16 @@ def addHrContributor(_contributor: address, _compensation: uint256):
 
 @external
 def setRipeAvailForHr(_amount: uint256):
-    assert addys._isSwitchboardAddr(msg.sender) or msg.sender == addys._getHumanResourcesAddr() # dev: no perms
+    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
     assert not deptBasics.isPaused # dev: not activated
     self.ripeAvailForHr = _amount
+
+
+@external
+def refundRipeAfterCancelPaycheck(_amount: uint256):
+    assert msg.sender == addys._getHumanResourcesAddr() # dev: no perms
+    assert not deptBasics.isPaused # dev: not activated
+    self.ripeAvailForHr += _amount
 
 
 #########

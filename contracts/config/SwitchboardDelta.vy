@@ -1,3 +1,15 @@
+#        ______   __     __   __   ______  ______   __  __   ______   ______   ______   ______   _____    
+#       /\  ___\ /\ \  _ \ \ /\ \ /\__  _\/\  ___\ /\ \_\ \ /\  == \ /\  __ \ /\  __ \ /\  == \ /\  __-.  
+#       \ \___  \\ \ \/ ".\ \\ \ \\/_/\ \/\ \ \____\ \  __ \\ \  __< \ \ \/\ \\ \  __ \\ \  __< \ \ \/\ \ 
+#        \/\_____\\ \__/".~\_\\ \_\  \ \_\ \ \_____\\ \_\ \_\\ \_____\\ \_____\\ \_\ \_\\ \_\ \_\\ \____- 
+#         \/_____/ \/_/   \/_/ \/_/   \/_/  \/_____/ \/_/\/_/ \/_____/ \/_____/ \/_/\/_/ \/_/ /_/ \/____/ 
+#                                                      ┓  ┓   
+#                                                     ┏┫┏┓┃╋┏┓
+#                                                     ┗┻┗ ┗┗┗┻
+#
+#      Ripe Protocol License: https://github.com/ripe-foundation/ripe-protocol/blob/master/LICENSE.md
+#      Ripe Foundation (C) 2025 
+
 # @version 0.4.1
 # pragma optimize codesize
 
@@ -21,7 +33,6 @@ interface HrContributor:
     def cancelPaycheck(): nonpayable
 
 interface MissionControl:
-    def setStabClaimRewardsConfig(_config: cs.StabClaimRewardsConfig): nonpayable
     def setRipeBondConfig(_config: cs.RipeBondConfig): nonpayable
     def canPerformLiteAction(_user: address) -> bool: view
     def setHrConfig(_config: cs.HrConfig): nonpayable
@@ -50,7 +61,6 @@ flag ActionType:
     RIPE_BOND_EPOCH_LENGTH
     RIPE_BOND_START_EPOCH
     RIPE_BAD_DEBT
-    STAB_CLAIM_REWARDS
 
 struct PendingManager:
     contributor: address
@@ -145,12 +155,6 @@ event PendingBadDebtSet:
     confirmationBlock: uint256
     actionId: uint256
 
-event PendingStabClaimRewardsConfigSet:
-    rewardsLockDuration: uint256
-    ripePerDollarClaimed: uint256
-    confirmationBlock: uint256
-    actionId: uint256
-
 event HrContribTemplateSet:
     contribTemplate: indexed(address)
 
@@ -191,10 +195,6 @@ event RipeBondStartEpochAtBlockSet:
 event BadDebtSet:
     badDebt: uint256
 
-event StabClaimRewardsConfigSet:
-    rewardsLockDuration: uint256
-    ripePerDollarClaimed: uint256
-
 # pending config changes
 actionType: public(HashMap[uint256, ActionType]) # aid -> type
 pendingHrConfig: public(HashMap[uint256, cs.HrConfig]) # aid -> config
@@ -202,7 +202,6 @@ pendingManager: public(HashMap[uint256, PendingManager]) # aid -> pending manage
 pendingCancelPaycheck: public(HashMap[uint256, address]) # aid -> contributor
 pendingRipeBondConfig: public(HashMap[uint256, cs.RipeBondConfig]) # aid -> config
 pendingRipeBondConfigValue: public(HashMap[uint256, uint256]) # aid -> block
-pendingStabClaimRewardsConfig: public(HashMap[uint256, cs.StabClaimRewardsConfig]) # aid -> config
 
 LEDGER_ID: constant(uint256) = 4
 MISSION_CONTROL_ID: constant(uint256) = 5
@@ -214,7 +213,6 @@ DAY_IN_SECONDS: constant(uint256) = 60 * 60 * 24
 WEEK_IN_SECONDS: constant(uint256) = 7 * DAY_IN_SECONDS
 MONTH_IN_SECONDS: constant(uint256) = 30 * DAY_IN_SECONDS
 YEAR_IN_SECONDS: constant(uint256) = 365 * DAY_IN_SECONDS
-
 
 
 @deploy
@@ -560,33 +558,6 @@ def setBadDebt(_amount: uint256) -> uint256:
     return aid
 
 
-###########################
-# Stab Pool Claim Rewards #
-###########################
-
-
-@external
-def setStabClaimRewardsConfig(_rewardsLockDuration: uint256, _ripePerDollarClaimed: uint256) -> uint256:
-    assert gov._canGovern(msg.sender) # dev: no perms
-    assert _ripePerDollarClaimed != 0 # dev: invalid ripe per dollar claimed
-
-    aid: uint256 = timeLock._initiateAction()
-    self.actionType[aid] = ActionType.STAB_CLAIM_REWARDS
-    self.pendingStabClaimRewardsConfig[aid] = cs.StabClaimRewardsConfig(
-        rewardsLockDuration=_rewardsLockDuration,
-        ripePerDollarClaimed=_ripePerDollarClaimed,
-    )
-
-    confirmationBlock: uint256 = timeLock._getActionConfirmationBlock(aid)
-    log PendingStabClaimRewardsConfigSet(
-        rewardsLockDuration=_rewardsLockDuration,
-        ripePerDollarClaimed=_ripePerDollarClaimed,
-        confirmationBlock=confirmationBlock,
-        actionId=aid,
-    )
-    return aid
-
-
 #############
 # Execution #
 #############
@@ -680,11 +651,6 @@ def executePendingAction(_aid: uint256) -> bool:
         amount: uint256 = self.pendingRipeBondConfigValue[_aid]
         extcall Ledger(self._getLedgerAddr()).setBadDebt(amount)
         log BadDebtSet(badDebt=amount)
-
-    elif actionType == ActionType.STAB_CLAIM_REWARDS:
-        p: cs.StabClaimRewardsConfig = self.pendingStabClaimRewardsConfig[_aid]
-        extcall MissionControl(mc).setStabClaimRewardsConfig(p)
-        log StabClaimRewardsConfigSet(rewardsLockDuration=p.rewardsLockDuration, ripePerDollarClaimed=p.ripePerDollarClaimed)
 
     self.actionType[_aid] = empty(ActionType)
     return True

@@ -1,7 +1,9 @@
+# Ripe Protocol License: https://github.com/ripe-foundation/ripe-protocol/blob/master/LICENSE.md
+# Ripe Foundation (C) 2025
+
 # @version 0.4.1
 
 interface RipeHq:
-    def canModifyMissionControl(_addr: address) -> bool: view
     def isValidAddr(_addr: address) -> bool: view
     def getAddr(_regId: uint256) -> address: view
 

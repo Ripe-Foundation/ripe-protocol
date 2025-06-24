@@ -477,6 +477,18 @@ def defaults(fork):
     return d
 
 
+# training wheels
+
+
+@pytest.fixture(scope="session")
+def training_wheels(ripe_hq_deploy):
+    return boa.load(
+        "contracts/config/TrainingWheels.vy",
+        ripe_hq_deploy,
+        name="training_wheels",
+    )
+
+
 ##########
 # Vaults #
 ##########

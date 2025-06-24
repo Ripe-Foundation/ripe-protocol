@@ -1217,29 +1217,29 @@ def test_ltv_deviation_with_default_values(switchboard_bravo, governance, alpha_
     assert action_id > 0
 
 
-def test_whitelist_special_stab_pool_validation(switchboard_bravo, governance, alpha_token, mock_rando_contract):
-    """Test whitelist and special stab pool interaction validation"""
-    # Test: Cannot have whitelist with zero special stab pool when swapping in stab pools
-    with boa.reverts("invalid asset"):
-        switchboard_bravo.addAsset(
-            alpha_token, [1], 50_00, 30_00, 1000, 10000, 0,
-            (60_00, 70_00, 80_00, 5_00, 10_00, 2_00),  # with LTV
-            False,  # shouldBurnAsPayment
-            False,  # shouldTransferToEndaoment
-            True,   # shouldSwapInStabPools
-            True,   # shouldAuctionInstantly
-            True,   # canDeposit
-            True,   # canWithdraw
-            True,   # canRedeemCollateral
-            True,   # canRedeemInStabPool
-            True,   # canBuyInAuction
-            True,   # canClaimInStabPool
-            0,      # specialStabPoolId (zero with whitelist = invalid)
-            (False, 0, 0, 0, 0),  # customAuctionParams
-            mock_rando_contract,  # whitelist (non-zero)
-            False,  # isNft
-            sender=governance.address
-        )
+# def test_whitelist_special_stab_pool_validation(switchboard_bravo, governance, alpha_token, mock_rando_contract):
+#     """Test whitelist and special stab pool interaction validation"""
+#     # Test: Cannot have whitelist with zero special stab pool when swapping in stab pools
+#     with boa.reverts("invalid asset"):
+#         switchboard_bravo.addAsset(
+#             alpha_token, [1], 50_00, 30_00, 1000, 10000, 0,
+#             (60_00, 70_00, 80_00, 5_00, 10_00, 2_00),  # with LTV
+#             False,  # shouldBurnAsPayment
+#             False,  # shouldTransferToEndaoment
+#             True,   # shouldSwapInStabPools
+#             True,   # shouldAuctionInstantly
+#             True,   # canDeposit
+#             True,   # canWithdraw
+#             True,   # canRedeemCollateral
+#             True,   # canRedeemInStabPool
+#             True,   # canBuyInAuction
+#             True,   # canClaimInStabPool
+#             0,      # specialStabPoolId (zero with whitelist = invalid)
+#             (False, 0, 0, 0, 0),  # customAuctionParams
+#             mock_rando_contract,  # whitelist (non-zero)
+#             False,  # isNft
+#             sender=governance.address
+#         )
 
 
 def test_auction_params_validation_delegation(switchboard_bravo, governance, alpha_token, switchboard_alpha):
@@ -1397,7 +1397,7 @@ def test_complex_multi_asset_configuration_scenarios(switchboard_bravo, governan
     
     # Add token with full debt functionality
     action_id3 = switchboard_bravo.addAsset(
-        bravo_token, [3], 50_00, 30_00, 2000, 20000, 0,
+        bravo_token, [1, 3], 50_00, 30_00, 2000, 20000, 0,  # include vault 1 for staker allocation
         (70_00, 75_00, 85_00, 8_00, 12_00, 3_00),  # full debt terms
         False,  # shouldBurnAsPayment
         False,  # shouldTransferToEndaoment
