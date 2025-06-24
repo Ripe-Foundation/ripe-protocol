@@ -9,6 +9,8 @@ ADDYS = {
         # default chainlink feeds
         "CHAINLINK_ETH_USD": "0x71041dddad3595F9CEd3DcCFBe3D1F4b0a16Bb70",
         "CHAINLINK_BTC_USD": "0x64c911996D3c6aC71f9b455B1E8E7266BcbD848F",
+        "CHAINLINK_USDC_USD": "0x7e860098F58bBFC8648a4311b374B1D669a2bc6B",
+        "CHAINLINK_CBBTC_USD": "0x07DA0E54543a844a80ABE69c8A12F22B3aA59f9D",
         # important tokens / representations
         "WETH": "0x4200000000000000000000000000000000000006",
         "ETH": "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE",
@@ -30,6 +32,8 @@ ADDYS = {
         # oracles
         "PYTH_NETWORK": "0x8250f4aF4B972684F7b336503E2D6dFeDeB1487a",
         "STORK_NETWORK": "0x647DFd812BC1e116c6992CB2bC353b2112176fD6",
+        # governance
+        "GOVERNANCE": "0x13BEF4e90c8818Cd4bbdbA97085BA37a05F90580",
     },
     "local": {
         # important tokens / representations
@@ -37,11 +41,43 @@ ADDYS = {
         "ETH": "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE",
         "BTC": "0xbBbBBBBbbBBBbbbBbbBbbbbBBbBbbbbBbBbbBBbB",
     },
+    "sepolia": {
+        # important tokens / representations
+        "WETH": "0x4200000000000000000000000000000000000006",
+        "ETH": "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE",
+        "BTC": "0xbBbBBBBbbBBBbbbBbbBbbbbBBbBbbbbBbBbbBBbB",
+        "USDC": "0x611ce0729f6C052f49536c84a8fD717E619D5dc6",
+        "CBBTC": "0x003d1beA6B9C5193cDA8d747A5362eD2932a35d0",
+        "GOVERNANCE": "0xa6AC77Fb1Ac34d35F852456560bAef2d77239dcF",
+        "CURVE_ADDRESS_PROVIDER": "0x88953B3eBA73d6B5252b00B1827769b5a5617599",
+        "CURVE_STABLE_FACTORY": "0xa1ABe9e8F3C516c66F48cb318B62bFfa2CB5D1Cc",
+        "CURVE_CRYPTO_FACTORY": "0xe11286024334D79f8bA8d621dA8bCB177C7F988C",
+    },
 }
 
 
 PARAMS = {
     "base": {
+        # ripe hq - gov changes (blocks)
+        "RIPE_HQ_MIN_GOV_TIMELOCK": 43_200,  # 1 day on Base
+        "RIPE_HQ_MAX_GOV_TIMELOCK": 302_400,  # 7 days on Base
+        # ripe hq - registry changes (blocks)
+        "RIPE_HQ_MIN_REG_TIMELOCK": 21_600,  # 12 hours on Base
+        "RIPE_HQ_MAX_REG_TIMELOCK": 302_400,  # 7 days on Base
+        # tokens (green / ripe)
+        "MIN_HQ_CHANGE_TIMELOCK": 43_200,  # 1 day on Base
+        "MAX_HQ_CHANGE_TIMELOCK": 302_400,  # 7 days on Base
+        # price desk (timestamps, not blocks!)
+        "PRICE_DESK_MIN_STALE_TIME": 60 * 5,  # 5 mins
+        "PRICE_DESK_MAX_STALE_TIME": 60 * 60 * 24 * 3,  # 3 days
+        # price desk (blocks)
+        "PRICE_DESK_MIN_REG_TIMELOCK": 21_600,  # 12 hours on Base
+        "PRICE_DESK_MAX_REG_TIMELOCK": 302_400,  # 7 days on Base
+        # vault book (blocks)
+        "VAULT_BOOK_MIN_REG_TIMELOCK": 21_600,  # 12 hours on Base
+        "VAULT_BOOK_MAX_REG_TIMELOCK": 302_400,  # 7 days on Base
+    },
+    "sepolia": {
         # ripe hq - gov changes (blocks)
         "RIPE_HQ_MIN_GOV_TIMELOCK": 43_200,  # 1 day on Base
         "RIPE_HQ_MAX_GOV_TIMELOCK": 302_400,  # 7 days on Base
@@ -112,11 +148,33 @@ CORE_TOKENS = {
         "WELL": "0xA88594D404727625A9437C3f886C7643872296AE",
         "VIRTUAL": "0x0b3e328455c4059EEb9e3f84b5543F74E24e7E1b",
     },
+    "sepolia": {},
 }
 
 
 CURVE_PARAMS = {
     "base": {
+        # green pool parameters
+        "GREEN_POOL_NAME": "GREEN/USDC Pool",
+        "GREEN_POOL_SYMBOL": "GREEN/USDC",
+        "GREEN_POOL_A": 100,
+        "GREEN_POOL_FEE": 4000000,
+        "GREEN_POOL_OFFPEG_MULTIPLIER": 20000000000,
+        "GREEN_POOL_MA_EXP_TIME": 600,
+        # ripe pool params
+        "RIPE_POOL_NAME": "RIPE/WETH Pool",
+        "RIPE_POOL_SYMBOL": "RIPE/WETH",
+        "RIPE_POOL_A": 2700000,
+        "RIPE_POOL_GAMMA": 1300000000000,
+        "RIPE_POOL_MID_FEE": 2999999,
+        "RIPE_POOL_OUT_FEE": 80000000,
+        "RIPE_POOL_FEE_GAMMA": 350000000000000,
+        "RIPE_POOL_EXTRA_PROFIT": 100000000000,
+        "RIPE_POOL_ADJ_STEP": 100000000000,
+        "RIPE_POOL_MA_EXP_TIME": 600,
+        "RIPE_POOL_INIT_PRICE": 10 ** 13,
+    },
+    "sepolia": {
         # green pool parameters
         "GREEN_POOL_NAME": "GREEN/USDC Pool",
         "GREEN_POOL_SYMBOL": "GREEN/USDC",
@@ -217,4 +275,5 @@ YIELD_TOKENS = {
         "AAVEV3_GHO": "0x067ae75628177FD257c2B1e500993e1a0baBcBd1",
 
     },
+    "sepolia": {},
 }

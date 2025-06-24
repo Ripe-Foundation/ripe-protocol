@@ -162,7 +162,7 @@ def mock_curve_prices(ripe_hq_deploy, fork):
 def mock_chainlink_feed_one():
     return boa.load(
         "contracts/mock/MockChainlinkFeed.vy",
-        EIGHTEEN_DECIMALS, # $1
+        EIGHTEEN_DECIMALS,  # $1
         name="mock_chainlink_feed_one",
     )
 
@@ -171,7 +171,7 @@ def mock_chainlink_feed_one():
 def mock_chainlink_feed_two():
     return boa.load(
         "contracts/mock/MockChainlinkFeed.vy",
-        EIGHTEEN_DECIMALS, # $1
+        EIGHTEEN_DECIMALS,  # $1
         name="mock_chainlink_feed_two",
     )
 
@@ -196,7 +196,7 @@ def mock_registry(ripe_hq_deploy, fork):
     return boa.load(
         "contracts/mock/MockRegistry.vy",
         ripe_hq_deploy,
-        PARAMS[fork]["MIN_HQ_CHANGE_TIMELOCK"], # initial time lock
+        PARAMS[fork]["MIN_HQ_CHANGE_TIMELOCK"],  # initial time lock
         PARAMS[fork]["MIN_HQ_CHANGE_TIMELOCK"],
         PARAMS[fork]["MAX_HQ_CHANGE_TIMELOCK"],
         name="mock_registry",

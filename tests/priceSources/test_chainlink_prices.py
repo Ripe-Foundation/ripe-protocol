@@ -10,7 +10,7 @@ from config.BluePrint import PARAMS, ADDYS
 def mock_chainlink_alpha():
     return boa.load(
         "contracts/mock/MockChainlinkFeed.vy",
-        500 * EIGHTEEN_DECIMALS, # $500
+        500 * EIGHTEEN_DECIMALS,  # $500
     )
 
 
@@ -18,7 +18,7 @@ def mock_chainlink_alpha():
 def mock_chainlink_bravo():
     return boa.load(
         "contracts/mock/MockChainlinkFeed.vy",
-        2_500 * EIGHTEEN_DECIMALS, # ETH, 18 decimals, $2500
+        2_500 * EIGHTEEN_DECIMALS,  # ETH, 18 decimals, $2500
     )
 
 
@@ -26,7 +26,7 @@ def mock_chainlink_bravo():
 def mock_chainlink_charlie():
     return boa.load(
         "contracts/mock/MockChainlinkFeed.vy",
-        EIGHTEEN_DECIMALS, # USDC, 6 decimals, $1
+        EIGHTEEN_DECIMALS,  # USDC, 6 decimals, $1
     )
 
 
@@ -34,7 +34,7 @@ def mock_chainlink_charlie():
 def mock_chainlink_delta():
     return boa.load(
         "contracts/mock/MockChainlinkFeed.vy",
-        50_000 * EIGHTEEN_DECIMALS, #WBTC, 8 decimals, $50,000
+        50_000 * EIGHTEEN_DECIMALS,  # WBTC, 8 decimals, $50,000
     )
 
 
@@ -89,7 +89,7 @@ def test_chainlink_add_price_feed(
 
     # Test successful feed addition
     assert mock_chainlink.addNewPriceFeed(alpha_token, mock_chainlink_alpha, sender=governance.address)
-    
+
     # Verify event
     log = filter_logs(mock_chainlink, "NewChainlinkFeedPending")[0]
     assert log.asset == alpha_token.address
@@ -106,7 +106,7 @@ def test_chainlink_add_price_feed(
 
     # Test confirming
     assert mock_chainlink.confirmNewPriceFeed(alpha_token, sender=governance.address)
-    
+
     # Verify event
     log = filter_logs(mock_chainlink, "NewChainlinkFeedAdded")[0]
     assert log.asset == alpha_token.address
@@ -135,7 +135,7 @@ def test_chainlink_add_price_feed_cancel(
 ):
     # Add feed
     assert mock_chainlink.addNewPriceFeed(alpha_token, mock_chainlink_alpha, sender=governance.address)
-    
+
     # Verify event
     log = filter_logs(mock_chainlink, "NewChainlinkFeedPending")[0]
     assert log.asset == alpha_token.address
@@ -145,7 +145,7 @@ def test_chainlink_add_price_feed_cancel(
 
     # Cancel feed
     assert mock_chainlink.cancelNewPendingPriceFeed(alpha_token, sender=governance.address)
-    
+
     # Verify event
     log = filter_logs(mock_chainlink, "NewChainlinkFeedCancelled")[0]
     assert log.asset == alpha_token.address
@@ -175,7 +175,7 @@ def test_chainlink_add_price_feed_eth_btc_conversion(
 
     # Add feed with ETH conversion
     assert mock_chainlink.addNewPriceFeed(alpha_token, mock_chainlink_alpha, True, False, sender=governance.address)
-    
+
     # Verify event
     log = filter_logs(mock_chainlink, "NewChainlinkFeedPending")[0]
     assert log.asset == alpha_token.address
@@ -200,7 +200,7 @@ def test_chainlink_add_price_feed_eth_btc_conversion(
 
     # Update feed with BTC conversion using a different feed
     assert mock_chainlink.updatePriceFeed(alpha_token, mock_chainlink_delta, False, True, sender=governance.address)
-    
+
     # Verify event
     log = filter_logs(mock_chainlink, "ChainlinkFeedUpdatePending")[0]
     assert log.asset == alpha_token.address
@@ -258,7 +258,7 @@ def test_chainlink_update_price_feed(
 
     # Test successful update
     assert mock_chainlink.updatePriceFeed(alpha_token, mock_chainlink_bravo, sender=governance.address)
-    
+
     # Verify event
     log = filter_logs(mock_chainlink, "ChainlinkFeedUpdatePending")[0]
     assert log.asset == alpha_token.address
@@ -275,7 +275,7 @@ def test_chainlink_update_price_feed(
 
     # Test confirming
     assert mock_chainlink.confirmPriceFeedUpdate(alpha_token, sender=governance.address)
-    
+
     # Verify event
     log = filter_logs(mock_chainlink, "ChainlinkFeedUpdated")[0]
     assert log.asset == alpha_token.address
@@ -306,7 +306,7 @@ def test_chainlink_update_price_feed_cancel(
 
     # Start update
     assert mock_chainlink.updatePriceFeed(alpha_token, mock_chainlink_bravo, sender=governance.address)
-    
+
     # Verify event
     log = filter_logs(mock_chainlink, "ChainlinkFeedUpdatePending")[0]
     assert log.asset == alpha_token.address
@@ -316,7 +316,7 @@ def test_chainlink_update_price_feed_cancel(
 
     # Cancel update
     assert mock_chainlink.cancelPriceFeedUpdate(alpha_token, sender=governance.address)
-    
+
     # Verify event
     log = filter_logs(mock_chainlink, "ChainlinkFeedUpdateCancelled")[0]
     assert log.asset == alpha_token.address
@@ -353,7 +353,7 @@ def test_chainlink_disable_price_feed(
 
     # Test successful disable
     assert mock_chainlink.disablePriceFeed(alpha_token, sender=governance.address)
-    
+
     # Verify event
     log = filter_logs(mock_chainlink, "DisableChainlinkFeedPending")[0]
     assert log.asset == alpha_token.address
@@ -367,7 +367,7 @@ def test_chainlink_disable_price_feed(
 
     # Test confirming
     assert mock_chainlink.confirmDisablePriceFeed(alpha_token, sender=governance.address)
-    
+
     # Verify event
     log = filter_logs(mock_chainlink, "ChainlinkFeedDisabled")[0]
     assert log.asset == alpha_token.address
@@ -394,14 +394,14 @@ def test_chainlink_disable_price_feed_cancel(
 
     # Start disable
     assert mock_chainlink.disablePriceFeed(alpha_token, sender=governance.address)
-    
+
     # Verify event
     log = filter_logs(mock_chainlink, "DisableChainlinkFeedPending")[0]
     assert log.asset == alpha_token.address
 
     # Cancel disable
     assert mock_chainlink.cancelDisablePriceFeed(alpha_token, sender=governance.address)
-    
+
     # Verify event
     log = filter_logs(mock_chainlink, "DisableChainlinkFeedCancelled")[0]
     assert log.asset == alpha_token.address
@@ -739,4 +739,3 @@ def test_chainlink_price_feed_timestamp_validation(
     # Update timestamp again for confirmation validation
     mock_chainlink_alpha.setMockData(500 * CHAINLINK_DECIMALS, 1, 1, 1, boa.env.evm.patch.timestamp)
     assert mock_chainlink.confirmNewPriceFeed(alpha_token, sender=governance.address)
-

@@ -468,12 +468,12 @@ def switchboard_delta(ripe_hq_deploy, fork):
 
 
 @pytest.fixture(scope="session")
-def defaults(fork):
+def defaults(fork, contributor_template):
     d = ZERO_ADDRESS
     if fork == "local":
         d = boa.load("contracts/config/DefaultsLocal.vy")
     elif fork == "base":
-        d = boa.load("contracts/config/DefaultsBase.vy")
+        d = boa.load("contracts/config/DefaultsBase.vy", contributor_template)
     return d
 
 

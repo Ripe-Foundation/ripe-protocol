@@ -17,19 +17,15 @@ MONTH_IN_SECONDS: constant(uint256) = 30 * DAY_IN_SECONDS
 YEAR_IN_SECONDS: constant(uint256) = 365 * DAY_IN_SECONDS
 
 # blocks
-DAY_IN_BLOCKS: constant(uint256) = 7_200
+DAY_IN_BLOCKS: constant(uint256) = 43_200
 WEEK_IN_BLOCKS: constant(uint256) = 7 * DAY_IN_BLOCKS
 MONTH_IN_BLOCKS: constant(uint256) = 30 * DAY_IN_BLOCKS
 YEAR_IN_BLOCKS: constant(uint256) = 365 * DAY_IN_BLOCKS
 
-# contributor template
-
-CONTRIBUTOR_TEMPLATE: immutable(address)
-
 
 @deploy
-def __init__(_contributorTemplate: address):
-    CONTRIBUTOR_TEMPLATE = _contributorTemplate
+def __init__():
+    pass
 
 
 # general config
@@ -62,107 +58,29 @@ def genConfig() -> cs.GenConfig:
 @external
 def genDebtConfig() -> cs.GenDebtConfig:
     return cs.GenDebtConfig(
-        perUserDebtLimit = 100 * EIGHTEEN_DECIMALS,
-        globalDebtLimit = 1000 * EIGHTEEN_DECIMALS,
-        minDebtAmount = 1 * EIGHTEEN_DECIMALS,
+        perUserDebtLimit = 1_000_000 * EIGHTEEN_DECIMALS,
+        globalDebtLimit = 100_000_000 * EIGHTEEN_DECIMALS,
+        minDebtAmount = 100 * EIGHTEEN_DECIMALS,
         numAllowedBorrowers = 50,
-        maxBorrowPerInterval = 50 * EIGHTEEN_DECIMALS,
-        numBlocksPerInterval = 1 * DAY_IN_BLOCKS,
-        minDynamicRateBoost = 1 * HUNDRED_PERCENT,
+        maxBorrowPerInterval = 100_000 * EIGHTEEN_DECIMALS,
+        numBlocksPerInterval = 100,
+        minDynamicRateBoost = 50_00,
         maxDynamicRateBoost = 5 * HUNDRED_PERCENT,
         increasePerDangerBlock = 10,
         maxBorrowRate = HUNDRED_PERCENT,
         maxLtvDeviation = 10_00,
         keeperFeeRatio = 1_00,
-        minKeeperFee = 1 * EIGHTEEN_DECIMALS,
-        maxKeeperFee = 25_000 * EIGHTEEN_DECIMALS,
+        minKeeperFee = EIGHTEEN_DECIMALS,
+        maxKeeperFee = 10_0000 * EIGHTEEN_DECIMALS,
         isDaowryEnabled = True,
         ltvPaybackBuffer = 5_00,
         genAuctionParams = cs.AuctionParams(
             hasParams = True,
-            startDiscount = 1_00,
+            startDiscount = 0,
             maxDiscount = 50_00,
             delay = 0,
-            duration = 1 * DAY_IN_BLOCKS,
+            duration = DAY_IN_BLOCKS,
         ),
-    )
-
-
-# ripe available
-
-
-@view
-@external
-def ripeAvailForRewards() -> uint256:
-    return 1_000 * EIGHTEEN_DECIMALS
-
-
-@view
-@external
-def ripeAvailForHr() -> uint256:
-    return 1_000 * EIGHTEEN_DECIMALS
-
-
-@view
-@external
-def ripeAvailForBonds() -> uint256:
-    return 1_000 * EIGHTEEN_DECIMALS
-
-
-# ripe bond config
-
-
-@view
-@external
-def ripeBondConfig() -> cs.RipeBondConfig:
-    return cs.RipeBondConfig(
-        asset = empty(address),
-        amountPerEpoch = 10 * (10 ** 6),
-        canBond = False,
-        minRipePerUnit = 1 * EIGHTEEN_DECIMALS,
-        maxRipePerUnit = 100 * EIGHTEEN_DECIMALS,
-        maxRipePerUnitLockBonus = 1 * EIGHTEEN_DECIMALS,
-        epochLength = 1 * DAY_IN_BLOCKS,
-        shouldAutoRestart = False,
-        restartDelayBlocks = 0,
-    )
-
-
-# ripe rewards config
-
-
-@view
-@external
-def rewardsConfig() -> cs.RipeRewardsConfig:
-    return cs.RipeRewardsConfig(
-        arePointsEnabled = False,
-        ripePerBlock = 0,
-        borrowersAlloc = 10_00,
-        stakersAlloc = 90_00,
-        votersAlloc = 0,
-        genDepositorsAlloc = 0,
-        autoStakeRatio = 90_00,
-        autoStakeDurationRatio = 25_00,
-        stabPoolRipePerDollarClaimed = 1 * EIGHTEEN_DECIMALS,
-    )
-
-
-# ripe token config for ripe gov vault
-
-
-@view
-@external
-def ripeTokenVaultConfig() -> cs.RipeGovVaultConfig:
-    return cs.RipeGovVaultConfig(
-        lockTerms = cs.LockTerms(
-            minLockDuration = 1 * DAY_IN_BLOCKS,
-            maxLockDuration = 1 * WEEK_IN_BLOCKS,
-            maxLockBoost = 5 * HUNDRED_PERCENT,
-            canExit = True,
-            exitFee = 50_00,
-        ),
-        assetWeight = HUNDRED_PERCENT,
-        shouldFreezeWhenBadDebt = True,
     )
 
 
@@ -173,19 +91,76 @@ def ripeTokenVaultConfig() -> cs.RipeGovVaultConfig:
 @external
 def hrConfig() -> cs.HrConfig:
     return cs.HrConfig(
-        contribTemplate = CONTRIBUTOR_TEMPLATE,
+        contribTemplate = empty(address),
         maxCompensation = 0, # set this later, after core contributor vesting setup
         minCliffLength = 1 * WEEK_IN_SECONDS,
-        maxStartDelay = 3 * MONTH_IN_SECONDS,
-        minVestingLength = 1 * WEEK_IN_SECONDS,
-        maxVestingLength = 10 * YEAR_IN_SECONDS,
+        maxStartDelay = 1 * MONTH_IN_SECONDS,
+        minVestingLength = 1 * MONTH_IN_SECONDS,
+        maxVestingLength = 5 * YEAR_IN_SECONDS,
+    )
+
+
+# ripe bond config
+
+
+@view
+@external
+def ripeBondConfig() -> cs.RipeBondConfig:
+    return cs.RipeBondConfig(
+        asset = 0x611ce0729f6C052f49536c84a8fD717E619D5dc6,
+        amountPerEpoch = 100_000 * (10 ** 6),
+        canBond = True,
+        minRipePerUnit = 1 * EIGHTEEN_DECIMALS,
+        maxRipePerUnit = 100 * EIGHTEEN_DECIMALS,
+        maxRipePerUnitLockBonus = 10 * EIGHTEEN_DECIMALS,
+        epochLength = 1000,
+        shouldAutoRestart = True,
+        restartDelayBlocks = 100,
+    )
+
+
+# ripe rewards config
+
+
+@view
+@external
+def rewardsConfig() -> cs.RipeRewardsConfig:
+    return cs.RipeRewardsConfig(
+        arePointsEnabled = True,
+        ripePerBlock = 1 * EIGHTEEN_DECIMALS,
+        borrowersAlloc = 50_00,
+        stakersAlloc = 10_00,
+        votersAlloc = 0,
+        genDepositorsAlloc = 0,
+        autoStakeRatio = 90_00,
+        autoStakeDurationRatio = 10_00,
+        stabPoolRipePerDollarClaimed = 1 * EIGHTEEN_DECIMALS,
+    )
+
+
+# ripe gov vault config
+
+
+@view
+@external
+def ripeTokenVaultConfig() -> cs.RipeGovVaultConfig:
+    return cs.RipeGovVaultConfig(
+        lockTerms = cs.LockTerms(
+            minLockDuration = 1 * DAY_IN_BLOCKS,
+            maxLockDuration = 1 * MONTH_IN_BLOCKS,
+            maxLockBoost = 2 * HUNDRED_PERCENT,
+            canExit = True,
+            exitFee = 10_00,
+        ),
+        assetWeight = HUNDRED_PERCENT,
+        shouldFreezeWhenBadDebt = True,
     )
 
 
 # underscore registry
 
 
-UNDERSCORE_REGISTRY: constant(address) = 0x7BcD6d471D1A068012A79347C7a944d1Df01a1AE
+UNDERSCORE_REGISTRY: constant(address) = 0xa89a59E14333187829528C50eBAaE6EC12Bae95d
 
 
 @view
@@ -201,3 +176,24 @@ def underscoreRegistry() -> address:
 @external
 def shouldCheckLastTouch() -> bool:
     return True
+
+
+# ripe available
+
+
+@view
+@external
+def ripeAvailForRewards() -> uint256:
+    return 100_000_000 * EIGHTEEN_DECIMALS
+
+
+@view
+@external
+def ripeAvailForHr() -> uint256:
+    return 100_000_000 * EIGHTEEN_DECIMALS
+
+
+@view
+@external
+def ripeAvailForBonds() -> uint256:
+    return 100_000_000 * EIGHTEEN_DECIMALS
