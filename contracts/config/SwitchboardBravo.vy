@@ -501,9 +501,10 @@ def _isValidAssetLiqConfig(
         if _isNft:
             return False
 
-        # cannot have whitelist if no special stab pool
-        if _whitelist != empty(address) and _specialStabPoolId == 0:
-            return False
+        # NOTE: removing this temporarily during initial deployment, training wheels period
+        # # cannot have whitelist if no special stab pool
+        # if _whitelist != empty(address) and _specialStabPoolId == 0:
+        #     return False
 
         # must have ltv
         if _debtTermsLtv == 0:
