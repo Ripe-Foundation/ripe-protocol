@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: MIT
 # Underscore Protocol License: https://github.com/underscore-finance/underscore/blob/main/licenses/MIT_LICENSE
 # Underscore Protocol (C) 2025 Hightop Financial, Inc.
-# @version 0.4.1
+# @version 0.4.3
 
 from ethereum.ercs import IERC20
 from ethereum.ercs import IERC20Detailed
