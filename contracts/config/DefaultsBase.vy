@@ -22,10 +22,14 @@ WEEK_IN_BLOCKS: constant(uint256) = 7 * DAY_IN_BLOCKS
 MONTH_IN_BLOCKS: constant(uint256) = 30 * DAY_IN_BLOCKS
 YEAR_IN_BLOCKS: constant(uint256) = 365 * DAY_IN_BLOCKS
 
+# contributor template
+
+CONTRIBUTOR_TEMPLATE: immutable(address)
+
 
 @deploy
-def __init__():
-    pass
+def __init__(_contributorTemplate: address):
+    CONTRIBUTOR_TEMPLATE = _contributorTemplate
 
 
 # general config
@@ -169,7 +173,7 @@ def ripeTokenVaultConfig() -> cs.RipeGovVaultConfig:
 @external
 def hrConfig() -> cs.HrConfig:
     return cs.HrConfig(
-        contribTemplate = empty(address),
+        contribTemplate = CONTRIBUTOR_TEMPLATE,
         maxCompensation = 0, # set this later, after core contributor vesting setup
         minCliffLength = 1 * WEEK_IN_SECONDS,
         maxStartDelay = 3 * MONTH_IN_SECONDS,

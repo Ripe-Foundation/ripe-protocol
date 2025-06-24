@@ -49,6 +49,14 @@ class Migration:
 
         return tx
 
+    def _register_contract(self, name, label, contract, args):
+        self._contract_files[label] = name
+        self._contracts[label] = contract
+        self._args[label] = args
+        self._append_manifest(label)
+        self._save_log_file()
+        return contract
+
     def deploy_bp(self, name):
         """
         Deploys contract with given name as blueprint or skips if already deployed
@@ -62,11 +70,7 @@ class Migration:
             return c
 
         contract = self._run(name, deploy_bp_wrapper, *args, **kwargs)
-        self._contracts[name] = contract
-        self._args[name] = args
-        self._append_manifest(name)
-        self._save_log_file()
-        return contract
+        return self._register_contract(name, name, contract, args)
 
     def deploy(self, name, *args, **kwargs):
         """
@@ -78,12 +82,7 @@ class Migration:
         kwargs.pop("label", None)
 
         contract = self._run(name, boa.load, self._files[name], *args, name=label, **kwargs)
-        self._contract_files[label] = name
-        self._contracts[label] = contract
-        self._args[label] = args
-        self._append_manifest(label)
-        self._save_log_file()
-        return contract
+        return self._register_contract(name, label, contract, args)
 
     def soft_deploy(self, name, *args, **kwargs):
         """

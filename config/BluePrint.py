@@ -9,6 +9,8 @@ ADDYS = {
         # default chainlink feeds
         "CHAINLINK_ETH_USD": "0x71041dddad3595F9CEd3DcCFBe3D1F4b0a16Bb70",
         "CHAINLINK_BTC_USD": "0x64c911996D3c6aC71f9b455B1E8E7266BcbD848F",
+        "CHAINLINK_USDC_USD": "0x7e860098F58bBFC8648a4311b374B1D669a2bc6B",
+        "CHAINLINK_CBBTC_USD": "0x07DA0E54543a844a80ABE69c8A12F22B3aA59f9D",
         # important tokens / representations
         "WETH": "0x4200000000000000000000000000000000000006",
         "ETH": "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE",
@@ -30,7 +32,8 @@ ADDYS = {
         # oracles
         "PYTH_NETWORK": "0x8250f4aF4B972684F7b336503E2D6dFeDeB1487a",
         "STORK_NETWORK": "0x647DFd812BC1e116c6992CB2bC353b2112176fD6",
-        "USDC": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+        # governance TODO: add this
+        "GOVERNANCE": "0x0000000000000000000000000000000000000000",
     },
     "local": {
         # important tokens / representations
@@ -145,6 +148,7 @@ CORE_TOKENS = {
         "WELL": "0xA88594D404727625A9437C3f886C7643872296AE",
         "VIRTUAL": "0x0b3e328455c4059EEb9e3f84b5543F74E24e7E1b",
     },
+    "sepolia": {},
 }
 
 
@@ -271,4 +275,5 @@ YIELD_TOKENS = {
         "AAVEV3_GHO": "0x067ae75628177FD257c2B1e500993e1a0baBcBd1",
 
     },
+    "sepolia": {},
 }
