@@ -1,4 +1,4 @@
-# @version 0.4.1
+# @version 0.4.3
 
 allowed: public(HashMap[address, HashMap[address, bool]]) # user -> asset -> allowed
 

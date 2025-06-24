@@ -2,7 +2,7 @@
 # @author Takayuki Jimba (@yudetamago)
 # https://github.com/ethereum/EIPs/blob/master/EIPS/eip-20.md
 
-# @version 0.4.1
+# @version 0.4.3
 
 from ethereum.ercs import IERC20
 from ethereum.ercs import IERC20Detailed
