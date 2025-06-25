@@ -544,25 +544,23 @@ def test_rewards_points_enable_disable(switchboard_alpha, mission_control, gover
 
 
 def test_priority_liq_asset_vaults_filtered(switchboard_alpha, governance):
-    # Create sample vault data that will be filtered out
+    # Create sample vault data that will be filtered out due to invalid vault/asset
+    # With the new assertion, these will be filtered during sanitization,
+    # causing len(sanitized) != len(input), which triggers "invalid priority vaults"
     vaults = [
         (1, ZERO_ADDRESS),  # Will be filtered out due to invalid vault/asset
         (2, ZERO_ADDRESS),
     ]
     
-    # The function should still succeed but filter out invalid vaults
-    # This test expects the filtering behavior to work and all vaults to be filtered
+    # The function should revert because invalid vaults get filtered,
+    # making sanitized length != input length
     with boa.reverts("invalid priority vaults"):
         switchboard_alpha.setPriorityLiqAssetVaults(vaults, sender=governance.address)
     
-    # Test with empty array directly
-    with boa.reverts("invalid priority vaults"):
-        switchboard_alpha.setPriorityLiqAssetVaults([], sender=governance.address)
-    
-    # Test with duplicate invalid vaults
+    # Test with duplicate invalid vaults - duplicates get filtered, causing length mismatch
     duplicate_vaults = [
         (1, ZERO_ADDRESS),
-        (1, ZERO_ADDRESS),  # Exact duplicate
+        (1, ZERO_ADDRESS),  # Exact duplicate - will be filtered
         (2, ZERO_ADDRESS),
     ]
     with boa.reverts("invalid priority vaults"):
@@ -570,16 +568,17 @@ def test_priority_liq_asset_vaults_filtered(switchboard_alpha, governance):
 
 
 def test_priority_stab_vaults_filtered(switchboard_alpha, governance):
+    # Invalid vaults will be filtered during sanitization, causing length mismatch
     vaults = [(1, ZERO_ADDRESS)]
-    # Same as above - should be filtered out
     with boa.reverts("invalid priority vaults"):
         switchboard_alpha.setPriorityStabVaults(vaults, sender=governance.address)
     
     # Test with multiple invalid vaults including duplicates
+    # Both invalid vaults and duplicates will be filtered, causing length mismatch
     multiple_vaults = [
         (1, ZERO_ADDRESS),
         (2, ZERO_ADDRESS),
-        (1, ZERO_ADDRESS),  # Duplicate
+        (1, ZERO_ADDRESS),  # Duplicate - will be filtered
         (3, ZERO_ADDRESS),
     ]
     with boa.reverts("invalid priority vaults"):
@@ -587,9 +586,16 @@ def test_priority_stab_vaults_filtered(switchboard_alpha, governance):
 
 
 def test_invalid_priority_vaults(switchboard_alpha, governance):
-    # Test empty vaults array fails
+    # With the new assertion requiring exact length match, empty arrays are now valid
+    # since len([]) == len([]) after sanitization
+    # Test that empty arrays now succeed
+    action_id = switchboard_alpha.setPriorityLiqAssetVaults([], sender=governance.address)
+    assert action_id > 0
+    
+    # Test that arrays with invalid vaults still fail due to length mismatch
+    invalid_vaults = [(999, ZERO_ADDRESS)]  # Invalid vault that will be filtered
     with boa.reverts("invalid priority vaults"):
-        switchboard_alpha.setPriorityLiqAssetVaults([], sender=governance.address)
+        switchboard_alpha.setPriorityLiqAssetVaults(invalid_vaults, sender=governance.address)
 
 
 def test_priority_price_source_ids_filtered(switchboard_alpha, governance):
@@ -617,7 +623,7 @@ def test_priority_price_source_ids_filtered(switchboard_alpha, governance):
 
 
 def test_invalid_priority_sources(switchboard_alpha, governance):
-    # Test empty sources array fails
+    # Test empty sources array fails (price sources have different validation)
     with boa.reverts("invalid priority sources"):
         switchboard_alpha.setPriorityPriceSourceIds([], sender=governance.address)
 
@@ -874,13 +880,13 @@ def test_sanitize_priority_vaults_deduplication(switchboard_alpha, governance, a
     # Test with duplicate vault ID + asset combinations
     vaults = [
         (1, alpha_token),
-        (1, alpha_token),  # exact duplicate
-        (1, alpha_token),  # another duplicate
+        (1, alpha_token),  # exact duplicate - will be filtered
+        (1, alpha_token),  # another duplicate - will be filtered
         (2, alpha_token),  # different vault, same asset
     ]
     
-    # This should filter out duplicates and invalid vaults
-    # In test environment, all vaults will be invalid (not registered in VaultBook)
+    # With the new length assertion, duplicates will be filtered during sanitization,
+    # causing len(sanitized) != len(input), which triggers "invalid priority vaults"
     with boa.reverts("invalid priority vaults"):
         switchboard_alpha.setPriorityLiqAssetVaults(vaults, sender=governance.address)
 
@@ -1212,11 +1218,11 @@ def test_transient_storage_behavior(switchboard_alpha, governance, alpha_token, 
     vaults = [
         (1, alpha_token),
         (1, bravo_token),
-        (1, alpha_token),  # duplicate of first
+        (1, alpha_token),  # duplicate of first - will be filtered
     ]
     
-    # The transient storage should deduplicate within a single call
-    # All vaults will be invalid in test environment
+    # With the new length assertion, duplicates will be filtered during sanitization,
+    # causing len(sanitized) != len(input), which triggers "invalid priority vaults"
     with boa.reverts("invalid priority vaults"):
         switchboard_alpha.setPriorityLiqAssetVaults(vaults, sender=governance.address)
     
@@ -1282,14 +1288,15 @@ def test_priority_vault_deduplication_complex(switchboard_alpha, governance, alp
     vaults = [
         (1, alpha_token),
         (2, bravo_token),
-        (1, alpha_token),  # Duplicate
+        (1, alpha_token),  # Duplicate - will be filtered
         (3, charlie_token),
-        (2, bravo_token),  # Duplicate
+        (2, bravo_token),  # Duplicate - will be filtered
         (1, bravo_token),  # Same vault, different asset
-        (3, charlie_token),  # Duplicate
+        (3, charlie_token),  # Duplicate - will be filtered
     ]
     
-    # The transient storage should handle deduplication correctly
+    # With the new length assertion, duplicates will be filtered during sanitization,
+    # causing len(sanitized) != len(input), which triggers "invalid priority vaults"
     with boa.reverts("invalid priority vaults"):
         switchboard_alpha.setPriorityLiqAssetVaults(vaults, sender=governance.address)
 

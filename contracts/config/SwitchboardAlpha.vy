@@ -1192,7 +1192,7 @@ def setPriorityLiqAssetVaults(_priorityLiqAssetVaults: DynArray[cs.VaultLite, PR
     assert gov._canGovern(msg.sender) # dev: no perms
 
     priorityVaults: DynArray[cs.VaultLite, PRIORITY_VAULT_DATA] = self._sanitizePriorityVaults(_priorityLiqAssetVaults)
-    assert len(priorityVaults) != 0 # dev: invalid priority vaults
+    assert len(priorityVaults) == len(_priorityLiqAssetVaults) # dev: invalid priority vaults
 
     aid: uint256 = timeLock._initiateAction()
     self.actionType[aid] = ActionType.OTHER_PRIORITY_LIQ_ASSET_VAULTS
@@ -1214,7 +1214,7 @@ def setPriorityStabVaults(_priorityStabVaults: DynArray[cs.VaultLite, PRIORITY_V
     assert gov._canGovern(msg.sender) # dev: no perms
 
     priorityVaults: DynArray[cs.VaultLite, PRIORITY_VAULT_DATA] = self._sanitizePriorityVaults(_priorityStabVaults)
-    assert len(priorityVaults) != 0 # dev: invalid priority vaults
+    assert len(priorityVaults) == len(_priorityStabVaults) # dev: invalid priority vaults
 
     aid: uint256 = timeLock._initiateAction()
     self.actionType[aid] = ActionType.OTHER_PRIORITY_STAB_VAULTS
