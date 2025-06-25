@@ -169,6 +169,15 @@ def underscoreRegistry() -> address:
     return UNDERSCORE_REGISTRY
 
 
+# training wheels
+
+
+@view
+@external
+def trainingWheels() -> address:
+    return empty(address)
+
+
 # should check last touch
 
 

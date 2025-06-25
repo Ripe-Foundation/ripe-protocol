@@ -203,6 +203,7 @@ canPerformLiteAction: public(HashMap[address, bool]) # user -> canPerformLiteAct
 # other
 priorityPriceSourceIds: public(DynArray[uint256, MAX_PRIORITY_PRICE_SOURCES])
 underscoreRegistry: public(address)
+trainingWheels: public(address)
 shouldCheckLastTouch: public(bool)
 
 MAX_VAULTS_PER_ASSET: constant(uint256) = 10
@@ -225,6 +226,7 @@ def __init__(_ripeHq: address, _defaults: address):
         self.ripeBondConfig = staticcall Defaults(_defaults).ripeBondConfig()
         self.rewardsConfig = staticcall Defaults(_defaults).rewardsConfig()
         self.underscoreRegistry = staticcall Defaults(_defaults).underscoreRegistry()
+        self.trainingWheels = staticcall Defaults(_defaults).trainingWheels()
         self.shouldCheckLastTouch = staticcall Defaults(_defaults).shouldCheckLastTouch()
 
         ripeTokenVaultConfig: cs.RipeGovVaultConfig = staticcall Defaults(_defaults).ripeTokenVaultConfig()
@@ -415,6 +417,15 @@ def setCanPerformLiteAction(_user: address, _canDo: bool):
 #########
 # Other #
 #########
+
+
+# training wheels
+
+
+@external
+def setTrainingWheels(_trainingWheels: address):
+    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
+    self.trainingWheels = _trainingWheels
 
 
 # underscore registry

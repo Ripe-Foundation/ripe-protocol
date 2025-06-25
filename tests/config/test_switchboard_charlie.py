@@ -1443,22 +1443,22 @@ def test_switchboard_three_add_many_training_wheels_access_control(
     training_wheels,
     alpha_token,
 ):
-    """Test access control for addManyTrainingWheels"""
+    """Test access control for setManyTrainingWheelsAccess"""
     addr = training_wheels.address
     training_wheel_access = [
-        (alice, alpha_token.address, True),
-        (bob, alpha_token.address, False)
+        (alice, True),
+        (bob, False)
     ]
     
     # Non-governance users should be rejected
     with boa.reverts("no perms"):
-        switchboard_charlie.addManyTrainingWheels(addr, training_wheel_access, sender=alice)
+        switchboard_charlie.setManyTrainingWheelsAccess(addr, training_wheel_access, sender=alice)
     
     with boa.reverts("no perms"):
-        switchboard_charlie.addManyTrainingWheels(addr, training_wheel_access, sender=bob)
+        switchboard_charlie.setManyTrainingWheelsAccess(addr, training_wheel_access, sender=bob)
     
     # Governance should succeed
-    action_id = switchboard_charlie.addManyTrainingWheels(addr, training_wheel_access, sender=governance.address)
+    action_id = switchboard_charlie.setManyTrainingWheelsAccess(addr, training_wheel_access, sender=governance.address)
     assert action_id > 0
 
 
@@ -1469,25 +1469,25 @@ def test_switchboard_three_add_many_training_wheels_parameter_validation(
     training_wheels,
     alpha_token,
 ):
-    """Test parameter validation for addManyTrainingWheels"""
-    valid_training_wheels = [(alice, alpha_token.address, True)]
+    """Test parameter validation for setManyTrainingWheelsAccess"""
+    valid_training_wheels = [(alice, True)]
     
     # Test invalid address (zero address)
     with boa.reverts("invalid address"):
-        switchboard_charlie.addManyTrainingWheels(ZERO_ADDRESS, valid_training_wheels, sender=governance.address)
+        switchboard_charlie.setManyTrainingWheelsAccess(ZERO_ADDRESS, valid_training_wheels, sender=governance.address)
     
     # Test empty training wheels array
     with boa.reverts("no training wheels provided"):
-        switchboard_charlie.addManyTrainingWheels(training_wheels.address, [], sender=governance.address)
+        switchboard_charlie.setManyTrainingWheelsAccess(training_wheels.address, [], sender=governance.address)
     
     # Test array limit (MAX_TRAINING_WHEEL_ACCESS = 25)
-    max_training_wheels = [(alice, alpha_token.address, True)] * 26  # Exceed limit
+    max_training_wheels = [(alice, True)] * 26  # Exceed limit
     with boa.reverts():  # Should fail due to Vyper array size validation
-        switchboard_charlie.addManyTrainingWheels(training_wheels.address, max_training_wheels, sender=governance.address)
+        switchboard_charlie.setManyTrainingWheelsAccess(training_wheels.address, max_training_wheels, sender=governance.address)
     
     # Test exactly at limit should work
-    at_limit_training_wheels = [(alice, alpha_token.address, True)] * 25
-    action_id = switchboard_charlie.addManyTrainingWheels(training_wheels.address, at_limit_training_wheels, sender=governance.address)
+    at_limit_training_wheels = [(alice, True)] * 25
+    action_id = switchboard_charlie.setManyTrainingWheelsAccess(training_wheels.address, at_limit_training_wheels, sender=governance.address)
     assert action_id > 0
 
 
@@ -1501,20 +1501,20 @@ def test_switchboard_three_add_many_training_wheels_timelock_and_execution(
     alpha_token,
     bravo_token,
 ):
-    """Test timelock functionality and execution for addManyTrainingWheels"""
+    """Test timelock functionality and execution for setManyTrainingWheelsAccess"""
     addr = training_wheels.address
     training_wheel_access = [
-        (alice, alpha_token.address, True),   # Allow alice for alpha_token
-        (bob, alpha_token.address, False),    # Deny bob for alpha_token  
-        (sally, bravo_token.address, True),   # Allow sally for bravo_token
-        (alice, bravo_token.address, False),  # Deny alice for bravo_token
+        (alice, True),   # Allow alice
+        (bob, False),    # Deny bob  
+        (sally, True),   # Allow sally
+        (alice, False),  # Deny alice (this will override the first one)
     ]
     
     # Create pending action
-    action_id = switchboard_charlie.addManyTrainingWheels(addr, training_wheel_access, sender=governance.address)
+    action_id = switchboard_charlie.setManyTrainingWheelsAccess(addr, training_wheel_access, sender=governance.address)
     
     # Verify event was emitted immediately
-    logs = filter_logs(switchboard_charlie, "PendingAddManyTrainingWheelsAction")
+    logs = filter_logs(switchboard_charlie, "PendingSetManyTrainingWheelsAccess")
     assert len(logs) == 1
     log = logs[0]
     assert log.addr == addr
@@ -1522,16 +1522,15 @@ def test_switchboard_three_add_many_training_wheels_timelock_and_execution(
     assert log.actionId == action_id
     
     # Verify action is stored correctly
-    assert switchboard_charlie.actionType(action_id) == 8192  # ActionType.ADD_MANY_TRAINING_WHEELS
-    stored_bundle = switchboard_charlie.pendingTrainingWheelAccessActions(action_id)
+    assert switchboard_charlie.actionType(action_id) == 16384  # ActionType.ADD_MANY_TRAINING_WHEELS
+    stored_bundle = switchboard_charlie.pendingTrainingWheelAccess(action_id)
     assert stored_bundle.addr == addr
     assert len(stored_bundle.trainingWheels) == len(training_wheel_access)
     
     # Verify individual training wheel access entries
-    for i, (user, asset, is_allowed) in enumerate(training_wheel_access):
-        stored_tw = switchboard_charlie.pendingTrainingWheelAccessActions(action_id).trainingWheels[i]
+    for i, (user, is_allowed) in enumerate(training_wheel_access):
+        stored_tw = switchboard_charlie.pendingTrainingWheelAccess(action_id).trainingWheels[i]
         assert stored_tw.user == user
-        assert stored_tw.asset == asset
         assert stored_tw.isAllowed == is_allowed
     
     # Execution should fail before timelock
@@ -1546,18 +1545,17 @@ def test_switchboard_three_add_many_training_wheels_timelock_and_execution(
     assert result
     
     # Verify execution event was emitted
-    exec_logs = filter_logs(switchboard_charlie, "AddManyTrainingWheelsExecuted")
+    exec_logs = filter_logs(switchboard_charlie, "SetManyTrainingWheelsAccessExecuted")
     assert len(exec_logs) == 1
     exec_log = exec_logs[0]
     assert exec_log.addr == addr
     assert exec_log.numTrainingWheels == len(training_wheel_access)
     
     # Verify training wheels contract was called correctly
-    # Check that the training wheels were set properly
-    assert training_wheels.isUserAllowed(alice, alpha_token.address) == True
-    assert training_wheels.isUserAllowed(bob, alpha_token.address) == False
-    assert training_wheels.isUserAllowed(sally, bravo_token.address) == True
-    assert training_wheels.isUserAllowed(alice, bravo_token.address) == False
+    # Check that the training wheels were set properly (final state after all calls)
+    assert training_wheels.allowed(alice) == False  # Last call wins
+    assert training_wheels.allowed(bob) == False
+    assert training_wheels.allowed(sally) == True
     
     # Verify action was cleared after execution
     assert switchboard_charlie.actionType(action_id) == 0
@@ -1568,15 +1566,14 @@ def test_switchboard_three_add_many_training_wheels_cancellation(
     governance,
     alice,
     training_wheels,
-    alpha_token,
 ):
-    """Test cancellation of addManyTrainingWheels actions"""
+    """Test cancellation of setManyTrainingWheelsAccess actions"""
     addr = training_wheels.address
-    training_wheel_access = [(alice, alpha_token.address, True)]
+    training_wheel_access = [(alice, True)]
     
     # Create pending action
-    action_id = switchboard_charlie.addManyTrainingWheels(addr, training_wheel_access, sender=governance.address)
-    assert switchboard_charlie.actionType(action_id) == 8192  # ADD_MANY_TRAINING_WHEELS
+    action_id = switchboard_charlie.setManyTrainingWheelsAccess(addr, training_wheel_access, sender=governance.address)
+    assert switchboard_charlie.actionType(action_id) == 16384  # ADD_MANY_TRAINING_WHEELS
     
     # Cancel action
     success = switchboard_charlie.cancelPendingAction(action_id, sender=governance.address)
@@ -1588,6 +1585,77 @@ def test_switchboard_three_add_many_training_wheels_cancellation(
     # Should not be able to cancel again
     with boa.reverts("cannot cancel action"):
         switchboard_charlie.cancelPendingAction(action_id, sender=governance.address)
+
+
+def test_switchboard_three_set_training_wheels_access_control(
+    switchboard_charlie,
+    alice,
+    bob,
+    governance,
+    training_wheels,
+):
+    """Test access control for setTrainingWheels"""
+    training_wheels_addr = training_wheels.address
+    
+    # Non-governance users should be rejected
+    with boa.reverts("no perms"):
+        switchboard_charlie.setTrainingWheels(training_wheels_addr, sender=alice)
+    
+    with boa.reverts("no perms"):
+        switchboard_charlie.setTrainingWheels(training_wheels_addr, sender=bob)
+    
+    # Governance should succeed
+    action_id = switchboard_charlie.setTrainingWheels(training_wheels_addr, sender=governance.address)
+    assert action_id > 0
+
+
+def test_switchboard_three_set_training_wheels_timelock_and_execution(
+    switchboard_charlie,
+    governance,
+    training_wheels,
+    mission_control,
+):
+    """Test timelock functionality and execution for setTrainingWheels"""
+    training_wheels_addr = training_wheels.address
+    
+    # Create pending action
+    action_id = switchboard_charlie.setTrainingWheels(training_wheels_addr, sender=governance.address)
+    
+    # Verify event was emitted immediately
+    logs = filter_logs(switchboard_charlie, "PendingTrainingWheelsChange")
+    assert len(logs) == 1
+    log = logs[0]
+    assert log.trainingWheels == training_wheels_addr
+    assert log.actionId == action_id
+    
+    # Verify action is stored correctly
+    assert switchboard_charlie.actionType(action_id) == 8192  # ActionType.TRAINING_WHEELS
+    stored_address = switchboard_charlie.pendingTrainingWheels(action_id)
+    assert stored_address == training_wheels_addr
+    
+    # Execution should fail before timelock
+    result = switchboard_charlie.executePendingAction(action_id, sender=governance.address)
+    assert not result
+    
+    # Time travel past timelock
+    boa.env.time_travel(blocks=switchboard_charlie.actionTimeLock())
+    
+    # Now execution should succeed
+    result = switchboard_charlie.executePendingAction(action_id, sender=governance.address)
+    assert result
+    
+    # Verify execution event was emitted
+    exec_logs = filter_logs(switchboard_charlie, "TrainingWheelsSet")
+    assert len(exec_logs) == 1
+    exec_log = exec_logs[0]
+    assert exec_log.trainingWheels == training_wheels_addr
+    
+    # Verify mission control was called correctly
+    # The training wheels address should be set in mission control
+    assert mission_control.trainingWheels() == training_wheels_addr
+    
+    # Verify action was cleared after execution
+    assert switchboard_charlie.actionType(action_id) == 0
 
 
 # Run the tests
@@ -1602,3 +1670,4 @@ if __name__ == "__main__":
     print("- Complex workflows and permission boundaries")
     print("- Data integrity across all operations")
     print("- Training wheels functionality")
+    print("- New setTrainingWheels function")

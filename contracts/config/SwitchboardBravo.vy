@@ -29,6 +29,7 @@ interface MissionControl:
     def assetConfig(_asset: address) -> cs.AssetConfig: view
     def isSupportedAsset(_asset: address) -> bool: view
     def maxLtvDeviation() -> uint256: view
+    def trainingWheels() -> address: view
 
 interface SwitchboardAlpha:
     def areValidAuctionParams(_params: cs.AuctionParams) -> bool: view
@@ -501,10 +502,10 @@ def _isValidAssetLiqConfig(
         if _isNft:
             return False
 
-        # NOTE: removing this temporarily during initial deployment, training wheels period
-        # # cannot have whitelist if no special stab pool
-        # if _whitelist != empty(address) and _specialStabPoolId == 0:
-        #     return False
+        # cannot have whitelist if no special stab pool
+        if _whitelist != empty(address) and _specialStabPoolId == 0:
+            if _whitelist != staticcall MissionControl(self._getMissionControlAddr()).trainingWheels():
+                return False
 
         # must have ltv
         if _debtTermsLtv == 0:

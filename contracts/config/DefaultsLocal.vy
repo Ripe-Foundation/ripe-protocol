@@ -99,6 +99,15 @@ def underscoreRegistry() -> address:
     return empty(address)
 
 
+# training wheels
+
+
+@view
+@external
+def trainingWheels() -> address:
+    return empty(address)
+
+
 # should check last touch
 
 

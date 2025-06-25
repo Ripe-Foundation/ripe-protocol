@@ -22,14 +22,18 @@ WEEK_IN_BLOCKS: constant(uint256) = 7 * DAY_IN_BLOCKS
 MONTH_IN_BLOCKS: constant(uint256) = 30 * DAY_IN_BLOCKS
 YEAR_IN_BLOCKS: constant(uint256) = 365 * DAY_IN_BLOCKS
 
-# contributor template
-
-CONTRIBUTOR_TEMPLATE: immutable(address)
+# initial adddresses
+CONTRIB_TEMPLATE: immutable(address)
+TRAINING_WHEELS: immutable(address)
 
 
 @deploy
-def __init__(_contributorTemplate: address):
-    CONTRIBUTOR_TEMPLATE = _contributorTemplate
+def __init__(
+    _contribTemplate: address,
+    _trainingWheels: address,
+):
+    CONTRIB_TEMPLATE = _contribTemplate
+    TRAINING_WHEELS = _trainingWheels
 
 
 # general config
@@ -173,7 +177,7 @@ def ripeTokenVaultConfig() -> cs.RipeGovVaultConfig:
 @external
 def hrConfig() -> cs.HrConfig:
     return cs.HrConfig(
-        contribTemplate = CONTRIBUTOR_TEMPLATE,
+        contribTemplate = CONTRIB_TEMPLATE,
         maxCompensation = 0, # set this later, after core contributor vesting setup
         minCliffLength = 1 * WEEK_IN_SECONDS,
         maxStartDelay = 3 * MONTH_IN_SECONDS,
@@ -192,6 +196,15 @@ UNDERSCORE_REGISTRY: constant(address) = 0x7BcD6d471D1A068012A79347C7a944d1Df01a
 @external
 def underscoreRegistry() -> address:
     return UNDERSCORE_REGISTRY
+
+
+# training wheels
+
+
+@view
+@external
+def trainingWheels() -> address:
+    return TRAINING_WHEELS
 
 
 # should check last touch

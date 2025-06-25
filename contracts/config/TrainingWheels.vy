@@ -17,29 +17,41 @@ from interfaces import Department
 
 event TrainingWheelsModified:
     user: indexed(address)
-    asset: indexed(address)
     shouldAllow: bool
 
 # data
-allowed: public(HashMap[address, HashMap[address, bool]]) # user -> asset -> allowed
+allowed: public(HashMap[address, bool]) # user -> allowed
+
+MAX_INITIAL: constant(uint256) = 20
 
 
 @deploy
-def __init__(_ripeHq: address):
+def __init__(_ripeHq: address, _initialList: DynArray[address, MAX_INITIAL]):
     addys.__init__(_ripeHq)
     deptBasics.__init__(False, False, False) # no minting
 
+    # set initial access
+    if len(_initialList) != 0:
+        for a: address in _initialList:
+            if a == empty(address):
+                continue
+            self.allowed[a] = True
+            log TrainingWheelsModified(user=a, shouldAllow=True)
+
 
 @external
-def setAllowed(_user: address, _asset: address, _shouldAllow: bool):
+def setAllowed(_user: address, _shouldAllow: bool):
     assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
-    assert empty(address) not in [_user, _asset] # dev: invalid user or asset
+    assert _user != empty(address) # dev: invalid user
 
-    self.allowed[_user][_asset] = _shouldAllow
-    log TrainingWheelsModified(user=_user, asset=_asset, shouldAllow=_shouldAllow)
+    self.allowed[_user] = _shouldAllow
+    log TrainingWheelsModified(user=_user, shouldAllow=_shouldAllow)
+
+
+# NOTE: need to keep `_asset` to be compatible with other "whitelist" contracts
 
 
 @view
 @external
 def isUserAllowed(_user: address, _asset: address) -> bool:
-    return self.allowed[_user][_asset]
+    return self.allowed[_user]
