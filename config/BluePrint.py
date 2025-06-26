@@ -33,7 +33,7 @@ ADDYS = {
         "PYTH_NETWORK": "0x8250f4aF4B972684F7b336503E2D6dFeDeB1487a",
         "STORK_NETWORK": "0x647DFd812BC1e116c6992CB2bC353b2112176fD6",
         # governance
-        "GOVERNANCE": "0x13BEF4e90c8818Cd4bbdbA97085BA37a05F90580",
+        "GOVERNANCE": "0xe488a42D33b3Af5d3E5Cd5680938d8369716D1bf",
     },
     "local": {
         # important tokens / representations
