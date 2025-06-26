@@ -58,7 +58,7 @@ def verify_from_manifest(api_key: str, contract_name: str, manifest_data: dict, 
         "contractaddress": manifest_data["address"],
         "codeformat": "vyper-json",
         "contractname": f"{contract_file}:{contract_name}",  # Format: contractfile.vy:contractname
-        "compilerversion": "vyper:0.4.1",
+        "compilerversion": "vyper:0.4.3",
         "constructorArguements": manifest_data.get("args", ""),
         "optimizationUsed": "1",
         "runs": "200",
