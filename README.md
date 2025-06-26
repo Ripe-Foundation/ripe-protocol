@@ -41,7 +41,7 @@
 | AuctionHouseNFT     | [0x504Fb3b94a9f4A238Ee3A16474B91F99A3f26F3A](https://basescan.org/address/0x504Fb3b94a9f4A238Ee3A16474B91F99A3f26F3A) |
 | Boardroom           | [0xb5cA6Ef866b510C3b85D4B0e3862061A569412D1](https://basescan.org/address/0xb5cA6Ef866b510C3b85D4B0e3862061A569412D1) |
 | BondRoom            | [0x831ab43127A7B14FD4f895fD10Ae897f324D2188](https://basescan.org/address/0x831ab43127A7B14FD4f895fD10Ae897f324D2188) |
-| CreditEngine        | [0x07e27c6F6B4c9283D723E5313540dF39eCE327A4](https://basescan.org/address/0x07e27c6F6B4c9283D723E5313540dF39eCE327A4) |
+| CreditEngine        | [0xC4d54b999D333E8c8293f83DDcF3B9A19B76645F](https://basescan.org/address/0xC4d54b999D333E8c8293f83DDcF3B9A19B76645F) |
 | Endaoment           | [0x2d987CA3467925BcE8b6d40382f87EdCf0A3DF43](https://basescan.org/address/0x2d987CA3467925BcE8b6d40382f87EdCf0A3DF43) |
 | HumanResources      | [0xF9aCDFd0d167b741f9144Ca01E52FcdE16BE108b](https://basescan.org/address/0xF9aCDFd0d167b741f9144Ca01E52FcdE16BE108b) |
 | Lootbox             | [0x7f2af830886389E8A7fE4352c839147E7aa929Af](https://basescan.org/address/0x7f2af830886389E8A7fE4352c839147E7aa929Af) |
