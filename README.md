@@ -8,6 +8,46 @@
 
 ## Deployed Contracts
 
+### Base Mainnet
+
+| Contract            | Address                                                                                                               |
+| ------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| GreenToken          | [0xd1Eac76497D06Cf15475A5e3984D5bC03de7C707](https://basescan.org/address/0xd1Eac76497D06Cf15475A5e3984D5bC03de7C707) |
+| RipeToken           | [0x2A0a59d6B975828e781EcaC125dBA40d7ee5dDC0](https://basescan.org/address/0x2A0a59d6B975828e781EcaC125dBA40d7ee5dDC0) |
+| SavingsGreen        | [0xaa0f13488CE069A7B5a099457c753A7CFBE04d36](https://basescan.org/address/0xaa0f13488CE069A7B5a099457c753A7CFBE04d36) |
+| RipeHq              | [0x6162df1b329E157479F8f1407E888260E0EC3d2b](https://basescan.org/address/0x6162df1b329E157479F8f1407E888260E0EC3d2b) |
+| Contributor         | [0x4965578D80E54b5EbE3BB5D7b1B3E0425559C1D1](https://basescan.org/address/0x4965578D80E54b5EbE3BB5D7b1B3E0425559C1D1) |
+| TrainingWheels      | [0x2255b0006A3DA38AA184E0F9d5e056C2d0448065](https://basescan.org/address/0x2255b0006A3DA38AA184E0F9d5e056C2d0448065) |
+| DefaultsBase        | [0xE12a0621487C5Cb9FD9582B33618319bbBAd8346](https://basescan.org/address/0xE12a0621487C5Cb9FD9582B33618319bbBAd8346) |
+| Ledger              | [0x365256e322a47Aa2015F6724783F326e9B24fA47](https://basescan.org/address/0x365256e322a47Aa2015F6724783F326e9B24fA47) |
+| MissionControl      | [0xB59b84B526547b6dcb86CCF4004d48E619156CF3](https://basescan.org/address/0xB59b84B526547b6dcb86CCF4004d48E619156CF3) |
+| Switchboard         | [0x77935629C29a4521e602ab43287e5B188cbcD923](https://basescan.org/address/0x77935629C29a4521e602ab43287e5B188cbcD923) |
+| SwitchboardAlpha    | [0x88792a8C08dbE316bE6fe1778a00D461ABaBa92D](https://basescan.org/address/0x88792a8C08dbE316bE6fe1778a00D461ABaBa92D) |
+| SwitchboardBravo    | [0x277821781f0e9f6892F2742A68827e21D491e60B](https://basescan.org/address/0x277821781f0e9f6892F2742A68827e21D491e60B) |
+| SwitchboardCharlie  | [0x8412b523f5df164d9404A1e3d9f28B61e2440c75](https://basescan.org/address/0x8412b523f5df164d9404A1e3d9f28B61e2440c75) |
+| SwitchboardDelta    | [0xbBDd02FfB71b0f3C5A5433C9b647f8dcd2282eF4](https://basescan.org/address/0xbBDd02FfB71b0f3C5A5433C9b647f8dcd2282eF4) |
+| PriceDesk           | [0x4Cc505adF813344596E022271a67fA95C7676698](https://basescan.org/address/0x4Cc505adF813344596E022271a67fA95C7676698) |
+| ChainlinkPrices     | [0x7f511f3Cefcc840bCB9828E726c14988BE5D7b34](https://basescan.org/address/0x7f511f3Cefcc840bCB9828E726c14988BE5D7b34) |
+| CurvePrices         | [0x6e981679D0E3f8d3f5E5d35B22802dB477259e26](https://basescan.org/address/0x6e981679D0E3f8d3f5E5d35B22802dB477259e26) |
+| BlueChipYieldPrices | [0xaF58c8bD19a71A6c70148c3ABB38633fc1B4Ea37](https://basescan.org/address/0xaF58c8bD19a71A6c70148c3ABB38633fc1B4Ea37) |
+| PythPrices          | [0xDEE8F270250430f19eeBda2E7AC3B0a809856c24](https://basescan.org/address/0xDEE8F270250430f19eeBda2E7AC3B0a809856c24) |
+| StorkPrices         | [0xb08E389a45BA558bcEc598c9356df1E7c78FC933](https://basescan.org/address/0xb08E389a45BA558bcEc598c9356df1E7c78FC933) |
+| VaultBook           | [0xa75bc02AB8Bcc9887BcEE0801188F9200bB65480](https://basescan.org/address/0xa75bc02AB8Bcc9887BcEE0801188F9200bB65480) |
+| StabilityPool       | [0x2a157096af6337b2b4bd47de435520572ed5a439](https://basescan.org/address/0x2a157096af6337b2b4bd47de435520572ed5a439) |
+| RipeGov             | [0xe42b3dC546527EB70D741B185Dc57226cA01839D](https://basescan.org/address/0xe42b3dC546527EB70D741B185Dc57226cA01839D) |
+| SimpleErc20         | [0xf75b566eF80Fde0dEfcC045A4d57b540eb43ddfD](https://basescan.org/address/0xf75b566eF80Fde0dEfcC045A4d57b540eb43ddfD) |
+| RebaseErc20         | [0xce2E96C9F6806731914A7b4c3E4aC1F296d98597](https://basescan.org/address/0xce2E96C9F6806731914A7b4c3E4aC1F296d98597) |
+| AuctionHouse        | [0x3228b04a4b4b498dA7235154131374077600989F](https://basescan.org/address/0x3228b04a4b4b498dA7235154131374077600989F) |
+| AuctionHouseNFT     | [0x504Fb3b94a9f4A238Ee3A16474B91F99A3f26F3A](https://basescan.org/address/0x504Fb3b94a9f4A238Ee3A16474B91F99A3f26F3A) |
+| Boardroom           | [0xb5cA6Ef866b510C3b85D4B0e3862061A569412D1](https://basescan.org/address/0xb5cA6Ef866b510C3b85D4B0e3862061A569412D1) |
+| BondRoom            | [0x831ab43127A7B14FD4f895fD10Ae897f324D2188](https://basescan.org/address/0x831ab43127A7B14FD4f895fD10Ae897f324D2188) |
+| CreditEngine        | [0x07e27c6F6B4c9283D723E5313540dF39eCE327A4](https://basescan.org/address/0x07e27c6F6B4c9283D723E5313540dF39eCE327A4) |
+| Endaoment           | [0x2d987CA3467925BcE8b6d40382f87EdCf0A3DF43](https://basescan.org/address/0x2d987CA3467925BcE8b6d40382f87EdCf0A3DF43) |
+| HumanResources      | [0xF9aCDFd0d167b741f9144Ca01E52FcdE16BE108b](https://basescan.org/address/0xF9aCDFd0d167b741f9144Ca01E52FcdE16BE108b) |
+| Lootbox             | [0x7f2af830886389E8A7fE4352c839147E7aa929Af](https://basescan.org/address/0x7f2af830886389E8A7fE4352c839147E7aa929Af) |
+| Teller              | [0xc0a8Bf2A0688f8986f890729f3eDdba52AC635e3](https://basescan.org/address/0xc0a8Bf2A0688f8986f890729f3eDdba52AC635e3) |
+| GreenPool           | [0xd6c283655B42FA0eb2685F7AB819784F071459dc](https://basescan.org/address/0xd6c283655B42FA0eb2685F7AB819784F071459dc) |
+
 ### Base Sepolia
 
 | Contract           | Address                                                                                                                       |
