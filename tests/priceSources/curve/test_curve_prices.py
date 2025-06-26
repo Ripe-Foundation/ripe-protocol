@@ -929,3 +929,41 @@ def test_access_control_non_governance(curve_prices, bob, green_token, deployed_
         
     with boa.reverts("no perms"):
         curve_prices.cancelDisablePriceFeed(green_token, sender=bob)
+
+
+@pytest.base
+def test_savings_green_price(
+    addSeedGreenLiq,
+    green_token,
+    deployed_green_pool,
+    curve_prices,
+    governance,
+    savings_green, 
+    credit_engine,
+    _test,
+    alice,
+):
+    addSeedGreenLiq() # need to add liquidity to pool
+
+    # setup green price
+    assert curve_prices.addNewPriceFeed(green_token, deployed_green_pool, sender=governance.address)
+    boa.env.time_travel(blocks=curve_prices.actionTimeLock() + 1)
+    assert curve_prices.confirmNewPriceFeed(green_token, sender=governance.address)
+    
+    # initial prices
+    green_price = curve_prices.getPrice(green_token)
+    initial_sgreen_price = curve_prices.getPrice(savings_green)
+    _test(initial_sgreen_price, green_price)
+
+    # deposit into savings green
+    amount = 100 * EIGHTEEN_DECIMALS
+    green_token.mint(alice, amount, sender=credit_engine.address) 
+    green_token.approve(savings_green, amount, sender=alice)
+    savings_green.deposit(amount, alice, sender=alice)
+
+    # double share value in savings green
+    green_token.mint(savings_green, amount, sender=credit_engine.address)
+
+    # should now be double the price
+    boosted_sgreen_price = curve_prices.getPrice(savings_green)
+    _test(boosted_sgreen_price, green_price * 2)

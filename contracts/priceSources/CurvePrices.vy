@@ -22,6 +22,7 @@ import contracts.modules.TimeLock as timeLock
 
 import interfaces.PriceSource as PriceSource
 from ethereum.ercs import IERC20Detailed
+from ethereum.ercs import IERC4626
 
 interface CurveMetaRegistry:
     def get_registry_handlers_from_pool(_pool: address) -> address[10]: view
@@ -214,11 +215,16 @@ MAX_POOLS: constant(uint256) = 50
 EIGHTEEN_DECIMALS: constant(uint256) = 10 ** 18
 HUNDRED_PERCENT: constant(uint256) = 100_00 # 100.00%
 
+GREEN: public(immutable(address))
+SGREEN: public(immutable(address))
+
 
 @deploy
 def __init__(
     _ripeHq: address,
     _curveAddressProvider: address,
+    _green: address,
+    _savingsGreen: address,
     _minPriceChangeTimeLock: uint256,
     _maxPriceChangeTimeLock: uint256,
 ):
@@ -226,6 +232,9 @@ def __init__(
     addys.__init__(_ripeHq)
     priceData.__init__(False)
     timeLock.__init__(_minPriceChangeTimeLock, _maxPriceChangeTimeLock, 0, _maxPriceChangeTimeLock)
+
+    GREEN = _green
+    SGREEN = _savingsGreen
 
     # set curve address provider
     if _curveAddressProvider != empty(address):
@@ -250,19 +259,38 @@ def __init__(
 @view
 @external
 def getPrice(_asset: address, _staleTime: uint256 = 0, _priceDesk: address = empty(address)) -> uint256:
-    config: CurvePriceConfig = self.curveConfig[_asset]
-    if config.pool == empty(address):
-        return 0
-    return self._getCurvePrice(_asset, config, _priceDesk)
+    price: uint256 = 0
+    na: bool = False
+    price, na = self._getPriceAndHasFeed(_asset, _staleTime, _priceDesk)
+    return price
 
 
 @view
 @external
 def getPriceAndHasFeed(_asset: address, _staleTime: uint256 = 0, _priceDesk: address = empty(address)) -> (uint256, bool):
-    config: CurvePriceConfig = self.curveConfig[_asset]
+    return self._getPriceAndHasFeed(_asset, _staleTime, _priceDesk)
+
+
+@view
+@internal
+def _getPriceAndHasFeed(_asset: address, _staleTime: uint256, _priceDesk: address) -> (uint256, bool):
+    asset: address = _asset
+
+    sGreen: address = SGREEN
+    isSavingsGreen: bool = asset == sGreen
+    if isSavingsGreen:
+        asset = GREEN
+
+    config: CurvePriceConfig = self.curveConfig[asset]
     if config.pool == empty(address):
         return 0, False
-    return self._getCurvePrice(_asset, config, _priceDesk), True
+
+    # get price, adjust if savings green
+    assetPrice: uint256 = self._getCurvePrice(asset, config, _priceDesk)
+    if isSavingsGreen:
+        assetPrice = self._getSavingsGreenPrice(sGreen, assetPrice)
+
+    return assetPrice, True
 
 
 # utilities
@@ -271,7 +299,10 @@ def getPriceAndHasFeed(_asset: address, _staleTime: uint256 = 0, _priceDesk: add
 @view
 @external
 def hasPriceFeed(_asset: address) -> bool:
-    return self.curveConfig[_asset].pool != empty(address)
+    asset: address = _asset
+    if _asset == SGREEN:
+        asset = GREEN
+    return self.curveConfig[asset].pool != empty(address)
 
 
 @view
@@ -1086,3 +1117,15 @@ def getGreenStabilizerConfig() -> StabilizerConfig:
         stabilizerAdjustWeight=config.stabilizerAdjustWeight,
         stabilizerMaxPoolDebt=config.stabilizerMaxPoolDebt,
     )
+
+
+#################
+# Savings Green #
+#################
+
+
+@view
+@internal
+def _getSavingsGreenPrice(_savingsGreen: address, _greenPrice: uint256) -> uint256:
+    pricePerShare: uint256 = staticcall IERC4626(_savingsGreen).convertToAssets(EIGHTEEN_DECIMALS)
+    return _greenPrice * pricePerShare // EIGHTEEN_DECIMALS
