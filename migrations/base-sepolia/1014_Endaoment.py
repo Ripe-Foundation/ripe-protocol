@@ -15,3 +15,7 @@ def migrate(migration: Migration):
 
     migration.execute(hq.startAddNewAddressToRegistry, endaoment, "Endaoment")
     assert int(migration.execute(hq.confirmNewAddressToRegistry, endaoment)) == 14
+
+    # endaoment can mint green
+    migration.execute(hq.initiateHqConfigChange, 14, True, False, False)
+    migration.execute(hq.confirmHqConfigChange, 14)

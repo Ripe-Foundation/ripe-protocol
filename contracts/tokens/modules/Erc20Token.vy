@@ -372,6 +372,16 @@ def permit(
         s: bytes32 = convert(slice(_signature, 32, 32), bytes32)
         v: uint8 = convert(slice(_signature, 64, 1), uint8)
 
+        # validate v parameter (27 or 28)
+        if v < 27:
+            v = v + 27
+        assert v == 27 or v == 28 # dev: invalid v parameter
+
+        # prevent signature malleability by ensuring s is in lower half of curve order
+        s_uint: uint256 = convert(s, uint256)
+        assert s_uint != 0 # dev: invalid s value (zero)
+        assert s_uint <= convert(0x7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF5D576E7357A4501DDFE92F46681B20A0, uint256) # dev: invalid s value
+
         response: Bytes[32] = raw_call(
             ECRECOVER_PRECOMPILE,
             abi_encode(digest, v, r, s),

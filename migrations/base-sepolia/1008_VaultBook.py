@@ -15,16 +15,6 @@ def migrate(migration: Migration):
         blueprint.PARAMS["VAULT_BOOK_MAX_REG_TIMELOCK"],
     )
 
-    simple_erc20_vault = migration.deploy(
-        "SimpleErc20",
-        hq,
-    )
-
-    rebase_erc20_vault = migration.deploy(
-        "RebaseErc20",
-        hq,
-    )
-
     stability_pool = migration.deploy(
         "StabilityPool",
         hq,
@@ -35,19 +25,27 @@ def migrate(migration: Migration):
         hq,
     )
 
+    simple_erc20_vault = migration.deploy(
+        "SimpleErc20",
+        hq,
+    )
+
+    rebase_erc20_vault = migration.deploy(
+        "RebaseErc20",
+        hq,
+    )
+
     migration.execute(vault_book.startAddNewAddressToRegistry, stability_pool, "Stability Pool")
-    migration.execute(vault_book.confirmNewAddressToRegistry, stability_pool)
+    assert int(migration.execute(vault_book.confirmNewAddressToRegistry, stability_pool)) == 1
 
     migration.execute(vault_book.startAddNewAddressToRegistry, ripe_gov_vault, "Ripe Gov Vault")
-    migration.execute(vault_book.confirmNewAddressToRegistry, ripe_gov_vault)
+    assert int(migration.execute(vault_book.confirmNewAddressToRegistry, ripe_gov_vault)) == 2
 
     migration.execute(vault_book.startAddNewAddressToRegistry, simple_erc20_vault, "Simple ERC20 Vault")
-    migration.execute(vault_book.confirmNewAddressToRegistry, simple_erc20_vault)
+    assert int(migration.execute(vault_book.confirmNewAddressToRegistry, simple_erc20_vault)) == 3
 
     migration.execute(vault_book.startAddNewAddressToRegistry, rebase_erc20_vault, "Rebase ERC20 Vault")
-    migration.execute(vault_book.confirmNewAddressToRegistry, rebase_erc20_vault)
-
-    migration.execute(vault_book.setRegistryTimeLockAfterSetup)
+    assert int(migration.execute(vault_book.confirmNewAddressToRegistry, rebase_erc20_vault)) == 4
 
     migration.execute(hq.startAddNewAddressToRegistry, vault_book, "Vault Book")
     assert int(migration.execute(hq.confirmNewAddressToRegistry, vault_book)) == 8

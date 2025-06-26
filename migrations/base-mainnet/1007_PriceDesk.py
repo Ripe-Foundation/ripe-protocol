@@ -38,8 +38,6 @@ def migrate(migration: Migration):
                       blueprint.CORE_TOKENS["CBBTC"], blueprint.ADDYS["CHAINLINK_CBBTC_USD"])
     migration.execute(chainlink.confirmNewPriceFeed, blueprint.CORE_TOKENS["CBBTC"])
 
-    migration.execute(chainlink.setActionTimeLockAfterSetup)
-
     migration.execute(price_desk.startAddNewAddressToRegistry, chainlink, "Chainlink")
     assert int(migration.execute(price_desk.confirmNewAddressToRegistry, chainlink)) == 1
 
@@ -69,7 +67,6 @@ def migrate(migration: Migration):
         blueprint.ADDYS["MOONWELL_COMPTROLLER"],
         blueprint.ADDYS["AAVE_V3_ADDRESS_PROVIDER"],
     )
-    migration.execute(bluechip_yield_prices.setActionTimeLockAfterSetup)
     migration.execute(price_desk.startAddNewAddressToRegistry, bluechip_yield_prices, "BlueChip Yield Prices")
     migration.execute(price_desk.confirmNewAddressToRegistry, bluechip_yield_prices)
 
@@ -82,7 +79,6 @@ def migrate(migration: Migration):
         blueprint.PARAMS["PRICE_DESK_MIN_REG_TIMELOCK"],
         blueprint.PARAMS["PRICE_DESK_MAX_REG_TIMELOCK"],
     )
-    migration.execute(pyth_prices.setActionTimeLockAfterSetup)
     migration.execute(price_desk.startAddNewAddressToRegistry, pyth_prices, "Pyth Prices")
     migration.execute(price_desk.confirmNewAddressToRegistry, pyth_prices)
 
@@ -95,11 +91,9 @@ def migrate(migration: Migration):
         blueprint.PARAMS["PRICE_DESK_MIN_REG_TIMELOCK"],
         blueprint.PARAMS["PRICE_DESK_MAX_REG_TIMELOCK"],
     )
-    migration.execute(stork_prices.setActionTimeLockAfterSetup)
     migration.execute(price_desk.startAddNewAddressToRegistry, stork_prices, "Stork Prices")
     migration.execute(price_desk.confirmNewAddressToRegistry, stork_prices)
 
     # finish registry setup
-    migration.execute(price_desk.setRegistryTimeLockAfterSetup)
     migration.execute(hq.startAddNewAddressToRegistry, price_desk, "Price Desk")
     assert int(migration.execute(hq.confirmNewAddressToRegistry, price_desk)) == 7

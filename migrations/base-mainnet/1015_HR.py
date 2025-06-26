@@ -14,7 +14,6 @@ def migrate(migration: Migration):
         blueprint.PARAMS["MIN_HQ_CHANGE_TIMELOCK"],
         blueprint.PARAMS["MAX_HQ_CHANGE_TIMELOCK"],
     )
-    migration.execute(human_resources.setActionTimeLockAfterSetup)
 
     migration.execute(hq.startAddNewAddressToRegistry, human_resources, "Human Resources")
     assert int(migration.execute(hq.confirmNewAddressToRegistry, human_resources)) == 15

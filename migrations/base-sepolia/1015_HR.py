@@ -18,5 +18,6 @@ def migrate(migration: Migration):
     migration.execute(hq.startAddNewAddressToRegistry, human_resources, "Human Resources")
     assert int(migration.execute(hq.confirmNewAddressToRegistry, human_resources)) == 15
 
+    # human resources can mint ripe
     migration.execute(hq.initiateHqConfigChange, 15, False, True, False)
     migration.execute(hq.confirmHqConfigChange, 15)

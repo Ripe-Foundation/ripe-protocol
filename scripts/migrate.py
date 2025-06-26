@@ -6,9 +6,12 @@ from scripts.utils import log
 from scripts.utils.migration_helpers import get_account, load_vyper_files
 from scripts.utils.migration_runner import MigrationRunner
 from scripts.utils.deploy_args import DeployArgs
-from scripts.utils.safe import SafeAccount
+from scripts.utils.safe_account import SafeAccount
 from boa.environment import Env
+from scripts.utils.ledger_account import LedgerAccount
+from scripts.utils.mock_account import MockAccount
 import os
+
 
 MIGRATION_SCRIPTS_DIR = "./migrations"
 MIGRATION_HISTORY_DIR = "./migration_history"
@@ -50,8 +53,8 @@ CLICK_PROMPTS = {
     },
     "blueprint": {
         "prompt": "Blueprint",
-        "default": "base",
-        "help": "Blueprint to use for the migration. Defaults to `base`.",
+        "default": "",
+        "help": "Blueprint to use for the migration. Defaults to ``.",
     },
     "chain": {
         "prompt": "Chain name",
@@ -194,6 +197,12 @@ def param_prompt(ctx, param, value):
     callback=param_prompt,
 )
 @click.option(
+    "--ledger",
+    default=-1,
+    help="Ledger account index to use (default: -1 = Not using Ledger)",
+    type=int,
+)
+@click.option(
     "--is-retry",
     is_flag=True,
     default=CLICK_PROMPTS["is_retry"]["default"],
@@ -213,6 +222,7 @@ def cli(
     chain,
     blueprint,
     account,
+    ledger,
 ):
     """
     Deploys the protocol by running migration scripts.
@@ -243,13 +253,20 @@ def cli(
     final_rpc = rpc if rpc else (
         'boa' if chain == 'local' else f"https://{chain}.g.alchemy.com/v2/{os.environ.get('WEB3_ALCHEMY_API_KEY')}")
 
-    if safe == "":
-        sender = get_account(account)
+    if safe != "":
+        if fork:
+            sender = MockAccount(safe)
+        else:
+            sender = SafeAccount(
+                safe_address=safe,
+                rpc_url=final_rpc
+            )
+    elif ledger != -1:
+        sender = LedgerAccount(final_rpc, ledger)
+        if fork:
+            sender = MockAccount(sender.address)
     else:
-        sender = SafeAccount(
-            safe_address=safe,
-            rpc_url=final_rpc
-        )
+        sender = get_account(account)
 
     deploy_args = DeployArgs(sender, chain, ignore_logs=not is_retry, blueprint=blueprint)
 
@@ -283,7 +300,7 @@ def cli(
     elif fork:
         with boa.fork(final_rpc, allow_dirty=True) as env:
             try:
-                env.set_balance(account.address, 10*10**18)
+                env.set_balance(sender.address, 10*10**18)
                 log.h2('Deployer wallet funded with 10 ETH')
             except:
                 log.h2('Cannot fund deployer wallet')

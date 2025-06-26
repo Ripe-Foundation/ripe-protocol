@@ -1,6 +1,5 @@
 from scripts.utils import log
 from scripts.utils.migration import Migration
-from tests.constants import EIGHTEEN_DECIMALS
 
 
 def migrate(migration: Migration):
@@ -11,7 +10,7 @@ def migrate(migration: Migration):
     ledger = migration.deploy(
         "Ledger",
         hq,
-        migration.get_contract("DefaultsBaseSepolia"),
+        migration.get_contract("DefaultsBase"),
     )
 
     migration.execute(hq.startAddNewAddressToRegistry, ledger, "Ledger")

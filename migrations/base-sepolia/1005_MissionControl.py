@@ -10,7 +10,7 @@ def migrate(migration: Migration):
     mission_control = migration.deploy(
         "MissionControl",
         hq,
-        migration.get_contract("DefaultsBaseSepolia"),
+        migration.get_contract("DefaultsBase"),
     )
 
     migration.execute(hq.startAddNewAddressToRegistry, mission_control, "Mission Control")

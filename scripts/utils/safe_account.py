@@ -1,8 +1,5 @@
-from eth_account import Account
-from eth_account.messages import encode_defunct
 from web3 import Web3
 import requests
-import json
 import time
 import hashlib
 import webbrowser
@@ -337,15 +334,13 @@ class SafeAccount:
 
     def _wait_for_execution(self, nonce=None):
         """Wait for the Safe transaction to be executed. If safeTxHash is not found, poll by nonce until it appears."""
-        max_attempts = 60
         poll_interval = 5
-        attempt = 0
 
         is_executed = False
         tx = None
 
         # If safe_tx_hash is None or empty, poll by nonce until we get the hash
-        while (not is_executed) and nonce is not None and attempt < max_attempts:
+        while (not is_executed):
             txs = requests.get(
                 f"{self.safe_service_url}/api/v1/safes/{self.address}/multisig-transactions/?nonce={nonce}"
             )
@@ -356,9 +351,6 @@ class SafeAccount:
                     tx = results[0]
                     break
             time.sleep(poll_interval)
-            attempt += 1
-        if not is_executed:
-            raise Exception("No transaction found for this nonce after waiting!")
 
         print(f"✅ Safe Transaction executed")
         return tx

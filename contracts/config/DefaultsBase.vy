@@ -17,7 +17,7 @@ MONTH_IN_SECONDS: constant(uint256) = 30 * DAY_IN_SECONDS
 YEAR_IN_SECONDS: constant(uint256) = 365 * DAY_IN_SECONDS
 
 # blocks
-DAY_IN_BLOCKS: constant(uint256) = 7_200
+DAY_IN_BLOCKS: constant(uint256) = 43_200
 WEEK_IN_BLOCKS: constant(uint256) = 7 * DAY_IN_BLOCKS
 MONTH_IN_BLOCKS: constant(uint256) = 30 * DAY_IN_BLOCKS
 YEAR_IN_BLOCKS: constant(uint256) = 365 * DAY_IN_BLOCKS

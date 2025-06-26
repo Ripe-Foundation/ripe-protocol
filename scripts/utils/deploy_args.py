@@ -22,3 +22,12 @@ class DeployArgs:
 class LegoType:
     YIELD_OPP = 2**0  # 2 ** 0 = 1
     DEX = 2**1  # 2 ** 1 = 2
+
+
+DEFAULT_AUCTION_PARAMS = (
+    False,
+    0,
+    0,
+    0,
+    0,
+)

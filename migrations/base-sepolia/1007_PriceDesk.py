@@ -17,27 +17,6 @@ def migrate(migration: Migration):
         blueprint.PARAMS["PRICE_DESK_MAX_REG_TIMELOCK"],
     )
 
-    migration.execute(hq.startAddNewAddressToRegistry, price_desk, "Price Desk")
-    assert int(migration.execute(hq.confirmNewAddressToRegistry, price_desk)) == 7
-
-    # Set up chainlink feeds
-
-    mock_usdc_feed = migration.deploy(
-        "MockChainlinkFeed",
-        1*EIGHTEEN_DECIMALS,
-        label="MockUsdcFeed",
-    )
-    mock_btc_feed = migration.deploy(
-        "MockChainlinkFeed",
-        100_000*EIGHTEEN_DECIMALS,
-        label="MockBtcFeed",
-    )
-    mock_weth_feed = migration.deploy(
-        "MockChainlinkFeed",
-        2_500*EIGHTEEN_DECIMALS,
-        label="MockEthFeed",
-    )
-
     # Deploy chainlink
 
     chainlink = migration.deploy(
@@ -48,20 +27,19 @@ def migrate(migration: Migration):
         blueprint.ADDYS["WETH"],
         blueprint.ADDYS["ETH"],
         blueprint.ADDYS["BTC"],
-        mock_weth_feed.address,
-        mock_btc_feed.address,
+        blueprint.ADDYS["CHAINLINK_ETH_USD"],
+        blueprint.ADDYS["CHAINLINK_BTC_USD"],
     )
 
-    migration.execute(chainlink.addNewPriceFeed, blueprint.ADDYS["USDC"], mock_usdc_feed.address)
-    migration.execute(chainlink.confirmNewPriceFeed, blueprint.ADDYS["USDC"])
+    migration.execute(chainlink.addNewPriceFeed, blueprint.CORE_TOKENS["USDC"], blueprint.ADDYS["CHAINLINK_USDC_USD"])
+    migration.execute(chainlink.confirmNewPriceFeed, blueprint.CORE_TOKENS["USDC"])
 
-    migration.execute(chainlink.addNewPriceFeed, blueprint.ADDYS["CBBTC"], mock_btc_feed.address)
-    migration.execute(chainlink.confirmNewPriceFeed, blueprint.ADDYS["CBBTC"])
-
-    migration.execute(chainlink.setActionTimeLockAfterSetup)
+    migration.execute(chainlink.addNewPriceFeed,
+                      blueprint.CORE_TOKENS["CBBTC"], blueprint.ADDYS["CHAINLINK_CBBTC_USD"])
+    migration.execute(chainlink.confirmNewPriceFeed, blueprint.CORE_TOKENS["CBBTC"])
 
     migration.execute(price_desk.startAddNewAddressToRegistry, chainlink, "Chainlink")
-    migration.execute(price_desk.confirmNewAddressToRegistry, chainlink)
+    assert int(migration.execute(price_desk.confirmNewAddressToRegistry, chainlink)) == 1
 
     # Set up Curve Prices
 
@@ -73,31 +51,49 @@ def migrate(migration: Migration):
         blueprint.PARAMS["PRICE_DESK_MAX_REG_TIMELOCK"],
     )
     migration.execute(price_desk.startAddNewAddressToRegistry, curve_prices, "Curve Prices")
-    migration.execute(price_desk.confirmNewAddressToRegistry, curve_prices)
+    assert int(migration.execute(price_desk.confirmNewAddressToRegistry, curve_prices)) == 2
 
-    # Add Green Prices
-    green_token = migration.get_address("GreenToken")
-    green_pool = migration.get_address("GreenPool")
-    migration.execute(curve_prices.addNewPriceFeed, green_token, green_pool)
-    migration.execute(curve_prices.confirmNewPriceFeed, green_token)
-    migration.execute(curve_prices.addNewPriceFeed, green_pool, green_pool)
-    migration.execute(curve_prices.confirmNewPriceFeed, green_pool)
+    # # Set up BlueChip Yield Prices
 
-    # Add Ripe Prices
-    ripe_token = migration.get_address("RipeToken")
-    ripe_pool = migration.get_address("RipePool")
-    migration.execute(curve_prices.addNewPriceFeed, ripe_token, ripe_pool)
-    migration.execute(curve_prices.confirmNewPriceFeed, ripe_token)
-    migration.execute(curve_prices.addNewPriceFeed, ripe_pool, ripe_pool)
-    migration.execute(curve_prices.confirmNewPriceFeed, ripe_pool)
+    # bluechip_yield_prices = migration.deploy(
+    #     "BlueChipYieldPrices",
+    #     hq,
+    #     blueprint.PARAMS["PRICE_DESK_MIN_REG_TIMELOCK"],
+    #     blueprint.PARAMS["PRICE_DESK_MAX_REG_TIMELOCK"],
+    #     [blueprint.ADDYS["MORPHO_FACTORY"], blueprint.ADDYS["MORPHO_FACTORY_LEGACY"]],
+    #     [blueprint.ADDYS["EULER_EVAULT_FACTORY"], blueprint.ADDYS["EULER_EARN_FACTORY"]],
+    #     blueprint.ADDYS["FLUID_RESOLVER"],
+    #     blueprint.ADDYS["COMPOUND_V3_CONFIGURATOR"],
+    #     blueprint.ADDYS["MOONWELL_COMPTROLLER"],
+    #     blueprint.ADDYS["AAVE_V3_ADDRESS_PROVIDER"],
+    # )
+    # migration.execute(price_desk.startAddNewAddressToRegistry, bluechip_yield_prices, "BlueChip Yield Prices")
+    # migration.execute(price_desk.confirmNewAddressToRegistry, bluechip_yield_prices)
 
-    mock_s_green_price = migration.deploy(
-        "MockSGreenPrice",
-        migration.get_address("SavingsGreen"),
-    )
+    # # Set up Pyth Prices
 
-    migration.execute(price_desk.startAddNewAddressToRegistry, mock_s_green_price, "Mock SavingsGreen Price")
-    migration.execute(price_desk.confirmNewAddressToRegistry, mock_s_green_price)
+    # pyth_prices = migration.deploy(
+    #     "PythPrices",
+    #     hq,
+    #     blueprint.ADDYS["PYTH_NETWORK"],
+    #     blueprint.PARAMS["PRICE_DESK_MIN_REG_TIMELOCK"],
+    #     blueprint.PARAMS["PRICE_DESK_MAX_REG_TIMELOCK"],
+    # )
+    # migration.execute(price_desk.startAddNewAddressToRegistry, pyth_prices, "Pyth Prices")
+    # migration.execute(price_desk.confirmNewAddressToRegistry, pyth_prices)
+
+    # # Set up Stork Prices
+
+    # stork_prices = migration.deploy(
+    #     "StorkPrices",
+    #     hq,
+    #     blueprint.ADDYS["STORK_NETWORK"],
+    #     blueprint.PARAMS["PRICE_DESK_MIN_REG_TIMELOCK"],
+    #     blueprint.PARAMS["PRICE_DESK_MAX_REG_TIMELOCK"],
+    # )
+    # migration.execute(price_desk.startAddNewAddressToRegistry, stork_prices, "Stork Prices")
+    # migration.execute(price_desk.confirmNewAddressToRegistry, stork_prices)
 
     # finish registry setup
-    migration.execute(price_desk.setRegistryTimeLockAfterSetup)
+    migration.execute(hq.startAddNewAddressToRegistry, price_desk, "Price Desk")
+    assert int(migration.execute(hq.confirmNewAddressToRegistry, price_desk)) == 7
