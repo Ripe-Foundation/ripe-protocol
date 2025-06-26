@@ -1202,16 +1202,16 @@ def getMaxWithdrawableForAsset(
     if userDebt.inLiquidation:
         return 0
 
+    # get the asset's debt terms
+    assetDebtTerms: cs.DebtTerms = staticcall MissionControl(a.missionControl).getDebtTerms(_asset)
+    if assetDebtTerms.ltv == 0:
+        return max_value(uint256) # asset doesn't contribute to borrowing power
+
     # get current asset value for user
     userBalance: uint256 = staticcall Vault(vaultAddr).getTotalAmountForUser(_user, _asset)
     userUsdValue: uint256 = staticcall PriceDesk(a.priceDesk).getUsdValue(_asset, userBalance, False)
     if userUsdValue == 0:
         return 0 # cannot determine value
-
-    # get the asset's debt terms
-    assetDebtTerms: cs.DebtTerms = staticcall MissionControl(a.missionControl).getDebtTerms(_asset)
-    if assetDebtTerms.ltv == 0:
-        return max_value(uint256) # asset doesn't contribute to borrowing power
 
     # get borrow terms excluding the asset to withdraw
     btExcluding: UserBorrowTerms = self._getUserBorrowTerms(_user, d.numUserVaults, True, _vaultId, _asset, a)
