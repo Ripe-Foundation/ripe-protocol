@@ -45,6 +45,10 @@ interface Ledger:
 
 interface BondRoom:
     def startBondEpochAtBlock(_block: uint256): nonpayable
+    def setBondBooster(_bondBooster: address): nonpayable
+
+interface BondBooster:
+    def getBoostedRipe(_user: address, _units: uint256) -> uint256: view
 
 interface RipeHq:
     def getAddr(_regId: uint256) -> address: view
@@ -61,6 +65,7 @@ flag ActionType:
     RIPE_BOND_EPOCH_LENGTH
     RIPE_BOND_START_EPOCH
     RIPE_BAD_DEBT
+    RIPE_BOND_BOOSTER
 
 struct PendingManager:
     contributor: address
@@ -155,6 +160,11 @@ event PendingBadDebtSet:
     confirmationBlock: uint256
     actionId: uint256
 
+event PendingBondBoosterSet:
+    bondBooster: indexed(address)
+    confirmationBlock: uint256
+    actionId: uint256
+
 event HrContribTemplateSet:
     contribTemplate: indexed(address)
 
@@ -195,6 +205,9 @@ event RipeBondStartEpochAtBlockSet:
 event BadDebtSet:
     badDebt: uint256
 
+event RipeBondBoosterSet:
+    bondBooster: indexed(address)
+
 # pending config changes
 actionType: public(HashMap[uint256, ActionType]) # aid -> type
 pendingHrConfig: public(HashMap[uint256, cs.HrConfig]) # aid -> config
@@ -202,6 +215,7 @@ pendingManager: public(HashMap[uint256, PendingManager]) # aid -> pending manage
 pendingCancelPaycheck: public(HashMap[uint256, address]) # aid -> contributor
 pendingRipeBondConfig: public(HashMap[uint256, cs.RipeBondConfig]) # aid -> config
 pendingRipeBondConfigValue: public(HashMap[uint256, uint256]) # aid -> block
+pendingBondBooster: public(HashMap[uint256, address]) # aid -> bond booster
 
 LEDGER_ID: constant(uint256) = 4
 MISSION_CONTROL_ID: constant(uint256) = 5
@@ -558,6 +572,35 @@ def setBadDebt(_amount: uint256) -> uint256:
     return aid
 
 
+# bond booster
+
+
+@external
+def setRipeBondBooster(_bondBooster: address) -> uint256:
+    assert gov._canGovern(msg.sender) # dev: no perms
+    assert self._isValidRipeBondBoosterAddr(_bondBooster) # dev: invalid bond booster
+
+    aid: uint256 = timeLock._initiateAction()
+    self.actionType[aid] = ActionType.RIPE_BOND_BOOSTER
+    self.pendingBondBooster[aid] = _bondBooster
+    confirmationBlock: uint256 = timeLock._getActionConfirmationBlock(aid)
+    log PendingBondBoosterSet(
+        bondBooster=_bondBooster,
+        confirmationBlock=confirmationBlock,
+        actionId=aid,
+    )
+    return aid
+
+
+@view
+@internal
+def _isValidRipeBondBoosterAddr(_addr: address) -> bool:
+    # make sure has interface
+    if _addr != empty(address):
+        na: uint256 = staticcall BondBooster(_addr).getBoostedRipe(empty(address), 10)
+    return True
+
+
 #############
 # Execution #
 #############
@@ -651,6 +694,11 @@ def executePendingAction(_aid: uint256) -> bool:
         amount: uint256 = self.pendingRipeBondConfigValue[_aid]
         extcall Ledger(self._getLedgerAddr()).setBadDebt(amount)
         log BadDebtSet(badDebt=amount)
+
+    elif actionType == ActionType.RIPE_BOND_BOOSTER:
+        bondBooster: address = self.pendingBondBooster[_aid]
+        extcall BondRoom(self._getBondRoomAddr()).setBondBooster(bondBooster)
+        log RipeBondBoosterSet(bondBooster=bondBooster)
 
     self.actionType[_aid] = empty(ActionType)
     return True

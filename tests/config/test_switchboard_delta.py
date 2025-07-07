@@ -987,3 +987,83 @@ def test_switchboard_delta_set_bad_debt(switchboard_delta, ledger, governance, a
     # Check action was cleared after execution
     final_action_type = switchboard_delta.actionType(aid)
     assert final_action_type == 0  # Should be cleared
+
+
+def test_switchboard_delta_set_ripe_bond_booster(switchboard_delta, bond_room, ripe_hq_deploy, governance, alice):
+    """Test setRipeBondBooster creates timelock action and validates permissions"""
+    # Deploy a new bond booster for testing
+    new_bond_booster = boa.load(
+        "contracts/config/BondBooster.vy",
+        ripe_hq_deploy,
+        1000 * EIGHTEEN_DECIMALS,  # _maxBoost
+        100,                        # _maxUnits
+        [],                         # _initialBoosts
+        name="new_bond_booster"
+    )
+    
+    # Non-governance cannot set bond booster
+    with boa.reverts("no perms"):
+        switchboard_delta.setRipeBondBooster(new_bond_booster.address, sender=alice)
+    
+    # Note: ZERO_ADDRESS is actually allowed by the validation logic
+    # The validation only fails for non-empty addresses that don't have the interface
+    
+    # Governance can create pending bond booster action
+    aid = switchboard_delta.setRipeBondBooster(new_bond_booster.address, sender=governance.address)
+    assert aid > 0
+    
+    # Check pending event was emitted
+    logs = filter_logs(switchboard_delta, "PendingBondBoosterSet")
+    assert len(logs) == 1
+    log = logs[0]
+    assert log.bondBooster == new_bond_booster.address
+    assert log.actionId == aid
+    
+    # Check action was stored
+    action_type = switchboard_delta.actionType(aid)
+    assert action_type == 2048  # ActionType.RIPE_BOND_BOOSTER (bit 11 set)
+    
+    # Check pending bond booster was stored
+    pending_bond_booster = switchboard_delta.pendingBondBooster(aid)
+    assert pending_bond_booster == new_bond_booster.address
+    
+    # Verify initial bond room has different bond booster
+    initial_bond_booster = bond_room.bondBooster()
+    assert initial_bond_booster != new_bond_booster.address
+    
+    # Try to execute before timelock (should fail)
+    success_early = switchboard_delta.executePendingAction(aid, sender=governance.address)
+    assert not success_early
+    
+    # Advance time past timelock
+    boa.env.time_travel(blocks=switchboard_delta.actionTimeLock())
+    
+    # Execute the action
+    success_execute = switchboard_delta.executePendingAction(aid, sender=governance.address)
+    assert success_execute
+    
+    # Check execution event was emitted
+    execution_logs = filter_logs(switchboard_delta, "RipeBondBoosterSet")
+    assert len(execution_logs) == 1
+    execution_log = execution_logs[0]
+    assert execution_log.bondBooster == new_bond_booster.address
+    
+    # Verify bond room bond booster was actually set
+    final_bond_booster = bond_room.bondBooster()
+    assert final_bond_booster == new_bond_booster.address
+    
+    # Check action was cleared after execution
+    final_action_type = switchboard_delta.actionType(aid)
+    assert final_action_type == 0  # Should be cleared
+
+
+def test_switchboard_delta_set_ripe_bond_booster_validation(switchboard_delta, governance, alice):
+    """Test setRipeBondBooster validation for invalid bond booster addresses"""
+    # Non-contract address should fail validation (will revert when trying to call getBoostedRipe)
+    with boa.reverts():  # This will catch any revert, not a specific message
+        switchboard_delta.setRipeBondBooster(alice, sender=governance.address)
+    
+    # Empty address is actually allowed by the validation logic
+    # The validation only checks if the address has the interface when it's not empty
+    aid = switchboard_delta.setRipeBondBooster(ZERO_ADDRESS, sender=governance.address)
+    assert aid > 0

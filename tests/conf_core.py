@@ -286,10 +286,11 @@ def boardroom(ripe_hq_deploy):
 
 
 @pytest.fixture(scope="session")
-def bond_room(ripe_hq_deploy):
+def bond_room(ripe_hq_deploy, bond_booster):
     return boa.load(
         "contracts/core/BondRoom.vy",
         ripe_hq_deploy,
+        bond_booster,
         name="bond_room",
     )
 
@@ -487,6 +488,21 @@ def training_wheels(ripe_hq_deploy):
         ripe_hq_deploy,
         [],
         name="training_wheels",
+    )
+
+
+# bond booster
+
+
+@pytest.fixture(scope="session")
+def bond_booster(ripe_hq_deploy):
+    return boa.load(
+        "contracts/config/BondBooster.vy",
+        ripe_hq_deploy,
+        1000 * EIGHTEEN_DECIMALS,  # _maxBoost
+        100,                        # _maxUnits
+        [],                         # _initialBoosts
+        name="bond_booster",
     )
 
 

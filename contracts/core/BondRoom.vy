@@ -44,6 +44,10 @@ interface Teller:
     def depositFromTrusted(_user: address, _vaultId: uint256, _asset: address, _amount: uint256, _lockDuration: uint256, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
     def isUnderscoreWalletOwner(_user: address, _caller: address, _mc: address = empty(address)) -> bool: view
 
+interface BondBooster:
+    def getBoostedRipe(_user: address, _units: uint256) -> uint256: view
+    def addNewUnitsUsed(_user: address, _newUnits: uint256): nonpayable
+
 interface PriceDesk:
     def getUsdValue(_asset: address, _amount: uint256, _shouldRaise: bool = False) -> uint256: view
 
@@ -82,18 +86,26 @@ event RipeBondPurchased:
     ripeForBadDebt: uint256
     baseRipePerUnit: uint256
     ripePerUnitBonus: uint256
+    boostedRipe: uint256
     epochProgress: uint256
     refundAmount: uint256
     caller: indexed(address)
 
+event BondBoosterSet:
+    bondBooster: address
+
 HUNDRED_PERCENT: constant(uint256) = 100_00 # 100.00%
 RIPE_GOV_VAULT_ID: constant(uint256) = 2
 
+bondBooster: public(address)
+
 
 @deploy
-def __init__(_ripeHq: address):
+def __init__(_ripeHq: address, _bondBooster: address):
     addys.__init__(_ripeHq)
     deptBasics.__init__(False, False, True) # can mint ripe only
+
+    self.bondBooster = _bondBooster
 
 
 ##############
@@ -151,9 +163,20 @@ def purchaseRipeBond(
     else:
         lockDuration = 0
 
-    # finalize ripe payout
+    # main ripe payout
     ripePerUnit: uint256 = baseRipePerUnit + ripePerUnitBonus
-    ripePayout: uint256 = ripePerUnit * paymentAmount // (10 ** convert(staticcall IERC20Detailed(_paymentAsset).decimals(), uint256))
+    units: uint256 = paymentAmount // (10 ** convert(staticcall IERC20Detailed(_paymentAsset).decimals(), uint256))
+    ripePayout: uint256 = ripePerUnit * units
+
+    # check if user has bond booster (if applicable)
+    boostedRipe: uint256 = 0
+    bondBooster: address = self.bondBooster
+    if bondBooster != empty(address):
+        boostedRipe = staticcall BondBooster(bondBooster).getBoostedRipe(_recipient, units)
+        if boostedRipe != 0:
+            ripePayout += boostedRipe
+            extcall BondBooster(bondBooster).addNewUnitsUsed(_recipient, units)
+
     assert ripePayout != 0 # dev: bad deal, user is not getting fair amount of Ripe
     assert ripePayout <= data.ripeAvailForBonds # dev: not enough ripe avail
 
@@ -194,7 +217,20 @@ def purchaseRipeBond(
         newStartBlock: uint256 = block.number + config.restartDelayBlocks
         extcall Ledger(a.ledger).setEpochData(newStartBlock, newStartBlock + config.epochLength, config.amountPerEpoch)
 
-    log RipeBondPurchased(recipient=_recipient, paymentAsset=_paymentAsset, paymentAmount=paymentAmount, lockDuration=lockDuration, ripePayout=ripePayout, ripeForBadDebt=ripeForBadDebt, baseRipePerUnit=baseRipePerUnit, ripePerUnitBonus=ripePerUnitBonus, epochProgress=epochProgress, refundAmount=refundAmount, caller=_caller)
+    log RipeBondPurchased(
+        recipient=_recipient,
+        paymentAsset=_paymentAsset,
+        paymentAmount=paymentAmount,
+        lockDuration=lockDuration,
+        ripePayout=ripePayout,
+        ripeForBadDebt=ripeForBadDebt,
+        baseRipePerUnit=baseRipePerUnit,
+        ripePerUnitBonus=ripePerUnitBonus,
+        boostedRipe=boostedRipe,
+        epochProgress=epochProgress,
+        refundAmount=refundAmount,
+        caller=_caller,
+    )
     return ripePayout
 
 
@@ -262,6 +298,18 @@ def previewNextEpoch() -> (uint256, uint256):
     na: bool = False
     epochStart, epochEnd, na = self._getLatestEpochBlockTimes(epochStart, epochEnd, config.epochLength)
     return epochStart, epochEnd
+
+
+################
+# Bond Booster #
+################
+
+
+@external
+def setBondBooster(_bondBooster: address):
+    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
+    self.bondBooster = _bondBooster
+    log BondBoosterSet(bondBooster=_bondBooster)
 
 
 ##########

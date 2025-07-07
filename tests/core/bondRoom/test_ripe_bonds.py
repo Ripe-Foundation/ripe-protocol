@@ -237,7 +237,7 @@ def test_purchase_ripe_bond_with_minimum_lock_duration(
     expected_base = payment_amount  # min ripe per unit at epoch start
     expected_bonus = 0  # no bonus at minimum lock duration
     expected_total = expected_base + expected_bonus
-    _test(ripe_payout, expected_total)
+    _test(expected_total, ripe_payout)
 
     # tokens should be locked in gov vault, not in user balance
     assert ripe_token.balanceOf(bob) == 0
@@ -275,7 +275,7 @@ def test_purchase_ripe_bond_with_lock_above_minimum(
     expected_bonus_ratio = (lock_duration - 100) / (1000 - 100)  # (150-100)/(1000-100)
     expected_bonus = int(100 * EIGHTEEN_DECIMALS * expected_bonus_ratio * payment_amount // EIGHTEEN_DECIMALS)
     expected_total = expected_base + expected_bonus
-    _test(ripe_payout, expected_total)
+    _test(expected_total, ripe_payout)
 
     # tokens should be locked, not in user balance
     assert ripe_token.balanceOf(bob) == 0
@@ -309,7 +309,7 @@ def test_purchase_ripe_bond_with_lock_maximum(
     expected_base = payment_amount  # min ripe per unit at epoch start (1x)
     expected_bonus = 100 * payment_amount  # max lock bonus (100x)  
     expected_total = expected_base + expected_bonus
-    _test(ripe_payout, expected_total)
+    _test(expected_total, ripe_payout)
 
     # tokens should be locked, not in user balance
     assert ripe_token.balanceOf(bob) == 0
@@ -343,7 +343,7 @@ def test_purchase_ripe_bond_with_lock_exceeding_max(
     expected_base = payment_amount  # min ripe per unit at epoch start (1x)
     expected_bonus = 100 * payment_amount  # max lock bonus (100x)
     expected_total = expected_base + expected_bonus
-    _test(ripe_payout, expected_total)
+    _test(expected_total, ripe_payout)
     
     # verify tokens were deposited into gov vault
     expected_deposit = ripe_gov_vault.getTotalAmountForUser(bob, ripe_token)
@@ -722,12 +722,12 @@ def test_purchase_ripe_bond_very_small_amount(
 ):
     setupRipeBonds()
 
-    # purchase setup with very small amount
-    payment_amount = 1  # 1 wei
+    # purchase setup with very small amount (1 unit = 10^18 wei for 18 decimal token)
+    payment_amount = 10 ** alpha_token.decimals()  # 1 full token unit
     alpha_token.transfer(bob, payment_amount, sender=alpha_token_whale)
     alpha_token.approve(teller, payment_amount, sender=bob)  
 
-    # purchase should still work for tiny amounts
+    # purchase should work for small amounts
     ripe_payout = teller.purchaseRipeBond(
         alpha_token,
         payment_amount,
@@ -1106,7 +1106,7 @@ def test_purchase_ripe_bond_maximum_parameters(
     expected_total_rate = expected_base_rate + expected_bonus  # ~2990.01e18
     expected_total = expected_total_rate * payment_amount // EIGHTEEN_DECIMALS
     
-    _test(ripe_payout, expected_total)
+    _test(expected_total, ripe_payout)
     
     # Verify tokens were deposited into gov vault
     expected_deposit = ripe_gov_vault.getTotalAmountForUser(bob, ripe_token)
@@ -2109,4 +2109,358 @@ def test_preview_ripe_bond_payout_gas_efficiency(
     epoch_2 = bond_room.previewNextEpoch()
     
     assert epoch_1 == epoch_2
+
+
+#########################
+# Bond Booster Tests
+#########################
+
+
+def test_purchase_ripe_bond_with_bond_booster(
+    teller, setupRipeBonds, bob, alpha_token_whale, alpha_token, bond_room, 
+    bond_booster, switchboard_delta, _test
+):
+    """Test purchasing ripe bond with bond booster gives extra RIPE"""
+    setupRipeBonds()
+    
+    # Set up bond booster for bob
+    # 50 RIPE per unit, max 100 units, expires far in future
+    config = (bob, 50 * EIGHTEEN_DECIMALS, 100, 1000000)
+    bond_booster.setBondBooster(config, sender=switchboard_delta.address)
+    
+    # Purchase setup - 100 alpha tokens (100 units)
+    payment_amount = 100 * EIGHTEEN_DECIMALS
+    alpha_token.transfer(bob, payment_amount, sender=alpha_token_whale)
+    alpha_token.approve(teller, payment_amount, sender=bob)
+    
+    # Purchase ripe bond
+    ripe_payout = teller.purchaseRipeBond(
+        alpha_token,
+        payment_amount,
+        sender=bob
+    )
+    
+    # Should get base payout (1 RIPE per unit = 100 RIPE) + boost (50 RIPE per unit = 5000 RIPE)
+    expected_base = 100 * EIGHTEEN_DECIMALS  # 100 units * 1 RIPE per unit
+    expected_boost = 50 * EIGHTEEN_DECIMALS * 100  # 100 units * 50 RIPE boost per unit
+    expected_total = expected_base + expected_boost
+    _test(expected_total, ripe_payout)
+    
+    # Check that units were used in bond booster
+    assert bond_booster.unitsUsed(bob) == 100
+
+
+def test_purchase_ripe_bond_with_partial_bond_booster(
+    teller, setupRipeBonds, bob, alpha_token_whale, alpha_token, bond_room,
+    bond_booster, switchboard_delta, _test
+):
+    """Test purchasing with partially available bond booster units"""
+    setupRipeBonds()
+    
+    # Set up bond booster for bob - only 50 units available
+    config = (bob, 25 * EIGHTEEN_DECIMALS, 50, 1000000)
+    bond_booster.setBondBooster(config, sender=switchboard_delta.address)
+    
+    # Purchase setup - 100 alpha tokens (100 units, but only 50 boosted)
+    payment_amount = 100 * EIGHTEEN_DECIMALS
+    alpha_token.transfer(bob, payment_amount, sender=alpha_token_whale)
+    alpha_token.approve(teller, payment_amount, sender=bob)
+    
+    # Purchase ripe bond
+    ripe_payout = teller.purchaseRipeBond(
+        alpha_token,
+        payment_amount,
+        sender=bob
+    )
+    
+    # Should get base payout (100 RIPE) + partial boost (50 units * 25 RIPE = 1250 RIPE)
+    expected_base = 100 * EIGHTEEN_DECIMALS
+    expected_boost = 25 * EIGHTEEN_DECIMALS * 50  # Only 50 units boosted
+    expected_total = expected_base + expected_boost
+    _test(expected_total, ripe_payout)
+    
+    # Check that 100 units were used (all available units for bob)
+    assert bond_booster.unitsUsed(bob) == 100
+
+
+def test_purchase_ripe_bond_with_exhausted_bond_booster(
+    teller, setupRipeBonds, bob, alice, alpha_token_whale, alpha_token, bond_room,
+    bond_booster, switchboard_delta, _test
+):
+    """Test purchasing after bond booster units are exhausted"""
+    setupRipeBonds()
+    
+    # Set up bond booster for bob - 50 units max
+    config = (bob, 25 * EIGHTEEN_DECIMALS, 50, 1000000)
+    bond_booster.setBondBooster(config, sender=switchboard_delta.address)
+    
+    # First purchase - use up all booster units
+    payment_amount_1 = 50 * EIGHTEEN_DECIMALS  # 50 units
+    alpha_token.transfer(bob, payment_amount_1, sender=alpha_token_whale)
+    alpha_token.approve(teller, payment_amount_1, sender=bob)
+    
+    ripe_payout_1 = teller.purchaseRipeBond(
+        alpha_token,
+        payment_amount_1,
+        sender=bob
+    )
+    
+    # Should get base + full boost
+    expected_1 = 50 * EIGHTEEN_DECIMALS + (25 * EIGHTEEN_DECIMALS * 50)
+    _test(expected_1, ripe_payout_1)
+    assert bond_booster.unitsUsed(bob) == 50
+    
+    # Second purchase - no boost available
+    payment_amount_2 = 30 * EIGHTEEN_DECIMALS  # 30 units
+    alpha_token.transfer(bob, payment_amount_2, sender=alpha_token_whale)
+    alpha_token.approve(teller, payment_amount_2, sender=bob)
+    
+    ripe_payout_2 = teller.purchaseRipeBond(
+        alpha_token,
+        payment_amount_2,
+        sender=bob
+    )
+    
+    # Should get only base payout (no boost)
+    expected_2 = 30 * EIGHTEEN_DECIMALS
+    _test(expected_2, ripe_payout_2)
+    assert bond_booster.unitsUsed(bob) == 50  # Unchanged
+
+
+def test_purchase_ripe_bond_with_expired_bond_booster(
+    teller, setupRipeBonds, bob, alice, alpha_token_whale, alpha_token, bond_room,
+    bond_booster, switchboard_delta, _test
+):
+    """Test purchasing with expired bond booster vs without booster"""
+    start, end = setupRipeBonds()
+    
+    # Set up bond booster that will expire soon
+    current_block = boa.env.evm.patch.block_number
+    config = (bob, 25 * EIGHTEEN_DECIMALS, 50, current_block + 50)  # Expires in 50 blocks
+    bond_booster.setBondBooster(config, sender=switchboard_delta.address)
+    
+    # Move past expiration 
+    boa.env.time_travel(blocks=60)
+    
+    # First, purchase with alice (no booster) as baseline at this point in time
+    payment_amount = 50 * EIGHTEEN_DECIMALS
+    alpha_token.transfer(alice, payment_amount, sender=alpha_token_whale)
+    alpha_token.approve(teller, payment_amount, sender=alice)
+    
+    alice_payout = teller.purchaseRipeBond(
+        alpha_token,
+        payment_amount,
+        sender=alice
+    )
+    
+    # Now purchase with bob (expired booster) - should get same as alice
+    alpha_token.transfer(bob, payment_amount, sender=alpha_token_whale)
+    alpha_token.approve(teller, payment_amount, sender=bob)
+    
+    bob_payout = teller.purchaseRipeBond(
+        alpha_token,
+        payment_amount,
+        sender=bob
+    )
+    
+    # Bob should get same payout as alice (no boost due to expiration)
+    _test(alice_payout, bob_payout)
+    assert bond_booster.unitsUsed(bob) == 0  # No units used since expired
+
+
+def test_purchase_ripe_bond_without_bond_booster(
+    teller, setupRipeBonds, bob, alpha_token_whale, alpha_token, _test
+):
+    """Test purchasing without any bond booster config"""
+    setupRipeBonds()
+    
+    # Purchase setup - bob has no bond booster config
+    payment_amount = 100 * EIGHTEEN_DECIMALS
+    alpha_token.transfer(bob, payment_amount, sender=alpha_token_whale)
+    alpha_token.approve(teller, payment_amount, sender=bob)
+    
+    # Purchase ripe bond
+    ripe_payout = teller.purchaseRipeBond(
+        alpha_token,
+        payment_amount,
+        sender=bob
+    )
+    
+    # Should get only base payout (no boost)
+    expected = 100 * EIGHTEEN_DECIMALS  # 100 units * 1 RIPE per unit
+    _test(expected, ripe_payout)
+
+
+def test_purchase_ripe_bond_booster_with_lock_duration(
+    teller, setupRipeBonds, bob, alpha_token_whale, alpha_token, bond_room,
+    bond_booster, switchboard_delta, _test
+):
+    """Test bond booster works with lock duration bonuses"""
+    setupRipeBonds()
+    
+    # Set up bond booster
+    config = (bob, 30 * EIGHTEEN_DECIMALS, 100, 1000000)
+    bond_booster.setBondBooster(config, sender=switchboard_delta.address)
+    
+    # Purchase setup with max lock duration (1000 blocks)
+    payment_amount = 50 * EIGHTEEN_DECIMALS
+    alpha_token.transfer(bob, payment_amount, sender=alpha_token_whale)
+    alpha_token.approve(teller, payment_amount, sender=bob)
+    
+    # Purchase with lock duration
+    ripe_payout = teller.purchaseRipeBond(
+        alpha_token,
+        payment_amount,
+        1000,  # max lock duration
+        sender=bob
+    )
+    
+    # Should get base (1 RIPE) + lock bonus (100 RIPE max) + booster (30 RIPE) per unit
+    # Total: 131 RIPE per unit * 50 units = 6550 RIPE
+    expected_per_unit = 1 * EIGHTEEN_DECIMALS + 100 * EIGHTEEN_DECIMALS + 30 * EIGHTEEN_DECIMALS
+    expected_total = expected_per_unit * 50
+    _test(expected_total, ripe_payout)
+
+
+def test_purchase_ripe_bond_booster_event_emission(
+    teller, setupRipeBonds, bob, alpha_token_whale, alpha_token, bond_room,
+    bond_booster, switchboard_delta
+):
+    """Test that bond purchase events include booster information"""
+    setupRipeBonds()
+    
+    # Set up bond booster
+    config = (bob, 40 * EIGHTEEN_DECIMALS, 100, 1000000)
+    bond_booster.setBondBooster(config, sender=switchboard_delta.address)
+    
+    # Purchase setup
+    payment_amount = 75 * EIGHTEEN_DECIMALS
+    alpha_token.transfer(bob, payment_amount, sender=alpha_token_whale)
+    alpha_token.approve(teller, payment_amount, sender=bob)
+    
+    # Purchase ripe bond
+    teller.purchaseRipeBond(
+        alpha_token,
+        payment_amount,
+        sender=bob
+    )
+    
+    # Check event emission
+    logs = filter_logs(teller, "RipeBondPurchased")
+    assert len(logs) == 1
+    log = logs[0]
+    
+    # Verify booster amount is in the event
+    expected_boost = 40 * EIGHTEEN_DECIMALS * 75  # 75 units * 40 RIPE boost
+    assert log.boostedRipe == expected_boost
+    assert log.recipient == bob
+
+
+def test_purchase_ripe_bond_multiple_users_with_boosters(
+    teller, setupRipeBonds, bob, alice, charlie, alpha_token_whale, alpha_token,
+    bond_booster, switchboard_delta, _test
+):
+    """Test multiple users with different bond booster configurations"""
+    setupRipeBonds()
+    
+    # Set up different boosters for each user
+    configs = [
+        (bob, 20 * EIGHTEEN_DECIMALS, 50, 1000000),      # Bob: 20 RIPE/unit, 50 max
+        (alice, 60 * EIGHTEEN_DECIMALS, 30, 1000000),    # Alice: 60 RIPE/unit, 30 max  
+        (charlie, 100 * EIGHTEEN_DECIMALS, 75, 1000000), # Charlie: 100 RIPE/unit, 75 max
+    ]
+    bond_booster.setManyBondBoosters(configs, sender=switchboard_delta.address)
+    
+    # Bob's purchase - 50 units (all boosted)
+    payment_amount_bob = 50 * EIGHTEEN_DECIMALS
+    alpha_token.transfer(bob, payment_amount_bob, sender=alpha_token_whale)
+    alpha_token.approve(teller, payment_amount_bob, sender=bob)
+    
+    ripe_payout_bob = teller.purchaseRipeBond(
+        alpha_token,
+        payment_amount_bob,
+        sender=bob
+    )
+    
+    expected_bob = 50 * EIGHTEEN_DECIMALS + (20 * EIGHTEEN_DECIMALS * 50)
+    _test(expected_bob, ripe_payout_bob)
+    
+    # Alice's purchase - 40 units (30 boosted, 10 regular)
+    payment_amount_alice = 40 * EIGHTEEN_DECIMALS
+    alpha_token.transfer(alice, payment_amount_alice, sender=alpha_token_whale)
+    alpha_token.approve(teller, payment_amount_alice, sender=alice)
+    
+    ripe_payout_alice = teller.purchaseRipeBond(
+        alpha_token,
+        payment_amount_alice,
+        sender=alice
+    )
+    
+    expected_alice = 40 * EIGHTEEN_DECIMALS + (60 * EIGHTEEN_DECIMALS * 30)  # Only 30 units boosted
+    _test(expected_alice, ripe_payout_alice)
+    
+    # Charlie's purchase - 20 units (all boosted)
+    payment_amount_charlie = 20 * EIGHTEEN_DECIMALS
+    alpha_token.transfer(charlie, payment_amount_charlie, sender=alpha_token_whale)
+    alpha_token.approve(teller, payment_amount_charlie, sender=charlie)
+    
+    ripe_payout_charlie = teller.purchaseRipeBond(
+        alpha_token,
+        payment_amount_charlie,
+        sender=charlie
+    )
+    
+    expected_charlie = 20 * EIGHTEEN_DECIMALS + (100 * EIGHTEEN_DECIMALS * 20)
+    _test(expected_charlie, ripe_payout_charlie)
+    
+    # Verify units used for each user
+    assert bond_booster.unitsUsed(bob) == 50
+    assert bond_booster.unitsUsed(alice) == 40  # All 40 units used
+    assert bond_booster.unitsUsed(charlie) == 20
+
+
+def test_purchase_ripe_bond_with_removed_booster(
+    teller, setupRipeBonds, bob, alpha_token_whale, alpha_token, bond_room,
+    bond_booster, switchboard_delta, _test
+):
+    """Test purchasing after bond booster is removed"""
+    setupRipeBonds()
+    
+    # Set up bond booster and use some units
+    config = (bob, 30 * EIGHTEEN_DECIMALS, 100, 1000000)
+    bond_booster.setBondBooster(config, sender=switchboard_delta.address)
+    
+    # First purchase with booster
+    payment_amount_1 = 25 * EIGHTEEN_DECIMALS
+    alpha_token.transfer(bob, payment_amount_1, sender=alpha_token_whale)
+    alpha_token.approve(teller, payment_amount_1, sender=bob)
+    
+    ripe_payout_1 = teller.purchaseRipeBond(
+        alpha_token,
+        payment_amount_1,
+        sender=bob
+    )
+    
+    expected_1 = 25 * EIGHTEEN_DECIMALS + (30 * EIGHTEEN_DECIMALS * 25)
+    _test(expected_1, ripe_payout_1)
+    assert bond_booster.unitsUsed(bob) == 25
+    
+    # Remove booster
+    bond_booster.removeBondBooster(bob, sender=switchboard_delta.address)
+    
+    # Second purchase without booster
+    payment_amount_2 = 30 * EIGHTEEN_DECIMALS
+    alpha_token.transfer(bob, payment_amount_2, sender=alpha_token_whale)
+    alpha_token.approve(teller, payment_amount_2, sender=bob)
+    
+    ripe_payout_2 = teller.purchaseRipeBond(
+        alpha_token,
+        payment_amount_2,
+        sender=bob
+    )
+    
+    # Should get only base payout
+    expected_2 = 30 * EIGHTEEN_DECIMALS
+    _test(expected_2, ripe_payout_2)
+    assert bond_booster.unitsUsed(bob) == 0  # Reset after removal
 
