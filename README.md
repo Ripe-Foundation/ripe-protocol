@@ -28,7 +28,7 @@
 | SwitchboardDelta    | [0xbBDd02FfB71b0f3C5A5433C9b647f8dcd2282eF4](https://basescan.org/address/0xbBDd02FfB71b0f3C5A5433C9b647f8dcd2282eF4) |
 | PriceDesk           | [0x4Cc505adF813344596E022271a67fA95C7676698](https://basescan.org/address/0x4Cc505adF813344596E022271a67fA95C7676698) |
 | ChainlinkPrices     | [0x7f511f3Cefcc840bCB9828E726c14988BE5D7b34](https://basescan.org/address/0x7f511f3Cefcc840bCB9828E726c14988BE5D7b34) |
-| CurvePrices         | [0x6e981679D0E3f8d3f5E5d35B22802dB477259e26](https://basescan.org/address/0x6e981679D0E3f8d3f5E5d35B22802dB477259e26) |
+| CurvePrices         | [0x677044541aFDf098984b1A4f5bD150e5e850997d](https://basescan.org/address/0x677044541aFDf098984b1A4f5bD150e5e850997d) |
 | BlueChipYieldPrices | [0xaF58c8bD19a71A6c70148c3ABB38633fc1B4Ea37](https://basescan.org/address/0xaF58c8bD19a71A6c70148c3ABB38633fc1B4Ea37) |
 | PythPrices          | [0xDEE8F270250430f19eeBda2E7AC3B0a809856c24](https://basescan.org/address/0xDEE8F270250430f19eeBda2E7AC3B0a809856c24) |
 | StorkPrices         | [0xb08E389a45BA558bcEc598c9356df1E7c78FC933](https://basescan.org/address/0xb08E389a45BA558bcEc598c9356df1E7c78FC933) |
