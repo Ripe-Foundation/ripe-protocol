@@ -647,6 +647,7 @@ def chainlink(ripe_hq_deploy, fork, sally, bob, deploy3r, mock_chainlink_feed_on
     c = boa.load(
         "contracts/priceSources/ChainlinkPrices.vy",
         ripe_hq_deploy,
+        ZERO_ADDRESS,
         PARAMS[fork]["PRICE_DESK_MIN_REG_TIMELOCK"],
         PARAMS[fork]["PRICE_DESK_MAX_REG_TIMELOCK"],
         ADDYS[fork]["WETH"],
@@ -680,6 +681,7 @@ def curve_prices(ripe_hq_deploy, fork, deploy3r, green_token, savings_green):
     c = boa.load(
         "contracts/priceSources/CurvePrices.vy",
         ripe_hq_deploy,
+        ZERO_ADDRESS,
         curve_address_provider,
         green_token,
         savings_green,
@@ -708,6 +710,7 @@ def blue_chip_prices(ripe_hq_deploy, fork, deploy3r, mock_yield_registry):
     c = boa.load(
         "contracts/priceSources/BlueChipYieldPrices.vy",
         ripe_hq_deploy,
+        ZERO_ADDRESS,
         PARAMS[fork]["PRICE_DESK_MIN_REG_TIMELOCK"],
         PARAMS[fork]["PRICE_DESK_MAX_REG_TIMELOCK"],
         [MORPHO_A, MORPHO_B],
@@ -732,6 +735,7 @@ def pyth_prices(ripe_hq_deploy, fork, deploy3r, mock_pyth):
     c = boa.load(
         "contracts/priceSources/PythPrices.vy",
         ripe_hq_deploy,
+        ZERO_ADDRESS,
         pyth_network,
         PARAMS[fork]["PRICE_DESK_MIN_REG_TIMELOCK"],
         PARAMS[fork]["PRICE_DESK_MAX_REG_TIMELOCK"],
@@ -751,6 +755,7 @@ def stork_prices(ripe_hq_deploy, fork, deploy3r, mock_stork):
     c = boa.load(
         "contracts/priceSources/StorkPrices.vy",
         ripe_hq_deploy,
+        ZERO_ADDRESS,
         stork_network,
         PARAMS[fork]["PRICE_DESK_MIN_REG_TIMELOCK"],
         PARAMS[fork]["PRICE_DESK_MAX_REG_TIMELOCK"],

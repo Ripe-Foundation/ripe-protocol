@@ -105,6 +105,7 @@ MAX_PRICE_UPDATES: constant(uint256) = 20
 @deploy
 def __init__(
     _ripeHq: address,
+    _tempGov: address,
     _pythNetwork: address,
     _minPriceChangeTimeLock: uint256,
     _maxPriceChangeTimeLock: uint256,
@@ -112,7 +113,7 @@ def __init__(
     assert _pythNetwork != empty(address) # dev: invalid pyth network
     PYTH = _pythNetwork
 
-    gov.__init__(_ripeHq, empty(address), 0, 0, 0)
+    gov.__init__(_ripeHq, _tempGov, 0, 0, 0)
     addys.__init__(_ripeHq)
     priceData.__init__(False)
     timeLock.__init__(_minPriceChangeTimeLock, _maxPriceChangeTimeLock, 0, _maxPriceChangeTimeLock)

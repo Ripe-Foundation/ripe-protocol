@@ -45,6 +45,7 @@ def mock_chainlink(ripe_hq, fork):
     c = boa.load(
         "contracts/priceSources/ChainlinkPrices.vy",
         ripe_hq,
+        ZERO_ADDRESS,
         PARAMS[fork]["PRICE_DESK_MIN_REG_TIMELOCK"],
         PARAMS[fork]["PRICE_DESK_MAX_REG_TIMELOCK"],
         ADDYS[fork]["WETH"],

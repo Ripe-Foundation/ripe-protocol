@@ -545,3 +545,181 @@ def test_local_gov_governance_change_validation(
     assert local_gov.governance() == mock_rando_contract.address
     assert local_gov.canGovern(mock_rando_contract)
     assert not local_gov.canGovern(deploy3r)
+
+
+def test_local_gov_relinquish_gov_success(
+    createMockLocalGov,
+    mock_rando_contract,
+    governance,
+):
+    """Test successful relinquishing of governance by local governance"""
+    local_gov = createMockLocalGov(_initialGov=mock_rando_contract)
+    
+    # Initial state verification
+    assert local_gov.governance() == mock_rando_contract.address
+    assert local_gov.canGovern(mock_rando_contract)
+    assert local_gov.canGovern(governance)  # ripe hq governance
+    assert local_gov.numGovChanges() == 0
+    
+    # Relinquish governance
+    local_gov.relinquishGov(sender=mock_rando_contract.address)
+    
+    # Verify event immediately after the transaction
+    relinquish_log = filter_logs(local_gov, "GovRelinquished")[0]
+    assert relinquish_log.prevGov == mock_rando_contract.address
+    
+    # Verify state after relinquishing
+    assert local_gov.governance() == ZERO_ADDRESS
+    assert not local_gov.canGovern(mock_rando_contract)
+    assert local_gov.canGovern(governance)  # ripe hq governance still works
+    assert local_gov.numGovChanges() == 1
+
+
+def test_local_gov_relinquish_gov_no_perms(
+    createMockLocalGov,
+    mock_rando_contract,
+    bob,
+):
+    """Test that non-governance cannot relinquish governance"""
+    local_gov = createMockLocalGov(_initialGov=mock_rando_contract)
+    
+    # Try to relinquish governance as non-governance
+    with boa.reverts("no perms"):
+        local_gov.relinquishGov(sender=bob)
+    
+    # State should be unchanged
+    assert local_gov.governance() == mock_rando_contract.address
+    assert local_gov.numGovChanges() == 0
+
+
+def test_ripe_hq_gov_cannot_relinquish(
+    createMockLocalGov,
+    deploy3r,
+):
+    """Test that ripe hq governance cannot relinquish governance"""
+    # Create ripe hq governance (no ripe hq address)
+    hq_gov = createMockLocalGov(
+        _ripeHq=ZERO_ADDRESS,
+        _initialGov=deploy3r,
+        _minTimeLock=100,
+        _maxTimeLock=200,
+        _initialTimeLock=0
+    )
+    
+    # Try to relinquish governance - should fail
+    with boa.reverts("ripe hq cannot relinquish gov"):
+        hq_gov.relinquishGov(sender=deploy3r)
+    
+    # State should be unchanged
+    assert hq_gov.governance() == deploy3r
+    assert hq_gov.numGovChanges() == 0
+
+
+def test_local_gov_relinquish_with_pending_change(
+    createMockLocalGov,
+    mock_rando_contract,
+    mock_whitelist,
+    governance,
+):
+    """Test relinquishing governance when there's a pending governance change"""
+    local_gov = createMockLocalGov(_initialGov=mock_rando_contract)
+    
+    # Start a governance change
+    local_gov.startGovernanceChange(mock_whitelist, sender=mock_rando_contract.address)
+    assert local_gov.hasPendingGovChange()
+    
+    # Should still be able to relinquish governance even with pending change
+    local_gov.relinquishGov(sender=mock_rando_contract.address)
+    
+    # Verify event immediately after the transaction
+    relinquish_log = filter_logs(local_gov, "GovRelinquished")[0]
+    assert relinquish_log.prevGov == mock_rando_contract.address
+    
+    # Verify governance was relinquished
+    assert local_gov.governance() == ZERO_ADDRESS
+    assert local_gov.numGovChanges() == 1
+    
+    # Pending change should still exist (relinquish doesn't cancel it)
+    assert local_gov.hasPendingGovChange()
+
+
+def test_local_gov_operations_after_relinquish(
+    createMockLocalGov,
+    mock_rando_contract,
+    governance,
+    mock_whitelist,
+):
+    """Test that governance operations work correctly after relinquishing"""
+    local_gov = createMockLocalGov(_initialGov=mock_rando_contract)
+    
+    # Relinquish governance
+    local_gov.relinquishGov(sender=mock_rando_contract.address)
+    
+    # Local governance operations should fail
+    with boa.reverts("no perms"):
+        local_gov.startGovernanceChange(mock_whitelist, sender=mock_rando_contract.address)
+    
+    with boa.reverts("no perms"):
+        local_gov.setGovTimeLock(local_gov.govChangeTimeLock() + 10, sender=mock_rando_contract.address)
+    
+    # But ripe hq governance should still work
+    new_time_lock = local_gov.govChangeTimeLock() + 10
+    assert local_gov.setGovTimeLock(new_time_lock, sender=governance.address)
+    assert local_gov.govChangeTimeLock() == new_time_lock
+    
+    # Ripe hq governance can start governance changes
+    local_gov.startGovernanceChange(mock_whitelist, sender=governance.address)
+    assert local_gov.hasPendingGovChange()
+
+
+def test_local_gov_relinquish_governance_access_after(
+    createMockLocalGov,
+    mock_rando_contract,
+    governance,
+):
+    """Test that governance access is correctly updated after relinquishing"""
+    local_gov = createMockLocalGov(_initialGov=mock_rando_contract)
+    
+    # Before relinquishing
+    governors_before = local_gov.getGovernors()
+    assert mock_rando_contract.address in governors_before
+    assert governance.address in governors_before
+    assert len(governors_before) == 2
+    
+    # Relinquish governance
+    local_gov.relinquishGov(sender=mock_rando_contract.address)
+    
+    # After relinquishing
+    governors_after = local_gov.getGovernors()
+    assert mock_rando_contract.address not in governors_after
+    assert governance.address in governors_after  # ripe hq governance remains
+    assert len(governors_after) == 1
+
+
+def test_local_gov_relinquish_sequential_changes(
+    createMockLocalGov,
+    mock_rando_contract,
+    mock_whitelist,
+    governance,
+):
+    """Test relinquishing governance and then setting new governance via ripe hq"""
+    local_gov = createMockLocalGov(_initialGov=mock_rando_contract)
+    
+    initial_changes = local_gov.numGovChanges()
+    
+    # Relinquish governance
+    local_gov.relinquishGov(sender=mock_rando_contract.address)
+    assert local_gov.numGovChanges() == initial_changes + 1
+    
+    # Ripe hq governance sets new governance
+    time_lock = local_gov.govChangeTimeLock()
+    local_gov.startGovernanceChange(mock_whitelist, sender=governance.address)
+    boa.env.time_travel(blocks=time_lock)
+    local_gov.confirmGovernanceChange(sender=mock_whitelist.address)
+    
+    # Verify new governance is set
+    assert local_gov.governance() == mock_whitelist.address
+    assert local_gov.canGovern(mock_whitelist)
+    assert local_gov.canGovern(governance)  # ripe hq governance still works
+    assert not local_gov.canGovern(mock_rando_contract)  # original governance no longer works
+    assert local_gov.numGovChanges() == initial_changes + 2

@@ -29,6 +29,9 @@ event GovChangeCancelled:
     initiatedBlock: uint256
     confirmBlock: uint256
 
+event GovRelinquished:
+    prevGov: indexed(address)
+
 event GovChangeTimeLockModified:
     prevTimeLock: uint256
     newTimeLock: uint256
@@ -229,6 +232,19 @@ def cancelGovernanceChange():
     assert data.confirmBlock != 0 # dev: no pending change
     self.pendingGov = empty(PendingGovernance)
     log GovChangeCancelled(cancelledGov=data.newGov, initiatedBlock=data.initiatedBlock, confirmBlock=data.confirmBlock)
+
+
+# relinquish gov (only for local gov)
+
+
+@external
+def relinquishGov():
+    assert msg.sender == self.governance # dev: no perms
+    assert not self._isRipeHqGov() # dev: ripe hq cannot relinquish gov
+
+    self.governance = empty(address)
+    self.numGovChanges += 1
+    log GovRelinquished(prevGov=msg.sender)
 
 
 ####################
