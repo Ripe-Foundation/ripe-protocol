@@ -1,0 +1,83 @@
+# @version 0.4.3
+
+flag ActionType:
+    TRANSFER
+    EARN_DEPOSIT
+    EARN_WITHDRAW
+    EARN_REBALANCE
+    SWAP
+    MINT_REDEEM
+    CONFIRM_MINT_REDEEM
+    ADD_COLLATERAL
+    REMOVE_COLLATERAL
+    BORROW
+    REPAY_DEBT
+    REWARDS
+    ETH_TO_WETH
+    WETH_TO_ETH
+    ADD_LIQ
+    REMOVE_LIQ
+    ADD_LIQ_CONC
+    REMOVE_LIQ_CONC
+
+struct MiniAddys:
+    ledger: address
+    missionControl: address
+    legoBook: address
+    appraiser: address
+
+struct SwapInstruction:
+    legoId: uint256
+    amountIn: uint256
+    minAmountOut: uint256
+    tokenPath: DynArray[address, MAX_TOKEN_PATH]
+    poolPath: DynArray[address, MAX_TOKEN_PATH - 1]
+
+MAX_TOKEN_PATH: constant(uint256) = 5
+
+
+@external
+def addLiquidityConcentrated(_nftTokenId: uint256, _pool: address, _tokenA: address, _tokenB: address, _tickLower: int24, _tickUpper: int24, _amountA: uint256, _amountB: uint256, _minAmountA: uint256, _minAmountB: uint256, _extraData: bytes32, _recipient: address, _miniAddys: MiniAddys = empty(MiniAddys)) -> (uint256, uint256, uint256, uint256, uint256):
+    ...
+
+@external
+def addLiquidity(_pool: address, _tokenA: address, _tokenB: address, _amountA: uint256, _amountB: uint256, _minAmountA: uint256, _minAmountB: uint256, _minLpAmount: uint256, _extraData: bytes32, _recipient: address, _miniAddys: MiniAddys = empty(MiniAddys)) -> (address, uint256, uint256, uint256, uint256):
+    ...
+
+@external
+def removeLiquidityConcentrated(_nftTokenId: uint256, _pool: address, _tokenA: address, _tokenB: address, _liqToRemove: uint256, _minAmountA: uint256, _minAmountB: uint256, _extraData: bytes32, _recipient: address, _miniAddys: MiniAddys = empty(MiniAddys)) -> (uint256, uint256, uint256, bool, uint256):
+    ...
+
+@external
+def removeLiquidity(_pool: address, _tokenA: address, _tokenB: address, _lpToken: address, _lpAmount: uint256, _minAmountA: uint256, _minAmountB: uint256, _extraData: bytes32, _recipient: address, _miniAddys: MiniAddys = empty(MiniAddys)) -> (uint256, uint256, uint256, uint256):
+    ...
+
+@external
+def mintOrRedeemAsset(_tokenIn: address, _tokenOut: address, _tokenInAmount: uint256, _minAmountOut: uint256, _extraData: bytes32, _recipient: address, _miniAddys: MiniAddys = empty(MiniAddys)) -> (uint256, uint256, bool, uint256):
+    ...
+
+@external
+def swapTokens(_amountIn: uint256, _minAmountOut: uint256, _tokenPath: DynArray[address, MAX_TOKEN_PATH], _poolPath: DynArray[address, MAX_TOKEN_PATH - 1], _recipient: address, _miniAddys: MiniAddys = empty(MiniAddys)) -> (uint256, uint256, uint256):
+    ...
+
+@external
+def depositForYield(_asset: address, _amount: uint256, _vaultAddr: address, _extraData: bytes32, _recipient: address, _miniAddys: MiniAddys = empty(MiniAddys)) -> (uint256, address, uint256, uint256):
+    ...
+
+@external
+def withdrawFromYield(_vaultToken: address, _amount: uint256, _extraData: bytes32, _recipient: address, _miniAddys: MiniAddys = empty(MiniAddys)) -> (uint256, address, uint256, uint256):
+    ...
+
+@external
+def confirmMintOrRedeemAsset(_tokenIn: address, _tokenOut: address, _extraData: bytes32, _recipient: address, _miniAddys: MiniAddys = empty(MiniAddys)) -> (uint256, uint256):
+    ...
+
+@external
+def claimRewards(_user: address, _rewardToken: address, _rewardAmount: uint256, _extraData: bytes32, _miniAddys: MiniAddys = empty(MiniAddys)) -> (uint256, uint256):
+    ...
+
+@view
+@external
+def getAccessForLego(_user: address, _action: ActionType) -> (address, String[64], uint256):
+    ...
+

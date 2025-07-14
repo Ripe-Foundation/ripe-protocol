@@ -56,11 +56,11 @@ interface VaultBook:
 interface PriceDesk:
     def isValidRegId(_regId: uint256) -> bool: view
 
-interface UnderscoreAgentFactory:
+interface UnderscoreLedger:
     def isUserWallet(_addr: address) -> bool: view
 
 interface UnderscoreRegistry:
-    def getAddy(_addyId: uint256) -> address: view
+    def getAddr(_addyId: uint256) -> address: view
 
 interface RipeHq:
     def getAddr(_regId: uint256) -> address: view
@@ -414,7 +414,7 @@ MAX_STALE_TIME: public(immutable(uint256))
 
 MAX_PRIORITY_PRICE_SOURCES: constant(uint256) = 10
 PRIORITY_VAULT_DATA: constant(uint256) = 20
-UNDERSCORE_AGENT_FACTORY_ID: constant(uint256) = 1
+UNDERSCORE_LEDGER_ID: constant(uint256) = 2
 HUNDRED_PERCENT: constant(uint256) = 100_00 # 100%
 EIGHTEEN_DECIMALS: constant(uint256) = 10 ** 18
 
@@ -1312,12 +1312,12 @@ def setUnderscoreRegistry(_underscoreRegistry: address) -> uint256:
 @view
 @internal
 def _isValidUnderscoreAddr(_addr: address) -> bool:
-    agentFactory: address = staticcall UnderscoreRegistry(_addr).getAddy(UNDERSCORE_AGENT_FACTORY_ID)
-    if agentFactory == empty(address):
+    undyLedger: address = staticcall UnderscoreRegistry(_addr).getAddr(UNDERSCORE_LEDGER_ID)
+    if undyLedger == empty(address):
         return False
 
     # make sure has interface
-    return not staticcall UnderscoreAgentFactory(agentFactory).isUserWallet(empty(address))
+    return not staticcall UnderscoreLedger(undyLedger).isUserWallet(empty(address))
 
 
 ###########################

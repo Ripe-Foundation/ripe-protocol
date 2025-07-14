@@ -1,8 +1,8 @@
 import pytest
 import boa
 
-from config.BluePrint import PARAMS
-from constants import EIGHTEEN_DECIMALS
+from config.BluePrint import PARAMS, ADDYS
+from constants import EIGHTEEN_DECIMALS, ZERO_ADDRESS
 
 
 ############
@@ -226,3 +226,9 @@ def mock_pyth():
 @pytest.fixture(scope="session")
 def mock_stork():
     return boa.load("contracts/mock/MockStork.vy", name="mock_stork")
+
+
+@pytest.fixture(scope="session")
+def mock_undy_v2(fork):
+    underscore_registry = ADDYS[fork]["UNDERSCORE_REGISTRY"] if fork != "local" else ZERO_ADDRESS
+    return boa.load("contracts/mock/MockUndyV2.vy", underscore_registry, name="mock_undy_v2")

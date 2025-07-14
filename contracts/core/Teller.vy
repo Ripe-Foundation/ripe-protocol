@@ -92,11 +92,11 @@ interface BondRoom:
 interface CurvePrices:
     def addGreenRefPoolSnapshot() -> bool: nonpayable
 
-interface UnderscoreAgentFactory:
+interface UnderscoreLedger:
     def isUserWallet(_addr: address) -> bool: view
 
 interface UnderscoreRegistry:
-    def getAddy(_addyId: uint256) -> address: view
+    def getAddr(_addyId: uint256) -> address: view
 
 interface UnderscoreWallet:
     def walletConfig() -> address: view
@@ -203,7 +203,7 @@ MAX_STAB_REDEMPTIONS: constant(uint256) = 15
 
 STABILITY_POOL_ID: constant(uint256) = 1
 RIPE_GOV_VAULT_ID: constant(uint256) = 2
-UNDERSCORE_AGENT_FACTORY_ID: constant(uint256) = 1
+UNDERSCORE_LEDGER_ID: constant(uint256) = 2
 CURVE_PRICES_ID: constant(uint256) = 2
 
 
@@ -1083,12 +1083,12 @@ def _isUnderscoreWallet(_user: address, _mc: address) -> bool:
     if underscore == empty(address):
         return False
 
-    agentFactory: address = staticcall UnderscoreRegistry(underscore).getAddy(UNDERSCORE_AGENT_FACTORY_ID)
-    if agentFactory == empty(address):
+    undyLedger: address = staticcall UnderscoreRegistry(underscore).getAddr(UNDERSCORE_LEDGER_ID)
+    if undyLedger == empty(address):
         return False
 
     # check if user is underscore wallet
-    return staticcall UnderscoreAgentFactory(agentFactory).isUserWallet(_user)
+    return staticcall UnderscoreLedger(undyLedger).isUserWallet(_user)
 
 
 @view

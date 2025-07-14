@@ -22,10 +22,12 @@ WEEK_IN_BLOCKS: constant(uint256) = 7 * DAY_IN_BLOCKS
 MONTH_IN_BLOCKS: constant(uint256) = 30 * DAY_IN_BLOCKS
 YEAR_IN_BLOCKS: constant(uint256) = 365 * DAY_IN_BLOCKS
 
+UNDERSCORE_REGISTRY: immutable(address)
+
 
 @deploy
-def __init__():
-    pass
+def __init__(_underscoreRegistry: address):
+    UNDERSCORE_REGISTRY = _underscoreRegistry
 
 
 # general config
@@ -158,9 +160,6 @@ def ripeTokenVaultConfig() -> cs.RipeGovVaultConfig:
 
 
 # underscore registry
-
-
-UNDERSCORE_REGISTRY: constant(address) = 0xa89a59E14333187829528C50eBAaE6EC12Bae95d
 
 
 @view

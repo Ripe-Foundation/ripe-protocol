@@ -22,20 +22,21 @@ initializes: timeLock[gov := gov]
 import contracts.modules.LocalGov as gov
 import contracts.modules.TimeLock as timeLock
 import contracts.modules.Addys as addys
+from interfaces import UndyLego as ul
 
 interface Endaoment:
-    def addLiquidity(_legoId: uint256, _nftAddr: address, _nftTokenId: uint256, _pool: address, _tokenA: address, _tokenB: address, _amountA: uint256, _amountB: uint256, _tickLower: int24, _tickUpper: int24, _minAmountA: uint256, _minAmountB: uint256, _minLpAmount: uint256) -> (uint256, uint256, uint256, uint256, uint256): nonpayable
-    def removeLiquidity(_legoId: uint256, _nftAddr: address, _nftTokenId: uint256, _pool: address, _tokenA: address, _tokenB: address, _liqToRemove: uint256, _minAmountA: uint256, _minAmountB: uint256) -> (uint256, uint256, uint256, bool): nonpayable
-    def rebalance(_fromLegoId: uint256, _fromAsset: address, _fromVaultAddr: address, _toLegoId: uint256, _toVaultAddr: address, _fromVaultAmount: uint256, _hasFromVaultToken: bool) -> (uint256, address, uint256, uint256): nonpayable
+    def addLiquidity(_legoId: uint256, _pool: address, _tokenA: address, _tokenB: address, _amountA: uint256 = max_value(uint256), _amountB: uint256 = max_value(uint256), _minAmountA: uint256 = 0, _minAmountB: uint256 = 0, _minLpAmount: uint256 = 0, _extraData: bytes32 = empty(bytes32)) -> (uint256, uint256, uint256, uint256): nonpayable
+    def removeLiquidity(_legoId: uint256, _pool: address, _tokenA: address, _tokenB: address, _lpToken: address, _lpAmount: uint256 = max_value(uint256), _minAmountA: uint256 = 0, _minAmountB: uint256 = 0, _extraData: bytes32 = empty(bytes32)) -> (uint256, uint256, uint256, uint256): nonpayable
+    def rebalanceYieldPosition(_fromLegoId: uint256, _fromVaultToken: address, _toLegoId: uint256, _toVaultAddr: address = empty(address), _fromVaultAmount: uint256 = max_value(uint256), _extraData: bytes32 = empty(bytes32)) -> (uint256, address, uint256, uint256): nonpayable
+    def depositForYield(_legoId: uint256, _asset: address, _vaultAddr: address = empty(address), _amount: uint256 = max_value(uint256), _extraData: bytes32 = empty(bytes32)) -> (uint256, address, uint256, uint256): nonpayable
+    def claimRewards(_legoId: uint256, _rewardToken: address = empty(address), _rewardAmount: uint256 = max_value(uint256), _extraData: bytes32 = empty(bytes32)) -> (uint256, uint256): nonpayable
+    def withdrawFromYield(_legoId: uint256, _vaultToken: address, _amount: uint256 = max_value(uint256), _extraData: bytes32 = empty(bytes32)) -> (uint256, address, uint256, uint256): nonpayable
     def addPartnerLiquidity(_legoId: uint256, _pool: address, _partner: address, _asset: address, _amount: uint256, _minLpAmount: uint256) -> (uint256, uint256, uint256): nonpayable
-    def convertWethToEth(_amount: uint256, _recipient: address, _withdrawLegoId: uint256, _withdrawVaultAddr: address, _hasWithdrawVaultToken: bool) -> uint256: nonpayable
-    def withdrawTokens(_legoId: uint256, _asset: address, _vaultAddr: address, _withdrawAmount: uint256, _hasVaultToken: bool) -> (uint256, uint256, uint256): nonpayable
-    def depositTokens(_legoId: uint256, _asset: address, _vault: address, _amount: uint256) -> (uint256, address, uint256, uint256): nonpayable
-    def claimRewards(_legoId: uint256, _market: address, _rewardToken: address, _rewardAmount: uint256, _proof: bytes32): nonpayable
-    def convertEthToWeth(_amount: uint256, _depositLegoId: uint256, _depositVault: address) -> (uint256, address, uint256): payable
-    def swapTokens(_swapInstructions: DynArray[SwapInstruction, MAX_SWAP_INSTRUCTIONS]) -> (uint256, uint256, uint256): nonpayable
-    def mintPartnerLiquidity(_partner: address, _asset: address, _amount: uint256) -> uint256: nonpayable
+    def swapTokens(_instructions: DynArray[ul.SwapInstruction, MAX_SWAP_INSTRUCTIONS]) -> (address, uint256, address, uint256, uint256): nonpayable
+    def mintPartnerLiquidity(_partner: address, _asset: address, _amount: uint256 = max_value(uint256)) -> uint256: nonpayable
     def recoverNft(_collection: address, _nftTokenId: uint256, _recipient: address) -> bool: nonpayable
+    def convertWethToEth(_amount: uint256 = max_value(uint256)) -> (uint256, uint256): nonpayable
+    def convertEthToWeth(_amount: uint256 = max_value(uint256)) -> (uint256, uint256): payable
     def repayPoolDebt(_pool: address, _amount: uint256) -> bool: nonpayable
     def stabilizeGreenRefPool() -> bool: nonpayable
 
@@ -117,38 +118,19 @@ struct FungAuctionConfig:
     vaultId: uint256
     asset: address
 
-struct SwapInstruction:
+struct EndaoLiquidityAction:
     legoId: uint256
-    amountIn: uint256
-    minAmountOut: uint256
-    tokenPath: DynArray[address, MAX_TOKEN_PATH]
-    poolPath: DynArray[address, MAX_TOKEN_PATH - 1]
-
-struct EndaoAddLiquidityAction:
-    legoId: uint256
-    nftAddr: address
-    nftTokenId: uint256
     pool: address
     tokenA: address
     tokenB: address
     amountA: uint256
     amountB: uint256
-    tickLower: int24
-    tickUpper: int24
     minAmountA: uint256
     minAmountB: uint256
     minLpAmount: uint256
-
-struct EndaoRemoveLiquidityAction:
-    legoId: uint256
-    nftAddr: address
-    nftTokenId: uint256
-    pool: address
-    tokenA: address
-    tokenB: address
-    liqToRemove: uint256
-    minAmountA: uint256
-    minAmountB: uint256
+    extraData: bytes32
+    lpToken: address
+    lpAmount: uint256
 
 struct EndaoPartnerMintAction:
     partner: address
@@ -371,7 +353,6 @@ event EndaomentWithdrawalPerformed:
     asset: indexed(address)
     vaultAddr: indexed(address)
     withdrawAmount: uint256
-    hasVaultToken: bool
     caller: indexed(address)
 
 event EndaomentReblanacePerformed:
@@ -384,22 +365,17 @@ event EndaomentReblanacePerformed:
 
 event EndaomentEthToWethPerformed:
     amount: uint256
-    depositLegoId: uint256
-    depositVault: indexed(address)
     caller: indexed(address)
 
 event EndaomentWethToEthPerformed:
     amount: uint256
-    recipient: indexed(address)
-    withdrawLegoId: uint256
-    withdrawVaultAddr: indexed(address)
-    hasWithdrawVaultToken: bool
     caller: indexed(address)
 
 event EndaomentClaimPerformed:
     legoId: uint256
-    market: indexed(address)
     rewardToken: indexed(address)
+    rewardAmount: uint256
+    usdValue: uint256
     caller: indexed(address)
 
 event EndaomentStabilizerPerformed:
@@ -458,9 +434,9 @@ pendingStartAuctionActions: public(HashMap[uint256, FungAuctionConfig])
 pendingStartManyAuctionsActions: public(HashMap[uint256, DynArray[FungAuctionConfig, MAX_AUCTIONS]])
 pendingPauseAuctionActions: public(HashMap[uint256, FungAuctionConfig])
 pendingPauseManyAuctionsActions: public(HashMap[uint256, DynArray[FungAuctionConfig, MAX_AUCTIONS]])
-pendingEndaoSwapActions: public(HashMap[uint256, DynArray[SwapInstruction, MAX_SWAP_INSTRUCTIONS]])
-pendingEndaoAddLiquidityActions: public(HashMap[uint256, EndaoAddLiquidityAction])
-pendingEndaoRemoveLiquidityActions: public(HashMap[uint256, EndaoRemoveLiquidityAction])
+pendingEndaoSwapActions: public(HashMap[uint256, DynArray[ul.SwapInstruction, MAX_SWAP_INSTRUCTIONS]])
+pendingEndaoAddLiquidityActions: public(HashMap[uint256, EndaoLiquidityAction])
+pendingEndaoRemoveLiquidityActions: public(HashMap[uint256, EndaoLiquidityAction])
 pendingEndaoPartnerMintActions: public(HashMap[uint256, EndaoPartnerMintAction])
 pendingEndaoPartnerPoolActions: public(HashMap[uint256, EndaoPartnerPoolAction])
 pendingEndaoRepayActions: public(HashMap[uint256, EndaoRepayAction])
@@ -847,85 +823,88 @@ def pauseManyAuctions(_auctions: DynArray[FungAuctionConfig, MAX_AUCTIONS]) -> u
 
 
 @external
-def performEndaomentDeposit(_legoId: uint256, _asset: address, _vault: address, _amount: uint256 = max_value(uint256)) -> (uint256, address, uint256, uint256):
-    assert self.hasPermsForLiteAction(msg.sender, True) # dev: no perms
-    assert empty(address) not in [_asset, _vault] # dev: invalid parameters
-    assert _legoId != 0 # dev: invalid lego id
-
-    result: (uint256, address, uint256, uint256) = extcall Endaoment(self._getEndaomentAddr()).depositTokens(_legoId, _asset, _vault, _amount)
-    log EndaomentDepositPerformed(legoId=_legoId, asset=_asset, vault=_vault, amount=_amount, caller=msg.sender)
-    return result
-
-
-@external
-def performEndaomentWithdraw(_legoId: uint256, _asset: address, _vaultAddr: address, _withdrawAmount: uint256 = max_value(uint256), _hasVaultToken: bool = True) -> (uint256, uint256, uint256):
+def performEndaomentDeposit(
+    _legoId: uint256,
+    _asset: address,
+    _vaultAddr: address = empty(address),
+    _amount: uint256 = max_value(uint256),
+    _extraData: bytes32 = empty(bytes32),
+) -> (uint256, address, uint256, uint256):
     assert self.hasPermsForLiteAction(msg.sender, True) # dev: no perms
     assert empty(address) not in [_asset, _vaultAddr] # dev: invalid parameters
     assert _legoId != 0 # dev: invalid lego id
 
-    result: (uint256, uint256, uint256) = extcall Endaoment(self._getEndaomentAddr()).withdrawTokens(_legoId, _asset, _vaultAddr, _withdrawAmount, _hasVaultToken)
-    log EndaomentWithdrawalPerformed(legoId=_legoId, asset=_asset, vaultAddr=_vaultAddr, withdrawAmount=_withdrawAmount, hasVaultToken=_hasVaultToken, caller=msg.sender)
+    result: (uint256, address, uint256, uint256) = extcall Endaoment(self._getEndaomentAddr()).depositForYield(_legoId, _asset, _vaultAddr, _amount, _extraData)
+    log EndaomentDepositPerformed(legoId=_legoId, asset=_asset, vault=_vaultAddr, amount=_amount, caller=msg.sender)
+    return result
+
+
+@external
+def performEndaomentWithdraw(
+    _legoId: uint256,
+    _vaultToken: address,
+    _amount: uint256 = max_value(uint256),
+    _extraData: bytes32 = empty(bytes32),
+) -> (uint256, address, uint256, uint256):
+    assert self.hasPermsForLiteAction(msg.sender, True) # dev: no perms
+    assert empty(address) not in [_vaultToken] # dev: invalid parameters
+    assert _legoId != 0 # dev: invalid lego id
+
+    result: (uint256, address, uint256, uint256) = extcall Endaoment(self._getEndaomentAddr()).withdrawFromYield(_legoId, _vaultToken, _amount, _extraData)
+    log EndaomentWithdrawalPerformed(legoId=_legoId, asset=result[1], vaultAddr=_vaultToken, withdrawAmount=result[0], caller=msg.sender)
     return result
 
 
 @external
 def performEndaomentRebalance(
     _fromLegoId: uint256,
-    _fromAsset: address,
-    _fromVaultAddr: address,
+    _fromVaultToken: address,
     _toLegoId: uint256,
-    _toVaultAddr: address,
+    _toVaultAddr: address = empty(address),
     _fromVaultAmount: uint256 = max_value(uint256),
-    _hasFromVaultToken: bool = True,
+    _extraData: bytes32 = empty(bytes32),
 ) -> (uint256, address, uint256, uint256):
     assert self.hasPermsForLiteAction(msg.sender, True) # dev: no perms
-    assert empty(address) not in [_fromAsset, _fromVaultAddr, _toVaultAddr] # dev: invalid parameters
+    assert empty(address) not in [_fromVaultToken, _toVaultAddr] # dev: invalid parameters
     assert _fromLegoId != 0 and _toLegoId != 0 # dev: invalid lego ids
 
-    result: (uint256, address, uint256, uint256) = extcall Endaoment(self._getEndaomentAddr()).rebalance(_fromLegoId, _fromAsset, _fromVaultAddr, _toLegoId, _toVaultAddr, _fromVaultAmount, _hasFromVaultToken)
-    log EndaomentReblanacePerformed(fromLegoId=_fromLegoId, fromAsset=_fromAsset, fromVaultAddr=_fromVaultAddr, toLegoId=_toLegoId, toVaultAddr=_toVaultAddr, caller=msg.sender)
+    result: (uint256, address, uint256, uint256) = extcall Endaoment(self._getEndaomentAddr()).rebalanceYieldPosition(_fromLegoId, _fromVaultToken, _toLegoId, _toVaultAddr, _fromVaultAmount, _extraData)
+    log EndaomentReblanacePerformed(fromLegoId=_fromLegoId, fromAsset=_fromVaultToken, fromVaultAddr=_fromVaultToken, toLegoId=_toLegoId, toVaultAddr=_toVaultAddr, caller=msg.sender)
     return result
 
 
 @payable
 @external
-def performEndaomentEthToWeth(_amount: uint256 = max_value(uint256), _depositLegoId: uint256 = 0, _depositVault: address = empty(address)) -> (uint256, address, uint256):
+def performEndaomentEthToWeth(_amount: uint256 = max_value(uint256)) -> (uint256, uint256):
     assert self.hasPermsForLiteAction(msg.sender, True) # dev: no perms
 
-    result: (uint256, address, uint256) = extcall Endaoment(self._getEndaomentAddr()).convertEthToWeth(_amount, _depositLegoId, _depositVault, value=msg.value)
-    log EndaomentEthToWethPerformed(amount=_amount, depositLegoId=_depositLegoId, depositVault=_depositVault, caller=msg.sender)
+    result: (uint256, uint256) = extcall Endaoment(self._getEndaomentAddr()).convertEthToWeth(_amount, value=msg.value)
+    log EndaomentEthToWethPerformed(amount=_amount, caller=msg.sender)
     return result
 
 
 @external
-def performEndaomentWethToEth(
-    _amount: uint256 = max_value(uint256),
-    _recipient: address = empty(address),
-    _withdrawLegoId: uint256 = 0,
-    _withdrawVaultAddr: address = empty(address),
-    _hasWithdrawVaultToken: bool = True,
-) -> uint256:
+def performEndaomentWethToEth(_amount: uint256 = max_value(uint256)) -> (uint256, uint256):
     assert self.hasPermsForLiteAction(msg.sender, True) # dev: no perms
 
-    result: uint256 = extcall Endaoment(self._getEndaomentAddr()).convertWethToEth(_amount, _recipient, _withdrawLegoId, _withdrawVaultAddr, _hasWithdrawVaultToken)
-    log EndaomentWethToEthPerformed(amount=_amount, recipient=_recipient, withdrawLegoId=_withdrawLegoId, withdrawVaultAddr=_withdrawVaultAddr, hasWithdrawVaultToken=_hasWithdrawVaultToken, caller=msg.sender)
+    result: (uint256, uint256) = extcall Endaoment(self._getEndaomentAddr()).convertWethToEth(_amount)
+    log EndaomentWethToEthPerformed(amount=_amount, caller=msg.sender)
     return result
 
 
 @external
 def performEndaomentClaim(
     _legoId: uint256,
-    _market: address = empty(address),
     _rewardToken: address = empty(address),
     _rewardAmount: uint256 = max_value(uint256),
-    _proof: bytes32 = empty(bytes32),
-) -> bool:
+    _extraData: bytes32 = empty(bytes32),
+) -> (uint256, uint256):
     assert self.hasPermsForLiteAction(msg.sender, True) # dev: no perms
     assert _legoId != 0 # dev: invalid lego id
 
-    extcall Endaoment(self._getEndaomentAddr()).claimRewards(_legoId, _market, _rewardToken, _rewardAmount, _proof)
-    log EndaomentClaimPerformed(legoId=_legoId, market=_market, rewardToken=_rewardToken, caller=msg.sender)
-    return True
+    result: (uint256, uint256) = extcall Endaoment(self._getEndaomentAddr()).claimRewards(_legoId, _rewardToken, _rewardAmount, _extraData)
+    log EndaomentClaimPerformed(legoId=_legoId, rewardToken=_rewardToken, rewardAmount=result[0], usdValue=result[1], caller=msg.sender)
+    return result
 
 
 @external
@@ -941,17 +920,17 @@ def performEndaomentStabilizer() -> bool:
 
 
 @external
-def performEndaomentSwap(_swapInstructions: DynArray[SwapInstruction, MAX_SWAP_INSTRUCTIONS]) -> uint256:
+def performEndaomentSwap(_instructions: DynArray[ul.SwapInstruction, MAX_SWAP_INSTRUCTIONS]) -> uint256:
     assert gov._canGovern(msg.sender) # dev: no perms
-    assert len(_swapInstructions) != 0 # dev: no swap instructions provided
+    assert len(_instructions) != 0 # dev: no swap instructions provided
     
     aid: uint256 = timeLock._initiateAction()
     self.actionType[aid] = ActionType.ENDAO_SWAP
-    self.pendingEndaoSwapActions[aid] = _swapInstructions
+    self.pendingEndaoSwapActions[aid] = _instructions
     
     confirmationBlock: uint256 = timeLock._getActionConfirmationBlock(aid)
     log PendingEndaoSwapAction(
-        numSwapInstructions=len(_swapInstructions),
+        numSwapInstructions=len(_instructions),
         confirmationBlock=confirmationBlock,
         actionId=aid
     )
@@ -961,38 +940,34 @@ def performEndaomentSwap(_swapInstructions: DynArray[SwapInstruction, MAX_SWAP_I
 @external
 def addLiquidityInEndaoment(
     _legoId: uint256,
-    _nftAddr: address,
-    _nftTokenId: uint256,
     _pool: address,
     _tokenA: address,
     _tokenB: address,
     _amountA: uint256 = max_value(uint256),
     _amountB: uint256 = max_value(uint256),
-    _tickLower: int24 = min_value(int24),
-    _tickUpper: int24 = max_value(int24),
     _minAmountA: uint256 = 0,
     _minAmountB: uint256 = 0,
     _minLpAmount: uint256 = 0,
+    _extraData: bytes32 = empty(bytes32),
 ) -> uint256:
     assert gov._canGovern(msg.sender) # dev: no perms
     assert _legoId != 0 # dev: invalid lego id
     
     aid: uint256 = timeLock._initiateAction()
     self.actionType[aid] = ActionType.ENDAO_ADD_LIQUIDITY
-    self.pendingEndaoAddLiquidityActions[aid] = EndaoAddLiquidityAction(
+    self.pendingEndaoAddLiquidityActions[aid] = EndaoLiquidityAction(
         legoId=_legoId,
-        nftAddr=_nftAddr,
-        nftTokenId=_nftTokenId,
         pool=_pool,
         tokenA=_tokenA,
         tokenB=_tokenB,
         amountA=_amountA,
         amountB=_amountB,
-        tickLower=_tickLower,
-        tickUpper=_tickUpper,
         minAmountA=_minAmountA,
         minAmountB=_minAmountB,
-        minLpAmount=_minLpAmount
+        minLpAmount=_minLpAmount,
+        extraData=_extraData,
+        lpToken=empty(address),
+        lpAmount=0
     )
     
     confirmationBlock: uint256 = timeLock._getActionConfirmationBlock(aid)
@@ -1010,30 +985,33 @@ def addLiquidityInEndaoment(
 @external
 def removeLiquidityInEndaoment(
     _legoId: uint256,
-    _nftAddr: address,
-    _nftTokenId: uint256,
     _pool: address,
     _tokenA: address,
     _tokenB: address,
-    _liqToRemove: uint256 = max_value(uint256),
+    _lpToken: address,
+    _lpAmount: uint256 = max_value(uint256),
     _minAmountA: uint256 = 0,
     _minAmountB: uint256 = 0,
+    _extraData: bytes32 = empty(bytes32),
 ) -> uint256:
     assert gov._canGovern(msg.sender) # dev: no perms
     assert _legoId != 0 # dev: invalid lego id
     
     aid: uint256 = timeLock._initiateAction()
     self.actionType[aid] = ActionType.ENDAO_REMOVE_LIQUIDITY
-    self.pendingEndaoRemoveLiquidityActions[aid] = EndaoRemoveLiquidityAction(
+    self.pendingEndaoRemoveLiquidityActions[aid] = EndaoLiquidityAction(
         legoId=_legoId,
-        nftAddr=_nftAddr,
-        nftTokenId=_nftTokenId,
         pool=_pool,
         tokenA=_tokenA,
         tokenB=_tokenB,
-        liqToRemove=_liqToRemove,
+        amountA=0,
+        amountB=0,
         minAmountA=_minAmountA,
-        minAmountB=_minAmountB
+        minAmountB=_minAmountB,
+        minLpAmount=0,
+        extraData=_extraData,
+        lpToken=_lpToken,
+        lpAmount=_lpAmount
     )
     
     confirmationBlock: uint256 = timeLock._getActionConfirmationBlock(aid)
@@ -1246,18 +1224,18 @@ def executePendingAction(_aid: uint256) -> bool:
         log PauseManyAuctionsExecuted(numAuctionsPaused=numPaused)
 
     elif actionType == ActionType.ENDAO_SWAP:
-        swapInstructions: DynArray[SwapInstruction, MAX_SWAP_INSTRUCTIONS] = self.pendingEndaoSwapActions[_aid]
+        swapInstructions: DynArray[ul.SwapInstruction, MAX_SWAP_INSTRUCTIONS] = self.pendingEndaoSwapActions[_aid]
         extcall Endaoment(self._getEndaomentAddr()).swapTokens(swapInstructions)
         log EndaoSwapExecuted(numSwapInstructions=len(swapInstructions))
 
     elif actionType == ActionType.ENDAO_ADD_LIQUIDITY:
-        p: EndaoAddLiquidityAction = self.pendingEndaoAddLiquidityActions[_aid]
-        extcall Endaoment(self._getEndaomentAddr()).addLiquidity(p.legoId, p.nftAddr, p.nftTokenId, p.pool, p.tokenA, p.tokenB, p.amountA, p.amountB, p.tickLower, p.tickUpper, p.minAmountA, p.minAmountB, p.minLpAmount)
+        p: EndaoLiquidityAction = self.pendingEndaoAddLiquidityActions[_aid]
+        extcall Endaoment(self._getEndaomentAddr()).addLiquidity(p.legoId, p.pool, p.tokenA, p.tokenB, p.amountA, p.amountB, p.minAmountA, p.minAmountB, p.minLpAmount, p.extraData)
         log EndaoAddLiquidityExecuted(legoId=p.legoId, pool=p.pool, tokenA=p.tokenA, tokenB=p.tokenB)
 
     elif actionType == ActionType.ENDAO_REMOVE_LIQUIDITY:
-        p: EndaoRemoveLiquidityAction = self.pendingEndaoRemoveLiquidityActions[_aid]
-        extcall Endaoment(self._getEndaomentAddr()).removeLiquidity(p.legoId, p.nftAddr, p.nftTokenId, p.pool, p.tokenA, p.tokenB, p.liqToRemove, p.minAmountA, p.minAmountB)
+        p: EndaoLiquidityAction = self.pendingEndaoRemoveLiquidityActions[_aid]
+        extcall Endaoment(self._getEndaomentAddr()).removeLiquidity(p.legoId, p.pool, p.tokenA, p.tokenB, p.lpToken, p.lpAmount, p.minAmountA, p.minAmountB, p.extraData)
         log EndaoRemoveLiquidityExecuted(legoId=p.legoId, pool=p.pool, tokenA=p.tokenA, tokenB=p.tokenB)
 
     elif actionType == ActionType.ENDAO_PARTNER_MINT:

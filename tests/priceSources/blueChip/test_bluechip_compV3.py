@@ -9,9 +9,10 @@ from conf_utils import filter_logs
 @pytest.fixture(scope="module")
 def usdc_token(fork, chainlink, governance):
     usdc = boa.from_etherscan(CORE_TOKENS[fork]["USDC"], name="usdc")
-    assert chainlink.addNewPriceFeed(usdc, "0x7e860098F58bBFC8648a4311b374B1D669a2bc6B", sender=governance.address)
-    boa.env.time_travel(blocks=chainlink.actionTimeLock() + 1)
-    assert chainlink.confirmNewPriceFeed(usdc, sender=governance.address)
+    if not chainlink.hasPriceFeed(usdc):
+        assert chainlink.addNewPriceFeed(usdc, "0x7e860098F58bBFC8648a4311b374B1D669a2bc6B", sender=governance.address)
+        boa.env.time_travel(blocks=chainlink.actionTimeLock() + 1)
+        assert chainlink.confirmNewPriceFeed(usdc, sender=governance.address)
     return usdc
 
 

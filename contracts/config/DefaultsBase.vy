@@ -25,15 +25,18 @@ YEAR_IN_BLOCKS: constant(uint256) = 365 * DAY_IN_BLOCKS
 # initial adddresses
 CONTRIB_TEMPLATE: immutable(address)
 TRAINING_WHEELS: immutable(address)
+UNDERSCORE_REGISTRY: immutable(address)
 
 
 @deploy
 def __init__(
     _contribTemplate: address,
     _trainingWheels: address,
+    _underscoreRegistry: address,
 ):
     CONTRIB_TEMPLATE = _contribTemplate
     TRAINING_WHEELS = _trainingWheels
+    UNDERSCORE_REGISTRY = _underscoreRegistry
 
 
 # general config
@@ -187,9 +190,6 @@ def hrConfig() -> cs.HrConfig:
 
 
 # underscore registry
-
-
-UNDERSCORE_REGISTRY: constant(address) = 0x7BcD6d471D1A068012A79347C7a944d1Df01a1AE
 
 
 @view

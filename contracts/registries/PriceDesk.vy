@@ -47,7 +47,7 @@ interface MissionControl:
     def underscoreRegistry() -> address: view
 
 interface UnderscoreRegistry:
-    def getAddy(_addyId: uint256) -> address: view
+    def getAddr(_regId: uint256) -> address: view
 
 struct PriceConfig:
     staleTime: uint256
@@ -55,7 +55,7 @@ struct PriceConfig:
 
 ETH: public(immutable(address))
 MAX_PRIORITY_PRICE_SOURCES: constant(uint256) = 10
-LEGO_REGISTRY_ID: constant(uint256) = 2
+UNDERSCORE_APPRAISER_ID: constant(uint256) = 8
 
 
 @deploy
@@ -293,7 +293,7 @@ def cancelAddressDisableInRegistry(_regId: uint256) -> bool:
 @external 
 def addPriceSnapshot(_asset: address) -> bool:
     if not addys._isValidRipeAddr(msg.sender):
-        assert self._isUndyLegoRegistry(msg.sender) # dev: no perms
+        assert self._isUndyAppraiser(msg.sender) # dev: no perms
 
     numSources: uint256 = registry.numAddrs
     if numSources == 0:
@@ -314,8 +314,8 @@ def addPriceSnapshot(_asset: address) -> bool:
 
 @view
 @internal
-def _isUndyLegoRegistry(_addr: address) -> bool:
+def _isUndyAppraiser(_addr: address) -> bool:
     underscore: address = staticcall MissionControl(addys._getMissionControlAddr()).underscoreRegistry()
     if underscore == empty(address):
         return False
-    return _addr == staticcall UnderscoreRegistry(underscore).getAddy(LEGO_REGISTRY_ID)
+    return _addr == staticcall UnderscoreRegistry(underscore).getAddr(UNDERSCORE_APPRAISER_ID)
