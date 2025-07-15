@@ -52,18 +52,12 @@ def __init__(
     _ripeHq: address,
     _maxBoost: uint256,
     _maxUnits: uint256,
-    _initialBoosts: DynArray[BoosterConfig, MAX_BOOSTERS],
 ):
     addys.__init__(_ripeHq)
     deptBasics.__init__(False, False, False) # no minting
 
     self.maxBoost = _maxBoost
     self.maxUnits = _maxUnits
-
-    # set initial access
-    if len(_initialBoosts) != 0:
-        for b: BoosterConfig in _initialBoosts:
-            assert self._setBondBooster(b) # dev: invalid booster
 
 
 ####################
