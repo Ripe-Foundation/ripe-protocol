@@ -427,12 +427,13 @@ VAULT_BOOK_ID: constant(uint256) = 8
 @deploy
 def __init__(
     _ripeHq: address,
+    _tempGov: address,
     _minStaleTime: uint256,
     _maxStaleTime: uint256,
     _minConfigTimeLock: uint256,
     _maxConfigTimeLock: uint256,
 ):
-    gov.__init__(_ripeHq, empty(address), 0, 0, 0)
+    gov.__init__(_ripeHq, _tempGov, 0, 0, 0)
     timeLock.__init__(_minConfigTimeLock, _maxConfigTimeLock, 0, _maxConfigTimeLock)
 
     assert _minStaleTime < _maxStaleTime # dev: invalid stale time range

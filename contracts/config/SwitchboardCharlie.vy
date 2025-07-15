@@ -465,10 +465,11 @@ LOOTBOX_ID: constant(uint256) = 16
 @deploy
 def __init__(
     _ripeHq: address,
+    _tempGov: address,
     _minConfigTimeLock: uint256,
     _maxConfigTimeLock: uint256,
 ):
-    gov.__init__(_ripeHq, empty(address), 0, 0, 0)
+    gov.__init__(_ripeHq, _tempGov, 0, 0, 0)
     timeLock.__init__(_minConfigTimeLock, _maxConfigTimeLock, 0, _maxConfigTimeLock)
 
 

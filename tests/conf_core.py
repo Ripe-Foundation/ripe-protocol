@@ -416,6 +416,7 @@ def switchboard_alpha(ripe_hq_deploy, fork):
     return boa.load(
         "contracts/config/SwitchboardAlpha.vy",
         ripe_hq_deploy,
+        ZERO_ADDRESS,
         PARAMS[fork]["PRICE_DESK_MIN_STALE_TIME"],
         PARAMS[fork]["PRICE_DESK_MAX_STALE_TIME"],
         PARAMS[fork]["MIN_HQ_CHANGE_TIMELOCK"],
@@ -432,6 +433,7 @@ def switchboard_bravo(ripe_hq_deploy, fork):
     return boa.load(
         "contracts/config/SwitchboardBravo.vy",
         ripe_hq_deploy,
+        ZERO_ADDRESS,
         PARAMS[fork]["MIN_HQ_CHANGE_TIMELOCK"],
         PARAMS[fork]["MAX_HQ_CHANGE_TIMELOCK"],
         name="switchboard_bravo",
@@ -446,6 +448,7 @@ def switchboard_charlie(ripe_hq_deploy, fork):
     return boa.load(
         "contracts/config/SwitchboardCharlie.vy",
         ripe_hq_deploy,
+        ZERO_ADDRESS,
         PARAMS[fork]["MIN_HQ_CHANGE_TIMELOCK"],
         PARAMS[fork]["MAX_HQ_CHANGE_TIMELOCK"],
         name="switchboard_charlie",
@@ -460,6 +463,7 @@ def switchboard_delta(ripe_hq_deploy, fork):
     return boa.load(
         "contracts/config/SwitchboardDelta.vy",
         ripe_hq_deploy,
+        ZERO_ADDRESS,
         PARAMS[fork]["MIN_HQ_CHANGE_TIMELOCK"],
         PARAMS[fork]["MAX_HQ_CHANGE_TIMELOCK"],
         name="switchboard_delta",

@@ -10,6 +10,7 @@ def test_deployment_invalid_stale_time_range(ripe_hq_deploy):
         boa.load(
             "contracts/config/SwitchboardAlpha.vy",
             ripe_hq_deploy.address,
+            ZERO_ADDRESS,
             200,  # min
             100,  # max (less than min)
             50,   # min timelock
@@ -21,6 +22,7 @@ def test_deployment_invalid_stale_time_range(ripe_hq_deploy):
         boa.load(
             "contracts/config/SwitchboardAlpha.vy",
             ripe_hq_deploy.address,
+            ZERO_ADDRESS,
             100,  # min
             100,  # max (equal to min)
             50,   # min timelock
