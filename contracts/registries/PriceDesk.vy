@@ -227,19 +227,19 @@ def hasPriceFeed(_asset: address) -> bool:
 
 @external
 def startAddNewAddressToRegistry(_addr: address, _description: String[64]) -> bool:
-    assert gov._canGovern(msg.sender) # dev: no perms
+    assert self._canPerformAction(msg.sender) # dev: no perms
     return registry._startAddNewAddressToRegistry(_addr, _description)
 
 
 @external
 def confirmNewAddressToRegistry(_addr: address) -> uint256:
-    assert gov._canGovern(msg.sender) # dev: no perms
+    assert self._canPerformAction(msg.sender) # dev: no perms
     return registry._confirmNewAddressToRegistry(_addr)
 
 
 @external
 def cancelNewAddressToRegistry(_addr: address) -> bool:
-    assert gov._canGovern(msg.sender) # dev: no perms
+    assert self._canPerformAction(msg.sender) # dev: no perms
     return registry._cancelNewAddressToRegistry(_addr)
 
 
@@ -248,19 +248,19 @@ def cancelNewAddressToRegistry(_addr: address) -> bool:
 
 @external
 def startAddressUpdateToRegistry(_regId: uint256, _newAddr: address) -> bool:
-    assert gov._canGovern(msg.sender) # dev: no perms
+    assert self._canPerformAction(msg.sender) # dev: no perms
     return registry._startAddressUpdateToRegistry(_regId, _newAddr)
 
 
 @external
 def confirmAddressUpdateToRegistry(_regId: uint256) -> bool:
-    assert gov._canGovern(msg.sender) # dev: no perms
+    assert self._canPerformAction(msg.sender) # dev: no perms
     return registry._confirmAddressUpdateToRegistry(_regId)
 
 
 @external
 def cancelAddressUpdateToRegistry(_regId: uint256) -> bool:
-    assert gov._canGovern(msg.sender) # dev: no perms
+    assert self._canPerformAction(msg.sender) # dev: no perms
     return registry._cancelAddressUpdateToRegistry(_regId)
 
 
@@ -269,19 +269,19 @@ def cancelAddressUpdateToRegistry(_regId: uint256) -> bool:
 
 @external
 def startAddressDisableInRegistry(_regId: uint256) -> bool:
-    assert gov._canGovern(msg.sender) # dev: no perms
+    assert self._canPerformAction(msg.sender) # dev: no perms
     return registry._startAddressDisableInRegistry(_regId)
 
 
 @external
 def confirmAddressDisableInRegistry(_regId: uint256) -> bool:
-    assert gov._canGovern(msg.sender) # dev: no perms
+    assert self._canPerformAction(msg.sender) # dev: no perms
     return registry._confirmAddressDisableInRegistry(_regId)
 
 
 @external
 def cancelAddressDisableInRegistry(_regId: uint256) -> bool:
-    assert gov._canGovern(msg.sender) # dev: no perms
+    assert self._canPerformAction(msg.sender) # dev: no perms
     return registry._cancelAddressDisableInRegistry(_regId)
 
 
@@ -319,3 +319,14 @@ def _isUndyAppraiser(_addr: address) -> bool:
     if underscore == empty(address):
         return False
     return _addr == staticcall UnderscoreRegistry(underscore).getAddr(UNDERSCORE_APPRAISER_ID)
+
+
+#############
+# Utilities #
+#############
+
+
+@view
+@internal
+def _canPerformAction(_caller: address) -> bool:
+    return gov._canGovern(_caller) and not deptBasics.isPaused
