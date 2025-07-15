@@ -1457,9 +1457,12 @@ def test_switchboard_three_add_many_training_wheels_access_control(
     with boa.reverts("no perms"):
         switchboard_charlie.setManyTrainingWheelsAccess(addr, training_wheel_access, sender=bob)
     
-    # Governance should succeed
-    action_id = switchboard_charlie.setManyTrainingWheelsAccess(addr, training_wheel_access, sender=governance.address)
-    assert action_id > 0
+    # Governance should succeed (immediate execution, no action_id returned)
+    switchboard_charlie.setManyTrainingWheelsAccess(addr, training_wheel_access, sender=governance.address)
+    
+    # Verify the training wheels were set immediately
+    assert training_wheels.allowed(alice) == True
+    assert training_wheels.allowed(bob) == False
 
 
 def test_switchboard_three_add_many_training_wheels_parameter_validation(
@@ -1485,13 +1488,14 @@ def test_switchboard_three_add_many_training_wheels_parameter_validation(
     with boa.reverts():  # Should fail due to Vyper array size validation
         switchboard_charlie.setManyTrainingWheelsAccess(training_wheels.address, max_training_wheels, sender=governance.address)
     
-    # Test exactly at limit should work
+    # Test exactly at limit should work (immediate execution)
     at_limit_training_wheels = [(alice, True)] * 25
-    action_id = switchboard_charlie.setManyTrainingWheelsAccess(training_wheels.address, at_limit_training_wheels, sender=governance.address)
-    assert action_id > 0
+    switchboard_charlie.setManyTrainingWheelsAccess(training_wheels.address, at_limit_training_wheels, sender=governance.address)
+    # Verify it was set
+    assert training_wheels.allowed(alice) == True
 
 
-def test_switchboard_three_add_many_training_wheels_timelock_and_execution(
+def test_switchboard_three_add_many_training_wheels_immediate_execution(
     switchboard_charlie,
     governance,
     alice,
@@ -1501,7 +1505,7 @@ def test_switchboard_three_add_many_training_wheels_timelock_and_execution(
     alpha_token,
     bravo_token,
 ):
-    """Test timelock functionality and execution for setManyTrainingWheelsAccess"""
+    """Test immediate execution for setManyTrainingWheelsAccess (no longer has timelock)"""
     addr = training_wheels.address
     training_wheel_access = [
         (alice, True),   # Allow alice
@@ -1510,81 +1514,50 @@ def test_switchboard_three_add_many_training_wheels_timelock_and_execution(
         (alice, False),  # Deny alice (this will override the first one)
     ]
     
-    # Create pending action
-    action_id = switchboard_charlie.setManyTrainingWheelsAccess(addr, training_wheel_access, sender=governance.address)
+    # Execute immediately (no longer creates pending action)
+    switchboard_charlie.setManyTrainingWheelsAccess(addr, training_wheel_access, sender=governance.address)
     
-    # Verify event was emitted immediately
-    logs = filter_logs(switchboard_charlie, "PendingSetManyTrainingWheelsAccess")
-    assert len(logs) == 1
-    log = logs[0]
-    assert log.addr == addr
-    assert log.numTrainingWheels == len(training_wheel_access)
-    assert log.actionId == action_id
+    # Verify events were emitted immediately for each access set
+    logs = filter_logs(switchboard_charlie, "TrainingWheelsAccessSet")
+    assert len(logs) == len(training_wheel_access)
     
-    # Verify action is stored correctly
-    assert switchboard_charlie.actionType(action_id) == 16384  # ActionType.ADD_MANY_TRAINING_WHEELS
-    stored_bundle = switchboard_charlie.pendingTrainingWheelAccess(action_id)
-    assert stored_bundle.addr == addr
-    assert len(stored_bundle.trainingWheels) == len(training_wheel_access)
-    
-    # Verify individual training wheel access entries
+    # Verify each event
     for i, (user, is_allowed) in enumerate(training_wheel_access):
-        stored_tw = switchboard_charlie.pendingTrainingWheelAccess(action_id).trainingWheels[i]
-        assert stored_tw.user == user
-        assert stored_tw.isAllowed == is_allowed
-    
-    # Execution should fail before timelock
-    result = switchboard_charlie.executePendingAction(action_id, sender=governance.address)
-    assert not result
-    
-    # Time travel past timelock
-    boa.env.time_travel(blocks=switchboard_charlie.actionTimeLock())
-    
-    # Now execution should succeed
-    result = switchboard_charlie.executePendingAction(action_id, sender=governance.address)
-    assert result
-    
-    # Verify execution event was emitted
-    exec_logs = filter_logs(switchboard_charlie, "SetManyTrainingWheelsAccessExecuted")
-    assert len(exec_logs) == 1
-    exec_log = exec_logs[0]
-    assert exec_log.addr == addr
-    assert exec_log.numTrainingWheels == len(training_wheel_access)
+        log = logs[i]
+        assert log.trainingWheels == addr
+        assert log.user == user
+        assert log.isAllowed == is_allowed
     
     # Verify training wheels contract was called correctly
     # Check that the training wheels were set properly (final state after all calls)
-    assert training_wheels.allowed(alice) == False  # Last call wins
+    assert training_wheels.allowed(alice) == False  # Last call wins (alice was set to False in the last entry)
     assert training_wheels.allowed(bob) == False
     assert training_wheels.allowed(sally) == True
-    
-    # Verify action was cleared after execution
-    assert switchboard_charlie.actionType(action_id) == 0
 
 
-def test_switchboard_three_add_many_training_wheels_cancellation(
+def test_switchboard_three_add_many_training_wheels_multiple_calls(
     switchboard_charlie,
     governance,
     alice,
+    bob,
     training_wheels,
 ):
-    """Test cancellation of setManyTrainingWheelsAccess actions"""
+    """Test multiple calls to setManyTrainingWheelsAccess (immediate execution)"""
     addr = training_wheels.address
-    training_wheel_access = [(alice, True)]
     
-    # Create pending action
-    action_id = switchboard_charlie.setManyTrainingWheelsAccess(addr, training_wheel_access, sender=governance.address)
-    assert switchboard_charlie.actionType(action_id) == 16384  # ADD_MANY_TRAINING_WHEELS
+    # First call - set alice to True
+    switchboard_charlie.setManyTrainingWheelsAccess(addr, [(alice, True)], sender=governance.address)
+    assert training_wheels.allowed(alice) == True
     
-    # Cancel action
-    success = switchboard_charlie.cancelPendingAction(action_id, sender=governance.address)
-    assert success
+    # Second call - set alice to False and bob to True
+    switchboard_charlie.setManyTrainingWheelsAccess(addr, [(alice, False), (bob, True)], sender=governance.address)
+    assert training_wheels.allowed(alice) == False
+    assert training_wheels.allowed(bob) == True
     
-    # Verify action was cleared
-    assert switchboard_charlie.actionType(action_id) == 0
-    
-    # Should not be able to cancel again
-    with boa.reverts("cannot cancel action"):
-        switchboard_charlie.cancelPendingAction(action_id, sender=governance.address)
+    # Third call - can set multiple at once
+    switchboard_charlie.setManyTrainingWheelsAccess(addr, [(alice, True), (bob, False)], sender=governance.address)
+    assert training_wheels.allowed(alice) == True
+    assert training_wheels.allowed(bob) == False
 
 
 def test_switchboard_three_set_training_wheels_access_control(

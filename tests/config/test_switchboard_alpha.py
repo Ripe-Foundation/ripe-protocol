@@ -630,13 +630,6 @@ def test_invalid_priority_sources(switchboard_alpha, governance):
         switchboard_alpha.setPriorityPriceSourceIds([], sender=governance.address)
 
 
-def test_set_underscore_registry_validation_zero_address(switchboard_alpha, governance):
-    # Test invalid underscore registry with zero address
-    # This will fail at the static call level
-    with boa.reverts():
-        switchboard_alpha.setUnderscoreRegistry(ZERO_ADDRESS, sender=governance.address)
-
-
 def test_set_underscore_registry_success(switchboard_alpha, governance, mock_rando_contract):
     # This will fail validation as mock_rando_contract doesn't implement the required interface
     with boa.reverts():  # Just check it reverts, don't match exact message

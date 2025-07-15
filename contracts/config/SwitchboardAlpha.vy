@@ -1313,6 +1313,9 @@ def setUnderscoreRegistry(_underscoreRegistry: address) -> uint256:
 @view
 @internal
 def _isValidUnderscoreAddr(_addr: address) -> bool:
+    if _addr == empty(address):
+        return True # allowing setting to empty address
+
     undyLedger: address = staticcall UnderscoreRegistry(_addr).getAddr(UNDERSCORE_LEDGER_ID)
     if undyLedger == empty(address):
         return False

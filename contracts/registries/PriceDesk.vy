@@ -61,6 +61,7 @@ UNDERSCORE_APPRAISER_ID: constant(uint256) = 8
 @deploy
 def __init__(
     _ripeHq: address,
+    _tempGov: address,
     _ethAddr: address,
     _minRegistryTimeLock: uint256,
     _maxRegistryTimeLock: uint256,
@@ -69,7 +70,7 @@ def __init__(
     ETH = _ethAddr
 
     # modules
-    gov.__init__(_ripeHq, empty(address), 0, 0, 0)
+    gov.__init__(_ripeHq, _tempGov, 0, 0, 0)
     registry.__init__(_minRegistryTimeLock, _maxRegistryTimeLock, 0, "PriceDesk.vy")
     addys.__init__(_ripeHq)
     deptBasics.__init__(False, False, False) # no minting

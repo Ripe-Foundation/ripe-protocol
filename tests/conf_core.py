@@ -371,6 +371,7 @@ def switchboard_deploy(ripe_hq_deploy, fork):
     return boa.load(
         "contracts/registries/Switchboard.vy",
         ripe_hq_deploy,
+        ZERO_ADDRESS,
         PARAMS[fork]["MIN_HQ_CHANGE_TIMELOCK"],
         PARAMS[fork]["MAX_HQ_CHANGE_TIMELOCK"],
         name="switchboard",
@@ -524,6 +525,7 @@ def vault_book_deploy(ripe_hq_deploy, fork):
     return boa.load(
         "contracts/registries/VaultBook.vy",
         ripe_hq_deploy,
+        ZERO_ADDRESS,
         PARAMS[fork]["VAULT_BOOK_MIN_REG_TIMELOCK"],
         PARAMS[fork]["VAULT_BOOK_MAX_REG_TIMELOCK"],
         name="vault_book",
@@ -617,6 +619,7 @@ def price_desk_deploy(ripe_hq_deploy, fork):
     return boa.load(
         "contracts/registries/PriceDesk.vy",
         ripe_hq_deploy,
+        ZERO_ADDRESS,
         ETH,
         PARAMS[fork]["PRICE_DESK_MIN_REG_TIMELOCK"],
         PARAMS[fork]["PRICE_DESK_MAX_REG_TIMELOCK"],

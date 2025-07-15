@@ -97,7 +97,6 @@ flag ActionType:
     ENDAO_REPAY
     ENDOA_RECOVER_NFT
     TRAINING_WHEELS
-    ADD_MANY_TRAINING_WHEELS
 
 struct PauseAction:
     contractAddr: address
@@ -297,12 +296,6 @@ event LockedAccountSet:
     isLocked: bool
     caller: indexed(address)
 
-event PendingSetManyTrainingWheelsAccess:
-    addr: indexed(address)
-    numTrainingWheels: uint256
-    confirmationBlock: uint256
-    actionId: uint256
-
 event DebtUpdatedForUser:
     user: indexed(address)
     success: bool
@@ -421,9 +414,10 @@ event EndaoRecoverNftExecuted:
 event TrainingWheelsSet:
     trainingWheels: indexed(address)
 
-event SetManyTrainingWheelsAccessExecuted:
-    addr: indexed(address)
-    numTrainingWheels: uint256
+event TrainingWheelsAccessSet:
+    trainingWheels: indexed(address)
+    user: indexed(address)
+    isAllowed: bool
 
 # pending actions storage
 actionType: public(HashMap[uint256, ActionType])
@@ -442,7 +436,6 @@ pendingEndaoPartnerPoolActions: public(HashMap[uint256, EndaoPartnerPoolAction])
 pendingEndaoRepayActions: public(HashMap[uint256, EndaoRepayAction])
 pendingEndaoRecoverNftActions: public(HashMap[uint256, EndaoRecoverNftAction])
 pendingTrainingWheels: public(HashMap[uint256, address])
-pendingTrainingWheelAccess: public(HashMap[uint256, TrainingWheelBundle])
 
 MAX_RECOVER_ASSETS: constant(uint256) = 20
 MAX_AUCTIONS: constant(uint256) = 20
@@ -1138,6 +1131,9 @@ def recoverNftInEndaoment(_collection: address, _nftTokenId: uint256, _recipient
 ###################
 
 
+# set training wheels address (does not set access)
+
+
 @external
 def setTrainingWheels(_trainingWheels: address) -> uint256:
     assert gov._canGovern(msg.sender) # dev: no perms
@@ -1154,27 +1150,18 @@ def setTrainingWheels(_trainingWheels: address) -> uint256:
     return aid
 
 
+# sets access to training wheels
+
+
 @external
-def setManyTrainingWheelsAccess(_addr: address, _trainingWheels: DynArray[TrainingWheelAccess, MAX_TRAINING_WHEEL_ACCESS]) -> uint256:
+def setManyTrainingWheelsAccess(_addr: address, _trainingWheels: DynArray[TrainingWheelAccess, MAX_TRAINING_WHEEL_ACCESS]):
     assert gov._canGovern(msg.sender) # dev: no perms
     assert len(_trainingWheels) != 0 # dev: no training wheels provided
     assert _addr != empty(address) # dev: invalid address
-    
-    aid: uint256 = timeLock._initiateAction()
-    self.actionType[aid] = ActionType.ADD_MANY_TRAINING_WHEELS
-    self.pendingTrainingWheelAccess[aid] = TrainingWheelBundle(
-        addr=_addr,
-        trainingWheels=_trainingWheels
-    )
 
-    confirmationBlock: uint256 = timeLock._getActionConfirmationBlock(aid)
-    log PendingSetManyTrainingWheelsAccess(
-        addr=_addr,
-        numTrainingWheels=len(_trainingWheels),
-        confirmationBlock=confirmationBlock,
-        actionId=aid
-    )
-    return aid
+    for tw: TrainingWheelAccess in _trainingWheels:
+        extcall TrainingWheels(_addr).setAllowed(tw.user, tw.isAllowed)
+        log TrainingWheelsAccessSet(trainingWheels=_addr, user=tw.user, isAllowed=tw.isAllowed)
 
 
 #############
@@ -1263,12 +1250,6 @@ def executePendingAction(_aid: uint256) -> bool:
         p: address = self.pendingTrainingWheels[_aid]
         extcall MissionControl(self._getMissionControlAddr()).setTrainingWheels(p)
         log TrainingWheelsSet(trainingWheels=p)
-
-    elif actionType == ActionType.ADD_MANY_TRAINING_WHEELS:
-        p: TrainingWheelBundle = self.pendingTrainingWheelAccess[_aid]
-        for tw: TrainingWheelAccess in p.trainingWheels:
-            extcall TrainingWheels(p.addr).setAllowed(tw.user, tw.isAllowed)
-        log SetManyTrainingWheelsAccessExecuted(addr=p.addr, numTrainingWheels=len(p.trainingWheels))
 
     self.actionType[_aid] = empty(ActionType)
     return True
