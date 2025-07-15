@@ -33,13 +33,18 @@ event ManyBondBoostersSet:
 event BondBoostRemoved:
     user: address
 
+event MaxBoostAndMaxUnitsSet:
+    maxBoost: uint256
+    maxUnits: uint256
+
 # data
 config: public(HashMap[address, BoosterConfig]) # user -> config
 unitsUsed: public(HashMap[address, uint256]) # user -> units used
 
+maxBoost: public(uint256)
+maxUnits: public(uint256)
+
 MAX_BOOSTERS: constant(uint256) = 50
-MAX_BOOST: immutable(uint256)
-MAX_UNITS: immutable(uint256)
 
 
 @deploy
@@ -52,8 +57,8 @@ def __init__(
     addys.__init__(_ripeHq)
     deptBasics.__init__(False, False, False) # no minting
 
-    MAX_BOOST = _maxBoost
-    MAX_UNITS = _maxUnits
+    self.maxBoost = _maxBoost
+    self.maxUnits = _maxUnits
 
     # set initial access
     if len(_initialBoosts) != 0:
@@ -95,7 +100,7 @@ def addNewUnitsUsed(_user: address, _newUnits: uint256):
 ######################
 
 
-# set single
+# add booster config
 
 
 @external
@@ -104,16 +109,12 @@ def setBondBooster(_config: BoosterConfig):
     assert self._setBondBooster(_config) # dev: invalid booster
 
 
-# set many
-
-
 @external
 def setManyBondBoosters(_boosters: DynArray[BoosterConfig, MAX_BOOSTERS]):
     assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
     assert len(_boosters) != 0 # dev: no boosters
     for b: BoosterConfig in _boosters:
         assert self._setBondBooster(b) # dev: invalid booster
-    log ManyBondBoostersSet(numBoosters = len(_boosters))
 
 
 @internal
@@ -135,11 +136,39 @@ def _setBondBooster(_config: BoosterConfig) -> bool:
 
 
 @external
+def removeManyBondBoosters(_users: DynArray[address, MAX_BOOSTERS]):
+    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
+    for user: address in _users:
+        if user == empty(address):
+            continue
+        self._removeBondBooster(user)
+
+
+@external
 def removeBondBooster(_user: address):
     assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
+    assert _user != empty(address) # dev: invalid user
+    self._removeBondBooster(_user)
+
+
+@internal
+def _removeBondBooster(_user: address):
     self.config[_user] = empty(BoosterConfig)
     self.unitsUsed[_user] = 0
     log BondBoostRemoved(user = _user)
+
+
+# set max boost and max units
+
+
+@external
+def setMaxBoostAndMaxUnits(_maxBoost: uint256, _maxUnits: uint256):
+    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
+    assert max_value(uint256) not in [_maxBoost, _maxUnits] # dev: invalid max values
+    assert 0 not in [_maxBoost, _maxUnits] # dev: invalid max values
+    self.maxBoost = _maxBoost
+    self.maxUnits = _maxUnits
+    log MaxBoostAndMaxUnitsSet(maxBoost = _maxBoost, maxUnits = _maxUnits)
 
 
 ######################
@@ -158,10 +187,10 @@ def isValidBooster(_config: BoosterConfig) -> bool:
 def _isValidBooster(_config: BoosterConfig) -> bool:
     if _config.user == empty(address):
         return False
-    if _config.ripePerUnit == 0 or _config.ripePerUnit > MAX_BOOST:
+    if _config.ripePerUnit == 0 or _config.ripePerUnit > self.maxBoost:
         return False
     if _config.expireBlock <= block.number:
         return False
-    if _config.maxUnitsAllowed == 0 or _config.maxUnitsAllowed > MAX_UNITS:
+    if _config.maxUnitsAllowed == 0 or _config.maxUnitsAllowed > self.maxUnits:
         return False
     return True
