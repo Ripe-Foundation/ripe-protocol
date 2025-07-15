@@ -72,6 +72,9 @@ PARAMS = {
         # tokens (green / ripe)
         "MIN_HQ_CHANGE_TIMELOCK": 43_200,  # 1 day on Base
         "MAX_HQ_CHANGE_TIMELOCK": 302_400,  # 7 days on Base
+        # switchboard (green / ripe)
+        "MIN_SWITCHBOARD_CHANGE_TIMELOCK": 21_600,  # 12 hours on Base
+        "MAX_SWITCHBOARD_CHANGE_TIMELOCK": 302_400,  # 7 days on Base
         # price desk (timestamps, not blocks!)
         "PRICE_DESK_MIN_STALE_TIME": 60 * 5,  # 5 mins
         "PRICE_DESK_MAX_STALE_TIME": 60 * 60 * 24 * 3,  # 3 days
