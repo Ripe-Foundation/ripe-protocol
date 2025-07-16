@@ -321,10 +321,25 @@ def test_bond_booster_set_many_bond_boosters(bond_booster, alice, bob, charlie, 
     
     bond_booster.setManyBondBoosters(configs, sender=switchboard_delta.address)
     
-    # Check events immediately after transaction
-    logs = filter_logs(bond_booster, "ManyBondBoostersSet")
-    assert len(logs) == 1
-    assert logs[0].numBoosters == 3
+    # Check BondBoostModified events - one for each config
+    logs = filter_logs(bond_booster, "BondBoostModified")
+    assert len(logs) == 3
+    
+    # Verify events for each user
+    assert logs[0].user == alice
+    assert logs[0].ripePerUnit == 100 * EIGHTEEN_DECIMALS
+    assert logs[0].maxUnitsAllowed == 50
+    assert logs[0].expireBlock == 1000000
+    
+    assert logs[1].user == bob
+    assert logs[1].ripePerUnit == 200 * EIGHTEEN_DECIMALS
+    assert logs[1].maxUnitsAllowed == 25
+    assert logs[1].expireBlock == 2000000
+    
+    assert logs[2].user == charlie
+    assert logs[2].ripePerUnit == 300 * EIGHTEEN_DECIMALS
+    assert logs[2].maxUnitsAllowed == 75
+    assert logs[2].expireBlock == 3000000
     
     # Verify all configs were set
     alice_config = bond_booster.config(alice)
@@ -368,10 +383,20 @@ def test_bond_booster_set_many_bond_boosters_max_limit(bond_booster, switchboard
     # Should work with exactly MAX_BOOSTERS
     bond_booster.setManyBondBoosters(configs, sender=switchboard_delta.address)
     
-    # Check event
-    logs = filter_logs(bond_booster, "ManyBondBoostersSet")
-    assert len(logs) == 1
-    assert logs[0].numBoosters == 50
+    # Check BondBoostModified events - one for each config
+    logs = filter_logs(bond_booster, "BondBoostModified")
+    assert len(logs) == 50
+    
+    # Verify first and last events to ensure all were processed
+    assert logs[0].user == "0x" + f"{1:040x}"
+    assert logs[0].ripePerUnit == 100 * EIGHTEEN_DECIMALS
+    assert logs[0].maxUnitsAllowed == 50
+    assert logs[0].expireBlock == 1000000
+    
+    assert logs[49].user == "0x" + f"{50:040x}"
+    assert logs[49].ripePerUnit == 100 * EIGHTEEN_DECIMALS
+    assert logs[49].maxUnitsAllowed == 50
+    assert logs[49].expireBlock == 1000000
 
 
 #########################

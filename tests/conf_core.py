@@ -507,7 +507,6 @@ def bond_booster(ripe_hq_deploy):
         ripe_hq_deploy,
         1000 * EIGHTEEN_DECIMALS,  # _maxBoost
         100,                        # _maxUnits
-        [],                         # _initialBoosts
         name="bond_booster",
     )
 

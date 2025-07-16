@@ -39,15 +39,19 @@ interface MissionControl:
     def ripeBondConfig() -> cs.RipeBondConfig: view
     def hrConfig() -> cs.HrConfig: view
 
+interface BondRoom:
+    def startBondEpochAtBlock(_block: uint256): nonpayable
+    def setBondBooster(_bondBooster: address): nonpayable
+    def bondBooster() -> address: view
+
 interface Ledger:
     def isHrContributor(_contributor: address) -> bool: view
     def setBadDebt(_amount: uint256): nonpayable
 
-interface BondRoom:
-    def startBondEpochAtBlock(_block: uint256): nonpayable
-    def setBondBooster(_bondBooster: address): nonpayable
-
 interface BondBooster:
+    def setManyBondBoosters(_boosters: DynArray[BoosterConfig, MAX_BOOSTERS]): nonpayable
+    def removeManyBondBoosters(_users: DynArray[address, MAX_BOOSTERS]): nonpayable
+    def setMaxBoostAndMaxUnits(_maxBoost: uint256, _maxUnits: uint256): nonpayable
     def getBoostedRipe(_user: address, _units: uint256) -> uint256: view
 
 interface RipeHq:
@@ -66,6 +70,8 @@ flag ActionType:
     RIPE_BOND_START_EPOCH
     RIPE_BAD_DEBT
     RIPE_BOND_BOOSTER
+    BOND_BOOSTER_ADD
+    BOND_BOOSTER_BOUNDARIES
 
 struct PendingManager:
     contributor: address
@@ -74,6 +80,16 @@ struct PendingManager:
 struct PendingCancelPaycheck:
     contributor: address
     pendingShouldCancel: bool
+
+struct BoosterConfig:
+    user: address
+    ripePerUnit: uint256
+    maxUnitsAllowed: uint256
+    expireBlock: uint256
+
+struct BoosterBoundaries:
+    maxBoost: uint256
+    maxUnits: uint256
 
 event PendingHrContribTemplateChange:
     contribTemplate: indexed(address)
@@ -165,6 +181,20 @@ event PendingBondBoosterSet:
     confirmationBlock: uint256
     actionId: uint256
 
+event PendingBoosterBoundariesSet:
+    maxBoost: uint256
+    maxUnits: uint256
+    confirmationBlock: uint256
+    actionId: uint256
+
+event PendingBoosterConfigsSet:
+    numBoosters: uint256
+    confirmationBlock: uint256
+    actionId: uint256
+
+event ManyBondBoostersRemoved:
+    numUsers: uint256
+
 event HrContribTemplateSet:
     contribTemplate: indexed(address)
 
@@ -208,6 +238,13 @@ event BadDebtSet:
 event RipeBondBoosterSet:
     bondBooster: indexed(address)
 
+event ManyBondBoostersSet:
+    numBoosters: uint256
+
+event BoosterBoundariesSet:
+    maxBoost: uint256
+    maxUnits: uint256
+
 # pending config changes
 actionType: public(HashMap[uint256, ActionType]) # aid -> type
 pendingHrConfig: public(HashMap[uint256, cs.HrConfig]) # aid -> config
@@ -216,11 +253,14 @@ pendingCancelPaycheck: public(HashMap[uint256, address]) # aid -> contributor
 pendingRipeBondConfig: public(HashMap[uint256, cs.RipeBondConfig]) # aid -> config
 pendingRipeBondConfigValue: public(HashMap[uint256, uint256]) # aid -> block
 pendingBondBooster: public(HashMap[uint256, address]) # aid -> bond booster
+pendingBoosterConfigs: public(HashMap[uint256, DynArray[BoosterConfig, MAX_BOOSTERS]]) # aid -> configs
+pendingBoosterBoundaries: public(HashMap[uint256, BoosterBoundaries]) # aid -> boundaries
 
 LEDGER_ID: constant(uint256) = 4
 MISSION_CONTROL_ID: constant(uint256) = 5
 BOND_ROOM_ID: constant(uint256) = 12
 EIGHTEEN_DECIMALS: constant(uint256) = 10 ** 18
+MAX_BOOSTERS: constant(uint256) = 50
 
 # timestamp units (not blocks!)
 DAY_IN_SECONDS: constant(uint256) = 60 * 60 * 24
@@ -573,7 +613,12 @@ def setBadDebt(_amount: uint256) -> uint256:
     return aid
 
 
-# bond booster
+################
+# Bond Booster #
+################
+
+
+# setting bond booster contract
 
 
 @external
@@ -600,6 +645,47 @@ def _isValidRipeBondBoosterAddr(_addr: address) -> bool:
     if _addr != empty(address):
         na: uint256 = staticcall BondBooster(_addr).getBoostedRipe(empty(address), 10)
     return True
+
+
+# add booster configs
+
+
+@external
+def setManyBondBoosters(_boosters: DynArray[BoosterConfig, MAX_BOOSTERS]) -> uint256:
+    assert gov._canGovern(msg.sender) # dev: no perms
+    assert len(_boosters) != 0 # dev: no boosters
+    aid: uint256 = timeLock._initiateAction()
+    self.actionType[aid] = ActionType.BOND_BOOSTER_ADD
+    self.pendingBoosterConfigs[aid] = _boosters
+    confirmationBlock: uint256 = timeLock._getActionConfirmationBlock(aid)
+    log PendingBoosterConfigsSet(numBoosters=len(_boosters), confirmationBlock=confirmationBlock, actionId=aid)
+    return aid
+
+
+# remove boosted users
+
+
+@external
+def removeManyBondBoosters(_users: DynArray[address, MAX_BOOSTERS]) -> bool:
+    assert self._hasPermsToEnable(msg.sender, True) # dev: no perms
+    bondBooster: address = staticcall BondRoom(self._getBondRoomAddr()).bondBooster()
+    extcall BondBooster(bondBooster).removeManyBondBoosters(_users)
+    log ManyBondBoostersRemoved(numUsers=len(_users))
+    return True
+
+
+# set booster boundaries
+
+
+@external
+def setBoosterBoundaries(_maxBoost: uint256, _maxUnits: uint256) -> uint256:
+    assert gov._canGovern(msg.sender) # dev: no perms
+    aid: uint256 = timeLock._initiateAction()
+    self.actionType[aid] = ActionType.BOND_BOOSTER_BOUNDARIES
+    self.pendingBoosterBoundaries[aid] = BoosterBoundaries(maxBoost=_maxBoost, maxUnits=_maxUnits)
+    confirmationBlock: uint256 = timeLock._getActionConfirmationBlock(aid)
+    log PendingBoosterBoundariesSet(maxBoost=_maxBoost, maxUnits=_maxUnits, confirmationBlock=confirmationBlock, actionId=aid)
+    return aid
 
 
 #############
@@ -700,6 +786,16 @@ def executePendingAction(_aid: uint256) -> bool:
         bondBooster: address = self.pendingBondBooster[_aid]
         extcall BondRoom(self._getBondRoomAddr()).setBondBooster(bondBooster)
         log RipeBondBoosterSet(bondBooster=bondBooster)
+
+    elif actionType == ActionType.BOND_BOOSTER_ADD:
+        boosters: DynArray[BoosterConfig, MAX_BOOSTERS] = self.pendingBoosterConfigs[_aid]
+        extcall BondBooster(self._getBondRoomAddr()).setManyBondBoosters(boosters)
+        log ManyBondBoostersSet(numBoosters=len(boosters))
+
+    elif actionType == ActionType.BOND_BOOSTER_BOUNDARIES:
+        boundaries: BoosterBoundaries = self.pendingBoosterBoundaries[_aid]
+        extcall BondBooster(self._getBondRoomAddr()).setMaxBoostAndMaxUnits(boundaries.maxBoost, boundaries.maxUnits)
+        log BoosterBoundariesSet(maxBoost=boundaries.maxBoost, maxUnits=boundaries.maxUnits)
 
     self.actionType[_aid] = empty(ActionType)
     return True
