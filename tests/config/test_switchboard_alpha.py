@@ -1194,10 +1194,8 @@ def test_comprehensive_permission_matrix(switchboard_alpha, governance, bob, ali
     switchboard_alpha.setCanWithdraw(True, sender=governance.address)  # Re-enable
     switchboard_alpha.setCanWithdraw(False, sender=alice)  # Alice disables
     
-    # Remove bob's permission
-    action_id = switchboard_alpha.setCanPerformLiteAction(bob, False, sender=governance.address)
-    boa.env.time_travel(blocks=switchboard_alpha.actionTimeLock())
-    switchboard_alpha.executePendingAction(action_id, sender=governance.address)
+    # Remove bob's permission (now happens immediately)
+    switchboard_alpha.setCanPerformLiteAction(bob, False, sender=governance.address)
     
     # Now only alice can disable
     switchboard_alpha.setCanWithdraw(True, sender=governance.address)  # Enable first
@@ -1371,18 +1369,10 @@ def test_multi_user_complex_permission_scenarios(switchboard_alpha, governance, 
     with boa.reverts("no perms"):
         switchboard_alpha.setCanBorrow(False, sender=charlie)
     
-    # Test removing permissions while actions are pending
-    action_id3 = switchboard_alpha.setCanPerformLiteAction(bob, False, sender=governance.address)
+    # Test removing permissions (now happens immediately)
+    switchboard_alpha.setCanPerformLiteAction(bob, False, sender=governance.address)
     
-    # Bob should still be able to disable before the action executes
-    switchboard_alpha.setCanDeposit(True, sender=governance.address)  # Re-enable
-    switchboard_alpha.setCanDeposit(False, sender=bob)  # Should still work
-    
-    # Execute the permission removal
-    boa.env.time_travel(blocks=switchboard_alpha.actionTimeLock())
-    switchboard_alpha.executePendingAction(action_id3, sender=governance.address)
-    
-    # Now bob cannot disable
+    # Bob cannot disable anymore (permission removal is immediate)
     switchboard_alpha.setCanDeposit(True, sender=governance.address)  # Re-enable
     with boa.reverts("no perms"):
         switchboard_alpha.setCanDeposit(False, sender=bob)

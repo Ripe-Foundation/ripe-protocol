@@ -1333,6 +1333,12 @@ def _isValidUnderscoreAddr(_addr: address) -> bool:
 def setCanPerformLiteAction(_user: address, _canDo: bool) -> uint256:
     assert gov._canGovern(msg.sender) # dev: no perms
 
+    # when removing, allow to do immediately
+    if not _canDo:
+        extcall MissionControl(self._getMissionControlAddr()).setCanPerformLiteAction(_user, _canDo)
+        log CanPerformLiteAction(user=_user, canDo=_canDo)
+        return 0
+
     aid: uint256 = timeLock._initiateAction()
     self.actionType[aid] = ActionType.OTHER_CAN_PERFORM_LITE_ACTION
     self.pendingCanPerformLiteAction[aid] = CanPerform(user=_user, canDo=_canDo)
