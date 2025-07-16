@@ -105,23 +105,29 @@ class MigrationRunner:
         for file in os.listdir(self.migrations_dir):
             # timestamp of the filename is the initial string of numbers,
             # up to the first non-digit character
-            match = re.fullmatch("(\d+).*\.py$", file)
+            match = re.fullmatch(r"(\d+).*\.py$", file)
             if match:
                 timestamp = match.group(1)
                 filename = os.path.join(self.migrations_dir, file)
                 timestamped_migrations.append((filename, timestamp))
 
         # sort order of `os.listdir` is not guaranteed, so we sort on timestamp
+        # Convert timestamps to integers for proper numerical sorting
         timestamped_migrations = sorted(
-            timestamped_migrations, key=itemgetter(0))
+            timestamped_migrations, key=lambda x: int(x[1]))
 
         # include previous timestamp in migration tuples
         migrations = []
         prev_timestamp = None
         for filename, timestamp in timestamped_migrations:
-            if end_timestamp != '0' and end_timestamp != None and timestamp > end_timestamp:
+            # Convert timestamps to integers for proper numerical comparison
+            timestamp_int = int(timestamp)
+            end_timestamp_int = int(end_timestamp) if end_timestamp and end_timestamp != '0' else None
+            start_timestamp_int = int(start_timestamp) if start_timestamp else None
+
+            if end_timestamp_int is not None and timestamp_int > end_timestamp_int:
                 break
-            if start_timestamp == None or timestamp >= start_timestamp:
+            if start_timestamp_int is None or timestamp_int >= start_timestamp_int:
                 migrations.append((filename, timestamp, prev_timestamp))
             prev_timestamp = timestamp
 
@@ -138,10 +144,11 @@ class MigrationRunner:
 
         # scan each file to get the latest timestamp
         for file in os.listdir(self.history_dir):
-            match = re.fullmatch("(.*)\-manifest\.json$", file)
+            match = re.fullmatch(r"(.*)\-manifest\.json$", file)
             if match:
                 timestamp = match.group(1)
-                if latest_timestamp == None or timestamp > latest_timestamp:
+                # Convert timestamps to integers for proper numerical comparison
+                if latest_timestamp == None or int(timestamp) > int(latest_timestamp):
                     latest_timestamp = timestamp
 
         return latest_timestamp
