@@ -128,7 +128,7 @@ def ripeBondConfig() -> cs.RipeBondConfig:
         canBond = False,
         minRipePerUnit = 1 * EIGHTEEN_DECIMALS,
         maxRipePerUnit = 100 * EIGHTEEN_DECIMALS,
-        maxRipePerUnitLockBonus = 1 * EIGHTEEN_DECIMALS,
+        maxRipePerUnitLockBonus = HUNDRED_PERCENT,
         epochLength = 1 * DAY_IN_BLOCKS,
         shouldAutoRestart = False,
         restartDelayBlocks = 0,

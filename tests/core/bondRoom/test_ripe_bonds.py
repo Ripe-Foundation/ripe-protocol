@@ -1,7 +1,7 @@
 import pytest
 import boa
 
-from constants import EIGHTEEN_DECIMALS
+from constants import EIGHTEEN_DECIMALS, HUNDRED_PERCENT
 from conf_utils import filter_logs
 
 
@@ -13,7 +13,7 @@ def setupRipeBonds(mission_control, bond_room, setAssetConfig, setGeneralConfig,
         _canBond = True,
         _minRipePerUnit = 1 * EIGHTEEN_DECIMALS,
         _maxRipePerUnit = 100 * EIGHTEEN_DECIMALS,
-        _maxRipePerUnitLockBonus = 100 * EIGHTEEN_DECIMALS,
+        _maxRipePerUnitLockBonus = HUNDRED_PERCENT,  # 100% bonus (doubles the base payout)
         _epochLength = 100,
         _shouldAutoRestart = True,
         _restartDelayBlocks = 50,
@@ -269,11 +269,12 @@ def test_purchase_ripe_bond_with_lock_above_minimum(
 
     # Should get base rate + proportional lock bonus
     # lockDuration = 150, minLock = 100, maxLock = 1000
+    # maxLockBonus = 100% (from fixture)
     # bonus ratio = (150 - 100) / (1000 - 100) = 50/900 ≈ 5.56%
-    # bonus = 5.56% of 100 RIPE per unit = ~5.56 RIPE per unit
-    expected_base = payment_amount  # min ripe per unit at epoch start
-    expected_bonus_ratio = (lock_duration - 100) / (1000 - 100)  # (150-100)/(1000-100)
-    expected_bonus = int(100 * EIGHTEEN_DECIMALS * expected_bonus_ratio * payment_amount // EIGHTEEN_DECIMALS)
+    # bonus = 5.56% of base payout
+    expected_base = payment_amount  # 100 units * 1 RIPE per unit at epoch start
+    lock_bonus_ratio = HUNDRED_PERCENT * (lock_duration - 100) // (1000 - 100)  # 5.56% of max bonus
+    expected_bonus = expected_base * lock_bonus_ratio // HUNDRED_PERCENT
     expected_total = expected_base + expected_bonus
     _test(expected_total, ripe_payout)
 
@@ -305,9 +306,9 @@ def test_purchase_ripe_bond_with_lock_maximum(
         sender=bob
     )
 
-    # should get base amount + full lock bonus (100 RIPE per unit bonus)
-    expected_base = payment_amount  # min ripe per unit at epoch start (1x)
-    expected_bonus = 100 * payment_amount  # max lock bonus (100x)  
+    # should get base amount + full lock bonus (100% of base from fixture)
+    expected_base = payment_amount  # 100 units * 1 RIPE per unit at epoch start
+    expected_bonus = expected_base * 100 // 100  # 100% lock bonus
     expected_total = expected_base + expected_bonus
     _test(expected_total, ripe_payout)
 
@@ -340,8 +341,8 @@ def test_purchase_ripe_bond_with_lock_exceeding_max(
     )
 
     # should get same as max lock duration
-    expected_base = payment_amount  # min ripe per unit at epoch start (1x)
-    expected_bonus = 100 * payment_amount  # max lock bonus (100x)
+    expected_base = payment_amount  # 100 units * 1 RIPE per unit at epoch start
+    expected_bonus = expected_base * 100 // 100  # 100% lock bonus (capped at max)
     expected_total = expected_base + expected_bonus
     _test(expected_total, ripe_payout)
     
@@ -834,7 +835,7 @@ def test_purchase_ripe_bond_event_emission(
     assert event.paymentAsset == alpha_token.address
     assert event.paymentAmount == payment_amount
     assert event.lockDuration == lock_duration
-    assert event.ripePayout == ripe_payout
+    assert event.totalRipePayout == ripe_payout
     assert event.caller == bob
     
     # verify tokens were deposited into gov vault
@@ -848,7 +849,7 @@ def test_purchase_ripe_bond_lock_bonus_calculation(
     setupRipeBonds(
         _minLockDuration=100,
         _maxLockDuration=1000,
-        _maxRipePerUnitLockBonus=50 * EIGHTEEN_DECIMALS  # 50x bonus
+        _maxRipePerUnitLockBonus=50 * HUNDRED_PERCENT  # 5000% bonus (50x multiplier)
     )
 
     # Test no lock
@@ -901,9 +902,14 @@ def test_purchase_ripe_bond_lock_bonus_calculation(
     assert ripe_payout_min_lock < ripe_payout_mid_lock
     assert ripe_payout_mid_lock < ripe_payout_max_lock
     
-    # Maximum should get base + full bonus
-    expected_max = payment_amount + 50 * payment_amount  # base + 50x bonus
-    _test(ripe_payout_max_lock, expected_max)
+    # Mid-range should get 50% of max bonus (lock duration 550 is 50% of the way from 100 to 1000)
+    # Max bonus is capped at 1000% (10x) by contract, so 50% of 1000% = 500% bonus
+    expected_mid = payment_amount + (payment_amount * 500 // 100)  # base + 500% bonus = 600% total
+    _test(expected_mid, ripe_payout_mid_lock)
+    
+    # Maximum should get base + full bonus (capped at 1000%)
+    expected_max = payment_amount + (payment_amount * 1000 // 100)  # base + 1000% bonus = 1100% total
+    _test(expected_max, ripe_payout_max_lock)
     
     # Verify total locked amount in gov vault (should be sum of all locked purchases)
     total_locked_amount = ripe_payout_min_lock + ripe_payout_mid_lock + ripe_payout_max_lock
@@ -1073,7 +1079,7 @@ def test_purchase_ripe_bond_maximum_parameters(
     # Setup with large values
     large_amount_per_epoch = 1000000 * EIGHTEEN_DECIMALS
     large_max_ripe_per_unit = 1000 * EIGHTEEN_DECIMALS
-    large_max_lock_bonus = 2000 * EIGHTEEN_DECIMALS
+    large_max_lock_bonus = 5 * HUNDRED_PERCENT  # 500% bonus
     
     setupRipeBonds(
         _amountPerEpoch=large_amount_per_epoch,
@@ -1083,7 +1089,7 @@ def test_purchase_ripe_bond_maximum_parameters(
     )
     
     # Test large purchase with maximum lock (but within available ripe limits)
-    payment_amount = 30000 * EIGHTEEN_DECIMALS  # Reduced to stay within ripe availability
+    payment_amount = 5000 * EIGHTEEN_DECIMALS  # Reduced to stay within ripe availability
     alpha_token.transfer(bob, payment_amount, sender=alpha_token_whale)
     alpha_token.approve(teller, payment_amount, sender=bob)
     
@@ -1099,12 +1105,12 @@ def test_purchase_ripe_bond_maximum_parameters(
     
     # Should get max base rate + max lock bonus
     # At 99% epoch progress: baseRipePerUnit = 1 + (9900 * 999 / 10000) = 990.01
-    # Lock bonus: full 2000 RIPE per unit
-    # Total: ~2990.01 RIPE per unit
+    # Base rate: ~990.01 RIPE per unit
     expected_base_rate = 1 * EIGHTEEN_DECIMALS + (9900 * 999 * EIGHTEEN_DECIMALS // 10000)  # ~990.01e18
-    expected_bonus = large_max_lock_bonus  # 2000e18
-    expected_total_rate = expected_base_rate + expected_bonus  # ~2990.01e18
-    expected_total = expected_total_rate * payment_amount // EIGHTEEN_DECIMALS
+    expected_base_payout = expected_base_rate * payment_amount // EIGHTEEN_DECIMALS
+    # Lock bonus: 500% of base payout
+    expected_lock_bonus = expected_base_payout * large_max_lock_bonus // HUNDRED_PERCENT
+    expected_total = expected_base_payout + expected_lock_bonus
     
     _test(expected_total, ripe_payout)
     
@@ -1666,14 +1672,14 @@ def test_bond_purchase_multiple_transactions_progressive_debt_clearing(
 
 
 def test_preview_ripe_bond_payout_basic(
-    bond_room, setupRipeBonds, _test
+    bond_room, setupRipeBonds, _test, bob
 ):
     """Test basic preview functionality at epoch start"""
     setupRipeBonds()
     
     # Preview at epoch start with no lock
     payment_amount = 100 * EIGHTEEN_DECIMALS
-    preview_payout = bond_room.previewRipeBondPayout(0, payment_amount)
+    preview_payout = bond_room.previewRipeBondPayout(bob, 0, payment_amount)
     
     # Should get minimum rate (1x) at epoch start
     expected_payout = payment_amount  # min ripe per unit at epoch start
@@ -1681,21 +1687,21 @@ def test_preview_ripe_bond_payout_basic(
 
 
 def test_preview_ripe_bond_payout_epoch_progress(
-    bond_room, setupRipeBonds, _test
+    bond_room, setupRipeBonds, _test, bob
 ):
     """Test preview payout changes with epoch progress"""
     start, end = setupRipeBonds()
     
     # Test at epoch start (0% progress)
     payment_amount = 100 * EIGHTEEN_DECIMALS
-    preview_start = bond_room.previewRipeBondPayout(0, payment_amount)
+    preview_start = bond_room.previewRipeBondPayout(bob, 0, payment_amount)
     _test(preview_start, payment_amount)  # min rate (1x)
     
     # Move to middle of epoch (50% progress)
     blocks_to_travel = (end - start) // 2
     boa.env.time_travel(blocks=blocks_to_travel)
     
-    preview_mid = bond_room.previewRipeBondPayout(0, payment_amount)
+    preview_mid = bond_room.previewRipeBondPayout(bob, 0, payment_amount)
     # Should be halfway between min (1x) and max (100x) = 50.5x
     expected_mid = 5050 * EIGHTEEN_DECIMALS
     _test(preview_mid, expected_mid)
@@ -1704,7 +1710,7 @@ def test_preview_ripe_bond_payout_epoch_progress(
     additional_blocks = (end - start) - blocks_to_travel - 1
     boa.env.time_travel(blocks=additional_blocks)
     
-    preview_end = bond_room.previewRipeBondPayout(0, payment_amount)
+    preview_end = bond_room.previewRipeBondPayout(bob, 0, payment_amount)
     # Should be near maximum rate (~99.01x)
     expected_end = 9901 * EIGHTEEN_DECIMALS
     _test(preview_end, expected_end)
@@ -1714,7 +1720,7 @@ def test_preview_ripe_bond_payout_epoch_progress(
 
 
 def test_preview_ripe_bond_payout_lock_durations(
-    bond_room, setupRipeBonds, _test
+    bond_room, setupRipeBonds, _test, bob
 ):
     """Test preview with different lock durations"""
     setupRipeBonds()
@@ -1722,31 +1728,31 @@ def test_preview_ripe_bond_payout_lock_durations(
     payment_amount = 100 * EIGHTEEN_DECIMALS
     
     # No lock
-    preview_no_lock = bond_room.previewRipeBondPayout(0, payment_amount)
+    preview_no_lock = bond_room.previewRipeBondPayout(bob, 0, payment_amount)
     _test(preview_no_lock, payment_amount)  # base rate only
     
     # Below minimum lock (should be treated as no lock)
-    preview_below_min = bond_room.previewRipeBondPayout(50, payment_amount)
+    preview_below_min = bond_room.previewRipeBondPayout(bob, 50, payment_amount)
     _test(preview_below_min, payment_amount)  # same as no lock
     
     # Minimum lock (gets zero bonus since lockDuration - minLockDuration = 0)
-    preview_min_lock = bond_room.previewRipeBondPayout(100, payment_amount)
+    preview_min_lock = bond_room.previewRipeBondPayout(bob, 100, payment_amount)
     _test(preview_min_lock, payment_amount)  # base rate only
     
     # Mid-range lock (50% of max lock bonus)
-    preview_mid_lock = bond_room.previewRipeBondPayout(550, payment_amount)
+    preview_mid_lock = bond_room.previewRipeBondPayout(bob, 550, payment_amount)
     # Lock bonus ratio = (550 - 100) / (1000 - 100) = 450/900 = 50%
-    # Bonus = 50% of 100 RIPE per unit = 50 RIPE per unit
-    expected_mid = payment_amount + 50 * payment_amount  # base + 50x bonus
+    # Bonus = 50% of base payout (since max lock bonus is 100% from fixture)
+    expected_mid = payment_amount + (payment_amount * 50 // 100)  # base + 50% bonus
     _test(preview_mid_lock, expected_mid)
     
     # Maximum lock
-    preview_max_lock = bond_room.previewRipeBondPayout(1000, payment_amount)
-    expected_max = payment_amount + 100 * payment_amount  # base + 100x bonus
+    preview_max_lock = bond_room.previewRipeBondPayout(bob, 1000, payment_amount)
+    expected_max = payment_amount + (payment_amount * 100 // 100)  # base + 100% bonus
     _test(preview_max_lock, expected_max)
     
     # Above maximum lock (should cap at max)
-    preview_above_max = bond_room.previewRipeBondPayout(2000, payment_amount)
+    preview_above_max = bond_room.previewRipeBondPayout(bob, 2000, payment_amount)
     _test(preview_above_max, expected_max)  # same as max lock
     
     # Verify progression
@@ -1756,90 +1762,90 @@ def test_preview_ripe_bond_payout_lock_durations(
 
 
 def test_preview_ripe_bond_payout_payment_amounts(
-    bond_room, setupRipeBonds, _test
+    bond_room, setupRipeBonds, _test, bob
 ):
     """Test preview with different payment amounts"""
     setupRipeBonds()
     
     # Small payment amount
     small_amount = 10 * EIGHTEEN_DECIMALS
-    preview_small = bond_room.previewRipeBondPayout(0, small_amount)
+    preview_small = bond_room.previewRipeBondPayout(bob, 0, small_amount)
     _test(preview_small, small_amount)
     
     # Large payment amount (within available)
     large_amount = 500 * EIGHTEEN_DECIMALS
-    preview_large = bond_room.previewRipeBondPayout(0, large_amount)
+    preview_large = bond_room.previewRipeBondPayout(bob, 0, large_amount)
     _test(preview_large, large_amount)
     
     # Payment amount exceeding epoch availability (should be capped)
     excessive_amount = 5000 * EIGHTEEN_DECIMALS  # more than 1000 available
-    preview_excessive = bond_room.previewRipeBondPayout(0, excessive_amount)
+    preview_excessive = bond_room.previewRipeBondPayout(bob, 0, excessive_amount)
     expected_capped = 1000 * EIGHTEEN_DECIMALS  # should be capped to available amount
     _test(preview_excessive, expected_capped)
     
     # Zero payment amount (should return 0)
-    preview_zero = bond_room.previewRipeBondPayout(0, 0)
+    preview_zero = bond_room.previewRipeBondPayout(bob, 0, 0)
     assert preview_zero == 0
     
     # Default max_value parameter (should use available amount)
-    preview_default = bond_room.previewRipeBondPayout(0)  # using default max_value
+    preview_default = bond_room.previewRipeBondPayout(bob, 0)  # using default max_value
     _test(preview_default, expected_capped)
 
 
 def test_preview_ripe_bond_payout_disabled_bonds(
-    bond_room, setupRipeBonds
+    bond_room, setupRipeBonds, bob
 ):
     """Test preview returns 0 when bonds are disabled"""
     setupRipeBonds(_canBond=False)
     
     payment_amount = 100 * EIGHTEEN_DECIMALS
-    preview_payout = bond_room.previewRipeBondPayout(0, payment_amount)
+    preview_payout = bond_room.previewRipeBondPayout(bob, 0, payment_amount)
     
     assert preview_payout == 0
 
 
 def test_preview_ripe_bond_payout_no_ripe_per_unit(
-    bond_room, setupRipeBonds
+    bond_room, setupRipeBonds, bob
 ):
     """Test preview returns 0 when max ripe per unit is 0"""
     setupRipeBonds(_maxRipePerUnit=0)
     
     payment_amount = 100 * EIGHTEEN_DECIMALS
-    preview_payout = bond_room.previewRipeBondPayout(0, payment_amount)
+    preview_payout = bond_room.previewRipeBondPayout(bob, 0, payment_amount)
     
     assert preview_payout == 0
 
 
 def test_preview_ripe_bond_payout_6_decimal_token(
-    bond_room, setupRipeBonds, charlie_token, _test
+    bond_room, setupRipeBonds, charlie_token, _test, bob
 ):
     """Test preview with 6 decimal token"""
     charlie_amount_per_epoch = 1000 * (10 ** 6)
     setupRipeBonds(_asset=charlie_token, _amountPerEpoch=charlie_amount_per_epoch)
     
     payment_amount_6dec = 100 * (10 ** 6)
-    preview_6dec = bond_room.previewRipeBondPayout(0, payment_amount_6dec)
+    preview_6dec = bond_room.previewRipeBondPayout(bob, 0, payment_amount_6dec)
     # Ripe per unit is 1e18, so 100 * 1e6 * 1e18 / 1e6 = 100e18
     expected_6dec = 100 * EIGHTEEN_DECIMALS
     _test(preview_6dec, expected_6dec)
 
 
 def test_preview_ripe_bond_payout_8_decimal_token(
-    bond_room, setupRipeBonds, delta_token, _test
+    bond_room, setupRipeBonds, delta_token, _test, bob
 ):
     """Test preview with 8 decimal token"""
     delta_amount_per_epoch = 1000 * (10 ** 8)
     setupRipeBonds(_asset=delta_token, _amountPerEpoch=delta_amount_per_epoch)
     
     payment_amount_8dec = 100 * (10 ** 8)
-    preview_8dec = bond_room.previewRipeBondPayout(0, payment_amount_8dec)
+    preview_8dec = bond_room.previewRipeBondPayout(bob, 0, payment_amount_8dec)
     # Ripe per unit is 1e18, so 100 * 1e8 * 1e18 / 1e8 = 100e18
     expected_8dec = 100 * EIGHTEEN_DECIMALS
     _test(preview_8dec, expected_8dec)
 
 
 def test_preview_ripe_bond_payout_epoch_auto_advance(
-    bond_room, setupRipeBonds, _test
+    bond_room, setupRipeBonds, _test, bob
 ):
     """Test preview when epoch would auto-advance"""
     start, end = setupRipeBonds()
@@ -1850,7 +1856,7 @@ def test_preview_ripe_bond_payout_epoch_auto_advance(
     
     current_block = boa.env.evm.patch.block_number
     payment_amount = 100 * EIGHTEEN_DECIMALS
-    preview_payout = bond_room.previewRipeBondPayout(0, payment_amount)
+    preview_payout = bond_room.previewRipeBondPayout(bob, 0, payment_amount)
     
     # When epoch auto-advances, new epoch starts at old epoch end (which is in the past)
     # So we're actually partway through the new epoch, which gives higher rate
@@ -1880,19 +1886,19 @@ def test_preview_ripe_bond_payout_exhausted_epoch(
     
     # Preview should return 0 since no more available in current epoch
     payment_amount = 100 * EIGHTEEN_DECIMALS
-    preview_payout = bond_room.previewRipeBondPayout(0, payment_amount)
+    preview_payout = bond_room.previewRipeBondPayout(bob, 0, payment_amount)
     
     assert preview_payout == 0
 
 
 def test_preview_ripe_bond_payout_complex_scenario(
-    bond_room, setupRipeBonds, _test
+    bond_room, setupRipeBonds, _test, bob
 ):
     """Test preview with complex scenario combining multiple factors"""
     start, end = setupRipeBonds(
         _minRipePerUnit=5 * EIGHTEEN_DECIMALS,
         _maxRipePerUnit=50 * EIGHTEEN_DECIMALS,
-        _maxRipePerUnitLockBonus=25 * EIGHTEEN_DECIMALS,
+        _maxRipePerUnitLockBonus=2 * HUNDRED_PERCENT,  # 200% bonus
         _minLockDuration=200,
         _maxLockDuration=2000
     )
@@ -1905,17 +1911,20 @@ def test_preview_ripe_bond_payout_complex_scenario(
     payment_amount = 200 * EIGHTEEN_DECIMALS
     lock_duration = 1280  # 200 + (0.6 * (2000 - 200)) = 1280
     
-    preview_payout = bond_room.previewRipeBondPayout(lock_duration, payment_amount)
+    preview_payout = bond_room.previewRipeBondPayout(bob, lock_duration, payment_amount)
     
     # Calculate expected values
     # Epoch progress = 75% = 7500/10000
     # Base rate = 5 + (7500 * 45 / 10000) = 5 + 33.75 = 38.75 RIPE per unit
-    # Lock bonus = 60% of 25 = 15 RIPE per unit  
-    # Total rate = 38.75 + 15 = 53.75 RIPE per unit
-    expected_base = 5 * EIGHTEEN_DECIMALS + (7500 * 45 * EIGHTEEN_DECIMALS // 10000)
-    expected_bonus = 15 * EIGHTEEN_DECIMALS  # 60% of 25
-    expected_rate = expected_base + expected_bonus
-    expected_payout = expected_rate * payment_amount // EIGHTEEN_DECIMALS
+    # Units = 200
+    # Base payout = 38.75 * 200 = 7750 RIPE
+    # Lock bonus ratio = 60% of 200% = 120%
+    # Lock bonus = 120% of base payout
+    expected_base_rate = 5 * EIGHTEEN_DECIMALS + (7500 * 45 * EIGHTEEN_DECIMALS // 10000)
+    expected_base_payout = expected_base_rate * payment_amount // EIGHTEEN_DECIMALS
+    lock_bonus_ratio = 60 * 2 * HUNDRED_PERCENT // 100  # 60% of 200% max bonus
+    expected_lock_bonus = expected_base_payout * lock_bonus_ratio // HUNDRED_PERCENT
+    expected_payout = expected_base_payout + expected_lock_bonus
     
     _test(preview_payout, expected_payout)
 
@@ -2057,7 +2066,7 @@ def test_preview_functions_consistency(
     lock_duration = 300
     
     # Get preview values before purchase
-    preview_payout = bond_room.previewRipeBondPayout(lock_duration, payment_amount)
+    preview_payout = bond_room.previewRipeBondPayout(bob, lock_duration, payment_amount)
     preview_start, preview_end = bond_room.previewNextEpoch()
     
     # Execute actual purchase
@@ -2089,7 +2098,7 @@ def test_preview_functions_consistency(
 
 
 def test_preview_ripe_bond_payout_gas_efficiency(
-    bond_room, setupRipeBonds
+    bond_room, setupRipeBonds, bob
 ):
     """Test that preview functions are gas efficient (view functions)"""
     setupRipeBonds()
@@ -2098,9 +2107,9 @@ def test_preview_ripe_bond_payout_gas_efficiency(
     payment_amount = 100 * EIGHTEEN_DECIMALS
     
     # Call preview multiple times - should be consistent
-    preview_1 = bond_room.previewRipeBondPayout(0, payment_amount)
-    preview_2 = bond_room.previewRipeBondPayout(0, payment_amount)
-    preview_3 = bond_room.previewRipeBondPayout(0, payment_amount)
+    preview_1 = bond_room.previewRipeBondPayout(bob, 0, payment_amount)
+    preview_2 = bond_room.previewRipeBondPayout(bob, 0, payment_amount)
+    preview_3 = bond_room.previewRipeBondPayout(bob, 0, payment_amount)
     
     assert preview_1 == preview_2 == preview_3
     
@@ -2124,8 +2133,8 @@ def test_purchase_ripe_bond_with_bond_booster(
     setupRipeBonds()
     
     # Set up bond booster for bob
-    # 50 RIPE per unit, max 100 units, expires far in future
-    config = (bob, 50 * EIGHTEEN_DECIMALS, 100, 1000000)
+    # 300% boost, max 100 units, expires far in future
+    config = (bob, 3 * HUNDRED_PERCENT, 100, 1000000)
     bond_booster.setBondBooster(config, sender=switchboard_delta.address)
     
     # Purchase setup - 100 alpha tokens (100 units)
@@ -2140,9 +2149,9 @@ def test_purchase_ripe_bond_with_bond_booster(
         sender=bob
     )
     
-    # Should get base payout (1 RIPE per unit = 100 RIPE) + boost (50 RIPE per unit = 5000 RIPE)
+    # Should get base payout (100 RIPE) + boost (300% of base = 300 RIPE)
     expected_base = 100 * EIGHTEEN_DECIMALS  # 100 units * 1 RIPE per unit
-    expected_boost = 50 * EIGHTEEN_DECIMALS * 100  # 100 units * 50 RIPE boost per unit
+    expected_boost = expected_base * 300 // 100  # 300% of base
     expected_total = expected_base + expected_boost
     _test(expected_total, ripe_payout)
     
@@ -2150,18 +2159,18 @@ def test_purchase_ripe_bond_with_bond_booster(
     assert bond_booster.unitsUsed(bob) == 100
 
 
-def test_purchase_ripe_bond_with_partial_bond_booster(
+def test_purchase_ripe_bond_with_limited_bond_booster_units(
     teller, setupRipeBonds, bob, alpha_token_whale, alpha_token, bond_room,
     bond_booster, switchboard_delta, _test
 ):
-    """Test purchasing with partially available bond booster units"""
+    """Test purchasing with limited bond booster units available"""
     setupRipeBonds()
     
-    # Set up bond booster for bob - only 50 units available
-    config = (bob, 25 * EIGHTEEN_DECIMALS, 50, 1000000)
+    # Set up bond booster for bob - 100% boost, only 50 units available
+    config = (bob, HUNDRED_PERCENT, 50, 1000000)
     bond_booster.setBondBooster(config, sender=switchboard_delta.address)
     
-    # Purchase setup - 100 alpha tokens (100 units, but only 50 boosted)
+    # Purchase setup - 100 alpha tokens (100 units requested)
     payment_amount = 100 * EIGHTEEN_DECIMALS
     alpha_token.transfer(bob, payment_amount, sender=alpha_token_whale)
     alpha_token.approve(teller, payment_amount, sender=bob)
@@ -2173,13 +2182,14 @@ def test_purchase_ripe_bond_with_partial_bond_booster(
         sender=bob
     )
     
-    # Should get base payout (100 RIPE) + partial boost (50 units * 25 RIPE = 1250 RIPE)
+    # Should get base payout (100 RIPE) + full boost (100% of base)
+    # Boost applies to full amount as long as ANY units are available
     expected_base = 100 * EIGHTEEN_DECIMALS
-    expected_boost = 25 * EIGHTEEN_DECIMALS * 50  # Only 50 units boosted
+    expected_boost = expected_base * 100 // 100  # 100% of base
     expected_total = expected_base + expected_boost
     _test(expected_total, ripe_payout)
     
-    # Check that 100 units were used (all available units for bob)
+    # Check that 100 units were used (even though only 50 were available)
     assert bond_booster.unitsUsed(bob) == 100
 
 
@@ -2190,8 +2200,8 @@ def test_purchase_ripe_bond_with_exhausted_bond_booster(
     """Test purchasing after bond booster units are exhausted"""
     setupRipeBonds()
     
-    # Set up bond booster for bob - 50 units max
-    config = (bob, 25 * EIGHTEEN_DECIMALS, 50, 1000000)
+    # Set up bond booster for bob - 100% boost, 50 units max
+    config = (bob, HUNDRED_PERCENT, 50, 1000000)
     bond_booster.setBondBooster(config, sender=switchboard_delta.address)
     
     # First purchase - use up all booster units
@@ -2205,8 +2215,9 @@ def test_purchase_ripe_bond_with_exhausted_bond_booster(
         sender=bob
     )
     
-    # Should get base + full boost
-    expected_1 = 50 * EIGHTEEN_DECIMALS + (25 * EIGHTEEN_DECIMALS * 50)
+    # Should get base + full boost (100% of base)
+    expected_base_1 = 50 * EIGHTEEN_DECIMALS
+    expected_1 = expected_base_1 + (expected_base_1 * 100 // 100)
     _test(expected_1, ripe_payout_1)
     assert bond_booster.unitsUsed(bob) == 50
     
@@ -2236,7 +2247,7 @@ def test_purchase_ripe_bond_with_expired_bond_booster(
     
     # Set up bond booster that will expire soon
     current_block = boa.env.evm.patch.block_number
-    config = (bob, 25 * EIGHTEEN_DECIMALS, 50, current_block + 50)  # Expires in 50 blocks
+    config = (bob, HUNDRED_PERCENT, 50, current_block + 50)  # 100% boost, expires in 50 blocks
     bond_booster.setBondBooster(config, sender=switchboard_delta.address)
     
     # Move past expiration 
@@ -2299,7 +2310,7 @@ def test_purchase_ripe_bond_booster_with_lock_duration(
     setupRipeBonds()
     
     # Set up bond booster
-    config = (bob, 30 * EIGHTEEN_DECIMALS, 100, 1000000)
+    config = (bob, 2 * HUNDRED_PERCENT, 100, 1000000)  # 200% boost
     bond_booster.setBondBooster(config, sender=switchboard_delta.address)
     
     # Purchase setup with max lock duration (1000 blocks)
@@ -2315,10 +2326,11 @@ def test_purchase_ripe_bond_booster_with_lock_duration(
         sender=bob
     )
     
-    # Should get base (1 RIPE) + lock bonus (100 RIPE max) + booster (30 RIPE) per unit
-    # Total: 131 RIPE per unit * 50 units = 6550 RIPE
-    expected_per_unit = 1 * EIGHTEEN_DECIMALS + 100 * EIGHTEEN_DECIMALS + 30 * EIGHTEEN_DECIMALS
-    expected_total = expected_per_unit * 50
+    # Should get base (1 RIPE) + lock bonus (100% of base) + booster (200% of base)
+    expected_base = 50 * EIGHTEEN_DECIMALS  # 50 units * 1 RIPE per unit
+    expected_lock_bonus = expected_base * 100 // 100  # 100% of base (from fixture)
+    expected_boost_bonus = expected_base * 200 // 100  # 200% of base
+    expected_total = expected_base + expected_lock_bonus + expected_boost_bonus
     _test(expected_total, ripe_payout)
 
 
@@ -2330,7 +2342,7 @@ def test_purchase_ripe_bond_booster_event_emission(
     setupRipeBonds()
     
     # Set up bond booster
-    config = (bob, 40 * EIGHTEEN_DECIMALS, 100, 1000000)
+    config = (bob, 5 * HUNDRED_PERCENT, 100, 1000000)  # 500% boost
     bond_booster.setBondBooster(config, sender=switchboard_delta.address)
     
     # Purchase setup
@@ -2351,8 +2363,9 @@ def test_purchase_ripe_bond_booster_event_emission(
     log = logs[0]
     
     # Verify booster amount is in the event
-    expected_boost = 40 * EIGHTEEN_DECIMALS * 75  # 75 units * 40 RIPE boost
-    assert log.boostedRipe == expected_boost
+    expected_base = 75 * EIGHTEEN_DECIMALS
+    expected_boost = expected_base * 500 // 100  # 500% of base
+    assert log.ripeBoostBonus == expected_boost
     assert log.recipient == bob
 
 
@@ -2365,9 +2378,9 @@ def test_purchase_ripe_bond_multiple_users_with_boosters(
     
     # Set up different boosters for each user
     configs = [
-        (bob, 20 * EIGHTEEN_DECIMALS, 50, 1000000),      # Bob: 20 RIPE/unit, 50 max
-        (alice, 60 * EIGHTEEN_DECIMALS, 30, 1000000),    # Alice: 60 RIPE/unit, 30 max  
-        (charlie, 100 * EIGHTEEN_DECIMALS, 75, 1000000), # Charlie: 100 RIPE/unit, 75 max
+        (bob, HUNDRED_PERCENT, 50, 1000000),            # Bob: 100% boost, 50 max
+        (alice, 2 * HUNDRED_PERCENT, 30, 1000000),      # Alice: 200% boost, 30 max  
+        (charlie, 3 * HUNDRED_PERCENT, 75, 1000000),    # Charlie: 300% boost, 75 max
     ]
     bond_booster.setManyBondBoosters(configs, sender=switchboard_delta.address)
     
@@ -2382,7 +2395,8 @@ def test_purchase_ripe_bond_multiple_users_with_boosters(
         sender=bob
     )
     
-    expected_bob = 50 * EIGHTEEN_DECIMALS + (20 * EIGHTEEN_DECIMALS * 50)
+    expected_base_bob = 50 * EIGHTEEN_DECIMALS
+    expected_bob = expected_base_bob + (expected_base_bob * 100 // 100)  # +100% boost
     _test(expected_bob, ripe_payout_bob)
     
     # Alice's purchase - 40 units (30 boosted, 10 regular)
@@ -2396,7 +2410,8 @@ def test_purchase_ripe_bond_multiple_users_with_boosters(
         sender=alice
     )
     
-    expected_alice = 40 * EIGHTEEN_DECIMALS + (60 * EIGHTEEN_DECIMALS * 30)  # Only 30 units boosted
+    expected_base_alice = 40 * EIGHTEEN_DECIMALS
+    expected_alice = expected_base_alice + (expected_base_alice * 200 // 100)  # +200% boost on full amount
     _test(expected_alice, ripe_payout_alice)
     
     # Charlie's purchase - 20 units (all boosted)
@@ -2410,7 +2425,8 @@ def test_purchase_ripe_bond_multiple_users_with_boosters(
         sender=charlie
     )
     
-    expected_charlie = 20 * EIGHTEEN_DECIMALS + (100 * EIGHTEEN_DECIMALS * 20)
+    expected_base_charlie = 20 * EIGHTEEN_DECIMALS
+    expected_charlie = expected_base_charlie + (expected_base_charlie * 300 // 100)  # +300% boost
     _test(expected_charlie, ripe_payout_charlie)
     
     # Verify units used for each user
@@ -2427,7 +2443,7 @@ def test_purchase_ripe_bond_with_removed_booster(
     setupRipeBonds()
     
     # Set up bond booster and use some units
-    config = (bob, 30 * EIGHTEEN_DECIMALS, 100, 1000000)
+    config = (bob, 2 * HUNDRED_PERCENT, 100, 1000000)  # 200% boost
     bond_booster.setBondBooster(config, sender=switchboard_delta.address)
     
     # First purchase with booster
@@ -2441,7 +2457,8 @@ def test_purchase_ripe_bond_with_removed_booster(
         sender=bob
     )
     
-    expected_1 = 25 * EIGHTEEN_DECIMALS + (30 * EIGHTEEN_DECIMALS * 25)
+    expected_base_1 = 25 * EIGHTEEN_DECIMALS
+    expected_1 = expected_base_1 + (expected_base_1 * 200 // 100)  # +200% boost
     _test(expected_1, ripe_payout_1)
     assert bond_booster.unitsUsed(bob) == 25
     

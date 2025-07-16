@@ -1,7 +1,7 @@
 import pytest
 import boa
 
-from constants import ZERO_ADDRESS, EIGHTEEN_DECIMALS
+from constants import ZERO_ADDRESS, EIGHTEEN_DECIMALS, HUNDRED_PERCENT
 from conf_utils import filter_logs
 from contracts.modules import Contributor
 
@@ -995,8 +995,8 @@ def test_switchboard_delta_set_ripe_bond_booster(switchboard_delta, bond_room, r
     new_bond_booster = boa.load(
         "contracts/config/BondBooster.vy",
         ripe_hq_deploy,
-        1000 * EIGHTEEN_DECIMALS,  # _maxBoost
-        100,                        # _maxUnits
+        1000 * HUNDRED_PERCENT,  # _maxBoostRatio (1000x or 100,000%)
+        100,                     # _maxUnits
         name="new_bond_booster"
     )
     
@@ -1058,7 +1058,7 @@ def test_switchboard_delta_set_ripe_bond_booster(switchboard_delta, bond_room, r
 
 def test_switchboard_delta_set_ripe_bond_booster_validation(switchboard_delta, governance, alice):
     """Test setRipeBondBooster validation for invalid bond booster addresses"""
-    # Non-contract address should fail validation (will revert when trying to call getBoostedRipe)
+    # Non-contract address should fail validation (will revert when trying to call getBoostRatio)
     with boa.reverts():  # This will catch any revert, not a specific message
         switchboard_delta.setRipeBondBooster(alice, sender=governance.address)
     

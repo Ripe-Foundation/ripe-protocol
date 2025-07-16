@@ -2,7 +2,7 @@ import pytest
 import boa
 
 from config.BluePrint import PARAMS, ADDYS
-from constants import ZERO_ADDRESS, EIGHTEEN_DECIMALS
+from constants import ZERO_ADDRESS, EIGHTEEN_DECIMALS, HUNDRED_PERCENT
 
 
 ###########
@@ -505,8 +505,8 @@ def bond_booster(ripe_hq_deploy):
     return boa.load(
         "contracts/config/BondBooster.vy",
         ripe_hq_deploy,
-        1000 * EIGHTEEN_DECIMALS,  # _maxBoost
-        100,                        # _maxUnits
+        1000 * HUNDRED_PERCENT,  # _maxBoostRatio (1000x or 100,000%)
+        100,                     # _maxUnits
         name="bond_booster",
     )
 

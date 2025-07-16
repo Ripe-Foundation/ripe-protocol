@@ -17,13 +17,13 @@ from interfaces import Department
 
 struct BoosterConfig:
     user: address
-    ripePerUnit: uint256
+    boostRatio: uint256
     maxUnitsAllowed: uint256
     expireBlock: uint256
 
 event BondBoostModified:
     user: address
-    ripePerUnit: uint256
+    boostRatio: uint256
     maxUnitsAllowed: uint256
     expireBlock: uint256
 
@@ -34,14 +34,14 @@ event BondBoostRemoved:
     user: address
 
 event MaxBoostAndMaxUnitsSet:
-    maxBoost: uint256
+    maxBoostRatio: uint256
     maxUnits: uint256
 
 # data
 config: public(HashMap[address, BoosterConfig]) # user -> config
 unitsUsed: public(HashMap[address, uint256]) # user -> units used
 
-maxBoost: public(uint256)
+maxBoostRatio: public(uint256)
 maxUnits: public(uint256)
 
 MAX_BOOSTERS: constant(uint256) = 50
@@ -50,13 +50,13 @@ MAX_BOOSTERS: constant(uint256) = 50
 @deploy
 def __init__(
     _ripeHq: address,
-    _maxBoost: uint256,
+    _maxBoostRatio: uint256,
     _maxUnits: uint256,
 ):
     addys.__init__(_ripeHq)
     deptBasics.__init__(False, False, False) # no minting
 
-    self.maxBoost = _maxBoost
+    self.maxBoostRatio = _maxBoostRatio
     self.maxUnits = _maxUnits
 
 
@@ -67,15 +67,14 @@ def __init__(
 
 @view
 @external
-def getBoostedRipe(_user: address, _units: uint256) -> uint256:
+def getBoostRatio(_user: address, _units: uint256) -> uint256:
     config: BoosterConfig = self.config[_user]
     if config.user == empty(address) or config.expireBlock <= block.number:
         return 0
     unitsUsed: uint256 = self.unitsUsed[_user]
     if unitsUsed >= config.maxUnitsAllowed:
         return 0
-    availUnits: uint256 = min(config.maxUnitsAllowed - unitsUsed, _units)
-    return config.ripePerUnit * availUnits
+    return config.boostRatio
 
 
 #######################
@@ -119,7 +118,7 @@ def _setBondBooster(_config: BoosterConfig) -> bool:
     self.config[_config.user] = _config
     log BondBoostModified(
         user=_config.user,
-        ripePerUnit=_config.ripePerUnit,
+        boostRatio=_config.boostRatio,
         maxUnitsAllowed=_config.maxUnitsAllowed,
         expireBlock=_config.expireBlock,
     )
@@ -156,13 +155,13 @@ def _removeBondBooster(_user: address):
 
 
 @external
-def setMaxBoostAndMaxUnits(_maxBoost: uint256, _maxUnits: uint256):
+def setMaxBoostAndMaxUnits(_maxBoostRatio: uint256, _maxUnitsAvail: uint256):
     assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
-    assert max_value(uint256) not in [_maxBoost, _maxUnits] # dev: invalid max values
-    assert 0 not in [_maxBoost, _maxUnits] # dev: invalid max values
-    self.maxBoost = _maxBoost
-    self.maxUnits = _maxUnits
-    log MaxBoostAndMaxUnitsSet(maxBoost = _maxBoost, maxUnits = _maxUnits)
+    assert max_value(uint256) not in [_maxBoostRatio, _maxUnitsAvail] # dev: invalid max values
+    assert 0 not in [_maxBoostRatio, _maxUnitsAvail] # dev: invalid max values
+    self.maxBoostRatio = _maxBoostRatio
+    self.maxUnits = _maxUnitsAvail
+    log MaxBoostAndMaxUnitsSet(maxBoostRatio = _maxBoostRatio, maxUnits = _maxUnitsAvail)
 
 
 ######################
@@ -181,7 +180,7 @@ def isValidBooster(_config: BoosterConfig) -> bool:
 def _isValidBooster(_config: BoosterConfig) -> bool:
     if _config.user == empty(address):
         return False
-    if _config.ripePerUnit == 0 or _config.ripePerUnit > self.maxBoost:
+    if _config.boostRatio == 0 or _config.boostRatio > self.maxBoostRatio:
         return False
     if _config.expireBlock <= block.number:
         return False
