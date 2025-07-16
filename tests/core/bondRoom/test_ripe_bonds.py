@@ -1,7 +1,7 @@
 import pytest
 import boa
 
-from constants import EIGHTEEN_DECIMALS, HUNDRED_PERCENT
+from constants import EIGHTEEN_DECIMALS, HUNDRED_PERCENT, ZERO_ADDRESS
 from conf_utils import filter_logs
 
 
@@ -2480,4 +2480,400 @@ def test_purchase_ripe_bond_with_removed_booster(
     expected_2 = 30 * EIGHTEEN_DECIMALS
     _test(expected_2, ripe_payout_2)
     assert bond_booster.unitsUsed(bob) == 0  # Reset after removal
+
+
+#########################
+# Additional Edge Cases #
+#########################
+
+
+def test_purchase_ripe_bond_contract_paused(
+    teller, setupRipeBonds, bob, alpha_token_whale, alpha_token, bond_room, switchboard_alpha
+):
+    """Test that purchases fail when contract is paused"""
+    setupRipeBonds()
+    
+    # Setup purchase
+    payment_amount = 100 * EIGHTEEN_DECIMALS
+    alpha_token.transfer(bob, payment_amount, sender=alpha_token_whale)
+    alpha_token.approve(teller, payment_amount, sender=bob)
+    
+    # Pause the contract
+    bond_room.pause(True, sender=switchboard_alpha.address)
+    
+    # Attempt purchase - should fail
+    with boa.reverts("contract paused"):
+        teller.purchaseRipeBond(
+            alpha_token,
+            payment_amount,
+            sender=bob
+        )
+    
+    # Unpause and verify it works
+    bond_room.pause(False, sender=switchboard_alpha.address)
+    ripe_payout = teller.purchaseRipeBond(
+        alpha_token,
+        payment_amount,
+        sender=bob
+    )
+    assert ripe_payout == payment_amount
+
+
+def test_purchase_ripe_bond_user_not_whitelisted(
+    teller, setupRipeBonds, setAssetConfig, bob, alpha_token_whale, alpha_token, 
+    mock_whitelist
+):
+    """Test purchase fails when user is not on whitelist"""
+    # First setup bonds as normal
+    setupRipeBonds()
+    
+    # Then update the asset config to add whitelist requirement
+    setAssetConfig(
+        alpha_token,
+        _whitelist=mock_whitelist  # Add whitelist restriction
+    )
+    
+    # Bob is not on whitelist initially
+    payment_amount = 100 * EIGHTEEN_DECIMALS
+    alpha_token.transfer(bob, payment_amount, sender=alpha_token_whale)
+    alpha_token.approve(teller, payment_amount, sender=bob)
+    
+    # Try to purchase - should fail because bob is not whitelisted
+    with boa.reverts("user not on whitelist"):
+        teller.purchaseRipeBond(
+            alpha_token,
+            payment_amount,
+            sender=bob
+        )
+    
+    # Add bob to whitelist
+    mock_whitelist.setAllowed(bob, alpha_token, True, sender=bob)
+    
+    # Now purchase should work
+    ripe_payout = teller.purchaseRipeBond(
+        alpha_token,
+        payment_amount,
+        sender=bob
+    )
+    
+    # Verify purchase succeeded
+    assert ripe_payout > 0
+
+
+def test_purchase_ripe_bond_bad_debt_zero_usd_value(
+    teller, setupRipeBonds, bob, alpha_token_whale, alpha_token, ledger, mock_price_source, switchboard_alpha, _test
+):
+    """Test bad debt handling when PriceDesk returns 0 USD value"""
+    setupRipeBonds()
+    
+    # Set bad debt
+    ledger.setBadDebt(1000 * EIGHTEEN_DECIMALS, sender=switchboard_alpha.address)
+    
+    # Set price to 0 to simulate price feed failure
+    mock_price_source.setPrice(alpha_token, 0)
+    
+    payment_amount = 100 * EIGHTEEN_DECIMALS
+    alpha_token.transfer(bob, payment_amount, sender=alpha_token_whale)
+    alpha_token.approve(teller, payment_amount, sender=bob)
+    
+    # Purchase should work but no debt should be cleared if USD value is 0
+    ripe_payout = teller.purchaseRipeBond(
+        alpha_token,
+        payment_amount,
+        sender=bob
+    )
+    
+    # Check that bad debt wasn't reduced
+    assert ledger.badDebt() == 1000 * EIGHTEEN_DECIMALS
+    _test(ripe_payout, payment_amount)
+
+
+def test_purchase_ripe_bond_division_by_zero_protection(
+    bond_room, setupRipeBonds
+):
+    """Test division by zero protection in calculations"""
+    # Test with minLockDuration = maxLockDuration
+    setupRipeBonds(
+        _minLockDuration=1000,
+        _maxLockDuration=1000,  # Same as min
+        _maxRipePerUnitLockBonus=HUNDRED_PERCENT  # 100% lock bonus
+    )
+    
+    # Fixed: Previously had division by zero bug when minLockDuration = maxLockDuration
+    # Now it should give full lock bonus when meeting the fixed duration requirement
+    payment_amount = 100 * EIGHTEEN_DECIMALS
+    
+    # Preview with the fixed lock duration should now work and give full bonus
+    preview_with_lock = bond_room.previewRipeBondPayout(ZERO_ADDRESS, 1000, payment_amount)
+    assert preview_with_lock == 2 * payment_amount  # Base (100) + full lock bonus (100%)
+    
+    # Preview with no lock duration should give just base payout
+    preview_no_lock = bond_room.previewRipeBondPayout(ZERO_ADDRESS, 0, payment_amount)
+    assert preview_no_lock == payment_amount  # Just base payout
+
+
+def test_purchase_ripe_bond_very_large_numbers(
+    teller, setupRipeBonds, bob, alpha_token_whale, alpha_token, _test
+):
+    """Test with very large numbers to check for overflow"""
+    # Setup with large values that are still within reasonable bounds
+    large_amount_per_epoch = 10**9 * EIGHTEEN_DECIMALS  # 1 billion tokens
+    
+    setupRipeBonds(
+        _amountPerEpoch=large_amount_per_epoch,
+        _maxRipePerUnit=1000 * EIGHTEEN_DECIMALS,
+        _maxRipePerUnitLockBonus=5 * HUNDRED_PERCENT  # 500%
+    )
+    
+    # Purchase a large amount
+    payment_amount = 10**6 * EIGHTEEN_DECIMALS  # 1 million tokens
+    alpha_token.transfer(bob, payment_amount, sender=alpha_token_whale)
+    alpha_token.approve(teller, payment_amount, sender=bob)
+    
+    # Should handle large numbers without overflow
+    ripe_payout = teller.purchaseRipeBond(
+        alpha_token,
+        payment_amount,
+        sender=bob
+    )
+    
+    # Verify expected payout
+    # At epoch start (0% progress), rate = minRipePerUnit = 1 RIPE per unit
+    # 1 million units * 1 RIPE per unit = 1 million RIPE
+    expected_payout = payment_amount  # 1:1 at epoch start
+    _test(ripe_payout, expected_payout)
+
+
+def test_set_bond_booster_permissions(
+    bond_room, alice, switchboard_delta
+):
+    """Test setBondBooster permission requirements"""
+    new_booster = alice  # Just use any address
+    
+    # Non-switchboard cannot set
+    with boa.reverts("no perms"):
+        bond_room.setBondBooster(new_booster, sender=alice)
+    
+    # Switchboard can set
+    bond_room.setBondBooster(new_booster, sender=switchboard_delta.address)
+    assert bond_room.bondBooster() == new_booster
+
+
+def test_start_bond_epoch_permissions_and_paused(
+    bond_room, alice, switchboard_delta, switchboard_alpha
+):
+    """Test startBondEpochAtBlock permissions and paused state"""
+    # Non-switchboard cannot call
+    with boa.reverts("no perms"):
+        bond_room.startBondEpochAtBlock(1000, sender=alice)
+    
+    # Pause contract
+    bond_room.pause(True, sender=switchboard_alpha.address)
+    
+    # Switchboard cannot call when paused
+    with boa.reverts("contract paused"):
+        bond_room.startBondEpochAtBlock(1000, sender=switchboard_delta.address)
+    
+    # Unpause
+    bond_room.pause(False, sender=switchboard_alpha.address)
+    
+    # Now it should work
+    bond_room.startBondEpochAtBlock(1000, sender=switchboard_delta.address)
+
+
+def test_refresh_bond_epoch_permissions(
+    bond_room, alice
+):
+    """Test refreshBondEpoch permission requirements"""
+    # Random address cannot call
+    with boa.reverts("no perms"):
+        bond_room.refreshBondEpoch(sender=alice)
+
+
+def test_purchase_ripe_bond_with_bond_booster_and_bad_debt(
+    teller, setupRipeBonds, bob, alpha_token_whale, alpha_token,
+    bond_booster, switchboard_delta, ledger, switchboard_alpha, mock_price_source
+):
+    """Test complex scenario with both bond booster and bad debt"""
+    setupRipeBonds()
+    
+    # Set price for alpha token
+    mock_price_source.setPrice(alpha_token, 1 * EIGHTEEN_DECIMALS)  # $1 USD per token
+    
+    # Set up bond booster
+    config = (bob, 2 * HUNDRED_PERCENT, 100, 1000000)  # 200% boost
+    bond_booster.setBondBooster(config, sender=switchboard_delta.address)
+    
+    # Set bad debt
+    ledger.setBadDebt(500 * EIGHTEEN_DECIMALS, sender=switchboard_alpha.address)
+    
+    # Purchase
+    payment_amount = 100 * EIGHTEEN_DECIMALS
+    alpha_token.transfer(bob, payment_amount, sender=alpha_token_whale)
+    alpha_token.approve(teller, payment_amount, sender=bob)
+    
+    ripe_payout = teller.purchaseRipeBond(
+        alpha_token,
+        payment_amount,
+        sender=bob
+    )
+    
+    # With 200% boost: base (100) + boost (200) = 300 RIPE total
+    # Bad debt logic: User still receives full RIPE payout, but some is accounted as bad debt repayment
+    assert ripe_payout == 300 * EIGHTEEN_DECIMALS  # User receives full payout
+    
+    # Verify bad debt was reduced by payment USD value (not RIPE amount)
+    # Initial debt: 500, payment value: ~100, remaining: 400
+    remaining_debt = ledger.badDebt()
+    assert remaining_debt == 400 * EIGHTEEN_DECIMALS
+
+
+def test_purchase_ripe_bond_epoch_boundary_race_condition(
+    teller, setupRipeBonds, bob, alice, alpha_token_whale, alpha_token
+):
+    """Test multiple users purchasing at epoch boundary"""
+    start, end = setupRipeBonds(
+        _amountPerEpoch=150 * EIGHTEEN_DECIMALS,  # Limited amount
+        _shouldAutoRestart=True,
+        _restartDelayBlocks=10
+    )
+    
+    # Move close to epoch exhaustion
+    payment_amount = 75 * EIGHTEEN_DECIMALS
+    
+    # Bob purchases first half
+    alpha_token.transfer(bob, payment_amount, sender=alpha_token_whale)
+    alpha_token.approve(teller, payment_amount, sender=bob)
+    teller.purchaseRipeBond(alpha_token, payment_amount, sender=bob)
+    
+    # Alice purchases second half, exhausting epoch
+    alpha_token.transfer(alice, payment_amount, sender=alpha_token_whale)
+    alpha_token.approve(teller, payment_amount, sender=alice)
+    teller.purchaseRipeBond(alpha_token, payment_amount, sender=alice)
+    
+    # Next user should fail until restart delay passes
+    alpha_token.transfer(bob, payment_amount, sender=alpha_token_whale)
+    alpha_token.approve(teller, payment_amount, sender=bob)
+    
+    with boa.reverts("not within epoch window"):
+        teller.purchaseRipeBond(alpha_token, payment_amount, sender=bob)
+    
+    # After delay, should work
+    boa.env.time_travel(blocks=10)
+    teller.purchaseRipeBond(alpha_token, payment_amount, sender=bob)
+
+
+def test_purchase_ripe_bond_zero_base_payout_fails(
+    teller, setupRipeBonds, bob, charlie_token, charlie_token_whale
+):
+    """Test that purchase fails if base payout would be 0"""
+    # Setup with 6 decimal token
+    setupRipeBonds(_asset=charlie_token)
+    
+    # Try to purchase less than 1 unit (0.5 tokens with 6 decimals)
+    payment_amount = 5 * 10**5  # 0.5 tokens
+    charlie_token.transfer(bob, payment_amount, sender=charlie_token_whale)
+    charlie_token.approve(teller, payment_amount, sender=bob)
+    
+    # Should fail because base payout would be 0
+    with boa.reverts("must have base ripe payout"):
+        teller.purchaseRipeBond(
+            charlie_token,
+            payment_amount,
+            sender=bob
+        )
+
+
+def test_purchase_ripe_bond_max_lock_bonus_cap(
+    teller, setupRipeBonds, bob, alpha_token_whale, alpha_token, _test
+):
+    """Test that lock bonus is properly capped at 1000%"""
+    # Setup with lock bonus exceeding 1000%
+    setupRipeBonds(
+        _maxRipePerUnitLockBonus=20 * HUNDRED_PERCENT  # 2000% - should be capped
+    )
+    
+    payment_amount = 100 * EIGHTEEN_DECIMALS
+    alpha_token.transfer(bob, payment_amount, sender=alpha_token_whale)
+    alpha_token.approve(teller, payment_amount, sender=bob)
+    
+    # Purchase with max lock
+    ripe_payout = teller.purchaseRipeBond(
+        alpha_token,
+        payment_amount,
+        1000,  # max lock duration
+        sender=bob
+    )
+    
+    # Should be capped at 1000% bonus (10x)
+    # Base (100) + capped bonus (1000) = 1100 RIPE
+    expected = 11 * payment_amount  # 11x total
+    _test(ripe_payout, expected)
+
+
+def test_preview_consistency_with_purchase(
+    teller, bond_room, setupRipeBonds, bob, alpha_token_whale, alpha_token
+):
+    """Test that preview accurately predicts actual purchase results"""
+    setupRipeBonds()
+    
+    payment_amount = 100 * EIGHTEEN_DECIMALS
+    lock_duration = 500
+    
+    # Get preview
+    preview = bond_room.previewRipeBondPayout(bob, lock_duration, payment_amount)
+    
+    # Do actual purchase
+    alpha_token.transfer(bob, payment_amount, sender=alpha_token_whale)
+    alpha_token.approve(teller, payment_amount, sender=bob)
+    
+    actual = teller.purchaseRipeBond(
+        alpha_token,
+        payment_amount,
+        lock_duration,
+        sender=bob
+    )
+    
+    # Should match exactly
+    assert preview == actual
+
+
+def test_purchase_ripe_bond_rounding_errors(
+    teller, setupRipeBonds, bob, alpha_token_whale, alpha_token, bond_room
+):
+    """Test for potential rounding errors in calculations"""
+    setupRipeBonds(
+        _minRipePerUnit=333333333333333333,  # 0.333... RIPE per unit
+        _maxRipePerUnit=666666666666666667,  # 0.666... RIPE per unit
+        _maxRipePerUnitLockBonus=33333  # 333.33% - odd percentage
+    )
+    
+    # Use odd payment amount
+    payment_amount = 77 * EIGHTEEN_DECIMALS + 777777777777777777  # 77.777... tokens
+    alpha_token.transfer(bob, payment_amount, sender=alpha_token_whale)
+    alpha_token.approve(teller, payment_amount, sender=bob)
+    
+    # Purchase with odd lock duration
+    lock_duration = 333
+    ripe_payout = teller.purchaseRipeBond(
+        alpha_token,
+        payment_amount,
+        lock_duration,
+        sender=bob
+    )
+    
+    # Should handle rounding without reverting
+    # Calculate expected payout with the odd values
+    # At epoch start (0% progress): ripePerUnit = 0.333... RIPE
+    # Units = 77.777... 
+    # Base payout = 0.333... * 77.777... ≈ 25.925 RIPE
+    # Lock bonus: (333-100)/(1000-100) = 233/900 ≈ 25.89% of max bonus
+    # Lock bonus amount = 25.925 * (333.33% * 25.89%) ≈ 25.925 * 86.3% ≈ 22.37 RIPE
+    # Total ≈ 48.3 RIPE
+    assert ripe_payout > 25 * EIGHTEEN_DECIMALS  # At least base payout
+    assert ripe_payout < 100 * EIGHTEEN_DECIMALS  # Reasonable upper bound
+    
+    # Verify no tokens are stuck due to rounding
+    bond_balance = alpha_token.balanceOf(bond_room.address)
+    assert bond_balance == 0  # All should be transferred to endaoment
 

@@ -167,7 +167,11 @@ def purchaseRipeBond(
     lockDuration: uint256 = min(_lockDuration, config.maxLockDuration)
     if lockDuration >= config.minLockDuration:
         maxLockBonusRatio: uint256 = min(config.maxRipePerUnitLockBonus, 10 * HUNDRED_PERCENT) # extra sanity check 
-        lockBonusRatio: uint256 = maxLockBonusRatio * (lockDuration - config.minLockDuration) // (config.maxLockDuration - config.minLockDuration)
+        lockBonusRatio: uint256 = 0
+        if config.maxLockDuration > config.minLockDuration:
+            lockBonusRatio = maxLockBonusRatio * (lockDuration - config.minLockDuration) // (config.maxLockDuration - config.minLockDuration)
+        else:
+            lockBonusRatio = maxLockBonusRatio # when min and max are equal, give full bonus
         ripeLockBonus = baseRipePayout * lockBonusRatio // HUNDRED_PERCENT
         totalRipePayout += ripeLockBonus
     else:
@@ -292,7 +296,11 @@ def previewRipeBondPayout(_recipient: address, _lockDuration: uint256 = 0, _paym
     lockDuration: uint256 = min(_lockDuration, config.maxLockDuration)
     if lockDuration >= config.minLockDuration:
         maxLockBonusRatio: uint256 = min(config.maxRipePerUnitLockBonus, 10 * HUNDRED_PERCENT) # extra sanity check 
-        lockBonusRatio: uint256 = maxLockBonusRatio * (lockDuration - config.minLockDuration) // (config.maxLockDuration - config.minLockDuration)
+        lockBonusRatio: uint256 = 0
+        if config.maxLockDuration > config.minLockDuration:
+            lockBonusRatio = maxLockBonusRatio * (lockDuration - config.minLockDuration) // (config.maxLockDuration - config.minLockDuration)
+        else:
+            lockBonusRatio = maxLockBonusRatio # when min and max are equal, give full bonus
         totalRipePayout += baseRipePayout * lockBonusRatio // HUNDRED_PERCENT
 
     # bonus from bond booster (if applicable)
