@@ -997,7 +997,6 @@ def test_switchboard_delta_set_ripe_bond_booster(switchboard_delta, bond_room, r
         ripe_hq_deploy,
         1000 * EIGHTEEN_DECIMALS,  # _maxBoost
         100,                        # _maxUnits
-        [],                         # _initialBoosts
         name="new_bond_booster"
     )
     
