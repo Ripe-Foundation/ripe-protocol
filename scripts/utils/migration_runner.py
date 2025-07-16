@@ -105,7 +105,7 @@ class MigrationRunner:
         for file in os.listdir(self.migrations_dir):
             # timestamp of the filename is the initial string of numbers,
             # up to the first non-digit character
-            match = re.fullmatch("(\d+).*\.py$", file)
+            match = re.fullmatch(r"(\d+).*\.py$", file)
             if match:
                 timestamp = match.group(1)
                 filename = os.path.join(self.migrations_dir, file)
@@ -144,7 +144,7 @@ class MigrationRunner:
 
         # scan each file to get the latest timestamp
         for file in os.listdir(self.history_dir):
-            match = re.fullmatch("(.*)\-manifest\.json$", file)
+            match = re.fullmatch(r"(.*)\-manifest\.json$", file)
             if match:
                 timestamp = match.group(1)
                 # Convert timestamps to integers for proper numerical comparison
