@@ -61,6 +61,7 @@ Thank you for helping keep Ripe protocol safe for everyone!
 | Lootbox             | [0x7f2af830886389E8A7fE4352c839147E7aa929Af](https://basescan.org/address/0x7f2af830886389E8A7fE4352c839147E7aa929Af) |
 | Teller              | [0x0fD51642c37230d6088293f1f5490712078085aD](https://basescan.org/address/0x0fD51642c37230d6088293f1f5490712078085aD) |
 | GreenPool           | [0xd6c283655B42FA0eb2685F7AB819784F071459dc](https://basescan.org/address/0xd6c283655B42FA0eb2685F7AB819784F071459dc) |
+| RipePool            | [0xF8D92a9531205AB2Dd0Bc623CDF4A6Ab4c3a2526](https://basescan.org/address/0xF8D92a9531205AB2Dd0Bc623CDF4A6Ab4c3a2526) |
 | BondBooster         | [0x86878A3b522E2498390e7ECbBADe32de5aa0DC9E](https://basescan.org/address/0x86878A3b522E2498390e7ECbBADe32de5aa0DC9E) |
 
 ### Base Sepolia
