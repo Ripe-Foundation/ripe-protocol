@@ -1,6 +1,7 @@
 import boa
+import pytest
 
-from constants import EIGHTEEN_DECIMALS
+from constants import EIGHTEEN_DECIMALS, ZERO_ADDRESS
 
 
 def test_loot_deposit_points_first_save(
@@ -1426,3 +1427,1348 @@ def test_loot_deposit_points_extreme_elapsed(
     expected_points = (deposit_amount // ap.precision) * (1 + 1000000)
     assert ap.balancePoints == expected_points
     assert ap.lastUsdValue == deposit_amount // EIGHTEEN_DECIMALS
+
+
+# calc specific loot
+
+
+def test_calc_specific_loot_basic(lootbox):
+    """Test basic functionality with normal values"""
+    # 50% user share, asset has 50% of global points
+    asset_points_after, global_points_after, rewards_after, user_rewards = lootbox.calcSpecificLoot(
+        50_00,  # 50% user share
+        1000,   # asset points
+        2000,   # global points
+        100 * EIGHTEEN_DECIMALS,  # 100 tokens available
+    )
+    
+    # Asset gets 50% of rewards (1000/2000), user gets 50% of that
+    assert user_rewards == 25 * EIGHTEEN_DECIMALS
+    assert rewards_after == 75 * EIGHTEEN_DECIMALS
+    assert asset_points_after == 500  # 1000 - (1000 * 50%)
+    assert global_points_after == 1500  # 2000 - 500
+
+
+def test_calc_specific_loot_100_percent_user_share(lootbox):
+    """Test when user owns 100% of the asset"""
+    asset_points_after, global_points_after, rewards_after, user_rewards = lootbox.calcSpecificLoot(
+        100_00,  # 100% user share
+        1000,    # asset points
+        2000,    # global points
+        100 * EIGHTEEN_DECIMALS,  # rewards available
+    )
+    
+    # User gets all of asset's share
+    assert user_rewards == 50 * EIGHTEEN_DECIMALS
+    assert rewards_after == 50 * EIGHTEEN_DECIMALS
+    assert asset_points_after == 0  # All points consumed
+    assert global_points_after == 1000  # 2000 - 1000
+
+
+def test_calc_specific_loot_small_user_share(lootbox):
+    """Test with very small user share"""
+    asset_points_after, global_points_after, rewards_after, user_rewards = lootbox.calcSpecificLoot(
+        1,  # 0.01% user share
+        1000000,  # asset points
+        2000000,  # global points
+        100 * EIGHTEEN_DECIMALS,  # rewards available
+    )
+    
+    # User should get 0.01% of 50% = 0.005 tokens
+    expected_user_rewards = 100 * EIGHTEEN_DECIMALS * 1000000 // 2000000 * 1 // 100_00
+    assert user_rewards == expected_user_rewards
+    assert rewards_after == 100 * EIGHTEEN_DECIMALS - user_rewards
+    
+    # Points reduced should be minimal
+    points_reduced = 1000000 * 1 // 100_00
+    assert asset_points_after == 1000000 - points_reduced
+    assert global_points_after == 2000000 - points_reduced
+
+
+def test_calc_specific_loot_asset_points_exceed_global(lootbox):
+    """Test the edge case where asset points > global points"""
+    asset_points_after, global_points_after, rewards_after, user_rewards = lootbox.calcSpecificLoot(
+        100_00,  # 100% user share
+        71555000,  # asset points (greater than global)
+        21690000,  # global points
+        4880250000000000000,  # rewards available
+    )
+    
+    # Asset points should be capped to global points
+    # So user gets 100% of all rewards
+    assert user_rewards == 4880250000000000000
+    assert rewards_after == 0
+    assert asset_points_after == 0  # All points consumed
+    assert global_points_after == 0  # All points consumed
+
+
+def test_calc_specific_loot_zero_values(lootbox):
+    """Test all zero value edge cases"""
+    # Zero asset points
+    ap, gp, ra, ur = lootbox.calcSpecificLoot(50_00, 0, 1000, 100 * EIGHTEEN_DECIMALS)
+    assert (ap, gp, ra, ur) == (0, 1000, 100 * EIGHTEEN_DECIMALS, 0)
+    
+    # Zero global points
+    ap, gp, ra, ur = lootbox.calcSpecificLoot(50_00, 1000, 0, 100 * EIGHTEEN_DECIMALS)
+    assert (ap, gp, ra, ur) == (1000, 0, 100 * EIGHTEEN_DECIMALS, 0)
+    
+    # Zero rewards
+    ap, gp, ra, ur = lootbox.calcSpecificLoot(50_00, 1000, 2000, 0)
+    assert (ap, gp, ra, ur) == (1000, 2000, 0, 0)
+    
+    # Zero user share
+    ap, gp, ra, ur = lootbox.calcSpecificLoot(0, 1000, 2000, 100 * EIGHTEEN_DECIMALS)
+    assert (ap, gp, ra, ur) == (1000, 2000, 100 * EIGHTEEN_DECIMALS, 0)
+
+
+def test_calc_specific_loot_precision_edge_cases(lootbox):
+    """Test precision edge cases that might cause rounding issues"""
+    # Test case where division might lose precision
+    asset_points_after, global_points_after, rewards_after, user_rewards = lootbox.calcSpecificLoot(
+        33_33,  # 33.33% user share
+        3333,   # asset points
+        10000,  # global points
+        100 * EIGHTEEN_DECIMALS,  # rewards available
+    )
+    
+    # Asset gets 3333/10000 of rewards, user gets 33.33% of that
+    asset_rewards = 100 * EIGHTEEN_DECIMALS * 3333 // 10000
+    expected_user_rewards = asset_rewards * 33_33 // 100_00
+    assert user_rewards == expected_user_rewards
+    
+    # Points reduction calculation
+    points_to_reduce = 3333 * 33_33 // 100_00
+    assert asset_points_after == 3333 - points_to_reduce
+    assert global_points_after == 10000 - points_to_reduce
+
+
+def test_calc_specific_loot_maximum_values(lootbox):
+    """Test with maximum uint256 values to check for overflows"""
+    # Use large but safe values that won't overflow in calculations
+    large_points = 10**18
+    large_rewards = 10**30
+    
+    asset_points_after, global_points_after, rewards_after, user_rewards = lootbox.calcSpecificLoot(
+        50_00,  # 50% user share
+        large_points,
+        large_points * 2,
+        large_rewards,
+    )
+    
+    # User should get 25% of total rewards (50% of 50%)
+    assert user_rewards == large_rewards // 4
+    assert rewards_after == large_rewards * 3 // 4
+    assert asset_points_after == large_points // 2
+    assert global_points_after == large_points * 3 // 2
+
+
+def test_calc_specific_loot_user_gets_no_rewards(lootbox):
+    """Test case where user share is so small they get 0 rewards"""
+    asset_points_after, global_points_after, rewards_after, user_rewards = lootbox.calcSpecificLoot(
+        1,  # 0.01% user share
+        100,  # small asset points
+        1000000,  # large global points
+        100,  # small rewards available
+    )
+    
+    # User rewards should round down to 0
+    assert user_rewards == 0
+    assert rewards_after == 100
+    assert asset_points_after == 100  # No change
+    assert global_points_after == 1000000  # No change
+
+
+def test_calc_specific_loot_equal_asset_and_global_points(lootbox):
+    """Test when asset points equal global points"""
+    asset_points_after, global_points_after, rewards_after, user_rewards = lootbox.calcSpecificLoot(
+        50_00,  # 50% user share
+        1000,   # asset points
+        1000,   # global points (same as asset)
+        100 * EIGHTEEN_DECIMALS,  # rewards available
+    )
+    
+    # Asset gets 100% of rewards, user gets 50% of that
+    assert user_rewards == 50 * EIGHTEEN_DECIMALS
+    assert rewards_after == 50 * EIGHTEEN_DECIMALS
+    assert asset_points_after == 500
+    assert global_points_after == 500
+
+
+def test_calc_specific_loot_fractional_percentages(lootbox):
+    """Test various fractional percentage scenarios"""
+    test_cases = [
+        (1, "0.01%"),      # 0.01%
+        (10, "0.1%"),      # 0.1%
+        (100, "1%"),       # 1%
+        (1000, "10%"),     # 10%
+        (2500, "25%"),     # 25%
+        (7550, "75.5%"),   # 75.5%
+        (9999, "99.99%"),  # 99.99%
+    ]
+    
+    for user_share, description in test_cases:
+        asset_points_after, global_points_after, rewards_after, user_rewards = lootbox.calcSpecificLoot(
+            user_share,
+            100000,  # asset points
+            200000,  # global points
+            1000 * EIGHTEEN_DECIMALS,  # rewards available
+        )
+        
+        # Asset gets 50% of total rewards
+        asset_rewards = 500 * EIGHTEEN_DECIMALS
+        expected_user_rewards = asset_rewards * user_share // 100_00
+        
+        # Verify calculations
+        assert user_rewards == expected_user_rewards, f"Failed for {description}"
+        assert rewards_after == 1000 * EIGHTEEN_DECIMALS - user_rewards
+        
+        # Verify points reduction
+        points_to_reduce = 100000 * user_share // 100_00
+        assert asset_points_after == 100000 - points_to_reduce
+        assert global_points_after == 200000 - points_to_reduce
+
+
+def test_calc_specific_loot_consecutive_calls(lootbox):
+    """Test multiple consecutive calls to simulate real usage"""
+    # Initial state
+    asset_points = 1000000
+    global_points = 2000000
+    rewards_available = 1000 * EIGHTEEN_DECIMALS
+    
+    # User 1 claims 25%
+    ap1, gp1, ra1, ur1 = lootbox.calcSpecificLoot(
+        25_00,  # 25% share
+        asset_points,
+        global_points,
+        rewards_available,
+    )
+    
+    # User 2 claims 30% of remaining
+    ap2, gp2, ra2, ur2 = lootbox.calcSpecificLoot(
+        30_00,  # 30% share
+        ap1,
+        gp1,
+        ra1,
+    )
+    
+    # User 3 claims 100% of remaining
+    ap3, gp3, ra3, ur3 = lootbox.calcSpecificLoot(
+        100_00,  # 100% share
+        ap2,
+        gp2,
+        ra2,
+    )
+    
+    # Verify total rewards distributed
+    total_distributed = ur1 + ur2 + ur3
+    assert total_distributed <= rewards_available
+    
+    # Verify final state
+    assert ap3 == 0  # All asset points consumed
+    # The remaining rewards should be significant due to the way points are reduced
+    assert ra3 == rewards_available - total_distributed
+
+
+def test_calc_specific_loot_boundary_values(lootbox):
+    """Test boundary values for all parameters"""
+    # Test with 1 wei values - user share is 0.01% which rounds to 0
+    ap, gp, ra, ur = lootbox.calcSpecificLoot(1, 1, 1, 1)
+    assert ur == 0  # 1 * 1 // 1 * 1 // 10000 = 0
+    assert (ap, gp, ra) == (1, 1, 1)  # No change since no rewards
+    
+    # Test with 100% user share and 1 wei values
+    ap, gp, ra, ur = lootbox.calcSpecificLoot(100_00, 1, 1, 1)
+    assert ur == 1  # 100% of 1
+    assert (ap, gp, ra) == (0, 0, 0)
+    
+    # Test with maximum percentage
+    ap, gp, ra, ur = lootbox.calcSpecificLoot(
+        100_00,  # 100%
+        1000,
+        1000,
+        1000,
+    )
+    assert ur == 1000
+    assert (ap, gp, ra) == (0, 0, 0)
+
+
+# reset deposit points
+
+
+def test_reset_user_balance_points_basic(
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    setRipeRewardsConfig,
+    performDeposit,
+    mock_price_source,
+    simple_erc20_vault,
+    vault_book,
+    ledger,
+    lootbox,
+    teller,
+    switchboard_delta,
+):
+    """Test basic reset of user balance points"""
+    # basic setup
+    setGeneralConfig()
+    setAssetConfig(alpha_token, _stakersPointsAlloc=0, _voterPointsAlloc=20)
+    setRipeRewardsConfig(True)
+
+    # set mock prices
+    price = 1 * EIGHTEEN_DECIMALS
+    mock_price_source.setPrice(alpha_token, price)
+
+    # deposit
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    performDeposit(bob, deposit_amount, alpha_token, alpha_token_whale)
+
+    vault_id = vault_book.getRegId(simple_erc20_vault)
+    
+    # First update to initialize
+    lootbox.updateDepositPoints(bob, vault_id, simple_erc20_vault, alpha_token, sender=teller.address)
+
+    # Time travel to accumulate points
+    elapsed = 20
+    boa.env.time_travel(blocks=elapsed)
+    lootbox.updateDepositPoints(bob, vault_id, simple_erc20_vault, alpha_token, sender=teller.address)
+
+    # Check points before reset
+    up_before = ledger.userDepositPoints(bob, vault_id, alpha_token)
+    ap_before = ledger.assetDepositPoints(vault_id, alpha_token)
+    assert up_before.balancePoints == (deposit_amount // ap_before.precision) * elapsed
+    assert ap_before.balancePoints == (deposit_amount // ap_before.precision) * elapsed
+
+    # Reset user balance points
+    lootbox.resetUserBalancePoints(bob, alpha_token, vault_id, sender=switchboard_delta.address)
+
+    # Check points after reset
+    up_after = ledger.userDepositPoints(bob, vault_id, alpha_token)
+    ap_after = ledger.assetDepositPoints(vault_id, alpha_token)
+    
+    # User balance points should be zero
+    assert up_after.balancePoints == 0
+    # Asset balance points should be reduced by user's amount
+    assert ap_after.balancePoints == 0  # Since user had all the points
+    # Other points should remain unchanged
+    assert ap_after.ripeVotePoints == ap_before.ripeVotePoints
+    assert ap_after.ripeGenPoints == ap_before.ripeGenPoints
+
+
+def test_reset_user_balance_points_multiple_users(
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    alice,
+    setGeneralConfig,
+    setAssetConfig,
+    setRipeRewardsConfig,
+    performDeposit,
+    mock_price_source,
+    simple_erc20_vault,
+    vault_book,
+    ledger,
+    lootbox,
+    teller,
+    switchboard_delta,
+):
+    """Test reset of user balance points with multiple users"""
+    # basic setup
+    setGeneralConfig()
+    setAssetConfig(alpha_token, _stakersPointsAlloc=0, _voterPointsAlloc=20)
+    setRipeRewardsConfig(True)
+
+    # set mock prices
+    price = 1 * EIGHTEEN_DECIMALS
+    mock_price_source.setPrice(alpha_token, price)
+
+    # deposits - bob deposits more than alice
+    bob_deposit = 100 * EIGHTEEN_DECIMALS
+    alice_deposit = 50 * EIGHTEEN_DECIMALS
+    performDeposit(bob, bob_deposit, alpha_token, alpha_token_whale)
+    performDeposit(alice, alice_deposit, alpha_token, alpha_token_whale)
+
+    vault_id = vault_book.getRegId(simple_erc20_vault)
+    
+    # Initialize both users
+    lootbox.updateDepositPoints(bob, vault_id, simple_erc20_vault, alpha_token, sender=teller.address)
+    lootbox.updateDepositPoints(alice, vault_id, simple_erc20_vault, alpha_token, sender=teller.address)
+
+    # Time travel to accumulate points
+    elapsed = 20
+    boa.env.time_travel(blocks=elapsed)
+    lootbox.updateDepositPoints(bob, vault_id, simple_erc20_vault, alpha_token, sender=teller.address)
+    lootbox.updateDepositPoints(alice, vault_id, simple_erc20_vault, alpha_token, sender=teller.address)
+
+    # Check points before reset
+    ap_before = ledger.assetDepositPoints(vault_id, alpha_token)
+    up_bob_before = ledger.userDepositPoints(bob, vault_id, alpha_token)
+    up_alice_before = ledger.userDepositPoints(alice, vault_id, alpha_token)
+    
+    total_balance = bob_deposit + alice_deposit
+    assert ap_before.balancePoints == (total_balance // ap_before.precision) * elapsed
+    assert up_bob_before.balancePoints == (bob_deposit // ap_before.precision) * elapsed
+    assert up_alice_before.balancePoints == (alice_deposit // ap_before.precision) * elapsed
+
+    # Reset only bob's balance points
+    lootbox.resetUserBalancePoints(bob, alpha_token, vault_id, sender=switchboard_delta.address)
+
+    # Check points after reset
+    up_bob_after = ledger.userDepositPoints(bob, vault_id, alpha_token)
+    up_alice_after = ledger.userDepositPoints(alice, vault_id, alpha_token)
+    ap_after = ledger.assetDepositPoints(vault_id, alpha_token)
+    
+    # Bob's balance points should be zero
+    assert up_bob_after.balancePoints == 0
+    # Alice's balance points should remain unchanged
+    assert up_alice_after.balancePoints == up_alice_before.balancePoints
+    # Asset balance points should be reduced by bob's amount
+    assert ap_after.balancePoints == (alice_deposit // ap_before.precision) * elapsed
+
+
+def test_reset_user_balance_points_zero_balance(
+    alpha_token,
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    setRipeRewardsConfig,
+    mock_price_source,
+    simple_erc20_vault,
+    vault_book,
+    ledger,
+    lootbox,
+    switchboard_delta,
+):
+    """Test reset when user has zero balance points"""
+    # basic setup
+    setGeneralConfig()
+    setAssetConfig(alpha_token, _stakersPointsAlloc=0, _voterPointsAlloc=20)
+    setRipeRewardsConfig(True)
+
+    # set mock prices
+    price = 1 * EIGHTEEN_DECIMALS
+    mock_price_source.setPrice(alpha_token, price)
+
+    vault_id = vault_book.getRegId(simple_erc20_vault)
+    
+    # Reset without any deposits or points
+    lootbox.resetUserBalancePoints(bob, alpha_token, vault_id, sender=switchboard_delta.address)
+
+    # Check that nothing breaks
+    up = ledger.userDepositPoints(bob, vault_id, alpha_token)
+    ap = ledger.assetDepositPoints(vault_id, alpha_token)
+    assert up.balancePoints == 0
+    assert ap.balancePoints == 0
+
+
+def test_reset_user_balance_points_after_withdrawal(
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    setRipeRewardsConfig,
+    performDeposit,
+    mock_price_source,
+    simple_erc20_vault,
+    vault_book,
+    ledger,
+    lootbox,
+    teller,
+    switchboard_delta,
+):
+    """Test reset after user withdraws but still has accumulated points"""
+    # basic setup
+    setGeneralConfig()
+    setAssetConfig(alpha_token, _stakersPointsAlloc=0, _voterPointsAlloc=20)
+    setRipeRewardsConfig(True)
+
+    # set mock prices
+    price = 1 * EIGHTEEN_DECIMALS
+    mock_price_source.setPrice(alpha_token, price)
+
+    # deposit
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    performDeposit(bob, deposit_amount, alpha_token, alpha_token_whale)
+
+    vault_id = vault_book.getRegId(simple_erc20_vault)
+    
+    # Initialize
+    lootbox.updateDepositPoints(bob, vault_id, simple_erc20_vault, alpha_token, sender=teller.address)
+
+    # Time travel to accumulate points
+    elapsed = 20
+    boa.env.time_travel(blocks=elapsed)
+    lootbox.updateDepositPoints(bob, vault_id, simple_erc20_vault, alpha_token, sender=teller.address)
+
+    # Withdraw all funds
+    teller.withdraw(alpha_token, deposit_amount, bob, simple_erc20_vault, sender=bob)
+
+    # Check points before reset - should still have accumulated points
+    up_before = ledger.userDepositPoints(bob, vault_id, alpha_token)
+    ap_before = ledger.assetDepositPoints(vault_id, alpha_token)
+    assert up_before.balancePoints == (deposit_amount // ap_before.precision) * elapsed
+    assert up_before.lastBalance == 0  # Current balance is zero
+
+    # Reset user balance points
+    lootbox.resetUserBalancePoints(bob, alpha_token, vault_id, sender=switchboard_delta.address)
+
+    # Check points after reset
+    up_after = ledger.userDepositPoints(bob, vault_id, alpha_token)
+    ap_after = ledger.assetDepositPoints(vault_id, alpha_token)
+    
+    # User balance points should be zero
+    assert up_after.balancePoints == 0
+    # Asset balance points should also be zero since user had all points
+    assert ap_after.balancePoints == 0
+
+
+def test_reset_user_balance_points_permissions(
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    alice,
+    setGeneralConfig,
+    setAssetConfig,
+    setRipeRewardsConfig,
+    performDeposit,
+    mock_price_source,
+    simple_erc20_vault,
+    vault_book,
+    lootbox,
+    switchboard_delta,
+):
+    """Test permission requirements for resetUserBalancePoints"""
+    # basic setup
+    setGeneralConfig()
+    setAssetConfig(alpha_token, _stakersPointsAlloc=0, _voterPointsAlloc=20)
+    setRipeRewardsConfig(True)
+
+    # set mock prices
+    price = 1 * EIGHTEEN_DECIMALS
+    mock_price_source.setPrice(alpha_token, price)
+
+    # deposit
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    performDeposit(bob, deposit_amount, alpha_token, alpha_token_whale)
+
+    vault_id = vault_book.getRegId(simple_erc20_vault)
+    
+    # Try to reset from unauthorized address
+    with boa.reverts("no perms"):
+        lootbox.resetUserBalancePoints(bob, alpha_token, vault_id, sender=alice)
+
+    # Try to reset when paused
+    lootbox.pause(True, sender=switchboard_delta.address)
+    with boa.reverts("contract paused"):
+        lootbox.resetUserBalancePoints(bob, alpha_token, vault_id, sender=switchboard_delta.address)
+
+    # Unpause and verify it works
+    lootbox.pause(False, sender=switchboard_delta.address)
+    lootbox.resetUserBalancePoints(bob, alpha_token, vault_id, sender=switchboard_delta.address)
+
+
+def test_reset_user_balance_points_empty_params(
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    setRipeRewardsConfig,
+    performDeposit,
+    mock_price_source,
+    simple_erc20_vault,
+    vault_book,
+    ledger,
+    lootbox,
+    teller,
+    switchboard_delta,
+):
+    """Test reset with empty/invalid parameters"""
+    # basic setup
+    setGeneralConfig()
+    setAssetConfig(alpha_token, _stakersPointsAlloc=0, _voterPointsAlloc=20)
+    setRipeRewardsConfig(True)
+
+    # set mock prices
+    price = 1 * EIGHTEEN_DECIMALS
+    mock_price_source.setPrice(alpha_token, price)
+
+    # deposit
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    performDeposit(bob, deposit_amount, alpha_token, alpha_token_whale)
+
+    vault_id = vault_book.getRegId(simple_erc20_vault)
+    
+    # Initialize and accumulate points
+    lootbox.updateDepositPoints(bob, vault_id, simple_erc20_vault, alpha_token, sender=teller.address)
+    boa.env.time_travel(blocks=20)
+    lootbox.updateDepositPoints(bob, vault_id, simple_erc20_vault, alpha_token, sender=teller.address)
+
+    # Test with empty user address - should return early
+    lootbox.resetUserBalancePoints(ZERO_ADDRESS, alpha_token, vault_id, sender=switchboard_delta.address)
+    
+    # Test with empty asset address - should return early
+    lootbox.resetUserBalancePoints(bob, ZERO_ADDRESS, vault_id, sender=switchboard_delta.address)
+    
+    # Test with invalid vault id - should return early
+    lootbox.resetUserBalancePoints(bob, alpha_token, 999, sender=switchboard_delta.address)
+    
+    # Verify original points are unchanged
+    up = ledger.userDepositPoints(bob, vault_id, alpha_token)
+    assert up.balancePoints > 0  # Still has points
+
+
+def test_reset_user_balance_points_edge_case_overflow(
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    alice,
+    setGeneralConfig,
+    setAssetConfig,
+    setRipeRewardsConfig,
+    performDeposit,
+    mock_price_source,
+    simple_erc20_vault,
+    vault_book,
+    ledger,
+    lootbox,
+    teller,
+    switchboard_delta,
+):
+    """Test edge case where user points might exceed asset points"""
+    # basic setup
+    setGeneralConfig()
+    setAssetConfig(alpha_token, _stakersPointsAlloc=0, _voterPointsAlloc=20)
+    setRipeRewardsConfig(True)
+
+    # set mock prices
+    price = 1 * EIGHTEEN_DECIMALS
+    mock_price_source.setPrice(alpha_token, price)
+
+    # deposit
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    performDeposit(bob, deposit_amount, alpha_token, alpha_token_whale)
+
+    vault_id = vault_book.getRegId(simple_erc20_vault)
+    
+    # Initialize
+    lootbox.updateDepositPoints(bob, vault_id, simple_erc20_vault, alpha_token, sender=teller.address)
+
+    # Time travel to accumulate points
+    elapsed = 20
+    boa.env.time_travel(blocks=elapsed)
+    lootbox.updateDepositPoints(bob, vault_id, simple_erc20_vault, alpha_token, sender=teller.address)
+
+    # Manually set points to create edge case (if possible through other means)
+    # In this case, the contract uses min() to prevent underflow
+    
+    # Reset user balance points
+    lootbox.resetUserBalancePoints(bob, alpha_token, vault_id, sender=switchboard_delta.address)
+
+    # Check that asset points don't go negative (should use min)
+    ap_after = ledger.assetDepositPoints(vault_id, alpha_token)
+    assert ap_after.balancePoints == 0
+    assert ap_after.balancePoints >= 0  # Can't go negative
+
+
+def test_reset_user_balance_points_multiple_assets(
+    alpha_token,
+    alpha_token_whale,
+    bravo_token,
+    bravo_token_whale,
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    setRipeRewardsConfig,
+    performDeposit,
+    mock_price_source,
+    simple_erc20_vault,
+    vault_book,
+    ledger,
+    lootbox,
+    teller,
+    switchboard_delta,
+):
+    """Test reset doesn't affect other assets"""
+    # basic setup
+    setGeneralConfig()
+    setAssetConfig(alpha_token, _stakersPointsAlloc=0, _voterPointsAlloc=20)
+    setAssetConfig(bravo_token, _stakersPointsAlloc=10, _voterPointsAlloc=20)
+    setRipeRewardsConfig(True)
+
+    # set mock prices
+    price = 1 * EIGHTEEN_DECIMALS
+    mock_price_source.setPrice(alpha_token, price)
+    mock_price_source.setPrice(bravo_token, price)
+
+    # deposits in both assets
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    performDeposit(bob, deposit_amount, alpha_token, alpha_token_whale)
+    performDeposit(bob, deposit_amount, bravo_token, bravo_token_whale)
+
+    vault_id = vault_book.getRegId(simple_erc20_vault)
+    
+    # Initialize both assets
+    lootbox.updateDepositPoints(bob, vault_id, simple_erc20_vault, alpha_token, sender=teller.address)
+    lootbox.updateDepositPoints(bob, vault_id, simple_erc20_vault, bravo_token, sender=teller.address)
+
+    # Time travel to accumulate points
+    elapsed = 20
+    boa.env.time_travel(blocks=elapsed)
+    lootbox.updateDepositPoints(bob, vault_id, simple_erc20_vault, alpha_token, sender=teller.address)
+    lootbox.updateDepositPoints(bob, vault_id, simple_erc20_vault, bravo_token, sender=teller.address)
+
+    # Check bravo points before reset
+    up_bravo_before = ledger.userDepositPoints(bob, vault_id, bravo_token)
+    ap_bravo_before = ledger.assetDepositPoints(vault_id, bravo_token)
+
+    # Reset only alpha token balance points
+    lootbox.resetUserBalancePoints(bob, alpha_token, vault_id, sender=switchboard_delta.address)
+
+    # Check alpha points are reset
+    up_alpha_after = ledger.userDepositPoints(bob, vault_id, alpha_token)
+    assert up_alpha_after.balancePoints == 0
+
+    # Check bravo points are unchanged
+    up_bravo_after = ledger.userDepositPoints(bob, vault_id, bravo_token)
+    ap_bravo_after = ledger.assetDepositPoints(vault_id, bravo_token)
+    assert up_bravo_after.balancePoints == up_bravo_before.balancePoints
+    assert ap_bravo_after.balancePoints == ap_bravo_before.balancePoints
+
+
+def test_reset_user_balance_points_with_ongoing_accrual(
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    setRipeRewardsConfig,
+    performDeposit,
+    mock_price_source,
+    simple_erc20_vault,
+    vault_book,
+    ledger,
+    lootbox,
+    teller,
+    switchboard_delta,
+):
+    """Test that points continue to accrue after reset"""
+    # basic setup
+    setGeneralConfig()
+    setAssetConfig(alpha_token, _stakersPointsAlloc=0, _voterPointsAlloc=20)
+    setRipeRewardsConfig(True)
+
+    # set mock prices
+    price = 1 * EIGHTEEN_DECIMALS
+    mock_price_source.setPrice(alpha_token, price)
+
+    # deposit
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    performDeposit(bob, deposit_amount, alpha_token, alpha_token_whale)
+
+    vault_id = vault_book.getRegId(simple_erc20_vault)
+    
+    # Initialize
+    lootbox.updateDepositPoints(bob, vault_id, simple_erc20_vault, alpha_token, sender=teller.address)
+
+    # Time travel to accumulate points
+    elapsed1 = 20
+    boa.env.time_travel(blocks=elapsed1)
+    lootbox.updateDepositPoints(bob, vault_id, simple_erc20_vault, alpha_token, sender=teller.address)
+
+    # Reset user balance points
+    lootbox.resetUserBalancePoints(bob, alpha_token, vault_id, sender=switchboard_delta.address)
+
+    # Verify reset
+    up_after_reset = ledger.userDepositPoints(bob, vault_id, alpha_token)
+    assert up_after_reset.balancePoints == 0
+
+    # Time travel again
+    elapsed2 = 10
+    boa.env.time_travel(blocks=elapsed2)
+    lootbox.updateDepositPoints(bob, vault_id, simple_erc20_vault, alpha_token, sender=teller.address)
+
+    # Check that points have started accumulating again
+    up_final = ledger.userDepositPoints(bob, vault_id, alpha_token)
+    ap_final = ledger.assetDepositPoints(vault_id, alpha_token)
+    
+    # Points should only be from the second period
+    assert up_final.balancePoints == (deposit_amount // ap_final.precision) * elapsed2
+    assert ap_final.balancePoints == (deposit_amount // ap_final.precision) * elapsed2
+
+
+# reset asset points
+
+
+def test_reset_asset_points_basic(
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    setRipeRewardsConfig,
+    performDeposit,
+    mock_price_source,
+    simple_erc20_vault,
+    vault_book,
+    ledger,
+    lootbox,
+    teller,
+    switchboard_delta,
+):
+    """Test basic reset of asset points"""
+    # basic setup
+    setGeneralConfig()
+    setAssetConfig(alpha_token, _stakersPointsAlloc=10, _voterPointsAlloc=20)
+    setRipeRewardsConfig(True)
+
+    # set mock prices
+    price = 1 * EIGHTEEN_DECIMALS
+    mock_price_source.setPrice(alpha_token, price)
+
+    # deposit
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    performDeposit(bob, deposit_amount, alpha_token, alpha_token_whale)
+
+    vault_id = vault_book.getRegId(simple_erc20_vault)
+    
+    # First update to initialize
+    lootbox.updateDepositPoints(bob, vault_id, simple_erc20_vault, alpha_token, sender=teller.address)
+
+    # Time travel to accumulate points
+    elapsed = 20
+    boa.env.time_travel(blocks=elapsed)
+    lootbox.updateDepositPoints(bob, vault_id, simple_erc20_vault, alpha_token, sender=teller.address)
+
+    # Check points before reset
+    ap_before = ledger.assetDepositPoints(vault_id, alpha_token)
+    gp_before = ledger.globalDepositPoints()
+    
+    assert ap_before.ripeStakerPoints == 10 * elapsed
+    assert ap_before.ripeVotePoints == 20 * elapsed
+    assert ap_before.ripeGenPoints == 0  # No gen points when asset has staker allocation
+    assert gp_before.ripeStakerPoints >= ap_before.ripeStakerPoints
+    assert gp_before.ripeVotePoints >= ap_before.ripeVotePoints
+    assert gp_before.ripeGenPoints >= ap_before.ripeGenPoints
+
+    # Reset asset points
+    lootbox.resetAssetPoints(alpha_token, vault_id, sender=switchboard_delta.address)
+
+    # Check points after reset
+    ap_after = ledger.assetDepositPoints(vault_id, alpha_token)
+    gp_after = ledger.globalDepositPoints()
+    
+    # All asset points should be zero
+    assert ap_after.ripeStakerPoints == 0
+    assert ap_after.ripeVotePoints == 0
+    assert ap_after.ripeGenPoints == 0
+    
+    # Global points should be reduced
+    assert gp_after.ripeStakerPoints == gp_before.ripeStakerPoints - ap_before.ripeStakerPoints
+    assert gp_after.ripeVotePoints == gp_before.ripeVotePoints - ap_before.ripeVotePoints
+    assert gp_after.ripeGenPoints == gp_before.ripeGenPoints  # Since asset had no gen points
+    
+    # Balance points should NOT be affected
+    assert ap_after.balancePoints == ap_before.balancePoints
+
+
+def test_reset_asset_points_multiple_assets(
+    alpha_token,
+    alpha_token_whale,
+    bravo_token,
+    bravo_token_whale,
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    setRipeRewardsConfig,
+    performDeposit,
+    mock_price_source,
+    simple_erc20_vault,
+    vault_book,
+    ledger,
+    lootbox,
+    teller,
+    switchboard_delta,
+):
+    """Test reset only affects specified asset"""
+    # basic setup
+    setGeneralConfig()
+    setAssetConfig(alpha_token, _stakersPointsAlloc=10, _voterPointsAlloc=20)
+    setAssetConfig(bravo_token, _stakersPointsAlloc=5, _voterPointsAlloc=15)
+    setRipeRewardsConfig(True)
+
+    # set mock prices
+    price = 1 * EIGHTEEN_DECIMALS
+    mock_price_source.setPrice(alpha_token, price)
+    mock_price_source.setPrice(bravo_token, price)
+
+    # deposits
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    performDeposit(bob, deposit_amount, alpha_token, alpha_token_whale)
+    performDeposit(bob, deposit_amount, bravo_token, bravo_token_whale)
+
+    vault_id = vault_book.getRegId(simple_erc20_vault)
+    
+    # Initialize both assets
+    lootbox.updateDepositPoints(bob, vault_id, simple_erc20_vault, alpha_token, sender=teller.address)
+    lootbox.updateDepositPoints(bob, vault_id, simple_erc20_vault, bravo_token, sender=teller.address)
+
+    # Time travel to accumulate points
+    elapsed = 20
+    boa.env.time_travel(blocks=elapsed)
+    lootbox.updateDepositPoints(bob, vault_id, simple_erc20_vault, alpha_token, sender=teller.address)
+    lootbox.updateDepositPoints(bob, vault_id, simple_erc20_vault, bravo_token, sender=teller.address)
+
+    # Check bravo points before reset
+    ap_bravo_before = ledger.assetDepositPoints(vault_id, bravo_token)
+    
+    # Reset only alpha asset points
+    lootbox.resetAssetPoints(alpha_token, vault_id, sender=switchboard_delta.address)
+
+    # Check alpha points are reset
+    ap_alpha_after = ledger.assetDepositPoints(vault_id, alpha_token)
+    assert ap_alpha_after.ripeStakerPoints == 0
+    assert ap_alpha_after.ripeVotePoints == 0
+    assert ap_alpha_after.ripeGenPoints == 0
+
+    # Check bravo points are unchanged
+    ap_bravo_after = ledger.assetDepositPoints(vault_id, bravo_token)
+    assert ap_bravo_after.ripeStakerPoints == ap_bravo_before.ripeStakerPoints
+    assert ap_bravo_after.ripeVotePoints == ap_bravo_before.ripeVotePoints
+    assert ap_bravo_after.ripeGenPoints == ap_bravo_before.ripeGenPoints
+
+
+def test_reset_asset_points_zero_points(
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    setRipeRewardsConfig,
+    performDeposit,
+    mock_price_source,
+    simple_erc20_vault,
+    vault_book,
+    ledger,
+    lootbox,
+    teller,
+    switchboard_delta,
+):
+    """Test reset when asset has zero points"""
+    # basic setup
+    setGeneralConfig()
+    setAssetConfig(alpha_token, _stakersPointsAlloc=10, _voterPointsAlloc=20)
+    setRipeRewardsConfig(True)
+
+    # set mock prices
+    price = 1 * EIGHTEEN_DECIMALS
+    mock_price_source.setPrice(alpha_token, price)
+
+    vault_id = vault_book.getRegId(simple_erc20_vault)
+    
+    # Reset without any deposits or points
+    lootbox.resetAssetPoints(alpha_token, vault_id, sender=switchboard_delta.address)
+
+    # Check that nothing breaks
+    ap = ledger.assetDepositPoints(vault_id, alpha_token)
+    assert ap.ripeStakerPoints == 0
+    assert ap.ripeVotePoints == 0
+    assert ap.ripeGenPoints == 0
+
+
+def test_reset_asset_points_permissions(
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    alice,
+    setGeneralConfig,
+    setAssetConfig,
+    setRipeRewardsConfig,
+    performDeposit,
+    mock_price_source,
+    simple_erc20_vault,
+    vault_book,
+    lootbox,
+    teller,
+    switchboard_delta,
+):
+    """Test permission requirements for resetAssetPoints"""
+    # basic setup
+    setGeneralConfig()
+    setAssetConfig(alpha_token, _stakersPointsAlloc=10, _voterPointsAlloc=20)
+    setRipeRewardsConfig(True)
+
+    # set mock prices
+    price = 1 * EIGHTEEN_DECIMALS
+    mock_price_source.setPrice(alpha_token, price)
+
+    # deposit
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    performDeposit(bob, deposit_amount, alpha_token, alpha_token_whale)
+
+    vault_id = vault_book.getRegId(simple_erc20_vault)
+    
+    # Try to reset from unauthorized address
+    with boa.reverts("no perms"):
+        lootbox.resetAssetPoints(alpha_token, vault_id, sender=alice)
+
+    # Try to reset when paused
+    lootbox.pause(True, sender=switchboard_delta.address)
+    with boa.reverts("contract paused"):
+        lootbox.resetAssetPoints(alpha_token, vault_id, sender=switchboard_delta.address)
+
+    # Unpause and verify it works
+    lootbox.pause(False, sender=switchboard_delta.address)
+    lootbox.resetAssetPoints(alpha_token, vault_id, sender=switchboard_delta.address)
+
+
+def test_reset_asset_points_empty_params(
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    setRipeRewardsConfig,
+    performDeposit,
+    mock_price_source,
+    simple_erc20_vault,
+    vault_book,
+    ledger,
+    lootbox,
+    teller,
+    switchboard_delta,
+):
+    """Test reset with empty/invalid parameters"""
+    # basic setup
+    setGeneralConfig()
+    setAssetConfig(alpha_token, _stakersPointsAlloc=10, _voterPointsAlloc=20)
+    setRipeRewardsConfig(True)
+
+    # set mock prices
+    price = 1 * EIGHTEEN_DECIMALS
+    mock_price_source.setPrice(alpha_token, price)
+
+    # deposit
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    performDeposit(bob, deposit_amount, alpha_token, alpha_token_whale)
+
+    vault_id = vault_book.getRegId(simple_erc20_vault)
+    
+    # Initialize and accumulate points
+    lootbox.updateDepositPoints(bob, vault_id, simple_erc20_vault, alpha_token, sender=teller.address)
+    boa.env.time_travel(blocks=20)
+    lootbox.updateDepositPoints(bob, vault_id, simple_erc20_vault, alpha_token, sender=teller.address)
+
+    # Test with empty asset address - should return early
+    lootbox.resetAssetPoints(ZERO_ADDRESS, vault_id, sender=switchboard_delta.address)
+    
+    # Test with invalid vault id - should return early
+    lootbox.resetAssetPoints(alpha_token, 999, sender=switchboard_delta.address)
+    
+    # Verify original points are unchanged
+    ap = ledger.assetDepositPoints(vault_id, alpha_token)
+    assert ap.ripeStakerPoints > 0  # Still has points
+
+
+def test_reset_asset_points_edge_case_overflow(
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    setRipeRewardsConfig,
+    performDeposit,
+    mock_price_source,
+    simple_erc20_vault,
+    vault_book,
+    ledger,
+    lootbox,
+    teller,
+    switchboard_delta,
+):
+    """Test edge case where asset points might exceed global points"""
+    # basic setup
+    setGeneralConfig()
+    setAssetConfig(alpha_token, _stakersPointsAlloc=10, _voterPointsAlloc=20)
+    setRipeRewardsConfig(True)
+
+    # set mock prices
+    price = 1 * EIGHTEEN_DECIMALS
+    mock_price_source.setPrice(alpha_token, price)
+
+    # deposit
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    performDeposit(bob, deposit_amount, alpha_token, alpha_token_whale)
+
+    vault_id = vault_book.getRegId(simple_erc20_vault)
+    
+    # Initialize
+    lootbox.updateDepositPoints(bob, vault_id, simple_erc20_vault, alpha_token, sender=teller.address)
+
+    # Time travel to accumulate points
+    elapsed = 20
+    boa.env.time_travel(blocks=elapsed)
+    lootbox.updateDepositPoints(bob, vault_id, simple_erc20_vault, alpha_token, sender=teller.address)
+
+    # Reset asset points
+    lootbox.resetAssetPoints(alpha_token, vault_id, sender=switchboard_delta.address)
+
+    # Check that global points don't go negative (should use min)
+    gp_after = ledger.globalDepositPoints()
+    assert gp_after.ripeStakerPoints >= 0
+    assert gp_after.ripeVotePoints >= 0
+    assert gp_after.ripeGenPoints >= 0
+
+
+def test_reset_asset_points_with_multiple_users(
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    alice,
+    setGeneralConfig,
+    setAssetConfig,
+    setRipeRewardsConfig,
+    performDeposit,
+    mock_price_source,
+    simple_erc20_vault,
+    vault_book,
+    ledger,
+    lootbox,
+    teller,
+    switchboard_delta,
+):
+    """Test reset affects all users of the asset"""
+    # basic setup
+    setGeneralConfig()
+    setAssetConfig(alpha_token, _stakersPointsAlloc=10, _voterPointsAlloc=20)
+    setRipeRewardsConfig(True)
+
+    # set mock prices
+    price = 1 * EIGHTEEN_DECIMALS
+    mock_price_source.setPrice(alpha_token, price)
+
+    # deposits from multiple users
+    bob_deposit = 100 * EIGHTEEN_DECIMALS
+    alice_deposit = 50 * EIGHTEEN_DECIMALS
+    performDeposit(bob, bob_deposit, alpha_token, alpha_token_whale)
+    performDeposit(alice, alice_deposit, alpha_token, alpha_token_whale)
+
+    vault_id = vault_book.getRegId(simple_erc20_vault)
+    
+    # Initialize both users
+    lootbox.updateDepositPoints(bob, vault_id, simple_erc20_vault, alpha_token, sender=teller.address)
+    lootbox.updateDepositPoints(alice, vault_id, simple_erc20_vault, alpha_token, sender=teller.address)
+
+    # Time travel to accumulate points
+    elapsed = 20
+    boa.env.time_travel(blocks=elapsed)
+    lootbox.updateDepositPoints(bob, vault_id, simple_erc20_vault, alpha_token, sender=teller.address)
+    lootbox.updateDepositPoints(alice, vault_id, simple_erc20_vault, alpha_token, sender=teller.address)
+
+    # Check user points before reset
+    up_bob_before = ledger.userDepositPoints(bob, vault_id, alpha_token)
+    up_alice_before = ledger.userDepositPoints(alice, vault_id, alpha_token)
+    
+    # Reset asset points
+    lootbox.resetAssetPoints(alpha_token, vault_id, sender=switchboard_delta.address)
+
+    # Check asset points are reset
+    ap_after = ledger.assetDepositPoints(vault_id, alpha_token)
+    assert ap_after.ripeStakerPoints == 0
+    assert ap_after.ripeVotePoints == 0
+    assert ap_after.ripeGenPoints == 0
+
+    # Check user balance points are NOT affected
+    up_bob_after = ledger.userDepositPoints(bob, vault_id, alpha_token)
+    up_alice_after = ledger.userDepositPoints(alice, vault_id, alpha_token)
+    assert up_bob_after.balancePoints == up_bob_before.balancePoints
+    assert up_alice_after.balancePoints == up_alice_before.balancePoints
+
+
+def test_reset_asset_points_only_gen_points(
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    setRipeRewardsConfig,
+    performDeposit,
+    mock_price_source,
+    simple_erc20_vault,
+    vault_book,
+    ledger,
+    lootbox,
+    teller,
+    switchboard_delta,
+):
+    """Test reset when asset only has gen points (no staker/voter alloc)"""
+    # basic setup
+    setGeneralConfig()
+    setAssetConfig(alpha_token, _stakersPointsAlloc=0, _voterPointsAlloc=0)  # Only gen points
+    setRipeRewardsConfig(True)
+
+    # set mock prices
+    price = 1 * EIGHTEEN_DECIMALS
+    mock_price_source.setPrice(alpha_token, price)
+
+    # deposit
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    performDeposit(bob, deposit_amount, alpha_token, alpha_token_whale)
+
+    vault_id = vault_book.getRegId(simple_erc20_vault)
+    
+    # Initialize
+    lootbox.updateDepositPoints(bob, vault_id, simple_erc20_vault, alpha_token, sender=teller.address)
+
+    # Time travel to accumulate points
+    elapsed = 20
+    boa.env.time_travel(blocks=elapsed)
+    lootbox.updateDepositPoints(bob, vault_id, simple_erc20_vault, alpha_token, sender=teller.address)
+
+    # Check points before reset
+    ap_before = ledger.assetDepositPoints(vault_id, alpha_token)
+    assert ap_before.ripeStakerPoints == 0
+    assert ap_before.ripeVotePoints == 0
+    assert ap_before.ripeGenPoints == (deposit_amount // EIGHTEEN_DECIMALS) * elapsed
+
+    # Reset asset points
+    lootbox.resetAssetPoints(alpha_token, vault_id, sender=switchboard_delta.address)
+
+    # Check all points are reset
+    ap_after = ledger.assetDepositPoints(vault_id, alpha_token)
+    assert ap_after.ripeStakerPoints == 0
+    assert ap_after.ripeVotePoints == 0
+    assert ap_after.ripeGenPoints == 0
+
+
+def test_reset_asset_points_with_ongoing_accrual(
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    setRipeRewardsConfig,
+    performDeposit,
+    mock_price_source,
+    simple_erc20_vault,
+    vault_book,
+    ledger,
+    lootbox,
+    teller,
+    switchboard_delta,
+):
+    """Test that points continue to accrue after reset"""
+    # basic setup
+    setGeneralConfig()
+    setAssetConfig(alpha_token, _stakersPointsAlloc=10, _voterPointsAlloc=20)
+    setRipeRewardsConfig(True)
+
+    # set mock prices
+    price = 1 * EIGHTEEN_DECIMALS
+    mock_price_source.setPrice(alpha_token, price)
+
+    # deposit
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    performDeposit(bob, deposit_amount, alpha_token, alpha_token_whale)
+
+    vault_id = vault_book.getRegId(simple_erc20_vault)
+    
+    # Initialize
+    lootbox.updateDepositPoints(bob, vault_id, simple_erc20_vault, alpha_token, sender=teller.address)
+
+    # Time travel to accumulate points
+    elapsed1 = 20
+    boa.env.time_travel(blocks=elapsed1)
+    lootbox.updateDepositPoints(bob, vault_id, simple_erc20_vault, alpha_token, sender=teller.address)
+
+    # Reset asset points
+    lootbox.resetAssetPoints(alpha_token, vault_id, sender=switchboard_delta.address)
+
+    # Verify reset
+    ap_after_reset = ledger.assetDepositPoints(vault_id, alpha_token)
+    assert ap_after_reset.ripeStakerPoints == 0
+    assert ap_after_reset.ripeVotePoints == 0
+    assert ap_after_reset.ripeGenPoints == 0
+
+    # Time travel again
+    elapsed2 = 10
+    boa.env.time_travel(blocks=elapsed2)
+    lootbox.updateDepositPoints(bob, vault_id, simple_erc20_vault, alpha_token, sender=teller.address)
+
+    # Check that points have started accumulating again
+    ap_final = ledger.assetDepositPoints(vault_id, alpha_token)
+    assert ap_final.ripeStakerPoints == 10 * elapsed2
+    assert ap_final.ripeVotePoints == 20 * elapsed2
+    assert ap_final.ripeGenPoints == 0  # No gen points when asset has staker allocation
+    
+    # Balance points should be unaffected and continue accumulating
+    assert ap_final.balancePoints == (deposit_amount // ap_final.precision) * (elapsed1 + elapsed2)
+
+
+def test_reset_asset_points_multiple_vaults(
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    setRipeRewardsConfig,
+    performDeposit,
+    mock_price_source,
+    simple_erc20_vault,
+    rebase_erc20_vault,
+    vault_book,
+    ledger,
+    lootbox,
+    teller,
+    switchboard_delta,
+):
+    """Test reset only affects specified vault"""
+    vault_id1 = vault_book.getRegId(simple_erc20_vault)
+    vault_id2 = vault_book.getRegId(rebase_erc20_vault)
+
+    # basic setup
+    setGeneralConfig()
+    setAssetConfig(alpha_token, _vaultIds=[vault_id1, vault_id2], _stakersPointsAlloc=10, _voterPointsAlloc=20)
+    setRipeRewardsConfig(True)
+
+    # set mock prices
+    price = 1 * EIGHTEEN_DECIMALS
+    mock_price_source.setPrice(alpha_token, price)
+
+    # deposits in both vaults
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    performDeposit(bob, deposit_amount, alpha_token, alpha_token_whale)
+    performDeposit(bob, deposit_amount, alpha_token, alpha_token_whale, rebase_erc20_vault)
+
+    # Initialize both vaults
+    lootbox.updateDepositPoints(bob, vault_id1, simple_erc20_vault, alpha_token, sender=teller.address)
+    lootbox.updateDepositPoints(bob, vault_id2, rebase_erc20_vault, alpha_token, sender=teller.address)
+
+    # Time travel to accumulate points
+    elapsed = 20
+    boa.env.time_travel(blocks=elapsed)
+    lootbox.updateDepositPoints(bob, vault_id1, simple_erc20_vault, alpha_token, sender=teller.address)
+    lootbox.updateDepositPoints(bob, vault_id2, rebase_erc20_vault, alpha_token, sender=teller.address)
+
+    # Check vault 2 points before reset
+    ap2_before = ledger.assetDepositPoints(vault_id2, alpha_token)
+
+    # Reset only vault 1 asset points
+    lootbox.resetAssetPoints(alpha_token, vault_id1, sender=switchboard_delta.address)
+
+    # Check vault 1 points are reset
+    ap1_after = ledger.assetDepositPoints(vault_id1, alpha_token)
+    assert ap1_after.ripeStakerPoints == 0
+    assert ap1_after.ripeVotePoints == 0
+    assert ap1_after.ripeGenPoints == 0
+
+    # Check vault 2 points are unchanged
+    ap2_after = ledger.assetDepositPoints(vault_id2, alpha_token)
+    assert ap2_after.ripeStakerPoints == ap2_before.ripeStakerPoints
+    assert ap2_after.ripeVotePoints == ap2_before.ripeVotePoints
+    assert ap2_after.ripeGenPoints == ap2_before.ripeGenPoints
+
+

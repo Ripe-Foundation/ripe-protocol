@@ -39,6 +39,17 @@ interface MissionControl:
     def ripeBondConfig() -> cs.RipeBondConfig: view
     def hrConfig() -> cs.HrConfig: view
 
+interface BondBooster:
+    def setManyBondBoosters(_boosters: DynArray[BoosterConfig, MAX_BOOSTERS]): nonpayable
+    def removeManyBondBoosters(_users: DynArray[address, MAX_BOOSTERS]): nonpayable
+    def setMaxBoostAndMaxUnits(_maxBoostRatio: uint256, _maxUnits: uint256): nonpayable
+    def getBoostRatio(_user: address, _units: uint256) -> uint256: view
+
+interface Lootbox:
+    def resetUserBalancePoints(_user: address, _asset: address, _vaultId: uint256): nonpayable
+    def resetAssetPoints(_asset: address, _vaultId: uint256): nonpayable
+    def resetUserBorrowPoints(_user: address): nonpayable
+
 interface BondRoom:
     def startBondEpochAtBlock(_block: uint256): nonpayable
     def setBondBooster(_bondBooster: address): nonpayable
@@ -46,13 +57,8 @@ interface BondRoom:
 
 interface Ledger:
     def isHrContributor(_contributor: address) -> bool: view
+    def getEpochData() -> (uint256, uint256): view
     def setBadDebt(_amount: uint256): nonpayable
-
-interface BondBooster:
-    def setManyBondBoosters(_boosters: DynArray[BoosterConfig, MAX_BOOSTERS]): nonpayable
-    def removeManyBondBoosters(_users: DynArray[address, MAX_BOOSTERS]): nonpayable
-    def setMaxBoostAndMaxUnits(_maxBoostRatio: uint256, _maxUnits: uint256): nonpayable
-    def getBoostRatio(_user: address, _units: uint256) -> uint256: view
 
 interface RipeHq:
     def getAddr(_regId: uint256) -> address: view
@@ -72,6 +78,9 @@ flag ActionType:
     RIPE_BOND_BOOSTER
     BOND_BOOSTER_ADD
     BOND_BOOSTER_BOUNDARIES
+    LOOT_USER_BALANCE_RESET
+    LOOT_ASSET_RESET
+    LOOT_USER_BORROW_RESET
 
 struct PendingManager:
     contributor: address
@@ -86,6 +95,15 @@ struct BoosterConfig:
     boostRatio: uint256
     maxUnitsAllowed: uint256
     expireBlock: uint256
+
+struct UserBalanceReset:
+    user: address
+    asset: address
+    vaultId: uint256
+
+struct AssetReset:
+    asset: address
+    vaultId: uint256
 
 struct BoosterBoundaries:
     maxBoostRatio: uint256
@@ -161,6 +179,11 @@ event PendingRipeBondEpochLengthSet:
     epochLength: uint256
     confirmationBlock: uint256
     actionId: uint256
+
+event BondEpochRestarted:
+    prevEpochStart: uint256
+    prevEpochEnd: uint256
+    restartedBy: indexed(address)
 
 event PendingStartEpochAtBlockSet:
     startBlock: uint256
@@ -245,6 +268,30 @@ event BoosterBoundariesSet:
     maxBoostRatio: uint256
     maxUnits: uint256
 
+event PendingUserBalanceResetSet:
+    numResets: uint256
+    confirmationBlock: uint256
+    actionId: uint256
+
+event PendingAssetResetSet:
+    numResets: uint256
+    confirmationBlock: uint256
+    actionId: uint256
+
+event UserBalanceResetExecuted:
+    numResets: uint256
+
+event AssetResetExecuted:
+    numResets: uint256
+
+event PendingUserBorrowResetSet:
+    numResets: uint256
+    confirmationBlock: uint256
+    actionId: uint256
+
+event UserBorrowResetExecuted:
+    numResets: uint256
+
 # pending config changes
 actionType: public(HashMap[uint256, ActionType]) # aid -> type
 pendingHrConfig: public(HashMap[uint256, cs.HrConfig]) # aid -> config
@@ -255,13 +302,19 @@ pendingRipeBondConfigValue: public(HashMap[uint256, uint256]) # aid -> block
 pendingBondBooster: public(HashMap[uint256, address]) # aid -> bond booster
 pendingBoosterConfigs: public(HashMap[uint256, DynArray[BoosterConfig, MAX_BOOSTERS]]) # aid -> configs
 pendingBoosterBoundaries: public(HashMap[uint256, BoosterBoundaries]) # aid -> boundaries
+pendingUserBalanceReset: public(HashMap[uint256, DynArray[UserBalanceReset, MAX_USERS]]) # aid -> users
+pendingAssetReset: public(HashMap[uint256, DynArray[AssetReset, MAX_ASSETS]]) # aid -> assets
+pendingUserBorrowReset: public(HashMap[uint256, DynArray[address, MAX_USERS]]) # aid -> users
 
 LEDGER_ID: constant(uint256) = 4
 MISSION_CONTROL_ID: constant(uint256) = 5
 BOND_ROOM_ID: constant(uint256) = 12
+LOOTBOX_ID: constant(uint256) = 16
 EIGHTEEN_DECIMALS: constant(uint256) = 10 ** 18
 MAX_BOOSTERS: constant(uint256) = 50
 HUNDRED_PERCENT: constant(uint256) = 100_00
+MAX_USERS: constant(uint256) = 40
+MAX_ASSETS: constant(uint256) = 20
 
 # timestamp units (not blocks!)
 DAY_IN_SECONDS: constant(uint256) = 60 * 60 * 24
@@ -313,6 +366,12 @@ def _getLedgerAddr() -> address:
 @internal
 def _getBondRoomAddr() -> address:
     return staticcall RipeHq(gov._getRipeHqFromGov()).getAddr(BOND_ROOM_ID)
+
+
+@view
+@internal
+def _getLootboxAddr() -> address:
+    return staticcall RipeHq(gov._getRipeHqFromGov()).getAddr(LOOTBOX_ID)
 
 
 #############
@@ -571,6 +630,30 @@ def setRipeBondEpochLength(_epochLength: uint256) -> uint256:
     return aid
 
 
+# restart epoch
+
+
+@external
+def restartBondEpoch() -> bool:
+    assert gov._canGovern(msg.sender) # dev: no perms
+
+    # validate epoch is in progress
+    ledger: address = self._getLedgerAddr()
+    epochStart: uint256 = 0
+    epochEnd: uint256 = 0
+    epochStart, epochEnd = staticcall Ledger(ledger).getEpochData()
+    if epochStart == 0 or epochEnd == 0:
+        return False
+
+    # validate epoch is in progress
+    if block.number < epochStart or block.number > epochEnd:
+        return False
+
+    extcall BondRoom(self._getBondRoomAddr()).startBondEpochAtBlock(0) # reset epoch
+    log BondEpochRestarted(prevEpochStart=epochStart, prevEpochEnd=epochEnd, restartedBy=msg.sender)
+    return True
+
+
 # start epoch at block
 
 
@@ -690,6 +773,47 @@ def setBoosterBoundaries(_maxBoostRatio: uint256, _maxUnits: uint256) -> uint256
     return aid
 
 
+################
+# Loot Cleanup #
+################
+
+
+@external
+def resetManyUserBalancePoints(_users: DynArray[UserBalanceReset, MAX_USERS]) -> uint256:
+    assert gov._canGovern(msg.sender) # dev: no perms
+    assert len(_users) != 0 # dev: no users
+    aid: uint256 = timeLock._initiateAction()
+    self.actionType[aid] = ActionType.LOOT_USER_BALANCE_RESET
+    self.pendingUserBalanceReset[aid] = _users
+    confirmationBlock: uint256 = timeLock._getActionConfirmationBlock(aid)
+    log PendingUserBalanceResetSet(numResets=len(_users), confirmationBlock=confirmationBlock, actionId=aid)
+    return aid
+
+
+@external
+def resetManyAssetPoints(_assets: DynArray[AssetReset, MAX_ASSETS]) -> uint256:
+    assert gov._canGovern(msg.sender) # dev: no perms
+    assert len(_assets) != 0 # dev: no assets
+    aid: uint256 = timeLock._initiateAction()
+    self.actionType[aid] = ActionType.LOOT_ASSET_RESET
+    self.pendingAssetReset[aid] = _assets
+    confirmationBlock: uint256 = timeLock._getActionConfirmationBlock(aid)
+    log PendingAssetResetSet(numResets=len(_assets), confirmationBlock=confirmationBlock, actionId=aid)
+    return aid
+
+
+@external
+def resetManyUserBorrowPoints(_users: DynArray[address, MAX_USERS]) -> uint256:
+    assert gov._canGovern(msg.sender) # dev: no perms
+    assert len(_users) != 0 # dev: no users
+    aid: uint256 = timeLock._initiateAction()
+    self.actionType[aid] = ActionType.LOOT_USER_BORROW_RESET
+    self.pendingUserBorrowReset[aid] = _users
+    confirmationBlock: uint256 = timeLock._getActionConfirmationBlock(aid)
+    log PendingUserBorrowResetSet(numResets=len(_users), confirmationBlock=confirmationBlock, actionId=aid)
+    return aid
+
+
 #############
 # Execution #
 #############
@@ -798,6 +922,27 @@ def executePendingAction(_aid: uint256) -> bool:
         boundaries: BoosterBoundaries = self.pendingBoosterBoundaries[_aid]
         extcall BondBooster(self._getBondRoomAddr()).setMaxBoostAndMaxUnits(boundaries.maxBoostRatio, boundaries.maxUnits)
         log BoosterBoundariesSet(maxBoostRatio=boundaries.maxBoostRatio, maxUnits=boundaries.maxUnits)
+
+    elif actionType == ActionType.LOOT_USER_BALANCE_RESET:
+        resets: DynArray[UserBalanceReset, MAX_USERS] = self.pendingUserBalanceReset[_aid]
+        lootbox: address = self._getLootboxAddr()
+        for reset: UserBalanceReset in resets:
+            extcall Lootbox(lootbox).resetUserBalancePoints(reset.user, reset.asset, reset.vaultId)
+        log UserBalanceResetExecuted(numResets=len(resets))
+
+    elif actionType == ActionType.LOOT_ASSET_RESET:
+        resets: DynArray[AssetReset, MAX_ASSETS] = self.pendingAssetReset[_aid]
+        lootbox: address = self._getLootboxAddr()
+        for reset: AssetReset in resets:
+            extcall Lootbox(lootbox).resetAssetPoints(reset.asset, reset.vaultId)
+        log AssetResetExecuted(numResets=len(resets))
+
+    elif actionType == ActionType.LOOT_USER_BORROW_RESET:
+        users: DynArray[address, MAX_USERS] = self.pendingUserBorrowReset[_aid]
+        lootbox: address = self._getLootboxAddr()
+        for user: address in users:
+            extcall Lootbox(lootbox).resetUserBorrowPoints(user)
+        log UserBorrowResetExecuted(numResets=len(users))
 
     self.actionType[_aid] = empty(ActionType)
     return True
