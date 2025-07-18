@@ -436,57 +436,7 @@ def _getClaimableDepositLootForAsset(
     globalRipeRewards: RipeRewards = empty(RipeRewards)
     userRipeRewards, up, ap, gp, globalRipeRewards = self._getDepositLootData(_user, _vaultId, _vaultAddr, _asset, False, _a)
     return userRipeRewards.ripeStakerLoot + userRipeRewards.ripeVoteLoot + userRipeRewards.ripeGenLoot
-
-
-# claim utils
-
-
-@view
-@internal
-def _calcSpecificLoot(
-    _userShareOfAsset: uint256,
-    _assetPoints: uint256,
-    _globalPoints: uint256,
-    _rewardsAvailable: uint256,
-) -> (uint256, uint256, uint256, uint256):
-
-    # nothing to do here
-    if _assetPoints == 0 or _globalPoints == 0 or _rewardsAvailable == 0:
-        return _assetPoints, _globalPoints, _rewardsAvailable, 0
-
-    # calc asset rewards
-    assetRewards: uint256 = 0
-    if _assetPoints * HUNDRED_PERCENT > _globalPoints:
-        assetShareOfGlobal: uint256 = min(_assetPoints * HUNDRED_PERCENT // _globalPoints, HUNDRED_PERCENT)
-        assetRewards = _rewardsAvailable * assetShareOfGlobal // HUNDRED_PERCENT
-    else:
-        assetRewards = _rewardsAvailable * _assetPoints // _globalPoints
-
-    # calc user rewards (for asset)
-    userRewards: uint256 = assetRewards * _userShareOfAsset // HUNDRED_PERCENT
-    if userRewards == 0:
-        return _assetPoints, _globalPoints, _rewardsAvailable, 0
-
-    # calc how many points to reduce (from asset and global)
-    pointsToReduce: uint256 = 0
-    if _assetPoints * _userShareOfAsset > HUNDRED_PERCENT:
-        pointsToReduce = _assetPoints * _userShareOfAsset // HUNDRED_PERCENT
-    else:
-        remainingRewards: uint256 = assetRewards - userRewards
-        pointsRemaining: uint256 = _assetPoints
-        if _assetPoints * remainingRewards > assetRewards:
-            pointsRemaining = _assetPoints * remainingRewards // assetRewards
-        pointsToReduce = _assetPoints - pointsRemaining
-
-    if pointsToReduce == 0:
-        return _assetPoints, _globalPoints, _rewardsAvailable, 0
-
-    # updated data
-    newAssetPoints: uint256 = _assetPoints - pointsToReduce
-    newGlobalPoints: uint256 = _globalPoints - pointsToReduce
-    newRewardsAvail: uint256 = _rewardsAvailable - userRewards
-    return newAssetPoints, newGlobalPoints, newRewardsAvail, userRewards
-
+    
 
 @view
 @internal
@@ -496,6 +446,59 @@ def _flushDepositPoints(_userPoints: UserDepositPoints, _assetPoints: AssetDepos
     ap.balancePoints -= up.balancePoints
     up.balancePoints = 0
     return up, ap
+
+
+# claim utils
+
+
+@view
+@external
+def calcSpecificLoot(
+    _userShareOfAsset: uint256,
+    _assetPoints: uint256,
+    _globalPoints: uint256,
+    _rewardsAvailable: uint256,
+) -> (uint256, uint256, uint256, uint256):
+    return self._calcSpecificLoot(_userShareOfAsset, _assetPoints, _globalPoints, _rewardsAvailable)
+
+
+@view
+@internal
+def _calcSpecificLoot(
+    _userShareOfAsset: uint256,
+    _assetPoints: uint256,
+    _globalPoints: uint256,
+    _rewardsAvailable: uint256,
+  ) -> (uint256, uint256, uint256, uint256):
+
+    # early returns for edge cases
+    if _assetPoints == 0 or _globalPoints == 0 or _rewardsAvailable == 0 or _userShareOfAsset == 0:
+        return _assetPoints, _globalPoints, _rewardsAvailable, 0
+
+    # cap asset points to global points to prevent inconsistencies
+    assetPoints: uint256 = min(_assetPoints, _globalPoints)
+
+    # calc asset rewards
+    assetRewards: uint256 = _rewardsAvailable * assetPoints // _globalPoints
+
+    # calc user rewards
+    userRewards: uint256 = assetRewards * _userShareOfAsset // HUNDRED_PERCENT
+
+    # early return if no user rewards
+    if userRewards == 0:
+        return assetPoints, _globalPoints, _rewardsAvailable, 0
+
+    # calc points to reduce
+    userAssetPoints: uint256 = assetPoints * _userShareOfAsset // HUNDRED_PERCENT
+    pointsToReduce: uint256 = min(userAssetPoints, assetPoints)
+    pointsToReduce = min(pointsToReduce, _globalPoints)
+
+    # update values
+    newAssetPoints: uint256 = assetPoints - pointsToReduce
+    newGlobalPoints: uint256 = _globalPoints - pointsToReduce
+    newRewardsAvail: uint256 = _rewardsAvailable - userRewards
+
+    return newAssetPoints, newGlobalPoints, newRewardsAvail, userRewards
 
 
 ##################
