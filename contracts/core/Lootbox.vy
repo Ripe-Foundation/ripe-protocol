@@ -535,6 +535,70 @@ def updateDepositPoints(
     extcall Ledger(a.ledger).setDepositPointsAndRipeRewards(_user, _vaultId, _asset, up, ap, gp, globalRewards)
 
 
+# reset balance points
+
+
+@external
+def resetUserBalancePoints(_user: address, _asset: address, _vaultId: uint256):
+    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
+    assert not deptBasics.isPaused # dev: contract paused
+    a: addys.Addys = addys._getAddys()
+
+    # get latest global rewards
+    config: RewardsConfig = staticcall MissionControl(a.missionControl).getRewardsConfig()
+    globalRewards: RipeRewards = self._getLatestGlobalRipeRewards(config, a)
+    vaultAddr: address = staticcall VaultBook(a.vaultBook).getAddr(_vaultId)
+    if empty(address) in [vaultAddr, _asset, _user]:
+        return
+
+    # get latest deposit points
+    up: UserDepositPoints = empty(UserDepositPoints)
+    ap: AssetDepositPoints = empty(AssetDepositPoints)
+    gp: GlobalDepositPoints = empty(GlobalDepositPoints)
+    up, ap, gp = self._getLatestDepositPoints(_user, _vaultId, vaultAddr, _asset, config, a)
+
+    # reset user balance points
+    ap.balancePoints -= min(up.balancePoints, ap.balancePoints)
+    up.balancePoints = 0
+
+    # update points
+    extcall Ledger(a.ledger).setDepositPointsAndRipeRewards(_user, _vaultId, _asset, up, ap, gp, globalRewards)
+
+
+# reset asset points
+
+
+@external
+def resetAssetPoints(_asset: address, _vaultId: uint256):
+    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
+    assert not deptBasics.isPaused # dev: contract paused
+    a: addys.Addys = addys._getAddys()
+
+    # get latest global rewards
+    config: RewardsConfig = staticcall MissionControl(a.missionControl).getRewardsConfig()
+    globalRewards: RipeRewards = self._getLatestGlobalRipeRewards(config, a)
+    vaultAddr: address = staticcall VaultBook(a.vaultBook).getAddr(_vaultId)
+    if empty(address) in [vaultAddr, _asset]:
+        return
+
+    # get latest deposit points
+    up: UserDepositPoints = empty(UserDepositPoints)
+    ap: AssetDepositPoints = empty(AssetDepositPoints)
+    gp: GlobalDepositPoints = empty(GlobalDepositPoints)
+    up, ap, gp = self._getLatestDepositPoints(empty(address), _vaultId, vaultAddr, _asset, config, a)
+
+    # reset asset points
+    gp.ripeStakerPoints -= min(ap.ripeStakerPoints, gp.ripeStakerPoints)
+    ap.ripeStakerPoints = 0
+    gp.ripeVotePoints -= min(ap.ripeVotePoints, gp.ripeVotePoints)
+    ap.ripeVotePoints = 0
+    gp.ripeGenPoints -= min(ap.ripeGenPoints, gp.ripeGenPoints)
+    ap.ripeGenPoints = 0
+
+    # update points
+    extcall Ledger(a.ledger).setDepositPointsAndRipeRewards(empty(address), _vaultId, _asset, up, ap, gp, globalRewards)
+
+
 # global deposit points
 
 
@@ -756,6 +820,31 @@ def updateBorrowPoints(_user: address, _a: addys.Addys = empty(addys.Addys)):
     extcall Ledger(a.ledger).setBorrowPointsAndRipeRewards(_user, up, gp, globalRewards)
 
 
+# reset borrow points
+
+
+@external
+def resetUserBorrowPoints(_user: address):
+    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
+    assert not deptBasics.isPaused # dev: contract paused
+    a: addys.Addys = addys._getAddys()
+    if _user == empty(address):
+        return
+
+    config: RewardsConfig = staticcall MissionControl(a.missionControl).getRewardsConfig()
+    globalRewards: RipeRewards = self._getLatestGlobalRipeRewards(config, a)
+    up: BorrowPoints = empty(BorrowPoints)
+    gp: BorrowPoints = empty(BorrowPoints)
+    up, gp = self._getLatestBorrowPoints(_user, config.arePointsEnabled, a.ledger)
+
+    # reset user borrow points
+    gp.points -= min(up.points, gp.points)
+    up.points = 0
+
+    # update points
+    extcall Ledger(a.ledger).setBorrowPointsAndRipeRewards(_user, up, gp, globalRewards)
+
+
 # borrow points
 
 
@@ -896,7 +985,7 @@ def _getClaimableBorrowLootData(_user: address, _a: addys.Addys) -> (uint256, Bo
     # update structs
     if userRipeRewards != 0:
         globalRewards.borrowers -= userRipeRewards
-        gp.points -= up.points # do first
+        gp.points -= min(up.points, gp.points) # do first
         up.points = 0
 
     return userRipeRewards, up, gp, globalRewards
