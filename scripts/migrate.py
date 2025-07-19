@@ -268,7 +268,7 @@ def cli(
     else:
         sender = get_account(account)
 
-    deploy_args = DeployArgs(sender, chain, ignore_logs=not is_retry, blueprint=blueprint)
+    deploy_args = DeployArgs(sender, chain, ignore_logs=not is_retry, blueprint=blueprint, rpc=final_rpc)
 
     log.h1("Contract Migration")
     log.info(f"Connected to rpc `{final_rpc}`.")

@@ -39,7 +39,7 @@ Thank you for helping keep Ripe protocol safe for everyone!
 | SwitchboardAlpha    | [0xDde6Bd1570fF2740bA9afb0D5a579f537074B9Ea](https://basescan.org/address/0xDde6Bd1570fF2740bA9afb0D5a579f537074B9Ea) |
 | SwitchboardBravo    | [0x39b5d43C51C4ab37C4153C32b5f825d10d1a83aD](https://basescan.org/address/0x39b5d43C51C4ab37C4153C32b5f825d10d1a83aD) |
 | SwitchboardCharlie  | [0xB96D9862838f17Ca51603EEECd54E99f33D3461d](https://basescan.org/address/0xB96D9862838f17Ca51603EEECd54E99f33D3461d) |
-| SwitchboardDelta    | [0xE4a727007c852A6991678c0ac66586998Adce6Eb](https://basescan.org/address/0xE4a727007c852A6991678c0ac66586998Adce6Eb) |
+| SwitchboardDelta    | [0x8d365eD80ea76aA8Bd132be71974A7ffa8990aC2](https://basescan.org/address/0x8d365eD80ea76aA8Bd132be71974A7ffa8990aC2) |
 | PriceDesk           | [0xe03Df96Fe695a6DdeD8711fa668b1eaE561C7A8C](https://basescan.org/address/0xe03Df96Fe695a6DdeD8711fa668b1eaE561C7A8C) |
 | ChainlinkPrices     | [0x10E14b0F24D44101a5543b0dd4dC39554dBD9761](https://basescan.org/address/0x10E14b0F24D44101a5543b0dd4dC39554dBD9761) |
 | CurvePrices         | [0x50C3eCC034436c7D962E7063Fc7cD8f05A97Bbc1](https://basescan.org/address/0x50C3eCC034436c7D962E7063Fc7cD8f05A97Bbc1) |
@@ -58,7 +58,7 @@ Thank you for helping keep Ripe protocol safe for everyone!
 | CreditEngine        | [0xC4d54b999D333E8c8293f83DDcF3B9A19B76645F](https://basescan.org/address/0xC4d54b999D333E8c8293f83DDcF3B9A19B76645F) |
 | Endaoment           | [0x9fEa7B792B8528a20731C3e7c14F0Bd6F7ae9dfE](https://basescan.org/address/0x9fEa7B792B8528a20731C3e7c14F0Bd6F7ae9dfE) |
 | HumanResources      | [0xF9aCDFd0d167b741f9144Ca01E52FcdE16BE108b](https://basescan.org/address/0xF9aCDFd0d167b741f9144Ca01E52FcdE16BE108b) |
-| Lootbox             | [0x7f2af830886389E8A7fE4352c839147E7aa929Af](https://basescan.org/address/0x7f2af830886389E8A7fE4352c839147E7aa929Af) |
+| Lootbox             | [0xE05605ba1Fb0551c6f4b0089FD46D42D63c795bA](https://basescan.org/address/0xE05605ba1Fb0551c6f4b0089FD46D42D63c795bA) |
 | Teller              | [0x0fD51642c37230d6088293f1f5490712078085aD](https://basescan.org/address/0x0fD51642c37230d6088293f1f5490712078085aD) |
 | GreenPool           | [0xd6c283655B42FA0eb2685F7AB819784F071459dc](https://basescan.org/address/0xd6c283655B42FA0eb2685F7AB819784F071459dc) |
 | RipePool            | [0xF8D92a9531205AB2Dd0Bc623CDF4A6Ab4c3a2526](https://basescan.org/address/0xF8D92a9531205AB2Dd0Bc623CDF4A6Ab4c3a2526) |
