@@ -12,11 +12,12 @@ class BluePrint:
 
 
 class DeployArgs:
-    def __init__(self, sender, chain, ignore_logs, blueprint):
+    def __init__(self, sender, chain, ignore_logs, blueprint, rpc):
         self.sender = sender
         self.chain = chain
         self.ignore_logs = ignore_logs
         self.blueprint = BluePrint(blueprint)
+        self.rpc = rpc
 
 
 class LegoType:

@@ -39,6 +39,9 @@ class Migration:
         except:
             log.h3(f"No previous log file: {self._log_filename()}")
 
+    def rpc(self):
+        return self._deploy_args.rpc
+
     def execute(self, transaction, *args, **kwargs):
         """
         Executes a transaction or skips if already executed.
