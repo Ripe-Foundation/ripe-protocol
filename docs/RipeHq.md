@@ -21,6 +21,7 @@ RipeHq is built using a modular architecture that separates concerns and promote
 ### LocalGov Module
 - **Location**: `contracts/modules/LocalGov.vy`
 - **Purpose**: Provides governance functionality with time-locked changes
+- **Documentation**: See [LocalGov Technical Documentation](./LocalGov.md)
 - **Key Features**:
   - Governance address management with time-locked transitions
   - Configurable min/max timelock periods for security
@@ -30,6 +31,7 @@ RipeHq is built using a modular architecture that separates concerns and promote
 ### AddressRegistry Module  
 - **Location**: `contracts/registries/modules/AddressRegistry.vy`
 - **Purpose**: Manages the registry of protocol addresses
+- **Documentation**: See [AddressRegistry Technical Documentation](./AddressRegistry.md)
 - **Key Features**:
   - Sequential registry ID assignment (starting from 1)
   - Time-locked address additions, updates, and disabling
@@ -119,11 +121,11 @@ struct PendingHqConfig:
 - `MAX_RECOVER_ASSETS: uint256 = 20` - Maximum number of assets recoverable in a single transaction
 
 ### Inherited State Variables (from modules)
-From LocalGov:
+From [LocalGov](./LocalGov.md):
 - `governance: address` - Current governance address
 - `govChangeTimeLock: uint256` - Timelock for governance changes
 
-From AddressRegistry:
+From [AddressRegistry](./AddressRegistry.md):
 - `registryChangeTimeLock: uint256` - Timelock for registry changes
 - Various internal registry mappings for address management
 
@@ -212,11 +214,11 @@ def startAddNewAddressToRegistry(_addr: address, _description: String[64]) -> bo
 
 #### Access
 
-Only callable by governance
+Only callable by governance (see [LocalGov](./LocalGov.md) for governance details)
 
 #### Events Emitted
 
-- `AddressAdditionInitiated` (from AddressRegistry) - Contains address, description, and confirmation block
+- `NewAddressPending` (from [AddressRegistry](./AddressRegistry.md)) - Contains address, description, and confirmation block
 
 #### Example Usage
 ```python
@@ -253,11 +255,11 @@ def confirmNewAddressToRegistry(_addr: address) -> uint256:
 
 #### Access
 
-Only callable by governance
+Only callable by governance (see [LocalGov](./LocalGov.md) for governance details)
 
 #### Events Emitted
 
-- `NewAddressConfirmed` (from AddressRegistry) - Contains registry ID, address, description, initiation and confirmation blocks
+- `NewAddressConfirmed` (from [AddressRegistry](./AddressRegistry.md)) - Contains registry ID, address, description
 
 #### Example Usage
 ```python
@@ -295,11 +297,11 @@ def cancelNewAddressToRegistry(_addr: address) -> bool:
 
 #### Access
 
-Only callable by governance
+Only callable by governance (see [LocalGov](./LocalGov.md) for governance details)
 
 #### Events Emitted
 
-- `NewAddressCancelled` (from AddressRegistry) - Contains address, description, initiation and confirmation blocks
+- `NewAddressCancelled` (from [AddressRegistry](./AddressRegistry.md)) - Contains address, description, initiation and confirmation blocks
 
 #### Example Usage
 ```python
@@ -336,11 +338,11 @@ def startAddressUpdateToRegistry(_regId: uint256, _newAddr: address) -> bool:
 
 #### Access
 
-Only callable by governance
+Only callable by governance (see [LocalGov](./LocalGov.md) for governance details)
 
 #### Events Emitted
 
-- `AddressUpdatePending` (from AddressRegistry) - Contains registry ID, old address, new address, and confirmation block
+- `AddressUpdatePending` (from [AddressRegistry](./AddressRegistry.md)) - Contains registry ID, old address, new address, and confirmation block
 
 #### Example Usage
 ```python
@@ -377,11 +379,11 @@ def confirmAddressUpdateToRegistry(_regId: uint256) -> bool:
 
 #### Access
 
-Only callable by governance
+Only callable by governance (see [LocalGov](./LocalGov.md) for governance details)
 
 #### Events Emitted
 
-- `AddressUpdateConfirmed` (from AddressRegistry) - Contains registry ID, old address, new address, initiation and confirmation blocks
+- `AddressUpdateConfirmed` (from [AddressRegistry](./AddressRegistry.md)) - Contains registry ID, old address, new address, version
 
 #### Example Usage
 ```python
@@ -418,11 +420,11 @@ def cancelAddressUpdateToRegistry(_regId: uint256) -> bool:
 
 #### Access
 
-Only callable by governance
+Only callable by governance (see [LocalGov](./LocalGov.md) for governance details)
 
 #### Events Emitted
 
-- `AddressUpdateCancelled` (from AddressRegistry) - Contains registry ID, old address, new address, initiation and confirmation blocks
+- `AddressUpdateCancelled` (from [AddressRegistry](./AddressRegistry.md)) - Contains registry ID, old address, new address, initiation and confirmation blocks
 
 #### Example Usage
 ```python
@@ -458,11 +460,11 @@ def startAddressDisableInRegistry(_regId: uint256) -> bool:
 
 #### Access
 
-Only callable by governance
+Only callable by governance (see [LocalGov](./LocalGov.md) for governance details)
 
 #### Events Emitted
 
-- `AddressDisablePending` (from AddressRegistry) - Contains registry ID, address, description, and confirmation block
+- `AddressDisablePending` (from [AddressRegistry](./AddressRegistry.md)) - Contains registry ID, address, description, and confirmation block
 
 #### Example Usage
 ```python
@@ -498,11 +500,11 @@ def confirmAddressDisableInRegistry(_regId: uint256) -> bool:
 
 #### Access
 
-Only callable by governance
+Only callable by governance (see [LocalGov](./LocalGov.md) for governance details)
 
 #### Events Emitted
 
-- `AddressDisableConfirmed` (from AddressRegistry) - Contains registry ID, address, description, initiation and confirmation blocks
+- `AddressDisableConfirmed` (from [AddressRegistry](./AddressRegistry.md)) - Contains registry ID, address, description, version
 
 #### Example Usage
 ```python
@@ -539,11 +541,11 @@ def cancelAddressDisableInRegistry(_regId: uint256) -> bool:
 
 #### Access
 
-Only callable by governance
+Only callable by governance (see [LocalGov](./LocalGov.md) for governance details)
 
 #### Events Emitted
 
-- `AddressDisableCancelled` (from AddressRegistry) - Contains registry ID, address, description, initiation and confirmation blocks
+- `AddressDisableCancelled` (from [AddressRegistry](./AddressRegistry.md)) - Contains registry ID, address, description, initiation and confirmation blocks
 
 #### Example Usage
 ```python
@@ -621,7 +623,7 @@ def initiateHqConfigChange(
 
 #### Access
 
-Only callable by governance
+Only callable by governance (see [LocalGov](./LocalGov.md) for governance details)
 
 #### Events Emitted
 
@@ -664,7 +666,7 @@ def confirmHqConfigChange(_regId: uint256) -> bool:
 
 #### Access
 
-Only callable by governance
+Only callable by governance (see [LocalGov](./LocalGov.md) for governance details)
 
 #### Events Emitted
 
@@ -705,7 +707,7 @@ def cancelHqConfigChange(_regId: uint256) -> bool:
 
 #### Access
 
-Only callable by governance
+Only callable by governance (see [LocalGov](./LocalGov.md) for governance details)
 
 #### Events Emitted
 
@@ -990,7 +992,7 @@ def setMintingEnabled(_shouldEnable: bool):
 
 #### Access
 
-Only callable by governance
+Only callable by governance (see [LocalGov](./LocalGov.md) for governance details)
 
 #### Events Emitted
 
@@ -1033,7 +1035,7 @@ def recoverFunds(_recipient: address, _asset: address):
 
 #### Access
 
-Only callable by governance
+Only callable by governance (see [LocalGov](./LocalGov.md) for governance details)
 
 #### Events Emitted
 
@@ -1075,7 +1077,7 @@ def recoverFundsMany(_recipient: address, _assets: DynArray[address, MAX_RECOVER
 
 #### Access
 
-Only callable by governance
+Only callable by governance (see [LocalGov](./LocalGov.md) for governance details)
 
 #### Events Emitted
 
