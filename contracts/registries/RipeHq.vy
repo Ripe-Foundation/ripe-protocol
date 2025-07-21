@@ -303,6 +303,7 @@ def cancelHqConfigChange(_regId: uint256) -> bool:
 # validation
 
 
+@view
 @external
 def isValidHqConfig(
     _regId: uint256,
@@ -312,6 +313,7 @@ def isValidHqConfig(
     return self._isValidHqConfig(_regId, _canMintGreen, _canMintRipe)
 
 
+@view
 @internal
 def _isValidHqConfig(
     _regId: uint256,
