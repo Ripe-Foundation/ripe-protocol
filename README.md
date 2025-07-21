@@ -39,7 +39,7 @@ Thank you for helping keep Ripe protocol safe for everyone!
 | SwitchboardAlpha    | [0xDde6Bd1570fF2740bA9afb0D5a579f537074B9Ea](https://basescan.org/address/0xDde6Bd1570fF2740bA9afb0D5a579f537074B9Ea) |
 | SwitchboardBravo    | [0x39b5d43C51C4ab37C4153C32b5f825d10d1a83aD](https://basescan.org/address/0x39b5d43C51C4ab37C4153C32b5f825d10d1a83aD) |
 | SwitchboardCharlie  | [0xB96D9862838f17Ca51603EEECd54E99f33D3461d](https://basescan.org/address/0xB96D9862838f17Ca51603EEECd54E99f33D3461d) |
-| SwitchboardDelta    | [0x8d365eD80ea76aA8Bd132be71974A7ffa8990aC2](https://basescan.org/address/0x8d365eD80ea76aA8Bd132be71974A7ffa8990aC2) |
+| SwitchboardDelta    | [0x6C56Da2520b7f8B505D50F1FE25fb59928647708](https://basescan.org/address/0x6C56Da2520b7f8B505D50F1FE25fb59928647708) |
 | PriceDesk           | [0xe03Df96Fe695a6DdeD8711fa668b1eaE561C7A8C](https://basescan.org/address/0xe03Df96Fe695a6DdeD8711fa668b1eaE561C7A8C) |
 | ChainlinkPrices     | [0x10E14b0F24D44101a5543b0dd4dC39554dBD9761](https://basescan.org/address/0x10E14b0F24D44101a5543b0dd4dC39554dBD9761) |
 | CurvePrices         | [0x50C3eCC034436c7D962E7063Fc7cD8f05A97Bbc1](https://basescan.org/address/0x50C3eCC034436c7D962E7063Fc7cD8f05A97Bbc1) |
