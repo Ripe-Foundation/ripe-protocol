@@ -1105,4 +1105,4 @@ assert charlie_token.balanceOf(treasury.address) == 2000
 
 ## Testing
 
-For comprehensive test examples, see: [`tests/registries/test_ripe_hq.py`](../tests/registries/test_ripe_hq.py)
+For comprehensive test examples, see: [`tests/registries/test_ripe_hq.py`](../../tests/registries/test_ripe_hq.py)
