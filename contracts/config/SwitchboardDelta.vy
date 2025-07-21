@@ -915,12 +915,14 @@ def executePendingAction(_aid: uint256) -> bool:
 
     elif actionType == ActionType.BOND_BOOSTER_ADD:
         boosters: DynArray[BoosterConfig, MAX_BOOSTERS] = self.pendingBoosterConfigs[_aid]
-        extcall BondBooster(self._getBondRoomAddr()).setManyBondBoosters(boosters)
+        bondBooster: address = staticcall BondRoom(self._getBondRoomAddr()).bondBooster()
+        extcall BondBooster(bondBooster).setManyBondBoosters(boosters)
         log ManyBondBoostersSet(numBoosters=len(boosters))
 
     elif actionType == ActionType.BOND_BOOSTER_BOUNDARIES:
         boundaries: BoosterBoundaries = self.pendingBoosterBoundaries[_aid]
-        extcall BondBooster(self._getBondRoomAddr()).setMaxBoostAndMaxUnits(boundaries.maxBoostRatio, boundaries.maxUnits)
+        bondBooster: address = staticcall BondRoom(self._getBondRoomAddr()).bondBooster()
+        extcall BondBooster(bondBooster).setMaxBoostAndMaxUnits(boundaries.maxBoostRatio, boundaries.maxUnits)
         log BoosterBoundariesSet(maxBoostRatio=boundaries.maxBoostRatio, maxUnits=boundaries.maxUnits)
 
     elif actionType == ActionType.LOOT_USER_BALANCE_RESET:
