@@ -220,7 +220,7 @@ def getPrice(_asset: address, _staleTime: uint256 = 0, _priceDesk: address = emp
 | Name | Type | Description |
 |------|------|-------------|
 | `_asset` | `address` | Asset to get price for |
-| `_staleTime` | `uint256` | Maximum age for price data (0 accepts any) |
+| `_staleTime` | `uint256` | Maximum age for price data in seconds. The caller is responsible for providing this value. A value of 0 disables the staleness check for this call. |
 | `_priceDesk` | `address` | Not used in Stork implementation |
 
 #### Returns

@@ -487,11 +487,86 @@ green_to_add = endaoment.getGreenAmountToAddInStabilizer()
 # Returns: Amount of Green that would be added to pool
 ```
 
+### `getGreenAmountToRemoveInStabilizer`
+
+Previews how much Green would be removed from the stabilizer pool.
+
+```vyper
+@view
+@external
+def getGreenAmountToRemoveInStabilizer() -> uint256:
+```
+
+#### Returns
+
+| Type | Description |
+|------|-------------|
+| `uint256` | Green amount that would be removed |
+
+#### Access
+
+Public view function
+
+#### Example Usage
+```python
+# Preview stabilizer removal
+green_to_remove = endaoment.getGreenAmountToRemoveInStabilizer()
+# Returns: Amount of Green that would be removed from pool
+```
+
 ## Partner Liquidity Functions
+
+### `mintPartnerLiquidity`
+
+Takes a partner's asset, gets its USD value, and mints an equivalent amount of Green tokens.
+
+```vyper
+@nonreentrant
+@external
+def mintPartnerLiquidity(
+    _partner: address,
+    _asset: address,
+    _amount: uint256,
+) -> uint256:
+```
+
+#### Parameters
+
+| Name | Type | Description |
+|------|------|-------------|
+| `_partner` | `address` | Partner wallet providing asset |
+| `_asset` | `address` | Asset being provided |
+| `_amount` | `uint256` | Amount of asset |
+
+#### Returns
+
+| Type | Description |
+|------|-------------|
+| `uint256` | Amount of Green tokens minted |
+
+#### Access
+
+Only callable by Switchboard-registered contracts
+
+#### Events Emitted
+
+- `PartnerLiquidityMinted` - Contains partner address, asset, amount, and Green minted
+
+#### Example Usage
+```python
+# Partner provides 10 ETH for liquidity
+green_minted = endaoment.mintPartnerLiquidity(
+    partner.address,
+    weth.address,
+    10_000000000000000000,  # 10 ETH
+    sender=treasury_manager.address
+)
+# Returns: Amount of Green minted (e.g., 15000e18 if ETH = $1500)
+```
 
 ### `addPartnerLiquidity`
 
-Adds liquidity in partnership with external providers.
+Takes a partner's asset AND an existing amount of Green tokens and adds them to a liquidity pool.
 
 ```vyper
 @nonreentrant
@@ -516,8 +591,8 @@ def addPartnerLiquidity(
 | `_legoId` | `uint256` | AMM strategy ID |
 | `_pool` | `address` | Pool address |
 | `_asset` | `address` | Partner's asset |
-| `_partnerAmount` | `uint256` | Partner contribution |
-| `_greenAmount` | `uint256` | Green contribution |
+| `_partnerAmount` | `uint256` | Partner's asset contribution |
+| `_greenAmount` | `uint256` | Green token contribution |
 | `_minLpAmount` | `uint256` | Minimum LP tokens |
 | `_extraData` | `bytes32` | Pool-specific data |
 
@@ -535,20 +610,94 @@ Only callable by Switchboard-registered contracts
 
 - `PartnerLiquidityAdded` - Partnership liquidity details
 
-### `addPartnerLiquidityWithMint`
+#### Example Usage
+```python
+# Add partner asset + Green to Curve pool
+lp_tokens = endaoment.addPartnerLiquidity(
+    partner.address,
+    2,  # Curve Lego ID
+    curve_pool.address,
+    usdc.address,
+    1000_000000,  # 1000 USDC from partner
+    1000_000000000000000000,  # 1000 Green already in treasury
+    950_000000000000000000,  # Min LP tokens
+    b"",
+    sender=treasury_manager.address
+)
+```
 
-Creates liquidity by minting Green to pair with partner assets.
+## Swap and Exchange Functions
+
+### `swapTokens`
+
+Executes a series of token swaps through different DeFi protocols (Lego contracts).
 
 ```vyper
 @nonreentrant
 @external
-def addPartnerLiquidityWithMint(
-    _partner: address,
+def swapTokens(
+    _inputAsset: address,
+    _outputAsset: address,
+    _inputAmount: uint256,
+    _minOutputAmount: uint256,
+    _swapInstructions: DynArray[SwapInstruction, MAX_SWAP_INSTRUCTIONS],
+) -> uint256:
+```
+
+#### Parameters
+
+| Name | Type | Description |
+|------|------|-------------|
+| `_inputAsset` | `address` | Token to swap from |
+| `_outputAsset` | `address` | Token to swap to |
+| `_inputAmount` | `uint256` | Amount to swap |
+| `_minOutputAmount` | `uint256` | Minimum output expected |
+| `_swapInstructions` | `DynArray[SwapInstruction, 5]` | Routing instructions |
+
+#### Returns
+
+| Type | Description |
+|------|-------------|
+| `uint256` | Amount of output tokens received |
+
+#### Access
+
+Only callable by Switchboard-registered contracts
+
+#### Events Emitted
+
+- `WalletAction` - Swap details (op code 20)
+
+#### Example Usage
+```python
+# Swap USDC to ETH through multiple DEXes
+instructions = [
+    SwapInstruction(1, curve_pool, 500_000000),  # 50% through Curve
+    SwapInstruction(2, uniswap_pool, 500_000000) # 50% through Uniswap
+]
+eth_received = endaoment.swapTokens(
+    usdc.address,
+    weth.address,
+    1000_000000,  # 1000 USDC
+    650000000000000000,  # Min 0.65 ETH
+    instructions,
+    sender=treasury_manager.address
+)
+```
+
+### `mintOrRedeemAsset`
+
+A generic function for complex operations like minting rETH from ETH via Rocket Pool.
+
+```vyper
+@nonreentrant
+@external
+def mintOrRedeemAsset(
     _legoId: uint256,
-    _pool: address,
-    _asset: address,
-    _partnerAmount: uint256,
-    _minLpAmount: uint256 = 0,
+    _inputAsset: address,
+    _outputAsset: address,
+    _inputAmount: uint256,
+    _minOutputAmount: uint256,
     _extraData: bytes32 = empty(bytes32),
 ) -> uint256:
 ```
@@ -557,19 +706,18 @@ def addPartnerLiquidityWithMint(
 
 | Name | Type | Description |
 |------|------|-------------|
-| `_partner` | `address` | Partner wallet |
-| `_legoId` | `uint256` | Strategy ID |
-| `_pool` | `address` | Pool address |
-| `_asset` | `address` | Partner asset |
-| `_partnerAmount` | `uint256` | Partner contribution |
-| `_minLpAmount` | `uint256` | Minimum LP tokens |
-| `_extraData` | `bytes32` | Pool-specific data |
+| `_legoId` | `uint256` | Protocol strategy ID |
+| `_inputAsset` | `address` | Asset to provide |
+| `_outputAsset` | `address` | Asset to receive |
+| `_inputAmount` | `uint256` | Amount to convert |
+| `_minOutputAmount` | `uint256` | Minimum output |
+| `_extraData` | `bytes32` | Protocol-specific data |
 
 #### Returns
 
 | Type | Description |
 |------|-------------|
-| `uint256` | LP tokens received |
+| `uint256` | Amount of output asset received |
 
 #### Access
 
@@ -577,7 +725,308 @@ Only callable by Switchboard-registered contracts
 
 #### Events Emitted
 
-- `PartnerLiquidityMinted` - Mint-and-pair details
+- `WalletAction` - Mint/redeem details (op code 21)
+
+#### Example Usage
+```python
+# Mint rETH from ETH via Rocket Pool
+reth_received = endaoment.mintOrRedeemAsset(
+    5,  # Rocket Pool Lego ID
+    weth.address,
+    reth.address,
+    10_000000000000000000,  # 10 ETH
+    9_800000000000000000,   # Min 9.8 rETH
+    b"",
+    sender=treasury_manager.address
+)
+```
+
+### `confirmMintOrRedeemAsset`
+
+Confirms a pending mint/redeem operation if the Lego contract has a time delay.
+
+```vyper
+@nonreentrant
+@external
+def confirmMintOrRedeemAsset(
+    _legoId: uint256,
+    _outputAsset: address,
+    _extraData: bytes32 = empty(bytes32),
+) -> uint256:
+```
+
+#### Parameters
+
+| Name | Type | Description |
+|------|------|-------------|
+| `_legoId` | `uint256` | Protocol strategy ID |
+| `_outputAsset` | `address` | Asset to claim |
+| `_extraData` | `bytes32` | Protocol-specific data |
+
+#### Returns
+
+| Type | Description |
+|------|-------------|
+| `uint256` | Amount of output asset received |
+
+#### Access
+
+Only callable by Switchboard-registered contracts
+
+#### Events Emitted
+
+- `WalletAction` - Confirmation details (op code 22)
+
+## Yield and Reward Functions
+
+### `claimRewards`
+
+A generic function to claim accumulated rewards from any yield strategy.
+
+```vyper
+@nonreentrant
+@external
+def claimRewards(
+    _legoId: uint256,
+    _vaultToken: address,
+    _rewardAssets: DynArray[address, MAX_ASSETS],
+    _extraData: bytes32 = empty(bytes32),
+) -> DynArray[uint256, MAX_ASSETS]:
+```
+
+#### Parameters
+
+| Name | Type | Description |
+|------|------|-------------|
+| `_legoId` | `uint256` | Strategy ID with rewards |
+| `_vaultToken` | `address` | Vault token earning rewards |
+| `_rewardAssets` | `DynArray[address, 10]` | Expected reward tokens |
+| `_extraData` | `bytes32` | Strategy-specific data |
+
+#### Returns
+
+| Type | Description |
+|------|-------------|
+| `DynArray[uint256, 10]` | Amounts of each reward token claimed |
+
+#### Access
+
+Only callable by Switchboard-registered contracts
+
+#### Events Emitted
+
+- `WalletAction` - Reward claim details (op code 12)
+
+#### Example Usage
+```python
+# Claim rewards from Aave position
+reward_assets = [aave_token.address, stkAAVE.address]
+rewards_claimed = endaoment.claimRewards(
+    1,  # Aave Lego ID
+    aUSDC.address,
+    reward_assets,
+    b"",
+    sender=treasury_manager.address
+)
+# Returns: [1000e18, 500e18] (1000 AAVE, 500 stkAAVE)
+```
+
+## ETH and WETH Conversion
+
+### `convertEthToWeth`
+
+A payable function to wrap ETH into WETH.
+
+```vyper
+@payable
+@nonreentrant
+@external
+def convertEthToWeth(_amount: uint256 = max_value(uint256)) -> uint256:
+```
+
+#### Parameters
+
+| Name | Type | Description |
+|------|------|-------------|
+| `_amount` | `uint256` | Amount to wrap (max = msg.value) |
+
+#### Returns
+
+| Type | Description |
+|------|-------------|
+| `uint256` | Amount of WETH received |
+
+#### Access
+
+Only callable by Switchboard-registered contracts
+
+#### Events Emitted
+
+- `WalletAction` - ETH wrap details (op code 80)
+
+#### Example Usage
+```python
+# Wrap 5 ETH to WETH
+weth_amount = endaoment.convertEthToWeth(
+    5_000000000000000000,
+    value=5_000000000000000000,  # Send 5 ETH
+    sender=treasury_manager.address
+)
+# Returns: 5000000000000000000 (5 WETH)
+```
+
+### `convertWethToEth`
+
+Unwraps WETH back into ETH.
+
+```vyper
+@nonreentrant
+@external
+def convertWethToEth(_amount: uint256 = max_value(uint256)) -> uint256:
+```
+
+#### Parameters
+
+| Name | Type | Description |
+|------|------|-------------|
+| `_amount` | `uint256` | Amount to unwrap (max = balance) |
+
+#### Returns
+
+| Type | Description |
+|------|-------------|
+| `uint256` | Amount of ETH received |
+
+#### Access
+
+Only callable by Switchboard-registered contracts
+
+#### Events Emitted
+
+- `WalletAction` - ETH unwrap details (op code 81)
+
+#### Example Usage
+```python
+# Unwrap all WETH to ETH
+eth_amount = endaoment.convertWethToEth(
+    sender=treasury_manager.address
+)
+# Returns: Amount of ETH received
+```
+
+## Concentrated Liquidity Functions
+
+### `addLiquidityConcentrated`
+
+Adds liquidity to a concentrated liquidity position, represented by an NFT.
+
+```vyper
+@nonreentrant
+@external
+def addLiquidityConcentrated(
+    _legoId: uint256,
+    _pool: address,
+    _nftTokenId: uint256,
+    _tokenA: address,
+    _tokenB: address,
+    _amountA: uint256 = max_value(uint256),
+    _amountB: uint256 = max_value(uint256),
+    _minAmountA: uint256 = 0,
+    _minAmountB: uint256 = 0,
+    _extraData: bytes32 = empty(bytes32),
+) -> (uint256, uint256, uint256):
+```
+
+#### Parameters
+
+| Name | Type | Description |
+|------|------|-------------|
+| `_legoId` | `uint256` | Concentrated AMM strategy ID |
+| `_pool` | `address` | Pool address |
+| `_nftTokenId` | `uint256` | Position NFT ID (0 for new) |
+| `_tokenA` | `address` | First token |
+| `_tokenB` | `address` | Second token |
+| `_amountA` | `uint256` | Amount of token A |
+| `_amountB` | `uint256` | Amount of token B |
+| `_minAmountA` | `uint256` | Minimum token A to use |
+| `_minAmountB` | `uint256` | Minimum token B to use |
+| `_extraData` | `bytes32` | Position parameters |
+
+#### Returns
+
+| Type | Description |
+|------|-------------|
+| `(uint256, uint256, uint256)` | (amountAUsed, amountBUsed, nftTokenId) |
+
+#### Access
+
+Only callable by Switchboard-registered contracts
+
+#### Events Emitted
+
+- `WalletAction` - Concentrated liquidity details (op code 32)
+
+#### Example Usage
+```python
+# Add to Uniswap V3 position
+amount_a, amount_b, nft_id = endaoment.addLiquidityConcentrated(
+    3,  # UniV3 Lego ID
+    univ3_pool.address,
+    0,  # Create new position
+    usdc.address,
+    weth.address,
+    1000_000000,  # 1000 USDC
+    1_000000000000000000,  # 1 ETH
+    950_000000,  # Min 950 USDC
+    950000000000000000,  # Min 0.95 ETH
+    encode_tick_range(-887220, 887220),  # Full range
+    sender=treasury_manager.address
+)
+```
+
+### `removeLiquidityConcentrated`
+
+Removes liquidity from a concentrated liquidity position.
+
+```vyper
+@nonreentrant
+@external
+def removeLiquidityConcentrated(
+    _legoId: uint256,
+    _pool: address,
+    _nftTokenId: uint256,
+    _liquidity: uint256 = max_value(uint256),
+    _minAmountA: uint256 = 0,
+    _minAmountB: uint256 = 0,
+    _extraData: bytes32 = empty(bytes32),
+) -> (uint256, uint256):
+```
+
+#### Parameters
+
+| Name | Type | Description |
+|------|------|-------------|
+| `_legoId` | `uint256` | Concentrated AMM strategy ID |
+| `_pool` | `address` | Pool address |
+| `_nftTokenId` | `uint256` | Position NFT ID |
+| `_liquidity` | `uint256` | Liquidity to remove |
+| `_minAmountA` | `uint256` | Minimum token A out |
+| `_minAmountB` | `uint256` | Minimum token B out |
+| `_extraData` | `bytes32` | Strategy-specific data |
+
+#### Returns
+
+| Type | Description |
+|------|-------------|
+| `(uint256, uint256)` | (amountAReceived, amountBReceived) |
+
+#### Access
+
+Only callable by Switchboard-registered contracts
+
+#### Events Emitted
+
+- `WalletAction` - Removal details (op code 33)
 
 ## Utility Functions
 
@@ -624,6 +1073,53 @@ Only callable by Switchboard-registered contracts
 #### Events Emitted
 
 - `EndaomentNftRecovered` - NFT recovery details
+
+## Treasury Management
+
+### `repayPoolDebt`
+
+Repays the debt that was created when minting Green for the stabilizer pool.
+
+```vyper
+@nonreentrant
+@external
+def repayPoolDebt(_amount: uint256 = max_value(uint256)) -> uint256:
+```
+
+#### Parameters
+
+| Name | Type | Description |
+|------|------|-------------|
+| `_amount` | `uint256` | Amount to repay (max = full debt) |
+
+#### Returns
+
+| Type | Description |
+|------|-------------|
+| `uint256` | Amount of debt repaid |
+
+#### Access
+
+Only callable by Switchboard-registered contracts
+
+#### Events Emitted
+
+- `PoolDebtRepaid` - Contains amount repaid and remaining debt
+
+#### Example Usage
+```python
+# Repay all stabilizer pool debt
+debt_repaid = endaoment.repayPoolDebt(
+    sender=treasury_manager.address
+)
+# Returns: Amount of Green burned to repay debt
+
+# Repay partial debt
+debt_repaid = endaoment.repayPoolDebt(
+    500_000000000000000000,  # Repay 500 Green
+    sender=treasury_manager.address
+)
+```
 
 ## Key Mathematical Functions
 

@@ -478,7 +478,7 @@ def startAddNewAddressToRegistry(_addr: address, _description: String[64]) -> bo
 
 #### Access
 
-Only callable by governance or when not paused (see [LocalGov](../LocalGov.md) for governance details)
+Only callable by governance AND only when the contract is not paused (see [LocalGov](../LocalGov.md) for governance details)
 
 #### Events Emitted
 
@@ -519,7 +519,7 @@ def confirmNewAddressToRegistry(_addr: address) -> uint256:
 
 #### Access
 
-Only callable by governance or when not paused
+Only callable by governance AND only when the contract is not paused
 
 #### Events Emitted
 
@@ -559,7 +559,7 @@ def cancelNewAddressToRegistry(_addr: address) -> bool:
 
 #### Access
 
-Only callable by governance or when not paused
+Only callable by governance AND only when the contract is not paused
 
 #### Events Emitted
 
@@ -597,7 +597,7 @@ def startAddressUpdateToRegistry(_regId: uint256, _newAddr: address) -> bool:
 
 #### Access
 
-Only callable by governance or when not paused
+Only callable by governance AND only when the contract is not paused
 
 #### Events Emitted
 
@@ -636,7 +636,7 @@ def confirmAddressUpdateToRegistry(_regId: uint256) -> bool:
 
 #### Access
 
-Only callable by governance or when not paused
+Only callable by governance AND only when the contract is not paused
 
 #### Events Emitted
 
@@ -675,7 +675,7 @@ def cancelAddressUpdateToRegistry(_regId: uint256) -> bool:
 
 #### Access
 
-Only callable by governance or when not paused
+Only callable by governance AND only when the contract is not paused
 
 #### Events Emitted
 
@@ -704,7 +704,7 @@ def startAddressDisableInRegistry(_regId: uint256) -> bool:
 
 #### Access
 
-Only callable by governance or when not paused
+Only callable by governance AND only when the contract is not paused
 
 #### Events Emitted
 
@@ -742,7 +742,7 @@ def confirmAddressDisableInRegistry(_regId: uint256) -> bool:
 
 #### Access
 
-Only callable by governance or when not paused
+Only callable by governance AND only when the contract is not paused
 
 #### Events Emitted
 
@@ -771,7 +771,7 @@ def cancelAddressDisableInRegistry(_regId: uint256) -> bool:
 
 #### Access
 
-Only callable by governance or when not paused
+Only callable by governance AND only when the contract is not paused
 
 #### Events Emitted
 
@@ -798,7 +798,7 @@ def addPriceSnapshot(_asset: address) -> bool:
 
 | Type | Description |
 |------|-------------|
-| `bool` | True if any oracle was updated |
+| `bool` | Returns `True` if a snapshot was successfully triggered on at least one price source. Returns `False` if no price sources had a feed for the asset. |
 
 #### Access
 

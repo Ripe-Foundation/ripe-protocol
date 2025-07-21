@@ -598,6 +598,245 @@ def getCollateralValue(_user: address) -> uint256:
 
 Public view function
 
+### `updateDebtForUser`
+
+Manually recalculates and updates a user's debt state, including interest accrual and debt term weighting.
+
+```vyper
+@external
+def updateDebtForUser(_user: address) -> bool:
+```
+
+#### Parameters
+
+| Name | Type | Description |
+|------|------|-------------|
+| `_user` | `address` | User whose debt to update |
+
+#### Returns
+
+| Type | Description |
+|------|-------------|
+| `bool` | True if update successful |
+
+#### Access
+
+Callable by any valid Ripe address (not just Teller or AuctionHouse)
+
+#### Example Usage
+```python
+# Update user's debt state
+success = credit_engine.updateDebtForUser(
+    user.address,
+    sender=keeper.address  # Any valid Ripe address
+)
+```
+
+## Debt Health Check Functions
+
+### `hasGoodDebtHealth`
+
+Checks if a user's collateral value is sufficient to cover their debt based on the LTV.
+
+```vyper
+@view
+@external
+def hasGoodDebtHealth(_user: address) -> bool:
+```
+
+#### Parameters
+
+| Name | Type | Description |
+|------|------|-------------|
+| `_user` | `address` | User to check |
+
+#### Returns
+
+| Type | Description |
+|------|-------------|
+| `bool` | True if user has healthy debt position |
+
+#### Access
+
+Public view function
+
+#### Example Usage
+```python
+# Check if user position is healthy
+is_healthy = credit_engine.hasGoodDebtHealth(user.address)
+# Returns: True if collateral value > debt * LTV
+```
+
+### `canLiquidateUser`
+
+Checks if a user's collateral value has fallen below their liquidation threshold.
+
+```vyper
+@view
+@external
+def canLiquidateUser(_user: address) -> bool:
+```
+
+#### Parameters
+
+| Name | Type | Description |
+|------|------|-------------|
+| `_user` | `address` | User to check |
+
+#### Returns
+
+| Type | Description |
+|------|-------------|
+| `bool` | True if user can be liquidated |
+
+#### Access
+
+Public view function
+
+#### Example Usage
+```python
+# Check if user can be liquidated
+can_liquidate = credit_engine.canLiquidateUser(user.address)
+# Returns: True if collateral < liquidation threshold
+```
+
+### `canRedeemUserCollateral`
+
+Checks if a user's collateral value has fallen below their redemption threshold.
+
+```vyper
+@view
+@external
+def canRedeemUserCollateral(_user: address) -> bool:
+```
+
+#### Parameters
+
+| Name | Type | Description |
+|------|------|-------------|
+| `_user` | `address` | User to check |
+
+#### Returns
+
+| Type | Description |
+|------|-------------|
+| `bool` | True if user's collateral can be redeemed |
+
+#### Access
+
+Public view function
+
+#### Example Usage
+```python
+# Check if collateral can be redeemed
+can_redeem = credit_engine.canRedeemUserCollateral(user.address)
+# Returns: True if collateral < redemption threshold
+```
+
+## Threshold Getter Functions
+
+### `getLiquidationThreshold`
+
+Returns the USD collateral value at which a user becomes eligible for liquidation.
+
+```vyper
+@view
+@external
+def getLiquidationThreshold(_user: address) -> uint256:
+```
+
+#### Parameters
+
+| Name | Type | Description |
+|------|------|-------------|
+| `_user` | `address` | User to check |
+
+#### Returns
+
+| Type | Description |
+|------|-------------|
+| `uint256` | USD value threshold for liquidation |
+
+#### Access
+
+Public view function
+
+#### Example Usage
+```python
+# Get liquidation threshold
+liq_threshold = credit_engine.getLiquidationThreshold(user.address)
+# Returns: 110000000000000000000 ($110 if debt is $100)
+```
+
+### `getRedemptionThreshold`
+
+Returns the USD collateral value at which a user's collateral becomes eligible for redemption.
+
+```vyper
+@view
+@external
+def getRedemptionThreshold(_user: address) -> uint256:
+```
+
+#### Parameters
+
+| Name | Type | Description |
+|------|------|-------------|
+| `_user` | `address` | User to check |
+
+#### Returns
+
+| Type | Description |
+|------|-------------|
+| `uint256` | USD value threshold for redemption |
+
+#### Access
+
+Public view function
+
+#### Example Usage
+```python
+# Get redemption threshold
+redeem_threshold = credit_engine.getRedemptionThreshold(user.address)
+# Returns: 105000000000000000000 ($105 if debt is $100)
+```
+
+## Dynamic Rate Functions
+
+### `getDynamicBorrowRate`
+
+Takes a base borrow rate and returns the final, adjusted rate after applying dynamic boosts based on market conditions.
+
+```vyper
+@view
+@external
+def getDynamicBorrowRate(_baseBorrowRate: uint256) -> uint256:
+```
+
+#### Parameters
+
+| Name | Type | Description |
+|------|------|-------------|
+| `_baseBorrowRate` | `uint256` | Base borrow rate before adjustments |
+
+#### Returns
+
+| Type | Description |
+|------|-------------|
+| `uint256` | Adjusted borrow rate with dynamic boosts |
+
+#### Access
+
+Public view function
+
+#### Example Usage
+```python
+# Get dynamic rate based on stability pool health
+base_rate = 500  # 5%
+dynamic_rate = credit_engine.getDynamicBorrowRate(base_rate)
+# Returns: 700 (7% if stability pool in danger)
+```
+
 ## Key Mathematical Functions
 
 ### Weighted Terms Calculation

@@ -452,7 +452,7 @@ Protocol governance only.
 - No transfers
 - No approvals
 - No minting
-- Burning still allowed
+- No burning
 
 ## Initial Setup Function
 

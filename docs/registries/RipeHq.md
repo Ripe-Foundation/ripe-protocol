@@ -475,7 +475,7 @@ success = ripe_hq.startAddressDisableInRegistry(
 )
 ```
 
-**Example Output**: Returns `True` if not a token ID, reverts with "cannot disable token" for IDs 1-3
+**Example Output**: Returns `True` if not a token ID, reverts with "dev: cannot disable token" for IDs 1-3
 
 ### `confirmAddressDisableInRegistry`
 
@@ -662,7 +662,7 @@ def confirmHqConfigChange(_regId: uint256) -> bool:
 
 | Type | Description |
 |------|-------------|
-| `bool` | True if successfully confirmed |
+| `bool` | True if successfully confirmed, False if the configuration is invalid (in which case the pending configuration is deleted) |
 
 #### Access
 
@@ -711,7 +711,7 @@ Only callable by governance (see [LocalGov](./LocalGov.md) for governance detail
 
 #### Events Emitted
 
-- `HqConfigChangeCancelled` - Contains registry ID, description, permissions, and both initiation and confirmation blocks
+- `HqConfigChangeCancelled` - Contains registry ID, description, permissions (canMintGreen, canMintRipe, canSetTokenBlacklist), initiatedBlock, and confirmBlock
 
 #### Example Usage
 ```python
@@ -729,6 +729,7 @@ success = ripe_hq.cancelHqConfigChange(
 Validates whether a proposed configuration is valid for a given registry ID. Checks that non-token entries support the requested minting capabilities.
 
 ```vyper
+@view
 @external
 def isValidHqConfig(
     _regId: uint256,
@@ -753,7 +754,7 @@ def isValidHqConfig(
 
 #### Access
 
-Public view function
+Public external function (marked with `@view` decorator)
 
 #### Example Usage
 ```python

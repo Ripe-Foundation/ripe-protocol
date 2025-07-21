@@ -367,6 +367,170 @@ claimable = lootbox.getClaimableLoot(user.address)
 # Returns: Total Ripe tokens available to claim
 ```
 
+## Granular Claiming Functions
+
+### `claimDepositLootForAsset`
+
+Claims rewards for a single deposit position rather than all positions.
+
+```vyper
+@external
+def claimDepositLootForAsset(
+    _user: address,
+    _vaultId: uint256,
+    _asset: address
+) -> uint256:
+```
+
+#### Parameters
+
+| Name | Type | Description |
+|------|------|-------------|
+| `_user` | `address` | User to claim rewards for |
+| `_vaultId` | `uint256` | Specific vault ID |
+| `_asset` | `address` | Specific asset to claim for |
+
+#### Returns
+
+| Type | Description |
+|------|-------------|
+| `uint256` | Ripe tokens claimed for this position |
+
+#### Access
+
+Only callable by valid Ripe addresses
+
+#### Events Emitted
+
+- `DepositLootClaimed` - Deposit rewards claimed for specific position
+
+#### Example Usage
+```python
+# Claim rewards for only USDC deposits in vault 1
+claimed = lootbox.claimDepositLootForAsset(
+    user.address,
+    1,  # Vault ID
+    usdc.address,
+    sender=teller.address
+)
+```
+
+**Example Output**: Claims and distributes rewards for a single deposit position
+
+### `claimBorrowLoot`
+
+Claims only borrowing-related rewards for a user.
+
+```vyper
+@external
+def claimBorrowLoot(_user: address) -> uint256:
+```
+
+#### Parameters
+
+| Name | Type | Description |
+|------|------|-------------|
+| `_user` | `address` | User to claim borrowing rewards for |
+
+#### Returns
+
+| Type | Description |
+|------|-------------|
+| `uint256` | Ripe tokens claimed from borrowing |
+
+#### Access
+
+Only callable by valid Ripe addresses
+
+#### Events Emitted
+
+- `BorrowLootClaimed` - Borrowing rewards claimed
+
+#### Example Usage
+```python
+# Claim only borrowing rewards
+borrow_rewards = lootbox.claimBorrowLoot(
+    user.address,
+    sender=teller.address
+)
+```
+
+**Example Output**: Claims rewards accumulated from borrowing activities only
+
+### `getClaimableDepositLootForAsset`
+
+Previews claimable rewards for a specific deposit position.
+
+```vyper
+@view
+@external
+def getClaimableDepositLootForAsset(
+    _user: address,
+    _vaultId: uint256,
+    _asset: address
+) -> uint256:
+```
+
+#### Parameters
+
+| Name | Type | Description |
+|------|------|-------------|
+| `_user` | `address` | User to check |
+| `_vaultId` | `uint256` | Vault ID |
+| `_asset` | `address` | Asset to check |
+
+#### Returns
+
+| Type | Description |
+|------|-------------|
+| `uint256` | Claimable Ripe tokens for this position |
+
+#### Access
+
+Public view function
+
+#### Example Usage
+```python
+# Check rewards for specific position
+position_rewards = lootbox.getClaimableDepositLootForAsset(
+    user.address,
+    1,  # Vault ID
+    usdc.address
+)
+```
+
+### `getClaimableBorrowLoot`
+
+Previews claimable borrowing rewards.
+
+```vyper
+@view
+@external
+def getClaimableBorrowLoot(_user: address) -> uint256:
+```
+
+#### Parameters
+
+| Name | Type | Description |
+|------|------|-------------|
+| `_user` | `address` | User to check |
+
+#### Returns
+
+| Type | Description |
+|------|-------------|
+| `uint256` | Claimable Ripe tokens from borrowing |
+
+#### Access
+
+Public view function
+
+#### Example Usage
+```python
+# Check borrowing rewards
+borrow_rewards = lootbox.getClaimableBorrowLoot(user.address)
+```
+
 ## Points Update Functions
 
 ### `updateDepositPoints`
@@ -467,6 +631,81 @@ lootbox.resetUserBorrowPoints(
 )
 ```
 
+## Administrative Reset Functions
+
+### `resetUserBalancePoints`
+
+Resets a single user's deposit points for one specific asset. Used for maintenance or correcting state.
+
+```vyper
+@external
+def resetUserBalancePoints(
+    _user: address,
+    _asset: address,
+    _vaultId: uint256
+):
+```
+
+#### Parameters
+
+| Name | Type | Description |
+|------|------|-------------|
+| `_user` | `address` | User whose points to reset |
+| `_asset` | `address` | Specific asset to reset |
+| `_vaultId` | `uint256` | Vault ID for the position |
+
+#### Access
+
+Only callable by Switchboard-registered contracts
+
+#### Example Usage
+```python
+# Reset user's USDC points in vault 1
+lootbox.resetUserBalancePoints(
+    user.address,
+    usdc.address,
+    1,  # Vault ID
+    sender=admin_contract.address
+)
+```
+
+**Example Output**: Resets the user's accumulated points for the specified position to zero
+
+### `resetAssetPoints`
+
+Resets the entire points cache for a specific asset within a vault. Affects all users holding this asset.
+
+```vyper
+@external
+def resetAssetPoints(
+    _asset: address,
+    _vaultId: uint256
+):
+```
+
+#### Parameters
+
+| Name | Type | Description |
+|------|------|-------------|
+| `_asset` | `address` | Asset to reset points for |
+| `_vaultId` | `uint256` | Vault ID containing the asset |
+
+#### Access
+
+Only callable by Switchboard-registered contracts
+
+#### Example Usage
+```python
+# Reset all USDC points in vault 1
+lootbox.resetAssetPoints(
+    usdc.address,
+    1,  # Vault ID
+    sender=admin_contract.address
+)
+```
+
+**Example Output**: Resets accumulated points for all users holding this asset in the specified vault
+
 ## View Functions
 
 ### `getLatestDepositPoints`
@@ -532,6 +771,70 @@ def getLatestBorrowPoints(
 #### Access
 
 Public view function
+
+## Global Rewards Update Functions
+
+### `updateRipeRewards`
+
+Manually triggers an update of the global Ripe reward buckets based on block-based emissions. This function calculates new rewards and distributes them across the four reward categories.
+
+```vyper
+@external
+def updateRipeRewards():
+```
+
+#### Parameters
+
+*This function takes no parameters*
+
+#### Access
+
+Only callable by valid Ripe addresses
+
+#### Example Usage
+```python
+# Manually update global rewards
+lootbox.updateRipeRewards(sender=rewards_updater.address)
+```
+
+**Example Output**: Updates global reward pools based on `ripePerBlock` emissions and allocation percentages
+
+### `getLatestGlobalRipeRewards`
+
+Previews the state of global reward buckets after accounting for block-based emissions. This is a view function that shows what the rewards would be if updated now.
+
+```vyper
+@view
+@external
+def getLatestGlobalRipeRewards() -> RipeRewards:
+```
+
+#### Parameters
+
+*This function takes no parameters*
+
+#### Returns
+
+| Type | Description |
+|------|-------------|
+| `RipeRewards` | Current global rewards state including borrowers, stakers, voters, and general depositors allocations |
+
+#### Access
+
+Public view function
+
+#### Example Usage
+```python
+# Check current global rewards state
+rewards = lootbox.getLatestGlobalRipeRewards()
+# Returns RipeRewards struct with:
+# - borrowers: Total rewards for borrowers
+# - stakers: Total rewards for stakers
+# - voters: Total rewards for voters
+# - genDepositors: Total rewards for general depositors
+# - newRipeRewards: New rewards since last update
+# - lastUpdate: Block number of last update
+```
 
 ## Key Mathematical Functions
 
