@@ -223,7 +223,7 @@ def purchaseRipeBond(
 
     # start next epoch (if applicable)
     if paymentAmount == data.paymentAmountAvailInEpoch and config.shouldAutoRestart:
-        newStartBlock: uint256 = block.number + config.restartDelayBlocks
+        newStartBlock: uint256 = epochEnd + config.restartDelayBlocks
         extcall Ledger(a.ledger).setEpochData(newStartBlock, newStartBlock + config.epochLength, config.amountPerEpoch)
 
     log RipeBondPurchased(
