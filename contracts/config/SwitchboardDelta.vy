@@ -57,7 +57,6 @@ interface BondRoom:
 
 interface Ledger:
     def isHrContributor(_contributor: address) -> bool: view
-    def getEpochData() -> (uint256, uint256): view
     def setBadDebt(_amount: uint256): nonpayable
 
 interface RipeHq:
@@ -73,7 +72,6 @@ flag ActionType:
     HR_CANCEL_PAYCHECK
     RIPE_BOND_CONFIG
     RIPE_BOND_EPOCH_LENGTH
-    RIPE_BOND_START_EPOCH
     RIPE_BAD_DEBT
     RIPE_BOND_BOOSTER
     BOND_BOOSTER_ADD
@@ -177,16 +175,6 @@ event PendingRipeBondConfigSet:
 
 event PendingRipeBondEpochLengthSet:
     epochLength: uint256
-    confirmationBlock: uint256
-    actionId: uint256
-
-event BondEpochRestarted:
-    prevEpochStart: uint256
-    prevEpochEnd: uint256
-    restartedBy: indexed(address)
-
-event PendingStartEpochAtBlockSet:
-    startBlock: uint256
     confirmationBlock: uint256
     actionId: uint256
 
@@ -630,43 +618,17 @@ def setRipeBondEpochLength(_epochLength: uint256) -> uint256:
     return aid
 
 
-# restart epoch
-
-
-@external
-def restartBondEpoch() -> bool:
-    assert gov._canGovern(msg.sender) # dev: no perms
-
-    # validate epoch is in progress
-    ledger: address = self._getLedgerAddr()
-    epochStart: uint256 = 0
-    epochEnd: uint256 = 0
-    epochStart, epochEnd = staticcall Ledger(ledger).getEpochData()
-    if epochStart == 0 or epochEnd == 0:
-        return False
-
-    # validate epoch is in progress
-    if block.number < epochStart or block.number > epochEnd:
-        return False
-
-    extcall BondRoom(self._getBondRoomAddr()).startBondEpochAtBlock(0) # reset epoch
-    log BondEpochRestarted(prevEpochStart=epochStart, prevEpochEnd=epochEnd, restartedBy=msg.sender)
-    return True
-
-
 # start epoch at block
 
 
 @external
-def setStartEpochAtBlock(_block: uint256 = 0) -> uint256:
+def setStartEpochAtBlock(_block: uint256 = 0):
     assert gov._canGovern(msg.sender) # dev: no perms
-    aid: uint256 = timeLock._initiateAction()
-    self.actionType[aid] = ActionType.RIPE_BOND_START_EPOCH
+
     blockNum: uint256 = max(_block, block.number)
-    self.pendingRipeBondConfigValue[aid] = blockNum
-    confirmationBlock: uint256 = timeLock._getActionConfirmationBlock(aid)
-    log PendingStartEpochAtBlockSet(startBlock=blockNum, confirmationBlock=confirmationBlock, actionId=aid)
-    return aid
+    bondRoom: address = self._getBondRoomAddr()
+    extcall BondRoom(bondRoom).startBondEpochAtBlock(blockNum)
+    log RipeBondStartEpochAtBlockSet(startBlock=blockNum)
 
 
 # disable / enable bonding
@@ -888,20 +850,13 @@ def executePendingAction(_aid: uint256) -> bool:
         config.shouldAutoRestart = p.shouldAutoRestart
         config.restartDelayBlocks = p.restartDelayBlocks
         extcall MissionControl(mc).setRipeBondConfig(config)
-        extcall BondRoom(self._getBondRoomAddr()).startBondEpochAtBlock(0) # reset epoch
         log RipeBondConfigSet(asset=p.asset, amountPerEpoch=p.amountPerEpoch, minRipePerUnit=p.minRipePerUnit, maxRipePerUnit=p.maxRipePerUnit, maxRipePerUnitLockBonus=p.maxRipePerUnitLockBonus, shouldAutoRestart=p.shouldAutoRestart)
 
     elif actionType == ActionType.RIPE_BOND_EPOCH_LENGTH:
         config: cs.RipeBondConfig = staticcall MissionControl(mc).ripeBondConfig()
         config.epochLength = self.pendingRipeBondConfigValue[_aid]
         extcall MissionControl(mc).setRipeBondConfig(config)
-        extcall BondRoom(self._getBondRoomAddr()).startBondEpochAtBlock(0) # reset epoch
         log RipeBondEpochLengthSet(epochLength=config.epochLength)
-
-    elif actionType == ActionType.RIPE_BOND_START_EPOCH:
-        startBlock: uint256 = self.pendingRipeBondConfigValue[_aid]
-        extcall BondRoom(self._getBondRoomAddr()).startBondEpochAtBlock(startBlock)
-        log RipeBondStartEpochAtBlockSet(startBlock=startBlock)
 
     elif actionType == ActionType.RIPE_BAD_DEBT:
         amount: uint256 = self.pendingRipeBondConfigValue[_aid]

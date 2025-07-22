@@ -90,6 +90,8 @@ event RipeBondPurchased:
     ripeForBadDebt: uint256
     epochProgress: uint256
     refundAmount: uint256
+    epochStart: uint256
+    epochEnd: uint256
     caller: indexed(address)
 
 event BondBoosterSet:
@@ -239,6 +241,8 @@ def purchaseRipeBond(
         ripeForBadDebt=ripeForBadDebt,
         epochProgress=epochProgress,
         refundAmount=refundAmount,
+        epochStart=epochStart,
+        epochEnd=epochEnd,
         caller=_caller,
     )
     return totalRipePayout
