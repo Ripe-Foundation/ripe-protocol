@@ -21,7 +21,7 @@ SimpleErc20 is built using a modular architecture with delegation to foundationa
 ### Core Module Dependencies
 - **BasicVault**: Provides fundamental vault operations with direct asset-amount accounting
 - **VaultData**: Manages user balances, asset registration, and vault state
-- **Addys**: Handles protocol address resolution and permission management
+- **[Addys](../modules/Addys.md)**: Handles protocol address resolution and permission management
 
 ### Module Initialization
 ```vyper

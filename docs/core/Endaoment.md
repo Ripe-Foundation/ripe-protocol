@@ -23,6 +23,7 @@ Endaoment is built using a modular architecture with the following components:
 ### Addys Module
 - **Location**: `contracts/modules/Addys.vy`
 - **Purpose**: Provides protocol-wide address resolution
+- **Documentation**: See [Addys Technical Documentation](../modules/Addys.md)
 - **Key Features**:
   - Access to all protocol contract addresses
   - Validation of caller permissions

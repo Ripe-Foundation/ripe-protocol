@@ -47,6 +47,7 @@ Switchboard is built using a modular architecture that inherits functionality fr
 ### Addys Module
 - **Location**: `contracts/modules/Addys.vy`
 - **Purpose**: Provides RipeHq integration for address lookups
+- **Documentation**: See [Addys Technical Documentation](../modules/Addys.md)
 - **Key Features**:
   - Access to RipeHq address
   - Protocol address validation

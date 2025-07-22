@@ -25,6 +25,7 @@ MissionControl is built using a modular architecture that provides foundational 
 ### Addys Module
 - **Location**: `contracts/modules/Addys.vy`
 - **Purpose**: Provides protocol-wide address resolution and validation
+- **Documentation**: See [Addys Technical Documentation](../modules/Addys.md)
 - **Key Features**:
   - Access to all protocol contract addresses
   - Validation that only Switchboard-registered contracts can modify configurations

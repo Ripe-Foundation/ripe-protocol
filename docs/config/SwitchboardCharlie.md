@@ -43,6 +43,7 @@ SwitchboardCharlie is built using a modular architecture with the following comp
 ### Addys Module (imported for interfaces)
 - **Location**: `contracts/modules/Addys.vy`
 - **Purpose**: Provides address resolution interfaces
+- **Documentation**: See [Addys Technical Documentation](../modules/Addys.md)
 - **Usage**: Used for UndyLego integration and type definitions
 
 ### Module Initialization

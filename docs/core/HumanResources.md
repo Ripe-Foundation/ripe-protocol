@@ -24,9 +24,18 @@ HumanResources is built as a Department with modular architecture:
 
 ### Core Module Dependencies
 - **LocalGov**: Provides governance functionality with access control
-- **Addys**: Address resolution for protocol contracts
 - **DeptBasics**: Department fundamentals (can mint RIPE only)
 - **TimeLock**: Time-locked changes for contributor deployment
+
+### Addys Module
+- **Location**: `contracts/modules/Addys.vy`
+- **Purpose**: Provides protocol-wide address resolution
+- **Documentation**: See [Addys Technical Documentation](../modules/Addys.md)
+- **Key Features**:
+  - Access to all protocol contract addresses
+  - Resolution of Ledger, RipeGovVault, VaultBook, etc.
+  - Validation for authorized callers
+- **Exported Interface**: Address utilities via `addys.__interface__`
 
 ### External Contract Interfaces
 - **Ledger**: Tracks contributors and available RIPE for HR

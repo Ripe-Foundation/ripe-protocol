@@ -12,7 +12,7 @@ At its core, DeptBasics manages three fundamental responsibilities:
 
 **3. Minting Capability Declaration**: Allows departments to declare whether they have the capability to mint Green or Ripe tokens. This is set immutably at deployment and provides a standardized interface for RipeHq to query minting capabilities as part of its two-factor authentication system.
 
-For technical readers, DeptBasics implements the Department interface standard, integrates with the Addys module for Switchboard validation, provides immutable minting capability flags set at deployment, and includes batch recovery functions for efficient fund rescue operations. The module's design promotes consistency across all department contracts while allowing flexibility in configuration.
+For technical readers, DeptBasics implements the Department interface standard, integrates with the [Addys](Addys.md) module for Switchboard validation, provides immutable minting capability flags set at deployment, and includes batch recovery functions for efficient fund rescue operations. The module's design promotes consistency across all department contracts while allowing flexibility in configuration.
 
 ## System Architecture Diagram
 

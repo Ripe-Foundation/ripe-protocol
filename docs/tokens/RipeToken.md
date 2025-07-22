@@ -28,7 +28,7 @@ RipeToken is built using a modular architecture that inherits comprehensive ERC2
   - Pause mechanism for emergency stops
   - Time-locked governance transitions
   - Secure minting and burning capabilities
-- **Exported Interface**: Complete ERC20 interface via `token.__interface__`
+- **Exported Interface**: Complete token interface via `token.__interface__`
 
 ### Module Initialization
 ```vyper

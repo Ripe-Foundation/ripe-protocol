@@ -21,7 +21,7 @@ StabilityPool is built using a modular architecture with delegation to specializ
 ### Core Module Dependencies
 - **StabVault**: Provides sophisticated stability pool functionality with USD value-based accounting
 - **VaultData**: Manages user balances, asset registration, and vault state
-- **Addys**: Handles protocol address resolution and permission management
+- **[Addys](../modules/Addys.md)**: Handles protocol address resolution and permission management
 
 ### Module Initialization
 ```vyper

@@ -25,7 +25,7 @@ RipeGov is built using a sophisticated modular architecture with multiple extern
 ### Core Module Dependencies
 - **SharesVault**: Provides yield-bearing vault functionality with share-based accounting
 - **VaultData**: Manages user balances, asset registration, and vault state
-- **Addys**: Handles protocol address resolution and permission management
+- **[Addys](../modules/Addys.md)**: Handles protocol address resolution and permission management
 
 ### External Integrations
 - **MissionControl**: Configuration management for lock terms and asset weights
