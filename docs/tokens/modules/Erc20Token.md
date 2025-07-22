@@ -2,7 +2,7 @@
 
 ## Overview
 
-Erc20Token serves as the foundational token module for the Ripe Protocol ecosystem, providing a feature-rich ERC20 implementation with additional security and governance capabilities. Think of it as an enhanced version of the standard ERC20 token that includes built-in blacklisting, pausability, and a sophisticated governance connection through RipeHq. Unlike basic ERC20 tokens, this module provides enterprise-grade features needed for a DeFi protocol including permit functionality for gasless approvals and time-locked governance changes.
+Erc20Token serves as the foundational token module for the Ripe Protocol ecosystem, providing a feature-rich ERC20 implementation with additional security and governance capabilities. Think of it as an enhanced version of the standard ERC20 token that includes built-in blacklisting, pausability, and a sophisticated governance connection through [RipeHq](../../registries/RipeHq.md). Unlike basic ERC20 tokens, this module provides enterprise-grade features needed for a DeFi protocol including permit functionality for gasless approvals and time-locked governance changes.
 
 At its core, Erc20Token manages five fundamental responsibilities:
 
@@ -369,7 +369,7 @@ def setBlacklist(_addr: address, _shouldBlacklist: bool) -> bool:
 
 #### Access
 
-Only addresses with `canSetTokenBlacklist` permission in RipeHq.
+Only addresses with `canSetTokenBlacklist` permission in [RipeHq](../../registries/RipeHq.md).
 
 #### Restrictions
 - Cannot blacklist token contract itself

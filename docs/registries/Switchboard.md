@@ -7,27 +7,29 @@ Switchboard serves as the critical authorization gateway for all protocol config
 At its core, Switchboard manages three fundamental responsibilities:
 
 **1. Configuration Authority Registry**: Maintains a registry of approved configuration contracts that can modify protocol settings in Mission Control. Each contract is registered with a unique ID and description, creating an audit trail of authorized configurators. Only these registered contracts can update critical parameters like:
-   - Deposit and withdrawal limits (`TellerDepositConfig`, `TellerWithdrawConfig`)
-   - Borrowing parameters and debt ceilings (`BorrowConfig`, `RepayConfig`)
-   - Liquidation thresholds and auction settings (`GenLiqConfig`, `AssetLiqConfig`)
-   - Rewards distribution and points allocation (`RewardsConfig`, `DepositPointsConfig`)
-   - Price oracle configurations (`PriceConfig`)
-   - Stability pool parameters (`StabPoolClaimsConfig`, `StabPoolRedemptionsConfig`)
+
+- Deposit and withdrawal limits (`TellerDepositConfig`, `TellerWithdrawConfig`)
+- Borrowing parameters and debt ceilings (`BorrowConfig`, `RepayConfig`)
+- Liquidation thresholds and auction settings (`GenLiqConfig`, `AssetLiqConfig`)
+- Rewards distribution and points allocation (`RewardsConfig`, `DepositPointsConfig`)
+- Price oracle configurations (`PriceConfig`)
+- Stability pool parameters (`StabPoolClaimsConfig`, `StabPoolRedemptionsConfig`)
 
 **2. Blacklist Management Gateway**: Provides a controlled passthrough mechanism for registered contracts to update token blacklists. This ensures only vetted configuration contracts can freeze or unfreeze addresses across the protocol's tokens.
 
 **3. Mission Control Access Layer**: Acts as the exclusive gateway to Mission Control's setter functions. Mission Control validates every configuration change by checking `isSwitchboardAddr(msg.sender)`, ensuring only Switchboard-registered contracts can modify protocol parameters.
 
-For technical readers, Switchboard implements a critical security pattern where all protocol configuration is centralized in Mission Control, but access is strictly controlled through Switchboard's registry. This creates a two-layer security model: governance controls what gets into Switchboard, and Switchboard controls what can modify Mission Control. The contract utilizes modular architecture with [LocalGov](../LocalGov.md), [AddressRegistry](../AddressRegistry.md), Addys, and [DeptBasics](../DeptBasics.md) modules, and includes pause functionality for emergency situations.
+For technical readers, Switchboard implements a critical security pattern where all protocol configuration is centralized in Mission Control, but access is strictly controlled through Switchboard's registry. This creates a two-layer security model: governance controls what gets into Switchboard, and Switchboard controls what can modify Mission Control. The contract utilizes modular architecture with [LocalGov](../modules/LocalGov.md), [AddressRegistry](../modules/AddressRegistry.md), Addys, and [DeptBasics](../modules/DeptBasics.md) modules, and includes pause functionality for emergency situations.
 
 ## Architecture & Modules
 
 Switchboard is built using a modular architecture that inherits functionality from multiple base modules:
 
 ### LocalGov Module
+
 - **Location**: `contracts/modules/LocalGov.vy`
 - **Purpose**: Provides governance functionality with time-locked changes
-- **Documentation**: See [LocalGov Technical Documentation](../LocalGov.md)
+- **Documentation**: See [LocalGov Technical Documentation](../modules/LocalGov.md)
 - **Key Features**:
   - Governance address management
   - Time-locked transitions
@@ -35,9 +37,10 @@ Switchboard is built using a modular architecture that inherits functionality fr
 - **Exported Interface**: All governance functions via `gov.__interface__`
 
 ### AddressRegistry Module
+
 - **Location**: `contracts/registries/modules/AddressRegistry.vy`
 - **Purpose**: Manages the registry of configuration contract addresses
-- **Documentation**: See [AddressRegistry Technical Documentation](../AddressRegistry.md)
+- **Documentation**: See [AddressRegistry Technical Documentation](../modules/AddressRegistry.md)
 - **Key Features**:
   - Sequential registry ID assignment for config contracts
   - Time-locked address additions, updates, and disabling
@@ -45,6 +48,7 @@ Switchboard is built using a modular architecture that inherits functionality fr
 - **Exported Interface**: All registry functions via `registry.__interface__`
 
 ### Addys Module
+
 - **Location**: `contracts/modules/Addys.vy`
 - **Purpose**: Provides RipeHq integration for address lookups
 - **Documentation**: See [Addys Technical Documentation](../modules/Addys.md)
@@ -54,9 +58,10 @@ Switchboard is built using a modular architecture that inherits functionality fr
 - **Exported Interface**: Address utilities via `addys.__interface__`
 
 ### DeptBasics Module
+
 - **Location**: `contracts/modules/DeptBasics.vy`
 - **Purpose**: Provides department-level basic functionality
-- **Documentation**: See [DeptBasics Technical Documentation](../DeptBasics.md)
+- **Documentation**: See [DeptBasics Technical Documentation](../modules/DeptBasics.md)
 - **Key Features**:
   - Pause mechanism
   - Department interface compliance
@@ -64,6 +69,7 @@ Switchboard is built using a modular architecture that inherits functionality fr
 - **Exported Interface**: Department basics via `deptBasics.__interface__`
 
 ### Module Initialization
+
 ```vyper
 initializes: gov
 initializes: registry[gov := gov]
@@ -166,18 +172,23 @@ initializes: deptBasics[addys := addys]
 ## State Variables
 
 ### Inherited State Variables
-From [LocalGov](../LocalGov.md):
+
+From [LocalGov](../modules/LocalGov.md):
+
 - `governance: address` - Current governance address
 - `govChangeTimeLock: uint256` - Timelock for governance changes
 
-From [AddressRegistry](../AddressRegistry.md):
+From [AddressRegistry](../modules/AddressRegistry.md):
+
 - `registryChangeTimeLock: uint256` - Timelock for registry changes
 - Registry mappings for configuration contract management
 
 From Addys:
+
 - RipeHq address reference
 
-From [DeptBasics](../DeptBasics.md):
+From [DeptBasics](../modules/DeptBasics.md):
+
 - `isPaused: bool` - Department pause state
 
 ## Constructor
@@ -198,22 +209,23 @@ def __init__(
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
-| `_ripeHq` | `address` | RipeHq contract address |
-| `_tempGov` | `address` | Initial temporary governance address |
+| Name                   | Type      | Description                            |
+| ---------------------- | --------- | -------------------------------------- |
+| `_ripeHq`              | `address` | RipeHq contract address                |
+| `_tempGov`             | `address` | Initial temporary governance address   |
 | `_minRegistryTimeLock` | `uint256` | Minimum time-lock for registry changes |
 | `_maxRegistryTimeLock` | `uint256` | Maximum time-lock for registry changes |
 
 #### Returns
 
-*Constructor does not return any values*
+_Constructor does not return any values_
 
 #### Access
 
 Called only during deployment
 
 #### Example Usage
+
 ```python
 # Deploy Switchboard
 switchboard = boa.load(
@@ -241,14 +253,14 @@ def isSwitchboardAddr(_addr: address) -> bool:
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
+| Name    | Type      | Description          |
+| ------- | --------- | -------------------- |
 | `_addr` | `address` | The address to check |
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type   | Description                   |
+| ------ | ----------------------------- |
 | `bool` | True if address is registered |
 
 #### Access
@@ -256,6 +268,7 @@ def isSwitchboardAddr(_addr: address) -> bool:
 Public view function
 
 #### Example Usage
+
 ```python
 # Check if blacklist manager is registered
 is_registered = switchboard.isSwitchboardAddr(blacklist_mgr.address)
@@ -279,26 +292,27 @@ def startAddNewAddressToRegistry(_addr: address, _description: String[64]) -> bo
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
-| `_addr` | `address` | The configuration contract address |
+| Name           | Type         | Description                               |
+| -------------- | ------------ | ----------------------------------------- |
+| `_addr`        | `address`    | The configuration contract address        |
 | `_description` | `String[64]` | Description of the configuration contract |
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type   | Description                    |
+| ------ | ------------------------------ |
 | `bool` | True if successfully initiated |
 
 #### Access
 
-Only callable by governance AND only when the contract is not paused (see [LocalGov](../LocalGov.md) for governance details)
+Only callable by governance AND only when the contract is not paused (see [LocalGov](../modules/LocalGov.md) for governance details)
 
 #### Events Emitted
 
-- `NewAddressPending` (from [AddressRegistry](../AddressRegistry.md)) - Contains address, description, and confirmation block
+- `NewAddressPending` (from [AddressRegistry](../modules/AddressRegistry.md)) - Contains address, description, and confirmation block
 
 #### Example Usage
+
 ```python
 # Add blacklist manager contract
 success = switchboard.startAddNewAddressToRegistry(
@@ -321,14 +335,14 @@ def confirmNewAddressToRegistry(_addr: address) -> uint256:
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
+| Name    | Type      | Description                                   |
+| ------- | --------- | --------------------------------------------- |
 | `_addr` | `address` | The configuration contract address to confirm |
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type      | Description              |
+| --------- | ------------------------ |
 | `uint256` | The assigned registry ID |
 
 #### Access
@@ -337,9 +351,10 @@ Only callable by governance AND only when the contract is not paused
 
 #### Events Emitted
 
-- `NewAddressConfirmed` (from [AddressRegistry](../AddressRegistry.md)) - Contains registry ID, address, description
+- `NewAddressConfirmed` (from [AddressRegistry](../modules/AddressRegistry.md)) - Contains registry ID, address, description
 
 #### Example Usage
+
 ```python
 # Confirm after timelock
 boa.env.time_travel(blocks=time_lock)
@@ -361,14 +376,14 @@ def cancelNewAddressToRegistry(_addr: address) -> bool:
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
+| Name    | Type      | Description                                  |
+| ------- | --------- | -------------------------------------------- |
 | `_addr` | `address` | The configuration contract address to cancel |
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type   | Description                    |
+| ------ | ------------------------------ |
 | `bool` | True if successfully cancelled |
 
 #### Access
@@ -377,9 +392,10 @@ Only callable by governance AND only when the contract is not paused
 
 #### Events Emitted
 
-- `NewAddressCancelled` (from [AddressRegistry](../AddressRegistry.md))
+- `NewAddressCancelled` (from [AddressRegistry](../modules/AddressRegistry.md))
 
 #### Example Usage
+
 ```python
 success = switchboard.cancelNewAddressToRegistry(
     blacklist_manager.address,
@@ -398,15 +414,15 @@ def startAddressUpdateToRegistry(_regId: uint256, _newAddr: address) -> bool:
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
-| `_regId` | `uint256` | Registry ID to update |
+| Name       | Type      | Description                        |
+| ---------- | --------- | ---------------------------------- |
+| `_regId`   | `uint256` | Registry ID to update              |
 | `_newAddr` | `address` | New configuration contract address |
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type   | Description                    |
+| ------ | ------------------------------ |
 | `bool` | True if successfully initiated |
 
 #### Access
@@ -415,9 +431,10 @@ Only callable by governance AND only when the contract is not paused
 
 #### Events Emitted
 
-- `AddressUpdatePending` (from [AddressRegistry](../AddressRegistry.md))
+- `AddressUpdatePending` (from [AddressRegistry](../modules/AddressRegistry.md))
 
 #### Example Usage
+
 ```python
 # Update config contract to new version
 success = switchboard.startAddressUpdateToRegistry(
@@ -438,14 +455,14 @@ def confirmAddressUpdateToRegistry(_regId: uint256) -> bool:
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
+| Name     | Type      | Description               |
+| -------- | --------- | ------------------------- |
 | `_regId` | `uint256` | Registry ID being updated |
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type   | Description                    |
+| ------ | ------------------------------ |
 | `bool` | True if successfully confirmed |
 
 #### Access
@@ -454,9 +471,10 @@ Only callable by governance AND only when the contract is not paused
 
 #### Events Emitted
 
-- `AddressUpdateConfirmed` (from [AddressRegistry](../AddressRegistry.md))
+- `AddressUpdateConfirmed` (from [AddressRegistry](../modules/AddressRegistry.md))
 
 #### Example Usage
+
 ```python
 # Confirm update after timelock
 boa.env.time_travel(blocks=time_lock)
@@ -477,14 +495,14 @@ def cancelAddressUpdateToRegistry(_regId: uint256) -> bool:
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
+| Name     | Type      | Description                  |
+| -------- | --------- | ---------------------------- |
 | `_regId` | `uint256` | Registry ID to cancel update |
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type   | Description                    |
+| ------ | ------------------------------ |
 | `bool` | True if successfully cancelled |
 
 #### Access
@@ -493,7 +511,7 @@ Only callable by governance AND only when the contract is not paused
 
 #### Events Emitted
 
-- `AddressUpdateCancelled` (from [AddressRegistry](../AddressRegistry.md))
+- `AddressUpdateCancelled` (from [AddressRegistry](../modules/AddressRegistry.md))
 
 ### `startAddressDisableInRegistry`
 
@@ -506,14 +524,14 @@ def startAddressDisableInRegistry(_regId: uint256) -> bool:
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
+| Name     | Type      | Description            |
+| -------- | --------- | ---------------------- |
 | `_regId` | `uint256` | Registry ID to disable |
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type   | Description                    |
+| ------ | ------------------------------ |
 | `bool` | True if successfully initiated |
 
 #### Access
@@ -522,9 +540,10 @@ Only callable by governance AND only when the contract is not paused
 
 #### Events Emitted
 
-- `AddressDisablePending` (from [AddressRegistry](../AddressRegistry.md))
+- `AddressDisablePending` (from [AddressRegistry](../modules/AddressRegistry.md))
 
 #### Example Usage
+
 ```python
 # Start disabling compromised config contract
 success = switchboard.startAddressDisableInRegistry(
@@ -544,14 +563,14 @@ def confirmAddressDisableInRegistry(_regId: uint256) -> bool:
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
+| Name     | Type      | Description            |
+| -------- | --------- | ---------------------- |
 | `_regId` | `uint256` | Registry ID to disable |
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type   | Description                   |
+| ------ | ----------------------------- |
 | `bool` | True if successfully disabled |
 
 #### Access
@@ -560,7 +579,7 @@ Only callable by governance AND only when the contract is not paused
 
 #### Events Emitted
 
-- `AddressDisableConfirmed` (from [AddressRegistry](../AddressRegistry.md))
+- `AddressDisableConfirmed` (from [AddressRegistry](../modules/AddressRegistry.md))
 
 ### `cancelAddressDisableInRegistry`
 
@@ -573,14 +592,14 @@ def cancelAddressDisableInRegistry(_regId: uint256) -> bool:
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
+| Name     | Type      | Description                   |
+| -------- | --------- | ----------------------------- |
 | `_regId` | `uint256` | Registry ID to cancel disable |
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type   | Description                    |
+| ------ | ------------------------------ |
 | `bool` | True if successfully cancelled |
 
 #### Access
@@ -589,7 +608,7 @@ Only callable by governance AND only when the contract is not paused
 
 #### Events Emitted
 
-- `AddressDisableCancelled` (from [AddressRegistry](../AddressRegistry.md))
+- `AddressDisableCancelled` (from [AddressRegistry](../modules/AddressRegistry.md))
 
 ## Blacklist Management Functions
 
@@ -604,16 +623,16 @@ def setBlacklist(_tokenAddr: address, _addr: address, _shouldBlacklist: bool) ->
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
-| `_tokenAddr` | `address` | The token contract to update |
-| `_addr` | `address` | The address to blacklist/unblacklist |
-| `_shouldBlacklist` | `bool` | True to blacklist, False to remove |
+| Name               | Type      | Description                          |
+| ------------------ | --------- | ------------------------------------ |
+| `_tokenAddr`       | `address` | The token contract to update         |
+| `_addr`            | `address` | The address to blacklist/unblacklist |
+| `_shouldBlacklist` | `bool`    | True to blacklist, False to remove   |
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type   | Description                  |
+| ------ | ---------------------------- |
 | `bool` | True if successfully updated |
 
 #### Access
@@ -621,6 +640,7 @@ def setBlacklist(_tokenAddr: address, _addr: address, _shouldBlacklist: bool) ->
 Only callable by registered configuration contracts
 
 #### Example Usage
+
 ```python
 # Blacklist manager adds address to Green token blacklist
 success = switchboard.setBlacklist(
@@ -640,6 +660,16 @@ success = switchboard.setBlacklist(
 ```
 
 **Example Output**: Calls `setBlacklist` on the token contract, returns `True`
+
+## Security Considerations
+
+1. **Configuration Authority**: Only registered contracts can modify Mission Control settings
+2. **Time-Locked Registry**: All registry changes require time lock for security
+3. **Pause Mechanism**: Can be paused by authorized contracts in emergencies
+4. **Blacklist Power**: Can modify token blacklists - requires careful access control
+5. **No Direct User Access**: All functions require governance or authorized contract access
+6. **Registry Validation**: Validates configuration contracts before allowing registration
+7. **Immutable Core**: Cannot modify its own registry after initial setup
 
 ## Testing
 

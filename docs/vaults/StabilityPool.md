@@ -12,18 +12,20 @@ At its core, StabilityPool manages three fundamental responsibilities:
 
 **3. Reward-Based Withdrawals**: Enables users to withdraw their stability pool positions and claim accumulated liquidated assets, with automatic Ripe token reward distribution to incentivize long-term protocol participation and stability provision.
 
-For technical readers, StabilityPool operates as a thin wrapper around the sophisticated StabVault module, providing contract-specific events and access controls while delegating all core functionality to the underlying module. It implements USD value-based share accounting rather than simple asset accounting, handles complex liquidation integration with AuctionHouse for collateral distribution, supports multiple stablecoin types with automatic asset registration, and provides specialized query functions for integration with Lootbox rewards, CreditEngine collateral calculations, and other protocol components. The vault is designed to maintain protocol stability while providing attractive yields to depositors.
+For technical readers, StabilityPool operates as a thin wrapper around the sophisticated StabVault module, providing contract-specific events and access controls while delegating all core functionality to the underlying module. It implements USD value-based share accounting rather than simple asset accounting, handles complex liquidation integration with [AuctionHouse](../core/AuctionHouse.md) for collateral distribution, supports multiple stablecoin types with automatic asset registration, and provides specialized query functions for integration with [Lootbox](../core/Lootbox.md) rewards, [CreditEngine](../core/CreditEngine.md) collateral calculations, and other protocol components. The vault is designed to maintain protocol stability while providing attractive yields to depositors.
 
 ## Architecture & Dependencies
 
 StabilityPool is built using a modular architecture with delegation to specialized modules:
 
 ### Core Module Dependencies
+
 - **StabVault**: Provides sophisticated stability pool functionality with USD value-based accounting
 - **VaultData**: Manages user balances, asset registration, and vault state
 - **[Addys](../modules/Addys.md)**: Handles protocol address resolution and permission management
 
 ### Module Initialization
+
 ```vyper
 exports: addys.__interface__
 exports: vaultData.__interface__
@@ -114,16 +116,18 @@ def __init__(_ripeHq: address):
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
+| Name      | Type      | Description                                      |
+| --------- | --------- | ------------------------------------------------ |
 | `_ripeHq` | `address` | RipeHq contract address for protocol integration |
 
 #### Process Flow
+
 1. **Address Setup**: Initializes Addys module with RipeHq address
 2. **VaultData Setup**: Initializes with non-paused state (`False`)
 3. **StabVault Setup**: Initializes stability pool functionality
 
 #### Example Usage
+
 ```python
 # Deploy stability pool vault
 stability_pool = boa.load(
@@ -151,24 +155,25 @@ def depositTokensInVault(
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
-| `_user` | `address` | User making the deposit |
-| `_asset` | `address` | Stability pool asset (GREEN, sGREEN, etc.) |
-| `_amount` | `uint256` | Amount to deposit |
-| `_a` | `addys.Addys` | Protocol addresses struct |
+| Name      | Type          | Description                                |
+| --------- | ------------- | ------------------------------------------ |
+| `_user`   | `address`     | User making the deposit                    |
+| `_asset`  | `address`     | Stability pool asset (GREEN, sGREEN, etc.) |
+| `_amount` | `uint256`     | Amount to deposit                          |
+| `_a`      | `addys.Addys` | Protocol addresses struct                  |
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type      | Description             |
+| --------- | ----------------------- |
 | `uint256` | Actual amount deposited |
 
 #### Access
 
-Only callable by Teller
+Only callable by [Teller](../core/Teller.md)
 
 #### Process Flow
+
 1. **Access Validation**: Ensures caller is Teller contract
 2. **StabVault Delegation**: Calls `stabVault._depositTokensInVault()` for core functionality
 3. **Event Emission**: Logs deposit with user, asset, amount, and shares
@@ -179,6 +184,7 @@ Only callable by Teller
 - `StabilityPoolDeposit` - Contains user, asset, amount, and shares minted
 
 #### Example Usage
+
 ```python
 # Deposit GREEN into stability pool through Teller
 deposit_amount = stability_pool.depositTokensInVault(
@@ -208,26 +214,27 @@ def withdrawTokensFromVault(
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
-| `_user` | `address` | User making withdrawal |
-| `_asset` | `address` | Stability pool asset to withdraw |
-| `_amount` | `uint256` | Amount to withdraw |
-| `_recipient` | `address` | Address to receive withdrawn assets |
-| `_a` | `addys.Addys` | Protocol addresses struct |
+| Name         | Type          | Description                         |
+| ------------ | ------------- | ----------------------------------- |
+| `_user`      | `address`     | User making withdrawal              |
+| `_asset`     | `address`     | Stability pool asset to withdraw    |
+| `_amount`    | `uint256`     | Amount to withdraw                  |
+| `_recipient` | `address`     | Address to receive withdrawn assets |
+| `_a`         | `addys.Addys` | Protocol addresses struct           |
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
-| `uint256` | Actual amount withdrawn |
-| `bool` | True if user's position is depleted |
+| Type      | Description                         |
+| --------- | ----------------------------------- |
+| `uint256` | Actual amount withdrawn             |
+| `bool`    | True if user's position is depleted |
 
 #### Access
 
-Only callable by Teller, AuctionHouse, or CreditEngine
+Only callable by [Teller](../core/Teller.md), AuctionHouse, or CreditEngine
 
 #### Process Flow
+
 1. **Access Validation**: Ensures caller is authorized contract
 2. **StabVault Delegation**: Calls `stabVault._withdrawTokensFromVault()` for core functionality
 3. **Event Emission**: Logs withdrawal with depletion status and shares burned
@@ -238,6 +245,7 @@ Only callable by Teller, AuctionHouse, or CreditEngine
 - `StabilityPoolWithdrawal` - Contains user, asset, amount, depletion status, and shares burned
 
 #### Example Usage
+
 ```python
 # Withdraw GREEN from stability pool through AuctionHouse
 withdrawal_amount, is_depleted = stability_pool.withdrawTokensFromVault(
@@ -268,26 +276,27 @@ def transferBalanceWithinVault(
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
-| `_asset` | `address` | Stability pool asset to transfer |
-| `_fromUser` | `address` | User losing the position |
-| `_toUser` | `address` | User gaining the position |
-| `_transferAmount` | `uint256` | Amount to transfer |
-| `_a` | `addys.Addys` | Protocol addresses struct |
+| Name              | Type          | Description                      |
+| ----------------- | ------------- | -------------------------------- |
+| `_asset`          | `address`     | Stability pool asset to transfer |
+| `_fromUser`       | `address`     | User losing the position         |
+| `_toUser`         | `address`     | User gaining the position        |
+| `_transferAmount` | `uint256`     | Amount to transfer               |
+| `_a`              | `addys.Addys` | Protocol addresses struct        |
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
-| `uint256` | Actual amount transferred |
-| `bool` | True if from user's position is depleted |
+| Type      | Description                              |
+| --------- | ---------------------------------------- |
+| `uint256` | Actual amount transferred                |
+| `bool`    | True if from user's position is depleted |
 
 #### Access
 
-Only callable by AuctionHouse or CreditEngine (for liquidations)
+Only callable by [AuctionHouse](../core/AuctionHouse.md) or CreditEngine (for liquidations)
 
 #### Process Flow
+
 1. **Access Validation**: Ensures caller is liquidation contract
 2. **StabVault Delegation**: Calls `stabVault._transferBalanceWithinVault()` for share transfers
 3. **Event Emission**: Logs transfer with from/to users and depletion status
@@ -311,15 +320,15 @@ def getVaultDataOnDeposit(_user: address, _asset: address) -> Vault.VaultDataOnD
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
-| `_user` | `address` | User making deposit |
+| Name     | Type      | Description           |
+| -------- | --------- | --------------------- |
+| `_user`  | `address` | User making deposit   |
 | `_asset` | `address` | Asset being deposited |
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type                       | Description                                 |
+| -------------------------- | ------------------------------------------- |
 | `Vault.VaultDataOnDeposit` | Vault data structure for Teller integration |
 
 #### Usage
@@ -338,15 +347,15 @@ def getUserLootBoxShare(_user: address, _asset: address) -> uint256:
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
-| `_user` | `address` | User to get share for |
-| `_asset` | `address` | Stability pool asset |
+| Name     | Type      | Description           |
+| -------- | --------- | --------------------- |
+| `_user`  | `address` | User to get share for |
+| `_asset` | `address` | Stability pool asset  |
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type      | Description                           |
+| --------- | ------------------------------------- |
 | `uint256` | User's proportional share for rewards |
 
 #### Usage
@@ -365,16 +374,16 @@ def getUserAssetAndAmountAtIndex(_user: address, _index: uint256) -> (address, u
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
-| `_user` | `address` | User to query |
-| `_index` | `uint256` | Asset index |
+| Name     | Type      | Description   |
+| -------- | --------- | ------------- |
+| `_user`  | `address` | User to query |
+| `_index` | `uint256` | Asset index   |
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
-| `address` | Asset address |
+| Type      | Description        |
+| --------- | ------------------ |
+| `address` | Asset address      |
 | `uint256` | Asset amount/value |
 
 #### Usage
@@ -397,17 +406,17 @@ def getUserAssetAtIndexAndHasBalance(_user: address, _index: uint256) -> (addres
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
-| `_user` | `address` | User to query |
-| `_index` | `uint256` | Asset index |
+| Name     | Type      | Description   |
+| -------- | --------- | ------------- |
+| `_user`  | `address` | User to query |
+| `_index` | `uint256` | Asset index   |
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
-| `address` | Asset address |
-| `bool` | True if user has balance |
+| Type      | Description              |
+| --------- | ------------------------ |
+| `address` | Asset address            |
+| `bool`    | True if user has balance |
 
 #### Usage
 
@@ -447,12 +456,12 @@ Emitted when users deposit into the stability pool.
 
 #### Event Data
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `user` | `indexed(address)` | User making deposit |
-| `asset` | `indexed(address)` | Asset deposited |
-| `amount` | `uint256` | Amount deposited |
-| `shares` | `uint256` | Shares minted |
+| Field    | Type               | Description         |
+| -------- | ------------------ | ------------------- |
+| `user`   | `indexed(address)` | User making deposit |
+| `asset`  | `indexed(address)` | Asset deposited     |
+| `amount` | `uint256`          | Amount deposited    |
+| `shares` | `uint256`          | Shares minted       |
 
 ### `StabilityPoolWithdrawal`
 
@@ -460,13 +469,13 @@ Emitted when users withdraw from the stability pool.
 
 #### Event Data
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `user` | `indexed(address)` | User making withdrawal |
-| `asset` | `indexed(address)` | Asset withdrawn |
-| `amount` | `uint256` | Amount withdrawn |
-| `isDepleted` | `bool` | True if user position depleted |
-| `shares` | `uint256` | Shares burned |
+| Field        | Type               | Description                    |
+| ------------ | ------------------ | ------------------------------ |
+| `user`       | `indexed(address)` | User making withdrawal         |
+| `asset`      | `indexed(address)` | Asset withdrawn                |
+| `amount`     | `uint256`          | Amount withdrawn               |
+| `isDepleted` | `bool`             | True if user position depleted |
+| `shares`     | `uint256`          | Shares burned                  |
 
 ### `StabilityPoolTransfer`
 
@@ -474,14 +483,14 @@ Emitted when positions are transferred between users (liquidations).
 
 #### Event Data
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `fromUser` | `indexed(address)` | User losing position |
-| `toUser` | `indexed(address)` | User gaining position |
-| `asset` | `indexed(address)` | Asset transferred |
-| `transferAmount` | `uint256` | Amount transferred |
-| `isFromUserDepleted` | `bool` | True if from user position depleted |
-| `transferShares` | `uint256` | Shares transferred |
+| Field                | Type               | Description                         |
+| -------------------- | ------------------ | ----------------------------------- |
+| `fromUser`           | `indexed(address)` | User losing position                |
+| `toUser`             | `indexed(address)` | User gaining position               |
+| `asset`              | `indexed(address)` | Asset transferred                   |
+| `transferAmount`     | `uint256`          | Amount transferred                  |
+| `isFromUserDepleted` | `bool`             | True if from user position depleted |
+| `transferShares`     | `uint256`          | Shares transferred                  |
 
 ## Advanced Functionality
 
@@ -512,16 +521,19 @@ Unlike traditional vaults that use 1:1 asset accounting, StabilityPool uses soph
 ## Security Considerations
 
 ### Access Controls
+
 - **Teller Only**: Deposits restricted to Teller contract
 - **Liquidation Contracts**: Withdrawals and transfers restricted to authorized liquidation contracts
 - **StabVault Delegation**: All complex logic handled by battle-tested StabVault module
 
 ### Position Safety
+
 - **No Borrowing**: Stability pool positions cannot be used as collateral for borrowing
 - **Proportional Distribution**: All liquidation proceeds distributed fairly based on pool participation
 - **Share Protection**: USD value-based accounting prevents manipulation through volatile asset prices
 
 ### Integration Safety
+
 - **Event Consistency**: Contract-specific events provide clear audit trails
 - **Module Isolation**: Core functionality isolated in StabVault module for security and upgradability
 - **Access Validation**: All external calls validate caller permissions through Addys module
@@ -529,6 +541,7 @@ Unlike traditional vaults that use 1:1 asset accounting, StabilityPool uses soph
 ## Usage Patterns
 
 ### Depositing to Stability Pool
+
 ```python
 # User deposits GREEN through Teller
 result = teller.depositToVault(
@@ -540,6 +553,7 @@ result = teller.depositToVault(
 ```
 
 ### Claiming Liquidated Assets
+
 ```python
 # User claims accumulated WETH from GREEN stability pool
 result = teller.claimFromStabilityPool(
@@ -553,6 +567,7 @@ result = teller.claimFromStabilityPool(
 ```
 
 ### Redeeming GREEN for Assets
+
 ```python
 # Redeem GREEN for available claimable assets
 result = teller.redeemFromStabilityPool(

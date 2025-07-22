@@ -12,16 +12,17 @@ At its core, VaultBook manages three fundamental responsibilities:
 
 **3. Reward Distribution Gateway**: Acts as the authorized minter of Ripe tokens for stability pool rewards, ensuring only registered vaults can trigger reward distributions while maintaining proper accounting through the Ledger.
 
-For technical readers, VaultBook utilizes modular architecture with [LocalGov](../LocalGov.md), [AddressRegistry](../AddressRegistry.md), Addys, and [DeptBasics](../DeptBasics.md) modules, implements fund safety checks before vault modifications, provides controlled Ripe token minting for rewards, and includes pause functionality for emergency situations. The contract's unique feature is its ability to mint Ripe tokens exclusively for stability pool rewards.
+For technical readers, VaultBook utilizes modular architecture with [LocalGov](../modules/LocalGov.md), [AddressRegistry](../modules/AddressRegistry.md), Addys, and [DeptBasics](../modules/DeptBasics.md) modules, implements fund safety checks before vault modifications, provides controlled Ripe token minting for rewards, and includes pause functionality for emergency situations. The contract's unique feature is its ability to mint Ripe tokens exclusively for stability pool rewards.
 
 ## Architecture & Modules
 
 VaultBook is built using a modular architecture that inherits functionality from multiple base modules:
 
 ### LocalGov Module
+
 - **Location**: `contracts/modules/LocalGov.vy`
 - **Purpose**: Provides governance functionality with time-locked changes
-- **Documentation**: See [LocalGov Technical Documentation](../LocalGov.md)
+- **Documentation**: See [LocalGov Technical Documentation](../modules/LocalGov.md)
 - **Key Features**:
   - Governance address management
   - Time-locked transitions
@@ -29,9 +30,10 @@ VaultBook is built using a modular architecture that inherits functionality from
 - **Exported Interface**: All governance functions via `gov.__interface__`
 
 ### AddressRegistry Module
+
 - **Location**: `contracts/registries/modules/AddressRegistry.vy`
 - **Purpose**: Manages the registry of vault addresses
-- **Documentation**: See [AddressRegistry Technical Documentation](../AddressRegistry.md)
+- **Documentation**: See [AddressRegistry Technical Documentation](../modules/AddressRegistry.md)
 - **Key Features**:
   - Sequential registry ID assignment for vaults
   - Time-locked address additions, updates, and disabling
@@ -39,6 +41,7 @@ VaultBook is built using a modular architecture that inherits functionality from
 - **Exported Interface**: All registry functions via `registry.__interface__`
 
 ### Addys Module
+
 - **Location**: `contracts/modules/Addys.vy`
 - **Purpose**: Provides RipeHq integration for address lookups
 - **Documentation**: See [Addys Technical Documentation](../modules/Addys.md)
@@ -48,9 +51,10 @@ VaultBook is built using a modular architecture that inherits functionality from
 - **Exported Interface**: Address utilities via `addys.__interface__`
 
 ### DeptBasics Module
+
 - **Location**: `contracts/modules/DeptBasics.vy`
 - **Purpose**: Provides department-level basic functionality
-- **Documentation**: See [DeptBasics Technical Documentation](../DeptBasics.md)
+- **Documentation**: See [DeptBasics Technical Documentation](../modules/DeptBasics.md)
 - **Key Features**:
   - Pause mechanism
   - Department interface compliance
@@ -58,6 +62,7 @@ VaultBook is built using a modular architecture that inherits functionality from
 - **Exported Interface**: Department basics via `deptBasics.__interface__`
 
 ### Module Initialization
+
 ```vyper
 initializes: gov
 initializes: registry[gov := gov]
@@ -140,18 +145,23 @@ initializes: deptBasics[addys := addys]
 ## State Variables
 
 ### Inherited State Variables
-From [LocalGov](../LocalGov.md):
+
+From [LocalGov](../modules/LocalGov.md):
+
 - `governance: address` - Current governance address
 - `govChangeTimeLock: uint256` - Timelock for governance changes
 
-From [AddressRegistry](../AddressRegistry.md):
+From [AddressRegistry](../modules/AddressRegistry.md):
+
 - `registryChangeTimeLock: uint256` - Timelock for registry changes
 - Registry mappings for vault management
 
 From Addys:
+
 - RipeHq address reference
 
-From [DeptBasics](../DeptBasics.md):
+From [DeptBasics](../modules/DeptBasics.md):
+
 - `isPaused: bool` - Department pause state
 - `canMintRipe: bool` - Set to `True` for VaultBook
 
@@ -173,22 +183,23 @@ def __init__(
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
-| `_ripeHq` | `address` | RipeHq contract address |
-| `_tempGov` | `address` | Initial temporary governance address |
+| Name                   | Type      | Description                            |
+| ---------------------- | --------- | -------------------------------------- |
+| `_ripeHq`              | `address` | RipeHq contract address                |
+| `_tempGov`             | `address` | Initial temporary governance address   |
 | `_minRegistryTimeLock` | `uint256` | Minimum time-lock for registry changes |
 | `_maxRegistryTimeLock` | `uint256` | Maximum time-lock for registry changes |
 
 #### Returns
 
-*Constructor does not return any values*
+_Constructor does not return any values_
 
 #### Access
 
 Called only during deployment
 
 #### Example Usage
+
 ```python
 # Deploy VaultBook
 vault_book = boa.load(
@@ -216,14 +227,14 @@ def isVaultBookAddr(_addr: address) -> bool:
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
+| Name    | Type      | Description          |
+| ------- | --------- | -------------------- |
 | `_addr` | `address` | The address to check |
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type   | Description                           |
+| ------ | ------------------------------------- |
 | `bool` | True if address is a registered vault |
 
 #### Access
@@ -231,6 +242,7 @@ def isVaultBookAddr(_addr: address) -> bool:
 Public view function
 
 #### Example Usage
+
 ```python
 # Check if collateral vault is registered
 is_vault = vault_book.isVaultBookAddr(collateral_vault.address)
@@ -254,26 +266,27 @@ def startAddNewAddressToRegistry(_addr: address, _description: String[64]) -> bo
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
-| `_addr` | `address` | The vault contract address |
-| `_description` | `String[64]` | Description of the vault |
+| Name           | Type         | Description                |
+| -------------- | ------------ | -------------------------- |
+| `_addr`        | `address`    | The vault contract address |
+| `_description` | `String[64]` | Description of the vault   |
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type   | Description                    |
+| ------ | ------------------------------ |
 | `bool` | True if successfully initiated |
 
 #### Access
 
-Only callable by governance AND only when the contract is not paused (see [LocalGov](../LocalGov.md) for governance details)
+Only callable by governance AND only when the contract is not paused (see [LocalGov](../modules/LocalGov.md) for governance details)
 
 #### Events Emitted
 
-- `NewAddressPending` (from [AddressRegistry](../AddressRegistry.md)) - Contains address, description, and confirmation block
+- `NewAddressPending` (from [AddressRegistry](../modules/AddressRegistry.md)) - Contains address, description, and confirmation block
 
 #### Example Usage
+
 ```python
 # Add new collateral vault
 success = vault_book.startAddNewAddressToRegistry(
@@ -296,14 +309,14 @@ def confirmNewAddressToRegistry(_addr: address) -> uint256:
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
+| Name    | Type      | Description                  |
+| ------- | --------- | ---------------------------- |
 | `_addr` | `address` | The vault address to confirm |
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type      | Description              |
+| --------- | ------------------------ |
 | `uint256` | The assigned registry ID |
 
 #### Access
@@ -312,9 +325,10 @@ Only callable by governance AND only when the contract is not paused
 
 #### Events Emitted
 
-- `NewAddressConfirmed` (from [AddressRegistry](../AddressRegistry.md)) - Contains registry ID, address, description
+- `NewAddressConfirmed` (from [AddressRegistry](../modules/AddressRegistry.md)) - Contains registry ID, address, description
 
 #### Example Usage
+
 ```python
 # Confirm after timelock
 boa.env.time_travel(blocks=time_lock)
@@ -336,14 +350,14 @@ def cancelNewAddressToRegistry(_addr: address) -> bool:
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
+| Name    | Type      | Description                 |
+| ------- | --------- | --------------------------- |
 | `_addr` | `address` | The vault address to cancel |
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type   | Description                    |
+| ------ | ------------------------------ |
 | `bool` | True if successfully cancelled |
 
 #### Access
@@ -352,9 +366,10 @@ Only callable by governance AND only when the contract is not paused
 
 #### Events Emitted
 
-- `NewAddressCancelled` (from [AddressRegistry](../AddressRegistry.md))
+- `NewAddressCancelled` (from [AddressRegistry](../modules/AddressRegistry.md))
 
 #### Example Usage
+
 ```python
 success = vault_book.cancelNewAddressToRegistry(
     eth_vault.address,
@@ -373,15 +388,15 @@ def startAddressUpdateToRegistry(_regId: uint256, _newAddr: address) -> bool:
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
-| `_regId` | `uint256` | Registry ID to update |
-| `_newAddr` | `address` | New vault address |
+| Name       | Type      | Description           |
+| ---------- | --------- | --------------------- |
+| `_regId`   | `uint256` | Registry ID to update |
+| `_newAddr` | `address` | New vault address     |
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type   | Description                    |
+| ------ | ------------------------------ |
 | `bool` | True if successfully initiated |
 
 #### Access
@@ -390,9 +405,10 @@ Only callable by governance AND only when the contract is not paused
 
 #### Events Emitted
 
-- `AddressUpdatePending` (from [AddressRegistry](../AddressRegistry.md))
+- `AddressUpdatePending` (from [AddressRegistry](../modules/AddressRegistry.md))
 
 #### Example Usage
+
 ```python
 # Update vault to new version (only if empty)
 success = vault_book.startAddressUpdateToRegistry(
@@ -414,14 +430,14 @@ def confirmAddressUpdateToRegistry(_regId: uint256) -> bool:
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
+| Name     | Type      | Description               |
+| -------- | --------- | ------------------------- |
 | `_regId` | `uint256` | Registry ID being updated |
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type   | Description                    |
+| ------ | ------------------------------ |
 | `bool` | True if successfully confirmed |
 
 #### Access
@@ -430,9 +446,10 @@ Only callable by governance AND only when the contract is not paused
 
 #### Events Emitted
 
-- `AddressUpdateConfirmed` (from [AddressRegistry](../AddressRegistry.md))
+- `AddressUpdateConfirmed` (from [AddressRegistry](../modules/AddressRegistry.md))
 
 #### Example Usage
+
 ```python
 # Confirm update after timelock
 boa.env.time_travel(blocks=time_lock)
@@ -453,14 +470,14 @@ def cancelAddressUpdateToRegistry(_regId: uint256) -> bool:
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
+| Name     | Type      | Description                  |
+| -------- | --------- | ---------------------------- |
 | `_regId` | `uint256` | Registry ID to cancel update |
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type   | Description                    |
+| ------ | ------------------------------ |
 | `bool` | True if successfully cancelled |
 
 #### Access
@@ -469,7 +486,7 @@ Only callable by governance AND only when the contract is not paused
 
 #### Events Emitted
 
-- `AddressUpdateCancelled` (from [AddressRegistry](../AddressRegistry.md))
+- `AddressUpdateCancelled` (from [AddressRegistry](../modules/AddressRegistry.md))
 
 ### `startAddressDisableInRegistry`
 
@@ -482,14 +499,14 @@ def startAddressDisableInRegistry(_regId: uint256) -> bool:
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
+| Name     | Type      | Description            |
+| -------- | --------- | ---------------------- |
 | `_regId` | `uint256` | Registry ID to disable |
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type   | Description                    |
+| ------ | ------------------------------ |
 | `bool` | True if successfully initiated |
 
 #### Access
@@ -498,9 +515,10 @@ Only callable by governance AND only when the contract is not paused
 
 #### Events Emitted
 
-- `AddressDisablePending` (from [AddressRegistry](../AddressRegistry.md))
+- `AddressDisablePending` (from [AddressRegistry](../modules/AddressRegistry.md))
 
 #### Example Usage
+
 ```python
 # Start disabling deprecated vault (only if empty)
 success = vault_book.startAddressDisableInRegistry(
@@ -521,14 +539,14 @@ def confirmAddressDisableInRegistry(_regId: uint256) -> bool:
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
+| Name     | Type      | Description            |
+| -------- | --------- | ---------------------- |
 | `_regId` | `uint256` | Registry ID to disable |
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type   | Description                   |
+| ------ | ----------------------------- |
 | `bool` | True if successfully disabled |
 
 #### Access
@@ -537,7 +555,7 @@ Only callable by governance AND only when the contract is not paused
 
 #### Events Emitted
 
-- `AddressDisableConfirmed` (from [AddressRegistry](../AddressRegistry.md))
+- `AddressDisableConfirmed` (from [AddressRegistry](../modules/AddressRegistry.md))
 
 ### `cancelAddressDisableInRegistry`
 
@@ -550,14 +568,14 @@ def cancelAddressDisableInRegistry(_regId: uint256) -> bool:
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
+| Name     | Type      | Description                   |
+| -------- | --------- | ----------------------------- |
 | `_regId` | `uint256` | Registry ID to cancel disable |
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type   | Description                    |
+| ------ | ------------------------------ |
 | `bool` | True if successfully cancelled |
 
 #### Access
@@ -566,7 +584,7 @@ Only callable by governance AND only when the contract is not paused
 
 #### Events Emitted
 
-- `AddressDisableCancelled` (from [AddressRegistry](../AddressRegistry.md))
+- `AddressDisableCancelled` (from [AddressRegistry](../modules/AddressRegistry.md))
 
 ## Stability Pool Reward Functions
 
@@ -581,16 +599,16 @@ def mintRipeForStabPoolClaims(_amount: uint256, _ripeToken: address, _ledger: ad
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
-| `_amount` | `uint256` | Amount of Ripe tokens to mint |
-| `_ripeToken` | `address` | Ripe token contract address |
-| `_ledger` | `address` | Ledger contract for accounting |
+| Name         | Type      | Description                    |
+| ------------ | --------- | ------------------------------ |
+| `_amount`    | `uint256` | Amount of Ripe tokens to mint  |
+| `_ripeToken` | `address` | Ripe token contract address    |
+| `_ledger`    | `address` | Ledger contract for accounting |
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type   | Description                 |
+| ------ | --------------------------- |
 | `bool` | True if successfully minted |
 
 #### Access
@@ -598,6 +616,7 @@ def mintRipeForStabPoolClaims(_amount: uint256, _ripeToken: address, _ledger: ad
 Only callable by registered vaults (typically the Stability Pool)
 
 #### Example Usage
+
 ```python
 # Stability pool claims rewards
 success = vault_book.mintRipeForStabPoolClaims(
@@ -608,7 +627,8 @@ success = vault_book.mintRipeForStabPoolClaims(
 )
 ```
 
-**Example Output**: 
+**Example Output**:
+
 1. Mints Ripe tokens to the calling vault
 2. Calls `didGetRewardsFromStabClaims` on Ledger to record the reward
 3. Returns `True`

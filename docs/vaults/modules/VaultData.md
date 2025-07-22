@@ -346,7 +346,7 @@ def deregisterUserAsset(_user: address, _asset: address) -> bool:
 
 #### Access
 
-Only callable by Lootbox (for reward cleanup)
+Only callable by [Lootbox](../../core/Lootbox.md) (for reward cleanup)
 
 #### Process Flow
 1. **Balance Check**: Ensures user balance is zero before deregistering
@@ -405,7 +405,7 @@ def deregisterVaultAsset(_asset: address) -> bool:
 
 #### Access
 
-Only callable by Switchboard addresses (governance)
+Only callable by [Switchboard](../../registries/Switchboard.md) addresses (governance)
 
 #### Process Flow
 1. **Balance Check**: Ensures total balance is zero before deregistering
@@ -519,7 +519,7 @@ def pause(_shouldPause: bool):
 
 #### Access
 
-Only callable by Switchboard addresses (governance)
+Only callable by [Switchboard](../../registries/Switchboard.md) addresses (governance)
 
 #### Events Emitted
 
@@ -554,7 +554,7 @@ def recoverFunds(_recipient: address, _asset: address):
 
 #### Access
 
-Only callable by Switchboard addresses (governance)
+Only callable by [Switchboard](../../registries/Switchboard.md) addresses (governance)
 
 #### Validation
 - Asset must not be registered in vault (`indexOfAsset[_asset] == 0`)

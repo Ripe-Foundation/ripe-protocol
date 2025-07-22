@@ -21,6 +21,7 @@ For technical readers, CreditEngine implements advanced DeFi mechanics including
 CreditEngine is built using a modular architecture with the following components:
 
 ### Addys Module
+
 - **Location**: `contracts/modules/Addys.vy`
 - **Purpose**: Provides protocol-wide address resolution
 - **Documentation**: See [Addys Technical Documentation](../modules/Addys.md)
@@ -31,6 +32,7 @@ CreditEngine is built using a modular architecture with the following components
 - **Exported Interface**: Address utilities via `addys.__interface__`
 
 ### DeptBasics Module
+
 - **Location**: `contracts/modules/DeptBasics.vy`
 - **Purpose**: Provides department-level functionality
 - **Documentation**: See [DeptBasics Technical Documentation](../modules/DeptBasics.md)
@@ -41,6 +43,7 @@ CreditEngine is built using a modular architecture with the following components
 - **Exported Interface**: Department basics via `deptBasics.__interface__`
 
 ### Module Initialization
+
 ```vyper
 initializes: addys
 initializes: deptBasics[addys := addys]
@@ -109,7 +112,9 @@ initializes: deptBasics[addys := addys]
 ## Data Structures
 
 ### UserDebt Struct
+
 Current debt state for a user:
+
 ```vyper
 struct UserDebt:
     amount: uint256             # Total debt (principal + interest)
@@ -120,7 +125,9 @@ struct UserDebt:
 ```
 
 ### UserBorrowTerms Struct
+
 Aggregated borrowing parameters across all positions:
+
 ```vyper
 struct UserBorrowTerms:
     collateralVal: uint256      # Total USD collateral value
@@ -129,7 +136,9 @@ struct UserBorrowTerms:
 ```
 
 ### IntervalBorrow Struct
+
 Tracks borrowing within time intervals:
+
 ```vyper
 struct IntervalBorrow:
     start: uint256              # Interval start block
@@ -137,7 +146,9 @@ struct IntervalBorrow:
 ```
 
 ### BorrowConfig Struct
+
 Protocol-wide borrowing configuration:
+
 ```vyper
 struct BorrowConfig:
     canBorrow: bool                    # Global borrow toggle
@@ -152,7 +163,9 @@ struct BorrowConfig:
 ```
 
 ### CollateralRedemption Struct
+
 Redemption request parameters:
+
 ```vyper
 struct CollateralRedemption:
     user: address               # Position to redeem from
@@ -164,6 +177,7 @@ struct CollateralRedemption:
 ## State Variables
 
 ### Constants
+
 - `ONE_YEAR: uint256 = 60 * 60 * 24 * 365` - Seconds in a year
 - `HUNDRED_PERCENT: uint256 = 100_00` - 100.00% in basis points
 - `DANGER_BLOCKS_DENOMINATOR: uint256 = 100_0000` - For danger calculations
@@ -174,7 +188,9 @@ struct CollateralRedemption:
 - `CURVE_PRICES_ID: uint256 = 2` - Curve prices registry ID
 
 ### Inherited State Variables
+
 From [DeptBasics](../modules/DeptBasics.md):
+
 - `isPaused: bool` - Department pause state
 - `canMintGreen: bool` - Set to `True` for borrowing
 
@@ -191,19 +207,20 @@ def __init__(_ripeHq: address):
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
+| Name      | Type      | Description             |
+| --------- | --------- | ----------------------- |
 | `_ripeHq` | `address` | RipeHq contract address |
 
 #### Returns
 
-*Constructor does not return any values*
+_Constructor does not return any values_
 
 #### Access
 
 Called only during deployment
 
 #### Example Usage
+
 ```python
 # Deploy CreditEngine
 credit_engine = boa.load(
@@ -234,19 +251,19 @@ def borrowForUser(
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
-| `_user` | `address` | User borrowing |
-| `_greenAmount` | `uint256` | Amount to borrow |
-| `_wantsSavingsGreen` | `bool` | Receive as Savings Green |
-| `_shouldEnterStabPool` | `bool` | Auto-deposit to stability pool |
-| `_caller` | `address` | Transaction initiator |
-| `_a` | `addys.Addys` | Cached addresses (optional) |
+| Name                   | Type          | Description                    |
+| ---------------------- | ------------- | ------------------------------ |
+| `_user`                | `address`     | User borrowing                 |
+| `_greenAmount`         | `uint256`     | Amount to borrow               |
+| `_wantsSavingsGreen`   | `bool`        | Receive as Savings Green       |
+| `_shouldEnterStabPool` | `bool`        | Auto-deposit to stability pool |
+| `_caller`              | `address`     | Transaction initiator          |
+| `_a`                   | `addys.Addys` | Cached addresses (optional)    |
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type      | Description                |
+| --------- | -------------------------- |
 | `uint256` | Amount borrowed after fees |
 
 #### Access
@@ -262,6 +279,7 @@ Only callable by Teller contract
   - Global yield realized
 
 #### Example Usage
+
 ```python
 # Borrow 1000 Green as Savings Green
 amount_received = credit_engine.borrowForUser(
@@ -288,14 +306,14 @@ def getMaxBorrowAmount(_user: address) -> uint256:
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
+| Name    | Type      | Description   |
+| ------- | --------- | ------------- |
 | `_user` | `address` | User to check |
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type      | Description              |
+| --------- | ------------------------ |
 | `uint256` | Maximum borrowable Green |
 
 #### Access
@@ -303,6 +321,7 @@ def getMaxBorrowAmount(_user: address) -> uint256:
 Public view function
 
 #### Example Usage
+
 ```python
 # Check borrowing capacity
 max_borrow = credit_engine.getMaxBorrowAmount(user.address)
@@ -328,18 +347,18 @@ def repayForUser(
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
-| `_user` | `address` | User whose debt to repay |
-| `_greenAmount` | `uint256` | Amount to repay |
-| `_shouldRefundSavingsGreen` | `bool` | Refund excess as sGreen |
-| `_caller` | `address` | Transaction initiator |
-| `_a` | `addys.Addys` | Cached addresses (optional) |
+| Name                        | Type          | Description                 |
+| --------------------------- | ------------- | --------------------------- |
+| `_user`                     | `address`     | User whose debt to repay    |
+| `_greenAmount`              | `uint256`     | Amount to repay             |
+| `_shouldRefundSavingsGreen` | `bool`        | Refund excess as sGreen     |
+| `_caller`                   | `address`     | Transaction initiator       |
+| `_a`                        | `addys.Addys` | Cached addresses (optional) |
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type   | Description                  |
+| ------ | ---------------------------- |
 | `bool` | True if debt health restored |
 
 #### Access
@@ -355,6 +374,7 @@ Only callable by Teller contract
   - Health factor status
 
 #### Example Usage
+
 ```python
 # Repay 500 Green of debt
 is_healthy = credit_engine.repayForUser(
@@ -383,18 +403,18 @@ def repayDuringLiquidation(
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
-| `_liqUser` | `address` | User being liquidated |
-| `_userDebt` | `UserDebt` | Current debt state |
-| `_repayValue` | `uint256` | Amount to repay |
-| `_newInterest` | `uint256` | Accrued interest |
-| `_a` | `addys.Addys` | Cached addresses (optional) |
+| Name           | Type          | Description                 |
+| -------------- | ------------- | --------------------------- |
+| `_liqUser`     | `address`     | User being liquidated       |
+| `_userDebt`    | `UserDebt`    | Current debt state          |
+| `_repayValue`  | `uint256`     | Amount to repay             |
+| `_newInterest` | `uint256`     | Accrued interest            |
+| `_a`           | `addys.Addys` | Cached addresses (optional) |
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type   | Description                  |
+| ------ | ---------------------------- |
 | `bool` | True if debt health restored |
 
 #### Access
@@ -408,24 +428,24 @@ Repayment when collateral is purchased from auction.
 ```vyper
 @external
 def repayDuringAuctionPurchase(
-    _liqUser: address, 
-    _repayValue: uint256, 
+    _liqUser: address,
+    _repayValue: uint256,
     _a: addys.Addys = empty(addys.Addys)
 ) -> bool:
 ```
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
-| `_liqUser` | `address` | User being liquidated |
-| `_repayValue` | `uint256` | Green from auction sale |
-| `_a` | `addys.Addys` | Cached addresses (optional) |
+| Name          | Type          | Description                 |
+| ------------- | ------------- | --------------------------- |
+| `_liqUser`    | `address`     | User being liquidated       |
+| `_repayValue` | `uint256`     | Green from auction sale     |
+| `_a`          | `addys.Addys` | Cached addresses (optional) |
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type   | Description                  |
+| ------ | ---------------------------- |
 | `bool` | True if debt health restored |
 
 #### Access
@@ -453,20 +473,20 @@ def redeemCollateralFromMany(
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
-| `_redemptions` | `DynArray[CollateralRedemption, 20]` | Redemption requests |
-| `_greenAmount` | `uint256` | Total Green to spend |
-| `_recipient` | `address` | Collateral recipient |
-| `_caller` | `address` | Transaction initiator |
-| `_shouldTransferBalance` | `bool` | Transfer vs withdraw |
-| `_shouldRefundSavingsGreen` | `bool` | Refund excess as sGreen |
-| `_a` | `addys.Addys` | Cached addresses (optional) |
+| Name                        | Type                                 | Description                 |
+| --------------------------- | ------------------------------------ | --------------------------- |
+| `_redemptions`              | `DynArray[CollateralRedemption, 20]` | Redemption requests         |
+| `_greenAmount`              | `uint256`                            | Total Green to spend        |
+| `_recipient`                | `address`                            | Collateral recipient        |
+| `_caller`                   | `address`                            | Transaction initiator       |
+| `_shouldTransferBalance`    | `bool`                               | Transfer vs withdraw        |
+| `_shouldRefundSavingsGreen` | `bool`                               | Refund excess as sGreen     |
+| `_a`                        | `addys.Addys`                        | Cached addresses (optional) |
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type      | Description       |
+| --------- | ----------------- |
 | `uint256` | Total Green spent |
 
 #### Access
@@ -482,6 +502,7 @@ Only callable by Teller contract
   - Health status
 
 #### Example Usage
+
 ```python
 # Redeem collateral from unhealthy positions
 redemptions = [
@@ -511,14 +532,14 @@ def getMaxRedeemValue(_user: address) -> uint256:
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
+| Name    | Type      | Description            |
+| ------- | --------- | ---------------------- |
 | `_user` | `address` | User position to check |
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type      | Description                    |
+| --------- | ------------------------------ |
 | `uint256` | Maximum Green value redeemable |
 
 #### Access
@@ -545,18 +566,18 @@ def getUserBorrowTerms(
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
-| `_user` | `address` | User to analyze |
-| `_shouldRaise` | `bool` | Raise on price errors |
-| `_skipVaultId` | `uint256` | Vault to exclude (optional) |
-| `_skipAsset` | `address` | Asset to exclude (optional) |
-| `_a` | `addys.Addys` | Cached addresses (optional) |
+| Name           | Type          | Description                 |
+| -------------- | ------------- | --------------------------- |
+| `_user`        | `address`     | User to analyze             |
+| `_shouldRaise` | `bool`        | Raise on price errors       |
+| `_skipVaultId` | `uint256`     | Vault to exclude (optional) |
+| `_skipAsset`   | `address`     | Asset to exclude (optional) |
+| `_a`           | `addys.Addys` | Cached addresses (optional) |
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type              | Description                 |
+| ----------------- | --------------------------- |
 | `UserBorrowTerms` | Aggregated terms and values |
 
 #### Access
@@ -564,6 +585,7 @@ def getUserBorrowTerms(
 Public view function
 
 #### Example Usage
+
 ```python
 # Get user's borrowing terms
 terms = credit_engine.getUserBorrowTerms(
@@ -585,14 +607,14 @@ def getCollateralValue(_user: address) -> uint256:
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
+| Name    | Type      | Description   |
+| ------- | --------- | ------------- |
 | `_user` | `address` | User to check |
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type      | Description                   |
+| --------- | ----------------------------- |
 | `uint256` | Total collateral value in USD |
 
 #### Access
@@ -610,14 +632,14 @@ def updateDebtForUser(_user: address) -> bool:
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
+| Name    | Type      | Description               |
+| ------- | --------- | ------------------------- |
 | `_user` | `address` | User whose debt to update |
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type   | Description               |
+| ------ | ------------------------- |
 | `bool` | True if update successful |
 
 #### Access
@@ -625,6 +647,7 @@ def updateDebtForUser(_user: address) -> bool:
 Callable by any valid Ripe address (not just Teller or AuctionHouse)
 
 #### Example Usage
+
 ```python
 # Update user's debt state
 success = credit_engine.updateDebtForUser(
@@ -647,14 +670,14 @@ def hasGoodDebtHealth(_user: address) -> bool:
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
+| Name    | Type      | Description   |
+| ------- | --------- | ------------- |
 | `_user` | `address` | User to check |
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type   | Description                            |
+| ------ | -------------------------------------- |
 | `bool` | True if user has healthy debt position |
 
 #### Access
@@ -662,6 +685,7 @@ def hasGoodDebtHealth(_user: address) -> bool:
 Public view function
 
 #### Example Usage
+
 ```python
 # Check if user position is healthy
 is_healthy = credit_engine.hasGoodDebtHealth(user.address)
@@ -680,14 +704,14 @@ def canLiquidateUser(_user: address) -> bool:
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
+| Name    | Type      | Description   |
+| ------- | --------- | ------------- |
 | `_user` | `address` | User to check |
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type   | Description                    |
+| ------ | ------------------------------ |
 | `bool` | True if user can be liquidated |
 
 #### Access
@@ -695,6 +719,7 @@ def canLiquidateUser(_user: address) -> bool:
 Public view function
 
 #### Example Usage
+
 ```python
 # Check if user can be liquidated
 can_liquidate = credit_engine.canLiquidateUser(user.address)
@@ -713,14 +738,14 @@ def canRedeemUserCollateral(_user: address) -> bool:
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
+| Name    | Type      | Description   |
+| ------- | --------- | ------------- |
 | `_user` | `address` | User to check |
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type   | Description                               |
+| ------ | ----------------------------------------- |
 | `bool` | True if user's collateral can be redeemed |
 
 #### Access
@@ -728,6 +753,7 @@ def canRedeemUserCollateral(_user: address) -> bool:
 Public view function
 
 #### Example Usage
+
 ```python
 # Check if collateral can be redeemed
 can_redeem = credit_engine.canRedeemUserCollateral(user.address)
@@ -748,14 +774,14 @@ def getLiquidationThreshold(_user: address) -> uint256:
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
+| Name    | Type      | Description   |
+| ------- | --------- | ------------- |
 | `_user` | `address` | User to check |
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type      | Description                         |
+| --------- | ----------------------------------- |
 | `uint256` | USD value threshold for liquidation |
 
 #### Access
@@ -763,6 +789,7 @@ def getLiquidationThreshold(_user: address) -> uint256:
 Public view function
 
 #### Example Usage
+
 ```python
 # Get liquidation threshold
 liq_threshold = credit_engine.getLiquidationThreshold(user.address)
@@ -781,14 +808,14 @@ def getRedemptionThreshold(_user: address) -> uint256:
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
+| Name    | Type      | Description   |
+| ------- | --------- | ------------- |
 | `_user` | `address` | User to check |
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type      | Description                        |
+| --------- | ---------------------------------- |
 | `uint256` | USD value threshold for redemption |
 
 #### Access
@@ -796,6 +823,7 @@ def getRedemptionThreshold(_user: address) -> uint256:
 Public view function
 
 #### Example Usage
+
 ```python
 # Get redemption threshold
 redeem_threshold = credit_engine.getRedemptionThreshold(user.address)
@@ -816,14 +844,14 @@ def getDynamicBorrowRate(_baseBorrowRate: uint256) -> uint256:
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
+| Name              | Type      | Description                         |
+| ----------------- | --------- | ----------------------------------- |
 | `_baseBorrowRate` | `uint256` | Base borrow rate before adjustments |
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type      | Description                              |
+| --------- | ---------------------------------------- |
 | `uint256` | Adjusted borrow rate with dynamic boosts |
 
 #### Access
@@ -831,6 +859,7 @@ def getDynamicBorrowRate(_baseBorrowRate: uint256) -> uint256:
 Public view function
 
 #### Example Usage
+
 ```python
 # Get dynamic rate based on stability pool health
 base_rate = 500  # 5%
@@ -882,6 +911,16 @@ If pool in danger:
   boost = min(maxBoost, dangerBlocks * increasePerBlock)
   dynamicRate = min(maxRate, baseRate + boost)
 ```
+
+## Security Considerations
+
+1. **Access Control**: All critical functions are protected by RipeHq authorization checks
+2. **Debt Manipulation**: Only authorized contracts can modify debt positions
+3. **Interest Accrual**: Interest calculations use safe math to prevent overflows
+4. **Liquidation Protection**: Positions can only be liquidated by AuctionHouse
+5. **Time-based Attacks**: Uses block.timestamp for interest, subject to miner manipulation
+6. **Reentrancy**: External calls follow checks-effects-interactions pattern
+7. **Oracle Dependency**: Relies on PriceDesk for accurate collateral valuations
 
 ## Testing
 

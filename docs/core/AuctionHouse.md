@@ -19,6 +19,7 @@ For technical readers, AuctionHouse implements sophisticated liquidation mathema
 AuctionHouse is built using a modular architecture with the following components:
 
 ### Addys Module
+
 - **Location**: `contracts/modules/Addys.vy`
 - **Purpose**: Provides protocol-wide address resolution
 - **Documentation**: See [Addys Technical Documentation](../modules/Addys.md)
@@ -29,6 +30,7 @@ AuctionHouse is built using a modular architecture with the following components
 - **Exported Interface**: Address utilities via `addys.__interface__`
 
 ### DeptBasics Module
+
 - **Location**: `contracts/modules/DeptBasics.vy`
 - **Purpose**: Provides department-level functionality
 - **Documentation**: See [DeptBasics Technical Documentation](../modules/DeptBasics.md)
@@ -39,6 +41,7 @@ AuctionHouse is built using a modular architecture with the following components
 - **Exported Interface**: Department basics via `deptBasics.__interface__`
 
 ### Module Initialization
+
 ```vyper
 initializes: addys
 initializes: deptBasics[addys := addys]
@@ -118,7 +121,9 @@ initializes: deptBasics[addys := addys]
 ## Data Structures
 
 ### AuctionBuyConfig Struct
+
 Configuration for auction purchase permissions:
+
 ```vyper
 struct AuctionBuyConfig:
     canBuyInAuctionGeneral: bool      # General auction participation allowed
@@ -128,7 +133,9 @@ struct AuctionBuyConfig:
 ```
 
 ### UserBorrowTerms Struct
+
 User's borrowing parameters:
+
 ```vyper
 struct UserBorrowTerms:
     collateralVal: uint256            # Total collateral value in USD
@@ -137,7 +144,9 @@ struct UserBorrowTerms:
 ```
 
 ### UserDebt Struct
+
 Current debt state:
+
 ```vyper
 struct UserDebt:
     amount: uint256                   # Current debt amount
@@ -148,7 +157,9 @@ struct UserDebt:
 ```
 
 ### GenLiqConfig Struct
+
 General liquidation configuration:
+
 ```vyper
 struct GenLiqConfig:
     canLiquidate: bool                # Global liquidation toggle
@@ -162,7 +173,9 @@ struct GenLiqConfig:
 ```
 
 ### AssetLiqConfig Struct
+
 Asset-specific liquidation configuration:
+
 ```vyper
 struct AssetLiqConfig:
     hasConfig: bool                   # Has custom configuration
@@ -175,7 +188,9 @@ struct AssetLiqConfig:
 ```
 
 ### FungibleAuction Struct
+
 Active auction data:
+
 ```vyper
 struct FungibleAuction:
     liqUser: address                  # User being liquidated
@@ -191,6 +206,7 @@ struct FungibleAuction:
 ## State Variables
 
 ### Transient Storage (Gas Optimization)
+
 - `vaultAddrs: transient(HashMap[uint256, address])` - Cached vault addresses
 - `assetLiqConfig: transient(HashMap[address, AssetLiqConfig])` - Cached asset configs
 - `didHandleLiqAsset: transient(HashMap[address, HashMap[uint256, HashMap[address, bool]]])` - Processing tracker
@@ -199,6 +215,7 @@ struct FungibleAuction:
 - `userAssetForAuction: transient(HashMap[address, HashMap[uint256, VaultData]])` - Auction asset data
 
 ### Constants
+
 - `HUNDRED_PERCENT: uint256 = 100_00` - 100.00% in basis points
 - `ONE_PERCENT: uint256 = 1_00` - 1.00% in basis points
 - `MAX_STAB_VAULT_DATA: uint256 = 10` - Max stability vaults
@@ -207,7 +224,9 @@ struct FungibleAuction:
 - `MAX_AUCTIONS: uint256 = 20` - Max batch auctions
 
 ### Inherited State Variables
+
 From [DeptBasics](../modules/DeptBasics.md):
+
 - `isPaused: bool` - Department pause state
 - `canMintGreen: bool` - Set to `True` for keeper rewards
 
@@ -224,19 +243,20 @@ def __init__(_ripeHq: address):
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
+| Name      | Type      | Description             |
+| --------- | --------- | ----------------------- |
 | `_ripeHq` | `address` | RipeHq contract address |
 
 #### Returns
 
-*Constructor does not return any values*
+_Constructor does not return any values_
 
 #### Access
 
 Called only during deployment
 
 #### Example Usage
+
 ```python
 # Deploy AuctionHouse
 auction_house = boa.load(
@@ -265,17 +285,17 @@ def liquidateUser(
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
-| `_liqUser` | `address` | User to liquidate |
-| `_keeper` | `address` | Keeper receiving rewards |
-| `_wantsSavingsGreen` | `bool` | Receive rewards as sGreen |
-| `_a` | `addys.Addys` | Cached addresses (optional) |
+| Name                 | Type          | Description                 |
+| -------------------- | ------------- | --------------------------- |
+| `_liqUser`           | `address`     | User to liquidate           |
+| `_keeper`            | `address`     | Keeper receiving rewards    |
+| `_wantsSavingsGreen` | `bool`        | Receive rewards as sGreen   |
+| `_a`                 | `addys.Addys` | Cached addresses (optional) |
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type      | Description          |
+| --------- | -------------------- |
 | `uint256` | Keeper reward amount |
 
 #### Access
@@ -288,6 +308,7 @@ Only callable by Teller contract
 - Various phase-specific events based on liquidation path
 
 #### Example Usage
+
 ```python
 # Keeper triggers liquidation
 keeper_rewards = auction_house.liquidateUser(
@@ -316,17 +337,17 @@ def liquidateManyUsers(
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
-| `_liqUsers` | `DynArray[address, MAX_LIQ_USERS]` | Users to liquidate (max 50) |
-| `_keeper` | `address` | Keeper receiving rewards |
-| `_wantsSavingsGreen` | `bool` | Receive rewards as sGreen |
-| `_a` | `addys.Addys` | Cached addresses (optional) |
+| Name                 | Type                               | Description                 |
+| -------------------- | ---------------------------------- | --------------------------- |
+| `_liqUsers`          | `DynArray[address, MAX_LIQ_USERS]` | Users to liquidate (max 50) |
+| `_keeper`            | `address`                          | Keeper receiving rewards    |
+| `_wantsSavingsGreen` | `bool`                             | Receive rewards as sGreen   |
+| `_a`                 | `addys.Addys`                      | Cached addresses (optional) |
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type      | Description          |
+| --------- | -------------------- |
 | `uint256` | Total keeper rewards |
 
 #### Access
@@ -334,6 +355,7 @@ def liquidateManyUsers(
 Only callable by Teller contract
 
 #### Example Usage
+
 ```python
 # Batch liquidation
 users = [user1.address, user2.address, user3.address]
@@ -357,14 +379,14 @@ def calcAmountOfDebtToRepayDuringLiq(_user: address) -> uint256:
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
+| Name    | Type      | Description           |
+| ------- | --------- | --------------------- |
 | `_user` | `address` | User to calculate for |
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type      | Description             |
+| --------- | ----------------------- |
 | `uint256` | Target repayment amount |
 
 #### Access
@@ -372,6 +394,7 @@ def calcAmountOfDebtToRepayDuringLiq(_user: address) -> uint256:
 Public view function
 
 #### Example Usage
+
 ```python
 # Check liquidation repayment target
 target_repay = auction_house.calcAmountOfDebtToRepayDuringLiq(
@@ -398,17 +421,17 @@ def startAuction(
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
-| `_liqUser` | `address` | User in liquidation |
-| `_liqVaultId` | `uint256` | Vault containing asset |
-| `_liqAsset` | `address` | Asset to auction |
-| `_a` | `addys.Addys` | Cached addresses (optional) |
+| Name          | Type          | Description                 |
+| ------------- | ------------- | --------------------------- |
+| `_liqUser`    | `address`     | User in liquidation         |
+| `_liqVaultId` | `uint256`     | Vault containing asset      |
+| `_liqAsset`   | `address`     | Asset to auction            |
+| `_a`          | `addys.Addys` | Cached addresses (optional) |
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type   | Description             |
+| ------ | ----------------------- |
 | `bool` | True if auction started |
 
 #### Access
@@ -420,6 +443,7 @@ Only callable by Switchboard-registered contracts
 - `FungibleAuctionUpdated` - Auction parameters and status
 
 #### Example Usage
+
 ```python
 # Start auction for remaining collateral
 success = auction_house.startAuction(
@@ -444,15 +468,15 @@ def startManyAuctions(
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
-| `_auctions` | `DynArray[FungAuctionConfig, MAX_AUCTIONS]` | Auction configurations |
-| `_a` | `addys.Addys` | Cached addresses (optional) |
+| Name        | Type                                        | Description                 |
+| ----------- | ------------------------------------------- | --------------------------- |
+| `_auctions` | `DynArray[FungAuctionConfig, MAX_AUCTIONS]` | Auction configurations      |
+| `_a`        | `addys.Addys`                               | Cached addresses (optional) |
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type      | Description                |
+| --------- | -------------------------- |
 | `uint256` | Number of auctions started |
 
 #### Access
@@ -475,17 +499,17 @@ def pauseAuction(
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
-| `_liqUser` | `address` | User in liquidation |
-| `_liqVaultId` | `uint256` | Vault containing asset |
-| `_liqAsset` | `address` | Asset being auctioned |
-| `_a` | `addys.Addys` | Cached addresses (optional) |
+| Name          | Type          | Description                 |
+| ------------- | ------------- | --------------------------- |
+| `_liqUser`    | `address`     | User in liquidation         |
+| `_liqVaultId` | `uint256`     | Vault containing asset      |
+| `_liqAsset`   | `address`     | Asset being auctioned       |
+| `_a`          | `addys.Addys` | Cached addresses (optional) |
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type   | Description            |
+| ------ | ---------------------- |
 | `bool` | True if auction paused |
 
 #### Access
@@ -510,15 +534,15 @@ def pauseManyAuctions(
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
-| `_auctions` | `DynArray[FungAuctionConfig, MAX_AUCTIONS]` | Auctions to pause |
-| `_a` | `addys.Addys` | Cached addresses (optional) |
+| Name        | Type                                        | Description                 |
+| ----------- | ------------------------------------------- | --------------------------- |
+| `_auctions` | `DynArray[FungAuctionConfig, MAX_AUCTIONS]` | Auctions to pause           |
+| `_a`        | `addys.Addys`                               | Cached addresses (optional) |
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type      | Description               |
+| --------- | ------------------------- |
 | `uint256` | Number of auctions paused |
 
 #### Access
@@ -541,16 +565,16 @@ def canStartAuction(
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
-| `_liqUser` | `address` | User to check |
-| `_liqVaultId` | `uint256` | Vault ID |
-| `_liqAsset` | `address` | Asset to auction |
+| Name          | Type      | Description      |
+| ------------- | --------- | ---------------- |
+| `_liqUser`    | `address` | User to check    |
+| `_liqVaultId` | `uint256` | Vault ID         |
+| `_liqAsset`   | `address` | Asset to auction |
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type   | Description               |
+| ------ | ------------------------- |
 | `bool` | True if auction can start |
 
 #### Access
@@ -580,22 +604,22 @@ def buyFungibleAuction(
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
-| `_liqUser` | `address` | User being liquidated |
-| `_vaultId` | `uint256` | Vault containing asset |
-| `_asset` | `address` | Asset to purchase |
-| `_greenAmount` | `uint256` | Max Green to spend |
-| `_recipient` | `address` | Collateral recipient |
-| `_caller` | `address` | Transaction initiator |
-| `_shouldTransferBalance` | `bool` | Transfer within vault vs withdraw |
-| `_shouldRefundSavingsGreen` | `bool` | Refund excess as sGreen |
-| `_a` | `addys.Addys` | Cached addresses (optional) |
+| Name                        | Type          | Description                       |
+| --------------------------- | ------------- | --------------------------------- |
+| `_liqUser`                  | `address`     | User being liquidated             |
+| `_vaultId`                  | `uint256`     | Vault containing asset            |
+| `_asset`                    | `address`     | Asset to purchase                 |
+| `_greenAmount`              | `uint256`     | Max Green to spend                |
+| `_recipient`                | `address`     | Collateral recipient              |
+| `_caller`                   | `address`     | Transaction initiator             |
+| `_shouldTransferBalance`    | `bool`        | Transfer within vault vs withdraw |
+| `_shouldRefundSavingsGreen` | `bool`        | Refund excess as sGreen           |
+| `_a`                        | `addys.Addys` | Cached addresses (optional)       |
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type      | Description        |
+| --------- | ------------------ |
 | `uint256` | Green tokens spent |
 
 #### Access
@@ -607,6 +631,7 @@ Only callable by Teller contract
 - `FungAuctionPurchased` - Purchase details including amounts and debt status
 
 #### Example Usage
+
 ```python
 # Buy discounted collateral
 green_spent = auction_house.buyFungibleAuction(
@@ -643,20 +668,20 @@ def buyManyFungibleAuctions(
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
-| `_purchases` | `DynArray[FungAuctionPurchase, MAX_AUCTIONS]` | Purchase configurations |
-| `_greenAmount` | `uint256` | Total Green budget |
-| `_recipient` | `address` | Collateral recipient |
-| `_caller` | `address` | Transaction initiator |
-| `_shouldTransferBalance` | `bool` | Transfer within vault vs withdraw |
-| `_shouldRefundSavingsGreen` | `bool` | Refund excess as sGreen |
-| `_a` | `addys.Addys` | Cached addresses (optional) |
+| Name                        | Type                                          | Description                       |
+| --------------------------- | --------------------------------------------- | --------------------------------- |
+| `_purchases`                | `DynArray[FungAuctionPurchase, MAX_AUCTIONS]` | Purchase configurations           |
+| `_greenAmount`              | `uint256`                                     | Total Green budget                |
+| `_recipient`                | `address`                                     | Collateral recipient              |
+| `_caller`                   | `address`                                     | Transaction initiator             |
+| `_shouldTransferBalance`    | `bool`                                        | Transfer within vault vs withdraw |
+| `_shouldRefundSavingsGreen` | `bool`                                        | Refund excess as sGreen           |
+| `_a`                        | `addys.Addys`                                 | Cached addresses (optional)       |
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type      | Description       |
+| --------- | ----------------- |
 | `uint256` | Total Green spent |
 
 #### Access
@@ -664,6 +689,7 @@ def buyManyFungibleAuctions(
 Only callable by Teller contract
 
 #### Example Usage
+
 ```python
 # Batch auction purchases
 purchases = [
@@ -686,7 +712,9 @@ total_spent = auction_house.buyManyFungibleAuctions(
 ### Phase 1 Events
 
 #### `StabAssetBurntAsRepayment`
+
 Emitted when Green/sGreen is burned for debt repayment:
+
 ```vyper
 event StabAssetBurntAsRepayment:
     liqUser: indexed(address)
@@ -698,7 +726,9 @@ event StabAssetBurntAsRepayment:
 ```
 
 #### `CollateralSentToEndaoment`
+
 Emitted when stablecoins are sent to Endaoment:
+
 ```vyper
 event CollateralSentToEndaoment:
     liqUser: indexed(address)
@@ -712,7 +742,9 @@ event CollateralSentToEndaoment:
 ### Phase 2 Events
 
 #### `CollateralSwappedWithStabPool`
+
 Emitted when collateral is swapped with stability pools:
+
 ```vyper
 event CollateralSwappedWithStabPool:
     liqUser: indexed(address)
@@ -738,6 +770,7 @@ R = (D - T*C) * (1-F) / (1 - F - T)
 ```
 
 Where:
+
 - R = Repayment amount
 - D = Current debt
 - C = Collateral value
@@ -745,6 +778,7 @@ Where:
 - F = Liquidation fee ratio
 
 This formula ensures:
+
 - Consistent behavior across liquidation types
 - Conservative approach (may slightly over-repay)
 - Guaranteed debt health restoration
@@ -753,11 +787,22 @@ This formula ensures:
 ### Auction Discount Calculation
 
 Linear discount progression:
+
 ```
 discount = startDiscount + (progress * (maxDiscount - startDiscount))
 ```
 
 Where progress is the percentage of auction duration elapsed.
+
+## Security Considerations
+
+1. **Access Control**: Only Teller can initiate liquidations, preventing unauthorized triggers
+2. **Transient Storage**: Uses EIP-1153 transient storage for gas optimization without state pollution
+3. **Unified Math**: Single repayment formula prevents calculation inconsistencies
+4. **Price Oracle Dependency**: Relies heavily on PriceDesk for accurate valuations
+5. **Keeper MEV**: Liquidation rewards may be subject to MEV extraction
+6. **Auction Timing**: Dutch auction discounts increase linearly, potentially allowing manipulation
+7. **Multi-Phase Safety**: Phased liquidation approach minimizes market impact
 
 ## Testing
 

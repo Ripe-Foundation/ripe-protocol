@@ -12,16 +12,17 @@ At its core, PriceDesk manages three fundamental responsibilities:
 
 **3. Value Conversions**: Provides utility functions to convert between asset amounts and USD values, handling decimal conversions automatically. This includes specialized functions for ETH conversions and feed availability checks.
 
-For technical readers, PriceDesk utilizes modular architecture with [LocalGov](../LocalGov.md), [AddressRegistry](../AddressRegistry.md), Addys, and [DeptBasics](../DeptBasics.md) modules, implements a priority-based oracle selection system, provides automatic decimal handling for diverse token standards, and includes snapshot functionality for price updates. The contract's design ensures resilient price discovery across multiple oracle sources.
+For technical readers, PriceDesk utilizes modular architecture with [LocalGov](../modules/LocalGov.md), [AddressRegistry](../modules/AddressRegistry.md), Addys, and [DeptBasics](../modules/DeptBasics.md) modules, implements a priority-based oracle selection system, provides automatic decimal handling for diverse token standards, and includes snapshot functionality for price updates. The contract's design ensures resilient price discovery across multiple oracle sources.
 
 ## Architecture & Modules
 
 PriceDesk is built using a modular architecture that inherits functionality from multiple base modules:
 
 ### LocalGov Module
+
 - **Location**: `contracts/modules/LocalGov.vy`
 - **Purpose**: Provides governance functionality with time-locked changes
-- **Documentation**: See [LocalGov Technical Documentation](../LocalGov.md)
+- **Documentation**: See [LocalGov Technical Documentation](../modules/LocalGov.md)
 - **Key Features**:
   - Governance address management
   - Time-locked transitions
@@ -29,9 +30,10 @@ PriceDesk is built using a modular architecture that inherits functionality from
 - **Exported Interface**: All governance functions via `gov.__interface__`
 
 ### AddressRegistry Module
+
 - **Location**: `contracts/registries/modules/AddressRegistry.vy`
 - **Purpose**: Manages the registry of price source addresses
-- **Documentation**: See [AddressRegistry Technical Documentation](../AddressRegistry.md)
+- **Documentation**: See [AddressRegistry Technical Documentation](../modules/AddressRegistry.md)
 - **Key Features**:
   - Sequential registry ID assignment for price sources
   - Time-locked address additions, updates, and disabling
@@ -39,6 +41,7 @@ PriceDesk is built using a modular architecture that inherits functionality from
 - **Exported Interface**: All registry functions via `registry.__interface__`
 
 ### Addys Module
+
 - **Location**: `contracts/modules/Addys.vy`
 - **Purpose**: Provides RipeHq integration for address lookups
 - **Documentation**: See [Addys Technical Documentation](../modules/Addys.md)
@@ -48,9 +51,10 @@ PriceDesk is built using a modular architecture that inherits functionality from
 - **Exported Interface**: Address utilities via `addys.__interface__`
 
 ### DeptBasics Module
+
 - **Location**: `contracts/modules/DeptBasics.vy`
 - **Purpose**: Provides department-level basic functionality
-- **Documentation**: See [DeptBasics Technical Documentation](../DeptBasics.md)
+- **Documentation**: See [DeptBasics Technical Documentation](../modules/DeptBasics.md)
 - **Key Features**:
   - Pause mechanism
   - Department interface compliance
@@ -58,6 +62,7 @@ PriceDesk is built using a modular architecture that inherits functionality from
 - **Exported Interface**: Department basics via `deptBasics.__interface__`
 
 ### Module Initialization
+
 ```vyper
 initializes: gov
 initializes: registry[gov := gov]
@@ -127,7 +132,9 @@ initializes: deptBasics[addys := addys]
 ## Data Structures
 
 ### PriceConfig Struct
+
 Configuration for price discovery (fetched from MissionControl):
+
 ```vyper
 struct PriceConfig:
     staleTime: uint256                                              # Maximum age for valid prices
@@ -137,25 +144,32 @@ struct PriceConfig:
 ## State Variables
 
 ### Constants
+
 - `MAX_PRIORITY_PRICE_SOURCES: uint256 = 10` - Maximum priority sources in config
 - `UNDERSCORE_APPRAISER_ID: uint256 = 8` - Registry ID for underscore appraiser
 
 ### Immutable Variables
+
 - `ETH: address` - Address representing ETH for pricing
 
 ### Inherited State Variables
-From [LocalGov](../LocalGov.md):
+
+From [LocalGov](../modules/LocalGov.md):
+
 - `governance: address` - Current governance address
 - `govChangeTimeLock: uint256` - Timelock for governance changes
 
-From [AddressRegistry](../AddressRegistry.md):
+From [AddressRegistry](../modules/AddressRegistry.md):
+
 - `registryChangeTimeLock: uint256` - Timelock for registry changes
 - Registry mappings for oracle management
 
 From Addys:
+
 - RipeHq address reference
 
-From [DeptBasics](../DeptBasics.md):
+From [DeptBasics](../modules/DeptBasics.md):
+
 - `isPaused: bool` - Department pause state
 
 ## Constructor
@@ -177,23 +191,24 @@ def __init__(
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
-| `_ripeHq` | `address` | RipeHq contract address |
-| `_tempGov` | `address` | Initial temporary governance address |
-| `_ethAddr` | `address` | Address representing ETH for pricing |
+| Name                   | Type      | Description                            |
+| ---------------------- | --------- | -------------------------------------- |
+| `_ripeHq`              | `address` | RipeHq contract address                |
+| `_tempGov`             | `address` | Initial temporary governance address   |
+| `_ethAddr`             | `address` | Address representing ETH for pricing   |
 | `_minRegistryTimeLock` | `uint256` | Minimum time-lock for registry changes |
 | `_maxRegistryTimeLock` | `uint256` | Maximum time-lock for registry changes |
 
 #### Returns
 
-*Constructor does not return any values*
+_Constructor does not return any values_
 
 #### Access
 
 Called only during deployment
 
 #### Example Usage
+
 ```python
 # Deploy PriceDesk
 price_desk = boa.load(
@@ -222,15 +237,15 @@ def getPrice(_asset: address, _shouldRaise: bool = False) -> uint256:
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
-| `_asset` | `address` | The asset to price |
-| `_shouldRaise` | `bool` | Whether to raise exception if feed exists but no price |
+| Name           | Type      | Description                                            |
+| -------------- | --------- | ------------------------------------------------------ |
+| `_asset`       | `address` | The asset to price                                     |
+| `_shouldRaise` | `bool`    | Whether to raise exception if feed exists but no price |
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type      | Description                                 |
+| --------- | ------------------------------------------- |
 | `uint256` | USD price with 18 decimals (0 if not found) |
 
 #### Access
@@ -238,6 +253,7 @@ def getPrice(_asset: address, _shouldRaise: bool = False) -> uint256:
 Public view function
 
 #### Example Usage
+
 ```python
 # Get USDC price
 usdc_price = price_desk.getPrice(usdc.address)
@@ -245,7 +261,7 @@ usdc_price = price_desk.getPrice(usdc.address)
 
 # Get price with exception on stale
 btc_price = price_desk.getPrice(
-    wbtc.address, 
+    wbtc.address,
     True  # Raise if feed exists but price is stale
 )
 ```
@@ -264,16 +280,16 @@ def getUsdValue(_asset: address, _amount: uint256, _shouldRaise: bool = False) -
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
-| `_asset` | `address` | The asset address |
-| `_amount` | `uint256` | Amount in asset's native decimals |
-| `_shouldRaise` | `bool` | Whether to raise on stale price |
+| Name           | Type      | Description                       |
+| -------------- | --------- | --------------------------------- |
+| `_asset`       | `address` | The asset address                 |
+| `_amount`      | `uint256` | Amount in asset's native decimals |
+| `_shouldRaise` | `bool`    | Whether to raise on stale price   |
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type      | Description                |
+| --------- | -------------------------- |
 | `uint256` | USD value with 18 decimals |
 
 #### Access
@@ -281,6 +297,7 @@ def getUsdValue(_asset: address, _amount: uint256, _shouldRaise: bool = False) -
 Public view function
 
 #### Example Usage
+
 ```python
 # Get USD value of 100 USDC (6 decimals)
 usd_value = price_desk.getUsdValue(
@@ -309,16 +326,16 @@ def getAssetAmount(_asset: address, _usdValue: uint256, _shouldRaise: bool = Fal
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
-| `_asset` | `address` | The asset address |
-| `_usdValue` | `uint256` | USD value with 18 decimals |
-| `_shouldRaise` | `bool` | Whether to raise on stale price |
+| Name           | Type      | Description                     |
+| -------------- | --------- | ------------------------------- |
+| `_asset`       | `address` | The asset address               |
+| `_usdValue`    | `uint256` | USD value with 18 decimals      |
+| `_shouldRaise` | `bool`    | Whether to raise on stale price |
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type      | Description                     |
+| --------- | ------------------------------- |
 | `uint256` | Asset amount in native decimals |
 
 #### Access
@@ -326,6 +343,7 @@ def getAssetAmount(_asset: address, _usdValue: uint256, _shouldRaise: bool = Fal
 Public view function
 
 #### Example Usage
+
 ```python
 # Get USDC amount for $500
 usdc_amount = price_desk.getAssetAmount(
@@ -354,14 +372,14 @@ def hasPriceFeed(_asset: address) -> bool:
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
+| Name     | Type      | Description        |
+| -------- | --------- | ------------------ |
 | `_asset` | `address` | The asset to check |
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type   | Description                   |
+| ------ | ----------------------------- |
 | `bool` | True if any oracle has a feed |
 
 #### Access
@@ -369,6 +387,7 @@ def hasPriceFeed(_asset: address) -> bool:
 Public view function
 
 #### Example Usage
+
 ```python
 # Check if USDC has a price feed
 has_feed = price_desk.hasPriceFeed(usdc.address)
@@ -393,15 +412,15 @@ def getEthUsdValue(_amount: uint256, _shouldRaise: bool = False) -> uint256:
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
-| `_amount` | `uint256` | ETH amount in wei (18 decimals) |
-| `_shouldRaise` | `bool` | Whether to raise on stale price |
+| Name           | Type      | Description                     |
+| -------------- | --------- | ------------------------------- |
+| `_amount`      | `uint256` | ETH amount in wei (18 decimals) |
+| `_shouldRaise` | `bool`    | Whether to raise on stale price |
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type      | Description                |
+| --------- | -------------------------- |
 | `uint256` | USD value with 18 decimals |
 
 #### Access
@@ -409,6 +428,7 @@ def getEthUsdValue(_amount: uint256, _shouldRaise: bool = False) -> uint256:
 Public view function
 
 #### Example Usage
+
 ```python
 # Get USD value of 1.5 ETH
 usd_value = price_desk.getEthUsdValue(
@@ -429,15 +449,15 @@ def getEthAmount(_usdValue: uint256, _shouldRaise: bool = False) -> uint256:
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
-| `_usdValue` | `uint256` | USD value with 18 decimals |
-| `_shouldRaise` | `bool` | Whether to raise on stale price |
+| Name           | Type      | Description                     |
+| -------------- | --------- | ------------------------------- |
+| `_usdValue`    | `uint256` | USD value with 18 decimals      |
+| `_shouldRaise` | `bool`    | Whether to raise on stale price |
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type      | Description       |
+| --------- | ----------------- |
 | `uint256` | ETH amount in wei |
 
 #### Access
@@ -445,6 +465,7 @@ def getEthAmount(_usdValue: uint256, _shouldRaise: bool = False) -> uint256:
 Public view function
 
 #### Example Usage
+
 ```python
 # Get ETH amount for $3,000
 eth_amount = price_desk.getEthAmount(
@@ -466,26 +487,27 @@ def startAddNewAddressToRegistry(_addr: address, _description: String[64]) -> bo
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
-| `_addr` | `address` | The price source contract address |
-| `_description` | `String[64]` | Description of the price source |
+| Name           | Type         | Description                       |
+| -------------- | ------------ | --------------------------------- |
+| `_addr`        | `address`    | The price source contract address |
+| `_description` | `String[64]` | Description of the price source   |
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type   | Description                    |
+| ------ | ------------------------------ |
 | `bool` | True if successfully initiated |
 
 #### Access
 
-Only callable by governance AND only when the contract is not paused (see [LocalGov](../LocalGov.md) for governance details)
+Only callable by governance AND only when the contract is not paused (see [LocalGov](../modules/LocalGov.md) for governance details)
 
 #### Events Emitted
 
-- `NewAddressPending` (from [AddressRegistry](../AddressRegistry.md)) - Contains address, description, and confirmation block
+- `NewAddressPending` (from [AddressRegistry](../modules/AddressRegistry.md)) - Contains address, description, and confirmation block
 
 #### Example Usage
+
 ```python
 # Add Chainlink oracle
 success = price_desk.startAddNewAddressToRegistry(
@@ -508,14 +530,14 @@ def confirmNewAddressToRegistry(_addr: address) -> uint256:
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
+| Name    | Type      | Description                         |
+| ------- | --------- | ----------------------------------- |
 | `_addr` | `address` | The price source address to confirm |
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type      | Description              |
+| --------- | ------------------------ |
 | `uint256` | The assigned registry ID |
 
 #### Access
@@ -524,9 +546,10 @@ Only callable by governance AND only when the contract is not paused
 
 #### Events Emitted
 
-- `NewAddressConfirmed` (from [AddressRegistry](../AddressRegistry.md)) - Contains registry ID, address, description
+- `NewAddressConfirmed` (from [AddressRegistry](../modules/AddressRegistry.md)) - Contains registry ID, address, description
 
 #### Example Usage
+
 ```python
 # Confirm after timelock
 boa.env.time_travel(blocks=time_lock)
@@ -548,14 +571,14 @@ def cancelNewAddressToRegistry(_addr: address) -> bool:
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
+| Name    | Type      | Description                        |
+| ------- | --------- | ---------------------------------- |
 | `_addr` | `address` | The price source address to cancel |
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type   | Description                    |
+| ------ | ------------------------------ |
 | `bool` | True if successfully cancelled |
 
 #### Access
@@ -564,9 +587,10 @@ Only callable by governance AND only when the contract is not paused
 
 #### Events Emitted
 
-- `NewAddressCancelled` (from [AddressRegistry](../AddressRegistry.md))
+- `NewAddressCancelled` (from [AddressRegistry](../modules/AddressRegistry.md))
 
 #### Example Usage
+
 ```python
 success = price_desk.cancelNewAddressToRegistry(
     chainlink_oracle.address,
@@ -585,15 +609,15 @@ def startAddressUpdateToRegistry(_regId: uint256, _newAddr: address) -> bool:
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
-| `_regId` | `uint256` | Registry ID to update |
+| Name       | Type      | Description              |
+| ---------- | --------- | ------------------------ |
+| `_regId`   | `uint256` | Registry ID to update    |
 | `_newAddr` | `address` | New price source address |
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type   | Description                    |
+| ------ | ------------------------------ |
 | `bool` | True if successfully initiated |
 
 #### Access
@@ -602,9 +626,10 @@ Only callable by governance AND only when the contract is not paused
 
 #### Events Emitted
 
-- `AddressUpdatePending` (from [AddressRegistry](../AddressRegistry.md))
+- `AddressUpdatePending` (from [AddressRegistry](../modules/AddressRegistry.md))
 
 #### Example Usage
+
 ```python
 # Update oracle to new version
 success = price_desk.startAddressUpdateToRegistry(
@@ -625,14 +650,14 @@ def confirmAddressUpdateToRegistry(_regId: uint256) -> bool:
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
+| Name     | Type      | Description               |
+| -------- | --------- | ------------------------- |
 | `_regId` | `uint256` | Registry ID being updated |
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type   | Description                    |
+| ------ | ------------------------------ |
 | `bool` | True if successfully confirmed |
 
 #### Access
@@ -641,9 +666,10 @@ Only callable by governance AND only when the contract is not paused
 
 #### Events Emitted
 
-- `AddressUpdateConfirmed` (from [AddressRegistry](../AddressRegistry.md))
+- `AddressUpdateConfirmed` (from [AddressRegistry](../modules/AddressRegistry.md))
 
 #### Example Usage
+
 ```python
 # Confirm update after timelock
 boa.env.time_travel(blocks=time_lock)
@@ -664,14 +690,14 @@ def cancelAddressUpdateToRegistry(_regId: uint256) -> bool:
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
+| Name     | Type      | Description                  |
+| -------- | --------- | ---------------------------- |
 | `_regId` | `uint256` | Registry ID to cancel update |
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type   | Description                    |
+| ------ | ------------------------------ |
 | `bool` | True if successfully cancelled |
 
 #### Access
@@ -680,7 +706,7 @@ Only callable by governance AND only when the contract is not paused
 
 #### Events Emitted
 
-- `AddressUpdateCancelled` (from [AddressRegistry](../AddressRegistry.md))
+- `AddressUpdateCancelled` (from [AddressRegistry](../modules/AddressRegistry.md))
 
 ### `startAddressDisableInRegistry`
 
@@ -693,14 +719,14 @@ def startAddressDisableInRegistry(_regId: uint256) -> bool:
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
+| Name     | Type      | Description            |
+| -------- | --------- | ---------------------- |
 | `_regId` | `uint256` | Registry ID to disable |
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type   | Description                    |
+| ------ | ------------------------------ |
 | `bool` | True if successfully initiated |
 
 #### Access
@@ -709,9 +735,10 @@ Only callable by governance AND only when the contract is not paused
 
 #### Events Emitted
 
-- `AddressDisablePending` (from [AddressRegistry](../AddressRegistry.md))
+- `AddressDisablePending` (from [AddressRegistry](../modules/AddressRegistry.md))
 
 #### Example Usage
+
 ```python
 # Start disabling compromised oracle
 success = price_desk.startAddressDisableInRegistry(
@@ -731,14 +758,14 @@ def confirmAddressDisableInRegistry(_regId: uint256) -> bool:
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
+| Name     | Type      | Description            |
+| -------- | --------- | ---------------------- |
 | `_regId` | `uint256` | Registry ID to disable |
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type   | Description                   |
+| ------ | ----------------------------- |
 | `bool` | True if successfully disabled |
 
 #### Access
@@ -747,7 +774,7 @@ Only callable by governance AND only when the contract is not paused
 
 #### Events Emitted
 
-- `AddressDisableConfirmed` (from [AddressRegistry](../AddressRegistry.md))
+- `AddressDisableConfirmed` (from [AddressRegistry](../modules/AddressRegistry.md))
 
 ### `cancelAddressDisableInRegistry`
 
@@ -760,14 +787,14 @@ def cancelAddressDisableInRegistry(_regId: uint256) -> bool:
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
+| Name     | Type      | Description                   |
+| -------- | --------- | ----------------------------- |
 | `_regId` | `uint256` | Registry ID to cancel disable |
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type   | Description                    |
+| ------ | ------------------------------ |
 | `bool` | True if successfully cancelled |
 
 #### Access
@@ -776,7 +803,7 @@ Only callable by governance AND only when the contract is not paused
 
 #### Events Emitted
 
-- `AddressDisableCancelled` (from [AddressRegistry](../AddressRegistry.md))
+- `AddressDisableCancelled` (from [AddressRegistry](../modules/AddressRegistry.md))
 
 ## Price Snapshot Functions
 
@@ -785,20 +812,20 @@ Only callable by governance AND only when the contract is not paused
 Triggers price snapshots across all oracles that have a feed for the asset.
 
 ```vyper
-@external 
+@external
 def addPriceSnapshot(_asset: address) -> bool:
 ```
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
+| Name     | Type      | Description                  |
+| -------- | --------- | ---------------------------- |
 | `_asset` | `address` | Asset to snapshot prices for |
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type   | Description                                                                                                                                         |
+| ------ | --------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `bool` | Returns `True` if a snapshot was successfully triggered on at least one price source. Returns `False` if no price sources had a feed for the asset. |
 
 #### Access
@@ -806,6 +833,7 @@ def addPriceSnapshot(_asset: address) -> bool:
 Only callable by valid Ripe addresses or the underscore appraiser
 
 #### Example Usage
+
 ```python
 # Trigger price snapshot for USDC
 updated = price_desk.addPriceSnapshot(

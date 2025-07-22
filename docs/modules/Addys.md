@@ -88,8 +88,8 @@ This gives the inheriting contract access to all internal functions and the abil
 +------------------+    +-------------------+    +------------------+
 | Core Contracts   |    | Vault System      |    | Config System    |
 | * Green Token    |    | * VaultBook       |    | * Switchboard    |
-| * CreditEngine   |    | * Registered      |    | * Registered     |
-| * Teller, etc.   |    |   Vaults          |    |   Configs        |
+| * [CreditEngine](../core/CreditEngine.md)   |    | * Registered      |    | * Registered     |
+| * [Teller](../core/Teller.md), etc.   |    |   Vaults          |    |   Configs        |
 +------------------+    +-------------------+    +------------------+
 ```
 
@@ -389,9 +389,9 @@ Each department has a pair of functions for getting its ID and address:
 - `_getVaultBookId() -> uint256` - Returns VAULT_BOOK_ID (8)
 - `_getVaultBookAddr() -> address` - Returns VaultBook address
 
-### AuctionHouse Functions
+### [AuctionHouse](../core/AuctionHouse.md) Functions
 - `_getAuctionHouseId() -> uint256` - Returns AUCTION_HOUSE_ID (9)
-- `_getAuctionHouseAddr() -> address` - Returns AuctionHouse address
+- `_getAuctionHouseAddr() -> address` - Returns [AuctionHouse](../core/AuctionHouse.md) address
 
 ### AuctionHouseNft Functions
 - `_getAuctionHouseNftId() -> uint256` - Returns AUCTION_HOUSE_NFT_ID (10)
@@ -401,27 +401,27 @@ Each department has a pair of functions for getting its ID and address:
 - `_getBoardroomId() -> uint256` - Returns BOARDROOM_ID (11)
 - `_getBoardroomAddr() -> address` - Returns Boardroom address
 
-### BondRoom Functions
+### [BondRoom](../core/BondRoom.md) Functions
 - `_getBondRoomId() -> uint256` - Returns BOND_ROOM_ID (12)
 - `_getBondRoomAddr() -> address` - Returns BondRoom address
 
-### CreditEngine Functions
+### [CreditEngine](../core/CreditEngine.md) Functions
 - `_getCreditEngineId() -> uint256` - Returns CREDIT_ENGINE_ID (13)
 - `_getCreditEngineAddr() -> address` - Returns CreditEngine address
 
-### Endaoment Functions
+### [Endaoment](../core/Endaoment.md) Functions
 - `_getEndaomentId() -> uint256` - Returns ENDAOMENT_ID (14)
 - `_getEndaomentAddr() -> address` - Returns Endaoment address
 
-### HumanResources Functions
+### [HumanResources](../core/HumanResources.md) Functions
 - `_getHumanResourcesId() -> uint256` - Returns HUMAN_RESOURCES_ID (15)
 - `_getHumanResourcesAddr() -> address` - Returns HumanResources address
 
-### Lootbox Functions
+### [Lootbox](../core/Lootbox.md) Functions
 - `_getLootboxId() -> uint256` - Returns LOOTBOX_ID (16)
 - `_getLootboxAddr() -> address` - Returns Lootbox address
 
-### Teller Functions
+### [Teller](../core/Teller.md) Functions
 - `_getTellerId() -> uint256` - Returns TELLER_ID (17)
 - `_getTellerAddr() -> address` - Returns Teller address
 

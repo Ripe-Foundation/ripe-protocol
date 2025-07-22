@@ -21,7 +21,7 @@ RipeHq is built using a modular architecture that separates concerns and promote
 ### LocalGov Module
 - **Location**: `contracts/modules/LocalGov.vy`
 - **Purpose**: Provides governance functionality with time-locked changes
-- **Documentation**: See [LocalGov Technical Documentation](./LocalGov.md)
+- **Documentation**: See [LocalGov Technical Documentation](../modules/LocalGov.md)
 - **Key Features**:
   - Governance address management with time-locked transitions
   - Configurable min/max timelock periods for security
@@ -31,7 +31,7 @@ RipeHq is built using a modular architecture that separates concerns and promote
 ### AddressRegistry Module  
 - **Location**: `contracts/registries/modules/AddressRegistry.vy`
 - **Purpose**: Manages the registry of protocol addresses
-- **Documentation**: See [AddressRegistry Technical Documentation](./AddressRegistry.md)
+- **Documentation**: See [AddressRegistry Technical Documentation](../modules/AddressRegistry.md)
 - **Key Features**:
   - Sequential registry ID assignment (starting from 1)
   - Time-locked address additions, updates, and disabling

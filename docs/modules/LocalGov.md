@@ -6,7 +6,7 @@ LocalGov serves as a flexible governance module for the Ripe Protocol ecosystem.
 
 At its core, LocalGov manages three fundamental responsibilities:
 
-**1. Hierarchical Governance**: Supports both local governance (specific to the implementing contract) and global governance (from RipeHq), allowing for flexible permission models where either the local governor or RipeHq's governor can perform administrative actions.
+**1. Hierarchical Governance**: Supports both local governance (specific to the implementing contract) and global governance (from [RipeHq](../../registries/RipeHq.md)), allowing for flexible permission models where either the local governor or RipeHq's governor can perform administrative actions.
 
 **2. Time-locked Transitions**: All governance changes require a two-step process with configurable time delays, preventing rushed decisions and providing transparency. New governors must actively confirm their role, ensuring intentional governance transfers.
 
@@ -83,8 +83,8 @@ def __init__(
 |------|------|-------------|
 | `_ripeHq` | `address` | RipeHq address (or empty for top-level governance) |
 | `_initialGov` | `address` | Initial governance address |
-| `_minTimeLock` | `uint256` | Minimum time-lock blocks (0 to inherit from RipeHq) |
-| `_maxTimeLock` | `uint256` | Maximum time-lock blocks (0 to inherit from RipeHq) |
+| `_minTimeLock` | `uint256` | Minimum time-lock blocks (0 to inherit from [RipeHq](../../registries/RipeHq.md)) |
+| `_maxTimeLock` | `uint256` | Maximum time-lock blocks (0 to inherit from [RipeHq](../../registries/RipeHq.md)) |
 | `_initialTimeLock` | `uint256` | Initial time-lock setting |
 
 #### Returns
@@ -112,8 +112,8 @@ dept_gov = boa.load(
     "contracts/modules/LocalGov.vy",
     ripe_hq.address,  # RipeHq address
     dept_owner,       # Initial local governor
-    0,                # Inherit min from RipeHq
-    0,                # Inherit max from RipeHq
+    0,                # Inherit min from [RipeHq](../../registries/RipeHq.md)
+    0,                # Inherit max from [RipeHq](../../registries/RipeHq.md)
     200               # Initial timelock
 )
 ```
@@ -155,7 +155,7 @@ ripe_hq_addr = local_gov.getRipeHqFromGov()
 
 ### `canGovern`
 
-Checks if an address has governance permissions (either local or from RipeHq).
+Checks if an address has governance permissions (either local or from [RipeHq](../../registries/RipeHq.md)).
 
 ```vyper
 @view

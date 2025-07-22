@@ -12,13 +12,14 @@ At its core, SavingsGreen manages three fundamental responsibilities:
 
 **3. Advanced Token Features**: Includes sophisticated features like EIP-2612 permit functionality for gasless approvals, blacklist capabilities for compliance, pause mechanisms for emergency situations, and time-locked governance transitions inherited from the ERC20 base module.
 
-For technical readers, SavingsGreen utilizes a modular architecture combining Erc20Token and Erc4626Token modules, implements precise share-to-asset conversion with proper rounding for deposits and withdrawals, tracks price-per-share history for yield calculation and reporting, provides nonreentrant deposit and withdrawal functions for security, and supports time-locked RipeHq governance changes with proper validation. The vault is designed for maximum capital efficiency while maintaining full ERC4626 compatibility.
+For technical readers, SavingsGreen utilizes a modular architecture combining Erc20Token and Erc4626Token modules, implements precise share-to-asset conversion with proper rounding for deposits and withdrawals, tracks price-per-share history for yield calculation and reporting, provides nonreentrant deposit and withdrawal functions for security, and supports time-locked [RipeHq](../registries/RipeHq.md) governance changes with proper validation. The vault is designed for maximum capital efficiency while maintaining full ERC4626 compatibility.
 
 ## Architecture & Modules
 
 SavingsGreen is built using a modular architecture that combines ERC20 token functionality with ERC4626 vault capabilities:
 
 ### Erc20Token Module
+
 - **Location**: `contracts/tokens/modules/Erc20Token.vy`
 - **Purpose**: Provides complete ERC20 token functionality for sGREEN shares
 - **Key Features**:
@@ -30,6 +31,7 @@ SavingsGreen is built using a modular architecture that combines ERC20 token fun
   - Secure minting and burning capabilities
 
 ### Erc4626Token Module
+
 - **Location**: `contracts/tokens/modules/Erc4626Token.vy`
 - **Purpose**: Provides complete ERC4626 vault functionality
 - **Key Features**:
@@ -41,6 +43,7 @@ SavingsGreen is built using a modular architecture that combines ERC20 token fun
   - Maximum limits and preview functions
 
 ### Module Initialization
+
 ```vyper
 exports: token.__interface__
 exports: erc4626.__interface__
@@ -126,7 +129,9 @@ initializes: erc4626[token := token]
 ## Data Structures
 
 ### PendingHq Struct (Inherited)
+
 Tracks pending RipeHq address changes:
+
 ```vyper
 struct PendingHq:
     newHq: address                    # New RipeHq address
@@ -137,21 +142,25 @@ struct PendingHq:
 ## State Variables
 
 ### Token Information (Immutable)
+
 - `TOKEN_NAME: String[64]` - "Savings Green USD"
-- `TOKEN_SYMBOL: String[32]` - "sGREEN" 
+- `TOKEN_SYMBOL: String[32]` - "sGREEN"
 - `TOKEN_DECIMALS: uint8` - Matches underlying Green token decimals (18)
 - `VERSION: String[8]` - "v1.0.0"
 
 ### ERC4626 Vault State
+
 - `ASSET: immutable(address)` - Green token contract address (underlying asset)
 - `lastPricePerShare: uint256` - Last recorded price per share for yield tracking
 
 ### Core ERC20 State (Inherited)
+
 - `balanceOf: HashMap[address, uint256]` - sGREEN share balances
 - `allowance: HashMap[address, HashMap[address, uint256]]` - Spending approvals
 - `totalSupply: uint256` - Total sGREEN share supply
 
 ### Security and Governance (Inherited)
+
 - `ripeHq: address` - Current RipeHq contract address
 - `blacklisted: HashMap[address, bool]` - Blacklisted addresses
 - `isPaused: bool` - Token pause state
@@ -159,10 +168,12 @@ struct PendingHq:
 - `hqChangeTimeLock: uint256` - Time lock for RipeHq changes
 
 ### EIP-712 Support (Inherited)
+
 - `nonces: HashMap[address, uint256]` - Permit nonces for each address
 - Domain separator components for signature validation
 
 ### Constants and Immutable (Inherited)
+
 - `MIN_HQ_TIME_LOCK: uint256` - Minimum time lock for RipeHq changes
 - `MAX_HQ_TIME_LOCK: uint256` - Maximum time lock for RipeHq changes
 - Various EIP-712 and cryptographic constants
@@ -188,25 +199,26 @@ def __init__(
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
-| `_asset` | `address` | Green token contract address (underlying asset) |
-| `_ripeHq` | `address` | RipeHq contract address (empty for initial deployment) |
-| `_initialGov` | `address` | Initial governance address (for setup phase) |
-| `_minHqTimeLock` | `uint256` | Minimum time lock for RipeHq changes |
-| `_maxHqTimeLock` | `uint256` | Maximum time lock for RipeHq changes |
-| `_initialSupply` | `uint256` | Initial sGREEN supply to mint |
-| `_initialSupplyRecipient` | `address` | Recipient of initial supply |
+| Name                      | Type      | Description                                            |
+| ------------------------- | --------- | ------------------------------------------------------ |
+| `_asset`                  | `address` | Green token contract address (underlying asset)        |
+| `_ripeHq`                 | `address` | RipeHq contract address (empty for initial deployment) |
+| `_initialGov`             | `address` | Initial governance address (for setup phase)           |
+| `_minHqTimeLock`          | `uint256` | Minimum time lock for RipeHq changes                   |
+| `_maxHqTimeLock`          | `uint256` | Maximum time lock for RipeHq changes                   |
+| `_initialSupply`          | `uint256` | Initial sGREEN supply to mint                          |
+| `_initialSupplyRecipient` | `address` | Recipient of initial supply                            |
 
 #### Returns
 
-*Constructor does not return any values*
+_Constructor does not return any values_
 
 #### Access
 
 Called only during deployment
 
 #### Example Usage
+
 ```python
 # Deploy SavingsGreen vault
 savings_green = boa.load(
@@ -237,8 +249,8 @@ def name() -> String[64]:
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type         | Description         |
+| ------------ | ------------------- |
 | `String[64]` | "Savings Green USD" |
 
 #### Access
@@ -257,9 +269,9 @@ def symbol() -> String[32]:
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
-| `String[32]` | "sGREEN" |
+| Type         | Description |
+| ------------ | ----------- |
+| `String[32]` | "sGREEN"    |
 
 #### Access
 
@@ -277,8 +289,8 @@ def decimals() -> uint8:
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type    | Description                 |
+| ------- | --------------------------- |
 | `uint8` | 18 decimals (matches GREEN) |
 
 #### Access
@@ -291,14 +303,14 @@ Returns the total sGREEN share supply.
 
 ```vyper
 @view
-@external 
+@external
 def totalSupply() -> uint256:
 ```
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type      | Description                   |
+| --------- | ----------------------------- |
 | `uint256` | Total supply of sGREEN shares |
 
 #### Access
@@ -317,14 +329,14 @@ def balanceOf(_account: address) -> uint256:
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
+| Name       | Type      | Description      |
+| ---------- | --------- | ---------------- |
 | `_account` | `address` | Account to check |
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type      | Description                         |
+| --------- | ----------------------------------- |
 | `uint256` | sGREEN share balance of the account |
 
 #### Access
@@ -345,8 +357,8 @@ def asset() -> address:
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type      | Description                  |
+| --------- | ---------------------------- |
 | `address` | Green token contract address |
 
 #### Access
@@ -365,8 +377,8 @@ def totalAssets() -> uint256:
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type      | Description                          |
+| --------- | ------------------------------------ |
 | `uint256` | Total GREEN tokens held in the vault |
 
 #### Access
@@ -374,6 +386,7 @@ def totalAssets() -> uint256:
 Public view function
 
 #### Example Usage
+
 ```python
 # Check total assets in vault
 total_green = savings_green.totalAssets()
@@ -394,14 +407,14 @@ def maxDeposit(_receiver: address) -> uint256:
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
+| Name        | Type      | Description                       |
+| ----------- | --------- | --------------------------------- |
 | `_receiver` | `address` | Address that would receive shares |
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type      | Description                        |
+| --------- | ---------------------------------- |
 | `uint256` | Maximum deposit amount (unlimited) |
 
 #### Access
@@ -420,14 +433,14 @@ def previewDeposit(_assets: uint256) -> uint256:
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
+| Name      | Type      | Description                       |
+| --------- | --------- | --------------------------------- |
 | `_assets` | `uint256` | Amount of GREEN tokens to deposit |
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type      | Description                                  |
+| --------- | -------------------------------------------- |
 | `uint256` | Number of sGREEN shares that would be minted |
 
 #### Access
@@ -435,6 +448,7 @@ def previewDeposit(_assets: uint256) -> uint256:
 Public view function
 
 #### Example Usage
+
 ```python
 # Preview deposit of 1000 GREEN
 shares_preview = savings_green.previewDeposit(1000_000000000000000000)
@@ -453,15 +467,15 @@ def deposit(_assets: uint256, _receiver: address = msg.sender) -> uint256:
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
-| `_assets` | `uint256` | Amount of GREEN tokens to deposit |
+| Name        | Type      | Description                                           |
+| ----------- | --------- | ----------------------------------------------------- |
+| `_assets`   | `uint256` | Amount of GREEN tokens to deposit                     |
 | `_receiver` | `address` | Address to receive sGREEN shares (defaults to caller) |
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type      | Description                    |
+| --------- | ------------------------------ |
 | `uint256` | Number of sGREEN shares minted |
 
 #### Access
@@ -474,6 +488,7 @@ Public function (requires GREEN token approval)
 - `Transfer` - sGREEN share mint event
 
 #### Example Usage
+
 ```python
 # First approve GREEN tokens
 green_token.approve(savings_green.address, 1000_000000000000000000, sender=user)
@@ -499,14 +514,14 @@ def maxMint(_receiver: address) -> uint256:
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
+| Name        | Type      | Description                       |
+| ----------- | --------- | --------------------------------- |
 | `_receiver` | `address` | Address that would receive shares |
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type      | Description                                   |
+| --------- | --------------------------------------------- |
 | `uint256` | Maximum shares that can be minted (unlimited) |
 
 #### Access
@@ -525,14 +540,14 @@ def previewMint(_shares: uint256) -> uint256:
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
+| Name      | Type      | Description                     |
+| --------- | --------- | ------------------------------- |
 | `_shares` | `uint256` | Number of sGREEN shares to mint |
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type      | Description                     |
+| --------- | ------------------------------- |
 | `uint256` | Amount of GREEN tokens required |
 
 #### Access
@@ -551,15 +566,15 @@ def mint(_shares: uint256, _receiver: address = msg.sender) -> uint256:
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
-| `_shares` | `uint256` | Number of sGREEN shares to mint |
+| Name        | Type      | Description                                    |
+| ----------- | --------- | ---------------------------------------------- |
+| `_shares`   | `uint256` | Number of sGREEN shares to mint                |
 | `_receiver` | `address` | Address to receive shares (defaults to caller) |
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type      | Description                      |
+| --------- | -------------------------------- |
 | `uint256` | Amount of GREEN tokens deposited |
 
 #### Access
@@ -572,6 +587,7 @@ Public function (requires GREEN token approval)
 - `Transfer` - sGREEN share mint event
 
 #### Example Usage
+
 ```python
 # Mint exactly 500 sGREEN shares
 assets_required = savings_green.mint(
@@ -595,14 +611,14 @@ def maxWithdraw(_owner: address) -> uint256:
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
+| Name     | Type      | Description         |
+| -------- | --------- | ------------------- |
 | `_owner` | `address` | Share owner address |
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type      | Description                                |
+| --------- | ------------------------------------------ |
 | `uint256` | Maximum GREEN tokens that can be withdrawn |
 
 #### Access
@@ -621,14 +637,14 @@ def previewWithdraw(_assets: uint256) -> uint256:
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
+| Name      | Type      | Description                        |
+| --------- | --------- | ---------------------------------- |
 | `_assets` | `uint256` | Amount of GREEN tokens to withdraw |
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type      | Description                      |
+| --------- | -------------------------------- |
 | `uint256` | Number of sGREEN shares required |
 
 #### Access
@@ -646,16 +662,16 @@ def withdraw(_assets: uint256, _receiver: address = msg.sender, _owner: address 
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
-| `_assets` | `uint256` | Amount of GREEN tokens to withdraw |
-| `_receiver` | `address` | Address to receive GREEN tokens |
-| `_owner` | `address` | Share owner (defaults to caller) |
+| Name        | Type      | Description                        |
+| ----------- | --------- | ---------------------------------- |
+| `_assets`   | `uint256` | Amount of GREEN tokens to withdraw |
+| `_receiver` | `address` | Address to receive GREEN tokens    |
+| `_owner`    | `address` | Share owner (defaults to caller)   |
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type      | Description                    |
+| --------- | ------------------------------ |
 | `uint256` | Number of sGREEN shares burned |
 
 #### Access
@@ -668,6 +684,7 @@ Public function (requires sufficient shares or allowance)
 - `Transfer` - sGREEN share burn event
 
 #### Example Usage
+
 ```python
 # Withdraw exactly 500 GREEN tokens
 shares_burned = savings_green.withdraw(
@@ -690,14 +707,14 @@ def maxRedeem(_owner: address) -> uint256:
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
+| Name     | Type      | Description         |
+| -------- | --------- | ------------------- |
 | `_owner` | `address` | Share owner address |
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type      | Description                                |
+| --------- | ------------------------------------------ |
 | `uint256` | Maximum sGREEN shares that can be redeemed |
 
 #### Access
@@ -716,14 +733,14 @@ def previewRedeem(_shares: uint256) -> uint256:
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
+| Name      | Type      | Description                       |
+| --------- | --------- | --------------------------------- |
 | `_shares` | `uint256` | Number of sGREEN shares to redeem |
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type      | Description                                   |
+| --------- | --------------------------------------------- |
 | `uint256` | Amount of GREEN tokens that would be received |
 
 #### Access
@@ -741,16 +758,16 @@ def redeem(_shares: uint256, _receiver: address = msg.sender, _owner: address = 
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
-| `_shares` | `uint256` | Number of sGREEN shares to redeem |
-| `_receiver` | `address` | Address to receive GREEN tokens |
-| `_owner` | `address` | Share owner (defaults to caller) |
+| Name        | Type      | Description                       |
+| ----------- | --------- | --------------------------------- |
+| `_shares`   | `uint256` | Number of sGREEN shares to redeem |
+| `_receiver` | `address` | Address to receive GREEN tokens   |
+| `_owner`    | `address` | Share owner (defaults to caller)  |
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type      | Description                     |
+| --------- | ------------------------------- |
 | `uint256` | Amount of GREEN tokens received |
 
 #### Access
@@ -763,6 +780,7 @@ Public function (requires sufficient shares or allowance)
 - `Transfer` - sGREEN share burn event
 
 #### Example Usage
+
 ```python
 # Redeem all sGREEN shares
 user_shares = savings_green.balanceOf(user.address)
@@ -788,14 +806,14 @@ def convertToShares(_assets: uint256) -> uint256:
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
+| Name      | Type      | Description            |
+| --------- | --------- | ---------------------- |
 | `_assets` | `uint256` | Amount of GREEN tokens |
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type      | Description                        |
+| --------- | ---------------------------------- |
 | `uint256` | Equivalent number of sGREEN shares |
 
 #### Access
@@ -814,14 +832,14 @@ def convertToAssets(_shares: uint256) -> uint256:
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
+| Name      | Type      | Description             |
+| --------- | --------- | ----------------------- |
 | `_shares` | `uint256` | Number of sGREEN shares |
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type      | Description                       |
+| --------- | --------------------------------- |
 | `uint256` | Equivalent amount of GREEN tokens |
 
 #### Access
@@ -829,6 +847,7 @@ def convertToAssets(_shares: uint256) -> uint256:
 Public view function
 
 #### Example Usage
+
 ```python
 # Convert 1000 GREEN to shares
 shares_equivalent = savings_green.convertToShares(1000_000000000000000000)
@@ -851,8 +870,8 @@ def pricePerShare() -> uint256:
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type      | Description                                            |
+| --------- | ------------------------------------------------------ |
 | `uint256` | Current GREEN tokens per sGREEN share (scaled by 1e18) |
 
 #### Access
@@ -860,6 +879,7 @@ def pricePerShare() -> uint256:
 Public view function
 
 #### Example Usage
+
 ```python
 # Check current yield
 price = savings_green.pricePerShare()
@@ -883,8 +903,8 @@ def lastPricePerShare() -> uint256:
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type      | Description                                 |
+| --------- | ------------------------------------------- |
 | `uint256` | Last recorded GREEN tokens per sGREEN share |
 
 #### Access
@@ -903,14 +923,14 @@ def getLastUnderlying(_shares: uint256) -> uint256:
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
+| Name      | Type      | Description             |
+| --------- | --------- | ----------------------- |
 | `_shares` | `uint256` | Number of sGREEN shares |
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type      | Description                              |
+| --------- | ---------------------------------------- |
 | `uint256` | GREEN token value at last recorded price |
 
 #### Access
@@ -963,7 +983,7 @@ def allowance(_owner: address, _spender: address) -> uint256:
 SavingsGreen inherits all RipeHq management and governance functions from the ERC20 base module:
 
 - `ripeHq()` - Current RipeHq address
-- `hasPendingHqChange()` - Pending governance changes  
+- `hasPendingHqChange()` - Pending governance changes
 - `initiateHqChange()` - Start governance transition
 - `confirmHqChange()` - Complete governance transition
 - `cancelHqChange()` - Cancel pending transition
@@ -984,4 +1004,4 @@ SavingsGreen inherits comprehensive security features:
 
 ## Testing
 
-For comprehensive test examples, see: [`tests/tokens/test_savings_green.py`](../../tests/tokens/test_savings_green.py)
+For comprehensive test examples, see: [`tests/tokens/test_erc4626.py`](../../tests/tokens/test_erc4626.py)

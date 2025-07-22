@@ -8,17 +8,18 @@ At its core, GreenToken manages three fundamental responsibilities:
 
 **1. Stablecoin Functionality**: Implements complete ERC20 functionality with 18 decimals, providing standard token operations like transfers, approvals, and allowances while maintaining USD parity through the protocol's collateralization mechanisms.
 
-**2. Controlled Minting System**: Only authorized protocol contracts (verified through RipeHq's two-factor authentication system) can mint new Green tokens. This ensures all Green tokens are properly backed by collateral and prevents unauthorized inflation.
+**2. Controlled Minting System**: Only authorized protocol contracts (verified through [RipeHq](../registries/RipeHq.md)'s two-factor authentication system) can mint new Green tokens. This ensures all Green tokens are properly backed by collateral and prevents unauthorized inflation.
 
 **3. Advanced Token Features**: Includes sophisticated features like EIP-2612 permit functionality for gasless approvals, blacklist capabilities for compliance, pause mechanisms for emergency situations, and time-locked governance transitions for security.
 
-For technical readers, GreenToken utilizes a modular architecture built on the Erc20Token base module, implements RipeHq integration for minting authorization with two-factor authentication validation, provides EIP-712 domain separation for secure off-chain signatures, includes comprehensive blacklist and pause functionality, and supports time-locked governance changes with proper validation. The token is designed for maximum security and regulatory compliance while maintaining decentralized operation.
+For technical readers, GreenToken utilizes a modular architecture built on the Erc20Token base module, implements [RipeHq](../registries/RipeHq.md) integration for minting authorization with two-factor authentication validation, provides EIP-712 domain separation for secure off-chain signatures, includes comprehensive blacklist and pause functionality, and supports time-locked governance changes with proper validation. The token is designed for maximum security and regulatory compliance while maintaining decentralized operation.
 
 ## Architecture & Modules
 
 GreenToken is built using a modular architecture that inherits comprehensive ERC20 functionality:
 
 ### Erc20Token Module
+
 - **Location**: `contracts/tokens/modules/Erc20Token.vy`
 - **Purpose**: Provides complete ERC20 token functionality with advanced features
 - **Key Features**:
@@ -31,6 +32,7 @@ GreenToken is built using a modular architecture that inherits comprehensive ERC
 - **Exported Interface**: Complete token interface via `token.__interface__`
 
 ### Module Initialization
+
 ```vyper
 exports: token.__interface__
 initializes: token
@@ -94,18 +96,20 @@ initializes: token
 | RipeHq           |    | Protocol          |    | Users &          |
 | Validation       |    | Contracts         |    | External         |
 |                  |    |                   |    | Interfaces       |
-| * canMintGreen   |    | * CreditEngine    |    |                  |
-| * governance     |    | * Teller          |    | * ERC20 ops      |
-| * blacklist      |    | * AuctionHouse    |    | * Permit         |
-| * permissions    |    | * StabilityPool   |    | * Transfers      |
-+------------------+    | * VaultBook       |    | * Approvals      |
+| * canMintGreen   |    | * [CreditEngine](../core/CreditEngine.md)    |    |                  |
+| * governance     |    | * [Teller](../core/Teller.md)          |    | * ERC20 ops      |
+| * blacklist      |    | * [AuctionHouse](../core/AuctionHouse.md)    |    | * Permit         |
+| * permissions    |    | * [StabilityPool](../vaults/StabilityPool.md)   |    | * Transfers      |
++------------------+    | * [VaultBook](../registries/VaultBook.md)       |    | * Approvals      |
                         +-------------------+    +------------------+
 ```
 
 ## Data Structures
 
 ### PendingHq Struct
+
 Tracks pending RipeHq address changes:
+
 ```vyper
 struct PendingHq:
     newHq: address                    # New RipeHq address
@@ -116,17 +120,20 @@ struct PendingHq:
 ## State Variables
 
 ### Token Information (Immutable)
+
 - `TOKEN_NAME: String[64]` - "Green USD Stablecoin"
-- `TOKEN_SYMBOL: String[32]` - "GREEN" 
+- `TOKEN_SYMBOL: String[32]` - "GREEN"
 - `TOKEN_DECIMALS: uint8` - 18 decimals
 - `VERSION: String[8]` - "v1.0.0"
 
 ### Core ERC20 State
+
 - `balanceOf: HashMap[address, uint256]` - Token balances
 - `allowance: HashMap[address, HashMap[address, uint256]]` - Spending approvals
 - `totalSupply: uint256` - Total token supply
 
 ### Security and Governance
+
 - `ripeHq: address` - Current RipeHq contract address
 - `blacklisted: HashMap[address, bool]` - Blacklisted addresses
 - `isPaused: bool` - Token pause state
@@ -134,10 +141,12 @@ struct PendingHq:
 - `hqChangeTimeLock: uint256` - Time lock for RipeHq changes
 
 ### EIP-712 Support
+
 - `nonces: HashMap[address, uint256]` - Permit nonces for each address
 - Domain separator components for signature validation
 
 ### Constants and Immutable
+
 - `MIN_HQ_TIME_LOCK: uint256` - Minimum time lock for RipeHq changes
 - `MAX_HQ_TIME_LOCK: uint256` - Maximum time lock for RipeHq changes
 - Various EIP-712 and cryptographic constants
@@ -162,24 +171,25 @@ def __init__(
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
-| `_ripeHq` | `address` | RipeHq contract address (empty for initial deployment) |
-| `_initialGov` | `address` | Initial governance address (for setup phase) |
-| `_minHqTimeLock` | `uint256` | Minimum time lock for RipeHq changes |
-| `_maxHqTimeLock` | `uint256` | Maximum time lock for RipeHq changes |
-| `_initialSupply` | `uint256` | Initial token supply to mint |
-| `_initialSupplyRecipient` | `address` | Recipient of initial supply |
+| Name                      | Type      | Description                                            |
+| ------------------------- | --------- | ------------------------------------------------------ |
+| `_ripeHq`                 | `address` | RipeHq contract address (empty for initial deployment) |
+| `_initialGov`             | `address` | Initial governance address (for setup phase)           |
+| `_minHqTimeLock`          | `uint256` | Minimum time lock for RipeHq changes                   |
+| `_maxHqTimeLock`          | `uint256` | Maximum time lock for RipeHq changes                   |
+| `_initialSupply`          | `uint256` | Initial token supply to mint                           |
+| `_initialSupplyRecipient` | `address` | Recipient of initial supply                            |
 
 #### Returns
 
-*Constructor does not return any values*
+_Constructor does not return any values_
 
 #### Access
 
 Called only during deployment
 
 #### Example Usage
+
 ```python
 # Deploy Green token with initial governance
 green_token = boa.load(
@@ -209,8 +219,8 @@ def name() -> String[64]:
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type         | Description            |
+| ------------ | ---------------------- |
 | `String[64]` | "Green USD Stablecoin" |
 
 #### Access
@@ -229,9 +239,9 @@ def symbol() -> String[32]:
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
-| `String[32]` | "GREEN" |
+| Type         | Description |
+| ------------ | ----------- |
+| `String[32]` | "GREEN"     |
 
 #### Access
 
@@ -249,8 +259,8 @@ def decimals() -> uint8:
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type    | Description |
+| ------- | ----------- |
 | `uint8` | 18 decimals |
 
 #### Access
@@ -263,14 +273,14 @@ Returns the total token supply.
 
 ```vyper
 @view
-@external 
+@external
 def totalSupply() -> uint256:
 ```
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type      | Description                  |
+| --------- | ---------------------------- |
 | `uint256` | Total supply of Green tokens |
 
 #### Access
@@ -289,14 +299,14 @@ def balanceOf(_account: address) -> uint256:
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
+| Name       | Type      | Description      |
+| ---------- | --------- | ---------------- |
 | `_account` | `address` | Account to check |
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type      | Description                  |
+| --------- | ---------------------------- |
 | `uint256` | Token balance of the account |
 
 #### Access
@@ -316,15 +326,15 @@ def transfer(_recipient: address, _amount: uint256) -> bool:
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
+| Name         | Type      | Description               |
+| ------------ | --------- | ------------------------- |
 | `_recipient` | `address` | Address to receive tokens |
-| `_amount` | `uint256` | Amount to transfer |
+| `_amount`    | `uint256` | Amount to transfer        |
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type   | Description                 |
+| ------ | --------------------------- |
 | `bool` | True if transfer successful |
 
 #### Access
@@ -336,6 +346,7 @@ Public function (requires caller not blacklisted, token not paused)
 - `Transfer` - Contains sender, recipient, and amount
 
 #### Example Usage
+
 ```python
 # Transfer 100 Green tokens
 success = green_token.transfer(
@@ -357,16 +368,16 @@ def transferFrom(_sender: address, _recipient: address, _amount: uint256) -> boo
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
-| `_sender` | `address` | Address to send from |
+| Name         | Type      | Description               |
+| ------------ | --------- | ------------------------- |
+| `_sender`    | `address` | Address to send from      |
 | `_recipient` | `address` | Address to receive tokens |
-| `_amount` | `uint256` | Amount to transfer |
+| `_amount`    | `uint256` | Amount to transfer        |
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type   | Description                 |
+| ------ | --------------------------- |
 | `bool` | True if transfer successful |
 
 #### Access
@@ -379,11 +390,12 @@ Public function (requires sufficient allowance, parties not blacklisted)
 - `Approval` - If allowance is updated
 
 #### Example Usage
+
 ```python
 # Transfer on behalf of user
 success = green_token.transferFrom(
     user.address,
-    recipient.address, 
+    recipient.address,
     50_000000000000000000,  # 50 GREEN
     sender=approved_spender.address
 )
@@ -402,15 +414,15 @@ def approve(_spender: address, _amount: uint256) -> bool:
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
-| `_spender` | `address` | Address authorized to spend |
-| `_amount` | `uint256` | Amount approved for spending |
+| Name       | Type      | Description                  |
+| ---------- | --------- | ---------------------------- |
+| `_spender` | `address` | Address authorized to spend  |
+| `_amount`  | `uint256` | Amount approved for spending |
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type   | Description                 |
+| ------ | --------------------------- |
 | `bool` | True if approval successful |
 
 #### Access
@@ -422,6 +434,7 @@ Public function (requires parties not blacklisted, token not paused)
 - `Approval` - Contains owner, spender, and amount
 
 #### Example Usage
+
 ```python
 # Approve spending
 success = green_token.approve(
@@ -443,15 +456,15 @@ def allowance(_owner: address, _spender: address) -> uint256:
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
-| `_owner` | `address` | Token owner |
+| Name       | Type      | Description        |
+| ---------- | --------- | ------------------ |
+| `_owner`   | `address` | Token owner        |
 | `_spender` | `address` | Authorized spender |
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type      | Description              |
+| --------- | ------------------------ |
 | `uint256` | Current allowance amount |
 
 #### Access
@@ -469,15 +482,15 @@ def increaseAllowance(_spender: address, _amount: uint256) -> bool:
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
+| Name       | Type      | Description                       |
+| ---------- | --------- | --------------------------------- |
 | `_spender` | `address` | Address to increase allowance for |
-| `_amount` | `uint256` | Amount to increase by |
+| `_amount`  | `uint256` | Amount to increase by             |
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type   | Description                 |
+| ------ | --------------------------- |
 | `bool` | True if increase successful |
 
 #### Access
@@ -495,15 +508,15 @@ def decreaseAllowance(_spender: address, _amount: uint256) -> bool:
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
+| Name       | Type      | Description                       |
+| ---------- | --------- | --------------------------------- |
 | `_spender` | `address` | Address to decrease allowance for |
-| `_amount` | `uint256` | Amount to decrease by |
+| `_amount`  | `uint256` | Amount to decrease by             |
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type   | Description                 |
+| ------ | --------------------------- |
 | `bool` | True if decrease successful |
 
 #### Access
@@ -523,26 +536,27 @@ def mint(_recipient: address, _amount: uint256) -> bool:
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
+| Name         | Type      | Description                   |
+| ------------ | --------- | ----------------------------- |
 | `_recipient` | `address` | Address to receive new tokens |
-| `_amount` | `uint256` | Amount of tokens to mint |
+| `_amount`    | `uint256` | Amount of tokens to mint      |
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type   | Description             |
+| ------ | ----------------------- |
 | `bool` | True if mint successful |
 
 #### Access
 
-Only callable by addresses authorized through RipeHq's `canMintGreen` validation
+Only callable by addresses authorized through [RipeHq](../registries/RipeHq.md)'s `canMintGreen` validation
 
 #### Events Emitted
 
 - `Transfer` - Contains zero address as sender, recipient, and amount
 
 #### Example Usage
+
 ```python
 # Mint Green tokens (only authorized contracts)
 success = green_token.mint(
@@ -565,14 +579,14 @@ def burn(_amount: uint256) -> bool:
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
+| Name      | Type      | Description              |
+| --------- | --------- | ------------------------ |
 | `_amount` | `uint256` | Amount of tokens to burn |
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type   | Description             |
+| ------ | ----------------------- |
 | `bool` | True if burn successful |
 
 #### Access
@@ -584,6 +598,7 @@ Public function (requires token not paused, sufficient balance)
 - `Transfer` - Contains sender, zero address as recipient, and amount
 
 #### Example Usage
+
 ```python
 # Burn own tokens
 success = green_token.burn(
@@ -606,8 +621,8 @@ def DOMAIN_SEPARATOR() -> bytes32:
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type      | Description                   |
+| --------- | ----------------------------- |
 | `bytes32` | Current domain separator hash |
 
 #### Access
@@ -626,14 +641,14 @@ def nonces(_owner: address) -> uint256:
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
+| Name     | Type      | Description                |
+| -------- | --------- | -------------------------- |
 | `_owner` | `address` | Address to check nonce for |
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type      | Description         |
+| --------- | ------------------- |
 | `uint256` | Current nonce value |
 
 #### Access
@@ -657,18 +672,18 @@ def permit(
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
-| `_owner` | `address` | Token owner granting approval |
-| `_spender` | `address` | Address authorized to spend |
-| `_value` | `uint256` | Approval amount |
-| `_deadline` | `uint256` | Signature expiration timestamp |
-| `_signature` | `Bytes[65]` | EIP-712 signature |
+| Name         | Type        | Description                    |
+| ------------ | ----------- | ------------------------------ |
+| `_owner`     | `address`   | Token owner granting approval  |
+| `_spender`   | `address`   | Address authorized to spend    |
+| `_value`     | `uint256`   | Approval amount                |
+| `_deadline`  | `uint256`   | Signature expiration timestamp |
+| `_signature` | `Bytes[65]` | EIP-712 signature              |
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type   | Description               |
+| ------ | ------------------------- |
 | `bool` | True if permit successful |
 
 #### Access
@@ -680,6 +695,7 @@ Public function (signature must be valid and not expired)
 - `Approval` - Contains owner, spender, and value
 
 #### Example Usage
+
 ```python
 # Create permit signature off-chain, then use it
 success = green_token.permit(
@@ -706,14 +722,14 @@ def blacklisted(_addr: address) -> bool:
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
+| Name    | Type      | Description      |
+| ------- | --------- | ---------------- |
 | `_addr` | `address` | Address to check |
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type   | Description                    |
+| ------ | ------------------------------ |
 | `bool` | True if address is blacklisted |
 
 #### Access
@@ -731,26 +747,27 @@ def setBlacklist(_addr: address, _shouldBlacklist: bool) -> bool:
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
-| `_addr` | `address` | Address to blacklist/unblacklist |
-| `_shouldBlacklist` | `bool` | True to blacklist, False to remove |
+| Name               | Type      | Description                        |
+| ------------------ | --------- | ---------------------------------- |
+| `_addr`            | `address` | Address to blacklist/unblacklist   |
+| `_shouldBlacklist` | `bool`    | True to blacklist, False to remove |
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type   | Description                  |
+| ------ | ---------------------------- |
 | `bool` | True if operation successful |
 
 #### Access
 
-Only callable by addresses authorized through RipeHq's `canSetTokenBlacklist`
+Only callable by addresses authorized through [RipeHq](../registries/RipeHq.md)'s `canSetTokenBlacklist`
 
 #### Events Emitted
 
 - `BlacklistModified` - Contains address and blacklist status
 
 #### Example Usage
+
 ```python
 # Blacklist an address (only authorized contracts)
 success = green_token.setBlacklist(
@@ -771,20 +788,20 @@ def burnBlacklistTokens(_addr: address, _amount: uint256 = max_value(uint256)) -
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
-| `_addr` | `address` | Blacklisted address to burn from |
+| Name      | Type      | Description                              |
+| --------- | --------- | ---------------------------------------- |
+| `_addr`   | `address` | Blacklisted address to burn from         |
 | `_amount` | `uint256` | Amount to burn (default: entire balance) |
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type   | Description             |
+| ------ | ----------------------- |
 | `bool` | True if burn successful |
 
 #### Access
 
-Only callable by RipeHq governance
+Only callable by [RipeHq](../registries/RipeHq.md) governance
 
 #### Events Emitted
 
@@ -804,8 +821,8 @@ def ripeHq() -> address:
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type      | Description                     |
+| --------- | ------------------------------- |
 | `address` | Current RipeHq contract address |
 
 #### Access
@@ -824,8 +841,8 @@ def hasPendingHqChange() -> bool:
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type   | Description                      |
+| ------ | -------------------------------- |
 | `bool` | True if RipeHq change is pending |
 
 #### Access
@@ -843,23 +860,24 @@ def initiateHqChange(_newHq: address):
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
+| Name     | Type      | Description                 |
+| -------- | --------- | --------------------------- |
 | `_newHq` | `address` | New RipeHq contract address |
 
 #### Returns
 
-*Function does not return any values*
+_Function does not return any values_
 
 #### Access
 
-Only callable by RipeHq governance
+Only callable by [RipeHq](../registries/RipeHq.md) governance
 
 #### Events Emitted
 
 - `HqChangeInitiated` - Contains previous HQ, new HQ, and confirmation block
 
 #### Example Usage
+
 ```python
 # Initiate RipeHq change
 green_token.initiateHqChange(
@@ -879,19 +897,20 @@ def confirmHqChange() -> bool:
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type   | Description                                          |
+| ------ | ---------------------------------------------------- |
 | `bool` | True if change confirmed, False if validation failed |
 
 #### Access
 
-Only callable by RipeHq governance
+Only callable by [RipeHq](../registries/RipeHq.md) governance
 
 #### Events Emitted
 
 - `HqChangeConfirmed` - Contains previous HQ, new HQ, initiation block, and confirmation block
 
 #### Example Usage
+
 ```python
 # Wait for time lock
 boa.env.time_travel(blocks=time_lock)
@@ -911,7 +930,7 @@ def cancelHqChange():
 
 #### Access
 
-Only callable by RipeHq governance
+Only callable by [RipeHq](../registries/RipeHq.md) governance
 
 #### Events Emitted
 
@@ -929,14 +948,14 @@ def isValidNewRipeHq(_newHq: address) -> bool:
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
+| Name     | Type      | Description         |
+| -------- | --------- | ------------------- |
 | `_newHq` | `address` | Address to validate |
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type   | Description                     |
+| ------ | ------------------------------- |
 | `bool` | True if address is valid RipeHq |
 
 #### Access
@@ -957,8 +976,8 @@ def hqChangeTimeLock() -> uint256:
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type      | Description                 |
+| --------- | --------------------------- |
 | `uint256` | Current time lock in blocks |
 
 #### Access
@@ -976,19 +995,19 @@ def setHqChangeTimeLock(_newTimeLock: uint256) -> bool:
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
+| Name           | Type      | Description                    |
+| -------------- | --------- | ------------------------------ |
 | `_newTimeLock` | `uint256` | New time lock period in blocks |
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type   | Description               |
+| ------ | ------------------------- |
 | `bool` | True if update successful |
 
 #### Access
 
-Only callable by RipeHq governance (when no pending governance changes)
+Only callable by [RipeHq](../registries/RipeHq.md) governance (when no pending governance changes)
 
 #### Events Emitted
 
@@ -1006,14 +1025,14 @@ def isValidHqChangeTimeLock(_newTimeLock: uint256) -> bool:
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
+| Name           | Type      | Description              |
+| -------------- | --------- | ------------------------ |
 | `_newTimeLock` | `uint256` | Proposed time lock value |
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type   | Description                |
+| ------ | -------------------------- |
 | `bool` | True if time lock is valid |
 
 #### Access
@@ -1032,8 +1051,8 @@ def minHqTimeLock() -> uint256:
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type      | Description                 |
+| --------- | --------------------------- |
 | `uint256` | Minimum time lock in blocks |
 
 #### Access
@@ -1052,8 +1071,8 @@ def maxHqTimeLock() -> uint256:
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type      | Description                 |
+| --------- | --------------------------- |
 | `uint256` | Maximum time lock in blocks |
 
 #### Access
@@ -1074,8 +1093,8 @@ def isPaused() -> bool:
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type   | Description             |
+| ------ | ----------------------- |
 | `bool` | True if token is paused |
 
 #### Access
@@ -1093,19 +1112,20 @@ def pause(_shouldPause: bool):
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
+| Name           | Type   | Description                     |
+| -------------- | ------ | ------------------------------- |
 | `_shouldPause` | `bool` | True to pause, False to unpause |
 
 #### Access
 
-Only callable by RipeHq governance
+Only callable by [RipeHq](../registries/RipeHq.md) governance
 
 #### Events Emitted
 
 - `TokenPauseModified` - Contains new pause state
 
 #### Example Usage
+
 ```python
 # Emergency pause
 green_token.pause(True, sender=governance.address)
@@ -1127,15 +1147,15 @@ def finishTokenSetup(_newHq: address, _timeLock: uint256 = 0) -> bool:
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
-| `_newHq` | `address` | RipeHq contract address |
+| Name        | Type      | Description                         |
+| ----------- | --------- | ----------------------------------- |
+| `_newHq`    | `address` | RipeHq contract address             |
 | `_timeLock` | `uint256` | Time lock duration (0 uses minimum) |
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type   | Description              |
+| ------ | ------------------------ |
 | `bool` | True if setup successful |
 
 #### Access
@@ -1147,6 +1167,7 @@ Only callable by initial governance (one-time use during deployment)
 - `InitialRipeHqSet` - Contains HQ address and time lock value
 
 #### Example Usage
+
 ```python
 # Complete token setup
 success = green_token.finishTokenSetup(
@@ -1156,6 +1177,16 @@ success = green_token.finishTokenSetup(
 )
 ```
 
+## Security Considerations
+
+1. **Minting Authorization**: Only RipeHq-authorized contracts can mint Green tokens
+2. **Two-Factor Authentication**: Minting requires both RipeHq listing and contract capability
+3. **Blacklist System**: Addresses can be blacklisted to comply with regulatory requirements
+4. **Pause Mechanism**: Contract can be paused in emergencies by authorized contracts
+5. **Time-Locked Governance**: RipeHq changes require time lock to prevent sudden takeovers
+6. **EIP-2612 Permits**: Off-chain signatures enable gasless approvals but require replay protection
+7. **Supply Control**: No maximum supply cap, relying on collateralization for stability
+
 ## Testing
 
-For comprehensive test examples, see: [`tests/tokens/test_green_token.py`](../../tests/tokens/test_green_token.py)
+For comprehensive test examples, see: [`tests/tokens/test_erc20.py`](../../tests/tokens/test_erc20.py)

@@ -25,6 +25,7 @@ For technical readers, Ledger implements a modular architecture with Addys and [
 Ledger is built using a modular architecture that provides foundational department functionality:
 
 ### Addys Module
+
 - **Location**: `contracts/modules/Addys.vy`
 - **Purpose**: Provides protocol-wide address resolution and validation
 - **Documentation**: See [Addys Technical Documentation](../modules/Addys.md)
@@ -35,6 +36,7 @@ Ledger is built using a modular architecture that provides foundational departme
 - **Exported Interface**: Address utilities via `addys.__interface__`
 
 ### DeptBasics Module
+
 - **Location**: `contracts/modules/DeptBasics.vy`
 - **Purpose**: Provides department-level basic functionality
 - **Documentation**: See [DeptBasics Technical Documentation](../modules/DeptBasics.md)
@@ -45,6 +47,7 @@ Ledger is built using a modular architecture that provides foundational departme
 - **Exported Interface**: Department basics via `deptBasics.__interface__`
 
 ### Module Initialization
+
 ```vyper
 initializes: addys
 initializes: deptBasics[addys := addys]
@@ -119,7 +122,9 @@ initializes: deptBasics[addys := addys]
 ### User Debt Information
 
 #### UserDebt Struct
+
 Current debt state for a user:
+
 ```vyper
 struct UserDebt:
     amount: uint256                   # Current debt amount with interest
@@ -130,7 +135,9 @@ struct UserDebt:
 ```
 
 #### IntervalBorrow Struct
+
 Tracks borrowing intervals for analytics:
+
 ```vyper
 struct IntervalBorrow:
     start: uint256                    # Interval start timestamp
@@ -138,7 +145,9 @@ struct IntervalBorrow:
 ```
 
 #### BorrowDataBundle Struct
+
 Comprehensive borrowing information:
+
 ```vyper
 struct BorrowDataBundle:
     userDebt: UserDebt
@@ -152,7 +161,9 @@ struct BorrowDataBundle:
 ### Points and Rewards System
 
 #### RipeRewards Struct
+
 Ripe token reward distribution tracking:
+
 ```vyper
 struct RipeRewards:
     borrowers: uint256                # Rewards allocated to borrowers
@@ -164,7 +175,9 @@ struct RipeRewards:
 ```
 
 #### UserDepositPoints Struct
+
 Individual user deposit tracking:
+
 ```vyper
 struct UserDepositPoints:
     balancePoints: uint256            # Accumulated balance points
@@ -173,7 +186,9 @@ struct UserDepositPoints:
 ```
 
 #### AssetDepositPoints Struct
+
 Asset-specific deposit metrics:
+
 ```vyper
 struct AssetDepositPoints:
     balancePoints: uint256            # Total balance points for asset
@@ -187,7 +202,9 @@ struct AssetDepositPoints:
 ```
 
 #### GlobalDepositPoints Struct
+
 Protocol-wide deposit metrics:
+
 ```vyper
 struct GlobalDepositPoints:
     lastUsdValue: uint256             # Total protocol USD value
@@ -200,7 +217,9 @@ struct GlobalDepositPoints:
 ### Auction System
 
 #### FungibleAuction Struct
+
 Active auction information:
+
 ```vyper
 struct FungibleAuction:
     liqUser: address                  # User being liquidated
@@ -216,7 +235,9 @@ struct FungibleAuction:
 ### Utility Bundles
 
 #### DepositLedgerData Struct
+
 Basic deposit participation info:
+
 ```vyper
 struct DepositLedgerData:
     isParticipatingInVault: bool
@@ -224,7 +245,9 @@ struct DepositLedgerData:
 ```
 
 #### RipeBondData Struct
+
 Bond market information:
+
 ```vyper
 struct RipeBondData:
     paymentAmountAvailInEpoch: uint256 # Available payment amount
@@ -235,6 +258,7 @@ struct RipeBondData:
 ## State Variables
 
 ### User Activity Tracking
+
 - `lastTouch: HashMap[address, uint256]` - Last interaction block per user
 - `isLockedAccount: HashMap[address, bool]` - Account lock status
 - `userVaults: HashMap[address, HashMap[uint256, uint256]]` - User vault participation
@@ -242,6 +266,7 @@ struct RipeBondData:
 - `numUserVaults: HashMap[address, uint256]` - Count of user's vaults
 
 ### Debt Management
+
 - `userDebt: HashMap[address, UserDebt]` - Individual user debt positions
 - `totalDebt: uint256` - Protocol-wide total debt
 - `borrowers: HashMap[uint256, address]` - Indexed list of borrowers
@@ -251,6 +276,7 @@ struct RipeBondData:
 - `unrealizedYield: uint256` - Accumulated unrealized yield
 
 ### Points and Rewards
+
 - `ripeRewards: RipeRewards` - Current reward distribution
 - `ripeAvailForRewards: uint256` - Available Ripe for rewards
 - `globalDepositPoints: GlobalDepositPoints` - Protocol-wide deposit metrics
@@ -260,6 +286,7 @@ struct RipeBondData:
 - `globalBorrowPoints: BorrowPoints` - Protocol borrowing metrics
 
 ### Auction Data
+
 - `fungibleAuctions: HashMap[address, HashMap[uint256, FungibleAuction]]` - Active auctions
 - `fungibleAuctionIndex: HashMap[address, HashMap[uint256, HashMap[address, uint256]]]` - Auction indexing
 - `numFungibleAuctions: HashMap[address, uint256]` - Auction count per user
@@ -268,6 +295,7 @@ struct RipeBondData:
 - `numFungLiqUsers: uint256` - Total liquidation users
 
 ### Bond and Contributor Data
+
 - `epochStart: uint256` - Current epoch start time
 - `epochEnd: uint256` - Current epoch end time
 - `badDebt: uint256` - Outstanding bad debt
@@ -277,7 +305,9 @@ struct RipeBondData:
 - `greenPoolDebt: HashMap[address, uint256]` - Green pool debt tracking
 
 ### Inherited State Variables
+
 From [DeptBasics](../modules/DeptBasics.md):
+
 - `isPaused: bool` - Department pause state
 - `canMintGreen: bool` - Set to `False`
 - `canMintRipe: bool` - Set to `False`
@@ -295,20 +325,21 @@ def __init__(_ripeHq: address, _defaults: address):
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
-| `_ripeHq` | `address` | RipeHq contract address |
+| Name        | Type      | Description                                     |
+| ----------- | --------- | ----------------------------------------------- |
+| `_ripeHq`   | `address` | RipeHq contract address                         |
 | `_defaults` | `address` | Defaults contract for initial values (optional) |
 
 #### Returns
 
-*Constructor does not return any values*
+_Constructor does not return any values_
 
 #### Access
 
 Called only during deployment
 
 #### Example Usage
+
 ```python
 # Deploy Ledger with defaults
 ledger = boa.load(
@@ -340,21 +371,22 @@ def checkAndUpdateLastTouch(_user: address, _shouldCheck: bool, _mc: address = e
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
-| `_user` | `address` | User address to check/update |
-| `_shouldCheck` | `bool` | Whether to enforce one-action-per-block |
-| `_mc` | `address` | Mission Control address (unused parameter) |
+| Name           | Type      | Description                                |
+| -------------- | --------- | ------------------------------------------ |
+| `_user`        | `address` | User address to check/update               |
+| `_shouldCheck` | `bool`    | Whether to enforce one-action-per-block    |
+| `_mc`          | `address` | Mission Control address (unused parameter) |
 
 #### Returns
 
-*Function does not return any values*
+_Function does not return any values_
 
 #### Access
 
 Only callable by Teller contract
 
 #### Example Usage
+
 ```python
 # Enforce one action per block
 ledger.checkAndUpdateLastTouch(
@@ -384,20 +416,21 @@ def setLockedAccount(_wallet: address, _shouldLock: bool):
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
-| `_wallet` | `address` | Wallet address to lock/unlock |
-| `_shouldLock` | `bool` | True to lock, False to unlock |
+| Name          | Type      | Description                   |
+| ------------- | --------- | ----------------------------- |
+| `_wallet`     | `address` | Wallet address to lock/unlock |
+| `_shouldLock` | `bool`    | True to lock, False to unlock |
 
 #### Returns
 
-*Function does not return any values*
+_Function does not return any values_
 
 #### Access
 
 Only callable by Switchboard-registered contracts
 
 #### Example Usage
+
 ```python
 # Lock suspicious account
 ledger.setLockedAccount(
@@ -428,15 +461,15 @@ def isParticipatingInVault(_user: address, _vaultId: uint256) -> bool:
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
-| `_user` | `address` | User address to check |
-| `_vaultId` | `uint256` | Vault ID to check |
+| Name       | Type      | Description           |
+| ---------- | --------- | --------------------- |
+| `_user`    | `address` | User address to check |
+| `_vaultId` | `uint256` | Vault ID to check     |
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type   | Description                        |
+| ------ | ---------------------------------- |
 | `bool` | True if user participates in vault |
 
 #### Access
@@ -444,6 +477,7 @@ def isParticipatingInVault(_user: address, _vaultId: uint256) -> bool:
 Public view function
 
 #### Example Usage
+
 ```python
 # Check vault participation
 is_participant = ledger.isParticipatingInVault(
@@ -465,14 +499,14 @@ def getNumUserVaults(_user: address) -> uint256:
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
+| Name    | Type      | Description  |
+| ------- | --------- | ------------ |
 | `_user` | `address` | User address |
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type      | Description                           |
+| --------- | ------------------------------------- |
 | `uint256` | Number of vaults user participates in |
 
 #### Access
@@ -480,6 +514,7 @@ def getNumUserVaults(_user: address) -> uint256:
 Public view function
 
 #### Example Usage
+
 ```python
 # Get user's vault count
 vault_count = ledger.getNumUserVaults(user.address)
@@ -497,20 +532,21 @@ def addVaultToUser(_user: address, _vaultId: uint256):
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
-| `_user` | `address` | User address |
+| Name       | Type      | Description     |
+| ---------- | --------- | --------------- |
+| `_user`    | `address` | User address    |
 | `_vaultId` | `uint256` | Vault ID to add |
 
 #### Returns
 
-*Function does not return any values*
+_Function does not return any values_
 
 #### Access
 
 Only callable by Teller, CreditEngine, AuctionHouse, or HumanResources
 
 #### Example Usage
+
 ```python
 # Add user to vault (typically called during deposit)
 ledger.addVaultToUser(
@@ -533,20 +569,21 @@ def removeVaultFromUser(_user: address, _vaultId: uint256):
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
-| `_user` | `address` | User address |
+| Name       | Type      | Description        |
+| ---------- | --------- | ------------------ |
+| `_user`    | `address` | User address       |
 | `_vaultId` | `uint256` | Vault ID to remove |
 
 #### Returns
 
-*Function does not return any values*
+_Function does not return any values_
 
 #### Access
 
 Only callable by Lootbox contract
 
 #### Example Usage
+
 ```python
 # Remove user from vault (typically called during full withdrawal)
 ledger.removeVaultFromUser(
@@ -568,15 +605,15 @@ def getDepositLedgerData(_user: address, _vaultId: uint256) -> DepositLedgerData
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
-| `_user` | `address` | User address |
-| `_vaultId` | `uint256` | Vault ID |
+| Name       | Type      | Description  |
+| ---------- | --------- | ------------ |
+| `_user`    | `address` | User address |
+| `_vaultId` | `uint256` | Vault ID     |
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type                | Description                                      |
+| ------------------- | ------------------------------------------------ |
 | `DepositLedgerData` | Struct with participation status and vault count |
 
 #### Access
@@ -584,6 +621,7 @@ def getDepositLedgerData(_user: address, _vaultId: uint256) -> DepositLedgerData
 Public view function
 
 #### Example Usage
+
 ```python
 # Get deposit data
 deposit_data = ledger.getDepositLedgerData(user.address, 1)
@@ -603,22 +641,23 @@ def setUserDebt(_user: address, _userDebt: UserDebt, _newYield: uint256, _interv
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
-| `_user` | `address` | User address |
-| `_userDebt` | `UserDebt` | New debt information |
-| `_newYield` | `uint256` | Additional yield to add |
+| Name        | Type             | Description             |
+| ----------- | ---------------- | ----------------------- |
+| `_user`     | `address`        | User address            |
+| `_userDebt` | `UserDebt`       | New debt information    |
+| `_newYield` | `uint256`        | Additional yield to add |
 | `_interval` | `IntervalBorrow` | Borrowing interval data |
 
 #### Returns
 
-*Function does not return any values*
+_Function does not return any values_
 
 #### Access
 
 Only callable by CreditEngine contract
 
 #### Example Usage
+
 ```python
 # Update user debt after borrowing
 new_debt = UserDebt(
@@ -651,12 +690,12 @@ def flushUnrealizedYield() -> uint256:
 
 #### Parameters
 
-*Function has no parameters*
+_Function has no parameters_
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type      | Description                |
+| --------- | -------------------------- |
 | `uint256` | Amount of unrealized yield |
 
 #### Access
@@ -664,6 +703,7 @@ def flushUnrealizedYield() -> uint256:
 Only callable by CreditEngine contract
 
 #### Example Usage
+
 ```python
 # Get unrealized yield for distribution
 yield_amount = ledger.flushUnrealizedYield(sender=credit_engine.address)
@@ -682,14 +722,14 @@ def hasDebt(_user: address) -> bool:
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
+| Name    | Type      | Description           |
+| ------- | --------- | --------------------- |
 | `_user` | `address` | User address to check |
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type   | Description           |
+| ------ | --------------------- |
 | `bool` | True if user has debt |
 
 #### Access
@@ -697,6 +737,7 @@ def hasDebt(_user: address) -> bool:
 Public view function
 
 #### Example Usage
+
 ```python
 # Check if user has debt
 has_debt = ledger.hasDebt(user.address)
@@ -715,14 +756,14 @@ def getBorrowDataBundle(_user: address) -> BorrowDataBundle:
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
+| Name    | Type      | Description  |
+| ------- | --------- | ------------ |
 | `_user` | `address` | User address |
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type               | Description                    |
+| ------------------ | ------------------------------ |
 | `BorrowDataBundle` | Complete borrowing information |
 
 #### Access
@@ -730,6 +771,7 @@ def getBorrowDataBundle(_user: address) -> BorrowDataBundle:
 Public view function
 
 #### Example Usage
+
 ```python
 # Get complete borrow data
 borrow_data = ledger.getBorrowDataBundle(user.address)
@@ -748,14 +790,14 @@ def getRepayDataBundle(_user: address) -> RepayDataBundle:
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
+| Name    | Type      | Description  |
+| ------- | --------- | ------------ |
 | `_user` | `address` | User address |
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type              | Description                |
+| ----------------- | -------------------------- |
 | `RepayDataBundle` | Debt and vault information |
 
 #### Access
@@ -763,6 +805,7 @@ def getRepayDataBundle(_user: address) -> RepayDataBundle:
 Public view function
 
 #### Example Usage
+
 ```python
 # Get repayment data
 repay_data = ledger.getRepayDataBundle(user.address)
@@ -781,14 +824,14 @@ def isBorrower(_user: address) -> bool:
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
+| Name    | Type      | Description  |
+| ------- | --------- | ------------ |
 | `_user` | `address` | User address |
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type   | Description                         |
+| ------ | ----------------------------------- |
 | `bool` | True if user is registered borrower |
 
 #### Access
@@ -807,14 +850,14 @@ def isUserInLiquidation(_user: address) -> bool:
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
+| Name    | Type      | Description  |
+| ------- | --------- | ------------ |
 | `_user` | `address` | User address |
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type   | Description                    |
+| ------ | ------------------------------ |
 | `bool` | True if user is in liquidation |
 
 #### Access
@@ -834,19 +877,20 @@ def setRipeRewards(_ripeRewards: RipeRewards):
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
+| Name           | Type          | Description             |
+| -------------- | ------------- | ----------------------- |
 | `_ripeRewards` | `RipeRewards` | New reward distribution |
 
 #### Returns
 
-*Function does not return any values*
+_Function does not return any values_
 
 #### Access
 
 Only callable by Lootbox contract
 
 #### Example Usage
+
 ```python
 # Update reward distribution
 new_rewards = RipeRewards(
@@ -875,19 +919,20 @@ def setRipeAvailForRewards(_amount: uint256):
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
+| Name      | Type      | Description                     |
+| --------- | --------- | ------------------------------- |
 | `_amount` | `uint256` | Amount of Ripe tokens available |
 
 #### Returns
 
-*Function does not return any values*
+_Function does not return any values_
 
 #### Access
 
 Only callable by Switchboard-registered contracts
 
 #### Example Usage
+
 ```python
 # Set available rewards
 ledger.setRipeAvailForRewards(
@@ -907,19 +952,20 @@ def didGetRewardsFromStabClaims(_amount: uint256):
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
+| Name      | Type      | Description               |
+| --------- | --------- | ------------------------- |
 | `_amount` | `uint256` | Amount of rewards claimed |
 
 #### Returns
 
-*Function does not return any values*
+_Function does not return any values_
 
 #### Access
 
 Only callable by VaultBook contract
 
 #### Example Usage
+
 ```python
 # Record stability pool reward claim
 ledger.didGetRewardsFromStabClaims(
@@ -947,15 +993,15 @@ def setDepositPointsAndRipeRewards(
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
-| `_user` | `address` | User address (can be empty for global updates) |
-| `_vaultId` | `uint256` | Vault ID |
-| `_asset` | `address` | Asset address |
-| `_userPoints` | `UserDepositPoints` | User-specific point data |
-| `_assetPoints` | `AssetDepositPoints` | Asset-specific point data |
-| `_globalPoints` | `GlobalDepositPoints` | Protocol-wide point data |
-| `_ripeRewards` | `RipeRewards` | Updated reward distribution |
+| Name            | Type                  | Description                                    |
+| --------------- | --------------------- | ---------------------------------------------- |
+| `_user`         | `address`             | User address (can be empty for global updates) |
+| `_vaultId`      | `uint256`             | Vault ID                                       |
+| `_asset`        | `address`             | Asset address                                  |
+| `_userPoints`   | `UserDepositPoints`   | User-specific point data                       |
+| `_assetPoints`  | `AssetDepositPoints`  | Asset-specific point data                      |
+| `_globalPoints` | `GlobalDepositPoints` | Protocol-wide point data                       |
+| `_ripeRewards`  | `RipeRewards`         | Updated reward distribution                    |
 
 #### Access
 
@@ -977,12 +1023,12 @@ def setBorrowPointsAndRipeRewards(
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
-| `_user` | `address` | User address (can be empty for global updates) |
-| `_userPoints` | `BorrowPoints` | User borrowing points |
-| `_globalPoints` | `BorrowPoints` | Global borrowing points |
-| `_ripeRewards` | `RipeRewards` | Updated reward distribution |
+| Name            | Type           | Description                                    |
+| --------------- | -------------- | ---------------------------------------------- |
+| `_user`         | `address`      | User address (can be empty for global updates) |
+| `_userPoints`   | `BorrowPoints` | User borrowing points                          |
+| `_globalPoints` | `BorrowPoints` | Global borrowing points                        |
+| `_ripeRewards`  | `RipeRewards`  | Updated reward distribution                    |
 
 #### Access
 
@@ -1000,8 +1046,8 @@ def getRipeRewardsBundle() -> RipeRewardsBundle:
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type                | Description                      |
+| ------------------- | -------------------------------- |
 | `RipeRewardsBundle` | Current rewards and availability |
 
 #### Access
@@ -1020,14 +1066,14 @@ def getBorrowPointsBundle(_user: address) -> BorrowPointsBundle:
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
+| Name    | Type      | Description  |
+| ------- | --------- | ------------ |
 | `_user` | `address` | User address |
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type                 | Description                      |
+| -------------------- | -------------------------------- |
 | `BorrowPointsBundle` | User and global borrowing points |
 
 #### Access
@@ -1046,16 +1092,16 @@ def getDepositPointsBundle(_user: address, _vaultId: uint256, _asset: address) -
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
-| `_user` | `address` | User address (can be empty) |
-| `_vaultId` | `uint256` | Vault ID |
-| `_asset` | `address` | Asset address |
+| Name       | Type      | Description                 |
+| ---------- | --------- | --------------------------- |
+| `_user`    | `address` | User address (can be empty) |
+| `_vaultId` | `uint256` | Vault ID                    |
+| `_asset`   | `address` | Asset address               |
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type                  | Description                            |
+| --------------------- | -------------------------------------- |
 | `DepositPointsBundle` | User, asset, and global deposit points |
 
 #### Access
@@ -1076,14 +1122,14 @@ def hasFungibleAuctions(_liqUser: address) -> bool:
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
+| Name       | Type      | Description             |
+| ---------- | --------- | ----------------------- |
 | `_liqUser` | `address` | Liquidated user address |
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type   | Description                      |
+| ------ | -------------------------------- |
 | `bool` | True if user has active auctions |
 
 #### Access
@@ -1101,14 +1147,14 @@ def createNewFungibleAuction(_auc: FungibleAuction) -> uint256:
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
+| Name   | Type              | Description           |
+| ------ | ----------------- | --------------------- |
 | `_auc` | `FungibleAuction` | Auction configuration |
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type      | Description                              |
+| --------- | ---------------------------------------- |
 | `uint256` | Auction ID (0 if auction already exists) |
 
 #### Access
@@ -1116,6 +1162,7 @@ def createNewFungibleAuction(_auc: FungibleAuction) -> uint256:
 Only callable by AuctionHouse contract
 
 #### Example Usage
+
 ```python
 # Create new auction
 auction = FungibleAuction(
@@ -1146,11 +1193,11 @@ def removeFungibleAuction(_liqUser: address, _vaultId: uint256, _asset: address)
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
+| Name       | Type      | Description             |
+| ---------- | --------- | ----------------------- |
 | `_liqUser` | `address` | Liquidated user address |
-| `_vaultId` | `uint256` | Vault ID |
-| `_asset` | `address` | Asset address |
+| `_vaultId` | `uint256` | Vault ID                |
+| `_asset`   | `address` | Asset address           |
 
 #### Access
 
@@ -1172,17 +1219,17 @@ def setFungibleAuction(
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
-| `_liqUser` | `address` | Liquidated user address |
-| `_vaultId` | `uint256` | Vault ID |
-| `_asset` | `address` | Asset address |
-| `_auc` | `FungibleAuction` | Updated auction data |
+| Name       | Type              | Description             |
+| ---------- | ----------------- | ----------------------- |
+| `_liqUser` | `address`         | Liquidated user address |
+| `_vaultId` | `uint256`         | Vault ID                |
+| `_asset`   | `address`         | Asset address           |
+| `_auc`     | `FungibleAuction` | Updated auction data    |
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type   | Description                                     |
+| ------ | ----------------------------------------------- |
 | `bool` | True if auction was updated, False if not found |
 
 #### Access
@@ -1200,8 +1247,8 @@ def removeAllFungibleAuctions(_liqUser: address):
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
+| Name       | Type      | Description             |
+| ---------- | --------- | ----------------------- |
 | `_liqUser` | `address` | Liquidated user address |
 
 #### Access
@@ -1220,16 +1267,16 @@ def getFungibleAuction(_liqUser: address, _vaultId: uint256, _asset: address) ->
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
+| Name       | Type      | Description             |
+| ---------- | --------- | ----------------------- |
 | `_liqUser` | `address` | Liquidated user address |
-| `_vaultId` | `uint256` | Vault ID |
-| `_asset` | `address` | Asset address |
+| `_vaultId` | `uint256` | Vault ID                |
+| `_asset`   | `address` | Asset address           |
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type              | Description  |
+| ----------------- | ------------ |
 | `FungibleAuction` | Auction data |
 
 #### Access
@@ -1248,16 +1295,16 @@ def getFungibleAuctionDuringPurchase(_liqUser: address, _vaultId: uint256, _asse
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
+| Name       | Type      | Description             |
+| ---------- | --------- | ----------------------- |
 | `_liqUser` | `address` | Liquidated user address |
-| `_vaultId` | `uint256` | Vault ID |
-| `_asset` | `address` | Asset address |
+| `_vaultId` | `uint256` | Vault ID                |
+| `_asset`   | `address` | Asset address           |
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type              | Description                                |
+| ----------------- | ------------------------------------------ |
 | `FungibleAuction` | Auction data (empty if not in liquidation) |
 
 #### Access
@@ -1276,16 +1323,16 @@ def hasFungibleAuction(_liqUser: address, _vaultId: uint256, _asset: address) ->
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
+| Name       | Type      | Description             |
+| ---------- | --------- | ----------------------- |
 | `_liqUser` | `address` | Liquidated user address |
-| `_vaultId` | `uint256` | Vault ID |
-| `_asset` | `address` | Asset address |
+| `_vaultId` | `uint256` | Vault ID                |
+| `_asset`   | `address` | Asset address           |
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type   | Description            |
+| ------ | ---------------------- |
 | `bool` | True if auction exists |
 
 #### Access
@@ -1306,14 +1353,14 @@ def isHrContributor(_contributor: address) -> bool:
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
+| Name           | Type      | Description         |
+| -------------- | --------- | ------------------- |
 | `_contributor` | `address` | Contributor address |
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type   | Description                    |
+| ------ | ------------------------------ |
 | `bool` | True if registered contributor |
 
 #### Access
@@ -1331,20 +1378,21 @@ def addHrContributor(_contributor: address, _compensation: uint256):
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
-| `_contributor` | `address` | Contributor address |
+| Name            | Type      | Description                   |
+| --------------- | --------- | ----------------------------- |
+| `_contributor`  | `address` | Contributor address           |
 | `_compensation` | `uint256` | Compensation amount to deduct |
 
 #### Returns
 
-*Function does not return any values*
+_Function does not return any values_
 
 #### Access
 
 Only callable by HumanResources contract
 
 #### Example Usage
+
 ```python
 # Add new contributor
 ledger.addHrContributor(
@@ -1365,8 +1413,8 @@ def setRipeAvailForHr(_amount: uint256):
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
+| Name      | Type      | Description             |
+| --------- | --------- | ----------------------- |
 | `_amount` | `uint256` | Amount available for HR |
 
 #### Access
@@ -1384,8 +1432,8 @@ def refundRipeAfterCancelPaycheck(_amount: uint256):
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
+| Name      | Type      | Description      |
+| --------- | --------- | ---------------- |
 | `_amount` | `uint256` | Amount to refund |
 
 #### Access
@@ -1406,8 +1454,8 @@ def getEpochData() -> (uint256, uint256):
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type                 | Description                    |
+| -------------------- | ------------------------------ |
 | `(uint256, uint256)` | Epoch start and end timestamps |
 
 #### Access
@@ -1426,8 +1474,8 @@ def getRipeBondData() -> RipeBondData:
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type           | Description                                               |
+| -------------- | --------------------------------------------------------- |
 | `RipeBondData` | Bond market data including available amounts and bad debt |
 
 #### Access
@@ -1445,8 +1493,8 @@ def setRipeAvailForBonds(_amount: uint256):
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
+| Name      | Type      | Description                |
+| --------- | --------- | -------------------------- |
 | `_amount` | `uint256` | Amount available for bonds |
 
 #### Access
@@ -1464,8 +1512,8 @@ def setBadDebt(_amount: uint256):
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
+| Name      | Type      | Description         |
+| --------- | --------- | ------------------- |
 | `_amount` | `uint256` | New bad debt amount |
 
 #### Access
@@ -1483,10 +1531,10 @@ def didClearBadDebt(_amount: uint256, _ripeAmount: uint256):
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
-| `_amount` | `uint256` | Amount of bad debt cleared |
-| `_ripeAmount` | `uint256` | Amount of Ripe paid out |
+| Name          | Type      | Description                |
+| ------------- | --------- | -------------------------- |
+| `_amount`     | `uint256` | Amount of bad debt cleared |
+| `_ripeAmount` | `uint256` | Amount of Ripe paid out    |
 
 #### Access
 
@@ -1503,9 +1551,9 @@ def didPurchaseRipeBond(_amountPaid: uint256, _ripePayout: uint256):
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
-| `_amountPaid` | `uint256` | Amount paid for bonds |
+| Name          | Type      | Description             |
+| ------------- | --------- | ----------------------- |
+| `_amountPaid` | `uint256` | Amount paid for bonds   |
 | `_ripePayout` | `uint256` | Amount of Ripe received |
 
 #### Access
@@ -1523,10 +1571,10 @@ def setEpochData(_epochStart: uint256, _epochEnd: uint256, _amountAvailInEpoch: 
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
-| `_epochStart` | `uint256` | Epoch start timestamp |
-| `_epochEnd` | `uint256` | Epoch end timestamp |
+| Name                  | Type      | Description                       |
+| --------------------- | --------- | --------------------------------- |
+| `_epochStart`         | `uint256` | Epoch start timestamp             |
+| `_epochEnd`           | `uint256` | Epoch end timestamp               |
 | `_amountAvailInEpoch` | `uint256` | Payment amount available in epoch |
 
 #### Access
@@ -1546,21 +1594,22 @@ def updateGreenPoolDebt(_pool: address, _amount: uint256, _isIncrement: bool):
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
-| `_pool` | `address` | Pool address |
-| `_amount` | `uint256` | Amount to add or subtract |
-| `_isIncrement` | `bool` | True to add, False to subtract |
+| Name           | Type      | Description                    |
+| -------------- | --------- | ------------------------------ |
+| `_pool`        | `address` | Pool address                   |
+| `_amount`      | `uint256` | Amount to add or subtract      |
+| `_isIncrement` | `bool`    | True to add, False to subtract |
 
 #### Returns
 
-*Function does not return any values*
+_Function does not return any values_
 
 #### Access
 
 Only callable by Endaoment contract
 
 #### Example Usage
+
 ```python
 # Increase pool debt
 ledger.updateGreenPoolDebt(
@@ -1578,6 +1627,16 @@ ledger.updateGreenPoolDebt(
     sender=endaoment.address
 )
 ```
+
+## Security Considerations
+
+1. **Write Protection**: Only authorized protocol contracts can modify state
+2. **One-Action-Per-Block**: Prevents flash loan attacks and ensures state consistency
+3. **No User Access**: All functions require protocol contract authorization
+4. **Account Locking**: Provides mechanism to lock compromised accounts
+5. **Data Integrity**: Read-only contract ensures data cannot be corrupted
+6. **Points Manipulation**: Reward calculations must be carefully validated by callers
+7. **No Token Handling**: Ledger never handles tokens directly, only tracks data
 
 ## Testing
 

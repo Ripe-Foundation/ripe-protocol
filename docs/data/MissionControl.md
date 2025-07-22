@@ -23,6 +23,7 @@ For technical readers, MissionControl implements a read-only interface for most 
 MissionControl is built using a modular architecture that provides foundational department functionality:
 
 ### Addys Module
+
 - **Location**: `contracts/modules/Addys.vy`
 - **Purpose**: Provides protocol-wide address resolution and validation
 - **Documentation**: See [Addys Technical Documentation](../modules/Addys.md)
@@ -33,6 +34,7 @@ MissionControl is built using a modular architecture that provides foundational 
 - **Exported Interface**: Address utilities via `addys.__interface__`
 
 ### DeptBasics Module
+
 - **Location**: `contracts/modules/DeptBasics.vy`
 - **Purpose**: Provides department-level basic functionality
 - **Documentation**: See [DeptBasics Technical Documentation](../modules/DeptBasics.md)
@@ -43,6 +45,7 @@ MissionControl is built using a modular architecture that provides foundational 
 - **Exported Interface**: Department basics via `deptBasics.__interface__`
 
 ### Module Initialization
+
 ```vyper
 initializes: addys
 initializes: deptBasics[addys := addys]
@@ -113,7 +116,9 @@ initializes: deptBasics[addys := addys]
 ### Configuration Bundles
 
 #### TellerDepositConfig Struct
+
 Complete deposit operation configuration:
+
 ```vyper
 struct TellerDepositConfig:
     canDepositGeneral: bool           # Global deposit permission
@@ -129,7 +134,9 @@ struct TellerDepositConfig:
 ```
 
 #### TellerWithdrawConfig Struct
+
 Complete withdrawal operation configuration:
+
 ```vyper
 struct TellerWithdrawConfig:
     canWithdrawGeneral: bool          # Global withdrawal permission
@@ -140,7 +147,9 @@ struct TellerWithdrawConfig:
 ```
 
 #### BorrowConfig Struct
+
 Complete borrowing operation configuration:
+
 ```vyper
 struct BorrowConfig:
     canBorrow: bool                   # Global borrowing permission
@@ -155,7 +164,9 @@ struct BorrowConfig:
 ```
 
 #### GenLiqConfig Struct
+
 Complete general liquidation configuration:
+
 ```vyper
 struct GenLiqConfig:
     canLiquidate: bool                # Global liquidation permission
@@ -169,12 +180,14 @@ struct GenLiqConfig:
 ```
 
 #### AssetLiqConfig Struct
+
 Asset-specific liquidation configuration:
+
 ```vyper
 struct AssetLiqConfig:
     hasConfig: bool                   # Has custom liquidation config
     shouldBurnAsPayment: bool         # Burn asset as debt repayment
-    shouldTransferToEndaoment: bool   # Transfer asset to Endaoment
+    shouldTransferToEndaoment: bool   # Transfer asset to [Endaoment](../core/Endaoment.md)
     shouldSwapInStabPools: bool       # Allow stability pool swaps
     shouldAuctionInstantly: bool      # Create auctions immediately
     customAuctionParams: cs.AuctionParams # Asset-specific auction params
@@ -182,7 +195,9 @@ struct AssetLiqConfig:
 ```
 
 #### RewardsConfig Struct
+
 Complete rewards system configuration:
+
 ```vyper
 struct RewardsConfig:
     arePointsEnabled: bool            # Points system active
@@ -198,7 +213,9 @@ struct RewardsConfig:
 ### Utility Structures
 
 #### VaultData Struct
+
 Vault identification and information:
+
 ```vyper
 struct VaultData:
     vaultId: uint256                  # Registry ID of vault
@@ -207,7 +224,9 @@ struct VaultData:
 ```
 
 #### PriceConfig Struct
+
 Price oracle configuration:
+
 ```vyper
 struct PriceConfig:
     staleTime: uint256                # Maximum age for valid prices
@@ -215,7 +234,9 @@ struct PriceConfig:
 ```
 
 #### PurchaseRipeBondConfig Struct
+
 Bond market configuration:
+
 ```vyper
 struct PurchaseRipeBondConfig:
     asset: address                    # Bond payment asset
@@ -236,47 +257,57 @@ struct PurchaseRipeBondConfig:
 ## State Variables
 
 ### Global Configuration
+
 - `genConfig: cs.GenConfig` - Protocol-wide operational settings
 - `genDebtConfig: cs.GenDebtConfig` - Global debt and liquidation parameters
 - `hrConfig: cs.HrConfig` - Human resources configuration
 - `ripeBondConfig: cs.RipeBondConfig` - Bond market settings
 
 ### Asset Management
+
 - `assetConfig: HashMap[address, cs.AssetConfig]` - Asset-specific configurations
 - `assets: HashMap[uint256, address]` - Asset registry (index to address)
 - `indexOfAsset: HashMap[address, uint256]` - Asset index lookup
 - `numAssets: uint256` - Total registered assets
 
 ### User Configuration
+
 - `userConfig: HashMap[address, cs.UserConfig]` - User-specific settings
 - `userDelegation: HashMap[address, HashMap[address, cs.ActionDelegation]]` - Delegation permissions
 
 ### Rewards System
+
 - `rewardsConfig: cs.RipeRewardsConfig` - Rewards distribution settings
 - `totalPointsAllocs: TotalPointsAllocs` - Global point allocation tracking
 
 ### Vault Configuration
+
 - `ripeGovVaultConfig: HashMap[address, cs.RipeGovVaultConfig]` - Governance vault settings
 - `priorityLiqAssetVaults: DynArray[cs.VaultLite, PRIORITY_VAULT_DATA]` - Priority liquidation vaults
 - `priorityStabVaults: DynArray[cs.VaultLite, PRIORITY_VAULT_DATA]` - Priority stability vaults
 
 ### Access Control
+
 - `canPerformLiteAction: HashMap[address, bool]` - Lite action permissions
 - `underscoreRegistry: address` - Underscore registry address
 - `trainingWheels: address` - Training wheels contract address
 - `shouldCheckLastTouch: bool` - One-action-per-block enforcement
 
 ### Price Configuration
+
 - `priorityPriceSourceIds: DynArray[uint256, MAX_PRIORITY_PRICE_SOURCES]` - Priority oracle IDs
 
 ### Constants
+
 - `MAX_VAULTS_PER_ASSET: uint256 = 10` - Maximum vaults per asset
 - `MAX_PRIORITY_PRICE_SOURCES: uint256 = 10` - Maximum priority price sources
 - `PRIORITY_VAULT_DATA: uint256 = 20` - Maximum priority vault entries
 - `HUNDRED_PERCENT: uint256 = 100_00` - 100.00% in basis points
 
 ### Inherited State Variables
+
 From [DeptBasics](../modules/DeptBasics.md):
+
 - `isPaused: bool` - Department pause state
 - `canMintGreen: bool` - Set to `False`
 - `canMintRipe: bool` - Set to `False`
@@ -294,20 +325,21 @@ def __init__(_ripeHq: address, _defaults: address):
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
-| `_ripeHq` | `address` | RipeHq contract address |
+| Name        | Type      | Description                                             |
+| ----------- | --------- | ------------------------------------------------------- |
+| `_ripeHq`   | `address` | RipeHq contract address                                 |
 | `_defaults` | `address` | Defaults contract for initial configurations (optional) |
 
 #### Returns
 
-*Constructor does not return any values*
+_Constructor does not return any values_
 
 #### Access
 
 Called only during deployment
 
 #### Example Usage
+
 ```python
 # Deploy MissionControl with defaults
 mission_control = boa.load(
@@ -339,19 +371,20 @@ def setGeneralConfig(_config: cs.GenConfig):
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
+| Name      | Type           | Description               |
+| --------- | -------------- | ------------------------- |
 | `_config` | `cs.GenConfig` | New general configuration |
 
 #### Returns
 
-*Function does not return any values*
+_Function does not return any values_
 
 #### Access
 
-Only callable by Switchboard-registered contracts
+Only callable by [Switchboard](../registries/Switchboard.md)-registered contracts
 
 #### Example Usage
+
 ```python
 # Update global permissions
 new_config = GenConfig(
@@ -387,19 +420,20 @@ def setGeneralDebtConfig(_config: cs.GenDebtConfig):
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
+| Name      | Type               | Description            |
+| --------- | ------------------ | ---------------------- |
 | `_config` | `cs.GenDebtConfig` | New debt configuration |
 
 #### Returns
 
-*Function does not return any values*
+_Function does not return any values_
 
 #### Access
 
-Only callable by Switchboard-registered contracts
+Only callable by [Switchboard](../registries/Switchboard.md)-registered contracts
 
 #### Example Usage
+
 ```python
 # Update debt parameters
 debt_config = GenDebtConfig(
@@ -432,13 +466,13 @@ def setHrConfig(_config: cs.HrConfig):
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
+| Name      | Type          | Description          |
+| --------- | ------------- | -------------------- |
 | `_config` | `cs.HrConfig` | New HR configuration |
 
 #### Access
 
-Only callable by Switchboard-registered contracts
+Only callable by [Switchboard](../registries/Switchboard.md)-registered contracts
 
 ### `setRipeBondConfig`
 
@@ -451,13 +485,13 @@ def setRipeBondConfig(_config: cs.RipeBondConfig):
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
+| Name      | Type                | Description            |
+| --------- | ------------------- | ---------------------- |
 | `_config` | `cs.RipeBondConfig` | New bond configuration |
 
 #### Access
 
-Only callable by Switchboard-registered contracts
+Only callable by [Switchboard](../registries/Switchboard.md)-registered contracts
 
 ## Asset Configuration Functions
 
@@ -472,20 +506,21 @@ def setAssetConfig(_asset: address, _config: cs.AssetConfig):
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
-| `_asset` | `address` | Asset address |
+| Name      | Type             | Description         |
+| --------- | ---------------- | ------------------- |
+| `_asset`  | `address`        | Asset address       |
 | `_config` | `cs.AssetConfig` | Asset configuration |
 
 #### Returns
 
-*Function does not return any values*
+_Function does not return any values_
 
 #### Access
 
-Only callable by Switchboard-registered contracts
+Only callable by [Switchboard](../registries/Switchboard.md)-registered contracts
 
 #### Example Usage
+
 ```python
 # Configure USDC asset
 usdc_config = AssetConfig(
@@ -531,21 +566,22 @@ def deregisterAsset(_asset: address) -> bool:
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
+| Name     | Type      | Description                 |
+| -------- | --------- | --------------------------- |
 | `_asset` | `address` | Asset address to deregister |
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type   | Description                       |
+| ------ | --------------------------------- |
 | `bool` | True if successfully deregistered |
 
 #### Access
 
-Only callable by Switchboard-registered contracts
+Only callable by [Switchboard](../registries/Switchboard.md)-registered contracts
 
 #### Example Usage
+
 ```python
 # Deregister deprecated asset
 success = mission_control.deregisterAsset(
@@ -567,16 +603,17 @@ def setUserConfig(_user: address, _config: cs.UserConfig):
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
-| `_user` | `address` | User address |
+| Name      | Type            | Description        |
+| --------- | --------------- | ------------------ |
+| `_user`   | `address`       | User address       |
 | `_config` | `cs.UserConfig` | User configuration |
 
 #### Access
 
-Only callable by Switchboard-registered contracts or Teller
+Only callable by [Switchboard](../registries/Switchboard.md)-registered contracts or Teller
 
 #### Example Usage
+
 ```python
 # Update user permissions
 user_config = UserConfig(
@@ -603,17 +640,18 @@ def setUserDelegation(_user: address, _delegate: address, _config: cs.ActionDele
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
-| `_user` | `address` | User granting delegation |
-| `_delegate` | `address` | Address receiving delegation |
-| `_config` | `cs.ActionDelegation` | Delegation permissions |
+| Name        | Type                  | Description                  |
+| ----------- | --------------------- | ---------------------------- |
+| `_user`     | `address`             | User granting delegation     |
+| `_delegate` | `address`             | Address receiving delegation |
+| `_config`   | `cs.ActionDelegation` | Delegation permissions       |
 
 #### Access
 
-Only callable by Switchboard-registered contracts or Teller
+Only callable by [Switchboard](../registries/Switchboard.md)-registered contracts or Teller
 
 #### Example Usage
+
 ```python
 # Grant delegation to trading bot
 delegation = ActionDelegation(
@@ -644,15 +682,16 @@ def setRipeRewardsConfig(_config: cs.RipeRewardsConfig):
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
+| Name      | Type                   | Description           |
+| --------- | ---------------------- | --------------------- |
 | `_config` | `cs.RipeRewardsConfig` | Rewards configuration |
 
 #### Access
 
-Only callable by Switchboard-registered contracts
+Only callable by [Switchboard](../registries/Switchboard.md)-registered contracts
 
 #### Example Usage
+
 ```python
 # Update rewards distribution
 rewards_config = RipeRewardsConfig(
@@ -691,16 +730,16 @@ def setRipeGovVaultConfig(
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
-| `_asset` | `address` | Asset address |
-| `_assetWeight` | `uint256` | Voting weight of asset |
-| `_shouldFreezeWhenBadDebt` | `bool` | Freeze when bad debt exists |
-| `_lockTerms` | `cs.LockTerms` | Lock duration parameters |
+| Name                       | Type           | Description                 |
+| -------------------------- | -------------- | --------------------------- |
+| `_asset`                   | `address`      | Asset address               |
+| `_assetWeight`             | `uint256`      | Voting weight of asset      |
+| `_shouldFreezeWhenBadDebt` | `bool`         | Freeze when bad debt exists |
+| `_lockTerms`               | `cs.LockTerms` | Lock duration parameters    |
 
 #### Access
 
-Only callable by Switchboard-registered contracts
+Only callable by [Switchboard](../registries/Switchboard.md)-registered contracts
 
 ### `setPriorityLiqAssetVaults`
 
@@ -713,13 +752,13 @@ def setPriorityLiqAssetVaults(_priorityLiqAssetVaults: DynArray[cs.VaultLite, PR
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
+| Name                      | Type                                          | Description         |
+| ------------------------- | --------------------------------------------- | ------------------- |
 | `_priorityLiqAssetVaults` | `DynArray[cs.VaultLite, PRIORITY_VAULT_DATA]` | Priority vault list |
 
 #### Access
 
-Only callable by Switchboard-registered contracts
+Only callable by [Switchboard](../registries/Switchboard.md)-registered contracts
 
 ### `setPriorityStabVaults`
 
@@ -732,13 +771,13 @@ def setPriorityStabVaults(_priorityStabVaults: DynArray[cs.VaultLite, PRIORITY_V
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
+| Name                  | Type                                          | Description                   |
+| --------------------- | --------------------------------------------- | ----------------------------- |
 | `_priorityStabVaults` | `DynArray[cs.VaultLite, PRIORITY_VAULT_DATA]` | Priority stability vault list |
 
 #### Access
 
-Only callable by Switchboard-registered contracts
+Only callable by [Switchboard](../registries/Switchboard.md)-registered contracts
 
 ## Access Control Functions
 
@@ -753,14 +792,14 @@ def setCanPerformLiteAction(_user: address, _canDo: bool):
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
-| `_user` | `address` | User address |
-| `_canDo` | `bool` | Permission to grant or revoke |
+| Name     | Type      | Description                   |
+| -------- | --------- | ----------------------------- |
+| `_user`  | `address` | User address                  |
+| `_canDo` | `bool`    | Permission to grant or revoke |
 
 #### Access
 
-Only callable by Switchboard-registered contracts
+Only callable by [Switchboard](../registries/Switchboard.md)-registered contracts
 
 ### `setTrainingWheels`
 
@@ -773,13 +812,13 @@ def setTrainingWheels(_trainingWheels: address):
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
+| Name              | Type      | Description                      |
+| ----------------- | --------- | -------------------------------- |
 | `_trainingWheels` | `address` | Training wheels contract address |
 
 #### Access
 
-Only callable by Switchboard-registered contracts
+Only callable by [Switchboard](../registries/Switchboard.md)-registered contracts
 
 ### `setUnderscoreRegistry`
 
@@ -792,13 +831,13 @@ def setUnderscoreRegistry(_underscoreRegistry: address):
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
+| Name                  | Type      | Description                 |
+| --------------------- | --------- | --------------------------- |
 | `_underscoreRegistry` | `address` | Underscore registry address |
 
 #### Access
 
-Only callable by Switchboard-registered contracts
+Only callable by [Switchboard](../registries/Switchboard.md)-registered contracts
 
 ### `setPriorityPriceSourceIds`
 
@@ -811,13 +850,13 @@ def setPriorityPriceSourceIds(_priorityIds: DynArray[uint256, MAX_PRIORITY_PRICE
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
+| Name           | Type                                            | Description                      |
+| -------------- | ----------------------------------------------- | -------------------------------- |
 | `_priorityIds` | `DynArray[uint256, MAX_PRIORITY_PRICE_SOURCES]` | Ordered list of price source IDs |
 
 #### Access
 
-Only callable by Switchboard-registered contracts
+Only callable by [Switchboard](../registries/Switchboard.md)-registered contracts
 
 ### `setShouldCheckLastTouch`
 
@@ -830,13 +869,13 @@ def setShouldCheckLastTouch(_shouldCheck: bool):
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
+| Name           | Type   | Description                             |
+| -------------- | ------ | --------------------------------------- |
 | `_shouldCheck` | `bool` | Whether to enforce one-action-per-block |
 
 #### Access
 
-Only callable by Switchboard-registered contracts
+Only callable by [Switchboard](../registries/Switchboard.md)-registered contracts
 
 ## Asset Query Functions
 
@@ -852,14 +891,14 @@ def isSupportedAsset(_asset: address) -> bool:
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
+| Name     | Type      | Description            |
+| -------- | --------- | ---------------------- |
 | `_asset` | `address` | Asset address to check |
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type   | Description                |
+| ------ | -------------------------- |
 | `bool` | True if asset is supported |
 
 #### Access
@@ -867,6 +906,7 @@ def isSupportedAsset(_asset: address) -> bool:
 Public view function
 
 #### Example Usage
+
 ```python
 # Check asset support
 is_supported = mission_control.isSupportedAsset(usdc.address)
@@ -885,15 +925,15 @@ def isSupportedAssetInVault(_vaultId: uint256, _asset: address) -> bool:
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
-| `_vaultId` | `uint256` | Vault ID |
-| `_asset` | `address` | Asset address |
+| Name       | Type      | Description   |
+| ---------- | --------- | ------------- |
+| `_vaultId` | `uint256` | Vault ID      |
+| `_asset`   | `address` | Asset address |
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type   | Description                         |
+| ------ | ----------------------------------- |
 | `bool` | True if asset is supported in vault |
 
 #### Access
@@ -912,8 +952,8 @@ def getNumAssets() -> uint256:
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type      | Description                 |
+| --------- | --------------------------- |
 | `uint256` | Number of registered assets |
 
 #### Access
@@ -932,14 +972,14 @@ def getFirstVaultIdForAsset(_asset: address) -> uint256:
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
+| Name     | Type      | Description   |
+| -------- | --------- | ------------- |
 | `_asset` | `address` | Asset address |
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type      | Description                                   |
+| --------- | --------------------------------------------- |
 | `uint256` | First vault ID (0 if no vaults support asset) |
 
 #### Access
@@ -960,16 +1000,16 @@ def getTellerDepositConfig(_vaultId: uint256, _asset: address, _user: address) -
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
-| `_vaultId` | `uint256` | Target vault ID |
-| `_asset` | `address` | Asset to deposit |
-| `_user` | `address` | User making deposit |
+| Name       | Type      | Description         |
+| ---------- | --------- | ------------------- |
+| `_vaultId` | `uint256` | Target vault ID     |
+| `_asset`   | `address` | Asset to deposit    |
+| `_user`    | `address` | User making deposit |
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type                  | Description                           |
+| --------------------- | ------------------------------------- |
 | `TellerDepositConfig` | Complete deposit configuration bundle |
 
 #### Access
@@ -977,6 +1017,7 @@ def getTellerDepositConfig(_vaultId: uint256, _asset: address, _user: address) -
 Public view function
 
 #### Example Usage
+
 ```python
 # Get deposit configuration
 deposit_config = mission_control.getTellerDepositConfig(
@@ -986,7 +1027,7 @@ deposit_config = mission_control.getTellerDepositConfig(
 )
 
 # Check if deposit is allowed
-if (deposit_config.canDepositGeneral and 
+if (deposit_config.canDepositGeneral and
     deposit_config.canDepositAsset and
     deposit_config.doesVaultSupportAsset and
     deposit_config.isUserAllowed):
@@ -1005,16 +1046,16 @@ def getTellerWithdrawConfig(_asset: address, _user: address, _caller: address) -
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
-| `_asset` | `address` | Asset to withdraw |
-| `_user` | `address` | User owning the funds |
+| Name      | Type      | Description                   |
+| --------- | --------- | ----------------------------- |
+| `_asset`  | `address` | Asset to withdraw             |
+| `_user`   | `address` | User owning the funds         |
 | `_caller` | `address` | Address initiating withdrawal |
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type                   | Description                              |
+| ---------------------- | ---------------------------------------- |
 | `TellerWithdrawConfig` | Complete withdrawal configuration bundle |
 
 #### Access
@@ -1035,14 +1076,14 @@ def getDebtTerms(_asset: address) -> cs.DebtTerms:
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
+| Name     | Type      | Description              |
+| -------- | --------- | ------------------------ |
 | `_asset` | `address` | Collateral asset address |
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type           | Description                             |
+| -------------- | --------------------------------------- |
 | `cs.DebtTerms` | Debt parameters including rates and LTV |
 
 #### Access
@@ -1061,15 +1102,15 @@ def getBorrowConfig(_user: address, _caller: address) -> BorrowConfig:
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
-| `_user` | `address` | User to borrow for |
+| Name      | Type      | Description               |
+| --------- | --------- | ------------------------- |
+| `_user`   | `address` | User to borrow for        |
 | `_caller` | `address` | Address initiating borrow |
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type           | Description                             |
+| -------------- | --------------------------------------- |
 | `BorrowConfig` | Complete borrowing configuration bundle |
 
 #### Access
@@ -1088,8 +1129,8 @@ def maxLtvDeviation() -> uint256:
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type      | Description                           |
+| --------- | ------------------------------------- |
 | `uint256` | Maximum LTV deviation in basis points |
 
 #### Access
@@ -1108,14 +1149,14 @@ def getRepayConfig(_user: address) -> RepayConfig:
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
+| Name    | Type      | Description  |
+| ------- | --------- | ------------ |
 | `_user` | `address` | User address |
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type          | Description             |
+| ------------- | ----------------------- |
 | `RepayConfig` | Repayment configuration |
 
 #### Access
@@ -1136,8 +1177,8 @@ def getGenLiqConfig() -> GenLiqConfig:
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type           | Description                                             |
+| -------------- | ------------------------------------------------------- |
 | `GenLiqConfig` | Complete liquidation configuration with priority vaults |
 
 #### Access
@@ -1145,6 +1186,7 @@ def getGenLiqConfig() -> GenLiqConfig:
 Public view function
 
 #### Example Usage
+
 ```python
 # Get liquidation configuration
 liq_config = mission_control.getGenLiqConfig()
@@ -1170,14 +1212,14 @@ def getAssetLiqConfig(_asset: address) -> AssetLiqConfig:
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
+| Name     | Type      | Description   |
+| -------- | --------- | ------------- |
 | `_asset` | `address` | Asset address |
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type             | Description                              |
+| ---------------- | ---------------------------------------- |
 | `AssetLiqConfig` | Asset-specific liquidation configuration |
 
 #### Access
@@ -1196,8 +1238,8 @@ def getGenAuctionParams() -> cs.AuctionParams:
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type               | Description                |
+| ------------------ | -------------------------- |
 | `cs.AuctionParams` | Default auction parameters |
 
 #### Access
@@ -1216,15 +1258,15 @@ def getRedeemCollateralConfig(_asset: address, _recipient: address) -> RedeemCol
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
-| `_asset` | `address` | Asset to redeem |
+| Name         | Type      | Description       |
+| ------------ | --------- | ----------------- |
+| `_asset`     | `address` | Asset to redeem   |
 | `_recipient` | `address` | Recipient address |
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type                     | Description                         |
+| ------------------------ | ----------------------------------- |
 | `RedeemCollateralConfig` | Collateral redemption configuration |
 
 #### Access
@@ -1243,8 +1285,8 @@ def getLtvPaybackBuffer() -> uint256:
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type      | Description                        |
+| --------- | ---------------------------------- |
 | `uint256` | LTV payback buffer in basis points |
 
 #### Access
@@ -1263,15 +1305,15 @@ def getAuctionBuyConfig(_asset: address, _recipient: address) -> AuctionBuyConfi
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
-| `_asset` | `address` | Asset being auctioned |
-| `_recipient` | `address` | Purchase recipient |
+| Name         | Type      | Description           |
+| ------------ | --------- | --------------------- |
+| `_asset`     | `address` | Asset being auctioned |
+| `_recipient` | `address` | Purchase recipient    |
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type               | Description                    |
+| ------------------ | ------------------------------ |
 | `AuctionBuyConfig` | Auction purchase configuration |
 
 #### Access
@@ -1292,17 +1334,17 @@ def getStabPoolClaimsConfig(_claimAsset: address, _claimer: address, _caller: ad
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
-| `_claimAsset` | `address` | Asset being claimed |
-| `_claimer` | `address` | User claiming rewards |
-| `_caller` | `address` | Address initiating claim |
-| `_ripeToken` | `address` | Ripe token address |
+| Name          | Type      | Description              |
+| ------------- | --------- | ------------------------ |
+| `_claimAsset` | `address` | Asset being claimed      |
+| `_claimer`    | `address` | User claiming rewards    |
+| `_caller`     | `address` | Address initiating claim |
+| `_ripeToken`  | `address` | Ripe token address       |
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type                   | Description                         |
+| ---------------------- | ----------------------------------- |
 | `StabPoolClaimsConfig` | Stability pool claims configuration |
 
 #### Access
@@ -1321,15 +1363,15 @@ def getStabPoolRedemptionsConfig(_asset: address, _recipient: address) -> StabPo
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
-| `_asset` | `address` | Asset to redeem |
+| Name         | Type      | Description       |
+| ------------ | --------- | ----------------- |
+| `_asset`     | `address` | Asset to redeem   |
 | `_recipient` | `address` | Recipient address |
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type                        | Description                             |
+| --------------------------- | --------------------------------------- |
 | `StabPoolRedemptionsConfig` | Stability pool redemption configuration |
 
 #### Access
@@ -1350,16 +1392,16 @@ def getClaimLootConfig(_user: address, _caller: address, _ripeToken: address) ->
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
-| `_user` | `address` | User claiming rewards |
-| `_caller` | `address` | Address initiating claim |
-| `_ripeToken` | `address` | Ripe token address |
+| Name         | Type      | Description              |
+| ------------ | --------- | ------------------------ |
+| `_user`      | `address` | User claiming rewards    |
+| `_caller`    | `address` | Address initiating claim |
+| `_ripeToken` | `address` | Ripe token address       |
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type              | Description                 |
+| ----------------- | --------------------------- |
 | `ClaimLootConfig` | Loot claiming configuration |
 
 #### Access
@@ -1378,8 +1420,8 @@ def getRewardsConfig() -> RewardsConfig:
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type            | Description                                           |
+| --------------- | ----------------------------------------------------- |
 | `RewardsConfig` | Complete rewards configuration with point allocations |
 
 #### Access
@@ -1398,14 +1440,14 @@ def getDepositPointsConfig(_asset: address) -> DepositPointsConfig:
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
+| Name     | Type      | Description   |
+| -------- | --------- | ------------- |
 | `_asset` | `address` | Asset address |
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type                  | Description                  |
+| --------------------- | ---------------------------- |
 | `DepositPointsConfig` | Deposit points configuration |
 
 #### Access
@@ -1426,8 +1468,8 @@ def getPriceConfig() -> PriceConfig:
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type          | Description                                              |
+| ------------- | -------------------------------------------------------- |
 | `PriceConfig` | Price configuration with stale time and priority sources |
 
 #### Access
@@ -1446,8 +1488,8 @@ def getPriceStaleTime() -> uint256:
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type      | Description                 |
+| --------- | --------------------------- |
 | `uint256` | Price stale time in seconds |
 
 #### Access
@@ -1466,14 +1508,14 @@ def getPurchaseRipeBondConfig(_user: address) -> PurchaseRipeBondConfig:
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
+| Name    | Type      | Description  |
+| ------- | --------- | ------------ |
 | `_user` | `address` | User address |
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type                     | Description                        |
+| ------------------------ | ---------------------------------- |
 | `PurchaseRipeBondConfig` | Complete bond market configuration |
 
 #### Access
@@ -1492,8 +1534,8 @@ def getDynamicBorrowRateConfig() -> DynamicBorrowRateConfig:
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type                      | Description             |
+| ------------------------- | ----------------------- |
 | `DynamicBorrowRateConfig` | Dynamic rate parameters |
 
 #### Access
@@ -1507,15 +1549,15 @@ Public view function
 Returns the priority order of price sources.
 
 ```vyper
-@view 
-@external 
+@view
+@external
 def getPriorityPriceSourceIds() -> DynArray[uint256, MAX_PRIORITY_PRICE_SOURCES]:
 ```
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type                                            | Description                      |
+| ----------------------------------------------- | -------------------------------- |
 | `DynArray[uint256, MAX_PRIORITY_PRICE_SOURCES]` | Ordered list of price source IDs |
 
 #### Access
@@ -1527,15 +1569,15 @@ Public view function
 Returns priority vaults for liquidation asset processing.
 
 ```vyper
-@view 
-@external 
+@view
+@external
 def getPriorityLiqAssetVaults() -> DynArray[cs.VaultLite, PRIORITY_VAULT_DATA]:
 ```
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type                                          | Description                 |
+| --------------------------------------------- | --------------------------- |
 | `DynArray[cs.VaultLite, PRIORITY_VAULT_DATA]` | Priority liquidation vaults |
 
 #### Access
@@ -1547,15 +1589,15 @@ Public view function
 Returns priority vaults for stability pool operations.
 
 ```vyper
-@view 
-@external 
+@view
+@external
 def getPriorityStabVaults() -> DynArray[cs.VaultLite, PRIORITY_VAULT_DATA]:
 ```
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type                                          | Description               |
+| --------------------------------------------- | ------------------------- |
 | `DynArray[cs.VaultLite, PRIORITY_VAULT_DATA]` | Priority stability vaults |
 
 #### Access
@@ -1576,15 +1618,15 @@ def doesUndyLegoHaveAccess(_wallet: address, _legoAddr: address) -> bool:
 
 #### Parameters
 
-| Name | Type | Description |
-|------|------|-------------|
-| `_wallet` | `address` | User wallet address |
+| Name        | Type      | Description           |
+| ----------- | --------- | --------------------- |
+| `_wallet`   | `address` | User wallet address   |
 | `_legoAddr` | `address` | Lego contract address |
 
 #### Returns
 
-| Type | Description |
-|------|-------------|
+| Type   | Description                  |
+| ------ | ---------------------------- |
 | `bool` | True if lego has full access |
 
 #### Access
@@ -1592,6 +1634,7 @@ def doesUndyLegoHaveAccess(_wallet: address, _legoAddr: address) -> bool:
 Public view function
 
 #### Example Usage
+
 ```python
 # Check if lego has access
 has_access = mission_control.doesUndyLegoHaveAccess(

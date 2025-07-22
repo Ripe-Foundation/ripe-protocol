@@ -14,7 +14,7 @@ At its core, PriceSourceData manages four fundamental responsibilities:
 
 **4. Indexed Asset Enumeration**: Maintains optimized data structures for efficient asset iteration and querying, supporting up to 50 assets per price source with proper indexing and array compression to prevent storage gaps.
 
-For technical readers, PriceSourceData implements a 1-based indexing system to distinguish between "not registered" (index 0) and registered assets, provides atomic asset registration and deregistration with automatic array compression, maintains pause states that can be checked by all price query functions, implements secure fund recovery restricted to Switchboard governance addresses, and offers comprehensive asset enumeration for integration with PriceDesk and other protocol components. The module is designed to be oracle-agnostic, supporting any price source implementation while maintaining consistent administrative controls.
+For technical readers, PriceSourceData implements a 1-based indexing system to distinguish between "not registered" (index 0) and registered assets, provides atomic asset registration and deregistration with automatic array compression, maintains pause states that can be checked by all price query functions, implements secure fund recovery restricted to Switchboard governance addresses, and offers comprehensive asset enumeration for integration with [PriceDesk](../../registries/PriceDesk.md) and other protocol components. The module is designed to be oracle-agnostic, supporting any price source implementation while maintaining consistent administrative controls.
 
 ## Architecture & Dependencies
 

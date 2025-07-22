@@ -30,10 +30,10 @@ RipeGov is built using a sophisticated modular architecture with multiple extern
 ### External Integrations
 - **MissionControl**: Configuration management for lock terms and asset weights
 - **BoardRoom**: Receives governance power updates for voting systems
-- **Lootbox**: Integrates with reward distribution and points tracking
+- **[Lootbox](../core/Lootbox.md)**: Integrates with reward distribution and points tracking
 - **VaultBook**: Provides vault registration and identification
 - **Ledger**: Checks bad debt status for withdrawal restrictions
-- **HumanResources**: Manages contributor tokens and transfers
+- **[HumanResources](../core/HumanResources.md)**: Manages contributor tokens and transfers
 
 ### Module Initialization
 ```vyper
@@ -243,7 +243,7 @@ def depositTokensInVault(
 
 #### Access
 
-Only callable by Teller
+Only callable by [Teller](../core/Teller.md)
 
 #### Process Flow
 1. **SharesVault Deposit**: Uses SharesVault module for token handling and share minting
@@ -339,7 +339,7 @@ def withdrawTokensFromVault(
 
 #### Access
 
-Only callable by Teller, AuctionHouse, or CreditEngine
+Only callable by [Teller](../core/Teller.md), AuctionHouse, or CreditEngine
 
 #### Withdrawal Restrictions
 1. **Lock Period**: Must wait until `unlock` block is reached
@@ -374,7 +374,7 @@ def transferBalanceWithinVault(
 
 #### Access
 
-Only callable by AuctionHouse or CreditEngine (for liquidations)
+Only callable by [AuctionHouse](../core/AuctionHouse.md) or CreditEngine (for liquidations)
 
 #### Process Flow
 1. **SharesVault Transfer**: Moves shares between users
