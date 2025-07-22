@@ -61,7 +61,7 @@ packaging==23.2
 paginate==0.5.7
 parsimonious==0.10.0
 pathspec==0.12.1
-pillow==11.2.1
+pillow==11.3.0
 pip-tools==7.4.1
 platformdirs==4.3.7
 pluggy==1.5.0
