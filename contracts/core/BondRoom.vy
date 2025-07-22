@@ -90,6 +90,8 @@ event RipeBondPurchased:
     ripeForBadDebt: uint256
     epochProgress: uint256
     refundAmount: uint256
+    epochStart: uint256
+    epochEnd: uint256
     caller: indexed(address)
 
 event BondBoosterSet:
@@ -223,7 +225,7 @@ def purchaseRipeBond(
 
     # start next epoch (if applicable)
     if paymentAmount == data.paymentAmountAvailInEpoch and config.shouldAutoRestart:
-        newStartBlock: uint256 = block.number + config.restartDelayBlocks
+        newStartBlock: uint256 = epochEnd + config.restartDelayBlocks
         extcall Ledger(a.ledger).setEpochData(newStartBlock, newStartBlock + config.epochLength, config.amountPerEpoch)
 
     log RipeBondPurchased(
@@ -239,6 +241,8 @@ def purchaseRipeBond(
         ripeForBadDebt=ripeForBadDebt,
         epochProgress=epochProgress,
         refundAmount=refundAmount,
+        epochStart=epochStart,
+        epochEnd=epochEnd,
         caller=_caller,
     )
     return totalRipePayout

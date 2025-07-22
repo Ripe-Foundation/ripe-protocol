@@ -953,7 +953,7 @@ def test_switchboard_delta_set_bad_debt(switchboard_delta, ledger, governance, a
     
     # Check action was stored
     action_type = switchboard_delta.actionType(aid)
-    assert action_type == 1024  # ActionType.RIPE_BAD_DEBT (bit 10 set)
+    assert action_type == 512  # ActionType.RIPE_BAD_DEBT (bit 9 set)
     
     # Check pending value was stored
     pending_value = switchboard_delta.pendingRipeBondConfigValue(aid)
@@ -1020,7 +1020,7 @@ def test_switchboard_delta_set_ripe_bond_booster(switchboard_delta, bond_room, r
     
     # Check action was stored
     action_type = switchboard_delta.actionType(aid)
-    assert action_type == 2048  # ActionType.RIPE_BOND_BOOSTER (bit 11 set)
+    assert action_type == 1024  # ActionType.RIPE_BOND_BOOSTER (bit 10 set)
     
     # Check pending bond booster was stored
     pending_bond_booster = switchboard_delta.pendingBondBooster(aid)
@@ -1066,3 +1066,47 @@ def test_switchboard_delta_set_ripe_bond_booster_validation(switchboard_delta, g
     # The validation only checks if the address has the interface when it's not empty
     aid = switchboard_delta.setRipeBondBooster(ZERO_ADDRESS, sender=governance.address)
     assert aid > 0
+
+
+def test_switchboard_delta_set_start_epoch_at_block(switchboard_delta, bond_room, governance, alice):
+    """Test setStartEpochAtBlock is instant and requires governance permissions"""
+    # Non-governance cannot set start epoch
+    with boa.reverts("no perms"):
+        switchboard_delta.setStartEpochAtBlock(sender=alice)
+    
+    # Governance can set start epoch at block immediately (no timelock)
+    current_block = boa.env.evm.patch.block_number
+    future_block = current_block + 100
+    
+    # Set epoch to start at future block
+    switchboard_delta.setStartEpochAtBlock(future_block, sender=governance.address)
+    
+    # Check event was emitted
+    logs = filter_logs(switchboard_delta, "RipeBondStartEpochAtBlockSet")
+    assert len(logs) == 1
+    assert logs[0].startBlock == future_block
+    
+    # If no block specified, should use current block
+    switchboard_delta.setStartEpochAtBlock(sender=governance.address)
+    
+    # Check event for current block
+    logs = filter_logs(switchboard_delta, "RipeBondStartEpochAtBlockSet")
+    assert len(logs) == 1
+    assert logs[0].startBlock >= current_block
+    
+    # Test that when block is 0, it uses current block
+    switchboard_delta.setStartEpochAtBlock(0, sender=governance.address)
+    
+    logs = filter_logs(switchboard_delta, "RipeBondStartEpochAtBlockSet")
+    assert len(logs) == 1
+    # When 0 is specified, it should use the current block
+    assert logs[0].startBlock >= current_block
+    
+    # Time travel forward and verify block is used correctly
+    boa.env.time_travel(blocks=50)
+    new_current_block = boa.env.evm.patch.block_number
+    
+    switchboard_delta.setStartEpochAtBlock(sender=governance.address)
+    logs = filter_logs(switchboard_delta, "RipeBondStartEpochAtBlockSet")
+    assert len(logs) == 1
+    assert logs[0].startBlock == new_current_block

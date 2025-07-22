@@ -663,9 +663,8 @@ def test_purchase_ripe_bond_auto_restart_epoch(
     new_start = ledger.epochStart()
     new_end = ledger.epochEnd() 
     
-    # With default _restartDelayBlocks=50, new epoch starts 50 blocks after transaction
-    current_block = boa.env.evm.patch.block_number
-    expected_start = current_block + 50  # restart delay
+    # With default _restartDelayBlocks=50, new epoch starts 50 blocks after epoch end
+    expected_start = end + 50  # restart delay from epoch end
     assert new_start == expected_start
     assert new_end == expected_start + 100  # epoch length
     assert ledger.paymentAmountAvailInEpoch() == 1000 * EIGHTEEN_DECIMALS  # refreshed
@@ -1360,9 +1359,9 @@ def test_purchase_ripe_bond_auto_restart_with_delay(
     new_start = ledger.epochStart()
     new_end = ledger.epochEnd()
     
-    # New epoch should start exactly restart_delay blocks after the transaction block
-    # Contract uses: block.number + restart_delay (where block.number is the transaction block)
-    expected_new_start = current_block_after_purchase + restart_delay
+    # New epoch should start exactly restart_delay blocks after the epoch end
+    # Contract now uses: epochEnd + restart_delay
+    expected_new_start = end + restart_delay
     assert new_start == expected_new_start
     assert new_end == expected_new_start + 100  # epoch length
     assert ledger.paymentAmountAvailInEpoch() == 1000 * EIGHTEEN_DECIMALS  # refreshed
@@ -1383,12 +1382,16 @@ def test_purchase_ripe_bond_different_restart_delays(
     teller.purchaseRipeBond(alpha_token, available_amount, sender=bob)
     current_block_after = boa.env.evm.patch.block_number
     
-    # With zero delay, new epoch should start immediately at the transaction block
+    # With zero delay, new epoch should start immediately after the epoch end
     new_start1 = ledger.epochStart()
-    expected_start1 = current_block_after + 0  # transaction block + zero delay
+    expected_start1 = end1 + 0  # epoch end + zero delay
     assert new_start1 == expected_start1
     
-    # Test with larger delay
+    # Test with larger delay - we need to travel to be within the new epoch
+    # The first epoch auto-restarted, so we need to travel past the new start
+    blocks_to_travel = new_start1 - boa.env.evm.patch.block_number + 1
+    boa.env.time_travel(blocks=blocks_to_travel)
+    
     large_delay = 100
     start2, end2 = setupRipeBonds(_shouldAutoRestart=True, _restartDelayBlocks=large_delay)
     
@@ -1399,9 +1402,9 @@ def test_purchase_ripe_bond_different_restart_delays(
     teller.purchaseRipeBond(alpha_token, available_amount, sender=alice)
     current_block_after2 = boa.env.evm.patch.block_number
     
-    # With large delay, new epoch should start much later
+    # With large delay, new epoch should start much later after epoch end
     new_start2 = ledger.epochStart()
-    expected_start2 = current_block_after2 + large_delay
+    expected_start2 = end2 + large_delay
     assert new_start2 == expected_start2
     assert ledger.epochEnd() == expected_start2 + 100  # epoch length
 
@@ -2759,8 +2762,45 @@ def test_purchase_ripe_bond_epoch_boundary_race_condition(
         teller.purchaseRipeBond(alpha_token, payment_amount, sender=bob)
     
     # After delay, should work
-    boa.env.time_travel(blocks=10)
+    # New epoch starts at end + 10, so we need to be past that
+    blocks_to_new_epoch = end + 10 - boa.env.evm.patch.block_number
+    boa.env.time_travel(blocks=blocks_to_new_epoch + 1)
     teller.purchaseRipeBond(alpha_token, payment_amount, sender=bob)
+
+
+def test_purchase_ripe_bond_auto_restart_based_on_epoch_end(
+    teller, setupRipeBonds, bob, alpha_token_whale, alpha_token, ledger
+):
+    """Test that auto-restart is based on epoch end, not current block"""
+    restart_delay = 20
+    start, end = setupRipeBonds(_shouldAutoRestart=True, _restartDelayBlocks=restart_delay)
+    
+    # Travel to near the end of the epoch but not at the end
+    boa.env.time_travel(blocks=90)  # 10 blocks before epoch end
+    
+    # Exhaust entire epoch availability with one purchase
+    available_amount = ledger.paymentAmountAvailInEpoch()
+    alpha_token.transfer(bob, available_amount, sender=alpha_token_whale)
+    alpha_token.approve(teller, available_amount, sender=bob)
+    
+    # Store the block when purchase happens
+    teller.purchaseRipeBond(alpha_token, available_amount, sender=bob)
+    purchase_block = boa.env.evm.patch.block_number
+    
+    # Verify new epoch starts based on original epoch end, not purchase block
+    new_start = ledger.epochStart()
+    new_end = ledger.epochEnd()
+    
+    # New epoch should start at original epoch end + restart delay
+    # NOT at purchase block + restart delay
+    expected_start = end + restart_delay
+    assert new_start == expected_start
+    assert new_end == expected_start + 100  # epoch length
+    
+    # Verify that purchase block was before epoch end
+    assert purchase_block < end
+    # And that new start is based on epoch end, not purchase block
+    assert new_start != purchase_block + restart_delay
 
 
 def test_purchase_ripe_bond_zero_base_payout_fails(
