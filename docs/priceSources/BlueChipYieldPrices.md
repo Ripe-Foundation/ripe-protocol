@@ -2,21 +2,15 @@
 
 ## Overview
 
-BlueChipYieldPrices serves as a sophisticated price oracle specifically designed for yield-bearing vault tokens from major DeFi protocols within the Ripe Protocol ecosystem. Think of it as a specialized financial analyst that continuously monitors and calculates accurate prices for tokens that represent shares in yield-generating vaults - from Morpho's lending vaults to Aave's interest-bearing tokens to Compound's cTokens. Unlike simple token pricing, these vault tokens require complex calculations to account for accumulated yield and changing share values over time.
+BlueChipYieldPrices provides accurate USD pricing for yield-bearing vault tokens across major DeFi protocols. It calculates prices by combining the underlying asset's USD value with the vault's exchange rate, ensuring precise valuations for protocol operations.
 
-At its core, BlueChipYieldPrices manages five fundamental responsibilities:
+**Key Features**:
+- **Multi-Protocol Support**: Integrates with Morpho, Euler, Moonwell, Sky, Fluid, Aave V3, and Compound V3
+- **Snapshot System**: Time-series price tracking with supply-weighted averaging for manipulation resistance
+- **Safety Throttling**: Configurable upside deviation limits prevent sudden price spikes
+- **Time-Locked Updates**: All feed modifications require governance approval with enforced delays
 
-**1. Multi-Protocol Support**: Integrates with seven major DeFi protocols (Morpho, Euler, Moonwell, Sky, Fluid, Aave V3, and Compound V3) through their respective registries and interfaces, automatically detecting valid vault tokens and retrieving their underlying asset information.
-
-**2. Price Snapshot System**: Maintains a sophisticated time-series database of price snapshots for each vault token, tracking total supply and price-per-share values over time to calculate weighted average prices that resist manipulation and provide stable pricing even during volatile market conditions.
-
-**3. Weighted Price Calculation**: Implements a supply-weighted averaging mechanism across multiple snapshots, giving more weight to prices when total supply was higher, which provides more accurate pricing by emphasizing periods of greater market participation.
-
-**4. Safety Throttling**: Includes configurable upside deviation limits that prevent sudden price spikes from affecting the oracle, protecting against both technical glitches and potential manipulation attempts while still allowing legitimate yield accumulation.
-
-**5. Time-Locked Configuration**: All price feed additions, updates, and removals require time-locked governance approval, preventing rushed changes and ensuring careful consideration of oracle modifications that could affect protocol operations.
-
-For technical readers, BlueChipYieldPrices implements a modular architecture with LocalGov for governance, TimeLock for change management, and PriceSourceData for asset tracking. It uses protocol-specific adapters to handle the unique interfaces of each supported DeFi protocol (ERC4626 for Morpho/Euler/Fluid, custom interfaces for Moonwell, direct pricing for Aave/Compound). The snapshot system maintains up to 25 historical price points per asset with configurable minimum delays between snapshots. Price calculations use weighted averages based on total supply at each snapshot time, with automatic throttling of upside movements beyond configured thresholds. The contract includes comprehensive validation for new price feeds and graceful handling of stale or invalid data.
+The module implements protocol-specific adapters for each integration, maintains up to 25 historical price points per asset, and uses weighted averages based on total supply for reliable pricing data in collateral evaluation and risk management.
 
 ## Architecture & Dependencies
 

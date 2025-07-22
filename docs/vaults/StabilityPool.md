@@ -2,17 +2,14 @@
 
 ## Overview
 
-StabilityPool serves as a specialized vault within the Ripe Protocol ecosystem, designed specifically for stability pool operations that support the protocol's liquidation system. Think of it as an insurance fund where users deposit stablecoins (GREEN, sGREEN, and other approved assets) to earn rewards by providing liquidity for liquidated collateral. When borrowers get liquidated, stability pool depositors receive the liquidated assets at a discount while helping maintain protocol stability.
+StabilityPool is a specialized vault that acts as the protocol's liquidation backstop. Users deposit stablecoins (GREEN, sGREEN) to earn discounted collateral from liquidations, typically receiving 5-10% instant profit while helping maintain protocol solvency.
 
-At its core, StabilityPool manages three fundamental responsibilities:
+**How It Works**:
+- **Deposit Stablecoins**: Provide GREEN or sGREEN to the stability pool
+- **Receive Liquidated Assets**: Automatically get ETH, BTC, or other collateral at discount
+- **Earn RIPE Rewards**: Additional incentives for providing stability
 
-**1. Stability Pool Deposits**: Accepts deposits of approved stablecoin assets and manages them through sophisticated share-based accounting that tracks both deposited assets and accumulated liquidated collateral, ensuring fair distribution of liquidation proceeds among all participants.
-
-**2. Liquidation Asset Distribution**: Integrates seamlessly with the AuctionHouse to receive and distribute liquidated collateral to stability pool participants, automatically updating share values to reflect the addition of new liquidated assets.
-
-**3. Reward-Based Withdrawals**: Enables users to withdraw their stability pool positions and claim accumulated liquidated assets, with automatic Ripe token reward distribution to incentivize long-term protocol participation and stability provision.
-
-For technical readers, StabilityPool operates as a thin wrapper around the sophisticated StabVault module, providing contract-specific events and access controls while delegating all core functionality to the underlying module. It implements USD value-based share accounting rather than simple asset accounting, handles complex liquidation integration with [AuctionHouse](../core/AuctionHouse.md) for collateral distribution, supports multiple stablecoin types with automatic asset registration, and provides specialized query functions for integration with [Lootbox](../core/Lootbox.md) rewards, [CreditEngine](../core/CreditEngine.md) collateral calculations, and other protocol components. The vault is designed to maintain protocol stability while providing attractive yields to depositors.
+Built on the StabVault module, StabilityPool uses USD-based share accounting to fairly distribute liquidation proceeds. It integrates directly with AuctionHouse for collateral distribution and tracks both original deposits and accumulated rewards for transparent accounting.
 
 ## Architecture & Dependencies
 

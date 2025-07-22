@@ -2,21 +2,17 @@
 
 ## Overview
 
-Contributor contracts represent individual compensation agreements for protocol contributors within the Ripe ecosystem. Think of each Contributor contract as a personalized vesting vault that manages one person's token compensation with built-in protections, time-based vesting, and governance capabilities. Unlike traditional employment contracts, these are immutable on-chain agreements that automatically handle token distribution according to predefined schedules while providing flexibility for ownership transfers and delegation.
+Contributor contracts are personalized vesting vaults that manage individual token compensation agreements for protocol contributors. Each contract represents an immutable on-chain employment agreement that automatically handles
+token distribution according to predefined schedules with built-in protections and governance capabilities.
 
-At its core, each Contributor contract manages five fundamental responsibilities:
+**Core Functions**:
+- **Vesting Management**: Linear vesting with cliff periods, automatically calculating and tracking earned amounts
+- **Token Distribution**: Interfaces with HumanResources to mint and deposit vested RIPE tokens with appropriate locks
+- **Access Control**: Dual-permission system with owner/manager roles plus time-delayed ownership transfers
+- **Position Transfers**: Enables access to vested tokens after unlock periods with security delays
+- **Governance Integration**: Allows voting power delegation from vested positions with protection controls
 
-**1. Vesting Schedule Enforcement**: Automatically calculates and tracks vested amounts based on linear vesting between start and end times, with cliff periods ensuring minimum commitment before any tokens become available.
-
-**2. Token Distribution Management**: Handles the "cashing" of RIPE paychecks by interfacing with HumanResources to mint earned tokens and deposit them into the Ripe Gov Vault with appropriate lock durations.
-
-**3. Ownership and Access Control**: Implements a dual-permission system with separate owner (beneficiary) and manager (operator) roles, plus time-delayed ownership transfers to prevent unauthorized takeovers.
-
-**4. Position Transfer Capability**: Allows vested token positions to be transferred after the unlock period, enabling contributors to access their earned compensation while maintaining protocol security through time delays.
-
-**5. Governance Participation**: Enables contributors to participate in protocol governance by delegating their voting power from vested positions, with controls to prevent malicious delegation during disputes.
-
-For technical readers, Contributor contracts are deployed as blueprints from HumanResources using create_from_blueprint for gas efficiency. Each contract stores immutable vesting parameters (compensation, start, end, cliff, unlock times) set during deployment. The contract implements sophisticated time-based calculations for vesting with support for partial vesting and early termination. It includes a two-phase commit pattern for sensitive operations like ownership changes and token transfers, with configurable delays between initiation and confirmation. The contract can be frozen by protocol governance for emergency situations and includes integration points with HumanResources for minting, RipeGovernance for delegation, and the broader protocol ecosystem.
+Deployed as blueprints for gas efficiency, each contract stores immutable vesting parameters and implements sophisticated time-based calculations with two-phase commit patterns for sensitive operations.
 
 ## Architecture & Dependencies
 

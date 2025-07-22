@@ -2,19 +2,16 @@
 
 ## Overview
 
-SwitchboardDelta serves as the specialized configuration management contract for HR (Human Resources) operations and Ripe bond mechanics in the Ripe Protocol ecosystem. Think of it as a dedicated control panel for managing contributor compensation, bond sales parameters, and reward system maintenance. While other Switchboard contracts handle protocol-wide settings, assets, and operations, SwitchboardDelta focuses exclusively on human capital management and tokenomics configurations.
+SwitchboardDelta specializes in HR operations and Ripe bond mechanics for the Ripe Protocol, managing contributor compensation, bond sales parameters, and reward system maintenance as a dedicated control panel for human capital
+and tokenomics.
 
-At its core, SwitchboardDelta manages four fundamental responsibilities:
+**Management Areas**:
+- **HR Configuration**: Controls contributor compensation templates, limits, vesting schedules, cliff periods, and start delays to ensure fair treatment while preventing exploitation
+- **Contributor Operations**: Manages individual settings including manager assignments, paycheck cancellations, ownership transfers, and account freezing with both governance and lite action permissions
+- **Bond Configuration**: Controls bond sale mechanics including asset selection, epoch parameters, pricing curves, lock bonuses, and auto-restart settings for sustainable token distribution
+- **Reward Maintenance**: Provides cleanup and reset functions for the loot distribution system to correct errors or prepare for upgrades
 
-**1. HR Configuration Management**: Controls all aspects of contributor compensation including template contracts, compensation limits, vesting schedules, cliff periods, and start delays. These parameters ensure fair and consistent treatment of protocol contributors while preventing exploitation.
-
-**2. Contributor Operations**: Manages individual contributor settings including manager assignments, paycheck cancellations, ownership transfers, and account freezing. Both governance and lite action permissions enable quick responses to HR situations.
-
-**3. Ripe Bond Configuration**: Controls the bond sale mechanism including asset selection, epoch parameters, pricing curves, lock bonuses, and auto-restart settings. This creates a sustainable token distribution mechanism aligned with protocol growth.
-
-**4. Reward System Maintenance**: Provides cleanup and reset functions for the loot distribution system, allowing governance to correct accumulated errors or prepare for system upgrades. This includes resetting user points, asset points, and borrowing rewards.
-
-For technical readers, SwitchboardDelta implements sophisticated patterns including time-locked HR and bond configurations, immediate execution for emergency contributor actions, bond booster integration for incentive campaigns, comprehensive validation for compensation parameters, and batch operations for efficient management. The contract ensures proper incentive alignment while maintaining operational flexibility.
+The contract implements time-locked HR/bond configurations, immediate emergency actions, bond booster integration, comprehensive validation, and batch operations to ensure proper incentive alignment with operational flexibility.
 
 ## Architecture & Modules
 

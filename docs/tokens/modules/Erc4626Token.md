@@ -2,21 +2,16 @@
 
 ## Overview
 
-Erc4626Token serves as a tokenized vault module that extends the Erc20Token module to implement the EIP-4626 standard within the Ripe Protocol ecosystem. Think of it as a wrapper that transforms any ERC20 token into a yield-bearing vault token, where users deposit assets and receive shares representing their proportional ownership of the vault's total assets. Unlike simple token wrappers, ERC4626 vaults provide a standardized interface for yield-bearing tokens, making them composable across DeFi protocols.
+Erc4626Token is a tokenized vault module that extends Erc20Token to implement the EIP-4626 standard. It transforms any ERC20 token into a yield-bearing vault token, enabling standardized interactions with DeFi aggregators and yield optimizers.
 
-At its core, Erc4626Token manages five fundamental responsibilities:
+**Core Functions**:
+- **Asset/Share Conversion**: Bidirectional exchange with accurate rate calculations
+- **Flexible Operations**: Multiple deposit/withdrawal methods (asset or share-based)
+- **Price Tracking**: Current and historical price-per-share for valuation and security
+- **EIP-4626 Compliance**: Full standard implementation for protocol composability
+- **Attack Protection**: Careful rounding logic prevents precision loss exploits
 
-**1. Asset-to-Share Conversion**: Implements bidirectional conversion between deposited assets and vault shares, maintaining accurate exchange rates based on the vault's total assets and share supply.
-
-**2. Deposit and Withdrawal Operations**: Provides multiple entry points for deposits (asset-based or share-based) and withdrawals (redeem shares or withdraw assets), giving users flexibility in how they interact with the vault.
-
-**3. Price Per Share Tracking**: Maintains both current and historical price-per-share values, enabling accurate valuation of positions and protecting against common vault attack vectors like donation attacks.
-
-**4. Standardized Vault Interface**: Implements the full EIP-4626 specification, ensuring compatibility with aggregators, yield optimizers, and other protocols that integrate with tokenized vaults.
-
-**5. Rounding Protection**: Implements careful rounding logic in conversions to protect against precision loss attacks while ensuring fair treatment of depositors and withdrawers.
-
-For technical readers, Erc4626Token uses Vyper's module system to extend Erc20Token functionality, inheriting all token features while adding vault-specific logic. The module implements precise mathematical conversions between assets and shares with configurable rounding directions to prevent exploitation. It includes reentrancy protection on all state-changing operations and maintains a lastPricePerShare variable for additional security checks. The contract handles edge cases like first deposits, zero total supply, and maximum value deposits gracefully. All operations emit standard EIP-4626 events (Deposit/Withdraw) in addition to ERC20 Transfer events for complete transparency.
+Built on Vyper's module system, Erc4626Token inherits all Erc20Token features while adding vault logic. It implements reentrancy protection, handles edge cases gracefully, and maintains lastPricePerShare for security. All operations emit standard events for transparency and integration.
 
 ## Architecture & Dependencies
 

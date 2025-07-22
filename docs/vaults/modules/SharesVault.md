@@ -2,17 +2,15 @@
 
 ## Overview
 
-SharesVault serves as an advanced vault module within the Ripe Protocol ecosystem that implements share-based accounting for vault positions. Think of it as a sophisticated yield-bearing vault system where users receive shares representing their proportional ownership of the vault's assets, similar to how mutual fund shares work. As the vault generates yield or experiences losses, the value of each share changes accordingly.
+SharesVault is an advanced vault module implementing share-based accounting for yield-bearing positions. Users receive shares representing proportional ownership of vault assets, enabling automatic yield distribution as share values appreciate over time.
 
-At its core, SharesVault manages three fundamental responsibilities:
+**Core Functions**:
+- **Share-Based Accounting**: Deposits receive shares; value changes affect all holders proportionally
+- **Attack Prevention**: Dead shares and decimal offsets protect against donation attacks
+- **Precise Conversions**: Configurable rounding for share-to-asset calculations
+- **Yield Integration**: Specialized functions account for share appreciation in rewards
 
-**1. Share-Based Asset Management**: Implements a share-to-asset conversion system where user deposits receive shares that represent proportional ownership of vault assets, allowing for automatic yield distribution and loss sharing among depositors.
-
-**2. Advanced Share Calculations**: Provides sophisticated share-to-amount conversion functions with configurable rounding, donation attack prevention through decimal offsets, and precise calculations for deposits, withdrawals, and internal transfers.
-
-**3. Yield-Aware Integration Support**: Offers specialized utility functions for protocol contracts that account for share appreciation, providing accurate asset valuations and share-based reward calculations for integration with other protocol components.
-
-For technical readers, SharesVault extends vault functionality with ERC4626-style share accounting, implements donation attack prevention through dead shares and decimal offsets, provides precise share-to-asset conversions with configurable rounding modes, maintains share balances in VaultData while calculating asset values dynamically, and offers integration functions that account for share appreciation in rewards and liquidation calculations. The module is designed to handle yield-bearing vaults where asset values appreciate over time.
+Extending VaultData with ERC4626-style mechanics, SharesVault maintains share balances while calculating asset values dynamically. It provides yield-aware utilities for protocol integration, making it ideal for vaults where assets appreciate through rebasing or external yield generation.
 
 ## Architecture & Dependencies
 

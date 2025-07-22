@@ -2,17 +2,14 @@
 
 ## Overview
 
-AuctionHouse serves as the comprehensive liquidation engine for the Ripe Protocol ecosystem. Think of it as a sophisticated financial recovery system that automatically identifies under-collateralized positions, executes multi-phase liquidation strategies, and manages collateral auctions to restore protocol health. It orchestrates the entire liquidation lifecycle - from initial position assessment through collateral recovery, stability pool swaps, and final auction sales - all while ensuring fair treatment of both borrowers and liquidators.
+AuctionHouse is the liquidation engine for Ripe Protocol, executing multi-phase strategies to recover value from under-collateralized positions. It prioritizes minimal market impact through phased liquidations: first burning borrower's stablecoins, then swapping with stability pools, and finally running Dutch auctions.
 
-At its core, AuctionHouse manages three fundamental responsibilities:
+**Core Functions**:
+- **Phased Liquidations**: Burns GREEN/sGREEN → Stability pool swaps → Dutch auctions
+- **Auction Management**: Time-based discounts from 0% to maximum, paid in GREEN
+- **Keeper Rewards**: Incentivizes decentralized position monitoring with debt-based rewards
 
-**1. Multi-Phase Liquidation Execution**: Implements a prioritized liquidation strategy that first attempts to use the borrower's own stablecoins (burning Green/sGreen), then swaps collateral with stability pools for instant liquidity, and finally creates Dutch auctions for remaining assets. This phased approach minimizes market impact and maximizes recovery value.
-
-**2. Auction Management**: Creates and manages time-based Dutch auctions where collateral is sold at increasing discounts over time. Buyers can purchase liquidated assets using Green tokens, with the discount starting small and increasing to a maximum, ensuring efficient price discovery while protecting protocol solvency.
-
-**3. Keeper Incentives & Rewards**: Provides configurable rewards to keepers (liquidators) who trigger liquidations, creating a decentralized network of actors monitoring position health. Rewards are calculated based on the debt size and can be paid in either Green or Savings Green tokens.
-
-For technical readers, AuctionHouse implements sophisticated liquidation mathematics including a unified repayment formula that works across all liquidation types, transient storage for gas optimization during complex operations, configurable auction parameters per asset type, and integration with multiple protocol components (CreditEngine, StabilityPool, Ledger, etc.). The contract ensures atomic execution of liquidations while maintaining strict accounting of all value flows.
+Built with transient storage optimization, AuctionHouse implements unified repayment formulas across all liquidation types. It integrates with CreditEngine, StabilityPool, and Ledger for atomic execution while maintaining strict value flow accounting and configurable per-asset auction parameters.
 
 ## Architecture & Modules
 

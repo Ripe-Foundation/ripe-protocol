@@ -2,17 +2,14 @@
 
 ## Overview
 
-RipeHq serves as the master registry and governance hub for the Ripe Protocol ecosystem. Think of it as the central control tower at an airport - it coordinates all the critical components, maintains authoritative records of who's who, and ensures only authorized parties can perform sensitive operations.
+RipeHq is the master registry and governance hub for Ripe Protocol, coordinating all critical components and controlling token minting permissions. It maintains the authoritative record of protocol contracts while enforcing strict security through two-factor authentication and time-locked changes.
 
-At its core, RipeHq manages three fundamental responsibilities:
+**Core Functions**:
+- **Identity Registry**: Maps every protocol contract to unique IDs (Green: 1, sGREEN: 2, RIPE: 3)
+- **Two-Factor Minting**: Requires both RipeHq permission AND department self-declaration
+- **Safety Controls**: Time-locked changes, circuit breaker for emergencies, and power separation
 
-**1. Identity Management**: Every important contract in the Ripe ecosystem gets registered here with a unique ID and description. This creates a single source of truth for finding protocol components - from the Green token (ID: 1) to Savings Green (ID: 2) to the Ripe token (ID: 3), and beyond.
-
-**2. Permission Control**: RipeHq implements a sophisticated two-factor authentication system for minting tokens. Departments (protocol components) must first be granted minting permissions through RipeHq's configuration system, and then they must also self-declare their minting capability. This double-check prevents unauthorized token creation.
-
-**3. Safety Mechanisms**: The contract includes time-locked changes (preventing rushed decisions), a circuit breaker for minting operations (allowing emergency stops), and careful separation of powers between different protocol components.
-
-For technical readers, RipeHq utilizes modular architecture with imported governance and registry modules, implements time-locked state changes, provides comprehensive event logging, and includes recovery mechanisms for misplaced funds. The contract's structure reflects common patterns in DeFi protocols where centralized registries help coordinate decentralized components.
+Built with modular governance and registry components, RipeHq prevents unauthorized token creation through double-verification. Its architecture ensures decentralized components coordinate safely through a trusted central registry with comprehensive event logging and fund recovery mechanisms.
 
 ## Architecture & Modules
 

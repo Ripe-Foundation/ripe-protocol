@@ -2,19 +2,15 @@
 
 ## Overview
 
-SwitchboardAlpha serves as the primary configuration management contract for the Ripe Protocol ecosystem. Think of it as a comprehensive control panel that manages all critical protocol parameters through time-locked changes, ensuring careful governance and preventing hasty modifications that could harm the system. It acts as the authorized configurator registered in Switchboard, capable of modifying parameters in MissionControl and Ledger contracts.
+SwitchboardAlpha is the primary configuration management contract for the Ripe Protocol, controlling critical protocol parameters through time-locked changes to ensure careful governance and system stability.
 
-At its core, SwitchboardAlpha manages four fundamental responsibilities:
+**Key Responsibilities**:
+- **Protocol Configuration**: Manages deposit/withdrawal limits, debt settings, liquidation parameters, and rewards distribution through time-locked changes
+- **Emergency Controls**: Enables rapid disabling of protocol functions by authorized users (lite actions) while requiring governance for re-enabling
+- **Priority Management**: Optimizes protocol operations by managing prioritized lists for vaults, stability pools, and price sources
+- **Rewards Configuration**: Controls Ripe token emissions, allocation percentages, and auto-staking parameters
 
-**1. Protocol Configuration Management**: Controls all critical protocol parameters including deposit/withdrawal limits, debt management settings, liquidation parameters, and rewards distribution. Each configuration change goes through a time-lock period to ensure proper review and prevent malicious modifications.
-
-**2. Emergency Controls**: Provides rapid-response capabilities for authorized users to disable protocol functions during emergencies. While enabling functions requires governance approval, disabling can be done by users with "lite action" permissions for quick crisis response.
-
-**3. Priority System Management**: Manages prioritized lists for vaults, stability pools, and price sources to optimize protocol operations. This ensures the most reliable and liquid sources are checked first during critical operations like liquidations and price discovery.
-
-**4. Rewards & Incentive Configuration**: Controls the Ripe token emission schedule, allocation percentages across different user categories, and auto-staking parameters. This includes managing available token supplies for rewards, bonds, and human resources distribution.
-
-For technical readers, SwitchboardAlpha implements sophisticated governance patterns including time-locked configuration changes with action IDs, immediate disabling for emergency response, batch validation and sanitization, comprehensive event logging for transparency, and modular configuration categories. The contract ensures protocol stability while maintaining operational flexibility.
+The contract implements time-locked changes with action IDs, immediate emergency disabling, batch validation, and comprehensive event logging to ensure protocol stability with operational flexibility.
 
 ## Architecture & Modules
 

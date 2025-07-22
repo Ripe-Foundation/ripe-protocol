@@ -2,17 +2,16 @@
 
 ## Overview
 
-LocalGov serves as a flexible governance module for the Ripe Protocol ecosystem. Think of it as a modular building block that provides governance functionality to any contract that needs it - from the main RipeHq registry to individual department contracts. It implements a two-tier governance system where local governance can be managed independently while still respecting the protocol's global governance hierarchy.
+LocalGov is a flexible governance module implementing a two-tier system for the Ripe Protocol. It enables contracts to maintain local governance while respecting the protocol's global hierarchy, allowing both independent
+management and centralized control through RipeHq when needed.
 
-At its core, LocalGov manages three fundamental responsibilities:
+**Governance Structure**:
+- **Hierarchical Control**: Supports both local governance (contract-specific) and global governance (RipeHq override)
+- **Time-locked Transitions**: Two-step process with delays for all changes, requiring new governors to confirm their role
+- **Flexible Operation**: Functions as either top-level governance (RipeHq) or subordinate module (departments)
 
-**1. Hierarchical Governance**: Supports both local governance (specific to the implementing contract) and global governance (from [RipeHq](../../registries/RipeHq.md)), allowing for flexible permission models where either the local governor or RipeHq's governor can perform administrative actions.
-
-**2. Time-locked Transitions**: All governance changes require a two-step process with configurable time delays, preventing rushed decisions and providing transparency. New governors must actively confirm their role, ensuring intentional governance transfers.
-
-**3. Flexible Configuration**: Can operate as either the top-level governance (for RipeHq itself) or as a subordinate module (for departments), with different rules and constraints based on the context.
-
-For technical readers, LocalGov implements secure governance transitions with time-locked changes, supports governance relinquishment for local contracts, provides configurable time-lock bounds, and includes special setup procedures for initial deployment. The module's design allows for both centralized control through RipeHq and decentralized management at the department level.
+The module implements secure transitions with configurable time-locks, supports governance relinquishment for decentralization, and includes special setup procedures for RipeHq initialization, balancing autonomy with
+protocol-wide control.
 
 ## Governance Change Flow
 

@@ -2,17 +2,14 @@
 
 ## Overview
 
-RebaseErc20 serves as a sophisticated yield-bearing vault within the Ripe Protocol ecosystem, specifically designed to handle rebase tokens and yield-generating assets through share-based accounting. Think of it as an advanced vault that automatically compounds yield for depositors by using shares to represent ownership stakes in a growing pool of assets, making it perfect for assets that rebase (change balance over time) or generate yield through external protocols.
+RebaseErc20 is a yield-optimized vault designed for rebase tokens and yield-generating assets like stETH, rETH, and aTokens. It automatically captures rebases and compounds yield through share-based accounting, providing depositors with passive growth without active management.
 
-At its core, RebaseErc20 manages three fundamental responsibilities:
+**Core Functions**:
+- **Share-Based Accounting**: Converts deposits to shares representing proportional vault ownership
+- **Automatic Compounding**: Captures rebases and yield without user intervention
+- **Fair Distribution**: Maintains accurate ownership percentages as vault value grows
 
-**1. Share-Based Yield Capture**: Converts deposited rebase tokens into shares that represent proportional ownership of the underlying asset pool, allowing users to benefit from token rebases and yield generation without actively managing their positions or dealing with changing token balances.
-
-**2. Automatic Yield Compounding**: Accumulates yield and rebase rewards within the vault automatically, with share values increasing over time as the total pool grows, providing users with a "set and forget" yield optimization strategy without requiring active participation.
-
-**3. Proportional Distribution**: Ensures fair distribution of accumulated rewards and rebased tokens among all vault participants through precise share calculations, maintaining accurate proportional ownership even as assets rebase or generate additional yield over time.
-
-For technical readers, RebaseErc20 operates as a thin wrapper around the sophisticated SharesVault module, providing contract-specific events and access controls while delegating all core functionality to the underlying module. It implements share-based accounting where deposited assets are converted to shares and stored in VaultData as share balances rather than asset amounts, handles automatic yield accumulation through share price appreciation as the vault's asset balance grows from rebases or external rewards, supports any rebase token or yield-generating asset without requiring special configuration, provides donation attack protection through decimal offset mechanisms, and maintains seamless integration with protocol liquidation systems while preserving share-based accounting. This vault type is ideal for maximizing yield from rebase tokens and assets that generate rewards over time.
+Built on the SharesVault module, RebaseErc20 implements sophisticated yield capture mechanics. Share values appreciate as underlying assets rebase or generate rewards, donation attack protection ensures vault security, and seamless protocol integration enables use as collateral while earning yield.
 
 ## Architecture & Dependencies
 

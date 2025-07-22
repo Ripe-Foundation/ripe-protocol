@@ -2,17 +2,15 @@
 
 ## Overview
 
-RipeToken serves as the primary governance token for the Ripe DAO ecosystem. Think of it as the voting shares that grant holders decision-making power over the protocol's future direction, parameter adjustments, and treasury management. Ripe tokens are distributed through various protocol rewards, bonding mechanisms, and initial allocations to align stakeholder incentives with long-term protocol success.
+RipeToken (RIPE) is the governance token powering the Ripe DAO, granting holders voting rights over protocol parameters, treasury allocation, and strategic direction. Distributed through rewards, bonding, and initial allocations, RIPE aligns stakeholder incentives with long-term protocol success.
 
-At its core, RipeToken manages three fundamental responsibilities:
+**Governance Powers**:
+- **Protocol Parameters**: Vote on collateral ratios, fee structures, and risk parameters
+- **Treasury Management**: Direct allocation of protocol revenues and strategic reserves
+- **Contract Upgrades**: Approve new modules and protocol improvements through governance
+- **Reward Distribution**: Control emission rates and allocation across protocol activities
 
-**1. Governance Token Functionality**: Implements complete ERC20 functionality with 18 decimals, providing standard token operations like transfers, approvals, and allowances while serving as the foundation for all governance activities within the Ripe ecosystem.
-
-**2. Controlled Minting System**: Only authorized protocol contracts (verified through [RipeHq](../registries/RipeHq.md)'s two-factor authentication system) can mint new Ripe tokens. This ensures all Ripe tokens are distributed according to established protocol rules and prevents unauthorized inflation.
-
-**3. Advanced Token Features**: Includes sophisticated features like EIP-2612 permit functionality for gasless approvals, blacklist capabilities for compliance, pause mechanisms for emergency situations, and time-locked governance transitions for security.
-
-For technical readers, RipeToken utilizes a modular architecture built on the Erc20Token base module, implements RipeHq integration for minting authorization with two-factor authentication validation, provides EIP-712 domain separation for secure off-chain signatures, includes comprehensive blacklist and pause functionality, and supports time-locked governance changes with proper validation. The token is designed for maximum security and regulatory compliance while maintaining decentralized governance operation.
+RIPE implements controlled minting through RipeHq authorization, ensuring transparent distribution according to DAO-approved rules. The token features EIP-2612 permits, emergency controls, and time-locked transitions for secure decentralized governance.
 
 ## Architecture & Modules
 

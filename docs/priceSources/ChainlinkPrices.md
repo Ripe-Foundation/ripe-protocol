@@ -2,19 +2,15 @@
 
 ## Overview
 
-ChainlinkPrices serves as the primary oracle integration for real-time asset pricing within the Ripe Protocol ecosystem. Think of it as the protocol's connection to the most widely-used decentralized oracle network, providing reliable and tamper-resistant price feeds for cryptocurrencies and other digital assets. Unlike traditional price feeds that rely on single sources, Chainlink aggregates data from multiple providers to ensure accuracy and resist manipulation.
+ChainlinkPrices integrates Chainlink's decentralized oracle network to provide reliable USD pricing for protocol assets. It manages multiple price feeds with built-in staleness checks and decimal normalization for consistent valuations.
 
-At its core, ChainlinkPrices manages four fundamental responsibilities:
+**Core Functions**:
+- **Feed Management**: Maps assets to their Chainlink aggregators with metadata tracking
+- **Staleness Protection**: Enforces heartbeat intervals to reject outdated prices
+- **Decimal Normalization**: Converts all prices to 18-decimal USD values
+- **Cross-Rate Support**: Handles ETH/BTC denominated feeds with automatic USD conversion
 
-**1. Direct Oracle Integration**: Connects directly to Chainlink price feed contracts to retrieve latest price data, including validation of round IDs, timestamps, and answer values to ensure data integrity before using prices in the protocol.
-
-**2. Cross-Rate Conversions**: Supports assets priced in ETH or BTC by automatically converting to USD using additional Chainlink feeds, enabling pricing for a wider range of assets that may not have direct USD pairs.
-
-**3. Decimal Normalization**: Handles the varying decimal formats used by different Chainlink feeds, normalizing all prices to 18 decimals for consistent use throughout the Ripe Protocol.
-
-**4. Staleness Protection**: Implements configurable staleness checks that reject prices older than acceptable thresholds, protecting the protocol from using outdated data during oracle outages or market disruptions.
-
-For technical readers, ChainlinkPrices implements the standard Chainlink aggregator interface with `latestRoundData()` calls, validates all oracle responses including round ID progression and timestamp checks, supports both direct USD feeds and cross-rate calculations through ETH/USD or BTC/USD conversions, normalizes varying decimal formats (commonly 8 decimals) to the protocol's standard 18 decimals, includes time-locked governance for all feed additions and updates, and provides special handling for core assets (ETH, WETH, BTC) that cannot be disabled. The contract is designed to be the most reliable and battle-tested price source for the protocol.
+The module implements automatic validation of price feed data, configurable staleness thresholds per asset, time-locked governance for feed updates, and special handling for core assets (ETH, WETH, BTC) that cannot be disabled.
 
 ## Architecture & Dependencies
 

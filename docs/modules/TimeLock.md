@@ -2,17 +2,16 @@
 
 ## Overview
 
-TimeLock serves as a flexible time-lock module for managing delayed actions within the Ripe Protocol ecosystem. Think of it as a universal timer mechanism that can be embedded into any contract requiring time-delayed operations with expiration windows. It provides a standardized way to initiate actions that must wait for a specified period before execution, while also ensuring they expire if not executed within a reasonable timeframe.
+TimeLock is a flexible time-delay module for managing sensitive operations within the Ripe Protocol. It provides a universal timer mechanism that enforces waiting periods before action execution while preventing stale operations
+through expiration windows, ensuring transparent and secure protocol changes.
 
-At its core, TimeLock manages three fundamental responsibilities:
+**Key Features**:
+- **Action Scheduling**: Sequential ID assignment with configurable delays before confirmation
+- **Expiration Management**: Actions expire if not executed within the window, preventing indefinite pending operations
+- **Flexible Configuration**: Adjustable time-lock and expiration parameters within governance-set bounds
 
-**1. Action Scheduling**: Actions are initiated with automatically assigned sequential IDs and must wait for a configurable time-lock period before they can be confirmed. This creates a transparent delay mechanism for sensitive operations.
-
-**2. Expiration Management**: Unlike simple time-locks, this module includes expiration windows. Actions that aren't confirmed within the expiration period become invalid, preventing stale operations from being executed indefinitely.
-
-**3. Flexible Configuration**: Both the time-lock duration and expiration window can be adjusted by governance, allowing the protocol to adapt its security parameters as needed while respecting minimum and maximum bounds.
-
-For technical readers, TimeLock implements a modular design that integrates with LocalGov for access control, maintains a mapping of pending actions with their timing parameters, provides validation functions for action confirmation, and includes special setup procedures for initial deployment. The module's design promotes secure, time-delayed operations across various protocol components.
+The module integrates with LocalGov for access control, maintains pending action mappings, provides validation functions, and includes special setup procedures for initial deployment, promoting secure time-delayed operations
+across protocol components.
 
 ## System Architecture Diagram
 

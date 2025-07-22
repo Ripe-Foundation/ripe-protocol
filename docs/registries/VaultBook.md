@@ -2,17 +2,14 @@
 
 ## Overview
 
-VaultBook serves as the central registry for all deposit vaults in the Ripe Protocol ecosystem. Think of it as the authoritative catalog of approved vaults where users can deposit collateral to mint stablecoins. It not only maintains the registry of vault contracts but also provides critical safety checks during updates and manages Ripe token rewards distribution for stability pool participants.
+VaultBook is the central registry for all deposit vaults in Ripe Protocol. It maintains the authoritative list of approved vaults while enforcing critical safety checks and managing RIPE reward distribution for stability pool participants.
 
-At its core, VaultBook manages three fundamental responsibilities:
+**Core Functions**:
+- **Vault Registry**: Maintains approved vault contracts with unique IDs and descriptions
+- **Safety Validation**: Prevents vault updates when user funds are present
+- **Reward Distribution**: Exclusive RIPE minting authority for stability pool rewards
 
-**1. Vault Registry Management**: Maintains a registry of approved vault contracts, each with a unique ID and description. This creates a single source of truth for identifying legitimate vaults within the protocol.
-
-**2. Safety Validation**: Implements crucial safety checks preventing vault updates or disabling when vaults contain user funds. This protects users from losing access to their deposits during contract migrations.
-
-**3. Reward Distribution Gateway**: Acts as the authorized minter of Ripe tokens for stability pool rewards, ensuring only registered vaults can trigger reward distributions while maintaining proper accounting through the Ledger.
-
-For technical readers, VaultBook utilizes modular architecture with [LocalGov](../modules/LocalGov.md), [AddressRegistry](../modules/AddressRegistry.md), Addys, and [DeptBasics](../modules/DeptBasics.md) modules, implements fund safety checks before vault modifications, provides controlled Ripe token minting for rewards, and includes pause functionality for emergency situations. The contract's unique feature is its ability to mint Ripe tokens exclusively for stability pool rewards.
+Built on LocalGov, AddressRegistry, and DeptBasics modules, VaultBook ensures vault integrity through automated fund checks before modifications. Its unique role as the sole RIPE minter for stability rewards creates a secure, controlled distribution mechanism with proper Ledger accounting.
 
 ## Architecture & Modules
 

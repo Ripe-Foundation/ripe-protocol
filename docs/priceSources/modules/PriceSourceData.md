@@ -2,19 +2,15 @@
 
 ## Overview
 
-PriceSourceData serves as the foundational data management module for all price source contracts within the Ripe Protocol ecosystem. Think of it as the universal database layer that handles asset registration, pause states, and fund recovery for every price oracle integration in the system. Whether it's Chainlink, Pyth, Stork, or custom price sources, they all rely on PriceSourceData for consistent state management and administrative controls.
+PriceSourceData is the foundational module for all price source implementations in Ripe Protocol. It defines the standard interface and shared functionality that ensures consistent pricing across different oracle integrations.
 
-At its core, PriceSourceData manages four fundamental responsibilities:
+**Core Components**:
+- **Asset Registry**: Tracks supported assets with 1-based indexing and automatic compression
+- **Pause Controls**: Emergency circuit breaker for halting price feed operations
+- **Fund Recovery**: Secure mechanisms for retrieving accidentally sent tokens
+- **Enumeration Support**: Optimized iteration for up to 50 assets per price source
 
-**1. Asset Registration and Tracking**: Maintains a registry of all assets that have pricing information available through the price source, with automatic registration and deregistration capabilities to ensure accurate tracking of supported assets across oracle integrations.
-
-**2. Pause State Management**: Implements contract-wide pause functionality that allows emergency halting of price feed operations, providing critical circuit breaker capabilities for handling oracle malfunctions or market anomalies.
-
-**3. Fund Recovery Operations**: Provides secure mechanisms for recovering any tokens accidentally sent to price source contracts, ensuring no funds are permanently locked while maintaining strict access controls.
-
-**4. Indexed Asset Enumeration**: Maintains optimized data structures for efficient asset iteration and querying, supporting up to 50 assets per price source with proper indexing and array compression to prevent storage gaps.
-
-For technical readers, PriceSourceData implements a 1-based indexing system to distinguish between "not registered" (index 0) and registered assets, provides atomic asset registration and deregistration with automatic array compression, maintains pause states that can be checked by all price query functions, implements secure fund recovery restricted to Switchboard governance addresses, and offers comprehensive asset enumeration for integration with [PriceDesk](../../registries/PriceDesk.md) and other protocol components. The module is designed to be oracle-agnostic, supporting any price source implementation while maintaining consistent administrative controls.
+As a base module, it provides the blueprint for atomic asset registration, standardized pause state management, secure token recovery protocols, and efficient asset enumeration that all price sources must implement.
 
 ## Architecture & Dependencies
 

@@ -2,19 +2,16 @@
 
 ## Overview
 
-SwitchboardCharlie serves as the operational control center for the Ripe Protocol ecosystem. Think of it as a mission control panel that manages day-to-day protocol operations, emergency responses, and specialized treasury functions. While SwitchboardAlpha handles protocol-wide configurations and SwitchboardBravo manages asset settings, SwitchboardCharlie focuses on operational tasks that require either immediate action or careful time-locked execution for treasury operations.
+SwitchboardCharlie is the operational control center for day-to-day Ripe Protocol management, handling emergency responses, routine maintenance, and treasury operations that require either immediate action or careful time-locked
+execution.
 
-At its core, SwitchboardCharlie manages four fundamental responsibilities:
+**Operational Domains**:
+- **Emergency Response**: Rapid execution of pausing contracts, blacklisting addresses, locking accounts, and recovering funds via governance or lite action permissions
+- **Protocol Maintenance**: Manages debt updates, reward distribution, loot claiming, and deposit point calculations to keep the protocol running smoothly
+- **Auction Management**: Controls liquidation auction initiation and pausing with time-locked execution for orderly liquidations
+- **Treasury Operations**: Manages yield farming, liquidity provision, token swaps, and partner integrations through time-locked transactions
 
-**1. Emergency Response Operations**: Provides rapid-response capabilities for pausing contracts, blacklisting addresses, locking accounts, and recovering funds. These critical functions can be executed by governance or authorized users with "lite action" permissions to ensure quick crisis response.
-
-**2. Protocol Maintenance**: Manages routine protocol maintenance tasks including debt updates, reward distribution, loot claiming, and deposit point calculations. These functions keep the protocol running smoothly and ensure users receive their entitled rewards.
-
-**3. Auction Management**: Controls the initiation and pausing of liquidation auctions with time-locked execution. This ensures orderly liquidation processes while preventing manipulation through governance oversight.
-
-**4. Treasury Operations (Endaoment)**: Manages complex treasury operations including yield farming, liquidity provision, token swaps, and partner integrations. Most treasury operations require time-locks to ensure careful review of potentially high-value transactions.
-
-For technical readers, SwitchboardCharlie implements sophisticated operational patterns including immediate execution for emergencies, time-locked execution for treasury operations, batch processing for efficiency, comprehensive event logging, and flexible permission models. The contract ensures operational efficiency while maintaining security controls.
+The contract balances immediate execution for emergencies with time-locked execution for treasury operations, implementing batch processing, comprehensive logging, and flexible permissions for operational efficiency.
 
 ## Architecture & Modules
 

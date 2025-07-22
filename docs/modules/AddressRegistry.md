@@ -2,17 +2,15 @@
 
 ## Overview
 
-AddressRegistry serves as a flexible registry module for managing protocol addresses within the Ripe ecosystem. Think of it as a standardized phone book that can be embedded into any contract that needs to maintain an authoritative list of addresses. It provides a consistent interface for registering, updating, and disabling addresses with built-in time-lock protection.
+AddressRegistry is a flexible registry module for managing protocol addresses within the Ripe ecosystem. It provides a standardized interface for registering, updating, and disabling addresses with built-in time-lock protection,
+functioning as an authoritative directory that can be embedded into any contract.
 
-At its core, AddressRegistry manages three fundamental responsibilities:
+**Core Features**:
+- **Address Registration**: Sequential ID assignment with descriptive labels, ensuring unique contract registrations
+- **Address Management**: Time-locked updates and disabling of registry entries for secure upgrades
+- **Security Controls**: Two-step process for all changes with configurable delays, preventing rushed modifications
 
-**1. Address Registration**: New addresses can be added to the registry with descriptive labels and automatically assigned sequential IDs. Each address must be a valid contract and cannot be registered twice.
-
-**2. Address Management**: Existing registry entries can be updated to point to new addresses (useful for upgrades) or disabled entirely. All changes require a two-step time-locked process for security.
-
-**3. Time-locked Operations**: Every state change - whether adding, updating, or disabling an address - requires initiation followed by confirmation after a configurable time delay. This prevents rushed changes and provides transparency.
-
-For technical readers, AddressRegistry implements a modular design that can be imported by other contracts, maintains bidirectional mappings between addresses and registry IDs, provides comprehensive query functions for address validation, and includes configurable time-lock bounds with support for zero-timelock during initial setup. The module's design promotes code reuse across different registry implementations in the protocol.
+The module implements bidirectional mappings for efficient lookups, comprehensive query functions, configurable time-lock bounds with zero-timelock during setup, and promotes code reuse across different registry implementations.
 
 ## System Architecture Diagram
 

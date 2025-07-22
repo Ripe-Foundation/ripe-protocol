@@ -2,17 +2,15 @@
 
 ## Overview
 
-DeptBasics serves as a foundational module that provides essential department-level functionality for contracts in the Ripe Protocol ecosystem. Think of it as a standardized toolkit that equips any contract with basic operational capabilities like pause mechanisms, token recovery, and minting declarations. It ensures all department contracts have a consistent interface for these common operations while allowing customization of minting permissions during deployment.
+DeptBasics is a foundational module providing essential department-level functionality for Ripe Protocol contracts. It standardizes common operations across all departments including pause mechanisms, token recovery, and minting
+capability declarations, ensuring consistency while allowing deployment-time customization.
 
-At its core, DeptBasics manages three fundamental responsibilities:
+**Core Capabilities**:
+- **Pause Functionality**: Circuit breaker for emergencies, allowing Switchboard-authorized contracts to halt operations
+- **Token Recovery**: Secure retrieval of accidentally sent tokens with batch support for efficiency
+- **Minting Declarations**: Immutable capability flags for Green/Ripe token minting, supporting RipeHq's two-factor authentication
 
-**1. Pause Functionality**: Provides a circuit breaker mechanism that allows authorized contracts (registered in Switchboard) to pause department operations. This is crucial for emergency situations where a department needs to halt its activities without affecting the entire protocol.
-
-**2. Token Recovery**: Implements a secure way to recover tokens accidentally sent to department contracts. Only Switchboard-registered contracts can trigger recoveries, ensuring funds can be rescued while maintaining security.
-
-**3. Minting Capability Declaration**: Allows departments to declare whether they have the capability to mint Green or Ripe tokens. This is set immutably at deployment and provides a standardized interface for RipeHq to query minting capabilities as part of its two-factor authentication system.
-
-For technical readers, DeptBasics implements the Department interface standard, integrates with the [Addys](Addys.md) module for Switchboard validation, provides immutable minting capability flags set at deployment, and includes batch recovery functions for efficient fund rescue operations. The module's design promotes consistency across all department contracts while allowing flexibility in configuration.
+The module implements the Department interface standard, integrates with Addys for validation, and promotes operational consistency across all protocol departments.
 
 ## System Architecture Diagram
 

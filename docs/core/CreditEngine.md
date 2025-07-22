@@ -2,19 +2,15 @@
 
 ## Overview
 
-CreditEngine serves as the lending and borrowing powerhouse for the Ripe Protocol ecosystem. Think of it as a sophisticated financial engine that manages the entire credit lifecycle - from collateralized borrowing and interest accrual to debt repayment and collateral redemption. It orchestrates complex interactions between users, vaults, and the protocol's stablecoin (Green) while maintaining strict risk parameters and enabling efficient liquidations.
+CreditEngine is the lending and borrowing powerhouse of Ripe Protocol, managing the entire credit lifecycle from collateralized borrowing to liquidations. It enables users to borrow GREEN stablecoins against deposited collateral while maintaining strict risk parameters and efficient capital utilization.
 
-At its core, CreditEngine manages four fundamental responsibilities:
+**Core Functions**:
+- **Collateralized Borrowing**: Borrow GREEN against multi-asset collateral with weighted LTV calculations
+- **Debt Management**: Track principal/interest separately with dynamic rates based on stability pool health
+- **Collateral Redemption**: Allow GREEN holders to redeem unhealthy positions directly
+- **Risk Controls**: Enforce debt ceilings, interval-based limits, and automatic liquidation triggers
 
-**1. Collateralized Borrowing**: Enables users to borrow Green stablecoins against their deposited collateral. The system calculates borrowing power based on weighted average LTV ratios across all user positions, enforces per-user and global debt limits, implements dynamic interest rates based on market conditions, and distributes origination fees (daowry) to protocol stakeholders.
-
-**2. Debt Management & Repayment**: Handles all forms of debt repayment including standard user repayments, liquidation repayments from AuctionHouse, and forced redemptions. The system tracks principal vs interest separately, allows partial or full repayments, and automatically updates user health factors and liquidation status.
-
-**3. Collateral Redemption**: Provides a mechanism for Green holders to directly redeem user collateral when positions become unhealthy. This creates additional stability by allowing market participants to reduce risky positions while maintaining protocol solvency.
-
-**4. Dynamic Risk Management**: Implements sophisticated risk controls including weighted debt terms across heterogeneous collateral, dynamic interest rates responding to stability pool health, interval-based borrowing limits to prevent flash attacks, and automatic liquidation status updates based on health factors.
-
-For technical readers, CreditEngine implements advanced DeFi mechanics including multi-asset collateral aggregation with position-weighted parameters, transient storage patterns for gas optimization, atomic debt updates with interest compounding, integration with external boost and points systems, and support for both EOA and smart wallet interactions. The contract ensures capital efficiency while maintaining robust risk controls.
+CreditEngine implements advanced DeFi mechanics including position-weighted risk parameters, transient storage for gas optimization, atomic debt updates with compounding, and integration with boost systems. It ensures capital efficiency while maintaining robust protections against flash attacks and bad debt.
 
 ## Architecture & Modules
 

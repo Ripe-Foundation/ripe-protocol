@@ -2,21 +2,16 @@
 
 ## Overview
 
-MissionControl serves as the central configuration hub for the entire Ripe Protocol ecosystem. Think of it as the protocol's master control panel that stores all operational parameters, permissions, and behavioral rules for every component. Every critical decision in the protocol - from whether users can deposit specific assets to complex liquidation strategies - is determined by configuration data stored in MissionControl and accessed through its extensive query interface.
+MissionControl is the central configuration hub for Ripe Protocol, storing all operational parameters, permissions, and behavioral rules. Every critical protocol decision - from asset deposits to liquidation strategies - is determined by configuration data stored here and accessed through its extensive query interface.
 
-At its core, MissionControl manages five fundamental responsibilities:
+**Core Responsibilities**:
+- **Global Configuration**: Protocol-wide permissions, user limits, and operational rules
+- **Asset Configuration**: Per-asset settings for deposits, debt terms, LTVs, and liquidations
+- **Delegation System**: User permission grants for borrowing, withdrawals, and rewards
+- **Rewards Configuration**: Points allocation across borrowers, stakers, voters, and depositors
+- **Advanced Features**: Priority vaults, stability pools, bond markets, and dynamic rates
 
-**1. Global Configuration Management**: Stores protocol-wide settings that affect all operations including general permissions (deposits, withdrawals, borrowing, liquidations), user limits, vault participation rules, and pricing parameters. These configurations provide the foundation for all protocol interactions.
-
-**2. Asset-Specific Configuration**: Maintains detailed configuration for each supported asset including deposit/withdrawal permissions, debt terms (interest rates, LTVs, liquidation thresholds), vault associations, whitelists, and specialized liquidation behaviors. This allows fine-tuned control over how different assets behave within the protocol.
-
-**3. User and Delegation Management**: Handles user-specific configurations and delegation systems that allow users to grant specific permissions to other addresses for actions like borrowing, withdrawing, or claiming rewards on their behalf.
-
-**4. Rewards and Points System Configuration**: Manages the complex points allocation system that determines how Ripe token rewards are distributed across borrowers, stakers, voters, and depositors, including per-asset point allocations and global reward parameters.
-
-**5. Advanced Feature Configuration**: Stores configuration for sophisticated protocol features including priority vault systems for liquidations, stability pool parameters, bond market settings, dynamic interest rate mechanisms, and governance vault configurations.
-
-For technical readers, MissionControl implements a read-only interface for most operations with write access restricted to Switchboard-registered contracts, provides extensive configuration bundling functions that package related settings for efficient consumption by other contracts, maintains asset registry with automatic registration during configuration updates, and includes sophisticated validation and helper functions. The contract is designed as the single source of truth for all protocol behavior.
+MissionControl implements read-only access for queries with writes restricted to Switchboard-registered contracts. Extensive bundling functions package related configurations for efficient consumption, while automatic asset registration and validation ensure data integrity across the protocol.
 
 ## Architecture & Modules
 

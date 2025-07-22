@@ -2,17 +2,15 @@
 
 ## Overview
 
-SavingsGreen serves as a yield-bearing wrapper for Green USD stablecoin within the Ripe Protocol ecosystem. Think of it as a savings account that automatically earns yield on your Green tokens by pooling them together and generating returns through various protocol activities. Users deposit Green tokens to receive sGREEN shares, which appreciate in value over time as the underlying vault generates yield.
+SavingsGreen (sGREEN) is an ERC4626 yield-bearing vault that automatically compounds returns on deposited GREEN stablecoins. By pooling GREEN tokens and deploying them across protocol yield strategies, sGREEN shares appreciate over time without user intervention.
 
-At its core, SavingsGreen manages three fundamental responsibilities:
+**Yield Generation**:
+- **Automated Compounding**: Share value increases as vault generates returns from protocol activities
+- **ERC4626 Standard**: Full compatibility with DeFi infrastructure for seamless integrations
+- **Flexible Access**: Deposit and withdraw GREEN anytime with proportional share calculations
+- **Transparent Accounting**: Real-time price-per-share tracking for accurate yield reporting
 
-**1. ERC4626 Vault Functionality**: Implements the complete ERC4626 standard for tokenized vaults, providing standardized deposit, withdraw, mint, and redeem operations with precise share-to-asset calculations and automatic yield accrual through share appreciation.
-
-**2. Yield Generation and Distribution**: Automatically compounds yield generated from the underlying Green tokens through protocol activities, increasing the value of each sGREEN share over time without requiring user intervention or additional transactions.
-
-**3. Advanced Token Features**: Includes sophisticated features like EIP-2612 permit functionality for gasless approvals, blacklist capabilities for compliance, pause mechanisms for emergency situations, and time-locked governance transitions inherited from the ERC20 base module.
-
-For technical readers, SavingsGreen utilizes a modular architecture combining Erc20Token and Erc4626Token modules, implements precise share-to-asset conversion with proper rounding for deposits and withdrawals, tracks price-per-share history for yield calculation and reporting, provides nonreentrant deposit and withdrawal functions for security, and supports time-locked [RipeHq](../registries/RipeHq.md) governance changes with proper validation. The vault is designed for maximum capital efficiency while maintaining full ERC4626 compatibility.
+The vault combines ERC20 and ERC4626 modules to provide a secure, efficient savings mechanism. Features include permit functionality for gasless operations, comprehensive security controls, and integration with protocol-wide governance systems.
 
 ## Architecture & Modules
 

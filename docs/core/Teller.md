@@ -2,21 +2,18 @@
 
 ## Overview
 
-Teller serves as the primary user interface and entry point for the Ripe Protocol ecosystem. Think of it as a comprehensive banking teller that handles all user-facing operations including deposits, withdrawals, borrowing, repayment, liquidations, and advanced DeFi operations like auction participation and stability pool interactions. It orchestrates complex multi-contract operations while providing user-friendly interfaces and robust permission management.
+Teller is the primary gateway to the Ripe Protocol, serving as a unified interface for all user operations. Like a comprehensive banking teller, it orchestrates complex multi-contract operations while providing user-friendly
+interfaces and robust permission management.
 
-At its core, Teller manages five fundamental responsibilities:
+**Unified Operations**:
+- **Asset Management**: Deposits, withdrawals with automatic vault selection, configurable limits, and batch operations
+- **Credit Services**: Borrowing against collateral and debt repayment with support for both Green and Savings Green tokens
+- **Market Participation**: Liquidations, auction purchases, stability pool interactions, and collateral redemption
+- **Rewards & Governance**: Loot claiming, Ripe bond purchases, and governance vault management
+- **Delegation System**: Comprehensive permissions allowing authorized proxy operations with Underscore wallet integration
 
-**1. Deposit & Withdrawal Management**: Handles all user deposits into vaults with configurable limits, asset restrictions, and permission controls. Supports both individual and batch operations, manages vault selection automatically, and includes sophisticated validation for user limits, global limits, and minimum balance requirements.
-
-**2. Credit Operations**: Facilitates borrowing against collateral and debt repayment with support for different Green token types (Green vs Savings Green). Integrates with CreditEngine for all credit calculations while providing user-friendly interfaces for complex operations.
-
-**3. Liquidation & Auction Interface**: Provides user access to liquidation and auction systems, enabling participation in protocol stability mechanisms. Users can liquidate unhealthy positions, purchase discounted collateral from auctions, and participate in automated liquidation systems.
-
-**4. Advanced DeFi Operations**: Supports sophisticated operations like stability pool interactions, collateral redemption, reward claiming, and Ripe bond purchases. Each operation includes appropriate permission checks and delegated access controls.
-
-**5. Permission & Delegation Management**: Implements comprehensive delegation systems allowing users to authorize others to perform actions on their behalf. Supports both general permissions and operation-specific delegations with integration into Underscore wallet systems.
-
-For technical readers, Teller implements advanced DeFi UX patterns including automatic vault selection based on asset compatibility, batch operations for gas efficiency, comprehensive event logging for transparency, flexible payment handling (Green vs sGreen), and sophisticated permission systems supporting both EOA and smart wallet interactions. The contract ensures security while maximizing user experience through thoughtful abstraction layers.
+The contract abstracts protocol complexity through automatic vault selection, batch processing for gas efficiency, flexible payment handling, sophisticated permission hierarchies, and comprehensive event logging while
+maintaining security through thoughtful validation layers.
 
 ## Architecture & Modules
 

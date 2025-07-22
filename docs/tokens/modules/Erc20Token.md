@@ -2,21 +2,16 @@
 
 ## Overview
 
-Erc20Token serves as the foundational token module for the Ripe Protocol ecosystem, providing a feature-rich ERC20 implementation with additional security and governance capabilities. Think of it as an enhanced version of the standard ERC20 token that includes built-in blacklisting, pausability, and a sophisticated governance connection through [RipeHq](../../registries/RipeHq.md). Unlike basic ERC20 tokens, this module provides enterprise-grade features needed for a DeFi protocol including permit functionality for gasless approvals and time-locked governance changes.
+Erc20Token is the foundational token module for Ripe Protocol, providing enhanced ERC20 functionality with built-in security and governance features. It extends standard ERC20 with blacklisting, pausability, permit functionality, and deep RipeHq integration for enterprise-grade token management.
 
-At its core, Erc20Token manages five fundamental responsibilities:
+**Core Features**:
+- **Enhanced ERC20**: Standard operations with blacklist validation and pause checks
+- **Governance Integration**: RipeHq controls minting, blacklisting, and pausing permissions
+- **Permit System**: EIP-2612 gasless approvals via signatures (EOA and ERC-1271)
+- **Blacklist Management**: Compliance tools with ability to burn blacklisted tokens
+- **Safe Migrations**: Time-locked RipeHq updates prevent rushed protocol changes
 
-**1. Standard ERC20 Operations**: Implements all standard token functions including transfers, approvals, minting, and burning with additional validation layers for blacklisted addresses and pause states.
-
-**2. Governance Integration**: Connects to RipeHq for permission management, allowing only authorized addresses to perform sensitive operations like minting, blacklisting, and pausing based on protocol-wide governance rules.
-
-**3. Blacklist Management**: Provides address blacklisting capabilities to comply with regulatory requirements or respond to security incidents, with special functions to burn tokens from blacklisted addresses.
-
-**4. Permit Functionality**: Implements EIP-2612 permit system allowing users to approve token spending through signatures rather than transactions, enabling gasless token approvals and better UX.
-
-**5. RipeHq Migration**: Supports time-locked migration to new RipeHq contracts, ensuring smooth protocol upgrades while preventing rushed changes that could compromise security.
-
-For technical readers, Erc20Token implements the full IERC20 interface with additional features. It uses EIP-712 structured data signing for permits with support for both EOA signatures (via ecrecover) and smart contract signatures (via ERC-1271). The module includes comprehensive blacklist checks in all transfer paths and integrates deeply with RipeHq for permission validation. It supports initial supply distribution during deployment and includes a two-phase setup process for tokens deployed before RipeHq. The contract implements reentrancy protection where needed and includes extensive validation to prevent common attack vectors. All state changes emit detailed events for transparency and off-chain tracking.
+The module implements comprehensive security including reentrancy protection, extensive validation, and detailed event logging. It supports initial supply distribution and two-phase setup for pre-RipeHq deployments, ensuring flexible yet secure token operations.
 
 ## Architecture & Dependencies
 

@@ -2,23 +2,16 @@
 
 ## Overview
 
-Ledger serves as the comprehensive data storage engine for the Ripe Protocol ecosystem. Think of it as the protocol's central database that maintains all critical state information - from user vault participation and debt positions to auction data and reward calculations. It acts as the single source of truth for tracking user interactions, financial positions, and protocol metrics across all protocol components.
+Ledger is the comprehensive data storage engine for Ripe Protocol, maintaining all critical state information from user positions to protocol metrics. It acts as the single source of truth for tracking interactions, financial positions, and rewards calculations across all protocol components.
 
-At its core, Ledger manages six fundamental responsibilities:
+**Core Functions**:
+- **User Tracking**: Vault participation, one-action-per-block enforcement, and account locking
+- **Debt Management**: Positions, principals, interest accrual, and liquidation status
+- **Rewards System**: Complex points calculations for deposits and borrows
+- **Auction Storage**: Active liquidation data with lifecycle management
+- **Protocol Data**: Contributor allocations, bond epochs, and pool debt tracking
 
-**1. User Activity Tracking**: Maintains records of user vault participation, enforces one-action-per-block limits, and manages account locking mechanisms for security purposes.
-
-**2. Debt Management**: Stores and updates all user debt positions including amounts, principals, interest accrual, liquidation status, and borrower registries. It tracks both individual and aggregate debt metrics.
-
-**3. Points and Rewards System**: Manages the complex points calculation system for both deposit and borrow activities, tracking user-specific and global metrics used for Ripe token reward distribution.
-
-**4. Auction Data Storage**: Maintains all active fungible auction information for liquidated positions, including auction parameters, user associations, and lifecycle management.
-
-**5. Human Resources Integration**: Tracks contributor registrations and manages Ripe token allocations for protocol contributors and governance participants.
-
-**6. Bond and Endaoment Data**: Stores epoch-based bond market data, bad debt tracking, and Green pool debt information for the protocol's various financial mechanisms.
-
-For technical readers, Ledger implements a modular architecture with Addys and [DeptBasics](../modules/DeptBasics.md) modules, provides extensive data bundling functions for efficient reads, includes safety mechanisms like one-action-per-block enforcement, and offers comprehensive state management for all protocol components. The contract is designed as a read-heavy, write-controlled system where only authorized protocol contracts can modify state.
+Built with Addys and DeptBasics modules, Ledger implements a read-heavy, write-controlled architecture. Only authorized contracts can modify state, while extensive bundling functions enable efficient data retrieval for protocol operations.
 
 ## Architecture & Modules
 

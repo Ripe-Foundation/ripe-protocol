@@ -2,17 +2,15 @@
 
 ## Overview
 
-GreenToken serves as the primary USD-pegged stablecoin for the Ripe Protocol ecosystem. Think of it as the protocol's foundational currency that users mint by depositing collateral and use throughout the system for transactions, payments, and liquidity provision. Green maintains its stability through overcollateralization and serves as the primary medium of exchange within the Ripe ecosystem.
+GreenToken (GREEN) is Ripe Protocol's USD-pegged stablecoin, serving as the primary medium of exchange across all protocol operations. Minted through overcollateralized positions, GREEN maintains stability while enabling seamless transactions, liquidity provision, and yield generation throughout the ecosystem.
 
-At its core, GreenToken manages three fundamental responsibilities:
+**Core Features**:
+- **USD-Pegged Stability**: Maintains 1:1 USD parity through robust collateralization mechanisms
+- **Controlled Minting**: Only authorized protocol contracts can mint via RipeHq's two-factor authentication
+- **EIP-2612 Permits**: Gasless approvals for improved user experience and composability
+- **Compliance Tools**: Blacklist capabilities and emergency pause for regulatory requirements
 
-**1. Stablecoin Functionality**: Implements complete ERC20 functionality with 18 decimals, providing standard token operations like transfers, approvals, and allowances while maintaining USD parity through the protocol's collateralization mechanisms.
-
-**2. Controlled Minting System**: Only authorized protocol contracts (verified through [RipeHq](../registries/RipeHq.md)'s two-factor authentication system) can mint new Green tokens. This ensures all Green tokens are properly backed by collateral and prevents unauthorized inflation.
-
-**3. Advanced Token Features**: Includes sophisticated features like EIP-2612 permit functionality for gasless approvals, blacklist capabilities for compliance, pause mechanisms for emergency situations, and time-locked governance transitions for security.
-
-For technical readers, GreenToken utilizes a modular architecture built on the Erc20Token base module, implements [RipeHq](../registries/RipeHq.md) integration for minting authorization with two-factor authentication validation, provides EIP-712 domain separation for secure off-chain signatures, includes comprehensive blacklist and pause functionality, and supports time-locked governance changes with proper validation. The token is designed for maximum security and regulatory compliance while maintaining decentralized operation.
+Built on a modular ERC20 architecture, GREEN implements advanced security features including time-locked governance transitions, comprehensive event logging, and integration with protocol-wide pause mechanisms for maximum safety and compliance.
 
 ## Architecture & Modules
 

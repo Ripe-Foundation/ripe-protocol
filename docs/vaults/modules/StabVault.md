@@ -2,21 +2,16 @@
 
 ## Overview
 
-StabVault serves as the most sophisticated vault module within the Ripe Protocol ecosystem, implementing stability pool functionality that allows users to earn rewards by providing liquidity for liquidated collateral. Think of it as a specialized insurance fund where depositors provide stablecoin backing for the protocol's liquidation system and in return receive liquidated collateral at a discount plus additional Ripe token rewards.
+StabVault is the most sophisticated vault module in Ripe Protocol, implementing stability pool functionality for liquidation absorption. Users provide stablecoin liquidity and receive liquidated collateral at discounts plus RIPE rewards, acting as the protocol's insurance fund.
 
-At its core, StabVault manages five fundamental responsibilities:
+**Core Functions**:
+- **Stability Operations**: Stablecoin deposits absorb liquidations for discounted collateral
+- **USD-Based Shares**: Value accounting includes deposits plus accumulated collateral
+- **Claimable Tracking**: Detailed records of liquidated assets available for claiming
+- **Redemption System**: Exchange GREEN for claimable assets at market rates
+- **Automated Rewards**: RIPE rewards distributed and locked in governance vault
 
-**1. Stability Pool Operations**: Provides stablecoin liquidity (GREEN, sGREEN, or other approved assets) that gets used to absorb liquidated positions, with depositors receiving proportional shares of liquidated collateral based on their vault participation.
-
-**2. Share-Based Value Accounting**: Implements sophisticated USD value-based share calculations that account for both deposited stablecoin assets and accumulated liquidated collateral, ensuring fair distribution of liquidation proceeds among all stability pool participants.
-
-**3. Claimable Asset Management**: Maintains detailed tracking of claimable liquidated assets that accumulate from liquidation events, allowing users to claim their proportional share of various collateral types received through the liquidation process.
-
-**4. Redemption System**: Enables users to exchange GREEN tokens for available claimable assets in the stability pool at fair market rates, providing an additional exit mechanism and helping maintain protocol stability.
-
-**5. Reward Distribution**: Automatically distributes Ripe token rewards to users who claim from stability pools, with rewards locked in the governance vault to align long-term protocol participation incentives.
-
-For technical readers, StabVault extends vault functionality with USD value-based share accounting rather than simple asset-based shares, implements comprehensive claimable asset tracking with automatic registration and cleanup, provides sophisticated liquidation swap mechanisms for AuctionHouse integration, handles complex redemption logic across multiple stability pool assets, integrates with PriceDesk for accurate USD valuations and MissionControl for configuration management, and includes automatic Ripe reward minting and governance vault deposits. The module is designed to handle the most complex DeFi operations while maintaining accurate accounting and fair user treatment.
+StabVault implements USD value-based accounting with PriceDesk integration, comprehensive asset tracking with automatic cleanup, and sophisticated AuctionHouse liquidation swaps. It handles complex multi-asset operations while maintaining accurate accounting for fair distribution among participants.
 
 ## Architecture & Dependencies
 

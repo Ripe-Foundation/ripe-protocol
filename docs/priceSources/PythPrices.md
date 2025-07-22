@@ -2,21 +2,15 @@
 
 ## Overview
 
-PythPrices serves as the integration point for Pyth Network's decentralized oracle services within the Ripe Protocol ecosystem. Think of it as a bridge that connects Ripe to one of the most sophisticated cross-chain oracle networks, providing high-frequency price updates from professional market data providers. Unlike traditional oracles that update on-chain periodically, Pyth uses a pull-based model where prices are published off-chain and brought on-chain only when needed, significantly reducing costs while maintaining data freshness.
+PythPrices integrates the Pyth Network oracle for high-frequency, low-latency price feeds. It provides real-time USD pricing with confidence intervals and exponential notation support for maximum precision.
 
-At its core, PythPrices manages five fundamental responsibilities:
+**Core Features**:
+- **Pull-Based Updates**: On-demand price updates with fee optimization
+- **Confidence Intervals**: Price uncertainty metrics for risk assessment
+- **Batch Processing**: Multi-asset updates in single transaction
+- **Exponential Pricing**: Handles both positive and negative exponents
 
-**1. Price Feed Management**: Maintains mappings between protocol assets and their corresponding Pyth price feed IDs, allowing the protocol to query real-time prices for any configured asset through standardized interfaces.
-
-**2. Pull-Based Updates**: Implements Pyth's unique pull oracle design where anyone can bring fresh price data on-chain by submitting signed price updates, with the contract verifying authenticity and paying required fees automatically.
-
-**3. Confidence Interval Handling**: Processes Pyth's confidence intervals that come with each price, subtracting the confidence from the price to provide conservative estimates that account for market uncertainty and data provider disagreement.
-
-**4. Exponent Normalization**: Handles Pyth's flexible decimal representation system by converting prices with positive or negative exponents into Ripe's standard 18-decimal format, ensuring compatibility across the protocol.
-
-**5. Time-Locked Configuration**: All price feed additions, updates, and removals require time-locked governance approval, preventing rushed changes while maintaining the ability to adapt to new market needs or feed migrations.
-
-For technical readers, PythPrices implements the standard PriceSource interface with LocalGov for governance, TimeLock for change management, and PriceSourceData for asset tracking. It interfaces with Pyth Network contracts using the getPriceUnsafe method for gas-efficient price queries and implements the pull oracle pattern with updatePriceFeeds for bringing fresh data on-chain. The contract handles Pyth's PythPrice struct containing price, confidence, exponent, and publish time, with automatic conversion to 18-decimal format. Price staleness checks use publish timestamps rather than block timestamps for more accurate freshness validation. The contract includes ETH balance management for paying update fees and batch update capabilities for efficient multi-asset price refreshes.
+The module implements automatic fee calculation for updates, strict validation of price freshness and confidence, efficient caching to minimize update costs, and comprehensive error handling for failed updates.
 
 ## Architecture & Dependencies
 

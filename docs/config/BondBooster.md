@@ -2,17 +2,16 @@
 
 ## Overview
 
-BondBooster serves as the bond purchase incentive system for the Ripe Protocol ecosystem. Think of it as a dynamic discount mechanism that allows specific users to purchase Ripe bonds at boosted rates during designated time periods. It manages temporary boost configurations that enhance the Ripe token output when users purchase bonds, creating targeted incentives for strategic protocol participants.
+BondBooster is a dynamic discount mechanism that incentivizes strategic bond purchases in the Ripe Protocol. It allows authorized users to purchase Ripe bonds at boosted rates during designated time periods, creating targeted
+incentives for protocol participants.
 
-At its core, BondBooster manages three fundamental responsibilities:
+**Core Functions**:
+- **Boost Configuration**: Manages individual boost settings (ratios, limits, expiration) for authorized users
+- **Usage Tracking**: Monitors boost consumption to enforce limits and prevent abuse
+- **Validation & Limits**: Enforces protocol-wide and per-user constraints on boost ratios and usage
 
-**1. Boost Configuration Management**: Maintains individual boost configurations for authorized users, including boost ratios, maximum usage limits, and expiration times. Each configuration is tailored to specific users or strategies, allowing fine-grained control over bond purchase incentives.
-
-**2. Usage Tracking**: Monitors how many units of boost each user has consumed to enforce limits and prevent abuse. This ensures boost benefits are distributed according to protocol strategy rather than being exhausted by single participants.
-
-**3. Validation & Limits**: Enforces protocol-wide maximum boost ratios and unit limits while validating all configurations against these constraints. The system prevents excessive discounts that could harm protocol economics while maintaining flexibility for strategic incentives.
-
-For technical readers, BondBooster implements a permissioned boost system with time-based expiration, unit-based consumption tracking, configurable limits per user and globally, batch operations for efficient management, and comprehensive event logging for transparency. The contract ensures controlled bond distribution while incentivizing strategic participation.
+The contract implements time-based expiration, unit-based consumption tracking, configurable limits, batch operations, and comprehensive event logging to ensure controlled bond distribution while incentivizing strategic
+participation.
 
 ## Architecture & Modules
 

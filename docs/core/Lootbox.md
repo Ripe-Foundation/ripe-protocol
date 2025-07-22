@@ -2,19 +2,17 @@
 
 ## Overview
 
-Lootbox serves as the comprehensive rewards distribution engine for the Ripe Protocol ecosystem. Think of it as a sophisticated points-based rewards system that tracks user activity across borrowing and depositing, calculates proportional reward shares, and distributes Ripe tokens based on time-weighted participation. It creates incentive alignment by rewarding users for productive protocol usage while maintaining fair distribution through advanced mathematical models.
+Lootbox is the rewards distribution engine for Ripe Protocol, implementing a sophisticated points-based system that tracks user activity and distributes Ripe tokens proportionally. It incentivizes productive protocol usage
+through time-weighted participation scoring across multiple activities.
 
-At its core, Lootbox manages four fundamental responsibilities:
+**Core Mechanics**:
+- **Points Calculation**: Time-weighted scoring (balance × blocks) across borrowing, staking, voting, and general deposits for fair distribution
+- **Multi-Tier Rewards**: Distributes block-based Ripe emissions across four user categories with configurable allocation percentages
+- **Flexible Claiming**: Users can receive rewards directly or auto-stake in governance vault with configurable lock durations
+- **Gas Optimization**: Intelligent storage cleanup removes empty positions, reducing gas costs for all users
 
-**1. Points-Based Reward Calculation**: Implements time-weighted scoring across multiple activity types including borrowing (based on debt principal), deposit staking (based on vault balances), voting deposits (governance participation), and general depositing (all other vault deposits). Each activity earns points proportional to amount × time, creating fair reward distribution.
-
-**2. Multi-Tier Allocation System**: Distributes block-based Ripe rewards across four categories with configurable allocations: borrowers (debt-based rewards), stakers (staked asset rewards), voters (governance token rewards), and general depositors (all other deposits). Each category receives a percentage of total per-block Ripe emissions.
-
-**3. Automated Claiming & Staking**: Provides flexible reward claiming where users can receive Ripe tokens directly or automatically stake them in the governance vault with configurable lock durations. Supports both self-claiming and proxy claiming with appropriate permissions.
-
-**4. Storage Optimization**: Implements intelligent cleanup mechanisms that remove empty user positions from storage to reduce gas costs. Automatically removes asset positions with zero balance and vault associations when users fully exit positions.
-
-For technical readers, Lootbox implements advanced DeFi reward mechanics including time-weighted point accumulation with block-level precision, multi-asset reward calculations with USD value normalization, fractional share calculations preventing dust issues, batch processing for gas efficiency, and comprehensive event logging for transparency. The system ensures fair reward distribution while maintaining gas efficiency through storage optimizations.
+The system implements block-level precision for point accumulation, USD value normalization for cross-asset fairness, fractional share calculations to prevent dust, batch processing for efficiency, and comprehensive event
+logging for transparency.
 
 ## Architecture & Modules
 

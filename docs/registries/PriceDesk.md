@@ -2,17 +2,14 @@
 
 ## Overview
 
-PriceDesk serves as the centralized price oracle registry for the Ripe Protocol ecosystem. Think of it as a sophisticated price aggregation hub that manages multiple oracle sources and ensures the protocol always has access to reliable asset pricing. It acts as the single point of contact for any contract needing USD valuations, automatically routing requests through a prioritized list of price sources to find the most current data.
+PriceDesk is the centralized oracle registry that aggregates multiple price sources to provide reliable USD valuations across Ripe Protocol. It intelligently routes price requests through prioritized oracles, ensuring accurate pricing even when individual sources fail.
 
-At its core, PriceDesk manages three fundamental responsibilities:
+**Core Functions**:
+- **Oracle Registry**: Manages approved price sources with unique IDs and descriptions
+- **Smart Aggregation**: Checks priority sources first, then falls back to all registered oracles
+- **Value Conversions**: Automatic USD/asset conversions with decimal normalization
 
-**1. Oracle Registry Management**: Maintains a registry of approved price source contracts (oracles) that can provide asset pricing. Each oracle is registered with a unique ID and description, allowing for easy management and updates.
-
-**2. Price Aggregation Logic**: Implements intelligent price discovery by checking multiple sources in priority order. It first consults priority sources configured in MissionControl, then falls back to checking all registered oracles until valid pricing is found.
-
-**3. Value Conversions**: Provides utility functions to convert between asset amounts and USD values, handling decimal conversions automatically. This includes specialized functions for ETH conversions and feed availability checks.
-
-For technical readers, PriceDesk utilizes modular architecture with [LocalGov](../modules/LocalGov.md), [AddressRegistry](../modules/AddressRegistry.md), Addys, and [DeptBasics](../modules/DeptBasics.md) modules, implements a priority-based oracle selection system, provides automatic decimal handling for diverse token standards, and includes snapshot functionality for price updates. The contract's design ensures resilient price discovery across multiple oracle sources.
+Built on LocalGov and AddressRegistry modules, PriceDesk implements resilient price discovery through priority-based oracle selection. It handles diverse token decimals automatically and provides specialized ETH conversion utilities, ensuring protocol-wide access to accurate pricing data.
 
 ## Architecture & Modules
 

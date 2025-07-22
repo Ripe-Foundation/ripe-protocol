@@ -2,19 +2,16 @@
 
 ## Overview
 
-SwitchboardBravo serves as the asset configuration management contract for the Ripe Protocol ecosystem. Think of it as a specialized control panel dedicated to managing all aspects of individual asset configurations - from deposit parameters to liquidation settings. While SwitchboardAlpha handles protocol-wide configurations, SwitchboardBravo focuses exclusively on per-asset settings through time-locked changes, ensuring careful governance and preventing hasty modifications that could harm specific asset markets.
+SwitchboardBravo manages asset-specific configurations for the Ripe Protocol. While SwitchboardAlpha handles protocol-wide settings, SwitchboardBravo focuses exclusively on individual asset parameters through time-locked
+governance.
 
-At its core, SwitchboardBravo manages four fundamental responsibilities:
+**Core Functions**:
+- **Asset Onboarding**: Manages complete asset integration including vault assignments, point allocations, deposit limits, debt terms, and liquidation settings
+- **Parameter Updates**: Controls modifications to existing assets (deposit limits, liquidation settings, debt terms, whitelist changes) with independent time-locks
+- **Emergency Controls**: Provides rapid-response disabling of asset functions via lite action permissions
+- **Validation**: Enforces complex rules ensuring asset configurations are internally consistent and protocol-compatible
 
-**1. Asset Onboarding**: Manages the complete process of adding new assets to the protocol, including vault assignments, point allocations, deposit limits, debt terms, liquidation configurations, and whitelist settings. Each new asset goes through a comprehensive validation and time-lock process.
-
-**2. Asset Parameter Updates**: Controls modifications to existing asset configurations including deposit limits, liquidation settings, debt terms, and whitelist changes. Each category of changes is managed independently with its own time-lock period.
-
-**3. Emergency Asset Controls**: Provides rapid-response capabilities for authorized users to disable specific asset functions during emergencies. While enabling functions requires governance approval, disabling can be done by users with "lite action" permissions for quick crisis response.
-
-**4. Asset-Specific Validation**: Enforces complex validation rules that ensure asset configurations are internally consistent and compatible with protocol requirements. This includes checking vault validity, LTV constraints, liquidation parameters, and special asset rules.
-
-For technical readers, SwitchboardBravo implements sophisticated governance patterns including categorized time-locked changes with action IDs, immediate disabling for emergency response, comprehensive parameter validation, LTV deviation limits to prevent market manipulation, and modular configuration updates. The contract ensures asset stability while maintaining operational flexibility.
+The contract implements categorized time-locked changes, immediate emergency response, comprehensive validation, LTV deviation protection, and modular updates to ensure asset stability with operational flexibility.
 
 ## Architecture & Modules
 

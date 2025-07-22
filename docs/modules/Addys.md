@@ -2,17 +2,15 @@
 
 ## Overview
 
-Addys serves as the centralized address resolution module for the Ripe Protocol ecosystem. Think of it as a sophisticated directory service that provides instant access to all protocol contract addresses while maintaining consistency and reducing gas costs across the entire system. It acts as a single source of truth for address lookups, validation, and permission checks throughout the protocol.
+Addys is the centralized address resolution module for the Ripe Protocol, functioning as a sophisticated directory service that provides instant access to all protocol contracts. It eliminates redundant address storage across
+contracts while maintaining consistency and reducing gas costs through intelligent caching.
 
-At its core, Addys manages three fundamental responsibilities:
+**Core Functions**:
+- **Protocol Directory**: Unified interface returning all protocol addresses through a single struct
+- **Address Validation**: Comprehensive checks for core departments, vaults, and configuration contracts
+- **Gas Optimization**: Batch retrieval and caching mechanisms minimize external calls and storage reads
 
-**1. Protocol Address Resolution**: Provides a unified interface to retrieve addresses of all core protocol contracts. Instead of each contract storing and managing multiple addresses, they simply inherit Addys and gain instant access to the entire protocol ecosystem through a single struct.
-
-**2. Address Validation**: Implements comprehensive validation logic to determine if an address is a valid Ripe Protocol participant. This includes checking core departments registered in RipeHq, vaults registered in VaultBook, and configuration contracts registered in Switchboard.
-
-**3. Gas Optimization**: Reduces gas costs by caching address lookups and providing both individual and batched address retrieval methods. The module's design allows contracts to fetch all needed addresses in a single call rather than making multiple external calls.
-
-For technical readers, Addys implements several optimization patterns including lazy loading of addresses only when needed, struct-based batch retrieval to minimize external calls, immutable storage of the RipeHq reference for security, and comprehensive internal helper functions for specific address needs. The module ensures consistency while maximizing gas efficiency.
+The module uses lazy loading, struct-based batch retrieval, immutable RipeHq reference, and comprehensive helper functions, ensuring efficient and consistent address resolution throughout the protocol.
 
 ## Architecture & Design
 

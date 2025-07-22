@@ -2,21 +2,15 @@
 
 ## Overview
 
-CurvePrices serves as a specialized oracle for pricing Curve Finance assets within the Ripe Protocol ecosystem. Think of it as a sophisticated price calculator that understands the complex mathematics behind Curve's automated market maker (AMM) pools - from stable pools that minimize slippage for similar assets to crypto pools that handle volatile pairs. Unlike simple token pricing, Curve pools require specialized calculations to derive accurate prices from their bonding curves, virtual prices, and liquidity balances.
+CurvePrices provides specialized pricing for Curve LP tokens and manages the Green token stabilizer mechanism. It handles complex multi-asset pools while maintaining accurate USD valuations for protocol operations.
 
-At its core, CurvePrices manages five fundamental responsibilities:
+**Dual Functionality**:
+- **LP Token Pricing**: Calculates USD values using virtual price and underlying asset prices
+- **Green Stabilizer**: Monitors GREEN/USDC pool ratios for external stabilization mechanisms
+- **Multi-Pool Support**: Handles stable pools, crypto pools, and metapool configurations
+- **Automated Discovery**: Leverages Curve's Meta Registry for automatic pool configuration
 
-**1. Automated Pool Discovery**: Leverages Curve's Meta Registry to automatically discover pool configurations, LP tokens, and underlying assets when adding new price feeds - requiring only the pool address as input.
-
-**2. Dual LP Token Pricing Methods**: Implements distinct pricing strategies for stable pools (using virtual price × lowest underlying price) and crypto pools (using lp_price × first asset price) to ensure accurate valuation across different pool types.
-
-**3. Single Asset Pricing**: Retrieves individual token prices directly from Curve's internal price oracles, which use exponential moving averages (EMAs) to provide manipulation-resistant price feeds for pool assets.
-
-**4. GREEN Reference Pool Monitoring**: Maintains a sophisticated snapshot system for the GREEN/USDC pool, tracking balance ratios and danger states to provide data for external stabilization mechanisms rather than enforcing price bounds directly.
-
-**5. Savings GREEN Integration**: Special handling for sGREEN tokens using the ERC4626 standard, calculating prices based on GREEN price adjusted by the savings contract's price per share.
-
-For technical readers, CurvePrices implements the PriceSource interface with LocalGov for governance, TimeLock for configuration changes, and PriceSourceData for asset registry. It interfaces directly with Curve's infrastructure including the Address Provider for registry discovery and Meta Registry for pool configuration queries. The contract manages complex data structures including pool configurations with up to 4 underlying assets, sophisticated GREEN pool monitoring with weighted ratio calculations, and a circular buffer snapshot system for historical tracking. Price calculations involve distinct methods for stable vs crypto pools, automatic decimal normalization, and comprehensive validation. The contract includes time-locked governance for all configuration changes and special handling for Ripe ecosystem tokens (GREEN, sGREEN, RIPE).
+The module implements distinct pricing methods for stable vs crypto pools, EMA-based price oracles for manipulation resistance, snapshot system for historical tracking, and special handling for ecosystem tokens (GREEN, sGREEN, RIPE).
 
 ## Architecture & Dependencies
 

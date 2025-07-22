@@ -2,24 +2,14 @@
 
 ## Overview
 
-Switchboard serves as the critical authorization gateway for all protocol configuration changes in the Ripe Protocol ecosystem. Think of it as the security checkpoint that determines which contracts have the authority to modify the extensive configuration data stored in Mission Control. Every configuration update in the protocol - from collateral ratios to liquidation parameters - must pass through a contract registered in Switchboard.
+Switchboard is the authorization gateway controlling all protocol configuration changes in Ripe Protocol. It determines which contracts can modify Mission Control settings, creating a secure two-layer system where governance controls Switchboard access, and Switchboard controls configuration updates.
 
-At its core, Switchboard manages three fundamental responsibilities:
+**Core Functions**:
+- **Configuration Authority**: Registers approved contracts that can update protocol parameters
+- **Parameter Control**: Guards access to critical settings including collateral ratios, liquidation thresholds, rewards distribution, and oracle configurations
+- **Blacklist Gateway**: Manages token freeze/unfreeze operations through vetted contracts
 
-**1. Configuration Authority Registry**: Maintains a registry of approved configuration contracts that can modify protocol settings in Mission Control. Each contract is registered with a unique ID and description, creating an audit trail of authorized configurators. Only these registered contracts can update critical parameters like:
-
-- Deposit and withdrawal limits (`TellerDepositConfig`, `TellerWithdrawConfig`)
-- Borrowing parameters and debt ceilings (`BorrowConfig`, `RepayConfig`)
-- Liquidation thresholds and auction settings (`GenLiqConfig`, `AssetLiqConfig`)
-- Rewards distribution and points allocation (`RewardsConfig`, `DepositPointsConfig`)
-- Price oracle configurations (`PriceConfig`)
-- Stability pool parameters (`StabPoolClaimsConfig`, `StabPoolRedemptionsConfig`)
-
-**2. Blacklist Management Gateway**: Provides a controlled passthrough mechanism for registered contracts to update token blacklists. This ensures only vetted configuration contracts can freeze or unfreeze addresses across the protocol's tokens.
-
-**3. Mission Control Access Layer**: Acts as the exclusive gateway to Mission Control's setter functions. Mission Control validates every configuration change by checking `isSwitchboardAddr(msg.sender)`, ensuring only Switchboard-registered contracts can modify protocol parameters.
-
-For technical readers, Switchboard implements a critical security pattern where all protocol configuration is centralized in Mission Control, but access is strictly controlled through Switchboard's registry. This creates a two-layer security model: governance controls what gets into Switchboard, and Switchboard controls what can modify Mission Control. The contract utilizes modular architecture with [LocalGov](../modules/LocalGov.md), [AddressRegistry](../modules/AddressRegistry.md), Addys, and [DeptBasics](../modules/DeptBasics.md) modules, and includes pause functionality for emergency situations.
+Built on LocalGov and AddressRegistry modules, Switchboard enforces that only registered contracts can call Mission Control setters. This architecture creates an audit trail of authorized configurators while preventing unauthorized parameter changes through strict access control and emergency pause capabilities.
 
 ## Architecture & Modules
 

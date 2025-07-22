@@ -2,21 +2,15 @@
 
 ## Overview
 
-StorkPrices serves as the integration layer for Stork Network's oracle services within the Ripe Protocol ecosystem. Think of it as a specialized connector that brings institutional-grade price feeds from Stork's network of data providers directly into the protocol. Similar to Pyth, Stork uses a pull-based oracle design where prices are published off-chain and brought on-chain only when needed, but with its own unique approach to temporal data representation and quantized values.
+StorkPrices integrates Stork Network's decentralized oracle infrastructure for reliable asset pricing. It leverages Stork's temporal data system with nanosecond-precision timestamps and pre-normalized 18-decimal values.
 
-At its core, StorkPrices manages five fundamental responsibilities:
+**Key Capabilities**:
+- **Temporal Pricing**: Nanosecond-precision timestamps for accurate staleness checks
+- **Pre-Normalized Values**: Native 18-decimal format eliminates conversion needs
+- **Pull-Based Updates**: On-demand price updates with automatic fee handling
+- **Batch Operations**: Update multiple feeds in single transaction for gas efficiency
 
-**1. Temporal Price Data**: Handles Stork's temporal numeric value system which provides prices with nanosecond-precision timestamps, enabling highly accurate time-based price tracking and staleness checks for financial applications.
-
-**2. Quantized Value Processing**: Works with Stork's quantized value representation that provides prices in a standardized 18-decimal format, eliminating the need for complex decimal conversions while maintaining precision.
-
-**3. Pull-Based Updates**: Implements the efficient pull oracle pattern where fresh price data is brought on-chain through signed payloads, with automatic fee calculation and payment to maintain oracle sustainability.
-
-**4. Feed Management**: Maintains mappings between protocol assets and Stork feed IDs through a time-locked governance system, ensuring secure and deliberate oracle configuration changes.
-
-**5. Batch Update Capability**: Supports updating multiple price feeds in a single transaction, reducing gas costs and improving efficiency for protocols that need to refresh many prices simultaneously.
-
-For technical readers, StorkPrices implements the PriceSource interface with LocalGov for governance, TimeLock for configuration changes, and PriceSourceData for asset registry. It interfaces with Stork Network using the V1 API including getTemporalNumericValueUnsafeV1 for efficient price queries and updateTemporalNumericValuesV1 for on-chain updates. The contract processes TemporalNumericValue structs containing timestamp in nanoseconds and quantized values in 18 decimals. Unlike other oracles that require decimal conversions, Stork's quantized values are already normalized. The contract includes ETH balance management for update fees, batch processing for up to 20 simultaneous updates, and comprehensive event logging for transparency.
+The module implements direct integration with Stork V1 API, automatic fee calculation and payment, time-locked feed management, and support for up to 20 simultaneous price updates.
 
 ## Architecture & Dependencies
 

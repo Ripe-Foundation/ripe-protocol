@@ -2,17 +2,14 @@
 
 ## Overview
 
-SimpleErc20 serves as the most straightforward vault implementation within the Ripe Protocol ecosystem, designed to provide basic deposit and withdrawal functionality for standard ERC20 tokens without additional complexity. Think of it as the foundation vault that handles simple asset custody with 1:1 deposit-to-balance ratios, making it perfect for basic collateral storage, simple yield farming, or any scenario where users need straightforward token deposit and withdrawal capabilities.
+SimpleErc20 is the most straightforward vault in Ripe Protocol, providing basic deposit and withdrawal for any ERC20 token. With direct 1:1 balance tracking and no yield mechanics, it's ideal for collateral storage, basic custody, and scenarios requiring predictable asset management.
 
-At its core, SimpleErc20 manages three fundamental responsibilities:
+**What Makes It Simple**:
+- **No Shares**: Direct asset amounts, not share calculations
+- **No Yield**: Assets don't grow or compound
+- **No Complexity**: Just deposit, withdraw, and track balances
 
-**1. Direct Asset Custody**: Accepts deposits of any supported ERC20 tokens and stores them with a direct 1:1 relationship between deposited amounts and user balances, providing transparent and predictable asset management without share calculations or yield mechanics.
-
-**2. Balance-Based Operations**: Maintains user balances that directly correspond to deposited asset amounts, enabling simple withdrawal calculations and transparent position tracking without the complexity of share-based accounting or yield accumulation.
-
-**3. Protocol Integration**: Provides essential integration points for other protocol components including Lootbox reward calculations, CreditEngine collateral evaluation, and AuctionHouse liquidation operations, while maintaining the simplicity of direct asset management.
-
-For technical readers, SimpleErc20 operates as a thin wrapper around the BasicVault module, providing contract-specific events and access controls while delegating all core functionality to the underlying module. It implements direct asset-amount accounting rather than share-based systems, supports any ERC20 token without requiring special handling or configuration, provides straightforward deposit/withdrawal mechanics suitable for basic collateral or custody needs, integrates seamlessly with protocol liquidation systems for collateral transfers, and maintains compatibility with the Vault interface standard while keeping operations as simple as possible. This vault type is ideal for basic custody needs where users want predictable 1:1 asset relationships.
+Built on the BasicVault module, SimpleErc20 is perfect for USDC, DAI, WETH, or any standard token where users want transparent custody. It integrates seamlessly with protocol systems for collateral evaluation and liquidations while maintaining maximum simplicity.
 
 ## Architecture & Dependencies
 

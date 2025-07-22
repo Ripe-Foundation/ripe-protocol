@@ -2,21 +2,15 @@
 
 ## Overview
 
-RipeGov serves as the sophisticated governance vault within the Ripe Protocol ecosystem, designed specifically for RIPE token and RIPE LP token deposits with advanced time-locking, governance point accrual, and voting power mechanisms. Think of it as the cornerstone of the protocol's decentralized governance system where token holders lock their assets to gain voting power and earn rewards proportional to their commitment duration and asset weight.
+RipeGov is the protocol's governance vault where users lock RIPE tokens or RIPE LP tokens to gain voting power. Lock duration determines governance points - longer locks earn exponentially more power, creating alignment between token holders and protocol success.
 
-At its core, RipeGov manages five fundamental responsibilities:
+**Core Mechanics**:
+- **Time-Locked Staking**: Lock RIPE for 3 months to 2 years for voting rights
+- **Governance Points**: Earn points based on amount × duration × asset weight
+- **Lock Management**: Extend locks for bonuses or exit early with penalties
+- **Real-Time Voting Power**: Automatic Boardroom integration updates governance weight
 
-**1. Time-Locked Staking System**: Implements sophisticated time-locking mechanisms where users deposit RIPE tokens or RIPE LP tokens with configurable lock durations, earning governance points that increase with longer commitments and cannot be withdrawn until unlock periods expire.
-
-**2. Governance Points Accumulation**: Calculates and tracks complex governance points based on deposited shares, time elapsed, asset-specific weights, and lock duration bonuses, providing the foundation for protocol voting power and reward distribution calculations.
-
-**3. Lock Duration Management**: Provides comprehensive lock adjustment capabilities including lock extensions for additional bonuses, early exit mechanisms with penalty fees, and weighted averaging for multiple deposits with different lock periods.
-
-**4. Boardroom Integration**: Automatically updates the Boardroom contract with governance power changes, ensuring that voting systems have accurate, real-time information about each user's voting weight based on their governance point balances.
-
-**5. Contributor Token Management**: Includes specialized functions for handling contributor tokens through Human Resources integration, supporting contributor token transfers and token burning for governance or compliance purposes.
-
-For technical readers, RipeGov utilizes a modular architecture built on SharesVault for yield-bearing functionality with VaultData for state management, implements complex governance point calculations with time-based accrual, asset weighting, and lock bonuses, provides comprehensive lock management with weighted averaging for multiple deposits, integrates with Boardroom for real-time governance power updates and supports early exit mechanisms with configurable penalty structures, and includes specialized contributor management through HR department integration. The vault is designed to incentivize long-term protocol participation while maintaining flexibility for governance needs.
+Built on SharesVault with specialized governance calculations, RipeGov incentivizes long-term participation. Example: Lock 1000 RIPE for 2 years to get 50% more voting power than a 6-month lock. The vault also handles contributor token transfers and supports protocol-wide governance operations.
 
 ## Architecture & Dependencies
 

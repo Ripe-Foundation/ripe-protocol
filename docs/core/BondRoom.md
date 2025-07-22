@@ -2,17 +2,15 @@
 
 ## Overview
 
-BondRoom serves as the decentralized bond marketplace for the Ripe Protocol ecosystem. Think of it as a sophisticated financial instrument that allows users to purchase Ripe tokens at a discount in exchange for providing stable assets to the protocol's treasury. It implements dynamic pricing based on epoch-based availability, provides lock-up bonuses for longer commitments, integrates boost mechanics for additional rewards, and automatically handles bad debt repayment when needed.
+BondRoom is the decentralized bond marketplace for the Ripe Protocol, enabling users to purchase discounted Ripe tokens in exchange for stable assets. The contract implements a sophisticated bond mechanism with epoch-based
+availability, dynamic pricing curves, and automated treasury management.
 
-At its core, BondRoom manages three fundamental responsibilities:
+**Core Features**:
+- **Epoch-Based Sales**: Time-boxed periods with limited availability to ensure predictable supply release and fair access
+- **Dynamic Pricing**: Linear pricing curves within epochs (high to low) with lock-up bonuses up to 10x and boost mechanics integration
+- **Automated Treasury**: Allocates bond proceeds between treasury growth and bad debt repayment based on protocol health
 
-**1. Epoch-Based Bond Sales**: Implements time-boxed sales periods (epochs) with limited availability per epoch. This creates predictable supply release and prevents market manipulation while ensuring fair access to bonds for all participants.
-
-**2. Dynamic Pricing with Bonuses**: Calculates bond prices dynamically based on epoch progress (starting high, decreasing over time), offers lock-up bonuses for users who commit their Ripe tokens for longer periods, and integrates with external boost mechanics for additional rewards based on user activity.
-
-**3. Bad Debt Management**: Automatically allocates a portion of bond proceeds to repay protocol bad debt when it exists. This creates a self-healing mechanism where bond sales help restore protocol health while still rewarding purchasers.
-
-For technical readers, BondRoom implements sophisticated bond economics including linear pricing curves within epochs, configurable lock duration bonuses up to 10x, integration with BondBooster contracts for activity-based rewards, automatic epoch rollovers with configurable delays, and whitelist support for restricted access. The contract ensures atomic execution of bond purchases while maintaining strict accounting through the Ledger.
+The contract uses atomic execution for all bond purchases, maintains strict accounting through the Ledger, supports whitelist restrictions, and provides configurable parameters for sustainable token distribution.
 
 ## Architecture & Modules
 

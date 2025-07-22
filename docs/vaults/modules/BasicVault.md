@@ -2,17 +2,14 @@
 
 ## Overview
 
-BasicVault serves as the foundational vault module within the Ripe Protocol ecosystem, providing essential deposit, withdrawal, and balance transfer operations for all vault types. Think of it as the core engine that handles the fundamental mechanics of moving assets in and out of vaults while maintaining accurate balance tracking and user asset management.
+BasicVault is the foundational vault module in Ripe Protocol, providing essential deposit, withdrawal, and transfer operations for all vault types. It handles the core mechanics of asset movement while maintaining accurate balance tracking through integration with VaultData.
 
-At its core, BasicVault manages three fundamental responsibilities:
+**Core Functions**:
+- **Asset Operations**: Secure deposits, withdrawals, and internal transfers with balance accounting
+- **State Management**: User balances and asset registrations via VaultData interface
+- **Protocol Integration**: Utility functions for Teller, CreditEngine, Lootbox, and AuctionHouse
 
-**1. Asset Movement Operations**: Implements secure deposit, withdrawal, and internal transfer functions that handle token movements while maintaining proper balance accounting and user asset registration across the vault system.
-
-**2. Balance and Asset Tracking**: Maintains comprehensive tracking of user balances, asset registrations, and vault states by interfacing with the VaultData module for all balance modifications and asset management operations.
-
-**3. Integration Support Functions**: Provides specialized utility functions that other protocol contracts (Teller, CreditEngine, Lootbox, AuctionHouse) require for vault operations, balance queries, and user asset enumeration.
-
-For technical readers, BasicVault utilizes the VaultData module for all state management and balance tracking, implements pause-aware operations for emergency control, provides secure token transfer operations with proper validation, maintains user and vault asset registries through the VaultData interface, and offers utility functions for integration with other protocol components. The module is designed as a foundational building block that other vault modules extend and build upon.
+Built as a base layer for other vault modules, BasicVault implements pause-aware operations for emergency control and validates all token transfers. It serves as the fundamental building block that specialized vaults like SharesVault and StabVault extend with additional functionality.
 
 ## Architecture & Dependencies
 

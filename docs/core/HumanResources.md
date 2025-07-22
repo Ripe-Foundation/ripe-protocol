@@ -2,21 +2,17 @@
 
 ## Overview
 
-HumanResources serves as the compensation management system for human contributors within the Ripe Protocol ecosystem. Think of it as a sophisticated payroll department that handles the creation, management, and distribution of token-based compensation packages for protocol contributors. Unlike traditional payroll systems that deal with fiat currency, HumanResources manages vesting schedules, cliff periods, and automated RIPE token distributions through individually deployed Contributor contracts.
+HumanResources re-imagines contributor compensation by bringing payroll onchain, managing token-based vesting schedules for protocol team members. Unlike traditional systems, it creates transparent, immutable compensation
+agreements through individually deployed Contributor contracts.
 
-At its core, HumanResources manages five fundamental responsibilities:
+**Key Functions**:
+- **Contract Deployment**: Creates personalized Contributor contracts with customized vesting schedules, cliff periods, and unlock timelines
+- **Compensation Management**: Handles RIPE token minting and distribution according to vesting schedules through the Ripe Gov Vault
+- **Security Controls**: Two-phase deployment with time-locks prevents rushed decisions and ensures careful compensation commitments
+- **Lifecycle Management**: Facilitates minting paychecks, transferring vested tokens, and handling cancellations with refunds
+- **Protocol Tracking**: Provides aggregate visibility into total compensation committed and claimed for sustainable tokenomics
 
-**1. Contributor Contract Deployment**: Creates individual Contributor contracts for each team member with customized compensation terms including vesting schedules, cliff periods, and unlock timelines, ensuring transparent and immutable compensation agreements.
-
-**2. Compensation Management**: Oversees the minting and distribution of RIPE tokens according to predefined vesting schedules, handling both the initial allocation and ongoing vesting calculations through the Ripe Gov Vault system.
-
-**3. Two-Phase Security**: Implements time-locked deployment of new contributors requiring both initiation and confirmation phases, preventing rushed decisions and ensuring careful consideration of compensation commitments.
-
-**4. Token Lifecycle Management**: Facilitates the full lifecycle of contributor tokens including minting paychecks, transferring vested tokens to owners, and handling cancellations with appropriate refunds to maintain protocol treasury balance.
-
-**5. Aggregate Tracking**: Provides protocol-wide visibility into total compensation committed and claimed, enabling governance to monitor human capital investments and ensure sustainable tokenomics.
-
-For technical readers, HumanResources implements the Department interface with governance controls, time-locked operations, and integration with multiple protocol components. It uses Vyper's create_from_blueprint for gas-efficient deployment of Contributor contracts from a template stored in MissionControl. The contract manages compensation through the Ripe Gov Vault (ID: 2) with automatic Ledger updates for tracking. It includes sophisticated validation logic for contributor terms based on protocol-wide HR configuration limits. The system supports manager/owner separation for operational flexibility and includes emergency functions for canceling unvested compensation. All operations emit comprehensive events for transparency and integrate with the Lootbox point system for engagement tracking.
+The system uses Vyper's create_from_blueprint for gas-efficient deployments, implements sophisticated validation based on protocol-wide HR limits, supports manager/owner separation, and includes emergency cancellation functions.
 
 ## Architecture & Dependencies
 

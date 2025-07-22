@@ -2,19 +2,15 @@
 
 ## Overview
 
-VaultData serves as the foundational data management module for all vault operations within the Ripe Protocol ecosystem. Think of it as the universal database layer that handles all balance tracking, asset registration, and state management for every type of vault in the system. Whether it's a basic vault, shares vault, or stability pool, they all rely on VaultData for consistent and secure state management.
+VaultData is the foundational data management module for all vault operations in Ripe Protocol. It serves as the universal database layer handling balance tracking, asset registration, and state management for every vault type - from basic vaults to complex stability pools.
 
-At its core, VaultData manages four fundamental responsibilities:
+**Core Functions**:
+- **Balance Tracking**: Precise records of user balances (amounts or shares) with atomic operations
+- **Asset Management**: Automatic registration and indexed lookups for efficient enumeration
+- **Security Controls**: Pause functionality and fund recovery for emergency operations
+- **Storage Optimization**: Dual-layer tracking prevents bloat while enabling fast queries
 
-**1. Balance and Share Tracking**: Maintains precise records of user balances (which may represent actual asset amounts or shares depending on vault type) and total balances across all supported assets, with atomic operations for deposits and withdrawals.
-
-**2. Asset Registration and Enumeration**: Provides comprehensive asset management with automatic registration of new user assets and vault assets, maintaining indexed lookups for efficient iteration and querying across user positions and vault holdings.
-
-**3. State Management and Security**: Implements vault-wide pause functionality for emergency controls, fund recovery mechanisms for administrative operations, and consistent validation patterns across all balance modification operations.
-
-**4. Data Structure Optimization**: Maintains optimized data structures for both user-specific asset tracking (supporting efficient enumeration of user positions) and vault-wide asset management, with proper indexing and cleanup to prevent storage bloat.
-
-For technical readers, VaultData implements a dual-layer asset tracking system with both user-centric and vault-centric views, provides atomic balance modification functions with proper validation and event emission, maintains indexed asset arrays for efficient iteration while avoiding storage gaps, implements pause-aware operations for emergency control, and offers comprehensive fund recovery capabilities for administrative operations. The module is designed to be vault-type agnostic, supporting basic amounts, share-based accounting, and USD value-based accounting through the same interface.
+VaultData implements vault-agnostic state management supporting basic amounts, shares, and USD values through a unified interface. It provides atomic modifications with validation, maintains clean indexed arrays, and enables both user-centric and vault-centric data views for maximum flexibility.
 
 ## Architecture & Dependencies
 

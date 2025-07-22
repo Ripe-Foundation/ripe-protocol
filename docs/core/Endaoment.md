@@ -2,19 +2,16 @@
 
 ## Overview
 
-Endaoment serves as the protocol-owned treasury and liquidity management hub for the Ripe Protocol ecosystem. Think of it as a sophisticated DeFi treasury that actively manages protocol funds across diverse yield-generating strategies, maintains stablecoin peg stability through automated market making, handles partner liquidity agreements, and processes liquidation proceeds. It acts as the protocol's financial nerve center, ensuring optimal capital efficiency while maintaining Green token stability.
+Endaoment is the protocol-owned treasury and liquidity management hub for Ripe Protocol, actively managing funds across DeFi strategies while maintaining Green token stability. It serves as the financial nerve center, optimizing
+capital efficiency through yield generation and automated market operations.
 
-At its core, Endaoment manages four fundamental responsibilities:
+**Core Functions**:
+- **Yield Management**: Deploys funds across modular "Lego" strategies including lending protocols, AMMs, and liquid staking for optimal returns
+- **Green Stabilization**: Automated peg maintenance through Curve pool liquidity adjustments based on Green trading ratios
+- **Partner Programs**: Facilitates liquidity partnerships with external parties providing assets alongside protocol-minted Green
+- **Treasury Operations**: Receives and manages liquidation proceeds, bond sales, fees, and handles ETH/WETH conversions
 
-**1. Yield Strategy Management**: Deploys protocol funds across various DeFi yield sources using modular "Lego" contracts. These include lending protocols (Aave, Compound), automated market makers (Uniswap, Curve), liquid staking derivatives, and other yield-bearing assets. The system supports both simple yield farming and complex concentrated liquidity positions.
-
-**2. Green Token Stabilization**: Implements an automated stabilizer mechanism that maintains Green's peg by managing liquidity in Curve pools. When Green trades below peg, the system adds more Green liquidity to absorb sell pressure. When Green trades above peg, it removes Green liquidity to reduce supply pressure.
-
-**3. Partner Liquidity Programs**: Facilitates partnerships where external parties provide assets alongside protocol-minted Green tokens in liquidity pools. This creates deeper markets while sharing IL risk with strategic partners.
-
-**4. Treasury Operations**: Receives proceeds from liquidations, bond sales, and protocol fees. Manages ETH/WETH conversions, handles NFT recovery for accidentally sent tokens, and provides comprehensive asset management capabilities with full event logging for transparency.
-
-For technical readers, Endaoment implements advanced treasury mechanics including pluggable yield strategy architecture via UndyLego interface, automated rebalancing algorithms for yield optimization, sophisticated AMM liquidity management with slippage protection, debt tracking for leveraged liquidity provision, and comprehensive event logging for all treasury operations. The contract ensures protocol solvency while maximizing yield generation.
+The contract implements pluggable yield strategies, automated rebalancing, sophisticated AMM management, comprehensive event logging, and debt tracking for leveraged positions while ensuring protocol solvency.
 
 ## Architecture & Modules
 
