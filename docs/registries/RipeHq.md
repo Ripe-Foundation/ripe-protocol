@@ -1,5 +1,7 @@
 # RipeHq Technical Documentation
 
+[📄 View Source Code](../../contracts/registries/RipeHq.vy)
+
 ## Overview
 
 RipeHq is the master registry and governance hub for Ripe Protocol, coordinating all critical components and controlling token minting permissions. It maintains the authoritative record of protocol contracts while enforcing strict security through two-factor authentication and time-locked changes.

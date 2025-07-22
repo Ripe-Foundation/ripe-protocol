@@ -1,5 +1,7 @@
 # Addys Technical Documentation
 
+[📄 View Source Code](../../contracts/modules/Addys.vy)
+
 ## Overview
 
 Addys is the centralized address resolution module for the Ripe Protocol, functioning as a sophisticated directory service that provides instant access to all protocol contracts. It eliminates redundant address storage across

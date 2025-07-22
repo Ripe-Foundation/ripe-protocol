@@ -1,5 +1,7 @@
 # StabilityPool Vault Technical Documentation
 
+[📄 View Source Code](../../contracts/vaults/StabilityPool.vy)
+
 ## Overview
 
 StabilityPool is a specialized vault that acts as the protocol's liquidation backstop. Users deposit stablecoins (GREEN, sGREEN) to earn discounted collateral from liquidations, typically receiving 5-10% instant profit while helping maintain protocol solvency.

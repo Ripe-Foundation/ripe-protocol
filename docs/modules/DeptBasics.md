@@ -1,5 +1,7 @@
 # DeptBasics Technical Documentation
 
+[📄 View Source Code](../../contracts/modules/DeptBasics.vy)
+
 ## Overview
 
 DeptBasics is a foundational module providing essential department-level functionality for Ripe Protocol contracts. It standardizes common operations across all departments including pause mechanisms, token recovery, and minting

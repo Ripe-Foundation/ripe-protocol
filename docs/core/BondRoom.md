@@ -1,5 +1,7 @@
 # BondRoom Technical Documentation
 
+[📄 View Source Code](../../contracts/core/BondRoom.vy)
+
 ## Overview
 
 BondRoom is the decentralized bond marketplace for the Ripe Protocol, enabling users to purchase discounted Ripe tokens in exchange for stable assets. The contract implements a sophisticated bond mechanism with epoch-based

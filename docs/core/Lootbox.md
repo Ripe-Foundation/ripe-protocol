@@ -1,5 +1,7 @@
 # Lootbox Technical Documentation
 
+[📄 View Source Code](../../contracts/core/Lootbox.vy)
+
 ## Overview
 
 Lootbox is the rewards distribution engine for Ripe Protocol, implementing a sophisticated points-based system that tracks user activity and distributes Ripe tokens proportionally. It incentivizes productive protocol usage

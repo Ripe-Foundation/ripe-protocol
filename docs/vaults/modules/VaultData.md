@@ -1,5 +1,7 @@
 # VaultData Module Technical Documentation
 
+[📄 View Source Code](../../../contracts/vaults/modules/VaultData.vy)
+
 ## Overview
 
 VaultData is the foundational data management module for all vault operations in Ripe Protocol. It serves as the universal database layer handling balance tracking, asset registration, and state management for every vault type - from basic vaults to complex stability pools.

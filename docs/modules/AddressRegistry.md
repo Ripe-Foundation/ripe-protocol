@@ -1,5 +1,7 @@
 # AddressRegistry Technical Documentation
 
+[📄 View Source Code](../../contracts/modules/AddressRegistry.vy)
+
 ## Overview
 
 AddressRegistry is a flexible registry module for managing protocol addresses within the Ripe ecosystem. It provides a standardized interface for registering, updating, and disabling addresses with built-in time-lock protection,

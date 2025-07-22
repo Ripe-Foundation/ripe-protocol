@@ -1,5 +1,7 @@
 # AuctionHouse Technical Documentation
 
+[📄 View Source Code](../../contracts/core/AuctionHouse.vy)
+
 ## Overview
 
 AuctionHouse is the liquidation engine for Ripe Protocol, executing multi-phase strategies to recover value from under-collateralized positions. It prioritizes minimal market impact through phased liquidations: first burning borrower's stablecoins, then swapping with stability pools, and finally running Dutch auctions.

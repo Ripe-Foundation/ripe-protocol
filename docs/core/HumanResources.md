@@ -1,5 +1,7 @@
 # HumanResources Technical Documentation
 
+[📄 View Source Code](../../contracts/core/HumanResources.vy)
+
 ## Overview
 
 HumanResources re-imagines contributor compensation by bringing payroll onchain, managing token-based vesting schedules for protocol team members. Unlike traditional systems, it creates transparent, immutable compensation

@@ -1,5 +1,7 @@
 # SwitchboardCharlie Technical Documentation
 
+[📄 View Source Code](../../contracts/config/SwitchboardCharlie.vy)
+
 ## Overview
 
 SwitchboardCharlie is the operational control center for day-to-day Ripe Protocol management, handling emergency responses, routine maintenance, and treasury operations that require either immediate action or careful time-locked

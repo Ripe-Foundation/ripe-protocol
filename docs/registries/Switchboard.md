@@ -1,5 +1,7 @@
 # Switchboard Technical Documentation
 
+[📄 View Source Code](../../contracts/registries/Switchboard.vy)
+
 ## Overview
 
 Switchboard is the authorization gateway controlling all protocol configuration changes in Ripe Protocol. It determines which contracts can modify Mission Control settings, creating a secure two-layer system where governance controls Switchboard access, and Switchboard controls configuration updates.

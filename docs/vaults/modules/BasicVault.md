@@ -1,5 +1,7 @@
 # BasicVault Module Technical Documentation
 
+[📄 View Source Code](../../../contracts/vaults/modules/BasicVault.vy)
+
 ## Overview
 
 BasicVault is the foundational vault module in Ripe Protocol, providing essential deposit, withdrawal, and transfer operations for all vault types. It handles the core mechanics of asset movement while maintaining accurate balance tracking through integration with VaultData.

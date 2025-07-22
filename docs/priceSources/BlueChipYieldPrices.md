@@ -1,5 +1,7 @@
 # BlueChipYieldPrices Technical Documentation
 
+[📄 View Source Code](../../contracts/priceSources/BlueChipYieldPrices.vy)
+
 ## Overview
 
 BlueChipYieldPrices provides accurate USD pricing for yield-bearing vault tokens across major DeFi protocols. It calculates prices by combining the underlying asset's USD value with the vault's exchange rate, ensuring precise valuations for protocol operations.

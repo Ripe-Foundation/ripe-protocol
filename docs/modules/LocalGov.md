@@ -1,5 +1,7 @@
 # LocalGov Technical Documentation
 
+[📄 View Source Code](../../contracts/modules/LocalGov.vy)
+
 ## Overview
 
 LocalGov is a flexible governance module implementing a two-tier system for the Ripe Protocol. It enables contracts to maintain local governance while respecting the protocol's global hierarchy, allowing both independent

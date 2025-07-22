@@ -1,5 +1,7 @@
 # TimeLock Technical Documentation
 
+[📄 View Source Code](../../contracts/modules/TimeLock.vy)
+
 ## Overview
 
 TimeLock is a flexible time-delay module for managing sensitive operations within the Ripe Protocol. It provides a universal timer mechanism that enforces waiting periods before action execution while preventing stale operations

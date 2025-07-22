@@ -1,5 +1,7 @@
 # Endaoment Technical Documentation
 
+[📄 View Source Code](../../contracts/core/Endaoment.vy)
+
 ## Overview
 
 Endaoment is the protocol-owned treasury and liquidity management hub for Ripe Protocol, actively managing funds across DeFi strategies while maintaining Green token stability. It serves as the financial nerve center, optimizing

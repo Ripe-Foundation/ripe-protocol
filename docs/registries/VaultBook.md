@@ -1,5 +1,7 @@
 # VaultBook Technical Documentation
 
+[📄 View Source Code](../../contracts/registries/VaultBook.vy)
+
 ## Overview
 
 VaultBook is the central registry for all deposit vaults in Ripe Protocol. It maintains the authoritative list of approved vaults while enforcing critical safety checks and managing RIPE reward distribution for stability pool participants.

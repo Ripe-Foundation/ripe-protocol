@@ -1,5 +1,7 @@
 # Erc4626Token Technical Documentation
 
+[📄 View Source Code](../../../contracts/tokens/modules/Erc4626Token.vy)
+
 ## Overview
 
 Erc4626Token is a tokenized vault module that extends Erc20Token to implement the EIP-4626 standard. It transforms any ERC20 token into a yield-bearing vault token, enabling standardized interactions with DeFi aggregators and yield optimizers.

@@ -1,5 +1,7 @@
 # PriceSourceData Module Technical Documentation
 
+[📄 View Source Code](../../../contracts/priceSources/modules/PriceSourceData.vy)
+
 ## Overview
 
 PriceSourceData is the foundational module for all price source implementations in Ripe Protocol. It defines the standard interface and shared functionality that ensures consistent pricing across different oracle integrations.

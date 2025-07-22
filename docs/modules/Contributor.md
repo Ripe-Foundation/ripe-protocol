@@ -1,5 +1,7 @@
 # Contributor Technical Documentation
 
+[📄 View Source Code](../../contracts/modules/Contributor.vy)
+
 ## Overview
 
 Contributor contracts are personalized vesting vaults that manage individual token compensation agreements for protocol contributors. Each contract represents an immutable on-chain employment agreement that automatically handles

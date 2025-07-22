@@ -1,5 +1,7 @@
 # CreditEngine Technical Documentation
 
+[📄 View Source Code](../../contracts/core/CreditEngine.vy)
+
 ## Overview
 
 CreditEngine is the lending and borrowing powerhouse of Ripe Protocol, managing the entire credit lifecycle from collateralized borrowing to liquidations. It enables users to borrow GREEN stablecoins against deposited collateral while maintaining strict risk parameters and efficient capital utilization.

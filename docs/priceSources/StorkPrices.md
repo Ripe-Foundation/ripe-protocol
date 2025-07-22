@@ -1,5 +1,7 @@
 # StorkPrices Technical Documentation
 
+[📄 View Source Code](../../contracts/priceSources/StorkPrices.vy)
+
 ## Overview
 
 StorkPrices integrates Stork Network's decentralized oracle infrastructure for reliable asset pricing. It leverages Stork's temporal data system with nanosecond-precision timestamps and pre-normalized 18-decimal values.

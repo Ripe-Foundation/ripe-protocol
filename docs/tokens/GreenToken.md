@@ -1,5 +1,7 @@
 # GreenToken Technical Documentation
 
+[📄 View Source Code](../../contracts/tokens/GreenToken.vy)
+
 ## Overview
 
 GreenToken (GREEN) is Ripe Protocol's USD-pegged stablecoin, serving as the primary medium of exchange across all protocol operations. Minted through overcollateralized positions, GREEN maintains stability while enabling seamless transactions, liquidity provision, and yield generation throughout the ecosystem.

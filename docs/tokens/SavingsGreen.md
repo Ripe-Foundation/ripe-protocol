@@ -1,5 +1,7 @@
 # SavingsGreen Technical Documentation
 
+[📄 View Source Code](../../contracts/tokens/SavingsGreen.vy)
+
 ## Overview
 
 SavingsGreen (sGREEN) is an ERC4626 yield-bearing vault that automatically compounds returns on deposited GREEN stablecoins. By pooling GREEN tokens and deploying them across protocol yield strategies, sGREEN shares appreciate over time without user intervention.

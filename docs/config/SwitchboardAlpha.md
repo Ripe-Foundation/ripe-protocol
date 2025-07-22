@@ -1,5 +1,7 @@
 # SwitchboardAlpha Technical Documentation
 
+[📄 View Source Code](../../contracts/config/SwitchboardAlpha.vy)
+
 ## Overview
 
 SwitchboardAlpha is the primary configuration management contract for the Ripe Protocol, controlling critical protocol parameters through time-locked changes to ensure careful governance and system stability.

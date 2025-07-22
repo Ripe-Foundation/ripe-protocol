@@ -1,5 +1,7 @@
 # Ledger Technical Documentation
 
+[📄 View Source Code](../../contracts/data/Ledger.vy)
+
 ## Overview
 
 Ledger is the comprehensive data storage engine for Ripe Protocol, maintaining all critical state information from user positions to protocol metrics. It acts as the single source of truth for tracking interactions, financial positions, and rewards calculations across all protocol components.

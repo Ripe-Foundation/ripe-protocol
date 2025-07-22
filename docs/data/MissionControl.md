@@ -1,5 +1,7 @@
 # MissionControl Technical Documentation
 
+[📄 View Source Code](../../contracts/data/MissionControl.vy)
+
 ## Overview
 
 MissionControl is the central configuration hub for Ripe Protocol, storing all operational parameters, permissions, and behavioral rules. Every critical protocol decision - from asset deposits to liquidation strategies - is determined by configuration data stored here and accessed through its extensive query interface.

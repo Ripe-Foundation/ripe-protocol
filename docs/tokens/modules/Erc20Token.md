@@ -1,5 +1,7 @@
 # Erc20Token Technical Documentation
 
+[📄 View Source Code](../../../contracts/tokens/modules/Erc20Token.vy)
+
 ## Overview
 
 Erc20Token is the foundational token module for Ripe Protocol, providing enhanced ERC20 functionality with built-in security and governance features. It extends standard ERC20 with blacklisting, pausability, permit functionality, and deep RipeHq integration for enterprise-grade token management.

@@ -1,5 +1,7 @@
 # SimpleErc20 Vault Technical Documentation
 
+[📄 View Source Code](../../contracts/vaults/SimpleErc20.vy)
+
 ## Overview
 
 SimpleErc20 is the most straightforward vault in Ripe Protocol, providing basic deposit and withdrawal for any ERC20 token. With direct 1:1 balance tracking and no yield mechanics, it's ideal for collateral storage, basic custody, and scenarios requiring predictable asset management.

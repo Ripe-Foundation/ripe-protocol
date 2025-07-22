@@ -1,5 +1,7 @@
 # RebaseErc20 Vault Technical Documentation
 
+[📄 View Source Code](../../contracts/vaults/RebaseErc20.vy)
+
 ## Overview
 
 RebaseErc20 is a yield-optimized vault designed for rebase tokens and yield-generating assets like stETH, rETH, and aTokens. It automatically captures rebases and compounds yield through share-based accounting, providing depositors with passive growth without active management.

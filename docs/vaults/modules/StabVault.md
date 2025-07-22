@@ -1,5 +1,7 @@
 # StabVault Module Technical Documentation
 
+[📄 View Source Code](../../../contracts/vaults/modules/StabVault.vy)
+
 ## Overview
 
 StabVault is the most sophisticated vault module in Ripe Protocol, implementing stability pool functionality for liquidation absorption. Users provide stablecoin liquidity and receive liquidated collateral at discounts plus RIPE rewards, acting as the protocol's insurance fund.

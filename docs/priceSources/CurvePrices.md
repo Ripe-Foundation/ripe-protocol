@@ -1,5 +1,7 @@
 # CurvePrices Technical Documentation
 
+[📄 View Source Code](../../contracts/priceSources/CurvePrices.vy)
+
 ## Overview
 
 CurvePrices provides specialized pricing for Curve LP tokens and manages the Green token stabilizer mechanism. It handles complex multi-asset pools while maintaining accurate USD valuations for protocol operations.

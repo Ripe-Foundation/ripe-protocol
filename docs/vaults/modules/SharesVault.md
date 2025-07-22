@@ -1,5 +1,7 @@
 # SharesVault Module Technical Documentation
 
+[📄 View Source Code](../../../contracts/vaults/modules/SharesVault.vy)
+
 ## Overview
 
 SharesVault is an advanced vault module implementing share-based accounting for yield-bearing positions. Users receive shares representing proportional ownership of vault assets, enabling automatic yield distribution as share values appreciate over time.

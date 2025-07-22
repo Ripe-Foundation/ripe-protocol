@@ -1,5 +1,7 @@
 # SwitchboardDelta Technical Documentation
 
+[📄 View Source Code](../../contracts/config/SwitchboardDelta.vy)
+
 ## Overview
 
 SwitchboardDelta specializes in HR operations and Ripe bond mechanics for the Ripe Protocol, managing contributor compensation, bond sales parameters, and reward system maintenance as a dedicated control panel for human capital

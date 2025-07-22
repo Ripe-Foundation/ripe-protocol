@@ -1,5 +1,7 @@
 # SwitchboardBravo Technical Documentation
 
+[📄 View Source Code](../../contracts/config/SwitchboardBravo.vy)
+
 ## Overview
 
 SwitchboardBravo manages asset-specific configurations for the Ripe Protocol. While SwitchboardAlpha handles protocol-wide settings, SwitchboardBravo focuses exclusively on individual asset parameters through time-locked

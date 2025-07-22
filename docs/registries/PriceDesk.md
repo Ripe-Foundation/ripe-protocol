@@ -1,5 +1,7 @@
 # PriceDesk Technical Documentation
 
+[📄 View Source Code](../../contracts/registries/PriceDesk.vy)
+
 ## Overview
 
 PriceDesk is the centralized oracle registry that aggregates multiple price sources to provide reliable USD valuations across Ripe Protocol. It intelligently routes price requests through prioritized oracles, ensuring accurate pricing even when individual sources fail.

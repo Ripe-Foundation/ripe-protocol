@@ -1,5 +1,7 @@
 # BondBooster Technical Documentation
 
+[📄 View Source Code](../../contracts/config/BondBooster.vy)
+
 ## Overview
 
 BondBooster is a dynamic discount mechanism that incentivizes strategic bond purchases in the Ripe Protocol. It allows authorized users to purchase Ripe bonds at boosted rates during designated time periods, creating targeted

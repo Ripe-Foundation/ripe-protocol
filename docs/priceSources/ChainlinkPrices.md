@@ -1,5 +1,7 @@
 # ChainlinkPrices Technical Documentation
 
+[📄 View Source Code](../../contracts/priceSources/ChainlinkPrices.vy)
+
 ## Overview
 
 ChainlinkPrices integrates Chainlink's decentralized oracle network to provide reliable USD pricing for protocol assets. It manages multiple price feeds with built-in staleness checks and decimal normalization for consistent valuations.

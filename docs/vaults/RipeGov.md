@@ -1,5 +1,7 @@
 # RipeGov Vault Technical Documentation
 
+[📄 View Source Code](../../contracts/vaults/RipeGov.vy)
+
 ## Overview
 
 RipeGov is the protocol's governance vault where users lock RIPE tokens or RIPE LP tokens to gain voting power. Lock duration determines governance points - longer locks earn exponentially more power, creating alignment between token holders and protocol success.

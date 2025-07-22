@@ -1,5 +1,7 @@
 # RipeToken Technical Documentation
 
+[📄 View Source Code](../../contracts/tokens/RipeToken.vy)
+
 ## Overview
 
 RipeToken (RIPE) is the governance token powering the Ripe DAO, granting holders voting rights over protocol parameters, treasury allocation, and strategic direction. Distributed through rewards, bonding, and initial allocations, RIPE aligns stakeholder incentives with long-term protocol success.

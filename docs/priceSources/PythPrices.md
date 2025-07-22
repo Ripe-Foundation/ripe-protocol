@@ -1,5 +1,7 @@
 # PythPrices Technical Documentation
 
+[📄 View Source Code](../../contracts/priceSources/PythPrices.vy)
+
 ## Overview
 
 PythPrices integrates the Pyth Network oracle for high-frequency, low-latency price feeds. It provides real-time USD pricing with confidence intervals and exponential notation support for maximum precision.
