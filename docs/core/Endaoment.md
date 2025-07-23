@@ -518,7 +518,7 @@ green_to_remove = endaoment.getGreenAmountToRemoveInStabilizer()
 
 ### `mintPartnerLiquidity`
 
-Takes a partner's asset, gets its USD value, and mints an equivalent amount of Green tokens.
+Takes a partner's asset, gets its USD value, and mints an equivalent amount of Green tokens. The partner can be an external wallet or the Endaoment itself.
 
 ```vyper
 @nonreentrant
@@ -534,7 +534,7 @@ def mintPartnerLiquidity(
 
 | Name | Type | Description |
 |------|------|-------------|
-| `_partner` | `address` | Partner wallet providing asset |
+| `_partner` | `address` | Partner wallet providing asset (can be Endaoment itself) |
 | `_asset` | `address` | Asset being provided |
 | `_amount` | `uint256` | Amount of asset |
 
@@ -552,9 +552,16 @@ Only callable by Switchboard-registered contracts
 
 - `PartnerLiquidityMinted` - Contains partner address, asset, amount, and Green minted
 
+#### Special Behavior - Self as Partner
+
+When `_partner` is the Endaoment contract address itself:
+- **No token transfer**: Assets are used directly from Endaoment's existing balance
+- **Internal operation**: Functions as an internal mint operation using treasury funds
+- **Same events**: Events are still emitted with Endaoment as the partner address
+
 #### Example Usage
 ```python
-# Partner provides 10 ETH for liquidity
+# External partner provides 10 ETH for liquidity
 green_minted = endaoment.mintPartnerLiquidity(
     partner.address,
     weth.address,
@@ -562,45 +569,50 @@ green_minted = endaoment.mintPartnerLiquidity(
     sender=treasury_manager.address
 )
 # Returns: Amount of Green minted (e.g., 15000e18 if ETH = $1500)
+
+# Endaoment using its own funds
+green_minted = endaoment.mintPartnerLiquidity(
+    endaoment.address,  # Self as partner
+    usdc.address,
+    1000_000000,  # 1000 USDC from treasury
+    sender=treasury_manager.address
+)
+# Returns: 1000e18 Green minted (assuming $1 USDC)
 ```
 
 ### `addPartnerLiquidity`
 
-Takes a partner's asset AND an existing amount of Green tokens and adds them to a liquidity pool.
+Takes a partner's asset, mints equivalent Green tokens, and adds both to a liquidity pool. LP tokens are shared between the partner and Endaoment, except when the partner is Endaoment itself.
 
 ```vyper
 @nonreentrant
 @external
 def addPartnerLiquidity(
-    _partner: address,
     _legoId: uint256,
     _pool: address,
+    _partner: address,
     _asset: address,
-    _partnerAmount: uint256,
-    _greenAmount: uint256,
+    _amount: uint256 = max_value(uint256),
     _minLpAmount: uint256 = 0,
-    _extraData: bytes32 = empty(bytes32),
-) -> uint256:
+) -> (uint256, uint256, uint256):
 ```
 
 #### Parameters
 
 | Name | Type | Description |
 |------|------|-------------|
-| `_partner` | `address` | Partner wallet address |
 | `_legoId` | `uint256` | AMM strategy ID |
 | `_pool` | `address` | Pool address |
+| `_partner` | `address` | Partner wallet address (can be Endaoment itself) |
 | `_asset` | `address` | Partner's asset |
-| `_partnerAmount` | `uint256` | Partner's asset contribution |
-| `_greenAmount` | `uint256` | Green token contribution |
+| `_amount` | `uint256` | Partner's asset contribution (max = all available) |
 | `_minLpAmount` | `uint256` | Minimum LP tokens |
-| `_extraData` | `bytes32` | Pool-specific data |
 
 #### Returns
 
 | Type | Description |
 |------|-------------|
-| `uint256` | LP tokens received |
+| `(uint256, uint256, uint256)` | (lpAmountReceived, liqAmountA, liqAmountB) |
 
 #### Access
 
@@ -610,20 +622,39 @@ Only callable by Switchboard-registered contracts
 
 - `PartnerLiquidityAdded` - Partnership liquidity details
 
+#### Special Behavior - Self as Partner
+
+When `_partner` is the Endaoment contract address itself:
+- **No token transfer**: Assets used directly from Endaoment's balance
+- **All LP tokens to Endaoment**: No 50/50 split - all LP tokens remain with Endaoment
+- **Same pool debt tracking**: Pool debt is still tracked for newly minted Green tokens
+- **Treasury operation**: Functions as an internal treasury liquidity operation
+
 #### Example Usage
 ```python
-# Add partner asset + Green to Curve pool
-lp_tokens = endaoment.addPartnerLiquidity(
-    partner.address,
+# External partner liquidity (50/50 LP split)
+lp_tokens, amount_a, amount_b = endaoment.addPartnerLiquidity(
     2,  # Curve Lego ID
     curve_pool.address,
+    partner.address,
     usdc.address,
     1000_000000,  # 1000 USDC from partner
-    1000_000000000000000000,  # 1000 Green already in treasury
     950_000000000000000000,  # Min LP tokens
-    b"",
     sender=treasury_manager.address
 )
+# LP tokens split: 50% to partner, 50% to Endaoment
+
+# Endaoment self-liquidity (all LP to Endaoment)
+lp_tokens, amount_a, amount_b = endaoment.addPartnerLiquidity(
+    2,  # Curve Lego ID
+    curve_pool.address,
+    endaoment.address,  # Self as partner
+    usdc.address,
+    2000_000000,  # 2000 USDC from treasury
+    1900_000000000000000000,  # Min LP tokens
+    sender=treasury_manager.address
+)
+# LP tokens: 100% remain with Endaoment
 ```
 
 ## Swap and Exchange Functions
