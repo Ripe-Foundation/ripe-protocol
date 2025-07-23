@@ -127,6 +127,7 @@ event PartnerLiquidityMinted:
     partner: indexed(address)
     asset: indexed(address)
     partnerAmount: uint256
+    usdValue: uint256
     greenMinted: uint256
 
 HUNDRED_PERCENT: constant(uint256) = 100_00 # 100.00%
@@ -138,7 +139,7 @@ ERC721_RECEIVE_DATA: constant(Bytes[1024]) = b"UE721"
 API_VERSION: constant(String[28]) = "0.1.0"
 FIFTY_PERCENT: constant(uint256) = 50_00 # 50.00%
 EIGHTEEN_DECIMALS: constant(uint256) = 10 ** 18
-LEGO_BOOK_ID: constant(uint256) = 4
+LEGO_BOOK_ID: constant(uint256) = 3
 CURVE_PRICES_ID: constant(uint256) = 2
 
 WETH: public(immutable(address))
@@ -1053,9 +1054,10 @@ def mintPartnerLiquidity(_partner: address, _asset: address, _amount: uint256 = 
     assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
     a: addys.Addys = addys._getAddys()
     partnerAmount: uint256 = 0
+    usdValue: uint256 = 0
     greenMinted: uint256 = 0
-    partnerAmount, greenMinted = self._mintPartnerLiquidity(_partner, _asset, _amount, a.priceDesk, a.greenToken)
-    log PartnerLiquidityMinted(partner=_partner, asset=_asset, partnerAmount=partnerAmount, greenMinted=greenMinted)
+    partnerAmount, usdValue, greenMinted = self._mintPartnerLiquidity(_partner, _asset, _amount, a.priceDesk, a.greenToken)
+    log PartnerLiquidityMinted(partner=_partner, asset=_asset, partnerAmount=partnerAmount, usdValue=usdValue, greenMinted=greenMinted)
     return greenMinted
 
 
@@ -1075,7 +1077,8 @@ def addPartnerLiquidity(
     # mint green
     partnerAmount: uint256 = 0
     greenAmount: uint256 = 0
-    partnerAmount, greenAmount = self._mintPartnerLiquidity(_partner, _asset, _amount, a.priceDesk, a.greenToken)
+    greenMinted: uint256 = 0
+    partnerAmount, greenAmount, greenMinted = self._mintPartnerLiquidity(_partner, _asset, _amount, a.priceDesk, a.greenToken)
 
     # add liquidity
     lpToken: address = empty(address)
@@ -1088,10 +1091,12 @@ def addPartnerLiquidity(
     # share lp balance with partner
     lpBalance: uint256 = staticcall IERC20(lpToken).balanceOf(self)
     assert lpBalance != 0 # dev: no liquidity added
-    assert extcall IERC20(lpToken).transfer(_partner, lpBalance // 2, default_return_value=True) # dev: could not transfer
+    if _partner != self:
+        assert extcall IERC20(lpToken).transfer(_partner, lpBalance // 2, default_return_value=True) # dev: could not transfer
 
     # add pool debt
-    extcall Ledger(a.ledger).updateGreenPoolDebt(_pool, greenAmount, True)
+    if greenMinted != 0:
+        extcall Ledger(a.ledger).updateGreenPoolDebt(_pool, greenMinted, True)
 
     log PartnerLiquidityAdded(partner=_partner, asset=_asset, partnerAmount=partnerAmount, greenAmount=greenAmount, lpBalance=lpBalance)
     return lpAmountReceived, liqAmountA, liqAmountB
@@ -1107,17 +1112,24 @@ def _mintPartnerLiquidity(
     _amount: uint256,
     _priceDesk: address,
     _greenToken: address,
-) -> (uint256, uint256):
+) -> (uint256, uint256, uint256):
     partnerAmount: uint256 = min(_amount, staticcall IERC20(_asset).balanceOf(_partner))
     assert partnerAmount != 0 # dev: no asset to add
-    assert extcall IERC20(_asset).transferFrom(_partner, self, partnerAmount, default_return_value=True) # dev: transfer failed
+
+    if _partner != self:
+        assert extcall IERC20(_asset).transferFrom(_partner, self, partnerAmount, default_return_value=True) # dev: transfer failed
 
     usdValue: uint256 = staticcall PriceDesk(_priceDesk).getUsdValue(_asset, partnerAmount, True)
     assert usdValue != 0 # dev: invalid asset
 
-    # mint green
-    extcall GreenToken(_greenToken).mint(self, usdValue)
-    return partnerAmount, usdValue
+    # mint green (if needed)
+    greenAvail: uint256 = staticcall IERC20(_greenToken).balanceOf(self)
+    newMinted: uint256 = 0
+    if usdValue > greenAvail:
+        newMinted = usdValue - greenAvail
+        extcall GreenToken(_greenToken).mint(self, newMinted)
+
+    return partnerAmount, usdValue, newMinted
 
 
 #############
