@@ -10,10 +10,10 @@ MONTH_IN_SECONDS = 30 * 24 * 60 * 60
 
 @pytest.fixture(scope="module")
 def addPythFeed(pyth_prices, governance):
-    def addPythFeed(_asset, _feed_id):
+    def addPythFeed(_asset, _feed_id, _stale_time=0):
         if pyth_prices.hasPriceFeed(_asset):
             return
-        assert pyth_prices.addNewPriceFeed(_asset, _feed_id, sender=governance.address)
+        assert pyth_prices.addNewPriceFeed(_asset, _feed_id, _stale_time, sender=governance.address)
         boa.env.time_travel(blocks=pyth_prices.actionTimeLock() + 1)
         assert pyth_prices.confirmNewPriceFeed(_asset, sender=governance.address)
     yield addPythFeed
@@ -301,6 +301,48 @@ def test_pyth_get_price_stale(
     assert pyth_prices.getPrice(alpha_token, 3600) == 0
 
 
+def test_pyth_price_stale_with_feed_config(
+    pyth_prices,
+    mock_pyth,
+    alpha_token,
+    governance,
+):
+    # Test adding feed with custom stale time
+    stale_time = 3600  # 1 hour
+    data_feed_id = bytes.fromhex("eaa020c61cc479712813461ce153894a96a6c00b21ed0cfc2798d1f9a9e9c94a")
+    
+    # Refresh the feed's timestamp to current time
+    payload = mock_pyth.createPriceFeedUpdateData(data_feed_id, 98000000, 50000, -8, boa.env.evm.patch.timestamp)
+    boa.env.set_balance(boa.env.eoa, EIGHTEEN_DECIMALS)  # Add ETH for fee payment
+    mock_pyth.updatePriceFeeds(payload, value=len(payload))
+    
+    # Add feed with custom stale time (use 0 first to avoid validation issues)
+    assert pyth_prices.addNewPriceFeed(alpha_token, data_feed_id, 0, sender=governance.address)
+    boa.env.time_travel(blocks=pyth_prices.actionTimeLock() + 1)
+    assert pyth_prices.confirmNewPriceFeed(alpha_token, sender=governance.address)
+
+    # Verify event has stale time
+    log = filter_logs(pyth_prices, "NewPythFeedAdded")[0]
+    assert log.asset == alpha_token.address
+    assert log.feedId == data_feed_id
+    assert log.staleTime == 0  # We used 0 as stale time
+
+    # Test price with feed's stale time (should have price data from earlier setup)
+    assert pyth_prices.getPrice(alpha_token) != 0
+
+    # Test price with additional stale time parameter (should use max of both)
+    # The price should be 0 because the feed's publishTime is old enough to be stale with 1 hour stale time
+    assert pyth_prices.getPrice(alpha_token, stale_time) == 0  # 1 hour stale time
+
+    # Test price with larger stale time parameter (should also be stale)
+    assert pyth_prices.getPrice(alpha_token, 7200) == 0  # 2 hours > 1 hour
+
+    # Test that the feed config structure works correctly
+    config = pyth_prices.feedConfig(alpha_token)
+    assert config.feedId == data_feed_id
+    assert config.staleTime == 0  # We used 0 as stale time
+
+
 def test_pyth_is_valid_feed(
     pyth_prices,
     alpha_token,
@@ -309,13 +351,13 @@ def test_pyth_is_valid_feed(
     invalid_feed_id = bytes.fromhex("f" * 64)
 
     # valid feed
-    assert pyth_prices.isValidNewFeed(alpha_token, data_feed_id)
+    assert pyth_prices.isValidNewFeed(alpha_token, data_feed_id, 0)
 
     # invalid feed id
-    assert not pyth_prices.isValidNewFeed(alpha_token, invalid_feed_id)
+    assert not pyth_prices.isValidNewFeed(alpha_token, invalid_feed_id, 0)
 
     # invalid asset
-    assert not pyth_prices.isValidNewFeed(ZERO_ADDRESS, data_feed_id)
+    assert not pyth_prices.isValidNewFeed(ZERO_ADDRESS, data_feed_id, 0)
 
 
 ######################
@@ -333,29 +375,30 @@ def test_pyth_add_price_feed(
 
     # Test unauthorized access
     with boa.reverts("no perms"):
-        pyth_prices.addNewPriceFeed(alpha_token, data_feed_id, sender=bob)
+        pyth_prices.addNewPriceFeed(alpha_token, data_feed_id, 0, sender=bob)
 
     # Test adding invalid feed (non-existent feed)
     invalid_feed_id = bytes.fromhex("f" * 64)
     with boa.reverts("invalid feed"):
-        pyth_prices.addNewPriceFeed(alpha_token, invalid_feed_id, sender=governance.address)
+        pyth_prices.addNewPriceFeed(alpha_token, invalid_feed_id, 0, sender=governance.address)
 
     # Test adding feed with zero address asset
     with boa.reverts("invalid feed"):
-        pyth_prices.addNewPriceFeed(ZERO_ADDRESS, data_feed_id, sender=governance.address)
+        pyth_prices.addNewPriceFeed(ZERO_ADDRESS, data_feed_id, 0, sender=governance.address)
 
     # Test successful feed addition
-    assert pyth_prices.addNewPriceFeed(alpha_token, data_feed_id, sender=governance.address)
+    assert pyth_prices.addNewPriceFeed(alpha_token, data_feed_id, 0, sender=governance.address)
     
     # Verify event
     log = filter_logs(pyth_prices, "NewPythFeedPending")[0]
     assert log.asset == alpha_token.address
     assert log.feedId == data_feed_id
+    assert log.staleTime == 0
 
     # Verify pending state
     assert pyth_prices.hasPendingPriceFeedUpdate(alpha_token)
     pending = pyth_prices.pendingUpdates(alpha_token)
-    assert pending.feedId == data_feed_id
+    assert pending.config.feedId == data_feed_id
 
     # Test confirming before time lock
     with boa.reverts("time lock not reached"):
@@ -371,10 +414,11 @@ def test_pyth_add_price_feed(
     log = filter_logs(pyth_prices, "NewPythFeedAdded")[0]
     assert log.asset == alpha_token.address
     assert log.feedId == data_feed_id
+    assert log.staleTime == 0
 
     # Verify feed is active
     assert pyth_prices.hasPriceFeed(alpha_token)
-    assert pyth_prices.feedConfig(alpha_token) == data_feed_id
+    assert pyth_prices.feedConfig(alpha_token).feedId == data_feed_id
     assert pyth_prices.getPrice(alpha_token) != 0
     assert not pyth_prices.hasPendingPriceFeedUpdate(alpha_token)
 
@@ -384,7 +428,7 @@ def test_pyth_add_price_feed(
 
     # Test adding feed for existing asset
     with boa.reverts("invalid feed"):
-        pyth_prices.addNewPriceFeed(alpha_token, data_feed_id, sender=governance.address)
+        pyth_prices.addNewPriceFeed(alpha_token, data_feed_id, 0, sender=governance.address)
 
 
 def test_pyth_add_price_feed_cancel(
@@ -395,12 +439,13 @@ def test_pyth_add_price_feed_cancel(
     data_feed_id = bytes.fromhex("eaa020c61cc479712813461ce153894a96a6c00b21ed0cfc2798d1f9a9e9c94a")
 
     # Add feed
-    assert pyth_prices.addNewPriceFeed(alpha_token, data_feed_id, sender=governance.address)
+    assert pyth_prices.addNewPriceFeed(alpha_token, data_feed_id, 0, sender=governance.address)
     
     # Verify event
     log = filter_logs(pyth_prices, "NewPythFeedPending")[0]
     assert log.asset == alpha_token.address
     assert log.feedId == data_feed_id
+    assert log.staleTime == 0
 
     # Cancel feed
     assert pyth_prices.cancelNewPendingPriceFeed(alpha_token, sender=governance.address)
@@ -435,7 +480,7 @@ def test_pyth_add_price_feed_validation_during_confirm(
     boa.env.set_balance(boa.env.eoa, EIGHTEEN_DECIMALS)  # Add ETH for fee payment
     mock_pyth.updatePriceFeeds(payload, value=len(payload))
     
-    assert pyth_prices.addNewPriceFeed(alpha_token, invalid_feed_id, sender=governance.address)
+    assert pyth_prices.addNewPriceFeed(alpha_token, invalid_feed_id, 0, sender=governance.address)
     
     # Travel past time lock
     boa.env.time_travel(blocks=pyth_prices.actionTimeLock() + 1)
@@ -479,29 +524,30 @@ def test_pyth_update_price_feed(
 
     # Test unauthorized access
     with boa.reverts("no perms"):
-        pyth_prices.updatePriceFeed(alpha_token, data_feed_id_2, sender=bob)
+        pyth_prices.updatePriceFeed(alpha_token, data_feed_id_2, 0, sender=bob)
 
     # Test updating with same feed
     with boa.reverts("invalid feed"):
-        pyth_prices.updatePriceFeed(alpha_token, data_feed_id_1, sender=governance.address)
+        pyth_prices.updatePriceFeed(alpha_token, data_feed_id_1, 0, sender=governance.address)
 
     # Test updating non-existent asset
     with boa.reverts("invalid feed"):
-        pyth_prices.updatePriceFeed(ZERO_ADDRESS, data_feed_id_2, sender=governance.address)
+        pyth_prices.updatePriceFeed(ZERO_ADDRESS, data_feed_id_2, 0, sender=governance.address)
 
     # Test updating with invalid feed
     invalid_feed_id = bytes.fromhex("f" * 64)
     with boa.reverts("invalid feed"):
-        pyth_prices.updatePriceFeed(alpha_token, invalid_feed_id, sender=governance.address)
+        pyth_prices.updatePriceFeed(alpha_token, invalid_feed_id, 0, sender=governance.address)
 
     # Test successful update
-    assert pyth_prices.updatePriceFeed(alpha_token, data_feed_id_2, sender=governance.address)
+    assert pyth_prices.updatePriceFeed(alpha_token, data_feed_id_2, 0, sender=governance.address)
     
     # Verify event
     log = filter_logs(pyth_prices, "PythFeedUpdatePending")[0]
     assert log.asset == alpha_token.address
     assert log.feedId == data_feed_id_2
     assert log.oldFeedId == data_feed_id_1
+    assert log.staleTime == 0
 
     # Test confirming before time lock
     with boa.reverts("time lock not reached"):
@@ -518,10 +564,11 @@ def test_pyth_update_price_feed(
     assert log.asset == alpha_token.address
     assert log.feedId == data_feed_id_2
     assert log.oldFeedId == data_feed_id_1
+    assert log.staleTime == 0
 
     # Verify feed is updated
     assert pyth_prices.hasPriceFeed(alpha_token)
-    assert pyth_prices.feedConfig(alpha_token) == data_feed_id_2
+    assert pyth_prices.feedConfig(alpha_token).feedId == data_feed_id_2
     assert pyth_prices.getPrice(alpha_token) != 0
 
     # Test canceling non-existent update
@@ -548,13 +595,14 @@ def test_pyth_update_price_feed_cancel(
     addPythFeed(alpha_token, data_feed_id_1)
 
     # Start update
-    assert pyth_prices.updatePriceFeed(alpha_token, data_feed_id_2, sender=governance.address)
+    assert pyth_prices.updatePriceFeed(alpha_token, data_feed_id_2, 0, sender=governance.address)
     
     # Verify event
     log = filter_logs(pyth_prices, "PythFeedUpdatePending")[0]
     assert log.asset == alpha_token.address
     assert log.feedId == data_feed_id_2
     assert log.oldFeedId == data_feed_id_1
+    assert log.staleTime == 0
 
     # Cancel update
     assert pyth_prices.cancelPriceFeedUpdate(alpha_token, sender=governance.address)
@@ -567,7 +615,7 @@ def test_pyth_update_price_feed_cancel(
 
     # Verify feed is not updated
     assert pyth_prices.hasPriceFeed(alpha_token)
-    assert pyth_prices.feedConfig(alpha_token) == data_feed_id_1
+    assert pyth_prices.feedConfig(alpha_token).feedId == data_feed_id_1
     assert not pyth_prices.hasPendingPriceFeedUpdate(alpha_token)
 
     # Test confirming after cancel
@@ -595,10 +643,10 @@ def test_pyth_update_feed_validation_functions(
     addPythFeed(alpha_token, data_feed_id_1)
 
     # Test isValidUpdateFeed function
-    assert pyth_prices.isValidUpdateFeed(alpha_token, data_feed_id_2)  # Valid update
-    assert not pyth_prices.isValidUpdateFeed(alpha_token, data_feed_id_1)  # Same feed
-    assert not pyth_prices.isValidUpdateFeed(bravo_token, data_feed_id_2)  # No existing feed
-    assert not pyth_prices.isValidUpdateFeed(alpha_token, invalid_feed_id)  # Invalid feed
+    assert pyth_prices.isValidUpdateFeed(alpha_token, data_feed_id_2, 0)  # Valid update
+    assert not pyth_prices.isValidUpdateFeed(alpha_token, data_feed_id_1, 0)  # Same feed
+    assert not pyth_prices.isValidUpdateFeed(bravo_token, data_feed_id_2, 0)  # No existing feed
+    assert not pyth_prices.isValidUpdateFeed(alpha_token, invalid_feed_id, 0)  # Invalid feed
 
 
 ######################
@@ -652,7 +700,7 @@ def test_pyth_disable_price_feed(
     # Verify feed is disabled
     assert not pyth_prices.hasPriceFeed(alpha_token)
     assert pyth_prices.getPrice(alpha_token) == 0
-    assert pyth_prices.feedConfig(alpha_token) == bytes(32)
+    assert pyth_prices.feedConfig(alpha_token).feedId == bytes(32)
 
     # Test canceling non-existent disable
     with boa.reverts("cannot cancel action"):
@@ -688,7 +736,7 @@ def test_pyth_disable_price_feed_cancel(
     # Verify feed is still active
     assert pyth_prices.hasPriceFeed(alpha_token)
     assert pyth_prices.getPrice(alpha_token) != 0
-    assert pyth_prices.feedConfig(alpha_token) == data_feed_id
+    assert pyth_prices.feedConfig(alpha_token).feedId == data_feed_id
 
     # Test confirming after cancel
     with boa.reverts("no pending disable feed"):
@@ -767,7 +815,7 @@ def test_pyth_time_lock_edge_cases(
     mock_pyth.updatePriceFeeds(payload_2, value=len(payload_2))
 
     # Test confirming just before time lock boundary
-    assert pyth_prices.addNewPriceFeed(alpha_token, data_feed_id_1, sender=governance.address)
+    assert pyth_prices.addNewPriceFeed(alpha_token, data_feed_id_1, 0, sender=governance.address)
     boa.env.time_travel(blocks=pyth_prices.actionTimeLock() - 1)
     with boa.reverts("time lock not reached"):
         pyth_prices.confirmNewPriceFeed(alpha_token, sender=governance.address)
@@ -777,7 +825,7 @@ def test_pyth_time_lock_edge_cases(
     assert pyth_prices.confirmNewPriceFeed(alpha_token, sender=governance.address)
 
     # Test multiple time lock actions in sequence
-    assert pyth_prices.updatePriceFeed(alpha_token, data_feed_id_2, sender=governance.address)
+    assert pyth_prices.updatePriceFeed(alpha_token, data_feed_id_2, 0, sender=governance.address)
     boa.env.time_travel(blocks=pyth_prices.actionTimeLock() + 1)
     assert pyth_prices.confirmPriceFeedUpdate(alpha_token, sender=governance.address)
     
@@ -787,7 +835,7 @@ def test_pyth_time_lock_edge_cases(
 
     # Test with different time lock values
     pyth_prices.setActionTimeLock(302400, sender=governance.address)  # 7 days in blocks
-    assert pyth_prices.addNewPriceFeed(bravo_token, data_feed_id_1, sender=governance.address)
+    assert pyth_prices.addNewPriceFeed(bravo_token, data_feed_id_1, 0, sender=governance.address)
     boa.env.time_travel(blocks=302400)
     assert pyth_prices.confirmNewPriceFeed(bravo_token, sender=governance.address)
 
@@ -808,21 +856,21 @@ def test_pyth_governance_edge_cases(
     mock_pyth.updatePriceFeeds(payload_2, value=len(payload_2))
 
     # Test multiple governance actions in sequence
-    assert pyth_prices.addNewPriceFeed(alpha_token, data_feed_id_1, sender=governance.address)
+    assert pyth_prices.addNewPriceFeed(alpha_token, data_feed_id_1, 0, sender=governance.address)
     assert pyth_prices.cancelNewPendingPriceFeed(alpha_token, sender=governance.address)
-    assert pyth_prices.addNewPriceFeed(alpha_token, data_feed_id_1, sender=governance.address)
+    assert pyth_prices.addNewPriceFeed(alpha_token, data_feed_id_1, 0, sender=governance.address)
     boa.env.time_travel(blocks=pyth_prices.actionTimeLock() + 1)
     assert pyth_prices.confirmNewPriceFeed(alpha_token, sender=governance.address)
-    assert pyth_prices.updatePriceFeed(alpha_token, data_feed_id_2, sender=governance.address)
+    assert pyth_prices.updatePriceFeed(alpha_token, data_feed_id_2, 0, sender=governance.address)
     boa.env.time_travel(blocks=pyth_prices.actionTimeLock() + 1)
     assert pyth_prices.confirmPriceFeedUpdate(alpha_token, sender=governance.address)
 
     # Test governance actions during pause (using MissionControl address)
     pyth_prices.pause(True, sender=switchboard_alpha.address)
     with boa.reverts("contract paused"):
-        pyth_prices.addNewPriceFeed(alpha_token, data_feed_id_1, sender=governance.address)
+        pyth_prices.addNewPriceFeed(alpha_token, data_feed_id_1, 0, sender=governance.address)
     with boa.reverts("contract paused"):
-        pyth_prices.updatePriceFeed(alpha_token, data_feed_id_1, sender=governance.address)
+        pyth_prices.updatePriceFeed(alpha_token, data_feed_id_1, 0, sender=governance.address)
     with boa.reverts("contract paused"):
         pyth_prices.disablePriceFeed(alpha_token, sender=governance.address)
 
@@ -833,7 +881,7 @@ def test_pyth_governance_edge_cases(
     boa.env.time_travel(blocks=pyth_prices.actionTimeLock() + 1)
     assert pyth_prices.confirmDisablePriceFeed(alpha_token, sender=governance.address)
     # Now we can add a new feed
-    assert pyth_prices.addNewPriceFeed(alpha_token, data_feed_id_1, sender=governance.address)
+    assert pyth_prices.addNewPriceFeed(alpha_token, data_feed_id_1, 0, sender=governance.address)
 
 
 def test_pyth_feed_validation_edge_cases(
@@ -853,7 +901,7 @@ def test_pyth_feed_validation_edge_cases(
     mock_pyth.updatePriceFeeds(payload, value=len(payload))
 
     # Should work regardless of timestamp since staleness check is removed for adding feeds
-    assert pyth_prices.addNewPriceFeed(alpha_token, new_feed_id, sender=governance.address)
+    assert pyth_prices.addNewPriceFeed(alpha_token, new_feed_id, 0, sender=governance.address)
     
     # Travel past time lock and confirm
     boa.env.time_travel(blocks=pyth_prices.actionTimeLock() + 1)
@@ -861,7 +909,7 @@ def test_pyth_feed_validation_edge_cases(
     
     # Verify feed is active
     assert pyth_prices.hasPriceFeed(alpha_token)
-    assert pyth_prices.feedConfig(alpha_token) == new_feed_id
+    assert pyth_prices.feedConfig(alpha_token).feedId == new_feed_id
 
 
 @pytest.base

@@ -41,6 +41,7 @@ struct ChainlinkConfig:
     decimals: uint256
     needsEthToUsd: bool
     needsBtcToUsd: bool
+    staleTime: uint256
 
 struct PendingChainlinkConfig:
     actionId: uint256
@@ -51,6 +52,7 @@ event NewChainlinkFeedPending:
     feed: indexed(address)
     needsEthToUsd: bool
     needsBtcToUsd: bool
+    staleTime: uint256
     confirmationBlock: uint256
     actionId: uint256
 
@@ -59,6 +61,7 @@ event NewChainlinkFeedAdded:
     feed: indexed(address)
     needsEthToUsd: bool
     needsBtcToUsd: bool
+    staleTime: uint256
 
 event NewChainlinkFeedCancelled:
     asset: indexed(address)
@@ -69,6 +72,7 @@ event ChainlinkFeedUpdatePending:
     feed: indexed(address)
     needsEthToUsd: bool
     needsBtcToUsd: bool
+    staleTime: uint256
     confirmationBlock: uint256
     oldFeed: indexed(address)
     actionId: uint256
@@ -78,6 +82,7 @@ event ChainlinkFeedUpdated:
     feed: indexed(address)
     needsEthToUsd: bool
     needsBtcToUsd: bool
+    staleTime: uint256
     oldFeed: indexed(address)
 
 event ChainlinkFeedUpdateCancelled:
@@ -150,13 +155,14 @@ def __init__(
 @internal
 def _setDefaultFeedOnDeploy(_asset: address, _newFeed: address) -> bool:
     decimals: uint256 = convert(staticcall ChainlinkFeed(_newFeed).decimals(), uint256)
-    if not self._isValidNewFeed(_asset, _newFeed, decimals, False, False):
+    if not self._isValidNewFeed(_asset, _newFeed, decimals, False, False, 0):
         return False
     self.feedConfig[_asset] = ChainlinkConfig(
         feed=_newFeed,
         decimals=decimals,
         needsEthToUsd=False,
         needsBtcToUsd=False,
+        staleTime=0,
     )
     priceData._addPricedAsset(_asset)
     return True
@@ -176,7 +182,8 @@ def getPrice(_asset: address, _staleTime: uint256 = 0, _priceDesk: address = emp
     config: ChainlinkConfig = self.feedConfig[_asset]
     if config.feed == empty(address):
         return 0
-    return self._getPrice(config.feed, config.decimals, config.needsEthToUsd, config.needsBtcToUsd, _staleTime)
+    staleTime: uint256 = max(_staleTime, config.staleTime)
+    return self._getPrice(config.feed, config.decimals, config.needsEthToUsd, config.needsBtcToUsd, staleTime)
 
 
 @view
@@ -185,7 +192,8 @@ def getPriceAndHasFeed(_asset: address, _staleTime: uint256 = 0, _priceDesk: add
     config: ChainlinkConfig = self.feedConfig[_asset]
     if config.feed == empty(address):
         return 0, False
-    return self._getPrice(config.feed, config.decimals, config.needsEthToUsd, config.needsBtcToUsd, _staleTime), True
+    staleTime: uint256 = max(_staleTime, config.staleTime)
+    return self._getPrice(config.feed, config.decimals, config.needsEthToUsd, config.needsBtcToUsd, staleTime), True
 
 
 @view
@@ -296,6 +304,7 @@ def _getChainlinkData(_feed: address, _decimals: uint256, _staleTime: uint256) -
 def addNewPriceFeed(
     _asset: address, 
     _newFeed: address, 
+    _staleTime: uint256 = 0,
     _needsEthToUsd: bool = False,
     _needsBtcToUsd: bool = False,
 ) -> bool:
@@ -306,7 +315,7 @@ def addNewPriceFeed(
     decimals: uint256 = 0
     if _newFeed != empty(address):
         decimals = convert(staticcall ChainlinkFeed(_newFeed).decimals(), uint256)
-    assert self._isValidNewFeed(_asset, _newFeed, decimals, _needsEthToUsd, _needsBtcToUsd) # dev: invalid feed
+    assert self._isValidNewFeed(_asset, _newFeed, decimals, _needsEthToUsd, _needsBtcToUsd, _staleTime) # dev: invalid feed
 
     # set to pending state
     aid: uint256 = timeLock._initiateAction()
@@ -317,10 +326,11 @@ def addNewPriceFeed(
             decimals=decimals,
             needsEthToUsd=_needsEthToUsd,
             needsBtcToUsd=_needsBtcToUsd,
+            staleTime=_staleTime,
         ),
     )
 
-    log NewChainlinkFeedPending(asset=_asset, feed=_newFeed, needsEthToUsd=_needsEthToUsd, needsBtcToUsd=_needsBtcToUsd, confirmationBlock=timeLock._getActionConfirmationBlock(aid), actionId=aid)
+    log NewChainlinkFeedPending(asset=_asset, feed=_newFeed, needsEthToUsd=_needsEthToUsd, needsBtcToUsd=_needsBtcToUsd, staleTime=_staleTime, confirmationBlock=timeLock._getActionConfirmationBlock(aid), actionId=aid)
     return True
 
 
@@ -335,7 +345,7 @@ def confirmNewPriceFeed(_asset: address) -> bool:
     # validate again
     d: PendingChainlinkConfig = self.pendingUpdates[_asset]
     assert d.config.feed != empty(address) # dev: no pending new feed
-    if not self._isValidNewFeed(_asset, d.config.feed, d.config.decimals, d.config.needsEthToUsd, d.config.needsBtcToUsd):
+    if not self._isValidNewFeed(_asset, d.config.feed, d.config.decimals, d.config.needsEthToUsd, d.config.needsBtcToUsd, d.config.staleTime):
         self._cancelNewPendingPriceFeed(_asset, d.actionId)
         return False
 
@@ -347,7 +357,7 @@ def confirmNewPriceFeed(_asset: address) -> bool:
     self.pendingUpdates[_asset] = empty(PendingChainlinkConfig)
     priceData._addPricedAsset(_asset)
 
-    log NewChainlinkFeedAdded(asset=_asset, feed=d.config.feed, needsEthToUsd=d.config.needsEthToUsd, needsBtcToUsd=d.config.needsBtcToUsd)
+    log NewChainlinkFeedAdded(asset=_asset, feed=d.config.feed, needsEthToUsd=d.config.needsEthToUsd, needsBtcToUsd=d.config.needsBtcToUsd, staleTime=d.config.staleTime)
     return True
 
 
@@ -376,16 +386,16 @@ def _cancelNewPendingPriceFeed(_asset: address, _aid: uint256):
 
 @view
 @external
-def isValidNewFeed(_asset: address, _newFeed: address, _decimals: uint256, _needsEthToUsd: bool, _needsBtcToUsd: bool) -> bool:
-    return self._isValidNewFeed(_asset, _newFeed, _decimals, _needsEthToUsd, _needsBtcToUsd)
+def isValidNewFeed(_asset: address, _newFeed: address, _decimals: uint256, _needsEthToUsd: bool, _needsBtcToUsd: bool, _staleTime: uint256) -> bool:
+    return self._isValidNewFeed(_asset, _newFeed, _decimals, _needsEthToUsd, _needsBtcToUsd, _staleTime)
 
 
 @view
 @internal
-def _isValidNewFeed(_asset: address, _newFeed: address, _decimals: uint256, _needsEthToUsd: bool, _needsBtcToUsd: bool) -> bool:
+def _isValidNewFeed(_asset: address, _newFeed: address, _decimals: uint256, _needsEthToUsd: bool, _needsBtcToUsd: bool, _staleTime: uint256) -> bool:
     if priceData.indexOfAsset[_asset] != 0 or self.feedConfig[_asset].feed != empty(address): # use the `updatePriceFeed` function instead
         return False
-    return self._isValidFeedConfig(_asset, _newFeed, _decimals, _needsEthToUsd, _needsBtcToUsd)
+    return self._isValidFeedConfig(_asset, _newFeed, _decimals, _needsEthToUsd, _needsBtcToUsd, _staleTime)
 
 
 ###############
@@ -400,6 +410,7 @@ def _isValidNewFeed(_asset: address, _newFeed: address, _decimals: uint256, _nee
 def updatePriceFeed(
     _asset: address, 
     _newFeed: address, 
+    _staleTime: uint256 = 0,
     _needsEthToUsd: bool = False,
     _needsBtcToUsd: bool = False,
 ) -> bool:
@@ -411,7 +422,7 @@ def updatePriceFeed(
     if _newFeed != empty(address):
         decimals = convert(staticcall ChainlinkFeed(_newFeed).decimals(), uint256)
     oldFeed: address = self.feedConfig[_asset].feed
-    assert self._isValidUpdateFeed(_asset, _newFeed, oldFeed, decimals, _needsEthToUsd, _needsBtcToUsd) # dev: invalid feed
+    assert self._isValidUpdateFeed(_asset, _newFeed, oldFeed, decimals, _needsEthToUsd, _needsBtcToUsd, _staleTime) # dev: invalid feed
 
     # set to pending state
     aid: uint256 = timeLock._initiateAction()
@@ -422,9 +433,10 @@ def updatePriceFeed(
             decimals=decimals,
             needsEthToUsd=_needsEthToUsd,
             needsBtcToUsd=_needsBtcToUsd,
+            staleTime=_staleTime,
         ),
     )
-    log ChainlinkFeedUpdatePending(asset=_asset, feed=_newFeed, needsEthToUsd=_needsEthToUsd, needsBtcToUsd=_needsBtcToUsd, confirmationBlock=timeLock._getActionConfirmationBlock(aid), oldFeed=oldFeed, actionId=aid)
+    log ChainlinkFeedUpdatePending(asset=_asset, feed=_newFeed, needsEthToUsd=_needsEthToUsd, needsBtcToUsd=_needsBtcToUsd, staleTime=_staleTime, confirmationBlock=timeLock._getActionConfirmationBlock(aid), oldFeed=oldFeed, actionId=aid)
     return True
 
 
@@ -440,7 +452,7 @@ def confirmPriceFeedUpdate(_asset: address) -> bool:
     d: PendingChainlinkConfig = self.pendingUpdates[_asset]
     assert d.config.feed != empty(address) # dev: no pending update feed
     oldFeed: address = self.feedConfig[_asset].feed
-    if not self._isValidUpdateFeed(_asset, d.config.feed, oldFeed, d.config.decimals, d.config.needsEthToUsd, d.config.needsBtcToUsd):
+    if not self._isValidUpdateFeed(_asset, d.config.feed, oldFeed, d.config.decimals, d.config.needsEthToUsd, d.config.needsBtcToUsd, d.config.staleTime):
         self._cancelPriceFeedUpdate(_asset, d.actionId)
         return False
 
@@ -451,7 +463,7 @@ def confirmPriceFeedUpdate(_asset: address) -> bool:
     self.feedConfig[_asset] = d.config
     self.pendingUpdates[_asset] = empty(PendingChainlinkConfig)
 
-    log ChainlinkFeedUpdated(asset=_asset, feed=d.config.feed, needsEthToUsd=d.config.needsEthToUsd, needsBtcToUsd=d.config.needsBtcToUsd, oldFeed=oldFeed)
+    log ChainlinkFeedUpdated(asset=_asset, feed=d.config.feed, needsEthToUsd=d.config.needsEthToUsd, needsBtcToUsd=d.config.needsBtcToUsd, staleTime=d.config.staleTime, oldFeed=oldFeed)
     return True
 
 
@@ -480,18 +492,18 @@ def _cancelPriceFeedUpdate(_asset: address, _aid: uint256):
 
 @view
 @external
-def isValidUpdateFeed(_asset: address, _newFeed: address, _decimals: uint256, _needsEthToUsd: bool, _needsBtcToUsd: bool) -> bool:
-    return self._isValidUpdateFeed(_asset, _newFeed, self.feedConfig[_asset].feed, _decimals, _needsEthToUsd, _needsBtcToUsd)
+def isValidUpdateFeed(_asset: address, _newFeed: address, _decimals: uint256, _needsEthToUsd: bool, _needsBtcToUsd: bool, _staleTime: uint256) -> bool:
+    return self._isValidUpdateFeed(_asset, _newFeed, self.feedConfig[_asset].feed, _decimals, _needsEthToUsd, _needsBtcToUsd, _staleTime)
 
 
 @view
 @internal
-def _isValidUpdateFeed(_asset: address, _newFeed: address, _oldFeed: address, _decimals: uint256, _needsEthToUsd: bool, _needsBtcToUsd: bool) -> bool:
+def _isValidUpdateFeed(_asset: address, _newFeed: address, _oldFeed: address, _decimals: uint256, _needsEthToUsd: bool, _needsBtcToUsd: bool, _staleTime: uint256) -> bool:
     if _newFeed == _oldFeed:
         return False
     if priceData.indexOfAsset[_asset] == 0 or _oldFeed == empty(address): # use the `addNewPriceFeed` function instead
         return False
-    return self._isValidFeedConfig(_asset, _newFeed, _decimals, _needsEthToUsd, _needsBtcToUsd)
+    return self._isValidFeedConfig(_asset, _newFeed, _decimals, _needsEthToUsd, _needsBtcToUsd, _staleTime)
 
 
 @view
@@ -502,16 +514,17 @@ def _isValidFeedConfig(
     _decimals: uint256,
     _needsEthToUsd: bool,
     _needsBtcToUsd: bool,
+    _staleTime: uint256,
 ) -> bool:
     if empty(address) in [_asset, _feed]:
         return False
     if _needsEthToUsd and _needsBtcToUsd:
         return False
 
-    staleTime: uint256 = 0
+    staleTime: uint256 = _staleTime
     missionControl: address = addys._getMissionControlAddr()
     if missionControl != empty(address):
-        staleTime = staticcall MissionControl(missionControl).getPriceStaleTime()
+        staleTime = max(staleTime, staticcall MissionControl(missionControl).getPriceStaleTime())
 
     return self._getPrice(_feed, _decimals, _needsEthToUsd, _needsBtcToUsd, staleTime) != 0
 
