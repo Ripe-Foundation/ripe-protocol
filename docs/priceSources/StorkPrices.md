@@ -52,18 +52,26 @@ struct TemporalNumericValue:
     quantizedValue: uint256  # Price in 18 decimals
 ```
 
+### StorkFeedConfig Struct
+Configuration for each asset's price feed:
+```vyper
+struct StorkFeedConfig:
+    feedId: bytes32          # Stork feed identifier
+    staleTime: uint256       # Maximum age for price data in seconds
+```
+
 ### PendingStorkFeed Struct
 Tracks pending feed changes:
 ```vyper
 struct PendingStorkFeed:
     actionId: uint256        # TimeLock action ID
-    feedId: bytes32          # Stork feed identifier
+    config: StorkFeedConfig  # New configuration
 ```
 
 ## State Variables
 
 ### Feed Configuration
-- `feedConfig: HashMap[address, bytes32]` - Maps assets to Stork feed IDs
+- `feedConfig: HashMap[address, StorkFeedConfig]` - Maps assets to Stork feed configurations
 - `pendingUpdates: HashMap[address, PendingStorkFeed]` - Pending changes
 
 ### Constants
@@ -331,7 +339,7 @@ Initiates addition of a new Stork price feed.
 
 ```vyper
 @external
-def addNewPriceFeed(_asset: address, _feedId: bytes32) -> bool:
+def addNewPriceFeed(_asset: address, _feedId: bytes32, _staleTime: uint256 = 0) -> bool:
 ```
 
 #### Parameters
@@ -340,6 +348,7 @@ def addNewPriceFeed(_asset: address, _feedId: bytes32) -> bool:
 |------|------|-------------|
 | `_asset` | `address` | Asset to add price feed for |
 | `_feedId` | `bytes32` | Stork Network feed identifier |
+| `_staleTime` | `uint256` | Maximum age for price data in seconds (0 uses MissionControl default) |
 
 #### Access
 
@@ -379,7 +388,7 @@ Updates existing feed to new Stork feed ID.
 
 ```vyper
 @external
-def updatePriceFeed(_asset: address, _feedId: bytes32) -> bool:
+def updatePriceFeed(_asset: address, _feedId: bytes32, _staleTime: uint256 = 0) -> bool:
 ```
 
 Similar timelock process as additions.
@@ -451,7 +460,7 @@ Validates new feed configuration.
 ```vyper
 @view
 @external
-def isValidNewFeed(_asset: address, _feedId: bytes32) -> bool:
+def isValidNewFeed(_asset: address, _feedId: bytes32, _staleTime: uint256) -> bool:
 ```
 
 #### Validation Checks
