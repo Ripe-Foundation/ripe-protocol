@@ -239,6 +239,8 @@ def transfer(_recipient: address, _amount: uint256) -> bool:
 
 Standard ERC20 transfer with blacklist and pause checks.
 
+**Events Emitted**: `Transfer`
+
 #### `transferFrom`
 ```vyper
 @external
@@ -246,6 +248,8 @@ def transferFrom(_sender: address, _recipient: address, _amount: uint256) -> boo
 ```
 
 Transfer on behalf of another address using allowance.
+
+**Events Emitted**: `Transfer`, `Approval`
 
 ### Allowance Functions
 
@@ -257,6 +261,8 @@ def approve(_spender: address, _amount: uint256) -> bool:
 
 Set spending allowance with validation.
 
+**Events Emitted**: `Approval`
+
 #### `increaseAllowance`
 ```vyper
 @external
@@ -265,6 +271,8 @@ def increaseAllowance(_spender: address, _amount: uint256) -> bool:
 
 Safely increase allowance (prevents race conditions).
 
+**Events Emitted**: `Approval`
+
 #### `decreaseAllowance`
 ```vyper
 @external
@@ -272,6 +280,8 @@ def decreaseAllowance(_spender: address, _amount: uint256) -> bool:
 ```
 
 Safely decrease allowance (prevents underflow).
+
+**Events Emitted**: `Approval`
 
 ### Minting and Burning
 
@@ -283,6 +293,8 @@ def _mint(_recipient: address, _amount: uint256) -> bool:
 
 Mints new tokens. Must be called by inheriting contract with proper permissions.
 
+**Events Emitted**: `Transfer`
+
 #### `burn`
 ```vyper
 @external
@@ -290,6 +302,8 @@ def burn(_amount: uint256) -> bool:
 ```
 
 Burns tokens from caller's balance.
+
+**Events Emitted**: `Transfer`
 
 ## Permit Function (EIP-2612)
 
@@ -353,6 +367,8 @@ token.permit(
 )
 ```
 
+**Events Emitted**: `Approval`
+
 ## Blacklist Functions
 
 ### `setBlacklist`
@@ -372,6 +388,8 @@ Only addresses with `canSetTokenBlacklist` permission in [RipeHq](../../registri
 - Cannot blacklist token contract itself
 - Cannot blacklist zero address
 
+**Events Emitted**: `BlacklistModified`
+
 ### `burnBlacklistTokens`
 
 Burns tokens from blacklisted addresses.
@@ -384,6 +402,8 @@ def burnBlacklistTokens(_addr: address, _amount: uint256 = max_value(uint256)) -
 #### Access
 
 Only protocol governance.
+
+**Events Emitted**: `Transfer`
 
 #### Parameters
 - `_amount`: Amount to burn (defaults to full balance)
@@ -408,6 +428,8 @@ Current governance only.
 - No pending governance changes in either HQ
 - Both tokens must be set in new HQ
 
+**Events Emitted**: `HqChangeInitiated`
+
 ### `confirmHqChange`
 
 Completes HQ migration after timelock.
@@ -419,6 +441,8 @@ def confirmHqChange() -> bool:
 
 Re-validates and updates RipeHq pointer.
 
+**Events Emitted**: `HqChangeConfirmed`
+
 ### `setHqChangeTimeLock`
 
 Adjusts timelock for future HQ changes.
@@ -429,6 +453,8 @@ def setHqChangeTimeLock(_newTimeLock: uint256) -> bool:
 ```
 
 Must be within MIN/MAX bounds.
+
+**Events Emitted**: `HqChangeTimeLockModified`
 
 ## Pause Function
 
@@ -451,6 +477,8 @@ Protocol governance only.
 - No minting
 - No burning
 
+**Events Emitted**: `TokenPauseModified`
+
 ## Initial Setup Function
 
 ### `finishTokenSetup`
@@ -472,6 +500,8 @@ Temporary governance only.
 3. Configures timelock
 4. Clears temporary governance
 
+**Events Emitted**: `InitialRipeHqSet`
+
 ## View Functions
 
 ### Token Info
@@ -491,22 +521,6 @@ Temporary governance only.
 - `minHqTimeLock() -> uint256`
 - `maxHqTimeLock() -> uint256`
 
-## Events
-
-### Token Events
-- `Transfer` - Token transfers
-- `Approval` - Allowance changes
-
-### Blacklist Events
-- `BlacklistModified` - Address blacklist status changed
-
-### Governance Events
-- `HqChangeInitiated` - HQ migration started
-- `HqChangeConfirmed` - HQ migration completed
-- `HqChangeCancelled` - HQ migration cancelled
-- `TokenPauseModified` - Pause state changed
-- `InitialRipeHqSet` - Initial setup completed
-- `HqChangeTimeLockModified` - Timelock adjusted
 
 ## Security Considerations
 

@@ -13,7 +13,7 @@ MissionControl is the central configuration hub for Ripe Protocol, storing all o
 - **Rewards Configuration**: Points allocation across borrowers, stakers, voters, and depositors
 - **Advanced Features**: Priority vaults, stability pools, bond markets, and dynamic rates
 
-MissionControl implements read-only access for queries with writes restricted to Switchboard-registered contracts. Extensive bundling functions package related configurations for efficient consumption, while automatic asset registration and validation ensure data integrity across the protocol.
+MissionControl implements read-only access for queries with writes restricted to [Switchboard](../registries/Switchboard.md)-registered contracts. Extensive bundling functions package related configurations for efficient consumption, while automatic asset registration and validation ensure data integrity across the protocol. It serves all major protocol components including [CreditEngine](../core/CreditEngine.md), [AuctionHouse](../core/AuctionHouse.md), [PriceDesk](../registries/PriceDesk.md), and vault systems.
 
 ## Architecture & Modules
 

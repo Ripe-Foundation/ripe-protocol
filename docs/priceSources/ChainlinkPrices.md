@@ -12,7 +12,7 @@ ChainlinkPrices integrates Chainlink's decentralized oracle network to provide r
 - **Decimal Normalization**: Converts all prices to 18-decimal USD values
 - **Cross-Rate Support**: Handles ETH/BTC denominated feeds with automatic USD conversion
 
-The module implements automatic validation of price feed data, configurable staleness thresholds per asset, time-locked governance for feed updates, and special handling for core assets (ETH, WETH, BTC) that cannot be disabled.
+The module implements automatic validation of price feed data, configurable staleness thresholds per asset, time-locked governance for feed updates, and special handling for core assets (ETH, WETH, BTC) that cannot be disabled. It integrates with [PriceDesk](../registries/PriceDesk.md) for aggregation and uses [MissionControl](../data/MissionControl.md) for configuration management.
 
 ## Architecture & Dependencies
 

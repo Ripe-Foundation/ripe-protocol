@@ -11,7 +11,7 @@ PriceDesk is the centralized oracle registry that aggregates multiple price sour
 - **Smart Aggregation**: Checks priority sources first, then falls back to all registered oracles
 - **Value Conversions**: Automatic USD/asset conversions with decimal normalization
 
-Built on LocalGov and AddressRegistry modules, PriceDesk implements resilient price discovery through priority-based oracle selection. It handles diverse token decimals automatically and provides specialized ETH conversion utilities, ensuring protocol-wide access to accurate pricing data.
+Built on LocalGov and AddressRegistry modules, PriceDesk implements resilient price discovery through priority-based oracle selection. It handles diverse token decimals automatically and provides specialized ETH conversion utilities, ensuring protocol-wide access to accurate pricing data. It integrates with price sources like [ChainlinkPrices](../priceSources/ChainlinkPrices.md), [CurvePrices](../priceSources/CurvePrices.md), and [PythPrices](../priceSources/PythPrices.md), with configuration managed through [MissionControl](../data/MissionControl.md).
 
 ## Architecture & Modules
 

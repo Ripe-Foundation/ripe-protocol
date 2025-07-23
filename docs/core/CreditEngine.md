@@ -12,7 +12,7 @@ CreditEngine is the lending and borrowing powerhouse of Ripe Protocol, managing 
 - **Collateral Redemption**: Allow GREEN holders to redeem unhealthy positions directly
 - **Risk Controls**: Enforce debt ceilings, interval-based limits, and automatic liquidation triggers
 
-CreditEngine implements advanced DeFi mechanics including position-weighted risk parameters, transient storage for gas optimization, atomic debt updates with compounding, and integration with boost systems. It ensures capital efficiency while maintaining robust protections against flash attacks and bad debt.
+CreditEngine implements advanced DeFi mechanics including position-weighted risk parameters, transient storage for gas optimization, atomic debt updates with compounding, and integration with boost systems. It ensures capital efficiency while maintaining robust protections against flash attacks and bad debt, working closely with [AuctionHouse](AuctionHouse.md) for liquidations, [Ledger](../data/Ledger.md) for debt tracking, and [Lootbox](Lootbox.md) for points updates.
 
 ## Architecture & Modules
 

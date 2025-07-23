@@ -11,7 +11,7 @@ AuctionHouse is the liquidation engine for Ripe Protocol, executing multi-phase 
 - **Auction Management**: Time-based discounts from 0% to maximum, paid in GREEN
 - **Keeper Rewards**: Incentivizes decentralized position monitoring with debt-based rewards
 
-Built with transient storage optimization, AuctionHouse implements unified repayment formulas across all liquidation types. It integrates with CreditEngine, StabilityPool, and Ledger for atomic execution while maintaining strict value flow accounting and configurable per-asset auction parameters.
+Built with transient storage optimization, AuctionHouse implements unified repayment formulas across all liquidation types. It integrates with [CreditEngine](CreditEngine.md), [StabilityPool](../vaults/StabilityPool.md), and [Ledger](../data/Ledger.md) for atomic execution while maintaining strict value flow accounting and configurable per-asset auction parameters.
 
 ## Architecture & Modules
 
@@ -304,7 +304,10 @@ Only callable by Teller contract
 #### Events Emitted
 
 - `LiquidateUser` - Complete liquidation details including fees, repayments, and auction starts
-- Various phase-specific events based on liquidation path
+- `StabAssetBurntAsRepayment` - When Green/sGreen is burned for debt repayment (Phase 1)
+- `CollateralSentToEndaoment` - When stablecoins are sent to Endaoment (Phase 1)
+- `CollateralSwappedWithStabPool` - When collateral is swapped with stability pools (Phase 2)
+- `FungibleAuctionUpdated` - When auctions are created for remaining collateral (Phase 3)
 
 #### Example Usage
 
@@ -352,6 +355,14 @@ def liquidateManyUsers(
 #### Access
 
 Only callable by Teller contract
+
+#### Events Emitted
+
+- `LiquidateUser` - Complete liquidation details for each user including fees, repayments, and auction starts
+- `StabAssetBurntAsRepayment` - When Green/sGreen is burned for debt repayment (Phase 1)
+- `CollateralSentToEndaoment` - When stablecoins are sent to Endaoment (Phase 1)  
+- `CollateralSwappedWithStabPool` - When collateral is swapped with stability pools (Phase 2)
+- `FungibleAuctionUpdated` - When auctions are created for remaining collateral (Phase 3)
 
 #### Example Usage
 
@@ -706,57 +717,6 @@ total_spent = auction_house.buyManyFungibleAuctions(
 )
 ```
 
-## Liquidation Phase Events
-
-### Phase 1 Events
-
-#### `StabAssetBurntAsRepayment`
-
-Emitted when Green/sGreen is burned for debt repayment:
-
-```vyper
-event StabAssetBurntAsRepayment:
-    liqUser: indexed(address)
-    vaultId: uint256
-    liqStabAsset: indexed(address)
-    amountBurned: uint256
-    usdValue: uint256
-    isDepleted: bool
-```
-
-#### `CollateralSentToEndaoment`
-
-Emitted when stablecoins are sent to Endaoment:
-
-```vyper
-event CollateralSentToEndaoment:
-    liqUser: indexed(address)
-    vaultId: uint256
-    liqAsset: indexed(address)
-    amountSent: uint256
-    usdValue: uint256
-    isDepleted: bool
-```
-
-### Phase 2 Events
-
-#### `CollateralSwappedWithStabPool`
-
-Emitted when collateral is swapped with stability pools:
-
-```vyper
-event CollateralSwappedWithStabPool:
-    liqUser: indexed(address)
-    liqVaultId: uint256
-    liqAsset: indexed(address)
-    collateralAmountOut: uint256
-    collateralValueOut: uint256
-    stabVaultId: uint256
-    stabAsset: indexed(address)
-    assetSwapped: address
-    amountSwapped: uint256
-    valueSwapped: uint256
-```
 
 ## Key Mathematical Functions
 

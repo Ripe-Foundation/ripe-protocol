@@ -11,7 +11,7 @@ StabilityPool is a specialized vault that acts as the protocol's liquidation bac
 - **Receive Liquidated Assets**: Automatically get ETH, BTC, or other collateral at discount
 - **Earn RIPE Rewards**: Additional incentives for providing stability
 
-Built on the StabVault module, StabilityPool uses USD-based share accounting to fairly distribute liquidation proceeds. It integrates directly with AuctionHouse for collateral distribution and tracks both original deposits and accumulated rewards for transparent accounting.
+Built on the StabVault module, StabilityPool uses USD-based share accounting to fairly distribute liquidation proceeds. It integrates directly with [AuctionHouse](../core/AuctionHouse.md) for collateral distribution and tracks both original deposits and accumulated rewards for transparent accounting. The stability pool is managed through [VaultBook](../registries/VaultBook.md) and configuration is handled via [MissionControl](../data/MissionControl.md).
 
 ## Architecture & Dependencies
 

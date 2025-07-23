@@ -12,7 +12,7 @@ RipeToken (RIPE) is the governance token powering the Ripe DAO, granting holders
 - **Contract Upgrades**: Approve new modules and protocol improvements through governance
 - **Reward Distribution**: Control emission rates and allocation across protocol activities
 
-RIPE implements controlled minting through RipeHq authorization, ensuring transparent distribution according to DAO-approved rules. The token features EIP-2612 permits, emergency controls, and time-locked transitions for secure decentralized governance.
+RIPE implements controlled minting through [RipeHq](../registries/RipeHq.md) authorization, ensuring transparent distribution according to DAO-approved rules. The token features EIP-2612 permits, emergency controls, and time-locked transitions for secure decentralized governance. RIPE is distributed via [Lootbox](../core/Lootbox.md) rewards, [BondRoom](../core/BondRoom.md) purchases, and can be locked in [RipeGov](../vaults/RipeGov.md) for enhanced governance power.
 
 ## Architecture & Modules
 

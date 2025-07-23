@@ -195,6 +195,8 @@ def deposit(_assets: uint256, _receiver: address = msg.sender) -> uint256:
 3. Mint shares to receiver
 4. Update price per share
 
+**Events Emitted**: `Deposit`, `Transfer`
+
 #### `mint`
 
 Mint exact amount of shares for assets.
@@ -214,6 +216,8 @@ def mint(_shares: uint256, _receiver: address = msg.sender) -> uint256:
 
 #### Returns
 - `uint256`: Amount of assets deposited
+
+**Events Emitted**: `Deposit`, `Transfer`
 
 ### Withdrawal Functions
 
@@ -237,6 +241,8 @@ def withdraw(_assets: uint256, _receiver: address = msg.sender, _owner: address 
 #### Returns
 - `uint256`: Amount of shares burned
 
+**Events Emitted**: `Withdraw`, `Transfer`
+
 #### `redeem`
 
 Redeem exact amount of shares for assets.
@@ -256,6 +262,8 @@ def redeem(_shares: uint256, _receiver: address = msg.sender, _owner: address = 
 
 #### Returns
 - `uint256`: Amount of assets withdrawn
+
+**Events Emitted**: `Withdraw`, `Transfer`
 
 ## Preview Functions
 
@@ -410,18 +418,6 @@ Key Logic:
 - Normal: `amount = shares * totalBalance / totalShares`
 - Rounding: Up for minting, down for redeeming
 
-## Events
-
-### Vault Events
-- `Deposit` - Assets deposited for shares
-- `Withdraw` - Assets withdrawn by burning shares
-
-Both events include sender, receiver, owner, assets, and shares.
-
-### Inherited Events
-All Erc20Token events are also emitted:
-- `Transfer` - On mint/burn operations
-- `Approval` - When using allowances
 
 ## Security Considerations
 

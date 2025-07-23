@@ -12,7 +12,7 @@ GreenToken (GREEN) is Ripe Protocol's USD-pegged stablecoin, serving as the prim
 - **EIP-2612 Permits**: Gasless approvals for improved user experience and composability
 - **Compliance Tools**: Blacklist capabilities and emergency pause for regulatory requirements
 
-Built on a modular ERC20 architecture, GREEN implements advanced security features including time-locked governance transitions, comprehensive event logging, and integration with protocol-wide pause mechanisms for maximum safety and compliance.
+Built on a modular ERC20 architecture, GREEN implements advanced security features including time-locked governance transitions, comprehensive event logging, and integration with protocol-wide pause mechanisms for maximum safety and compliance. GREEN is minted by [CreditEngine](../core/CreditEngine.md) for borrowing operations and used throughout the protocol alongside [RipeToken](RipeToken.md) for governance and [SavingsGreen](SavingsGreen.md) for yield generation.
 
 ## Architecture & Modules
 

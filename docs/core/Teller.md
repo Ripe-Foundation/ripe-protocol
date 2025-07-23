@@ -14,8 +14,7 @@ interfaces and robust permission management.
 - **Rewards & Governance**: Loot claiming, Ripe bond purchases, and governance vault management
 - **Delegation System**: Comprehensive permissions allowing authorized proxy operations with Underscore wallet integration
 
-The contract abstracts protocol complexity through automatic vault selection, batch processing for gas efficiency, flexible payment handling, sophisticated permission hierarchies, and comprehensive event logging while
-maintaining security through thoughtful validation layers.
+The contract abstracts protocol complexity through automatic vault selection, batch processing for gas efficiency, flexible payment handling, sophisticated permission hierarchies, and comprehensive event logging while maintaining security through thoughtful validation layers. It interfaces with [CreditEngine](CreditEngine.md) for borrowing operations, [VaultBook](../registries/VaultBook.md) for vault validation, and [Lootbox](Lootbox.md) for rewards coordination.
 
 ## Architecture & Modules
 

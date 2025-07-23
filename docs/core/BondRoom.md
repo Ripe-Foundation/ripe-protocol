@@ -12,7 +12,7 @@ availability, dynamic pricing curves, and automated treasury management.
 - **Dynamic Pricing**: Linear pricing curves within epochs (high to low) with lock-up bonuses up to 10x and boost mechanics integration
 - **Automated Treasury**: Allocates bond proceeds between treasury growth and bad debt repayment based on protocol health
 
-The contract uses atomic execution for all bond purchases, maintains strict accounting through the Ledger, supports whitelist restrictions, and provides configurable parameters for sustainable token distribution.
+The contract uses atomic execution for all bond purchases, maintains strict accounting through the [Ledger](../data/Ledger.md), supports whitelist restrictions, and provides configurable parameters for sustainable token distribution. Bond proceeds are transferred to [Endaoment](Endaoment.md) and coordinated with [MissionControl](../data/MissionControl.md) for dynamic pricing.
 
 ## Architecture & Modules
 
