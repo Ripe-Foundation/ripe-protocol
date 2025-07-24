@@ -55,6 +55,7 @@ def migrate(migration: Migration):
     pyth_prices = migration.deploy(
         "PythPrices",
         hq,
+        migration.account(),
         blueprint.ADDYS["PYTH_NETWORK"],
         blueprint.PARAMS["PRICE_DESK_MIN_REG_TIMELOCK"],
         blueprint.PARAMS["PRICE_DESK_MAX_REG_TIMELOCK"],
@@ -65,6 +66,7 @@ def migrate(migration: Migration):
     stork_prices = migration.deploy(
         "StorkPrices",
         hq,
+        migration.account(),
         blueprint.ADDYS["STORK_NETWORK"],
         blueprint.PARAMS["PRICE_DESK_MIN_REG_TIMELOCK"],
         blueprint.PARAMS["PRICE_DESK_MAX_REG_TIMELOCK"],
@@ -92,6 +94,7 @@ def migrate(migration: Migration):
     switchboard_alpha = migration.deploy(
         "SwitchboardAlpha",
         hq,
+        migration.account(),
         blueprint.PARAMS["PRICE_DESK_MIN_STALE_TIME"],
         blueprint.PARAMS["PRICE_DESK_MAX_STALE_TIME"],
         blueprint.PARAMS["MIN_HQ_CHANGE_TIMELOCK"],
@@ -102,8 +105,8 @@ def migrate(migration: Migration):
     migration.execute(
         switchboard_alpha.setPriorityStabVaults,
         [
-            (1, migration.get_contract("GreenPool")),
-            (1, migration.get_contract("SavingsGreen"))
+            (1, migration.get_address("GreenPool")),
+            (1, migration.get_address("SavingsGreen"))
         ]
     )
     migration.execute(
@@ -146,5 +149,6 @@ def migrate(migration: Migration):
     endaoment = migration.deploy(
         "Endaoment",
         hq,
-        migration.blueprint().ADDYS["WETH"],
+        blueprint.ADDYS["WETH"],
+        blueprint.ADDYS["ETH"],
     )
