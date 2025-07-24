@@ -80,7 +80,7 @@ PARAMS = {
         "MAX_SWITCHBOARD_CHANGE_TIMELOCK": 302_400,  # 7 days on Base
         # price desk (timestamps, not blocks!)
         "PRICE_DESK_MIN_STALE_TIME": 60 * 5,  # 5 mins
-        "PRICE_DESK_MAX_STALE_TIME": 60 * 60 * 24 * 3,  # 3 days
+        "PRICE_DESK_MAX_STALE_TIME": 60 * 60 * 24 * 7,  # 7 days
         # price desk (blocks)
         "PRICE_DESK_MIN_REG_TIMELOCK": 21_600,  # 12 hours on Base
         "PRICE_DESK_MAX_REG_TIMELOCK": 302_400,  # 7 days on Base
