@@ -846,4 +846,4 @@ Emitted when user exits early with fee.
 
 ## Testing
 
-For comprehensive test examples, see: [`tests/vaults/test_ripe_gov.py`](../../tests/vaults/test_ripe_gov.py)
+For comprehensive test examples, see: [`tests/vaults/test_ripe_gov_vault.py`](../../tests/vaults/test_ripe_gov_vault.py)

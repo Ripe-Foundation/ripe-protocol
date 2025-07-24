@@ -8,7 +8,7 @@
 
 ## 🛠️ **For Developers, Auditors & Integrators**
 
-**[📖 Complete Technical Documentation](docs/README.md)** - Everything you need to understand, audit, or integrate with Ripe Protocol:
+**[📖 Complete Technical Documentation](docs/technical/README.md)** - Everything you need to understand, audit, or integrate with Ripe Protocol:
 
 - 🏗️ **System Architecture** - How 40+ contracts work together
 - 📋 **Function-by-Function Reference** - Every parameter, return value, and event
