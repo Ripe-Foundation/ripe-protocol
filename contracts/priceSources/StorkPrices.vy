@@ -31,19 +31,25 @@ struct TemporalNumericValue:
     timestampNs: uint64
     quantizedValue: uint256
 
+struct StorkFeedConfig:
+    feedId: bytes32
+    staleTime: uint256
+
 struct PendingStorkFeed:
     actionId: uint256
-    feedId: bytes32
+    config: StorkFeedConfig
 
 event NewStorkFeedPending:
     asset: indexed(address)
     feedId: bytes32
+    staleTime: uint256
     confirmationBlock: uint256
     actionId: uint256
 
 event NewStorkFeedAdded:
     asset: indexed(address)
     feedId: bytes32
+    staleTime: uint256
 
 event NewStorkFeedCancelled:
     asset: indexed(address)
@@ -52,6 +58,7 @@ event NewStorkFeedCancelled:
 event StorkFeedUpdatePending:
     asset: indexed(address)
     feedId: bytes32
+    staleTime: uint256
     confirmationBlock: uint256
     oldFeedId: bytes32
     actionId: uint256
@@ -59,6 +66,7 @@ event StorkFeedUpdatePending:
 event StorkFeedUpdated:
     asset: indexed(address)
     feedId: bytes32
+    staleTime: uint256
     oldFeedId: bytes32
 
 event StorkFeedUpdateCancelled:
@@ -90,7 +98,7 @@ event EthRecoveredFromStork:
     amount: uint256
 
 # data
-feedConfig: public(HashMap[address, bytes32]) # asset -> feed
+feedConfig: public(HashMap[address, StorkFeedConfig]) # asset -> feed
 pendingUpdates: public(HashMap[address, PendingStorkFeed]) # asset -> feed
 
 STORK: public(immutable(address))
@@ -126,19 +134,21 @@ def __init__(
 @view
 @external
 def getPrice(_asset: address, _staleTime: uint256 = 0, _priceDesk: address = empty(address)) -> uint256:
-    feedId: bytes32 = self.feedConfig[_asset]
-    if feedId == empty(bytes32):
+    config: StorkFeedConfig = self.feedConfig[_asset]
+    if config.feedId == empty(bytes32):
         return 0
-    return self._getPrice(feedId, _staleTime)
+    staleTime: uint256 = max(_staleTime, config.staleTime)
+    return self._getPrice(config.feedId, staleTime)
 
 
 @view
 @external
 def getPriceAndHasFeed(_asset: address, _staleTime: uint256 = 0, _priceDesk: address = empty(address)) -> (uint256, bool):
-    feedId: bytes32 = self.feedConfig[_asset]
-    if feedId == empty(bytes32):
+    config: StorkFeedConfig = self.feedConfig[_asset]
+    if config.feedId == empty(bytes32):
         return 0, False
-    return self._getPrice(feedId, _staleTime), True
+    staleTime: uint256 = max(_staleTime, config.staleTime)
+    return self._getPrice(config.feedId, staleTime), True
 
 
 @view
@@ -164,7 +174,7 @@ def _getPrice(_feedId: bytes32, _staleTime: uint256) -> uint256:
 @view
 @external
 def hasPriceFeed(_asset: address) -> bool:
-    return self.feedConfig[_asset] != empty(bytes32)
+    return self.feedConfig[_asset].feedId != empty(bytes32)
 
 
 @view
@@ -187,18 +197,21 @@ def addPriceSnapshot(_asset: address) -> bool:
 
 
 @external
-def addNewPriceFeed(_asset: address, _feedId: bytes32) -> bool:
+def addNewPriceFeed(_asset: address, _feedId: bytes32, _staleTime: uint256 = 0) -> bool:
     assert gov._canGovern(msg.sender) # dev: no perms
     assert not priceData.isPaused # dev: contract paused
 
     # validation
-    assert self._isValidNewFeed(_asset, _feedId) # dev: invalid feed
+    assert self._isValidNewFeed(_asset, _feedId, _staleTime) # dev: invalid feed
 
     # set to pending state
     aid: uint256 = timeLock._initiateAction()
-    self.pendingUpdates[_asset] = PendingStorkFeed(actionId=aid, feedId=_feedId)
+    self.pendingUpdates[_asset] = PendingStorkFeed(
+        actionId=aid, 
+        config=StorkFeedConfig(feedId=_feedId, staleTime=_staleTime)
+    )
 
-    log NewStorkFeedPending(asset=_asset, feedId=_feedId, confirmationBlock=timeLock._getActionConfirmationBlock(aid), actionId=aid)
+    log NewStorkFeedPending(asset=_asset, feedId=_feedId, staleTime=_staleTime, confirmationBlock=timeLock._getActionConfirmationBlock(aid), actionId=aid)
     return True
 
 
@@ -212,8 +225,8 @@ def confirmNewPriceFeed(_asset: address) -> bool:
 
     # validate again
     d: PendingStorkFeed = self.pendingUpdates[_asset]
-    assert d.feedId != empty(bytes32) # dev: no pending new feed
-    if not self._isValidNewFeed(_asset, d.feedId):
+    assert d.config.feedId != empty(bytes32) # dev: no pending new feed
+    if not self._isValidNewFeed(_asset, d.config.feedId, d.config.staleTime):
         self._cancelNewPendingPriceFeed(_asset, d.actionId)
         return False
 
@@ -221,11 +234,11 @@ def confirmNewPriceFeed(_asset: address) -> bool:
     assert timeLock._confirmAction(d.actionId) # dev: time lock not reached
 
     # save new feed
-    self.feedConfig[_asset] = d.feedId
+    self.feedConfig[_asset] = d.config
     self.pendingUpdates[_asset] = empty(PendingStorkFeed)
     priceData._addPricedAsset(_asset)
 
-    log NewStorkFeedAdded(asset=_asset, feedId=d.feedId)
+    log NewStorkFeedAdded(asset=_asset, feedId=d.config.feedId, staleTime=d.config.staleTime)
     return True
 
 
@@ -239,7 +252,7 @@ def cancelNewPendingPriceFeed(_asset: address) -> bool:
 
     d: PendingStorkFeed = self.pendingUpdates[_asset]
     self._cancelNewPendingPriceFeed(_asset, d.actionId)
-    log NewStorkFeedCancelled(asset=_asset, feedId=d.feedId)
+    log NewStorkFeedCancelled(asset=_asset, feedId=d.config.feedId)
     return True
 
 
@@ -254,16 +267,16 @@ def _cancelNewPendingPriceFeed(_asset: address, _aid: uint256):
 
 @view
 @external
-def isValidNewFeed(_asset: address, _feedId: bytes32) -> bool:
-    return self._isValidNewFeed(_asset, _feedId)
+def isValidNewFeed(_asset: address, _feedId: bytes32, _staleTime: uint256) -> bool:
+    return self._isValidNewFeed(_asset, _feedId, _staleTime)
 
 
 @view
 @internal
-def _isValidNewFeed(_asset: address, _feedId: bytes32) -> bool:
-    if priceData.indexOfAsset[_asset] != 0 or self.feedConfig[_asset] != empty(bytes32): # use the `updatePriceFeed` function instead
+def _isValidNewFeed(_asset: address, _feedId: bytes32, _staleTime: uint256) -> bool:
+    if priceData.indexOfAsset[_asset] != 0 or self.feedConfig[_asset].feedId != empty(bytes32): # use the `updatePriceFeed` function instead
         return False
-    return self._isValidFeedConfig(_asset, _feedId)
+    return self._isValidFeedConfig(_asset, _feedId, _staleTime)
 
 
 ###############
@@ -275,19 +288,22 @@ def _isValidNewFeed(_asset: address, _feedId: bytes32) -> bool:
 
 
 @external
-def updatePriceFeed(_asset: address, _feedId: bytes32) -> bool:
+def updatePriceFeed(_asset: address, _feedId: bytes32, _staleTime: uint256 = 0) -> bool:
     assert gov._canGovern(msg.sender) # dev: no perms
     assert not priceData.isPaused # dev: contract paused
 
     # validation
-    oldFeedId: bytes32 = self.feedConfig[_asset]
-    assert self._isValidUpdateFeed(_asset, _feedId, oldFeedId) # dev: invalid feed
+    oldFeedId: bytes32 = self.feedConfig[_asset].feedId
+    assert self._isValidUpdateFeed(_asset, _feedId, oldFeedId, _staleTime) # dev: invalid feed
 
     # set to pending state
     aid: uint256 = timeLock._initiateAction()
-    self.pendingUpdates[_asset] = PendingStorkFeed(actionId=aid, feedId=_feedId)
+    self.pendingUpdates[_asset] = PendingStorkFeed(
+        actionId=aid, 
+        config=StorkFeedConfig(feedId=_feedId, staleTime=_staleTime)
+    )
 
-    log StorkFeedUpdatePending(asset=_asset, feedId=_feedId, confirmationBlock=timeLock._getActionConfirmationBlock(aid), oldFeedId=oldFeedId, actionId=aid)
+    log StorkFeedUpdatePending(asset=_asset, feedId=_feedId, staleTime=_staleTime, confirmationBlock=timeLock._getActionConfirmationBlock(aid), oldFeedId=oldFeedId, actionId=aid)
     return True
 
 
@@ -301,9 +317,9 @@ def confirmPriceFeedUpdate(_asset: address) -> bool:
 
     # validate again
     d: PendingStorkFeed = self.pendingUpdates[_asset]
-    assert d.feedId != empty(bytes32) # dev: no pending update feed
-    oldFeedId: bytes32 = self.feedConfig[_asset]
-    if not self._isValidUpdateFeed(_asset, d.feedId, oldFeedId):
+    assert d.config.feedId != empty(bytes32) # dev: no pending update feed
+    oldFeedId: bytes32 = self.feedConfig[_asset].feedId
+    if not self._isValidUpdateFeed(_asset, d.config.feedId, oldFeedId, d.config.staleTime):
         self._cancelPriceFeedUpdate(_asset, d.actionId)
         return False
 
@@ -311,10 +327,10 @@ def confirmPriceFeedUpdate(_asset: address) -> bool:
     assert timeLock._confirmAction(d.actionId) # dev: time lock not reached
 
     # save new feed
-    self.feedConfig[_asset] = d.feedId
+    self.feedConfig[_asset] = d.config
     self.pendingUpdates[_asset] = empty(PendingStorkFeed)
 
-    log StorkFeedUpdated(asset=_asset, feedId=d.feedId, oldFeedId=oldFeedId)
+    log StorkFeedUpdated(asset=_asset, feedId=d.config.feedId, staleTime=d.config.staleTime, oldFeedId=oldFeedId)
     return True
 
 
@@ -328,7 +344,7 @@ def cancelPriceFeedUpdate(_asset: address) -> bool:
 
     d: PendingStorkFeed = self.pendingUpdates[_asset]
     self._cancelPriceFeedUpdate(_asset, d.actionId)
-    log StorkFeedUpdateCancelled(asset=_asset, feedId=d.feedId, oldFeedId=self.feedConfig[_asset])
+    log StorkFeedUpdateCancelled(asset=_asset, feedId=d.config.feedId, oldFeedId=self.feedConfig[_asset].feedId)
     return True
 
 
@@ -343,23 +359,23 @@ def _cancelPriceFeedUpdate(_asset: address, _aid: uint256):
 
 @view
 @external
-def isValidUpdateFeed(_asset: address, _feedId: bytes32) -> bool:
-    return self._isValidUpdateFeed(_asset, _feedId, self.feedConfig[_asset])
+def isValidUpdateFeed(_asset: address, _feedId: bytes32, _staleTime: uint256) -> bool:
+    return self._isValidUpdateFeed(_asset, _feedId, self.feedConfig[_asset].feedId, _staleTime)
 
 
 @view
 @internal
-def _isValidUpdateFeed(_asset: address, _feedId: bytes32, _oldFeedId: bytes32) -> bool:
+def _isValidUpdateFeed(_asset: address, _feedId: bytes32, _oldFeedId: bytes32, _staleTime: uint256) -> bool:
     if _feedId == _oldFeedId:
         return False
     if priceData.indexOfAsset[_asset] == 0 or _oldFeedId == empty(bytes32): # use the `addNewPriceFeed` function instead
         return False
-    return self._isValidFeedConfig(_asset, _feedId)
+    return self._isValidFeedConfig(_asset, _feedId, _staleTime)
 
 
 @view
 @internal
-def _isValidFeedConfig(_asset: address, _feedId: bytes32) -> bool:
+def _isValidFeedConfig(_asset: address, _feedId: bytes32, _staleTime: uint256) -> bool:
     if _asset == empty(address):
         return False
 
@@ -381,12 +397,15 @@ def disablePriceFeed(_asset: address) -> bool:
     assert not priceData.isPaused # dev: contract paused
 
     # validation
-    oldFeedId: bytes32 = self.feedConfig[_asset]
+    oldFeedId: bytes32 = self.feedConfig[_asset].feedId
     assert self._isValidDisablePriceFeed(_asset, oldFeedId) # dev: invalid asset
 
     # set to pending state
     aid: uint256 = timeLock._initiateAction()
-    self.pendingUpdates[_asset] = PendingStorkFeed(actionId=aid, feedId=empty(bytes32))
+    self.pendingUpdates[_asset] = PendingStorkFeed(
+        actionId=aid, 
+        config=empty(StorkFeedConfig)
+    )
 
     log DisableStorkFeedPending(asset=_asset, feedId=oldFeedId, confirmationBlock=timeLock._getActionConfirmationBlock(aid), actionId=aid)
     return True
@@ -401,7 +420,7 @@ def confirmDisablePriceFeed(_asset: address) -> bool:
     assert not priceData.isPaused # dev: contract paused
 
     # validate again
-    oldFeedId: bytes32 = self.feedConfig[_asset]
+    oldFeedId: bytes32 = self.feedConfig[_asset].feedId
     d: PendingStorkFeed = self.pendingUpdates[_asset]
     assert d.actionId != 0 # dev: no pending disable feed
     if not self._isValidDisablePriceFeed(_asset, oldFeedId):
@@ -412,7 +431,7 @@ def confirmDisablePriceFeed(_asset: address) -> bool:
     assert timeLock._confirmAction(d.actionId) # dev: time lock not reached
 
     # disable feed
-    self.feedConfig[_asset] = empty(bytes32)
+    self.feedConfig[_asset] = empty(StorkFeedConfig)
     self.pendingUpdates[_asset] = empty(PendingStorkFeed)
     priceData._removePricedAsset(_asset)
     
@@ -429,7 +448,7 @@ def cancelDisablePriceFeed(_asset: address) -> bool:
     assert not priceData.isPaused # dev: contract paused
 
     self._cancelDisablePriceFeed(_asset, self.pendingUpdates[_asset].actionId)
-    log DisableStorkFeedCancelled(asset=_asset, feedId=self.feedConfig[_asset])
+    log DisableStorkFeedCancelled(asset=_asset, feedId=self.feedConfig[_asset].feedId)
     return True
 
 
@@ -445,7 +464,7 @@ def _cancelDisablePriceFeed(_asset: address, _aid: uint256):
 @view
 @external
 def isValidDisablePriceFeed(_asset: address) -> bool:
-    return self._isValidDisablePriceFeed(_asset, self.feedConfig[_asset])
+    return self._isValidDisablePriceFeed(_asset, self.feedConfig[_asset].feedId)
 
 
 @view

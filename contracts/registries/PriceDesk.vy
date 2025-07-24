@@ -55,7 +55,7 @@ struct PriceConfig:
 
 ETH: public(immutable(address))
 MAX_PRIORITY_PRICE_SOURCES: constant(uint256) = 10
-UNDERSCORE_APPRAISER_ID: constant(uint256) = 8
+UNDERSCORE_APPRAISER_ID: constant(uint256) = 7
 
 
 @deploy

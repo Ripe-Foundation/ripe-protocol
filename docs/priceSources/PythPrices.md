@@ -54,18 +54,26 @@ struct PythPrice:
     publishTime: uint64   # When price was published
 ```
 
+### PythFeedConfig Struct
+Configuration for each asset's price feed:
+```vyper
+struct PythFeedConfig:
+    feedId: bytes32       # Pyth price feed ID
+    staleTime: uint256    # Maximum age for price data in seconds
+```
+
 ### PendingPythFeed Struct
 Tracks pending feed changes during timelock:
 ```vyper
 struct PendingPythFeed:
     actionId: uint256     # TimeLock action ID
-    feedId: bytes32       # Pyth price feed ID
+    config: PythFeedConfig # New configuration
 ```
 
 ## State Variables
 
 ### Feed Configuration
-- `feedConfig: HashMap[address, bytes32]` - Maps assets to Pyth feed IDs
+- `feedConfig: HashMap[address, PythFeedConfig]` - Maps assets to Pyth feed configurations
 - `pendingUpdates: HashMap[address, PendingPythFeed]` - Pending changes
 
 ### Constants
@@ -332,7 +340,7 @@ Initiates addition of a new Pyth price feed.
 
 ```vyper
 @external
-def addNewPriceFeed(_asset: address, _feedId: bytes32) -> bool:
+def addNewPriceFeed(_asset: address, _feedId: bytes32, _staleTime: uint256 = 0) -> bool:
 ```
 
 #### Parameters
@@ -341,6 +349,7 @@ def addNewPriceFeed(_asset: address, _feedId: bytes32) -> bool:
 |------|------|-------------|
 | `_asset` | `address` | Asset to add price feed for |
 | `_feedId` | `bytes32` | Pyth Network price feed ID |
+| `_staleTime` | `uint256` | Maximum age for price data in seconds (0 uses MissionControl default) |
 
 #### Access
 
@@ -357,10 +366,11 @@ Only callable by governance
 
 #### Example Usage
 ```python
-# Add ETH/USD feed
+# Add ETH/USD feed with custom stale time
 pyth_prices.addNewPriceFeed(
     eth.address,
     "0xff61491a931112ddf1bd8147cd1b641375f79f5825126d665480874634fd0ace",  # ETH/USD
+    300,  # 5 minute stale time
     sender=governance
 )
 ```
@@ -390,7 +400,7 @@ Updates existing feed to new Pyth feed ID.
 
 ```vyper
 @external
-def updatePriceFeed(_asset: address, _feedId: bytes32) -> bool:
+def updatePriceFeed(_asset: address, _feedId: bytes32, _staleTime: uint256 = 0) -> bool:
 ```
 
 Used when Pyth migrates feeds or better feeds become available.
@@ -482,7 +492,7 @@ Checks if a new feed configuration is valid.
 ```vyper
 @view
 @external
-def isValidNewFeed(_asset: address, _feedId: bytes32) -> bool:
+def isValidNewFeed(_asset: address, _feedId: bytes32, _staleTime: uint256) -> bool:
 ```
 
 #### Validation Checks

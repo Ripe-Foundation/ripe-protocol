@@ -414,7 +414,7 @@ MAX_STALE_TIME: public(immutable(uint256))
 
 MAX_PRIORITY_PRICE_SOURCES: constant(uint256) = 10
 PRIORITY_VAULT_DATA: constant(uint256) = 20
-UNDERSCORE_LEDGER_ID: constant(uint256) = 2
+UNDERSCORE_LEDGER_ID: constant(uint256) = 1
 HUNDRED_PERCENT: constant(uint256) = 100_00 # 100%
 EIGHTEEN_DECIMALS: constant(uint256) = 10 ** 18
 
