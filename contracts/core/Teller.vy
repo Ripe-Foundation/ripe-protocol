@@ -89,6 +89,9 @@ interface AddressRegistry:
 interface BondRoom:
     def purchaseRipeBond(_recipient: address, _paymentAsset: address, _paymentAmount: uint256, _lockDuration: uint256, _caller: address, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
 
+interface PriceDesk:
+    def addPriceSnapshot(_asset: address) -> bool: nonpayable
+
 interface CurvePrices:
     def addGreenRefPoolSnapshot() -> bool: nonpayable
 
@@ -203,7 +206,7 @@ MAX_STAB_REDEMPTIONS: constant(uint256) = 15
 
 STABILITY_POOL_ID: constant(uint256) = 1
 RIPE_GOV_VAULT_ID: constant(uint256) = 2
-UNDERSCORE_LEDGER_ID: constant(uint256) = 2
+UNDERSCORE_LEDGER_ID: constant(uint256) = 1
 CURVE_PRICES_ID: constant(uint256) = 2
 
 
@@ -303,6 +306,9 @@ def _deposit(
     # perform house keeping
     if _shouldPerformHouseKeeping:
         self._performHousekeeping(False, _user, msg.sender, True, _a)
+
+    # update price desk (important for share-based assets)
+    extcall PriceDesk(_a.priceDesk).addPriceSnapshot(_asset)
 
     log TellerDeposit(user=_user, depositor=_depositor, asset=_asset, amount=amount, vaultAddr=vaultAddr, vaultId=vaultId)
     return amount
@@ -461,6 +467,9 @@ def _withdraw(
 
     # update lootbox points
     extcall Lootbox(_a.lootbox).updateDepositPoints(_user, vaultId, vaultAddr, _asset, _a)
+
+    # update price desk (important for share-based assets)
+    extcall PriceDesk(_a.priceDesk).addPriceSnapshot(_asset)
 
     log TellerWithdrawal(user=_user, asset=_asset, caller=_caller, amount=amount, vaultAddr=vaultAddr, vaultId=vaultId, isDepleted=isDepleted)
     return amount

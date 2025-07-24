@@ -1209,3 +1209,246 @@ def test_endao_add_partner_liquidity_asset_price_validation(
     # Should revert due to invalid asset (no USD value)
     with boa.reverts("invalid asset"):
         endaoment.addPartnerLiquidity(10, green_pool, alice, alpha_token, amount, 0, sender=switchboard_delta.address)
+
+
+##################################
+# Partner Liquidity - Self Tests #
+##################################
+
+
+@pytest.base
+def test_endao_mint_partner_liquidity_self_as_partner(
+    endaoment,
+    switchboard_delta,
+    usdc_token,
+    green_token,
+    fork,
+    mock_price_source,
+    _test,
+):
+    # Test mintPartnerLiquidity where partner is Endaoment itself
+    usdc_whale = WHALES[fork]["usdc"]
+    amount = 1_000 * (10 ** usdc_token.decimals())
+    mock_price_source.setPrice(usdc_token, 1 * EIGHTEEN_DECIMALS)
+
+    # Transfer funds into Endaoment before calling it
+    usdc_token.transfer(endaoment, amount, sender=usdc_whale)
+    
+    pre_usdc_balance = usdc_token.balanceOf(endaoment)
+    pre_green_balance = green_token.balanceOf(endaoment)
+    
+    # Mint partner liquidity with endaoment as partner
+    green_minted = endaoment.mintPartnerLiquidity(endaoment, usdc_token, amount, sender=switchboard_delta.address)
+    
+    # Check event was emitted
+    log = filter_logs(endaoment, "PartnerLiquidityMinted")[0]
+    assert log.partner == endaoment.address
+    assert log.asset == usdc_token.address
+    _test(log.partnerAmount, amount)
+    _test(log.greenMinted, green_minted)
+    _test(green_minted, amount * EIGHTEEN_DECIMALS // (10 ** usdc_token.decimals()))
+    
+    # Check balances - USDC stays in endaoment, green is minted
+    assert usdc_token.balanceOf(endaoment) == pre_usdc_balance  # No transfer needed
+    assert green_token.balanceOf(endaoment) == pre_green_balance + green_minted
+
+
+@pytest.base
+def test_endao_mint_partner_liquidity_self_max_amount(
+    endaoment,
+    switchboard_delta,
+    usdc_token,
+    green_token,
+    fork,
+    mock_price_source,
+    _test,
+):
+    # Test mintPartnerLiquidity with max amount where partner is Endaoment itself
+    usdc_whale = WHALES[fork]["usdc"]
+    amount = 2_500 * (10 ** usdc_token.decimals())
+    mock_price_source.setPrice(usdc_token, 1 * EIGHTEEN_DECIMALS)
+
+    # Transfer funds into Endaoment
+    usdc_token.transfer(endaoment, amount, sender=usdc_whale)
+    endaoment_balance = usdc_token.balanceOf(endaoment)
+    
+    # Mint partner liquidity with max amount
+    green_minted = endaoment.mintPartnerLiquidity(endaoment, usdc_token, sender=switchboard_delta.address)
+    
+    # Check event
+    log = filter_logs(endaoment, "PartnerLiquidityMinted")[0]
+    _test(log.partnerAmount, endaoment_balance)
+    _test(log.greenMinted, green_minted)
+    
+    # Check all USDC balance was used
+    expected_green = endaoment_balance * EIGHTEEN_DECIMALS // (10 ** usdc_token.decimals())
+    _test(green_minted, expected_green)
+
+
+@pytest.base
+def test_endao_mint_partner_liquidity_self_insufficient_balance(
+    endaoment,
+    switchboard_delta,
+    usdc_token,
+):
+    # Test mintPartnerLiquidity where Endaoment has insufficient balance
+    amount = 1_000 * (10 ** usdc_token.decimals())
+    
+    # Don't transfer any funds to Endaoment
+    assert usdc_token.balanceOf(endaoment) == 0
+    
+    # Should revert due to no asset to add
+    with boa.reverts("no asset to add"):
+        endaoment.mintPartnerLiquidity(endaoment, usdc_token, amount, sender=switchboard_delta.address)
+
+
+@pytest.base
+def test_endao_add_partner_liquidity_self_as_partner(
+    endaoment,
+    deployed_green_pool,
+    switchboard_delta,
+    green_token,
+    usdc_token,
+    fork,
+    ledger,
+    _test,
+):
+    # Test addPartnerLiquidity where partner is Endaoment itself
+    green_pool = boa.env.lookup_contract(deployed_green_pool)
+    usdc_whale = WHALES[fork]["usdc"]
+    amount = 1_000 * (10 ** usdc_token.decimals())
+
+    # Transfer funds into Endaoment before calling it
+    usdc_token.transfer(endaoment, amount, sender=usdc_whale)
+    
+    pre_endaoment_lp = green_pool.balanceOf(endaoment)
+    
+    # Add partner liquidity with endaoment as partner
+    liquidityAdded, liqAmountA, liqAmountB = endaoment.addPartnerLiquidity(
+        10, green_pool, endaoment, usdc_token, amount, 0, sender=switchboard_delta.address
+    )
+    
+    # Check event was emitted
+    log = filter_logs(endaoment, "PartnerLiquidityAdded")[0]
+    assert log.partner == endaoment.address
+    assert log.asset == usdc_token.address
+    assert log.lpBalance == liquidityAdded
+    _test(log.partnerAmount, amount)
+    _test(log.greenAmount, 1_000 * EIGHTEEN_DECIMALS)
+    
+    # Check balances - all assets should be consumed, all LP should go to endaoment
+    assert usdc_token.balanceOf(endaoment) == 0
+    assert green_token.balanceOf(endaoment) == 0
+    
+    # Endaoment should get ALL the LP tokens (not split)
+    total_lp_received = green_pool.balanceOf(endaoment) - pre_endaoment_lp
+    _test(total_lp_received, liquidityAdded)
+    
+    # Check pool debt was added
+    _test(ledger.greenPoolDebt(green_pool), 1_000 * EIGHTEEN_DECIMALS)
+
+
+@pytest.base
+def test_endao_add_partner_liquidity_self_max_amount(
+    endaoment,
+    deployed_green_pool,
+    switchboard_delta,
+    green_token,
+    usdc_token,
+    fork,
+    ledger,
+    _test,
+):
+    # Test addPartnerLiquidity with max amount where partner is Endaoment itself
+    green_pool = boa.env.lookup_contract(deployed_green_pool)
+    usdc_whale = WHALES[fork]["usdc"]
+    amount = 3_000 * (10 ** usdc_token.decimals())
+
+    # Transfer funds into Endaoment
+    usdc_token.transfer(endaoment, amount, sender=usdc_whale)
+    endaoment_balance = usdc_token.balanceOf(endaoment)
+    
+    pre_endaoment_lp = green_pool.balanceOf(endaoment)
+    
+    # Add partner liquidity with max amount
+    liquidityAdded, liqAmountA, liqAmountB = endaoment.addPartnerLiquidity(
+        10, green_pool, endaoment, usdc_token, sender=switchboard_delta.address
+    )
+    
+    # Check event
+    log = filter_logs(endaoment, "PartnerLiquidityAdded")[0]
+    _test(log.partnerAmount, endaoment_balance)
+    _test(log.greenAmount, 3_000 * EIGHTEEN_DECIMALS)
+    
+    # All LP tokens should go to endaoment
+    total_lp_received = green_pool.balanceOf(endaoment) - pre_endaoment_lp
+    _test(total_lp_received, liquidityAdded)
+    
+    # Check pool debt
+    _test(ledger.greenPoolDebt(green_pool), 3_000 * EIGHTEEN_DECIMALS)
+
+
+@pytest.base
+def test_endao_add_partner_liquidity_self_with_existing_green(
+    endaoment,
+    deployed_green_pool,
+    switchboard_delta,
+    green_token,
+    usdc_token,
+    fork,
+    whale,
+    ledger,
+    _test,
+):
+    # Test addPartnerLiquidity where Endaoment already has green tokens
+    green_pool = boa.env.lookup_contract(deployed_green_pool)
+    usdc_whale = WHALES[fork]["usdc"]
+    usdc_amount = 1_000 * (10 ** usdc_token.decimals())
+    green_amount = 500 * EIGHTEEN_DECIMALS
+
+    # Transfer both USDC and existing Green into Endaoment
+    usdc_token.transfer(endaoment, usdc_amount, sender=usdc_whale)
+    green_token.transfer(endaoment, green_amount, sender=whale)
+    
+    pre_endaoment_lp = green_pool.balanceOf(endaoment)
+    
+    # Add partner liquidity with endaoment as partner
+    liquidityAdded, liqAmountA, liqAmountB = endaoment.addPartnerLiquidity(
+        10, green_pool, endaoment, usdc_token, usdc_amount, 0, sender=switchboard_delta.address
+    )
+    
+    # Check event
+    log = filter_logs(endaoment, "PartnerLiquidityAdded")[0]
+    _test(log.partnerAmount, usdc_amount)
+    _test(log.greenAmount, 1_000 * EIGHTEEN_DECIMALS)  # Full amount minted
+    
+    # Check balances
+    assert usdc_token.balanceOf(endaoment) == 0
+    assert green_token.balanceOf(endaoment) == 0  # Both existing and new green used
+    
+    # All LP tokens should go to endaoment
+    total_lp_received = green_pool.balanceOf(endaoment) - pre_endaoment_lp
+    _test(total_lp_received, liquidityAdded)
+    
+    # Pool debt should only be for newly minted green (1000 - 500 = 500)
+    expected_new_debt = 1_000 * EIGHTEEN_DECIMALS - green_amount
+    _test(ledger.greenPoolDebt(green_pool), expected_new_debt)
+
+
+@pytest.base
+def test_endao_add_partner_liquidity_self_insufficient_balance(
+    endaoment,
+    deployed_green_pool,
+    switchboard_delta,
+    usdc_token,
+):
+    # Test addPartnerLiquidity where Endaoment has insufficient balance
+    green_pool = boa.env.lookup_contract(deployed_green_pool)
+    amount = 1_000 * (10 ** usdc_token.decimals())
+    
+    # Don't transfer any funds to Endaoment
+    assert usdc_token.balanceOf(endaoment) == 0
+    
+    # Should revert due to no asset to add
+    with boa.reverts("no asset to add"):
+        endaoment.addPartnerLiquidity(10, green_pool, endaoment, usdc_token, amount, 0, sender=switchboard_delta.address)

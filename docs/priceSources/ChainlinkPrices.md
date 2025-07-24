@@ -64,6 +64,7 @@ struct ChainlinkConfig:
     decimals: uint256       # Feed's decimal places
     needsEthToUsd: bool     # Convert ETH price to USD
     needsBtcToUsd: bool     # Convert BTC price to USD
+    staleTime: uint256      # Maximum age for price data in seconds
 ```
 
 ### PendingChainlinkConfig Struct
@@ -306,6 +307,7 @@ Initiates addition of a new Chainlink price feed.
 def addNewPriceFeed(
     _asset: address, 
     _newFeed: address, 
+    _staleTime: uint256 = 0,
     _needsEthToUsd: bool = False,
     _needsBtcToUsd: bool = False,
 ) -> bool:
@@ -317,6 +319,7 @@ def addNewPriceFeed(
 |------|------|-------------|
 | `_asset` | `address` | Asset to add price feed for |
 | `_newFeed` | `address` | Chainlink aggregator address |
+| `_staleTime` | `uint256` | Maximum age for price data in seconds (0 uses MissionControl default) |
 | `_needsEthToUsd` | `bool` | Convert ETH price to USD |
 | `_needsBtcToUsd` | `bool` | Convert BTC price to USD |
 
@@ -339,6 +342,7 @@ Only callable by governance
 chainlink_prices.addNewPriceFeed(
     dai.address,
     "0xAed0c38402a5d19df6E4c03F4E2DceD6e29c1ee9",  # DAI/USD
+    3600,  # 1 hour stale time
     sender=governance
 )
 
@@ -346,6 +350,7 @@ chainlink_prices.addNewPriceFeed(
 chainlink_prices.addNewPriceFeed(
     token.address,
     token_eth_feed.address,
+    300,   # 5 minute stale time
     True,  # needsEthToUsd
     False,
     sender=governance
@@ -380,6 +385,7 @@ Updates existing feed configuration.
 def updatePriceFeed(
     _asset: address, 
     _newFeed: address, 
+    _staleTime: uint256 = 0,
     _needsEthToUsd: bool = False,
     _needsBtcToUsd: bool = False,
 ) -> bool:

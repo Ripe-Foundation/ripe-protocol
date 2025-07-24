@@ -95,6 +95,7 @@ def test_chainlink_add_price_feed(
     log = filter_logs(mock_chainlink, "NewChainlinkFeedPending")[0]
     assert log.asset == alpha_token.address
     assert log.feed == mock_chainlink_alpha.address
+    assert log.staleTime == 0
     assert not log.needsEthToUsd
     assert not log.needsBtcToUsd
 
@@ -112,6 +113,7 @@ def test_chainlink_add_price_feed(
     log = filter_logs(mock_chainlink, "NewChainlinkFeedAdded")[0]
     assert log.asset == alpha_token.address
     assert log.feed == mock_chainlink_alpha.address
+    assert log.staleTime == 0
     assert not log.needsEthToUsd
     assert not log.needsBtcToUsd
 
@@ -141,6 +143,7 @@ def test_chainlink_add_price_feed_cancel(
     log = filter_logs(mock_chainlink, "NewChainlinkFeedPending")[0]
     assert log.asset == alpha_token.address
     assert log.feed == mock_chainlink_alpha.address
+    assert log.staleTime == 0
     assert not log.needsEthToUsd
     assert not log.needsBtcToUsd
 
@@ -175,12 +178,13 @@ def test_chainlink_add_price_feed_eth_btc_conversion(
     assert mock_chainlink.confirmNewPriceFeed(mock_chainlink.ETH(), sender=governance.address)
 
     # Add feed with ETH conversion
-    assert mock_chainlink.addNewPriceFeed(alpha_token, mock_chainlink_alpha, True, False, sender=governance.address)
+    assert mock_chainlink.addNewPriceFeed(alpha_token, mock_chainlink_alpha, 0, True, False, sender=governance.address)
 
     # Verify event
     log = filter_logs(mock_chainlink, "NewChainlinkFeedPending")[0]
     assert log.asset == alpha_token.address
     assert log.feed == mock_chainlink_alpha.address
+    assert log.staleTime == 0
     assert log.needsEthToUsd
     assert not log.needsBtcToUsd
 
@@ -200,12 +204,13 @@ def test_chainlink_add_price_feed_eth_btc_conversion(
     assert mock_chainlink.confirmNewPriceFeed(mock_chainlink.BTC(), sender=governance.address)
 
     # Update feed with BTC conversion using a different feed
-    assert mock_chainlink.updatePriceFeed(alpha_token, mock_chainlink_delta, False, True, sender=governance.address)
+    assert mock_chainlink.updatePriceFeed(alpha_token, mock_chainlink_delta, 0, False, True, sender=governance.address)
 
     # Verify event
     log = filter_logs(mock_chainlink, "ChainlinkFeedUpdatePending")[0]
     assert log.asset == alpha_token.address
     assert log.feed == mock_chainlink_delta.address
+    assert log.staleTime == 0
     assert not log.needsEthToUsd
     assert log.needsBtcToUsd
 
@@ -221,7 +226,7 @@ def test_chainlink_add_price_feed_eth_btc_conversion(
 
     # Test invalid conversion (both ETH and BTC)
     with boa.reverts("invalid feed"):
-        mock_chainlink.updatePriceFeed(alpha_token, mock_chainlink_delta, True, True, sender=governance.address)
+        mock_chainlink.updatePriceFeed(alpha_token, mock_chainlink_delta, 0, True, True, sender=governance.address)
 
 
 def test_chainlink_update_price_feed(
@@ -264,6 +269,7 @@ def test_chainlink_update_price_feed(
     log = filter_logs(mock_chainlink, "ChainlinkFeedUpdatePending")[0]
     assert log.asset == alpha_token.address
     assert log.feed == mock_chainlink_bravo.address
+    assert log.staleTime == 0
     assert not log.needsEthToUsd
     assert not log.needsBtcToUsd
 
@@ -281,6 +287,7 @@ def test_chainlink_update_price_feed(
     log = filter_logs(mock_chainlink, "ChainlinkFeedUpdated")[0]
     assert log.asset == alpha_token.address
     assert log.feed == mock_chainlink_bravo.address
+    assert log.staleTime == 0
     assert not log.needsEthToUsd
     assert not log.needsBtcToUsd
 
@@ -312,6 +319,7 @@ def test_chainlink_update_price_feed_cancel(
     log = filter_logs(mock_chainlink, "ChainlinkFeedUpdatePending")[0]
     assert log.asset == alpha_token.address
     assert log.feed == mock_chainlink_bravo.address
+    assert log.staleTime == 0
     assert not log.needsEthToUsd
     assert not log.needsBtcToUsd
 
@@ -456,6 +464,82 @@ def test_chainlink_price_stale(
     # Make price stale by advancing time
     boa.env.time_travel(seconds=2)  # Advance 2 seconds, making price stale for _staleTime=1
     assert mock_chainlink.getPrice(alpha_token, 1) == 0  # Price should be 0 when stale
+
+
+def test_chainlink_price_stale_with_feed_config(
+    mock_chainlink,
+    alpha_token,
+    mock_chainlink_alpha,
+    mock_chainlink_bravo,  # Use a different feed for update
+    governance,
+):
+    # Test adding feed with custom stale time
+    stale_time = 3600  # 1 hour
+    
+    # Refresh the feed's timestamp to current time
+    mock_chainlink_alpha.setMockData(500 * 10**8)
+    
+    # Add feed with custom stale time
+    assert mock_chainlink.addNewPriceFeed(alpha_token, mock_chainlink_alpha, stale_time, False, False, sender=governance.address)
+    boa.env.time_travel(blocks=mock_chainlink.actionTimeLock() + 1)
+    # Refresh again after time travel
+    mock_chainlink_alpha.setMockData(500 * 10**8)
+    assert mock_chainlink.confirmNewPriceFeed(alpha_token, sender=governance.address)
+
+    # Verify event has stale time
+    log = filter_logs(mock_chainlink, "NewChainlinkFeedAdded")[0]
+    assert log.asset == alpha_token.address
+    assert log.feed == mock_chainlink_alpha.address
+    assert log.staleTime == stale_time
+    assert not log.needsEthToUsd
+    assert not log.needsBtcToUsd
+
+    # Test price with feed's stale time
+    assert mock_chainlink.getPrice(alpha_token) == 500 * EIGHTEEN_DECIMALS
+
+    # Test price with additional stale time (should use max of both)
+    assert mock_chainlink.getPrice(alpha_token, 7200) == 500 * EIGHTEEN_DECIMALS  # 2 hours > 1 hour
+
+    # Make price stale by advancing time (less than feed's stale time)
+    boa.env.time_travel(seconds=1800)  # Advance 30 minutes
+    mock_chainlink_alpha.setMockData(500 * 10**8)
+    assert mock_chainlink.getPrice(alpha_token) == 500 * EIGHTEEN_DECIMALS  # Should still be valid
+
+    # Make price stale by advancing time (more than feed's stale time)
+    boa.env.time_travel(seconds=3600)  # Advance another hour (total 2 hours)
+    # Set the feed's updatedAt to an old timestamp to make it stale
+    old_timestamp = boa.env.timestamp - 7200  # 2 hours ago
+    mock_chainlink_alpha.setMockData(500 * 10**8, 1, 1, boa.env.timestamp, old_timestamp)
+    assert mock_chainlink.getPrice(alpha_token) == 0  # Price should be 0 when stale
+
+    # Test updating feed with different stale time
+    mock_chainlink_bravo.setMockData(500 * 10**8)  # Use bravo feed with same price
+    assert mock_chainlink.updatePriceFeed(alpha_token, mock_chainlink_bravo, 7200, False, False, sender=governance.address)
+    boa.env.time_travel(blocks=mock_chainlink.actionTimeLock() + 1)
+    mock_chainlink_bravo.setMockData(500 * 10**8)
+    assert mock_chainlink.confirmPriceFeedUpdate(alpha_token, sender=governance.address)
+
+    # Verify update event has new stale time
+    log = filter_logs(mock_chainlink, "ChainlinkFeedUpdated")[0]
+    assert log.asset == alpha_token.address
+    assert log.feed == mock_chainlink_bravo.address
+    assert log.staleTime == 7200
+    assert not log.needsEthToUsd
+    assert not log.needsBtcToUsd
+
+    # Test price with new stale time
+    assert mock_chainlink.getPrice(alpha_token) == 500 * EIGHTEEN_DECIMALS
+
+    # Make price stale with new stale time
+    boa.env.time_travel(seconds=3600)  # Advance 1 hour
+    mock_chainlink_bravo.setMockData(500 * 10**8)
+    assert mock_chainlink.getPrice(alpha_token) == 500 * EIGHTEEN_DECIMALS  # Should still be valid
+
+    boa.env.time_travel(seconds=3601)  # Advance another hour + 1 second (total 2 hours + 1 second)
+    # Set the feed's updatedAt to an old timestamp to make it stale
+    old_timestamp = boa.env.timestamp - 7201  # 2 hours + 1 second ago
+    mock_chainlink_bravo.setMockData(500 * 10**8, 1, 1, boa.env.timestamp, old_timestamp)
+    assert mock_chainlink.getPrice(alpha_token) == 0  # Price should be 0 when stale
 
 
 def test_chainlink_price_decimals(
