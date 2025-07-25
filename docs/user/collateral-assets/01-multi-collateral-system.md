@@ -159,4 +159,4 @@ The system supports continuous portfolio adjustment:
 - Portfolio rebalancing affects weighted terms
 - Market-responsive position management
 
-The multi-collateral architecture maximizes capital efficiency through portfolio aggregation while maintaining individual risk isolation, creating a resilient lending system adaptable to diverse asset types. This system's robustness enables the [three-phase liquidation system](../liquidations/liquidation-phases.md) to handle any asset type safely.
+The multi-collateral architecture maximizes capital efficiency through portfolio aggregation while maintaining individual risk isolation, creating a resilient lending system adaptable to diverse asset types. This system's robustness enables the [three-phase liquidation system](liquidations/liquidation-phases.md) to handle any asset type safely.

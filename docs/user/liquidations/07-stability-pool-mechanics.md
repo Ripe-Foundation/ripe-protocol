@@ -156,4 +156,4 @@ Stability pools connect with other protocol components:
 
 The stability pool system creates a market-based liquidation mechanism that benefits both liquidated users and pool participants while maintaining protocol solvency.
 
-For technical implementation details, see [StabilityPool Technical Documentation](../technical/vaults/StabilityPool.md).
+For technical implementation details, see [StabilityPool Technical Documentation](technical/vaults/StabilityPool.md).

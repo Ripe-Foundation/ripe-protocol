@@ -282,5 +282,5 @@ Asset support evolution includes:
 
 ## Related Documentation
 
-- [Asset Parameters](asset-parameters.md) - Detailed parameter mechanics
-- [Deposit & Withdrawal Mechanics](deposit-withdrawal-mechanics.md) - Asset flow processes
+- [Asset Parameters](04-asset-parameters.md) - Detailed parameter mechanics
+- [Deposit & Withdrawal Mechanics](02-deposit-withdrawal-mechanics.md) - Asset flow processes

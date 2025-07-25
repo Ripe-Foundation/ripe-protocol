@@ -114,4 +114,4 @@ During extreme market events, temporary restrictions may apply:
 
 ---
 
-Next: Learn about [Repaying Your Loan](repaying-loans.md) →
+Next: Learn about [Repaying Your Loan](05-repaying-loans.md) →

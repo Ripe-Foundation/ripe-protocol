@@ -1,6 +1,6 @@
 # Dynamic Rate Protection
 
-Dynamic Rate Protection automatically adjusts borrowing rates based on market conditions to maintain [GREEN's](../green.md) dollar peg. The system monitors liquidity pool health and responds proportionally to imbalances, working alongside other [stability mechanisms](../green.md#stability-mechanisms) to ensure peg maintenance.
+Dynamic Rate Protection automatically adjusts borrowing rates based on market conditions to maintain [GREEN's](green.md) dollar peg. The system monitors liquidity pool health and responds proportionally to imbalances, working alongside other [stability mechanisms](green.md#stability-mechanisms) to ensure peg maintenance.
 
 ## Dynamic Rate Architecture
 
@@ -235,4 +235,4 @@ A: The weighted calculations and on-chain implementation make manipulation econo
 
 Dynamic Rate Protection represents a breakthrough in stablecoin design, creating a resilient system that maintains stability through market incentives rather than manual intervention.
 
-Next: Learn about [Advanced Borrowing Mechanics](advanced-borrowing-mechanics.md) →
+Next: Learn about [Advanced Borrowing Mechanics](06-advanced-borrowing-mechanics.md) →

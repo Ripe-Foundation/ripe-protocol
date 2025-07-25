@@ -6,28 +6,37 @@ This documentation explains the fundamental mechanisms and concepts underlying R
 
 Understanding Ripe Protocol requires familiarity with these interconnected systems:
 
-### 1. [GREEN Stablecoin](green.md)
+### Core Lending System
+
+#### 1. [GREEN Stablecoin](01-green.md)
 The heart of Ripe - GREEN is the protocol's native overcollateralized stablecoin, minted through borrowing and maintained at dollar parity through multiple stability mechanisms.
 
-### 2. [Collateral Assets](collateral-assets/README.md)
+#### 2. [Collateral Assets](collateral-assets/README.md)
 The foundation - Ripe's multi-collateral system enables multiple assets to back a single loan position, transforming how DeFi lending operates.
 
-### 3. [Borrowing](borrowing/README.md)
+#### 3. [Borrowing](borrowing/README.md)
 The core function - Protocol's borrowing mechanism mints GREEN against deposited collateral through an overcollateralized debt system.
 
-### 4. [Liquidations](liquidations/README.md)
+#### 4. [Liquidations](liquidations/README.md)
 The safety net - A three-phase liquidation system maintains protocol solvency while minimizing borrower losses through progressive mechanisms.
 
-### 5. [Savings GREEN (sGREEN)](sgreen.md)
+### Value Generation
+
+#### 5. [Savings GREEN (sGREEN)](05-sgreen.md)
 Value accrual - sGREEN represents the yield-bearing version of GREEN, automatically accruing value through protocol revenue distribution.
 
-### 6. [Endaoment](endaoment.md)
+#### 6. [Endaoment](06-endaoment.md)
 The engine - Protocol treasury manages assets, maintains GREEN stability, and generates yield across DeFi strategies.
 
-### 7. [RIPE Governance](ripe-governance.md)
+### RIPE Token Ecosystem
+
+#### 7. [RIPE Block Rewards](07-ripe-block-rewards.md)
+Incentive engine - Distributes RIPE tokens to borrowers, depositors, and governance participants based on their protocol activity.
+
+#### 8. [RIPE Governance](08-ripe-governance.md)
 Community control - RIPE token holders accumulate governance power through time-locked deposits, preparing for decentralized protocol management.
 
-### 8. [Bonds](bonding.md)
+#### 9. [Bonds](09-bonding.md)
 Growth mechanism - Bond system exchanges stablecoins for RIPE tokens, building Endaoment reserves and liquidity.
 
 ## Protocol Architecture
@@ -61,12 +70,12 @@ Growth mechanism - Bond system exchanges stablecoins for RIPE tokens, building E
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                          SUPPORT SYSTEMS                                   │
 │  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐             │
-│  │   ENDAOMENT     │  │   ORACLES &     │  │   GOVERNANCE    │             │
-│  │   TREASURY      │  │   KEEPERS       │  │   & BONDS       │             │
+│  │   ENDAOMENT     │  │   ORACLES &     │  │  RIPE TOKENS    │             │
+│  │   TREASURY      │  │   KEEPERS       │  │  & INCENTIVES   │             │
 │  │                 │  │                 │  │                 │             │
-│  │ • Asset Mgmt    │  │ • Price Feeds   │  │ • RIPE Voting   │             │
-│  │ • Yield Gen     │  │ • Liquidations  │  │ • Bond Sales    │             │
-│  │ • Peg Defense   │  │ • Rate Updates  │  │ • Parameters    │             │
+│  │ • Asset Mgmt    │  │ • Price Feeds   │  │ • Governance    │             │
+│  │ • Yield Gen     │  │ • Liquidations  │  │ • Block Rewards │             │
+│  │ • Peg Defense   │  │ • Rate Updates  │  │ • Bond Sales    │             │
 │  └─────────────────┘  └─────────────────┘  └─────────────────┘             │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
@@ -88,6 +97,7 @@ This graduated approach minimizes market impact while ensuring protocol solvency
 ### Value Accrual Mechanisms
 The protocol generates value through:
 - Interest payments flowing to sGREEN holders
+- RIPE block rewards distributed to active participants
 - Liquidation fees captured by stability pools
 - Treasury yield generation via DeFi strategies
 - Bond sales building protocol reserves
@@ -118,13 +128,13 @@ Definitions of key terms and concepts used throughout the protocol documentation
 
 ### For Developers
 
-#### [Technical Documentation](../technical/README.md)
+#### [Technical Documentation](technical/README.md)
 Implementation details and smart contract specifications for developers.
 
 ## Getting Started
 
 ### New to Ripe Protocol?
-1. **Start with [GREEN Stablecoin](green.md)** - Understand the core asset
+1. **Start with [GREEN Stablecoin](01-green.md)** - Understand the core asset
 2. **Review [Multi-Collateral System](collateral-assets/multi-collateral-system.md)** - Learn the unified approach
 3. **Check [Quick Reference](quick-reference.md)** - Get key parameters
 4. **Browse [FAQ](faq.md)** - Address common questions
@@ -133,4 +143,5 @@ Implementation details and smart contract specifications for developers.
 1. **[Supported Assets](collateral-assets/supported-assets.md)** - See what you can deposit
 2. **[Deposit Mechanics](collateral-assets/deposit-withdrawal-mechanics.md)** - Understand the process
 3. **[Borrowing Mechanics](borrowing/borrowing-mechanics.md)** - Learn to mint GREEN
-4. **[Liquidation System](liquidations/README.md)** - Know the safety mechanisms
+4. **[RIPE Block Rewards](07-ripe-block-rewards.md)** - Earn rewards for participation
+5. **[Liquidation System](liquidations/README.md)** - Know the safety mechanisms

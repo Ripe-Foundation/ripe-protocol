@@ -62,4 +62,4 @@ Result: Endaoment transfer saves you the asset discount, though liquidation fees
 
 Endaoment transfer is a Phase 1 mechanism that moves your stablecoins to protocol reserves at full value. While you still pay liquidation fees for being liquidated, you avoid the additional discount losses of market-based liquidations.
 
-Next: Learn about [Stability Pool Swaps](stability-pool-swaps.md) →
+Next: Learn about [Stability Pool Swaps](06-stability-pool-swaps.md) →

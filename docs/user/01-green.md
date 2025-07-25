@@ -24,10 +24,10 @@ GREEN maintains its peg through robust collateral requirements:
 
 The protocol employs several layers to maintain GREEN's $1 peg:
 
-1. **Dynamic Interest Rates**: Borrowing costs adjust to influence supply
+1. **[Dynamic Interest Rates](borrowing/dynamic-rate-protection.md)**: Borrowing costs adjust to influence supply
 2. **[Stability Pools](liquidations/stability-pool-mechanics.md)**: Provide liquidity during market stress
-3. **Direct Redemptions**: Exchange GREEN for collateral at par
-4. **[Endaoment](endaoment.md) Operations**: Treasury actions support peg
+3. **[Direct Redemptions](liquidations/README.md#pre-liquidation-protection)**: Exchange GREEN for collateral at par
+4. **[Endaoment](06-endaoment.md) Operations**: Treasury actions support peg
 5. **[Liquidation Mechanisms](liquidations/README.md)**: Remove bad debt before it impacts peg
 
 ## How GREEN is Created
@@ -67,37 +67,34 @@ This ensures GREEN supply contracts as demand decreases.
 
 ### 1. Dynamic Interest Rate Adjustment
 
-Ripe's most innovative stability mechanism continuously monitors market conditions and adjusts borrowing rates in real-time. This creates powerful economic incentives that maintain GREEN's peg without manual intervention.
+The protocol continuously monitors market conditions and adjusts borrowing rates in real-time based on liquidity pool health. This creates economic incentives that help maintain GREEN's peg without manual intervention.
 
 **How Pool Health Monitoring Works**:
 - **Reference Pool**: Monitors GREEN/USDC liquidity pool as market health indicator
-- **Weighted Ratio**: Sophisticated calculation prevents manipulation
+- **Weighted Calculation**: Considers pool depth, volume, and time-weighted prices to prevent manipulation
 - **Danger Threshold**: Rates begin increasing when GREEN exceeds 60% of pool
-- **Progressive Response**: Mild imbalance = mild adjustment, severe = strong response
+- **Progressive Response**: Proportional scaling based on imbalance severity - the worse it gets, the higher rates go
 
-**Rate Adjustment Tiers**:
-```
-Pool Status          GREEN Ratio    Rate Multiplier    Action
-Healthy              <60%           1.0x               Normal rates
-Warning              60-65%         1.5x               Discourage borrowing
-Stressed             65-70%         2.0x               Strong disincentive
-Critical             70-75%         2.5x               Urgent correction
-Emergency            >75%           3.0x               Maximum response
-```
+**How Rates Adjust**:
+- Below 60% GREEN: Normal rates (no multiplier)
+- Above 60% GREEN: Progressive multiplier increases continuously
+- Multiplier range: 1.5x to 3.0x based on imbalance severity
+- The worse the imbalance, the higher the multiplier
 
-**Two-Component System**:
-1. **Ratio Boost**: Multiplier based on pool imbalance severity (1.5x-3.0x)
-2. **Time Boost**: Additional increase based on blocks in danger zone
+**Three-Layer Response System**:
+1. **Ratio Boost**: Multiplier based on pool imbalance severity (scales between min/max)
+2. **Time Boost**: Additional rate increase per block in danger zone (+0.1% per 1000 blocks)
+3. **Rate Caps**: Maximum rate protection (e.g., 50% APR)
 
 **Example with pool at 70% GREEN for 5,000 blocks**:
 - Base rate: 5% APR
 - Ratio boost: 5% × 2.25x = 11.25% APR
-- Time boost: +0.5% APR (after 5,000 blocks)
-- Total rate: 11.75% APR
+- Time boost: +0.5% APR (0.1% × 5)
+- Total rate: 11.75% APR (capped at maximum if exceeded)
 
-This dual mechanism ensures immediate response to imbalances while creating increasing urgency for sustained stress.
+This multi-layer system ensures immediate response to imbalances while creating increasing urgency for sustained stress.
 
-For complete details on this system, see [Dynamic Rate Protection](dynamic-rate-protection.md).
+For complete details on this system, see [Dynamic Rate Protection](borrowing/dynamic-rate-protection.md).
 
 ### 2. Direct Redemption Mechanism
 
@@ -110,6 +107,8 @@ When GREEN trades below $1, holders can directly redeem:
 
 **Important**: Redemptions only affect users whose debt health has deteriorated significantly. If your position is well-collateralized, you cannot be targeted for redemption.
 
+For more details on redemptions, see [Pre-Liquidation Protection](liquidations/README.md#pre-liquidation-protection).
+
 ### 3. Stability Pool Defense
 
 Specialized pools that maintain peg stability:
@@ -119,6 +118,8 @@ Specialized pools that maintain peg stability:
 - **Depositor Protection**: Pool participants share in liquidation profits
 - **Automatic Activation**: Engage without manual intervention
 
+Learn more about [Stability Pool Mechanics](liquidations/stability-pool-mechanics.md).
+
 ### 4. Endaoment Stabilizer
 
 The protocol treasury actively manages stability:
@@ -127,6 +128,8 @@ The protocol treasury actively manages stability:
 - **Emergency Response**: Authorized to take rapid action during extreme events
 - **Programmatic Rules**: Operates within pre-defined parameters
 - **Transparent Actions**: All operations visible on-chain
+
+For details on treasury operations, see [The Endaoment](06-endaoment.md).
 
 ## GREEN vs Other Stablecoins
 
@@ -151,7 +154,7 @@ The protocol treasury actively manages stability:
 - Isolated positions
 
 **GREEN**:
-- Multi-collateral innovation
+- Multi-collateral innovation (single loan)
 - Streamlined mechanics
 - Expanding asset support
 - Unified positions
@@ -169,25 +172,6 @@ The protocol treasury actively manages stability:
 - Proven model
 - Multiple safeguards
 
-## Stability Response Mechanisms
-
-### Market Volatility Management
-
-During significant market events, GREEN's automated systems activate sequentially:
-
-- Liquidation mechanisms process underwater positions
-- Stability pools provide immediate liquidity
-- Dynamic rates adjust to market conditions
-- Peg maintenance occurs without manual intervention
-
-### System Characteristics
-
-The multi-layered architecture provides:
-- Rapid response to market changes through automated triggers
-- Distributed risk management without single points of failure
-- Transparent operations through on-chain execution
-- Predictable behavior based on coded parameters
-
 ## GREEN Design Philosophy
 
 GREEN implements proven collateralization models with modern automation:
@@ -198,4 +182,4 @@ GREEN implements proven collateralization models with modern automation:
 
 This architecture creates a decentralized stable value system operating through transparent, predictable mechanisms.
 
-For technical implementation details, see [GreenToken Technical Documentation](../technical/tokens/GreenToken.md).
+For technical implementation details, see [Green Token Technical Documentation](technical/tokens/GreenToken.md).

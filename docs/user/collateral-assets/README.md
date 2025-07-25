@@ -2,7 +2,7 @@
 
 This section covers how Ripe Protocol's multi-collateral system works, including asset types, deposit mechanics, and portfolio management features.
 
-Ripe Protocol accepts diverse tokenized assets as collateral through a unified system that enables portfolio-based borrowing. The protocol's architecture supports assets ranging from major cryptocurrencies to tokenized real-world assets.
+Ripe Protocol accepts diverse tokenized assets as collateral through a unified system that enables portfolio-based borrowing. The protocol's architecture supports assets ranging from major crypto assets to tokenized real-world assets.
 
 ## Collateral System Architecture
 
@@ -15,12 +15,12 @@ The protocol's collateral framework operates through:
 
 ## Documentation Structure
 
-1. **[Multi-Collateral System](multi-collateral-system.md)** - Portfolio-based collateral mechanics
-2. **[Deposit & Withdrawal Mechanics](deposit-withdrawal-mechanics.md)** - Asset flow mechanisms and processes
-3. **[Supported Assets](supported-assets.md)** - Asset categories and parameters
-4. **[Asset Parameters](asset-parameters.md)** - Configuration and vault architecture
-5. **[Delegation & Permissions](delegation-permissions.md)** - Access control systems
-6. **[Special Asset Types](special-asset-types.md)** - NFT and RWA collateral handling
+1. **[Multi-Collateral System](01-multi-collateral-system.md)** - Portfolio-based collateral mechanics
+2. **[Deposit & Withdrawal Mechanics](02-deposit-withdrawal-mechanics.md)** - Asset flow mechanisms and processes
+3. **[Supported Assets](03-supported-assets.md)** - Asset categories and parameters
+4. **[Asset Parameters](04-asset-parameters.md)** - Configuration and vault architecture
+5. **[Delegation & Permissions](05-delegation-permissions.md)** - Access control systems
+6. **[Special Asset Types](06-special-asset-types.md)** - NFT and RWA collateral handling
 
 ## Asset Diversity Through Risk Isolation
 

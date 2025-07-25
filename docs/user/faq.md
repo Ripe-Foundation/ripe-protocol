@@ -328,4 +328,4 @@ Individual risk isolation means one user's asset choices don't affect others. Th
 
 ---
 
-For technical implementation details, see the [Technical Documentation](../technical/README.md) section.
+For technical implementation details, see the [Technical Documentation](technical/README.md) section.

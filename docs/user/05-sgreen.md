@@ -125,13 +125,13 @@ The economic outcome depends on the relationship between borrowing costs and sGR
 
 ### Stability Pool Deployment
 
-sGREEN in [stability pools](../liquidations/stability-pool-mechanics.md) generates:
+sGREEN in [stability pools](liquidations/stability-pool-mechanics.md) generates:
 - Base sGREEN appreciation (protocol revenues)
 - Liquidation discount capture (pool participation)
 - Additional protocol incentives when available
 
 **Revenue Distinction:**
-Holding sGREEN captures protocol fee distribution while [stability pool participation](../liquidations/stability-pool-swaps.md) adds liquidation premiums.
+Holding sGREEN captures protocol fee distribution while [stability pool participation](liquidations/stability-pool-swaps.md) adds liquidation premiums.
 
 ### Liquidity Pool Participation
 
@@ -170,8 +170,8 @@ The system supports:
 - Transparent value accounting
 
 For technical implementation details, see:
-- [SavingsGreen Technical Documentation](../technical/tokens/SavingsGreen.md)
-- [ERC-4626 Token Module Documentation](../technical/tokens/modules/Erc4626Token.md)
+- [SavingsGreen Technical Documentation](technical/tokens/SavingsGreen.md)
+- [ERC-4626 Token Module Documentation](technical/tokens/modules/Erc4626Token.md)
 
 ## Operational Characteristics
 

@@ -1,6 +1,6 @@
 # Liquidation Phases
 
-Ripe Protocol implements a three-phase liquidation system that prioritizes different asset types and mechanisms based on their characteristics and protocol configuration. This system enables the [multi-collateral framework](../collateral-assets/multi-collateral-system.md) to support diverse asset types safely.
+Ripe Protocol implements a three-phase liquidation system that prioritizes different asset types and mechanisms based on their characteristics and protocol configuration. This system enables the [multi-collateral framework](collateral-assets/multi-collateral-system.md) to support diverse asset types safely.
 
 ## The Three-Phase System
 
@@ -153,4 +153,4 @@ All phases used to restore health
 
 The three-phase system creates a hierarchy of liquidation mechanisms, each with different economic characteristics and market impacts.
 
-Next: Learn about [Stablecoin Burning](stablecoin-burning.md) →
+Next: Learn about [Stablecoin Burning](04-stablecoin-burning.md) →

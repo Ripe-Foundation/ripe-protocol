@@ -230,4 +230,4 @@ Current points will directly translate to future voting power. The proportional 
 
 The Ripe Governance Vault represents the foundation of community control over Ripe Protocol. By locking RIPE tokens now, participants are not only earning governance points but also positioning themselves to shape the protocol's future development and parameters when full decentralized governance activates.
 
-For technical implementation details, see [RipeGov Technical Documentation](../technical/vaults/RipeGov.md).
+For technical implementation details, see [RipeGov Technical Documentation](technical/vaults/RipeGov.md).

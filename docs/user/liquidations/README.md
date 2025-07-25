@@ -49,35 +49,35 @@ Minimum collateral value equals debt multiplied by (100% / liquidation threshold
 - A 95% threshold requires 105.3% collateralization
 - An 85% threshold requires 117.6% collateralization
 
-The threshold mechanism ensures positions maintain adequate collateral buffers before liquidation becomes possible. These thresholds work in conjunction with [Dynamic Rate Protection](../borrowing/dynamic-rate-protection.md) to maintain system stability.
+The threshold mechanism ensures positions maintain adequate collateral buffers before liquidation becomes possible. These thresholds work in conjunction with [Dynamic Rate Protection](borrowing/dynamic-rate-protection.md) to maintain system stability.
 
 ## Three-Phase Liquidation System
 
 The protocol routes liquidations through specialized mechanisms based on asset type and availability:
 
 ### Phase 1: Internal Recovery
-- [Stablecoin Burning](stablecoin-burning.md) - GREEN/sGREEN burn mechanisms
-- [Endaoment Transfer](endaoment-transfer.md) - Stablecoin treasury routing
+- [Stablecoin Burning](04-stablecoin-burning.md) - GREEN/sGREEN burn mechanisms
+- [Endaoment Transfer](05-endaoment-transfer.md) - Stablecoin treasury routing
 
 ### Phase 2: Stability Pool Integration  
-- [Stability Pool Swaps](stability-pool-swaps.md) - Collateral-for-debt exchanges
-- [Pool Mechanics](stability-pool-mechanics.md) - Pool operations and priorities
+- [Stability Pool Swaps](06-stability-pool-swaps.md) - Collateral-for-debt exchanges
+- [Pool Mechanics](07-stability-pool-mechanics.md) - Pool operations and priorities
 
 ### Phase 3: Market Mechanisms
-- [Dutch Auctions](dutch-auctions.md) - Time-based discount auctions
+- [Dutch Auctions](08-dutch-auctions.md) - Time-based discount auctions
 
 ## Core Liquidation Components
 
-### **[Liquidation Phases](liquidation-phases.md)**
+### **[Liquidation Phases](01-liquidation-phases.md)**
 The three-phase system that routes assets to appropriate liquidation mechanisms.
 
-### **[Liquidation Configuration](liquidation-configuration.md)**
+### **[Liquidation Configuration](02-liquidation-configuration.md)**
 How protocol and asset-specific parameters determine liquidation behavior.
 
-### **[Unified Repayment Formula](unified-repayment-formula.md)**
+### **[Unified Repayment Formula](03-unified-repayment-formula.md)**
 The mathematical foundation calculating optimal liquidation amounts.
 
-### **[Keepers](keepers.md)**
+### **[Keepers](09-keepers.md)**
 External actors who execute liquidations, update rates, and manage auctions for economic rewards.
 
 ## System Properties
@@ -97,19 +97,19 @@ Keeper networks compete to execute liquidations, ensuring rapid response without
 ## Documentation Structure
 
 ### Core Mechanics
-1. **[Liquidation Phases](liquidation-phases.md)** - Three-phase asset routing system
-2. **[Liquidation Configuration](liquidation-configuration.md)** - Parameter framework
-3. **[Unified Repayment Formula](unified-repayment-formula.md)** - Mathematical calculations
+1. **[Liquidation Phases](01-liquidation-phases.md)** - Three-phase asset routing system
+2. **[Liquidation Configuration](02-liquidation-configuration.md)** - Parameter framework
+3. **[Unified Repayment Formula](03-unified-repayment-formula.md)** - Mathematical calculations
 
 ### Specific Mechanisms
-1. **[Stablecoin Burning](stablecoin-burning.md)** - Phase 1 GREEN/sGREEN mechanism
-2. **[Endaoment Transfer](endaoment-transfer.md)** - Phase 1 stablecoin handling
-3. **[Stability Pool Swaps](stability-pool-swaps.md)** - Phase 2 liquidation method
-4. **[Stability Pool Mechanics](stability-pool-mechanics.md)** - Pool operations and economics
-5. **[Dutch Auctions](dutch-auctions.md)** - Phase 3 market mechanism
+1. **[Stablecoin Burning](04-stablecoin-burning.md)** - Phase 1 GREEN/sGREEN mechanism
+2. **[Endaoment Transfer](05-endaoment-transfer.md)** - Phase 1 stablecoin handling
+3. **[Stability Pool Swaps](06-stability-pool-swaps.md)** - Phase 2 liquidation method
+4. **[Stability Pool Mechanics](07-stability-pool-mechanics.md)** - Pool operations and economics
+5. **[Dutch Auctions](08-dutch-auctions.md)** - Phase 3 market mechanism
 
 ### System Participants
-1. **[Keepers](keepers.md)** - Decentralized actors maintaining protocol health
+1. **[Keepers](09-keepers.md)** - Decentralized actors maintaining protocol health
 
 ## System Design Principles
 

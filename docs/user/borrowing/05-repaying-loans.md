@@ -132,4 +132,4 @@ Repayment in Ripe Protocol is designed to be flexible and user-friendly, allowin
 
 ---
 
-*For more on debt management, see [Understanding Your Debt](understanding-debt.md)*
+*For more on debt management, see [Understanding Your Debt](02-understanding-debt.md)*

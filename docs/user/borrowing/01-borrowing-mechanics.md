@@ -1,6 +1,6 @@
 # Borrowing Mechanics
 
-Borrowing in Ripe Protocol involves minting [GREEN stablecoins](../green.md) against [deposited collateral](../collateral-assets/deposit-withdrawal-mechanics.md). The protocol calculates borrowing capacity based on collateral values and parameters, with multiple safety mechanisms throughout the process.
+Borrowing in Ripe Protocol involves minting [GREEN stablecoins](green.md) against [deposited collateral](collateral-assets/deposit-withdrawal-mechanics.md). The protocol calculates borrowing capacity based on collateral values and parameters, with multiple safety mechanisms throughout the process.
 
 ## Borrowing Power Calculation
 
@@ -205,7 +205,7 @@ When rates change due to pool health:
 
 This mechanism prevents retroactive rate changes while enabling dynamic market response.
 
-For complete details about debt management, see [Understanding Your Debt](understanding-debt.md).
+For complete details about debt management, see [Understanding Your Debt](02-understanding-debt.md).
 
 ## Special Collateral Types
 
@@ -234,7 +234,7 @@ Yield-bearing collateral continues accruing value while securing debt positions.
 
 Ripe Protocol implements multiple types of limits to ensure system stability and gradual growth. These include per-user limits, global protocol caps, and time-based interval restrictions.
 
-For complete details about all limit types, how they interact, and strategies for working within them, see [Borrowing Limits](borrowing-limits.md).
+For complete details about all limit types, how they interact, and strategies for working within them, see [Borrowing Limits](04-borrowing-limits.md).
 
 ## Economic Use Cases
 

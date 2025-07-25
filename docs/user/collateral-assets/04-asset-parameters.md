@@ -192,8 +192,8 @@ Withdrawal availability: 110 stETH (10% share)
 ```
 
 #### Stability Pool (Special Vault)
-**For**: [sGREEN](../sgreen.md) (Savings GREEN) only
-**Purpose**: Backstop for [liquidations](../liquidations/stability-pool-mechanics.md)
+**For**: [sGREEN](sgreen.md) (Savings GREEN) only
+**Purpose**: Backstop for [liquidations](liquidations/stability-pool-mechanics.md)
 **Special Features**:
 - Earns liquidation premiums
 - First line of defense for bad debt
