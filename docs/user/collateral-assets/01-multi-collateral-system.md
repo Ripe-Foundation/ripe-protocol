@@ -131,32 +131,4 @@ Individual risk isolation enables universal asset acceptance while portfolio agg
 
 The architecture supports future expansion to non-fungible tokens and tokenized real-world assets without compromising existing functionality.
 
-## Important Considerations
-
-### Risk Weighting
-
-Asset parameters vary based on:
-- Volatility metrics
-- Liquidity depth
-- Historical performance
-- Market conditions
-
-Aggregate terms reflect portfolio-weighted averages.
-
-### Liquidation Priority
-
-Liquidation prioritization optimizes:
-- Loss minimization
-- Protocol solvency
-- Market impact reduction
-- Gas efficiency
-
-### Dynamic Collateral Management
-
-The system supports continuous portfolio adjustment:
-- Asset addition modifies aggregate parameters
-- Collateral removal subject to health requirements
-- Portfolio rebalancing affects weighted terms
-- Market-responsive position management
-
-The multi-collateral architecture maximizes capital efficiency through portfolio aggregation while maintaining individual risk isolation, creating a resilient lending system adaptable to diverse asset types. This system's robustness enables the [three-phase liquidation system](liquidations/liquidation-phases.md) to handle any asset type safely.
+The multi-collateral architecture maximizes capital efficiency through portfolio aggregation while maintaining individual risk isolation, creating a resilient lending system adaptable to diverse asset types. This system's robustness enables the [three-phase liquidation system](../liquidations/01-liquidation-phases.md) to handle any asset type safely.

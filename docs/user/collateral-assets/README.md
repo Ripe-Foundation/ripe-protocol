@@ -16,22 +16,20 @@ The protocol's collateral framework operates through:
 ## Documentation Structure
 
 1. **[Multi-Collateral System](01-multi-collateral-system.md)** - Portfolio-based collateral mechanics
-2. **[Deposit & Withdrawal Mechanics](02-deposit-withdrawal-mechanics.md)** - Asset flow mechanisms and processes
-3. **[Supported Assets](03-supported-assets.md)** - Asset categories and parameters
-4. **[Asset Parameters](04-asset-parameters.md)** - Configuration and vault architecture
-5. **[Delegation & Permissions](05-delegation-permissions.md)** - Access control systems
-6. **[Special Asset Types](06-special-asset-types.md)** - NFT and RWA collateral handling
+2. **[Supported Assets](02-supported-assets.md)** - Asset categories and special handling
+3. **[Asset Parameters](03-asset-parameters.md)** - Risk parameters and configuration
+4. **[Delegation & Permissions](04-delegation-permissions.md)** - Access control systems
 
-## Asset Diversity Through Risk Isolation
+## What Makes Ripe Different
 
-Ripe's ability to accept diverse asset types stems from its individual risk isolation architecture. Unlike pooled lending protocols where all users share bad debt risk, Ripe isolates each borrower's risk profile.
+**Borrow against ANY asset** - Unlike Aave or Compound which only accept a handful of blue-chip assets, Ripe enables borrowing against:
+- Yield-bearing positions (stETH, LP/vault tokens)
+- Tokenized real-world assets
+- Meme coins (PEPE, SHIB, DOGE)
+- Gaming tokens and NFTs
+- Any future tokenized value
 
-This isolation combines with:
-- Three-phase liquidation mechanisms
-- Asset-specific parameter configuration
-- Progressive liquidation approaches
-
-The result enables support for assets ranging from blue-chip cryptocurrencies to experimental tokens while maintaining protocol solvency.
+This universal collateral support is possible because Ripe doesn't pool user funds. In Aave/Compound, all lenders share risk - one bad asset can hurt everyone. In Ripe, each position is independent, and our three-phase liquidation system (stability pool → auction → direct redemption) ensures positions are resolved before bad debt occurs. This architecture enables safe support for volatile assets that would create systemic risk in pooled lending protocols.
 
 ## Core Principles
 
