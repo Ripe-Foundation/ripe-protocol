@@ -1,6 +1,6 @@
 # Multi-Collateral System
 
-Ripe Protocol's multi-collateral system represents a fundamental shift in how DeFi lending works. Instead of managing multiple isolated positions across different assets, you maintain a single, unified loan backed by your entire portfolio.
+Ripe Protocol's multi-collateral system transforms DeFi lending through portfolio-based borrowing. The system unifies multiple assets into a single loan position backed by an entire collateral portfolio.
 
 ## The Lending Landscape
 
@@ -13,17 +13,17 @@ Traditional lending protocols create separate borrowing positions for each asset
 - Monitor and manage each position independently
 - One position's liquidation doesn't help the others
 
-This approach creates unnecessary complexity and risk. A temporary price dip in one asset could liquidate that position, even if your other collateral remains healthy.
+This approach creates complexity and isolated risk exposure. Price volatility in one asset triggers liquidation regardless of other healthy positions.
 
 ### Money Markets (Aave, Moonwell, etc.)
 
 Modern money markets already allow multiple assets backing a single loan position. However, they face a critical limitation: **they can only support conservative, blue-chip assets**.
 
 Why? Because in pooled lending:
-- All depositors share the risk of bad debt
-- One toxic asset can contaminate the entire pool
-- Conservative parameters are necessary for pool safety
-- New or volatile assets pose systemic risks
+- All depositors share bad debt risk
+- Single asset failures affect entire pools
+- Conservative parameters maintain pool safety
+- Volatile assets create systemic risks
 
 This limits these protocols to:
 - Major cryptocurrencies (ETH, BTC)
@@ -42,131 +42,121 @@ Ripe combines the best of both worlds: the simplicity of a single loan position 
 - Integration of tokenized real-world assets
 - Future-proofing for new asset types
 
+Example portfolio composition:
+- 10 WETH ($20,000) - Blue-chip asset
+- 5,000 USDC ($5,000) - Stablecoin
+- 0.5 WBTC ($15,000) - Blue-chip asset
+- 100,000 PEPE ($100) - Volatile asset
+- 50 stETH ($100,000) - Yield-bearing asset
+- 1,000 GAME ($500) - Gaming token
+
+Result: Single unified GREEN loan position
+
+This architecture isolates individual risk profiles, enabling support for assets unsuitable for pooled lending protocols.
+
+### System Mechanics
+
 ```
-Your Portfolio:
-├── 10 WETH ($20,000)        ← Blue-chip
-├── 5,000 USDC ($5,000)      ← Stablecoin
-├── 0.5 WBTC ($15,000)       ← Blue-chip
-├── 100,000 PEPE ($100)      ← Meme coin (not possible in Aave!)
-├── 50 stETH ($100,000)      ← Yield-bearing
-└── 1,000 GAME ($500)        ← Gaming token
-    
-= One GREEN Loan Position
+TRADITIONAL ISOLATED LENDING
+├── ETH Position: $10k → Max borrow $8k (80% LTV)
+├── USDC Position: $5k → Max borrow $4.5k (90% LTV)
+└── WBTC Position: $15k → Max borrow $12k (80% LTV)
+    Total: 3 separate loans, isolated risk
+
+RIPE MULTI-COLLATERAL SYSTEM
+┌─────────────────────────────────────────────────┐
+│              UNIFIED POSITION                   │
+│  ┌─────────┬─────────┬─────────┬─────────────┐  │
+│  │   ETH   │  USDC   │  WBTC   │    PEPE     │  │
+│  │  $10k   │   $5k   │  $15k   │    $100     │  │
+│  │  80%LTV │ 90%LTV  │ 80%LTV  │   50%LTV    │  │
+│  └─────────┴─────────┴─────────┴─────────────┘  │
+│              ↓ WEIGHTED AVERAGE ↓               │
+│        Single GREEN Loan: $24.1k capacity      │
+│        Blended Rate: 5.2% APR                   │
+│        Unified Health Factor: 1.25              │
+└─────────────────────────────────────────────────┘
 ```
 
-This architecture means one user's risky collateral choices don't affect other users, allowing Ripe to support assets that would be too dangerous for pooled lending protocols.
-
-### How It Works
-
-1. **Deposit Any Combination**: Add different assets to your collateral basket
-2. **Unified Borrowing Power**: The protocol calculates your total borrowing capacity
-3. **Single Debt Position**: Borrow GREEN against your entire portfolio
-4. **Shared Risk Buffer**: Strong assets protect weaker ones
+1. **Multi-Asset Deposits**: Various assets form collateral basket
+2. **Aggregated Borrowing Power**: Protocol calculates total capacity
+3. **Unified Debt Position**: GREEN borrowed against entire portfolio
+4. **Cross-Asset Support**: Strong assets buffer weaker positions
 
 ## Benefits of Multi-Collateral
 
 ### 1. Reduced Liquidation Risk
 
-When assets work together, temporary price movements become less dangerous:
+Asset diversification reduces liquidation risk:
 
-- **Isolated System**: WETH drops 20% → Position liquidated
-- **Ripe System**: WETH drops 20% → Other assets maintain overall health
+- **Isolated System**: 20% WETH decline triggers liquidation
+- **Unified System**: 20% WETH decline absorbed by portfolio
 
-Your portfolio's diversity becomes your protection.
+Portfolio diversity provides systemic protection.
 
 ### 2. Simplified Management
 
-Instead of juggling multiple loans:
-- One position to monitor
-- One debt health status to track
-- One repayment to manage
-- One liquidation threshold
+Unified position management:
+- Single position monitoring
+- Consolidated health metrics
+- Unified repayment structure
+- Aggregate liquidation threshold
 
 ### 3. Capital Efficiency
 
-Every asset contributes to your borrowing power:
-- Blue-chip assets provide high loan-to-value
-- Stablecoins add stability
-- Smaller positions still contribute
-- No asset sits idle
+All assets contribute to borrowing capacity:
+- Blue-chip assets maximize loan-to-value
+- Stablecoins enhance stability
+- Small positions remain productive
+- Full capital utilization
 
 ### 4. Dynamic Optimization
 
-The protocol automatically optimizes your position:
+Automatic position optimization includes:
 - Weighted average interest rates
 - Blended risk parameters
-- Optimal liquidation sequencing
+- Optimized liquidation sequencing
 - Efficient collateral utilization
 
-## Real-World Example
+## Architectural Comparison
 
-Let's see how Sarah's diverse portfolio works across different protocols:
+### Isolated Lending Models
+Traditional protocols create separate positions per asset, requiring independent management and limiting capital efficiency. Each position faces liquidation risk independently.
 
-**Sarah's Portfolio:**
-- 5 WETH (worth $10,000) - 80% LTV
-- 10,000 USDC - 90% LTV
-- 50,000 SHIB (worth $500) - 50% LTV
-- 2 stETH (worth $4,000) - 75% LTV
-- 1M PEPE (worth $1,000) - 40% LTV
+### Pooled Money Markets
+Shared risk pools restrict asset acceptance to established, low-volatility tokens. System-wide risk sharing prevents inclusion of experimental or volatile assets.
 
-**Isolated Lending (Compound-style):**
-- WETH position: Can borrow $8,000
-- USDC position: Can borrow $9,000
-- SHIB position: Can borrow $250
-- stETH position: Can borrow $3,000
-- PEPE: Not supported
-- Total: $20,250 across 4 separate loans
+### Ripe's Unified System
+Individual risk isolation enables universal asset acceptance while portfolio aggregation creates capital efficiency. All assets contribute to a single position with optimized parameters.
 
-**Money Market (Aave/Moonwell):**
-- WETH: ✓ Accepted
-- USDC: ✓ Accepted
-- SHIB: ✗ Too risky for the pool
-- stETH: ✓ Accepted (select protocols)
-- PEPE: ✗ Not established enough
-- Result: Can only use $23,000 of $25,500 in assets
-
-**Ripe Protocol (Current):**
-- All assets accepted and working together
-- Combined collateral: $25,500
-- Weighted average LTV: ~78%
-- Single borrowing capacity: $19,650
-- One loan to manage
-- Full portfolio utilization
-
-**Ripe Protocol (Future with NFTs):**
-- Will include NFT collateral
-- Even more diverse portfolios
-- Tokenized real-world assets
-- True universal collateral
+The architecture supports future expansion to non-fungible tokens and tokenized real-world assets without compromising existing functionality.
 
 ## Important Considerations
 
 ### Risk Weighting
 
-Not all assets are equal. The protocol applies different parameters based on:
-- Asset volatility
+Asset parameters vary based on:
+- Volatility metrics
 - Liquidity depth
 - Historical performance
 - Market conditions
 
-Your overall terms reflect the weighted average of your portfolio.
+Aggregate terms reflect portfolio-weighted averages.
 
 ### Liquidation Priority
 
-If liquidation becomes necessary, the protocol intelligently chooses which assets to liquidate first, optimizing for:
-- Minimal user loss
-- Protocol safety
-- Market impact
+Liquidation prioritization optimizes:
+- Loss minimization
+- Protocol solvency
+- Market impact reduction
 - Gas efficiency
 
-### Adding and Removing Collateral
+### Dynamic Collateral Management
 
-You can adjust your collateral mix anytime:
-- Add new asset types to improve terms
-- Remove excess collateral above safe thresholds
-- Rebalance for optimal ratios
-- Respond to market conditions
+The system supports continuous portfolio adjustment:
+- Asset addition modifies aggregate parameters
+- Collateral removal subject to health requirements
+- Portfolio rebalancing affects weighted terms
+- Market-responsive position management
 
-The multi-collateral system is designed to work with your natural portfolio, not against it. Whether you hold blue-chip assets, stablecoins, yield-bearing tokens, or emerging assets, they all contribute to your borrowing power in Ripe.
-
-Next: Learn about [Asset Categories](supported-assets.md) →
+The multi-collateral architecture maximizes capital efficiency through portfolio aggregation while maintaining individual risk isolation, creating a resilient lending system adaptable to diverse asset types. This system's robustness enables the [three-phase liquidation system](../liquidations/liquidation-phases.md) to handle any asset type safely.

@@ -1,6 +1,6 @@
-# Repaying Your Loan
+# Loan Repayment
 
-Repaying your loan in Ripe Protocol is straightforward and flexible. You can repay any amount at any time, from small partial payments to complete loan closure. This guide covers everything you need to know about the repayment process.
+Loan repayment in Ripe Protocol supports flexible partial or complete debt settlement without time restrictions or prepayment penalties.
 
 ## Repayment Options
 
@@ -20,63 +20,33 @@ Reduce your debt while maintaining your position:
 - Reduces interest burden
 - Maintains collateral exposure
 
-**Benefits of Partial Repayment:**
-- Reduce liquidation risk
-- Lower ongoing interest costs
-- Maintain leveraged position
-- Flexibility to re-borrow later
+Partial repayments reduce outstanding debt, decrease interest accumulation, and improve position health metrics while maintaining collateral exposure.
 
-## Where to Get GREEN for Repayment
+## GREEN Acquisition Methods
 
-### 1. Decentralized Exchanges (DEXs)
+### Market Sources
 
-Purchase GREEN on supported exchanges:
-- **Primary Pairs**: GREEN/USDC (Curve)
-- **Check Multiple DEXs**: Prices may vary
-- **Consider Slippage**: Large purchases may impact price
+GREEN tokens for repayment can be obtained through:
+- Decentralized exchange liquidity pools
+- sGREEN redemption at current exchange rates
+- Stability pool withdrawals
 
-### 2. Redeem from sGREEN
+### Redemption Mechanics
 
-If you hold sGREEN (Savings GREEN):
-1. Convert sGREEN → GREEN at current exchange rate
-2. Use redeemed GREEN for repayment
-3. Benefits from any accumulated yield
-4. No slippage or trading fees
+sGREEN holders can redeem tokens for GREEN based on the current exchange rate, capturing any accumulated yield in the process. Stability pool participants may withdraw their positions to access GREEN for repayment.
 
-**Example:**
-```
-Holding: 1,000 sGREEN
-Current rate: 1 sGREEN = 1.05 GREEN
-Redeem for: 1,050 GREEN
-Extra 50 GREEN from yield earnings
-```
+## Repayment Mechanics
 
-### 3. Withdraw from Stability Pools
+### Debt Calculation
 
-If participating in stability pools:
-1. Withdraw your sGREEN from pool
-2. Redeem to GREEN if needed
-3. May forfeit ongoing rewards
-4. Consider timing for optimal returns
+Total repayment amounts comprise:
+- Principal debt from initial borrowing
+- Accumulated interest through current block
+- Continuous interest accrual during transaction
 
-## The Repayment Process
+### Transaction Process
 
-### Step 1: Check Current Debt
-
-Before repaying, verify your total debt:
-- **Principal**: Original borrowed amount
-- **Accrued Interest**: Interest accumulated to current block
-- **Total Due**: Principal + Interest
-
-**Important**: Interest accrues every block (~2 seconds), so your exact repayment amount changes constantly.
-
-### Step 2: Acquire GREEN
-
-Obtain enough GREEN to cover your intended repayment:
-- For full repayment: Get slightly more than shown debt (to cover accruing interest)
-- For partial repayment: Any amount helps improve position
-
-### Step 3: Approve GREEN Spending
+Repayment executes through GREEN token transfers to the protocol, requiring standard ERC-20 approval patterns. The system calculates exact debt at transaction time, accounting for block-by-block interest accumulation.
 
 The CreditEngine contract needs permission to use your GREEN:
 1. Approve GREEN token for CreditEngine

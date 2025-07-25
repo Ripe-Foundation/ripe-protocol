@@ -1,6 +1,6 @@
-# Understanding Your Debt
+# Understanding Debt
 
-Managing debt effectively requires understanding how it's calculated, how it grows, and how various factors affect your position. This guide explains everything you need to know about your Ripe Protocol debt.
+Debt in Ripe Protocol consists of principal and accrued interest, tracked through sophisticated mechanisms that ensure precision and capital efficiency.
 
 ## Debt Components
 
@@ -22,34 +22,13 @@ The cost of borrowing over time:
 
 ## How Interest Accumulates
 
-### Continuous Compounding
+### Interest Accumulation Mechanics
 
-Ripe uses continuous compounding for precise calculations:
+The protocol implements continuous interest compounding:
 
-```
-Interest at time t = Principal × (e^(rate × time) - 1)
-```
-
-This means:
-- Interest accrues every block (~2 seconds on Base)
-- Small amounts compound frequently
-- More accurate than daily/monthly compounding
-
-### Real-World Example
-
-**Initial Borrow**:
-- Principal: 10,000 GREEN
-- Annual Rate: 5%
-- Daily Rate: 0.0137%
-
-**Interest Growth**:
-- Hour 1: 0.057 GREEN
-- Day 1: 1.37 GREEN  
-- Week 1: 9.59 GREEN
-- Month 1: 41.10 GREEN
-- Year 1: 500 GREEN
-
-Your debt grows predictably based on time and rate.
+- Block-level interest accrual provides smooth growth
+- Continuous compounding creates effective rates slightly above nominal
+- Predictable debt growth based on time and rate parameters
 
 ## Weighted Debt Terms
 
@@ -59,40 +38,34 @@ With multiple collateral types, your debt terms are weighted averages:
 
 Each asset contributes to your overall terms based on its borrowing power:
 
-**Example Portfolio**:
-```
-Asset    Value     LTV    Max Debt   Rate   Weight
-WETH     $20,000   80%    $16,000    5%     76%
-USDC     $5,000    90%    $4,500     3%     21%
-PEPE     $1,000    50%    $500       12%    3%
-------------------------------------------------
-Total    $26,000          $21,000    4.8%   100%
-```
+Each asset's contribution to borrowing power determines its weight in rate calculations. Assets with higher LTV ratios and values exert proportionally greater influence on the weighted average rate.
 
-Your effective rate: (5% × 0.76) + (3% × 0.21) + (12% × 0.03) = 4.8%
+### Weighting Impact
 
-### Why Weighting Matters
-
-- **Better Rates**: High-value, low-risk assets improve your average
-- **Risk Distribution**: No single asset dominates your terms
-- **Optimization Opportunity**: Add assets strategically to improve rates
+The weighted average system ensures:
+- Lower-risk assets reduce overall borrowing costs
+- Portfolio diversification affects rate determination
+- Asset composition directly influences debt terms
 
 ## Critical Debt Thresholds
 
 Ripe Protocol uses three key thresholds that determine your position's safety. Understanding these is crucial for managing your debt effectively.
 
+### Threshold Framework
+
+Three critical ratios govern position safety:
+- **LTV Ratio**: Determines maximum borrowing capacity
+- **Redemption Threshold**: Activates deleveraging mechanisms
+- **Liquidation Threshold**: Triggers forced collateral sales
+
 ### 1. Loan-to-Value (LTV) Ratio
 
 **What it is**: Your basic borrowing limit
 **How it works**: You can borrow up to this percentage of your collateral value
+**Direction**: Higher debt OR lower collateral value → Higher LTV (bad)
 **Calculation**: `Maximum Debt = Collateral Value × LTV%`
 
-**Example**:
-```
-Collateral: $10,000 WETH
-LTV: 80%
-Maximum you can borrow: $8,000 GREEN
-```
+The LTV ratio establishes the upper bound for borrowing against deposited collateral value.
 
 ### 2. Redemption Threshold
 
@@ -187,6 +160,117 @@ Weighted redemption threshold =
   (90% × $6,400 + 80% × $1,000) / $7,400 = 88.6%
 ```
 
-Understanding these thresholds is crucial for avoiding costly redemptions and liquidations. Monitor your position relative to all three thresholds, not just your borrowing limit.
+## Real-Time Position Monitoring
 
-Next: Learn about [Borrowing Limits](borrowing-limits.md) →
+### Understanding Your Health Factor
+
+Your health factor is simply how much cushion you have:
+- **Healthy**: Your collateral is worth significantly more than your debt
+- **At Risk**: Your collateral value is getting close to your debt amount
+- **Danger**: Your collateral barely covers your debt
+
+### Risk Indicator Thresholds
+
+The protocol operates with clear risk boundaries:
+
+| Metric | Safe Zone | Caution Zone | Danger Zone |
+|--------|-----------|--------------|-------------|
+| **Collateralization Ratio** | >150% | 120-150% | <120% |
+| **Distance to Redemption** | >20% | 10-20% | <10% |
+| **Distance to Liquidation** | >15% | 5-15% | <5% |
+| **Interest Coverage** | Positive | Neutral | Negative |
+
+### Market Condition Monitoring
+
+Key protocol metrics that affect debt positions:
+- Collateral value fluctuations impact position health
+- Health factor degradation accelerates near thresholds
+- Interest rate changes affect long-term debt sustainability
+- Pool health stress increases dynamic rate adjustments
+
+## Practical Debt Management
+
+### Safety Buffer Calculations
+
+Buffer zones between thresholds provide reaction time:
+
+```
+Maximum LTV: 80%
+Safe operating range: 60% (25% buffer)
+Redemption threshold: 111% collateralization
+Safe collateralization: 140% (26% buffer)
+```
+
+Larger buffers increase position resilience to market volatility.
+
+### Interest Optimization
+
+**Compound Effect Example**:
+```
+Borrow: $10,000 at 5% APR
+Daily interest: $1.37
+Monthly interest: $41.10
+Yearly interest: $512.75 (with compounding)
+
+Monthly repayment reduces compound interest impact
+Savings: ~$12.75/year
+```
+
+### Position Management at Critical Thresholds
+
+The protocol design creates natural intervention points:
+
+**125% Collateralization Zone**: Buffer erosion indicates increasing risk. Stablecoin additions provide immediate ratio improvement due to high LTV parameters.
+
+**115% Collateralization Zone**: Approaching protocol safety mechanisms. Debt reduction or collateral addition becomes economically critical.
+
+**110% Collateralization Zone**: Redemption mechanism activation imminent. Market forces incentivize position adjustment through redemption pressure.
+
+## Advanced Debt Metrics
+
+### Effective Interest Rate
+
+Your true cost includes:
+- Base borrow rate
+- Compounding frequency
+- Origination fee (amortized)
+- Opportunity cost
+
+**Calculation**:
+```
+Effective APR = Base Rate + (Daowry / Loan Term) + Compound Effect
+Example: 5% + (0.5% / 1 year) + 0.25% = 5.75% true cost
+```
+
+### Break-Even Analysis
+
+When does borrowing make sense?
+
+```
+Asset appreciation needed = Effective borrow rate + Risk premium
+Example: 5.75% cost + 2% risk = 7.75% required return
+
+If ETH typically returns 15%+, borrowing at 7.75% is profitable
+```
+
+## Economic Considerations
+
+### Position Optimization Metrics
+
+Key calculations for debt management:
+- Safe borrowing capacity incorporates volatility buffers
+- Interest projections compound continuously
+- Liquidation prices derive from threshold calculations
+- Collateral requirements scale with risk parameters
+
+### Historical Performance Analysis
+
+Position metrics reveal optimization opportunities:
+- Utilization patterns indicate risk tolerance
+- Interest efficiency measures borrowing costs versus returns
+- Threshold proximity events highlight volatility exposure
+- Parameter adjustments reflect changing conditions
+
+---
+
+The debt management system demonstrates how Ripe Protocol creates transparent, predictable borrowing mechanics while maintaining flexibility for diverse strategies and risk profiles.

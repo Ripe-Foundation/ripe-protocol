@@ -1,41 +1,51 @@
 # Collateral Assets
 
-Ripe Protocol transforms DeFi lending by accepting virtually any tokenized asset as collateral. Unlike traditional lending platforms that support only a handful of blue-chip assets, Ripe embraces the full spectrum of blockchain innovation—from established cryptocurrencies to emerging tokenized real-world assets.
+This section covers how Ripe Protocol's multi-collateral system works, including asset types, deposit mechanics, and portfolio management features.
 
-## Why Collateral Matters
+Ripe Protocol accepts diverse tokenized assets as collateral through a unified system that enables portfolio-based borrowing. The protocol's architecture supports assets ranging from major cryptocurrencies to tokenized real-world assets.
 
-When you borrow in DeFi, you lock up assets as collateral to secure your loan. The value and type of collateral you provide determines how much you can borrow and at what terms. Ripe's approach is flexible: supporting everything from blue-chip assets to emerging tokens, with yield-bearing assets maintaining their productive nature even while serving as collateral.
+## Collateral System Architecture
 
-## The Ripe Difference
+The protocol's collateral framework operates through:
 
-Traditional lending protocols force you to choose between different isolated markets. Have WETH and want to borrow? That's one position. Have cbBTC too? That's a separate position with its own risks. Ripe changes this paradigm:
+- **Unified Positions**: Multiple assets backing single loans
+- **Portfolio Diversification**: Risk distribution across asset types
+- **Yield Preservation**: Productive assets maintain earning capabilities
+- **Extensible Design**: New asset types integrate without core changes
 
-- **One Loan, Many Assets**: All your collateral backs a single loan position
-- **Portfolio Approach**: Diversification reduces liquidation risk
-- **Yield Preservation**: Yield-bearing assets continue earning while serving as collateral
-- **Future-Ready**: New asset types integrate seamlessly
+## Documentation Structure
 
-## What You'll Learn
+1. **[Multi-Collateral System](multi-collateral-system.md)** - Portfolio-based collateral mechanics
+2. **[Deposit & Withdrawal Mechanics](deposit-withdrawal-mechanics.md)** - Asset flow mechanisms and processes
+3. **[Supported Assets](supported-assets.md)** - Asset categories and parameters
+4. **[Asset Parameters](asset-parameters.md)** - Configuration and vault architecture
+5. **[Delegation & Permissions](delegation-permissions.md)** - Access control systems
+6. **[Special Asset Types](special-asset-types.md)** - NFT and RWA collateral handling
 
-This section covers everything you need to know about using collateral in Ripe:
+## Asset Diversity Through Risk Isolation
 
-1. **[Multi-Collateral System](multi-collateral-system.md)** - How multiple assets work together
-2. **[Asset Categories](supported-assets.md)** - Types of assets you can use
-3. **[How Assets Work](how-assets-work.md)** - Configuration and parameters explained
+Ripe's ability to accept diverse asset types stems from its individual risk isolation architecture. Unlike pooled lending protocols where all users share bad debt risk, Ripe isolates each borrower's risk profile.
 
-## How We Support Diverse Assets Safely
+This isolation combines with:
+- Three-phase liquidation mechanisms
+- Asset-specific parameter configuration
+- Progressive liquidation approaches
 
-**"How can Ripe accept risky assets like memecoins or NFTs as collateral?"**
+The result enables support for assets ranging from blue-chip cryptocurrencies to experimental tokens while maintaining protocol solvency.
 
-This is possible thanks to our sophisticated liquidation system. While other protocols restrict themselves to "safe" assets, Ripe's three-phase liquidation mechanism can handle virtually any asset type while maintaining system security. The combination of:
-- Isolated risk per user (your risky assets don't affect others)
-- Multiple liquidation mechanisms (gentle to aggressive)
-- Customized parameters per asset type
+## Core Principles
 
-...enables us to safely support assets other protocols won't touch. Learn more about [how our liquidation system enables asset diversity](../liquidations/README.md#why-liquidations-enable-asset-diversity).
+### Unified Position Management
+All deposited assets contribute to a single borrowing position, eliminating the complexity of managing multiple isolated loans.
 
-## Getting Started
+### Dynamic Collateral Composition
+Assets can be added or removed subject to maintaining adequate collateralization ratios.
 
-The best way to understand Ripe's collateral system is to start with our [Multi-Collateral System](multi-collateral-system.md) guide. It explains the core innovation that makes Ripe different from every other lending protocol.
+### Yield Continuity
+Yield-bearing assets maintain their productive characteristics while serving as collateral.
 
-Ready to put your assets to work? Let's explore how Ripe transforms any token into productive collateral.
+### Individual Risk Containment
+Each user's collateral choices affect only their position, preventing systemic contagion.
+
+### Immediate Liquidity
+No mandatory lock-up periods or withdrawal delays under normal operating conditions.

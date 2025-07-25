@@ -1,12 +1,12 @@
-# Asset Categories
+# Supported Assets
 
-Ripe Protocol's universal collateral system is designed to support a diverse range of assets, from battle-tested crypto assets to innovative new token types. This flexibility ensures you can use your entire portfolio productively, regardless of what you hold.
+Ripe Protocol supports diverse asset types through its universal collateral system, ranging from established cryptocurrencies to experimental tokens and real-world asset representations.
 
 ## Asset Categories Overview
 
 ### 1. Stablecoins
 
-The foundation of many DeFi portfolios, stablecoins offer predictable value and high loan-to-value ratios.
+Stablecoins provide value stability and elevated loan-to-value ratios.
 
 **Examples:**
 - **USDC**: Circle's regulated dollar stablecoin
@@ -14,7 +14,7 @@ The foundation of many DeFi portfolios, stablecoins offer predictable value and 
 - **USDS**: Sky's decentralized stablecoin (formerly MakerDAO)
 - **Yield-bearing stables**: Interest-earning stable assets
 
-**Best For:** Users seeking maximum borrowing power with minimal liquidation risk due to stablecoins' predictable value.
+Stablecoins typically offer high loan-to-value ratios and reduced liquidation risk due to price stability.
 
 ### 2. Blue-Chip Crypto Assets
 
@@ -27,11 +27,11 @@ Established crypto assets with deep liquidity and proven track records.
 - **Layer 1 tokens**: Native blockchain assets
 - **Established altcoins**: Top market cap crypto assets
 
-**Best For:** Long-term holders who want to access liquidity without selling their core positions.
+These assets provide substantial borrowing capacity with moderate risk parameters.
 
 ### 3. Yield-Bearing Assets
 
-Tokens that generate returns while serving as collateral, offering the best of both worlds.
+Assets generating returns while serving as collateral enable simultaneous yield and borrowing.
 
 **Examples:**
 - **Liquid Staking Tokens**:
@@ -43,20 +43,17 @@ Tokens that generate returns while serving as collateral, offering the best of b
 - **Interest-bearing tokens**: Lending protocol deposits (Aave, Morpho, Euler, etc)
 - **Staked governance tokens**: Locked protocol tokens
 
-**Key Benefit:** Your collateral continues earning its native yield while borrowed against. This means:
-- Liquid staking tokens keep accruing staking rewards
-- LP tokens continue earning trading fees
-- Vault tokens keep auto-compounding
-- No need to choose between yield and liquidity
+**Yield Continuity**: Collateral maintains its productive characteristics:
+- Liquid staking tokens accrue staking rewards
+- LP tokens collect trading fees
+- Vault tokens continue compounding
+- Yield generation occurs simultaneously with borrowing
 
-**Example Strategy:** 
-If stETH earns 4% and you borrow at 3%, you have a positive carry of 1%. This enables leveraged strategies where your collateral earns more than your borrowing costs.
-
-**Best For:** Users who want their collateral to remain productive while borrowing.
+Positive carry scenarios emerge when asset yields exceed borrowing costs.
 
 ### 4. Emerging Assets
 
-The long tail of crypto innovation, including community tokens and experimental assets.
+Community-driven and experimental assets represent crypto innovation.
 
 **Examples:**
 - **Meme Coins**: Community-driven tokens like SHIB, PEPE
@@ -65,11 +62,11 @@ The long tail of crypto innovation, including community tokens and experimental 
 - **New Protocol Tokens**: Recently launched DeFi projects
 - **Experimental Assets**: Novel token mechanisms
 
-**Best For:** Diversifying collateral without selling speculative positions. These assets typically have more conservative parameters due to their volatility.
+These assets receive conservative parameters reflecting their volatility profiles and market characteristics.
 
 ### 5. Tokenized Real-World Assets
 
-The bridge between traditional finance and DeFi, bringing real-world value on-chain.
+Tokenized representations of traditional assets enable real-world value integration.
 
 **Examples:**
 - **Tokenized Securities**: Digital representations of stocks, bonds
@@ -90,13 +87,13 @@ The bridge between traditional finance and DeFi, bringing real-world value on-ch
 - Direct redemption mechanisms only
 - Compliance preserved throughout lifecycle
 
-**Benefits:**
-- Access DeFi liquidity while maintaining compliance
-- Institutional-grade infrastructure
-- Clear regulatory framework
-- Segregated from permissionless assets
+**Compliance Integration:**
+- DeFi liquidity access with regulatory compliance
+- Institutional infrastructure requirements
+- Regulatory framework adherence
+- Segregation from permissionless systems
 
-These assets have parameters that vary significantly based on the underlying asset type and regulatory framework.
+Parameters vary based on underlying asset characteristics and applicable regulations.
 
 ### 6. NFTs & Tokenized Unique Assets
 
@@ -117,16 +114,16 @@ Non-fungible tokens represent unique digital assets, collectibles, and tokenized
 - Different liquidation mechanisms
 - Floor price or third-party valuation considerations
 
-## How Assets Are Added
+## Asset Addition Process
 
-New assets don't appear randomly in Ripe. Each goes through a careful process:
+New asset integration follows a structured process:
 
-1. **Community Proposal**: Users suggest new assets
-2. **Risk Assessment**: Analysis of volatility, liquidity, and market metrics
-3. **Parameter Setting**: Determining appropriate LTV, rates, and limits
-4. **Governance Vote**: RIPE holders approve additions
-5. **Technical Integration**: Smart contract updates and testing
-6. **Gradual Rollout**: Conservative initial parameters, adjusted over time
+1. **Community Proposal**: Asset suggestions from participants
+2. **Risk Assessment**: Volatility, liquidity, and market analysis
+3. **Parameter Setting**: LTV, rate, and limit determination
+4. **Governance Vote**: RIPE holder approval
+5. **Technical Integration**: Contract updates and testing
+6. **Gradual Rollout**: Conservative initial parameters with adjustments
 
 ## The Expanding Universe of Collateral
 
@@ -140,6 +137,150 @@ Ripe's architecture is designed to accommodate any tokenized value. The protocol
 - **Privacy Tokens**: Assets with enhanced privacy features
 - **And More**: If it's tokenized and has value, it can potentially serve as collateral
 
-The key is maintaining a balance between innovation and safety, ensuring new asset types enhance rather than endanger the protocol.
+Asset expansion balances innovation with safety, ensuring additions enhance protocol stability.
 
-Next: Understand [How Assets Work](how-assets-work.md) in the protocol →
+## Checking Asset Support
+
+### Asset Support Verification
+
+The protocol maintains a comprehensive list of supported assets with their associated parameters:
+
+1. **Supported Asset Registry**: On-chain list of approved tokens
+2. **Asset Parameters**: Each asset has defined LTV ratios, interest rates, and deposit limits
+3. **Access Restrictions**: Certain assets require whitelist approval for regulatory compliance
+4. **Vault Assignment**: Each asset maps to a specific vault type for proper handling
+
+### Current Asset Status
+
+Assets fall into categories:
+
+**Fully Supported** ✅
+- Immediate deposits
+- No restrictions
+- Standard parameters
+
+**Whitelist Required** 🔐
+- KYC/compliance needed
+- Apply for access
+- Then deposit normally
+
+**Coming Soon** ⏳
+- Approved by governance
+- Awaiting deployment
+- Join waitlist
+
+**Not Yet Supported** ❌
+- Propose through governance
+- Community discussion
+- Technical integration
+
+## Adding New Assets
+
+### Community Process
+
+Asset addition follows this process:
+
+1. **Research Phase**
+   - Analyze token metrics
+   - Check liquidity depth
+   - Review smart contract
+   - Assess market demand
+
+2. **Proposal Creation**
+   - Submit governance proposal
+   - Include risk analysis
+   - Suggest parameters
+   - Provide integration plan
+
+3. **Community Discussion**
+   - Forum deliberation
+   - Risk assessment
+   - Parameter refinement
+   - Technical review
+
+4. **Governance Vote**
+   - RIPE holders decide
+   - Requires quorum
+   - Majority approval
+   - Time-locked execution
+
+5. **Technical Integration**
+   - Smart contract updates
+   - Oracle configuration
+   - Vault assignment
+   - Testing phase
+
+6. **Gradual Rollout**
+   - Conservative initial parameters
+   - Limited deposits first
+   - Monitor performance
+   - Expand over time
+
+### Typical Timeline
+
+- Research & Proposal: 1-2 weeks
+- Discussion: 1 week
+- Voting: 3-7 days
+- Integration: 1-2 weeks
+- Total: 4-6 weeks average
+
+### What Makes a Good Candidate?
+
+**Technical Requirements**:
+- ERC-20 compliant
+- Reliable price oracles
+- Sufficient liquidity
+- Clean audit history
+
+**Market Requirements**:
+- Active trading volume
+- Multiple exchanges
+- Established community
+- Clear use case
+
+**Risk Considerations**:
+- Volatility profile
+- Correlation to other assets
+- Potential for manipulation
+- Regulatory clarity
+
+## Special Considerations by Type
+
+### For Yield-Bearing Assets
+- Must have share-based vault
+- Yield mechanism understood
+- No negative rebases (ideally)
+- Audited yield source
+
+### For NFT Collections
+- Floor price oracle needed
+- Sufficient trading volume
+- Clear valuation method
+- Liquidation buyers exist
+
+### For RWAs
+- Legal structure clear
+- Compliance framework
+- Redemption mechanism
+- Transfer restrictions handled
+
+### For New Tokens
+- Initial conservative parameters
+- Higher collateral requirements
+- Lower debt ceilings
+- Gradual parameter improvement
+
+## Stay Updated
+
+Asset support evolves constantly:
+
+Asset support evolution includes:
+- Regular asset additions
+- Governance participation opportunities
+- Parameter improvements over time
+- Community proposal mechanisms
+
+## Related Documentation
+
+- [Asset Parameters](asset-parameters.md) - Detailed parameter mechanics
+- [Deposit & Withdrawal Mechanics](deposit-withdrawal-mechanics.md) - Asset flow processes

@@ -1,64 +1,39 @@
 # Borrowing
 
-Borrowing in Ripe Protocol means minting GREEN, a decentralized stablecoin backed by your deposited collateral. Unlike traditional lending where you receive existing tokens, GREEN is created specifically for your loan and destroyed when repaid, ensuring sustainable economics.
+This section explains how Ripe Protocol's borrowing system works, from GREEN stablecoin creation to debt management and repayment mechanisms.
 
-## Why Borrow?
+Borrowing in Ripe Protocol involves minting GREEN stablecoin against deposited collateral. The protocol creates GREEN tokens when loans originate and burns them upon repayment, maintaining supply-demand equilibrium.
 
-Borrowing allows you to:
-- **Access Liquidity**: Use your assets' value without selling
-- **Maintain Exposure**: Keep upside potential while accessing funds
-- **Tax Efficiency**: Loans aren't taxable events in most jurisdictions
-- **Leverage Strategies**: Amplify positions or yield opportunities
+## Borrowing System Overview
 
-## The Ripe Borrowing Experience
+The protocol's borrowing mechanism features:
 
-Ripe simplifies borrowing through several innovations:
+- **Unified Positions**: All collateral backs a single loan
+- **GREEN Creation**: Stablecoin minted against collateral value
+- **Dynamic Rates**: Interest rates adjust based on market conditions
+- **Flexible Repayment**: Partial or complete repayment without penalties
+- **Safety Mechanisms**: Multiple systems prevent bad debt accumulation
 
-- **Single Loan Position**: One loan backed by all your collateral
-- **GREEN Stablecoin**: Freshly minted, USD-pegged stability
-- **Dynamic Rates**: Interest adjusts to market conditions
-- **Flexible Repayment**: Partial or full, anytime
-- **Built-in Safety**: Multiple mechanisms prevent bad debt
+## Documentation Structure
 
-## What You'll Learn
+1. **[GREEN Stablecoin](../green.md)** - The protocol's native stablecoin mechanics
+2. **[Borrowing Mechanics](borrowing-mechanics.md)** - Core borrowing system functionality
+3. **[Understanding Your Debt](understanding-debt.md)** - Debt composition and management
+4. **[Dynamic Rate Protection](dynamic-rate-protection.md)** - Interest rate adjustment mechanisms
+5. **[Borrowing Limits](borrowing-limits.md)** - Protocol constraints and parameters
+6. **[Repaying Your Loan](repaying-loans.md)** - Repayment processes and calculations
+7. **[Advanced Borrowing Mechanics](advanced-borrowing-mechanics.md)** - Complex system interactions
 
-This section covers everything about borrowing in Ripe:
-
-1. **[GREEN Stablecoin](green-stablecoin.md)** - Understanding Ripe's native stablecoin
-2. **[Borrowing Mechanics](borrowing-mechanics.md)** - How borrowing actually works
-3. **[Understanding Your Debt](understanding-debt.md)** - Managing principal and interest
-4. **[Borrowing Limits](borrowing-limits.md)** - Caps and restrictions explained
-5. **[Repaying Your Loan](repaying-loans.md)** - How to repay partial or full amounts
-
-## Quick Start
-
-If you're ready to borrow:
-
-1. **Deposit Collateral**: Add assets to back your loan
-2. **Check Borrowing Power**: See how much GREEN you can mint
-3. **Borrow GREEN**: Create your loan with one transaction
-4. **Monitor Health**: Keep your position safe
-5. **Repay When Ready**: Close or reduce your loan anytime
-
-## Key Concepts
+## Core Concepts
 
 ### Borrowing Power
-The maximum GREEN you can mint based on your collateral value and loan-to-value ratios.
+Maximum GREEN mintable based on aggregate collateral value multiplied by respective loan-to-value ratios.
 
 ### Debt Health
-A measure of your position's safety. Good debt health means your collateral adequately covers your debt; bad debt health triggers liquidation eligibility.
+Metric indicating position safety relative to liquidation thresholds. Calculated as the ratio of collateral value to outstanding debt.
 
-### Interest Rates
-Dynamic rates that adjust based on market conditions and asset types.
+### Interest Rate Dynamics
+Rates adjust algorithmically based on market conditions, pool health, and asset-specific parameters. The Dynamic Rate Protection system maintains GREEN stability through automated adjustments.
 
-### Liquidation
-The process of selling collateral to repay debt when positions become unsafe.
-
-## Important Reminders
-
-1. **Borrowing Creates Debt**: You must repay principal plus interest
-2. **Collateral Can Be Liquidated**: Monitor your health factor
-3. **Rates Can Change**: Interest rates adjust dynamically
-4. **GREEN Must Maintain Peg**: Various mechanisms ensure stability
-
-Ready to unlock your assets' potential? Start with understanding [GREEN Stablecoin](green-stablecoin.md) →
+### Liquidation Process
+Collateral liquidation occurs when positions breach minimum collateralization ratios, executed through the three-phase system to minimize losses.

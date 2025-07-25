@@ -1,70 +1,87 @@
 # Liquidation Phases
 
-Ripe processes liquidations in three phases, always trying the gentlest methods first to minimize your losses.
+Ripe Protocol implements a three-phase liquidation system that prioritizes different asset types and mechanisms based on their characteristics and protocol configuration. This system enables the [multi-collateral framework](../collateral-assets/multi-collateral-system.md) to support diverse asset types safely.
 
 ## The Three-Phase System
 
-Think of it like emergency medical care—start with the least invasive treatment:
+The protocol categorizes assets into three phases based on liquidation method:
 
-**Phase 1**: Use your protocol deposits (GREEN/sGREEN)
-**Phase 2**: Liquidate priority collateral (ETH, BTC, etc.)
-**Phase 3**: Liquidate everything else if needed
-
-## Phase 1: Your Protocol Deposits
-
-**What's used first:**
-- sGREEN in stability pools
-- GREEN tokens you've deposited
-- Stablecoins eligible for Endaoment
-
-**Why it's best:**
-- Zero loss (burns at full value)
-- Instant processing
-- No market impact
-
-**Example:**
 ```
-Need to repay: $5,000
-Your sGREEN: 3,000 ($3,000 value)
-
-Result: Burn sGREEN → $3,000 repaid
-Remaining: $2,000 (moves to Phase 2)
-```
-
-## Phase 2: Priority Collateral
-
-**What's used second:**
-- Major cryptocurrencies (WETH, WBTC)
-- High-liquidity tokens
-- Assets with stability pools
-
-**Why it's middle ground:**
-- Fixed discounts (your liquidation fee)
-- Quick processing via pools
-- Predictable outcomes
-
-**Example:**
-```
-Remaining debt: $2,000
-Your WETH: 1 ETH ($2,500 value)
-
-Result: Stability pool takes 1 WETH
-You lose: ~$300 (liquidation fee + discount)
-Debt: Fully repaid ✅
+LIQUIDATION TRIGGER
+        |
+        v
+┌─────────────────────────────────────────────────────────┐
+│                   ASSET ROUTING                         │
+└─────────────────┬─────────────┬─────────────────────────┘
+                  │             │
+                  v             v
+        ┌─────────────┐   ┌─────────────────┐
+        │   PHASE 1   │   │     PHASE 2     │
+        │             │   │                 │
+        │ GREEN/sGREEN│   │ Stability Pools │
+        │ Stablecoins │   │   (WETH, etc)   │
+        │             │   │                 │
+        │   INSTANT   │   │    INSTANT      │
+        │  SETTLEMENT │   │   LIQUIDATION   │
+        └─────────────┘   └─────────────────┘
+                                     │
+                                     v
+                            ┌─────────────────┐
+                            │     PHASE 3     │
+                            │                 │
+                            │ Dutch Auctions  │
+                            │  (All Others)   │
+                            │                 │
+                            │  TIME-BASED     │
+                            │   SETTLEMENT    │
+                            └─────────────────┘
 ```
 
-## Phase 3: Everything Else
+**Phase 1**: Protocol deposits and stablecoins
+**Phase 2**: Major cryptocurrencies with stability pool support  
+**Phase 3**: All other assets requiring auction mechanisms
 
-**What's used last:**
-- Exotic tokens
-- NFTs
-- Assets without pools
-- New collateral types
+All phases operate **concurrently** - assets route to appropriate mechanisms simultaneously.
 
-**Why it's last resort:**
-- May require auctions
-- Higher discounts possible
-- Slower processing
+## Phase 1: Protocol Deposits and Stablecoins
+
+**Assets in this phase:**
+- GREEN and sGREEN held in protocol vaults
+- Stablecoins designated for treasury transfer (USDC, USDT, etc.)
+
+**Mechanism:**
+- GREEN/sGREEN burns directly to reduce debt
+- Stablecoins transfer to Endaoment treasury at full value
+- No market operations required
+
+**Phase 1 Operation:**
+When liquidation requires debt repayment, sGREEN burns at face value to reduce the debt. Any remaining debt after Phase 1 mechanisms proceeds to subsequent phases.
+
+## Phase 2: Stability Pool Eligible Assets
+
+**Assets in this phase:**
+- Major cryptocurrencies configured with stability pools
+- Assets explicitly marked for pool swaps in configuration
+
+**Mechanism:**
+- Collateral swaps with stability pool participants
+- Discount equals the asset's liquidation fee parameter
+- Pool liquidity determines processing capacity
+
+**Phase 2 Operation:**
+Stability pools exchange collateral for debt reduction at predetermined discounts. The liquidation fee parameter determines the economic loss during this exchange.
+
+## Phase 3: Auction-Based Liquidation
+
+**Assets in this phase:**
+- Tokens without stability pool support
+- NFTs and unique assets
+- Assets configured for auction-only liquidation
+
+**Mechanism:**
+- Dutch auction with increasing discount over time
+- Starting and maximum discounts set per asset type
+- Market participants bid using GREEN tokens
 
 **Example:**
 ```
@@ -76,9 +93,9 @@ Expected sale: ~$600 (after discounts)
 Debt cleared, but higher loss
 ```
 
-## How Phases Work Together
+## Phase Interaction Mechanics
 
-The system moves through phases until your debt is healthy again:
+The liquidation system processes assets until the position reaches target health:
 
 ### Quick Resolution
 ```
@@ -114,26 +131,26 @@ All phases used to restore health
 - Only moves to Phase 2 if more needed
 - Phase 3 is truly last resort
 
-## Optimization Tips
+## Phase Execution Details
 
-**Best protection strategy:**
-1. Maintain sGREEN reserves (Phase 1 shield)
-2. Use blue-chip collateral (Phase 2 efficiency)
-3. Limit exotic assets (avoid Phase 3)
+**Asset Processing Order:**
+1. Protocol deposits (GREEN/sGREEN) are consumed first
+2. Priority liquidation assets defined in configuration
+3. Remaining vault positions in order
 
-**During liquidation:**
-- Phase 1 happens automatically
-- Phase 2 uses available pools
-- Phase 3 creates auctions as needed
+**Simultaneous Processing:**
+- All phases evaluate concurrently
+- Each asset type routes to its designated mechanism
+- Processing continues until debt is restored to health
 
-## Key Takeaways
+## Key Mechanics
 
-1. **Three phases, increasing severity** - Gentle → Standard → Harsh
-2. **Phases stop when debt healthy** - Not everything gets liquidated
-3. **Your deposits used first** - Best possible outcome
-4. **Priority assets next** - Stability pool swaps
-5. **Everything else last** - Auctions if necessary
+1. **Phase categorization** - Assets route to phases based on configuration
+2. **Concurrent processing** - All phases evaluate simultaneously
+3. **Partial liquidation** - Process stops when position reaches target health
+4. **Priority ordering** - Within phases, specific assets process first
+5. **Value preservation** - Earlier phases preserve more value than later ones
 
-The phase system protects you by trying the least painful methods first. Understanding these phases helps you position your collateral for the best possible liquidation outcome.
+The three-phase system creates a hierarchy of liquidation mechanisms, each with different economic characteristics and market impacts.
 
 Next: Learn about [Stablecoin Burning](stablecoin-burning.md) →

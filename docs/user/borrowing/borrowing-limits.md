@@ -1,6 +1,6 @@
-# Borrowing Limits & Controls
+# Borrowing Limits
 
-Ripe Protocol implements multiple borrowing limits to ensure system stability, prevent manipulation, and protect users. Understanding these limits helps you plan your borrowing strategy and avoid unexpected restrictions.
+Ripe Protocol implements multiple borrowing constraints to ensure system stability and prevent exploitation.
 
 ## Types of Limits
 
@@ -13,14 +13,7 @@ The fundamental limit based on your deposited assets:
 - Your total borrowing power = Sum of (Asset Value × LTV)
 - Cannot borrow more than this calculated maximum
 
-**Example**:
-```
-Deposited: $50,000 in various assets
-Weighted Average LTV: 75%
-Maximum Borrow: $37,500
-```
-
-This is your hard ceiling regardless of other limits.
+Maximum borrowing capacity equals the sum of each asset's value multiplied by its loan-to-value ratio. This creates the fundamental borrowing constraint.
 
 ### 2. Per-User Debt Limits
 
@@ -32,14 +25,7 @@ Individual borrowing cap per address:
 - Temporary measure for controlled growth
 - Will be removed as protocol matures
 
-**Example**:
-```
-Per-user limit: $100,000
-Your collateral allows: $200,000
-Maximum you can borrow: $100,000
-```
-
-This ensures gradual protocol scaling during early stages.
+When per-user limits are active, borrowing capacity becomes the minimum of collateral-based limits and per-user caps. This mechanism enables controlled protocol growth.
 
 ### 3. Global Protocol Limits
 
@@ -50,12 +36,7 @@ System-wide caps for overall stability:
 - Prevents unlimited minting
 - Adjusted by governance
 
-**Current Example**:
-- Global Limit: 50,000,000 GREEN
-- Current Supply: 35,000,000 GREEN
-- Available: 15,000,000 GREEN
-
-When the global limit is reached, no new borrowing is possible until debt is repaid or limits increase.
+The protocol maintains a global debt ceiling that caps total GREEN supply. New borrowing becomes unavailable when this system-wide limit is reached.
 
 ### 4. Time-Based (Interval) Limits
 
@@ -66,18 +47,7 @@ Anti-manipulation mechanism using time windows:
 - Typically 1,000-5,000 blocks
 - Resets after interval expires
 
-**Example**:
-```
-Interval: 1,000 blocks (~33 minutes on Base)
-Limit: 1,000,000 GREEN per interval
-Current Interval Used: 750,000 GREEN
-Available This Interval: 250,000 GREEN
-```
-
-**Purpose**:
-- Prevent flash loan attacks
-- Smooth borrowing demand
-- Allow system monitoring
+Interval limits track borrowing within rolling time windows, preventing rapid protocol exploitation while maintaining legitimate usage patterns. These windows reset automatically, creating temporary borrowing constraints that smooth demand.
 
 ## Additional Considerations
 

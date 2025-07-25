@@ -2,14 +2,14 @@
 
 Dutch auctions are Ripe's final liquidation method—when other mechanisms can't handle your collateral, it goes to auction where anyone can buy it at an increasing discount over time.
 
-## How It Works
+## Auction Mechanism
 
-Think of it like a clearance sale that gets cheaper every hour:
+Dutch auctions implement time-based progressive discounting:
 
-1. **Auction starts** at near market price (small discount)
-2. **Price drops gradually** over time (linear decrease)
-3. **Anyone can buy** with GREEN tokens at current price
-4. **Auction ends** when someone buys or max discount reached
+1. **Delayed start** - Configurable delay period after liquidation
+2. **Linear progression** - Discount increases from start to maximum
+3. **GREEN settlement** - All purchases require GREEN tokens
+4. **Termination** - Ends on purchase or reaching maximum discount
 
 ## Real Example
 
@@ -28,13 +28,14 @@ Hour 6: $1,500 (25% off - max discount)
 
 Someone buys at Hour 3 for $8,500 total → Your debt reduced by $8,500
 
-## When Auctions Happen
+## Auction Triggers
 
-Your collateral goes to auction when:
-- **No stability pools available** for that asset
-- **Pools are full** and can't take more
-- **Exotic assets** without other liquidation options
-- **Remainder collateral** after partial pool swaps
+Collateral enters the auction system when:
+- **No pool configuration** exists for the asset
+- **Pool capacity exhausted** during liquidation
+- **Asset configuration** specifies auction-only liquidation
+- **Partial liquidation** leaves remainder after pool swaps
+- **Keeper initiation** after liquidation with auction flag
 
 ## Cost to You
 
@@ -45,12 +46,13 @@ Dutch auctions typically cost more than stability pools:
 
 The longer the auction runs, the bigger your loss.
 
-## Who Buys at Auctions?
+## Auction Participants
 
-**Arbitrageurs**: Buy below market, sell immediately for profit
-**Investors**: Accumulate assets at discounts
-**Protocols**: May buy strategic assets
-**Anyone**: Open market—anyone with GREEN can participate
+Dutch auctions attract various market participants:
+- Arbitrageurs seeking immediate profit opportunities
+- Investors accumulating assets at discounts
+- Protocol treasuries acquiring strategic positions
+- General market participants with GREEN holdings
 
 ### Exception: Permissioned Assets
 
@@ -60,16 +62,16 @@ For whitelisted assets (like tokenized real estate or securities):
 - **Smaller buyer pool** may mean longer auctions
 - **Same discount mechanics** apply to qualified buyers
 
-## Asset-Specific Settings
+## Auction Parameters
 
-Different assets have different auction parameters:
+Each asset type has configured auction settings:
 
-- **Blue-chip (ETH, BTC)**: 5% → 20% over 6 hours
-- **Major tokens**: 10% → 30% over 8 hours
-- **Volatile assets**: 15% → 40% over 12 hours
-- **NFTs**: 20% → 50% over 24 hours
+- **Delay blocks**: Time before auction starts (prevents instant arbitrage)
+- **Start discount**: Initial percentage below market (e.g., 2-5%)
+- **Maximum discount**: Final percentage if no buyers (e.g., 20-50%)
+- **Duration blocks**: Total time for discount progression
 
-Riskier assets = Bigger discounts needed
+Parameter selection reflects asset liquidity, volatility, and market depth.
 
 ## Phase 3 Priority
 
@@ -78,33 +80,27 @@ Dutch auctions are the last resort:
 2. **Phase 2**: Swap with stability pools
 3. **Phase 3**: Auction remaining collateral
 
-## Multi-Phase Example
+## Liquidation Flow Integration
 
-```
-You need $60,000 liquidation:
+Auctions process collateral remaining after earlier phases:
+- Phase 1 mechanisms reduce debt through burns and transfers
+- Phase 2 stability pools handle liquid assets
+- Phase 3 auctions clear remaining collateral at market-discovered prices
 
-Phase 1: Burn your 20,000 sGREEN → $20,000 repaid
-Phase 2: Stability pools take WETH → $25,000 repaid
-Phase 3: Auction your rare NFT → $18,000 repaid
+Excess collateral value returns to the original position holder after debt settlement.
 
-Result: Liquidation complete, $3,000 surplus returned
-```
+## Auction Characteristics
 
-## Key Points
+Dutch auctions serve as the final liquidation mechanism with:
+- Activation only when other methods cannot process collateral
+- Progressive discounting over time
+- Open participation for GREEN holders
+- Higher effective costs than stability pool liquidations
+- Guaranteed eventual liquidation through maximum discounts
 
-1. **Last resort mechanism** - Only when other methods unavailable
-2. **Time = Money** - Longer auction = bigger discount
-3. **Open market** - Anyone can buy your collateral
-4. **Higher cost** - Typically 15-25% total loss vs 6% in pools
-5. **Guaranteed liquidation** - Ensures debt gets repaid eventually
+## Auction System Design
 
-## Tips to Avoid Auctions
+Dutch auctions provide a market-based liquidation mechanism when other methods are unavailable or insufficient. The time-based discount structure creates economic incentives for market participants while ensuring all positions can eventually be liquidated.
 
-- **Maintain sGREEN reserves** - Phase 1 protection
-- **Use common collateral** - Better pool availability
-- **Monitor debt health** - Repay before liquidation
-- **Act fast if liquidated** - Buy your own auction early
+The auction mechanism operates as the protocol's final liquidation method, guaranteeing debt resolution through progressive discounting that attracts buyers at market-clearing prices.
 
-Dutch auctions ensure every position can be liquidated, but at a cost. They're the safety net that keeps the protocol solvent while giving markets time to find fair prices for your collateral.
-
-Next: Learn about [Unified Repayment Formula](unified-repayment-formula.md) →

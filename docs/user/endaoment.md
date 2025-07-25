@@ -1,137 +1,162 @@
-# The Endaoment: Ripe's Protocol Treasury
+# The Endaoment
 
-The Endaoment is Ripe Protocol's intelligent treasury system that manages protocol assets, maintains GREEN's stability, and generates yield to support sustainable operations.
+The Endaoment is Ripe Protocol's treasury and liquidity management system that controls protocol assets, maintains [GREEN](green.md) stability through automated market operations, and generates yield across decentralized finance strategies.
 
 ## Core Functions
 
 ### 1. Asset Management
 
-**Inflows:**
-- Stablecoins from liquidations
-- GREEN LP tokens from stability pools
-- Protocol fees and bond proceeds
-- Partner contributions
+**Treasury Inflows:**
+- Stablecoins received from liquidation events
+- GREEN LP tokens consumed during stability pool liquidations
+- Protocol revenue from fees and bond sales
+- Partner capital contributions
 
-**Management:**
-- Deploys to yield strategies via Underscore Protocol's Legos
-- Optimizes asset composition
-- Maintains liquidity reserves
-- Handles emergency operations
+**Capital Deployment:**
+- Yield generation through Underscore Protocol's modular Lego adapters
+- Asset allocation optimization across strategies
+- Liquidity reserve maintenance
+- Emergency response capabilities
 
 ### 2. GREEN Price Stabilization
 
-The **Green Stabilizer** maintains GREEN's $1 peg automatically:
+The Green Stabilizer system monitors and adjusts Curve pool ratios:
 
-**Below peg (GREEN > 50% of Curve pool):**
-- Removes GREEN liquidity to restore balance
-- Repays pool debt first
-- Burns excess GREEN after debt repayment
+**Ratio Imbalance Response:**
 
-**Above peg (GREEN < 50% of Curve pool):**
-- Adds GREEN liquidity
-- May mint new GREEN (creates tracked "pool debt")
-- Weighted adjustments (e.g., 20% of needed amount)
+When GREEN exceeds 50% of pool composition:
+- System removes GREEN liquidity from the pool
+- Prioritizes repayment of any existing pool debt
+- Burns excess GREEN tokens after debt settlement
 
-All operations ensure profitability and respect debt limits.
+When GREEN falls below 50% of pool composition:
+- System adds GREEN liquidity to rebalance
+- May create new GREEN with tracked debt obligations
+- Applies weighted adjustments based on configured parameters
 
-### 3. Yield Generation via Legos
+The system maintains profitability constraints and debt ceiling limits throughout all operations.
 
-The Endaoment uses **Underscore Protocol's Lego system** - plug-and-play adapters for DeFi protocols:
+### 3. Yield Generation via Lego Architecture
 
-**Current Integrations:**
-- **Lending**: Aave V3, Compound V3, Morpho, Euler, Fluid
-- **DEX/AMM**: Uniswap V2/V3, Curve, Aerodrome
+The Endaoment interfaces with Underscore Protocol's Lego system - modular adapters that enable standardized interaction with various DeFi protocols:
 
-**Example Optimization:**
-```
-$10M USDC to deploy:
-- Morpho: 7% → $5M
-- Aave: 6% → $3M  
-- Compound: 5.5% → $2M
-Result: 6.5% weighted yield (+$50k/year vs single protocol)
-```
+**Protocol Integrations:**
+- **Lending Markets**: Aave V3, Compound V3, Morpho, Euler, Fluid
+- **Decentralized Exchanges**: Uniswap V2/V3, Curve, Aerodrome
 
-**Key Benefits:**
-- Auto-access to new protocols
-- Risk isolation per strategy
-- Cross-protocol optimization
-- No contract upgrades needed
+**Capital Allocation Mechanics:**
+The system distributes capital across multiple yield sources based on:
+- Current market rates across protocols
+- Risk parameters for each strategy
+- Liquidity requirements and withdrawal needs
+- Historical performance metrics
 
-### 4. Partner Liquidity Program
+**Architectural Benefits:**
+- Automatic integration of new protocols via standardized interface
+- Risk isolation between different strategies
+- Dynamic rebalancing across yield sources
+- Upgradeable strategies without core contract changes
 
-Creates strategic liquidity partnerships:
+### 4. Partner Liquidity Programs
 
-```
-Partner provides: $1M USDC
-Endaoment mints: $1M GREEN
-Creates: $2M liquidity pool
-Split: 50/50 LP tokens
-```
+The protocol facilitates liquidity partnerships through two mechanisms:
 
-Benefits: Deeper liquidity, strategic alliances, shared revenues
+**Mint and Pair Model:**
+- Partner contributes external assets (e.g., USDC)
+- Protocol mints equivalent value in GREEN
+- Combined assets form liquidity pool
+- LP tokens distributed according to contribution ratios
 
-## Who Benefits?
+**Direct Liquidity Model:**
+- Both parties provide existing tokens
+- Flexible contribution ratios supported
+- Participation in established pools
 
-**GREEN Holders**: Stable peg, deep liquidity, no inflation
-**Borrowers**: Better liquidations, system stability, lower fees
-**sGREEN Holders**: Higher yields from treasury earnings
-**Stability Pool Depositors**: Productive use of LP tokens
+These partnerships create deeper liquidity pools, establish strategic relationships, and enable revenue sharing arrangements.
 
-## Treasury Holdings
+## System Beneficiaries
 
-- **Core**: Stablecoins, GREEN/sGREEN, LP tokens
-- **Strategic**: Partner tokens, concentrated liquidity NFTs
-- **Reserves**: Quick-access stables, ETH for operations
+**GREEN Token Holders**: Peg stability maintenance, enhanced liquidity depth, controlled supply mechanics
 
-## Special Features
+**Protocol Borrowers**: Efficient liquidation processes, system stability benefits, optimized fee structures
 
-- **Internal Liquidity**: Can act as own partner (keeps 100% LP)
-- **NFT Management**: Handles Uniswap v3 positions
-- **Modular Design**: New strategies easily added
+**sGREEN Participants**: Yield generation from treasury operations and protocol revenues
 
-## Real-World Examples
+**Stability Pool Contributors**: Productive deployment of LP tokens during liquidation events
 
-### Market Crash Response
-```
-Event: ETH -40% in 24 hours
-Inflow: $10M USDC from liquidations
-Actions:
-- 60% → Lending protocols (4% yield)
-- 20% → GREEN/USDC liquidity
-- 20% → Liquid reserves
-Result: GREEN peg maintained, +$400k annual yield
-```
+## Treasury Asset Composition
 
-### Stabilizer in Action
-```
-Situation: GREEN at $0.97 (below peg)
-Pool: 55% GREEN, 45% USDC
-Action: Remove 500k GREEN (300k to repay debt, 200k burned)
-Result: Pool balanced, price → $0.995
-```
+**Core Holdings**: Stablecoin reserves, GREEN and sGREEN balances, liquidity provider tokens
 
-## Governance & Security
+**Strategic Assets**: Partner protocol tokens, concentrated liquidity positions (NFTs)
 
-- **Governance controls**: Strategy parameters, risk limits, partner approvals
-- **Security**: Multi-layered access, safety checks, emergency pauses
-- **Transparency**: All holdings on-chain, regular reporting
+**Operational Reserves**: Readily accessible stablecoins, ETH for transaction costs
 
-## FAQ
+## Distinctive Capabilities
 
-**Who controls it?** Governance sets strategy; operations are automated
+**Self-Partnership**: Protocol can provide both sides of liquidity, retaining full LP token ownership
 
-**Can it mint unlimited GREEN?** No - only for stabilization (with debt) or partnerships (with backing)
+**NFT Position Management**: Handles concentrated liquidity positions from Uniswap V3 and similar protocols
 
-**Where do yields go?** Support operations, boost sGREEN returns, build reserves
+**Modular Architecture**: New yield strategies integrate through standardized Lego interface
 
-**What if a strategy fails?** Risk isolated per Lego; others continue normally
+## Operational Scenarios
 
-## Key Takeaways
+### Market Volatility Response
 
-The Endaoment is an active treasury that:
-- Generates yield through diverse DeFi strategies
-- Maintains GREEN stability automatically
-- Grows stronger with each liquidation
-- Operates transparently on-chain
+During significant market downturns:
+- Treasury receives stablecoin inflows from liquidation activity
+- Capital deployment across yield strategies maintains revenue generation
+- Liquidity provision supports market stability
+- Reserve allocation ensures operational continuity
 
-It transforms Ripe from a simple lending protocol into a self-sustaining financial ecosystem, ensuring long-term success for all participants.
+### Stabilizer Mechanism Example
+
+When GREEN trades below peg due to pool imbalance:
+- System detects excess GREEN ratio in liquidity pools
+- Automated removal of GREEN liquidity restores balance
+- Debt repayment takes priority over token burning
+- Pool rebalancing supports price recovery
+
+## Governance and Security Framework
+
+**Governance Oversight**: Strategy parameter configuration, risk limit establishment, partnership authorization
+
+**Security Architecture**: Hierarchical access controls, comprehensive safety validations, emergency pause mechanisms
+
+**Transparency Measures**: On-chain asset visibility, automated reporting systems
+
+## System Mechanics
+
+### Control Structure
+Governance determines strategic parameters while operational execution remains automated through smart contracts.
+
+### GREEN Minting Constraints
+The system can only create GREEN tokens under specific conditions:
+- Stabilization operations (with corresponding debt tracking)
+- Partnership liquidity programs (with matching asset backing)
+
+### Yield Distribution
+Generated yields flow to:
+- Protocol operational expenses
+- sGREEN holder returns
+- Reserve accumulation
+
+### Risk Isolation
+Individual Lego strategy failures remain contained, allowing other strategies to continue operating normally.
+
+## Endaoment Architecture Summary
+
+The Endaoment functions as an autonomous treasury system that:
+
+**Yield Optimization**: Deploys capital across multiple DeFi strategies through modular Lego adapters
+
+**Market Stability**: Maintains GREEN peg through automated Curve pool rebalancing
+
+**Capital Accumulation**: Strengthens reserves through liquidation proceeds and protocol revenues
+
+**Transparent Operations**: Executes all functions through verifiable on-chain transactions
+
+This architecture creates a self-reinforcing financial system where protocol activity generates treasury growth, supporting long-term sustainability and value accrual.
+
+For technical implementation details, see [Endaoment Technical Documentation](../technical/core/Endaoment.md).

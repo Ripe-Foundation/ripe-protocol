@@ -1,45 +1,43 @@
-# Ripe Bonds: Building Protocol Liquidity
+# Ripe Bonds
 
-Ripe Bonds offer users the opportunity to purchase RIPE tokens at a discount in exchange for providing stable assets that strengthen the protocol's treasury and GREEN liquidity.
+Ripe Bonds are a protocol mechanism that exchanges stablecoins for RIPE tokens at dynamic prices. This system builds Endaoment reserves and liquidity for the GREEN stablecoin.
 
-## What Are Ripe Bonds?
+## Bond Mechanism
 
-Bonds are a mechanism where you can:
-- **Buy RIPE tokens** at below market price
-- **Pay with stablecoins** (USDC, USDT, etc.)
-- **Get extra rewards** for locking your RIPE
-- **Help bootstrap** GREEN's liquidity and stability
+The bond system operates through:
+- **Token Exchange**: Stablecoins convert to RIPE tokens
+- **Dynamic Pricing**: Rates vary based on epoch parameters
+- **Lock Options**: Additional tokens awarded for time commitments
+- **Treasury Routing**: All proceeds flow to the [Endaoment](endaoment.md)
 
-Think of it as an early-bird discount: you provide capital when the protocol needs it most, and receive RIPE at a discount in return.
+## Bond Economics
 
-## Why Bonds Matter
+### Treasury Impact
 
-### For the Protocol
+Bonds create a capital formation mechanism for the protocol:
 
-Bonds serve a critical purpose: **bootstrapping the Endaoment treasury**
+**Capital Flow:**
+1. Bond purchases convert stablecoins to treasury assets
+2. Treasury deploys capital to:
+   - GREEN/stablecoin liquidity pools
+   - Yield-generating strategies
+   - Reserve holdings
+   - Peg stability operations
 
-**The flow:**
-1. You purchase bonds with stablecoins
-2. Your payment goes directly to the Endaoment
-3. Endaoment uses these funds to:
-   - Provide GREEN/stablecoin liquidity on Curve
-   - Generate yield through DeFi strategies
-   - Build reserves for market operations
-   - Support GREEN peg stability
+**Alternative Mechanisms:**
+- Fee accumulation (gradual treasury growth)
+- Token emissions (dilutive funding)
+- External investment (centralized dependencies)
 
-Without bonds, the protocol would need to:
-- Rely solely on fees (slow growth)
-- Print tokens without backing (inflationary)
-- Depend on external funding (less decentralized)
+### Economic Design
 
-### For You
+The bond system creates value through:
+- **Price Discovery**: Market-based token valuation
+- **Time Incentives**: Lock bonuses reward commitment
+- **Activity Recognition**: Protocol usage affects pricing
+- **Treasury Growth**: Direct capital accumulation
 
-**Discounted RIPE**: Buy below market price
-**Lock bonuses**: Up to 10x more RIPE for longer locks
-**Activity bonuses**: Extra rewards based on protocol usage
-**Supporting growth**: Your capital directly strengthens the ecosystem
-
-## How Bonds Work
+## Bond Mechanics
 
 ### Epoch System
 
@@ -49,14 +47,11 @@ Bonds are sold in **epochs** (time periods):
 - Prevents unlimited token distribution
 - Creates fair access for all users
 
-**Example epoch:**
-```
-Duration: 7 days
-Available: $100,000 worth of bonds
-Min price: 0.8 RIPE per dollar
-Max price: 1.2 RIPE per dollar
-Status: 65% sold
-```
+**Epoch Parameters:**
+- Duration: Configurable time periods (e.g., 7 days)
+- Availability: Limited token allocation per epoch
+- Price Range: Minimum and maximum RIPE per dollar
+- Progress Tracking: Real-time availability updates
 
 ### Dynamic Pricing
 
@@ -65,76 +60,68 @@ Within each epoch, prices follow a curve:
 - **End of epoch**: Lower price (more discount)
 - **Linear decrease**: Predictable pricing
 
-This rewards:
-- Early buyers with guaranteed availability
-- Patient buyers with better prices
-- Everyone with transparent, fair pricing
+This mechanism creates:
+- Availability certainty at epoch start
+- Progressive discount incentives
+- Transparent pricing throughout
 
-### Lock-Up Bonuses
+### Lock-Up Multipliers
 
-Get more RIPE by locking your tokens. The bonus multiplier is configurable by governance:
+The protocol implements time-based bonuses through governance-controlled multipliers:
 
-**Example bonus structure:**
-```
-No lock: 1,000 RIPE (1x)
-30-day lock: 1,100 RIPE (1.1x)
-90-day lock: 1,250 RIPE (1.25x)
-180-day lock: 1,500 RIPE (1.5x)
-1-year lock: 1,750 RIPE (1.75x)
-3-year lock: 2,000 RIPE (2x max)
-```
+**Multiplier Structure:**
+- No lock: Base rate (1x)
+- Short-term locks: Minor multipliers (e.g., 1.1x-1.25x)
+- Medium-term locks: Moderate multipliers (e.g., 1.25x-1.5x)
+- Long-term locks: Maximum multipliers (e.g., 1.5x-2x)
 
-Locked RIPE goes to governance vault:
-- Can't be sold (reduces sell pressure)
-- Still counts for voting power
-- Unlocks after your chosen duration
+**Lock Mechanics:**
+- Tokens transfer to governance vault during lock period
+- Voting power remains active throughout lock
+- Automatic release at lock expiration
+- Multipliers adjust via governance proposals
 
-**Note:** The exact bonus multipliers and maximum lock duration are set by governance and may change based on protocol needs.
+### Ripe Radness Mechanism
 
-### Ripe Radness Bond Booster
+The protocol recognizes early testnet participation through the Ripe Radness system:
 
-Early testnet contributors receive the **Ripe Radness** boost as a thank you for helping test the protocol:
+**Mechanism Design:**
+- Testnet participants receive bonus multipliers
+- Configurable boost ratios (e.g., 2x base amount)
+- Unit limits cap total boost usage
+- Block-based expiration ensures time bounds
+- Multipliers stack with lock bonuses
 
-**How it works:**
-- Testnet testers get bonus RIPE when purchasing bonds
-- Boost ratio is configurable (e.g., 2x means double RIPE)
-- Limited to a maximum number of units (e.g., 1000 USDC worth)
-- Expires at a specific block number
-- Stacks with lock bonuses for maximum rewards
+**Boost Parameters:**
+- Eligibility: Testnet participation record
+- Magnitude: Governance-set multiplier
+- Capacity: Maximum applicable units
+- Expiration: Specific block number
 
-**Example boost:**
-- Base bond purchase: 1,000 RIPE
-- Ripe Radness boost (2x): +1,000 RIPE  
-- Total with boost: 2,000 RIPE
+**System Properties:**
+- Non-transferable boost allocation
+- Automatic application during bond purchase
+- One-time usage up to unit limit
+- No renewal after expiration
 
-**Important notes:**
-- Once you've used your maximum units, the boost is exhausted
-- Boost expires after the configured block number
-- Cannot be transferred or renewed
-- Automatically applied when you purchase bonds
+## Bond Calculation Mechanics
 
-## Bond Purchase Example
+The protocol determines bond payouts through:
 
-```
-Current epoch status:
-- Payment asset: USDC
-- Progress: 40% sold
-- Current price: 1.0 RIPE per USDC
-- Your purchase: 1,000 USDC
-- Lock duration: 1 year
+**Base Calculation:**
+- Payment amount divided by current epoch price
+- Results in base RIPE allocation
 
-Calculation:
-- Base payout: 1,000 RIPE
-- Lock bonus (1.75x): +750 RIPE
-- Ripe Radness boost (2x): +1,000 RIPE (if eligible)
-- Total received: 2,750 RIPE
+**Multiplier Application:**
+- Lock multiplier applied to base amount
+- Ripe Radness boost (if eligible) applied to base
+- Multipliers combine additively or multiplicatively per configuration
 
-Result:
-- You pay: 1,000 USDC
-- You receive: 2,750 RIPE (locked 1 year)
-- Effective price: $0.36 per RIPE
-- Discount: 64% below $1 market price
-```
+**Final Distribution:**
+- Total RIPE calculated from all multipliers
+- Lock duration determines vault routing
+- Immediate distribution for unlocked tokens
+- Governance vault custody for locked tokens
 
 ## Bad Debt Consideration
 
@@ -145,42 +132,45 @@ If the protocol has bad debt from liquidations:
 - Helps maintain protocol solvency
 - Temporary until debt is cleared
 
-**Example with bad debt:**
-```
-Your payment: 1,000 USDC (full amount to treasury)
-Total RIPE earned: 2,750 RIPE
-Bad debt to clear: $100 (10% of your payment value)
-RIPE for bad debt: 275 RIPE (10% of your payout)
-RIPE you receive: 2,475 RIPE (90% of normal amount)
-```
+**Bad Debt Allocation:**
+- Payment amounts: Full value to treasury
+- RIPE allocation: Proportional reduction for debt coverage
+- Debt clearing: Automatic via reduced distribution
+- Calculation: Debt percentage applied to payout
 
-## How Your Purchase Helps
+## Treasury Capital Flow
 
-When you buy $10,000 in bonds:
+Bond proceeds create systematic protocol improvements:
 
-1. **Immediate Impact**
-   - $10,000 goes to Endaoment treasury
-   - Deploys to yield strategies (~5% APY)
-   - Generates $500/year for protocol
+**Capital Deployment:**
+- Direct treasury funding from bond sales
+- Yield strategy allocation for returns
+- Annual revenue generation from deployed capital
 
-2. **Liquidity Creation**
-   - Enables $20,000 GREEN/USDC pool
-   - Provides trading liquidity
-   - Stabilizes GREEN price
+**Liquidity Formation:**
+- Capital enables liquidity pool creation
+- Trading depth increases with treasury size
+- Price stability improves through deeper markets
 
-3. **Ecosystem Growth**
-   - Stronger treasury = better stability
-   - More liquidity = more users
-   - Growing protocol = RIPE appreciation
+**Ecosystem Effects:**
+- Treasury strength correlates with protocol stability
+- Liquidity depth affects user capacity
+- Protocol growth influences token dynamics
 
-## Key Takeaways
+## Bond System Architecture
 
-1. **Win-Win Mechanism** - You get discounted RIPE, protocol gets liquidity
-2. **Flexible Options** - Choose your lock duration and bonus level
-3. **Direct Impact** - Your funds immediately strengthen GREEN liquidity
-4. **Fair System** - Transparent pricing and equal access
-5. **Long-term Value** - Supports sustainable protocol growth
+The bond mechanism creates:
 
-Bonds are the foundation of Ripe's liquidity strategy, turning community capital into protocol strength while rewarding participants with discounted tokens.
+**Economic Exchange**: Stablecoin capital converts to protocol tokens at market-discovered rates
 
-Your bond purchase directly contributes to GREEN's stability and Ripe's long-term success.
+**Time Flexibility**: Lock duration options with corresponding multipliers
+
+**Treasury Growth**: Direct capital accumulation for protocol operations
+
+**Transparent Pricing**: Epoch-based systems with clear parameters
+
+**Sustainable Funding**: Non-dilutive capital formation through voluntary exchange
+
+The bond system transforms external capital into protocol resources, establishing treasury reserves that support GREEN stability and protocol operations through market-based token distribution.
+
+For technical implementation details, see [BondRoom Technical Documentation](../technical/core/BondRoom.md).

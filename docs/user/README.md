@@ -1,75 +1,133 @@
-# Ripe Protocol User Documentation
+# Ripe Protocol Documentation
 
-Welcome to the Ripe Protocol user documentation. This comprehensive guide covers everything you need to know about using Ripe's innovative multi-collateral lending protocol.
+This documentation explains the fundamental mechanisms and concepts underlying Ripe Protocol's multi-collateral lending system.
 
-## Documentation Sections
+## Core Components
 
-### Core Features
+Understanding Ripe Protocol requires familiarity with these interconnected systems:
 
-#### 📊 [Collateral Assets](collateral-assets/README.md)
-Learn about Ripe's revolutionary multi-collateral system that allows you to use multiple assets as collateral for a single loan position.
+### 1. [GREEN Stablecoin](green.md)
+The heart of Ripe - GREEN is the protocol's native overcollateralized stablecoin, minted through borrowing and maintained at dollar parity through multiple stability mechanisms.
 
-#### 💰 [Borrowing](borrowing/README.md)
-Understand how to borrow GREEN stablecoin against your collateral, manage your debt, and utilize advanced borrowing features.
+### 2. [Collateral Assets](collateral-assets/README.md)
+The foundation - Ripe's multi-collateral system enables multiple assets to back a single loan position, transforming how DeFi lending operates.
 
-#### 💚 [Savings GREEN (sGREEN)](sgreen.md)
-Discover the yield-bearing version of GREEN that automatically earns protocol revenues while maintaining full liquidity.
+### 3. [Borrowing](borrowing/README.md)
+The core function - Protocol's borrowing mechanism mints GREEN against deposited collateral through an overcollateralized debt system.
 
-#### 🛡️ [Liquidations](liquidations/README.md)
-Explore Ripe's sophisticated three-phase liquidation system designed to minimize losses while maintaining protocol security.
+### 4. [Liquidations](liquidations/README.md)
+The safety net - A three-phase liquidation system maintains protocol solvency while minimizing borrower losses through progressive mechanisms.
 
-## Getting Started
+### 5. [Savings GREEN (sGREEN)](sgreen.md)
+Value accrual - sGREEN represents the yield-bearing version of GREEN, automatically accruing value through protocol revenue distribution.
 
-### New Users
-1. Start with [Multi-Collateral System](collateral-assets/multi-collateral-system.md) to understand Ripe's core innovation
-2. Review [Supported Assets](collateral-assets/supported-assets.md) to see what you can use as collateral
-3. Learn about [GREEN Stablecoin](borrowing/green-stablecoin.md) - what you'll be borrowing
-4. Understand [Borrowing Mechanics](borrowing/borrowing-mechanics.md) to start using the protocol
+### 6. [Endaoment](endaoment.md)
+The engine - Protocol treasury manages assets, maintains GREEN stability, and generates yield across DeFi strategies.
 
-### Yield Seekers
-1. Explore [Savings GREEN (sGREEN)](sgreen.md) for automatic yield generation
-2. Learn about [Stability Pool Swaps](liquidations/stability-pool-swaps.md) for enhanced returns
-3. Understand liquidation rewards in [Stability Pool Swaps](liquidations/stability-pool-swaps.md)
+### 7. [Bonds](bonding.md)
+Growth mechanism - Bond system exchanges stablecoins for RIPE tokens, building Endaoment reserves and liquidity.
 
-### Risk-Conscious Users
-1. Study the [Liquidation Phases](liquidations/liquidation-phases.md) to understand the safety mechanisms
-2. Review [Understanding Your Debt](borrowing/understanding-debt.md) for risk management
-3. Learn about [Stablecoin Burning](liquidations/stablecoin-burning.md) - the most user-friendly liquidation mechanism
+## Protocol Architecture
+
+```
+                    RIPE PROTOCOL SYSTEM OVERVIEW
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                                USERS                                        │
+│  ┌──────────────────┐  ┌──────────────────┐  ┌──────────────────┐          │
+│  │   BORROWERS      │  │     LENDERS      │  │     TRADERS      │          │
+│  │ (Multi-Asset     │  │  (sGREEN/Pools)  │  │   (GREEN/DEX)    │          │
+│  │  Collateral)     │  │                  │  │                  │          │
+│  └─────────┬────────┘  └─────────┬────────┘  └─────────┬────────┘          │
+└───────────┼─────────────────────┼─────────────────────┼─────────────────────┘
+            │                     │                     │
+            v                     v                     v
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                           CORE PROTOCOL                                    │
+│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐             │
+│  │  MULTI-ASSET    │  │   GREEN MINT/   │  │   LIQUIDATION   │             │
+│  │   VAULTS        │  │     BURN        │  │     SYSTEM      │             │
+│  │                 │  │                 │  │                 │             │
+│  │ • Simple ERC20  │  │ • Overcollat.   │  │ • Phase 1: Burn │             │
+│  │ • Yield-bearing │  │ • Dynamic Rates │  │ • Phase 2: Pools│             │
+│  │ • Stability Pool│  │ • Peg Stability │  │ • Phase 3: Auct.│             │
+│  │ • Governance    │  │                 │  │                 │             │
+│  └─────────────────┘  └─────────────────┘  └─────────────────┘             │
+└─────────────────────────────────────────────────────────────────────────────┘
+            │                     │                     │
+            v                     v                     v
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                          SUPPORT SYSTEMS                                   │
+│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐             │
+│  │   ENDAOMENT     │  │   ORACLES &     │  │   GOVERNANCE    │             │
+│  │   TREASURY      │  │   KEEPERS       │  │   & BONDS       │             │
+│  │                 │  │                 │  │                 │             │
+│  │ • Asset Mgmt    │  │ • Price Feeds   │  │ • RIPE Voting   │             │
+│  │ • Yield Gen     │  │ • Liquidations  │  │ • Bond Sales    │             │
+│  │ • Peg Defense   │  │ • Rate Updates  │  │ • Parameters    │             │
+│  └─────────────────┘  └─────────────────┘  └─────────────────┘             │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Multi-Collateral Framework
+Ripe unifies multiple collateral assets into single loan positions, enabling portfolio-based borrowing rather than isolated markets. This architecture supports diverse asset types while maintaining individual risk isolation.
+
+### GREEN Stablecoin System
+GREEN maintains its dollar peg through overcollateralization, dynamic interest rates, redemption mechanisms, and automated market operations managed by the Endaoment treasury.
+
+### Liquidation Architecture
+The three-phase system progressively attempts:
+1. Internal recovery through token burning and treasury transfers
+2. Stability pool exchanges at predetermined discounts
+3. Dutch auctions for remaining collateral
+
+This graduated approach minimizes market impact while ensuring protocol solvency.
+
+### Value Accrual Mechanisms
+The protocol generates value through:
+- Interest payments flowing to sGREEN holders
+- Liquidation fees captured by stability pools
+- Treasury yield generation via DeFi strategies
+- Bond sales building protocol reserves
 
 ## Key Concepts
 
-### Multi-Collateral Innovation
-Unlike traditional lending protocols that create separate loans for each collateral type, Ripe allows you to combine multiple assets into a single, unified loan position with better overall terms.
+### Unified Positions
+Unlike traditional lending protocols, Ripe combines all collateral into a single borrowing position with weighted-average terms based on asset contributions.
 
-### GREEN Stablecoin
-The protocol's native stablecoin, overcollateralized and maintained at $1 through multiple stability mechanisms including dynamic interest rates, direct redemptions, and the Endaoment treasury.
+### Risk Isolation
+Each user's collateral backs only their own debt, preventing systemic contagion and enabling support for diverse asset types.
 
-### Three-Phase Liquidation
-A sophisticated system that attempts the least impactful liquidation methods first:
-1. Internal recovery (burning GREEN/sGREEN, Endaoment transfers)
-2. Stability pool swaps at controlled discounts
-3. Dutch auctions as the final mechanism
+### Automated Stability
+Market-driven mechanisms maintain GREEN's peg without governance intervention, using economic incentives to self-correct imbalances.
 
-### Yield Generation
-Multiple ways to earn:
-- Hold sGREEN for automatic protocol revenue sharing
-- Participate in stability pools for liquidation premiums
-- Provide liquidity with GREEN pairs
+## Additional Resources
 
-## Safety First
+### Quick Access Documents
 
-- Always maintain adequate collateralization buffers
-- Monitor your Debt Health regularly
-- Understand liquidation mechanics before borrowing
-- Start small and increase positions gradually
+#### [Quick Reference Guide](quick-reference.md)
+Essential parameters, formulas, and thresholds for protocol operations.
 
-## Need Help?
+#### [Frequently Asked Questions](faq.md)
+Comprehensive answers to common questions about protocol mechanics and safety features.
 
-- Join our community Discord for real-time support
-- Review specific documentation sections for detailed information
-- Check our FAQ and troubleshooting guides
-- Contact support for technical issues
+#### [Glossary](glossary.md)
+Definitions of key terms and concepts used throughout the protocol documentation.
 
----
+### For Developers
 
-*This documentation is continuously updated as Ripe Protocol evolves. Always refer to the latest version for the most accurate information.*
+#### [Technical Documentation](../technical/README.md)
+Implementation details and smart contract specifications for developers.
+
+## Getting Started
+
+### New to Ripe Protocol?
+1. **Start with [GREEN Stablecoin](green.md)** - Understand the core asset
+2. **Review [Multi-Collateral System](collateral-assets/multi-collateral-system.md)** - Learn the unified approach
+3. **Check [Quick Reference](quick-reference.md)** - Get key parameters
+4. **Browse [FAQ](faq.md)** - Address common questions
+
+### Ready to Use the Protocol?
+1. **[Supported Assets](collateral-assets/supported-assets.md)** - See what you can deposit
+2. **[Deposit Mechanics](collateral-assets/deposit-withdrawal-mechanics.md)** - Understand the process
+3. **[Borrowing Mechanics](borrowing/borrowing-mechanics.md)** - Learn to mint GREEN
+4. **[Liquidation System](liquidations/README.md)** - Know the safety mechanisms

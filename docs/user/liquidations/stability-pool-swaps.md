@@ -11,15 +11,16 @@ When your collateral needs liquidation:
 3. **Pool assets pay your debt** - GREEN LP tokens go to Endaoment, sGREEN is burned
 4. **You avoid market selling** - no slippage or timing issues
 
-## Current Pool Assets
+## Pool Asset Types
 
-**What's in stability pools today:**
-- **sGREEN** - The primary stability asset (burned when used)
-- **GREEN LP tokens** - Liquidity pool tokens (sent to Endaoment when used)
+**Available stability pool assets:**
+- **GREEN LP tokens** - Liquidity provider tokens from GREEN/USDC pools
+- **sGREEN** - Savings GREEN that earns yield while in pools
 
-**Priority order:**
-1. GREEN LP tokens used first → sent to Endaoment
-2. sGREEN used second → redeemed and burned
+**Processing hierarchy:**
+1. Claimable GREEN (from previous partial redemptions) → burned directly
+2. GREEN LP tokens → transferred to Endaoment treasury
+3. sGREEN → redeemed to GREEN and burned
 
 ### Permissioned Asset Pools
 
@@ -34,9 +35,9 @@ For regulated/whitelisted assets (tokenized securities, real estate):
 
 **Key insight**: The liquidation fee you pay becomes the discount for stability pool depositors.
 
-### How Liquidation Fee is Calculated
+### Liquidation Fee Calculation
 
-Like other debt terms, your liquidation fee is weighted across all collateral:
+Multi-collateral positions calculate weighted liquidation fees based on borrowing power contribution:
 
 ```
 Example Multi-Collateral Position:
@@ -64,23 +65,20 @@ Your cost: $600
 2. Pool depositors get your collateral at 6% discount
 3. This discount is their compensation for providing liquidity
 
-## Benefits vs. Risks
+## Economic Characteristics
 
-### For Liquidated Users
-✅ **Better than auctions** - Your liquidation fee is the only cost
-✅ **Instant resolution** - No waiting for buyers
-✅ **No market impact** - Doesn't crash asset prices
+### Liquidation Impact
+The stability pool mechanism creates specific economic outcomes:
+- **Fixed Discount**: Liquidation fee parameter determines exact discount
+- **Instant Settlement**: No price discovery period or auction delays
+- **Market Isolation**: Swaps occur without affecting spot markets
 
-❌ **Still costs money** - Pay your weighted liquidation fee
-❌ **No control** - Automatic process
-
-### For Pool Depositors
-✅ **Earn on liquidations** - Buy assets at discount
-✅ **Passive income** - Automated process
-✅ **Diversification** - Acquire various assets
-
-❌ **Asset risk** - Acquired assets may decline
-❌ **Timing risk** - Can't control when liquidations occur
+### Pool Participant Economics
+Stability pool depositors experience:
+- **Discount Capture**: Acquire assets below market price
+- **Passive Execution**: No active management required
+- **Portfolio Accumulation**: Build positions through liquidations
+- **Volatility Exposure**: Hold acquired assets with market risk
 
 ## Multi-Pool Example
 
@@ -107,14 +105,14 @@ Stability pool swaps happen in Phase 2:
 
 This ordering maximizes value preservation while ensuring rapid liquidation.
 
-## Key Takeaways
+## Mechanism Summary
 
-1. **Primary liquidation method** - Most liquidations use stability pools
-2. **Your liquidation fee = Pool discount** - The fee you pay is what depositors earn
-3. **Current assets** - GREEN LP and sGREEN provide the liquidity
-4. **Total cost** - Just your weighted liquidation fee (no additional costs)
-5. **Win-win design** - Depositors earn your fee as their discount
+1. **Primary liquidation pathway** - Configured assets route through stability pools
+2. **Discount mechanism** - Liquidation fees translate directly to pool discounts
+3. **Asset hierarchy** - Claimable GREEN, then LP tokens, then sGREEN
+4. **Economic transfer** - Value flows from liquidated positions to pool participants
+5. **System efficiency** - Automated swaps eliminate market friction
 
-Stability pools create a sustainable liquidation system where everyone benefits: liquidated users get fair treatment, depositors earn returns, and the protocol maintains stability.
+The stability pool system creates an internal liquidation market that operates independently of external exchanges while maintaining economic incentives for participation.
 
 Next: Learn about [Dutch Auctions](dutch-auctions.md) →

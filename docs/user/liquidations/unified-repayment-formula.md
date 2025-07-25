@@ -1,28 +1,34 @@
 # Unified Repayment Formula
 
-Ripe uses a mathematical formula to calculate exactly how much of your collateral gets liquidated—no more, no less. This ensures fair liquidations that only take what's needed to restore your position to health.
+The protocol implements a single mathematical formula that calculates optimal liquidation amounts across all liquidation mechanisms. This formula ensures consistent behavior whether assets go through burning, stability pools, or auctions.
 
-## What It Does
+## Summary
 
-The formula calculates the minimum liquidation needed by considering:
-- Your current debt
-- Your collateral value  
-- Target safety level after liquidation
-- Liquidation fees
+The unified repayment formula dynamically calculates the minimum liquidation amount needed to restore position health, considering multi-collateral positions, weighted parameters, and safety buffers. Unlike static percentage systems, this approach minimizes liquidation impact while ensuring protocol solvency.
 
-**Result**: Precise liquidation amount that restores health without over-liquidating.
+## Formula Purpose
 
-## Why It Matters
+The calculation determines the exact debt repayment amount needed by incorporating:
+- Current debt position
+- Total collateral value
+- Target loan-to-value ratio with safety buffer
+- Asset-specific liquidation fees
 
-### Traditional Liquidations (Other Protocols)
-"Liquidate 50% of position" → Often takes too much
-"Fixed percentages" → One-size-fits-all approach
-**Problem**: You lose more than necessary
+**Output**: Minimum repayment amount that restores position health with appropriate margin.
 
-### Ripe's Formula
-"Calculate exact amount needed" → Takes only what's required
-"Dynamic calculation" → Adapts to your specific position
-**Benefit**: Minimal loss, maximum fairness
+## Mathematical Approach
+
+### Fixed Percentage Systems
+Many protocols use predetermined liquidation percentages:
+- Static ratios regardless of position specifics
+- Often liquidate more than necessary
+- Simple but imprecise
+
+### Dynamic Calculation
+Ripe's formula adapts to each position:
+- Calculates based on actual parameters
+- Accounts for multi-collateral complexity
+- Minimizes liquidation while ensuring safety
 
 ## Simple Examples
 
@@ -48,22 +54,22 @@ Formula calculates: Need to liquidate $8,000 worth
 Result: You keep $10,000 of collateral, position restored to safety
 ```
 
-## How It Protects You
+## Formula Characteristics
 
-1. **No Over-Liquidation**
-   - Takes exactly what's needed
-   - Preserves maximum collateral
-   - No arbitrary percentages
+1. **Precision Targeting**
+   - Calculates exact repayment requirements
+   - Avoids excessive liquidation
+   - Consistent across all mechanisms
 
-2. **Accounts for All Costs**
-   - Includes liquidation fees upfront
-   - No surprises after liquidation
-   - Clear total cost calculation
+2. **Comprehensive Calculation**
+   - Incorporates all fees and costs
+   - Accounts for target LTV buffer
+   - Handles weighted parameters
 
-3. **Dynamic Adjustment**
-   - Adapts to market conditions
-   - Considers asset volatility
-   - Optimizes for your specific mix
+3. **Universal Application**
+   - Same formula for all liquidation types
+   - Works with future mechanisms
+   - Ensures predictable outcomes
 
 ## The Math (Simplified)
 
@@ -97,14 +103,14 @@ Ripe's formula:
 
 **That's real money saved.**
 
-## Key Takeaways
+## Formula Impact
 
-1. **Mathematical precision** - Not arbitrary percentages
-2. **Minimal liquidation** - Only what's needed to restore health
-3. **Fair to users** - Protects your remaining collateral
-4. **Transparent calculation** - No hidden surprises
-5. **Better outcomes** - Typically save 20-40% vs. traditional liquidations
+1. **Consistent methodology** - Single formula across all mechanisms
+2. **Optimal sizing** - Minimum viable liquidation amount
+3. **Parameter integration** - Incorporates all position-specific values
+4. **Conservative approach** - May slightly over-repay for safety
+5. **Predictable results** - Deterministic calculation from inputs
 
-The Unified Repayment Formula is complex math working simply in your favor—ensuring every liquidation is as small as possible while still protecting the protocol.
+The unified repayment formula creates a standardized approach to liquidation sizing that balances position recovery with value preservation.
 
 Next: Learn about [Keeper Incentives](keeper-incentives.md) →

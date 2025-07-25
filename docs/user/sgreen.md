@@ -1,235 +1,200 @@
 # Savings GREEN (sGREEN)
 
-Savings GREEN (sGREEN) is the yield-bearing version of GREEN stablecoin, allowing holders to earn protocol revenues automatically without any active management. It represents a share of the growing sGREEN pool and maintains full redeemability for GREEN at any time.
+sGREEN is the yield-bearing representation of GREEN stablecoin that automatically accrues value through protocol revenue distribution. It operates as a share-based token where each unit represents a proportional claim on the underlying GREEN pool.
 
-## What is sGREEN?
+## sGREEN Mechanism
 
-### Core Concept
+### Fundamental Design
 
-sGREEN is a wrapped version of GREEN that:
-- **Automatically compounds yield** from protocol revenues
-- **Maintains 1:1+ GREEN redeemability** (always worth at least 1 GREEN)
-- **No lock-up periods** - redeem anytime
-- **ERC-4626 compliant** - standard yield-bearing token interface
+sGREEN implements a share-based value accrual system where:
+- Protocol revenues automatically increase share value
+- Each sGREEN maintains minimum 1:1 GREEN backing
+- Redemption remains available without time restrictions
+- Implements ERC-4626 vault standard for interoperability
 
-### How Value Accrues
+### Value Accrual Mechanism
 
-Unlike rebasing tokens, sGREEN uses an exchange rate model:
+sGREEN employs an exchange rate model rather than rebasing:
 
-```
-Exchange Rate = Total GREEN in Pool / Total sGREEN Supply
-```
+**Exchange Rate Calculation:**
+The rate equals total GREEN in the pool divided by total sGREEN supply.
 
-**Example Growth:**
-- Day 1: 1 sGREEN = 1.00 GREEN
-- Day 30: 1 sGREEN = 1.01 GREEN
-- Day 365: 1 sGREEN = 1.08 GREEN
+**Rate Progression:**
+The exchange rate increases as protocol revenues flow into the pool. This creates a monotonically increasing value per share, where the rate can only increase or remain stable, never decrease.
 
-The exchange rate only increases, never decreases.
-
-## Yield Sources
+## Revenue Sources
 
 ### 1. Borrowing Interest
 
-The primary yield source comes from GREEN borrowers:
-- Borrowers pay interest on their GREEN loans
-- Interest accumulates in the sGREEN pool
-- Distributed proportionally to all sGREEN holders
+The protocol collects interest from GREEN borrowers:
+- Interest payments flow into the sGREEN pool
+- Pool growth increases the exchange rate
+- All sGREEN holders benefit proportionally
 
-### 2. Daowry Fees
+### 2. Origination Fees
 
-One-time origination fees from new loans:
-- Typically 0.5% of borrowed amount
-- Paid to sGREEN holders
-- Provides immediate yield boost
+Daowry fees charged on loan origination:
+- One-time fee on new borrowing positions
+- Typically configured around 0.5% of borrowed amount
+- Immediate contribution to pool value
 
-### 3. Liquidation Fees
+### 3. Protocol Fee Distribution
 
-Revenue from liquidation events:
-- Base liquidation fees go to sGREEN holders
-- **Note**: Only if you deposit sGREEN into stability pools do you earn additional liquidation premiums
-- Simply holding sGREEN earns base protocol fees, not liquidation discounts
+Liquidation-related revenues:
+- Base protocol fees from liquidation events accrue to sGREEN
+- Distinct from liquidation discounts earned by stability pool participants
+- Holding sGREEN captures protocol fees while stability pools capture liquidation premiums
 
-## How to Get sGREEN
+## sGREEN Acquisition Methods
 
-### Method 1: Direct Conversion
+### Direct Conversion Mechanism
 
-Convert existing GREEN to sGREEN:
+GREEN tokens convert to sGREEN through the vault interface:
+- GREEN deposits into the sGREEN pool
+- sGREEN minted based on current exchange rate
+- Proportional share ownership established
 
-1. **Approve GREEN spending** for sGREEN contract
-2. **Deposit GREEN** into sGREEN pool
-3. **Receive sGREEN** at current exchange rate
+**Conversion Dynamics:**
+When the exchange rate exceeds 1:1, depositors receive fewer sGREEN tokens than GREEN deposited, but each sGREEN represents more GREEN value.
 
-**Example:**
-```
-Current rate: 1 sGREEN = 1.05 GREEN
-Deposit: 1,050 GREEN
-Receive: 1,000 sGREEN
-```
+### Direct Borrowing Option
 
-### Method 2: Borrow Directly to sGREEN
+The protocol allows borrowers to receive loans directly as sGREEN:
+- Borrowed amount mints directly into sGREEN
+- Immediate participation in yield generation
+- Single transaction efficiency
 
-When taking a loan, receive sGREEN instead of GREEN:
+**Economic Implications:**
+Borrowers receiving sGREEN may benefit if sGREEN yield exceeds borrowing costs, creating a positive carry position where loans partially self-amortize through yield.
 
-**Benefits:**
-- Start earning immediately
-- No conversion needed
-- Gas efficient
-- Offset borrowing costs
+## System Characteristics
 
-**Example Strategy:**
-```
-Borrow Rate: 5% APR
-sGREEN Yield: 8% APR
-Net Benefit: +3% APR (self-paying loan)
-```
+### Automatic Value Accrual
 
-## Key Features and Benefits
+The protocol design enables:
+- Continuous compounding without user interaction
+- No manual claiming or restaking requirements
+- Gas efficiency through pooled operations
+- Passive value accumulation
 
-### Automatic Compounding
+### Liquidity Properties
 
-**No Action Required:**
-- Yield compounds continuously
-- No claiming or restaking needed
-- Gas-efficient for all holders
-- Set and forget simplicity
+Redemption mechanics:
+- Unrestricted GREEN redemption availability
+- No exit fees or penalties
+- No mandatory waiting periods
+- Minimum 1:1 value preservation
 
-### Full Liquidity
+### Tax Considerations
 
-**Instant Redemption:**
-- Convert sGREEN → GREEN anytime
-- No withdrawal fees
-- No waiting periods
-- Always receive at least 1:1
+Structural implications:
+- Value accrual through price appreciation rather than distribution
+- Single redemption event for realized gains
+- Simplified tracking compared to multiple distributions
+- Tax treatment varies by jurisdiction
 
-### Tax Efficiency
+### Protocol Composability
 
-**Potential Benefits:**
-- No taxable events from auto-compounding
-- Single transaction for redemption
-- Cleaner reporting vs. multiple claims
-- *Consult your tax advisor*
+Integration capabilities:
+- Potential collateral asset in lending protocols
+- Liquidity pairing with GREEN or other stables
+- Compatible with yield aggregation protocols
+- Cross-protocol utility expansion
 
-### Composability
+## sGREEN Economic Dynamics
 
-**DeFi Integration:**
-- Use as collateral (where accepted)
-- LP with GREEN for stable pairs
-- Integration with yield aggregators
-- Cross-protocol strategies
+### Holding Mechanics
 
-## sGREEN Strategies
+Basic sGREEN ownership provides:
+- Automatic capture of protocol revenues
+- Compound growth through exchange rate appreciation
+- Flexible redemption timing
+- Passive yield generation
 
-### 1. Simple Holding
+Typical yields derive from aggregate protocol activity including borrowing demand and fee generation.
 
-**Best For:** Passive income seekers
+### Borrowing Integration
 
-**Strategy:**
-- Convert GREEN to sGREEN
-- Hold long-term
-- Benefit from compound growth
-- Redeem when needed
+Direct sGREEN borrowing creates:
+- Immediate yield exposure on borrowed funds
+- Potential interest cost offset
+- Single-transaction efficiency
+- Dynamic position management
 
-**Expected Returns:** Base protocol yield (typically 5-10% APR)
+The economic outcome depends on the relationship between borrowing costs and sGREEN appreciation rates.
 
-### 2. Borrow and Hold
+### Stability Pool Deployment
 
-**Best For:** Active borrowers
+sGREEN in [stability pools](../liquidations/stability-pool-mechanics.md) generates:
+- Base sGREEN appreciation (protocol revenues)
+- Liquidation discount capture (pool participation)
+- Additional protocol incentives when available
 
-**Strategy:**
-- Borrow directly to sGREEN
-- Hold while loan is active
-- Yield offsets interest costs
-- May achieve net positive returns
+**Revenue Distinction:**
+Holding sGREEN captures protocol fee distribution while [stability pool participation](../liquidations/stability-pool-swaps.md) adds liquidation premiums.
 
-**Example Math:**
-```
-Collateral: $20,000 WETH
-Borrow: 10,000 GREEN → sGREEN
-Cost: 5% APR = $500/year
-Yield: 8% APR = $800/year
-Net Profit: $300/year
-```
+### Liquidity Pool Participation
 
-### 3. Stability Pool Stacking
+sGREEN/GREEN liquidity positions feature:
+- Highly correlated asset pairing
+- Reduced impermanent loss risk
+- Trading fee accumulation
+- Combined yield sources
 
-**Best For:** Yield maximizers
+The stable relationship between sGREEN and GREEN creates favorable liquidity provision dynamics.
 
-**Strategy:**
-- Deposit sGREEN into stability pools
-- Earn base sGREEN yield (from holding sGREEN)
-- Plus liquidation discounts (from stability pool participation)
-- Plus RIPE rewards (if applicable)
+## Implementation Architecture
 
-**Important Distinction:**
-- Holding sGREEN alone: Earns protocol fees and interest
-- sGREEN in stability pools: Additionally earns liquidation premiums
+### Vault Standard Compliance
 
-**Potential Returns:** 15-25% APR during active liquidation periods
+sGREEN implements the ERC-4626 tokenized vault standard, providing:
+- Standardized deposit and withdrawal interfaces
+- Share-to-asset conversion functions
+- Predictable integration patterns
+- Industry-standard vault mechanics
 
-### 4. Liquidity Provision
+### Exchange Rate Dynamics
 
-**Best For:** Liquidity providers
+Rate appreciation occurs through:
+- Interest payment accumulation
+- Origination fee collection
+- Protocol fee distribution
+- Revenue stream aggregation
 
-**Strategy:**
-- Create sGREEN/GREEN LP positions
-- Minimal impermanent loss (correlated assets)
-- Earn trading fees
-- Plus sGREEN appreciation
+### Protocol Integration
 
-**Benefits:**
-- Stable pair dynamics
-- Additional fee income
-- Deep liquidity support
+The system supports:
+- Full ERC-20 token functionality
+- ERC-4626 vault operations
+- Standard DeFi composability
+- Transparent value accounting
 
-## Technical Details
+For technical implementation details, see:
+- [SavingsGreen Technical Documentation](../technical/tokens/SavingsGreen.md)
+- [ERC-4626 Token Module Documentation](../technical/tokens/modules/Erc4626Token.md)
 
-### ERC-4626 Compliance
+## Operational Characteristics
 
-sGREEN follows the standard vault token interface:
-- `deposit()` - Convert GREEN to sGREEN
-- `redeem()` - Convert sGREEN to GREEN
-- `convertToAssets()` - Check current exchange rate
-- `totalAssets()` - View total GREEN in pool
+### Holding Period Requirements
+The protocol imposes no minimum holding periods or lock-up requirements. Redemption remains available at any time.
 
-For developers and technical users, see the contract documentation:
-- [SavingsGreen.md](../../contracts/tokens/SavingsGreen.md) - Implementation details
-- [Erc4626Token.md](../../contracts/tokens/Erc4626Token.md) - Base vault standard
+### Exchange Rate Stability
+The system design ensures monotonic rate growth - the exchange rate can only increase or remain stable, never decrease.
 
-### Exchange Rate Updates
+### Emergency Scenarios
+Protocol emergency mechanisms maintain the GREEN backing of all sGREEN tokens. The vault structure preserves asset segregation.
 
-The rate increases when:
-- Interest payments received
-- Daowry fees collected
-- Liquidation fees added
-- Any protocol revenue distributed
+### Compounding Frequency
+Value accrual occurs continuously as protocol revenues flow into the system, with no discrete compounding events.
 
-### Integration Guidelines
+### Token Transferability
+sGREEN functions as a standard ERC-20 token with full transfer capabilities and DeFi compatibility.
 
-For developers and protocols:
-- Standard ERC-20 functions supported
-- Additional ERC-4626 vault functions
-- Easy integration with existing DeFi
-- Detailed documentation available
+### Peg Independence
+The sGREEN-to-GREEN exchange rate operates independently of GREEN's USD value. Market fluctuations in GREEN's dollar price do not affect the sGREEN exchange rate.
 
-## Frequently Asked Questions
+## System Summary
 
-### Is there a minimum holding period?
-No, you can redeem sGREEN for GREEN instantly at any time.
+sGREEN provides automated yield generation on GREEN holdings through a share-based vault mechanism. The system captures protocol revenues, maintains full liquidity, and integrates with broader DeFi infrastructure through standard interfaces.
 
-### Can the exchange rate ever decrease?
-No, the exchange rate only increases. It cannot go down by design.
-
-### What happens during protocol emergencies?
-sGREEN maintains full backing by GREEN in the pool. Emergency procedures protect user funds.
-
-### How often does yield compound?
-Continuously with each protocol revenue event - borrowing interest, fees, etc.
-
-### Can I transfer sGREEN?
-Yes, sGREEN is a standard ERC-20 token that can be transferred, traded, or used in DeFi.
-
-### Is sGREEN affected by GREEN's peg?
-sGREEN maintains its GREEN exchange rate regardless of GREEN's USD peg. If GREEN = $0.95, 1 sGREEN still redeems for 1.05+ GREEN (at the current rate).
-
-sGREEN represents the simplest way to earn yield on your stablecoins within the Ripe ecosystem, providing sustainable returns while maintaining full liquidity and composability.
+The architecture creates sustainable value accrual while preserving capital flexibility and compositional utility across the ecosystem.
