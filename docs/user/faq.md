@@ -203,6 +203,58 @@ Each borrower's collateral backs only their own debt:
 **Protocol Level**: Emergency pause capabilities, governance intervention mechanisms
 **System Level**: Multiple oracle fallbacks, redundant liquidation phases
 
+## RIPE Governance
+
+### How does RIPE governance work?
+
+RIPE token holders can lock their tokens in the Ripe Governance Vault to accumulate governance points. Governance power equals a user's total points divided by the protocol's total points. When full governance launches, this power will control asset support, protocol parameters, and treasury management.
+
+### Is governance active now?
+
+Full on-chain governance is not yet active, but governance points are accumulating. Early participants who lock RIPE tokens now are building the voting power they'll use when decentralized governance launches in the coming months.
+
+### How do governance points accumulate?
+
+Points are calculated using: Token Balance × Blocks Elapsed × Asset Weight × Lock Bonus
+
+Asset weights:
+- RIPE tokens: 100% weight
+- RIPE LP tokens: 150% weight
+
+Lock bonuses reward longer commitments:
+- 1 day (minimum): 0% bonus
+- 6 months: ~35% bonus  
+- 1 year: ~65% bonus
+- 2 years: ~130% bonus
+- 3 years: 200% bonus (maximum)
+
+### Can I exit my governance lock early?
+
+Early exit is possible but extremely costly:
+- **Exit fee**: 80% of your deposited tokens are forfeited
+- **Distribution**: The 80% penalty stays in the vault for other depositors
+- **You receive**: Only 20% of your original deposit back
+- **Governance points**: 100% LOST (complete slash of all accumulated points)
+- **Smart protection**: Prevents costly exits during bad debt when withdrawals would fail anyway
+
+### Do I lose governance points when withdrawing?
+
+**Yes - ALL withdrawals proportionally slash your governance points:**
+- Withdraw 10% of tokens → Lose 10% of governance points
+- Withdraw 50% of tokens → Lose 50% of governance points  
+- Withdraw 100% of tokens → Lose ALL governance points
+
+This applies to both normal withdrawals (after lock expires) and early exits. Governance power is always tied to your current deposit.
+
+### What will governance control?
+
+When activated, RIPE holders will govern:
+- **Asset Support**: Which tokens can serve as collateral
+- **Risk Parameters**: LTV ratios, liquidation thresholds, interest rates
+- **Treasury Strategy**: How Endaoment funds are invested
+- **Protocol Economics**: Fee structures, revenue distribution, reward emissions
+- **System Parameters**: Dynamic rates, liquidation configuration, stability mechanisms
+
 ## Advanced Features
 
 ### Can positions be automated?

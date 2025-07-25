@@ -24,7 +24,10 @@ Value accrual - sGREEN represents the yield-bearing version of GREEN, automatica
 ### 6. [Endaoment](endaoment.md)
 The engine - Protocol treasury manages assets, maintains GREEN stability, and generates yield across DeFi strategies.
 
-### 7. [Bonds](bonding.md)
+### 7. [RIPE Governance](ripe-governance.md)
+Community control - RIPE token holders accumulate governance power through time-locked deposits, preparing for decentralized protocol management.
+
+### 8. [Bonds](bonding.md)
 Growth mechanism - Bond system exchanges stablecoins for RIPE tokens, building Endaoment reserves and liquidity.
 
 ## Protocol Architecture

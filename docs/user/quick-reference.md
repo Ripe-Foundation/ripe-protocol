@@ -42,6 +42,26 @@ Exchange Rate = Total GREEN in Pool / Total sGREEN Supply
 ```
 - Rate can only increase or remain stable, never decrease
 
+#### RIPE Governance Power
+```
+Governance Power = User's Total Gov Points / Protocol Total Gov Points
+```
+
+#### Governance Point Calculation
+```
+Base Points = Token Balance × Blocks Elapsed × Asset Weight
+Lock Bonus = Base Points × Lock Bonus Percentage
+Total Points = Base Points + Lock Bonus
+```
+
+Asset Weights:
+- RIPE tokens: 100%
+- RIPE LP tokens: 150%
+
+**⚠️ Important**: ANY withdrawal proportionally slashes governance points
+- Withdraw 25% of tokens = Lose 25% of points
+- Withdraw 100% of tokens = Lose ALL points
+
 ## System Thresholds
 
 ### Liquidation Triggers
@@ -73,7 +93,7 @@ Exchange Rate = Total GREEN in Pool / Total sGREEN Supply
 | **Simple ERC-20** | Standard tokens | WETH, USDC, WBTC | 1:1 deposit/withdrawal |
 | **Share-Based** | Yield-bearing | stETH, aTokens, LP tokens | Captures yields/rebases |
 | **Stability Pool** | Liquidation backstop | sGREEN only | Earns liquidation premiums |
-| **Governance** | Protocol voting | RIPE only | Time-locked with multipliers |
+| **Governance** | Protocol voting | RIPE, RIPE LP | Time-locked, governance points |
 
 ## Liquidation System
 
@@ -104,6 +124,39 @@ Exchange Rate = Total GREEN in Pool / Total sGREEN Supply
 | **Loot Claims** | Collect RIPE rewards | Low |
 
 **Security**: All funds always route to original owner address
+
+## RIPE Governance
+
+### Lock Duration Bonuses
+
+| Lock Duration | Approximate Bonus | Example Total Multiplier |
+|---------------|-------------------|-------------------------|
+| **1 day (min)** | 0% | 1.0x |
+| **3 months** | ~15% | 1.15x |
+| **6 months** | ~35% | 1.35x |
+| **1 year** | ~65% | 1.65x |
+| **2 years** | ~130% | 2.3x |
+| **3 years** | 200% (max) | 3.0x |
+
+**Early Exit Fee**: 80% of deposited tokens (only receive 20% back)
+
+### Governance Timeline
+
+| Status | Description | Timeframe |
+|--------|-------------|----------|
+| **Points Accruing** | Governance power accumulating | Current |
+| **Full Governance** | On-chain voting active | Coming months |
+| **Protocol Control** | Community parameter control | Post-launch |
+
+### Governance Scope (Future)
+
+| Category | Examples |
+|----------|----------|
+| **Asset Support** | Collateral approval, parameter setting |
+| **Risk Management** | LTV ratios, liquidation thresholds |
+| **Treasury Strategy** | Endaoment investment allocation |
+| **Protocol Economics** | Fee structures, revenue splits |
+| **System Parameters** | Rate protection, liquidation config |
 
 ## Fee Structure
 
