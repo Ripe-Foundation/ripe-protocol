@@ -1,6 +1,6 @@
 # GREEN: The Stablecoin That Works Harder
 
-GREEN is Ripe Protocol's overcollateralized stablecoin — a digital dollar that maintains rock-solid stability while powering an entire ecosystem of yield opportunities, liquidation profits, and financial tools. Unlike traditional stablecoins that sit idle in your wallet, GREEN actively participates in DeFi, earning yield through [sGREEN](05-sgreen.md), protecting the protocol through [stability pools](10-stability-pools.md), and maintaining its peg through multiple autonomous mechanisms that work 24/7.
+GREEN is Ripe Protocol's overcollateralized stablecoin — a digital dollar that maintains rock-solid stability while powering an entire ecosystem of yield opportunities, liquidation profits, and financial tools. Unlike traditional stablecoins that sit idle in your wallet, GREEN actively participates in DeFi, earning yield through [sGREEN](04-sgreen.md), protecting the protocol through [stability pools](05-stability-pools.md), and maintaining its peg through multiple autonomous mechanisms that work 24/7.
 
 ## Why GREEN Exists
 
@@ -195,7 +195,7 @@ This mechanism works 24/7 without any manual intervention, creating relentless b
 
 ### 4. Stability Pool Redemption Mechanism
 
-A second powerful redemption path exists through [stability pools](10-stability-pools.md) that hold liquidated collateral:
+A second powerful redemption path exists through [stability pools](05-stability-pools.md) that hold liquidated collateral:
 
 **How Pool Redemptions Work**:
 - Stability pools accumulate ETH, WBTC, and other assets from liquidations
@@ -220,7 +220,7 @@ Double the arbitrage opportunities = Stronger peg defense
 
 ### 5. Endaoment Treasury Operations
 
-The [Endaoment](06-endaoment.md) serves as GREEN's financial fortress — a protocol-owned treasury with vast capabilities to defend the peg:
+The [Endaoment](10-endaoment.md) serves as GREEN's financial fortress — a protocol-owned treasury with vast capabilities to defend the peg:
 
 **Capital Arsenal from Bond Sales**:
 - Bond proceeds provide stablecoin reserves for immediate deployment
@@ -281,7 +281,7 @@ The Endaoment transforms from passive treasury to active market participant, wit
 
 ### Transform to sGREEN for Automatic Yield
 
-[sGREEN](05-sgreen.md) is GREEN's yield-bearing twin:
+[sGREEN](04-sgreen.md) is GREEN's yield-bearing twin:
 - **Set and Forget**: Deposit GREEN, receive sGREEN
 - **Auto-Compounding**: Value grows through exchange rate, not rebasing
 - **Protocol Revenue**: Captures fees from borrowing, liquidations, and more

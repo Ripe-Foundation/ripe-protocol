@@ -78,7 +78,7 @@ No Lock → 0% bonus → 1x RIPE (base amount only)
 **How It Works:**
 - Choose your lock duration when bonding (0 to 3 years)
 - Bonus calculated as percentage of base bond amount
-- Locked RIPE automatically deposits into [Ripe Governance Vault](08-ripe-governance.md)
+- Locked RIPE automatically deposits into [Ripe Governance Vault](08-governance.md)
 - Start earning governance points and staking rewards immediately
 - Maintain full voting rights throughout lock period
 

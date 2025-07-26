@@ -1,6 +1,6 @@
 # The Endaoment: Ripe Protocol's Autonomous Treasury
 
-The Endaoment is Ripe Protocol's self-sustaining treasury system that transforms stablecoin deposits from [bond sales](09-bonding.md) into productive capital that works perpetually for the protocol. Think of it as an intelligent treasury that never sleeps — automatically defending [GREEN](green-stablecoin.md)'s dollar peg, generating yield across DeFi, and growing the protocol's financial strength without human intervention.
+The Endaoment is Ripe Protocol's self-sustaining treasury system that transforms stablecoin deposits from [bond sales](09-bonds.md) into productive capital that works perpetually for the protocol. Think of it as an intelligent treasury that never sleeps — automatically defending [GREEN](01-green-stablecoin.md)'s dollar peg, generating yield across DeFi, and growing the protocol's financial strength without human intervention.
 
 ## Why The Endaoment Exists
 
@@ -21,7 +21,7 @@ Bond Sales → Treasury Growth → Yield Generation → Protocol Strength
      └──────────── More User Confidence ←─────────────────┘
 ```
 
-Every stablecoin that enters through [bond sales](09-bonding.md) becomes productive capital that:
+Every stablecoin that enters through [bond sales](09-bonds.md) becomes productive capital that:
 - Earns yield across multiple DeFi protocols
 - Provides liquidity for GREEN trading
 - Backs the protocol during market stress
@@ -109,7 +109,7 @@ The Endaoment enables win-win liquidity partnerships:
 
 ### For sGREEN Stakers
 
-**Stability Rewards**: [sGREEN](05-sgreen.md) stakers earn rewards from providing stability to the GREEN ecosystem through the stability pool mechanism.
+**Stability Rewards**: [sGREEN](04-sgreen.md) stakers earn rewards from providing stability to the GREEN ecosystem through the stability pool mechanism.
 
 **Protected Participation**: Your staked position helps maintain protocol health while earning returns from liquidation premiums.
 

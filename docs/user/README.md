@@ -1,147 +1,160 @@
-# Ripe Protocol Documentation
+# Ripe Protocol: Where Your Entire Portfolio Becomes Productive Capital
 
-This documentation explains the fundamental mechanisms and concepts underlying Ripe Protocol's multi-collateral lending system.
+Welcome to Ripe Protocol — a lending platform that transforms how DeFi handles collateral. Instead of juggling multiple isolated positions, your entire portfolio works as one, backing a single loan with the combined strength of all your assets.
+
+## The Problem We Solve
+
+Traditional DeFi lending forces impossible choices:
+
+**Isolated Positions** (MakerDAO, Liquity)
+- ETH vault here, WBTC vault there
+- Each position managed separately
+- Liquidation cascades risk your entire portfolio
+
+**Pooled Risk** (Aave, Compound)  
+- Your collateral backs everyone's loans
+- Limited to "safe" blue-chip assets
+- One bad actor affects all users
+
+**Fragmented Markets** (Morpho, Euler)
+- Better rates but still isolated positions
+- Each market needs its own liquidity
+- Innovation limited by conservative parameters
+
+## The Ripe Solution: Unified Multi-Collateral Lending
+
+```
+Your Portfolio:              Traditional:           Ripe:
+┌─────────────┐             ┌─────────────┐       ┌─────────────┐
+│ 5 ETH       │ ──────────> │ ETH Loan #1 │       │             │
+│ 2 WBTC      │ ──────────> │ WBTC Loan #2│       │  ONE LOAN   │
+│ 10K USDC    │ ──────────> │ USDC Loan #3│  ───> │  GREEN      │
+│ stETH       │ ──────────> │ Can't use   │       │  All Assets │
+│ NFTs        │ ──────────> │ Can't use   │       │  Working    │
+└─────────────┘             └─────────────┘       └─────────────┘
+                            5 positions to          1 unified
+                            manage, limited         position,
+                            assets                  everything works
+```
 
 ## Core Components
 
-Understanding Ripe Protocol requires familiarity with these interconnected systems:
+### 🟢 [GREEN: The Stablecoin That Works Harder](01-green-stablecoin.md)
 
-### Core Lending System
+Your gateway to capital efficiency. GREEN maintains rock-solid stability through five autonomous mechanisms while powering an entire ecosystem of yield opportunities.
 
-#### 1. [GREEN Stablecoin](green-stablecoin.md)
-The heart of Ripe - GREEN is the protocol's native overcollateralized stablecoin, minted through borrowing and maintained at dollar parity through multiple stability mechanisms.
+- **Mint GREEN** by borrowing against any asset
+- **Always $1** through overcollateralization and market mechanisms  
+- **Burn on repayment** creating natural supply/demand balance
 
-#### 2. [Collateral Assets](collateral-assets/README.md)
-The foundation - Ripe's multi-collateral system enables multiple assets to back a single loan position, transforming how DeFi lending operates.
+### 🏦 [Collateral Assets: Everything Has Value](02-collateral-assets.md)
 
-#### 3. [Borrowing](borrowing/README.md)
-The core function - Protocol's borrowing mechanism mints GREEN against deposited collateral through an overcollateralized debt system.
+From stablecoins to meme coins, from blue-chip crypto to NFTs — if it has value, it can back your loan.
 
-#### 4. [Liquidations](liquidations/README.md)
-The safety net - A three-phase liquidation system maintains protocol solvency while minimizing borrower losses through progressive mechanisms.
+- **Unified positions** - All assets support one loan
+- **Weighted terms** - Each asset contributes its best LTV
+- **Extensible vaults** - Support for future asset types
 
-### Value Generation
+### 💰 [Borrowing: One Position, Infinite Possibilities](03-borrowing.md)
 
-#### 5. [Savings GREEN (sGREEN)](05-sgreen.md)
-Value accrual - sGREEN represents the yield-bearing version of GREEN, automatically accruing value through protocol revenue distribution.
+Experience lending without the complexity. Deposit anything, borrow GREEN, manage one position.
 
-#### 6. [Endaoment](06-endaoment.md)
-The engine - Protocol treasury manages assets, maintains GREEN stability, and generates yield across DeFi strategies.
+- **Portfolio-based borrowing** - Your net worth, not individual assets
+- **Dynamic rates** - Respond to market conditions automatically
+- **Partial liquidations** - Only what's necessary, never more
 
-### RIPE Token Ecosystem
+### 💎 [sGREEN: Your Yield Amplifier](04-sgreen.md)
 
-#### 7. [RIPE Block Rewards](07-ripe-block-rewards.md)
-Incentive engine - Distributes RIPE tokens to borrowers, depositors, and governance participants based on their protocol activity.
+Transform idle GREEN into a compounding yield machine. Just hold sGREEN and watch it grow.
 
-#### 8. [RIPE Governance](08-ripe-governance.md)
-Community control - RIPE token holders accumulate governance power through time-locked deposits, preparing for decentralized protocol management.
+- **Auto-compounding** - All protocol revenue flows to holders
+- **No lockups** - Redeem instantly for GREEN
+- **Use everywhere** - Stability pools, governance, and more
 
-#### 9. [Bonds](09-bonding.md)
-Growth mechanism - Bond system exchanges stablecoins for RIPE tokens, building Endaoment reserves and liquidity.
+### 🎯 [Stability Pools: Liquidation Profits for Everyone](05-stability-pools.md)
 
-## Protocol Architecture
+Democratizing liquidation profits. Deposit sGREEN or LP tokens, automatically buy discounted collateral.
 
-```
-                    RIPE PROTOCOL SYSTEM OVERVIEW
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                                USERS                                        │
-│  ┌──────────────────┐  ┌──────────────────┐  ┌──────────────────┐          │
-│  │   BORROWERS      │  │     LENDERS      │  │     TRADERS      │          │
-│  │ (Multi-Asset     │  │  (sGREEN/Pools)  │  │   (GREEN/DEX)    │          │
-│  │  Collateral)     │  │                  │  │                  │          │
-│  └─────────┬────────┘  └─────────┬────────┘  └─────────┬────────┘          │
-└───────────┼─────────────────────┼─────────────────────┼─────────────────────┘
-            │                     │                     │
-            v                     v                     v
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                           CORE PROTOCOL                                    │
-│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐             │
-│  │  MULTI-ASSET    │  │   GREEN MINT/   │  │   LIQUIDATION   │             │
-│  │   VAULTS        │  │     BURN        │  │     SYSTEM      │             │
-│  │                 │  │                 │  │                 │             │
-│  │ • Simple ERC20  │  │ • Overcollat.   │  │ • Phase 1: Burn │             │
-│  │ • Yield-bearing │  │ • Dynamic Rates │  │ • Phase 2: Pools│             │
-│  │ • Stability Pool│  │ • Peg Stability │  │ • Phase 3: Auct.│             │
-│  │ • Governance    │  │                 │  │                 │             │
-│  └─────────────────┘  └─────────────────┘  └─────────────────┘             │
-└─────────────────────────────────────────────────────────────────────────────┘
-            │                     │                     │
-            v                     v                     v
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                          SUPPORT SYSTEMS                                   │
-│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐             │
-│  │   ENDAOMENT     │  │   ORACLES &     │  │  RIPE TOKENS    │             │
-│  │   TREASURY      │  │   KEEPERS       │  │  & INCENTIVES   │             │
-│  │                 │  │                 │  │                 │             │
-│  │ • Asset Mgmt    │  │ • Price Feeds   │  │ • Governance    │             │
-│  │ • Yield Gen     │  │ • Liquidations  │  │ • Block Rewards │             │
-│  │ • Peg Defense   │  │ • Rate Updates  │  │ • Bond Sales    │             │
-│  └─────────────────┘  └─────────────────┘  └─────────────────┘             │
-└─────────────────────────────────────────────────────────────────────────────┘
-```
+- **5-15% instant profits** on liquidated assets
+- **Triple yields** - Base rate + liquidations + RIPE rewards
+- **Passive income** - No bots or timing required
 
-### Multi-Collateral Framework
-Ripe unifies multiple collateral assets into single loan positions, enabling portfolio-based borrowing rather than isolated markets. This architecture supports diverse asset types while maintaining individual risk isolation.
+### 🛡️ [Liquidations: Protection Through Innovation](06-liquidations.md)
 
-### GREEN Stablecoin System
-GREEN maintains its dollar peg through overcollateralization, dynamic interest rates, redemption mechanisms, and automated market operations managed by the Endaoment treasury.
+Three-phase system designed to protect borrowers while maintaining protocol health.
 
-### Liquidation Architecture
-The three-phase system progressively attempts:
-1. Internal recovery through token burning and treasury transfers
-2. Stability pool exchanges at predetermined discounts
-3. Dutch auctions for remaining collateral
+- **Redemption buffer** - Early warning system
+- **Your assets first** - Burns GREEN/sGREEN before collateral
+- **Gradual process** - Minimizes market impact
 
-This graduated approach minimizes market impact while ensuring protocol solvency.
+### 🪙 [RIPE Token: Governance and Rewards](07-ripe-rewards.md)
 
-### Value Accrual Mechanisms
-The protocol generates value through:
-- Interest payments flowing to sGREEN holders
-- RIPE block rewards distributed to active participants
-- Liquidation fees captured by stability pools
-- Treasury yield generation via DeFi strategies
-- Bond sales building protocol reserves
+Earn RIPE by using the protocol. Time-weighted rewards ensure fair distribution.
 
-## Key Concepts
+- **150M RIPE** distributed over 4 years
+- **Four ways to earn** - Borrow, stake, deposit, vote
+- **Auto-staking** - Compound directly to governance
 
-### Unified Positions
-Unlike traditional lending protocols, Ripe combines all collateral into a single borrowing position with weighted-average terms based on asset contributions.
+### 🏛️ [Governance: Power Through Time](08-governance.md)
 
-### Risk Isolation
-Each user's collateral backs only their own debt, preventing systemic contagion and enabling support for diverse asset types.
+Lock RIPE tokens to accumulate voting power and earn protocol rewards.
 
-### Automated Stability
-Market-driven mechanisms maintain GREEN's peg without governance intervention, using economic incentives to self-correct imbalances.
+- **Time multipliers** - Up to 3x power for 4-year locks
+- **25% of emissions** - Guaranteed rewards for stakers
+- **Future control** - Guide protocol evolution
 
-## Additional Resources
+### 🎟️ [Bonds: Fund the Future](09-bonds.md)
 
-### Quick Access Documents
+Exchange stablecoins for discounted RIPE, supporting protocol growth.
 
-#### [Quick Reference Guide](quick-reference.md)
-Essential parameters, formulas, and thresholds for protocol operations.
+- **Instant or locked** - Up to 3x tokens for commitment
+- **Power-ups** - Bonus rewards for ecosystem contributors
+- **Permanent funding** - Builds the Endaoment treasury
 
-#### [Frequently Asked Questions](faq.md)
-Comprehensive answers to common questions about protocol mechanics and safety features.
+### 🏰 [The Endaoment: Autonomous Treasury](10-endaoment.md)
 
-#### [Glossary](glossary.md)
-Definitions of key terms and concepts used throughout the protocol documentation.
+Self-sustaining treasury that works 24/7 defending GREEN and generating yield.
 
-### For Developers
-
-#### [Technical Documentation](technical/README.md)
-Implementation details and smart contract specifications for developers.
+- **Multi-strategy yields** - Optimized across DeFi
+- **Peg defense** - Automated market operations
+- **Partner programs** - Collaborative liquidity
 
 ## Getting Started
 
-### New to Ripe Protocol?
-1. **Start with [GREEN Stablecoin](green-stablecoin.md)** - Understand the core asset
-2. **Review [Multi-Collateral System](collateral-assets/multi-collateral-system.md)** - Learn the unified approach
-3. **Check [Quick Reference](quick-reference.md)** - Get key parameters
-4. **Browse [FAQ](faq.md)** - Address common questions
+### New to Ripe?
 
-### Ready to Use the Protocol?
-1. **[Supported Assets](collateral-assets/supported-assets.md)** - See what you can deposit
-2. **[Deposit Mechanics](collateral-assets/deposit-withdrawal-mechanics.md)** - Understand the process
-3. **[Borrowing Mechanics](borrowing/borrowing-mechanics.md)** - Learn to mint GREEN
-4. **[RIPE Block Rewards](07-ripe-block-rewards.md)** - Earn rewards for participation
-5. **[Liquidation System](liquidations/README.md)** - Know the safety mechanisms
+1. Start with [GREEN Stablecoin](01-green-stablecoin.md) — understand the core asset
+2. Explore [Collateral Assets](02-collateral-assets.md) — see what you can deposit
+3. Learn [Borrowing](03-borrowing.md) — discover unified positions
+
+### Ready to Earn?
+
+1. Convert to [sGREEN](04-sgreen.md) — automatic yield generation
+2. Join [Stability Pools](05-stability-pools.md) — capture liquidation profits
+3. Earn [RIPE Rewards](07-ripe-rewards.md) — get paid for participation
+
+### Want to Go Deeper?
+
+1. Understand [Liquidations](06-liquidations.md) — know the safety mechanisms
+2. Explore [Governance](08-governance.md) — accumulate voting power
+3. Consider [Bonds](09-bonds.md) — support protocol growth
+4. Study [The Endaoment](10-endaoment.md) — see where value flows
+
+## Key Innovation: Risk Isolation with Portfolio Efficiency
+
+Traditional lending makes you choose between efficiency and safety. Ripe delivers both:
+
+- **Your risk only** - Collateral backs only your loans
+- **Portfolio power** - All assets work together
+- **Permissionless innovation** - Any asset can be supported
+- **Individual safety** - Isolated from other users
+
+## The Bottom Line
+
+Ripe Protocol reimagines DeFi lending from first principles. By unifying your entire portfolio into a single, powerful position, we create unprecedented capital efficiency while maintaining the safety of isolated risk. Whether you're seeking stable yields through sGREEN, hunting liquidation profits in stability pools, or building long-term value through governance — Ripe provides the infrastructure for your DeFi journey.
+
+Start exploring, and discover how much harder your assets can work.
+
+---
+
+*For technical implementation details, see the [Technical Documentation](../technical/).*

@@ -131,7 +131,7 @@ For regulated assets (tokenized securities, real estate):
 - GREEN holders can redeem against pool collateral for peg stability
 - Flexible withdrawal lets depositors choose which assets to claim
 
-*For deeper understanding of stability pool mechanics, see [Stability Pools](10-stability-pools.md).*
+*For deeper understanding of stability pool mechanics, see [Stability Pools](05-stability-pools.md).*
 
 ### Phase 3: Dutch Auctions
 
