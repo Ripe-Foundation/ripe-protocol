@@ -1,233 +1,166 @@
-# RIPE Token & Governance
+# Ripe Governance: Power Through Commitment
 
-RIPE is Ripe Protocol's governance token that enables community control over protocol operations. The Ripe Governance Vault provides a mechanism for token holders to lock RIPE tokens in exchange for governance power that will ultimately determine protocol parameters, asset support, and treasury management.
+The Ripe Governance Vault transforms RIPE tokens into voting power through a unique time-locked staking system. By committing tokens for extended periods, participants earn governance points that will control every aspect of the protocol — from asset parameters to treasury strategies. While full on-chain governance hasn't launched yet, **your governance power is actively accumulating now**, positioning early participants to shape Ripe Protocol's future.
 
-## Current Status & Future Governance
+## Why Lock RIPE?
 
-The protocol does not yet have full on-chain decentralized governance, but **governance power is actively accruing**. Community members who lock RIPE tokens now are accumulating governance points that will translate directly into voting power when full governance launches in the coming months.
+### The Power of Time Commitment
 
-```
-CURRENT STATE                    FUTURE GOVERNANCE
-┌─────────────────────┐         ┌─────────────────────┐
-│   RIPE DEPOSITS     │         │    FULL VOTING      │
-│      ↓              │   →     │                     │
-│ GOVERNANCE POINTS   │         │ • Asset Support     │
-│   ACCUMULATING      │         │ • Debt Parameters   │
-│                     │         │ • Treasury Strategy │
-│  (Preparing for     │         │ • Protocol Limits   │
-│   Future Voting)    │         │ • Revenue Splits    │
-└─────────────────────┘         └─────────────────────┘
-```
+Traditional governance systems treat all tokens equally, allowing whales to buy influence at the last minute. Ripe's approach rewards genuine long-term believers:
 
-## Governance Power Calculation
+- **Time-Weighted Power**: Governance points accumulate continuously based on both stake size and duration
+- **Lock Bonuses**: Longer commitments earn exponentially more voting power (up to 3x for maximum locks)
+- **Early Advantage**: Points earned today compound over time, giving early participants outsized influence
+- **Aligned Incentives**: Those willing to lock tokens longest have the most say in protocol direction
 
-Individual governance power equals the portion of total points held:
+### Real Yield Through Staking
 
-**Governance Power = User's Total Points / Protocol Total Points**
+Beyond governance power, RIPE stakers earn substantial rewards:
 
-This proportional system ensures fair representation based on contribution and commitment to the protocol.
+- **Block Rewards**: 25% of all RIPE emissions flow to governance vault participants
+- **Enhanced LP Rewards**: RIPE LP tokens earn 50% more points than regular RIPE
+- **Auto-Compounding**: Claim rewards directly into the vault for exponential growth
+- **No Opportunity Cost**: Earn while building governance influence
 
-## The Ripe Governance Vault System
+## How Governance Points Work
 
-### What is the Ripe Governance Vault?
+### The Point Accumulation Engine
 
-The Ripe Governance Vault is a specialized vault where RIPE token holders deposit and lock their tokens to earn governance points. Unlike regular deposits, governance vault positions require time-based commitments that increase governance influence.
-
-### Supported Assets
-
-The Ripe Governance Vault accepts:
-- **RIPE tokens**: The primary governance asset (100% weight)
-- **RIPE LP tokens**: Liquidity provider tokens from RIPE trading pairs (150% weight)
-
-LP tokens receive a 50% bonus in point calculations compared to RIPE tokens, reflecting their dual contribution to protocol liquidity and governance.
-
-## Governance Point Mechanics
-
-**⚠️ Key Principle: Governance points are tied to deposited tokens. Any withdrawal or transfer proportionally reduces your points.**
-
-### Base Point Calculation
-
-Governance points accumulate based on a time-weighted formula:
-
-**Base Points = Token Balance × Blocks Elapsed × Asset Weight**
-
-- **Token Balance**: Amount of RIPE or RIPE LP tokens deposited
-- **Blocks Elapsed**: Time since last point update
-- **Asset Weight**: 100% for RIPE, 150% for RIPE LP tokens
-
-### Lock Duration Bonuses
-
-The vault rewards longer commitments with additional governance points:
+Your governance power grows through a sophisticated point system that rewards both commitment and patience:
 
 ```
-LOCK DURATION BONUS STRUCTURE
-┌─────────────────────────────────────────┐
-│  Duration     │  Bonus Multiplier       │
-│─────────────────────────────────────────│
-│  1 day (min)  │  0% bonus               │
-│  3 months     │  ~15% bonus             │
-│  6 months     │  ~35% bonus             │
-│  1 year       │  ~65% bonus             │
-│  2 years      │  ~130% bonus            │
-│  3 years      │  200% bonus (maximum)   │
-└─────────────────────────────────────────┘
+Base Points = Deposited Tokens × Blocks Held × Asset Weight
+Lock Bonus = Base Points × Lock Bonus Multiplier
+Total Points = Base Points + Lock Bonus
 ```
 
-**Lock Bonus Formula:**
-1. Calculate remaining lock duration
-2. Determine position within min-max range
-3. Apply proportional bonus up to maximum (200%)
-4. Add bonus points to base points
+**Key Mechanics:**
+- Points accumulate every block (not just at intervals)
+- Longer locks multiply your earning rate
+- LP tokens receive 1.5x weight for providing liquidity
+- Points compound — early deposits gain massive advantages
 
-### Example Calculation
+### Lock Duration Rewards
 
-**Scenario**: 1,000 RIPE tokens locked for 1 year (with 3-year max and 200% max bonus)
+The vault offers dramatic bonuses for longer commitments:
 
-- Base points per 100 blocks: 1,000 × 100 = 100,000
-- Lock duration bonus: ~65% = 65,000 additional points
-- **Total points earned**: 165,000 per 100 blocks
+| Lock Duration | Bonus Multiplier | Effective APY Boost |
+|--------------|------------------|---------------------|
+| 1 day (minimum) | 0% | 1x points |
+| 3 months | ~15% | 1.15x points |
+| 6 months | ~35% | 1.35x points |
+| 1 year | ~65% | 1.65x points |
+| 2 years | ~130% | 2.3x points |
+| 3 years (maximum) | 200% | 3x points |
 
-**LP Token Example**: 1,000 RIPE LP tokens locked for 1 year
+**Example**: Lock 1,000 RIPE for 2 years and earn 2.3x the governance points of someone who locks for just 1 day.
 
-- Asset weight: 150% (compared to 100% for RIPE)
-- Base points per 100 blocks: 1,000 × 100 × 1.5 = 150,000
-- Lock duration bonus: ~65% = 97,500 additional points
-- **Total points earned**: 247,500 per 100 blocks
+### Asset Weighting System
 
-## Lock Management
+Not all deposits are created equal:
 
-### Initial Lock Requirements
+- **RIPE Tokens**: 100% weight (baseline)
+- **RIPE LP Tokens**: 150% weight (50% bonus for liquidity provision)
 
-When depositing RIPE tokens:
-- **Minimum lock duration**: 1 day
-- Lock duration determines bonus multiplier
-- Cannot reduce lock time, only extend
+This incentivizes users to provide liquidity while building governance power, strengthening the entire ecosystem.
 
-### Lock Extension
-
-Token holders can extend their lock duration at any time:
-- **Extension only**: Cannot shorten existing locks
-- **Immediate effect**: Bonus calculations update instantly
-- **No penalties**: Extending locks has no downside
-
-### Early Exit Mechanism
-
-The protocol allows early lock release with severe penalties:
-- **Exit fee**: 80% of deposited tokens forfeited
-- **Fee distribution**: The 80% penalty remains in the vault for other depositors
-- **Remaining balance**: Exiter receives only 20% of their original deposit
-- **Governance point slash**: ALL governance points are lost (100% slash on 100% withdrawal)
-- **Governance protection**: System prevents exits during bad debt when withdrawals would fail anyway
-
-Note: Even though you only receive 20% of tokens back, this counts as a 100% withdrawal for governance points, resulting in complete loss of accumulated points.
-
-### Lock Expiration
-
-When locks expire:
-- **Automatic unlock**: Tokens become withdrawable
-- **Continued accrual**: Governance points continue accumulating at base rate
-- **Re-lock option**: Can establish new locks for additional bonuses
-
-## Deposit and Withdrawal Process
+## Managing Your Position
 
 ### Making Deposits
 
-**Standard Deposits** (via Teller):
-- Uses minimum lock duration from protocol configuration
-- Applies current asset weight for point calculations
-- Automatically begins governance point accumulation
+**Standard Path** (through protocol UI):
+- Deposits automatically use minimum lock duration
+- Points begin accumulating immediately
+- Can extend lock anytime for bonus multiplier
 
-**Advanced Deposits** (protocol-directed):
-- May specify custom lock durations
-- Used for reward distributions and special allocations
+**Advanced Path** (for protocols/contracts):
+- Specify custom lock durations up to 3 years
+- Used for treasury management and reward distribution
 - Weighted averaging with existing positions
 
-### Withdrawal Process
+### Lock Extensions: Your Power Move
 
-**Withdrawal Requirements:**
-1. **Lock expiration**: Must wait until unlock block
-2. **No bad debt**: Some configurations freeze withdrawals during protocol stress
-3. **Governance point slash**: Withdrawing reduces governance points proportionally
+Extending locks is the ultimate governance strategy:
+- **Instant Bonus**: Lock bonus recalculates immediately on extension
+- **No Downside**: Can only extend, never reduce lock time
+- **Compound Strategy**: Extend when claiming rewards for maximum effect
+- **Flexibility**: Extend partially through lock period to optimize
 
-**⚠️ Important: Proportional Point Slashing**
+**Pro Tip**: Time your extensions with reward claims to maximize compounding.
 
-When you withdraw ANY amount from the governance vault, your governance points are reduced proportionally:
+### Early Exit: The Nuclear Option
 
-**Points Lost = Total User Points × (Shares Withdrawn ÷ Total User Shares)**
+Need liquidity urgently? Early exit is possible but extremely costly:
 
-Examples:
-- Withdraw 50% of your tokens → Lose 50% of your governance points
-- Withdraw 10% of your tokens → Lose 10% of your governance points
-- Withdraw 100% of your tokens → Lose ALL governance points
+- **80% Penalty**: Forfeit 80% of your deposited tokens
+- **Complete Point Loss**: ALL governance points vanish instantly
+- **Permanent**: Cannot recover forfeited tokens or points
+- **Smart Protection**: System prevents exits during bad debt (when you couldn't withdraw anyway)
 
-This ensures governance power always reflects current stake in the protocol. There is no way to withdraw tokens while maintaining governance points.
+**The Math**: Exit with 10,000 RIPE locked → Receive only 2,000 RIPE back
 
-## Future Governance Scope
+This severe penalty ensures only genuine emergencies trigger early exits, protecting the governance system's integrity.
 
-When full governance activates, RIPE holders will control:
+### Natural Unlock: Patience Rewards
 
-### Asset and Parameter Management
-- **Collateral asset approval**: Which tokens can serve as collateral
-- **Risk parameters**: Loan-to-value ratios, liquidation thresholds, interest rates
-- **Deposit limits**: Per-user and global caps for new assets
-- **Oracle configuration**: Price feed priorities and backup systems
+When your lock expires:
+- **Full Access**: Withdraw 100% of tokens with no penalty
+- **Continued Earning**: Points keep accumulating at base rate
+- **Re-lock Option**: Establish new lock for bonus multiplier
+- **Flexible Timing**: No rush — unlocked tokens remain productive
+
+## Stacking Rewards: The Triple Play
+
+RIPE governance participants benefit from three distinct reward streams:
+
+### 1. Governance Points (Future Voting Power)
+- Accumulate continuously based on stake and time
+- Lock bonuses multiply accumulation rate
+- Compound through extended commitments
+- Translate directly to voting weight when governance launches
+
+### 2. RIPE Block Rewards (25% of Emissions)
+- Governance vault receives 25% of all RIPE emissions
+- Distribution based on share of total staked RIPE/LP
+- Auto-stake option compounds returns
+- No additional action required — just hold
+
+### 3. Strategic Positioning
+- Early participants gain disproportionate influence
+- Time advantage compounds exponentially
+- First movers shape initial parameters
+- Network effects benefit early believers
+
+## What You'll Control (Coming Soon)
+
+When on-chain governance activates, RIPE holders will wield comprehensive protocol control:
+
+### Core Protocol Parameters
+- **Risk Management**: Collateral ratios, liquidation thresholds, stability fees
+- **Asset Integration**: New collateral approval, oracle selection, risk tiers
+- **Economic Policy**: Interest rate models, fee structures, revenue distribution
+- **System Limits**: Debt ceilings, deposit caps, exposure limits
 
 ### Treasury Operations
-- **Investment strategies**: How Endaoment funds are deployed
-- **Yield optimization**: Capital allocation across DeFi protocols
-- **Partnership programs**: Liquidity partnerships and revenue sharing
-- **Emergency procedures**: Crisis response and fund protection
+- **Endaoment Strategy**: Yield deployment across DeFi protocols
+- **Partnership Terms**: Liquidity partnerships and revenue sharing
+- **Capital Allocation**: Investment priorities and risk tolerance
+- **Emergency Response**: Crisis management and recovery procedures
 
-### Protocol Economics
-- **Debt ceilings**: Maximum borrowing limits per asset
-- **Fee structures**: Origination fees, liquidation penalties
-- **Revenue distribution**: Split between sGREEN holders and RIPE stakers
-- **Reward emissions**: RIPE token distribution rates and targets
+### Protocol Evolution
+- **Technical Upgrades**: Smart contract improvements and new features
+- **Incentive Design**: Reward distributions and emission schedules
+- **Governance Rules**: Voting parameters and proposal requirements
+- **Strategic Direction**: Long-term vision and growth initiatives
 
-### System Parameters
-- **Dynamic rate parameters**: Thresholds and multipliers for rate protection
-- **Liquidation configuration**: Phase priorities and discount rates
-- **Stability pool parameters**: Rewards and participation incentives
+## Why This Matters
 
-## Integration with Rewards
+Ripe's governance model creates a unique dynamic where patience and commitment translate directly into protocol control. Unlike typical DeFi governance where wealthy actors can buy influence instantly, our time-weighted system ensures those who've supported the protocol longest have the strongest voice.
 
-### RIPE Block Rewards
-
-The Lootbox system distributes RIPE tokens to various participant categories:
-- **Borrowers**: Users minting GREEN against collateral
-- **Depositors**: Users providing assets to vaults
-- **Governance participants**: RIPE token stakers in the governance vault
-- **Stability pool providers**: sGREEN holders in liquidation pools
-
-### Reward Claiming Options
-
-When claiming RIPE rewards:
-- **Direct receipt**: Tokens sent to user address immediately
-- **Auto-staking**: Automatic deposit into Ripe Governance Vault with lock
-- **Lock customization**: Specify desired lock duration for governance bonuses
-
-### Compound Benefits
-
-Participants can maximize returns through:
-- **Reward auto-staking**: Claim rewards directly into governance vault
-- **Extended locks**: Higher bonuses on both existing and new deposits
-- **Multi-asset participation**: Earn rewards while building governance power
-
-## Preparing for Full Governance
-
-### Building Position Now
-
-Early participants can:
-- **Accumulate points**: Start building governance power before competition increases
-- **Optimize locks**: Establish long lock periods for maximum future influence
-- **Monitor developments**: Stay informed about governance system progress
-
-### Understanding Future Power
-
-Current points will directly translate to future voting power. The proportional system means early participants with longer locks will have the strongest influence when governance launches.
+This isn't just about voting — it's about building a sustainable, community-driven protocol where incentives align perfectly. Lock your RIPE, accumulate your power, and help shape the future of decentralized stablecoins.
 
 ---
 
-The Ripe Governance Vault represents the foundation of community control over Ripe Protocol. By locking RIPE tokens now, participants are not only earning governance points but also positioning themselves to shape the protocol's future development and parameters when full decentralized governance activates.
+Ready to become a governance participant? Start accumulating your voting power today in the Ripe Governance Vault. The earlier you begin, the more influence you'll wield when the protocol's future is in your hands.
 
-For technical implementation details, see [RipeGov Technical Documentation](technical/vaults/RipeGov.md).
+For technical implementation details, see [RipeGov Technical Documentation](../technical/vaults/RipeGov.md).
