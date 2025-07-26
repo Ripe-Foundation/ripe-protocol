@@ -9,32 +9,51 @@ Dutch auctions implement time-based progressive discounting:
 1. **Delayed start** - Configurable delay period after liquidation
 2. **Linear progression** - Discount increases from start to maximum
 3. **GREEN settlement** - All purchases require GREEN tokens
-4. **Termination** - Ends on purchase or reaching maximum discount
+4. **Termination** - Ends when all collateral sold, debt repaid, or maximum discount reached
+
+### How Payment Works
+
+Dutch auctions are instant and flexible:
+- **Instant settlement** - No waiting for auction to "end" 
+- **Partial purchases allowed** - Buyers can purchase any amount (for fungible/ERC20 assets)
+- **Buyer pays GREEN** - Must pay in GREEN tokens at current discount rate
+- **GREEN is burned** - Those GREEN tokens are permanently destroyed
+- **Your debt reduced** - The burned GREEN amount reduces your outstanding debt
+- **You keep remainder** - Any collateral value above debt stays yours
+
+For fungible assets like WETH or USDC, there's no concept of "winning" - anyone can buy any portion at the current discount rate until all collateral is sold or debt is repaid.
 
 ## Real Example
 
 ```
 Your 5 WETH going to auction
 Market price: $2,000 each
+Your debt: $8,000
 
-Hour 0: $1,900 (5% off)
-Hour 1: $1,833 (8% off)
-Hour 2: $1,767 (12% off)
-Hour 3: $1,700 (15% off)
-Hour 4: $1,633 (18% off)
-Hour 5: $1,567 (22% off)
-Hour 6: $1,500 (25% off - max discount)
+Hour 0: $1,900 per WETH (5% off)
+Hour 1: $1,833 per WETH (8% off)
+Hour 2: $1,767 per WETH (12% off)
+Hour 3: $1,700 per WETH (15% off)
 ```
 
-Someone buys at Hour 3 for $8,500 total → Your debt reduced by $8,500
+Multiple buyers at Hour 3:
+- Buyer A: Purchases 2 WETH for 3,400 GREEN
+- Buyer B: Purchases 1.5 WETH for 2,550 GREEN  
+- Buyer C: Purchases 1.5 WETH for 2,550 GREEN
+
+Total outcome:
+- GREEN burned: 8,500 (all purchases combined)
+- Your debt: Reduced from $8,000 to $0
+- You receive: $500 worth of leftover collateral
+- Auction ends: No more WETH to sell
 
 ## Auction Triggers
 
 Collateral enters the auction system when:
-- **No pool configuration** exists for the asset
-- **Pool capacity exhausted** during liquidation
+- **No stability pool configuration** exists for the asset
+- **Stability pool capacity exhausted** during liquidation
 - **Asset configuration** specifies auction-only liquidation
-- **Partial liquidation** leaves remainder after pool swaps
+- **Partial liquidation** leaves remainder after stability pool swaps
 - **Keeper initiation** after liquidation with auction flag
 
 ## Cost to You

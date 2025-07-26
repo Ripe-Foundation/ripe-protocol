@@ -15,7 +15,7 @@ When your position requires liquidation and you hold eligible stablecoins:
 
 Typically high-quality stablecoins the protocol wants to accumulate:
 - USDC, USDT, USDS, FRAX
-- Other governance-approved stablecoins
+- Other governance-approved stablecoins or stable assets (tokenized treasuries, etc)
 
 ## Example
 
@@ -35,7 +35,7 @@ Process:
 
 ### For You
 - **Full value credit** - No liquidation discount on transferred assets
-- **Still pay fees** - Standard liquidation fee applies (typically 5%)
+- **Still pay fees** - Standard liquidation fee applies
 - **Instant processing** - No waiting for buyers
 - **Better than selling** - Avoids market slippage
 
@@ -62,4 +62,4 @@ Result: Endaoment transfer saves you the asset discount, though liquidation fees
 
 Endaoment transfer is a Phase 1 mechanism that moves your stablecoins to protocol reserves at full value. While you still pay liquidation fees for being liquidated, you avoid the additional discount losses of market-based liquidations.
 
-Next: Learn about [Stability Pool Swaps](06-stability-pool-swaps.md) →
+Next: Learn about [Stability Pool Swaps](03-stability-pool-swaps.md) →

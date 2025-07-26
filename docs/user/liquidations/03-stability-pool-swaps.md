@@ -115,4 +115,4 @@ This ordering maximizes value preservation while ensuring rapid liquidation.
 
 The stability pool system creates an internal liquidation market that operates independently of external exchanges while maintaining economic incentives for participation.
 
-Next: Learn about [Dutch Auctions](08-dutch-auctions.md) →
+Next: Learn about [Dutch Auctions](05-dutch-auctions.md) →

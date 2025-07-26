@@ -6,16 +6,16 @@ This document addresses common questions about Ripe Protocol's mechanics, safety
 
 ### What makes Ripe different from other lending protocols?
 
-Ripe combines multiple collateral assets into a single borrowing position, unlike isolated lending markets. This enables support for diverse asset types (including meme coins, NFTs, and RWAs) through individual risk isolation - one user's risky collateral choices don't affect others.
+Ripe lets you deposit 10+ different assets as collateral for a single loan - from stablecoins to meme coins to NFTs. Unlike other protocols where each asset requires a separate position, Ripe unifies everything into one manageable loan with blended parameters. This multi-collateral innovation enables support for assets too risky for traditional lending pools.
 
 ### How does GREEN maintain its dollar peg?
 
 GREEN uses five complementary mechanisms:
-1. **Dynamic Rate Protection**: Automatic borrowing rate adjustments
-2. **Stability Pools**: Immediate liquidity during stress
-3. **Direct Redemptions**: Exchange GREEN for collateral at par value
-4. **Endaoment Operations**: Treasury-managed market interventions
-5. **Liquidation System**: Bad debt removal before peg impact
+1. **Dynamic Rate Protection**: Rates increase when GREEN exceeds 60% of liquidity pools
+2. **Stability Pools**: Provide instant liquidity and enable par value redemptions
+3. **Direct Redemptions**: GREEN holders can redeem $1 of collateral per GREEN
+4. **Endaoment Operations**: Treasury automatically manages Curve pool ratios
+5. **Liquidation System**: Three-phase system removes bad debt efficiently
 
 ### What's the difference between GREEN and sGREEN?
 
@@ -62,7 +62,7 @@ Parameters reflect risk characteristics:
 
 ### How are borrowing rates determined?
 
-Each asset has a base rate reflecting its risk profile. The Dynamic Rate Protection system can increase rates during market stress to maintain GREEN's peg. Multiple assets create blended rates weighted by borrowing power contribution.
+Base rates reflect asset risk profiles. When GREEN exceeds 60% of reference liquidity pools, rates progressively increase with a multiplier (1.5x-3.0x) plus time-based boosts. Multiple collateral assets create weighted-average rates based on borrowing power contribution.
 
 ### When do borrowing rates update?
 
@@ -76,49 +76,60 @@ Existing borrowers remain insulated from temporary rate spikes unless they choos
 
 ### What triggers liquidation?
 
-Liquidation occurs when debt exceeds the liquidation threshold percentage of collateral value. This threshold is always higher than the LTV to provide a safety buffer. For example:
-- LTV: 80% (maximum borrowing)
-- Liquidation threshold: 85% (liquidation trigger)
+Liquidation occurs when your collateral value drops below the minimum required for your debt level. The liquidation threshold works inversely - it defines minimum collateral needed:
+- LTV: 80% (borrow up to $8,000 on $10,000 collateral)
+- Liquidation threshold: 95% (need $8,421 collateral for $8,000 debt)
 
 ### How does partial liquidation work?
 
-The protocol aims to restore position health rather than complete closure:
-- Liquidation targets the minimum amount needed to return above thresholds
-- Asset selection prioritizes minimizing user losses
-- Multiple liquidation phases operate simultaneously
-- Borrowers retain maximum possible collateral
+Ripe uses a unified repayment formula that calculates exactly what's needed to restore health - nothing more:
+- Only liquidates the mathematically required amount
+- Includes fees and small safety buffer
+- Same formula across all three phases
+- You keep maximum possible collateral
+
+### Who executes liquidations?
+
+Keepers (automated bots) monitor all positions 24/7 and trigger liquidations instantly when thresholds are breached:
+- Compete for 1-2% rewards of liquidated debt
+- Execute within blocks of eligibility
+- No delays or grace periods - liquidation is immediate
+- You can't negotiate or delay once eligible
 
 ## Liquidations and Safety
 
 ### What is the three-phase liquidation system?
 
 1. **Phase 1: Internal Recovery**
-   - GREEN/sGREEN burning mechanisms
-   - Stablecoin transfers to Endaoment treasury
+   - Burns your GREEN/sGREEN deposits to reduce debt
+   - Transfers stablecoins and GREEN LP to Endaoment at full value
 
-2. **Phase 2: Stability Pool Integration**
-   - Collateral swaps with stability pool participants
-   - Predetermined discount rates
+2. **Phase 2: Stability Pool Swaps**
+   - Exchanges collateral for sGREEN/GREEN LP at discount
+   - Pool participants get your collateral, you get debt reduction
 
-3. **Phase 3: Market Mechanisms**
-   - Dutch auctions with declining prices
-   - Public market-based liquidation
+3. **Phase 3: Dutch Auctions**
+   - Time-based discounts (5% to 25% over hours)
+   - Anyone can buy portions with GREEN (which gets burned)
+   - Instant settlement for fungible assets
 
-All phases operate concurrently based on asset type and availability.
+All phases run simultaneously - protocol routes each asset optimally.
 
 ### How do stability pools work?
 
-Stability pools hold sGREEN that can instantly swap for liquidated collateral at discounts. Participants earn:
-- **Base sGREEN yield**: Protocol revenue distribution
-- **Liquidation premiums**: Discounted collateral purchases
-- **RIPE rewards**: Additional protocol incentives
+Stability pools hold sGREEN and GREEN LP tokens that swap for liquidated collateral. Participants earn:
+- **Base yield**: sGREEN appreciation and LP trading fees
+- **Liquidation profits**: Acquire collateral at 5-15% discounts
+- **RIPE rewards**: Staker category rewards (not general depositor)
+- **GREEN redemptions**: When GREEN < $1, arbitrageurs buy and redeem against pool
 
 ### What happens during redemptions?
 
-GREEN holders can redeem tokens against positions in the redemption zone (between redemption threshold and liquidation threshold). This provides:
-- Par value exchange (no discount)
-- Automatic deleveraging for risky positions
-- Gradual position improvement before liquidation
+When positions enter the redemption zone, GREEN holders can redeem tokens for exactly $1 of collateral. This creates:
+- **Peg stabilization**: Arbitrage opportunity when GREEN < $1
+- **Automatic deleveraging**: Reduces debt for at-risk positions
+- **No liquidation fees**: Better than liquidation for borrowers
+- **Risk-based priority**: Only affects positions approaching liquidation
 
 ## Protocol Economics
 
@@ -138,15 +149,15 @@ Bonds exchange stablecoins for RIPE tokens at dynamic prices:
 - **Epoch System**: Limited availability prevents unlimited issuance
 - **Fair Access**: Equal opportunities across all participants
 
-### How do points and rewards work?
+### How do RIPE block rewards work?
 
-Deposited assets earn points each block based on:
-- **Token amount**: Balance-based point accumulation
-- **USD value**: Dollar-denominated calculations
-- **Asset type**: Risk-adjusted multipliers
-- **Special positions**: Governance stakes earn maximum rates
+15% of RIPE supply (150M tokens) distributed over ~5 years across four categories:
+- **Borrowers**: Based on debt amount × time
+- **Stakers**: RIPE/RIPE LP in governance vault + sGREEN/GREEN LP in stability pools
+- **Vote Depositors**: Assets selected by governance (when active)
+- **General Depositors**: All vault deposits based on USD value
 
-Points convert to RIPE token distributions through the rewards system.
+Rewards accumulate per block and can be claimed or auto-staked.
 
 ## Technical Operations
 
@@ -162,12 +173,11 @@ The system uses the first available valid price without averaging, automatically
 
 ### What are vaults and how do they work?
 
-Assets store in specialized vaults optimized for different token types:
-
-**Simple ERC-20 Vaults**: Direct balance tracking for standard tokens
-**Share-Based Vaults**: Percentage ownership for yield-bearing assets
-**Stability Pool Vault**: Special handling for sGREEN liquidation backstops
-**Governance Vault**: Time-locked RIPE deposits with voting power
+Vaults are smart contracts that hold your deposited assets. Each asset type gets an appropriate vault:
+- **Standard tokens**: Simple balance tracking
+- **Yield-bearing assets**: Share-based to capture all yields/rebases
+- **Stability pools**: Hold sGREEN/GREEN LP for liquidation swaps
+- **Governance vault**: Locks RIPE/RIPE LP with time bonuses
 
 ### How does whitelist access work for restricted assets?
 
@@ -199,9 +209,10 @@ Each borrower's collateral backs only their own debt:
 
 ### What emergency mechanisms exist?
 
-**Individual Level**: Immediate delegation revocation, liquidation protection through diversification
-**Protocol Level**: Emergency pause capabilities, governance intervention mechanisms
-**System Level**: Multiple oracle fallbacks, redundant liquidation phases
+- **For users**: Instant delegation revocation, multi-collateral diversification
+- **For liquidations**: Keepers compete to execute instantly, preventing bad debt
+- **For oracles**: Priority hierarchy with automatic fallbacks
+- **For governance**: Emergency pause and parameter updates (when active)
 
 ## RIPE Governance
 
@@ -306,17 +317,17 @@ The protocol supports everything from simple borrowing to complex automated stra
 
 ## Common Misconceptions
 
-### "Multi-collateral is the same as money markets"
+### "Multi-collateral is the same as isolated lending markets"
 
-While both support multiple assets, Ripe's individual risk isolation enables support for assets too risky for shared pools. Money markets require conservative, blue-chip assets to protect all depositors.
+Isolated markets force you to manage 10 separate loans for 10 assets. Ripe combines all collateral into ONE loan with weighted-average parameters. This unified position makes complex strategies simple while enabling support for exotic assets.
 
 ### "Dynamic rates mean unpredictable costs"
 
-Dynamic Rate Protection responds predictably to market conditions with transparent triggers. Rates only update when borrowers interact, providing control over timing.
+Rates follow clear rules: when GREEN exceeds 60% of reference pools, multipliers kick in (1.5x-3.0x). You control when rates apply - they only update when you interact with your position.
 
 ### "Liquidation means losing everything"
 
-The system prioritizes partial liquidation to restore health while preserving maximum collateral. Three-phase mechanisms minimize losses through progressive approaches.
+Ripe's unified formula only liquidates what's mathematically needed to restore health. Unlike protocols that take fixed 50% chunks, Ripe might only need to liquidate 20-30% to fix your position.
 
 ### "Delegation gives others control of funds"
 
@@ -324,7 +335,7 @@ Delegates can only perform authorized actions with all value flows returning to 
 
 ### "Exotic assets make the protocol risky"
 
-Individual risk isolation means one user's asset choices don't affect others. The protocol can safely support experimental assets through personalized risk management.
+Each user's collateral backs only their own debt - your PEPE doesn't affect my loan. Conservative parameters for risky assets (30% LTV vs 90% for stables) ensure protocol safety while enabling innovation.
 
 ---
 

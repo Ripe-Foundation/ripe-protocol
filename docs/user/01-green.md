@@ -118,7 +118,13 @@ Specialized pools that maintain peg stability:
 - **Depositor Protection**: Pool participants share in liquidation profits
 - **Automatic Activation**: Engage without manual intervention
 
-Learn more about [Stability Pool Mechanics](liquidations/stability-pool-mechanics.md).
+**Collateral Redemption Mechanism**: 
+When stability pools accumulate liquidated collateral, any GREEN holder can redeem their GREEN for these assets at $1 par value. The pool then holds the redeemed GREEN instead of the collateral, maintaining the same total value. This creates a stabilization mechanism - when GREEN is under peg, arbitrageurs can:
+1. Buy discounted GREEN on the market (e.g., at $0.95)
+2. Redeem it for exactly $1 worth of collateral from stability pools
+3. This buying pressure helps restore the peg
+
+Learn more about [Stability Pool Mechanics](liquidations/04-stability-pool-mechanics.md).
 
 ### 4. Endaoment Stabilizer
 

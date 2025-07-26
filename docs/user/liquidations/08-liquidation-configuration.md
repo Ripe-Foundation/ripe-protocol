@@ -49,7 +49,7 @@ Assets can override default auction settings:
 - **Start Discount**: Initial discount percentage (e.g., 2-5%)
 - **Maximum Discount**: Final discount at auction end (e.g., 20-50%)
 - **Delay Period**: Blocks before auction starts after liquidation
-- **Duration**: Total blocks for discount progression
+- **Duration**: Total blocks for discount progression (entire auction duration)
 
 ### Special Stability Pools
 

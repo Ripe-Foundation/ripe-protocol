@@ -42,4 +42,4 @@ During liquidation:
 
 If you have sGREEN in stability pools, it automatically protects you during liquidation by reducing debt at full value. This Phase 1 mechanism executes before any collateral liquidation, minimizing your losses.
 
-Next: Learn about [Endaoment Transfer](05-endaoment-transfer.md) →
+Next: Learn about [Endaoment Transfer](02-endaoment-transfer.md) →

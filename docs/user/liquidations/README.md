@@ -26,6 +26,13 @@ The redemption threshold creates a buffer zone before liquidation becomes possib
 - Reduces position debt without liquidation penalties
 - Operates automatically without borrower intervention
 
+**Peg Stabilization Function:**
+Importantly, this mechanism also serves as a peg stabilization tool. During market stress when GREEN trades below $1:
+- Arbitrageurs can buy discounted GREEN on the market
+- Redeem it at $1 par value against collateral positions
+- This creates buying pressure that helps restore the peg
+- Only profitable when GREEN is under peg, creating automatic stabilization
+
 **Operational Example:**
 When a position enters the redemption zone:
 - GREEN holders may redeem against the position
@@ -33,52 +40,73 @@ When a position enters the redemption zone:
 - Debt reduces by redemption amount
 - Position may return to safe collateralization
 
-This mechanism provides gradual deleveraging before liquidation becomes necessary.
+This dual mechanism provides both gradual deleveraging for at-risk positions and market-driven peg stability during periods of stress.
 
 ## When Liquidation Occurs
 
 ### Liquidation Threshold Mechanics
 
-The liquidation threshold determines the minimum collateralization ratio where positions become eligible for liquidation. This parameter defines the required collateral value relative to outstanding debt.
+The liquidation threshold determines when forced liquidation occurs. Unlike LTV which calculates how much you can borrow, the liquidation threshold works inversely - it defines the **minimum collateral required** for your debt level.
 
-**Threshold Calculation:**
-Minimum collateral value equals debt multiplied by (100% / liquidation threshold percentage).
+**How It Works:**
+```
+Minimum Collateral = Debt × 100% / Liquidation Threshold%
+```
 
-**Parameter Relationships:**
-- Higher threshold percentages create tighter collateralization requirements
-- A 95% threshold requires 105.3% collateralization
-- An 85% threshold requires 117.6% collateralization
+**Real Example:**
+```
+Your debt: $8,000 GREEN
+Liquidation threshold: 95%
+Liquidation triggers when collateral < $8,421
+(Because $8,000 × 100% / 95% = $8,421)
+```
 
-The threshold mechanism ensures positions maintain adequate collateral buffers before liquidation becomes possible. These thresholds work in conjunction with [Dynamic Rate Protection](borrowing/dynamic-rate-protection.md) to maintain system stability.
+**Risk Progression:**
+Starting with $10,000 collateral and $7,000 debt:
+
+1. **Healthy Zone** (Collateral > $8,750)
+   - Below maximum LTV
+   - No risk of liquidation
+   
+2. **Redemption Zone** (Collateral $7,778 - $7,368)
+   - Redemption threshold: 90%
+   - Others can redeem your collateral
+   - Warning to add collateral or repay
+   
+3. **Liquidation Zone** (Collateral < $7,368)
+   - Liquidation threshold: 95%
+   - Three-phase liquidation activates
+
+As your collateral value drops OR debt grows from interest, you move through these zones. Higher threshold percentages mean tighter requirements and less room for error.
 
 ## Three-Phase Liquidation System
 
 The protocol routes liquidations through specialized mechanisms based on asset type and availability:
 
 ### Phase 1: Internal Recovery
-- [Stablecoin Burning](04-stablecoin-burning.md) - GREEN/sGREEN burn mechanisms
-- [Endaoment Transfer](05-endaoment-transfer.md) - Stablecoin treasury routing
+User's own protocol deposits are used first:
+- **[Stablecoin Burning](01-stablecoin-burning.md)** - GREEN/sGREEN burn mechanisms
+- **[Endaoment Transfer](02-endaoment-transfer.md)** - Stablecoin and GREEN LP routing
 
 ### Phase 2: Stability Pool Integration  
-- [Stability Pool Swaps](06-stability-pool-swaps.md) - Collateral-for-debt exchanges
-- [Pool Mechanics](07-stability-pool-mechanics.md) - Pool operations and priorities
+Collateral swaps with stability pool participants:
+- **[Stability Pool Swaps](03-stability-pool-swaps.md)** - Collateral-for-debt exchanges
+- **[Pool Mechanics](04-stability-pool-mechanics.md)** - Pool operations and priorities
 
 ### Phase 3: Market Mechanisms
-- [Dutch Auctions](08-dutch-auctions.md) - Time-based discount auctions
+All other assets through time-based auctions:
+- **[Dutch Auctions](05-dutch-auctions.md)** - Increasing discount mechanisms
 
-## Core Liquidation Components
+## Supporting Systems
 
-### **[Liquidation Phases](01-liquidation-phases.md)**
-The three-phase system that routes assets to appropriate liquidation mechanisms.
+### **[Keepers](06-keepers.md)**
+External actors who execute liquidations, update rates, and manage auctions for economic rewards.
 
-### **[Liquidation Configuration](02-liquidation-configuration.md)**
-How protocol and asset-specific parameters determine liquidation behavior.
-
-### **[Unified Repayment Formula](03-unified-repayment-formula.md)**
+### **[Unified Repayment Formula](07-unified-repayment-formula.md)**
 The mathematical foundation calculating optimal liquidation amounts.
 
-### **[Keepers](09-keepers.md)**
-External actors who execute liquidations, update rates, and manage auctions for economic rewards.
+### **[Liquidation Configuration](08-liquidation-configuration.md)**
+How protocol and asset-specific parameters determine liquidation behavior.
 
 ## System Properties
 
@@ -96,20 +124,21 @@ Keeper networks compete to execute liquidations, ensuring rapid response without
 
 ## Documentation Structure
 
-### Core Mechanics
-1. **[Liquidation Phases](01-liquidation-phases.md)** - Three-phase asset routing system
-2. **[Liquidation Configuration](02-liquidation-configuration.md)** - Parameter framework
-3. **[Unified Repayment Formula](03-unified-repayment-formula.md)** - Mathematical calculations
+### Phase 1: Internal Recovery
+1. **[Stablecoin Burning](01-stablecoin-burning.md)** - GREEN/sGREEN burn mechanisms
+2. **[Endaoment Transfer](02-endaoment-transfer.md)** - Stablecoin handling
 
-### Specific Mechanisms
-1. **[Stablecoin Burning](04-stablecoin-burning.md)** - Phase 1 GREEN/sGREEN mechanism
-2. **[Endaoment Transfer](05-endaoment-transfer.md)** - Phase 1 stablecoin handling
-3. **[Stability Pool Swaps](06-stability-pool-swaps.md)** - Phase 2 liquidation method
-4. **[Stability Pool Mechanics](07-stability-pool-mechanics.md)** - Pool operations and economics
-5. **[Dutch Auctions](08-dutch-auctions.md)** - Phase 3 market mechanism
+### Phase 2: Stability Pool Integration
+3. **[Stability Pool Swaps](03-stability-pool-swaps.md)** - Collateral-for-debt exchanges
+4. **[Stability Pool Mechanics](04-stability-pool-mechanics.md)** - Pool operations and economics
 
-### System Participants
-1. **[Keepers](09-keepers.md)** - Decentralized actors maintaining protocol health
+### Phase 3: Market Mechanisms
+5. **[Dutch Auctions](05-dutch-auctions.md)** - Time-based price discovery
+
+### Supporting Systems
+6. **[Keepers](06-keepers.md)** - Decentralized actors maintaining protocol health
+7. **[Unified Repayment Formula](07-unified-repayment-formula.md)** - Mathematical calculations
+8. **[Liquidation Configuration](08-liquidation-configuration.md)** - Parameter framework
 
 ## System Design Principles
 

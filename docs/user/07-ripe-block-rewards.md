@@ -34,7 +34,9 @@ Users who mint GREEN stablecoin against their collateral earn rewards based on:
 - **Calculation**: Principal × Blocks = Borrower Points
 
 ### 2. Stakers
-Users who deposit RIPE tokens or RIPE LP tokens in the Ripe Governance Vault earn based on:
+Users who stake assets in eligible vaults earn rewards from this category. This includes:
+
+**A. Ripe Governance Vault Deposits (RIPE and RIPE LP tokens):**
 - **Deposited amount**: Size of their governance vault position
 - **Lock duration bonus**: Longer lock commitments earn bonus points (up to 200% bonus for maximum lock)
 - **Asset weight**: RIPE LP tokens receive 150% weight compared to RIPE tokens (100% weight)
@@ -42,7 +44,14 @@ Users who deposit RIPE tokens or RIPE LP tokens in the Ripe Governance Vault ear
 - **Time staked**: Duration tokens remain in governance vault
 - **Calculation**: (Balance × Blocks × Asset Weight × Asset Staker Allocation) + Lock Duration Bonus
 
-*Note: RIPE and RIPE LP tokens earn rewards exclusively from the Stakers category and are not eligible for Vote Depositors or General Depositors rewards*
+**B. Stability Pool Deposits (sGREEN and GREEN LP tokens):**
+- **Deposited amount**: Size of their stability pool position
+- **Asset allocation**: sGREEN and GREEN LP have configured staker points allocations
+- **Time staked**: Duration tokens remain in stability pool
+- **Calculation**: Balance × Blocks × Asset Staker Allocation
+- **No lock bonus**: Stability pools have no lock periods, so no duration bonus applies
+
+*Note: These staked assets (RIPE, RIPE LP, sGREEN, and GREEN LP in their respective vaults) earn rewards exclusively from the Stakers category and are not eligible for Vote Depositors or General Depositors rewards*
 
 ### 3. Vote Depositors
 This category rewards deposits in assets chosen by governance voting (once fully activated):
@@ -67,14 +76,14 @@ All vault deposits earn from this pool based on USD value proportions:
 Each supported asset has allocation percentages that determine its share of the top-level reward categories. These allocations split the category pools among eligible assets:
 
 - **Staker Points Allocation**: Asset's share of the total Stakers category pool
-  - Only applies to Ripe Governance Vault assets (RIPE and RIPE LP tokens)
-  - Example: If RIPE has 60% and RIPE LP has 40%, they split the Stakers pool accordingly
-  - Other assets have 0% staker allocation
+  - Applies to staked assets: RIPE and RIPE LP (in Governance Vault), sGREEN and GREEN LP (in Stability Pools)
+  - Example: If RIPE has 30%, RIPE LP has 20%, sGREEN has 25%, and GREEN LP has 25%, they split the Stakers pool accordingly
+  - Non-staked assets have 0% staker allocation
   
 - **Voter Points Allocation**: Asset's share of the total Vote Depositors category pool
   - Applies to assets selected through governance voting
   - Example: If Asset A has 50% and Asset B has 50%, each receives half of the Vote Depositors pool
-  - RIPE and RIPE LP tokens have 0% voter allocation
+  - Staked assets (RIPE, RIPE LP, sGREEN, GREEN LP) have 0% voter allocation
   - All voter allocations must sum to 100% across eligible assets
 
 **Important**: These percentages determine how assets split their respective top-level categories. If the Vote Depositors category receives 20% of total emissions and Asset A has 50% voter allocation, then Asset A depositors share 10% of total emissions (50% of 20%).
@@ -189,13 +198,19 @@ Depositors earn across multiple categories simultaneously:
 - Depends on asset configuration and vault type
 - Withdrawals proportionally reduce future rewards
 
-### Governance Participation
+### Governance and Stability Pool Participation
 
-RIPE governance vault deposits earn enhanced rewards:
+**RIPE governance vault deposits** earn enhanced rewards:
 - Qualify for staker allocation percentage only
 - **Staker rewards**: Lock duration provides bonus points (up to 200% bonus)
 - **No vote depositor rewards**: RIPE and RIPE LP tokens have 0% voter allocation
 - Can claim and auto-stake to compound positions
+
+**Stability pool deposits** (sGREEN and GREEN LP) also earn staker rewards:
+- Qualify for staker allocation percentage only
+- **Staker rewards**: Based on deposit size and duration (no lock bonus)
+- **No vote depositor rewards**: sGREEN and GREEN LP have 0% voter allocation
+- Provide additional yield through liquidation profits
 
 ## Protocol Configuration
 
@@ -207,7 +222,7 @@ The reward system parameters are set through MissionControl:
 - **Category Allocations**: Percentage split between four categories
 
 ### Per-Asset Settings
-- **Staker Points Allocation**: Asset's share of staker rewards (RIPE and RIPE LP only)
+- **Staker Points Allocation**: Asset's share of staker rewards (RIPE, RIPE LP, sGREEN, GREEN LP)
 - **Voter Points Allocation**: Asset's share of vote depositor rewards
 - **Asset Weight**: Multiplier for certain assets (e.g., RIPE LP tokens have 150% weight)
 
