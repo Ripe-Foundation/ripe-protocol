@@ -1,6 +1,6 @@
 # RIPE Block Rewards: Earning While You Participate
 
-RIPE block rewards are the heartbeat of Ripe Protocol's incentive system — continuously distributing tokens to users who actively strengthen the ecosystem. Whether you're borrowing GREEN, providing liquidity, or simply holding assets, the protocol rewards your participation with a share of 150 million RIPE tokens allocated specifically for community incentives.
+RIPE block rewards are the heartbeat of Ripe Protocol's incentive system — continuously distributing tokens to users who actively strengthen the ecosystem. Whether you're borrowing GREEN, providing liquidity, or simply holding assets, the protocol rewards your participation with a share of 150 million RIPE tokens (15% of total supply) allocated specifically for community incentives.
 
 ## The Reward Engine
 
@@ -238,6 +238,6 @@ Every reward serves protocol health:
 
 ---
 
-RIPE block rewards transform protocol participation into profitable opportunity. With 150 million tokens dedicated to community incentives over approximately 5 years, early participants can build substantial positions while helping create DeFi's most robust lending ecosystem. The time to start earning is now — every block counts toward your future rewards.
+RIPE block rewards transform protocol participation into profitable opportunity. With 150 million tokens (15% of total supply) dedicated to community incentives over a minimum of 5 years, early participants can build substantial positions while helping create DeFi's most robust lending ecosystem. The time to start earning is now — every block counts toward your future rewards.
 
 For technical implementation details, see [Lootbox Technical Documentation](../technical/core/Lootbox.md).
