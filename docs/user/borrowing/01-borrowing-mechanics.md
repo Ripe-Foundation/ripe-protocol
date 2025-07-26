@@ -24,24 +24,7 @@ With multiple collateral types, each asset contributes based on:
 
 Higher LTV assets (like stablecoins at 90%) provide more borrowing power per dollar than lower LTV assets (like volatile tokens at 50%).
 
-### Parameter Blending
-
-The protocol calculates weighted average terms based on each asset's proportional contribution to borrowing power.
-
-#### Weighting Mechanism
-
-Parameters blend according to borrowing power contribution:
-- Assets with higher LTV ratios exert greater influence
-- Interest rates combine proportionally
-- Risk metrics unify across the portfolio
-
-#### System Properties
-
-The weighted average mechanism ensures:
-- Proportional parameter influence based on borrowing contribution
-- Risk distribution across multiple asset types
-- Dynamic recalculation when portfolio composition changes
-- Mathematical precision in term determination
+With multiple collateral types, your borrowing terms (interest rate, liquidation threshold, etc.) are weighted averages based on each asset's contribution to your total borrowing power. See [Understanding Debt](02-understanding-debt.md#weighted-debt-terms) for detailed calculations.
 
 ## The Borrowing Process
 
@@ -73,25 +56,12 @@ These thresholds ensure all positions remain economically viable for both users 
 
 ### Step 2: Interest Rate Determination
 
-Your interest rate combines:
+Your interest rate is based on:
+- Asset-specific base rates for each collateral type
+- Dynamic adjustments for market conditions
+- GREEN pool imbalance multipliers (if applicable)
 
-**Base Rate Components**:
-- Asset-specific rates (weighted by borrowing power)
-- Protocol base rate
-- Market conditions
-
-**Dynamic Adjustments**:
-- GREEN pool health and balance ratios
-- Time spent in imbalanced state
-- Automatic rate multipliers during stress
-
-**Example Calculation**:
-```
-WETH portion: $16,000 at 5% = $800/year
-USDC portion: $4,500 at 3% = $135/year  
-PEPE portion: $500 at 15% = $75/year
-Weighted Rate: $1,010/$21,000 = 4.8% APR
-```
+With multiple collateral types, you pay a weighted average rate. Higher-risk assets have higher rates, but their impact is proportional to their contribution to your borrowing power.
 
 ### Step 3: Origination Fee (Daowry)
 
@@ -134,101 +104,6 @@ Borrowed funds can flow directly into stability pools:
 - Potential access to discounted collateral
 
 The protocol automatically handles necessary conversions for stability pool participation within single transactions.
-
-## Interest Rate Updates and Management
-
-### When Your Rate Updates
-
-Your interest rate is recalculated in several scenarios:
-
-1. **User-Initiated Actions**:
-   - Borrowing additional GREEN
-   - Repaying any amount (partial or full)
-   - Adding or removing collateral
-   - Changing collateral composition
-
-2. **Keeper Updates**:
-   - Anyone can call `updateDebtForUser` to refresh rates
-   - Triggered after market movements or pool health changes
-   - Updates position to current dynamic rates
-   - Permissionless operation
-
-3. **Automatic Triggers**:
-   - During liquidation processes
-   - When collateral is redeemed
-   - As part of certain protocol operations
-
-### Understanding Rate Refreshes
-
-**Rate Update Design**:
-- Gas optimization through on-demand updates
-- User-initiated interactions determine timing
-- Predictable rate changes at known points
-
-**Rate Update Mechanics**:
-- Rate decreases benefit from immediate updates
-- Rate increases apply only on interaction
-- Pool health metrics indicate rate direction
-
-**Rate Update Timing**:
-Rate changes apply at specific interaction points. Positions maintain existing rates until borrower actions or keeper updates trigger recalculation. This design optimizes gas costs while ensuring eventual rate convergence.
-
-### Keeper Economics
-
-Keepers update rates due to:
-
-1. **MEV Opportunities**: Rate updates before liquidations
-2. **Protocol Accuracy**: System-wide rate synchronization
-3. **Automation Services**: Dedicated keeper infrastructure
-4. **Economic Incentives**: Gas cost reimbursement mechanisms
-
-This decentralized approach ensures rates stay current without centralized intervention.
-
-## Advanced Interest Mechanics
-
-### Compound Interest Calculation
-
-The protocol calculates interest continuously using block-based compounding:
-
-- Interest compounds each block (approximately every few seconds)
-- Continuous compounding results in slightly higher effective rates
-- A 10% nominal rate yields approximately 10.5% effective annual rate
-- This mechanism is standard across DeFi protocols
-
-### Dynamic Rate Integration
-
-When rates change due to pool health:
-
-1. **Existing Interest**: Locked at previous rate
-2. **New Interest**: Accrues at new rate
-3. **Blended Cost**: Weighted average over time
-
-This mechanism prevents retroactive rate changes while enabling dynamic market response.
-
-For complete details about debt management, see [Understanding Your Debt](02-understanding-debt.md).
-
-## Special Collateral Types
-
-### NFT Collateral Support
-
-Ripe Protocol includes infrastructure for NFT collateral, enabling:
-
-- **Verified Collections**: Support for established NFT projects
-- **Fractional Ownership**: Tokenized NFT shares as collateral
-- **Floor Price Valuation**: Conservative pricing mechanisms
-- **Specialized Parameters**: NFT-specific risk metrics
-
-**Note**: NFT collateral availability depends on governance approval and oracle support.
-
-### Yield-Bearing Collateral
-
-Deposit assets that earn yield while collateralizing loans:
-
-- **Liquid Staking Tokens**: stETH, rETH, etc.
-- **LP Tokens**: From approved DEX pools
-- **Vault Tokens**: From integrated yield protocols
-
-Yield-bearing collateral continues accruing value while securing debt positions.
 
 ## Borrowing Limits
 

@@ -11,7 +11,7 @@ The protocol's borrowing mechanism features:
 - **Unified Positions**: All collateral backs a single loan
 - **GREEN Creation**: Stablecoin minted against collateral value
 - **Dynamic Rates**: Interest rates adjust based on market conditions
-- **Flexible Repayment**: Partial or complete repayment without penalties
+- **Flexible Repayment**: No prepayment penalties or time restrictions
 - **Safety Mechanisms**: Multiple systems prevent bad debt accumulation
 
 ## Documentation Structure
@@ -21,8 +21,6 @@ The protocol's borrowing mechanism features:
 3. **[Understanding Your Debt](02-understanding-debt.md)** - Debt composition and management
 4. **[Dynamic Rate Protection](03-dynamic-rate-protection.md)** - Interest rate adjustment mechanisms
 5. **[Borrowing Limits](04-borrowing-limits.md)** - Protocol constraints and parameters
-6. **[Repaying Your Loan](05-repaying-loans.md)** - Repayment processes and calculations
-7. **[Advanced Borrowing Mechanics](06-advanced-borrowing-mechanics.md)** - Complex system interactions
 
 ## Core Concepts
 
