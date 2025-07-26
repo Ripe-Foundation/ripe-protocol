@@ -1,6 +1,6 @@
 # The Endaoment: Ripe Protocol's Autonomous Treasury
 
-The Endaoment is Ripe Protocol's self-sustaining treasury system that transforms stablecoin deposits from [bond sales](09-bonding.md) into productive capital that works perpetually for the protocol. Think of it as an intelligent treasury that never sleeps — automatically defending [GREEN](01-green.md)'s dollar peg, generating yield across DeFi, and growing the protocol's financial strength without human intervention.
+The Endaoment is Ripe Protocol's self-sustaining treasury system that transforms stablecoin deposits from [bond sales](09-bonding.md) into productive capital that works perpetually for the protocol. Think of it as an intelligent treasury that never sleeps — automatically defending [GREEN](green-stablecoin.md)'s dollar peg, generating yield across DeFi, and growing the protocol's financial strength without human intervention.
 
 ## Why The Endaoment Exists
 

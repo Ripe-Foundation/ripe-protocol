@@ -8,7 +8,7 @@ Understanding Ripe Protocol requires familiarity with these interconnected syste
 
 ### Core Lending System
 
-#### 1. [GREEN Stablecoin](01-green.md)
+#### 1. [GREEN Stablecoin](green-stablecoin.md)
 The heart of Ripe - GREEN is the protocol's native overcollateralized stablecoin, minted through borrowing and maintained at dollar parity through multiple stability mechanisms.
 
 #### 2. [Collateral Assets](collateral-assets/README.md)
@@ -134,7 +134,7 @@ Implementation details and smart contract specifications for developers.
 ## Getting Started
 
 ### New to Ripe Protocol?
-1. **Start with [GREEN Stablecoin](01-green.md)** - Understand the core asset
+1. **Start with [GREEN Stablecoin](green-stablecoin.md)** - Understand the core asset
 2. **Review [Multi-Collateral System](collateral-assets/multi-collateral-system.md)** - Learn the unified approach
 3. **Check [Quick Reference](quick-reference.md)** - Get key parameters
 4. **Browse [FAQ](faq.md)** - Address common questions
