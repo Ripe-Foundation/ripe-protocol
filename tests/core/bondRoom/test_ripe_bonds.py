@@ -2173,7 +2173,7 @@ def test_purchase_ripe_bond_with_limited_bond_booster_units(
     config = (bob, HUNDRED_PERCENT, 50, 1000000)
     bond_booster.setBondBooster(config, sender=switchboard_delta.address)
     
-    # Purchase setup - 100 alpha tokens (100 units requested)
+    # Purchase setup - 100 alpha tokens (100 units requested, exceeds limit)
     payment_amount = 100 * EIGHTEEN_DECIMALS
     alpha_token.transfer(bob, payment_amount, sender=alpha_token_whale)
     alpha_token.approve(teller, payment_amount, sender=bob)
@@ -2185,15 +2185,13 @@ def test_purchase_ripe_bond_with_limited_bond_booster_units(
         sender=bob
     )
     
-    # Should get base payout (100 RIPE) + full boost (100% of base)
-    # Boost applies to full amount as long as ANY units are available
+    # Should get only base payout (no boost since 100 units > 50 unit limit)
     expected_base = 100 * EIGHTEEN_DECIMALS
-    expected_boost = expected_base * 100 // 100  # 100% of base
-    expected_total = expected_base + expected_boost
+    expected_total = expected_base  # No boost applied
     _test(expected_total, ripe_payout)
     
-    # Check that 100 units were used (even though only 50 were available)
-    assert bond_booster.unitsUsed(bob) == 100
+    # No units should be used since boost wasn't applied
+    assert bond_booster.unitsUsed(bob) == 0
 
 
 def test_purchase_ripe_bond_with_exhausted_bond_booster(
@@ -2402,7 +2400,7 @@ def test_purchase_ripe_bond_multiple_users_with_boosters(
     expected_bob = expected_base_bob + (expected_base_bob * 100 // 100)  # +100% boost
     _test(expected_bob, ripe_payout_bob)
     
-    # Alice's purchase - 40 units (30 boosted, 10 regular)
+    # Alice's purchase - 40 units (exceeds 30 unit limit, no boost)
     payment_amount_alice = 40 * EIGHTEEN_DECIMALS
     alpha_token.transfer(alice, payment_amount_alice, sender=alpha_token_whale)
     alpha_token.approve(teller, payment_amount_alice, sender=alice)
@@ -2414,7 +2412,7 @@ def test_purchase_ripe_bond_multiple_users_with_boosters(
     )
     
     expected_base_alice = 40 * EIGHTEEN_DECIMALS
-    expected_alice = expected_base_alice + (expected_base_alice * 200 // 100)  # +200% boost on full amount
+    expected_alice = expected_base_alice  # No boost since 40 > 30 limit
     _test(expected_alice, ripe_payout_alice)
     
     # Charlie's purchase - 20 units (all boosted)
@@ -2434,8 +2432,24 @@ def test_purchase_ripe_bond_multiple_users_with_boosters(
     
     # Verify units used for each user
     assert bond_booster.unitsUsed(bob) == 50
-    assert bond_booster.unitsUsed(alice) == 40  # All 40 units used
+    assert bond_booster.unitsUsed(alice) == 0  # No units used since boost wasn't applied
     assert bond_booster.unitsUsed(charlie) == 20
+    
+    # Alice can still get boost if she stays within her 30 unit limit
+    payment_amount_alice_2 = 25 * EIGHTEEN_DECIMALS
+    alpha_token.transfer(alice, payment_amount_alice_2, sender=alpha_token_whale)
+    alpha_token.approve(teller, payment_amount_alice_2, sender=alice)
+    
+    ripe_payout_alice_2 = teller.purchaseRipeBond(
+        alpha_token,
+        payment_amount_alice_2,
+        sender=alice
+    )
+    
+    expected_base_alice_2 = 25 * EIGHTEEN_DECIMALS
+    expected_alice_2 = expected_base_alice_2 + (expected_base_alice_2 * 200 // 100)  # +200% boost
+    _test(expected_alice_2, ripe_payout_alice_2)
+    assert bond_booster.unitsUsed(alice) == 25  # Now units are used
 
 
 def test_purchase_ripe_bond_with_removed_booster(

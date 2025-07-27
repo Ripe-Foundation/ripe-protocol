@@ -72,7 +72,7 @@ def getBoostRatio(_user: address, _units: uint256) -> uint256:
     if config.user == empty(address) or config.expireBlock <= block.number:
         return 0
     unitsUsed: uint256 = self.unitsUsed[_user]
-    if unitsUsed >= config.maxUnitsAllowed:
+    if unitsUsed + _units > config.maxUnitsAllowed:
         return 0
     return config.boostRatio
 
