@@ -154,7 +154,7 @@ When GREEN trades below peg, borrowing rates increase to encourage repayment:
 **Emergency Rate Escalation**:
 When GREEN exceeds 60% in reference pools:
 - Base rates multiply progressively (1.5x to 3x based on severity)
-- Time-based penalties accumulate (+0.01% per 100 blocks)
+- Time-based penalties accumulate (+0.01% per 100 blocks = ~3.3 minutes on Base)
 - Creates powerful incentive to restore balance through repayment
 
 ### 3. Direct Redemption Mechanism

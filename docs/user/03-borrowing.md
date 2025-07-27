@@ -211,7 +211,7 @@ When imbalances occur, rates adjust through three mechanisms:
 
 2. **Time-Based Accumulation**  
    - Additional increases for sustained imbalances
-   - Typically 0.01% per 100 blocks in danger zone
+   - Typically 0.01% per 100 blocks in danger zone (~3.3 minutes on Base)
    - Creates urgency for market correction
 
 3. **Maximum Rate Protection**
@@ -224,7 +224,7 @@ When imbalances occur, rates adjust through three mechanisms:
 Your weighted base rate (from collateral mix): 5% APR
 This is what you pay under normal conditions!
 
-If pool reaches 70% GREEN for 5,000 blocks:
+If pool reaches 70% GREEN for 5,000 blocks (~2.8 hours on Base):
 - Your base rate: 5% (unchanged)
 - Dynamic multiplier: 2.0x = 10% total
 - Time boost: 0.01% × 50 = 0.5%
@@ -256,7 +256,7 @@ Ripe implements several limits to ensure sustainable growth:
 - Protects protocol stability
 
 **4. Interval Borrowing Limits**
-- Time-based windows (e.g., per 1,000 blocks)
+- Time-based windows (e.g., per 1,000 blocks = ~33 minutes on Base)
 - Prevents flash loan attacks
 - Smooths borrowing demand
 

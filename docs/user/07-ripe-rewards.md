@@ -2,6 +2,34 @@
 
 RIPE block rewards are the heartbeat of Ripe Protocol's incentive system — continuously distributing tokens to users who actively strengthen the ecosystem. Whether you're [borrowing GREEN](03-borrowing.md), providing liquidity, or simply holding assets, the protocol rewards your participation with a share of 150 million RIPE tokens (15% of total supply) allocated specifically for community incentives.
 
+> **📊 Rewards at a Glance**
+> - **Total RIPE for rewards**: 150M (15% of supply)
+> - **Target daily emissions**: ~4,320,000 RIPE (when fully ramped on Base)
+> - **Current emissions**: Starting at 0.0025 RIPE/block (ramping up)
+> - **Best earning strategy**: GREEN LP (65% of staker rewards)
+> - **Current split**: 90% to stakers, 10% to borrowers
+> - **Auto-stake requirement**: 75% of claimed rewards locked for 1 year
+> - **Claim anytime**: No minimum, no lockup for earning
+
+## Quick Start: Understanding Your Rewards
+
+**🎯 The One-Minute Version:**
+
+```
+YOUR ACTIVITY          →  REWARD POOL  →  YOUR SHARE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Staking RIPE/sGREEN    →  90% of RIPE  →  Based on stake + lock bonus
+Borrowing GREEN        →  10% of RIPE  →  Based on debt size
+
+FUTURE ALLOCATIONS (Not Active Yet):
+Depositing any asset   →  TBD % of RIPE  →  Based on USD value
+Future voted assets    →  TBD % of RIPE  →  Community decides
+
+SIMPLE FORMULA: Your % of pool × Pool rewards = Your RIPE
+```
+
+**💡 Key Insight**: You don't compete with all users — only those in your specific pool. A borrower doesn't dilute a staker's rewards!
+
 ## The Reward Engine
 
 ### Continuous Token Flow
@@ -23,22 +51,30 @@ Points = Position Size × Time Held (in blocks)
 
 This simple formula creates profound fairness — a smaller position held longer can earn more than a whale's brief deposit. It's democracy through mathematics.
 
-## Four Ways to Earn
+### Emission Schedule Ramp-Up
 
-The protocol splits rewards across four participant categories, each serving a vital ecosystem function:
+**Important Context**: The protocol is currently in its emission ramp-up phase:
 
-### 1. Borrowers (Debt Creates Demand)
+- **Starting emissions**: 0.0025 RIPE per block (~108 RIPE per day on Base)
+- **Target emissions**: ~100 RIPE per block (~4,320,000 RIPE per day on Base)
+- **Ramp-up period**: Gradual increase to match 5-year distribution schedule
+- **Why this matters**: Current rewards are ~40,000x lower than examples shown
 
-Taking out GREEN loans earns rewards proportional to your debt:
+This conservative start ensures:
+1. **Sustainable token distribution** over the full 5-year period
+2. **Time for liquidity to build** before major emissions
+3. **Gradual market absorption** of new RIPE tokens
+4. **Protection against early dumping** when liquidity is thin
 
-- **Reward Basis**: Outstanding GREEN principal × time borrowed
-- **Why It Matters**: Borrowing creates GREEN demand and protocol revenue
-- **Smart Strategy**: Larger, longer-term loans maximize rewards
-- **Real Benefit**: Offset borrowing costs with RIPE earnings
+**Note**: All reward calculations in this document assume target emission rates for illustration. Multiply by current emission rate (0.0025/100 = 0.0025%) for actual current rewards.
 
-### 2. Stakers (Security Through Commitment)  
+## Current Reward Categories
 
-Staking in protocol vaults earns enhanced rewards:
+The protocol currently distributes rewards to two participant groups:
+
+### 1. Stakers (90% of Emissions) 💎
+
+Staking in protocol vaults earns the lion's share of rewards:
 
 **[Governance Vault](08-governance.md) (RIPE & RIPE LP)**
 - **Base Rewards**: Size × time × asset weight
@@ -51,23 +87,32 @@ Staking in protocol vaults earns enhanced rewards:
 - **No Lock Required**: Flexible liquidity with full rewards
 - **Risk Buffer**: Help secure the protocol while earning
 
-### 3. Vote Depositors (Community Choice)
+### 2. Borrowers (10% of Emissions) 💰
 
-When [governance](08-governance.md) activates, token holders will vote on which assets earn bonus rewards:
+Taking out GREEN loans earns rewards proportional to your debt:
+
+- **Reward Basis**: Outstanding GREEN principal × time borrowed
+- **Why It Matters**: Borrowing creates GREEN demand and protocol revenue
+- **Smart Strategy**: Larger, longer-term loans maximize rewards
+- **Real Benefit**: Offset borrowing costs with RIPE earnings
+
+## Future Reward Categories (Not Active Yet)
+
+### Vote Depositors (Future)
+
+When governance activates, token holders may vote to allocate rewards to specific assets:
 
 - **Democratic Selection**: Community chooses reward-earning assets
 - **Targeted Incentives**: Direct liquidity where protocol needs it most
 - **Strategic Deposits**: Align your holdings with governance decisions
-- **Future Activation**: Building anticipation for full decentralization
 
-### 4. General Depositors (Universal Participation)
+### General Depositors (Future)
 
-Every vault deposit earns baseline rewards:
+May be activated to reward all vault deposits:
 
 - **USD-Weighted**: Fair distribution based on deposit value
 - **Asset Agnostic**: All supported assets participate equally
 - **Passive Income**: Earn just by holding assets in Ripe vaults
-- **Portfolio Friendly**: Diversification doesn't reduce rewards
 
 ## Understanding Your Share
 
@@ -77,7 +122,11 @@ Each supported asset has its own configuration that determines how it splits the
 
 - **Staker Points Allocation**: Percentage of the total Stakers pool this asset receives
   - Only applies to staked assets (RIPE, RIPE LP in [Governance Vault](08-governance.md); [sGREEN](04-sgreen.md), GREEN LP in [Stability Pools](05-stability-pools.md))
-  - Example: If RIPE has 40% allocation and RIPE LP has 60%, they split the Stakers pool accordingly
+  - Current allocations:
+    - GREEN LP: 65% (highest rewards!)
+    - RIPE LP: 15%
+    - sGREEN: 10%
+    - RIPE: 10%
   
 - **Voter Points Allocation**: Percentage of the Vote Depositors pool this asset receives
   - Only for assets selected through governance voting
@@ -86,107 +135,159 @@ Each supported asset has its own configuration that determines how it splits the
 
 **Important**: These percentages split their respective category pools. If Vote Depositors receive 20% of total emissions and Asset A has 50% voter allocation, Asset A depositors share 10% of total emissions (50% of 20%).
 
-### Two-Layer Calculation
+### How Rewards Actually Flow (Simplified)
 
-Your rewards flow through a precise distribution system:
+Think of RIPE rewards like a waterfall with two splits:
 
-**Layer 1: Your Share of Asset Pool**
 ```
-Your Share = Your Points / Total Asset Points
+Total RIPE Emissions (100 RIPE/block)
+            ↓
+    ┌───────┴───────┐
+    │ First Split  │ (by user type)
+    └───────┬───────┘
+            ↓
+    90% → Stakers Pool
+    10% → Borrowers Pool  
+    
+    Future: Vote & General Pools
+    (Currently 0%, may change)
+            ↓
+    ┌───────┴───────┐
+    │ Second Split │ (by asset within pool)
+    └───────┬───────┘
+            ↓
+    Each asset gets its
+    configured percentage
+            ↓
+    Your share based on
+    your points vs total
+
 ```
 
-**Layer 2: Asset's Share of Category**
+### Step-by-Step Calculation Guide
+
+Let's follow your RIPE rewards step by step:
+
+**🎯 Step 1: Where Do Your Rewards Come From?**
 ```
-Asset Share = (Asset Points × Asset Allocation) / Total Category Points
+If you're staking RIPE → You earn from the Stakers pool (90%)
+If you're borrowing → You earn from the Borrowers pool (10%)
+Future: General deposits and voted assets (not active yet)
 ```
 
-**Combined Result**
+**🎯 Step 2: What's Your Asset's Share?**
 ```
-Your Rewards = Your Share × Asset Share × Category Pool
+Within the Stakers pool (90 RIPE/block):
+- GREEN LP tokens get 65% (largest share!)
+- RIPE LP tokens get 15%
+- sGREEN gets 10%
+- RIPE tokens get 10%
+
+So stakers share 90 RIPE/block:
+- GREEN LP stakers: 90 × 65% = 58.5 RIPE
+- RIPE LP stakers: 90 × 15% = 13.5 RIPE
+- sGREEN holders: 90 × 10% = 9 RIPE
+- RIPE stakers: 90 × 10% = 9 RIPE
 ```
 
-### Real Example
+**🎯 Step 3: What's YOUR Share of Your Asset Pool?**
+```
+Your Points = Amount × Time
+Your Share = Your Points ÷ Total Points for that asset
 
-Let's walk through Alice's RIPE staking rewards:
+Example: You stake 1,000 RIPE for 100 blocks
+- Your points: 1,000 × 100 = 100,000
+- Total RIPE points: 1,000,000
+- Your share: 100,000 ÷ 1,000,000 = 10%
+```
 
-**Given:**
-- Total emissions: 100 RIPE/block
-- Staker allocation: 30% (30 RIPE)
-- RIPE token allocation: 60% of staker pool
-- Alice stakes: 1,000 RIPE for 100 blocks
-- Total RIPE staked: 10,000 for same period
+**🎯 Step 4: Calculate Your Rewards**
+```
+Your rewards = Your share × Asset's allocation
 
-**Calculation:**
-1. Alice's share of RIPE pool: 1,000/10,000 = 10%
-2. RIPE's daily staker rewards: 60% × 30 = 18 RIPE
-3. Alice's base earnings: 10% × 18 = 1.8 RIPE
-4. Plus any lock duration bonus multiplier
+From above: 10% × 9 RIPE = 0.9 RIPE per block
+Over 100 blocks: 0.9 × 100 = 90 RIPE earned!
+```
 
-## Smart Claiming Strategies
+### Quick Reference Table
 
-### Two Paths to Value
+| Your Action | Pool You Earn From | How to Maximize |
+|------------|-------------------|-----------------|
+| Provide GREEN LP | Stakers (90%) - 65% share | Larger positions earn more |
+| Provide RIPE LP | Stakers (90%) - 15% share | Larger positions earn more |
+| Stake RIPE | Stakers (90%) - 10% share | Lock for 3 years (+200% bonus) |
+| Deposit sGREEN | Stakers (90%) - 10% share | Combine with stability pool benefits |
+| Borrow GREEN | Borrowers (10%) | Larger, longer loans |
+| Future: General deposits | Not active yet | TBD |
+| Future: Voted assets | Not active yet | TBD |
 
-When claiming accumulated rewards, choose your strategy:
+### Simple Rewards Estimator
 
-**1. Liquid RIPE** (Immediate Value)
-- Receive tokens directly to wallet
-- Full liquidity for trading or use
-- No commitment required
-- Instant gratification
+**"How much will I earn?"** - Quick formulas for common scenarios:
 
-**2. Auto-Stake** (Compound Growth)
-- Automatically deposit into governance vault
-- Earn governance points immediately
-- Compound future rewards
-- Build long-term influence
+⚠️ **Note**: Examples below use TARGET emission rates (100 RIPE/block). Current emissions are 0.0025 RIPE/block, so multiply results by 0.0025% for actual current rewards.
 
-### Auto-Stake Parameters
+**For GREEN LP (Highest Rewards - 65% of stakers):**
+```
+Daily Rewards ≈ (Your LP Value / Total GREEN LP) × 2,527,200
+
+Example: $100,000 in GREEN LP (1% of total)
+= 1% × 2,527,200 = ~25,272 RIPE per day
+= ~$2,527.20 per day (at $0.10 RIPE)
+= ~92.2% APR in USD terms
+```
+
+**For RIPE Staking (10% of stakers):**
+```
+Daily Rewards ≈ (Your RIPE / Total RIPE Staked) × 388,800 × Lock Multiplier
+
+Example: 10,000 RIPE staked (1% of total) with 1-year lock
+= 1% × 388,800 × 1.5 = ~5,832 RIPE per day
+= ~$583.20 per day (at $0.10 RIPE)
+= Your stake worth $1,000, earning $583.20/day = 21,287% APR
+```
+
+**For sGREEN Deposits (10% of stakers):**
+```
+Daily Rewards ≈ (Your sGREEN Value / Total sGREEN) × 388,800
+
+Example: $20,000 in sGREEN (2% of total)
+= 2% × 388,800 = ~7,776 RIPE per day
+= ~$777.60 per day (at $0.10 RIPE)
+= ~1,418% APR in USD terms
+```
+
+**For Borrowing GREEN (10% of emissions):**
+```
+Daily Rewards ≈ (Your Debt / Total Debt) × 432,000
+
+Example: $50,000 borrowed (0.5% of total debt)
+= 0.5% × 432,000 = ~2,160 RIPE per day
+= ~$216.00 per day (at $0.10 RIPE)
+= ~158% APR in rewards (offsetting borrowing costs!)
+```
+
+## Auto-Staking Mechanism
+
+### How Auto-Staking Works
 
 The protocol enforces auto-staking to balance token distribution with long-term alignment:
 
-- **Stake Ratio**: Protocol-determined percentage that must be staked
-  - Example: At 70% ratio, only 30% goes to your wallet as liquid RIPE
+- **Stake Ratio**: 75% must be auto-staked
+  - Only 25% goes to your wallet as liquid RIPE
   - Prevents market flooding while building committed participants
   
-- **Duration Ratio**: Governance sets the required lock duration
-  - Example: 50% ratio × 3-year max = mandatory 1.5-year lock
+- **Duration Ratio**: 33% × 3-year max = 1-year lock
+  - All auto-staked rewards are locked for 1 year
   - Ensures reward recipients become long-term stakeholders
   
 **Why This Matters**: Rather than dumping tokens on the market, auto-staking creates a community of invested participants who earn governance power alongside their rewards. You're not just earning tokens — you're earning a voice in the protocol's future.
-
-## Maximizing Your Rewards
-
-### Strategic Positioning
-
-**For Borrowers:**
-- Maintain healthy debt levels for consistent earnings
-- Longer loan terms = more accumulated rewards
-- Use rewards to offset interest costs
-
-**For Stakers:**
-- Lock RIPE longer for multiplied earnings
-- Provide LP tokens for 50% bonus weight
-- Auto-stake rewards to compound returns
-
-**For Depositors:**
-- Diversify across vaults while maintaining positions
-- Hold for extended periods to maximize points
-- Watch for governance votes on reward allocations
-
-### The Compound Effect
-
-Consider the power of auto-staking:
-- Initial deposit: 1,000 RIPE
-- Monthly rewards: 50 RIPE
-- Auto-stake ratio: 100%
-- After 1 year: Earning rewards on 1,600 RIPE
-- Exponential growth through compounding
 
 ## Protocol Configuration
 
 ### Flexible Parameters
 
-MissionControl governs all reward settings:
+Mission Control governs all reward settings:
 
 - **Emission Rate**: RIPE tokens minted per block
 - **Category Splits**: Percentage to each participant type
@@ -201,43 +302,60 @@ Once activated, RIPE holders will control:
 - Asset-specific incentives
 - New reward mechanisms
 
-## Why This Matters
+## Common Questions About Rewards
 
-### Sustainable Incentives
+### "Why do I calculate my share twice?"
 
-RIPE rewards create a virtuous cycle:
-1. Users participate for rewards
-2. Participation strengthens protocol
-3. Stronger protocol attracts more users
-4. More users increase reward competition
-5. Competition drives deeper participation
+You don't! Think of it as one calculation with two inputs:
+1. **Which pie you're eating from** (Staker, Borrower, etc.)
+2. **How big your slice is** (Your percentage of that pie)
 
-### Fair Distribution
+It's like a buffet where desserts are on one table and mains on another — you only compete with people at your table, not the whole restaurant!
 
-The time-weighted system ensures:
-- **No Whale Dominance**: Time matters as much as size
-- **Accessible Entry**: Small holders can earn meaningfully
-- **Loyalty Rewards**: Long-term participants benefit most
-- **Transparent Calculation**: Anyone can verify their share
+### "How do I estimate my rewards?"
 
-### Economic Alignment
+**Simple Method:**
+1. Find your pool's daily RIPE allocation (at target emissions):
+   - Stakers total: 3,888,000 RIPE/day (90% of emissions)
+   - Borrowers total: 432,000 RIPE/day (10% of emissions)
+2. For stakers, find your asset's share:
+   - GREEN LP: 2,527,200 RIPE/day (65% of stakers)
+   - RIPE LP: 583,200 RIPE/day (15% of stakers)
+   - sGREEN: 388,800 RIPE/day (10% of stakers)
+   - RIPE: 388,800 RIPE/day (10% of stakers)
+3. Multiply: asset allocation × your percentage = daily rewards
 
-Every reward serves protocol health:
-- **Borrowers**: Create GREEN demand and fees
-- **Stakers**: Provide security and governance
-- **Depositors**: Supply liquidity and collateral
-- **All Participants**: Build network effects
+**Example**: You have 1% of all staked RIPE → 388,800 × 1% = 3,888 RIPE per day
 
-## Getting Started
+### "What happens when I claim?"
 
-1. **Choose Your Path**: Decide between borrowing, staking, or depositing
-2. **Commit Capital**: Deploy assets into protocol positions
-3. **Monitor Points**: Watch your rewards accumulate in real-time
-4. **Claim Strategically**: Optimize between liquidity and compounding
-5. **Stay Engaged**: Participate in governance when it launches
+The protocol enforces auto-staking parameters to align incentives:
+
+**Current Settings (Protocol-Controlled):**
+- **Auto-stake percentage**: 75% must be auto-staked
+- **Lock duration**: 1 year (33% of max 3-year duration)
+- **Your choice**: Only whether to claim now or wait
+
+**Example Claim:**
+- You have 1,000 RIPE rewards to claim
+- Protocol requires 75% auto-stake with 1-year lock
+- Result: 250 RIPE to your wallet + 750 RIPE locked in governance vault
+
+**Why This Matters**: Auto-staking prevents market flooding and ensures reward recipients become long-term stakeholders with governance power. You're earning both tokens AND future influence!
+
+### "Do different assets in the same pool compete?"
+
+Yes, within each pool! For example, in the Stakers pool:
+- RIPE stakers compete with other RIPE stakers
+- RIPE LP stakers compete with other RIPE LP stakers
+- But they share the total Stakers allocation based on configured percentages
+
+### "What happens if nobody stakes/borrows?"
+
+More rewards for those who do! If you're the only RIPE staker, you get 100% of RIPE's allocation in the Stakers pool. Early participants often see highest returns.
 
 ---
 
-RIPE block rewards transform protocol participation into profitable opportunity. With 150 million tokens (15% of total supply) dedicated to community incentives over a minimum of 5 years, early participants can build substantial positions while helping create DeFi's most robust lending ecosystem. The time to start earning is now — every block counts toward your future rewards.
+RIPE block rewards transform protocol participation into profitable opportunity. With 150 million tokens (15% of total supply) dedicated to community incentives, early participants can build substantial positions while helping create DeFi's most robust lending ecosystem. The time to start earning is now — every block counts toward your future rewards.
 
 For technical implementation details, see [Lootbox Technical Documentation](../technical/core/Lootbox.md).
