@@ -181,7 +181,7 @@ The protocol first looks to your existing positions within Ripe:
 
 **Stablecoin Transfers**
 - Other stablecoins (USDC, USDT) you've deposited
-- Transferred to [Endaoment](10-endaoment.md) treasury
+- Transferred to [Endaoment](11-endaoment.md) treasury
 - Used to back protocol reserves
 - Counts toward debt repayment
 
@@ -447,7 +447,7 @@ Anyone can be a keeper — no special permissions needed. This open system ensur
 
 Despite all protective mechanisms, extreme market conditions could potentially create bad debt (where liquidation proceeds don't fully cover the debt). The protocol has a clear resolution mechanism:
 
-**Bond Sales for Recovery**: The protocol can sell [bonds](09-bonds.md) to raise funds that clear bad debt. This process:
+**Bond Sales for Recovery**: The protocol can sell [bonds](10-bonds.md) to raise funds that clear bad debt. This process:
 - Creates RIPE tokens beyond the 1 billion supply cap
 - Distributes the dilution fairly across all RIPE holders
 - Ensures bond buyers receive their full allocation

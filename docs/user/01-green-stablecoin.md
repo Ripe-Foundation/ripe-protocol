@@ -220,7 +220,7 @@ Double the arbitrage opportunities = Stronger peg defense
 
 ### 5. Endaoment Treasury Operations
 
-The [Endaoment](10-endaoment.md) serves as GREEN's financial fortress — a protocol-owned treasury with vast capabilities to defend the peg:
+The [Endaoment](11-endaoment.md) serves as GREEN's financial fortress — a protocol-owned treasury with vast capabilities to defend the peg:
 
 **Capital Arsenal from Bond Sales**:
 - Bond proceeds provide stablecoin reserves for immediate deployment
@@ -272,7 +272,7 @@ The Endaoment transforms from passive treasury to active market participant, wit
 - Minimizes bad debt through rapid liquidation execution
 
 ### Bad Debt Resolution
-If extreme conditions create bad debt, the protocol can sell [bonds](09-bonds.md) to raise recovery funds. This mints RIPE beyond the 1B cap (e.g., becoming 1.001B), with dilution shared proportionally by all holders — ensuring GREEN always remains fully backed.
+If extreme conditions create bad debt, the protocol can sell [bonds](10-bonds.md) to raise recovery funds. This mints RIPE beyond the 1B cap (e.g., becoming 1.001B), with dilution shared proportionally by all holders — ensuring GREEN always remains fully backed.
 
 ### Protocol-Wide Integration
 - GREEN is the only borrowable asset in Ripe Protocol

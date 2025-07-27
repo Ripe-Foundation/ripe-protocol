@@ -85,11 +85,11 @@ When your position becomes eligible for collateral redemption by GREEN holders.
   Redemption triggers when collateral < $10,000
   (Because $8,000 ÷ 0.80 = $10,000)
   ```
-- **Purpose**: Provides market-based deleveraging and early warning before [liquidation](06-liquidations.md)
+- **Purpose**: Provides market-based deleveraging and early warning before [liquidation](07-liquidations.md)
 
 **3. Liquidation Threshold: The Danger Zone**
 
-The critical point where forced [liquidation](06-liquidations.md) begins to protect the protocol.
+The critical point where forced [liquidation](07-liquidations.md) begins to protect the protocol.
 
 - **What it means**: Your position will be liquidated
 - **How it's calculated**: Liquidation when collateral < debt ÷ liquidation threshold  
@@ -142,13 +142,13 @@ $10,000                    $8,571      $7,500     $6,667      $0
 - **What to do**: Consider reducing debt or adding collateral
 
 **🟠 REDEMPTION ZONE (Collateral $7,500 - $6,667)**
-- **Status**: Eligible for [redemption](06-liquidations.md#redemption-the-first-line-of-defense)
+- **Status**: Eligible for [redemption](07-liquidations.md#redemption-the-first-line-of-defense)
 - **Actions Available**: Anyone can pay your debt for collateral
 - **Risk Level**: High - active intervention needed
 - **What to do**: Urgently repay debt or add collateral
 
 **🔴 LIQUIDATION ZONE (Collateral < $6,667)**
-- **Status**: Automatic [liquidation](06-liquidations.md) triggered
+- **Status**: Automatic [liquidation](07-liquidations.md) triggered
 - **Actions Available**: None - process is automatic
 - **Risk Level**: Critical - position being closed
 - **What to do**: Learn from experience for next time

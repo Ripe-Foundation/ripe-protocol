@@ -228,7 +228,7 @@ Time matters as much as size — smaller deposits held longer can out-earn whale
 - [Governance Vault](08-governance.md) staking with multipliers
 - Future special purpose incentives
 
-For a detailed exploration of the RIPE rewards system, including emission schedules, point calculations, and maximization strategies, see [RIPE Block Rewards](07-ripe-rewards.md).
+For a detailed exploration of the RIPE rewards system, including emission schedules, point calculations, and maximization strategies, see [RIPE Block Rewards](06-ripe-rewards.md).
 
 ## Advanced Features
 

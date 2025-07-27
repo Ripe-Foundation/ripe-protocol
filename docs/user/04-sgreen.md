@@ -22,7 +22,7 @@ Every sGREEN holder benefits from multiple protocol revenue streams that flow di
 1. **Borrower Interest Payments**: Continuous yield from all active loans across the protocol
 2. **Origination Fees (Daowry)**: 0.5% fee on every new loan minted instantly adds value
 3. **Unrealized Yield Flush**: Accrued interest from borrowers gets distributed to sGREEN holders
-4. **Future Treasury Yields**: [Governance](08-governance.md) can direct [Endaoment](10-endaoment.md) profits to sGREEN holders
+4. **Future Treasury Yields**: [Governance](08-governance.md) can direct [Endaoment](11-endaoment.md) profits to sGREEN holders
 
 This isn't speculative yield — it's real revenue from actual protocol usage.
 
@@ -56,7 +56,7 @@ Deposit sGREEN in [stability pools](05-stability-pools.md) to stack multiple rev
 **Example Scenario**: 
 - sGREEN base yield: 6% APR
 - Liquidation profits: 8% APR
-- [RIPE rewards](07-ripe-rewards.md): 4% APR
+- [RIPE rewards](06-ripe-rewards.md): 4% APR
 - **Total potential**: 18% APR (before compounding)
 
 ## Why sGREEN is Built Different

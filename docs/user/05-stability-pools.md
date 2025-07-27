@@ -21,7 +21,7 @@ Stability pool participants benefit from three distinct yield sources that compo
 
 1. **Base Asset Yield**: [sGREEN](04-sgreen.md) continues earning protocol revenue while in the pool
 2. **Liquidation Premiums**: Purchase collateral at 5-15% below market value
-3. **[RIPE Rewards](07-ripe-rewards.md)**: Earn protocol tokens from the Stakers allocation
+3. **[RIPE Rewards](06-ripe-rewards.md)**: Earn protocol tokens from the Stakers allocation
 
 This triple-yield structure can generate returns significantly exceeding traditional DeFi strategies.
 
@@ -34,7 +34,7 @@ You can deposit two types of assets into stability pools:
 **GREEN LP Tokens** (GREEN/USDC liquidity positions)
 - Earn trading fees while waiting for liquidations
 - First priority in liquidation hierarchy
-- Transferred to [Endaoment](10-endaoment.md) treasury when used
+- Transferred to [Endaoment](11-endaoment.md) treasury when used
 
 **[sGREEN](04-sgreen.md)** (Savings GREEN)
 - Continues earning base yield in the pool

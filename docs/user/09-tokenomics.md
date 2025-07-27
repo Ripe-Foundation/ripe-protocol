@@ -7,7 +7,7 @@ RIPE is the governance token that powers Ripe Protocol, with a carefully designe
 > - **Community first**: 25% of supply goes to user incentives; this is the only bucket that begins unlocking at TGE via block rewards & bonding
 > - **All unlocks on-chain**: Immutable vesting contracts you can audit today
 
-For a deep dive into how RIPE powers the protocol—including [staking rewards](07-ripe-rewards.md), protocol fees via [sGREEN](04-sgreen.md), [governance participation](08-governance.md), and value accrual through [bonds](09-bonds.md)—explore these detailed guides. Full onchain governance will launch post-TGE once the community owns sufficient supply.
+For a deep dive into how RIPE powers the protocol—including [staking rewards](06-ripe-rewards.md), protocol fees via [sGREEN](04-sgreen.md), [governance participation](08-governance.md), and value accrual through [bonds](10-bonds.md)—explore these detailed guides. Full onchain governance will launch post-TGE once the community owns sufficient supply.
 
 ## Token Allocation: Community-First Distribution
 
@@ -36,7 +36,7 @@ Seed investors who provided capital and strategic guidance during testnet develo
 
 [GRAPHIC: Emission curve chart]
 
-The RIPE supply is strictly capped at 1 billion tokens with one carefully designed exception: if the protocol ever needs to cover bad debt that exceeds treasury reserves, it can auction [RIPE Bonds](09-bonds.md) to raise funds. These emergency tokens would be minted beyond the cap, transparently diluting all holders to socialize losses fairly.
+The RIPE supply is strictly capped at 1 billion tokens with one carefully designed exception: if the protocol ever needs to cover bad debt that exceeds treasury reserves, it can auction [RIPE Bonds](10-bonds.md) to raise funds. These emergency tokens would be minted beyond the cap, transparently diluting all holders to socialize losses fairly.
 
 ### Vesting Schedules by Category
 
@@ -156,4 +156,4 @@ RIPE's tokenomics demonstrate that sustainable DeFi is possible without compromi
 
 As Ripe Protocol grows from launch to maturity, RIPE tokens will flow to those who contribute most—whether through providing liquidity, participating in governance, or building on the platform. This isn't just tokenomics; it's the foundation for a new financial system built on transparency, efficiency, and community ownership.
 
-Ready to participate? Start earning RIPE through [block rewards](07-ripe-rewards.md), grab discounted tokens via [bonds](09-bonds.md), or stake your RIPE for [governance power](08-governance.md). The future of DeFi is being built today, and every RIPE holder has a voice in shaping it.
+Ready to participate? Start earning RIPE through [block rewards](06-ripe-rewards.md), grab discounted tokens via [bonds](10-bonds.md), or stake your RIPE for [governance power](08-governance.md). The future of DeFi is being built today, and every RIPE holder has a voice in shaping it.
