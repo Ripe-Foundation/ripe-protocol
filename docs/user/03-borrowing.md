@@ -101,47 +101,87 @@ The critical point where forced [liquidation](06-liquidations.md) begins to prot
   ```
 - **No escape**: Once triggered, liquidation proceeds automatically
 
-### How Thresholds Work Together
+### How Thresholds Work Together: A Visual Guide
 
-Here's how a position progresses through risk zones as conditions change:
+Here's a unified view of how all three thresholds create different risk zones:
 
-**Starting Position Example:**
-- Collateral: $10,000
-- Maximum borrow (70% LTV): $7,000
-- You borrow: $6,000
-- Initial safety margin: $4,000
+```
+COLLATERAL VALUE SCALE (for $6,000 debt)
+←─────────────────────────────────────────────────────────────→
+$10,000                    $8,571      $7,500     $6,667      $0
 
-**As collateral value drops OR debt grows from interest:**
+[════ SAFE ZONE ════][CAUTION][REDEMPTION][LIQUIDATION]
+     ✅ Healthy        ⚠️ Warning  🚨 Danger    💀 Critical
 
-**Zone 1: Healthy (Collateral > $8,571)**
-- ✅ Below maximum LTV
-- ✅ No redemption risk
-- ✅ Can still borrow more
+│                          │            │           │
+│                          │            │           └─ Liquidation (90%)
+│                          │            │               $6,000 ÷ 0.90 = $6,667
+│                          │            │
+│                          │            └─ Redemption (80%)
+│                          │                $6,000 ÷ 0.80 = $7,500
+│                          │
+│                          └─ Max Borrow/LTV (70%)
+│                              $6,000 ÷ 0.70 = $8,571
+│
+└─ Your Current Collateral: $10,000
+   (167% collateral ratio - very safe!)
+```
 
-**Zone 2: Caution (Collateral $8,571 - $7,500)**
-- ⚠️ Above max LTV, cannot borrow more
-- ✅ Still safe from redemption
-- ⏰ Time to add collateral or reduce debt
+**Understanding Each Zone:**
 
-**Zone 3: Redemption (Collateral $7,500 - $6,667)**
-- 🚨 Redemption threshold breached (80%)
-- ⚠️ GREEN holders can redeem your collateral
-- ⏰ Last chance to avoid liquidation
+**🟢 SAFE ZONE (Collateral > $8,571)**
+- **Status**: Healthy position with borrowing capacity
+- **Actions Available**: Can borrow up to $7,000 total
+- **Risk Level**: None - full flexibility
+- **What to do**: Normal operations
 
-**Zone 4: Liquidation (Collateral < $6,667)**
-- 💀 Liquidation threshold breached (90%)
-- 🔴 Automatic liquidation begins
-- 📉 Collateral sold to repay debt
+**🟡 CAUTION ZONE (Collateral $8,571 - $7,500)**
+- **Status**: Over max LTV but still protected
+- **Actions Available**: Cannot borrow more; can repay/add collateral
+- **Risk Level**: Medium - approaching danger
+- **What to do**: Consider reducing debt or adding collateral
+
+**🟠 REDEMPTION ZONE (Collateral $7,500 - $6,667)**
+- **Status**: Eligible for [redemption](06-liquidations.md#redemption-the-first-line-of-defense)
+- **Actions Available**: Anyone can pay your debt for collateral
+- **Risk Level**: High - active intervention needed
+- **What to do**: Urgently repay debt or add collateral
+
+**🔴 LIQUIDATION ZONE (Collateral < $6,667)**
+- **Status**: Automatic [liquidation](06-liquidations.md) triggered
+- **Actions Available**: None - process is automatic
+- **Risk Level**: Critical - position being closed
+- **What to do**: Learn from experience for next time
 
 ### The Critical Inverse Relationship
 
-Unlike LTV which calculates forward (debt as % of collateral), redemption and liquidation thresholds work inversely — they define the **minimum collateral required** for a given debt level. This means:
+Unlike LTV which calculates forward (debt as % of collateral), redemption and liquidation thresholds work inversely — they define the **minimum collateral required** for a given debt level.
 
+**Quick Reference - Two Ways to View the Same Thresholds:**
+
+| Threshold | Forward View (LTV) | Inverse View (Min Collateral) | Example ($6,000 debt) |
+|-----------|-------------------|------------------------------|---------------------|
+| **Max Borrow** | Can borrow up to 70% of collateral | Need 143% collateral coverage | Need $8,571+ collateral |
+| **Redemption** | Triggered at 80% debt-to-collateral | Need 125% collateral coverage | Need $7,500+ collateral |
+| **Liquidation** | Triggered at 90% debt-to-collateral | Need 111% collateral coverage | Need $6,667+ collateral |
+
+**What This Means:**
 - As debt grows from interest → You approach thresholds
 - As collateral value drops → You approach thresholds  
 - Higher threshold percentages = Tighter requirements = Less room for error
 
 Understanding this inverse relationship helps you monitor the right metrics and take action before it's too late.
+
+**Pro Tip - Monitor Your Health Factor:**
+```
+Health Factor = Current Collateral Value ÷ Liquidation Collateral Required
+
+Example: $10,000 collateral ÷ $6,667 required = 1.50 health factor
+- Above 1.5 = Very safe (green)
+- 1.2 to 1.5 = Monitor closely (yellow)
+- 1.0 to 1.2 = Take action now (orange)
+- Below 1.0 = Liquidation (red)
+```
 
 ## Dynamic Interest Rates
 

@@ -39,29 +39,45 @@ Your position's safety depends on three key thresholds that work together to cre
 - Calculated as minimum collateral needed for your debt
 - Example: At 90% threshold with $8,000 debt, liquidation starts when collateral < $8,889
 
-### How Risk Escalates
+### How Risk Escalates: Visual Zone Map
 
 Consider a position with $10,000 initial collateral and $6,000 debt:
 
-**Zone 1: Healthy** (Collateral > $8,571)
+```
+POSITION HEALTH VISUALIZATION (for $6,000 debt)
+←─────────────────────────────────────────────────────────────→
+$10,000                    $8,571      $7,500     $6,667      $0
+  YOU                        ↓           ↓           ↓
+  ARE                   Max LTV     Redemption  Liquidation
+  HERE                   (70%)        (80%)        (90%)
+
+[════ SAFE ZONE ════][CAUTION][REDEMPTION][LIQUIDATION]
+     ✅ Healthy        ⚠️ Warning  🚨 Danger    💀 Critical
+```
+
+**Zone Breakdown:**
+
+**🟢 Zone 1: Healthy** (Collateral > $8,571)
 - Below 70% LTV maximum
 - Can still borrow more
 - No intervention possible
 
-**Zone 2: Warning** (Collateral $8,571 - $7,500)
+**🟡 Zone 2: Warning** (Collateral $8,571 - $7,500)
 - Exceeded max LTV, cannot borrow
 - Still safe from redemption
 - Time to add collateral or repay
 
-**Zone 3: Redemption** (Collateral $7,500 - $6,667)
+**🟠 Zone 3: Redemption** (Collateral $7,500 - $6,667)
 - Redemption threshold breached
 - GREEN holders can redeem your collateral
 - Acts as automatic deleveraging
 
-**Zone 4: Liquidation** (Collateral < $6,667)
+**🔴 Zone 4: Liquidation** (Collateral < $6,667)
 - Liquidation threshold breached
 - Multi-phase liquidation activates
 - Position being actively liquidated
+
+*For a detailed explanation of how these thresholds work together, see [Understanding Three Thresholds](03-borrowing.md#how-thresholds-work-together-a-visual-guide) in the borrowing documentation.*
 
 ## The Redemption Buffer
 

@@ -45,12 +45,15 @@ Yes! There are no prepayment penalties, fixed terms, or lockups. Repay any amoun
 
 ### When do I get liquidated?
 
-[Liquidation](06-liquidations.md) happens when your collateral value drops below the required minimum for your debt. Key thresholds:
-- **Max LTV**: Your borrowing limit
-- **Redemption threshold**: Others can swap GREEN for your collateral at par
-- **Liquidation threshold**: Forced liquidation begins
+[Liquidation](06-liquidations.md) happens when your collateral value drops below the required minimum for your debt. There are three key thresholds to monitor:
 
-Monitor your position and add collateral or repay debt before reaching these zones.
+1. **Max LTV (e.g., 70%)**: Your borrowing limit - cannot borrow more beyond this
+2. **Redemption threshold (e.g., 80%)**: Early warning - GREEN holders can redeem against your position
+3. **Liquidation threshold (e.g., 90%)**: Danger zone - automatic liquidation begins
+
+**Quick Example**: With $6,000 debt and 90% liquidation threshold, you need at least $6,667 collateral ($6,000 ÷ 0.90). If collateral drops below this, liquidation starts.
+
+Monitor your position and add collateral or repay debt before reaching these zones. For a visual guide showing all risk zones, see [How Thresholds Work Together](03-borrowing.md#how-thresholds-work-together-a-visual-guide).
 
 ### What's the difference between redemption and liquidation?
 
