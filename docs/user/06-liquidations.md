@@ -2,6 +2,71 @@
 
 Ripe Protocol's liquidation system represents a sophisticated approach to managing undercollateralized positions. Rather than harsh, immediate liquidations that can devastate borrowers, Ripe employs a graduated system designed to protect both users and the protocol. Multiple lines of defense work together to maintain GREEN's stability while giving borrowers every opportunity to recover.
 
+## Executive Summary
+
+**Key Points:**
+- 🛡️ **Three defense layers**: Redemption buffer → Stability pools → Dutch auctions
+- 📊 **Partial only**: Liquidates just enough to restore health, not entire position
+- 💰 **Fair pricing**: 5-15% liquidation fees, much lower than competitors
+- ⚡ **Automated**: Keeper network ensures rapid execution
+- 🎯 **Your assets first**: Burns your GREEN/sGREEN before touching other collateral
+
+**Quick Visual: The Liquidation Flow**
+```
+Your Position Becomes Unhealthy
+            ↓
+    REDEMPTION ZONE (First)
+    └─ GREEN holders can redeem
+       at $1 (no penalty for you)
+            ↓
+    LIQUIDATION TRIGGERED
+            ↓
+┌───────────────────────────┐
+│   PHASE 1: Own Assets     │
+│   • Burn GREEN/sGREEN     │
+│   • Transfer stablecoins  │
+└────────────┬──────────────┘
+             ↓ (if needed)
+┌───────────────────────────┐
+│   PHASE 2: Stability Pool │
+│   • Instant swaps         │
+│   • 5-15% discount only   │
+└────────────┬──────────────┘
+             ↓ (if needed)
+┌───────────────────────────┐
+│   PHASE 3: Dutch Auction  │
+│   • Public sale           │
+│   • Increasing discounts  │
+└───────────────────────────┘
+```
+
+**What This Means For You:**
+- ✅ Multiple chances to avoid liquidation
+- ✅ Keep most of your collateral
+- ✅ Lower fees than other protocols
+- ✅ No cascade liquidations
+- ✅ Fair, transparent process
+
+## Quick Navigation
+
+**Understanding the Basics:**
+- [Why Liquidations Matter](#why-liquidations-matter) - Protocol safety and borrower protection
+- [Risk Zones](#understanding-the-risk-zones) - Three thresholds and visual guide
+- [Redemption Buffer](#the-redemption-buffer) - Your first line of defense
+
+**The Liquidation Process:**
+- [Phase 1: Own Assets](#phase-1-using-your-own-assets-first) - GREEN/sGREEN burning
+- [Phase 2: Stability Pools](#phase-2-stability-pool-swaps) - Instant liquidity
+- [Phase 3: Dutch Auctions](#phase-3-dutch-auctions) - Time-based discounts
+
+**Advanced Topics:**
+- [Liquidation Economics](#liquidation-economics) - Fees and calculations
+- [Keeper Network](#the-keeper-network) - Automated execution
+- [Common Scenarios](#common-scenarios) - Real-world examples
+- [Bad Debt Handling](#what-if-bad-debt-occurs) - Last resort measures
+
+---
+
 ## Why Liquidations Matter
 
 ### Protecting Protocol Solvency
@@ -193,6 +258,8 @@ Ripe's system only liquidates enough to restore healthy LTV:
 - Preserves maximum collateral possible
 - Single formula works across all liquidation types
 
+> **💡 TL;DR**: If you're at 80% LTV and need to get back to 50%, we only liquidate exactly what's needed - not your entire position. In the example below, you keep 25% of your collateral instead of losing everything.
+
 **Example Partial Liquidation**
 ```
 Starting position: 
@@ -224,6 +291,8 @@ Success! The unified formula perfectly calculates the liquidation amount
 to achieve target LTV, while you keep 25% of your original collateral.
 ```
 
+> **🎯 Simple Version**: Started with $1,250 collateral → Lost $937.50 to liquidation → Kept $312.50 (25%). Compare this to other protocols that would liquidate your entire $1,250!
+
 ## The Keeper Network
 
 ### Your Automated Safety Net
@@ -245,6 +314,17 @@ Keepers are the protocol's decentralized guardians — independent operators who
 Anyone can be a keeper — no special permissions needed. This open system ensures liquidations happen promptly and fairly, protecting both borrowers and the protocol.
 
 ## Why Ripe's System is Superior
+
+### Quick Comparison
+
+| Feature | Traditional DeFi | Ripe Protocol |
+|---------|-----------------|---------------|
+| **Liquidation Amount** | Entire position (100%) | Only what's needed (partial) |
+| **Warning System** | None | Redemption buffer zone |
+| **Liquidation Fee** | 13-50% penalty | 5-15% fixed discount |
+| **Who Can Buy** | MEV bots only | Anyone (pools + auctions) |
+| **Your Assets Used** | No | Yes (GREEN/sGREEN first) |
+| **Market Impact** | Large dumps | Phased, orderly process |
 
 ### Borrower Protection Features
 
