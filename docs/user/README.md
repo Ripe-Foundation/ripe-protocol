@@ -127,7 +127,7 @@ Understanding the 1 billion RIPE token distribution and vesting schedules that p
 Exchange stablecoins for discounted RIPE, supporting protocol growth.
 
 - **Instant or locked** - Up to 3x tokens for commitment
-- **Power-ups** - Bonus rewards for ecosystem contributors
+- **Bond Boosters** - Bonus rewards for ecosystem contributors
 - **Permanent funding** - Builds the Endaoment treasury
 
 ### Protocol Infrastructure

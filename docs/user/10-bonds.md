@@ -84,41 +84,41 @@ No Lock → 0% bonus → 1x RIPE (base amount only)
 
 **Strategic Consideration**: Longer locks mean larger positions but less liquidity. Balance your RIPE accumulation goals with capital flexibility needs.
 
-### Bond Power-Ups
+### Bond Boosters
 
-The protocol rewards specific user activities through Bond Power-Ups, creating targeted incentives for valuable contributions:
+The protocol rewards specific user activities through Bond Boosters, creating targeted incentives for valuable contributions:
 
-**How Power-Ups Work:**
-- **Automatic Application**: Power-Ups activate automatically during bond purchases
-- **Unit-Based Limits**: Each user has a maximum number of "units" they can power up
-- **Time Windows**: Power-Ups expire at specific block numbers
-- **Percentage Multipliers**: Power-Ups add percentage bonuses to base bond amount
+**How Bond Boosters Work:**
+- **Automatic Application**: Bond Boosters activate automatically during bond purchases
+- **Unit-Based Limits**: Each user has a maximum number of "units" they can boost
+- **Time Windows**: Bond Boosters expire at specific block numbers
+- **Percentage Multipliers**: Bond Boosters add percentage bonuses to base bond amount
 
-**Current Power-Up Programs:**
+**Current Bond Booster Programs:**
 - **Ripe Radness**: Rewards testnet participants
-  - Power-Up range: 10% to 200% based on contribution level
-  - Top contributors receive maximum 200% Power-Up
-  - Most participants receive between 10-100% Power-Up
+  - Bond Booster range: 10% to 200% based on contribution level
+  - Top contributors receive maximum 200% Bond Booster
+  - Most participants receive between 10-100% Bond Booster
   - Limited units per participant
   - Expires at predetermined block
   - Eligibility verified through Discord roles
 
 **The Unit System:**
-Units represent your Power-Up capacity:
+Units represent your Bond Booster capacity:
 - 1 unit = 1 USDC
-- If you have 1,000 units and 200% Power-Up:
-  - Bond 500 USDC → uses 500 units, get 200% Power-Up
-  - Bond 1,500 USDC → first 1,000 get Power-Up, remaining 500 don't
+- If you have 1,000 units and 200% Bond Booster:
+  - Bond 500 USDC → uses 500 units, get 200% Bond Booster
+  - Bond 1,500 USDC → first 1,000 get Bond Booster, remaining 500 don't
 - Units consumed permanently (no refills)
 
 **Stacking Example:**
 Top-tier testnet participant bonds 1,000 USDC with 3-year lock:
 - Base: 2,000 RIPE (at $0.50/RIPE)
 - Lock bonus: +4,000 RIPE (200% of base)
-- Radness Power-Up: +4,000 RIPE (200% of base for top contributors)
+- Radness Bond Booster: +4,000 RIPE (200% of base for top contributors)
 - **Total: 10,000 RIPE (5x multiplier)**
 
-*Note: Most participants receive smaller Power-Ups. With a 50% Radness Power-Up, total would be 7,000 RIPE (3.5x multiplier)*
+*Note: Most participants receive smaller Bond Boosters. With a 50% Radness Bond Booster, total would be 7,000 RIPE (3.5x multiplier)*
 
 ## Real-World Bonding Examples
 
@@ -128,7 +128,7 @@ Top-tier testnet participant bonds 1,000 USDC with 3-year lock:
 - **Epoch Status**: 7 hours into 24-hour epoch (30% complete)
 - **Base Rate**: $0.40 per RIPE → 12,500 RIPE base
 - **3-Year Lock**: +200% → 25,000 RIPE bonus
-- **Radness Power-Up**: +200% → 25,000 RIPE bonus
+- **Radness Bond Booster**: +200% → 25,000 RIPE bonus
 - **Total Received**: 62,500 RIPE (locked 3 years)
 - **Effective Price**: $0.08 per RIPE
 
@@ -138,7 +138,7 @@ Top-tier testnet participant bonds 1,000 USDC with 3-year lock:
 - **Epoch Status**: 17 hours into 24-hour epoch (70% complete)
 - **Base Rate**: $0.25 per RIPE → 40,000 RIPE base
 - **6-Month Lock**: +35% → 14,000 RIPE bonus
-- **No Power-Up**: 0 RIPE bonus
+- **No Bond Booster**: 0 RIPE bonus
 - **Total Received**: 54,000 RIPE (locked 6 months)
 - **Effective Price**: $0.185 per RIPE
 
@@ -148,7 +148,7 @@ Top-tier testnet participant bonds 1,000 USDC with 3-year lock:
 - **Epoch Status**: 6 hours into 12-hour epoch (50% complete)
 - **Base Rate**: $0.35 per RIPE → 5,714 RIPE base
 - **No Lock**: 0% bonus
-- **No Power-Up**: 0 RIPE bonus
+- **No Bond Booster**: 0 RIPE bonus
 - **Total Received**: 5,714 RIPE (immediately liquid)
 - **Effective Price**: $0.35 per RIPE
 
