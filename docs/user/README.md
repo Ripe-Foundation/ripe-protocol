@@ -119,6 +119,14 @@ Self-sustaining treasury that works 24/7 defending GREEN and generating yield.
 - **Peg defense** - Automated market operations
 - **Partner programs** - Collaborative liquidity
 
+### 🔮 [Price Oracles: Accurate Asset Valuation](11-price-oracles.md)
+
+Multi-oracle system ensuring fair and manipulation-resistant pricing.
+
+- **Five oracle providers** - Chainlink, Curve, Pyth, Stork, and yield-token pricing
+- **Automatic fallbacks** - No single point of failure
+- **Staleness protection** - Always current prices
+
 ## Getting Started
 
 ### New to Ripe?
@@ -139,6 +147,7 @@ Self-sustaining treasury that works 24/7 defending GREEN and generating yield.
 2. Explore [Governance](08-governance.md) — accumulate voting power
 3. Consider [Bonds](09-bonds.md) — support protocol growth
 4. Study [The Endaoment](10-endaoment.md) — see where value flows
+5. Learn [Price Oracles](11-price-oracles.md) — trust in accurate valuation
 
 ## Key Innovation: Risk Isolation with Portfolio Efficiency
 
