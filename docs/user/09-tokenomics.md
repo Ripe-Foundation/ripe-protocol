@@ -13,7 +13,7 @@ For a deep dive into how RIPE powers the protocol—including [staking rewards](
 
 The 1 billion RIPE supply is allocated across five key stakeholder groups, with the largest portion dedicated to community incentives:
 
-[GRAPHIC: Token allocation pie chart]
+![RIPE Token Allocation](https://miro.medium.com/v2/format:webp/1*2OWDZIl3gjqJl_B6JXyyaw.png)
 
 ### Community Incentives (25% - 250M RIPE)
 Block rewards, bonding discounts, and LP rewards that directly incentivize protocol usage and growth. This is the only allocation that begins distributing at TGE.
@@ -32,9 +32,9 @@ Seed investors who provided capital and strategic guidance during testnet develo
 
 ## Emission Schedule: Sustainable Token Release
 
-### Hard Cap with Emergency Provision
+![RIPE Emission Schedule](https://miro.medium.com/v2/format:webp/1*_cx_OWu-kZAygnVZeLI5Cw.png)
 
-[GRAPHIC: Emission curve chart]
+### Hard Cap with Emergency Provision
 
 The RIPE supply is strictly capped at 1 billion tokens with one carefully designed exception: if the protocol ever needs to cover bad debt that exceeds treasury reserves, it can auction [RIPE Bonds](10-bonds.md) to raise funds. These emergency tokens would be minted beyond the cap, transparently diluting all holders to socialize losses fairly.
 
