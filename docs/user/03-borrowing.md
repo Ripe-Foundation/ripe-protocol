@@ -1,6 +1,6 @@
 # Borrowing on Ripe: Unlock Liquidity Without Selling
 
-Ripe Protocol enables borrowing GREEN stablecoins against your deposited collateral through an automated system that weighs risks, adjusts rates dynamically, and maintains protocol stability. This isn't just another lending platform — it's a sophisticated credit engine that transforms idle assets into productive capital while preserving your exposure to upside potential.
+Ripe Protocol enables borrowing [GREEN stablecoins](01-green-stablecoin.md) against your [deposited collateral](02-collateral-assets.md) through an automated system that weighs risks, adjusts rates dynamically, and maintains protocol stability. This isn't just another lending platform — it's a sophisticated credit engine that transforms idle assets into productive capital while preserving your exposure to upside potential.
 
 ## Why Borrow on Ripe
 
@@ -13,7 +13,7 @@ When you deposit assets into Ripe vaults, they don't just sit idle. The protocol
 - **Compound yields** by borrowing at one rate and earning at another
 - **Access instant liquidity** without credit checks or applications
 
-The borrowing system serves as the demand driver for GREEN, creating natural use cases that strengthen the stablecoin's utility and adoption. GREEN is minted when you borrow and burned when you repay, maintaining supply-demand equilibrium.
+The borrowing system serves as the demand driver for [GREEN](01-green-stablecoin.md), creating natural use cases that strengthen the stablecoin's utility and adoption. GREEN is minted when you borrow and burned when you repay, maintaining supply-demand equilibrium.
 
 ## How Borrowing Works
 
@@ -85,11 +85,11 @@ When your position becomes eligible for collateral redemption by GREEN holders.
   Redemption triggers when collateral < $10,000
   (Because $8,000 ÷ 0.80 = $10,000)
   ```
-- **Purpose**: Provides market-based deleveraging and early warning before liquidation
+- **Purpose**: Provides market-based deleveraging and early warning before [liquidation](06-liquidations.md)
 
 **3. Liquidation Threshold: The Danger Zone**
 
-The critical point where forced liquidation begins to protect the protocol.
+The critical point where forced [liquidation](06-liquidations.md) begins to protect the protocol.
 
 - **What it means**: Your position will be liquidated
 - **How it's calculated**: Liquidation when collateral < debt ÷ liquidation threshold  
@@ -247,14 +247,14 @@ When borrowing, you can choose one of three ways to receive your funds:
 - Use immediately for any purpose
 - Most flexible option
 
-**Option 2: Auto-Convert to sGREEN**
-- Borrowed GREEN automatically wrapped into yield-bearing sGREEN
+**Option 2: Auto-Convert to [sGREEN](04-sgreen.md)**
+- Borrowed GREEN automatically wrapped into yield-bearing [sGREEN](04-sgreen.md)
 - Start earning yield immediately on borrowed funds
 - Potential for positive carry (yield > borrow rate)
 - No separate conversion transaction needed
 
-**Option 3: Direct to Stability Pool**
-- Borrowed GREEN converted to sGREEN and deposited into Stability Pool in one transaction
+**Option 3: Direct to [Stability Pool](05-stability-pools.md)**
+- Borrowed GREEN converted to sGREEN and deposited into [Stability Pool](05-stability-pools.md) in one transaction
 - Earn both sGREEN yield AND stability pool rewards
 - Participate in liquidations for discounted collateral
 - Maximum yield potential but least liquid option
@@ -262,7 +262,7 @@ When borrowing, you can choose one of three ways to receive your funds:
 ### Origination Fee (Daowry)
 
 A one-time 0.5% fee on new borrows that:
-- Flows directly to sGREEN holders
+- Flows directly to [sGREEN](04-sgreen.md) holders
 - Creates immediate protocol revenue
 - Aligns borrower and saver incentives
 

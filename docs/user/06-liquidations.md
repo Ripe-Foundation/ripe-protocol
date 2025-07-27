@@ -6,7 +6,7 @@ Ripe Protocol's liquidation system represents a sophisticated approach to managi
 
 ### Protecting Protocol Solvency
 
-Liquidations serve as the critical mechanism ensuring that GREEN remains fully backed. When borrowing positions become undercollateralized due to collateral value drops or accumulated interest, the protocol must act to prevent bad debt accumulation. Without effective liquidations, the protocol could become insolvent, threatening all participants.
+Liquidations serve as the critical mechanism ensuring that [GREEN](01-green-stablecoin.md) remains fully backed. When [borrowing positions](03-borrowing.md) become undercollateralized due to collateral value drops or accumulated interest, the protocol must act to prevent bad debt accumulation. Without effective liquidations, the protocol could become insolvent, threatening all participants.
 
 ### The Borrower-Friendly Approach
 
@@ -92,25 +92,25 @@ When liquidation becomes necessary, Ripe employs a carefully orchestrated three-
 
 The protocol first looks to your existing positions within Ripe:
 
-**GREEN and sGREEN Burning**
-- If you hold GREEN or sGREEN in stability pools
+**GREEN and [sGREEN](04-sgreen.md) Burning**
+- If you hold GREEN or [sGREEN](04-sgreen.md) in stability pools
 - These are burned first to repay your debt
 - Most direct form of repayment
 - No market impact or external sales
 
 **Stablecoin Transfers**
 - Other stablecoins (USDC, USDT) you've deposited
-- Transferred to Endaoment treasury
+- Transferred to [Endaoment](10-endaoment.md) treasury
 - Used to back protocol reserves
 - Counts toward debt repayment
 
 ### Phase 2: Stability Pool Swaps
 
-Next, the protocol engages stability pools for instant liquidity:
+Next, the protocol engages [stability pools](05-stability-pools.md) for instant liquidity:
 
 **How Pool Swaps Work**
 1. Your collateral (ETH, WBTC, etc.) needs liquidation
-2. Stability pools hold GREEN LP tokens and sGREEN
+2. [Stability pools](05-stability-pools.md) hold GREEN LP tokens and [sGREEN](04-sgreen.md)
 3. Pool assets swap for your collateral at the liquidation discount
 4. Pool participants get discounted assets, you avoid market dumps
 

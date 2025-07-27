@@ -1,6 +1,6 @@
 # RIPE Block Rewards: Earning While You Participate
 
-RIPE block rewards are the heartbeat of Ripe Protocol's incentive system — continuously distributing tokens to users who actively strengthen the ecosystem. Whether you're borrowing GREEN, providing liquidity, or simply holding assets, the protocol rewards your participation with a share of 150 million RIPE tokens (15% of total supply) allocated specifically for community incentives.
+RIPE block rewards are the heartbeat of Ripe Protocol's incentive system — continuously distributing tokens to users who actively strengthen the ecosystem. Whether you're [borrowing GREEN](03-borrowing.md), providing liquidity, or simply holding assets, the protocol rewards your participation with a share of 150 million RIPE tokens (15% of total supply) allocated specifically for community incentives.
 
 ## The Reward Engine
 
@@ -40,20 +40,20 @@ Taking out GREEN loans earns rewards proportional to your debt:
 
 Staking in protocol vaults earns enhanced rewards:
 
-**Governance Vault (RIPE & RIPE LP)**
+**[Governance Vault](08-governance.md) (RIPE & RIPE LP)**
 - **Base Rewards**: Size × time × asset weight
 - **Lock Multiplier**: Up to 3x boost for maximum duration locks
 - **LP Advantage**: RIPE LP tokens earn 50% more points than RIPE
 - **Compound Strategy**: Auto-stake rewards for exponential growth
 
-**Stability Pools (sGREEN & GREEN LP)**
+**[Stability Pools](05-stability-pools.md) ([sGREEN](04-sgreen.md) & GREEN LP)**
 - **Dual Yield**: RIPE rewards plus liquidation profits
 - **No Lock Required**: Flexible liquidity with full rewards
 - **Risk Buffer**: Help secure the protocol while earning
 
 ### 3. Vote Depositors (Community Choice)
 
-When governance activates, token holders will vote on which assets earn bonus rewards:
+When [governance](08-governance.md) activates, token holders will vote on which assets earn bonus rewards:
 
 - **Democratic Selection**: Community chooses reward-earning assets
 - **Targeted Incentives**: Direct liquidity where protocol needs it most
@@ -76,7 +76,7 @@ Every vault deposit earns baseline rewards:
 Each supported asset has its own configuration that determines how it splits the top-level reward pools:
 
 - **Staker Points Allocation**: Percentage of the total Stakers pool this asset receives
-  - Only applies to staked assets (RIPE, RIPE LP in Governance Vault; sGREEN, GREEN LP in Stability Pools)
+  - Only applies to staked assets (RIPE, RIPE LP in [Governance Vault](08-governance.md); [sGREEN](04-sgreen.md), GREEN LP in [Stability Pools](05-stability-pools.md))
   - Example: If RIPE has 40% allocation and RIPE LP has 60%, they split the Stakers pool accordingly
   
 - **Voter Points Allocation**: Percentage of the Vote Depositors pool this asset receives

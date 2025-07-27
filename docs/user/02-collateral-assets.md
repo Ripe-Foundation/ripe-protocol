@@ -224,7 +224,7 @@ Time matters as much as size — smaller deposits held longer can out-earn whale
 - Strategic deposit opportunities
 
 **Special Rewards** - Enhanced earnings in specific vaults
-- [Stability pool](10-stability-pools.md) deposits earning dual yields
+- [Stability pool](05-stability-pools.md) deposits earning dual yields
 - [Governance Vault](08-governance.md) staking with multipliers
 - Future special purpose incentives
 

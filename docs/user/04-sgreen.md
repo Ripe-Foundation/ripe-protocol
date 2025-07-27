@@ -1,6 +1,6 @@
 # Savings GREEN (sGREEN): Your GREEN Working Harder
 
-sGREEN transforms idle GREEN stablecoins into productive capital that automatically captures all protocol revenues. It's the simplest way to earn real yield in DeFi — no staking, no claiming, no complexity. Just deposit GREEN and watch your wealth grow through the power of compound interest.
+sGREEN transforms idle [GREEN stablecoins](01-green-stablecoin.md) into productive capital that automatically captures all protocol revenues. It's the simplest way to earn real yield in DeFi — no staking, no claiming, no complexity. Just deposit GREEN and watch your wealth grow through the power of compound interest.
 
 ## The sGREEN Advantage
 
@@ -22,7 +22,7 @@ Every sGREEN holder benefits from multiple protocol revenue streams that flow di
 1. **Borrower Interest Payments**: Continuous yield from all active loans across the protocol
 2. **Origination Fees (Daowry)**: 0.5% fee on every new loan minted instantly adds value
 3. **Unrealized Yield Flush**: Accrued interest from borrowers gets distributed to sGREEN holders
-4. **Future Treasury Yields**: Governance can direct Endaoment profits to sGREEN holders
+4. **Future Treasury Yields**: [Governance](08-governance.md) can direct [Endaoment](10-endaoment.md) profits to sGREEN holders
 
 This isn't speculative yield — it's real revenue from actual protocol usage.
 
@@ -44,9 +44,9 @@ Sophisticated users can borrow directly in sGREEN:
 
 **The Math**: Borrow at 5% APR, earn 8% on sGREEN = 3% net profit on borrowed funds
 
-## Advanced Strategy: Stability Pool
+## Advanced Strategy: [Stability Pool](05-stability-pools.md)
 
-Deposit sGREEN in stability pools to stack multiple revenue streams:
+Deposit sGREEN in [stability pools](05-stability-pools.md) to stack multiple revenue streams:
 
 1. **Base Layer**: Continue earning sGREEN's native yield
 2. **Liquidation Layer**: Purchase discounted collateral (typically 5-15% below market)
@@ -56,7 +56,7 @@ Deposit sGREEN in stability pools to stack multiple revenue streams:
 **Example Scenario**: 
 - sGREEN base yield: 6% APR
 - Liquidation profits: 8% APR
-- RIPE rewards: 4% APR
+- [RIPE rewards](07-ripe-rewards.md): 4% APR
 - **Total potential**: 18% APR (before compounding)
 
 ## Why sGREEN is Built Different

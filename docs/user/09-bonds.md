@@ -1,6 +1,6 @@
 # Ripe Bonds: Building Treasury Through Community
 
-Ripe Bonds create a powerful exchange mechanism where your stablecoins transform into RIPE tokens while funding the protocol's [Endaoment](06-endaoment.md) treasury. This isn't just a token sale — it's a strategic partnership where early supporters help build the financial foundation that makes GREEN stable and the entire protocol sustainable.
+Ripe Bonds create a powerful exchange mechanism where your stablecoins transform into RIPE tokens while funding the protocol's [Endaoment](10-endaoment.md) treasury. This isn't just a token sale — it's a strategic partnership where early supporters help build the financial foundation that makes [GREEN](01-green-stablecoin.md) stable and the entire protocol sustainable.
 
 ## The Bond Value Proposition
 
@@ -177,7 +177,7 @@ This mechanism ensures bonds remain attractive while helping the protocol recove
 
 ## Where Your Bond Payment Goes
 
-Every stablecoin from bond sales flows directly to the [Endaoment](06-endaoment.md), transforming into productive protocol assets:
+Every stablecoin from bond sales flows directly to the [Endaoment](10-endaoment.md), transforming into productive protocol assets:
 
 **Treasury Deployment Strategy:**
 - **Yield Farming**: Earns returns across DeFi via Underscore Protocol integrations

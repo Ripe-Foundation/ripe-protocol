@@ -19,9 +19,9 @@ When liquidations occur, your deposited assets instantly convert to discounted c
 
 Stability pool participants benefit from three distinct yield sources that compound together:
 
-1. **Base Asset Yield**: sGREEN continues earning protocol revenue while in the pool
+1. **Base Asset Yield**: [sGREEN](04-sgreen.md) continues earning protocol revenue while in the pool
 2. **Liquidation Premiums**: Purchase collateral at 5-15% below market value
-3. **RIPE Rewards**: Earn protocol tokens from the Stakers allocation
+3. **[RIPE Rewards](07-ripe-rewards.md)**: Earn protocol tokens from the Stakers allocation
 
 This triple-yield structure can generate returns significantly exceeding traditional DeFi strategies.
 
@@ -34,9 +34,9 @@ You can deposit two types of assets into stability pools:
 **GREEN LP Tokens** (GREEN/USDC liquidity positions)
 - Earn trading fees while waiting for liquidations
 - First priority in liquidation hierarchy
-- Transferred to Endaoment treasury when used
+- Transferred to [Endaoment](10-endaoment.md) treasury when used
 
-**sGREEN** (Savings GREEN)
+**[sGREEN](04-sgreen.md)** (Savings GREEN)
 - Continues earning base yield in the pool
 - Used after GREEN LP tokens
 - Redeemed and burned during liquidations
@@ -101,7 +101,7 @@ The protocol uses a dynamic reward system to maintain optimal pool composition. 
 
 - **RIPE per Dollar Claimed**: Each asset can have a specific reward rate (e.g., 0.1 RIPE per $1 of ETH claimed)
 - **Strategic Timing**: Higher rewards when pools need rebalancing with fresh sGREEN or GREEN LP
-- **Automatic Distribution**: Rewards paid instantly when you claim, locked in governance vault
+- **Automatic Distribution**: Rewards paid instantly when you claim, locked in [governance vault](08-governance.md)
 - **Pool Health Mechanism**: Ensures pools always have liquidity for new liquidations
 
 This creates a market-driven rebalancing system — when collateral accumulates, increased rewards incentivize claims, replenishing the pool with fresh deposits.

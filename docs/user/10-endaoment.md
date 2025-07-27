@@ -109,16 +109,16 @@ The Endaoment enables win-win liquidity partnerships:
 
 ### For sGREEN Stakers
 
-**Stability Rewards**: [sGREEN](04-sgreen.md) stakers earn rewards from providing stability to the GREEN ecosystem through the stability pool mechanism.
+**Stability Rewards**: [sGREEN](04-sgreen.md) stakers earn rewards from providing stability to the [GREEN](01-green-stablecoin.md) ecosystem through the [stability pool](05-stability-pools.md) mechanism.
 
 **Protected Participation**: Your staked position helps maintain protocol health while earning returns from liquidation premiums.
 
 ### Future Yield Distribution
 
-Currently, all treasury earnings remain in the Endaoment to maximize protocol growth and compound returns. However, governance retains the power to enable yield distribution in the future, which could direct treasury earnings to:
+Currently, all treasury earnings remain in the Endaoment to maximize protocol growth and compound returns. However, [governance](08-governance.md) retains the power to enable yield distribution in the future, which could direct treasury earnings to:
 
-- **RIPE stakers** in the governance vault — rewarding long-term aligned participants
-- **sGREEN stakers** — providing additional rewards beyond stability pool returns
+- **RIPE stakers** in the [governance vault](08-governance.md) — rewarding long-term aligned participants
+- **[sGREEN](04-sgreen.md) stakers** — providing additional rewards beyond [stability pool](05-stability-pools.md) returns
 
 When activated, these would represent real yield from treasury operations, not token inflation, creating sustainable value for committed protocol participants.
 
@@ -129,7 +129,7 @@ When activated, these would represent real yield from treasury operations, not t
 1. **Strategy Isolation**: Each yield strategy operates independently — a failure in one doesn't affect others
 2. **Debt Ceilings**: Hard limits on GREEN creation prevent runaway minting
 3. **Profitability Requirements**: Every stabilization operation must benefit the protocol
-4. **Governance Oversight**: Critical parameters require community approval
+4. **[Governance](08-governance.md) Oversight**: Critical parameters require community approval
 
 ### Transparency First
 
