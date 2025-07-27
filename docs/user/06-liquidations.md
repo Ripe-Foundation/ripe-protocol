@@ -347,6 +347,18 @@ Anyone can be a keeper — no special permissions needed. This open system ensur
 
 **Key Insight**: Auction discounts mean you don't get full debt reduction. Lost $1,080 total ($643 liq fee + $437 auction discount).
 
+## What If Bad Debt Occurs?
+
+Despite all protective mechanisms, extreme market conditions could potentially create bad debt (where liquidation proceeds don't fully cover the debt). The protocol has a clear resolution mechanism:
+
+**Bond Sales for Recovery**: The protocol can sell [bonds](09-bonds.md) to raise funds that clear bad debt. This process:
+- Creates RIPE tokens beyond the 1 billion supply cap
+- Distributes the dilution fairly across all RIPE holders
+- Ensures bond buyers receive their full allocation
+- Maintains protocol solvency without penalizing users
+
+For example, if 1M RIPE is needed to cover bad debt, the total supply becomes 1.001 billion. This transparent mechanism ensures the protocol can always recover while treating all participants fairly.
+
 ## The Bottom Line
 
 Ripe Protocol's liquidation system represents a fundamental rethinking of how DeFi handles risk. By prioritizing borrower protection while maintaining protocol solvency, the system creates sustainable conditions for all participants. The multi-phase approach, redemption buffer, and partial liquidation design work together to give you every opportunity to maintain your position while ensuring GREEN remains fully backed.

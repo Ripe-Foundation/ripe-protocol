@@ -269,7 +269,10 @@ The Endaoment transforms from passive treasury to active market participant, wit
 - Automated bots monitor all GREEN loans 24/7
 - Trigger liquidations when positions become unsafe
 - Keepers earn 0.1-0.5% rewards (paid in GREEN)
-- Ensures bad debt never threatens the peg
+- Minimizes bad debt through rapid liquidation execution
+
+### Bad Debt Resolution
+If extreme conditions create bad debt, the protocol can sell [bonds](09-bonds.md) to raise recovery funds. This mints RIPE beyond the 1B cap (e.g., becoming 1.001B), with dilution shared proportionally by all holders — ensuring GREEN always remains fully backed.
 
 ### Protocol-Wide Integration
 - GREEN is the only borrowable asset in Ripe Protocol

@@ -99,8 +99,8 @@ Earn RIPE by using the protocol. Time-weighted rewards ensure fair distribution.
 
 Lock RIPE tokens to accumulate voting power and earn protocol rewards.
 
-- **Time multipliers** - Up to 3x power for 4-year locks
-- **25% of emissions** - Guaranteed rewards for stakers
+- **Time multipliers** - Up to 3x power for 3-year locks
+- **Staker rewards** - Earn from protocol emissions
 - **Future control** - Guide protocol evolution
 
 ### 🎟️ [Bonds: Fund the Future](09-bonds.md)
