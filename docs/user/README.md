@@ -95,6 +95,15 @@ Earn RIPE by using the protocol. Time-weighted rewards ensure fair distribution.
 - **Four ways to earn** - Borrow, stake, deposit, vote
 - **Auto-staking** - Compound directly to governance
 
+### 📊 [RIPE Tokenomics: Aligned Incentives](12-tokenomics.md)
+
+Understanding the 1 billion RIPE token distribution and vesting schedules that power the protocol.
+
+- **Fixed supply** - 1B cap with bad debt exception
+- **Community first** - 25% for rewards, largest unlocking allocation
+- **Transparent vesting** - All schedules enforced onchain
+- **Strategic funding** - Bootstrapped with only $1.87M raised
+
 ### 🏛️ [Governance: Power Through Time](08-governance.md)
 
 Lock RIPE tokens to accumulate voting power and earn protocol rewards.
@@ -145,9 +154,10 @@ Multi-oracle system ensuring fair and manipulation-resistant pricing.
 
 1. Understand [Liquidations](06-liquidations.md) — know the safety mechanisms
 2. Explore [Governance](08-governance.md) — accumulate voting power
-3. Consider [Bonds](09-bonds.md) — support protocol growth
-4. Study [The Endaoment](10-endaoment.md) — see where value flows
-5. Learn [Price Oracles](11-price-oracles.md) — trust in accurate valuation
+3. Study [RIPE Tokenomics](12-tokenomics.md) — token distribution and vesting
+4. Consider [Bonds](09-bonds.md) — support protocol growth
+5. Study [The Endaoment](10-endaoment.md) — see where value flows
+6. Learn [Price Oracles](11-price-oracles.md) — trust in accurate valuation
 
 ## Key Innovation: Risk Isolation with Portfolio Efficiency
 
