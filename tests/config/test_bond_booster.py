@@ -114,9 +114,13 @@ def test_bond_booster_get_boost_ratio_partial_units(bond_booster, alice, switchb
     # Use 30 units
     bond_booster.addNewUnitsUsed(alice, 30, sender=bond_room.address)
     
-    # Request 30 units (only 20 available, but boost ratio should still be returned)
+    # Request 30 units (would exceed limit, so no boost)
     boost_ratio = bond_booster.getBoostRatio(alice, 30)
-    assert boost_ratio == HUNDRED_PERCENT  # Returns percentage, not affected by units requested
+    assert boost_ratio == 0  # No boost when units would exceed limit
+    
+    # Request 20 units (within remaining limit, boost applies)
+    boost_ratio = bond_booster.getBoostRatio(alice, 20)
+    assert boost_ratio == HUNDRED_PERCENT  # Boost applies when within limit
 
 
 def test_bond_booster_get_boost_ratio_full_available(bond_booster, alice, switchboard_delta):
@@ -445,8 +449,11 @@ def test_bond_booster_workflow_complete(bond_booster, alice, bob, switchboard_de
     bond_booster.addNewUnitsUsed(alice, 20, sender=bond_room.address)
     
     # 3. Check boost ratios
-    alice_boost_ratio = bond_booster.getBoostRatio(alice, 40)  # Still has units available
-    assert alice_boost_ratio == HUNDRED_PERCENT
+    alice_boost_ratio = bond_booster.getBoostRatio(alice, 40)  # Would exceed limit (20+40 > 50)
+    assert alice_boost_ratio == 0  # No boost when exceeding limit
+    
+    alice_boost_ratio_valid = bond_booster.getBoostRatio(alice, 30)  # Within limit (20+30 = 50)
+    assert alice_boost_ratio_valid == HUNDRED_PERCENT
     
     bob_boost_ratio = bond_booster.getBoostRatio(bob, 20)  # Has units available
     assert bob_boost_ratio == 2 * HUNDRED_PERCENT

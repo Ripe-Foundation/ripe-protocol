@@ -159,7 +159,8 @@ def purchaseRipeBond(
     ripePerUnit: uint256 = self._calcRipePerUnit(epochProgress, config.minRipePerUnit, config.maxRipePerUnit)
 
     # main ripe payout
-    units: uint256 = paymentAmount // (10 ** convert(staticcall IERC20Detailed(_paymentAsset).decimals(), uint256))
+    oneUnit: uint256 = 10 ** convert(staticcall IERC20Detailed(_paymentAsset).decimals(), uint256)
+    units: uint256 = paymentAmount // oneUnit
     baseRipePayout: uint256 = ripePerUnit * units
     assert baseRipePayout != 0 # dev: must have base ripe payout
     totalRipePayout: uint256 = baseRipePayout
@@ -224,7 +225,8 @@ def purchaseRipeBond(
         assert extcall IERC20(_paymentAsset).transfer(_caller, refundAmount, default_return_value=True) # dev: asset transfer failed
 
     # start next epoch (if applicable)
-    if paymentAmount == data.paymentAmountAvailInEpoch and config.shouldAutoRestart:
+    remainingBondAvail: uint256 = data.paymentAmountAvailInEpoch - paymentAmount
+    if remainingBondAvail < oneUnit and config.shouldAutoRestart:
         newStartBlock: uint256 = epochEnd + config.restartDelayBlocks
         extcall Ledger(a.ledger).setEpochData(newStartBlock, newStartBlock + config.epochLength, config.amountPerEpoch)
 
