@@ -62776,11 +62776,8 @@
     "GreenPool": {
       "address": "0xd6c283655B42FA0eb2685F7AB819784F071459dc"
     },
-    "RipePoolCurve": {
+    "RipePool": {
       "address": "0xF8D92a9531205AB2Dd0Bc623CDF4A6Ab4c3a2526"
-    },
-    "RipePoolAero": {
-      "address": "0x765824aD2eD0ECB70ECc25B0Cf285832b335d6A9"
     },
     "BondBooster": {
       "address": "0xF9E38714E01DA439E4211F8275F141d3A896bb74",

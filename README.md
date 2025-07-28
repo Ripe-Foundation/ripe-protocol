@@ -51,15 +51,16 @@
 | AuctionHouse        | [0x3228b04a4b4b498dA7235154131374077600989F](https://basescan.org/address/0x3228b04a4b4b498dA7235154131374077600989F) |
 | AuctionHouseNFT     | [0x504Fb3b94a9f4A238Ee3A16474B91F99A3f26F3A](https://basescan.org/address/0x504Fb3b94a9f4A238Ee3A16474B91F99A3f26F3A) |
 | Boardroom           | [0xb5cA6Ef866b510C3b85D4B0e3862061A569412D1](https://basescan.org/address/0xb5cA6Ef866b510C3b85D4B0e3862061A569412D1) |
-| BondRoom            | [0x12a52aC824876043A850ae3EA3a12ECeE0E7aDAE](https://basescan.org/address/0x12a52aC824876043A850ae3EA3a12ECeE0E7aDAE) |
+| BondRoom            | [0x7D0A292032c44e3e25871a1FB08288b85BdD816f](https://basescan.org/address/0x7D0A292032c44e3e25871a1FB08288b85BdD816f) |
 | CreditEngine        | [0xC4d54b999D333E8c8293f83DDcF3B9A19B76645F](https://basescan.org/address/0xC4d54b999D333E8c8293f83DDcF3B9A19B76645F) |
 | Endaoment           | [0xd00A4A131b26920b6f407D177bCCa94454EAEF7d](https://basescan.org/address/0xd00A4A131b26920b6f407D177bCCa94454EAEF7d) |
 | HumanResources      | [0xF9aCDFd0d167b741f9144Ca01E52FcdE16BE108b](https://basescan.org/address/0xF9aCDFd0d167b741f9144Ca01E52FcdE16BE108b) |
 | Lootbox             | [0xE05605ba1Fb0551c6f4b0089FD46D42D63c795bA](https://basescan.org/address/0xE05605ba1Fb0551c6f4b0089FD46D42D63c795bA) |
 | Teller              | [0xad4a471C8D57715d3D8585a593305a43bc7389fa](https://basescan.org/address/0xad4a471C8D57715d3D8585a593305a43bc7389fa) |
 | GreenPool           | [0xd6c283655B42FA0eb2685F7AB819784F071459dc](https://basescan.org/address/0xd6c283655B42FA0eb2685F7AB819784F071459dc) |
-| RipePool            | [0xF8D92a9531205AB2Dd0Bc623CDF4A6Ab4c3a2526](https://basescan.org/address/0xF8D92a9531205AB2Dd0Bc623CDF4A6Ab4c3a2526) |
-| BondBooster         | [0x86878A3b522E2498390e7ECbBADe32de5aa0DC9E](https://basescan.org/address/0x86878A3b522E2498390e7ECbBADe32de5aa0DC9E) |
+| RipePoolCurve       | [0xF8D92a9531205AB2Dd0Bc623CDF4A6Ab4c3a2526](https://basescan.org/address/0xF8D92a9531205AB2Dd0Bc623CDF4A6Ab4c3a2526) |
+| RipePoolAero        | [0x765824aD2eD0ECB70ECc25B0Cf285832b335d6A9](https://basescan.org/address/0x765824aD2eD0ECB70ECc25B0Cf285832b335d6A9) |
+| BondBooster         | [0xF9E38714E01DA439E4211F8275F141d3A896bb74](https://basescan.org/address/0xF9E38714E01DA439E4211F8275F141d3A896bb74) |
 
 ---
 
