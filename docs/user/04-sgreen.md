@@ -1,84 +1,89 @@
-# Savings GREEN (sGREEN): Your GREEN Working Harder
+# sGREEN: Set It and Forget It Yield
 
-sGREEN transforms idle [GREEN stablecoins](01-green-stablecoin.md) into productive capital that automatically captures all protocol revenues. It's the simplest way to earn real yield in DeFi — no staking, no claiming, no complexity. Just deposit GREEN and watch your wealth grow through the power of compound interest.
+Your stablecoins are lazy. Sitting there. Doing nothing. Earning nothing.
 
-## The sGREEN Advantage
+Meanwhile, Ripe borrowers are paying interest on loans backed by everything from ETH to jpegs. That interest? It could be yours. Just deposit [GREEN](01-green-stablecoin.md) into sGREEN and start capturing every penny of protocol revenue. No staking. No claiming. No thinking.
 
-### Automatic Wealth Accumulation
+The best part? You get paid even if borrowers ghost the protocol. Welcome to yield that actually works.
 
-Unlike traditional staking where you must claim rewards, sGREEN operates on an elegant share-based system that compounds value automatically:
+## Understanding sGREEN
 
-- **Set and Forget**: Your sGREEN balance stays constant while its GREEN value increases daily
-- **No Gas Fees**: Value accrues through exchange rate appreciation, not token distributions
-- **Compound Growth**: All revenues automatically reinvest, accelerating your returns
-- **Capital Preservation**: The exchange rate can only increase — never decrease
+sGREEN is GREEN's yield-bearing twin — a set-and-forget savings vault that automatically compounds protocol revenues into your holdings. Built on the battle-tested ERC-4626 standard, it transforms idle stablecoins into productive capital without the hassle of claiming rewards or managing positions.
 
-**Real Example**: If you deposited 1,000 GREEN when the rate was 1.0 and it's now 1.08, your sGREEN is worth 1,080 GREEN — an 8% gain with zero effort.
+## Where Your Yield Comes From
 
-### Where Your Yield Comes From
-
-Every sGREEN holder benefits from multiple protocol revenue streams that flow directly to the vault:
+Every sGREEN holder benefits from multiple real protocol revenue streams:
 
 1. **Borrower Interest Payments**: Continuous yield from all active loans across the protocol
 2. **Origination Fees (Daowry)**: 0.5% fee on every new loan minted instantly adds value
-3. **Unrealized Yield Flush**: Accrued interest from borrowers gets distributed to sGREEN holders
+3. **Unrealized Yield Flush**: Even if borrowers never repay, their accrued interest is periodically "flushed" to sGREEN holders through new GREEN minting. You don't wait for loan repayments to get your yield — the protocol ensures sGREEN value grows continuously regardless of borrower behavior
 4. **Future Treasury Yields**: [Governance](08-governance.md) can direct [Endaoment](11-endaoment.md) profits to sGREEN holders
 
-This isn't speculative yield — it's real revenue from actual protocol usage.
+This isn't speculative yield — it's real revenue from actual protocol usage that compounds automatically into your position.
 
-## Two Ways to Access sGREEN
+## How to Use sGREEN
 
-### 1. Direct Deposit (Most Common)
-Convert your GREEN to sGREEN with a simple deposit:
+### Option 1: Direct Deposit (Simplest)
+Convert your GREEN to sGREEN with one transaction:
 - Deposit any amount of GREEN to the vault
 - Receive sGREEN shares at the current exchange rate
 - Start earning immediately with no minimum or lock-up
 
 **Example**: At a 1.1 rate, depositing 1,100 GREEN gives you 1,000 sGREEN
 
-### 2. Smart Borrowing Strategy
-Sophisticated users can borrow directly in sGREEN:
+### Option 2: Borrow Directly in sGREEN
+Advanced strategy for sophisticated users:
 - Take out loans denominated in sGREEN instead of GREEN
 - Your debt stays constant while your sGREEN grows
 - Profit when sGREEN yield exceeds your borrow rate
 
 **The Math**: Borrow at 5% APR, earn 8% on sGREEN = 3% net profit on borrowed funds
 
-## Advanced Strategy: [Stability Pool](05-stability-pools.md)
+### Option 3: Deploy to [Stability Pools](05-stability-pools.md) (Maximum Yield)
+Stack multiple revenue streams by depositing sGREEN in stability pools:
+- **Keep earning**: sGREEN base yield continues 
+- **Add liquidations**: Buy collateral at 5-15% discounts
+- **Plus rewards**: Earn [RIPE tokens](09-ripe-rewards.md) on top
+- **Triple stack**: All three sources compound together
 
-Deposit sGREEN in [stability pools](05-stability-pools.md) to stack multiple revenue streams:
+**Potential Returns**: Base yield + liquidation profits + RIPE rewards = significant APR
 
-1. **Base Layer**: Continue earning sGREEN's native yield
-2. **Liquidation Layer**: Purchase discounted collateral (typically 5-15% below market)
-3. **Rewards Layer**: Earn RIPE tokens from the protocol's staker allocation
-4. **Compounding Effect**: All three layers work together, multiplying returns
+## Getting Paid No Matter What
 
-**Example Scenario**: 
-- sGREEN base yield: 6% APR
-- Liquidation profits: 8% APR
-- [RIPE rewards](06-ripe-rewards.md): 4% APR
-- **Total potential**: 18% APR (before compounding)
+Here's what most people miss: sGREEN holders get their yield even if borrowers ghost the protocol.
 
-## Why sGREEN is Built Different
+**How It Works**:
+- Borrowers accumulate interest every block (paid or unpaid)
+- This interest is tracked but not yet "realized" as new GREEN
+- Periodically, the protocol "flushes" this unrealized yield
+- New GREEN is minted to represent the accrued interest
+- sGREEN exchange rate increases, capturing this value
 
-### Unbreakable Value Preservation
-- **Monotonic Growth**: Exchange rate mathematically cannot decrease — only up or stable
-- **Full Backing**: Every sGREEN always redeemable for its GREEN value
-- **No Impairment Risk**: Protocol design prevents any value loss scenarios
-- **Audited Security**: ERC-4626 standard implementation with comprehensive testing
+**What This Means**: 
+- Your yield doesn't depend on borrowers being good actors
+- Interest compounds into sGREEN value whether loans are repaid or not
+- When borrowers eventually repay (or get liquidated), that GREEN is burned
+- The system stays balanced while you keep earning
 
-### True DeFi Liquidity
-- **Instant Redemption**: Convert to GREEN anytime with no delays
+## The sGREEN Advantage
+
+### How Value Accumulates Automatically
+
+Unlike traditional staking where you claim rewards, sGREEN uses an elegant share-based system:
+
+- **Set and Forget**: Your sGREEN balance stays constant while its GREEN value increases
+- **No Gas Fees**: Value accrues through exchange rate appreciation, not token distributions  
+- **Compound Growth**: All revenues automatically reinvest, accelerating returns
+- **Monotonic Rate**: The exchange rate can only increase — mathematically impossible to decrease
+
+**Real Example**: Deposit 1,000 GREEN at 1.0 rate → Wait one year → Rate becomes 1.08 → Your sGREEN now worth 1,080 GREEN. Zero actions required.
+
+### True DeFi Flexibility
+
+- **Instant Redemption**: Convert to GREEN anytime, no delays or penalties
 - **Zero Lock-ups**: Your capital is never trapped or restricted
-- **No Exit Penalties**: Withdraw 100% of your value whenever needed
-- **Full Transferability**: Send, trade, or use sGREEN anywhere ERC-20s are accepted
-
-### Elegant Tax Efficiency
-Unlike reward tokens that create taxable events, sGREEN's value accrues through price appreciation:
-- No constant reward claiming
-- Simplified accounting
-- Potential tax advantages (consult your tax advisor)
-- Clean transaction history
+- **Full Transferability**: Send, trade, or use sGREEN like any ERC-20
+- **Tax Efficiency**: Value accrues through price appreciation, not taxable distributions
 
 ## Real User Scenarios
 
@@ -105,7 +110,12 @@ Unlike reward tokens that create taxable events, sGREEN's value accrues through 
 ## Frequently Asked Questions
 
 **Q: How does sGREEN compare to other yield-bearing stablecoins?**
-A: sGREEN offers true decentralization, no lock-ups, and revenue from real protocol usage — not subsidized yields or risky strategies.
+A: The difference isn't just sGREEN — it's the entire Ripe ecosystem:
+- **Diverse Revenue**: sGREEN captures yield from a protocol that accepts EVERYTHING as collateral (NFTs, memecoins, yield positions), not just ETH/USDC
+- **Unrealized Yield Flush**: You get paid even if borrowers never repay — unique to Ripe
+- **Triple Stack Potential**: Deploy sGREEN to stability pools for base yield + liquidations + RIPE rewards
+- **Real Demand**: Borrowers use Ripe because they can leverage their entire portfolio in one position — creating sustainable yield sources
+- Other yield-bearing stables rely on narrow use cases or subsidized APYs. sGREEN's yield comes from solving a real problem: unified portfolio borrowing.
 
 **Q: What drives sGREEN yields?**
 A: Real borrowing demand. More loans = more interest and fees = higher sGREEN yields. It's sustainable because borrowers get productive capital.
@@ -122,11 +132,15 @@ A: sGREEN remains stable. Market volatility often increases borrowing and liquid
 **Q: How often does the exchange rate update?**
 A: Every transaction updates the rate in real-time. No waiting for daily rebase or epoch updates.
 
-## The Bottom Line
+## Stop Leaving Money on the Table
 
-sGREEN represents the evolution of stablecoin savings — combining the stability of GREEN with automatic yield generation that requires zero effort. Whether you're a passive holder seeking simple returns or an active strategist stacking yields, sGREEN provides the foundation for sustainable wealth accumulation in DeFi.
+Every block, Ripe borrowers generate interest. Every new loan pays fees. Every liquidation creates value.
 
-Your GREEN doesn't need to sit idle. Put it to work with sGREEN and let protocol revenues compound your wealth, automatically and perpetually.
+Without sGREEN, you're watching that revenue flow past you. With sGREEN, you're catching it all — automatically compounding into your position while you sleep, work, or forget crypto exists.
+
+One deposit. Infinite compounding. Zero effort.
+
+Your stablecoins have been lazy long enough.
 
 ---
 
