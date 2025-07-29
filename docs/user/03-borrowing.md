@@ -1,19 +1,10 @@
-# Borrowing on Ripe: Unlock Liquidity Without Selling
+# Borrowing: One Loan, Endless Possibilities
 
-Ripe Protocol enables borrowing [GREEN stablecoins](01-green-stablecoin.md) against your [deposited collateral](02-collateral-assets.md) through an automated system that weighs risks, adjusts rates dynamically, and maintains protocol stability. This isn't just another lending platform — it's a sophisticated credit engine that transforms idle assets into productive capital while preserving your exposure to upside potential.
+Other protocols: "Sorry, your NFT doesn't count. Open another vault for your WBTC. Oh, and that yield-bearing position? Can't use it."
 
-## Why Borrow on Ripe
+Ripe: "What's your total portfolio worth? Cool. Here's your borrowing power."
 
-### Capital Efficiency Without Compromise
-
-When you deposit assets into Ripe vaults, they don't just sit idle. The protocol evaluates your collateral portfolio and extends credit lines based on weighted risk parameters. This means:
-
-- **Maintain asset exposure** while accessing liquidity
-- **Avoid taxable events** from selling appreciated assets  
-- **Compound yields** by borrowing at one rate and earning at another
-- **Access instant liquidity** without credit checks or applications
-
-The borrowing system serves as the demand driver for [GREEN](01-green-stablecoin.md), creating natural use cases that strengthen the stablecoin's utility and adoption. GREEN is minted when you borrow and burned when you repay, maintaining supply-demand equilibrium.
+Every asset you own — from ETH to memecoins to that jpeg you overpaid for — backs a single [GREEN](01-green-stablecoin.md) loan. One position. One rate. One liquidation threshold. Finally, borrowing that makes sense.
 
 ## How Borrowing Works
 
@@ -129,29 +120,29 @@ $10,000                    $8,571      $7,500     $6,667      $0
 
 **Understanding Each Zone:**
 
-**🟢 SAFE ZONE (Collateral > $8,571)**
+**🟢 SAFE ZONE (Below 70% LTV / Collateral > $8,571)**
 - **Status**: Healthy position with borrowing capacity
-- **Actions Available**: Can borrow up to $7,000 total
+- **Actions Available**: Can borrow up to $7,000 total (70% max LTV)
 - **Risk Level**: None - full flexibility
 - **What to do**: Normal operations
 
-**🟡 CAUTION ZONE (Collateral $8,571 - $7,500)**
+**🟡 CAUTION ZONE (70%-80% LTV / Collateral $8,571 - $7,500)**
 - **Status**: Over max LTV but still protected
 - **Actions Available**: Cannot borrow more; can repay/add collateral
 - **Risk Level**: Medium - approaching danger
 - **What to do**: Consider reducing debt or adding collateral
 
-**🟠 REDEMPTION ZONE (Collateral $7,500 - $6,667)**
+**🟠 REDEMPTION ZONE (80%-90% LTV / Collateral $7,500 - $6,667)**
 - **Status**: Eligible for [redemption](07-liquidations.md#redemption-the-first-line-of-defense)
 - **Actions Available**: Anyone can pay your debt for collateral
 - **Risk Level**: High - active intervention needed
 - **What to do**: Urgently repay debt or add collateral
 
-**🔴 LIQUIDATION ZONE (Collateral < $6,667)**
+**🔴 LIQUIDATION ZONE (Above 90% LTV / Collateral < $6,667)**
 - **Status**: Automatic [liquidation](07-liquidations.md) triggered
 - **Actions Available**: None - process is automatic
-- **Risk Level**: Critical - position being closed
-- **What to do**: Learn from experience for next time
+- **Risk Level**: Critical - partial liquidation to restore health
+- **What to do**: Position will be partially liquidated until healthy again
 
 ### The Critical Inverse Relationship
 
@@ -172,17 +163,6 @@ Unlike LTV which calculates forward (debt as % of collateral), redemption and li
 
 Understanding this inverse relationship helps you monitor the right metrics and take action before it's too late.
 
-**Pro Tip - Monitor Your Health Factor:**
-```
-Health Factor = Current Collateral Value ÷ Liquidation Collateral Required
-
-Example: $10,000 collateral ÷ $6,667 required = 1.50 health factor
-- Above 1.5 = Very safe (green)
-- 1.2 to 1.5 = Monitor closely (yellow)
-- 1.0 to 1.2 = Take action now (orange)
-- Below 1.0 = Liquidation (red)
-```
-
 ## Dynamic Interest Rates
 
 ### Base Rates vs Dynamic Adjustments
@@ -197,7 +177,7 @@ Ripe monitors the GREEN/USDC liquidity pool as a health indicator. Under normal 
 
 **How Pool Monitoring Works:**
 - **Balanced State**: 50% GREEN / 50% USDC → Base rates apply
-- **Danger Zone**: GREEN exceeds 60% → Rate multipliers activate
+- **Danger Zone**: GREEN exceeds 60% of reference pool → Rate multipliers activate
 - **Scaling Adjustments**: Rates increase proportionally from 60% to 100% GREEN
 
 ### Three-Layer Rate Adjustment
@@ -217,7 +197,7 @@ When imbalances occur, rates adjust through three mechanisms:
 3. **Maximum Rate Protection**
    - Hard caps prevent excessive rates
    - Protocol maximum (e.g., 50% APR)
-   - Protects borrowers from extreme conditions
+   - Protects borrowers from extreme borrow rates
 
 **Real Example:**
 ```
@@ -284,7 +264,7 @@ When borrowing, you can choose one of three ways to receive your funds:
 
 **Option 1: Direct GREEN** 
 - Receive standard GREEN stablecoins
-- Use immediately for any purpose
+- Use immediately for any purpose (swap to USDC)
 - Most flexible option
 
 **Option 2: Auto-Convert to [sGREEN](04-sgreen.md)**
@@ -295,7 +275,7 @@ When borrowing, you can choose one of three ways to receive your funds:
 
 **Option 3: Direct to [Stability Pool](05-stability-pools.md)**
 - Borrowed GREEN converted to sGREEN and deposited into [Stability Pool](05-stability-pools.md) in one transaction
-- Earn both sGREEN yield AND stability pool rewards
+- Triple rewards: sGREEN yield + stability pool rewards + [RIPE rewards](09-ripe-rewards.md)
 - Participate in liquidations for discounted collateral
 - Maximum yield potential but least liquid option
 
@@ -318,6 +298,16 @@ Ripe Protocol offers complete repayment flexibility:
 
 This flexibility lets you manage debt according to your needs without restrictive schedules or penalties.
 
+## The Future of DeFi Borrowing
+
+Forget the old way. No more portfolio fragmentation. No more wasted collateral. No more choosing between earning yield or accessing liquidity.
+
+With Ripe, your stablecoins get treated like the safe assets they are while even your riskiest positions contribute something. Your yield positions keep earning while backing your loan. Dynamic rates protect the protocol without punishing everyday borrowers. And if things go south? Redemptions give you a buffer before liquidations even start.
+
+This is borrowing rebuilt from first principles. One position that actually understands what a portfolio is.
+
 ---
 
-Ready to start borrowing? Check your vault balances and available credit in the Ripe app.
+*Ready to experience unified borrowing? Your entire portfolio is waiting to work harder.*
+
+*For technical implementation details, see the [Credit Engine Technical Documentation](../technical/core/CreditEngine.md).*

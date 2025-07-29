@@ -1,6 +1,8 @@
 # Collateral Assets
 
-Ripe Protocol transforms traditional lending by creating a unified multi-collateral system where all your deposited assets work together to back a single GREEN loan. Instead of managing multiple isolated positions, your entire portfolio — from stablecoins to blue-chip crypto to emerging tokens — combines into one powerful borrowing position. Every asset you deposit contributes to your total borrowing capacity, creating unprecedented capital efficiency while maintaining individual risk isolation.
+One loan. Every asset. Maximum efficiency.
+
+That's Ripe Protocol. While other lending protocols make you open separate positions for each asset (exhausting) or limit you to "safe" tokens only (boring), Ripe does something radical: it treats your portfolio like a portfolio. Your ETH, your yield-bearing positions, your stablecoins, even your NFTs — they all work together to back a single GREEN loan with weighted terms. No juggling. No wasted capital. Just pure efficiency.
 
 ## Why Ripe's Approach is Different
 
@@ -10,7 +12,7 @@ Most DeFi protocols force you into one of two suboptimal models:
 
 **Isolated Markets**: Each asset creates a separate loan position
 - Deposit ETH → Manage one position
-- Deposit USDC → Manage another position  
+- Deposit cbBTC → Manage another position  
 - One liquidation doesn't help the others
 - Complex management across multiple positions
 
@@ -62,13 +64,13 @@ Ripe's extensible architecture can support a vast and growing universe of tokeni
 - **WETH**: Wrapped Ethereum, the DeFi standard
 - **WBTC/cbBTC**: Bitcoin representations on Ethereum
 - **Major DeFi tokens**: AAVE, UNI, CRV, and other protocol tokens
-- **Layer 1 tokens**: SOL, AVAX, MATIC (when bridged)
+- **Layer 1 tokens**: SOL, AVAX, XRP, HYPE (when bridged)
 - Provide strong borrowing power with proven track records
 
 **3. Yield-Bearing Assets** - Earn while you borrow
 - **Liquid staking**: stETH, rETH, cbETH continue earning staking rewards
 - **LP tokens**: Uniswap, Curve, Balancer positions keep earning fees
-- **Vault tokens**: Yearn, Aave aTokens compound while collateralized
+- **Vault tokens**: Lending positions from Aave, Morpho, Euler, etc.
 - Share-based accounting preserves all accumulated yields
 
 **4. Tokenized Real-World Assets** - Bridging traditional finance
@@ -93,13 +95,6 @@ Ripe's extensible architecture can support a vast and growing universe of tokeni
 - Conservative parameters reflect higher volatility
 
 ## How Deposits Work
-
-### The Deposit Process
-
-1. **Asset Selection**: Choose from any supported token
-2. **Automatic Vault Routing**: Protocol selects optimal vault type
-3. **Instant Activation**: Start earning rewards immediately
-4. **Portfolio Building**: Add more assets anytime
 
 ### Vault Types Explained
 
@@ -154,21 +149,12 @@ Since deposited assets serve as collateral backing GREEN loans, the protocol mus
 - Protects stablecoin integrity during market stress
 
 **Minimum Balances**
-- Small position requirements (often ~$100)
+- Small position requirements
 - Prevents dust accumulation
 - Ensures meaningful participation
 - Reduces computational overhead
 
 These limits adapt over time through governance, balancing growth opportunities with prudent risk management. As assets demonstrate stability and liquidity deepens, limits can expand while maintaining GREEN's robust backing.
-
-### Multi-Asset Advantages
-
-Building a diversified collateral portfolio provides:
-
-1. **Reduced Liquidation Risk**: Asset correlation protection
-2. **Optimized Borrowing Power**: Each asset contributes its best LTV
-3. **Simplified Management**: One position, one health factor
-4. **Flexible Composition**: Add/remove assets as needed
 
 ## Making Withdrawals
 
@@ -256,14 +242,6 @@ Some assets require special access:
 
 The protocol handles permissions transparently — you'll know if an asset requires approval.
 
-### Emergency Features
-
-Safety mechanisms protect your assets:
-- **Pause Functionality**: Temporary halts during emergencies
-- **Asset Isolation**: Problems don't spread between assets
-- **Graceful Degradation**: Withdrawals prioritized in crises
-- **User Protection**: Your assets remain yours
-
 ## Why Deposit in Ripe?
 
 ### Immediate Benefits
@@ -284,13 +262,13 @@ Safety mechanisms protect your assets:
 - **Lower liquidation risk** through diversification
 - **Optimized parameters** for each asset type
 
-## Conclusion
+## The Power of True Portfolio Lending
 
-Ripe Protocol's deposit and withdrawal system represents the next evolution in DeFi lending. By combining the simplicity of unified positions with the flexibility of universal collateral acceptance, the protocol creates unprecedented opportunities for capital efficiency.
+Forget everything you know about DeFi borrowing. No more juggling ten different positions. No more leaving half your assets idle because they're "not supported." No more choosing between earning yield or accessing liquidity.
 
-Whether you're a conservative saver earning on stablecoins, a DeFi veteran maximizing yield-bearing positions, or an innovator exploring emerging assets, Ripe provides the infrastructure to make your assets work harder while maintaining the security and flexibility you demand.
+With Ripe, your Aave positions keep earning. Your NFTs become productive. That random memecoin moonshot? It's collateral now. One loan, weighted terms, every asset working.
 
-Start your journey today — every block counts toward your future rewards.
+This isn't just another lending protocol — it's how DeFi lending should have worked from day one.
 
 ---
 

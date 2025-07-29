@@ -1,6 +1,10 @@
 # GREEN: The Stablecoin That Works Harder
 
-GREEN is Ripe Protocol's overcollateralized stablecoin — a digital dollar that maintains rock-solid stability while powering an entire ecosystem of yield opportunities, liquidation profits, and financial tools. Unlike traditional stablecoins that sit idle in your wallet, GREEN actively participates in DeFi, earning yield through [sGREEN](04-sgreen.md), protecting the protocol through [stability pools](05-stability-pools.md), and maintaining its peg through multiple autonomous mechanisms that work 24/7.
+Your USDC sits there doing nothing. Your DAI requires a new vault for every asset. Your LUSD only accepts ETH.
+
+GREEN? It's built different. Mint it against your entire portfolio — ETH, stablecoins, NFTs, whatever you've got. Earn yield automatically through [sGREEN](04-sgreen.md). Score liquidation profits in [stability pools](05-stability-pools.md). Watch five different mechanisms defend the peg while you sleep.
+
+This is what happens when you stop asking "how do we make another stablecoin?" and start asking "how should stablecoins actually work?"
 
 ## Why GREEN Exists
 
@@ -324,12 +328,13 @@ When you need to borrow stablecoins, GREEN offers fundamental advantages:
 
 **The Key Difference**: GREEN is built for borrowers who want to use their entire portfolio efficiently. Whether you hold ETH, stablecoins, NFTs, tokenized stocks or emerging tokens, everything works together to back a single, manageable loan position.
 
+## Why This Matters
 
-## The Bottom Line
+Every other stablecoin makes you choose: safety or efficiency, yield or liquidity, simplicity or power.
 
-GREEN represents the next evolution in stablecoin design — combining the proven safety of overcollateralization with modern capital efficiency and seamless ecosystem integration. Whether you're borrowing against assets, earning yield through sGREEN, participating in liquidations, or simply using a reliable dollar instrument, GREEN provides unmatched utility without compromising stability.
+GREEN breaks the tradeoffs. One position backed by everything you own. Automatic yield that compounds while you sleep. Liquidation profits when others get rekt. A peg that defends itself through pure economics, not faith.
 
-Start using GREEN today and experience how a stablecoin should work: stable, productive, and integral to a thriving DeFi ecosystem.
+Stop settling for stablecoins designed for 2020. This is how money works in DeFi now.
 
 ---
 
