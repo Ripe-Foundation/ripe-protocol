@@ -137,8 +137,8 @@ def migrate(migration: Migration):
         True,  # shouldTransferToEndaoment
         False,  # shouldSwapInStabPools
         False,  # shouldAuctionInstantly
-        True,  # canDeposit
-        True,  # canWithdraw
+        False,  # canDeposit
+        False,  # canWithdraw
         False,  # canRedeemCollateral
         True,  # canRedeemInStabPool
         True,  # canBuyInAuction
