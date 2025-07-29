@@ -1,6 +1,10 @@
-# The Endaoment: Ripe Protocol's Autonomous Treasury
+# The Endaoment: Your Money Working Overtime
 
-The Endaoment is Ripe Protocol's self-sustaining treasury system that transforms stablecoin deposits from [bond sales](10-bonds.md) into productive capital that works perpetually for the protocol. Think of it as an intelligent treasury that never sleeps — automatically defending [GREEN](01-green-stablecoin.md)'s dollar peg, generating yield across DeFi, and growing the protocol's financial strength without human intervention.
+Every protocol has a treasury. Most sit on millions doing nothing.
+
+The Endaoment puts every dollar to work. Bond proceeds from [bond sales](10-bonds.md) don't collect dust—they're deployed across DeFi earning yield, providing liquidity, and defending [GREEN](01-green-stablecoin.md)'s peg. It's a treasury that compounds while others sleep.
+
+This is what happens when you design a treasury to grow wealth, not just hold it.
 
 ## Why The Endaoment Exists
 
@@ -38,12 +42,12 @@ The Endaoment acts as GREEN's guardian, maintaining its $1 peg through automated
 **When GREEN Weakens** (trades below $1):
 - Detects when GREEN exceeds 50% of the pool
 - Removes excess GREEN liquidity
-- Burns GREEN to create scarcity
+- Burns GREEN to reduce circulating supply
 - Market forces push price back to $1
 
 **When GREEN Strengthens** (trades above $1):
 - Detects when GREEN falls below 50% of the pool
-- Adds GREEN liquidity to increase supply
+- Adds GREEN liquidity to increase availability
 - May mint new GREEN (tracked as debt)
 - Market forces bring price back to $1
 
@@ -57,7 +61,6 @@ The Endaoment leverages **Underscore Protocol** — an advanced infrastructure t
 - **Unified Interface**: Every yield strategy uses the same standardized commands, whether deploying to Aave or Uniswap
 - **Registry-Based Discovery**: New protocol integrations automatically become available without contract upgrades
 - **AI-Ready Architecture**: Designed from day one to enable AI agents to analyze and execute complex treasury strategies
-- **Gas Optimization**: Batch operations across multiple protocols in single transactions
 
 **Active Strategies Include:**
 - **Lending Protocols**: Earning interest on Aave, Morpho, Euler, Fluid, Compound
@@ -89,31 +92,7 @@ The Endaoment enables win-win liquidity partnerships:
 - Expand market presence
 - Generate additional revenue streams
 
-## The Value Proposition
-
-### For GREEN Users
-
-**Unshakeable Stability**: The Endaoment's automated interventions ensure GREEN maintains its dollar peg even during market turbulence. This isn't just a promise — it's mathematically enforced by smart contracts.
-
-**Deep Liquidity**: Treasury-owned liquidity means you can trade GREEN with minimal slippage, whether you're swapping $100 or $100,000.
-
-**Sustainable Backing**: Every GREEN is backed by productive assets generating real yield, not just idle reserves.
-
-### For RIPE Holders
-
-**Growing Treasury**: Bond proceeds don't sit idle — they work 24/7 across DeFi generating returns that strengthen the protocol.
-
-**Non-Dilutive Revenue**: Treasury yields fund operations and rewards without minting new tokens.
-
-**Compounding Value**: As the treasury grows, so does the protocol's ability to generate yield, creating a virtuous cycle.
-
-### For sGREEN Stakers
-
-**Stability Rewards**: [sGREEN](04-sgreen.md) stakers earn rewards from providing stability to the [GREEN](01-green-stablecoin.md) ecosystem through the [stability pool](05-stability-pools.md) mechanism.
-
-**Protected Participation**: Your staked position helps maintain protocol health while earning returns from liquidation premiums.
-
-### Future Yield Distribution
+## Future Yield Distribution
 
 Currently, all treasury earnings remain in the Endaoment to maximize protocol growth and compound returns. However, [governance](08-governance.md) retains the power to enable yield distribution in the future, which could direct treasury earnings to:
 
@@ -124,23 +103,24 @@ When activated, these would represent real yield from treasury operations, not t
 
 ## What Sets The Endaoment Apart
 
-Unlike traditional protocol treasuries that require constant human management, the Endaoment operates as an autonomous financial engine. It doesn't just hold assets — it actively manages them to:
+Unlike traditional protocol treasuries that rely entirely on manual decisions, the Endaoment combines automated mechanisms with strategic oversight. It doesn't just hold assets — it actively manages them to:
 
 1. **Generate sustainable yield** without taking excessive risks
 2. **Defend GREEN's stability** through market-based mechanisms
 3. **Grow protocol wealth** in both bull and bear markets
 4. **Operate transparently** with all actions verifiable on-chain
 
-## The Bottom Line
+## The Compound Effect
 
-The Endaoment transforms idle treasury assets into a productive force that benefits every protocol participant. By combining automated market operations, diversified yield strategies, and strategic partnerships, it creates a self-reinforcing system where:
+Here's what most people miss about treasuries: they're not just backstops. They're growth engines.
 
-- **Users** get a stable, liquid GREEN token
-- **Holders** benefit from a growing, productive treasury
-- **Stakers** earn real yield from treasury operations
-- **Partners** access mutually beneficial opportunities
+Every bond sold adds fuel. Every yield harvest compounds. Every market intervention strengthens the peg. The Endaoment doesn't just protect the protocol—it makes it unstoppable.
 
-This isn't just a treasury — it's the financial backbone that enables Ripe Protocol to grow sustainably while maintaining the stability users demand.
+While other treasuries measure success in dollars held, the Endaoment measures it in dollars earned. That's the difference between surviving and thriving.
+
+The treasury is working. The yields are compounding. The protocol is growing.
+
+Are you in?
 
 ---
 
