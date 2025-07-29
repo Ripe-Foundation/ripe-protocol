@@ -184,7 +184,6 @@ That's not a feature. That's survival.
 ---
 
 _For technical implementation details, see:_
-
 - _[Price Desk Technical Documentation](../technical/registries/PriceDesk.md) - Oracle aggregation system_
 - _[Chainlink Prices](../technical/priceSources/ChainlinkPrices.md) - Chainlink integration_
 - _[Curve Prices](../technical/priceSources/CurvePrices.md) - AMM-based pricing and GREEN monitoring_

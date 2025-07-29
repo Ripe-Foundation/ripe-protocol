@@ -95,7 +95,7 @@ GREEN isn't just another stablecoin. It's the cornerstone of Ripe Protocol:
 
 Every GREEN token represents real value locked in Ripe Protocol:
 
-1. **Deposit Collateral**: Lock any [supported asset](02-collateral-types.md) (ETH, WBTC, stablecoins, etc.)
+1. **Deposit Collateral**: Lock any [supported asset](02-collateral-assets.md) (ETH, WBTC, stablecoins, etc.)
 2. **Borrow GREEN**: Mint new GREEN against your collateral
 3. **Overcollateralized Always**: Minimum 110% backing, often much higher
 4. **Pay Interest**: [Dynamic rates](03-borrowing.md#dynamic-interest-rates) that respond to market conditions
@@ -289,7 +289,7 @@ If extreme conditions create bad debt, the protocol can sell [bonds](10-bonds.md
 - Fee flows strengthen the ecosystem
 - Designed for maximum composability with DeFi
 
-### [Keeper Network](06-liquidation-keepers.md) Protection
+### Keeper Network Protection
 
 - Automated bots monitor all GREEN loans 24/7
 - Trigger liquidations when positions become unsafe

@@ -155,7 +155,7 @@ Every vesting contract is visible onchain, allowing anyone to verify:
 
 The protocol can freeze contracts in emergencies but cannot steal vested tokens. If someone leaves early, unvested tokens return to treasury while vested amounts remain claimable—ensuring fairness for all parties.
 
-For deep technical details on the vesting system, see the [Contributor contract documentation](../technical/modules/Contributor.md).
+_For deep technical details on the vesting system, see the [Contributor contract documentation](../technical/modules/Contributor.md)._
 
 ## The Bottom Line: Own the Future, Not the Hype
 
