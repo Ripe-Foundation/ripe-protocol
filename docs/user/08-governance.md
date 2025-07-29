@@ -1,6 +1,12 @@
-# Ripe Governance: Power Through Commitment
+# Governance: Buy Power, or Earn It?
 
-The Ripe Governance Vault transforms RIPE tokens into voting power through a unique time-locked staking system. By committing tokens for extended periods, participants earn governance points that will control every aspect of the protocol — from asset parameters to treasury strategies. While full on-chain governance hasn't launched yet, **your governance power is actively accumulating now**, positioning early participants to shape Ripe Protocol's future.
+Other protocols: "Got money? Here's your vote. Welcome to the whale show."
+
+Ripe: "Got conviction? Lock it up. Time in the market beats timing the market."
+
+No instant influence for sale here. Your power grows every block you stay locked. A small holder locked for 3 years outweighs a whale who showed up yesterday. This is governance by believers, not buyers.
+
+**The kicker**: Governance isn't live yet, but your power is already accumulating. Like mining Bitcoin in 2010.
 
 ## Why Lock RIPE?
 
@@ -65,18 +71,6 @@ Not all deposits are created equal:
 This incentivizes users to provide liquidity while building governance power, strengthening the entire ecosystem.
 
 ## Managing Your Position
-
-### Making Deposits
-
-**Standard Path** (through protocol UI):
-- Deposits automatically use minimum lock duration
-- Points begin accumulating immediately
-- Can extend lock anytime for bonus multiplier
-
-**Advanced Path** (for protocols/contracts):
-- Specify custom lock durations up to 3 years
-- Used for treasury management and reward distribution
-- Weighted averaging with existing positions
 
 ### Lock Extensions: Your Power Move
 
@@ -153,14 +147,20 @@ When on-chain governance activates, RIPE holders will wield comprehensive protoc
 - **Governance Rules**: Voting parameters and proposal requirements
 - **Strategic Direction**: Long-term vision and growth initiatives
 
-## Why This Matters
+## Time to Choose Your Side
 
-Ripe's governance model creates a unique dynamic where patience and commitment translate directly into protocol control. Unlike typical DeFi governance where wealthy actors can buy influence instantly, our time-weighted system ensures those who've supported the protocol longest have the strongest voice.
+Every protocol eventually faces the same question: Who really owns this?
 
-This isn't just about voting — it's about building a sustainable, community-driven protocol where incentives align perfectly. Lock your RIPE, accumulate your power, and help shape the future of decentralized stablecoins.
+In most DeFi, the answer is simple: whoever has the most money right now. Buy tokens, vote immediately, dump tomorrow. The mercenary model.
+
+Ripe flips the script. Your vote weight = tokens × time locked × commitment multiplier. Can't buy your way to the top. Can't raid the treasury and run. 
+
+The protocol belongs to those who bet their future on it.
+
+Governance launches eventually. Power accumulates now. The clock is ticking.
 
 ---
 
-Ready to become a governance participant? Start accumulating your voting power today in the Ripe Governance Vault. The earlier you begin, the more influence you'll wield when the protocol's future is in your hands.
+*Lock RIPE. Stack points. Own the future.*
 
-For technical implementation details, see [RipeGov Technical Documentation](../technical/vaults/RipeGov.md).
+*For technical implementation details, see [RipeGov Technical Documentation](../technical/vaults/RipeGov.md).*
