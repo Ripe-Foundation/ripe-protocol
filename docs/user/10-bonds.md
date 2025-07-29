@@ -1,6 +1,12 @@
-# Ripe Bonds: Building Treasury Through Community
+# Ripe Bonds: Trade Cash for Power
 
-Ripe Bonds create a powerful exchange mechanism where your stablecoins transform into RIPE tokens while funding the protocol's [Endaoment](11-endaoment.md) treasury. This isn't just a token sale — it's a strategic partnership where early supporters help build the financial foundation that makes [GREEN](01-green-stablecoin.md) stable and the entire protocol sustainable.
+Every protocol needs capital. Most just sell tokens and spend it.
+
+Ripe bonds transform your capital into permanent treasury assets. Your USDC doesn't get spent on salaries or marketing—it becomes protocol-owned liquidity in the [Endaoment](11-endaoment.md), earning yield that backs [GREEN](01-green-stablecoin.md) forever. Lock for 3 years? Triple your allocation. Have activity boosters? Multiply it again. 
+
+The longer everyone else waits, the more you accumulate.
+
+You're not funding an exit. You're funding a machine that prints money for the protocol—and getting a piece of the action.
 
 ## The Bond Value Proposition
 
@@ -82,8 +88,6 @@ No Lock → 0% bonus → 1x RIPE (base amount only)
 - Start earning governance points and staking rewards immediately
 - Maintain full voting rights throughout lock period
 
-**Strategic Consideration**: Longer locks mean larger positions but less liquidity. Balance your RIPE accumulation goals with capital flexibility needs.
-
 ### Bond Boosters
 
 The protocol rewards specific user activities through Bond Boosters, creating targeted incentives for valuable contributions:
@@ -106,10 +110,12 @@ The protocol rewards specific user activities through Bond Boosters, creating ta
 **The Unit System:**
 Units represent your Bond Booster capacity:
 - 1 unit = 1 USDC
-- If you have 1,000 units and 200% Bond Booster:
-  - Bond 500 USDC → uses 500 units, get 200% Bond Booster
-  - Bond 1,500 USDC → first 1,000 get Bond Booster, remaining 500 don't
 - Units consumed permanently (no refills)
+
+Example scenarios with 1,000 units and 200% Bond Booster:
+- **Scenario A**: Bond 500 USDC → uses 500 units, all 500 USDC gets boosted (500 units remain)
+- **Scenario B**: Bond 1,500 USDC → uses all 1,000 units, only first 1,000 USDC gets boosted
+- **Scenario C**: Bond 500 USDC first, then bond 1,000 USDC later → second bond only has 500 units left, so only 500 of the 1,000 USDC gets boosted
 
 **Stacking Example:**
 Top-tier testnet participant bonds 1,000 USDC with 3-year lock:
@@ -122,8 +128,8 @@ Top-tier testnet participant bonds 1,000 USDC with 3-year lock:
 
 ## Real-World Bonding Examples
 
-### Example 1: The Committed Builder
-*Sarah bonds 5,000 USDC with maximum commitment*
+### Example 1: Maximum Value Strategy
+*Sarah bonds 5,000 USDC with full commitment*
 
 - **Epoch Status**: 7 hours into 24-hour epoch (30% complete)
 - **Base Rate**: $0.40 per RIPE → 12,500 RIPE base
@@ -132,7 +138,7 @@ Top-tier testnet participant bonds 1,000 USDC with 3-year lock:
 - **Total Received**: 62,500 RIPE (locked 3 years)
 - **Effective Price**: $0.08 per RIPE
 
-### Example 2: The Flexible Investor
+### Example 2: Balanced Approach
 *James bonds 10,000 USDC with moderate lock*
 
 - **Epoch Status**: 17 hours into 24-hour epoch (70% complete)
@@ -142,42 +148,32 @@ Top-tier testnet participant bonds 1,000 USDC with 3-year lock:
 - **Total Received**: 54,000 RIPE (locked 6 months)
 - **Effective Price**: $0.185 per RIPE
 
-### Example 3: The Liquid Participant
-*Maya bonds 2,000 USDC with no lock*
-
-- **Epoch Status**: 6 hours into 12-hour epoch (50% complete)
-- **Base Rate**: $0.35 per RIPE → 5,714 RIPE base
-- **No Lock**: 0% bonus
-- **No Bond Booster**: 0 RIPE bonus
-- **Total Received**: 5,714 RIPE (immediately liquid)
-- **Effective Price**: $0.35 per RIPE
-
 ## Understanding Bad Debt Mechanics
 
-When protocol liquidations create bad debt, bonds help restore system health:
+When protocol liquidations create bad debt, bonds serve as a recovery mechanism:
 
-**What Happens to Your Bond:**
-- You receive **100% of your calculated RIPE** — no reduction
-- Your payment helps clear bad debt from the system
-- Protocol health improves with every bond purchase
+**How Bond Purchases Work During Bad Debt:**
+- Bond purchasers receive **100% of calculated RIPE allocation**
+- Bond proceeds directly clear bad debt from the system
+- Protocol health improves with each bond sale
 
-**The Supply Impact:**
+**Supply Expansion Mechanism:**
 - RIPE allocated to cover bad debt gets minted **beyond the 1 billion cap**
-- For example: If 1M RIPE covers bad debt, total supply becomes 1.001 billion
-- This extra minting dilutes all RIPE holders proportionally
-- Protocol tracks exactly how much additional RIPE was minted for transparency
+- Example: If 1M RIPE covers bad debt, total supply becomes 1.001 billion
+- This expansion dilutes all RIPE holders proportionally
+- Protocol transparently tracks all additional RIPE minted
 
-**Why This Design:**
-- Ensures bondholders always receive their full allocation
-- Distributes bad debt cost fairly across all token holders
-- Maintains bond attractiveness during protocol stress
-- Creates incentive for governance to minimize bad debt
+**Design Rationale:**
+- Bond purchasers always receive full allocation regardless of protocol state
+- Bad debt costs are socialized across all token holders via dilution
+- Bond demand remains strong even during protocol stress
+- Governance has incentive to minimize bad debt to prevent dilution
 
-This mechanism ensures bonds remain attractive while helping the protocol recover from market stress — a win-win for participants and system stability.
+This mechanism ensures bonds function as both a treasury building tool and an emergency recovery system.
 
-## Where Your Bond Payment Goes
+## Bond Proceeds and Treasury Management
 
-Every stablecoin from bond sales flows directly to the [Endaoment](11-endaoment.md), transforming into productive protocol assets:
+All stablecoins from bond sales flow directly to the [Endaoment](11-endaoment.md), becoming productive protocol assets:
 
 **Treasury Deployment Strategy:**
 - **Yield Farming**: Earns returns across DeFi via Underscore Protocol integrations
@@ -194,14 +190,22 @@ Your Bonds → Treasury Growth → More Yield → Stronger Protocol
 
 Unlike protocols that waste treasury on temporary incentives, every bond dollar becomes permanent productive capital working 24/7 for protocol sustainability.
 
-## The Bottom Line
+## Time to Choose: Mercenary or Builder?
 
-Ripe Bonds offer a unique opportunity to acquire RIPE tokens while directly funding the protocol's success. Through dynamic pricing, lock bonuses, and activity rewards, committed participants can accumulate significant positions at attractive valuations. 
+Here's the choice that matters:
 
-Every bond strengthens the Endaoment treasury, deepens GREEN liquidity, and builds a more sustainable protocol — creating value for all participants while rewarding those who contribute capital when it matters most.
+Bond with a 3-year lock? Get up to 3x base allocation. Add Bond Boosters? Multiply again.
+
+Wait for exchanges? Pay market price. No bonuses. No multipliers. Just hoping someone sells.
+
+But this isn't really about the discount. It's about what happens to your money. Every dollar bonded becomes permanent protocol capital. Not exit liquidity for VCs. Not marketing budgets. Actual yield-generating assets backing actual stablecoins.
+
+The protocol needs capital. You want tokens. Bonds make it happen.
+
+The epochs are running. The treasury is building. What are you waiting for?
 
 ---
 
-*Ready to bond? Check current epoch status and calculate your potential RIPE allocation in the Ripe Protocol interface.*
+*Check current epoch status and calculate your potential RIPE allocation in the Ripe Protocol interface.*
 
 *For technical implementation details, see the [BondRoom Technical Documentation](../technical/core/BondRoom.md).*

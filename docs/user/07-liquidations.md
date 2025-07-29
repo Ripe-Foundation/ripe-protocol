@@ -1,10 +1,10 @@
 # Liquidations: When Leverage Goes Wrong (But Not Too Wrong)
 
-Other protocols: "Your position dropped 10%? We're taking everything. Thanks for playing."
+Most protocols liquidate everything when you cross the line. Position worth $10,000? Debt at $9,001? They take it all. You get nothing.
 
-Ripe: "Let's fix this together. We'll use your sGREEN first, take only what we need, and you keep the rest."
+Ripe takes only what's needed. Your position hits the danger zone? The protocol uses your own sGREEN first, then takes just enough collateral to restore health. You keep the rest.
 
-Four layers of protection. Partial liquidations only. Your own assets used first. This isn't charity — it's math. Keeping borrowers alive keeps the protocol healthy. Dead borrowers don't pay interest.
+Four layers of protection. Partial liquidations only. Your own assets used first. This isn't charity — it's math. Keeping borrowers alive keeps the protocol healthy.
 
 ## Executive Summary
 

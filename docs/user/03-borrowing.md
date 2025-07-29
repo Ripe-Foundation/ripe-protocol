@@ -1,10 +1,10 @@
 # Borrowing: One Loan, Endless Possibilities
 
-Other protocols: "Sorry, your NFT doesn't count. Open another vault for your WBTC. Oh, and that yield-bearing position? Can't use it."
+Most lending protocols make you juggle multiple vaults. Different assets, different loans, different liquidation risks. Complexity for no reason.
 
-Ripe: "What's your total portfolio worth? Cool. Here's your borrowing power."
+Ripe simplifies everything. Every asset you own — from ETH to memecoins to that jpeg you overpaid for — backs a single [GREEN](01-green-stablecoin.md) loan. Your entire portfolio determines your borrowing power. One position. One rate. One liquidation threshold.
 
-Every asset you own — from ETH to memecoins to that jpeg you overpaid for — backs a single [GREEN](01-green-stablecoin.md) loan. One position. One rate. One liquidation threshold. Finally, borrowing that makes sense.
+Finally, borrowing that respects how people actually manage money.
 
 ## How Borrowing Works
 
