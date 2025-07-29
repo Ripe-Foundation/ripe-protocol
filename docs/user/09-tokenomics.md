@@ -1,13 +1,17 @@
-# RIPE Tokenomics: Aligning Incentives for Long-Term Success
+# RIPE Tokenomics: Where Early Believers Win Big
 
-RIPE is the governance token that powers Ripe Protocol, with a carefully designed distribution model that prioritizes community ownership while ensuring sustainable development. With a fixed supply of 1 billion tokens and transparent on-chain vesting, RIPE creates alignment between users, contributors, and the protocol's long-term success.
+Every DeFi token promises "fair distribution." Then VCs dump on retail.
+
+RIPE flips the script. Community gets tokens first. Team waits a year. Early backers paid 2 cents while builders self-funded development. Now 250 million RIPE flows to users who actually use the protocol.
+
+One small seed round at $0.02 after 2+ years of building. Just builders who bet their own money and users who show up early.
 
 > **📊 Tokenomics at a Glance**
 > - **Fixed supply**: 1B RIPE (mint beyond cap only if RIPE Bonds are triggered to cover bad debt)
 > - **Community first**: 25% of supply goes to user incentives; this is the only bucket that begins unlocking at TGE via block rewards & bonding
 > - **All unlocks on-chain**: Immutable vesting contracts you can audit today
 
-For a deep dive into how RIPE powers the protocol—including [staking rewards](06-ripe-rewards.md), protocol fees via [sGREEN](04-sgreen.md), [governance participation](08-governance.md), and value accrual through [bonds](10-bonds.md)—explore these detailed guides. Full onchain governance will launch post-TGE once the community owns sufficient supply.
+For a deep dive into how RIPE powers the protocol—including [staking rewards](06-ripe-rewards.md), protocol fees via [sGREEN](04-sgreen.md), [governance participation](08-governance.md), and treasury building through [bond sales](10-bonds.md)—explore these detailed guides. Full onchain governance will launch post-TGE once the community owns sufficient supply.
 
 ## Token Allocation: Community-First Distribution
 
@@ -133,27 +137,16 @@ Every vesting contract is visible onchain, allowing anyone to verify:
 
 The protocol can freeze contracts in emergencies but cannot steal vested tokens. If someone leaves early, unvested tokens return to treasury while vested amounts remain claimable—ensuring fairness for all parties.
 
-### Why This Matters
-
-Onchain vesting creates unprecedented alignment:
-- **No trust required**: Code enforces terms, not promises
-- **Immediate participation**: Vested tokens can vote from day one
-- **Perfect transparency**: Every token movement tracked publicly
-- **Automated fairness**: Same rules for founders and investors
-
 For deep technical details on the vesting system, see the [Contributor contract documentation](../technical/modules/Contributor.md).
 
-## Summary: Tokenomics That Work
+## The Bottom Line: Own the Future, Not the Hype
 
-RIPE's tokenomics demonstrate that sustainable DeFi is possible without compromising on decentralization or fairness:
+RIPE isn't another VC exit scam dressed up as "community ownership."
 
-- **Fixed Supply**: 1 billion cap maintains scarcity
-- **Community First**: Largest unlocking allocation goes to users
-- **Transparent Vesting**: Every schedule visible on-chain
-- **Aligned Incentives**: Multi-year lockups for all insiders
-- **Emergency Provision**: Bad debt mechanism protects protocol
-- **Strategic Funding**: Efficient capital raise at fair valuation
+Founders self-funded for 2.5 years. Locked for another year after launch. Early backers paid real money at a fair price. Every token unlock happens on-chain where you can audit it.
 
-As Ripe Protocol grows from launch to maturity, RIPE tokens will flow to those who contribute most—whether through providing liquidity, participating in governance, or building on the platform. This isn't just tokenomics; it's the foundation for a new financial system built on transparency, efficiency, and community ownership.
+But here's what matters: 250 million RIPE goes to users. Not eventually. Now. Through [block rewards](06-ripe-rewards.md) that started at TGE. Through [bonds](10-bonds.md) that let you buy at discounts. Through actual usage, not Twitter campaigns.
 
-Ready to participate? Start earning RIPE through [block rewards](06-ripe-rewards.md), grab discounted tokens via [bonds](10-bonds.md), or stake your RIPE for [governance power](08-governance.md). The future of DeFi is being built today, and every RIPE holder has a voice in shaping it.
+The protocol that wins is the one that survives. The one that survives is the one people own.
+
+Your move.
