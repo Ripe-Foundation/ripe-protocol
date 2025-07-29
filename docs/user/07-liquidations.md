@@ -1,15 +1,19 @@
-# Liquidations: A Multi-Layered Defense System
+# Liquidations: When Leverage Goes Wrong (But Not Too Wrong)
 
-Ripe Protocol's liquidation system represents a sophisticated approach to managing undercollateralized positions. Rather than harsh, immediate liquidations that can devastate borrowers, Ripe employs a graduated system designed to protect both users and the protocol. Multiple lines of defense work together to maintain GREEN's stability while giving borrowers every opportunity to recover.
+Other protocols: "Your position dropped 10%? We're taking everything. Thanks for playing."
+
+Ripe: "Let's fix this together. We'll use your sGREEN first, take only what we need, and you keep the rest."
+
+Four layers of protection. Partial liquidations only. Your own assets used first. This isn't charity — it's math. Keeping borrowers alive keeps the protocol healthy. Dead borrowers don't pay interest.
 
 ## Executive Summary
 
 **Key Points:**
-- 🛡️ **Three defense layers**: Redemption buffer → Stability pools → Dutch auctions
+- 🛡️ **Four defense layers**: Redemption buffer → Your own assets → Stability pools → Dutch auctions
 - 📊 **Partial only**: Liquidates just enough to restore health, not entire position
-- 💰 **Fair pricing**: 5-15% liquidation fees, much lower than competitors
+- 💰 **Fair pricing**: 5-15% liquidation fees
 - ⚡ **Automated**: Keeper network ensures rapid execution
-- 🎯 **Your assets first**: Burns your GREEN/sGREEN before touching other collateral
+- 🎯 **Your assets first**: Uses your stability pool deposits and stablecoins with no penalties
 
 **Quick Visual: The Liquidation Flow**
 ```
@@ -21,11 +25,12 @@ Your Position Becomes Unhealthy
             ↓
     LIQUIDATION TRIGGERED
             ↓
-┌───────────────────────────┐
-│   PHASE 1: Own Assets     │
-│   • Burn GREEN/sGREEN     │
-│   • Transfer stablecoins  │
-└────────────┬──────────────┘
+┌───────────────────────────────┐
+│   PHASE 1: Your Own Assets    │
+│   • Your sGREEN in pools      │
+│   • Your GREEN LP in pools    │
+│   • Your stablecoin deposits  │
+└────────────┬──────────────────┘
              ↓ (if needed)
 ┌───────────────────────────┐
 │   PHASE 2: Stability Pool │
@@ -71,7 +76,7 @@ Your Position Becomes Unhealthy
 
 ### Protecting Protocol Solvency
 
-Liquidations serve as the critical mechanism ensuring that [GREEN](01-green-stablecoin.md) remains fully backed. When [borrowing positions](03-borrowing.md) become undercollateralized due to collateral value drops or accumulated interest, the protocol must act to prevent bad debt accumulation. Without effective liquidations, the protocol could become insolvent, threatening all participants.
+Liquidations serve as the critical mechanism ensuring that [GREEN](01-green-stablecoin.md) remains fully backed. When [borrowing positions](03-borrowing.md) become undercollateralized due to collateral value drops or accumulated interest, the protocol must act to prevent bad debt accumulation. Without effective liquidations, GREEN could lose its peg, affecting GREEN and sGREEN holders.
 
 ### The Borrower-Friendly Approach
 
@@ -157,14 +162,6 @@ Before liquidation becomes possible, the redemption mechanism provides a unique 
 
 This mechanism serves dual purposes: protecting borrowers through gradual deleveraging while helping maintain GREEN's $1 peg during market stress.
 
-### How Redemptions Help Everyone
-
-When GREEN trades below $1:
-- Arbitrageurs buy cheap GREEN from markets
-- Redeem it against positions for $1 of collateral
-- Creates buying pressure that restores the peg
-- Provides liquidity exactly when needed most
-
 ## The Three-Phase Liquidation Process
 
 When liquidation becomes necessary, Ripe employs a carefully orchestrated three-phase approach designed to minimize impact while ensuring debt repayment.
@@ -173,17 +170,17 @@ When liquidation becomes necessary, Ripe employs a carefully orchestrated three-
 
 The protocol first looks to your existing positions within Ripe:
 
-**GREEN and [sGREEN](04-sgreen.md) Burning**
-- If you hold GREEN or [sGREEN](04-sgreen.md) in stability pools
-- These are burned first to repay your debt
-- Most direct form of repayment
-- No market impact or external sales
+**Your Stability Pool Deposits**
+- Your own [sGREEN](04-sgreen.md) deposits in stability pools → burned to reduce debt
+- Your own GREEN LP deposits in stability pools → sent to Endaoment to reduce debt
+- Direct debt reduction with no penalties or discounts
+- These are YOUR deposits being used to pay YOUR debt
 
-**Stablecoin Transfers**
-- Other stablecoins (USDC, USDT) you've deposited
-- Transferred to [Endaoment](11-endaoment.md) treasury
-- Used to back protocol reserves
-- Counts toward debt repayment
+**Your Stablecoin Collateral**
+- USDC, USDT, and other stablecoins you deposited as collateral
+- Transferred to [Endaoment](11-endaoment.md) treasury at 1:1 value
+- No liquidation discount applied to stablecoins
+- Immediately reduces your debt dollar-for-dollar
 
 ### Phase 2: Stability Pool Swaps
 
@@ -195,12 +192,6 @@ Next, the protocol engages [stability pools](05-stability-pools.md) for instant 
 3. Pool assets swap for your collateral at the liquidation discount
 4. Pool participants get discounted assets, you avoid market dumps
 
-**Special Note on Permissioned Assets**
-For regulated assets (tokenized securities, real estate):
-- Dedicated permissioned pools with whitelisted participants
-- Same swap mechanics but restricted access
-- Ensures compliance throughout liquidation process
-
 **The Win-Win Dynamic**
 - You avoid harsh market conditions and slippage
 - Pool depositors earn fixed discounts (typically 5-15%)
@@ -211,6 +202,12 @@ For regulated assets (tokenized securities, real estate):
 - Depositors earn RIPE rewards from the Stakers allocation
 - GREEN holders can redeem against pool collateral for peg stability
 - Flexible withdrawal lets depositors choose which assets to claim
+
+**Special Note on Permissioned Assets**
+For regulated assets (tokenized securities, real estate):
+- Dedicated permissioned pools with whitelisted participants
+- Same swap mechanics but restricted access
+- Ensures compliance throughout liquidation process
 
 *For deeper understanding of stability pool mechanics, see [Stability Pools](05-stability-pools.md).*
 
@@ -260,38 +257,27 @@ Ripe's system only liquidates enough to restore healthy LTV:
 
 > **💡 TL;DR**: If you're at 80% LTV and need to get back to 50%, we only liquidate exactly what's needed - not your entire position. In the example below, you keep 25% of your collateral instead of losing everything.
 
-**Example Partial Liquidation**
+**Real Example: Partial vs Full Liquidation**
+
 ```
-Starting position: 
+Your position hits liquidation threshold:
 - Debt: $1,000
-- Collateral: $1,250 (LTV = 80% - at liquidation threshold!)
-- Max allowed LTV: 50%
-- Liquidation fee: 10%
+- Collateral: $1,250 (too risky!)
+- Target: Get back to safe 50% LTV
 
-Protocol's unified formula: R = (D - T×C) × (1-F) / (1 - F - T)
-Where: D = debt, C = collateral, T = target LTV, F = fee ratio
+Other protocols: Take ALL $1,250 → You get $0
 
-Calculation:
-- R = ($1,000 - 0.50×$1,250) × 0.90 / (1 - 0.10 - 0.50)
-- R = ($1,000 - $625) × 0.90 / 0.40
-- R = $375 × 0.90 / 0.40
-- R = $843.75 (amount to repay)
+Ripe Protocol:
+- Takes only $937.50 of collateral
+- Pays down debt to $156.25
+- You keep $312.50 (25% of original!)
+- Position restored to exactly 50% LTV
 
-What happens:
-1. Need to liquidate $937.50 of collateral (to get $843.75 after 10% fee)
-2. Stability pools pay $843.75 (they keep 10% discount = $93.75)
-3. Your debt reduces by $843.75
-
-Final position:
-- Debt: $1,000 - $843.75 = $156.25
-- Collateral: $1,250 - $937.50 = $312.50
-- New LTV: $156.25 ÷ $312.50 = 50% exactly!
-
-Success! The unified formula perfectly calculates the liquidation amount
-to achieve target LTV, while you keep 25% of your original collateral.
+The 10% liquidation fee ($93.75) goes to stability pool depositors
+as their profit for providing instant liquidity.
 ```
 
-> **🎯 Simple Version**: Started with $1,250 collateral → Lost $937.50 to liquidation → Kept $312.50 (25%). Compare this to other protocols that would liquidate your entire $1,250!
+> **🎯 Key Takeaway**: You lost $937.50 but kept $312.50. On other protocols, you'd lose everything. That's a $312.50 difference in your pocket.
 
 ## The Keeper Network
 
@@ -342,107 +328,6 @@ Anyone can be a keeper — no special permissions needed. This open system ensur
 4. **Rapid Execution**: Automated systems respond instantly
 5. **Proven Resilience**: Designed for extreme market conditions
 
-## Common Scenarios
-
-### Scenario 1: Flash Crash with Redemption Buffer
-*ETH drops from $2,500 to $1,800 in minutes*
-
-**Your Position:**
-- Collateral: 10 ETH (was $25,000, now $18,000)
-- Debt: $15,000 GREEN
-- LTV jumps: 60% → 83%
-
-**What Happens:**
-- At 80% you hit redemption threshold (not liquidation yet!)
-- Arbitrageurs buy cheap GREEN and redeem $3,000 against your position
-- Your debt drops to $12,000, LTV improves to 67%
-- ETH rebounds to $2,100 within hours
-- **Result**: Position saved by redemption buffer, no liquidation triggered
-
-**Key Insight**: The redemption mechanism bought you time during extreme volatility.
-
-### Scenario 2: Interest Accumulation Triggers Liquidation
-*Forgot about your position for 6 months*
-
-**Your Position Evolution:**
-- Collateral: $62,500 ETH + $3,000 USDC = $65,500 total
-- Max borrowing power: (ETH × 70%) + (USDC × 90%) = $43,750 + $2,700 = $46,450
-- Debt: $46,000 (99% of max borrowing power - risky!)
-- Month 3: $46,920 debt from 8% APR interest (exceeds borrowing power)
-- Month 6: $47,840 debt (position underwater - liquidation triggered!)
-- Also have: 2,000 sGREEN in stability pool (not collateral)
-
-**Liquidation Execution:**
-1. **Phase 1**: Burns your 2,000 sGREEN → debt drops to $45,840
-2. **Phase 1**: Transfers 3,000 USDC to Endaoment → debt drops to $42,840
-3. **Phase 2**: Need to restore position to safe borrowing capacity
-   - Current: $42,840 debt, $62,500 ETH collateral only
-   - ETH max borrowing: $62,500 × 70% = $43,750
-   - Already under max! But need buffer for safety
-   - Target: reduce debt to $40,000 (64% of ETH value)
-   - Using unified formula with modest liquidation:
-   - Liquidate $3,155 ETH at 10% fee → receive $2,840 GREEN
-   - Your debt: $42,840 - $2,840 = $40,000
-   - Your collateral: $62,500 - $3,155 = $59,345 ETH
-   - New borrowing capacity: $59,345 × 70% = $41,541 (debt is $40,000 ✓)
-
-**Final Damage:**
-- Lost $315 to liquidation discount ($3,155 × 10%)
-- Plus lost all your USDC collateral ($3,000)
-- Total loss: $3,315 vs paying $1,840 interest
-- **Key Insight**: Interest slowly pushes you toward liquidation - monitor regularly!
-
-### Scenario 3: Multi-Collateral Liquidation
-*You have diverse collateral when liquidation hits*
-
-**Your Position:**
-- 5,000 sGREEN in stability pool ($5,250 value - 0% LTV, not counted as collateral)
-- 10,000 USDC (90% LTV)
-- 3 ETH ($6,000, 70% LTV)
-- Max borrowing power: ($10,000 × 90%) + ($6,000 × 70%) = $9,000 + $4,200 = $13,200
-- Debt: $13,000 (98.5% of max - liquidation triggered!)
-- Assets total: $21,250 (but only $16,000 counts as collateral)
-
-**Important Note:** sGREEN and GREEN LP tokens have 0% LTV - they cannot be used as collateral for borrowing. Your actual borrowing capacity comes only from USDC and ETH.
-
-**Liquidation Sequence:**
-1. **Phase 1**: Burns your 5,000 sGREEN → debt drops to $7,750
-2. **Phase 1**: Transfers 7,000 USDC to Endaoment → debt drops to $750
-3. **Phase 2**: Swaps 0.42 ETH with stability pools → debt cleared
-   - Need $833 of ETH to get $750 after 10% fee
-   - You keep: 3,000 USDC + 2.58 ETH
-4. **Final Position**: Debt cleared, borrowing capacity restored
-   - Remaining: 3,000 USDC + 2.58 ETH = $8,160 collateral value
-   - Max borrowing: ($3,000 × 90%) + ($5,160 × 70%) = $6,312
-
-**Key Insight**: Your sGREEN holdings, while not collateral, serve as your first line of defense in liquidation - protecting your actual collateral assets.
-
-### Scenario 4: Worst Case - High Fee Asset
-*Your experimental token position goes bad*
-
-**Your Position:**
-- Collateral: $10,000 in volatile gaming token
-- Debt: $5,000 (50% LTV)
-- Token drops 30% → collateral now $7,000
-- LTV jumps to 71%, triggering liquidation
-- Liquidation fee: 15% (high-risk asset)
-
-**What Happens:**
-- No stability pools for this asset - straight to auction
-- Current position: $5,000 debt / $7,000 collateral = 71.4% LTV
-- Using unified formula to reach 50% LTV: R = (D - T×C) × (1-F) / (1 - F - T)
-- R = ($5,000 - 0.50×$7,000) × 0.85 / (0.85 - 0.50)
-- R = $1,500 × 0.85 / 0.35 = $3,643 repayment needed
-- Collateral to liquidate (includes 15% fee): $3,643 / 0.85 = $4,286
-- Dutch auction: buyers pay $3,643 GREEN for $4,286 of collateral
-- Auction discount at purchase: 12% (buyers pay 88% of value)
-- Actual GREEN paid: $3,643 × 0.88 = $3,206
-- **Result**: Debt reduced by $3,206 to $1,794
-- **Your collateral**: $7,000 - $4,286 = $2,714
-- **New LTV**: $1,794 ÷ $2,714 = 66% (not quite at target due to auction discount)
-
-**Key Insight**: Auction discounts mean you don't get full debt reduction. Lost $1,080 total ($643 liq fee + $437 auction discount).
-
 ## What If Bad Debt Occurs?
 
 Despite all protective mechanisms, extreme market conditions could potentially create bad debt (where liquidation proceeds don't fully cover the debt). The protocol has a clear resolution mechanism:
@@ -453,13 +338,21 @@ Despite all protective mechanisms, extreme market conditions could potentially c
 - Ensures bond buyers receive their full allocation
 - Maintains protocol solvency without penalizing users
 
-For example, if 1M RIPE is needed to cover bad debt, the total supply becomes 1.001 billion. This transparent mechanism ensures the protocol can always recover while treating all participants fairly.
+For example, if 1M RIPE is needed to cover bad debt, the total supply becomes 1.001 billion. This transparent mechanism ensures GREEN remains fully backed while distributing any dilution proportionally across all RIPE holders.
 
-## The Bottom Line
+## Liquidations That Don't Ruin Lives
 
-Ripe Protocol's liquidation system represents a fundamental rethinking of how DeFi handles risk. By prioritizing borrower protection while maintaining protocol solvency, the system creates sustainable conditions for all participants. The multi-phase approach, redemption buffer, and partial liquidation design work together to give you every opportunity to maintain your position while ensuring GREEN remains fully backed.
+Here's what actually matters:
 
-Understanding these mechanisms empowers you to borrow with confidence, knowing that the protocol's design aligns with your interests even in worst-case scenarios.
+**When others get liquidated**: They lose everything. Position gone. Starting over from zero.
+
+**When you get liquidated on Ripe**: You lose some. Position survives. Still in the game.
+
+That $312.50 difference in our example? That's rent money. That's staying in crypto versus rage quitting. That's the difference between a setback and a catastrophe.
+
+The protocol doesn't do this to be nice. It does it because borrowers who survive keep borrowing, keep paying interest, keep the system running. Your success is the protocol's success.
+
+So go ahead. Take that loan. The safety net has four layers.
 
 ---
 
