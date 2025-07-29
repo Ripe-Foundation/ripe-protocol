@@ -595,9 +595,8 @@ def _isLtvWithinMaxDeviation(_newLtv: uint256, _prevLtv: uint256, _maxDeviation:
     if _prevLtv == 0 or _maxDeviation == 0:
         return True
 
-    upperBound: uint256 = min(_prevLtv + _maxDeviation, HUNDRED_PERCENT)
     lowerBound: uint256 = _prevLtv - min(_maxDeviation, _prevLtv)
-    return upperBound >= _newLtv and _newLtv >= lowerBound
+    return HUNDRED_PERCENT > _newLtv and _newLtv >= lowerBound
 
 
 #####################
