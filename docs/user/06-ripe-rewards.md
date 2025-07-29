@@ -1,6 +1,12 @@
-# RIPE Block Rewards: Earning While You Participate
+# RIPE Rewards: Get Paid to Use the Protocol
 
-RIPE block rewards are the heartbeat of Ripe Protocol's incentive system — continuously distributing tokens to users who actively strengthen the ecosystem. Whether you're [borrowing GREEN](03-borrowing.md), providing liquidity, or simply holding assets, the protocol rewards your participation with a share of 150 million RIPE tokens (15% of total supply) allocated specifically for community incentives.
+Every block. Every transaction. Every dollar borrowed or staked.
+
+Ripe Protocol is watching. And paying.
+
+150 million RIPE tokens are flowing to users who actually use the protocol. Not VCs. Not insiders. Users. Borrow GREEN? Get paid. Stake in pools? Get paid more. Lock your rewards? Get paid even more.
+
+The best part? Early users are sharing a tiny pool. More rewards per person until the masses arrive.
 
 > **📊 Rewards at a Glance**
 > - **Total RIPE for rewards**: 150M (15% of supply)
@@ -18,7 +24,9 @@ RIPE block rewards are the heartbeat of Ripe Protocol's incentive system — con
 ```
 YOUR ACTIVITY          →  REWARD POOL  →  YOUR SHARE
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Staking RIPE/sGREEN    →  90% of RIPE  →  Based on stake + lock bonus
+Staking (All Types)    →  90% of RIPE  →  Based on asset type + position
+  • RIPE/RIPE LP      →  Governance   →  Lock bonus up to 3x
+  • sGREEN/GREEN LP   →  Stability    →  Size × time × weight
 Borrowing GREEN        →  10% of RIPE  →  Based on debt size
 
 FUTURE ALLOCATIONS (Not Active Yet):
@@ -241,30 +249,31 @@ Example: $100,000 in GREEN LP (1% of total)
 ```
 Daily Rewards ≈ (Your RIPE / Total RIPE Staked) × 388,800 × Lock Multiplier
 
-Example: 10,000 RIPE staked (1% of total) with 1-year lock
-= 1% × 388,800 × 1.5 = ~5,832 RIPE per day
-= ~$583.20 per day (at $0.10 RIPE)
-= Your stake worth $1,000, earning $583.20/day = 21,287% APR
+Example: 100,000 RIPE staked (0.1% of total) with 3-year lock
+= 0.1% × 388,800 × 3.0 = ~1,166 RIPE per day
+= ~$116.60 per day (at $0.10 RIPE)
+= Your stake worth $10,000, earning $116.60/day = ~425% APR
+With compounding: ~1,000% APY
 ```
 
 **For sGREEN Deposits (10% of stakers):**
 ```
 Daily Rewards ≈ (Your sGREEN Value / Total sGREEN) × 388,800
 
-Example: $20,000 in sGREEN (2% of total)
-= 2% × 388,800 = ~7,776 RIPE per day
-= ~$777.60 per day (at $0.10 RIPE)
-= ~1,418% APR in USD terms
+Example: $100,000 in sGREEN (0.5% of total)
+= 0.5% × 388,800 = ~1,944 RIPE per day
+= ~$194.40 per day (at $0.10 RIPE)
+= ~71% APR in USD terms
 ```
 
 **For Borrowing GREEN (10% of emissions):**
 ```
 Daily Rewards ≈ (Your Debt / Total Debt) × 432,000
 
-Example: $50,000 borrowed (0.5% of total debt)
-= 0.5% × 432,000 = ~2,160 RIPE per day
-= ~$216.00 per day (at $0.10 RIPE)
-= ~158% APR in rewards (offsetting borrowing costs!)
+Example: $500,000 borrowed (0.25% of total debt)
+= 0.25% × 432,000 = ~1,080 RIPE per day
+= ~$108.00 per day (at $0.10 RIPE)
+= ~7.9% APR in rewards (offsetting borrowing costs!)
 ```
 
 ## Auto-Staking Mechanism
@@ -354,8 +363,16 @@ Yes, within each pool! For example, in the Stakers pool:
 
 More rewards for those who do! If you're the only RIPE staker, you get 100% of RIPE's allocation in the Stakers pool. Early participants often see highest returns.
 
+## The Early Bird Gets the RIPE
+
+Right now, emissions are ramping up. TVL is growing. But it's still early.
+
+Those juicy GREEN LP yields? They'll shrink when billions pour in. That insane RIPE staking APY? Only while the participant pool stays small.
+
+Every block you wait is rewards you're not earning. Every day you delay is yield going to someone else.
+
+The protocol pays those who show up. Are you showing up?
+
 ---
 
-RIPE block rewards transform protocol participation into profitable opportunity. With 150 million tokens (15% of total supply) dedicated to community incentives, early participants can build substantial positions while helping create DeFi's most robust lending ecosystem. The time to start earning is now — every block counts toward your future rewards.
-
-For technical implementation details, see [Lootbox Technical Documentation](../technical/core/Lootbox.md).
+*For technical implementation details, see [Lootbox Technical Documentation](../technical/core/Lootbox.md).*
