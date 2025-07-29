@@ -1,6 +1,10 @@
-# Price Oracles: Your Assets, Accurately Valued
+# Price Oracles: The Truth About Your Money
 
-In DeFi, accurate pricing is everything. A lending protocol is only as reliable as its price feeds — stale or manipulated prices can trigger unfair liquidations, enable exploits, or break core functionality. Ripe Protocol takes pricing seriously with a sophisticated multi-oracle system that prioritizes accuracy, resilience, and transparency.
+One bad price feed can destroy a protocol. Positions liquidated on fake spikes. Exploits draining millions. Users losing everything to a malicious update.
+
+Ripe doesn't rely on any single source. We check Chainlink, Pyth, Stork, and Curve in priority order — taking the first valid price. If one fails, we instantly fall back to the next.
+
+Your collateral value comes from the most reliable source available at that moment.
 
 ## Why Pricing Matters in Ripe
 
@@ -158,9 +162,17 @@ Governance can adjust priorities based on:
 - Fund recovery for stuck update fees
 - Governance override capabilities
 
-## The Bottom Line
+## Trust Through Verification
 
-Ripe Protocol's multi-oracle system provides the most resilient and accurate pricing infrastructure in DeFi. By aggregating multiple independent price sources, implementing staleness protection, and maintaining transparent priority systems, we ensure your assets are always valued fairly. This robust foundation enables confident borrowing, safe liquidations, and reliable protocol operations — because in DeFi, accurate prices aren't just numbers, they're the foundation of trust.
+Here's what your lending protocol won't tell you: they probably use one oracle. Maybe two if they're fancy.
+
+Ripe connects to four independent price sources with instant fallback. Primary oracle down? We're already using the backup. No delays. No manual intervention. No single point of failure.
+
+This isn't paranoia. It's the difference between a protocol that survives oracle outages and one that doesn't.
+
+When your primary oracle fails — and it will — your positions keep getting priced.
+
+That's not a feature. That's survival.
 
 ---
 
