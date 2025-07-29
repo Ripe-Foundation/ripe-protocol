@@ -1,6 +1,10 @@
-# Stability Pools: Your Gateway to Liquidation Profits
+# Stability Pools: Buy the Rip at 90 Cents on the Dollar
 
-Stability Pools are Ripe Protocol's first line of defense against bad debt and your opportunity to earn substantial returns by providing liquidity that absorbs liquidations. When borrowers' positions become undercollateralized, stability pool participants automatically purchase their collateral at discount — typically earning 5-15% instant profit while helping maintain protocol solvency.
+Forget hunting for dips. Forget timing the market. Forget competing with MEV bots.
+
+Stability pools put you first in line to buy liquidated collateral at guaranteed discounts. When leveraged degens get rekt, you get their ETH at 5-15% off. Automatically. Passively. While earning triple-stacked yields on top.
+
+This is wholesale DeFi liquidations, democratized.
 
 ## The Core Proposition
 
@@ -8,7 +12,7 @@ Stability Pools are Ripe Protocol's first line of defense against bad debt and y
 
 Unlike traditional liquidation systems that require active monitoring and complex bot infrastructure, stability pools democratize liquidation profits:
 
-- **Passive Participation**: Deposit once and automatically participate in all liquidations
+- **Passive Participation**: Deposit once and automatically participate in liquidations
 - **Fair Distribution**: Profits shared proportionally among all depositors
 - **No Technical Barriers**: No bots, no gas wars, no timing games
 - **Guaranteed Discounts**: Fixed liquidation fees ensure profitable swaps
@@ -108,7 +112,7 @@ This creates a market-driven rebalancing system — when collateral accumulates,
 
 ### GREEN Redemption Mechanism
 
-Stability pools also serve as GREEN's price stability mechanism. When the pool holds liquidated collateral, any GREEN holder can:
+Stability pools also serve as a stability mechanism for GREEN. When the pool holds liquidated collateral, any GREEN holder can:
 
 1. **Redeem GREEN for collateral** at exactly $1 value
 2. **Help stabilize GREEN price** through arbitrage
@@ -116,22 +120,6 @@ Stability pools also serve as GREEN's price stability mechanism. When the pool h
 
 This creates a powerful peg defense mechanism while preserving depositor value.
 
-#### How Redemptions Protect Your Deposits
-
-When GREEN holders redeem for collateral, the GREEN they leave behind creates an unexpected benefit for depositors:
-
-**Smart Liquidation Priority**: The protocol uses assets in a specific order during liquidations:
-1. **Redeemed GREEN first** - Acts as a buffer, gets burned before touching your deposits
-2. **GREEN LP tokens next** - Your liquidity positions, used only after GREEN is exhausted
-3. **sGREEN last** - Your yield-bearing tokens, protected by the other layers
-
-**The Protection Layer**: 
-- Think of redeemed GREEN as a protective cushion for your deposits
-- During busy redemption periods, this cushion grows larger
-- Your yield-generating assets (GREEN LP and sGREEN) stay untouched longer
-- More redemptions = more protection for depositors
-
-This creates a beautiful synergy: the more people redeem GREEN for arbitrage profits, the more protected your deposited assets become during future liquidations. It's like having a self-replenishing shield that grows stronger with use.
 
 ### Multi-Asset Accumulation
 
@@ -161,14 +149,18 @@ You maintain exposure to this diversified basket while earning on all components
 - **Earn while protecting** the system from bad debt
 - **Accumulate governance power** through RIPE rewards
 
-## The Bottom Line
+## The Liquidation Game, Simplified
 
-Stability pools transform liquidations from a zero-sum game into a win-win mechanism. Liquidated users avoid harsh market impact while you earn substantial profits providing essential liquidity. With triple-stacked yields, instant liquidity, and passive operation, stability pools offer one of DeFi's most compelling risk-adjusted return opportunities.
+Every market crash. Every overleveraged position. Every liquidation event.
 
-By participating, you're not just earning yield — you're actively securing the protocol while building wealth through a sustainable, market-driven mechanism that benefits the entire ecosystem.
+They all flow through stability pools first. While others panic sell, you're automatically buying at protocol-enforced discounts. While others chase yields, you're stacking three revenue streams simultaneously.
+
+No bots. No gas wars. No coding required.
+
+Just deposit, wait for the inevitable liquidations, and collect your discounted crypto. The degen's loss is quite literally your gain.
 
 ---
 
-*Ready to start earning liquidation profits? Deposit into Ripe Protocol's stability pools and let the protocol work for you.*
+*Stop watching liquidations happen. Start profiting from them.*
 
 *For technical implementation details, see the [StabilityPool Technical Documentation](../technical/vaults/StabilityPool.md).*
