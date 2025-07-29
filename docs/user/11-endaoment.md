@@ -122,22 +122,6 @@ Currently, all treasury earnings remain in the Endaoment to maximize protocol gr
 
 When activated, these would represent real yield from treasury operations, not token inflation, creating sustainable value for committed protocol participants.
 
-## Security & Risk Management
-
-### Multi-Layer Protection
-
-1. **Strategy Isolation**: Each yield strategy operates independently — a failure in one doesn't affect others
-2. **Debt Ceilings**: Hard limits on GREEN creation prevent runaway minting
-3. **Profitability Requirements**: Every stabilization operation must benefit the protocol
-4. **[Governance](08-governance.md) Oversight**: Critical parameters require community approval
-
-### Transparency First
-
-- **On-Chain Visibility**: Every treasury position viewable in real-time
-- **Performance Tracking**: Yield metrics publicly accessible
-- **Debt Accounting**: All minted GREEN clearly tracked
-- **Event Logging**: Complete audit trail of all operations
-
 ## What Sets The Endaoment Apart
 
 Unlike traditional protocol treasuries that require constant human management, the Endaoment operates as an autonomous financial engine. It doesn't just hold assets — it actively manages them to:

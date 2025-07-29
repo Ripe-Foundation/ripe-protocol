@@ -161,14 +161,6 @@ You maintain exposure to this diversified basket while earning on all components
 - **Earn while protecting** the system from bad debt
 - **Accumulate governance power** through RIPE rewards
 
-## Getting Started
-
-1. **Choose your asset**: Decide between GREEN LP tokens and sGREEN
-2. **Deposit to the pool**: No minimum amounts or commitments
-3. **Monitor your position**: Watch your share value grow through liquidations
-4. **Claim when ready**: Harvest specific collateral or let it accumulate
-5. **Compound your returns**: Reinvest profits for exponential growth
-
 ## The Bottom Line
 
 Stability pools transform liquidations from a zero-sum game into a win-win mechanism. Liquidated users avoid harsh market impact while you earn substantial profits providing essential liquidity. With triple-stacked yields, instant liquidity, and passive operation, stability pools offer one of DeFi's most compelling risk-adjusted return opportunities.
