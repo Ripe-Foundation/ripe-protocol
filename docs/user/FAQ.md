@@ -1,14 +1,16 @@
 # Frequently Asked Questions
 
+Quick answers to what actually matters.
+
 ## Getting Started
 
 ### What is Ripe Protocol?
 
-Ripe is a DeFi lending protocol where you can borrow GREEN stablecoins using your entire crypto portfolio as collateral. Unlike traditional lending where each asset needs its own loan, Ripe combines everything — from ETH to stablecoins to meme coins — into one unified position with a single interest rate and health factor to monitor.
+One loan backed by everything you own. While other protocols make you juggle five vaults for five assets, Ripe combines your entire portfolio — crypto, tokenized stocks, blue-chip NFTs, everything — into ONE position. Borrow GREEN stablecoins against it all.
 
 ### What makes Ripe different from other lending protocols?
 
-**One loan, many assets.** While other protocols force you to manage separate positions for each collateral type, Ripe lets you deposit 10+ different assets that all work together to back a single GREEN loan. This means you can use your USDC, ETH, PEPE, and even NFTs all in one [borrowing position](03-borrowing.md).
+**One loan, many assets.** While other protocols force you to manage separate positions for each collateral type, Ripe lets you deposit multiple different assets that all work together to back a single GREEN loan. This means you can use your USDC, ETH, tokenized stocks, treasury bills, and even NFTs all in one [borrowing position](03-borrowing.md).
 
 ### What is GREEN?
 
@@ -16,7 +18,7 @@ Ripe is a DeFi lending protocol where you can borrow GREEN stablecoins using you
 
 ### Is my money safe?
 
-Your [deposits](02-collateral-assets.md) back only your own loans — not a shared lending pool. If someone else's risky position fails, it doesn't affect you. The protocol uses multiple safety mechanisms including redemptions before [liquidations](07-liquidations.md), partial liquidations (not full), and a three-phase liquidation system designed to minimize losses.
+Your [deposits](02-collateral-assets.md) back only your own loans — not a shared lending pool. If someone else's risky position fails, it doesn't affect you. The protocol uses multiple safety mechanisms including redemptions before [liquidations](07-liquidations.md), partial liquidations (not full), and a four-phase liquidation system designed to minimize losses.
 
 ## Borrowing Basics
 
@@ -68,8 +70,8 @@ Monitor your position and add collateral or repay debt before reaching these zon
 **Liquidation** (last resort):
 
 - Incurs liquidation fees (5-15%)
-- Three-phase process to minimize impact
-- Only liquidates enough to restore health
+- Four-phase process: Your own assets → Stability pools → Dutch auctions
+- Only liquidates enough to restore health (partial, not full)
 
 ### How does partial liquidation work?
 
@@ -100,14 +102,18 @@ It's like being a liquidator without running any bots.
 
 ### How do I earn RIPE rewards?
 
-[RIPE rewards](06-ripe-rewards.md) flow to four groups:
+[RIPE rewards](06-ripe-rewards.md) currently flow to two groups (90% stakers, 10% borrowers):
 
-1. **Borrowers**: Based on debt size and duration
-2. **Stakers**: RIPE/LP in governance vault, sGREEN/LP in stability pools
-3. **General Depositors**: All collateral deposits earn baseline rewards
-4. **Vote Depositors**: Future governance-selected assets
+1. **Stakers (90%)**: 
+   - GREEN LP: 65% of staker rewards (best returns!)
+   - RIPE LP: 15% of staker rewards
+   - sGREEN: 10% of staker rewards
+   - RIPE: 10% of staker rewards
+2. **Borrowers (10%)**: Based on debt size and duration
 
-Rewards accumulate every block based on your position size and time held.
+Future categories (not active yet): General depositors and vote-selected assets.
+
+**Important**: Current emissions are ramping up from 0.0025 RIPE/block to target 100 RIPE/block. When claiming rewards, 75% auto-stakes with a 1-year lock.
 
 ## GREEN Stability
 
@@ -140,6 +146,10 @@ The protocol's design makes this extremely unlikely. As long as loans remain ove
 ### Can I use yield-bearing tokens as collateral?
 
 Yes! Tokens like stETH, aTokens, and LP positions continue earning their underlying yields while serving as collateral. The protocol uses share-based accounting to capture all rewards, rebases, and fee accruals.
+
+### Can I use tokenized real-world assets?
+
+Yes! Ripe is built for the $16 trillion in real-world assets being tokenized by 2030. Tokenized stocks, real estate, treasury bills, gold — if it has value, you can borrow against it. This is the core vision: unlocking liquidity for assets that traditional DeFi ignores.
 
 ### What's the delegation system?
 
@@ -175,29 +185,57 @@ RIPE is the protocol's [governance](08-governance.md) token. Lock it in the gove
 
 Governance points are accumulating now, but on-chain voting hasn't launched yet. Governance will activate once sufficient RIPE tokens have been distributed through block rewards and the holder base has grown to ensure decentralized decision-making. Early participants who lock RIPE are building voting power that will control the protocol when governance activates.
 
+### What's the RIPE token distribution?
+
+1 billion RIPE total supply:
+- **25%** Community incentives (only allocation unlocking at TGE)
+- **22.2%** Ripe Foundation treasury
+- **20.6%** Core contributors (locked 1 year, then 4-year vest)
+- **17.2%** Early backers ($550k seed at $0.02)
+- **15%** Distribution partner (Hightop)
+
+All vesting happens on-chain with transparent contracts. See full details in [RIPE Tokenomics](09-tokenomics.md).
+
 ### What are Ripe Bonds?
 
 [Bonds](10-bonds.md) let you exchange stablecoins (like USDC) for RIPE tokens at dynamic prices. Lock your bonded RIPE for up to 3 years to get up to 3x more tokens. All proceeds build the [Endaoment](11-endaoment.md) treasury that backs GREEN and generates protocol revenue.
 
+### What are Bond Boosters?
+
+Bond Boosters multiply your bond allocation based on ecosystem contributions (like testnet participation). They work through a unit system:
+- 1 unit = 1 USDC of boost capacity
+- Units are consumed permanently when bonding
+- Example: 1,000 units + 200% booster = first 1,000 USDC bonded gets 3x RIPE
+
+Combined with lock bonuses, top contributors can get up to 5x multipliers.
+
 ### What's the Endaoment?
 
-The [Endaoment](11-endaoment.md) is Ripe's autonomous treasury system. It:
+The [Endaoment](11-endaoment.md) is Ripe's treasury system that combines automated mechanisms with strategic oversight. It:
 
-- Manages protocol-owned liquidity
-- Generates yield across DeFi
-- Defends GREEN's peg automatically
+- Manages protocol-owned liquidity from bond sales
+- Generates yield across DeFi via Underscore Protocol
+- Defends GREEN's peg through market operations
 - Funds operations without token inflation
 
-Think of it as an AI treasurer that never sleeps.
+All bond proceeds become permanent productive capital working 24/7.
 
 ## Safety & Security
 
 ### What are the main risks?
 
-- **Smart contract risk**: Bugs could affect funds (mitigated by audits)
+- **Smart contract risk**: Bugs could affect funds
 - **Liquidation risk**: Collateral value dropping too fast
 - **Oracle risk**: Incorrect price feeds (mitigated by multiple sources)
 - **Interest rate risk**: Dynamic rates during market stress
+
+### Is Ripe audited?
+
+ChainSecurity reviewed the code last year, but lessons from Underscore and real-world usage in Hightop pushed us to refactor. We removed onchain governance, Juice Score, NFTs, GREEN bonds, and complex DeFi adapters. The slimmer v1 launching today has not yet been re-audited — please keep this in mind when deciding position sizes.
+
+### How does Ripe price assets accurately?
+
+Ripe uses a [multi-oracle system](12-price-oracles.md) with automatic fallback. We check Chainlink, Pyth, Stork, and Curve in priority order, taking the first valid price. If one oracle fails, we instantly switch to the next — no manual intervention needed. This prevents single points of failure that have destroyed other protocols.
 
 ### How does Ripe handle bad debt?
 
@@ -228,6 +266,7 @@ During extreme volatility:
 - **[Documentation](README.md)**: Detailed guides in our docs
 - **[Discord](https://discord.gg/Y6PWmndNaC)**: Active community and team support
 - **[Twitter](https://x.com/ripe_dao)**: Protocol updates and announcements
+- **[GitHub](https://github.com/Ripe-Foundation/ripe-protocol)**: Open source code and development
 - **[Homepage](https://www.ripe.finance/)**: Ripe Homepage
 
 ### How do I report bugs or issues?
