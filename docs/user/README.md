@@ -148,6 +148,15 @@ Multi-oracle system ensuring fair and manipulation-resistant pricing.
 - **Automatic fallbacks** - No single point of failure
 - **Staleness protection** - Always current prices
 
+#### 📚 [Protocol Archives: The Journey to Launch](13-archives.md)
+
+Explore Ripe's evolution from early conception through years of refinement to protocol launch.
+
+- **Historical documentation** - Whitepapers, blog posts, and videos from 2022-2024
+- **Design philosophy** - Understand the core ideas that guided development
+- **Testnet learnings** - See how "Ripe Radness" seasons shaped the final protocol
+- **Key refinements** - Learn why features like Juice Score evolved out
+
 ---
 
 ## Key Innovation: Risk Isolation with Portfolio Efficiency
