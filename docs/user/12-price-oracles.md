@@ -99,6 +99,7 @@ Custom pricing for yield-bearing tokens from major protocols:
 - **Trust Model**: Based on underlying protocol's accounting
 
 **Two-Layer Pricing**: This oracle combines real-time underlying asset prices (from Chainlink or other primary oracles) with weighted snapshots of the share price/exchange rate. For example, to price a Morpho USDC position:
+
 - **Underlying USDC price**: Fetched in real-time from Chainlink ($1.00)
 - **Morpho share price**: Weighted average over time (e.g., 1.05 USDC per share)
 - **Final position value**: $1.00 × 1.05 = $1.05 per share
@@ -110,14 +111,17 @@ Custom pricing for yield-bearing tokens from major protocols:
 Stale prices are dangerous. Here's how we prevent them:
 
 ### Global Staleness Threshold
+
 - Default: 3600 seconds (1 hour) for most assets
 - Stricter limits for volatile assets
 - Relaxed for stable assets like USDC
 
 ### Per-Oracle Configuration
+
 Each oracle can have custom staleness limits:
+
 - Chainlink: Uses round timestamp
-- Pyth/Stork: Uses publish timestamp  
+- Pyth/Stork: Uses publish timestamp
 - Curve: Always current (reads directly from pool state)
 - Blue Chip: Snapshot-based with minimum delays
 
@@ -143,6 +147,7 @@ Priority Order (Configurable):
 ```
 
 Governance can adjust priorities based on:
+
 - Oracle reliability track record
 - Gas costs for updates
 - Asset-specific considerations
@@ -151,12 +156,14 @@ Governance can adjust priorities based on:
 ## Security Measures
 
 ### Time-Locked Changes
+
 - New oracle additions: 24-hour delay
-- Oracle priority changes: 12-hour delay  
+- Oracle priority changes: 12-hour delay
 - Feed updates: 6-hour delay
 - Emergency disables: Instant (governance multisig)
 
 ### Fail-Safe Mechanisms
+
 - Automatic fallback to secondary oracles
 - Pause functionality for compromised feeds
 - Fund recovery for stuck update fees
@@ -176,10 +183,11 @@ That's not a feature. That's survival.
 
 ---
 
-*For technical implementation details, see:*
-- *[Price Desk Technical Documentation](../technical/registries/PriceDesk.md) - Oracle aggregation system*
-- *[Chainlink Prices](../technical/priceSources/ChainlinkPrices.md) - Chainlink integration*
-- *[Curve Prices](../technical/priceSources/CurvePrices.md) - AMM-based pricing and GREEN monitoring*
-- *[Pyth Prices](../technical/priceSources/PythPrices.md) - High-frequency oracle updates*
-- *[Stork Prices](../technical/priceSources/StorkPrices.md) - Decentralized price attestations*
-- *[Blue Chip Yield Prices](../technical/priceSources/BlueChipYieldPrices.md) - Yield token valuations*
+_For technical implementation details, see:_
+
+- _[Price Desk Technical Documentation](../technical/registries/PriceDesk.md) - Oracle aggregation system_
+- _[Chainlink Prices](../technical/priceSources/ChainlinkPrices.md) - Chainlink integration_
+- _[Curve Prices](../technical/priceSources/CurvePrices.md) - AMM-based pricing and GREEN monitoring_
+- _[Pyth Prices](../technical/priceSources/PythPrices.md) - High-frequency oracle updates_
+- _[Stork Prices](../technical/priceSources/StorkPrices.md) - Decentralized price attestations_
+- _[Blue Chip Yield Prices](../technical/priceSources/BlueChipYieldPrices.md) - Yield token valuations_

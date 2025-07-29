@@ -7,6 +7,7 @@ RIPE flips the script. Community gets tokens first. Team waits a year. Early bac
 One small seed round at $0.02 after 2+ years of building. Just builders who bet their own money and users who show up early.
 
 > **📊 Tokenomics at a Glance**
+>
 > - **Fixed supply**: 1B RIPE (mint beyond cap only if RIPE Bonds are triggered to cover bad debt)
 > - **Community first**: 25% of supply goes to user incentives; this is the only bucket that begins unlocking at TGE via block rewards & bonding
 > - **All unlocks on-chain**: Immutable vesting contracts you can audit today
@@ -20,18 +21,23 @@ The 1 billion RIPE supply is allocated across five key stakeholder groups, with 
 ![RIPE Token Allocation](https://miro.medium.com/v2/format:webp/1*2OWDZIl3gjqJl_B6JXyyaw.png)
 
 ### Community Incentives (25% - 250M RIPE)
+
 Block rewards, bonding discounts, and LP rewards that directly incentivize protocol usage and growth. This is the only allocation that begins distributing at TGE.
 
 ### Ripe Foundation Treasury (22.2% - 222M RIPE)
+
 Long-term liquidity provisions, strategic partnerships, ecosystem grants, and marketing initiatives to ensure protocol sustainability.
 
 ### Core Contributors (20.6% - 206M RIPE)
+
 Compensation for 2.5 years of full-time protocol development already completed, plus ongoing development through the 4-year vesting period, ensuring the team remains committed to building and improving the protocol.
 
 ### Distribution Partner - Hightop (15% - 150M RIPE)
+
 Strategic partner providing mobile on-ramps and fiat bridges to bring Ripe Protocol to mainstream users beyond crypto natives.
 
 ### Early Backers (17.2% - 172M RIPE)
+
 Seed investors who provided capital and strategic guidance during testnet development, helping accelerate the path to mainnet launch.
 
 ## Emission Schedule: Sustainable Token Release
@@ -47,17 +53,20 @@ The RIPE supply is strictly capped at 1 billion tokens with one carefully design
 Community Incentives stand alone as the only allocation unlocking from day one, ensuring immediate protocol activity:
 
 **Community Incentives (Unlocking Now)**
+
 - **First Unlock**: Immediate at TGE
 - **Release Length**: 5+ years
 - **Pattern**: Dynamic distribution via block rewards, bonding discounts, and governance
 
 **Core Contributors (Locked First Year)**
+
 - **First Unlock**: 12 months from TGE
 - **Total Length**: 4 years
 - **Release Pattern**: 25% unlocked at month 12, then linear vesting over 36 months
 - **Example**: A contributor with 1M RIPE allocation receives 250K at month 12, then ~694 RIPE per day
 
 **Ripe Foundation, Distribution Partner & Early Backers (Aligned Schedules)**
+
 - **First Unlock**: 12 months from TGE
 - **Total Length**: 3 years
 - **Release Pattern**: 33% unlocked at month 12, then linear vesting over 24 months
@@ -70,11 +79,13 @@ Community Incentives stand alone as the only allocation unlocking from day one, 
 Ripe Protocol represents a new model for DeFi development—bootstrapped primarily by its builders. Since committing [full-time](https://medium.com/hightop/hightop-sunset-ripe-sunrise-b2559ff9a7e4) to the protocol, the team has deployed $1.87M in capital:
 
 **Core Contributor Funding**: $1.32M
+
 - Self-funded by the founding team
 - Covered operational expenses, legal structure, and security audits
 - Demonstrates deep personal commitment to the protocol's success
 
 **Seed Round**: $550K (February 2025)
+
 - Raised via Ripe Foundation at $0.02 per RIPE
 - Implied fully diluted valuation: $20M
 - First external capital after 2+ years of development
@@ -85,11 +96,13 @@ Ripe Protocol represents a new model for DeFi development—bootstrapped primari
 The seed round brought together a carefully selected group of strategic partners who share the vision for sustainable DeFi:
 
 **Institutional Partners**
+
 - **[OrangeDAO](https://www.orangedao.xyz/)**: YCombinator alumni network (also advisor allocation)
 - **[Big Brain](https://www.bigbrain.holdings/)**: Crypto-Native VC
 - **[Tetranode](https://x.com/Tetranode)**: Prominent DeFi investor/whale
 
 **Individual Strategic Investors**
+
 - **Sid Krommenhoek**: Partner at [Album VC](https://www.album.vc/)
 - **Stephen McKeon**: Partner at [Collab+Currency](https://www.collabcurrency.com/)
 - **Trevor Koverko**: Founder of [Sapien](https://www.sapien.io/)
@@ -112,17 +125,21 @@ Unlike traditional vesting that relies on lawyers and spreadsheets, Ripe Protoco
 ### The Vesting Process
 
 **1. Token Release**
+
 ```
 Vested Amount = Total Allocation × (Time Elapsed / Vesting Duration)
 ```
+
 Tokens vest continuously—every block brings contributors closer to their full allocation.
 
 **2. Claiming Tokens**
+
 - Contributors can claim vested RIPE anytime (daily, monthly, or in bulk)
 - Claimed tokens are minted and deposited into the [Governance Vault](08-governance.md)
 - Tokens remain locked but gain full voting power immediately
 
 **3. Unlocking for Transfer**
+
 - After the unlock period (varies by group), tokens become transferable
 - Two-phase security process: initiate → wait → confirm
 - Protects against compromised accounts and hasty decisions
@@ -130,6 +147,7 @@ Tokens vest continuously—every block brings contributors closer to their full 
 ### Transparency & Security
 
 Every vesting contract is visible onchain, allowing anyone to verify:
+
 - Total allocation and vesting schedule
 - Tokens claimed vs. remaining
 - Exact unlock dates

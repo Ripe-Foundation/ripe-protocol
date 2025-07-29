@@ -9,16 +9,19 @@ Welcome to Ripe Protocol — a lending platform that transforms how DeFi handles
 Traditional DeFi lending forces impossible choices:
 
 **Isolated Positions** (MakerDAO, Liquity)
+
 - ETH vault here, WBTC vault there
 - Each position managed separately
 - Liquidation cascades risk your entire portfolio
 
-**Pooled Risk** (Aave, Compound)  
+**Pooled Risk** (Aave, Compound)
+
 - Your collateral backs everyone's loans
 - Limited to "safe" blue-chip assets
 - One bad actor affects all users
 
 **Fragmented Markets** (Morpho, Euler)
+
 - Better rates but still isolated positions
 - Each market needs its own liquidity
 - Innovation limited by conservative parameters
@@ -50,7 +53,7 @@ Your Portfolio:              Traditional:           Ripe:
 Your gateway to capital efficiency. GREEN maintains rock-solid stability through five autonomous mechanisms while powering an entire ecosystem of yield opportunities.
 
 - **Mint GREEN** by borrowing against any asset
-- **Always $1** through overcollateralization and market mechanisms  
+- **Always $1** through overcollateralization and market mechanisms
 - **Burn on repayment** creating natural supply/demand balance
 
 #### 🏦 [Collateral Assets: Everything Has Value](02-collateral-assets.md)
@@ -190,18 +193,22 @@ Have questions? Check our comprehensive [**FAQ**](FAQ.md) for answers to:
 Ripe Protocol offers multiple paths to put your assets to work:
 
 ### 🟢 **Safe & Steady**: Hold sGREEN for Auto-Compounding Yields
+
 Convert GREEN to sGREEN and earn protocol fees automatically. No lockups, no complexity — just growing value.  
 **→ [Start with sGREEN](04-sgreen.md)**
 
 ### ⚡ **Active Profits**: Capture Liquidation Opportunities
+
 Join stability pools to automatically purchase discounted collateral. Earn 5-15% on each liquidation event.  
 **→ [Explore Stability Pools](05-stability-pools.md)**
 
 ### 🎯 **Capital Efficient**: Borrow Against Everything
+
 Use your entire portfolio as collateral for a single GREEN loan. One position, maximum efficiency.  
 **→ [Learn to Borrow](03-borrowing.md)**
 
 ### 🏗️ **Build the Future**: Govern Protocol Evolution
+
 Lock RIPE tokens for voting power and rewards. Shape the protocol while earning emissions.  
 **→ [Understand Governance](08-governance.md)**
 
@@ -224,4 +231,4 @@ Lock RIPE tokens for voting power and rewards. Shape the protocol while earning 
 
 ---
 
-*For technical implementation details, see the [Technical Documentation](../technical/).*
+_For technical implementation details, see the [Technical Documentation](../technical/)._

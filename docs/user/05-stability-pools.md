@@ -36,11 +36,13 @@ This triple-yield structure can generate returns significantly exceeding traditi
 You can deposit two types of assets into stability pools:
 
 **GREEN LP Tokens** (GREEN/USDC liquidity positions)
+
 - Earn trading fees while waiting for liquidations
 - First priority in liquidation hierarchy
 - Transferred to [Endaoment](11-endaoment.md) treasury when used
 
 **[sGREEN](04-sgreen.md)** (Savings GREEN)
+
 - Continues earning base yield in the pool
 - Used after GREEN LP tokens
 - Redeemed and burned during liquidations
@@ -120,13 +122,12 @@ Stability pools also serve as a stability mechanism for GREEN. When the pool hol
 
 This creates a powerful peg defense mechanism while preserving depositor value.
 
-
 ### Multi-Asset Accumulation
 
 Over time, stability pools accumulate diverse collateral types:
 
 - ETH from liquidated Ethereum positions
-- cbBTC from Bitcoin-backed loans  
+- cbBTC from Bitcoin-backed loans
 - Various DeFi tokens from other collateral types
 - GREEN from redemption operations
 
@@ -135,16 +136,19 @@ You maintain exposure to this diversified basket while earning on all components
 ## Why Participate in Stability Pools?
 
 ### For Yield Seekers
+
 - **Triple-stacked returns** from base yield, liquidations, and rewards
 - **Passive income** requiring no active management
 - **Predictable profits** from fixed liquidation discounts
 
 ### For Risk-Conscious Users
+
 - **Senior position** in liquidation hierarchy
 - **Instant liquidity** with no lockups
 - **Protocol protection** role enhances system stability
 
 ### For GREEN Ecosystem Supporters
+
 - **Strengthen the protocol** by providing liquidation liquidity
 - **Earn while protecting** the system from bad debt
 - **Accumulate governance power** through RIPE rewards
@@ -161,6 +165,6 @@ Just deposit, wait for the inevitable liquidations, and collect your discounted 
 
 ---
 
-*Stop watching liquidations happen. Start profiting from them.*
+_Stop watching liquidations happen. Start profiting from them._
 
-*For technical implementation details, see the [StabilityPool Technical Documentation](../technical/vaults/StabilityPool.md).*
+_For technical implementation details, see the [StabilityPool Technical Documentation](../technical/vaults/StabilityPool.md)._

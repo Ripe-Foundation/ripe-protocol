@@ -24,7 +24,9 @@ This isn't speculative yield — it's real revenue from actual protocol usage th
 ## How to Use sGREEN
 
 ### Option 1: Direct Deposit (Simplest)
+
 Convert your GREEN to sGREEN with one transaction:
+
 - Deposit any amount of GREEN to the vault
 - Receive sGREEN shares at the current exchange rate
 - Start earning immediately with no minimum or lock-up
@@ -32,7 +34,9 @@ Convert your GREEN to sGREEN with one transaction:
 **Example**: At a 1.1 rate, depositing 1,100 GREEN gives you 1,000 sGREEN
 
 ### Option 2: Borrow Directly in sGREEN
+
 Advanced strategy for sophisticated users:
+
 - Take out loans denominated in sGREEN instead of GREEN
 - Your debt stays constant while your sGREEN grows
 - Profit when sGREEN yield exceeds your borrow rate
@@ -40,8 +44,10 @@ Advanced strategy for sophisticated users:
 **The Math**: Borrow at 5% APR, earn 8% on sGREEN = 3% net profit on borrowed funds
 
 ### Option 3: Deploy to [Stability Pools](05-stability-pools.md) (Maximum Yield)
+
 Stack multiple revenue streams by depositing sGREEN in stability pools:
-- **Keep earning**: sGREEN base yield continues 
+
+- **Keep earning**: sGREEN base yield continues
 - **Add liquidations**: Buy collateral at 5-15% discounts
 - **Plus rewards**: Earn [RIPE tokens](09-ripe-rewards.md) on top
 - **Triple stack**: All three sources compound together
@@ -53,13 +59,15 @@ Stack multiple revenue streams by depositing sGREEN in stability pools:
 Here's what most people miss: sGREEN holders get their yield even if borrowers ghost the protocol.
 
 **How It Works**:
+
 - Borrowers accumulate interest every block (paid or unpaid)
 - This interest is tracked but not yet "realized" as new GREEN
 - Periodically, the protocol "flushes" this unrealized yield
 - New GREEN is minted to represent the accrued interest
 - sGREEN exchange rate increases, capturing this value
 
-**What This Means**: 
+**What This Means**:
+
 - Your yield doesn't depend on borrowers being good actors
 - Interest compounds into sGREEN value whether loans are repaid or not
 - When borrowers eventually repay (or get liquidated), that GREEN is burned
@@ -72,7 +80,7 @@ Here's what most people miss: sGREEN holders get their yield even if borrowers g
 Unlike traditional staking where you claim rewards, sGREEN uses an elegant share-based system:
 
 - **Set and Forget**: Your sGREEN balance stays constant while its GREEN value increases
-- **No Gas Fees**: Value accrues through exchange rate appreciation, not token distributions  
+- **No Gas Fees**: Value accrues through exchange rate appreciation, not token distributions
 - **Compound Growth**: All revenues automatically reinvest, accelerating returns
 - **Monotonic Rate**: The exchange rate can only increase — mathematically impossible to decrease
 
@@ -88,21 +96,27 @@ Unlike traditional staking where you claim rewards, sGREEN uses an elegant share
 ## Real User Scenarios
 
 ### Scenario 1: The Passive Saver
-*Sarah deposits 10,000 GREEN into sGREEN and forgets about it for a year*
+
+_Sarah deposits 10,000 GREEN into sGREEN and forgets about it for a year_
+
 - Starting rate: 1.00 (10,000 sGREEN received)
 - After 1 year at 7% APR: Rate is 1.07
 - Sarah's value: 10,700 GREEN
 - **Profit: 700 GREEN with zero actions taken**
 
 ### Scenario 2: The Yield Farmer
-*Alex deposits 50,000 GREEN worth of sGREEN into stability pools*
+
+_Alex deposits 50,000 GREEN worth of sGREEN into stability pools_
+
 - sGREEN base yield: 6% = 3,000 GREEN/year
 - Liquidation profits: 8% = 4,000 GREEN/year
 - RIPE rewards: 4% = 2,000 GREEN equivalent/year
 - **Total return: 9,000 GREEN (18% APR) plus compounding**
 
 ### Scenario 3: The Arbitrageur
-*Jordan borrows 100,000 GREEN as sGREEN at 5% APR*
+
+_Jordan borrows 100,000 GREEN as sGREEN at 5% APR_
+
 - Borrowing cost: 5,000 GREEN/year
 - sGREEN earnings at 8%: 8,000 GREEN/year
 - **Net profit: 3,000 GREEN/year on borrowed capital**
@@ -111,6 +125,7 @@ Unlike traditional staking where you claim rewards, sGREEN uses an elegant share
 
 **Q: How does sGREEN compare to other yield-bearing stablecoins?**
 A: The difference isn't just sGREEN — it's the entire Ripe ecosystem:
+
 - **Diverse Revenue**: sGREEN captures yield from a protocol that accepts EVERYTHING as collateral (NFTs, memecoins, yield positions), not just ETH/USDC
 - **Unrealized Yield Flush**: You get paid even if borrowers never repay — unique to Ripe
 - **Triple Stack Potential**: Deploy sGREEN to stability pools for base yield + liquidations + RIPE rewards
@@ -144,6 +159,6 @@ Your stablecoins have been lazy long enough.
 
 ---
 
-*Ready to start earning? Convert your GREEN to sGREEN through the Ripe Protocol interface.*
+_Ready to start earning? Convert your GREEN to sGREEN through the Ripe Protocol interface._
 
-*For technical implementation details, see the [SavingsGreen Technical Documentation](../technical/tokens/SavingsGreen.md).*
+_For technical implementation details, see the [SavingsGreen Technical Documentation](../technical/tokens/SavingsGreen.md)._

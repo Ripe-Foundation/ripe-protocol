@@ -28,15 +28,17 @@ This multi-factor approach ensures fair credit access while maintaining system s
 When you deposit multiple collateral types, Ripe doesn't just average your terms — it weights them based on each asset's contribution to your total borrowing power. Here's how it works:
 
 **Example Portfolio:**
+
 ```
 ETH: $10,000 value × 70% LTV = $7,000 borrowing power
-WBTC: $5,000 value × 65% LTV = $3,250 borrowing power  
+WBTC: $5,000 value × 65% LTV = $3,250 borrowing power
 USDC: $15,000 value × 90% LTV = $13,500 borrowing power
 
 Total Borrowing Power = $23,750
 ```
 
 **Weighted Interest Rate Calculation:**
+
 ```
 ETH weight: $7,000 / $23,750 = 29.5%
 WBTC weight: $3,250 / $23,750 = 13.7%
@@ -83,7 +85,7 @@ When your position becomes eligible for collateral redemption by GREEN holders.
 The critical point where forced [liquidation](07-liquidations.md) begins to protect the protocol.
 
 - **What it means**: Your position will be liquidated
-- **How it's calculated**: Liquidation when collateral < debt ÷ liquidation threshold  
+- **How it's calculated**: Liquidation when collateral < debt ÷ liquidation threshold
 - **Example with 90% threshold**:
   ```
   Your debt: $8,000
@@ -121,24 +123,28 @@ $10,000                    $8,571      $7,500     $6,667      $0
 **Understanding Each Zone:**
 
 **🟢 SAFE ZONE (Below 70% LTV / Collateral > $8,571)**
+
 - **Status**: Healthy position with borrowing capacity
 - **Actions Available**: Can borrow up to $7,000 total (70% max LTV)
 - **Risk Level**: None - full flexibility
 - **What to do**: Normal operations
 
 **🟡 CAUTION ZONE (70%-80% LTV / Collateral $8,571 - $7,500)**
+
 - **Status**: Over max LTV but still protected
 - **Actions Available**: Cannot borrow more; can repay/add collateral
 - **Risk Level**: Medium - approaching danger
 - **What to do**: Consider reducing debt or adding collateral
 
 **🟠 REDEMPTION ZONE (80%-90% LTV / Collateral $7,500 - $6,667)**
+
 - **Status**: Eligible for [redemption](07-liquidations.md#redemption-the-first-line-of-defense)
 - **Actions Available**: Anyone can pay your debt for collateral
 - **Risk Level**: High - active intervention needed
 - **What to do**: Urgently repay debt or add collateral
 
 **🔴 LIQUIDATION ZONE (Above 90% LTV / Collateral < $6,667)**
+
 - **Status**: Automatic [liquidation](07-liquidations.md) triggered
 - **Actions Available**: None - process is automatic
 - **Risk Level**: Critical - partial liquidation to restore health
@@ -150,15 +156,16 @@ Unlike LTV which calculates forward (debt as % of collateral), redemption and li
 
 **Quick Reference - Two Ways to View the Same Thresholds:**
 
-| Threshold | Forward View (LTV) | Inverse View (Min Collateral) | Example ($6,000 debt) |
-|-----------|-------------------|------------------------------|---------------------|
-| **Max Borrow** | Can borrow up to 70% of collateral | Need 143% collateral coverage | Need $8,571+ collateral |
-| **Redemption** | Triggered at 80% debt-to-collateral | Need 125% collateral coverage | Need $7,500+ collateral |
+| Threshold       | Forward View (LTV)                  | Inverse View (Min Collateral) | Example ($6,000 debt)   |
+| --------------- | ----------------------------------- | ----------------------------- | ----------------------- |
+| **Max Borrow**  | Can borrow up to 70% of collateral  | Need 143% collateral coverage | Need $8,571+ collateral |
+| **Redemption**  | Triggered at 80% debt-to-collateral | Need 125% collateral coverage | Need $7,500+ collateral |
 | **Liquidation** | Triggered at 90% debt-to-collateral | Need 111% collateral coverage | Need $6,667+ collateral |
 
 **What This Means:**
+
 - As debt grows from interest → You approach thresholds
-- As collateral value drops → You approach thresholds  
+- As collateral value drops → You approach thresholds
 - Higher threshold percentages = Tighter requirements = Less room for error
 
 Understanding this inverse relationship helps you monitor the right metrics and take action before it's too late.
@@ -176,6 +183,7 @@ Ripe monitors the GREEN/USDC liquidity pool as a health indicator. Under normal 
 **Key Point**: Dynamic rates are a protective mechanism that may never activate. They exist to incentivize market corrections during extreme conditions, not to penalize everyday borrowing.
 
 **How Pool Monitoring Works:**
+
 - **Balanced State**: 50% GREEN / 50% USDC → Base rates apply
 - **Danger Zone**: GREEN exceeds 60% of reference pool → Rate multipliers activate
 - **Scaling Adjustments**: Rates increase proportionally from 60% to 100% GREEN
@@ -185,11 +193,13 @@ Ripe monitors the GREEN/USDC liquidity pool as a health indicator. Under normal 
 When imbalances occur, rates adjust through three mechanisms:
 
 1. **Ratio-Based Multiplier**
+
    - Scales continuously based on pool composition
    - Higher GREEN percentage = Higher multiplier
    - Example: 65% GREEN might trigger a 1.5x multiplier, 80% GREEN a 2.5x multiplier
 
-2. **Time-Based Accumulation**  
+2. **Time-Based Accumulation**
+
    - Additional increases for sustained imbalances
    - Typically 0.01% per 100 blocks in danger zone (~3.3 minutes on Base)
    - Creates urgency for market correction
@@ -200,6 +210,7 @@ When imbalances occur, rates adjust through three mechanisms:
    - Protects borrowers from extreme borrow rates
 
 **Real Example:**
+
 ```
 Your weighted base rate (from collateral mix): 5% APR
 This is what you pay under normal conditions!
@@ -222,25 +233,30 @@ When pool returns to balance:
 Ripe implements several limits to ensure sustainable growth:
 
 **1. Collateral-Based Limits**
+
 - Fundamental constraint based on deposited value
 - Maximum = Sum of (Asset Value × LTV Ratio)
 
 **2. Per-User Debt Ceiling**
+
 - Individual caps during protocol growth phase
 - Equal limits for all users
 - Gradually increased by governance
 
 **3. Global Debt Limit**
+
 - System-wide GREEN supply cap
 - Prevents unlimited minting
 - Protects protocol stability
 
 **4. Interval Borrowing Limits**
+
 - Time-based windows (e.g., per 1,000 blocks = ~33 minutes on Base)
 - Prevents flash loan attacks
 - Smooths borrowing demand
 
 **5. Minimum Debt Requirement**
+
 - Starts at ~$10 during early protocol growth
 - Will increase gradually as protocol scales
 - Ensures position economic viability
@@ -262,18 +278,21 @@ When borrowing, the most restrictive limit applies. This creates a robust framew
 
 When borrowing, you can choose one of three ways to receive your funds:
 
-**Option 1: Direct GREEN** 
+**Option 1: Direct GREEN**
+
 - Receive standard GREEN stablecoins
 - Use immediately for any purpose (swap to USDC)
 - Most flexible option
 
 **Option 2: Auto-Convert to [sGREEN](04-sgreen.md)**
+
 - Borrowed GREEN automatically wrapped into yield-bearing [sGREEN](04-sgreen.md)
 - Start earning yield immediately on borrowed funds
 - Potential for positive carry (yield > borrow rate)
 - No separate conversion transaction needed
 
 **Option 3: Direct to [Stability Pool](05-stability-pools.md)**
+
 - Borrowed GREEN converted to sGREEN and deposited into [Stability Pool](05-stability-pools.md) in one transaction
 - Triple rewards: sGREEN yield + stability pool rewards + [RIPE rewards](09-ripe-rewards.md)
 - Participate in liquidations for discounted collateral
@@ -282,6 +301,7 @@ When borrowing, you can choose one of three ways to receive your funds:
 ### Origination Fee (Daowry)
 
 A one-time 0.5% fee on new borrows that:
+
 - Flows directly to [sGREEN](04-sgreen.md) holders
 - Creates immediate protocol revenue
 - Aligns borrower and saver incentives
@@ -291,6 +311,7 @@ Example: Borrow 10,000 GREEN → Pay 50 GREEN fee → Receive 9,950 GREEN
 ## Repayment Flexibility
 
 Ripe Protocol offers complete repayment flexibility:
+
 - **No prepayment penalties** - Repay any amount at any time
 - **No fixed terms** - Keep your loan as long as needed
 - **Partial payments allowed** - Reduce debt incrementally
@@ -308,6 +329,6 @@ This is borrowing rebuilt from first principles. One position that actually unde
 
 ---
 
-*Ready to experience unified borrowing? Your entire portfolio is waiting to work harder.*
+_Ready to experience unified borrowing? Your entire portfolio is waiting to work harder._
 
-*For technical implementation details, see the [Credit Engine Technical Documentation](../technical/core/CreditEngine.md).*
+_For technical implementation details, see the [Credit Engine Technical Documentation](../technical/core/CreditEngine.md)._

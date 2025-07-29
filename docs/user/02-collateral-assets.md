@@ -11,12 +11,14 @@ That's Ripe Protocol. While other lending protocols make you open separate posit
 Most DeFi protocols force you into one of two suboptimal models:
 
 **Isolated Markets**: Each asset creates a separate loan position
+
 - Deposit ETH → Manage one position
-- Deposit cbBTC → Manage another position  
+- Deposit cbBTC → Manage another position
 - One liquidation doesn't help the others
 - Complex management across multiple positions
 
 **Pooled Lending**: Shared risk limits asset acceptance
+
 - Only blue-chip assets allowed
 - Your deposits back everyone's loans
 - Bad actors affect all depositors
@@ -55,12 +57,14 @@ This architecture enables support for virtually any asset while maintaining prot
 Ripe's extensible architecture can support a vast and growing universe of tokenized value:
 
 **1. Stablecoins** - The foundation of stability
+
 - **USDC, USDT**: Major centralized stablecoins with deep liquidity
 - **USDS**: Decentralized stablecoin from Sky Protocol
 - **Yield-bearing stables**: Interest-earning stable assets
 - Typically offer 80-90% LTV ratios due to price stability
 
 **2. Blue-Chip Crypto** - Established digital assets
+
 - **WETH**: Wrapped Ethereum, the DeFi standard
 - **WBTC/cbBTC**: Bitcoin representations on Ethereum
 - **Major DeFi tokens**: AAVE, UNI, CRV, and other protocol tokens
@@ -68,12 +72,14 @@ Ripe's extensible architecture can support a vast and growing universe of tokeni
 - Provide strong borrowing power with proven track records
 
 **3. Yield-Bearing Assets** - Earn while you borrow
+
 - **Liquid staking**: stETH, rETH, cbETH continue earning staking rewards
 - **LP tokens**: Uniswap, Curve, Balancer positions keep earning fees
 - **Vault tokens**: Lending positions from Aave, Morpho, Euler, etc.
 - Share-based accounting preserves all accumulated yields
 
 **4. Tokenized Real-World Assets** - Bridging traditional finance
+
 - **Securities**: Tokenized stocks, bonds, ETFs
 - **Commodities**: Gold, silver, oil representations
 - **Real estate**: Property-backed tokens
@@ -81,6 +87,7 @@ Ripe's extensible architecture can support a vast and growing universe of tokeni
 - Special handling for regulatory compliance
 
 **5. NFTs & Unique Assets** - Beyond fungible tokens
+
 - **Blue-chip collections**: Punks, Apes, Penguins as collateral
 - **Art NFTs**: Generative and 1/1 pieces
 - **Gaming items**: Weapons, land, characters
@@ -88,6 +95,7 @@ Ripe's extensible architecture can support a vast and growing universe of tokeni
 - Lower LTVs (30-50%) but still productive capital
 
 **6. Emerging Digital Assets** - The new frontier
+
 - **Prediction shares**: Tokenized prediction market positions
 - **Meme coins**: PEPE, SHIB, and community tokens
 - **Social tokens**: Creator coins and DAO tokens
@@ -101,16 +109,19 @@ Ripe's extensible architecture can support a vast and growing universe of tokeni
 Ripe automatically routes your deposits to specialized vaults:
 
 **Simple Erc20 Vaults** - Standard tokens (ETH, USDC, most assets)
+
 - Direct 1:1 balance tracking
 - Simple deposit/withdraw mechanics
 - Most common vault type
 
 **Rebase Erc20 Vaults** - Yield-bearing assets (stETH, aTokens)
+
 - Share-based accounting preserves yields
 - Compound earnings while deposited
 - No opportunity cost from collateralization
 
 **Special Purpose Vaults**
+
 - **[Ripe Gov Vault](08-governance.md)**: Lock RIPE tokens for governance power
 - **[Stability Pools](05-stability-pools.md)**: Earn from liquidations with sGREEN/LP tokens
 - **Future Vaults**: NFTs, RWAs, and emerging asset types
@@ -137,18 +148,21 @@ Each asset has configurable parameters that protect the stability of GREEN, our 
 Since deposited assets serve as collateral backing GREEN loans, the protocol must prevent any single asset from becoming too dominant. If 90% of GREEN were backed by one volatile asset, its price swings could destabilize the entire system. Limits ensure diversified, resilient backing.
 
 **Per-User Limits**
+
 - Maximum deposit per user per asset
 - Prevents whale dominance in specific assets
 - Ensures broad distribution of risk
 - Maintains fair access for all participants
 
-**Global Limits**  
+**Global Limits**
+
 - Protocol-wide caps per asset type
 - Controls each asset's percentage of total GREEN backing
 - Gradual increases as assets prove stability and liquidity
 - Protects stablecoin integrity during market stress
 
 **Minimum Balances**
+
 - Small position requirements
 - Prevents dust accumulation
 - Ensures meaningful participation
@@ -170,12 +184,14 @@ Withdrawals respect your overall position health:
 ### Understanding Available Withdrawals
 
 Your withdrawal capacity depends on:
+
 - **Unused collateral** not backing loans
 - **Asset-specific LTVs** determining borrowing power
 - **Current debt levels** and interest accrued
 - **Overall health factor** maintaining safety
 
 Example:
+
 ```
 Deposited: $10,000 ETH
 Borrowed: $5,000 GREEN (at 80% LTV)
@@ -200,16 +216,19 @@ Time matters as much as size — smaller deposits held longer can out-earn whale
 ### Reward Categories
 
 **General Depositors** - All deposits earn base rewards
+
 - USD-weighted fair distribution
 - No special requirements
 - Passive income on all assets
 
 **Vote Depositors** - Community-selected bonus rewards
+
 - Higher allocations for chosen assets
 - Governance participation benefits
 - Strategic deposit opportunities
 
 **Special Rewards** - Enhanced earnings in specific vaults
+
 - [Stability pool](05-stability-pools.md) deposits earning dual yields
 - [Governance Vault](08-governance.md) staking with multipliers
 - Future special purpose incentives
@@ -221,12 +240,14 @@ For a detailed exploration of the RIPE rewards system, including emission schedu
 ### Delegation System
 
 Grant specific permissions to other addresses:
+
 - **Deposit Rights**: Allow others to add collateral
 - **Withdrawal Rights**: Delegate withdrawal capabilities
 - **Full Flexibility**: Revoke permissions anytime
 - **Smart Wallet Compatible**: Works with Underscore wallets (Hightop app)
 
 Use cases:
+
 - Team treasury management
 - Automated strategy execution
 - Family account structures
@@ -235,6 +256,7 @@ Use cases:
 ### Whitelisted Assets
 
 Some assets require special access:
+
 - **Tokenized Securities**: KYC/AML verification
 - **Institutional Assets**: Accredited investor status
 - **Beta Features**: Early access programs
@@ -245,18 +267,21 @@ The protocol handles permissions transparently — you'll know if an asset requi
 ## Why Deposit in Ripe?
 
 ### Immediate Benefits
+
 - **Earn RIPE rewards** on all deposits automatically
 - **No lock-ups** on general deposits (withdraw anytime)
 - **Productive collateral** - yields continue accumulating
 - **Portfolio approach** reduces liquidation risk
 
 ### Long-term Value
+
 - **Early participant advantages** in growing protocol
 - **Governance participation** shapes the future
 - **Network effects** as more assets join
 - **Innovation pipeline** supporting new asset types
 
 ### Capital Efficiency
+
 - **One position** instead of many to manage
 - **Cross-collateralization** maximizes borrowing power
 - **Lower liquidation risk** through diversification
@@ -272,4 +297,4 @@ This isn't just another lending protocol — it's how DeFi lending should have w
 
 ---
 
-*For technical implementation details, see the [Technical Documentation](../technical/core/Teller.md)*
+_For technical implementation details, see the [Technical Documentation](../technical/core/Teller.md)_

@@ -41,6 +41,7 @@ Total Points = Base Points + Lock Bonus
 ```
 
 **Key Mechanics:**
+
 - Points accumulate every block (not just at intervals)
 - Longer locks multiply your earning rate
 - LP tokens receive 1.5x weight for providing liquidity
@@ -50,14 +51,14 @@ Total Points = Base Points + Lock Bonus
 
 The vault offers dramatic bonuses for longer commitments:
 
-| Lock Duration | Bonus Multiplier | Effective APY Boost |
-|--------------|------------------|---------------------|
-| 1 day (minimum) | 0% | 1x points |
-| 3 months | ~15% | 1.15x points |
-| 6 months | ~35% | 1.35x points |
-| 1 year | ~65% | 1.65x points |
-| 2 years | ~130% | 2.3x points |
-| 3 years (maximum) | 200% | 3x points |
+| Lock Duration     | Bonus Multiplier | Effective APY Boost |
+| ----------------- | ---------------- | ------------------- |
+| 1 day (minimum)   | 0%               | 1x points           |
+| 3 months          | ~15%             | 1.15x points        |
+| 6 months          | ~35%             | 1.35x points        |
+| 1 year            | ~65%             | 1.65x points        |
+| 2 years           | ~130%            | 2.3x points         |
+| 3 years (maximum) | 200%             | 3x points           |
 
 **Example**: Lock 1,000 RIPE for 2 years and earn 2.3x the governance points of someone who locks for just 1 day.
 
@@ -75,6 +76,7 @@ This incentivizes users to provide liquidity while building governance power, st
 ### Lock Extensions: Your Power Move
 
 Extending locks is the ultimate governance strategy:
+
 - **Instant Bonus**: Lock bonus recalculates immediately on extension
 - **No Downside**: Can only extend, never reduce lock time
 - **Compound Strategy**: Extend when claiming rewards for maximum effect
@@ -98,6 +100,7 @@ This severe penalty ensures only genuine emergencies trigger early exits, protec
 ### Natural Unlock: Patience Rewards
 
 When your lock expires:
+
 - **Full Access**: Withdraw 100% of tokens with no penalty
 - **Continued Earning**: Points keep accumulating at base rate
 - **Re-lock Option**: Establish new lock for bonus multiplier
@@ -108,18 +111,21 @@ When your lock expires:
 RIPE governance participants benefit from three distinct reward streams:
 
 ### 1. Governance Points (Future Voting Power)
+
 - Accumulate continuously based on stake and time
 - Lock bonuses multiply accumulation rate
 - Compound through extended commitments
 - Translate directly to voting weight when governance launches
 
 ### 2. [RIPE Block Rewards](06-ripe-rewards.md) (Staker Allocation)
+
 - Governance vault receives rewards from the staker emission category
 - Distribution based on share of total staked RIPE/LP
 - Auto-stake option compounds returns
 - No additional action required — just hold
 
 ### 3. Strategic Positioning
+
 - Early participants gain disproportionate influence
 - Time advantage compounds exponentially
 - First movers shape initial parameters
@@ -130,18 +136,21 @@ RIPE governance participants benefit from three distinct reward streams:
 When on-chain governance activates, RIPE holders will wield comprehensive protocol control:
 
 ### Core Protocol Parameters
+
 - **Risk Management**: Collateral ratios, liquidation thresholds, stability fees
 - **Asset Integration**: New collateral approval, oracle selection, risk tiers
 - **Economic Policy**: Interest rate models, fee structures, revenue distribution
 - **System Limits**: Debt ceilings, deposit caps, exposure limits
 
 ### Treasury Operations
+
 - **[Endaoment](11-endaoment.md) Strategy**: Yield deployment across DeFi protocols
 - **Partnership Terms**: Liquidity partnerships and revenue sharing
 - **Capital Allocation**: Investment priorities and risk tolerance
 - **Emergency Response**: Crisis management and recovery procedures
 
 ### Protocol Evolution
+
 - **Technical Upgrades**: Smart contract improvements and new features
 - **Incentive Design**: Reward distributions and emission schedules
 - **Governance Rules**: Voting parameters and proposal requirements
@@ -153,7 +162,7 @@ Every protocol eventually faces the same question: Who really owns this?
 
 In most DeFi, the answer is simple: whoever has the most money right now. Buy tokens, vote immediately, dump tomorrow. The mercenary model.
 
-Ripe flips the script. Your vote weight = tokens × time locked × commitment multiplier. Can't buy your way to the top. Can't raid the treasury and run. 
+Ripe flips the script. Your vote weight = tokens × time locked × commitment multiplier. Can't buy your way to the top. Can't raid the treasury and run.
 
 The protocol belongs to those who bet their future on it.
 
@@ -161,6 +170,6 @@ Governance launches eventually. Power accumulates now. The clock is ticking.
 
 ---
 
-*Lock RIPE. Stack points. Own the future.*
+_Lock RIPE. Stack points. Own the future._
 
-*For technical implementation details, see [RipeGov Technical Documentation](../technical/vaults/RipeGov.md).*
+_For technical implementation details, see [RipeGov Technical Documentation](../technical/vaults/RipeGov.md)._

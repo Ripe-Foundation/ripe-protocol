@@ -23,8 +23,9 @@ Your [deposits](02-collateral-assets.md) back only your own loans — not a shar
 ### How much can I borrow?
 
 Each asset has its own Loan-to-Value (LTV) ratio:
+
 - **Stablecoins**: Up to 90% of value
-- **ETH/WBTC**: Up to 70-80% of value  
+- **ETH/WBTC**: Up to 70-80% of value
 - **Volatile assets**: 30-50% of value
 
 Your total [borrowing power](03-borrowing.md) combines all assets weighted by their individual LTVs.
@@ -58,12 +59,14 @@ Monitor your position and add collateral or repay debt before reaching these zon
 ### What's the difference between redemption and liquidation?
 
 **Redemption** (happens first):
+
 - No penalty or discount
 - GREEN holders pay off your debt at exactly $1 value
 - Helps you deleverage automatically
 - Better outcome than liquidation
 
 **Liquidation** (last resort):
+
 - Incurs liquidation fees (5-15%)
 - Three-phase process to minimize impact
 - Only liquidates enough to restore health
@@ -77,6 +80,7 @@ Ripe only liquidates the minimum amount needed to make your position healthy aga
 ### What is sGREEN?
 
 [sGREEN](04-sgreen.md) is yield-bearing GREEN that automatically captures protocol revenues. Your sGREEN balance stays the same while its GREEN value increases over time through:
+
 - Borrower interest payments
 - Origination fees from new loans
 - Protocol revenue distributions
@@ -86,6 +90,7 @@ No staking or claiming needed — just hold and earn.
 ### How do stability pools work?
 
 [Stability pools](05-stability-pools.md) hold sGREEN and GREEN LP tokens that get swapped for liquidated collateral at discount. As a depositor, you:
+
 - Continue earning sGREEN yield
 - Get liquidated collateral at 5-15% discount
 - Earn RIPE rewards
@@ -96,6 +101,7 @@ It's like being a liquidator without running any bots.
 ### How do I earn RIPE rewards?
 
 [RIPE rewards](06-ripe-rewards.md) flow to four groups:
+
 1. **Borrowers**: Based on debt size and duration
 2. **Stakers**: RIPE/LP in governance vault, sGREEN/LP in stability pools
 3. **General Depositors**: All collateral deposits earn baseline rewards
@@ -108,6 +114,7 @@ Rewards accumulate every block based on your position size and time held.
 ### How does GREEN maintain its $1 peg?
 
 Five mechanisms work together:
+
 1. **Overcollateralization**: Every GREEN backed by 110%+ collateral
 2. **Dynamic rates**: Borrowing costs increase if GREEN weakens
 3. **Direct redemption**: Arbitrageurs can always redeem GREEN for $1 of collateral
@@ -117,6 +124,7 @@ Five mechanisms work together:
 ### What happens if GREEN trades below $1?
 
 Arbitrageurs immediately profit by:
+
 1. Buying GREEN cheap (e.g., $0.97)
 2. Redeeming for exactly $1 of collateral
 3. Pocketing the difference
@@ -136,6 +144,7 @@ Yes! Tokens like stETH, aTokens, and LP positions continue earning their underly
 ### What's the delegation system?
 
 You can grant specific permissions to other addresses:
+
 - **Deposit permission**: Let others add collateral for you
 - **Borrow permission**: Enable automated leverage strategies
 - **Withdraw permission**: Allow rebalancing
@@ -145,6 +154,7 @@ Delegates can never steal funds — withdrawals always go to the original owner.
 ### Can I use my borrowed GREEN to earn yield?
 
 Absolutely! When borrowing, you can:
+
 - Receive GREEN directly for any use
 - Auto-convert to sGREEN to start earning immediately
 - Deposit straight to stability pools for maximum yield
@@ -156,6 +166,7 @@ Many users borrow at 5% to earn 8%+ in sGREEN.
 ### What is RIPE?
 
 RIPE is the protocol's [governance](08-governance.md) token. Lock it in the governance vault to:
+
 - Accumulate voting power for future governance
 - Earn rewards from the staker allocation
 - Get up to 3x rewards with longer lock periods
@@ -171,6 +182,7 @@ Governance points are accumulating now, but on-chain voting hasn't launched yet.
 ### What's the Endaoment?
 
 The [Endaoment](11-endaoment.md) is Ripe's autonomous treasury system. It:
+
 - Manages protocol-owned liquidity
 - Generates yield across DeFi
 - Defends GREEN's peg automatically
@@ -190,6 +202,7 @@ Think of it as an AI treasurer that never sleeps.
 ### How does Ripe handle bad debt?
 
 The protocol has multiple defenses:
+
 1. Conservative collateral ratios
 2. Redemption mechanism before [liquidation](07-liquidations.md)
 3. [Stability pools](05-stability-pools.md) absorb liquidations
@@ -201,6 +214,7 @@ If bad debt does occur, the protocol can sell [bonds](10-bonds.md) to raise fund
 ### What happens in a market crash?
 
 During extreme volatility:
+
 - Redemptions help positions deleverage automatically
 - Stability pools provide instant liquidation liquidity
 - Partial liquidations minimize user losses
@@ -223,4 +237,4 @@ General bugs: Open an issue on GitHub or report in Discord
 
 ---
 
-*This FAQ covers common questions. For detailed technical information, see our comprehensive documentation.*
+_This FAQ covers common questions. For detailed technical information, see our comprehensive documentation._

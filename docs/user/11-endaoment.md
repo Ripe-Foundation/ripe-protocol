@@ -26,6 +26,7 @@ Bond Sales → Treasury Growth → Yield Generation → Protocol Strength
 ```
 
 Every stablecoin that enters through [bond sales](10-bonds.md) becomes productive capital that:
+
 - Earns yield across multiple DeFi protocols
 - Provides liquidity for GREEN trading
 - Backs the protocol during market stress
@@ -40,12 +41,14 @@ The Endaoment acts as GREEN's guardian, maintaining its $1 peg through automated
 **The 50/50 Rule**: The system monitors GREEN's ratio in Curve pools, targeting perfect balance with paired stablecoins.
 
 **When GREEN Weakens** (trades below $1):
+
 - Detects when GREEN exceeds 50% of the pool
 - Removes excess GREEN liquidity
 - Burns GREEN to reduce circulating supply
 - Market forces push price back to $1
 
 **When GREEN Strengthens** (trades above $1):
+
 - Detects when GREEN falls below 50% of the pool
 - Adds GREEN liquidity to increase availability
 - May mint new GREEN (tracked as debt)
@@ -58,17 +61,20 @@ This creates a self-balancing system where GREEN maintains its peg without manua
 The Endaoment leverages **Underscore Protocol** — an advanced infrastructure that provides standardized integrations (called "Legos") with DeFi protocols. This partnership enables both programmatic treasury management today and AI-driven optimization in the future.
 
 **How Underscore Powers the Endaoment:**
+
 - **Unified Interface**: Every yield strategy uses the same standardized commands, whether deploying to Aave or Uniswap
 - **Registry-Based Discovery**: New protocol integrations automatically become available without contract upgrades
 - **AI-Ready Architecture**: Designed from day one to enable AI agents to analyze and execute complex treasury strategies
 
 **Active Strategies Include:**
+
 - **Lending Protocols**: Earning interest on Aave, Morpho, Euler, Fluid, Compound
 - **Automated Market Makers**: Providing liquidity on Aerodrome, Uniswap, Curve
 - **Liquid Staking**: Capturing ETH staking rewards
 - **Concentrated Liquidity**: Maximizing capital efficiency
 
 **Smart Allocation**: The system continuously optimizes between strategies based on:
+
 - Real-time yield comparisons
 - Risk-adjusted returns
 - Liquidity needs
@@ -81,12 +87,14 @@ The Endaoment leverages **Underscore Protocol** — an advanced infrastructure t
 The Endaoment enables win-win liquidity partnerships:
 
 **For Partners:**
+
 - Co-invest alongside protocol treasury
 - Share in liquidity provision rewards
 - Reduce impermanent loss through diversification
 - Access protocol-generated GREEN liquidity
 
 **For Ripe Protocol:**
+
 - Deepen liquidity without dilution
 - Establish ecosystem relationships
 - Expand market presence
@@ -124,4 +132,4 @@ Are you in?
 
 ---
 
-*For technical implementation details, see the [Endaoment Technical Documentation](../technical/core/Endaoment.md).*
+_For technical implementation details, see the [Endaoment Technical Documentation](../technical/core/Endaoment.md)._
