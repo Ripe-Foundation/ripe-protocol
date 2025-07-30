@@ -33,10 +33,10 @@
 | Ledger              | [0x365256e322a47Aa2015F6724783F326e9B24fA47](https://basescan.org/address/0x365256e322a47Aa2015F6724783F326e9B24fA47) |
 | MissionControl      | [0xB59b84B526547b6dcb86CCF4004d48E619156CF3](https://basescan.org/address/0xB59b84B526547b6dcb86CCF4004d48E619156CF3) |
 | Switchboard         | [0xc68A90A40B87ae1dABA93Da9c02642F8B74030F9](https://basescan.org/address/0xc68A90A40B87ae1dABA93Da9c02642F8B74030F9) |
-| SwitchboardAlpha    | [0x34f1B01fA478a86982F7452BF4111E1D72f7284F](https://basescan.org/address/0x34f1B01fA478a86982F7452BF4111E1D72f7284F) |
-| SwitchboardBravo    | [0x39b5d43C51C4ab37C4153C32b5f825d10d1a83aD](https://basescan.org/address/0x39b5d43C51C4ab37C4153C32b5f825d10d1a83aD) |
+| SwitchboardAlpha    | [0xAb5Cc2381b8F637D772fF927A0a7c2852d4B819b](https://basescan.org/address/0xAb5Cc2381b8F637D772fF927A0a7c2852d4B819b) |
+| SwitchboardBravo    | [0xD18AC028cBe1AbebDb118E9C7A60018d58C846e7](https://basescan.org/address/0xD18AC028cBe1AbebDb118E9C7A60018d58C846e7) |
 | SwitchboardCharlie  | [0xB96D9862838f17Ca51603EEECd54E99f33D3461d](https://basescan.org/address/0xB96D9862838f17Ca51603EEECd54E99f33D3461d) |
-| SwitchboardDelta    | [0x1AFA720C8784e5Ef54f6F6710048e38d6D5526Be](https://basescan.org/address/0x1AFA720C8784e5Ef54f6F6710048e38d6D5526Be) |
+| SwitchboardDelta    | [0x7c3a6D04DF0e066FDa6c2CBC570C25022EA31276](https://basescan.org/address/0x7c3a6D04DF0e066FDa6c2CBC570C25022EA31276) |
 | PriceDesk           | [0xDFe8D79bc05420a3fFa14824135016a738eE8299](https://basescan.org/address/0xDFe8D79bc05420a3fFa14824135016a738eE8299) |
 | ChainlinkPrices     | [0x253f55e455701fF0B835128f55668ed159aAB3D9](https://basescan.org/address/0x253f55e455701fF0B835128f55668ed159aAB3D9) |
 | CurvePrices         | [0x50C3eCC034436c7D962E7063Fc7cD8f05A97Bbc1](https://basescan.org/address/0x50C3eCC034436c7D962E7063Fc7cD8f05A97Bbc1) |
