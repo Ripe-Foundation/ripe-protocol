@@ -82,7 +82,7 @@ PARAMS = {
         "PRICE_DESK_MIN_STALE_TIME": 60 * 5,  # 5 mins
         "PRICE_DESK_MAX_STALE_TIME": 60 * 60 * 24 * 7,  # 7 days
         # price desk (blocks)
-        "PRICE_DESK_MIN_REG_TIMELOCK": 21_600,  # 12 hours on Base
+        "PRICE_DESK_MIN_REG_TIMELOCK": 14_400,  # 8 hours on Base
         "PRICE_DESK_MAX_REG_TIMELOCK": 302_400,  # 7 days on Base
         # vault book (blocks)
         "VAULT_BOOK_MIN_REG_TIMELOCK": 21_600,  # 12 hours on Base
