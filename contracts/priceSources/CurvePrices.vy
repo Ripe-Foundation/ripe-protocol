@@ -943,7 +943,7 @@ def _isValidGreenRefPoolConfig(
     if _stabilizerAdjustWeight == 0 or _stabilizerAdjustWeight > HUNDRED_PERCENT:
         return False
 
-    if _stabilizerMaxPoolDebt == 0 or _stabilizerMaxPoolDebt > 1_000_000 * EIGHTEEN_DECIMALS: # 1 million
+    if _stabilizerMaxPoolDebt == 0 or _stabilizerMaxPoolDebt > 5_000_000 * EIGHTEEN_DECIMALS: # 5 million
         return False
 
     # make sure this curve integration works

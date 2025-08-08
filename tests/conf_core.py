@@ -76,7 +76,7 @@ def ripe_hq(
 
     # 8
     assert ripe_hq_deploy.startAddNewAddressToRegistry(vault_book, "Vault Book", sender=deploy3r)
-    assert ripe_hq_deploy.confirmNewAddressToRegistry(vault_book, sender=deploy3r) == 8
+    assert ripe_hq_deploy.confirmNewAddressToRegistry(vault_book, sender=deploy3r) == 8 
 
     # departments
 
