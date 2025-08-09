@@ -10,7 +10,7 @@
 
 ## 🛠️ **For Developers, Auditors & Integrators**
 
-**[📖 Complete Technical Documentation](https://docs.ripe.finance/technical-docs)** - Everything you need to understand, audit, or integrate with Ripe Protocol:
+**[📖 Complete Technical Documentation](https://ripe-finance.gitbook.io/ripe-developers)** - Everything you need to understand, audit, or integrate with Ripe Protocol:
 
 - 📍 **Deployed Addresses** - Contract addresses across all supported networks
 - 🏗️ **System Architecture** - How 40+ contracts work together
