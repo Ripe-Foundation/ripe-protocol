@@ -761,7 +761,7 @@ def _getLatestDepositPoints(
 
     # get user loot share
     userLootShare: uint256 = staticcall Vault(_vaultAddr).getUserLootBoxShare(_user, _asset)
-    if userLootShare != 0:
+    if userLootShare != 0 and _vaultId != 2: # skip for Ripe Gov Vault
         userLootShare = userLootShare // assetPoints.precision
 
     # update `lastBalance`
