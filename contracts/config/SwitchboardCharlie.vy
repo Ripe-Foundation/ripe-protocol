@@ -334,6 +334,12 @@ event DepositPointsUpdated:
     asset: indexed(address)
     caller: indexed(address)
 
+event DepositPointsUpdatedMany:
+    numUsers: uint256
+    vaultId: uint256
+    asset: indexed(address)
+    caller: indexed(address)
+
 event EndaomentDepositPerformed:
     legoId: uint256
     asset: indexed(address)
@@ -701,6 +707,21 @@ def updateDepositPoints(_user: address, _vaultId: uint256, _asset: address) -> b
 
     extcall Lootbox(self._getLootboxAddr()).updateDepositPoints(_user, _vaultId, vaultAddr, _asset)
     log DepositPointsUpdated(user=_user, vaultId=_vaultId, asset=_asset, caller=msg.sender)
+    return True
+
+
+@external
+def updateManyDepositPoints(_users: DynArray[address, MAX_CLAIM_USERS], _vaultId: uint256, _asset: address) -> bool:
+    assert self.hasPermsForLiteAction(msg.sender, True) # dev: no perms
+
+    # Get vault address from vault book
+    vaultAddr: address = staticcall VaultBook(self._getVaultBookAddr()).getAddr(_vaultId)
+    assert vaultAddr != empty(address) # dev: invalid vault
+
+    for u: address in _users:
+        extcall Lootbox(self._getLootboxAddr()).updateDepositPoints(u, _vaultId, vaultAddr, _asset)
+
+    log DepositPointsUpdatedMany(numUsers=len(_users), vaultId=_vaultId, asset=_asset, caller=msg.sender)
     return True
 
 
