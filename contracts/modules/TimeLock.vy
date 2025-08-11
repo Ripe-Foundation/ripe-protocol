@@ -4,7 +4,7 @@
 # @version 0.4.3
 
 uses: gov
-import contracts.modules.LocalGov as gov
+from . import LocalGov as gov
 
 struct PendingAction:
     initiatedBlock: uint256
