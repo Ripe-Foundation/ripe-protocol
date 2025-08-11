@@ -159,18 +159,36 @@ def getPriceAndHasFeed(_asset: address, _staleTime: uint256 = 0, _priceDesk: add
 
 
 @view
+@external
+def getLastPriceAndLastUpdate(_asset: address) -> (uint256, uint256):
+    config: PythFeedConfig = self.feedConfig[_asset]
+    if config.feedId == empty(bytes32):
+        return 0, 0
+    return self._getLastPriceAndLastUpdate(config.feedId, 0)
+
+
+@view
 @internal
 def _getPrice(_feedId: bytes32, _staleTime: uint256) -> uint256:
+    lastPrice: uint256 = 0
+    na: uint256 = 0
+    lastPrice, na = self._getLastPriceAndLastUpdate(_feedId, _staleTime)
+    return lastPrice
+
+
+@view
+@internal
+def _getLastPriceAndLastUpdate(_feedId: bytes32, _staleTime: uint256) -> (uint256, uint256):
     data: PythPrice = staticcall PythNetwork(PYTH).getPriceUnsafe(_feedId)
 
     # no price
     if data.price <= 0:
-        return 0
+        return 0, 0
 
     # price is too stale
     publishTime: uint256 = convert(data.publishTime, uint256)
     if _staleTime != 0 and block.timestamp - publishTime > _staleTime:
-        return 0
+        return 0, 0
 
     price: uint256 = convert(data.price, uint256)
     confidence: uint256 = convert(data.confidence, uint256)
@@ -191,9 +209,9 @@ def _getPrice(_feedId: bytes32, _staleTime: uint256) -> uint256:
 
     # invalid price
     if confidence >= price:
-        return 0
+        return 0, 0
 
-    return price - confidence
+    return price - confidence, publishTime
 
 
 # utilities
