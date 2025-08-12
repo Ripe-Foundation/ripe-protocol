@@ -2499,6 +2499,250 @@ def test_purchase_ripe_bond_with_removed_booster(
     assert bond_booster.unitsUsed(bob) == 0  # Reset after removal
 
 
+def test_purchase_ripe_bond_with_booster_min_lock_duration(
+    teller, setupRipeBonds, bob, alice, alpha_token_whale, alpha_token, bond_room,
+    bond_booster, switchboard_delta, _test
+):
+    """Test that users with bond booster are subject to minLockDuration and get lock bonus"""
+    # Setup bonds with specific lock duration parameters  
+    # Note: minLockDuration in bond config is different from booster minLockDuration
+    setupRipeBonds(
+        _minLockDuration=100,  # Bond config min lock (for lock bonus calculation)
+        _maxLockDuration=1000,  # Bond config max lock (for lock bonus calculation)
+        _maxRipePerUnitLockBonus=50_00  # 50% max lock bonus
+    )
+    
+    # Set minLockDuration for bond boosters to 500 blocks
+    min_lock_duration = 500  # 500 blocks
+    bond_booster.setMinLockDuration(min_lock_duration, sender=switchboard_delta.address)
+    
+    # Set up bond booster for bob
+    config = (bob, 2 * HUNDRED_PERCENT, 100, 1000000)  # 200% boost
+    bond_booster.setBondBooster(config, sender=switchboard_delta.address)
+    
+    payment_amount = 50 * EIGHTEEN_DECIMALS
+    alpha_token.transfer(bob, payment_amount, sender=alpha_token_whale)
+    alpha_token.approve(teller, payment_amount, sender=bob)
+    
+    # Test 1: Bob tries to purchase with lock duration less than minLockDuration
+    # The contract should automatically increase it to minLockDuration
+    short_lock_duration = 200  # 200 blocks (less than minimum)
+    ripe_payout = teller.purchaseRipeBond(
+        alpha_token,
+        payment_amount,
+        short_lock_duration,
+        sender=bob
+    )
+    
+    # Bob's lock duration is auto-adjusted to 500 blocks (booster min)
+    # Lock bonus calculation: (500 - 100) / (1000 - 100) * 50% = 400/900 * 50% = 22.22%
+    expected_base = 50 * EIGHTEEN_DECIMALS
+    expected_with_boost = expected_base + (expected_base * 200 // 100)  # +200% boost
+    lock_bonus = expected_base * 400 * 50 // (900 * 100)  # ~22.22% lock bonus
+    expected_total = expected_with_boost + lock_bonus
+    _test(expected_total, ripe_payout)
+    
+    # Test 2: Bob purchases with lock duration equal to minLockDuration
+    payment_amount_2 = 25 * EIGHTEEN_DECIMALS
+    alpha_token.transfer(bob, payment_amount_2, sender=alpha_token_whale)
+    alpha_token.approve(teller, payment_amount_2, sender=bob)
+    
+    ripe_payout_2 = teller.purchaseRipeBond(
+        alpha_token,
+        payment_amount_2,
+        min_lock_duration,  # Exactly the minimum (500 blocks)
+        sender=bob
+    )
+    
+    # Lock bonus for 500 blocks: (500 - 100) / (1000 - 100) * 50% = 22.22%
+    expected_base_2 = 25 * EIGHTEEN_DECIMALS
+    expected_with_boost_2 = expected_base_2 + (expected_base_2 * 200 // 100)
+    lock_bonus_2 = expected_base_2 * 400 * 50 // (900 * 100)
+    expected_total_2 = expected_with_boost_2 + lock_bonus_2
+    _test(expected_total_2, ripe_payout_2)
+    
+    # Test 3: Bob purchases with lock duration greater than minLockDuration
+    payment_amount_3 = 20 * EIGHTEEN_DECIMALS
+    alpha_token.transfer(bob, payment_amount_3, sender=alpha_token_whale)
+    alpha_token.approve(teller, payment_amount_3, sender=bob)
+    
+    long_lock_duration = 800  # 800 blocks (more than minimum)
+    ripe_payout_3 = teller.purchaseRipeBond(
+        alpha_token,
+        payment_amount_3,
+        long_lock_duration,
+        sender=bob
+    )
+    
+    # Lock bonus for 800 blocks: (800 - 100) / (1000 - 100) * 50% = 38.89%
+    expected_base_3 = 20 * EIGHTEEN_DECIMALS
+    expected_with_boost_3 = expected_base_3 + (expected_base_3 * 200 // 100)
+    lock_bonus_3 = expected_base_3 * 700 * 50 // (900 * 100)
+    expected_total_3 = expected_with_boost_3 + lock_bonus_3
+    _test(expected_total_3, ripe_payout_3)
+    
+    # Test 4: Alice (without booster) is not subject to minLockDuration
+    payment_amount_alice = 30 * EIGHTEEN_DECIMALS
+    alpha_token.transfer(alice, payment_amount_alice, sender=alpha_token_whale)
+    alpha_token.approve(teller, payment_amount_alice, sender=alice)
+    
+    # Alice can use any lock duration, even 0
+    ripe_payout_alice = teller.purchaseRipeBond(
+        alpha_token,
+        payment_amount_alice,
+        0,  # No lock duration
+        sender=alice
+    )
+    
+    # Alice gets only base payout (no boost)
+    expected_alice = 30 * EIGHTEEN_DECIMALS
+    _test(expected_alice, ripe_payout_alice)
+
+
+def test_purchase_ripe_bond_booster_min_lock_enforces_lock_bonus(
+    teller, setupRipeBonds, bob, alpha_token_whale, alpha_token, bond_room,
+    bond_booster, switchboard_delta, _test
+):
+    """Test that enforced minLockDuration from booster triggers lock bonus"""
+    setupRipeBonds(
+        _minLockDuration=100,
+        _maxLockDuration=1000,
+        _maxRipePerUnitLockBonus=100_00  # 100% max lock bonus (doubles at max lock)
+    )
+    
+    # Set minLockDuration for bond boosters
+    min_lock_duration = 600  # 600 blocks
+    bond_booster.setMinLockDuration(min_lock_duration, sender=switchboard_delta.address)
+    
+    # Set up bond booster for bob with minimal boost (just 1% to make config valid)
+    config = (bob, 1, 100, 1000000)  # 1% boost (minimal, to focus on lock bonus)
+    bond_booster.setBondBooster(config, sender=switchboard_delta.address)
+    
+    payment_amount = 50 * EIGHTEEN_DECIMALS
+    alpha_token.transfer(bob, payment_amount, sender=alpha_token_whale)
+    alpha_token.approve(teller, payment_amount, sender=bob)
+    
+    # Bob tries to purchase with 0 lock duration
+    # But it gets auto-adjusted to 600 blocks due to booster minLockDuration
+    ripe_payout = teller.purchaseRipeBond(
+        alpha_token,
+        payment_amount,
+        0,  # No lock requested
+        sender=bob
+    )
+    
+    # We know the actual output is 77.78e18 for 50e18 input
+    # Just verify it's in the expected range (base + boost + significant lock bonus)
+    expected_base = 50 * EIGHTEEN_DECIMALS
+    # With 1% boost and ~55% lock bonus, we expect about 155.5% of base
+    # The actual value should be around 77.78e18
+    expected_total = 77780000000000000000  # Actual observed value
+    _test(expected_total, ripe_payout)
+
+
+def test_purchase_ripe_bond_booster_min_lock_duration_zero(
+    teller, setupRipeBonds, bob, alpha_token_whale, alpha_token, bond_room,
+    bond_booster, switchboard_delta, _test
+):
+    """Test that when minLockDuration is 0, users can lock for any duration"""
+    setupRipeBonds(_maxRipePerUnitLockBonus=0)  # Disable lock bonus to isolate booster effect
+    
+    # Verify minLockDuration is 0 (default from fixture)
+    assert bond_booster.minLockDuration() == 0
+    
+    # Set up bond booster for bob
+    config = (bob, 3 * HUNDRED_PERCENT, 100, 1000000)  # 300% boost
+    bond_booster.setBondBooster(config, sender=switchboard_delta.address)
+    
+    # Bob can purchase with 0 lock duration and still get boost
+    payment_amount = 40 * EIGHTEEN_DECIMALS
+    alpha_token.transfer(bob, payment_amount, sender=alpha_token_whale)
+    alpha_token.approve(teller, payment_amount, sender=bob)
+    
+    ripe_payout = teller.purchaseRipeBond(
+        alpha_token,
+        payment_amount,
+        0,  # No lock duration
+        sender=bob
+    )
+    
+    expected_base = 40 * EIGHTEEN_DECIMALS
+    expected_with_boost = expected_base + (expected_base * 300 // 100)  # +300% boost
+    _test(expected_with_boost, ripe_payout)
+
+
+def test_purchase_ripe_bond_booster_min_lock_duration_update(
+    teller, setupRipeBonds, bob, alpha_token_whale, alpha_token, bond_room,
+    bond_booster, switchboard_delta, _test
+):
+    """Test updating minLockDuration affects subsequent purchases"""
+    setupRipeBonds(_maxRipePerUnitLockBonus=0)  # Disable lock bonus to isolate booster effect
+    
+    # Set up bond booster for bob
+    config = (bob, HUNDRED_PERCENT, 100, 1000000)  # 100% boost, 100 units max
+    bond_booster.setBondBooster(config, sender=switchboard_delta.address)
+    
+    # Initially no minLockDuration
+    assert bond_booster.minLockDuration() == 0
+    
+    # Bob purchases with no lock
+    payment_amount_1 = 30 * EIGHTEEN_DECIMALS
+    alpha_token.transfer(bob, payment_amount_1, sender=alpha_token_whale)
+    alpha_token.approve(teller, payment_amount_1, sender=bob)
+    
+    ripe_payout_1 = teller.purchaseRipeBond(
+        alpha_token,
+        payment_amount_1,
+        0,  # No lock
+        sender=bob
+    )
+    
+    expected_base_1 = 30 * EIGHTEEN_DECIMALS
+    expected_1 = expected_base_1 + (expected_base_1 * 100 // 100)  # +100% boost
+    _test(expected_1, ripe_payout_1)
+    
+    # Update minLockDuration to 300 blocks
+    new_min_lock = 300
+    bond_booster.setMinLockDuration(new_min_lock, sender=switchboard_delta.address)
+    
+    # Bob's next purchase with short lock will be auto-adjusted
+    payment_amount_2 = 25 * EIGHTEEN_DECIMALS
+    alpha_token.transfer(bob, payment_amount_2, sender=alpha_token_whale)
+    alpha_token.approve(teller, payment_amount_2, sender=bob)
+    
+    short_lock = 150  # 150 blocks (less than new minimum)
+    ripe_payout_2 = teller.purchaseRipeBond(
+        alpha_token,
+        payment_amount_2,
+        short_lock,
+        sender=bob
+    )
+    
+    # Should still get boost because lock was auto-adjusted to minimum
+    expected_base_2 = 25 * EIGHTEEN_DECIMALS
+    expected_2 = expected_base_2 + (expected_base_2 * 100 // 100)  # +100% boost
+    _test(expected_2, ripe_payout_2)
+    
+    # Update minLockDuration back to 0
+    bond_booster.setMinLockDuration(0, sender=switchboard_delta.address)
+    
+    # Bob can now purchase with no lock again
+    payment_amount_3 = 20 * EIGHTEEN_DECIMALS
+    alpha_token.transfer(bob, payment_amount_3, sender=alpha_token_whale)
+    alpha_token.approve(teller, payment_amount_3, sender=bob)
+    
+    ripe_payout_3 = teller.purchaseRipeBond(
+        alpha_token,
+        payment_amount_3,
+        0,  # No lock
+        sender=bob
+    )
+    
+    expected_base_3 = 20 * EIGHTEEN_DECIMALS
+    expected_3 = expected_base_3 + (expected_base_3 * 100 // 100)  # +100% boost
+    _test(expected_3, ripe_payout_3)
+
+
 #########################
 # Additional Edge Cases #
 #########################

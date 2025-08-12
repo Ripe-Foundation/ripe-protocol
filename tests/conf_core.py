@@ -507,6 +507,7 @@ def bond_booster(ripe_hq_deploy):
         ripe_hq_deploy,
         1000 * HUNDRED_PERCENT,  # _maxBoostRatio (1000x or 100,000%)
         100,                     # _maxUnits
+        0,                       # _minLockDuration (0 for default, no minimum)
         name="bond_booster",
     )
 

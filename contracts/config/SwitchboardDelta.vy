@@ -44,6 +44,7 @@ interface BondBooster:
     def removeManyBondBoosters(_users: DynArray[address, MAX_BOOSTERS]): nonpayable
     def setMaxBoostAndMaxUnits(_maxBoostRatio: uint256, _maxUnits: uint256): nonpayable
     def getBoostRatio(_user: address, _units: uint256) -> uint256: view
+    def setMinLockDuration(_minLockDuration: uint256): nonpayable
 
 interface Lootbox:
     def resetUserBalancePoints(_user: address, _asset: address, _vaultId: uint256): nonpayable
@@ -197,6 +198,9 @@ event PendingBoosterBoundariesSet:
     maxUnits: uint256
     confirmationBlock: uint256
     actionId: uint256
+
+event BoosterMinLockDurationSet:
+    minLockDuration: uint256
 
 event PendingBoosterConfigsSet:
     numBoosters: uint256
@@ -733,6 +737,18 @@ def setBoosterBoundaries(_maxBoostRatio: uint256, _maxUnits: uint256) -> uint256
     confirmationBlock: uint256 = timeLock._getActionConfirmationBlock(aid)
     log PendingBoosterBoundariesSet(maxBoostRatio=_maxBoostRatio, maxUnits=_maxUnits, confirmationBlock=confirmationBlock, actionId=aid)
     return aid
+
+
+# set booster min lock duration
+
+
+@external
+def setBoosterMinLockDuration(_minLockDuration: uint256) -> bool:
+    assert gov._canGovern(msg.sender) # dev: no perms
+    bondBooster: address = staticcall BondRoom(self._getBondRoomAddr()).bondBooster()
+    extcall BondBooster(bondBooster).setMinLockDuration(_minLockDuration)
+    log BoosterMinLockDurationSet(minLockDuration=_minLockDuration)
+    return True
 
 
 ################
