@@ -1,3 +1,9 @@
+# ape
+.build/
+
+# silverback
+.silverback-*/
+
 # python
 .env
 .venv

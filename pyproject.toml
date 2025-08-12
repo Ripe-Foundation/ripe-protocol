@@ -1,0 +1,31 @@
+# NOTE: `silverback build` uses this instead of `requirements.txt` if present
+
+# Supported networks
+[[tool.ape.plugins]]
+name = "base"
+
+# Compilers for project
+[[tool.ape.plugins]]
+name = "vyper"
+
+# Ignore Vyper modules (that do not include end-user code)
+[tool.ape.compile]
+exclude = [
+    "config",
+    "data",
+    "modules",
+]
+
+# Bot signer plugin
+[[tool.ape.plugins]]
+name = "turnkey"
+version = "0.8.0a0"
+
+# For fetching contract types
+[[tool.ape.plugins]]
+name = "etherscan"
+
+# Deployment tracking
+[[tool.ape.deployments.base.mainnet]]
+contract_type = "PythPrices"
+address = "0x4dfbFaC4592699A84377C7E8d6Be8d0fEDb4b9c0"

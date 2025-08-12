@@ -6,7 +6,7 @@
 uses: addys
 implements: dept
 
-import contracts.modules.Addys as addys
+from . import Addys as addys
 import interfaces.Department as dept
 from ethereum.ercs import IERC20
 
