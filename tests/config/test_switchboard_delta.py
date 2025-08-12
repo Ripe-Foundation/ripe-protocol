@@ -997,6 +997,7 @@ def test_switchboard_delta_set_ripe_bond_booster(switchboard_delta, bond_room, r
         ripe_hq_deploy,
         1000 * HUNDRED_PERCENT,  # _maxBoostRatio (1000x or 100,000%)
         100,                     # _maxUnits
+        0,                       # _minLockDuration (0 for default, no minimum)
         name="new_bond_booster"
     )
     
@@ -1110,3 +1111,36 @@ def test_switchboard_delta_set_start_epoch_at_block(switchboard_delta, bond_room
     logs = filter_logs(switchboard_delta, "RipeBondStartEpochAtBlockSet")
     assert len(logs) == 1
     assert logs[0].startBlock == new_current_block
+
+
+def test_switchboard_delta_set_booster_min_lock_duration(switchboard_delta, bond_room, bond_booster, governance, alice):
+    """Test setBoosterMinLockDuration updates BondBooster minLockDuration"""
+    # Check initial value
+    initial_min_lock = bond_booster.minLockDuration()
+    assert initial_min_lock == 0  # Default from fixture
+    
+    # Non-governance cannot set min lock duration
+    with boa.reverts("no perms"):
+        switchboard_delta.setBoosterMinLockDuration(100, sender=alice)
+    
+    # Governance can set min lock duration
+    new_min_lock = 1000  # 1000 blocks
+    result = switchboard_delta.setBoosterMinLockDuration(new_min_lock, sender=governance.address)
+    assert result == True
+    
+    # Verify the value was updated in BondBooster
+    assert bond_booster.minLockDuration() == new_min_lock
+    
+    # Check event emission
+    logs = filter_logs(switchboard_delta, "BoosterMinLockDurationSet")
+    assert len(logs) == 1
+    assert logs[0].minLockDuration == new_min_lock
+    
+    # Test updating to a different value
+    newer_min_lock = 5000  # 5000 blocks
+    switchboard_delta.setBoosterMinLockDuration(newer_min_lock, sender=governance.address)
+    assert bond_booster.minLockDuration() == newer_min_lock
+    
+    # Test setting to 0 (no minimum)
+    switchboard_delta.setBoosterMinLockDuration(0, sender=governance.address)
+    assert bond_booster.minLockDuration() == 0

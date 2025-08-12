@@ -37,12 +37,16 @@ event MaxBoostAndMaxUnitsSet:
     maxBoostRatio: uint256
     maxUnits: uint256
 
+event MinLockDurationSet:
+    minLockDuration: uint256
+
 # data
 config: public(HashMap[address, BoosterConfig]) # user -> config
 unitsUsed: public(HashMap[address, uint256]) # user -> units used
 
 maxBoostRatio: public(uint256)
 maxUnits: public(uint256)
+minLockDuration: public(uint256)
 
 MAX_BOOSTERS: constant(uint256) = 50
 
@@ -52,12 +56,14 @@ def __init__(
     _ripeHq: address,
     _maxBoostRatio: uint256,
     _maxUnits: uint256,
+    _minLockDuration: uint256,
 ):
     addys.__init__(_ripeHq)
     deptBasics.__init__(False, False, False) # no minting
 
     self.maxBoostRatio = _maxBoostRatio
     self.maxUnits = _maxUnits
+    self.minLockDuration = _minLockDuration
 
 
 ####################
@@ -162,6 +168,16 @@ def setMaxBoostAndMaxUnits(_maxBoostRatio: uint256, _maxUnitsAvail: uint256):
     self.maxBoostRatio = _maxBoostRatio
     self.maxUnits = _maxUnitsAvail
     log MaxBoostAndMaxUnitsSet(maxBoostRatio = _maxBoostRatio, maxUnits = _maxUnitsAvail)
+
+
+# set min lock duration
+
+
+@external
+def setMinLockDuration(_minLockDuration: uint256):
+    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
+    self.minLockDuration = _minLockDuration
+    log MinLockDurationSet(minLockDuration = _minLockDuration)
 
 
 ######################

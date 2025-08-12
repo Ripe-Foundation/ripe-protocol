@@ -40,13 +40,14 @@ interface Ledger:
     def getEpochData() -> (uint256, uint256): view
     def getRipeBondData() -> RipeBondData: view
 
-interface Teller:
-    def depositFromTrusted(_user: address, _vaultId: uint256, _asset: address, _amount: uint256, _lockDuration: uint256, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
-    def isUnderscoreWalletOwner(_user: address, _caller: address, _mc: address = empty(address)) -> bool: view
-
 interface BondBooster:
     def getBoostRatio(_user: address, _units: uint256) -> uint256: view
     def addNewUnitsUsed(_user: address, _newUnits: uint256): nonpayable
+    def minLockDuration() -> uint256: view
+
+interface Teller:
+    def depositFromTrusted(_user: address, _vaultId: uint256, _asset: address, _amount: uint256, _lockDuration: uint256, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
+    def isUnderscoreWalletOwner(_user: address, _caller: address, _mc: address = empty(address)) -> bool: view
 
 interface PriceDesk:
     def getUsdValue(_asset: address, _amount: uint256, _shouldRaise: bool = False) -> uint256: view
@@ -165,9 +166,25 @@ def purchaseRipeBond(
     assert baseRipePayout != 0 # dev: must have base ripe payout
     totalRipePayout: uint256 = baseRipePayout
 
+    # lock duration
+    lockDuration: uint256 = min(_lockDuration, config.maxLockDuration)
+
+    # bonus from bond booster (if applicable)
+    ripeBoostBonus: uint256 = 0
+    bondBooster: address = self.bondBooster
+    if bondBooster != empty(address):
+        boostRatio: uint256 = min(staticcall BondBooster(bondBooster).getBoostRatio(_recipient, units), 10 * HUNDRED_PERCENT) # extra sanity check 
+        ripeBoostBonus = baseRipePayout * boostRatio // HUNDRED_PERCENT
+        if ripeBoostBonus != 0:
+            totalRipePayout += ripeBoostBonus
+            extcall BondBooster(bondBooster).addNewUnitsUsed(_recipient, units)
+
+            # min lock duration for boosters
+            lockDuration = max(lockDuration, staticcall BondBooster(bondBooster).minLockDuration())
+            lockDuration = min(lockDuration, config.maxLockDuration)
+
     # bonus for lock duration
     ripeLockBonus: uint256 = 0
-    lockDuration: uint256 = min(_lockDuration, config.maxLockDuration)
     if lockDuration >= config.minLockDuration:
         maxLockBonusRatio: uint256 = min(config.maxRipePerUnitLockBonus, 10 * HUNDRED_PERCENT) # extra sanity check 
         lockBonusRatio: uint256 = 0
@@ -179,16 +196,6 @@ def purchaseRipeBond(
         totalRipePayout += ripeLockBonus
     else:
         lockDuration = 0
-
-    # bonus from bond booster (if applicable)
-    ripeBoostBonus: uint256 = 0
-    bondBooster: address = self.bondBooster
-    if bondBooster != empty(address):
-        boostRatio: uint256 = min(staticcall BondBooster(bondBooster).getBoostRatio(_recipient, units), 10 * HUNDRED_PERCENT) # extra sanity check 
-        ripeBoostBonus = baseRipePayout * boostRatio // HUNDRED_PERCENT
-        if ripeBoostBonus != 0:
-            totalRipePayout += ripeBoostBonus
-            extcall BondBooster(bondBooster).addNewUnitsUsed(_recipient, units)
 
     assert totalRipePayout <= data.ripeAvailForBonds # dev: not enough ripe avail
 
