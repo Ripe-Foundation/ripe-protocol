@@ -67,6 +67,9 @@ interface UnderscoreRegistry:
 interface MissionControl:
     def underscoreRegistry() -> address: view
 
+interface RipeHq:
+    def governance() -> address: view
+
 struct StabilizerConfig:
     pool: address
     lpToken: address
@@ -167,6 +170,41 @@ def onERC721Received(_operator: address, _owner: address, _tokenId: uint256, _da
 @external
 def __default__():
     pass
+
+
+##################
+# Transfer Funds #
+##################
+
+
+@external
+def transferFundsToGov(
+    _asset: address,
+    _amount: uint256 = max_value(uint256),
+) -> (uint256, uint256):
+    assert not deptBasics.isPaused # dev: contract paused
+    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
+
+    # finalize amount
+    amount: uint256 = min(_amount, staticcall IERC20(_asset).balanceOf(self))
+    assert amount != 0 # dev: no amt
+
+    # perform transfer
+    govRecipient: address = staticcall RipeHq(addys._getRipeHq()).governance()
+    assert govRecipient != empty(address) # dev: invalid gov recipient
+    assert extcall IERC20(_asset).transfer(govRecipient, amount, default_return_value = True) # dev: xfer
+
+    txUsdValue: uint256 = staticcall PriceDesk(addys._getPriceDeskAddr()).getUsdValue(_asset, amount, False)
+    log WalletAction(
+        op = 1,
+        asset1 = _asset,
+        asset2 = govRecipient,
+        amount1 = amount,
+        amount2 = 0,
+        usdValue = txUsdValue,
+        legoId = 0,
+    )
+    return amount, txUsdValue
 
 
 #########

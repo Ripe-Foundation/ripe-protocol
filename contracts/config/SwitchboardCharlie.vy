@@ -34,6 +34,7 @@ interface Endaoment:
     def addPartnerLiquidity(_legoId: uint256, _pool: address, _partner: address, _asset: address, _amount: uint256, _minLpAmount: uint256) -> (uint256, uint256, uint256): nonpayable
     def swapTokens(_instructions: DynArray[ul.SwapInstruction, MAX_SWAP_INSTRUCTIONS]) -> (address, uint256, address, uint256, uint256): nonpayable
     def mintPartnerLiquidity(_partner: address, _asset: address, _amount: uint256 = max_value(uint256)) -> uint256: nonpayable
+    def transferFundsToGov(_asset: address, _amount: uint256 = max_value(uint256)) -> (uint256, uint256): nonpayable
     def recoverNft(_collection: address, _nftTokenId: uint256, _recipient: address) -> bool: nonpayable
     def convertWethToEth(_amount: uint256 = max_value(uint256)) -> (uint256, uint256): nonpayable
     def convertEthToWeth(_amount: uint256 = max_value(uint256)) -> (uint256, uint256): payable
@@ -96,6 +97,7 @@ flag ActionType:
     ENDAO_PARTNER_POOL
     ENDAO_REPAY
     ENDOA_RECOVER_NFT
+    ENDAO_TRANSFER
     TRAINING_WHEELS
 
 struct PauseAction:
@@ -148,6 +150,10 @@ struct EndaoRepayAction:
     pool: address
     amount: uint256
 
+struct EndaoTransfer:
+    asset: address
+    amount: uint256
+
 struct EndaoRecoverNftAction:
     collection: address
     nftTokenId: uint256
@@ -196,6 +202,12 @@ event PendingPauseAuctionAction:
 
 event PendingPauseManyAuctionsAction:
     numAuctions: uint256
+    confirmationBlock: uint256
+    actionId: uint256
+
+event PendingEndaoTransferAction:
+    asset: indexed(address)
+    amount: uint256
     confirmationBlock: uint256
     actionId: uint256
 
@@ -381,6 +393,10 @@ event EndaomentStabilizerPerformed:
     success: bool
     caller: indexed(address)
 
+event EndaoTransferExecuted:
+    asset: indexed(address)
+    amount: uint256
+
 event EndaoSwapExecuted:
     numSwapInstructions: uint256
 
@@ -441,6 +457,7 @@ pendingEndaoPartnerMintActions: public(HashMap[uint256, EndaoPartnerMintAction])
 pendingEndaoPartnerPoolActions: public(HashMap[uint256, EndaoPartnerPoolAction])
 pendingEndaoRepayActions: public(HashMap[uint256, EndaoRepayAction])
 pendingEndaoRecoverNftActions: public(HashMap[uint256, EndaoRecoverNftAction])
+pendingEndaoTransfer: public(HashMap[uint256, EndaoTransfer])
 pendingTrainingWheels: public(HashMap[uint256, address])
 
 MAX_RECOVER_ASSETS: constant(uint256) = 20
@@ -935,6 +952,29 @@ def performEndaomentStabilizer() -> bool:
 
 
 @external
+def performEndaomentTransfer(_asset: address, _amount: uint256) -> uint256:
+    assert gov._canGovern(msg.sender) # dev: no perms
+    assert _asset != empty(address) # dev: invalid asset
+    assert _amount != 0 # dev: invalid amount
+    
+    aid: uint256 = timeLock._initiateAction()
+    self.actionType[aid] = ActionType.ENDAO_TRANSFER
+    self.pendingEndaoTransfer[aid] = EndaoTransfer(
+        asset=_asset,
+        amount=_amount
+    )
+
+    confirmationBlock: uint256 = timeLock._getActionConfirmationBlock(aid)
+    log PendingEndaoTransferAction(
+        asset=_asset,
+        amount=_amount,
+        confirmationBlock=confirmationBlock,
+        actionId=aid
+    )
+    return aid
+
+
+@external
 def performEndaomentSwap(_instructions: DynArray[ul.SwapInstruction, MAX_SWAP_INSTRUCTIONS]) -> uint256:
     assert gov._canGovern(msg.sender) # dev: no perms
     assert len(_instructions) != 0 # dev: no swap instructions provided
@@ -1231,6 +1271,11 @@ def executePendingAction(_aid: uint256) -> bool:
         auctions: DynArray[FungAuctionConfig, MAX_AUCTIONS] = self.pendingPauseManyAuctionsActions[_aid]
         numPaused: uint256 = extcall AuctionHouse(self._getAuctionHouseAddr()).pauseManyAuctions(auctions)
         log PauseManyAuctionsExecuted(numAuctionsPaused=numPaused)
+
+    elif actionType == ActionType.ENDAO_TRANSFER:
+        p: EndaoTransfer = self.pendingEndaoTransfer[_aid]
+        extcall Endaoment(self._getEndaomentAddr()).transferFundsToGov(p.asset, p.amount)
+        log EndaoTransferExecuted(asset=p.asset, amount=p.amount)
 
     elif actionType == ActionType.ENDAO_SWAP:
         swapInstructions: DynArray[ul.SwapInstruction, MAX_SWAP_INSTRUCTIONS] = self.pendingEndaoSwapActions[_aid]
