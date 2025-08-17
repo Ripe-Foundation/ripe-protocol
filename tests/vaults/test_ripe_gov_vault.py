@@ -39,6 +39,8 @@ def setupRipeGovVaultConfig(mission_control, setAssetConfig, switchboard_alpha, 
     yield setupRipeGovVaultConfig
 
 
+
+
 def test_ripe_gov_vault_initial_deposit_no_lock(
     ripe_gov_vault, ripe_token, whale, bob, teller, _test, setupRipeGovVaultConfig
 ):
@@ -2279,4 +2281,289 @@ def test_ripe_gov_vault_release_lock_works_when_no_bad_debt_regardless_of_freeze
     # Verify exit fee was charged (12% of shares should be removed)
     expected_shares_after = initial_shares * 88 // 100  # 88% remaining after 12% fee
     assert userData_after.lastShares == expected_shares_after
+
+
+def test_depositIntoGovVault_basic_no_lock(
+    teller, ripe_gov_vault, ripe_token, whale, setupRipeGovVaultConfig, setGeneralConfig
+):
+    """Test basic depositIntoGovVault without lock duration (lockDuration = 0)"""
+    setupRipeGovVaultConfig()
+    setGeneralConfig()  # Enable general deposits
+    
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    
+    # Approve teller to spend tokens
+    ripe_token.approve(teller, deposit_amount, sender=whale)
+    
+    # Get initial balances
+    initial_whale_balance = ripe_token.balanceOf(whale)
+    initial_vault_balance = ripe_token.balanceOf(ripe_gov_vault)
+    
+    # Deposit without lock (lockDuration = 0)
+    shares = teller.depositIntoGovVault(
+        ripe_token,
+        deposit_amount,
+        0,  # No lock duration
+        whale,
+        sender=whale
+    )
+    
+    # Verify deposit was successful
+    assert shares == deposit_amount  # 1:1 for first deposit
+    
+    # Verify token transfer occurred
+    assert ripe_token.balanceOf(whale) == initial_whale_balance - deposit_amount
+    assert ripe_token.balanceOf(ripe_gov_vault) == initial_vault_balance + deposit_amount
+    
+    # Verify user's position in vault
+    user_amount = ripe_gov_vault.getTotalAmountForUser(whale, ripe_token)
+    assert user_amount == deposit_amount
+    
+    # Check governance data - should have minimum lock
+    userData = ripe_gov_vault.userGovData(whale, ripe_token)
+    current_block = boa.env.evm.patch.block_number
+    assert userData.unlock == current_block + 100  # minLockDuration from config
+
+
+def test_depositIntoGovVault_with_lock_duration(
+    teller, ripe_gov_vault, ripe_token, whale, setupRipeGovVaultConfig, setGeneralConfig
+):
+    """Test depositIntoGovVault with specific lock duration"""
+    setupRipeGovVaultConfig()
+    setGeneralConfig()  # Enable general deposits
+    
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    lock_duration = 500  # blocks
+    
+    # Approve teller to spend tokens
+    ripe_token.approve(teller, deposit_amount, sender=whale)
+    
+    # Deposit with lock duration
+    shares = teller.depositIntoGovVault(
+        ripe_token,
+        deposit_amount,
+        lock_duration,
+        whale,
+        sender=whale
+    )
+    
+    # Verify deposit was successful
+    assert shares == deposit_amount
+    
+    # Check governance data - should have specified lock duration
+    userData = ripe_gov_vault.userGovData(whale, ripe_token)
+    expected_unlock = boa.env.evm.patch.block_number + lock_duration
+    assert userData.unlock == expected_unlock
+
+
+def test_depositIntoGovVault_underscore_can_deposit_for_others_with_lock(
+    teller, ripe_gov_vault, ripe_token, whale, bob, mock_undy_v2, mission_control, switchboard_alpha, setupRipeGovVaultConfig, setGeneralConfig
+):
+    """Test that underscore addresses can deposit for other users with lock duration"""
+    setupRipeGovVaultConfig()
+    setGeneralConfig()  # Enable general deposits
+    
+    # Set mock_undy_v2 as the underscore registry
+    mission_control.setUnderscoreRegistry(mock_undy_v2.address, sender=switchboard_alpha.address)
+    
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    lock_duration = 500  # blocks - a specific lock duration between min and max
+    
+    # Transfer tokens to mock_undy_v2 (underscore address)
+    ripe_token.transfer(mock_undy_v2.address, deposit_amount, sender=whale)
+    
+    # mock_undy_v2 approves teller
+    ripe_token.approve(teller, deposit_amount, sender=mock_undy_v2.address)
+    
+    # mock_undy_v2 deposits for bob with specific lock duration
+    shares = teller.depositIntoGovVault(
+        ripe_token,
+        deposit_amount,
+        lock_duration,  # Specific lock duration
+        bob,  # Depositing for bob
+        sender=mock_undy_v2.address  # Underscore address is the sender
+    )
+    
+    # Verify deposit was successful
+    assert shares == deposit_amount
+    
+    # Verify bob received the deposit
+    user_amount = ripe_gov_vault.getTotalAmountForUser(bob, ripe_token)
+    assert user_amount == deposit_amount
+    
+    # Verify the specific lock duration was applied to bob
+    userData = ripe_gov_vault.userGovData(bob, ripe_token)
+    expected_unlock = boa.env.evm.patch.block_number + lock_duration
+    assert userData.unlock == expected_unlock  # Should be exactly the lock_duration specified
+
+
+def test_depositIntoGovVault_regular_user_cannot_deposit_for_others(
+    teller, ripe_token, whale, bob, alice, setupRipeGovVaultConfig, setGeneralConfig
+):
+    """Test that regular users cannot deposit for other users"""
+    setupRipeGovVaultConfig()
+    setGeneralConfig()  # Enable general deposits
+    
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    
+    # Transfer tokens to alice (regular user)
+    ripe_token.transfer(alice, deposit_amount, sender=whale)
+    
+    # Alice approves teller
+    ripe_token.approve(teller, deposit_amount, sender=alice)
+    
+    # Alice tries to deposit for bob (should fail)
+    with boa.reverts("cannot deposit"):
+        teller.depositIntoGovVault(
+            ripe_token,
+            deposit_amount,
+            0,
+            bob,  # Trying to deposit for bob
+            sender=alice  # Regular user
+        )
+
+
+def test_depositIntoGovVault_for_self_allowed(
+    teller, ripe_gov_vault, ripe_token, whale, alice, setupRipeGovVaultConfig, setGeneralConfig
+):
+    """Test that anyone can deposit for themselves with lock duration"""
+    setupRipeGovVaultConfig()
+    setGeneralConfig()  # Enable general deposits
+    
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    lock_duration = 300  # blocks
+    
+    # Transfer tokens to alice
+    ripe_token.transfer(alice, deposit_amount, sender=whale)
+    
+    # Approve teller from alice
+    ripe_token.approve(teller, deposit_amount, sender=alice)
+    
+    # Deposit for self with lock duration (should succeed)
+    shares = teller.depositIntoGovVault(
+        ripe_token,
+        deposit_amount,
+        lock_duration,
+        alice,  # Depositing for self
+        sender=alice
+    )
+    
+    # Verify deposit was successful
+    assert shares == deposit_amount
+    
+    # Verify alice received the deposit
+    user_amount = ripe_gov_vault.getTotalAmountForUser(alice, ripe_token)
+    assert user_amount == deposit_amount
+
+
+def test_depositIntoGovVault_when_paused(
+    teller, ripe_token, whale, switchboard_alpha, setupRipeGovVaultConfig, setGeneralConfig
+):
+    """Test that depositIntoGovVault fails when contract is paused"""
+    setupRipeGovVaultConfig()
+    setGeneralConfig()  # Enable general deposits
+    
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    
+    # Approve teller to spend tokens
+    ripe_token.approve(teller, deposit_amount, sender=whale)
+    
+    # Pause the teller contract
+    teller.pause(True, sender=switchboard_alpha.address)
+    
+    # Try to deposit (should fail)
+    with boa.reverts("contract paused"):
+        teller.depositIntoGovVault(
+            ripe_token,
+            deposit_amount,
+            0,
+            whale,
+            sender=whale
+        )
+    
+    # Unpause for cleanup
+    teller.pause(False, sender=switchboard_alpha.address)
+
+
+def test_depositIntoGovVault_multiple_deposits(
+    teller, ripe_gov_vault, ripe_token, whale, setupRipeGovVaultConfig, setGeneralConfig
+):
+    """Test multiple deposits through depositIntoGovVault with different lock durations"""
+    setupRipeGovVaultConfig()
+    setGeneralConfig()  # Enable general deposits
+    
+    first_deposit = 100 * EIGHTEEN_DECIMALS
+    second_deposit = 200 * EIGHTEEN_DECIMALS
+    
+    # Approve teller for total amount
+    total_amount = first_deposit + second_deposit
+    ripe_token.approve(teller, total_amount, sender=whale)
+    
+    # First deposit with short lock
+    lock_duration_1 = 200  # blocks
+    teller.depositIntoGovVault(
+        ripe_token,
+        first_deposit,
+        lock_duration_1,
+        whale,
+        sender=whale
+    )
+    
+    # Get unlock time after first deposit
+    userData_1 = ripe_gov_vault.userGovData(whale, ripe_token)
+    unlock_1 = userData_1.unlock
+    
+    # Second deposit with longer lock
+    lock_duration_2 = 600  # blocks
+    teller.depositIntoGovVault(
+        ripe_token,
+        second_deposit,
+        lock_duration_2,
+        whale,
+        sender=whale
+    )
+    
+    # Verify total position
+    total_amount_in_vault = ripe_gov_vault.getTotalAmountForUser(whale, ripe_token)
+    assert total_amount_in_vault == first_deposit + second_deposit
+    
+    # Check that unlock time is weighted average
+    userData_2 = ripe_gov_vault.userGovData(whale, ripe_token)
+    unlock_2 = userData_2.unlock
+    
+    # The new unlock should be a weighted average, biased toward the larger deposit
+    # Since second deposit is 2x larger with longer lock, it should pull the unlock time up
+    assert unlock_2 > unlock_1
+    assert unlock_2 < boa.env.evm.patch.block_number + lock_duration_2  # But not as far as the full second lock
+
+
+def test_depositIntoGovVault_lock_duration_capped(
+    teller, ripe_gov_vault, ripe_token, whale, setupRipeGovVaultConfig, setGeneralConfig
+):
+    """Test depositIntoGovVault with lock duration exceeding maximum gets capped"""
+    setupRipeGovVaultConfig()
+    setGeneralConfig()  # Enable general deposits
+    
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    excessive_lock_duration = 1500  # exceeds maxLockDuration of 1000
+    
+    # Approve teller to spend tokens
+    ripe_token.approve(teller, deposit_amount, sender=whale)
+    
+    # Deposit with excessive lock duration (should succeed but be capped)
+    shares = teller.depositIntoGovVault(
+        ripe_token,
+        deposit_amount,
+        excessive_lock_duration,
+        whale,
+        sender=whale
+    )
+    
+    # Verify deposit was successful
+    assert shares == deposit_amount
+    
+    # Verify lock duration was capped at maxLockDuration (1000)
+    userData = ripe_gov_vault.userGovData(whale, ripe_token)
+    expected_unlock = boa.env.evm.patch.block_number + 1000  # maxLockDuration
+    assert userData.unlock == expected_unlock
 

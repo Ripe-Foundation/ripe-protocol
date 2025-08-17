@@ -85,6 +85,7 @@ interface Ledger:
 interface AddressRegistry:
     def getRegId(_addr: address) -> uint256: view
     def getAddr(_regId: uint256) -> address: view
+    def isValidAddr(_addr: address) -> bool: view
 
 interface BondRoom:
     def purchaseRipeBond(_recipient: address, _paymentAsset: address, _paymentAmount: uint256, _lockDuration: uint256, _caller: address, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
@@ -97,9 +98,6 @@ interface CurvePrices:
 
 interface UnderscoreLedger:
     def isUserWallet(_addr: address) -> bool: view
-
-interface UnderscoreRegistry:
-    def getAddr(_addyId: uint256) -> address: view
 
 interface UnderscoreWallet:
     def walletConfig() -> address: view
@@ -207,6 +205,7 @@ MAX_STAB_REDEMPTIONS: constant(uint256) = 15
 STABILITY_POOL_ID: constant(uint256) = 1
 RIPE_GOV_VAULT_ID: constant(uint256) = 2
 UNDERSCORE_LEDGER_ID: constant(uint256) = 1
+UNDERSCORE_LEGOBOOK_ID: constant(uint256) = 3
 CURVE_PRICES_ID: constant(uint256) = 2
 
 
@@ -232,7 +231,7 @@ def deposit(
 ) -> uint256:
     assert not deptBasics.isPaused # dev: contract paused
     a: addys.Addys = addys._getAddys()
-    return self._deposit(_asset, _amount, _user, _vaultAddr, _vaultId, msg.sender, 0, False, True, a)
+    return self._deposit(_asset, _amount, _user, _vaultAddr, _vaultId, msg.sender, 0, False, False, True, a)
 
 
 @nonreentrant
@@ -241,7 +240,7 @@ def depositMany(_user: address, _deposits: DynArray[DepositAction, MAX_BALANCE_A
     assert not deptBasics.isPaused # dev: contract paused
     a: addys.Addys = addys._getAddys()
     for d: DepositAction in _deposits:
-        self._deposit(d.asset, d.amount, _user, d.vaultAddr, d.vaultId, msg.sender, 0, False, False, a)
+        self._deposit(d.asset, d.amount, _user, d.vaultAddr, d.vaultId, msg.sender, 0, False, False, False, a)
     self._performHousekeeping(False, _user, True, a)
     return len(_deposits)
 
@@ -257,7 +256,7 @@ def depositFromTrusted(
 ) -> uint256:
     assert addys._isValidRipeAddr(msg.sender) # dev: no perms
     a: addys.Addys = addys._getAddys(_a)
-    return self._deposit(_asset, _amount, _user, empty(address), _vaultId, msg.sender, _lockDuration, False, False, a)
+    return self._deposit(_asset, _amount, _user, empty(address), _vaultId, msg.sender, _lockDuration, True, False, False, a)
 
 
 # core logic
@@ -272,6 +271,7 @@ def _deposit(
     _vaultId: uint256,
     _depositor: address,
     _lockDuration: uint256,
+    _didAlreadyValidateSender: bool,
     _areFundsHereAlready: bool,
     _shouldPerformHouseKeeping: bool,
     _a: addys.Addys,
@@ -282,7 +282,7 @@ def _deposit(
 
     # get ledger data
     d: DepositLedgerData = staticcall Ledger(_a.ledger).getDepositLedgerData(_user, vaultId)
-    amount: uint256 = self._validateOnDeposit(_asset, _amount, _user, vaultId, vaultAddr, _depositor, _areFundsHereAlready, d, _a.missionControl)
+    amount: uint256 = self._validateOnDeposit(_asset, _amount, _user, vaultId, vaultAddr, _depositor, _didAlreadyValidateSender, _areFundsHereAlready, d, _a.missionControl)
 
     # transfer tokens
     if _areFundsHereAlready:
@@ -326,6 +326,7 @@ def _validateOnDeposit(
     _vaultId: uint256,
     _vaultAddr: address,
     _depositor: address,
+    _didAlreadyValidateSender: bool,
     _areFundsHereAlready: bool,
     _d: DepositLedgerData,
     _missionControl: address,
@@ -340,7 +341,7 @@ def _validateOnDeposit(
     isRipeDepartment: bool = addys._isValidRipeAddr(_depositor)
 
     # make sure depositor is allowed to deposit for user
-    if _user != _depositor and not config.canAnyoneDeposit:
+    if not _didAlreadyValidateSender and _user != _depositor and not config.canAnyoneDeposit:
         assert isRipeDepartment or self._isUnderscoreWalletOwner(_user, _depositor, _missionControl) # dev: cannot deposit for user
 
     # avail amount
@@ -688,7 +689,7 @@ def convertToSavingsGreenAndDepositIntoStabPool(_user: address = msg.sender, _gr
     sGreenAmount: uint256 = extcall IERC4626(a.savingsGreen).deposit(greenAmount, self)
     assert extcall IERC20(a.greenToken).approve(a.savingsGreen, 0, default_return_value=True) # dev: green approval failed
 
-    return self._deposit(a.savingsGreen, sGreenAmount, _user, empty(address), STABILITY_POOL_ID, msg.sender, 0, True, True, a)
+    return self._deposit(a.savingsGreen, sGreenAmount, _user, empty(address), STABILITY_POOL_ID, msg.sender, 0, False, True, True, a)
 
 
 # claims
@@ -809,6 +810,21 @@ def claimLootForManyUsers(_users: DynArray[address, MAX_CLAIM_USERS], _shouldSta
 
 @nonreentrant
 @external
+def depositIntoGovVault(
+    _asset: address,
+    _amount: uint256,
+    _lockDuration: uint256,
+    _user: address = msg.sender,
+) -> uint256:
+    assert not deptBasics.isPaused # dev: contract paused
+    a: addys.Addys = addys._getAddys()
+    if _user != msg.sender:
+        assert self._isUnderscoreAddr(msg.sender, a.missionControl) or self._isUnderscoreWalletOwner(_user, msg.sender, a.missionControl) # dev: cannot deposit
+    return self._deposit(_asset, _amount, _user, empty(address), RIPE_GOV_VAULT_ID, msg.sender, _lockDuration, True, False, True, a)
+
+
+@nonreentrant
+@external
 def adjustLock(_asset: address, _newLockDuration: uint256, _user: address = msg.sender):
     assert not deptBasics.isPaused # dev: contract paused
     a: addys.Addys = addys._getAddys()
@@ -816,7 +832,7 @@ def adjustLock(_asset: address, _newLockDuration: uint256, _user: address = msg.
 
     # validate underscore wallet
     if _user != msg.sender:
-        assert self._isUnderscoreWalletOwner(_user, msg.sender, a.missionControl) # dev: not owner of underscore wallet
+        assert self._isUnderscoreAddr(msg.sender, a.missionControl) or self._isUnderscoreWalletOwner(_user, msg.sender, a.missionControl) # dev: no perms
 
     extcall RipeGovVault(vaultAddr).adjustLock(_user, _asset, _newLockDuration, a)
     self._performHousekeeping(False, _user, True, a)
@@ -831,7 +847,7 @@ def releaseLock(_asset: address, _user: address = msg.sender):
 
     # validate underscore wallet
     if _user != msg.sender:
-        assert self._isUnderscoreWalletOwner(_user, msg.sender, a.missionControl) # dev: not owner of underscore wallet
+        assert self._isUnderscoreAddr(msg.sender, a.missionControl) or self._isUnderscoreWalletOwner(_user, msg.sender, a.missionControl) # dev: no perms
 
     extcall RipeGovVault(vaultAddr).releaseLock(_user, _asset, a)
     self._performHousekeeping(False, _user, True, a)
@@ -1091,7 +1107,7 @@ def _isUnderscoreWallet(_user: address, _mc: address) -> bool:
     if underscore == empty(address):
         return False
 
-    undyLedger: address = staticcall UnderscoreRegistry(underscore).getAddr(UNDERSCORE_LEDGER_ID)
+    undyLedger: address = staticcall AddressRegistry(underscore).getAddr(UNDERSCORE_LEDGER_ID)
     if undyLedger == empty(address):
         return False
 
@@ -1111,6 +1127,27 @@ def _isUnderscoreWalletOwner(_user: address, _caller: address, _mc: address) -> 
 
     # check if caller is owner
     return staticcall UnderscoreWalletConfig(walletConfig).owner() == _caller
+
+
+# underscore address check
+
+
+@view
+@internal
+def _isUnderscoreAddr(_addr: address, _mc: address) -> bool:
+    underscore: address = staticcall MissionControl(_mc).underscoreRegistry()
+    if underscore == empty(address):
+        return False
+
+    # check if addr is in underscore registry (Loot Distributor)
+    if staticcall AddressRegistry(underscore).isValidAddr(_addr):
+        return True
+
+    undyLegoBook: address = staticcall AddressRegistry(underscore).getAddr(UNDERSCORE_LEGOBOOK_ID)
+    if undyLegoBook == empty(address):
+        return False
+
+    return staticcall AddressRegistry(undyLegoBook).isValidAddr(_addr)
 
 
 ########  ######## ########   #######   ######  #### ######## 
