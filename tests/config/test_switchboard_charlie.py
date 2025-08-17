@@ -1602,7 +1602,7 @@ def test_switchboard_three_set_training_wheels_timelock_and_execution(
     assert log.actionId == action_id
     
     # Verify action is stored correctly
-    assert switchboard_charlie.actionType(action_id) == 8192  # ActionType.TRAINING_WHEELS
+    assert switchboard_charlie.actionType(action_id) == 16384  # ActionType.TRAINING_WHEELS (2^14)
     stored_address = switchboard_charlie.pendingTrainingWheels(action_id)
     assert stored_address == training_wheels_addr
     
