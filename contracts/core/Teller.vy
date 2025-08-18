@@ -808,7 +808,6 @@ def claimLootForManyUsers(_users: DynArray[address, MAX_CLAIM_USERS], _shouldSta
 ##################
 
 
-@nonreentrant
 @external
 def depositIntoGovVault(
     _asset: address,
