@@ -22,6 +22,14 @@ import contracts.modules.TimeLock as timeLock
 
 import interfaces.PriceSource as PriceSource
 from ethereum.ercs import IERC20
+from ethereum.ercs import IERC20Detailed
+
+interface AeroClassicPool:
+    def getReserves() -> (uint256, uint256, uint256): view
+    def tokens() -> (address, address): view
+
+interface PriceDesk:
+    def getPrice(_asset: address, _shouldRaise: bool = False) -> uint256: view
 
 struct PriceConfig:
     minSnapshotDelay: uint256
@@ -32,7 +40,6 @@ struct PriceConfig:
     nextIndex: uint256
 
 struct PriceSnapshot:
-    totalSupply: uint256
     price: uint256
     lastUpdate: uint256
 
@@ -49,15 +56,21 @@ event PriceConfigUpdatePending:
     confirmationBlock: uint256
     actionId: uint256
 
+event PriceSnapshotAdded:
+    asset: indexed(address)
+    price: uint256
+    lastUpdate: uint256
+
 # data 
 priceConfigs: public(HashMap[address, PriceConfig]) # asset -> config
 snapShots: public(HashMap[address, HashMap[uint256, PriceSnapshot]]) # asset -> index -> snapshot
 pendingPriceConfigs: public(HashMap[address, PendingPriceConfig]) # asset -> pending config
 
-HUNDRED_PERCENT: constant(uint256) = 100_00 # 100%
+HUNDRED_PERCENT: constant(uint256) = 100_00
+EIGHTEEN_DECIMALS: constant(uint256) = 10 ** 18
 
+RIPE_WETH_POOL: public(immutable(address))
 RIPE_TOKEN: public(immutable(address))
-WETH_TOKEN: public(immutable(address))
 
 
 @deploy
@@ -66,16 +79,16 @@ def __init__(
     _tempGov: address,
     _minPriceChangeTimeLock: uint256,
     _maxPriceChangeTimeLock: uint256,
+    _ripeWethPool: address,
     _ripeToken: address,
-    _wethToken: address,
 ):
     gov.__init__(_ripeHq, _tempGov, 0, 0, 0)
     addys.__init__(_ripeHq)
     priceData.__init__(False)
     timeLock.__init__(_minPriceChangeTimeLock, _maxPriceChangeTimeLock, 0, _maxPriceChangeTimeLock)
 
+    RIPE_WETH_POOL = _ripeWethPool
     RIPE_TOKEN = _ripeToken
-    WETH_TOKEN = _wethToken
 
     # set ripe token config
     self.priceConfigs[RIPE_TOKEN] = PriceConfig(
@@ -104,7 +117,7 @@ def getPrice(_asset: address, _staleTime: uint256 = 0, _priceDesk: address = emp
     if _asset != ripe:
         return 0
     config: PriceConfig = self.priceConfigs[ripe]
-    return self._getPrice(_asset, config, _priceDesk)
+    return self._getPrice(ripe, config, _priceDesk)
 
 
 @view
@@ -114,7 +127,7 @@ def getPriceAndHasFeed(_asset: address, _staleTime: uint256 = 0, _priceDesk: add
     if _asset != ripe:
         return 0, False
     config: PriceConfig = self.priceConfigs[ripe]
-    return self._getPrice(_asset, config, _priceDesk), True
+    return self._getPrice(ripe, config, _priceDesk), True
 
 
 @view
@@ -124,7 +137,7 @@ def _getPrice(_asset: address, _config: PriceConfig, _priceDesk: address) -> uin
     # Config here has its own stale time.
 
     weightedPrice: uint256 = self._getWeightedPrice(_asset, _config)
-    currentPrice: uint256 = self._getAeroRipePrice()
+    currentPrice: uint256 = self._getAeroRipePrice(_asset, _priceDesk)
 
     return min(weightedPrice, currentPrice)
 
@@ -141,7 +154,10 @@ def hasPriceFeed(_asset: address) -> bool:
 @view
 @external
 def hasPendingPriceFeedUpdate(_asset: address) -> bool:
-    return timeLock._hasPendingAction(self.pendingPriceConfigs[RIPE_TOKEN].actionId)
+    ripe: address = RIPE_TOKEN
+    if _asset != ripe:
+        return False
+    return timeLock._hasPendingAction(self.pendingPriceConfigs[ripe].actionId)
 
 
 ###################
@@ -150,9 +166,54 @@ def hasPendingPriceFeedUpdate(_asset: address) -> bool:
 
 
 @view
-@external
-def _getAeroRipePrice() -> uint256:
-    return 0 # TODO: aero price
+@internal
+def _getAeroRipePrice(_asset: address, _priceDesk: address) -> uint256:
+    pool: address = RIPE_WETH_POOL
+
+    token0: address = empty(address)
+    token1: address = empty(address)
+    token0, token1 = staticcall AeroClassicPool(pool).tokens()
+
+    # alt price
+    altPrice: uint256 = 0
+    if _asset == token0:
+        altPrice = staticcall PriceDesk(_priceDesk).getPrice(token1, False)
+    else:
+        altPrice = staticcall PriceDesk(_priceDesk).getPrice(token0, False)
+
+    # return early if no alt price
+    if altPrice == 0:
+        return 0
+
+    # reserves
+    reserve0: uint256 = 0
+    reserve1: uint256 = 0
+    na: uint256 = 0
+    reserve0, reserve1, na = staticcall AeroClassicPool(pool).getReserves()
+
+    # avoid division by zero
+    if reserve0 == 0 or reserve1 == 0:
+        return 0  
+
+    # price of token0 in token1
+    priceZeroToOne: uint256 = reserve1 * EIGHTEEN_DECIMALS // reserve0
+
+    # adjust for decimals: price should be in 18 decimals
+    decimals0: uint256 = convert(staticcall IERC20Detailed(token0).decimals(), uint256)
+    decimals1: uint256 = convert(staticcall IERC20Detailed(token1).decimals(), uint256)
+    if decimals0 > decimals1:
+        scaleFactor: uint256 = 10 ** (decimals0 - decimals1)
+        priceZeroToOne = priceZeroToOne * scaleFactor
+    elif decimals1 > decimals0:
+        scaleFactor: uint256 = 10 ** (decimals1 - decimals0)
+        priceZeroToOne = priceZeroToOne // scaleFactor
+
+    # if _asset is token1, make price inverse
+    priceToOther: uint256 = priceZeroToOne
+    if _asset == token1:
+        priceToOther = EIGHTEEN_DECIMALS * EIGHTEEN_DECIMALS // priceZeroToOne
+
+    return altPrice * priceToOther // EIGHTEEN_DECIMALS
 
 
 #################
@@ -236,7 +297,7 @@ def getWeightedPrice(_asset: address) -> uint256:
     if _asset != ripe:
         return 0
     config: PriceConfig = self.priceConfigs[ripe]
-    return self._getWeightedPrice(_asset, config)
+    return self._getWeightedPrice(ripe, config)
 
 
 @view
@@ -251,24 +312,24 @@ def _getWeightedPrice(_asset: address, _config: PriceConfig) -> uint256:
     for i: uint256 in range(_config.maxNumSnapshots, bound=max_value(uint256)):
 
         snapShot: PriceSnapshot = self.snapShots[_asset][i]
-        if snapShot.price == 0 or snapShot.totalSupply == 0 or snapShot.lastUpdate == 0:
+        if snapShot.price == 0 or snapShot.lastUpdate == 0:
             continue
 
         # too stale, skip
         if _config.staleTime != 0 and block.timestamp > snapShot.lastUpdate + _config.staleTime:
             continue
 
-        numerator += (snapShot.totalSupply * snapShot.price)
-        denominator += snapShot.totalSupply
+        numerator += snapShot.price
+        denominator += 1
 
-    # weighted price per share
-    weightedPricePerShare: uint256 = 0
+    # weighted price
+    weightedPrice: uint256 = 0
     if numerator != 0:
-        weightedPricePerShare = numerator // denominator
+        weightedPrice = numerator // denominator
     else:
-        weightedPricePerShare = _config.lastSnapshot.pricePerShare
+        weightedPrice = _config.lastSnapshot.price
 
-    return weightedPricePerShare
+    return weightedPrice
 
 
 # add price snapshot
@@ -276,20 +337,18 @@ def _getWeightedPrice(_asset: address, _config: PriceConfig) -> uint256:
 
 @external 
 def addPriceSnapshot(_asset: address) -> bool:
+    ripe: address = RIPE_TOKEN
+    if _asset != ripe:
+        return False
+
     assert addys._isValidRipeAddr(msg.sender) # dev: no perms
     assert not priceData.isPaused # dev: contract paused
-    return self._addPriceSnapshot(_asset, self.priceConfigs[_asset])
+    return self._addPriceSnapshot(ripe, self.priceConfigs[ripe])
 
 
 @internal 
 def _addPriceSnapshot(_asset: address, _config: PriceConfig) -> bool:
     config: PriceConfig = _config
-    if config.underlyingAsset == empty(address):
-        return False
-
-    # aave v3 and compound v3 - not using snapshots
-    if _config.protocol == Protocol.COMPOUND_V3 or _config.protocol == Protocol.AAVE_V3:
-        return False
 
     # already have snapshot for this time
     if config.lastSnapshot.lastUpdate == block.timestamp:
@@ -312,11 +371,10 @@ def _addPriceSnapshot(_asset: address, _config: PriceConfig) -> bool:
     # save config data
     self.priceConfigs[_asset] = config
 
-    log PricePerShareSnapshotAdded(
+    log PriceSnapshotAdded(
         asset=_asset,
-        underlyingAsset=config.underlyingAsset,
-        totalSupply=newSnapshot.totalSupply,
-        pricePerShare=newSnapshot.pricePerShare,
+        price=newSnapshot.price,
+        lastUpdate=newSnapshot.lastUpdate,
     )
     return True
 
@@ -327,31 +385,22 @@ def _addPriceSnapshot(_asset: address, _config: PriceConfig) -> bool:
 @view
 @external
 def getLatestSnapshot(_asset: address) -> PriceSnapshot:
-    return self._getLatestSnapshot(_asset, self.priceConfigs[_asset])
+    ripe: address = RIPE_TOKEN
+    if _asset != ripe:
+        return empty(PriceSnapshot)
+    return self._getLatestSnapshot(ripe, self.priceConfigs[ripe])
 
 
 @view
 @internal
 def _getLatestSnapshot(_asset: address, _config: PriceConfig) -> PriceSnapshot:
-    totalSupply: uint256 = staticcall IERC20(_asset).totalSupply() // (10 ** _config.vaultTokenDecimals)
-    pricePerShare: uint256 = 0
-
-    # erc4626 vaults
-    if _config.protocol == Protocol.MORPHO or _config.protocol == Protocol.EULER or _config.protocol == Protocol.FLUID:
-        pricePerShare = self._getCurrentErc4626PricePerShare(_asset, _config.vaultTokenDecimals)
-
-    # moonwell
-    elif _config.protocol == Protocol.MOONWELL:
-        pricePerShare = self._getCurrentMoonwellPricePerShare(_asset, _config.vaultTokenDecimals)
-
-    # TODO: implement rest of protocols
+    price: uint256 = self._getAeroRipePrice(_asset, addys._getPriceDeskAddr())
 
     # throttle upside (extra safety check)
-    pricePerShare = self._throttleUpside(pricePerShare, _config.lastSnapshot.pricePerShare, _config.maxUpsideDeviation)
+    price = self._throttleUpside(price, _config.lastSnapshot.price, _config.maxUpsideDeviation)
 
     return PriceSnapshot(
-        totalSupply=totalSupply,
-        pricePerShare=pricePerShare,
+        price=price,
         lastUpdate=block.timestamp,
     )
 
@@ -361,8 +410,8 @@ def _getLatestSnapshot(_asset: address, _config: PriceConfig) -> PriceSnapshot:
 def _throttleUpside(_newValue: uint256, _prevValue: uint256, _maxUpside: uint256) -> uint256:
     if _maxUpside == 0 or _prevValue == 0 or _newValue == 0:
         return _newValue
-    maxPricePerShare: uint256 = _prevValue + (_prevValue * _maxUpside // HUNDRED_PERCENT)
-    return min(_newValue, maxPricePerShare)
+    maxPrice: uint256 = _prevValue + (_prevValue * _maxUpside // HUNDRED_PERCENT)
+    return min(_newValue, maxPrice)
 
 
 # other
