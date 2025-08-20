@@ -1124,12 +1124,12 @@ def test_ltv_deviation_validation_edge_cases(switchboard_bravo, switchboard_alph
     )
     assert action_id > 0
     
-    # Test: LTV change outside allowed deviation (60% -> 75% = 15% change > 10% max)
-    with boa.reverts("ltv is outside max deviation"):
-        switchboard_bravo.setAssetDebtTerms(
-            alpha_token, 75_00, 80_00, 85_00, 5_00, 10_00, 2_00,
-            sender=governance.address
-        )
+    # Test: LTV can increase without upper bound limit (60% -> 75% is allowed)
+    action_id = switchboard_bravo.setAssetDebtTerms(
+        alpha_token, 75_00, 80_00, 85_00, 5_00, 10_00, 2_00,
+        sender=governance.address
+    )
+    assert action_id > 0
     
     # Test: LTV change to lower bound (60% -> 50%)
     action_id = switchboard_bravo.setAssetDebtTerms(
@@ -1192,10 +1192,17 @@ def test_ltv_deviation_with_default_values(switchboard_bravo, governance, alpha_
     )
     assert action_id > 0
     
-    # Test: LTV change outside default max deviation (50% -> 65%, change = 15% > 10% default)
+    # Test: LTV can increase without upper bound limit (50% -> 65% is allowed)
+    action_id = switchboard_bravo.setAssetDebtTerms(
+        alpha_token, 65_00, 75_00, 85_00, 5_00, 10_00, 2_00,
+        sender=governance.address
+    )
+    assert action_id > 0
+    
+    # Test: LTV cannot exceed 100% (hard upper limit)
     with boa.reverts("ltv is outside max deviation"):
         switchboard_bravo.setAssetDebtTerms(
-            alpha_token, 65_00, 75_00, 85_00, 5_00, 10_00, 2_00,
+            alpha_token, 100_00, 110_00, 120_00, 5_00, 10_00, 2_00,  # 100% LTV
             sender=governance.address
         )
     
@@ -1242,7 +1249,7 @@ def test_whitelist_special_stab_pool_validation(switchboard_bravo, governance, a
         )
 
 
-def test_auction_params_validation_delegation(switchboard_bravo, governance, alpha_token, switchboard_alpha):
+def test_auction_params_validation_delegation(switchboard_bravo, governance, alpha_token):
     """Test that auction params validation is delegated to SwitchboardOne"""
     # Create invalid auction params (start >= max discount)
     invalid_auction_params = (True, 50_00, 40_00, 1000, 3000)  # start 50% >= max 40%

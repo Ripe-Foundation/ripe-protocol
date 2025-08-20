@@ -563,8 +563,8 @@ def _getRepayAmountAndRefundAmount(_userDebtAmount: uint256, _greenAmount: uint2
 
     repayAmount: uint256 = min(availAmount, _userDebtAmount)
     refundAmount: uint256 = 0
-    if repayAmount > availAmount:
-        refundAmount = repayAmount - availAmount
+    if availAmount > _userDebtAmount:
+        refundAmount = availAmount - _userDebtAmount
 
     return repayAmount, refundAmount
 

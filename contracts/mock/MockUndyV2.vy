@@ -32,6 +32,12 @@ def getAddr(_regId: uint256) -> address:
 
 @view
 @external
+def isValidAddr(_addr: address) -> bool:
+    return True
+
+
+@view
+@external
 def isUserWallet(_addr: address) -> bool:
     return True
 
