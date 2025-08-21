@@ -77,10 +77,10 @@ RIPE_TOKEN: public(immutable(address))
 def __init__(
     _ripeHq: address,
     _tempGov: address,
-    _minPriceChangeTimeLock: uint256,
-    _maxPriceChangeTimeLock: uint256,
     _ripeWethPool: address,
     _ripeToken: address,
+    _minPriceChangeTimeLock: uint256,
+    _maxPriceChangeTimeLock: uint256,
 ):
     gov.__init__(_ripeHq, _tempGov, 0, 0, 0)
     addys.__init__(_ripeHq)
@@ -91,15 +91,16 @@ def __init__(
     RIPE_TOKEN = _ripeToken
 
     # set ripe token config
-    self.priceConfigs[RIPE_TOKEN] = PriceConfig(
-        minSnapshotDelay = 60 * 5, # 5 minutes
-        maxNumSnapshots = 20,
-        maxUpsideDeviation = 10_00, # 10%
-        staleTime = 0,
-        lastSnapshot = empty(PriceSnapshot),
-        nextIndex = 0,
-    )
-    priceData._addPricedAsset(RIPE_TOKEN)
+    if _ripeToken != empty(address):
+        self.priceConfigs[RIPE_TOKEN] = PriceConfig(
+            minSnapshotDelay = 60 * 5, # 5 minutes
+            maxNumSnapshots = 20,
+            maxUpsideDeviation = 10_00, # 10%
+            staleTime = 0,
+            lastSnapshot = empty(PriceSnapshot),
+            nextIndex = 0,
+        )
+        priceData._addPricedAsset(RIPE_TOKEN)
 
 
 ###############
@@ -136,10 +137,13 @@ def _getPrice(_asset: address, _config: PriceConfig, _priceDesk: address) -> uin
     # NOTE: not using Mission Control `_staleTime` in this contract.
     # Config here has its own stale time.
 
-    weightedPrice: uint256 = self._getWeightedPrice(_asset, _config)
-    currentPrice: uint256 = self._getAeroRipePrice(_asset, _priceDesk)
+    price: uint256 = self._getAeroRipePrice(_asset, _priceDesk)
 
-    return min(weightedPrice, currentPrice)
+    weightedPrice: uint256 = self._getWeightedPrice(_asset, _config)
+    if weightedPrice != 0:
+        price = min(weightedPrice, price)
+
+    return price
 
 
 # utilities
@@ -163,6 +167,15 @@ def hasPendingPriceFeedUpdate(_asset: address) -> bool:
 ###################
 # Aero Ripe Price #
 ###################
+
+
+@view
+@external
+def getAeroRipePrice(_asset: address) -> uint256:
+    ripe: address = RIPE_TOKEN
+    if _asset != ripe:
+        return 0
+    return self._getAeroRipePrice(ripe, addys._getPriceDeskAddr())
 
 
 @view

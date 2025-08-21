@@ -1,5 +1,7 @@
 ADDYS = {
     "base": {
+        "RIPE_WETH_POOL": "0x765824aD2eD0ECB70ECc25B0Cf285832b335d6A9",
+        "RIPE_TOKEN": "0x2A0a59d6B975828e781EcaC125dBA40d7ee5dDC0",
         # underscore
         "UNDERSCORE_REGISTRY": "0x44Cf3c4f000DFD76a35d03298049D37bE688D6F9",
         # curve
