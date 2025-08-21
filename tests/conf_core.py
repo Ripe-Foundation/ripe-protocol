@@ -628,7 +628,7 @@ def price_desk_deploy(ripe_hq_deploy, fork):
 
 
 @pytest.fixture(scope="session")
-def price_desk(price_desk_deploy, deploy3r, chainlink, mock_price_source, curve_prices, blue_chip_prices, pyth_prices, stork_prices):
+def price_desk(price_desk_deploy, deploy3r, chainlink, mock_price_source, curve_prices, blue_chip_prices, pyth_prices, stork_prices, aero_ripe_prices):
 
     # register chainlink
     assert price_desk_deploy.startAddNewAddressToRegistry(chainlink, "Chainlink", sender=deploy3r)
@@ -653,6 +653,10 @@ def price_desk(price_desk_deploy, deploy3r, chainlink, mock_price_source, curve_
     # register mock price source
     assert price_desk_deploy.startAddNewAddressToRegistry(mock_price_source, "Mock Price Source", sender=deploy3r)
     assert price_desk_deploy.confirmNewAddressToRegistry(mock_price_source, sender=deploy3r) == 6
+
+    # register aero ripe prices
+    assert price_desk_deploy.startAddNewAddressToRegistry(aero_ripe_prices, "Aero Ripe Prices", sender=deploy3r)
+    assert price_desk_deploy.confirmNewAddressToRegistry(aero_ripe_prices, sender=deploy3r) == 7
 
     # finish registry setup
     assert price_desk_deploy.setRegistryTimeLockAfterSetup(sender=deploy3r)
@@ -784,6 +788,28 @@ def stork_prices(ripe_hq_deploy, fork, deploy3r, mock_stork):
         PARAMS[fork]["PRICE_DESK_MIN_REG_TIMELOCK"],
         PARAMS[fork]["PRICE_DESK_MAX_REG_TIMELOCK"],
         name="stork_prices",
+    )
+    assert c.setActionTimeLockAfterSetup(sender=deploy3r)
+    return c
+
+
+# aero ripe prices
+
+
+@pytest.fixture(scope="session")
+def aero_ripe_prices(ripe_hq_deploy, fork, deploy3r):
+    ripe_weth_pool = ZERO_ADDRESS if fork == "local" else ADDYS[fork]["RIPE_WETH_POOL"]
+    ripe_token = ZERO_ADDRESS if fork == "local" else ADDYS[fork]["RIPE_TOKEN"]
+
+    c = boa.load(
+        "contracts/priceSources/AeroRipePrices.vy",
+        ripe_hq_deploy,
+        ZERO_ADDRESS,
+        ripe_weth_pool,
+        ripe_token,
+        PARAMS[fork]["PRICE_DESK_MIN_REG_TIMELOCK"],
+        PARAMS[fork]["PRICE_DESK_MAX_REG_TIMELOCK"],
+        name="aero_ripe_prices",
     )
     assert c.setActionTimeLockAfterSetup(sender=deploy3r)
     return c
