@@ -1,7 +1,7 @@
 import pytest
 import boa
 
-from config.BluePrint import PARAMS, ADDYS
+from config.BluePrint import PARAMS, ADDYS, YIELD_TOKENS
 from constants import ZERO_ADDRESS, EIGHTEEN_DECIMALS, HUNDRED_PERCENT
 
 
@@ -628,8 +628,18 @@ def price_desk_deploy(ripe_hq_deploy, fork):
 
 
 @pytest.fixture(scope="session")
-def price_desk(price_desk_deploy, deploy3r, chainlink, mock_price_source, curve_prices, blue_chip_prices, pyth_prices, stork_prices, aero_ripe_prices):
-
+def price_desk(
+    price_desk_deploy,
+    deploy3r,
+    chainlink,
+    mock_price_source,
+    curve_prices,
+    blue_chip_prices,
+    pyth_prices,
+    stork_prices,
+    aero_ripe_prices,
+    wsuper_oethb_prices,
+):
     # register chainlink
     assert price_desk_deploy.startAddNewAddressToRegistry(chainlink, "Chainlink", sender=deploy3r)
     assert price_desk_deploy.confirmNewAddressToRegistry(chainlink, sender=deploy3r) == 1
@@ -657,6 +667,10 @@ def price_desk(price_desk_deploy, deploy3r, chainlink, mock_price_source, curve_
     # register aero ripe prices
     assert price_desk_deploy.startAddNewAddressToRegistry(aero_ripe_prices, "Aero Ripe Prices", sender=deploy3r)
     assert price_desk_deploy.confirmNewAddressToRegistry(aero_ripe_prices, sender=deploy3r) == 7
+
+    # register wsuper oethb prices
+    assert price_desk_deploy.startAddNewAddressToRegistry(wsuper_oethb_prices, "WSuper OETHb Prices", sender=deploy3r)
+    assert price_desk_deploy.confirmNewAddressToRegistry(wsuper_oethb_prices, sender=deploy3r) == 8
 
     # finish registry setup
     assert price_desk_deploy.setRegistryTimeLockAfterSetup(sender=deploy3r)
@@ -810,6 +824,27 @@ def aero_ripe_prices(ripe_hq_deploy, fork, deploy3r):
         PARAMS[fork]["PRICE_DESK_MIN_REG_TIMELOCK"],
         PARAMS[fork]["PRICE_DESK_MAX_REG_TIMELOCK"],
         name="aero_ripe_prices",
+    )
+    assert c.setActionTimeLockAfterSetup(sender=deploy3r)
+    return c
+
+
+# wsuper oethb prices
+
+
+@pytest.fixture(scope="session")
+def wsuper_oethb_prices(ripe_hq_deploy, fork, deploy3r):
+    super_oeth = ZERO_ADDRESS if fork == "local" else YIELD_TOKENS[fork]["SUPER_OETH"]
+    wrapped_super_oeth = ZERO_ADDRESS if fork == "local" else YIELD_TOKENS[fork]["WRAPPED_SUPER_OETH"]
+
+    c = boa.load(
+        "contracts/priceSources/wsuperOETHbPrices.vy",
+        ripe_hq_deploy,
+        super_oeth,
+        wrapped_super_oeth,
+        PARAMS[fork]["PRICE_DESK_MIN_REG_TIMELOCK"],
+        PARAMS[fork]["PRICE_DESK_MAX_REG_TIMELOCK"],
+        name="wsuper_oethb_prices",
     )
     assert c.setActionTimeLockAfterSetup(sender=deploy3r)
     return c
