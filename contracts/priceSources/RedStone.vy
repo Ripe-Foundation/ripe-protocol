@@ -475,7 +475,7 @@ def _isValidFeedConfig(
     if missionControl != empty(address):
         staleTime = max(staleTime, staticcall MissionControl(missionControl).getPriceStaleTime())
 
-    return self._getPrice(_feed, _decimals, _needsEthToUsd, staleTime) != 0
+    return self._getPrice(_feed, _decimals, _needsEthToUsd, staleTime, addys._getPriceDeskAddr()) != 0
 
 
 ################
@@ -567,6 +567,4 @@ def isValidDisablePriceFeed(_asset: address) -> bool:
 def _isValidDisablePriceFeed(_asset: address, _oldFeed: address) -> bool:
     if priceData.indexOfAsset[_asset] == 0:
         return False
-    if _oldFeed == empty(address):
-        return False
-    return _asset != ETH
+    return _oldFeed != empty(address)

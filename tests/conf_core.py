@@ -639,6 +639,7 @@ def price_desk(
     stork_prices,
     aero_ripe_prices,
     wsuper_oethb_prices,
+    redstone,
 ):
     # register chainlink
     assert price_desk_deploy.startAddNewAddressToRegistry(chainlink, "Chainlink", sender=deploy3r)
@@ -671,6 +672,10 @@ def price_desk(
     # register wsuper oethb prices
     assert price_desk_deploy.startAddNewAddressToRegistry(wsuper_oethb_prices, "WSuper OETHb Prices", sender=deploy3r)
     assert price_desk_deploy.confirmNewAddressToRegistry(wsuper_oethb_prices, sender=deploy3r) == 8
+
+    # register redstone prices
+    assert price_desk_deploy.startAddNewAddressToRegistry(redstone, "RedStone Prices", sender=deploy3r)
+    assert price_desk_deploy.confirmNewAddressToRegistry(redstone, sender=deploy3r) == 9
 
     # finish registry setup
     assert price_desk_deploy.setRegistryTimeLockAfterSetup(sender=deploy3r)
@@ -845,6 +850,24 @@ def wsuper_oethb_prices(ripe_hq_deploy, fork, deploy3r):
         PARAMS[fork]["PRICE_DESK_MIN_REG_TIMELOCK"],
         PARAMS[fork]["PRICE_DESK_MAX_REG_TIMELOCK"],
         name="wsuper_oethb_prices",
+    )
+    assert c.setActionTimeLockAfterSetup(sender=deploy3r)
+    return c
+
+
+# redstone
+
+
+@pytest.fixture(scope="session")
+def redstone(ripe_hq_deploy, fork, deploy3r):
+    c = boa.load(
+        "contracts/priceSources/RedStone.vy",
+        ripe_hq_deploy,
+        ZERO_ADDRESS,
+        ADDYS[fork]["ETH"],
+        PARAMS[fork]["PRICE_DESK_MIN_REG_TIMELOCK"],
+        PARAMS[fork]["PRICE_DESK_MAX_REG_TIMELOCK"],
+        name="redstone",
     )
     assert c.setActionTimeLockAfterSetup(sender=deploy3r)
     return c
