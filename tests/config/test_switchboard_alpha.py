@@ -890,7 +890,7 @@ def test_sanitize_priority_sources_deduplication(switchboard_alpha, governance):
     """Test the deduplication logic in _sanitizePrioritySources"""
     
     # Test with duplicate price source IDs (1 and 2 are valid)
-    ids = [1, 1, 2, 2, 1, 9]  # Contains duplicates, 9 is invalid
+    ids = [1, 1, 2, 2, 1, 99]  # Contains duplicates, 99 is invalid
     
     # This should succeed with valid IDs 1 and 2 (deduplicated)
     action_id = switchboard_alpha.setPriorityPriceSourceIds(ids, sender=governance.address)

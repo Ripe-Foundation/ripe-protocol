@@ -838,9 +838,9 @@ def aero_ripe_prices(ripe_hq_deploy, fork, deploy3r):
 
 
 @pytest.fixture(scope="session")
-def wsuper_oethb_prices(ripe_hq_deploy, fork, deploy3r):
-    super_oeth = ZERO_ADDRESS if fork == "local" else YIELD_TOKENS[fork]["SUPER_OETH"]
-    wrapped_super_oeth = ZERO_ADDRESS if fork == "local" else YIELD_TOKENS[fork]["WRAPPED_SUPER_OETH"]
+def wsuper_oethb_prices(ripe_hq_deploy, fork, deploy3r, mock_yield_registry):
+    super_oeth = mock_yield_registry if fork == "local" else YIELD_TOKENS[fork]["SUPER_OETH"]
+    wrapped_super_oeth = mock_yield_registry if fork == "local" else YIELD_TOKENS[fork]["WRAPPED_SUPER_OETH"]
 
     c = boa.load(
         "contracts/priceSources/wsuperOETHbPrices.vy",
