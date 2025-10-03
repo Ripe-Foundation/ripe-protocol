@@ -22,8 +22,8 @@ FORKS = {
     "base": {
         "rpc_url": f"https://base-mainnet.g.alchemy.com/v2/{os.environ.get('WEB3_ALCHEMY_API_KEY')}",
         "block": 34471929,
-        "etherscan_url": "https://api.basescan.org/api",
-        "etherscan_api_key": os.environ["BASESCAN_API_KEY"],
+        "etherscan_url": "https://api.etherscan.io/v2/api?chainid=8453",
+        "etherscan_api_key": os.environ["ETHERSCAN_API_KEY"],
         "anvil": True,
     }
 }

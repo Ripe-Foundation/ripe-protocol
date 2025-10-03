@@ -898,6 +898,16 @@ def _getUserBorrowTerms(
 
 @view
 @external
+def getUserDebtAmount(_user: address) -> uint256:
+    d: RepayDataBundle = staticcall Ledger(addys._getLedgerAddr()).getRepayDataBundle(_user)
+    userDebt: UserDebt = empty(UserDebt)
+    na: uint256 = 0
+    userDebt, na = self._getLatestUserDebtWithInterest(d.userDebt)
+    return userDebt.amount
+
+
+@view
+@external
 def getLatestUserDebtAndTerms(
     _user: address,
     _shouldRaise: bool,
