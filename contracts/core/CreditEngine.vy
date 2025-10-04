@@ -908,6 +908,18 @@ def getUserDebtAmount(_user: address) -> uint256:
 
 @view
 @external
+def getUserCollateralValueAndDebtAmount(_user: address) -> (uint256, uint256):
+    a: addys.Addys = addys._getAddys()
+    d: RepayDataBundle = staticcall Ledger(a.ledger).getRepayDataBundle(_user)
+    userDebt: UserDebt = empty(UserDebt)
+    na: uint256 = 0
+    userDebt, na = self._getLatestUserDebtWithInterest(d.userDebt)
+    bt: UserBorrowTerms = self._getUserBorrowTerms(_user, d.numUserVaults, False, 0, empty(address), a)
+    return bt.collateralVal, userDebt.amount
+
+
+@view
+@external
 def getLatestUserDebtAndTerms(
     _user: address,
     _shouldRaise: bool,
