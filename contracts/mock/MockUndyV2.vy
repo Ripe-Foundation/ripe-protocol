@@ -54,6 +54,12 @@ def setUseThisLegoId(_legoId: uint256):
     self.useThisLegoId = _legoId
 
 
+@view
+@external
+def isEarnVault(_vaultAddr: address) -> bool:
+    return True
+
+
 #############
 # Liquidity #
 #############
