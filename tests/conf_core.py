@@ -640,6 +640,7 @@ def price_desk(
     aero_ripe_prices,
     wsuper_oethb_prices,
     redstone,
+    undy_vault_prices,
 ):
     # register chainlink
     assert price_desk_deploy.startAddNewAddressToRegistry(chainlink, "Chainlink", sender=deploy3r)
@@ -676,6 +677,10 @@ def price_desk(
     # register redstone prices
     assert price_desk_deploy.startAddNewAddressToRegistry(redstone, "RedStone Prices", sender=deploy3r)
     assert price_desk_deploy.confirmNewAddressToRegistry(redstone, sender=deploy3r) == 9
+
+    # register undy vault prices
+    assert price_desk_deploy.startAddNewAddressToRegistry(undy_vault_prices, "Undy Vault Prices", sender=deploy3r)
+    assert price_desk_deploy.confirmNewAddressToRegistry(undy_vault_prices, sender=deploy3r) == 10
 
     # finish registry setup
     assert price_desk_deploy.setRegistryTimeLockAfterSetup(sender=deploy3r)
@@ -868,6 +873,23 @@ def redstone(ripe_hq_deploy, fork, deploy3r):
         PARAMS[fork]["PRICE_DESK_MIN_REG_TIMELOCK"],
         PARAMS[fork]["PRICE_DESK_MAX_REG_TIMELOCK"],
         name="redstone",
+    )
+    assert c.setActionTimeLockAfterSetup(sender=deploy3r)
+    return c
+
+
+# undy vault prices
+
+
+@pytest.fixture(scope="session")
+def undy_vault_prices(ripe_hq_deploy, fork, deploy3r):
+    c = boa.load(
+        "contracts/priceSources/UndyVaultPrices.vy",
+        ripe_hq_deploy,
+        ZERO_ADDRESS,
+        PARAMS[fork]["PRICE_DESK_MIN_REG_TIMELOCK"],
+        PARAMS[fork]["PRICE_DESK_MAX_REG_TIMELOCK"],
+        name="undy_vault_prices",
     )
     assert c.setActionTimeLockAfterSetup(sender=deploy3r)
     return c
