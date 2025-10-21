@@ -8,7 +8,7 @@ from scripts.utils.migration_runner import MigrationRunner
 from scripts.utils.deploy_args import DeployArgs
 from scripts.utils.safe_account import SafeAccount
 from boa.environment import Env
-from scripts.utils.ledger_account import LedgerAccount
+# from scripts.utils.ledger_account import LedgerAccount
 from scripts.utils.mock_account import MockAccount
 import os
 
@@ -262,7 +262,7 @@ def cli(
                 rpc_url=final_rpc
             )
     elif ledger != -1:
-        sender = LedgerAccount(final_rpc, ledger)
+        # sender = LedgerAccount(final_rpc, ledger)
         if fork:
             sender = MockAccount(sender.address)
     else:
@@ -298,7 +298,7 @@ def cli(
                 deploy_args, start_timestamp, end_timestamp, not single)
 
     elif fork:
-        with boa.fork(final_rpc, allow_dirty=True) as env:
+        with boa.fork(final_rpc, allow_dirty=True, block_identifier=36671400) as env:
             try:
                 env.set_balance(sender.address, 10*10**18)
                 log.h2('Deployer wallet funded with 10 ETH')
