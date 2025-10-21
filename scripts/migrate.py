@@ -73,6 +73,11 @@ CLICK_PROMPTS = {
         "help": "Ignore previous log files",
         "default": False,
     },
+    "manifest": {
+        "prompt": "Manifest",
+        "default": "current",
+        "help": "Manifest to use for the migration. Defaults to `current`.",
+    },
 }
 
 
