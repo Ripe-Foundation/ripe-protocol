@@ -21,12 +21,20 @@ MIGRATION_HISTORY_DIR = "./migration_history"
     help=CLICK_PROMPTS["chain"]["help"],
     callback=param_prompt,
 )
-def cli(environment, chain):
+@click.option(
+    "--manifest",
+    default=CLICK_PROMPTS["manifest"]["default"],
+    help=CLICK_PROMPTS["manifest"]["help"],
+    callback=param_prompt,
+)
+def cli(environment, chain, manifest):
     """Verify contracts on Etherscan/Basescan"""
     print(f"Verifying contracts from environment: {environment}")
-
+    print(f"Verifying contracts from chain: {chain}")
+    print(f"Verifying contracts from manifest: {manifest}")
     # Load manifest
-    manifest_path = f"{MIGRATION_HISTORY_DIR}/{chain}/{environment}/current-manifest.json"
+    manifest_path = f"{MIGRATION_HISTORY_DIR}/{chain}/{environment}/{manifest}-manifest.json"
+    print(f"Manifest path: {manifest_path}")
     if not os.path.exists(manifest_path):
         print(f"No manifest found at {manifest_path}")
         return
@@ -36,9 +44,9 @@ def cli(environment, chain):
 
     # Get API key based on chain
     if "base" in chain:
-        api_key = os.getenv("BASESCAN_API_KEY")
+        api_key = os.getenv("ETHERSCAN_API_KEY")
         if not api_key:
-            print("BASESCAN_API_KEY environment variable not set")
+            print("ETHERSCAN_API_KEY environment variable not set")
             return
     else:
         api_key = os.getenv("ETHERSCAN_API_KEY")

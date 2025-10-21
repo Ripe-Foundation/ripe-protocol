@@ -6,9 +6,9 @@ from scripts.utils import log
 from scripts.utils.migration_helpers import get_account, load_vyper_files
 from scripts.utils.migration_runner import MigrationRunner
 from scripts.utils.deploy_args import DeployArgs
-from scripts.utils.safe_account import SafeAccount
 from boa.environment import Env
-from scripts.utils.ledger_account import LedgerAccount
+# from scripts.utils.safe_account import SafeAccount
+# from scripts.utils.ledger_account import LedgerAccount
 from scripts.utils.mock_account import MockAccount
 import os
 
@@ -72,6 +72,11 @@ CLICK_PROMPTS = {
         "prompt": "Ignore current logs (always run transactions)?",
         "help": "Ignore previous log files",
         "default": False,
+    },
+    "manifest": {
+        "prompt": "Manifest",
+        "default": "current",
+        "help": "Manifest to use for the migration. Defaults to `current`.",
     },
 }
 
@@ -256,13 +261,13 @@ def cli(
     if safe != "":
         if fork:
             sender = MockAccount(safe)
-        else:
-            sender = SafeAccount(
-                safe_address=safe,
-                rpc_url=final_rpc
-            )
+        # else:
+        #     sender = SafeAccount(
+        #         safe_address=safe,
+        #         rpc_url=final_rpc
+        #     )
     elif ledger != -1:
-        sender = LedgerAccount(final_rpc, ledger)
+        # sender = LedgerAccount(final_rpc, ledger)
         if fork:
             sender = MockAccount(sender.address)
     else:
