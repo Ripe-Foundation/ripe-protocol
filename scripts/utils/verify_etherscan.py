@@ -2,13 +2,15 @@ import requests
 import json
 import time
 
-base_urls = {
-    "eth-mainnet": "https://api.etherscan.io/api",
-    "eth-goerli": "https://api-goerli.etherscan.io/api",
-    "eth-sepolia": "https://api-sepolia.etherscan.io/api",
-    "base-mainnet": "https://api.basescan.org/api",
-    "base-goerli": "https://api-goerli.basescan.org/api",
-    "base-sepolia": "https://api-sepolia.basescan.org/api",
+api_url = "https://api.etherscan.io/v2/api"
+
+chain_ids = {
+    "eth-mainnet": 1,
+    "eth-goerli": 5,
+    "eth-sepolia": 11155111,
+    "base-mainnet": 8453,
+    "base-goerli": 84532,
+    "base-sepolia": 84532,
 }
 
 
@@ -24,9 +26,10 @@ contract_base_url = {
 
 def is_contract_verified(api_key: str, contract_address: str, chain: str) -> bool:
     """Check if contract is already verified"""
-    api_url = base_urls.get(chain, base_urls["eth-mainnet"])
+    chain_id = chain_ids.get(chain, chain_ids["eth-mainnet"])
 
     params = {
+        "chainid": chain_id,
         "apikey": api_key,
         "module": "contract",
         "action": "getabi",
@@ -50,6 +53,8 @@ def verify_from_manifest(api_key: str, contract_name: str, manifest_data: dict, 
 
     # Prepare verification request
     contract_file = next(iter(manifest_data["solc_json"]["sources"].keys()))
+
+    chain_id = chain_ids.get(chain, chain_ids["eth-mainnet"])
     params = {
         "apikey": api_key,
         "module": "contract",
@@ -65,11 +70,9 @@ def verify_from_manifest(api_key: str, contract_name: str, manifest_data: dict, 
         "evmversion": ""
     }
 
-    api_url = base_urls.get(chain, base_urls["eth-mainnet"])
-
     try:
         # Submit verification request
-        response = requests.post(api_url, data=params)
+        response = requests.post(api_url, params={"chainid": chain_id}, data=params)
         result = response.json()
 
         if result["status"] != "1":
@@ -81,6 +84,7 @@ def verify_from_manifest(api_key: str, contract_name: str, manifest_data: dict, 
 
         # Check verification status
         check_params = {
+            "chainid": chain_id,
             "apikey": api_key,
             "module": "contract",
             "action": "checkverifystatus",

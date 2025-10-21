@@ -36,9 +36,9 @@ def cli(environment, chain):
 
     # Get API key based on chain
     if "base" in chain:
-        api_key = os.getenv("BASESCAN_API_KEY")
+        api_key = os.getenv("ETHERSCAN_API_KEY")
         if not api_key:
-            print("BASESCAN_API_KEY environment variable not set")
+            print("ETHERSCAN_API_KEY environment variable not set")
             return
     else:
         api_key = os.getenv("ETHERSCAN_API_KEY")
