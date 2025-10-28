@@ -877,3 +877,305 @@ def test_phase1_skips_non_green_stablecoin_assets(
     # Verify debt was reduced
     assert repaid_amount > 0, "Should have repaid some debt"
 
+
+def test_phase1_processes_multiple_stability_pools(
+    deleverage,
+    teller,
+    stability_pool,
+    simple_erc20_vault,
+    bob,
+    alice,  # Use alice instead of charlie
+    savings_green,
+    green_token,
+    alpha_token,
+    alpha_token_whale,
+    setupDeleverage,
+    performDeposit,
+    setup_priority_configs,
+    credit_engine,
+    setAssetConfig,
+    createDebtTerms,
+    _test,
+):
+    """
+    CRITICAL TEST: Verify Phase 1 correctly processes multiple stability pools.
+
+    SCENARIO:
+    - Configure 2 stability pools in priority order
+    - User (bob) participates in pool 1, NOT in pool 2
+    - Another user (alice) in pool 2 to verify no cross-contamination
+    - Bob's pool 1 assets sufficient to cover debt
+
+    EXPECTED:
+    - Pool 1 processed (user participates, covers full debt)
+    - Pool 2 SKIPPED (user doesn't participate)
+    - Alice's assets untouched
+    - Only 1 burn event
+
+    VALIDATES: Lines 244-255 (multiple pool iteration and participation check)
+    """
+    # Configure GREEN token to be supported by simple_erc20_vault (vault ID 3)
+    # This allows Alice to deposit GREEN there for the second pool
+    setAssetConfig(green_token, _vaultIds=[1, 3], _debtTerms=createDebtTerms(), _shouldBurnAsPayment=True)
+    # Setup bob with debt using alpha_token as collateral
+    # Using standard borrow_amount=500 which creates 500 debt and yields 500 GREEN
+    setupDeleverage(
+        bob,
+        alpha_token,
+        alpha_token_whale,
+        deposit_amount=1000 * EIGHTEEN_DECIMALS,
+        borrow_amount=500 * EIGHTEEN_DECIMALS,
+        get_sgreen=False,
+    )
+
+    # Bob borrowed GREEN, deposit some to stability pool (vault 1)
+    green_balance = green_token.balanceOf(bob)
+    assert green_balance == 500 * EIGHTEEN_DECIMALS, "Should have 500 GREEN"
+    performDeposit(bob, 200 * EIGHTEEN_DECIMALS, green_token, bob, stability_pool)
+
+    # Setup Alice with GREEN in simple_erc20_vault (vault 3) - Alice needs to borrow her own GREEN
+    setupDeleverage(
+        alice,
+        alpha_token,
+        alpha_token_whale,
+        deposit_amount=1000 * EIGHTEEN_DECIMALS,
+        borrow_amount=500 * EIGHTEEN_DECIMALS,
+        get_sgreen=False,
+    )
+    alice_green = green_token.balanceOf(alice)
+    assert alice_green == 500 * EIGHTEEN_DECIMALS
+    # Alice deposits her GREEN to simple_erc20_vault using performDeposit fixture
+    performDeposit(alice, 500 * EIGHTEEN_DECIMALS, green_token, alice, simple_erc20_vault)
+
+    # Add more GREEN to stability pool (simulating different priority)
+    # Bob has 300 GREEN remaining, deposit it
+    performDeposit(bob, 300 * EIGHTEEN_DECIMALS, green_token, bob, stability_pool)
+
+    # Configure multiple pools with priority order
+    # Bob has 500 GREEN total in stability pool, Alice has 500 in simple_erc20_vault
+    setup_priority_configs(
+        priority_stab_assets=[
+            (stability_pool, green_token),     # Priority 1: Bob has 500 GREEN total
+            (simple_erc20_vault, green_token), # Priority 2: Alice has 500, Bob has 0
+        ]
+    )
+
+    # Track balances before
+    pre_bob_green_stab = stability_pool.getTotalAmountForUser(bob, green_token)
+    pre_alice_green_vault = simple_erc20_vault.getTotalAmountForUser(alice, green_token)
+    pre_debt = credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount
+
+    # Verify initial state
+    assert pre_bob_green_stab == 500 * EIGHTEEN_DECIMALS  # 200 + 300 deposited
+    assert pre_alice_green_vault == 500 * EIGHTEEN_DECIMALS
+    # Note: Bob borrowed 600 but only received 500 GREEN due to fees, however debt is still 500 not 600
+    # The borrow amount includes fees, but the actual debt recorded is the net amount
+    assert pre_debt == 500 * EIGHTEEN_DECIMALS
+
+    # Deleverage bob
+    repaid_amount = deleverage.deleverageUser(bob, bob, 0, sender=teller.address)
+
+    # Get burn events
+    burn_logs = filter_logs(deleverage, "StabAssetBurntDuringDeleverage")
+
+    # Track balances after
+    post_bob_green_stab = stability_pool.getTotalAmountForUser(bob, green_token)
+    post_alice_green_vault = simple_erc20_vault.getTotalAmountForUser(alice, green_token)
+    post_debt = credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount
+
+    # CRITICAL ASSERTIONS:
+
+    # 1. Should have exactly 1 burn event (pool 2 skipped, only pool 1 processed)
+    assert len(burn_logs) == 1, f"Expected 1 burn (pool 2 skipped), got {len(burn_logs)}"
+
+    # 2. Only burn: GREEN from pool 1 (500 burned, partial debt coverage)
+    assert burn_logs[0].stabAsset == green_token.address
+    assert burn_logs[0].vaultId == 1  # stability_pool
+    assert burn_logs[0].amountBurned == 500 * EIGHTEEN_DECIMALS
+    assert burn_logs[0].isDepleted == True  # All depleted
+
+    # 4. Alice's assets in pool 2 UNTOUCHED (critical)
+    assert post_alice_green_vault == pre_alice_green_vault, "Alice's assets should be untouched"
+
+    # 5. Bob's balances updated correctly
+    assert post_bob_green_stab == 0, "Bob's GREEN should be fully depleted"
+
+    # 6. Debt fully repaid (500 GREEN covers 500 debt completely)
+    assert post_debt == 0, "Debt should be fully repaid"
+    _test(repaid_amount, 500 * EIGHTEEN_DECIMALS)
+
+
+def test_phase1_exact_balance_equals_target(
+    deleverage,
+    teller,
+    stability_pool,
+    bob,
+    green_token,
+    alpha_token,
+    alpha_token_whale,
+    setupDeleverage,
+    performDeposit,
+    setup_priority_configs,
+    credit_engine,
+    _test,
+):
+    """
+    Test Phase 1 when user balance EXACTLY equals debt amount.
+
+    SCENARIO:
+    - User has exactly 500 GREEN in stability pool
+    - User has exactly 500 GREEN debt
+    - No surplus, no deficit
+
+    EXPECTED:
+    - Exactly 500 GREEN burned
+    - Position fully depleted (isDepleted=True)
+    - Debt reduced to exactly 0
+    - No remainder, no rounding issues
+
+    VALIDATES: Edge case of exact match, rounding behavior
+    """
+    # Setup user with debt using alpha_token as collateral
+    setupDeleverage(
+        bob,
+        alpha_token,
+        alpha_token_whale,
+        deposit_amount=1000 * EIGHTEEN_DECIMALS,
+        borrow_amount=500 * EIGHTEEN_DECIMALS,
+        get_sgreen=False,
+    )
+
+    # Bob already has borrowed GREEN, deposit EXACTLY 500 GREEN to stability pool
+    green_balance = green_token.balanceOf(bob)
+    assert green_balance >= 500 * EIGHTEEN_DECIMALS, "Should have at least 500 GREEN"
+    performDeposit(bob, 500 * EIGHTEEN_DECIMALS, green_token, bob, stability_pool)
+
+    # Configure Phase 1
+    setup_priority_configs(
+        priority_stab_assets=[(stability_pool, green_token)]
+    )
+
+    # Track balances
+    pre_green = stability_pool.getTotalAmountForUser(bob, green_token)
+    pre_debt = credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount
+
+    # Verify exact match
+    assert pre_green == 500 * EIGHTEEN_DECIMALS, "Should have exactly 500 GREEN"
+    assert pre_debt == 500 * EIGHTEEN_DECIMALS, "Should have exactly 500 debt"
+
+    # Deleverage
+    repaid_amount = deleverage.deleverageUser(bob, bob, 0, sender=teller.address)
+
+    # Get burn event
+    burn_logs = filter_logs(deleverage, "StabAssetBurntDuringDeleverage")
+
+    # Post balances
+    post_green = stability_pool.getTotalAmountForUser(bob, green_token)
+    post_debt = credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount
+
+    # CRITICAL ASSERTIONS for exact match:
+
+    # 1. Exactly one burn event
+    assert len(burn_logs) == 1, "Should have exactly 1 burn"
+
+    # 2. Burned exactly the debt amount
+    assert burn_logs[0].amountBurned == 500 * EIGHTEEN_DECIMALS, "Should burn exactly 500"
+    assert burn_logs[0].usdValue == 500 * EIGHTEEN_DECIMALS, "USD value should be exactly 500"
+
+    # 3. Position fully depleted
+    assert burn_logs[0].isDepleted == True, "Position should be fully depleted"
+
+    # 4. Balances exactly zero
+    assert post_green == 0, "GREEN balance should be exactly 0"
+    assert post_debt == 0, "Debt should be exactly 0"
+
+    # 5. Repaid amount exact
+    _test(repaid_amount, 500 * EIGHTEEN_DECIMALS)
+
+
+def test_phase1_handles_dust_amounts(
+    deleverage,
+    teller,
+    stability_pool,
+    bob,
+    green_token,
+    alpha_token,
+    alpha_token_whale,
+    setupDeleverage,
+    performDeposit,
+    setup_priority_configs,
+    credit_engine,
+    _test,
+):
+    """
+    Test Phase 1 with extremely small (dust) amounts.
+
+    SCENARIO:
+    - User has 1000 GREEN as collateral (for borrowing)
+    - User has only 1 wei debt (smallest possible)
+    - User has 1000 GREEN in stability pool
+
+    EXPECTED:
+    - Exactly 1 wei burned
+    - No reverts or underflows
+    - Correct event emission
+    - No rounding errors
+
+    VALIDATES: Handling of minimum amounts, rounding behavior
+    """
+    # Setup user with minimal debt (1 wei) using alpha_token as collateral
+    setupDeleverage(
+        bob,
+        alpha_token,
+        alpha_token_whale,
+        deposit_amount=1000 * EIGHTEEN_DECIMALS,
+        borrow_amount=1,  # 1 wei debt
+        get_sgreen=False,
+    )
+
+    # Bob already has borrowed GREEN, deposit it to stability pool
+    green_balance = green_token.balanceOf(bob)
+    assert green_balance > 0, "Should have some GREEN from borrowing"
+    performDeposit(bob, green_balance, green_token, bob, stability_pool)
+
+    # Configure Phase 1
+    setup_priority_configs(
+        priority_stab_assets=[(stability_pool, green_token)]
+    )
+
+    # Track balances
+    pre_green = stability_pool.getTotalAmountForUser(bob, green_token)
+    pre_debt = credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount
+
+    assert pre_green == 1, "Should have 1 wei GREEN from 1 wei borrow"
+    assert pre_debt == 1, "Should have 1 wei debt"
+
+    # Deleverage
+    repaid_amount = deleverage.deleverageUser(bob, bob, 0, sender=teller.address)
+
+    # Get burn event
+    burn_logs = filter_logs(deleverage, "StabAssetBurntDuringDeleverage")
+
+    # Post balances
+    post_green = stability_pool.getTotalAmountForUser(bob, green_token)
+    post_debt = credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount
+
+    # Assertions for dust amount:
+
+    # 1. One burn event
+    assert len(burn_logs) == 1
+
+    # 2. Burned exactly 1 wei
+    assert burn_logs[0].amountBurned == 1, "Should burn exactly 1 wei"
+    assert burn_logs[0].usdValue == 1, "USD value should be 1 wei"
+
+    # 3. Position fully depleted (only had 1 wei)
+    assert burn_logs[0].isDepleted == True
+
+    # 4. Correct balance changes
+    assert post_green == 0, "Should be 0 after burning 1 wei"
+    assert post_debt == 0, "Debt should be 0"
+
+    # 5. Repaid exactly 1 wei
+    _test(repaid_amount, 1)
+
