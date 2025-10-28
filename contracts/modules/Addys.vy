@@ -32,6 +32,7 @@ struct Addys:
     humanResources: address
     lootbox: address
     teller: address
+    deleverage: address
 
 # hq
 RIPE_HQ_FOR_ADDYS: immutable(address)
@@ -54,6 +55,7 @@ ENDAOMENT_ID: constant(uint256) = 14
 HUMAN_RESOURCES_ID: constant(uint256) = 15
 LOOTBOX_ID: constant(uint256) = 16
 TELLER_ID: constant(uint256) = 17
+DELEVERAGE_ID: constant(uint256) = 18
 
 
 @deploy
@@ -104,6 +106,7 @@ def _generateAddys() -> Addys:
         humanResources=staticcall RipeHq(hq).getAddr(HUMAN_RESOURCES_ID),
         lootbox=staticcall RipeHq(hq).getAddr(LOOTBOX_ID),
         teller=staticcall RipeHq(hq).getAddr(TELLER_ID),
+        deleverage=staticcall RipeHq(hq).getAddr(DELEVERAGE_ID),
     )
 
 
@@ -397,3 +400,18 @@ def _getTellerId() -> uint256:
 @internal
 def _getTellerAddr() -> address:
     return staticcall RipeHq(RIPE_HQ_FOR_ADDYS).getAddr(TELLER_ID)
+
+
+# deleverage
+
+
+@view
+@internal
+def _getDeleverageId() -> uint256:
+    return DELEVERAGE_ID
+
+
+@view
+@internal
+def _getDeleverageAddr() -> address:
+    return staticcall RipeHq(RIPE_HQ_FOR_ADDYS).getAddr(DELEVERAGE_ID)

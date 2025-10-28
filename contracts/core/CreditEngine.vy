@@ -82,6 +82,7 @@ flag RepayType:
     LIQUIDATION
     AUCTION
     REDEMPTION
+    DELEVERAGE
 
 struct BorrowDataBundle:
     userDebt: UserDebt
@@ -450,13 +451,15 @@ def repayDuringLiquidation(
     _userDebt: UserDebt,
     _repayValue: uint256,
     _newInterest: uint256,
+    _isDeleverage: bool,
     _a: addys.Addys = empty(addys.Addys),
 ) -> bool:
-    assert msg.sender == addys._getAuctionHouseAddr() # dev: only auction house allowed
+    assert msg.sender in [addys._getDeleverageAddr(), addys._getAuctionHouseAddr()] # dev: only auction house or deleverage allowed
     assert not deptBasics.isPaused # dev: contract paused
     a: addys.Addys = addys._getAddys(_a)
     numVaults: uint256 = staticcall Ledger(a.ledger).numUserVaults(_liqUser)
-    return self._repayDebt(_liqUser, _userDebt, numVaults, _repayValue, 0, _newInterest, False, False, RepayType.LIQUIDATION, a)
+    repayType: RepayType = RepayType.DELEVERAGE if _isDeleverage else RepayType.LIQUIDATION
+    return self._repayDebt(_liqUser, _userDebt, numVaults, _repayValue, 0, _newInterest, False, False, repayType, a)
 
 
 # repay during auction purchase

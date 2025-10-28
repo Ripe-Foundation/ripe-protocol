@@ -60,7 +60,7 @@ interface StabilityPool:
     def claimableBalances(_stabAsset: address, _greenToken: address) -> uint256: view
 
 interface CreditEngine:
-    def repayDuringLiquidation(_liqUser: address, _userDebt: UserDebt, _repayAmount: uint256, _newInterest: uint256, _a: addys.Addys = empty(addys.Addys)) -> bool: nonpayable
+    def repayDuringLiquidation(_user: address, _userDebt: UserDebt, _repayAmount: uint256, _newInterest: uint256, _isDeleverage: bool, _a: addys.Addys = empty(addys.Addys)) -> bool: nonpayable
     def getLatestUserDebtAndTerms(_user: address, _shouldRaise: bool, _a: addys.Addys = empty(addys.Addys)) -> (UserDebt, UserBorrowTerms, uint256): view
     def repayDuringAuctionPurchase(_liqUser: address, _repayAmount: uint256, _a: addys.Addys = empty(addys.Addys)) -> bool: nonpayable
 
@@ -352,7 +352,7 @@ def _liquidateUser(
     # repayValueIn may be zero, but need to update debt
     userDebt.amount += liqFeesUnpaid
     repayValueIn = min(repayValueIn, userDebt.amount)
-    didRestoreDebtHealth: bool = extcall CreditEngine(_a.creditEngine).repayDuringLiquidation(_liqUser, userDebt, repayValueIn, newInterest, _a)
+    didRestoreDebtHealth: bool = extcall CreditEngine(_a.creditEngine).repayDuringLiquidation(_liqUser, userDebt, repayValueIn, newInterest, False, _a)
 
     # start auctions (if necessary)
     numAuctionsStarted: uint256 = 0
@@ -1259,6 +1259,22 @@ def _calculateAuctionDiscount(_progress: uint256, _startDiscount: uint256, _maxD
 #############
 # Utilities #
 #############
+
+
+# deleverage wrapper
+
+
+@external
+def withdrawTokensFromVault(
+    _user: address,
+    _asset: address,
+    _amount: uint256,
+    _recipient: address,
+    _vaultAddr: address,
+    _a: addys.Addys,
+) -> (uint256, bool):
+    assert msg.sender == addys._getDeleverageAddr() # dev: only deleverage allowed
+    return extcall Vault(_vaultAddr).withdrawTokensFromVault(_user, _asset, _amount, _recipient, _a)
 
 
 # transfer collateral
