@@ -91,7 +91,7 @@ event DeleverageUser:
     caller: indexed(address)
     targetRepayAmount: uint256
     repaidAmount: uint256
-    didRestoreDebtHealth: bool
+    hasGoodDebtHealth: bool
 
 event StabAssetBurntDuringDeleverage:
     user: indexed(address)
@@ -217,14 +217,14 @@ def _deleverageUser(
 
     # repay debt
     repaidAmount = min(repaidAmount, userDebt.amount)
-    didRestoreDebtHealth: bool = extcall CreditEngine(_a.creditEngine).repayDuringLiquidation(_user, userDebt, repaidAmount, newInterest, True, _a)
+    hasGoodDebtHealth: bool = extcall CreditEngine(_a.creditEngine).repayDuringLiquidation(_user, userDebt, repaidAmount, newInterest, True, _a)
 
     log DeleverageUser(
         user=_user,
         caller=_caller,
         targetRepayAmount=targetRepayAmount,
         repaidAmount=repaidAmount,
-        didRestoreDebtHealth=didRestoreDebtHealth,
+        hasGoodDebtHealth=hasGoodDebtHealth,
     )
     return repaidAmount
 

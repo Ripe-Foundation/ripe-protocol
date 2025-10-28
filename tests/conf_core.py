@@ -41,6 +41,7 @@ def ripe_hq(
     mission_control,
     switchboard,
     credit_engine,
+    deleverage,
     endaoment,
     ledger,
     lootbox,
@@ -115,6 +116,10 @@ def ripe_hq(
     # 17
     assert ripe_hq_deploy.startAddNewAddressToRegistry(teller, "Teller", sender=deploy3r)
     assert ripe_hq_deploy.confirmNewAddressToRegistry(teller, sender=deploy3r) == 17
+
+    # 18
+    assert ripe_hq_deploy.startAddNewAddressToRegistry(deleverage, "Deleverage", sender=deploy3r)
+    assert ripe_hq_deploy.confirmNewAddressToRegistry(deleverage, sender=deploy3r) == 18
 
     # special permission setup
 
@@ -255,6 +260,18 @@ def auction_house(ripe_hq_deploy):
         "contracts/core/AuctionHouse.vy",
         ripe_hq_deploy,
         name="auction_house",
+    )
+
+
+# deleverage
+
+
+@pytest.fixture(scope="session")
+def deleverage(ripe_hq_deploy):
+    return boa.load(
+        "contracts/core/Deleverage.vy",
+        ripe_hq_deploy,
+        name="deleverage",
     )
 
 
