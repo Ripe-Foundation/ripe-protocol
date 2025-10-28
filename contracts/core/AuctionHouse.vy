@@ -41,7 +41,6 @@ interface Ledger:
     def getFungibleAuctionDuringPurchase(_liqUser: address, _vaultId: uint256, _asset: address) -> FungibleAuction: view
     def removeFungibleAuction(_liqUser: address, _vaultId: uint256, _asset: address): nonpayable
     def hasFungibleAuction(_liqUser: address, _vaultId: uint256, _asset: address) -> bool: view
-    def isParticipatingInVault(_user: address, _vaultId: uint256) -> bool: view
     def createNewFungibleAuction(_auc: FungibleAuction) -> uint256: nonpayable
     def addVaultToUser(_user: address, _vaultId: uint256): nonpayable
     def userVaults(_user: address, _index: uint256) -> uint256: view
@@ -154,22 +153,6 @@ event LiquidateUser:
     liqFeesUnpaid: uint256
     numAuctionsStarted: uint256
     keeperFee: uint256
-
-event CollateralSentToEndaoment:
-    liqUser: indexed(address)
-    vaultId: uint256
-    liqAsset: indexed(address)
-    amountSent: uint256
-    usdValue: uint256
-    isDepleted: bool
-
-event StabAssetBurntAsRepayment:
-    liqUser: indexed(address)
-    vaultId: uint256
-    liqStabAsset: indexed(address)
-    amountBurned: uint256
-    usdValue: uint256
-    isDepleted: bool
 
 event CollateralSwappedWithStabPool:
     liqUser: indexed(address)
@@ -389,22 +372,9 @@ def _performLiquidationPhases(
     remainingToRepay: uint256 = _targetRepayAmount
     collateralValueOut: uint256 = 0
 
-    # PHASE 1 -- If liq user is in stability pool, use those assets first to pay off debt
+    # PHASE 1 -- Go thru priority liq assets (set in mission control)
 
-    for stabPool: VaultData in _config.priorityStabVaults:
-        if remainingToRepay == 0:
-            break
-
-        if not staticcall Ledger(_a.ledger).isParticipatingInVault(_liqUser, stabPool.vaultId):
-            continue
-
-        remainingToRepay, collateralValueOut = self._iterateThruAssetsWithinVault(_liqUser, stabPool.vaultId, stabPool.vaultAddr, remainingToRepay, collateralValueOut, _liqFeeRatio, [], _a)
-        if self.vaultAddrs[stabPool.vaultId] == empty(address):
-            self.vaultAddrs[stabPool.vaultId] = stabPool.vaultAddr # cache
-
-    # PHASE 2 -- Go thru priority liq assets (set in mission control)
-
-    if remainingToRepay != 0:
+    if len(_config.priorityLiqAssetVaults) != 0:
         for pData: VaultData in _config.priorityLiqAssetVaults:
             if remainingToRepay == 0:
                 break
@@ -416,7 +386,7 @@ def _performLiquidationPhases(
             if self.vaultAddrs[pData.vaultId] == empty(address):
                 self.vaultAddrs[pData.vaultId] = pData.vaultAddr # cache
 
-    # PHASE 3 -- Go thru user's vaults (top to bottom as saved in ledger / vaults)
+    # PHASE 2 -- Go thru user's vaults (top to bottom as saved in ledger / vaults)
 
     if remainingToRepay != 0:
         remainingToRepay, collateralValueOut = self._iterateThruAllUserVaults(_liqUser, remainingToRepay, collateralValueOut, _liqFeeRatio, _config.priorityStabVaults, _a)
@@ -546,14 +516,12 @@ def _handleSpecificLiqAsset(
     remainingToRepay: uint256 = _remainingToRepay
     collateralValueOut: uint256 = _collateralValueOut
 
-    # burn as payment (GREEN, sGREEN)
+    # skip assets that should be handled by Deleverage contract (GREEN, sGREEN)
     if config.shouldBurnAsPayment and _liqAsset in [_a.greenToken, _a.savingsGreen]:
-        remainingToRepay, collateralValueOut = self._burnLiqUserStabAsset(_liqUser, _vaultId, _vaultAddr, _liqAsset, remainingToRepay, collateralValueOut, _a)
         return remainingToRepay, collateralValueOut
 
-    # endaoment wants this asset (other stablecoins)
+    # skip assets that Endaoment wants (stablecoins) - handled by Deleverage contract
     if config.shouldTransferToEndaoment:
-        remainingToRepay, collateralValueOut = self._transferToEndaoment(_liqUser, _vaultId, _vaultAddr, _liqAsset, remainingToRepay, collateralValueOut, _a)
         return remainingToRepay, collateralValueOut
 
     # stability pool swaps (eth, btc, etc)
@@ -565,95 +533,6 @@ def _handleSpecificLiqAsset(
     if config.shouldAuctionInstantly and not isPositionDepleted:
         self._saveLiqAssetForAuction(_liqUser, _vaultId, _vaultAddr, _liqAsset)
 
-    return remainingToRepay, collateralValueOut
-
-
-####################################
-# Liquidation - Endaoment Transfer #
-####################################
-
-
-@internal
-def _transferToEndaoment(
-    _liqUser: address,
-    _liqVaultId: uint256,
-    _liqVaultAddr: address,
-    _liqAsset: address,
-    _remainingToRepay: uint256,
-    _collateralValueOut: uint256,
-    _a: addys.Addys,
-) -> (uint256, uint256):
-    remainingToRepay: uint256 = _remainingToRepay
-    collateralValueOut: uint256 = _collateralValueOut
-
-    collateralUsdValueSent: uint256 = 0
-    collateralAmountSent: uint256 = 0
-    isPositionDepleted: bool = False
-    na: bool = False
-    collateralUsdValueSent, collateralAmountSent, isPositionDepleted, na = self._transferCollateral(_liqUser, _a.endaoment, _liqVaultId, _liqVaultAddr, _liqAsset, False, remainingToRepay, _a)
-    if collateralUsdValueSent == 0:
-        return remainingToRepay, collateralValueOut
-
-    # update totals
-    remainingToRepay -= min(collateralUsdValueSent, remainingToRepay)
-    collateralValueOut += collateralUsdValueSent
-
-    log CollateralSentToEndaoment(
-        liqUser=_liqUser,
-        vaultId=_liqVaultId,
-        liqAsset=_liqAsset,
-        amountSent=collateralAmountSent,
-        usdValue=collateralUsdValueSent,
-        isDepleted=isPositionDepleted,
-    )
-    return remainingToRepay, collateralValueOut
-
-
-#################################
-# Liquidation - Burn Stab Asset #
-#################################
-
-
-@internal
-def _burnLiqUserStabAsset(
-    _liqUser: address,
-    _liqVaultId: uint256,
-    _liqVaultAddr: address,
-    _liqStabAsset: address,
-    _remainingToRepay: uint256,
-    _collateralValueOut: uint256,
-    _a: addys.Addys,
-) -> (uint256, uint256):
-    remainingToRepay: uint256 = _remainingToRepay
-    collateralValueOut: uint256 = _collateralValueOut
-
-    usdValue: uint256 = 0
-    amountReceived: uint256 = 0
-    isPositionDepleted: bool = False
-    na: bool = False
-    usdValue, amountReceived, isPositionDepleted, na = self._transferCollateral(_liqUser, self, _liqVaultId, _liqVaultAddr, _liqStabAsset, False, remainingToRepay, _a)
-    if usdValue == 0:
-        return remainingToRepay, collateralValueOut
-
-    # burn stab asset
-    if _liqStabAsset == _a.savingsGreen:
-        greenAmount: uint256 = extcall IERC4626(_a.savingsGreen).redeem(amountReceived, self, self) # dev: savings green redeem failed
-        assert extcall GreenToken(_a.greenToken).burn(greenAmount) # dev: failed to burn green
-    else:
-        assert extcall GreenToken(_a.greenToken).burn(amountReceived) # dev: failed to burn green
-
-    # update totals
-    remainingToRepay -= min(usdValue, remainingToRepay)
-    collateralValueOut += usdValue
-
-    log StabAssetBurntAsRepayment(
-        liqUser=_liqUser,
-        vaultId=_liqVaultId,
-        liqStabAsset=_liqStabAsset,
-        amountBurned=amountReceived,
-        usdValue=usdValue,
-        isDepleted=isPositionDepleted,
-    )
     return remainingToRepay, collateralValueOut
 
 
