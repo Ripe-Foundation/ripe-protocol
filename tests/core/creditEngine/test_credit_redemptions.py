@@ -1139,46 +1139,46 @@ def test_get_max_redeem_value(
     performDeposit,
     mock_price_source,
     teller,
-    credit_engine,
+    credit_redeem,
     createDebtTerms,
 ):
     """Test getMaxRedeemValue function"""
     setGeneralConfig()
-    
+
     debt_terms = createDebtTerms(
         _ltv=60_00,  # 60% LTV
         _redemptionThreshold=70_00,
     )
     setAssetConfig(alpha_token, _debtTerms=debt_terms)
-    
+
     # Test with 10% payback buffer
     setGeneralDebtConfig(_ltvPaybackBuffer=10_00)
 
     mock_price_source.setPrice(alpha_token, 1 * EIGHTEEN_DECIMALS)
 
     # Test 1: User with no debt
-    assert credit_engine.getMaxRedeemValue(bob) == 0
+    assert credit_redeem.getMaxRedeemValue(bob) == 0
 
     # Test 2: User with healthy position
     collateral_amount = 200 * EIGHTEEN_DECIMALS
     performDeposit(bob, collateral_amount, alpha_token, alpha_token_whale)
     debt_amount = 100 * EIGHTEEN_DECIMALS  # 50% LTV
     teller.borrow(debt_amount, bob, False, sender=bob)
-    
+
     # Not redeemable yet
-    assert credit_engine.getMaxRedeemValue(bob) == 0
+    assert credit_redeem.getMaxRedeemValue(bob) == 0
 
     # Test 3: User is redeemable
     # Drop price to make redeemable
     mock_price_source.setPrice(alpha_token, 70 * EIGHTEEN_DECIMALS // 100)
-    
+
     # Now collateral = 200 * 0.70 = 140
     # Debt = 100
     # Ratio = 100/140 = 71.4% > 70% threshold
-    
-    max_redeem = credit_engine.getMaxRedeemValue(bob)
+
+    max_redeem = credit_redeem.getMaxRedeemValue(bob)
     assert max_redeem > 0
-    
+
     # With 10% buffer, target LTV = 60% * 90% = 54%
     # To calculate expected max redeem:
     # (100 - x) / (140 - x) = 0.54
@@ -1186,7 +1186,7 @@ def test_get_max_redeem_value(
     # 100 - x = 75.6 - 0.54x
     # 24.4 = 0.46x
     # x = 53.04
-    
+
     expected_max = 53 * EIGHTEEN_DECIMALS  # Approximately
     assert abs(max_redeem - expected_max) < 2 * EIGHTEEN_DECIMALS  # Within 2 tokens
 
@@ -1308,6 +1308,7 @@ def test_utility_functions_edge_cases(
     mock_price_source,
     teller,
     credit_engine,
+    credit_redeem,
     createDebtTerms,
     ledger,
 ):
@@ -1334,7 +1335,7 @@ def test_utility_functions_edge_cases(
     ledger.setUserDebt(bob, tuple(user_debt), 0, (0, 0), sender=credit_engine.address)
     
     # Should return 0 when in liquidation
-    assert credit_engine.getMaxRedeemValue(bob) == 0
+    assert credit_redeem.getMaxRedeemValue(bob) == 0
     
     # Reset liquidation status
     user_debt[4] = False
@@ -1353,7 +1354,7 @@ def test_utility_functions_edge_cases(
     
     # getMaxRedeemValue returns 0 because even though user is redeemable,
     # there's no collateral value to actually redeem
-    assert credit_engine.getMaxRedeemValue(bob) == 0
+    assert credit_redeem.getMaxRedeemValue(bob) == 0
     
     # getRedemptionThreshold calculation:
     # The function uses the redemption threshold from the user's debt terms

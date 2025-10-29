@@ -41,8 +41,8 @@ interface CreditEngine:
     def getLatestUserDebtWithInterest(_userDebt: UserDebt) -> (UserDebt, uint256): view
 
 interface Teller:
-    def isUnderscoreWalletOwner(_user: address, _caller: address, _mc: address) -> bool: view
     def depositFromTrusted(_user: address, _vaultId: uint256, _asset: address, _amount: uint256, _lockDuration: uint256, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
+    def isUnderscoreWalletOwner(_user: address, _caller: address, _mc: address) -> bool: view
 
 interface MissionControl:
     def getRedeemCollateralConfig(_asset: address, _recipient: address) -> RedeemCollateralConfig: view
