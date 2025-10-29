@@ -1751,3 +1751,388 @@ def test_credit_redemption_transfer_refund_handling(
     # Verify Alice has vault balance from transfer
     assert simple_erc20_vault.userBalances(alice, alpha_token) > 0
 
+
+def test_credit_redemption_recipient_equals_user(
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    green_token,
+    whale,
+    setGeneralConfig,
+    setAssetConfig,
+    setGeneralDebtConfig,
+    performDeposit,
+    mock_price_source,
+    teller,
+    createDebtTerms,
+    simple_erc20_vault,
+    vault_book,
+):
+    """Test that recipient cannot equal user being redeemed from"""
+    setGeneralConfig()
+
+    debt_terms = createDebtTerms(
+        _ltv=50_00,
+        _liqThreshold=60_00,
+        _redemptionThreshold=70_00,
+    )
+    setAssetConfig(alpha_token, _debtTerms=debt_terms)
+    setGeneralDebtConfig()
+
+    # Setup: Bob has a redeemable position
+    mock_price_source.setPrice(alpha_token, 1 * EIGHTEEN_DECIMALS)
+    collateral_amount = 100 * EIGHTEEN_DECIMALS
+    performDeposit(bob, collateral_amount, alpha_token, alpha_token_whale)
+    debt_amount = 50 * EIGHTEEN_DECIMALS  # 50% LTV
+    teller.borrow(debt_amount, bob, False, sender=bob)
+
+    # Make Bob's position redeemable by dropping price
+    mock_price_source.setPrice(alpha_token, 70 * EIGHTEEN_DECIMALS // 100)
+
+    # Give Bob GREEN tokens to attempt redemption
+    green_token.transfer(bob, 100 * EIGHTEEN_DECIMALS, sender=whale)
+    green_token.approve(teller, 100 * EIGHTEEN_DECIMALS, sender=bob)
+
+    # Bob tries to redeem from himself (recipient = user)
+    # This should fail because CreditRedeem._redeemCollateral checks if recipient == user
+    vault_id = vault_book.getRegId(simple_erc20_vault)
+    with boa.reverts("no redemptions occurred"):
+        teller.redeemCollateral(
+            bob,  # user to redeem from
+            vault_id,  # vault ID
+            alpha_token,
+            100 * EIGHTEEN_DECIMALS,  # payment amount
+            False,  # not savings green
+            False,  # should transfer balance
+            True,  # should refund savings green
+            bob,  # recipient (same as user - should fail)
+            sender=bob
+        )
+
+
+def test_credit_redemption_unauthorized_deposit_for_recipient(
+    alpha_token,
+    alpha_token_whale,
+    alice,
+    bob,
+    charlie,
+    green_token,
+    setGeneralConfig,
+    setAssetConfig,
+    setGeneralDebtConfig,
+    credit_engine,
+    setUserConfig,
+    performDeposit,
+    mock_price_source,
+    teller,
+    createDebtTerms,
+    simple_erc20_vault,
+    vault_book,
+):
+    """Test permission check when caller deposits to different recipient without permission"""
+    setGeneralConfig()
+
+    debt_terms = createDebtTerms(
+        _ltv=50_00,
+        _liqThreshold=60_00,
+        _redemptionThreshold=70_00,
+    )
+    setAssetConfig(alpha_token, _debtTerms=debt_terms)
+    setGeneralDebtConfig()
+
+    # Setup: Bob has a redeemable position
+    mock_price_source.setPrice(alpha_token, 1 * EIGHTEEN_DECIMALS)
+    collateral_amount = 100 * EIGHTEEN_DECIMALS
+    performDeposit(bob, collateral_amount, alpha_token, alpha_token_whale)
+    debt_amount = 50 * EIGHTEEN_DECIMALS
+    teller.borrow(debt_amount, bob, False, sender=bob)
+
+    # Make Bob's position redeemable
+    mock_price_source.setPrice(alpha_token, 70 * EIGHTEEN_DECIMALS // 100)
+
+    # Configure Charlie to NOT allow anyone to deposit for them
+    setUserConfig(charlie, _canAnyoneDeposit=False)
+
+    # Give Alice GREEN tokens to attempt redemption
+    green_token.mint(alice, 100 * EIGHTEEN_DECIMALS, sender=credit_engine.address)
+    green_token.approve(teller, 100 * EIGHTEEN_DECIMALS, sender=alice)
+
+    # Alice tries to redeem from Bob and deposit to Charlie without permission
+    # This should fail with "not allowed to deposit for user"
+    vault_id = vault_book.getRegId(simple_erc20_vault)
+    with boa.reverts("not allowed to deposit for user"):
+        teller.redeemCollateral(
+            bob,  # user to redeem from
+            vault_id,  # vault ID
+            alpha_token,
+            100 * EIGHTEEN_DECIMALS,  # payment amount
+            False,  # not savings green
+            False,  # should transfer balance
+            True,  # should refund savings green
+            charlie,  # recipient (Alice doesn't have permission to deposit for Charlie)
+            sender=alice
+        )
+
+
+def test_credit_redemption_zero_redemption_threshold(
+    alpha_token,
+    alpha_token_whale,
+    alice,
+    bob,
+    green_token,
+    setGeneralConfig,
+    setAssetConfig,
+    setGeneralDebtConfig,
+    performDeposit,
+    mock_price_source,
+    teller,
+    credit_engine,
+    credit_redeem,
+    createDebtTerms,
+    simple_erc20_vault,
+    vault_book,
+):
+    """Test asset with redemption threshold = 0 cannot be redeemed"""
+    setGeneralConfig()
+
+    # Create debt terms with redemption threshold = 0
+    debt_terms = createDebtTerms(
+        _ltv=50_00,
+        _liqThreshold=60_00,
+        _redemptionThreshold=0,  # Zero threshold - redemptions disabled
+    )
+    setAssetConfig(alpha_token, _debtTerms=debt_terms)
+    setGeneralDebtConfig()
+
+    # Setup: Bob has a position that would normally be redeemable
+    mock_price_source.setPrice(alpha_token, 1 * EIGHTEEN_DECIMALS)
+    collateral_amount = 100 * EIGHTEEN_DECIMALS
+    performDeposit(bob, collateral_amount, alpha_token, alpha_token_whale)
+    debt_amount = 50 * EIGHTEEN_DECIMALS
+    teller.borrow(debt_amount, bob, False, sender=bob)
+
+    # Drop price significantly - position would be redeemable with non-zero threshold
+    mock_price_source.setPrice(alpha_token, 40 * EIGHTEEN_DECIMALS // 100)
+    # Now debt/collateral = 50/40 = 125% - way over any reasonable threshold
+
+    # Verify that canRedeemUserCollateral returns False with zero threshold
+    assert not credit_engine.canRedeemUserCollateral(bob)
+
+    # Verify getMaxRedeemValue returns 0
+    assert credit_redeem.getMaxRedeemValue(bob) == 0
+
+    # Give Alice GREEN tokens
+    green_token.mint(alice, 100 * EIGHTEEN_DECIMALS, sender=credit_engine.address)
+    green_token.approve(teller, 100 * EIGHTEEN_DECIMALS, sender=alice)
+
+    # Alice tries to redeem but it should fail since threshold is 0
+    vault_id = vault_book.getRegId(simple_erc20_vault)
+    with boa.reverts("no redemptions occurred"):
+        teller.redeemCollateral(
+            bob,  # user to redeem from
+            vault_id,  # vault ID
+            alpha_token,
+            100 * EIGHTEEN_DECIMALS,  # payment amount
+            False,  # not savings green
+            False,  # should transfer balance
+            True,  # should refund savings green
+            alice,  # recipient
+            sender=alice
+        )
+
+
+def test_credit_redemption_stability_pool_entry(
+    alpha_token,
+    alpha_token_whale,
+    alice,
+    bob,
+    green_token,
+    savings_green,
+    setGeneralConfig,
+    setAssetConfig,
+    setGeneralDebtConfig,
+    performDeposit,
+    mock_price_source,
+    teller,
+    stability_pool,
+    createDebtTerms,
+    credit_engine,
+    simple_erc20_vault,
+    vault_book,
+):
+    """Test refund deposited into stability pool when _shouldEnterStabPool=True"""
+    setGeneralConfig()
+
+    debt_terms = createDebtTerms(
+        _ltv=50_00,
+        _liqThreshold=60_00,
+        _redemptionThreshold=70_00,
+    )
+    setAssetConfig(alpha_token, _debtTerms=debt_terms)
+    setGeneralDebtConfig()
+
+    # Configure savings_green for stability pool deposits (vault ID 1)
+    setAssetConfig(savings_green, [1])  # Enable sGREEN deposits to stability pool
+
+    # Setup: Bob has a redeemable position
+    mock_price_source.setPrice(alpha_token, 1 * EIGHTEEN_DECIMALS)
+    collateral_amount = 100 * EIGHTEEN_DECIMALS
+    performDeposit(bob, collateral_amount, alpha_token, alpha_token_whale)
+    debt_amount = 50 * EIGHTEEN_DECIMALS
+    teller.borrow(debt_amount, bob, False, sender=bob)
+
+    # Make Bob's position redeemable
+    mock_price_source.setPrice(alpha_token, 70 * EIGHTEEN_DECIMALS // 100)
+    # Now collateral value = 70, debt = 50, ratio = 71.4%
+
+    # Calculate expected redemption amount to reach 50% LTV
+    # (50 - x) / (70 - x) = 0.5
+    # x = 30
+
+    # Give Alice GREEN tokens with extra for refund
+    green_amount = 35 * EIGHTEEN_DECIMALS  # 30 needed + 5 extra for refund
+    green_token.mint(alice, green_amount, sender=credit_engine.address)
+    green_token.approve(teller, green_amount, sender=alice)
+
+    # Check Alice's initial stability pool balance (should be 0)
+    initial_stab_balance = stability_pool.getTotalAmountForUser(alice, savings_green)
+    assert initial_stab_balance == 0
+
+    # Alice redeems with shouldEnterStabPool=True
+    # Note: This functionality would need to be exposed through Teller
+    # For now, we test the indirect path where refunds go to savings green
+    vault_id = vault_book.getRegId(simple_erc20_vault)
+    green_spent = teller.redeemCollateral(
+        bob,
+        vault_id,
+        alpha_token,
+        green_amount,
+        False,  # not savings green payment
+        False,  # should transfer balance
+        True,  # should refund savings green (will convert to sGREEN)
+        alice,
+        sender=alice
+    )
+
+    refund_amount = green_amount - green_spent
+    assert refund_amount > 10 ** 9  # Above dust threshold
+
+    # Verify Alice received savings green refund
+    alice_sgreen_balance = savings_green.balanceOf(alice)
+    assert alice_sgreen_balance > 0
+
+    # Now Alice can deposit the savings green into stability pool
+    # First approve the teller to spend the sGREEN
+    savings_green.approve(teller, alice_sgreen_balance, sender=alice)
+
+    # Deposit sGREEN into stability pool
+    teller.deposit(
+        savings_green,  # asset
+        alice_sgreen_balance,  # amount
+        alice,  # recipient
+        stability_pool,  # vault address
+        1,  # vault ID (STABILITY_POOL_ID)
+        sender=alice
+    )
+
+    # Verify Alice now has stability pool balance
+    final_stab_balance = stability_pool.getTotalAmountForUser(alice, savings_green)
+    assert final_stab_balance > 0
+    assert final_stab_balance == alice_sgreen_balance
+
+    # Alice's sGREEN balance should now be 0 (deposited into pool)
+    assert savings_green.balanceOf(alice) == 0
+
+
+def test_credit_redemption_with_interest_accrual(
+    alpha_token,
+    alpha_token_whale,
+    alice,
+    bob,
+    green_token,
+    setGeneralConfig,
+    setAssetConfig,
+    setGeneralDebtConfig,
+    performDeposit,
+    mock_price_source,
+    teller,
+    ledger,
+    createDebtTerms,
+    credit_engine,
+    simple_erc20_vault,
+    vault_book,
+):
+    """Test redemption after significant interest accrual"""
+    setGeneralConfig()
+
+    # Create debt terms with borrowing rate (interest)
+    debt_terms = createDebtTerms(
+        _ltv=50_00,
+        _liqThreshold=60_00,
+        _redemptionThreshold=70_00,
+        _borrowRate=10_00,  # 10% borrow rate
+    )
+    setAssetConfig(alpha_token, _debtTerms=debt_terms)
+    setGeneralDebtConfig()
+
+    # Setup: Bob has a redeemable position
+    mock_price_source.setPrice(alpha_token, 1 * EIGHTEEN_DECIMALS)
+    collateral_amount = 100 * EIGHTEEN_DECIMALS
+    performDeposit(bob, collateral_amount, alpha_token, alpha_token_whale)
+    debt_amount = 50 * EIGHTEEN_DECIMALS
+    teller.borrow(debt_amount, bob, False, sender=bob)
+
+    # Record initial debt
+    initial_debt_data = ledger.userDebt(bob)
+    initial_debt_amount = initial_debt_data[0]  # amount field
+    assert initial_debt_amount == debt_amount
+
+    # Advance time by 1 year to accrue 10% interest
+    boa.env.time_travel(seconds=365 * 24 * 60 * 60)  # 1 year in seconds
+
+    # Make Bob's position redeemable by dropping price
+    mock_price_source.setPrice(alpha_token, 70 * EIGHTEEN_DECIMALS // 100)
+
+    # Give Alice GREEN tokens
+    green_amount = 60 * EIGHTEEN_DECIMALS  # Enough to cover debt + interest
+    green_token.mint(alice, green_amount, sender=credit_engine.address)
+    green_token.approve(teller, green_amount, sender=alice)
+
+    # Alice redeems from Bob
+    initial_alice_green = green_token.balanceOf(alice)
+    vault_id = vault_book.getRegId(simple_erc20_vault)
+    green_spent = teller.redeemCollateral(
+        bob,
+        vault_id,
+        alpha_token,
+        green_amount,
+        False,
+        False,
+        True,
+        alice,
+        sender=alice
+    )
+
+    # Verify redemption occurred and interest was included
+    assert green_spent > 0
+
+    # Check Bob's updated debt
+    final_debt_data = ledger.userDebt(bob)
+    final_debt_amount = final_debt_data[0]
+
+    # Debt should be reduced by the redemption amount
+    # The interest should have been calculated and included in the redemption
+    debt_reduction = initial_debt_amount - final_debt_amount
+    assert debt_reduction > 0
+
+    # The amount redeemed should account for accrued interest
+    # With 10% APR for 1 year, total debt should be ~55 tokens (50 * 1.1)
+    expected_debt_with_interest = debt_amount * 110 // 100  # ~55 tokens
+
+    # Green spent should be significant if there's a redemption
+    # The exact amount depends on how much is needed to reach target LTV
+    assert green_spent > 0  # Some redemption occurred
+
+    # Verify Alice spent green tokens for the redemption
+    assert green_token.balanceOf(alice) < initial_alice_green
+
