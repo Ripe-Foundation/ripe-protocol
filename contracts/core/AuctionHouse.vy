@@ -59,7 +59,7 @@ interface StabilityPool:
     def claimableBalances(_stabAsset: address, _greenToken: address) -> uint256: view
 
 interface CreditEngine:
-    def repayDuringLiquidation(_user: address, _userDebt: UserDebt, _repayAmount: uint256, _newInterest: uint256, _isDeleverage: bool, _a: addys.Addys = empty(addys.Addys)) -> bool: nonpayable
+    def repayFromDept(_user: address, _userDebt: UserDebt, _repayValue: uint256, _newInterest: uint256, _numUserVaults: uint256, _a: addys.Addys = empty(addys.Addys)) -> bool: nonpayable
     def getLatestUserDebtAndTerms(_user: address, _shouldRaise: bool, _a: addys.Addys = empty(addys.Addys)) -> (UserDebt, UserBorrowTerms, uint256): view
     def repayDuringAuctionPurchase(_liqUser: address, _repayAmount: uint256, _a: addys.Addys = empty(addys.Addys)) -> bool: nonpayable
 
@@ -335,7 +335,7 @@ def _liquidateUser(
     # repayValueIn may be zero, but need to update debt
     userDebt.amount += liqFeesUnpaid
     repayValueIn = min(repayValueIn, userDebt.amount)
-    didRestoreDebtHealth: bool = extcall CreditEngine(_a.creditEngine).repayDuringLiquidation(_liqUser, userDebt, repayValueIn, newInterest, False, _a)
+    didRestoreDebtHealth: bool = extcall CreditEngine(_a.creditEngine).repayFromDept(_liqUser, userDebt, repayValueIn, newInterest, 0, _a)
 
     # start auctions (if necessary)
     numAuctionsStarted: uint256 = 0

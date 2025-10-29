@@ -31,7 +31,7 @@ interface MissionControl:
     def getGenLiqConfig() -> GenLiqConfig: view
 
 interface CreditEngine:
-    def repayDuringLiquidation(_user: address, _userDebt: UserDebt, _repayAmount: uint256, _newInterest: uint256, _isDeleverage: bool, _a: addys.Addys = empty(addys.Addys)) -> bool: nonpayable
+    def repayFromDept(_user: address, _userDebt: UserDebt, _repayValue: uint256, _newInterest: uint256, _numUserVaults: uint256, _a: addys.Addys = empty(addys.Addys)) -> bool: nonpayable
     def getLatestUserDebtAndTerms(_user: address, _shouldRaise: bool, _a: addys.Addys = empty(addys.Addys)) -> (UserDebt, UserBorrowTerms, uint256): view
 
 interface AuctionHouse:
@@ -217,7 +217,7 @@ def _deleverageUser(
 
     # repay debt
     repaidAmount = min(repaidAmount, userDebt.amount)
-    hasGoodDebtHealth: bool = extcall CreditEngine(_a.creditEngine).repayDuringLiquidation(_user, userDebt, repaidAmount, newInterest, True, _a)
+    hasGoodDebtHealth: bool = extcall CreditEngine(_a.creditEngine).repayFromDept(_user, userDebt, repaidAmount, newInterest, 0, _a)
 
     log DeleverageUser(
         user=_user,

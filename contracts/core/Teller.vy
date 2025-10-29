@@ -39,8 +39,6 @@ from ethereum.ercs import IERC20
 from ethereum.ercs import IERC4626
 
 interface CreditEngine:
-    def redeemCollateralFromMany(_redemptions: DynArray[CollateralRedemption, MAX_COLLATERAL_REDEMPTIONS], _greenAmount: uint256, _recipient: address, _caller: address, _shouldTransferBalance: bool, _shouldRefundSavingsGreen: bool, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
-    def redeemCollateral(_user: address, _vaultId: uint256, _asset: address, _greenAmount: uint256, _recipient: address, _caller: address, _shouldTransferBalance: bool, _shouldRefundSavingsGreen: bool, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
     def getMaxWithdrawableForAsset(_user: address, _vaultId: uint256, _asset: address, _vaultAddr: address = empty(address), _a: addys.Addys = empty(addys.Addys)) -> uint256: view
     def repayForUser(_user: address, _greenAmount: uint256, _shouldRefundSavingsGreen: bool, _caller: address, _a: addys.Addys = empty(addys.Addys)) -> bool: nonpayable
     def borrowForUser(_user: address, _greenAmount: uint256, _wantsSavingsGreen: bool, _shouldEnterStabPool: bool, _caller: address, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
@@ -86,6 +84,9 @@ interface AddressRegistry:
     def getRegId(_addr: address) -> uint256: view
     def getAddr(_regId: uint256) -> address: view
     def isValidAddr(_addr: address) -> bool: view
+
+interface CreditRedeem:
+    def redeemCollateralFromMany(_redemptions: DynArray[CollateralRedemption, MAX_COLLATERAL_REDEMPTIONS], _greenAmount: uint256, _recipient: address, _caller: address, _shouldTransferBalance: bool, _shouldRefundSavingsGreen: bool, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
 
 interface BondRoom:
     def purchaseRipeBond(_recipient: address, _paymentAsset: address, _paymentAmount: uint256, _lockDuration: uint256, _caller: address, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
@@ -565,9 +566,10 @@ def redeemCollateral(
 ) -> uint256:
     assert not deptBasics.isPaused # dev: contract paused
     a: addys.Addys = addys._getAddys()
-    greenAmount: uint256 = self._handleGreenPayment(_isPaymentSavingsGreen, _paymentAmount, a.creditEngine, a.greenToken, a.savingsGreen)
+    creditRedeem: address = addys._getCreditRedeemAddr()
+    greenAmount: uint256 = self._handleGreenPayment(_isPaymentSavingsGreen, _paymentAmount, creditRedeem, a.greenToken, a.savingsGreen)
     redemptions: DynArray[CollateralRedemption, MAX_COLLATERAL_REDEMPTIONS] = [CollateralRedemption(user=_user, vaultId=_vaultId, asset=_asset, maxGreenAmount=greenAmount)]
-    greenSpent: uint256 = extcall CreditEngine(a.creditEngine).redeemCollateralFromMany(redemptions, max_value(uint256), _recipient, msg.sender, _shouldTransferBalance, _shouldRefundSavingsGreen, a)
+    greenSpent: uint256 = extcall CreditRedeem(creditRedeem).redeemCollateralFromMany(redemptions, max_value(uint256), _recipient, msg.sender, _shouldTransferBalance, _shouldRefundSavingsGreen, a)
     self._performHousekeeping(False, _recipient, True, a)
     return greenSpent
 
@@ -584,8 +586,9 @@ def redeemCollateralFromMany(
 ) -> uint256:
     assert not deptBasics.isPaused # dev: contract paused
     a: addys.Addys = addys._getAddys()
-    greenAmount: uint256 = self._handleGreenPayment(_isPaymentSavingsGreen, _paymentAmount, a.creditEngine, a.greenToken, a.savingsGreen)
-    greenSpent: uint256 = extcall CreditEngine(a.creditEngine).redeemCollateralFromMany(_redemptions, greenAmount, _recipient, msg.sender, _shouldTransferBalance, _shouldRefundSavingsGreen, a)
+    creditRedeem: address = addys._getCreditRedeemAddr()
+    greenAmount: uint256 = self._handleGreenPayment(_isPaymentSavingsGreen, _paymentAmount, creditRedeem, a.greenToken, a.savingsGreen)
+    greenSpent: uint256 = extcall CreditRedeem(creditRedeem).redeemCollateralFromMany(_redemptions, greenAmount, _recipient, msg.sender, _shouldTransferBalance, _shouldRefundSavingsGreen, a)
     self._performHousekeeping(False, _recipient, True, a)
     return greenSpent
 

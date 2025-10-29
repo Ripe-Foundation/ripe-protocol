@@ -48,7 +48,8 @@ def ripe_hq(
     teller,
     boardroom,
     deploy3r,
-    governance
+    governance,
+    credit_redeem,
 ):
     # finish token setup
     assert green_token.finishTokenSetup(ripe_hq_deploy, sender=deploy3r)
@@ -120,6 +121,10 @@ def ripe_hq(
     # 18
     assert ripe_hq_deploy.startAddNewAddressToRegistry(deleverage, "Deleverage", sender=deploy3r)
     assert ripe_hq_deploy.confirmNewAddressToRegistry(deleverage, sender=deploy3r) == 18
+
+    # 19
+    assert ripe_hq_deploy.startAddNewAddressToRegistry(credit_redeem, "Credit Redeem", sender=deploy3r)
+    assert ripe_hq_deploy.confirmNewAddressToRegistry(credit_redeem, sender=deploy3r) == 19
 
     # special permission setup
 
@@ -375,6 +380,18 @@ def teller(ripe_hq_deploy):
         ripe_hq_deploy,
         False,
         name="teller",
+    )
+
+
+# credit redeem
+
+
+@pytest.fixture(scope="session")
+def credit_redeem(ripe_hq_deploy):
+    return boa.load(
+        "contracts/core/CreditRedeem.vy",
+        ripe_hq_deploy,
+        name="credit_redeem",
     )
 
 
