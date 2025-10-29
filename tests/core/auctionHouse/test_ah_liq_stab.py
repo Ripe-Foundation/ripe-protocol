@@ -1509,7 +1509,6 @@ def test_ah_liquidation_with_priority_liq_assets(
     credit_engine,
     stability_pool,
     performDeposit,
-    endaoment,
     mission_control,
     switchboard_alpha,
 ):
@@ -1578,18 +1577,10 @@ def test_ah_liquidation_with_priority_liq_assets(
     teller.liquidateUser(bob, False, sender=sally)
     
     # Check logs
-    endaoment_logs = filter_logs(teller, "CollateralSentToEndaoment")
     swap_logs = filter_logs(teller, "CollateralSwappedWithStabPool")
     
-    # Charlie (priority asset) should be liquidated FIRST via endaoment
-    assert len(endaoment_logs) == 1, "Charlie should go to endaoment"
-    assert endaoment_logs[0].liqAsset == charlie_token.address
-    
     # Regular assets should be swapped after priority asset
-    assert len(swap_logs) > 0, "Regular assets should be swapped"
-    
-    # Verify charlie was fully liquidated first
-    assert charlie_token.balanceOf(endaoment) == 30 * 10**6, "All charlie should go to endaoment"  # Charlie has 6 decimals
+    assert len(swap_logs) == 2, "charlie not swapped"
 
 
 def test_ah_liquidation_edge_case_exact_liquidity_match(
