@@ -1457,6 +1457,8 @@ def test_ah_liquidation_user_with_stab_pool_position(
     
     # Track initial values
     initial_green_supply = green_token.totalSupply()
+    initial_glp_supply = green_lp_token.totalSupply()
+    endaoment_initial_glp_balance = green_lp_token.balanceOf(endaoment)
     bob_initial_sgreen_value = stability_pool.getTotalUserValue(bob, savings_green)
     bob_initial_glp_value = stability_pool.getTotalUserValue(bob, green_lp_token)
     
@@ -1471,21 +1473,21 @@ def test_ah_liquidation_user_with_stab_pool_position(
     # Get logs
     logs = filter_logs(teller, "CollateralSwappedWithStabPool")
     
-    # PHASE 1 should use Bob's stability pool positions FIRST
-    # Check that Bob's stab pool positions were reduced
+    # stability pool should be same as before
     bob_final_sgreen_value = stability_pool.getTotalUserValue(bob, savings_green)
     bob_final_glp_value = stability_pool.getTotalUserValue(bob, green_lp_token)
     
-    assert bob_final_sgreen_value < bob_initial_sgreen_value, "Bob's savings_green position must be reduced"
-    assert bob_final_glp_value < bob_initial_glp_value, "Bob's green_lp position must be reduced"
+    assert bob_final_sgreen_value == bob_initial_sgreen_value, "Bob's savings_green position must be the same"
+    assert bob_final_glp_value > bob_initial_glp_value, "Bob's green_lp position must be greater"
     
     # Verify burn/transfer behavior
     final_green_supply = green_token.totalSupply()
-    assert final_green_supply < initial_green_supply, "Green must be burned for savings_green"
-    
-    # Some green_lp should have gone to endaoment
-    assert green_lp_token.balanceOf(endaoment) > 0, "Green LP from Bob's position must go to endaoment"
-    
+    final_glp_supply = green_lp_token.totalSupply()
+    endaoment_final_glp_balance = green_lp_token.balanceOf(endaoment)
+    assert final_green_supply == initial_green_supply, "Green must be the same"
+    assert final_glp_supply == initial_glp_supply, "Green LP is less than initial"
+    assert endaoment_final_glp_balance > endaoment_initial_glp_balance, "Green LP must go to endaoment"
+
     # Alpha should also be in stability pool from swaps
     assert alpha_token.balanceOf(stability_pool) > 0, "Alpha must be swapped into stability pool"
 

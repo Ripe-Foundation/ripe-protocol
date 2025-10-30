@@ -207,6 +207,7 @@ MAX_STAB_VAULT_DATA: constant(uint256) = 10
 PRIORITY_LIQ_VAULT_DATA: constant(uint256) = 20
 MAX_LIQ_USERS: constant(uint256) = 50
 MAX_AUCTIONS: constant(uint256) = 20
+TEN_CENTS: constant(uint256) = 10 ** 17 # $0.10
 
 
 @deploy
@@ -376,7 +377,7 @@ def _performLiquidationPhases(
 
     if len(_config.priorityLiqAssetVaults) != 0:
         for pData: VaultData in _config.priorityLiqAssetVaults:
-            if remainingToRepay == 0:
+            if remainingToRepay <= TEN_CENTS:
                 break
 
             if not staticcall Vault(pData.vaultAddr).doesUserHaveBalance(_liqUser, pData.asset):
@@ -388,7 +389,7 @@ def _performLiquidationPhases(
 
     # PHASE 2 -- Go thru user's vaults (top to bottom as saved in ledger / vaults)
 
-    if remainingToRepay != 0:
+    if remainingToRepay > TEN_CENTS:
         remainingToRepay, collateralValueOut = self._iterateThruAllUserVaults(_liqUser, remainingToRepay, collateralValueOut, _liqFeeRatio, _config.priorityStabVaults, _a)
 
     return _targetRepayAmount - remainingToRepay, collateralValueOut
@@ -408,13 +409,16 @@ def _iterateThruAllUserVaults(
     _genStabPools: DynArray[VaultData, MAX_STAB_VAULT_DATA],
     _a: addys.Addys,
 ) -> (uint256, uint256):
+    numUserVaults: uint256 = staticcall Ledger(_a.ledger).numUserVaults(_liqUser)
+    if numUserVaults == 0:
+        return _remainingToRepay, _collateralValueOut
+
     remainingToRepay: uint256 = _remainingToRepay
     collateralValueOut: uint256 = _collateralValueOut
 
     # iterate thru each user vault
-    numUserVaults: uint256 = staticcall Ledger(_a.ledger).numUserVaults(_liqUser)
     for i: uint256 in range(1, numUserVaults, bound=max_value(uint256)):
-        if remainingToRepay == 0:
+        if remainingToRepay <= TEN_CENTS:
             break
 
         vaultId: uint256 = staticcall Ledger(_a.ledger).userVaults(_liqUser, i)
@@ -466,7 +470,7 @@ def _iterateThruAssetsWithinVault(
     remainingToRepay: uint256 = _remainingToRepay
     collateralValueOut: uint256 = _collateralValueOut
     for y: uint256 in range(1, numUserAssets, bound=max_value(uint256)):
-        if remainingToRepay == 0:
+        if remainingToRepay <= TEN_CENTS:
             break
 
         # check if user still has balance in this asset
@@ -574,7 +578,7 @@ def _swapWithStabPools(
     # iterate thru each stab pool
     isPositionDepleted: bool = False
     for stabPool: VaultData in stabPoolsToUse:
-        if remainingToRepay == 0:
+        if remainingToRepay <= TEN_CENTS:
             break
 
         # swap with stability pool
@@ -614,7 +618,7 @@ def _swapWithSpecificStabPool(
     isPositionDepleted: bool = False
     shouldGoToNextAsset: bool = False
     remainingToRepay, collateralValueOut, isPositionDepleted, shouldGoToNextAsset = self._swapWithGreenRedemptions(_stabPool, _liqUser, _liqVaultId, _liqVaultAddr, _liqAsset, _liqFeeRatio, remainingToRepay, collateralValueOut, _a)
-    if remainingToRepay == 0 or isPositionDepleted or shouldGoToNextAsset:
+    if remainingToRepay <= TEN_CENTS or isPositionDepleted or shouldGoToNextAsset:
         return remainingToRepay, collateralValueOut, isPositionDepleted, shouldGoToNextAsset
 
     # no balance in stability pool, skip
@@ -625,7 +629,7 @@ def _swapWithSpecificStabPool(
     # max usd value in stability pool
     maxUsdValueInStabPool: uint256 = self._getUsdValue(_stabPool.asset, maxAmountInStabPool, _a.greenToken, _a.savingsGreen, _a.priceDesk)  
     if maxUsdValueInStabPool == 0:
-        return remainingToRepay, collateralValueOut, False, False # can't get price of stab asset, skip      
+        return remainingToRepay, collateralValueOut, False, False # can't get price
 
     # where to move stab asset
     stabProceedsAddr: address = _a.endaoment # non-green assets, move to Endaoment
@@ -694,6 +698,8 @@ def _swapAssetsWithStabPool(
 
     # max collateral usd value (to take from liq user)
     maxCollateralUsdValue: uint256 = min(_maxUsdValueInStabPool, remainingToRepay) * HUNDRED_PERCENT // (HUNDRED_PERCENT - _liqFeeRatio)
+    if maxCollateralUsdValue <= TEN_CENTS:
+        return remainingToRepay, collateralValueOut, False, False # return if it's too small amount
 
     # transfer collateral to stability pool
     collateralUsdValueSent: uint256 = 0
