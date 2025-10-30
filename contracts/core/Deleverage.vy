@@ -532,10 +532,3 @@ def _getVaultAddr(_vaultId: uint256, _vaultBook: address) -> (address, bool):
     if vaultAddr != empty(address):
         return vaultAddr, True
     return staticcall VaultBook(_vaultBook).getAddr(_vaultId), False
-
-
-
-
-
-
-

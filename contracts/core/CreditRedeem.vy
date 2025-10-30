@@ -40,19 +40,23 @@ interface CreditEngine:
     def getLatestUserDebtAndTerms(_user: address, _shouldRaise: bool, _a: addys.Addys = empty(addys.Addys)) -> (UserDebt, UserBorrowTerms, uint256): view
     def getLatestUserDebtWithInterest(_userDebt: UserDebt) -> (UserDebt, uint256): view
 
-interface Teller:
-    def depositFromTrusted(_user: address, _vaultId: uint256, _asset: address, _amount: uint256, _lockDuration: uint256, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
-    def isUnderscoreWalletOwner(_user: address, _caller: address, _mc: address) -> bool: view
-
 interface MissionControl:
     def getRedeemCollateralConfig(_asset: address, _recipient: address) -> RedeemCollateralConfig: view
     def getLtvPaybackBuffer() -> uint256: view
+    def underscoreRegistry() -> address: view
+
+interface Teller:
+    def depositFromTrusted(_user: address, _vaultId: uint256, _asset: address, _amount: uint256, _lockDuration: uint256, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
+    def isUnderscoreWalletOwner(_user: address, _caller: address, _mc: address) -> bool: view
 
 interface PriceDesk:
     def getAssetAmount(_asset: address, _usdValue: uint256, _shouldRaise: bool) -> uint256: view
 
 interface Ledger:
     def getRepayDataBundle(_user: address) -> RepayDataBundle: view
+
+interface VaultRegistry:
+    def isEarnVault(_vaultAddr: address) -> bool: view
 
 interface GreenToken:
     def burn(_amount: uint256) -> bool: nonpayable
@@ -103,6 +107,7 @@ event CollateralRedeemed:
 HUNDRED_PERCENT: constant(uint256) = 100_00 # 100.00%
 MAX_COLLATERAL_REDEMPTIONS: constant(uint256) = 20
 STABILITY_POOL_ID: constant(uint256) = 1
+UNDERSCORE_VAULT_REGISTRY_ID: constant(uint256) = 10
 
 
 @deploy
@@ -129,6 +134,7 @@ def redeemCollateralFromMany(
     assert msg.sender == addys._getTellerAddr() # dev: only Teller allowed
     assert not deptBasics.isPaused # dev: contract paused
     a: addys.Addys = addys._getAddys(_a)
+    vaultRegistry: address = self._getUnderscoreVaultRegistry(a.missionControl)
 
     totalGreenSpent: uint256 = 0
     totalGreenRemaining: uint256 = min(_greenAmount, staticcall IERC20(a.greenToken).balanceOf(self))
@@ -137,7 +143,7 @@ def redeemCollateralFromMany(
     for r: CollateralRedemption in _redemptions:
         if totalGreenRemaining == 0:
             break
-        greenSpent: uint256 = self._redeemCollateral(r.user, r.vaultId, r.asset, r.maxGreenAmount, totalGreenRemaining, _recipient, _caller, _shouldTransferBalance, a)
+        greenSpent: uint256 = self._redeemCollateral(r.user, r.vaultId, r.asset, r.maxGreenAmount, totalGreenRemaining, _recipient, _caller, _shouldTransferBalance, vaultRegistry, a)
         totalGreenRemaining -= greenSpent
         totalGreenSpent += greenSpent
 
@@ -160,6 +166,7 @@ def _redeemCollateral(
     _recipient: address,
     _caller: address,
     _shouldTransferBalance: bool,
+    _vaultRegistry: address,
     _a: addys.Addys,
 ) -> uint256:
 
@@ -180,6 +187,10 @@ def _redeemCollateral(
 
     # user must have balance
     if not staticcall Vault(vaultAddr).doesUserHaveBalance(_user, _asset):
+        return 0
+
+    # cannot redeem from underscore vaults
+    if _vaultRegistry != empty(address) and staticcall VaultRegistry(_vaultRegistry).isEarnVault(_user):
         return 0
 
     # redemptions not allowed on asset
@@ -210,9 +221,10 @@ def _redeemCollateral(
     if not self._canRedeemUserCollateral(userDebt.amount, bt.collateralVal, bt.debtTerms.redemptionThreshold):
         return 0
 
-    # estimated debt to pay back to achieve safe LTV
-    # won't be exact because depends on which collateral is redeemed (LTV changes)
-    targetLtv: uint256 = bt.debtTerms.ltv * (HUNDRED_PERCENT - config.ltvPaybackBuffer) // HUNDRED_PERCENT
+    # target ltv
+    targetLtv: uint256 = bt.lowestLtv
+    if config.ltvPaybackBuffer != 0:
+        targetLtv = targetLtv * (HUNDRED_PERCENT - config.ltvPaybackBuffer) // HUNDRED_PERCENT
     maxCollateralValue: uint256 = self._calcAmountToPay(userDebt.amount, bt.collateralVal, targetLtv)
 
     # treating green as $1
@@ -302,9 +314,14 @@ def getMaxRedeemValue(_user: address) -> uint256:
 
     if not self._canRedeemUserCollateral(userDebt.amount, bt.collateralVal, bt.debtTerms.redemptionThreshold):
         return 0
-    
+
     ltvPaybackBuffer: uint256 = staticcall MissionControl(a.missionControl).getLtvPaybackBuffer()
-    targetLtv: uint256 = bt.debtTerms.ltv * (HUNDRED_PERCENT - ltvPaybackBuffer) // HUNDRED_PERCENT
+
+    # target ltv
+    targetLtv: uint256 = bt.lowestLtv
+    if ltvPaybackBuffer != 0:
+        targetLtv = targetLtv * (HUNDRED_PERCENT - ltvPaybackBuffer) // HUNDRED_PERCENT
+
     return self._calcAmountToPay(userDebt.amount, bt.collateralVal, targetLtv)
 
 
@@ -312,11 +329,16 @@ def getMaxRedeemValue(_user: address) -> uint256:
 @internal
 def _calcAmountToPay(_debtAmount: uint256, _collateralValue: uint256, _targetLtv: uint256) -> uint256:
     # goal here is to only reduce the debt necessary to get LTV back to safe position
-    # it will never be perfectly precise because depending on what assets are taken, the LTV might slightly change
+    # it will never be perfectly precise because depending on what assets are taken
+    # to ensure maximum protocol solvency, we will target the user's lowest LTV
     collValueAdjusted: uint256 =_collateralValue * _targetLtv // HUNDRED_PERCENT
 
-    toPay: uint256 = (_debtAmount - collValueAdjusted) * HUNDRED_PERCENT // (HUNDRED_PERCENT - _targetLtv)
-    return min(toPay, _debtAmount)
+    # collateral value too low
+    if _debtAmount <= collValueAdjusted:
+        return _debtAmount
+
+    debtToRepay: uint256 = (_debtAmount - collValueAdjusted) * HUNDRED_PERCENT // (HUNDRED_PERCENT - _targetLtv)
+    return min(debtToRepay, _debtAmount)
 
 
 @view
@@ -328,3 +350,15 @@ def _canRedeemUserCollateral(_userDebtAmount: uint256, _collateralVal: uint256, 
     # check if collateral value is below (or equal) to redemption threshold
     redemptionThreshold: uint256 = _userDebtAmount * HUNDRED_PERCENT // _redemptionThreshold
     return _collateralVal <= redemptionThreshold
+
+
+# underscore vault registry
+
+
+@view
+@internal
+def _getUnderscoreVaultRegistry(_mc: address) -> address:
+    underscore: address = staticcall MissionControl(_mc).underscoreRegistry()
+    if underscore == empty(address):
+        return empty(address)
+    return staticcall AddressRegistry(underscore).getAddr(UNDERSCORE_VAULT_REGISTRY_ID)

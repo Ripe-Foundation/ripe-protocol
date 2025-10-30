@@ -52,6 +52,7 @@ interface MissionControl:
     def getAssetLiqConfig(_asset: address) -> AssetLiqConfig: view
     def getGenAuctionParams() -> cs.AuctionParams: view
     def getGenLiqConfig() -> GenLiqConfig: view
+    def underscoreRegistry() -> address: view
 
 interface StabilityPool:
     def swapForLiquidatedCollateral(_stabAsset: address, _stabAmountToRemove: uint256, _liqAsset: address, _liqAmountSent: uint256, _recipient: address, _greenToken: address, _savingsGreenToken: address) -> uint256: nonpayable
@@ -77,7 +78,10 @@ interface LootBox:
 interface Teller:
     def isUnderscoreWalletOwner(_user: address, _caller: address, _mc: address = empty(address)) -> bool: view
 
-interface VaultBook:
+interface VaultRegistry:
+    def isEarnVault(_vaultAddr: address) -> bool: view
+
+interface AddressRegistry:
     def getAddr(_vaultId: uint256) -> address: view
 
 struct AuctionBuyConfig:
@@ -202,6 +206,7 @@ didHandleVaultId: transient(HashMap[address, HashMap[uint256, bool]]) # user -> 
 numUserAssetsForAuction: transient(HashMap[address, uint256]) # user -> num assets
 userAssetForAuction: transient(HashMap[address, HashMap[uint256, VaultData]]) # user -> index -> asset
 
+UNDERSCORE_VAULT_REGISTRY_ID: constant(uint256) = 10
 HUNDRED_PERCENT: constant(uint256) = 100_00 # 100.00%
 ONE_PERCENT: constant(uint256) = 1_00 # 1%
 MAX_STAB_VAULT_DATA: constant(uint256) = 10
@@ -232,12 +237,13 @@ def liquidateUser(
     assert msg.sender == addys._getTellerAddr() # dev: only teller allowed
     assert not deptBasics.isPaused # dev: contract paused
     a: addys.Addys = addys._getAddys(_a)
+    vaultRegistry: address = self._getUnderscoreVaultRegistry(a.missionControl)
 
     config: GenLiqConfig = staticcall MissionControl(a.missionControl).getGenLiqConfig()
     assert config.canLiquidate # dev: cannot liquidate
 
     # liquidate user
-    keeperRewards: uint256 = self._liquidateUser(_liqUser, config, a)
+    keeperRewards: uint256 = self._liquidateUser(_liqUser, config, vaultRegistry, a)
 
     # handle keeper rewards
     if keeperRewards != 0:
@@ -256,13 +262,14 @@ def liquidateManyUsers(
     assert msg.sender == addys._getTellerAddr() # dev: only teller allowed
     assert not deptBasics.isPaused # dev: contract paused
     a: addys.Addys = addys._getAddys(_a)
+    vaultRegistry: address = self._getUnderscoreVaultRegistry(a.missionControl)
 
     config: GenLiqConfig = staticcall MissionControl(a.missionControl).getGenLiqConfig()
     assert config.canLiquidate # dev: cannot liquidate
 
     totalKeeperRewards: uint256 = 0
     for liqUser: address in _liqUsers:
-        totalKeeperRewards += self._liquidateUser(liqUser, config, a)
+        totalKeeperRewards += self._liquidateUser(liqUser, config, vaultRegistry, a)
 
     # handle keeper rewards
     if totalKeeperRewards != 0:
@@ -275,9 +282,14 @@ def liquidateManyUsers(
 def _liquidateUser(
     _liqUser: address,
     _config: GenLiqConfig,
+    _vaultRegistry: address,
     _a: addys.Addys,
 ) -> uint256:
     if _liqUser == empty(address):
+        return 0
+
+    # cannot liquidate underscore vaults
+    if _vaultRegistry != empty(address) and staticcall VaultRegistry(_vaultRegistry).isEarnVault(_liqUser):
         return 0
 
     # get latest user debt and terms
@@ -849,7 +861,7 @@ def _canStartAuction(
     _vaultBook: address,
     _ledger: address,
 ) -> bool:
-    vaultAddr: address = staticcall VaultBook(_vaultBook).getAddr(_liqVaultId)
+    vaultAddr: address = staticcall AddressRegistry(_vaultBook).getAddr(_liqVaultId)
     if vaultAddr == empty(address):
         return False
     if not staticcall Vault(vaultAddr).doesUserHaveBalance(_liqUser, _liqAsset):
@@ -1089,7 +1101,7 @@ def _buyFungibleAuction(
     discount: uint256 = self._calculateAuctionDiscount(auctionProgress, auc.startDiscount, auc.maxDiscount)
 
     # get vault addr
-    liqVaultAddr: address = staticcall VaultBook(_a.vaultBook).getAddr(_liqVaultId)
+    liqVaultAddr: address = staticcall AddressRegistry(_a.vaultBook).getAddr(_liqVaultId)
     if liqVaultAddr == empty(address):
         return 0
 
@@ -1320,6 +1332,18 @@ def _calcTargetRepayAmount(_debtAmount: uint256, _collateralValue: uint256, _tar
     return min(debtToRepay, _debtAmount)
 
 
+# underscore vault registry
+
+
+@view
+@internal
+def _getUnderscoreVaultRegistry(_mc: address) -> address:
+    underscore: address = staticcall MissionControl(_mc).underscoreRegistry()
+    if underscore == empty(address):
+        return empty(address)
+    return staticcall AddressRegistry(underscore).getAddr(UNDERSCORE_VAULT_REGISTRY_ID)
+
+
 #########
 # Cache #
 #########
@@ -1340,7 +1364,7 @@ def _getVaultAddr(_vaultId: uint256, _vaultBook: address) -> (address, bool):
     vaultAddr: address = self.vaultAddrs[_vaultId]
     if vaultAddr != empty(address):
         return vaultAddr, True
-    return staticcall VaultBook(_vaultBook).getAddr(_vaultId), False
+    return staticcall AddressRegistry(_vaultBook).getAddr(_vaultId), False
 
 
 @internal
