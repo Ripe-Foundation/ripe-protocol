@@ -317,8 +317,9 @@ def _liquidateUser(
         totalLiqFees += keeperFee
         liqFeeRatio = totalLiqFees * HUNDRED_PERCENT // userDebt.amount
 
-    # how much to achieve safe LTV - use single robust formula for all liquidation types
-    targetLtv: uint256 = bt.lowestLtv * (HUNDRED_PERCENT - _config.ltvPaybackBuffer) // HUNDRED_PERCENT
+    targetLtv: uint256 = bt.lowestLtv
+    if _config.ltvPaybackBuffer != 0:
+        targetLtv = targetLtv * (HUNDRED_PERCENT - _config.ltvPaybackBuffer) // HUNDRED_PERCENT
     targetRepayAmount: uint256 = self._calcTargetRepayAmount(userDebt.amount + totalLiqFees, bt.collateralVal, targetLtv)
 
     # perform liquidation phases
@@ -1289,8 +1290,11 @@ def calcAmountOfDebtToRepayDuringLiq(_user: address) -> uint256:
         keeperFee = min(keeperFee, config.maxKeeperFee)
         totalLiqFees += keeperFee
 
-    # how much to achieve safe LTV - use single robust formula for all liquidation types
-    targetLtv: uint256 = bt.lowestLtv * (HUNDRED_PERCENT - config.ltvPaybackBuffer) // HUNDRED_PERCENT
+    # target ltv
+    targetLtv: uint256 = bt.lowestLtv
+    if config.ltvPaybackBuffer != 0:
+        targetLtv = targetLtv * (HUNDRED_PERCENT - config.ltvPaybackBuffer) // HUNDRED_PERCENT
+    
     return self._calcTargetRepayAmount(userDebt.amount + totalLiqFees, bt.collateralVal, targetLtv)
 
 
