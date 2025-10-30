@@ -1295,6 +1295,12 @@ def calcAmountOfDebtToRepayDuringLiq(_user: address) -> uint256:
 
 
 @view
+@external
+def calcTargetRepayAmount(_debtAmount: uint256, _collateralValue: uint256, _targetLtv: uint256) -> uint256:
+    return self._calcTargetRepayAmount(_debtAmount, _collateralValue, _targetLtv)
+
+
+@view
 @internal
 def _calcTargetRepayAmount(_debtAmount: uint256, _collateralValue: uint256, _targetLtv: uint256) -> uint256:
     # goal here is to only reduce the debt necessary to get LTV back to safe position
