@@ -1153,15 +1153,24 @@ def getMaxWithdrawableForAsset(
         # entire debt must be supported by this asset
         minAssetValueToRemain = userDebt.amount * (HUNDRED_PERCENT + ONE_PERCENT) // assetDebtTerms.ltv
 
-    # multi-asset case: check if remaining collateral is sufficient
+    # multi-asset case: use capacity-based calculation
     else:
-        minCollateralNeeded: uint256 = userDebt.amount * (HUNDRED_PERCENT + ONE_PERCENT) // btExcluding.debtTerms.ltv
-        if btExcluding.collateralVal >= minCollateralNeeded:
-            return max_value(uint256) # remaining collateral is sufficient
-        
-        # calculate additional value needed from this asset
-        additionalCollateralNeeded: uint256 = minCollateralNeeded - btExcluding.collateralVal
-        minAssetValueToRemain = additionalCollateralNeeded * HUNDRED_PERCENT // assetDebtTerms.ltv
+        # Calculate how much debt the remaining assets can support
+        remainingMaxDebt: uint256 = btExcluding.totalMaxDebt
+
+        # Calculate total debt that needs to be supported (with 1% buffer)
+        totalDebtNeeded: uint256 = userDebt.amount * (HUNDRED_PERCENT + ONE_PERCENT) // HUNDRED_PERCENT
+
+        # If remaining assets can support all debt, can withdraw everything
+        if remainingMaxDebt >= totalDebtNeeded:
+            return max_value(uint256)
+
+        # Calculate how much debt must be covered by this asset
+        debtNeedingAssetSupport: uint256 = totalDebtNeeded - remainingMaxDebt
+
+        # Calculate minimum collateral value needed from this asset
+        # minCollateral = debtNeeded / assetLTV
+        minAssetValueToRemain = debtNeedingAssetSupport * HUNDRED_PERCENT // assetDebtTerms.ltv
 
     # cannot withdraw if user has less than the minimum required
     if userUsdValue <= minAssetValueToRemain:
