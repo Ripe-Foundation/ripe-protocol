@@ -1242,10 +1242,9 @@ def test_ah_liquidation_multiple_collateral_different_configs(
     
     assert alpha_swapped, "Alpha must be swapped through stab pool"
     
-    # Bravo should go directly to endaoment
-    assert len(endaoment_logs) == 1, "Bravo should go to endaoment"
-    assert endaoment_logs[0].liqAsset == bravo_token.address
-    assert bravo_token.balanceOf(endaoment) > initial_bravo_in_endaoment
+    # Bravo should go directly to endaoment -- so it's skipped
+    assert len(endaoment_logs) == 0, "Bravo should NOT go to endaoment"
+    assert bravo_token.balanceOf(endaoment) == initial_bravo_in_endaoment
     
     # Verify alpha is in stability pool
     assert alpha_token.balanceOf(stability_pool) > 0, "Alpha must be in stability pool"
