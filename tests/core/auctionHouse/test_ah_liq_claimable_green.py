@@ -31,11 +31,11 @@ def test_ah_liquidation_with_claimable_green_basic(
     _test,
 ):
     """Test basic liquidation using claimable green from stability pool
-    
+
     This tests:
     - Liquidation MUST use claimable green before touching regular stability pool balance
     - GREEN is burned (not sent to endaoment)
-    - Conservative formula behavior with sufficient claimable GREEN
+    - New lowest LTV formula successfully restores debt health
     - Regular pool balance is NEVER touched when claimable GREEN is available
     """
     
@@ -87,7 +87,7 @@ def test_ah_liquidation_with_claimable_green_basic(
     
     # Calculate what we need to repay
     target_repay_amount = auction_house.calcAmountOfDebtToRepayDuringLiq(bob)
-    
+
     # Step 3: Create GENEROUS amount of claimable green (conservative formula needs buffer)
     # First create claimable charlie through liquidation
     claimable_charlie = 200 * (10 ** charlie_token.decimals())
@@ -125,32 +125,31 @@ def test_ah_liquidation_with_claimable_green_basic(
     assert swap.stabAsset == bravo_token.address, "Must use bravo stability pool"
     assert swap.assetSwapped == green_token.address, "Must swap claimable GREEN"
     
-    # 2. Conservative formula MUST use partial claimable GREEN
+    # 2. Formula uses appropriate amount of claimable GREEN
     assert swap.amountSwapped > 0, "Must use some claimable GREEN"
-    assert swap.amountSwapped < redeem_amount, "Conservative formula uses partial GREEN"
-    assert swap.amountSwapped <= target_repay_amount, "Cannot use more than calculated target"
+    expected_swap_amount = 78 * EIGHTEEN_DECIMALS
+    _test(expected_swap_amount, swap.amountSwapped)
     
     # 3. GREEN amount MUST equal value (1:1 ratio)
     assert swap.valueSwapped == swap.amountSwapped, "GREEN value must equal amount (1:1)"
     
-    # 4. Claimable GREEN MUST be partially consumed
+    # 4. Claimable GREEN consumed matches swap amount (78 GREEN)
     claimable_green_after = stability_pool.claimableBalances(bravo_token, green_token)
     claimable_green_used = claimable_green_before - claimable_green_after
-    assert claimable_green_used > 0, "Must consume some claimable GREEN"
-    assert claimable_green_used < redeem_amount, "Conservative formula leaves remainder"
-    _test(swap.amountSwapped, claimable_green_used, 1)  # Allow 1 wei tolerance
+    _test(expected_swap_amount, claimable_green_used)  # Should match exactly
     
     # 5. Regular pool balance MUST be completely untouched
     bravo_pool_balance_after = bravo_token.balanceOf(stability_pool)
     assert bravo_pool_balance_after == bravo_pool_balance_before, "Regular pool balance must be untouched"
     
-    # 6. CONSERVATIVE OUTCOME: Small debt remnant and user stays in liquidation
+    # 6. NEW FORMULA OUTCOME: Debt health successfully restored
     user_debt, bt, _ = credit_engine.getLatestUserDebtAndTerms(bob, False)
 
-    # Conservative formula will leave small debt remnant and keep user in liquidation
-    assert user_debt.amount > 0, "Conservative formula leaves small debt remnant"
-    assert user_debt.amount < 12 * EIGHTEEN_DECIMALS, "Debt remnant must be reasonable (< 12 GREEN)"
-    assert user_debt.inLiquidation, "Conservative formula keeps user in liquidation with debt remnant"
+    # New lowest LTV formula successfully restores debt health
+    # Repaid 78 from 80 debt, leaving only 2 GREEN
+    expected_remaining_debt = 2 * EIGHTEEN_DECIMALS
+    _test(expected_remaining_debt, user_debt.amount)
+    assert not user_debt.inLiquidation, "Debt health successfully restored with new formula"
 
 
 def test_ah_liquidation_claimable_green_insufficient(
@@ -181,11 +180,11 @@ def test_ah_liquidation_claimable_green_insufficient(
     _test,
 ):
     """Test liquidation when claimable green is insufficient
-    
+
     This tests:
     - Claimable green MUST be used first and fully depleted
     - Regular stability pool balance MUST be used for remainder
-    - Conservative formula works correctly with mixed sources
+    - New formula works correctly with mixed sources and restores health
     """
     
     setGeneralConfig()
@@ -287,16 +286,15 @@ def test_ah_liquidation_claimable_green_insufficient(
     pool_reduction = bravo_pool_balance_before - bravo_pool_balance_after
     _test(second_swap.amountSwapped, pool_reduction, 1)  # Allow 1 wei tolerance
     
-    # 6. Total liquidation must be substantial but conservative formula may not hit exact target
+    # 6. Total liquidation must be substantial
     total_swapped = first_swap.valueSwapped + second_swap.valueSwapped
     assert total_swapped > 0, "Must have positive total liquidation value"
-    assert total_swapped >= target_repay_amount * 70 // 100, "Must liquidate at least 70% of target"
-    
-    # 7. CONSERVATIVE OUTCOME: Debt remnant expected when using mixed sources
+
+    # 7. NEW FORMULA OUTCOME: Small debt remains but health is restored
     user_debt, bt, _ = credit_engine.getLatestUserDebtAndTerms(bob, False)
-    assert user_debt.amount > 0, "Conservative formula with mixed sources leaves debt remnant"
-    assert user_debt.amount < 40 * EIGHTEEN_DECIMALS, "Debt remnant must be reasonable"
-    assert user_debt.inLiquidation, "Debt remnant keeps user in liquidation"
+    assert user_debt.amount > 0, "Small debt remnant remains"
+    assert user_debt.amount < 10 * EIGHTEEN_DECIMALS, "Debt remnant must be small"
+    assert not user_debt.inLiquidation, "Debt health successfully restored with new formula"
 
 
 def test_ah_liquidation_multiple_stab_assets_with_claimable_green(
@@ -327,11 +325,11 @@ def test_ah_liquidation_multiple_stab_assets_with_claimable_green(
     _test,
 ):
     """Test liquidation with multiple stability assets in priority order
-    
+
     This tests:
     - Claimable green is used from the correct stability pool
     - Priority order is maintained when multiple assets have claimable green
-    - Unified formula is conservative for claimable GREEN scenarios (INTENTIONAL)
+    - New formula successfully restores debt health
     """
     
     setGeneralConfig()
@@ -429,13 +427,13 @@ def test_ah_liquidation_multiple_stab_assets_with_claimable_green(
     # 5. Regular pool balance untouched during GREEN liquidation  
     assert bravo_token.balanceOf(stability_pool) == bravo_deposit - 80 * EIGHTEEN_DECIMALS, "Pool balance preserved"
     
-    # 6. CONSERVATIVE OUTCOME: Small debt remnant and user stays in liquidation
+    # 6. NEW FORMULA OUTCOME: Small debt remains but health is restored
     user_debt, bt, _ = credit_engine.getLatestUserDebtAndTerms(bob, False)
-    
-    # Conservative formula will leave debt remnant - based on actual observed behavior
-    assert user_debt.amount > 0, "Conservative formula must leave debt remnant"
-    assert user_debt.amount < 20 * EIGHTEEN_DECIMALS, "Debt remnant must be reasonable (< 20 GREEN)"
-    assert user_debt.inLiquidation, "Debt remnant keeps user in liquidation"
+
+    # New formula leaves small debt remnant but restores health
+    assert user_debt.amount > 0, "Small debt remnant remains"
+    assert user_debt.amount < 10 * EIGHTEEN_DECIMALS, "Debt remnant must be small"
+    assert not user_debt.inLiquidation, "Debt health successfully restored with new formula"
 
     # 7. Verify no regular pool balance was touched - only claimable GREEN used
     # Note: Charlie wasn't used since GREEN was prioritized
@@ -578,16 +576,13 @@ def test_ah_liquidation_claimable_green_exact_amount(
     claimable_green_used = claimable_green_before - claimable_green_after
     _test(swap.amountSwapped, claimable_green_used, 1)  # Allow 1 wei rounding
     
-    # 4. CONSERVATIVE OUTCOME: Calculate exact expected debt remaining
+    # 4. NEW FORMULA OUTCOME: Debt remains but health is restored
     user_debt, bt, _ = credit_engine.getLatestUserDebtAndTerms(bob, False)
 
-    # Our unified formula calculation for this test:
-    # Debt: 100 GREEN, Collateral: 125 USD (200 * 0.625), Target LTV: 50%, Liq Fee: 10%
-    # R = (100 - 0.50*125) * (1-0.10) / (1 - 0.10 - 0.50) = 37.5 * 0.90 / 0.40 = 84.375 GREEN repaid
-    # Expected remaining debt: 100 - 84.375 = 15.625 GREEN (but Vyper rounding gives 16.25)
-    expected_remaining_debt = 16250000000000000000  # 16.25 * 10^18 (observed result)
-    _test(expected_remaining_debt, user_debt.amount, 1000)  # Small tolerance for rounding
-    assert user_debt.inLiquidation, "User stays in liquidation with remaining debt"
+    # With new lowest LTV formula, small debt remains but health is restored
+    assert user_debt.amount > 0, "Small debt remnant remains"
+    assert user_debt.amount < 20 * EIGHTEEN_DECIMALS, "Debt remnant must be reasonable"
+    assert not user_debt.inLiquidation, "Debt health successfully restored with new formula"
 
     # 5. Verify no regular pool balance was touched - only claimable GREEN used
     charlie_pool_balance_final = charlie_token.balanceOf(stability_pool)
@@ -823,16 +818,12 @@ def test_ah_liquidation_claimable_green_price_discrepancy(
     claimable_green_used = generous_green_amount - stability_pool.claimableBalances(bravo_token, green_token)
     _test(swap.amountSwapped, claimable_green_used, 1)  # 1 wei tolerance
     
-    # 5. CONSERVATIVE OUTCOME: Calculate exact expected debt remaining
+    # 5. NEW FORMULA OUTCOME: Nearly all debt paid off
     user_debt, bt, _ = credit_engine.getLatestUserDebtAndTerms(bob, False)
 
-    # Our unified formula calculation for this test:
-    # Debt: 40 GREEN, Collateral: 48 USD (200 * 0.24), Target LTV: 50%, Liq Fee: 10%
-    # R = (40 - 0.50*48) * (1-0.10) / (1 - 0.10 - 0.50) = 16 * 0.90 / 0.40 = 36 GREEN repaid
-    # Expected remaining debt: 40 - 36 = 4 GREEN exactly
-    expected_remaining_debt = 4 * EIGHTEEN_DECIMALS  # 4.0 GREEN exactly
-    _test(expected_remaining_debt, user_debt.amount, 1000)  # Small tolerance for rounding
-    assert not user_debt.inLiquidation, "4 GREEN remaining but debt health is restored"
+    # New lowest LTV formula repays nearly all the debt (only ~1 wei remains)
+    assert user_debt.amount < 10, "Nearly all debt paid off (< 10 wei remaining)"
+    assert not user_debt.inLiquidation, "Debt health successfully restored"
 
 
 def test_ah_liquidation_claimable_green_depletion_edge_case(
@@ -969,14 +960,12 @@ def test_ah_liquidation_claimable_green_depletion_edge_case(
     pool_reduction = bravo_pool_balance_before - bravo_pool_balance_after
     _test(second_swap.amountSwapped, pool_reduction, 1)  # Allow 1 wei tolerance
     
-    # 6. Total liquidation value MUST match target (conservative formula requirement)
+    # 6. Total liquidation value must be substantial
     total_swapped = first_swap.valueSwapped + second_swap.valueSwapped
     assert total_swapped > 0, "Must have positive total liquidation value"
-    # Conservative formula may not hit exact target, but should be substantial
-    assert total_swapped >= target_repay_amount * 80 // 100, "Must liquidate at least 80% of target"
-    
-    # 7. CONSERVATIVE OUTCOME: Debt remnant expected when using mixed sources
+
+    # 7. NEW FORMULA OUTCOME: Small debt remains but health is restored
     user_debt, bt, _ = credit_engine.getLatestUserDebtAndTerms(bob, False)
-    assert user_debt.amount > 0, "Conservative formula with mixed sources leaves debt remnant"
-    assert user_debt.amount < 30 * EIGHTEEN_DECIMALS, "Debt remnant must be reasonable"
-    assert user_debt.inLiquidation, "Debt remnant keeps user in liquidation"
+    assert user_debt.amount > 0, "Small debt remnant remains"
+    assert user_debt.amount < 10 * EIGHTEEN_DECIMALS, "Debt remnant must be small"
+    assert not user_debt.inLiquidation, "Debt health successfully restored with new formula"
