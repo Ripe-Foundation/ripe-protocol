@@ -64,6 +64,7 @@ struct UserBorrowTerms:
     collateralVal: uint256
     totalMaxDebt: uint256
     debtTerms: cs.DebtTerms
+    lowestLtv: uint256
 
 struct UserDebt:
     amount: uint256

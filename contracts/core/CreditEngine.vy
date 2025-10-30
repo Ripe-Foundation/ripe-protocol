@@ -93,6 +93,7 @@ struct UserBorrowTerms:
     collateralVal: uint256
     totalMaxDebt: uint256
     debtTerms: cs.DebtTerms
+    lowestLtv: uint256
 
 struct UserDebt:
     amount: uint256
@@ -642,6 +643,7 @@ def _getUserBorrowTerms(
 
     # sum vars
     bt: UserBorrowTerms = empty(UserBorrowTerms)
+    bt.lowestLtv = max_value(uint256)
     ltvSum: uint256 = 0
     redemptionThresholdSum: uint256 = 0
     liqThresholdSum: uint256 = 0
@@ -692,6 +694,10 @@ def _getUserBorrowTerms(
             borrowRateSum += debtTermsWeight * debtTerms.borrowRate
             daowrySum += debtTermsWeight * debtTerms.daowry
             totalSum += debtTermsWeight
+
+            # lowest ltv
+            if debtTerms.ltv != 0 and debtTerms.ltv < bt.lowestLtv:
+                bt.lowestLtv = debtTerms.ltv
 
             # totals
             if not (hasSkip and asset == _skipAsset and vaultId == _skipVaultId):
