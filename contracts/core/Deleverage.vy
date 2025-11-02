@@ -513,6 +513,16 @@ def _getMaxAssetAmount(
     return amount
 
 
+# deleverage if needed for withdrawal
+
+
+@external
+def deleverageForWithdrawal(_user: address, _vaultId: uint256, _asset: address, _amount: uint256) -> bool:
+    # TODO: implement
+    # make sure has access control
+    return False
+
+
 # cache tools
 
 
