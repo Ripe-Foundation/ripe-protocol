@@ -20,25 +20,28 @@ import interfaces.ConfigStructs as cs
 from ethereum.ercs import IERC4626
 from ethereum.ercs import IERC20
 
+interface MissionControl:
+    def userDelegation(_user: address, _caller: address) -> cs.ActionDelegation: view
+    def getAssetLiqConfig(_asset: address) -> AssetLiqConfig: view
+    def getGenLiqConfig() -> GenLiqConfig: view
+    def getDebtTerms(_asset: address) -> cs.DebtTerms: view
+
+interface CreditEngine:
+    def repayFromDept(_user: address, _userDebt: UserDebt, _repayValue: uint256, _newInterest: uint256, _numUserVaults: uint256, _a: addys.Addys = empty(addys.Addys)) -> bool: nonpayable
+    def getLatestUserDebtAndTerms(_user: address, _shouldRaise: bool, _a: addys.Addys = empty(addys.Addys)) -> (UserDebt, UserBorrowTerms, uint256): view
+    def getUserBorrowTerms(_user: address, _shouldRaise: bool, _skipVaultId: uint256 = 0, _skipAsset: address = empty(address), _a: addys.Addys = empty(addys.Addys)) -> UserBorrowTerms: view
+
 interface Ledger:
     def isParticipatingInVault(_user: address, _vaultId: uint256) -> bool: view
     def userVaults(_user: address, _index: uint256) -> uint256: view
     def numUserVaults(_user: address) -> uint256: view
 
-interface MissionControl:
-    def userDelegation(_user: address, _caller: address) -> cs.ActionDelegation: view
-    def getAssetLiqConfig(_asset: address) -> AssetLiqConfig: view
-    def getGenLiqConfig() -> GenLiqConfig: view
-
-interface CreditEngine:
-    def repayFromDept(_user: address, _userDebt: UserDebt, _repayValue: uint256, _newInterest: uint256, _numUserVaults: uint256, _a: addys.Addys = empty(addys.Addys)) -> bool: nonpayable
-    def getLatestUserDebtAndTerms(_user: address, _shouldRaise: bool, _a: addys.Addys = empty(addys.Addys)) -> (UserDebt, UserBorrowTerms, uint256): view
+interface PriceDesk:
+    def getAssetAmount(_asset: address, _usdValue: uint256, _shouldRaise: bool = False) -> uint256: view
+    def getUsdValue(_asset: address, _amount: uint256, _shouldRaise: bool = False) -> uint256: view
 
 interface AuctionHouse:
     def withdrawTokensFromVault(_user: address, _asset: address, _amount: uint256, _recipient: address, _vaultAddr: address, _a: addys.Addys) -> (uint256, bool): nonpayable
-
-interface PriceDesk:
-    def getAssetAmount(_asset: address, _usdValue: uint256, _shouldRaise: bool = False) -> uint256: view
 
 interface VaultBook:
     def getAddr(_vaultId: uint256) -> address: view
@@ -117,6 +120,7 @@ didHandleAsset: transient(HashMap[address, HashMap[uint256, HashMap[address, boo
 didHandleVaultId: transient(HashMap[address, HashMap[uint256, bool]]) # user -> vaultId -> did handle
 
 HUNDRED_PERCENT: constant(uint256) = 100_00 # 100.00%
+ONE_PERCENT: constant(uint256) = 1_00 # 1.00%
 PRIORITY_LIQ_VAULT_DATA: constant(uint256) = 20
 MAX_STAB_VAULT_DATA: constant(uint256) = 10
 MAX_DELEVERAGE_USERS: constant(uint256) = 25
@@ -518,9 +522,54 @@ def _getMaxAssetAmount(
 
 @external
 def deleverageForWithdrawal(_user: address, _vaultId: uint256, _asset: address, _amount: uint256) -> bool:
-    # TODO: implement
-    # make sure has access control
-    return False
+    assert addys._isValidRipeAddr(msg.sender) # dev: no perms
+    assert not deptBasics.isPaused # dev: contract paused
+    a: addys.Addys = addys._getAddys()
+
+    # get current user state
+    userDebt: UserDebt = empty(UserDebt)
+    bt: UserBorrowTerms = empty(UserBorrowTerms)
+    na: uint256 = 0
+    userDebt, bt, na = staticcall CreditEngine(a.creditEngine).getLatestUserDebtAndTerms(_user, True, a)
+    if userDebt.amount == 0:
+        return False
+
+    # asset information
+    vaultAddr: address = staticcall VaultBook(a.vaultBook).getAddr(_vaultId)
+    userBalance: uint256 = staticcall Vault(vaultAddr).getTotalAmountForUser(_user, _asset)
+    userUsdValue: uint256 = staticcall PriceDesk(a.priceDesk).getUsdValue(_asset, userBalance, True)
+
+    # calculate withdraw usd value
+    withdrawUsdValue: uint256 = userUsdValue
+    if _amount < userBalance:
+        withdrawUsdValue = userUsdValue * _amount // userBalance
+
+    # asset debt terms
+    assetDebtTerms: cs.DebtTerms = staticcall MissionControl(a.missionControl).getDebtTerms(_asset)
+    if assetDebtTerms.ltv == 0:
+        return False # 0% LTV means asset doesn't affect borrowing capacity
+
+    # get borrowing capacity excluding this asset
+    btExcluding: UserBorrowTerms = staticcall CreditEngine(a.creditEngine).getUserBorrowTerms(_user, True, _vaultId, _asset, a)
+
+    # calculate debt capacity after withdrawal
+    remainingAssetValue: uint256 = userUsdValue - withdrawUsdValue
+    newAssetDebtCapacity: uint256 = remainingAssetValue * assetDebtTerms.ltv // HUNDRED_PERCENT
+    newTotalDebtCapacity: uint256 = btExcluding.totalMaxDebt + newAssetDebtCapacity
+
+    # calculate max sustainable debt (with 1% buffer)
+    maxSustainableDebt: uint256 = newTotalDebtCapacity * (HUNDRED_PERCENT - ONE_PERCENT) // HUNDRED_PERCENT
+
+    # calculate required repayment
+    if userDebt.amount <= maxSustainableDebt:
+        return False # no deleveraging needed
+
+    requiredRepayment: uint256 = userDebt.amount - maxSustainableDebt
+
+    # execute deleveraging
+    config: GenLiqConfig = staticcall MissionControl(a.missionControl).getGenLiqConfig()
+    repaidAmount: uint256 = self._deleverageUser(_user, _user, requiredRepayment, config, a)
+    return repaidAmount != 0
 
 
 # cache tools
