@@ -564,11 +564,9 @@ def deleverageForWithdrawal(_user: address, _vaultId: uint256, _asset: address, 
     if userDebt.amount <= maxSustainableDebt:
         return False # no deleveraging needed
 
-    requiredRepayment: uint256 = userDebt.amount - maxSustainableDebt
-
     # execute deleveraging
     config: GenLiqConfig = staticcall MissionControl(a.missionControl).getGenLiqConfig()
-    repaidAmount: uint256 = self._deleverageUser(_user, _user, requiredRepayment, config, a)
+    repaidAmount: uint256 = self._deleverageUser(_user, _user, userDebt.amount, config, a)
     return repaidAmount != 0
 
 
