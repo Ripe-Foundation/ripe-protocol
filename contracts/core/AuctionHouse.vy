@@ -95,6 +95,7 @@ struct UserBorrowTerms:
     totalMaxDebt: uint256
     debtTerms: cs.DebtTerms
     lowestLtv: uint256
+    highestLtv: uint256
 
 struct UserDebt:
     amount: uint256

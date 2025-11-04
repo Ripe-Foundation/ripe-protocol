@@ -82,6 +82,7 @@ struct UserBorrowTerms:
     totalMaxDebt: uint256
     debtTerms: cs.DebtTerms
     lowestLtv: uint256
+    highestLtv: uint256
 
 struct UserDebt:
     amount: uint256
@@ -517,6 +518,70 @@ def _getMaxAssetAmount(
     return amount
 
 
+# get deleverage info
+
+
+@view
+@external
+def getDeleverageInfo(_user: address) -> (uint256, uint256):
+    return self._getDeleverageInfo(_user, addys._getAddys())
+
+
+@view
+@internal
+def _getDeleverageInfo(_user: address, _a: addys.Addys) -> (uint256, uint256):
+    maxDeleveragableUsd: uint256 = 0
+    ltvSum: uint256 = 0 
+
+    # number of user vaults
+    numUserVaults: uint256 = staticcall Ledger(_a.ledger).numUserVaults(_user)
+    if numUserVaults == 0:
+        return 0, 0
+
+    # iterate through user vaults
+    for i: uint256 in range(1, numUserVaults, bound=max_value(uint256)):
+        vaultId: uint256 = staticcall Ledger(_a.ledger).userVaults(_user, i)
+        vaultAddr: address = staticcall VaultBook(_a.vaultBook).getAddr(vaultId)
+        if vaultAddr == empty(address):
+            continue
+
+        # number of assets in vault
+        numUserAssets: uint256 = staticcall Vault(vaultAddr).numUserAssets(_user)
+        if numUserAssets == 0:
+            continue
+
+        # iterate through assets
+        for y: uint256 in range(1, numUserAssets, bound=max_value(uint256)):
+            asset: address = empty(address)
+            amount: uint256 = 0
+            asset, amount = staticcall Vault(vaultAddr).getUserAssetAndAmountAtIndex(_user, y)
+            if asset == empty(address) or amount == 0:
+                continue
+
+            # check if asset is deleveragable
+            assetLiqConfig: AssetLiqConfig = staticcall MissionControl(_a.missionControl).getAssetLiqConfig(asset)
+            if not assetLiqConfig.shouldBurnAsPayment and not assetLiqConfig.shouldTransferToEndaoment:
+                continue
+
+            # usd value
+            usdValue: uint256 = staticcall PriceDesk(_a.priceDesk).getUsdValue(asset, amount, True)
+            if usdValue == 0:
+                continue
+
+            maxDeleveragableUsd += usdValue
+
+            # get asset LTV for weighted calculation
+            debtTerms: cs.DebtTerms = staticcall MissionControl(_a.missionControl).getDebtTerms(asset)
+            ltvSum += usdValue * debtTerms.ltv
+
+    # calculate effective weighted LTV
+    effectiveWeightedLtv: uint256 = 0
+    if maxDeleveragableUsd != 0:
+        effectiveWeightedLtv = ltvSum // maxDeleveragableUsd
+
+    return maxDeleveragableUsd, effectiveWeightedLtv
+
+
 # deleverage if needed for withdrawal
 
 
@@ -549,24 +614,45 @@ def deleverageForWithdrawal(_user: address, _vaultId: uint256, _asset: address, 
     if assetDebtTerms.ltv == 0:
         return False # 0% LTV means asset doesn't affect borrowing capacity
 
-    # get borrowing capacity excluding this asset
-    btExcluding: UserBorrowTerms = staticcall CreditEngine(a.creditEngine).getUserBorrowTerms(_user, True, _vaultId, _asset, a)
+    # calculate lost capacity from withdrawal
+    lostCapacity: uint256 = withdrawUsdValue * assetDebtTerms.ltv // HUNDRED_PERCENT
+    if lostCapacity == 0:
+        return False # if no capacity lost, no need to deleverage
 
-    # calculate debt capacity after withdrawal
-    remainingAssetValue: uint256 = userUsdValue - withdrawUsdValue
-    newAssetDebtCapacity: uint256 = remainingAssetValue * assetDebtTerms.ltv // HUNDRED_PERCENT
-    newTotalDebtCapacity: uint256 = btExcluding.totalMaxDebt + newAssetDebtCapacity
+    # get deleverage info (maxDeleveragable amount and effective weighted LTV)
+    maxDeleveragable: uint256 = 0
+    effectiveLtv: uint256 = 0
+    maxDeleveragable, effectiveLtv = self._getDeleverageInfo(_user, a)
+    if maxDeleveragable == 0:
+        return False # no deleveragable assets
 
-    # calculate max sustainable debt (with 1% buffer)
-    maxSustainableDebt: uint256 = newTotalDebtCapacity * (HUNDRED_PERCENT - ONE_PERCENT) // HUNDRED_PERCENT
+    # calculate required repayment to maintain utilization ratio
+    # Formula: requiredRepayment = (debt × lostCapacity) / (capacity - debt × effectiveLtv)
+    numerator: uint256 = userDebt.amount * lostCapacity
+    denominator: uint256 = bt.totalMaxDebt - (userDebt.amount * effectiveLtv // HUNDRED_PERCENT)
+    if denominator == 0:
+        return False # edge case: capacity exactly equals debt × effectiveLtv
 
-    # calculate required repayment
-    if userDebt.amount <= maxSustainableDebt:
-        return False # no deleveraging needed
+    requiredRepayment: uint256 = numerator // denominator
+
+    # cap at max deleveragable amount
+    if requiredRepayment > maxDeleveragable:
+        requiredRepayment = maxDeleveragable
+
+    # apply 1% buffer to be more conservative
+    requiredRepayment = requiredRepayment * (HUNDRED_PERCENT + ONE_PERCENT) // HUNDRED_PERCENT
+
+    # final cap at total debt
+    if requiredRepayment > userDebt.amount:
+        requiredRepayment = userDebt.amount
+
+    # don't proceed if calculated repayment is 0 (edge case with very small amounts)
+    if requiredRepayment == 0:
+        return False
 
     # execute deleveraging
     config: GenLiqConfig = staticcall MissionControl(a.missionControl).getGenLiqConfig()
-    repaidAmount: uint256 = self._deleverageUser(_user, _user, userDebt.amount, config, a)
+    repaidAmount: uint256 = self._deleverageUser(_user, _user, requiredRepayment, config, a)
     return repaidAmount != 0
 
 
