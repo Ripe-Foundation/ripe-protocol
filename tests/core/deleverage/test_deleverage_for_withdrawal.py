@@ -1980,3 +1980,384 @@ def test_multiple_sequential_withdrawals(
     # 2. Second withdrawal fails due to titanoboa bug (not contract logic)
     # 3. Contract state shows second withdrawal SHOULD work (has debt, has USDC, etc.)
     # This confirms the contract logic is correct and will work in production.
+
+
+############################################
+# 7. Recursive Leverage Tests (5 tests)
+############################################
+# Tests for scenarios where the same asset (USDC) is used as both
+# initial collateral and leveraged asset in a recursive loop
+
+
+def test_recursive_usdc_leverage_basic_setup(
+    deleverage,
+    credit_engine,
+    simple_erc20_vault,
+    bob,
+    charlie_token,  # USDC
+    charlie_token_whale,
+    whale,
+    teller,
+    performDeposit,
+    setup_priority_configs,
+    _test,
+):
+    """
+    Test basic recursive USDC leverage scenario:
+    1. Deposit USDC as collateral
+    2. Borrow GREEN against it
+    3. Simulate swap to USDC and re-deposit
+    4. Verify deleverage info is correct
+    """
+    # Step 1: Initial USDC deposit ($1000)
+    initial_usdc = 1000 * SIX_DECIMALS
+    performDeposit(bob, initial_usdc, charlie_token, charlie_token_whale, simple_erc20_vault)
+
+    # Verify initial capacity (90% LTV for USDC)
+    initial_capacity = credit_engine.getUserBorrowTerms(bob, False).totalMaxDebt
+    expected_capacity = 900 * EIGHTEEN_DECIMALS  # $900 at 90% LTV
+    _test(expected_capacity, initial_capacity, 100)
+
+    # Step 2: Borrow GREEN ($800)
+    borrow_amount = 800 * EIGHTEEN_DECIMALS
+    teller.borrow(borrow_amount, bob, False, sender=bob)  # False = get GREEN, not sGREEN
+
+    # Step 3: Simulate swap to USDC and re-deposit
+    # In reality, user would swap GREEN to USDC. Here we simulate by depositing more USDC.
+    second_usdc = 800 * SIX_DECIMALS  # $800 USDC from swap
+    performDeposit(bob, second_usdc, charlie_token, charlie_token_whale, simple_erc20_vault)
+
+    # Configure USDC for deleveraging
+    setup_priority_configs([], [(simple_erc20_vault, charlie_token)])
+
+    # Verify recursive position state
+    total_usdc = simple_erc20_vault.getTotalAmountForUser(bob, charlie_token)
+    assert total_usdc == 1800 * SIX_DECIMALS, f"Should have $1800 USDC total: {total_usdc}"
+
+    debt = credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount
+    assert debt == borrow_amount, f"Should have $800 debt: {debt}"
+
+    capacity = credit_engine.getUserBorrowTerms(bob, False).totalMaxDebt
+    expected_capacity = 1800 * EIGHTEEN_DECIMALS * 90 // 100  # $1620 at 90% LTV
+    _test(expected_capacity, capacity, 100)
+
+    # Verify deleverage info
+    max_deleveragable, effective_ltv = deleverage.getDeleverageInfo(bob)
+
+    # All $1800 USDC is deleveragable
+    expected_deleveragable = 1800 * EIGHTEEN_DECIMALS
+    _test(expected_deleveragable, max_deleveragable, 100)
+
+    # Effective LTV should be 90% (only USDC)
+    assert effective_ltv == 90_00, f"Effective LTV should be 90%: {effective_ltv}"
+
+    # Calculate utilization
+    utilization = (debt * HUNDRED_PERCENT) // capacity
+    expected_utilization = (800 * HUNDRED_PERCENT) // 1620  # ~49.4%
+    _test(expected_utilization, utilization, 100)
+
+
+def test_recursive_usdc_leverage_withdrawal(
+    deleverage,
+    teller,
+    credit_engine,
+    simple_erc20_vault,
+    endaoment,
+    bob,
+    charlie_token,  # USDC
+    charlie_token_whale,
+    performDeposit,
+    setup_priority_configs,
+    _test,
+):
+    """
+    Test withdrawal in recursive USDC leverage scenario.
+    Verifies that withdrawing USDC correctly deleverages using the same USDC asset.
+    """
+    # Setup recursive position: $1000 initial + $900 leveraged = $1900 total USDC
+    initial_usdc = 1000 * SIX_DECIMALS
+    performDeposit(bob, initial_usdc, charlie_token, charlie_token_whale, simple_erc20_vault)
+
+    # Borrow $900 GREEN
+    borrow_amount = 900 * EIGHTEEN_DECIMALS
+    teller.borrow(borrow_amount, bob, False, sender=bob)  # False = get GREEN, not sGREEN
+
+    # Simulate swap and re-deposit $900 USDC
+    leveraged_usdc = 900 * SIX_DECIMALS
+    performDeposit(bob, leveraged_usdc, charlie_token, charlie_token_whale, simple_erc20_vault)
+
+    setup_priority_configs([], [(simple_erc20_vault, charlie_token)])
+
+    # Pre-withdrawal state
+    pre_debt = credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount
+    pre_capacity = credit_engine.getUserBorrowTerms(bob, False).totalMaxDebt
+    pre_usdc = simple_erc20_vault.getTotalAmountForUser(bob, charlie_token)
+    pre_endaoment = charlie_token.balanceOf(endaoment)
+
+    # Total USDC: $1900, Debt: $900, Capacity: $1710
+    assert pre_usdc == 1900 * SIX_DECIMALS
+    assert pre_debt == 900 * EIGHTEEN_DECIMALS
+    assert pre_capacity == 1710 * EIGHTEEN_DECIMALS  # $1900 * 90%
+
+    # Withdraw 200 USDC (in 6 decimals, not USD)
+    withdraw_amount = 200 * SIX_DECIMALS
+
+    # Calculate expected deleverage
+    # Lost capacity = $200 * 90% = $180
+    # Effective LTV = 90% (all USDC)
+    # Formula: ($900 * $180) / ($1710 - $900 * 0.90) = $162,000 / $900 = $180
+    # With 1% buffer: $180 * 1.01 = $181.80
+
+    result = deleverage.deleverageForWithdrawal(
+        bob, 3, charlie_token, withdraw_amount, sender=teller.address
+    )
+    assert result == True, "Deleverage should succeed"
+
+    # Verify USDC was transferred to Endaoment
+    post_usdc = simple_erc20_vault.getTotalAmountForUser(bob, charlie_token)
+    post_endaoment = charlie_token.balanceOf(endaoment)
+
+    usdc_to_endaoment = pre_usdc - post_usdc
+    endaoment_received = post_endaoment - pre_endaoment
+
+    # Should deleverage proportional amount, not full debt
+    expected_deleverage = 181_80 * SIX_DECIMALS // 100  # $181.80 in 6 decimals
+    _test(expected_deleverage, usdc_to_endaoment, 100)
+    assert usdc_to_endaoment == endaoment_received
+
+    # Verify debt reduction
+    post_debt = credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount
+    debt_reduced = pre_debt - post_debt
+    expected_debt_reduction = 181_80 * EIGHTEEN_DECIMALS // 100  # $181.80 debt reduced
+    _test(expected_debt_reduction, debt_reduced, 100)
+
+    # After deleverage, user still needs to actually withdraw
+    # Total USDC removed from position = $181.80 (deleverage) + $200 (withdrawal) = $381.80
+    # This demonstrates a more reasonable capital requirement for recursive leverage
+
+
+def test_recursive_usdc_leverage_large_withdrawal(
+    deleverage,
+    teller,
+    credit_engine,
+    simple_erc20_vault,
+    endaoment,
+    bob,
+    charlie_token,  # USDC
+    charlie_token_whale,
+    performDeposit,
+    setup_priority_configs,
+    _test,
+):
+    """
+    Test large withdrawal in recursive USDC leverage.
+    Verifies the formula works correctly even with significant withdrawals.
+    """
+    # Setup: $2000 initial + $1800 leveraged = $3800 total USDC
+    initial_usdc = 2000 * SIX_DECIMALS
+    performDeposit(bob, initial_usdc, charlie_token, charlie_token_whale, simple_erc20_vault)
+
+    # Borrow $1800 GREEN (90% of capacity)
+    borrow_amount = 1800 * EIGHTEEN_DECIMALS
+    teller.borrow(borrow_amount, bob, False, sender=bob)  # False = get GREEN, not sGREEN
+
+    # Re-deposit $1800 USDC
+    leveraged_usdc = 1800 * SIX_DECIMALS
+    performDeposit(bob, leveraged_usdc, charlie_token, charlie_token_whale, simple_erc20_vault)
+
+    setup_priority_configs([], [(simple_erc20_vault, charlie_token)])
+
+    # Pre-state
+    pre_debt = 1800 * EIGHTEEN_DECIMALS
+    pre_capacity = 3800 * EIGHTEEN_DECIMALS * 90 // 100  # $3420
+    pre_usdc = simple_erc20_vault.getTotalAmountForUser(bob, charlie_token)
+
+    # Large withdrawal: 1000 USDC (26% of total collateral)
+    withdraw_amount = 1000 * SIX_DECIMALS
+
+    # Calculate expected deleverage
+    # Lost capacity = $1000 * 90% = $900
+    # Denominator = $3420 - ($1800 * 0.90) = $3420 - $1620 = $1800
+    # Required = ($1800 * $900) / $1800 = $900
+    # With 1% buffer: $900 * 1.01 = $909
+
+    result = deleverage.deleverageForWithdrawal(
+        bob, 3, charlie_token, withdraw_amount, sender=teller.address
+    )
+    assert result == True
+
+    # Verify deleverage amount
+    post_usdc = simple_erc20_vault.getTotalAmountForUser(bob, charlie_token)
+    usdc_deleveraged = pre_usdc - post_usdc
+
+    expected_deleverage = 909 * SIX_DECIMALS  # $909 in 6 decimals
+    _test(expected_deleverage, usdc_deleveraged, 100)
+
+    # Verify debt reduction
+    post_debt = credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount
+    debt_reduced = pre_debt - post_debt
+    expected_debt_reduction = 909 * EIGHTEEN_DECIMALS  # $909 debt reduced
+    _test(expected_debt_reduction, debt_reduced, 100)
+
+    # Total USDC needed: $1000 (withdrawal) + $909 (deleverage) = $1909
+    # This shows ~1.9x capital requirement for withdrawals in recursive leverage
+
+
+def test_recursive_usdc_leverage_high_utilization(
+    deleverage,
+    teller,
+    credit_engine,
+    simple_erc20_vault,
+    bob,
+    charlie_token,  # USDC
+    charlie_token_whale,
+    performDeposit,
+    setup_priority_configs,
+    _test,
+):
+    """
+    Test recursive USDC leverage with very high utilization.
+    Verifies the formula handles edge cases where denominator is small.
+    """
+    # Setup with maximum safe borrowing (just below 90% utilization)
+    initial_usdc = 1000 * SIX_DECIMALS
+    performDeposit(bob, initial_usdc, charlie_token, charlie_token_whale, simple_erc20_vault)
+
+    # Borrow $899 GREEN (99.9% of $900 capacity)
+    borrow_amount = 899 * EIGHTEEN_DECIMALS
+    teller.borrow(borrow_amount, bob, False, sender=bob)  # False = get GREEN, not sGREEN
+
+    # Re-deposit $899 USDC
+    leveraged_usdc = 899 * SIX_DECIMALS
+    performDeposit(bob, leveraged_usdc, charlie_token, charlie_token_whale, simple_erc20_vault)
+
+    setup_priority_configs([], [(simple_erc20_vault, charlie_token)])
+
+    # State: $1899 USDC total, $899 debt, $1709.10 capacity
+    # Utilization = $899 / $1709.10 = 52.6%
+
+    pre_debt = credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount
+    pre_capacity = credit_engine.getUserBorrowTerms(bob, False).totalMaxDebt
+
+    # Small withdrawal that tests formula with high utilization
+    withdraw_amount = 50 * SIX_DECIMALS
+
+    # Calculate expected deleverage
+    # Lost capacity = $50 * 90% = $45
+    # Denominator = $1709.10 - ($899 * 0.90) = $1709.10 - $809.10 = $900
+    # Required = ($899 * $45) / $900 = $44.95
+    # With 1% buffer: $44.95 * 1.01 = $45.40
+
+    result = deleverage.deleverageForWithdrawal(
+        bob, 3, charlie_token, withdraw_amount, sender=teller.address
+    )
+    assert result == True
+
+    # Verify debt reduction
+    post_debt = credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount
+    debt_reduced = pre_debt - post_debt
+
+    expected_reduction = 45_40 * EIGHTEEN_DECIMALS // 100  # $45.40 debt reduced
+    _test(expected_reduction, debt_reduced, 100)
+
+
+def test_recursive_usdc_leverage_complete_cycle(
+    deleverage,
+    teller,
+    credit_engine,
+    simple_erc20_vault,
+    endaoment,
+    bob,
+    charlie_token,  # USDC
+    charlie_token_whale,
+    performDeposit,
+    setup_priority_configs,
+    _test,
+):
+    """
+    Test complete recursive leverage cycle with multiple loops and withdrawal.
+    This simulates a realistic recursive leverage scenario with 3 loops.
+    """
+    # Loop 1: Initial deposit $1000 USDC
+    deposit1 = 1000 * SIX_DECIMALS
+    performDeposit(bob, deposit1, charlie_token, charlie_token_whale, simple_erc20_vault)
+
+    # Borrow $900 GREEN (90% of capacity)
+    borrow1 = 900 * EIGHTEEN_DECIMALS
+    teller.borrow(borrow1, bob, False, sender=bob)  # False = get GREEN, not sGREEN
+
+    # Loop 2: Re-deposit $900 USDC (from swap)
+    deposit2 = 900 * SIX_DECIMALS
+    performDeposit(bob, deposit2, charlie_token, charlie_token_whale, simple_erc20_vault)
+
+    # Borrow additional $810 GREEN (90% of new $900 capacity)
+    borrow2 = 810 * EIGHTEEN_DECIMALS
+    teller.borrow(borrow2, bob, False, sender=bob)  # False = get GREEN, not sGREEN
+
+    # Loop 3: Re-deposit $810 USDC (from swap)
+    deposit3 = 810 * SIX_DECIMALS
+    performDeposit(bob, deposit3, charlie_token, charlie_token_whale, simple_erc20_vault)
+
+    setup_priority_configs([], [(simple_erc20_vault, charlie_token)])
+
+    # Final state after 3 loops:
+    # Total USDC: $1000 + $900 + $810 = $2710
+    # Total debt: $900 + $810 = $1710
+    # Total capacity: $2710 * 90% = $2439
+    # Utilization: $1710 / $2439 = 70.1%
+
+    total_usdc = simple_erc20_vault.getTotalAmountForUser(bob, charlie_token)
+    assert total_usdc == 2710 * SIX_DECIMALS, f"Should have $2710 USDC: {total_usdc}"
+
+    total_debt = credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount
+    assert total_debt == 1710 * EIGHTEEN_DECIMALS, f"Should have $1710 debt: {total_debt}"
+
+    total_capacity = credit_engine.getUserBorrowTerms(bob, False).totalMaxDebt
+    expected_capacity = 2439 * EIGHTEEN_DECIMALS
+    _test(expected_capacity, total_capacity, 100)
+
+    # Pre-withdrawal state
+    pre_endaoment = charlie_token.balanceOf(endaoment)
+
+    # Withdraw 300 USDC (11% of total collateral)
+    withdraw_amount = 300 * SIX_DECIMALS
+
+    # Calculate expected deleverage
+    # Lost capacity = $300 * 90% = $270
+    # Denominator = $2439 - ($1710 * 0.90) = $2439 - $1539 = $900
+    # Required = ($1710 * $270) / $900 = $513
+    # With 1% buffer: $513 * 1.01 = $518.13
+
+    result = deleverage.deleverageForWithdrawal(
+        bob, 3, charlie_token, withdraw_amount, sender=teller.address
+    )
+    assert result == True, "Deleverage should succeed"
+
+    # Verify USDC transferred to Endaoment
+    post_usdc = simple_erc20_vault.getTotalAmountForUser(bob, charlie_token)
+    post_endaoment = charlie_token.balanceOf(endaoment)
+
+    usdc_deleveraged = (total_usdc - post_usdc)
+    endaoment_received = (post_endaoment - pre_endaoment)
+
+    expected_deleverage = 518_13 * SIX_DECIMALS // 100  # $518.13 in 6 decimals
+    _test(expected_deleverage, usdc_deleveraged, 100)
+    assert usdc_deleveraged == endaoment_received
+
+    # Verify debt reduction
+    post_debt = credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount
+    debt_reduced = total_debt - post_debt
+    expected_debt_reduction = 518_13 * EIGHTEEN_DECIMALS // 100  # $518.13 debt reduced
+    _test(expected_debt_reduction, debt_reduced, 100)
+
+    # Summary: To withdraw $300 USDC from recursive position:
+    # - $518.13 USDC sent to Endaoment (deleverage)
+    # - $300 USDC withdrawn to user
+    # - Total USDC removed: $818.13 (2.73x the withdrawal amount)
+    # This demonstrates more reasonable capital efficiency after the fix
+
+    # Verify event
+    events = filter_logs(deleverage, "EndaomentTransferDuringDeleverage")
+    assert len(events) == 1
+    assert events[0].user == bob
+    assert events[0].asset == charlie_token.address
