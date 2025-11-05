@@ -23,8 +23,9 @@ from ethereum.ercs import IERC20
 interface MissionControl:
     def userDelegation(_user: address, _caller: address) -> cs.ActionDelegation: view
     def getAssetLiqConfig(_asset: address) -> AssetLiqConfig: view
-    def getGenLiqConfig() -> GenLiqConfig: view
+    def getFirstVaultIdForAsset(_asset: address) -> uint256: view
     def getDebtTerms(_asset: address) -> cs.DebtTerms: view
+    def getGenLiqConfig() -> GenLiqConfig: view
     def underscoreRegistry() -> address: view
 
 interface CreditEngine:
@@ -613,8 +614,12 @@ def deleverageForWithdrawal(_user: address, _vaultId: uint256, _asset: address, 
     if userDebt.amount == 0:
         return False
 
+    vaultId: uint256 = _vaultId
+    if _vaultId == 0:
+        vaultId = staticcall MissionControl(a.missionControl).getFirstVaultIdForAsset(_asset)
+
     # asset information
-    vaultAddr: address = staticcall Registry(a.vaultBook).getAddr(_vaultId)
+    vaultAddr: address = staticcall Registry(a.vaultBook).getAddr(vaultId)
     userBalance: uint256 = staticcall Vault(vaultAddr).getTotalAmountForUser(_user, _asset)
     userUsdValue: uint256 = staticcall PriceDesk(a.priceDesk).getUsdValue(_asset, userBalance, True)
 
