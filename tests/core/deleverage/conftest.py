@@ -2,6 +2,7 @@
 Fixtures and helper functions for Deleverage.vy tests
 """
 import pytest
+import boa
 from constants import EIGHTEEN_DECIMALS
 from conf_utils import filter_logs
 
@@ -70,3 +71,25 @@ def setup_priority_configs(
         return stab_id
 
     return setup_priority_configs
+
+
+@pytest.fixture
+def deploy_deleverage(ripe_hq):
+    """
+    Deploy a fresh Deleverage contract.
+    Used to work around titanoboa's transient storage bug by getting clean storage.
+    """
+    def deploy():
+        # Load and deploy fresh Deleverage contract
+        with open("contracts/core/Deleverage.vy", "r") as f:
+            source_code = f.read()
+
+        # Deploy with same constructor arg as original
+        fresh_deleverage = boa.loads(
+            source_code,
+            ripe_hq.address  # Only needs RipeHq address
+        )
+
+        return fresh_deleverage
+
+    return deploy

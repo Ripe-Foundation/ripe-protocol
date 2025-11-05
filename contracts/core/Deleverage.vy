@@ -25,6 +25,7 @@ interface MissionControl:
     def getAssetLiqConfig(_asset: address) -> AssetLiqConfig: view
     def getGenLiqConfig() -> GenLiqConfig: view
     def getDebtTerms(_asset: address) -> cs.DebtTerms: view
+    def underscoreRegistry() -> address: view
 
 interface CreditEngine:
     def repayFromDept(_user: address, _userDebt: UserDebt, _repayValue: uint256, _newInterest: uint256, _numUserVaults: uint256, _a: addys.Addys = empty(addys.Addys)) -> bool: nonpayable
@@ -40,11 +41,15 @@ interface PriceDesk:
     def getAssetAmount(_asset: address, _usdValue: uint256, _shouldRaise: bool = False) -> uint256: view
     def getUsdValue(_asset: address, _amount: uint256, _shouldRaise: bool = False) -> uint256: view
 
+interface Registry:
+    def getAddr(_vaultId: uint256) -> address: view
+    def isValidAddr(_addr: address) -> bool: view
+
 interface AuctionHouse:
     def withdrawTokensFromVault(_user: address, _asset: address, _amount: uint256, _recipient: address, _vaultAddr: address, _a: addys.Addys) -> (uint256, bool): nonpayable
 
-interface VaultBook:
-    def getAddr(_vaultId: uint256) -> address: view
+interface VaultRegistry:
+    def isEarnVault(_vaultAddr: address) -> bool: view
 
 interface GreenToken:
     def burn(_amount: uint256) -> bool: nonpayable
@@ -120,6 +125,8 @@ assetLiqConfig: transient(HashMap[address, AssetLiqConfig]) # asset -> config
 didHandleAsset: transient(HashMap[address, HashMap[uint256, HashMap[address, bool]]]) # user -> vaultId -> asset -> did handle
 didHandleVaultId: transient(HashMap[address, HashMap[uint256, bool]]) # user -> vaultId -> did handle
 
+UNDERSCORE_LEGOBOOK_ID: constant(uint256) = 3
+UNDERSCORE_VAULT_REGISTRY_ID: constant(uint256) = 10
 HUNDRED_PERCENT: constant(uint256) = 100_00 # 100.00%
 ONE_PERCENT: constant(uint256) = 1_00 # 1.00%
 PRIORITY_LIQ_VAULT_DATA: constant(uint256) = 20
@@ -541,7 +548,7 @@ def _getDeleverageInfo(_user: address, _a: addys.Addys) -> (uint256, uint256):
     # iterate through user vaults
     for i: uint256 in range(1, numUserVaults, bound=max_value(uint256)):
         vaultId: uint256 = staticcall Ledger(_a.ledger).userVaults(_user, i)
-        vaultAddr: address = staticcall VaultBook(_a.vaultBook).getAddr(vaultId)
+        vaultAddr: address = staticcall Registry(_a.vaultBook).getAddr(vaultId)
         if vaultAddr == empty(address):
             continue
 
@@ -553,9 +560,14 @@ def _getDeleverageInfo(_user: address, _a: addys.Addys) -> (uint256, uint256):
         # iterate through assets
         for y: uint256 in range(1, numUserAssets, bound=max_value(uint256)):
             asset: address = empty(address)
-            amount: uint256 = 0
-            asset, amount = staticcall Vault(vaultAddr).getUserAssetAndAmountAtIndex(_user, y)
-            if asset == empty(address) or amount == 0:
+            hasBalance: bool = False
+            asset, hasBalance = staticcall Vault(vaultAddr).getUserAssetAtIndexAndHasBalance(_user, y)
+            if asset == empty(address) or not hasBalance:
+                continue
+
+            # get actual amount from vault
+            amount: uint256 = staticcall Vault(vaultAddr).getTotalAmountForUser(_user, asset)
+            if amount == 0:
                 continue
 
             # check if asset is deleveragable
@@ -587,9 +599,11 @@ def _getDeleverageInfo(_user: address, _a: addys.Addys) -> (uint256, uint256):
 
 @external
 def deleverageForWithdrawal(_user: address, _vaultId: uint256, _asset: address, _amount: uint256) -> bool:
-    assert addys._isValidRipeAddr(msg.sender) # dev: no perms
     assert not deptBasics.isPaused # dev: contract paused
     a: addys.Addys = addys._getAddys()
+
+    if not addys._isValidRipeAddr(msg.sender):
+        assert self._isUnderscoreAddr(msg.sender, a.missionControl) # dev: no perms
 
     # get current user state
     userDebt: UserDebt = empty(UserDebt)
@@ -600,7 +614,7 @@ def deleverageForWithdrawal(_user: address, _vaultId: uint256, _asset: address, 
         return False
 
     # asset information
-    vaultAddr: address = staticcall VaultBook(a.vaultBook).getAddr(_vaultId)
+    vaultAddr: address = staticcall Registry(a.vaultBook).getAddr(_vaultId)
     userBalance: uint256 = staticcall Vault(vaultAddr).getTotalAmountForUser(_user, _asset)
     userUsdValue: uint256 = staticcall PriceDesk(a.priceDesk).getUsdValue(_asset, userBalance, True)
 
@@ -634,26 +648,48 @@ def deleverageForWithdrawal(_user: address, _vaultId: uint256, _asset: address, 
         return False # edge case: capacity exactly equals debt × effectiveLtv
 
     requiredRepayment: uint256 = numerator // denominator
-
-    # cap at max deleveragable amount
-    if requiredRepayment > maxDeleveragable:
-        requiredRepayment = maxDeleveragable
+    if requiredRepayment == 0:
+        return False
 
     # apply 1% buffer to be more conservative
     requiredRepayment = requiredRepayment * (HUNDRED_PERCENT + ONE_PERCENT) // HUNDRED_PERCENT
 
-    # final cap at total debt
-    if requiredRepayment > userDebt.amount:
-        requiredRepayment = userDebt.amount
+    # cap at max deleveragable amount
+    requiredRepayment = min(maxDeleveragable, requiredRepayment)
 
-    # don't proceed if calculated repayment is 0 (edge case with very small amounts)
-    if requiredRepayment == 0:
-        return False
+    # final cap at total debt
+    requiredRepayment = min(userDebt.amount, requiredRepayment)
 
     # execute deleveraging
     config: GenLiqConfig = staticcall MissionControl(a.missionControl).getGenLiqConfig()
     repaidAmount: uint256 = self._deleverageUser(_user, _user, requiredRepayment, config, a)
     return repaidAmount != 0
+
+
+# underscore address
+
+
+@view
+@internal
+def _isUnderscoreAddr(_addr: address, _mc: address) -> bool:
+    underscore: address = staticcall MissionControl(_mc).underscoreRegistry()
+    if underscore == empty(address):
+        return False
+
+    # check if underscore vault
+    vaultRegistry: address = staticcall Registry(underscore).getAddr(UNDERSCORE_VAULT_REGISTRY_ID)
+    if vaultRegistry == empty(address):
+        return False
+
+    if staticcall VaultRegistry(vaultRegistry).isEarnVault(_addr):
+        return True
+
+    # check if underscore lego
+    undyLegoBook: address = staticcall Registry(underscore).getAddr(UNDERSCORE_LEGOBOOK_ID)
+    if undyLegoBook == empty(address):
+        return False
+    
+    return staticcall Registry(undyLegoBook).isValidAddr(_addr)
 
 
 # cache tools
@@ -674,4 +710,4 @@ def _getVaultAddr(_vaultId: uint256, _vaultBook: address) -> (address, bool):
     vaultAddr: address = self.vaultAddrs[_vaultId]
     if vaultAddr != empty(address):
         return vaultAddr, True
-    return staticcall VaultBook(_vaultBook).getAddr(_vaultId), False
+    return staticcall Registry(_vaultBook).getAddr(_vaultId), False
