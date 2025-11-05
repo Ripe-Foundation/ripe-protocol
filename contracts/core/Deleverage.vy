@@ -603,8 +603,8 @@ def deleverageForWithdrawal(_user: address, _vaultId: uint256, _asset: address, 
     assert not deptBasics.isPaused # dev: contract paused
     a: addys.Addys = addys._getAddys()
 
-    if not addys._isValidRipeAddr(msg.sender):
-        assert self._isUnderscoreAddr(msg.sender, a.missionControl) # dev: no perms
+    if not self._isUnderscoreAddr(msg.sender, a.missionControl):
+        assert addys._isValidRipeAddr(msg.sender) # dev: no perms
 
     # get current user state
     userDebt: UserDebt = empty(UserDebt)
