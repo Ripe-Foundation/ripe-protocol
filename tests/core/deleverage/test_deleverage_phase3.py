@@ -148,7 +148,7 @@ def test_phase3_only_no_priority_assets(
     initial_endaoment_alpha = alpha_token.balanceOf(endaoment)
 
     # Execute deleverage - should use Phase 3 for everything
-    repaid_amount = deleverage.deleverageUser(bob, bob, 0, sender=teller.address)
+    repaid_amount = deleverage.deleverageUser(bob, 0, sender=teller.address)
 
     # Check events - should have transfers from Phase 3 only
     events = filter_logs(deleverage, "EndaomentTransferDuringDeleverage")
@@ -207,7 +207,7 @@ def test_phase3_fallback_after_phase1_partial(
 
     # Execute deleverage
     initial_debt = credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount
-    repaid_amount = deleverage.deleverageUser(bob, bob, 0, sender=teller.address)
+    repaid_amount = deleverage.deleverageUser(bob, 0, sender=teller.address)
 
     # Check events - should have both burn and transfer events
     burn_events = filter_logs(deleverage, "StabAssetBurntDuringDeleverage")
@@ -278,7 +278,7 @@ def test_phase3_fallback_after_phase2_partial(
 
     # Execute deleverage
     initial_debt = credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount
-    repaid_amount = deleverage.deleverageUser(bob, bob, 0, sender=teller.address)
+    repaid_amount = deleverage.deleverageUser(bob, 0, sender=teller.address)
 
     # Check events
     events = filter_logs(deleverage, "EndaomentTransferDuringDeleverage")
@@ -347,7 +347,7 @@ def test_phase3_multiple_vaults_iteration(
 
     # Execute deleverage
     initial_debt = credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount
-    repaid_amount = deleverage.deleverageUser(bob, bob, 0, sender=teller.address)
+    repaid_amount = deleverage.deleverageUser(bob, 0, sender=teller.address)
 
     # Check events
     events = filter_logs(deleverage, "EndaomentTransferDuringDeleverage")
@@ -406,7 +406,7 @@ def test_phase3_multiple_assets_within_vault(
     teller.borrow(100 * EIGHTEEN_DECIMALS, bob, False, sender=bob)  # Total debt = 200
 
     # Execute deleverage
-    repaid_amount = deleverage.deleverageUser(bob, bob, 0, sender=teller.address)
+    repaid_amount = deleverage.deleverageUser(bob, 0, sender=teller.address)
 
     # Check events
     events = filter_logs(deleverage, "EndaomentTransferDuringDeleverage")
@@ -467,7 +467,7 @@ def test_phase3_cross_phase_deduplication(
     )
 
     # Execute deleverage
-    repaid_amount = deleverage.deleverageUser(bob, bob, 0, sender=teller.address)
+    repaid_amount = deleverage.deleverageUser(bob, 0, sender=teller.address)
 
     # Check events
     events = filter_logs(deleverage, "EndaomentTransferDuringDeleverage")
@@ -519,7 +519,7 @@ def test_phase3_multiple_vaults_same_asset(
 
     # Execute deleverage
     initial_debt = credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount
-    repaid_amount = deleverage.deleverageUser(bob, bob, 0, sender=teller.address)
+    repaid_amount = deleverage.deleverageUser(bob, 0, sender=teller.address)
 
     # Check events
     events = filter_logs(deleverage, "EndaomentTransferDuringDeleverage")
@@ -575,7 +575,7 @@ def test_phase3_all_assets_depleted_partial_repay(
 
     # Execute deleverage requesting to repay MORE than available collateral
     # This will deplete all assets but not fully repay if we request full debt
-    repaid_amount = deleverage.deleverageUser(bob, bob, 0, sender=teller.address)
+    repaid_amount = deleverage.deleverageUser(bob, 0, sender=teller.address)
 
     # Check events
     events = filter_logs(deleverage, "EndaomentTransferDuringDeleverage")
@@ -625,7 +625,7 @@ def test_phase3_exact_debt_match(
     teller.borrow(200 * EIGHTEEN_DECIMALS, bob, False, sender=bob)
 
     # Execute deleverage
-    repaid_amount = deleverage.deleverageUser(bob, bob, 0, sender=teller.address)
+    repaid_amount = deleverage.deleverageUser(bob, 0, sender=teller.address)
 
     # Check events
     events = filter_logs(deleverage, "EndaomentTransferDuringDeleverage")
@@ -698,7 +698,7 @@ def test_all_three_phases_sequential(
     teller.borrow(200 * EIGHTEEN_DECIMALS, bob, False, sender=bob)  # Total debt = 400
 
     # Execute deleverage
-    repaid_amount = deleverage.deleverageUser(bob, bob, 0, sender=teller.address)
+    repaid_amount = deleverage.deleverageUser(bob, 0, sender=teller.address)
 
     # Check events
     burn_events = filter_logs(deleverage, "StabAssetBurntDuringDeleverage")
@@ -762,7 +762,7 @@ def test_phase3_burns_green_sgreen(
     initial_endaoment_sgreen = savings_green.balanceOf(endaoment)
 
     # Execute deleverage
-    repaid_amount = deleverage.deleverageUser(bob, bob, 0, sender=teller.address)
+    repaid_amount = deleverage.deleverageUser(bob, 0, sender=teller.address)
 
     # Check events - should have transfers (alpha) and potentially burns (green/sgreen)
     burn_events = filter_logs(deleverage, "StabAssetBurntDuringDeleverage")
@@ -814,7 +814,7 @@ def test_phase3_target_repay_respected(
 
     # Execute deleverage with target amount (half of debt)
     target_repay = initial_debt // 2
-    repaid_amount = deleverage.deleverageUser(bob, bob, target_repay, sender=teller.address)
+    repaid_amount = deleverage.deleverageUser(bob, target_repay, sender=teller.address)
 
     # Check final debt
     final_debt = credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount
@@ -882,7 +882,7 @@ def test_target_repay_spans_all_phases(
 
     # Execute with target that spans all phases (half of debt)
     target_repay = initial_debt // 2
-    repaid_amount = deleverage.deleverageUser(bob, bob, target_repay, sender=teller.address)
+    repaid_amount = deleverage.deleverageUser(bob, target_repay, sender=teller.address)
 
     # Check events
     burn_events = filter_logs(deleverage, "StabAssetBurntDuringDeleverage")
@@ -908,7 +908,7 @@ def test_phase3_user_no_vaults(
     """
     # Try to deleverage alice (who has no positions) - should revert
     with boa.reverts("cannot deleverage"):
-        deleverage.deleverageUser(alice, alice, 0, sender=teller.address)
+        deleverage.deleverageUser(alice, 0, sender=teller.address)
 
 
 def test_phase3_mixed_decimal_accounting(
@@ -951,7 +951,7 @@ def test_phase3_mixed_decimal_accounting(
     initial_debt = credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount
 
     # Execute deleverage
-    repaid_amount = deleverage.deleverageUser(bob, bob, 0, sender=teller.address)
+    repaid_amount = deleverage.deleverageUser(bob, 0, sender=teller.address)
 
     # Check events
     events = filter_logs(deleverage, "EndaomentTransferDuringDeleverage")

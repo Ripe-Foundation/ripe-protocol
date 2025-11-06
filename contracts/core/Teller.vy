@@ -94,6 +94,9 @@ interface BondRoom:
 interface PriceDesk:
     def addPriceSnapshot(_asset: address) -> bool: nonpayable
 
+interface VaultRegistry:
+    def isEarnVault(_vaultAddr: address) -> bool: view
+
 interface CurvePrices:
     def addGreenRefPoolSnapshot() -> bool: nonpayable
 
@@ -207,6 +210,7 @@ STABILITY_POOL_ID: constant(uint256) = 1
 RIPE_GOV_VAULT_ID: constant(uint256) = 2
 UNDERSCORE_LEDGER_ID: constant(uint256) = 1
 UNDERSCORE_LEGOBOOK_ID: constant(uint256) = 3
+UNDERSCORE_VAULT_REGISTRY_ID: constant(uint256) = 10
 CURVE_PRICES_ID: constant(uint256) = 2
 
 
@@ -830,12 +834,13 @@ def depositIntoGovVault(
 def adjustLock(_asset: address, _newLockDuration: uint256, _user: address = msg.sender):
     assert not deptBasics.isPaused # dev: contract paused
     a: addys.Addys = addys._getAddys()
-    vaultAddr: address = staticcall AddressRegistry(a.vaultBook).getAddr(RIPE_GOV_VAULT_ID)
+    isSwitchboard: bool = addys._isSwitchboardAddr(msg.sender)
 
     # validate underscore wallet
-    if _user != msg.sender:
+    if _user != msg.sender and not isSwitchboard:
         assert self._isUnderscoreAddr(msg.sender, a.missionControl) or self._isUnderscoreWalletOwner(_user, msg.sender, a.missionControl) # dev: no perms
 
+    vaultAddr: address = staticcall AddressRegistry(a.vaultBook).getAddr(RIPE_GOV_VAULT_ID)
     extcall RipeGovVault(vaultAddr).adjustLock(_user, _asset, _newLockDuration, a)
     self._performHousekeeping(False, _user, True, a)
 
@@ -845,12 +850,13 @@ def adjustLock(_asset: address, _newLockDuration: uint256, _user: address = msg.
 def releaseLock(_asset: address, _user: address = msg.sender):
     assert not deptBasics.isPaused # dev: contract paused
     a: addys.Addys = addys._getAddys()
-    vaultAddr: address = staticcall AddressRegistry(a.vaultBook).getAddr(RIPE_GOV_VAULT_ID)
+    isSwitchboard: bool = addys._isSwitchboardAddr(msg.sender)
 
     # validate underscore wallet
-    if _user != msg.sender:
+    if _user != msg.sender and not isSwitchboard:
         assert self._isUnderscoreAddr(msg.sender, a.missionControl) or self._isUnderscoreWalletOwner(_user, msg.sender, a.missionControl) # dev: no perms
 
+    vaultAddr: address = staticcall AddressRegistry(a.vaultBook).getAddr(RIPE_GOV_VAULT_ID)
     extcall RipeGovVault(vaultAddr).releaseLock(_user, _asset, a)
     self._performHousekeeping(False, _user, True, a)
 
@@ -977,7 +983,7 @@ def setUndyLegoAccess(_legoAddr: address) -> bool:
     if _legoAddr == empty(address):
         return False
 
-    if not self._isUnderscoreWallet(msg.sender, mc):
+    if not self._isUnderscoreWallet(msg.sender, mc) and not self._isUnderscoreVault(msg.sender, mc):
         return False
 
     # set config
@@ -1004,7 +1010,8 @@ def _performHousekeeping(
     # one action per block
     shouldCheckLastTouch: bool = False
     if staticcall MissionControl(_a.missionControl).shouldCheckLastTouch():
-        shouldCheckLastTouch = _isHigherRisk and not self._isUnderscoreWallet(_user, _a.missionControl)
+        isUndyCaller: bool = self._isUnderscoreWallet(_user, _a.missionControl) or self._isUnderscoreVault(_user, _a.missionControl)
+        shouldCheckLastTouch = _isHigherRisk and not isUndyCaller
     extcall Ledger(_a.ledger).checkAndUpdateLastTouch(_user, shouldCheckLastTouch)
 
     # update green ref pool snapshot
@@ -1119,6 +1126,22 @@ def _isUnderscoreWallet(_user: address, _mc: address) -> bool:
 
 @view
 @internal
+def _isUnderscoreVault(_user: address, _mc: address) -> bool:
+    underscore: address = staticcall MissionControl(_mc).underscoreRegistry()
+    if underscore == empty(address):
+        return False
+
+    # check if underscore vault
+    vaultRegistry: address = staticcall AddressRegistry(underscore).getAddr(UNDERSCORE_VAULT_REGISTRY_ID)
+    if vaultRegistry == empty(address):
+        return False
+
+    # check if vault is an earn vault
+    return staticcall VaultRegistry(vaultRegistry).isEarnVault(_user)
+
+
+@view
+@internal
 def _isUnderscoreWalletOwner(_user: address, _caller: address, _mc: address) -> bool:
     if not self._isUnderscoreWallet(_user, _mc):
         return False
@@ -1145,10 +1168,10 @@ def _isUnderscoreAddr(_addr: address, _mc: address) -> bool:
     if staticcall AddressRegistry(underscore).isValidAddr(_addr):
         return True
 
+    # check if addr is an underscore lego
     undyLegoBook: address = staticcall AddressRegistry(underscore).getAddr(UNDERSCORE_LEGOBOOK_ID)
     if undyLegoBook == empty(address):
         return False
-
     return staticcall AddressRegistry(undyLegoBook).isValidAddr(_addr)
 
 

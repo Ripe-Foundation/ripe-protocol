@@ -26,6 +26,7 @@ interface MissionControl:
     def getFirstVaultIdForAsset(_asset: address) -> uint256: view
     def getDebtTerms(_asset: address) -> cs.DebtTerms: view
     def getGenLiqConfig() -> GenLiqConfig: view
+    def getLtvPaybackBuffer() -> uint256: view
     def underscoreRegistry() -> address: view
 
 interface CreditEngine:
@@ -150,17 +151,12 @@ def __init__(_ripeHq: address):
 
 
 @external
-def deleverageUser(
-    _user: address,
-    _caller: address,
-    _targetRepayAmount: uint256,
-    _a: addys.Addys = empty(addys.Addys),
-) -> uint256:
-    assert addys._isValidRipeAddr(msg.sender) # dev: no perms
+def deleverageUser(_user: address, _targetRepayAmount: uint256) -> uint256:
     assert not deptBasics.isPaused # dev: contract paused
-    a: addys.Addys = addys._getAddys(_a)
+    a: addys.Addys = addys._getAddys()
     config: GenLiqConfig = staticcall MissionControl(a.missionControl).getGenLiqConfig()
-    repaidAmount: uint256 = self._deleverageUser(_user, _caller, _targetRepayAmount, config, a)
+    isTrusted: bool = addys._isValidRipeAddr(msg.sender) or self._isUnderscoreAddr(msg.sender, a.missionControl)
+    repaidAmount: uint256 = self._deleverageUser(_user, msg.sender, isTrusted, _targetRepayAmount, config, a)
     assert repaidAmount != 0 # dev: cannot deleverage
     return repaidAmount
 
@@ -169,20 +165,16 @@ def deleverageUser(
 
 
 @external
-def deleverageManyUsers(
-    _users: DynArray[DeleverageUserRequest, MAX_DELEVERAGE_USERS],
-    _caller: address,
-    _a: addys.Addys = empty(addys.Addys),
-) -> uint256:
-    assert addys._isValidRipeAddr(msg.sender) # dev: no perms
+def deleverageManyUsers(_users: DynArray[DeleverageUserRequest, MAX_DELEVERAGE_USERS]) -> uint256:
     assert not deptBasics.isPaused # dev: contract paused
-    a: addys.Addys = addys._getAddys(_a)
+    a: addys.Addys = addys._getAddys()
     config: GenLiqConfig = staticcall MissionControl(a.missionControl).getGenLiqConfig()
+    isTrusted: bool = addys._isValidRipeAddr(msg.sender) or self._isUnderscoreAddr(msg.sender, a.missionControl)
 
     totalRepaidAmount: uint256 = 0
     numUsers: uint256 = 0
     for u: DeleverageUserRequest in _users:
-        repaidAmount: uint256 = self._deleverageUser(u.user, _caller, u.targetRepayAmount, config, a)
+        repaidAmount: uint256 = self._deleverageUser(u.user, msg.sender, isTrusted, u.targetRepayAmount, config, a)
         if repaidAmount != 0:
             totalRepaidAmount += repaidAmount
             numUsers += 1
@@ -200,16 +192,17 @@ def deleverageManyUsers(
 def _deleverageUser(
     _user: address,
     _caller: address,
+    _isTrusted: bool,
     _targetRepayAmount: uint256,
     _config: GenLiqConfig,
     _a: addys.Addys,
 ) -> uint256:
+    isTrusted: bool = _isTrusted
 
     # check perms -- must also be able to borrow
-    if _user != _caller:
+    if not isTrusted and _user != _caller:
         delegation: cs.ActionDelegation = staticcall MissionControl(_a.missionControl).userDelegation(_user, _caller)
-        if not delegation.canBorrow:
-            return 0
+        isTrusted = delegation.canBorrow
     
     # get latest user debt
     userDebt: UserDebt = empty(UserDebt)
@@ -223,6 +216,19 @@ def _deleverageUser(
     targetRepayAmount: uint256 = min(_targetRepayAmount, userDebt.amount)
     if targetRepayAmount == 0:
         targetRepayAmount = userDebt.amount # maximum possible
+
+    # have cap when not trusted (treat similar to redemption)
+    if not isTrusted:
+        if not self._canDeleverageUserDebtPosition(userDebt.amount, bt.collateralVal, bt.debtTerms.redemptionThreshold):
+            return 0
+        targetLtv: uint256 = bt.lowestLtv
+        ltvPaybackBuffer: uint256 = staticcall MissionControl(_a.missionControl).getLtvPaybackBuffer()
+        if ltvPaybackBuffer != 0:
+            targetLtv = targetLtv * (HUNDRED_PERCENT - ltvPaybackBuffer) // HUNDRED_PERCENT
+        maxRepayableAmount: uint256 = self._calcAmountToPay(userDebt.amount, bt.collateralVal, targetLtv)
+        if maxRepayableAmount == 0:
+            return 0
+        targetRepayAmount = min(targetRepayAmount, maxRepayableAmount)
 
     # perform deleverage phases
     repaidAmount: uint256 = self._performDeleveragePhases(_user, targetRepayAmount, _config.priorityStabVaults, _config.priorityLiqAssetVaults, _a)
@@ -474,59 +480,9 @@ def _transferToEndaoment(
     return _remainingToRepay - min(collateralUsdValueSent, _remainingToRepay)
 
 
-#############
-# Utilities #
-#############
-
-
-# transfer collateral
-
-
-@internal
-def _transferCollateral(
-    _fromUser: address,
-    _toUser: address,
-    _vaultAddr: address,
-    _asset: address,
-    _targetUsdValue: uint256,
-    _a: addys.Addys,
-) -> (uint256, uint256, bool):
-    maxAssetAmount: uint256 = self._getMaxAssetAmount(_asset, _targetUsdValue, _a.greenToken, _a.savingsGreen, _a.priceDesk)
-    if maxAssetAmount == 0:
-        return 0, 0, False
-
-    # withdraw and transfer to recipient -- AuctionHouse has permissions to perform this
-    amountSent: uint256 = 0
-    isPositionDepleted: bool = False
-    amountSent, isPositionDepleted = extcall AuctionHouse(_a.auctionHouse).withdrawTokensFromVault(_fromUser, _asset, maxAssetAmount, _toUser, _vaultAddr, _a)
-
-    usdValue: uint256 = _targetUsdValue * amountSent // maxAssetAmount
-    return usdValue, amountSent, isPositionDepleted
-
-
-# get asset amount
-
-
-@view
-@internal
-def _getMaxAssetAmount(
-    _asset: address,
-    _targetUsdValue: uint256,
-    _greenToken: address,
-    _savingsGreen: address,
-    _priceDesk: address,
-) -> uint256:
-    amount: uint256 = 0
-    if _asset == _greenToken:
-        amount = _targetUsdValue
-    elif _asset == _savingsGreen:
-        amount = staticcall IERC4626(_savingsGreen).convertToShares(_targetUsdValue)
-    else:
-        amount = staticcall PriceDesk(_priceDesk).getAssetAmount(_asset, _targetUsdValue, True)
-    return amount
-
-
-# get deleverage info
+###################
+# Deleverage Info #
+###################
 
 
 @view
@@ -595,7 +551,9 @@ def _getDeleverageInfo(_user: address, _a: addys.Addys) -> (uint256, uint256):
     return maxDeleveragableUsd, effectiveWeightedLtv
 
 
-# deleverage if needed for withdrawal
+##############################
+# Underscore Leverage Vaults #
+##############################
 
 
 @external
@@ -667,7 +625,7 @@ def deleverageForWithdrawal(_user: address, _vaultId: uint256, _asset: address, 
 
     # execute deleveraging
     config: GenLiqConfig = staticcall MissionControl(a.missionControl).getGenLiqConfig()
-    repaidAmount: uint256 = self._deleverageUser(_user, _user, requiredRepayment, config, a)
+    repaidAmount: uint256 = self._deleverageUser(_user, msg.sender, True, requiredRepayment, config, a)
     return repaidAmount != 0
 
 
@@ -685,7 +643,6 @@ def _isUnderscoreAddr(_addr: address, _mc: address) -> bool:
     vaultRegistry: address = staticcall Registry(underscore).getAddr(UNDERSCORE_VAULT_REGISTRY_ID)
     if vaultRegistry == empty(address):
         return False
-
     if staticcall VaultRegistry(vaultRegistry).isEarnVault(_addr):
         return True
 
@@ -693,8 +650,115 @@ def _isUnderscoreAddr(_addr: address, _mc: address) -> bool:
     undyLegoBook: address = staticcall Registry(underscore).getAddr(UNDERSCORE_LEGOBOOK_ID)
     if undyLegoBook == empty(address):
         return False
-    
     return staticcall Registry(undyLegoBook).isValidAddr(_addr)
+
+
+#############
+# Utilities #
+#############
+
+
+# max deleverage amount
+
+
+@view
+@external
+def getMaxDeleverageAmount(_user: address) -> uint256:
+    a: addys.Addys = addys._getAddys()
+
+    # get latest user debt and terms
+    userDebt: UserDebt = empty(UserDebt)
+    bt: UserBorrowTerms = empty(UserBorrowTerms)
+    na: uint256 = 0
+    userDebt, bt, na = staticcall CreditEngine(a.creditEngine).getLatestUserDebtAndTerms(_user, False, a)
+    if userDebt.amount == 0 or userDebt.inLiquidation or bt.collateralVal == 0:
+        return 0
+
+    if not self._canDeleverageUserDebtPosition(userDebt.amount, bt.collateralVal, bt.debtTerms.redemptionThreshold):
+        return 0
+
+    ltvPaybackBuffer: uint256 = staticcall MissionControl(a.missionControl).getLtvPaybackBuffer()
+
+    # target ltv
+    targetLtv: uint256 = bt.lowestLtv
+    if ltvPaybackBuffer != 0:
+        targetLtv = targetLtv * (HUNDRED_PERCENT - ltvPaybackBuffer) // HUNDRED_PERCENT
+
+    return self._calcAmountToPay(userDebt.amount, bt.collateralVal, targetLtv)
+
+
+@view
+@internal
+def _calcAmountToPay(_debtAmount: uint256, _collateralValue: uint256, _targetLtv: uint256) -> uint256:
+    # goal here is to only reduce the debt necessary to get LTV back to safe position
+    # it will never be perfectly precise because depending on what assets are taken
+    # to ensure maximum protocol solvency, we will target the user's lowest LTV
+    collValueAdjusted: uint256 =_collateralValue * _targetLtv // HUNDRED_PERCENT
+
+    # collateral value too low
+    if _debtAmount <= collValueAdjusted:
+        return _debtAmount
+
+    debtToRepay: uint256 = (_debtAmount - collValueAdjusted) * HUNDRED_PERCENT // (HUNDRED_PERCENT - _targetLtv)
+    return min(debtToRepay, _debtAmount)
+
+
+@view
+@internal
+def _canDeleverageUserDebtPosition(_userDebtAmount: uint256, _collateralVal: uint256, _redemptionThreshold: uint256) -> bool:
+    if _redemptionThreshold == 0:
+        return False
+    
+    # check if collateral value is below (or equal) to redemption threshold
+    redemptionThreshold: uint256 = _userDebtAmount * HUNDRED_PERCENT // _redemptionThreshold
+    return _collateralVal <= redemptionThreshold
+
+
+# transfer collateral
+
+
+@internal
+def _transferCollateral(
+    _fromUser: address,
+    _toUser: address,
+    _vaultAddr: address,
+    _asset: address,
+    _targetUsdValue: uint256,
+    _a: addys.Addys,
+) -> (uint256, uint256, bool):
+    maxAssetAmount: uint256 = self._getMaxAssetAmount(_asset, _targetUsdValue, _a.greenToken, _a.savingsGreen, _a.priceDesk)
+    if maxAssetAmount == 0:
+        return 0, 0, False
+
+    # withdraw and transfer to recipient -- AuctionHouse has permissions to perform this
+    amountSent: uint256 = 0
+    isPositionDepleted: bool = False
+    amountSent, isPositionDepleted = extcall AuctionHouse(_a.auctionHouse).withdrawTokensFromVault(_fromUser, _asset, maxAssetAmount, _toUser, _vaultAddr, _a)
+
+    usdValue: uint256 = _targetUsdValue * amountSent // maxAssetAmount
+    return usdValue, amountSent, isPositionDepleted
+
+
+# get asset amount
+
+
+@view
+@internal
+def _getMaxAssetAmount(
+    _asset: address,
+    _targetUsdValue: uint256,
+    _greenToken: address,
+    _savingsGreen: address,
+    _priceDesk: address,
+) -> uint256:
+    amount: uint256 = 0
+    if _asset == _greenToken:
+        amount = _targetUsdValue
+    elif _asset == _savingsGreen:
+        amount = staticcall IERC4626(_savingsGreen).convertToShares(_targetUsdValue)
+    else:
+        amount = staticcall PriceDesk(_priceDesk).getAssetAmount(_asset, _targetUsdValue, True)
+    return amount
 
 
 # cache tools

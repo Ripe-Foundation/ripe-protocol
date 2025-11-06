@@ -138,7 +138,7 @@ def test_basic_endaoment_transfer(
     assert pre_user_balance >= pre_debt, "User should have sufficient collateral"
 
     # Deleverage
-    repaid_amount = deleverage.deleverageUser(bob, bob, 0, sender=teller.address)
+    repaid_amount = deleverage.deleverageUser(bob, 0, sender=teller.address)
 
     # Get events immediately
     transfer_log = filter_logs(deleverage, "EndaomentTransferDuringDeleverage")[0]
@@ -170,7 +170,7 @@ def test_basic_endaoment_transfer(
 
     # Verify DeleverageUser event
     assert deleverage_log.user == bob
-    assert deleverage_log.caller == bob
+    assert deleverage_log.caller == teller.address  # caller is now msg.sender
     assert deleverage_log.targetRepayAmount == pre_debt
     _test(deleverage_log.repaidAmount, repaid_amount)
     assert deleverage_log.hasGoodDebtHealth == True
@@ -230,7 +230,7 @@ def test_multiple_assets_priority_order(
     pre_bravo_balance = simple_erc20_vault.getTotalAmountForUser(bob, bravo_token)
 
     # Deleverage
-    repaid_amount = deleverage.deleverageUser(bob, bob, 0, sender=teller.address)
+    repaid_amount = deleverage.deleverageUser(bob, 0, sender=teller.address)
 
     # Get events
     transfer_logs = filter_logs(deleverage, "EndaomentTransferDuringDeleverage")
@@ -309,7 +309,7 @@ def test_multiple_assets_first_sufficient(
     pre_bravo_balance = simple_erc20_vault.getTotalAmountForUser(bob, bravo_token)
 
     # Deleverage
-    repaid_amount = deleverage.deleverageUser(bob, bob, 0, sender=teller.address)
+    repaid_amount = deleverage.deleverageUser(bob, 0, sender=teller.address)
 
     # Get events
     transfer_logs = filter_logs(deleverage, "EndaomentTransferDuringDeleverage")
@@ -387,7 +387,7 @@ def test_multiple_assets_both_needed(
     total_collateral = pre_alpha_balance + pre_bravo_balance
 
     # Deleverage
-    repaid_amount = deleverage.deleverageUser(bob, bob, 0, sender=teller.address)
+    repaid_amount = deleverage.deleverageUser(bob, 0, sender=teller.address)
 
     # Get events
     transfer_logs = filter_logs(deleverage, "EndaomentTransferDuringDeleverage")
@@ -458,7 +458,7 @@ def test_no_balance_in_priority_asset(
     pre_bravo_balance = simple_erc20_vault.getTotalAmountForUser(bob, bravo_token)
 
     # Deleverage
-    repaid_amount = deleverage.deleverageUser(bob, bob, 0, sender=teller.address)
+    repaid_amount = deleverage.deleverageUser(bob, 0, sender=teller.address)
 
     # Get events
     transfer_logs = filter_logs(deleverage, "EndaomentTransferDuringDeleverage")
@@ -506,7 +506,7 @@ def test_empty_priority_list(
     )
 
     # Deleverage (will fall through to Phase 3)
-    repaid_amount = deleverage.deleverageUser(bob, bob, 0, sender=teller.address)
+    repaid_amount = deleverage.deleverageUser(bob, 0, sender=teller.address)
 
     # Phase 2 skipped - but Phase 3 should still handle it
     assert repaid_amount > 0, "Should still deleverage via Phase 3"
@@ -553,7 +553,7 @@ def test_target_repay_amount(
     target_repay = 200 * EIGHTEEN_DECIMALS
 
     # Deleverage with target
-    repaid_amount = deleverage.deleverageUser(bob, bob, target_repay, sender=teller.address)
+    repaid_amount = deleverage.deleverageUser(bob, target_repay, sender=teller.address)
 
     # Get events
     transfer_log = filter_logs(deleverage, "EndaomentTransferDuringDeleverage")[0]
@@ -619,7 +619,7 @@ def test_vault_balance_changes(
     pre_endaoment_token_balance = alpha_token.balanceOf(endaoment)
 
     # Deleverage
-    deleverage.deleverageUser(bob, bob, 0, sender=teller.address)
+    deleverage.deleverageUser(bob, 0, sender=teller.address)
 
     # Post-state
     post_user_vault_balance = simple_erc20_vault.getTotalAmountForUser(bob, alpha_token)
@@ -691,7 +691,7 @@ def test_balance_changes_multiple_assets_all_depleted(
     pre_bravo_endaoment = bravo_token.balanceOf(endaoment)
 
     # Deleverage
-    deleverage.deleverageUser(bob, bob, 0, sender=teller.address)
+    deleverage.deleverageUser(bob, 0, sender=teller.address)
 
     # Post-state
     post_alpha_vault = simple_erc20_vault.getTotalAmountForUser(bob, alpha_token)
@@ -789,7 +789,7 @@ def test_balance_changes_multiple_assets_partial(
     pre_charlie_endaoment = charlie_token.balanceOf(endaoment)
 
     # Deleverage
-    deleverage.deleverageUser(bob, bob, 0, sender=teller.address)
+    deleverage.deleverageUser(bob, 0, sender=teller.address)
 
     # Post-state
     post_alpha_vault = simple_erc20_vault.getTotalAmountForUser(bob, alpha_token)
@@ -901,7 +901,7 @@ def test_balance_changes_different_decimals(
     pre_delta_endaoment = delta_token.balanceOf(endaoment)
 
     # Deleverage
-    deleverage.deleverageUser(bob, bob, 0, sender=teller.address)
+    deleverage.deleverageUser(bob, 0, sender=teller.address)
 
     # Post-state
     post_alpha_vault = simple_erc20_vault.getTotalAmountForUser(bob, alpha_token)
@@ -996,7 +996,7 @@ def test_balance_changes_with_target_amount(
 
     # Deleverage with target
     target_repay = 300 * EIGHTEEN_DECIMALS
-    deleverage.deleverageUser(bob, bob, target_repay, sender=teller.address)
+    deleverage.deleverageUser(bob, target_repay, sender=teller.address)
 
     # Post-state
     post_alpha_vault = simple_erc20_vault.getTotalAmountForUser(bob, alpha_token)
@@ -1091,7 +1091,7 @@ def test_balance_changes_skip_empty_asset(
     assert pre_alpha_vault == 0, "Alpha should be empty"
 
     # Deleverage
-    deleverage.deleverageUser(bob, bob, 0, sender=teller.address)
+    deleverage.deleverageUser(bob, 0, sender=teller.address)
 
     # Post-state
     post_alpha_vault = simple_erc20_vault.getTotalAmountForUser(bob, alpha_token)
@@ -1204,7 +1204,7 @@ def test_four_assets_priority(
     pre_debt = credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount
 
     # Deleverage
-    repaid_amount = deleverage.deleverageUser(bob, bob, 0, sender=teller.address)
+    repaid_amount = deleverage.deleverageUser(bob, 0, sender=teller.address)
 
     # Get events
     transfer_logs = filter_logs(deleverage, "EndaomentTransferDuringDeleverage")
@@ -1333,7 +1333,7 @@ def test_phase2_then_phase3_prevents_double_processing(
     assert pre_bravo_vault3 == 100 * EIGHTEEN_DECIMALS
 
     # Deleverage
-    repaid_amount = deleverage.deleverageUser(bob, bob, 0, sender=teller.address)
+    repaid_amount = deleverage.deleverageUser(bob, 0, sender=teller.address)
 
     # Get transfer events
     transfer_logs = filter_logs(deleverage, "EndaomentTransferDuringDeleverage")
@@ -1476,7 +1476,7 @@ def test_phase2_with_non_dollar_asset_prices(
     assert pre_charlie_vault == 20 * SIX_DECIMALS
 
     # Deleverage
-    repaid_amount = deleverage.deleverageUser(bob, bob, 0, sender=teller.address)
+    repaid_amount = deleverage.deleverageUser(bob, 0, sender=teller.address)
 
     # Get transfer events
     transfer_logs = filter_logs(deleverage, "EndaomentTransferDuringDeleverage")
@@ -1581,7 +1581,7 @@ def test_phase2_tiny_debt_amount(
     pre_debt = credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount
 
     # Deleverage
-    repaid_amount = deleverage.deleverageUser(bob, bob, 0, sender=teller.address)
+    repaid_amount = deleverage.deleverageUser(bob, 0, sender=teller.address)
 
     # Get event
     transfer_logs = filter_logs(deleverage, "EndaomentTransferDuringDeleverage")
