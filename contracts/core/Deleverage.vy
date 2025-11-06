@@ -60,6 +60,11 @@ struct DeleverageUserRequest:
     user: address
     targetRepayAmount: uint256
 
+struct DeleverageAsset:
+    vaultId: uint256
+    asset: address
+    targetRepayAmount: uint256  # USD value to repay using this asset
+
 struct GenLiqConfig:
     canLiquidate: bool
     keeperFeeRatio: uint256
@@ -134,6 +139,7 @@ ONE_PERCENT: constant(uint256) = 1_00 # 1.00%
 PRIORITY_LIQ_VAULT_DATA: constant(uint256) = 20
 MAX_STAB_VAULT_DATA: constant(uint256) = 10
 MAX_DELEVERAGE_USERS: constant(uint256) = 25
+MAX_DELEVERAGE_ASSETS: constant(uint256) = 25
 
 
 @deploy
@@ -180,6 +186,79 @@ def deleverageManyUsers(_users: DynArray[DeleverageUserRequest, MAX_DELEVERAGE_U
             numUsers += 1
 
     assert numUsers != 0 # dev: nobody deleveraged
+    return totalRepaidAmount
+
+
+# specific assets in order
+
+
+@external
+def deleverageWithSpecificAssets(
+    _user: address,
+    _assets: DynArray[DeleverageAsset, MAX_DELEVERAGE_ASSETS],
+) -> uint256:
+    assert not deptBasics.isPaused # dev: contract paused
+    a: addys.Addys = addys._getAddys()
+    isTrusted: bool = _user == msg.sender or addys._isValidRipeAddr(msg.sender) or self._isUnderscoreAddr(msg.sender, a.missionControl)
+
+    # check perms -- must also be able to borrow
+    if not isTrusted:
+        delegation: cs.ActionDelegation = staticcall MissionControl(a.missionControl).userDelegation(_user, msg.sender)
+        isTrusted = delegation.canBorrow
+
+    # must be trusted to deleverage with specific asset order
+    assert isTrusted # dev: not allowed
+
+    # get latest user debt
+    userDebt: UserDebt = empty(UserDebt)
+    bt: UserBorrowTerms = empty(UserBorrowTerms)
+    newInterest: uint256 = 0
+    userDebt, bt, newInterest = staticcall CreditEngine(a.creditEngine).getLatestUserDebtAndTerms(_user, True, a)
+    if userDebt.amount == 0:
+        return 0
+
+    maxTargetRepayAmount: uint256 = userDebt.amount
+    trueTargetRepayAmount: uint256 = 0
+
+    # process each asset in the specified order
+    for data: DeleverageAsset in _assets:
+        if maxTargetRepayAmount == 0:
+            break
+        if data.targetRepayAmount == 0:
+            continue
+
+        # get vault address
+        vaultAddr: address = empty(address)
+        isVaultAddrCached: bool = False
+        vaultAddr, isVaultAddrCached = self._getVaultAddr(data.vaultId, a.vaultBook)
+        if vaultAddr == empty(address):
+            continue
+
+        # cache vault addr
+        if not isVaultAddrCached:
+            self.vaultAddrs[data.vaultId] = vaultAddr
+
+        # handle this specific asset
+        repayForAsset: uint256 = min(maxTargetRepayAmount, data.targetRepayAmount)
+        trueTargetRepayAmount += repayForAsset
+        remainingToRepayForAsset: uint256 = self._handleSpecificAsset(_user, data.vaultId, vaultAddr, data.asset, repayForAsset, a)
+        paidAmountForAsset: uint256 = repayForAsset - remainingToRepayForAsset
+        maxTargetRepayAmount -= paidAmountForAsset
+
+    # calculate how much we actually repaid
+    totalRepaidAmount: uint256 = userDebt.amount - maxTargetRepayAmount
+    assert totalRepaidAmount != 0 # dev: no assets processed
+
+    # repay debt
+    hasGoodDebtHealth: bool = extcall CreditEngine(a.creditEngine).repayFromDept(_user, userDebt, min(totalRepaidAmount, userDebt.amount), newInterest, 0, a)
+
+    log DeleverageUser(
+        user=_user,
+        caller=msg.sender,
+        targetRepayAmount=trueTargetRepayAmount,
+        repaidAmount=totalRepaidAmount,
+        hasGoodDebtHealth=hasGoodDebtHealth,
+    )
     return totalRepaidAmount
 
 
@@ -658,7 +737,7 @@ def _isUnderscoreAddr(_addr: address, _mc: address) -> bool:
 #############
 
 
-# max deleverage amount
+# max deleverage amount (when untrusted caller)
 
 
 @view
