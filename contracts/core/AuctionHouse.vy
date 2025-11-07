@@ -340,10 +340,6 @@ def _liquidateUser(
     collateralValueOut: uint256 = 0
     repayValueIn, collateralValueOut = self._performLiquidationPhases(_liqUser, targetRepayAmount, liqFeeRatio, _config, _a)
 
-    # cannot liquidate
-    if repayValueIn == 0 and collateralValueOut == 0:
-        return 0
-
     # check if liq fees were already covered (stability pool swaps)
     liqFeesUnpaid: uint256 = totalLiqFees
     if collateralValueOut > repayValueIn:
