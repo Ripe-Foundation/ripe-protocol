@@ -52,6 +52,7 @@ interface MissionControl:
     def getDynamicBorrowRateConfig() -> DynamicBorrowRateConfig: view
     def getRepayConfig(_user: address) -> RepayConfig: view
     def getDebtTerms(_asset: address) -> cs.DebtTerms: view
+    def underscoreRegistry() -> address: view
 
 interface Teller:
     def depositFromTrusted(_user: address, _vaultId: uint256, _asset: address, _amount: uint256, _lockDuration: uint256, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
@@ -70,6 +71,9 @@ interface PriceDesk:
 
 interface CurvePrices:
     def getCurrentGreenPoolStatus() -> CurrentGreenPoolStatus: view
+
+interface VaultRegistry:
+    def isEarnVault(_vaultAddr: address) -> bool: view
 
 interface AddressRegistry:
     def getAddr(_regId: uint256) -> address: view
@@ -158,18 +162,28 @@ event RepayDebt:
     maxUserDebt: uint256
     hasGoodDebtHealth: bool
 
+event UnderscoreVaultDiscountSet:
+    discount: uint256
+
+# borrow rate discount
+undyVaulDiscount: public(uint256)
+
 ONE_YEAR: constant(uint256) = 60 * 60 * 24 * 365
 HUNDRED_PERCENT: constant(uint256) = 100_00 # 100.00%
 DANGER_BLOCKS_DENOMINATOR: constant(uint256) = 100_0000 # 100.0000%
 ONE_PERCENT: constant(uint256) = 1_00 # 1.00%
 STABILITY_POOL_ID: constant(uint256) = 1
 CURVE_PRICES_ID: constant(uint256) = 2
+UNDERSCORE_VAULT_REGISTRY_ID: constant(uint256) = 10
 
 
 @deploy
 def __init__(_ripeHq: address):
     addys.__init__(_ripeHq)
     deptBasics.__init__(False, True, False) # can mint green only
+
+    # default discount for underscore vaults
+    self.undyVaulDiscount = 50_00 # 50.00%
 
 
 ##########
@@ -234,6 +248,12 @@ def borrowForUser(
     assert hasGoodDebtHealth # dev: bad debt health
     userDebt.inLiquidation = False
 
+    # apply discount for underscore vaults
+    isUndyVault: bool = self._isUnderscoreVault(_user, a.missionControl)
+    undyVaulDiscount: uint256 = self.undyVaulDiscount
+    if undyVaulDiscount != 0 and isUndyVault:
+        userDebt.debtTerms.borrowRate = userDebt.debtTerms.borrowRate * (HUNDRED_PERCENT - undyVaulDiscount) // HUNDRED_PERCENT
+
     # save debt
     extcall Ledger(a.ledger).setUserDebt(_user, userDebt, newInterest, userBorrowInterval)
 
@@ -247,7 +267,7 @@ def borrowForUser(
 
     # origination fee
     daowry: uint256 = 0
-    if config.isDaowryEnabled:
+    if config.isDaowryEnabled and not isUndyVault:
         daowry = newBorrowAmount * bt.debtTerms.daowry // HUNDRED_PERCENT
 
     # dao revenue
@@ -517,7 +537,12 @@ def _repayDebt(
     hasGoodDebtHealth: bool = self._hasGoodDebtHealth(userDebt.amount, bt.collateralVal, bt.debtTerms.ltv)
     if hasGoodDebtHealth:
         userDebt.inLiquidation = False
-    
+
+    # apply discount for underscore vaults
+    undyVaulDiscount: uint256 = self.undyVaulDiscount
+    if undyVaulDiscount != 0 and self._isUnderscoreVault(_user, _a.missionControl):
+        userDebt.debtTerms.borrowRate = userDebt.debtTerms.borrowRate * (HUNDRED_PERCENT - undyVaulDiscount) // HUNDRED_PERCENT
+
     # update user debt, borrow points
     extcall Ledger(_a.ledger).setUserDebt(_user, userDebt, _newInterest, empty(IntervalBorrow))
     extcall LootBox(_a.lootbox).updateBorrowPoints(_user, _a)
@@ -1010,6 +1035,38 @@ def _calcDynamicRateBoost(_ratio: uint256, _minBoost: uint256, _maxBoost: uint25
     return _minBoost + adjustment
 
 
+##############
+# Underscore #
+##############
+
+
+# set undy vault discount
+
+
+@external
+def setUnderscoreVaultDiscount(_discount: uint256):
+    assert addys._isSwitchboardAddr(msg.sender) # dev: only switchboard allowed
+    assert not deptBasics.isPaused # dev: contract paused
+    assert _discount <= HUNDRED_PERCENT # dev: invalid discount
+    self.undyVaulDiscount = _discount
+    log UnderscoreVaultDiscountSet(discount=_discount)
+
+
+# underscore vault
+
+
+@view
+@internal
+def _isUnderscoreVault(_addr: address, _mc: address) -> bool:
+    underscore: address = staticcall MissionControl(_mc).underscoreRegistry()
+    if underscore == empty(address):
+        return False
+    vaultRegistry: address = staticcall AddressRegistry(underscore).getAddr(UNDERSCORE_VAULT_REGISTRY_ID)
+    if vaultRegistry == empty(address):
+        return False
+    return staticcall VaultRegistry(vaultRegistry).isEarnVault(_addr)
+
+
 #############
 # Utilities #
 #############
@@ -1037,6 +1094,12 @@ def updateDebtForUser(_user: address, _a: addys.Addys = empty(addys.Addys)) -> b
         userDebt.inLiquidation = False
 
     userDebt.debtTerms = bt.debtTerms
+
+    # apply discount for underscore vaults
+    undyVaulDiscount: uint256 = self.undyVaulDiscount
+    if undyVaulDiscount != 0 and self._isUnderscoreVault(_user, a.missionControl):
+        userDebt.debtTerms.borrowRate = userDebt.debtTerms.borrowRate * (HUNDRED_PERCENT - undyVaulDiscount) // HUNDRED_PERCENT
+
     extcall Ledger(a.ledger).setUserDebt(_user, userDebt, newInterest, empty(IntervalBorrow))
 
     # update borrow points
