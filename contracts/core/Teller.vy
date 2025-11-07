@@ -936,8 +936,6 @@ def setUserDelegation(
     _canClaimLoot: bool = True,
 ) -> bool:
     assert not deptBasics.isPaused # dev: contract paused
-    assert _delegate != empty(address) # dev: invalid delegate
-    assert _delegate != _user # dev: cannot delegate to self
 
     # validate underscore wallet
     mc: address = addys._getMissionControlAddr()
@@ -958,6 +956,9 @@ def _setUserDelegation(
     _canClaimLoot: bool,
     _mc: address
 ) -> bool:
+    if _delegate == empty(address) or _delegate == _user:
+        return False # bad delegation
+
     config: cs.ActionDelegation = cs.ActionDelegation(
         canWithdraw=_canWithdraw,
         canBorrow=_canBorrow,
