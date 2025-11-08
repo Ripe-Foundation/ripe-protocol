@@ -56,6 +56,7 @@ LOOTBOX_ID: constant(uint256) = 16
 TELLER_ID: constant(uint256) = 17
 DELEVERAGE_ID: constant(uint256) = 18
 CREDIT_REDEEM_ID: constant(uint256) = 19
+TELLER_UTILS_ID: constant(uint256) = 20
 
 
 @deploy
@@ -429,3 +430,18 @@ def _getCreditRedeemId() -> uint256:
 @internal
 def _getCreditRedeemAddr() -> address:
     return staticcall RipeHq(RIPE_HQ_FOR_ADDYS).getAddr(CREDIT_REDEEM_ID)
+
+
+# teller utils
+
+
+@view
+@internal
+def _getTellerUtilsId() -> uint256:
+    return TELLER_UTILS_ID
+
+
+@view
+@internal
+def _getTellerUtilsAddr() -> address:
+    return staticcall RipeHq(RIPE_HQ_FOR_ADDYS).getAddr(TELLER_UTILS_ID)
