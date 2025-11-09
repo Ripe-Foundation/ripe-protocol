@@ -144,6 +144,11 @@ event CollateralSwapped:
     depositAmount: uint256
     usdValue: uint256
 
+event DeleverageUserWithVolatileAssets:
+    user: indexed(address)
+    repaidAmount: uint256
+    hasGoodDebtHealth: bool
+
 # cache
 vaultAddrs: transient(HashMap[uint256, address]) # vaultId -> vaultAddr
 assetLiqConfig: transient(HashMap[address, AssetLiqConfig]) # asset -> config
@@ -211,10 +216,7 @@ def deleverageManyUsers(_users: DynArray[DeleverageUserRequest, MAX_DELEVERAGE_U
 
 
 @external
-def deleverageWithSpecificAssets(
-    _user: address,
-    _assets: DynArray[DeleverageAsset, MAX_DELEVERAGE_ASSETS],
-) -> uint256:
+def deleverageWithSpecificAssets(_user: address, _assets: DynArray[DeleverageAsset, MAX_DELEVERAGE_ASSETS]) -> uint256:
     assert not deptBasics.isPaused # dev: contract paused
     a: addys.Addys = addys._getAddys()
     isTrusted: bool = _user == msg.sender or addys._isValidRipeAddr(msg.sender) or self._isUnderscoreAddr(msg.sender, a.missionControl)
@@ -259,7 +261,7 @@ def deleverageWithSpecificAssets(
         # handle this specific asset
         repayForAsset: uint256 = min(maxTargetRepayAmount, data.targetRepayAmount)
         trueTargetRepayAmount += repayForAsset
-        remainingToRepayForAsset: uint256 = self._handleSpecificAsset(_user, data.vaultId, vaultAddr, data.asset, repayForAsset, a)
+        remainingToRepayForAsset: uint256 = self._handleSpecificAsset(_user, data.vaultId, vaultAddr, data.asset, repayForAsset, False, a)
         paidAmountForAsset: uint256 = repayForAsset - remainingToRepayForAsset
         maxTargetRepayAmount -= paidAmountForAsset
 
@@ -274,6 +276,64 @@ def deleverageWithSpecificAssets(
         user=_user,
         caller=msg.sender,
         targetRepayAmount=trueTargetRepayAmount,
+        repaidAmount=totalRepaidAmount,
+        hasGoodDebtHealth=hasGoodDebtHealth,
+    )
+    return totalRepaidAmount
+
+
+# volatile collateral assets
+
+
+@external
+def deleverageWithVolAssets(_user: address, _assets: DynArray[DeleverageAsset, MAX_DELEVERAGE_ASSETS]) -> uint256:
+    assert not deptBasics.isPaused # dev: contract paused
+    a: addys.Addys = addys._getAddys()
+    assert msg.sender == staticcall RipeHq(a.hq).governance() # dev: governance only
+
+    # get latest user debt
+    userDebt: UserDebt = empty(UserDebt)
+    bt: UserBorrowTerms = empty(UserBorrowTerms)
+    newInterest: uint256 = 0
+    userDebt, bt, newInterest = staticcall CreditEngine(a.creditEngine).getLatestUserDebtAndTerms(_user, True, a)
+    if userDebt.amount == 0:
+        return 0
+
+    maxTargetRepayAmount: uint256 = userDebt.amount
+
+    # process each volatile asset in the specified order
+    for data: DeleverageAsset in _assets:
+        if maxTargetRepayAmount == 0:
+            break
+        if data.targetRepayAmount == 0:
+            continue
+
+        # get vault address
+        vaultAddr: address = empty(address)
+        isVaultAddrCached: bool = False
+        vaultAddr, isVaultAddrCached = self._getVaultAddr(data.vaultId, a.vaultBook)
+        if vaultAddr == empty(address):
+            continue
+
+        # cache vault addr
+        if not isVaultAddrCached:
+            self.vaultAddrs[data.vaultId] = vaultAddr
+
+        # handle this volatile asset (skip stability pool & shouldTransferToEndaoment assets)
+        repayForAsset: uint256 = min(maxTargetRepayAmount, data.targetRepayAmount)
+        remainingToRepayForAsset: uint256 = self._handleSpecificAsset(_user, data.vaultId, vaultAddr, data.asset, repayForAsset, True, a)
+        paidAmountForAsset: uint256 = repayForAsset - remainingToRepayForAsset
+        maxTargetRepayAmount -= paidAmountForAsset
+
+    # calculate how much we actually repaid
+    totalRepaidAmount: uint256 = userDebt.amount - maxTargetRepayAmount
+    assert totalRepaidAmount != 0 # dev: no volatile assets processed
+
+    # repay debt
+    hasGoodDebtHealth: bool = extcall CreditEngine(a.creditEngine).repayFromDept(_user, userDebt, min(totalRepaidAmount, userDebt.amount), newInterest, 0, a)
+
+    log DeleverageUserWithVolatileAssets(
+        user=_user,
         repaidAmount=totalRepaidAmount,
         hasGoodDebtHealth=hasGoodDebtHealth,
     )
@@ -563,7 +623,7 @@ def _performDeleveragePhases(
             if not staticcall Vault(pData.vaultAddr).doesUserHaveBalance(_user, pData.asset):
                 continue
 
-            remainingToRepay = self._handleSpecificAsset(_user, pData.vaultId, pData.vaultAddr, pData.asset, remainingToRepay, _a)
+            remainingToRepay = self._handleSpecificAsset(_user, pData.vaultId, pData.vaultAddr, pData.asset, remainingToRepay, False, _a)
             if self.vaultAddrs[pData.vaultId] == empty(address):
                 self.vaultAddrs[pData.vaultId] = pData.vaultAddr # cache
 
@@ -648,7 +708,7 @@ def _iterateThruAssetsWithinVault(
             continue
 
         # handle specific liq asset
-        remainingToRepay = self._handleSpecificAsset(_user, _vaultId, _vaultAddr, asset, remainingToRepay, _a)
+        remainingToRepay = self._handleSpecificAsset(_user, _vaultId, _vaultAddr, asset, remainingToRepay, False, _a)
 
     return remainingToRepay
 
@@ -663,6 +723,7 @@ def _handleSpecificAsset(
     _vaultAddr: address,
     _asset: address,
     _remainingToRepay: uint256,
+    _volatilesOnly: bool,
     _a: addys.Addys,
 ) -> uint256:
 
@@ -678,11 +739,17 @@ def _handleSpecificAsset(
     if not isConfigCached:
         self.assetLiqConfig[_asset] = config
 
-    # burn as payment (GREEN, sGREEN)
+    # handle volatile assets only - skip normal deleverage assets (shouldBurnAsPayment or shouldTransferToEndaoment)
+    if _volatilesOnly:
+        if config.shouldBurnAsPayment or config.shouldTransferToEndaoment:
+            return _remainingToRepay
+        return self._transferToEndaoment(_user, _vaultId, _vaultAddr, _asset, _remainingToRepay, _a)
+
+    # burn stability pool assets (GREEN, sGREEN)
     if config.shouldBurnAsPayment and _asset in [_a.greenToken, _a.savingsGreen]:
         return self._burnStabPoolAsset(_user, _vaultId, _vaultAddr, _asset, _remainingToRepay, _a)
 
-    # endaoment wants this asset (other stablecoins)
+    # transfer to endaoment (other stablecoins)
     if config.shouldTransferToEndaoment:
         return self._transferToEndaoment(_user, _vaultId, _vaultAddr, _asset, _remainingToRepay, _a)
 
