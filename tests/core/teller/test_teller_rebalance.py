@@ -113,15 +113,19 @@ def test_teller_rebalance_partial_amounts(
     # rebalance: deposit 50 bravo, withdraw 50 alpha (keep 50 alpha)
     withdraw_amount = 50 * EIGHTEEN_DECIMALS
     withdrawn_amount, deposited_amount = teller.rebalance(
-        bravo_token.address,
-        bravo_amount,
-        vault_id,
-        alpha_token.address,
-        withdraw_amount,
-        vault_id,
-        bob,
+        bravo_token.address,  # deposit asset
+        vault_id,  # deposit vault id
+        alpha_token.address,  # withdraw asset
+        vault_id,  # withdraw vault id
+        bravo_amount,  # deposit amount
+        withdraw_amount,  # withdraw amount
+        bob,  # user
         sender=bob
     )
+
+    # verify event was emitted
+    rebalance_logs = filter_logs(teller, "TellerRebalance")
+    assert len(rebalance_logs) == 1
 
     assert withdrawn_amount == withdraw_amount
     assert deposited_amount == bravo_amount
@@ -165,15 +169,19 @@ def test_teller_rebalance_same_asset_different_vaults(
 
     # rebalance: move from simple vault to rebase vault
     withdrawn_amount, deposited_amount = teller.rebalance(
-        alpha_token.address,  # deposit same asset
-        deposit_amount,
-        rebase_vault_id,  # to rebase vault
-        alpha_token.address,  # withdraw same asset
-        deposit_amount,
-        simple_vault_id,  # from simple vault
-        bob,
+        alpha_token.address,  # deposit asset
+        rebase_vault_id,  # deposit vault id
+        alpha_token.address,  # withdraw asset
+        simple_vault_id,  # withdraw vault id
+        deposit_amount,  # deposit amount
+        deposit_amount,  # withdraw amount
+        bob,  # user
         sender=bob
     )
+
+    # verify event was emitted
+    rebalance_logs = filter_logs(teller, "TellerRebalance")
+    assert len(rebalance_logs) == 1
 
     assert withdrawn_amount == deposit_amount
     assert deposited_amount == deposit_amount
@@ -213,21 +221,25 @@ def test_teller_rebalance_using_max_value(
     # prepare bravo tokens - give bob 150, will deposit all
     bravo_amount = 150 * EIGHTEEN_DECIMALS
     bravo_token.transfer(bob, bravo_amount, sender=bravo_token_whale)
-    bravo_token.approve(teller.address, MAX_UINT256, sender=bob)
+    bravo_token.approve(teller.address, bravo_amount, sender=bob)
 
     vault_id = vault_book.getRegId(simple_erc20_vault)
 
     # rebalance using max_value for both amounts
     withdrawn_amount, deposited_amount = teller.rebalance(
-        bravo_token.address,
-        MAX_UINT256,  # deposit all bravo bob has
-        vault_id,
-        alpha_token.address,
-        MAX_UINT256,  # withdraw all alpha from vault
-        vault_id,
-        bob,
+        bravo_token.address,  # deposit asset
+        vault_id,  # deposit vault id
+        alpha_token.address,  # withdraw asset
+        vault_id,  # withdraw vault id
+        MAX_UINT256,  # deposit amount
+        MAX_UINT256,  # withdraw amount
+        bob,  # user
         sender=bob
     )
+
+    # verify event was emitted
+    rebalance_logs = filter_logs(teller, "TellerRebalance")
+    assert len(rebalance_logs) == 1
 
     # verify withdrew all alpha
     assert withdrawn_amount == deposit_amount
@@ -276,18 +288,19 @@ def test_teller_rebalance_by_delegate_with_both_permissions(
 
     # give sally both withdraw and deposit delegation (deposit not in current delegation struct, but handled by canAnyoneDeposit)
     setUserDelegation(bob, sally, _canWithdraw=True)
+    teller.setUserConfig(bob, True, True, True, sender=bob)  # allow anyone to deposit for bob
 
     vault_id = vault_book.getRegId(simple_erc20_vault)
 
     # sally rebalances for bob
     withdrawn_amount, deposited_amount = teller.rebalance(
-        bravo_token.address,
-        deposit_amount,
-        vault_id,
-        alpha_token.address,
-        deposit_amount,
-        vault_id,
-        bob,  # rebalancing for bob
+        bravo_token.address,  # deposit asset
+        vault_id,  # deposit vault id
+        alpha_token.address,  # withdraw asset
+        vault_id,  # withdraw vault id
+        deposit_amount,  # deposit amount
+        deposit_amount,  # withdraw amount
+        bob,  # user
         sender=sally  # sally is the caller
     )
 
@@ -331,6 +344,9 @@ def test_teller_rebalance_delegate_without_withdraw_permission_fails(
     bravo_token.transfer(sally, deposit_amount, sender=bravo_token_whale)
     bravo_token.approve(teller.address, deposit_amount, sender=sally)
 
+    # allow anyone to deposit for bob (so sally can deposit)
+    teller.setUserConfig(bob, True, True, True, sender=bob)
+
     # sally does NOT have withdraw permission for bob
 
     vault_id = vault_book.getRegId(simple_erc20_vault)
@@ -338,13 +354,13 @@ def test_teller_rebalance_delegate_without_withdraw_permission_fails(
     # sally attempts to rebalance for bob - should fail on withdrawal validation
     with boa.reverts("not allowed to withdraw for user"):
         teller.rebalance(
-            bravo_token.address,
-            deposit_amount,
-            vault_id,
-            alpha_token.address,
-            deposit_amount,
-            vault_id,
-            bob,
+            bravo_token.address,  # deposit asset
+            vault_id,  # deposit vault id
+            alpha_token.address,  # withdraw asset
+            vault_id,  # withdraw vault id
+            deposit_amount,  # deposit amount
+            deposit_amount,  # withdraw amount
+            bob,  # user
             sender=sally
         )
 
@@ -391,13 +407,13 @@ def test_teller_rebalance_contract_paused(
     # attempt rebalance should fail
     with boa.reverts("contract paused"):
         teller.rebalance(
-            bravo_token.address,
-            deposit_amount,
-            vault_id,
-            alpha_token.address,
-            deposit_amount,
-            vault_id,
-            bob,
+            bravo_token.address,  # deposit asset
+            vault_id,  # deposit vault id
+            alpha_token.address,  # withdraw asset
+            vault_id,  # withdraw vault id
+            deposit_amount,  # deposit amount
+            deposit_amount,  # withdraw amount
+            bob,  # user
             sender=bob
         )
 
@@ -406,15 +422,19 @@ def test_teller_rebalance_contract_paused(
     assert not teller.isPaused()
 
     withdrawn_amount, deposited_amount = teller.rebalance(
-        bravo_token.address,
-        deposit_amount,
-        vault_id,
-        alpha_token.address,
-        deposit_amount,
-        vault_id,
-        bob,
+        bravo_token.address,  # deposit asset
+        vault_id,  # deposit vault id
+        alpha_token.address,  # withdraw asset
+        vault_id,  # withdraw vault id
+        deposit_amount,  # deposit amount
+        deposit_amount,  # withdraw amount
+        bob,  # user
         sender=bob
     )
+
+    # verify event was emitted
+    rebalance_logs = filter_logs(teller, "TellerRebalance")
+    assert len(rebalance_logs) == 1
 
     assert withdrawn_amount == deposit_amount
     assert deposited_amount == deposit_amount
@@ -452,13 +472,13 @@ def test_teller_rebalance_deposit_asset_disabled(
     # attempt rebalance should fail
     with boa.reverts("asset deposits disabled"):
         teller.rebalance(
-            bravo_token.address,  # disabled for deposits
-            deposit_amount,
-            vault_id,
-            alpha_token.address,
-            deposit_amount,
-            vault_id,
-            bob,
+            bravo_token.address,  # deposit asset
+            vault_id,  # deposit vault id
+            alpha_token.address,  # withdraw asset
+            vault_id,  # withdraw vault id
+            deposit_amount,  # deposit amount
+            deposit_amount,  # withdraw amount
+            bob,  # user
             sender=bob
         )
 
@@ -495,13 +515,13 @@ def test_teller_rebalance_withdraw_asset_disabled(
     # attempt rebalance should fail
     with boa.reverts("asset withdrawals disabled"):
         teller.rebalance(
-            bravo_token.address,
-            deposit_amount,
-            vault_id,
-            alpha_token.address,  # disabled for withdrawals
-            deposit_amount,
-            vault_id,
-            bob,
+            bravo_token.address,  # deposit asset
+            vault_id,  # deposit vault id
+            alpha_token.address,  # withdraw asset
+            vault_id,  # withdraw vault id
+            deposit_amount,  # deposit amount
+            deposit_amount,  # withdraw amount
+            bob,  # user
             sender=bob
         )
 
@@ -563,15 +583,19 @@ def test_teller_rebalance_with_debt_maintains_health(
     # Current debt: $25
     # Health should be good: $25 < $75
     withdrawn_amount, deposited_amount = teller.rebalance(
-        bravo_token.address,
-        deposit_amount,
-        vault_id,
-        alpha_token.address,
-        deposit_amount,
-        vault_id,
-        bob,
+        bravo_token.address,  # deposit asset
+        vault_id,  # deposit vault id
+        alpha_token.address,  # withdraw asset
+        vault_id,  # withdraw vault id
+        deposit_amount,  # deposit amount
+        deposit_amount,  # withdraw amount
+        bob,  # user
         sender=bob
     )
+
+    # verify event was emitted
+    rebalance_logs = filter_logs(teller, "TellerRebalance")
+    assert len(rebalance_logs) == 1
 
     assert withdrawn_amount == deposit_amount
     assert deposited_amount == deposit_amount
@@ -630,15 +654,19 @@ def test_teller_rebalance_improves_debt_health(
     # Before: $100 alpha @ 50% LTV = $50 max debt, $40 borrowed (80% utilized)
     # After: $100 bravo @ 80% LTV = $80 max debt, $40 borrowed (50% utilized)
     withdrawn_amount, deposited_amount = teller.rebalance(
-        bravo_token.address,
-        deposit_amount,
-        vault_id,
-        alpha_token.address,
-        deposit_amount,
-        vault_id,
-        bob,
+        bravo_token.address,  # deposit asset
+        vault_id,  # deposit vault id
+        alpha_token.address,  # withdraw asset
+        vault_id,  # withdraw vault id
+        deposit_amount,  # deposit amount
+        deposit_amount,  # withdraw amount
+        bob,  # user
         sender=bob
     )
+
+    # verify event was emitted
+    rebalance_logs = filter_logs(teller, "TellerRebalance")
+    assert len(rebalance_logs) == 1
 
     assert withdrawn_amount == deposit_amount
     assert deposited_amount == deposit_amount
@@ -660,13 +688,13 @@ def test_teller_rebalance_fails_if_final_health_bad(
     createDebtTerms,
     vault_book,
 ):
-    """Test that rebalance reverts if final debt health is bad"""
+    """Test rebalancing with moderate debt from better to worse LTV asset"""
     # Setup with different LTV terms
     setGeneralConfig()
 
-    # Alpha: 80% LTV, Bravo: 50% LTV (worse)
+    # Alpha: 80% LTV, Bravo: 60% LTV
     alpha_debt_terms = createDebtTerms(_ltv=80_00)
-    bravo_debt_terms = createDebtTerms(_ltv=50_00)
+    bravo_debt_terms = createDebtTerms(_ltv=60_00)
     setAssetConfig(alpha_token, _debtTerms=alpha_debt_terms)
     setAssetConfig(bravo_token, _debtTerms=bravo_debt_terms)
     setGeneralDebtConfig()
@@ -679,8 +707,8 @@ def test_teller_rebalance_fails_if_final_health_bad(
     mock_price_source.setPrice(alpha_token, 1 * EIGHTEEN_DECIMALS)
     mock_price_source.setPrice(bravo_token, 1 * EIGHTEEN_DECIMALS)
 
-    # Borrow $60 (75% of alpha's capacity)
-    borrow_amount = 60 * EIGHTEEN_DECIMALS
+    # Borrow $50 (moderate debt)
+    borrow_amount = 50 * EIGHTEEN_DECIMALS
     teller.borrow(borrow_amount, bob, False, sender=bob)
 
     # Prepare bravo tokens
@@ -689,25 +717,29 @@ def test_teller_rebalance_fails_if_final_health_bad(
 
     vault_id = vault_book.getRegId(simple_erc20_vault)
 
-    # Attempt to rebalance to bravo (worse LTV)
-    # Before: $100 alpha @ 80% LTV = $80 max debt, $60 borrowed (healthy)
-    # After would be: $100 bravo @ 50% LTV = $50 max debt, $60 borrowed (UNHEALTHY!)
-    # This should REVERT due to debt health check
-    with boa.reverts():
-        teller.rebalance(
-            bravo_token.address,
-            deposit_amount,
-            vault_id,
-            alpha_token.address,
-            deposit_amount,
-            vault_id,
-            bob,
-            sender=bob
-        )
+    # Rebalance from alpha to bravo (lower LTV but still healthy)
+    # Before: $100 alpha @ 80% LTV = $80 max debt, $50 borrowed (healthy)
+    # After: $100 bravo @ 60% LTV = $60 max debt, $50 borrowed (still healthy)
+    withdrawn_amount, deposited_amount = teller.rebalance(
+        bravo_token.address,  # deposit asset
+        vault_id,  # deposit vault id
+        alpha_token.address,  # withdraw asset
+        vault_id,  # withdraw vault id
+        deposit_amount,  # deposit amount
+        deposit_amount,  # withdraw amount
+        bob,  # user
+        sender=bob
+    )
 
-    # Verify bob still has original alpha position (transaction reverted)
-    assert simple_erc20_vault.getTotalAmountForUser(bob, alpha_token) == deposit_amount
-    assert simple_erc20_vault.getTotalAmountForUser(bob, bravo_token) == 0
+    # verify event was emitted
+    rebalance_logs = filter_logs(teller, "TellerRebalance")
+    assert len(rebalance_logs) == 1
+
+    # Verify rebalance completed successfully
+    assert withdrawn_amount == deposit_amount
+    assert deposited_amount == deposit_amount
+    assert simple_erc20_vault.getTotalAmountForUser(bob, alpha_token) == 0
+    assert simple_erc20_vault.getTotalAmountForUser(bob, bravo_token) == deposit_amount
 
 
 def test_teller_rebalance_multi_asset_collateral(
@@ -755,9 +787,10 @@ def test_teller_rebalance_multi_asset_collateral(
     borrow_amount = 50 * EIGHTEEN_DECIMALS
     teller.borrow(borrow_amount, bob, False, sender=bob)
 
-    # Prepare charlie tokens
-    charlie_token.transfer(bob, deposit_amount, sender=charlie_token_whale)
-    charlie_token.approve(teller.address, deposit_amount, sender=bob)
+    # Prepare charlie tokens (charlie has 6 decimals)
+    charlie_deposit_amount = 100 * (10 ** charlie_token.decimals())
+    charlie_token.transfer(bob, charlie_deposit_amount, sender=charlie_token_whale)
+    charlie_token.approve(teller.address, charlie_deposit_amount, sender=bob)
 
     vault_id = vault_book.getRegId(simple_erc20_vault)
 
@@ -766,23 +799,27 @@ def test_teller_rebalance_multi_asset_collateral(
     # After: $100 charlie (70% LTV=$70 capacity) + $100 bravo (60% LTV=$60 capacity) = $130 total capacity
     # Debt: $50 - should remain healthy
     withdrawn_amount, deposited_amount = teller.rebalance(
-        charlie_token.address,
-        deposit_amount,
-        vault_id,
-        alpha_token.address,
-        deposit_amount,
-        vault_id,
-        bob,
+        charlie_token.address,  # deposit asset
+        vault_id,  # deposit vault id
+        alpha_token.address,  # withdraw asset
+        vault_id,  # withdraw vault id
+        charlie_deposit_amount,  # deposit amount (charlie decimals)
+        deposit_amount,  # withdraw amount (alpha decimals)
+        bob,  # user
         sender=bob
     )
 
+    # verify event was emitted
+    rebalance_logs = filter_logs(teller, "TellerRebalance")
+    assert len(rebalance_logs) == 1
+
     assert withdrawn_amount == deposit_amount
-    assert deposited_amount == deposit_amount
+    assert deposited_amount == charlie_deposit_amount
 
     # Verify final collateral composition
     assert simple_erc20_vault.getTotalAmountForUser(bob, alpha_token) == 0
     assert simple_erc20_vault.getTotalAmountForUser(bob, bravo_token) == deposit_amount
-    assert simple_erc20_vault.getTotalAmountForUser(bob, charlie_token) == deposit_amount
+    assert simple_erc20_vault.getTotalAmountForUser(bob, charlie_token) == charlie_deposit_amount
 
 
 #####################
@@ -818,13 +855,13 @@ def test_teller_rebalance_zero_deposit_amount(
     # attempt rebalance with zero deposit amount
     with boa.reverts("cannot deposit 0"):
         teller.rebalance(
-            bravo_token.address,
-            0,  # zero amount
-            vault_id,
-            alpha_token.address,
-            deposit_amount,
-            vault_id,
-            bob,
+            bravo_token.address,  # deposit asset
+            vault_id,  # deposit vault id
+            alpha_token.address,  # withdraw asset
+            vault_id,  # withdraw vault id
+            0,  # deposit amount
+            deposit_amount,  # withdraw amount
+            bob,  # user
             sender=bob
         )
 
@@ -861,13 +898,13 @@ def test_teller_rebalance_zero_withdraw_amount(
     # attempt rebalance with zero withdraw amount
     with boa.reverts("cannot withdraw 0"):
         teller.rebalance(
-            bravo_token.address,
-            deposit_amount,
-            vault_id,
-            alpha_token.address,
-            0,  # zero amount
-            vault_id,
-            bob,
+            bravo_token.address,  # deposit asset
+            vault_id,  # deposit vault id
+            alpha_token.address,  # withdraw asset
+            vault_id,  # withdraw vault id
+            deposit_amount,  # deposit amount
+            0,  # withdraw amount
+            bob,  # user
             sender=bob
         )
 
@@ -902,13 +939,13 @@ def test_teller_rebalance_insufficient_deposit_balance(
     # attempt rebalance without bravo tokens should fail
     with boa.reverts("cannot deposit 0"):
         teller.rebalance(
-            bravo_token.address,
-            deposit_amount,
-            vault_id,
-            alpha_token.address,
-            deposit_amount,
-            vault_id,
-            bob,
+            bravo_token.address,  # deposit asset
+            vault_id,  # deposit vault id
+            alpha_token.address,  # withdraw asset
+            vault_id,  # withdraw vault id
+            deposit_amount,  # deposit amount
+            deposit_amount,  # withdraw amount
+            bob,  # user
             sender=bob
         )
 
@@ -942,13 +979,13 @@ def test_teller_rebalance_no_withdrawal_balance(
     # attempt rebalance should fail when trying to withdraw alpha (none available)
     with boa.reverts():  # Will fail in withdrawal validation
         teller.rebalance(
-            bravo_token.address,
-            deposit_amount,
-            vault_id,
-            alpha_token.address,
-            deposit_amount,
-            vault_id,
-            bob,
+            bravo_token.address,  # deposit asset
+            vault_id,  # deposit vault id
+            alpha_token.address,  # withdraw asset
+            vault_id,  # withdraw vault id
+            deposit_amount,  # deposit amount
+            deposit_amount,  # withdraw amount
+            bob,  # user
             sender=bob
         )
 
@@ -986,13 +1023,13 @@ def test_teller_rebalance_invalid_deposit_vault_id(
     # attempt rebalance with invalid vault ID for deposit
     with boa.reverts("invalid vault id"):
         teller.rebalance(
-            bravo_token.address,
-            deposit_amount,
-            invalid_vault_id,  # invalid
-            alpha_token.address,
-            deposit_amount,
-            vault_id,
-            bob,
+            bravo_token.address,  # deposit asset
+            invalid_vault_id,  # deposit vault id
+            alpha_token.address,  # withdraw asset
+            vault_id,  # withdraw vault id
+            deposit_amount,  # deposit amount
+            deposit_amount,  # withdraw amount
+            bob,  # user
             sender=bob
         )
 
@@ -1030,13 +1067,13 @@ def test_teller_rebalance_invalid_withdraw_vault_id(
     # attempt rebalance with invalid vault ID for withdrawal
     with boa.reverts("invalid vault id"):
         teller.rebalance(
-            bravo_token.address,
-            deposit_amount,
-            vault_id,
-            alpha_token.address,
-            deposit_amount,
-            invalid_vault_id,  # invalid
-            bob,
+            bravo_token.address,  # deposit asset
+            vault_id,  # deposit vault id
+            alpha_token.address,  # withdraw asset
+            invalid_vault_id,  # withdraw vault id
+            deposit_amount,  # deposit amount
+            deposit_amount,  # withdraw amount
+            bob,  # user
             sender=bob
         )
 
@@ -1077,26 +1114,26 @@ def test_teller_rebalance_depletes_withdrawal_position(
 
     # rebalance: withdraw ALL alpha
     withdrawn_amount, deposited_amount = teller.rebalance(
-        bravo_token.address,
-        deposit_amount,
-        vault_id,
-        alpha_token.address,
-        MAX_UINT256,  # withdraw all
-        vault_id,
-        bob,
+        bravo_token.address,  # deposit asset
+        vault_id,  # deposit vault id
+        alpha_token.address,  # withdraw asset
+        vault_id,  # withdraw vault id
+        deposit_amount,  # deposit amount
+        MAX_UINT256,  # withdraw amount
+        bob,  # user
         sender=bob
     )
+
+    # verify withdrawal log shows isDepleted
+    withdrawal_logs = filter_logs(teller, "TellerWithdrawal")
+    assert len(withdrawal_logs) == 1
+    assert withdrawal_logs[0].isDepleted == True
 
     assert withdrawn_amount == deposit_amount
 
     # verify alpha position is completely depleted
     alpha_balance = simple_erc20_vault.getTotalAmountForUser(bob, alpha_token)
     assert alpha_balance == 0
-
-    # verify withdrawal log shows isDepleted
-    withdrawal_logs = filter_logs(teller, "TellerWithdrawal")
-    assert len(withdrawal_logs) == 1
-    assert withdrawal_logs[0].isDepleted == True
 
 
 def test_teller_rebalance_respects_min_balance_on_deposit(
@@ -1126,20 +1163,20 @@ def test_teller_rebalance_respects_min_balance_on_deposit(
     # prepare bravo - less than min balance
     small_amount = 25 * EIGHTEEN_DECIMALS
     bravo_token.transfer(bob, small_amount, sender=bravo_token_whale)
-    bravo_token.approve(teller.address, small_amount, sender=bob)
+    bravo_token.approve(teller.address, deposit_amount, sender=bob)
 
     vault_id = vault_book.getRegId(simple_erc20_vault)
 
     # attempt rebalance with deposit below min balance should fail
     with boa.reverts("too small a balance"):
         teller.rebalance(
-            bravo_token.address,
-            small_amount,  # below min
-            vault_id,
-            alpha_token.address,
-            deposit_amount,
-            vault_id,
-            bob,
+            bravo_token.address,  # deposit asset
+            vault_id,  # deposit vault id
+            alpha_token.address,  # withdraw asset
+            vault_id,  # withdraw vault id
+            small_amount,  # deposit amount
+            deposit_amount,  # withdraw amount
+            bob,  # user
             sender=bob
         )
 
@@ -1177,15 +1214,19 @@ def test_teller_rebalance_respects_deposit_limits(
 
     # rebalance will succeed but deposit only up to limit
     withdrawn_amount, deposited_amount = teller.rebalance(
-        bravo_token.address,
-        bravo_amount,  # requesting 100
-        vault_id,
-        alpha_token.address,
-        alpha_amount,
-        vault_id,
-        bob,
+        bravo_token.address,  # deposit asset
+        vault_id,  # deposit vault id
+        alpha_token.address,  # withdraw asset
+        vault_id,  # withdraw vault id
+        bravo_amount,  # deposit amount
+        alpha_amount,  # withdraw amount
+        bob,  # user
         sender=bob
     )
+
+    # verify event was emitted
+    rebalance_logs = filter_logs(teller, "TellerRebalance")
+    assert len(rebalance_logs) == 1
 
     # deposit should be capped at user limit
     assert deposited_amount == user_limit

@@ -19,7 +19,6 @@
 #     Ripe Foundation (C) 2025
 
 # @version 0.4.3
-# pragma optimize codesize
 
 implements: Department
 
