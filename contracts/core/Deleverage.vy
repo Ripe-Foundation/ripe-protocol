@@ -39,6 +39,10 @@ interface Ledger:
     def userVaults(_user: address, _index: uint256) -> uint256: view
     def numUserVaults(_user: address) -> uint256: view
 
+interface Teller:
+    def depositFromTrusted(_user: address, _vaultId: uint256, _asset: address, _amount: uint256, _lockDuration: uint256, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
+    def performHousekeeping(_isHigherRisk: bool, _user: address, _shouldUpdateDebt: bool, _a: addys.Addys = empty(addys.Addys)): nonpayable
+
 interface PriceDesk:
     def getAssetAmount(_asset: address, _usdValue: uint256, _shouldRaise: bool = False) -> uint256: view
     def getUsdValue(_asset: address, _amount: uint256, _shouldRaise: bool = False) -> uint256: view
@@ -55,6 +59,9 @@ interface VaultRegistry:
 
 interface GreenToken:
     def burn(_amount: uint256) -> bool: nonpayable
+
+interface RipeHq:
+    def governance() -> address: view
 
 struct DeleverageUserRequest:
     user: address
@@ -125,6 +132,17 @@ event EndaomentTransferDuringDeleverage:
     amountSent: uint256
     usdValue: uint256
     isDepleted: bool
+
+event CollateralSwapped:
+    user: indexed(address)
+    caller: indexed(address)
+    withdrawVaultId: uint256
+    withdrawAsset: indexed(address)
+    withdrawAmount: uint256
+    depositVaultId: uint256
+    depositAsset: address
+    depositAmount: uint256
+    usdValue: uint256
 
 # cache
 vaultAddrs: transient(HashMap[uint256, address]) # vaultId -> vaultAddr
@@ -730,6 +748,87 @@ def _isUnderscoreAddr(_addr: address, _mc: address) -> bool:
     if undyLegoBook == empty(address):
         return False
     return staticcall Registry(undyLegoBook).isValidAddr(_addr)
+
+
+###################
+# Collateral Swap #
+###################
+
+
+@external
+def swapCollateral(
+    _user: address,
+    _withdrawVaultId: uint256,
+    _withdrawAsset: address,
+    _depositVaultId: uint256,
+    _depositAsset: address,
+    _withdrawAmount: uint256 = max_value(uint256),
+) -> (uint256, uint256):
+    assert not deptBasics.isPaused # dev: contract paused
+    assert empty(address) not in [_user, _withdrawAsset, _depositAsset] # dev: invalid assets
+    assert 0 not in [_withdrawVaultId, _depositVaultId] # dev: invalid vault ids
+
+    a: addys.Addys = addys._getAddys()
+    assert msg.sender == staticcall RipeHq(a.hq).governance() # dev: governance only
+
+    # get vault addresses
+    withdrawVaultAddr: address = staticcall Registry(a.vaultBook).getAddr(_withdrawVaultId)
+    assert withdrawVaultAddr != empty(address) # dev: invalid withdraw vault
+
+    depositVaultAddr: address = staticcall Registry(a.vaultBook).getAddr(_depositVaultId)
+    assert depositVaultAddr != empty(address) # dev: invalid deposit vault
+
+    # get debt terms for both assets
+    withdrawAssetTerms: cs.DebtTerms = staticcall MissionControl(a.missionControl).getDebtTerms(_withdrawAsset)
+    depositAssetTerms: cs.DebtTerms = staticcall MissionControl(a.missionControl).getDebtTerms(_depositAsset)
+
+    # validate LTV: deposit asset must have >= LTV as withdraw asset
+    assert depositAssetTerms.ltv >= withdrawAssetTerms.ltv # dev: deposit asset LTV too low
+
+    # withdraw collateral from user's vault, transfer to governance (msg.sender)
+    withdrawnAmount: uint256 = 0
+    isPositionDepleted: bool = False
+    withdrawnAmount, isPositionDepleted = extcall AuctionHouse(a.auctionHouse).withdrawTokensFromVault(
+        _user,
+        _withdrawAsset,
+        _withdrawAmount,
+        msg.sender, # recipient is governance
+        withdrawVaultAddr,
+        a,
+    )
+    assert withdrawnAmount != 0 # dev: no collateral withdrawn
+
+    # calculate USD value of withdrawn amount
+    usdValue: uint256 = staticcall PriceDesk(a.priceDesk).getUsdValue(_withdrawAsset, withdrawnAmount, True)
+    assert usdValue != 0 # dev: invalid USD value
+
+    # calculate deposit amount based on USD value
+    depositAmount: uint256 = staticcall PriceDesk(a.priceDesk).getAssetAmount(_depositAsset, usdValue, True)
+    assert depositAmount != 0 # dev: invalid deposit amount
+
+    # transfer new collateral from governance to this contract
+    assert extcall IERC20(_depositAsset).transferFrom(msg.sender, self, depositAmount) # dev: transferFrom failed
+
+    # approve Teller to spend tokens and deposit into user's vault
+    assert extcall IERC20(_depositAsset).approve(a.teller, depositAmount) # dev: approve failed
+    extcall Teller(a.teller).depositFromTrusted(_user, _depositVaultId, _depositAsset, depositAmount, 0, a)
+    assert extcall IERC20(_depositAsset).approve(a.teller, 0) # dev: approve failed
+
+    # perform house keeping
+    extcall Teller(a.teller).performHousekeeping(True, _user, True, a)
+
+    log CollateralSwapped(
+        user=_user,
+        caller=msg.sender,
+        withdrawVaultId=_withdrawVaultId,
+        withdrawAsset=_withdrawAsset,
+        withdrawAmount=withdrawnAmount,
+        depositVaultId=_depositVaultId,
+        depositAsset=_depositAsset,
+        depositAmount=depositAmount,
+        usdValue=usdValue,
+    )
+    return withdrawnAmount, depositAmount
 
 
 #############

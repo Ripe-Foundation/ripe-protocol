@@ -925,16 +925,19 @@ def setUndyLegoAccess(_legoAddr: address) -> bool:
 #############
 
 
-# is underscore wallet owner
-
-
-@view
-@external
-def isUnderscoreWalletOwner(_user: address, _caller: address, _mc: address = empty(address)) -> bool:
-    return staticcall TellerUtils(addys._getTellerUtilsAddr()).isUnderscoreWalletOwner(_user, _caller, _mc)
-
-
 # housekeeping
+
+
+@external
+def performHousekeeping(
+    _isHigherRisk: bool,
+    _user: address,
+    _shouldUpdateDebt: bool,
+    _a: addys.Addys = empty(addys.Addys),
+):
+    assert addys._isValidRipeAddr(msg.sender) # dev: only ripe addr allowed
+    a: addys.Addys = addys._getAddys(_a)
+    self._performHousekeeping(_isHigherRisk, _user, _shouldUpdateDebt, a)
 
 
 @internal
@@ -993,6 +996,15 @@ def _handleGreenPayment(
         assert extcall IERC20(_greenToken).transferFrom(msg.sender, _recipient, amount, default_return_value=True) # dev: token transfer failed
 
     return amount
+
+
+# is underscore wallet owner
+
+
+@view
+@external
+def isUnderscoreWalletOwner(_user: address, _caller: address, _mc: address = empty(address)) -> bool:
+    return staticcall TellerUtils(addys._getTellerUtilsAddr()).isUnderscoreWalletOwner(_user, _caller, _mc)
 
 
 ########  ######## ########   #######   ######  #### ######## 
