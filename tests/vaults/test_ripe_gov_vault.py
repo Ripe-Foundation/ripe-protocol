@@ -2413,7 +2413,7 @@ def test_depositIntoGovVault_regular_user_cannot_deposit_for_others(
     ripe_token.approve(teller, deposit_amount, sender=alice)
     
     # Alice tries to deposit for bob (should fail)
-    with boa.reverts("cannot deposit"):
+    with boa.reverts("no perms"):
         teller.depositIntoGovVault(
             ripe_token,
             deposit_amount,

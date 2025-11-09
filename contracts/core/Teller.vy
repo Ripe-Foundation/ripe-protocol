@@ -925,6 +925,15 @@ def setUndyLegoAccess(_legoAddr: address) -> bool:
 #############
 
 
+# is underscore wallet owner
+
+
+@view
+@external
+def isUnderscoreWalletOwner(_user: address, _caller: address, _mc: address = empty(address)) -> bool:
+    return staticcall TellerUtils(addys._getTellerUtilsAddr()).isUnderscoreWalletOwner(_user, _caller, _mc)
+
+
 # housekeeping
 
 

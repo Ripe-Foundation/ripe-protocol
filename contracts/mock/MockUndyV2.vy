@@ -17,6 +17,7 @@ LEGACY_LEGO_REGISTRY_ID: constant(uint256) = 2
 UNDY_LEGACY: public(immutable(address))
 
 useThisLegoId: public(uint256)
+_isUserWallet: public(bool)
 
 
 @deploy
@@ -39,7 +40,12 @@ def isValidAddr(_addr: address) -> bool:
 @view
 @external
 def isUserWallet(_addr: address) -> bool:
-    return True
+    return self._isUserWallet
+
+
+@external
+def setIsUserWallet(_isUserWallet: bool):
+    self._isUserWallet = _isUserWallet
 
 
 @view
