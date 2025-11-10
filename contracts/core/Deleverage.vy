@@ -70,7 +70,7 @@ struct DeleverageUserRequest:
 struct DeleverageAsset:
     vaultId: uint256
     asset: address
-    targetRepayAmount: uint256  # USD value to repay using this asset
+    targetRepayAmount: uint256
 
 struct GenLiqConfig:
     canLiquidate: bool
@@ -180,12 +180,13 @@ def __init__(_ripeHq: address):
 
 
 @external
-def deleverageUser(_user: address, _targetRepayAmount: uint256) -> uint256:
+def deleverageUser(_user: address, _caller: address, _targetRepayAmount: uint256, _a: addys.Addys = empty(addys.Addys)) -> uint256:
+    assert msg.sender == addys._getTellerAddr() # dev: only teller allowed
     assert not deptBasics.isPaused # dev: contract paused
-    a: addys.Addys = addys._getAddys()
+    a: addys.Addys = addys._getAddys(_a)
     config: GenLiqConfig = staticcall MissionControl(a.missionControl).getGenLiqConfig()
-    isTrusted: bool = addys._isValidRipeAddr(msg.sender) or self._isUnderscoreAddr(msg.sender, a.missionControl)
-    repaidAmount: uint256 = self._deleverageUser(_user, msg.sender, isTrusted, _targetRepayAmount, config, a)
+    isTrusted: bool = addys._isValidRipeAddr(_caller) or self._isUnderscoreAddr(_caller, a.missionControl)
+    repaidAmount: uint256 = self._deleverageUser(_user, _caller, isTrusted, _targetRepayAmount, config, a)
     assert repaidAmount != 0 # dev: cannot deleverage
     return repaidAmount
 
@@ -194,16 +195,17 @@ def deleverageUser(_user: address, _targetRepayAmount: uint256) -> uint256:
 
 
 @external
-def deleverageManyUsers(_users: DynArray[DeleverageUserRequest, MAX_DELEVERAGE_USERS]) -> uint256:
+def deleverageManyUsers(_users: DynArray[DeleverageUserRequest, MAX_DELEVERAGE_USERS], _caller: address, _a: addys.Addys = empty(addys.Addys)) -> uint256:
+    assert msg.sender == addys._getTellerAddr() # dev: only teller allowed
     assert not deptBasics.isPaused # dev: contract paused
-    a: addys.Addys = addys._getAddys()
+    a: addys.Addys = addys._getAddys(_a)
     config: GenLiqConfig = staticcall MissionControl(a.missionControl).getGenLiqConfig()
-    isTrusted: bool = addys._isValidRipeAddr(msg.sender) or self._isUnderscoreAddr(msg.sender, a.missionControl)
+    isTrusted: bool = addys._isValidRipeAddr(_caller) or self._isUnderscoreAddr(_caller, a.missionControl)
 
     totalRepaidAmount: uint256 = 0
     numUsers: uint256 = 0
     for u: DeleverageUserRequest in _users:
-        repaidAmount: uint256 = self._deleverageUser(u.user, msg.sender, isTrusted, u.targetRepayAmount, config, a)
+        repaidAmount: uint256 = self._deleverageUser(u.user, _caller, isTrusted, u.targetRepayAmount, config, a)
         if repaidAmount != 0:
             totalRepaidAmount += repaidAmount
             numUsers += 1
@@ -216,14 +218,15 @@ def deleverageManyUsers(_users: DynArray[DeleverageUserRequest, MAX_DELEVERAGE_U
 
 
 @external
-def deleverageWithSpecificAssets(_user: address, _assets: DynArray[DeleverageAsset, MAX_DELEVERAGE_ASSETS]) -> uint256:
+def deleverageWithSpecificAssets(_user: address, _assets: DynArray[DeleverageAsset, MAX_DELEVERAGE_ASSETS], _caller: address, _a: addys.Addys = empty(addys.Addys)) -> uint256:
+    assert msg.sender == addys._getTellerAddr() # dev: only teller allowed
     assert not deptBasics.isPaused # dev: contract paused
-    a: addys.Addys = addys._getAddys()
-    isTrusted: bool = _user == msg.sender or addys._isValidRipeAddr(msg.sender) or self._isUnderscoreAddr(msg.sender, a.missionControl)
+    a: addys.Addys = addys._getAddys(_a)
+    isTrusted: bool = _user == _caller or addys._isValidRipeAddr(_caller) or self._isUnderscoreAddr(_caller, a.missionControl)
 
     # check perms -- must also be able to borrow
     if not isTrusted:
-        delegation: cs.ActionDelegation = staticcall MissionControl(a.missionControl).userDelegation(_user, msg.sender)
+        delegation: cs.ActionDelegation = staticcall MissionControl(a.missionControl).userDelegation(_user, _caller)
         isTrusted = delegation.canBorrow
 
     # must be trusted to deleverage with specific asset order
@@ -274,12 +277,17 @@ def deleverageWithSpecificAssets(_user: address, _assets: DynArray[DeleverageAss
 
     log DeleverageUser(
         user=_user,
-        caller=msg.sender,
+        caller=_caller,
         targetRepayAmount=trueTargetRepayAmount,
         repaidAmount=totalRepaidAmount,
         hasGoodDebtHealth=hasGoodDebtHealth,
     )
     return totalRepaidAmount
+
+
+######################
+# Special Deleverage #
+######################
 
 
 # volatile collateral assets
@@ -289,7 +297,8 @@ def deleverageWithSpecificAssets(_user: address, _assets: DynArray[DeleverageAss
 def deleverageWithVolAssets(_user: address, _assets: DynArray[DeleverageAsset, MAX_DELEVERAGE_ASSETS]) -> uint256:
     assert not deptBasics.isPaused # dev: contract paused
     a: addys.Addys = addys._getAddys()
-    assert msg.sender == staticcall RipeHq(a.hq).governance() # dev: governance only
+    if not addys._isValidRipeAddr(msg.sender):
+        assert msg.sender == staticcall RipeHq(a.hq).governance() # dev: governance only
 
     # get latest user debt
     userDebt: UserDebt = empty(UserDebt)
@@ -340,9 +349,87 @@ def deleverageWithVolAssets(_user: address, _assets: DynArray[DeleverageAsset, M
     return totalRepaidAmount
 
 
-##############################
-# Underscore Leverage Vaults #
-##############################
+# collateral swap
+
+
+@external
+def swapCollateral(
+    _user: address,
+    _withdrawVaultId: uint256,
+    _withdrawAsset: address,
+    _depositVaultId: uint256,
+    _depositAsset: address,
+    _withdrawAmount: uint256 = max_value(uint256),
+) -> (uint256, uint256):
+    assert not deptBasics.isPaused # dev: contract paused
+    assert empty(address) not in [_user, _withdrawAsset, _depositAsset] # dev: invalid assets
+    assert 0 not in [_withdrawVaultId, _depositVaultId] # dev: invalid vault ids
+
+    a: addys.Addys = addys._getAddys()
+    if not addys._isValidRipeAddr(msg.sender):
+        assert msg.sender == staticcall RipeHq(a.hq).governance() # dev: governance only
+
+    # get vault addresses
+    withdrawVaultAddr: address = staticcall Registry(a.vaultBook).getAddr(_withdrawVaultId)
+    assert withdrawVaultAddr != empty(address) # dev: invalid withdraw vault
+
+    depositVaultAddr: address = staticcall Registry(a.vaultBook).getAddr(_depositVaultId)
+    assert depositVaultAddr != empty(address) # dev: invalid deposit vault
+
+    # get debt terms for both assets
+    withdrawAssetTerms: cs.DebtTerms = staticcall MissionControl(a.missionControl).getDebtTerms(_withdrawAsset)
+    depositAssetTerms: cs.DebtTerms = staticcall MissionControl(a.missionControl).getDebtTerms(_depositAsset)
+
+    # validate LTV: deposit asset must have >= LTV as withdraw asset
+    assert depositAssetTerms.ltv >= withdrawAssetTerms.ltv # dev: deposit asset LTV too low
+
+    # withdraw collateral from user's vault, transfer to governance (msg.sender)
+    withdrawnAmount: uint256 = 0
+    isPositionDepleted: bool = False
+    withdrawnAmount, isPositionDepleted = extcall AuctionHouse(a.auctionHouse).withdrawTokensFromVault(
+        _user,
+        _withdrawAsset,
+        _withdrawAmount,
+        msg.sender, # recipient is governance
+        withdrawVaultAddr,
+        a,
+    )
+    assert withdrawnAmount != 0 # dev: no collateral withdrawn
+
+    # calculate USD value of withdrawn amount
+    usdValue: uint256 = staticcall PriceDesk(a.priceDesk).getUsdValue(_withdrawAsset, withdrawnAmount, True)
+    assert usdValue != 0 # dev: invalid USD value
+
+    # calculate deposit amount based on USD value
+    depositAmount: uint256 = staticcall PriceDesk(a.priceDesk).getAssetAmount(_depositAsset, usdValue, True)
+    assert depositAmount != 0 # dev: invalid deposit amount
+
+    # transfer new collateral from governance to this contract
+    assert extcall IERC20(_depositAsset).transferFrom(msg.sender, self, depositAmount) # dev: transferFrom failed
+
+    # approve Teller to spend tokens and deposit into user's vault
+    assert extcall IERC20(_depositAsset).approve(a.teller, depositAmount) # dev: approve failed
+    extcall Teller(a.teller).depositFromTrusted(_user, _depositVaultId, _depositAsset, depositAmount, 0, a)
+    assert extcall IERC20(_depositAsset).approve(a.teller, 0) # dev: approve failed
+
+    # perform house keeping
+    extcall Teller(a.teller).performHousekeeping(True, _user, True, a)
+
+    log CollateralSwapped(
+        user=_user,
+        caller=msg.sender,
+        withdrawVaultId=_withdrawVaultId,
+        withdrawAsset=_withdrawAsset,
+        withdrawAmount=withdrawnAmount,
+        depositVaultId=_depositVaultId,
+        depositAsset=_depositAsset,
+        depositAmount=depositAmount,
+        usdValue=usdValue,
+    )
+    return withdrawnAmount, depositAmount
+
+
+# underscore leverage vaults
 
 
 @external
@@ -418,114 +505,9 @@ def deleverageForWithdrawal(_user: address, _vaultId: uint256, _asset: address, 
     return repaidAmount != 0
 
 
-# underscore address
-
-
-@view
-@internal
-def _isUnderscoreAddr(_addr: address, _mc: address) -> bool:
-    underscore: address = staticcall MissionControl(_mc).underscoreRegistry()
-    if underscore == empty(address):
-        return False
-
-    # check if underscore vault
-    vaultRegistry: address = staticcall Registry(underscore).getAddr(UNDERSCORE_VAULT_REGISTRY_ID)
-    if vaultRegistry == empty(address):
-        return False
-    if staticcall VaultRegistry(vaultRegistry).isEarnVault(_addr):
-        return True
-
-    # check if underscore lego
-    undyLegoBook: address = staticcall Registry(underscore).getAddr(UNDERSCORE_LEGOBOOK_ID)
-    if undyLegoBook == empty(address):
-        return False
-    return staticcall Registry(undyLegoBook).isValidAddr(_addr)
-
-
-###################
-# Collateral Swap #
-###################
-
-
-@external
-def swapCollateral(
-    _user: address,
-    _withdrawVaultId: uint256,
-    _withdrawAsset: address,
-    _depositVaultId: uint256,
-    _depositAsset: address,
-    _withdrawAmount: uint256 = max_value(uint256),
-) -> (uint256, uint256):
-    assert not deptBasics.isPaused # dev: contract paused
-    assert empty(address) not in [_user, _withdrawAsset, _depositAsset] # dev: invalid assets
-    assert 0 not in [_withdrawVaultId, _depositVaultId] # dev: invalid vault ids
-
-    a: addys.Addys = addys._getAddys()
-    assert msg.sender == staticcall RipeHq(a.hq).governance() # dev: governance only
-
-    # get vault addresses
-    withdrawVaultAddr: address = staticcall Registry(a.vaultBook).getAddr(_withdrawVaultId)
-    assert withdrawVaultAddr != empty(address) # dev: invalid withdraw vault
-
-    depositVaultAddr: address = staticcall Registry(a.vaultBook).getAddr(_depositVaultId)
-    assert depositVaultAddr != empty(address) # dev: invalid deposit vault
-
-    # get debt terms for both assets
-    withdrawAssetTerms: cs.DebtTerms = staticcall MissionControl(a.missionControl).getDebtTerms(_withdrawAsset)
-    depositAssetTerms: cs.DebtTerms = staticcall MissionControl(a.missionControl).getDebtTerms(_depositAsset)
-
-    # validate LTV: deposit asset must have >= LTV as withdraw asset
-    assert depositAssetTerms.ltv >= withdrawAssetTerms.ltv # dev: deposit asset LTV too low
-
-    # withdraw collateral from user's vault, transfer to governance (msg.sender)
-    withdrawnAmount: uint256 = 0
-    isPositionDepleted: bool = False
-    withdrawnAmount, isPositionDepleted = extcall AuctionHouse(a.auctionHouse).withdrawTokensFromVault(
-        _user,
-        _withdrawAsset,
-        _withdrawAmount,
-        msg.sender, # recipient is governance
-        withdrawVaultAddr,
-        a,
-    )
-    assert withdrawnAmount != 0 # dev: no collateral withdrawn
-
-    # calculate USD value of withdrawn amount
-    usdValue: uint256 = staticcall PriceDesk(a.priceDesk).getUsdValue(_withdrawAsset, withdrawnAmount, True)
-    assert usdValue != 0 # dev: invalid USD value
-
-    # calculate deposit amount based on USD value
-    depositAmount: uint256 = staticcall PriceDesk(a.priceDesk).getAssetAmount(_depositAsset, usdValue, True)
-    assert depositAmount != 0 # dev: invalid deposit amount
-
-    # transfer new collateral from governance to this contract
-    assert extcall IERC20(_depositAsset).transferFrom(msg.sender, self, depositAmount) # dev: transferFrom failed
-
-    # approve Teller to spend tokens and deposit into user's vault
-    assert extcall IERC20(_depositAsset).approve(a.teller, depositAmount) # dev: approve failed
-    extcall Teller(a.teller).depositFromTrusted(_user, _depositVaultId, _depositAsset, depositAmount, 0, a)
-    assert extcall IERC20(_depositAsset).approve(a.teller, 0) # dev: approve failed
-
-    # perform house keeping
-    extcall Teller(a.teller).performHousekeeping(True, _user, True, a)
-
-    log CollateralSwapped(
-        user=_user,
-        caller=msg.sender,
-        withdrawVaultId=_withdrawVaultId,
-        withdrawAsset=_withdrawAsset,
-        withdrawAmount=withdrawnAmount,
-        depositVaultId=_depositVaultId,
-        depositAsset=_depositAsset,
-        depositAmount=depositAmount,
-        usdValue=usdValue,
-    )
-    return withdrawnAmount, depositAmount
-
-
-#################
-# Internal Core #
-#################
+#######################
+# Internal Deleverage #
+#######################
 
 
 @internal
@@ -589,6 +571,9 @@ def _deleverageUser(
     return repaidAmount
 
 
+# deleverage phases
+
+
 @internal
 def _performDeleveragePhases(
     _user: address,
@@ -633,11 +618,6 @@ def _performDeleveragePhases(
         remainingToRepay = self._iterateThruAllUserVaults(_user, remainingToRepay, _a)
 
     return _targetRepayAmount - remainingToRepay
-
-
-###################
-# Vaults / Assets #
-###################
 
 
 # all user vaults
@@ -756,9 +736,7 @@ def _handleSpecificAsset(
     return _remainingToRepay
 
 
-#########################
-# Stability Pool Assets #
-#########################
+# burn stability pool assets
 
 
 @internal
@@ -795,9 +773,7 @@ def _burnStabPoolAsset(
     return _remainingToRepay - min(usdValue, _remainingToRepay)
 
 
-######################
-# Endaoment Transfer #
-######################
+# transfer to endaoment
 
 
 @internal
@@ -980,6 +956,30 @@ def _transferCollateral(
 
     usdValue: uint256 = _targetUsdValue * amountSent // maxAssetAmount
     return usdValue, amountSent, isPositionDepleted
+
+
+# underscore address
+
+
+@view
+@internal
+def _isUnderscoreAddr(_addr: address, _mc: address) -> bool:
+    underscore: address = staticcall MissionControl(_mc).underscoreRegistry()
+    if underscore == empty(address):
+        return False
+
+    # check if underscore vault
+    vaultRegistry: address = staticcall Registry(underscore).getAddr(UNDERSCORE_VAULT_REGISTRY_ID)
+    if vaultRegistry == empty(address):
+        return False
+    if staticcall VaultRegistry(vaultRegistry).isEarnVault(_addr):
+        return True
+
+    # check if underscore lego
+    undyLegoBook: address = staticcall Registry(underscore).getAddr(UNDERSCORE_LEGOBOOK_ID)
+    if undyLegoBook == empty(address):
+        return False
+    return staticcall Registry(undyLegoBook).isValidAddr(_addr)
 
 
 # get asset amount

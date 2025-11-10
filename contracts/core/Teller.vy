@@ -84,6 +84,11 @@ interface Ledger:
     def checkAndUpdateLastTouch(_user: address, _shouldCheck: bool): nonpayable
     def addVaultToUser(_user: address, _vaultId: uint256): nonpayable
 
+interface Deleverage:
+    def deleverageWithSpecificAssets(_user: address, _assets: DynArray[DeleverageAsset, MAX_DELEVERAGE_ASSETS], _caller: address, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
+    def deleverageManyUsers(_users: DynArray[DeleverageUserRequest, MAX_DELEVERAGE_USERS], _caller: address, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
+    def deleverageUser(_user: address, _caller: address, _targetRepayAmount: uint256, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
+
 interface CreditRedeem:
     def redeemCollateralFromMany(_redemptions: DynArray[CollateralRedemption, MAX_COLLATERAL_REDEMPTIONS], _greenAmount: uint256, _recipient: address, _caller: address, _shouldTransferBalance: bool, _shouldRefundSavingsGreen: bool, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
 
@@ -143,6 +148,15 @@ struct StabPoolRedemption:
     claimAsset: address
     maxGreenAmount: uint256
 
+struct DeleverageUserRequest:
+    user: address
+    targetRepayAmount: uint256
+
+struct DeleverageAsset:
+    vaultId: uint256
+    asset: address
+    targetRepayAmount: uint256
+
 event TellerDeposit:
     user: indexed(address)
     depositor: indexed(address)
@@ -193,6 +207,8 @@ MAX_AUCTION_PURCHASES: constant(uint256) = 20
 MAX_LIQ_USERS: constant(uint256) = 50
 MAX_STAB_CLAIMS: constant(uint256) = 15
 MAX_STAB_REDEMPTIONS: constant(uint256) = 15
+MAX_DELEVERAGE_USERS: constant(uint256) = 25
+MAX_DELEVERAGE_ASSETS: constant(uint256) = 25
 
 STABILITY_POOL_ID: constant(uint256) = 1
 RIPE_GOV_VAULT_ID: constant(uint256) = 2
@@ -808,6 +824,32 @@ def purchaseRipeBond(
     ripePayout: uint256 = extcall BondRoom(a.bondRoom).purchaseRipeBond(_recipient, _paymentAsset, paymentAmount, _lockDuration, msg.sender, a)
     self._performHousekeeping(False, _recipient, True, a)
     return ripePayout
+
+
+##############
+# Deleverage #
+##############
+
+
+@external
+def deleverageUser(_user: address = msg.sender, _targetRepayAmount: uint256 = max_value(uint256)) -> uint256:
+    assert not deptBasics.isPaused # dev: contract paused
+    a: addys.Addys = addys._getAddys()
+    return extcall Deleverage(addys._getDeleverageAddr()).deleverageUser(_user, msg.sender, _targetRepayAmount, a)
+
+
+@external
+def deleverageManyUsers(_users: DynArray[DeleverageUserRequest, MAX_DELEVERAGE_USERS]) -> uint256:
+    assert not deptBasics.isPaused # dev: contract paused
+    a: addys.Addys = addys._getAddys()
+    return extcall Deleverage(addys._getDeleverageAddr()).deleverageManyUsers(_users, msg.sender, a)
+
+
+@external
+def deleverageWithSpecificAssets(_assets: DynArray[DeleverageAsset, MAX_DELEVERAGE_ASSETS], _user: address = msg.sender) -> uint256:
+    assert not deptBasics.isPaused # dev: contract paused
+    a: addys.Addys = addys._getAddys()
+    return extcall Deleverage(addys._getDeleverageAddr()).deleverageWithSpecificAssets(_user, _assets, msg.sender, a)
 
 
 ###############
