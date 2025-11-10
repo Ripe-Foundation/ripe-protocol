@@ -83,7 +83,8 @@ def setup(
 
 
 def test_basic_endaoment_transfer(
-    deleverage,
+    ripe_hq,  # Ensures switchboard is registered
+    switchboard,  # Ensures switchboard_alpha is registered
     teller,
     credit_engine,
     simple_erc20_vault,
@@ -94,6 +95,7 @@ def test_basic_endaoment_transfer(
     setupDeleverage,
     setup_priority_configs,
     _test,
+    switchboard_alpha,
 ):
     """
     Test basic Phase 2 functionality: single asset transfer to Endaoment.
@@ -138,11 +140,11 @@ def test_basic_endaoment_transfer(
     assert pre_user_balance >= pre_debt, "User should have sufficient collateral"
 
     # Deleverage
-    repaid_amount = deleverage.deleverageUser(bob, 0, sender=teller.address)
+    repaid_amount = teller.deleverageUser(bob, 0, sender=switchboard_alpha.address)
 
     # Get events immediately
-    transfer_log = filter_logs(deleverage, "EndaomentTransferDuringDeleverage")[0]
-    deleverage_log = filter_logs(deleverage, "DeleverageUser")[0]
+    transfer_log = filter_logs(teller, "EndaomentTransferDuringDeleverage")[0]
+    deleverage_log = filter_logs(teller, "DeleverageUser")[0]
 
     # Verify collateral transferred
     post_user_balance = simple_erc20_vault.getTotalAmountForUser(bob, alpha_token)
@@ -170,14 +172,15 @@ def test_basic_endaoment_transfer(
 
     # Verify DeleverageUser event
     assert deleverage_log.user == bob
-    assert deleverage_log.caller == teller.address  # caller is now msg.sender
+    assert deleverage_log.caller == switchboard_alpha.address  # caller is now msg.sender
     assert deleverage_log.targetRepayAmount == pre_debt
     _test(deleverage_log.repaidAmount, repaid_amount)
     assert deleverage_log.hasGoodDebtHealth == True
 
 
 def test_multiple_assets_priority_order(
-    deleverage,
+    ripe_hq,  # Ensures switchboard is registered
+    switchboard,  # Ensures switchboard_alpha is registered
     teller,
     credit_engine,
     simple_erc20_vault,
@@ -190,6 +193,7 @@ def test_multiple_assets_priority_order(
     performDeposit,
     setup_priority_configs,
     _test,
+    switchboard_alpha,
 ):
     """
     Test Phase 2 priority order: alpha_token should be processed before bravo_token.
@@ -230,10 +234,10 @@ def test_multiple_assets_priority_order(
     pre_bravo_balance = simple_erc20_vault.getTotalAmountForUser(bob, bravo_token)
 
     # Deleverage
-    repaid_amount = deleverage.deleverageUser(bob, 0, sender=teller.address)
+    repaid_amount = teller.deleverageUser(bob, 0, sender=switchboard_alpha.address)
 
     # Get events
-    transfer_logs = filter_logs(deleverage, "EndaomentTransferDuringDeleverage")
+    transfer_logs = filter_logs(teller, "EndaomentTransferDuringDeleverage")
 
     # Should have 2 transfer events
     assert len(transfer_logs) == 2, "Should have 2 transfer events"
@@ -262,7 +266,8 @@ def test_multiple_assets_priority_order(
 
 
 def test_multiple_assets_first_sufficient(
-    deleverage,
+    ripe_hq,  # Ensures switchboard is registered
+    switchboard,  # Ensures switchboard_alpha is registered
     teller,
     credit_engine,
     simple_erc20_vault,
@@ -275,6 +280,7 @@ def test_multiple_assets_first_sufficient(
     setup_priority_configs,
     bob,
     _test,
+    switchboard_alpha,
 ):
     """
     Test Phase 2 when first priority asset is sufficient to cover debt.
@@ -309,10 +315,10 @@ def test_multiple_assets_first_sufficient(
     pre_bravo_balance = simple_erc20_vault.getTotalAmountForUser(bob, bravo_token)
 
     # Deleverage
-    repaid_amount = deleverage.deleverageUser(bob, 0, sender=teller.address)
+    repaid_amount = teller.deleverageUser(bob, 0, sender=switchboard_alpha.address)
 
     # Get events
-    transfer_logs = filter_logs(deleverage, "EndaomentTransferDuringDeleverage")
+    transfer_logs = filter_logs(teller, "EndaomentTransferDuringDeleverage")
 
     # Should have only 1 transfer event (alpha_token only)
     assert len(transfer_logs) == 1, "Should have only 1 transfer event"
@@ -332,7 +338,8 @@ def test_multiple_assets_first_sufficient(
 
 
 def test_multiple_assets_both_needed(
-    deleverage,
+    ripe_hq,  # Ensures switchboard is registered
+    switchboard,  # Ensures switchboard_alpha is registered
     teller,
     credit_engine,
     simple_erc20_vault,
@@ -345,6 +352,7 @@ def test_multiple_assets_both_needed(
     setup_priority_configs,
     alpha_token,
     _test,
+    switchboard_alpha,
 ):
     """
     Test Phase 2 when both assets are needed.
@@ -387,10 +395,10 @@ def test_multiple_assets_both_needed(
     total_collateral = pre_alpha_balance + pre_bravo_balance
 
     # Deleverage
-    repaid_amount = deleverage.deleverageUser(bob, 0, sender=teller.address)
+    repaid_amount = teller.deleverageUser(bob, 0, sender=switchboard_alpha.address)
 
     # Get events
-    transfer_logs = filter_logs(deleverage, "EndaomentTransferDuringDeleverage")
+    transfer_logs = filter_logs(teller, "EndaomentTransferDuringDeleverage")
 
     # Should have 2 transfer events
     assert len(transfer_logs) == 2
@@ -414,7 +422,8 @@ def test_multiple_assets_both_needed(
 
 
 def test_no_balance_in_priority_asset(
-    deleverage,
+    ripe_hq,  # Ensures switchboard is registered
+    switchboard,  # Ensures switchboard_alpha is registered
     teller,
     credit_engine,
     simple_erc20_vault,
@@ -425,6 +434,7 @@ def test_no_balance_in_priority_asset(
     setupDeleverage,
     setup_priority_configs,
     _test,
+    switchboard_alpha,
 ):
     """
     Test Phase 2 when user has no balance in first priority asset.
@@ -458,10 +468,10 @@ def test_no_balance_in_priority_asset(
     pre_bravo_balance = simple_erc20_vault.getTotalAmountForUser(bob, bravo_token)
 
     # Deleverage
-    repaid_amount = deleverage.deleverageUser(bob, 0, sender=teller.address)
+    repaid_amount = teller.deleverageUser(bob, 0, sender=switchboard_alpha.address)
 
     # Get events
-    transfer_logs = filter_logs(deleverage, "EndaomentTransferDuringDeleverage")
+    transfer_logs = filter_logs(teller, "EndaomentTransferDuringDeleverage")
 
     # Should have only 1 event (bravo_token, alpha skipped)
     assert len(transfer_logs) == 1
@@ -477,13 +487,15 @@ def test_no_balance_in_priority_asset(
 
 
 def test_empty_priority_list(
-    deleverage,
+    ripe_hq,  # Ensures switchboard is registered
+    switchboard,  # Ensures switchboard_alpha is registered
     teller,
     bob,
     alpha_token,
     alpha_token_whale,
     setupDeleverage,
     setup_priority_configs,
+    switchboard_alpha,
 ):
     """
     Test Phase 2 is skipped when priority_liq_assets list is empty.
@@ -506,14 +518,15 @@ def test_empty_priority_list(
     )
 
     # Deleverage (will fall through to Phase 3)
-    repaid_amount = deleverage.deleverageUser(bob, 0, sender=teller.address)
+    repaid_amount = teller.deleverageUser(bob, 0, sender=switchboard_alpha.address)
 
     # Phase 2 skipped - but Phase 3 should still handle it
     assert repaid_amount > 0, "Should still deleverage via Phase 3"
 
 
 def test_target_repay_amount(
-    deleverage,
+    ripe_hq,  # Ensures switchboard is registered
+    switchboard,  # Ensures switchboard_alpha is registered
     teller,
     credit_engine,
     simple_erc20_vault,
@@ -523,6 +536,7 @@ def test_target_repay_amount(
     setupDeleverage,
     setup_priority_configs,
     _test,
+    switchboard_alpha,
 ):
     """
     Test Phase 2 respects target repay amount parameter.
@@ -553,11 +567,11 @@ def test_target_repay_amount(
     target_repay = 200 * EIGHTEEN_DECIMALS
 
     # Deleverage with target
-    repaid_amount = deleverage.deleverageUser(bob, target_repay, sender=teller.address)
+    repaid_amount = teller.deleverageUser(bob, target_repay, sender=switchboard_alpha.address)
 
     # Get events
-    transfer_log = filter_logs(deleverage, "EndaomentTransferDuringDeleverage")[0]
-    deleverage_log = filter_logs(deleverage, "DeleverageUser")[0]
+    transfer_log = filter_logs(teller, "EndaomentTransferDuringDeleverage")[0]
+    deleverage_log = filter_logs(teller, "DeleverageUser")[0]
 
     # Verify only target amount repaid
     assert repaid_amount <= target_repay
@@ -581,7 +595,8 @@ def test_target_repay_amount(
 
 
 def test_vault_balance_changes(
-    deleverage,
+    ripe_hq,  # Ensures switchboard is registered
+    switchboard,  # Ensures switchboard_alpha is registered
     teller,
     simple_erc20_vault,
     bob,
@@ -591,6 +606,7 @@ def test_vault_balance_changes(
     setupDeleverage,
     setup_priority_configs,
     _test,
+    switchboard_alpha,
 ):
     """
     Test that vault balances change correctly:
@@ -619,7 +635,7 @@ def test_vault_balance_changes(
     pre_endaoment_token_balance = alpha_token.balanceOf(endaoment)
 
     # Deleverage
-    deleverage.deleverageUser(bob, 0, sender=teller.address)
+    teller.deleverageUser(bob, 0, sender=switchboard_alpha.address)
 
     # Post-state
     post_user_vault_balance = simple_erc20_vault.getTotalAmountForUser(bob, alpha_token)
@@ -636,7 +652,8 @@ def test_vault_balance_changes(
 
 
 def test_balance_changes_multiple_assets_all_depleted(
-    deleverage,
+    ripe_hq,  # Ensures switchboard is registered
+    switchboard,  # Ensures switchboard_alpha is registered
     teller,
     simple_erc20_vault,
     bob,
@@ -649,6 +666,7 @@ def test_balance_changes_multiple_assets_all_depleted(
     performDeposit,
     setup_priority_configs,
     _test,
+    switchboard_alpha,
 ):
     """
     Test balance changes when multiple assets are both used in deleverage.
@@ -691,7 +709,7 @@ def test_balance_changes_multiple_assets_all_depleted(
     pre_bravo_endaoment = bravo_token.balanceOf(endaoment)
 
     # Deleverage
-    deleverage.deleverageUser(bob, 0, sender=teller.address)
+    teller.deleverageUser(bob, 0, sender=switchboard_alpha.address)
 
     # Post-state
     post_alpha_vault = simple_erc20_vault.getTotalAmountForUser(bob, alpha_token)
@@ -725,7 +743,8 @@ def test_balance_changes_multiple_assets_all_depleted(
 
 
 def test_balance_changes_multiple_assets_partial(
-    deleverage,
+    ripe_hq,  # Ensures switchboard is registered
+    switchboard,  # Ensures switchboard_alpha is registered
     teller,
     simple_erc20_vault,
     bob,
@@ -740,6 +759,7 @@ def test_balance_changes_multiple_assets_partial(
     performDeposit,
     setup_priority_configs,
     _test,
+    switchboard_alpha,
 ):
     """
     Test balance changes when assets are partially used.
@@ -789,7 +809,7 @@ def test_balance_changes_multiple_assets_partial(
     pre_charlie_endaoment = charlie_token.balanceOf(endaoment)
 
     # Deleverage
-    deleverage.deleverageUser(bob, 0, sender=teller.address)
+    teller.deleverageUser(bob, 0, sender=switchboard_alpha.address)
 
     # Post-state
     post_alpha_vault = simple_erc20_vault.getTotalAmountForUser(bob, alpha_token)
@@ -832,7 +852,8 @@ def test_balance_changes_multiple_assets_partial(
 
 
 def test_balance_changes_different_decimals(
-    deleverage,
+    ripe_hq,  # Ensures switchboard is registered
+    switchboard,  # Ensures switchboard_alpha is registered
     teller,
     simple_erc20_vault,
     bob,
@@ -847,6 +868,7 @@ def test_balance_changes_different_decimals(
     performDeposit,
     setup_priority_configs,
     _test,
+    switchboard_alpha,
 ):
     """
     Test balance changes with tokens of different decimals to ensure proper accounting.
@@ -901,7 +923,7 @@ def test_balance_changes_different_decimals(
     pre_delta_endaoment = delta_token.balanceOf(endaoment)
 
     # Deleverage
-    deleverage.deleverageUser(bob, 0, sender=teller.address)
+    teller.deleverageUser(bob, 0, sender=switchboard_alpha.address)
 
     # Post-state
     post_alpha_vault = simple_erc20_vault.getTotalAmountForUser(bob, alpha_token)
@@ -944,7 +966,8 @@ def test_balance_changes_different_decimals(
 
 
 def test_balance_changes_with_target_amount(
-    deleverage,
+    ripe_hq,  # Ensures switchboard is registered
+    switchboard,  # Ensures switchboard_alpha is registered
     teller,
     simple_erc20_vault,
     bob,
@@ -957,6 +980,7 @@ def test_balance_changes_with_target_amount(
     performDeposit,
     setup_priority_configs,
     _test,
+    switchboard_alpha,
 ):
     """
     Test balance changes when using target repay amount (partial deleverage).
@@ -996,7 +1020,7 @@ def test_balance_changes_with_target_amount(
 
     # Deleverage with target
     target_repay = 300 * EIGHTEEN_DECIMALS
-    deleverage.deleverageUser(bob, target_repay, sender=teller.address)
+    teller.deleverageUser(bob, target_repay, sender=switchboard_alpha.address)
 
     # Post-state
     post_alpha_vault = simple_erc20_vault.getTotalAmountForUser(bob, alpha_token)
@@ -1029,7 +1053,8 @@ def test_balance_changes_with_target_amount(
 
 
 def test_balance_changes_skip_empty_asset(
-    deleverage,
+    ripe_hq,  # Ensures switchboard is registered
+    switchboard,  # Ensures switchboard_alpha is registered
     teller,
     simple_erc20_vault,
     bob,
@@ -1043,6 +1068,7 @@ def test_balance_changes_skip_empty_asset(
     performDeposit,
     setup_priority_configs,
     _test,
+    switchboard_alpha,
 ):
     """
     Test balance changes when priority asset has zero balance (should skip).
@@ -1091,7 +1117,7 @@ def test_balance_changes_skip_empty_asset(
     assert pre_alpha_vault == 0, "Alpha should be empty"
 
     # Deleverage
-    deleverage.deleverageUser(bob, 0, sender=teller.address)
+    teller.deleverageUser(bob, 0, sender=switchboard_alpha.address)
 
     # Post-state
     post_alpha_vault = simple_erc20_vault.getTotalAmountForUser(bob, alpha_token)
@@ -1136,7 +1162,8 @@ def test_balance_changes_skip_empty_asset(
 
 
 def test_four_assets_priority(
-    deleverage,
+    ripe_hq,  # Ensures switchboard is registered
+    switchboard,  # Ensures switchboard_alpha is registered
     teller,
     credit_engine,
     simple_erc20_vault,
@@ -1153,6 +1180,7 @@ def test_four_assets_priority(
     performDeposit,
     setup_priority_configs,
     _test,
+    switchboard_alpha,
 ):
     """
     Test Phase 2 with full priority list (4 assets: alpha, bravo, charlie, delta).
@@ -1204,10 +1232,10 @@ def test_four_assets_priority(
     pre_debt = credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount
 
     # Deleverage
-    repaid_amount = deleverage.deleverageUser(bob, 0, sender=teller.address)
+    repaid_amount = teller.deleverageUser(bob, 0, sender=switchboard_alpha.address)
 
     # Get events
-    transfer_logs = filter_logs(deleverage, "EndaomentTransferDuringDeleverage")
+    transfer_logs = filter_logs(teller, "EndaomentTransferDuringDeleverage")
 
     # Should have 4 transfer events (all 4 assets used)
     assert len(transfer_logs) == 4, "Should have 4 transfer events"
@@ -1245,7 +1273,8 @@ def test_four_assets_priority(
 
 
 def test_phase2_then_phase3_prevents_double_processing(
-    deleverage,
+    ripe_hq,  # Ensures switchboard is registered
+    switchboard,  # Ensures switchboard_alpha is registered
     teller,
     simple_erc20_vault,
     rebase_erc20_vault,
@@ -1260,6 +1289,7 @@ def test_phase2_then_phase3_prevents_double_processing(
     setAssetConfig,
     createDebtTerms,
     _test,
+    switchboard_alpha,
 ):
     """
     CRITICAL TEST: Verify that same asset in Phase 2 priority list AND user's Phase 3 vault
@@ -1333,10 +1363,10 @@ def test_phase2_then_phase3_prevents_double_processing(
     assert pre_bravo_vault3 == 100 * EIGHTEEN_DECIMALS
 
     # Deleverage
-    repaid_amount = deleverage.deleverageUser(bob, 0, sender=teller.address)
+    repaid_amount = teller.deleverageUser(bob, 0, sender=switchboard_alpha.address)
 
     # Get transfer events
-    transfer_logs = filter_logs(deleverage, "EndaomentTransferDuringDeleverage")
+    transfer_logs = filter_logs(teller, "EndaomentTransferDuringDeleverage")
 
     # Track balances after
     post_alpha_vault3 = simple_erc20_vault.getTotalAmountForUser(bob, alpha_token)
@@ -1390,7 +1420,8 @@ def test_phase2_then_phase3_prevents_double_processing(
 
 
 def test_phase2_with_non_dollar_asset_prices(
-    deleverage,
+    ripe_hq,  # Ensures switchboard is registered
+    switchboard,  # Ensures switchboard_alpha is registered
     teller,
     simple_erc20_vault,
     bob,
@@ -1406,6 +1437,7 @@ def test_phase2_with_non_dollar_asset_prices(
     setup_priority_configs,
     mock_price_source,
     _test,
+    switchboard_alpha,
 ):
     """
     CRITICAL TEST: Test Phase 2 with assets priced differently from $1.00.
@@ -1476,10 +1508,10 @@ def test_phase2_with_non_dollar_asset_prices(
     assert pre_charlie_vault == 20 * SIX_DECIMALS
 
     # Deleverage
-    repaid_amount = deleverage.deleverageUser(bob, 0, sender=teller.address)
+    repaid_amount = teller.deleverageUser(bob, 0, sender=switchboard_alpha.address)
 
     # Get transfer events
-    transfer_logs = filter_logs(deleverage, "EndaomentTransferDuringDeleverage")
+    transfer_logs = filter_logs(teller, "EndaomentTransferDuringDeleverage")
 
     # Track balances after
     post_alpha_vault = simple_erc20_vault.getTotalAmountForUser(bob, alpha_token)
@@ -1533,7 +1565,8 @@ def test_phase2_with_non_dollar_asset_prices(
 
 
 def test_phase2_tiny_debt_amount(
-    deleverage,
+    ripe_hq,  # Ensures switchboard is registered
+    switchboard,  # Ensures switchboard_alpha is registered
     teller,
     simple_erc20_vault,
     bob,
@@ -1544,6 +1577,7 @@ def test_phase2_tiny_debt_amount(
     setup_priority_configs,
     credit_engine,
     _test,
+    switchboard_alpha,
 ):
     """
     Test Phase 2 with extremely small debt amount (1 wei).
@@ -1581,10 +1615,10 @@ def test_phase2_tiny_debt_amount(
     pre_debt = credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount
 
     # Deleverage
-    repaid_amount = deleverage.deleverageUser(bob, 0, sender=teller.address)
+    repaid_amount = teller.deleverageUser(bob, 0, sender=switchboard_alpha.address)
 
     # Get event
-    transfer_logs = filter_logs(deleverage, "EndaomentTransferDuringDeleverage")
+    transfer_logs = filter_logs(teller, "EndaomentTransferDuringDeleverage")
 
     # Post balances
     post_vault = simple_erc20_vault.getTotalAmountForUser(bob, alpha_token)

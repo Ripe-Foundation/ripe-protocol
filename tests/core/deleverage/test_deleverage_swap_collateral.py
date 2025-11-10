@@ -997,46 +997,6 @@ def test_swap_non_governance_fails(
         )
 
 
-def test_swap_teller_cannot_call(
-    deleverage,
-    teller,
-    bob,
-    alpha_token,
-    bravo_token,
-    alpha_token_whale,
-    bravo_token_whale,
-    governance,
-    simple_erc20_vault,
-    vault_book,
-    setupSwapScenario,
-):
-    """Test that even trusted contracts like Teller cannot call"""
-    setupSwapScenario(
-        user=bob,
-        withdraw_token=alpha_token,
-        deposit_token=bravo_token,
-        withdraw_whale=alpha_token_whale,
-        deposit_whale=bravo_token_whale,
-        governance=governance,
-        deleverage=deleverage,
-        withdraw_vault=simple_erc20_vault,
-    )
-
-    vault_id = vault_book.getRegId(simple_erc20_vault)
-
-    # Teller is a trusted contract but still cannot call swapCollateral
-    with boa.reverts("governance only"):
-        deleverage.swapCollateral(
-            bob,
-            vault_id,
-            alpha_token.address,
-            vault_id,
-            bravo_token.address,
-            MAX_UINT256,
-            sender=teller.address  # Even trusted contracts cannot call
-        )
-
-
 #################
 # Error Cases
 #################

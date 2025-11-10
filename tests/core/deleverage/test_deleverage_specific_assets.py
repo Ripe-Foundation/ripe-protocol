@@ -96,6 +96,7 @@ def setup(
 
 
 def test_single_asset_sgreen_burn(
+    switchboard_alpha,
     deleverage,
     teller,
     credit_engine,
@@ -136,13 +137,13 @@ def test_single_asset_sgreen_burn(
     target_amount = 250 * EIGHTEEN_DECIMALS
     assets = [(1, savings_green.address, target_amount)]
 
-    repaid_amount = deleverage.deleverageWithSpecificAssets(
-        bob, assets, sender=teller.address
+    repaid_amount = teller.deleverageWithSpecificAssets(
+        assets, bob, sender=switchboard_alpha.address
     )
 
     # Get events immediately
-    burn_log = filter_logs(deleverage, "StabAssetBurntDuringDeleverage")[0]
-    main_log = filter_logs(deleverage, "DeleverageUser")[0]
+    burn_log = filter_logs(teller, "StabAssetBurntDuringDeleverage")[0]
+    main_log = filter_logs(teller, "DeleverageUser")[0]
 
     # Post-state
     post_sgreen_in_pool = stability_pool.getTotalAmountForUser(bob, savings_green)
@@ -167,13 +168,14 @@ def test_single_asset_sgreen_burn(
 
     # Verify main event - trueTargetRepayAmount should match requested
     assert main_log.user == bob
-    assert main_log.caller == teller.address
+    assert main_log.caller == switchboard_alpha.address
     _test(main_log.targetRepayAmount, target_amount)
     _test(main_log.repaidAmount, repaid_amount)
     assert main_log.hasGoodDebtHealth == True
 
 
 def test_single_asset_endaoment_transfer(
+    switchboard_alpha,
     deleverage,
     teller,
     credit_engine,
@@ -208,13 +210,13 @@ def test_single_asset_endaoment_transfer(
     target_amount = 200 * EIGHTEEN_DECIMALS
     assets = [(3, bravo_token.address, target_amount)]
 
-    repaid_amount = deleverage.deleverageWithSpecificAssets(
-        bob, assets, sender=teller.address
+    repaid_amount = teller.deleverageWithSpecificAssets(
+        assets, bob, sender=switchboard_alpha.address
     )
 
     # Get events immediately
-    transfer_log = filter_logs(deleverage, "EndaomentTransferDuringDeleverage")[0]
-    main_log = filter_logs(deleverage, "DeleverageUser")[0]
+    transfer_log = filter_logs(teller, "EndaomentTransferDuringDeleverage")[0]
+    main_log = filter_logs(teller, "DeleverageUser")[0]
 
     # Post-state
     post_bravo_vault = simple_erc20_vault.getTotalAmountForUser(bob, bravo_token)
@@ -244,12 +246,13 @@ def test_single_asset_endaoment_transfer(
 
     # Verify main event
     assert main_log.user == bob
-    assert main_log.caller == teller.address
+    assert main_log.caller == switchboard_alpha.address
     _test(main_log.targetRepayAmount, target_amount)
     _test(main_log.repaidAmount, repaid_amount)
 
 
 def test_multiple_assets_custom_order(
+    switchboard_alpha,
     deleverage,
     teller,
     credit_engine,
@@ -298,13 +301,13 @@ def test_multiple_assets_custom_order(
         (1, savings_green.address, 200 * EIGHTEEN_DECIMALS),
     ]
 
-    repaid_amount = deleverage.deleverageWithSpecificAssets(
-        bob, assets, sender=teller.address
+    repaid_amount = teller.deleverageWithSpecificAssets(
+        assets, bob, sender=switchboard_alpha.address
     )
 
     # Get events immediately
-    transfer_logs = filter_logs(deleverage, "EndaomentTransferDuringDeleverage")
-    burn_logs = filter_logs(deleverage, "StabAssetBurntDuringDeleverage")
+    transfer_logs = filter_logs(teller, "EndaomentTransferDuringDeleverage")
+    burn_logs = filter_logs(teller, "StabAssetBurntDuringDeleverage")
 
     # Verify event order: bravo transfer FIRST
     assert len(transfer_logs) == 1
@@ -338,6 +341,7 @@ def test_multiple_assets_custom_order(
 
 
 def test_order_overrides_priority_configs(
+    switchboard_alpha,
     deleverage,
     teller,
     stability_pool,
@@ -389,11 +393,11 @@ def test_order_overrides_priority_configs(
         (1, savings_green.address, 100 * EIGHTEEN_DECIMALS),
     ]
 
-    deleverage.deleverageWithSpecificAssets(bob, assets, sender=teller.address)
+    teller.deleverageWithSpecificAssets(assets, bob, sender=switchboard_alpha.address)
 
     # Get events immediately
-    transfer_logs = filter_logs(deleverage, "EndaomentTransferDuringDeleverage")
-    burn_logs = filter_logs(deleverage, "StabAssetBurntDuringDeleverage")
+    transfer_logs = filter_logs(teller, "EndaomentTransferDuringDeleverage")
+    burn_logs = filter_logs(teller, "StabAssetBurntDuringDeleverage")
 
     # Verify bravo processed FIRST despite priority saying sGREEN should be first
     assert len(transfer_logs) == 1
@@ -412,6 +416,7 @@ def test_order_overrides_priority_configs(
 
 
 def test_processes_same_asset_only_once_deduplication(
+    switchboard_alpha,
     deleverage,
     teller,
     stability_pool,
@@ -448,12 +453,12 @@ def test_processes_same_asset_only_once_deduplication(
         (1, savings_green.address, 200 * EIGHTEEN_DECIMALS),  # Duplicate!
     ]
 
-    repaid_amount = deleverage.deleverageWithSpecificAssets(
-        bob, assets, sender=teller.address
+    repaid_amount = teller.deleverageWithSpecificAssets(
+        assets, bob, sender=switchboard_alpha.address
     )
 
     # Get events immediately
-    burn_logs = filter_logs(deleverage, "StabAssetBurntDuringDeleverage")
+    burn_logs = filter_logs(teller, "StabAssetBurntDuringDeleverage")
 
     # Should have only ONE burn event (deduplication works)
     assert len(burn_logs) == 1
@@ -473,6 +478,7 @@ def test_processes_same_asset_only_once_deduplication(
 
 
 def test_max_uint_amount_uses_all_available(
+    switchboard_alpha,
     deleverage,
     teller,
     stability_pool,
@@ -509,12 +515,12 @@ def test_max_uint_amount_uses_all_available(
     # Call with max_uint
     assets = [(1, savings_green.address, 2**256 - 1)]
 
-    repaid_amount = deleverage.deleverageWithSpecificAssets(
-        bob, assets, sender=teller.address
+    repaid_amount = teller.deleverageWithSpecificAssets(
+        assets, bob, sender=switchboard_alpha.address
     )
 
     # Get main event
-    main_log = filter_logs(deleverage, "DeleverageUser")[0]
+    main_log = filter_logs(teller, "DeleverageUser")[0]
 
     # Post-state
     post_sgreen = stability_pool.getTotalAmountForUser(bob, savings_green)
@@ -531,6 +537,7 @@ def test_max_uint_amount_uses_all_available(
 
 
 def test_caps_per_asset_when_debt_runs_out(
+    switchboard_alpha,
     deleverage,
     teller,
     simple_erc20_vault,
@@ -572,13 +579,13 @@ def test_caps_per_asset_when_debt_runs_out(
         (3, bravo_token.address, 150 * EIGHTEEN_DECIMALS),  # Won't process (deduplicated + no debt left)
     ]
 
-    repaid_amount = deleverage.deleverageWithSpecificAssets(
-        bob, assets, sender=teller.address
+    repaid_amount = teller.deleverageWithSpecificAssets(
+        assets, bob, sender=switchboard_alpha.address
     )
 
     # Get events
-    transfer_logs = filter_logs(deleverage, "EndaomentTransferDuringDeleverage")
-    main_log = filter_logs(deleverage, "DeleverageUser")[0]
+    transfer_logs = filter_logs(teller, "EndaomentTransferDuringDeleverage")
+    main_log = filter_logs(teller, "DeleverageUser")[0]
 
     # Should have 2 events: bravo (150) and charlie (50)
     assert len(transfer_logs) == 2
@@ -606,6 +613,7 @@ def test_caps_per_asset_when_debt_runs_out(
 
 
 def test_partial_asset_depletion_midway(
+    switchboard_alpha,
     deleverage,
     teller,
     credit_engine,
@@ -649,12 +657,12 @@ def test_partial_asset_depletion_midway(
         (3, charlie_token.address, 300 * EIGHTEEN_DECIMALS),
     ]
 
-    repaid_amount = deleverage.deleverageWithSpecificAssets(
-        bob, assets, sender=teller.address
+    repaid_amount = teller.deleverageWithSpecificAssets(
+        assets, bob, sender=switchboard_alpha.address
     )
 
     # Get events
-    transfer_logs = filter_logs(deleverage, "EndaomentTransferDuringDeleverage")
+    transfer_logs = filter_logs(teller, "EndaomentTransferDuringDeleverage")
 
     # Find each asset's event
     bravo_log = next(e for e in transfer_logs if e.asset == bravo_token.address)
@@ -687,7 +695,7 @@ def test_partial_asset_depletion_midway(
 
 
 def test_user_can_call_for_themselves(
-    deleverage,
+    teller,
     credit_engine,
     stability_pool,
     bob,
@@ -719,8 +727,8 @@ def test_user_can_call_for_themselves(
     # Bob calls for himself
     assets = [(1, savings_green.address, 100 * EIGHTEEN_DECIMALS)]
 
-    repaid_amount = deleverage.deleverageWithSpecificAssets(
-        bob, assets, sender=bob  # User calling for themselves
+    repaid_amount = teller.deleverageWithSpecificAssets(
+        assets, bob, sender=bob  # User calling for themselves
     )
 
     assert repaid_amount > 0
@@ -731,7 +739,7 @@ def test_user_can_call_for_themselves(
 
 
 def test_untrusted_caller_blocked(
-    deleverage,
+    teller,
     stability_pool,
     bob,
     alice,  # Untrusted caller
@@ -762,7 +770,7 @@ def test_untrusted_caller_blocked(
     assets = [(1, savings_green.address, 100 * EIGHTEEN_DECIMALS)]
 
     with boa.reverts("not allowed"):
-        deleverage.deleverageWithSpecificAssets(bob, assets, sender=alice)
+        teller.deleverageWithSpecificAssets(assets, bob, sender=alice)
 
 
 ###########################
@@ -771,7 +779,7 @@ def test_untrusted_caller_blocked(
 
 
 def test_empty_array_fails(
-    deleverage,
+    switchboard_alpha,
     teller,
     bob,
     alpha_token,
@@ -795,11 +803,11 @@ def test_empty_array_fails(
     assets = []
 
     with boa.reverts("no assets processed"):
-        deleverage.deleverageWithSpecificAssets(bob, assets, sender=teller.address)
+        teller.deleverageWithSpecificAssets(assets, bob, sender=switchboard_alpha.address)
 
 
 def test_all_invalid_vaults_fails(
-    deleverage,
+    switchboard_alpha,
     teller,
     bob,
     alpha_token,
@@ -827,4 +835,4 @@ def test_all_invalid_vaults_fails(
     ]
 
     with boa.reverts("no assets processed"):
-        deleverage.deleverageWithSpecificAssets(bob, assets, sender=teller.address)
+        teller.deleverageWithSpecificAssets(assets, bob, sender=switchboard_alpha.address)

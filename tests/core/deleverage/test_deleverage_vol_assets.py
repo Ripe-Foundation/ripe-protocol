@@ -143,6 +143,7 @@ def setup(
 
 def test_single_volatile_asset_deleverage(
     deleverage,
+    switchboard_alpha,
     ripe_hq,
     credit_engine,
     simple_erc20_vault,
@@ -182,8 +183,6 @@ def test_single_volatile_asset_deleverage(
     pre_vault_balance = simple_erc20_vault.getTotalAmountForUser(bob, alpha_token)
     pre_endaoment_balance = alpha_token.balanceOf(endaoment)
 
-    # Get governance address
-    governance = ripe_hq.governance()
 
     # Call deleverageWithVolAssets
     target_amount = 250 * EIGHTEEN_DECIMALS
@@ -191,7 +190,7 @@ def test_single_volatile_asset_deleverage(
     assets = [(vault_id, alpha_token.address, target_amount)]
 
     repaid_amount = deleverage.deleverageWithVolAssets(
-        bob, assets, sender=governance
+        bob, assets, sender=switchboard_alpha.address
     )
 
     # Get events immediately
@@ -234,6 +233,7 @@ def test_single_volatile_asset_deleverage(
 
 def test_multiple_volatile_assets_ordered(
     deleverage,
+    switchboard_alpha,
     ripe_hq,
     credit_engine,
     simple_erc20_vault,
@@ -279,8 +279,6 @@ def test_multiple_volatile_assets_ordered(
     pre_alpha = simple_erc20_vault.getTotalAmountForUser(bob, alpha_token)
     pre_bravo = simple_erc20_vault.getTotalAmountForUser(bob, bravo_token)
 
-    # Get governance address
-    governance = ripe_hq.governance()
 
     # Call with SPECIFIC ORDER: bravo FIRST, then alpha
     vault_id = 3
@@ -290,7 +288,7 @@ def test_multiple_volatile_assets_ordered(
     ]
 
     repaid_amount = deleverage.deleverageWithVolAssets(
-        bob, assets, sender=governance
+        bob, assets, sender=switchboard_alpha.address
     )
 
     # Get events immediately
@@ -322,6 +320,7 @@ def test_multiple_volatile_assets_ordered(
 
 def test_max_uint_amount(
     deleverage,
+    switchboard_alpha,
     ripe_hq,
     simple_erc20_vault,
     bob,
@@ -355,15 +354,13 @@ def test_max_uint_amount(
     pre_vault_balance = simple_erc20_vault.getTotalAmountForUser(bob, alpha_token)
     assert pre_vault_balance == 1_000 * EIGHTEEN_DECIMALS
 
-    # Get governance address
-    governance = ripe_hq.governance()
 
     # Use MAX_UINT256
     vault_id = 3
     assets = [(vault_id, alpha_token.address, MAX_UINT256)]
 
     repaid_amount = deleverage.deleverageWithVolAssets(
-        bob, assets, sender=governance
+        bob, assets, sender=switchboard_alpha.address
     )
 
     # Post-state
@@ -380,6 +377,7 @@ def test_max_uint_amount(
 
 def test_partial_amount_deleverage(
     deleverage,
+    switchboard_alpha,
     ripe_hq,
     credit_engine,
     simple_erc20_vault,
@@ -415,8 +413,6 @@ def test_partial_amount_deleverage(
     pre_debt = credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount
     pre_vault_balance = simple_erc20_vault.getTotalAmountForUser(bob, alpha_token)
 
-    # Get governance address
-    governance = ripe_hq.governance()
 
     # Target only 100 USD
     target_amount = 100 * EIGHTEEN_DECIMALS
@@ -424,7 +420,7 @@ def test_partial_amount_deleverage(
     assets = [(vault_id, alpha_token.address, target_amount)]
 
     repaid_amount = deleverage.deleverageWithVolAssets(
-        bob, assets, sender=governance
+        bob, assets, sender=switchboard_alpha.address
     )
 
     # Post-state
@@ -442,6 +438,7 @@ def test_partial_amount_deleverage(
 
 def test_different_decimals(
     deleverage,
+    switchboard_alpha,
     ripe_hq,
     credit_engine,
     simple_erc20_vault,
@@ -484,8 +481,6 @@ def test_different_decimals(
     pre_endaoment_alpha = alpha_token.balanceOf(endaoment)
     pre_endaoment_charlie = charlie_token.balanceOf(endaoment)
 
-    # Get governance address
-    governance = ripe_hq.governance()
 
     # Deleverage both
     vault_id = 3
@@ -495,7 +490,7 @@ def test_different_decimals(
     ]
 
     repaid_amount = deleverage.deleverageWithVolAssets(
-        bob, assets, sender=governance
+        bob, assets, sender=switchboard_alpha.address
     )
 
     # Post-state
@@ -518,6 +513,7 @@ def test_different_decimals(
 
 def test_skips_stability_pool_assets(
     deleverage,
+    switchboard_alpha,
     ripe_hq,
     credit_engine,
     stability_pool,
@@ -554,18 +550,17 @@ def test_skips_stability_pool_assets(
     sgreen_balance = savings_green.balanceOf(bob)
     performDeposit(bob, sgreen_balance, savings_green, bob, stability_pool)
 
-    # Get governance address
-    governance = ripe_hq.governance()
 
     # Try to deleverage sGREEN - should FAIL
     assets = [(1, savings_green.address, 250 * EIGHTEEN_DECIMALS)]
 
     with boa.reverts("no volatile assets processed"):
-        deleverage.deleverageWithVolAssets(bob, assets, sender=governance)
+        deleverage.deleverageWithVolAssets(bob, assets, sender=switchboard_alpha.address)
 
 
 def test_skips_endaoment_transfer_assets(
     deleverage,
+    switchboard_alpha,
     ripe_hq,
     simple_erc20_vault,
     bob,
@@ -596,19 +591,18 @@ def test_skips_endaoment_transfer_assets(
         get_sgreen=False,
     )
 
-    # Get governance address
-    governance = ripe_hq.governance()
 
     # Try to deleverage delta_token - should FAIL
     vault_id = 3
     assets = [(vault_id, delta_token.address, 250 * EIGHTEEN_DECIMALS)]
 
     with boa.reverts("no volatile assets processed"):
-        deleverage.deleverageWithVolAssets(bob, assets, sender=governance)
+        deleverage.deleverageWithVolAssets(bob, assets, sender=switchboard_alpha.address)
 
 
 def test_mixed_assets_only_processes_volatiles(
     deleverage,
+    switchboard_alpha,
     ripe_hq,
     credit_engine,
     stability_pool,
@@ -661,8 +655,6 @@ def test_mixed_assets_only_processes_volatiles(
     pre_delta = simple_erc20_vault.getTotalAmountForUser(bob, delta_token)
     pre_sgreen = stability_pool.getTotalAmountForUser(bob, savings_green)
 
-    # Get governance address
-    governance = ripe_hq.governance()
 
     # Try to deleverage all three - only alpha should work
     assets = [
@@ -672,7 +664,7 @@ def test_mixed_assets_only_processes_volatiles(
     ]
 
     repaid_amount = deleverage.deleverageWithVolAssets(
-        bob, assets, sender=governance
+        bob, assets, sender=switchboard_alpha.address
     )
 
     # Get events
@@ -705,6 +697,7 @@ def test_mixed_assets_only_processes_volatiles(
 
 def test_only_non_volatiles_fails(
     deleverage,
+    switchboard_alpha,
     ripe_hq,
     stability_pool,
     simple_erc20_vault,
@@ -746,8 +739,6 @@ def test_only_non_volatiles_fails(
     delta_token.transfer(bob, 300 * EIGHT_DECIMALS, sender=delta_token_whale)
     performDeposit(bob, 300 * EIGHT_DECIMALS, delta_token, bob, simple_erc20_vault)
 
-    # Get governance address
-    governance = ripe_hq.governance()
 
     # Only non-volatile assets - should FAIL
     assets = [
@@ -756,7 +747,7 @@ def test_only_non_volatiles_fails(
     ]
 
     with boa.reverts("no volatile assets processed"):
-        deleverage.deleverageWithVolAssets(bob, assets, sender=governance)
+        deleverage.deleverageWithVolAssets(bob, assets, sender=switchboard_alpha.address)
 
 
 #####################
@@ -766,6 +757,7 @@ def test_only_non_volatiles_fails(
 
 def test_emits_endaoment_transfer_event(
     deleverage,
+    switchboard_alpha,
     ripe_hq,
     simple_erc20_vault,
     bob,
@@ -795,15 +787,13 @@ def test_emits_endaoment_transfer_event(
     # Pre-state
     pre_vault_balance = simple_erc20_vault.getTotalAmountForUser(bob, alpha_token)
 
-    # Get governance address
-    governance = ripe_hq.governance()
 
     # Deleverage
     target_amount = 300 * EIGHTEEN_DECIMALS
     vault_id = 3
     assets = [(vault_id, alpha_token.address, target_amount)]
 
-    deleverage.deleverageWithVolAssets(bob, assets, sender=governance)
+    deleverage.deleverageWithVolAssets(bob, assets, sender=switchboard_alpha.address)
 
     # Get event immediately
     transfer_log = filter_logs(deleverage, "EndaomentTransferDuringDeleverage")[0]
@@ -823,6 +813,7 @@ def test_emits_endaoment_transfer_event(
 
 def test_emits_deleverage_vol_assets_event(
     deleverage,
+    switchboard_alpha,
     ripe_hq,
     bob,
     alpha_token,
@@ -848,15 +839,13 @@ def test_emits_deleverage_vol_assets_event(
         get_sgreen=False,
     )
 
-    # Get governance address
-    governance = ripe_hq.governance()
 
     # Deleverage
     target_amount = 250 * EIGHTEEN_DECIMALS
     vault_id = 3
     assets = [(vault_id, alpha_token.address, target_amount)]
 
-    repaid_amount = deleverage.deleverageWithVolAssets(bob, assets, sender=governance)
+    repaid_amount = deleverage.deleverageWithVolAssets(bob, assets, sender=switchboard_alpha.address)
 
     # Get event immediately
     vol_log = filter_logs(deleverage, "DeleverageUserWithVolatileAssets")[0]
@@ -870,6 +859,7 @@ def test_emits_deleverage_vol_assets_event(
 
 def test_no_burn_events_emitted(
     deleverage,
+    switchboard_alpha,
     ripe_hq,
     bob,
     alpha_token,
@@ -894,14 +884,12 @@ def test_no_burn_events_emitted(
         get_sgreen=False,
     )
 
-    # Get governance address
-    governance = ripe_hq.governance()
 
     # Deleverage volatile
     vault_id = 3
     assets = [(vault_id, alpha_token.address, 250 * EIGHTEEN_DECIMALS)]
 
-    deleverage.deleverageWithVolAssets(bob, assets, sender=governance)
+    deleverage.deleverageWithVolAssets(bob, assets, sender=switchboard_alpha.address)
 
     # Get events
     burn_logs = filter_logs(deleverage, "StabAssetBurntDuringDeleverage")
@@ -921,6 +909,7 @@ def test_no_burn_events_emitted(
 
 def test_vault_balance_decreases_correctly(
     deleverage,
+    switchboard_alpha,
     ripe_hq,
     simple_erc20_vault,
     bob,
@@ -948,15 +937,13 @@ def test_vault_balance_decreases_correctly(
     # Pre-state
     pre_vault_balance = simple_erc20_vault.getTotalAmountForUser(bob, alpha_token)
 
-    # Get governance address
-    governance = ripe_hq.governance()
 
     # Deleverage
     target_amount = 175 * EIGHTEEN_DECIMALS
     vault_id = 3
     assets = [(vault_id, alpha_token.address, target_amount)]
 
-    deleverage.deleverageWithVolAssets(bob, assets, sender=governance)
+    deleverage.deleverageWithVolAssets(bob, assets, sender=switchboard_alpha.address)
 
     # Post-state
     post_vault_balance = simple_erc20_vault.getTotalAmountForUser(bob, alpha_token)
@@ -969,6 +956,7 @@ def test_vault_balance_decreases_correctly(
 
 def test_endaoment_receives_exact_amount(
     deleverage,
+    switchboard_alpha,
     ripe_hq,
     simple_erc20_vault,
     bob,
@@ -998,15 +986,13 @@ def test_endaoment_receives_exact_amount(
     pre_vault_balance = simple_erc20_vault.getTotalAmountForUser(bob, alpha_token)
     pre_endaoment_balance = alpha_token.balanceOf(endaoment)
 
-    # Get governance address
-    governance = ripe_hq.governance()
 
     # Deleverage
     target_amount = 225 * EIGHTEEN_DECIMALS
     vault_id = 3
     assets = [(vault_id, alpha_token.address, target_amount)]
 
-    deleverage.deleverageWithVolAssets(bob, assets, sender=governance)
+    deleverage.deleverageWithVolAssets(bob, assets, sender=switchboard_alpha.address)
 
     # Post-state
     post_vault_balance = simple_erc20_vault.getTotalAmountForUser(bob, alpha_token)
@@ -1022,6 +1008,7 @@ def test_endaoment_receives_exact_amount(
 
 def test_debt_reduced_by_usd_value(
     deleverage,
+    switchboard_alpha,
     ripe_hq,
     credit_engine,
     bob,
@@ -1049,15 +1036,13 @@ def test_debt_reduced_by_usd_value(
     # Pre-state
     pre_debt = credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount
 
-    # Get governance address
-    governance = ripe_hq.governance()
 
     # Deleverage
     target_amount = 275 * EIGHTEEN_DECIMALS
     vault_id = 3
     assets = [(vault_id, alpha_token.address, target_amount)]
 
-    repaid_amount = deleverage.deleverageWithVolAssets(bob, assets, sender=governance)
+    repaid_amount = deleverage.deleverageWithVolAssets(bob, assets, sender=switchboard_alpha.address)
 
     # Post-state
     post_debt = credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount
@@ -1070,6 +1055,7 @@ def test_debt_reduced_by_usd_value(
 
 def test_multiple_assets_cumulative_debt_reduction(
     deleverage,
+    switchboard_alpha,
     ripe_hq,
     credit_engine,
     simple_erc20_vault,
@@ -1108,8 +1094,6 @@ def test_multiple_assets_cumulative_debt_reduction(
     # Pre-state
     pre_debt = credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount
 
-    # Get governance address
-    governance = ripe_hq.governance()
 
     # Deleverage both
     vault_id = 3
@@ -1118,7 +1102,7 @@ def test_multiple_assets_cumulative_debt_reduction(
         (vault_id, bravo_token.address, 150 * EIGHTEEN_DECIMALS),
     ]
 
-    repaid_amount = deleverage.deleverageWithVolAssets(bob, assets, sender=governance)
+    repaid_amount = deleverage.deleverageWithVolAssets(bob, assets, sender=switchboard_alpha.address)
 
     # Post-state
     post_debt = credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount
@@ -1136,6 +1120,7 @@ def test_multiple_assets_cumulative_debt_reduction(
 
 def test_empty_assets_array_fails(
     deleverage,
+    switchboard_alpha,
     ripe_hq,
     bob,
     alpha_token,
@@ -1158,18 +1143,17 @@ def test_empty_assets_array_fails(
         get_sgreen=False,
     )
 
-    # Get governance address
-    governance = ripe_hq.governance()
 
     # Empty array should fail
     assets = []
 
     with boa.reverts("no volatile assets processed"):
-        deleverage.deleverageWithVolAssets(bob, assets, sender=governance)
+        deleverage.deleverageWithVolAssets(bob, assets, sender=switchboard_alpha.address)
 
 
 def test_zero_target_amounts_skipped(
     deleverage,
+    switchboard_alpha,
     ripe_hq,
     bob,
     alpha_token,
@@ -1210,8 +1194,6 @@ def test_zero_target_amounts_skipped(
     pre_alpha = simple_erc20_vault.getTotalAmountForUser(bob, alpha_token)
     pre_bravo = simple_erc20_vault.getTotalAmountForUser(bob, bravo_token)
 
-    # Get governance address
-    governance = ripe_hq.governance()
 
     # alpha with 0, bravo with 200
     vault_id = 3
@@ -1220,7 +1202,7 @@ def test_zero_target_amounts_skipped(
         (vault_id, bravo_token.address, 200 * EIGHTEEN_DECIMALS),  # Processed
     ]
 
-    repaid_amount = deleverage.deleverageWithVolAssets(bob, assets, sender=governance)
+    repaid_amount = deleverage.deleverageWithVolAssets(bob, assets, sender=switchboard_alpha.address)
 
     # Post-state
     post_alpha = simple_erc20_vault.getTotalAmountForUser(bob, alpha_token)
@@ -1234,6 +1216,7 @@ def test_zero_target_amounts_skipped(
 
 def test_invalid_vault_id_skipped(
     deleverage,
+    switchboard_alpha,
     ripe_hq,
     bob,
     alpha_token,
@@ -1270,8 +1253,6 @@ def test_invalid_vault_id_skipped(
     bravo_token.transfer(bob, 500 * EIGHTEEN_DECIMALS, sender=bravo_token_whale)
     performDeposit(bob, 500 * EIGHTEEN_DECIMALS, bravo_token, bob, simple_erc20_vault)
 
-    # Get governance address
-    governance = ripe_hq.governance()
 
     # Invalid vault 999, then valid vault 3
     assets = [
@@ -1279,7 +1260,7 @@ def test_invalid_vault_id_skipped(
         (3, bravo_token.address, 150 * EIGHTEEN_DECIMALS),  # Valid - processed
     ]
 
-    repaid_amount = deleverage.deleverageWithVolAssets(bob, assets, sender=governance)
+    repaid_amount = deleverage.deleverageWithVolAssets(bob, assets, sender=switchboard_alpha.address)
 
     # Should have processed bravo despite invalid first entry
     _test(repaid_amount, 150 * EIGHTEEN_DECIMALS)
@@ -1287,6 +1268,7 @@ def test_invalid_vault_id_skipped(
 
 def test_asset_depletion_flag_set(
     deleverage,
+    switchboard_alpha,
     ripe_hq,
     simple_erc20_vault,
     bob,
@@ -1322,14 +1304,12 @@ def test_asset_depletion_flag_set(
     pre_balance = simple_erc20_vault.getTotalAmountForUser(bob, alpha_token)
     _test(pre_balance, 500 * EIGHTEEN_DECIMALS)
 
-    # Get governance address
-    governance = ripe_hq.governance()
 
     # Use MAX_UINT to repay all debt
     vault_id = 3
     assets = [(vault_id, alpha_token.address, MAX_UINT256)]
 
-    repaid_amount = deleverage.deleverageWithVolAssets(bob, assets, sender=governance)
+    repaid_amount = deleverage.deleverageWithVolAssets(bob, assets, sender=switchboard_alpha.address)
 
     # Get event
     transfer_log = filter_logs(deleverage, "EndaomentTransferDuringDeleverage")[0]
@@ -1348,6 +1328,7 @@ def test_asset_depletion_flag_set(
 
 def test_duplicate_assets_only_processed_once(
     deleverage,
+    switchboard_alpha,
     ripe_hq,
     simple_erc20_vault,
     bob,
@@ -1379,8 +1360,6 @@ def test_duplicate_assets_only_processed_once(
     # Pre-state
     pre_vault_balance = simple_erc20_vault.getTotalAmountForUser(bob, alpha_token)
 
-    # Get governance address
-    governance = ripe_hq.governance()
 
     # Duplicate alpha entries
     vault_id = 3
@@ -1389,7 +1368,7 @@ def test_duplicate_assets_only_processed_once(
         (vault_id, alpha_token.address, 200 * EIGHTEEN_DECIMALS),  # Duplicate - skipped
     ]
 
-    repaid_amount = deleverage.deleverageWithVolAssets(bob, assets, sender=governance)
+    repaid_amount = deleverage.deleverageWithVolAssets(bob, assets, sender=switchboard_alpha.address)
 
     # Get events
     transfer_logs = filter_logs(deleverage, "EndaomentTransferDuringDeleverage")
@@ -1413,6 +1392,7 @@ def test_duplicate_assets_only_processed_once(
 
 def test_governance_can_call(
     deleverage,
+    switchboard_alpha,
     ripe_hq,
     bob,
     alpha_token,
@@ -1421,10 +1401,10 @@ def test_governance_can_call(
     _test,
 ):
     """
-    Test that governance address can successfully call the function.
+    Test that switchboard address can successfully call the function.
 
     EXPECTED:
-    - Governance call succeeds
+    - Switchboard call succeeds
     - Function executes normally
     """
     # Setup
@@ -1437,15 +1417,13 @@ def test_governance_can_call(
         get_sgreen=False,
     )
 
-    # Get governance address
-    governance = ripe_hq.governance()
 
-    # Governance should be able to call
+    # Switchboard should be able to call
     vault_id = 3
     assets = [(vault_id, alpha_token.address, 100 * EIGHTEEN_DECIMALS)]
 
     repaid_amount = deleverage.deleverageWithVolAssets(
-        bob, assets, sender=governance
+        bob, assets, sender=switchboard_alpha.address
     )
 
     # Should succeed
@@ -1454,6 +1432,7 @@ def test_governance_can_call(
 
 def test_non_governance_reverts(
     deleverage,
+    switchboard_alpha,
     bob,
     alice,
     alpha_token,
@@ -1461,11 +1440,11 @@ def test_non_governance_reverts(
     setupDeleverage,
 ):
     """
-    Test that non-governance caller reverts with "governance only" error.
+    Test that non-trusted caller reverts with "no perms" error.
 
     EXPECTED:
-    - Non-governance (alice) cannot call
-    - Reverts with "governance only"
+    - Non-trusted (alice) cannot call
+    - Reverts with "no perms"
     """
     # Setup
     setupDeleverage(
@@ -1477,16 +1456,17 @@ def test_non_governance_reverts(
         get_sgreen=False,
     )
 
-    # Alice (not governance) tries to call
+    # Alice (not trusted) tries to call
     vault_id = 3
     assets = [(vault_id, alpha_token.address, 100 * EIGHTEEN_DECIMALS)]
 
-    with boa.reverts("governance only"):
+    with boa.reverts("no perms"):
         deleverage.deleverageWithVolAssets(bob, assets, sender=alice)
 
 
 def test_user_cannot_call_own_position(
     deleverage,
+    switchboard_alpha,
     bob,
     alpha_token,
     alpha_token_whale,
@@ -1494,11 +1474,11 @@ def test_user_cannot_call_own_position(
 ):
     """
     Test that even the user themselves cannot call this function.
-    Only governance can call.
+    Only trusted addresses (Ripe addresses or switchboard) can call.
 
     EXPECTED:
     - Bob cannot deleverage own position
-    - Reverts with "governance only"
+    - Reverts with "no perms"
     """
     # Setup
     setupDeleverage(
@@ -1514,7 +1494,7 @@ def test_user_cannot_call_own_position(
     vault_id = 3
     assets = [(vault_id, alpha_token.address, 100 * EIGHTEEN_DECIMALS)]
 
-    with boa.reverts("governance only"):
+    with boa.reverts("no perms"):
         deleverage.deleverageWithVolAssets(bob, assets, sender=bob)
 
 
@@ -1525,6 +1505,7 @@ def test_user_cannot_call_own_position(
 
 def test_insufficient_collateral_to_cover_target(
     deleverage,
+    switchboard_alpha,
     ripe_hq,
     simple_erc20_vault,
     bob,
@@ -1560,14 +1541,12 @@ def test_insufficient_collateral_to_cover_target(
     pre_vault_balance = simple_erc20_vault.getTotalAmountForUser(bob, alpha_token)
     _test(pre_vault_balance, 400 * EIGHTEEN_DECIMALS)
 
-    # Get governance address
-    governance = ripe_hq.governance()
 
     # Target more than debt (500 > 200 debt)
     vault_id = 3
     assets = [(vault_id, alpha_token.address, 500 * EIGHTEEN_DECIMALS)]
 
-    repaid_amount = deleverage.deleverageWithVolAssets(bob, assets, sender=governance)
+    repaid_amount = deleverage.deleverageWithVolAssets(bob, assets, sender=switchboard_alpha.address)
 
     # Post-state
     post_vault_balance = simple_erc20_vault.getTotalAmountForUser(bob, alpha_token)
@@ -1579,6 +1558,7 @@ def test_insufficient_collateral_to_cover_target(
 
 def test_target_exceeds_total_debt(
     deleverage,
+    switchboard_alpha,
     ripe_hq,
     credit_engine,
     bob,
@@ -1612,14 +1592,12 @@ def test_target_exceeds_total_debt(
     pre_debt = credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount
     _test(pre_debt, 500 * EIGHTEEN_DECIMALS)
 
-    # Get governance address
-    governance = ripe_hq.governance()
 
     # Target more than debt
     vault_id = 3
     assets = [(vault_id, alpha_token.address, 800 * EIGHTEEN_DECIMALS)]
 
-    repaid_amount = deleverage.deleverageWithVolAssets(bob, assets, sender=governance)
+    repaid_amount = deleverage.deleverageWithVolAssets(bob, assets, sender=switchboard_alpha.address)
 
     # Post-state
     post_debt = credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount
@@ -1631,6 +1609,7 @@ def test_target_exceeds_total_debt(
 
 def test_zero_debt_returns_zero(
     deleverage,
+    switchboard_alpha,
     ripe_hq,
     bob,
     alpha_token,
@@ -1653,14 +1632,12 @@ def test_zero_debt_returns_zero(
     alpha_token.transfer(bob, 1_000 * EIGHTEEN_DECIMALS, sender=alpha_token_whale)
     performDeposit(bob, 1_000 * EIGHTEEN_DECIMALS, alpha_token, bob)
 
-    # Get governance address
-    governance = ripe_hq.governance()
 
     # Try to deleverage user with no debt
     vault_id = 3
     assets = [(vault_id, alpha_token.address, 100 * EIGHTEEN_DECIMALS)]
 
-    repaid_amount = deleverage.deleverageWithVolAssets(bob, assets, sender=governance)
+    repaid_amount = deleverage.deleverageWithVolAssets(bob, assets, sender=switchboard_alpha.address)
 
     # Should return 0
     assert repaid_amount == 0
@@ -1680,6 +1657,7 @@ def test_zero_debt_returns_zero(
 
 def test_partial_depletion_isDepleted_false(
     deleverage,
+    switchboard_alpha,
     ripe_hq,
     bob,
     alpha_token,
@@ -1706,14 +1684,12 @@ def test_partial_depletion_isDepleted_false(
         get_sgreen=False,
     )
 
-    # Get governance address
-    governance = ripe_hq.governance()
 
     # Use partial amount
     vault_id = 3
     assets = [(vault_id, alpha_token.address, 300 * EIGHTEEN_DECIMALS)]
 
-    deleverage.deleverageWithVolAssets(bob, assets, sender=governance)
+    deleverage.deleverageWithVolAssets(bob, assets, sender=switchboard_alpha.address)
 
     # Get event
     transfer_log = filter_logs(deleverage, "EndaomentTransferDuringDeleverage")[0]
@@ -1724,6 +1700,7 @@ def test_partial_depletion_isDepleted_false(
 
 def test_full_depletion_isDepleted_true(
     deleverage,
+    switchboard_alpha,
     ripe_hq,
     credit_engine,
     simple_erc20_vault,
@@ -1760,14 +1737,12 @@ def test_full_depletion_isDepleted_true(
     pre_balance = simple_erc20_vault.getTotalAmountForUser(bob, alpha_token)
     pre_debt = credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount
 
-    # Get governance address
-    governance = ripe_hq.governance()
 
     # Use MAX_UINT to repay all debt
     vault_id = 3
     assets = [(vault_id, alpha_token.address, MAX_UINT256)]
 
-    repaid_amount = deleverage.deleverageWithVolAssets(bob, assets, sender=governance)
+    repaid_amount = deleverage.deleverageWithVolAssets(bob, assets, sender=switchboard_alpha.address)
 
     # Get event
     transfer_log = filter_logs(deleverage, "EndaomentTransferDuringDeleverage")[0]
@@ -1791,6 +1766,7 @@ def test_full_depletion_isDepleted_true(
 
 def test_hasGoodDebtHealth_flag_correct(
     deleverage,
+    switchboard_alpha,
     ripe_hq,
     credit_engine,
     bob,
@@ -1818,14 +1794,12 @@ def test_hasGoodDebtHealth_flag_correct(
         get_sgreen=False,
     )
 
-    # Get governance address
-    governance = ripe_hq.governance()
 
     # Partial repayment
     vault_id = 3
     assets = [(vault_id, alpha_token.address, 200 * EIGHTEEN_DECIMALS)]
 
-    deleverage.deleverageWithVolAssets(bob, assets, sender=governance)
+    deleverage.deleverageWithVolAssets(bob, assets, sender=switchboard_alpha.address)
 
     # Get event
     vol_log = filter_logs(deleverage, "DeleverageUserWithVolatileAssets")[0]

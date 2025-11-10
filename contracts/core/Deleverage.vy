@@ -298,7 +298,7 @@ def deleverageWithVolAssets(_user: address, _assets: DynArray[DeleverageAsset, M
     assert not deptBasics.isPaused # dev: contract paused
     a: addys.Addys = addys._getAddys()
     if not addys._isValidRipeAddr(msg.sender):
-        assert msg.sender == staticcall RipeHq(a.hq).governance() # dev: governance only
+        assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
 
     # get latest user debt
     userDebt: UserDebt = empty(UserDebt)
@@ -413,7 +413,7 @@ def swapCollateral(
     assert extcall IERC20(_depositAsset).approve(a.teller, 0) # dev: approve failed
 
     # perform house keeping
-    extcall Teller(a.teller).performHousekeeping(True, _user, True, a)
+    extcall Teller(a.teller).performHousekeeping(False, _user, True, a)
 
     log CollateralSwapped(
         user=_user,

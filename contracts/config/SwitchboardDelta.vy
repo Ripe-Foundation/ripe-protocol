@@ -46,6 +46,11 @@ interface BondBooster:
     def getBoostRatio(_user: address, _units: uint256) -> uint256: view
     def setMinLockDuration(_minLockDuration: uint256): nonpayable
 
+interface Teller:
+    def deleverageWithSpecificAssets(_assets: DynArray[DeleverageAsset, MAX_DELEVERAGE_ASSETS], _user: address = msg.sender) -> uint256: nonpayable
+    def deleverageUser(_user: address = msg.sender, _targetRepayAmount: uint256 = max_value(uint256)) -> uint256: nonpayable
+    def deleverageManyUsers(_users: DynArray[DeleverageUserRequest, MAX_DELEVERAGE_USERS]) -> uint256: nonpayable
+
 interface Lootbox:
     def resetUserBalancePoints(_user: address, _asset: address, _vaultId: uint256): nonpayable
     def resetAssetPoints(_asset: address, _vaultId: uint256): nonpayable
@@ -59,6 +64,9 @@ interface BondRoom:
 interface Ledger:
     def isHrContributor(_contributor: address) -> bool: view
     def setBadDebt(_amount: uint256): nonpayable
+
+interface Deleverage:
+    def deleverageWithVolAssets(_user: address, _assets: DynArray[DeleverageAsset, MAX_DELEVERAGE_ASSETS]) -> uint256: nonpayable
 
 interface RipeHq:
     def getAddr(_regId: uint256) -> address: view
@@ -80,6 +88,15 @@ flag ActionType:
     LOOT_USER_BALANCE_RESET
     LOOT_ASSET_RESET
     LOOT_USER_BORROW_RESET
+
+struct DeleverageUserRequest:
+    user: address
+    targetRepayAmount: uint256
+
+struct DeleverageAsset:
+    vaultId: uint256
+    asset: address
+    targetRepayAmount: uint256
 
 struct PendingManager:
     contributor: address
@@ -298,15 +315,19 @@ pendingUserBalanceReset: public(HashMap[uint256, DynArray[UserBalanceReset, MAX_
 pendingAssetReset: public(HashMap[uint256, DynArray[AssetReset, MAX_ASSETS]]) # aid -> assets
 pendingUserBorrowReset: public(HashMap[uint256, DynArray[address, MAX_USERS]]) # aid -> users
 
+TELLER_ID: constant(uint256) = 3
 LEDGER_ID: constant(uint256) = 4
 MISSION_CONTROL_ID: constant(uint256) = 5
 BOND_ROOM_ID: constant(uint256) = 12
 LOOTBOX_ID: constant(uint256) = 16
+DELEVERAGE_ID: constant(uint256) = 18
 EIGHTEEN_DECIMALS: constant(uint256) = 10 ** 18
 MAX_BOOSTERS: constant(uint256) = 50
 HUNDRED_PERCENT: constant(uint256) = 100_00
 MAX_USERS: constant(uint256) = 40
 MAX_ASSETS: constant(uint256) = 20
+MAX_DELEVERAGE_USERS: constant(uint256) = 25
+MAX_DELEVERAGE_ASSETS: constant(uint256) = 25
 
 # timestamp units (not blocks!)
 DAY_IN_SECONDS: constant(uint256) = 60 * 60 * 24
@@ -356,6 +377,12 @@ def _getLedgerAddr() -> address:
 
 @view
 @internal
+def _getTellerAddr() -> address:
+    return staticcall RipeHq(gov._getRipeHqFromGov()).getAddr(TELLER_ID)
+
+
+@view
+@internal
 def _getBondRoomAddr() -> address:
     return staticcall RipeHq(gov._getRipeHqFromGov()).getAddr(BOND_ROOM_ID)
 
@@ -364,6 +391,36 @@ def _getBondRoomAddr() -> address:
 @internal
 def _getLootboxAddr() -> address:
     return staticcall RipeHq(gov._getRipeHqFromGov()).getAddr(LOOTBOX_ID)
+
+
+##############
+# Deleverage #
+##############
+
+
+@external
+def deleverageUser(_user: address, _targetRepayAmount: uint256 = max_value(uint256)) -> uint256:
+    assert self._hasPermsToEnable(msg.sender, True) # dev: no perms
+    return extcall Teller(self._getTellerAddr()).deleverageUser(_user, _targetRepayAmount)
+
+
+@external
+def deleverageManyUsers(_users: DynArray[DeleverageUserRequest, MAX_DELEVERAGE_USERS]) -> uint256:
+    assert self._hasPermsToEnable(msg.sender, True) # dev: no perms
+    return extcall Teller(self._getTellerAddr()).deleverageManyUsers(_users)
+
+
+@external
+def deleverageWithSpecificAssets(_assets: DynArray[DeleverageAsset, MAX_DELEVERAGE_ASSETS], _user: address) -> uint256:
+    assert self._hasPermsToEnable(msg.sender, True) # dev: no perms
+    return extcall Teller(self._getTellerAddr()).deleverageWithSpecificAssets(_assets, _user)
+
+
+@external
+def deleverageWithVolAssets(_user: address, _assets: DynArray[DeleverageAsset, MAX_DELEVERAGE_ASSETS]) -> uint256:
+    assert gov._canGovern(msg.sender) # dev: no perms
+    deleverage: address = staticcall RipeHq(gov._getRipeHqFromGov()).getAddr(DELEVERAGE_ID)
+    return extcall Deleverage(deleverage).deleverageWithVolAssets(_user, _assets)
 
 
 #############
@@ -935,5 +992,3 @@ def cancelPendingAction(_aid: uint256) -> bool:
 def _cancelPendingAction(_aid: uint256):
     assert timeLock._cancelAction(_aid) # dev: cannot cancel action
     self.actionType[_aid] = empty(ActionType)
-
-
