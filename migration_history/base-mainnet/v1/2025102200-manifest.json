@@ -876,9 +876,13 @@
         },
         "settings": {
           "outputSelection": {
-            "contracts/tokens/GreenToken.vy": ["*"]
+            "contracts/tokens/GreenToken.vy": [
+              "*"
+            ]
           },
-          "search_paths": ["."]
+          "search_paths": [
+            "."
+          ]
         },
         "compiler_version": "v0.4.3+commit.bff19ea2",
         "integrity": "d1271456cc5310df843fd5671721bf1f2e37d85e3b7269bf6c5bbb26263e1a6d"
@@ -1762,9 +1766,13 @@
         },
         "settings": {
           "outputSelection": {
-            "contracts/tokens/RipeToken.vy": ["*"]
+            "contracts/tokens/RipeToken.vy": [
+              "*"
+            ]
           },
-          "search_paths": ["."]
+          "search_paths": [
+            "."
+          ]
         },
         "compiler_version": "v0.4.3+commit.bff19ea2",
         "integrity": "ae5dc1cb6c5574ceb0e8c56764bb53ac282daf419d4f005cce7e78976ea4417d"
@@ -3131,9 +3139,13 @@
         },
         "settings": {
           "outputSelection": {
-            "contracts/tokens/SavingsGreen.vy": ["*"]
+            "contracts/tokens/SavingsGreen.vy": [
+              "*"
+            ]
           },
-          "search_paths": ["."]
+          "search_paths": [
+            "."
+          ]
         },
         "compiler_version": "v0.4.3+commit.bff19ea2",
         "integrity": "9d78cf1fb6fb6526cf2533bb4e8541623d584e20743c94199a371681753cded7"
@@ -5006,9 +5018,13 @@
         },
         "settings": {
           "outputSelection": {
-            "contracts/registries/RipeHq.vy": ["*"]
+            "contracts/registries/RipeHq.vy": [
+              "*"
+            ]
           },
-          "search_paths": ["."]
+          "search_paths": [
+            "."
+          ]
         },
         "compiler_version": "v0.4.3+commit.bff19ea2",
         "integrity": "5d941b007b133cfcec0ef74a3bdafec754a3a9f7dc76745c0b29fc0749026e22"
@@ -5804,9 +5820,13 @@
         },
         "settings": {
           "outputSelection": {
-            "contracts/modules/Contributor.vy": ["*"]
+            "contracts/modules/Contributor.vy": [
+              "*"
+            ]
           },
-          "search_paths": ["."]
+          "search_paths": [
+            "."
+          ]
         },
         "compiler_version": "v0.4.3+commit.bff19ea2",
         "integrity": "855566d3e7e93afa010f798fd905ea9293b9e1c00f9dc347539875576edcdc08"
@@ -6138,9 +6158,13 @@
         },
         "settings": {
           "outputSelection": {
-            "contracts/config/TrainingWheels.vy": ["*"]
+            "contracts/config/TrainingWheels.vy": [
+              "*"
+            ]
           },
-          "search_paths": ["."]
+          "search_paths": [
+            "."
+          ]
         },
         "compiler_version": "v0.4.3+commit.bff19ea2",
         "integrity": "cac6fd620716ce7409a435828dc2e5a0a389de5fdf1e6f9747c4c6875cfa79a3"
@@ -6617,9 +6641,13 @@
         },
         "settings": {
           "outputSelection": {
-            "contracts/config/DefaultsBase.vy": ["*"]
+            "contracts/config/DefaultsBase.vy": [
+              "*"
+            ]
           },
-          "search_paths": ["."]
+          "search_paths": [
+            "."
+          ]
         },
         "compiler_version": "v0.4.3+commit.bff19ea2",
         "integrity": "a74feee109f4e1ef92c9270d4a8477b87739667dba7aad87072069439bc32f50"
@@ -9143,9 +9171,13 @@
         },
         "settings": {
           "outputSelection": {
-            "contracts/data/Ledger.vy": ["*"]
+            "contracts/data/Ledger.vy": [
+              "*"
+            ]
           },
-          "search_paths": ["."]
+          "search_paths": [
+            "."
+          ]
         },
         "compiler_version": "v0.4.3+commit.bff19ea2",
         "integrity": "1aa27005edd424133a707695d47e31866d1ab4e7016ac328c2a3f96a4b142535"
@@ -11940,9 +11972,13 @@
         },
         "settings": {
           "outputSelection": {
-            "contracts/data/MissionControl.vy": ["*"]
+            "contracts/data/MissionControl.vy": [
+              "*"
+            ]
           },
-          "search_paths": ["."]
+          "search_paths": [
+            "."
+          ]
         },
         "compiler_version": "v0.4.3+commit.bff19ea2",
         "integrity": "ed83a2f52e06ddb9f6f8d6d504ac7157f326a29f480a2170c42e7025f6a9c62a"
@@ -13598,9 +13634,13 @@
         },
         "settings": {
           "outputSelection": {
-            "contracts/registries/Switchboard.vy": ["*"]
+            "contracts/registries/Switchboard.vy": [
+              "*"
+            ]
           },
-          "search_paths": ["."]
+          "search_paths": [
+            "."
+          ]
         },
         "compiler_version": "v0.4.3+commit.bff19ea2",
         "integrity": "36cc5762ad5e73710cddc6ebb14a8bf69319af531ee9dabf4336f03732b867dc"
@@ -16748,9 +16788,13 @@
         },
         "settings": {
           "outputSelection": {
-            "contracts/config/SwitchboardAlpha.vy": ["*"]
+            "contracts/config/SwitchboardAlpha.vy": [
+              "*"
+            ]
           },
-          "search_paths": ["."]
+          "search_paths": [
+            "."
+          ]
         },
         "compiler_version": "v0.4.3+commit.bff19ea2",
         "integrity": "816c4c5f8efcaef8d45458903c009ef35348f43e947d7af111c023906dd7773c"
@@ -20301,9 +20345,13 @@
         },
         "settings": {
           "outputSelection": {
-            "contracts/config/SwitchboardBravo.vy": ["*"]
+            "contracts/config/SwitchboardBravo.vy": [
+              "*"
+            ]
           },
-          "search_paths": ["."]
+          "search_paths": [
+            "."
+          ]
         },
         "compiler_version": "v0.4.3+commit.bff19ea2",
         "integrity": "459a468b582185148721e57186d99602df8ec5b78e8f9b12deb65125a1a2eeda"
@@ -24674,9 +24722,13 @@
         },
         "settings": {
           "outputSelection": {
-            "contracts/config/SwitchboardCharlie.vy": ["*"]
+            "contracts/config/SwitchboardCharlie.vy": [
+              "*"
+            ]
           },
-          "search_paths": ["."]
+          "search_paths": [
+            "."
+          ]
         },
         "compiler_version": "v0.4.3+commit.bff19ea2",
         "integrity": "677545c0e36046d52634db1955bc5497591908d57ed238cc237bb284b363304a"
@@ -27007,9 +27059,13 @@
         },
         "settings": {
           "outputSelection": {
-            "contracts/config/SwitchboardDelta.vy": ["*"]
+            "contracts/config/SwitchboardDelta.vy": [
+              "*"
+            ]
           },
-          "search_paths": ["."]
+          "search_paths": [
+            "."
+          ]
         },
         "compiler_version": "v0.4.3+commit.bff19ea2",
         "integrity": "b91aabf1bdaee3ef54b4a4a2e8b5ab20dd49db24c79c9b267cb2bb89a24c89ae"
@@ -28883,9 +28939,13 @@
         },
         "settings": {
           "outputSelection": {
-            "contracts/registries/PriceDesk.vy": ["*"]
+            "contracts/registries/PriceDesk.vy": [
+              "*"
+            ]
           },
-          "search_paths": ["."]
+          "search_paths": [
+            "."
+          ]
         },
         "compiler_version": "v0.4.3+commit.bff19ea2",
         "integrity": "d515bd3a696b1f0b5d0f37992ab64c962db9940d6ca8244a78b46e3c4e349e2c"
@@ -30893,9 +30953,13 @@
         },
         "settings": {
           "outputSelection": {
-            "contracts/priceSources/ChainlinkPrices.vy": ["*"]
+            "contracts/priceSources/ChainlinkPrices.vy": [
+              "*"
+            ]
           },
-          "search_paths": ["."]
+          "search_paths": [
+            "."
+          ]
         },
         "compiler_version": "v0.4.3+commit.bff19ea2",
         "integrity": "f99af41e5fecc50c74b3e3466e23cabcd01eadd1f853a01ecd7c7e1f8480019f"
@@ -33271,9 +33335,13 @@
         },
         "settings": {
           "outputSelection": {
-            "contracts/priceSources/CurvePrices.vy": ["*"]
+            "contracts/priceSources/CurvePrices.vy": [
+              "*"
+            ]
           },
-          "search_paths": ["."]
+          "search_paths": [
+            "."
+          ]
         },
         "compiler_version": "v0.4.3+commit.bff19ea2",
         "integrity": "bb14e28409aff8073cdc7564858fd567df2800cb777d328d1bced1fbbbbb603d"
@@ -35560,9 +35628,13 @@
         },
         "settings": {
           "outputSelection": {
-            "contracts/priceSources/BlueChipYieldPrices.vy": ["*"]
+            "contracts/priceSources/BlueChipYieldPrices.vy": [
+              "*"
+            ]
           },
-          "search_paths": ["."]
+          "search_paths": [
+            "."
+          ]
         },
         "compiler_version": "v0.4.3+commit.bff19ea2",
         "integrity": "91152e1dd31d8bd409d17645f1a59bb375181cb9d851bb103099082bed41dcd6"
@@ -37362,9 +37434,13 @@
         },
         "settings": {
           "outputSelection": {
-            "contracts/priceSources/PythPrices.vy": ["*"]
+            "contracts/priceSources/PythPrices.vy": [
+              "*"
+            ]
           },
-          "search_paths": ["."]
+          "search_paths": [
+            "."
+          ]
         },
         "compiler_version": "v0.4.3+commit.bff19ea2",
         "integrity": "fb7aa10c80716fc56c24077dd35b7f6d7a978b9a8b2d060a9b66d3aa82420b08"
@@ -39164,9 +39240,13 @@
         },
         "settings": {
           "outputSelection": {
-            "contracts/priceSources/StorkPrices.vy": ["*"]
+            "contracts/priceSources/StorkPrices.vy": [
+              "*"
+            ]
           },
-          "search_paths": ["."]
+          "search_paths": [
+            "."
+          ]
         },
         "compiler_version": "v0.4.3+commit.bff19ea2",
         "integrity": "c4eef76d764ea051d37bfb49a53fdab3892c073d468e602fb91d4e75f94bf59d"
@@ -40826,9 +40906,13 @@
         },
         "settings": {
           "outputSelection": {
-            "contracts/registries/VaultBook.vy": ["*"]
+            "contracts/registries/VaultBook.vy": [
+              "*"
+            ]
           },
-          "search_paths": ["."]
+          "search_paths": [
+            "."
+          ]
         },
         "compiler_version": "v0.4.3+commit.bff19ea2",
         "integrity": "e7f7033059fe3a9875e35f5d91f9f8b28bff2832f92d7fc8180a7fed77bd1b78"
@@ -42947,9 +43031,13 @@
         },
         "settings": {
           "outputSelection": {
-            "contracts/vaults/StabilityPool.vy": ["*"]
+            "contracts/vaults/StabilityPool.vy": [
+              "*"
+            ]
           },
-          "search_paths": ["."]
+          "search_paths": [
+            "."
+          ]
         },
         "compiler_version": "v0.4.3+commit.bff19ea2",
         "integrity": "2db25ba2af32af04e287830b309186600096e333ccbf3bf41140b12628e69ac1"
@@ -45370,9 +45458,13 @@
         },
         "settings": {
           "outputSelection": {
-            "contracts/vaults/RipeGov.vy": ["*"]
+            "contracts/vaults/RipeGov.vy": [
+              "*"
+            ]
           },
-          "search_paths": ["."]
+          "search_paths": [
+            "."
+          ]
         },
         "compiler_version": "v0.4.3+commit.bff19ea2",
         "integrity": "2f02bf430f17dec74cd80b2f9e6b5de69db93d5bf93280a925d9d9b6ada3e08b"
@@ -46535,9 +46627,13 @@
         },
         "settings": {
           "outputSelection": {
-            "contracts/vaults/SimpleErc20.vy": ["*"]
+            "contracts/vaults/SimpleErc20.vy": [
+              "*"
+            ]
           },
-          "search_paths": ["."]
+          "search_paths": [
+            "."
+          ]
         },
         "compiler_version": "v0.4.3+commit.bff19ea2",
         "integrity": "472e744216b94882601af5658e4e56afeac070470853e29c4b319d40528e43f6"
@@ -47765,9 +47861,13 @@
         },
         "settings": {
           "outputSelection": {
-            "contracts/vaults/RebaseErc20.vy": ["*"]
+            "contracts/vaults/RebaseErc20.vy": [
+              "*"
+            ]
           },
-          "search_paths": ["."]
+          "search_paths": [
+            "."
+          ]
         },
         "compiler_version": "v0.4.3+commit.bff19ea2",
         "integrity": "8673d27e50b88612fa54a4a84f82a0b0b6e210cd7f4651085a571b125df527c8"
@@ -49531,9 +49631,13 @@
         },
         "settings": {
           "outputSelection": {
-            "contracts/core/AuctionHouse.vy": ["*"]
+            "contracts/core/AuctionHouse.vy": [
+              "*"
+            ]
           },
-          "search_paths": ["."]
+          "search_paths": [
+            "."
+          ]
         },
         "compiler_version": "v0.4.3+commit.bff19ea2",
         "integrity": "3cda571870f21df3ddf293107b4925e56902dec9dc5adbdc0b9b5fa2733e93cc"
@@ -49790,9 +49894,13 @@
         },
         "settings": {
           "outputSelection": {
-            "contracts/core/AuctionHouseNFT.vy": ["*"]
+            "contracts/core/AuctionHouseNFT.vy": [
+              "*"
+            ]
           },
-          "search_paths": ["."]
+          "search_paths": [
+            "."
+          ]
         },
         "compiler_version": "v0.4.3+commit.bff19ea2",
         "integrity": "441acb12e5373c4db1da44bc4e1b5ceff9ac075fb1aa97a141ff42e506e78f2e"
@@ -50069,9 +50177,13 @@
         },
         "settings": {
           "outputSelection": {
-            "contracts/core/Boardroom.vy": ["*"]
+            "contracts/core/Boardroom.vy": [
+              "*"
+            ]
           },
-          "search_paths": ["."]
+          "search_paths": [
+            "."
+          ]
         },
         "compiler_version": "v0.4.3+commit.bff19ea2",
         "integrity": "ffd0db198d1e34d551e814a6cc213d2849bd040934dab39aad5cf6bd632afc7b"
@@ -50734,9 +50846,13 @@
         },
         "settings": {
           "outputSelection": {
-            "contracts/core/BondRoom.vy": ["*"]
+            "contracts/core/BondRoom.vy": [
+              "*"
+            ]
           },
-          "search_paths": ["."]
+          "search_paths": [
+            "."
+          ]
         },
         "compiler_version": "v0.4.3+commit.bff19ea2",
         "integrity": "9738cc4369711ba817e6134497ead21f1e46ebfc7155efff28a63cae57d13f98"
@@ -53332,9 +53448,13 @@
         },
         "settings": {
           "outputSelection": {
-            "contracts/core/CreditEngine.vy": ["*"]
+            "contracts/core/CreditEngine.vy": [
+              "*"
+            ]
           },
-          "search_paths": ["."]
+          "search_paths": [
+            "."
+          ]
         },
         "compiler_version": "v0.4.3+commit.bff19ea2",
         "integrity": "bb611db33c01750ba0d2126ed21b8e4e7a1ee653a9f36694a74396cd904e960f"
@@ -56582,9 +56702,13 @@
         },
         "settings": {
           "outputSelection": {
-            "contracts/core/Endaoment.vy": ["*"]
+            "contracts/core/Endaoment.vy": [
+              "*"
+            ]
           },
-          "search_paths": ["."]
+          "search_paths": [
+            "."
+          ]
         },
         "compiler_version": "v0.4.3+commit.bff19ea2",
         "integrity": "c47df6f5ea1665dfb34313eaebe87c516094311d7ed18b4fa0fd2ee8307b42d4"
@@ -57942,9 +58066,13 @@
         },
         "settings": {
           "outputSelection": {
-            "contracts/core/HumanResources.vy": ["*"]
+            "contracts/core/HumanResources.vy": [
+              "*"
+            ]
           },
-          "search_paths": ["."]
+          "search_paths": [
+            "."
+          ]
         },
         "compiler_version": "v0.4.3+commit.bff19ea2",
         "integrity": "3729a4cda2b2399fbf34f190cde6d3045b300bb6dee84b5ad7bf20a26d4feab2"
@@ -59410,9 +59538,13 @@
         },
         "settings": {
           "outputSelection": {
-            "contracts/core/Lootbox.vy": ["*"]
+            "contracts/core/Lootbox.vy": [
+              "*"
+            ]
           },
-          "search_paths": ["."]
+          "search_paths": [
+            "."
+          ]
         },
         "compiler_version": "v0.4.3+commit.bff19ea2",
         "integrity": "fb21df6da7beeb5cbad45f0f3032a5cd4348955099a259c836b66451db886582"
@@ -62900,9 +63032,13 @@
         },
         "settings": {
           "outputSelection": {
-            "contracts/core/Teller.vy": ["*"]
+            "contracts/core/Teller.vy": [
+              "*"
+            ]
           },
-          "search_paths": ["."]
+          "search_paths": [
+            "."
+          ]
         },
         "compiler_version": "v0.4.3+commit.bff19ea2",
         "integrity": "ce8e11625a55fed07235940978abc34a76106c0bd0b7b22ec46c377b9d7f824d"
@@ -63532,9 +63668,13 @@
         },
         "settings": {
           "outputSelection": {
-            "contracts/config/BondBooster.vy": ["*"]
+            "contracts/config/BondBooster.vy": [
+              "*"
+            ]
           },
-          "search_paths": ["."]
+          "search_paths": [
+            "."
+          ]
         },
         "compiler_version": "v0.4.3+commit.bff19ea2",
         "integrity": "67c8cecdca1a7bb16e1dbdaf4cb429499ac82c645138c57362d643567a6171b6"
@@ -64815,9 +64955,13 @@
         },
         "settings": {
           "outputSelection": {
-            "contracts/priceSources/wsuperOETHbPrices.vy": ["*"]
+            "contracts/priceSources/wsuperOETHbPrices.vy": [
+              "*"
+            ]
           },
-          "search_paths": ["."]
+          "search_paths": [
+            "."
+          ]
         },
         "compiler_version": "v0.4.3+commit.bff19ea2",
         "integrity": "7349b53a0626a13fc80d788e462b453e83433b8d4e50616484fecdc115569e48"
@@ -66683,9 +66827,13 @@
         },
         "settings": {
           "outputSelection": {
-            "contracts/priceSources/RedStone.vy": ["*"]
+            "contracts/priceSources/RedStone.vy": [
+              "*"
+            ]
           },
-          "search_paths": ["."]
+          "search_paths": [
+            "."
+          ]
         },
         "compiler_version": "v0.4.3+commit.bff19ea2",
         "integrity": "58196c9577648b970640cdd559180b6a30f5e97aa85e7e222bb6faf66051545a"
@@ -68784,9 +68932,13 @@
         },
         "settings": {
           "outputSelection": {
-            "contracts/priceSources/UndyVaultPrices.vy": ["*"]
+            "contracts/priceSources/UndyVaultPrices.vy": [
+              "*"
+            ]
           },
-          "search_paths": ["."]
+          "search_paths": [
+            "."
+          ]
         },
         "compiler_version": "v0.4.3+commit.bff19ea2",
         "integrity": "1b241c8523d24131190d7fef802a32d2ab647af485eeba96e4773569521934a2"
@@ -69949,9 +70101,13 @@
         },
         "settings": {
           "outputSelection": {
-            "contracts/vaults/SimpleErc20.vy": ["*"]
+            "contracts/vaults/SimpleErc20.vy": [
+              "*"
+            ]
           },
-          "search_paths": ["."]
+          "search_paths": [
+            "."
+          ]
         },
         "compiler_version": "v0.4.3+commit.bff19ea2",
         "integrity": "472e744216b94882601af5658e4e56afeac070470853e29c4b319d40528e43f6"

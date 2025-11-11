@@ -54,6 +54,9 @@ ENDAOMENT_ID: constant(uint256) = 14
 HUMAN_RESOURCES_ID: constant(uint256) = 15
 LOOTBOX_ID: constant(uint256) = 16
 TELLER_ID: constant(uint256) = 17
+DELEVERAGE_ID: constant(uint256) = 18
+CREDIT_REDEEM_ID: constant(uint256) = 19
+TELLER_UTILS_ID: constant(uint256) = 20
 
 
 @deploy
@@ -397,3 +400,48 @@ def _getTellerId() -> uint256:
 @internal
 def _getTellerAddr() -> address:
     return staticcall RipeHq(RIPE_HQ_FOR_ADDYS).getAddr(TELLER_ID)
+
+
+# deleverage
+
+
+@view
+@internal
+def _getDeleverageId() -> uint256:
+    return DELEVERAGE_ID
+
+
+@view
+@internal
+def _getDeleverageAddr() -> address:
+    return staticcall RipeHq(RIPE_HQ_FOR_ADDYS).getAddr(DELEVERAGE_ID)
+
+
+# creditRedeem
+
+
+@view
+@internal
+def _getCreditRedeemId() -> uint256:
+    return CREDIT_REDEEM_ID
+
+
+@view
+@internal
+def _getCreditRedeemAddr() -> address:
+    return staticcall RipeHq(RIPE_HQ_FOR_ADDYS).getAddr(CREDIT_REDEEM_ID)
+
+
+# teller utils
+
+
+@view
+@internal
+def _getTellerUtilsId() -> uint256:
+    return TELLER_UTILS_ID
+
+
+@view
+@internal
+def _getTellerUtilsAddr() -> address:
+    return staticcall RipeHq(RIPE_HQ_FOR_ADDYS).getAddr(TELLER_UTILS_ID)

@@ -27,7 +27,7 @@ def test_ripe_hq_and_tokens_setup(
 
     # registry
     assert ripe_hq.registryChangeTimeLock() != 0
-    assert ripe_hq.getNumAddrs() == 17
+    assert ripe_hq.getNumAddrs() == 20
 
     # governance
     assert ripe_hq.governance() == governance.address
@@ -51,7 +51,7 @@ def test_ripe_hq_and_tokens_setup(
 
     # price desk
     assert price_desk.registryChangeTimeLock() != 0
-    assert price_desk.getNumAddrs() == 7
+    assert price_desk.getNumAddrs() == 10
     assert price_desk.governance() == ZERO_ADDRESS
 
     # chainlink

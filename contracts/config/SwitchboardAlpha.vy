@@ -27,8 +27,8 @@ import interfaces.ConfigStructs as cs
 interface MissionControl:
     def setRipeGovVaultConfig(_asset: address, _assetWeight: uint256, _shouldFreezeWhenBadDebt: bool, _lockTerms: cs.LockTerms): nonpayable
     def setPriorityLiqAssetVaults(_priorityLiqAssetVaults: DynArray[cs.VaultLite, PRIORITY_VAULT_DATA]): nonpayable
-    def setPriorityPriceSourceIds(_priorityIds: DynArray[uint256, MAX_PRIORITY_PRICE_SOURCES]): nonpayable
     def setPriorityStabVaults(_priorityStabVaults: DynArray[cs.VaultLite, PRIORITY_VAULT_DATA]): nonpayable
+    def setPriorityPriceSourceIds(_priorityIds: DynArray[uint256, MAX_PRIORITY_PRICE_SOURCES]): nonpayable
     def isSupportedAssetInVault(_vaultId: uint256, _asset: address) -> bool: view
     def setRipeRewardsConfig(_rewardsConfig: cs.RipeRewardsConfig): nonpayable
     def setCanPerformLiteAction(_user: address, _canDisable: bool): nonpayable
@@ -52,6 +52,9 @@ interface Ledger:
 interface VaultBook:
     def isValidRegId(_regId: uint256) -> bool: view
     def getAddr(_regId: uint256) -> address: view
+
+interface CreditEngine:
+    def setUnderscoreVaultDiscount(_discount: uint256): nonpayable
 
 interface PriceDesk:
     def isValidRegId(_regId: uint256) -> bool: view
@@ -88,6 +91,7 @@ flag ActionType:
     OTHER_CAN_PERFORM_LITE_ACTION
     OTHER_SHOULD_CHECK_LAST_TOUCH
     RIPE_VAULT_CONFIG
+    DEBT_UNDY_VAULT_DISCOUNT
 
 flag GenConfigFlag:
     CAN_DEPOSIT
@@ -206,6 +210,11 @@ event PendingDefaultAuctionParamsChange:
     maxDiscount: uint256
     delay: uint256
     duration: uint256
+    confirmationBlock: uint256
+    actionId: uint256
+
+event PendingUndyVaultDiscountChange:
+    discount: uint256
     confirmationBlock: uint256
     actionId: uint256
 
@@ -337,6 +346,9 @@ event GenAuctionParamsSet:
     delay: uint256
     duration: uint256
 
+event UndyVaultDiscountSet:
+    discount: uint256
+
 event RipeRewardsPerBlockSet:
     ripePerBlock: uint256
 
@@ -397,6 +409,7 @@ actionType: public(HashMap[uint256, ActionType]) # aid -> type
 pendingRipeRewardsConfig: public(HashMap[uint256, cs.RipeRewardsConfig]) # aid -> config
 pendingGeneralConfig: public(HashMap[uint256, GenConfigLite]) # aid -> config
 pendingDebtConfig: public(HashMap[uint256, cs.GenDebtConfig]) # aid -> config
+pendingUndyVaultDiscount: public(HashMap[uint256, uint256]) # aid -> discount
 pendingPriorityLiqAssetVaults: public(HashMap[uint256, DynArray[cs.VaultLite, PRIORITY_VAULT_DATA]])
 pendingPriorityStabVaults: public(HashMap[uint256, DynArray[cs.VaultLite, PRIORITY_VAULT_DATA]])
 pendingPriorityPriceSourceIds: public(HashMap[uint256, DynArray[uint256, MAX_PRIORITY_PRICE_SOURCES]])
@@ -422,6 +435,7 @@ LEDGER_ID: constant(uint256) = 4
 MISSION_CONTROL_ID: constant(uint256) = 5
 PRICE_DESK_ID: constant(uint256) = 7
 VAULT_BOOK_ID: constant(uint256) = 8
+CREDIT_ENGINE_ID: constant(uint256) = 13
 
 
 @deploy
@@ -479,6 +493,12 @@ def _getVaultBookAddr() -> address:
 @internal
 def _getLedgerAddr() -> address:
     return staticcall RipeHq(gov._getRipeHqFromGov()).getAddr(LEDGER_ID)
+
+
+@view
+@internal
+def _getCreditEngineAddr() -> address:
+    return staticcall RipeHq(gov._getRipeHqFromGov()).getAddr(CREDIT_ENGINE_ID)
 
 
 ##################
@@ -871,6 +891,26 @@ def _areValidAuctionParams(_params: cs.AuctionParams) -> bool:
     if _params.duration == 0 or _params.duration == max_value(uint256):
         return False
     return True
+
+
+# underscore vault discount
+
+
+@external
+def setUndyVaultDiscount(_discount: uint256) -> uint256:
+    assert gov._canGovern(msg.sender) # dev: no perms
+    assert _discount <= HUNDRED_PERCENT # dev: invalid discount
+
+    aid: uint256 = timeLock._initiateAction()
+    self.actionType[aid] = ActionType.DEBT_UNDY_VAULT_DISCOUNT
+    self.pendingUndyVaultDiscount[aid] = _discount
+    confirmationBlock: uint256 = timeLock._getActionConfirmationBlock(aid)
+    log PendingUndyVaultDiscountChange(
+        discount=_discount,
+        confirmationBlock=confirmationBlock,
+        actionId=aid,
+    )
+    return aid
 
 
 # set pending debt config
@@ -1537,6 +1577,11 @@ def executePendingAction(_aid: uint256) -> bool:
         config.genAuctionParams = p.genAuctionParams
         extcall MissionControl(mc).setGeneralDebtConfig(config)
         log GenAuctionParamsSet(startDiscount=p.genAuctionParams.startDiscount, maxDiscount=p.genAuctionParams.maxDiscount, delay=p.genAuctionParams.delay, duration=p.genAuctionParams.duration)
+
+    elif actionType == ActionType.DEBT_UNDY_VAULT_DISCOUNT:
+        discount: uint256 = self.pendingUndyVaultDiscount[_aid]
+        extcall CreditEngine(self._getCreditEngineAddr()).setUnderscoreVaultDiscount(discount)
+        log UndyVaultDiscountSet(discount=discount)
 
     elif actionType == ActionType.RIPE_REWARDS_BLOCK:
         config: cs.RipeRewardsConfig = staticcall MissionControl(mc).rewardsConfig()

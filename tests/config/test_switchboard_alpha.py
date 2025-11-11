@@ -890,7 +890,7 @@ def test_sanitize_priority_sources_deduplication(switchboard_alpha, governance):
     """Test the deduplication logic in _sanitizePrioritySources"""
     
     # Test with duplicate price source IDs (1 and 2 are valid)
-    ids = [1, 1, 2, 2, 1, 9]  # Contains duplicates, 9 is invalid
+    ids = [1, 1, 2, 2, 1, 99]  # Contains duplicates, 99 is invalid
     
     # This should succeed with valid IDs 1 and 2 (deduplicated)
     action_id = switchboard_alpha.setPriorityPriceSourceIds(ids, sender=governance.address)
@@ -3089,3 +3089,231 @@ def test_ripe_available_edge_cases(switchboard_alpha, ledger, governance):
     boa.env.time_travel(blocks=switchboard_alpha.actionTimeLock())
     assert switchboard_alpha.executePendingAction(action_id4, sender=governance.address)
     assert ledger.ripeAvailForRewards() == large_amount
+
+# ========================================
+# Underscore Vault Discount Tests
+# ========================================
+
+
+def test_set_undy_vault_discount_validation(switchboard_alpha, governance):
+    """Test that discount validation works correctly"""
+    # Test discount > 100%
+    with boa.reverts("invalid discount"):
+        switchboard_alpha.setUndyVaultDiscount(100_01, sender=governance.address)  # 100.01%
+
+    with boa.reverts("invalid discount"):
+        switchboard_alpha.setUndyVaultDiscount(MAX_UINT256, sender=governance.address)  # max uint256
+
+    # Test discount = 100% should work
+    action_id = switchboard_alpha.setUndyVaultDiscount(100_00, sender=governance.address)
+    assert action_id > 0
+
+
+def test_set_undy_vault_discount_permissions(switchboard_alpha, governance, bob):
+    """Test that only governance can set underscore vault discount"""
+    # Non-governance user should not be able to call the function
+    with boa.reverts("no perms"):
+        switchboard_alpha.setUndyVaultDiscount(50_00, sender=bob)
+
+    # Governance should be able to call the function
+    action_id = switchboard_alpha.setUndyVaultDiscount(50_00, sender=governance.address)
+    assert action_id > 0
+
+
+def test_set_undy_vault_discount_success(switchboard_alpha, governance):
+    """Test successful creation of undy vault discount action"""
+    # Test with valid discount
+    action_id = switchboard_alpha.setUndyVaultDiscount(75_00, sender=governance.address)
+    assert action_id > 0
+
+    # Check event was emitted
+    logs = filter_logs(switchboard_alpha, "PendingUndyVaultDiscountChange")
+    assert len(logs) == 1
+    log = logs[0]
+    assert log.discount == 75_00
+    assert log.actionId == action_id
+
+    # Check pending config was stored correctly
+    assert switchboard_alpha.pendingUndyVaultDiscount(action_id) == 75_00
+
+    # Verify action type is set correctly (non-zero means it's set)
+    assert switchboard_alpha.actionType(action_id) != 0
+
+
+def test_set_undy_vault_discount_boundary_conditions(switchboard_alpha, governance):
+    """Test undy vault discount at boundary values"""
+    # Test at 0% (no discount)
+    action_id = switchboard_alpha.setUndyVaultDiscount(0, sender=governance.address)
+    assert action_id > 0
+    assert switchboard_alpha.pendingUndyVaultDiscount(action_id) == 0
+
+    # Test at exactly 100% (full discount)
+    action_id2 = switchboard_alpha.setUndyVaultDiscount(100_00, sender=governance.address)
+    assert action_id2 > 0
+    assert switchboard_alpha.pendingUndyVaultDiscount(action_id2) == 100_00
+
+    # Test typical values
+    action_id3 = switchboard_alpha.setUndyVaultDiscount(25_00, sender=governance.address)
+    assert action_id3 > 0
+    assert switchboard_alpha.pendingUndyVaultDiscount(action_id3) == 25_00
+
+
+def test_execute_undy_vault_discount(switchboard_alpha, credit_engine, governance):
+    """Test execution of undy vault discount action"""
+    # Get initial discount value
+    initial_discount = credit_engine.undyVaulDiscount()
+
+    # Create the action with a different discount
+    new_discount = 60_00
+    action_id = switchboard_alpha.setUndyVaultDiscount(new_discount, sender=governance.address)
+    assert action_id > 0
+
+    # Verify discount hasn't changed yet
+    assert credit_engine.undyVaulDiscount() == initial_discount
+
+    # Time travel past timelock
+    boa.env.time_travel(blocks=switchboard_alpha.actionTimeLock())
+
+    # Execute the action
+    success = switchboard_alpha.executePendingAction(action_id, sender=governance.address)
+    assert success
+
+    # Verify the discount was updated in CreditEngine
+    assert credit_engine.undyVaulDiscount() == new_discount
+
+    # Check execution event was emitted
+    logs = filter_logs(switchboard_alpha, "UndyVaultDiscountSet")
+    assert len(logs) == 1
+    log = logs[0]
+    assert log.discount == new_discount
+
+    # Verify action was cleaned up
+    assert switchboard_alpha.actionType(action_id) == 0
+    assert not switchboard_alpha.hasPendingAction(action_id)
+
+
+def test_execute_undy_vault_discount_multiple_changes(switchboard_alpha, credit_engine, governance):
+    """Test multiple sequential discount changes"""
+    # First change: 40%
+    action_id1 = switchboard_alpha.setUndyVaultDiscount(40_00, sender=governance.address)
+    boa.env.time_travel(blocks=switchboard_alpha.actionTimeLock())
+    switchboard_alpha.executePendingAction(action_id1, sender=governance.address)
+    assert credit_engine.undyVaulDiscount() == 40_00
+
+    # Second change: 80%
+    action_id2 = switchboard_alpha.setUndyVaultDiscount(80_00, sender=governance.address)
+    boa.env.time_travel(blocks=switchboard_alpha.actionTimeLock())
+    switchboard_alpha.executePendingAction(action_id2, sender=governance.address)
+    assert credit_engine.undyVaulDiscount() == 80_00
+
+    # Third change: 0% (remove discount)
+    action_id3 = switchboard_alpha.setUndyVaultDiscount(0, sender=governance.address)
+    boa.env.time_travel(blocks=switchboard_alpha.actionTimeLock())
+    switchboard_alpha.executePendingAction(action_id3, sender=governance.address)
+    assert credit_engine.undyVaulDiscount() == 0
+
+    # Fourth change: back to 50%
+    action_id4 = switchboard_alpha.setUndyVaultDiscount(50_00, sender=governance.address)
+    boa.env.time_travel(blocks=switchboard_alpha.actionTimeLock())
+    switchboard_alpha.executePendingAction(action_id4, sender=governance.address)
+    assert credit_engine.undyVaulDiscount() == 50_00
+
+
+def test_undy_vault_discount_timelock_required(switchboard_alpha, credit_engine, governance):
+    """Test that timelock must be satisfied before execution"""
+    initial_discount = credit_engine.undyVaulDiscount()
+
+    # Create the action
+    action_id = switchboard_alpha.setUndyVaultDiscount(30_00, sender=governance.address)
+
+    # Try to execute immediately (should fail/return false)
+    success = switchboard_alpha.executePendingAction(action_id, sender=governance.address)
+    assert not success  # Should not execute before timelock
+
+    # Verify discount hasn't changed
+    assert credit_engine.undyVaulDiscount() == initial_discount
+
+    # Time travel but not enough
+    boa.env.time_travel(blocks=switchboard_alpha.actionTimeLock() - 1)
+    success = switchboard_alpha.executePendingAction(action_id, sender=governance.address)
+    assert not success  # Still not enough time
+    assert credit_engine.undyVaulDiscount() == initial_discount
+
+    # Time travel one more block (now should work)
+    boa.env.time_travel(blocks=1)
+    success = switchboard_alpha.executePendingAction(action_id, sender=governance.address)
+    assert success
+    assert credit_engine.undyVaulDiscount() == 30_00
+
+
+def test_undy_vault_discount_cancel_action(switchboard_alpha, credit_engine, governance):
+    """Test cancelling a pending discount change"""
+    initial_discount = credit_engine.undyVaulDiscount()
+
+    # Create the action
+    action_id = switchboard_alpha.setUndyVaultDiscount(90_00, sender=governance.address)
+    assert switchboard_alpha.hasPendingAction(action_id)
+
+    # Cancel the action
+    success = switchboard_alpha.cancelPendingAction(action_id, sender=governance.address)
+    assert success
+
+    # Verify action was cancelled
+    assert not switchboard_alpha.hasPendingAction(action_id)
+    assert switchboard_alpha.actionType(action_id) == 0
+
+    # Time travel past timelock and try to execute (should fail)
+    boa.env.time_travel(blocks=switchboard_alpha.actionTimeLock())
+    success = switchboard_alpha.executePendingAction(action_id, sender=governance.address)
+    assert not success
+
+    # Verify discount wasn't changed
+    assert credit_engine.undyVaulDiscount() == initial_discount
+
+
+def test_undy_vault_discount_with_other_debt_configs(switchboard_alpha, mission_control, credit_engine, governance):
+    """Test that undy vault discount works independently of other debt configs"""
+    # Set some other debt config
+    debt_action = switchboard_alpha.setGlobalDebtLimits(7000, 70000, 250, 150, sender=governance.address)
+    boa.env.time_travel(blocks=switchboard_alpha.actionTimeLock())
+    switchboard_alpha.executePendingAction(debt_action, sender=governance.address)
+
+    # Verify debt limits were set
+    debt_config = mission_control.genDebtConfig()
+    assert debt_config.perUserDebtLimit == 7000
+    assert debt_config.globalDebtLimit == 70000
+
+    # Now set undy vault discount
+    discount_action = switchboard_alpha.setUndyVaultDiscount(45_00, sender=governance.address)
+    boa.env.time_travel(blocks=switchboard_alpha.actionTimeLock())
+    switchboard_alpha.executePendingAction(discount_action, sender=governance.address)
+
+    # Verify discount was set
+    assert credit_engine.undyVaulDiscount() == 45_00
+
+    # Verify debt config wasn't affected
+    debt_config = mission_control.genDebtConfig()
+    assert debt_config.perUserDebtLimit == 7000
+    assert debt_config.globalDebtLimit == 70000
+
+
+def test_undy_vault_discount_multiple_pending_actions(switchboard_alpha, governance):
+    """Test that multiple discount actions can be pending at once"""
+    # Create multiple actions
+    action_id1 = switchboard_alpha.setUndyVaultDiscount(20_00, sender=governance.address)
+    action_id2 = switchboard_alpha.setUndyVaultDiscount(40_00, sender=governance.address)
+    action_id3 = switchboard_alpha.setUndyVaultDiscount(60_00, sender=governance.address)
+
+    # All should be different
+    assert action_id1 != action_id2
+    assert action_id2 != action_id3
+
+    # All should be pending
+    assert switchboard_alpha.hasPendingAction(action_id1)
+    assert switchboard_alpha.hasPendingAction(action_id2)
+    assert switchboard_alpha.hasPendingAction(action_id3)
+
+    # All should have correct pending values
+    assert switchboard_alpha.pendingUndyVaultDiscount(action_id1) == 20_00
+    assert switchboard_alpha.pendingUndyVaultDiscount(action_id2) == 40_00
+    assert switchboard_alpha.pendingUndyVaultDiscount(action_id3) == 60_00

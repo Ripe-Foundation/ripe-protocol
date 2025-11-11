@@ -1,7 +1,7 @@
 import pytest
 import boa
 
-from config.BluePrint import PARAMS, ADDYS
+from config.BluePrint import PARAMS, ADDYS, YIELD_TOKENS
 from constants import ZERO_ADDRESS, EIGHTEEN_DECIMALS, HUNDRED_PERCENT
 
 
@@ -41,13 +41,16 @@ def ripe_hq(
     mission_control,
     switchboard,
     credit_engine,
+    deleverage,
     endaoment,
     ledger,
     lootbox,
     teller,
     boardroom,
     deploy3r,
-    governance
+    governance,
+    credit_redeem,
+    teller_utils,
 ):
     # finish token setup
     assert green_token.finishTokenSetup(ripe_hq_deploy, sender=deploy3r)
@@ -115,6 +118,18 @@ def ripe_hq(
     # 17
     assert ripe_hq_deploy.startAddNewAddressToRegistry(teller, "Teller", sender=deploy3r)
     assert ripe_hq_deploy.confirmNewAddressToRegistry(teller, sender=deploy3r) == 17
+
+    # 18
+    assert ripe_hq_deploy.startAddNewAddressToRegistry(deleverage, "Deleverage", sender=deploy3r)
+    assert ripe_hq_deploy.confirmNewAddressToRegistry(deleverage, sender=deploy3r) == 18
+
+    # 19
+    assert ripe_hq_deploy.startAddNewAddressToRegistry(credit_redeem, "Credit Redeem", sender=deploy3r)
+    assert ripe_hq_deploy.confirmNewAddressToRegistry(credit_redeem, sender=deploy3r) == 19
+
+    # 20
+    assert ripe_hq_deploy.startAddNewAddressToRegistry(teller_utils, "Teller Utils", sender=deploy3r)
+    assert ripe_hq_deploy.confirmNewAddressToRegistry(teller_utils, sender=deploy3r) == 20
 
     # special permission setup
 
@@ -258,6 +273,18 @@ def auction_house(ripe_hq_deploy):
     )
 
 
+# deleverage
+
+
+@pytest.fixture(scope="session")
+def deleverage(ripe_hq_deploy):
+    return boa.load(
+        "contracts/core/Deleverage.vy",
+        ripe_hq_deploy,
+        name="deleverage",
+    )
+
+
 # auction house nft
 
 
@@ -358,6 +385,30 @@ def teller(ripe_hq_deploy):
         ripe_hq_deploy,
         False,
         name="teller",
+    )
+
+
+# credit redeem
+
+
+@pytest.fixture(scope="session")
+def credit_redeem(ripe_hq_deploy):
+    return boa.load(
+        "contracts/core/CreditRedeem.vy",
+        ripe_hq_deploy,
+        name="credit_redeem",
+    )
+
+
+# teller utils
+
+
+@pytest.fixture(scope="session")
+def teller_utils(ripe_hq_deploy):
+    return boa.load(
+        "contracts/core/TellerUtils.vy",
+        ripe_hq_deploy,
+        name="teller_utils",
     )
 
 
@@ -628,8 +679,20 @@ def price_desk_deploy(ripe_hq_deploy, fork):
 
 
 @pytest.fixture(scope="session")
-def price_desk(price_desk_deploy, deploy3r, chainlink, mock_price_source, curve_prices, blue_chip_prices, pyth_prices, stork_prices, aero_ripe_prices):
-
+def price_desk(
+    price_desk_deploy,
+    deploy3r,
+    chainlink,
+    mock_price_source,
+    curve_prices,
+    blue_chip_prices,
+    pyth_prices,
+    stork_prices,
+    aero_ripe_prices,
+    wsuper_oethb_prices,
+    redstone,
+    undy_vault_prices,
+):
     # register chainlink
     assert price_desk_deploy.startAddNewAddressToRegistry(chainlink, "Chainlink", sender=deploy3r)
     assert price_desk_deploy.confirmNewAddressToRegistry(chainlink, sender=deploy3r) == 1
@@ -657,6 +720,18 @@ def price_desk(price_desk_deploy, deploy3r, chainlink, mock_price_source, curve_
     # register aero ripe prices
     assert price_desk_deploy.startAddNewAddressToRegistry(aero_ripe_prices, "Aero Ripe Prices", sender=deploy3r)
     assert price_desk_deploy.confirmNewAddressToRegistry(aero_ripe_prices, sender=deploy3r) == 7
+
+    # register wsuper oethb prices
+    assert price_desk_deploy.startAddNewAddressToRegistry(wsuper_oethb_prices, "WSuper OETHb Prices", sender=deploy3r)
+    assert price_desk_deploy.confirmNewAddressToRegistry(wsuper_oethb_prices, sender=deploy3r) == 8
+
+    # register redstone prices
+    assert price_desk_deploy.startAddNewAddressToRegistry(redstone, "RedStone Prices", sender=deploy3r)
+    assert price_desk_deploy.confirmNewAddressToRegistry(redstone, sender=deploy3r) == 9
+
+    # register undy vault prices
+    assert price_desk_deploy.startAddNewAddressToRegistry(undy_vault_prices, "Undy Vault Prices", sender=deploy3r)
+    assert price_desk_deploy.confirmNewAddressToRegistry(undy_vault_prices, sender=deploy3r) == 10
 
     # finish registry setup
     assert price_desk_deploy.setRegistryTimeLockAfterSetup(sender=deploy3r)
@@ -810,6 +885,62 @@ def aero_ripe_prices(ripe_hq_deploy, fork, deploy3r):
         PARAMS[fork]["PRICE_DESK_MIN_REG_TIMELOCK"],
         PARAMS[fork]["PRICE_DESK_MAX_REG_TIMELOCK"],
         name="aero_ripe_prices",
+    )
+    assert c.setActionTimeLockAfterSetup(sender=deploy3r)
+    return c
+
+
+# wsuper oethb prices
+
+
+@pytest.fixture(scope="session")
+def wsuper_oethb_prices(ripe_hq_deploy, fork, deploy3r, mock_yield_registry):
+    super_oeth = mock_yield_registry if fork == "local" else YIELD_TOKENS[fork]["SUPER_OETH"]
+    wrapped_super_oeth = mock_yield_registry if fork == "local" else YIELD_TOKENS[fork]["WRAPPED_SUPER_OETH"]
+
+    c = boa.load(
+        "contracts/priceSources/wsuperOETHbPrices.vy",
+        ripe_hq_deploy,
+        super_oeth,
+        wrapped_super_oeth,
+        PARAMS[fork]["PRICE_DESK_MIN_REG_TIMELOCK"],
+        PARAMS[fork]["PRICE_DESK_MAX_REG_TIMELOCK"],
+        name="wsuper_oethb_prices",
+    )
+    assert c.setActionTimeLockAfterSetup(sender=deploy3r)
+    return c
+
+
+# redstone
+
+
+@pytest.fixture(scope="session")
+def redstone(ripe_hq_deploy, fork, deploy3r):
+    c = boa.load(
+        "contracts/priceSources/RedStone.vy",
+        ripe_hq_deploy,
+        ZERO_ADDRESS,
+        ADDYS[fork]["ETH"],
+        PARAMS[fork]["PRICE_DESK_MIN_REG_TIMELOCK"],
+        PARAMS[fork]["PRICE_DESK_MAX_REG_TIMELOCK"],
+        name="redstone",
+    )
+    assert c.setActionTimeLockAfterSetup(sender=deploy3r)
+    return c
+
+
+# undy vault prices
+
+
+@pytest.fixture(scope="session")
+def undy_vault_prices(ripe_hq_deploy, fork, deploy3r):
+    c = boa.load(
+        "contracts/priceSources/UndyVaultPrices.vy",
+        ripe_hq_deploy,
+        ZERO_ADDRESS,
+        PARAMS[fork]["PRICE_DESK_MIN_REG_TIMELOCK"],
+        PARAMS[fork]["PRICE_DESK_MAX_REG_TIMELOCK"],
+        name="undy_vault_prices",
     )
     assert c.setActionTimeLockAfterSetup(sender=deploy3r)
     return c
