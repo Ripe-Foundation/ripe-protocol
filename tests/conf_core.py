@@ -41,13 +41,16 @@ def ripe_hq(
     mission_control,
     switchboard,
     credit_engine,
+    deleverage,
     endaoment,
     ledger,
     lootbox,
     teller,
     boardroom,
     deploy3r,
-    governance
+    governance,
+    credit_redeem,
+    teller_utils,
 ):
     # finish token setup
     assert green_token.finishTokenSetup(ripe_hq_deploy, sender=deploy3r)
@@ -115,6 +118,18 @@ def ripe_hq(
     # 17
     assert ripe_hq_deploy.startAddNewAddressToRegistry(teller, "Teller", sender=deploy3r)
     assert ripe_hq_deploy.confirmNewAddressToRegistry(teller, sender=deploy3r) == 17
+
+    # 18
+    assert ripe_hq_deploy.startAddNewAddressToRegistry(deleverage, "Deleverage", sender=deploy3r)
+    assert ripe_hq_deploy.confirmNewAddressToRegistry(deleverage, sender=deploy3r) == 18
+
+    # 19
+    assert ripe_hq_deploy.startAddNewAddressToRegistry(credit_redeem, "Credit Redeem", sender=deploy3r)
+    assert ripe_hq_deploy.confirmNewAddressToRegistry(credit_redeem, sender=deploy3r) == 19
+
+    # 20
+    assert ripe_hq_deploy.startAddNewAddressToRegistry(teller_utils, "Teller Utils", sender=deploy3r)
+    assert ripe_hq_deploy.confirmNewAddressToRegistry(teller_utils, sender=deploy3r) == 20
 
     # special permission setup
 
@@ -258,6 +273,18 @@ def auction_house(ripe_hq_deploy):
     )
 
 
+# deleverage
+
+
+@pytest.fixture(scope="session")
+def deleverage(ripe_hq_deploy):
+    return boa.load(
+        "contracts/core/Deleverage.vy",
+        ripe_hq_deploy,
+        name="deleverage",
+    )
+
+
 # auction house nft
 
 
@@ -358,6 +385,30 @@ def teller(ripe_hq_deploy):
         ripe_hq_deploy,
         False,
         name="teller",
+    )
+
+
+# credit redeem
+
+
+@pytest.fixture(scope="session")
+def credit_redeem(ripe_hq_deploy):
+    return boa.load(
+        "contracts/core/CreditRedeem.vy",
+        ripe_hq_deploy,
+        name="credit_redeem",
+    )
+
+
+# teller utils
+
+
+@pytest.fixture(scope="session")
+def teller_utils(ripe_hq_deploy):
+    return boa.load(
+        "contracts/core/TellerUtils.vy",
+        ripe_hq_deploy,
+        name="teller_utils",
     )
 
 

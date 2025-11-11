@@ -571,20 +571,18 @@ def test_teller_withdraw_multiple_assets_with_debt(
     assert max_withdrawable_alpha == MAX_UINT256  # Can withdraw all alpha
 
     # Test withdrawing bravo
-    # Without bravo: $100 alpha collateral, $50 max debt from alpha
-    # Need $100 debt * 100/49 (with buffer) = $204.08 collateral
-    # Alpha only provides $100, need $104.08 from bravo = 52.04 bravo tokens
-    # But due to rounding in calculation: userBalance * maxWithdrawableValue // userUsdValue
-    # The actual result is closer to 32 tokens
+    # Without bravo: $100 alpha collateral, $50 max debt capacity from alpha
+    # Total debt needed (with 1% buffer): $100 * 101% = $101
+    # Debt bravo must support: $101 - $50 = $51
+    # Min bravo collateral needed: $51 / 75% = $68
+    # Can withdraw: $200 - $68 = $132 worth of bravo = 66 tokens
     max_withdrawable_bravo = credit_engine.getMaxWithdrawableForAsset(
         bob,
         vault_id,
         bravo_token,
         simple_erc20_vault
     )
-    # Actual calculation: need ~$104 from bravo, so can withdraw ~$96 worth = 48 tokens
-    # But implementation gives different result due to calculation method
-    assert max_withdrawable_bravo == 32 * EIGHTEEN_DECIMALS
+    assert max_withdrawable_bravo == 66 * EIGHTEEN_DECIMALS
 
 
 def test_teller_withdraw_user_in_liquidation(
@@ -1050,3 +1048,469 @@ def test_teller_withdraw_min_balance_partial_then_blocked(
     amount2 = teller.withdraw(alpha_token, min_balance, bob, simple_erc20_vault, sender=bob)
     assert amount2 == min_balance
     assert alpha_token.balanceOf(simple_erc20_vault) == 0
+
+
+def test_teller_withdraw_small_debt_buffer_precision(
+    simple_erc20_vault,
+    alpha_token,
+    bravo_token,
+    alpha_token_whale,
+    bravo_token_whale,
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    setGeneralDebtConfig,
+    performDeposit,
+    teller,
+    credit_engine,
+    mock_price_source,
+    createDebtTerms,
+    vault_book,
+):
+    """Test that 1% buffer works correctly even with small debt amounts"""
+    setGeneralConfig()
+
+    # Alpha: 50% LTV, Bravo: 80% LTV
+    alpha_debt_terms = createDebtTerms(_ltv=50_00)
+    bravo_debt_terms = createDebtTerms(_ltv=80_00)
+    setAssetConfig(alpha_token, _debtTerms=alpha_debt_terms)
+    setAssetConfig(bravo_token, _debtTerms=bravo_debt_terms)
+    setGeneralDebtConfig()
+
+    # Deposits: Small amounts to create small debt
+    deposit_amount_alpha = 10 * EIGHTEEN_DECIMALS
+    deposit_amount_bravo = 20 * EIGHTEEN_DECIMALS
+    performDeposit(bob, deposit_amount_alpha, alpha_token, alpha_token_whale)
+    performDeposit(bob, deposit_amount_bravo, bravo_token, bravo_token_whale)
+
+    # Prices: alpha=$1, bravo=$1
+    mock_price_source.setPrice(alpha_token, 1 * EIGHTEEN_DECIMALS)
+    mock_price_source.setPrice(bravo_token, 1 * EIGHTEEN_DECIMALS)
+
+    # Borrow tiny amount: $10
+    borrow_amount = 10 * EIGHTEEN_DECIMALS
+    teller.borrow(borrow_amount, bob, False, sender=bob)
+
+    vault_id = vault_book.getRegId(simple_erc20_vault)
+
+    # Test withdrawing bravo with small debt
+    # Without bravo: $10 alpha, $5 capacity
+    # Need: $10 * 1.01 = $10.1 (buffer should apply even for small amounts)
+    # Bravo must cover: $10.1 - $5 = $5.1
+    # Min bravo needed: $5.1 / 80% = $6.375
+    # Can withdraw: $20 - $6.375 = $13.625
+    max_withdrawable_bravo = credit_engine.getMaxWithdrawableForAsset(
+        bob,
+        vault_id,
+        bravo_token,
+        simple_erc20_vault
+    )
+
+    # Expected: 13.625 tokens (since price is $1)
+    # Due to integer division: 10 * 10100 // 10000 = 1010000 // 10000 = 101 (works!)
+    # 101 - 5 = 96 (in wei: $0.96)
+    # Need more precision - let me calculate in wei properly
+    # debtNeeded = 10e18 * 10100 // 10000 = 10.1e18
+    # gap = 10.1e18 - 5e18 = 5.1e18
+    # minBravo = 5.1e18 * 10000 // 8000 = 6.375e18
+    # canWithdraw = 20e18 - 6.375e18 = 13.625e18
+    expected = 13625 * EIGHTEEN_DECIMALS // 1000  # 13.625 tokens
+    assert max_withdrawable_bravo == expected
+
+
+def test_teller_withdraw_three_assets_different_ltvs(
+    simple_erc20_vault,
+    alpha_token,
+    bravo_token,
+    charlie_token,
+    alpha_token_whale,
+    bravo_token_whale,
+    charlie_token_whale,
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    setGeneralDebtConfig,
+    performDeposit,
+    teller,
+    credit_engine,
+    mock_price_source,
+    createDebtTerms,
+    vault_book,
+):
+    """Test withdrawal calculation with three assets having different LTVs"""
+    setGeneralConfig()
+
+    # Three assets: Alpha 40%, Bravo 60%, Charlie 80%
+    alpha_debt_terms = createDebtTerms(_ltv=40_00)
+    bravo_debt_terms = createDebtTerms(_ltv=60_00)
+    charlie_debt_terms = createDebtTerms(_ltv=80_00)
+    setAssetConfig(alpha_token, _debtTerms=alpha_debt_terms)
+    setAssetConfig(bravo_token, _debtTerms=bravo_debt_terms)
+    setAssetConfig(charlie_token, _debtTerms=charlie_debt_terms)
+    setGeneralDebtConfig()
+
+    # Deposits: $100 each (use proper decimals for each token)
+    deposit_alpha = 100 * (10 ** alpha_token.decimals())
+    deposit_bravo = 100 * (10 ** bravo_token.decimals())
+    deposit_charlie = 100 * (10 ** charlie_token.decimals())
+    performDeposit(bob, deposit_alpha, alpha_token, alpha_token_whale)
+    performDeposit(bob, deposit_bravo, bravo_token, bravo_token_whale)
+    performDeposit(bob, deposit_charlie, charlie_token, charlie_token_whale)
+
+    # Prices: all $1 (adjust for decimals)
+    mock_price_source.setPrice(alpha_token, 1 * EIGHTEEN_DECIMALS)
+    mock_price_source.setPrice(bravo_token, 1 * EIGHTEEN_DECIMALS)
+    mock_price_source.setPrice(charlie_token, 1 * EIGHTEEN_DECIMALS)
+
+    # Total: $300 collateral
+    # Max debt: $40 + $60 + $80 = $180
+    # Borrow $150
+    borrow_amount = 150 * EIGHTEEN_DECIMALS
+    teller.borrow(borrow_amount, bob, False, sender=bob)
+
+    vault_id = vault_book.getRegId(simple_erc20_vault)
+
+    # Test 1: Withdraw Charlie (highest LTV)
+    # Without charlie: $200 collateral, $100 capacity (40+60)
+    # Need: $150 * 1.01 = $151.5
+    # Charlie must cover: $151.5 - $100 = $51.5
+    # Min charlie: $51.5 / 80% = $64.375
+    # Can withdraw: $100 - $64.375 = $35.625
+    max_withdrawable_charlie = credit_engine.getMaxWithdrawableForAsset(
+        bob,
+        vault_id,
+        charlie_token,
+        simple_erc20_vault
+    )
+    # Charlie has 6 decimals, so convert: 35.625 * 1e6
+    expected_charlie = 35625000  # 35.625 tokens with 6 decimals
+    assert max_withdrawable_charlie == expected_charlie
+
+    # Test 2: Withdraw Alpha (lowest LTV)
+    # Without alpha: $200 collateral, $140 capacity (60+80)
+    # Need: $151.5
+    # $140 < $151.5, so alpha must cover gap
+    # Alpha must cover: $151.5 - $140 = $11.5
+    # Min alpha: $11.5 / 40% = $28.75
+    # Can withdraw: $100 - $28.75 = $71.25
+    max_withdrawable_alpha = credit_engine.getMaxWithdrawableForAsset(
+        bob,
+        vault_id,
+        alpha_token,
+        simple_erc20_vault
+    )
+    expected_alpha = 7125 * EIGHTEEN_DECIMALS // 100  # 71.25 tokens
+    assert max_withdrawable_alpha == expected_alpha
+
+    # Test 3: Withdraw Bravo (middle LTV)
+    # Without bravo: $200 collateral, $120 capacity (40+80)
+    # Bravo must cover: $151.5 - $120 = $31.5
+    # Min bravo: $31.5 / 60% = $52.5
+    # Can withdraw: $100 - $52.5 = $47.5
+    max_withdrawable_bravo = credit_engine.getMaxWithdrawableForAsset(
+        bob,
+        vault_id,
+        bravo_token,
+        simple_erc20_vault
+    )
+    expected_bravo = 475 * EIGHTEEN_DECIMALS // 10  # 47.5 tokens
+    assert max_withdrawable_bravo == expected_bravo
+
+
+def test_teller_withdraw_high_ltv_asset(
+    simple_erc20_vault,
+    alpha_token,
+    bravo_token,
+    alpha_token_whale,
+    bravo_token_whale,
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    setGeneralDebtConfig,
+    performDeposit,
+    teller,
+    credit_engine,
+    mock_price_source,
+    createDebtTerms,
+    vault_book,
+):
+    """Test calculation with very high LTV asset (90%)"""
+    setGeneralConfig()
+
+    # Alpha: 30% LTV (safe), Bravo: 90% LTV (risky)
+    alpha_debt_terms = createDebtTerms(_ltv=30_00)
+    bravo_debt_terms = createDebtTerms(_ltv=90_00)
+    setAssetConfig(alpha_token, _debtTerms=alpha_debt_terms)
+    setAssetConfig(bravo_token, _debtTerms=bravo_debt_terms)
+    setGeneralDebtConfig()
+
+    # Deposits
+    deposit_alpha = 100 * EIGHTEEN_DECIMALS
+    deposit_bravo = 100 * EIGHTEEN_DECIMALS
+    performDeposit(bob, deposit_alpha, alpha_token, alpha_token_whale)
+    performDeposit(bob, deposit_bravo, bravo_token, bravo_token_whale)
+
+    # Prices: both $1
+    mock_price_source.setPrice(alpha_token, 1 * EIGHTEEN_DECIMALS)
+    mock_price_source.setPrice(bravo_token, 1 * EIGHTEEN_DECIMALS)
+
+    # Borrow $100
+    # Max capacity: $30 + $90 = $120
+    borrow_amount = 100 * EIGHTEEN_DECIMALS
+    teller.borrow(borrow_amount, bob, False, sender=bob)
+
+    vault_id = vault_book.getRegId(simple_erc20_vault)
+
+    # Withdraw the high-LTV asset (bravo)
+    # Without bravo: $100 alpha, $30 capacity
+    # Need: $100 * 1.01 = $101
+    # Bravo must cover: $101 - $30 = $71
+    # Min bravo: $71 / 90% = $78.888...
+    # Can withdraw: $100 - $78.889 = $21.111
+    max_withdrawable_bravo = credit_engine.getMaxWithdrawableForAsset(
+        bob,
+        vault_id,
+        bravo_token,
+        simple_erc20_vault
+    )
+
+    # Calculation in wei:
+    # gap = 101e18 - 30e18 = 71e18
+    # minBravo = 71e18 * 10000 // 9000 = 78.888...e18 (rounds down in division)
+    # 71e18 * 10000 = 710000e18
+    # 710000e18 // 9000 = 78888888888888888888 (78.888... tokens)
+    # withdraw = 100e18 - 78888888888888888888 = 21111111111111111112
+    expected = 21111111111111111112  # ~21.111 tokens
+    assert max_withdrawable_bravo == expected
+
+    # Verify can actually withdraw this amount
+    teller.withdraw(bravo_token, expected, bob, simple_erc20_vault, sender=bob)
+
+
+def test_teller_withdraw_exact_capacity_edge_case(
+    simple_erc20_vault,
+    alpha_token,
+    bravo_token,
+    alpha_token_whale,
+    bravo_token_whale,
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    setGeneralDebtConfig,
+    performDeposit,
+    teller,
+    credit_engine,
+    mock_price_source,
+    createDebtTerms,
+    vault_book,
+):
+    """Test edge case where remaining capacity exactly equals debt needed"""
+    setGeneralConfig()
+
+    # Alpha: 75% LTV, Bravo: 50% LTV
+    alpha_debt_terms = createDebtTerms(_ltv=75_00)
+    bravo_debt_terms = createDebtTerms(_ltv=50_00)
+    setAssetConfig(alpha_token, _debtTerms=alpha_debt_terms)
+    setAssetConfig(bravo_token, _debtTerms=bravo_debt_terms)
+    setGeneralDebtConfig()
+
+    # Carefully chosen deposits to create exact capacity scenario
+    # Want: debt * 1.01 == remaining capacity
+    # If debt = $100, need remaining capacity = $101
+    # Bravo with 50% LTV needs $202 collateral for $101 capacity
+    deposit_alpha = 100 * EIGHTEEN_DECIMALS
+    deposit_bravo = 202 * EIGHTEEN_DECIMALS
+    performDeposit(bob, deposit_alpha, alpha_token, alpha_token_whale)
+    performDeposit(bob, deposit_bravo, bravo_token, bravo_token_whale)
+
+    # Prices
+    mock_price_source.setPrice(alpha_token, 1 * EIGHTEEN_DECIMALS)
+    mock_price_source.setPrice(bravo_token, 1 * EIGHTEEN_DECIMALS)
+
+    # Borrow exactly $100
+    borrow_amount = 100 * EIGHTEEN_DECIMALS
+    teller.borrow(borrow_amount, bob, False, sender=bob)
+
+    vault_id = vault_book.getRegId(simple_erc20_vault)
+
+    # Try to withdraw Alpha
+    # Without alpha: $202 bravo, $101 capacity
+    # Need: $100 * 1.01 = $101
+    # Exactly equal! Should be able to withdraw ALL alpha
+    max_withdrawable_alpha = credit_engine.getMaxWithdrawableForAsset(
+        bob,
+        vault_id,
+        alpha_token,
+        simple_erc20_vault
+    )
+
+    # Should return max_value(uint256) when remaining can support all debt
+    assert max_withdrawable_alpha == MAX_UINT256
+
+    # Verify can actually withdraw all
+    teller.withdraw(alpha_token, deposit_alpha, bob, simple_erc20_vault, sender=bob)
+
+
+def test_teller_withdraw_order_dependency(
+    simple_erc20_vault,
+    alpha_token,
+    bravo_token,
+    charlie_token,
+    alpha_token_whale,
+    bravo_token_whale,
+    charlie_token_whale,
+    bob,
+    alice,
+    setGeneralConfig,
+    setAssetConfig,
+    setGeneralDebtConfig,
+    performDeposit,
+    teller,
+    credit_engine,
+    mock_price_source,
+    createDebtTerms,
+    vault_book,
+):
+    """Test that withdrawal order affects how much can be withdrawn"""
+    setGeneralConfig()
+
+    # Alpha: 30% LTV, Bravo: 60% LTV, Charlie: 90% LTV
+    alpha_debt_terms = createDebtTerms(_ltv=30_00)
+    bravo_debt_terms = createDebtTerms(_ltv=60_00)
+    charlie_debt_terms = createDebtTerms(_ltv=90_00)
+    setAssetConfig(alpha_token, _debtTerms=alpha_debt_terms)
+    setAssetConfig(bravo_token, _debtTerms=bravo_debt_terms)
+    setAssetConfig(charlie_token, _debtTerms=charlie_debt_terms)
+    setGeneralDebtConfig()
+
+    # Set up two users with identical positions (use proper decimals)
+    deposit_alpha = 100 * (10 ** alpha_token.decimals())
+    deposit_bravo = 100 * (10 ** bravo_token.decimals())
+    deposit_charlie = 100 * (10 ** charlie_token.decimals())
+
+    # Bob's deposits
+    performDeposit(bob, deposit_alpha, alpha_token, alpha_token_whale)
+    performDeposit(bob, deposit_bravo, bravo_token, bravo_token_whale)
+    performDeposit(bob, deposit_charlie, charlie_token, charlie_token_whale)
+
+    # Alice's deposits
+    performDeposit(alice, deposit_alpha, alpha_token, alpha_token_whale)
+    performDeposit(alice, deposit_bravo, bravo_token, bravo_token_whale)
+    performDeposit(alice, deposit_charlie, charlie_token, charlie_token_whale)
+
+    # Prices
+    mock_price_source.setPrice(alpha_token, 1 * EIGHTEEN_DECIMALS)
+    mock_price_source.setPrice(bravo_token, 1 * EIGHTEEN_DECIMALS)
+    mock_price_source.setPrice(charlie_token, 1 * EIGHTEEN_DECIMALS)
+
+    # Both borrow $100
+    borrow_amount = 100 * EIGHTEEN_DECIMALS
+    teller.borrow(borrow_amount, bob, False, sender=bob)
+    teller.borrow(borrow_amount, alice, False, sender=alice)
+
+    vault_id = vault_book.getRegId(simple_erc20_vault)
+
+    # Strategy 1 (Bob): Withdraw low-LTV first, then check high-LTV
+    # First check: how much charlie can bob withdraw initially?
+    max_charlie_initial = credit_engine.getMaxWithdrawableForAsset(
+        bob,
+        vault_id,
+        charlie_token,
+        simple_erc20_vault
+    )
+
+    # Now Bob withdraws alpha (low LTV) first
+    max_alpha_bob = credit_engine.getMaxWithdrawableForAsset(
+        bob,
+        vault_id,
+        alpha_token,
+        simple_erc20_vault
+    )
+    # Should be able to withdraw most/all alpha since bravo+charlie provide good capacity
+    teller.withdraw(alpha_token, max_alpha_bob, bob, simple_erc20_vault, sender=bob)
+
+    # Now check charlie again for Bob (after withdrawing alpha)
+    max_charlie_after_alpha = credit_engine.getMaxWithdrawableForAsset(
+        bob,
+        vault_id,
+        charlie_token,
+        simple_erc20_vault
+    )
+
+    # Strategy 2 (Alice): Check charlie without withdrawing anything
+    max_charlie_alice = credit_engine.getMaxWithdrawableForAsset(
+        alice,
+        vault_id,
+        charlie_token,
+        simple_erc20_vault
+    )
+
+    # Bob's max charlie (after withdrawing alpha) should be LESS than Alice's max charlie
+    # Because Bob lost the low-LTV alpha capacity
+    # Alice still has alpha+bravo remaining if she withdraws charlie
+    # Bob only has bravo remaining if he withdraws charlie
+    assert max_charlie_after_alpha < max_charlie_alice
+
+    # Initial check should equal Alice's current check (both have all assets)
+    assert max_charlie_initial == max_charlie_alice
+
+
+def test_teller_withdraw_remaining_capacity_exceeds_debt(
+    simple_erc20_vault,
+    alpha_token,
+    bravo_token,
+    alpha_token_whale,
+    bravo_token_whale,
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    setGeneralDebtConfig,
+    performDeposit,
+    teller,
+    credit_engine,
+    mock_price_source,
+    createDebtTerms,
+    vault_book,
+):
+    """Test when one asset alone can support all debt (other asset fully withdrawable)"""
+    setGeneralConfig()
+
+    # Alpha: 40% LTV, Bravo: 80% LTV
+    alpha_debt_terms = createDebtTerms(_ltv=40_00)
+    bravo_debt_terms = createDebtTerms(_ltv=80_00)
+    setAssetConfig(alpha_token, _debtTerms=alpha_debt_terms)
+    setAssetConfig(bravo_token, _debtTerms=bravo_debt_terms)
+    setGeneralDebtConfig()
+
+    # Large deposits, small debt
+    deposit_alpha = 50 * EIGHTEEN_DECIMALS
+    deposit_bravo = 200 * EIGHTEEN_DECIMALS
+    performDeposit(bob, deposit_alpha, alpha_token, alpha_token_whale)
+    performDeposit(bob, deposit_bravo, bravo_token, bravo_token_whale)
+
+    # Prices
+    mock_price_source.setPrice(alpha_token, 1 * EIGHTEEN_DECIMALS)
+    mock_price_source.setPrice(bravo_token, 1 * EIGHTEEN_DECIMALS)
+
+    # Small debt: $50
+    # Bravo alone provides: $200 * 80% = $160 capacity >> $50 debt
+    borrow_amount = 50 * EIGHTEEN_DECIMALS
+    teller.borrow(borrow_amount, bob, False, sender=bob)
+
+    vault_id = vault_book.getRegId(simple_erc20_vault)
+
+    # Try to withdraw Alpha
+    # Without alpha: $200 bravo, $160 capacity
+    # Need: $50 * 1.01 = $50.5
+    # $160 > $50.5, so can withdraw ALL alpha
+    max_withdrawable_alpha = credit_engine.getMaxWithdrawableForAsset(
+        bob,
+        vault_id,
+        alpha_token,
+        simple_erc20_vault
+    )
+
+    assert max_withdrawable_alpha == MAX_UINT256
+
+    # Verify can withdraw all
+    teller.withdraw(alpha_token, deposit_alpha, bob, simple_erc20_vault, sender=bob)

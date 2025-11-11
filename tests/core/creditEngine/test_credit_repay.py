@@ -481,7 +481,7 @@ def test_repay_during_liquidation(
 
     # repay during liquidation
     repay_value = borrow_amount // 2
-    assert credit_engine.repayDuringLiquidation(bob, user_debt, repay_value, 0, sender=auction_house.address)
+    assert credit_engine.repayFromDept(bob, user_debt, repay_value, 0, 0, sender=auction_house.address)
 
     # verify debt is cleared
     assert ledger.userDebt(bob).amount == borrow_amount - repay_value
@@ -599,8 +599,8 @@ def test_repay_during_liquidation_unauthorized(
     user_debt = (0, 0, debt_terms, 0, True)
 
     # attempt to repay during liquidation as unauthorized sender
-    with boa.reverts("only auction house allowed"):
-        credit_engine.repayDuringLiquidation(bob, user_debt, 10 * EIGHTEEN_DECIMALS, 0, sender=bob)
+    with boa.reverts("not allowed"):
+        credit_engine.repayFromDept(bob, user_debt, 10 * EIGHTEEN_DECIMALS, 0, 0, sender=bob)
 
 
 def test_repay_during_auction_purchase_unauthorized(

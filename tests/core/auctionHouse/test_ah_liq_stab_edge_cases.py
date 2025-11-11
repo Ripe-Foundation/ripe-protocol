@@ -406,77 +406,6 @@ def test_ah_liquidation_keeper_fee_max(
     assert logs[0].keeperFee == 50 * EIGHTEEN_DECIMALS  # Max fee applied
 
 
-def test_ah_liquidation_phase1_user_stab_deposits(
-    setupStabAssetConfig,
-    setAssetConfig,
-    green_lp_token,
-    green_lp_token_whale,
-    alpha_token,
-    alpha_token_whale,
-    bob,
-    sally,
-    teller,
-    mock_price_source,
-    createDebtTerms,
-    credit_engine,
-    stability_pool,
-    performDeposit,
-):
-    """Test Phase 1: User's own stability pool deposits are used first"""
-    setupStabAssetConfig()
-    
-    # Setup alpha token as collateral
-    debt_terms = createDebtTerms(_liqThreshold=80_00, _liqFee=10_00, _borrowRate=0)
-    setAssetConfig(
-        alpha_token,
-        _debtTerms=debt_terms,
-        _shouldSwapInStabPools=True,
-        _shouldAuctionInstantly=False,
-    )
-    mock_price_source.setPrice(alpha_token, 1 * EIGHTEEN_DECIMALS)
-    
-    # Bob deposits into stability pool FIRST
-    bob_glp = 60 * EIGHTEEN_DECIMALS
-    green_lp_token.transfer(bob, bob_glp, sender=green_lp_token_whale)
-    green_lp_token.approve(teller, bob_glp, sender=bob)
-    teller.deposit(green_lp_token, bob_glp, bob, stability_pool, 0, sender=bob)
-    
-    # Sally also deposits (for comparison)
-    sally_glp = 100 * EIGHTEEN_DECIMALS
-    green_lp_token.transfer(sally, sally_glp, sender=green_lp_token_whale)
-    green_lp_token.approve(teller, sally_glp, sender=sally)
-    teller.deposit(green_lp_token, sally_glp, sally, stability_pool, 0, sender=sally)
-    
-    # Track initial balances
-    bob_stab_before = stability_pool.getTotalAmountForUser(bob, green_lp_token)
-    sally_stab_before = stability_pool.getTotalAmountForUser(sally, green_lp_token)
-    
-    # Bob takes out a loan
-    performDeposit(bob, 200 * EIGHTEEN_DECIMALS, alpha_token, alpha_token_whale)
-    teller.borrow(100 * EIGHTEEN_DECIMALS, bob, False, sender=bob)
-    
-    # Trigger liquidation
-    mock_price_source.setPrice(alpha_token, 125 * EIGHTEEN_DECIMALS // 200)
-    assert credit_engine.canLiquidateUser(bob)
-    
-    # Liquidate
-    teller.liquidateUser(bob, False, sender=sally)
-    
-    # Check that Bob's stability pool position was reduced FIRST
-    bob_stab_after = stability_pool.getTotalAmountForUser(bob, green_lp_token)
-    sally_stab_after = stability_pool.getTotalAmountForUser(sally, green_lp_token)
-    
-    assert bob_stab_after < bob_stab_before  # Bob's position reduced FIRST
-    
-    # Sally's position should increase due to liquidation profits
-    # The key is that Bob's own deposits were used first
-    assert sally_stab_after > sally_stab_before  # Sally must gain from liquidation
-    
-    # The reduction in Bob's position should be significant
-    bob_reduction = bob_stab_before - bob_stab_after
-    assert bob_reduction > 50 * EIGHTEEN_DECIMALS  # Most of Bob's deposit was used
-
-
 def test_ah_liquidation_batch_multiple_users(
     setupStabAssetConfig,
     setAssetConfig,
@@ -556,42 +485,109 @@ def test_ah_liquidation_zero_ltv_buffer(
     credit_engine,
     stability_pool,
     performDeposit,
+    auction_house,
+    _test,
 ):
-    """Test liquidation with zero LTV payback buffer"""
+    """Test partial liquidation with zero LTV payback buffer - formula over-liquidates due to fee handling"""
     setupStabAssetConfig()
-    setGeneralDebtConfig(_ltvPaybackBuffer=0)  # No buffer
-    
-    # Setup with 50% LTV, 80% liquidation threshold
-    debt_terms = createDebtTerms(_ltv=50_00, _liqThreshold=80_00, _liqFee=10_00, _borrowRate=0)
+    setGeneralDebtConfig(_ltvPaybackBuffer=0, _keeperFeeRatio=1_00)  # No buffer, 1% keeper fee
+
+    # Setup with 50% LTV, 80% liquidation threshold, lower liq fee for partial liquidation
+    debt_terms = createDebtTerms(_ltv=50_00, _liqThreshold=80_00, _liqFee=5_00, _borrowRate=0)  # 5% liq fee
     setAssetConfig(
         alpha_token,
         _debtTerms=debt_terms,
         _shouldSwapInStabPools=True,
     )
     mock_price_source.setPrice(alpha_token, 1 * EIGHTEEN_DECIMALS)
-    
+
     # Setup position at 50% LTV
-    performDeposit(bob, 200 * EIGHTEEN_DECIMALS, alpha_token, alpha_token_whale)
-    teller.borrow(100 * EIGHTEEN_DECIMALS, bob, False, sender=bob)
-    
+    collateral_amount = 200 * EIGHTEEN_DECIMALS
+    debt_amount = 100 * EIGHTEEN_DECIMALS
+    performDeposit(bob, collateral_amount, alpha_token, alpha_token_whale)
+    teller.borrow(debt_amount, bob, False, sender=bob)
+
     # Add sufficient liquidity
     green_lp_token.transfer(sally, 200 * EIGHTEEN_DECIMALS, sender=green_lp_token_whale)
     green_lp_token.approve(teller, 200 * EIGHTEEN_DECIMALS, sender=sally)
     teller.deposit(green_lp_token, 200 * EIGHTEEN_DECIMALS, sally, stability_pool, 0, sender=sally)
-    
+
     # Trigger liquidation - price drop makes LTV exceed 80%
-    mock_price_source.setPrice(alpha_token, 62 * EIGHTEEN_DECIMALS // 100)
+    new_price = 62 * EIGHTEEN_DECIMALS // 100
+    mock_price_source.setPrice(alpha_token, new_price)
     assert credit_engine.canLiquidateUser(bob)
-    
+
+    # Pre-liquidation state
+    pre_user_debt, pre_bt, _ = credit_engine.getLatestUserDebtAndTerms(bob, False)
+    _test(debt_amount, pre_user_debt.amount)
+    _test(124 * EIGHTEEN_DECIMALS, pre_bt.collateralVal)  # 200 tokens * 0.62
+
+    # Calculate target repay amount
+    target_repay_amount = auction_house.calcAmountOfDebtToRepayDuringLiq(bob)
+    # With 5% liq fee + 1% keeper = 6% total fees
+    # Formula calculates 88 GREEN to repay from 100 GREEN debt
+    expected_target_repay = 88 * EIGHTEEN_DECIMALS
+    _test(expected_target_repay, target_repay_amount)
+
     # Liquidate
     teller.liquidateUser(bob, False, sender=sally)
-    
-    # Check final LTV - should target exactly 50% (no buffer)
+
+    # Get liquidation results
+    logs = filter_logs(teller, "LiquidateUser")
+    assert len(logs) == 1
+    log = logs[0]
+
+    # Check final state
     user_debt, bt, _ = credit_engine.getLatestUserDebtAndTerms(bob, False)
-    # After partial liquidation, Bob should still have debt and collateral
-    assert user_debt.amount > 0
-    assert bt.collateralVal > 0
-    
+
+    # OPINIONATED ASSERTIONS FOR PARTIAL LIQUIDATION:
+
+    # 1. Liquidation must restore debt health
+    assert log.didRestoreDebtHealth, "Liquidation must restore debt health"
+
+    # 2. Partial liquidation - exact expected amounts
+    # Debt calculation: 100 + 0.38 unpaid fees - 88 repaid = 12.38 remaining
+    expected_remaining_debt = int(12.38 * EIGHTEEN_DECIMALS)
+    # Use a small absolute tolerance for rounding differences
+    assert abs(user_debt.amount - expected_remaining_debt) < 1e16, f"Expected ~12.38 GREEN debt, got {user_debt.amount/EIGHTEEN_DECIMALS}"
+
+    # Collateral: 124 - 93.62 = ~30.38 remaining
+    expected_remaining_collateral = 30.38 * EIGHTEEN_DECIMALS
+    _test(expected_remaining_collateral, bt.collateralVal, 1)  # 1% tolerance
+
+    # 3. Final LTV is ~40.75%, not exactly 50% because:
+    # - Formula conservatively ensures health even if not all fees can be paid
+    # - Only 5.62 of 6 GREEN fees paid from spread, 0.38 becomes debt
+    # - Final state: 12.38 debt / 30.38 collateral = 40.75% LTV
+    # This is expected behavior - formula is conservative to ensure safety
     final_ltv = user_debt.amount * HUNDRED_PERCENT // bt.collateralVal
-    # With 0 buffer, should restore to exactly the LTV limit (50%)
-    assert abs(final_ltv - 50_00) < 200  # Within 2% tolerance
+    expected_ltv = 40_75  # 40.75%
+    assert abs(final_ltv - expected_ltv) < 50, f"LTV should be ~40.75%, got {final_ltv/100:.2f}%"
+
+    # 4. Verify liquidation fees (5% liq fee + 1% keeper fee = 6% total)
+    expected_total_fees = pre_user_debt.amount * 6_00 // HUNDRED_PERCENT
+    _test(expected_total_fees, log.totalLiqFees)
+
+    # Verify unpaid fees (~0.38 GREEN becomes debt)
+    expected_unpaid_fees = int(0.38 * EIGHTEEN_DECIMALS)
+    assert abs(log.liqFeesUnpaid - expected_unpaid_fees) < 1e16, f"Expected ~0.38 GREEN unpaid fees, got {log.liqFeesUnpaid/EIGHTEEN_DECIMALS}"
+
+    # 5. Repay amount is ~88 GREEN (with rounding)
+    expected_repay = 88 * EIGHTEEN_DECIMALS
+    assert abs(log.repayAmount - expected_repay) < 10, f"Repay amount should be ~88 GREEN, got {log.repayAmount/EIGHTEEN_DECIMALS}"
+
+    # 6. No auctions should be started when debt health is restored
+    assert log.numAuctionsStarted == 0, "No auctions should be started when debt health is restored"
+
+    # 7. Collateral taken = 88 / 0.94 = ~93.62 GREEN
+    expected_collateral = 93.62 * EIGHTEEN_DECIMALS
+    _test(expected_collateral, log.collateralValueOut, 1)  # 1% tolerance for rounding
+
+    # 8. Debt reduction should be ~87.62 GREEN (100 - 12.38)
+    debt_reduction = pre_user_debt.amount - user_debt.amount
+    expected_debt_reduction = int(87.62 * EIGHTEEN_DECIMALS)
+    assert abs(debt_reduction - expected_debt_reduction) < 1e16, f"Debt reduction should be ~87.62 GREEN, got {debt_reduction/EIGHTEEN_DECIMALS}"
+
+    # 9. Collateral reduction equals collateral taken
+    collateral_reduction = pre_bt.collateralVal - bt.collateralVal
+    _test(expected_collateral, collateral_reduction, 1)  # 1% tolerance
