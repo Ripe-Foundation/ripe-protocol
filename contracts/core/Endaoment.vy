@@ -144,6 +144,7 @@ FIFTY_PERCENT: constant(uint256) = 50_00 # 50.00%
 EIGHTEEN_DECIMALS: constant(uint256) = 10 ** 18
 LEGO_BOOK_ID: constant(uint256) = 3
 CURVE_PRICES_ID: constant(uint256) = 2
+MAX_PROOFS: constant(uint256) = 25
 
 WETH: public(immutable(address))
 ETH: public(immutable(address))
@@ -387,10 +388,12 @@ def swapTokens(_instructions: DynArray[UndyLego.SwapInstruction, MAX_SWAP_INSTRU
             newTokenIn: address = i.tokenPath[0]
             assert lastTokenOut == newTokenIn # dev: path
             amountIn = min(lastTokenOutAmount, staticcall IERC20(newTokenIn).balanceOf(self))
-        
+
         thisTxUsdValue: uint256 = 0
         lastTokenOut, lastTokenOutAmount, thisTxUsdValue = self._performSwapInstruction(amountIn, i)
         maxTxUsdValue = max(maxTxUsdValue, thisTxUsdValue)
+
+    assert lastTokenOutAmount != 0 # dev: no output amount
 
     log WalletAction(
         op = 20,
@@ -518,29 +521,29 @@ def confirmMintOrRedeemAsset(
     return tokenOutAmount, txUsdValue
 
 
-#################
-# Claim Rewards #
-#################
+####################
+# Claim Incentives #
+####################
 
 
 @nonreentrant
 @external
-def claimRewards(
+def claimIncentives(
     _legoId: uint256,
     _rewardToken: address = empty(address),
     _rewardAmount: uint256 = max_value(uint256),
-    _extraData: bytes32 = empty(bytes32),
+    _proofs: DynArray[bytes32, MAX_PROOFS] = [],
 ) -> (uint256, uint256):
     assert not deptBasics.isPaused # dev: contract paused
     assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
-    legoAddr: address = self._getLegoAddr(_legoId)
 
+    legoAddr: address = self._getLegoAddr(_legoId)
     self._checkLegoAccessForAction(legoAddr, UndyLego.ActionType.REWARDS)
 
     # claim rewards
     rewardAmount: uint256 = 0
     txUsdValue: uint256 = 0
-    rewardAmount, txUsdValue = extcall UndyLego(legoAddr).claimRewards(self, _rewardToken, _rewardAmount, _extraData)
+    rewardAmount, txUsdValue = extcall UndyLego(legoAddr).claimIncentives(self, _rewardToken, _rewardAmount, _proofs)
 
     log WalletAction(
         op = 50,
