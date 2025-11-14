@@ -91,7 +91,7 @@ def test_basic_endaoment_transfer(
     bob,
     alpha_token,
     alpha_token_whale,
-    endaoment,
+    endaoment_funds,
     setupDeleverage,
     setup_priority_configs,
     _test,
@@ -134,7 +134,7 @@ def test_basic_endaoment_transfer(
     # Pre-state
     pre_debt = credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount
     pre_user_balance = simple_erc20_vault.getTotalAmountForUser(bob, alpha_token)
-    pre_endaoment_balance = alpha_token.balanceOf(endaoment)
+    pre_endaoment_balance = alpha_token.balanceOf(endaoment_funds)
 
     assert pre_debt > 0, "User should have debt"
     assert pre_user_balance >= pre_debt, "User should have sufficient collateral"
@@ -148,7 +148,7 @@ def test_basic_endaoment_transfer(
 
     # Verify collateral transferred
     post_user_balance = simple_erc20_vault.getTotalAmountForUser(bob, alpha_token)
-    post_endaoment_balance = alpha_token.balanceOf(endaoment)
+    post_endaoment_balance = alpha_token.balanceOf(endaoment_funds)
 
     transferred_amount = pre_user_balance - post_user_balance
     endaoment_received = post_endaoment_balance - pre_endaoment_balance
@@ -602,7 +602,7 @@ def test_vault_balance_changes(
     bob,
     alpha_token,
     alpha_token_whale,
-    endaoment,
+    endaoment_funds,
     setupDeleverage,
     setup_priority_configs,
     _test,
@@ -632,14 +632,14 @@ def test_vault_balance_changes(
 
     # Pre-state
     pre_user_vault_balance = simple_erc20_vault.getTotalAmountForUser(bob, alpha_token)
-    pre_endaoment_token_balance = alpha_token.balanceOf(endaoment)
+    pre_endaoment_token_balance = alpha_token.balanceOf(endaoment_funds)
 
     # Deleverage
     teller.deleverageUser(bob, 0, sender=switchboard_alpha.address)
 
     # Post-state
     post_user_vault_balance = simple_erc20_vault.getTotalAmountForUser(bob, alpha_token)
-    post_endaoment_token_balance = alpha_token.balanceOf(endaoment)
+    post_endaoment_token_balance = alpha_token.balanceOf(endaoment_funds)
 
     # Calculate changes
     user_decrease = pre_user_vault_balance - post_user_vault_balance
@@ -661,7 +661,7 @@ def test_balance_changes_multiple_assets_all_depleted(
     alpha_token_whale,
     bravo_token,
     bravo_token_whale,
-    endaoment,
+    endaoment_funds,
     setupDeleverage,
     performDeposit,
     setup_priority_configs,
@@ -705,8 +705,8 @@ def test_balance_changes_multiple_assets_all_depleted(
     # Pre-state - track all balances
     pre_alpha_vault = simple_erc20_vault.getTotalAmountForUser(bob, alpha_token)
     pre_bravo_vault = simple_erc20_vault.getTotalAmountForUser(bob, bravo_token)
-    pre_alpha_endaoment = alpha_token.balanceOf(endaoment)
-    pre_bravo_endaoment = bravo_token.balanceOf(endaoment)
+    pre_alpha_endaoment = alpha_token.balanceOf(endaoment_funds)
+    pre_bravo_endaoment = bravo_token.balanceOf(endaoment_funds)
 
     # Deleverage
     teller.deleverageUser(bob, 0, sender=switchboard_alpha.address)
@@ -714,8 +714,8 @@ def test_balance_changes_multiple_assets_all_depleted(
     # Post-state
     post_alpha_vault = simple_erc20_vault.getTotalAmountForUser(bob, alpha_token)
     post_bravo_vault = simple_erc20_vault.getTotalAmountForUser(bob, bravo_token)
-    post_alpha_endaoment = alpha_token.balanceOf(endaoment)
-    post_bravo_endaoment = bravo_token.balanceOf(endaoment)
+    post_alpha_endaoment = alpha_token.balanceOf(endaoment_funds)
+    post_bravo_endaoment = bravo_token.balanceOf(endaoment_funds)
 
     # Calculate changes
     alpha_vault_decrease = pre_alpha_vault - post_alpha_vault
@@ -754,7 +754,7 @@ def test_balance_changes_multiple_assets_partial(
     bravo_token_whale,
     charlie_token,
     charlie_token_whale,
-    endaoment,
+    endaoment_funds,
     setupDeleverage,
     performDeposit,
     setup_priority_configs,
@@ -804,9 +804,9 @@ def test_balance_changes_multiple_assets_partial(
     pre_alpha_vault = simple_erc20_vault.getTotalAmountForUser(bob, alpha_token)
     pre_bravo_vault = simple_erc20_vault.getTotalAmountForUser(bob, bravo_token)
     pre_charlie_vault = simple_erc20_vault.getTotalAmountForUser(bob, charlie_token)
-    pre_alpha_endaoment = alpha_token.balanceOf(endaoment)
-    pre_bravo_endaoment = bravo_token.balanceOf(endaoment)
-    pre_charlie_endaoment = charlie_token.balanceOf(endaoment)
+    pre_alpha_endaoment = alpha_token.balanceOf(endaoment_funds)
+    pre_bravo_endaoment = bravo_token.balanceOf(endaoment_funds)
+    pre_charlie_endaoment = charlie_token.balanceOf(endaoment_funds)
 
     # Deleverage
     teller.deleverageUser(bob, 0, sender=switchboard_alpha.address)
@@ -815,9 +815,9 @@ def test_balance_changes_multiple_assets_partial(
     post_alpha_vault = simple_erc20_vault.getTotalAmountForUser(bob, alpha_token)
     post_bravo_vault = simple_erc20_vault.getTotalAmountForUser(bob, bravo_token)
     post_charlie_vault = simple_erc20_vault.getTotalAmountForUser(bob, charlie_token)
-    post_alpha_endaoment = alpha_token.balanceOf(endaoment)
-    post_bravo_endaoment = bravo_token.balanceOf(endaoment)
-    post_charlie_endaoment = charlie_token.balanceOf(endaoment)
+    post_alpha_endaoment = alpha_token.balanceOf(endaoment_funds)
+    post_bravo_endaoment = bravo_token.balanceOf(endaoment_funds)
+    post_charlie_endaoment = charlie_token.balanceOf(endaoment_funds)
 
     # Calculate changes
     alpha_decrease = pre_alpha_vault - post_alpha_vault
@@ -863,7 +863,7 @@ def test_balance_changes_different_decimals(
     charlie_token_whale,
     delta_token,
     delta_token_whale,
-    endaoment,
+    endaoment_funds,
     setupDeleverage,
     performDeposit,
     setup_priority_configs,
@@ -918,9 +918,9 @@ def test_balance_changes_different_decimals(
     pre_alpha_vault = simple_erc20_vault.getTotalAmountForUser(bob, alpha_token)
     pre_charlie_vault = simple_erc20_vault.getTotalAmountForUser(bob, charlie_token)
     pre_delta_vault = simple_erc20_vault.getTotalAmountForUser(bob, delta_token)
-    pre_alpha_endaoment = alpha_token.balanceOf(endaoment)
-    pre_charlie_endaoment = charlie_token.balanceOf(endaoment)
-    pre_delta_endaoment = delta_token.balanceOf(endaoment)
+    pre_alpha_endaoment = alpha_token.balanceOf(endaoment_funds)
+    pre_charlie_endaoment = charlie_token.balanceOf(endaoment_funds)
+    pre_delta_endaoment = delta_token.balanceOf(endaoment_funds)
 
     # Deleverage
     teller.deleverageUser(bob, 0, sender=switchboard_alpha.address)
@@ -929,9 +929,9 @@ def test_balance_changes_different_decimals(
     post_alpha_vault = simple_erc20_vault.getTotalAmountForUser(bob, alpha_token)
     post_charlie_vault = simple_erc20_vault.getTotalAmountForUser(bob, charlie_token)
     post_delta_vault = simple_erc20_vault.getTotalAmountForUser(bob, delta_token)
-    post_alpha_endaoment = alpha_token.balanceOf(endaoment)
-    post_charlie_endaoment = charlie_token.balanceOf(endaoment)
-    post_delta_endaoment = delta_token.balanceOf(endaoment)
+    post_alpha_endaoment = alpha_token.balanceOf(endaoment_funds)
+    post_charlie_endaoment = charlie_token.balanceOf(endaoment_funds)
+    post_delta_endaoment = delta_token.balanceOf(endaoment_funds)
 
     # Calculate changes
     alpha_decrease = pre_alpha_vault - post_alpha_vault
@@ -975,7 +975,7 @@ def test_balance_changes_with_target_amount(
     alpha_token_whale,
     bravo_token,
     bravo_token_whale,
-    endaoment,
+    endaoment_funds,
     setupDeleverage,
     performDeposit,
     setup_priority_configs,
@@ -1015,8 +1015,8 @@ def test_balance_changes_with_target_amount(
     # Pre-state
     pre_alpha_vault = simple_erc20_vault.getTotalAmountForUser(bob, alpha_token)
     pre_bravo_vault = simple_erc20_vault.getTotalAmountForUser(bob, bravo_token)
-    pre_alpha_endaoment = alpha_token.balanceOf(endaoment)
-    pre_bravo_endaoment = bravo_token.balanceOf(endaoment)
+    pre_alpha_endaoment = alpha_token.balanceOf(endaoment_funds)
+    pre_bravo_endaoment = bravo_token.balanceOf(endaoment_funds)
 
     # Deleverage with target
     target_repay = 300 * EIGHTEEN_DECIMALS
@@ -1025,8 +1025,8 @@ def test_balance_changes_with_target_amount(
     # Post-state
     post_alpha_vault = simple_erc20_vault.getTotalAmountForUser(bob, alpha_token)
     post_bravo_vault = simple_erc20_vault.getTotalAmountForUser(bob, bravo_token)
-    post_alpha_endaoment = alpha_token.balanceOf(endaoment)
-    post_bravo_endaoment = bravo_token.balanceOf(endaoment)
+    post_alpha_endaoment = alpha_token.balanceOf(endaoment_funds)
+    post_bravo_endaoment = bravo_token.balanceOf(endaoment_funds)
 
     # Calculate changes
     alpha_decrease = pre_alpha_vault - post_alpha_vault
@@ -1063,7 +1063,7 @@ def test_balance_changes_skip_empty_asset(
     bravo_token_whale,
     charlie_token,
     charlie_token_whale,
-    endaoment,
+    endaoment_funds,
     setupDeleverage,
     performDeposit,
     setup_priority_configs,
@@ -1110,9 +1110,9 @@ def test_balance_changes_skip_empty_asset(
     pre_alpha_vault = simple_erc20_vault.getTotalAmountForUser(bob, alpha_token)
     pre_bravo_vault = simple_erc20_vault.getTotalAmountForUser(bob, bravo_token)
     pre_charlie_vault = simple_erc20_vault.getTotalAmountForUser(bob, charlie_token)
-    pre_alpha_endaoment = alpha_token.balanceOf(endaoment)
-    pre_bravo_endaoment = bravo_token.balanceOf(endaoment)
-    pre_charlie_endaoment = charlie_token.balanceOf(endaoment)
+    pre_alpha_endaoment = alpha_token.balanceOf(endaoment_funds)
+    pre_bravo_endaoment = bravo_token.balanceOf(endaoment_funds)
+    pre_charlie_endaoment = charlie_token.balanceOf(endaoment_funds)
 
     assert pre_alpha_vault == 0, "Alpha should be empty"
 
@@ -1123,9 +1123,9 @@ def test_balance_changes_skip_empty_asset(
     post_alpha_vault = simple_erc20_vault.getTotalAmountForUser(bob, alpha_token)
     post_bravo_vault = simple_erc20_vault.getTotalAmountForUser(bob, bravo_token)
     post_charlie_vault = simple_erc20_vault.getTotalAmountForUser(bob, charlie_token)
-    post_alpha_endaoment = alpha_token.balanceOf(endaoment)
-    post_bravo_endaoment = bravo_token.balanceOf(endaoment)
-    post_charlie_endaoment = charlie_token.balanceOf(endaoment)
+    post_alpha_endaoment = alpha_token.balanceOf(endaoment_funds)
+    post_bravo_endaoment = bravo_token.balanceOf(endaoment_funds)
+    post_charlie_endaoment = charlie_token.balanceOf(endaoment_funds)
 
     # Calculate changes
     alpha_decrease = pre_alpha_vault - post_alpha_vault
@@ -1283,7 +1283,7 @@ def test_phase2_then_phase3_prevents_double_processing(
     alpha_token_whale,
     bravo_token,
     bravo_token_whale,
-    endaoment,
+    endaoment_funds,
     performDeposit,
     setup_priority_configs,
     setAssetConfig,
@@ -1355,8 +1355,8 @@ def test_phase2_then_phase3_prevents_double_processing(
     pre_alpha_vault3 = simple_erc20_vault.getTotalAmountForUser(bob, alpha_token)
     pre_alpha_vault4 = rebase_erc20_vault.getTotalAmountForUser(bob, alpha_token)
     pre_bravo_vault3 = simple_erc20_vault.getTotalAmountForUser(bob, bravo_token)
-    pre_endaoment_alpha = alpha_token.balanceOf(endaoment)
-    pre_endaoment_bravo = bravo_token.balanceOf(endaoment)
+    pre_endaoment_alpha = alpha_token.balanceOf(endaoment_funds)
+    pre_endaoment_bravo = bravo_token.balanceOf(endaoment_funds)
 
     assert pre_alpha_vault3 == 200 * EIGHTEEN_DECIMALS
     assert pre_alpha_vault4 == 300 * EIGHTEEN_DECIMALS
@@ -1372,8 +1372,8 @@ def test_phase2_then_phase3_prevents_double_processing(
     post_alpha_vault3 = simple_erc20_vault.getTotalAmountForUser(bob, alpha_token)
     post_alpha_vault4 = rebase_erc20_vault.getTotalAmountForUser(bob, alpha_token)
     post_bravo_vault3 = simple_erc20_vault.getTotalAmountForUser(bob, bravo_token)
-    post_endaoment_alpha = alpha_token.balanceOf(endaoment)
-    post_endaoment_bravo = bravo_token.balanceOf(endaoment)
+    post_endaoment_alpha = alpha_token.balanceOf(endaoment_funds)
+    post_endaoment_bravo = bravo_token.balanceOf(endaoment_funds)
 
     # CRITICAL ASSERTIONS:
 
@@ -1431,7 +1431,7 @@ def test_phase2_with_non_dollar_asset_prices(
     bravo_token_whale,
     charlie_token,
     charlie_token_whale,
-    endaoment,
+    endaoment_funds,
     setupDeleverage,
     performDeposit,
     setup_priority_configs,
@@ -1498,9 +1498,9 @@ def test_phase2_with_non_dollar_asset_prices(
     pre_alpha_vault = simple_erc20_vault.getTotalAmountForUser(bob, alpha_token)
     pre_bravo_vault = simple_erc20_vault.getTotalAmountForUser(bob, bravo_token)
     pre_charlie_vault = simple_erc20_vault.getTotalAmountForUser(bob, charlie_token)
-    pre_alpha_endaoment = alpha_token.balanceOf(endaoment)
-    pre_bravo_endaoment = bravo_token.balanceOf(endaoment)
-    pre_charlie_endaoment = charlie_token.balanceOf(endaoment)
+    pre_alpha_endaoment = alpha_token.balanceOf(endaoment_funds)
+    pre_bravo_endaoment = bravo_token.balanceOf(endaoment_funds)
+    pre_charlie_endaoment = charlie_token.balanceOf(endaoment_funds)
 
     # Verify starting amounts
     assert pre_alpha_vault == 500 * EIGHTEEN_DECIMALS
@@ -1517,9 +1517,9 @@ def test_phase2_with_non_dollar_asset_prices(
     post_alpha_vault = simple_erc20_vault.getTotalAmountForUser(bob, alpha_token)
     post_bravo_vault = simple_erc20_vault.getTotalAmountForUser(bob, bravo_token)
     post_charlie_vault = simple_erc20_vault.getTotalAmountForUser(bob, charlie_token)
-    post_alpha_endaoment = alpha_token.balanceOf(endaoment)
-    post_bravo_endaoment = bravo_token.balanceOf(endaoment)
-    post_charlie_endaoment = charlie_token.balanceOf(endaoment)
+    post_alpha_endaoment = alpha_token.balanceOf(endaoment_funds)
+    post_bravo_endaoment = bravo_token.balanceOf(endaoment_funds)
+    post_charlie_endaoment = charlie_token.balanceOf(endaoment_funds)
 
     # CRITICAL PRICE-AWARE ASSERTIONS:
 
@@ -1572,7 +1572,7 @@ def test_phase2_tiny_debt_amount(
     bob,
     alpha_token,
     alpha_token_whale,
-    endaoment,
+    endaoment_funds,
     setupDeleverage,
     setup_priority_configs,
     credit_engine,
@@ -1611,7 +1611,7 @@ def test_phase2_tiny_debt_amount(
 
     # Track balances
     pre_vault = simple_erc20_vault.getTotalAmountForUser(bob, alpha_token)
-    pre_endaoment = alpha_token.balanceOf(endaoment)
+    pre_endaoment = alpha_token.balanceOf(endaoment_funds)
     pre_debt = credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount
 
     # Deleverage
@@ -1622,7 +1622,7 @@ def test_phase2_tiny_debt_amount(
 
     # Post balances
     post_vault = simple_erc20_vault.getTotalAmountForUser(bob, alpha_token)
-    post_endaoment = alpha_token.balanceOf(endaoment)
+    post_endaoment = alpha_token.balanceOf(endaoment_funds)
     post_debt = credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount
 
     # Assertions

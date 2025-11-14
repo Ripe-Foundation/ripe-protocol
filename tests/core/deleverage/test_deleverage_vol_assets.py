@@ -150,7 +150,7 @@ def test_single_volatile_asset_deleverage(
     bob,
     alpha_token,
     alpha_token_whale,
-    endaoment,
+    endaoment_funds,
     setupDeleverage,
     _test,
 ):
@@ -181,7 +181,7 @@ def test_single_volatile_asset_deleverage(
     # Pre-state
     pre_debt = credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount
     pre_vault_balance = simple_erc20_vault.getTotalAmountForUser(bob, alpha_token)
-    pre_endaoment_balance = alpha_token.balanceOf(endaoment)
+    pre_endaoment_balance = alpha_token.balanceOf(endaoment_funds)
 
 
     # Call deleverageWithVolAssets
@@ -203,7 +203,7 @@ def test_single_volatile_asset_deleverage(
 
     # Post-state
     post_vault_balance = simple_erc20_vault.getTotalAmountForUser(bob, alpha_token)
-    post_endaoment_balance = alpha_token.balanceOf(endaoment)
+    post_endaoment_balance = alpha_token.balanceOf(endaoment_funds)
     post_debt = credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount
 
     # Calculate changes
@@ -447,7 +447,7 @@ def test_different_decimals(
     alpha_token_whale,
     charlie_token,
     charlie_token_whale,
-    endaoment,
+    endaoment_funds,
     setupDeleverage,
     performDeposit,
     _test,
@@ -478,8 +478,8 @@ def test_different_decimals(
     performDeposit(bob, 300 * SIX_DECIMALS, charlie_token, bob, simple_erc20_vault)
 
     # Pre-state
-    pre_endaoment_alpha = alpha_token.balanceOf(endaoment)
-    pre_endaoment_charlie = charlie_token.balanceOf(endaoment)
+    pre_endaoment_alpha = alpha_token.balanceOf(endaoment_funds)
+    pre_endaoment_charlie = charlie_token.balanceOf(endaoment_funds)
 
 
     # Deleverage both
@@ -494,8 +494,8 @@ def test_different_decimals(
     )
 
     # Post-state
-    post_endaoment_alpha = alpha_token.balanceOf(endaoment)
-    post_endaoment_charlie = charlie_token.balanceOf(endaoment)
+    post_endaoment_alpha = alpha_token.balanceOf(endaoment_funds)
+    post_endaoment_charlie = charlie_token.balanceOf(endaoment_funds)
 
     # Verify both received correct amounts
     alpha_received = post_endaoment_alpha - pre_endaoment_alpha
@@ -962,7 +962,7 @@ def test_endaoment_receives_exact_amount(
     bob,
     alpha_token,
     alpha_token_whale,
-    endaoment,
+    endaoment_funds,
     setupDeleverage,
     _test,
 ):
@@ -984,7 +984,7 @@ def test_endaoment_receives_exact_amount(
 
     # Pre-state
     pre_vault_balance = simple_erc20_vault.getTotalAmountForUser(bob, alpha_token)
-    pre_endaoment_balance = alpha_token.balanceOf(endaoment)
+    pre_endaoment_balance = alpha_token.balanceOf(endaoment_funds)
 
 
     # Deleverage
@@ -996,7 +996,7 @@ def test_endaoment_receives_exact_amount(
 
     # Post-state
     post_vault_balance = simple_erc20_vault.getTotalAmountForUser(bob, alpha_token)
-    post_endaoment_balance = alpha_token.balanceOf(endaoment)
+    post_endaoment_balance = alpha_token.balanceOf(endaoment_funds)
 
     # Verify balance conservation
     vault_decrease = pre_vault_balance - post_vault_balance

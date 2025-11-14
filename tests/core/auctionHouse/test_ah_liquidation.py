@@ -328,7 +328,7 @@ def test_ah_liquidation_multiple_stab_assets_same_pool(
     vault_book,
     switchboard_alpha,
     mission_control,
-    endaoment,
+    endaoment_funds,
     _test,
 ):
     """Test liquidation with multiple stability assets in same pool - tests priority ordering"""
@@ -409,20 +409,20 @@ def test_ah_liquidation_multiple_stab_assets_same_pool(
     assert green_deposit < target_repay_amount
     _test(green_deposit, first_log.valueSwapped)
     
-    # Verify green tokens were burned (not sent to endaoment)
-    assert green_token.balanceOf(endaoment) == 0
+    # Verify green tokens were burned (not sent to endaoment_funds)
+    assert green_token.balanceOf(endaoment_funds) == 0
     assert green_token.balanceOf(stability_pool) == green_deposit - first_log.amountSwapped
 
     # Since target repay amount > green pool liquidity, we should definitely have a second swap
     remaining_to_repay = target_repay_amount - green_deposit
     assert remaining_to_repay > 0
-    
+
     second_log = logs[1]
     assert second_log.stabAsset == bravo_token.address
     assert second_log.stabVaultId == stab_pool_id
-    
-    # Verify bravo tokens went to endaoment (non-green asset)
-    assert bravo_token.balanceOf(endaoment) == second_log.amountSwapped
+
+    # Verify bravo tokens went to endaoment_funds (non-green asset)
+    assert bravo_token.balanceOf(endaoment_funds) == second_log.amountSwapped
     assert bravo_token.balanceOf(stability_pool) == bravo_deposit - second_log.amountSwapped
     
     # Verify the second swap covers the remaining amount

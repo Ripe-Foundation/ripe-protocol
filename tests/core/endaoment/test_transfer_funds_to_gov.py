@@ -6,6 +6,7 @@ from conf_utils import filter_logs
 
 def test_transfer_funds_basic(
     endaoment,
+    endaoment_funds,
     switchboard_charlie,
     governance,
     alpha_token,
@@ -13,10 +14,10 @@ def test_transfer_funds_basic(
 ):
     """Test basic transfer of funds to governance"""
     transfer_amount = 1000 * EIGHTEEN_DECIMALS
-    
-    # Fund endaoment with ALPHA tokens
-    alpha_token.transfer(endaoment.address, transfer_amount, sender=alpha_token_whale)
-    initial_balance = alpha_token.balanceOf(endaoment.address)
+
+    # Fund endaoment_funds with ALPHA tokens
+    alpha_token.transfer(endaoment_funds.address, transfer_amount, sender=alpha_token_whale)
+    initial_balance = alpha_token.balanceOf(endaoment_funds.address)
     assert initial_balance == transfer_amount
     
     # Get initial governance balance
@@ -36,7 +37,7 @@ def test_transfer_funds_basic(
     assert usd_value == 0
     
     # Verify balances
-    assert alpha_token.balanceOf(endaoment.address) == initial_balance - transfer_amount
+    assert alpha_token.balanceOf(endaoment_funds.address) == initial_balance - transfer_amount
     assert alpha_token.balanceOf(governance.address) == initial_gov_balance + transfer_amount
     
     # Check event
@@ -54,6 +55,7 @@ def test_transfer_funds_basic(
 
 def test_transfer_funds_max_value(
     endaoment,
+    endaoment_funds,
     switchboard_charlie,
     governance,
     bravo_token,
@@ -61,10 +63,10 @@ def test_transfer_funds_max_value(
 ):
     """Test transfer with max_value (transfers entire balance)"""
     fund_amount = 2500 * EIGHTEEN_DECIMALS
-    
-    # Fund endaoment
-    bravo_token.transfer(endaoment.address, fund_amount, sender=bravo_token_whale)
-    initial_balance = bravo_token.balanceOf(endaoment.address)
+
+    # Fund endaoment_funds
+    bravo_token.transfer(endaoment_funds.address, fund_amount, sender=bravo_token_whale)
+    initial_balance = bravo_token.balanceOf(endaoment_funds.address)
     
     # Get initial governance balance
     initial_gov_balance = bravo_token.balanceOf(governance.address)
@@ -78,12 +80,13 @@ def test_transfer_funds_max_value(
     amount_transferred, usd_value = tx
     assert amount_transferred == initial_balance
     assert usd_value == 0  # No price feed configured for test token
-    assert bravo_token.balanceOf(endaoment.address) == 0
+    assert bravo_token.balanceOf(endaoment_funds.address) == 0
     assert bravo_token.balanceOf(governance.address) == initial_gov_balance + initial_balance
 
 
 def test_transfer_funds_partial_when_requested_exceeds_balance(
     endaoment,
+    endaoment_funds,
     switchboard_charlie,
     governance,
     charlie_token,
@@ -93,9 +96,9 @@ def test_transfer_funds_partial_when_requested_exceeds_balance(
     # Charlie token has 6 decimals
     balance_amount = 1000 * 10**6
     request_amount = 2000 * 10**6  # Request more than available
-    
-    # Fund endaoment with less than requested
-    charlie_token.transfer(endaoment.address, balance_amount, sender=charlie_token_whale)
+
+    # Fund endaoment_funds with less than requested
+    charlie_token.transfer(endaoment_funds.address, balance_amount, sender=charlie_token_whale)
     initial_gov_balance = charlie_token.balanceOf(governance.address)
     
     # Execute transfer
@@ -107,7 +110,7 @@ def test_transfer_funds_partial_when_requested_exceeds_balance(
     
     amount_transferred, _ = tx
     assert amount_transferred == balance_amount  # Should transfer available balance
-    assert charlie_token.balanceOf(endaoment.address) == 0
+    assert charlie_token.balanceOf(endaoment_funds.address) == 0
     assert charlie_token.balanceOf(governance.address) == initial_gov_balance + balance_amount
 
 
@@ -127,6 +130,7 @@ def test_transfer_funds_unauthorized_caller(
 
 def test_transfer_funds_when_paused(
     endaoment,
+    endaoment_funds,
     switchboard_charlie,
     governance,
     alpha_token,
@@ -135,9 +139,9 @@ def test_transfer_funds_when_paused(
     """Test that transfer fails when contract is paused"""
     # Pause the contract
     switchboard_charlie.pause(endaoment.address, True, sender=governance.address)
-    
-    # Fund endaoment
-    alpha_token.transfer(endaoment.address, 1000 * EIGHTEEN_DECIMALS, sender=alpha_token_whale)
+
+    # Fund endaoment_funds
+    alpha_token.transfer(endaoment_funds.address, 1000 * EIGHTEEN_DECIMALS, sender=alpha_token_whale)
     
     # Try to transfer
     with boa.reverts("contract paused"):
@@ -152,12 +156,13 @@ def test_transfer_funds_when_paused(
 
 def test_transfer_funds_no_balance(
     endaoment,
+    endaoment_funds,
     switchboard_charlie,
     delta_token,
 ):
     """Test that transfer fails when there's no balance"""
-    # Ensure endaoment has no delta tokens
-    assert delta_token.balanceOf(endaoment.address) == 0
+    # Ensure endaoment_funds has no delta tokens
+    assert delta_token.balanceOf(endaoment_funds.address) == 0
     
     with boa.reverts("no amt"):
         endaoment.transferFundsToGov(
@@ -169,6 +174,7 @@ def test_transfer_funds_no_balance(
 
 def test_transfer_funds_multiple_tokens(
     endaoment,
+    endaoment_funds,
     switchboard_charlie,
     governance,
     alpha_token,
@@ -179,10 +185,10 @@ def test_transfer_funds_multiple_tokens(
     """Test transferring multiple different tokens"""
     alpha_amount = 1000 * EIGHTEEN_DECIMALS
     bravo_amount = 500 * EIGHTEEN_DECIMALS
-    
-    # Fund endaoment with both tokens
-    alpha_token.transfer(endaoment.address, alpha_amount, sender=alpha_token_whale)
-    bravo_token.transfer(endaoment.address, bravo_amount, sender=bravo_token_whale)
+
+    # Fund endaoment_funds with both tokens
+    alpha_token.transfer(endaoment_funds.address, alpha_amount, sender=alpha_token_whale)
+    bravo_token.transfer(endaoment_funds.address, bravo_amount, sender=bravo_token_whale)
     
     initial_alpha_gov = alpha_token.balanceOf(governance.address)
     initial_bravo_gov = bravo_token.balanceOf(governance.address)
@@ -204,24 +210,25 @@ def test_transfer_funds_multiple_tokens(
     assert tx2[0] == bravo_amount
     
     # Verify both transfers completed
-    assert alpha_token.balanceOf(endaoment.address) == 0
-    assert bravo_token.balanceOf(endaoment.address) == 0
+    assert alpha_token.balanceOf(endaoment_funds.address) == 0
+    assert bravo_token.balanceOf(endaoment_funds.address) == 0
     assert alpha_token.balanceOf(governance.address) == initial_alpha_gov + alpha_amount
     assert bravo_token.balanceOf(governance.address) == initial_bravo_gov + bravo_amount
 
 
 def test_transfer_funds_with_green_token(
     endaoment,
+    endaoment_funds,
     switchboard_charlie,
     governance,
     green_token,
 ):
     """Test transfer with GREEN token (endaoment can mint green)"""
     green_amount = 10000 * EIGHTEEN_DECIMALS
-    
-    # Endaoment can mint GREEN tokens
-    green_token.mint(endaoment.address, green_amount, sender=endaoment.address)
-    
+
+    # Mint GREEN tokens and transfer to vault
+    green_token.mint(endaoment_funds.address, green_amount, sender=endaoment.address)
+
     initial_gov_balance = green_token.balanceOf(governance.address)
     
     # Execute transfer
@@ -234,23 +241,24 @@ def test_transfer_funds_with_green_token(
     amount_transferred, usd_value = tx
     assert amount_transferred == green_amount
     assert usd_value == 0  # No price feed configured for test token
-    assert green_token.balanceOf(endaoment.address) == 0
+    assert green_token.balanceOf(endaoment_funds.address) == 0
     assert green_token.balanceOf(governance.address) == initial_gov_balance + green_amount
 
 
 def test_switchboard_transfer_initiate_and_execute(
     switchboard_charlie,
     endaoment,
+    endaoment_funds,
     governance,
     bravo_token,
     bravo_token_whale,
 ):
     """Test full governance flow: initiate and execute transfer through SwitchboardCharlie"""
     transfer_amount = 1500 * EIGHTEEN_DECIMALS
-    
-    # Fund endaoment
-    bravo_token.transfer(endaoment.address, transfer_amount, sender=bravo_token_whale)
-    initial_endao_balance = bravo_token.balanceOf(endaoment.address)
+
+    # Fund endaoment_funds
+    bravo_token.transfer(endaoment_funds.address, transfer_amount, sender=bravo_token_whale)
+    initial_endao_balance = bravo_token.balanceOf(endaoment_funds.address)
     initial_gov_balance = bravo_token.balanceOf(governance.address)
     
     # Initiate the transfer action
@@ -283,7 +291,7 @@ def test_switchboard_transfer_initiate_and_execute(
     switchboard_charlie.executePendingAction(action_id, sender=governance.address)
     
     # Verify the transfer was executed
-    assert bravo_token.balanceOf(endaoment.address) == initial_endao_balance - transfer_amount
+    assert bravo_token.balanceOf(endaoment_funds.address) == initial_endao_balance - transfer_amount
     assert bravo_token.balanceOf(governance.address) == initial_gov_balance + transfer_amount
     
     # Check execution event
@@ -296,15 +304,16 @@ def test_switchboard_transfer_initiate_and_execute(
 def test_switchboard_transfer_max_amount(
     switchboard_charlie,
     endaoment,
+    endaoment_funds,
     governance,
     alpha_token,
     alpha_token_whale,
 ):
     """Test governance transfer with max amount through SwitchboardCharlie"""
     fund_amount = 3000 * EIGHTEEN_DECIMALS
-    
-    # Fund endaoment
-    alpha_token.transfer(endaoment.address, fund_amount, sender=alpha_token_whale)
+
+    # Fund endaoment_funds
+    alpha_token.transfer(endaoment_funds.address, fund_amount, sender=alpha_token_whale)
     
     # Get initial governance balance to track exact change
     initial_gov_balance = alpha_token.balanceOf(governance.address)
@@ -326,7 +335,7 @@ def test_switchboard_transfer_max_amount(
     switchboard_charlie.executePendingAction(action_id, sender=governance.address)
     
     # Verify entire balance was transferred
-    assert alpha_token.balanceOf(endaoment.address) == 0
+    assert alpha_token.balanceOf(endaoment_funds.address) == 0
     # Verify governance received exactly the fund_amount
     assert alpha_token.balanceOf(governance.address) == initial_gov_balance + fund_amount
 
@@ -427,14 +436,15 @@ def test_switchboard_transfer_execute_too_early(
 def test_switchboard_transfer_insufficient_balance(
     switchboard_charlie,
     endaoment,
+    endaoment_funds,
     governance,
     alpha_token,
 ):
     """Test that transfer fails gracefully when endaoment has insufficient balance"""
     transfer_amount = 1000 * EIGHTEEN_DECIMALS
-    
-    # Ensure endaoment has no ALPHA
-    assert alpha_token.balanceOf(endaoment.address) == 0
+
+    # Ensure endaoment_funds has no ALPHA
+    assert alpha_token.balanceOf(endaoment_funds.address) == 0
     
     # Initiate the transfer action
     switchboard_charlie.performEndaomentTransfer(

@@ -186,7 +186,7 @@ def deleverageUser(_user: address, _caller: address, _targetRepayAmount: uint256
     a: addys.Addys = addys._getAddys(_a)
     config: GenLiqConfig = staticcall MissionControl(a.missionControl).getGenLiqConfig()
     isTrusted: bool = addys._isValidRipeAddr(_caller) or self._isUnderscoreAddr(_caller, a.missionControl)
-    repaidAmount: uint256 = self._deleverageUser(_user, _caller, isTrusted, _targetRepayAmount, config, a)
+    repaidAmount: uint256 = self._deleverageUser(_user, _caller, isTrusted, _targetRepayAmount, config, addys._getEndaomentFundsAddr(), a)
     assert repaidAmount != 0 # dev: cannot deleverage
     return repaidAmount
 
@@ -201,11 +201,12 @@ def deleverageManyUsers(_users: DynArray[DeleverageUserRequest, MAX_DELEVERAGE_U
     a: addys.Addys = addys._getAddys(_a)
     config: GenLiqConfig = staticcall MissionControl(a.missionControl).getGenLiqConfig()
     isTrusted: bool = addys._isValidRipeAddr(_caller) or self._isUnderscoreAddr(_caller, a.missionControl)
+    endaoFunds: address = addys._getEndaomentFundsAddr()
 
     totalRepaidAmount: uint256 = 0
     numUsers: uint256 = 0
     for u: DeleverageUserRequest in _users:
-        repaidAmount: uint256 = self._deleverageUser(u.user, _caller, isTrusted, u.targetRepayAmount, config, a)
+        repaidAmount: uint256 = self._deleverageUser(u.user, _caller, isTrusted, u.targetRepayAmount, config, endaoFunds, a)
         if repaidAmount != 0:
             totalRepaidAmount += repaidAmount
             numUsers += 1
@@ -223,6 +224,7 @@ def deleverageWithSpecificAssets(_user: address, _assets: DynArray[DeleverageAss
     assert not deptBasics.isPaused # dev: contract paused
     a: addys.Addys = addys._getAddys(_a)
     isTrusted: bool = _user == _caller or addys._isValidRipeAddr(_caller) or self._isUnderscoreAddr(_caller, a.missionControl)
+    endaoFunds: address = addys._getEndaomentFundsAddr()
 
     # check perms -- must also be able to borrow
     if not isTrusted:
@@ -264,7 +266,7 @@ def deleverageWithSpecificAssets(_user: address, _assets: DynArray[DeleverageAss
         # handle this specific asset
         repayForAsset: uint256 = min(maxTargetRepayAmount, data.targetRepayAmount)
         trueTargetRepayAmount += repayForAsset
-        remainingToRepayForAsset: uint256 = self._handleSpecificAsset(_user, data.vaultId, vaultAddr, data.asset, repayForAsset, False, a)
+        remainingToRepayForAsset: uint256 = self._handleSpecificAsset(_user, data.vaultId, vaultAddr, data.asset, repayForAsset, False, endaoFunds, a)
         paidAmountForAsset: uint256 = repayForAsset - remainingToRepayForAsset
         maxTargetRepayAmount -= paidAmountForAsset
 
@@ -309,6 +311,7 @@ def deleverageWithVolAssets(_user: address, _assets: DynArray[DeleverageAsset, M
         return 0
 
     maxTargetRepayAmount: uint256 = userDebt.amount
+    endaoFunds: address = addys._getEndaomentFundsAddr()
 
     # process each volatile asset in the specified order
     for data: DeleverageAsset in _assets:
@@ -330,7 +333,7 @@ def deleverageWithVolAssets(_user: address, _assets: DynArray[DeleverageAsset, M
 
         # handle this volatile asset (skip stability pool & shouldTransferToEndaoment assets)
         repayForAsset: uint256 = min(maxTargetRepayAmount, data.targetRepayAmount)
-        remainingToRepayForAsset: uint256 = self._handleSpecificAsset(_user, data.vaultId, vaultAddr, data.asset, repayForAsset, True, a)
+        remainingToRepayForAsset: uint256 = self._handleSpecificAsset(_user, data.vaultId, vaultAddr, data.asset, repayForAsset, True, endaoFunds, a)
         paidAmountForAsset: uint256 = repayForAsset - remainingToRepayForAsset
         maxTargetRepayAmount -= paidAmountForAsset
 
@@ -501,7 +504,7 @@ def deleverageForWithdrawal(_user: address, _vaultId: uint256, _asset: address, 
 
     # execute deleveraging
     config: GenLiqConfig = staticcall MissionControl(a.missionControl).getGenLiqConfig()
-    repaidAmount: uint256 = self._deleverageUser(_user, msg.sender, True, requiredRepayment, config, a)
+    repaidAmount: uint256 = self._deleverageUser(_user, msg.sender, True, requiredRepayment, config, addys._getEndaomentFundsAddr(), a)
     return repaidAmount != 0
 
 
@@ -517,6 +520,7 @@ def _deleverageUser(
     _isTrusted: bool,
     _targetRepayAmount: uint256,
     _config: GenLiqConfig,
+    _endaoFunds: address,
     _a: addys.Addys,
 ) -> uint256:
     isTrusted: bool = _isTrusted
@@ -553,7 +557,7 @@ def _deleverageUser(
         targetRepayAmount = min(targetRepayAmount, maxRepayableAmount)
 
     # perform deleverage phases
-    repaidAmount: uint256 = self._performDeleveragePhases(_user, targetRepayAmount, _config.priorityStabVaults, _config.priorityLiqAssetVaults, _a)
+    repaidAmount: uint256 = self._performDeleveragePhases(_user, targetRepayAmount, _config.priorityStabVaults, _config.priorityLiqAssetVaults, _endaoFunds, _a)
     if repaidAmount == 0:
         return 0
 
@@ -580,6 +584,7 @@ def _performDeleveragePhases(
     _targetRepayAmount: uint256,
     _priorityStabVaults: DynArray[VaultData, MAX_STAB_VAULT_DATA],
     _priorityLiqAssetVaults: DynArray[VaultData, PRIORITY_LIQ_VAULT_DATA],
+    _endaoFunds: address,
     _a: addys.Addys,
 ) -> uint256:
     remainingToRepay: uint256 = _targetRepayAmount
@@ -594,7 +599,7 @@ def _performDeleveragePhases(
             if not staticcall Ledger(_a.ledger).isParticipatingInVault(_user, stabPool.vaultId):
                 continue
 
-            remainingToRepay = self._iterateThruAssetsWithinVault(_user, stabPool.vaultId, stabPool.vaultAddr, remainingToRepay, _a)
+            remainingToRepay = self._iterateThruAssetsWithinVault(_user, stabPool.vaultId, stabPool.vaultAddr, remainingToRepay, _endaoFunds, _a)
             if self.vaultAddrs[stabPool.vaultId] == empty(address):
                 self.vaultAddrs[stabPool.vaultId] = stabPool.vaultAddr # cache
 
@@ -608,14 +613,14 @@ def _performDeleveragePhases(
             if not staticcall Vault(pData.vaultAddr).doesUserHaveBalance(_user, pData.asset):
                 continue
 
-            remainingToRepay = self._handleSpecificAsset(_user, pData.vaultId, pData.vaultAddr, pData.asset, remainingToRepay, False, _a)
+            remainingToRepay = self._handleSpecificAsset(_user, pData.vaultId, pData.vaultAddr, pData.asset, remainingToRepay, False, _endaoFunds, _a)
             if self.vaultAddrs[pData.vaultId] == empty(address):
                 self.vaultAddrs[pData.vaultId] = pData.vaultAddr # cache
 
     # PHASE 3 -- Go thru user's vaults (top to bottom as saved in ledger / vaults)
 
     if remainingToRepay != 0:
-        remainingToRepay = self._iterateThruAllUserVaults(_user, remainingToRepay, _a)
+        remainingToRepay = self._iterateThruAllUserVaults(_user, remainingToRepay, _endaoFunds, _a)
 
     return _targetRepayAmount - remainingToRepay
 
@@ -624,7 +629,7 @@ def _performDeleveragePhases(
 
 
 @internal
-def _iterateThruAllUserVaults(_user: address, _remainingToRepay: uint256, _a: addys.Addys) -> uint256:
+def _iterateThruAllUserVaults(_user: address, _remainingToRepay: uint256, _endaoFunds: address, _a: addys.Addys) -> uint256:
     numUserVaults: uint256 = staticcall Ledger(_a.ledger).numUserVaults(_user)
     if numUserVaults == 0:
         return _remainingToRepay
@@ -647,7 +652,7 @@ def _iterateThruAllUserVaults(_user: address, _remainingToRepay: uint256, _a: ad
         if not isVaultAddrCached:
             self.vaultAddrs[vaultId] = vaultAddr
 
-        remainingToRepay = self._iterateThruAssetsWithinVault(_user, vaultId, vaultAddr, remainingToRepay, _a)
+        remainingToRepay = self._iterateThruAssetsWithinVault(_user, vaultId, vaultAddr, remainingToRepay, _endaoFunds, _a)
 
     return remainingToRepay
 
@@ -661,6 +666,7 @@ def _iterateThruAssetsWithinVault(
     _vaultId: uint256,
     _vaultAddr: address,
     _remainingToRepay: uint256,
+    _endaoFunds: address,
     _a: addys.Addys,
 ) -> uint256:
 
@@ -688,7 +694,7 @@ def _iterateThruAssetsWithinVault(
             continue
 
         # handle specific liq asset
-        remainingToRepay = self._handleSpecificAsset(_user, _vaultId, _vaultAddr, asset, remainingToRepay, False, _a)
+        remainingToRepay = self._handleSpecificAsset(_user, _vaultId, _vaultAddr, asset, remainingToRepay, False, _endaoFunds, _a)
 
     return remainingToRepay
 
@@ -704,6 +710,7 @@ def _handleSpecificAsset(
     _asset: address,
     _remainingToRepay: uint256,
     _volatilesOnly: bool,
+    _endaoFunds: address,
     _a: addys.Addys,
 ) -> uint256:
 
@@ -723,7 +730,7 @@ def _handleSpecificAsset(
     if _volatilesOnly:
         if config.shouldBurnAsPayment or config.shouldTransferToEndaoment:
             return _remainingToRepay
-        return self._transferToEndaoment(_user, _vaultId, _vaultAddr, _asset, _remainingToRepay, _a)
+        return self._transferToEndaoment(_user, _vaultId, _vaultAddr, _asset, _remainingToRepay, _endaoFunds, _a)
 
     # burn stability pool assets (GREEN, sGREEN)
     if config.shouldBurnAsPayment and _asset in [_a.greenToken, _a.savingsGreen]:
@@ -731,7 +738,7 @@ def _handleSpecificAsset(
 
     # transfer to endaoment (other stablecoins)
     if config.shouldTransferToEndaoment:
-        return self._transferToEndaoment(_user, _vaultId, _vaultAddr, _asset, _remainingToRepay, _a)
+        return self._transferToEndaoment(_user, _vaultId, _vaultAddr, _asset, _remainingToRepay, _endaoFunds, _a)
 
     return _remainingToRepay
 
@@ -783,12 +790,13 @@ def _transferToEndaoment(
     _vaultAddr: address,
     _asset: address,
     _remainingToRepay: uint256,
+    _endaoFunds: address,
     _a: addys.Addys,
 ) -> uint256:
     collateralUsdValueSent: uint256 = 0
     collateralAmountSent: uint256 = 0
     isPositionDepleted: bool = False
-    collateralUsdValueSent, collateralAmountSent, isPositionDepleted = self._transferCollateral(_user, addys._getEndaomentFundsAddr(), _vaultAddr, _asset, _remainingToRepay, _a)
+    collateralUsdValueSent, collateralAmountSent, isPositionDepleted = self._transferCollateral(_user, _endaoFunds, _vaultAddr, _asset, _remainingToRepay, _a)
     if collateralUsdValueSent == 0:
         return _remainingToRepay
 

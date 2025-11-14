@@ -116,7 +116,7 @@ def test_phase3_only_no_priority_assets(
     alpha_token_whale,
     bravo_token_whale,
     charlie_token_whale,
-    endaoment,
+    endaoment_funds,
     setupDeleverage,
     performDeposit,
     _test,
@@ -147,7 +147,7 @@ def test_phase3_only_no_priority_assets(
     initial_debt = credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount
     initial_alpha = simple_erc20_vault.getTotalAmountForUser(bob, alpha_token)
     initial_bravo = simple_erc20_vault.getTotalAmountForUser(bob, bravo_token)
-    initial_endaoment_alpha = alpha_token.balanceOf(endaoment)
+    initial_endaoment_alpha = alpha_token.balanceOf(endaoment_funds)
 
     # Execute deleverage - should use Phase 3 for everything
     repaid_amount = teller.deleverageUser(bob, 0, sender=switchboard_alpha.address)
@@ -160,8 +160,8 @@ def test_phase3_only_no_priority_assets(
     final_debt = credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount
     assert final_debt == 0  # Debt fully cleared
 
-    # Verify Endaoment received the assets
-    assert alpha_token.balanceOf(endaoment) > initial_endaoment_alpha
+    # Verify endaoment_funds received the assets
+    assert alpha_token.balanceOf(endaoment_funds) > initial_endaoment_alpha
 
     # Verify correct repayment
     _test(repaid_amount, initial_debt)

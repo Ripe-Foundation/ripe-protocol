@@ -633,6 +633,7 @@ def test_endao_repay_pool_debt_max_amount(
 
 def test_endao_mint_partner_liquidity_basic(
     endaoment,
+    endaoment_funds,
     switchboard_delta,
     alpha_token,
     alpha_token_whale,
@@ -662,13 +663,14 @@ def test_endao_mint_partner_liquidity_basic(
     _test(green_minted, amount)
     
     # Check balances
-    assert alpha_token.balanceOf(endaoment) == amount
-    assert green_token.balanceOf(endaoment) == green_minted
+    assert alpha_token.balanceOf(endaoment_funds) == amount
+    assert green_token.balanceOf(endaoment_funds) == green_minted
     assert alpha_token.balanceOf(partner) == pre_bal - amount
 
 
 def test_endao_mint_partner_liquidity_max_amount(
     endaoment,
+    endaoment_funds,
     switchboard_delta,
     alpha_token,
     alpha_token_whale,
@@ -695,13 +697,14 @@ def test_endao_mint_partner_liquidity_max_amount(
     _test(green_minted, partner_balance * 2)
     
     # Check balances
-    assert alpha_token.balanceOf(endaoment) == partner_balance
-    assert green_token.balanceOf(endaoment) == green_minted
+    assert alpha_token.balanceOf(endaoment_funds) == partner_balance
+    assert green_token.balanceOf(endaoment_funds) == green_minted
     assert alpha_token.balanceOf(partner) == 0  # All transferred
 
 
 def test_endao_mint_partner_liquidity_different_decimals(
     endaoment,
+    endaoment_funds,
     switchboard_delta,
     charlie_token,  # 6 decimals
     charlie_token_whale,
@@ -731,8 +734,8 @@ def test_endao_mint_partner_liquidity_different_decimals(
     _test(green_minted, 1000 * EIGHTEEN_DECIMALS)
     
     # Check balances
-    assert charlie_token.balanceOf(endaoment) == amount
-    assert green_token.balanceOf(endaoment) == green_minted
+    assert charlie_token.balanceOf(endaoment_funds) == amount
+    assert green_token.balanceOf(endaoment_funds) == green_minted
     assert charlie_token.balanceOf(partner) == pre_bal - amount
 
 

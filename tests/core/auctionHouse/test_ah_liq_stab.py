@@ -104,7 +104,7 @@ def test_ah_liquidation_with_stab_pool_both_assets_debug(
     performDeposit,
     whale,
     green_token,
-    endaoment,
+    endaoment_funds,
     _test,
 ):
     """Test liquidation with both savings_green and green_lp_token in stability pool"""
@@ -223,7 +223,7 @@ def test_ah_liquidation_with_stab_pool_both_assets_debug(
     assert sgreen_swapped > 0, "Savings green must be swapped"
     
     # Verify green_lp_token went to endaoment
-    assert green_lp_token.balanceOf(endaoment) == glp_swapped, "All green LP must go to endaoment"
+    assert green_lp_token.balanceOf(endaoment_funds) == glp_swapped, "All green LP must go to endaoment"
     
     # Verify savings_green resulted in burn
     final_green_supply = green_token.totalSupply()
@@ -255,7 +255,7 @@ def test_ah_liquidation_stab_pool_green_lp_only(
     stability_pool,
     performDeposit,
     green_token,
-    endaoment,
+    endaoment_funds,
     _test,
 ):
     """Test liquidation with only green_lp_token in stability pool"""
@@ -301,7 +301,7 @@ def test_ah_liquidation_stab_pool_green_lp_only(
     _test(target_repay_amount, log.valueSwapped)
     
     # Verify green_lp_token was transferred to endaoment (shouldTransferToEndaoment=True)
-    assert green_lp_token.balanceOf(endaoment) == log.amountSwapped, "Green LP must be transferred to endaoment"
+    assert green_lp_token.balanceOf(endaoment_funds) == log.amountSwapped, "Green LP must be transferred to endaoment"
     assert green_lp_token.balanceOf(stability_pool) == glp_deposit - log.amountSwapped
     
     # Verify NO burning occurred (green supply should remain the same)
@@ -323,7 +323,7 @@ def test_ah_liquidation_stab_pool_savings_green_only(
     stability_pool,
     performDeposit,
     green_token,
-    endaoment,
+    endaoment_funds,
     _test,
 ):
     """Test liquidation with only savings_green in stability pool"""
@@ -388,8 +388,8 @@ def test_ah_liquidation_stab_pool_savings_green_only(
     _test(expected_burn_amount, actual_burn_amount)
     
     # Verify NO transfer to endaoment occurred
-    assert green_token.balanceOf(endaoment) == 0, "No green should go to endaoment"
-    assert savings_green.balanceOf(endaoment) == 0, "No savings green should go to endaoment"
+    assert green_token.balanceOf(endaoment_funds) == 0, "No green should go to endaoment"
+    assert savings_green.balanceOf(endaoment_funds) == 0, "No savings green should go to endaoment"
     
     # Verify alpha token went to stability pool
     assert alpha_token.balanceOf(stability_pool) == log.collateralAmountOut
@@ -414,7 +414,7 @@ def test_ah_liquidation_insufficient_stab_pool_liquidity(
     stability_pool,
     performDeposit,
     green_token,
-    endaoment,
+    endaoment_funds,
 ):
     """Test liquidation when stability pool has insufficient liquidity"""
     # Use the setupStabAssetConfig fixture which already configures savings_green and green_lp_token
@@ -519,7 +519,7 @@ def test_ah_liquidation_insufficient_stab_pool_liquidity(
     assert final_green_supply < initial_green_supply, "Green must be burned for savings_green"
     
     # Verify green_lp went to endaoment
-    assert green_lp_token.balanceOf(endaoment) == glp_swapped, "All green LP must go to endaoment"
+    assert green_lp_token.balanceOf(endaoment_funds) == glp_swapped, "All green LP must go to endaoment"
     
     # Verify user is no longer in liquidation
     assert not credit_engine.canLiquidateUser(bob)
@@ -542,7 +542,7 @@ def test_ah_liquidation_with_bravo_collateral_and_stab_pool(
     stability_pool,
     performDeposit,
     green_token,
-    endaoment,
+    endaoment_funds,
 ):
     """Test liquidation using bravo token as collateral with configured stab pool"""
     setupStabAssetConfig()
@@ -623,7 +623,7 @@ def test_ah_liquidation_with_bravo_collateral_and_stab_pool(
     assert sgreen_swapped > 0, "Savings green must be used"
     
     # Verify green_lp went to endaoment
-    assert green_lp_token.balanceOf(endaoment) == glp_swapped, "All green LP must go to endaoment"
+    assert green_lp_token.balanceOf(endaoment_funds) == glp_swapped, "All green LP must go to endaoment"
     
     # Verify green burn for savings_green
     final_green_supply = green_token.totalSupply()
@@ -647,7 +647,7 @@ def test_ah_liquidation_priority_order_stab_assets(
     stability_pool,
     performDeposit,
     green_token,
-    endaoment,
+    endaoment_funds,
     _test,
 ):
     """Test that liquidation respects priority order of stab assets"""
@@ -720,7 +720,7 @@ def test_ah_liquidation_priority_order_stab_assets(
     assert abs(glp_swapped - glp_deposit) <= 1, f"All green LP must be used first: {glp_swapped} vs {glp_deposit}"
     
     # Verify green_lp_token went to endaoment
-    assert green_lp_token.balanceOf(endaoment) == glp_swapped, "All green LP must go to endaoment"
+    assert green_lp_token.balanceOf(endaoment_funds) == glp_swapped, "All green LP must go to endaoment"
     
     # Verify savings_green burn
     final_green_supply = green_token.totalSupply()
@@ -751,7 +751,7 @@ def test_ah_liquidation_claimable_green_redemption(
     whale,
     savings_green,
     green_token,
-    endaoment,
+    endaoment_funds,
 ):
     """Test liquidation with claimable green tokens in stability pool"""
     setupStabAssetConfig()
@@ -787,7 +787,7 @@ def test_ah_liquidation_claimable_green_redemption(
         1,  # small amount to create claimable
         green_token,  # liq asset  
         claimable_green,  # amount sent
-        endaoment,  # green_lp goes to endaoment
+        endaoment_funds,  # green_lp goes to endaoment
         green_token,
         savings_green,
         sender=auction_house.address
@@ -806,7 +806,7 @@ def test_ah_liquidation_claimable_green_redemption(
     
     # Record initial state
     initial_green_supply = green_token.totalSupply()
-    initial_glp_in_endaoment = green_lp_token.balanceOf(endaoment)
+    initial_glp_in_endaoment_funds = green_lp_token.balanceOf(endaoment_funds)
     
     # Liquidate
     teller.liquidateUser(bob, False, sender=sally)
@@ -850,7 +850,7 @@ def test_ah_liquidation_multiple_users_sharing_stab_pool(
     performDeposit,
     whale,
     green_token,
-    endaoment,
+    endaoment_funds,
 ):
     """Test liquidation with multiple users depositing in stability pool"""
     setupStabAssetConfig()
@@ -1001,7 +1001,7 @@ def test_ah_liquidation_multiple_users_sharing_stab_pool(
     
     # Verify green_lp went to endaoment
     total_glp_swapped = sum(log.amountSwapped for log in glp_logs)
-    assert green_lp_token.balanceOf(endaoment) == total_glp_swapped, "All green LP must go to endaoment"
+    assert green_lp_token.balanceOf(endaoment_funds) == total_glp_swapped, "All green LP must go to endaoment"
 
 
 def test_ah_liquidation_multiple_collateral_types(
@@ -1023,7 +1023,7 @@ def test_ah_liquidation_multiple_collateral_types(
     stability_pool,
     performDeposit,
     green_token,
-    endaoment,
+    endaoment_funds,
 ):
     """Test liquidation when user has both alpha and bravo tokens as collateral"""
     setupStabAssetConfig()
@@ -1133,7 +1133,7 @@ def test_ah_liquidation_multiple_collateral_types(
     
     # Verify stab pool handling
     assert glp_swapped > 0, "Green LP must be used"
-    assert green_lp_token.balanceOf(endaoment) == glp_swapped, "Green LP must go to endaoment"
+    assert green_lp_token.balanceOf(endaoment_funds) == glp_swapped, "Green LP must go to endaoment"
     
     assert sgreen_swapped > 0, "Savings green must be used"
     final_green_supply = green_token.totalSupply()
@@ -1167,7 +1167,7 @@ def test_ah_liquidation_multiple_collateral_different_configs(
     credit_engine,
     stability_pool,
     performDeposit,
-    endaoment,
+    endaoment_funds,
 ):
     """Test liquidation with multiple collateral types having different liquidation configs"""
     setupStabAssetConfig()
@@ -1224,7 +1224,7 @@ def test_ah_liquidation_multiple_collateral_different_configs(
     assert credit_engine.canLiquidateUser(bob)
     
     # Track initial state
-    initial_bravo_in_endaoment = bravo_token.balanceOf(endaoment)
+    initial_bravo_in_endaoment_funds = bravo_token.balanceOf(endaoment_funds)
     
     # Liquidate
     teller.liquidateUser(bob, False, sender=sally)
@@ -1244,13 +1244,13 @@ def test_ah_liquidation_multiple_collateral_different_configs(
     
     # Bravo should go directly to endaoment -- so it's skipped
     assert len(endaoment_logs) == 0, "Bravo should NOT go to endaoment"
-    assert bravo_token.balanceOf(endaoment) == initial_bravo_in_endaoment
+    assert bravo_token.balanceOf(endaoment_funds) == initial_bravo_in_endaoment_funds
     
     # Verify alpha is in stability pool
     assert alpha_token.balanceOf(stability_pool) > 0, "Alpha must be in stability pool"
     
     # Verify green_lp went to endaoment from stab swap
-    assert green_lp_token.balanceOf(endaoment) > 0, "Green LP from swap must go to endaoment"
+    assert green_lp_token.balanceOf(endaoment_funds) > 0, "Green LP from swap must go to endaoment"
     
     # Verify liquidation reduced debt
     user_debt, _, _ = credit_engine.getLatestUserDebtAndTerms(bob, False)
@@ -1275,7 +1275,7 @@ def test_ah_liquidation_multiple_collateral_partial_liquidation(
     stability_pool,
     performDeposit,
     green_token,
-    endaoment,
+    endaoment_funds,
 ):
     """Test partial liquidation with multiple collateral types"""
     setupStabAssetConfig()
@@ -1366,7 +1366,7 @@ def test_ah_liquidation_multiple_collateral_partial_liquidation(
     
     # Verify stab pool was used
     assert glp_swapped > 0, "Green LP must be used"
-    assert green_lp_token.balanceOf(endaoment) == glp_swapped, "Green LP must go to endaoment"
+    assert green_lp_token.balanceOf(endaoment_funds) == glp_swapped, "Green LP must go to endaoment"
     
     # Verify liquidation occurred
     user_debt, bt, _ = credit_engine.getLatestUserDebtAndTerms(bob, False)
@@ -1391,7 +1391,7 @@ def test_ah_liquidation_user_with_stab_pool_position(
     stability_pool,
     performDeposit,
     green_token,
-    endaoment,
+    endaoment_funds,
 ):
     """Test Phase 1: Liquidating user who also has stability pool positions"""
     setupStabAssetConfig()
@@ -1455,7 +1455,7 @@ def test_ah_liquidation_user_with_stab_pool_position(
     # Track initial values
     initial_green_supply = green_token.totalSupply()
     initial_glp_supply = green_lp_token.totalSupply()
-    endaoment_initial_glp_balance = green_lp_token.balanceOf(endaoment)
+    endaoment_funds_initial_glp_balance = green_lp_token.balanceOf(endaoment_funds)
     bob_initial_sgreen_value = stability_pool.getTotalUserValue(bob, savings_green)
     bob_initial_glp_value = stability_pool.getTotalUserValue(bob, green_lp_token)
     
@@ -1480,10 +1480,10 @@ def test_ah_liquidation_user_with_stab_pool_position(
     # Verify burn/transfer behavior
     final_green_supply = green_token.totalSupply()
     final_glp_supply = green_lp_token.totalSupply()
-    endaoment_final_glp_balance = green_lp_token.balanceOf(endaoment)
+    endaoment_funds_final_glp_balance = green_lp_token.balanceOf(endaoment_funds)
     assert final_green_supply == initial_green_supply, "Green must be the same"
     assert final_glp_supply == initial_glp_supply, "Green LP is less than initial"
-    assert endaoment_final_glp_balance > endaoment_initial_glp_balance, "Green LP must go to endaoment"
+    assert endaoment_funds_final_glp_balance > endaoment_funds_initial_glp_balance, "Green LP must go to endaoment"
 
     # Alpha should also be in stability pool from swaps
     assert alpha_token.balanceOf(stability_pool) > 0, "Alpha must be swapped into stability pool"
