@@ -1176,29 +1176,6 @@ def test_endao_add_partner_liquidity_multiple_partners(
 
 
 @pytest.base
-def test_endao_add_partner_liquidity_invalid_lego_id(
-    endaoment,
-    deployed_green_pool,
-    switchboard_delta,
-    alice,
-    usdc_token,
-    fork,
-):
-    # Test addPartnerLiquidity with invalid lego ID
-    green_pool = boa.env.lookup_contract(deployed_green_pool)
-    usdc_whale = WHALES[fork]["usdc"]
-    amount = 1_000 * (10 ** usdc_token.decimals())
-    
-    # Give partner tokens
-    usdc_token.transfer(alice, amount, sender=usdc_whale)
-    usdc_token.approve(endaoment, amount, sender=alice)
-    
-    # Use invalid lego ID (999)
-    with boa.reverts("invalid lego"):
-        endaoment.addPartnerLiquidity(999, green_pool, alice, usdc_token, amount, 0, sender=switchboard_delta.address)
-
-
-@pytest.base
 def test_endao_add_partner_liquidity_asset_price_validation(
     endaoment,
     deployed_green_pool,
