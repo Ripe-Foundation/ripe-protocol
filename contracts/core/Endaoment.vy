@@ -512,7 +512,6 @@ def claimIncentives(
 
 
 @nonreentrant
-@payable
 @external
 def convertEthToWeth(_amount: uint256 = max_value(uint256)) -> (uint256, uint256):
     assert not deptBasics.isPaused # dev: contract paused
@@ -533,7 +532,7 @@ def convertEthToWeth(_amount: uint256 = max_value(uint256)) -> (uint256, uint256
         op = 2,
         asset1 = ETH,
         asset2 = weth,
-        amount1 = msg.value,
+        amount1 = amount,
         amount2 = amount,
         usdValue = txUsdValue,
         legoId = 0,

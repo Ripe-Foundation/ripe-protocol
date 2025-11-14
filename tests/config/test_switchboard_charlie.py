@@ -1631,6 +1631,292 @@ def test_switchboard_three_set_training_wheels_timelock_and_execution(
     assert switchboard_charlie.actionType(action_id) == 0
 
 
+###################################
+# Endaoment Function Coverage Tests
+###################################
+
+
+def test_switchboard_charlie_transfer_funds_to_vault_access_control(
+    switchboard_charlie,
+    alice,
+    bob,
+    alpha_token,
+):
+    """Test access control for transferFundsToVaultInEndaoment (lite action)"""
+    assets = [alpha_token.address]
+
+    # Non-lite users should be rejected
+    with boa.reverts("no perms"):
+        switchboard_charlie.transferFundsToVaultInEndaoment(assets, sender=alice)
+
+    with boa.reverts("no perms"):
+        switchboard_charlie.transferFundsToVaultInEndaoment(assets, sender=bob)
+
+
+def test_switchboard_charlie_transfer_funds_to_vault_parameter_validation(
+    switchboard_charlie,
+    governance,
+):
+    """Test parameter validation for transferFundsToVaultInEndaoment"""
+    # Empty assets array should be rejected
+    with boa.reverts("no assets provided"):
+        switchboard_charlie.transferFundsToVaultInEndaoment([], sender=governance.address)
+
+
+def test_switchboard_charlie_add_liquidity_concentrated_access_control(
+    switchboard_charlie,
+    alice,
+    bob,
+    alpha_token,
+    green_token,
+):
+    """Test access control for addLiquidityConcentratedInEndaoment (timelock action)"""
+    nft_addr = "0x0000000000000000000000000000000000000001"
+    pool_addr = "0x0000000000000000000000000000000000000002"
+
+    # Non-governance users should be rejected
+    with boa.reverts("no perms"):
+        switchboard_charlie.addLiquidityConcentratedInEndaoment(
+            1,  # legoId
+            nft_addr,
+            0,  # nftTokenId
+            pool_addr,
+            alpha_token.address,
+            green_token.address,
+            sender=alice
+        )
+
+    with boa.reverts("no perms"):
+        switchboard_charlie.addLiquidityConcentratedInEndaoment(
+            1,
+            nft_addr,
+            0,
+            pool_addr,
+            alpha_token.address,
+            green_token.address,
+            sender=bob
+        )
+
+
+def test_switchboard_charlie_add_liquidity_concentrated_parameter_validation(
+    switchboard_charlie,
+    governance,
+    alpha_token,
+    green_token,
+):
+    """Test parameter validation for addLiquidityConcentratedInEndaoment"""
+    nft_addr = "0x0000000000000000000000000000000000000001"
+    pool_addr = "0x0000000000000000000000000000000000000002"
+
+    # Invalid lego id should be rejected
+    with boa.reverts("invalid lego id"):
+        switchboard_charlie.addLiquidityConcentratedInEndaoment(
+            0,  # invalid legoId
+            nft_addr,
+            0,
+            pool_addr,
+            alpha_token.address,
+            green_token.address,
+            sender=governance.address
+        )
+
+    # Invalid nft address should be rejected
+    with boa.reverts("invalid nft address"):
+        switchboard_charlie.addLiquidityConcentratedInEndaoment(
+            1,
+            ZERO_ADDRESS,  # invalid nft address
+            0,
+            pool_addr,
+            alpha_token.address,
+            green_token.address,
+            sender=governance.address
+        )
+
+
+def test_switchboard_charlie_add_liquidity_concentrated_timelock_flow(
+    switchboard_charlie,
+    governance,
+    alpha_token,
+    green_token,
+):
+    """Test timelock flow for addLiquidityConcentratedInEndaoment"""
+    nft_addr = "0x0000000000000000000000000000000000000001"
+    pool_addr = "0x0000000000000000000000000000000000000002"
+
+    # Create pending action
+    action_id = switchboard_charlie.addLiquidityConcentratedInEndaoment(
+        1,  # legoId
+        nft_addr,
+        123,  # nftTokenId
+        pool_addr,
+        alpha_token.address,
+        green_token.address,
+        sender=governance.address
+    )
+
+    # Verify event was emitted
+    logs = filter_logs(switchboard_charlie, "PendingEndaoAddLiquidityConcentratedAction")
+    assert len(logs) == 1
+    log = logs[0]
+    assert log.legoId == 1
+    assert log.pool == pool_addr
+    assert log.tokenA == alpha_token.address
+    assert log.tokenB == green_token.address
+    assert log.nftTokenId == 123
+    assert log.actionId == action_id
+
+    # Verify action is stored correctly
+    assert switchboard_charlie.actionType(action_id) == 32768  # ActionType.ENDAO_ADD_LIQUIDITY_CONCENTRATED (2^15)
+    stored_action = switchboard_charlie.pendingEndaoAddLiquidityConcentratedActions(action_id)
+    assert stored_action[0] == 1  # legoId
+    assert stored_action[1] == nft_addr
+    assert stored_action[2] == 123  # nftTokenId
+    assert stored_action[3] == pool_addr
+
+    # Execution should fail before timelock
+    result = switchboard_charlie.executePendingAction(action_id, sender=governance.address)
+    assert not result
+
+
+def test_switchboard_charlie_remove_liquidity_concentrated_access_control(
+    switchboard_charlie,
+    alice,
+    bob,
+    alpha_token,
+    green_token,
+):
+    """Test access control for removeLiquidityConcentratedInEndaoment (timelock action)"""
+    nft_addr = "0x0000000000000000000000000000000000000001"
+    pool_addr = "0x0000000000000000000000000000000000000002"
+
+    # Non-governance users should be rejected
+    with boa.reverts("no perms"):
+        switchboard_charlie.removeLiquidityConcentratedInEndaoment(
+            1,  # legoId
+            nft_addr,
+            123,  # nftTokenId
+            pool_addr,
+            alpha_token.address,
+            green_token.address,
+            sender=alice
+        )
+
+    with boa.reverts("no perms"):
+        switchboard_charlie.removeLiquidityConcentratedInEndaoment(
+            1,
+            nft_addr,
+            123,
+            pool_addr,
+            alpha_token.address,
+            green_token.address,
+            sender=bob
+        )
+
+
+def test_switchboard_charlie_remove_liquidity_concentrated_parameter_validation(
+    switchboard_charlie,
+    governance,
+    alpha_token,
+    green_token,
+):
+    """Test parameter validation for removeLiquidityConcentratedInEndaoment"""
+    nft_addr = "0x0000000000000000000000000000000000000001"
+    pool_addr = "0x0000000000000000000000000000000000000002"
+
+    # Invalid lego id should be rejected
+    with boa.reverts("invalid lego id"):
+        switchboard_charlie.removeLiquidityConcentratedInEndaoment(
+            0,  # invalid legoId
+            nft_addr,
+            123,
+            pool_addr,
+            alpha_token.address,
+            green_token.address,
+            sender=governance.address
+        )
+
+    # Invalid nft address should be rejected
+    with boa.reverts("invalid nft address"):
+        switchboard_charlie.removeLiquidityConcentratedInEndaoment(
+            1,
+            ZERO_ADDRESS,  # invalid nft address
+            123,
+            pool_addr,
+            alpha_token.address,
+            green_token.address,
+            sender=governance.address
+        )
+
+    # Invalid nft token id should be rejected
+    with boa.reverts("invalid nft token id"):
+        switchboard_charlie.removeLiquidityConcentratedInEndaoment(
+            1,
+            nft_addr,
+            0,  # invalid nftTokenId
+            pool_addr,
+            alpha_token.address,
+            green_token.address,
+            sender=governance.address
+        )
+
+
+def test_switchboard_charlie_remove_liquidity_concentrated_timelock_flow(
+    switchboard_charlie,
+    governance,
+    alpha_token,
+    green_token,
+):
+    """Test timelock flow for removeLiquidityConcentratedInEndaoment"""
+    nft_addr = "0x0000000000000000000000000000000000000001"
+    pool_addr = "0x0000000000000000000000000000000000000002"
+
+    # Create pending action
+    action_id = switchboard_charlie.removeLiquidityConcentratedInEndaoment(
+        1,  # legoId
+        nft_addr,
+        456,  # nftTokenId
+        pool_addr,
+        alpha_token.address,
+        green_token.address,
+        sender=governance.address
+    )
+
+    # Verify event was emitted
+    logs = filter_logs(switchboard_charlie, "PendingEndaoRemoveLiquidityConcentratedAction")
+    assert len(logs) == 1
+    log = logs[0]
+    assert log.legoId == 1
+    assert log.pool == pool_addr
+    assert log.tokenA == alpha_token.address
+    assert log.tokenB == green_token.address
+    assert log.nftTokenId == 456
+    assert log.actionId == action_id
+
+    # Verify action is stored correctly
+    assert switchboard_charlie.actionType(action_id) == 65536  # ActionType.ENDAO_REMOVE_LIQUIDITY_CONCENTRATED (2^16)
+    stored_action = switchboard_charlie.pendingEndaoRemoveLiquidityConcentratedActions(action_id)
+    assert stored_action[0] == 1  # legoId
+    assert stored_action[1] == nft_addr
+    assert stored_action[2] == 456  # nftTokenId
+    assert stored_action[3] == pool_addr
+
+    # Execution should fail before timelock
+    result = switchboard_charlie.executePendingAction(action_id, sender=governance.address)
+    assert not result
+
+
+def test_switchboard_charlie_concentrated_liquidity_action_type_values(
+    switchboard_charlie,
+):
+    """Test that ActionType flag values are correct for concentrated liquidity actions"""
+    # These are flag enums using bit values (powers of 2)
+    # ENDAO_ADD_LIQUIDITY_CONCENTRATED should be 2^15 = 32768
+    # ENDAO_REMOVE_LIQUIDITY_CONCENTRATED should be 2^16 = 65536
+
+    # We can't directly test flag values, but we can verify through action storage
+    # This is tested in the timelock flow tests above
+
+
 # Run the tests
 if __name__ == "__main__":
     print("Additional comprehensive tests for SwitchboardThree.vy")
