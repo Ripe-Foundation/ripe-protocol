@@ -210,7 +210,7 @@ def __init__(
 
 @nonreentrant
 @external
-def mint(_usdcAmount: uint256 = max_value(uint256), _recipient: address = msg.sender) -> uint256:
+def mintGreen(_usdcAmount: uint256 = max_value(uint256), _recipient: address = msg.sender) -> uint256:
     assert not deptBasics.isPaused # dev: contract paused
     assert self.canMint # dev: minting disabled
     a: addys.Addys = addys._getAddys()
@@ -342,7 +342,7 @@ def _checkAndUpdateMintInterval(_amount: uint256):
 
 @nonreentrant
 @external
-def redeem(_greenAmount: uint256 = max_value(uint256), _recipient: address = msg.sender) -> uint256:
+def redeemGreen(_greenAmount: uint256 = max_value(uint256), _recipient: address = msg.sender) -> uint256:
     assert not deptBasics.isPaused # dev: contract paused
     assert self.canRedeem # dev: redemption disabled
     a: addys.Addys = addys._getAddys()
@@ -414,6 +414,13 @@ def getMaxRedeemableGreenAmount(_user: address = empty(address)) -> uint256:
     usdValue: uint256 = staticcall PriceDesk(a.priceDesk).getUsdValue(usdc, usdcAvailable, False)
     usdcInGreenDecimals: uint256 = usdcAvailable * ONE_GREEN // ONE_USDC
     maxGreenFromUsdc: uint256 = min(usdValue, usdcInGreenDecimals)
+
+    # account for redeem fee: usdcAfterFee = usdcToGive * (1 - fee)
+    # reverse: greenAmount = greenBeforeFee / (1 - fee)
+    redeemFee: uint256 = self.redeemFee
+    if redeemFee != 0:
+        feeMultiplier: uint256 = HUNDRED_PERCENT - redeemFee
+        maxGreenFromUsdc = maxGreenFromUsdc * HUNDRED_PERCENT // feeMultiplier
 
     # get limiting factor from interval and usdc
     maxRedeemable: uint256 = min(intervalCapacity, maxGreenFromUsdc)
@@ -642,7 +649,7 @@ def setCanMint(_canMint: bool):
     assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
     assert _canMint != self.canMint # dev: no change
     self.canMint = _canMint
-    log CanMintUpdated(_canMint)
+    log CanMintUpdated(canMint=_canMint)
 
 
 # mint fee
@@ -650,40 +657,49 @@ def setCanMint(_canMint: bool):
 
 @external
 def setMintFee(_fee: uint256):
+    assert not deptBasics.isPaused # dev: contract paused
     assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
     assert _fee <= HUNDRED_PERCENT # dev: fee too high
+    assert _fee != self.mintFee # dev: no change
     self.mintFee = _fee
-    log MintFeeUpdated(_fee)
+    log MintFeeUpdated(fee=_fee)
 
 
 # max interval mint
 
 
 @external
-def setMaxIntervalMint(_max: uint256):
+def setMaxIntervalMint(_maxGreenAmount: uint256):
+    assert not deptBasics.isPaused # dev: contract paused
     assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
-    self.maxIntervalMint = _max
-    log MaxIntervalMintUpdated(_max)
+    assert _maxGreenAmount != self.maxIntervalMint # dev: no change
+    assert _maxGreenAmount != 0 and _maxGreenAmount != max_value(uint256) # dev: invalid max
+    self.maxIntervalMint = _maxGreenAmount
+    log MaxIntervalMintUpdated(max=_maxGreenAmount)
 
 
 # enforce mint allowlist
 
 
 @external
-def setShouldEnforceMintAllowlist(_enforce: bool):
+def setShouldEnforceMintAllowlist(_shouldEnforce: bool):
+    assert not deptBasics.isPaused # dev: contract paused
     assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
-    self.shouldEnforceMintAllowlist = _enforce
-    log ShouldEnforceMintAllowlistUpdated(_enforce)
+    assert _shouldEnforce != self.shouldEnforceMintAllowlist # dev: no change
+    self.shouldEnforceMintAllowlist = _shouldEnforce
+    log ShouldEnforceMintAllowlistUpdated(enforce=_shouldEnforce)
 
 
 # update mint allowlist
 
 
 @external
-def updateMintAllowlist(_user: address, _allowed: bool):
+def updateMintAllowlist(_user: address, _isAllowed: bool):
+    assert not deptBasics.isPaused # dev: contract paused
     assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
-    self.mintAllowlist[_user] = _allowed
-    log MintAllowlistUpdated(_user, _allowed)
+    assert _isAllowed != self.mintAllowlist[_user] # dev: no change
+    self.mintAllowlist[_user] = _isAllowed
+    log MintAllowlistUpdated(user=_user, allowed=_isAllowed)
 
 
 #################
@@ -696,9 +712,11 @@ def updateMintAllowlist(_user: address, _allowed: bool):
 
 @external
 def setCanRedeem(_canRedeem: bool):
+    assert not deptBasics.isPaused # dev: contract paused
     assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
+    assert _canRedeem != self.canRedeem # dev: no change
     self.canRedeem = _canRedeem
-    log CanRedeemUpdated(_canRedeem)
+    log CanRedeemUpdated(canRedeem=_canRedeem)
 
 
 # redeem fee
@@ -706,40 +724,49 @@ def setCanRedeem(_canRedeem: bool):
 
 @external
 def setRedeemFee(_fee: uint256):
+    assert not deptBasics.isPaused # dev: contract paused
     assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
     assert _fee <= HUNDRED_PERCENT # dev: fee too high
+    assert _fee != self.redeemFee # dev: no change
     self.redeemFee = _fee
-    log RedeemFeeUpdated(_fee)
+    log RedeemFeeUpdated(fee=_fee)
 
 
 # max interval redeem
 
 
 @external
-def setMaxIntervalRedeem(_max: uint256):
+def setMaxIntervalRedeem(_maxGreenAmount: uint256):
+    assert not deptBasics.isPaused # dev: contract paused
     assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
-    self.maxIntervalRedeem = _max
-    log MaxIntervalRedeemUpdated(_max)
+    assert _maxGreenAmount != self.maxIntervalRedeem # dev: no change
+    assert _maxGreenAmount != 0 and _maxGreenAmount != max_value(uint256) # dev: invalid max
+    self.maxIntervalRedeem = _maxGreenAmount
+    log MaxIntervalRedeemUpdated(max=_maxGreenAmount)
 
 
 # enforce redeem allowlist
 
 
 @external
-def setShouldEnforceRedeemAllowlist(_enforce: bool):
+def setShouldEnforceRedeemAllowlist(_shouldEnforce: bool):
+    assert not deptBasics.isPaused # dev: contract paused
     assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
-    self.shouldEnforceRedeemAllowlist = _enforce
-    log ShouldEnforceRedeemAllowlistUpdated(_enforce)
+    assert _shouldEnforce != self.shouldEnforceRedeemAllowlist # dev: no change
+    self.shouldEnforceRedeemAllowlist = _shouldEnforce
+    log ShouldEnforceRedeemAllowlistUpdated(enforce=_shouldEnforce)
 
 
 # update redeem allowlist
 
 
 @external
-def updateRedeemAllowlist(_user: address, _allowed: bool):
+def updateRedeemAllowlist(_user: address, _isAllowed: bool):
+    assert not deptBasics.isPaused # dev: contract paused
     assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
-    self.redeemAllowlist[_user] = _allowed
-    log RedeemAllowlistUpdated(_user, _allowed)
+    assert _isAllowed != self.redeemAllowlist[_user] # dev: no change
+    self.redeemAllowlist[_user] = _isAllowed
+    log RedeemAllowlistUpdated(user=_user, allowed=_isAllowed)
 
 
 ##################
@@ -752,9 +779,12 @@ def updateRedeemAllowlist(_user: address, _allowed: bool):
 
 @external
 def setUsdcYieldPosition(_legoId: uint256, _vaultToken: address):
+    assert not deptBasics.isPaused # dev: contract paused
     assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
+    currentPosition: UsdcYieldPosition = self.usdcYieldPosition
+    assert _legoId != currentPosition.legoId or _vaultToken != currentPosition.vaultToken # dev: no change
     self.usdcYieldPosition = UsdcYieldPosition(legoId=_legoId, vaultToken=_vaultToken)
-    log UsdcYieldPositionUpdated(_legoId, _vaultToken)
+    log UsdcYieldPositionUpdated(legoId=_legoId, vaultToken=_vaultToken)
 
 
 # num blocks per interval
@@ -762,7 +792,9 @@ def setUsdcYieldPosition(_legoId: uint256, _vaultToken: address):
 
 @external
 def setNumBlocksPerInterval(_blocks: uint256):
+    assert not deptBasics.isPaused # dev: contract paused
     assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
-    assert _blocks > 0 # dev: invalid interval
+    assert _blocks != self.numBlocksPerInterval # dev: no change
+    assert _blocks != 0 and _blocks != max_value(uint256) # dev: invalid interval
     self.numBlocksPerInterval = _blocks
-    log NumBlocksPerIntervalUpdated(_blocks)
+    log NumBlocksPerIntervalUpdated(blocks=_blocks)
