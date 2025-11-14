@@ -51,6 +51,7 @@ def ripe_hq(
     governance,
     credit_redeem,
     teller_utils,
+    endaoment_funds,
 ):
     # finish token setup
     assert green_token.finishTokenSetup(ripe_hq_deploy, sender=deploy3r)
@@ -130,6 +131,10 @@ def ripe_hq(
     # 20
     assert ripe_hq_deploy.startAddNewAddressToRegistry(teller_utils, "Teller Utils", sender=deploy3r)
     assert ripe_hq_deploy.confirmNewAddressToRegistry(teller_utils, sender=deploy3r) == 20
+
+    # 21
+    assert ripe_hq_deploy.startAddNewAddressToRegistry(endaoment_funds, "Endaoment Funds", sender=deploy3r)
+    assert ripe_hq_deploy.confirmNewAddressToRegistry(endaoment_funds, sender=deploy3r) == 21
 
     # special permission setup
 
@@ -345,6 +350,15 @@ def endaoment(ripe_hq_deploy, fork):
         ADDYS[fork]["WETH"],
         ADDYS[fork]["ETH"],
         name="endaoment",
+    )
+
+
+@pytest.fixture(scope="session")
+def endaoment_funds(ripe_hq_deploy):
+    return boa.load(
+        "contracts/core/EndaomentFunds.vy",
+        ripe_hq_deploy,
+        name="endaoment_funds",
     )
 
 

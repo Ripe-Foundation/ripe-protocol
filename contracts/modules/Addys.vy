@@ -57,6 +57,7 @@ TELLER_ID: constant(uint256) = 17
 DELEVERAGE_ID: constant(uint256) = 18
 CREDIT_REDEEM_ID: constant(uint256) = 19
 TELLER_UTILS_ID: constant(uint256) = 20
+ENDAOMENT_FUNDS_ID: constant(uint256) = 21
 
 
 @deploy
@@ -445,3 +446,18 @@ def _getTellerUtilsId() -> uint256:
 @internal
 def _getTellerUtilsAddr() -> address:
     return staticcall RipeHq(RIPE_HQ_FOR_ADDYS).getAddr(TELLER_UTILS_ID)
+
+
+# endaoment funds
+
+
+@view
+@internal
+def _getEndaomentFundsId() -> uint256:
+    return ENDAOMENT_FUNDS_ID
+
+
+@view
+@internal
+def _getEndaomentFundsAddr() -> address:
+    return staticcall RipeHq(RIPE_HQ_FOR_ADDYS).getAddr(ENDAOMENT_FUNDS_ID)
