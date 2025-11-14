@@ -82,3 +82,8 @@ def claimIncentives(_user: address, _rewardToken: address, _rewardAmount: uint25
 @external
 def getAccessForLego(_user: address, _action: ActionType) -> (address, String[64], uint256):
     ...
+
+@view
+@external
+def getUnderlyingAmountSafe(_vaultToken: address, _vaultTokenBalance: uint256) -> uint256:
+    ...

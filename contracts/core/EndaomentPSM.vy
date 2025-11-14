@@ -54,7 +54,7 @@ interface VaultRegistry:
 interface MissionControl:
     def underscoreRegistry() -> address: view
 
-struct IntervalBorrow:
+struct PsmInterval:
     start: uint256
     amount: uint256
 
@@ -65,15 +65,16 @@ struct UsdcYieldPosition:
 event MintGreen:
     user: indexed(address)
     sender: indexed(address)
-    usdcAmount: uint256
-    greenAmount: uint256
-    feeAmount: uint256
+    usdcIn: uint256
+    greenOut: uint256
+    usdcFee: uint256
 
 event RedeemGreen:
     user: indexed(address)
+    sender: indexed(address)
     greenIn: uint256
     usdcOut: uint256
-    fee: uint256
+    usdcFee: uint256
 
 event EndaomentPSMYieldDeposit:
     amount: uint256
@@ -81,9 +82,11 @@ event EndaomentPSMYieldDeposit:
     vaultTokenReceived: uint256
     usdValue: uint256
 
-event YieldWithdraw:
+event EndaomentPSMYieldWithdrawal:
+    vaultToken: indexed(address)
     vaultTokenBurned: uint256
     usdcReceived: uint256
+    usdValue: uint256
 
 event CanMintUpdated:
     canMint: bool
@@ -138,7 +141,7 @@ mintFee: public(uint256) # basis points
 maxIntervalMint: public(uint256) # max GREEN mintable per interval
 mintAllowlist: public(HashMap[address, bool])
 shouldEnforceMintAllowlist: public(bool)
-globalMintInterval: public(IntervalBorrow)
+globalMintInterval: public(PsmInterval)
 
 # redeem config
 canRedeem: public(bool)
@@ -146,7 +149,7 @@ redeemFee: public(uint256) # basis points
 maxIntervalRedeem: public(uint256) # max GREEN redeemable per interval
 redeemAllowlist: public(HashMap[address, bool])
 shouldEnforceRedeemAllowlist: public(bool)
-globalRedeemInterval: public(IntervalBorrow)
+globalRedeemInterval: public(PsmInterval)
 
 UNDERSCORE_LEGOBOOK_ID: constant(uint256) = 3
 UNDERSCORE_VAULT_REGISTRY_ID: constant(uint256) = 10
@@ -193,9 +196,8 @@ def __init__(
     USDC = _usdc
 
     # yield config
-    assert _usdcYieldLegoId != 0 # dev: invalid lego ID
-    assert _usdcYieldVaultToken != empty(address) # dev: invalid vault token
-    self.usdcYieldPosition = UsdcYieldPosition(legoId=_usdcYieldLegoId, vaultToken=_usdcYieldVaultToken)
+    if _usdcYieldLegoId != 0 and _usdcYieldVaultToken != empty(address):
+        self.usdcYieldPosition = UsdcYieldPosition(legoId=_usdcYieldLegoId, vaultToken=_usdcYieldVaultToken)
 
 
 ##############
@@ -246,8 +248,40 @@ def mint(_usdcAmount: uint256 = max_value(uint256), _recipient: address = msg.se
     # deposit usdc into yield
     self._depositToYield(usdc, a.missionControl)
 
-    log MintGreen(user=_recipient, sender=msg.sender, usdcAmount=usdcAmount, greenAmount=greenToMint, feeAmount=feeAmount)
+    log MintGreen(user=_recipient, sender=msg.sender, usdcIn=usdcAmount, greenOut=greenToMint, usdcFee=feeAmount)
     return greenToMint
+
+
+# max mintable (front-end can use this to get max USDC amount)
+
+
+@view
+@external
+def getMaxUsdcAmountForMint(_user: address = empty(address)) -> uint256:
+    usdc: address = USDC
+    a: addys.Addys = addys._getAddys()
+
+    # convert interval capacity (GREEN) back to USDC needed
+    intervalCapacity: uint256 = self._getAvailIntervalMint()
+
+    # properly account for USDC price (may need more USDC if below peg)
+    usdcFromPriceDesk: uint256 = staticcall PriceDesk(a.priceDesk).getAssetAmount(usdc, intervalCapacity, False)
+    usdcInGreenDecimals: uint256 = intervalCapacity * ONE_USDC // ONE_GREEN
+    usdcNeeded: uint256 = max(usdcFromPriceDesk, usdcInGreenDecimals)
+
+    # account for mint fee: usdcAfterFee = usdcInput * (1 - fee)
+    # reverse: usdcInput = usdcAfterFee * HUNDRED_PERCENT / (HUNDRED_PERCENT - fee)
+    mintFee: uint256 = self.mintFee
+    if mintFee != 0:
+        feeMultiplier: uint256 = HUNDRED_PERCENT - mintFee
+        usdcNeeded = usdcNeeded * HUNDRED_PERCENT // feeMultiplier
+
+    # if user provided, also consider their usdc balance
+    if _user != empty(address):
+        usdcBalance: uint256 = staticcall IERC20(usdc).balanceOf(_user)
+        usdcNeeded = min(usdcBalance, usdcNeeded)
+
+    return usdcNeeded
 
 
 # check interval availability
@@ -255,8 +289,14 @@ def mint(_usdcAmount: uint256 = max_value(uint256), _recipient: address = msg.se
 
 @view
 @external
-def getAvailableToMint() -> uint256:
-    data: IntervalBorrow = self.globalMintInterval
+def getAvailIntervalMint() -> uint256:
+    return self._getAvailIntervalMint()
+
+
+@view
+@internal
+def _getAvailIntervalMint() -> uint256:
+    data: PsmInterval = self.globalMintInterval
     maxIntervalMint: uint256 = self.maxIntervalMint
     if data.start != 0 and data.start + self.numBlocksPerInterval > block.number:
         maxIntervalMint -= min(data.amount, maxIntervalMint)
@@ -268,7 +308,7 @@ def getAvailableToMint() -> uint256:
 
 @internal
 def _checkAndUpdateMintInterval(_amount: uint256):
-    data: IntervalBorrow = self.globalMintInterval
+    data: PsmInterval = self.globalMintInterval
     availToMint: uint256 = 0
     isFreshInterval: bool = True
 
@@ -290,6 +330,153 @@ def _checkAndUpdateMintInterval(_amount: uint256):
         data.amount += _amount
 
     self.globalMintInterval = data
+
+
+#####################
+# GREEN Redemptions #
+#####################
+
+
+# redeem
+
+
+@nonreentrant
+@external
+def redeem(_greenAmount: uint256 = max_value(uint256), _recipient: address = msg.sender) -> uint256:
+    assert not deptBasics.isPaused # dev: contract paused
+    assert self.canRedeem # dev: redemption disabled
+    a: addys.Addys = addys._getAddys()
+
+    # green amount to transfer
+    green: address = a.greenToken
+    greenAmount: uint256 = min(_greenAmount, staticcall IERC20(green).balanceOf(msg.sender))
+    assert greenAmount != 0 # dev: zero amount
+
+    # allowlist check (Underscore addresses bypass)
+    isUnderscore: bool = self._isUnderscoreAddr(msg.sender, a.missionControl)
+    if not isUnderscore and self.shouldEnforceRedeemAllowlist:
+        assert self.redeemAllowlist[msg.sender] # dev: not on redeem allowlist
+
+    # transfer green from user
+    assert extcall IERC20(green).transferFrom(msg.sender, self, greenAmount, default_return_value=True) # dev: transfer failed
+
+    # usdc to give
+    usdc: address = USDC
+    usdcFromPriceDesk: uint256 = staticcall PriceDesk(a.priceDesk).getAssetAmount(usdc, greenAmount, True)
+    greenInUsdcDecimals: uint256 = greenAmount * ONE_USDC // ONE_GREEN
+    usdcToGive: uint256 = min(usdcFromPriceDesk, greenInUsdcDecimals)
+    assert usdcToGive != 0 # dev: zero redeem amount
+
+    feeAmount: uint256 = 0
+    usdcAfterFee: uint256 = usdcToGive
+
+    # check and update interval limits (Underscore addresses bypass)
+    if not isUnderscore:
+        self._checkAndUpdateRedeemInterval(greenAmount)
+
+        # redeem fee
+        feeAmount = usdcToGive * self.redeemFee // HUNDRED_PERCENT
+        usdcAfterFee = usdcToGive - feeAmount
+
+    # ensure usdc liquidity (withdraw from yield if needed)
+    usdcBalance: uint256 = staticcall IERC20(usdc).balanceOf(self)
+    if usdcBalance < usdcAfterFee:
+        usdcBalance += self._withdrawFromYield(a.missionControl)
+        assert usdcBalance >= usdcAfterFee # dev: insufficient USDC
+
+    # transfer usdc to recipient
+    assert extcall IERC20(usdc).transfer(_recipient, usdcAfterFee, default_return_value=True) # dev: transfer failed
+
+    # burn green
+    assert extcall GreenToken(green).burn(greenAmount) # dev: burn failed
+
+    log RedeemGreen(user=_recipient, sender=msg.sender, greenIn=greenAmount, usdcOut=usdcAfterFee, usdcFee=feeAmount)
+    return usdcAfterFee
+
+
+# max redeemable (front-end can use this to get max GREEN amount)
+
+
+@view
+@external
+def getMaxRedeemableGreenAmount(_user: address = empty(address)) -> uint256:
+    a: addys.Addys = addys._getAddys()
+    usdc: address = USDC
+
+    # interval capacity
+    intervalCapacity: uint256 = self._getAvailIntervalRedemptions()
+
+    # usdc available (idle + yield)
+    usdcYieldPosition: UsdcYieldPosition = self.usdcYieldPosition
+    usdcAvailable: uint256 = self._getAvailableUsdc(usdc, usdcYieldPosition.legoId, usdcYieldPosition.vaultToken, a.missionControl)
+
+    # convert usdc to max green
+    usdValue: uint256 = staticcall PriceDesk(a.priceDesk).getUsdValue(usdc, usdcAvailable, False)
+    usdcInGreenDecimals: uint256 = usdcAvailable * ONE_GREEN // ONE_USDC
+    maxGreenFromUsdc: uint256 = min(usdValue, usdcInGreenDecimals)
+
+    # get limiting factor from interval and usdc
+    maxRedeemable: uint256 = min(intervalCapacity, maxGreenFromUsdc)
+
+    # if user provided, also consider their green balance
+    if _user != empty(address):
+        greenBalance: uint256 = staticcall IERC20(a.greenToken).balanceOf(_user)
+        maxRedeemable = min(maxRedeemable, greenBalance)
+
+    return maxRedeemable
+
+
+# available interval redemptions
+
+
+@view
+@external
+def getAvailIntervalRedemptions() -> uint256:
+    return self._getAvailIntervalRedemptions()
+
+
+@view
+@internal
+def _getAvailIntervalRedemptions() -> uint256:
+    data: PsmInterval = self.globalRedeemInterval
+    maxIntervalRedeem: uint256 = self.maxIntervalRedeem
+    if data.start != 0 and data.start + self.numBlocksPerInterval > block.number:
+        maxIntervalRedeem -= min(data.amount, maxIntervalRedeem)
+    return maxIntervalRedeem
+
+
+# update redeem interval
+
+
+@internal
+def _checkAndUpdateRedeemInterval(_amount: uint256):
+    data: PsmInterval = self.globalRedeemInterval
+    availToRedeem: uint256 = 0
+    isFreshInterval: bool = True
+
+    # check if in same interval or new interval
+    if data.start != 0 and data.start + self.numBlocksPerInterval > block.number:
+        maxIntervalRedeem: uint256 = self.maxIntervalRedeem
+        availToRedeem = maxIntervalRedeem - min(data.amount, maxIntervalRedeem)
+        isFreshInterval = False
+    else:
+        availToRedeem = self.maxIntervalRedeem
+
+    assert _amount <= availToRedeem # dev: exceeds max interval redeem
+
+    # update interval
+    if isFreshInterval:
+        data.start = block.number
+        data.amount = _amount
+    else:
+        data.amount += _amount
+
+    self.globalRedeemInterval = data
+
+
+##################
+# Yield Position #
+##################
 
 
 # deposit to yield
@@ -321,6 +508,67 @@ def _depositToYield(_usdc: address, _missionControl: address):
     assert extcall IERC20(_usdc).approve(legoAddr, 0, default_return_value=True)
 
     log EndaomentPSMYieldDeposit(amount=assetAmount, vaultToken=vaultToken, vaultTokenReceived=vaultTokenAmountReceived, usdValue=txUsdValue)
+
+
+# withdraw from yield
+
+
+@internal
+def _withdrawFromYield(_missionControl: address) -> uint256:
+    usdcYieldPosition: UsdcYieldPosition = self.usdcYieldPosition
+    if usdcYieldPosition.legoId == 0 or usdcYieldPosition.vaultToken == empty(address):
+        return 0
+
+    # check vault token balance
+    vaultTokenBalance: uint256 = staticcall IERC20(usdcYieldPosition.vaultToken).balanceOf(self)
+    if vaultTokenBalance == 0:
+        return 0
+
+    # get lego address
+    legoAddr: address = self._getLegoAddr(usdcYieldPosition.legoId, _missionControl)
+    if legoAddr == empty(address):
+        return 0
+
+    # withdraw from yield position
+    assert extcall IERC20(usdcYieldPosition.vaultToken).approve(legoAddr, vaultTokenBalance, default_return_value=True)
+    vaultTokenBurned: uint256 = 0
+    underlyingAsset: address = empty(address)
+    underlyingAmount: uint256 = 0
+    txUsdValue: uint256 = 0
+    vaultTokenBurned, underlyingAsset, underlyingAmount, txUsdValue = extcall UndyLego(legoAddr).withdrawFromYield(usdcYieldPosition.vaultToken, vaultTokenBalance, empty(bytes32), self)
+    assert extcall IERC20(usdcYieldPosition.vaultToken).approve(legoAddr, 0, default_return_value=True)
+
+    log EndaomentPSMYieldWithdrawal(vaultToken=usdcYieldPosition.vaultToken, vaultTokenBurned=vaultTokenBurned, usdcReceived=underlyingAmount, usdValue=txUsdValue)
+    return underlyingAmount
+
+
+# underlying amount
+
+
+@view
+@external
+def getUnderlyingYieldAmount() -> uint256:
+    usdcYieldPosition: UsdcYieldPosition = self.usdcYieldPosition
+    return self._getUnderlyingYieldAmount(usdcYieldPosition.legoId, usdcYieldPosition.vaultToken, addys._getMissionControlAddr())
+
+
+@view
+@internal
+def _getUnderlyingYieldAmount(_legoId: uint256, _vaultToken: address, _missionControl: address) -> uint256:
+    if _legoId == 0 or _vaultToken == empty(address):
+        return 0
+    vaultTokenBalance: uint256 = staticcall IERC20(_vaultToken).balanceOf(self)
+    if vaultTokenBalance == 0:
+        return 0
+    legoAddr: address = self._getLegoAddr(_legoId, _missionControl)
+    if legoAddr == empty(address):
+        return 0
+    return staticcall UndyLego(legoAddr).getUnderlyingAmountSafe(_vaultToken, vaultTokenBalance)
+
+
+#############
+# Utilities #
+#############
 
 
 # lego addr
@@ -363,327 +611,158 @@ def _isUnderscoreAddr(_addr: address, _missionControl: address) -> bool:
     return False
 
 
-################
-# GREEN Redeem #
-################
-
-
-# redeem interval
+# max usdc available
 
 
 @view
 @external
-def getAvailableToRedeem() -> uint256:
-    data: IntervalBorrow = self.globalRedeemInterval
-    maxIntervalRedeem: uint256 = self.maxIntervalRedeem
-    if data.start != 0 and data.start + self.numBlocksPerInterval > block.number:
-        maxIntervalRedeem -= min(data.amount, maxIntervalRedeem)
-    return maxIntervalRedeem
+def getAvailableUsdc() -> uint256:
+    usdcYieldPosition: UsdcYieldPosition = self.usdcYieldPosition
+    return self._getAvailableUsdc(USDC, usdcYieldPosition.legoId, usdcYieldPosition.vaultToken, addys._getMissionControlAddr())
 
 
-# @nonreentrant
-# @external
-# def redeem(_greenAmount: uint256 = max_value(uint256)) -> uint256:
-#     """
-#     @notice Redeem GREEN for USDC
-#     @param _greenAmount Amount of GREEN to redeem (max_value for all)
-#     @return Amount of USDC received
-#     """
-#     assert not deptBasics.isPaused  # dev: contract paused
-#     assert self.canRedeem  # dev: redemption disabled
-
-#     # Get actual amount to redeem
-#     greenAmount: uint256 = _greenAmount
-#     if _greenAmount == max_value(uint256):
-#         greenAmount = staticcall IERC20(addys._getGreenTokenAddr(empty(addys.Addys))).balanceOf(msg.sender)
-
-#     assert greenAmount > 0  # dev: zero amount
-
-#     # Check allowlist (Underscore addresses bypass)
-#     isUnderscore: bool = self._isUnderscoreAddr(msg.sender)
-#     if self.shouldEnforceRedeemAllowlist and not isUnderscore:
-#         assert self.redeemAllowlist[msg.sender]  # dev: not on redeem allowlist
-
-#     # Transfer GREEN from user
-#     a: addys.Addys = addys._getAddys(empty(addys.Addys))
-#     assert extcall IERC20(a.greenToken).transferFrom(msg.sender, self, greenAmount, default_return_value=True)  # dev: transfer failed
-
-#     # Calculate USDC to give
-#     # min(PriceDesk.getAssetAmount(USDC, greenAmount), greenAmount in USDC decimals)
-#     usdcFromPriceDesk: uint256 = staticcall PriceDesk(a.priceDesk).getAssetAmount(USDC, greenAmount, False)
-#     greenInUsdcDecimals: uint256 = greenAmount * ONE_USDC // ONE_GREEN
-#     usdcToGive: uint256 = min(usdcFromPriceDesk, greenInUsdcDecimals)
-
-#     assert usdcToGive > 0  # dev: zero redeem amount
-
-#     # Check and update interval limits (Underscore addresses bypass)
-#     if not isUnderscore:
-#         self._checkAndUpdateRedeemInterval(greenAmount)
-
-#     # Apply redeem fee
-#     feeAmount: uint256 = usdcToGive * self.redeemFee // HUNDRED_PERCENT
-#     usdcAfterFee: uint256 = usdcToGive - feeAmount
-
-#     # Ensure we have enough USDC (withdraw from yield if needed)
-#     self._ensureUsdcLiquidity(usdcAfterFee)
-
-#     # Transfer USDC to user
-#     assert extcall IERC20(USDC).transfer(msg.sender, usdcAfterFee, default_return_value=True)  # dev: transfer failed
-
-#     # Burn GREEN
-#     assert extcall GreenToken(a.greenToken).burn(greenAmount)  # dev: burn failed
-
-#     log RedeemGreen(msg.sender, greenAmount, usdcAfterFee, feeAmount)
-
-#     return usdcAfterFee
-
-# # ============================================
-# # Internal Helper Functions
-# # ============================================
+@view
+@internal
+def _getAvailableUsdc(_usdc: address, _legoId: uint256, _vaultToken: address, _missionControl: address) -> uint256:
+    underlyingAmount: uint256 = self._getUnderlyingYieldAmount(_legoId, _vaultToken, _missionControl)
+    return underlyingAmount + staticcall IERC20(_usdc).balanceOf(self)
 
 
+###############
+# Mint Config #
+###############
 
 
+# can mint
 
 
-# @internal
-# def _checkAndUpdateRedeemInterval(_amount: uint256):
-#     """
-#     @notice Check and update global redeem interval for rate limiting
-#     @param _amount Amount to redeem
-#     """
-#     globalInterval: IntervalBorrow = self.globalRedeemInterval
-#     availToRedeem: uint256 = 0
-#     isFreshInterval: bool = True
-
-#     # Check if in same interval or new interval
-#     if globalInterval.start != 0 and globalInterval.start + self.numBlocksPerInterval > block.number:
-#         # Still in same interval
-#         availToRedeem = self.maxIntervalRedeem - min(globalInterval.amount, self.maxIntervalRedeem)
-#         isFreshInterval = False
-#     else:
-#         # Fresh interval
-#         availToRedeem = self.maxIntervalRedeem
-
-#     assert _amount <= availToRedeem  # dev: exceeds max interval redeem
-
-#     # Update interval
-#     if isFreshInterval:
-#         self.globalRedeemInterval = IntervalBorrow(start=block.number, amount=_amount)
-#     else:
-#         self.globalRedeemInterval.amount += _amount
+@external
+def setCanMint(_canMint: bool):
+    assert not deptBasics.isPaused # dev: contract paused
+    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
+    assert _canMint != self.canMint # dev: no change
+    self.canMint = _canMint
+    log CanMintUpdated(_canMint)
 
 
-# @internal
-# def _withdrawFromYield(_amount: uint256) -> uint256:
-#     """
-#     @notice Withdraw USDC from yield position
-#     @param _amount Amount of USDC needed
-#     @return Actual amount of USDC withdrawn
-#     """
-#     if self.usdcYieldPosition.legoId == 0:
-#         return 0
+# mint fee
 
-#     if self.usdcYieldPosition.vaultToken == empty(address):
-#         return 0
 
-#     # Check vault token balance
-#     vaultTokenBalance: uint256 = staticcall IERC20(self.usdcYieldPosition.vaultToken).balanceOf(self)
-#     if vaultTokenBalance == 0:
-#         return 0
+@external
+def setMintFee(_fee: uint256):
+    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
+    assert _fee <= HUNDRED_PERCENT # dev: fee too high
+    self.mintFee = _fee
+    log MintFeeUpdated(_fee)
 
-#     # Get lego address
-#     a: addys.Addys = addys._getAddys(empty(addys.Addys))
-#     legoAddr: address = staticcall Registry(a.missionControl).getAddr(self.usdcYieldPosition.legoId)
-#     assert legoAddr != empty(address)  # dev: invalid lego
 
-#     # Approve vault token
-#     assert extcall IERC20(self.usdcYieldPosition.vaultToken).approve(legoAddr, vaultTokenBalance, default_return_value=True)
+# max interval mint
 
-#     # Withdraw from yield (withdraw all vault tokens, not specific amount)
-#     vaultTokenBurned: uint256 = 0
-#     underlyingAsset: address = empty(address)
-#     underlyingAmount: uint256 = 0
-#     txUsdValue: uint256 = 0
 
-#     vaultTokenBurned, underlyingAsset, underlyingAmount, txUsdValue = extcall UndyLego(legoAddr).withdrawFromYield(
-#         self.usdcYieldPosition.vaultToken,
-#         vaultTokenBalance,
-#         empty(bytes32),
-#         self
-#     )
+@external
+def setMaxIntervalMint(_max: uint256):
+    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
+    self.maxIntervalMint = _max
+    log MaxIntervalMintUpdated(_max)
 
-#     # Reset approval
-#     assert extcall IERC20(self.usdcYieldPosition.vaultToken).approve(legoAddr, 0, default_return_value=True)
 
-#     log YieldWithdraw(vaultTokenBurned, underlyingAmount)
+# enforce mint allowlist
 
-#     return underlyingAmount
 
-# @internal
-# def _ensureUsdcLiquidity(_amount: uint256):
-#     """
-#     @notice Ensure contract has enough USDC, withdraw from yield if needed
-#     @param _amount Amount of USDC needed
-#     """
-#     usdcBalance: uint256 = staticcall IERC20(USDC).balanceOf(self)
+@external
+def setShouldEnforceMintAllowlist(_enforce: bool):
+    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
+    self.shouldEnforceMintAllowlist = _enforce
+    log ShouldEnforceMintAllowlistUpdated(_enforce)
 
-#     if usdcBalance >= _amount:
-#         return
 
-#     # Need to withdraw from yield
-#     neededAmount: uint256 = _amount - usdcBalance
-#     withdrawnAmount: uint256 = self._withdrawFromYield(neededAmount)
+# update mint allowlist
 
-#     # Verify we now have enough
-#     usdcBalance = staticcall IERC20(USDC).balanceOf(self)
-#     assert usdcBalance >= _amount  # dev: insufficient USDC
 
-# # ============================================
-# # Governance Functions (Switchboard-only)
-# # ============================================
+@external
+def updateMintAllowlist(_user: address, _allowed: bool):
+    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
+    self.mintAllowlist[_user] = _allowed
+    log MintAllowlistUpdated(_user, _allowed)
 
-# @external
-# def setCanMint(_canMint: bool):
-#     """
-#     @notice Enable/disable minting
-#     @param _canMint New canMint value
-#     """
-#     assert addys._isSwitchboardAddr(msg.sender)  # dev: no perms
-#     self.canMint = _canMint
-#     log CanMintUpdated(_canMint)
 
-# @external
-# def setCanRedeem(_canRedeem: bool):
-#     """
-#     @notice Enable/disable redemptions
-#     @param _canRedeem New canRedeem value
-#     """
-#     assert addys._isSwitchboardAddr(msg.sender)  # dev: no perms
-#     self.canRedeem = _canRedeem
-#     log CanRedeemUpdated(_canRedeem)
+#################
+# Redeem Config #
+#################
 
-# @external
-# def setMintFee(_fee: uint256):
-#     """
-#     @notice Set mint fee
-#     @param _fee Fee in basis points (100_00 = 100%)
-#     """
-#     assert addys._isSwitchboardAddr(msg.sender)  # dev: no perms
-#     assert _fee <= HUNDRED_PERCENT  # dev: fee too high
-#     self.mintFee = _fee
-#     log MintFeeUpdated(_fee)
 
-# @external
-# def setRedeemFee(_fee: uint256):
-#     """
-#     @notice Set redeem fee
-#     @param _fee Fee in basis points (100_00 = 100%)
-#     """
-#     assert addys._isSwitchboardAddr(msg.sender)  # dev: no perms
-#     assert _fee <= HUNDRED_PERCENT  # dev: fee too high
-#     self.redeemFee = _fee
-#     log RedeemFeeUpdated(_fee)
+# can redeem
 
-# @external
-# def setMaxIntervalMint(_max: uint256):
-#     """
-#     @notice Set maximum mint amount per interval
-#     @param _max Maximum amount
-#     """
-#     assert addys._isSwitchboardAddr(msg.sender)  # dev: no perms
-#     self.maxIntervalMint = _max
-#     log MaxIntervalMintUpdated(_max)
 
-# @external
-# def setMaxIntervalRedeem(_max: uint256):
-#     """
-#     @notice Set maximum redeem amount per interval
-#     @param _max Maximum amount
-#     """
-#     assert addys._isSwitchboardAddr(msg.sender)  # dev: no perms
-#     self.maxIntervalRedeem = _max
-#     log MaxIntervalRedeemUpdated(_max)
+@external
+def setCanRedeem(_canRedeem: bool):
+    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
+    self.canRedeem = _canRedeem
+    log CanRedeemUpdated(_canRedeem)
 
-# @external
-# def setNumBlocksPerInterval(_blocks: uint256):
-#     """
-#     @notice Set interval duration in blocks
-#     @param _blocks Number of blocks per interval
-#     """
-#     assert addys._isSwitchboardAddr(msg.sender)  # dev: no perms
-#     assert _blocks > 0  # dev: invalid interval
-#     self.numBlocksPerInterval = _blocks
-#     log NumBlocksPerIntervalUpdated(_blocks)
 
-# @external
-# def setShouldEnforceMintAllowlist(_enforce: bool):
-#     """
-#     @notice Enable/disable mint allowlist enforcement
-#     @param _enforce Whether to enforce allowlist
-#     """
-#     assert addys._isSwitchboardAddr(msg.sender)  # dev: no perms
-#     self.shouldEnforceMintAllowlist = _enforce
-#     log ShouldEnforceMintAllowlistUpdated(_enforce)
+# redeem fee
 
-# @external
-# def setShouldEnforceRedeemAllowlist(_enforce: bool):
-#     """
-#     @notice Enable/disable redeem allowlist enforcement
-#     @param _enforce Whether to enforce allowlist
-#     """
-#     assert addys._isSwitchboardAddr(msg.sender)  # dev: no perms
-#     self.shouldEnforceRedeemAllowlist = _enforce
-#     log ShouldEnforceRedeemAllowlistUpdated(_enforce)
 
-# @external
-# def updateMintAllowlist(_user: address, _allowed: bool):
-#     """
-#     @notice Update mint allowlist for a user
-#     @param _user User address
-#     @param _allowed Whether user is allowed
-#     """
-#     assert addys._isSwitchboardAddr(msg.sender)  # dev: no perms
-#     self.mintAllowlist[_user] = _allowed
-#     log MintAllowlistUpdated(_user, _allowed)
+@external
+def setRedeemFee(_fee: uint256):
+    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
+    assert _fee <= HUNDRED_PERCENT # dev: fee too high
+    self.redeemFee = _fee
+    log RedeemFeeUpdated(_fee)
 
-# @external
-# def updateRedeemAllowlist(_user: address, _allowed: bool):
-#     """
-#     @notice Update redeem allowlist for a user
-#     @param _user User address
-#     @param _allowed Whether user is allowed
-#     """
-#     assert addys._isSwitchboardAddr(msg.sender)  # dev: no perms
-#     self.redeemAllowlist[_user] = _allowed
-#     log RedeemAllowlistUpdated(_user, _allowed)
 
-# @external
-# def setUsdcYieldPosition(_legoId: uint256, _vaultToken: address):
-#     """
-#     @notice Configure USDC yield position
-#     @param _legoId Lego ID for yield
-#     @param _vaultToken Vault token address
-#     """
-#     assert addys._isSwitchboardAddr(msg.sender)  # dev: no perms
-#     self.usdcYieldPosition = UsdcYieldPosition(legoId=_legoId, vaultToken=_vaultToken)
-#     log UsdcYieldPositionUpdated(_legoId, _vaultToken)
+# max interval redeem
 
-# @external
-# def withdrawFees(_recipient: address, _amount: uint256):
-#     """
-#     @notice Withdraw accumulated fees
-#     @param _recipient Recipient address
-#     @param _amount Amount to withdraw (max_value for all)
-#     """
-#     assert addys._isSwitchboardAddr(msg.sender)  # dev: no perms
-#     assert _recipient != empty(address)  # dev: zero address
 
-#     amount: uint256 = _amount
-#     if _amount == max_value(uint256):
-#         amount = staticcall IERC20(USDC).balanceOf(self)
+@external
+def setMaxIntervalRedeem(_max: uint256):
+    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
+    self.maxIntervalRedeem = _max
+    log MaxIntervalRedeemUpdated(_max)
 
-#     assert amount > 0  # dev: zero amount
-#     assert extcall IERC20(USDC).transfer(_recipient, amount, default_return_value=True)  # dev: transfer failed
 
-#     log FeesWithdrawn(_recipient, amount)
+# enforce redeem allowlist
+
+
+@external
+def setShouldEnforceRedeemAllowlist(_enforce: bool):
+    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
+    self.shouldEnforceRedeemAllowlist = _enforce
+    log ShouldEnforceRedeemAllowlistUpdated(_enforce)
+
+
+# update redeem allowlist
+
+
+@external
+def updateRedeemAllowlist(_user: address, _allowed: bool):
+    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
+    self.redeemAllowlist[_user] = _allowed
+    log RedeemAllowlistUpdated(_user, _allowed)
+
+
+##################
+# General Config #
+##################
+
+
+# set yield position
+
+
+@external
+def setUsdcYieldPosition(_legoId: uint256, _vaultToken: address):
+    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
+    self.usdcYieldPosition = UsdcYieldPosition(legoId=_legoId, vaultToken=_vaultToken)
+    log UsdcYieldPositionUpdated(_legoId, _vaultToken)
+
+
+# num blocks per interval
+
+
+@external
+def setNumBlocksPerInterval(_blocks: uint256):
+    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
+    assert _blocks > 0 # dev: invalid interval
+    self.numBlocksPerInterval = _blocks
+    log NumBlocksPerIntervalUpdated(_blocks)
