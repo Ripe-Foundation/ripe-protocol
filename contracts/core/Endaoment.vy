@@ -727,12 +727,12 @@ def _addLiquidity(
     _pool: address,
     _tokenA: address,
     _tokenB: address,
-    _amountA: uint256 = max_value(uint256),
-    _amountB: uint256 = max_value(uint256),
-    _minAmountA: uint256 = 0,
-    _minAmountB: uint256 = 0,
-    _minLpAmount: uint256 = 0,
-    _extraData: bytes32 = empty(bytes32),
+    _amountA: uint256,
+    _amountB: uint256,
+    _minAmountA: uint256,
+    _minAmountB: uint256,
+    _minLpAmount: uint256,
+    _extraData: bytes32,
 ) -> (address, uint256, uint256, uint256, uint256):
     legoAddr: address = self._getLegoAddr(_legoId)
     endaoFunds: address = addys._getEndaomentFundsAddr()
@@ -799,10 +799,10 @@ def _removeLiquidity(
     _tokenA: address,
     _tokenB: address,
     _lpToken: address,
-    _lpAmount: uint256 = max_value(uint256),
-    _minAmountA: uint256 = 0,
-    _minAmountB: uint256 = 0,
-    _extraData: bytes32 = empty(bytes32),
+    _lpAmount: uint256,
+    _minAmountA: uint256,
+    _minAmountB: uint256,
+    _extraData: bytes32,
 ) -> (uint256, uint256, uint256, uint256):
     legoAddr: address = self._getLegoAddr(_legoId)
     endaoFunds: address = addys._getEndaomentFundsAddr()
@@ -975,11 +975,16 @@ def stabilizeGreenRefPool() -> bool:
     assert not deptBasics.isPaused # dev: contract paused
     assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
     a: addys.Addys = addys._getAddys()
+    endaoFunds: address = addys._getEndaomentFundsAddr()
 
     curvePrices: address = staticcall PriceDesk(a.priceDesk).getAddr(CURVE_PRICES_ID)
     data: StabilizerConfig = staticcall CurvePrices(curvePrices).getGreenStabilizerConfig()
     if data.pool == empty(address) or data.greenBalance == 0:
         return False
+
+    # pull LP and Green from vault
+    self._prepareEndaomentFunds(data.lpToken, max_value(uint256), endaoFunds)
+    self._prepareEndaomentFunds(a.greenToken, max_value(uint256), endaoFunds)
 
     # current profits
     lpBalance: uint256 = staticcall IERC20(data.lpToken).balanceOf(self)
@@ -1000,6 +1005,15 @@ def stabilizeGreenRefPool() -> bool:
     poolDebt = staticcall Ledger(a.ledger).greenPoolDebt(data.pool)
     newProfit: uint256 = self._calcProfitForStabilizer(data.pool, lpBalance, leftoverGreen, poolDebt)
     assert newProfit >= initialProfit # dev: stabilizer was not profitable
+
+    # transfer LP and Green back to vault
+    lpBalance = staticcall IERC20(data.lpToken).balanceOf(self)
+    if lpBalance != 0:
+        assert extcall IERC20(data.lpToken).transfer(endaoFunds, lpBalance, default_return_value = True) # dev: transfer failed
+
+    leftoverGreen = staticcall IERC20(a.greenToken).balanceOf(self)
+    if leftoverGreen != 0:
+        assert extcall IERC20(a.greenToken).transfer(endaoFunds, leftoverGreen, default_return_value = True) # dev: transfer failed
 
     return didAdjust
 
@@ -1072,7 +1086,7 @@ def getGreenAmountToAddInStabilizer() -> uint256:
     if data.pool == empty(address) or data.greenBalance == 0:
         return 0
     poolDebt: uint256 = staticcall Ledger(addys._getLedgerAddr()).greenPoolDebt(data.pool)
-    leftoverGreen: uint256 = staticcall IERC20(addys._getGreenToken()).balanceOf(self)
+    leftoverGreen: uint256 = staticcall IERC20(addys._getGreenToken()).balanceOf(addys._getEndaomentFundsAddr())
     return self._getGreenAmountToAdd(poolDebt, leftoverGreen, data)
 
 
@@ -1139,7 +1153,7 @@ def getGreenAmountToRemoveInStabilizer() -> uint256:
     data: StabilizerConfig = staticcall CurvePrices(curvePrices).getGreenStabilizerConfig()
     if data.pool == empty(address) or data.greenBalance == 0:
         return 0
-    lpBalance: uint256 = staticcall IERC20(data.lpToken).balanceOf(self)
+    lpBalance: uint256 = staticcall IERC20(data.lpToken).balanceOf(addys._getEndaomentFundsAddr())
     poolDebt: uint256 = staticcall Ledger(addys._getLedgerAddr()).greenPoolDebt(data.pool)
     return self._getGreenAmountToRemove(lpBalance, poolDebt, data)
 
@@ -1189,7 +1203,7 @@ def mintPartnerLiquidity(_partner: address, _asset: address, _amount: uint256 = 
     partnerAmount: uint256 = 0
     usdValue: uint256 = 0
     greenMinted: uint256 = 0
-    partnerAmount, usdValue, greenMinted = self._mintPartnerLiquidity(_partner, _asset, _amount, a.priceDesk, a.greenToken)
+    partnerAmount, usdValue, greenMinted = self._mintPartnerLiquidity(_partner, _asset, _amount, a.priceDesk, a.greenToken, addys._getEndaomentFundsAddr())
     log PartnerLiquidityMinted(partner=_partner, asset=_asset, partnerAmount=partnerAmount, usdValue=usdValue, greenMinted=greenMinted)
     return greenMinted
 
@@ -1206,26 +1220,36 @@ def addPartnerLiquidity(
     assert not deptBasics.isPaused # dev: contract paused
     assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
     a: addys.Addys = addys._getAddys()
+    endaoFunds: address = addys._getEndaomentFundsAddr()
 
     # mint green
     partnerAmount: uint256 = 0
     greenAmount: uint256 = 0
     greenMinted: uint256 = 0
-    partnerAmount, greenAmount, greenMinted = self._mintPartnerLiquidity(_partner, _asset, _amount, a.priceDesk, a.greenToken)
+    partnerAmount, greenAmount, greenMinted = self._mintPartnerLiquidity(_partner, _asset, _amount, a.priceDesk, a.greenToken, endaoFunds)
 
-    # add liquidity
+    # add liquidity (LP goes to vault)
     lpToken: address = empty(address)
     lpAmountReceived: uint256 = 0
     liqAmountA: uint256 = 0
     liqAmountB: uint256 = 0
     usdValue: uint256 = 0
-    lpToken, lpAmountReceived, liqAmountA, liqAmountB, usdValue = self._addLiquidity(_legoId, _pool, _asset, a.greenToken, partnerAmount, greenAmount, 0, 0, _minLpAmount)
+    lpToken, lpAmountReceived, liqAmountA, liqAmountB, usdValue = self._addLiquidity(_legoId, _pool, _asset, a.greenToken, partnerAmount, greenAmount, 0, 0, _minLpAmount, empty(bytes32))
 
-    # share lp balance with partner
+    # pull LP from vault to split with partner
+    self._prepareEndaomentFunds(lpToken, max_value(uint256), endaoFunds)
     lpBalance: uint256 = staticcall IERC20(lpToken).balanceOf(self)
     assert lpBalance != 0 # dev: no liquidity added
-    if _partner != self:
-        assert extcall IERC20(lpToken).transfer(_partner, lpBalance // 2, default_return_value=True) # dev: could not transfer
+
+    # transfer partner's half
+    partnerShare: uint256 = lpBalance // 2
+    if _partner != self and partnerShare != 0:
+        assert extcall IERC20(lpToken).transfer(_partner, partnerShare, default_return_value=True) # dev: could not transfer
+
+    # transfer vault's half back to vault
+    vaultShare: uint256 = lpBalance - partnerShare
+    if vaultShare != 0:
+        assert extcall IERC20(lpToken).transfer(endaoFunds, vaultShare, default_return_value=True) # dev: transfer failed
 
     # add pool debt
     if greenMinted != 0:
@@ -1245,22 +1269,23 @@ def _mintPartnerLiquidity(
     _amount: uint256,
     _priceDesk: address,
     _greenToken: address,
+    _endaoFunds: address,
 ) -> (uint256, uint256, uint256):
     partnerAmount: uint256 = min(_amount, staticcall IERC20(_asset).balanceOf(_partner))
     assert partnerAmount != 0 # dev: no asset to add
 
     if _partner != self:
-        assert extcall IERC20(_asset).transferFrom(_partner, self, partnerAmount, default_return_value=True) # dev: transfer failed
+        assert extcall IERC20(_asset).transferFrom(_partner, _endaoFunds, partnerAmount, default_return_value=True) # dev: transfer failed
 
     usdValue: uint256 = staticcall PriceDesk(_priceDesk).getUsdValue(_asset, partnerAmount, True)
     assert usdValue != 0 # dev: invalid asset
 
-    # mint green (if needed)
-    greenAvail: uint256 = staticcall IERC20(_greenToken).balanceOf(self)
+    greenAvail: uint256 = staticcall IERC20(_greenToken).balanceOf(_endaoFunds)
     newMinted: uint256 = 0
     if usdValue > greenAvail:
         newMinted = usdValue - greenAvail
         extcall GreenToken(_greenToken).mint(self, newMinted)
+        assert extcall IERC20(_greenToken).transfer(_endaoFunds, newMinted, default_return_value = True) # dev: transfer failed
 
     return partnerAmount, usdValue, newMinted
 
@@ -1275,12 +1300,22 @@ def repayPoolDebt(_pool: address, _amount: uint256 = max_value(uint256)) -> bool
     assert not deptBasics.isPaused # dev: contract paused
     assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
     a: addys.Addys = addys._getAddys()
+    endaoFunds: address = addys._getEndaomentFundsAddr()
+
+    # pull Green from vault if needed
+    self._prepareEndaomentFunds(a.greenToken, _amount, endaoFunds)
 
     greenAvail: uint256 = min(_amount, staticcall IERC20(a.greenToken).balanceOf(self))
     repayAmount: uint256 = min(greenAvail, staticcall Ledger(a.ledger).greenPoolDebt(_pool))
     assert repayAmount != 0 # dev: no debt to repay
 
     self._repayPoolDebt(_pool, repayAmount, a.greenToken, a.ledger)
+
+    # transfer leftover Green back to vault
+    leftoverGreen: uint256 = staticcall IERC20(a.greenToken).balanceOf(self)
+    if leftoverGreen != 0:
+        assert extcall IERC20(a.greenToken).transfer(endaoFunds, leftoverGreen, default_return_value = True)
+
     log PoolDebtRepaid(pool=_pool, amount=repayAmount)
     return True
 

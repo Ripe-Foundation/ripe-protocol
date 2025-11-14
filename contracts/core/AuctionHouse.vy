@@ -645,7 +645,7 @@ def _swapWithSpecificStabPool(
         return remainingToRepay, collateralValueOut, False, False # can't get price
 
     # where to move stab asset
-    stabProceedsAddr: address = _a.endaoment # non-green assets, move to Endaoment
+    stabProceedsAddr: address = addys._getEndaomentFundsAddr() # non-green assets, move to endaoment funds
     if _stabPool.asset in [_a.greenToken, _a.savingsGreen]:
         stabProceedsAddr = empty(address)
 

@@ -788,7 +788,7 @@ def _transferToEndaoment(
     collateralUsdValueSent: uint256 = 0
     collateralAmountSent: uint256 = 0
     isPositionDepleted: bool = False
-    collateralUsdValueSent, collateralAmountSent, isPositionDepleted = self._transferCollateral(_user, _a.endaoment, _vaultAddr, _asset, _remainingToRepay, _a)
+    collateralUsdValueSent, collateralAmountSent, isPositionDepleted = self._transferCollateral(_user, addys._getEndaomentFundsAddr(), _vaultAddr, _asset, _remainingToRepay, _a)
     if collateralUsdValueSent == 0:
         return _remainingToRepay
 
