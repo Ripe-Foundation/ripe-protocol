@@ -1036,6 +1036,19 @@ def getGreenAmountToRemoveInStabilizer() -> uint256:
 
 
 @view
+@external
+def calcProfitForStabilizer() -> uint256:
+    a: addys.Addys = addys._getAddys()
+    endaoFunds: address = addys._getEndaomentFundsAddr()
+    curvePrices: address = staticcall PriceDesk(a.priceDesk).getAddr(CURVE_PRICES_ID)
+    data: StabilizerConfig = staticcall CurvePrices(curvePrices).getGreenStabilizerConfig()
+    lpBalance: uint256 = staticcall IERC20(data.lpToken).balanceOf(endaoFunds)
+    leftoverGreen: uint256 = staticcall IERC20(a.greenToken).balanceOf(endaoFunds)
+    poolDebt: uint256 = staticcall Ledger(a.ledger).greenPoolDebt(data.pool)
+    return self._calcProfitForStabilizer(data.pool, lpBalance, leftoverGreen, poolDebt)
+
+
+@view
 @internal
 def _calcProfitForStabilizer(
     _pool: address,

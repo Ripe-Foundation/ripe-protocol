@@ -1132,7 +1132,6 @@ def test_endao_add_partner_liquidity_multiple_partners(
     endaoment,
     deployed_green_pool,
     switchboard_delta,
-    green_token,
     alice,
     bob,
     usdc_token,
@@ -1269,7 +1268,6 @@ def test_endao_mint_partner_liquidity_self_max_amount(
     endaoment,
     switchboard_delta,
     usdc_token,
-    green_token,
     fork,
     mock_price_source,
     _test,
@@ -1369,7 +1367,6 @@ def test_endao_add_partner_liquidity_self_max_amount(
     endaoment_funds,
     deployed_green_pool,
     switchboard_delta,
-    green_token,
     usdc_token,
     fork,
     ledger,
@@ -1483,14 +1480,24 @@ def test_endao_add_partner_liquidity_self_insufficient_balance(
 def test_green_stabilizer_profit_never_decreases_on_add(
     setGreenRefConfig,
     endaoment,
+    endaoment_funds,
     deployed_green_pool,
     switchboard_delta,
     green_token,
     usdc_token,
     fork,
     ledger,
+    addSeedGreenLiq,
 ):
-    """Test that profit never decreases when adding green liquidity"""
+    """Test that profit never decreases when adding green liquidity
+
+    This test verifies a critical invariant: when the stabilizer adds green liquidity
+    to rebalance the pool, the net profit position should never decrease.
+
+    Profit is calculated as: (LP balance - LP debt equivalent) + net green balance
+    Where LP debt is derived from (pool debt - green balance) / virtual price
+    """
+    addSeedGreenLiq()
     setGreenRefConfig(_stabilizerAdjustWeight=100_00)
     green_pool = boa.env.lookup_contract(deployed_green_pool)
     usdc_whale = WHALES[fork]["usdc"]
@@ -1500,26 +1507,36 @@ def test_green_stabilizer_profit_never_decreases_on_add(
     usdc_token.transfer(endaoment, usdc_add_amount, sender=usdc_whale)
     usdc_token.approve(green_pool.address, usdc_add_amount, sender=endaoment.address)
 
-    amounts = [0, usdc_add_amount]
+    amounts = [usdc_add_amount, 0]
     green_pool.add_liquidity(amounts, 0, sender=endaoment.address)
 
-    # Get initial profit
-    initial_profit = ledger.profit()
+    # Calculate initial profit using the new view function
+    initial_profit = endaoment.calcProfitForStabilizer()
+    initial_lp = green_pool.balanceOf(endaoment_funds)
+    initial_green = green_token.balanceOf(endaoment_funds)
+    initial_debt = ledger.greenPoolDebt(green_pool)
 
     # Run stabilizer to add green
     endaoment.stabilizeGreenRefPool(sender=switchboard_delta.address)
 
-    # Get new profit
-    new_profit = ledger.profit()
+    # Calculate new profit
+    new_profit = endaoment.calcProfitForStabilizer()
+    new_lp = green_pool.balanceOf(endaoment_funds)
+    new_green = green_token.balanceOf(endaoment_funds)
+    new_debt = ledger.greenPoolDebt(green_pool)
 
-    # CRITICAL INVARIANT: Profit should never decrease
-    assert new_profit >= initial_profit, f"Profit decreased! Initial: {initial_profit}, New: {new_profit}"
+    # CRITICAL INVARIANT: Profit should never decrease when stabilizing
+    assert new_profit >= initial_profit, \
+        f"Profit decreased! Initial: {initial_profit}, New: {new_profit}, " \
+        f"LP change: {new_lp - initial_lp}, Green change: {new_green - initial_green}, " \
+        f"Debt change: {new_debt - initial_debt}"
 
 
 @pytest.base
 def test_green_stabilizer_profit_never_decreases_on_remove(
     setGreenRefConfig,
     endaoment,
+    endaoment_funds,
     deployed_green_pool,
     switchboard_delta,
     green_token,
@@ -1527,17 +1544,27 @@ def test_green_stabilizer_profit_never_decreases_on_remove(
     fork,
     whale,
     ledger,
+    addSeedGreenLiq,
 ):
-    """Test that profit never decreases when removing green liquidity"""
+    """Test that profit never decreases when removing green liquidity
+
+    This test verifies that when the stabilizer removes green liquidity (and potentially
+    repays debt), the net profit position should never decrease. This is important because
+    removing liquidity can repay debt, which should improve or maintain the profit position.
+    """
+    addSeedGreenLiq()
     setGreenRefConfig(_stabilizerAdjustWeight=100_00)
     green_pool = boa.env.lookup_contract(deployed_green_pool)
 
     # First create pool debt by adding partner liquidity
     usdc_whale = WHALES[fork]["usdc"]
     usdc_amount = 10_000 * (10 ** usdc_token.decimals())
-    usdc_token.transfer(endaoment, usdc_amount, sender=usdc_whale)
-
     partner = boa.env.generate_address()
+
+    # Transfer to partner and approve endaoment
+    usdc_token.transfer(partner, usdc_amount, sender=usdc_whale)
+    usdc_token.approve(endaoment, usdc_amount, sender=partner)
+
     endaoment.addPartnerLiquidity(10, green_pool, partner, usdc_token, usdc_amount, 0, sender=switchboard_delta.address)
 
     # Create imbalance by adding green to pool (pool will have more green than USDC)
@@ -1545,20 +1572,29 @@ def test_green_stabilizer_profit_never_decreases_on_remove(
     green_token.transfer(endaoment, green_add_amount, sender=whale)
     green_token.approve(green_pool.address, green_add_amount, sender=endaoment.address)
 
-    amounts = [green_add_amount, 0]
+    amounts = [0, green_add_amount]
     green_pool.add_liquidity(amounts, 0, sender=endaoment.address)
 
-    # Get initial profit
-    initial_profit = ledger.profit()
+    # Calculate initial profit
+    initial_profit = endaoment.calcProfitForStabilizer()
+    initial_lp = green_pool.balanceOf(endaoment_funds)
+    initial_green = green_token.balanceOf(endaoment_funds)
+    initial_debt = ledger.greenPoolDebt(green_pool)
 
-    # Run stabilizer to remove green
+    # Run stabilizer to remove green (and potentially repay debt)
     endaoment.stabilizeGreenRefPool(sender=switchboard_delta.address)
 
-    # Get new profit
-    new_profit = ledger.profit()
+    # Calculate new profit
+    new_profit = endaoment.calcProfitForStabilizer()
+    new_lp = green_pool.balanceOf(endaoment_funds)
+    new_green = green_token.balanceOf(endaoment_funds)
+    new_debt = ledger.greenPoolDebt(green_pool)
 
-    # CRITICAL INVARIANT: Profit should never decrease
-    assert new_profit >= initial_profit, f"Profit decreased! Initial: {initial_profit}, New: {new_profit}"
+    # CRITICAL INVARIANT: Profit should never decrease, especially when repaying debt
+    assert new_profit >= initial_profit, \
+        f"Profit decreased! Initial: {initial_profit}, New: {new_profit}, " \
+        f"LP change: {new_lp - initial_lp}, Green change: {new_green - initial_green}, " \
+        f"Debt change: {new_debt - initial_debt}"
 
 
 @pytest.base
@@ -1569,9 +1605,15 @@ def test_green_stabilizer_profit_with_extreme_imbalance(
     switchboard_delta,
     usdc_token,
     fork,
-    ledger,
+    addSeedGreenLiq,
 ):
-    """Test profit invariant with extreme pool imbalance (>80% one side)"""
+    """Test profit invariant with extreme pool imbalance (>80% one side)
+
+    This is a stress test to ensure the profit invariant holds even when the pool
+    is severely imbalanced. In extreme conditions, slippage and price impact are high,
+    but the stabilizer should still maintain or improve the profit position.
+    """
+    addSeedGreenLiq()
     setGreenRefConfig(_stabilizerAdjustWeight=100_00)
     green_pool = boa.env.lookup_contract(deployed_green_pool)
     usdc_whale = WHALES[fork]["usdc"]
@@ -1581,28 +1623,34 @@ def test_green_stabilizer_profit_with_extreme_imbalance(
     usdc_token.transfer(endaoment, extreme_amount, sender=usdc_whale)
     usdc_token.approve(green_pool.address, extreme_amount, sender=endaoment.address)
 
-    amounts = [0, extreme_amount]
+    amounts = [extreme_amount, 0]
     green_pool.add_liquidity(amounts, 0, sender=endaoment.address)
 
-    # Check pool ratio
+    # Check pool ratio (index 0 is USDC, index 1 is GREEN in amounts array)
+    # But get_balances() might return them differently, so let's calculate correctly
     balances = green_pool.get_balances()
-    total = balances[0] + balances[1]
-    usdc_percentage = (balances[1] * 100) // total
+    # Normalize to 18 decimals for comparison
+    usdc_normalized = balances[0] * EIGHTEEN_DECIMALS // (10 ** usdc_token.decimals())
+    green_normalized = balances[1]
+    total = usdc_normalized + green_normalized
+    usdc_percentage = (usdc_normalized * 100) // total if total > 0 else 0
 
     # Verify we have extreme imbalance
-    assert usdc_percentage > 80, f"Not extreme enough: {usdc_percentage}%"
+    assert usdc_percentage > 80, f"Not extreme enough: {usdc_percentage}% USDC (balances: {balances[0]} USDC, {balances[1]} GREEN)"
 
-    # Get initial profit
-    initial_profit = ledger.profit()
+    # Calculate initial profit
+    initial_profit = endaoment.calcProfitForStabilizer()
 
-    # Run stabilizer
+    # Run stabilizer on extremely imbalanced pool
     endaoment.stabilizeGreenRefPool(sender=switchboard_delta.address)
 
-    # Get new profit
-    new_profit = ledger.profit()
+    # Calculate new profit
+    new_profit = endaoment.calcProfitForStabilizer()
 
-    # Even with extreme imbalance, profit should not decrease
-    assert new_profit >= initial_profit
+    # Even with extreme imbalance and high slippage, profit should not decrease
+    assert new_profit >= initial_profit, \
+        f"Profit decreased with extreme imbalance! Initial: {initial_profit}, New: {new_profit}, " \
+        f"Pool imbalance: {usdc_percentage}% USDC"
 
 
 ###################################
@@ -1627,9 +1675,12 @@ def test_pool_debt_multiple_operations(
     # Add partner liquidity 3 times
     for i in range(3):
         usdc_amount = 5_000 * (10 ** usdc_token.decimals())
-        usdc_token.transfer(endaoment, usdc_amount, sender=usdc_whale)
-
         partner = boa.env.generate_address()
+
+        # Transfer to partner and approve endaoment
+        usdc_token.transfer(partner, usdc_amount, sender=usdc_whale)
+        usdc_token.approve(endaoment, usdc_amount, sender=partner)
+
         endaoment.addPartnerLiquidity(10, green_pool, partner, usdc_token, usdc_amount, 0, sender=switchboard_delta.address)
 
     # Total debt should be ~3 * 5000 GREEN (in 18 decimals)
@@ -1661,9 +1712,12 @@ def test_pool_debt_repayment_reduces_debt(
 
     # Create initial debt
     usdc_amount = 10_000 * (10 ** usdc_token.decimals())
-    usdc_token.transfer(endaoment, usdc_amount, sender=usdc_whale)
-
     partner = boa.env.generate_address()
+
+    # Transfer to partner and approve endaoment
+    usdc_token.transfer(partner, usdc_amount, sender=usdc_whale)
+    usdc_token.approve(endaoment, usdc_amount, sender=partner)
+
     endaoment.addPartnerLiquidity(10, green_pool, partner, usdc_token, usdc_amount, 0, sender=switchboard_delta.address)
 
     initial_debt = ledger.greenPoolDebt(green_pool)
@@ -1690,6 +1744,7 @@ def test_pool_debt_repayment_reduces_debt(
 @pytest.base
 def test_pool_debt_cannot_over_repay(
     endaoment,
+    endaoment_funds,
     deployed_green_pool,
     switchboard_delta,
     green_token,
@@ -1699,38 +1754,46 @@ def test_pool_debt_cannot_over_repay(
     ledger,
     _test,
 ):
-    """Test that repaying more than debt only reduces debt to zero"""
+    """Test that repaying more than debt only reduces debt to zero
+
+    repayPoolDebt() pulls green from endaoment_funds, burns only up to the debt amount,
+    and returns any leftover green back to endaoment_funds.
+    """
     green_pool = boa.env.lookup_contract(deployed_green_pool)
     usdc_whale = WHALES[fork]["usdc"]
 
     # Create debt
     usdc_amount = 5_000 * (10 ** usdc_token.decimals())
-    usdc_token.transfer(endaoment, usdc_amount, sender=usdc_whale)
-
     partner = boa.env.generate_address()
+
+    # Transfer to partner and approve endaoment
+    usdc_token.transfer(partner, usdc_amount, sender=usdc_whale)
+    usdc_token.approve(endaoment, usdc_amount, sender=partner)
+
     endaoment.addPartnerLiquidity(10, green_pool, partner, usdc_token, usdc_amount, 0, sender=switchboard_delta.address)
 
     debt = ledger.greenPoolDebt(green_pool)
     assert debt > 0
 
-    # Try to repay more than debt
+    # Try to repay more than debt - transfer to endaoment_funds (where assets are stored)
     excessive_repay = debt * 2
-    green_token.transfer(endaoment, excessive_repay, sender=whale)
+    green_token.transfer(endaoment_funds, excessive_repay, sender=whale)
 
-    initial_green_balance = green_token.balanceOf(endaoment)
+    initial_green_balance = green_token.balanceOf(endaoment_funds)
 
-    # Repay excessive amount
-    actual_repaid = endaoment.repayPoolDebt(green_pool, excessive_repay, sender=switchboard_delta.address)
+    # Repay excessive amount - contract will only burn up to debt amount
+    success = endaoment.repayPoolDebt(green_pool, excessive_repay, sender=switchboard_delta.address)
 
-    # Should only repay actual debt amount
-    _test(actual_repaid, debt)
+    # Should succeed
+    assert success
 
     # Debt should be zero
     assert ledger.greenPoolDebt(green_pool) == 0
 
-    # Only the actual debt should have been transferred
-    green_used = initial_green_balance - green_token.balanceOf(endaoment)
-    _test(green_used, debt)
+    # Only the actual debt should have been burned, rest should remain in endaoment_funds
+    final_green_balance = green_token.balanceOf(endaoment_funds)
+    green_burned = initial_green_balance - final_green_balance
+    _test(debt, green_burned)
 
 
 @pytest.base
@@ -1744,17 +1807,22 @@ def test_pool_debt_integrity_during_stabilizer_remove(
     fork,
     whale,
     ledger,
+    addSeedGreenLiq,
 ):
     """Test that debt is properly repaid during green removal"""
+    addSeedGreenLiq()
     setGreenRefConfig(_stabilizerAdjustWeight=100_00)
     green_pool = boa.env.lookup_contract(deployed_green_pool)
     usdc_whale = WHALES[fork]["usdc"]
 
     # Create debt via partner liquidity
     usdc_amount = 10_000 * (10 ** usdc_token.decimals())
-    usdc_token.transfer(endaoment, usdc_amount, sender=usdc_whale)
-
     partner = boa.env.generate_address()
+
+    # Transfer to partner and approve endaoment
+    usdc_token.transfer(partner, usdc_amount, sender=usdc_whale)
+    usdc_token.approve(endaoment, usdc_amount, sender=partner)
+
     endaoment.addPartnerLiquidity(10, green_pool, partner, usdc_token, usdc_amount, 0, sender=switchboard_delta.address)
 
     initial_debt = ledger.greenPoolDebt(green_pool)
@@ -1765,7 +1833,7 @@ def test_pool_debt_integrity_during_stabilizer_remove(
     green_token.transfer(endaoment, green_add_amount, sender=whale)
     green_token.approve(green_pool.address, green_add_amount, sender=endaoment.address)
 
-    amounts = [green_add_amount, 0]
+    amounts = [0, green_add_amount]
     green_pool.add_liquidity(amounts, 0, sender=endaoment.address)
 
     # Run stabilizer to remove green (which should repay debt)
@@ -1792,48 +1860,65 @@ def test_stabilizer_add_then_remove_sequence(
     fork,
     whale,
     ledger,
+    addSeedGreenLiq,
 ):
-    """Test stabilizer operation sequence: add → remove"""
+    """Test stabilizer operation sequence: add → remove
+
+    This test verifies that profit never decreases through a full sequence of stabilizer
+    operations: adding green to rebalance, then removing green to rebalance in the opposite
+    direction. This tests the cumulative effect of multiple stabilizer actions.
+    """
+    addSeedGreenLiq()
     setGreenRefConfig(_stabilizerAdjustWeight=100_00)
     green_pool = boa.env.lookup_contract(deployed_green_pool)
     usdc_whale = WHALES[fork]["usdc"]
 
     # First create pool debt
     usdc_amount = 10_000 * (10 ** usdc_token.decimals())
-    usdc_token.transfer(endaoment, usdc_amount, sender=usdc_whale)
     partner = boa.env.generate_address()
+
+    # Transfer to partner and approve endaoment
+    usdc_token.transfer(partner, usdc_amount, sender=usdc_whale)
+    usdc_token.approve(endaoment, usdc_amount, sender=partner)
+
     endaoment.addPartnerLiquidity(10, green_pool, partner, usdc_token, usdc_amount, 0, sender=switchboard_delta.address)
 
     # Record initial state
-    initial_profit = ledger.profit()
+    initial_profit = endaoment.calcProfitForStabilizer()
     initial_debt = ledger.greenPoolDebt(green_pool)
 
     # Step 1: Create imbalance (more USDC) and add green
     usdc_add_amount = 30_000 * (10 ** usdc_token.decimals())
     usdc_token.transfer(endaoment, usdc_add_amount, sender=usdc_whale)
     usdc_token.approve(green_pool.address, usdc_add_amount, sender=endaoment.address)
-    amounts = [0, usdc_add_amount]
+    amounts = [usdc_add_amount, 0]
     green_pool.add_liquidity(amounts, 0, sender=endaoment.address)
 
     endaoment.stabilizeGreenRefPool(sender=switchboard_delta.address)
 
-    after_add_profit = ledger.profit()
+    # Check profit and debt after adding
+    after_add_profit = endaoment.calcProfitForStabilizer()
     after_add_debt = ledger.greenPoolDebt(green_pool)
 
     # Step 2: Create opposite imbalance (more green) and remove
     green_add_amount = 40_000 * EIGHTEEN_DECIMALS
     green_token.transfer(endaoment, green_add_amount, sender=whale)
     green_token.approve(green_pool.address, green_add_amount, sender=endaoment.address)
-    amounts2 = [green_add_amount, 0]
+    amounts2 = [0, green_add_amount]
     green_pool.add_liquidity(amounts2, 0, sender=endaoment.address)
 
     endaoment.stabilizeGreenRefPool(sender=switchboard_delta.address)
 
-    final_profit = ledger.profit()
+    # Check final profit and debt after removing
+    final_profit = endaoment.calcProfitForStabilizer()
     final_debt = ledger.greenPoolDebt(green_pool)
 
-    # Verify invariants throughout
-    assert after_add_profit >= initial_profit
-    assert final_profit >= after_add_profit
-    assert after_add_debt >= initial_debt  # Adding green increases debt
-    assert final_debt <= after_add_debt  # Removing green repays debt
+    # Verify profit invariants throughout the sequence
+    assert after_add_profit >= initial_profit, \
+        f"Profit decreased after adding! Initial: {initial_profit}, After add: {after_add_profit}"
+    assert final_profit >= after_add_profit, \
+        f"Profit decreased after removing! After add: {after_add_profit}, Final: {final_profit}"
+
+    # Verify debt behavior
+    assert after_add_debt >= initial_debt, "Adding green should increase debt"
+    assert final_debt <= after_add_debt, "Removing green should repay debt"
