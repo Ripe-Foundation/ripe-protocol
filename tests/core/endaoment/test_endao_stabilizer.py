@@ -144,6 +144,7 @@ def setup_mock_undy_v2(mock_undy_v2):
 def test_endao_stabilizer_add_green(
     setGreenRefConfig,
     endaoment,
+    endaoment_funds,
     curve_prices,
     addSeedGreenLiq,
     swapUsdcForGreen,
@@ -182,13 +183,14 @@ def test_endao_stabilizer_add_green(
     assert ledger.greenPoolDebt(green_pool) == log.poolDebtAdded
 
     # test lp balance
-    assert green_pool.balanceOf(endaoment) == log.lpReceived
+    assert green_pool.balanceOf(endaoment_funds) == log.lpReceived
 
 
 @pytest.base
 def test_endao_stabilizer_remove_green(
     setGreenRefConfig,
     endaoment,
+    endaoment_funds,
     curve_prices,
     addSeedGreenLiq,
     swapGreenForUsdc,
@@ -202,9 +204,9 @@ def test_endao_stabilizer_remove_green(
     setGreenRefConfig(_stabilizerAdjustWeight=50_00)
     green_pool = boa.env.lookup_contract(deployed_green_pool)
 
-    # move seed lp into endaoment
-    green_pool.transfer(endaoment, green_pool.balanceOf(bob), sender=bob)
-    pre_lp = green_pool.balanceOf(endaoment)
+    # move seed lp into endaoment_funds
+    green_pool.transfer(endaoment_funds, green_pool.balanceOf(bob), sender=bob)
+    pre_lp = green_pool.balanceOf(endaoment_funds)
 
     # imablance pool, has more green
     large_green_swap = 5_000 * EIGHTEEN_DECIMALS
@@ -228,8 +230,8 @@ def test_endao_stabilizer_remove_green(
     assert log.debtRepaid == 0
 
     # test balances
-    assert green_pool.balanceOf(endaoment) == pre_lp - log.lpBurned
-    assert green_token.balanceOf(endaoment) == log.greenAmountRemoved
+    assert green_pool.balanceOf(endaoment_funds) == pre_lp - log.lpBurned
+    assert green_token.balanceOf(endaoment_funds) == log.greenAmountRemoved
 
 
 @pytest.base
@@ -436,6 +438,7 @@ def test_endao_stabilizer_no_lp_tokens_to_remove(
 def test_endao_stabilizer_view_functions(
     setGreenRefConfig,
     endaoment,
+    endaoment_funds,
     addSeedGreenLiq,
     swapUsdcForGreen,
     swapGreenForUsdc,
@@ -459,9 +462,9 @@ def test_endao_stabilizer_view_functions(
     assert remove_amount == 0
     
     # Now test remove scenario
-    # First rebalance pool and give endaoment LP tokens
+    # First rebalance pool and give endaoment_funds LP tokens
     green_pool = boa.env.lookup_contract(deployed_green_pool)
-    green_pool.transfer(endaoment, green_pool.balanceOf(bob), sender=bob)
+    green_pool.transfer(endaoment_funds, green_pool.balanceOf(bob), sender=bob)
     
     # Swap back to balance, then create opposite imbalance
     large_green_swap = 8_000 * EIGHTEEN_DECIMALS
@@ -531,6 +534,7 @@ def test_endao_stabilizer_paused_contract(
 def test_endao_repay_pool_debt_directly(
     setGreenRefConfig,
     endaoment,
+    endaoment_funds,
     addSeedGreenLiq,
     swapUsdcForGreen,
     usdc_token,
@@ -554,10 +558,10 @@ def test_endao_repay_pool_debt_directly(
     initial_debt = ledger.greenPoolDebt(deployed_green_pool)
     assert initial_debt > 0
     
-    # Give endaoment extra green for repayment
+    # Give endaoment_funds extra green for repayment
     extra_green = 5_000 * EIGHTEEN_DECIMALS  # Enough to cover any repayment
-    green_token.transfer(endaoment, extra_green, sender=whale)
-    green_balance_before = green_token.balanceOf(endaoment)
+    green_token.transfer(endaoment_funds, extra_green, sender=whale)
+    green_balance_before = green_token.balanceOf(endaoment_funds)
     
     # Repay partial debt (request more than we plan to actually repay)
     requested_repay = min(3_000 * EIGHTEEN_DECIMALS, initial_debt)
@@ -576,9 +580,9 @@ def test_endao_repay_pool_debt_directly(
     final_debt = ledger.greenPoolDebt(deployed_green_pool)
     expected_debt = initial_debt - actual_repay_amount
     assert final_debt == expected_debt
-    
+
     # Check green was burned (balance should decrease)
-    green_balance_after = green_token.balanceOf(endaoment)
+    green_balance_after = green_token.balanceOf(endaoment_funds)
     green_burned = green_balance_before - green_balance_after
     _test(green_burned, actual_repay_amount)
 
@@ -874,6 +878,7 @@ def test_endao_mint_partner_liquidity_usd_value_calculation(
 @pytest.base
 def test_endao_add_partner_liquidity_basic(
     endaoment,
+    endaoment_funds,
     deployed_green_pool,
     switchboard_delta,
     green_token,
@@ -881,7 +886,6 @@ def test_endao_add_partner_liquidity_basic(
     fork,
     alice,
     usdc_token,
-    mock_undy_v2,
     ledger,
 ):
     green_pool = boa.env.lookup_contract(deployed_green_pool)
@@ -890,7 +894,6 @@ def test_endao_add_partner_liquidity_basic(
     usdc_whale = WHALES[fork]["usdc"]
     usdc_amount = 10_000 * (10 ** usdc_token.decimals())
     usdc_token.transfer(alice, usdc_amount, sender=usdc_whale)
-    usdc_token.approve(green_pool, usdc_amount, sender=alice)
 
     # setup
     partner = alice
@@ -899,7 +902,7 @@ def test_endao_add_partner_liquidity_basic(
 
     # Approve endaoment to spend partner's tokens
     usdc_token.approve(endaoment, amount, sender=partner)
-    
+
     # Mint partner liquidity
     liquidityAdded, liqAmountA, liqAmountB = endaoment.addPartnerLiquidity(10, green_pool, partner, asset, amount, 0, sender=switchboard_delta.address)
     
@@ -919,7 +922,7 @@ def test_endao_add_partner_liquidity_basic(
     assert green_token.balanceOf(endaoment) == 0
 
     _test(log.lpBalance // 2, green_pool.balanceOf(partner))
-    _test(log.lpBalance // 2, green_pool.balanceOf(endaoment))
+    _test(log.lpBalance // 2, green_pool.balanceOf(endaoment_funds))
 
     _test(ledger.greenPoolDebt(green_pool), 1_000 * EIGHTEEN_DECIMALS)
 
@@ -1017,6 +1020,7 @@ def test_endao_add_partner_liquidity_insufficient_balance(
 
 @pytest.base
 def test_endao_add_partner_liquidity_max_amount(
+    addSeedGreenLiq,
     endaoment,
     deployed_green_pool,
     switchboard_delta,
@@ -1027,6 +1031,7 @@ def test_endao_add_partner_liquidity_max_amount(
     _test,
 ):
     # Test addPartnerLiquidity with max_value(uint256)
+    addSeedGreenLiq()
     green_pool = boa.env.lookup_contract(deployed_green_pool)
     usdc_whale = WHALES[fork]["usdc"]
     partner_balance = 5_000 * (10 ** usdc_token.decimals())
@@ -1078,7 +1083,9 @@ def test_endao_add_partner_liquidity_min_lp_amount(
 
 @pytest.base
 def test_endao_add_partner_liquidity_lp_sharing(
+    addSeedGreenLiq,
     endaoment,
+    endaoment_funds,
     deployed_green_pool,
     switchboard_delta,
     alice,
@@ -1086,14 +1093,15 @@ def test_endao_add_partner_liquidity_lp_sharing(
     fork,
     _test,
 ):
-    # Test that LP tokens are properly shared between partner and endaoment
+    # Test that LP tokens are properly shared between partner and endaoment_funds
+    addSeedGreenLiq()
     green_pool = boa.env.lookup_contract(deployed_green_pool)
     usdc_whale = WHALES[fork]["usdc"]
     amount = 2_000 * (10 ** usdc_token.decimals())
-    
+
     # Record initial LP balances
     initial_partner_lp = green_pool.balanceOf(alice)
-    initial_endaoment_lp = green_pool.balanceOf(endaoment)
+    initial_endaoment_funds_lp = green_pool.balanceOf(endaoment_funds)
     
     # Give partner tokens
     usdc_token.transfer(alice, amount, sender=usdc_whale)
@@ -1105,21 +1113,22 @@ def test_endao_add_partner_liquidity_lp_sharing(
     # Check LP tokens were shared 50/50
     log = filter_logs(endaoment, "PartnerLiquidityAdded")[0]
     total_lp_received = log.lpBalance
-    
+
     partner_lp_received = green_pool.balanceOf(alice) - initial_partner_lp
-    endaoment_lp_received = green_pool.balanceOf(endaoment) - initial_endaoment_lp
-    
+    endaoment_funds_lp_received = green_pool.balanceOf(endaoment_funds) - initial_endaoment_funds_lp
+
     # Each should get half of the LP tokens
     _test(partner_lp_received, total_lp_received // 2)
-    _test(endaoment_lp_received, total_lp_received // 2)
-    
+    _test(endaoment_funds_lp_received, total_lp_received // 2)
+
     # Total should add up (accounting for potential rounding)
-    assert partner_lp_received + endaoment_lp_received >= total_lp_received - 1
-    assert partner_lp_received + endaoment_lp_received <= total_lp_received
+    assert partner_lp_received + endaoment_funds_lp_received >= total_lp_received - 1
+    assert partner_lp_received + endaoment_funds_lp_received <= total_lp_received
 
 
 @pytest.base
 def test_endao_add_partner_liquidity_multiple_partners(
+    addSeedGreenLiq,
     endaoment,
     deployed_green_pool,
     switchboard_delta,
@@ -1132,6 +1141,7 @@ def test_endao_add_partner_liquidity_multiple_partners(
     _test,
 ):
     # Test multiple partners adding liquidity sequentially
+    addSeedGreenLiq()
     green_pool = boa.env.lookup_contract(deployed_green_pool)
     usdc_whale = WHALES[fork]["usdc"]
     amount1 = 1_000 * (10 ** usdc_token.decimals())
@@ -1166,30 +1176,27 @@ def test_endao_add_partner_liquidity_multiple_partners(
     assert green_pool.balanceOf(bob) > 0
 
 
-# TEMPORARILY COMMENTING THIS OUT UNTIL WE GET RID OF MOCK_UNDY_V2
-
-
-# @pytest.base
-# def test_endao_add_partner_liquidity_invalid_lego_id(
-#     endaoment,
-#     deployed_green_pool,
-#     switchboard_delta,
-#     alice,
-#     usdc_token,
-#     fork,
-# ):
-#     # Test addPartnerLiquidity with invalid lego ID
-#     green_pool = boa.env.lookup_contract(deployed_green_pool)
-#     usdc_whale = WHALES[fork]["usdc"]
-#     amount = 1_000 * (10 ** usdc_token.decimals())
+@pytest.base
+def test_endao_add_partner_liquidity_invalid_lego_id(
+    endaoment,
+    deployed_green_pool,
+    switchboard_delta,
+    alice,
+    usdc_token,
+    fork,
+):
+    # Test addPartnerLiquidity with invalid lego ID
+    green_pool = boa.env.lookup_contract(deployed_green_pool)
+    usdc_whale = WHALES[fork]["usdc"]
+    amount = 1_000 * (10 ** usdc_token.decimals())
     
-#     # Give partner tokens
-#     usdc_token.transfer(alice, amount, sender=usdc_whale)
-#     usdc_token.approve(endaoment, amount, sender=alice)
+    # Give partner tokens
+    usdc_token.transfer(alice, amount, sender=usdc_whale)
+    usdc_token.approve(endaoment, amount, sender=alice)
     
-#     # Use invalid lego ID (999)
-#     with boa.reverts("invalid lego"):
-#         endaoment.addPartnerLiquidity(999, green_pool, alice, usdc_token, amount, 0, sender=switchboard_delta.address)
+    # Use invalid lego ID (999)
+    with boa.reverts("invalid lego"):
+        endaoment.addPartnerLiquidity(999, green_pool, alice, usdc_token, amount, 0, sender=switchboard_delta.address)
 
 
 @pytest.base
@@ -1222,6 +1229,7 @@ def test_endao_add_partner_liquidity_asset_price_validation(
 @pytest.base
 def test_endao_mint_partner_liquidity_self_as_partner(
     endaoment,
+    endaoment_funds,
     switchboard_delta,
     usdc_token,
     green_token,
@@ -1236,13 +1244,13 @@ def test_endao_mint_partner_liquidity_self_as_partner(
 
     # Transfer funds into Endaoment before calling it
     usdc_token.transfer(endaoment, amount, sender=usdc_whale)
-    
+
     pre_usdc_balance = usdc_token.balanceOf(endaoment)
-    pre_green_balance = green_token.balanceOf(endaoment)
-    
+    pre_green_balance = green_token.balanceOf(endaoment_funds)
+
     # Mint partner liquidity with endaoment as partner
     green_minted = endaoment.mintPartnerLiquidity(endaoment, usdc_token, amount, sender=switchboard_delta.address)
-    
+
     # Check event was emitted
     log = filter_logs(endaoment, "PartnerLiquidityMinted")[0]
     assert log.partner == endaoment.address
@@ -1250,10 +1258,10 @@ def test_endao_mint_partner_liquidity_self_as_partner(
     _test(log.partnerAmount, amount)
     _test(log.greenMinted, green_minted)
     _test(green_minted, amount * EIGHTEEN_DECIMALS // (10 ** usdc_token.decimals()))
-    
-    # Check balances - USDC stays in endaoment, green is minted
+
+    # Check balances - USDC stays in endaoment, green goes to endaoment_funds
     assert usdc_token.balanceOf(endaoment) == pre_usdc_balance  # No transfer needed
-    assert green_token.balanceOf(endaoment) == pre_green_balance + green_minted
+    assert green_token.balanceOf(endaoment_funds) == pre_green_balance + green_minted
 
 
 @pytest.base
@@ -1307,7 +1315,9 @@ def test_endao_mint_partner_liquidity_self_insufficient_balance(
 
 @pytest.base
 def test_endao_add_partner_liquidity_self_as_partner(
+    addSeedGreenLiq,
     endaoment,
+    endaoment_funds,
     deployed_green_pool,
     switchboard_delta,
     green_token,
@@ -1317,14 +1327,15 @@ def test_endao_add_partner_liquidity_self_as_partner(
     _test,
 ):
     # Test addPartnerLiquidity where partner is Endaoment itself
+    addSeedGreenLiq()
     green_pool = boa.env.lookup_contract(deployed_green_pool)
     usdc_whale = WHALES[fork]["usdc"]
     amount = 1_000 * (10 ** usdc_token.decimals())
 
     # Transfer funds into Endaoment before calling it
     usdc_token.transfer(endaoment, amount, sender=usdc_whale)
-    
-    pre_endaoment_lp = green_pool.balanceOf(endaoment)
+
+    pre_endaoment_funds_lp = green_pool.balanceOf(endaoment_funds)
     
     # Add partner liquidity with endaoment as partner
     liquidityAdded, liqAmountA, liqAmountB = endaoment.addPartnerLiquidity(
@@ -1339,21 +1350,23 @@ def test_endao_add_partner_liquidity_self_as_partner(
     _test(log.partnerAmount, amount)
     _test(log.greenAmount, 1_000 * EIGHTEEN_DECIMALS)
     
-    # Check balances - all assets should be consumed, all LP should go to endaoment
+    # Check balances - all assets should be consumed, all LP should go to endaoment_funds
     assert usdc_token.balanceOf(endaoment) == 0
     assert green_token.balanceOf(endaoment) == 0
-    
-    # Endaoment should get ALL the LP tokens (not split)
-    total_lp_received = green_pool.balanceOf(endaoment) - pre_endaoment_lp
+
+    # Endaoment_funds should get ALL the LP tokens (not split since partner is self)
+    total_lp_received = green_pool.balanceOf(endaoment_funds) - pre_endaoment_funds_lp
     _test(total_lp_received, liquidityAdded)
-    
+
     # Check pool debt was added
     _test(ledger.greenPoolDebt(green_pool), 1_000 * EIGHTEEN_DECIMALS)
 
 
 @pytest.base
 def test_endao_add_partner_liquidity_self_max_amount(
+    addSeedGreenLiq,
     endaoment,
+    endaoment_funds,
     deployed_green_pool,
     switchboard_delta,
     green_token,
@@ -1363,6 +1376,7 @@ def test_endao_add_partner_liquidity_self_max_amount(
     _test,
 ):
     # Test addPartnerLiquidity with max amount where partner is Endaoment itself
+    addSeedGreenLiq()
     green_pool = boa.env.lookup_contract(deployed_green_pool)
     usdc_whale = WHALES[fork]["usdc"]
     amount = 3_000 * (10 ** usdc_token.decimals())
@@ -1370,8 +1384,8 @@ def test_endao_add_partner_liquidity_self_max_amount(
     # Transfer funds into Endaoment
     usdc_token.transfer(endaoment, amount, sender=usdc_whale)
     endaoment_balance = usdc_token.balanceOf(endaoment)
-    
-    pre_endaoment_lp = green_pool.balanceOf(endaoment)
+
+    pre_endaoment_funds_lp = green_pool.balanceOf(endaoment_funds)
     
     # Add partner liquidity with max amount
     liquidityAdded, liqAmountA, liqAmountB = endaoment.addPartnerLiquidity(
@@ -1382,18 +1396,20 @@ def test_endao_add_partner_liquidity_self_max_amount(
     log = filter_logs(endaoment, "PartnerLiquidityAdded")[0]
     _test(log.partnerAmount, endaoment_balance)
     _test(log.greenAmount, 3_000 * EIGHTEEN_DECIMALS)
-    
-    # All LP tokens should go to endaoment
-    total_lp_received = green_pool.balanceOf(endaoment) - pre_endaoment_lp
+
+    # All LP tokens should go to endaoment_funds
+    total_lp_received = green_pool.balanceOf(endaoment_funds) - pre_endaoment_funds_lp
     _test(total_lp_received, liquidityAdded)
-    
+
     # Check pool debt
     _test(ledger.greenPoolDebt(green_pool), 3_000 * EIGHTEEN_DECIMALS)
 
 
 @pytest.base
 def test_endao_add_partner_liquidity_self_with_existing_green(
+    addSeedGreenLiq,
     endaoment,
+    endaoment_funds,
     deployed_green_pool,
     switchboard_delta,
     green_token,
@@ -1403,17 +1419,18 @@ def test_endao_add_partner_liquidity_self_with_existing_green(
     ledger,
     _test,
 ):
-    # Test addPartnerLiquidity where Endaoment already has green tokens
+    # Test addPartnerLiquidity where EndaomentFunds already has green tokens
+    addSeedGreenLiq()
     green_pool = boa.env.lookup_contract(deployed_green_pool)
     usdc_whale = WHALES[fork]["usdc"]
     usdc_amount = 1_000 * (10 ** usdc_token.decimals())
     green_amount = 500 * EIGHTEEN_DECIMALS
 
-    # Transfer both USDC and existing Green into Endaoment
+    # Transfer USDC to Endaoment and existing Green to EndaomentFunds
     usdc_token.transfer(endaoment, usdc_amount, sender=usdc_whale)
-    green_token.transfer(endaoment, green_amount, sender=whale)
-    
-    pre_endaoment_lp = green_pool.balanceOf(endaoment)
+    green_token.transfer(endaoment_funds, green_amount, sender=whale)
+
+    pre_endaoment_funds_lp = green_pool.balanceOf(endaoment_funds)
     
     # Add partner liquidity with endaoment as partner
     liquidityAdded, liqAmountA, liqAmountB = endaoment.addPartnerLiquidity(
@@ -1423,16 +1440,16 @@ def test_endao_add_partner_liquidity_self_with_existing_green(
     # Check event
     log = filter_logs(endaoment, "PartnerLiquidityAdded")[0]
     _test(log.partnerAmount, usdc_amount)
-    _test(log.greenAmount, 1_000 * EIGHTEEN_DECIMALS)  # Full amount minted
-    
+    _test(log.greenAmount, 1_000 * EIGHTEEN_DECIMALS)  # Full amount needed
+
     # Check balances
     assert usdc_token.balanceOf(endaoment) == 0
-    assert green_token.balanceOf(endaoment) == 0  # Both existing and new green used
-    
-    # All LP tokens should go to endaoment
-    total_lp_received = green_pool.balanceOf(endaoment) - pre_endaoment_lp
+    assert green_token.balanceOf(endaoment) == 0
+
+    # All LP tokens should go to endaoment_funds
+    total_lp_received = green_pool.balanceOf(endaoment_funds) - pre_endaoment_funds_lp
     _test(total_lp_received, liquidityAdded)
-    
+
     # Pool debt should only be for newly minted green (1000 - 500 = 500)
     expected_new_debt = 1_000 * EIGHTEEN_DECIMALS - green_amount
     _test(ledger.greenPoolDebt(green_pool), expected_new_debt)
@@ -1464,6 +1481,7 @@ def test_endao_add_partner_liquidity_self_insufficient_balance(
 
 @pytest.base
 def test_green_stabilizer_profit_never_decreases_on_add(
+    setGreenRefConfig,
     endaoment,
     deployed_green_pool,
     switchboard_delta,
@@ -1473,6 +1491,7 @@ def test_green_stabilizer_profit_never_decreases_on_add(
     ledger,
 ):
     """Test that profit never decreases when adding green liquidity"""
+    setGreenRefConfig(_stabilizerAdjustWeight=100_00)
     green_pool = boa.env.lookup_contract(deployed_green_pool)
     usdc_whale = WHALES[fork]["usdc"]
 
@@ -1488,7 +1507,7 @@ def test_green_stabilizer_profit_never_decreases_on_add(
     initial_profit = ledger.profit()
 
     # Run stabilizer to add green
-    endaoment.greenStabilizer(green_pool, 10_000, sender=switchboard_delta.address)
+    endaoment.stabilizeGreenRefPool(sender=switchboard_delta.address)
 
     # Get new profit
     new_profit = ledger.profit()
@@ -1499,6 +1518,7 @@ def test_green_stabilizer_profit_never_decreases_on_add(
 
 @pytest.base
 def test_green_stabilizer_profit_never_decreases_on_remove(
+    setGreenRefConfig,
     endaoment,
     deployed_green_pool,
     switchboard_delta,
@@ -1509,6 +1529,7 @@ def test_green_stabilizer_profit_never_decreases_on_remove(
     ledger,
 ):
     """Test that profit never decreases when removing green liquidity"""
+    setGreenRefConfig(_stabilizerAdjustWeight=100_00)
     green_pool = boa.env.lookup_contract(deployed_green_pool)
 
     # First create pool debt by adding partner liquidity
@@ -1531,7 +1552,7 @@ def test_green_stabilizer_profit_never_decreases_on_remove(
     initial_profit = ledger.profit()
 
     # Run stabilizer to remove green
-    endaoment.greenStabilizer(green_pool, 10_000, sender=switchboard_delta.address)
+    endaoment.stabilizeGreenRefPool(sender=switchboard_delta.address)
 
     # Get new profit
     new_profit = ledger.profit()
@@ -1542,15 +1563,16 @@ def test_green_stabilizer_profit_never_decreases_on_remove(
 
 @pytest.base
 def test_green_stabilizer_profit_with_extreme_imbalance(
+    setGreenRefConfig,
     endaoment,
     deployed_green_pool,
     switchboard_delta,
-    green_token,
     usdc_token,
     fork,
     ledger,
 ):
     """Test profit invariant with extreme pool imbalance (>80% one side)"""
+    setGreenRefConfig(_stabilizerAdjustWeight=100_00)
     green_pool = boa.env.lookup_contract(deployed_green_pool)
     usdc_whale = WHALES[fork]["usdc"]
 
@@ -1574,7 +1596,7 @@ def test_green_stabilizer_profit_with_extreme_imbalance(
     initial_profit = ledger.profit()
 
     # Run stabilizer
-    endaoment.greenStabilizer(green_pool, 10_000, sender=switchboard_delta.address)
+    endaoment.stabilizeGreenRefPool(sender=switchboard_delta.address)
 
     # Get new profit
     new_profit = ledger.profit()
@@ -1713,6 +1735,7 @@ def test_pool_debt_cannot_over_repay(
 
 @pytest.base
 def test_pool_debt_integrity_during_stabilizer_remove(
+    setGreenRefConfig,
     endaoment,
     deployed_green_pool,
     switchboard_delta,
@@ -1723,6 +1746,7 @@ def test_pool_debt_integrity_during_stabilizer_remove(
     ledger,
 ):
     """Test that debt is properly repaid during green removal"""
+    setGreenRefConfig(_stabilizerAdjustWeight=100_00)
     green_pool = boa.env.lookup_contract(deployed_green_pool)
     usdc_whale = WHALES[fork]["usdc"]
 
@@ -1745,7 +1769,7 @@ def test_pool_debt_integrity_during_stabilizer_remove(
     green_pool.add_liquidity(amounts, 0, sender=endaoment.address)
 
     # Run stabilizer to remove green (which should repay debt)
-    endaoment.greenStabilizer(green_pool, 10_000, sender=switchboard_delta.address)
+    endaoment.stabilizeGreenRefPool(sender=switchboard_delta.address)
 
     # Debt should have decreased or stayed same (never increase)
     new_debt = ledger.greenPoolDebt(green_pool)
@@ -1759,6 +1783,7 @@ def test_pool_debt_integrity_during_stabilizer_remove(
 
 @pytest.base
 def test_stabilizer_add_then_remove_sequence(
+    setGreenRefConfig,
     endaoment,
     deployed_green_pool,
     switchboard_delta,
@@ -1769,6 +1794,7 @@ def test_stabilizer_add_then_remove_sequence(
     ledger,
 ):
     """Test stabilizer operation sequence: add → remove"""
+    setGreenRefConfig(_stabilizerAdjustWeight=100_00)
     green_pool = boa.env.lookup_contract(deployed_green_pool)
     usdc_whale = WHALES[fork]["usdc"]
 
@@ -1789,7 +1815,7 @@ def test_stabilizer_add_then_remove_sequence(
     amounts = [0, usdc_add_amount]
     green_pool.add_liquidity(amounts, 0, sender=endaoment.address)
 
-    endaoment.greenStabilizer(green_pool, 10_000, sender=switchboard_delta.address)
+    endaoment.stabilizeGreenRefPool(sender=switchboard_delta.address)
 
     after_add_profit = ledger.profit()
     after_add_debt = ledger.greenPoolDebt(green_pool)
@@ -1801,7 +1827,7 @@ def test_stabilizer_add_then_remove_sequence(
     amounts2 = [green_add_amount, 0]
     green_pool.add_liquidity(amounts2, 0, sender=endaoment.address)
 
-    endaoment.greenStabilizer(green_pool, 10_000, sender=switchboard_delta.address)
+    endaoment.stabilizeGreenRefPool(sender=switchboard_delta.address)
 
     final_profit = ledger.profit()
     final_debt = ledger.greenPoolDebt(green_pool)
