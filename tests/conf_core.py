@@ -378,8 +378,8 @@ def endaoment_funds(ripe_hq_deploy):
 
 
 @pytest.fixture(scope="session")
-def endaoment_psm(ripe_hq_deploy, fork, alpha_token):
-    usdc = alpha_token if fork == "local" else CORE_TOKENS[fork]["USDC"]
+def endaoment_psm(ripe_hq_deploy, fork, charlie_token):
+    usdc = charlie_token if fork == "local" else CORE_TOKENS[fork]["USDC"]
     return boa.load(
         "contracts/core/EndaomentPSM.vy",
         ripe_hq_deploy,
