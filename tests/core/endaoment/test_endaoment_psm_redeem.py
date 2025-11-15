@@ -1945,3 +1945,369 @@ def test_multiple_users_interleaved_redemptions(endaoment_psm, charlie_token, gr
     assert green_token.balanceOf(user1) == 500 * EIGHTEEN_DECIMALS
     assert green_token.balanceOf(user2) == 0
     assert green_token.balanceOf(user3) == 500 * EIGHTEEN_DECIMALS
+
+
+###########################
+# Savings Green Tests     #
+###########################
+
+
+def test_redeem_with_savings_green_happy_path(endaoment_psm, charlie_token, green_token, savings_green, switchboard_charlie, governance, mock_price_source, whale):
+    """Redeeming with _isPaymentSavingsGreen=True should convert sGREEN to GREEN then to USDC"""
+    user = boa.env.generate_address()
+    green_amount = 1000 * EIGHTEEN_DECIMALS
+
+    # Setup: Give user sGREEN by depositing GREEN
+    green_token.transfer(user, green_amount, sender=whale)
+    green_token.approve(savings_green.address, green_amount, sender=user)
+    user_sgreen_shares = savings_green.deposit(green_amount, user, sender=user)
+
+    # Enable redemption
+    mock_price_source.setPrice(charlie_token.address, 1 * EIGHTEEN_DECIMALS)
+    endaoment_psm.setCanRedeem(True, sender=switchboard_charlie.address)
+
+    # Fund PSM with USDC for redemption
+    charlie_token.mint(endaoment_psm.address, 1000 * SIX_DECIMALS, sender=governance.address)
+
+    # Approve and redeem with Savings Green
+    savings_green.approve(endaoment_psm.address, user_sgreen_shares, sender=user)
+    usdc_received = endaoment_psm.redeemGreen(user_sgreen_shares, user, True, sender=user)
+
+    # Verify redemption
+    assert usdc_received == 1000 * SIX_DECIMALS
+    assert savings_green.balanceOf(user) == 0  # All sGREEN redeemed
+    assert charlie_token.balanceOf(user) == 1000 * SIX_DECIMALS
+
+
+def test_redeem_without_savings_green_uses_regular_green(endaoment_psm, charlie_token, green_token, savings_green, switchboard_charlie, governance, mock_price_source, whale):
+    """Redeeming with _isPaymentSavingsGreen=False (default) should use regular GREEN"""
+    user = boa.env.generate_address()
+    green_amount = 1000 * EIGHTEEN_DECIMALS
+
+    # Setup: Give user GREEN directly
+    green_token.transfer(user, green_amount, sender=whale)
+
+    # Enable redemption
+    mock_price_source.setPrice(charlie_token.address, 1 * EIGHTEEN_DECIMALS)
+    endaoment_psm.setCanRedeem(True, sender=switchboard_charlie.address)
+
+    # Fund PSM with USDC
+    charlie_token.mint(endaoment_psm.address, 1000 * SIX_DECIMALS, sender=governance.address)
+
+    # Get initial sGREEN balance (should be 0)
+    initial_sgreen = savings_green.balanceOf(user)
+
+    # Approve and redeem with regular GREEN
+    green_token.approve(endaoment_psm.address, green_amount, sender=user)
+    usdc_received = endaoment_psm.redeemGreen(green_amount, user, False, sender=user)
+
+    # Verify redemption used GREEN, not sGREEN
+    assert usdc_received == 1000 * SIX_DECIMALS
+    assert savings_green.balanceOf(user) == initial_sgreen  # No sGREEN touched
+    assert green_token.balanceOf(user) == 0  # GREEN was used
+
+
+def test_redeem_savings_green_to_different_recipient(endaoment_psm, charlie_token, green_token, savings_green, switchboard_charlie, governance, mock_price_source, whale):
+    """Redeeming sGREEN should send USDC to specified recipient"""
+    user = boa.env.generate_address()
+    recipient = boa.env.generate_address()
+    green_amount = 1000 * EIGHTEEN_DECIMALS
+
+    # Setup: Give user sGREEN
+    green_token.transfer(user, green_amount, sender=whale)
+    green_token.approve(savings_green.address, green_amount, sender=user)
+    user_sgreen_shares = savings_green.deposit(green_amount, user, sender=user)
+
+    # Enable redemption
+    mock_price_source.setPrice(charlie_token.address, 1 * EIGHTEEN_DECIMALS)
+    endaoment_psm.setCanRedeem(True, sender=switchboard_charlie.address)
+
+    # Fund PSM
+    charlie_token.mint(endaoment_psm.address, 1000 * SIX_DECIMALS, sender=governance.address)
+
+    # Redeem to different recipient
+    savings_green.approve(endaoment_psm.address, user_sgreen_shares, sender=user)
+    usdc_received = endaoment_psm.redeemGreen(user_sgreen_shares, recipient, True, sender=user)
+
+    # Verify recipient got USDC
+    assert charlie_token.balanceOf(recipient) == 1000 * SIX_DECIMALS
+    assert charlie_token.balanceOf(user) == 0
+
+
+def test_redeem_savings_green_share_to_green_conversion(endaoment_psm, charlie_token, green_token, savings_green, switchboard_charlie, governance, mock_price_source, whale):
+    """sGREEN shares should convert correctly to GREEN amount during redemption"""
+    user = boa.env.generate_address()
+    green_amount = 1000 * EIGHTEEN_DECIMALS
+
+    # Setup: Give user sGREEN
+    green_token.transfer(user, green_amount, sender=whale)
+    green_token.approve(savings_green.address, green_amount, sender=user)
+    user_sgreen_shares = savings_green.deposit(green_amount, user, sender=user)
+
+    # Enable redemption
+    mock_price_source.setPrice(charlie_token.address, 1 * EIGHTEEN_DECIMALS)
+    endaoment_psm.setCanRedeem(True, sender=switchboard_charlie.address)
+
+    # Fund PSM
+    charlie_token.mint(endaoment_psm.address, 1000 * SIX_DECIMALS, sender=governance.address)
+
+    # Calculate expected GREEN from sGREEN shares
+    expected_green = savings_green.convertToAssets(user_sgreen_shares)
+
+    # Redeem
+    savings_green.approve(endaoment_psm.address, user_sgreen_shares, sender=user)
+    usdc_received = endaoment_psm.redeemGreen(user_sgreen_shares, user, True, sender=user)
+
+    # Expected USDC should match GREEN amount (at 1:1 peg)
+    expected_usdc = expected_green * SIX_DECIMALS // EIGHTEEN_DECIMALS
+    assert usdc_received == expected_usdc
+
+
+def test_redeem_savings_green_with_max_value(endaoment_psm, charlie_token, green_token, savings_green, switchboard_charlie, governance, mock_price_source, whale):
+    """Redeeming with MAX_UINT256 should redeem all sGREEN balance"""
+    user = boa.env.generate_address()
+    green_amount = 1000 * EIGHTEEN_DECIMALS
+
+    # Setup: Give user sGREEN
+    green_token.transfer(user, green_amount, sender=whale)
+    green_token.approve(savings_green.address, green_amount, sender=user)
+    savings_green.deposit(green_amount, user, sender=user)
+
+    # Enable redemption
+    mock_price_source.setPrice(charlie_token.address, 1 * EIGHTEEN_DECIMALS)
+    endaoment_psm.setCanRedeem(True, sender=switchboard_charlie.address)
+
+    # Fund PSM
+    charlie_token.mint(endaoment_psm.address, 1000 * SIX_DECIMALS, sender=governance.address)
+
+    # Redeem with MAX_UINT256
+    savings_green.approve(endaoment_psm.address, MAX_UINT256, sender=user)
+    usdc_received = endaoment_psm.redeemGreen(MAX_UINT256, user, True, sender=user)
+
+    # All sGREEN should be redeemed
+    assert savings_green.balanceOf(user) == 0
+    assert usdc_received == 1000 * SIX_DECIMALS
+
+
+def test_redeem_savings_green_after_yield_accrual(endaoment_psm, charlie_token, green_token, savings_green, switchboard_charlie, governance, mock_price_source, whale):
+    """sGREEN should be worth more GREEN after yield accrual"""
+    user = boa.env.generate_address()
+    green_amount = 1000 * EIGHTEEN_DECIMALS
+
+    # Setup: Give user sGREEN
+    green_token.transfer(user, green_amount, sender=whale)
+    green_token.approve(savings_green.address, green_amount, sender=user)
+    user_sgreen_shares = savings_green.deposit(green_amount, user, sender=user)
+
+    # Simulate yield accrual by transferring GREEN to Savings Green vault
+    yield_amount = 100 * EIGHTEEN_DECIMALS  # 10% yield
+    green_token.transfer(savings_green.address, yield_amount, sender=whale)
+
+    # Enable redemption
+    mock_price_source.setPrice(charlie_token.address, 1 * EIGHTEEN_DECIMALS)
+    endaoment_psm.setCanRedeem(True, sender=switchboard_charlie.address)
+
+    # Fund PSM with extra USDC to cover yield
+    charlie_token.mint(endaoment_psm.address, 1100 * SIX_DECIMALS, sender=governance.address)
+
+    # Redeem sGREEN (should get more GREEN due to yield)
+    savings_green.approve(endaoment_psm.address, user_sgreen_shares, sender=user)
+    usdc_received = endaoment_psm.redeemGreen(user_sgreen_shares, user, True, sender=user)
+
+    # Should receive more than initial deposit due to yield
+    assert usdc_received > 1000 * SIX_DECIMALS
+    assert usdc_received <= 1100 * SIX_DECIMALS  # Should get ~1100
+
+
+def test_redeem_savings_green_multiple_users_proportional(endaoment_psm, charlie_token, green_token, savings_green, switchboard_charlie, governance, mock_price_source, whale):
+    """Multiple users should redeem proportional sGREEN correctly"""
+    user1 = boa.env.generate_address()
+    user2 = boa.env.generate_address()
+
+    # Setup: User1 deposits 1000 GREEN, User2 deposits 500 GREEN
+    green_token.transfer(user1, 1000 * EIGHTEEN_DECIMALS, sender=whale)
+    green_token.transfer(user2, 500 * EIGHTEEN_DECIMALS, sender=whale)
+
+    green_token.approve(savings_green.address, 1000 * EIGHTEEN_DECIMALS, sender=user1)
+    green_token.approve(savings_green.address, 500 * EIGHTEEN_DECIMALS, sender=user2)
+
+    user1_shares = savings_green.deposit(1000 * EIGHTEEN_DECIMALS, user1, sender=user1)
+    user2_shares = savings_green.deposit(500 * EIGHTEEN_DECIMALS, user2, sender=user2)
+
+    # Enable redemption
+    mock_price_source.setPrice(charlie_token.address, 1 * EIGHTEEN_DECIMALS)
+    endaoment_psm.setCanRedeem(True, sender=switchboard_charlie.address)
+
+    # Fund PSM
+    charlie_token.mint(endaoment_psm.address, 1500 * SIX_DECIMALS, sender=governance.address)
+
+    # Both users redeem
+    savings_green.approve(endaoment_psm.address, user1_shares, sender=user1)
+    savings_green.approve(endaoment_psm.address, user2_shares, sender=user2)
+
+    usdc1 = endaoment_psm.redeemGreen(user1_shares, user1, True, sender=user1)
+    usdc2 = endaoment_psm.redeemGreen(user2_shares, user2, True, sender=user2)
+
+    # Verify proportional redemption
+    assert usdc1 == 1000 * SIX_DECIMALS
+    assert usdc2 == 500 * SIX_DECIMALS
+
+
+def test_redeem_event_with_savings_green_flag_true(endaoment_psm, charlie_token, green_token, savings_green, switchboard_charlie, governance, mock_price_source, whale):
+    """RedeemGreen event should have paidWithSavingsGreen=True when sGREEN used"""
+    user = boa.env.generate_address()
+    green_amount = 1000 * EIGHTEEN_DECIMALS
+
+    # Setup: Give user sGREEN
+    green_token.transfer(user, green_amount, sender=whale)
+    green_token.approve(savings_green.address, green_amount, sender=user)
+    user_sgreen_shares = savings_green.deposit(green_amount, user, sender=user)
+
+    # Enable redemption
+    mock_price_source.setPrice(charlie_token.address, 1 * EIGHTEEN_DECIMALS)
+    endaoment_psm.setCanRedeem(True, sender=switchboard_charlie.address)
+
+    # Fund PSM
+    charlie_token.mint(endaoment_psm.address, 1000 * SIX_DECIMALS, sender=governance.address)
+
+    # Redeem with Savings Green
+    savings_green.approve(endaoment_psm.address, user_sgreen_shares, sender=user)
+    endaoment_psm.redeemGreen(user_sgreen_shares, user, True, sender=user)
+
+    # Check event
+    log = filter_logs(endaoment_psm, "RedeemGreen")[0]
+    assert log.paidWithSavingsGreen == True
+
+
+def test_redeem_event_with_savings_green_flag_false(endaoment_psm, charlie_token, green_token, savings_green, switchboard_charlie, governance, mock_price_source, whale):
+    """RedeemGreen event should have paidWithSavingsGreen=False when regular GREEN used"""
+    user = boa.env.generate_address()
+    green_amount = 1000 * EIGHTEEN_DECIMALS
+
+    # Setup: Give user GREEN
+    green_token.transfer(user, green_amount, sender=whale)
+
+    # Enable redemption
+    mock_price_source.setPrice(charlie_token.address, 1 * EIGHTEEN_DECIMALS)
+    endaoment_psm.setCanRedeem(True, sender=switchboard_charlie.address)
+
+    # Fund PSM
+    charlie_token.mint(endaoment_psm.address, 1000 * SIX_DECIMALS, sender=governance.address)
+
+    # Redeem with regular GREEN
+    green_token.approve(endaoment_psm.address, green_amount, sender=user)
+    endaoment_psm.redeemGreen(green_amount, user, False, sender=user)
+
+    # Check event
+    log = filter_logs(endaoment_psm, "RedeemGreen")[0]
+    assert log.paidWithSavingsGreen == False
+
+
+def test_redeem_savings_green_with_fee(endaoment_psm, charlie_token, green_token, savings_green, switchboard_charlie, governance, mock_price_source, whale):
+    """Redeeming with fee and Savings Green should apply fee after converting sGREEN to GREEN"""
+    user = boa.env.generate_address()
+    green_amount = 1000 * EIGHTEEN_DECIMALS
+    fee_percent = 5_00  # 5%
+
+    # Setup: Give user sGREEN
+    green_token.transfer(user, green_amount, sender=whale)
+    green_token.approve(savings_green.address, green_amount, sender=user)
+    user_sgreen_shares = savings_green.deposit(green_amount, user, sender=user)
+
+    # Enable redemption with fee
+    mock_price_source.setPrice(charlie_token.address, 1 * EIGHTEEN_DECIMALS)
+    endaoment_psm.setCanRedeem(True, sender=switchboard_charlie.address)
+    endaoment_psm.setRedeemFee(fee_percent, sender=switchboard_charlie.address)
+
+    # Fund PSM
+    charlie_token.mint(endaoment_psm.address, 1000 * SIX_DECIMALS, sender=governance.address)
+
+    # Redeem with fee
+    savings_green.approve(endaoment_psm.address, user_sgreen_shares, sender=user)
+    usdc_received = endaoment_psm.redeemGreen(user_sgreen_shares, user, True, sender=user)
+
+    # Calculate expected USDC after 5% fee
+    expected_usdc = 1000 * SIX_DECIMALS * (HUNDRED_PERCENT - fee_percent) // HUNDRED_PERCENT
+    assert usdc_received == expected_usdc
+    assert usdc_received == 950 * SIX_DECIMALS
+
+
+def test_redeem_savings_green_with_allowlist(endaoment_psm, charlie_token, green_token, savings_green, switchboard_charlie, governance, mock_price_source, whale):
+    """Redeeming with Savings Green should respect allowlist enforcement"""
+    user = boa.env.generate_address()
+    green_amount = 1000 * EIGHTEEN_DECIMALS
+
+    # Setup: Give user sGREEN
+    green_token.transfer(user, green_amount, sender=whale)
+    green_token.approve(savings_green.address, green_amount, sender=user)
+    user_sgreen_shares = savings_green.deposit(green_amount, user, sender=user)
+
+    # Enable redemption with allowlist
+    mock_price_source.setPrice(charlie_token.address, 1 * EIGHTEEN_DECIMALS)
+    endaoment_psm.setCanRedeem(True, sender=switchboard_charlie.address)
+    endaoment_psm.setShouldEnforceRedeemAllowlist(True, sender=switchboard_charlie.address)
+    endaoment_psm.updateRedeemAllowlist(user, True, sender=switchboard_charlie.address)
+
+    # Fund PSM
+    charlie_token.mint(endaoment_psm.address, 1000 * SIX_DECIMALS, sender=governance.address)
+
+    # Redeem with Savings Green (should succeed due to allowlist)
+    savings_green.approve(endaoment_psm.address, user_sgreen_shares, sender=user)
+    usdc_received = endaoment_psm.redeemGreen(user_sgreen_shares, user, True, sender=user)
+
+    # Verify redemption succeeded
+    assert usdc_received == 1000 * SIX_DECIMALS
+
+
+def test_redeem_savings_green_respects_interval_limits(endaoment_psm, charlie_token, green_token, savings_green, switchboard_charlie, governance, mock_price_source, whale):
+    """Redeeming with Savings Green should respect interval limits"""
+    user = boa.env.generate_address()
+    # Try to redeem 100,001 GREEN worth of sGREEN (exceeds 100k limit)
+    green_amount = 100_001 * EIGHTEEN_DECIMALS
+
+    # Setup: Give user sGREEN
+    green_token.transfer(user, green_amount, sender=whale)
+    green_token.approve(savings_green.address, green_amount, sender=user)
+    user_sgreen_shares = savings_green.deposit(green_amount, user, sender=user)
+
+    # Enable redemption
+    mock_price_source.setPrice(charlie_token.address, 1 * EIGHTEEN_DECIMALS)
+    endaoment_psm.setCanRedeem(True, sender=switchboard_charlie.address)
+
+    # Fund PSM with enough USDC
+    charlie_token.mint(endaoment_psm.address, 100_001 * SIX_DECIMALS, sender=governance.address)
+
+    # Attempt to redeem should fail due to interval limit
+    savings_green.approve(endaoment_psm.address, user_sgreen_shares, sender=user)
+    with boa.reverts("exceeds max interval redeem"):
+        endaoment_psm.redeemGreen(user_sgreen_shares, user, True, sender=user)
+
+
+def test_redeem_savings_green_with_usdc_liquidity_check(endaoment_psm, charlie_token, green_token, savings_green, switchboard_charlie, governance, mock_price_source, whale):
+    """Redeeming sGREEN should work even when PSM needs to withdraw from yield"""
+    user = boa.env.generate_address()
+    green_amount = 1000 * EIGHTEEN_DECIMALS
+
+    # Setup: Give user sGREEN
+    green_token.transfer(user, green_amount, sender=whale)
+    green_token.approve(savings_green.address, green_amount, sender=user)
+    user_sgreen_shares = savings_green.deposit(green_amount, user, sender=user)
+
+    # Enable redemption
+    mock_price_source.setPrice(charlie_token.address, 1 * EIGHTEEN_DECIMALS)
+    endaoment_psm.setCanRedeem(True, sender=switchboard_charlie.address)
+
+    # Fund PSM with USDC (simulating previous mints)
+    charlie_token.mint(endaoment_psm.address, 1000 * SIX_DECIMALS, sender=governance.address)
+
+    # Verify PSM has USDC
+    psm_balance_before = charlie_token.balanceOf(endaoment_psm.address)
+    assert psm_balance_before == 1000 * SIX_DECIMALS
+
+    # Redeem
+    savings_green.approve(endaoment_psm.address, user_sgreen_shares, sender=user)
+    usdc_received = endaoment_psm.redeemGreen(user_sgreen_shares, user, True, sender=user)
+
+    # Verify successful redemption
+    assert usdc_received == 1000 * SIX_DECIMALS
+    assert charlie_token.balanceOf(user) == 1000 * SIX_DECIMALS

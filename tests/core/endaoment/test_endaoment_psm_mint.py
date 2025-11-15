@@ -1304,7 +1304,7 @@ def test_very_small_usdc_amount(endaoment_psm, charlie_token, switchboard_charli
     small_amount = int(0.5 * SIX_DECIMALS)  # 0.5 USDC
 
     # Enable minting
-    
+
     mock_price_source.setPrice(charlie_token.address, 1 * EIGHTEEN_DECIMALS)
     endaoment_psm.setCanMint(True, sender=switchboard_charlie.address)
 
@@ -1316,3 +1316,313 @@ def test_very_small_usdc_amount(endaoment_psm, charlie_token, switchboard_charli
     # Should mint 0.5 GREEN
     expected_green = int(0.5 * EIGHTEEN_DECIMALS)
     assert green_minted == expected_green
+
+
+###########################
+# Savings Green Tests     #
+###########################
+
+
+def test_mint_with_savings_green_happy_path(endaoment_psm, charlie_token, switchboard_charlie, governance, mock_price_source, green_token, savings_green):
+    """Minting with _wantsSavingsGreen=True should deposit GREEN into Savings Green and send sGREEN to recipient"""
+    user = boa.env.generate_address()
+    usdc_amount = 1000 * SIX_DECIMALS
+
+    # Enable minting
+    mock_price_source.setPrice(charlie_token.address, 1 * EIGHTEEN_DECIMALS)
+    endaoment_psm.setCanMint(True, sender=switchboard_charlie.address)
+
+    # Setup user
+    charlie_token.mint(user, usdc_amount, sender=governance.address)
+    charlie_token.approve(endaoment_psm.address, usdc_amount, sender=user)
+
+    # Get initial balances
+    initial_green_balance = green_token.balanceOf(user)
+    initial_sgreen_balance = savings_green.balanceOf(user)
+
+    # Mint with Savings Green
+    green_minted = endaoment_psm.mintGreen(usdc_amount, user, True, sender=user)
+
+    # Verify user received sGREEN shares, not GREEN
+    final_green_balance = green_token.balanceOf(user)
+    final_sgreen_balance = savings_green.balanceOf(user)
+
+    assert final_green_balance == initial_green_balance  # No GREEN received
+    assert final_sgreen_balance > initial_sgreen_balance  # sGREEN shares received
+    assert green_minted > 0  # Function returns GREEN amount that was minted
+
+
+def test_mint_without_savings_green_uses_regular_green(endaoment_psm, charlie_token, switchboard_charlie, governance, mock_price_source, green_token, savings_green):
+    """Minting with _wantsSavingsGreen=False (default) should send GREEN tokens directly"""
+    user = boa.env.generate_address()
+    usdc_amount = 1000 * SIX_DECIMALS
+
+    # Enable minting
+    mock_price_source.setPrice(charlie_token.address, 1 * EIGHTEEN_DECIMALS)
+    endaoment_psm.setCanMint(True, sender=switchboard_charlie.address)
+
+    # Setup user
+    charlie_token.mint(user, usdc_amount, sender=governance.address)
+    charlie_token.approve(endaoment_psm.address, usdc_amount, sender=user)
+
+    # Get initial balances
+    initial_green_balance = green_token.balanceOf(user)
+    initial_sgreen_balance = savings_green.balanceOf(user)
+
+    # Mint without Savings Green (default False)
+    green_minted = endaoment_psm.mintGreen(usdc_amount, user, False, sender=user)
+
+    # Verify user received GREEN, not sGREEN
+    final_green_balance = green_token.balanceOf(user)
+    final_sgreen_balance = savings_green.balanceOf(user)
+
+    assert final_green_balance == initial_green_balance + green_minted  # GREEN received
+    assert final_sgreen_balance == initial_sgreen_balance  # No sGREEN received
+
+
+def test_mint_savings_green_to_different_recipient(endaoment_psm, charlie_token, switchboard_charlie, governance, mock_price_source, green_token, savings_green):
+    """Minting with Savings Green should send sGREEN to specified recipient"""
+    user = boa.env.generate_address()
+    recipient = boa.env.generate_address()
+    usdc_amount = 1000 * SIX_DECIMALS
+
+    # Enable minting
+    mock_price_source.setPrice(charlie_token.address, 1 * EIGHTEEN_DECIMALS)
+    endaoment_psm.setCanMint(True, sender=switchboard_charlie.address)
+
+    # Setup user
+    charlie_token.mint(user, usdc_amount, sender=governance.address)
+    charlie_token.approve(endaoment_psm.address, usdc_amount, sender=user)
+
+    # Get initial balances
+    initial_recipient_sgreen = savings_green.balanceOf(recipient)
+
+    # Mint with Savings Green to different recipient
+    endaoment_psm.mintGreen(usdc_amount, recipient, True, sender=user)
+
+    # Verify recipient received sGREEN
+    final_recipient_sgreen = savings_green.balanceOf(recipient)
+    assert final_recipient_sgreen > initial_recipient_sgreen
+
+
+def test_mint_savings_green_share_calculation(endaoment_psm, charlie_token, switchboard_charlie, governance, mock_price_source, green_token, savings_green):
+    """sGREEN shares received should match ERC4626 deposit calculation"""
+    user = boa.env.generate_address()
+    usdc_amount = 1000 * SIX_DECIMALS
+
+    # Enable minting
+    mock_price_source.setPrice(charlie_token.address, 1 * EIGHTEEN_DECIMALS)
+    endaoment_psm.setCanMint(True, sender=switchboard_charlie.address)
+
+    # Setup user
+    charlie_token.mint(user, usdc_amount, sender=governance.address)
+    charlie_token.approve(endaoment_psm.address, usdc_amount, sender=user)
+
+    # Mint with Savings Green
+    green_minted = endaoment_psm.mintGreen(usdc_amount, user, True, sender=user)
+
+    # Calculate expected shares
+    expected_shares = savings_green.convertToShares(green_minted)
+    actual_shares = savings_green.balanceOf(user)
+
+    assert actual_shares == expected_shares
+
+
+def test_mint_savings_green_with_dust_amount_fallback(endaoment_psm, charlie_token, switchboard_charlie, governance, mock_price_source, green_token, savings_green):
+    """Minting with amount <= 10^18 (1 GREEN) should fallback to regular GREEN even if _wantsSavingsGreen=True"""
+    user = boa.env.generate_address()
+    # Amount that will mint exactly 1 GREEN (10^18 wei) - at dust threshold
+    usdc_amount = 1 * SIX_DECIMALS  # 1 USDC
+
+    # Enable minting (fee is already 0 by default)
+    mock_price_source.setPrice(charlie_token.address, 1 * EIGHTEEN_DECIMALS)
+    endaoment_psm.setCanMint(True, sender=switchboard_charlie.address)
+
+    # Setup user
+    charlie_token.mint(user, usdc_amount, sender=governance.address)
+    charlie_token.approve(endaoment_psm.address, usdc_amount, sender=user)
+
+    # Get initial balances
+    initial_green_balance = green_token.balanceOf(user)
+    initial_sgreen_balance = savings_green.balanceOf(user)
+
+    # Mint with Savings Green (but amount is at dust threshold, should fallback)
+    green_minted = endaoment_psm.mintGreen(usdc_amount, user, True, sender=user)
+
+    # Verify user received GREEN (fallback), not sGREEN
+    final_green_balance = green_token.balanceOf(user)
+    final_sgreen_balance = savings_green.balanceOf(user)
+
+    assert green_minted == 1 * EIGHTEEN_DECIMALS  # Exactly 1 GREEN (at threshold)
+    assert final_green_balance == initial_green_balance + green_minted  # GREEN received directly
+    assert final_sgreen_balance == initial_sgreen_balance  # No sGREEN received
+
+
+def test_mint_savings_green_at_minimum_threshold(endaoment_psm, charlie_token, switchboard_charlie, governance, mock_price_source, green_token, savings_green):
+    """Minting with amount just above 10^18 (> 1 GREEN) should deposit to Savings Green"""
+    user = boa.env.generate_address()
+    # Amount that will mint slightly more than 1 GREEN (10^18 wei)
+    usdc_amount = 2 * SIX_DECIMALS  # 2 USDC = 2 GREEN, above threshold
+
+    # Enable minting
+    mock_price_source.setPrice(charlie_token.address, 1 * EIGHTEEN_DECIMALS)
+    endaoment_psm.setCanMint(True, sender=switchboard_charlie.address)
+
+    # Setup user
+    charlie_token.mint(user, usdc_amount, sender=governance.address)
+    charlie_token.approve(endaoment_psm.address, usdc_amount, sender=user)
+
+    # Get initial balances
+    initial_sgreen_balance = savings_green.balanceOf(user)
+
+    # Mint with Savings Green
+    green_minted = endaoment_psm.mintGreen(usdc_amount, user, True, sender=user)
+
+    # Verify user received sGREEN (not fallback)
+    final_sgreen_balance = savings_green.balanceOf(user)
+
+    assert green_minted > 1 * EIGHTEEN_DECIMALS  # Above threshold (> 1 GREEN)
+    assert final_sgreen_balance > initial_sgreen_balance  # sGREEN received
+
+
+def test_mint_savings_green_just_below_threshold(endaoment_psm, charlie_token, switchboard_charlie, governance, mock_price_source, green_token, savings_green):
+    """Minting with amount less than 1 GREEN should fallback to regular GREEN"""
+    user = boa.env.generate_address()
+    # Mint 0.5 GREEN (below 1 GREEN threshold)
+    usdc_amount = int(0.5 * SIX_DECIMALS)  # 0.5 USDC
+
+    # Enable minting (fee is already 0 by default)
+    mock_price_source.setPrice(charlie_token.address, 1 * EIGHTEEN_DECIMALS)
+    endaoment_psm.setCanMint(True, sender=switchboard_charlie.address)
+
+    # Setup user
+    charlie_token.mint(user, usdc_amount, sender=governance.address)
+    charlie_token.approve(endaoment_psm.address, usdc_amount, sender=user)
+
+    # Get initial balances
+    initial_green_balance = green_token.balanceOf(user)
+    initial_sgreen_balance = savings_green.balanceOf(user)
+
+    # Mint with Savings Green (should fallback since < 1 GREEN)
+    green_minted = endaoment_psm.mintGreen(usdc_amount, user, True, sender=user)
+
+    # Verify fallback behavior - regular GREEN received, not sGREEN
+    final_green_balance = green_token.balanceOf(user)
+    final_sgreen_balance = savings_green.balanceOf(user)
+
+    assert green_minted == int(0.5 * EIGHTEEN_DECIMALS)  # 0.5 GREEN (below threshold)
+    assert final_green_balance == initial_green_balance + green_minted  # GREEN received directly
+    assert final_sgreen_balance == initial_sgreen_balance  # No sGREEN received
+
+
+def test_mint_event_with_savings_green_flag_true(endaoment_psm, charlie_token, switchboard_charlie, governance, mock_price_source, savings_green):
+    """MintGreen event should have receivedSavingsGreen=True when sGREEN deposited"""
+    user = boa.env.generate_address()
+    usdc_amount = 1000 * SIX_DECIMALS
+
+    # Enable minting
+    mock_price_source.setPrice(charlie_token.address, 1 * EIGHTEEN_DECIMALS)
+    endaoment_psm.setCanMint(True, sender=switchboard_charlie.address)
+
+    # Setup user
+    charlie_token.mint(user, usdc_amount, sender=governance.address)
+    charlie_token.approve(endaoment_psm.address, usdc_amount, sender=user)
+
+    # Mint with Savings Green
+    endaoment_psm.mintGreen(usdc_amount, user, True, sender=user)
+
+    # Check event
+    log = filter_logs(endaoment_psm, "MintGreen")[0]
+    assert log.receivedSavingsGreen == True
+
+
+def test_mint_event_with_savings_green_flag_false(endaoment_psm, charlie_token, switchboard_charlie, governance, mock_price_source):
+    """MintGreen event should have receivedSavingsGreen=False when regular GREEN minted"""
+    user = boa.env.generate_address()
+    usdc_amount = 1000 * SIX_DECIMALS
+
+    # Enable minting
+    mock_price_source.setPrice(charlie_token.address, 1 * EIGHTEEN_DECIMALS)
+    endaoment_psm.setCanMint(True, sender=switchboard_charlie.address)
+
+    # Setup user
+    charlie_token.mint(user, usdc_amount, sender=governance.address)
+    charlie_token.approve(endaoment_psm.address, usdc_amount, sender=user)
+
+    # Mint without Savings Green
+    endaoment_psm.mintGreen(usdc_amount, user, False, sender=user)
+
+    # Check event
+    log = filter_logs(endaoment_psm, "MintGreen")[0]
+    assert log.receivedSavingsGreen == False
+
+
+def test_mint_savings_green_with_fee(endaoment_psm, charlie_token, switchboard_charlie, governance, mock_price_source, green_token, savings_green):
+    """Minting with fee and Savings Green should apply fee before depositing to sGREEN"""
+    user = boa.env.generate_address()
+    usdc_amount = 1000 * SIX_DECIMALS
+    fee_percent = 5_00  # 5%
+
+    # Enable minting with fee
+    mock_price_source.setPrice(charlie_token.address, 1 * EIGHTEEN_DECIMALS)
+    endaoment_psm.setCanMint(True, sender=switchboard_charlie.address)
+    endaoment_psm.setMintFee(fee_percent, sender=switchboard_charlie.address)
+
+    # Setup user
+    charlie_token.mint(user, usdc_amount, sender=governance.address)
+    charlie_token.approve(endaoment_psm.address, usdc_amount, sender=user)
+
+    # Mint with Savings Green and fee
+    green_minted = endaoment_psm.mintGreen(usdc_amount, user, True, sender=user)
+
+    # Calculate expected GREEN after fee
+    expected_usdc_after_fee = usdc_amount * (HUNDRED_PERCENT - fee_percent) // HUNDRED_PERCENT
+    expected_green = expected_usdc_after_fee * EIGHTEEN_DECIMALS // SIX_DECIMALS
+
+    # Verify correct amount was deposited to sGREEN
+    assert green_minted == expected_green
+    assert savings_green.balanceOf(user) > 0
+
+
+def test_mint_savings_green_with_allowlist(endaoment_psm, charlie_token, switchboard_charlie, governance, mock_price_source, savings_green):
+    """Minting with Savings Green should respect allowlist enforcement"""
+    user = boa.env.generate_address()
+    usdc_amount = 1000 * SIX_DECIMALS
+
+    # Enable minting with allowlist
+    mock_price_source.setPrice(charlie_token.address, 1 * EIGHTEEN_DECIMALS)
+    endaoment_psm.setCanMint(True, sender=switchboard_charlie.address)
+    endaoment_psm.setShouldEnforceMintAllowlist(True, sender=switchboard_charlie.address)
+    endaoment_psm.updateMintAllowlist(user, True, sender=switchboard_charlie.address)
+
+    # Setup user
+    charlie_token.mint(user, usdc_amount, sender=governance.address)
+    charlie_token.approve(endaoment_psm.address, usdc_amount, sender=user)
+
+    # Mint with Savings Green (should succeed due to allowlist)
+    endaoment_psm.mintGreen(usdc_amount, user, True, sender=user)
+
+    # Verify sGREEN received
+    assert savings_green.balanceOf(user) > 0
+
+
+def test_mint_savings_green_respects_interval_limits(endaoment_psm, charlie_token, switchboard_charlie, governance, mock_price_source, savings_green):
+    """Minting with Savings Green should respect interval limits"""
+    user = boa.env.generate_address()
+    # Try to mint 100,001 GREEN (exceeds 100k limit)
+    usdc_amount = 100_001 * SIX_DECIMALS
+
+    # Enable minting
+    mock_price_source.setPrice(charlie_token.address, 1 * EIGHTEEN_DECIMALS)
+    endaoment_psm.setCanMint(True, sender=switchboard_charlie.address)
+
+    # Setup user
+    charlie_token.mint(user, usdc_amount, sender=governance.address)
+    charlie_token.approve(endaoment_psm.address, usdc_amount, sender=user)
+
+    # Attempt to mint with Savings Green should fail due to interval limit
+    with boa.reverts("exceeds max interval mint"):
+        endaoment_psm.mintGreen(usdc_amount, user, True, sender=user)
+
+    # Verify no sGREEN received
+    assert savings_green.balanceOf(user) == 0
