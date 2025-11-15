@@ -35,6 +35,7 @@ from interfaces import Department
 from interfaces import UndyLego
 
 from ethereum.ercs import IERC20
+from ethereum.ercs import IERC4626
 
 interface PriceDesk:
     def getAssetAmount(_asset: address, _usdValue: uint256, _shouldRaise: bool = False) -> uint256: view
@@ -68,6 +69,7 @@ event MintGreen:
     usdcIn: uint256
     greenOut: uint256
     usdcFee: uint256
+    receivedSavingsGreen: bool
 
 event RedeemGreen:
     user: indexed(address)
@@ -75,6 +77,7 @@ event RedeemGreen:
     greenIn: uint256
     usdcOut: uint256
     usdcFee: uint256
+    paidWithSavingsGreen: bool
 
 event EndaomentPSMYieldDeposit:
     amount: uint256
@@ -213,7 +216,7 @@ def __init__(
 
 @nonreentrant
 @external
-def mintGreen(_usdcAmount: uint256 = max_value(uint256), _recipient: address = msg.sender) -> uint256:
+def mintGreen(_usdcAmount: uint256 = max_value(uint256), _recipient: address = msg.sender, _wantsSavingsGreen: bool = False) -> uint256:
     assert not deptBasics.isPaused # dev: contract paused
     assert self.canMint # dev: minting disabled
     a: addys.Addys = addys._getAddys()
@@ -251,14 +254,25 @@ def mintGreen(_usdcAmount: uint256 = max_value(uint256), _recipient: address = m
     if not isUnderscore:
         self._checkAndUpdateMintInterval(greenToMint)
 
-    # mint green
-    extcall GreenToken(a.greenToken).mint(_recipient, greenToMint)
+    receivedSavingsGreen: bool = False
+
+    # mint GREEN to self, then deposit to Savings Green for recipient
+    if _wantsSavingsGreen and greenToMint > ONE_GREEN:
+        extcall GreenToken(a.greenToken).mint(self, greenToMint)
+        assert extcall IERC20(a.greenToken).approve(a.savingsGreen, greenToMint, default_return_value=True)
+        extcall IERC4626(a.savingsGreen).deposit(greenToMint, _recipient)
+        assert extcall IERC20(a.greenToken).approve(a.savingsGreen, 0, default_return_value=True)
+        receivedSavingsGreen = True
+
+    # mint GREEN directly to recipient
+    else:
+        extcall GreenToken(a.greenToken).mint(_recipient, greenToMint)
 
     # deposit usdc into yield
     if self.shouldAutoDeposit:
         self._depositToYield(usdc, a.missionControl)
 
-    log MintGreen(user=_recipient, sender=msg.sender, usdcIn=usdcAmount, greenOut=greenToMint, usdcFee=feeAmount)
+    log MintGreen(user=_recipient, sender=msg.sender, usdcIn=usdcAmount, greenOut=greenToMint, usdcFee=feeAmount, receivedSavingsGreen=receivedSavingsGreen)
     return greenToMint
 
 
@@ -352,24 +366,31 @@ def _checkAndUpdateMintInterval(_amount: uint256):
 
 @nonreentrant
 @external
-def redeemGreen(_greenAmount: uint256 = max_value(uint256), _recipient: address = msg.sender) -> uint256:
+def redeemGreen(_paymentAmount: uint256 = max_value(uint256), _recipient: address = msg.sender, _isPaymentSavingsGreen: bool = False) -> uint256:
     assert not deptBasics.isPaused # dev: contract paused
     assert self.canRedeem # dev: redemption disabled
     a: addys.Addys = addys._getAddys()
     assert _recipient != empty(address) # dev: invalid recipient
 
-    # green amount to transfer
-    green: address = a.greenToken
-    greenAmount: uint256 = min(_greenAmount, staticcall IERC20(green).balanceOf(msg.sender))
-    assert greenAmount != 0 # dev: zero amount
+    greenAmount: uint256 = 0
+
+    # transfer sGREEN from user and redeem to GREEN
+    if _isPaymentSavingsGreen:
+        sGreenAmount: uint256 = min(_paymentAmount, staticcall IERC20(a.savingsGreen).balanceOf(msg.sender))
+        assert sGreenAmount != 0 # dev: zero amount
+        assert extcall IERC20(a.savingsGreen).transferFrom(msg.sender, self, sGreenAmount, default_return_value=True) # dev: transfer failed
+        greenAmount = extcall IERC4626(a.savingsGreen).redeem(sGreenAmount, self, self)
+
+    # transfer GREEN directly from user
+    else:
+        greenAmount = min(_paymentAmount, staticcall IERC20(a.greenToken).balanceOf(msg.sender))
+        assert greenAmount != 0 # dev: zero amount
+        assert extcall IERC20(a.greenToken).transferFrom(msg.sender, self, greenAmount, default_return_value=True) # dev: transfer failed
 
     # allowlist check (Underscore addresses bypass)
     isUnderscore: bool = self._isUnderscoreAddr(msg.sender, a.missionControl)
     if not isUnderscore and self.shouldEnforceRedeemAllowlist:
         assert self.redeemAllowlist[msg.sender] # dev: not on redeem allowlist
-
-    # transfer green from user
-    assert extcall IERC20(green).transferFrom(msg.sender, self, greenAmount, default_return_value=True) # dev: transfer failed
 
     # usdc to give
     usdc: address = USDC
@@ -400,9 +421,9 @@ def redeemGreen(_greenAmount: uint256 = max_value(uint256), _recipient: address 
     assert extcall IERC20(usdc).transfer(_recipient, usdcAfterFee, default_return_value=True) # dev: transfer failed
 
     # burn green
-    assert extcall GreenToken(green).burn(greenAmount) # dev: burn failed
+    assert extcall GreenToken(a.greenToken).burn(greenAmount) # dev: burn failed
 
-    log RedeemGreen(user=_recipient, sender=msg.sender, greenIn=greenAmount, usdcOut=usdcAfterFee, usdcFee=feeAmount)
+    log RedeemGreen(user=_recipient, sender=msg.sender, greenIn=greenAmount, usdcOut=usdcAfterFee, usdcFee=feeAmount, paidWithSavingsGreen=_isPaymentSavingsGreen)
     return usdcAfterFee
 
 
