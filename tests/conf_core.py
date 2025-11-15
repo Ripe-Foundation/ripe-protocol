@@ -1,7 +1,7 @@
 import pytest
 import boa
 
-from config.BluePrint import PARAMS, ADDYS, YIELD_TOKENS
+from config.BluePrint import PARAMS, ADDYS, YIELD_TOKENS, CORE_TOKENS
 from constants import ZERO_ADDRESS, EIGHTEEN_DECIMALS, HUNDRED_PERCENT
 
 
@@ -52,6 +52,7 @@ def ripe_hq(
     credit_redeem,
     teller_utils,
     endaoment_funds,
+    endaoment_psm,
 ):
     # finish token setup
     assert green_token.finishTokenSetup(ripe_hq_deploy, sender=deploy3r)
@@ -136,6 +137,10 @@ def ripe_hq(
     assert ripe_hq_deploy.startAddNewAddressToRegistry(endaoment_funds, "Endaoment Funds", sender=deploy3r)
     assert ripe_hq_deploy.confirmNewAddressToRegistry(endaoment_funds, sender=deploy3r) == 21
 
+    # 22
+    assert ripe_hq_deploy.startAddNewAddressToRegistry(endaoment_psm, "Endaoment PSM", sender=deploy3r)
+    assert ripe_hq_deploy.confirmNewAddressToRegistry(endaoment_psm, sender=deploy3r) == 22
+
     # special permission setup
 
     # switchboard can set token blacklists
@@ -169,6 +174,10 @@ def ripe_hq(
     # lootbox can mint ripe
     ripe_hq_deploy.initiateHqConfigChange(16, False, True, False, sender=deploy3r)
     assert ripe_hq_deploy.confirmHqConfigChange(16, sender=deploy3r)
+
+    # endaoment psm can mint green
+    ripe_hq_deploy.initiateHqConfigChange(22, True, False, False, sender=deploy3r)
+    assert ripe_hq_deploy.confirmHqConfigChange(22, sender=deploy3r)
 
     # finish ripe hq setup
     assert ripe_hq_deploy.setRegistryTimeLockAfterSetup(sender=deploy3r)
@@ -353,12 +362,36 @@ def endaoment(ripe_hq_deploy, fork):
     )
 
 
+# endaoment funds
+
+
 @pytest.fixture(scope="session")
 def endaoment_funds(ripe_hq_deploy):
     return boa.load(
         "contracts/core/EndaomentFunds.vy",
         ripe_hq_deploy,
         name="endaoment_funds",
+    )
+
+
+# endaoment psm
+
+
+@pytest.fixture(scope="session")
+def endaoment_psm(ripe_hq_deploy, fork, alpha_token):
+    usdc = alpha_token if fork == "local" else CORE_TOKENS[fork]["USDC"]
+    return boa.load(
+        "contracts/core/EndaomentPSM.vy",
+        ripe_hq_deploy,
+        43_200, # 1 day in blocks
+        0, # mint fee
+        100_000 * EIGHTEEN_DECIMALS, # max interval mint
+        0, # redeem fee
+        100_000 * EIGHTEEN_DECIMALS, # max interval redeem
+        usdc,
+        0, # usdc yield lego id
+        ZERO_ADDRESS, # usdc yield vault token
+        name="endaoment_psm",
     )
 
 

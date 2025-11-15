@@ -1171,8 +1171,7 @@ def _mintPartnerLiquidity(
     newMinted: uint256 = 0
     if usdValue > greenAvail:
         newMinted = usdValue - greenAvail
-        extcall GreenToken(_greenToken).mint(self, newMinted)
-        self._transferToEndaomentFunds(_greenToken, _endaoFunds)
+        extcall GreenToken(_greenToken).mint(_endaoFunds, newMinted)
 
     return partnerAmount, usdValue, newMinted
 

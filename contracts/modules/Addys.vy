@@ -58,6 +58,7 @@ DELEVERAGE_ID: constant(uint256) = 18
 CREDIT_REDEEM_ID: constant(uint256) = 19
 TELLER_UTILS_ID: constant(uint256) = 20
 ENDAOMENT_FUNDS_ID: constant(uint256) = 21
+ENDAOMENT_PSM_ID: constant(uint256) = 22
 
 
 @deploy
@@ -461,3 +462,18 @@ def _getEndaomentFundsId() -> uint256:
 @internal
 def _getEndaomentFundsAddr() -> address:
     return staticcall RipeHq(RIPE_HQ_FOR_ADDYS).getAddr(ENDAOMENT_FUNDS_ID)
+
+
+# endaoment psm
+
+
+@view
+@internal
+def _getEndaomentPsmId() -> uint256:
+    return ENDAOMENT_PSM_ID
+
+
+@view
+@internal
+def _getEndaomentPsmAddr() -> address:
+    return staticcall RipeHq(RIPE_HQ_FOR_ADDYS).getAddr(ENDAOMENT_PSM_ID)
