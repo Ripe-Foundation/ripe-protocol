@@ -87,3 +87,8 @@ def getAccessForLego(_user: address, _action: ActionType) -> (address, String[64
 @external
 def getUnderlyingAmountSafe(_vaultToken: address, _vaultTokenBalance: uint256) -> uint256:
     ...
+
+@view
+@external
+def getVaultTokenAmount(_asset: address, _assetAmount: uint256, _vaultToken: address) -> uint256:
+    ...
