@@ -2311,3 +2311,156 @@ def test_redeem_savings_green_with_usdc_liquidity_check(endaoment_psm, charlie_t
     # Verify successful redemption
     assert usdc_received == 1000 * SIX_DECIMALS
     assert charlie_token.balanceOf(user) == 1000 * SIX_DECIMALS
+
+
+#################################
+# GREEN Burning Verification   #
+#################################
+
+
+def test_redeem_burns_green_tokens(endaoment_psm, charlie_token, green_token, switchboard_charlie, governance, mock_price_source, whale):
+    """Verify that GREEN tokens are actually burned during redemption, not just transferred"""
+    # Setup redemption
+    mock_price_source.setPrice(charlie_token.address, 1 * EIGHTEEN_DECIMALS)
+    endaoment_psm.setCanRedeem(True, sender=switchboard_charlie.address)
+
+    # Fund PSM with USDC
+    charlie_token.mint(endaoment_psm.address, 10_000 * SIX_DECIMALS, sender=governance.address)
+
+    # User has GREEN
+    user = boa.env.generate_address()
+    green_amount = 1000 * EIGHTEEN_DECIMALS
+    green_token.transfer(user, green_amount, sender=whale)
+    green_token.approve(endaoment_psm.address, green_amount, sender=user)
+
+    # Get total supply before redemption
+    total_supply_before = green_token.totalSupply()
+    user_balance_before = green_token.balanceOf(user)
+
+    # Redeem
+    endaoment_psm.redeemGreen(green_amount, user, False, sender=user)
+
+    # Verify total supply decreased (tokens were burned)
+    total_supply_after = green_token.totalSupply()
+    assert total_supply_after == total_supply_before - green_amount
+
+    # Verify user balance decreased
+    user_balance_after = green_token.balanceOf(user)
+    assert user_balance_after == user_balance_before - green_amount
+
+    # Verify GREEN was not transferred to PSM (it was burned)
+    psm_green_balance = green_token.balanceOf(endaoment_psm.address)
+    assert psm_green_balance == 0
+
+
+def test_redeem_burns_correct_amount_with_partial_redemption(endaoment_psm, charlie_token, green_token, switchboard_charlie, governance, mock_price_source, whale):
+    """Verify correct amount is burned with partial redemption"""
+    # Setup
+    mock_price_source.setPrice(charlie_token.address, 1 * EIGHTEEN_DECIMALS)
+    endaoment_psm.setCanRedeem(True, sender=switchboard_charlie.address)
+    charlie_token.mint(endaoment_psm.address, 10_000 * SIX_DECIMALS, sender=governance.address)
+
+    # User has 5000 GREEN but only redeems 2000
+    user = boa.env.generate_address()
+    total_green = 5000 * EIGHTEEN_DECIMALS
+    redeem_green = 2000 * EIGHTEEN_DECIMALS
+    green_token.transfer(user, total_green, sender=whale)
+    green_token.approve(endaoment_psm.address, total_green, sender=user)
+
+    # Get supply before
+    total_supply_before = green_token.totalSupply()
+
+    # Redeem partial amount
+    endaoment_psm.redeemGreen(redeem_green, user, False, sender=user)
+
+    # Verify only redeemed amount was burned
+    total_supply_after = green_token.totalSupply()
+    assert total_supply_after == total_supply_before - redeem_green
+
+    # Verify user still has remaining GREEN
+    user_balance_after = green_token.balanceOf(user)
+    assert user_balance_after == total_green - redeem_green
+
+
+def test_redeem_multiple_users_burns_accumulate(endaoment_psm, charlie_token, green_token, switchboard_charlie, governance, mock_price_source, whale):
+    """Verify that burns from multiple users correctly accumulate"""
+    # Setup
+    mock_price_source.setPrice(charlie_token.address, 1 * EIGHTEEN_DECIMALS)
+    endaoment_psm.setCanRedeem(True, sender=switchboard_charlie.address)
+    charlie_token.mint(endaoment_psm.address, 50_000 * SIX_DECIMALS, sender=governance.address)
+
+    # Get initial supply
+    initial_supply = green_token.totalSupply()
+
+    # Three users redeem different amounts
+    amounts = [1000 * EIGHTEEN_DECIMALS, 2500 * EIGHTEEN_DECIMALS, 1500 * EIGHTEEN_DECIMALS]
+    total_burned = 0
+
+    for amount in amounts:
+        user = boa.env.generate_address()
+        green_token.transfer(user, amount, sender=whale)
+        green_token.approve(endaoment_psm.address, amount, sender=user)
+        endaoment_psm.redeemGreen(amount, user, False, sender=user)
+        total_burned += amount
+
+    # Verify total supply decreased by sum of all redemptions
+    final_supply = green_token.totalSupply()
+    assert final_supply == initial_supply - total_burned
+
+
+def test_redeem_with_fee_burns_full_payment_amount(endaoment_psm, charlie_token, green_token, switchboard_charlie, governance, mock_price_source, whale):
+    """Verify that full payment amount of GREEN is burned, even though user receives less USDC due to fee"""
+    # Setup with 10% fee
+    mock_price_source.setPrice(charlie_token.address, 1 * EIGHTEEN_DECIMALS)
+    endaoment_psm.setCanRedeem(True, sender=switchboard_charlie.address)
+    endaoment_psm.setRedeemFee(1000, sender=switchboard_charlie.address)  # 10% fee
+    charlie_token.mint(endaoment_psm.address, 10_000 * SIX_DECIMALS, sender=governance.address)
+
+    # User redeems GREEN
+    user = boa.env.generate_address()
+    green_amount = 1000 * EIGHTEEN_DECIMALS
+    green_token.transfer(user, green_amount, sender=whale)
+    green_token.approve(endaoment_psm.address, green_amount, sender=user)
+
+    # Get supply before
+    total_supply_before = green_token.totalSupply()
+
+    # Redeem (user gets 90% USDC due to fee, but still burns 100% of GREEN)
+    usdc_received = endaoment_psm.redeemGreen(green_amount, user, False, sender=user)
+
+    # Verify user got 90% of USDC (fee applied)
+    expected_usdc = (green_amount * SIX_DECIMALS // EIGHTEEN_DECIMALS * 90) // 100
+    assert abs(usdc_received - expected_usdc) < SIX_DECIMALS  # Within 1 USDC
+
+    # Verify full GREEN amount was burned (not reduced by fee)
+    total_supply_after = green_token.totalSupply()
+    assert total_supply_after == total_supply_before - green_amount
+
+
+def test_failed_redeem_does_not_burn_tokens(endaoment_psm, charlie_token, green_token, switchboard_charlie, mock_price_source, whale):
+    """Verify that failed redemption attempts do not burn tokens"""
+    # Setup redemption but with insufficient USDC
+    mock_price_source.setPrice(charlie_token.address, 1 * EIGHTEEN_DECIMALS)
+    endaoment_psm.setCanRedeem(True, sender=switchboard_charlie.address)
+
+    # Intentionally do NOT fund PSM with USDC
+
+    # User has GREEN
+    user = boa.env.generate_address()
+    green_amount = 1000 * EIGHTEEN_DECIMALS
+    green_token.transfer(user, green_amount, sender=whale)
+    green_token.approve(endaoment_psm.address, green_amount, sender=user)
+
+    # Get balances before
+    total_supply_before = green_token.totalSupply()
+    user_balance_before = green_token.balanceOf(user)
+
+    # Attempt to redeem should fail
+    with boa.reverts():
+        endaoment_psm.redeemGreen(green_amount, user, False, sender=user)
+
+    # Verify no tokens were burned
+    total_supply_after = green_token.totalSupply()
+    user_balance_after = green_token.balanceOf(user)
+    assert total_supply_after == total_supply_before
+    assert user_balance_after == user_balance_before

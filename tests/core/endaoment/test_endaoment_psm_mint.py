@@ -1626,3 +1626,53 @@ def test_mint_savings_green_respects_interval_limits(endaoment_psm, charlie_toke
 
     # Verify no sGREEN received
     assert savings_green.balanceOf(user) == 0
+
+
+#############################
+# Approval Reset Tests #
+#############################
+
+
+def test_mint_savings_green_resets_approval(endaoment_psm, charlie_token, green_token, switchboard_charlie, governance, mock_price_source, savings_green):
+    """Minting with Savings Green should reset GREEN approval to 0 after deposit"""
+    user = boa.env.generate_address()
+    usdc_amount = 1000 * SIX_DECIMALS
+
+    # Enable minting
+    mock_price_source.setPrice(charlie_token.address, 1 * EIGHTEEN_DECIMALS)
+    endaoment_psm.setCanMint(True, sender=switchboard_charlie.address)
+
+    # Setup user
+    charlie_token.mint(user, usdc_amount, sender=governance.address)
+    charlie_token.approve(endaoment_psm.address, usdc_amount, sender=user)
+
+    # Mint with Savings Green
+    endaoment_psm.mintGreen(usdc_amount, user, True, sender=user)
+
+    # Verify that GREEN approval from PSM to Savings Green is 0
+    psm_allowance = green_token.allowance(endaoment_psm.address, savings_green.address)
+    assert psm_allowance == 0
+
+
+def test_mint_savings_green_approval_reset_on_failure(endaoment_psm, charlie_token, green_token, switchboard_charlie, governance, mock_price_source, savings_green):
+    """If savings GREEN deposit fails, approval should still be reset to 0"""
+    user = boa.env.generate_address()
+    usdc_amount = 1000 * SIX_DECIMALS
+
+    # Enable minting
+    mock_price_source.setPrice(charlie_token.address, 1 * EIGHTEEN_DECIMALS)
+    endaoment_psm.setCanMint(True, sender=switchboard_charlie.address)
+
+    # Setup user
+    charlie_token.mint(user, usdc_amount, sender=governance.address)
+    charlie_token.approve(endaoment_psm.address, usdc_amount, sender=user)
+
+    # Mint normally first to verify baseline
+    endaoment_psm.mintGreen(usdc_amount, user, True, sender=user)
+
+    # After successful mint, approval should be 0
+    psm_allowance = green_token.allowance(endaoment_psm.address, savings_green.address)
+    assert psm_allowance == 0
+
+    # Verify no leftover approvals that could be exploited
+    assert psm_allowance == 0
