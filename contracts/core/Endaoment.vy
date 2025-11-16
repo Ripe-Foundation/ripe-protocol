@@ -507,39 +507,39 @@ def _validateAndGetSwapInfo(_instructions: DynArray[UndyLego.SwapInstruction, MA
 ####################
 
 
-# @nonreentrant
-# @external
-# def claimIncentives(
-#     _user: address,
-#     _legoId: uint256,
-#     _rewardToken: address = empty(address),
-#     _rewardAmount: uint256 = max_value(uint256),
-#     _proofs: DynArray[bytes32, MAX_PROOFS] = [],
-# ) -> (uint256, uint256):
-#     assert not deptBasics.isPaused # dev: contract paused
-#     assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
+@nonreentrant
+@external
+def claimIncentives(
+    _user: address,
+    _legoId: uint256,
+    _rewardToken: address = empty(address),
+    _rewardAmount: uint256 = max_value(uint256),
+    _proofs: DynArray[bytes32, MAX_PROOFS] = [],
+) -> (uint256, uint256):
+    assert not deptBasics.isPaused # dev: contract paused
+    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
 
-#     legoAddr: address = self._getLegoAddr(_legoId)
-#     self._checkLegoAccessForAction(legoAddr, UndyLego.ActionType.REWARDS)
+    legoAddr: address = self._getLegoAddr(_legoId)
+    self._checkLegoAccessForAction(legoAddr, UndyLego.ActionType.REWARDS)
 
-#     # claim rewards
-#     rewardAmount: uint256 = 0
-#     txUsdValue: uint256 = 0
-#     rewardAmount, txUsdValue = extcall UndyLego(legoAddr).claimIncentives(_user, _rewardToken, _rewardAmount, _proofs)
+    # claim rewards
+    rewardAmount: uint256 = 0
+    txUsdValue: uint256 = 0
+    rewardAmount, txUsdValue = extcall UndyLego(legoAddr).claimIncentives(_user, _rewardToken, _rewardAmount, _proofs)
 
-#     # transfer to endaoment funds
-#     self._transferToEndaomentFunds(_rewardToken, addys._getEndaomentFundsAddr())
+    # transfer to endaoment funds
+    self._transferToEndaomentFunds(_rewardToken, addys._getEndaomentFundsAddr())
 
-#     log WalletAction(
-#         op = 50,
-#         asset1 = _rewardToken,
-#         asset2 = legoAddr,
-#         amount1 = rewardAmount,
-#         amount2 = 0,
-#         usdValue = txUsdValue,
-#         legoId = _legoId,
-#     )
-#     return rewardAmount, txUsdValue
+    log WalletAction(
+        op = 50,
+        asset1 = _rewardToken,
+        asset2 = legoAddr,
+        amount1 = rewardAmount,
+        amount2 = 0,
+        usdValue = txUsdValue,
+        legoId = _legoId,
+    )
+    return rewardAmount, txUsdValue
 
 
 ###############
