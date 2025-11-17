@@ -477,7 +477,7 @@ def switchboard_deploy(ripe_hq_deploy, fork):
 
 
 @pytest.fixture(scope="session")
-def switchboard(switchboard_deploy, deploy3r, switchboard_alpha, switchboard_bravo, switchboard_charlie, switchboard_delta):
+def switchboard(switchboard_deploy, deploy3r, switchboard_alpha, switchboard_bravo, switchboard_charlie, switchboard_echo, switchboard_delta):
 
     # alpha
     assert switchboard_deploy.startAddNewAddressToRegistry(switchboard_alpha, "Alpha", sender=deploy3r)
@@ -495,6 +495,10 @@ def switchboard(switchboard_deploy, deploy3r, switchboard_alpha, switchboard_bra
     assert switchboard_deploy.startAddNewAddressToRegistry(switchboard_delta, "Delta", sender=deploy3r)
     assert switchboard_deploy.confirmNewAddressToRegistry(switchboard_delta, sender=deploy3r) == 4
 
+    # echo
+    assert switchboard_deploy.startAddNewAddressToRegistry(switchboard_echo, "Echo", sender=deploy3r)
+    assert switchboard_deploy.confirmNewAddressToRegistry(switchboard_echo, sender=deploy3r) == 5
+
     # finish setup
     assert switchboard_deploy.setRegistryTimeLockAfterSetup(sender=deploy3r)
 
@@ -503,6 +507,7 @@ def switchboard(switchboard_deploy, deploy3r, switchboard_alpha, switchboard_bra
     assert switchboard_bravo.setActionTimeLockAfterSetup(sender=deploy3r)
     assert switchboard_charlie.setActionTimeLockAfterSetup(sender=deploy3r)
     assert switchboard_delta.setActionTimeLockAfterSetup(sender=deploy3r)
+    assert switchboard_echo.setActionTimeLockAfterSetup(sender=deploy3r)
 
     return switchboard_deploy
 
@@ -566,6 +571,21 @@ def switchboard_delta(ripe_hq_deploy, fork):
         PARAMS[fork]["MIN_HQ_CHANGE_TIMELOCK"],
         PARAMS[fork]["MAX_HQ_CHANGE_TIMELOCK"],
         name="switchboard_delta",
+    )
+
+
+# switchboard echo
+
+
+@pytest.fixture(scope="session")
+def switchboard_echo(ripe_hq_deploy, fork):
+    return boa.load(
+        "contracts/config/SwitchboardEcho.vy",
+        ripe_hq_deploy,
+        ZERO_ADDRESS,
+        PARAMS[fork]["MIN_HQ_CHANGE_TIMELOCK"],
+        PARAMS[fork]["MAX_HQ_CHANGE_TIMELOCK"],
+        name="switchboard_echo",
     )
 
 

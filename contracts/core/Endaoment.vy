@@ -37,7 +37,6 @@ from interfaces import UndyLego
 
 from ethereum.ercs import IERC20
 from ethereum.ercs import IERC721
-
 interface CurvePool:
     def remove_liquidity_imbalance(_amounts: DynArray[uint256, 2], _maxLpBurnAmount: uint256, _recipient: address = msg.sender) -> uint256: nonpayable
     def add_liquidity(_amounts: DynArray[uint256, 2], _minLpAmountOut: uint256, _recipient: address = msg.sender) -> uint256: nonpayable
@@ -46,7 +45,6 @@ interface CurvePool:
 interface EndaomentFunds:
     def transfer(_asset: address = empty(address), _amount: uint256 = max_value(uint256)) -> uint256: nonpayable
     def hasBalance(_asset: address = empty(address)) -> bool: view
-    def transferNft(_nft: address, _tokenId: uint256): nonpayable
 
 interface EndaomentPSM:
     def USDC() -> address: view
@@ -107,11 +105,6 @@ event WalletActionExt:
     usdValue: uint256
     extra: uint256
 
-event EndaomentNftRecovered:
-    collection: indexed(address)
-    nftTokenId: uint256
-    recipient: indexed(address)
-
 event StabilizerPoolLiqAdded:
     pool: indexed(address)
     greenAmountAdded: uint256
@@ -147,7 +140,6 @@ MAX_SWAP_INSTRUCTIONS: constant(uint256) = 5
 MAX_TOKEN_PATH: constant(uint256) = 5
 MAX_ASSETS: constant(uint256) = 10
 MAX_LEGOS: constant(uint256) = 10
-ERC721_RECEIVE_DATA: constant(Bytes[1024]) = b"UE721"
 API_VERSION: constant(String[28]) = "0.1.0"
 FIFTY_PERCENT: constant(uint256) = 50_00 # 50.00%
 EIGHTEEN_DECIMALS: constant(uint256) = 10 ** 18
@@ -167,13 +159,6 @@ def __init__(_ripeHq: address, _weth: address, _eth: address):
     assert empty(address) not in [_weth, _eth] # dev: invalid addys
     WETH = _weth
     ETH = _eth
-
-
-@view
-@external
-def onERC721Received(_operator: address, _owner: address, _tokenId: uint256, _data: Bytes[1024]) -> bytes4:
-    # must implement method for safe NFT transfers
-    return method_id("onERC721Received(address,address,uint256,bytes)", output_type = bytes4)
 
 
 @payable
@@ -1125,11 +1110,6 @@ def _prepareEndaomentFunds(_asset: address, _amount: uint256, _endaoFunds: addre
     return extcall EndaomentFunds(_endaoFunds).transfer(_asset, _amount)
 
 
-@internal
-def _pullNftFromVault(_nftAddr: address, _tokenId: uint256, _endaoFunds: address):
-    extcall EndaomentFunds(_endaoFunds).transferNft(_nftAddr, _tokenId)
-
-
 # transfer funds to endaoment funds
 
 
@@ -1180,16 +1160,6 @@ def _resetApproval(_token: address, _legoAddr: address, _endaoFunds: address):
         assert extcall IERC20(_token).approve(_legoAddr, 0, default_return_value = True) # dev: appr
     
     self._transferToEndaomentFunds(_token, _endaoFunds)
-
-
-# recover nft
-
-
-@external
-def recoverNft(_collection: address, _nftTokenId: uint256, _recipient: address):
-    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
-    extcall IERC721(_collection).safeTransferFrom(self, _recipient, _nftTokenId)
-    log EndaomentNftRecovered(collection=_collection, nftTokenId=_nftTokenId, recipient=_recipient)
 
 
 # pool debt

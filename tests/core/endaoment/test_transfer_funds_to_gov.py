@@ -246,94 +246,94 @@ def test_transfer_funds_with_green_token(
 
 
 def test_switchboard_transfer_initiate_and_execute(
-    switchboard_charlie,
+    switchboard_echo,
     endaoment,
     endaoment_funds,
     governance,
     bravo_token,
     bravo_token_whale,
 ):
-    """Test full governance flow: initiate and execute transfer through SwitchboardCharlie"""
+    """Test full governance flow: initiate and execute transfer through SwitchboardEcho"""
     transfer_amount = 1500 * EIGHTEEN_DECIMALS
 
     # Fund endaoment_funds
     bravo_token.transfer(endaoment_funds.address, transfer_amount, sender=bravo_token_whale)
     initial_endao_balance = bravo_token.balanceOf(endaoment_funds.address)
     initial_gov_balance = bravo_token.balanceOf(governance.address)
-    
+
     # Initiate the transfer action
-    switchboard_charlie.performEndaomentTransfer(
+    switchboard_echo.performEndaomentTransfer(
         bravo_token.address,
         transfer_amount,
         sender=governance.address
     )
-    
+
     # Get action ID from events
-    events = filter_logs(switchboard_charlie, "PendingEndaoTransferAction")
+    events = filter_logs(switchboard_echo, "PendingEndaoTransferAction")
     assert len(events) == 1
     event = events[0]
     assert event.asset == bravo_token.address
     assert event.amount == transfer_amount
     action_id = event.actionId
-    
+
     # Verify the pending action is stored
-    pending_action = switchboard_charlie.pendingEndaoTransfer(action_id)
+    pending_action = switchboard_echo.pendingEndaoTransfer(action_id)
     assert pending_action[0] == bravo_token.address  # asset
     assert pending_action[1] == transfer_amount  # amount
-    
-    # Verify action type is set correctly (ENDAO_TRANSFER is at position 13 in the enum, stored as flag)
-    assert switchboard_charlie.actionType(action_id) == 2**13  # ActionType.ENDAO_TRANSFER
-    
+
+    # Verify action type is set correctly (ENDAO_TRANSFER is at position 6 in SwitchboardEcho, stored as flag)
+    assert switchboard_echo.actionType(action_id) == 2**6  # ActionType.ENDAO_TRANSFER
+
     # Wait for timelock
-    boa.env.time_travel(blocks=switchboard_charlie.actionTimeLock() + 1)
-    
+    boa.env.time_travel(blocks=switchboard_echo.actionTimeLock() + 1)
+
     # Execute the action
-    switchboard_charlie.executePendingAction(action_id, sender=governance.address)
-    
+    switchboard_echo.executePendingAction(action_id, sender=governance.address)
+
     # Verify the transfer was executed
     assert bravo_token.balanceOf(endaoment_funds.address) == initial_endao_balance - transfer_amount
     assert bravo_token.balanceOf(governance.address) == initial_gov_balance + transfer_amount
-    
+
     # Check execution event
-    exec_events = filter_logs(switchboard_charlie, "EndaoTransferExecuted")
+    exec_events = filter_logs(switchboard_echo, "EndaoTransferExecuted")
     assert len(exec_events) == 1
     assert exec_events[0].asset == bravo_token.address
     assert exec_events[0].amount == transfer_amount
 
 
 def test_switchboard_transfer_max_amount(
-    switchboard_charlie,
+    switchboard_echo,
     endaoment,
     endaoment_funds,
     governance,
     alpha_token,
     alpha_token_whale,
 ):
-    """Test governance transfer with max amount through SwitchboardCharlie"""
+    """Test governance transfer with max amount through SwitchboardEcho"""
     fund_amount = 3000 * EIGHTEEN_DECIMALS
 
     # Fund endaoment_funds
     alpha_token.transfer(endaoment_funds.address, fund_amount, sender=alpha_token_whale)
-    
+
     # Get initial governance balance to track exact change
     initial_gov_balance = alpha_token.balanceOf(governance.address)
-    
+
     # Initiate transfer with max_value
     max_uint256 = 2**256 - 1
-    switchboard_charlie.performEndaomentTransfer(
+    switchboard_echo.performEndaomentTransfer(
         alpha_token.address,
         max_uint256,  # Use max value to transfer entire balance
         sender=governance.address
     )
-    
+
     # Get action ID
-    events = filter_logs(switchboard_charlie, "PendingEndaoTransferAction")
+    events = filter_logs(switchboard_echo, "PendingEndaoTransferAction")
     action_id = events[0].actionId
-    
+
     # Wait for timelock and execute
-    boa.env.time_travel(blocks=switchboard_charlie.actionTimeLock() + 1)
-    switchboard_charlie.executePendingAction(action_id, sender=governance.address)
-    
+    boa.env.time_travel(blocks=switchboard_echo.actionTimeLock() + 1)
+    switchboard_echo.executePendingAction(action_id, sender=governance.address)
+
     # Verify entire balance was transferred
     assert alpha_token.balanceOf(endaoment_funds.address) == 0
     # Verify governance received exactly the fund_amount
@@ -341,43 +341,43 @@ def test_switchboard_transfer_max_amount(
 
 
 def test_switchboard_transfer_cancel(
-    switchboard_charlie,
+    switchboard_echo,
     governance,
     ripe_token,
 ):
     """Test cancelling a transfer action before execution"""
     transfer_amount = 500 * EIGHTEEN_DECIMALS
-    
+
     # Initiate the transfer action
-    switchboard_charlie.performEndaomentTransfer(
+    switchboard_echo.performEndaomentTransfer(
         ripe_token.address,
         transfer_amount,
         sender=governance.address
     )
-    
+
     # Get action ID
-    events = filter_logs(switchboard_charlie, "PendingEndaoTransferAction")
+    events = filter_logs(switchboard_echo, "PendingEndaoTransferAction")
     action_id = events[0].actionId
-    
+
     # Cancel the action
-    switchboard_charlie.cancelPendingAction(action_id, sender=governance.address)
-    
+    switchboard_echo.cancelPendingAction(action_id, sender=governance.address)
+
     # Wait past timelock to try execution
-    boa.env.time_travel(blocks=switchboard_charlie.actionTimeLock() + 1)
-    
+    boa.env.time_travel(blocks=switchboard_echo.actionTimeLock() + 1)
+
     # Try to execute the cancelled action - should return False (action was deleted)
-    result = switchboard_charlie.executePendingAction(action_id, sender=governance.address)
+    result = switchboard_echo.executePendingAction(action_id, sender=governance.address)
     assert result == False  # Action no longer exists after cancellation
 
 
 def test_switchboard_transfer_no_permission(
-    switchboard_charlie,
+    switchboard_echo,
     alice,
     alpha_token,
 ):
-    """Test that non-governance cannot initiate transfer through SwitchboardCharlie"""
+    """Test that non-governance cannot initiate transfer through SwitchboardEcho"""
     with boa.reverts("no perms"):
-        switchboard_charlie.performEndaomentTransfer(
+        switchboard_echo.performEndaomentTransfer(
             alpha_token.address,
             1000,
             sender=alice
@@ -385,12 +385,12 @@ def test_switchboard_transfer_no_permission(
 
 
 def test_switchboard_transfer_invalid_asset(
-    switchboard_charlie,
+    switchboard_echo,
     governance,
 ):
     """Test that initiating transfer with invalid asset fails"""
     with boa.reverts("invalid asset"):
-        switchboard_charlie.performEndaomentTransfer(
+        switchboard_echo.performEndaomentTransfer(
             ZERO_ADDRESS,
             1000,
             sender=governance.address
@@ -398,13 +398,13 @@ def test_switchboard_transfer_invalid_asset(
 
 
 def test_switchboard_transfer_zero_amount(
-    switchboard_charlie,
+    switchboard_echo,
     governance,
     alpha_token,
 ):
     """Test that initiating transfer with zero amount fails"""
     with boa.reverts("invalid amount"):
-        switchboard_charlie.performEndaomentTransfer(
+        switchboard_echo.performEndaomentTransfer(
             alpha_token.address,
             0,
             sender=governance.address
@@ -412,29 +412,29 @@ def test_switchboard_transfer_zero_amount(
 
 
 def test_switchboard_transfer_execute_too_early(
-    switchboard_charlie,
+    switchboard_echo,
     governance,
     alpha_token,
 ):
     """Test that executing before timelock returns False"""
     # Initiate the transfer action
-    switchboard_charlie.performEndaomentTransfer(
+    switchboard_echo.performEndaomentTransfer(
         alpha_token.address,
         1000 * EIGHTEEN_DECIMALS,
         sender=governance.address
     )
-    
+
     # Get action ID
-    events = filter_logs(switchboard_charlie, "PendingEndaoTransferAction")
+    events = filter_logs(switchboard_echo, "PendingEndaoTransferAction")
     action_id = events[0].actionId
-    
+
     # Try to execute immediately - should return False (timelock not met)
-    result = switchboard_charlie.executePendingAction(action_id, sender=governance.address)
+    result = switchboard_echo.executePendingAction(action_id, sender=governance.address)
     assert result == False  # Timelock not met
 
 
 def test_switchboard_transfer_insufficient_balance(
-    switchboard_charlie,
+    switchboard_echo,
     endaoment,
     endaoment_funds,
     governance,
@@ -445,21 +445,21 @@ def test_switchboard_transfer_insufficient_balance(
 
     # Ensure endaoment_funds has no ALPHA
     assert alpha_token.balanceOf(endaoment_funds.address) == 0
-    
+
     # Initiate the transfer action
-    switchboard_charlie.performEndaomentTransfer(
+    switchboard_echo.performEndaomentTransfer(
         alpha_token.address,
         transfer_amount,
         sender=governance.address
     )
-    
+
     # Get action ID
-    events = filter_logs(switchboard_charlie, "PendingEndaoTransferAction")
+    events = filter_logs(switchboard_echo, "PendingEndaoTransferAction")
     action_id = events[0].actionId
-    
+
     # Wait for timelock
-    boa.env.time_travel(blocks=switchboard_charlie.actionTimeLock() + 1)
-    
+    boa.env.time_travel(blocks=switchboard_echo.actionTimeLock() + 1)
+
     # Execute should fail due to no balance in endaoment
     with boa.reverts("no amt"):
-        switchboard_charlie.executePendingAction(action_id, sender=governance.address)
+        switchboard_echo.executePendingAction(action_id, sender=governance.address)

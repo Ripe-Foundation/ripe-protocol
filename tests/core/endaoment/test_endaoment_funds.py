@@ -45,34 +45,6 @@ def test_receive_erc20_via_transfer(endaoment_funds, alpha_token, alpha_token_wh
     assert alpha_token.balanceOf(endaoment_funds.address) == initial_balance + transfer_amount
 
 
-def test_receive_erc721_via_safe_transfer(endaoment_funds, mock_nft, governance):
-    """Test contract can receive ERC721 NFTs via safeTransferFrom"""
-    # Mint NFT to governance
-    token_id = mock_nft.mint(governance.address, sender=governance.address)
-
-    # Transfer NFT to endaoment_funds using safeTransferFrom
-    mock_nft.safeTransferFrom(governance.address, endaoment_funds.address, token_id, sender=governance.address)
-
-    # Verify ownership
-    assert mock_nft.ownerOf(token_id) == endaoment_funds.address
-
-
-def test_on_erc721_received_returns_correct_signature(endaoment_funds, alice):
-    """Test onERC721Received returns correct method signature"""
-    # Call the function
-    result = endaoment_funds.onERC721Received(
-        alice,  # operator
-        alice,  # owner
-        1,      # tokenId
-        b""     # data
-    )
-
-    # Verify it returns the correct selector
-    # The selector for onERC721Received(address,address,uint256,bytes)
-    expected_selector = b'\x15\x0bz\x02'  # method_id for onERC721Received
-    assert result == expected_selector
-
-
 ########################
 # hasBalance Function Tests #
 ########################
@@ -401,102 +373,7 @@ def test_transfer_eth_event_emission(endaoment_funds, endaoment, alice):
     assert event.amount == transfer_amount
 
 
-#############################
-# transferNft Function Tests #
-#############################
-
-
-def test_transfer_nft_basic(endaoment_funds, endaoment, mock_nft, governance):
-    """Test basic NFT transfer to endaoment"""
-    # Mint NFT to endaoment_funds
-    token_id = mock_nft.mint(endaoment_funds.address, sender=governance.address)
-
-    # Verify initial ownership
-    assert mock_nft.ownerOf(token_id) == endaoment_funds.address
-
-    # Transfer NFT
-    endaoment_funds.transferNft(mock_nft.address, token_id, sender=endaoment.address)
-
-    # Verify ownership transferred
-    assert mock_nft.ownerOf(token_id) == endaoment.address
-
-
-def test_transfer_nft_unauthorized_caller(endaoment_funds, mock_nft, governance, alice):
-    """Test that non-endaoment caller cannot transfer NFT"""
-    # Mint NFT to endaoment_funds
-    token_id = mock_nft.mint(endaoment_funds.address, sender=governance.address)
-
-    with boa.reverts("not authorized"):
-        endaoment_funds.transferNft(mock_nft.address, token_id, sender=alice)
-
-
-def test_transfer_nft_not_owner_reverts(endaoment_funds, endaoment, mock_nft, governance):
-    """Test that transfer reverts when contract doesn't own the NFT"""
-    # Mint NFT to someone else (not endaoment_funds)
-    token_id = mock_nft.mint(governance.address, sender=governance.address)
-
-    # Verify endaoment_funds is not the owner
-    assert mock_nft.ownerOf(token_id) != endaoment_funds.address
-
-    with boa.reverts("not owner"):
-        endaoment_funds.transferNft(mock_nft.address, token_id, sender=endaoment.address)
-
-
-def test_transfer_nft_event_emission(endaoment_funds, endaoment, mock_nft, governance):
-    """Test EndaomentNftMoved event is emitted correctly"""
-    # Mint NFT to endaoment_funds
-    token_id = mock_nft.mint(endaoment_funds.address, sender=governance.address)
-
-    # Transfer NFT
-    endaoment_funds.transferNft(mock_nft.address, token_id, sender=endaoment.address)
-
-    # Check event
-    events = filter_logs(endaoment_funds, "EndaomentNftMoved")
-    assert len(events) == 1
-    event = events[0]
-    assert event.nft == mock_nft.address
-    assert event.to == endaoment.address
-    assert event.tokenId == token_id
-
-
-def test_transfer_multiple_nfts_same_collection(endaoment_funds, endaoment, mock_nft, governance):
-    """Test transferring multiple NFTs from same collection"""
-    # Mint multiple NFTs to endaoment_funds
-    token_id_1 = mock_nft.mint(endaoment_funds.address, sender=governance.address)
-    token_id_2 = mock_nft.mint(endaoment_funds.address, sender=governance.address)
-    token_id_3 = mock_nft.mint(endaoment_funds.address, sender=governance.address)
-
-    # Transfer all
-    endaoment_funds.transferNft(mock_nft.address, token_id_1, sender=endaoment.address)
-    endaoment_funds.transferNft(mock_nft.address, token_id_2, sender=endaoment.address)
-    endaoment_funds.transferNft(mock_nft.address, token_id_3, sender=endaoment.address)
-
-    # Verify all transferred
-    assert mock_nft.ownerOf(token_id_1) == endaoment.address
-    assert mock_nft.ownerOf(token_id_2) == endaoment.address
-    assert mock_nft.ownerOf(token_id_3) == endaoment.address
-
-
-def test_transfer_nfts_different_collections(endaoment_funds, endaoment, governance):
-    """Test transferring NFTs from different collections"""
-    # Create two different NFT collections
-    mock_nft_1 = boa.load("contracts/mock/MockErc721.vy", governance.address, "NFT One", "NFT1")
-    mock_nft_2 = boa.load("contracts/mock/MockErc721.vy", governance.address, "NFT Two", "NFT2")
-
-    # Mint one from each collection
-    token_id_1 = mock_nft_1.mint(endaoment_funds.address, sender=governance.address)
-    token_id_2 = mock_nft_2.mint(endaoment_funds.address, sender=governance.address)
-
-    # Transfer both
-    endaoment_funds.transferNft(mock_nft_1.address, token_id_1, sender=endaoment.address)
-    endaoment_funds.transferNft(mock_nft_2.address, token_id_2, sender=endaoment.address)
-
-    # Verify both transferred
-    assert mock_nft_1.ownerOf(token_id_1) == endaoment.address
-    assert mock_nft_2.ownerOf(token_id_2) == endaoment.address
-
-
-###########################
+############################
 # Integration & Edge Cases #
 ###########################
 
@@ -544,21 +421,6 @@ def test_full_flow_eth(endaoment_funds, endaoment, alice):
     assert endaoment_funds.hasBalance() == False
 
 
-def test_full_flow_nft(endaoment_funds, endaoment, mock_nft, governance):
-    """Test full flow for NFT: receive → transfer → verify"""
-    # 1. Receive NFT (mint directly to endaoment_funds)
-    token_id = mock_nft.mint(endaoment_funds.address, sender=governance.address)
-
-    # 2. Verify ownership
-    assert mock_nft.ownerOf(token_id) == endaoment_funds.address
-
-    # 3. Transfer to endaoment
-    endaoment_funds.transferNft(mock_nft.address, token_id, sender=endaoment.address)
-
-    # 4. Verify ownership transferred
-    assert mock_nft.ownerOf(token_id) == endaoment.address
-
-
 def test_mixed_assets_flow(
     endaoment_funds,
     endaoment,
@@ -566,11 +428,8 @@ def test_mixed_assets_flow(
     bravo_token,
     alpha_token_whale,
     bravo_token_whale,
-    mock_nft,
-    governance,
-    alice,
 ):
-    """Test holding and transferring mixed assets (ERC20 + ETH + NFT)"""
+    """Test holding and transferring mixed assets (ERC20 + ETH)"""
     alpha_amount = 1000 * EIGHTEEN_DECIMALS
     bravo_amount = 500 * EIGHTEEN_DECIMALS
     eth_amount = 2 * EIGHTEEN_DECIMALS
@@ -580,13 +439,11 @@ def test_mixed_assets_flow(
     bravo_token.transfer(endaoment_funds.address, bravo_amount, sender=bravo_token_whale)
     initial_eth_balance = boa.env.get_balance(endaoment_funds.address)
     boa.env.set_balance(endaoment_funds.address, initial_eth_balance + eth_amount)
-    token_id = mock_nft.mint(endaoment_funds.address, sender=governance.address)
 
     # Verify all balances
     assert endaoment_funds.hasBalance(alpha_token.address) == True
     assert endaoment_funds.hasBalance(bravo_token.address) == True
     assert endaoment_funds.hasBalance() == True
-    assert mock_nft.ownerOf(token_id) == endaoment_funds.address
 
     # Get initial endaoment balances
     initial_alpha = alpha_token.balanceOf(endaoment.address)
@@ -597,13 +454,11 @@ def test_mixed_assets_flow(
     endaoment_funds.transfer(alpha_token.address, alpha_amount, sender=endaoment.address)
     endaoment_funds.transfer(bravo_token.address, bravo_amount, sender=endaoment.address)
     endaoment_funds.transfer(ZERO_ADDRESS, eth_amount, sender=endaoment.address)
-    endaoment_funds.transferNft(mock_nft.address, token_id, sender=endaoment.address)
 
     # Verify all transferred
     assert alpha_token.balanceOf(endaoment.address) == initial_alpha + alpha_amount
     assert bravo_token.balanceOf(endaoment.address) == initial_bravo + bravo_amount
     assert boa.env.get_balance(endaoment.address) == initial_eth + eth_amount
-    assert mock_nft.ownerOf(token_id) == endaoment.address
 
     # Verify endaoment_funds is empty
     assert endaoment_funds.hasBalance(alpha_token.address) == False

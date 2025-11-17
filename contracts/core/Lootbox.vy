@@ -19,6 +19,7 @@
 #     Ripe Foundation (C) 2025
 
 # @version 0.4.3
+# pragma optimize codesize
 
 implements: Department
 
@@ -51,6 +52,7 @@ interface MissionControl:
     def getClaimLootConfig(_user: address, _caller: address, _ripeToken: address) -> ClaimLootConfig: view
     def getDepositPointsConfig(_asset: address) -> DepositPointsConfig: view
     def getRewardsConfig() -> RewardsConfig: view
+    def underscoreRegistry() -> address: view
 
 interface Teller:
     def depositFromTrusted(_user: address, _vaultId: uint256, _asset: address, _amount: uint256, _lockDuration: uint256, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
@@ -62,7 +64,7 @@ interface PriceDesk:
 interface RipeToken:
     def mint(_to: address, _amount: uint256): nonpayable
 
-interface VaultBook:
+interface AddressRegistry:
     def getAddr(_vaultId: uint256) -> address: view
 
 struct RipeRewards:
@@ -158,6 +160,7 @@ MAX_ASSETS_TO_CLEAN: constant(uint256) = 20
 MAX_VAULTS_TO_CLEAN: constant(uint256) = 10
 MAX_CLAIM_USERS: constant(uint256) = 25
 RIPE_GOV_VAULT_ID: constant(uint256) = 2
+UNDERSCORE_LOOT_DISTRIBUTOR_ID: constant(uint256) = 6
 
 
 @deploy
@@ -241,7 +244,7 @@ def _claimLoot(
 
     for i: uint256 in range(1, numUserVaults, bound=max_value(uint256)):
         vaultId: uint256 = staticcall Ledger(_a.ledger).userVaults(_user, i)
-        vaultAddr: address = staticcall VaultBook(_a.vaultBook).getAddr(vaultId)
+        vaultAddr: address = staticcall AddressRegistry(_a.vaultBook).getAddr(vaultId)
         if vaultAddr == empty(address):
             continue
 
@@ -294,7 +297,7 @@ def getClaimableLoot(_user: address) -> uint256:
 
     for i: uint256 in range(1, numUserVaults, bound=max_value(uint256)):
         vaultId: uint256 = staticcall Ledger(a.ledger).userVaults(_user, i)
-        vaultAddr: address = staticcall VaultBook(a.vaultBook).getAddr(vaultId)
+        vaultAddr: address = staticcall AddressRegistry(a.vaultBook).getAddr(vaultId)
         if vaultAddr == empty(address):
             continue
         numUserAssets: uint256 = staticcall Vault(vaultAddr).numUserAssets(_user)
@@ -320,7 +323,7 @@ def claimDepositLootForAsset(_user: address, _vaultId: uint256, _asset: address)
     assert addys._isValidRipeAddr(msg.sender) # dev: no perms
     assert not deptBasics.isPaused # dev: contract paused
     a: addys.Addys = addys._getAddys()
-    vaultAddr: address = staticcall VaultBook(a.vaultBook).getAddr(_vaultId)
+    vaultAddr: address = staticcall AddressRegistry(a.vaultBook).getAddr(_vaultId)
     totalRipeForUser: uint256 = self._claimDepositLoot(_user, _vaultId, vaultAddr, _asset, False, a)
     if totalRipeForUser != 0:
         config: ClaimLootConfig = staticcall MissionControl(a.missionControl).getClaimLootConfig(_user, _user, a.ripeToken)
@@ -416,7 +419,7 @@ def _getDepositLootData(
 @external
 def getClaimableDepositLootForAsset(_user: address, _vaultId: uint256, _asset: address) -> uint256:
     a: addys.Addys = addys._getAddys()
-    vaultAddr: address = staticcall VaultBook(a.vaultBook).getAddr(_vaultId)
+    vaultAddr: address = staticcall AddressRegistry(a.vaultBook).getAddr(_vaultId)
     return self._getClaimableDepositLootForAsset(_user, _vaultId, vaultAddr, _asset, a)
 
 
@@ -547,7 +550,7 @@ def resetUserBalancePoints(_user: address, _asset: address, _vaultId: uint256):
     # get latest global rewards
     config: RewardsConfig = staticcall MissionControl(a.missionControl).getRewardsConfig()
     globalRewards: RipeRewards = self._getLatestGlobalRipeRewards(config, a)
-    vaultAddr: address = staticcall VaultBook(a.vaultBook).getAddr(_vaultId)
+    vaultAddr: address = staticcall AddressRegistry(a.vaultBook).getAddr(_vaultId)
     if empty(address) in [vaultAddr, _asset, _user]:
         return
 
@@ -577,7 +580,7 @@ def resetAssetPoints(_asset: address, _vaultId: uint256):
     # get latest global rewards
     config: RewardsConfig = staticcall MissionControl(a.missionControl).getRewardsConfig()
     globalRewards: RipeRewards = self._getLatestGlobalRipeRewards(config, a)
-    vaultAddr: address = staticcall VaultBook(a.vaultBook).getAddr(_vaultId)
+    vaultAddr: address = staticcall AddressRegistry(a.vaultBook).getAddr(_vaultId)
     if empty(address) in [vaultAddr, _asset]:
         return
 
@@ -716,7 +719,7 @@ def getLatestDepositPoints(
 ) -> (UserDepositPoints, AssetDepositPoints, GlobalDepositPoints):
     a: addys.Addys = addys._getAddys(_a)
     c: RewardsConfig = staticcall MissionControl(a.missionControl).getRewardsConfig()
-    vaultAddr: address = staticcall VaultBook(a.vaultBook).getAddr(_vaultId)
+    vaultAddr: address = staticcall AddressRegistry(a.vaultBook).getAddr(_vaultId)
     return self._getLatestDepositPoints(_user, _vaultId, vaultAddr, _asset, c, a)
 
 
@@ -1072,6 +1075,27 @@ def _getLatestGlobalRipeRewards(_config: RewardsConfig, _a: addys.Addys) -> Ripe
         rewards.newRipeRewards = newRipeDistro
 
     return rewards
+
+
+###############################
+# Underscore Loot Distributor #
+###############################
+
+
+# TODO: implement
+
+
+# get underscore loot distributor
+
+
+@view
+@internal
+def _getUnderscoreLootDistributor(_mc: address) -> address:
+    underscore: address = staticcall MissionControl(_mc).underscoreRegistry()
+    if underscore == empty(address):
+        return empty(address)
+    return staticcall AddressRegistry(underscore).getAddr(UNDERSCORE_LOOT_DISTRIBUTOR_ID)
+
 
 
 #########
