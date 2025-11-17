@@ -28,6 +28,10 @@ interface Lootbox:
     def claimLootForUser(_user: address, _caller: address, _shouldStake: bool, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
     def claimDepositLootForAsset(_user: address, _vaultId: uint256, _asset: address) -> uint256: nonpayable
     def updateRipeRewards(_a: addys.Addys = empty(addys.Addys)): nonpayable
+    def distributeUnderscoreRewards(_a: addys.Addys = empty(addys.Addys)): nonpayable
+    def setUnderscoreSendInterval(_interval: uint256): nonpayable
+    def setUndyDepositRewardsAmount(_amount: uint256): nonpayable
+    def setUndyYieldBonusAmount(_amount: uint256): nonpayable
 
 interface AuctionHouse:
     def startManyAuctions(_auctions: DynArray[FungAuctionConfig, MAX_AUCTIONS], _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
@@ -237,6 +241,22 @@ event TrainingWheelsAccessSet:
     trainingWheels: indexed(address)
     user: indexed(address)
     isAllowed: bool
+
+event UnderscoreRewardsDistributed:
+    caller: indexed(address)
+    success: bool
+
+event UnderscoreSendIntervalSet:
+    interval: uint256
+    caller: indexed(address)
+
+event UndyDepositRewardsAmountSet:
+    amount: uint256
+    caller: indexed(address)
+
+event UndyYieldBonusAmountSet:
+    amount: uint256
+    caller: indexed(address)
 
 # pending actions storage
 actionType: public(HashMap[uint256, ActionType])
@@ -480,6 +500,42 @@ def updateRipeRewards() -> bool:
 
     extcall Lootbox(self._getLootboxAddr()).updateRipeRewards()
     log RipeRewardsUpdated(caller=msg.sender, success=True)
+    return True
+
+
+@external
+def distributeUnderscoreRewards() -> bool:
+    assert self._hasPermsForLiteAction(msg.sender, True) # dev: no perms
+
+    extcall Lootbox(self._getLootboxAddr()).distributeUnderscoreRewards()
+    log UnderscoreRewardsDistributed(caller=msg.sender, success=True)
+    return True
+
+
+@external
+def setUnderscoreSendInterval(_interval: uint256) -> bool:
+    assert self._hasPermsForLiteAction(msg.sender, True) # dev: no perms
+
+    extcall Lootbox(self._getLootboxAddr()).setUnderscoreSendInterval(_interval)
+    log UnderscoreSendIntervalSet(interval=_interval, caller=msg.sender)
+    return True
+
+
+@external
+def setUndyDepositRewardsAmount(_amount: uint256) -> bool:
+    assert self._hasPermsForLiteAction(msg.sender, True) # dev: no perms
+
+    extcall Lootbox(self._getLootboxAddr()).setUndyDepositRewardsAmount(_amount)
+    log UndyDepositRewardsAmountSet(amount=_amount, caller=msg.sender)
+    return True
+
+
+@external
+def setUndyYieldBonusAmount(_amount: uint256) -> bool:
+    assert self._hasPermsForLiteAction(msg.sender, True) # dev: no perms
+
+    extcall Lootbox(self._getLootboxAddr()).setUndyYieldBonusAmount(_amount)
+    log UndyYieldBonusAmountSet(amount=_amount, caller=msg.sender)
     return True
 
 

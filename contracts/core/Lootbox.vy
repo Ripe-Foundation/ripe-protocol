@@ -154,6 +154,12 @@ event BorrowLootClaimed:
     user: indexed(address)
     ripeAmount: uint256
 
+event UnderscoreRewardsDistributed:
+    underscoreAddr: indexed(address)
+    depositAmount: uint256
+    yieldAmount: uint256
+    blockNumber: uint256
+
 EIGHTEEN_DECIMALS: constant(uint256) = 10 ** 18
 HUNDRED_PERCENT: constant(uint256) = 100_00 # 100.00%
 MAX_ASSETS_TO_CLEAN: constant(uint256) = 20
@@ -161,6 +167,12 @@ MAX_VAULTS_TO_CLEAN: constant(uint256) = 10
 MAX_CLAIM_USERS: constant(uint256) = 25
 RIPE_GOV_VAULT_ID: constant(uint256) = 2
 UNDERSCORE_LOOT_DISTRIBUTOR_ID: constant(uint256) = 6
+
+# Underscore rewards storage
+UnderscoreSendInterval: public(uint256)
+lastUnderscoreSend: public(uint256)
+UndyDepositRewardsAmount: public(uint256)
+UndyYieldBonusAmount: public(uint256)
 
 
 @deploy
@@ -1082,7 +1094,84 @@ def _getLatestGlobalRipeRewards(_config: RewardsConfig, _a: addys.Addys) -> Ripe
 ###############################
 
 
-# TODO: implement
+# config setters (switchboard-callable)
+
+
+@external
+def setUnderscoreSendInterval(_interval: uint256):
+    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
+    assert not deptBasics.isPaused # dev: contract paused
+    self.UnderscoreSendInterval = _interval
+
+
+@external
+def setUndyDepositRewardsAmount(_amount: uint256):
+    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
+    assert not deptBasics.isPaused # dev: contract paused
+    self.UndyDepositRewardsAmount = _amount
+
+
+@external
+def setUndyYieldBonusAmount(_amount: uint256):
+    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
+    assert not deptBasics.isPaused # dev: contract paused
+    self.UndyYieldBonusAmount = _amount
+
+
+# distribute underscore rewards
+
+
+@external
+def distributeUnderscoreRewards(_a: addys.Addys = empty(addys.Addys)):
+    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
+    assert not deptBasics.isPaused # dev: contract paused
+    a: addys.Addys = addys._getAddys(_a)
+
+    # check interval constraint
+    assert block.number > self.lastUnderscoreSend + self.UnderscoreSendInterval # dev: too early
+
+    # get available RIPE rewards
+    ripeAvailForRewards: uint256 = staticcall Ledger(a.ledger).ripeAvailForRewards()
+
+    # calculate total to send (capped at available)
+    totalConfigured: uint256 = self.UndyDepositRewardsAmount + self.UndyYieldBonusAmount
+    actualTotal: uint256 = min(totalConfigured, ripeAvailForRewards)
+
+    # early return if nothing to send
+    if actualTotal == 0:
+        return
+
+    # calculate proportional amounts for deposit and yield
+    actualDepositAmount: uint256 = 0
+    actualYieldAmount: uint256 = 0
+    if totalConfigured != 0:
+        actualDepositAmount = actualTotal * self.UndyDepositRewardsAmount // totalConfigured
+        actualYieldAmount = actualTotal - actualDepositAmount
+
+    # get underscore distributor address
+    underscoreDistributor: address = self._getUnderscoreLootDistributor(a.missionControl)
+    assert underscoreDistributor != empty(address) # dev: no underscore distributor
+
+    # mint RIPE to underscore
+    extcall RipeToken(a.ripeToken).mint(underscoreDistributor, actualTotal)
+
+    # update last send block
+    self.lastUnderscoreSend = block.number
+
+    # update Ledger accounting - use RipeRewards.newRipeRewards to decrement ripeAvailForRewards
+    b: RipeRewardsBundle = staticcall Ledger(a.ledger).getRipeRewardsBundle()
+    rewards: RipeRewards = b.ripeRewards
+    rewards.newRipeRewards = actualTotal
+    rewards.lastUpdate = block.number
+    extcall Ledger(a.ledger).setRipeRewards(rewards)
+
+    # emit event
+    log UnderscoreRewardsDistributed(
+        underscoreAddr=underscoreDistributor,
+        depositAmount=actualDepositAmount,
+        yieldAmount=actualYieldAmount,
+        blockNumber=block.number
+    )
 
 
 # get underscore loot distributor
