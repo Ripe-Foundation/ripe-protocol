@@ -281,31 +281,35 @@ def mintGreen(_usdcAmount: uint256 = max_value(uint256), _recipient: address = m
 
 @view
 @external
-def getMaxUsdcAmountForMint(_user: address = empty(address)) -> uint256:
+def getMaxUsdcAmountForMint(_user: address = empty(address), _isUnderscoreAddr: bool = False) -> uint256:
     usdc: address = USDC
     a: addys.Addys = addys._getAddys()
+    usdcAmount: uint256 = max_value(uint256)
 
-    # convert interval capacity (GREEN) back to USDC needed
-    intervalCapacity: uint256 = self._getAvailIntervalMint()
+    # not underscore addr
+    if not _isUnderscoreAddr:
 
-    # properly account for USDC price (may need more USDC if below peg)
-    usdcFromPriceDesk: uint256 = staticcall PriceDesk(a.priceDesk).getAssetAmount(usdc, intervalCapacity, False)
-    usdcInGreenDecimals: uint256 = intervalCapacity * ONE_USDC // ONE_GREEN
-    usdcNeeded: uint256 = max(usdcFromPriceDesk, usdcInGreenDecimals)
+        # convert interval capacity (GREEN) back to USDC needed
+        intervalCapacity: uint256 = self._getAvailIntervalMint()
 
-    # account for mint fee: usdcAfterFee = usdcInput * (1 - fee)
-    # reverse: usdcInput = usdcAfterFee * HUNDRED_PERCENT / (HUNDRED_PERCENT - fee)
-    mintFee: uint256 = self.mintFee
-    if mintFee != 0:
-        feeMultiplier: uint256 = HUNDRED_PERCENT - mintFee
-        usdcNeeded = usdcNeeded * HUNDRED_PERCENT // feeMultiplier
+        # properly account for USDC price (may need more USDC if below peg)
+        usdcFromPriceDesk: uint256 = staticcall PriceDesk(a.priceDesk).getAssetAmount(usdc, intervalCapacity, False)
+        usdcInGreenDecimals: uint256 = intervalCapacity * ONE_USDC // ONE_GREEN
+        usdcAmount = max(usdcFromPriceDesk, usdcInGreenDecimals)
+
+        # account for mint fee: usdcAfterFee = usdcInput * (1 - fee)
+        # reverse: usdcInput = usdcAfterFee * HUNDRED_PERCENT / (HUNDRED_PERCENT - fee)
+        mintFee: uint256 = self.mintFee
+        if mintFee != 0:
+            feeMultiplier: uint256 = HUNDRED_PERCENT - mintFee
+            usdcAmount = usdcAmount * HUNDRED_PERCENT // feeMultiplier
 
     # if user provided, also consider their usdc balance
     if _user != empty(address):
         usdcBalance: uint256 = staticcall IERC20(usdc).balanceOf(_user)
-        usdcNeeded = min(usdcBalance, usdcNeeded)
+        usdcAmount = min(usdcBalance, usdcAmount)
 
-    return usdcNeeded
+    return usdcAmount
 
 
 # check interval availability
@@ -432,12 +436,14 @@ def redeemGreen(_paymentAmount: uint256 = max_value(uint256), _recipient: addres
 
 @view
 @external
-def getMaxRedeemableGreenAmount(_user: address = empty(address)) -> uint256:
+def getMaxRedeemableGreenAmount(_user: address = empty(address), _isUnderscoreAddr: bool = False) -> uint256:
     a: addys.Addys = addys._getAddys()
     usdc: address = USDC
 
     # interval capacity
-    intervalCapacity: uint256 = self._getAvailIntervalRedemptions()
+    intervalCapacity: uint256 = max_value(uint256)
+    if not _isUnderscoreAddr:
+        intervalCapacity = self._getAvailIntervalRedemptions()
 
     # usdc available (idle + yield)
     usdcYieldPosition: UsdcYieldPosition = self.usdcYieldPosition
@@ -450,10 +456,11 @@ def getMaxRedeemableGreenAmount(_user: address = empty(address)) -> uint256:
 
     # account for redeem fee: usdcAfterFee = usdcToGive * (1 - fee)
     # reverse: greenAmount = greenBeforeFee / (1 - fee)
-    redeemFee: uint256 = self.redeemFee
-    if redeemFee != 0:
-        feeMultiplier: uint256 = HUNDRED_PERCENT - redeemFee
-        maxGreenFromUsdc = maxGreenFromUsdc * HUNDRED_PERCENT // feeMultiplier
+    if not _isUnderscoreAddr:
+        redeemFee: uint256 = self.redeemFee
+        if redeemFee != 0:
+            feeMultiplier: uint256 = HUNDRED_PERCENT - redeemFee
+            maxGreenFromUsdc = maxGreenFromUsdc * HUNDRED_PERCENT // feeMultiplier
 
     # get limiting factor from interval and usdc
     maxRedeemable: uint256 = min(intervalCapacity, maxGreenFromUsdc)

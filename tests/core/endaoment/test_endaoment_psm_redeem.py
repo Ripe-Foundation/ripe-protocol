@@ -1297,7 +1297,7 @@ def test_getMaxRedeemableGreenAmount_full_interval(endaoment_psm, charlie_token,
     endaoment_psm.setCanRedeem(True, sender=switchboard_charlie.address)
 
     # At 1:1 peg with no fee, max GREEN should equal interval limit
-    max_green = endaoment_psm.getMaxRedeemableGreenAmount()
+    max_green = endaoment_psm.getMaxRedeemableGreenAmount(ZERO_ADDRESS, False)
     assert max_green == 100_000 * EIGHTEEN_DECIMALS
 
 
@@ -1323,7 +1323,7 @@ def test_getMaxRedeemableGreenAmount_after_partial_redeem(endaoment_psm, charlie
     endaoment_psm.redeemGreen(30_000 * EIGHTEEN_DECIMALS, sender=user)
 
     # Max GREEN should now be 70,000
-    max_green = endaoment_psm.getMaxRedeemableGreenAmount()
+    max_green = endaoment_psm.getMaxRedeemableGreenAmount(ZERO_ADDRESS, False)
     assert max_green == 70_000 * EIGHTEEN_DECIMALS
 
 
@@ -1343,7 +1343,7 @@ def test_getMaxRedeemableGreenAmount_with_fee(endaoment_psm, charlie_token, swit
     # Therefore, min(100k, huge) = 100k GREEN
     # The interval limit is the constraining factor, not USDC availability
     expected = 100_000 * EIGHTEEN_DECIMALS
-    max_green = endaoment_psm.getMaxRedeemableGreenAmount()
+    max_green = endaoment_psm.getMaxRedeemableGreenAmount(ZERO_ADDRESS, False)
     assert max_green == expected
 
 
@@ -1465,7 +1465,7 @@ def test_getMaxRedeemableGreenAmount_limited_by_usdc_availability(endaoment_psm,
     endaoment_psm.setCanRedeem(True, sender=switchboard_charlie.address)
 
     # Max GREEN should be limited by USDC (50,000), not interval (100,000)
-    max_green = endaoment_psm.getMaxRedeemableGreenAmount()
+    max_green = endaoment_psm.getMaxRedeemableGreenAmount(ZERO_ADDRESS, False)
     assert max_green == 50_000 * EIGHTEEN_DECIMALS
 
 

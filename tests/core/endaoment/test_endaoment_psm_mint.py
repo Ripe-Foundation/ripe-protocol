@@ -962,7 +962,7 @@ def test_getMaxUsdcAmountForMint_full_interval(endaoment_psm, charlie_token, swi
     endaoment_psm.setCanMint(True, sender=switchboard_charlie.address)
 
     # At 1:1 peg with no fee, max USDC should equal interval limit
-    max_usdc = endaoment_psm.getMaxUsdcAmountForMint()
+    max_usdc = endaoment_psm.getMaxUsdcAmountForMint(ZERO_ADDRESS, False)
     assert max_usdc == 100_000 * SIX_DECIMALS
 
 
@@ -980,7 +980,7 @@ def test_getMaxUsdcAmountForMint_after_partial_mint(endaoment_psm, charlie_token
     endaoment_psm.mintGreen(30_000 * SIX_DECIMALS, sender=user)
 
     # Max USDC should now be 70,000
-    max_usdc = endaoment_psm.getMaxUsdcAmountForMint()
+    max_usdc = endaoment_psm.getMaxUsdcAmountForMint(ZERO_ADDRESS, False)
     assert max_usdc == 70_000 * SIX_DECIMALS
 
 
@@ -996,7 +996,7 @@ def test_getMaxUsdcAmountForMint_with_fee(endaoment_psm, charlie_token, switchbo
     #         = 100_000 * 10_000 / (10_000 - 500)
     #         = 100_000 * 10_000 / 9_500
     expected = 100_000 * SIX_DECIMALS * 10_000 // 9_500
-    max_usdc = endaoment_psm.getMaxUsdcAmountForMint()
+    max_usdc = endaoment_psm.getMaxUsdcAmountForMint(ZERO_ADDRESS, False)
     assert max_usdc == expected
 
 
@@ -1012,11 +1012,11 @@ def test_getMaxUsdcAmountForMint_with_user_address(endaoment_psm, charlie_token,
     charlie_token.mint(user, 50_000 * SIX_DECIMALS, sender=governance.address)
 
     # Without user address, should return full interval
-    max_usdc_general = endaoment_psm.getMaxUsdcAmountForMint()
+    max_usdc_general = endaoment_psm.getMaxUsdcAmountForMint(ZERO_ADDRESS, False)
     assert max_usdc_general == 100_000 * SIX_DECIMALS
 
     # With user address, should cap at user balance
-    max_usdc_user = endaoment_psm.getMaxUsdcAmountForMint(user)
+    max_usdc_user = endaoment_psm.getMaxUsdcAmountForMint(user, False)
     assert max_usdc_user == 50_000 * SIX_DECIMALS
 
 
@@ -1030,7 +1030,7 @@ def test_getMaxUsdcAmountForMint_usdc_below_peg(endaoment_psm, charlie_token, sw
 
     # When USDC is at $0.95, need more USDC to mint 100k GREEN
     # To get $100k worth of GREEN, need 100k / 0.95 = ~105,263 USDC
-    max_usdc = endaoment_psm.getMaxUsdcAmountForMint()
+    max_usdc = endaoment_psm.getMaxUsdcAmountForMint(ZERO_ADDRESS, False)
 
     # Should be more than 100k USDC due to below-peg price
     assert max_usdc > 100_000 * SIX_DECIMALS
@@ -1048,7 +1048,7 @@ def test_getMaxUsdcAmountForMint_usdc_above_peg(endaoment_psm, charlie_token, sw
 
     # When USDC is at $1.05, the price desk would suggest less USDC needed
     # But contract uses max(priceDesk, decimalConversion), so at 1:1 decimal ratio
-    max_usdc = endaoment_psm.getMaxUsdcAmountForMint()
+    max_usdc = endaoment_psm.getMaxUsdcAmountForMint(ZERO_ADDRESS, False)
 
     # Should use decimal conversion (100k USDC for 100k GREEN)
     assert max_usdc == 100_000 * SIX_DECIMALS
@@ -1068,14 +1068,14 @@ def test_getMaxUsdcAmountForMint_after_interval_reset(endaoment_psm, charlie_tok
     endaoment_psm.mintGreen(80_000 * SIX_DECIMALS, sender=user)
 
     # Should have only 20,000 remaining
-    max_usdc = endaoment_psm.getMaxUsdcAmountForMint()
+    max_usdc = endaoment_psm.getMaxUsdcAmountForMint(ZERO_ADDRESS, False)
     assert max_usdc == 20_000 * SIX_DECIMALS
 
     # Travel past interval
     boa.env.time_travel(blocks=ONE_DAY_BLOCKS + 1)
 
     # Should reset to full capacity
-    max_usdc = endaoment_psm.getMaxUsdcAmountForMint()
+    max_usdc = endaoment_psm.getMaxUsdcAmountForMint(ZERO_ADDRESS, False)
     assert max_usdc == 100_000 * SIX_DECIMALS
 
 
@@ -1095,7 +1095,7 @@ def test_getMaxUsdcAmountForMint_with_fee_and_user_balance(endaoment_psm, charli
     charlie_token.mint(user, 50_000 * SIX_DECIMALS, sender=governance.address)
 
     # Should cap at user's 50k balance
-    max_usdc_user = endaoment_psm.getMaxUsdcAmountForMint(user)
+    max_usdc_user = endaoment_psm.getMaxUsdcAmountForMint(user, False)
     assert max_usdc_user == 50_000 * SIX_DECIMALS
 
 
