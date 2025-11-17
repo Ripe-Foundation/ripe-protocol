@@ -410,6 +410,7 @@ def human_resources(ripe_hq_deploy, fork, deploy3r):
     assert hr.setActionTimeLockAfterSetup(sender=deploy3r)
     return hr
 
+
 # lootbox
 
 
@@ -418,6 +419,9 @@ def lootbox(ripe_hq_deploy):
     return boa.load(
         "contracts/core/Lootbox.vy",
         ripe_hq_deploy,
+        43_200, # 1 day in blocks
+        100 * EIGHTEEN_DECIMALS, # deposit rewards amount
+        100 * EIGHTEEN_DECIMALS, # yield bonus amount
         name="lootbox",
     )
 

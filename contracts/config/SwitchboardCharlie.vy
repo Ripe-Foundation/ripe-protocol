@@ -28,7 +28,8 @@ interface Lootbox:
     def claimLootForUser(_user: address, _caller: address, _shouldStake: bool, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
     def claimDepositLootForAsset(_user: address, _vaultId: uint256, _asset: address) -> uint256: nonpayable
     def updateRipeRewards(_a: addys.Addys = empty(addys.Addys)): nonpayable
-    def distributeUnderscoreRewards(_a: addys.Addys = empty(addys.Addys)): nonpayable
+    def distributeUnderscoreRewards() -> (uint256, uint256): nonpayable
+    def setHasUnderscoreRewards(_hasRewards: bool): nonpayable
     def setUnderscoreSendInterval(_interval: uint256): nonpayable
     def setUndyDepositRewardsAmount(_amount: uint256): nonpayable
     def setUndyYieldBonusAmount(_amount: uint256): nonpayable
@@ -76,6 +77,9 @@ flag ActionType:
     PAUSE_AUCTION
     PAUSE_MANY_AUCTIONS
     TRAINING_WHEELS
+    SET_UNDERSCORE_SEND_INTERVAL
+    SET_UNDY_DEPOSIT_REWARDS_AMOUNT
+    SET_UNDY_YIELD_BONUS_AMOUNT
 
 struct PauseAction:
     contractAddr: address
@@ -258,6 +262,25 @@ event UndyYieldBonusAmountSet:
     amount: uint256
     caller: indexed(address)
 
+event HasUnderscoreRewardsSet:
+    hasRewards: bool
+    caller: indexed(address)
+
+event PendingUnderscoreSendIntervalAction:
+    interval: uint256
+    confirmationBlock: uint256
+    actionId: uint256
+
+event PendingUndyDepositRewardsAmountAction:
+    amount: uint256
+    confirmationBlock: uint256
+    actionId: uint256
+
+event PendingUndyYieldBonusAmountAction:
+    amount: uint256
+    confirmationBlock: uint256
+    actionId: uint256
+
 # pending actions storage
 actionType: public(HashMap[uint256, ActionType])
 pendingPauseActions: public(HashMap[uint256, PauseAction])
@@ -268,6 +291,9 @@ pendingStartManyAuctionsActions: public(HashMap[uint256, DynArray[FungAuctionCon
 pendingPauseAuctionActions: public(HashMap[uint256, FungAuctionConfig])
 pendingPauseManyAuctionsActions: public(HashMap[uint256, DynArray[FungAuctionConfig, MAX_AUCTIONS]])
 pendingTrainingWheels: public(HashMap[uint256, address])
+pendingUnderscoreSendInterval: public(HashMap[uint256, uint256])
+pendingUndyDepositRewardsAmount: public(HashMap[uint256, uint256])
+pendingUndyYieldBonusAmount: public(HashMap[uint256, uint256])
 
 MAX_RECOVER_ASSETS: constant(uint256) = 20
 MAX_AUCTIONS: constant(uint256) = 20
@@ -513,30 +539,61 @@ def distributeUnderscoreRewards() -> bool:
 
 
 @external
-def setUnderscoreSendInterval(_interval: uint256) -> bool:
-    assert self._hasPermsForLiteAction(msg.sender, True) # dev: no perms
+def setHasUnderscoreRewards(_hasRewards: bool) -> bool:
+    # Allow lite action to disable (False), but only governance can enable (True)
+    assert self._hasPermsForLiteAction(msg.sender, not _hasRewards) # dev: no perms
 
-    extcall Lootbox(self._getLootboxAddr()).setUnderscoreSendInterval(_interval)
-    log UnderscoreSendIntervalSet(interval=_interval, caller=msg.sender)
+    extcall Lootbox(self._getLootboxAddr()).setHasUnderscoreRewards(_hasRewards)
+    log HasUnderscoreRewardsSet(hasRewards=_hasRewards, caller=msg.sender)
     return True
 
 
 @external
-def setUndyDepositRewardsAmount(_amount: uint256) -> bool:
-    assert self._hasPermsForLiteAction(msg.sender, True) # dev: no perms
+def setUnderscoreSendInterval(_interval: uint256) -> uint256:
+    assert gov._canGovern(msg.sender) # dev: no perms
 
-    extcall Lootbox(self._getLootboxAddr()).setUndyDepositRewardsAmount(_amount)
-    log UndyDepositRewardsAmountSet(amount=_amount, caller=msg.sender)
-    return True
+    aid: uint256 = timeLock._initiateAction()
+    self.actionType[aid] = ActionType.SET_UNDERSCORE_SEND_INTERVAL
+    self.pendingUnderscoreSendInterval[aid] = _interval
+    confirmationBlock: uint256 = timeLock._getActionConfirmationBlock(aid)
+    log PendingUnderscoreSendIntervalAction(
+        interval=_interval,
+        confirmationBlock=confirmationBlock,
+        actionId=aid
+    )
+    return aid
 
 
 @external
-def setUndyYieldBonusAmount(_amount: uint256) -> bool:
-    assert self._hasPermsForLiteAction(msg.sender, True) # dev: no perms
+def setUndyDepositRewardsAmount(_amount: uint256) -> uint256:
+    assert gov._canGovern(msg.sender) # dev: no perms
 
-    extcall Lootbox(self._getLootboxAddr()).setUndyYieldBonusAmount(_amount)
-    log UndyYieldBonusAmountSet(amount=_amount, caller=msg.sender)
-    return True
+    aid: uint256 = timeLock._initiateAction()
+    self.actionType[aid] = ActionType.SET_UNDY_DEPOSIT_REWARDS_AMOUNT
+    self.pendingUndyDepositRewardsAmount[aid] = _amount
+    confirmationBlock: uint256 = timeLock._getActionConfirmationBlock(aid)
+    log PendingUndyDepositRewardsAmountAction(
+        amount=_amount,
+        confirmationBlock=confirmationBlock,
+        actionId=aid
+    )
+    return aid
+
+
+@external
+def setUndyYieldBonusAmount(_amount: uint256) -> uint256:
+    assert gov._canGovern(msg.sender) # dev: no perms
+
+    aid: uint256 = timeLock._initiateAction()
+    self.actionType[aid] = ActionType.SET_UNDY_YIELD_BONUS_AMOUNT
+    self.pendingUndyYieldBonusAmount[aid] = _amount
+    confirmationBlock: uint256 = timeLock._getActionConfirmationBlock(aid)
+    log PendingUndyYieldBonusAmountAction(
+        amount=_amount,
+        confirmationBlock=confirmationBlock,
+        actionId=aid
+    )
+    return aid
 
 
 @external
@@ -771,6 +828,21 @@ def executePendingAction(_aid: uint256) -> bool:
         p: address = self.pendingTrainingWheels[_aid]
         extcall MissionControl(self._getMissionControlAddr()).setTrainingWheels(p)
         log TrainingWheelsSet(trainingWheels=p)
+
+    elif actionType == ActionType.SET_UNDERSCORE_SEND_INTERVAL:
+        interval: uint256 = self.pendingUnderscoreSendInterval[_aid]
+        extcall Lootbox(self._getLootboxAddr()).setUnderscoreSendInterval(interval)
+        log UnderscoreSendIntervalSet(interval=interval, caller=msg.sender)
+
+    elif actionType == ActionType.SET_UNDY_DEPOSIT_REWARDS_AMOUNT:
+        amount: uint256 = self.pendingUndyDepositRewardsAmount[_aid]
+        extcall Lootbox(self._getLootboxAddr()).setUndyDepositRewardsAmount(amount)
+        log UndyDepositRewardsAmountSet(amount=amount, caller=msg.sender)
+
+    elif actionType == ActionType.SET_UNDY_YIELD_BONUS_AMOUNT:
+        amount: uint256 = self.pendingUndyYieldBonusAmount[_aid]
+        extcall Lootbox(self._getLootboxAddr()).setUndyYieldBonusAmount(amount)
+        log UndyYieldBonusAmountSet(amount=amount, caller=msg.sender)
 
     self.actionType[_aid] = empty(ActionType)
     return True

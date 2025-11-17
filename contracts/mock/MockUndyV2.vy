@@ -140,3 +140,10 @@ def addLiquidity(
         assert extcall IERC20(_tokenB).transfer(msg.sender, refundAssetAmountB, default_return_value=True) # dev: transfer failed
 
     return lpToken, lpAmountReceived, liqAmountA, liqAmountB, usdValue
+
+
+@external
+def addDepositRewards(_asset: address, _amount: uint256):
+    amount: uint256 = min(_amount, staticcall IERC20(_asset).balanceOf(msg.sender))
+    assert amount != 0 # dev: nothing to add
+    assert extcall IERC20(_asset).transferFrom(msg.sender, self, amount, default_return_value=True) # dev: transfer failed
