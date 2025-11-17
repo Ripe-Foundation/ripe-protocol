@@ -1217,18 +1217,22 @@ def distributeUnderscoreRewards() -> (uint256, uint256):
     config: RewardsConfig = staticcall MissionControl(a.missionControl).getRewardsConfig()
     ripeRewards: RipeRewards = self._getLatestGlobalRipeRewards(config, a)
     ripeAvailForRewards -= min(ripeRewards.newRipeRewards, ripeAvailForRewards)
+    assert ripeAvailForRewards != 0 # dev: no rewards to distribute
 
     # calculate total
     undyDepositRewardsAmount: uint256 = self.undyDepositRewardsAmount
     undyYieldBonusAmount: uint256 = self.undyYieldBonusAmount
-    newUndyRewards: uint256 = min(undyDepositRewardsAmount + undyYieldBonusAmount, ripeAvailForRewards)
-    assert newUndyRewards != 0 # dev: no rewards to distribute
+    totalRewardsAmount: uint256 = undyDepositRewardsAmount + undyYieldBonusAmount
+    assert totalRewardsAmount != 0 # dev: no rewards to distribute
+
+    newUndyRewards: uint256 = min(totalRewardsAmount, ripeAvailForRewards)
 
     # calculate proportional amounts for deposit and yield
-    depositRewards: uint256 = newUndyRewards * undyDepositRewardsAmount // (undyDepositRewardsAmount + undyYieldBonusAmount)
-    yieldBonusAmount: uint256 = newUndyRewards - depositRewards
-    newUndyRewards = depositRewards + yieldBonusAmount
-    assert newUndyRewards != 0 # dev: no rewards to distribute
+    depositRewards: uint256 = undyDepositRewardsAmount
+    yieldBonusAmount: uint256 = undyYieldBonusAmount
+    if newUndyRewards != totalRewardsAmount:
+        depositRewards = newUndyRewards * undyDepositRewardsAmount // totalRewardsAmount
+        yieldBonusAmount = newUndyRewards - depositRewards
 
     # mint RIPE tokens
     extcall RipeToken(a.ripeToken).mint(self, newUndyRewards)
