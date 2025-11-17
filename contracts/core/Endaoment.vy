@@ -37,6 +37,7 @@ from interfaces import UndyLego
 
 from ethereum.ercs import IERC20
 from ethereum.ercs import IERC721
+
 interface CurvePool:
     def remove_liquidity_imbalance(_amounts: DynArray[uint256, 2], _maxLpBurnAmount: uint256, _recipient: address = msg.sender) -> uint256: nonpayable
     def add_liquidity(_amounts: DynArray[uint256, 2], _minLpAmountOut: uint256, _recipient: address = msg.sender) -> uint256: nonpayable
@@ -45,9 +46,6 @@ interface CurvePool:
 interface EndaomentFunds:
     def transfer(_asset: address = empty(address), _amount: uint256 = max_value(uint256)) -> uint256: nonpayable
     def hasBalance(_asset: address = empty(address)) -> bool: view
-
-interface EndaomentPSM:
-    def USDC() -> address: view
 
 interface Ledger:
     def updateGreenPoolDebt(_pool: address, _amount: uint256, _isIncrement: bool): nonpayable
@@ -73,6 +71,9 @@ interface UnderscoreRegistry:
 
 interface MissionControl:
     def underscoreRegistry() -> address: view
+
+interface EndaomentPSM:
+    def USDC() -> address: view
 
 interface RipeHq:
     def governance() -> address: view
