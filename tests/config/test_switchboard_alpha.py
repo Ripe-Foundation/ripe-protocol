@@ -3317,3 +3317,253 @@ def test_undy_vault_discount_multiple_pending_actions(switchboard_alpha, governa
     assert switchboard_alpha.pendingUndyVaultDiscount(action_id1) == 20_00
     assert switchboard_alpha.pendingUndyVaultDiscount(action_id2) == 40_00
     assert switchboard_alpha.pendingUndyVaultDiscount(action_id3) == 60_00
+
+
+###########################
+# Buyback Ratio Tests     #
+###########################
+
+
+def test_set_buyback_ratio_validation(switchboard_alpha, governance):
+    """Test that buyback ratio validation works correctly"""
+    # Test ratio > 100%
+    with boa.reverts("invalid ratio"):
+        switchboard_alpha.setBuybackRatio(100_01, sender=governance.address)  # 100.01%
+
+    with boa.reverts("invalid ratio"):
+        switchboard_alpha.setBuybackRatio(MAX_UINT256, sender=governance.address)  # max uint256
+
+    # Test ratio = 100% should work
+    action_id = switchboard_alpha.setBuybackRatio(100_00, sender=governance.address)
+    assert action_id > 0
+
+
+def test_set_buyback_ratio_permissions(switchboard_alpha, governance, bob):
+    """Test that only governance can set buyback ratio"""
+    # Non-governance user should not be able to call the function
+    with boa.reverts("no perms"):
+        switchboard_alpha.setBuybackRatio(50_00, sender=bob)
+
+    # Governance should be able to call the function
+    action_id = switchboard_alpha.setBuybackRatio(50_00, sender=governance.address)
+    assert action_id > 0
+
+
+def test_set_buyback_ratio_success(switchboard_alpha, governance):
+    """Test successful creation of buyback ratio action"""
+    # Test with valid ratio
+    action_id = switchboard_alpha.setBuybackRatio(75_00, sender=governance.address)
+    assert action_id > 0
+
+    # Check event was emitted
+    logs = filter_logs(switchboard_alpha, "PendingBuybackRatioChange")
+    assert len(logs) == 1
+    log = logs[0]
+    assert log.ratio == 75_00
+    assert log.actionId == action_id
+
+    # Check pending config was stored correctly
+    assert switchboard_alpha.pendingBuybackRatio(action_id) == 75_00
+
+    # Verify action type is set correctly (non-zero means it's set)
+    assert switchboard_alpha.actionType(action_id) != 0
+
+
+def test_set_buyback_ratio_boundary_conditions(switchboard_alpha, governance):
+    """Test buyback ratio at boundary values"""
+    # Test at 0% (all goes to savings green)
+    action_id = switchboard_alpha.setBuybackRatio(0, sender=governance.address)
+    assert action_id > 0
+    assert switchboard_alpha.pendingBuybackRatio(action_id) == 0
+
+    # Test at exactly 100% (all goes to buyback)
+    action_id2 = switchboard_alpha.setBuybackRatio(100_00, sender=governance.address)
+    assert action_id2 > 0
+    assert switchboard_alpha.pendingBuybackRatio(action_id2) == 100_00
+
+    # Test typical values
+    action_id3 = switchboard_alpha.setBuybackRatio(25_00, sender=governance.address)
+    assert action_id3 > 0
+    assert switchboard_alpha.pendingBuybackRatio(action_id3) == 25_00
+
+
+def test_execute_buyback_ratio(switchboard_alpha, credit_engine, governance):
+    """Test execution of buyback ratio action"""
+    # Get initial ratio value
+    initial_ratio = credit_engine.buybackRatio()
+
+    # Create the action with a different ratio
+    new_ratio = 60_00
+    action_id = switchboard_alpha.setBuybackRatio(new_ratio, sender=governance.address)
+    assert action_id > 0
+
+    # Verify ratio hasn't changed yet
+    assert credit_engine.buybackRatio() == initial_ratio
+
+    # Time travel past timelock
+    boa.env.time_travel(blocks=switchboard_alpha.actionTimeLock())
+
+    # Execute the action
+    success = switchboard_alpha.executePendingAction(action_id, sender=governance.address)
+    assert success
+
+    # Verify the ratio was updated in CreditEngine
+    assert credit_engine.buybackRatio() == new_ratio
+
+    # Check execution event was emitted from SwitchboardAlpha
+    logs = filter_logs(switchboard_alpha, "BuybackRatioSet")
+    # Filter to only get logs from SwitchboardAlpha (CreditEngine also emits this event)
+    sb_logs = [log for log in logs if log.address == switchboard_alpha.address]
+    assert len(sb_logs) == 1
+    log = sb_logs[0]
+    assert log.ratio == new_ratio
+
+    # Verify action was cleaned up
+    assert switchboard_alpha.actionType(action_id) == 0
+    assert not switchboard_alpha.hasPendingAction(action_id)
+
+
+def test_execute_buyback_ratio_multiple_changes(switchboard_alpha, credit_engine, governance):
+    """Test multiple sequential buyback ratio changes"""
+    # First change: 40%
+    action_id1 = switchboard_alpha.setBuybackRatio(40_00, sender=governance.address)
+    boa.env.time_travel(blocks=switchboard_alpha.actionTimeLock())
+    switchboard_alpha.executePendingAction(action_id1, sender=governance.address)
+    assert credit_engine.buybackRatio() == 40_00
+
+    # Second change: 80%
+    action_id2 = switchboard_alpha.setBuybackRatio(80_00, sender=governance.address)
+    boa.env.time_travel(blocks=switchboard_alpha.actionTimeLock())
+    switchboard_alpha.executePendingAction(action_id2, sender=governance.address)
+    assert credit_engine.buybackRatio() == 80_00
+
+    # Third change: 0% (all to savings green)
+    action_id3 = switchboard_alpha.setBuybackRatio(0, sender=governance.address)
+    boa.env.time_travel(blocks=switchboard_alpha.actionTimeLock())
+    switchboard_alpha.executePendingAction(action_id3, sender=governance.address)
+    assert credit_engine.buybackRatio() == 0
+
+    # Fourth change: back to 50%
+    action_id4 = switchboard_alpha.setBuybackRatio(50_00, sender=governance.address)
+    boa.env.time_travel(blocks=switchboard_alpha.actionTimeLock())
+    switchboard_alpha.executePendingAction(action_id4, sender=governance.address)
+    assert credit_engine.buybackRatio() == 50_00
+
+
+def test_buyback_ratio_timelock_required(switchboard_alpha, credit_engine, governance):
+    """Test that timelock must be satisfied before execution"""
+    initial_ratio = credit_engine.buybackRatio()
+
+    # Create the action
+    action_id = switchboard_alpha.setBuybackRatio(30_00, sender=governance.address)
+
+    # Try to execute immediately (should fail/return false)
+    success = switchboard_alpha.executePendingAction(action_id, sender=governance.address)
+    assert not success  # Should not execute before timelock
+
+    # Verify ratio hasn't changed
+    assert credit_engine.buybackRatio() == initial_ratio
+
+    # Time travel but not enough
+    boa.env.time_travel(blocks=switchboard_alpha.actionTimeLock() - 1)
+    success = switchboard_alpha.executePendingAction(action_id, sender=governance.address)
+    assert not success  # Still not enough time
+    assert credit_engine.buybackRatio() == initial_ratio
+
+    # Time travel one more block (now should work)
+    boa.env.time_travel(blocks=1)
+    success = switchboard_alpha.executePendingAction(action_id, sender=governance.address)
+    assert success
+    assert credit_engine.buybackRatio() == 30_00
+
+
+def test_buyback_ratio_cancel_action(switchboard_alpha, credit_engine, governance):
+    """Test cancelling a pending buyback ratio change"""
+    initial_ratio = credit_engine.buybackRatio()
+
+    # Create the action
+    action_id = switchboard_alpha.setBuybackRatio(90_00, sender=governance.address)
+    assert switchboard_alpha.hasPendingAction(action_id)
+
+    # Cancel the action
+    success = switchboard_alpha.cancelPendingAction(action_id, sender=governance.address)
+    assert success
+
+    # Verify action was cancelled
+    assert not switchboard_alpha.hasPendingAction(action_id)
+    assert switchboard_alpha.actionType(action_id) == 0
+
+    # Time travel past timelock and try to execute (should fail)
+    boa.env.time_travel(blocks=switchboard_alpha.actionTimeLock())
+    success = switchboard_alpha.executePendingAction(action_id, sender=governance.address)
+    assert not success
+
+    # Verify ratio wasn't changed
+    assert credit_engine.buybackRatio() == initial_ratio
+
+
+def test_buyback_ratio_with_other_debt_configs(switchboard_alpha, mission_control, credit_engine, governance):
+    """Test that buyback ratio works independently of other debt configs"""
+    # Set some other debt config
+    debt_action = switchboard_alpha.setGlobalDebtLimits(7000, 70000, 250, 150, sender=governance.address)
+    boa.env.time_travel(blocks=switchboard_alpha.actionTimeLock())
+    switchboard_alpha.executePendingAction(debt_action, sender=governance.address)
+
+    # Verify debt limits were set
+    debt_config = mission_control.genDebtConfig()
+    assert debt_config.perUserDebtLimit == 7000
+    assert debt_config.globalDebtLimit == 70000
+
+    # Now set buyback ratio
+    ratio_action = switchboard_alpha.setBuybackRatio(45_00, sender=governance.address)
+    boa.env.time_travel(blocks=switchboard_alpha.actionTimeLock())
+    switchboard_alpha.executePendingAction(ratio_action, sender=governance.address)
+
+    # Verify ratio was set
+    assert credit_engine.buybackRatio() == 45_00
+
+    # Verify debt config wasn't affected
+    debt_config = mission_control.genDebtConfig()
+    assert debt_config.perUserDebtLimit == 7000
+    assert debt_config.globalDebtLimit == 70000
+
+
+def test_buyback_ratio_multiple_pending_actions(switchboard_alpha, governance):
+    """Test that multiple buyback ratio actions can be pending at once"""
+    # Create multiple actions
+    action_id1 = switchboard_alpha.setBuybackRatio(20_00, sender=governance.address)
+    action_id2 = switchboard_alpha.setBuybackRatio(40_00, sender=governance.address)
+    action_id3 = switchboard_alpha.setBuybackRatio(60_00, sender=governance.address)
+
+    # All should be different
+    assert action_id1 != action_id2
+    assert action_id2 != action_id3
+
+    # All should be pending
+    assert switchboard_alpha.hasPendingAction(action_id1)
+    assert switchboard_alpha.hasPendingAction(action_id2)
+    assert switchboard_alpha.hasPendingAction(action_id3)
+
+    # All should have correct pending values
+    assert switchboard_alpha.pendingBuybackRatio(action_id1) == 20_00
+    assert switchboard_alpha.pendingBuybackRatio(action_id2) == 40_00
+    assert switchboard_alpha.pendingBuybackRatio(action_id3) == 60_00
+
+
+def test_buyback_ratio_with_undy_vault_discount(switchboard_alpha, credit_engine, governance):
+    """Test that buyback ratio and undy vault discount work independently"""
+    # Set buyback ratio
+    ratio_action = switchboard_alpha.setBuybackRatio(35_00, sender=governance.address)
+    boa.env.time_travel(blocks=switchboard_alpha.actionTimeLock())
+    switchboard_alpha.executePendingAction(ratio_action, sender=governance.address)
+    assert credit_engine.buybackRatio() == 35_00
+
+    # Set undy vault discount
+    discount_action = switchboard_alpha.setUndyVaultDiscount(55_00, sender=governance.address)
+    boa.env.time_travel(blocks=switchboard_alpha.actionTimeLock())
+    switchboard_alpha.executePendingAction(discount_action, sender=governance.address)
+    assert credit_engine.undyVaulDiscount() == 55_00
+
+    # Verify both are set correctly and independently
+    assert credit_engine.buybackRatio() == 35_00
+    assert credit_engine.undyVaulDiscount() == 55_00
