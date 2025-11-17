@@ -222,15 +222,16 @@ def mintGreen(_usdcAmount: uint256 = max_value(uint256), _recipient: address = m
     a: addys.Addys = addys._getAddys()
     assert _recipient != empty(address) # dev: invalid recipient
 
-    # usdc amount to transfer
-    usdc: address = USDC
-    usdcAmount: uint256 = min(_usdcAmount, staticcall IERC20(usdc).balanceOf(msg.sender))
-    assert usdcAmount != 0 # dev: zero amount
-
     # allowlist check (Underscore addresses bypass)
     isUnderscore: bool = self._isUnderscoreAddr(msg.sender, a.missionControl)
     if not isUnderscore and self.shouldEnforceMintAllowlist:
         assert self.mintAllowlist[msg.sender] # dev: not on mint allowlist
+
+    # usdc amount to transfer (cap by user balance and interval limit)
+    usdc: address = USDC
+    maxUsdcAmount: uint256 = min(self._calculateMaxUsdcForMint(isUnderscore, usdc, a.priceDesk), staticcall IERC20(usdc).balanceOf(msg.sender))
+    usdcAmount: uint256 = min(_usdcAmount, maxUsdcAmount)
+    assert usdcAmount != 0 # dev: zero amount
 
     # transfer usdc from user
     assert extcall IERC20(usdc).transferFrom(msg.sender, self, usdcAmount, default_return_value=True) # dev: transfer failed
@@ -250,9 +251,9 @@ def mintGreen(_usdcAmount: uint256 = max_value(uint256), _recipient: address = m
     greenToMint: uint256 = min(usdValue, usdcInGreenDecimals)
     assert greenToMint != 0 # dev: zero mint amount
 
-    # check and update interval limits (Underscore addresses bypass)
+    # update interval storage (Underscore addresses bypass)
     if not isUnderscore:
-        self._checkAndUpdateMintInterval(greenToMint)
+        self._updateMintInterval(greenToMint)
 
     receivedSavingsGreen: bool = False
 
@@ -276,6 +277,35 @@ def mintGreen(_usdcAmount: uint256 = max_value(uint256), _recipient: address = m
     return greenToMint
 
 
+# max mintable (internal helper)
+
+
+@view
+@internal
+def _calculateMaxUsdcForMint(_isUnderscoreAddr: bool, _usdc: address, _priceDesk: address) -> uint256:
+    if _isUnderscoreAddr:
+        return max_value(uint256) # underscore addresses have unlimited capacity
+
+    # convert interval capacity (GREEN) back to USDC needed
+    intervalCapacity: uint256 = self._getAvailIntervalMint()
+
+    # properly account for USDC price (may need more USDC if below peg)
+    usdcFromPriceDesk: uint256 = staticcall PriceDesk(_priceDesk).getAssetAmount(_usdc, intervalCapacity, False)
+    usdcInGreenDecimals: uint256 = intervalCapacity * ONE_USDC // ONE_GREEN
+    usdcAmount: uint256 = max(usdcFromPriceDesk, usdcInGreenDecimals)
+
+    # account for mint fee: usdcAfterFee = usdcInput * (1 - fee)
+    # reverse: usdcInput = usdcAfterFee * HUNDRED_PERCENT / (HUNDRED_PERCENT - fee)
+    mintFee: uint256 = self.mintFee
+    if mintFee != 0:
+        feeMultiplier: uint256 = HUNDRED_PERCENT - mintFee
+        if feeMultiplier == 0:
+            return 0 # cannot divide by zero
+        usdcAmount = usdcAmount * HUNDRED_PERCENT // feeMultiplier
+
+    return usdcAmount
+
+
 # max mintable (front-end can use this to get max USDC amount)
 
 
@@ -283,26 +313,7 @@ def mintGreen(_usdcAmount: uint256 = max_value(uint256), _recipient: address = m
 @external
 def getMaxUsdcAmountForMint(_user: address = empty(address), _isUnderscoreAddr: bool = False) -> uint256:
     usdc: address = USDC
-    a: addys.Addys = addys._getAddys()
-    usdcAmount: uint256 = max_value(uint256)
-
-    # not underscore addr
-    if not _isUnderscoreAddr:
-
-        # convert interval capacity (GREEN) back to USDC needed
-        intervalCapacity: uint256 = self._getAvailIntervalMint()
-
-        # properly account for USDC price (may need more USDC if below peg)
-        usdcFromPriceDesk: uint256 = staticcall PriceDesk(a.priceDesk).getAssetAmount(usdc, intervalCapacity, False)
-        usdcInGreenDecimals: uint256 = intervalCapacity * ONE_USDC // ONE_GREEN
-        usdcAmount = max(usdcFromPriceDesk, usdcInGreenDecimals)
-
-        # account for mint fee: usdcAfterFee = usdcInput * (1 - fee)
-        # reverse: usdcInput = usdcAfterFee * HUNDRED_PERCENT / (HUNDRED_PERCENT - fee)
-        mintFee: uint256 = self.mintFee
-        if mintFee != 0:
-            feeMultiplier: uint256 = HUNDRED_PERCENT - mintFee
-            usdcAmount = usdcAmount * HUNDRED_PERCENT // feeMultiplier
+    usdcAmount: uint256 = self._calculateMaxUsdcForMint(_isUnderscoreAddr, usdc, addys._getPriceDeskAddr())
 
     # if user provided, also consider their usdc balance
     if _user != empty(address):
@@ -335,27 +346,17 @@ def _getAvailIntervalMint() -> uint256:
 
 
 @internal
-def _checkAndUpdateMintInterval(_amount: uint256):
+def _updateMintInterval(_amount: uint256):
     data: PsmInterval = self.globalMintInterval
-    availToMint: uint256 = 0
-    isFreshInterval: bool = True
 
-    # check if in same interval or new interval
+    # existing interval - accumulate amount
     if data.start != 0 and data.start + self.numBlocksPerInterval > block.number:
-        maxIntervalMint: uint256 = self.maxIntervalMint
-        availToMint = maxIntervalMint - min(data.amount, maxIntervalMint)
-        isFreshInterval = False
+        data.amount += _amount
+
+    # new interval - reset with current block and amount
     else:
-        availToMint = self.maxIntervalMint
-
-    assert _amount <= availToMint # dev: exceeds max interval mint
-
-    # update interval
-    if isFreshInterval:
         data.start = block.number
         data.amount = _amount
-    else:
-        data.amount += _amount
 
     self.globalMintInterval = data
 

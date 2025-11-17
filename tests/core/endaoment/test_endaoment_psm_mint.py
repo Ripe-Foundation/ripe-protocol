@@ -492,7 +492,7 @@ def test_mint_with_maximum_fee(endaoment_psm, charlie_token, switchboard_charlie
     usdc_amount = 1000 * SIX_DECIMALS
 
     # Enable minting and set 100% fee
-    
+
     mock_price_source.setPrice(charlie_token.address, 1 * EIGHTEEN_DECIMALS)
     endaoment_psm.setCanMint(True, sender=switchboard_charlie.address)
     endaoment_psm.setMintFee(10000, sender=switchboard_charlie.address)  # 100.00%
@@ -501,8 +501,8 @@ def test_mint_with_maximum_fee(endaoment_psm, charlie_token, switchboard_charlie
     charlie_token.mint(user, usdc_amount, sender=governance.address)
     charlie_token.approve(endaoment_psm.address, usdc_amount, sender=user)
 
-    # Attempt to mint should fail
-    with boa.reverts("zero mint amount"):
+    # Attempt to mint should fail (100% fee means zero capacity)
+    with boa.reverts("zero amount"):
         endaoment_psm.mintGreen(usdc_amount, sender=user)
 
 
@@ -741,22 +741,28 @@ def test_mint_exactly_at_interval_limit(endaoment_psm, charlie_token, switchboar
     assert green_minted == 100_000 * EIGHTEEN_DECIMALS
 
 
-def test_mint_exceeds_interval_limit(endaoment_psm, charlie_token, switchboard_charlie, governance, mock_price_source):
-    """Minting beyond limit should fail"""
+def test_mint_exceeds_interval_limit(endaoment_psm, charlie_token, green_token, switchboard_charlie, governance, mock_price_source):
+    """Minting beyond limit should gracefully cap to interval limit"""
     user = boa.env.generate_address()
 
     # Enable minting
-    
+
     mock_price_source.setPrice(charlie_token.address, 1 * EIGHTEEN_DECIMALS)
     endaoment_psm.setCanMint(True, sender=switchboard_charlie.address)
 
-    # Setup user
+    # Setup user with more USDC than interval allows
     charlie_token.mint(user, 100_001 * SIX_DECIMALS, sender=governance.address)
     charlie_token.approve(endaoment_psm.address, 100_001 * SIX_DECIMALS, sender=user)
 
-    # Attempt to mint 100,001 GREEN
-    with boa.reverts("exceeds max interval mint"):
-        endaoment_psm.mintGreen(100_001 * SIX_DECIMALS, sender=user)
+    # Attempt to mint 100,001 USDC worth - should gracefully cap to 100,000
+    green_minted = endaoment_psm.mintGreen(100_001 * SIX_DECIMALS, sender=user)
+
+    # Should mint exactly 100,000 GREEN (the interval limit)
+    assert green_minted == 100_000 * EIGHTEEN_DECIMALS
+    assert green_token.balanceOf(user) == 100_000 * EIGHTEEN_DECIMALS
+
+    # Only 100,000 USDC should have been transferred (not 100,001)
+    assert charlie_token.balanceOf(user) == 1 * SIX_DECIMALS
 
 
 def test_multiple_mints_accumulate_in_interval(endaoment_psm, charlie_token, switchboard_charlie, governance, mock_price_source):
@@ -764,7 +770,7 @@ def test_multiple_mints_accumulate_in_interval(endaoment_psm, charlie_token, swi
     user = boa.env.generate_address()
 
     # Enable minting
-    
+
     mock_price_source.setPrice(charlie_token.address, 1 * EIGHTEEN_DECIMALS)
     endaoment_psm.setCanMint(True, sender=switchboard_charlie.address)
 
@@ -780,8 +786,8 @@ def test_multiple_mints_accumulate_in_interval(endaoment_psm, charlie_token, swi
     green2 = endaoment_psm.mintGreen(40_000 * SIX_DECIMALS, sender=user)
     assert green2 == 40_000 * EIGHTEEN_DECIMALS
 
-    # Third mint: 1 more GREEN should fail
-    with boa.reverts("exceeds max interval mint"):
+    # Third mint: trying to mint more should fail with zero amount (no interval capacity left)
+    with boa.reverts("zero amount"):
         endaoment_psm.mintGreen(1 * SIX_DECIMALS, sender=user)
 
 
@@ -830,8 +836,8 @@ def test_interval_boundary_exact_block(endaoment_psm, charlie_token, switchboard
     # Roll to one block before the boundary
     boa.env.time_travel(blocks=ONE_DAY_BLOCKS - 1)
 
-    # One block before boundary, should still be in same interval
-    with boa.reverts("exceeds max interval mint"):
+    # One block before boundary, should still be in same interval (no capacity left)
+    with boa.reverts("zero amount"):
         endaoment_psm.mintGreen(1 * SIX_DECIMALS, sender=user)
 
     # Roll one more block to reach the boundary
@@ -1119,14 +1125,13 @@ def test_concurrent_mints_by_different_users_share_interval(endaoment_psm, charl
     green_a = endaoment_psm.mintGreen(sender=user_a)
     assert green_a == 60_000 * EIGHTEEN_DECIMALS
 
-    # User B tries to mint all 50,000 but that would exceed interval limit
-    # Verify it reverts
-    with boa.reverts("exceeds max interval mint"):
-        endaoment_psm.mintGreen(sender=user_b)
-
-    # User B can successfully mint 40,000 GREEN (remaining in interval)
-    green_b = endaoment_psm.mintGreen(40_000 * SIX_DECIMALS, sender=user_b)
+    # User B tries to mint all 50,000 but interval limit only has 40,000 remaining
+    # Should gracefully cap to 40,000 GREEN
+    green_b = endaoment_psm.mintGreen(sender=user_b)
     assert green_b == 40_000 * EIGHTEEN_DECIMALS
+
+    # User B should have 10,000 USDC remaining (50k - 40k used)
+    assert charlie_token.balanceOf(user_b) == 10_000 * SIX_DECIMALS
 
 
 ###############
@@ -1289,13 +1294,14 @@ def test_state_changes_atomic_on_revert(endaoment_psm, charlie_token, switchboar
     charlie_token.mint(user, 100_001 * SIX_DECIMALS, sender=governance.address)
     charlie_token.approve(endaoment_psm.address, 100_001 * SIX_DECIMALS, sender=user)
 
-    # Try to mint over limit
-    with boa.reverts("exceeds max interval mint"):
-        endaoment_psm.mintGreen(100_001 * SIX_DECIMALS, sender=user)
+    # Try to mint over limit - should gracefully cap to 100,000
+    green_minted = endaoment_psm.mintGreen(100_001 * SIX_DECIMALS, sender=user)
+    assert green_minted == 100_000 * EIGHTEEN_DECIMALS
 
-    # Interval state should be unchanged
+    # Interval state should reflect the 100k mint
     interval_after = endaoment_psm.globalMintInterval()
-    assert interval_after == interval_before
+    assert interval_after.amount == 100_000 * EIGHTEEN_DECIMALS
+    assert interval_after.start > 0
 
 
 def test_very_small_usdc_amount(endaoment_psm, charlie_token, switchboard_charlie, governance, mock_price_source):
@@ -1620,12 +1626,13 @@ def test_mint_savings_green_respects_interval_limits(endaoment_psm, charlie_toke
     charlie_token.mint(user, usdc_amount, sender=governance.address)
     charlie_token.approve(endaoment_psm.address, usdc_amount, sender=user)
 
-    # Attempt to mint with Savings Green should fail due to interval limit
-    with boa.reverts("exceeds max interval mint"):
-        endaoment_psm.mintGreen(usdc_amount, user, True, sender=user)
+    # Attempt to mint with Savings Green should gracefully cap to 100k
+    green_minted = endaoment_psm.mintGreen(usdc_amount, user, True, sender=user)
+    assert green_minted == 100_000 * EIGHTEEN_DECIMALS
 
-    # Verify no sGREEN received
-    assert savings_green.balanceOf(user) == 0
+    # Verify sGREEN received (100k GREEN deposited)
+    sgreen_balance = savings_green.balanceOf(user)
+    assert sgreen_balance > 0  # Will be slightly less than 100k due to share calculation
 
 
 #############################
