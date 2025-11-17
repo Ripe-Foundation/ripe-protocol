@@ -377,28 +377,33 @@ def redeemGreen(_paymentAmount: uint256 = max_value(uint256), _recipient: addres
     a: addys.Addys = addys._getAddys()
     assert _recipient != empty(address) # dev: invalid recipient
 
-    greenAmount: uint256 = 0
-
-    # transfer sGREEN from user and redeem to GREEN
-    if _isPaymentSavingsGreen:
-        sGreenAmount: uint256 = min(_paymentAmount, staticcall IERC20(a.savingsGreen).balanceOf(msg.sender))
-        assert sGreenAmount != 0 # dev: zero amount
-        assert extcall IERC20(a.savingsGreen).transferFrom(msg.sender, self, sGreenAmount, default_return_value=True) # dev: transfer failed
-        greenAmount = extcall IERC4626(a.savingsGreen).redeem(sGreenAmount, self, self)
-
-    # transfer GREEN directly from user
-    else:
-        greenAmount = min(_paymentAmount, staticcall IERC20(a.greenToken).balanceOf(msg.sender))
-        assert greenAmount != 0 # dev: zero amount
-        assert extcall IERC20(a.greenToken).transferFrom(msg.sender, self, greenAmount, default_return_value=True) # dev: transfer failed
-
     # allowlist check (Underscore addresses bypass)
     isUnderscore: bool = self._isUnderscoreAddr(msg.sender, a.missionControl)
     if not isUnderscore and self.shouldEnforceRedeemAllowlist:
         assert self.redeemAllowlist[msg.sender] # dev: not on redeem allowlist
 
-    # usdc to give
+    # calculate max allowed to redeem (cap by interval and USDC availability)
     usdc: address = USDC
+    usdcYieldPosition: UsdcYieldPosition = self.usdcYieldPosition
+    maxGreenAllowed: uint256 = self._calculateMaxRedeemableGreen(isUnderscore, usdcYieldPosition.legoId, usdcYieldPosition.vaultToken, usdc, a.priceDesk, a.missionControl)
+
+    # transfer sGREEN from user and redeem to GREEN (cap by max allowed)
+    greenAmount: uint256 = 0
+    if _isPaymentSavingsGreen:
+        maxSavingsGreenAmount: uint256 = min(staticcall IERC4626(a.savingsGreen).convertToShares(maxGreenAllowed), staticcall IERC20(a.savingsGreen).balanceOf(msg.sender))
+        savingsGreenAmount: uint256 = min(_paymentAmount, maxSavingsGreenAmount)
+        assert savingsGreenAmount != 0 # dev: zero amount
+        assert extcall IERC20(a.savingsGreen).transferFrom(msg.sender, self, savingsGreenAmount, default_return_value=True) # dev: transfer failed
+        greenAmount = extcall IERC4626(a.savingsGreen).redeem(savingsGreenAmount, self, self)
+
+    # transfer GREEN directly from user (cap by max allowed)
+    else:
+        maxGreenAmount: uint256 = min(maxGreenAllowed, staticcall IERC20(a.greenToken).balanceOf(msg.sender))
+        greenAmount = min(_paymentAmount, maxGreenAmount)
+        assert greenAmount != 0 # dev: zero amount
+        assert extcall IERC20(a.greenToken).transferFrom(msg.sender, self, greenAmount, default_return_value=True) # dev: transfer failed
+
+    # usdc to give
     usdcFromPriceDesk: uint256 = staticcall PriceDesk(a.priceDesk).getAssetAmount(usdc, greenAmount, True)
     greenInUsdcDecimals: uint256 = greenAmount * ONE_USDC // ONE_GREEN
     usdcToGive: uint256 = min(usdcFromPriceDesk, greenInUsdcDecimals)
@@ -407,9 +412,9 @@ def redeemGreen(_paymentAmount: uint256 = max_value(uint256), _recipient: addres
     feeAmount: uint256 = 0
     usdcAfterFee: uint256 = usdcToGive
 
-    # check and update interval limits (Underscore addresses bypass)
+    # update interval storage (Underscore addresses bypass)
     if not isUnderscore:
-        self._checkAndUpdateRedeemInterval(greenAmount)
+        self._updateRedeemInterval(greenAmount)
 
         # redeem fee
         feeAmount = usdcToGive * self.redeemFee // HUNDRED_PERCENT
@@ -418,7 +423,7 @@ def redeemGreen(_paymentAmount: uint256 = max_value(uint256), _recipient: addres
     # ensure usdc liquidity (withdraw from yield if needed)
     usdcBalance: uint256 = staticcall IERC20(usdc).balanceOf(self)
     if usdcBalance < usdcAfterFee:
-        usdcBalance += self._withdrawFromYield(usdcAfterFee - usdcBalance, a.missionControl, usdc)
+        usdcBalance += self._withdrawFromYield(usdcYieldPosition.legoId, usdcYieldPosition.vaultToken, usdcAfterFee - usdcBalance, a.missionControl, usdc)
         assert usdcBalance >= usdcAfterFee # dev: insufficient USDC
 
     # transfer usdc to recipient
@@ -432,6 +437,40 @@ def redeemGreen(_paymentAmount: uint256 = max_value(uint256), _recipient: addres
     return usdcAfterFee
 
 
+# max redeemable (internal helper)
+
+
+@view
+@internal
+def _calculateMaxRedeemableGreen(_isUnderscoreAddr: bool, _legoId: uint256, _vaultToken: address, _usdc: address, _priceDesk: address, _missionControl: address) -> uint256:
+    # usdc available (idle + yield) - always limited by this
+    usdcAvailable: uint256 = self._getAvailableUsdc(_usdc, _legoId, _vaultToken, _missionControl)
+
+    # convert usdc to max green
+    usdValue: uint256 = staticcall PriceDesk(_priceDesk).getUsdValue(_usdc, usdcAvailable, False)
+    usdcInGreenDecimals: uint256 = usdcAvailable * ONE_GREEN // ONE_USDC
+    maxGreenFromUsdc: uint256 = min(usdValue, usdcInGreenDecimals)
+
+    # underscore addresses bypass interval limits and fees, but still limited by USDC
+    if _isUnderscoreAddr:
+        return maxGreenFromUsdc
+
+    # account for redeem fee: usdcAfterFee = usdcToGive * (1 - fee)
+    # reverse: greenAmount = greenBeforeFee / (1 - fee)
+    redeemFee: uint256 = self.redeemFee
+    if redeemFee != 0:
+        feeMultiplier: uint256 = HUNDRED_PERCENT - redeemFee
+        if feeMultiplier == 0:
+            return 0 # cannot divide by zero
+        maxGreenFromUsdc = maxGreenFromUsdc * HUNDRED_PERCENT // feeMultiplier
+
+    # interval capacity
+    intervalCapacity: uint256 = self._getAvailIntervalRedemptions()
+
+    # get limiting factor from interval and usdc
+    return min(intervalCapacity, maxGreenFromUsdc)
+
+
 # max redeemable (front-end can use this to get max GREEN amount)
 
 
@@ -440,31 +479,8 @@ def redeemGreen(_paymentAmount: uint256 = max_value(uint256), _recipient: addres
 def getMaxRedeemableGreenAmount(_user: address = empty(address), _isUnderscoreAddr: bool = False) -> uint256:
     a: addys.Addys = addys._getAddys()
     usdc: address = USDC
-
-    # interval capacity
-    intervalCapacity: uint256 = max_value(uint256)
-    if not _isUnderscoreAddr:
-        intervalCapacity = self._getAvailIntervalRedemptions()
-
-    # usdc available (idle + yield)
     usdcYieldPosition: UsdcYieldPosition = self.usdcYieldPosition
-    usdcAvailable: uint256 = self._getAvailableUsdc(usdc, usdcYieldPosition.legoId, usdcYieldPosition.vaultToken, a.missionControl)
-
-    # convert usdc to max green
-    usdValue: uint256 = staticcall PriceDesk(a.priceDesk).getUsdValue(usdc, usdcAvailable, False)
-    usdcInGreenDecimals: uint256 = usdcAvailable * ONE_GREEN // ONE_USDC
-    maxGreenFromUsdc: uint256 = min(usdValue, usdcInGreenDecimals)
-
-    # account for redeem fee: usdcAfterFee = usdcToGive * (1 - fee)
-    # reverse: greenAmount = greenBeforeFee / (1 - fee)
-    if not _isUnderscoreAddr:
-        redeemFee: uint256 = self.redeemFee
-        if redeemFee != 0:
-            feeMultiplier: uint256 = HUNDRED_PERCENT - redeemFee
-            maxGreenFromUsdc = maxGreenFromUsdc * HUNDRED_PERCENT // feeMultiplier
-
-    # get limiting factor from interval and usdc
-    maxRedeemable: uint256 = min(intervalCapacity, maxGreenFromUsdc)
+    maxRedeemable: uint256 = self._calculateMaxRedeemableGreen(_isUnderscoreAddr, usdcYieldPosition.legoId, usdcYieldPosition.vaultToken, usdc, a.priceDesk, a.missionControl)
 
     # if user provided, also consider their green balance
     if _user != empty(address):
@@ -497,27 +513,17 @@ def _getAvailIntervalRedemptions() -> uint256:
 
 
 @internal
-def _checkAndUpdateRedeemInterval(_amount: uint256):
+def _updateRedeemInterval(_amount: uint256):
     data: PsmInterval = self.globalRedeemInterval
-    availToRedeem: uint256 = 0
-    isFreshInterval: bool = True
 
-    # check if in same interval or new interval
+    # existing interval - accumulate amount
     if data.start != 0 and data.start + self.numBlocksPerInterval > block.number:
-        maxIntervalRedeem: uint256 = self.maxIntervalRedeem
-        availToRedeem = maxIntervalRedeem - min(data.amount, maxIntervalRedeem)
-        isFreshInterval = False
+        data.amount += _amount
+
+    # new interval - reset with current block and amount
     else:
-        availToRedeem = self.maxIntervalRedeem
-
-    assert _amount <= availToRedeem # dev: exceeds max interval redeem
-
-    # update interval
-    if isFreshInterval:
         data.start = block.number
         data.amount = _amount
-    else:
-        data.amount += _amount
 
     self.globalRedeemInterval = data
 
@@ -577,7 +583,8 @@ def withdrawFromYield(_amount: uint256 = max_value(uint256), _shouldTransferToEn
     usdc: address = USDC
 
     # withdraw from yield
-    withdrawnAmount: uint256 = self._withdrawFromYield(_amount, addys._getMissionControlAddr(), usdc)
+    usdcYieldPosition: UsdcYieldPosition = self.usdcYieldPosition
+    withdrawnAmount: uint256 = self._withdrawFromYield(usdcYieldPosition.legoId, usdcYieldPosition.vaultToken, _amount, addys._getMissionControlAddr(), usdc)
     assert withdrawnAmount != 0 # dev: zero amount
 
     # transfer to endaoment funds
@@ -591,18 +598,17 @@ def withdrawFromYield(_amount: uint256 = max_value(uint256), _shouldTransferToEn
 
 
 @internal
-def _withdrawFromYield(_amount: uint256, _missionControl: address, _usdc: address) -> uint256:
-    usdcYieldPosition: UsdcYieldPosition = self.usdcYieldPosition
-    if usdcYieldPosition.legoId == 0 or usdcYieldPosition.vaultToken == empty(address) or _amount == 0:
+def _withdrawFromYield(_legoId: uint256, _vaultToken: address, _amount: uint256, _missionControl: address, _usdc: address) -> uint256:
+    if _legoId == 0 or _vaultToken == empty(address) or _amount == 0:
         return 0
 
     # check vault token balance
-    vaultTokenBalance: uint256 = staticcall IERC20(usdcYieldPosition.vaultToken).balanceOf(self)
+    vaultTokenBalance: uint256 = staticcall IERC20(_vaultToken).balanceOf(self)
     if vaultTokenBalance == 0:
         return 0
 
     # get lego address
-    legoAddr: address = self._getLegoAddr(usdcYieldPosition.legoId, _missionControl)
+    legoAddr: address = self._getLegoAddr(_legoId, _missionControl)
     if legoAddr == empty(address):
         return 0
 
@@ -610,19 +616,19 @@ def _withdrawFromYield(_amount: uint256, _missionControl: address, _usdc: addres
     vaultTokensNeeded: uint256 = max_value(uint256)
     if _amount != max_value(uint256):
         amountNeeded: uint256 = _amount * 102_00 // HUNDRED_PERCENT # remove extra to ensure enough liquidity
-        vaultTokensNeeded = staticcall UndyLego(legoAddr).getVaultTokenAmount(_usdc, amountNeeded, usdcYieldPosition.vaultToken)
+        vaultTokensNeeded = staticcall UndyLego(legoAddr).getVaultTokenAmount(_usdc, amountNeeded, _vaultToken)
     vaultTokenBalance = min(vaultTokenBalance, vaultTokensNeeded)
 
     # withdraw from yield position
-    assert extcall IERC20(usdcYieldPosition.vaultToken).approve(legoAddr, vaultTokenBalance, default_return_value=True)
+    assert extcall IERC20(_vaultToken).approve(legoAddr, vaultTokenBalance, default_return_value=True)
     vaultTokenBurned: uint256 = 0
     underlyingAsset: address = empty(address)
     underlyingAmount: uint256 = 0
     txUsdValue: uint256 = 0
-    vaultTokenBurned, underlyingAsset, underlyingAmount, txUsdValue = extcall UndyLego(legoAddr).withdrawFromYield(usdcYieldPosition.vaultToken, vaultTokenBalance, empty(bytes32), self)
-    assert extcall IERC20(usdcYieldPosition.vaultToken).approve(legoAddr, 0, default_return_value=True)
+    vaultTokenBurned, underlyingAsset, underlyingAmount, txUsdValue = extcall UndyLego(legoAddr).withdrawFromYield(_vaultToken, vaultTokenBalance, empty(bytes32), self)
+    assert extcall IERC20(_vaultToken).approve(legoAddr, 0, default_return_value=True)
 
-    log EndaomentPSMYieldWithdrawal(vaultToken=usdcYieldPosition.vaultToken, vaultTokenBurned=vaultTokenBurned, usdcReceived=underlyingAmount, usdValue=txUsdValue)
+    log EndaomentPSMYieldWithdrawal(vaultToken=_vaultToken, vaultTokenBurned=vaultTokenBurned, usdcReceived=underlyingAmount, usdValue=txUsdValue)
     return underlyingAmount
 
 

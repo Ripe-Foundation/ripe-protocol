@@ -1023,7 +1023,7 @@ def test_redeem_exactly_at_interval_limit(endaoment_psm, charlie_token, green_to
 
 
 def test_redeem_exceeds_interval_limit(endaoment_psm, charlie_token, green_token, switchboard_charlie, governance, mock_price_source):
-    """Redemption beyond limit should fail"""
+    """Redemption beyond limit should gracefully cap to interval limit"""
     user = boa.env.generate_address()
 
     # Setup: increase mint interval to allow minting 100,001 GREEN
@@ -1042,9 +1042,12 @@ def test_redeem_exceeds_interval_limit(endaoment_psm, charlie_token, green_token
     endaoment_psm.setCanRedeem(True, sender=switchboard_charlie.address)
     green_token.approve(endaoment_psm.address, 100_001 * EIGHTEEN_DECIMALS, sender=user)
 
-    # Attempt to redeem 100,001 GREEN should fail
-    with boa.reverts("exceeds max interval redeem"):
-        endaoment_psm.redeemGreen(100_001 * EIGHTEEN_DECIMALS, sender=user)
+    # Attempt to redeem 100,001 GREEN - should gracefully cap to 100,000
+    usdc_out = endaoment_psm.redeemGreen(100_001 * EIGHTEEN_DECIMALS, sender=user)
+
+    # Should redeem exactly 100,000 GREEN (the interval limit)
+    assert usdc_out == 100_000 * SIX_DECIMALS
+    assert green_token.balanceOf(user) == 1 * EIGHTEEN_DECIMALS  # 1 GREEN left
 
 
 def test_multiple_redemptions_accumulate_in_interval(endaoment_psm, charlie_token, green_token, switchboard_charlie, governance, mock_price_source):
@@ -1075,8 +1078,8 @@ def test_multiple_redemptions_accumulate_in_interval(endaoment_psm, charlie_toke
     usdc2 = endaoment_psm.redeemGreen(40_000 * EIGHTEEN_DECIMALS, sender=user)
     assert usdc2 == 40_000 * SIX_DECIMALS
 
-    # Third redemption: 1 more GREEN should fail
-    with boa.reverts("exceeds max interval redeem"):
+    # Third redemption: 1 more GREEN should fail due to zero amount (interval exhausted)
+    with boa.reverts("zero amount"):
         endaoment_psm.redeemGreen(1 * EIGHTEEN_DECIMALS, sender=user)
 
 
@@ -1136,8 +1139,8 @@ def test_interval_boundary_exact_block(endaoment_psm, charlie_token, green_token
     # Roll to one block before the boundary
     boa.env.time_travel(blocks=ONE_DAY_BLOCKS - 1)
 
-    # One block before boundary, should still be in same interval
-    with boa.reverts("exceeds max interval redeem"):
+    # One block before boundary, should still be in same interval (zero amount due to exhausted interval)
+    with boa.reverts("zero amount"):
         endaoment_psm.redeemGreen(1 * EIGHTEEN_DECIMALS, sender=user)
 
     # Roll one more block to reach the boundary
@@ -1376,13 +1379,10 @@ def test_concurrent_redemptions_by_different_users_share_interval(endaoment_psm,
     usdc_a = endaoment_psm.redeemGreen(sender=user_a)
     assert usdc_a == 60_000 * SIX_DECIMALS
 
-    # User B tries to redeem all 50,000 but that would exceed interval limit
-    with boa.reverts("exceeds max interval redeem"):
-        endaoment_psm.redeemGreen(sender=user_b)
-
-    # User B can successfully redeem 40,000 GREEN (remaining in interval)
-    usdc_b = endaoment_psm.redeemGreen(40_000 * EIGHTEEN_DECIMALS, sender=user_b)
+    # User B tries to redeem all 50,000 but gracefully caps to 40,000 (remaining in interval)
+    usdc_b = endaoment_psm.redeemGreen(sender=user_b)
     assert usdc_b == 40_000 * SIX_DECIMALS
+    assert green_token.balanceOf(user_b) == 10_000 * EIGHTEEN_DECIMALS  # 10k GREEN left
 
 
 #########################
@@ -1446,13 +1446,11 @@ def test_redeem_fails_if_insufficient_usdc(endaoment_psm, charlie_token, green_t
     green_token.approve(endaoment_psm.address, 1000 * EIGHTEEN_DECIMALS, sender=user)
 
     # Attempt to redeem 1000 GREEN (needs 1000 USDC, but only 50 available)
-    # This should fail with "insufficient USDC" because:
-    # - usdcBalance = 50 USDC
-    # - usdcAfterFee = 1000 USDC
-    # - _withdrawFromYield returns 0 (no yield configured)
-    # - assert 50 >= 1000 fails with "insufficient USDC"
-    with boa.reverts("insufficient USDC"):
-        endaoment_psm.redeemGreen(1000 * EIGHTEEN_DECIMALS, sender=user)
+    # With graceful capping, this should cap to 50 GREEN (max redeemable with 50 USDC)
+    usdc_out = endaoment_psm.redeemGreen(1000 * EIGHTEEN_DECIMALS, sender=user)
+    assert usdc_out == 50 * SIX_DECIMALS
+    assert charlie_token.balanceOf(endaoment_psm.address) == 0
+    assert green_token.balanceOf(user) == 950 * EIGHTEEN_DECIMALS  # 950 GREEN left
 
 
 def test_getMaxRedeemableGreenAmount_limited_by_usdc_availability(endaoment_psm, charlie_token, switchboard_charlie, mock_price_source, governance):
@@ -1512,8 +1510,8 @@ def test_multiple_redemptions_reduce_available_usdc(endaoment_psm, charlie_token
     charlie_token.transfer(boa.env.generate_address(), 10 * SIX_DECIMALS, sender=endaoment_psm.address)
     assert charlie_token.balanceOf(endaoment_psm.address) == 0
 
-    # Third redemption: 10 GREEN should fail (no USDC left)
-    with boa.reverts("insufficient USDC"):
+    # Third redemption: 10 GREEN should fail (zero amount due to no USDC left)
+    with boa.reverts("zero amount"):
         endaoment_psm.redeemGreen(10 * EIGHTEEN_DECIMALS, sender=user)
 
 
@@ -1739,14 +1737,16 @@ def test_state_changes_atomic_on_revert(endaoment_psm, charlie_token, green_toke
     # Get initial interval state
     interval_before = endaoment_psm.globalRedeemInterval()
 
-    # Approve and try to redeem over limit
+    # Approve and redeem - should gracefully cap to 100k
     green_token.approve(endaoment_psm.address, 100_001 * EIGHTEEN_DECIMALS, sender=user)
-    with boa.reverts("exceeds max interval redeem"):
-        endaoment_psm.redeemGreen(100_001 * EIGHTEEN_DECIMALS, sender=user)
+    usdc_out = endaoment_psm.redeemGreen(100_001 * EIGHTEEN_DECIMALS, sender=user)
+    assert usdc_out == 100_000 * SIX_DECIMALS
+    assert green_token.balanceOf(user) == 1 * EIGHTEEN_DECIMALS  # 1 GREEN left
 
-    # Interval state should be unchanged
+    # Interval state should be updated to reflect 100k redeemed
     interval_after = endaoment_psm.globalRedeemInterval()
-    assert interval_after == interval_before
+    assert interval_after.start == boa.env.evm.patch.block_number
+    assert interval_after.amount == 100_000 * EIGHTEEN_DECIMALS
 
 
 def test_dust_amounts_and_precision(endaoment_psm, charlie_token, green_token, switchboard_charlie, governance, mock_price_source):
@@ -2277,10 +2277,14 @@ def test_redeem_savings_green_respects_interval_limits(endaoment_psm, charlie_to
     # Fund PSM with enough USDC
     charlie_token.mint(endaoment_psm.address, 100_001 * SIX_DECIMALS, sender=governance.address)
 
-    # Attempt to redeem should fail due to interval limit
+    # Attempt to redeem should gracefully cap to 100k GREEN
     savings_green.approve(endaoment_psm.address, user_sgreen_shares, sender=user)
-    with boa.reverts("exceeds max interval redeem"):
-        endaoment_psm.redeemGreen(user_sgreen_shares, user, True, sender=user)
+    usdc_out = endaoment_psm.redeemGreen(user_sgreen_shares, user, True, sender=user)
+    assert usdc_out == 100_000 * SIX_DECIMALS
+
+    # Should have leftover sGREEN for the 1 GREEN that couldn't be redeemed
+    remaining_sgreen = savings_green.balanceOf(user)
+    assert remaining_sgreen > 0
 
 
 def test_redeem_savings_green_with_usdc_liquidity_check(endaoment_psm, charlie_token, green_token, savings_green, switchboard_charlie, governance, mock_price_source, whale):
