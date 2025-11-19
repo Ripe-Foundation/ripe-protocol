@@ -99,6 +99,9 @@ event PythPriceUpdated:
     feeAmount: uint256
     caller: indexed(address)
 
+event MaxConfidenceRatioUpdated:
+    newRatio: uint256
+
 event EthRecoveredFromPyth:
     recipient: indexed(address)
     amount: uint256
@@ -106,9 +109,11 @@ event EthRecoveredFromPyth:
 # data
 feedConfig: public(HashMap[address, PythFeedConfig]) # asset -> feed
 pendingUpdates: public(HashMap[address, PendingPythFeed]) # asset -> feed
+maxConfidenceRatio: public(uint256) # basis points (100_00 = 100%)
 
 PYTH: public(immutable(address))
 
+HUNDRED_PERCENT: constant(uint256) = 100_00 # 100%
 NORMALIZED_DECIMALS: constant(uint256) = 18
 MAX_PRICE_UPDATES: constant(uint256) = 20
 
@@ -123,6 +128,7 @@ def __init__(
 ):
     assert _pythNetwork != empty(address) # dev: invalid pyth network
     PYTH = _pythNetwork
+    self.maxConfidenceRatio = 3_00 # 3% default
 
     gov.__init__(_ripeHq, _tempGov, 0, 0, 0)
     addys.__init__(_ripeHq)
@@ -207,9 +213,16 @@ def _getLastPriceAndLastUpdate(_feedId: bytes32, _staleTime: uint256) -> (uint25
         price = price * scale * (10 ** exponent)
         confidence = confidence * scale * (10 ** exponent)
 
-    # invalid price
+    # invalid price: confidence >= price
     if confidence >= price:
         return 0, 0
+
+    # validate confidence ratio
+    maxConfidenceRatio: uint256 = self.maxConfidenceRatio
+    if maxConfidenceRatio != 0:
+        confidenceRatio: uint256 = confidence * HUNDRED_PERCENT // price
+        if confidenceRatio > maxConfidenceRatio:
+            return 0, 0
 
     return price - confidence, publishTime
 
@@ -558,6 +571,22 @@ def _updatePythPrice(_payload: Bytes[2048], _pythNetwork: address) -> bool:
         return False
     extcall PythNetwork(_pythNetwork).updatePriceFeeds(_payload, value=feeAmount)
     log PythPriceUpdated(payload=_payload, feeAmount=feeAmount, caller=msg.sender)
+    return True
+
+
+####################
+# Confidence Ratio #
+####################
+
+
+@external
+def setMaxConfidenceRatio(_newRatio: uint256) -> bool:
+    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
+    assert not priceData.isPaused # dev: contract paused
+    assert _newRatio < HUNDRED_PERCENT # dev: ratio must be < 100%
+    assert _newRatio != self.maxConfidenceRatio # dev: ratio already set
+    self.maxConfidenceRatio = _newRatio
+    log MaxConfidenceRatioUpdated(newRatio=_newRatio)
     return True
 
 

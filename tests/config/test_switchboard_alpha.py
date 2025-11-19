@@ -3567,3 +3567,154 @@ def test_buyback_ratio_with_undy_vault_discount(switchboard_alpha, credit_engine
     # Verify both are set correctly and independently
     assert credit_engine.buybackRatio() == 35_00
     assert credit_engine.undyVaulDiscount() == 55_00
+
+
+###################################
+# Pyth Max Confidence Ratio Tests #
+###################################
+
+
+def test_set_pyth_max_confidence_ratio_validation(switchboard_alpha, governance):
+    """Test that pyth max confidence ratio validation works correctly"""
+    # Test ratio >= 100%
+    with boa.reverts("ratio must be < 100%"):
+        switchboard_alpha.setPythMaxConfidenceRatio(100_00, sender=governance.address)  # 100%
+
+    with boa.reverts("ratio must be < 100%"):
+        switchboard_alpha.setPythMaxConfidenceRatio(100_01, sender=governance.address)  # 100.01%
+
+    with boa.reverts("ratio must be < 100%"):
+        switchboard_alpha.setPythMaxConfidenceRatio(MAX_UINT256, sender=governance.address)  # max uint256
+
+    # Test ratio < 100% should work
+    action_id = switchboard_alpha.setPythMaxConfidenceRatio(99_99, sender=governance.address)
+    assert action_id > 0
+
+
+def test_set_pyth_max_confidence_ratio_permissions(switchboard_alpha, governance, bob):
+    """Test that only governance can set pyth max confidence ratio"""
+    # Non-governance user should not be able to call the function
+    with boa.reverts("no perms"):
+        switchboard_alpha.setPythMaxConfidenceRatio(5_00, sender=bob)
+
+    # Governance should be able to call the function
+    action_id = switchboard_alpha.setPythMaxConfidenceRatio(5_00, sender=governance.address)
+    assert action_id > 0
+
+
+def test_set_pyth_max_confidence_ratio_success(switchboard_alpha, governance):
+    """Test successful creation of pyth max confidence ratio action"""
+    # Test with valid ratio
+    action_id = switchboard_alpha.setPythMaxConfidenceRatio(5_00, sender=governance.address)
+    assert action_id > 0
+
+    # Check event was emitted
+    logs = filter_logs(switchboard_alpha, "PendingPythMaxConfidenceRatioChange")
+    assert len(logs) == 1
+    log = logs[0]
+    assert log.ratio == 5_00
+    assert log.actionId == action_id
+
+    # Check pending config was stored correctly
+    assert switchboard_alpha.pendingPythMaxConfidenceRatio(action_id) == 5_00
+
+    # Verify action type is set correctly (non-zero means it's set)
+    assert switchboard_alpha.actionType(action_id) != 0
+
+
+def test_set_pyth_max_confidence_ratio_boundary_conditions(switchboard_alpha, governance):
+    """Test pyth max confidence ratio at boundary values"""
+    # Test at 0% (disable validation)
+    action_id = switchboard_alpha.setPythMaxConfidenceRatio(0, sender=governance.address)
+    assert action_id > 0
+    assert switchboard_alpha.pendingPythMaxConfidenceRatio(action_id) == 0
+
+    # Test at 1 basis point
+    action_id2 = switchboard_alpha.setPythMaxConfidenceRatio(1, sender=governance.address)
+    assert action_id2 > 0
+    assert switchboard_alpha.pendingPythMaxConfidenceRatio(action_id2) == 1
+
+    # Test at 99.99% (just below 100%)
+    action_id3 = switchboard_alpha.setPythMaxConfidenceRatio(99_99, sender=governance.address)
+    assert action_id3 > 0
+    assert switchboard_alpha.pendingPythMaxConfidenceRatio(action_id3) == 99_99
+
+    # Test typical values
+    action_id4 = switchboard_alpha.setPythMaxConfidenceRatio(3_00, sender=governance.address)  # 3% default
+    assert action_id4 > 0
+    assert switchboard_alpha.pendingPythMaxConfidenceRatio(action_id4) == 3_00
+
+
+def test_execute_pyth_max_confidence_ratio(switchboard_alpha, pyth_prices, governance):
+    """Test execution of pyth max confidence ratio action"""
+    # Get initial ratio value
+    initial_ratio = pyth_prices.maxConfidenceRatio()
+
+    # Create the action with a different ratio
+    new_ratio = 10_00
+    action_id = switchboard_alpha.setPythMaxConfidenceRatio(new_ratio, sender=governance.address)
+    assert action_id > 0
+
+    # Verify ratio hasn't changed yet
+    assert pyth_prices.maxConfidenceRatio() == initial_ratio
+
+    # Time travel past timelock
+    boa.env.time_travel(blocks=switchboard_alpha.actionTimeLock())
+
+    # Execute the action
+    success = switchboard_alpha.executePendingAction(action_id, sender=governance.address)
+    assert success
+
+    # Verify the ratio was updated in PythPrices
+    assert pyth_prices.maxConfidenceRatio() == new_ratio
+
+    # Check execution event was emitted from SwitchboardAlpha
+    logs = filter_logs(switchboard_alpha, "PythMaxConfidenceRatioSet")
+    # Filter to only get logs from SwitchboardAlpha (PythPrices also emits an event)
+    sb_logs = [log for log in logs if log.address == switchboard_alpha.address]
+    assert len(sb_logs) == 1
+    log = sb_logs[0]
+    assert log.ratio == new_ratio
+
+    # Verify action was cleaned up
+    assert switchboard_alpha.actionType(action_id) == 0
+    assert not switchboard_alpha.hasPendingAction(action_id)
+
+
+def test_execute_pyth_max_confidence_ratio_multiple_changes(switchboard_alpha, pyth_prices, governance):
+    """Test multiple sequential pyth max confidence ratio changes"""
+    # First change: 4%
+    action_id1 = switchboard_alpha.setPythMaxConfidenceRatio(4_00, sender=governance.address)
+    boa.env.time_travel(blocks=switchboard_alpha.actionTimeLock())
+    switchboard_alpha.executePendingAction(action_id1, sender=governance.address)
+    assert pyth_prices.maxConfidenceRatio() == 4_00
+
+    # Second change: 2%
+    action_id2 = switchboard_alpha.setPythMaxConfidenceRatio(2_00, sender=governance.address)
+    boa.env.time_travel(blocks=switchboard_alpha.actionTimeLock())
+    switchboard_alpha.executePendingAction(action_id2, sender=governance.address)
+    assert pyth_prices.maxConfidenceRatio() == 2_00
+
+    # Third change: 0% (disable validation)
+    action_id3 = switchboard_alpha.setPythMaxConfidenceRatio(0, sender=governance.address)
+    boa.env.time_travel(blocks=switchboard_alpha.actionTimeLock())
+    switchboard_alpha.executePendingAction(action_id3, sender=governance.address)
+    assert pyth_prices.maxConfidenceRatio() == 0
+
+
+def test_pyth_max_confidence_ratio_multiple_pending_actions(switchboard_alpha, governance):
+    """Test creating multiple pending actions for pyth max confidence ratio"""
+    # Create three different pending actions
+    action_id1 = switchboard_alpha.setPythMaxConfidenceRatio(2_00, sender=governance.address)
+    action_id2 = switchboard_alpha.setPythMaxConfidenceRatio(5_00, sender=governance.address)
+    action_id3 = switchboard_alpha.setPythMaxConfidenceRatio(10_00, sender=governance.address)
+
+    # All should have unique action IDs
+    assert action_id1 != action_id2
+    assert action_id2 != action_id3
+    assert action_id1 != action_id3
+
+    # All should be stored correctly
+    assert switchboard_alpha.pendingPythMaxConfidenceRatio(action_id1) == 2_00
+    assert switchboard_alpha.pendingPythMaxConfidenceRatio(action_id2) == 5_00
+    assert switchboard_alpha.pendingPythMaxConfidenceRatio(action_id3) == 10_00
