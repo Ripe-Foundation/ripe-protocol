@@ -19,6 +19,16 @@ def addPythFeed(pyth_prices, governance):
     yield addPythFeed
 
 
+@pytest.fixture(scope="module")
+def authorized_caller(switchboard_alpha, mission_control, governance, bob):
+    """Grant canPerformLiteAction permission to bob for oracle updates"""
+    action_id = switchboard_alpha.setCanPerformLiteAction(bob, True, sender=governance.address)
+    boa.env.time_travel(blocks=switchboard_alpha.actionTimeLock())
+    switchboard_alpha.executePendingAction(action_id, sender=governance.address)
+    assert mission_control.canPerformLiteAction(bob)
+    return bob
+
+
 ##################
 # Unique to Pyth #
 ##################
@@ -28,7 +38,7 @@ def test_pyth_local_update_prices(
     pyth_prices,
     mock_pyth,
     alpha_token,
-    governance,
+    authorized_caller,
     addPythFeed,
 ):
     data_feed_id = bytes.fromhex("eaa020c61cc479712813461ce153894a96a6c00b21ed0cfc2798d1f9a9e9c94a")
@@ -46,25 +56,25 @@ def test_pyth_local_update_prices(
     )
     exp_fee = len(payload)
 
-    # no balance
-    assert not pyth_prices.updatePythPrice(payload, sender=governance.address)
+    # insufficient payment
+    with boa.reverts("payment required"):
+        pyth_prices.updatePythPrice(payload, sender=authorized_caller, value=0)
 
-    # add eth balance
+    # success - caller provides payment
     assert boa.env.get_balance(mock_pyth.address) == 0
-    boa.env.set_balance(pyth_prices.address, EIGHTEEN_DECIMALS)
-    assert boa.env.get_balance(pyth_prices.address) > exp_fee
-    pre_pyth_prices_bal = boa.env.get_balance(pyth_prices.address)
+    boa.env.set_balance(authorized_caller, EIGHTEEN_DECIMALS)
+    pre_caller_bal = boa.env.get_balance(authorized_caller)
 
-    # success
-    assert pyth_prices.updatePythPrice(payload, sender=governance.address)
+    assert pyth_prices.updatePythPrice(payload, sender=authorized_caller, value=EIGHTEEN_DECIMALS)
 
     log = filter_logs(pyth_prices, 'PythPriceUpdated')[0]
     assert log.payload == payload
     assert log.feeAmount == exp_fee
-    assert log.caller == governance.address
+    assert log.caller == authorized_caller
 
-    assert boa.env.get_balance(pyth_prices.address) == pre_pyth_prices_bal - exp_fee
+    # Check that fee was paid and excess was refunded
     assert boa.env.get_balance(mock_pyth.address) == exp_fee
+    assert boa.env.get_balance(authorized_caller) == pre_caller_bal - exp_fee
 
     # check mock pyth
     price_data = mock_pyth.priceFeeds(data_feed_id)
@@ -74,49 +84,6 @@ def test_pyth_local_update_prices(
     assert price_data.price.publishTime == publish_time
 
     assert int(0.98 * EIGHTEEN_DECIMALS) >= pyth_prices.getPrice(alpha_token) > int(0.97 * EIGHTEEN_DECIMALS)
-
-
-def test_pyth_update_many_prices(
-    pyth_prices,
-    mock_pyth,
-    alpha_token,
-    bravo_token,
-    governance,
-    addPythFeed,
-):
-    # Add feeds for multiple assets
-    data_feed_id_1 = bytes.fromhex("eaa020c61cc479712813461ce153894a96a6c00b21ed0cfc2798d1f9a9e9c94a")
-    data_feed_id_2 = bytes.fromhex("baa020c61cc479712813461ce153894a96a6c00b21ed0cfc2798d1f9a9e9c94b")
-    
-    # Setup the second feed by creating a payload and updating it in MockPyth
-    payload_2 = mock_pyth.createPriceFeedUpdateData(data_feed_id_2, 97000000, 45000, -8, boa.env.evm.patch.timestamp)
-    boa.env.set_balance(boa.env.eoa, EIGHTEEN_DECIMALS)  # Add ETH for fee payment
-    mock_pyth.updatePriceFeeds(payload_2, value=len(payload_2))
-    
-    addPythFeed(alpha_token, data_feed_id_1)
-    addPythFeed(bravo_token, data_feed_id_2)
-
-    # Create payloads for both feeds
-    publish_time = boa.env.evm.patch.timestamp + 1
-    payload1 = mock_pyth.createPriceFeedUpdateData(data_feed_id_1, 98000000, 50000, -8, publish_time)
-    payload2 = mock_pyth.createPriceFeedUpdateData(data_feed_id_2, 97000000, 45000, -8, publish_time)
-    
-    # Add ETH balance
-    total_fee = len(payload1) + len(payload2)
-    boa.env.set_balance(pyth_prices.address, total_fee + EIGHTEEN_DECIMALS)
-    pre_balance = boa.env.get_balance(pyth_prices.address)
-
-    # Test successful batch update
-    num_updated = pyth_prices.updateManyPythPrices([payload1, payload2], sender=governance.address)
-    assert num_updated == 2
-
-    # Check balances
-    assert boa.env.get_balance(pyth_prices.address) == pre_balance - total_fee
-
-    # Test with insufficient balance (should stop after first update fails)
-    boa.env.set_balance(pyth_prices.address, len(payload1) - 1)  # Not enough for first payload
-    num_updated = pyth_prices.updateManyPythPrices([payload1, payload2], sender=governance.address)
-    assert num_updated == 0
 
 
 def test_pyth_recover_eth(
@@ -228,7 +195,7 @@ def test_pyth_confidence_ratio_validation(
     pyth_prices,
     mock_pyth,
     alpha_token,
-    governance,
+    authorized_caller,
     switchboard_alpha,
     addPythFeed,
 ):
@@ -236,8 +203,8 @@ def test_pyth_confidence_ratio_validation(
     data_feed_id = bytes.fromhex("eaa020c61cc479712813461ce153894a96a6c00b21ed0cfc2798d1f9a9e9c94a")
     addPythFeed(alpha_token, data_feed_id)
 
-    # Set up ETH balance for price updates
-    boa.env.set_balance(pyth_prices.address, 10 * EIGHTEEN_DECIMALS)
+    # Give switchboard enough ETH for all tests
+    boa.env.set_balance(authorized_caller, 100 * EIGHTEEN_DECIMALS)
 
     # Test 1: With default 3% threshold, 2% confidence should pass (returns price - confidence)
     publish_time = boa.env.evm.patch.timestamp + 1
@@ -248,7 +215,7 @@ def test_pyth_confidence_ratio_validation(
         -8,
         publish_time,
     )
-    assert pyth_prices.updatePythPrice(payload, sender=governance.address)
+    assert pyth_prices.updatePythPrice(payload, sender=authorized_caller, value=EIGHTEEN_DECIMALS)
     assert pyth_prices.getPrice(alpha_token) == int(0.98 * 10**18)  # Returns price - confidence
 
     # Test 2: With default 3% threshold, 5% confidence should be rejected
@@ -260,7 +227,7 @@ def test_pyth_confidence_ratio_validation(
         -8,
         publish_time,
     )
-    assert pyth_prices.updatePythPrice(payload, sender=governance.address)
+    assert pyth_prices.updatePythPrice(payload, sender=authorized_caller, value=EIGHTEEN_DECIMALS)
     assert pyth_prices.getPrice(alpha_token) == 0  # Rejected due to high confidence
 
     # Test 3: Change threshold to 10%, now 5% should pass (returns price - confidence)
@@ -273,7 +240,7 @@ def test_pyth_confidence_ratio_validation(
         -8,
         publish_time,
     )
-    assert pyth_prices.updatePythPrice(payload, sender=governance.address)
+    assert pyth_prices.updatePythPrice(payload, sender=authorized_caller, value=EIGHTEEN_DECIMALS)
     assert pyth_prices.getPrice(alpha_token) == int(0.95 * 10**18)  # Now accepted, returns price - confidence
 
     # Test 4: With 10% threshold, 15% confidence should still be rejected
@@ -285,7 +252,7 @@ def test_pyth_confidence_ratio_validation(
         -8,
         publish_time,
     )
-    assert pyth_prices.updatePythPrice(payload, sender=governance.address)
+    assert pyth_prices.updatePythPrice(payload, sender=authorized_caller, value=EIGHTEEN_DECIMALS)
     assert pyth_prices.getPrice(alpha_token) == 0  # Rejected
 
     # Test 5: Setting to 0 disables validation entirely (accepts any confidence)
@@ -298,7 +265,7 @@ def test_pyth_confidence_ratio_validation(
         -8,
         publish_time,
     )
-    assert pyth_prices.updatePythPrice(payload, sender=governance.address)
+    assert pyth_prices.updatePythPrice(payload, sender=authorized_caller, value=EIGHTEEN_DECIMALS)
     assert pyth_prices.getPrice(alpha_token) == int(0.1 * 10**18)  # Accepted! Returns price - confidence = 0.1
 
     # Reset to default
@@ -370,7 +337,7 @@ def test_pyth_get_price(
     pyth_prices,
     mock_pyth,
     alpha_token,
-    governance,
+    authorized_caller,
     addPythFeed,
     price,
     conf,
@@ -390,12 +357,12 @@ def test_pyth_get_price(
         publish_time,
     )
 
-    # add eth balance
-    if boa.env.get_balance(pyth_prices.address) < EIGHTEEN_DECIMALS:
-        boa.env.set_balance(pyth_prices.address, 2 * EIGHTEEN_DECIMALS)
+    # Give switchboard ETH for payment
+    boa.env.set_balance(authorized_caller, EIGHTEEN_DECIMALS)
 
-    # update price
-    assert pyth_prices.updatePythPrice(payload, sender=governance.address)
+    # update price - caller provides payment
+    boa.env.set_balance(authorized_caller, 10 * EIGHTEEN_DECIMALS)
+    assert pyth_prices.updatePythPrice(payload, sender=authorized_caller, value=EIGHTEEN_DECIMALS)
 
     # test price
     assert pyth_prices.getPrice(alpha_token) == expected_price
@@ -427,7 +394,7 @@ def test_pyth_get_price_stale(
     pyth_prices,
     mock_pyth,
     alpha_token,
-    governance,
+    authorized_caller,
     addPythFeed,
 ):
     boa.env.evm.patch.timestamp += MONTH_IN_SECONDS
@@ -446,11 +413,11 @@ def test_pyth_get_price_stale(
         publish_time,
     )
 
-    # add eth balance
-    boa.env.set_balance(pyth_prices.address, EIGHTEEN_DECIMALS)
+    # Give authorized_caller ETH for payment
+    boa.env.set_balance(authorized_caller, 10 * EIGHTEEN_DECIMALS)
 
-    # success update price
-    assert pyth_prices.updatePythPrice(payload, sender=governance.address)
+    # success update price - caller provides payment
+    assert pyth_prices.updatePythPrice(payload, sender=authorized_caller, value=EIGHTEEN_DECIMALS)
 
     # price should be 0 due to staleness
     assert pyth_prices.getPrice(alpha_token, 3600) == 0
@@ -923,17 +890,19 @@ def test_pyth_price_stale_edge_cases(
     pyth_prices,
     mock_pyth,
     alpha_token,
-    governance,
+    authorized_caller,
     addPythFeed,
 ):
     data_feed_id = bytes.fromhex("eaa020c61cc479712813461ce153894a96a6c00b21ed0cfc2798d1f9a9e9c94a")
     addPythFeed(alpha_token, data_feed_id)
 
+    # Give switchboard enough ETH for all tests
+    boa.env.set_balance(authorized_caller, 100 * EIGHTEEN_DECIMALS)
+
     # Test price exactly at stale time boundary
     publish_time = boa.env.evm.patch.timestamp
     payload = mock_pyth.createPriceFeedUpdateData(data_feed_id, 98000000, 50000, -8, publish_time)
-    boa.env.set_balance(pyth_prices.address, EIGHTEEN_DECIMALS)
-    assert pyth_prices.updatePythPrice(payload, sender=governance.address)
+    assert pyth_prices.updatePythPrice(payload, sender=authorized_caller, value=EIGHTEEN_DECIMALS)
 
     # Test price just at stale boundary (should still be valid)
     assert pyth_prices.getPrice(alpha_token, 0) != 0
@@ -946,7 +915,7 @@ def test_pyth_price_stale_edge_cases(
 
     # Test with maximum uint256 stale time
     payload = mock_pyth.createPriceFeedUpdateData(data_feed_id, 98000000, 50000, -8, boa.env.evm.patch.timestamp)
-    assert pyth_prices.updatePythPrice(payload, sender=governance.address)
+    assert pyth_prices.updatePythPrice(payload, sender=authorized_caller, value=EIGHTEEN_DECIMALS)
     assert pyth_prices.getPrice(alpha_token, 2**256 - 1) != 0
 
     # Test with zero stale time (never stale)
@@ -1020,7 +989,7 @@ def test_pyth_governance_edge_cases(
     boa.env.time_travel(blocks=pyth_prices.actionTimeLock() + 1)
     assert pyth_prices.confirmPriceFeedUpdate(alpha_token, sender=governance.address)
 
-    # Test governance actions during pause (using MissionControl address)
+    # Test governance actions during pause (using switchboard address)
     pyth_prices.pause(True, sender=switchboard_alpha.address)
     with boa.reverts("contract paused"):
         pyth_prices.addNewPriceFeed(alpha_token, data_feed_id_1, 0, sender=governance.address)

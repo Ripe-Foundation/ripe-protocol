@@ -30,6 +30,7 @@ interface PythNetwork:
 
 interface MissionControl:
     def getPriceStaleTime() -> uint256: view
+    def canPerformLiteAction(_user: address) -> bool: view
 
 struct PythPrice:
     price: int64
@@ -546,31 +547,28 @@ def _isValidDisablePriceFeed(_asset: address, _oldFeedId: bytes32) -> bool:
 ################
 
 
-@external
-def updateManyPythPrices(_payloads: DynArray[Bytes[2048], MAX_PRICE_UPDATES]) -> uint256:
-    pythNetwork: address = PYTH
-    numUpdated: uint256 = 0
-    for p: Bytes[2048] in _payloads:
-        didUpdate: bool = self._updatePythPrice(p, pythNetwork)
-        if didUpdate:
-            numUpdated += 1
-        else:
-            break
-    return numUpdated
-
-
+@payable
 @external
 def updatePythPrice(_payload: Bytes[2048]) -> bool:
-    return self._updatePythPrice(_payload, PYTH)
+    assert staticcall MissionControl(addys._getMissionControlAddr()).canPerformLiteAction(msg.sender) # dev: not authorized
+    assert msg.value != 0 # dev: payment required
+    return self._updatePythPrice(_payload, PYTH, msg.value)
 
 
 @internal
-def _updatePythPrice(_payload: Bytes[2048], _pythNetwork: address) -> bool:
+def _updatePythPrice(_payload: Bytes[2048], _pythNetwork: address, _payment: uint256) -> bool:
     feeAmount: uint256 = staticcall PythNetwork(_pythNetwork).getUpdateFee(_payload)
-    if self.balance < feeAmount:
-        return False
+    assert _payment >= feeAmount # dev: insufficient payment
+
+    # update oracle price feeds
     extcall PythNetwork(_pythNetwork).updatePriceFeeds(_payload, value=feeAmount)
     log PythPriceUpdated(payload=_payload, feeAmount=feeAmount, caller=msg.sender)
+
+    # refund excess payment to caller
+    excess: uint256 = _payment - feeAmount
+    if excess > 0:
+        send(msg.sender, excess)
+
     return True
 
 

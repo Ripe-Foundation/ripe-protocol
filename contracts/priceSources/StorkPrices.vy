@@ -27,6 +27,9 @@ interface StorkNetwork:
     def updateTemporalNumericValuesV1(_payload: Bytes[2048]): payable
     def getUpdateFeeV1(_payload: Bytes[2048]) -> uint256: view
 
+interface MissionControl:
+    def canPerformLiteAction(_user: address) -> bool: view
+
 struct TemporalNumericValue:
     timestampNs: uint64
     quantizedValue: uint256
@@ -480,31 +483,28 @@ def _isValidDisablePriceFeed(_asset: address, _oldFeedId: bytes32) -> bool:
 ################
 
 
-@external
-def updateManyStorkPrices(_payloads: DynArray[Bytes[2048], MAX_PRICE_UPDATES]) -> uint256:
-    stork: address = STORK
-    numUpdated: uint256 = 0
-    for p: Bytes[2048] in _payloads:
-        didUpdate: bool = self._updateStorkPrice(p, stork)
-        if didUpdate:
-            numUpdated += 1
-        else:
-            break
-    return numUpdated
-
-
+@payable
 @external
 def updateStorkPrice(_payload: Bytes[2048]) -> bool:
-    return self._updateStorkPrice(_payload, STORK)
+    assert staticcall MissionControl(addys._getMissionControlAddr()).canPerformLiteAction(msg.sender) # dev: not authorized
+    assert msg.value != 0 # dev: payment required
+    return self._updateStorkPrice(_payload, STORK, msg.value)
 
 
 @internal
-def _updateStorkPrice(_payload: Bytes[2048], _stork: address) -> bool:
+def _updateStorkPrice(_payload: Bytes[2048], _stork: address, _payment: uint256) -> bool:
     feeAmount: uint256 = staticcall StorkNetwork(_stork).getUpdateFeeV1(_payload)
-    if self.balance < feeAmount:
-        return False
+    assert _payment >= feeAmount # dev: insufficient payment
+
+    # update oracle price feeds
     extcall StorkNetwork(_stork).updateTemporalNumericValuesV1(_payload, value=feeAmount)
     log StorkPriceUpdated(payload=_payload, feeAmount=feeAmount, caller=msg.sender)
+
+    # refund excess payment to caller
+    excess: uint256 = _payment - feeAmount
+    if excess > 0:
+        send(msg.sender, excess)
+
     return True
 
 
