@@ -1875,3 +1875,108 @@ def test_stab_vault_redemptions_mixed_assets_with_sgreen(
 
     # No green should remain in the stability pool
     assert green_token.balanceOf(stability_pool) == bravo_for_alpha  # Only from alpha redemption
+
+
+def test_stab_vault_redeem_fragmented_claims_refunds_profit(
+    stability_pool,
+    alpha_token,
+    charlie_token,
+    delta_token,
+    alpha_token_whale,
+    charlie_token_whale,
+    delta_token_whale,
+    bravo_token,
+    bravo_token_whale,
+    green_token,
+    whale,
+    alice,
+    bob,
+    teller,
+    auction_house,
+    mock_price_source,
+    vault_book,
+    savings_green,
+    setGeneralConfig,
+    setAssetConfig,
+):
+    """
+    Test that verifies the rounding vulnerability fix.
+    Before the fix: redeemers could profit from fragmented claims by harvesting per-asset rounding losses.
+    After the fix: redeemers pay at least the USD value of collateral (round up favors protocol).
+    """
+    setGeneralConfig()
+    setAssetConfig(alpha_token)
+    setAssetConfig(charlie_token)
+    setAssetConfig(delta_token)
+    setAssetConfig(
+        bravo_token,
+        _shouldSwapInStabPools=True,
+        _canRedeemInStabPool=True,
+    )
+
+    # Price claim asset below $1 for fractional conversions
+    mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
+    mock_price_source.setPrice(charlie_token, EIGHTEEN_DECIMALS)
+    mock_price_source.setPrice(delta_token, EIGHTEEN_DECIMALS)
+    mock_price_source.setPrice(green_token, EIGHTEEN_DECIMALS)
+    claim_price = 73 * EIGHTEEN_DECIMALS // 100  # $0.73
+    mock_price_source.setPrice(bravo_token, claim_price)
+
+    # Register three stability assets
+    stab_assets = [
+        (alpha_token, alpha_token_whale),
+        (charlie_token, charlie_token_whale),
+        (delta_token, delta_token_whale),
+    ]
+    prepared_assets = []
+    for token, whale_addr in stab_assets:
+        deposit_amount = 50 * (10 ** token.decimals())
+        token.transfer(stability_pool, deposit_amount, sender=whale_addr)
+        stability_pool.depositTokensInVault(
+            alice, token, deposit_amount, sender=teller.address
+        )
+        prepared_assets.append((token, deposit_amount))
+
+    # Seed each asset with slightly offset claim buckets to maximize rounding
+    claim_amounts = [10**15 + 1, 2 * 10**15 + 1, 5 * 10**15 + 1]
+    for (token, deposit_amount), claim_amount in zip(prepared_assets, claim_amounts):
+        bravo_token.transfer(stability_pool, claim_amount, sender=bravo_token_whale)
+        stability_pool.swapForLiquidatedCollateral(
+            token,
+            deposit_amount // 4,
+            bravo_token,
+            claim_amount,
+            whale,
+            green_token,
+            savings_green,
+            sender=auction_house.address,
+        )
+
+    total_claimable = sum(claim_amounts)
+    green_budget = total_claimable * claim_price // EIGHTEEN_DECIMALS
+    green_token.transfer(bob, green_budget, sender=whale)
+    green_token.approve(teller, green_budget, sender=bob)
+
+    vault_id = vault_book.getRegId(stability_pool)
+    green_spent = teller.redeemFromStabilityPool(
+        vault_id, bravo_token, green_budget, bob, sender=bob
+    )
+
+    # Calculate actual values
+    refund = green_budget - green_spent
+    bravo_received = bravo_token.balanceOf(bob)
+    redeemed_value = bravo_received * claim_price // EIGHTEEN_DECIMALS
+
+    # After the fix: GREEN spent should be >= USD value (protocol favored by rounding up)
+    # The exploit no longer works
+    assert green_spent >= redeemed_value, f"Vulnerability still exists! green_spent ({green_spent}) < redeemed_value ({redeemed_value})"
+
+    # With rounding up, redeemer should receive almost all collateral
+    # They may be a few wei short if they budgeted using floor division (which is acceptable)
+    assert bravo_received >= total_claimable - 10, f"Redeemer should receive nearly all collateral"
+
+    # The key metric: verify the exploit is not profitable
+    # Before fix: green_spent < redeemed_value (redeemer profits)
+    # After fix: green_spent >= redeemed_value (protocol protected)
+    profit_or_loss = redeemed_value - green_spent
+    assert profit_or_loss <= 0, f"Redeemer should not profit from rounding! Profit: {profit_or_loss}"

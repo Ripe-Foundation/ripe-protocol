@@ -901,8 +901,12 @@ def _redeemFromStabilityPool(
         self._handleAssetForUser(_asset, claimAmount, _recipient, _shouldAutoDeposit, _a)
         remainingClaimAmount -= claimAmount
 
-        # finalize redeem amount
-        redeemAmount: uint256 = min(claimAmount * maxRedeemValue // maxClaimableAmount, remainingRedeemValue)
+        # finalize redeem amount (round up to favor protocol)
+        numerator: uint256 = claimAmount * maxRedeemValue
+        redeemAmount: uint256 = numerator // maxClaimableAmount
+        if numerator % maxClaimableAmount != 0:
+            redeemAmount += 1
+        redeemAmount = min(redeemAmount, remainingRedeemValue)
 
         # if stab asset is sGREEN, just convert directly, no need to make green claimable in this case
         if stabAsset == _a.savingsGreen:
