@@ -78,7 +78,7 @@ PARAMS = {
         "MIN_HQ_CHANGE_TIMELOCK": 43_200,  # 1 day on Base
         "MAX_HQ_CHANGE_TIMELOCK": 302_400,  # 7 days on Base
         # switchboard (green / ripe)
-        "MIN_SWITCHBOARD_CHANGE_TIMELOCK": 14_400,  # 8 hours on Base
+        "MIN_SWITCHBOARD_CHANGE_TIMELOCK": 3_600,  # 2 hours on Base
         "MAX_SWITCHBOARD_CHANGE_TIMELOCK": 302_400,  # 7 days on Base
         # price desk (timestamps, not blocks!)
         "PRICE_DESK_MIN_STALE_TIME": 60 * 5,  # 5 mins

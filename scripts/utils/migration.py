@@ -100,9 +100,10 @@ class Migration:
     def get_address(self, name):
         return self._previous_manifest["contracts"][name]["address"]
 
-    def get_contract(self, name):
+    def get_contract(self, name, address=None):
         file = self._previous_manifest["contracts"][name]["file"]
-        return boa.load_partial(file).at(self.get_address(name))
+        address = address or self.get_address(name)
+        return boa.load_partial(file).at(address)
 
     def end(self):
         """
