@@ -565,12 +565,15 @@ def _getValueOfClaimableAssets(
         asset: address = self.claimableAssets[_stabAsset][i]
         if asset == empty(address):
             continue
+
         balance: uint256 = self.claimableBalances[_stabAsset][asset]
         if balance == 0:
             continue
 
         claimValue: uint256 = self._getUsdValue(asset, balance, _greenToken, _savingsGreen, _priceDesk)
-        assert claimValue != 0 # dev: claimable asset has no value
+        if claimValue == 0:
+            continue
+
         totalValue += claimValue
 
     return totalValue
