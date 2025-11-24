@@ -533,6 +533,12 @@ def _updateRedeemInterval(_amount: uint256):
 ##################
 
 
+@view
+@external
+def getUsdcYieldPositionVaultToken() -> address:
+    return self.usdcYieldPosition.vaultToken
+
+
 # deposit to yield
 
 
