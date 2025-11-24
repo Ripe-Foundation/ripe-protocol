@@ -488,11 +488,17 @@ def _isValidDisablePriceFeed(_asset: address, _oldFeedId: bytes32) -> bool:
 def updateStorkPrice(_payload: Bytes[2048]) -> bool:
     assert staticcall MissionControl(addys._getMissionControlAddr()).canPerformLiteAction(msg.sender) # dev: not authorized
     assert msg.value != 0 # dev: payment required
-    return self._updateStorkPrice(_payload, STORK, msg.value)
+    return self._updateStorkPrice(_payload, STORK, msg.value, True)
+
+
+@external
+def updateStorkPriceNoPay(_payload: Bytes[2048]) -> bool:
+    assert staticcall MissionControl(addys._getMissionControlAddr()).canPerformLiteAction(msg.sender) # dev: not authorized
+    return self._updateStorkPrice(_payload, STORK, self.balance, False)
 
 
 @internal
-def _updateStorkPrice(_payload: Bytes[2048], _stork: address, _payment: uint256) -> bool:
+def _updateStorkPrice(_payload: Bytes[2048], _stork: address, _payment: uint256, _shouldRefund: bool) -> bool:
     feeAmount: uint256 = staticcall StorkNetwork(_stork).getUpdateFeeV1(_payload)
     assert _payment >= feeAmount # dev: insufficient payment
 
@@ -502,7 +508,7 @@ def _updateStorkPrice(_payload: Bytes[2048], _stork: address, _payment: uint256)
 
     # refund excess payment to caller
     excess: uint256 = _payment - feeAmount
-    if excess > 0:
+    if _shouldRefund and excess > 0:
         send(msg.sender, excess)
 
     return True

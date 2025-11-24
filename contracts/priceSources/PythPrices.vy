@@ -552,11 +552,17 @@ def _isValidDisablePriceFeed(_asset: address, _oldFeedId: bytes32) -> bool:
 def updatePythPrice(_payload: Bytes[2048]) -> bool:
     assert staticcall MissionControl(addys._getMissionControlAddr()).canPerformLiteAction(msg.sender) # dev: not authorized
     assert msg.value != 0 # dev: payment required
-    return self._updatePythPrice(_payload, PYTH, msg.value)
+    return self._updatePythPrice(_payload, PYTH, msg.value, True)
+
+
+@external
+def updatePythPriceNoPay(_payload: Bytes[2048]) -> bool:
+    assert staticcall MissionControl(addys._getMissionControlAddr()).canPerformLiteAction(msg.sender) # dev: not authorized
+    return self._updatePythPrice(_payload, PYTH, self.balance, False)
 
 
 @internal
-def _updatePythPrice(_payload: Bytes[2048], _pythNetwork: address, _payment: uint256) -> bool:
+def _updatePythPrice(_payload: Bytes[2048], _pythNetwork: address, _payment: uint256, _shouldRefund: bool) -> bool:
     feeAmount: uint256 = staticcall PythNetwork(_pythNetwork).getUpdateFee(_payload)
     assert _payment >= feeAmount # dev: insufficient payment
 
@@ -566,7 +572,7 @@ def _updatePythPrice(_payload: Bytes[2048], _pythNetwork: address, _payment: uin
 
     # refund excess payment to caller
     excess: uint256 = _payment - feeAmount
-    if excess > 0:
+    if _shouldRefund and excess > 0:
         send(msg.sender, excess)
 
     return True
