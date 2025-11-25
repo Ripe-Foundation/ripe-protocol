@@ -214,7 +214,7 @@ MAX_STAB_VAULT_DATA: constant(uint256) = 10
 PRIORITY_LIQ_VAULT_DATA: constant(uint256) = 20
 MAX_LIQ_USERS: constant(uint256) = 50
 MAX_AUCTIONS: constant(uint256) = 20
-TEN_CENTS: constant(uint256) = 10 ** 17 # $0.10
+ONE_CENT: constant(uint256) = 10 ** 16 # $0.01
 
 
 @deploy
@@ -320,14 +320,32 @@ def _liquidateUser(
     userDebt.inLiquidation = True
 
     # liquidation fees
-    totalLiqFees: uint256 = userDebt.amount * bt.debtTerms.liqFee // HUNDRED_PERCENT
+    baseLiqFee: uint256 = userDebt.amount * bt.debtTerms.liqFee // HUNDRED_PERCENT
+    totalLiqFees: uint256 = baseLiqFee
     liqFeeRatio: uint256 = bt.debtTerms.liqFee
 
     # keeper fee (for liquidator)
     keeperFee: uint256 = max(_config.minKeeperFee, userDebt.amount * _config.keeperFeeRatio // HUNDRED_PERCENT)
     if keeperFee != 0 and _config.maxKeeperFee != 0:
         keeperFee = min(keeperFee, _config.maxKeeperFee)
-        totalLiqFees += keeperFee
+
+    # cap fees based on collateral surplus over debt
+    # goal: liquidate everything possible, even if fees are reduced to zero
+    # additional constraint: ensure liqFeeRatio never exceeds 99% to prevent underflow in stability pool swap
+    maxAllowableFees: uint256 = 0
+    if bt.collateralVal > userDebt.amount:
+        maxAllowableFees = min(bt.collateralVal - userDebt.amount, userDebt.amount * 99_00 // HUNDRED_PERCENT)
+
+    # adjust fees if necessary
+    if baseLiqFee + keeperFee > maxAllowableFees:
+        if baseLiqFee <= maxAllowableFees:
+            keeperFee = maxAllowableFees - baseLiqFee
+        else:
+            keeperFee = 0
+            baseLiqFee = maxAllowableFees
+
+    totalLiqFees = baseLiqFee + keeperFee
+    if totalLiqFees != 0:
         liqFeeRatio = totalLiqFees * HUNDRED_PERCENT // userDebt.amount
 
     targetLtv: uint256 = bt.lowestLtv
@@ -390,7 +408,7 @@ def _performLiquidationPhases(
 
     if len(_config.priorityLiqAssetVaults) != 0:
         for pData: VaultData in _config.priorityLiqAssetVaults:
-            if remainingToRepay <= TEN_CENTS:
+            if remainingToRepay <= ONE_CENT:
                 break
 
             if not staticcall Vault(pData.vaultAddr).doesUserHaveBalance(_liqUser, pData.asset):
@@ -402,7 +420,7 @@ def _performLiquidationPhases(
 
     # PHASE 2 -- Go thru user's vaults (top to bottom as saved in ledger / vaults)
 
-    if remainingToRepay > TEN_CENTS:
+    if remainingToRepay > ONE_CENT:
         remainingToRepay, collateralValueOut = self._iterateThruAllUserVaults(_liqUser, remainingToRepay, collateralValueOut, _liqFeeRatio, _config.priorityStabVaults, _a)
 
     return _targetRepayAmount - remainingToRepay, collateralValueOut
@@ -431,7 +449,7 @@ def _iterateThruAllUserVaults(
 
     # iterate thru each user vault
     for i: uint256 in range(1, numUserVaults, bound=max_value(uint256)):
-        if remainingToRepay <= TEN_CENTS:
+        if remainingToRepay <= ONE_CENT:
             break
 
         vaultId: uint256 = staticcall Ledger(_a.ledger).userVaults(_liqUser, i)
@@ -483,7 +501,7 @@ def _iterateThruAssetsWithinVault(
     remainingToRepay: uint256 = _remainingToRepay
     collateralValueOut: uint256 = _collateralValueOut
     for y: uint256 in range(1, numUserAssets, bound=max_value(uint256)):
-        if remainingToRepay <= TEN_CENTS:
+        if remainingToRepay <= ONE_CENT:
             break
 
         # check if user still has balance in this asset
@@ -591,7 +609,7 @@ def _swapWithStabPools(
     # iterate thru each stab pool
     isPositionDepleted: bool = False
     for stabPool: VaultData in stabPoolsToUse:
-        if remainingToRepay <= TEN_CENTS:
+        if remainingToRepay <= ONE_CENT:
             break
 
         # swap with stability pool
@@ -631,7 +649,7 @@ def _swapWithSpecificStabPool(
     isPositionDepleted: bool = False
     shouldGoToNextAsset: bool = False
     remainingToRepay, collateralValueOut, isPositionDepleted, shouldGoToNextAsset = self._swapWithGreenRedemptions(_stabPool, _liqUser, _liqVaultId, _liqVaultAddr, _liqAsset, _liqFeeRatio, remainingToRepay, collateralValueOut, _a)
-    if remainingToRepay <= TEN_CENTS or isPositionDepleted or shouldGoToNextAsset:
+    if remainingToRepay <= ONE_CENT or isPositionDepleted or shouldGoToNextAsset:
         return remainingToRepay, collateralValueOut, isPositionDepleted, shouldGoToNextAsset
 
     # no balance in stability pool, skip
@@ -711,7 +729,7 @@ def _swapAssetsWithStabPool(
 
     # max collateral usd value (to take from liq user)
     maxCollateralUsdValue: uint256 = min(_maxUsdValueInStabPool, remainingToRepay) * HUNDRED_PERCENT // (HUNDRED_PERCENT - _liqFeeRatio)
-    if maxCollateralUsdValue <= TEN_CENTS:
+    if maxCollateralUsdValue <= ONE_CENT:
         return remainingToRepay, collateralValueOut, False, False # return if it's too small amount
 
     # transfer collateral to stability pool
@@ -1295,13 +1313,28 @@ def calcAmountOfDebtToRepayDuringLiq(_user: address) -> uint256:
         return 0
 
     # liquidation fees
-    totalLiqFees: uint256 = userDebt.amount * bt.debtTerms.liqFee // HUNDRED_PERCENT
+    baseLiqFee: uint256 = userDebt.amount * bt.debtTerms.liqFee // HUNDRED_PERCENT
+    totalLiqFees: uint256 = baseLiqFee
 
     # keeper fee (for liquidator)
     keeperFee: uint256 = max(config.minKeeperFee, userDebt.amount * config.keeperFeeRatio // HUNDRED_PERCENT)
     if keeperFee != 0 and config.maxKeeperFee != 0:
         keeperFee = min(keeperFee, config.maxKeeperFee)
-        totalLiqFees += keeperFee
+
+    # cap fees based on collateral surplus over debt (match _liquidateUser logic)
+    maxAllowableFees: uint256 = 0
+    if bt.collateralVal > userDebt.amount:
+        maxAllowableFees = min(bt.collateralVal - userDebt.amount, userDebt.amount * 99_00 // HUNDRED_PERCENT)
+
+    # adjust fees if necessary
+    if baseLiqFee + keeperFee > maxAllowableFees:
+        if baseLiqFee <= maxAllowableFees:
+            keeperFee = maxAllowableFees - baseLiqFee
+        else:
+            keeperFee = 0
+            baseLiqFee = maxAllowableFees
+
+    totalLiqFees = baseLiqFee + keeperFee
 
     # target ltv
     targetLtv: uint256 = bt.lowestLtv
