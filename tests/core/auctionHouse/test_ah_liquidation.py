@@ -328,7 +328,7 @@ def test_ah_liquidation_multiple_stab_assets_same_pool(
     vault_book,
     switchboard_alpha,
     mission_control,
-    endaoment,
+    endaoment_funds,
     _test,
 ):
     """Test liquidation with multiple stability assets in same pool - tests priority ordering"""
@@ -409,20 +409,20 @@ def test_ah_liquidation_multiple_stab_assets_same_pool(
     assert green_deposit < target_repay_amount
     _test(green_deposit, first_log.valueSwapped)
     
-    # Verify green tokens were burned (not sent to endaoment)
-    assert green_token.balanceOf(endaoment) == 0
+    # Verify green tokens were burned (not sent to endaoment_funds)
+    assert green_token.balanceOf(endaoment_funds) == 0
     assert green_token.balanceOf(stability_pool) == green_deposit - first_log.amountSwapped
 
     # Since target repay amount > green pool liquidity, we should definitely have a second swap
     remaining_to_repay = target_repay_amount - green_deposit
     assert remaining_to_repay > 0
-    
+
     second_log = logs[1]
     assert second_log.stabAsset == bravo_token.address
     assert second_log.stabVaultId == stab_pool_id
-    
-    # Verify bravo tokens went to endaoment (non-green asset)
-    assert bravo_token.balanceOf(endaoment) == second_log.amountSwapped
+
+    # Verify bravo tokens went to endaoment_funds (non-green asset)
+    assert bravo_token.balanceOf(endaoment_funds) == second_log.amountSwapped
     assert bravo_token.balanceOf(stability_pool) == bravo_deposit - second_log.amountSwapped
     
     # Verify the second swap covers the remaining amount
@@ -2242,4 +2242,305 @@ def test_liquidation_threshold_zero_protection(
     # Liquidation should work even with tiny threshold
     keeper_rewards = teller.liquidateUser(alice, sender=bob)
     assert keeper_rewards >= 0  # Should not revert
+
+
+###########################
+# Dust Position Liquidation
+###########################
+
+
+def test_ah_liquidation_dust_position_zero_keeper_fee(
+    setGeneralConfig,
+    setAssetConfig,
+    setGeneralDebtConfig,
+    performDeposit,
+    alpha_token,
+    alpha_token_whale,
+    green_token,
+    bob,
+    teller,
+    whale,
+    mock_price_source,
+    createDebtTerms,
+    credit_engine,
+    stability_pool,
+    vault_book,
+    switchboard_alpha,
+    mission_control,
+    sally,
+    _test,
+):
+    """Test liquidating a dust position where keeper fee must be reduced to 0.
+
+    This tests the fix for positions where:
+    - Debt is very small (e.g., 1 GREEN)
+    - minKeeperFee is high (e.g., 10 GREEN)
+    - Keeper fee exceeds collateral value, causing underflow in the old code
+
+    Expected behavior:
+    - Keeper fee is capped to fit within 90% of debt
+    - Liquidation succeeds with reduced/zero keeper fee
+    - All collateral is used to repay as much debt as possible
+    """
+    setGeneralConfig()
+
+    # Configure high minimum keeper fee that exceeds the debt
+    setGeneralDebtConfig(
+        _ltvPaybackBuffer=0,
+        _keeperFeeRatio=10_00,  # 10% keeper fee
+        _minKeeperFee=10 * EIGHTEEN_DECIMALS,  # 10 GREEN minimum - exceeds debt!
+        _maxKeeperFee=100 * EIGHTEEN_DECIMALS,
+    )
+
+    debt_terms = createDebtTerms(_liqThreshold=80_00, _liqFee=10_00, _ltv=50_00, _borrowRate=0)
+    setAssetConfig(
+        alpha_token,
+        _debtTerms=debt_terms,
+        _shouldBurnAsPayment=False,
+        _shouldTransferToEndaoment=False,
+        _shouldSwapInStabPools=True,
+        _shouldAuctionInstantly=False,
+    )
+
+    # Setup stability pool
+    mock_price_source.setPrice(alpha_token, 1 * EIGHTEEN_DECIMALS)
+    mock_price_source.setPrice(green_token, 1 * EIGHTEEN_DECIMALS)
+
+    stab_pool_id = vault_book.getRegId(stability_pool)
+    mission_control.setPriorityStabVaults([
+        (stab_pool_id, green_token),
+    ], sender=switchboard_alpha.address)
+
+    stab_debt_terms = createDebtTerms(0, 0, 0, 0, 0, 0)
+    setAssetConfig(green_token, _vaultIds=[stab_pool_id], _debtTerms=stab_debt_terms)
+
+    # Fund stability pool
+    stab_deposit_amount = 100 * EIGHTEEN_DECIMALS
+    green_token.transfer(whale, stab_deposit_amount, sender=whale)
+    green_token.approve(teller, stab_deposit_amount, sender=whale)
+    teller.deposit(green_token, stab_deposit_amount, whale, stability_pool, 0, sender=whale)
+
+    # Create dust position: small debt that keeper fee would exceed
+    deposit_amount = 2 * EIGHTEEN_DECIMALS  # $2 collateral
+    performDeposit(bob, deposit_amount, alpha_token, alpha_token_whale)
+    debt_amount = 1 * EIGHTEEN_DECIMALS  # $1 debt
+    teller.borrow(debt_amount, bob, False, sender=bob)
+
+    # Make position liquidatable (price drops so collateral < debt / liqThreshold)
+    # At 80% liq threshold, need collateral < $1 / 0.80 = $1.25
+    new_price = 60 * EIGHTEEN_DECIMALS // 100  # $0.60 per token, $1.20 total collateral
+    mock_price_source.setPrice(alpha_token, new_price)
+
+    assert credit_engine.canLiquidateUser(bob), "Position should be liquidatable"
+
+    # Without the fix, this would revert due to underflow
+    # With the fix, fees are capped based on collateral surplus and liquidation proceeds
+    keeper_rewards = teller.liquidateUser(bob, False, sender=sally)
+
+    # Fees are now capped based on collateral surplus over debt
+    # Collateral value = 2 tokens * $0.60 = $1.20
+    # Debt = $1.00
+    # Collateral surplus = $0.20
+    # Base liq fee = $1 * 10% = $0.10
+    # Max keeper fee = $0.20 - $0.10 = $0.10 (not the 10 GREEN minimum!)
+    collateral_value = deposit_amount * new_price // EIGHTEEN_DECIMALS
+    collateral_surplus = collateral_value - debt_amount if collateral_value > debt_amount else 0
+    base_liq_fee = debt_amount * 10_00 // HUNDRED_PERCENT
+    max_allowable_keeper = collateral_surplus - base_liq_fee if collateral_surplus > base_liq_fee else 0
+    assert keeper_rewards <= max_allowable_keeper, f"Keeper fee {keeper_rewards} should be <= {max_allowable_keeper}"
+
+    # Verify liquidation event occurred
+    liquidation_logs = filter_logs(teller, "LiquidateUser")
+    assert len(liquidation_logs) == 1, "Liquidation should have occurred"
+    assert liquidation_logs[0].user == bob
+
+
+def test_ah_liquidation_dust_position_reduced_keeper_fee(
+    setGeneralConfig,
+    setAssetConfig,
+    setGeneralDebtConfig,
+    performDeposit,
+    alpha_token,
+    alpha_token_whale,
+    green_token,
+    bob,
+    teller,
+    whale,
+    mock_price_source,
+    createDebtTerms,
+    credit_engine,
+    stability_pool,
+    vault_book,
+    switchboard_alpha,
+    mission_control,
+    sally,
+    _test,
+):
+    """Test liquidating a position where keeper fee is partially reduced.
+
+    This tests a scenario where:
+    - Debt is moderate (e.g., 5 GREEN)
+    - minKeeperFee is high but not extreme (e.g., 3 GREEN)
+    - Base liq fee + keeper fee would exceed 90%, so keeper fee is reduced
+
+    Expected behavior:
+    - Keeper fee is reduced to fit within the 90% cap
+    - Liquidation succeeds
+    """
+    setGeneralConfig()
+
+    # Configure keeper fee that would push total fees > 90%
+    setGeneralDebtConfig(
+        _ltvPaybackBuffer=0,
+        _keeperFeeRatio=50_00,  # 50% keeper fee ratio
+        _minKeeperFee=3 * EIGHTEEN_DECIMALS,  # 3 GREEN minimum
+        _maxKeeperFee=100 * EIGHTEEN_DECIMALS,
+    )
+
+    # High liq fee: 50%
+    debt_terms = createDebtTerms(_liqThreshold=80_00, _liqFee=50_00, _ltv=50_00, _borrowRate=0)
+    setAssetConfig(
+        alpha_token,
+        _debtTerms=debt_terms,
+        _shouldBurnAsPayment=False,
+        _shouldTransferToEndaoment=False,
+        _shouldSwapInStabPools=True,
+        _shouldAuctionInstantly=False,
+    )
+
+    # Setup stability pool
+    mock_price_source.setPrice(alpha_token, 1 * EIGHTEEN_DECIMALS)
+    mock_price_source.setPrice(green_token, 1 * EIGHTEEN_DECIMALS)
+
+    stab_pool_id = vault_book.getRegId(stability_pool)
+    mission_control.setPriorityStabVaults([
+        (stab_pool_id, green_token),
+    ], sender=switchboard_alpha.address)
+
+    stab_debt_terms = createDebtTerms(0, 0, 0, 0, 0, 0)
+    setAssetConfig(green_token, _vaultIds=[stab_pool_id], _debtTerms=stab_debt_terms)
+
+    # Fund stability pool
+    stab_deposit_amount = 500 * EIGHTEEN_DECIMALS
+    green_token.transfer(whale, stab_deposit_amount, sender=whale)
+    green_token.approve(teller, stab_deposit_amount, sender=whale)
+    teller.deposit(green_token, stab_deposit_amount, whale, stability_pool, 0, sender=whale)
+
+    # Create position
+    deposit_amount = 10 * EIGHTEEN_DECIMALS  # $10 collateral
+    performDeposit(bob, deposit_amount, alpha_token, alpha_token_whale)
+    debt_amount = 5 * EIGHTEEN_DECIMALS  # $5 debt
+    teller.borrow(debt_amount, bob, False, sender=bob)
+
+    # Without capping: liqFee (50%) + keeperFee (50%) = 100% of debt
+    # This would cause issues in the stability pool swap calculation
+    # With capping: total fees capped at 90%, so keeper fee reduced to 40%
+
+    # Make position liquidatable
+    new_price = 60 * EIGHTEEN_DECIMALS // 100  # $0.60 per token
+    mock_price_source.setPrice(alpha_token, new_price)
+
+    assert credit_engine.canLiquidateUser(bob)
+
+    # This should succeed with the fix - the key is that it doesn't revert
+    # Previously this would cause an underflow when liqFeeRatio exceeded 100%
+    keeper_rewards = teller.liquidateUser(bob, False, sender=sally)
+
+    # Verify liquidation occurred (no revert)
+    liquidation_logs = filter_logs(teller, "LiquidateUser")
+    assert len(liquidation_logs) == 1
+    assert liquidation_logs[0].user == bob
+
+    # The key validation: keeper rewards should be non-negative (liquidation succeeded)
+    assert keeper_rewards >= 0, "Liquidation should succeed with capped fees"
+
+
+def test_ah_liquidation_normal_position_unaffected(
+    setGeneralConfig,
+    setAssetConfig,
+    setGeneralDebtConfig,
+    performDeposit,
+    alpha_token,
+    alpha_token_whale,
+    green_token,
+    bob,
+    teller,
+    whale,
+    mock_price_source,
+    createDebtTerms,
+    credit_engine,
+    stability_pool,
+    vault_book,
+    switchboard_alpha,
+    mission_control,
+    sally,
+    _test,
+):
+    """Regression test: normal positions should be unaffected by the dust fix.
+
+    This tests that positions with sufficient collateral still pay full keeper fees.
+    """
+    setGeneralConfig()
+
+    # Normal configuration
+    setGeneralDebtConfig(
+        _ltvPaybackBuffer=0,
+        _keeperFeeRatio=2_00,  # 2% keeper fee
+        _minKeeperFee=1 * EIGHTEEN_DECIMALS,  # 1 GREEN minimum
+        _maxKeeperFee=100 * EIGHTEEN_DECIMALS,
+    )
+
+    debt_terms = createDebtTerms(_liqThreshold=80_00, _liqFee=10_00, _ltv=50_00, _borrowRate=0)
+    setAssetConfig(
+        alpha_token,
+        _debtTerms=debt_terms,
+        _shouldBurnAsPayment=False,
+        _shouldTransferToEndaoment=False,
+        _shouldSwapInStabPools=True,
+        _shouldAuctionInstantly=False,
+    )
+
+    # Setup stability pool
+    mock_price_source.setPrice(alpha_token, 1 * EIGHTEEN_DECIMALS)
+    mock_price_source.setPrice(green_token, 1 * EIGHTEEN_DECIMALS)
+
+    stab_pool_id = vault_book.getRegId(stability_pool)
+    mission_control.setPriorityStabVaults([
+        (stab_pool_id, green_token),
+    ], sender=switchboard_alpha.address)
+
+    stab_debt_terms = createDebtTerms(0, 0, 0, 0, 0, 0)
+    setAssetConfig(green_token, _vaultIds=[stab_pool_id], _debtTerms=stab_debt_terms)
+
+    # Fund stability pool
+    stab_deposit_amount = 1000 * EIGHTEEN_DECIMALS
+    green_token.transfer(whale, stab_deposit_amount, sender=whale)
+    green_token.approve(teller, stab_deposit_amount, sender=whale)
+    teller.deposit(green_token, stab_deposit_amount, whale, stability_pool, 0, sender=whale)
+
+    # Create normal-sized position
+    deposit_amount = 200 * EIGHTEEN_DECIMALS  # $200 collateral
+    performDeposit(bob, deposit_amount, alpha_token, alpha_token_whale)
+    debt_amount = 100 * EIGHTEEN_DECIMALS  # $100 debt
+    teller.borrow(debt_amount, bob, False, sender=bob)
+
+    # Total fees would be: liqFee (10%) + keeperFee (2%) = 12%
+    # This is well under 90%, so no capping should occur
+
+    # Make position liquidatable
+    new_price = 60 * EIGHTEEN_DECIMALS // 100  # $0.60 per token
+    mock_price_source.setPrice(alpha_token, new_price)
+
+    assert credit_engine.canLiquidateUser(bob)
+
+    keeper_rewards = teller.liquidateUser(bob, False, sender=sally)
+
+    # For normal position, keeper should get full fee
+    # 2% of 100 GREEN = 2 GREEN, but minKeeperFee is 1 GREEN, so max(1, 2) = 2 GREEN
+    expected_keeper_fee = max(1 * EIGHTEEN_DECIMALS, debt_amount * 2_00 // HUNDRED_PERCENT)
+    _test(expected_keeper_fee, keeper_rewards)
+
+    liquidation_logs = filter_logs(teller, "LiquidateUser")
+    assert len(liquidation_logs) == 1
+    _test(expected_keeper_fee, liquidation_logs[0].keeperFee)
 

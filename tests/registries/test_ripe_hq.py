@@ -27,7 +27,7 @@ def test_ripe_hq_and_tokens_setup(
 
     # registry
     assert ripe_hq.registryChangeTimeLock() != 0
-    assert ripe_hq.getNumAddrs() == 20
+    assert ripe_hq.getNumAddrs() == 22
 
     # governance
     assert ripe_hq.governance() == governance.address
@@ -41,7 +41,7 @@ def test_ripe_hq_and_tokens_setup(
 
     # switchboard
     assert switchboard.registryChangeTimeLock() != 0
-    assert switchboard.getNumAddrs() == 4
+    assert switchboard.getNumAddrs() == 5
     assert switchboard.governance() == ZERO_ADDRESS
 
     # vault book

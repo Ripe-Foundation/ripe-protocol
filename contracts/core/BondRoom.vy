@@ -214,7 +214,7 @@ def purchaseRipeBond(
     extcall Ledger(a.ledger).didPurchaseRipeBond(paymentAmount, totalRipePayout - ripeForBadDebt)
 
     # transfer payment proceeds to endaoment
-    assert extcall IERC20(_paymentAsset).transfer(a.endaoment, paymentAmount, default_return_value=True) # dev: asset transfer failed
+    assert extcall IERC20(_paymentAsset).transfer(addys._getEndaomentFundsAddr(), paymentAmount, default_return_value=True) # dev: asset transfer failed
 
     # mint ripe tokens, deposit into gov vault or transfer tokens to user
     if lockDuration != 0:

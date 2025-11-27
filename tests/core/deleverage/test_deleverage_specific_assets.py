@@ -183,7 +183,7 @@ def test_single_asset_endaoment_transfer(
     bob,
     bravo_token,
     bravo_token_whale,
-    endaoment,
+    endaoment_funds,
     setupDeleverage,
     _test,
 ):
@@ -204,7 +204,7 @@ def test_single_asset_endaoment_transfer(
     # Pre-state
     pre_debt = credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount
     pre_bravo_vault = simple_erc20_vault.getTotalAmountForUser(bob, bravo_token)
-    pre_endaoment_bravo = bravo_token.balanceOf(endaoment)
+    pre_endaoment_bravo = bravo_token.balanceOf(endaoment_funds)
 
     # Call deleverageWithSpecificAssets
     target_amount = 200 * EIGHTEEN_DECIMALS
@@ -220,7 +220,7 @@ def test_single_asset_endaoment_transfer(
 
     # Post-state
     post_bravo_vault = simple_erc20_vault.getTotalAmountForUser(bob, bravo_token)
-    post_endaoment_bravo = bravo_token.balanceOf(endaoment)
+    post_endaoment_bravo = bravo_token.balanceOf(endaoment_funds)
 
     # Calculate changes
     bravo_transferred = pre_bravo_vault - post_bravo_vault

@@ -19,6 +19,7 @@
 #     Ripe Foundation (C) 2025
 
 # @version 0.4.3
+# pragma optimize codesize
 
 implements: Department
 
@@ -41,6 +42,10 @@ interface CurvePool:
     def remove_liquidity_imbalance(_amounts: DynArray[uint256, 2], _maxLpBurnAmount: uint256, _recipient: address = msg.sender) -> uint256: nonpayable
     def add_liquidity(_amounts: DynArray[uint256, 2], _minLpAmountOut: uint256, _recipient: address = msg.sender) -> uint256: nonpayable
     def get_virtual_price() -> uint256: view
+
+interface EndaomentFunds:
+    def transfer(_asset: address = empty(address), _amount: uint256 = max_value(uint256)) -> uint256: nonpayable
+    def hasBalance(_asset: address = empty(address)) -> bool: view
 
 interface Ledger:
     def updateGreenPoolDebt(_pool: address, _amount: uint256, _isIncrement: bool): nonpayable
@@ -66,6 +71,9 @@ interface UnderscoreRegistry:
 
 interface MissionControl:
     def underscoreRegistry() -> address: view
+
+interface EndaomentPSM:
+    def USDC() -> address: view
 
 interface RipeHq:
     def governance() -> address: view
@@ -97,11 +105,6 @@ event WalletActionExt:
     amount2: uint256
     usdValue: uint256
     extra: uint256
-
-event EndaomentNftRecovered:
-    collection: indexed(address)
-    nftTokenId: uint256
-    recipient: indexed(address)
 
 event StabilizerPoolLiqAdded:
     pool: indexed(address)
@@ -138,12 +141,12 @@ MAX_SWAP_INSTRUCTIONS: constant(uint256) = 5
 MAX_TOKEN_PATH: constant(uint256) = 5
 MAX_ASSETS: constant(uint256) = 10
 MAX_LEGOS: constant(uint256) = 10
-ERC721_RECEIVE_DATA: constant(Bytes[1024]) = b"UE721"
 API_VERSION: constant(String[28]) = "0.1.0"
 FIFTY_PERCENT: constant(uint256) = 50_00 # 50.00%
 EIGHTEEN_DECIMALS: constant(uint256) = 10 ** 18
 LEGO_BOOK_ID: constant(uint256) = 3
 CURVE_PRICES_ID: constant(uint256) = 2
+MAX_PROOFS: constant(uint256) = 25
 
 WETH: public(immutable(address))
 ETH: public(immutable(address))
@@ -159,13 +162,6 @@ def __init__(_ripeHq: address, _weth: address, _eth: address):
     ETH = _eth
 
 
-@view
-@external
-def onERC721Received(_operator: address, _owner: address, _tokenId: uint256, _data: Bytes[1024]) -> bytes4:
-    # must implement method for safe NFT transfers
-    return method_id("onERC721Received(address,address,uint256,bytes)", output_type = bytes4)
-
-
 @payable
 @external
 def __default__():
@@ -178,15 +174,13 @@ def __default__():
 
 
 @external
-def transferFundsToGov(
-    _asset: address,
-    _amount: uint256 = max_value(uint256),
-) -> (uint256, uint256):
+def transferFundsToGov(_asset: address, _amount: uint256 = max_value(uint256)) -> (uint256, uint256):
     assert not deptBasics.isPaused # dev: contract paused
     assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
 
     # finalize amount
-    amount: uint256 = min(_amount, staticcall IERC20(_asset).balanceOf(self))
+    endaoFunds: address = addys._getEndaomentFundsAddr()
+    amount: uint256 = self._prepareEndaomentFunds(_asset, _amount, endaoFunds)
     assert amount != 0 # dev: no amt
 
     # perform transfer
@@ -199,6 +193,83 @@ def transferFundsToGov(
         op = 1,
         asset1 = _asset,
         asset2 = govRecipient,
+        amount1 = amount,
+        amount2 = 0,
+        usdValue = txUsdValue,
+        legoId = 0,
+    )
+    return amount, txUsdValue
+
+
+@external
+def transferFundsToVault(_assets: DynArray[address, MAX_ASSETS]):
+    assert not deptBasics.isPaused # dev: contract paused
+    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
+
+    priceDesk: address = addys._getPriceDeskAddr()
+    endaoFunds: address = addys._getEndaomentFundsAddr()
+    assert endaoFunds != empty(address) # dev: no endaoment funds
+
+    for a: address in _assets:
+        asset: address = a
+        amount: uint256 = 0
+
+        if a == empty(address):
+            amount = self.balance
+        else:
+            amount = staticcall IERC20(a).balanceOf(self)
+
+        # skip if no balance
+        if amount == 0:
+            continue
+
+        # transfer to vault
+        if a == empty(address):
+            send(endaoFunds, amount)
+            asset = WETH
+        else:
+            assert extcall IERC20(a).transfer(endaoFunds, amount, default_return_value = True) # dev: xfer
+
+        txUsdValue: uint256 = staticcall PriceDesk(priceDesk).getUsdValue(asset, amount, False)
+        log WalletAction(
+            op = 1,
+            asset1 = asset,
+            asset2 = endaoFunds,
+            amount1 = amount,
+            amount2 = 0,
+            usdValue = txUsdValue,
+            legoId = 0,
+        )
+
+
+@external
+def transferFundsToEndaomentPSM(_amount: uint256 = max_value(uint256)) -> (uint256, uint256):
+    assert not deptBasics.isPaused # dev: contract paused
+
+    # allow switchboard or governance to call this function
+    isSwitchboard: bool = addys._isSwitchboardAddr(msg.sender)
+    isGovernance: bool = msg.sender == staticcall RipeHq(addys._getRipeHq()).governance()
+    assert isSwitchboard or isGovernance # dev: no perms
+
+    # get EndaomentPSM and USDC address
+    endaoPSM: address = addys._getEndaomentPsmAddr()
+    assert endaoPSM != empty(address) # dev: no endaoment psm
+    usdc: address = staticcall EndaomentPSM(endaoPSM).USDC()
+    assert usdc != empty(address) # dev: no usdc
+
+    # finalize amount
+    endaoFunds: address = addys._getEndaomentFundsAddr()
+    amount: uint256 = self._prepareEndaomentFunds(usdc, _amount, endaoFunds)
+    assert amount != 0 # dev: no amt
+
+    # perform transfer
+    assert extcall IERC20(usdc).transfer(endaoPSM, amount, default_return_value = True) # dev: xfer
+
+    txUsdValue: uint256 = staticcall PriceDesk(addys._getPriceDeskAddr()).getUsdValue(usdc, amount, False)
+    log WalletAction(
+        op = 1,
+        asset1 = usdc,
+        asset2 = endaoPSM,
         amount1 = amount,
         amount2 = 0,
         usdValue = txUsdValue,
@@ -239,15 +310,16 @@ def _depositForYield(
     _shouldGenerateEvent: bool,
 ) -> (uint256, address, uint256, uint256):
     legoAddr: address = self._getLegoAddr(_legoId)
-    amount: uint256 = self._getAmountAndApprove(_asset, _amount, legoAddr) # doing approval here
+    endaoFunds: address = addys._getEndaomentFundsAddr()
+    amount: uint256 = self._getAmountAndApprove(_asset, _amount, legoAddr, endaoFunds) # doing approval here
 
     # deposit for yield
     assetAmount: uint256 = 0
     vaultToken: address = empty(address)
     vaultTokenAmountReceived: uint256 = 0
     txUsdValue: uint256 = 0
-    assetAmount, vaultToken, vaultTokenAmountReceived, txUsdValue = extcall UndyLego(legoAddr).depositForYield(_asset, amount, _vaultAddr, _extraData, self)
-    self._resetApproval(_asset, legoAddr)
+    assetAmount, vaultToken, vaultTokenAmountReceived, txUsdValue = extcall UndyLego(legoAddr).depositForYield(_asset, amount, _vaultAddr, _extraData, endaoFunds)
+    self._resetApproval(_asset, legoAddr, endaoFunds)
 
     if _shouldGenerateEvent:
         log WalletAction(
@@ -287,9 +359,11 @@ def _withdrawFromYield(
     _shouldGenerateEvent: bool,
 ) -> (uint256, address, uint256, uint256):
     legoAddr: address = self._getLegoAddr(_legoId)
+    endaoFunds: address = addys._getEndaomentFundsAddr()
+
     amount: uint256 = _amount
     if _vaultToken != empty(address):
-        amount = self._getAmountAndApprove(_vaultToken, _amount, empty(address)) # not approving here
+        amount = self._getAmountAndApprove(_vaultToken, _amount, empty(address), endaoFunds) # not approving here
 
         # some vault tokens require max value approval (comp v3)
         assert extcall IERC20(_vaultToken).approve(legoAddr, max_value(uint256), default_return_value = True) # dev: appr
@@ -299,10 +373,10 @@ def _withdrawFromYield(
     underlyingAsset: address = empty(address)
     underlyingAmount: uint256 = 0
     txUsdValue: uint256 = 0
-    vaultTokenAmountBurned, underlyingAsset, underlyingAmount, txUsdValue = extcall UndyLego(legoAddr).withdrawFromYield(_vaultToken, amount, _extraData, self)
+    vaultTokenAmountBurned, underlyingAsset, underlyingAmount, txUsdValue = extcall UndyLego(legoAddr).withdrawFromYield(_vaultToken, amount, _extraData, endaoFunds)
 
     if _vaultToken != empty(address):
-        self._resetApproval(_vaultToken, legoAddr)
+        self._resetApproval(_vaultToken, legoAddr, endaoFunds)
 
     if _shouldGenerateEvent:
         log WalletAction(
@@ -317,48 +391,6 @@ def _withdrawFromYield(
     return vaultTokenAmountBurned, underlyingAsset, underlyingAmount, txUsdValue
 
 
-# rebalance position
-
-
-@nonreentrant
-@external
-def rebalanceYieldPosition(
-    _fromLegoId: uint256,
-    _fromVaultToken: address,
-    _toLegoId: uint256,
-    _toVaultAddr: address = empty(address),
-    _fromVaultAmount: uint256 = max_value(uint256),
-    _extraData: bytes32 = empty(bytes32),
-) -> (uint256, address, uint256, uint256):
-    assert not deptBasics.isPaused # dev: contract paused
-    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
-
-    # withdraw
-    vaultTokenAmountBurned: uint256 = 0
-    underlyingAsset: address = empty(address)
-    underlyingAmount: uint256 = 0
-    withdrawTxUsdValue: uint256 = 0
-    vaultTokenAmountBurned, underlyingAsset, underlyingAmount, withdrawTxUsdValue = self._withdrawFromYield(_fromLegoId, _fromVaultToken, _fromVaultAmount, _extraData, False)
-
-    # deposit
-    toVaultToken: address = empty(address)
-    toVaultTokenAmountReceived: uint256 = 0
-    depositTxUsdValue: uint256 = 0
-    underlyingAmount, toVaultToken, toVaultTokenAmountReceived, depositTxUsdValue = self._depositForYield(_toLegoId, underlyingAsset, _toVaultAddr, underlyingAmount, _extraData, False)
-
-    maxUsdValue: uint256 = max(withdrawTxUsdValue, depositTxUsdValue)
-    log WalletAction(
-        op = 12,
-        asset1 = _fromVaultToken,
-        asset2 = toVaultToken,
-        amount1 = vaultTokenAmountBurned,
-        amount2 = toVaultTokenAmountReceived,
-        usdValue = maxUsdValue,
-        legoId = _fromLegoId,
-    )
-    return underlyingAmount, toVaultToken, toVaultTokenAmountReceived, maxUsdValue
-
-
 ###################
 # Swap / Exchange #
 ###################
@@ -369,13 +401,14 @@ def rebalanceYieldPosition(
 def swapTokens(_instructions: DynArray[UndyLego.SwapInstruction, MAX_SWAP_INSTRUCTIONS]) -> (address, uint256, address, uint256, uint256):
     assert not deptBasics.isPaused # dev: contract paused
     assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
+    endaoFunds: address = addys._getEndaomentFundsAddr()
 
     tokenIn: address = empty(address)
     tokenOut: address = empty(address)
     legoIds: DynArray[uint256, MAX_LEGOS] = []
     tokenIn, tokenOut, legoIds = self._validateAndGetSwapInfo(_instructions)
 
-    origAmountIn: uint256 = self._getAmountAndApprove(tokenIn, _instructions[0].amountIn, empty(address)) # not approving here
+    origAmountIn: uint256 = self._getAmountAndApprove(tokenIn, _instructions[0].amountIn, empty(address), endaoFunds) # not approving here
     amountIn: uint256 = origAmountIn
     lastTokenOut: address = empty(address)
     lastTokenOutAmount: uint256 = 0
@@ -387,10 +420,13 @@ def swapTokens(_instructions: DynArray[UndyLego.SwapInstruction, MAX_SWAP_INSTRU
             newTokenIn: address = i.tokenPath[0]
             assert lastTokenOut == newTokenIn # dev: path
             amountIn = min(lastTokenOutAmount, staticcall IERC20(newTokenIn).balanceOf(self))
-        
+
         thisTxUsdValue: uint256 = 0
         lastTokenOut, lastTokenOutAmount, thisTxUsdValue = self._performSwapInstruction(amountIn, i)
         maxTxUsdValue = max(maxTxUsdValue, thisTxUsdValue)
+
+    assert lastTokenOutAmount != 0 # dev: no output amount
+    self._transferToEndaomentFunds(lastTokenOut, endaoFunds)
 
     log WalletAction(
         op = 20,
@@ -421,7 +457,7 @@ def _performSwapInstruction(
 
     assert extcall IERC20(tokenIn).approve(legoAddr, _amountIn, default_return_value = True) # dev: appr
     tokenInAmount, tokenOutAmount, txUsdValue = extcall UndyLego(legoAddr).swapTokens(_amountIn, _i.minAmountOut, _i.tokenPath, _i.poolPath, self)
-    self._resetApproval(tokenIn, legoAddr)
+    self._resetApproval(tokenIn, legoAddr, empty(address))
     return tokenOut, tokenOutAmount, txUsdValue
 
 
@@ -452,95 +488,33 @@ def _validateAndGetSwapInfo(_instructions: DynArray[UndyLego.SwapInstruction, MA
     return tokenIn, tokenOut, legoIds
 
 
-# mint / redeem
+####################
+# Claim Incentives #
+####################
 
 
 @nonreentrant
 @external
-def mintOrRedeemAsset(
-    _legoId: uint256,
-    _tokenIn: address,
-    _tokenOut: address,
-    _amountIn: uint256 = max_value(uint256),
-    _minAmountOut: uint256 = 0,
-    _extraData: bytes32 = empty(bytes32),
-) -> (uint256, uint256, bool, uint256):
-    assert not deptBasics.isPaused # dev: contract paused
-    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
-    legoAddr: address = self._getLegoAddr(_legoId)
-
-    # mint or redeem asset
-    tokenInAmount: uint256 = self._getAmountAndApprove(_tokenIn, _amountIn, legoAddr) # doing approval here
-    tokenOutAmount: uint256 = 0
-    isPending: bool = False
-    txUsdValue: uint256 = 0
-    tokenInAmount, tokenOutAmount, isPending, txUsdValue = extcall UndyLego(legoAddr).mintOrRedeemAsset(_tokenIn, _tokenOut, tokenInAmount, _minAmountOut, _extraData, self)
-    self._resetApproval(_tokenIn, legoAddr)
-
-    log WalletAction(
-        op = 21,
-        asset1 = _tokenIn,
-        asset2 = _tokenOut,
-        amount1 = tokenInAmount,
-        amount2 = tokenOutAmount,
-        usdValue = txUsdValue,
-        legoId = _legoId,
-    )
-    return tokenInAmount, tokenOutAmount, isPending, txUsdValue
-
-
-@nonreentrant
-@external
-def confirmMintOrRedeemAsset(
-    _legoId: uint256,
-    _tokenIn: address,
-    _tokenOut: address,
-    _extraData: bytes32 = empty(bytes32),
-) -> (uint256, uint256):
-    assert not deptBasics.isPaused # dev: contract paused
-    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
-    legoAddr: address = self._getLegoAddr(_legoId)
-
-    # confirm mint or redeem asset (if there is a delay on action)
-    tokenOutAmount: uint256 = 0
-    txUsdValue: uint256 = 0
-    tokenOutAmount, txUsdValue = extcall UndyLego(legoAddr).confirmMintOrRedeemAsset(_tokenIn, _tokenOut, _extraData, self)
-
-    log WalletAction(
-        op = 22,
-        asset1 = _tokenIn,
-        asset2 = _tokenOut,
-        amount1 = 0,
-        amount2 = tokenOutAmount,
-        usdValue = txUsdValue,
-        legoId = _legoId,
-    )
-    return tokenOutAmount, txUsdValue
-
-
-#################
-# Claim Rewards #
-#################
-
-
-@nonreentrant
-@external
-def claimRewards(
+def claimIncentives(
+    _user: address,
     _legoId: uint256,
     _rewardToken: address = empty(address),
     _rewardAmount: uint256 = max_value(uint256),
-    _extraData: bytes32 = empty(bytes32),
+    _proofs: DynArray[bytes32, MAX_PROOFS] = [],
 ) -> (uint256, uint256):
     assert not deptBasics.isPaused # dev: contract paused
     assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
-    legoAddr: address = self._getLegoAddr(_legoId)
 
+    legoAddr: address = self._getLegoAddr(_legoId)
     self._checkLegoAccessForAction(legoAddr, UndyLego.ActionType.REWARDS)
 
     # claim rewards
     rewardAmount: uint256 = 0
     txUsdValue: uint256 = 0
-    rewardAmount, txUsdValue = extcall UndyLego(legoAddr).claimRewards(self, _rewardToken, _rewardAmount, _extraData)
+    rewardAmount, txUsdValue = extcall UndyLego(legoAddr).claimIncentives(_user, _rewardToken, _rewardAmount, _proofs)
+
+    # transfer to endaoment funds
+    self._transferToEndaomentFunds(_rewardToken, addys._getEndaomentFundsAddr())
 
     log WalletAction(
         op = 50,
@@ -563,24 +537,27 @@ def claimRewards(
 
 
 @nonreentrant
-@payable
 @external
 def convertEthToWeth(_amount: uint256 = max_value(uint256)) -> (uint256, uint256):
     assert not deptBasics.isPaused # dev: contract paused
     assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
+
+    endaoFunds: address = addys._getEndaomentFundsAddr()
+    self._prepareEndaomentFunds(empty(address), _amount, endaoFunds)
 
     # convert eth to weth
     weth: address = WETH
     amount: uint256 = min(_amount, self.balance)
     assert amount != 0 # dev: no amt
     extcall WethContract(weth).deposit(value = amount)
+    self._transferToEndaomentFunds(weth, endaoFunds)
 
     txUsdValue: uint256 = staticcall PriceDesk(addys._getPriceDeskAddr()).getUsdValue(weth, amount, False)
     log WalletAction(
         op = 2,
         asset1 = ETH,
         asset2 = weth,
-        amount1 = msg.value,
+        amount1 = amount,
         amount2 = amount,
         usdValue = txUsdValue,
         legoId = 0,
@@ -596,11 +573,13 @@ def convertEthToWeth(_amount: uint256 = max_value(uint256)) -> (uint256, uint256
 def convertWethToEth(_amount: uint256 = max_value(uint256)) -> (uint256, uint256):
     assert not deptBasics.isPaused # dev: contract paused
     assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
+    endaoFunds: address = addys._getEndaomentFundsAddr()
 
     # convert weth to eth
     weth: address = WETH
-    amount: uint256 = self._getAmountAndApprove(weth, _amount, empty(address)) # nothing to approve
+    amount: uint256 = self._getAmountAndApprove(weth, _amount, empty(address), endaoFunds) # nothing to approve
     extcall WethContract(weth).withdraw(amount)
+    send(endaoFunds, self.balance)
 
     txUsdValue: uint256 = staticcall PriceDesk(addys._getPriceDeskAddr()).getUsdValue(weth, amount, False)
     log WalletAction(
@@ -654,22 +633,23 @@ def _addLiquidity(
     _pool: address,
     _tokenA: address,
     _tokenB: address,
-    _amountA: uint256 = max_value(uint256),
-    _amountB: uint256 = max_value(uint256),
-    _minAmountA: uint256 = 0,
-    _minAmountB: uint256 = 0,
-    _minLpAmount: uint256 = 0,
-    _extraData: bytes32 = empty(bytes32),
+    _amountA: uint256,
+    _amountB: uint256,
+    _minAmountA: uint256,
+    _minAmountB: uint256,
+    _minLpAmount: uint256,
+    _extraData: bytes32,
 ) -> (address, uint256, uint256, uint256, uint256):
     legoAddr: address = self._getLegoAddr(_legoId)
+    endaoFunds: address = addys._getEndaomentFundsAddr()
 
     # token approvals
     amountA: uint256 = 0
     if _amountA != 0:
-        amountA = self._getAmountAndApprove(_tokenA, _amountA, legoAddr)
+        amountA = self._getAmountAndApprove(_tokenA, _amountA, legoAddr, endaoFunds)
     amountB: uint256 = 0
     if _amountB != 0:
-        amountB = self._getAmountAndApprove(_tokenB, _amountB, legoAddr)
+        amountB = self._getAmountAndApprove(_tokenB, _amountB, legoAddr, endaoFunds)
 
     # add liquidity via lego partner
     lpToken: address = empty(address)
@@ -677,13 +657,13 @@ def _addLiquidity(
     addedTokenA: uint256 = 0
     addedTokenB: uint256 = 0
     txUsdValue: uint256 = 0
-    lpToken, lpAmountReceived, addedTokenA, addedTokenB, txUsdValue = extcall UndyLego(legoAddr).addLiquidity(_pool, _tokenA, _tokenB, amountA, amountB, _minAmountA, _minAmountB, _minLpAmount, _extraData, self)
+    lpToken, lpAmountReceived, addedTokenA, addedTokenB, txUsdValue = extcall UndyLego(legoAddr).addLiquidity(_pool, _tokenA, _tokenB, amountA, amountB, _minAmountA, _minAmountB, _minLpAmount, _extraData, endaoFunds)
 
     # remove approvals
     if amountA != 0:
-        self._resetApproval(_tokenA, legoAddr)
+        self._resetApproval(_tokenA, legoAddr, endaoFunds)
     if amountB != 0:
-        self._resetApproval(_tokenB, legoAddr)
+        self._resetApproval(_tokenB, legoAddr, endaoFunds)
 
     log WalletAction(
         op = 30,
@@ -725,21 +705,22 @@ def _removeLiquidity(
     _tokenA: address,
     _tokenB: address,
     _lpToken: address,
-    _lpAmount: uint256 = max_value(uint256),
-    _minAmountA: uint256 = 0,
-    _minAmountB: uint256 = 0,
-    _extraData: bytes32 = empty(bytes32),
+    _lpAmount: uint256,
+    _minAmountA: uint256,
+    _minAmountB: uint256,
+    _extraData: bytes32,
 ) -> (uint256, uint256, uint256, uint256):
     legoAddr: address = self._getLegoAddr(_legoId)
+    endaoFunds: address = addys._getEndaomentFundsAddr()
 
     # remove liquidity via lego partner
     amountAReceived: uint256 = 0
     amountBReceived: uint256 = 0
     lpAmountBurned: uint256 = 0
     txUsdValue: uint256 = 0
-    lpAmount: uint256 = self._getAmountAndApprove(_lpToken, _lpAmount, legoAddr)
-    amountAReceived, amountBReceived, lpAmountBurned, txUsdValue = extcall UndyLego(legoAddr).removeLiquidity(_pool, _tokenA, _tokenB, _lpToken, lpAmount, _minAmountA, _minAmountB, _extraData, self)
-    self._resetApproval(_lpToken, legoAddr)
+    lpAmount: uint256 = self._getAmountAndApprove(_lpToken, _lpAmount, legoAddr, endaoFunds)
+    amountAReceived, amountBReceived, lpAmountBurned, txUsdValue = extcall UndyLego(legoAddr).removeLiquidity(_pool, _tokenA, _tokenB, _lpToken, lpAmount, _minAmountA, _minAmountB, _extraData, endaoFunds)
+    self._resetApproval(_lpToken, legoAddr, endaoFunds)
 
     log WalletAction(
         op = 31,
@@ -753,123 +734,6 @@ def _removeLiquidity(
     return amountAReceived, amountBReceived, lpAmountBurned, txUsdValue
 
 
-############################
-# Liquidity - Concentrated #
-############################
-
-
-@nonreentrant
-@external
-def addLiquidityConcentrated(
-    _legoId: uint256,
-    _nftAddr: address,
-    _nftTokenId: uint256,
-    _pool: address,
-    _tokenA: address,
-    _tokenB: address,
-    _amountA: uint256 = max_value(uint256),
-    _amountB: uint256 = max_value(uint256),
-    _tickLower: int24 = min_value(int24),
-    _tickUpper: int24 = max_value(int24),
-    _minAmountA: uint256 = 0,
-    _minAmountB: uint256 = 0,
-    _extraData: bytes32 = empty(bytes32),
-) -> (uint256, uint256, uint256, uint256, uint256):
-    assert not deptBasics.isPaused # dev: contract paused
-    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
-    legoAddr: address = self._getLegoAddr(_legoId)
-
-    # token approvals
-    amountA: uint256 = 0
-    if _amountA != 0:
-        amountA = self._getAmountAndApprove(_tokenA, _amountA, legoAddr)
-    amountB: uint256 = 0
-    if _amountB != 0:
-        amountB = self._getAmountAndApprove(_tokenB, _amountB, legoAddr)
-
-    # transfer nft to lego (if applicable)
-    hasNftLiqPosition: bool = _nftAddr != empty(address) and _nftTokenId != 0
-    if hasNftLiqPosition:
-        extcall IERC721(_nftAddr).safeTransferFrom(self, legoAddr, _nftTokenId, ERC721_RECEIVE_DATA)
-
-    # add liquidity via lego partner
-    liqAdded: uint256 = 0
-    addedTokenA: uint256 = 0
-    addedTokenB: uint256 = 0
-    nftTokenId: uint256 = 0
-    txUsdValue: uint256 = 0
-    liqAdded, addedTokenA, addedTokenB, nftTokenId, txUsdValue = extcall UndyLego(legoAddr).addLiquidityConcentrated(_nftTokenId, _pool, _tokenA, _tokenB, _tickLower, _tickUpper, amountA, amountB, _minAmountA, _minAmountB, _extraData, self)
-
-    # make sure nft is back
-    assert staticcall IERC721(_nftAddr).ownerOf(nftTokenId) == self # dev: nft not returned
-
-    # remove approvals
-    if amountA != 0:
-        self._resetApproval(_tokenA, legoAddr)
-    if amountB != 0:
-        self._resetApproval(_tokenB, legoAddr)
-
-    log WalletActionExt(
-        op = 32,
-        asset1 = _tokenA,
-        asset2 = _tokenB,
-        tokenId = nftTokenId,
-        amount1 = addedTokenA,
-        amount2 = addedTokenB,
-        usdValue = txUsdValue,
-        extra = liqAdded,
-    )
-    return liqAdded, addedTokenA, addedTokenB, nftTokenId, txUsdValue
-
-
-@nonreentrant
-@external
-def removeLiquidityConcentrated(
-    _legoId: uint256,
-    _nftAddr: address,
-    _nftTokenId: uint256,
-    _pool: address,
-    _tokenA: address,
-    _tokenB: address,
-    _liqToRemove: uint256 = max_value(uint256),
-    _minAmountA: uint256 = 0,
-    _minAmountB: uint256 = 0,
-    _extraData: bytes32 = empty(bytes32),
-) -> (uint256, uint256, uint256, uint256):
-    assert not deptBasics.isPaused # dev: contract paused
-    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
-    legoAddr: address = self._getLegoAddr(_legoId)
-
-    # must have nft liq position
-    assert _nftAddr != empty(address) # dev: invalid nft addr
-    assert _nftTokenId != 0 # dev: invalid nft token id
-    extcall IERC721(_nftAddr).safeTransferFrom(self, legoAddr, _nftTokenId, ERC721_RECEIVE_DATA)
-
-    # remove liquidity via lego partner
-    amountAReceived: uint256 = 0
-    amountBReceived: uint256 = 0
-    liqRemoved: uint256 = 0
-    isDepleted: bool = False
-    txUsdValue: uint256 = 0
-    amountAReceived, amountBReceived, liqRemoved, isDepleted, txUsdValue = extcall UndyLego(legoAddr).removeLiquidityConcentrated(_nftTokenId, _pool, _tokenA, _tokenB, _liqToRemove, _minAmountA, _minAmountB, _extraData, self)
-
-    # validate the nft came back (if not depleted)
-    if not isDepleted:
-        assert staticcall IERC721(_nftAddr).ownerOf(_nftTokenId) == self # dev: nft not returned
-
-    log WalletActionExt(
-        op = 33,
-        asset1 = _tokenA,
-        asset2 = _tokenB,
-        tokenId = _nftTokenId,
-        amount1 = amountAReceived,
-        amount2 = amountBReceived,
-        usdValue = txUsdValue,
-        extra = liqRemoved,
-    )
-    return amountAReceived, amountBReceived, liqRemoved, txUsdValue
-
-
 ####################
 # Green Stabilizer #
 ####################
@@ -880,11 +744,16 @@ def stabilizeGreenRefPool() -> bool:
     assert not deptBasics.isPaused # dev: contract paused
     assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
     a: addys.Addys = addys._getAddys()
+    endaoFunds: address = addys._getEndaomentFundsAddr()
 
     curvePrices: address = staticcall PriceDesk(a.priceDesk).getAddr(CURVE_PRICES_ID)
     data: StabilizerConfig = staticcall CurvePrices(curvePrices).getGreenStabilizerConfig()
     if data.pool == empty(address) or data.greenBalance == 0:
         return False
+
+    # pull LP and Green from vault
+    self._prepareEndaomentFunds(data.lpToken, max_value(uint256), endaoFunds)
+    self._prepareEndaomentFunds(a.greenToken, max_value(uint256), endaoFunds)
 
     # current profits
     lpBalance: uint256 = staticcall IERC20(data.lpToken).balanceOf(self)
@@ -905,6 +774,10 @@ def stabilizeGreenRefPool() -> bool:
     poolDebt = staticcall Ledger(a.ledger).greenPoolDebt(data.pool)
     newProfit: uint256 = self._calcProfitForStabilizer(data.pool, lpBalance, leftoverGreen, poolDebt)
     assert newProfit >= initialProfit # dev: stabilizer was not profitable
+
+    # transfer LP and Green back to vault
+    self._transferToEndaomentFunds(data.lpToken, endaoFunds)
+    self._transferToEndaomentFunds(a.greenToken, endaoFunds)
 
     return didAdjust
 
@@ -977,7 +850,7 @@ def getGreenAmountToAddInStabilizer() -> uint256:
     if data.pool == empty(address) or data.greenBalance == 0:
         return 0
     poolDebt: uint256 = staticcall Ledger(addys._getLedgerAddr()).greenPoolDebt(data.pool)
-    leftoverGreen: uint256 = staticcall IERC20(addys._getGreenToken()).balanceOf(self)
+    leftoverGreen: uint256 = staticcall IERC20(addys._getGreenToken()).balanceOf(addys._getEndaomentFundsAddr())
     return self._getGreenAmountToAdd(poolDebt, leftoverGreen, data)
 
 
@@ -1044,12 +917,25 @@ def getGreenAmountToRemoveInStabilizer() -> uint256:
     data: StabilizerConfig = staticcall CurvePrices(curvePrices).getGreenStabilizerConfig()
     if data.pool == empty(address) or data.greenBalance == 0:
         return 0
-    lpBalance: uint256 = staticcall IERC20(data.lpToken).balanceOf(self)
+    lpBalance: uint256 = staticcall IERC20(data.lpToken).balanceOf(addys._getEndaomentFundsAddr())
     poolDebt: uint256 = staticcall Ledger(addys._getLedgerAddr()).greenPoolDebt(data.pool)
     return self._getGreenAmountToRemove(lpBalance, poolDebt, data)
 
 
 # utilities
+
+
+@view
+@external
+def calcProfitForStabilizer() -> uint256:
+    a: addys.Addys = addys._getAddys()
+    endaoFunds: address = addys._getEndaomentFundsAddr()
+    curvePrices: address = staticcall PriceDesk(a.priceDesk).getAddr(CURVE_PRICES_ID)
+    data: StabilizerConfig = staticcall CurvePrices(curvePrices).getGreenStabilizerConfig()
+    lpBalance: uint256 = staticcall IERC20(data.lpToken).balanceOf(endaoFunds)
+    leftoverGreen: uint256 = staticcall IERC20(a.greenToken).balanceOf(endaoFunds)
+    poolDebt: uint256 = staticcall Ledger(a.ledger).greenPoolDebt(data.pool)
+    return self._calcProfitForStabilizer(data.pool, lpBalance, leftoverGreen, poolDebt)
 
 
 @view
@@ -1094,7 +980,7 @@ def mintPartnerLiquidity(_partner: address, _asset: address, _amount: uint256 = 
     partnerAmount: uint256 = 0
     usdValue: uint256 = 0
     greenMinted: uint256 = 0
-    partnerAmount, usdValue, greenMinted = self._mintPartnerLiquidity(_partner, _asset, _amount, a.priceDesk, a.greenToken)
+    partnerAmount, usdValue, greenMinted = self._mintPartnerLiquidity(_partner, _asset, _amount, a.priceDesk, a.greenToken, addys._getEndaomentFundsAddr())
     log PartnerLiquidityMinted(partner=_partner, asset=_asset, partnerAmount=partnerAmount, usdValue=usdValue, greenMinted=greenMinted)
     return greenMinted
 
@@ -1111,26 +997,36 @@ def addPartnerLiquidity(
     assert not deptBasics.isPaused # dev: contract paused
     assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
     a: addys.Addys = addys._getAddys()
+    endaoFunds: address = addys._getEndaomentFundsAddr()
 
     # mint green
     partnerAmount: uint256 = 0
     greenAmount: uint256 = 0
     greenMinted: uint256 = 0
-    partnerAmount, greenAmount, greenMinted = self._mintPartnerLiquidity(_partner, _asset, _amount, a.priceDesk, a.greenToken)
+    partnerAmount, greenAmount, greenMinted = self._mintPartnerLiquidity(_partner, _asset, _amount, a.priceDesk, a.greenToken, endaoFunds)
 
-    # add liquidity
+    # add liquidity (LP goes to vault)
     lpToken: address = empty(address)
     lpAmountReceived: uint256 = 0
     liqAmountA: uint256 = 0
     liqAmountB: uint256 = 0
     usdValue: uint256 = 0
-    lpToken, lpAmountReceived, liqAmountA, liqAmountB, usdValue = self._addLiquidity(_legoId, _pool, _asset, a.greenToken, partnerAmount, greenAmount, 0, 0, _minLpAmount)
+    lpToken, lpAmountReceived, liqAmountA, liqAmountB, usdValue = self._addLiquidity(_legoId, _pool, _asset, a.greenToken, partnerAmount, greenAmount, 0, 0, _minLpAmount, empty(bytes32))
 
-    # share lp balance with partner
+    # pull LP from vault to split with partner
+    self._prepareEndaomentFunds(lpToken, max_value(uint256), endaoFunds)
     lpBalance: uint256 = staticcall IERC20(lpToken).balanceOf(self)
     assert lpBalance != 0 # dev: no liquidity added
-    if _partner != self:
-        assert extcall IERC20(lpToken).transfer(_partner, lpBalance // 2, default_return_value=True) # dev: could not transfer
+
+    # transfer partner's half
+    partnerShare: uint256 = lpBalance // 2
+    if _partner != self and partnerShare != 0:
+        assert extcall IERC20(lpToken).transfer(_partner, partnerShare, default_return_value=True) # dev: could not transfer
+
+    # transfer vault's half back to vault
+    vaultShare: uint256 = lpBalance - partnerShare
+    if vaultShare != 0:
+        self._transferToEndaomentFunds(lpToken, endaoFunds)
 
     # add pool debt
     if greenMinted != 0:
@@ -1150,22 +1046,22 @@ def _mintPartnerLiquidity(
     _amount: uint256,
     _priceDesk: address,
     _greenToken: address,
+    _endaoFunds: address,
 ) -> (uint256, uint256, uint256):
     partnerAmount: uint256 = min(_amount, staticcall IERC20(_asset).balanceOf(_partner))
     assert partnerAmount != 0 # dev: no asset to add
 
     if _partner != self:
-        assert extcall IERC20(_asset).transferFrom(_partner, self, partnerAmount, default_return_value=True) # dev: transfer failed
+        assert extcall IERC20(_asset).transferFrom(_partner, _endaoFunds, partnerAmount, default_return_value=True) # dev: transfer failed
 
     usdValue: uint256 = staticcall PriceDesk(_priceDesk).getUsdValue(_asset, partnerAmount, True)
     assert usdValue != 0 # dev: invalid asset
 
-    # mint green (if needed)
-    greenAvail: uint256 = staticcall IERC20(_greenToken).balanceOf(self)
+    greenAvail: uint256 = staticcall IERC20(_greenToken).balanceOf(_endaoFunds)
     newMinted: uint256 = 0
     if usdValue > greenAvail:
         newMinted = usdValue - greenAvail
-        extcall GreenToken(_greenToken).mint(self, newMinted)
+        extcall GreenToken(_greenToken).mint(_endaoFunds, newMinted)
 
     return partnerAmount, usdValue, newMinted
 
@@ -1180,12 +1076,22 @@ def repayPoolDebt(_pool: address, _amount: uint256 = max_value(uint256)) -> bool
     assert not deptBasics.isPaused # dev: contract paused
     assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
     a: addys.Addys = addys._getAddys()
+    endaoFunds: address = addys._getEndaomentFundsAddr()
+
+    # pull Green from vault if needed
+    self._prepareEndaomentFunds(a.greenToken, _amount, endaoFunds)
 
     greenAvail: uint256 = min(_amount, staticcall IERC20(a.greenToken).balanceOf(self))
     repayAmount: uint256 = min(greenAvail, staticcall Ledger(a.ledger).greenPoolDebt(_pool))
     assert repayAmount != 0 # dev: no debt to repay
 
     self._repayPoolDebt(_pool, repayAmount, a.greenToken, a.ledger)
+
+    # transfer leftover Green back to vault
+    leftoverGreen: uint256 = staticcall IERC20(a.greenToken).balanceOf(self)
+    if leftoverGreen != 0:
+        assert extcall IERC20(a.greenToken).transfer(endaoFunds, leftoverGreen, default_return_value = True)
+
     log PoolDebtRepaid(pool=_pool, amount=repayAmount)
     return True
 
@@ -1193,6 +1099,27 @@ def repayPoolDebt(_pool: address, _amount: uint256 = max_value(uint256)) -> bool
 #############
 # Utilities #
 #############
+
+
+# pull funds from endaoment funds
+
+
+@internal
+def _prepareEndaomentFunds(_asset: address, _amount: uint256, _endaoFunds: address) -> uint256:
+    if not staticcall EndaomentFunds(_endaoFunds).hasBalance(_asset):
+        return 0
+    return extcall EndaomentFunds(_endaoFunds).transfer(_asset, _amount)
+
+
+# transfer funds to endaoment funds
+
+
+@internal
+def _transferToEndaomentFunds(_asset: address, _endaoFunds: address):
+    if _endaoFunds != empty(address) and _asset != empty(address):
+        currentBalance: uint256 = staticcall IERC20(_asset).balanceOf(self)
+        if currentBalance != 0:
+            assert extcall IERC20(_asset).transfer(_endaoFunds, currentBalance, default_return_value = True) # dev: transfer failed
 
 
 # lego addr
@@ -1213,11 +1140,15 @@ def _getLegoAddr(_legoId: uint256) -> address:
 
 
 @internal
-def _getAmountAndApprove(_token: address, _amount: uint256, _legoAddr: address) -> uint256:
-    amount: uint256 = min(_amount, staticcall IERC20(_token).balanceOf(self))
+def _getAmountAndApprove(_token: address, _amount: uint256, _legoAddr: address, _endaoFunds: address) -> uint256:
+    self._prepareEndaomentFunds(_token, _amount, _endaoFunds)
+    currentBalance: uint256 = staticcall IERC20(_token).balanceOf(self)
+    amount: uint256 = min(_amount, currentBalance)
     assert amount != 0 # dev: no balance for _token
+
     if _legoAddr != empty(address):
         assert extcall IERC20(_token).approve(_legoAddr, amount, default_return_value = True) # dev: appr
+
     return amount
 
 
@@ -1225,19 +1156,11 @@ def _getAmountAndApprove(_token: address, _amount: uint256, _legoAddr: address) 
 
 
 @internal
-def _resetApproval(_token: address, _legoAddr: address):
+def _resetApproval(_token: address, _legoAddr: address, _endaoFunds: address):
     if _legoAddr != empty(address):
         assert extcall IERC20(_token).approve(_legoAddr, 0, default_return_value = True) # dev: appr
-
-
-# recover nft
-
-
-@external
-def recoverNft(_collection: address, _nftTokenId: uint256, _recipient: address):
-    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
-    extcall IERC721(_collection).safeTransferFrom(self, _recipient, _nftTokenId)
-    log EndaomentNftRecovered(collection=_collection, nftTokenId=_nftTokenId, recipient=_recipient)
+    
+    self._transferToEndaomentFunds(_token, _endaoFunds)
 
 
 # pool debt

@@ -1875,3 +1875,517 @@ def test_stab_vault_redemptions_mixed_assets_with_sgreen(
 
     # No green should remain in the stability pool
     assert green_token.balanceOf(stability_pool) == bravo_for_alpha  # Only from alpha redemption
+
+
+def test_stab_vault_redeem_fragmented_claims_refunds_profit(
+    stability_pool,
+    alpha_token,
+    charlie_token,
+    delta_token,
+    alpha_token_whale,
+    charlie_token_whale,
+    delta_token_whale,
+    bravo_token,
+    bravo_token_whale,
+    green_token,
+    whale,
+    alice,
+    bob,
+    teller,
+    auction_house,
+    mock_price_source,
+    vault_book,
+    savings_green,
+    setGeneralConfig,
+    setAssetConfig,
+):
+    """
+    Test that verifies the rounding vulnerability fix.
+    Before the fix: redeemers could profit from fragmented claims by harvesting per-asset rounding losses.
+    After the fix: redeemers pay at least the USD value of collateral (round up favors protocol).
+    """
+    setGeneralConfig()
+    setAssetConfig(alpha_token)
+    setAssetConfig(charlie_token)
+    setAssetConfig(delta_token)
+    setAssetConfig(
+        bravo_token,
+        _shouldSwapInStabPools=True,
+        _canRedeemInStabPool=True,
+    )
+
+    # Price claim asset below $1 for fractional conversions
+    mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS)
+    mock_price_source.setPrice(charlie_token, EIGHTEEN_DECIMALS)
+    mock_price_source.setPrice(delta_token, EIGHTEEN_DECIMALS)
+    mock_price_source.setPrice(green_token, EIGHTEEN_DECIMALS)
+    claim_price = 73 * EIGHTEEN_DECIMALS // 100  # $0.73
+    mock_price_source.setPrice(bravo_token, claim_price)
+
+    # Register three stability assets
+    stab_assets = [
+        (alpha_token, alpha_token_whale),
+        (charlie_token, charlie_token_whale),
+        (delta_token, delta_token_whale),
+    ]
+    prepared_assets = []
+    for token, whale_addr in stab_assets:
+        deposit_amount = 50 * (10 ** token.decimals())
+        token.transfer(stability_pool, deposit_amount, sender=whale_addr)
+        stability_pool.depositTokensInVault(
+            alice, token, deposit_amount, sender=teller.address
+        )
+        prepared_assets.append((token, deposit_amount))
+
+    # Seed each asset with slightly offset claim buckets to maximize rounding
+    claim_amounts = [10**15 + 1, 2 * 10**15 + 1, 5 * 10**15 + 1]
+    for (token, deposit_amount), claim_amount in zip(prepared_assets, claim_amounts):
+        bravo_token.transfer(stability_pool, claim_amount, sender=bravo_token_whale)
+        stability_pool.swapForLiquidatedCollateral(
+            token,
+            deposit_amount // 4,
+            bravo_token,
+            claim_amount,
+            whale,
+            green_token,
+            savings_green,
+            sender=auction_house.address,
+        )
+
+    total_claimable = sum(claim_amounts)
+    green_budget = total_claimable * claim_price // EIGHTEEN_DECIMALS
+    green_token.transfer(bob, green_budget, sender=whale)
+    green_token.approve(teller, green_budget, sender=bob)
+
+    vault_id = vault_book.getRegId(stability_pool)
+    green_spent = teller.redeemFromStabilityPool(
+        vault_id, bravo_token, green_budget, bob, sender=bob
+    )
+
+    # Calculate actual values
+    refund = green_budget - green_spent
+    bravo_received = bravo_token.balanceOf(bob)
+    redeemed_value = bravo_received * claim_price // EIGHTEEN_DECIMALS
+
+    # After the fix: GREEN spent should be >= USD value (protocol favored by rounding up)
+    # The exploit no longer works
+    assert green_spent >= redeemed_value, f"Vulnerability still exists! green_spent ({green_spent}) < redeemed_value ({redeemed_value})"
+
+    # With rounding up, redeemer should receive almost all collateral
+    # They may be a few wei short if they budgeted using floor division (which is acceptable)
+    assert bravo_received >= total_claimable - 10, f"Redeemer should receive nearly all collateral"
+
+    # The key metric: verify the exploit is not profitable
+    # Before fix: green_spent < redeemed_value (redeemer profits)
+    # After fix: green_spent >= redeemed_value (protocol protected)
+    profit_or_loss = redeemed_value - green_spent
+    assert profit_or_loss <= 0, f"Redeemer should not profit from rounding! Profit: {profit_or_loss}"
+
+
+#################################
+# Dust Removal Tests            #
+#################################
+
+
+DUST_USD_THRESHOLD = 10 ** 17  # $0.10 in 18-decimal USD
+
+
+def test_stab_vault_redemptions_dust_removal_below_threshold(
+    stability_pool,
+    alpha_token,
+    bravo_token,
+    alpha_token_whale,
+    bravo_token_whale,
+    bob,
+    alice,
+    teller,
+    auction_house,
+    mock_price_source,
+    vault_book,
+    savings_green,
+    setGeneralConfig,
+    setAssetConfig,
+    green_token,
+    whale,
+):
+    """Test that claimable asset is removed from iterable list when remaining USD value < $0.10 after redemption"""
+    setGeneralConfig()
+    setAssetConfig(bravo_token)
+
+    # Set mock prices - bravo at $1
+    price = 1 * EIGHTEEN_DECIMALS
+    mock_price_source.setPrice(alpha_token, price)
+    mock_price_source.setPrice(bravo_token, price)
+    mock_price_source.setPrice(green_token, price)
+
+    # Initial deposit
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    alpha_token.transfer(stability_pool, deposit_amount, sender=alpha_token_whale)
+    stability_pool.depositTokensInVault(alice, alpha_token, deposit_amount, sender=teller.address)
+
+    # Add claimable assets - $0.15 worth (just above threshold)
+    claimable_amount = 15 * 10 ** 16  # 0.15 tokens at $1 = $0.15
+    bravo_token.transfer(stability_pool, claimable_amount, sender=bravo_token_whale)
+    stability_pool.swapForLiquidatedCollateral(
+        alpha_token, deposit_amount, bravo_token, claimable_amount,
+        ZERO_ADDRESS, alpha_token, savings_green, sender=auction_house.address
+    )
+
+    # Verify bravo is in the claimable list (index > 0 means in list)
+    bravo_index_before = stability_pool.indexOfClaimableAsset(alpha_token, bravo_token)
+    assert bravo_index_before > 0, "Bravo should be in claimable list"
+
+    vault_id = vault_book.getRegId(stability_pool)
+
+    # Redeem enough to leave < $0.10 ($0.06 redemption, leaves $0.09)
+    redeem_amount = 6 * 10 ** 16  # $0.06
+    green_token.transfer(bob, redeem_amount, sender=whale)
+    green_token.approve(teller, redeem_amount, sender=bob)
+    teller.redeemFromStabilityPool(vault_id, bravo_token, redeem_amount, bob, sender=bob)
+
+    # Bravo should be removed from iterable list (dust removal) - index == 0
+    bravo_index_after = stability_pool.indexOfClaimableAsset(alpha_token, bravo_token)
+    assert bravo_index_after == 0, "Dust should be removed from iterable list"
+
+    # But balance should still exist
+    remaining_balance = stability_pool.claimableBalances(alpha_token, bravo_token)
+    assert remaining_balance > 0, "Balance should be preserved"
+
+
+def test_stab_vault_redemptions_no_dust_removal_above_threshold(
+    stability_pool,
+    alpha_token,
+    bravo_token,
+    alpha_token_whale,
+    bravo_token_whale,
+    bob,
+    alice,
+    teller,
+    auction_house,
+    mock_price_source,
+    vault_book,
+    savings_green,
+    setGeneralConfig,
+    setAssetConfig,
+    green_token,
+    whale,
+):
+    """Test that claimable asset stays in list when remaining USD value >= $0.10 after redemption"""
+    setGeneralConfig()
+    setAssetConfig(bravo_token)
+
+    # Set mock prices
+    price = 1 * EIGHTEEN_DECIMALS
+    mock_price_source.setPrice(alpha_token, price)
+    mock_price_source.setPrice(bravo_token, price)
+    mock_price_source.setPrice(green_token, price)
+
+    # Initial deposit
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    alpha_token.transfer(stability_pool, deposit_amount, sender=alpha_token_whale)
+    stability_pool.depositTokensInVault(alice, alpha_token, deposit_amount, sender=teller.address)
+
+    # Add claimable assets - $1.00 worth
+    claimable_amount = 1 * EIGHTEEN_DECIMALS
+    bravo_token.transfer(stability_pool, claimable_amount, sender=bravo_token_whale)
+    stability_pool.swapForLiquidatedCollateral(
+        alpha_token, deposit_amount, bravo_token, claimable_amount,
+        ZERO_ADDRESS, alpha_token, savings_green, sender=auction_house.address
+    )
+
+    vault_id = vault_book.getRegId(stability_pool)
+
+    # Redeem $0.50, leaving $0.50 (above threshold)
+    redeem_amount = 5 * 10 ** 17
+    green_token.transfer(bob, redeem_amount, sender=whale)
+    green_token.approve(teller, redeem_amount, sender=bob)
+    teller.redeemFromStabilityPool(vault_id, bravo_token, redeem_amount, bob, sender=bob)
+
+    # Bravo should still be in the list (index > 0)
+    bravo_index_after = stability_pool.indexOfClaimableAsset(alpha_token, bravo_token)
+    assert bravo_index_after > 0, "Non-dust should remain in list"
+
+
+def test_stab_vault_redemptions_dust_balance_preserved(
+    stability_pool,
+    alpha_token,
+    bravo_token,
+    alpha_token_whale,
+    bravo_token_whale,
+    bob,
+    alice,
+    teller,
+    auction_house,
+    mock_price_source,
+    vault_book,
+    savings_green,
+    _test,
+    setGeneralConfig,
+    setAssetConfig,
+    green_token,
+    whale,
+):
+    """Test that claimableBalances and totalClaimableBalances remain intact after dust removal"""
+    setGeneralConfig()
+    setAssetConfig(bravo_token)
+
+    # Set mock prices
+    price = 1 * EIGHTEEN_DECIMALS
+    mock_price_source.setPrice(alpha_token, price)
+    mock_price_source.setPrice(bravo_token, price)
+    mock_price_source.setPrice(green_token, price)
+
+    # Initial deposit
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    alpha_token.transfer(stability_pool, deposit_amount, sender=alpha_token_whale)
+    stability_pool.depositTokensInVault(alice, alpha_token, deposit_amount, sender=teller.address)
+
+    # Add claimable assets - $0.15 worth
+    claimable_amount = 15 * 10 ** 16
+    bravo_token.transfer(stability_pool, claimable_amount, sender=bravo_token_whale)
+    stability_pool.swapForLiquidatedCollateral(
+        alpha_token, deposit_amount, bravo_token, claimable_amount,
+        ZERO_ADDRESS, alpha_token, savings_green, sender=auction_house.address
+    )
+
+    vault_id = vault_book.getRegId(stability_pool)
+
+    # Redeem to leave dust ($0.06 -> leaves $0.09)
+    redeem_amount = 6 * 10 ** 16
+    green_token.transfer(bob, redeem_amount, sender=whale)
+    green_token.approve(teller, redeem_amount, sender=bob)
+    teller.redeemFromStabilityPool(vault_id, bravo_token, redeem_amount, bob, sender=bob)
+
+    # Verify dust removed from list (index == 0)
+    bravo_index_after = stability_pool.indexOfClaimableAsset(alpha_token, bravo_token)
+    assert bravo_index_after == 0, "Dust should be removed from list"
+
+    # Verify balances are preserved (not zeroed)
+    remaining_claimable = stability_pool.claimableBalances(alpha_token, bravo_token)
+    remaining_total = stability_pool.totalClaimableBalances(bravo_token)
+
+    expected_remaining = claimable_amount - redeem_amount
+    _test(expected_remaining, remaining_claimable)
+    _test(expected_remaining, remaining_total)
+
+
+def test_stab_vault_redemptions_dust_readdition_after_removal(
+    stability_pool,
+    alpha_token,
+    bravo_token,
+    alpha_token_whale,
+    bravo_token_whale,
+    bob,
+    alice,
+    teller,
+    auction_house,
+    mock_price_source,
+    vault_book,
+    savings_green,
+    setGeneralConfig,
+    setAssetConfig,
+    green_token,
+    whale,
+):
+    """Test that after dust removal via redemption, new liquidations re-add the asset to the list"""
+    setGeneralConfig()
+    setAssetConfig(bravo_token)
+
+    # Set mock prices
+    price = 1 * EIGHTEEN_DECIMALS
+    mock_price_source.setPrice(alpha_token, price)
+    mock_price_source.setPrice(bravo_token, price)
+    mock_price_source.setPrice(green_token, price)
+
+    # Initial deposit
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    alpha_token.transfer(stability_pool, deposit_amount, sender=alpha_token_whale)
+    stability_pool.depositTokensInVault(alice, alpha_token, deposit_amount, sender=teller.address)
+
+    # Add small claimable assets - $0.15 worth
+    claimable_amount = 15 * 10 ** 16
+    bravo_token.transfer(stability_pool, claimable_amount, sender=bravo_token_whale)
+    stability_pool.swapForLiquidatedCollateral(
+        alpha_token, deposit_amount // 2, bravo_token, claimable_amount,
+        ZERO_ADDRESS, alpha_token, savings_green, sender=auction_house.address
+    )
+
+    vault_id = vault_book.getRegId(stability_pool)
+
+    # Redeem to leave dust
+    redeem_amount = 6 * 10 ** 16
+    green_token.transfer(bob, redeem_amount, sender=whale)
+    green_token.approve(teller, redeem_amount, sender=bob)
+    teller.redeemFromStabilityPool(vault_id, bravo_token, redeem_amount, bob, sender=bob)
+
+    # Verify removed from list (index == 0)
+    bravo_index_after = stability_pool.indexOfClaimableAsset(alpha_token, bravo_token)
+    assert bravo_index_after == 0, "Dust should be removed from list"
+
+    # Store the dust balance
+    dust_balance = stability_pool.claimableBalances(alpha_token, bravo_token)
+    assert dust_balance > 0
+
+    # New liquidation adds more bravo - $1.00 worth
+    new_claimable = 1 * EIGHTEEN_DECIMALS
+    bravo_token.transfer(stability_pool, new_claimable, sender=bravo_token_whale)
+    stability_pool.swapForLiquidatedCollateral(
+        alpha_token, deposit_amount // 2, bravo_token, new_claimable,
+        ZERO_ADDRESS, alpha_token, savings_green, sender=auction_house.address
+    )
+
+    # Bravo should be back in the list (index > 0)
+    bravo_index_readded = stability_pool.indexOfClaimableAsset(alpha_token, bravo_token)
+    assert bravo_index_readded > 0, "Bravo should be re-added to list"
+
+    # Balance should be dust + new amount
+    total_balance = stability_pool.claimableBalances(alpha_token, bravo_token)
+    assert total_balance == dust_balance + new_claimable
+
+
+def test_stab_vault_redemptions_dust_precision_loss_triggers_removal(
+    stability_pool,
+    alpha_token,
+    bravo_token,
+    alpha_token_whale,
+    bravo_token_whale,
+    bob,
+    alice,
+    teller,
+    auction_house,
+    mock_price_source,
+    vault_book,
+    savings_green,
+    setGeneralConfig,
+    setAssetConfig,
+    green_token,
+    whale,
+):
+    """Test that very small remaining amounts trigger dust removal even when division would round to 0"""
+    setGeneralConfig()
+    setAssetConfig(bravo_token)
+
+    # Set mock prices
+    price = 1 * EIGHTEEN_DECIMALS
+    mock_price_source.setPrice(alpha_token, price)
+    mock_price_source.setPrice(bravo_token, price)
+    mock_price_source.setPrice(green_token, price)
+
+    # Initial deposit
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    alpha_token.transfer(stability_pool, deposit_amount, sender=alpha_token_whale)
+    stability_pool.depositTokensInVault(alice, alpha_token, deposit_amount, sender=teller.address)
+
+    # Add very small claimable amount (10 wei)
+    claimable_amount = 10
+    bravo_token.transfer(stability_pool, claimable_amount, sender=bravo_token_whale)
+    stability_pool.swapForLiquidatedCollateral(
+        alpha_token, deposit_amount, bravo_token, claimable_amount,
+        ZERO_ADDRESS, alpha_token, savings_green, sender=auction_house.address
+    )
+
+    vault_id = vault_book.getRegId(stability_pool)
+
+    # Redeem 9 out of 10 (leaves 1 wei)
+    # The precision loss fix should set remainingUsdValue=1 and trigger removal
+    redeem_amount = 9
+    green_token.transfer(bob, redeem_amount, sender=whale)
+    green_token.approve(teller, redeem_amount, sender=bob)
+    teller.redeemFromStabilityPool(vault_id, bravo_token, redeem_amount, bob, sender=bob)
+
+    # Should be removed from list due to precision loss handling (index == 0)
+    bravo_index_after = stability_pool.indexOfClaimableAsset(alpha_token, bravo_token)
+    assert bravo_index_after == 0, "Dust should be removed from list"
+
+    # But balance should remain
+    remaining = stability_pool.claimableBalances(alpha_token, bravo_token)
+    assert remaining == 1  # 1 wei left
+
+
+def test_stab_vault_redemptions_dust_multiple_stab_assets(
+    stability_pool,
+    alpha_token,
+    bravo_token,
+    charlie_token,
+    alpha_token_whale,
+    bravo_token_whale,
+    charlie_token_whale,
+    bob,
+    alice,
+    sally,
+    teller,
+    auction_house,
+    mock_price_source,
+    vault_book,
+    savings_green,
+    setGeneralConfig,
+    setAssetConfig,
+    green_token,
+    whale,
+):
+    """Test dust removal when redeeming from multiple stab assets"""
+    setGeneralConfig()
+    setAssetConfig(bravo_token)
+
+    # Set mock prices
+    price = 1 * EIGHTEEN_DECIMALS
+    mock_price_source.setPrice(alpha_token, price)
+    mock_price_source.setPrice(bravo_token, price)
+    mock_price_source.setPrice(charlie_token, price)
+    mock_price_source.setPrice(green_token, price)
+
+    # Setup deposits in both alpha and charlie
+    alpha_deposit = 100 * EIGHTEEN_DECIMALS
+    alpha_token.transfer(stability_pool, alpha_deposit, sender=alpha_token_whale)
+    stability_pool.depositTokensInVault(alice, alpha_token, alpha_deposit, sender=teller.address)
+
+    charlie_deposit = 100 * (10 ** charlie_token.decimals())
+    charlie_token.transfer(stability_pool, charlie_deposit, sender=charlie_token_whale)
+    stability_pool.depositTokensInVault(sally, charlie_token, charlie_deposit, sender=teller.address)
+
+    # Create bravo claimable for both - small amounts
+    bravo_for_alpha = 15 * 10 ** 16  # $0.15
+    bravo_for_charlie = 15 * 10 ** 16  # $0.15
+
+    bravo_token.transfer(stability_pool, bravo_for_alpha, sender=bravo_token_whale)
+    stability_pool.swapForLiquidatedCollateral(
+        alpha_token, alpha_deposit, bravo_token, bravo_for_alpha,
+        ZERO_ADDRESS, alpha_token, savings_green, sender=auction_house.address
+    )
+
+    bravo_token.transfer(stability_pool, bravo_for_charlie, sender=bravo_token_whale)
+    stability_pool.swapForLiquidatedCollateral(
+        charlie_token, charlie_deposit, bravo_token, bravo_for_charlie,
+        ZERO_ADDRESS, charlie_token, savings_green, sender=auction_house.address
+    )
+
+    # Both should be in lists (index > 0)
+    alpha_bravo_index = stability_pool.indexOfClaimableAsset(alpha_token, bravo_token)
+    charlie_bravo_index = stability_pool.indexOfClaimableAsset(charlie_token, bravo_token)
+    assert alpha_bravo_index > 0, "Bravo should be in alpha's claimable list"
+    assert charlie_bravo_index > 0, "Bravo should be in charlie's claimable list"
+
+    vault_id = vault_book.getRegId(stability_pool)
+
+    # Redeem $0.12 total - should leave dust in both
+    redeem_amount = 12 * 10 ** 16
+    green_token.transfer(bob, redeem_amount, sender=whale)
+    green_token.approve(teller, redeem_amount, sender=bob)
+    teller.redeemFromStabilityPool(vault_id, bravo_token, redeem_amount, bob, sender=bob)
+
+    # After redemption, both should have dust removed from lists
+    # (the redemption iterates through stab assets and redeems proportionally)
+    alpha_remaining = stability_pool.claimableBalances(alpha_token, bravo_token)
+    charlie_remaining = stability_pool.claimableBalances(charlie_token, bravo_token)
+
+    # At least one should be dust (< $0.10 threshold)
+    alpha_is_dust = alpha_remaining > 0 and alpha_remaining < DUST_USD_THRESHOLD
+    charlie_is_dust = charlie_remaining > 0 and charlie_remaining < DUST_USD_THRESHOLD
+
+    # If either has dust, it should be removed from iterable list (index == 0)
+    if alpha_is_dust:
+        alpha_bravo_index_after = stability_pool.indexOfClaimableAsset(alpha_token, bravo_token)
+        assert alpha_bravo_index_after == 0, "Alpha's dust should be removed from list"
+    if charlie_is_dust:
+        charlie_bravo_index_after = stability_pool.indexOfClaimableAsset(charlie_token, bravo_token)
+        assert charlie_bravo_index_after == 0, "Charlie's dust should be removed from list"

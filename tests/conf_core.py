@@ -1,7 +1,7 @@
 import pytest
 import boa
 
-from config.BluePrint import PARAMS, ADDYS, YIELD_TOKENS
+from config.BluePrint import PARAMS, ADDYS, YIELD_TOKENS, CORE_TOKENS
 from constants import ZERO_ADDRESS, EIGHTEEN_DECIMALS, HUNDRED_PERCENT
 
 
@@ -51,6 +51,8 @@ def ripe_hq(
     governance,
     credit_redeem,
     teller_utils,
+    endaoment_funds,
+    endaoment_psm,
 ):
     # finish token setup
     assert green_token.finishTokenSetup(ripe_hq_deploy, sender=deploy3r)
@@ -131,6 +133,14 @@ def ripe_hq(
     assert ripe_hq_deploy.startAddNewAddressToRegistry(teller_utils, "Teller Utils", sender=deploy3r)
     assert ripe_hq_deploy.confirmNewAddressToRegistry(teller_utils, sender=deploy3r) == 20
 
+    # 21
+    assert ripe_hq_deploy.startAddNewAddressToRegistry(endaoment_funds, "Endaoment Funds", sender=deploy3r)
+    assert ripe_hq_deploy.confirmNewAddressToRegistry(endaoment_funds, sender=deploy3r) == 21
+
+    # 22
+    assert ripe_hq_deploy.startAddNewAddressToRegistry(endaoment_psm, "Endaoment PSM", sender=deploy3r)
+    assert ripe_hq_deploy.confirmNewAddressToRegistry(endaoment_psm, sender=deploy3r) == 22
+
     # special permission setup
 
     # switchboard can set token blacklists
@@ -164,6 +174,10 @@ def ripe_hq(
     # lootbox can mint ripe
     ripe_hq_deploy.initiateHqConfigChange(16, False, True, False, sender=deploy3r)
     assert ripe_hq_deploy.confirmHqConfigChange(16, sender=deploy3r)
+
+    # endaoment psm can mint green
+    ripe_hq_deploy.initiateHqConfigChange(22, True, False, False, sender=deploy3r)
+    assert ripe_hq_deploy.confirmHqConfigChange(22, sender=deploy3r)
 
     # finish ripe hq setup
     assert ripe_hq_deploy.setRegistryTimeLockAfterSetup(sender=deploy3r)
@@ -348,6 +362,39 @@ def endaoment(ripe_hq_deploy, fork):
     )
 
 
+# endaoment funds
+
+
+@pytest.fixture(scope="session")
+def endaoment_funds(ripe_hq_deploy):
+    return boa.load(
+        "contracts/core/EndaomentFunds.vy",
+        ripe_hq_deploy,
+        name="endaoment_funds",
+    )
+
+
+# endaoment psm
+
+
+@pytest.fixture(scope="session")
+def endaoment_psm(ripe_hq_deploy, fork, charlie_token):
+    usdc = charlie_token if fork == "local" else CORE_TOKENS[fork]["USDC"]
+    return boa.load(
+        "contracts/core/EndaomentPSM.vy",
+        ripe_hq_deploy,
+        43_200, # 1 day in blocks
+        0, # mint fee
+        100_000 * EIGHTEEN_DECIMALS, # max interval mint
+        0, # redeem fee
+        100_000 * EIGHTEEN_DECIMALS, # max interval redeem
+        usdc,
+        0, # usdc yield lego id
+        ZERO_ADDRESS, # usdc yield vault token
+        name="endaoment_psm",
+    )
+
+
 # human resources
 
 
@@ -363,6 +410,7 @@ def human_resources(ripe_hq_deploy, fork, deploy3r):
     assert hr.setActionTimeLockAfterSetup(sender=deploy3r)
     return hr
 
+
 # lootbox
 
 
@@ -371,6 +419,9 @@ def lootbox(ripe_hq_deploy):
     return boa.load(
         "contracts/core/Lootbox.vy",
         ripe_hq_deploy,
+        43_200, # 1 day in blocks
+        100 * EIGHTEEN_DECIMALS, # deposit rewards amount
+        100 * EIGHTEEN_DECIMALS, # yield bonus amount
         name="lootbox",
     )
 
@@ -430,7 +481,7 @@ def switchboard_deploy(ripe_hq_deploy, fork):
 
 
 @pytest.fixture(scope="session")
-def switchboard(switchboard_deploy, deploy3r, switchboard_alpha, switchboard_bravo, switchboard_charlie, switchboard_delta):
+def switchboard(switchboard_deploy, deploy3r, switchboard_alpha, switchboard_bravo, switchboard_charlie, switchboard_echo, switchboard_delta):
 
     # alpha
     assert switchboard_deploy.startAddNewAddressToRegistry(switchboard_alpha, "Alpha", sender=deploy3r)
@@ -448,6 +499,10 @@ def switchboard(switchboard_deploy, deploy3r, switchboard_alpha, switchboard_bra
     assert switchboard_deploy.startAddNewAddressToRegistry(switchboard_delta, "Delta", sender=deploy3r)
     assert switchboard_deploy.confirmNewAddressToRegistry(switchboard_delta, sender=deploy3r) == 4
 
+    # echo
+    assert switchboard_deploy.startAddNewAddressToRegistry(switchboard_echo, "Echo", sender=deploy3r)
+    assert switchboard_deploy.confirmNewAddressToRegistry(switchboard_echo, sender=deploy3r) == 5
+
     # finish setup
     assert switchboard_deploy.setRegistryTimeLockAfterSetup(sender=deploy3r)
 
@@ -456,6 +511,7 @@ def switchboard(switchboard_deploy, deploy3r, switchboard_alpha, switchboard_bra
     assert switchboard_bravo.setActionTimeLockAfterSetup(sender=deploy3r)
     assert switchboard_charlie.setActionTimeLockAfterSetup(sender=deploy3r)
     assert switchboard_delta.setActionTimeLockAfterSetup(sender=deploy3r)
+    assert switchboard_echo.setActionTimeLockAfterSetup(sender=deploy3r)
 
     return switchboard_deploy
 
@@ -519,6 +575,21 @@ def switchboard_delta(ripe_hq_deploy, fork):
         PARAMS[fork]["MIN_HQ_CHANGE_TIMELOCK"],
         PARAMS[fork]["MAX_HQ_CHANGE_TIMELOCK"],
         name="switchboard_delta",
+    )
+
+
+# switchboard echo
+
+
+@pytest.fixture(scope="session")
+def switchboard_echo(ripe_hq_deploy, fork):
+    return boa.load(
+        "contracts/config/SwitchboardEcho.vy",
+        ripe_hq_deploy,
+        ZERO_ADDRESS,
+        PARAMS[fork]["MIN_HQ_CHANGE_TIMELOCK"],
+        PARAMS[fork]["MAX_HQ_CHANGE_TIMELOCK"],
+        name="switchboard_echo",
     )
 
 

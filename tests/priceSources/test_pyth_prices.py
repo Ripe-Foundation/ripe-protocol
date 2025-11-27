@@ -19,6 +19,16 @@ def addPythFeed(pyth_prices, governance):
     yield addPythFeed
 
 
+@pytest.fixture(scope="module")
+def authorized_caller(switchboard_alpha, mission_control, governance, bob):
+    """Grant canPerformLiteAction permission to bob for oracle updates"""
+    action_id = switchboard_alpha.setCanPerformLiteAction(bob, True, sender=governance.address)
+    boa.env.time_travel(blocks=switchboard_alpha.actionTimeLock())
+    switchboard_alpha.executePendingAction(action_id, sender=governance.address)
+    assert mission_control.canPerformLiteAction(bob)
+    return bob
+
+
 ##################
 # Unique to Pyth #
 ##################
@@ -28,7 +38,7 @@ def test_pyth_local_update_prices(
     pyth_prices,
     mock_pyth,
     alpha_token,
-    governance,
+    authorized_caller,
     addPythFeed,
 ):
     data_feed_id = bytes.fromhex("eaa020c61cc479712813461ce153894a96a6c00b21ed0cfc2798d1f9a9e9c94a")
@@ -46,25 +56,25 @@ def test_pyth_local_update_prices(
     )
     exp_fee = len(payload)
 
-    # no balance
-    assert not pyth_prices.updatePythPrice(payload, sender=governance.address)
+    # insufficient payment
+    with boa.reverts("payment required"):
+        pyth_prices.updatePythPrice(payload, sender=authorized_caller, value=0)
 
-    # add eth balance
+    # success - caller provides payment
     assert boa.env.get_balance(mock_pyth.address) == 0
-    boa.env.set_balance(pyth_prices.address, EIGHTEEN_DECIMALS)
-    assert boa.env.get_balance(pyth_prices.address) > exp_fee
-    pre_pyth_prices_bal = boa.env.get_balance(pyth_prices.address)
+    boa.env.set_balance(authorized_caller, EIGHTEEN_DECIMALS)
+    pre_caller_bal = boa.env.get_balance(authorized_caller)
 
-    # success
-    assert pyth_prices.updatePythPrice(payload, sender=governance.address)
+    assert pyth_prices.updatePythPrice(payload, sender=authorized_caller, value=EIGHTEEN_DECIMALS)
 
     log = filter_logs(pyth_prices, 'PythPriceUpdated')[0]
     assert log.payload == payload
     assert log.feeAmount == exp_fee
-    assert log.caller == governance.address
+    assert log.caller == authorized_caller
 
-    assert boa.env.get_balance(pyth_prices.address) == pre_pyth_prices_bal - exp_fee
+    # Check that fee was paid and excess was refunded
     assert boa.env.get_balance(mock_pyth.address) == exp_fee
+    assert boa.env.get_balance(authorized_caller) == pre_caller_bal - exp_fee
 
     # check mock pyth
     price_data = mock_pyth.priceFeeds(data_feed_id)
@@ -73,50 +83,7 @@ def test_pyth_local_update_prices(
     assert price_data.price.expo == -8
     assert price_data.price.publishTime == publish_time
 
-    assert int(0.98 * EIGHTEEN_DECIMALS) > pyth_prices.getPrice(alpha_token) > int(0.97 * EIGHTEEN_DECIMALS)
-
-
-def test_pyth_update_many_prices(
-    pyth_prices,
-    mock_pyth,
-    alpha_token,
-    bravo_token,
-    governance,
-    addPythFeed,
-):
-    # Add feeds for multiple assets
-    data_feed_id_1 = bytes.fromhex("eaa020c61cc479712813461ce153894a96a6c00b21ed0cfc2798d1f9a9e9c94a")
-    data_feed_id_2 = bytes.fromhex("baa020c61cc479712813461ce153894a96a6c00b21ed0cfc2798d1f9a9e9c94b")
-    
-    # Setup the second feed by creating a payload and updating it in MockPyth
-    payload_2 = mock_pyth.createPriceFeedUpdateData(data_feed_id_2, 97000000, 45000, -8, boa.env.evm.patch.timestamp)
-    boa.env.set_balance(boa.env.eoa, EIGHTEEN_DECIMALS)  # Add ETH for fee payment
-    mock_pyth.updatePriceFeeds(payload_2, value=len(payload_2))
-    
-    addPythFeed(alpha_token, data_feed_id_1)
-    addPythFeed(bravo_token, data_feed_id_2)
-
-    # Create payloads for both feeds
-    publish_time = boa.env.evm.patch.timestamp + 1
-    payload1 = mock_pyth.createPriceFeedUpdateData(data_feed_id_1, 98000000, 50000, -8, publish_time)
-    payload2 = mock_pyth.createPriceFeedUpdateData(data_feed_id_2, 97000000, 45000, -8, publish_time)
-    
-    # Add ETH balance
-    total_fee = len(payload1) + len(payload2)
-    boa.env.set_balance(pyth_prices.address, total_fee + EIGHTEEN_DECIMALS)
-    pre_balance = boa.env.get_balance(pyth_prices.address)
-
-    # Test successful batch update
-    num_updated = pyth_prices.updateManyPythPrices([payload1, payload2], sender=governance.address)
-    assert num_updated == 2
-
-    # Check balances
-    assert boa.env.get_balance(pyth_prices.address) == pre_balance - total_fee
-
-    # Test with insufficient balance (should stop after first update fails)
-    boa.env.set_balance(pyth_prices.address, len(payload1) - 1)  # Not enough for first payload
-    num_updated = pyth_prices.updateManyPythPrices([payload1, payload2], sender=governance.address)
-    assert num_updated == 0
+    assert int(0.98 * EIGHTEEN_DECIMALS) >= pyth_prices.getPrice(alpha_token) > int(0.97 * EIGHTEEN_DECIMALS)
 
 
 def test_pyth_recover_eth(
@@ -155,67 +122,222 @@ def test_pyth_recover_eth(
     assert log.amount == initial_balance
 
 
+def test_pyth_set_max_confidence_ratio(
+    pyth_prices,
+    governance,
+    switchboard_alpha,
+    bob,
+):
+    # Check initial value
+    assert pyth_prices.maxConfidenceRatio() == 300  # 3% default
+
+    # Test unauthorized access (non-switchboard)
+    with boa.reverts("no perms"):
+        pyth_prices.setMaxConfidenceRatio(500, sender=bob)
+
+    # Test governance cannot call it (only switchboard can)
+    with boa.reverts("no perms"):
+        pyth_prices.setMaxConfidenceRatio(500, sender=governance.address)
+
+    # Test setting to valid value (using switchboard)
+    assert pyth_prices.setMaxConfidenceRatio(100, sender=switchboard_alpha.address)  # 1%
+    assert pyth_prices.maxConfidenceRatio() == 100
+
+    # Test duplicate setting (should revert)
+    with boa.reverts("ratio already set"):
+        pyth_prices.setMaxConfidenceRatio(100, sender=switchboard_alpha.address)
+
+    # Test setting to another valid value
+    assert pyth_prices.setMaxConfidenceRatio(1000, sender=switchboard_alpha.address)  # 10%
+    assert pyth_prices.maxConfidenceRatio() == 1000
+
+    # Test setting to maximum valid value (just under 100%)
+    assert pyth_prices.setMaxConfidenceRatio(9999, sender=switchboard_alpha.address)
+    assert pyth_prices.maxConfidenceRatio() == 9999
+
+    # Test setting to zero (valid - disables validation)
+    assert pyth_prices.setMaxConfidenceRatio(0, sender=switchboard_alpha.address)
+    assert pyth_prices.maxConfidenceRatio() == 0
+
+    # Test setting to 100% or above (invalid)
+    with boa.reverts("ratio must be < 100%"):
+        pyth_prices.setMaxConfidenceRatio(10000, sender=switchboard_alpha.address)
+
+    with boa.reverts("ratio must be < 100%"):
+        pyth_prices.setMaxConfidenceRatio(10001, sender=switchboard_alpha.address)
+
+    # Reset to default
+    assert pyth_prices.setMaxConfidenceRatio(300, sender=switchboard_alpha.address)
+
+
+def test_pyth_max_confidence_ratio_event(
+    pyth_prices,
+    switchboard_alpha,
+):
+    """Test that MaxConfidenceRatioUpdated event is emitted"""
+    # Change ratio and check event
+    assert pyth_prices.setMaxConfidenceRatio(500, sender=switchboard_alpha.address)
+    log = filter_logs(pyth_prices, 'MaxConfidenceRatioUpdated')[0]
+    assert log.newRatio == 500
+
+    # Change again
+    assert pyth_prices.setMaxConfidenceRatio(100, sender=switchboard_alpha.address)
+    log = filter_logs(pyth_prices, 'MaxConfidenceRatioUpdated')[0]
+    assert log.newRatio == 100
+
+    # Reset
+    assert pyth_prices.setMaxConfidenceRatio(300, sender=switchboard_alpha.address)
+    log = filter_logs(pyth_prices, 'MaxConfidenceRatioUpdated')[0]
+    assert log.newRatio == 300
+
+
+def test_pyth_confidence_ratio_validation(
+    pyth_prices,
+    mock_pyth,
+    alpha_token,
+    authorized_caller,
+    switchboard_alpha,
+    addPythFeed,
+):
+    """Test that confidence ratio validation works correctly with different thresholds"""
+    data_feed_id = bytes.fromhex("eaa020c61cc479712813461ce153894a96a6c00b21ed0cfc2798d1f9a9e9c94a")
+    addPythFeed(alpha_token, data_feed_id)
+
+    # Give switchboard enough ETH for all tests
+    boa.env.set_balance(authorized_caller, 100 * EIGHTEEN_DECIMALS)
+
+    # Test 1: With default 3% threshold, 2% confidence should pass (returns price - confidence)
+    publish_time = boa.env.evm.patch.timestamp + 1
+    payload = mock_pyth.createPriceFeedUpdateData(
+        data_feed_id,
+        100000000,  # price = $1.00
+        2000000,    # confidence = $0.02 (2%)
+        -8,
+        publish_time,
+    )
+    assert pyth_prices.updatePythPrice(payload, sender=authorized_caller, value=EIGHTEEN_DECIMALS)
+    assert pyth_prices.getPrice(alpha_token) == int(0.98 * 10**18)  # Returns price - confidence
+
+    # Test 2: With default 3% threshold, 5% confidence should be rejected
+    publish_time = boa.env.evm.patch.timestamp + 2
+    payload = mock_pyth.createPriceFeedUpdateData(
+        data_feed_id,
+        100000000,  # price = $1.00
+        5000000,    # confidence = $0.05 (5%)
+        -8,
+        publish_time,
+    )
+    assert pyth_prices.updatePythPrice(payload, sender=authorized_caller, value=EIGHTEEN_DECIMALS)
+    assert pyth_prices.getPrice(alpha_token) == 0  # Rejected due to high confidence
+
+    # Test 3: Change threshold to 10%, now 5% should pass (returns price - confidence)
+    assert pyth_prices.setMaxConfidenceRatio(1000, sender=switchboard_alpha.address)  # 10%
+    publish_time = boa.env.evm.patch.timestamp + 3
+    payload = mock_pyth.createPriceFeedUpdateData(
+        data_feed_id,
+        100000000,  # price = $1.00
+        5000000,    # confidence = $0.05 (5%)
+        -8,
+        publish_time,
+    )
+    assert pyth_prices.updatePythPrice(payload, sender=authorized_caller, value=EIGHTEEN_DECIMALS)
+    assert pyth_prices.getPrice(alpha_token) == int(0.95 * 10**18)  # Now accepted, returns price - confidence
+
+    # Test 4: With 10% threshold, 15% confidence should still be rejected
+    publish_time = boa.env.evm.patch.timestamp + 4
+    payload = mock_pyth.createPriceFeedUpdateData(
+        data_feed_id,
+        100000000,  # price = $1.00
+        15000000,   # confidence = $0.15 (15%)
+        -8,
+        publish_time,
+    )
+    assert pyth_prices.updatePythPrice(payload, sender=authorized_caller, value=EIGHTEEN_DECIMALS)
+    assert pyth_prices.getPrice(alpha_token) == 0  # Rejected
+
+    # Test 5: Setting to 0 disables validation entirely (accepts any confidence)
+    assert pyth_prices.setMaxConfidenceRatio(0, sender=switchboard_alpha.address)  # Disable validation
+    publish_time = boa.env.evm.patch.timestamp + 5
+    payload = mock_pyth.createPriceFeedUpdateData(
+        data_feed_id,
+        100000000,  # price = $1.00
+        90000000,   # confidence = $0.90 (90%!)
+        -8,
+        publish_time,
+    )
+    assert pyth_prices.updatePythPrice(payload, sender=authorized_caller, value=EIGHTEEN_DECIMALS)
+    assert pyth_prices.getPrice(alpha_token) == int(0.1 * 10**18)  # Accepted! Returns price - confidence = 0.1
+
+    # Reset to default
+    assert pyth_prices.setMaxConfidenceRatio(300, sender=switchboard_alpha.address)
+
+
 @pytest.mark.parametrize(
     'price, conf, expo, expected_price',
     [
-        # Original test cases
-        (99995021, 56127, -8, int(0.99995021 * 10**18) - int(56127 * 10**(-8) * 10**18)),  # Normal case
+        # Original test cases - RETURNS PRICE - CONFIDENCE (conservative approach)
+        (99995021, 56127, -8, int(0.99995021 * 10**18) - int(56127 * 10**(-8) * 10**18)),  # Normal case, conf ratio ~0.056% < 3%
         (0, 56127, -8, 0),  # Zero price
         (-1, 56127, -8, 0), # Negative price
         (99995021, 99995021, -8, 0), # confidence == price
         (99995021, 99995022, -8, 0), # confidence > price
-        (99995021, 56127, 0, int(99995021 * 10**18) - int(56127 * 10**(0) * 10**18)),   # Zero exponent
-        (99995021, 56127, 1, int(99995021 * 10**19) - int(56127 * 10**(1) * 10**18)),   # Positive exponent
-        
+        (99995021, 56127, 0, int(99995021 * 10**18) - int(56127 * 10**18)),   # Zero exponent, conf ratio ~0.056% < 3%
+        (99995021, 56127, 1, int(99995021 * 10**19) - int(56127 * 10**19)),   # Positive exponent, conf ratio ~0.056% < 3%
+
         # Confidence Edge Cases
-        (100000000, 0, -8, int(1.0 * 10**18)),  # Zero confidence - should return full price
-        (100000000, 1, -8, int(1.0 * 10**18) - int(1 * 10**(-8) * 10**18)),  # Minimal confidence
-        (100000000, 50000000, -8, int(0.5 * 10**18)),  # 50% confidence
-        
-        # Exponent Edge Cases (corrected calculations)
-        (100000000, 10000000, -18, 90000000),  # Very negative exponent (-18): price=100000000*10^18//10^18=100000000, conf=10000000, result=90000000
-        (100000000, 10000000, -12, 90000000000000),  # Moderate negative exponent (-12): price*10^18//10^12, conf*10^18//10^12
-        (100000000, 10000000, 2, 9000000000000000000000000000),  # Larger positive exponent (+2): price*10^18*10^2, conf*10^18*10^2
-        (100000000, 10000000, 5, 9000000000000000000000000000000),  # Large positive exponent (+5): price*10^18*10^5, conf*10^18*10^5
-        
-        # Small Price Values (corrected calculations)
-        (1, 0, -8, 10000000000),  # Minimal price value: 1*10^18//10^8 = 10^10
-        (10, 5, -8, 50000000000),  # Small price with confidence: (10-5)*10^18//10^8 = 5*10^10
-        (100, 99, -8, 10000000000),  # Small price, high confidence ratio: (100-99)*10^18//10^8 = 10^10
-        
-        # Large Price Values (corrected calculations)
-        (4294967296, 2147483648, -8, 21474836480000000000),  # Large 32-bit values: (4294967296-2147483648)*10^18//10^8
-        (999999999999, 100000000000, -8, 8999999999990000000000),  # Very large values: proper integer division
-        
-        # Precision Boundary Cases (corrected calculations)
-        (1000000, 999999, -8, 10000000000),  # Confidence very close to price: (1000000-999999)*10^18//10^8
-        (1000000, 500000, -18, 500000),  # High precision with -18 exponent: (1000000-500000)*10^18//10^18
-        (123456789, 123456, -6, 123333333000000000000),  # Real-world-like values: proper scaling
-        
-        # Edge Arithmetic Cases (corrected calculations) 
-        (9223372036854775807, 1000000, -8, 92233720368537758070000000000),  # Near max int64 price: proper large number handling
-        (1000000000, 999999999, -8, 10000000000),  # Minimal difference: (1000000000-999999999)*10^18//10^8
-        
-        # Different Exponent Combinations (corrected calculations)
-        (50000000, 25000000, -4, 2500000000000000000000),  # -4 exponent: (50000000-25000000)*10^18//10^4
-        (30000000, 15000000, 3, 15000000000000000000000000000),  # +3 exponent: (30000000-15000000)*10^18*10^3
-        (80000000, 40000000, -10, 4000000000000000),  # -10 exponent: (80000000-40000000)*10^18//10^10
-        
-        # Real-world Scenarios (corrected calculations)
-        (300000000000, 150000000, -8, 2998500000000000000000),  # BTC-like price: (300000000000-150000000)*10^18//10^8
-        (100000000, 50000, -8, 999500000000000000),  # Stablecoin-like: (100000000-50000)*10^18//10^8  
-        (250000000000, 500000000, -8, 2495000000000000000000),  # ETH-like price: (250000000000-500000000)*10^18//10^8
-        
-        # Additional Edge Cases for Validation (corrected calculations)
+        (100000000, 0, -8, int(1.0 * 10**18)),  # Zero confidence - returns full price (no subtraction)
+        (100000000, 1, -8, int(1.0 * 10**18) - int(1 * 10**(-8) * 10**18)),  # Minimal confidence ~0.000001% < 3%
+        (100000000, 50000000, -8, 0),  # 50% confidence > 3% - REJECTED
+
+        # Exponent Edge Cases - 10% confidence > 3% - ALL REJECTED
+        (100000000, 10000000, -18, 0),  # 10% confidence > 3%
+        (100000000, 10000000, -12, 0),  # 10% confidence > 3%
+        (100000000, 10000000, 2, 0),  # 10% confidence > 3%
+        (100000000, 10000000, 5, 0),  # 10% confidence > 3%
+
+        # Small Price Values
+        (1, 0, -8, 10000000000),  # Zero confidence, returns: 1*10^18//10^8 = 10^10
+        (10, 5, -8, 0),  # 50% confidence > 3% - REJECTED
+        (100, 99, -8, 0),  # 99% confidence > 3% - REJECTED
+
+        # Large Price Values
+        (4294967296, 2147483648, -8, 0),  # 50% confidence > 3% - REJECTED
+        (999999999999, 100000000000, -8, 0),  # 10% confidence > 3% - REJECTED
+
+        # Precision Boundary Cases
+        (1000000, 999999, -8, 0),  # 99.9999% confidence > 3% - REJECTED
+        (1000000, 500000, -18, 0),  # 50% confidence > 3% - REJECTED
+        (123456789, 123456, -6, int(123456789 * 10**12) - int(123456 * 10**12)),  # ~0.1% confidence < 3% - returns price - confidence
+
+        # Edge Arithmetic Cases
+        (9223372036854775807, 1000000, -8, int(92233720368547758070000000000) - int(1000000 * 10**10)),  # ~0.00001% confidence < 3%
+        (1000000000, 999999999, -8, 0),  # 99.9999999% confidence > 3% - REJECTED
+
+        # Different Exponent Combinations - 50% confidence > 3% - ALL REJECTED
+        (50000000, 25000000, -4, 0),  # 50% confidence > 3%
+        (30000000, 15000000, 3, 0),  # 50% confidence > 3%
+        (80000000, 40000000, -10, 0),  # 50% confidence > 3%
+
+        # Real-world Scenarios (price - confidence)
+        (300000000000, 150000000, -8, int(3000 * 10**18) - int(1.5 * 10**18)),  # ~0.05% confidence < 3%
+        (100000000, 50000, -8, int(1.0 * 10**18) - int(0.0005 * 10**18)),  # ~0.05% confidence < 3%
+        (250000000000, 500000000, -8, int(2500 * 10**18) - int(5 * 10**18)),  # ~0.2% confidence < 3%
+
+        # Additional Edge Cases for Validation
         (1000000000, 2000000000, -8, 0),  # Confidence > price (should return 0)
         (-100, 50000, -8, 0),  # Another negative price case
+
+        # New test cases for 3% threshold boundary (price - confidence)
+        (100000000, 3000000, -8, int(1.0 * 10**18) - int(0.03 * 10**18)),  # Exactly 3% confidence - PASSES (not >)
+        (100000000, 3100000, -8, 0),  # 3.1% confidence - REJECTED (> 3%)
+        (100000000, 2999999, -8, int(1.0 * 10**18) - int(0.02999999 * 10**18)),  # Just under 3% confidence - PASSES
     ]
 )
 def test_pyth_get_price(
     pyth_prices,
     mock_pyth,
     alpha_token,
-    governance,
+    authorized_caller,
     addPythFeed,
     price,
     conf,
@@ -235,12 +357,12 @@ def test_pyth_get_price(
         publish_time,
     )
 
-    # add eth balance
-    if boa.env.get_balance(pyth_prices.address) < EIGHTEEN_DECIMALS:
-        boa.env.set_balance(pyth_prices.address, 2 * EIGHTEEN_DECIMALS)
+    # Give switchboard ETH for payment
+    boa.env.set_balance(authorized_caller, EIGHTEEN_DECIMALS)
 
-    # update price
-    assert pyth_prices.updatePythPrice(payload, sender=governance.address)
+    # update price - caller provides payment
+    boa.env.set_balance(authorized_caller, 10 * EIGHTEEN_DECIMALS)
+    assert pyth_prices.updatePythPrice(payload, sender=authorized_caller, value=EIGHTEEN_DECIMALS)
 
     # test price
     assert pyth_prices.getPrice(alpha_token) == expected_price
@@ -272,7 +394,7 @@ def test_pyth_get_price_stale(
     pyth_prices,
     mock_pyth,
     alpha_token,
-    governance,
+    authorized_caller,
     addPythFeed,
 ):
     boa.env.evm.patch.timestamp += MONTH_IN_SECONDS
@@ -291,11 +413,11 @@ def test_pyth_get_price_stale(
         publish_time,
     )
 
-    # add eth balance
-    boa.env.set_balance(pyth_prices.address, EIGHTEEN_DECIMALS)
+    # Give authorized_caller ETH for payment
+    boa.env.set_balance(authorized_caller, 10 * EIGHTEEN_DECIMALS)
 
-    # success update price
-    assert pyth_prices.updatePythPrice(payload, sender=governance.address)
+    # success update price - caller provides payment
+    assert pyth_prices.updatePythPrice(payload, sender=authorized_caller, value=EIGHTEEN_DECIMALS)
 
     # price should be 0 due to staleness
     assert pyth_prices.getPrice(alpha_token, 3600) == 0
@@ -768,17 +890,19 @@ def test_pyth_price_stale_edge_cases(
     pyth_prices,
     mock_pyth,
     alpha_token,
-    governance,
+    authorized_caller,
     addPythFeed,
 ):
     data_feed_id = bytes.fromhex("eaa020c61cc479712813461ce153894a96a6c00b21ed0cfc2798d1f9a9e9c94a")
     addPythFeed(alpha_token, data_feed_id)
 
+    # Give switchboard enough ETH for all tests
+    boa.env.set_balance(authorized_caller, 100 * EIGHTEEN_DECIMALS)
+
     # Test price exactly at stale time boundary
     publish_time = boa.env.evm.patch.timestamp
     payload = mock_pyth.createPriceFeedUpdateData(data_feed_id, 98000000, 50000, -8, publish_time)
-    boa.env.set_balance(pyth_prices.address, EIGHTEEN_DECIMALS)
-    assert pyth_prices.updatePythPrice(payload, sender=governance.address)
+    assert pyth_prices.updatePythPrice(payload, sender=authorized_caller, value=EIGHTEEN_DECIMALS)
 
     # Test price just at stale boundary (should still be valid)
     assert pyth_prices.getPrice(alpha_token, 0) != 0
@@ -791,7 +915,7 @@ def test_pyth_price_stale_edge_cases(
 
     # Test with maximum uint256 stale time
     payload = mock_pyth.createPriceFeedUpdateData(data_feed_id, 98000000, 50000, -8, boa.env.evm.patch.timestamp)
-    assert pyth_prices.updatePythPrice(payload, sender=governance.address)
+    assert pyth_prices.updatePythPrice(payload, sender=authorized_caller, value=EIGHTEEN_DECIMALS)
     assert pyth_prices.getPrice(alpha_token, 2**256 - 1) != 0
 
     # Test with zero stale time (never stale)
@@ -865,7 +989,7 @@ def test_pyth_governance_edge_cases(
     boa.env.time_travel(blocks=pyth_prices.actionTimeLock() + 1)
     assert pyth_prices.confirmPriceFeedUpdate(alpha_token, sender=governance.address)
 
-    # Test governance actions during pause (using MissionControl address)
+    # Test governance actions during pause (using switchboard address)
     pyth_prices.pause(True, sender=switchboard_alpha.address)
     with boa.reverts("contract paused"):
         pyth_prices.addNewPriceFeed(alpha_token, data_feed_id_1, 0, sender=governance.address)

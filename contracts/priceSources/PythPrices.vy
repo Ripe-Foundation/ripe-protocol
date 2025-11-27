@@ -30,6 +30,7 @@ interface PythNetwork:
 
 interface MissionControl:
     def getPriceStaleTime() -> uint256: view
+    def canPerformLiteAction(_user: address) -> bool: view
 
 struct PythPrice:
     price: int64
@@ -99,6 +100,9 @@ event PythPriceUpdated:
     feeAmount: uint256
     caller: indexed(address)
 
+event MaxConfidenceRatioUpdated:
+    newRatio: uint256
+
 event EthRecoveredFromPyth:
     recipient: indexed(address)
     amount: uint256
@@ -106,9 +110,11 @@ event EthRecoveredFromPyth:
 # data
 feedConfig: public(HashMap[address, PythFeedConfig]) # asset -> feed
 pendingUpdates: public(HashMap[address, PendingPythFeed]) # asset -> feed
+maxConfidenceRatio: public(uint256) # basis points (100_00 = 100%)
 
 PYTH: public(immutable(address))
 
+HUNDRED_PERCENT: constant(uint256) = 100_00 # 100%
 NORMALIZED_DECIMALS: constant(uint256) = 18
 MAX_PRICE_UPDATES: constant(uint256) = 20
 
@@ -123,6 +129,7 @@ def __init__(
 ):
     assert _pythNetwork != empty(address) # dev: invalid pyth network
     PYTH = _pythNetwork
+    self.maxConfidenceRatio = 3_00 # 3% default
 
     gov.__init__(_ripeHq, _tempGov, 0, 0, 0)
     addys.__init__(_ripeHq)
@@ -207,9 +214,16 @@ def _getLastPriceAndLastUpdate(_feedId: bytes32, _staleTime: uint256) -> (uint25
         price = price * scale * (10 ** exponent)
         confidence = confidence * scale * (10 ** exponent)
 
-    # invalid price
+    # invalid price: confidence >= price
     if confidence >= price:
         return 0, 0
+
+    # validate confidence ratio
+    maxConfidenceRatio: uint256 = self.maxConfidenceRatio
+    if maxConfidenceRatio != 0:
+        confidenceRatio: uint256 = confidence * HUNDRED_PERCENT // price
+        if confidenceRatio > maxConfidenceRatio:
+            return 0, 0
 
     return price - confidence, publishTime
 
@@ -533,31 +547,50 @@ def _isValidDisablePriceFeed(_asset: address, _oldFeedId: bytes32) -> bool:
 ################
 
 
-@external
-def updateManyPythPrices(_payloads: DynArray[Bytes[2048], MAX_PRICE_UPDATES]) -> uint256:
-    pythNetwork: address = PYTH
-    numUpdated: uint256 = 0
-    for p: Bytes[2048] in _payloads:
-        didUpdate: bool = self._updatePythPrice(p, pythNetwork)
-        if didUpdate:
-            numUpdated += 1
-        else:
-            break
-    return numUpdated
-
-
+@payable
 @external
 def updatePythPrice(_payload: Bytes[2048]) -> bool:
-    return self._updatePythPrice(_payload, PYTH)
+    assert staticcall MissionControl(addys._getMissionControlAddr()).canPerformLiteAction(msg.sender) # dev: not authorized
+    assert msg.value != 0 # dev: payment required
+    return self._updatePythPrice(_payload, PYTH, msg.value, True)
+
+
+@external
+def updatePythPriceNoPay(_payload: Bytes[2048]) -> bool:
+    assert staticcall MissionControl(addys._getMissionControlAddr()).canPerformLiteAction(msg.sender) # dev: not authorized
+    return self._updatePythPrice(_payload, PYTH, self.balance, False)
 
 
 @internal
-def _updatePythPrice(_payload: Bytes[2048], _pythNetwork: address) -> bool:
+def _updatePythPrice(_payload: Bytes[2048], _pythNetwork: address, _payment: uint256, _shouldRefund: bool) -> bool:
     feeAmount: uint256 = staticcall PythNetwork(_pythNetwork).getUpdateFee(_payload)
-    if self.balance < feeAmount:
-        return False
+    assert _payment >= feeAmount # dev: insufficient payment
+
+    # update oracle price feeds
     extcall PythNetwork(_pythNetwork).updatePriceFeeds(_payload, value=feeAmount)
     log PythPriceUpdated(payload=_payload, feeAmount=feeAmount, caller=msg.sender)
+
+    # refund excess payment to caller
+    excess: uint256 = _payment - feeAmount
+    if _shouldRefund and excess > 0:
+        send(msg.sender, excess)
+
+    return True
+
+
+####################
+# Confidence Ratio #
+####################
+
+
+@external
+def setMaxConfidenceRatio(_newRatio: uint256) -> bool:
+    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
+    assert not priceData.isPaused # dev: contract paused
+    assert _newRatio < HUNDRED_PERCENT # dev: ratio must be < 100%
+    assert _newRatio != self.maxConfidenceRatio # dev: ratio already set
+    self.maxConfidenceRatio = _newRatio
+    log MaxConfidenceRatioUpdated(newRatio=_newRatio)
     return True
 
 

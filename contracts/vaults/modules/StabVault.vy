@@ -93,6 +93,7 @@ MAX_STAB_REDEMPTIONS: constant(uint256) = 15
 DECIMAL_OFFSET: constant(uint256) = 10 ** 8
 EIGHTEEN_DECIMALS: constant(uint256) = 10 ** 18
 RIPE_GOV_VAULT_ID: constant(uint256) = 2
+DUST_USD_THRESHOLD: constant(uint256) = 10 ** 17  # $0.10 in 18-decimal USD
 
 
 @deploy
@@ -504,7 +505,8 @@ def swapWithClaimableGreen(
     assert amount != 0 # dev: no green
 
     # reduce green from claimable, and burn
-    self._reduceClaimableBalances(_stabAsset, _greenToken, amount, maxClaimableGreen)
+    # NOTE: GREEN is 1:1 with USD, so remainingUsdValue = remaining balance
+    self._reduceClaimableBalances(_stabAsset, _greenToken, amount, maxClaimableGreen, maxClaimableGreen - amount)
     assert extcall GreenToken(_greenToken).burn(amount) # dev: burn failed
 
     return amount
@@ -665,8 +667,15 @@ def _claimFromStabilityPool(
     isDepleted: bool = False
     claimShares, isDepleted = vaultData._reduceBalanceOnWithdrawal(_claimer, _stabAsset, claimShares, True)
 
-    # reduce claimable balances
-    self._reduceClaimableBalances(_stabAsset, _claimAsset, claimAmount, maxClaimableAsset)
+    # reduce claimable balances - compute remaining USD value using price ratio from claim calculation
+    remainingUsdValue: uint256 = 0
+    if claimAmount < maxClaimableAsset:
+        numerator: uint256 = (maxClaimableAsset - claimAmount) * claimUsdValue
+        if numerator < claimAmount:
+            remainingUsdValue = 1 # very small dust, trigger removal
+        else:
+            remainingUsdValue = numerator // claimAmount
+    self._reduceClaimableBalances(_stabAsset, _claimAsset, claimAmount, maxClaimableAsset, remainingUsdValue)
 
     # move tokens to recipient
     self._handleAssetForUser(_claimAsset, claimAmount, _claimer, _shouldAutoDeposit, _a)
@@ -900,12 +909,27 @@ def _redeemFromStabilityPool(
 
         # reduce claimable balances
         claimAmount: uint256 = min(remainingClaimAmount, claimableBalance)
-        self._reduceClaimableBalances(stabAsset, _asset, claimAmount, claimableBalance)
+
+        # compute remaining USD value using price ratio: maxRedeemValue / maxClaimableAmount
+        remainingUsdValue: uint256 = 0
+        if claimAmount < claimableBalance:
+            numerator: uint256 = (claimableBalance - claimAmount) * maxRedeemValue
+            if numerator < maxClaimableAmount:
+                remainingUsdValue = 1 # very small dust, trigger removal
+            else:
+                remainingUsdValue = numerator // maxClaimableAmount
+        self._reduceClaimableBalances(stabAsset, _asset, claimAmount, claimableBalance, remainingUsdValue)
+
+        # move tokens to recipient
         self._handleAssetForUser(_asset, claimAmount, _recipient, _shouldAutoDeposit, _a)
         remainingClaimAmount -= claimAmount
 
-        # finalize redeem amount
-        redeemAmount: uint256 = min(claimAmount * maxRedeemValue // maxClaimableAmount, remainingRedeemValue)
+        # finalize redeem amount (round up to favor protocol)
+        numerator: uint256 = claimAmount * maxRedeemValue
+        redeemAmount: uint256 = numerator // maxClaimableAmount
+        if numerator % maxClaimableAmount != 0:
+            redeemAmount += 1
+        redeemAmount = min(redeemAmount, remainingRedeemValue)
 
         # if stab asset is sGREEN, just convert directly, no need to make green claimable in this case
         if stabAsset == _a.savingsGreen:
@@ -1036,6 +1060,7 @@ def _reduceClaimableBalances(
     _claimAsset: address,
     _claimAmount: uint256,
     _prevClaimableBalance: uint256,
+    _remainingUsdValue: uint256,
 ):
     newClaimableBalance: uint256 = _prevClaimableBalance - _claimAmount
     self.claimableBalances[_stabAsset][_claimAsset] = newClaimableBalance
@@ -1043,6 +1068,10 @@ def _reduceClaimableBalances(
 
     # remove claimable asset if depleted
     if newClaimableBalance == 0:
+        self._removeClaimableAsset(_stabAsset, _claimAsset)
+
+    # remove claimable asset if remaining USD value is dust (< $0.10) - only remove from iterable list
+    elif _remainingUsdValue != 0 and _remainingUsdValue < DUST_USD_THRESHOLD:
         self._removeClaimableAsset(_stabAsset, _claimAsset)
 
 

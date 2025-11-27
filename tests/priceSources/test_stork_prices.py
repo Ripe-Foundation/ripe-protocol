@@ -19,6 +19,16 @@ def addStorkFeed(stork_prices, governance):
     yield addStorkFeed
 
 
+@pytest.fixture(scope="module")
+def authorized_caller(switchboard_alpha, mission_control, governance, bob):
+    """Grant canPerformLiteAction permission to bob for oracle updates"""
+    action_id = switchboard_alpha.setCanPerformLiteAction(bob, True, sender=governance.address)
+    boa.env.time_travel(blocks=switchboard_alpha.actionTimeLock())
+    switchboard_alpha.executePendingAction(action_id, sender=governance.address)
+    assert mission_control.canPerformLiteAction(bob)
+    return bob
+
+
 ###################
 # Unique to Stork #
 ###################
@@ -28,7 +38,7 @@ def test_stork_local_update_prices(
     stork_prices,
     mock_stork,
     alpha_token,
-    governance,
+    authorized_caller,
     addStorkFeed,
 ):
     data_feed_id = bytes.fromhex("7416a56f222e196d0487dce8a1a8003936862e7a15092a91898d69fa8bce290c")
@@ -44,25 +54,25 @@ def test_stork_local_update_prices(
     )
     exp_fee = len(payload)
 
-    # no balance
-    assert not stork_prices.updateStorkPrice(payload, sender=governance.address)
+    # insufficient payment
+    with boa.reverts("payment required"):
+        stork_prices.updateStorkPrice(payload, sender=authorized_caller, value=0)
 
-    # add eth balance
-    assert boa.env.get_balance(stork_prices.address) == 0
-    boa.env.set_balance(stork_prices.address, EIGHTEEN_DECIMALS)
-    assert boa.env.get_balance(stork_prices.address) > exp_fee
-    pre_stork_prices_bal = boa.env.get_balance(stork_prices.address)
+    # success - caller provides payment
+    assert boa.env.get_balance(mock_stork.address) == 0
+    boa.env.set_balance(authorized_caller, EIGHTEEN_DECIMALS)
+    pre_switchboard_bal = boa.env.get_balance(authorized_caller)
 
-    # success
-    assert stork_prices.updateStorkPrice(payload, sender=governance.address)
+    assert stork_prices.updateStorkPrice(payload, sender=authorized_caller, value=EIGHTEEN_DECIMALS)
 
     log = filter_logs(stork_prices, 'StorkPriceUpdated')[0]
     assert log.payload == payload
     assert log.feeAmount == exp_fee
-    assert log.caller == governance.address
+    assert log.caller == authorized_caller
 
-    assert boa.env.get_balance(stork_prices.address) == pre_stork_prices_bal - exp_fee
+    # Check that fee was paid and excess was refunded
     assert boa.env.get_balance(mock_stork.address) == exp_fee
+    assert boa.env.get_balance(authorized_caller) == pre_switchboard_bal - exp_fee
 
     # check mock stork
     price_data = mock_stork.priceFeeds(data_feed_id)
@@ -70,49 +80,6 @@ def test_stork_local_update_prices(
     assert price_data.timestampNs == publish_time * 1_000_000_000
 
     assert int(1 * EIGHTEEN_DECIMALS) > stork_prices.getPrice(alpha_token) > int(0.97 * EIGHTEEN_DECIMALS)
-
-
-def test_stork_update_many_prices(
-    stork_prices,
-    mock_stork,
-    alpha_token,
-    bravo_token,
-    governance,
-    addStorkFeed,
-):
-    # Add feeds for multiple assets
-    data_feed_id_1 = bytes.fromhex("7416a56f222e196d0487dce8a1a8003936862e7a15092a91898d69fa8bce290c")
-    data_feed_id_2 = bytes.fromhex("8416a56f222e196d0487dce8a1a8003936862e7a15092a91898d69fa8bce290d")
-    
-    # Setup the second feed by creating a payload and updating it in MockStork
-    payload_2 = mock_stork.createPriceFeedUpdateData(data_feed_id_2, 970000000000000000, boa.env.evm.patch.timestamp)
-    boa.env.set_balance(boa.env.eoa, EIGHTEEN_DECIMALS)  # Add ETH for fee payment
-    mock_stork.updateTemporalNumericValuesV1(payload_2, value=len(payload_2))
-    
-    addStorkFeed(alpha_token, data_feed_id_1)
-    addStorkFeed(bravo_token, data_feed_id_2)
-
-    # Create payloads for both feeds
-    publish_time = boa.env.evm.patch.timestamp + 1
-    payload1 = mock_stork.createPriceFeedUpdateData(data_feed_id_1, 998000000000000000, publish_time)
-    payload2 = mock_stork.createPriceFeedUpdateData(data_feed_id_2, 970000000000000000, publish_time)
-    
-    # Add ETH balance
-    total_fee = len(payload1) + len(payload2)
-    boa.env.set_balance(stork_prices.address, total_fee + EIGHTEEN_DECIMALS)
-    pre_balance = boa.env.get_balance(stork_prices.address)
-
-    # Test successful batch update
-    num_updated = stork_prices.updateManyStorkPrices([payload1, payload2], sender=governance.address)
-    assert num_updated == 2
-
-    # Check balances
-    assert boa.env.get_balance(stork_prices.address) == pre_balance - total_fee
-
-    # Test with insufficient balance (should stop after first update fails)
-    boa.env.set_balance(stork_prices.address, len(payload1) - 1)  # Not enough for first payload
-    num_updated = stork_prices.updateManyStorkPrices([payload1, payload2], sender=governance.address)
-    assert num_updated == 0
 
 
 def test_stork_recover_eth(
@@ -168,7 +135,7 @@ def test_stork_get_price(
     stork_prices,
     mock_stork,
     alpha_token,
-    governance,
+    authorized_caller,
     addStorkFeed,
     quantized_value,
     expected_price,
@@ -184,12 +151,9 @@ def test_stork_get_price(
         publish_time,
     )
 
-    # add eth balance
-    if boa.env.get_balance(stork_prices.address) < EIGHTEEN_DECIMALS:
-        boa.env.set_balance(stork_prices.address, 2 * EIGHTEEN_DECIMALS)
-
-    # update price
-    assert stork_prices.updateStorkPrice(payload, sender=governance.address)
+    # update price - caller provides payment
+    boa.env.set_balance(authorized_caller, 10 * EIGHTEEN_DECIMALS)
+    assert stork_prices.updateStorkPrice(payload, sender=authorized_caller, value=EIGHTEEN_DECIMALS)
 
     # test price
     assert stork_prices.getPrice(alpha_token) == expected_price
@@ -221,7 +185,7 @@ def test_stork_get_price_stale(
     stork_prices,
     mock_stork,
     alpha_token,
-    governance,
+    authorized_caller,
     addStorkFeed,
 ):
     boa.env.evm.patch.timestamp += MONTH_IN_SECONDS
@@ -238,11 +202,11 @@ def test_stork_get_price_stale(
         publish_time,
     )
 
-    # add eth balance
-    boa.env.set_balance(stork_prices.address, EIGHTEEN_DECIMALS)
+    # Give authorized_caller ETH for payment
+    boa.env.set_balance(authorized_caller, 10 * EIGHTEEN_DECIMALS)
 
     # success update price
-    assert stork_prices.updateStorkPrice(payload, sender=governance.address)
+    assert stork_prices.updateStorkPrice(payload, sender=authorized_caller, value=EIGHTEEN_DECIMALS)
 
     # price should be 0 due to staleness
     assert stork_prices.getPrice(alpha_token, 3600) == 0
@@ -717,17 +681,19 @@ def test_stork_price_stale_edge_cases(
     stork_prices,
     mock_stork,
     alpha_token,
-    governance,
+    authorized_caller,
     addStorkFeed,
 ):
     data_feed_id = bytes.fromhex("7416a56f222e196d0487dce8a1a8003936862e7a15092a91898d69fa8bce290c")
     addStorkFeed(alpha_token, data_feed_id)
 
+    # Give authorized_caller enough ETH for all tests
+    boa.env.set_balance(authorized_caller, 100 * EIGHTEEN_DECIMALS)
+
     # Test price exactly at stale time boundary
     publish_time = boa.env.evm.patch.timestamp
     payload = mock_stork.createPriceFeedUpdateData(data_feed_id, 998000000000000000, publish_time)
-    boa.env.set_balance(stork_prices.address, EIGHTEEN_DECIMALS)
-    assert stork_prices.updateStorkPrice(payload, sender=governance.address)
+    assert stork_prices.updateStorkPrice(payload, sender=authorized_caller, value=EIGHTEEN_DECIMALS)
 
     # Test price just at stale boundary (should still be valid)
     assert stork_prices.getPrice(alpha_token, 0) != 0
@@ -740,7 +706,7 @@ def test_stork_price_stale_edge_cases(
 
     # Test with maximum uint256 stale time
     payload = mock_stork.createPriceFeedUpdateData(data_feed_id, 998000000000000000, boa.env.evm.patch.timestamp)
-    assert stork_prices.updateStorkPrice(payload, sender=governance.address)
+    assert stork_prices.updateStorkPrice(payload, sender=authorized_caller, value=EIGHTEEN_DECIMALS)
     assert stork_prices.getPrice(alpha_token, 2**256 - 1) != 0
 
     # Test with zero stale time (never stale)
@@ -814,7 +780,7 @@ def test_stork_governance_edge_cases(
     boa.env.time_travel(blocks=stork_prices.actionTimeLock() + 1)
     assert stork_prices.confirmPriceFeedUpdate(alpha_token, sender=governance.address)
 
-    # Test governance actions during pause (using MissionControl address)
+    # Test governance actions during pause (using switchboard address)
     stork_prices.pause(True, sender=switchboard_alpha.address)
     with boa.reverts("contract paused"):
         stork_prices.addNewPriceFeed(alpha_token, data_feed_id_1, 0, sender=governance.address)

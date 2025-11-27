@@ -78,6 +78,9 @@ interface VaultRegistry:
 interface AddressRegistry:
     def getAddr(_regId: uint256) -> address: view
 
+interface RipeHq:
+    def governance() -> address: view
+
 flag RepayType:
     STANDARD
     LIQUIDATION
@@ -165,8 +168,14 @@ event RepayDebt:
 event UnderscoreVaultDiscountSet:
     discount: uint256
 
+event BuybackRatioSet:
+    ratio: uint256
+
 # borrow rate discount
 undyVaulDiscount: public(uint256)
+
+# buyback ratio for revenue split
+buybackRatio: public(uint256)
 
 ONE_YEAR: constant(uint256) = 60 * 60 * 24 * 365
 HUNDRED_PERCENT: constant(uint256) = 100_00 # 100.00%
@@ -184,6 +193,9 @@ def __init__(_ripeHq: address):
 
     # default discount for underscore vaults
     self.undyVaulDiscount = 50_00 # 50.00%
+
+    # default buyback ratio (disabled)
+    self.buybackRatio = 0
 
 
 ##########
@@ -273,7 +285,22 @@ def borrowForUser(
     # dao revenue
     forDao: uint256 = daowry + unrealizedYield
     if forDao != 0:
-        assert extcall IERC20(a.greenToken).transfer(a.savingsGreen, forDao, default_return_value=True) # dev: could not transfer
+
+        # split revenue between governance (for buyback) and savings green
+        forBuyback: uint256 = 0
+        buybackRatio: uint256 = self.buybackRatio
+        if buybackRatio != 0:
+            forBuyback = forDao * buybackRatio // HUNDRED_PERCENT
+
+        # transfer to governance for buyback
+        if forBuyback != 0:
+            govWallet: address = staticcall RipeHq(a.hq).governance()
+            assert extcall IERC20(a.greenToken).transfer(govWallet, forBuyback, default_return_value=True) # dev: could not transfer to gov
+
+        # transfer to savings green
+        forSavingsGreen: uint256 = forDao - forBuyback
+        if forSavingsGreen != 0:
+            assert extcall IERC20(a.greenToken).transfer(a.savingsGreen, forSavingsGreen, default_return_value=True) # dev: could not transfer
 
     # borrower gets their green now -- do this AFTER sending green to stakers
     forBorrower: uint256 = newBorrowAmount - daowry
@@ -1252,6 +1279,18 @@ def getMaxWithdrawableForAsset(
     # convert to asset amount
     maxWithdrawableValue: uint256 = userUsdValue - minAssetValueToRemain
     return userBalance * maxWithdrawableValue // userUsdValue
+
+
+# set buyback ratio
+
+
+@external
+def setBuybackRatio(_ratio: uint256):
+    assert addys._isSwitchboardAddr(msg.sender) # dev: only switchboard allowed
+    assert not deptBasics.isPaused # dev: contract paused
+    assert _ratio <= HUNDRED_PERCENT # dev: invalid ratio
+    self.buybackRatio = _ratio
+    log BuybackRatioSet(ratio=_ratio)
 
 
 ########   #######  ########  ########   #######  ##      ## 

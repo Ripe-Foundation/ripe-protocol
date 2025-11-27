@@ -19,6 +19,7 @@
 #     Ripe Foundation (C) 2025
 
 # @version 0.4.3
+# pragma optimize codesize
 
 implements: Department
 
@@ -46,11 +47,13 @@ interface Ledger:
     def setRipeRewards(_ripeRewards: RipeRewards): nonpayable
     def getRipeRewardsBundle() -> RipeRewardsBundle: view
     def numUserVaults(_user: address) -> uint256: view
+    def ripeAvailForRewards() -> uint256: view
 
 interface MissionControl:
     def getClaimLootConfig(_user: address, _caller: address, _ripeToken: address) -> ClaimLootConfig: view
     def getDepositPointsConfig(_asset: address) -> DepositPointsConfig: view
     def getRewardsConfig() -> RewardsConfig: view
+    def underscoreRegistry() -> address: view
 
 interface Teller:
     def depositFromTrusted(_user: address, _vaultId: uint256, _asset: address, _amount: uint256, _lockDuration: uint256, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
@@ -59,10 +62,13 @@ interface Teller:
 interface PriceDesk:
     def getUsdValue(_asset: address, _amount: uint256, _shouldRaise: bool = False) -> uint256: view
 
+interface UnderscoreLootDistributor:
+    def addDepositRewards(_asset: address, _amount: uint256): nonpayable
+
 interface RipeToken:
     def mint(_to: address, _amount: uint256): nonpayable
 
-interface VaultBook:
+interface AddressRegistry:
     def getAddr(_vaultId: uint256) -> address: view
 
 struct RipeRewards:
@@ -152,18 +158,58 @@ event BorrowLootClaimed:
     user: indexed(address)
     ripeAmount: uint256
 
+event UnderscoreRewardsDistributed:
+    underscoreAddr: indexed(address)
+    depositAmount: uint256
+    yieldAmount: uint256
+    blockNumber: uint256
+
+event HasUnderscoreRewardsUpdated:
+    hasRewards: bool
+
+event UnderscoreSendIntervalUpdated:
+    numBlocks: uint256
+
+event UndyDepositRewardsAmountUpdated:
+    amount: uint256
+
+event UndyYieldBonusAmountUpdated:
+    amount: uint256
+
+# underscore rewards
+hasUnderscoreRewards: public(bool)
+underscoreSendInterval: public(uint256)
+lastUnderscoreSend: public(uint256)
+undyDepositRewardsAmount: public(uint256)
+undyYieldBonusAmount: public(uint256)
+
+UNDERSCORE_LOOT_DISTRIBUTOR_ID: constant(uint256) = 6
 EIGHTEEN_DECIMALS: constant(uint256) = 10 ** 18
 HUNDRED_PERCENT: constant(uint256) = 100_00 # 100.00%
 MAX_ASSETS_TO_CLEAN: constant(uint256) = 20
 MAX_VAULTS_TO_CLEAN: constant(uint256) = 10
 MAX_CLAIM_USERS: constant(uint256) = 25
 RIPE_GOV_VAULT_ID: constant(uint256) = 2
+ONE_DAY: constant(uint256) = 43_200 # on Base
 
 
 @deploy
-def __init__(_ripeHq: address):
+def __init__(
+    _ripeHq: address,
+    _underscoreSendInterval: uint256,
+    _undyDepositRewardsAmount: uint256,
+    _undyYieldBonusAmount: uint256,
+):
     addys.__init__(_ripeHq)
     deptBasics.__init__(False, False, True) # can mint ripe only
+
+    # underscore rewards
+    if _underscoreSendInterval != 0:
+        assert _underscoreSendInterval >= ONE_DAY # dev: invalid interval
+        self.underscoreSendInterval = _underscoreSendInterval
+        self.undyDepositRewardsAmount = _undyDepositRewardsAmount
+        self.undyYieldBonusAmount = _undyYieldBonusAmount
+        self.hasUnderscoreRewards = True
 
 
 ##############
@@ -241,7 +287,7 @@ def _claimLoot(
 
     for i: uint256 in range(1, numUserVaults, bound=max_value(uint256)):
         vaultId: uint256 = staticcall Ledger(_a.ledger).userVaults(_user, i)
-        vaultAddr: address = staticcall VaultBook(_a.vaultBook).getAddr(vaultId)
+        vaultAddr: address = staticcall AddressRegistry(_a.vaultBook).getAddr(vaultId)
         if vaultAddr == empty(address):
             continue
 
@@ -294,7 +340,7 @@ def getClaimableLoot(_user: address) -> uint256:
 
     for i: uint256 in range(1, numUserVaults, bound=max_value(uint256)):
         vaultId: uint256 = staticcall Ledger(a.ledger).userVaults(_user, i)
-        vaultAddr: address = staticcall VaultBook(a.vaultBook).getAddr(vaultId)
+        vaultAddr: address = staticcall AddressRegistry(a.vaultBook).getAddr(vaultId)
         if vaultAddr == empty(address):
             continue
         numUserAssets: uint256 = staticcall Vault(vaultAddr).numUserAssets(_user)
@@ -320,7 +366,7 @@ def claimDepositLootForAsset(_user: address, _vaultId: uint256, _asset: address)
     assert addys._isValidRipeAddr(msg.sender) # dev: no perms
     assert not deptBasics.isPaused # dev: contract paused
     a: addys.Addys = addys._getAddys()
-    vaultAddr: address = staticcall VaultBook(a.vaultBook).getAddr(_vaultId)
+    vaultAddr: address = staticcall AddressRegistry(a.vaultBook).getAddr(_vaultId)
     totalRipeForUser: uint256 = self._claimDepositLoot(_user, _vaultId, vaultAddr, _asset, False, a)
     if totalRipeForUser != 0:
         config: ClaimLootConfig = staticcall MissionControl(a.missionControl).getClaimLootConfig(_user, _user, a.ripeToken)
@@ -416,7 +462,7 @@ def _getDepositLootData(
 @external
 def getClaimableDepositLootForAsset(_user: address, _vaultId: uint256, _asset: address) -> uint256:
     a: addys.Addys = addys._getAddys()
-    vaultAddr: address = staticcall VaultBook(a.vaultBook).getAddr(_vaultId)
+    vaultAddr: address = staticcall AddressRegistry(a.vaultBook).getAddr(_vaultId)
     return self._getClaimableDepositLootForAsset(_user, _vaultId, vaultAddr, _asset, a)
 
 
@@ -547,7 +593,7 @@ def resetUserBalancePoints(_user: address, _asset: address, _vaultId: uint256):
     # get latest global rewards
     config: RewardsConfig = staticcall MissionControl(a.missionControl).getRewardsConfig()
     globalRewards: RipeRewards = self._getLatestGlobalRipeRewards(config, a)
-    vaultAddr: address = staticcall VaultBook(a.vaultBook).getAddr(_vaultId)
+    vaultAddr: address = staticcall AddressRegistry(a.vaultBook).getAddr(_vaultId)
     if empty(address) in [vaultAddr, _asset, _user]:
         return
 
@@ -577,7 +623,7 @@ def resetAssetPoints(_asset: address, _vaultId: uint256):
     # get latest global rewards
     config: RewardsConfig = staticcall MissionControl(a.missionControl).getRewardsConfig()
     globalRewards: RipeRewards = self._getLatestGlobalRipeRewards(config, a)
-    vaultAddr: address = staticcall VaultBook(a.vaultBook).getAddr(_vaultId)
+    vaultAddr: address = staticcall AddressRegistry(a.vaultBook).getAddr(_vaultId)
     if empty(address) in [vaultAddr, _asset]:
         return
 
@@ -716,7 +762,7 @@ def getLatestDepositPoints(
 ) -> (UserDepositPoints, AssetDepositPoints, GlobalDepositPoints):
     a: addys.Addys = addys._getAddys(_a)
     c: RewardsConfig = staticcall MissionControl(a.missionControl).getRewardsConfig()
-    vaultAddr: address = staticcall VaultBook(a.vaultBook).getAddr(_vaultId)
+    vaultAddr: address = staticcall AddressRegistry(a.vaultBook).getAddr(_vaultId)
     return self._getLatestDepositPoints(_user, _vaultId, vaultAddr, _asset, c, a)
 
 
@@ -1144,3 +1190,133 @@ def _cleanUpUserVaults(
         return
     for vid: uint256 in _vaultsToClean:
         extcall Ledger(_ledger).removeVaultFromUser(_user, vid)
+
+
+###############################
+# Underscore Loot Distributor #
+###############################
+
+
+@external
+def distributeUnderscoreRewards() -> (uint256, uint256):
+    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
+    assert not deptBasics.isPaused # dev: contract paused
+    a: addys.Addys = addys._getAddys()
+
+    assert self.hasUnderscoreRewards # dev: no underscore rewards
+
+    # check interval constraint
+    underscoreSendInterval: uint256 = self.underscoreSendInterval
+    assert underscoreSendInterval != 0 # dev: invalid interval
+    assert block.number > self.lastUnderscoreSend + underscoreSendInterval # dev: too early
+
+    # get available RIPE rewards
+    ripeAvailForRewards: uint256 = staticcall Ledger(a.ledger).ripeAvailForRewards()
+
+    # piggy backing on this to actually update ripe rewards available
+    config: RewardsConfig = staticcall MissionControl(a.missionControl).getRewardsConfig()
+    ripeRewards: RipeRewards = self._getLatestGlobalRipeRewards(config, a)
+    ripeAvailForRewards -= min(ripeRewards.newRipeRewards, ripeAvailForRewards)
+    assert ripeAvailForRewards != 0 # dev: no rewards to distribute
+
+    # calculate total
+    undyDepositRewardsAmount: uint256 = self.undyDepositRewardsAmount
+    undyYieldBonusAmount: uint256 = self.undyYieldBonusAmount
+    totalRewardsAmount: uint256 = undyDepositRewardsAmount + undyYieldBonusAmount
+    assert totalRewardsAmount != 0 # dev: no rewards to distribute
+
+    newUndyRewards: uint256 = min(totalRewardsAmount, ripeAvailForRewards)
+
+    # calculate proportional amounts for deposit and yield
+    depositRewards: uint256 = undyDepositRewardsAmount
+    yieldBonusAmount: uint256 = undyYieldBonusAmount
+    if newUndyRewards != totalRewardsAmount:
+        depositRewards = newUndyRewards * undyDepositRewardsAmount // totalRewardsAmount
+        yieldBonusAmount = newUndyRewards - depositRewards
+
+    # mint RIPE tokens
+    extcall RipeToken(a.ripeToken).mint(self, newUndyRewards)
+
+    # get underscore distributor address
+    underscoreDistributor: address = self._getUnderscoreLootDistributor(a.missionControl)
+    assert underscoreDistributor != empty(address) # dev: no underscore distributor
+
+    # add deposit rewards
+    if depositRewards != 0:
+        assert extcall IERC20(a.ripeToken).approve(underscoreDistributor, depositRewards, default_return_value=True) # dev: ripe approval failed
+        extcall UnderscoreLootDistributor(underscoreDistributor).addDepositRewards(a.ripeToken, depositRewards)
+        assert extcall IERC20(a.ripeToken).approve(underscoreDistributor, 0, default_return_value=True) # dev: ripe approval failed
+
+    # transfer yield bonus to underscore distributor
+    if yieldBonusAmount != 0:
+        assert extcall IERC20(a.ripeToken).transfer(underscoreDistributor, yieldBonusAmount, default_return_value=True) # dev: ripe transfer failed
+
+    # update last rewards distribution block
+    self.lastUnderscoreSend = block.number
+
+    # update Ledger accounting - use RipeRewards.newRipeRewards to decrement ripeAvailForRewards
+    ripeRewards.newRipeRewards += newUndyRewards
+    extcall Ledger(a.ledger).setRipeRewards(ripeRewards)
+
+    log UnderscoreRewardsDistributed(
+        underscoreAddr=underscoreDistributor,
+        depositAmount=depositRewards,
+        yieldAmount=yieldBonusAmount,
+        blockNumber=block.number
+    )
+    return depositRewards, yieldBonusAmount
+
+
+# get underscore loot distributor
+
+
+@view
+@internal
+def _getUnderscoreLootDistributor(_mc: address) -> address:
+    underscore: address = staticcall MissionControl(_mc).underscoreRegistry()
+    if underscore == empty(address):
+        return empty(address)
+    return staticcall AddressRegistry(underscore).getAddr(UNDERSCORE_LOOT_DISTRIBUTOR_ID)
+
+
+# config setters
+
+
+@external
+def setHasUnderscoreRewards(_hasRewards: bool):
+    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
+    assert not deptBasics.isPaused # dev: contract paused
+    assert _hasRewards != self.hasUnderscoreRewards # dev: no change
+    self.hasUnderscoreRewards = _hasRewards
+    log HasUnderscoreRewardsUpdated(hasRewards=_hasRewards)
+
+
+@external
+def setUnderscoreSendInterval(_numBlocks: uint256):
+    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
+    assert not deptBasics.isPaused # dev: contract paused
+    assert _numBlocks != max_value(uint256) # dev: invalid interval
+    assert _numBlocks >= ONE_DAY # dev: invalid interval
+    assert _numBlocks != self.underscoreSendInterval # dev: no change
+    self.underscoreSendInterval = _numBlocks
+    log UnderscoreSendIntervalUpdated(numBlocks=_numBlocks)
+
+
+@external
+def setUndyDepositRewardsAmount(_amount: uint256):
+    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
+    assert not deptBasics.isPaused # dev: contract paused
+    assert _amount != max_value(uint256) # dev: invalid amount
+    assert _amount != self.undyDepositRewardsAmount # dev: no change
+    self.undyDepositRewardsAmount = _amount
+    log UndyDepositRewardsAmountUpdated(amount=_amount)
+
+
+@external
+def setUndyYieldBonusAmount(_amount: uint256):
+    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
+    assert not deptBasics.isPaused # dev: contract paused
+    assert _amount != max_value(uint256) # dev: invalid amount
+    assert _amount != self.undyYieldBonusAmount # dev: no change
+    self.undyYieldBonusAmount = _amount
+    log UndyYieldBonusAmountUpdated(amount=_amount)

@@ -250,7 +250,7 @@ def test_withdraw_cbbtc_with_usdc_deleveragable(
     teller,
     credit_engine,
     simple_erc20_vault,
-    endaoment,
+    endaoment_funds,
     bob,
     alpha_token,
     alpha_token_whale,
@@ -286,7 +286,7 @@ def test_withdraw_cbbtc_with_usdc_deleveragable(
     # Pre-state
     pre_debt = credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount
     pre_usdc = simple_erc20_vault.getTotalAmountForUser(bob, charlie_token)
-    pre_endaoment_usdc = charlie_token.balanceOf(endaoment)
+    pre_endaoment_usdc = charlie_token.balanceOf(endaoment_funds)
 
     # Action: Withdraw $200 cbBTC
     withdraw_amount = 200 * EIGHTEEN_DECIMALS
@@ -299,7 +299,7 @@ def test_withdraw_cbbtc_with_usdc_deleveragable(
 
     # Check USDC transferred to Endaoment
     post_usdc = simple_erc20_vault.getTotalAmountForUser(bob, charlie_token)
-    post_endaoment_usdc = charlie_token.balanceOf(endaoment)
+    post_endaoment_usdc = charlie_token.balanceOf(endaoment_funds)
     usdc_transferred = pre_usdc - post_usdc
     endaoment_received = post_endaoment_usdc - pre_endaoment_usdc
 
@@ -2062,7 +2062,7 @@ def test_recursive_usdc_leverage_withdrawal(
     teller,
     credit_engine,
     simple_erc20_vault,
-    endaoment,
+    endaoment_funds,
     bob,
     charlie_token,  # USDC
     charlie_token_whale,
@@ -2092,7 +2092,7 @@ def test_recursive_usdc_leverage_withdrawal(
     pre_debt = credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount
     pre_capacity = credit_engine.getUserBorrowTerms(bob, False).totalMaxDebt
     pre_usdc = simple_erc20_vault.getTotalAmountForUser(bob, charlie_token)
-    pre_endaoment = charlie_token.balanceOf(endaoment)
+    pre_endaoment = charlie_token.balanceOf(endaoment_funds)
 
     # Total USDC: $1900, Debt: $900, Capacity: $1710
     assert pre_usdc == 1900 * SIX_DECIMALS
@@ -2115,7 +2115,7 @@ def test_recursive_usdc_leverage_withdrawal(
 
     # Verify USDC was transferred to Endaoment
     post_usdc = simple_erc20_vault.getTotalAmountForUser(bob, charlie_token)
-    post_endaoment = charlie_token.balanceOf(endaoment)
+    post_endaoment = charlie_token.balanceOf(endaoment_funds)
 
     usdc_to_endaoment = pre_usdc - post_usdc
     endaoment_received = post_endaoment - pre_endaoment
@@ -2266,7 +2266,7 @@ def test_recursive_usdc_leverage_complete_cycle(
     teller,
     credit_engine,
     simple_erc20_vault,
-    endaoment,
+    endaoment_funds,
     bob,
     charlie_token,  # USDC
     charlie_token_whale,
@@ -2317,7 +2317,7 @@ def test_recursive_usdc_leverage_complete_cycle(
     _test(expected_capacity, total_capacity, 100)
 
     # Pre-withdrawal state
-    pre_endaoment = charlie_token.balanceOf(endaoment)
+    pre_endaoment = charlie_token.balanceOf(endaoment_funds)
 
     # Withdraw 300 USDC (11% of total collateral)
     withdraw_amount = 300 * SIX_DECIMALS
@@ -2335,7 +2335,7 @@ def test_recursive_usdc_leverage_complete_cycle(
 
     # Verify USDC transferred to Endaoment
     post_usdc = simple_erc20_vault.getTotalAmountForUser(bob, charlie_token)
-    post_endaoment = charlie_token.balanceOf(endaoment)
+    post_endaoment = charlie_token.balanceOf(endaoment_funds)
 
     usdc_deleveraged = (total_usdc - post_usdc)
     endaoment_received = (post_endaoment - pre_endaoment)

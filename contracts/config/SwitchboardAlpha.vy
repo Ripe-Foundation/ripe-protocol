@@ -55,9 +55,14 @@ interface VaultBook:
 
 interface CreditEngine:
     def setUnderscoreVaultDiscount(_discount: uint256): nonpayable
+    def setBuybackRatio(_ratio: uint256): nonpayable
 
 interface PriceDesk:
     def isValidRegId(_regId: uint256) -> bool: view
+    def getAddr(_regId: uint256) -> address: view
+
+interface PythPrices:
+    def setMaxConfidenceRatio(_newRatio: uint256) -> bool: nonpayable
 
 interface UnderscoreLedger:
     def isUserWallet(_addr: address) -> bool: view
@@ -92,6 +97,8 @@ flag ActionType:
     OTHER_SHOULD_CHECK_LAST_TOUCH
     RIPE_VAULT_CONFIG
     DEBT_UNDY_VAULT_DISCOUNT
+    DEBT_BUYBACK_RATIO
+    PYTH_MAX_CONFIDENCE_RATIO
 
 flag GenConfigFlag:
     CAN_DEPOSIT
@@ -215,6 +222,16 @@ event PendingDefaultAuctionParamsChange:
 
 event PendingUndyVaultDiscountChange:
     discount: uint256
+    confirmationBlock: uint256
+    actionId: uint256
+
+event PendingBuybackRatioChange:
+    ratio: uint256
+    confirmationBlock: uint256
+    actionId: uint256
+
+event PendingPythMaxConfidenceRatioChange:
+    ratio: uint256
     confirmationBlock: uint256
     actionId: uint256
 
@@ -349,6 +366,12 @@ event GenAuctionParamsSet:
 event UndyVaultDiscountSet:
     discount: uint256
 
+event BuybackRatioSet:
+    ratio: uint256
+
+event PythMaxConfidenceRatioSet:
+    ratio: uint256
+
 event RipeRewardsPerBlockSet:
     ripePerBlock: uint256
 
@@ -410,6 +433,8 @@ pendingRipeRewardsConfig: public(HashMap[uint256, cs.RipeRewardsConfig]) # aid -
 pendingGeneralConfig: public(HashMap[uint256, GenConfigLite]) # aid -> config
 pendingDebtConfig: public(HashMap[uint256, cs.GenDebtConfig]) # aid -> config
 pendingUndyVaultDiscount: public(HashMap[uint256, uint256]) # aid -> discount
+pendingBuybackRatio: public(HashMap[uint256, uint256]) # aid -> ratio
+pendingPythMaxConfidenceRatio: public(HashMap[uint256, uint256]) # aid -> ratio
 pendingPriorityLiqAssetVaults: public(HashMap[uint256, DynArray[cs.VaultLite, PRIORITY_VAULT_DATA]])
 pendingPriorityStabVaults: public(HashMap[uint256, DynArray[cs.VaultLite, PRIORITY_VAULT_DATA]])
 pendingPriorityPriceSourceIds: public(HashMap[uint256, DynArray[uint256, MAX_PRIORITY_PRICE_SOURCES]])
@@ -435,6 +460,7 @@ LEDGER_ID: constant(uint256) = 4
 MISSION_CONTROL_ID: constant(uint256) = 5
 PRICE_DESK_ID: constant(uint256) = 7
 VAULT_BOOK_ID: constant(uint256) = 8
+PYTH_PRICES_ID: constant(uint256) = 4
 CREDIT_ENGINE_ID: constant(uint256) = 13
 
 
@@ -499,6 +525,12 @@ def _getLedgerAddr() -> address:
 @internal
 def _getCreditEngineAddr() -> address:
     return staticcall RipeHq(gov._getRipeHqFromGov()).getAddr(CREDIT_ENGINE_ID)
+
+
+@view
+@internal
+def _getPythPricesAddr() -> address:
+    return staticcall PriceDesk(self._getPriceDeskAddr()).getAddr(PYTH_PRICES_ID)
 
 
 ##################
@@ -907,6 +939,43 @@ def setUndyVaultDiscount(_discount: uint256) -> uint256:
     confirmationBlock: uint256 = timeLock._getActionConfirmationBlock(aid)
     log PendingUndyVaultDiscountChange(
         discount=_discount,
+        confirmationBlock=confirmationBlock,
+        actionId=aid,
+    )
+    return aid
+
+
+# buyback ratio
+
+
+@external
+def setBuybackRatio(_ratio: uint256) -> uint256:
+    assert gov._canGovern(msg.sender) # dev: no perms
+    assert _ratio <= HUNDRED_PERCENT # dev: invalid ratio
+
+    aid: uint256 = timeLock._initiateAction()
+    self.actionType[aid] = ActionType.DEBT_BUYBACK_RATIO
+    self.pendingBuybackRatio[aid] = _ratio
+    confirmationBlock: uint256 = timeLock._getActionConfirmationBlock(aid)
+    log PendingBuybackRatioChange(
+        ratio=_ratio,
+        confirmationBlock=confirmationBlock,
+        actionId=aid,
+    )
+    return aid
+
+
+@external
+def setPythMaxConfidenceRatio(_ratio: uint256) -> uint256:
+    assert gov._canGovern(msg.sender) # dev: no perms
+    assert _ratio < HUNDRED_PERCENT # dev: ratio must be < 100%
+
+    aid: uint256 = timeLock._initiateAction()
+    self.actionType[aid] = ActionType.PYTH_MAX_CONFIDENCE_RATIO
+    self.pendingPythMaxConfidenceRatio[aid] = _ratio
+    confirmationBlock: uint256 = timeLock._getActionConfirmationBlock(aid)
+    log PendingPythMaxConfidenceRatioChange(
+        ratio=_ratio,
         confirmationBlock=confirmationBlock,
         actionId=aid,
     )
@@ -1582,6 +1651,16 @@ def executePendingAction(_aid: uint256) -> bool:
         discount: uint256 = self.pendingUndyVaultDiscount[_aid]
         extcall CreditEngine(self._getCreditEngineAddr()).setUnderscoreVaultDiscount(discount)
         log UndyVaultDiscountSet(discount=discount)
+
+    elif actionType == ActionType.DEBT_BUYBACK_RATIO:
+        ratio: uint256 = self.pendingBuybackRatio[_aid]
+        extcall CreditEngine(self._getCreditEngineAddr()).setBuybackRatio(ratio)
+        log BuybackRatioSet(ratio=ratio)
+
+    elif actionType == ActionType.PYTH_MAX_CONFIDENCE_RATIO:
+        ratio: uint256 = self.pendingPythMaxConfidenceRatio[_aid]
+        extcall PythPrices(self._getPythPricesAddr()).setMaxConfidenceRatio(ratio)
+        log PythMaxConfidenceRatioSet(ratio=ratio)
 
     elif actionType == ActionType.RIPE_REWARDS_BLOCK:
         config: cs.RipeRewardsConfig = staticcall MissionControl(mc).rewardsConfig()

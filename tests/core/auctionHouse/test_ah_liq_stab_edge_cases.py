@@ -288,8 +288,10 @@ def test_ah_liquidation_zero_price(
     assert log.didRestoreDebtHealth == False  # Can't restore with worthless collateral
     
     # The liquidation couldn't recover meaningful value
-    # liqFeesUnpaid shows that fees couldn't be covered
-    assert log.liqFeesUnpaid > 9 * EIGHTEEN_DECIMALS  # Almost all fees unpaid
+    # With new fee capping logic, fees are set to 0 when collateral < debt
+    # So liqFeesUnpaid is 0 (we never tried to charge fees in the first place)
+    assert log.liqFeesUnpaid == 0
+    assert log.totalLiqFees == 0  # Fees correctly capped to 0
 
 
 def test_ah_liquidation_keeper_fee_min(
@@ -318,31 +320,34 @@ def test_ah_liquidation_keeper_fee_min(
         _maxKeeperFee=50 * EIGHTEEN_DECIMALS  # Max 50 GREEN
     )
     
-    # Setup alpha token
-    debt_terms = createDebtTerms(_liqThreshold=80_00, _liqFee=10_00, _borrowRate=0)
+    # Setup alpha token with lower liquidation threshold so position can be liquidatable with surplus
+    debt_terms = createDebtTerms(_liqThreshold=50_00, _liqFee=10_00, _borrowRate=0)  # 50% threshold
     setAssetConfig(
         alpha_token,
         _debtTerms=debt_terms,
         _shouldSwapInStabPools=True,
     )
     mock_price_source.setPrice(alpha_token, 1 * EIGHTEEN_DECIMALS)
-    
+
     # Small position where 10% would be less than minimum
-    performDeposit(bob, 20 * EIGHTEEN_DECIMALS, alpha_token, alpha_token_whale)
+    # Need enough collateral surplus to cover min keeper fee ($5) + liq fee (10% = $1)
+    # Debt: $10, fees needed: $6, so collateral after liquidation needs to be $16
+    performDeposit(bob, 32 * EIGHTEEN_DECIMALS, alpha_token, alpha_token_whale)
     teller.borrow(10 * EIGHTEEN_DECIMALS, bob, False, sender=bob)
-    
+
     # Add liquidity
     green_lp_token.transfer(sally, 100 * EIGHTEEN_DECIMALS, sender=green_lp_token_whale)
     green_lp_token.approve(teller, 100 * EIGHTEEN_DECIMALS, sender=sally)
     teller.deposit(green_lp_token, 100 * EIGHTEEN_DECIMALS, sally, stability_pool, 0, sender=sally)
-    
-    # Trigger liquidation
+
+    # Trigger liquidation: 32 tokens @ $0.50 = $16 collateral, $10 debt, $6 surplus
+    # Liquidatable when collateral <= $10 / 0.50 = $20, and $16 <= $20 ✓
     mock_price_source.setPrice(alpha_token, 50 * EIGHTEEN_DECIMALS // 100)
     assert credit_engine.canLiquidateUser(bob)
-    
+
     # Liquidate
     teller.liquidateUser(bob, False, sender=sally)
-    
+
     # Check keeper fee in logs
     logs = filter_logs(teller, "LiquidateUser")
     assert len(logs) == 1
@@ -375,31 +380,34 @@ def test_ah_liquidation_keeper_fee_max(
         _maxKeeperFee=50 * EIGHTEEN_DECIMALS  # Max 50 GREEN
     )
     
-    # Setup alpha token
-    debt_terms = createDebtTerms(_liqThreshold=80_00, _liqFee=10_00, _borrowRate=0)
+    # Setup alpha token with lower liquidation threshold so position can be liquidatable with surplus
+    debt_terms = createDebtTerms(_liqThreshold=50_00, _liqFee=10_00, _borrowRate=0)  # 50% threshold
     setAssetConfig(
         alpha_token,
         _debtTerms=debt_terms,
         _shouldSwapInStabPools=True,
     )
     mock_price_source.setPrice(alpha_token, 1 * EIGHTEEN_DECIMALS)
-    
+
     # Large position where 10% would exceed maximum
-    performDeposit(bob, 2000 * EIGHTEEN_DECIMALS, alpha_token, alpha_token_whale)
+    # Need enough surplus to cover max keeper fee ($50) + liq fee (10% = $100)
+    # Debt: $1000, fees needed: $150, so collateral after liquidation needs to be $1150
+    performDeposit(bob, 2300 * EIGHTEEN_DECIMALS, alpha_token, alpha_token_whale)
     teller.borrow(1000 * EIGHTEEN_DECIMALS, bob, False, sender=bob)  # 10% = 100 GREEN > 50 max
-    
+
     # Add liquidity
     green_lp_token.transfer(sally, 2000 * EIGHTEEN_DECIMALS, sender=green_lp_token_whale)
     green_lp_token.approve(teller, 2000 * EIGHTEEN_DECIMALS, sender=sally)
     teller.deposit(green_lp_token, 2000 * EIGHTEEN_DECIMALS, sally, stability_pool, 0, sender=sally)
-    
-    # Trigger liquidation
+
+    # Trigger liquidation: 2300 tokens @ $0.50 = $1150 collateral, $1000 debt, $150 surplus
+    # Liquidatable when collateral <= $1000 / 0.50 = $2000, and $1150 <= $2000 ✓
     mock_price_source.setPrice(alpha_token, 50 * EIGHTEEN_DECIMALS // 100)
     assert credit_engine.canLiquidateUser(bob)
-    
+
     # Liquidate
     teller.liquidateUser(bob, False, sender=sally)
-    
+
     # Check keeper fee in logs
     logs = filter_logs(teller, "LiquidateUser")
     assert len(logs) == 1

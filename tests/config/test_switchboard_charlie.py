@@ -1602,7 +1602,7 @@ def test_switchboard_three_set_training_wheels_timelock_and_execution(
     assert log.actionId == action_id
     
     # Verify action is stored correctly
-    assert switchboard_charlie.actionType(action_id) == 16384  # ActionType.TRAINING_WHEELS (2^14)
+    assert switchboard_charlie.actionType(action_id) == 64  # ActionType.TRAINING_WHEELS (2^6 - 7th flag in Charlie)
     stored_address = switchboard_charlie.pendingTrainingWheels(action_id)
     assert stored_address == training_wheels_addr
     
@@ -1631,6 +1631,301 @@ def test_switchboard_three_set_training_wheels_timelock_and_execution(
     assert switchboard_charlie.actionType(action_id) == 0
 
 
+###################################
+# Underscore Rewards Tests
+###################################
+
+
+def test_switchboard_three_distribute_underscore_rewards_lite_action(
+    switchboard_charlie,
+    alice,
+    bob,
+    governance,
+    mission_control,
+    lootbox,
+    ledger,
+    switchboard_alpha,
+    mock_undy_v2,
+):
+    """Test distributeUnderscoreRewards as lite action (immediate execution)"""
+    # Setup: configure lootbox with underscore registry
+    mission_control.setUnderscoreRegistry(mock_undy_v2.address, sender=switchboard_alpha.address)
+    ledger.setRipeAvailForRewards(1000 * 10**18, sender=switchboard_alpha.address)
+
+    # Non-lite users should be rejected
+    with boa.reverts("no perms"):
+        switchboard_charlie.distributeUnderscoreRewards(sender=bob)
+
+    # Give alice lite access
+    mission_control.setCanPerformLiteAction(alice, True, sender=switchboard_charlie.address)
+
+    # Alice can distribute (lite action)
+    # Time travel past interval
+    boa.env.time_travel(blocks=43_200 + 1)
+
+    result = switchboard_charlie.distributeUnderscoreRewards(sender=alice)
+    assert result
+
+    # Verify event was emitted immediately from switchboard
+    logs = filter_logs(switchboard_charlie, "UnderscoreRewardsDistributed")
+    # There will be 2 events: one from Lootbox, one from SwitchboardCharlie
+    # The switchboard event is the last one
+    assert len(logs) >= 1
+    switchboard_event = [log for log in logs if hasattr(log, 'caller')]
+    assert len(switchboard_event) == 1
+    assert switchboard_event[0].caller == alice
+    assert switchboard_event[0].success
+
+    # Governance can also distribute
+    boa.env.time_travel(blocks=43_200 + 1)
+    result2 = switchboard_charlie.distributeUnderscoreRewards(sender=governance.address)
+    assert result2
+
+
+def test_switchboard_three_set_has_underscore_rewards_special_permissions(
+    switchboard_charlie,
+    alice,
+    bob,
+    governance,
+    mission_control,
+    lootbox,
+):
+    """Test setHasUnderscoreRewards special permission logic (lite can disable, only gov can enable)"""
+    # Non-lite users can't change
+    with boa.reverts("no perms"):
+        switchboard_charlie.setHasUnderscoreRewards(False, sender=bob)
+
+    # Give alice lite access
+    mission_control.setCanPerformLiteAction(alice, True, sender=switchboard_charlie.address)
+
+    # Verify initial state is True (from constructor)
+    assert lootbox.hasUnderscoreRewards() == True
+
+    # Alice with lite access can disable (set to False)
+    result = switchboard_charlie.setHasUnderscoreRewards(False, sender=alice)
+    assert result
+    assert lootbox.hasUnderscoreRewards() == False
+
+    # Verify event emitted immediately
+    logs = filter_logs(switchboard_charlie, "HasUnderscoreRewardsSet")
+    assert len(logs) == 1
+    assert logs[0].hasRewards == False
+    assert logs[0].caller == alice
+
+    # Alice with lite access CANNOT enable (set to True)
+    with boa.reverts("no perms"):
+        switchboard_charlie.setHasUnderscoreRewards(True, sender=alice)
+
+    # Only governance can enable
+    result2 = switchboard_charlie.setHasUnderscoreRewards(True, sender=governance.address)
+    assert result2
+    assert lootbox.hasUnderscoreRewards() == True
+
+    # Verify event
+    logs2 = filter_logs(switchboard_charlie, "HasUnderscoreRewardsSet")
+    assert len(logs2) == 1
+    assert logs2[0].hasRewards == True
+    assert logs2[0].caller == governance.address
+
+
+def test_switchboard_three_set_underscore_send_interval_timelock(
+    switchboard_charlie,
+    alice,
+    governance,
+    lootbox,
+):
+    """Test setUnderscoreSendInterval requires governance + timelock"""
+    new_interval = 43_200 * 2  # 2 days
+
+    # Non-governance users should be rejected
+    with boa.reverts("no perms"):
+        switchboard_charlie.setUnderscoreSendInterval(new_interval, sender=alice)
+
+    # Governance creates pending action
+    action_id = switchboard_charlie.setUnderscoreSendInterval(new_interval, sender=governance.address)
+    assert action_id > 0
+
+    # Verify event was emitted immediately
+    logs = filter_logs(switchboard_charlie, "PendingUnderscoreSendIntervalAction")
+    assert len(logs) == 1
+    assert logs[0].interval == new_interval
+    assert logs[0].actionId == action_id
+
+    # Verify action is stored
+    assert switchboard_charlie.actionType(action_id) == 128  # ActionType.SET_UNDERSCORE_SEND_INTERVAL (2^7)
+    assert switchboard_charlie.pendingUnderscoreSendInterval(action_id) == new_interval
+
+    # Can't execute before timelock
+    result = switchboard_charlie.executePendingAction(action_id, sender=governance.address)
+    assert not result
+
+    # Time travel past timelock
+    boa.env.time_travel(blocks=switchboard_charlie.actionTimeLock())
+
+    # Now execution should succeed
+    result = switchboard_charlie.executePendingAction(action_id, sender=governance.address)
+    assert result
+
+    # Verify lootbox was updated
+    assert lootbox.underscoreSendInterval() == new_interval
+
+    # Verify execution event
+    logs2 = filter_logs(switchboard_charlie, "UnderscoreSendIntervalSet")
+    assert len(logs2) == 1
+    assert logs2[0].interval == new_interval
+    assert logs2[0].caller == governance.address
+
+    # Verify action cleared
+    assert switchboard_charlie.actionType(action_id) == 0
+
+
+def test_switchboard_three_set_undy_deposit_rewards_amount_timelock(
+    switchboard_charlie,
+    alice,
+    governance,
+    lootbox,
+):
+    """Test setUndyDepositRewardsAmount requires governance + timelock"""
+    new_amount = 500 * 10**18
+
+    # Non-governance users should be rejected
+    with boa.reverts("no perms"):
+        switchboard_charlie.setUndyDepositRewardsAmount(new_amount, sender=alice)
+
+    # Governance creates pending action
+    action_id = switchboard_charlie.setUndyDepositRewardsAmount(new_amount, sender=governance.address)
+    assert action_id > 0
+
+    # Verify event
+    logs = filter_logs(switchboard_charlie, "PendingUndyDepositRewardsAmountAction")
+    assert len(logs) == 1
+    assert logs[0].amount == new_amount
+    assert logs[0].actionId == action_id
+
+    # Verify action stored
+    assert switchboard_charlie.actionType(action_id) == 256  # ActionType.SET_UNDY_DEPOSIT_REWARDS_AMOUNT (2^8)
+    assert switchboard_charlie.pendingUndyDepositRewardsAmount(action_id) == new_amount
+
+    # Time travel and execute
+    boa.env.time_travel(blocks=switchboard_charlie.actionTimeLock())
+    result = switchboard_charlie.executePendingAction(action_id, sender=governance.address)
+    assert result
+
+    # Verify lootbox updated
+    assert lootbox.undyDepositRewardsAmount() == new_amount
+
+    # Verify event
+    logs2 = filter_logs(switchboard_charlie, "UndyDepositRewardsAmountSet")
+    assert len(logs2) == 1
+    assert logs2[0].amount == new_amount
+
+    # Verify action cleared
+    assert switchboard_charlie.actionType(action_id) == 0
+
+
+def test_switchboard_three_set_undy_yield_bonus_amount_timelock(
+    switchboard_charlie,
+    alice,
+    governance,
+    lootbox,
+):
+    """Test setUndyYieldBonusAmount requires governance + timelock"""
+    new_amount = 300 * 10**18
+
+    # Non-governance users should be rejected
+    with boa.reverts("no perms"):
+        switchboard_charlie.setUndyYieldBonusAmount(new_amount, sender=alice)
+
+    # Governance creates pending action
+    action_id = switchboard_charlie.setUndyYieldBonusAmount(new_amount, sender=governance.address)
+    assert action_id > 0
+
+    # Verify event
+    logs = filter_logs(switchboard_charlie, "PendingUndyYieldBonusAmountAction")
+    assert len(logs) == 1
+    assert logs[0].amount == new_amount
+    assert logs[0].actionId == action_id
+
+    # Verify action stored
+    assert switchboard_charlie.actionType(action_id) == 512  # ActionType.SET_UNDY_YIELD_BONUS_AMOUNT (2^9)
+    assert switchboard_charlie.pendingUndyYieldBonusAmount(action_id) == new_amount
+
+    # Time travel and execute
+    boa.env.time_travel(blocks=switchboard_charlie.actionTimeLock())
+    result = switchboard_charlie.executePendingAction(action_id, sender=governance.address)
+    assert result
+
+    # Verify lootbox updated
+    assert lootbox.undyYieldBonusAmount() == new_amount
+
+    # Verify event
+    logs2 = filter_logs(switchboard_charlie, "UndyYieldBonusAmountSet")
+    assert len(logs2) == 1
+    assert logs2[0].amount == new_amount
+
+    # Verify action cleared
+    assert switchboard_charlie.actionType(action_id) == 0
+
+
+def test_switchboard_three_underscore_rewards_multiple_pending_actions(
+    switchboard_charlie,
+    governance,
+    lootbox,
+):
+    """Test multiple pending underscore rewards actions can coexist"""
+    # Create multiple pending actions
+    interval_action = switchboard_charlie.setUnderscoreSendInterval(43_200 * 3, sender=governance.address)
+    deposit_action = switchboard_charlie.setUndyDepositRewardsAmount(600 * 10**18, sender=governance.address)
+    yield_action = switchboard_charlie.setUndyYieldBonusAmount(400 * 10**18, sender=governance.address)
+
+    # Verify all stored correctly
+    assert switchboard_charlie.actionType(interval_action) == 128
+    assert switchboard_charlie.actionType(deposit_action) == 256
+    assert switchboard_charlie.actionType(yield_action) == 512
+
+    assert switchboard_charlie.pendingUnderscoreSendInterval(interval_action) == 43_200 * 3
+    assert switchboard_charlie.pendingUndyDepositRewardsAmount(deposit_action) == 600 * 10**18
+    assert switchboard_charlie.pendingUndyYieldBonusAmount(yield_action) == 400 * 10**18
+
+    # Time travel and execute one
+    boa.env.time_travel(blocks=switchboard_charlie.actionTimeLock())
+    result = switchboard_charlie.executePendingAction(interval_action, sender=governance.address)
+    assert result
+
+    # Verify only one was cleared
+    assert switchboard_charlie.actionType(interval_action) == 0
+    assert switchboard_charlie.actionType(deposit_action) == 256
+    assert switchboard_charlie.actionType(yield_action) == 512
+
+    # Execute another
+    result2 = switchboard_charlie.executePendingAction(deposit_action, sender=governance.address)
+    assert result2
+    assert switchboard_charlie.actionType(deposit_action) == 0
+    assert switchboard_charlie.actionType(yield_action) == 512
+
+
+def test_switchboard_three_underscore_rewards_cancellation(
+    switchboard_charlie,
+    governance,
+):
+    """Test cancellation of underscore rewards actions"""
+    # Create pending actions
+    action_id = switchboard_charlie.setUnderscoreSendInterval(43_200 * 5, sender=governance.address)
+    assert switchboard_charlie.actionType(action_id) == 128
+
+    # Cancel
+    success = switchboard_charlie.cancelPendingAction(action_id, sender=governance.address)
+    assert success
+    assert switchboard_charlie.actionType(action_id) == 0
+
+    # Can't cancel again
+    with boa.reverts("cannot cancel action"):
+        switchboard_charlie.cancelPendingAction(action_id, sender=governance.address)
+
+
+###################################
+# Endaoment Function Coverage Tests
+
 # Run the tests
 if __name__ == "__main__":
     print("Additional comprehensive tests for SwitchboardThree.vy")
@@ -1644,3 +1939,4 @@ if __name__ == "__main__":
     print("- Data integrity across all operations")
     print("- Training wheels functionality")
     print("- New setTrainingWheels function")
+    print("- Underscore rewards functions")

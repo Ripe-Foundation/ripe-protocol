@@ -3,18 +3,15 @@
 from ethereum.ercs import IERC20
 from interfaces import UndyLego
 
-interface LegacyLego:
-    def addLiquidity(_nftTokenId: uint256, _pool: address, _tokenA: address, _tokenB: address, _tickLower: int24, _tickUpper: int24, _amountA: uint256, _amountB: uint256, _minAmountA: uint256, _minAmountB: uint256, _minLpAmount: uint256, _recipient: address, _oracleRegistry: address = empty(address)) -> (uint256, uint256, uint256, uint256, uint256, uint256, uint256): nonpayable
-
-interface LegoRegistry:
-    def getLegoAddr(_legoId: uint256) -> address: view
+interface Lego:
+    def addLiquidity(_pool: address, _tokenA: address, _tokenB: address, _amountA: uint256, _amountB: uint256, _minAmountA: uint256, _minAmountB: uint256, _minLpAmount: uint256, _extraData: bytes32, _recipient: address) -> (address, uint256, uint256, uint256, uint256): nonpayable
 
 interface UnderscoreRegistry:
-    def getAddy(_regId: uint256) -> address: view
+    def getAddr(_regId: uint256) -> address: view
 
 MAX_TOKEN_PATH: constant(uint256) = 5
-LEGACY_LEGO_REGISTRY_ID: constant(uint256) = 2
-UNDY_LEGACY: public(immutable(address))
+LEGO_REGISTRY_ID: constant(uint256) = 3
+UNDY_REGISTRY: public(immutable(address))
 
 useThisLegoId: public(uint256)
 _isUserWallet: public(bool)
@@ -22,7 +19,7 @@ _isUserWallet: public(bool)
 
 @deploy
 def __init__(_undyLegacy: address):
-    UNDY_LEGACY = _undyLegacy
+    UNDY_REGISTRY = _undyLegacy
 
 
 @view
@@ -51,8 +48,8 @@ def setIsUserWallet(_isUserWallet: bool):
 @view
 @internal
 def _getLegoAddr(_legoId: uint256) -> address:
-    legoRegistry: address = staticcall UnderscoreRegistry(UNDY_LEGACY).getAddy(LEGACY_LEGO_REGISTRY_ID)
-    return staticcall LegoRegistry(legoRegistry).getLegoAddr(_legoId)
+    legoRegistry: address = staticcall UnderscoreRegistry(UNDY_REGISTRY).getAddr(LEGO_REGISTRY_ID)
+    return staticcall UnderscoreRegistry(legoRegistry).getAddr(_legoId)
 
 
 @external
@@ -109,23 +106,19 @@ def addLiquidity(
     assert extcall IERC20(_tokenB).approve(legoAddr, liqAmountB, default_return_value=True) # dev: approval failed
 
     # legacy underscore lego
-    liquidityAdded: uint256 = 0
+    lpToken: address = empty(address)
+    lpAmountReceived: uint256 = 0
     usdValue: uint256 = 0
-    refundAssetAmountALeg: uint256 = 0
-    refundAssetAmountBLeg: uint256 = 0
-    nftTokenId: uint256 = 0
-    liquidityAdded, liqAmountA, liqAmountB, usdValue, refundAssetAmountALeg, refundAssetAmountBLeg, nftTokenId = extcall LegacyLego(legoAddr).addLiquidity(
-        0,
+    lpToken, lpAmountReceived, liqAmountA, liqAmountB, usdValue = extcall Lego(legoAddr).addLiquidity(
         _pool,
         _tokenA,
         _tokenB,
-        0,
-        0,
         liqAmountA,
         liqAmountB,
         _minAmountA,
         _minAmountB,
         _minLpAmount,
+        _extraData,
         _recipient,
     )
 
@@ -146,4 +139,11 @@ def addLiquidity(
         refundAssetAmountB = currentLegoBalanceB - preLegoBalanceB
         assert extcall IERC20(_tokenB).transfer(msg.sender, refundAssetAmountB, default_return_value=True) # dev: transfer failed
 
-    return _pool, liquidityAdded, liqAmountA, liqAmountB, usdValue
+    return lpToken, lpAmountReceived, liqAmountA, liqAmountB, usdValue
+
+
+@external
+def addDepositRewards(_asset: address, _amount: uint256):
+    amount: uint256 = min(_amount, staticcall IERC20(_asset).balanceOf(msg.sender))
+    assert amount != 0 # dev: nothing to add
+    assert extcall IERC20(_asset).transferFrom(msg.sender, self, amount, default_return_value=True) # dev: transfer failed
