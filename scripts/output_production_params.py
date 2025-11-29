@@ -26,10 +26,10 @@ RIPE_HQ = "0x6162df1b329E157479F8f1407E888260E0EC3d2b"
 PRICE_DESK = "0xDFe8D79bc05420a3fFa14824135016a738eE8299"
 VAULT_BOOK = "0xB758e30C14825519b895Fd9928d5d8748A71a944"
 LEDGER = "0x365256e322a47Aa2015F6724783F326e9B24fA47"
-CREDIT_ENGINE = "0xf9111dFcAbf2538D6ED9057C07e18bc14AC8DA6a"
+CREDIT_ENGINE = "0x30aa8eB041AcB3B22228516297C331B313b81462"
 BOND_BOOSTER = "0xA1872467AC4fb442aeA341163A65263915ce178a"
-ENDAOMENT = "0x14F4f1CD5F4197DB7cB536B282fe6c59eACfE40d"
-ENDAOMENT_PSM = None  # Will be fetched dynamically or set to Endaoment if not deployed
+ENDAOMENT = "0x70fA85Aa99a39161A2623627377F1c791fd091f6"
+ENDAOMENT_PSM = "0x2893d0dfa54571bDc7DE60F2d8a456d3377CcAA7"
 GREEN_TOKEN = "0xd1Eac76497D06Cf15475A5e3984D5bC03de7C707"
 RIPE_TOKEN = "0x2A0a59d6B975828e781EcaC125dBA40d7ee5dDC0"
 SAVINGS_GREEN = "0xaa0f13488CE069A7B5a099457c753A7CFBE04d36"
@@ -37,10 +37,20 @@ STABILITY_POOL = "0x2a157096af6337b2b4bd47de435520572ed5a439"
 GREEN_POOL = "0xd6c283655B42FA0eb2685F7AB819784F071459dc"
 
 # Additional contracts
-LOOTBOX = "0xef52d8a4732b96b98A0Bd47a69beFb40CdCF2515"
-BOND_ROOM = "0xe2E1a03b95B8E8EFEB6eFbAD52172488FF8C84A6"
+LOOTBOX = "0x1f90ef42Da9B41502d2311300E13FAcf70c64be7"
+BOND_ROOM = "0x707f660A7834d00792DF9a28386Bb2cCC6446154"
 RIPE_GOV_VAULT = "0xe42b3dC546527EB70D741B185Dc57226cA01839D"
 SWITCHBOARD = "0xc68A90A40B87ae1dABA93Da9c02642F8B74030F9"
+
+# Core Lending contracts
+AUCTION_HOUSE = "0x8a02aC4754b72aFBDa4f403ec5DA7C2950164084"
+TELLER = "0xae87deB25Bc5030991Aa5E27Cbab38f37a112C13"
+DELEVERAGE = "0x75EeBb8c6f1A5727e7c0c1f9d64Ed07cd0966F27"
+CREDIT_REDEEM = "0x3bfB0F72642aeFA2486da00Db855c5F0b787e3FB"
+
+# Treasury contracts
+ENDAOMENT_FUNDS = "0x4Ce5FB8D572917Eb96724eA1866b505B2a6B0873"
+HUMAN_RESOURCES = "0xF9aCDFd0d167b741f9144Ca01E52FcdE16BE108b"
 
 # RPC URL
 RPC_URL = f"https://base-mainnet.g.alchemy.com/v2/{os.environ.get('WEB3_ALCHEMY_API_KEY')}"
@@ -215,15 +225,23 @@ def print_table_of_contents():
 6. [VaultBook Registry](#vault-book)
 7. [Ledger Statistics](#ledger)
 8. [Endaoment PSM](#endaoment-psm)
-9. [Other Contracts](#other-contracts)
+9. [Core Lending Contracts](#core-lending)
    - [CreditEngine](#credit-engine)
-   - [BondBooster](#bond-booster)
-   - [Lootbox](#lootbox)
-   - [BondRoom](#bond-room)
-   - [RipeGovVault](#ripe-gov-vault)
+   - [AuctionHouse](#auction-house)
+   - [Teller](#teller)
+   - [Deleverage](#deleverage)
+   - [CreditRedeem](#credit-redeem)
    - [StabilityPool](#stability-pool)
-10. [Price Source Configurations](#price-sources)
-11. [Token Statistics](#token-statistics)
+10. [Treasury & Rewards Contracts](#treasury-rewards)
+    - [Endaoment](#endaoment)
+    - [BondBooster](#bond-booster)
+    - [Lootbox](#lootbox)
+    - [BondRoom](#bond-room)
+    - [HumanResources](#human-resources)
+11. [Governance Contracts](#governance)
+    - [RipeGovVault](#ripe-gov-vault)
+12. [Price Source Configurations](#price-sources)
+13. [Token Statistics](#token-statistics)
 """)
 
 
@@ -942,27 +960,14 @@ def fetch_credit_engine_data(ce):
     print("# CreditEngine - Credit Configuration")
     print(f"Address: {CREDIT_ENGINE}")
 
-    rows = []
-    try:
-        undy_discount = ce.undyVaulDiscount()
-        rows.append(("undyVaultDiscount", format_percent(undy_discount)))
-    except AttributeError:
-        pass  # Function not deployed yet
-    except Exception as e:
-        rows.append(("undyVaultDiscount", f"Error: {e}"))
+    undy_discount = ce.undyVaulDiscount()
+    buyback_ratio = ce.buybackRatio()
 
-    try:
-        buyback_ratio = ce.buybackRatio()
-        rows.append(("buybackRatio", format_percent(buyback_ratio)))
-    except AttributeError:
-        pass  # Function not deployed yet
-    except Exception as e:
-        rows.append(("buybackRatio", f"Error: {e}"))
-
-    if rows:
-        print_table("Credit Engine Config", ["Parameter", "Value"], rows)
-    else:
-        print("*No config parameters deployed yet*")
+    rows = [
+        ("undyVaultDiscount", format_percent(undy_discount)),
+        ("buybackRatio", format_percent(buyback_ratio)),
+    ]
+    print_table("Credit Engine Config", ["Parameter", "Value"], rows)
 
 
 def fetch_bond_booster_data(bb):
@@ -994,41 +999,20 @@ def fetch_lootbox_data(lootbox):
     print("# Lootbox - RIPE Rewards & Underscore Config")
     print(f"Address: {LOOTBOX}")
 
-    rows = []
-    try:
-        has_undy = lootbox.hasUnderscoreRewards()
-        rows.append(("hasUnderscoreRewards", has_undy))
-    except AttributeError:
-        pass
+    has_undy = lootbox.hasUnderscoreRewards()
+    send_interval = lootbox.underscoreSendInterval()
+    last_send = lootbox.lastUnderscoreSend()
+    deposit_rewards = lootbox.undyDepositRewardsAmount()
+    yield_bonus = lootbox.undyYieldBonusAmount()
 
-    try:
-        send_interval = lootbox.underscoreSendInterval()
-        rows.append(("underscoreSendInterval", format_blocks_to_time(send_interval)))
-    except AttributeError:
-        pass
-
-    try:
-        last_send = lootbox.lastUnderscoreSend()
-        rows.append(("lastUnderscoreSend (block)", last_send))
-    except AttributeError:
-        pass
-
-    try:
-        deposit_rewards = lootbox.undyDepositRewardsAmount()
-        rows.append(("undyDepositRewardsAmount", format_token_amount(deposit_rewards, 18, "RIPE")))
-    except AttributeError:
-        pass
-
-    try:
-        yield_bonus = lootbox.undyYieldBonusAmount()
-        rows.append(("undyYieldBonusAmount", format_token_amount(yield_bonus, 18, "RIPE")))
-    except AttributeError:
-        pass
-
-    if rows:
-        print_table("Underscore Rewards Config", ["Parameter", "Value"], rows)
-    else:
-        print("*No underscore config deployed yet*")
+    rows = [
+        ("hasUnderscoreRewards", has_undy),
+        ("underscoreSendInterval", format_blocks_to_time(send_interval)),
+        ("lastUnderscoreSend (block)", last_send),
+        ("undyDepositRewardsAmount", format_token_amount(deposit_rewards, 18, "RIPE")),
+        ("undyYieldBonusAmount", format_token_amount(yield_bonus, 18, "RIPE")),
+    ]
+    print_table("Underscore Rewards Config", ["Parameter", "Value"], rows)
 
 
 def fetch_bond_room_data(bond_room):
@@ -1038,17 +1022,14 @@ def fetch_bond_room_data(bond_room):
     print("# BondRoom - Bond Purchase Configuration")
     print(f"Address: {BOND_ROOM}")
 
-    rows = []
-    try:
-        booster_addr = bond_room.bondBooster()
-        rows.append(("bondBooster", format_address(str(booster_addr))))
-    except AttributeError:
-        pass
+    is_paused = bond_room.isPaused()
+    booster_addr = bond_room.bondBooster()
 
-    if rows:
-        print_table("Bond Room Config", ["Parameter", "Value"], rows)
-    else:
-        print("*No bond room config deployed yet*")
+    rows = [
+        ("isPaused", is_paused),
+        ("bondBooster", format_address(str(booster_addr))),
+    ]
+    print_table("Bond Room Config", ["Parameter", "Value"], rows)
 
 
 def fetch_ripe_gov_vault_data(ripe_gov):
@@ -1058,23 +1039,14 @@ def fetch_ripe_gov_vault_data(ripe_gov):
     print("# Ripe Gov Vault - Governance Staking")
     print(f"Address: {RIPE_GOV_VAULT}")
 
-    rows = []
-    try:
-        total_points = ripe_gov.totalGovPoints()
-        rows.append(("totalGovPoints", f"{total_points:,}"))
-    except AttributeError:
-        pass
+    is_paused = ripe_gov.isPaused()
+    total_points = ripe_gov.totalGovPoints()
 
-    try:
-        is_paused = ripe_gov.isPaused()
-        rows.append(("isPaused", is_paused))
-    except AttributeError:
-        pass
-
-    if rows:
-        print_table("Governance Vault Stats", ["Parameter", "Value"], rows)
-    else:
-        print("*No governance vault data available*")
+    rows = [
+        ("isPaused", is_paused),
+        ("totalGovPoints", f"{total_points:,}"),
+    ]
+    print_table("Governance Vault Stats", ["Parameter", "Value"], rows)
 
 
 def fetch_price_source_configs(pd):
@@ -1238,21 +1210,107 @@ def fetch_stability_pool_data(stab_pool):
     print("# Stability Pool - Liquidation Buffer")
     print(f"Address: {STABILITY_POOL}")
 
-    rows = []
-    try:
-        is_paused = stab_pool.isPaused()
-        rows.append(("isPaused", is_paused))
-    except AttributeError:
-        pass
+    is_paused = stab_pool.isPaused()
+    num_assets = stab_pool.numAssets()
 
-    try:
-        num_assets = stab_pool.numAssets()
-        rows.append(("numAssets", num_assets - 1 if num_assets > 0 else 0))
-    except AttributeError:
-        pass
+    rows = [
+        ("isPaused", is_paused),
+        ("numAssets", num_assets - 1 if num_assets > 0 else 0),
+    ]
+    print_table("Stability Pool Config", ["Parameter", "Value"], rows)
 
-    if rows:
-        print_table("Stability Pool Config", ["Parameter", "Value"], rows)
+
+def fetch_auction_house_data(auction_house):
+    """Fetch and print AuctionHouse data."""
+    print("\n" + "=" * 80)
+    print("\n<a id=\"auction-house\"></a>")
+    print("# Auction House - Liquidation Auctions")
+    print(f"Address: {AUCTION_HOUSE}")
+
+    is_paused = auction_house.isPaused()
+
+    rows = [
+        ("isPaused", is_paused),
+    ]
+    print_table("Auction House Status", ["Parameter", "Value"], rows)
+
+
+def fetch_teller_data(teller):
+    """Fetch and print Teller data."""
+    print("\n" + "=" * 80)
+    print("\n<a id=\"teller\"></a>")
+    print("# Teller - User Interaction Gateway")
+    print(f"Address: {TELLER}")
+
+    is_paused = teller.isPaused()
+
+    rows = [
+        ("isPaused", is_paused),
+    ]
+    print_table("Teller Status", ["Parameter", "Value"], rows)
+
+
+def fetch_deleverage_data(deleverage):
+    """Fetch and print Deleverage data."""
+    print("\n" + "=" * 80)
+    print("\n<a id=\"deleverage\"></a>")
+    print("# Deleverage - Deleverage Engine")
+    print(f"Address: {DELEVERAGE}")
+
+    is_paused = deleverage.isPaused()
+
+    rows = [
+        ("isPaused", is_paused),
+    ]
+    print_table("Deleverage Status", ["Parameter", "Value"], rows)
+
+
+def fetch_credit_redeem_data(credit_redeem):
+    """Fetch and print CreditRedeem data."""
+    print("\n" + "=" * 80)
+    print("\n<a id=\"credit-redeem\"></a>")
+    print("# Credit Redeem - Redemptions Engine")
+    print(f"Address: {CREDIT_REDEEM}")
+
+    is_paused = credit_redeem.isPaused()
+
+    rows = [
+        ("isPaused", is_paused),
+    ]
+    print_table("Credit Redeem Status", ["Parameter", "Value"], rows)
+
+
+def fetch_endaoment_data(endaoment):
+    """Fetch and print Endaoment (main treasury) data."""
+    print("\n" + "=" * 80)
+    print("\n<a id=\"endaoment\"></a>")
+    print("# Endaoment - Treasury & GREEN Stabilization")
+    print(f"Address: {ENDAOMENT}")
+
+    is_paused = endaoment.isPaused()
+    weth = endaoment.WETH()
+
+    rows = [
+        ("isPaused", is_paused),
+        ("WETH", format_address(str(weth))),
+    ]
+    print_table("Endaoment Status", ["Parameter", "Value"], rows)
+
+
+def fetch_human_resources_data(hr):
+    """Fetch and print HumanResources data."""
+    print("\n" + "=" * 80)
+    print("\n<a id=\"human-resources\"></a>")
+    print("# Human Resources - Contributor Management")
+    print(f"Address: {HUMAN_RESOURCES}")
+
+    is_paused = hr.isPaused()
+
+    rows = [
+        ("isPaused", is_paused),
+    ]
+    print_table("Human Resources Status", ["Parameter", "Value"], rows)
+    print("\n*Note: numContributors is tracked in Ledger contract*")
 
 
 def fetch_endaoment_psm_data():
@@ -1479,6 +1537,16 @@ def main():
         ripe_gov = boa.from_etherscan(RIPE_GOV_VAULT, name="RipeGovVault")
         stab_pool = boa.from_etherscan(STABILITY_POOL, name="StabilityPool")
 
+        # Core lending contracts
+        auction_house = boa.from_etherscan(AUCTION_HOUSE, name="AuctionHouse")
+        teller = boa.from_etherscan(TELLER, name="Teller")
+        deleverage = boa.from_etherscan(DELEVERAGE, name="Deleverage")
+        credit_redeem = boa.from_etherscan(CREDIT_REDEEM, name="CreditRedeem")
+
+        # Treasury contracts
+        endaoment = boa.from_etherscan(ENDAOMENT, name="Endaoment")
+        hr = boa.from_etherscan(HUMAN_RESOURCES, name="HumanResources")
+
         # Load token contracts for executive summary
         green = boa.from_etherscan(GREEN_TOKEN, name="GreenToken")
         sgreen = boa.from_etherscan(SAVINGS_GREEN, name="SavingsGreen")
@@ -1512,18 +1580,40 @@ def main():
         # Endaoment PSM
         fetch_endaoment_psm_data()
 
-        # Other contracts section
+        # Core Lending Contracts
         print("\n" + "=" * 80)
-        print("\n<a id=\"other-contracts\"></a>")
-        print("# Other Contract Configurations")
+        print("\n<a id=\"core-lending\"></a>")
+        print("# Core Lending Contracts")
 
         fetch_credit_engine_data(ce)
+        fetch_auction_house_data(auction_house)
+        fetch_teller_data(teller)
+        fetch_deleverage_data(deleverage)
+        fetch_credit_redeem_data(credit_redeem)
+        fetch_stability_pool_data(stab_pool)
+
+        # Treasury & Rewards Contracts
+        print("\n" + "=" * 80)
+        print("\n<a id=\"treasury-rewards\"></a>")
+        print("# Treasury & Rewards Contracts")
+
+        fetch_endaoment_data(endaoment)
         fetch_bond_booster_data(bb)
         fetch_lootbox_data(lootbox)
         fetch_bond_room_data(bond_room)
+        fetch_human_resources_data(hr)
+
+        # Governance Contracts
+        print("\n" + "=" * 80)
+        print("\n<a id=\"governance\"></a>")
+        print("# Governance Contracts")
+
         fetch_ripe_gov_vault_data(ripe_gov)
-        fetch_stability_pool_data(stab_pool)
+
+        # Price Sources
         fetch_price_source_configs(pd)
+
+        # Token Statistics
         fetch_token_data()
 
         print("\n" + "=" * 80)

@@ -1,5 +1,5 @@
 Connecting to Base mainnet via Alchemy...
-Connected. Block: 38663660
+Connected. Block: 38821862
 
 Loading contracts from Etherscan...
 Fetching configuration data...
@@ -7,8 +7,8 @@ Fetching configuration data...
 ================================================================================
 # Ripe Protocol Production Parameters
 
-**Generated:** 2025-11-26 00:25:14 UTC
-**Block:** 38663660
+**Generated:** 2025-11-29 16:18:34 UTC
+**Block:** 38821862
 **Network:** Base Mainnet
 
 ## Table of Contents
@@ -25,15 +25,23 @@ Fetching configuration data...
 6. [VaultBook Registry](#vault-book)
 7. [Ledger Statistics](#ledger)
 8. [Endaoment PSM](#endaoment-psm)
-9. [Other Contracts](#other-contracts)
+9. [Core Lending Contracts](#core-lending)
    - [CreditEngine](#credit-engine)
-   - [BondBooster](#bond-booster)
-   - [Lootbox](#lootbox)
-   - [BondRoom](#bond-room)
-   - [RipeGovVault](#ripe-gov-vault)
+   - [AuctionHouse](#auction-house)
+   - [Teller](#teller)
+   - [Deleverage](#deleverage)
+   - [CreditRedeem](#credit-redeem)
    - [StabilityPool](#stability-pool)
-10. [Price Source Configurations](#price-sources)
-11. [Token Statistics](#token-statistics)
+10. [Treasury & Rewards Contracts](#treasury-rewards)
+    - [Endaoment](#endaoment)
+    - [BondBooster](#bond-booster)
+    - [Lootbox](#lootbox)
+    - [BondRoom](#bond-room)
+    - [HumanResources](#human-resources)
+11. [Governance Contracts](#governance)
+    - [RipeGovVault](#ripe-gov-vault)
+12. [Price Source Configurations](#price-sources)
+13. [Token Statistics](#token-statistics)
 
 
 <a id="executive-summary"></a>
@@ -41,14 +49,14 @@ Fetching configuration data...
 
 | Metric | Value |
 | --- | --- |
-| **Total GREEN Supply** | 202.46K GREEN |
-| **Total Debt Outstanding** | 74.80K GREEN |
-| **Debt Utilization** | 37.40% of 200.00K GREEN limit |
-| **Active Borrowers** | 79 |
+| **Total GREEN Supply** | 202.15K GREEN |
+| **Total Debt Outstanding** | 74.51K GREEN |
+| **Debt Utilization** | 37.25% of 200.00K GREEN limit |
+| **Active Borrowers** | 78 |
 | **Registered Assets** | 55 |
 | **Bad Debt** | 0.00 GREEN |
 | **RIPE Total Supply** | 10.32M RIPE |
-| **sGREEN Exchange Rate** | 1.055864 GREEN per sGREEN (+5.5864% vs 1:1) |
+| **sGREEN Exchange Rate** | 1.056273 GREEN per sGREEN (+5.6273% vs 1:1) |
 | **Protocol Status** | ✅ Deposits / ✅ Borrowing / ✅ Liquidations |
 
 ================================================================================
@@ -2634,7 +2642,7 @@ Address: 0x6162df1b329E157479F8f1407E888260E0EC3d2b
 ## Registry Config
 | Parameter | Value |
 | --- | --- |
-| numAddrs | 21 |
+| numAddrs | 23 |
 | registryChangeTimeLock | 21600 blocks (~12.0h) |
 
 ### All Registered Contracts
@@ -2648,18 +2656,20 @@ Address: 0x6162df1b329E157479F8f1407E888260E0EC3d2b
 | 6 | Switchboard | 0xc68A...30F9 | - | - | ✓ | False |
 | 7 | Price Desk | 0x6856...2Ff6 | - | - | - | False |
 | 8 | Vault Book | 0xB758...a944 | - | ✓ | - | False |
-| 9 | Auction House | 0x38FB...7312 | ✓ | - | - | False |
+| 9 | Auction House | 0x8a02...4084 | ✓ | - | - | False |
 | 10 | Auction House NFT | 0x504F...6F3A | - | - | - | False |
 | 11 | Boardroom | 0xb5cA...12D1 | - | - | - | False |
-| 12 | Bond Room | 0xe2E1...84A6 | - | ✓ | - | False |
-| 13 | Credit Engine | 0xf911...DA6a | ✓ | - | - | False |
-| 14 | Endaoment | Endaoment (0x14F4...E40d) | ✓ | - | - | False |
+| 12 | Bond Room | 0x707f...6154 | - | ✓ | - | False |
+| 13 | Credit Engine | 0x30aa...1462 | ✓ | - | - | False |
+| 14 | Endaoment | Endaoment (0x70fA...91f6) | ✓ | - | - | False |
 | 15 | Human Resources | 0xF9aC...108b | - | ✓ | - | False |
-| 16 | Lootbox | 0xef52...2515 | - | ✓ | - | False |
+| 16 | Lootbox | 0x1f90...4be7 | - | ✓ | - | False |
 | 17 | Teller | 0xae87...2C13 | - | - | - | False |
-| 18 | Deleverage | 0x9cE3...6F61 | - | - | - | False |
+| 18 | Deleverage | 0x75Ee...6F27 | - | - | - | False |
 | 19 | Credit Redeem | 0x3bfB...e3FB | - | - | - | False |
 | 20 | Teller Utils | 0x57f0...DcdD | - | - | - | False |
+| 21 | Endaoment Funds | 0x4Ce5...0873 | - | - | - | - |
+| 22 | Endaoment PSM | 0x2893...cAA7 | - | - | - | False |
 
 ================================================================================
 
@@ -2670,16 +2680,17 @@ Address: 0xc68A90A40B87ae1dABA93Da9c02642F8B74030F9
 ## Registry Config
 | Parameter | Value |
 | --- | --- |
-| numAddrs (switchboards) | 4 |
+| numAddrs (switchboards) | 5 |
 | registryChangeTimeLock | 21600 blocks (~12.0h) |
 
 ### Registered Switchboards
 | ID | Description | Address | Paused |
 | --- | --- | --- | --- |
-| 1 | Switchboard Alpha | 0x4EEc...AF8B | - |
+| 1 | Switchboard Alpha | 0x73Cd...CA83 | - |
 | 2 | Switchboard Bravo | 0xD18A...46e7 | - |
-| 3 | Switchboard Charlie | 0xaEb3...403b | - |
+| 3 | Switchboard Charlie | 0x6D79...4008 | - |
 | 4 | Switchboard Delta | 0x50e8...11cb | - |
+| 5 | Switchboard Echo | 0xdF99...5dbb | - |
 
 ================================================================================
 
@@ -2734,7 +2745,7 @@ Address: 0x2a157096af6337b2b4bd47de435520572ed5a439
 **Assets in Vault (2):**
 | Asset | Total Balance |
 | --- | --- |
-| sGREEN | Very High (5.44e+12 ) |
+| sGREEN | Very High (5.41e+12 ) |
 | GREEN/USDC | Very High (5.87e+12 ) |
 
 ### Vault 2: Ripe Gov Vault
@@ -2765,13 +2776,13 @@ Address: 0xf75b566eF80Fde0dEfcC045A4d57b540eb43ddfD
 **Assets in Vault (27):**
 | Asset | Total Balance |
 | --- | --- |
-| USDC | 764.26  |
+| USDC | 762.51  |
 | CBBTC | 0.02  |
 | WETH | 1.57  |
 | CBDOGE | 285.30  |
 | USOL | 1.70  |
 | MORPHO_SPARK_USDC | 7.14K  |
-| AERO | 1.81K  |
+| AERO | 1.78K  |
 | MOONWELL_AERO | 0.00  |
 | cbXRP | 0.00  |
 | WELL | 11.99K  |
@@ -2828,7 +2839,7 @@ Address: 0x4549A368c00f803862d457C4C0c659a293F26C66
 | UNDY_ETH | 0.00  |
 | UNDY_BTC | 0.00  |
 | undyUSD | 0.00  |
-| undyUSD | 103.47K  |
+| undyUSD | 103.05K  |
 | undyBTC | 0.00  |
 | undyETH | 0.01  |
 | undyAERO | 16.66  |
@@ -2842,36 +2853,36 @@ Address: 0x365256e322a47Aa2015F6724783F326e9B24fA47
 ## Debt Statistics
 | Parameter | Value |
 | --- | --- |
-| totalDebt | 74.80K GREEN |
-| numBorrowers | 79 |
-| unrealizedYield | 0.29 GREEN |
+| totalDebt | 74.51K GREEN |
+| numBorrowers | 78 |
+| unrealizedYield | 30.55 GREEN |
 
 ## RIPE Rewards Pool
 | Parameter | Value |
 | --- | --- |
-| borrowers allocation | 314.65 RIPE |
-| stakers allocation | 4.67K RIPE |
+| borrowers allocation | 363.92 RIPE |
+| stakers allocation | 5.61K RIPE |
 | voters allocation | 0.00 RIPE |
 | genDepositors allocation | 0.00 RIPE |
-| newRipeRewards | 51.43 RIPE |
-| lastUpdate (block) | 38662972 |
-| ripeAvailForRewards | 14.60K RIPE |
+| newRipeRewards | 0.00 RIPE |
+| lastUpdate (block) | 38812769 |
+| ripeAvailForRewards | 13.44K RIPE |
 
 ## Global Deposit Points
 | Parameter | Value |
 | --- | --- |
 | lastUsdValue | $0.15 |
-| ripeStakerPoints | 12944718095 |
+| ripeStakerPoints | 14248328154 |
 | ripeVotePoints | 0 |
-| ripeGenPoints | 933932358244 |
-| lastUpdate (block) | 38662972 |
+| ripeGenPoints | 956348019347 |
+| lastUpdate (block) | 38812769 |
 
 ## Global Borrow Points
 | Parameter | Value |
 | --- | --- |
 | lastPrincipal | 0.00 GREEN |
-| points | 89970245938 |
-| lastUpdate (block) | 38653959 |
+| points | 86321758907 |
+| lastUpdate (block) | 38812769 |
 
 ## Liquidation Statistics
 | Parameter | Value |
@@ -2903,23 +2914,123 @@ Address: 0x365256e322a47Aa2015F6724783F326e9B24fA47
 
 <a id="endaoment-psm"></a>
 # Endaoment PSM - Peg Stability Module
-Address: 0x14F4f1CD5F4197DB7cB536B282fe6c59eACfE40d
+Address: 0x2893d0dfa54571bDc7DE60F2d8a456d3377CcAA7
+
+## PSM Mint Configuration
+| Parameter | Value |
+| --- | --- |
+| canMint | ❌ Disabled |
+| mintFee | 0.00% |
+| maxIntervalMint | 100.00K GREEN |
+| shouldEnforceMintAllowlist | False |
+
+## PSM Redeem Configuration
+| Parameter | Value |
+| --- | --- |
+| canRedeem | ❌ Disabled |
+| redeemFee | 0.00% |
+| maxIntervalRedeem | 100.00K GREEN |
+| shouldEnforceRedeemAllowlist | False |
+
+## PSM Interval & Yield Configuration
+| Parameter | Value |
+| --- | --- |
+| numBlocksPerInterval | 43200 blocks (~1.0d) |
+| shouldAutoDeposit | True |
+| usdcYieldPosition.legoId | 13 |
+| usdcYieldPosition.vaultToken | undyUSD (0xb338...86Bf) |
+
+**USDC Address:** USDC (0x8335...2913)
 
 ================================================================================
 
-<a id="other-contracts"></a>
-# Other Contract Configurations
+<a id="core-lending"></a>
+# Core Lending Contracts
 
 ================================================================================
 
 <a id="credit-engine"></a>
 # CreditEngine - Credit Configuration
-Address: 0xf9111dFcAbf2538D6ED9057C07e18bc14AC8DA6a
+Address: 0x30aa8eB041AcB3B22228516297C331B313b81462
 
 ## Credit Engine Config
 | Parameter | Value |
 | --- | --- |
 | undyVaultDiscount | 50.00% |
+| buybackRatio | 0.00% |
+
+================================================================================
+
+<a id="auction-house"></a>
+# Auction House - Liquidation Auctions
+Address: 0x8a02aC4754b72aFBDa4f403ec5DA7C2950164084
+
+## Auction House Status
+| Parameter | Value |
+| --- | --- |
+| isPaused | False |
+
+================================================================================
+
+<a id="teller"></a>
+# Teller - User Interaction Gateway
+Address: 0xae87deB25Bc5030991Aa5E27Cbab38f37a112C13
+
+## Teller Status
+| Parameter | Value |
+| --- | --- |
+| isPaused | False |
+
+================================================================================
+
+<a id="deleverage"></a>
+# Deleverage - Deleverage Engine
+Address: 0x75EeBb8c6f1A5727e7c0c1f9d64Ed07cd0966F27
+
+## Deleverage Status
+| Parameter | Value |
+| --- | --- |
+| isPaused | False |
+
+================================================================================
+
+<a id="credit-redeem"></a>
+# Credit Redeem - Redemptions Engine
+Address: 0x3bfB0F72642aeFA2486da00Db855c5F0b787e3FB
+
+## Credit Redeem Status
+| Parameter | Value |
+| --- | --- |
+| isPaused | False |
+
+================================================================================
+
+<a id="stability-pool"></a>
+# Stability Pool - Liquidation Buffer
+Address: 0x2a157096af6337b2b4bd47de435520572ed5a439
+
+## Stability Pool Config
+| Parameter | Value |
+| --- | --- |
+| isPaused | False |
+| numAssets | 2 |
+
+================================================================================
+
+<a id="treasury-rewards"></a>
+# Treasury & Rewards Contracts
+
+================================================================================
+
+<a id="endaoment"></a>
+# Endaoment - Treasury & GREEN Stabilization
+Address: 0x70fA85Aa99a39161A2623627377F1c791fd091f6
+
+## Endaoment Status
+| Parameter | Value |
+| --- | --- |
+| isPaused | False |
+| WETH | WETH (0x4200...0006) |
 
 ================================================================================
 
@@ -2938,19 +3049,46 @@ Address: 0xA1872467AC4fb442aeA341163A65263915ce178a
 
 <a id="lootbox"></a>
 # Lootbox - RIPE Rewards & Underscore Config
-Address: 0xef52d8a4732b96b98A0Bd47a69beFb40CdCF2515
-*No underscore config deployed yet*
+Address: 0x1f90ef42Da9B41502d2311300E13FAcf70c64be7
+
+## Underscore Rewards Config
+| Parameter | Value |
+| --- | --- |
+| hasUnderscoreRewards | True |
+| underscoreSendInterval | 43200 blocks (~1.0d) |
+| lastUnderscoreSend (block) | 0 |
+| undyDepositRewardsAmount | 100.00 RIPE |
+| undyYieldBonusAmount | 100.00 RIPE |
 
 ================================================================================
 
 <a id="bond-room"></a>
 # BondRoom - Bond Purchase Configuration
-Address: 0xe2E1a03b95B8E8EFEB6eFbAD52172488FF8C84A6
+Address: 0x707f660A7834d00792DF9a28386Bb2cCC6446154
 
 ## Bond Room Config
 | Parameter | Value |
 | --- | --- |
+| isPaused | False |
 | bondBooster | 0xA187...178a |
+
+================================================================================
+
+<a id="human-resources"></a>
+# Human Resources - Contributor Management
+Address: 0xF9aCDFd0d167b741f9144Ca01E52FcdE16BE108b
+
+## Human Resources Status
+| Parameter | Value |
+| --- | --- |
+| isPaused | False |
+
+*Note: numContributors is tracked in Ledger contract*
+
+================================================================================
+
+<a id="governance"></a>
+# Governance Contracts
 
 ================================================================================
 
@@ -2961,20 +3099,8 @@ Address: 0xe42b3dC546527EB70D741B185Dc57226cA01839D
 ## Governance Vault Stats
 | Parameter | Value |
 | --- | --- |
-| totalGovPoints | 101,065,513,109,068,698,931 |
 | isPaused | False |
-
-================================================================================
-
-<a id="stability-pool"></a>
-# Stability Pool - Liquidation Buffer
-Address: 0x2a157096af6337b2b4bd47de435520572ed5a439
-
-## Stability Pool Config
-| Parameter | Value |
-| --- | --- |
-| isPaused | False |
-| numAssets | 2 |
+| totalGovPoints | 102,162,913,968,485,685,119 |
 
 ================================================================================
 
@@ -3151,7 +3277,7 @@ Address: 0x2210a9b994CC0F13689043A34F2E11d17DB2099C
 ## GREEN Token
 | Parameter | Value |
 | --- | --- |
-| totalSupply | 202.46K GREEN |
+| totalSupply | 202.15K GREEN |
 | decimals | 18 |
 | name | Green USD Stablecoin |
 | symbol | GREEN |
@@ -3167,17 +3293,17 @@ Address: 0x2210a9b994CC0F13689043A34F2E11d17DB2099C
 ## Savings GREEN (sGREEN)
 | Parameter | Value |
 | --- | --- |
-| totalSupply (shares) | 56.25K GREEN |
-| totalAssets (GREEN) | 59.40K GREEN |
-| **Exchange Rate** | **1.055864 GREEN per sGREEN** |
-| **Accumulated Yield** | **+5.5864%** above 1:1 |
+| totalSupply (shares) | 55.82K GREEN |
+| totalAssets (GREEN) | 58.96K GREEN |
+| **Exchange Rate** | **1.056273 GREEN per sGREEN** |
+| **Accumulated Yield** | **+5.6273%** above 1:1 |
 | decimals | 18 |
 | name | Savings Green USD |
 | symbol | sGREEN |
 
-*Example: 1,000 sGREEN = 1,055.8639 GREEN*
+*Example: 1,000 sGREEN = 1,056.2731 GREEN*
 
 ================================================================================
 
 ---
-*Report generated at block 38663660 on 2025-11-26 00:29:37 UTC*
+*Report generated at block 38821862 on 2025-11-29 16:23:22 UTC*
