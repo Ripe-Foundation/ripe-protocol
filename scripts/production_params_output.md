@@ -1,47 +1,42 @@
-Connecting to Base mainnet via Alchemy...
-Connected. Block: 38821862
-
-Loading contracts from Etherscan...
-Fetching configuration data...
-
 ================================================================================
 # Ripe Protocol Production Parameters
 
-**Generated:** 2025-11-29 16:18:34 UTC
-**Block:** 38821862
+**Generated:** 2025-12-01 02:28:42 UTC
+**Block:** 38883364
 **Network:** Base Mainnet
 
 ## Table of Contents
 
 1. [Executive Summary](#executive-summary)
-2. [MissionControl Configuration](#mission-control)
+2. [All Contract Addresses](#all-addresses)
+3. [MissionControl Configuration](#mission-control)
    - [General Config](#general-config)
    - [Debt Config](#debt-config)
    - [Rewards Config](#rewards-config)
    - [Registered Assets](#registered-assets)
-3. [RipeHQ Registry](#ripe-hq)
-4. [Switchboard Registry](#switchboard)
-5. [PriceDesk Oracles](#price-desk)
-6. [VaultBook Registry](#vault-book)
-7. [Ledger Statistics](#ledger)
-8. [Endaoment PSM](#endaoment-psm)
-9. [Core Lending Contracts](#core-lending)
-   - [CreditEngine](#credit-engine)
-   - [AuctionHouse](#auction-house)
-   - [Teller](#teller)
-   - [Deleverage](#deleverage)
-   - [CreditRedeem](#credit-redeem)
-   - [StabilityPool](#stability-pool)
-10. [Treasury & Rewards Contracts](#treasury-rewards)
+4. [RipeHQ Registry](#ripe-hq)
+5. [Switchboard Registry](#switchboard)
+6. [PriceDesk Oracles](#price-desk)
+7. [VaultBook Registry](#vault-book)
+8. [Ledger Statistics](#ledger)
+9. [Endaoment PSM](#endaoment-psm)
+10. [Core Lending Contracts](#core-lending)
+    - [CreditEngine](#credit-engine)
+    - [AuctionHouse](#auction-house)
+    - [Teller](#teller)
+    - [Deleverage](#deleverage)
+    - [CreditRedeem](#credit-redeem)
+    - [StabilityPool](#stability-pool)
+11. [Treasury & Rewards Contracts](#treasury-rewards)
     - [Endaoment](#endaoment)
     - [BondBooster](#bond-booster)
     - [Lootbox](#lootbox)
     - [BondRoom](#bond-room)
     - [HumanResources](#human-resources)
-11. [Governance Contracts](#governance)
+12. [Governance Contracts](#governance)
     - [RipeGovVault](#ripe-gov-vault)
-12. [Price Source Configurations](#price-sources)
-13. [Token Statistics](#token-statistics)
+13. [Price Source Configurations](#price-sources)
+14. [Token Statistics](#token-statistics)
 
 
 <a id="executive-summary"></a>
@@ -49,15 +44,96 @@ Fetching configuration data...
 
 | Metric | Value |
 | --- | --- |
-| **Total GREEN Supply** | 202.15K GREEN |
-| **Total Debt Outstanding** | 74.51K GREEN |
-| **Debt Utilization** | 37.25% of 200.00K GREEN limit |
+| **Total GREEN Supply** | 202.05K GREEN |
+| **Total Debt Outstanding** | 74.39K GREEN |
+| **Debt Utilization** | 37.19% of 200.00K GREEN limit |
 | **Active Borrowers** | 78 |
 | **Registered Assets** | 55 |
 | **Bad Debt** | 0.00 GREEN |
 | **RIPE Total Supply** | 10.32M RIPE |
-| **sGREEN Exchange Rate** | 1.056273 GREEN per sGREEN (+5.6273% vs 1:1) |
+| **sGREEN Exchange Rate** | 1.056821 GREEN per sGREEN (+5.6821% vs 1:1) |
 | **Protocol Status** | ✅ Deposits / ✅ Borrowing / ✅ Liquidations |
+
+<a id="all-addresses"></a>
+## 📋 All Contract Addresses
+
+*Complete list of all live protocol contract addresses*
+
+### Core Protocol Contracts (RipeHQ Registry)
+| ID | Contract | Address |
+| --- | --- | --- |
+| - | **RipeHQ** | `0x6162df1b329E157479F8f1407E888260E0EC3d2b` |
+| 1 | Green Token | `0xd1Eac76497D06Cf15475A5e3984D5bC03de7C707` |
+| 2 | Savings Green | `0xaa0f13488CE069A7B5a099457c753A7CFBE04d36` |
+| 3 | Ripe Token | `0x2A0a59d6B975828e781EcaC125dBA40d7ee5dDC0` |
+| 4 | Ledger | `0x365256e322a47Aa2015F6724783F326e9B24fA47` |
+| 5 | Mission Control | `0xB59b84B526547b6dcb86CCF4004d48E619156CF3` |
+| 6 | Switchboard | `0xc68A90A40B87ae1dABA93Da9c02642F8B74030F9` |
+| 7 | Price Desk | `0x68564c6035e8Dc21F0Ce6CB9592dC47B59dE2Ff6` |
+| 8 | Vault Book | `0xB758e30C14825519b895Fd9928d5d8748A71a944` |
+| 9 | Auction House | `0x8a02aC4754b72aFBDa4f403ec5DA7C2950164084` |
+| 10 | Auction House NFT | `0x504Fb3b94a9f4A238Ee3A16474B91F99A3f26F3A` |
+| 11 | Boardroom | `0xb5cA6Ef866b510C3b85D4B0e3862061A569412D1` |
+| 12 | Bond Room | `0x707f660A7834d00792DF9a28386Bb2cCC6446154` |
+| 13 | Credit Engine | `0x30aa8eB041AcB3B22228516297C331B313b81462` |
+| 14 | Endaoment | `0x70fA85Aa99a39161A2623627377F1c791fd091f6` |
+| 15 | Human Resources | `0xF9aCDFd0d167b741f9144Ca01E52FcdE16BE108b` |
+| 16 | Lootbox | `0x1f90ef42Da9B41502d2311300E13FAcf70c64be7` |
+| 17 | Teller | `0xae87deB25Bc5030991Aa5E27Cbab38f37a112C13` |
+| 18 | Deleverage | `0x75EeBb8c6f1A5727e7c0c1f9d64Ed07cd0966F27` |
+| 19 | Credit Redeem | `0x3bfB0F72642aeFA2486da00Db855c5F0b787e3FB` |
+| 20 | Teller Utils | `0x57f071AB96D1798C6bB3e314D2D283502DEDDcdD` |
+| 21 | Endaoment Funds | `0x4Ce5FB8D572917Eb96724eA1866b505B2a6B0873` |
+| 22 | Endaoment PSM | `0x2893d0dfa54571bDc7DE60F2d8a456d3377CcAA7` |
+
+### Switchboard Registry
+| ID | Contract | Address |
+| --- | --- | --- |
+| - | **Switchboard** | `0xc68A90A40B87ae1dABA93Da9c02642F8B74030F9` |
+| 1 | Switchboard Alpha | `0x73Cd87A047eb16E22f8afA21e0980C07Bb26CA83` |
+| 2 | Switchboard Bravo | `0xD18AC028cBe1AbebDb118E9C7A60018d58C846e7` |
+| 3 | Switchboard Charlie | `0x6D798bD44b1591571c9d95b6D51c9c34a5534008` |
+| 4 | Switchboard Delta | `0x50e815AC356798E42EB35De538a0376459ce11cb` |
+| 5 | Switchboard Echo | `0xdF99a86e4450163e8DbA47C928131e75D2995dbb` |
+
+### PriceDesk Registry (Oracle Sources)
+| ID | Contract | Address |
+| --- | --- | --- |
+| - | **PriceDesk** | `0x68564c6035e8Dc21F0Ce6CB9592dC47B59dE2Ff6` |
+| 1 | Chainlink | `0x253f55e455701fF0B835128f55668ed159aAB3D9` |
+| 2 | Curve Prices | `0x7B2aeE8B6A4bdF0885dEF48CCda8453Fdc1Bba5d` |
+| 3 | BlueChip Yield Prices | `0x90C70ACfF302c8a7f00574EC3547B0221f39cD28` |
+| 4 | Pyth Prices | `0x89b6E13E4aD4036EAA586219DD73Ebb2b36d5968` |
+| 5 | Stork Prices | `0xCa13ACFB607B842DF5c1D0657C0865cC47bEfe14` |
+| 6 | Aero Ripe Prices | `0x5ce2BbD5eBe9f7d9322a8F56740F95b9576eE0A2` |
+| 7 | wsuperOETHb Prices | `0x2606Ce36b62a77562DF664E7a0009805BB254F3f` |
+| 8 | Undy Vault Prices | `0x2210a9b994CC0F13689043A34F2E11d17DB2099C` |
+
+### VaultBook Registry
+| ID | Contract | Address |
+| --- | --- | --- |
+| - | **VaultBook** | `0xB758e30C14825519b895Fd9928d5d8748A71a944` |
+| 1 | Stability Pool | `0x2a157096af6337b2b4bd47de435520572ed5a439` |
+| 2 | Ripe Gov Vault | `0xe42b3dC546527EB70D741B185Dc57226cA01839D` |
+| 3 | Simple ERC20 Vault | `0xf75b566eF80Fde0dEfcC045A4d57b540eb43ddfD` |
+| 4 | Rebase ERC20 Vault | `0xce2E96C9F6806731914A7b4c3E4aC1F296d98597` |
+| 5 | Underscore Vault | `0x4549A368c00f803862d457C4C0c659a293F26C66` |
+
+### Derived Contracts
+| Contract | Source | Address |
+| --- | --- | --- |
+| BondBooster | BondRoom.bondBooster() | `0xA1872467AC4fb442aeA341163A65263915ce178a` |
+| GREEN Pool | CurvePrices.greenRefPoolConfig() | `0xd6c283655B42FA0eb2685F7AB819784F071459dc` |
+
+### Token Contracts
+| Token | Address |
+| --- | --- |
+| GREEN | `0xd1Eac76497D06Cf15475A5e3984D5bC03de7C707` |
+| sGREEN (Savings) | `0xaa0f13488CE069A7B5a099457c753A7CFBE04d36` |
+| RIPE | `0x2A0a59d6B975828e781EcaC125dBA40d7ee5dDC0` |
+
+---
+
 
 ================================================================================
 
@@ -114,7 +190,7 @@ Address: 0xB59b84B526547b6dcb86CCF4004d48E619156CF3
 ## HR Config (Compensation)
 | Parameter | Value |
 | --- | --- |
-| contribTemplate | 0x4965...C1D1 |
+| contribTemplate | `0x4965578D80E54b5EbE3BB5D7b1B3E0425559C1D1` |
 | maxCompensation | 0.000000 RIPE |
 | minCliffLength | 604800 blocks (~14.0d) |
 | maxStartDelay | 7776000 blocks (~180.0d) |
@@ -124,7 +200,7 @@ Address: 0xB59b84B526547b6dcb86CCF4004d48E619156CF3
 ## RIPE Bond Config
 | Parameter | Value |
 | --- | --- |
-| asset | USDC (0x8335...2913) |
+| asset | USDC (`0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913`) |
 | amountPerEpoch | 2,000.000000 (asset units) |
 | canBond | False |
 | minRipePerUnit | 0.000000 RIPE |
@@ -167,8 +243,8 @@ Address: 0xB59b84B526547b6dcb86CCF4004d48E619156CF3
 ## Other Settings
 | Parameter | Value |
 | --- | --- |
-| underscoreRegistry | UNDERSCORE_REGISTRY (0x44Cf...D6F9) |
-| trainingWheels | 0x2255...8065 |
+| underscoreRegistry | UNDERSCORE_REGISTRY (`0x44Cf3c4f000DFD76a35d03298049D37bE688D6F9`) |
+| trainingWheels | `0x2255b0006A3DA38AA184E0F9d5e056C2d0448065` |
 | shouldCheckLastTouch | True |
 
 ## Priority Price Source IDs
@@ -183,76 +259,76 @@ Address: 0xB59b84B526547b6dcb86CCF4004d48E619156CF3
 ## Priority Liquidation Asset Vaults
 | Vault ID | Asset |
 | --- | --- |
-| 3 | USDC (0x8335...2913) |
-| 3 | CBBTC (0xcbB7...33Bf) |
-| 3 | WETH (0x4200...0006) |
-| 3 | USOL (0x9B8D...db55) |
-| 3 | CBDOGE (0xcbD0...b510) |
+| 3 | USDC (`0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913`) |
+| 3 | CBBTC (`0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf`) |
+| 3 | WETH (`0x4200000000000000000000000000000000000006`) |
+| 3 | USOL (`0x9B8Df6E244526ab5F6e6400d331DB28C8fdDdb55`) |
+| 3 | CBDOGE (`0xcbD06E5A2B0C65597161de254AA074E489dEb510`) |
 
 ## Priority Stability Pool Vaults
 | Vault ID | Asset |
 | --- | --- |
-| 1 | GREEN/USDC (0xd6c2...59dc) |
-| 1 | sGREEN (0xaa0f...4d36) |
+| 1 | `0xd6c283655B42FA0eb2685F7AB819784F071459dc` |
+| 1 | `0xaa0f13488CE069A7B5a099457c753A7CFBE04d36` |
 
 ## Registered Assets (55 total)
 | Asset | Vault IDs | LTV | Liq Threshold | Borrow Rate | canDeposit | canBorrow |
 | --- | --- | --- | --- | --- | --- | --- |
-| USDC (0x8335...2913) | 3 | 80.00% | 90.00% | 5.00% | True | True |
-| CBBTC (0xcbB7...33Bf) | 3 | 70.00% | 80.00% | 7.00% | True | True |
-| WETH (0x4200...0006) | 3 | 70.00% | 80.00% | 7.00% | True | True |
-| sGREEN (0xaa0f...4d36) | 1 | 0.00% | 0.00% | 0.00% | True | False |
-| GREEN/USDC (0xd6c2...59dc) | 1 | 0.00% | 0.00% | 0.00% | True | False |
-| RIPE_TOKEN (0x2A0a...dDC0) | 2 | 0.00% | 0.00% | 0.00% | True | False |
-| RIPE/WETH (0xF8D9...2526) | 2 | 0.00% | 0.00% | 0.00% | False | False |
-| CBDOGE (0xcbD0...b510) | 3 | 50.00% | 65.00% | 11.00% | True | True |
-| USOL (0x9B8D...db55) | 3 | 50.00% | 65.00% | 11.00% | True | True |
-| RIPE_WETH_POOL (0x7658...d6A9) | 2 | 0.00% | 0.00% | 0.00% | True | False |
-| MORPHO_SPARK_USDC (0x7BfA...F34A) | 3 | 80.00% | 85.00% | 5.00% | True | True |
-| AERO (0x9401...8631) | 3 | 50.00% | 65.00% | 8.00% | True | True |
-| 0x784e...cE89 | 4 | 50.00% | 65.00% | 8.00% | True | True |
-| MOONWELL_AERO (0x7390...9Ba6) | 3 | 50.00% | 65.00% | 8.00% | True | True |
-| AAVEV3_USDC (0x4e65...c0AB) | 4 | 80.00% | 85.00% | 5.00% | True | True |
-| AAVEV3_CBBTC (0xBdb9...8EE6) | 4 | 70.00% | 80.00% | 7.00% | True | True |
-| AAVEV3_WETH (0xD4a0...8bb7) | 4 | 70.00% | 80.00% | 7.00% | True | True |
-| VIRTUAL (0x0b3e...7E1b) | 3 | 50.00% | 65.00% | 11.00% | True | True |
-| cbADA (0xcbAD...7b8c) | 3 | 50.00% | 65.00% | 11.00% | True | True |
-| cbXRP (0xcb58...a4af) | 3 | 50.00% | 65.00% | 11.00% | True | True |
-| cbLTC (0xcb17...445F) | 3 | 50.00% | 65.00% | 11.00% | True | True |
-| VVV (0xacfE...21bf) | 3 | 40.00% | 50.00% | 13.00% | True | True |
-| WELL (0xA885...96AE) | 3 | 40.00% | 50.00% | 13.00% | True | True |
-| DEGEN (0x4ed4...efed) | 3 | 40.00% | 50.00% | 13.00% | True | True |
-| COMPOUNDV3_WETH (0x46e6...70bf) | 4 | 70.00% | 80.00% | 7.00% | True | True |
-| MORPHO_MOONWELL_WETH (0xa0E4...0ff1) | 3 | 70.00% | 80.00% | 7.00% | True | True |
-| MORPHO_SEAMLESS_WETH (0x27D8...5c18) | 3 | 70.00% | 80.00% | 7.00% | True | True |
-| EULER_WETH (0x8591...b410) | 3 | 70.00% | 80.00% | 7.00% | True | True |
-| CBETH (0x2Ae3...Ec22) | 3 | 70.00% | 80.00% | 7.00% | True | True |
-| MOONWELL_CBETH (0x3bf9...A5E5) | 3 | 70.00% | 80.00% | 7.00% | True | True |
-| COMPOUNDV3_USDC (0xb125...Eb2F) | 4 | 80.00% | 90.00% | 5.00% | True | True |
-| MOONWELL_USDC (0xEdc8...6c22) | 3 | 80.00% | 90.00% | 5.00% | True | True |
-| EULER_USDC (0x0A1a...eE16) | 3 | 80.00% | 90.00% | 5.00% | True | True |
-| FLUID_USDC (0xf42f...9169) | 3 | 80.00% | 90.00% | 5.00% | True | True |
-| MORPHO_MOONWELL_USDC (0xc125...A2Ca) | 3 | 80.00% | 90.00% | 5.00% | True | True |
-| MORPHO_SEAMLESS_USDC (0x616a...3738) | 3 | 80.00% | 90.00% | 5.00% | True | True |
-| EULER_CBBTC (0x8820...7f8B) | 3 | 70.00% | 80.00% | 7.00% | True | True |
-| MOONWELL_CBBTC (0xF877...5976) | 3 | 70.00% | 80.00% | 7.00% | True | True |
-| MORPHO_MOONWELL_CBBTC (0x5432...a796) | 3 | 70.00% | 80.00% | 7.00% | True | True |
-| sUSDe (0x211C...E5d2) | 3 | 80.00% | 90.00% | 5.00% | True | True |
-| WRAPPED_SUPER_OETH (0x7FcD...8Ea6) | 3 | 70.00% | 80.00% | 7.00% | True | True |
-| GREEN (0xd1Ea...C707) | None | 0.00% | 0.00% | 0.00% | False | False |
-| UNDY_USD (0xcF9F...E41e) | 5 | 80.00% | 90.00% | 5.00% | False | True |
-| UNDY_ETH (0x01EC...3497) | 5 | 70.00% | 80.00% | 7.00% | False | True |
-| UNDY_BTC (0x4cD9...37d4) | 5 | 70.00% | 80.00% | 7.00% | False | True |
-| undyUSD (0xcdD8...9356) | 5 | 80.00% | 90.00% | 5.00% | False | True |
-| undyETH (0x4346...7457) | 5 | 70.00% | 80.00% | 7.00% | False | True |
-| undyBTC (0x897b...b86b) | 5 | 70.00% | 80.00% | 7.00% | False | True |
-| undyAERO (0x9e62...FEDa) | 5 | 50.00% | 65.00% | 8.00% | False | True |
-| undyEURC (0x4bCa...F7bf) | 5 | 80.00% | 90.00% | 5.00% | False | True |
-| undyETH (0x0298...7668) | 5 | 70.00% | 80.00% | 7.00% | True | True |
-| undyBTC (0x3fb0...8493) | 5 | 70.00% | 80.00% | 7.00% | True | True |
-| undyUSD (0xb338...86Bf) | 5 | 80.00% | 90.00% | 5.00% | True | True |
-| undyAERO (0x96F1...1087) | 5 | 50.00% | 65.00% | 8.00% | True | True |
-| undyEURC (0x1cb8...8eA8) | 5 | 80.00% | 90.00% | 5.00% | True | True |
+| USDC (`0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913`) | 3 | 80.00% | 90.00% | 5.00% | True | True |
+| CBBTC (`0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf`) | 3 | 70.00% | 80.00% | 7.00% | True | True |
+| WETH (`0x4200000000000000000000000000000000000006`) | 3 | 70.00% | 80.00% | 7.00% | True | True |
+| `0xaa0f13488CE069A7B5a099457c753A7CFBE04d36` | 1 | 0.00% | 0.00% | 0.00% | True | False |
+| `0xd6c283655B42FA0eb2685F7AB819784F071459dc` | 1 | 0.00% | 0.00% | 0.00% | True | False |
+| RIPE_TOKEN (`0x2A0a59d6B975828e781EcaC125dBA40d7ee5dDC0`) | 2 | 0.00% | 0.00% | 0.00% | True | False |
+| `0xF8D92a9531205AB2Dd0Bc623CDF4A6Ab4c3a2526` | 2 | 0.00% | 0.00% | 0.00% | False | False |
+| CBDOGE (`0xcbD06E5A2B0C65597161de254AA074E489dEb510`) | 3 | 50.00% | 65.00% | 11.00% | True | True |
+| USOL (`0x9B8Df6E244526ab5F6e6400d331DB28C8fdDdb55`) | 3 | 50.00% | 65.00% | 11.00% | True | True |
+| RIPE_WETH_POOL (`0x765824aD2eD0ECB70ECc25B0Cf285832b335d6A9`) | 2 | 0.00% | 0.00% | 0.00% | True | False |
+| MORPHO_SPARK_USDC (`0x7BfA7C4f149E7415b73bdeDfe609237e29CBF34A`) | 3 | 80.00% | 85.00% | 5.00% | True | True |
+| AERO (`0x940181a94A35A4569E4529A3CDfB74e38FD98631`) | 3 | 50.00% | 65.00% | 8.00% | True | True |
+| `0x784efeB622244d2348d4F2522f8860B96fbEcE89` | 4 | 50.00% | 65.00% | 8.00% | True | True |
+| MOONWELL_AERO (`0x73902f619CEB9B31FD8EFecf435CbDf89E369Ba6`) | 3 | 50.00% | 65.00% | 8.00% | True | True |
+| AAVEV3_USDC (`0x4e65fE4DbA92790696d040ac24Aa414708F5c0AB`) | 4 | 80.00% | 85.00% | 5.00% | True | True |
+| AAVEV3_CBBTC (`0xBdb9300b7CDE636d9cD4AFF00f6F009fFBBc8EE6`) | 4 | 70.00% | 80.00% | 7.00% | True | True |
+| AAVEV3_WETH (`0xD4a0e0b9149BCee3C920d2E00b5dE09138fd8bb7`) | 4 | 70.00% | 80.00% | 7.00% | True | True |
+| VIRTUAL (`0x0b3e328455c4059EEb9e3f84b5543F74E24e7E1b`) | 3 | 50.00% | 65.00% | 11.00% | True | True |
+| `0xcbADA732173e39521CDBE8bf59a6Dc85A9fc7b8c` | 3 | 50.00% | 65.00% | 11.00% | True | True |
+| `0xcb585250f852C6c6bf90434AB21A00f02833a4af` | 3 | 50.00% | 65.00% | 11.00% | True | True |
+| `0xcb17C9Db87B595717C857a08468793f5bAb6445F` | 3 | 50.00% | 65.00% | 11.00% | True | True |
+| `0xacfE6019Ed1A7Dc6f7B508C02d1b04ec88cC21bf` | 3 | 40.00% | 50.00% | 13.00% | True | True |
+| WELL (`0xA88594D404727625A9437C3f886C7643872296AE`) | 3 | 40.00% | 50.00% | 13.00% | True | True |
+| `0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed` | 3 | 40.00% | 50.00% | 13.00% | True | True |
+| COMPOUNDV3_WETH (`0x46e6b214b524310239732D51387075E0e70970bf`) | 4 | 70.00% | 80.00% | 7.00% | True | True |
+| MORPHO_MOONWELL_WETH (`0xa0E430870c4604CcfC7B38Ca7845B1FF653D0ff1`) | 3 | 70.00% | 80.00% | 7.00% | True | True |
+| MORPHO_SEAMLESS_WETH (`0x27D8c7273fd3fcC6956a0B370cE5Fd4A7fc65c18`) | 3 | 70.00% | 80.00% | 7.00% | True | True |
+| EULER_WETH (`0x859160DB5841E5cfB8D3f144C6b3381A85A4b410`) | 3 | 70.00% | 80.00% | 7.00% | True | True |
+| CBETH (`0x2Ae3F1Ec7F1F5012CFEab0185bfc7aa3cf0DEc22`) | 3 | 70.00% | 80.00% | 7.00% | True | True |
+| MOONWELL_CBETH (`0x3bf93770f2d4a794c3d9EBEfBAeBAE2a8f09A5E5`) | 3 | 70.00% | 80.00% | 7.00% | True | True |
+| COMPOUNDV3_USDC (`0xb125E6687d4313864e53df431d5425969c15Eb2F`) | 4 | 80.00% | 90.00% | 5.00% | True | True |
+| MOONWELL_USDC (`0xEdc817A28E8B93B03976FBd4a3dDBc9f7D176c22`) | 3 | 80.00% | 90.00% | 5.00% | True | True |
+| EULER_USDC (`0x0A1a3b5f2041F33522C4efc754a7D096f880eE16`) | 3 | 80.00% | 90.00% | 5.00% | True | True |
+| FLUID_USDC (`0xf42f5795D9ac7e9D757dB633D693cD548Cfd9169`) | 3 | 80.00% | 90.00% | 5.00% | True | True |
+| MORPHO_MOONWELL_USDC (`0xc1256Ae5FF1cf2719D4937adb3bbCCab2E00A2Ca`) | 3 | 80.00% | 90.00% | 5.00% | True | True |
+| MORPHO_SEAMLESS_USDC (`0x616a4E1db48e22028f6bbf20444Cd3b8e3273738`) | 3 | 80.00% | 90.00% | 5.00% | True | True |
+| EULER_CBBTC (`0x882018411Bc4A020A879CEE183441fC9fa5D7f8B`) | 3 | 70.00% | 80.00% | 7.00% | True | True |
+| MOONWELL_CBBTC (`0xF877ACaFA28c19b96727966690b2f44d35aD5976`) | 3 | 70.00% | 80.00% | 7.00% | True | True |
+| MORPHO_MOONWELL_CBBTC (`0x543257eF2161176D7C8cD90BA65C2d4CaEF5a796`) | 3 | 70.00% | 80.00% | 7.00% | True | True |
+| `0x211Cc4DD073734dA055fbF44a2b4667d5E5fE5d2` | 3 | 80.00% | 90.00% | 5.00% | True | True |
+| WRAPPED_SUPER_OETH (`0x7FcD174E80f264448ebeE8c88a7C4476AAF58Ea6`) | 3 | 70.00% | 80.00% | 7.00% | True | True |
+| `0xd1Eac76497D06Cf15475A5e3984D5bC03de7C707` | None | 0.00% | 0.00% | 0.00% | False | False |
+| UNDY_USD (`0xcF9F72237d4135a6D8b3ee717DC414Ae5b56E41e`) | 5 | 80.00% | 90.00% | 5.00% | False | True |
+| UNDY_ETH (`0x01ECc16CE82CCf7e6f734351d5d3AdCf2f8D3497`) | 5 | 70.00% | 80.00% | 7.00% | False | True |
+| UNDY_BTC (`0x4cD99832E44D1154bd7841f5E5E9ce66dA0437d4`) | 5 | 70.00% | 80.00% | 7.00% | False | True |
+| `0xcdD894E6c11d6444e0c3d974928Dd71b28b09356` | 5 | 80.00% | 90.00% | 5.00% | False | True |
+| `0x434696F22EF3862f14C6Abd008f18456418f7457` | 5 | 70.00% | 80.00% | 7.00% | False | True |
+| `0x897b56836C79e68042EFc51be7ad652a4BBFb86b` | 5 | 70.00% | 80.00% | 7.00% | False | True |
+| `0x9e629632c483235845E27840C304C11b59d2FEDa` | 5 | 50.00% | 65.00% | 8.00% | False | True |
+| `0x4bCa2A052428D7b7D2E1Daf9e1af471EA4c2F7bf` | 5 | 80.00% | 90.00% | 5.00% | False | True |
+| `0x02981DB1a99A14912b204437e7a2E02679B57668` | 5 | 70.00% | 80.00% | 7.00% | True | True |
+| `0x3fb0fC9D3Ddd543AD1b748Ed2286a022f4638493` | 5 | 70.00% | 80.00% | 7.00% | True | True |
+| `0xb33852cfd0c22647AAC501a6Af59Bc4210a686Bf` | 5 | 80.00% | 90.00% | 5.00% | True | True |
+| `0x96F1a7ce331F40afe866F3b707c223e377661087` | 5 | 50.00% | 65.00% | 8.00% | True | True |
+| `0x1cb8DAB80f19fC5Aca06C2552AECd79015008eA8` | 5 | 80.00% | 90.00% | 5.00% | True | True |
 
 ### Detailed Asset Configurations
 
@@ -385,9 +461,9 @@ Address: 0xB59b84B526547b6dcb86CCF4004d48E619156CF3
 | whitelist | None |
 | isNft | False |
 
-#### sGREEN (0xaa0f13488CE069A7B5a099457c753A7CFBE04d36)
+#### 0xaa0f13488CE069A7B5a099457c753A7CFBE04d36 (0xaa0f13488CE069A7B5a099457c753A7CFBE04d36)
 
-## sGREEN - Deposit Settings
+## 0xaa0f13488CE069A7B5a099457c753A7CFBE04d36 - Deposit Settings
 | Parameter | Value |
 | --- | --- |
 | vaultIds | 1 |
@@ -397,7 +473,7 @@ Address: 0xB59b84B526547b6dcb86CCF4004d48E619156CF3
 | globalDepositLimit | 1,000,000,000,000,000,000,000.000000 |
 | minDepositBalance | 10,000,000,000.000000 |
 
-## sGREEN - Debt Terms
+## 0xaa0f13488CE069A7B5a099457c753A7CFBE04d36 - Debt Terms
 | Parameter | Value |
 | --- | --- |
 | ltv | 0.00% |
@@ -407,7 +483,7 @@ Address: 0xB59b84B526547b6dcb86CCF4004d48E619156CF3
 | borrowRate | 0.00% |
 | daowry | 0.00% |
 
-## sGREEN - Liquidation Settings
+## 0xaa0f13488CE069A7B5a099457c753A7CFBE04d36 - Liquidation Settings
 | Parameter | Value |
 | --- | --- |
 | shouldBurnAsPayment | True |
@@ -416,7 +492,7 @@ Address: 0xB59b84B526547b6dcb86CCF4004d48E619156CF3
 | shouldAuctionInstantly | False |
 | specialStabPoolId | None |
 
-## sGREEN - Action Flags
+## 0xaa0f13488CE069A7B5a099457c753A7CFBE04d36 - Action Flags
 | Parameter | Value |
 | --- | --- |
 | canDeposit | True |
@@ -428,9 +504,9 @@ Address: 0xB59b84B526547b6dcb86CCF4004d48E619156CF3
 | whitelist | None |
 | isNft | False |
 
-#### GREEN/USDC (0xd6c283655B42FA0eb2685F7AB819784F071459dc)
+#### 0xd6c283655B42FA0eb2685F7AB819784F071459dc (0xd6c283655B42FA0eb2685F7AB819784F071459dc)
 
-## GREEN/USDC - Deposit Settings
+## 0xd6c283655B42FA0eb2685F7AB819784F071459dc - Deposit Settings
 | Parameter | Value |
 | --- | --- |
 | vaultIds | 1 |
@@ -440,7 +516,7 @@ Address: 0xB59b84B526547b6dcb86CCF4004d48E619156CF3
 | globalDepositLimit | 1,000,000,000,000,000,000,000.000000 |
 | minDepositBalance | 10,000,000,000.000000 |
 
-## GREEN/USDC - Debt Terms
+## 0xd6c283655B42FA0eb2685F7AB819784F071459dc - Debt Terms
 | Parameter | Value |
 | --- | --- |
 | ltv | 0.00% |
@@ -450,7 +526,7 @@ Address: 0xB59b84B526547b6dcb86CCF4004d48E619156CF3
 | borrowRate | 0.00% |
 | daowry | 0.00% |
 
-## GREEN/USDC - Liquidation Settings
+## 0xd6c283655B42FA0eb2685F7AB819784F071459dc - Liquidation Settings
 | Parameter | Value |
 | --- | --- |
 | shouldBurnAsPayment | False |
@@ -459,7 +535,7 @@ Address: 0xB59b84B526547b6dcb86CCF4004d48E619156CF3
 | shouldAuctionInstantly | False |
 | specialStabPoolId | None |
 
-## GREEN/USDC - Action Flags
+## 0xd6c283655B42FA0eb2685F7AB819784F071459dc - Action Flags
 | Parameter | Value |
 | --- | --- |
 | canDeposit | True |
@@ -514,9 +590,9 @@ Address: 0xB59b84B526547b6dcb86CCF4004d48E619156CF3
 | whitelist | None |
 | isNft | False |
 
-#### RIPE/WETH (0xF8D92a9531205AB2Dd0Bc623CDF4A6Ab4c3a2526)
+#### 0xF8D92a9531205AB2Dd0Bc623CDF4A6Ab4c3a2526 (0xF8D92a9531205AB2Dd0Bc623CDF4A6Ab4c3a2526)
 
-## RIPE/WETH - Deposit Settings
+## 0xF8D92a9531205AB2Dd0Bc623CDF4A6Ab4c3a2526 - Deposit Settings
 | Parameter | Value |
 | --- | --- |
 | vaultIds | 2 |
@@ -526,7 +602,7 @@ Address: 0xB59b84B526547b6dcb86CCF4004d48E619156CF3
 | globalDepositLimit | 1,000,000,000,000,000,000,000.000000 |
 | minDepositBalance | 1,000,000,000.000000 |
 
-## RIPE/WETH - Debt Terms
+## 0xF8D92a9531205AB2Dd0Bc623CDF4A6Ab4c3a2526 - Debt Terms
 | Parameter | Value |
 | --- | --- |
 | ltv | 0.00% |
@@ -536,7 +612,7 @@ Address: 0xB59b84B526547b6dcb86CCF4004d48E619156CF3
 | borrowRate | 0.00% |
 | daowry | 0.00% |
 
-## RIPE/WETH - Liquidation Settings
+## 0xF8D92a9531205AB2Dd0Bc623CDF4A6Ab4c3a2526 - Liquidation Settings
 | Parameter | Value |
 | --- | --- |
 | shouldBurnAsPayment | False |
@@ -545,7 +621,7 @@ Address: 0xB59b84B526547b6dcb86CCF4004d48E619156CF3
 | shouldAuctionInstantly | False |
 | specialStabPoolId | None |
 
-## RIPE/WETH - Action Flags
+## 0xF8D92a9531205AB2Dd0Bc623CDF4A6Ab4c3a2526 - Action Flags
 | Parameter | Value |
 | --- | --- |
 | canDeposit | False |
@@ -554,7 +630,7 @@ Address: 0xB59b84B526547b6dcb86CCF4004d48E619156CF3
 | canRedeemInStabPool | True |
 | canBuyInAuction | True |
 | canClaimInStabPool | True |
-| whitelist | 0x2255...8065 |
+| whitelist | `0x2255b0006A3DA38AA184E0F9d5e056C2d0448065` |
 | isNft | False |
 
 #### CBDOGE (0xcbD06E5A2B0C65597161de254AA074E489dEb510)
@@ -772,9 +848,9 @@ Address: 0xB59b84B526547b6dcb86CCF4004d48E619156CF3
 | whitelist | None |
 | isNft | False |
 
-#### 0x784e...cE89 (0x784efeB622244d2348d4F2522f8860B96fbEcE89)
+#### 0x784efeB622244d2348d4F2522f8860B96fbEcE89 (0x784efeB622244d2348d4F2522f8860B96fbEcE89)
 
-## 0x784e...cE89 - Deposit Settings
+## 0x784efeB622244d2348d4F2522f8860B96fbEcE89 - Deposit Settings
 | Parameter | Value |
 | --- | --- |
 | vaultIds | 4 |
@@ -784,7 +860,7 @@ Address: 0xB59b84B526547b6dcb86CCF4004d48E619156CF3
 | globalDepositLimit | 30,000,000,000,000,000.000000 |
 | minDepositBalance | 1,000,000,000,000.000000 |
 
-## 0x784e...cE89 - Debt Terms
+## 0x784efeB622244d2348d4F2522f8860B96fbEcE89 - Debt Terms
 | Parameter | Value |
 | --- | --- |
 | ltv | 50.00% |
@@ -794,7 +870,7 @@ Address: 0xB59b84B526547b6dcb86CCF4004d48E619156CF3
 | borrowRate | 8.00% |
 | daowry | 0.25% |
 
-## 0x784e...cE89 - Liquidation Settings
+## 0x784efeB622244d2348d4F2522f8860B96fbEcE89 - Liquidation Settings
 | Parameter | Value |
 | --- | --- |
 | shouldBurnAsPayment | False |
@@ -803,7 +879,7 @@ Address: 0xB59b84B526547b6dcb86CCF4004d48E619156CF3
 | shouldAuctionInstantly | True |
 | specialStabPoolId | None |
 
-## 0x784e...cE89 - Action Flags
+## 0x784efeB622244d2348d4F2522f8860B96fbEcE89 - Action Flags
 | Parameter | Value |
 | --- | --- |
 | canDeposit | True |
@@ -1030,9 +1106,9 @@ Address: 0xB59b84B526547b6dcb86CCF4004d48E619156CF3
 | whitelist | None |
 | isNft | False |
 
-#### cbADA (0xcbADA732173e39521CDBE8bf59a6Dc85A9fc7b8c)
+#### 0xcbADA732173e39521CDBE8bf59a6Dc85A9fc7b8c (0xcbADA732173e39521CDBE8bf59a6Dc85A9fc7b8c)
 
-## cbADA - Deposit Settings
+## 0xcbADA732173e39521CDBE8bf59a6Dc85A9fc7b8c - Deposit Settings
 | Parameter | Value |
 | --- | --- |
 | vaultIds | 3 |
@@ -1042,7 +1118,7 @@ Address: 0xB59b84B526547b6dcb86CCF4004d48E619156CF3
 | globalDepositLimit | 37,500.000000 |
 | minDepositBalance | 1.000000 |
 
-## cbADA - Debt Terms
+## 0xcbADA732173e39521CDBE8bf59a6Dc85A9fc7b8c - Debt Terms
 | Parameter | Value |
 | --- | --- |
 | ltv | 50.00% |
@@ -1052,7 +1128,7 @@ Address: 0xB59b84B526547b6dcb86CCF4004d48E619156CF3
 | borrowRate | 11.00% |
 | daowry | 0.25% |
 
-## cbADA - Liquidation Settings
+## 0xcbADA732173e39521CDBE8bf59a6Dc85A9fc7b8c - Liquidation Settings
 | Parameter | Value |
 | --- | --- |
 | shouldBurnAsPayment | False |
@@ -1061,7 +1137,7 @@ Address: 0xB59b84B526547b6dcb86CCF4004d48E619156CF3
 | shouldAuctionInstantly | True |
 | specialStabPoolId | None |
 
-## cbADA - Action Flags
+## 0xcbADA732173e39521CDBE8bf59a6Dc85A9fc7b8c - Action Flags
 | Parameter | Value |
 | --- | --- |
 | canDeposit | True |
@@ -1073,9 +1149,9 @@ Address: 0xB59b84B526547b6dcb86CCF4004d48E619156CF3
 | whitelist | None |
 | isNft | False |
 
-#### cbXRP (0xcb585250f852C6c6bf90434AB21A00f02833a4af)
+#### 0xcb585250f852C6c6bf90434AB21A00f02833a4af (0xcb585250f852C6c6bf90434AB21A00f02833a4af)
 
-## cbXRP - Deposit Settings
+## 0xcb585250f852C6c6bf90434AB21A00f02833a4af - Deposit Settings
 | Parameter | Value |
 | --- | --- |
 | vaultIds | 3 |
@@ -1085,7 +1161,7 @@ Address: 0xB59b84B526547b6dcb86CCF4004d48E619156CF3
 | globalDepositLimit | 10,000.000000 |
 | minDepositBalance | 0.333333 |
 
-## cbXRP - Debt Terms
+## 0xcb585250f852C6c6bf90434AB21A00f02833a4af - Debt Terms
 | Parameter | Value |
 | --- | --- |
 | ltv | 50.00% |
@@ -1095,7 +1171,7 @@ Address: 0xB59b84B526547b6dcb86CCF4004d48E619156CF3
 | borrowRate | 11.00% |
 | daowry | 0.25% |
 
-## cbXRP - Liquidation Settings
+## 0xcb585250f852C6c6bf90434AB21A00f02833a4af - Liquidation Settings
 | Parameter | Value |
 | --- | --- |
 | shouldBurnAsPayment | False |
@@ -1104,7 +1180,7 @@ Address: 0xB59b84B526547b6dcb86CCF4004d48E619156CF3
 | shouldAuctionInstantly | True |
 | specialStabPoolId | None |
 
-## cbXRP - Action Flags
+## 0xcb585250f852C6c6bf90434AB21A00f02833a4af - Action Flags
 | Parameter | Value |
 | --- | --- |
 | canDeposit | True |
@@ -1116,9 +1192,9 @@ Address: 0xB59b84B526547b6dcb86CCF4004d48E619156CF3
 | whitelist | None |
 | isNft | False |
 
-#### cbLTC (0xcb17C9Db87B595717C857a08468793f5bAb6445F)
+#### 0xcb17C9Db87B595717C857a08468793f5bAb6445F (0xcb17C9Db87B595717C857a08468793f5bAb6445F)
 
-## cbLTC - Deposit Settings
+## 0xcb17C9Db87B595717C857a08468793f5bAb6445F - Deposit Settings
 | Parameter | Value |
 | --- | --- |
 | vaultIds | 3 |
@@ -1128,7 +1204,7 @@ Address: 0xB59b84B526547b6dcb86CCF4004d48E619156CF3
 | globalDepositLimit | 25,000.000000 |
 | minDepositBalance | 0.800000 |
 
-## cbLTC - Debt Terms
+## 0xcb17C9Db87B595717C857a08468793f5bAb6445F - Debt Terms
 | Parameter | Value |
 | --- | --- |
 | ltv | 50.00% |
@@ -1138,7 +1214,7 @@ Address: 0xB59b84B526547b6dcb86CCF4004d48E619156CF3
 | borrowRate | 11.00% |
 | daowry | 0.25% |
 
-## cbLTC - Liquidation Settings
+## 0xcb17C9Db87B595717C857a08468793f5bAb6445F - Liquidation Settings
 | Parameter | Value |
 | --- | --- |
 | shouldBurnAsPayment | False |
@@ -1147,7 +1223,7 @@ Address: 0xB59b84B526547b6dcb86CCF4004d48E619156CF3
 | shouldAuctionInstantly | True |
 | specialStabPoolId | None |
 
-## cbLTC - Action Flags
+## 0xcb17C9Db87B595717C857a08468793f5bAb6445F - Action Flags
 | Parameter | Value |
 | --- | --- |
 | canDeposit | True |
@@ -1159,9 +1235,9 @@ Address: 0xB59b84B526547b6dcb86CCF4004d48E619156CF3
 | whitelist | None |
 | isNft | False |
 
-#### VVV (0xacfE6019Ed1A7Dc6f7B508C02d1b04ec88cC21bf)
+#### 0xacfE6019Ed1A7Dc6f7B508C02d1b04ec88cC21bf (0xacfE6019Ed1A7Dc6f7B508C02d1b04ec88cC21bf)
 
-## VVV - Deposit Settings
+## 0xacfE6019Ed1A7Dc6f7B508C02d1b04ec88cC21bf - Deposit Settings
 | Parameter | Value |
 | --- | --- |
 | vaultIds | 3 |
@@ -1171,7 +1247,7 @@ Address: 0xB59b84B526547b6dcb86CCF4004d48E619156CF3
 | globalDepositLimit | 11,000,000,000,000,000.000000 |
 | minDepositBalance | 110,000,000,000.000000 |
 
-## VVV - Debt Terms
+## 0xacfE6019Ed1A7Dc6f7B508C02d1b04ec88cC21bf - Debt Terms
 | Parameter | Value |
 | --- | --- |
 | ltv | 40.00% |
@@ -1181,7 +1257,7 @@ Address: 0xB59b84B526547b6dcb86CCF4004d48E619156CF3
 | borrowRate | 13.00% |
 | daowry | 0.25% |
 
-## VVV - Liquidation Settings
+## 0xacfE6019Ed1A7Dc6f7B508C02d1b04ec88cC21bf - Liquidation Settings
 | Parameter | Value |
 | --- | --- |
 | shouldBurnAsPayment | False |
@@ -1190,7 +1266,7 @@ Address: 0xB59b84B526547b6dcb86CCF4004d48E619156CF3
 | shouldAuctionInstantly | True |
 | specialStabPoolId | None |
 
-## VVV - Action Flags
+## 0xacfE6019Ed1A7Dc6f7B508C02d1b04ec88cC21bf - Action Flags
 | Parameter | Value |
 | --- | --- |
 | canDeposit | True |
@@ -1245,9 +1321,9 @@ Address: 0xB59b84B526547b6dcb86CCF4004d48E619156CF3
 | whitelist | None |
 | isNft | False |
 
-#### DEGEN (0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed)
+#### 0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed (0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed)
 
-## DEGEN - Deposit Settings
+## 0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed - Deposit Settings
 | Parameter | Value |
 | --- | --- |
 | vaultIds | 3 |
@@ -1257,7 +1333,7 @@ Address: 0xB59b84B526547b6dcb86CCF4004d48E619156CF3
 | globalDepositLimit | 7,500,000,000,000,000,000.000000 |
 | minDepositBalance | 75,000,000,000,000.000000 |
 
-## DEGEN - Debt Terms
+## 0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed - Debt Terms
 | Parameter | Value |
 | --- | --- |
 | ltv | 40.00% |
@@ -1267,7 +1343,7 @@ Address: 0xB59b84B526547b6dcb86CCF4004d48E619156CF3
 | borrowRate | 13.00% |
 | daowry | 0.25% |
 
-## DEGEN - Liquidation Settings
+## 0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed - Liquidation Settings
 | Parameter | Value |
 | --- | --- |
 | shouldBurnAsPayment | False |
@@ -1276,7 +1352,7 @@ Address: 0xB59b84B526547b6dcb86CCF4004d48E619156CF3
 | shouldAuctionInstantly | True |
 | specialStabPoolId | None |
 
-## DEGEN - Action Flags
+## 0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed - Action Flags
 | Parameter | Value |
 | --- | --- |
 | canDeposit | True |
@@ -1933,9 +2009,9 @@ Address: 0xB59b84B526547b6dcb86CCF4004d48E619156CF3
 | whitelist | None |
 | isNft | False |
 
-#### sUSDe (0x211Cc4DD073734dA055fbF44a2b4667d5E5fE5d2)
+#### 0x211Cc4DD073734dA055fbF44a2b4667d5E5fE5d2 (0x211Cc4DD073734dA055fbF44a2b4667d5E5fE5d2)
 
-## sUSDe - Deposit Settings
+## 0x211Cc4DD073734dA055fbF44a2b4667d5E5fE5d2 - Deposit Settings
 | Parameter | Value |
 | --- | --- |
 | vaultIds | 3 |
@@ -1945,7 +2021,7 @@ Address: 0xB59b84B526547b6dcb86CCF4004d48E619156CF3
 | globalDepositLimit | 60,000,000,000,000,000.000000 |
 | minDepositBalance | 10,000,000,000.000000 |
 
-## sUSDe - Debt Terms
+## 0x211Cc4DD073734dA055fbF44a2b4667d5E5fE5d2 - Debt Terms
 | Parameter | Value |
 | --- | --- |
 | ltv | 80.00% |
@@ -1955,7 +2031,7 @@ Address: 0xB59b84B526547b6dcb86CCF4004d48E619156CF3
 | borrowRate | 5.00% |
 | daowry | 0.25% |
 
-## sUSDe - Liquidation Settings
+## 0x211Cc4DD073734dA055fbF44a2b4667d5E5fE5d2 - Liquidation Settings
 | Parameter | Value |
 | --- | --- |
 | shouldBurnAsPayment | False |
@@ -1964,7 +2040,7 @@ Address: 0xB59b84B526547b6dcb86CCF4004d48E619156CF3
 | shouldAuctionInstantly | False |
 | specialStabPoolId | None |
 
-## sUSDe - Action Flags
+## 0x211Cc4DD073734dA055fbF44a2b4667d5E5fE5d2 - Action Flags
 | Parameter | Value |
 | --- | --- |
 | canDeposit | True |
@@ -2019,9 +2095,9 @@ Address: 0xB59b84B526547b6dcb86CCF4004d48E619156CF3
 | whitelist | None |
 | isNft | False |
 
-#### GREEN (0xd1Eac76497D06Cf15475A5e3984D5bC03de7C707)
+#### 0xd1Eac76497D06Cf15475A5e3984D5bC03de7C707 (0xd1Eac76497D06Cf15475A5e3984D5bC03de7C707)
 
-## GREEN - Deposit Settings
+## 0xd1Eac76497D06Cf15475A5e3984D5bC03de7C707 - Deposit Settings
 | Parameter | Value |
 | --- | --- |
 | vaultIds | None |
@@ -2031,7 +2107,7 @@ Address: 0xB59b84B526547b6dcb86CCF4004d48E619156CF3
 | globalDepositLimit | 0.000002 |
 | minDepositBalance | 0.000001 |
 
-## GREEN - Debt Terms
+## 0xd1Eac76497D06Cf15475A5e3984D5bC03de7C707 - Debt Terms
 | Parameter | Value |
 | --- | --- |
 | ltv | 0.00% |
@@ -2041,7 +2117,7 @@ Address: 0xB59b84B526547b6dcb86CCF4004d48E619156CF3
 | borrowRate | 0.00% |
 | daowry | 0.00% |
 
-## GREEN - Liquidation Settings
+## 0xd1Eac76497D06Cf15475A5e3984D5bC03de7C707 - Liquidation Settings
 | Parameter | Value |
 | --- | --- |
 | shouldBurnAsPayment | False |
@@ -2050,7 +2126,7 @@ Address: 0xB59b84B526547b6dcb86CCF4004d48E619156CF3
 | shouldAuctionInstantly | False |
 | specialStabPoolId | None |
 
-## GREEN - Action Flags
+## 0xd1Eac76497D06Cf15475A5e3984D5bC03de7C707 - Action Flags
 | Parameter | Value |
 | --- | --- |
 | canDeposit | False |
@@ -2191,9 +2267,9 @@ Address: 0xB59b84B526547b6dcb86CCF4004d48E619156CF3
 | whitelist | None |
 | isNft | False |
 
-#### undyUSD (0xcdD894E6c11d6444e0c3d974928Dd71b28b09356)
+#### 0xcdD894E6c11d6444e0c3d974928Dd71b28b09356 (0xcdD894E6c11d6444e0c3d974928Dd71b28b09356)
 
-## undyUSD - Deposit Settings
+## 0xcdD894E6c11d6444e0c3d974928Dd71b28b09356 - Deposit Settings
 | Parameter | Value |
 | --- | --- |
 | vaultIds | 5 |
@@ -2203,7 +2279,7 @@ Address: 0xB59b84B526547b6dcb86CCF4004d48E619156CF3
 | globalDepositLimit | 250,000.000000 |
 | minDepositBalance | 0.100000 |
 
-## undyUSD - Debt Terms
+## 0xcdD894E6c11d6444e0c3d974928Dd71b28b09356 - Debt Terms
 | Parameter | Value |
 | --- | --- |
 | ltv | 80.00% |
@@ -2213,7 +2289,7 @@ Address: 0xB59b84B526547b6dcb86CCF4004d48E619156CF3
 | borrowRate | 5.00% |
 | daowry | 0.25% |
 
-## undyUSD - Liquidation Settings
+## 0xcdD894E6c11d6444e0c3d974928Dd71b28b09356 - Liquidation Settings
 | Parameter | Value |
 | --- | --- |
 | shouldBurnAsPayment | False |
@@ -2222,7 +2298,7 @@ Address: 0xB59b84B526547b6dcb86CCF4004d48E619156CF3
 | shouldAuctionInstantly | False |
 | specialStabPoolId | None |
 
-## undyUSD - Action Flags
+## 0xcdD894E6c11d6444e0c3d974928Dd71b28b09356 - Action Flags
 | Parameter | Value |
 | --- | --- |
 | canDeposit | False |
@@ -2234,9 +2310,9 @@ Address: 0xB59b84B526547b6dcb86CCF4004d48E619156CF3
 | whitelist | None |
 | isNft | False |
 
-#### undyETH (0x434696F22EF3862f14C6Abd008f18456418f7457)
+#### 0x434696F22EF3862f14C6Abd008f18456418f7457 (0x434696F22EF3862f14C6Abd008f18456418f7457)
 
-## undyETH - Deposit Settings
+## 0x434696F22EF3862f14C6Abd008f18456418f7457 - Deposit Settings
 | Parameter | Value |
 | --- | --- |
 | vaultIds | 5 |
@@ -2246,7 +2322,7 @@ Address: 0xB59b84B526547b6dcb86CCF4004d48E619156CF3
 | globalDepositLimit | 2,500,000,000,000.000000 |
 | minDepositBalance | 25,000,000.000000 |
 
-## undyETH - Debt Terms
+## 0x434696F22EF3862f14C6Abd008f18456418f7457 - Debt Terms
 | Parameter | Value |
 | --- | --- |
 | ltv | 70.00% |
@@ -2256,7 +2332,7 @@ Address: 0xB59b84B526547b6dcb86CCF4004d48E619156CF3
 | borrowRate | 7.00% |
 | daowry | 0.25% |
 
-## undyETH - Liquidation Settings
+## 0x434696F22EF3862f14C6Abd008f18456418f7457 - Liquidation Settings
 | Parameter | Value |
 | --- | --- |
 | shouldBurnAsPayment | False |
@@ -2265,7 +2341,7 @@ Address: 0xB59b84B526547b6dcb86CCF4004d48E619156CF3
 | shouldAuctionInstantly | True |
 | specialStabPoolId | None |
 
-## undyETH - Action Flags
+## 0x434696F22EF3862f14C6Abd008f18456418f7457 - Action Flags
 | Parameter | Value |
 | --- | --- |
 | canDeposit | False |
@@ -2277,9 +2353,9 @@ Address: 0xB59b84B526547b6dcb86CCF4004d48E619156CF3
 | whitelist | None |
 | isNft | False |
 
-#### undyBTC (0x897b56836C79e68042EFc51be7ad652a4BBFb86b)
+#### 0x897b56836C79e68042EFc51be7ad652a4BBFb86b (0x897b56836C79e68042EFc51be7ad652a4BBFb86b)
 
-## undyBTC - Deposit Settings
+## 0x897b56836C79e68042EFc51be7ad652a4BBFb86b - Deposit Settings
 | Parameter | Value |
 | --- | --- |
 | vaultIds | 5 |
@@ -2289,7 +2365,7 @@ Address: 0xB59b84B526547b6dcb86CCF4004d48E619156CF3
 | globalDepositLimit | 10.000000 |
 | minDepositBalance | 0.000100 |
 
-## undyBTC - Debt Terms
+## 0x897b56836C79e68042EFc51be7ad652a4BBFb86b - Debt Terms
 | Parameter | Value |
 | --- | --- |
 | ltv | 70.00% |
@@ -2299,7 +2375,7 @@ Address: 0xB59b84B526547b6dcb86CCF4004d48E619156CF3
 | borrowRate | 7.00% |
 | daowry | 0.25% |
 
-## undyBTC - Liquidation Settings
+## 0x897b56836C79e68042EFc51be7ad652a4BBFb86b - Liquidation Settings
 | Parameter | Value |
 | --- | --- |
 | shouldBurnAsPayment | False |
@@ -2308,7 +2384,7 @@ Address: 0xB59b84B526547b6dcb86CCF4004d48E619156CF3
 | shouldAuctionInstantly | True |
 | specialStabPoolId | None |
 
-## undyBTC - Action Flags
+## 0x897b56836C79e68042EFc51be7ad652a4BBFb86b - Action Flags
 | Parameter | Value |
 | --- | --- |
 | canDeposit | False |
@@ -2320,9 +2396,9 @@ Address: 0xB59b84B526547b6dcb86CCF4004d48E619156CF3
 | whitelist | None |
 | isNft | False |
 
-#### undyAERO (0x9e629632c483235845E27840C304C11b59d2FEDa)
+#### 0x9e629632c483235845E27840C304C11b59d2FEDa (0x9e629632c483235845E27840C304C11b59d2FEDa)
 
-## undyAERO - Deposit Settings
+## 0x9e629632c483235845E27840C304C11b59d2FEDa - Deposit Settings
 | Parameter | Value |
 | --- | --- |
 | vaultIds | 5 |
@@ -2332,7 +2408,7 @@ Address: 0xB59b84B526547b6dcb86CCF4004d48E619156CF3
 | globalDepositLimit | 1,000,000,000,000,000.000000 |
 | minDepositBalance | 100,000,000,000.000000 |
 
-## undyAERO - Debt Terms
+## 0x9e629632c483235845E27840C304C11b59d2FEDa - Debt Terms
 | Parameter | Value |
 | --- | --- |
 | ltv | 50.00% |
@@ -2342,7 +2418,7 @@ Address: 0xB59b84B526547b6dcb86CCF4004d48E619156CF3
 | borrowRate | 8.00% |
 | daowry | 0.25% |
 
-## undyAERO - Liquidation Settings
+## 0x9e629632c483235845E27840C304C11b59d2FEDa - Liquidation Settings
 | Parameter | Value |
 | --- | --- |
 | shouldBurnAsPayment | False |
@@ -2351,7 +2427,7 @@ Address: 0xB59b84B526547b6dcb86CCF4004d48E619156CF3
 | shouldAuctionInstantly | True |
 | specialStabPoolId | None |
 
-## undyAERO - Action Flags
+## 0x9e629632c483235845E27840C304C11b59d2FEDa - Action Flags
 | Parameter | Value |
 | --- | --- |
 | canDeposit | False |
@@ -2363,9 +2439,9 @@ Address: 0xB59b84B526547b6dcb86CCF4004d48E619156CF3
 | whitelist | None |
 | isNft | False |
 
-#### undyEURC (0x4bCa2A052428D7b7D2E1Daf9e1af471EA4c2F7bf)
+#### 0x4bCa2A052428D7b7D2E1Daf9e1af471EA4c2F7bf (0x4bCa2A052428D7b7D2E1Daf9e1af471EA4c2F7bf)
 
-## undyEURC - Deposit Settings
+## 0x4bCa2A052428D7b7D2E1Daf9e1af471EA4c2F7bf - Deposit Settings
 | Parameter | Value |
 | --- | --- |
 | vaultIds | 5 |
@@ -2375,7 +2451,7 @@ Address: 0xB59b84B526547b6dcb86CCF4004d48E619156CF3
 | globalDepositLimit | 1,000.000000 |
 | minDepositBalance | 0.100000 |
 
-## undyEURC - Debt Terms
+## 0x4bCa2A052428D7b7D2E1Daf9e1af471EA4c2F7bf - Debt Terms
 | Parameter | Value |
 | --- | --- |
 | ltv | 80.00% |
@@ -2385,7 +2461,7 @@ Address: 0xB59b84B526547b6dcb86CCF4004d48E619156CF3
 | borrowRate | 5.00% |
 | daowry | 0.25% |
 
-## undyEURC - Liquidation Settings
+## 0x4bCa2A052428D7b7D2E1Daf9e1af471EA4c2F7bf - Liquidation Settings
 | Parameter | Value |
 | --- | --- |
 | shouldBurnAsPayment | False |
@@ -2394,7 +2470,7 @@ Address: 0xB59b84B526547b6dcb86CCF4004d48E619156CF3
 | shouldAuctionInstantly | False |
 | specialStabPoolId | None |
 
-## undyEURC - Action Flags
+## 0x4bCa2A052428D7b7D2E1Daf9e1af471EA4c2F7bf - Action Flags
 | Parameter | Value |
 | --- | --- |
 | canDeposit | False |
@@ -2406,9 +2482,9 @@ Address: 0xB59b84B526547b6dcb86CCF4004d48E619156CF3
 | whitelist | None |
 | isNft | False |
 
-#### undyETH (0x02981DB1a99A14912b204437e7a2E02679B57668)
+#### 0x02981DB1a99A14912b204437e7a2E02679B57668 (0x02981DB1a99A14912b204437e7a2E02679B57668)
 
-## undyETH - Deposit Settings
+## 0x02981DB1a99A14912b204437e7a2E02679B57668 - Deposit Settings
 | Parameter | Value |
 | --- | --- |
 | vaultIds | 5 |
@@ -2418,7 +2494,7 @@ Address: 0xB59b84B526547b6dcb86CCF4004d48E619156CF3
 | globalDepositLimit | 2,500,000,000,000.000000 |
 | minDepositBalance | 25,000,000.000000 |
 
-## undyETH - Debt Terms
+## 0x02981DB1a99A14912b204437e7a2E02679B57668 - Debt Terms
 | Parameter | Value |
 | --- | --- |
 | ltv | 70.00% |
@@ -2428,7 +2504,7 @@ Address: 0xB59b84B526547b6dcb86CCF4004d48E619156CF3
 | borrowRate | 7.00% |
 | daowry | 0.25% |
 
-## undyETH - Liquidation Settings
+## 0x02981DB1a99A14912b204437e7a2E02679B57668 - Liquidation Settings
 | Parameter | Value |
 | --- | --- |
 | shouldBurnAsPayment | False |
@@ -2437,7 +2513,7 @@ Address: 0xB59b84B526547b6dcb86CCF4004d48E619156CF3
 | shouldAuctionInstantly | True |
 | specialStabPoolId | None |
 
-## undyETH - Action Flags
+## 0x02981DB1a99A14912b204437e7a2E02679B57668 - Action Flags
 | Parameter | Value |
 | --- | --- |
 | canDeposit | True |
@@ -2449,9 +2525,9 @@ Address: 0xB59b84B526547b6dcb86CCF4004d48E619156CF3
 | whitelist | None |
 | isNft | False |
 
-#### undyBTC (0x3fb0fC9D3Ddd543AD1b748Ed2286a022f4638493)
+#### 0x3fb0fC9D3Ddd543AD1b748Ed2286a022f4638493 (0x3fb0fC9D3Ddd543AD1b748Ed2286a022f4638493)
 
-## undyBTC - Deposit Settings
+## 0x3fb0fC9D3Ddd543AD1b748Ed2286a022f4638493 - Deposit Settings
 | Parameter | Value |
 | --- | --- |
 | vaultIds | 5 |
@@ -2461,7 +2537,7 @@ Address: 0xB59b84B526547b6dcb86CCF4004d48E619156CF3
 | globalDepositLimit | 10.000000 |
 | minDepositBalance | 0.000100 |
 
-## undyBTC - Debt Terms
+## 0x3fb0fC9D3Ddd543AD1b748Ed2286a022f4638493 - Debt Terms
 | Parameter | Value |
 | --- | --- |
 | ltv | 70.00% |
@@ -2471,7 +2547,7 @@ Address: 0xB59b84B526547b6dcb86CCF4004d48E619156CF3
 | borrowRate | 7.00% |
 | daowry | 0.25% |
 
-## undyBTC - Liquidation Settings
+## 0x3fb0fC9D3Ddd543AD1b748Ed2286a022f4638493 - Liquidation Settings
 | Parameter | Value |
 | --- | --- |
 | shouldBurnAsPayment | False |
@@ -2480,7 +2556,7 @@ Address: 0xB59b84B526547b6dcb86CCF4004d48E619156CF3
 | shouldAuctionInstantly | True |
 | specialStabPoolId | None |
 
-## undyBTC - Action Flags
+## 0x3fb0fC9D3Ddd543AD1b748Ed2286a022f4638493 - Action Flags
 | Parameter | Value |
 | --- | --- |
 | canDeposit | True |
@@ -2492,9 +2568,9 @@ Address: 0xB59b84B526547b6dcb86CCF4004d48E619156CF3
 | whitelist | None |
 | isNft | False |
 
-#### undyUSD (0xb33852cfd0c22647AAC501a6Af59Bc4210a686Bf)
+#### 0xb33852cfd0c22647AAC501a6Af59Bc4210a686Bf (0xb33852cfd0c22647AAC501a6Af59Bc4210a686Bf)
 
-## undyUSD - Deposit Settings
+## 0xb33852cfd0c22647AAC501a6Af59Bc4210a686Bf - Deposit Settings
 | Parameter | Value |
 | --- | --- |
 | vaultIds | 5 |
@@ -2504,7 +2580,7 @@ Address: 0xB59b84B526547b6dcb86CCF4004d48E619156CF3
 | globalDepositLimit | 250,000.000000 |
 | minDepositBalance | 0.100000 |
 
-## undyUSD - Debt Terms
+## 0xb33852cfd0c22647AAC501a6Af59Bc4210a686Bf - Debt Terms
 | Parameter | Value |
 | --- | --- |
 | ltv | 80.00% |
@@ -2514,7 +2590,7 @@ Address: 0xB59b84B526547b6dcb86CCF4004d48E619156CF3
 | borrowRate | 5.00% |
 | daowry | 0.25% |
 
-## undyUSD - Liquidation Settings
+## 0xb33852cfd0c22647AAC501a6Af59Bc4210a686Bf - Liquidation Settings
 | Parameter | Value |
 | --- | --- |
 | shouldBurnAsPayment | False |
@@ -2523,7 +2599,7 @@ Address: 0xB59b84B526547b6dcb86CCF4004d48E619156CF3
 | shouldAuctionInstantly | False |
 | specialStabPoolId | None |
 
-## undyUSD - Action Flags
+## 0xb33852cfd0c22647AAC501a6Af59Bc4210a686Bf - Action Flags
 | Parameter | Value |
 | --- | --- |
 | canDeposit | True |
@@ -2535,9 +2611,9 @@ Address: 0xB59b84B526547b6dcb86CCF4004d48E619156CF3
 | whitelist | None |
 | isNft | False |
 
-#### undyAERO (0x96F1a7ce331F40afe866F3b707c223e377661087)
+#### 0x96F1a7ce331F40afe866F3b707c223e377661087 (0x96F1a7ce331F40afe866F3b707c223e377661087)
 
-## undyAERO - Deposit Settings
+## 0x96F1a7ce331F40afe866F3b707c223e377661087 - Deposit Settings
 | Parameter | Value |
 | --- | --- |
 | vaultIds | 5 |
@@ -2547,7 +2623,7 @@ Address: 0xB59b84B526547b6dcb86CCF4004d48E619156CF3
 | globalDepositLimit | 10,000,000,000,000,000.000000 |
 | minDepositBalance | 100,000,000,000.000000 |
 
-## undyAERO - Debt Terms
+## 0x96F1a7ce331F40afe866F3b707c223e377661087 - Debt Terms
 | Parameter | Value |
 | --- | --- |
 | ltv | 50.00% |
@@ -2557,7 +2633,7 @@ Address: 0xB59b84B526547b6dcb86CCF4004d48E619156CF3
 | borrowRate | 8.00% |
 | daowry | 0.25% |
 
-## undyAERO - Liquidation Settings
+## 0x96F1a7ce331F40afe866F3b707c223e377661087 - Liquidation Settings
 | Parameter | Value |
 | --- | --- |
 | shouldBurnAsPayment | False |
@@ -2566,7 +2642,7 @@ Address: 0xB59b84B526547b6dcb86CCF4004d48E619156CF3
 | shouldAuctionInstantly | True |
 | specialStabPoolId | None |
 
-## undyAERO - Action Flags
+## 0x96F1a7ce331F40afe866F3b707c223e377661087 - Action Flags
 | Parameter | Value |
 | --- | --- |
 | canDeposit | True |
@@ -2578,9 +2654,9 @@ Address: 0xB59b84B526547b6dcb86CCF4004d48E619156CF3
 | whitelist | None |
 | isNft | False |
 
-#### undyEURC (0x1cb8DAB80f19fC5Aca06C2552AECd79015008eA8)
+#### 0x1cb8DAB80f19fC5Aca06C2552AECd79015008eA8 (0x1cb8DAB80f19fC5Aca06C2552AECd79015008eA8)
 
-## undyEURC - Deposit Settings
+## 0x1cb8DAB80f19fC5Aca06C2552AECd79015008eA8 - Deposit Settings
 | Parameter | Value |
 | --- | --- |
 | vaultIds | 5 |
@@ -2590,7 +2666,7 @@ Address: 0xB59b84B526547b6dcb86CCF4004d48E619156CF3
 | globalDepositLimit | 10,000.000000 |
 | minDepositBalance | 0.100000 |
 
-## undyEURC - Debt Terms
+## 0x1cb8DAB80f19fC5Aca06C2552AECd79015008eA8 - Debt Terms
 | Parameter | Value |
 | --- | --- |
 | ltv | 80.00% |
@@ -2600,7 +2676,7 @@ Address: 0xB59b84B526547b6dcb86CCF4004d48E619156CF3
 | borrowRate | 5.00% |
 | daowry | 0.25% |
 
-## undyEURC - Liquidation Settings
+## 0x1cb8DAB80f19fC5Aca06C2552AECd79015008eA8 - Liquidation Settings
 | Parameter | Value |
 | --- | --- |
 | shouldBurnAsPayment | False |
@@ -2609,7 +2685,7 @@ Address: 0xB59b84B526547b6dcb86CCF4004d48E619156CF3
 | shouldAuctionInstantly | False |
 | specialStabPoolId | None |
 
-## undyEURC - Action Flags
+## 0x1cb8DAB80f19fC5Aca06C2552AECd79015008eA8 - Action Flags
 | Parameter | Value |
 | --- | --- |
 | canDeposit | True |
@@ -2635,9 +2711,9 @@ Address: 0x6162df1b329E157479F8f1407E888260E0EC3d2b
 ## Core Token Registry
 | Token | Address |
 | --- | --- |
-| greenToken (ID 1) | GREEN (0xd1Ea...C707) |
-| savingsGreen (ID 2) | sGREEN (0xaa0f...4d36) |
-| ripeToken (ID 3) | RIPE_TOKEN (0x2A0a...dDC0) |
+| greenToken (ID 1) | `0xd1Eac76497D06Cf15475A5e3984D5bC03de7C707` |
+| savingsGreen (ID 2) | `0xaa0f13488CE069A7B5a099457c753A7CFBE04d36` |
+| ripeToken (ID 3) | RIPE_TOKEN (`0x2A0a59d6B975828e781EcaC125dBA40d7ee5dDC0`) |
 
 ## Registry Config
 | Parameter | Value |
@@ -2648,28 +2724,28 @@ Address: 0x6162df1b329E157479F8f1407E888260E0EC3d2b
 ### All Registered Contracts
 | ID | Description | Address | Mint GREEN | Mint RIPE | Blacklist | Paused |
 | --- | --- | --- | --- | --- | --- | --- |
-| 1 | Green Token | GREEN (0xd1Ea...C707) | - | - | - | False |
-| 2 | Savings Green | sGREEN (0xaa0f...4d36) | - | - | - | False |
-| 3 | Ripe Token | RIPE_TOKEN (0x2A0a...dDC0) | - | - | - | False |
-| 4 | Ledger | 0x3652...fA47 | - | - | - | False |
-| 5 | Mission Control | MissionControl (0xB59b...6CF3) | - | - | - | False |
-| 6 | Switchboard | 0xc68A...30F9 | - | - | ✓ | False |
-| 7 | Price Desk | 0x6856...2Ff6 | - | - | - | False |
-| 8 | Vault Book | 0xB758...a944 | - | ✓ | - | False |
-| 9 | Auction House | 0x8a02...4084 | ✓ | - | - | False |
-| 10 | Auction House NFT | 0x504F...6F3A | - | - | - | False |
-| 11 | Boardroom | 0xb5cA...12D1 | - | - | - | False |
-| 12 | Bond Room | 0x707f...6154 | - | ✓ | - | False |
-| 13 | Credit Engine | 0x30aa...1462 | ✓ | - | - | False |
-| 14 | Endaoment | Endaoment (0x70fA...91f6) | ✓ | - | - | False |
-| 15 | Human Resources | 0xF9aC...108b | - | ✓ | - | False |
-| 16 | Lootbox | 0x1f90...4be7 | - | ✓ | - | False |
-| 17 | Teller | 0xae87...2C13 | - | - | - | False |
-| 18 | Deleverage | 0x75Ee...6F27 | - | - | - | False |
-| 19 | Credit Redeem | 0x3bfB...e3FB | - | - | - | False |
-| 20 | Teller Utils | 0x57f0...DcdD | - | - | - | False |
-| 21 | Endaoment Funds | 0x4Ce5...0873 | - | - | - | - |
-| 22 | Endaoment PSM | 0x2893...cAA7 | - | - | - | False |
+| 1 | Green Token | `0xd1Eac76497D06Cf15475A5e3984D5bC03de7C707` | - | - | - | False |
+| 2 | Savings Green | `0xaa0f13488CE069A7B5a099457c753A7CFBE04d36` | - | - | - | False |
+| 3 | Ripe Token | RIPE_TOKEN (`0x2A0a59d6B975828e781EcaC125dBA40d7ee5dDC0`) | - | - | - | False |
+| 4 | Ledger | `0x365256e322a47Aa2015F6724783F326e9B24fA47` | - | - | - | False |
+| 5 | Mission Control | `0xB59b84B526547b6dcb86CCF4004d48E619156CF3` | - | - | - | False |
+| 6 | Switchboard | `0xc68A90A40B87ae1dABA93Da9c02642F8B74030F9` | - | - | ✓ | False |
+| 7 | Price Desk | `0x68564c6035e8Dc21F0Ce6CB9592dC47B59dE2Ff6` | - | - | - | False |
+| 8 | Vault Book | `0xB758e30C14825519b895Fd9928d5d8748A71a944` | - | ✓ | - | False |
+| 9 | Auction House | `0x8a02aC4754b72aFBDa4f403ec5DA7C2950164084` | ✓ | - | - | False |
+| 10 | Auction House NFT | `0x504Fb3b94a9f4A238Ee3A16474B91F99A3f26F3A` | - | - | - | False |
+| 11 | Boardroom | `0xb5cA6Ef866b510C3b85D4B0e3862061A569412D1` | - | - | - | False |
+| 12 | Bond Room | `0x707f660A7834d00792DF9a28386Bb2cCC6446154` | - | ✓ | - | False |
+| 13 | Credit Engine | `0x30aa8eB041AcB3B22228516297C331B313b81462` | ✓ | - | - | False |
+| 14 | Endaoment | `0x70fA85Aa99a39161A2623627377F1c791fd091f6` | ✓ | - | - | False |
+| 15 | Human Resources | `0xF9aCDFd0d167b741f9144Ca01E52FcdE16BE108b` | - | ✓ | - | False |
+| 16 | Lootbox | `0x1f90ef42Da9B41502d2311300E13FAcf70c64be7` | - | ✓ | - | False |
+| 17 | Teller | `0xae87deB25Bc5030991Aa5E27Cbab38f37a112C13` | - | - | - | False |
+| 18 | Deleverage | `0x75EeBb8c6f1A5727e7c0c1f9d64Ed07cd0966F27` | - | - | - | False |
+| 19 | Credit Redeem | `0x3bfB0F72642aeFA2486da00Db855c5F0b787e3FB` | - | - | - | False |
+| 20 | Teller Utils | `0x57f071AB96D1798C6bB3e314D2D283502DEDDcdD` | - | - | - | False |
+| 21 | Endaoment Funds | `0x4Ce5FB8D572917Eb96724eA1866b505B2a6B0873` | - | - | - | - |
+| 22 | Endaoment PSM | `0x2893d0dfa54571bDc7DE60F2d8a456d3377CcAA7` | - | - | - | False |
 
 ================================================================================
 
@@ -2686,40 +2762,40 @@ Address: 0xc68A90A40B87ae1dABA93Da9c02642F8B74030F9
 ### Registered Switchboards
 | ID | Description | Address | Paused |
 | --- | --- | --- | --- |
-| 1 | Switchboard Alpha | 0x73Cd...CA83 | - |
-| 2 | Switchboard Bravo | 0xD18A...46e7 | - |
-| 3 | Switchboard Charlie | 0x6D79...4008 | - |
-| 4 | Switchboard Delta | 0x50e8...11cb | - |
-| 5 | Switchboard Echo | 0xdF99...5dbb | - |
+| 1 | Switchboard Alpha | `0x73Cd87A047eb16E22f8afA21e0980C07Bb26CA83` | - |
+| 2 | Switchboard Bravo | `0xD18AC028cBe1AbebDb118E9C7A60018d58C846e7` | - |
+| 3 | Switchboard Charlie | `0x6D798bD44b1591571c9d95b6D51c9c34a5534008` | - |
+| 4 | Switchboard Delta | `0x50e815AC356798E42EB35De538a0376459ce11cb` | - |
+| 5 | Switchboard Echo | `0xdF99a86e4450163e8DbA47C928131e75D2995dbb` | - |
 
 ================================================================================
 
 <a id="price-desk"></a>
 # PriceDesk - Oracle Registry
-Address: 0xDFe8D79bc05420a3fFa14824135016a738eE8299
+Address: 0x68564c6035e8Dc21F0Ce6CB9592dC47B59dE2Ff6
 
 ## Constants
 | Parameter | Value |
 | --- | --- |
-| ETH | ETH (0xEeee...EEeE) |
+| ETH | ETH (`0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE`) |
 
 ## Registry Config
 | Parameter | Value |
 | --- | --- |
 | numAddrs (price sources) | 8 |
-| registryChangeTimeLock | 21600 blocks (~12.0h) |
+| registryChangeTimeLock | 0 blocks (~0s) |
 
 ### Registered Price Sources
 | Reg ID | Description | Address |
 | --- | --- | --- |
-| 1 | Chainlink | 0x253f...B3D9 |
-| 2 | Curve Prices | 0x7B2a...ba5d |
-| 3 | BlueChip Yield Prices | 0x90C7...cD28 |
-| 4 | Pyth Prices | 0x4dfb...b9c0 |
-| 5 | Stork Prices | 0xd831...e774 |
-| 6 | Aero Ripe Prices | 0x5ce2...E0A2 |
-| 7 | wsuperOETHb Prices | 0x2606...4F3f |
-| 8 | Undy Vault Prices | 0x2210...099C |
+| 1 | Chainlink | `0x253f55e455701fF0B835128f55668ed159aAB3D9` |
+| 2 | Curve Prices | `0x7B2aeE8B6A4bdF0885dEF48CCda8453Fdc1Bba5d` |
+| 3 | BlueChip Yield Prices | `0x90C70ACfF302c8a7f00574EC3547B0221f39cD28` |
+| 4 | Pyth Prices | `0x89b6E13E4aD4036EAA586219DD73Ebb2b36d5968` |
+| 5 | Stork Prices | `0xCa13ACFB607B842DF5c1D0657C0865cC47bEfe14` |
+| 6 | Aero Ripe Prices | `0x5ce2BbD5eBe9f7d9322a8F56740F95b9576eE0A2` |
+| 7 | wsuperOETHb Prices | `0x2606Ce36b62a77562DF664E7a0009805BB254F3f` |
+| 8 | Undy Vault Prices | `0x2210a9b994CC0F13689043A34F2E11d17DB2099C` |
 
 ================================================================================
 
@@ -2745,8 +2821,8 @@ Address: 0x2a157096af6337b2b4bd47de435520572ed5a439
 **Assets in Vault (2):**
 | Asset | Total Balance |
 | --- | --- |
-| sGREEN | Very High (5.41e+12 ) |
-| GREEN/USDC | Very High (5.87e+12 ) |
+| 0xaa0f13488CE069A7B5a099457c753A7CFBE04d36 | Very High (5.41e+12 ) |
+| 0xd6c283655B42FA0eb2685F7AB819784F071459dc | Very High (5.87e+12 ) |
 
 ### Vault 2: Ripe Gov Vault
 Address: 0xe42b3dC546527EB70D741B185Dc57226cA01839D
@@ -2761,7 +2837,7 @@ Address: 0xe42b3dC546527EB70D741B185Dc57226cA01839D
 | Asset | Total Balance |
 | --- | --- |
 | RIPE_TOKEN | Very High (1.99e+13 ) |
-| RIPE/WETH | 0.00  |
+| 0xF8D92a9531205AB2Dd0Bc623CDF4A6Ab4c3a2526 | 0.00  |
 | RIPE_WETH_POOL | 22.83B  |
 
 ### Vault 3: Simple ERC20 Vault
@@ -2782,13 +2858,13 @@ Address: 0xf75b566eF80Fde0dEfcC045A4d57b540eb43ddfD
 | CBDOGE | 285.30  |
 | USOL | 1.70  |
 | MORPHO_SPARK_USDC | 7.14K  |
-| AERO | 1.78K  |
+| AERO | 1.70K  |
 | MOONWELL_AERO | 0.00  |
-| cbXRP | 0.00  |
+| 0xcb585250f852C6c6bf90434AB21A00f02833a4af | 0.00  |
 | WELL | 11.99K  |
 | VIRTUAL | 1.11K  |
-| VVV | 295.05  |
-| DEGEN | 145.66K  |
+| 0xacfE6019Ed1A7Dc6f7B508C02d1b04ec88cC21bf | 295.05  |
+| 0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed | 145.66K  |
 | MOONWELL_CBETH | 0.00  |
 | CBETH | 0.80  |
 | MOONWELL_USDC | 45.58  |
@@ -2801,7 +2877,7 @@ Address: 0xf75b566eF80Fde0dEfcC045A4d57b540eb43ddfD
 | MORPHO_SEAMLESS_WETH | 0.13  |
 | EULER_WETH | 0.00  |
 | MORPHO_MOONWELL_CBBTC | 0.00  |
-| sUSDe | 0.83  |
+| 0x211Cc4DD073734dA055fbF44a2b4667d5E5fE5d2 | 0.83  |
 | WRAPPED_SUPER_OETH | 0.37  |
 
 ### Vault 4: Rebase ERC20 Vault
@@ -2816,7 +2892,7 @@ Address: 0xce2E96C9F6806731914A7b4c3E4aC1F296d98597
 **Assets in Vault (6):**
 | Asset | Total Balance |
 | --- | --- |
-| 0x784e...cE89 | 0.00  |
+| 0x784efeB622244d2348d4F2522f8860B96fbEcE89 | 0.00  |
 | AAVEV3_CBBTC | 452.60  |
 | AAVEV3_USDC | 520.27B  |
 | AAVEV3_WETH | 86.29M  |
@@ -2838,11 +2914,11 @@ Address: 0x4549A368c00f803862d457C4C0c659a293F26C66
 | UNDY_USD | 0.00  |
 | UNDY_ETH | 0.00  |
 | UNDY_BTC | 0.00  |
-| undyUSD | 0.00  |
-| undyUSD | 103.05K  |
-| undyBTC | 0.00  |
-| undyETH | 0.01  |
-| undyAERO | 16.66  |
+| 0xcdD894E6c11d6444e0c3d974928Dd71b28b09356 | 0.00  |
+| 0xb33852cfd0c22647AAC501a6Af59Bc4210a686Bf | 103.07K  |
+| 0x3fb0fC9D3Ddd543AD1b748Ed2286a022f4638493 | 0.00  |
+| 0x02981DB1a99A14912b204437e7a2E02679B57668 | 0.01  |
+| 0x96F1a7ce331F40afe866F3b707c223e377661087 | 16.66  |
 
 ================================================================================
 
@@ -2853,36 +2929,36 @@ Address: 0x365256e322a47Aa2015F6724783F326e9B24fA47
 ## Debt Statistics
 | Parameter | Value |
 | --- | --- |
-| totalDebt | 74.51K GREEN |
+| totalDebt | 74.39K GREEN |
 | numBorrowers | 78 |
-| unrealizedYield | 30.55 GREEN |
+| unrealizedYield | 0.27 GREEN |
 
 ## RIPE Rewards Pool
 | Parameter | Value |
 | --- | --- |
-| borrowers allocation | 363.92 RIPE |
-| stakers allocation | 5.61K RIPE |
+| borrowers allocation | 413.73 RIPE |
+| stakers allocation | 6.02K RIPE |
 | voters allocation | 0.00 RIPE |
 | genDepositors allocation | 0.00 RIPE |
 | newRipeRewards | 0.00 RIPE |
-| lastUpdate (block) | 38812769 |
-| ripeAvailForRewards | 13.44K RIPE |
+| lastUpdate (block) | 38879399 |
+| ripeAvailForRewards | 12.94K RIPE |
 
 ## Global Deposit Points
 | Parameter | Value |
 | --- | --- |
 | lastUsdValue | $0.15 |
-| ripeStakerPoints | 14248328154 |
+| ripeStakerPoints | 14642957784 |
 | ripeVotePoints | 0 |
-| ripeGenPoints | 956348019347 |
-| lastUpdate (block) | 38812769 |
+| ripeGenPoints | 963753209294 |
+| lastUpdate (block) | 38862405 |
 
 ## Global Borrow Points
 | Parameter | Value |
 | --- | --- |
 | lastPrincipal | 0.00 GREEN |
-| points | 86321758907 |
-| lastUpdate (block) | 38812769 |
+| points | 91195132495 |
+| lastUpdate (block) | 38879399 |
 
 ## Liquidation Statistics
 | Parameter | Value |
@@ -2938,9 +3014,17 @@ Address: 0x2893d0dfa54571bDc7DE60F2d8a456d3377CcAA7
 | numBlocksPerInterval | 43200 blocks (~1.0d) |
 | shouldAutoDeposit | True |
 | usdcYieldPosition.legoId | 13 |
-| usdcYieldPosition.vaultToken | undyUSD (0xb338...86Bf) |
+| usdcYieldPosition.vaultToken | `0xb33852cfd0c22647AAC501a6Af59Bc4210a686Bf` |
 
-**USDC Address:** USDC (0x8335...2913)
+## PSM Current Interval Stats
+| Parameter | Value |
+| --- | --- |
+| Mint Interval Start | 0 |
+| Mint Interval Amount | 0.00 GREEN |
+| Redeem Interval Start | 0 |
+| Redeem Interval Amount | 0.00 GREEN |
+
+**USDC Address:** USDC (`0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913`)
 
 ================================================================================
 
@@ -3030,7 +3114,7 @@ Address: 0x70fA85Aa99a39161A2623627377F1c791fd091f6
 | Parameter | Value |
 | --- | --- |
 | isPaused | False |
-| WETH | WETH (0x4200...0006) |
+| WETH | WETH (`0x4200000000000000000000000000000000000006`) |
 
 ================================================================================
 
@@ -3070,7 +3154,7 @@ Address: 0x707f660A7834d00792DF9a28386Bb2cCC6446154
 | Parameter | Value |
 | --- | --- |
 | isPaused | False |
-| bondBooster | 0xA187...178a |
+| bondBooster | `0xA1872467AC4fb442aeA341163A65263915ce178a` |
 
 ================================================================================
 
@@ -3100,7 +3184,7 @@ Address: 0xe42b3dC546527EB70D741B185Dc57226cA01839D
 | Parameter | Value |
 | --- | --- |
 | isPaused | False |
-| totalGovPoints | 102,162,913,968,485,685,119 |
+| totalGovPoints | 102,522,757,469,984,937,255 |
 
 ================================================================================
 
@@ -3119,29 +3203,29 @@ Address: 0x253f55e455701fF0B835128f55668ed159aAB3D9
 ### Chainlink - Registered Assets (23)
 | Asset | Feed/Underlying | Config | StaleTime |
 | --- | --- | --- | --- |
-| ETH | CHAINLINK_ETH_USD (0x7104...Bb70) | ETH:False, BTC:False | default |
-| WETH | CHAINLINK_ETH_USD (0x7104...Bb70) | ETH:False, BTC:False | default |
-| BTC | CHAINLINK_BTC_USD (0x64c9...848F) | ETH:False, BTC:False | default |
-| USDC | CHAINLINK_USDC_USD (0x7e86...bc6B) | ETH:False, BTC:False | default |
-| CBBTC | CHAINLINK_CBBTC_USD (0x07DA...9f9D) | ETH:False, BTC:False | default |
-| USOL | CHAINLINK_SOL_USD (0x9750...462D) | ETH:False, BTC:False | default |
-| CBDOGE | CHAINLINK_DOGE_USD (0x8422...8e57) | ETH:False, BTC:False | default |
-| AERO | 0x4EC5...cfF0 | ETH:False, BTC:False | default |
-| cbADA | 0x34cD...9041 | ETH:False, BTC:False | default |
-| cbXRP | 0x9f0C...6D34 | ETH:False, BTC:False | default |
-| cbLTC | 0x206a...7a69 | ETH:False, BTC:False | default |
-| uAVAX | 0xE70f...cd92 | ETH:False, BTC:False | default |
-| uSHIB | 0xC8D5...9669 | ETH:False, BTC:False | default |
-| CBETH | 0xd781...817d | ETH:False, BTC:False | default |
-| sUSDe | 0x79cf...E533 | ETH:False, BTC:False | default |
-| VIRTUAL | 0xEaf3...19F7 | ETH:False, BTC:False | default |
-| VVV | 0x8eC6...873F | ETH:False, BTC:False | default |
-| WELL | 0xc15d...C5fe | ETH:False, BTC:False | default |
-| DEGEN | 0xE62B...99c2 | ETH:False, BTC:False | default |
-| EURC | 0xDAe3...8250 | ETH:False, BTC:False | default |
-| GHO | 0x4286...79b0 | ETH:False, BTC:False | default |
-| USDS | 0x2330...2930 | ETH:False, BTC:False | default |
-| SUPER_OETH | 0x39C6...10B4 | ETH:True, BTC:False | default |
+| ETH | CHAINLINK_ETH_USD (`0x71041dddad3595F9CEd3DcCFBe3D1F4b0a16Bb70`) | ETH:False, BTC:False | default |
+| WETH | CHAINLINK_ETH_USD (`0x71041dddad3595F9CEd3DcCFBe3D1F4b0a16Bb70`) | ETH:False, BTC:False | default |
+| BTC | CHAINLINK_BTC_USD (`0x64c911996D3c6aC71f9b455B1E8E7266BcbD848F`) | ETH:False, BTC:False | default |
+| USDC | CHAINLINK_USDC_USD (`0x7e860098F58bBFC8648a4311b374B1D669a2bc6B`) | ETH:False, BTC:False | default |
+| CBBTC | CHAINLINK_CBBTC_USD (`0x07DA0E54543a844a80ABE69c8A12F22B3aA59f9D`) | ETH:False, BTC:False | default |
+| USOL | CHAINLINK_SOL_USD (`0x975043adBb80fc32276CbF9Bbcfd4A601a12462D`) | ETH:False, BTC:False | default |
+| CBDOGE | CHAINLINK_DOGE_USD (`0x8422f3d3CAFf15Ca682939310d6A5e619AE08e57`) | ETH:False, BTC:False | default |
+| AERO | `0x4EC5970fC728C5f65ba413992CD5fF6FD70fcfF0` | ETH:False, BTC:False | default |
+| 0xcbADA732173e39521CDBE8bf59a6Dc85A9fc7b8c | `0x34cD971a092d5411bD69C10a5F0A7EEF72C69041` | ETH:False, BTC:False | default |
+| 0xcb585250f852C6c6bf90434AB21A00f02833a4af | `0x9f0C1dD78C4CBdF5b9cf923a549A201EdC676D34` | ETH:False, BTC:False | default |
+| 0xcb17C9Db87B595717C857a08468793f5bAb6445F | `0x206a34e47093125fbf4C75b7c7E88b84c6A77a69` | ETH:False, BTC:False | default |
+| uAVAX | `0xE70f2D34Fd04046aaEC26a198A35dD8F2dF5cd92` | ETH:False, BTC:False | default |
+| uSHIB | `0xC8D5D660bb585b68fa0263EeD7B4224a5FC99669` | ETH:False, BTC:False | default |
+| CBETH | `0xd7818272B9e248357d13057AAb0B417aF31E817d` | ETH:False, BTC:False | default |
+| 0x211Cc4DD073734dA055fbF44a2b4667d5E5fE5d2 | `0x79cf4a31B29D69191f0b6E97916eB93FEB81E533` | ETH:False, BTC:False | default |
+| VIRTUAL | `0xEaf310161c9eF7c813A14f8FEF6Fb271434019F7` | ETH:False, BTC:False | default |
+| 0xacfE6019Ed1A7Dc6f7B508C02d1b04ec88cC21bf | `0x8eC6a128a430f7A850165bcF18facc9520a9873F` | ETH:False, BTC:False | default |
+| WELL | `0xc15d9944dAefE2dB03e53bef8DDA25a56832C5fe` | ETH:False, BTC:False | default |
+| 0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed | `0xE62BcE5D7CB9d16AB8b4D622538bc0A50A5799c2` | ETH:False, BTC:False | default |
+| EURC | `0xDAe398520e2B67cd3f27aeF9Cf14D93D927f8250` | ETH:False, BTC:False | default |
+| GHO | `0x42868EFcee13C0E71af89c04fF7d96f5bec479b0` | ETH:False, BTC:False | default |
+| USDS | `0x2330aaE3bca5F05169d5f4597964D44522F62930` | ETH:False, BTC:False | default |
+| SUPER_OETH | `0x39C6E14CdE46D4FFD9F04Ff159e7ce8eC20E10B4` | ETH:True, BTC:False | default |
 
 ## Curve Prices
 Address: 0x7B2aeE8B6A4bdF0885dEF48CCda8453Fdc1Bba5d
@@ -3155,8 +3239,8 @@ Address: 0x7B2aeE8B6A4bdF0885dEF48CCda8453Fdc1Bba5d
 ### Curve Prices - Registered Assets (2)
 | Asset | Feed/Underlying | Config | StaleTime |
 | --- | --- | --- | --- |
-| GREEN | Curve Pool | - | - |
-| GREEN/USDC | Curve Pool | - | - |
+| 0xd1Eac76497D06Cf15475A5e3984D5bC03de7C707 | Curve Pool | - | - |
+| 0xd6c283655B42FA0eb2685F7AB819784F071459dc | Curve Pool | - | - |
 
 ## BlueChip Yield Prices
 Address: 0x90C70ACfF302c8a7f00574EC3547B0221f39cD28
@@ -3173,7 +3257,7 @@ Address: 0x90C70ACfF302c8a7f00574EC3547B0221f39cD28
 | MORPHO_SPARK_USDC | USDC | Morpho, snaps:20 | default |
 | AAVEV3_CBBTC | CBBTC | AaveV3, snaps:20 | default |
 | MOONWELL_AERO | AERO | Moonwell, snaps:20 | default |
-| 0x784e...cE89 | AERO | CompoundV3, snaps:20 | default |
+| 0x784efeB622244d2348d4F2522f8860B96fbEcE89 | AERO | CompoundV3, snaps:20 | default |
 | AAVEV3_USDC | USDC | AaveV3, snaps:20 | default |
 | AAVEV3_WETH | WETH | AaveV3, snaps:20 | default |
 | COMPOUNDV3_WETH | WETH | CompoundV3, snaps:20 | default |
@@ -3192,25 +3276,17 @@ Address: 0x90C70ACfF302c8a7f00574EC3547B0221f39cD28
 | MORPHO_MOONWELL_CBBTC | CBBTC | Morpho, snaps:20 | default |
 
 ## Pyth Prices
-Address: 0x4dfbFaC4592699A84377C7E8d6Be8d0fEDb4b9c0
+Address: 0x89b6E13E4aD4036EAA586219DD73Ebb2b36d5968
 
 ## Pyth Prices Global Config
 | Parameter | Value |
 | --- | --- |
 | isPaused | False |
-| numAssets | 5 |
-
-### Pyth Prices - Registered Assets (5)
-| Asset | Feed/Underlying | Config | StaleTime |
-| --- | --- | --- | --- |
-| COOKIE | 0xa73331cc...9a7a0191 | - | default |
-| KAITO | 0x7302dee6...692b7e59 | - | default |
-| AIXBT | 0x0fc54579...b638a5a7 | - | default |
-| KTA | 0x61fb0189...34c74084 | - | default |
-| ZORA | 0x93eacee7...3f5666b1 | - | default |
+| maxConfidenceRatio | 3.00% |
+| numAssets | 0 |
 
 ## Stork Prices
-Address: 0xd83187f7484FE9b92334d2a5bbCC6dDdA3E4e774
+Address: 0xCa13ACFB607B842DF5c1D0657C0865cC47bEfe14
 
 ## Stork Prices Global Config
 | Parameter | Value |
@@ -3258,16 +3334,16 @@ Address: 0x2210a9b994CC0F13689043A34F2E11d17DB2099C
 | UNDY_BTC | CBBTC | ID:0, snaps:20 | default |
 | UNDY_AERO | AERO | ID:0, snaps:20 | default |
 | UNDY_EURC | USDS | ID:0, snaps:20 | default |
-| undyEURC | EURC | ID:0, snaps:20 | default |
-| undyAERO | AERO | ID:0, snaps:20 | default |
-| undyBTC | CBBTC | ID:0, snaps:20 | default |
-| undyETH | WETH | ID:0, snaps:20 | default |
-| undyUSD | USDC | ID:0, snaps:20 | default |
-| undyUSD | USDC | ID:0, snaps:20 | default |
-| undyETH | WETH | ID:0, snaps:20 | default |
-| undyBTC | CBBTC | ID:0, snaps:20 | default |
-| undyAERO | AERO | ID:0, snaps:20 | default |
-| undyEURC | EURC | ID:0, snaps:20 | default |
+| 0x4bCa2A052428D7b7D2E1Daf9e1af471EA4c2F7bf | EURC | ID:0, snaps:20 | default |
+| 0x9e629632c483235845E27840C304C11b59d2FEDa | AERO | ID:0, snaps:20 | default |
+| 0x897b56836C79e68042EFc51be7ad652a4BBFb86b | CBBTC | ID:0, snaps:20 | default |
+| 0x434696F22EF3862f14C6Abd008f18456418f7457 | WETH | ID:0, snaps:20 | default |
+| 0xcdD894E6c11d6444e0c3d974928Dd71b28b09356 | USDC | ID:0, snaps:20 | default |
+| 0xb33852cfd0c22647AAC501a6Af59Bc4210a686Bf | USDC | ID:0, snaps:20 | default |
+| 0x02981DB1a99A14912b204437e7a2E02679B57668 | WETH | ID:0, snaps:20 | default |
+| 0x3fb0fC9D3Ddd543AD1b748Ed2286a022f4638493 | CBBTC | ID:0, snaps:20 | default |
+| 0x96F1a7ce331F40afe866F3b707c223e377661087 | AERO | ID:0, snaps:20 | default |
+| 0x1cb8DAB80f19fC5Aca06C2552AECd79015008eA8 | EURC | ID:0, snaps:20 | default |
 
 ================================================================================
 
@@ -3277,7 +3353,7 @@ Address: 0x2210a9b994CC0F13689043A34F2E11d17DB2099C
 ## GREEN Token
 | Parameter | Value |
 | --- | --- |
-| totalSupply | 202.15K GREEN |
+| totalSupply | 202.05K GREEN |
 | decimals | 18 |
 | name | Green USD Stablecoin |
 | symbol | GREEN |
@@ -3293,17 +3369,17 @@ Address: 0x2210a9b994CC0F13689043A34F2E11d17DB2099C
 ## Savings GREEN (sGREEN)
 | Parameter | Value |
 | --- | --- |
-| totalSupply (shares) | 55.82K GREEN |
-| totalAssets (GREEN) | 58.96K GREEN |
-| **Exchange Rate** | **1.056273 GREEN per sGREEN** |
-| **Accumulated Yield** | **+5.6273%** above 1:1 |
+| totalSupply (shares) | 55.83K GREEN |
+| totalAssets (GREEN) | 59.00K GREEN |
+| **Exchange Rate** | **1.056821 GREEN per sGREEN** |
+| **Accumulated Yield** | **+5.6821%** above 1:1 |
 | decimals | 18 |
 | name | Savings Green USD |
 | symbol | sGREEN |
 
-*Example: 1,000 sGREEN = 1,056.2731 GREEN*
+*Example: 1,000 sGREEN = 1,056.8213 GREEN*
 
 ================================================================================
 
 ---
-*Report generated at block 38821862 on 2025-11-29 16:23:22 UTC*
+*Report generated at block 38883364 on 2025-12-01 02:32:28 UTC*

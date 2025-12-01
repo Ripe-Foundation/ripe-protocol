@@ -7,50 +7,57 @@ smart contracts on Base mainnet, formatted as markdown tables.
 
 Usage:
     python scripts/output_production_params.py
+
+Output is written to: scripts/production_params_output.md
 """
 
 import os
 import sys
+import time
 from datetime import datetime, timezone
 
 import boa
 
 # Add project root to path for imports
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, os.path.dirname(SCRIPT_DIR))
+
+# Output file path
+OUTPUT_FILE = os.path.join(SCRIPT_DIR, "production_params_output.md")
 
 from config.BluePrint import CORE_TOKENS, YIELD_TOKENS, ADDYS
+from tests.constants import ZERO_ADDRESS
 
-# Contract addresses (Base Mainnet)
-MISSION_CONTROL = "0xB59b84B526547b6dcb86CCF4004d48E619156CF3"
+# Only RIPE_HQ is needed - all other addresses derived from registry
 RIPE_HQ = "0x6162df1b329E157479F8f1407E888260E0EC3d2b"
-PRICE_DESK = "0xDFe8D79bc05420a3fFa14824135016a738eE8299"
-VAULT_BOOK = "0xB758e30C14825519b895Fd9928d5d8748A71a944"
-LEDGER = "0x365256e322a47Aa2015F6724783F326e9B24fA47"
-CREDIT_ENGINE = "0x30aa8eB041AcB3B22228516297C331B313b81462"
-BOND_BOOSTER = "0xA1872467AC4fb442aeA341163A65263915ce178a"
-ENDAOMENT = "0x70fA85Aa99a39161A2623627377F1c791fd091f6"
-ENDAOMENT_PSM = "0x2893d0dfa54571bDc7DE60F2d8a456d3377CcAA7"
-GREEN_TOKEN = "0xd1Eac76497D06Cf15475A5e3984D5bC03de7C707"
-RIPE_TOKEN = "0x2A0a59d6B975828e781EcaC125dBA40d7ee5dDC0"
-SAVINGS_GREEN = "0xaa0f13488CE069A7B5a099457c753A7CFBE04d36"
-STABILITY_POOL = "0x2a157096af6337b2b4bd47de435520572ed5a439"
-GREEN_POOL = "0xd6c283655B42FA0eb2685F7AB819784F071459dc"
 
-# Additional contracts
-LOOTBOX = "0x1f90ef42Da9B41502d2311300E13FAcf70c64be7"
-BOND_ROOM = "0x707f660A7834d00792DF9a28386Bb2cCC6446154"
-RIPE_GOV_VAULT = "0xe42b3dC546527EB70D741B185Dc57226cA01839D"
-SWITCHBOARD = "0xc68A90A40B87ae1dABA93Da9c02642F8B74030F9"
+# Registry IDs (matching contracts/modules/Addys.vy)
+GREEN_TOKEN_ID = 1
+SAVINGS_GREEN_ID = 2
+RIPE_TOKEN_ID = 3
+LEDGER_ID = 4
+MISSION_CONTROL_ID = 5
+SWITCHBOARD_ID = 6
+PRICE_DESK_ID = 7
+VAULT_BOOK_ID = 8
+AUCTION_HOUSE_ID = 9
+AUCTION_HOUSE_NFT_ID = 10
+BOARDROOM_ID = 11
+BOND_ROOM_ID = 12
+CREDIT_ENGINE_ID = 13
+ENDAOMENT_ID = 14
+HUMAN_RESOURCES_ID = 15
+LOOTBOX_ID = 16
+TELLER_ID = 17
+DELEVERAGE_ID = 18
+CREDIT_REDEEM_ID = 19
+TELLER_UTILS_ID = 20
+ENDAOMENT_FUNDS_ID = 21
+ENDAOMENT_PSM_ID = 22
 
-# Core Lending contracts
-AUCTION_HOUSE = "0x8a02aC4754b72aFBDa4f403ec5DA7C2950164084"
-TELLER = "0xae87deB25Bc5030991Aa5E27Cbab38f37a112C13"
-DELEVERAGE = "0x75EeBb8c6f1A5727e7c0c1f9d64Ed07cd0966F27"
-CREDIT_REDEEM = "0x3bfB0F72642aeFA2486da00Db855c5F0b787e3FB"
-
-# Treasury contracts
-ENDAOMENT_FUNDS = "0x4Ce5FB8D572917Eb96724eA1866b505B2a6B0873"
-HUMAN_RESOURCES = "0xF9aCDFd0d167b741f9144Ca01E52FcdE16BE108b"
+# VaultBook IDs for derived contracts
+STABILITY_POOL_VB_ID = 1
+RIPE_GOV_VAULT_VB_ID = 2
 
 # RPC URL
 RPC_URL = f"https://base-mainnet.g.alchemy.com/v2/{os.environ.get('WEB3_ALCHEMY_API_KEY')}"
@@ -76,13 +83,13 @@ _token_symbol_cache = {}
 
 
 def get_token_name(address: str, try_fetch: bool = True) -> str:
-    """Resolve address to token symbol or return truncated address.
+    """Resolve address to token symbol or return full address.
 
     Args:
         address: The token address
         try_fetch: If True, attempt to fetch symbol from contract for unknown addresses
     """
-    if address == "0x0000000000000000000000000000000000000000":
+    if address == ZERO_ADDRESS:
         return "None"
 
     addr_lower = address.lower()
@@ -109,19 +116,6 @@ def get_token_name(address: str, try_fetch: bool = True) -> str:
             _token_symbol_cache[addr_lower] = name
             return name
 
-    # Known protocol addresses
-    known_addresses = {
-        MISSION_CONTROL.lower(): "MissionControl",
-        RIPE_TOKEN.lower(): "RIPE",
-        ENDAOMENT.lower(): "Endaoment",
-        "0xd1eac76497d06cf15475a5e3984d5bc03de7c707": "GREEN",
-        "0xaa0f13488ce069a7b5a099457c753a7cfbe04d36": "sGREEN",
-        "0x44cf3c4f000dfd76a35d03298049d37be688d6f9": "UnderscoreRegistry",
-    }
-    if addr_lower in known_addresses:
-        _token_symbol_cache[addr_lower] = known_addresses[addr_lower]
-        return known_addresses[addr_lower]
-
     # Try to fetch symbol from contract
     if try_fetch:
         try:
@@ -133,9 +127,9 @@ def get_token_name(address: str, try_fetch: bool = True) -> str:
         except Exception:
             pass
 
-    truncated = f"{address[:6]}...{address[-4:]}"
-    _token_symbol_cache[addr_lower] = truncated
-    return truncated
+    # Return full address (not truncated) when no name found
+    _token_symbol_cache[addr_lower] = address
+    return address
 
 
 def get_token_decimals(address: str) -> int:
@@ -148,11 +142,12 @@ def get_token_decimals(address: str) -> int:
 
 
 def format_address(address: str) -> str:
-    """Format address with resolved name."""
-    name = get_token_name(address)
-    if name != f"{address[:6]}...{address[-4:]}":
-        return f"{name} ({address[:6]}...{address[-4:]})"
-    return name
+    """Format address with resolved name and full address."""
+    name = get_token_name(address, try_fetch=False)
+    # Check if we got a resolved name (not a full address starting with 0x)
+    if name and not name.startswith("0x"):
+        return f"{name} (`{address}`)"
+    return f"`{address}`"
 
 
 def format_percent(value: int, base: int = HUNDRED_PERCENT) -> str:
@@ -214,34 +209,35 @@ def print_table_of_contents():
 ## Table of Contents
 
 1. [Executive Summary](#executive-summary)
-2. [MissionControl Configuration](#mission-control)
+2. [All Contract Addresses](#all-addresses)
+3. [MissionControl Configuration](#mission-control)
    - [General Config](#general-config)
    - [Debt Config](#debt-config)
    - [Rewards Config](#rewards-config)
    - [Registered Assets](#registered-assets)
-3. [RipeHQ Registry](#ripe-hq)
-4. [Switchboard Registry](#switchboard)
-5. [PriceDesk Oracles](#price-desk)
-6. [VaultBook Registry](#vault-book)
-7. [Ledger Statistics](#ledger)
-8. [Endaoment PSM](#endaoment-psm)
-9. [Core Lending Contracts](#core-lending)
-   - [CreditEngine](#credit-engine)
-   - [AuctionHouse](#auction-house)
-   - [Teller](#teller)
-   - [Deleverage](#deleverage)
-   - [CreditRedeem](#credit-redeem)
-   - [StabilityPool](#stability-pool)
-10. [Treasury & Rewards Contracts](#treasury-rewards)
+4. [RipeHQ Registry](#ripe-hq)
+5. [Switchboard Registry](#switchboard)
+6. [PriceDesk Oracles](#price-desk)
+7. [VaultBook Registry](#vault-book)
+8. [Ledger Statistics](#ledger)
+9. [Endaoment PSM](#endaoment-psm)
+10. [Core Lending Contracts](#core-lending)
+    - [CreditEngine](#credit-engine)
+    - [AuctionHouse](#auction-house)
+    - [Teller](#teller)
+    - [Deleverage](#deleverage)
+    - [CreditRedeem](#credit-redeem)
+    - [StabilityPool](#stability-pool)
+11. [Treasury & Rewards Contracts](#treasury-rewards)
     - [Endaoment](#endaoment)
     - [BondBooster](#bond-booster)
     - [Lootbox](#lootbox)
     - [BondRoom](#bond-room)
     - [HumanResources](#human-resources)
-11. [Governance Contracts](#governance)
+12. [Governance Contracts](#governance)
     - [RipeGovVault](#ripe-gov-vault)
-12. [Price Source Configurations](#price-sources)
-13. [Token Statistics](#token-statistics)
+13. [Price Source Configurations](#price-sources)
+14. [Token Statistics](#token-statistics)
 """)
 
 
@@ -250,68 +246,150 @@ def print_executive_summary(mc, ledger, green, sgreen, ripe):
     print("\n<a id=\"executive-summary\"></a>")
     print("## 📊 Executive Summary\n")
 
-    try:
-        # Key metrics
-        gen_debt = mc.genDebtConfig()
-        total_debt = ledger.totalDebt()
-        global_limit = gen_debt[1]
-        utilization = (total_debt / global_limit * 100) if global_limit > 0 else 0
+    # Key metrics
+    gen_debt = mc.genDebtConfig()
+    total_debt = ledger.totalDebt()
+    global_limit = gen_debt[1]
+    utilization = (total_debt / global_limit * 100) if global_limit > 0 else 0
 
-        num_borrowers = ledger.numBorrowers()
-        num_assets = mc.numAssets()
-        bad_debt = ledger.badDebt()
+    num_borrowers = ledger.numBorrowers()
+    num_assets = mc.numAssets()
+    bad_debt = ledger.badDebt()
 
-        green_supply = green.totalSupply()
-        ripe_supply = ripe.totalSupply()
-        sgreen_supply = sgreen.totalSupply()
-        sgreen_assets = sgreen.totalAssets()
+    green_supply = green.totalSupply()
+    ripe_supply = ripe.totalSupply()
+    sgreen_supply = sgreen.totalSupply()
+    sgreen_assets = sgreen.totalAssets()
 
-        # Calculate savings rate
-        savings_rate = 0
-        if sgreen_supply > 0:
-            exchange_rate = sgreen_assets / sgreen_supply
-            savings_rate = (exchange_rate - 1) * 100
+    # Calculate savings rate
+    savings_rate = 0
+    if sgreen_supply > 0:
+        exchange_rate = sgreen_assets / sgreen_supply
+        savings_rate = (exchange_rate - 1) * 100
 
-        print("| Metric | Value |")
-        print("| --- | --- |")
-        print(f"| **Total GREEN Supply** | {format_token_amount(green_supply)} |")
-        print(f"| **Total Debt Outstanding** | {format_token_amount(total_debt)} |")
-        print(f"| **Debt Utilization** | {utilization:.2f}% of {format_token_amount(global_limit)} limit |")
-        print(f"| **Active Borrowers** | {num_borrowers - 1 if num_borrowers > 0 else 0} |")
-        print(f"| **Registered Assets** | {num_assets - 1 if num_assets > 0 else 0} |")
-        print(f"| **Bad Debt** | {format_token_amount(bad_debt)} |")
-        print(f"| **RIPE Total Supply** | {format_token_amount(ripe_supply, 18, 'RIPE')} |")
-        print(f"| **sGREEN Exchange Rate** | {sgreen_assets / sgreen_supply:.6f} GREEN per sGREEN ({savings_rate:+.4f}% vs 1:1) |")
+    print("| Metric | Value |")
+    print("| --- | --- |")
+    print(f"| **Total GREEN Supply** | {format_token_amount(green_supply)} |")
+    print(f"| **Total Debt Outstanding** | {format_token_amount(total_debt)} |")
+    print(f"| **Debt Utilization** | {utilization:.2f}% of {format_token_amount(global_limit)} limit |")
+    print(f"| **Active Borrowers** | {num_borrowers - 1 if num_borrowers > 0 else 0} |")
+    print(f"| **Registered Assets** | {num_assets - 1 if num_assets > 0 else 0} |")
+    print(f"| **Bad Debt** | {format_token_amount(bad_debt)} |")
+    print(f"| **RIPE Total Supply** | {format_token_amount(ripe_supply, 18, 'RIPE')} |")
+    print(f"| **sGREEN Exchange Rate** | {sgreen_assets / sgreen_supply:.6f} GREEN per sGREEN ({savings_rate:+.4f}% vs 1:1) |")
 
-        # Protocol status
-        gen_config = mc.genConfig()
-        status_flags = []
-        if gen_config[3]:  # canDeposit
-            status_flags.append("✅ Deposits")
-        else:
-            status_flags.append("❌ Deposits")
-        if gen_config[5]:  # canBorrow
-            status_flags.append("✅ Borrowing")
-        else:
-            status_flags.append("❌ Borrowing")
-        if gen_config[8]:  # canLiquidate
-            status_flags.append("✅ Liquidations")
-        else:
-            status_flags.append("❌ Liquidations")
+    # Protocol status
+    gen_config = mc.genConfig()
+    status_flags = []
+    if gen_config[3]:  # canDeposit
+        status_flags.append("✅ Deposits")
+    else:
+        status_flags.append("❌ Deposits")
+    if gen_config[5]:  # canBorrow
+        status_flags.append("✅ Borrowing")
+    else:
+        status_flags.append("❌ Borrowing")
+    if gen_config[8]:  # canLiquidate
+        status_flags.append("✅ Liquidations")
+    else:
+        status_flags.append("❌ Liquidations")
 
-        print(f"| **Protocol Status** | {' / '.join(status_flags)} |")
-
-    except Exception as e:
-        print(f"*Error generating summary: {e}*")
+    print(f"| **Protocol Status** | {' / '.join(status_flags)} |")
 
 
-def fetch_mission_control_data(mc):
+def print_all_addresses(contracts: dict, hq, sb, pd, vb):
+    """Print a comprehensive list of all live contract addresses."""
+    print("\n<a id=\"all-addresses\"></a>")
+    print("## 📋 All Contract Addresses\n")
+    print("*Complete list of all live protocol contract addresses*\n")
+
+    # Core Protocol Contracts (from RipeHQ)
+    print("### Core Protocol Contracts (RipeHQ Registry)")
+    print("| ID | Contract | Address |")
+    print("| --- | --- | --- |")
+    print(f"| - | **RipeHQ** | `{contracts['hq']}` |")
+
+    num_hq_addrs = hq.numAddrs()
+    for i in range(1, num_hq_addrs):
+        time.sleep(0.1)  # Rate limit protection
+        addr_info = hq.addrInfo(i)
+        addr = str(addr_info.addr)
+        if addr == ZERO_ADDRESS:
+            continue
+        print(f"| {i} | {addr_info.description} | `{addr}` |")
+
+    # Switchboard Registry
+    print("\n### Switchboard Registry")
+    print("| ID | Contract | Address |")
+    print("| --- | --- | --- |")
+    print(f"| - | **Switchboard** | `{contracts['sb']}` |")
+
+    num_sb_addrs = sb.numAddrs()
+    for i in range(1, num_sb_addrs):
+        time.sleep(0.1)  # Rate limit protection
+        addr_info = sb.addrInfo(i)
+        addr = str(addr_info.addr)
+        if addr == ZERO_ADDRESS:
+            continue
+        print(f"| {i} | {addr_info.description} | `{addr}` |")
+
+    # PriceDesk Registry
+    print("\n### PriceDesk Registry (Oracle Sources)")
+    print("| ID | Contract | Address |")
+    print("| --- | --- | --- |")
+    print(f"| - | **PriceDesk** | `{contracts['pd']}` |")
+
+    num_pd_addrs = pd.numAddrs()
+    for i in range(1, num_pd_addrs):
+        time.sleep(0.1)  # Rate limit protection
+        addr_info = pd.addrInfo(i)
+        addr = str(addr_info.addr)
+        if addr == ZERO_ADDRESS:
+            continue
+        print(f"| {i} | {addr_info.description} | `{addr}` |")
+
+    # VaultBook Registry
+    print("\n### VaultBook Registry")
+    print("| ID | Contract | Address |")
+    print("| --- | --- | --- |")
+    print(f"| - | **VaultBook** | `{contracts['vb']}` |")
+
+    num_vb_addrs = vb.numAddrs()
+    for i in range(1, num_vb_addrs):
+        time.sleep(0.1)  # Rate limit protection
+        addr_info = vb.addrInfo(i)
+        addr = str(addr_info.addr)
+        if addr == ZERO_ADDRESS:
+            continue
+        print(f"| {i} | {addr_info.description} | `{addr}` |")
+
+    # Derived Contracts (not in registries directly)
+    print("\n### Derived Contracts")
+    print("| Contract | Source | Address |")
+    print("| --- | --- | --- |")
+    if contracts.get('bb'):
+        print(f"| BondBooster | BondRoom.bondBooster() | `{contracts['bb']}` |")
+    if contracts.get('green_pool'):
+        print(f"| GREEN Pool | CurvePrices.greenRefPoolConfig() | `{contracts['green_pool']}` |")
+
+    # Token Contracts
+    print("\n### Token Contracts")
+    print("| Token | Address |")
+    print("| --- | --- |")
+    print(f"| GREEN | `{contracts['green']}` |")
+    print(f"| sGREEN (Savings) | `{contracts['sgreen']}` |")
+    print(f"| RIPE | `{contracts['ripe']}` |")
+
+    print("\n---\n")
+
+
+def fetch_mission_control_data(mc, ripe_token_addr):
     """Fetch and print all MissionControl configuration data."""
 
     # Header
     print("\n<a id=\"mission-control\"></a>")
     print("# MissionControl - Core Protocol Configuration")
-    print(f"Address: {MISSION_CONTROL}")
+    print(f"Address: {mc.address}")
 
     # ====== General Config ======
     gen_config = mc.genConfig()
@@ -417,7 +495,7 @@ def fetch_mission_control_data(mc):
     print_table("Total Points Allocations", ["Parameter", "Value"], rows)
 
     # ====== RIPE Gov Vault Config ======
-    ripe_vault_config = mc.ripeGovVaultConfig(RIPE_TOKEN)
+    ripe_vault_config = mc.ripeGovVaultConfig(ripe_token_addr)
     lock_terms = ripe_vault_config[0]  # LockTerms tuple
     rows = [
         ("minLockDuration", format_blocks_to_time(lock_terms[0])),
@@ -439,43 +517,31 @@ def fetch_mission_control_data(mc):
     print_table("Other Settings", ["Parameter", "Value"], rows)
 
     # ====== Priority Price Source IDs ======
-    try:
-        price_source_ids = mc.getPriorityPriceSourceIds()
-        if price_source_ids:
-            rows = [(i, source_id) for i, source_id in enumerate(price_source_ids)]
-            print_table("Priority Price Source IDs", ["Priority", "Source ID"], rows)
-        else:
-            print("\n## Priority Price Source IDs")
-            print("*No priority price sources configured*")
-    except Exception as e:
-        print(f"\n## Priority Price Source IDs")
-        print(f"*Error fetching: {e}*")
+    price_source_ids = mc.getPriorityPriceSourceIds()
+    if price_source_ids:
+        rows = [(i, source_id) for i, source_id in enumerate(price_source_ids)]
+        print_table("Priority Price Source IDs", ["Priority", "Source ID"], rows)
+    else:
+        print("\n## Priority Price Source IDs")
+        print("*No priority price sources configured*")
 
     # ====== Priority Liquidation Asset Vaults ======
-    try:
-        liq_vaults = mc.getPriorityLiqAssetVaults()
-        if liq_vaults:
-            rows = [(v[0], format_address(v[1])) for v in liq_vaults]
-            print_table("Priority Liquidation Asset Vaults", ["Vault ID", "Asset"], rows)
-        else:
-            print("\n## Priority Liquidation Asset Vaults")
-            print("*No priority liquidation vaults configured*")
-    except Exception as e:
-        print(f"\n## Priority Liquidation Asset Vaults")
-        print(f"*Error fetching: {e}*")
+    liq_vaults = mc.getPriorityLiqAssetVaults()
+    if liq_vaults:
+        rows = [(v[0], format_address(v[1])) for v in liq_vaults]
+        print_table("Priority Liquidation Asset Vaults", ["Vault ID", "Asset"], rows)
+    else:
+        print("\n## Priority Liquidation Asset Vaults")
+        print("*No priority liquidation vaults configured*")
 
     # ====== Priority Stability Pool Vaults ======
-    try:
-        stab_vaults = mc.getPriorityStabVaults()
-        if stab_vaults:
-            rows = [(v[0], format_address(v[1])) for v in stab_vaults]
-            print_table("Priority Stability Pool Vaults", ["Vault ID", "Asset"], rows)
-        else:
-            print("\n## Priority Stability Pool Vaults")
-            print("*No priority stability pool vaults configured*")
-    except Exception as e:
-        print(f"\n## Priority Stability Pool Vaults")
-        print(f"*Error fetching: {e}*")
+    stab_vaults = mc.getPriorityStabVaults()
+    if stab_vaults:
+        rows = [(v[0], format_address(v[1])) for v in stab_vaults]
+        print_table("Priority Stability Pool Vaults", ["Vault ID", "Asset"], rows)
+    else:
+        print("\n## Priority Stability Pool Vaults")
+        print("*No priority stability pool vaults configured*")
 
     # ====== Registered Assets ======
     num_assets = mc.numAssets()
@@ -491,6 +557,7 @@ def fetch_mission_control_data(mc):
 
         # Start from index 1 (index 0 is unused)
         for i in range(1, num_assets):
+            time.sleep(0.15)  # Rate limit protection
             asset_addr = mc.assets(i)
             asset_config = mc.assetConfig(asset_addr)
             # Access nested struct via attribute (index 6 is debtTerms)
@@ -508,6 +575,7 @@ def fetch_mission_control_data(mc):
                 asset_config.canDeposit,
                 debt_terms.ltv > 0,  # has LTV means can borrow against it
             ])
+            time.sleep(0.15)  # Rate limit protection
 
         print(f"| {' | '.join(headers)} |")
         print(f"| {' | '.join(['---' for _ in headers])} |")
@@ -566,7 +634,7 @@ def fetch_mission_control_data(mc):
                 ("canRedeemInStabPool", asset_config.canRedeemInStabPool),
                 ("canBuyInAuction", asset_config.canBuyInAuction),
                 ("canClaimInStabPool", asset_config.canClaimInStabPool),
-                ("whitelist", format_address(whitelist_addr) if whitelist_addr != "0x0000000000000000000000000000000000000000" else "None"),
+                ("whitelist", format_address(whitelist_addr) if whitelist_addr != ZERO_ADDRESS else "None"),
                 ("isNft", asset_config.isNft),
             ]
             print_table(f"{asset_name} - Action Flags", ["Parameter", "Value"], rows)
@@ -581,6 +649,8 @@ def fetch_mission_control_data(mc):
                     ("duration", format_blocks_to_time(custom_auction.duration)),
                 ]
                 print_table(f"{asset_name} - Custom Auction Params", ["Parameter", "Value"], rows)
+
+            time.sleep(0.15)  # Rate limit protection
 
 
 def fetch_ripe_hq_data(hq):
@@ -605,56 +675,49 @@ def fetch_ripe_hq_data(hq):
     print_table("Core Token Registry", ["Token", "Address"], rows)
 
     # Registry info
-    try:
-        num_addrs = hq.numAddrs()
-        registry_timelock = hq.registryChangeTimeLock()
-        rows = [
-            ("numAddrs", num_addrs),
-            ("registryChangeTimeLock", format_blocks_to_time(registry_timelock)),
-        ]
-        print_table("Registry Config", ["Parameter", "Value"], rows)
+    num_addrs = hq.numAddrs()
+    registry_timelock = hq.registryChangeTimeLock()
+    rows = [
+        ("numAddrs", num_addrs),
+        ("registryChangeTimeLock", format_blocks_to_time(registry_timelock)),
+    ]
+    print_table("Registry Config", ["Parameter", "Value"], rows)
 
-        # List all registered addresses with details
-        if num_addrs > 1:
-            print("\n### All Registered Contracts")
-            headers = ["ID", "Description", "Address", "Mint GREEN", "Mint RIPE", "Blacklist", "Paused"]
-            rows = []
-            for i in range(1, num_addrs):
-                try:
-                    addr_info = hq.addrInfo(i)
-                    contract_addr = str(addr_info.addr)
-                    if contract_addr == "0x0000000000000000000000000000000000000000":
-                        continue
+    # List all registered addresses with details
+    if num_addrs > 1:
+        print("\n### All Registered Contracts")
+        headers = ["ID", "Description", "Address", "Mint GREEN", "Mint RIPE", "Blacklist", "Paused"]
+        rows = []
+        for i in range(1, num_addrs):
+            addr_info = hq.addrInfo(i)
+            contract_addr = str(addr_info.addr)
+            if contract_addr == ZERO_ADDRESS:
+                continue
 
-                    hq_config = hq.hqConfig(i)
+            hq_config = hq.hqConfig(i)
 
-                    # Try to get isPaused from the contract
-                    is_paused = "-"
-                    try:
-                        contract = boa.from_etherscan(contract_addr, name=f"Contract{i}")
-                        is_paused = contract.isPaused()
-                    except:
-                        pass
+            # Get isPaused from the contract (not all contracts have this method)
+            is_paused = "-"
+            contract = boa.from_etherscan(contract_addr, name=f"Contract{i}")
+            if hasattr(contract, 'isPaused'):
+                is_paused = contract.isPaused()
 
-                    rows.append([
-                        i,
-                        addr_info.description,
-                        format_address(contract_addr),
-                        "✓" if hq_config.canMintGreen else "-",
-                        "✓" if hq_config.canMintRipe else "-",
-                        "✓" if hq_config.canSetTokenBlacklist else "-",
-                        is_paused,
-                    ])
-                except Exception:
-                    pass
+            rows.append([
+                i,
+                addr_info.description,
+                format_address(contract_addr),
+                "✓" if hq_config.canMintGreen else "-",
+                "✓" if hq_config.canMintRipe else "-",
+                "✓" if hq_config.canSetTokenBlacklist else "-",
+                is_paused,
+            ])
+            time.sleep(0.15)  # Rate limit protection
 
-            if rows:
-                print(f"| {' | '.join(headers)} |")
-                print(f"| {' | '.join(['---' for _ in headers])} |")
-                for row in rows:
-                    print(f"| {' | '.join(str(cell) for cell in row)} |")
-    except Exception as e:
-        print(f"*Error fetching registry: {e}*")
+        if rows:
+            print(f"| {' | '.join(headers)} |")
+            print(f"| {' | '.join(['---' for _ in headers])} |")
+            for row in rows:
+                print(f"| {' | '.join(str(cell) for cell in row)} |")
 
 
 def fetch_switchboard_data(sb):
@@ -662,54 +725,46 @@ def fetch_switchboard_data(sb):
     print("\n" + "=" * 80)
     print("\n<a id=\"switchboard\"></a>")
     print("# Switchboard - Configuration Contracts Registry")
-    print(f"Address: {SWITCHBOARD}")
+    print(f"Address: {sb.address}")
 
-    try:
-        num_addrs = sb.numAddrs()
-        registry_timelock = sb.registryChangeTimeLock()
-        rows = [
-            ("numAddrs (switchboards)", num_addrs - 1 if num_addrs > 0 else 0),
-            ("registryChangeTimeLock", format_blocks_to_time(registry_timelock)),
-        ]
-        print_table("Registry Config", ["Parameter", "Value"], rows)
+    num_addrs = sb.numAddrs()
+    registry_timelock = sb.registryChangeTimeLock()
+    rows = [
+        ("numAddrs (switchboards)", num_addrs - 1 if num_addrs > 0 else 0),
+        ("registryChangeTimeLock", format_blocks_to_time(registry_timelock)),
+    ]
+    print_table("Registry Config", ["Parameter", "Value"], rows)
 
-        # List all switchboards with details
-        if num_addrs > 1:
-            print("\n### Registered Switchboards")
-            headers = ["ID", "Description", "Address", "Paused"]
-            rows = []
-            for i in range(1, num_addrs):
-                try:
-                    addr_info = sb.addrInfo(i)
-                    contract_addr = str(addr_info.addr)
-                    if contract_addr == "0x0000000000000000000000000000000000000000":
-                        continue
+    # List all switchboards with details
+    if num_addrs > 1:
+        print("\n### Registered Switchboards")
+        headers = ["ID", "Description", "Address", "Paused"]
+        rows = []
+        for i in range(1, num_addrs):
+            addr_info = sb.addrInfo(i)
+            contract_addr = str(addr_info.addr)
+            if contract_addr == ZERO_ADDRESS:
+                continue
 
-                    # Try to get isPaused
-                    is_paused = "-"
-                    try:
-                        contract = boa.from_etherscan(contract_addr, name=f"Switchboard{i}")
-                        is_paused = contract.isPaused()
-                    except:
-                        pass
+            # Get isPaused (not all contracts have this method)
+            is_paused = "-"
+            contract = boa.from_etherscan(contract_addr, name=f"Switchboard{i}")
+            if hasattr(contract, 'isPaused'):
+                is_paused = contract.isPaused()
 
-                    rows.append([
-                        i,
-                        addr_info.description,
-                        format_address(contract_addr),
-                        is_paused,
-                    ])
-                except Exception:
-                    continue
+            rows.append([
+                i,
+                addr_info.description,
+                format_address(contract_addr),
+                is_paused,
+            ])
+            time.sleep(0.15)  # Rate limit protection
 
-            if rows:
-                print(f"| {' | '.join(headers)} |")
-                print(f"| {' | '.join(['---' for _ in headers])} |")
-                for row in rows:
-                    print(f"| {' | '.join(str(cell) for cell in row)} |")
-
-    except Exception as e:
-        print(f"*Error fetching Switchboard: {e}*")
+        if rows:
+            print(f"| {' | '.join(headers)} |")
+            print(f"| {' | '.join(['---' for _ in headers])} |")
+            for row in rows:
+                print(f"| {' | '.join(str(cell) for cell in row)} |")
 
 
 def fetch_price_desk_data(pd):
@@ -717,47 +772,41 @@ def fetch_price_desk_data(pd):
     print("\n" + "=" * 80)
     print("\n<a id=\"price-desk\"></a>")
     print("# PriceDesk - Oracle Registry")
-    print(f"Address: {PRICE_DESK}")
+    print(f"Address: {pd.address}")
 
-    try:
-        # ETH address
-        rows = [
-            ("ETH", format_address(pd.ETH())),
-        ]
-        print_table("Constants", ["Parameter", "Value"], rows)
+    # ETH address
+    rows = [
+        ("ETH", format_address(pd.ETH())),
+    ]
+    print_table("Constants", ["Parameter", "Value"], rows)
 
-        # Registry info
-        num_addrs = pd.numAddrs()
-        registry_timelock = pd.registryChangeTimeLock()
-        rows = [
-            ("numAddrs (price sources)", num_addrs - 1 if num_addrs > 0 else 0),
-            ("registryChangeTimeLock", format_blocks_to_time(registry_timelock)),
-        ]
-        print_table("Registry Config", ["Parameter", "Value"], rows)
+    # Registry info
+    num_addrs = pd.numAddrs()
+    registry_timelock = pd.registryChangeTimeLock()
+    rows = [
+        ("numAddrs (price sources)", num_addrs - 1 if num_addrs > 0 else 0),
+        ("registryChangeTimeLock", format_blocks_to_time(registry_timelock)),
+    ]
+    print_table("Registry Config", ["Parameter", "Value"], rows)
 
-        # List all price sources
-        if num_addrs > 1:
-            print("\n### Registered Price Sources")
-            headers = ["Reg ID", "Description", "Address"]
-            rows = []
-            for i in range(1, num_addrs):
-                try:
-                    addr_info = pd.addrInfo(i)
-                    if str(addr_info.addr) != "0x0000000000000000000000000000000000000000":
-                        rows.append([
-                            i,
-                            addr_info.description,
-                            format_address(str(addr_info.addr)),
-                        ])
-                except Exception:
-                    pass
-            if rows:
-                print(f"| {' | '.join(headers)} |")
-                print(f"| {' | '.join(['---' for _ in headers])} |")
-                for row in rows:
-                    print(f"| {' | '.join(str(cell) for cell in row)} |")
-    except Exception as e:
-        print(f"*Error fetching PriceDesk: {e}*")
+    # List all price sources
+    if num_addrs > 1:
+        print("\n### Registered Price Sources")
+        headers = ["Reg ID", "Description", "Address"]
+        rows = []
+        for i in range(1, num_addrs):
+            addr_info = pd.addrInfo(i)
+            if str(addr_info.addr) != ZERO_ADDRESS:
+                rows.append([
+                    i,
+                    addr_info.description,
+                    format_address(str(addr_info.addr)),
+                ])
+        if rows:
+            print(f"| {' | '.join(headers)} |")
+            print(f"| {' | '.join(['---' for _ in headers])} |")
+            for row in rows:
+                print(f"| {' | '.join(str(cell) for cell in row)} |")
 
 
 def fetch_vault_book_data(vb):
@@ -765,192 +814,162 @@ def fetch_vault_book_data(vb):
     print("\n" + "=" * 80)
     print("\n<a id=\"vault-book\"></a>")
     print("# VaultBook - Vault Registry")
-    print(f"Address: {VAULT_BOOK}")
+    print(f"Address: {vb.address}")
 
-    try:
-        num_addrs = vb.numAddrs()
-        registry_timelock = vb.registryChangeTimeLock()
-        rows = [
-            ("numAddrs (vaults)", num_addrs - 1 if num_addrs > 0 else 0),
-            ("registryChangeTimeLock", format_blocks_to_time(registry_timelock)),
-        ]
-        print_table("Registry Config", ["Parameter", "Value"], rows)
+    num_addrs = vb.numAddrs()
+    registry_timelock = vb.registryChangeTimeLock()
+    rows = [
+        ("numAddrs (vaults)", num_addrs - 1 if num_addrs > 0 else 0),
+        ("registryChangeTimeLock", format_blocks_to_time(registry_timelock)),
+    ]
+    print_table("Registry Config", ["Parameter", "Value"], rows)
 
-        # List all vaults with detailed info
-        if num_addrs > 1:
-            for i in range(1, num_addrs):
-                try:
-                    addr_info = vb.addrInfo(i)
-                    vault_addr = str(addr_info.addr)
-                    if vault_addr == "0x0000000000000000000000000000000000000000":
+    # List all vaults with detailed info
+    if num_addrs > 1:
+        for i in range(1, num_addrs):
+            addr_info = vb.addrInfo(i)
+            vault_addr = str(addr_info.addr)
+            if vault_addr == ZERO_ADDRESS:
+                continue
+
+            print(f"\n### Vault {i}: {addr_info.description}")
+            print(f"Address: {vault_addr}")
+
+            # Load vault contract and get details
+            vault = boa.from_etherscan(vault_addr, name=f"Vault{i}")
+
+            vault_rows = []
+            # isPaused is optional - not all vault types have it
+            if hasattr(vault, 'isPaused'):
+                vault_rows.append(("isPaused", vault.isPaused()))
+
+            # numAssets is optional - not all vault types have it
+            num_assets = 0
+            if hasattr(vault, 'numAssets'):
+                num_assets = vault.numAssets()
+                vault_rows.append(("numAssets", num_assets - 1 if num_assets > 0 else 0))
+
+            if vault_rows:
+                print_table("Vault Status", ["Parameter", "Value"], vault_rows)
+
+            # Show assets in vault with balances (only if vault has vaultAssets)
+            if num_assets > 1 and hasattr(vault, 'vaultAssets'):
+                asset_rows = []
+                for j in range(1, num_assets):
+                    asset_addr = vault.vaultAssets(j)
+                    if str(asset_addr) == ZERO_ADDRESS:
                         continue
+                    asset_name = get_token_name(str(asset_addr))
+                    total_bal = vault.totalBalances(asset_addr)
+                    decimals = get_token_decimals(str(asset_addr))
+                    asset_rows.append([
+                        asset_name,
+                        format_token_amount(total_bal, decimals, "")
+                    ])
 
-                    print(f"\n### Vault {i}: {addr_info.description}")
-                    print(f"Address: {vault_addr}")
+                if asset_rows:
+                    print(f"\n**Assets in Vault ({len(asset_rows)}):**")
+                    print("| Asset | Total Balance |")
+                    print("| --- | --- |")
+                    for row in asset_rows:
+                        print(f"| {row[0]} | {row[1]} |")
 
-                    # Load vault contract and get details
-                    try:
-                        vault = boa.from_etherscan(vault_addr, name=f"Vault{i}")
-
-                        vault_rows = []
-                        try:
-                            is_paused = vault.isPaused()
-                            vault_rows.append(("isPaused", is_paused))
-                        except AttributeError:
-                            pass
-
-                        try:
-                            num_assets = vault.numAssets()
-                            vault_rows.append(("numAssets", num_assets - 1 if num_assets > 0 else 0))
-                        except AttributeError:
-                            num_assets = 0
-
-                        if vault_rows:
-                            print_table("Vault Status", ["Parameter", "Value"], vault_rows)
-
-                        # Show assets in vault with balances
-                        if num_assets > 1:
-                            asset_rows = []
-                            for j in range(1, num_assets):
-                                try:
-                                    asset_addr = vault.vaultAssets(j)
-                                    if str(asset_addr) == "0x0000000000000000000000000000000000000000":
-                                        continue
-                                    asset_name = get_token_name(str(asset_addr))
-                                    try:
-                                        total_bal = vault.totalBalances(asset_addr)
-                                        # Try to get decimals
-                                        decimals = 18
-                                        try:
-                                            asset_contract = boa.from_etherscan(str(asset_addr), name=f"Asset{j}")
-                                            decimals = asset_contract.decimals()
-                                        except:
-                                            pass
-                                        asset_rows.append([
-                                            asset_name,
-                                            format_token_amount(total_bal, decimals, "")
-                                        ])
-                                    except:
-                                        asset_rows.append([asset_name, "N/A"])
-                                except:
-                                    continue
-
-                            if asset_rows:
-                                print(f"\n**Assets in Vault ({len(asset_rows)}):**")
-                                print("| Asset | Total Balance |")
-                                print("| --- | --- |")
-                                for row in asset_rows:
-                                    print(f"| {row[0]} | {row[1]} |")
-
-                    except Exception as e:
-                        print(f"*Could not load vault contract: {e}*")
-
-                except Exception:
-                    continue
-
-    except Exception as e:
-        print(f"*Error fetching VaultBook: {e}*")
+            time.sleep(0.15)  # Rate limit protection
 
 
-def fetch_ledger_data(ledger):
+def fetch_ledger_data(ledger, green_pool_addr=None):
     """Fetch and print Ledger protocol-wide data."""
     print("\n" + "=" * 80)
     print("\n<a id=\"ledger\"></a>")
     print("# Ledger - Core Protocol Data")
-    print(f"Address: {LEDGER}")
+    print(f"Address: {ledger.address}")
 
-    try:
-        # Debt statistics
-        total_debt = ledger.totalDebt()
-        num_borrowers = ledger.numBorrowers()
-        unrealized_yield = ledger.unrealizedYield()
+    # Debt statistics
+    total_debt = ledger.totalDebt()
+    num_borrowers = ledger.numBorrowers()
+    unrealized_yield = ledger.unrealizedYield()
 
+    rows = [
+        ("totalDebt", format_token_amount(total_debt)),
+        ("numBorrowers", num_borrowers - 1 if num_borrowers > 0 else 0),
+        ("unrealizedYield", format_token_amount(unrealized_yield)),
+    ]
+    print_table("Debt Statistics", ["Parameter", "Value"], rows)
+
+    # RIPE Rewards
+    ripe_rewards = ledger.ripeRewards()
+    ripe_avail = ledger.ripeAvailForRewards()
+    rows = [
+        ("borrowers allocation", format_token_amount(ripe_rewards.borrowers, 18, "RIPE")),
+        ("stakers allocation", format_token_amount(ripe_rewards.stakers, 18, "RIPE")),
+        ("voters allocation", format_token_amount(ripe_rewards.voters, 18, "RIPE")),
+        ("genDepositors allocation", format_token_amount(ripe_rewards.genDepositors, 18, "RIPE")),
+        ("newRipeRewards", format_token_amount(ripe_rewards.newRipeRewards, 18, "RIPE")),
+        ("lastUpdate (block)", ripe_rewards.lastUpdate),
+        ("ripeAvailForRewards", format_token_amount(ripe_avail, 18, "RIPE")),
+    ]
+    print_table("RIPE Rewards Pool", ["Parameter", "Value"], rows)
+
+    # Global Deposit Points
+    global_points = ledger.globalDepositPoints()
+    rows = [
+        ("lastUsdValue", f"${global_points.lastUsdValue / DECIMALS_6:,.2f}"),
+        ("ripeStakerPoints", global_points.ripeStakerPoints),
+        ("ripeVotePoints", global_points.ripeVotePoints),
+        ("ripeGenPoints", global_points.ripeGenPoints),
+        ("lastUpdate (block)", global_points.lastUpdate),
+    ]
+    print_table("Global Deposit Points", ["Parameter", "Value"], rows)
+
+    # Global Borrow Points
+    borrow_points = ledger.globalBorrowPoints()
+    rows = [
+        ("lastPrincipal", format_token_amount(borrow_points.lastPrincipal)),
+        ("points", borrow_points.points),
+        ("lastUpdate (block)", borrow_points.lastUpdate),
+    ]
+    print_table("Global Borrow Points", ["Parameter", "Value"], rows)
+
+    # Liquidation Statistics
+    num_liq_users = ledger.numFungLiqUsers()
+    rows = [
+        ("numFungLiqUsers (active liquidations)", num_liq_users - 1 if num_liq_users > 0 else 0),
+    ]
+    print_table("Liquidation Statistics", ["Parameter", "Value"], rows)
+
+    # HR Data
+    ripe_avail_hr = ledger.ripeAvailForHr()
+    num_contributors = ledger.numContributors()
+    rows = [
+        ("ripeAvailForHr", format_token_amount(ripe_avail_hr, 18, "RIPE")),
+        ("numContributors", num_contributors - 1 if num_contributors > 0 else 0),
+    ]
+    print_table("Human Resources", ["Parameter", "Value"], rows)
+
+    # Bond/Epoch Data
+    epoch_start = ledger.epochStart()
+    epoch_end = ledger.epochEnd()
+    bad_debt = ledger.badDebt()
+    ripe_paid_bad_debt = ledger.ripePaidOutForBadDebt()
+    payment_avail = ledger.paymentAmountAvailInEpoch()
+    ripe_avail_bonds = ledger.ripeAvailForBonds()
+    rows = [
+        ("epochStart (block)", epoch_start),
+        ("epochEnd (block)", epoch_end),
+        ("badDebt", format_token_amount(bad_debt)),
+        ("ripePaidOutForBadDebt", format_token_amount(ripe_paid_bad_debt, 18, "RIPE")),
+        ("paymentAmountAvailInEpoch", format_token_amount(payment_avail)),
+        ("ripeAvailForBonds", format_token_amount(ripe_avail_bonds, 18, "RIPE")),
+    ]
+    print_table("Bond Epoch Data", ["Parameter", "Value"], rows)
+
+    # Green Pool Debt (Endaoment) - optional, may not be configured
+    if green_pool_addr:
+        green_pool_debt = ledger.greenPoolDebt(green_pool_addr)
         rows = [
-            ("totalDebt", format_token_amount(total_debt)),
-            ("numBorrowers", num_borrowers - 1 if num_borrowers > 0 else 0),
-            ("unrealizedYield", format_token_amount(unrealized_yield)),
+            ("greenPoolDebt (GREEN Pool)", format_token_amount(green_pool_debt)),
         ]
-        print_table("Debt Statistics", ["Parameter", "Value"], rows)
-
-        # RIPE Rewards
-        ripe_rewards = ledger.ripeRewards()
-        ripe_avail = ledger.ripeAvailForRewards()
-        rows = [
-            ("borrowers allocation", format_token_amount(ripe_rewards.borrowers, 18, "RIPE")),
-            ("stakers allocation", format_token_amount(ripe_rewards.stakers, 18, "RIPE")),
-            ("voters allocation", format_token_amount(ripe_rewards.voters, 18, "RIPE")),
-            ("genDepositors allocation", format_token_amount(ripe_rewards.genDepositors, 18, "RIPE")),
-            ("newRipeRewards", format_token_amount(ripe_rewards.newRipeRewards, 18, "RIPE")),
-            ("lastUpdate (block)", ripe_rewards.lastUpdate),
-            ("ripeAvailForRewards", format_token_amount(ripe_avail, 18, "RIPE")),
-        ]
-        print_table("RIPE Rewards Pool", ["Parameter", "Value"], rows)
-
-        # Global Deposit Points
-        global_points = ledger.globalDepositPoints()
-        rows = [
-            ("lastUsdValue", f"${global_points.lastUsdValue / DECIMALS_6:,.2f}"),
-            ("ripeStakerPoints", global_points.ripeStakerPoints),
-            ("ripeVotePoints", global_points.ripeVotePoints),
-            ("ripeGenPoints", global_points.ripeGenPoints),
-            ("lastUpdate (block)", global_points.lastUpdate),
-        ]
-        print_table("Global Deposit Points", ["Parameter", "Value"], rows)
-
-        # Global Borrow Points
-        borrow_points = ledger.globalBorrowPoints()
-        rows = [
-            ("lastPrincipal", format_token_amount(borrow_points.lastPrincipal)),
-            ("points", borrow_points.points),
-            ("lastUpdate (block)", borrow_points.lastUpdate),
-        ]
-        print_table("Global Borrow Points", ["Parameter", "Value"], rows)
-
-        # Liquidation Statistics
-        num_liq_users = ledger.numFungLiqUsers()
-        rows = [
-            ("numFungLiqUsers (active liquidations)", num_liq_users - 1 if num_liq_users > 0 else 0),
-        ]
-        print_table("Liquidation Statistics", ["Parameter", "Value"], rows)
-
-        # HR Data
-        ripe_avail_hr = ledger.ripeAvailForHr()
-        num_contributors = ledger.numContributors()
-        rows = [
-            ("ripeAvailForHr", format_token_amount(ripe_avail_hr, 18, "RIPE")),
-            ("numContributors", num_contributors - 1 if num_contributors > 0 else 0),
-        ]
-        print_table("Human Resources", ["Parameter", "Value"], rows)
-
-        # Bond/Epoch Data
-        epoch_start = ledger.epochStart()
-        epoch_end = ledger.epochEnd()
-        bad_debt = ledger.badDebt()
-        ripe_paid_bad_debt = ledger.ripePaidOutForBadDebt()
-        payment_avail = ledger.paymentAmountAvailInEpoch()
-        ripe_avail_bonds = ledger.ripeAvailForBonds()
-        rows = [
-            ("epochStart (block)", epoch_start),
-            ("epochEnd (block)", epoch_end),
-            ("badDebt", format_token_amount(bad_debt)),
-            ("ripePaidOutForBadDebt", format_token_amount(ripe_paid_bad_debt, 18, "RIPE")),
-            ("paymentAmountAvailInEpoch", format_token_amount(payment_avail)),
-            ("ripeAvailForBonds", format_token_amount(ripe_avail_bonds, 18, "RIPE")),
-        ]
-        print_table("Bond Epoch Data", ["Parameter", "Value"], rows)
-
-        # Green Pool Debt (Endaoment)
-        try:
-            green_pool_debt = ledger.greenPoolDebt(GREEN_POOL)
-            rows = [
-                ("greenPoolDebt (GREEN Pool)", format_token_amount(green_pool_debt)),
-            ]
-            print_table("Endaoment Pool Debt", ["Parameter", "Value"], rows)
-        except Exception:
-            pass
-
-    except Exception as e:
-        print(f"*Error fetching Ledger: {e}*")
+        print_table("Endaoment Pool Debt", ["Parameter", "Value"], rows)
 
 
 def fetch_credit_engine_data(ce):
@@ -958,7 +977,7 @@ def fetch_credit_engine_data(ce):
     print("\n" + "=" * 80)
     print("\n<a id=\"credit-engine\"></a>")
     print("# CreditEngine - Credit Configuration")
-    print(f"Address: {CREDIT_ENGINE}")
+    print(f"Address: {ce.address}")
 
     undy_discount = ce.undyVaulDiscount()
     buyback_ratio = ce.buybackRatio()
@@ -975,21 +994,18 @@ def fetch_bond_booster_data(bb):
     print("\n" + "=" * 80)
     print("\n<a id=\"bond-booster\"></a>")
     print("# BondBooster - Bond Boost Configuration")
-    print(f"Address: {BOND_BOOSTER}")
+    print(f"Address: {bb.address}")
 
-    try:
-        max_boost = bb.maxBoostRatio()
-        max_units = bb.maxUnits()
-        min_lock = bb.minLockDuration()
+    max_boost = bb.maxBoostRatio()
+    max_units = bb.maxUnits()
+    min_lock = bb.minLockDuration()
 
-        rows = [
-            ("maxBoostRatio", format_percent(max_boost)),
-            ("maxUnits", max_units),
-            ("minLockDuration", format_blocks_to_time(min_lock)),
-        ]
-        print_table("Bond Booster Global Config", ["Parameter", "Value"], rows)
-    except Exception as e:
-        print(f"*Error fetching BondBooster: {e}*")
+    rows = [
+        ("maxBoostRatio", format_percent(max_boost)),
+        ("maxUnits", max_units),
+        ("minLockDuration", format_blocks_to_time(min_lock)),
+    ]
+    print_table("Bond Booster Global Config", ["Parameter", "Value"], rows)
 
 
 def fetch_lootbox_data(lootbox):
@@ -997,7 +1013,7 @@ def fetch_lootbox_data(lootbox):
     print("\n" + "=" * 80)
     print("\n<a id=\"lootbox\"></a>")
     print("# Lootbox - RIPE Rewards & Underscore Config")
-    print(f"Address: {LOOTBOX}")
+    print(f"Address: {lootbox.address}")
 
     has_undy = lootbox.hasUnderscoreRewards()
     send_interval = lootbox.underscoreSendInterval()
@@ -1020,7 +1036,7 @@ def fetch_bond_room_data(bond_room):
     print("\n" + "=" * 80)
     print("\n<a id=\"bond-room\"></a>")
     print("# BondRoom - Bond Purchase Configuration")
-    print(f"Address: {BOND_ROOM}")
+    print(f"Address: {bond_room.address}")
 
     is_paused = bond_room.isPaused()
     booster_addr = bond_room.bondBooster()
@@ -1037,7 +1053,7 @@ def fetch_ripe_gov_vault_data(ripe_gov):
     print("\n" + "=" * 80)
     print("\n<a id=\"ripe-gov-vault\"></a>")
     print("# Ripe Gov Vault - Governance Staking")
-    print(f"Address: {RIPE_GOV_VAULT}")
+    print(f"Address: {ripe_gov.address}")
 
     is_paused = ripe_gov.isPaused()
     total_points = ripe_gov.totalGovPoints()
@@ -1055,63 +1071,46 @@ def fetch_price_source_configs(pd):
     print("\n<a id=\"price-sources\"></a>")
     print("# Price Source Configurations")
 
-    try:
-        num_addrs = pd.numAddrs()
-        if num_addrs <= 1:
-            print("*No price sources configured*")
-            return
+    num_addrs = pd.numAddrs()
+    if num_addrs <= 1:
+        print("*No price sources configured*")
+        return
 
-        for i in range(1, num_addrs):
-            try:
-                addr_info = pd.addrInfo(i)
-                if str(addr_info.addr) == "0x0000000000000000000000000000000000000000":
-                    continue
+    for i in range(1, num_addrs):
+        addr_info = pd.addrInfo(i)
+        if str(addr_info.addr) == ZERO_ADDRESS:
+            continue
 
-                source_addr = str(addr_info.addr)
-                source_name = addr_info.description
+        source_addr = str(addr_info.addr)
+        source_name = addr_info.description
 
-                print(f"\n## {source_name}")
-                print(f"Address: {source_addr}")
+        print(f"\n## {source_name}")
+        print(f"Address: {source_addr}")
 
-                # Try to load the price source and get its config
-                try:
-                    source = boa.from_etherscan(source_addr, name=f"PriceSource{i}")
+        # Load the price source contract
+        source = boa.from_etherscan(source_addr, name=f"PriceSource{i}")
 
-                    # Global config
-                    rows = []
-                    try:
-                        is_paused = source.isPaused()
-                        rows.append(("isPaused", is_paused))
-                    except AttributeError:
-                        pass
+        # Global config - these methods are optional depending on price source type
+        rows = []
+        if hasattr(source, 'isPaused'):
+            rows.append(("isPaused", source.isPaused()))
 
-                    try:
-                        max_conf = source.maxConfidenceRatio()
-                        rows.append(("maxConfidenceRatio", format_percent(max_conf)))
-                    except AttributeError:
-                        pass
+        if hasattr(source, 'maxConfidenceRatio'):
+            rows.append(("maxConfidenceRatio", format_percent(source.maxConfidenceRatio())))
 
-                    try:
-                        num_assets = source.numAssets()
-                        rows.append(("numAssets", num_assets - 1 if num_assets > 0 else 0))
-                    except AttributeError:
-                        num_assets = 0
+        num_assets = 0
+        if hasattr(source, 'numAssets'):
+            num_assets = source.numAssets()
+            rows.append(("numAssets", num_assets - 1 if num_assets > 0 else 0))
 
-                    if rows:
-                        print_table(f"{source_name} Global Config", ["Parameter", "Value"], rows)
+        if rows:
+            print_table(f"{source_name} Global Config", ["Parameter", "Value"], rows)
 
-                    # Per-asset configurations
-                    if num_assets > 1:
-                        _fetch_price_source_assets(source, source_name, num_assets)
+        # Per-asset configurations
+        if num_assets > 1:
+            _fetch_price_source_assets(source, source_name, num_assets)
 
-                except Exception as e:
-                    print(f"*Could not load contract: {e}*")
-
-            except Exception:
-                continue
-
-    except Exception as e:
-        print(f"*Error fetching price sources: {e}*")
+        time.sleep(0.15)  # Rate limit protection
 
 
 def _fetch_price_source_assets(source, source_name, num_assets):
@@ -1119,80 +1118,69 @@ def _fetch_price_source_assets(source, source_name, num_assets):
     asset_rows = []
 
     for j in range(1, num_assets):
-        try:
-            asset_addr = source.assets(j)
-            if str(asset_addr) == "0x0000000000000000000000000000000000000000":
-                continue
+        asset_addr = source.assets(j)
+        if str(asset_addr) == ZERO_ADDRESS:
+            continue
 
-            asset_name = get_token_name(str(asset_addr))
+        asset_name = get_token_name(str(asset_addr))
 
-            # Try to get feedConfig (Chainlink style)
-            try:
-                config = source.feedConfig(asset_addr)
+        # Different price source types have different config methods
+        # Check which config method this source supports and use it
+        if hasattr(source, 'feedConfig'):
+            # Chainlink / Pyth style
+            config = source.feedConfig(asset_addr)
+            if hasattr(config, 'feed'):
                 # Chainlink: feed, decimals, needsEthToUsd, needsBtcToUsd, staleTime
-                if hasattr(config, 'feed'):
-                    feed_addr = format_address(str(config.feed)) if str(config.feed) != "0x0000000000000000000000000000000000000000" else "N/A"
-                    needs_eth = getattr(config, 'needsEthToUsd', False)
-                    needs_btc = getattr(config, 'needsBtcToUsd', False)
-                    stale = getattr(config, 'staleTime', 0)
-                    asset_rows.append([
-                        asset_name,
-                        feed_addr,
-                        f"ETH:{needs_eth}, BTC:{needs_btc}",
-                        f"{stale}s" if stale > 0 else "default"
-                    ])
+                feed_addr = format_address(str(config.feed)) if str(config.feed) != ZERO_ADDRESS else "N/A"
+                needs_eth = getattr(config, 'needsEthToUsd', False)
+                needs_btc = getattr(config, 'needsBtcToUsd', False)
+                stale = getattr(config, 'staleTime', 0)
+                asset_rows.append([
+                    asset_name,
+                    feed_addr,
+                    f"ETH:{needs_eth}, BTC:{needs_btc}",
+                    f"{stale}s" if stale > 0 else "default"
+                ])
+            elif hasattr(config, 'feedId'):
                 # Pyth: feedId, staleTime
-                elif hasattr(config, 'feedId'):
-                    feed_id = config.feedId.hex() if config.feedId else "N/A"
-                    stale = getattr(config, 'staleTime', 0)
-                    asset_rows.append([
-                        asset_name,
-                        f"0x{feed_id[:8]}...{feed_id[-8:]}" if len(feed_id) > 16 else feed_id,
-                        "-",
-                        f"{stale}s" if stale > 0 else "default"
-                    ])
-                continue
-            except AttributeError:
-                pass
-
-            # Try priceConfigs (BlueChipYield / UndyVault style)
-            try:
-                config = source.priceConfigs(asset_addr)
-                if hasattr(config, 'underlyingAsset'):
-                    underlying = get_token_name(str(config.underlyingAsset))
-                    protocol_id = getattr(config, 'protocol', 0)
-                    protocol_name = PROTOCOL_NAMES.get(protocol_id, f"ID:{protocol_id}")
-                    stale = getattr(config, 'staleTime', 0)
-                    max_snapshots = getattr(config, 'maxNumSnapshots', 0)
-                    asset_rows.append([
-                        asset_name,
-                        underlying,
-                        f"{protocol_name}, snaps:{max_snapshots}",
-                        f"{stale}s" if stale > 0 else "default"
-                    ])
-                continue
-            except AttributeError:
-                pass
-
-            # Try curveConfig (Curve style)
-            try:
-                config = source.curveConfig(asset_addr)
-                if config:
-                    asset_rows.append([
-                        asset_name,
-                        "Curve Pool",
-                        "-",
-                        "-"
-                    ])
-                continue
-            except AttributeError:
-                pass
-
+                feed_id = config.feedId.hex() if config.feedId else "N/A"
+                stale = getattr(config, 'staleTime', 0)
+                asset_rows.append([
+                    asset_name,
+                    f"0x{feed_id[:8]}...{feed_id[-8:]}" if len(feed_id) > 16 else feed_id,
+                    "-",
+                    f"{stale}s" if stale > 0 else "default"
+                ])
+        elif hasattr(source, 'priceConfigs'):
+            # BlueChipYield / UndyVault style
+            config = source.priceConfigs(asset_addr)
+            if hasattr(config, 'underlyingAsset'):
+                underlying = get_token_name(str(config.underlyingAsset))
+                protocol_id = getattr(config, 'protocol', 0)
+                protocol_name = PROTOCOL_NAMES.get(protocol_id, f"ID:{protocol_id}")
+                stale = getattr(config, 'staleTime', 0)
+                max_snapshots = getattr(config, 'maxNumSnapshots', 0)
+                asset_rows.append([
+                    asset_name,
+                    underlying,
+                    f"{protocol_name}, snaps:{max_snapshots}",
+                    f"{stale}s" if stale > 0 else "default"
+                ])
+        elif hasattr(source, 'curveConfig'):
+            # Curve style
+            config = source.curveConfig(asset_addr)
+            if config:
+                asset_rows.append([
+                    asset_name,
+                    "Curve Pool",
+                    "-",
+                    "-"
+                ])
+        else:
             # Fallback - just show asset is registered
             asset_rows.append([asset_name, "Configured", "-", "-"])
 
-        except Exception:
-            continue
+        time.sleep(0.15)  # Rate limit protection
 
     if asset_rows:
         headers = ["Asset", "Feed/Underlying", "Config", "StaleTime"]
@@ -1208,7 +1196,7 @@ def fetch_stability_pool_data(stab_pool):
     print("\n" + "=" * 80)
     print("\n<a id=\"stability-pool\"></a>")
     print("# Stability Pool - Liquidation Buffer")
-    print(f"Address: {STABILITY_POOL}")
+    print(f"Address: {stab_pool.address}")
 
     is_paused = stab_pool.isPaused()
     num_assets = stab_pool.numAssets()
@@ -1225,7 +1213,7 @@ def fetch_auction_house_data(auction_house):
     print("\n" + "=" * 80)
     print("\n<a id=\"auction-house\"></a>")
     print("# Auction House - Liquidation Auctions")
-    print(f"Address: {AUCTION_HOUSE}")
+    print(f"Address: {auction_house.address}")
 
     is_paused = auction_house.isPaused()
 
@@ -1240,7 +1228,7 @@ def fetch_teller_data(teller):
     print("\n" + "=" * 80)
     print("\n<a id=\"teller\"></a>")
     print("# Teller - User Interaction Gateway")
-    print(f"Address: {TELLER}")
+    print(f"Address: {teller.address}")
 
     is_paused = teller.isPaused()
 
@@ -1255,7 +1243,7 @@ def fetch_deleverage_data(deleverage):
     print("\n" + "=" * 80)
     print("\n<a id=\"deleverage\"></a>")
     print("# Deleverage - Deleverage Engine")
-    print(f"Address: {DELEVERAGE}")
+    print(f"Address: {deleverage.address}")
 
     is_paused = deleverage.isPaused()
 
@@ -1270,7 +1258,7 @@ def fetch_credit_redeem_data(credit_redeem):
     print("\n" + "=" * 80)
     print("\n<a id=\"credit-redeem\"></a>")
     print("# Credit Redeem - Redemptions Engine")
-    print(f"Address: {CREDIT_REDEEM}")
+    print(f"Address: {credit_redeem.address}")
 
     is_paused = credit_redeem.isPaused()
 
@@ -1285,7 +1273,7 @@ def fetch_endaoment_data(endaoment):
     print("\n" + "=" * 80)
     print("\n<a id=\"endaoment\"></a>")
     print("# Endaoment - Treasury & GREEN Stabilization")
-    print(f"Address: {ENDAOMENT}")
+    print(f"Address: {endaoment.address}")
 
     is_paused = endaoment.isPaused()
     weth = endaoment.WETH()
@@ -1302,7 +1290,7 @@ def fetch_human_resources_data(hr):
     print("\n" + "=" * 80)
     print("\n<a id=\"human-resources\"></a>")
     print("# Human Resources - Contributor Management")
-    print(f"Address: {HUMAN_RESOURCES}")
+    print(f"Address: {hr.address}")
 
     is_paused = hr.isPaused()
 
@@ -1313,203 +1301,124 @@ def fetch_human_resources_data(hr):
     print("\n*Note: numContributors is tracked in Ledger contract*")
 
 
-def fetch_endaoment_psm_data():
+def fetch_endaoment_psm_data(psm):
     """Fetch and print Endaoment PSM (Peg Stability Module) config."""
     print("\n" + "=" * 80)
     print("\n<a id=\"endaoment-psm\"></a>")
     print("# Endaoment PSM - Peg Stability Module")
+    print(f"Address: {psm.address}")
 
-    # Try to find PSM address dynamically, fall back to Endaoment
-    psm_address = ENDAOMENT_PSM if ENDAOMENT_PSM else ENDAOMENT
-    print(f"Address: {psm_address}")
+    # Mint config
+    can_mint = psm.canMint()
+    mint_fee = psm.mintFee()
+    max_interval_mint = psm.maxIntervalMint()
+    enforce_allowlist = psm.shouldEnforceMintAllowlist()
 
-    try:
-        psm = boa.from_etherscan(psm_address, name="EndaomentPSM")
+    mint_rows = [
+        ("canMint", "✅ Enabled" if can_mint else "❌ Disabled"),
+        ("mintFee", format_percent(mint_fee)),
+        ("maxIntervalMint", format_token_amount(max_interval_mint)),
+        ("shouldEnforceMintAllowlist", enforce_allowlist),
+    ]
+    print_table("PSM Mint Configuration", ["Parameter", "Value"], mint_rows)
 
-        # Mint config
-        mint_rows = []
-        try:
-            can_mint = psm.canMint()
-            mint_rows.append(("canMint", "✅ Enabled" if can_mint else "❌ Disabled"))
-        except AttributeError:
-            pass
+    # Redeem config
+    can_redeem = psm.canRedeem()
+    redeem_fee = psm.redeemFee()
+    max_interval_redeem = psm.maxIntervalRedeem()
+    enforce_redeem_allowlist = psm.shouldEnforceRedeemAllowlist()
 
-        try:
-            mint_fee = psm.mintFee()
-            mint_rows.append(("mintFee", format_percent(mint_fee)))
-        except AttributeError:
-            pass
+    redeem_rows = [
+        ("canRedeem", "✅ Enabled" if can_redeem else "❌ Disabled"),
+        ("redeemFee", format_percent(redeem_fee)),
+        ("maxIntervalRedeem", format_token_amount(max_interval_redeem)),
+        ("shouldEnforceRedeemAllowlist", enforce_redeem_allowlist),
+    ]
+    print_table("PSM Redeem Configuration", ["Parameter", "Value"], redeem_rows)
 
-        try:
-            max_interval_mint = psm.maxIntervalMint()
-            mint_rows.append(("maxIntervalMint", format_token_amount(max_interval_mint)))
-        except AttributeError:
-            pass
+    # Interval config
+    num_blocks_per_interval = psm.numBlocksPerInterval()
+    should_auto_deposit = psm.shouldAutoDeposit()
+    usdc_yield_position = psm.usdcYieldPosition()
 
-        try:
-            enforce_allowlist = psm.shouldEnforceMintAllowlist()
-            mint_rows.append(("shouldEnforceMintAllowlist", enforce_allowlist))
-        except AttributeError:
-            pass
+    interval_rows = [
+        ("numBlocksPerInterval", format_blocks_to_time(num_blocks_per_interval)),
+        ("shouldAutoDeposit", should_auto_deposit),
+        ("usdcYieldPosition.legoId", usdc_yield_position[0]),
+        ("usdcYieldPosition.vaultToken", format_address(str(usdc_yield_position[1]))),
+    ]
+    print_table("PSM Interval & Yield Configuration", ["Parameter", "Value"], interval_rows)
 
-        if mint_rows:
-            print_table("PSM Mint Configuration", ["Parameter", "Value"], mint_rows)
+    # Current interval stats
+    global_mint_interval = psm.globalMintInterval()
+    global_redeem_interval = psm.globalRedeemInterval()
 
-        # Redeem config
-        redeem_rows = []
-        try:
-            can_redeem = psm.canRedeem()
-            redeem_rows.append(("canRedeem", "✅ Enabled" if can_redeem else "❌ Disabled"))
-        except AttributeError:
-            pass
+    stats_rows = [
+        ("Mint Interval Start", global_mint_interval[0]),
+        ("Mint Interval Amount", format_token_amount(global_mint_interval[1])),
+        ("Redeem Interval Start", global_redeem_interval[0]),
+        ("Redeem Interval Amount", format_token_amount(global_redeem_interval[1])),
+    ]
+    print_table("PSM Current Interval Stats", ["Parameter", "Value"], stats_rows)
 
-        try:
-            redeem_fee = psm.redeemFee()
-            redeem_rows.append(("redeemFee", format_percent(redeem_fee)))
-        except AttributeError:
-            pass
-
-        try:
-            max_interval_redeem = psm.maxIntervalRedeem()
-            redeem_rows.append(("maxIntervalRedeem", format_token_amount(max_interval_redeem)))
-        except AttributeError:
-            pass
-
-        try:
-            enforce_redeem_allowlist = psm.shouldEnforceRedeemAllowlist()
-            redeem_rows.append(("shouldEnforceRedeemAllowlist", enforce_redeem_allowlist))
-        except AttributeError:
-            pass
-
-        if redeem_rows:
-            print_table("PSM Redeem Configuration", ["Parameter", "Value"], redeem_rows)
-
-        # Interval config
-        interval_rows = []
-        try:
-            num_blocks_per_interval = psm.numBlocksPerInterval()
-            interval_rows.append(("numBlocksPerInterval", format_blocks_to_time(num_blocks_per_interval)))
-        except AttributeError:
-            pass
-
-        try:
-            should_auto_deposit = psm.shouldAutoDeposit()
-            interval_rows.append(("shouldAutoDeposit", should_auto_deposit))
-        except AttributeError:
-            pass
-
-        try:
-            usdc_yield_position = psm.usdcYieldPosition()
-            if hasattr(usdc_yield_position, 'legoId'):
-                interval_rows.append(("usdcYieldPosition.legoId", usdc_yield_position.legoId))
-                interval_rows.append(("usdcYieldPosition.vaultToken", format_address(str(usdc_yield_position.vaultToken))))
-        except AttributeError:
-            pass
-
-        if interval_rows:
-            print_table("PSM Interval & Yield Configuration", ["Parameter", "Value"], interval_rows)
-
-        # Current interval stats
-        stats_rows = []
-        try:
-            global_mint_interval = psm.globalMintInterval()
-            if hasattr(global_mint_interval, 'startBlock'):
-                stats_rows.append(("Mint Interval Start", global_mint_interval.startBlock))
-                stats_rows.append(("Mint Interval Amount", format_token_amount(global_mint_interval.amount)))
-        except AttributeError:
-            pass
-
-        try:
-            global_redeem_interval = psm.globalRedeemInterval()
-            if hasattr(global_redeem_interval, 'startBlock'):
-                stats_rows.append(("Redeem Interval Start", global_redeem_interval.startBlock))
-                stats_rows.append(("Redeem Interval Amount", format_token_amount(global_redeem_interval.amount)))
-        except AttributeError:
-            pass
-
-        if stats_rows:
-            print_table("PSM Current Interval Stats", ["Parameter", "Value"], stats_rows)
-
-        # USDC info
-        try:
-            usdc_addr = psm.USDC()
-            print(f"\n**USDC Address:** {format_address(str(usdc_addr))}")
-        except AttributeError:
-            pass
-
-    except Exception as e:
-        print(f"*Error fetching PSM data: {e}*")
-        print("*Note: PSM contract may not be deployed or verified yet*")
+    # USDC info
+    usdc_addr = psm.USDC()
+    print(f"\n**USDC Address:** {format_address(str(usdc_addr))}")
 
 
-def fetch_token_data():
+def fetch_token_data(green, ripe, sgreen):
     """Fetch and print token supply data with savings rate calculation."""
     print("\n" + "=" * 80)
     print("\n<a id=\"token-statistics\"></a>")
     print("# Token Statistics")
 
-    try:
-        # GREEN Token
-        green = boa.from_etherscan(GREEN_TOKEN, name="GreenToken")
-        green_supply = green.totalSupply()
-        rows = [
-            ("totalSupply", format_token_amount(green_supply)),
-            ("decimals", green.decimals()),
-            ("name", green.name()),
-            ("symbol", green.symbol()),
-        ]
-        print_table("GREEN Token", ["Parameter", "Value"], rows)
-    except Exception as e:
-        print(f"\n## GREEN Token")
-        print(f"*Error fetching: {e}*")
+    # GREEN Token
+    green_supply = green.totalSupply()
+    rows = [
+        ("totalSupply", format_token_amount(green_supply)),
+        ("decimals", green.decimals()),
+        ("name", green.name()),
+        ("symbol", green.symbol()),
+    ]
+    print_table("GREEN Token", ["Parameter", "Value"], rows)
 
-    try:
-        # RIPE Token
-        ripe = boa.from_etherscan(RIPE_TOKEN, name="RipeToken")
-        ripe_supply = ripe.totalSupply()
-        rows = [
-            ("totalSupply", format_token_amount(ripe_supply, 18, "RIPE")),
-            ("decimals", ripe.decimals()),
-            ("name", ripe.name()),
-            ("symbol", ripe.symbol()),
-        ]
-        print_table("RIPE Token", ["Parameter", "Value"], rows)
-    except Exception as e:
-        print(f"\n## RIPE Token")
-        print(f"*Error fetching: {e}*")
+    # RIPE Token
+    ripe_supply = ripe.totalSupply()
+    rows = [
+        ("totalSupply", format_token_amount(ripe_supply, 18, "RIPE")),
+        ("decimals", ripe.decimals()),
+        ("name", ripe.name()),
+        ("symbol", ripe.symbol()),
+    ]
+    print_table("RIPE Token", ["Parameter", "Value"], rows)
 
-    try:
-        # Savings GREEN (sGREEN) with exchange rate and savings yield
-        sgreen = boa.from_etherscan(SAVINGS_GREEN, name="SavingsGreen")
-        sgreen_supply = sgreen.totalSupply()
-        sgreen_assets = sgreen.totalAssets()
+    # Savings GREEN (sGREEN) with exchange rate and savings yield
+    sgreen_supply = sgreen.totalSupply()
+    sgreen_assets = sgreen.totalAssets()
 
-        # Calculate exchange rate and effective yield
-        exchange_rate = sgreen_assets / sgreen_supply if sgreen_supply > 0 else 1
-        accumulated_yield = (exchange_rate - 1) * 100  # How much above 1:1
+    # Calculate exchange rate and effective yield
+    exchange_rate = sgreen_assets / sgreen_supply if sgreen_supply > 0 else 1
+    accumulated_yield = (exchange_rate - 1) * 100  # How much above 1:1
 
-        rows = [
-            ("totalSupply (shares)", format_token_amount(sgreen_supply)),
-            ("totalAssets (GREEN)", format_token_amount(sgreen_assets)),
-            ("**Exchange Rate**", f"**{exchange_rate:.6f} GREEN per sGREEN**"),
-            ("**Accumulated Yield**", f"**{accumulated_yield:+.4f}%** above 1:1"),
-            ("decimals", sgreen.decimals()),
-            ("name", sgreen.name()),
-            ("symbol", sgreen.symbol()),
-        ]
-        print_table("Savings GREEN (sGREEN)", ["Parameter", "Value"], rows)
+    rows = [
+        ("totalSupply (shares)", format_token_amount(sgreen_supply)),
+        ("totalAssets (GREEN)", format_token_amount(sgreen_assets)),
+        ("**Exchange Rate**", f"**{exchange_rate:.6f} GREEN per sGREEN**"),
+        ("**Accumulated Yield**", f"**{accumulated_yield:+.4f}%** above 1:1"),
+        ("decimals", sgreen.decimals()),
+        ("name", sgreen.name()),
+        ("symbol", sgreen.symbol()),
+    ]
+    print_table("Savings GREEN (sGREEN)", ["Parameter", "Value"], rows)
 
-        # Show what 1000 sGREEN would be worth
-        print(f"\n*Example: 1,000 sGREEN = {1000 * exchange_rate:,.4f} GREEN*")
-
-    except Exception as e:
-        print(f"\n## Savings GREEN")
-        print(f"*Error fetching: {e}*")
+    # Show what 1000 sGREEN would be worth
+    print(f"\n*Example: 1,000 sGREEN = {1000 * exchange_rate:,.4f} GREEN*")
 
 
 def main():
     """Main entry point."""
-    print("Connecting to Base mainnet via Alchemy...")
+    # Status messages go to stderr so they appear on console
+    print("Connecting to Base mainnet via Alchemy...", file=sys.stderr)
 
     # Set etherscan API for contract loading
     boa.set_etherscan(
@@ -1520,105 +1429,152 @@ def main():
     # Fork at latest block (no block_identifier)
     with boa.fork(RPC_URL):
         block_number = boa.env.evm.patch.block_number
-        print(f"Connected. Block: {block_number}\n")
+        print(f"Connected. Block: {block_number}\n", file=sys.stderr)
 
-        # Load contracts from Etherscan
-        print("Loading contracts from Etherscan...")
-        mc = boa.from_etherscan(MISSION_CONTROL, name="MissionControl")
+        # Load contracts from Etherscan - derive all addresses from RIPE_HQ
+        print("Loading contracts from Etherscan...", file=sys.stderr)
+
+        # Phase 1: Load RipeHQ first (only hardcoded address)
         hq = boa.from_etherscan(RIPE_HQ, name="RipeHQ")
-        sb = boa.from_etherscan(SWITCHBOARD, name="Switchboard")
-        pd = boa.from_etherscan(PRICE_DESK, name="PriceDesk")
-        vb = boa.from_etherscan(VAULT_BOOK, name="VaultBook")
-        ledger = boa.from_etherscan(LEDGER, name="Ledger")
-        ce = boa.from_etherscan(CREDIT_ENGINE, name="CreditEngine")
-        bb = boa.from_etherscan(BOND_BOOSTER, name="BondBooster")
-        lootbox = boa.from_etherscan(LOOTBOX, name="Lootbox")
-        bond_room = boa.from_etherscan(BOND_ROOM, name="BondRoom")
-        ripe_gov = boa.from_etherscan(RIPE_GOV_VAULT, name="RipeGovVault")
-        stab_pool = boa.from_etherscan(STABILITY_POOL, name="StabilityPool")
 
-        # Core lending contracts
-        auction_house = boa.from_etherscan(AUCTION_HOUSE, name="AuctionHouse")
-        teller = boa.from_etherscan(TELLER, name="Teller")
-        deleverage = boa.from_etherscan(DELEVERAGE, name="Deleverage")
-        credit_redeem = boa.from_etherscan(CREDIT_REDEEM, name="CreditRedeem")
+        # Phase 2: Load core contracts using addresses from RipeHQ registry
+        mc = boa.from_etherscan(hq.getAddr(MISSION_CONTROL_ID), name="MissionControl")
+        sb = boa.from_etherscan(hq.getAddr(SWITCHBOARD_ID), name="Switchboard")
+        pd = boa.from_etherscan(hq.getAddr(PRICE_DESK_ID), name="PriceDesk")
+        vb = boa.from_etherscan(hq.getAddr(VAULT_BOOK_ID), name="VaultBook")
+        ledger = boa.from_etherscan(hq.getAddr(LEDGER_ID), name="Ledger")
+        ce = boa.from_etherscan(hq.getAddr(CREDIT_ENGINE_ID), name="CreditEngine")
+        bond_room = boa.from_etherscan(hq.getAddr(BOND_ROOM_ID), name="BondRoom")
+        lootbox = boa.from_etherscan(hq.getAddr(LOOTBOX_ID), name="Lootbox")
+        auction_house = boa.from_etherscan(hq.getAddr(AUCTION_HOUSE_ID), name="AuctionHouse")
+        teller = boa.from_etherscan(hq.getAddr(TELLER_ID), name="Teller")
+        deleverage = boa.from_etherscan(hq.getAddr(DELEVERAGE_ID), name="Deleverage")
+        credit_redeem = boa.from_etherscan(hq.getAddr(CREDIT_REDEEM_ID), name="CreditRedeem")
+        endaoment = boa.from_etherscan(hq.getAddr(ENDAOMENT_ID), name="Endaoment")
+        hr = boa.from_etherscan(hq.getAddr(HUMAN_RESOURCES_ID), name="HumanResources")
+        psm = boa.from_etherscan(hq.getAddr(ENDAOMENT_PSM_ID), name="EndaomentPSM")
 
-        # Treasury contracts
-        endaoment = boa.from_etherscan(ENDAOMENT, name="Endaoment")
-        hr = boa.from_etherscan(HUMAN_RESOURCES, name="HumanResources")
+        # Load token contracts
+        green = boa.from_etherscan(hq.getAddr(GREEN_TOKEN_ID), name="GreenToken")
+        sgreen = boa.from_etherscan(hq.getAddr(SAVINGS_GREEN_ID), name="SavingsGreen")
+        ripe = boa.from_etherscan(hq.getAddr(RIPE_TOKEN_ID), name="RipeToken")
 
-        # Load token contracts for executive summary
-        green = boa.from_etherscan(GREEN_TOKEN, name="GreenToken")
-        sgreen = boa.from_etherscan(SAVINGS_GREEN, name="SavingsGreen")
-        ripe = boa.from_etherscan(RIPE_TOKEN, name="RipeToken")
+        # Phase 3: Load derived contracts from sub-registries
+        # BondBooster from BondRoom
+        bb = boa.from_etherscan(bond_room.bondBooster(), name="BondBooster")
 
-        print("Fetching configuration data...\n")
-        print("=" * 80)
+        # StabilityPool and RipeGovVault from VaultBook
+        stab_pool = boa.from_etherscan(vb.getAddr(STABILITY_POOL_VB_ID), name="StabilityPool")
+        ripe_gov = boa.from_etherscan(vb.getAddr(RIPE_GOV_VAULT_VB_ID), name="RipeGovVault")
 
-        # Header
-        print("# Ripe Protocol Production Parameters")
-        print(f"\n**Generated:** {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')} UTC")
-        print(f"**Block:** {block_number}")
-        print(f"**Network:** Base Mainnet")
+        # GreenPool from CurvePrices (find in PriceDesk, then get greenRefPoolConfig)
+        green_pool_addr = None
+        num_price_sources = pd.numAddrs()
+        for i in range(1, num_price_sources):
+            addr = pd.getAddr(i)
+            if str(addr) == ZERO_ADDRESS:
+                continue
+            source = boa.from_etherscan(addr, name=f"PriceSource_{i}")
+            if hasattr(source, 'greenRefPoolConfig'):
+                config = source.greenRefPoolConfig()
+                green_pool_addr = config[0]  # pool is first field in struct
+                break
 
-        # Table of Contents
-        print_table_of_contents()
+        # Build contracts dictionary for address listing
+        contracts = {
+            'hq': RIPE_HQ,
+            'sb': sb.address,
+            'pd': pd.address,
+            'vb': vb.address,
+            'green': green.address,
+            'sgreen': sgreen.address,
+            'ripe': ripe.address,
+            'bb': bb.address,
+            'green_pool': str(green_pool_addr) if green_pool_addr else None,
+        }
 
-        # Executive Summary
-        print_executive_summary(mc, ledger, green, sgreen, ripe)
+        print("Fetching configuration data...", file=sys.stderr)
 
-        print("\n" + "=" * 80)
+        # Redirect stdout to output file
+        with open(OUTPUT_FILE, 'w') as f:
+            original_stdout = sys.stdout
+            sys.stdout = f
 
-        # Fetch and display all data
-        fetch_mission_control_data(mc)
-        fetch_ripe_hq_data(hq)
-        fetch_switchboard_data(sb)
-        fetch_price_desk_data(pd)
-        fetch_vault_book_data(vb)
-        fetch_ledger_data(ledger)
+            try:
+                print("=" * 80)
 
-        # Endaoment PSM
-        fetch_endaoment_psm_data()
+                # Header
+                print("# Ripe Protocol Production Parameters")
+                print(f"\n**Generated:** {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')} UTC")
+                print(f"**Block:** {block_number}")
+                print(f"**Network:** Base Mainnet")
 
-        # Core Lending Contracts
-        print("\n" + "=" * 80)
-        print("\n<a id=\"core-lending\"></a>")
-        print("# Core Lending Contracts")
+                # Table of Contents
+                print_table_of_contents()
 
-        fetch_credit_engine_data(ce)
-        fetch_auction_house_data(auction_house)
-        fetch_teller_data(teller)
-        fetch_deleverage_data(deleverage)
-        fetch_credit_redeem_data(credit_redeem)
-        fetch_stability_pool_data(stab_pool)
+                # Executive Summary
+                print_executive_summary(mc, ledger, green, sgreen, ripe)
 
-        # Treasury & Rewards Contracts
-        print("\n" + "=" * 80)
-        print("\n<a id=\"treasury-rewards\"></a>")
-        print("# Treasury & Rewards Contracts")
+                # All Contract Addresses
+                print_all_addresses(contracts, hq, sb, pd, vb)
 
-        fetch_endaoment_data(endaoment)
-        fetch_bond_booster_data(bb)
-        fetch_lootbox_data(lootbox)
-        fetch_bond_room_data(bond_room)
-        fetch_human_resources_data(hr)
+                print("\n" + "=" * 80)
 
-        # Governance Contracts
-        print("\n" + "=" * 80)
-        print("\n<a id=\"governance\"></a>")
-        print("# Governance Contracts")
+                # Fetch and display all data
+                fetch_mission_control_data(mc, ripe.address)
+                fetch_ripe_hq_data(hq)
+                fetch_switchboard_data(sb)
+                fetch_price_desk_data(pd)
+                fetch_vault_book_data(vb)
+                fetch_ledger_data(ledger, green_pool_addr)
 
-        fetch_ripe_gov_vault_data(ripe_gov)
+                # Endaoment PSM
+                fetch_endaoment_psm_data(psm)
 
-        # Price Sources
-        fetch_price_source_configs(pd)
+                # Core Lending Contracts
+                print("\n" + "=" * 80)
+                print("\n<a id=\"core-lending\"></a>")
+                print("# Core Lending Contracts")
 
-        # Token Statistics
-        fetch_token_data()
+                fetch_credit_engine_data(ce)
+                fetch_auction_house_data(auction_house)
+                fetch_teller_data(teller)
+                fetch_deleverage_data(deleverage)
+                fetch_credit_redeem_data(credit_redeem)
+                fetch_stability_pool_data(stab_pool)
 
-        print("\n" + "=" * 80)
-        print("\n---")
-        print(f"*Report generated at block {block_number} on {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')} UTC*")
+                # Treasury & Rewards Contracts
+                print("\n" + "=" * 80)
+                print("\n<a id=\"treasury-rewards\"></a>")
+                print("# Treasury & Rewards Contracts")
+
+                fetch_endaoment_data(endaoment)
+                fetch_bond_booster_data(bb)
+                fetch_lootbox_data(lootbox)
+                fetch_bond_room_data(bond_room)
+                fetch_human_resources_data(hr)
+
+                # Governance Contracts
+                print("\n" + "=" * 80)
+                print("\n<a id=\"governance\"></a>")
+                print("# Governance Contracts")
+
+                fetch_ripe_gov_vault_data(ripe_gov)
+
+                # Price Sources
+                fetch_price_source_configs(pd)
+
+                # Token Statistics
+                fetch_token_data(green, ripe, sgreen)
+
+                print("\n" + "=" * 80)
+                print("\n---")
+                print(f"*Report generated at block {block_number} on {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')} UTC*")
+
+            finally:
+                sys.stdout = original_stdout
+
+        print(f"\nOutput written to: {OUTPUT_FILE}", file=sys.stderr)
 
 
 if __name__ == "__main__":
