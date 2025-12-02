@@ -1,8 +1,8 @@
 ================================================================================
 # Ripe Protocol Deployments
 
-**Generated:** 2025-12-02 04:51:53 UTC
-**Block:** 38930862
+**Generated:** 2025-12-02 05:15:03 UTC
+**Block:** 38931554
 **Network:** Base Mainnet
 
 Complete list of all live contract addresses in the Ripe Protocol.
@@ -96,6 +96,7 @@ Complete list of all live contract addresses in the Ripe Protocol.
 | Contract | Source | Address |
 | --- | --- | --- |
 | BondBooster | BondRoom.bondBooster() | `0xA1872467AC4fb442aeA341163A65263915ce178a` |
+| ContributorBlueprint | MissionControl.hrConfig().contribTemplate | `0x4965578D80E54b5EbE3BB5D7b1B3E0425559C1D1` |
 | GREENPool | CurvePrices.greenRefPoolConfig() | `0xd6c283655B42FA0eb2685F7AB819784F071459dc` |
 
 <a id="token-contracts"></a>
@@ -110,4 +111,4 @@ Complete list of all live contract addresses in the Ripe Protocol.
 ================================================================================
 
 ---
-*Report generated at block 38930862 on 2025-12-02 04:51:53 UTC*
+*Report generated at block 38931554 on 2025-12-02 05:15:03 UTC*

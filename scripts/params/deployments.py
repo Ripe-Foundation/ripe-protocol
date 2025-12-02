@@ -204,6 +204,19 @@ def load_derived_addresses(hq, core_addresses):
                 "address": bb_addr,
             }
 
+    # Contributor Blueprint from MissionControl.hrConfig()
+    mc_addr = core_addresses.get(MISSION_CONTROL_ID, {}).get("address")
+    if mc_addr and mc_addr != ZERO_ADDRESS:
+        time.sleep(RPC_DELAY)
+        mc = boa.from_etherscan(mc_addr, name="MissionControl")
+        hr_config = mc.hrConfig()
+        contrib_template = str(hr_config[0])  # contribTemplate is first field
+        if contrib_template != ZERO_ADDRESS:
+            derived["ContributorBlueprint"] = {
+                "source": "MissionControl.hrConfig().contribTemplate",
+                "address": contrib_template,
+            }
+
     # GREEN Pool from CurvePrices (find in PriceDesk)
     pd_addr = core_addresses.get(PRICE_DESK_ID, {}).get("address")
     if pd_addr and pd_addr != ZERO_ADDRESS:
