@@ -511,6 +511,29 @@ def print_mission_control_config():
         print("\n#### Priority Stability Pool Vaults")
         print("*No priority stability pool vaults configured*")
 
+    # Lite Signers (graceful failure if not deployed yet)
+    try:
+        if hasattr(mc, 'numLiteSigners'):
+            num_lite_signers = mc.numLiteSigners()
+            if num_lite_signers > 1:  # 1-based indexing, so >1 means there are signers
+                rows = []
+                for i in range(1, num_lite_signers):
+                    time.sleep(RPC_DELAY)
+                    signer_addr = str(mc.liteSigners(i))
+                    if signer_addr != ZERO_ADDRESS:
+                        rows.append((i, format_address(signer_addr)))
+                if rows:
+                    print_table("Lite Signers", ["Index", "Address"], rows, level=4)
+                else:
+                    print("\n#### Lite Signers")
+                    print("*No lite signers configured*")
+            else:
+                print("\n#### Lite Signers")
+                print("*No lite signers configured*")
+    except Exception:
+        # MissionControl version doesn't support liteSigners yet
+        pass
+
 
 def print_ripe_hq_data():
     """Print RipeHQ registry data."""
