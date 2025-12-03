@@ -21,7 +21,6 @@ initializes: timeLock[gov := gov]
 
 import contracts.modules.LocalGov as gov
 import contracts.modules.TimeLock as timeLock
-from interfaces import Vault
 import interfaces.ConfigStructs as cs
 
 interface MissionControl:

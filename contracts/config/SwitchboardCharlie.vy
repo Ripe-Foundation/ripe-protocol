@@ -103,10 +103,6 @@ flag AssetFlag:
     CAN_CLAIM_IN_STAB_POOL
     CAN_REDEEM_COLLATERAL
 
-struct PauseAction:
-    contractAddr: address
-    shouldPause: bool
-
 struct RecoverFundsAction:
     contractAddr: address
     recipient: address
@@ -121,10 +117,6 @@ struct FungAuctionConfig:
     liqUser: address
     vaultId: uint256
     asset: address
-
-struct TrainingWheelBundle:
-    addr: address
-    trainingWheels: DynArray[TrainingWheelAccess, MAX_TRAINING_WHEEL_ACCESS]
 
 struct TrainingWheelAccess:
     user: address
@@ -386,7 +378,6 @@ event UserDelegationSet:
 
 # pending actions storage
 actionType: public(HashMap[uint256, ActionType])
-pendingPauseActions: public(HashMap[uint256, PauseAction])
 pendingRecoverFundsActions: public(HashMap[uint256, RecoverFundsAction])
 pendingRecoverFundsManyActions: public(HashMap[uint256, RecoverFundsManyAction])
 pendingStartAuctionActions: public(HashMap[uint256, FungAuctionConfig])
