@@ -35,19 +35,22 @@ interface Lootbox:
     def setHasUnderscoreRewards(_hasRewards: bool): nonpayable
     def setUndyYieldBonusAmount(_amount: uint256): nonpayable
 
+interface MissionControl:
+    def setUserDelegation(_user: address, _delegate: address, _config: cs.ActionDelegation): nonpayable
+    def setAssetConfig(_asset: address, _assetConfig: cs.AssetConfig): nonpayable
+    def setUserConfig(_user: address, _config: cs.UserConfig): nonpayable
+    def setTrainingWheels(_trainingWheels: address): nonpayable
+    def deregisterAsset(_asset: address) -> bool: nonpayable
+    def assetConfig(_asset: address) -> cs.AssetConfig: view
+    def canPerformLiteAction(_user: address) -> bool: view
+    def isSupportedAsset(_asset: address) -> bool: view
+
 interface AuctionHouse:
     def startManyAuctions(_auctions: DynArray[FungAuctionConfig, MAX_AUCTIONS], _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
     def pauseManyAuctions(_auctions: DynArray[FungAuctionConfig, MAX_AUCTIONS], _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
     def pauseAuction(_liqUser: address, _liqVaultId: uint256, _liqAsset: address, _a: addys.Addys = empty(addys.Addys)) -> bool: nonpayable
     def startAuction(_liqUser: address, _liqVaultId: uint256, _liqAsset: address, _a: addys.Addys = empty(addys.Addys)) -> bool: nonpayable
     def canStartAuction(_liqUser: address, _liqVaultId: uint256, _liqAsset: address) -> bool: view
-
-interface MissionControl:
-    def setAssetConfig(_asset: address, _assetConfig: cs.AssetConfig): nonpayable
-    def setTrainingWheels(_trainingWheels: address): nonpayable
-    def assetConfig(_asset: address) -> cs.AssetConfig: view
-    def canPerformLiteAction(_user: address) -> bool: view
-    def isSupportedAsset(_asset: address) -> bool: view
 
 interface RipeEcoContract:
     def recoverFundsMany(_recipient: address, _assets: DynArray[address, MAX_RECOVER_ASSETS]): nonpayable
@@ -67,6 +70,9 @@ interface Ledger:
 interface TrainingWheels:
     def setAllowed(_user: address, _shouldAllow: bool): nonpayable
 
+interface VaultData:
+    def deregisterVaultAsset(_asset: address) -> bool: nonpayable
+
 interface VaultBook:
     def getAddr(_vaultId: uint256) -> address: view
 
@@ -84,6 +90,10 @@ flag ActionType:
     SET_UNDERSCORE_SEND_INTERVAL
     SET_UNDY_DEPOSIT_REWARDS_AMOUNT
     SET_UNDY_YIELD_BONUS_AMOUNT
+    DEREGISTER_ASSET
+    DEREGISTER_VAULT_ASSET
+    SET_USER_CONFIG
+    SET_USER_DELEGATION
 
 flag AssetFlag:
     CAN_DEPOSIT
@@ -119,6 +129,19 @@ struct TrainingWheelBundle:
 struct TrainingWheelAccess:
     user: address
     isAllowed: bool
+
+struct DeregisterVaultAssetAction:
+    vaultAddr: address
+    asset: address
+
+struct UserConfigAction:
+    user: address
+    config: cs.UserConfig
+
+struct UserDelegationAction:
+    user: address
+    delegate: address
+    config: cs.ActionDelegation
 
 event PendingRecoverFundsAction:
     contractAddr: indexed(address)
@@ -323,6 +346,44 @@ event CanRedeemCollateralAssetSet:
     canRedeemCollateral: bool
     caller: indexed(address)
 
+event PendingDeregisterAssetAction:
+    asset: indexed(address)
+    confirmationBlock: uint256
+    actionId: uint256
+
+event AssetDeregistered:
+    asset: indexed(address)
+
+event PendingDeregisterVaultAssetAction:
+    vaultAddr: indexed(address)
+    asset: indexed(address)
+    confirmationBlock: uint256
+    actionId: uint256
+
+event PendingUserConfigAction:
+    user: indexed(address)
+    confirmationBlock: uint256
+    actionId: uint256
+
+event PendingUserDelegationAction:
+    user: indexed(address)
+    delegate: indexed(address)
+    confirmationBlock: uint256
+    actionId: uint256
+
+event VaultAssetDeregistered:
+    vaultAddr: indexed(address)
+    asset: indexed(address)
+
+event UserConfigSet:
+    user: indexed(address)
+    caller: indexed(address)
+
+event UserDelegationSet:
+    user: indexed(address)
+    delegate: indexed(address)
+    caller: indexed(address)
+
 # pending actions storage
 actionType: public(HashMap[uint256, ActionType])
 pendingPauseActions: public(HashMap[uint256, PauseAction])
@@ -336,6 +397,11 @@ pendingTrainingWheels: public(HashMap[uint256, address])
 pendingUnderscoreSendInterval: public(HashMap[uint256, uint256])
 pendingUndyDepositRewardsAmount: public(HashMap[uint256, uint256])
 pendingUndyYieldBonusAmount: public(HashMap[uint256, uint256])
+pendingMissionControl: public(HashMap[uint256, address])
+pendingDeregisterAsset: public(HashMap[uint256, address])
+pendingDeregisterVaultAsset: public(HashMap[uint256, DeregisterVaultAssetAction])
+pendingUserConfig: public(HashMap[uint256, UserConfigAction])
+pendingUserDelegation: public(HashMap[uint256, UserDelegationAction])
 
 MAX_RECOVER_ASSETS: constant(uint256) = 20
 MAX_AUCTIONS: constant(uint256) = 20
@@ -800,12 +866,13 @@ def pauseManyAuctions(_auctions: DynArray[FungAuctionConfig, MAX_AUCTIONS]) -> u
 
 
 @external
-def setTrainingWheels(_trainingWheels: address) -> uint256:
+def setTrainingWheels(_trainingWheels: address, _missionControl: address = empty(address)) -> uint256:
     assert gov._canGovern(msg.sender) # dev: no perms
 
     aid: uint256 = timeLock._initiateAction()
     self.actionType[aid] = ActionType.TRAINING_WHEELS
     self.pendingTrainingWheels[aid] = _trainingWheels
+    self.pendingMissionControl[aid] = self._resolveMissionControl(_missionControl)
     confirmationBlock: uint256 = timeLock._getActionConfirmationBlock(aid)
     log PendingTrainingWheelsChange(
         trainingWheels=_trainingWheels,
@@ -827,6 +894,102 @@ def setManyTrainingWheelsAccess(_addr: address, _trainingWheels: DynArray[Traini
     for tw: TrainingWheelAccess in _trainingWheels:
         extcall TrainingWheels(_addr).setAllowed(tw.user, tw.isAllowed)
         log TrainingWheelsAccessSet(trainingWheels=_addr, user=tw.user, isAllowed=tw.isAllowed)
+
+
+##################
+# Random Actions #
+##################
+
+
+# deregister asset
+
+
+@external
+def deregisterAsset(_asset: address, _missionControl: address = empty(address)) -> uint256:
+    assert gov._canGovern(msg.sender) # dev: no perms
+    assert _asset != empty(address) # dev: invalid asset
+
+    aid: uint256 = timeLock._initiateAction()
+    self.actionType[aid] = ActionType.DEREGISTER_ASSET
+    self.pendingDeregisterAsset[aid] = _asset
+    self.pendingMissionControl[aid] = self._resolveMissionControl(_missionControl)
+    confirmationBlock: uint256 = timeLock._getActionConfirmationBlock(aid)
+    log PendingDeregisterAssetAction(
+        asset=_asset,
+        confirmationBlock=confirmationBlock,
+        actionId=aid,
+    )
+    return aid
+
+
+# deregister vault asset
+
+
+@external
+def deregisterVaultAsset(_vaultAddr: address, _asset: address) -> uint256:
+    assert gov._canGovern(msg.sender) # dev: no perms
+    assert _vaultAddr != empty(address) # dev: invalid vault
+    assert _asset != empty(address) # dev: invalid asset
+
+    aid: uint256 = timeLock._initiateAction()
+    self.actionType[aid] = ActionType.DEREGISTER_VAULT_ASSET
+    self.pendingDeregisterVaultAsset[aid] = DeregisterVaultAssetAction(vaultAddr=_vaultAddr, asset=_asset)
+    confirmationBlock: uint256 = timeLock._getActionConfirmationBlock(aid)
+    log PendingDeregisterVaultAssetAction(
+        vaultAddr=_vaultAddr,
+        asset=_asset,
+        confirmationBlock=confirmationBlock,
+        actionId=aid,
+    )
+    return aid
+
+
+# set user config
+
+
+@external
+def setUserConfig(_user: address, _config: cs.UserConfig, _missionControl: address = empty(address)) -> uint256:
+    assert gov._canGovern(msg.sender) # dev: no perms
+    assert _user != empty(address) # dev: invalid user
+
+    aid: uint256 = timeLock._initiateAction()
+    self.actionType[aid] = ActionType.SET_USER_CONFIG
+    self.pendingUserConfig[aid] = UserConfigAction(user=_user, config=_config)
+    self.pendingMissionControl[aid] = self._resolveMissionControl(_missionControl)
+    confirmationBlock: uint256 = timeLock._getActionConfirmationBlock(aid)
+    log PendingUserConfigAction(
+        user=_user,
+        confirmationBlock=confirmationBlock,
+        actionId=aid,
+    )
+    return aid
+
+
+# set user delegation
+
+
+@external
+def setUserDelegation(
+    _user: address,
+    _delegate: address,
+    _config: cs.ActionDelegation,
+    _missionControl: address = empty(address),
+) -> uint256:
+    assert gov._canGovern(msg.sender) # dev: no perms
+    assert _user != empty(address) # dev: invalid user
+
+    aid: uint256 = timeLock._initiateAction()
+    self.actionType[aid] = ActionType.SET_USER_DELEGATION
+    self.pendingUserDelegation[aid] = UserDelegationAction(user=_user, delegate=_delegate, config=_config)
+    self.pendingMissionControl[aid] = self._resolveMissionControl(_missionControl)
+    confirmationBlock: uint256 = timeLock._getActionConfirmationBlock(aid)
+    log PendingUserDelegationAction(
+        user=_user,
+        delegate=_delegate,
+        confirmationBlock=confirmationBlock,
+        actionId=aid,
+    )
+    return aid
 
 
 #############
@@ -878,8 +1041,24 @@ def executePendingAction(_aid: uint256) -> bool:
 
     elif actionType == ActionType.TRAINING_WHEELS:
         p: address = self.pendingTrainingWheels[_aid]
-        extcall MissionControl(self._getMissionControlAddr()).setTrainingWheels(p)
+        mc: address = self.pendingMissionControl[_aid]
+        if mc == empty(address):
+            mc = self._getMissionControlAddr()
+        extcall MissionControl(mc).setTrainingWheels(p)
         log TrainingWheelsSet(trainingWheels=p)
+
+    elif actionType == ActionType.DEREGISTER_ASSET:
+        asset: address = self.pendingDeregisterAsset[_aid]
+        mc: address = self.pendingMissionControl[_aid]
+        if mc == empty(address):
+            mc = self._getMissionControlAddr()
+        extcall MissionControl(mc).deregisterAsset(asset)
+        log AssetDeregistered(asset=asset)
+
+    elif actionType == ActionType.DEREGISTER_VAULT_ASSET:
+        p: DeregisterVaultAssetAction = self.pendingDeregisterVaultAsset[_aid]
+        extcall VaultData(p.vaultAddr).deregisterVaultAsset(p.asset)
+        log VaultAssetDeregistered(vaultAddr=p.vaultAddr, asset=p.asset)
 
     elif actionType == ActionType.SET_UNDERSCORE_SEND_INTERVAL:
         interval: uint256 = self.pendingUnderscoreSendInterval[_aid]
@@ -895,6 +1074,22 @@ def executePendingAction(_aid: uint256) -> bool:
         amount: uint256 = self.pendingUndyYieldBonusAmount[_aid]
         extcall Lootbox(self._getLootboxAddr()).setUndyYieldBonusAmount(amount)
         log UndyYieldBonusAmountSet(amount=amount, caller=msg.sender)
+
+    elif actionType == ActionType.SET_USER_CONFIG:
+        p: UserConfigAction = self.pendingUserConfig[_aid]
+        mc: address = self.pendingMissionControl[_aid]
+        if mc == empty(address):
+            mc = self._getMissionControlAddr()
+        extcall MissionControl(mc).setUserConfig(p.user, p.config)
+        log UserConfigSet(user=p.user, caller=msg.sender)
+
+    elif actionType == ActionType.SET_USER_DELEGATION:
+        p: UserDelegationAction = self.pendingUserDelegation[_aid]
+        mc: address = self.pendingMissionControl[_aid]
+        if mc == empty(address):
+            mc = self._getMissionControlAddr()
+        extcall MissionControl(mc).setUserDelegation(p.user, p.delegate, p.config)
+        log UserDelegationSet(user=p.user, delegate=p.delegate, caller=msg.sender)
 
     self.actionType[_aid] = empty(ActionType)
     return True

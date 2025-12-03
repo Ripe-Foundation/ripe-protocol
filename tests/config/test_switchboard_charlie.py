@@ -2345,6 +2345,544 @@ def test_flag_setter_new_mc_does_not_affect_registered_mc(
     assert not mission_control.isSupportedAsset(bravo_token.address)
 
 
+# ========================================
+# setTrainingWheels with _missionControl Tests
+# ========================================
+
+
+def test_set_training_wheels_on_new_mission_control(
+    switchboard_charlie, governance, new_mission_control, mission_control
+):
+    """Test setTrainingWheels targeting a new MissionControl"""
+    new_tw_addr = boa.env.generate_address("new_training_wheels")
+
+    # Get original training wheels from registered MC
+    original_tw = mission_control.trainingWheels()
+
+    # Set training wheels on NEW mission control
+    action_id = switchboard_charlie.setTrainingWheels(
+        new_tw_addr,
+        new_mission_control.address,  # _missionControl
+        sender=governance.address
+    )
+
+    # Execute pending action
+    boa.env.time_travel(blocks=switchboard_charlie.actionTimeLock())
+    switchboard_charlie.executePendingAction(action_id, sender=governance.address)
+
+    # Verify training wheels set on new MC
+    assert new_mission_control.trainingWheels() == new_tw_addr
+
+    # Verify registered MC unchanged
+    assert mission_control.trainingWheels() == original_tw
+
+
+def test_set_training_wheels_revert_current_mc(
+    switchboard_charlie, governance, mission_control
+):
+    """Test that passing current MC address reverts"""
+    new_tw_addr = boa.env.generate_address("new_training_wheels")
+
+    with boa.reverts("use empty for current mission control"):
+        switchboard_charlie.setTrainingWheels(
+            new_tw_addr,
+            mission_control.address,  # current MC - should revert
+            sender=governance.address
+        )
+
+
+def test_set_training_wheels_pending_mc_storage(
+    switchboard_charlie, governance, new_mission_control
+):
+    """Test that pendingMissionControl is stored correctly"""
+    new_tw_addr = boa.env.generate_address("new_training_wheels")
+
+    action_id = switchboard_charlie.setTrainingWheels(
+        new_tw_addr,
+        new_mission_control.address,
+        sender=governance.address
+    )
+
+    # Verify pending mission control is stored
+    assert switchboard_charlie.pendingMissionControl(action_id) == new_mission_control.address
+
+
+# ========================================
+# deregisterAsset Tests
+# ========================================
+
+
+def test_deregister_asset_permissions(switchboard_charlie, governance, alice, alpha_token):
+    """Test that only governance can call deregisterAsset"""
+    with boa.reverts("no perms"):
+        switchboard_charlie.deregisterAsset(alpha_token, sender=alice)
+
+
+def test_deregister_asset_parameter_validation(switchboard_charlie, governance):
+    """Test parameter validation for deregisterAsset"""
+    # Zero address should fail
+    with boa.reverts("invalid asset"):
+        switchboard_charlie.deregisterAsset(ZERO_ADDRESS, sender=governance.address)
+
+
+def test_deregister_asset_creates_timelock(
+    switchboard_bravo, switchboard_charlie, governance, alpha_token
+):
+    """Test deregisterAsset creates timelock action correctly"""
+    # First add the asset
+    action_id = switchboard_bravo.addAsset(
+        alpha_token, [1], 50_00, 30_00, 1000, 10000, 0,
+        (0, 0, 0, 0, 0, 0),
+        False, False, False, True, True, True, False, True, True, True, 0,
+        sender=governance.address
+    )
+    boa.env.time_travel(blocks=switchboard_bravo.actionTimeLock())
+    switchboard_bravo.executePendingAction(action_id, sender=governance.address)
+
+    # Create pending deregister action
+    aid = switchboard_charlie.deregisterAsset(alpha_token.address, sender=governance.address)
+    assert aid > 0
+
+    # Check event was emitted
+    logs = filter_logs(switchboard_charlie, "PendingDeregisterAssetAction")
+    assert len(logs) == 1
+    log = logs[0]
+    assert log.asset == alpha_token.address
+    assert log.actionId == aid
+
+    # Check action was stored
+    action_type = switchboard_charlie.actionType(aid)
+    assert action_type == 1024  # ActionType.DEREGISTER_ASSET (2^10)
+
+    # Check pending data was stored
+    pending_asset = switchboard_charlie.pendingDeregisterAsset(aid)
+    assert pending_asset == alpha_token.address
+
+
+def test_deregister_asset_execute_success(
+    switchboard_bravo, switchboard_charlie, governance, mission_control, alpha_token
+):
+    """Test executing pending deregister asset action"""
+    # First add the asset
+    action_id = switchboard_bravo.addAsset(
+        alpha_token, [1], 50_00, 30_00, 1000, 10000, 0,
+        (0, 0, 0, 0, 0, 0),
+        False, False, False, True, True, True, False, True, True, True, 0,
+        sender=governance.address
+    )
+    boa.env.time_travel(blocks=switchboard_bravo.actionTimeLock())
+    switchboard_bravo.executePendingAction(action_id, sender=governance.address)
+
+    # Verify asset is registered
+    assert mission_control.isSupportedAsset(alpha_token.address)
+
+    # Create pending deregister action
+    aid = switchboard_charlie.deregisterAsset(alpha_token.address, sender=governance.address)
+
+    # Advance time past timelock
+    boa.env.time_travel(blocks=switchboard_charlie.actionTimeLock())
+
+    # Execute action
+    success = switchboard_charlie.executePendingAction(aid, sender=governance.address)
+    assert success
+
+    # Check execution event was emitted
+    logs = filter_logs(switchboard_charlie, "AssetDeregistered")
+    assert len(logs) == 1
+    assert logs[0].asset == alpha_token.address
+
+    # Verify asset is deregistered
+    assert not mission_control.isSupportedAsset(alpha_token.address)
+
+    # Check action was cleared
+    assert switchboard_charlie.actionType(aid) == 0
+
+
+def test_deregister_asset_on_new_mission_control(
+    switchboard_bravo, switchboard_charlie, governance, new_mission_control, mission_control, bravo_token
+):
+    """Test deregisterAsset targeting a new MissionControl"""
+    # Add asset to new MC
+    action_id = switchboard_bravo.addAsset(
+        bravo_token.address, [1], 50_00, 30_00, 1000, 10000, 0,
+        (0, 0, 0, 0, 0, 0),
+        False, False, False, True, True, True, False, True, True, True, 0,
+        (False, 0, 0, 0, 0), ZERO_ADDRESS, False,
+        new_mission_control.address,  # _missionControl
+        sender=governance.address
+    )
+    boa.env.time_travel(blocks=switchboard_bravo.actionTimeLock())
+    switchboard_bravo.executePendingAction(action_id, sender=governance.address)
+
+    # Verify asset is on new MC
+    assert new_mission_control.isSupportedAsset(bravo_token.address)
+    assert not mission_control.isSupportedAsset(bravo_token.address)
+
+    # Deregister from new MC
+    aid = switchboard_charlie.deregisterAsset(
+        bravo_token.address,
+        new_mission_control.address,  # _missionControl
+        sender=governance.address
+    )
+
+    # Verify pending MC is stored
+    assert switchboard_charlie.pendingMissionControl(aid) == new_mission_control.address
+
+    # Execute
+    boa.env.time_travel(blocks=switchboard_charlie.actionTimeLock())
+    success = switchboard_charlie.executePendingAction(aid, sender=governance.address)
+    assert success
+
+    # Verify deregistered from new MC
+    assert not new_mission_control.isSupportedAsset(bravo_token.address)
+
+
+# ========================================
+# setUserConfig Tests
+# ========================================
+
+
+def test_set_user_config_permissions(switchboard_charlie, governance, alice, bob):
+    """Test that only governance can call setUserConfig"""
+    # UserConfig: (canAnyoneDeposit, canAnyoneRepayDebt, canAnyoneBondForUser)
+    user_config = (False, False, False)
+
+    with boa.reverts("no perms"):
+        switchboard_charlie.setUserConfig(alice, user_config, sender=bob)
+
+
+def test_set_user_config_parameter_validation(switchboard_charlie, governance):
+    """Test parameter validation for setUserConfig"""
+    user_config = (False, False, False)
+
+    # Zero address user should fail
+    with boa.reverts("invalid user"):
+        switchboard_charlie.setUserConfig(ZERO_ADDRESS, user_config, sender=governance.address)
+
+
+def test_set_user_config_creates_timelock(
+    switchboard_charlie, governance, mission_control, alice
+):
+    """Test setUserConfig creates a timelock action"""
+    # UserConfig: (canAnyoneDeposit, canAnyoneRepayDebt, canAnyoneBondForUser)
+    user_config = (True, True, False)
+
+    # Initiate (creates pending action)
+    aid = switchboard_charlie.setUserConfig(alice, user_config, sender=governance.address)
+    assert aid > 0
+
+    # Check pending event was emitted
+    logs = filter_logs(switchboard_charlie, "PendingUserConfigAction")
+    assert len(logs) == 1
+    assert logs[0].user == alice
+    assert logs[0].actionId == aid
+
+    # Verify config was NOT set yet in MissionControl
+    stored_config = mission_control.userConfig(alice)
+    assert stored_config[0] == False  # canAnyoneDeposit - still default
+
+    # Verify pending storage
+    pending = switchboard_charlie.pendingUserConfig(aid)
+    assert pending[0] == alice  # user
+
+
+def test_set_user_config_execute_success(
+    switchboard_charlie, governance, mission_control, alice
+):
+    """Test setUserConfig executes after timelock"""
+    # UserConfig: (canAnyoneDeposit, canAnyoneRepayDebt, canAnyoneBondForUser)
+    user_config = (True, True, False)
+
+    # Initiate
+    aid = switchboard_charlie.setUserConfig(alice, user_config, sender=governance.address)
+
+    # Wait for timelock
+    boa.env.time_travel(blocks=switchboard_charlie.actionTimeLock())
+
+    # Execute
+    success = switchboard_charlie.executePendingAction(aid, sender=governance.address)
+    assert success
+
+    # Check event was emitted
+    logs = filter_logs(switchboard_charlie, "UserConfigSet")
+    assert len(logs) == 1
+    assert logs[0].user == alice
+    assert logs[0].caller == governance.address
+
+    # Verify config was set in MissionControl
+    stored_config = mission_control.userConfig(alice)
+    assert stored_config[0] == True  # canAnyoneDeposit
+    assert stored_config[1] == True  # canAnyoneRepayDebt
+    assert stored_config[2] == False # canAnyoneBondForUser
+
+
+def test_set_user_config_on_new_mission_control(
+    switchboard_charlie, governance, new_mission_control, mission_control, alice
+):
+    """Test setUserConfig targeting a new MissionControl"""
+    user_config = (True, False, True)
+
+    # Initiate config on new MC
+    aid = switchboard_charlie.setUserConfig(
+        alice,
+        user_config,
+        new_mission_control.address,  # _missionControl
+        sender=governance.address
+    )
+    assert aid > 0
+
+    # Verify pending MC storage
+    assert switchboard_charlie.pendingMissionControl(aid) == new_mission_control.address
+
+    # Wait for timelock and execute
+    boa.env.time_travel(blocks=switchboard_charlie.actionTimeLock())
+    success = switchboard_charlie.executePendingAction(aid, sender=governance.address)
+    assert success
+
+    # Verify config was set on new MC
+    new_config = new_mission_control.userConfig(alice)
+    assert new_config[0] == True  # canAnyoneDeposit
+
+    # Verify registered MC was NOT affected
+    reg_config = mission_control.userConfig(alice)
+    assert reg_config[0] == False  # Still default
+
+
+def test_set_user_config_revert_current_mc(
+    switchboard_charlie, governance, mission_control, alice
+):
+    """Test that passing current MC address reverts"""
+    user_config = (True, True, True)
+
+    with boa.reverts("use empty for current mission control"):
+        switchboard_charlie.setUserConfig(
+            alice,
+            user_config,
+            mission_control.address,  # current MC - should revert
+            sender=governance.address
+        )
+
+
+# ========================================
+# setUserDelegation Tests
+# ========================================
+
+
+def test_set_user_delegation_permissions(switchboard_charlie, governance, alice, bob, sally):
+    """Test that only governance can call setUserDelegation"""
+    # ActionDelegation: (canWithdraw, canBorrow, canClaimFromStabPool, canClaimLoot)
+    delegation_config = (False, False, False, False)
+
+    with boa.reverts("no perms"):
+        switchboard_charlie.setUserDelegation(alice, bob, delegation_config, sender=sally)
+
+
+def test_set_user_delegation_parameter_validation(switchboard_charlie, governance, bob):
+    """Test parameter validation for setUserDelegation"""
+    delegation_config = (False, False, False, False)
+
+    # Zero address user should fail
+    with boa.reverts("invalid user"):
+        switchboard_charlie.setUserDelegation(ZERO_ADDRESS, bob, delegation_config, sender=governance.address)
+
+
+def test_set_user_delegation_creates_timelock(
+    switchboard_charlie, governance, mission_control, alice, bob
+):
+    """Test setUserDelegation creates a timelock action"""
+    # ActionDelegation: (canWithdraw, canBorrow, canClaimFromStabPool, canClaimLoot)
+    delegation_config = (True, True, True, True)
+
+    # Initiate (creates pending action)
+    aid = switchboard_charlie.setUserDelegation(alice, bob, delegation_config, sender=governance.address)
+    assert aid > 0
+
+    # Check pending event was emitted
+    logs = filter_logs(switchboard_charlie, "PendingUserDelegationAction")
+    assert len(logs) == 1
+    assert logs[0].user == alice
+    assert logs[0].delegate == bob
+    assert logs[0].actionId == aid
+
+    # Verify delegation was NOT set yet in MissionControl
+    stored_delegation = mission_control.userDelegation(alice, bob)
+    assert stored_delegation[0] == False  # canWithdraw - still default
+
+    # Verify pending storage
+    pending = switchboard_charlie.pendingUserDelegation(aid)
+    assert pending[0] == alice  # user
+    assert pending[1] == bob  # delegate
+
+
+def test_set_user_delegation_execute_success(
+    switchboard_charlie, governance, mission_control, alice, bob
+):
+    """Test setUserDelegation executes after timelock"""
+    # ActionDelegation: (canWithdraw, canBorrow, canClaimFromStabPool, canClaimLoot)
+    delegation_config = (True, True, True, True)
+
+    # Initiate
+    aid = switchboard_charlie.setUserDelegation(alice, bob, delegation_config, sender=governance.address)
+
+    # Wait for timelock
+    boa.env.time_travel(blocks=switchboard_charlie.actionTimeLock())
+
+    # Execute
+    success = switchboard_charlie.executePendingAction(aid, sender=governance.address)
+    assert success
+
+    # Check event was emitted
+    logs = filter_logs(switchboard_charlie, "UserDelegationSet")
+    assert len(logs) == 1
+    assert logs[0].user == alice
+    assert logs[0].delegate == bob
+    assert logs[0].caller == governance.address
+
+    # Verify delegation was set in MissionControl
+    stored_delegation = mission_control.userDelegation(alice, bob)
+    assert stored_delegation[0] == True  # canWithdraw
+
+
+def test_set_user_delegation_on_new_mission_control(
+    switchboard_charlie, governance, new_mission_control, mission_control, alice, bob
+):
+    """Test setUserDelegation targeting a new MissionControl"""
+    delegation_config = (True, False, True, False)
+
+    # Initiate delegation on new MC
+    aid = switchboard_charlie.setUserDelegation(
+        alice,
+        bob,
+        delegation_config,
+        new_mission_control.address,  # _missionControl
+        sender=governance.address
+    )
+    assert aid > 0
+
+    # Verify pending MC storage
+    assert switchboard_charlie.pendingMissionControl(aid) == new_mission_control.address
+
+    # Wait for timelock and execute
+    boa.env.time_travel(blocks=switchboard_charlie.actionTimeLock())
+    success = switchboard_charlie.executePendingAction(aid, sender=governance.address)
+    assert success
+
+    # Verify delegation was set on new MC
+    new_delegation = new_mission_control.userDelegation(alice, bob)
+    assert new_delegation[0] == True  # canWithdraw
+
+    # Verify registered MC was NOT affected
+    reg_delegation = mission_control.userDelegation(alice, bob)
+    assert reg_delegation[0] == False  # Still default
+
+
+def test_set_user_delegation_revert_current_mc(
+    switchboard_charlie, governance, mission_control, alice, bob
+):
+    """Test that passing current MC address reverts"""
+    delegation_config = (True, True, True, True)
+
+    with boa.reverts("use empty for current mission control"):
+        switchboard_charlie.setUserDelegation(
+            alice,
+            bob,
+            delegation_config,
+            mission_control.address,  # current MC - should revert
+            sender=governance.address
+        )
+
+
+# ========================================
+# deregisterVaultAsset Tests
+# ========================================
+
+
+def test_deregister_vault_asset_permissions(switchboard_charlie, governance, alice, alpha_token_vault, alpha_token):
+    """Test that only governance can call deregisterVaultAsset"""
+    with boa.reverts("no perms"):
+        switchboard_charlie.deregisterVaultAsset(alpha_token_vault.address, alpha_token.address, sender=alice)
+
+
+def test_deregister_vault_asset_parameter_validation(switchboard_charlie, governance, alpha_token_vault, alpha_token):
+    """Test parameter validation for deregisterVaultAsset"""
+    # Zero address vault should fail
+    with boa.reverts("invalid vault"):
+        switchboard_charlie.deregisterVaultAsset(ZERO_ADDRESS, alpha_token.address, sender=governance.address)
+
+    # Zero address asset should fail
+    with boa.reverts("invalid asset"):
+        switchboard_charlie.deregisterVaultAsset(alpha_token_vault.address, ZERO_ADDRESS, sender=governance.address)
+
+
+def test_deregister_vault_asset_creates_timelock(
+    switchboard_charlie, governance, alpha_token_vault, alpha_token
+):
+    """Test deregisterVaultAsset creates timelock action correctly"""
+    # Create pending deregister vault asset action
+    aid = switchboard_charlie.deregisterVaultAsset(
+        alpha_token_vault.address,
+        alpha_token.address,
+        sender=governance.address
+    )
+    assert aid > 0
+
+    # Check event was emitted
+    logs = filter_logs(switchboard_charlie, "PendingDeregisterVaultAssetAction")
+    assert len(logs) == 1
+    log = logs[0]
+    assert log.vaultAddr == alpha_token_vault.address
+    assert log.asset == alpha_token.address
+    assert log.actionId == aid
+
+    # Check action was stored
+    action_type = switchboard_charlie.actionType(aid)
+    assert action_type == 2048  # ActionType.DEREGISTER_VAULT_ASSET (2^11)
+
+    # Check pending data was stored
+    pending_action = switchboard_charlie.pendingDeregisterVaultAsset(aid)
+    assert pending_action[0] == alpha_token_vault.address  # vaultAddr
+    assert pending_action[1] == alpha_token.address  # asset
+
+
+def test_deregister_vault_asset_before_timelock_fails(
+    switchboard_charlie, governance, alpha_token_vault, alpha_token
+):
+    """Test execution fails before timelock"""
+    aid = switchboard_charlie.deregisterVaultAsset(
+        alpha_token_vault.address,
+        alpha_token.address,
+        sender=governance.address
+    )
+
+    # Try to execute immediately (should fail)
+    result = switchboard_charlie.executePendingAction(aid, sender=governance.address)
+    assert not result
+
+    # Verify action still exists
+    assert switchboard_charlie.actionType(aid) != 0
+
+
+def test_deregister_vault_asset_cancellation(
+    switchboard_charlie, governance, alpha_token_vault, alpha_token
+):
+    """Test cancellation of deregisterVaultAsset action"""
+    aid = switchboard_charlie.deregisterVaultAsset(
+        alpha_token_vault.address,
+        alpha_token.address,
+        sender=governance.address
+    )
+
+    # Verify action exists
+    assert switchboard_charlie.actionType(aid) != 0
+
+    # Cancel
+    success = switchboard_charlie.cancelPendingAction(aid, sender=governance.address)
+    assert success
+
+    # Verify action was cancelled
+    assert switchboard_charlie.actionType(aid) == 0
+
+
 # Run the tests
 if __name__ == "__main__":
     print("Additional comprehensive tests for SwitchboardThree.vy")
@@ -2359,3 +2897,7 @@ if __name__ == "__main__":
     print("- Training wheels functionality")
     print("- New setTrainingWheels function")
     print("- Underscore rewards functions")
+    print("- deregisterAsset function")
+    print("- setUserConfig function")
+    print("- setUserDelegation function")
+    print("- deregisterVaultAsset function")

@@ -24,6 +24,26 @@ import contracts.modules.TimeLock as timeLock
 from interfaces import Vault
 import interfaces.ConfigStructs as cs
 
+interface MissionControl:
+    def setUnderscoreRegistry(_underscoreRegistry: address): nonpayable
+    def setRipeBondConfig(_config: cs.RipeBondConfig): nonpayable
+    def setShouldCheckLastTouch(_shouldCheck: bool): nonpayable
+    def canPerformLiteAction(_user: address) -> bool: view
+    def setHrConfig(_config: cs.HrConfig): nonpayable
+    def ripeBondConfig() -> cs.RipeBondConfig: view
+    def underscoreRegistry() -> address: view
+    def shouldCheckLastTouch() -> bool: view
+    def hrConfig() -> cs.HrConfig: view
+
+interface BondBooster:
+    def setManyBondBoosters(_boosters: DynArray[BoosterConfig, MAX_BOOSTERS]): nonpayable
+    def setMaxBoostAndMaxUnits(_maxBoostRatio: uint256, _maxUnits: uint256): nonpayable
+    def removeManyBondBoosters(_users: DynArray[address, MAX_BOOSTERS]): nonpayable
+    def getBoostRatio(_user: address, _units: uint256) -> uint256: view
+    def setMinLockDuration(_minLockDuration: uint256): nonpayable
+    def setBondBooster(_config: BoosterConfig): nonpayable
+    def removeBondBooster(_user: address): nonpayable
+
 interface HrContributor:
     def setIsFrozen(_shouldFreeze: bool) -> bool: nonpayable
     def setManager(_manager: address): nonpayable
@@ -31,20 +51,6 @@ interface HrContributor:
     def cancelOwnershipChange(): nonpayable
     def cancelRipeTransfer(): nonpayable
     def cancelPaycheck(): nonpayable
-
-interface MissionControl:
-    def setRipeBondConfig(_config: cs.RipeBondConfig): nonpayable
-    def canPerformLiteAction(_user: address) -> bool: view
-    def setHrConfig(_config: cs.HrConfig): nonpayable
-    def ripeBondConfig() -> cs.RipeBondConfig: view
-    def hrConfig() -> cs.HrConfig: view
-
-interface BondBooster:
-    def setManyBondBoosters(_boosters: DynArray[BoosterConfig, MAX_BOOSTERS]): nonpayable
-    def removeManyBondBoosters(_users: DynArray[address, MAX_BOOSTERS]): nonpayable
-    def setMaxBoostAndMaxUnits(_maxBoostRatio: uint256, _maxUnits: uint256): nonpayable
-    def getBoostRatio(_user: address, _units: uint256) -> uint256: view
-    def setMinLockDuration(_minLockDuration: uint256): nonpayable
 
 interface Teller:
     def deleverageWithSpecificAssets(_assets: DynArray[DeleverageAsset, MAX_DELEVERAGE_ASSETS], _user: address = msg.sender) -> uint256: nonpayable
@@ -63,10 +69,19 @@ interface BondRoom:
 
 interface Ledger:
     def isHrContributor(_contributor: address) -> bool: view
+    def setRipeAvailForRewards(_amount: uint256): nonpayable
+    def setRipeAvailForBonds(_amount: uint256): nonpayable
+    def setRipeAvailForHr(_amount: uint256): nonpayable
     def setBadDebt(_amount: uint256): nonpayable
 
 interface Deleverage:
     def deleverageWithVolAssets(_user: address, _assets: DynArray[DeleverageAsset, MAX_DELEVERAGE_ASSETS]) -> uint256: nonpayable
+
+interface UnderscoreLedger:
+    def isUserWallet(_addr: address) -> bool: view
+
+interface UnderscoreRegistry:
+    def getAddr(_addyId: uint256) -> address: view
 
 interface RipeHq:
     def getAddr(_regId: uint256) -> address: view
@@ -88,6 +103,11 @@ flag ActionType:
     LOOT_USER_BALANCE_RESET
     LOOT_ASSET_RESET
     LOOT_USER_BORROW_RESET
+    RIPE_AVAIL_REWARDS
+    RIPE_AVAIL_HR
+    RIPE_AVAIL_BONDS
+    OTHER_UNDERSCORE_REGISTRY
+    OTHER_SHOULD_CHECK_LAST_TOUCH
 
 struct DeleverageUserRequest:
     user: address
@@ -227,6 +247,14 @@ event PendingBoosterConfigsSet:
 event ManyBondBoostersRemoved:
     numUsers: uint256
 
+event BondBoosterRemoved:
+    user: indexed(address)
+
+event PendingBoosterConfigSet:
+    user: indexed(address)
+    confirmationBlock: uint256
+    actionId: uint256
+
 event HrContribTemplateSet:
     contribTemplate: indexed(address)
 
@@ -301,6 +329,46 @@ event PendingUserBorrowResetSet:
 event UserBorrowResetExecuted:
     numResets: uint256
 
+event PendingRipeAvailableForRewardsChange:
+    amount: uint256
+    confirmationBlock: uint256
+    actionId: uint256
+
+event PendingRipeAvailableForHrChange:
+    amount: uint256
+    confirmationBlock: uint256
+    actionId: uint256
+
+event PendingRipeAvailableForBondsChange:
+    amount: uint256
+    confirmationBlock: uint256
+    actionId: uint256
+
+event RipeAvailableForRewardsSet:
+    amount: uint256
+
+event RipeAvailableForHrSet:
+    amount: uint256
+
+event RipeAvailableForBondsSet:
+    amount: uint256
+
+event PendingUnderscoreRegistryChange:
+    underscoreRegistry: address
+    confirmationBlock: uint256
+    actionId: uint256
+
+event PendingShouldCheckLastTouchChange:
+    shouldCheck: bool
+    confirmationBlock: uint256
+    actionId: uint256
+
+event UnderscoreRegistrySet:
+    addr: indexed(address)
+
+event ShouldCheckLastTouchSet:
+    shouldCheck: bool
+
 # pending config changes
 actionType: public(HashMap[uint256, ActionType]) # aid -> type
 pendingHrConfig: public(HashMap[uint256, cs.HrConfig]) # aid -> config
@@ -314,10 +382,15 @@ pendingBoosterBoundaries: public(HashMap[uint256, BoosterBoundaries]) # aid -> b
 pendingUserBalanceReset: public(HashMap[uint256, DynArray[UserBalanceReset, MAX_USERS]]) # aid -> users
 pendingAssetReset: public(HashMap[uint256, DynArray[AssetReset, MAX_ASSETS]]) # aid -> assets
 pendingUserBorrowReset: public(HashMap[uint256, DynArray[address, MAX_USERS]]) # aid -> users
+pendingRipeAvailable: public(HashMap[uint256, uint256]) # aid -> amount
+pendingUnderscoreRegistry: public(HashMap[uint256, address])
+pendingShouldCheckLastTouch: public(HashMap[uint256, bool])
+pendingMissionControl: public(HashMap[uint256, address]) # aid -> target mission control
 
 TELLER_ID: constant(uint256) = 3
 LEDGER_ID: constant(uint256) = 4
 MISSION_CONTROL_ID: constant(uint256) = 5
+UNDERSCORE_LEDGER_ID: constant(uint256) = 1
 BOND_ROOM_ID: constant(uint256) = 12
 LOOTBOX_ID: constant(uint256) = 16
 DELEVERAGE_ID: constant(uint256) = 18
@@ -367,6 +440,16 @@ def _hasPermsToEnable(_caller: address, _isLite: bool) -> bool:
 @internal
 def _getMissionControlAddr() -> address:
     return staticcall RipeHq(gov._getRipeHqFromGov()).getAddr(MISSION_CONTROL_ID)
+
+
+@view
+@internal
+def _resolveMissionControl(_missionControl: address) -> address:
+    mc: address = self._getMissionControlAddr()
+    if _missionControl == empty(address):
+        return mc
+    assert _missionControl != mc # dev: use empty for current mission control
+    return _missionControl
 
 
 @view
@@ -432,52 +515,62 @@ def deleverageWithVolAssets(_user: address, _assets: DynArray[DeleverageAsset, M
 
 
 @external
-def setContributorTemplate(_contribTemplate: address) -> uint256:
+def setContributorTemplate(_contribTemplate: address, _missionControl: address = empty(address)) -> uint256:
     assert gov._canGovern(msg.sender) # dev: no perms
     assert _contribTemplate.is_contract and _contribTemplate != empty(address) # dev: invalid contrib template
-    return self._setPendingHrConfig(ActionType.HR_CONFIG_TEMPLATE, _contribTemplate)
+    aid: uint256 = self._setPendingHrConfig(ActionType.HR_CONFIG_TEMPLATE, _contribTemplate)
+    self.pendingMissionControl[aid] = self._resolveMissionControl(_missionControl)
+    return aid
 
 
 # max compensation
 
 
 @external
-def setMaxCompensation(_maxComp: uint256) -> uint256:
+def setMaxCompensation(_maxComp: uint256, _missionControl: address = empty(address)) -> uint256:
     assert gov._canGovern(msg.sender) # dev: no perms
     assert _maxComp != 0 and _maxComp <= 20_000_000 * EIGHTEEN_DECIMALS # dev: invalid max compensation
-    return self._setPendingHrConfig(ActionType.HR_CONFIG_MAX_COMP, empty(address), _maxComp)
+    aid: uint256 = self._setPendingHrConfig(ActionType.HR_CONFIG_MAX_COMP, empty(address), _maxComp)
+    self.pendingMissionControl[aid] = self._resolveMissionControl(_missionControl)
+    return aid
 
 
 # min cliff length
 
 
 @external
-def setMinCliffLength(_minCliffLength: uint256) -> uint256:
+def setMinCliffLength(_minCliffLength: uint256, _missionControl: address = empty(address)) -> uint256:
     assert gov._canGovern(msg.sender) # dev: no perms
     assert _minCliffLength > WEEK_IN_SECONDS # dev: invalid min cliff length
-    return self._setPendingHrConfig(ActionType.HR_CONFIG_MIN_CLIFF, empty(address), 0, _minCliffLength)
+    aid: uint256 = self._setPendingHrConfig(ActionType.HR_CONFIG_MIN_CLIFF, empty(address), 0, _minCliffLength)
+    self.pendingMissionControl[aid] = self._resolveMissionControl(_missionControl)
+    return aid
 
 
 # max start delay
 
 
 @external
-def setMaxStartDelay(_maxStartDelay: uint256) -> uint256:
+def setMaxStartDelay(_maxStartDelay: uint256, _missionControl: address = empty(address)) -> uint256:
     assert gov._canGovern(msg.sender) # dev: no perms
     assert _maxStartDelay <= 3 * MONTH_IN_SECONDS # dev: invalid max start delay
-    return self._setPendingHrConfig(ActionType.HR_CONFIG_MAX_START_DELAY, empty(address), 0, 0, _maxStartDelay)
+    aid: uint256 = self._setPendingHrConfig(ActionType.HR_CONFIG_MAX_START_DELAY, empty(address), 0, 0, _maxStartDelay)
+    self.pendingMissionControl[aid] = self._resolveMissionControl(_missionControl)
+    return aid
 
 
 # min vesting length
 
 
 @external
-def setVestingLengthBoundaries(_minVestingLength: uint256, _maxVestingLength: uint256) -> uint256:
+def setVestingLengthBoundaries(_minVestingLength: uint256, _maxVestingLength: uint256, _missionControl: address = empty(address)) -> uint256:
     assert gov._canGovern(msg.sender) # dev: no perms
     assert _minVestingLength < _maxVestingLength # dev: invalid vesting length boundaries
     assert _minVestingLength > MONTH_IN_SECONDS # dev: invalid min vesting length
     assert _maxVestingLength <= 5 * YEAR_IN_SECONDS # dev: invalid max vesting length
-    return self._setPendingHrConfig(ActionType.HR_CONFIG_VESTING, empty(address), 0, 0, 0, _minVestingLength, _maxVestingLength)
+    aid: uint256 = self._setPendingHrConfig(ActionType.HR_CONFIG_VESTING, empty(address), 0, 0, 0, _minVestingLength, _maxVestingLength)
+    self.pendingMissionControl[aid] = self._resolveMissionControl(_missionControl)
+    return aid
 
 
 # set pending hr config
@@ -628,6 +721,7 @@ def setRipeBondConfig(
     _maxRipePerUnitLockBonus: uint256,
     _shouldAutoRestart: bool,
     _restartDelayBlocks: uint256,
+    _missionControl: address = empty(address),
 ) -> uint256:
     assert gov._canGovern(msg.sender) # dev: no perms
     aid: uint256 = timeLock._initiateAction()
@@ -637,7 +731,7 @@ def setRipeBondConfig(
     assert 0 not in [_amountPerEpoch, _maxRipePerUnit] # dev: invalid config
     assert _minRipePerUnit < _maxRipePerUnit # dev: invalid min/max ripe per unit
     assert _maxRipePerUnitLockBonus <= (10 * HUNDRED_PERCENT) # dev: max is 1000%
-    
+
     self.pendingRipeBondConfig[aid] = cs.RipeBondConfig(
         asset=_asset,
         amountPerEpoch=_amountPerEpoch,
@@ -649,6 +743,7 @@ def setRipeBondConfig(
         shouldAutoRestart=_shouldAutoRestart,
         restartDelayBlocks=_restartDelayBlocks,
     )
+    self.pendingMissionControl[aid] = self._resolveMissionControl(_missionControl)
     confirmationBlock: uint256 = timeLock._getActionConfirmationBlock(aid)
     log PendingRipeBondConfigSet(
         asset=_asset,
@@ -668,12 +763,13 @@ def setRipeBondConfig(
 
 
 @external
-def setRipeBondEpochLength(_epochLength: uint256) -> uint256:
+def setRipeBondEpochLength(_epochLength: uint256, _missionControl: address = empty(address)) -> uint256:
     assert gov._canGovern(msg.sender) # dev: no perms
     assert _epochLength != 0 # dev: invalid epoch length
     aid: uint256 = timeLock._initiateAction()
     self.actionType[aid] = ActionType.RIPE_BOND_EPOCH_LENGTH
     self.pendingRipeBondConfigValue[aid] = _epochLength
+    self.pendingMissionControl[aid] = self._resolveMissionControl(_missionControl)
     confirmationBlock: uint256 = timeLock._getActionConfirmationBlock(aid)
     log PendingRipeBondEpochLengthSet(epochLength=_epochLength, confirmationBlock=confirmationBlock, actionId=aid)
     return aid
@@ -696,9 +792,9 @@ def setStartEpochAtBlock(_block: uint256 = 0):
 
 
 @external
-def setCanPurchaseRipeBond(_canBond: bool) -> bool:
+def setCanPurchaseRipeBond(_canBond: bool, _missionControl: address = empty(address)) -> bool:
     assert self._hasPermsToEnable(msg.sender, not _canBond) # dev: no perms
-    mc: address = self._getMissionControlAddr()
+    mc: address = self._resolveMissionControl(_missionControl)
     config: cs.RipeBondConfig = staticcall MissionControl(mc).ripeBondConfig()
     assert config.canBond != _canBond # dev: no change
     config.canBond = _canBond
@@ -718,6 +814,114 @@ def setBadDebt(_amount: uint256) -> uint256:
     self.pendingRipeBondConfigValue[aid] = _amount
     confirmationBlock: uint256 = timeLock._getActionConfirmationBlock(aid)
     log PendingBadDebtSet(badDebt=_amount, confirmationBlock=confirmationBlock, actionId=aid)
+    return aid
+
+
+##################
+# Ripe Available #
+##################
+
+
+@external
+def setRipeAvailableForRewards(_amount: uint256) -> uint256:
+    assert gov._canGovern(msg.sender) # dev: no perms
+
+    aid: uint256 = timeLock._initiateAction()
+    self.actionType[aid] = ActionType.RIPE_AVAIL_REWARDS
+    self.pendingRipeAvailable[aid] = _amount
+    confirmationBlock: uint256 = timeLock._getActionConfirmationBlock(aid)
+    log PendingRipeAvailableForRewardsChange(
+        amount=_amount,
+        confirmationBlock=confirmationBlock,
+        actionId=aid,
+    )
+    return aid
+
+
+@external
+def setRipeAvailableForHr(_amount: uint256) -> uint256:
+    assert gov._canGovern(msg.sender) # dev: no perms
+
+    aid: uint256 = timeLock._initiateAction()
+    self.actionType[aid] = ActionType.RIPE_AVAIL_HR
+    self.pendingRipeAvailable[aid] = _amount
+    confirmationBlock: uint256 = timeLock._getActionConfirmationBlock(aid)
+    log PendingRipeAvailableForHrChange(
+        amount=_amount,
+        confirmationBlock=confirmationBlock,
+        actionId=aid,
+    )
+    return aid
+
+
+@external
+def setRipeAvailableForBonds(_amount: uint256) -> uint256:
+    assert gov._canGovern(msg.sender) # dev: no perms
+
+    aid: uint256 = timeLock._initiateAction()
+    self.actionType[aid] = ActionType.RIPE_AVAIL_BONDS
+    self.pendingRipeAvailable[aid] = _amount
+    confirmationBlock: uint256 = timeLock._getActionConfirmationBlock(aid)
+    log PendingRipeAvailableForBondsChange(
+        amount=_amount,
+        confirmationBlock=confirmationBlock,
+        actionId=aid,
+    )
+    return aid
+
+
+#######################
+# Underscore Registry #
+#######################
+
+
+@external
+def setUnderscoreRegistry(_underscoreRegistry: address, _missionControl: address = empty(address)) -> uint256:
+    assert gov._canGovern(msg.sender) # dev: no perms
+    assert self._isValidUnderscoreAddr(_underscoreRegistry) # dev: invalid underscore registry
+
+    aid: uint256 = timeLock._initiateAction()
+    self.actionType[aid] = ActionType.OTHER_UNDERSCORE_REGISTRY
+    self.pendingUnderscoreRegistry[aid] = _underscoreRegistry
+    self.pendingMissionControl[aid] = self._resolveMissionControl(_missionControl)
+    confirmationBlock: uint256 = timeLock._getActionConfirmationBlock(aid)
+    log PendingUnderscoreRegistryChange(
+        underscoreRegistry=_underscoreRegistry,
+        confirmationBlock=confirmationBlock,
+        actionId=aid,
+    )
+    return aid
+
+
+@view
+@internal
+def _isValidUnderscoreAddr(_addr: address) -> bool:
+    if _addr == empty(address):
+        return True # allowing setting to empty address
+
+    undyLedger: address = staticcall UnderscoreRegistry(_addr).getAddr(UNDERSCORE_LEDGER_ID)
+    if undyLedger == empty(address):
+        return False
+
+    # make sure has interface
+    return not staticcall UnderscoreLedger(undyLedger).isUserWallet(empty(address))
+
+
+###########################
+# Should Check Last Touch #
+###########################
+
+
+@external
+def setShouldCheckLastTouch(_shouldCheck: bool, _missionControl: address = empty(address)) -> uint256:
+    assert gov._canGovern(msg.sender) # dev: no perms
+
+    aid: uint256 = timeLock._initiateAction()
+    self.actionType[aid] = ActionType.OTHER_SHOULD_CHECK_LAST_TOUCH
+    self.pendingShouldCheckLastTouch[aid] = _shouldCheck
+    self.pendingMissionControl[aid] = self._resolveMissionControl(_missionControl)
+    confirmationBlock: uint256 = timeLock._getActionConfirmationBlock(aid)
+    log PendingShouldCheckLastTouchChange(shouldCheck=_shouldCheck, confirmationBlock=confirmationBlock, actionId=aid)
     return aid
 
 
@@ -770,6 +974,20 @@ def setManyBondBoosters(_boosters: DynArray[BoosterConfig, MAX_BOOSTERS]) -> uin
     return aid
 
 
+# add single booster config
+
+
+@external
+def setBondBooster(_config: BoosterConfig) -> uint256:
+    assert gov._canGovern(msg.sender) # dev: no perms
+    aid: uint256 = timeLock._initiateAction()
+    self.actionType[aid] = ActionType.BOND_BOOSTER_ADD
+    self.pendingBoosterConfigs[aid] = [_config]
+    confirmationBlock: uint256 = timeLock._getActionConfirmationBlock(aid)
+    log PendingBoosterConfigSet(user=_config.user, confirmationBlock=confirmationBlock, actionId=aid)
+    return aid
+
+
 # remove boosted users
 
 
@@ -779,6 +997,18 @@ def removeManyBondBoosters(_users: DynArray[address, MAX_BOOSTERS]) -> bool:
     bondBooster: address = staticcall BondRoom(self._getBondRoomAddr()).bondBooster()
     extcall BondBooster(bondBooster).removeManyBondBoosters(_users)
     log ManyBondBoostersRemoved(numUsers=len(_users))
+    return True
+
+
+# remove single boosted user
+
+
+@external
+def removeBondBooster(_user: address) -> bool:
+    assert self._hasPermsToEnable(msg.sender, True) # dev: no perms
+    bondBooster: address = staticcall BondRoom(self._getBondRoomAddr()).bondBooster()
+    extcall BondBooster(bondBooster).removeBondBooster(_user)
+    log BondBoosterRemoved(user=_user)
     return True
 
 
@@ -865,7 +1095,11 @@ def executePendingAction(_aid: uint256) -> bool:
         return False
 
     actionType: ActionType = self.actionType[_aid]
-    mc: address = self._getMissionControlAddr()
+
+    # use stored MC if set, otherwise fallback to current (for backwards compat)
+    mc: address = self.pendingMissionControl[_aid]
+    if mc == empty(address):
+        mc = self._getMissionControlAddr()
 
     if actionType == ActionType.HR_CONFIG_TEMPLATE:
         config: cs.HrConfig = staticcall MissionControl(mc).hrConfig()
@@ -973,6 +1207,31 @@ def executePendingAction(_aid: uint256) -> bool:
         for user: address in users:
             extcall Lootbox(lootbox).resetUserBorrowPoints(user)
         log UserBorrowResetExecuted(numResets=len(users))
+
+    elif actionType == ActionType.RIPE_AVAIL_REWARDS:
+        amount: uint256 = self.pendingRipeAvailable[_aid]
+        extcall Ledger(self._getLedgerAddr()).setRipeAvailForRewards(amount)
+        log RipeAvailableForRewardsSet(amount=amount)
+
+    elif actionType == ActionType.RIPE_AVAIL_HR:
+        amount: uint256 = self.pendingRipeAvailable[_aid]
+        extcall Ledger(self._getLedgerAddr()).setRipeAvailForHr(amount)
+        log RipeAvailableForHrSet(amount=amount)
+
+    elif actionType == ActionType.RIPE_AVAIL_BONDS:
+        amount: uint256 = self.pendingRipeAvailable[_aid]
+        extcall Ledger(self._getLedgerAddr()).setRipeAvailForBonds(amount)
+        log RipeAvailableForBondsSet(amount=amount)
+
+    elif actionType == ActionType.OTHER_UNDERSCORE_REGISTRY:
+        underscoreRegistry: address = self.pendingUnderscoreRegistry[_aid]
+        extcall MissionControl(mc).setUnderscoreRegistry(underscoreRegistry)
+        log UnderscoreRegistrySet(addr=underscoreRegistry)
+
+    elif actionType == ActionType.OTHER_SHOULD_CHECK_LAST_TOUCH:
+        shouldCheck: bool = self.pendingShouldCheckLastTouch[_aid]
+        extcall MissionControl(mc).setShouldCheckLastTouch(shouldCheck)
+        log ShouldCheckLastTouchSet(shouldCheck=shouldCheck)
 
     self.actionType[_aid] = empty(ActionType)
     return True
