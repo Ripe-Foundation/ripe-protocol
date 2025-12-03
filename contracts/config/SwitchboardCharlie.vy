@@ -21,6 +21,7 @@ initializes: timeLock[gov := gov]
 import contracts.modules.LocalGov as gov
 import contracts.modules.TimeLock as timeLock
 import contracts.modules.Addys as addys
+import interfaces.ConfigStructs as cs
 
 interface Lootbox:
     def claimLootForManyUsers(_users: DynArray[address, MAX_CLAIM_USERS], _caller: address, _shouldStake: bool, _a: addys.Addys = empty(addys.Addys)) -> uint256: nonpayable
@@ -29,9 +30,9 @@ interface Lootbox:
     def claimDepositLootForAsset(_user: address, _vaultId: uint256, _asset: address) -> uint256: nonpayable
     def updateRipeRewards(_a: addys.Addys = empty(addys.Addys)): nonpayable
     def distributeUnderscoreRewards() -> (uint256, uint256): nonpayable
-    def setHasUnderscoreRewards(_hasRewards: bool): nonpayable
     def setUnderscoreSendInterval(_interval: uint256): nonpayable
     def setUndyDepositRewardsAmount(_amount: uint256): nonpayable
+    def setHasUnderscoreRewards(_hasRewards: bool): nonpayable
     def setUndyYieldBonusAmount(_amount: uint256): nonpayable
 
 interface AuctionHouse:
@@ -41,6 +42,13 @@ interface AuctionHouse:
     def startAuction(_liqUser: address, _liqVaultId: uint256, _liqAsset: address, _a: addys.Addys = empty(addys.Addys)) -> bool: nonpayable
     def canStartAuction(_liqUser: address, _liqVaultId: uint256, _liqAsset: address) -> bool: view
 
+interface MissionControl:
+    def setAssetConfig(_asset: address, _assetConfig: cs.AssetConfig): nonpayable
+    def setTrainingWheels(_trainingWheels: address): nonpayable
+    def assetConfig(_asset: address) -> cs.AssetConfig: view
+    def canPerformLiteAction(_user: address) -> bool: view
+    def isSupportedAsset(_asset: address) -> bool: view
+
 interface RipeEcoContract:
     def recoverFundsMany(_recipient: address, _assets: DynArray[address, MAX_RECOVER_ASSETS]): nonpayable
     def recoverFunds(_recipient: address, _asset: address): nonpayable
@@ -49,10 +57,6 @@ interface RipeEcoContract:
 interface CreditEngine:
     def updateDebtForManyUsers(_users: DynArray[address, MAX_DEBT_UPDATES], _a: addys.Addys = empty(addys.Addys)) -> bool: nonpayable
     def updateDebtForUser(_user: address, _a: addys.Addys = empty(addys.Addys)) -> bool: nonpayable
-
-interface MissionControl:
-    def setTrainingWheels(_trainingWheels: address): nonpayable
-    def canPerformLiteAction(_user: address) -> bool: view
 
 interface Switchboard:
     def setBlacklist(_tokenAddr: address, _addr: address, _shouldBlacklist: bool) -> bool: nonpayable
@@ -80,6 +84,14 @@ flag ActionType:
     SET_UNDERSCORE_SEND_INTERVAL
     SET_UNDY_DEPOSIT_REWARDS_AMOUNT
     SET_UNDY_YIELD_BONUS_AMOUNT
+
+flag AssetFlag:
+    CAN_DEPOSIT
+    CAN_WITHDRAW
+    CAN_REDEEM_IN_STAB_POOL
+    CAN_BUY_IN_AUCTION
+    CAN_CLAIM_IN_STAB_POOL
+    CAN_REDEEM_COLLATERAL
 
 struct PauseAction:
     contractAddr: address
@@ -281,6 +293,36 @@ event PendingUndyYieldBonusAmountAction:
     confirmationBlock: uint256
     actionId: uint256
 
+event CanDepositAssetSet:
+    asset: indexed(address)
+    canDeposit: bool
+    caller: indexed(address)
+
+event CanWithdrawAssetSet:
+    asset: indexed(address)
+    canWithdraw: bool
+    caller: indexed(address)
+
+event CanRedeemInStabPoolAssetSet:
+    asset: indexed(address)
+    canRedeemInStabPool: bool
+    caller: indexed(address)
+
+event CanBuyInAuctionAssetSet:
+    asset: indexed(address)
+    canBuyInAuction: bool
+    caller: indexed(address)
+
+event CanClaimInStabPoolAssetSet:
+    asset: indexed(address)
+    canClaimInStabPool: bool
+    caller: indexed(address)
+
+event CanRedeemCollateralAssetSet:
+    asset: indexed(address)
+    canRedeemCollateral: bool
+    caller: indexed(address)
+
 # pending actions storage
 actionType: public(HashMap[uint256, ActionType])
 pendingPauseActions: public(HashMap[uint256, PauseAction])
@@ -347,6 +389,16 @@ def _getAuctionHouseAddr() -> address:
 @internal
 def _getMissionControlAddr() -> address:
     return staticcall RipeHq(gov._getRipeHqFromGov()).getAddr(MISSION_CONTROL_ID)
+
+
+@view
+@internal
+def _resolveMissionControl(_missionControl: address) -> address:
+    mc: address = self._getMissionControlAddr()
+    if _missionControl == empty(address):
+        return mc
+    assert _missionControl != mc # dev: use empty for current mission control
+    return _missionControl
 
 
 @view
@@ -864,3 +916,109 @@ def cancelPendingAction(_aid: uint256) -> bool:
 def _cancelPendingAction(_aid: uint256):
     assert timeLock._cancelAction(_aid) # dev: cannot cancel action
     self.actionType[_aid] = empty(ActionType)
+
+
+###############
+# Asset Flags #
+###############
+
+
+@view
+@internal
+def _isValidRedeemCollateralConfig(
+    _asset: address,
+    _shouldEnable: bool,
+    _isNft: bool,
+    _debtTermsLtv: uint256,
+    _shouldTransferToEndaoment: bool,
+) -> bool:
+    if not _shouldEnable:
+        return True
+
+    # cannot redeem collateral if nft
+    if _isNft:
+        return False
+
+    # must have ltv
+    if _debtTermsLtv == 0:
+        return False
+
+    # any stable-ish assets cannot be redeemed
+    if _shouldTransferToEndaoment:
+        return False
+
+    return True
+
+
+@internal
+def _setAssetFlag(_asset: address, _flag: AssetFlag, _shouldEnable: bool, _missionControl: address, _caller: address) -> bool:
+    assert self._hasPermsForLiteAction(_caller, not _shouldEnable) # dev: no perms
+
+    mc: address = self._resolveMissionControl(_missionControl)
+    assert staticcall MissionControl(mc).isSupportedAsset(_asset) # dev: invalid asset
+    assetConfig: cs.AssetConfig = staticcall MissionControl(mc).assetConfig(_asset)
+
+    # get current value and validate
+    if _flag == AssetFlag.CAN_DEPOSIT:
+        assert assetConfig.canDeposit != _shouldEnable # dev: already set
+        assetConfig.canDeposit = _shouldEnable
+        log CanDepositAssetSet(asset=_asset, canDeposit=_shouldEnable, caller=_caller)
+
+    elif _flag == AssetFlag.CAN_WITHDRAW:
+        assert assetConfig.canWithdraw != _shouldEnable # dev: already set
+        assetConfig.canWithdraw = _shouldEnable
+        log CanWithdrawAssetSet(asset=_asset, canWithdraw=_shouldEnable, caller=_caller)
+
+    elif _flag == AssetFlag.CAN_REDEEM_IN_STAB_POOL:
+        assert assetConfig.canRedeemInStabPool != _shouldEnable # dev: already set
+        assetConfig.canRedeemInStabPool = _shouldEnable
+        log CanRedeemInStabPoolAssetSet(asset=_asset, canRedeemInStabPool=_shouldEnable, caller=_caller)
+
+    elif _flag == AssetFlag.CAN_BUY_IN_AUCTION:
+        assert assetConfig.canBuyInAuction != _shouldEnable # dev: already set
+        assetConfig.canBuyInAuction = _shouldEnable
+        log CanBuyInAuctionAssetSet(asset=_asset, canBuyInAuction=_shouldEnable, caller=_caller)
+
+    elif _flag == AssetFlag.CAN_CLAIM_IN_STAB_POOL:
+        assert assetConfig.canClaimInStabPool != _shouldEnable # dev: already set
+        assetConfig.canClaimInStabPool = _shouldEnable
+        log CanClaimInStabPoolAssetSet(asset=_asset, canClaimInStabPool=_shouldEnable, caller=_caller)
+
+    elif _flag == AssetFlag.CAN_REDEEM_COLLATERAL:
+        assert assetConfig.canRedeemCollateral != _shouldEnable # dev: already set
+        assert self._isValidRedeemCollateralConfig(_asset, _shouldEnable, assetConfig.isNft, assetConfig.debtTerms.ltv, assetConfig.shouldTransferToEndaoment) # dev: invalid redeem collateral config
+        assetConfig.canRedeemCollateral = _shouldEnable
+        log CanRedeemCollateralAssetSet(asset=_asset, canRedeemCollateral=_shouldEnable, caller=_caller)
+
+    extcall MissionControl(mc).setAssetConfig(_asset, assetConfig)
+    return True
+
+
+@external
+def setCanDepositAsset(_asset: address, _shouldEnable: bool, _missionControl: address = empty(address)) -> bool:
+    return self._setAssetFlag(_asset, AssetFlag.CAN_DEPOSIT, _shouldEnable, _missionControl, msg.sender)
+
+
+@external
+def setCanWithdrawAsset(_asset: address, _shouldEnable: bool, _missionControl: address = empty(address)) -> bool:
+    return self._setAssetFlag(_asset, AssetFlag.CAN_WITHDRAW, _shouldEnable, _missionControl, msg.sender)
+
+
+@external
+def setCanRedeemInStabPoolAsset(_asset: address, _shouldEnable: bool, _missionControl: address = empty(address)) -> bool:
+    return self._setAssetFlag(_asset, AssetFlag.CAN_REDEEM_IN_STAB_POOL, _shouldEnable, _missionControl, msg.sender)
+
+
+@external
+def setCanBuyInAuctionAsset(_asset: address, _shouldEnable: bool, _missionControl: address = empty(address)) -> bool:
+    return self._setAssetFlag(_asset, AssetFlag.CAN_BUY_IN_AUCTION, _shouldEnable, _missionControl, msg.sender)
+
+
+@external
+def setCanClaimInStabPoolAsset(_asset: address, _shouldEnable: bool, _missionControl: address = empty(address)) -> bool:
+    return self._setAssetFlag(_asset, AssetFlag.CAN_CLAIM_IN_STAB_POOL, _shouldEnable, _missionControl, msg.sender)
+
+
+@external
+def setCanRedeemCollateralAsset(_asset: address, _shouldEnable: bool, _missionControl: address = empty(address)) -> bool:
+    return self._setAssetFlag(_asset, AssetFlag.CAN_REDEEM_COLLATERAL, _shouldEnable, _missionControl, msg.sender)
