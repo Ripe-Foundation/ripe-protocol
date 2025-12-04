@@ -1,0 +1,3960 @@
+[
+  {
+    "name": "EndaomentDepositPerformed",
+    "inputs": [
+      {
+        "name": "legoId",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "asset",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "vault",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "amount",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "caller",
+        "type": "address",
+        "indexed": true
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "EndaomentWithdrawalPerformed",
+    "inputs": [
+      {
+        "name": "legoId",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "asset",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "vaultAddr",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "withdrawAmount",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "caller",
+        "type": "address",
+        "indexed": true
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "EndaomentEthToWethPerformed",
+    "inputs": [
+      {
+        "name": "amount",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "caller",
+        "type": "address",
+        "indexed": true
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "EndaomentWethToEthPerformed",
+    "inputs": [
+      {
+        "name": "amount",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "caller",
+        "type": "address",
+        "indexed": true
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "EndaomentClaimPerformed",
+    "inputs": [
+      {
+        "name": "legoId",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "rewardToken",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "rewardAmount",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "usdValue",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "caller",
+        "type": "address",
+        "indexed": true
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "EndaomentStabilizerPerformed",
+    "inputs": [
+      {
+        "name": "success",
+        "type": "bool",
+        "indexed": false
+      },
+      {
+        "name": "caller",
+        "type": "address",
+        "indexed": true
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "EndaomentPsmTransferPerformed",
+    "inputs": [
+      {
+        "name": "amount",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "usdValue",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "caller",
+        "type": "address",
+        "indexed": true
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "EndaomentVaultTransferPerformed",
+    "inputs": [
+      {
+        "name": "numAssets",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "caller",
+        "type": "address",
+        "indexed": true
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "EndaomentPsmDepositPerformed",
+    "inputs": [
+      {
+        "name": "amountDeposited",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "caller",
+        "type": "address",
+        "indexed": true
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "EndaomentPsmWithdrawPerformed",
+    "inputs": [
+      {
+        "name": "amountWithdrawn",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "amountTransferred",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "caller",
+        "type": "address",
+        "indexed": true
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "EndaomentPsmTransferToFundsPerformed",
+    "inputs": [
+      {
+        "name": "amount",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "caller",
+        "type": "address",
+        "indexed": true
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "PendingEndaoTransferAction",
+    "inputs": [
+      {
+        "name": "asset",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "amount",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "confirmationBlock",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "actionId",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "PendingEndaoSwapAction",
+    "inputs": [
+      {
+        "name": "numSwapInstructions",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "confirmationBlock",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "actionId",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "PendingEndaoAddLiquidityAction",
+    "inputs": [
+      {
+        "name": "legoId",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "pool",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "tokenA",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "tokenB",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "confirmationBlock",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "actionId",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "PendingEndaoRemoveLiquidityAction",
+    "inputs": [
+      {
+        "name": "legoId",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "pool",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "tokenA",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "tokenB",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "confirmationBlock",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "actionId",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "PendingEndaoPartnerMintAction",
+    "inputs": [
+      {
+        "name": "partner",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "asset",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "amount",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "confirmationBlock",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "actionId",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "PendingEndaoPartnerPoolAction",
+    "inputs": [
+      {
+        "name": "legoId",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "pool",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "partner",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "asset",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "confirmationBlock",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "actionId",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "PendingEndaoRepayAction",
+    "inputs": [
+      {
+        "name": "pool",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "amount",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "confirmationBlock",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "actionId",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "PendingPsmSetCanMintAction",
+    "inputs": [
+      {
+        "name": "canMint",
+        "type": "bool",
+        "indexed": false
+      },
+      {
+        "name": "confirmationBlock",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "actionId",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "PendingPsmSetMintFeeAction",
+    "inputs": [
+      {
+        "name": "fee",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "confirmationBlock",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "actionId",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "PendingPsmSetMaxIntervalMintAction",
+    "inputs": [
+      {
+        "name": "maxGreenAmount",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "confirmationBlock",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "actionId",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "PendingPsmSetShouldEnforceMintAllowlistAction",
+    "inputs": [
+      {
+        "name": "shouldEnforce",
+        "type": "bool",
+        "indexed": false
+      },
+      {
+        "name": "confirmationBlock",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "actionId",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "PendingPsmUpdateMintAllowlistAction",
+    "inputs": [
+      {
+        "name": "user",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "isAllowed",
+        "type": "bool",
+        "indexed": false
+      },
+      {
+        "name": "confirmationBlock",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "actionId",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "PendingPsmSetCanRedeemAction",
+    "inputs": [
+      {
+        "name": "canRedeem",
+        "type": "bool",
+        "indexed": false
+      },
+      {
+        "name": "confirmationBlock",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "actionId",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "PendingPsmSetRedeemFeeAction",
+    "inputs": [
+      {
+        "name": "fee",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "confirmationBlock",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "actionId",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "PendingPsmSetMaxIntervalRedeemAction",
+    "inputs": [
+      {
+        "name": "maxGreenAmount",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "confirmationBlock",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "actionId",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "PendingPsmSetShouldEnforceRedeemAllowlistAction",
+    "inputs": [
+      {
+        "name": "shouldEnforce",
+        "type": "bool",
+        "indexed": false
+      },
+      {
+        "name": "confirmationBlock",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "actionId",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "PendingPsmUpdateRedeemAllowlistAction",
+    "inputs": [
+      {
+        "name": "user",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "isAllowed",
+        "type": "bool",
+        "indexed": false
+      },
+      {
+        "name": "confirmationBlock",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "actionId",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "PendingPsmSetUsdcYieldPositionAction",
+    "inputs": [
+      {
+        "name": "legoId",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "vaultToken",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "confirmationBlock",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "actionId",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "PendingPsmSetNumBlocksPerIntervalAction",
+    "inputs": [
+      {
+        "name": "blocks",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "confirmationBlock",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "actionId",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "PendingPsmSetShouldAutoDepositAction",
+    "inputs": [
+      {
+        "name": "shouldAutoDeposit",
+        "type": "bool",
+        "indexed": false
+      },
+      {
+        "name": "confirmationBlock",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "actionId",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "EndaoTransferExecuted",
+    "inputs": [
+      {
+        "name": "asset",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "amount",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "EndaoSwapExecuted",
+    "inputs": [
+      {
+        "name": "numSwapInstructions",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "EndaoAddLiquidityExecuted",
+    "inputs": [
+      {
+        "name": "legoId",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "pool",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "tokenA",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "tokenB",
+        "type": "address",
+        "indexed": true
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "EndaoRemoveLiquidityExecuted",
+    "inputs": [
+      {
+        "name": "legoId",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "pool",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "tokenA",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "tokenB",
+        "type": "address",
+        "indexed": true
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "EndaoPartnerMintExecuted",
+    "inputs": [
+      {
+        "name": "partner",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "asset",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "greenMinted",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "EndaoPartnerPoolExecuted",
+    "inputs": [
+      {
+        "name": "legoId",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "pool",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "partner",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "asset",
+        "type": "address",
+        "indexed": true
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "EndaoRepayExecuted",
+    "inputs": [
+      {
+        "name": "pool",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "success",
+        "type": "bool",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "PsmSetCanMintExecuted",
+    "inputs": [
+      {
+        "name": "canMint",
+        "type": "bool",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "PsmSetMintFeeExecuted",
+    "inputs": [
+      {
+        "name": "fee",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "PsmSetMaxIntervalMintExecuted",
+    "inputs": [
+      {
+        "name": "maxGreenAmount",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "PsmSetShouldEnforceMintAllowlistExecuted",
+    "inputs": [
+      {
+        "name": "shouldEnforce",
+        "type": "bool",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "PsmUpdateMintAllowlistExecuted",
+    "inputs": [
+      {
+        "name": "user",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "isAllowed",
+        "type": "bool",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "PsmSetCanRedeemExecuted",
+    "inputs": [
+      {
+        "name": "canRedeem",
+        "type": "bool",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "PsmSetRedeemFeeExecuted",
+    "inputs": [
+      {
+        "name": "fee",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "PsmSetMaxIntervalRedeemExecuted",
+    "inputs": [
+      {
+        "name": "maxGreenAmount",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "PsmSetShouldEnforceRedeemAllowlistExecuted",
+    "inputs": [
+      {
+        "name": "shouldEnforce",
+        "type": "bool",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "PsmUpdateRedeemAllowlistExecuted",
+    "inputs": [
+      {
+        "name": "user",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "isAllowed",
+        "type": "bool",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "PsmSetUsdcYieldPositionExecuted",
+    "inputs": [
+      {
+        "name": "legoId",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "vaultToken",
+        "type": "address",
+        "indexed": true
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "PsmSetNumBlocksPerIntervalExecuted",
+    "inputs": [
+      {
+        "name": "blocks",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "PsmSetShouldAutoDepositExecuted",
+    "inputs": [
+      {
+        "name": "shouldAutoDeposit",
+        "type": "bool",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "GovChangeTimeLockModified",
+    "inputs": [
+      {
+        "name": "prevTimeLock",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "newTimeLock",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "ExpirationSet",
+    "inputs": [
+      {
+        "name": "expiration",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "ActionTimeLockSet",
+    "inputs": [
+      {
+        "name": "newTimeLock",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "prevTimeLock",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "GovChangeStarted",
+    "inputs": [
+      {
+        "name": "prevGov",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "newGov",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "confirmBlock",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "GovChangeConfirmed",
+    "inputs": [
+      {
+        "name": "prevGov",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "newGov",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "initiatedBlock",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "confirmBlock",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "GovChangeCancelled",
+    "inputs": [
+      {
+        "name": "cancelledGov",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "initiatedBlock",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "confirmBlock",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "GovRelinquished",
+    "inputs": [
+      {
+        "name": "prevGov",
+        "type": "address",
+        "indexed": true
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "RipeHqSetupFinished",
+    "inputs": [
+      {
+        "name": "prevGov",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "newGov",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "timeLock",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "getRipeHqFromGov",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "canGovern",
+    "inputs": [
+      {
+        "name": "_addr",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "getGovernors",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address[]"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "hasPendingGovChange",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "startGovernanceChange",
+    "inputs": [
+      {
+        "name": "_newGov",
+        "type": "address"
+      }
+    ],
+    "outputs": []
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "confirmGovernanceChange",
+    "inputs": [],
+    "outputs": []
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "cancelGovernanceChange",
+    "inputs": [],
+    "outputs": []
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "relinquishGov",
+    "inputs": [],
+    "outputs": []
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "setGovTimeLock",
+    "inputs": [
+      {
+        "name": "_numBlocks",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "isValidGovTimeLock",
+    "inputs": [
+      {
+        "name": "_newTimeLock",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "minGovChangeTimeLock",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "maxGovChangeTimeLock",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "finishRipeHqSetup",
+    "inputs": [
+      {
+        "name": "_newGov",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "finishRipeHqSetup",
+    "inputs": [
+      {
+        "name": "_newGov",
+        "type": "address"
+      },
+      {
+        "name": "_timeLock",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "governance",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "pendingGov",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "newGov",
+            "type": "address"
+          },
+          {
+            "name": "initiatedBlock",
+            "type": "uint256"
+          },
+          {
+            "name": "confirmBlock",
+            "type": "uint256"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "numGovChanges",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "govChangeTimeLock",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "canConfirmAction",
+    "inputs": [
+      {
+        "name": "_actionId",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "isExpired",
+    "inputs": [
+      {
+        "name": "_actionId",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "hasPendingAction",
+    "inputs": [
+      {
+        "name": "_actionId",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "getActionConfirmationBlock",
+    "inputs": [
+      {
+        "name": "_actionId",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "setActionTimeLock",
+    "inputs": [
+      {
+        "name": "_newTimeLock",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "isValidActionTimeLock",
+    "inputs": [
+      {
+        "name": "_newTimeLock",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "minActionTimeLock",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "maxActionTimeLock",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "setExpiration",
+    "inputs": [
+      {
+        "name": "_expiration",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "setActionTimeLockAfterSetup",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "setActionTimeLockAfterSetup",
+    "inputs": [
+      {
+        "name": "_newTimeLock",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "pendingActions",
+    "inputs": [
+      {
+        "name": "arg0",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "initiatedBlock",
+            "type": "uint256"
+          },
+          {
+            "name": "confirmBlock",
+            "type": "uint256"
+          },
+          {
+            "name": "expiration",
+            "type": "uint256"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "actionId",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "actionTimeLock",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "expiration",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "depositForYieldInEndaoment",
+    "inputs": [
+      {
+        "name": "_legoId",
+        "type": "uint256"
+      },
+      {
+        "name": "_asset",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      },
+      {
+        "name": "",
+        "type": "address"
+      },
+      {
+        "name": "",
+        "type": "uint256"
+      },
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "depositForYieldInEndaoment",
+    "inputs": [
+      {
+        "name": "_legoId",
+        "type": "uint256"
+      },
+      {
+        "name": "_asset",
+        "type": "address"
+      },
+      {
+        "name": "_vaultAddr",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      },
+      {
+        "name": "",
+        "type": "address"
+      },
+      {
+        "name": "",
+        "type": "uint256"
+      },
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "depositForYieldInEndaoment",
+    "inputs": [
+      {
+        "name": "_legoId",
+        "type": "uint256"
+      },
+      {
+        "name": "_asset",
+        "type": "address"
+      },
+      {
+        "name": "_vaultAddr",
+        "type": "address"
+      },
+      {
+        "name": "_amount",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      },
+      {
+        "name": "",
+        "type": "address"
+      },
+      {
+        "name": "",
+        "type": "uint256"
+      },
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "depositForYieldInEndaoment",
+    "inputs": [
+      {
+        "name": "_legoId",
+        "type": "uint256"
+      },
+      {
+        "name": "_asset",
+        "type": "address"
+      },
+      {
+        "name": "_vaultAddr",
+        "type": "address"
+      },
+      {
+        "name": "_amount",
+        "type": "uint256"
+      },
+      {
+        "name": "_extraData",
+        "type": "bytes32"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      },
+      {
+        "name": "",
+        "type": "address"
+      },
+      {
+        "name": "",
+        "type": "uint256"
+      },
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "withdrawFromYieldInEndaoment",
+    "inputs": [
+      {
+        "name": "_legoId",
+        "type": "uint256"
+      },
+      {
+        "name": "_vaultToken",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      },
+      {
+        "name": "",
+        "type": "address"
+      },
+      {
+        "name": "",
+        "type": "uint256"
+      },
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "withdrawFromYieldInEndaoment",
+    "inputs": [
+      {
+        "name": "_legoId",
+        "type": "uint256"
+      },
+      {
+        "name": "_vaultToken",
+        "type": "address"
+      },
+      {
+        "name": "_amount",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      },
+      {
+        "name": "",
+        "type": "address"
+      },
+      {
+        "name": "",
+        "type": "uint256"
+      },
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "withdrawFromYieldInEndaoment",
+    "inputs": [
+      {
+        "name": "_legoId",
+        "type": "uint256"
+      },
+      {
+        "name": "_vaultToken",
+        "type": "address"
+      },
+      {
+        "name": "_amount",
+        "type": "uint256"
+      },
+      {
+        "name": "_extraData",
+        "type": "bytes32"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      },
+      {
+        "name": "",
+        "type": "address"
+      },
+      {
+        "name": "",
+        "type": "uint256"
+      },
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "convertEthToWethInEndaoment",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      },
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "convertEthToWethInEndaoment",
+    "inputs": [
+      {
+        "name": "_amount",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      },
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "convertWethToEthInEndaoment",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      },
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "convertWethToEthInEndaoment",
+    "inputs": [
+      {
+        "name": "_amount",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      },
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "claimIncentivesInEndaoment",
+    "inputs": [
+      {
+        "name": "_user",
+        "type": "address"
+      },
+      {
+        "name": "_legoId",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      },
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "claimIncentivesInEndaoment",
+    "inputs": [
+      {
+        "name": "_user",
+        "type": "address"
+      },
+      {
+        "name": "_legoId",
+        "type": "uint256"
+      },
+      {
+        "name": "_rewardToken",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      },
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "claimIncentivesInEndaoment",
+    "inputs": [
+      {
+        "name": "_user",
+        "type": "address"
+      },
+      {
+        "name": "_legoId",
+        "type": "uint256"
+      },
+      {
+        "name": "_rewardToken",
+        "type": "address"
+      },
+      {
+        "name": "_rewardAmount",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      },
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "claimIncentivesInEndaoment",
+    "inputs": [
+      {
+        "name": "_user",
+        "type": "address"
+      },
+      {
+        "name": "_legoId",
+        "type": "uint256"
+      },
+      {
+        "name": "_rewardToken",
+        "type": "address"
+      },
+      {
+        "name": "_rewardAmount",
+        "type": "uint256"
+      },
+      {
+        "name": "_proofs",
+        "type": "bytes32[]"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      },
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "stabilizeGreenRefPoolInEndaoment",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "transferFundsToEndaomentPsmInEndaoment",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      },
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "transferFundsToEndaomentPsmInEndaoment",
+    "inputs": [
+      {
+        "name": "_amount",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      },
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "transferFundsToVaultInEndaoment",
+    "inputs": [
+      {
+        "name": "_assets",
+        "type": "address[]"
+      }
+    ],
+    "outputs": []
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "depositToYieldInPsm",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "withdrawFromYieldInPsm",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      },
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "withdrawFromYieldInPsm",
+    "inputs": [
+      {
+        "name": "_amount",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      },
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "withdrawFromYieldInPsm",
+    "inputs": [
+      {
+        "name": "_amount",
+        "type": "uint256"
+      },
+      {
+        "name": "_shouldTransferToEndaoFunds",
+        "type": "bool"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      },
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "withdrawFromYieldInPsm",
+    "inputs": [
+      {
+        "name": "_amount",
+        "type": "uint256"
+      },
+      {
+        "name": "_shouldTransferToEndaoFunds",
+        "type": "bool"
+      },
+      {
+        "name": "_shouldFullSweep",
+        "type": "bool"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      },
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "transferUsdcToEndaomentFundsInPsm",
+    "inputs": [
+      {
+        "name": "_amount",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "performEndaomentTransfer",
+    "inputs": [
+      {
+        "name": "_asset",
+        "type": "address"
+      },
+      {
+        "name": "_amount",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "performEndaomentSwap",
+    "inputs": [
+      {
+        "name": "_instructions",
+        "type": "tuple[]",
+        "components": [
+          {
+            "name": "legoId",
+            "type": "uint256"
+          },
+          {
+            "name": "amountIn",
+            "type": "uint256"
+          },
+          {
+            "name": "minAmountOut",
+            "type": "uint256"
+          },
+          {
+            "name": "tokenPath",
+            "type": "address[]"
+          },
+          {
+            "name": "poolPath",
+            "type": "address[]"
+          }
+        ]
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "addLiquidityInEndaoment",
+    "inputs": [
+      {
+        "name": "_legoId",
+        "type": "uint256"
+      },
+      {
+        "name": "_pool",
+        "type": "address"
+      },
+      {
+        "name": "_tokenA",
+        "type": "address"
+      },
+      {
+        "name": "_tokenB",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "addLiquidityInEndaoment",
+    "inputs": [
+      {
+        "name": "_legoId",
+        "type": "uint256"
+      },
+      {
+        "name": "_pool",
+        "type": "address"
+      },
+      {
+        "name": "_tokenA",
+        "type": "address"
+      },
+      {
+        "name": "_tokenB",
+        "type": "address"
+      },
+      {
+        "name": "_amountA",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "addLiquidityInEndaoment",
+    "inputs": [
+      {
+        "name": "_legoId",
+        "type": "uint256"
+      },
+      {
+        "name": "_pool",
+        "type": "address"
+      },
+      {
+        "name": "_tokenA",
+        "type": "address"
+      },
+      {
+        "name": "_tokenB",
+        "type": "address"
+      },
+      {
+        "name": "_amountA",
+        "type": "uint256"
+      },
+      {
+        "name": "_amountB",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "addLiquidityInEndaoment",
+    "inputs": [
+      {
+        "name": "_legoId",
+        "type": "uint256"
+      },
+      {
+        "name": "_pool",
+        "type": "address"
+      },
+      {
+        "name": "_tokenA",
+        "type": "address"
+      },
+      {
+        "name": "_tokenB",
+        "type": "address"
+      },
+      {
+        "name": "_amountA",
+        "type": "uint256"
+      },
+      {
+        "name": "_amountB",
+        "type": "uint256"
+      },
+      {
+        "name": "_minAmountA",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "addLiquidityInEndaoment",
+    "inputs": [
+      {
+        "name": "_legoId",
+        "type": "uint256"
+      },
+      {
+        "name": "_pool",
+        "type": "address"
+      },
+      {
+        "name": "_tokenA",
+        "type": "address"
+      },
+      {
+        "name": "_tokenB",
+        "type": "address"
+      },
+      {
+        "name": "_amountA",
+        "type": "uint256"
+      },
+      {
+        "name": "_amountB",
+        "type": "uint256"
+      },
+      {
+        "name": "_minAmountA",
+        "type": "uint256"
+      },
+      {
+        "name": "_minAmountB",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "addLiquidityInEndaoment",
+    "inputs": [
+      {
+        "name": "_legoId",
+        "type": "uint256"
+      },
+      {
+        "name": "_pool",
+        "type": "address"
+      },
+      {
+        "name": "_tokenA",
+        "type": "address"
+      },
+      {
+        "name": "_tokenB",
+        "type": "address"
+      },
+      {
+        "name": "_amountA",
+        "type": "uint256"
+      },
+      {
+        "name": "_amountB",
+        "type": "uint256"
+      },
+      {
+        "name": "_minAmountA",
+        "type": "uint256"
+      },
+      {
+        "name": "_minAmountB",
+        "type": "uint256"
+      },
+      {
+        "name": "_minLpAmount",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "addLiquidityInEndaoment",
+    "inputs": [
+      {
+        "name": "_legoId",
+        "type": "uint256"
+      },
+      {
+        "name": "_pool",
+        "type": "address"
+      },
+      {
+        "name": "_tokenA",
+        "type": "address"
+      },
+      {
+        "name": "_tokenB",
+        "type": "address"
+      },
+      {
+        "name": "_amountA",
+        "type": "uint256"
+      },
+      {
+        "name": "_amountB",
+        "type": "uint256"
+      },
+      {
+        "name": "_minAmountA",
+        "type": "uint256"
+      },
+      {
+        "name": "_minAmountB",
+        "type": "uint256"
+      },
+      {
+        "name": "_minLpAmount",
+        "type": "uint256"
+      },
+      {
+        "name": "_extraData",
+        "type": "bytes32"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "removeLiquidityInEndaoment",
+    "inputs": [
+      {
+        "name": "_legoId",
+        "type": "uint256"
+      },
+      {
+        "name": "_pool",
+        "type": "address"
+      },
+      {
+        "name": "_tokenA",
+        "type": "address"
+      },
+      {
+        "name": "_tokenB",
+        "type": "address"
+      },
+      {
+        "name": "_lpToken",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "removeLiquidityInEndaoment",
+    "inputs": [
+      {
+        "name": "_legoId",
+        "type": "uint256"
+      },
+      {
+        "name": "_pool",
+        "type": "address"
+      },
+      {
+        "name": "_tokenA",
+        "type": "address"
+      },
+      {
+        "name": "_tokenB",
+        "type": "address"
+      },
+      {
+        "name": "_lpToken",
+        "type": "address"
+      },
+      {
+        "name": "_lpAmount",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "removeLiquidityInEndaoment",
+    "inputs": [
+      {
+        "name": "_legoId",
+        "type": "uint256"
+      },
+      {
+        "name": "_pool",
+        "type": "address"
+      },
+      {
+        "name": "_tokenA",
+        "type": "address"
+      },
+      {
+        "name": "_tokenB",
+        "type": "address"
+      },
+      {
+        "name": "_lpToken",
+        "type": "address"
+      },
+      {
+        "name": "_lpAmount",
+        "type": "uint256"
+      },
+      {
+        "name": "_minAmountA",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "removeLiquidityInEndaoment",
+    "inputs": [
+      {
+        "name": "_legoId",
+        "type": "uint256"
+      },
+      {
+        "name": "_pool",
+        "type": "address"
+      },
+      {
+        "name": "_tokenA",
+        "type": "address"
+      },
+      {
+        "name": "_tokenB",
+        "type": "address"
+      },
+      {
+        "name": "_lpToken",
+        "type": "address"
+      },
+      {
+        "name": "_lpAmount",
+        "type": "uint256"
+      },
+      {
+        "name": "_minAmountA",
+        "type": "uint256"
+      },
+      {
+        "name": "_minAmountB",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "removeLiquidityInEndaoment",
+    "inputs": [
+      {
+        "name": "_legoId",
+        "type": "uint256"
+      },
+      {
+        "name": "_pool",
+        "type": "address"
+      },
+      {
+        "name": "_tokenA",
+        "type": "address"
+      },
+      {
+        "name": "_tokenB",
+        "type": "address"
+      },
+      {
+        "name": "_lpToken",
+        "type": "address"
+      },
+      {
+        "name": "_lpAmount",
+        "type": "uint256"
+      },
+      {
+        "name": "_minAmountA",
+        "type": "uint256"
+      },
+      {
+        "name": "_minAmountB",
+        "type": "uint256"
+      },
+      {
+        "name": "_extraData",
+        "type": "bytes32"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "mintPartnerLiquidityInEndaoment",
+    "inputs": [
+      {
+        "name": "_partner",
+        "type": "address"
+      },
+      {
+        "name": "_asset",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "mintPartnerLiquidityInEndaoment",
+    "inputs": [
+      {
+        "name": "_partner",
+        "type": "address"
+      },
+      {
+        "name": "_asset",
+        "type": "address"
+      },
+      {
+        "name": "_amount",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "addPartnerLiquidityInEndaoment",
+    "inputs": [
+      {
+        "name": "_legoId",
+        "type": "uint256"
+      },
+      {
+        "name": "_pool",
+        "type": "address"
+      },
+      {
+        "name": "_partner",
+        "type": "address"
+      },
+      {
+        "name": "_asset",
+        "type": "address"
+      },
+      {
+        "name": "_amount",
+        "type": "uint256"
+      },
+      {
+        "name": "_minLpAmount",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "repayPoolDebtInEndaoment",
+    "inputs": [
+      {
+        "name": "_pool",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "repayPoolDebtInEndaoment",
+    "inputs": [
+      {
+        "name": "_pool",
+        "type": "address"
+      },
+      {
+        "name": "_amount",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "setPsmCanMint",
+    "inputs": [
+      {
+        "name": "_canMint",
+        "type": "bool"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "setPsmMintFee",
+    "inputs": [
+      {
+        "name": "_fee",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "setPsmMaxIntervalMint",
+    "inputs": [
+      {
+        "name": "_maxGreenAmount",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "setPsmShouldEnforceMintAllowlist",
+    "inputs": [
+      {
+        "name": "_shouldEnforce",
+        "type": "bool"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "updatePsmMintAllowlist",
+    "inputs": [
+      {
+        "name": "_user",
+        "type": "address"
+      },
+      {
+        "name": "_isAllowed",
+        "type": "bool"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "setPsmCanRedeem",
+    "inputs": [
+      {
+        "name": "_canRedeem",
+        "type": "bool"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "setPsmRedeemFee",
+    "inputs": [
+      {
+        "name": "_fee",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "setPsmMaxIntervalRedeem",
+    "inputs": [
+      {
+        "name": "_maxGreenAmount",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "setPsmShouldEnforceRedeemAllowlist",
+    "inputs": [
+      {
+        "name": "_shouldEnforce",
+        "type": "bool"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "updatePsmRedeemAllowlist",
+    "inputs": [
+      {
+        "name": "_user",
+        "type": "address"
+      },
+      {
+        "name": "_isAllowed",
+        "type": "bool"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "setPsmUsdcYieldPosition",
+    "inputs": [
+      {
+        "name": "_legoId",
+        "type": "uint256"
+      },
+      {
+        "name": "_vaultToken",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "setPsmNumBlocksPerInterval",
+    "inputs": [
+      {
+        "name": "_blocks",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "setPsmShouldAutoDeposit",
+    "inputs": [
+      {
+        "name": "_shouldAutoDeposit",
+        "type": "bool"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "executePendingAction",
+    "inputs": [
+      {
+        "name": "_aid",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "cancelPendingAction",
+    "inputs": [
+      {
+        "name": "_aid",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "actionType",
+    "inputs": [
+      {
+        "name": "arg0",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "pendingEndaoSwapActions",
+    "inputs": [
+      {
+        "name": "arg0",
+        "type": "uint256"
+      },
+      {
+        "name": "arg1",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "legoId",
+            "type": "uint256"
+          },
+          {
+            "name": "amountIn",
+            "type": "uint256"
+          },
+          {
+            "name": "minAmountOut",
+            "type": "uint256"
+          },
+          {
+            "name": "tokenPath",
+            "type": "address[]"
+          },
+          {
+            "name": "poolPath",
+            "type": "address[]"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "pendingEndaoAddLiquidityActions",
+    "inputs": [
+      {
+        "name": "arg0",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "legoId",
+            "type": "uint256"
+          },
+          {
+            "name": "pool",
+            "type": "address"
+          },
+          {
+            "name": "tokenA",
+            "type": "address"
+          },
+          {
+            "name": "tokenB",
+            "type": "address"
+          },
+          {
+            "name": "amountA",
+            "type": "uint256"
+          },
+          {
+            "name": "amountB",
+            "type": "uint256"
+          },
+          {
+            "name": "minAmountA",
+            "type": "uint256"
+          },
+          {
+            "name": "minAmountB",
+            "type": "uint256"
+          },
+          {
+            "name": "minLpAmount",
+            "type": "uint256"
+          },
+          {
+            "name": "extraData",
+            "type": "bytes32"
+          },
+          {
+            "name": "lpToken",
+            "type": "address"
+          },
+          {
+            "name": "lpAmount",
+            "type": "uint256"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "pendingEndaoRemoveLiquidityActions",
+    "inputs": [
+      {
+        "name": "arg0",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "legoId",
+            "type": "uint256"
+          },
+          {
+            "name": "pool",
+            "type": "address"
+          },
+          {
+            "name": "tokenA",
+            "type": "address"
+          },
+          {
+            "name": "tokenB",
+            "type": "address"
+          },
+          {
+            "name": "amountA",
+            "type": "uint256"
+          },
+          {
+            "name": "amountB",
+            "type": "uint256"
+          },
+          {
+            "name": "minAmountA",
+            "type": "uint256"
+          },
+          {
+            "name": "minAmountB",
+            "type": "uint256"
+          },
+          {
+            "name": "minLpAmount",
+            "type": "uint256"
+          },
+          {
+            "name": "extraData",
+            "type": "bytes32"
+          },
+          {
+            "name": "lpToken",
+            "type": "address"
+          },
+          {
+            "name": "lpAmount",
+            "type": "uint256"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "pendingEndaoPartnerMintActions",
+    "inputs": [
+      {
+        "name": "arg0",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "partner",
+            "type": "address"
+          },
+          {
+            "name": "asset",
+            "type": "address"
+          },
+          {
+            "name": "amount",
+            "type": "uint256"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "pendingEndaoPartnerPoolActions",
+    "inputs": [
+      {
+        "name": "arg0",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "legoId",
+            "type": "uint256"
+          },
+          {
+            "name": "pool",
+            "type": "address"
+          },
+          {
+            "name": "partner",
+            "type": "address"
+          },
+          {
+            "name": "asset",
+            "type": "address"
+          },
+          {
+            "name": "amount",
+            "type": "uint256"
+          },
+          {
+            "name": "minLpAmount",
+            "type": "uint256"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "pendingEndaoRepayActions",
+    "inputs": [
+      {
+        "name": "arg0",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "pool",
+            "type": "address"
+          },
+          {
+            "name": "amount",
+            "type": "uint256"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "pendingEndaoTransfer",
+    "inputs": [
+      {
+        "name": "arg0",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "asset",
+            "type": "address"
+          },
+          {
+            "name": "amount",
+            "type": "uint256"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "pendingPsmSetCanMintActions",
+    "inputs": [
+      {
+        "name": "arg0",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "canMint",
+            "type": "bool"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "pendingPsmSetMintFeeActions",
+    "inputs": [
+      {
+        "name": "arg0",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "fee",
+            "type": "uint256"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "pendingPsmSetMaxIntervalMintActions",
+    "inputs": [
+      {
+        "name": "arg0",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "maxGreenAmount",
+            "type": "uint256"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "pendingPsmSetShouldEnforceMintAllowlistActions",
+    "inputs": [
+      {
+        "name": "arg0",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "shouldEnforce",
+            "type": "bool"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "pendingPsmUpdateMintAllowlistActions",
+    "inputs": [
+      {
+        "name": "arg0",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "user",
+            "type": "address"
+          },
+          {
+            "name": "isAllowed",
+            "type": "bool"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "pendingPsmSetCanRedeemActions",
+    "inputs": [
+      {
+        "name": "arg0",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "canRedeem",
+            "type": "bool"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "pendingPsmSetRedeemFeeActions",
+    "inputs": [
+      {
+        "name": "arg0",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "fee",
+            "type": "uint256"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "pendingPsmSetMaxIntervalRedeemActions",
+    "inputs": [
+      {
+        "name": "arg0",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "maxGreenAmount",
+            "type": "uint256"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "pendingPsmSetShouldEnforceRedeemAllowlistActions",
+    "inputs": [
+      {
+        "name": "arg0",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "shouldEnforce",
+            "type": "bool"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "pendingPsmUpdateRedeemAllowlistActions",
+    "inputs": [
+      {
+        "name": "arg0",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "user",
+            "type": "address"
+          },
+          {
+            "name": "isAllowed",
+            "type": "bool"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "pendingPsmSetUsdcYieldPositionActions",
+    "inputs": [
+      {
+        "name": "arg0",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "legoId",
+            "type": "uint256"
+          },
+          {
+            "name": "vaultToken",
+            "type": "address"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "pendingPsmSetNumBlocksPerIntervalActions",
+    "inputs": [
+      {
+        "name": "arg0",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "blocks",
+            "type": "uint256"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "pendingPsmSetShouldAutoDepositActions",
+    "inputs": [
+      {
+        "name": "arg0",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "shouldAutoDeposit",
+            "type": "bool"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "constructor",
+    "inputs": [
+      {
+        "name": "_ripeHq",
+        "type": "address"
+      },
+      {
+        "name": "_tempGov",
+        "type": "address"
+      },
+      {
+        "name": "_minConfigTimeLock",
+        "type": "uint256"
+      },
+      {
+        "name": "_maxConfigTimeLock",
+        "type": "uint256"
+      }
+    ],
+    "outputs": []
+  }
+]

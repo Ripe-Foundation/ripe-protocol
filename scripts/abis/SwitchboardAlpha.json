@@ -1,0 +1,3756 @@
+[
+  {
+    "name": "PendingVaultLimitsChange",
+    "inputs": [
+      {
+        "name": "perUserMaxVaults",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "perUserMaxAssetsPerVault",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "confirmationBlock",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "actionId",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "PendingStaleTimeChange",
+    "inputs": [
+      {
+        "name": "priceStaleTime",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "confirmationBlock",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "actionId",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "CanDepositSet",
+    "inputs": [
+      {
+        "name": "canDeposit",
+        "type": "bool",
+        "indexed": false
+      },
+      {
+        "name": "caller",
+        "type": "address",
+        "indexed": true
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "CanWithdrawSet",
+    "inputs": [
+      {
+        "name": "canWithdraw",
+        "type": "bool",
+        "indexed": false
+      },
+      {
+        "name": "caller",
+        "type": "address",
+        "indexed": true
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "CanBorrowSet",
+    "inputs": [
+      {
+        "name": "canBorrow",
+        "type": "bool",
+        "indexed": false
+      },
+      {
+        "name": "caller",
+        "type": "address",
+        "indexed": true
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "CanRepaySet",
+    "inputs": [
+      {
+        "name": "canRepay",
+        "type": "bool",
+        "indexed": false
+      },
+      {
+        "name": "caller",
+        "type": "address",
+        "indexed": true
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "CanClaimLootSet",
+    "inputs": [
+      {
+        "name": "canClaimLoot",
+        "type": "bool",
+        "indexed": false
+      },
+      {
+        "name": "caller",
+        "type": "address",
+        "indexed": true
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "CanLiquidateSet",
+    "inputs": [
+      {
+        "name": "canLiquidate",
+        "type": "bool",
+        "indexed": false
+      },
+      {
+        "name": "caller",
+        "type": "address",
+        "indexed": true
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "CanRedeemCollateralSet",
+    "inputs": [
+      {
+        "name": "canRedeemCollateral",
+        "type": "bool",
+        "indexed": false
+      },
+      {
+        "name": "caller",
+        "type": "address",
+        "indexed": true
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "CanRedeemInStabPoolSet",
+    "inputs": [
+      {
+        "name": "canRedeemInStabPool",
+        "type": "bool",
+        "indexed": false
+      },
+      {
+        "name": "caller",
+        "type": "address",
+        "indexed": true
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "CanBuyInAuctionSet",
+    "inputs": [
+      {
+        "name": "canBuyInAuction",
+        "type": "bool",
+        "indexed": false
+      },
+      {
+        "name": "caller",
+        "type": "address",
+        "indexed": true
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "CanClaimInStabPoolSet",
+    "inputs": [
+      {
+        "name": "canClaimInStabPool",
+        "type": "bool",
+        "indexed": false
+      },
+      {
+        "name": "caller",
+        "type": "address",
+        "indexed": true
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "PendingGlobalDebtLimitsChange",
+    "inputs": [
+      {
+        "name": "perUserDebtLimit",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "globalDebtLimit",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "minDebtAmount",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "numAllowedBorrowers",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "confirmationBlock",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "actionId",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "PendingBorrowIntervalConfigChange",
+    "inputs": [
+      {
+        "name": "maxBorrowPerInterval",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "numBlocksPerInterval",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "confirmationBlock",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "actionId",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "PendingDynamicRateConfigChange",
+    "inputs": [
+      {
+        "name": "minDynamicRateBoost",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "maxDynamicRateBoost",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "increasePerDangerBlock",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "maxBorrowRate",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "confirmationBlock",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "actionId",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "PendingKeeperConfigChange",
+    "inputs": [
+      {
+        "name": "keeperFeeRatio",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "minKeeperFee",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "maxKeeperFee",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "confirmationBlock",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "actionId",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "PendingLtvPaybackBufferChange",
+    "inputs": [
+      {
+        "name": "ltvPaybackBuffer",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "confirmationBlock",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "actionId",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "PendingDefaultAuctionParamsChange",
+    "inputs": [
+      {
+        "name": "startDiscount",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "maxDiscount",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "delay",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "duration",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "confirmationBlock",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "actionId",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "PendingUndyVaultDiscountChange",
+    "inputs": [
+      {
+        "name": "discount",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "confirmationBlock",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "actionId",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "PendingBuybackRatioChange",
+    "inputs": [
+      {
+        "name": "ratio",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "confirmationBlock",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "actionId",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "PendingPythMaxConfidenceRatioChange",
+    "inputs": [
+      {
+        "name": "ratio",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "confirmationBlock",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "actionId",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "IsDaowryEnabledSet",
+    "inputs": [
+      {
+        "name": "isDaowryEnabled",
+        "type": "bool",
+        "indexed": false
+      },
+      {
+        "name": "caller",
+        "type": "address",
+        "indexed": true
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "PendingRipeRewardsPerBlockChange",
+    "inputs": [
+      {
+        "name": "ripePerBlock",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "confirmationBlock",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "actionId",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "PendingRipeRewardsAllocsChange",
+    "inputs": [
+      {
+        "name": "borrowersAlloc",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "stakersAlloc",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "votersAlloc",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "genDepositorsAlloc",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "confirmationBlock",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "actionId",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "PendingRipeRewardsAutoStakeParamsChange",
+    "inputs": [
+      {
+        "name": "autoStakeRatio",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "autoStakeDurationRatio",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "stabPoolRipePerDollarClaimed",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "confirmationBlock",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "actionId",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "RewardsPointsEnabledModified",
+    "inputs": [
+      {
+        "name": "arePointsEnabled",
+        "type": "bool",
+        "indexed": false
+      },
+      {
+        "name": "caller",
+        "type": "address",
+        "indexed": true
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "PendingPriorityLiqAssetVaultsChange",
+    "inputs": [
+      {
+        "name": "numPriorityLiqAssetVaults",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "confirmationBlock",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "actionId",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "PendingPriorityStabVaultsChange",
+    "inputs": [
+      {
+        "name": "numPriorityStabVaults",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "confirmationBlock",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "actionId",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "PendingPriorityPriceSourceIdsChange",
+    "inputs": [
+      {
+        "name": "numPriorityPriceSourceIds",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "confirmationBlock",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "actionId",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "PendingCanPerformLiteAction",
+    "inputs": [
+      {
+        "name": "user",
+        "type": "address",
+        "indexed": false
+      },
+      {
+        "name": "canDo",
+        "type": "bool",
+        "indexed": false
+      },
+      {
+        "name": "confirmationBlock",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "actionId",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "PendingMaxLtvDeviationChange",
+    "inputs": [
+      {
+        "name": "newDeviation",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "confirmationBlock",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "actionId",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "PendingRipeGovVaultConfigChange",
+    "inputs": [
+      {
+        "name": "asset",
+        "type": "address",
+        "indexed": false
+      },
+      {
+        "name": "assetWeight",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "shouldFreezeWhenBadDebt",
+        "type": "bool",
+        "indexed": false
+      },
+      {
+        "name": "minLockDuration",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "maxLockDuration",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "maxLockBoost",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "canExit",
+        "type": "bool",
+        "indexed": false
+      },
+      {
+        "name": "exitFee",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "confirmationBlock",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "actionId",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "VaultLimitsSet",
+    "inputs": [
+      {
+        "name": "perUserMaxVaults",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "perUserMaxAssetsPerVault",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "StaleTimeSet",
+    "inputs": [
+      {
+        "name": "staleTime",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "GlobalDebtLimitsSet",
+    "inputs": [
+      {
+        "name": "perUserDebtLimit",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "globalDebtLimit",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "minDebtAmount",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "numAllowedBorrowers",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "BorrowIntervalConfigSet",
+    "inputs": [
+      {
+        "name": "maxBorrowPerInterval",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "numBlocksPerInterval",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "DynamicRateConfigSet",
+    "inputs": [
+      {
+        "name": "minDynamicRateBoost",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "maxDynamicRateBoost",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "increasePerDangerBlock",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "maxBorrowRate",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "KeeperConfigSet",
+    "inputs": [
+      {
+        "name": "keeperFeeRatio",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "minKeeperFee",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "maxKeeperFee",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "LtvPaybackBufferSet",
+    "inputs": [
+      {
+        "name": "ltvPaybackBuffer",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "GenAuctionParamsSet",
+    "inputs": [
+      {
+        "name": "startDiscount",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "maxDiscount",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "delay",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "duration",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "UndyVaultDiscountSet",
+    "inputs": [
+      {
+        "name": "discount",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "BuybackRatioSet",
+    "inputs": [
+      {
+        "name": "ratio",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "PythMaxConfidenceRatioSet",
+    "inputs": [
+      {
+        "name": "ratio",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "RipeRewardsPerBlockSet",
+    "inputs": [
+      {
+        "name": "ripePerBlock",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "RipeRewardsAllocsSet",
+    "inputs": [
+      {
+        "name": "borrowersAlloc",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "stakersAlloc",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "votersAlloc",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "genDepositorsAlloc",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "RipeRewardsAutoStakeParamsSet",
+    "inputs": [
+      {
+        "name": "autoStakeRatio",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "autoStakeDurationRatio",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "stabPoolRipePerDollarClaimed",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "PriorityLiqAssetVaultsSet",
+    "inputs": [
+      {
+        "name": "numVaults",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "PriorityStabVaultsSet",
+    "inputs": [
+      {
+        "name": "numVaults",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "PriorityPriceSourceIdsModified",
+    "inputs": [
+      {
+        "name": "numIds",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "CanPerformLiteAction",
+    "inputs": [
+      {
+        "name": "user",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "canDo",
+        "type": "bool",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "MaxLtvDeviationSet",
+    "inputs": [
+      {
+        "name": "newDeviation",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "RipeGovVaultConfigSet",
+    "inputs": [
+      {
+        "name": "asset",
+        "type": "address",
+        "indexed": false
+      },
+      {
+        "name": "assetWeight",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "shouldFreezeWhenBadDebt",
+        "type": "bool",
+        "indexed": false
+      },
+      {
+        "name": "minLockDuration",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "maxLockDuration",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "maxLockBoost",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "canExit",
+        "type": "bool",
+        "indexed": false
+      },
+      {
+        "name": "exitFee",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "GovChangeTimeLockModified",
+    "inputs": [
+      {
+        "name": "prevTimeLock",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "newTimeLock",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "ExpirationSet",
+    "inputs": [
+      {
+        "name": "expiration",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "ActionTimeLockSet",
+    "inputs": [
+      {
+        "name": "newTimeLock",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "prevTimeLock",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "GovChangeStarted",
+    "inputs": [
+      {
+        "name": "prevGov",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "newGov",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "confirmBlock",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "GovChangeConfirmed",
+    "inputs": [
+      {
+        "name": "prevGov",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "newGov",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "initiatedBlock",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "confirmBlock",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "GovChangeCancelled",
+    "inputs": [
+      {
+        "name": "cancelledGov",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "initiatedBlock",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "confirmBlock",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "GovRelinquished",
+    "inputs": [
+      {
+        "name": "prevGov",
+        "type": "address",
+        "indexed": true
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "RipeHqSetupFinished",
+    "inputs": [
+      {
+        "name": "prevGov",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "newGov",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "timeLock",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "getRipeHqFromGov",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "canGovern",
+    "inputs": [
+      {
+        "name": "_addr",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "getGovernors",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address[]"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "hasPendingGovChange",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "startGovernanceChange",
+    "inputs": [
+      {
+        "name": "_newGov",
+        "type": "address"
+      }
+    ],
+    "outputs": []
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "confirmGovernanceChange",
+    "inputs": [],
+    "outputs": []
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "cancelGovernanceChange",
+    "inputs": [],
+    "outputs": []
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "relinquishGov",
+    "inputs": [],
+    "outputs": []
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "setGovTimeLock",
+    "inputs": [
+      {
+        "name": "_numBlocks",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "isValidGovTimeLock",
+    "inputs": [
+      {
+        "name": "_newTimeLock",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "minGovChangeTimeLock",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "maxGovChangeTimeLock",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "finishRipeHqSetup",
+    "inputs": [
+      {
+        "name": "_newGov",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "finishRipeHqSetup",
+    "inputs": [
+      {
+        "name": "_newGov",
+        "type": "address"
+      },
+      {
+        "name": "_timeLock",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "governance",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "pendingGov",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "newGov",
+            "type": "address"
+          },
+          {
+            "name": "initiatedBlock",
+            "type": "uint256"
+          },
+          {
+            "name": "confirmBlock",
+            "type": "uint256"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "numGovChanges",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "govChangeTimeLock",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "canConfirmAction",
+    "inputs": [
+      {
+        "name": "_actionId",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "isExpired",
+    "inputs": [
+      {
+        "name": "_actionId",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "hasPendingAction",
+    "inputs": [
+      {
+        "name": "_actionId",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "getActionConfirmationBlock",
+    "inputs": [
+      {
+        "name": "_actionId",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "setActionTimeLock",
+    "inputs": [
+      {
+        "name": "_newTimeLock",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "isValidActionTimeLock",
+    "inputs": [
+      {
+        "name": "_newTimeLock",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "minActionTimeLock",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "maxActionTimeLock",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "setExpiration",
+    "inputs": [
+      {
+        "name": "_expiration",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "setActionTimeLockAfterSetup",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "setActionTimeLockAfterSetup",
+    "inputs": [
+      {
+        "name": "_newTimeLock",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "pendingActions",
+    "inputs": [
+      {
+        "name": "arg0",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "initiatedBlock",
+            "type": "uint256"
+          },
+          {
+            "name": "confirmBlock",
+            "type": "uint256"
+          },
+          {
+            "name": "expiration",
+            "type": "uint256"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "actionId",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "actionTimeLock",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "expiration",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "setVaultLimits",
+    "inputs": [
+      {
+        "name": "_perUserMaxVaults",
+        "type": "uint256"
+      },
+      {
+        "name": "_perUserMaxAssetsPerVault",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "setVaultLimits",
+    "inputs": [
+      {
+        "name": "_perUserMaxVaults",
+        "type": "uint256"
+      },
+      {
+        "name": "_perUserMaxAssetsPerVault",
+        "type": "uint256"
+      },
+      {
+        "name": "_missionControl",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "setStaleTime",
+    "inputs": [
+      {
+        "name": "_staleTime",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "setStaleTime",
+    "inputs": [
+      {
+        "name": "_staleTime",
+        "type": "uint256"
+      },
+      {
+        "name": "_missionControl",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "setCanDeposit",
+    "inputs": [
+      {
+        "name": "_shouldEnable",
+        "type": "bool"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "setCanDeposit",
+    "inputs": [
+      {
+        "name": "_shouldEnable",
+        "type": "bool"
+      },
+      {
+        "name": "_missionControl",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "setCanWithdraw",
+    "inputs": [
+      {
+        "name": "_shouldEnable",
+        "type": "bool"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "setCanWithdraw",
+    "inputs": [
+      {
+        "name": "_shouldEnable",
+        "type": "bool"
+      },
+      {
+        "name": "_missionControl",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "setCanBorrow",
+    "inputs": [
+      {
+        "name": "_shouldEnable",
+        "type": "bool"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "setCanBorrow",
+    "inputs": [
+      {
+        "name": "_shouldEnable",
+        "type": "bool"
+      },
+      {
+        "name": "_missionControl",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "setCanRepay",
+    "inputs": [
+      {
+        "name": "_shouldEnable",
+        "type": "bool"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "setCanRepay",
+    "inputs": [
+      {
+        "name": "_shouldEnable",
+        "type": "bool"
+      },
+      {
+        "name": "_missionControl",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "setCanClaimLoot",
+    "inputs": [
+      {
+        "name": "_shouldEnable",
+        "type": "bool"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "setCanClaimLoot",
+    "inputs": [
+      {
+        "name": "_shouldEnable",
+        "type": "bool"
+      },
+      {
+        "name": "_missionControl",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "setCanLiquidate",
+    "inputs": [
+      {
+        "name": "_shouldEnable",
+        "type": "bool"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "setCanLiquidate",
+    "inputs": [
+      {
+        "name": "_shouldEnable",
+        "type": "bool"
+      },
+      {
+        "name": "_missionControl",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "setCanRedeemCollateral",
+    "inputs": [
+      {
+        "name": "_shouldEnable",
+        "type": "bool"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "setCanRedeemCollateral",
+    "inputs": [
+      {
+        "name": "_shouldEnable",
+        "type": "bool"
+      },
+      {
+        "name": "_missionControl",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "setCanRedeemInStabPool",
+    "inputs": [
+      {
+        "name": "_shouldEnable",
+        "type": "bool"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "setCanRedeemInStabPool",
+    "inputs": [
+      {
+        "name": "_shouldEnable",
+        "type": "bool"
+      },
+      {
+        "name": "_missionControl",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "setCanBuyInAuction",
+    "inputs": [
+      {
+        "name": "_shouldEnable",
+        "type": "bool"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "setCanBuyInAuction",
+    "inputs": [
+      {
+        "name": "_shouldEnable",
+        "type": "bool"
+      },
+      {
+        "name": "_missionControl",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "setCanClaimInStabPool",
+    "inputs": [
+      {
+        "name": "_shouldEnable",
+        "type": "bool"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "setCanClaimInStabPool",
+    "inputs": [
+      {
+        "name": "_shouldEnable",
+        "type": "bool"
+      },
+      {
+        "name": "_missionControl",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "setGlobalDebtLimits",
+    "inputs": [
+      {
+        "name": "_perUserDebtLimit",
+        "type": "uint256"
+      },
+      {
+        "name": "_globalDebtLimit",
+        "type": "uint256"
+      },
+      {
+        "name": "_minDebtAmount",
+        "type": "uint256"
+      },
+      {
+        "name": "_numAllowedBorrowers",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "setGlobalDebtLimits",
+    "inputs": [
+      {
+        "name": "_perUserDebtLimit",
+        "type": "uint256"
+      },
+      {
+        "name": "_globalDebtLimit",
+        "type": "uint256"
+      },
+      {
+        "name": "_minDebtAmount",
+        "type": "uint256"
+      },
+      {
+        "name": "_numAllowedBorrowers",
+        "type": "uint256"
+      },
+      {
+        "name": "_missionControl",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "setBorrowIntervalConfig",
+    "inputs": [
+      {
+        "name": "_maxBorrowPerInterval",
+        "type": "uint256"
+      },
+      {
+        "name": "_numBlocksPerInterval",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "setBorrowIntervalConfig",
+    "inputs": [
+      {
+        "name": "_maxBorrowPerInterval",
+        "type": "uint256"
+      },
+      {
+        "name": "_numBlocksPerInterval",
+        "type": "uint256"
+      },
+      {
+        "name": "_missionControl",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "setDynamicRateConfig",
+    "inputs": [
+      {
+        "name": "_minDynamicRateBoost",
+        "type": "uint256"
+      },
+      {
+        "name": "_maxDynamicRateBoost",
+        "type": "uint256"
+      },
+      {
+        "name": "_increasePerDangerBlock",
+        "type": "uint256"
+      },
+      {
+        "name": "_maxBorrowRate",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "setDynamicRateConfig",
+    "inputs": [
+      {
+        "name": "_minDynamicRateBoost",
+        "type": "uint256"
+      },
+      {
+        "name": "_maxDynamicRateBoost",
+        "type": "uint256"
+      },
+      {
+        "name": "_increasePerDangerBlock",
+        "type": "uint256"
+      },
+      {
+        "name": "_maxBorrowRate",
+        "type": "uint256"
+      },
+      {
+        "name": "_missionControl",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "setMaxLtvDeviation",
+    "inputs": [
+      {
+        "name": "_newDeviation",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "setMaxLtvDeviation",
+    "inputs": [
+      {
+        "name": "_newDeviation",
+        "type": "uint256"
+      },
+      {
+        "name": "_missionControl",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "setKeeperConfig",
+    "inputs": [
+      {
+        "name": "_keeperFeeRatio",
+        "type": "uint256"
+      },
+      {
+        "name": "_minKeeperFee",
+        "type": "uint256"
+      },
+      {
+        "name": "_maxKeeperFee",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "setKeeperConfig",
+    "inputs": [
+      {
+        "name": "_keeperFeeRatio",
+        "type": "uint256"
+      },
+      {
+        "name": "_minKeeperFee",
+        "type": "uint256"
+      },
+      {
+        "name": "_maxKeeperFee",
+        "type": "uint256"
+      },
+      {
+        "name": "_missionControl",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "setLtvPaybackBuffer",
+    "inputs": [
+      {
+        "name": "_ltvPaybackBuffer",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "setLtvPaybackBuffer",
+    "inputs": [
+      {
+        "name": "_ltvPaybackBuffer",
+        "type": "uint256"
+      },
+      {
+        "name": "_missionControl",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "setGenAuctionParams",
+    "inputs": [
+      {
+        "name": "_startDiscount",
+        "type": "uint256"
+      },
+      {
+        "name": "_maxDiscount",
+        "type": "uint256"
+      },
+      {
+        "name": "_delay",
+        "type": "uint256"
+      },
+      {
+        "name": "_duration",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "setGenAuctionParams",
+    "inputs": [
+      {
+        "name": "_startDiscount",
+        "type": "uint256"
+      },
+      {
+        "name": "_maxDiscount",
+        "type": "uint256"
+      },
+      {
+        "name": "_delay",
+        "type": "uint256"
+      },
+      {
+        "name": "_duration",
+        "type": "uint256"
+      },
+      {
+        "name": "_missionControl",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "areValidAuctionParams",
+    "inputs": [
+      {
+        "name": "_params",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "hasParams",
+            "type": "bool"
+          },
+          {
+            "name": "startDiscount",
+            "type": "uint256"
+          },
+          {
+            "name": "maxDiscount",
+            "type": "uint256"
+          },
+          {
+            "name": "delay",
+            "type": "uint256"
+          },
+          {
+            "name": "duration",
+            "type": "uint256"
+          }
+        ]
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "setUndyVaultDiscount",
+    "inputs": [
+      {
+        "name": "_discount",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "setBuybackRatio",
+    "inputs": [
+      {
+        "name": "_ratio",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "setPythMaxConfidenceRatio",
+    "inputs": [
+      {
+        "name": "_ratio",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "setIsDaowryEnabled",
+    "inputs": [
+      {
+        "name": "_shouldEnable",
+        "type": "bool"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "setIsDaowryEnabled",
+    "inputs": [
+      {
+        "name": "_shouldEnable",
+        "type": "bool"
+      },
+      {
+        "name": "_missionControl",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "setRipePerBlock",
+    "inputs": [
+      {
+        "name": "_ripePerBlock",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "setRipePerBlock",
+    "inputs": [
+      {
+        "name": "_ripePerBlock",
+        "type": "uint256"
+      },
+      {
+        "name": "_missionControl",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "setRipeRewardsAllocs",
+    "inputs": [
+      {
+        "name": "_borrowersAlloc",
+        "type": "uint256"
+      },
+      {
+        "name": "_stakersAlloc",
+        "type": "uint256"
+      },
+      {
+        "name": "_votersAlloc",
+        "type": "uint256"
+      },
+      {
+        "name": "_genDepositorsAlloc",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "setRipeRewardsAllocs",
+    "inputs": [
+      {
+        "name": "_borrowersAlloc",
+        "type": "uint256"
+      },
+      {
+        "name": "_stakersAlloc",
+        "type": "uint256"
+      },
+      {
+        "name": "_votersAlloc",
+        "type": "uint256"
+      },
+      {
+        "name": "_genDepositorsAlloc",
+        "type": "uint256"
+      },
+      {
+        "name": "_missionControl",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "setAutoStakeParams",
+    "inputs": [
+      {
+        "name": "_autoStakeRatio",
+        "type": "uint256"
+      },
+      {
+        "name": "_autoStakeDurationRatio",
+        "type": "uint256"
+      },
+      {
+        "name": "_stabPoolRipePerDollarClaimed",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "setAutoStakeParams",
+    "inputs": [
+      {
+        "name": "_autoStakeRatio",
+        "type": "uint256"
+      },
+      {
+        "name": "_autoStakeDurationRatio",
+        "type": "uint256"
+      },
+      {
+        "name": "_stabPoolRipePerDollarClaimed",
+        "type": "uint256"
+      },
+      {
+        "name": "_missionControl",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "setRewardsPointsEnabled",
+    "inputs": [
+      {
+        "name": "_shouldEnable",
+        "type": "bool"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "setRewardsPointsEnabled",
+    "inputs": [
+      {
+        "name": "_shouldEnable",
+        "type": "bool"
+      },
+      {
+        "name": "_missionControl",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "setPriorityLiqAssetVaults",
+    "inputs": [
+      {
+        "name": "_priorityLiqAssetVaults",
+        "type": "tuple[]",
+        "components": [
+          {
+            "name": "vaultId",
+            "type": "uint256"
+          },
+          {
+            "name": "asset",
+            "type": "address"
+          }
+        ]
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "setPriorityLiqAssetVaults",
+    "inputs": [
+      {
+        "name": "_priorityLiqAssetVaults",
+        "type": "tuple[]",
+        "components": [
+          {
+            "name": "vaultId",
+            "type": "uint256"
+          },
+          {
+            "name": "asset",
+            "type": "address"
+          }
+        ]
+      },
+      {
+        "name": "_missionControl",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "setPriorityStabVaults",
+    "inputs": [
+      {
+        "name": "_priorityStabVaults",
+        "type": "tuple[]",
+        "components": [
+          {
+            "name": "vaultId",
+            "type": "uint256"
+          },
+          {
+            "name": "asset",
+            "type": "address"
+          }
+        ]
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "setPriorityStabVaults",
+    "inputs": [
+      {
+        "name": "_priorityStabVaults",
+        "type": "tuple[]",
+        "components": [
+          {
+            "name": "vaultId",
+            "type": "uint256"
+          },
+          {
+            "name": "asset",
+            "type": "address"
+          }
+        ]
+      },
+      {
+        "name": "_missionControl",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "setPriorityPriceSourceIds",
+    "inputs": [
+      {
+        "name": "_priorityIds",
+        "type": "uint256[]"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "setPriorityPriceSourceIds",
+    "inputs": [
+      {
+        "name": "_priorityIds",
+        "type": "uint256[]"
+      },
+      {
+        "name": "_missionControl",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "setCanPerformLiteAction",
+    "inputs": [
+      {
+        "name": "_user",
+        "type": "address"
+      },
+      {
+        "name": "_canDo",
+        "type": "bool"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "setCanPerformLiteAction",
+    "inputs": [
+      {
+        "name": "_user",
+        "type": "address"
+      },
+      {
+        "name": "_canDo",
+        "type": "bool"
+      },
+      {
+        "name": "_missionControl",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "setRipeGovVaultConfig",
+    "inputs": [
+      {
+        "name": "_asset",
+        "type": "address"
+      },
+      {
+        "name": "_assetWeight",
+        "type": "uint256"
+      },
+      {
+        "name": "_shouldFreezeWhenBadDebt",
+        "type": "bool"
+      },
+      {
+        "name": "_minLockDuration",
+        "type": "uint256"
+      },
+      {
+        "name": "_maxLockDuration",
+        "type": "uint256"
+      },
+      {
+        "name": "_maxLockBoost",
+        "type": "uint256"
+      },
+      {
+        "name": "_exitFee",
+        "type": "uint256"
+      },
+      {
+        "name": "_canExit",
+        "type": "bool"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "setRipeGovVaultConfig",
+    "inputs": [
+      {
+        "name": "_asset",
+        "type": "address"
+      },
+      {
+        "name": "_assetWeight",
+        "type": "uint256"
+      },
+      {
+        "name": "_shouldFreezeWhenBadDebt",
+        "type": "bool"
+      },
+      {
+        "name": "_minLockDuration",
+        "type": "uint256"
+      },
+      {
+        "name": "_maxLockDuration",
+        "type": "uint256"
+      },
+      {
+        "name": "_maxLockBoost",
+        "type": "uint256"
+      },
+      {
+        "name": "_exitFee",
+        "type": "uint256"
+      },
+      {
+        "name": "_canExit",
+        "type": "bool"
+      },
+      {
+        "name": "_missionControl",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "executePendingAction",
+    "inputs": [
+      {
+        "name": "_aid",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "cancelPendingAction",
+    "inputs": [
+      {
+        "name": "_aid",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "actionType",
+    "inputs": [
+      {
+        "name": "arg0",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "pendingRipeRewardsConfig",
+    "inputs": [
+      {
+        "name": "arg0",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "arePointsEnabled",
+            "type": "bool"
+          },
+          {
+            "name": "ripePerBlock",
+            "type": "uint256"
+          },
+          {
+            "name": "borrowersAlloc",
+            "type": "uint256"
+          },
+          {
+            "name": "stakersAlloc",
+            "type": "uint256"
+          },
+          {
+            "name": "votersAlloc",
+            "type": "uint256"
+          },
+          {
+            "name": "genDepositorsAlloc",
+            "type": "uint256"
+          },
+          {
+            "name": "autoStakeRatio",
+            "type": "uint256"
+          },
+          {
+            "name": "autoStakeDurationRatio",
+            "type": "uint256"
+          },
+          {
+            "name": "stabPoolRipePerDollarClaimed",
+            "type": "uint256"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "pendingGeneralConfig",
+    "inputs": [
+      {
+        "name": "arg0",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "perUserMaxVaults",
+            "type": "uint256"
+          },
+          {
+            "name": "perUserMaxAssetsPerVault",
+            "type": "uint256"
+          },
+          {
+            "name": "priceStaleTime",
+            "type": "uint256"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "pendingDebtConfig",
+    "inputs": [
+      {
+        "name": "arg0",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "perUserDebtLimit",
+            "type": "uint256"
+          },
+          {
+            "name": "globalDebtLimit",
+            "type": "uint256"
+          },
+          {
+            "name": "minDebtAmount",
+            "type": "uint256"
+          },
+          {
+            "name": "numAllowedBorrowers",
+            "type": "uint256"
+          },
+          {
+            "name": "maxBorrowPerInterval",
+            "type": "uint256"
+          },
+          {
+            "name": "numBlocksPerInterval",
+            "type": "uint256"
+          },
+          {
+            "name": "minDynamicRateBoost",
+            "type": "uint256"
+          },
+          {
+            "name": "maxDynamicRateBoost",
+            "type": "uint256"
+          },
+          {
+            "name": "increasePerDangerBlock",
+            "type": "uint256"
+          },
+          {
+            "name": "maxBorrowRate",
+            "type": "uint256"
+          },
+          {
+            "name": "maxLtvDeviation",
+            "type": "uint256"
+          },
+          {
+            "name": "keeperFeeRatio",
+            "type": "uint256"
+          },
+          {
+            "name": "minKeeperFee",
+            "type": "uint256"
+          },
+          {
+            "name": "maxKeeperFee",
+            "type": "uint256"
+          },
+          {
+            "name": "isDaowryEnabled",
+            "type": "bool"
+          },
+          {
+            "name": "ltvPaybackBuffer",
+            "type": "uint256"
+          },
+          {
+            "name": "genAuctionParams",
+            "type": "tuple",
+            "components": [
+              {
+                "name": "hasParams",
+                "type": "bool"
+              },
+              {
+                "name": "startDiscount",
+                "type": "uint256"
+              },
+              {
+                "name": "maxDiscount",
+                "type": "uint256"
+              },
+              {
+                "name": "delay",
+                "type": "uint256"
+              },
+              {
+                "name": "duration",
+                "type": "uint256"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "pendingUndyVaultDiscount",
+    "inputs": [
+      {
+        "name": "arg0",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "pendingBuybackRatio",
+    "inputs": [
+      {
+        "name": "arg0",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "pendingPythMaxConfidenceRatio",
+    "inputs": [
+      {
+        "name": "arg0",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "pendingPriorityLiqAssetVaults",
+    "inputs": [
+      {
+        "name": "arg0",
+        "type": "uint256"
+      },
+      {
+        "name": "arg1",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "vaultId",
+            "type": "uint256"
+          },
+          {
+            "name": "asset",
+            "type": "address"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "pendingPriorityStabVaults",
+    "inputs": [
+      {
+        "name": "arg0",
+        "type": "uint256"
+      },
+      {
+        "name": "arg1",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "vaultId",
+            "type": "uint256"
+          },
+          {
+            "name": "asset",
+            "type": "address"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "pendingPriorityPriceSourceIds",
+    "inputs": [
+      {
+        "name": "arg0",
+        "type": "uint256"
+      },
+      {
+        "name": "arg1",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "pendingCanPerformLiteAction",
+    "inputs": [
+      {
+        "name": "arg0",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "user",
+            "type": "address"
+          },
+          {
+            "name": "canDo",
+            "type": "bool"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "pendingRipeGovVaultConfig",
+    "inputs": [
+      {
+        "name": "arg0",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "asset",
+            "type": "address"
+          },
+          {
+            "name": "assetWeight",
+            "type": "uint256"
+          },
+          {
+            "name": "shouldFreezeWhenBadDebt",
+            "type": "bool"
+          },
+          {
+            "name": "lockTerms",
+            "type": "tuple",
+            "components": [
+              {
+                "name": "minLockDuration",
+                "type": "uint256"
+              },
+              {
+                "name": "maxLockDuration",
+                "type": "uint256"
+              },
+              {
+                "name": "maxLockBoost",
+                "type": "uint256"
+              },
+              {
+                "name": "canExit",
+                "type": "bool"
+              },
+              {
+                "name": "exitFee",
+                "type": "uint256"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "pendingMissionControl",
+    "inputs": [
+      {
+        "name": "arg0",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "MIN_STALE_TIME",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "MAX_STALE_TIME",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "constructor",
+    "inputs": [
+      {
+        "name": "_ripeHq",
+        "type": "address"
+      },
+      {
+        "name": "_tempGov",
+        "type": "address"
+      },
+      {
+        "name": "_minStaleTime",
+        "type": "uint256"
+      },
+      {
+        "name": "_maxStaleTime",
+        "type": "uint256"
+      },
+      {
+        "name": "_minConfigTimeLock",
+        "type": "uint256"
+      },
+      {
+        "name": "_maxConfigTimeLock",
+        "type": "uint256"
+      }
+    ],
+    "outputs": []
+  }
+]
