@@ -609,6 +609,164 @@ def test_mission_control_set_can_perform_lite_action_unauthorized(mission_contro
         mission_control.setCanPerformLiteAction(alice, True, sender=alice)
 
 
+#############################
+# Lite Signers Iteration    #
+#############################
+
+def test_lite_signers_iterable_add(mission_control, switchboard_alpha, alice, bob, charlie):
+    """Test adding multiple lite signers and verify indices."""
+    # Initially no signers (numLiteSigners starts at 1, 0 index unused)
+    assert mission_control.numLiteSigners() == 1
+    assert not mission_control.canPerformLiteAction(alice)
+    assert not mission_control.canPerformLiteAction(bob)
+
+    # Add first signer
+    mission_control.setCanPerformLiteAction(alice, True, sender=switchboard_alpha.address)
+    assert mission_control.canPerformLiteAction(alice)
+    assert mission_control.numLiteSigners() == 2
+    assert mission_control.liteSigners(1) == alice
+    assert mission_control.indexOfLiteSigner(alice) == 1
+
+    # Add second signer
+    mission_control.setCanPerformLiteAction(bob, True, sender=switchboard_alpha.address)
+    assert mission_control.canPerformLiteAction(bob)
+    assert mission_control.numLiteSigners() == 3
+    assert mission_control.liteSigners(2) == bob
+    assert mission_control.indexOfLiteSigner(bob) == 2
+
+    # Add third signer
+    mission_control.setCanPerformLiteAction(charlie, True, sender=switchboard_alpha.address)
+    assert mission_control.canPerformLiteAction(charlie)
+    assert mission_control.numLiteSigners() == 4
+    assert mission_control.liteSigners(3) == charlie
+    assert mission_control.indexOfLiteSigner(charlie) == 3
+
+
+def test_lite_signers_iterable_remove(mission_control, switchboard_alpha, alice, bob, charlie):
+    """Test removing lite signer and verify swap-and-pop behavior."""
+    # Add three signers
+    mission_control.setCanPerformLiteAction(alice, True, sender=switchboard_alpha.address)
+    mission_control.setCanPerformLiteAction(bob, True, sender=switchboard_alpha.address)
+    mission_control.setCanPerformLiteAction(charlie, True, sender=switchboard_alpha.address)
+
+    assert mission_control.numLiteSigners() == 4
+    assert mission_control.liteSigners(1) == alice
+    assert mission_control.liteSigners(2) == bob
+    assert mission_control.liteSigners(3) == charlie
+
+    # Remove middle signer (bob) - charlie should swap into bob's position
+    mission_control.setCanPerformLiteAction(bob, False, sender=switchboard_alpha.address)
+
+    assert not mission_control.canPerformLiteAction(bob)
+    assert mission_control.numLiteSigners() == 3
+    assert mission_control.indexOfLiteSigner(bob) == 0  # removed
+
+    # Charlie should now be at index 2 (swapped from index 3)
+    assert mission_control.liteSigners(2) == charlie
+    assert mission_control.indexOfLiteSigner(charlie) == 2
+
+    # Alice should still be at index 1
+    assert mission_control.liteSigners(1) == alice
+    assert mission_control.indexOfLiteSigner(alice) == 1
+
+
+def test_lite_signers_add_duplicate(mission_control, switchboard_alpha, alice):
+    """Test that adding a duplicate signer is idempotent (no-op)."""
+    # Add signer
+    mission_control.setCanPerformLiteAction(alice, True, sender=switchboard_alpha.address)
+    assert mission_control.numLiteSigners() == 2
+    assert mission_control.indexOfLiteSigner(alice) == 1
+
+    # Try to add again - should be no-op
+    mission_control.setCanPerformLiteAction(alice, True, sender=switchboard_alpha.address)
+    assert mission_control.numLiteSigners() == 2  # still 2
+    assert mission_control.indexOfLiteSigner(alice) == 1  # same index
+
+
+def test_lite_signers_remove_nonexistent(mission_control, switchboard_alpha, alice):
+    """Test that removing a non-existent signer is a no-op."""
+    # Initially no signers
+    assert mission_control.numLiteSigners() == 1
+    assert not mission_control.canPerformLiteAction(alice)
+
+    # Try to remove non-existent signer - should be no-op
+    mission_control.setCanPerformLiteAction(alice, False, sender=switchboard_alpha.address)
+    assert mission_control.numLiteSigners() == 1  # unchanged
+    assert not mission_control.canPerformLiteAction(alice)
+
+
+def test_lite_signers_remove_last(mission_control, switchboard_alpha, alice, bob):
+    """Test removing the last signer (no swap needed)."""
+    # Add two signers
+    mission_control.setCanPerformLiteAction(alice, True, sender=switchboard_alpha.address)
+    mission_control.setCanPerformLiteAction(bob, True, sender=switchboard_alpha.address)
+
+    assert mission_control.numLiteSigners() == 3
+    assert mission_control.liteSigners(2) == bob
+
+    # Remove the last signer (bob) - no swap needed
+    mission_control.setCanPerformLiteAction(bob, False, sender=switchboard_alpha.address)
+
+    assert not mission_control.canPerformLiteAction(bob)
+    assert mission_control.numLiteSigners() == 2
+    assert mission_control.indexOfLiteSigner(bob) == 0
+
+    # Alice should still be at index 1
+    assert mission_control.liteSigners(1) == alice
+    assert mission_control.indexOfLiteSigner(alice) == 1
+
+
+def test_lite_signers_add_remove_add(mission_control, switchboard_alpha, alice):
+    """Test state consistency through add-remove-add cycle."""
+    # Add signer
+    mission_control.setCanPerformLiteAction(alice, True, sender=switchboard_alpha.address)
+    assert mission_control.canPerformLiteAction(alice)
+    assert mission_control.numLiteSigners() == 2
+    assert mission_control.indexOfLiteSigner(alice) == 1
+
+    # Remove signer
+    mission_control.setCanPerformLiteAction(alice, False, sender=switchboard_alpha.address)
+    assert not mission_control.canPerformLiteAction(alice)
+    assert mission_control.numLiteSigners() == 1
+    assert mission_control.indexOfLiteSigner(alice) == 0
+
+    # Add signer again
+    mission_control.setCanPerformLiteAction(alice, True, sender=switchboard_alpha.address)
+    assert mission_control.canPerformLiteAction(alice)
+    assert mission_control.numLiteSigners() == 2
+    assert mission_control.indexOfLiteSigner(alice) == 1
+
+
+def test_lite_signers_iteration_integrity(mission_control, switchboard_alpha, alice, bob, charlie, governance):
+    """Test that indices stay contiguous after multiple removals."""
+    # Add four signers
+    mission_control.setCanPerformLiteAction(alice, True, sender=switchboard_alpha.address)
+    mission_control.setCanPerformLiteAction(bob, True, sender=switchboard_alpha.address)
+    mission_control.setCanPerformLiteAction(charlie, True, sender=switchboard_alpha.address)
+    mission_control.setCanPerformLiteAction(governance.address, True, sender=switchboard_alpha.address)
+
+    assert mission_control.numLiteSigners() == 5
+
+    # Remove first signer (alice) - governance should swap to position 1
+    mission_control.setCanPerformLiteAction(alice, False, sender=switchboard_alpha.address)
+    assert mission_control.numLiteSigners() == 4
+    assert mission_control.liteSigners(1) == governance.address
+    assert mission_control.indexOfLiteSigner(governance.address) == 1
+
+    # Remove middle signer (bob at index 2) - charlie should swap to position 2
+    mission_control.setCanPerformLiteAction(bob, False, sender=switchboard_alpha.address)
+    assert mission_control.numLiteSigners() == 3
+    assert mission_control.liteSigners(2) == charlie
+    assert mission_control.indexOfLiteSigner(charlie) == 2
+
+    # Verify remaining signers can be iterated
+    remaining_signers = [mission_control.liteSigners(i) for i in range(1, mission_control.numLiteSigners())]
+    assert governance.address in remaining_signers
+    assert charlie in remaining_signers
+    assert alice not in remaining_signers
+    assert bob not in remaining_signers
+
+
 #################
 # Other Tests   #
 #################

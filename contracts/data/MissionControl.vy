@@ -197,8 +197,10 @@ ripeGovVaultConfig: public(HashMap[address, cs.RipeGovVaultConfig]) # asset -> c
 priorityLiqAssetVaults: public(DynArray[cs.VaultLite, PRIORITY_VAULT_DATA])
 priorityStabVaults: public(DynArray[cs.VaultLite, PRIORITY_VAULT_DATA])
 
-# access
-canPerformLiteAction: public(HashMap[address, bool]) # user -> canPerformLiteAction
+# lite signers (iterable)
+liteSigners: public(HashMap[uint256, address]) # index -> signer
+indexOfLiteSigner: public(HashMap[address, uint256]) # signer -> index
+numLiteSigners: public(uint256)
 
 # other
 priorityPriceSourceIds: public(DynArray[uint256, MAX_PRIORITY_PRICE_SOURCES])
@@ -216,7 +218,9 @@ HUNDRED_PERCENT: constant(uint256) = 100_00 # 100.00%
 def __init__(_ripeHq: address, _defaults: address):
     addys.__init__(_ripeHq)
     deptBasics.__init__(False, False, False) # no minting
+
     self.numAssets = 1 # not using 0 index
+    self.numLiteSigners = 1 # not using 0 index, 0 means "not in list"
 
     # defaults
     if _defaults != empty(address):
@@ -403,15 +407,59 @@ def setPriorityStabVaults(_priorityStabVaults: DynArray[cs.VaultLite, PRIORITY_V
     self.priorityStabVaults = _priorityStabVaults
 
 
-##################
-# Access Control #
-##################
+################
+# Lite Signers #
+################
 
 
 @external
-def setCanPerformLiteAction(_user: address, _canDo: bool):
+def setCanPerformLiteAction(_signer: address, _canDo: bool):
     assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
-    self.canPerformLiteAction[_user] = _canDo
+    if _canDo:
+        self._addLiteSigner(_signer)
+    else:
+        self._removeLiteSigner(_signer)
+
+
+@view
+@external
+def canPerformLiteAction(_signer: address) -> bool:
+    return self.indexOfLiteSigner[_signer] != 0
+
+
+# add lite signer
+
+
+@internal
+def _addLiteSigner(_signer: address):
+    if self.indexOfLiteSigner[_signer] != 0:
+        return
+    idx: uint256 = self.numLiteSigners
+    self.liteSigners[idx] = _signer
+    self.indexOfLiteSigner[_signer] = idx
+    self.numLiteSigners = idx + 1
+
+
+# remove lite signer
+
+
+@internal
+def _removeLiteSigner(_signer: address):
+    targetIndex: uint256 = self.indexOfLiteSigner[_signer]
+    if targetIndex == 0:
+        return
+
+    lastIndex: uint256 = self.numLiteSigners - 1
+    self.numLiteSigners = lastIndex
+    self.indexOfLiteSigner[_signer] = 0
+
+    # swap with last item if not already last
+    if targetIndex != lastIndex:
+        lastItem: address = self.liteSigners[lastIndex]
+        self.liteSigners[targetIndex] = lastItem
+        self.indexOfLiteSigner[lastItem] = targetIndex
+
+    self.liteSigners[lastIndex] = empty(address)
 
 
 #########

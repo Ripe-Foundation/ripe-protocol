@@ -1,0 +1,2801 @@
+[
+  {
+    "name": "DepartmentPauseModified",
+    "inputs": [
+      {
+        "name": "isPaused",
+        "type": "bool",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "DepartmentFundsRecovered",
+    "inputs": [
+      {
+        "name": "asset",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "recipient",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "balance",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "getAddys",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "hq",
+            "type": "address"
+          },
+          {
+            "name": "greenToken",
+            "type": "address"
+          },
+          {
+            "name": "savingsGreen",
+            "type": "address"
+          },
+          {
+            "name": "ripeToken",
+            "type": "address"
+          },
+          {
+            "name": "ledger",
+            "type": "address"
+          },
+          {
+            "name": "missionControl",
+            "type": "address"
+          },
+          {
+            "name": "switchboard",
+            "type": "address"
+          },
+          {
+            "name": "priceDesk",
+            "type": "address"
+          },
+          {
+            "name": "vaultBook",
+            "type": "address"
+          },
+          {
+            "name": "auctionHouse",
+            "type": "address"
+          },
+          {
+            "name": "auctionHouseNft",
+            "type": "address"
+          },
+          {
+            "name": "boardroom",
+            "type": "address"
+          },
+          {
+            "name": "bondRoom",
+            "type": "address"
+          },
+          {
+            "name": "creditEngine",
+            "type": "address"
+          },
+          {
+            "name": "endaoment",
+            "type": "address"
+          },
+          {
+            "name": "humanResources",
+            "type": "address"
+          },
+          {
+            "name": "lootbox",
+            "type": "address"
+          },
+          {
+            "name": "teller",
+            "type": "address"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "getRipeHq",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "canMintGreen",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "canMintRipe",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "pause",
+    "inputs": [
+      {
+        "name": "_shouldPause",
+        "type": "bool"
+      }
+    ],
+    "outputs": []
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "recoverFunds",
+    "inputs": [
+      {
+        "name": "_recipient",
+        "type": "address"
+      },
+      {
+        "name": "_asset",
+        "type": "address"
+      }
+    ],
+    "outputs": []
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "recoverFundsMany",
+    "inputs": [
+      {
+        "name": "_recipient",
+        "type": "address"
+      },
+      {
+        "name": "_assets",
+        "type": "address[]"
+      }
+    ],
+    "outputs": []
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "isPaused",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "setGeneralConfig",
+    "inputs": [
+      {
+        "name": "_config",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "perUserMaxVaults",
+            "type": "uint256"
+          },
+          {
+            "name": "perUserMaxAssetsPerVault",
+            "type": "uint256"
+          },
+          {
+            "name": "priceStaleTime",
+            "type": "uint256"
+          },
+          {
+            "name": "canDeposit",
+            "type": "bool"
+          },
+          {
+            "name": "canWithdraw",
+            "type": "bool"
+          },
+          {
+            "name": "canBorrow",
+            "type": "bool"
+          },
+          {
+            "name": "canRepay",
+            "type": "bool"
+          },
+          {
+            "name": "canClaimLoot",
+            "type": "bool"
+          },
+          {
+            "name": "canLiquidate",
+            "type": "bool"
+          },
+          {
+            "name": "canRedeemCollateral",
+            "type": "bool"
+          },
+          {
+            "name": "canRedeemInStabPool",
+            "type": "bool"
+          },
+          {
+            "name": "canBuyInAuction",
+            "type": "bool"
+          },
+          {
+            "name": "canClaimInStabPool",
+            "type": "bool"
+          }
+        ]
+      }
+    ],
+    "outputs": []
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "setGeneralDebtConfig",
+    "inputs": [
+      {
+        "name": "_config",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "perUserDebtLimit",
+            "type": "uint256"
+          },
+          {
+            "name": "globalDebtLimit",
+            "type": "uint256"
+          },
+          {
+            "name": "minDebtAmount",
+            "type": "uint256"
+          },
+          {
+            "name": "numAllowedBorrowers",
+            "type": "uint256"
+          },
+          {
+            "name": "maxBorrowPerInterval",
+            "type": "uint256"
+          },
+          {
+            "name": "numBlocksPerInterval",
+            "type": "uint256"
+          },
+          {
+            "name": "minDynamicRateBoost",
+            "type": "uint256"
+          },
+          {
+            "name": "maxDynamicRateBoost",
+            "type": "uint256"
+          },
+          {
+            "name": "increasePerDangerBlock",
+            "type": "uint256"
+          },
+          {
+            "name": "maxBorrowRate",
+            "type": "uint256"
+          },
+          {
+            "name": "maxLtvDeviation",
+            "type": "uint256"
+          },
+          {
+            "name": "keeperFeeRatio",
+            "type": "uint256"
+          },
+          {
+            "name": "minKeeperFee",
+            "type": "uint256"
+          },
+          {
+            "name": "maxKeeperFee",
+            "type": "uint256"
+          },
+          {
+            "name": "isDaowryEnabled",
+            "type": "bool"
+          },
+          {
+            "name": "ltvPaybackBuffer",
+            "type": "uint256"
+          },
+          {
+            "name": "genAuctionParams",
+            "type": "tuple",
+            "components": [
+              {
+                "name": "hasParams",
+                "type": "bool"
+              },
+              {
+                "name": "startDiscount",
+                "type": "uint256"
+              },
+              {
+                "name": "maxDiscount",
+                "type": "uint256"
+              },
+              {
+                "name": "delay",
+                "type": "uint256"
+              },
+              {
+                "name": "duration",
+                "type": "uint256"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "outputs": []
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "setHrConfig",
+    "inputs": [
+      {
+        "name": "_config",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "contribTemplate",
+            "type": "address"
+          },
+          {
+            "name": "maxCompensation",
+            "type": "uint256"
+          },
+          {
+            "name": "minCliffLength",
+            "type": "uint256"
+          },
+          {
+            "name": "maxStartDelay",
+            "type": "uint256"
+          },
+          {
+            "name": "minVestingLength",
+            "type": "uint256"
+          },
+          {
+            "name": "maxVestingLength",
+            "type": "uint256"
+          }
+        ]
+      }
+    ],
+    "outputs": []
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "setRipeBondConfig",
+    "inputs": [
+      {
+        "name": "_config",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "asset",
+            "type": "address"
+          },
+          {
+            "name": "amountPerEpoch",
+            "type": "uint256"
+          },
+          {
+            "name": "canBond",
+            "type": "bool"
+          },
+          {
+            "name": "minRipePerUnit",
+            "type": "uint256"
+          },
+          {
+            "name": "maxRipePerUnit",
+            "type": "uint256"
+          },
+          {
+            "name": "maxRipePerUnitLockBonus",
+            "type": "uint256"
+          },
+          {
+            "name": "epochLength",
+            "type": "uint256"
+          },
+          {
+            "name": "shouldAutoRestart",
+            "type": "bool"
+          },
+          {
+            "name": "restartDelayBlocks",
+            "type": "uint256"
+          }
+        ]
+      }
+    ],
+    "outputs": []
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "setAssetConfig",
+    "inputs": [
+      {
+        "name": "_asset",
+        "type": "address"
+      },
+      {
+        "name": "_config",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "vaultIds",
+            "type": "uint256[]"
+          },
+          {
+            "name": "stakersPointsAlloc",
+            "type": "uint256"
+          },
+          {
+            "name": "voterPointsAlloc",
+            "type": "uint256"
+          },
+          {
+            "name": "perUserDepositLimit",
+            "type": "uint256"
+          },
+          {
+            "name": "globalDepositLimit",
+            "type": "uint256"
+          },
+          {
+            "name": "minDepositBalance",
+            "type": "uint256"
+          },
+          {
+            "name": "debtTerms",
+            "type": "tuple",
+            "components": [
+              {
+                "name": "ltv",
+                "type": "uint256"
+              },
+              {
+                "name": "redemptionThreshold",
+                "type": "uint256"
+              },
+              {
+                "name": "liqThreshold",
+                "type": "uint256"
+              },
+              {
+                "name": "liqFee",
+                "type": "uint256"
+              },
+              {
+                "name": "borrowRate",
+                "type": "uint256"
+              },
+              {
+                "name": "daowry",
+                "type": "uint256"
+              }
+            ]
+          },
+          {
+            "name": "shouldBurnAsPayment",
+            "type": "bool"
+          },
+          {
+            "name": "shouldTransferToEndaoment",
+            "type": "bool"
+          },
+          {
+            "name": "shouldSwapInStabPools",
+            "type": "bool"
+          },
+          {
+            "name": "shouldAuctionInstantly",
+            "type": "bool"
+          },
+          {
+            "name": "canDeposit",
+            "type": "bool"
+          },
+          {
+            "name": "canWithdraw",
+            "type": "bool"
+          },
+          {
+            "name": "canRedeemCollateral",
+            "type": "bool"
+          },
+          {
+            "name": "canRedeemInStabPool",
+            "type": "bool"
+          },
+          {
+            "name": "canBuyInAuction",
+            "type": "bool"
+          },
+          {
+            "name": "canClaimInStabPool",
+            "type": "bool"
+          },
+          {
+            "name": "specialStabPoolId",
+            "type": "uint256"
+          },
+          {
+            "name": "customAuctionParams",
+            "type": "tuple",
+            "components": [
+              {
+                "name": "hasParams",
+                "type": "bool"
+              },
+              {
+                "name": "startDiscount",
+                "type": "uint256"
+              },
+              {
+                "name": "maxDiscount",
+                "type": "uint256"
+              },
+              {
+                "name": "delay",
+                "type": "uint256"
+              },
+              {
+                "name": "duration",
+                "type": "uint256"
+              }
+            ]
+          },
+          {
+            "name": "whitelist",
+            "type": "address"
+          },
+          {
+            "name": "isNft",
+            "type": "bool"
+          }
+        ]
+      }
+    ],
+    "outputs": []
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "deregisterAsset",
+    "inputs": [
+      {
+        "name": "_asset",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "setUserConfig",
+    "inputs": [
+      {
+        "name": "_user",
+        "type": "address"
+      },
+      {
+        "name": "_config",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "canAnyoneDeposit",
+            "type": "bool"
+          },
+          {
+            "name": "canAnyoneRepayDebt",
+            "type": "bool"
+          },
+          {
+            "name": "canAnyoneBondForUser",
+            "type": "bool"
+          }
+        ]
+      }
+    ],
+    "outputs": []
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "setUserDelegation",
+    "inputs": [
+      {
+        "name": "_user",
+        "type": "address"
+      },
+      {
+        "name": "_delegate",
+        "type": "address"
+      },
+      {
+        "name": "_config",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "canWithdraw",
+            "type": "bool"
+          },
+          {
+            "name": "canBorrow",
+            "type": "bool"
+          },
+          {
+            "name": "canClaimFromStabPool",
+            "type": "bool"
+          },
+          {
+            "name": "canClaimLoot",
+            "type": "bool"
+          }
+        ]
+      }
+    ],
+    "outputs": []
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "setRipeRewardsConfig",
+    "inputs": [
+      {
+        "name": "_config",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "arePointsEnabled",
+            "type": "bool"
+          },
+          {
+            "name": "ripePerBlock",
+            "type": "uint256"
+          },
+          {
+            "name": "borrowersAlloc",
+            "type": "uint256"
+          },
+          {
+            "name": "stakersAlloc",
+            "type": "uint256"
+          },
+          {
+            "name": "votersAlloc",
+            "type": "uint256"
+          },
+          {
+            "name": "genDepositorsAlloc",
+            "type": "uint256"
+          },
+          {
+            "name": "autoStakeRatio",
+            "type": "uint256"
+          },
+          {
+            "name": "autoStakeDurationRatio",
+            "type": "uint256"
+          },
+          {
+            "name": "stabPoolRipePerDollarClaimed",
+            "type": "uint256"
+          }
+        ]
+      }
+    ],
+    "outputs": []
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "setRipeGovVaultConfig",
+    "inputs": [
+      {
+        "name": "_asset",
+        "type": "address"
+      },
+      {
+        "name": "_assetWeight",
+        "type": "uint256"
+      },
+      {
+        "name": "_shouldFreezeWhenBadDebt",
+        "type": "bool"
+      },
+      {
+        "name": "_lockTerms",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "minLockDuration",
+            "type": "uint256"
+          },
+          {
+            "name": "maxLockDuration",
+            "type": "uint256"
+          },
+          {
+            "name": "maxLockBoost",
+            "type": "uint256"
+          },
+          {
+            "name": "canExit",
+            "type": "bool"
+          },
+          {
+            "name": "exitFee",
+            "type": "uint256"
+          }
+        ]
+      }
+    ],
+    "outputs": []
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "setPriorityLiqAssetVaults",
+    "inputs": [
+      {
+        "name": "_priorityLiqAssetVaults",
+        "type": "tuple[]",
+        "components": [
+          {
+            "name": "vaultId",
+            "type": "uint256"
+          },
+          {
+            "name": "asset",
+            "type": "address"
+          }
+        ]
+      }
+    ],
+    "outputs": []
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "setPriorityStabVaults",
+    "inputs": [
+      {
+        "name": "_priorityStabVaults",
+        "type": "tuple[]",
+        "components": [
+          {
+            "name": "vaultId",
+            "type": "uint256"
+          },
+          {
+            "name": "asset",
+            "type": "address"
+          }
+        ]
+      }
+    ],
+    "outputs": []
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "setCanPerformLiteAction",
+    "inputs": [
+      {
+        "name": "_signer",
+        "type": "address"
+      },
+      {
+        "name": "_canDo",
+        "type": "bool"
+      }
+    ],
+    "outputs": []
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "canPerformLiteAction",
+    "inputs": [
+      {
+        "name": "_signer",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "setTrainingWheels",
+    "inputs": [
+      {
+        "name": "_trainingWheels",
+        "type": "address"
+      }
+    ],
+    "outputs": []
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "setUnderscoreRegistry",
+    "inputs": [
+      {
+        "name": "_underscoreRegistry",
+        "type": "address"
+      }
+    ],
+    "outputs": []
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "setPriorityPriceSourceIds",
+    "inputs": [
+      {
+        "name": "_priorityIds",
+        "type": "uint256[]"
+      }
+    ],
+    "outputs": []
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "setShouldCheckLastTouch",
+    "inputs": [
+      {
+        "name": "_shouldCheck",
+        "type": "bool"
+      }
+    ],
+    "outputs": []
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "isSupportedAsset",
+    "inputs": [
+      {
+        "name": "_asset",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "isSupportedAssetInVault",
+    "inputs": [
+      {
+        "name": "_vaultId",
+        "type": "uint256"
+      },
+      {
+        "name": "_asset",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "getNumAssets",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "getFirstVaultIdForAsset",
+    "inputs": [
+      {
+        "name": "_asset",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "getTellerDepositConfig",
+    "inputs": [
+      {
+        "name": "_vaultId",
+        "type": "uint256"
+      },
+      {
+        "name": "_asset",
+        "type": "address"
+      },
+      {
+        "name": "_user",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "canDepositGeneral",
+            "type": "bool"
+          },
+          {
+            "name": "canDepositAsset",
+            "type": "bool"
+          },
+          {
+            "name": "doesVaultSupportAsset",
+            "type": "bool"
+          },
+          {
+            "name": "isUserAllowed",
+            "type": "bool"
+          },
+          {
+            "name": "perUserDepositLimit",
+            "type": "uint256"
+          },
+          {
+            "name": "globalDepositLimit",
+            "type": "uint256"
+          },
+          {
+            "name": "perUserMaxAssetsPerVault",
+            "type": "uint256"
+          },
+          {
+            "name": "perUserMaxVaults",
+            "type": "uint256"
+          },
+          {
+            "name": "canAnyoneDeposit",
+            "type": "bool"
+          },
+          {
+            "name": "minDepositBalance",
+            "type": "uint256"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "getTellerWithdrawConfig",
+    "inputs": [
+      {
+        "name": "_asset",
+        "type": "address"
+      },
+      {
+        "name": "_user",
+        "type": "address"
+      },
+      {
+        "name": "_caller",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "canWithdrawGeneral",
+            "type": "bool"
+          },
+          {
+            "name": "canWithdrawAsset",
+            "type": "bool"
+          },
+          {
+            "name": "isUserAllowed",
+            "type": "bool"
+          },
+          {
+            "name": "canWithdrawForUser",
+            "type": "bool"
+          },
+          {
+            "name": "minDepositBalance",
+            "type": "uint256"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "getDebtTerms",
+    "inputs": [
+      {
+        "name": "_asset",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "ltv",
+            "type": "uint256"
+          },
+          {
+            "name": "redemptionThreshold",
+            "type": "uint256"
+          },
+          {
+            "name": "liqThreshold",
+            "type": "uint256"
+          },
+          {
+            "name": "liqFee",
+            "type": "uint256"
+          },
+          {
+            "name": "borrowRate",
+            "type": "uint256"
+          },
+          {
+            "name": "daowry",
+            "type": "uint256"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "getBorrowConfig",
+    "inputs": [
+      {
+        "name": "_user",
+        "type": "address"
+      },
+      {
+        "name": "_caller",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "canBorrow",
+            "type": "bool"
+          },
+          {
+            "name": "canBorrowForUser",
+            "type": "bool"
+          },
+          {
+            "name": "numAllowedBorrowers",
+            "type": "uint256"
+          },
+          {
+            "name": "maxBorrowPerInterval",
+            "type": "uint256"
+          },
+          {
+            "name": "numBlocksPerInterval",
+            "type": "uint256"
+          },
+          {
+            "name": "perUserDebtLimit",
+            "type": "uint256"
+          },
+          {
+            "name": "globalDebtLimit",
+            "type": "uint256"
+          },
+          {
+            "name": "minDebtAmount",
+            "type": "uint256"
+          },
+          {
+            "name": "isDaowryEnabled",
+            "type": "bool"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "maxLtvDeviation",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "getRepayConfig",
+    "inputs": [
+      {
+        "name": "_user",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "canRepay",
+            "type": "bool"
+          },
+          {
+            "name": "canAnyoneRepayDebt",
+            "type": "bool"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "getRedeemCollateralConfig",
+    "inputs": [
+      {
+        "name": "_asset",
+        "type": "address"
+      },
+      {
+        "name": "_recipient",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "canRedeemCollateralGeneral",
+            "type": "bool"
+          },
+          {
+            "name": "canRedeemCollateralAsset",
+            "type": "bool"
+          },
+          {
+            "name": "isUserAllowed",
+            "type": "bool"
+          },
+          {
+            "name": "ltvPaybackBuffer",
+            "type": "uint256"
+          },
+          {
+            "name": "canAnyoneDeposit",
+            "type": "bool"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "getLtvPaybackBuffer",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "getAuctionBuyConfig",
+    "inputs": [
+      {
+        "name": "_asset",
+        "type": "address"
+      },
+      {
+        "name": "_recipient",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "canBuyInAuctionGeneral",
+            "type": "bool"
+          },
+          {
+            "name": "canBuyInAuctionAsset",
+            "type": "bool"
+          },
+          {
+            "name": "isUserAllowed",
+            "type": "bool"
+          },
+          {
+            "name": "canAnyoneDeposit",
+            "type": "bool"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "getGenLiqConfig",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "canLiquidate",
+            "type": "bool"
+          },
+          {
+            "name": "keeperFeeRatio",
+            "type": "uint256"
+          },
+          {
+            "name": "minKeeperFee",
+            "type": "uint256"
+          },
+          {
+            "name": "maxKeeperFee",
+            "type": "uint256"
+          },
+          {
+            "name": "ltvPaybackBuffer",
+            "type": "uint256"
+          },
+          {
+            "name": "genAuctionParams",
+            "type": "tuple",
+            "components": [
+              {
+                "name": "hasParams",
+                "type": "bool"
+              },
+              {
+                "name": "startDiscount",
+                "type": "uint256"
+              },
+              {
+                "name": "maxDiscount",
+                "type": "uint256"
+              },
+              {
+                "name": "delay",
+                "type": "uint256"
+              },
+              {
+                "name": "duration",
+                "type": "uint256"
+              }
+            ]
+          },
+          {
+            "name": "priorityLiqAssetVaults",
+            "type": "tuple[]",
+            "components": [
+              {
+                "name": "vaultId",
+                "type": "uint256"
+              },
+              {
+                "name": "vaultAddr",
+                "type": "address"
+              },
+              {
+                "name": "asset",
+                "type": "address"
+              }
+            ]
+          },
+          {
+            "name": "priorityStabVaults",
+            "type": "tuple[]",
+            "components": [
+              {
+                "name": "vaultId",
+                "type": "uint256"
+              },
+              {
+                "name": "vaultAddr",
+                "type": "address"
+              },
+              {
+                "name": "asset",
+                "type": "address"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "getGenAuctionParams",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "hasParams",
+            "type": "bool"
+          },
+          {
+            "name": "startDiscount",
+            "type": "uint256"
+          },
+          {
+            "name": "maxDiscount",
+            "type": "uint256"
+          },
+          {
+            "name": "delay",
+            "type": "uint256"
+          },
+          {
+            "name": "duration",
+            "type": "uint256"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "getAssetLiqConfig",
+    "inputs": [
+      {
+        "name": "_asset",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "hasConfig",
+            "type": "bool"
+          },
+          {
+            "name": "shouldBurnAsPayment",
+            "type": "bool"
+          },
+          {
+            "name": "shouldTransferToEndaoment",
+            "type": "bool"
+          },
+          {
+            "name": "shouldSwapInStabPools",
+            "type": "bool"
+          },
+          {
+            "name": "shouldAuctionInstantly",
+            "type": "bool"
+          },
+          {
+            "name": "customAuctionParams",
+            "type": "tuple",
+            "components": [
+              {
+                "name": "hasParams",
+                "type": "bool"
+              },
+              {
+                "name": "startDiscount",
+                "type": "uint256"
+              },
+              {
+                "name": "maxDiscount",
+                "type": "uint256"
+              },
+              {
+                "name": "delay",
+                "type": "uint256"
+              },
+              {
+                "name": "duration",
+                "type": "uint256"
+              }
+            ]
+          },
+          {
+            "name": "specialStabPool",
+            "type": "tuple",
+            "components": [
+              {
+                "name": "vaultId",
+                "type": "uint256"
+              },
+              {
+                "name": "vaultAddr",
+                "type": "address"
+              },
+              {
+                "name": "asset",
+                "type": "address"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "getStabPoolClaimsConfig",
+    "inputs": [
+      {
+        "name": "_claimAsset",
+        "type": "address"
+      },
+      {
+        "name": "_claimer",
+        "type": "address"
+      },
+      {
+        "name": "_caller",
+        "type": "address"
+      },
+      {
+        "name": "_ripeToken",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "canClaimInStabPoolGeneral",
+            "type": "bool"
+          },
+          {
+            "name": "canClaimInStabPoolAsset",
+            "type": "bool"
+          },
+          {
+            "name": "canClaimFromStabPoolForUser",
+            "type": "bool"
+          },
+          {
+            "name": "isUserAllowed",
+            "type": "bool"
+          },
+          {
+            "name": "rewardsLockDuration",
+            "type": "uint256"
+          },
+          {
+            "name": "ripePerDollarClaimed",
+            "type": "uint256"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "getStabPoolRedemptionsConfig",
+    "inputs": [
+      {
+        "name": "_asset",
+        "type": "address"
+      },
+      {
+        "name": "_recipient",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "canRedeemInStabPoolGeneral",
+            "type": "bool"
+          },
+          {
+            "name": "canRedeemInStabPoolAsset",
+            "type": "bool"
+          },
+          {
+            "name": "isUserAllowed",
+            "type": "bool"
+          },
+          {
+            "name": "canAnyoneDeposit",
+            "type": "bool"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "getClaimLootConfig",
+    "inputs": [
+      {
+        "name": "_user",
+        "type": "address"
+      },
+      {
+        "name": "_caller",
+        "type": "address"
+      },
+      {
+        "name": "_ripeToken",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "canClaimLoot",
+            "type": "bool"
+          },
+          {
+            "name": "canClaimLootForUser",
+            "type": "bool"
+          },
+          {
+            "name": "autoStakeRatio",
+            "type": "uint256"
+          },
+          {
+            "name": "rewardsLockDuration",
+            "type": "uint256"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "getRewardsConfig",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "arePointsEnabled",
+            "type": "bool"
+          },
+          {
+            "name": "ripePerBlock",
+            "type": "uint256"
+          },
+          {
+            "name": "borrowersAlloc",
+            "type": "uint256"
+          },
+          {
+            "name": "stakersAlloc",
+            "type": "uint256"
+          },
+          {
+            "name": "votersAlloc",
+            "type": "uint256"
+          },
+          {
+            "name": "genDepositorsAlloc",
+            "type": "uint256"
+          },
+          {
+            "name": "stakersPointsAllocTotal",
+            "type": "uint256"
+          },
+          {
+            "name": "voterPointsAllocTotal",
+            "type": "uint256"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "getDepositPointsConfig",
+    "inputs": [
+      {
+        "name": "_asset",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "stakersPointsAlloc",
+            "type": "uint256"
+          },
+          {
+            "name": "voterPointsAlloc",
+            "type": "uint256"
+          },
+          {
+            "name": "isNft",
+            "type": "bool"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "getPriceConfig",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "staleTime",
+            "type": "uint256"
+          },
+          {
+            "name": "priorityPriceSourceIds",
+            "type": "uint256[]"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "getPurchaseRipeBondConfig",
+    "inputs": [
+      {
+        "name": "_user",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "asset",
+            "type": "address"
+          },
+          {
+            "name": "amountPerEpoch",
+            "type": "uint256"
+          },
+          {
+            "name": "canBond",
+            "type": "bool"
+          },
+          {
+            "name": "minRipePerUnit",
+            "type": "uint256"
+          },
+          {
+            "name": "maxRipePerUnit",
+            "type": "uint256"
+          },
+          {
+            "name": "maxRipePerUnitLockBonus",
+            "type": "uint256"
+          },
+          {
+            "name": "epochLength",
+            "type": "uint256"
+          },
+          {
+            "name": "shouldAutoRestart",
+            "type": "bool"
+          },
+          {
+            "name": "restartDelayBlocks",
+            "type": "uint256"
+          },
+          {
+            "name": "minLockDuration",
+            "type": "uint256"
+          },
+          {
+            "name": "maxLockDuration",
+            "type": "uint256"
+          },
+          {
+            "name": "canAnyoneBondForUser",
+            "type": "bool"
+          },
+          {
+            "name": "isUserAllowed",
+            "type": "bool"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "getDynamicBorrowRateConfig",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "minDynamicRateBoost",
+            "type": "uint256"
+          },
+          {
+            "name": "maxDynamicRateBoost",
+            "type": "uint256"
+          },
+          {
+            "name": "increasePerDangerBlock",
+            "type": "uint256"
+          },
+          {
+            "name": "maxBorrowRate",
+            "type": "uint256"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "getPriceStaleTime",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "getPriorityPriceSourceIds",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256[]"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "getPriorityLiqAssetVaults",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple[]",
+        "components": [
+          {
+            "name": "vaultId",
+            "type": "uint256"
+          },
+          {
+            "name": "asset",
+            "type": "address"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "getPriorityStabVaults",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple[]",
+        "components": [
+          {
+            "name": "vaultId",
+            "type": "uint256"
+          },
+          {
+            "name": "asset",
+            "type": "address"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "doesUndyLegoHaveAccess",
+    "inputs": [
+      {
+        "name": "_wallet",
+        "type": "address"
+      },
+      {
+        "name": "_legoAddr",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "genConfig",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "perUserMaxVaults",
+            "type": "uint256"
+          },
+          {
+            "name": "perUserMaxAssetsPerVault",
+            "type": "uint256"
+          },
+          {
+            "name": "priceStaleTime",
+            "type": "uint256"
+          },
+          {
+            "name": "canDeposit",
+            "type": "bool"
+          },
+          {
+            "name": "canWithdraw",
+            "type": "bool"
+          },
+          {
+            "name": "canBorrow",
+            "type": "bool"
+          },
+          {
+            "name": "canRepay",
+            "type": "bool"
+          },
+          {
+            "name": "canClaimLoot",
+            "type": "bool"
+          },
+          {
+            "name": "canLiquidate",
+            "type": "bool"
+          },
+          {
+            "name": "canRedeemCollateral",
+            "type": "bool"
+          },
+          {
+            "name": "canRedeemInStabPool",
+            "type": "bool"
+          },
+          {
+            "name": "canBuyInAuction",
+            "type": "bool"
+          },
+          {
+            "name": "canClaimInStabPool",
+            "type": "bool"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "genDebtConfig",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "perUserDebtLimit",
+            "type": "uint256"
+          },
+          {
+            "name": "globalDebtLimit",
+            "type": "uint256"
+          },
+          {
+            "name": "minDebtAmount",
+            "type": "uint256"
+          },
+          {
+            "name": "numAllowedBorrowers",
+            "type": "uint256"
+          },
+          {
+            "name": "maxBorrowPerInterval",
+            "type": "uint256"
+          },
+          {
+            "name": "numBlocksPerInterval",
+            "type": "uint256"
+          },
+          {
+            "name": "minDynamicRateBoost",
+            "type": "uint256"
+          },
+          {
+            "name": "maxDynamicRateBoost",
+            "type": "uint256"
+          },
+          {
+            "name": "increasePerDangerBlock",
+            "type": "uint256"
+          },
+          {
+            "name": "maxBorrowRate",
+            "type": "uint256"
+          },
+          {
+            "name": "maxLtvDeviation",
+            "type": "uint256"
+          },
+          {
+            "name": "keeperFeeRatio",
+            "type": "uint256"
+          },
+          {
+            "name": "minKeeperFee",
+            "type": "uint256"
+          },
+          {
+            "name": "maxKeeperFee",
+            "type": "uint256"
+          },
+          {
+            "name": "isDaowryEnabled",
+            "type": "bool"
+          },
+          {
+            "name": "ltvPaybackBuffer",
+            "type": "uint256"
+          },
+          {
+            "name": "genAuctionParams",
+            "type": "tuple",
+            "components": [
+              {
+                "name": "hasParams",
+                "type": "bool"
+              },
+              {
+                "name": "startDiscount",
+                "type": "uint256"
+              },
+              {
+                "name": "maxDiscount",
+                "type": "uint256"
+              },
+              {
+                "name": "delay",
+                "type": "uint256"
+              },
+              {
+                "name": "duration",
+                "type": "uint256"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "hrConfig",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "contribTemplate",
+            "type": "address"
+          },
+          {
+            "name": "maxCompensation",
+            "type": "uint256"
+          },
+          {
+            "name": "minCliffLength",
+            "type": "uint256"
+          },
+          {
+            "name": "maxStartDelay",
+            "type": "uint256"
+          },
+          {
+            "name": "minVestingLength",
+            "type": "uint256"
+          },
+          {
+            "name": "maxVestingLength",
+            "type": "uint256"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "ripeBondConfig",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "asset",
+            "type": "address"
+          },
+          {
+            "name": "amountPerEpoch",
+            "type": "uint256"
+          },
+          {
+            "name": "canBond",
+            "type": "bool"
+          },
+          {
+            "name": "minRipePerUnit",
+            "type": "uint256"
+          },
+          {
+            "name": "maxRipePerUnit",
+            "type": "uint256"
+          },
+          {
+            "name": "maxRipePerUnitLockBonus",
+            "type": "uint256"
+          },
+          {
+            "name": "epochLength",
+            "type": "uint256"
+          },
+          {
+            "name": "shouldAutoRestart",
+            "type": "bool"
+          },
+          {
+            "name": "restartDelayBlocks",
+            "type": "uint256"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "assetConfig",
+    "inputs": [
+      {
+        "name": "arg0",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "vaultIds",
+            "type": "uint256[]"
+          },
+          {
+            "name": "stakersPointsAlloc",
+            "type": "uint256"
+          },
+          {
+            "name": "voterPointsAlloc",
+            "type": "uint256"
+          },
+          {
+            "name": "perUserDepositLimit",
+            "type": "uint256"
+          },
+          {
+            "name": "globalDepositLimit",
+            "type": "uint256"
+          },
+          {
+            "name": "minDepositBalance",
+            "type": "uint256"
+          },
+          {
+            "name": "debtTerms",
+            "type": "tuple",
+            "components": [
+              {
+                "name": "ltv",
+                "type": "uint256"
+              },
+              {
+                "name": "redemptionThreshold",
+                "type": "uint256"
+              },
+              {
+                "name": "liqThreshold",
+                "type": "uint256"
+              },
+              {
+                "name": "liqFee",
+                "type": "uint256"
+              },
+              {
+                "name": "borrowRate",
+                "type": "uint256"
+              },
+              {
+                "name": "daowry",
+                "type": "uint256"
+              }
+            ]
+          },
+          {
+            "name": "shouldBurnAsPayment",
+            "type": "bool"
+          },
+          {
+            "name": "shouldTransferToEndaoment",
+            "type": "bool"
+          },
+          {
+            "name": "shouldSwapInStabPools",
+            "type": "bool"
+          },
+          {
+            "name": "shouldAuctionInstantly",
+            "type": "bool"
+          },
+          {
+            "name": "canDeposit",
+            "type": "bool"
+          },
+          {
+            "name": "canWithdraw",
+            "type": "bool"
+          },
+          {
+            "name": "canRedeemCollateral",
+            "type": "bool"
+          },
+          {
+            "name": "canRedeemInStabPool",
+            "type": "bool"
+          },
+          {
+            "name": "canBuyInAuction",
+            "type": "bool"
+          },
+          {
+            "name": "canClaimInStabPool",
+            "type": "bool"
+          },
+          {
+            "name": "specialStabPoolId",
+            "type": "uint256"
+          },
+          {
+            "name": "customAuctionParams",
+            "type": "tuple",
+            "components": [
+              {
+                "name": "hasParams",
+                "type": "bool"
+              },
+              {
+                "name": "startDiscount",
+                "type": "uint256"
+              },
+              {
+                "name": "maxDiscount",
+                "type": "uint256"
+              },
+              {
+                "name": "delay",
+                "type": "uint256"
+              },
+              {
+                "name": "duration",
+                "type": "uint256"
+              }
+            ]
+          },
+          {
+            "name": "whitelist",
+            "type": "address"
+          },
+          {
+            "name": "isNft",
+            "type": "bool"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "assets",
+    "inputs": [
+      {
+        "name": "arg0",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "indexOfAsset",
+    "inputs": [
+      {
+        "name": "arg0",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "numAssets",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "userConfig",
+    "inputs": [
+      {
+        "name": "arg0",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "canAnyoneDeposit",
+            "type": "bool"
+          },
+          {
+            "name": "canAnyoneRepayDebt",
+            "type": "bool"
+          },
+          {
+            "name": "canAnyoneBondForUser",
+            "type": "bool"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "userDelegation",
+    "inputs": [
+      {
+        "name": "arg0",
+        "type": "address"
+      },
+      {
+        "name": "arg1",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "canWithdraw",
+            "type": "bool"
+          },
+          {
+            "name": "canBorrow",
+            "type": "bool"
+          },
+          {
+            "name": "canClaimFromStabPool",
+            "type": "bool"
+          },
+          {
+            "name": "canClaimLoot",
+            "type": "bool"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "rewardsConfig",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "arePointsEnabled",
+            "type": "bool"
+          },
+          {
+            "name": "ripePerBlock",
+            "type": "uint256"
+          },
+          {
+            "name": "borrowersAlloc",
+            "type": "uint256"
+          },
+          {
+            "name": "stakersAlloc",
+            "type": "uint256"
+          },
+          {
+            "name": "votersAlloc",
+            "type": "uint256"
+          },
+          {
+            "name": "genDepositorsAlloc",
+            "type": "uint256"
+          },
+          {
+            "name": "autoStakeRatio",
+            "type": "uint256"
+          },
+          {
+            "name": "autoStakeDurationRatio",
+            "type": "uint256"
+          },
+          {
+            "name": "stabPoolRipePerDollarClaimed",
+            "type": "uint256"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "totalPointsAllocs",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "stakersPointsAllocTotal",
+            "type": "uint256"
+          },
+          {
+            "name": "voterPointsAllocTotal",
+            "type": "uint256"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "ripeGovVaultConfig",
+    "inputs": [
+      {
+        "name": "arg0",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "lockTerms",
+            "type": "tuple",
+            "components": [
+              {
+                "name": "minLockDuration",
+                "type": "uint256"
+              },
+              {
+                "name": "maxLockDuration",
+                "type": "uint256"
+              },
+              {
+                "name": "maxLockBoost",
+                "type": "uint256"
+              },
+              {
+                "name": "canExit",
+                "type": "bool"
+              },
+              {
+                "name": "exitFee",
+                "type": "uint256"
+              }
+            ]
+          },
+          {
+            "name": "assetWeight",
+            "type": "uint256"
+          },
+          {
+            "name": "shouldFreezeWhenBadDebt",
+            "type": "bool"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "priorityLiqAssetVaults",
+    "inputs": [
+      {
+        "name": "arg0",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "vaultId",
+            "type": "uint256"
+          },
+          {
+            "name": "asset",
+            "type": "address"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "priorityStabVaults",
+    "inputs": [
+      {
+        "name": "arg0",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "vaultId",
+            "type": "uint256"
+          },
+          {
+            "name": "asset",
+            "type": "address"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "liteSigners",
+    "inputs": [
+      {
+        "name": "arg0",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "indexOfLiteSigner",
+    "inputs": [
+      {
+        "name": "arg0",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "numLiteSigners",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "priorityPriceSourceIds",
+    "inputs": [
+      {
+        "name": "arg0",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "underscoreRegistry",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "trainingWheels",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "shouldCheckLastTouch",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "constructor",
+    "inputs": [
+      {
+        "name": "_ripeHq",
+        "type": "address"
+      },
+      {
+        "name": "_defaults",
+        "type": "address"
+      }
+    ],
+    "outputs": []
+  }
+]

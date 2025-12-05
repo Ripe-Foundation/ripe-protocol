@@ -1,0 +1,3096 @@
+[
+  {
+    "name": "NewBorrow",
+    "inputs": [
+      {
+        "name": "user",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "newLoan",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "daowry",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "didReceiveSavingsGreen",
+        "type": "bool",
+        "indexed": false
+      },
+      {
+        "name": "outstandingUserDebt",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "userCollateralVal",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "maxUserDebt",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "globalYieldRealized",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "RepayDebt",
+    "inputs": [
+      {
+        "name": "user",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "repayValue",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "repayType",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "refundAmount",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "refundWasSavingsGreen",
+        "type": "bool",
+        "indexed": false
+      },
+      {
+        "name": "outstandingUserDebt",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "userCollateralVal",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "maxUserDebt",
+        "type": "uint256",
+        "indexed": false
+      },
+      {
+        "name": "hasGoodDebtHealth",
+        "type": "bool",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "UnderscoreVaultDiscountSet",
+    "inputs": [
+      {
+        "name": "discount",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "BuybackRatioSet",
+    "inputs": [
+      {
+        "name": "ratio",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "DepartmentPauseModified",
+    "inputs": [
+      {
+        "name": "isPaused",
+        "type": "bool",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "DepartmentFundsRecovered",
+    "inputs": [
+      {
+        "name": "asset",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "recipient",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "balance",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "getAddys",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "hq",
+            "type": "address"
+          },
+          {
+            "name": "greenToken",
+            "type": "address"
+          },
+          {
+            "name": "savingsGreen",
+            "type": "address"
+          },
+          {
+            "name": "ripeToken",
+            "type": "address"
+          },
+          {
+            "name": "ledger",
+            "type": "address"
+          },
+          {
+            "name": "missionControl",
+            "type": "address"
+          },
+          {
+            "name": "switchboard",
+            "type": "address"
+          },
+          {
+            "name": "priceDesk",
+            "type": "address"
+          },
+          {
+            "name": "vaultBook",
+            "type": "address"
+          },
+          {
+            "name": "auctionHouse",
+            "type": "address"
+          },
+          {
+            "name": "auctionHouseNft",
+            "type": "address"
+          },
+          {
+            "name": "boardroom",
+            "type": "address"
+          },
+          {
+            "name": "bondRoom",
+            "type": "address"
+          },
+          {
+            "name": "creditEngine",
+            "type": "address"
+          },
+          {
+            "name": "endaoment",
+            "type": "address"
+          },
+          {
+            "name": "humanResources",
+            "type": "address"
+          },
+          {
+            "name": "lootbox",
+            "type": "address"
+          },
+          {
+            "name": "teller",
+            "type": "address"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "getRipeHq",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "canMintGreen",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "canMintRipe",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "pause",
+    "inputs": [
+      {
+        "name": "_shouldPause",
+        "type": "bool"
+      }
+    ],
+    "outputs": []
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "recoverFunds",
+    "inputs": [
+      {
+        "name": "_recipient",
+        "type": "address"
+      },
+      {
+        "name": "_asset",
+        "type": "address"
+      }
+    ],
+    "outputs": []
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "recoverFundsMany",
+    "inputs": [
+      {
+        "name": "_recipient",
+        "type": "address"
+      },
+      {
+        "name": "_assets",
+        "type": "address[]"
+      }
+    ],
+    "outputs": []
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "isPaused",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "borrowForUser",
+    "inputs": [
+      {
+        "name": "_user",
+        "type": "address"
+      },
+      {
+        "name": "_greenAmount",
+        "type": "uint256"
+      },
+      {
+        "name": "_wantsSavingsGreen",
+        "type": "bool"
+      },
+      {
+        "name": "_shouldEnterStabPool",
+        "type": "bool"
+      },
+      {
+        "name": "_caller",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "borrowForUser",
+    "inputs": [
+      {
+        "name": "_user",
+        "type": "address"
+      },
+      {
+        "name": "_greenAmount",
+        "type": "uint256"
+      },
+      {
+        "name": "_wantsSavingsGreen",
+        "type": "bool"
+      },
+      {
+        "name": "_shouldEnterStabPool",
+        "type": "bool"
+      },
+      {
+        "name": "_caller",
+        "type": "address"
+      },
+      {
+        "name": "_a",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "hq",
+            "type": "address"
+          },
+          {
+            "name": "greenToken",
+            "type": "address"
+          },
+          {
+            "name": "savingsGreen",
+            "type": "address"
+          },
+          {
+            "name": "ripeToken",
+            "type": "address"
+          },
+          {
+            "name": "ledger",
+            "type": "address"
+          },
+          {
+            "name": "missionControl",
+            "type": "address"
+          },
+          {
+            "name": "switchboard",
+            "type": "address"
+          },
+          {
+            "name": "priceDesk",
+            "type": "address"
+          },
+          {
+            "name": "vaultBook",
+            "type": "address"
+          },
+          {
+            "name": "auctionHouse",
+            "type": "address"
+          },
+          {
+            "name": "auctionHouseNft",
+            "type": "address"
+          },
+          {
+            "name": "boardroom",
+            "type": "address"
+          },
+          {
+            "name": "bondRoom",
+            "type": "address"
+          },
+          {
+            "name": "creditEngine",
+            "type": "address"
+          },
+          {
+            "name": "endaoment",
+            "type": "address"
+          },
+          {
+            "name": "humanResources",
+            "type": "address"
+          },
+          {
+            "name": "lootbox",
+            "type": "address"
+          },
+          {
+            "name": "teller",
+            "type": "address"
+          }
+        ]
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "getMaxBorrowAmount",
+    "inputs": [
+      {
+        "name": "_user",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "repayForUser",
+    "inputs": [
+      {
+        "name": "_user",
+        "type": "address"
+      },
+      {
+        "name": "_greenAmount",
+        "type": "uint256"
+      },
+      {
+        "name": "_shouldRefundSavingsGreen",
+        "type": "bool"
+      },
+      {
+        "name": "_caller",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "repayForUser",
+    "inputs": [
+      {
+        "name": "_user",
+        "type": "address"
+      },
+      {
+        "name": "_greenAmount",
+        "type": "uint256"
+      },
+      {
+        "name": "_shouldRefundSavingsGreen",
+        "type": "bool"
+      },
+      {
+        "name": "_caller",
+        "type": "address"
+      },
+      {
+        "name": "_a",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "hq",
+            "type": "address"
+          },
+          {
+            "name": "greenToken",
+            "type": "address"
+          },
+          {
+            "name": "savingsGreen",
+            "type": "address"
+          },
+          {
+            "name": "ripeToken",
+            "type": "address"
+          },
+          {
+            "name": "ledger",
+            "type": "address"
+          },
+          {
+            "name": "missionControl",
+            "type": "address"
+          },
+          {
+            "name": "switchboard",
+            "type": "address"
+          },
+          {
+            "name": "priceDesk",
+            "type": "address"
+          },
+          {
+            "name": "vaultBook",
+            "type": "address"
+          },
+          {
+            "name": "auctionHouse",
+            "type": "address"
+          },
+          {
+            "name": "auctionHouseNft",
+            "type": "address"
+          },
+          {
+            "name": "boardroom",
+            "type": "address"
+          },
+          {
+            "name": "bondRoom",
+            "type": "address"
+          },
+          {
+            "name": "creditEngine",
+            "type": "address"
+          },
+          {
+            "name": "endaoment",
+            "type": "address"
+          },
+          {
+            "name": "humanResources",
+            "type": "address"
+          },
+          {
+            "name": "lootbox",
+            "type": "address"
+          },
+          {
+            "name": "teller",
+            "type": "address"
+          }
+        ]
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "repayDuringAuctionPurchase",
+    "inputs": [
+      {
+        "name": "_liqUser",
+        "type": "address"
+      },
+      {
+        "name": "_repayValue",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "repayDuringAuctionPurchase",
+    "inputs": [
+      {
+        "name": "_liqUser",
+        "type": "address"
+      },
+      {
+        "name": "_repayValue",
+        "type": "uint256"
+      },
+      {
+        "name": "_a",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "hq",
+            "type": "address"
+          },
+          {
+            "name": "greenToken",
+            "type": "address"
+          },
+          {
+            "name": "savingsGreen",
+            "type": "address"
+          },
+          {
+            "name": "ripeToken",
+            "type": "address"
+          },
+          {
+            "name": "ledger",
+            "type": "address"
+          },
+          {
+            "name": "missionControl",
+            "type": "address"
+          },
+          {
+            "name": "switchboard",
+            "type": "address"
+          },
+          {
+            "name": "priceDesk",
+            "type": "address"
+          },
+          {
+            "name": "vaultBook",
+            "type": "address"
+          },
+          {
+            "name": "auctionHouse",
+            "type": "address"
+          },
+          {
+            "name": "auctionHouseNft",
+            "type": "address"
+          },
+          {
+            "name": "boardroom",
+            "type": "address"
+          },
+          {
+            "name": "bondRoom",
+            "type": "address"
+          },
+          {
+            "name": "creditEngine",
+            "type": "address"
+          },
+          {
+            "name": "endaoment",
+            "type": "address"
+          },
+          {
+            "name": "humanResources",
+            "type": "address"
+          },
+          {
+            "name": "lootbox",
+            "type": "address"
+          },
+          {
+            "name": "teller",
+            "type": "address"
+          }
+        ]
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "repayFromDept",
+    "inputs": [
+      {
+        "name": "_user",
+        "type": "address"
+      },
+      {
+        "name": "_userDebt",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "amount",
+            "type": "uint256"
+          },
+          {
+            "name": "principal",
+            "type": "uint256"
+          },
+          {
+            "name": "debtTerms",
+            "type": "tuple",
+            "components": [
+              {
+                "name": "ltv",
+                "type": "uint256"
+              },
+              {
+                "name": "redemptionThreshold",
+                "type": "uint256"
+              },
+              {
+                "name": "liqThreshold",
+                "type": "uint256"
+              },
+              {
+                "name": "liqFee",
+                "type": "uint256"
+              },
+              {
+                "name": "borrowRate",
+                "type": "uint256"
+              },
+              {
+                "name": "daowry",
+                "type": "uint256"
+              }
+            ]
+          },
+          {
+            "name": "lastTimestamp",
+            "type": "uint256"
+          },
+          {
+            "name": "inLiquidation",
+            "type": "bool"
+          }
+        ]
+      },
+      {
+        "name": "_repayValue",
+        "type": "uint256"
+      },
+      {
+        "name": "_newInterest",
+        "type": "uint256"
+      },
+      {
+        "name": "_numUserVaults",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "repayFromDept",
+    "inputs": [
+      {
+        "name": "_user",
+        "type": "address"
+      },
+      {
+        "name": "_userDebt",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "amount",
+            "type": "uint256"
+          },
+          {
+            "name": "principal",
+            "type": "uint256"
+          },
+          {
+            "name": "debtTerms",
+            "type": "tuple",
+            "components": [
+              {
+                "name": "ltv",
+                "type": "uint256"
+              },
+              {
+                "name": "redemptionThreshold",
+                "type": "uint256"
+              },
+              {
+                "name": "liqThreshold",
+                "type": "uint256"
+              },
+              {
+                "name": "liqFee",
+                "type": "uint256"
+              },
+              {
+                "name": "borrowRate",
+                "type": "uint256"
+              },
+              {
+                "name": "daowry",
+                "type": "uint256"
+              }
+            ]
+          },
+          {
+            "name": "lastTimestamp",
+            "type": "uint256"
+          },
+          {
+            "name": "inLiquidation",
+            "type": "bool"
+          }
+        ]
+      },
+      {
+        "name": "_repayValue",
+        "type": "uint256"
+      },
+      {
+        "name": "_newInterest",
+        "type": "uint256"
+      },
+      {
+        "name": "_numUserVaults",
+        "type": "uint256"
+      },
+      {
+        "name": "_a",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "hq",
+            "type": "address"
+          },
+          {
+            "name": "greenToken",
+            "type": "address"
+          },
+          {
+            "name": "savingsGreen",
+            "type": "address"
+          },
+          {
+            "name": "ripeToken",
+            "type": "address"
+          },
+          {
+            "name": "ledger",
+            "type": "address"
+          },
+          {
+            "name": "missionControl",
+            "type": "address"
+          },
+          {
+            "name": "switchboard",
+            "type": "address"
+          },
+          {
+            "name": "priceDesk",
+            "type": "address"
+          },
+          {
+            "name": "vaultBook",
+            "type": "address"
+          },
+          {
+            "name": "auctionHouse",
+            "type": "address"
+          },
+          {
+            "name": "auctionHouseNft",
+            "type": "address"
+          },
+          {
+            "name": "boardroom",
+            "type": "address"
+          },
+          {
+            "name": "bondRoom",
+            "type": "address"
+          },
+          {
+            "name": "creditEngine",
+            "type": "address"
+          },
+          {
+            "name": "endaoment",
+            "type": "address"
+          },
+          {
+            "name": "humanResources",
+            "type": "address"
+          },
+          {
+            "name": "lootbox",
+            "type": "address"
+          },
+          {
+            "name": "teller",
+            "type": "address"
+          }
+        ]
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "getUserBorrowTerms",
+    "inputs": [
+      {
+        "name": "_user",
+        "type": "address"
+      },
+      {
+        "name": "_shouldRaise",
+        "type": "bool"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "collateralVal",
+            "type": "uint256"
+          },
+          {
+            "name": "totalMaxDebt",
+            "type": "uint256"
+          },
+          {
+            "name": "debtTerms",
+            "type": "tuple",
+            "components": [
+              {
+                "name": "ltv",
+                "type": "uint256"
+              },
+              {
+                "name": "redemptionThreshold",
+                "type": "uint256"
+              },
+              {
+                "name": "liqThreshold",
+                "type": "uint256"
+              },
+              {
+                "name": "liqFee",
+                "type": "uint256"
+              },
+              {
+                "name": "borrowRate",
+                "type": "uint256"
+              },
+              {
+                "name": "daowry",
+                "type": "uint256"
+              }
+            ]
+          },
+          {
+            "name": "lowestLtv",
+            "type": "uint256"
+          },
+          {
+            "name": "highestLtv",
+            "type": "uint256"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "getUserBorrowTerms",
+    "inputs": [
+      {
+        "name": "_user",
+        "type": "address"
+      },
+      {
+        "name": "_shouldRaise",
+        "type": "bool"
+      },
+      {
+        "name": "_skipVaultId",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "collateralVal",
+            "type": "uint256"
+          },
+          {
+            "name": "totalMaxDebt",
+            "type": "uint256"
+          },
+          {
+            "name": "debtTerms",
+            "type": "tuple",
+            "components": [
+              {
+                "name": "ltv",
+                "type": "uint256"
+              },
+              {
+                "name": "redemptionThreshold",
+                "type": "uint256"
+              },
+              {
+                "name": "liqThreshold",
+                "type": "uint256"
+              },
+              {
+                "name": "liqFee",
+                "type": "uint256"
+              },
+              {
+                "name": "borrowRate",
+                "type": "uint256"
+              },
+              {
+                "name": "daowry",
+                "type": "uint256"
+              }
+            ]
+          },
+          {
+            "name": "lowestLtv",
+            "type": "uint256"
+          },
+          {
+            "name": "highestLtv",
+            "type": "uint256"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "getUserBorrowTerms",
+    "inputs": [
+      {
+        "name": "_user",
+        "type": "address"
+      },
+      {
+        "name": "_shouldRaise",
+        "type": "bool"
+      },
+      {
+        "name": "_skipVaultId",
+        "type": "uint256"
+      },
+      {
+        "name": "_skipAsset",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "collateralVal",
+            "type": "uint256"
+          },
+          {
+            "name": "totalMaxDebt",
+            "type": "uint256"
+          },
+          {
+            "name": "debtTerms",
+            "type": "tuple",
+            "components": [
+              {
+                "name": "ltv",
+                "type": "uint256"
+              },
+              {
+                "name": "redemptionThreshold",
+                "type": "uint256"
+              },
+              {
+                "name": "liqThreshold",
+                "type": "uint256"
+              },
+              {
+                "name": "liqFee",
+                "type": "uint256"
+              },
+              {
+                "name": "borrowRate",
+                "type": "uint256"
+              },
+              {
+                "name": "daowry",
+                "type": "uint256"
+              }
+            ]
+          },
+          {
+            "name": "lowestLtv",
+            "type": "uint256"
+          },
+          {
+            "name": "highestLtv",
+            "type": "uint256"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "getUserBorrowTerms",
+    "inputs": [
+      {
+        "name": "_user",
+        "type": "address"
+      },
+      {
+        "name": "_shouldRaise",
+        "type": "bool"
+      },
+      {
+        "name": "_skipVaultId",
+        "type": "uint256"
+      },
+      {
+        "name": "_skipAsset",
+        "type": "address"
+      },
+      {
+        "name": "_a",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "hq",
+            "type": "address"
+          },
+          {
+            "name": "greenToken",
+            "type": "address"
+          },
+          {
+            "name": "savingsGreen",
+            "type": "address"
+          },
+          {
+            "name": "ripeToken",
+            "type": "address"
+          },
+          {
+            "name": "ledger",
+            "type": "address"
+          },
+          {
+            "name": "missionControl",
+            "type": "address"
+          },
+          {
+            "name": "switchboard",
+            "type": "address"
+          },
+          {
+            "name": "priceDesk",
+            "type": "address"
+          },
+          {
+            "name": "vaultBook",
+            "type": "address"
+          },
+          {
+            "name": "auctionHouse",
+            "type": "address"
+          },
+          {
+            "name": "auctionHouseNft",
+            "type": "address"
+          },
+          {
+            "name": "boardroom",
+            "type": "address"
+          },
+          {
+            "name": "bondRoom",
+            "type": "address"
+          },
+          {
+            "name": "creditEngine",
+            "type": "address"
+          },
+          {
+            "name": "endaoment",
+            "type": "address"
+          },
+          {
+            "name": "humanResources",
+            "type": "address"
+          },
+          {
+            "name": "lootbox",
+            "type": "address"
+          },
+          {
+            "name": "teller",
+            "type": "address"
+          }
+        ]
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "collateralVal",
+            "type": "uint256"
+          },
+          {
+            "name": "totalMaxDebt",
+            "type": "uint256"
+          },
+          {
+            "name": "debtTerms",
+            "type": "tuple",
+            "components": [
+              {
+                "name": "ltv",
+                "type": "uint256"
+              },
+              {
+                "name": "redemptionThreshold",
+                "type": "uint256"
+              },
+              {
+                "name": "liqThreshold",
+                "type": "uint256"
+              },
+              {
+                "name": "liqFee",
+                "type": "uint256"
+              },
+              {
+                "name": "borrowRate",
+                "type": "uint256"
+              },
+              {
+                "name": "daowry",
+                "type": "uint256"
+              }
+            ]
+          },
+          {
+            "name": "lowestLtv",
+            "type": "uint256"
+          },
+          {
+            "name": "highestLtv",
+            "type": "uint256"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "getUserBorrowTermsWithNumVaults",
+    "inputs": [
+      {
+        "name": "_user",
+        "type": "address"
+      },
+      {
+        "name": "_numUserVaults",
+        "type": "uint256"
+      },
+      {
+        "name": "_shouldRaise",
+        "type": "bool"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "collateralVal",
+            "type": "uint256"
+          },
+          {
+            "name": "totalMaxDebt",
+            "type": "uint256"
+          },
+          {
+            "name": "debtTerms",
+            "type": "tuple",
+            "components": [
+              {
+                "name": "ltv",
+                "type": "uint256"
+              },
+              {
+                "name": "redemptionThreshold",
+                "type": "uint256"
+              },
+              {
+                "name": "liqThreshold",
+                "type": "uint256"
+              },
+              {
+                "name": "liqFee",
+                "type": "uint256"
+              },
+              {
+                "name": "borrowRate",
+                "type": "uint256"
+              },
+              {
+                "name": "daowry",
+                "type": "uint256"
+              }
+            ]
+          },
+          {
+            "name": "lowestLtv",
+            "type": "uint256"
+          },
+          {
+            "name": "highestLtv",
+            "type": "uint256"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "getUserBorrowTermsWithNumVaults",
+    "inputs": [
+      {
+        "name": "_user",
+        "type": "address"
+      },
+      {
+        "name": "_numUserVaults",
+        "type": "uint256"
+      },
+      {
+        "name": "_shouldRaise",
+        "type": "bool"
+      },
+      {
+        "name": "_skipVaultId",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "collateralVal",
+            "type": "uint256"
+          },
+          {
+            "name": "totalMaxDebt",
+            "type": "uint256"
+          },
+          {
+            "name": "debtTerms",
+            "type": "tuple",
+            "components": [
+              {
+                "name": "ltv",
+                "type": "uint256"
+              },
+              {
+                "name": "redemptionThreshold",
+                "type": "uint256"
+              },
+              {
+                "name": "liqThreshold",
+                "type": "uint256"
+              },
+              {
+                "name": "liqFee",
+                "type": "uint256"
+              },
+              {
+                "name": "borrowRate",
+                "type": "uint256"
+              },
+              {
+                "name": "daowry",
+                "type": "uint256"
+              }
+            ]
+          },
+          {
+            "name": "lowestLtv",
+            "type": "uint256"
+          },
+          {
+            "name": "highestLtv",
+            "type": "uint256"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "getUserBorrowTermsWithNumVaults",
+    "inputs": [
+      {
+        "name": "_user",
+        "type": "address"
+      },
+      {
+        "name": "_numUserVaults",
+        "type": "uint256"
+      },
+      {
+        "name": "_shouldRaise",
+        "type": "bool"
+      },
+      {
+        "name": "_skipVaultId",
+        "type": "uint256"
+      },
+      {
+        "name": "_skipAsset",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "collateralVal",
+            "type": "uint256"
+          },
+          {
+            "name": "totalMaxDebt",
+            "type": "uint256"
+          },
+          {
+            "name": "debtTerms",
+            "type": "tuple",
+            "components": [
+              {
+                "name": "ltv",
+                "type": "uint256"
+              },
+              {
+                "name": "redemptionThreshold",
+                "type": "uint256"
+              },
+              {
+                "name": "liqThreshold",
+                "type": "uint256"
+              },
+              {
+                "name": "liqFee",
+                "type": "uint256"
+              },
+              {
+                "name": "borrowRate",
+                "type": "uint256"
+              },
+              {
+                "name": "daowry",
+                "type": "uint256"
+              }
+            ]
+          },
+          {
+            "name": "lowestLtv",
+            "type": "uint256"
+          },
+          {
+            "name": "highestLtv",
+            "type": "uint256"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "getUserBorrowTermsWithNumVaults",
+    "inputs": [
+      {
+        "name": "_user",
+        "type": "address"
+      },
+      {
+        "name": "_numUserVaults",
+        "type": "uint256"
+      },
+      {
+        "name": "_shouldRaise",
+        "type": "bool"
+      },
+      {
+        "name": "_skipVaultId",
+        "type": "uint256"
+      },
+      {
+        "name": "_skipAsset",
+        "type": "address"
+      },
+      {
+        "name": "_a",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "hq",
+            "type": "address"
+          },
+          {
+            "name": "greenToken",
+            "type": "address"
+          },
+          {
+            "name": "savingsGreen",
+            "type": "address"
+          },
+          {
+            "name": "ripeToken",
+            "type": "address"
+          },
+          {
+            "name": "ledger",
+            "type": "address"
+          },
+          {
+            "name": "missionControl",
+            "type": "address"
+          },
+          {
+            "name": "switchboard",
+            "type": "address"
+          },
+          {
+            "name": "priceDesk",
+            "type": "address"
+          },
+          {
+            "name": "vaultBook",
+            "type": "address"
+          },
+          {
+            "name": "auctionHouse",
+            "type": "address"
+          },
+          {
+            "name": "auctionHouseNft",
+            "type": "address"
+          },
+          {
+            "name": "boardroom",
+            "type": "address"
+          },
+          {
+            "name": "bondRoom",
+            "type": "address"
+          },
+          {
+            "name": "creditEngine",
+            "type": "address"
+          },
+          {
+            "name": "endaoment",
+            "type": "address"
+          },
+          {
+            "name": "humanResources",
+            "type": "address"
+          },
+          {
+            "name": "lootbox",
+            "type": "address"
+          },
+          {
+            "name": "teller",
+            "type": "address"
+          }
+        ]
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "collateralVal",
+            "type": "uint256"
+          },
+          {
+            "name": "totalMaxDebt",
+            "type": "uint256"
+          },
+          {
+            "name": "debtTerms",
+            "type": "tuple",
+            "components": [
+              {
+                "name": "ltv",
+                "type": "uint256"
+              },
+              {
+                "name": "redemptionThreshold",
+                "type": "uint256"
+              },
+              {
+                "name": "liqThreshold",
+                "type": "uint256"
+              },
+              {
+                "name": "liqFee",
+                "type": "uint256"
+              },
+              {
+                "name": "borrowRate",
+                "type": "uint256"
+              },
+              {
+                "name": "daowry",
+                "type": "uint256"
+              }
+            ]
+          },
+          {
+            "name": "lowestLtv",
+            "type": "uint256"
+          },
+          {
+            "name": "highestLtv",
+            "type": "uint256"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "getUserCollateralValueAndDebtAmount",
+    "inputs": [
+      {
+        "name": "_user",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      },
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "getCollateralValue",
+    "inputs": [
+      {
+        "name": "_user",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "getUserDebtAmount",
+    "inputs": [
+      {
+        "name": "_user",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "getLatestUserDebtAndTerms",
+    "inputs": [
+      {
+        "name": "_user",
+        "type": "address"
+      },
+      {
+        "name": "_shouldRaise",
+        "type": "bool"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "amount",
+            "type": "uint256"
+          },
+          {
+            "name": "principal",
+            "type": "uint256"
+          },
+          {
+            "name": "debtTerms",
+            "type": "tuple",
+            "components": [
+              {
+                "name": "ltv",
+                "type": "uint256"
+              },
+              {
+                "name": "redemptionThreshold",
+                "type": "uint256"
+              },
+              {
+                "name": "liqThreshold",
+                "type": "uint256"
+              },
+              {
+                "name": "liqFee",
+                "type": "uint256"
+              },
+              {
+                "name": "borrowRate",
+                "type": "uint256"
+              },
+              {
+                "name": "daowry",
+                "type": "uint256"
+              }
+            ]
+          },
+          {
+            "name": "lastTimestamp",
+            "type": "uint256"
+          },
+          {
+            "name": "inLiquidation",
+            "type": "bool"
+          }
+        ]
+      },
+      {
+        "name": "",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "collateralVal",
+            "type": "uint256"
+          },
+          {
+            "name": "totalMaxDebt",
+            "type": "uint256"
+          },
+          {
+            "name": "debtTerms",
+            "type": "tuple",
+            "components": [
+              {
+                "name": "ltv",
+                "type": "uint256"
+              },
+              {
+                "name": "redemptionThreshold",
+                "type": "uint256"
+              },
+              {
+                "name": "liqThreshold",
+                "type": "uint256"
+              },
+              {
+                "name": "liqFee",
+                "type": "uint256"
+              },
+              {
+                "name": "borrowRate",
+                "type": "uint256"
+              },
+              {
+                "name": "daowry",
+                "type": "uint256"
+              }
+            ]
+          },
+          {
+            "name": "lowestLtv",
+            "type": "uint256"
+          },
+          {
+            "name": "highestLtv",
+            "type": "uint256"
+          }
+        ]
+      },
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "getLatestUserDebtAndTerms",
+    "inputs": [
+      {
+        "name": "_user",
+        "type": "address"
+      },
+      {
+        "name": "_shouldRaise",
+        "type": "bool"
+      },
+      {
+        "name": "_a",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "hq",
+            "type": "address"
+          },
+          {
+            "name": "greenToken",
+            "type": "address"
+          },
+          {
+            "name": "savingsGreen",
+            "type": "address"
+          },
+          {
+            "name": "ripeToken",
+            "type": "address"
+          },
+          {
+            "name": "ledger",
+            "type": "address"
+          },
+          {
+            "name": "missionControl",
+            "type": "address"
+          },
+          {
+            "name": "switchboard",
+            "type": "address"
+          },
+          {
+            "name": "priceDesk",
+            "type": "address"
+          },
+          {
+            "name": "vaultBook",
+            "type": "address"
+          },
+          {
+            "name": "auctionHouse",
+            "type": "address"
+          },
+          {
+            "name": "auctionHouseNft",
+            "type": "address"
+          },
+          {
+            "name": "boardroom",
+            "type": "address"
+          },
+          {
+            "name": "bondRoom",
+            "type": "address"
+          },
+          {
+            "name": "creditEngine",
+            "type": "address"
+          },
+          {
+            "name": "endaoment",
+            "type": "address"
+          },
+          {
+            "name": "humanResources",
+            "type": "address"
+          },
+          {
+            "name": "lootbox",
+            "type": "address"
+          },
+          {
+            "name": "teller",
+            "type": "address"
+          }
+        ]
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "amount",
+            "type": "uint256"
+          },
+          {
+            "name": "principal",
+            "type": "uint256"
+          },
+          {
+            "name": "debtTerms",
+            "type": "tuple",
+            "components": [
+              {
+                "name": "ltv",
+                "type": "uint256"
+              },
+              {
+                "name": "redemptionThreshold",
+                "type": "uint256"
+              },
+              {
+                "name": "liqThreshold",
+                "type": "uint256"
+              },
+              {
+                "name": "liqFee",
+                "type": "uint256"
+              },
+              {
+                "name": "borrowRate",
+                "type": "uint256"
+              },
+              {
+                "name": "daowry",
+                "type": "uint256"
+              }
+            ]
+          },
+          {
+            "name": "lastTimestamp",
+            "type": "uint256"
+          },
+          {
+            "name": "inLiquidation",
+            "type": "bool"
+          }
+        ]
+      },
+      {
+        "name": "",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "collateralVal",
+            "type": "uint256"
+          },
+          {
+            "name": "totalMaxDebt",
+            "type": "uint256"
+          },
+          {
+            "name": "debtTerms",
+            "type": "tuple",
+            "components": [
+              {
+                "name": "ltv",
+                "type": "uint256"
+              },
+              {
+                "name": "redemptionThreshold",
+                "type": "uint256"
+              },
+              {
+                "name": "liqThreshold",
+                "type": "uint256"
+              },
+              {
+                "name": "liqFee",
+                "type": "uint256"
+              },
+              {
+                "name": "borrowRate",
+                "type": "uint256"
+              },
+              {
+                "name": "daowry",
+                "type": "uint256"
+              }
+            ]
+          },
+          {
+            "name": "lowestLtv",
+            "type": "uint256"
+          },
+          {
+            "name": "highestLtv",
+            "type": "uint256"
+          }
+        ]
+      },
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "getLatestUserDebtWithInterest",
+    "inputs": [
+      {
+        "name": "_userDebt",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "amount",
+            "type": "uint256"
+          },
+          {
+            "name": "principal",
+            "type": "uint256"
+          },
+          {
+            "name": "debtTerms",
+            "type": "tuple",
+            "components": [
+              {
+                "name": "ltv",
+                "type": "uint256"
+              },
+              {
+                "name": "redemptionThreshold",
+                "type": "uint256"
+              },
+              {
+                "name": "liqThreshold",
+                "type": "uint256"
+              },
+              {
+                "name": "liqFee",
+                "type": "uint256"
+              },
+              {
+                "name": "borrowRate",
+                "type": "uint256"
+              },
+              {
+                "name": "daowry",
+                "type": "uint256"
+              }
+            ]
+          },
+          {
+            "name": "lastTimestamp",
+            "type": "uint256"
+          },
+          {
+            "name": "inLiquidation",
+            "type": "bool"
+          }
+        ]
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "amount",
+            "type": "uint256"
+          },
+          {
+            "name": "principal",
+            "type": "uint256"
+          },
+          {
+            "name": "debtTerms",
+            "type": "tuple",
+            "components": [
+              {
+                "name": "ltv",
+                "type": "uint256"
+              },
+              {
+                "name": "redemptionThreshold",
+                "type": "uint256"
+              },
+              {
+                "name": "liqThreshold",
+                "type": "uint256"
+              },
+              {
+                "name": "liqFee",
+                "type": "uint256"
+              },
+              {
+                "name": "borrowRate",
+                "type": "uint256"
+              },
+              {
+                "name": "daowry",
+                "type": "uint256"
+              }
+            ]
+          },
+          {
+            "name": "lastTimestamp",
+            "type": "uint256"
+          },
+          {
+            "name": "inLiquidation",
+            "type": "bool"
+          }
+        ]
+      },
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "hasGoodDebtHealth",
+    "inputs": [
+      {
+        "name": "_user",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "hasGoodDebtHealth",
+    "inputs": [
+      {
+        "name": "_user",
+        "type": "address"
+      },
+      {
+        "name": "_a",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "hq",
+            "type": "address"
+          },
+          {
+            "name": "greenToken",
+            "type": "address"
+          },
+          {
+            "name": "savingsGreen",
+            "type": "address"
+          },
+          {
+            "name": "ripeToken",
+            "type": "address"
+          },
+          {
+            "name": "ledger",
+            "type": "address"
+          },
+          {
+            "name": "missionControl",
+            "type": "address"
+          },
+          {
+            "name": "switchboard",
+            "type": "address"
+          },
+          {
+            "name": "priceDesk",
+            "type": "address"
+          },
+          {
+            "name": "vaultBook",
+            "type": "address"
+          },
+          {
+            "name": "auctionHouse",
+            "type": "address"
+          },
+          {
+            "name": "auctionHouseNft",
+            "type": "address"
+          },
+          {
+            "name": "boardroom",
+            "type": "address"
+          },
+          {
+            "name": "bondRoom",
+            "type": "address"
+          },
+          {
+            "name": "creditEngine",
+            "type": "address"
+          },
+          {
+            "name": "endaoment",
+            "type": "address"
+          },
+          {
+            "name": "humanResources",
+            "type": "address"
+          },
+          {
+            "name": "lootbox",
+            "type": "address"
+          },
+          {
+            "name": "teller",
+            "type": "address"
+          }
+        ]
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "canLiquidateUser",
+    "inputs": [
+      {
+        "name": "_user",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "canLiquidateUser",
+    "inputs": [
+      {
+        "name": "_user",
+        "type": "address"
+      },
+      {
+        "name": "_a",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "hq",
+            "type": "address"
+          },
+          {
+            "name": "greenToken",
+            "type": "address"
+          },
+          {
+            "name": "savingsGreen",
+            "type": "address"
+          },
+          {
+            "name": "ripeToken",
+            "type": "address"
+          },
+          {
+            "name": "ledger",
+            "type": "address"
+          },
+          {
+            "name": "missionControl",
+            "type": "address"
+          },
+          {
+            "name": "switchboard",
+            "type": "address"
+          },
+          {
+            "name": "priceDesk",
+            "type": "address"
+          },
+          {
+            "name": "vaultBook",
+            "type": "address"
+          },
+          {
+            "name": "auctionHouse",
+            "type": "address"
+          },
+          {
+            "name": "auctionHouseNft",
+            "type": "address"
+          },
+          {
+            "name": "boardroom",
+            "type": "address"
+          },
+          {
+            "name": "bondRoom",
+            "type": "address"
+          },
+          {
+            "name": "creditEngine",
+            "type": "address"
+          },
+          {
+            "name": "endaoment",
+            "type": "address"
+          },
+          {
+            "name": "humanResources",
+            "type": "address"
+          },
+          {
+            "name": "lootbox",
+            "type": "address"
+          },
+          {
+            "name": "teller",
+            "type": "address"
+          }
+        ]
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "canRedeemUserCollateral",
+    "inputs": [
+      {
+        "name": "_user",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "canRedeemUserCollateral",
+    "inputs": [
+      {
+        "name": "_user",
+        "type": "address"
+      },
+      {
+        "name": "_a",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "hq",
+            "type": "address"
+          },
+          {
+            "name": "greenToken",
+            "type": "address"
+          },
+          {
+            "name": "savingsGreen",
+            "type": "address"
+          },
+          {
+            "name": "ripeToken",
+            "type": "address"
+          },
+          {
+            "name": "ledger",
+            "type": "address"
+          },
+          {
+            "name": "missionControl",
+            "type": "address"
+          },
+          {
+            "name": "switchboard",
+            "type": "address"
+          },
+          {
+            "name": "priceDesk",
+            "type": "address"
+          },
+          {
+            "name": "vaultBook",
+            "type": "address"
+          },
+          {
+            "name": "auctionHouse",
+            "type": "address"
+          },
+          {
+            "name": "auctionHouseNft",
+            "type": "address"
+          },
+          {
+            "name": "boardroom",
+            "type": "address"
+          },
+          {
+            "name": "bondRoom",
+            "type": "address"
+          },
+          {
+            "name": "creditEngine",
+            "type": "address"
+          },
+          {
+            "name": "endaoment",
+            "type": "address"
+          },
+          {
+            "name": "humanResources",
+            "type": "address"
+          },
+          {
+            "name": "lootbox",
+            "type": "address"
+          },
+          {
+            "name": "teller",
+            "type": "address"
+          }
+        ]
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "getLiquidationThreshold",
+    "inputs": [
+      {
+        "name": "_user",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "getRedemptionThreshold",
+    "inputs": [
+      {
+        "name": "_user",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "getDynamicBorrowRate",
+    "inputs": [
+      {
+        "name": "_baseRate",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "setUnderscoreVaultDiscount",
+    "inputs": [
+      {
+        "name": "_discount",
+        "type": "uint256"
+      }
+    ],
+    "outputs": []
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "updateDebtForUser",
+    "inputs": [
+      {
+        "name": "_user",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "updateDebtForUser",
+    "inputs": [
+      {
+        "name": "_user",
+        "type": "address"
+      },
+      {
+        "name": "_a",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "hq",
+            "type": "address"
+          },
+          {
+            "name": "greenToken",
+            "type": "address"
+          },
+          {
+            "name": "savingsGreen",
+            "type": "address"
+          },
+          {
+            "name": "ripeToken",
+            "type": "address"
+          },
+          {
+            "name": "ledger",
+            "type": "address"
+          },
+          {
+            "name": "missionControl",
+            "type": "address"
+          },
+          {
+            "name": "switchboard",
+            "type": "address"
+          },
+          {
+            "name": "priceDesk",
+            "type": "address"
+          },
+          {
+            "name": "vaultBook",
+            "type": "address"
+          },
+          {
+            "name": "auctionHouse",
+            "type": "address"
+          },
+          {
+            "name": "auctionHouseNft",
+            "type": "address"
+          },
+          {
+            "name": "boardroom",
+            "type": "address"
+          },
+          {
+            "name": "bondRoom",
+            "type": "address"
+          },
+          {
+            "name": "creditEngine",
+            "type": "address"
+          },
+          {
+            "name": "endaoment",
+            "type": "address"
+          },
+          {
+            "name": "humanResources",
+            "type": "address"
+          },
+          {
+            "name": "lootbox",
+            "type": "address"
+          },
+          {
+            "name": "teller",
+            "type": "address"
+          }
+        ]
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "transferOrWithdrawViaRedemption",
+    "inputs": [
+      {
+        "name": "_shouldTransferBalance",
+        "type": "bool"
+      },
+      {
+        "name": "_asset",
+        "type": "address"
+      },
+      {
+        "name": "_user",
+        "type": "address"
+      },
+      {
+        "name": "_recipient",
+        "type": "address"
+      },
+      {
+        "name": "_amount",
+        "type": "uint256"
+      },
+      {
+        "name": "_vaultId",
+        "type": "uint256"
+      },
+      {
+        "name": "_vaultAddr",
+        "type": "address"
+      },
+      {
+        "name": "_a",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "hq",
+            "type": "address"
+          },
+          {
+            "name": "greenToken",
+            "type": "address"
+          },
+          {
+            "name": "savingsGreen",
+            "type": "address"
+          },
+          {
+            "name": "ripeToken",
+            "type": "address"
+          },
+          {
+            "name": "ledger",
+            "type": "address"
+          },
+          {
+            "name": "missionControl",
+            "type": "address"
+          },
+          {
+            "name": "switchboard",
+            "type": "address"
+          },
+          {
+            "name": "priceDesk",
+            "type": "address"
+          },
+          {
+            "name": "vaultBook",
+            "type": "address"
+          },
+          {
+            "name": "auctionHouse",
+            "type": "address"
+          },
+          {
+            "name": "auctionHouseNft",
+            "type": "address"
+          },
+          {
+            "name": "boardroom",
+            "type": "address"
+          },
+          {
+            "name": "bondRoom",
+            "type": "address"
+          },
+          {
+            "name": "creditEngine",
+            "type": "address"
+          },
+          {
+            "name": "endaoment",
+            "type": "address"
+          },
+          {
+            "name": "humanResources",
+            "type": "address"
+          },
+          {
+            "name": "lootbox",
+            "type": "address"
+          },
+          {
+            "name": "teller",
+            "type": "address"
+          }
+        ]
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "getMaxWithdrawableForAsset",
+    "inputs": [
+      {
+        "name": "_user",
+        "type": "address"
+      },
+      {
+        "name": "_vaultId",
+        "type": "uint256"
+      },
+      {
+        "name": "_asset",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "getMaxWithdrawableForAsset",
+    "inputs": [
+      {
+        "name": "_user",
+        "type": "address"
+      },
+      {
+        "name": "_vaultId",
+        "type": "uint256"
+      },
+      {
+        "name": "_asset",
+        "type": "address"
+      },
+      {
+        "name": "_vaultAddr",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "getMaxWithdrawableForAsset",
+    "inputs": [
+      {
+        "name": "_user",
+        "type": "address"
+      },
+      {
+        "name": "_vaultId",
+        "type": "uint256"
+      },
+      {
+        "name": "_asset",
+        "type": "address"
+      },
+      {
+        "name": "_vaultAddr",
+        "type": "address"
+      },
+      {
+        "name": "_a",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "hq",
+            "type": "address"
+          },
+          {
+            "name": "greenToken",
+            "type": "address"
+          },
+          {
+            "name": "savingsGreen",
+            "type": "address"
+          },
+          {
+            "name": "ripeToken",
+            "type": "address"
+          },
+          {
+            "name": "ledger",
+            "type": "address"
+          },
+          {
+            "name": "missionControl",
+            "type": "address"
+          },
+          {
+            "name": "switchboard",
+            "type": "address"
+          },
+          {
+            "name": "priceDesk",
+            "type": "address"
+          },
+          {
+            "name": "vaultBook",
+            "type": "address"
+          },
+          {
+            "name": "auctionHouse",
+            "type": "address"
+          },
+          {
+            "name": "auctionHouseNft",
+            "type": "address"
+          },
+          {
+            "name": "boardroom",
+            "type": "address"
+          },
+          {
+            "name": "bondRoom",
+            "type": "address"
+          },
+          {
+            "name": "creditEngine",
+            "type": "address"
+          },
+          {
+            "name": "endaoment",
+            "type": "address"
+          },
+          {
+            "name": "humanResources",
+            "type": "address"
+          },
+          {
+            "name": "lootbox",
+            "type": "address"
+          },
+          {
+            "name": "teller",
+            "type": "address"
+          }
+        ]
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "setBuybackRatio",
+    "inputs": [
+      {
+        "name": "_ratio",
+        "type": "uint256"
+      }
+    ],
+    "outputs": []
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "undyVaulDiscount",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "buybackRatio",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "constructor",
+    "inputs": [
+      {
+        "name": "_ripeHq",
+        "type": "address"
+      }
+    ],
+    "outputs": []
+  }
+]

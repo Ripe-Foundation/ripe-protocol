@@ -1,0 +1,2484 @@
+[
+  {
+    "name": "DepartmentPauseModified",
+    "inputs": [
+      {
+        "name": "isPaused",
+        "type": "bool",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "name": "DepartmentFundsRecovered",
+    "inputs": [
+      {
+        "name": "asset",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "recipient",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "name": "balance",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "anonymous": false,
+    "type": "event"
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "getAddys",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "hq",
+            "type": "address"
+          },
+          {
+            "name": "greenToken",
+            "type": "address"
+          },
+          {
+            "name": "savingsGreen",
+            "type": "address"
+          },
+          {
+            "name": "ripeToken",
+            "type": "address"
+          },
+          {
+            "name": "ledger",
+            "type": "address"
+          },
+          {
+            "name": "missionControl",
+            "type": "address"
+          },
+          {
+            "name": "switchboard",
+            "type": "address"
+          },
+          {
+            "name": "priceDesk",
+            "type": "address"
+          },
+          {
+            "name": "vaultBook",
+            "type": "address"
+          },
+          {
+            "name": "auctionHouse",
+            "type": "address"
+          },
+          {
+            "name": "auctionHouseNft",
+            "type": "address"
+          },
+          {
+            "name": "boardroom",
+            "type": "address"
+          },
+          {
+            "name": "bondRoom",
+            "type": "address"
+          },
+          {
+            "name": "creditEngine",
+            "type": "address"
+          },
+          {
+            "name": "endaoment",
+            "type": "address"
+          },
+          {
+            "name": "humanResources",
+            "type": "address"
+          },
+          {
+            "name": "lootbox",
+            "type": "address"
+          },
+          {
+            "name": "teller",
+            "type": "address"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "getRipeHq",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "canMintGreen",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "canMintRipe",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "pause",
+    "inputs": [
+      {
+        "name": "_shouldPause",
+        "type": "bool"
+      }
+    ],
+    "outputs": []
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "recoverFunds",
+    "inputs": [
+      {
+        "name": "_recipient",
+        "type": "address"
+      },
+      {
+        "name": "_asset",
+        "type": "address"
+      }
+    ],
+    "outputs": []
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "recoverFundsMany",
+    "inputs": [
+      {
+        "name": "_recipient",
+        "type": "address"
+      },
+      {
+        "name": "_assets",
+        "type": "address[]"
+      }
+    ],
+    "outputs": []
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "isPaused",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "checkAndUpdateLastTouch",
+    "inputs": [
+      {
+        "name": "_user",
+        "type": "address"
+      },
+      {
+        "name": "_shouldCheck",
+        "type": "bool"
+      }
+    ],
+    "outputs": []
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "checkAndUpdateLastTouch",
+    "inputs": [
+      {
+        "name": "_user",
+        "type": "address"
+      },
+      {
+        "name": "_shouldCheck",
+        "type": "bool"
+      },
+      {
+        "name": "_mc",
+        "type": "address"
+      }
+    ],
+    "outputs": []
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "setLockedAccount",
+    "inputs": [
+      {
+        "name": "_wallet",
+        "type": "address"
+      },
+      {
+        "name": "_shouldLock",
+        "type": "bool"
+      }
+    ],
+    "outputs": []
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "isParticipatingInVault",
+    "inputs": [
+      {
+        "name": "_user",
+        "type": "address"
+      },
+      {
+        "name": "_vaultId",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "getNumUserVaults",
+    "inputs": [
+      {
+        "name": "_user",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "addVaultToUser",
+    "inputs": [
+      {
+        "name": "_user",
+        "type": "address"
+      },
+      {
+        "name": "_vaultId",
+        "type": "uint256"
+      }
+    ],
+    "outputs": []
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "removeVaultFromUser",
+    "inputs": [
+      {
+        "name": "_user",
+        "type": "address"
+      },
+      {
+        "name": "_vaultId",
+        "type": "uint256"
+      }
+    ],
+    "outputs": []
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "getDepositLedgerData",
+    "inputs": [
+      {
+        "name": "_user",
+        "type": "address"
+      },
+      {
+        "name": "_vaultId",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "isParticipatingInVault",
+            "type": "bool"
+          },
+          {
+            "name": "numUserVaults",
+            "type": "uint256"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "setUserDebt",
+    "inputs": [
+      {
+        "name": "_user",
+        "type": "address"
+      },
+      {
+        "name": "_userDebt",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "amount",
+            "type": "uint256"
+          },
+          {
+            "name": "principal",
+            "type": "uint256"
+          },
+          {
+            "name": "debtTerms",
+            "type": "tuple",
+            "components": [
+              {
+                "name": "ltv",
+                "type": "uint256"
+              },
+              {
+                "name": "redemptionThreshold",
+                "type": "uint256"
+              },
+              {
+                "name": "liqThreshold",
+                "type": "uint256"
+              },
+              {
+                "name": "liqFee",
+                "type": "uint256"
+              },
+              {
+                "name": "borrowRate",
+                "type": "uint256"
+              },
+              {
+                "name": "daowry",
+                "type": "uint256"
+              }
+            ]
+          },
+          {
+            "name": "lastTimestamp",
+            "type": "uint256"
+          },
+          {
+            "name": "inLiquidation",
+            "type": "bool"
+          }
+        ]
+      },
+      {
+        "name": "_newYield",
+        "type": "uint256"
+      },
+      {
+        "name": "_interval",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "start",
+            "type": "uint256"
+          },
+          {
+            "name": "amount",
+            "type": "uint256"
+          }
+        ]
+      }
+    ],
+    "outputs": []
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "flushUnrealizedYield",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "hasDebt",
+    "inputs": [
+      {
+        "name": "_user",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "getNumBorrowers",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "getBorrowDataBundle",
+    "inputs": [
+      {
+        "name": "_user",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "userDebt",
+            "type": "tuple",
+            "components": [
+              {
+                "name": "amount",
+                "type": "uint256"
+              },
+              {
+                "name": "principal",
+                "type": "uint256"
+              },
+              {
+                "name": "debtTerms",
+                "type": "tuple",
+                "components": [
+                  {
+                    "name": "ltv",
+                    "type": "uint256"
+                  },
+                  {
+                    "name": "redemptionThreshold",
+                    "type": "uint256"
+                  },
+                  {
+                    "name": "liqThreshold",
+                    "type": "uint256"
+                  },
+                  {
+                    "name": "liqFee",
+                    "type": "uint256"
+                  },
+                  {
+                    "name": "borrowRate",
+                    "type": "uint256"
+                  },
+                  {
+                    "name": "daowry",
+                    "type": "uint256"
+                  }
+                ]
+              },
+              {
+                "name": "lastTimestamp",
+                "type": "uint256"
+              },
+              {
+                "name": "inLiquidation",
+                "type": "bool"
+              }
+            ]
+          },
+          {
+            "name": "userBorrowInterval",
+            "type": "tuple",
+            "components": [
+              {
+                "name": "start",
+                "type": "uint256"
+              },
+              {
+                "name": "amount",
+                "type": "uint256"
+              }
+            ]
+          },
+          {
+            "name": "isUserBorrower",
+            "type": "bool"
+          },
+          {
+            "name": "numUserVaults",
+            "type": "uint256"
+          },
+          {
+            "name": "totalDebt",
+            "type": "uint256"
+          },
+          {
+            "name": "numBorrowers",
+            "type": "uint256"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "getRepayDataBundle",
+    "inputs": [
+      {
+        "name": "_user",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "userDebt",
+            "type": "tuple",
+            "components": [
+              {
+                "name": "amount",
+                "type": "uint256"
+              },
+              {
+                "name": "principal",
+                "type": "uint256"
+              },
+              {
+                "name": "debtTerms",
+                "type": "tuple",
+                "components": [
+                  {
+                    "name": "ltv",
+                    "type": "uint256"
+                  },
+                  {
+                    "name": "redemptionThreshold",
+                    "type": "uint256"
+                  },
+                  {
+                    "name": "liqThreshold",
+                    "type": "uint256"
+                  },
+                  {
+                    "name": "liqFee",
+                    "type": "uint256"
+                  },
+                  {
+                    "name": "borrowRate",
+                    "type": "uint256"
+                  },
+                  {
+                    "name": "daowry",
+                    "type": "uint256"
+                  }
+                ]
+              },
+              {
+                "name": "lastTimestamp",
+                "type": "uint256"
+              },
+              {
+                "name": "inLiquidation",
+                "type": "bool"
+              }
+            ]
+          },
+          {
+            "name": "numUserVaults",
+            "type": "uint256"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "isBorrower",
+    "inputs": [
+      {
+        "name": "_user",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "isUserInLiquidation",
+    "inputs": [
+      {
+        "name": "_user",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "setRipeRewards",
+    "inputs": [
+      {
+        "name": "_ripeRewards",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "borrowers",
+            "type": "uint256"
+          },
+          {
+            "name": "stakers",
+            "type": "uint256"
+          },
+          {
+            "name": "voters",
+            "type": "uint256"
+          },
+          {
+            "name": "genDepositors",
+            "type": "uint256"
+          },
+          {
+            "name": "newRipeRewards",
+            "type": "uint256"
+          },
+          {
+            "name": "lastUpdate",
+            "type": "uint256"
+          }
+        ]
+      }
+    ],
+    "outputs": []
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "setRipeAvailForRewards",
+    "inputs": [
+      {
+        "name": "_amount",
+        "type": "uint256"
+      }
+    ],
+    "outputs": []
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "didGetRewardsFromStabClaims",
+    "inputs": [
+      {
+        "name": "_amount",
+        "type": "uint256"
+      }
+    ],
+    "outputs": []
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "setDepositPointsAndRipeRewards",
+    "inputs": [
+      {
+        "name": "_user",
+        "type": "address"
+      },
+      {
+        "name": "_vaultId",
+        "type": "uint256"
+      },
+      {
+        "name": "_asset",
+        "type": "address"
+      },
+      {
+        "name": "_userPoints",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "balancePoints",
+            "type": "uint256"
+          },
+          {
+            "name": "lastBalance",
+            "type": "uint256"
+          },
+          {
+            "name": "lastUpdate",
+            "type": "uint256"
+          }
+        ]
+      },
+      {
+        "name": "_assetPoints",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "balancePoints",
+            "type": "uint256"
+          },
+          {
+            "name": "lastBalance",
+            "type": "uint256"
+          },
+          {
+            "name": "lastUsdValue",
+            "type": "uint256"
+          },
+          {
+            "name": "ripeStakerPoints",
+            "type": "uint256"
+          },
+          {
+            "name": "ripeVotePoints",
+            "type": "uint256"
+          },
+          {
+            "name": "ripeGenPoints",
+            "type": "uint256"
+          },
+          {
+            "name": "lastUpdate",
+            "type": "uint256"
+          },
+          {
+            "name": "precision",
+            "type": "uint256"
+          }
+        ]
+      },
+      {
+        "name": "_globalPoints",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "lastUsdValue",
+            "type": "uint256"
+          },
+          {
+            "name": "ripeStakerPoints",
+            "type": "uint256"
+          },
+          {
+            "name": "ripeVotePoints",
+            "type": "uint256"
+          },
+          {
+            "name": "ripeGenPoints",
+            "type": "uint256"
+          },
+          {
+            "name": "lastUpdate",
+            "type": "uint256"
+          }
+        ]
+      },
+      {
+        "name": "_ripeRewards",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "borrowers",
+            "type": "uint256"
+          },
+          {
+            "name": "stakers",
+            "type": "uint256"
+          },
+          {
+            "name": "voters",
+            "type": "uint256"
+          },
+          {
+            "name": "genDepositors",
+            "type": "uint256"
+          },
+          {
+            "name": "newRipeRewards",
+            "type": "uint256"
+          },
+          {
+            "name": "lastUpdate",
+            "type": "uint256"
+          }
+        ]
+      }
+    ],
+    "outputs": []
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "setBorrowPointsAndRipeRewards",
+    "inputs": [
+      {
+        "name": "_user",
+        "type": "address"
+      },
+      {
+        "name": "_userPoints",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "lastPrincipal",
+            "type": "uint256"
+          },
+          {
+            "name": "points",
+            "type": "uint256"
+          },
+          {
+            "name": "lastUpdate",
+            "type": "uint256"
+          }
+        ]
+      },
+      {
+        "name": "_globalPoints",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "lastPrincipal",
+            "type": "uint256"
+          },
+          {
+            "name": "points",
+            "type": "uint256"
+          },
+          {
+            "name": "lastUpdate",
+            "type": "uint256"
+          }
+        ]
+      },
+      {
+        "name": "_ripeRewards",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "borrowers",
+            "type": "uint256"
+          },
+          {
+            "name": "stakers",
+            "type": "uint256"
+          },
+          {
+            "name": "voters",
+            "type": "uint256"
+          },
+          {
+            "name": "genDepositors",
+            "type": "uint256"
+          },
+          {
+            "name": "newRipeRewards",
+            "type": "uint256"
+          },
+          {
+            "name": "lastUpdate",
+            "type": "uint256"
+          }
+        ]
+      }
+    ],
+    "outputs": []
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "getRipeRewardsBundle",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "ripeRewards",
+            "type": "tuple",
+            "components": [
+              {
+                "name": "borrowers",
+                "type": "uint256"
+              },
+              {
+                "name": "stakers",
+                "type": "uint256"
+              },
+              {
+                "name": "voters",
+                "type": "uint256"
+              },
+              {
+                "name": "genDepositors",
+                "type": "uint256"
+              },
+              {
+                "name": "newRipeRewards",
+                "type": "uint256"
+              },
+              {
+                "name": "lastUpdate",
+                "type": "uint256"
+              }
+            ]
+          },
+          {
+            "name": "ripeAvailForRewards",
+            "type": "uint256"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "getBorrowPointsBundle",
+    "inputs": [
+      {
+        "name": "_user",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "userPoints",
+            "type": "tuple",
+            "components": [
+              {
+                "name": "lastPrincipal",
+                "type": "uint256"
+              },
+              {
+                "name": "points",
+                "type": "uint256"
+              },
+              {
+                "name": "lastUpdate",
+                "type": "uint256"
+              }
+            ]
+          },
+          {
+            "name": "globalPoints",
+            "type": "tuple",
+            "components": [
+              {
+                "name": "lastPrincipal",
+                "type": "uint256"
+              },
+              {
+                "name": "points",
+                "type": "uint256"
+              },
+              {
+                "name": "lastUpdate",
+                "type": "uint256"
+              }
+            ]
+          },
+          {
+            "name": "userDebtPrincipal",
+            "type": "uint256"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "getDepositPointsBundle",
+    "inputs": [
+      {
+        "name": "_user",
+        "type": "address"
+      },
+      {
+        "name": "_vaultId",
+        "type": "uint256"
+      },
+      {
+        "name": "_asset",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "userPoints",
+            "type": "tuple",
+            "components": [
+              {
+                "name": "balancePoints",
+                "type": "uint256"
+              },
+              {
+                "name": "lastBalance",
+                "type": "uint256"
+              },
+              {
+                "name": "lastUpdate",
+                "type": "uint256"
+              }
+            ]
+          },
+          {
+            "name": "assetPoints",
+            "type": "tuple",
+            "components": [
+              {
+                "name": "balancePoints",
+                "type": "uint256"
+              },
+              {
+                "name": "lastBalance",
+                "type": "uint256"
+              },
+              {
+                "name": "lastUsdValue",
+                "type": "uint256"
+              },
+              {
+                "name": "ripeStakerPoints",
+                "type": "uint256"
+              },
+              {
+                "name": "ripeVotePoints",
+                "type": "uint256"
+              },
+              {
+                "name": "ripeGenPoints",
+                "type": "uint256"
+              },
+              {
+                "name": "lastUpdate",
+                "type": "uint256"
+              },
+              {
+                "name": "precision",
+                "type": "uint256"
+              }
+            ]
+          },
+          {
+            "name": "globalPoints",
+            "type": "tuple",
+            "components": [
+              {
+                "name": "lastUsdValue",
+                "type": "uint256"
+              },
+              {
+                "name": "ripeStakerPoints",
+                "type": "uint256"
+              },
+              {
+                "name": "ripeVotePoints",
+                "type": "uint256"
+              },
+              {
+                "name": "ripeGenPoints",
+                "type": "uint256"
+              },
+              {
+                "name": "lastUpdate",
+                "type": "uint256"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "hasFungibleAuctions",
+    "inputs": [
+      {
+        "name": "_liqUser",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "createNewFungibleAuction",
+    "inputs": [
+      {
+        "name": "_auc",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "liqUser",
+            "type": "address"
+          },
+          {
+            "name": "vaultId",
+            "type": "uint256"
+          },
+          {
+            "name": "asset",
+            "type": "address"
+          },
+          {
+            "name": "startDiscount",
+            "type": "uint256"
+          },
+          {
+            "name": "maxDiscount",
+            "type": "uint256"
+          },
+          {
+            "name": "startBlock",
+            "type": "uint256"
+          },
+          {
+            "name": "endBlock",
+            "type": "uint256"
+          },
+          {
+            "name": "isActive",
+            "type": "bool"
+          }
+        ]
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "removeFungibleAuction",
+    "inputs": [
+      {
+        "name": "_liqUser",
+        "type": "address"
+      },
+      {
+        "name": "_vaultId",
+        "type": "uint256"
+      },
+      {
+        "name": "_asset",
+        "type": "address"
+      }
+    ],
+    "outputs": []
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "setFungibleAuction",
+    "inputs": [
+      {
+        "name": "_liqUser",
+        "type": "address"
+      },
+      {
+        "name": "_vaultId",
+        "type": "uint256"
+      },
+      {
+        "name": "_asset",
+        "type": "address"
+      },
+      {
+        "name": "_auc",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "liqUser",
+            "type": "address"
+          },
+          {
+            "name": "vaultId",
+            "type": "uint256"
+          },
+          {
+            "name": "asset",
+            "type": "address"
+          },
+          {
+            "name": "startDiscount",
+            "type": "uint256"
+          },
+          {
+            "name": "maxDiscount",
+            "type": "uint256"
+          },
+          {
+            "name": "startBlock",
+            "type": "uint256"
+          },
+          {
+            "name": "endBlock",
+            "type": "uint256"
+          },
+          {
+            "name": "isActive",
+            "type": "bool"
+          }
+        ]
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "removeAllFungibleAuctions",
+    "inputs": [
+      {
+        "name": "_liqUser",
+        "type": "address"
+      }
+    ],
+    "outputs": []
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "getFungibleAuction",
+    "inputs": [
+      {
+        "name": "_liqUser",
+        "type": "address"
+      },
+      {
+        "name": "_vaultId",
+        "type": "uint256"
+      },
+      {
+        "name": "_asset",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "liqUser",
+            "type": "address"
+          },
+          {
+            "name": "vaultId",
+            "type": "uint256"
+          },
+          {
+            "name": "asset",
+            "type": "address"
+          },
+          {
+            "name": "startDiscount",
+            "type": "uint256"
+          },
+          {
+            "name": "maxDiscount",
+            "type": "uint256"
+          },
+          {
+            "name": "startBlock",
+            "type": "uint256"
+          },
+          {
+            "name": "endBlock",
+            "type": "uint256"
+          },
+          {
+            "name": "isActive",
+            "type": "bool"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "getFungibleAuctionDuringPurchase",
+    "inputs": [
+      {
+        "name": "_liqUser",
+        "type": "address"
+      },
+      {
+        "name": "_vaultId",
+        "type": "uint256"
+      },
+      {
+        "name": "_asset",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "liqUser",
+            "type": "address"
+          },
+          {
+            "name": "vaultId",
+            "type": "uint256"
+          },
+          {
+            "name": "asset",
+            "type": "address"
+          },
+          {
+            "name": "startDiscount",
+            "type": "uint256"
+          },
+          {
+            "name": "maxDiscount",
+            "type": "uint256"
+          },
+          {
+            "name": "startBlock",
+            "type": "uint256"
+          },
+          {
+            "name": "endBlock",
+            "type": "uint256"
+          },
+          {
+            "name": "isActive",
+            "type": "bool"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "hasFungibleAuction",
+    "inputs": [
+      {
+        "name": "_liqUser",
+        "type": "address"
+      },
+      {
+        "name": "_vaultId",
+        "type": "uint256"
+      },
+      {
+        "name": "_asset",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "isHrContributor",
+    "inputs": [
+      {
+        "name": "_contributor",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "addHrContributor",
+    "inputs": [
+      {
+        "name": "_contributor",
+        "type": "address"
+      },
+      {
+        "name": "_compensation",
+        "type": "uint256"
+      }
+    ],
+    "outputs": []
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "setRipeAvailForHr",
+    "inputs": [
+      {
+        "name": "_amount",
+        "type": "uint256"
+      }
+    ],
+    "outputs": []
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "refundRipeAfterCancelPaycheck",
+    "inputs": [
+      {
+        "name": "_amount",
+        "type": "uint256"
+      }
+    ],
+    "outputs": []
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "getEpochData",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      },
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "getRipeBondData",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "paymentAmountAvailInEpoch",
+            "type": "uint256"
+          },
+          {
+            "name": "ripeAvailForBonds",
+            "type": "uint256"
+          },
+          {
+            "name": "badDebt",
+            "type": "uint256"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "setRipeAvailForBonds",
+    "inputs": [
+      {
+        "name": "_amount",
+        "type": "uint256"
+      }
+    ],
+    "outputs": []
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "setBadDebt",
+    "inputs": [
+      {
+        "name": "_amount",
+        "type": "uint256"
+      }
+    ],
+    "outputs": []
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "didClearBadDebt",
+    "inputs": [
+      {
+        "name": "_amount",
+        "type": "uint256"
+      },
+      {
+        "name": "_ripeAmount",
+        "type": "uint256"
+      }
+    ],
+    "outputs": []
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "didPurchaseRipeBond",
+    "inputs": [
+      {
+        "name": "_amountPaid",
+        "type": "uint256"
+      },
+      {
+        "name": "_ripePayout",
+        "type": "uint256"
+      }
+    ],
+    "outputs": []
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "setEpochData",
+    "inputs": [
+      {
+        "name": "_epochStart",
+        "type": "uint256"
+      },
+      {
+        "name": "_epochEnd",
+        "type": "uint256"
+      },
+      {
+        "name": "_amountAvailInEpoch",
+        "type": "uint256"
+      }
+    ],
+    "outputs": []
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "name": "updateGreenPoolDebt",
+    "inputs": [
+      {
+        "name": "_pool",
+        "type": "address"
+      },
+      {
+        "name": "_amount",
+        "type": "uint256"
+      },
+      {
+        "name": "_isIncrement",
+        "type": "bool"
+      }
+    ],
+    "outputs": []
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "lastTouch",
+    "inputs": [
+      {
+        "name": "arg0",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "isLockedAccount",
+    "inputs": [
+      {
+        "name": "arg0",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "userVaults",
+    "inputs": [
+      {
+        "name": "arg0",
+        "type": "address"
+      },
+      {
+        "name": "arg1",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "indexOfVault",
+    "inputs": [
+      {
+        "name": "arg0",
+        "type": "address"
+      },
+      {
+        "name": "arg1",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "numUserVaults",
+    "inputs": [
+      {
+        "name": "arg0",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "userDebt",
+    "inputs": [
+      {
+        "name": "arg0",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "amount",
+            "type": "uint256"
+          },
+          {
+            "name": "principal",
+            "type": "uint256"
+          },
+          {
+            "name": "debtTerms",
+            "type": "tuple",
+            "components": [
+              {
+                "name": "ltv",
+                "type": "uint256"
+              },
+              {
+                "name": "redemptionThreshold",
+                "type": "uint256"
+              },
+              {
+                "name": "liqThreshold",
+                "type": "uint256"
+              },
+              {
+                "name": "liqFee",
+                "type": "uint256"
+              },
+              {
+                "name": "borrowRate",
+                "type": "uint256"
+              },
+              {
+                "name": "daowry",
+                "type": "uint256"
+              }
+            ]
+          },
+          {
+            "name": "lastTimestamp",
+            "type": "uint256"
+          },
+          {
+            "name": "inLiquidation",
+            "type": "bool"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "totalDebt",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "borrowers",
+    "inputs": [
+      {
+        "name": "arg0",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "indexOfBorrower",
+    "inputs": [
+      {
+        "name": "arg0",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "numBorrowers",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "borrowIntervals",
+    "inputs": [
+      {
+        "name": "arg0",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "start",
+            "type": "uint256"
+          },
+          {
+            "name": "amount",
+            "type": "uint256"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "unrealizedYield",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "ripeRewards",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "borrowers",
+            "type": "uint256"
+          },
+          {
+            "name": "stakers",
+            "type": "uint256"
+          },
+          {
+            "name": "voters",
+            "type": "uint256"
+          },
+          {
+            "name": "genDepositors",
+            "type": "uint256"
+          },
+          {
+            "name": "newRipeRewards",
+            "type": "uint256"
+          },
+          {
+            "name": "lastUpdate",
+            "type": "uint256"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "ripeAvailForRewards",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "globalDepositPoints",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "lastUsdValue",
+            "type": "uint256"
+          },
+          {
+            "name": "ripeStakerPoints",
+            "type": "uint256"
+          },
+          {
+            "name": "ripeVotePoints",
+            "type": "uint256"
+          },
+          {
+            "name": "ripeGenPoints",
+            "type": "uint256"
+          },
+          {
+            "name": "lastUpdate",
+            "type": "uint256"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "assetDepositPoints",
+    "inputs": [
+      {
+        "name": "arg0",
+        "type": "uint256"
+      },
+      {
+        "name": "arg1",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "balancePoints",
+            "type": "uint256"
+          },
+          {
+            "name": "lastBalance",
+            "type": "uint256"
+          },
+          {
+            "name": "lastUsdValue",
+            "type": "uint256"
+          },
+          {
+            "name": "ripeStakerPoints",
+            "type": "uint256"
+          },
+          {
+            "name": "ripeVotePoints",
+            "type": "uint256"
+          },
+          {
+            "name": "ripeGenPoints",
+            "type": "uint256"
+          },
+          {
+            "name": "lastUpdate",
+            "type": "uint256"
+          },
+          {
+            "name": "precision",
+            "type": "uint256"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "userDepositPoints",
+    "inputs": [
+      {
+        "name": "arg0",
+        "type": "address"
+      },
+      {
+        "name": "arg1",
+        "type": "uint256"
+      },
+      {
+        "name": "arg2",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "balancePoints",
+            "type": "uint256"
+          },
+          {
+            "name": "lastBalance",
+            "type": "uint256"
+          },
+          {
+            "name": "lastUpdate",
+            "type": "uint256"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "userBorrowPoints",
+    "inputs": [
+      {
+        "name": "arg0",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "lastPrincipal",
+            "type": "uint256"
+          },
+          {
+            "name": "points",
+            "type": "uint256"
+          },
+          {
+            "name": "lastUpdate",
+            "type": "uint256"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "globalBorrowPoints",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "lastPrincipal",
+            "type": "uint256"
+          },
+          {
+            "name": "points",
+            "type": "uint256"
+          },
+          {
+            "name": "lastUpdate",
+            "type": "uint256"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "fungibleAuctions",
+    "inputs": [
+      {
+        "name": "arg0",
+        "type": "address"
+      },
+      {
+        "name": "arg1",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "components": [
+          {
+            "name": "liqUser",
+            "type": "address"
+          },
+          {
+            "name": "vaultId",
+            "type": "uint256"
+          },
+          {
+            "name": "asset",
+            "type": "address"
+          },
+          {
+            "name": "startDiscount",
+            "type": "uint256"
+          },
+          {
+            "name": "maxDiscount",
+            "type": "uint256"
+          },
+          {
+            "name": "startBlock",
+            "type": "uint256"
+          },
+          {
+            "name": "endBlock",
+            "type": "uint256"
+          },
+          {
+            "name": "isActive",
+            "type": "bool"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "fungibleAuctionIndex",
+    "inputs": [
+      {
+        "name": "arg0",
+        "type": "address"
+      },
+      {
+        "name": "arg1",
+        "type": "uint256"
+      },
+      {
+        "name": "arg2",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "numFungibleAuctions",
+    "inputs": [
+      {
+        "name": "arg0",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "fungLiqUsers",
+    "inputs": [
+      {
+        "name": "arg0",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "indexOfFungLiqUser",
+    "inputs": [
+      {
+        "name": "arg0",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "numFungLiqUsers",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "ripeAvailForHr",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "contributors",
+    "inputs": [
+      {
+        "name": "arg0",
+        "type": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "indexOfContributor",
+    "inputs": [
+      {
+        "name": "arg0",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "numContributors",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "epochStart",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "epochEnd",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "badDebt",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "ripePaidOutForBadDebt",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "paymentAmountAvailInEpoch",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "ripeAvailForBonds",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "greenPoolDebt",
+    "inputs": [
+      {
+        "name": "arg0",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "nonpayable",
+    "type": "constructor",
+    "inputs": [
+      {
+        "name": "_ripeHq",
+        "type": "address"
+      },
+      {
+        "name": "_defaults",
+        "type": "address"
+      }
+    ],
+    "outputs": []
+  }
+]

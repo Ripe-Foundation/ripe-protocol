@@ -20,7 +20,6 @@ initializes: timeLock[gov := gov]
 
 import contracts.modules.LocalGov as gov
 import contracts.modules.TimeLock as timeLock
-import contracts.modules.Addys as addys
 from interfaces import UndyLego as ul
 
 interface Endaoment:

@@ -104,10 +104,25 @@ def owner_address(valid_contributor_terms):
     return valid_contributor_terms["owner"]
 
 
-@pytest.fixture  
+@pytest.fixture
 def manager_address(valid_contributor_terms):
     """Get the manager address from terms"""
     return valid_contributor_terms["manager"]
+
+
+@pytest.fixture(scope="function")
+def new_mission_control(ripe_hq, defaults):
+    """Deploy a new MissionControl that is NOT registered in RipeHq.
+
+    Uses the same RipeHq so SwitchboardDelta is authorized as switchboard,
+    but this MC itself is not registered in the HQ registry.
+    """
+    return boa.load(
+        "contracts/data/MissionControl.vy",
+        ripe_hq,
+        defaults,
+        name="new_mission_control",
+    )
 
 
 ###############
@@ -1144,3 +1159,1196 @@ def test_switchboard_delta_set_booster_min_lock_duration(switchboard_delta, bond
     # Test setting to 0 (no minimum)
     switchboard_delta.setBoosterMinLockDuration(0, sender=governance.address)
     assert bond_booster.minLockDuration() == 0
+
+
+# ========================================
+# Underscore Registry Tests (moved from Alpha)
+# ========================================
+
+
+def test_set_underscore_registry_success(switchboard_delta, governance, mock_rando_contract):
+    """Test that setUnderscoreRegistry can be called by governance"""
+    # This will fail validation as mock_rando_contract doesn't implement the required interface
+    with boa.reverts():  # Just check it reverts, don't match exact message
+        switchboard_delta.setUnderscoreRegistry(mock_rando_contract, sender=governance.address)
+
+
+def test_underscore_registry_validation_comprehensive(switchboard_delta, governance):
+    """Test underscore registry validation with various scenarios"""
+    # Test with contract that doesn't implement expected interface
+    with boa.reverts():
+        switchboard_delta.setUnderscoreRegistry(governance.address, sender=governance.address)
+
+    # Test with EOA (not a contract)
+    eoa_address = boa.env.generate_address()
+    with boa.reverts():
+        switchboard_delta.setUnderscoreRegistry(eoa_address, sender=governance.address)
+
+
+# ========================================
+# Should Check Last Touch Tests (moved from Alpha)
+# ========================================
+
+
+def test_set_should_check_last_touch_permissions(switchboard_delta, governance, bob):
+    """Test that only governance can call setShouldCheckLastTouch"""
+    # Non-governance user should not be able to call the function
+    with boa.reverts("no perms"):
+        switchboard_delta.setShouldCheckLastTouch(True, sender=bob)
+
+    # Governance should be able to call the function
+    action_id = switchboard_delta.setShouldCheckLastTouch(True, sender=governance.address)
+    assert action_id > 0
+
+
+def test_set_should_check_last_touch_success_and_execute(switchboard_delta, mission_control, governance):
+    """Test successful setShouldCheckLastTouch creation and execution"""
+    # Test setting to True
+    action_id = switchboard_delta.setShouldCheckLastTouch(True, sender=governance.address)
+    assert action_id > 0
+
+    # Check event was emitted
+    logs = filter_logs(switchboard_delta, "PendingShouldCheckLastTouchChange")
+    assert len(logs) == 1
+    log = logs[0]  # Get the latest event
+    assert log.shouldCheck
+    assert log.actionId == action_id
+    assert log.confirmationBlock > 0
+
+    # Check pending data was stored
+    pending_data = switchboard_delta.pendingShouldCheckLastTouch(action_id)
+    assert pending_data
+
+    # Verify action is pending
+    assert switchboard_delta.hasPendingAction(action_id)
+    assert switchboard_delta.actionType(action_id) != 0
+
+    # Time travel past timelock
+    boa.env.time_travel(blocks=switchboard_delta.actionTimeLock())
+
+    # Execute the action
+    success = switchboard_delta.executePendingAction(action_id, sender=governance.address)
+    assert success
+
+    # Verify the config was applied to MissionControl
+    assert mission_control.shouldCheckLastTouch()
+
+    # Check execution event was emitted
+    execution_logs = filter_logs(switchboard_delta, "ShouldCheckLastTouchSet")
+    assert len(execution_logs) == 1
+    exec_log = execution_logs[0]  # Get the latest event
+    assert exec_log.shouldCheck
+
+    # Verify action was cleaned up
+    assert switchboard_delta.actionType(action_id) == 0
+    assert not switchboard_delta.hasPendingAction(action_id)
+
+    # Test setting to False in a separate action
+    action_id2 = switchboard_delta.setShouldCheckLastTouch(False, sender=governance.address)
+    boa.env.time_travel(blocks=switchboard_delta.actionTimeLock())
+    assert switchboard_delta.executePendingAction(action_id2, sender=governance.address)
+
+    # Verify False was applied
+    assert not mission_control.shouldCheckLastTouch()
+
+    # Check that an execution event was emitted for False
+    final_logs = filter_logs(switchboard_delta, "ShouldCheckLastTouchSet")
+    assert len(final_logs) == 1  # Should have at least 1 event
+    final_log = final_logs[0]  # Get the latest event
+    assert not final_log.shouldCheck
+
+
+# ========================================
+# Ripe Available Tests (moved from Alpha)
+# ========================================
+
+
+def test_set_ripe_available_for_rewards(switchboard_delta, ledger, governance):
+    """Test setting ripe available for rewards"""
+    # Set amount
+    amount = 1_000_000 * 10**18  # 1M RIPE
+
+    action_id = switchboard_delta.setRipeAvailableForRewards(amount, sender=governance.address)
+
+    # Check event was emitted
+    logs = filter_logs(switchboard_delta, "PendingRipeAvailableForRewardsChange")
+    assert len(logs) == 1
+    log = logs[0]
+    assert log.amount == amount
+    assert log.actionId == action_id
+    assert log.confirmationBlock > 0
+
+    # Check pending data was stored
+    pending_amount = switchboard_delta.pendingRipeAvailable(action_id)
+    assert pending_amount == amount
+
+    # Verify action is pending
+    assert switchboard_delta.hasPendingAction(action_id)
+    action_type = switchboard_delta.actionType(action_id)
+    assert action_type != 0  # Should be RIPE_AVAIL_REWARDS
+
+    # Time travel past timelock
+    boa.env.time_travel(blocks=switchboard_delta.actionTimeLock())
+
+    # Execute the action
+    success = switchboard_delta.executePendingAction(action_id, sender=governance.address)
+    assert success
+
+    # Verify the ledger was updated
+    assert ledger.ripeAvailForRewards() == amount
+
+    # Check execution event was emitted
+    execution_logs = filter_logs(switchboard_delta, "RipeAvailableForRewardsSet")
+    assert len(execution_logs) == 1
+    exec_log = execution_logs[0]
+    assert exec_log.amount == amount
+
+    # Verify action was cleaned up
+    assert switchboard_delta.actionType(action_id) == 0
+    assert not switchboard_delta.hasPendingAction(action_id)
+
+    # Test updating to a different value
+    new_amount = 500_000 * 10**18  # 500K RIPE
+    action_id2 = switchboard_delta.setRipeAvailableForRewards(new_amount, sender=governance.address)
+    boa.env.time_travel(blocks=switchboard_delta.actionTimeLock())
+    assert switchboard_delta.executePendingAction(action_id2, sender=governance.address)
+
+    # Verify ledger updated to new value
+    assert ledger.ripeAvailForRewards() == new_amount
+
+
+def test_set_ripe_available_for_hr(switchboard_delta, ledger, governance):
+    """Test setting ripe available for HR"""
+    # Set amount
+    amount = 250_000 * 10**18  # 250K RIPE
+
+    action_id = switchboard_delta.setRipeAvailableForHr(amount, sender=governance.address)
+
+    # Check event was emitted
+    logs = filter_logs(switchboard_delta, "PendingRipeAvailableForHrChange")
+    assert len(logs) == 1
+    log = logs[0]
+    assert log.amount == amount
+    assert log.actionId == action_id
+    assert log.confirmationBlock > 0
+
+    # Check pending data was stored
+    pending_amount = switchboard_delta.pendingRipeAvailable(action_id)
+    assert pending_amount == amount
+
+    # Verify action is pending
+    assert switchboard_delta.hasPendingAction(action_id)
+    action_type = switchboard_delta.actionType(action_id)
+    assert action_type != 0  # Should be RIPE_AVAIL_HR
+
+    # Time travel past timelock
+    boa.env.time_travel(blocks=switchboard_delta.actionTimeLock())
+
+    # Execute the action
+    success = switchboard_delta.executePendingAction(action_id, sender=governance.address)
+    assert success
+
+    # Verify the ledger was updated
+    assert ledger.ripeAvailForHr() == amount
+
+    # Check execution event was emitted
+    execution_logs = filter_logs(switchboard_delta, "RipeAvailableForHrSet")
+    assert len(execution_logs) == 1
+    exec_log = execution_logs[0]
+    assert exec_log.amount == amount
+
+    # Verify action was cleaned up
+    assert switchboard_delta.actionType(action_id) == 0
+    assert not switchboard_delta.hasPendingAction(action_id)
+
+    # Test setting to zero
+    action_id2 = switchboard_delta.setRipeAvailableForHr(0, sender=governance.address)
+    boa.env.time_travel(blocks=switchboard_delta.actionTimeLock())
+    assert switchboard_delta.executePendingAction(action_id2, sender=governance.address)
+    assert ledger.ripeAvailForHr() == 0
+
+
+def test_set_ripe_available_for_bonds(switchboard_delta, ledger, governance):
+    """Test setting ripe available for bonds"""
+    # Set amount
+    amount = 750_000 * 10**18  # 750K RIPE
+
+    action_id = switchboard_delta.setRipeAvailableForBonds(amount, sender=governance.address)
+
+    # Check event was emitted
+    logs = filter_logs(switchboard_delta, "PendingRipeAvailableForBondsChange")
+    assert len(logs) == 1
+    log = logs[0]
+    assert log.amount == amount
+    assert log.actionId == action_id
+    assert log.confirmationBlock > 0
+
+    # Check pending data was stored
+    pending_amount = switchboard_delta.pendingRipeAvailable(action_id)
+    assert pending_amount == amount
+
+    # Verify action is pending
+    assert switchboard_delta.hasPendingAction(action_id)
+    action_type = switchboard_delta.actionType(action_id)
+    assert action_type != 0  # Should be RIPE_AVAIL_BONDS
+
+    # Time travel past timelock
+    boa.env.time_travel(blocks=switchboard_delta.actionTimeLock())
+
+    # Execute the action
+    success = switchboard_delta.executePendingAction(action_id, sender=governance.address)
+    assert success
+
+    # Verify the ledger was updated
+    assert ledger.ripeAvailForBonds() == amount
+
+    # Check execution event was emitted
+    execution_logs = filter_logs(switchboard_delta, "RipeAvailableForBondsSet")
+    assert len(execution_logs) == 1
+    exec_log = execution_logs[0]
+    assert exec_log.amount == amount
+
+    # Verify action was cleaned up
+    assert switchboard_delta.actionType(action_id) == 0
+    assert not switchboard_delta.hasPendingAction(action_id)
+
+    # Test with maximum uint256 value
+    max_amount = 2**256 - 1
+    action_id2 = switchboard_delta.setRipeAvailableForBonds(max_amount, sender=governance.address)
+    boa.env.time_travel(blocks=switchboard_delta.actionTimeLock())
+    assert switchboard_delta.executePendingAction(action_id2, sender=governance.address)
+    assert ledger.ripeAvailForBonds() == max_amount
+
+
+def test_ripe_available_functions_permissions(switchboard_delta, bob):
+    """Test that only governance can set ripe available values"""
+    # Test all three functions require governance permissions
+    with boa.reverts("no perms"):
+        switchboard_delta.setRipeAvailableForRewards(1000, sender=bob)
+
+    with boa.reverts("no perms"):
+        switchboard_delta.setRipeAvailableForHr(1000, sender=bob)
+
+    with boa.reverts("no perms"):
+        switchboard_delta.setRipeAvailableForBonds(1000, sender=bob)
+
+
+def test_multiple_ripe_available_actions(switchboard_delta, ledger, governance):
+    """Test creating multiple ripe available actions concurrently"""
+    # Create three different actions
+    rewards_amount = 1_000_000 * 10**18
+    hr_amount = 500_000 * 10**18
+    bonds_amount = 750_000 * 10**18
+
+    action_id1 = switchboard_delta.setRipeAvailableForRewards(rewards_amount, sender=governance.address)
+    action_id2 = switchboard_delta.setRipeAvailableForHr(hr_amount, sender=governance.address)
+    action_id3 = switchboard_delta.setRipeAvailableForBonds(bonds_amount, sender=governance.address)
+
+    # Verify all are pending with correct data
+    assert switchboard_delta.pendingRipeAvailable(action_id1) == rewards_amount
+    assert switchboard_delta.pendingRipeAvailable(action_id2) == hr_amount
+    assert switchboard_delta.pendingRipeAvailable(action_id3) == bonds_amount
+
+    # Time travel past timelock
+    boa.env.time_travel(blocks=switchboard_delta.actionTimeLock())
+
+    # Execute in different order
+    assert switchboard_delta.executePendingAction(action_id3, sender=governance.address)
+    assert ledger.ripeAvailForBonds() == bonds_amount
+
+    assert switchboard_delta.executePendingAction(action_id1, sender=governance.address)
+    assert ledger.ripeAvailForRewards() == rewards_amount
+
+    assert switchboard_delta.executePendingAction(action_id2, sender=governance.address)
+    assert ledger.ripeAvailForHr() == hr_amount
+
+    # Verify all actions cleaned up
+    assert not switchboard_delta.hasPendingAction(action_id1)
+    assert not switchboard_delta.hasPendingAction(action_id2)
+    assert not switchboard_delta.hasPendingAction(action_id3)
+
+
+def test_ripe_available_edge_cases(switchboard_delta, ledger, governance):
+    """Test edge cases for ripe available functions"""
+    # Test setting all to zero
+    action_id1 = switchboard_delta.setRipeAvailableForRewards(0, sender=governance.address)
+    action_id2 = switchboard_delta.setRipeAvailableForHr(0, sender=governance.address)
+    action_id3 = switchboard_delta.setRipeAvailableForBonds(0, sender=governance.address)
+
+    boa.env.time_travel(blocks=switchboard_delta.actionTimeLock())
+
+    assert switchboard_delta.executePendingAction(action_id1, sender=governance.address)
+    assert switchboard_delta.executePendingAction(action_id2, sender=governance.address)
+    assert switchboard_delta.executePendingAction(action_id3, sender=governance.address)
+
+    assert ledger.ripeAvailForRewards() == 0
+    assert ledger.ripeAvailForHr() == 0
+    assert ledger.ripeAvailForBonds() == 0
+
+    # Test very large values
+    large_amount = 10**30  # Very large amount
+    action_id4 = switchboard_delta.setRipeAvailableForRewards(large_amount, sender=governance.address)
+    boa.env.time_travel(blocks=switchboard_delta.actionTimeLock())
+    assert switchboard_delta.executePendingAction(action_id4, sender=governance.address)
+    assert ledger.ripeAvailForRewards() == large_amount
+
+
+# ========================================
+# _missionControl Parameter Tests
+# ========================================
+
+
+def test_set_should_check_last_touch_on_new_mission_control(
+    switchboard_delta, governance, new_mission_control, mission_control
+):
+    """Test setShouldCheckLastTouch targeting a new MissionControl"""
+    # Get initial value from registered MC
+    original_value = mission_control.shouldCheckLastTouch()
+
+    # Set on NEW mission control
+    action_id = switchboard_delta.setShouldCheckLastTouch(
+        True,
+        new_mission_control.address,  # _missionControl
+        sender=governance.address
+    )
+
+    # Verify pending MC stored
+    assert switchboard_delta.pendingMissionControl(action_id) == new_mission_control.address
+
+    # Execute
+    boa.env.time_travel(blocks=switchboard_delta.actionTimeLock())
+    switchboard_delta.executePendingAction(action_id, sender=governance.address)
+
+    # Verify set on new MC
+    assert new_mission_control.shouldCheckLastTouch() == True
+
+    # Verify registered MC unchanged
+    assert mission_control.shouldCheckLastTouch() == original_value
+
+
+def test_resolve_mission_control_validation_delta(
+    switchboard_delta, governance, mission_control
+):
+    """Test that passing current MC address reverts on Delta"""
+    with boa.reverts("use empty for current mission control"):
+        switchboard_delta.setShouldCheckLastTouch(
+            True,
+            mission_control.address,  # current MC - should revert
+            sender=governance.address
+        )
+
+
+# ========================================
+# Single Bond Booster Tests
+# ========================================
+
+
+def test_set_single_bond_booster_permissions(switchboard_delta, governance, alice):
+    """Test that only governance can call setBondBooster"""
+    # Create a valid booster config
+    config = (
+        alice,  # user
+        100_00,  # boostRatio (100%)
+        10,  # maxUnitsAllowed
+        10000,  # expireBlock
+    )
+
+    # Non-governance cannot set bond booster
+    with boa.reverts("no perms"):
+        switchboard_delta.setBondBooster(config, sender=alice)
+
+
+def test_set_single_bond_booster_creates_timelock(
+    switchboard_delta, governance, alice, bond_booster
+):
+    """Test setBondBooster creates timelock action correctly"""
+    # Set up a valid booster config - need to get current values from bond_booster
+    max_boost = bond_booster.maxBoostRatio()
+    max_units = bond_booster.maxUnits()
+    # Make expire block far enough in future to survive timelock
+    future_block = boa.env.evm.patch.block_number + 100000
+
+    config = (
+        alice,  # user
+        max_boost,  # boostRatio (use max allowed)
+        max_units,  # maxUnitsAllowed (use max allowed)
+        future_block,  # expireBlock (future)
+    )
+
+    # Create pending action
+    aid = switchboard_delta.setBondBooster(config, sender=governance.address)
+    assert aid > 0
+
+    # Check event was emitted
+    logs = filter_logs(switchboard_delta, "PendingBoosterConfigSet")
+    assert len(logs) == 1
+    log = logs[0]
+    assert log.user == alice
+    assert log.actionId == aid
+
+    # Check action was stored with correct type
+    action_type = switchboard_delta.actionType(aid)
+    assert action_type == 2048  # ActionType.BOND_BOOSTER_ADD
+
+    # Check pending config was stored (need to access by index since it's a DynArray)
+    pending_config = switchboard_delta.pendingBoosterConfigs(aid, 0)
+    assert pending_config[0] == alice  # user
+
+
+def test_set_single_bond_booster_execute_success(
+    switchboard_delta, governance, alice, bond_booster
+):
+    """Test executing pending single bond booster action"""
+    # Set up a valid booster config
+    max_boost = bond_booster.maxBoostRatio()
+    max_units = bond_booster.maxUnits()
+    # Make expire block far enough in future to survive timelock
+    future_block = boa.env.evm.patch.block_number + 100000
+
+    config = (
+        alice,  # user
+        max_boost,  # boostRatio
+        max_units,  # maxUnitsAllowed
+        future_block,  # expireBlock
+    )
+
+    # Create pending action
+    aid = switchboard_delta.setBondBooster(config, sender=governance.address)
+
+    # Advance time past timelock
+    boa.env.time_travel(blocks=switchboard_delta.actionTimeLock())
+
+    # Execute action
+    success = switchboard_delta.executePendingAction(aid, sender=governance.address)
+    assert success
+
+    # Check execution event was emitted
+    logs = filter_logs(switchboard_delta, "ManyBondBoostersSet")
+    assert len(logs) == 1
+    assert logs[0].numBoosters == 1
+
+    # Verify config was actually set in BondBooster
+    stored_config = bond_booster.config(alice)
+    assert stored_config[0] == alice  # user
+    assert stored_config[1] == max_boost  # boostRatio
+
+    # Check action was cleared
+    assert switchboard_delta.actionType(aid) == 0
+
+
+def test_remove_single_bond_booster_permissions(switchboard_delta, governance, alice, bob, mission_control):
+    """Test removeBondBooster permissions: requires governance or lite action with enable"""
+    # Non-governance without lite access cannot remove
+    with boa.reverts("no perms"):
+        switchboard_delta.removeBondBooster(alice, sender=bob)
+
+    # Give bob lite access
+    mission_control.setCanPerformLiteAction(bob, True, sender=switchboard_delta.address)
+
+    # Bob with lite access can remove (enable=True action)
+    # Note: This will work even if alice has no booster config
+    result = switchboard_delta.removeBondBooster(alice, sender=bob)
+    assert result
+
+    # Governance can also remove
+    result2 = switchboard_delta.removeBondBooster(alice, sender=governance.address)
+    assert result2
+
+
+def test_remove_single_bond_booster_success(
+    switchboard_delta, governance, alice, bond_booster
+):
+    """Test removeBondBooster successfully removes a booster"""
+    # First set up a booster config via the switchboard
+    max_boost = bond_booster.maxBoostRatio()
+    max_units = bond_booster.maxUnits()
+    # Make expire block far enough in future to survive timelock
+    future_block = boa.env.evm.patch.block_number + 100000
+
+    config = (
+        alice,  # user
+        max_boost,  # boostRatio
+        max_units,  # maxUnitsAllowed
+        future_block,  # expireBlock
+    )
+
+    # Create and execute pending action to add booster
+    aid = switchboard_delta.setBondBooster(config, sender=governance.address)
+    boa.env.time_travel(blocks=switchboard_delta.actionTimeLock())
+    switchboard_delta.executePendingAction(aid, sender=governance.address)
+
+    # Verify booster was set
+    stored_config = bond_booster.config(alice)
+    assert stored_config[0] == alice
+
+    # Now remove the booster
+    result = switchboard_delta.removeBondBooster(alice, sender=governance.address)
+    assert result
+
+    # Check event was emitted
+    logs = filter_logs(switchboard_delta, "BondBoosterRemoved")
+    assert len(logs) == 1
+    assert logs[0].user == alice
+
+    # Verify booster was removed
+    removed_config = bond_booster.config(alice)
+    assert removed_config[0] == ZERO_ADDRESS  # user is empty
+
+
+def test_remove_single_bond_booster_immediate_execution(
+    switchboard_delta, governance, alice
+):
+    """Test that removeBondBooster is immediate (no timelock)"""
+    # removeBondBooster should execute immediately and return True
+    result = switchboard_delta.removeBondBooster(alice, sender=governance.address)
+    assert result
+
+    # Check event was emitted immediately
+    logs = filter_logs(switchboard_delta, "BondBoosterRemoved")
+    assert len(logs) == 1
+    assert logs[0].user == alice
+
+
+# ========================================
+# Deleverage Tests
+# ========================================
+
+
+def test_deleverage_user_permissions(switchboard_delta, governance, alice, bob, mission_control):
+    """Test deleverageUser requires governance or lite action permission to enable"""
+    # Non-governance without lite access cannot call
+    with boa.reverts("no perms"):
+        switchboard_delta.deleverageUser(alice, sender=bob)
+
+    # Grant bob lite access - verify the permission is granted
+    mission_control.setCanPerformLiteAction(bob, True, sender=switchboard_delta.address)
+    assert mission_control.canPerformLiteAction(bob)
+
+
+def test_deleverage_many_users_permissions(switchboard_delta, governance, alice, bob, mission_control):
+    """Test deleverageManyUsers requires governance or lite action permission to enable"""
+    # Create a sample request
+    requests = [(alice, 0)]  # (user, targetRepayAmount)
+
+    # Non-governance without lite access cannot call
+    with boa.reverts("no perms"):
+        switchboard_delta.deleverageManyUsers(requests, sender=bob)
+
+    # Grant bob lite access - verify the permission is granted
+    mission_control.setCanPerformLiteAction(bob, True, sender=switchboard_delta.address)
+    assert mission_control.canPerformLiteAction(bob)
+
+
+def test_deleverage_with_specific_assets_permissions(switchboard_delta, governance, alice, bob, mission_control):
+    """Test deleverageWithSpecificAssets requires governance or lite action permission to enable"""
+    # Create sample assets list
+    assets = []  # Empty list for permission test
+
+    # Non-governance without lite access cannot call
+    with boa.reverts("no perms"):
+        switchboard_delta.deleverageWithSpecificAssets(assets, alice, sender=bob)
+
+    # Grant bob lite access - verify the permission is granted
+    mission_control.setCanPerformLiteAction(bob, True, sender=switchboard_delta.address)
+    assert mission_control.canPerformLiteAction(bob)
+
+
+def test_deleverage_with_vol_assets_governance_only(switchboard_delta, governance, alice, bob, mission_control):
+    """Test deleverageWithVolAssets requires governance only (not lite action)"""
+    assets = []  # Empty list for permission test
+
+    # Non-governance cannot call even with lite access
+    mission_control.setCanPerformLiteAction(bob, True, sender=switchboard_delta.address)
+    with boa.reverts("no perms"):
+        switchboard_delta.deleverageWithVolAssets(alice, assets, sender=bob)
+
+    # Only governance can call
+    try:
+        switchboard_delta.deleverageWithVolAssets(alice, assets, sender=governance.address)
+    except Exception as e:
+        # If it fails, it should NOT be "no perms"
+        assert "no perms" not in str(e)
+
+
+# ========================================
+# Ripe Bond Config Tests
+# ========================================
+
+
+def test_set_ripe_bond_config_permissions(switchboard_delta, governance, alice, ripe_token):
+    """Test that only governance can call setRipeBondConfig"""
+    with boa.reverts("no perms"):
+        switchboard_delta.setRipeBondConfig(
+            ripe_token.address,  # _asset
+            1000 * EIGHTEEN_DECIMALS,  # _amountPerEpoch
+            1 * EIGHTEEN_DECIMALS,  # _minRipePerUnit
+            10 * EIGHTEEN_DECIMALS,  # _maxRipePerUnit
+            100_00,  # _maxRipePerUnitLockBonus (100%)
+            True,  # _shouldAutoRestart
+            100,  # _restartDelayBlocks
+            sender=alice
+        )
+
+
+def test_set_ripe_bond_config_creates_timelock(switchboard_delta, governance, ripe_token):
+    """Test setRipeBondConfig creates timelock action correctly"""
+    asset = ripe_token.address
+    amount_per_epoch = 1000 * EIGHTEEN_DECIMALS
+    min_ripe = 1 * EIGHTEEN_DECIMALS
+    max_ripe = 10 * EIGHTEEN_DECIMALS
+    max_lock_bonus = 100_00  # 100%
+    should_auto_restart = True
+    restart_delay = 100
+
+    aid = switchboard_delta.setRipeBondConfig(
+        asset,
+        amount_per_epoch,
+        min_ripe,
+        max_ripe,
+        max_lock_bonus,
+        should_auto_restart,
+        restart_delay,
+        sender=governance.address
+    )
+    assert aid > 0
+
+    # Check event was emitted
+    logs = filter_logs(switchboard_delta, "PendingRipeBondConfigSet")
+    assert len(logs) == 1
+    log = logs[0]
+    assert log.asset == asset
+    assert log.amountPerEpoch == amount_per_epoch
+    assert log.minRipePerUnit == min_ripe
+    assert log.maxRipePerUnit == max_ripe
+    assert log.actionId == aid
+
+    # Check action type
+    action_type = switchboard_delta.actionType(aid)
+    assert action_type == 128  # ActionType.RIPE_BOND_CONFIG (2^7)
+
+
+def test_set_ripe_bond_config_validation(switchboard_delta, governance, ripe_token):
+    """Test setRipeBondConfig validation"""
+    # Empty asset should fail
+    with boa.reverts("invalid asset"):
+        switchboard_delta.setRipeBondConfig(
+            ZERO_ADDRESS,  # _asset - invalid
+            1000 * EIGHTEEN_DECIMALS,
+            1 * EIGHTEEN_DECIMALS,
+            10 * EIGHTEEN_DECIMALS,
+            100_00,
+            True,
+            100,
+            sender=governance.address
+        )
+
+    # Zero amountPerEpoch should fail
+    with boa.reverts("invalid config"):
+        switchboard_delta.setRipeBondConfig(
+            ripe_token.address,
+            0,  # _amountPerEpoch - invalid
+            1 * EIGHTEEN_DECIMALS,
+            10 * EIGHTEEN_DECIMALS,
+            100_00,
+            True,
+            100,
+            sender=governance.address
+        )
+
+    # min >= max should fail
+    with boa.reverts("invalid min/max ripe per unit"):
+        switchboard_delta.setRipeBondConfig(
+            ripe_token.address,
+            1000 * EIGHTEEN_DECIMALS,
+            10 * EIGHTEEN_DECIMALS,  # _minRipePerUnit
+            10 * EIGHTEEN_DECIMALS,  # _maxRipePerUnit - equal to min
+            100_00,
+            True,
+            100,
+            sender=governance.address
+        )
+
+    # Lock bonus > 1000% should fail
+    with boa.reverts("max is 1000%"):
+        switchboard_delta.setRipeBondConfig(
+            ripe_token.address,
+            1000 * EIGHTEEN_DECIMALS,
+            1 * EIGHTEEN_DECIMALS,
+            10 * EIGHTEEN_DECIMALS,
+            1001_00,  # > 1000%
+            True,
+            100,
+            sender=governance.address
+        )
+
+
+def test_set_ripe_bond_config_execute_success(switchboard_delta, mission_control, governance, ripe_token):
+    """Test executing pending ripe bond config change"""
+    asset = ripe_token.address
+    amount_per_epoch = 1000 * EIGHTEEN_DECIMALS
+    min_ripe = 1 * EIGHTEEN_DECIMALS
+    max_ripe = 10 * EIGHTEEN_DECIMALS
+    max_lock_bonus = 100_00
+    should_auto_restart = True
+    restart_delay = 100
+
+    # Create pending action
+    aid = switchboard_delta.setRipeBondConfig(
+        asset,
+        amount_per_epoch,
+        min_ripe,
+        max_ripe,
+        max_lock_bonus,
+        should_auto_restart,
+        restart_delay,
+        sender=governance.address
+    )
+
+    # Advance time past timelock
+    boa.env.time_travel(blocks=switchboard_delta.actionTimeLock())
+
+    # Execute action
+    success = switchboard_delta.executePendingAction(aid, sender=governance.address)
+    assert success
+
+    # Check execution event was emitted
+    logs = filter_logs(switchboard_delta, "RipeBondConfigSet")
+    assert len(logs) == 1
+    log = logs[0]
+    assert log.asset == asset
+    assert log.amountPerEpoch == amount_per_epoch
+
+    # Verify config was set in MissionControl
+    config = mission_control.ripeBondConfig()
+    assert config[0] == asset  # asset
+    assert config[1] == amount_per_epoch  # amountPerEpoch
+
+    # Check action was cleared
+    assert switchboard_delta.actionType(aid) == 0
+
+
+def test_set_ripe_bond_epoch_length_permissions(switchboard_delta, governance, alice):
+    """Test that only governance can call setRipeBondEpochLength"""
+    with boa.reverts("no perms"):
+        switchboard_delta.setRipeBondEpochLength(1000, sender=alice)
+
+
+def test_set_ripe_bond_epoch_length_creates_timelock(switchboard_delta, governance):
+    """Test setRipeBondEpochLength creates timelock action"""
+    epoch_length = 1000
+
+    aid = switchboard_delta.setRipeBondEpochLength(epoch_length, sender=governance.address)
+    assert aid > 0
+
+    # Check event was emitted
+    logs = filter_logs(switchboard_delta, "PendingRipeBondEpochLengthSet")
+    assert len(logs) == 1
+    log = logs[0]
+    assert log.epochLength == epoch_length
+    assert log.actionId == aid
+
+    # Check action type
+    action_type = switchboard_delta.actionType(aid)
+    assert action_type == 256  # ActionType.RIPE_BOND_EPOCH_LENGTH (2^8)
+
+
+def test_set_ripe_bond_epoch_length_validation(switchboard_delta, governance):
+    """Test setRipeBondEpochLength validation"""
+    # Zero epoch length should fail
+    with boa.reverts("invalid epoch length"):
+        switchboard_delta.setRipeBondEpochLength(0, sender=governance.address)
+
+
+def test_set_can_purchase_ripe_bond_permissions(switchboard_delta, governance, alice, bob, mission_control):
+    """Test setCanPurchaseRipeBond asymmetric permissions: lite can disable, gov can enable"""
+    # First we need to set up bond config so canBond can be changed
+    # Get current config
+    config = mission_control.ripeBondConfig()
+    current_can_bond = config[2]  # canBond is index 2
+
+    # Non-governance without lite cannot change
+    with boa.reverts("no perms"):
+        switchboard_delta.setCanPurchaseRipeBond(not current_can_bond, sender=bob)
+
+    # Grant bob lite access
+    mission_control.setCanPerformLiteAction(bob, True, sender=switchboard_delta.address)
+
+    # Bob with lite access can DISABLE (set to False) but not ENABLE (set to True)
+    if current_can_bond:
+        # If currently True, bob can set to False (disable)
+        try:
+            switchboard_delta.setCanPurchaseRipeBond(False, sender=bob)
+        except Exception as e:
+            # Should pass permission check, may fail on "no change" if already false
+            assert "no perms" not in str(e)
+    else:
+        # If currently False, bob cannot set to True (enable)
+        with boa.reverts("no perms"):
+            switchboard_delta.setCanPurchaseRipeBond(True, sender=bob)
+
+
+def test_set_can_purchase_ripe_bond_immediate(switchboard_delta, mission_control, governance, ripe_token):
+    """Test setCanPurchaseRipeBond is immediate (no timelock)"""
+    # First set up a valid bond config with canBond = False
+    aid = switchboard_delta.setRipeBondConfig(
+        ripe_token.address,
+        1000 * EIGHTEEN_DECIMALS,
+        1 * EIGHTEEN_DECIMALS,
+        10 * EIGHTEEN_DECIMALS,
+        100_00,
+        True,
+        100,
+        sender=governance.address
+    )
+    boa.env.time_travel(blocks=switchboard_delta.actionTimeLock())
+    switchboard_delta.executePendingAction(aid, sender=governance.address)
+
+    # Now canBond should be False (default in setRipeBondConfig)
+    config = mission_control.ripeBondConfig()
+    assert not config[2]  # canBond is False
+
+    # Enable bonding immediately (no timelock)
+    result = switchboard_delta.setCanPurchaseRipeBond(True, sender=governance.address)
+    assert result
+
+    # Check event was emitted
+    logs = filter_logs(switchboard_delta, "CanPurchaseRipeBondModified")
+    assert len(logs) == 1
+    assert logs[0].canPurchaseRipeBond == True
+
+    # Verify change was applied immediately
+    config = mission_control.ripeBondConfig()
+    assert config[2]  # canBond is now True
+
+
+# ========================================
+# Many Bond Boosters Tests
+# ========================================
+
+
+def test_set_many_bond_boosters_permissions(switchboard_delta, governance, alice, bob, bond_booster):
+    """Test that only governance can call setManyBondBoosters"""
+    max_boost = bond_booster.maxBoostRatio()
+    max_units = bond_booster.maxUnits()
+    future_block = boa.env.evm.patch.block_number + 100000
+
+    configs = [
+        (alice, max_boost, max_units, future_block),
+        (bob, max_boost, max_units, future_block),
+    ]
+
+    with boa.reverts("no perms"):
+        switchboard_delta.setManyBondBoosters(configs, sender=alice)
+
+
+def test_set_many_bond_boosters_creates_timelock(switchboard_delta, governance, alice, bob, bond_booster):
+    """Test setManyBondBoosters creates timelock action correctly"""
+    max_boost = bond_booster.maxBoostRatio()
+    max_units = bond_booster.maxUnits()
+    future_block = boa.env.evm.patch.block_number + 100000
+
+    configs = [
+        (alice, max_boost, max_units, future_block),
+        (bob, max_boost, max_units, future_block),
+    ]
+
+    aid = switchboard_delta.setManyBondBoosters(configs, sender=governance.address)
+    assert aid > 0
+
+    # Check event was emitted
+    logs = filter_logs(switchboard_delta, "PendingBoosterConfigsSet")
+    assert len(logs) == 1
+    log = logs[0]
+    assert log.numBoosters == 2
+    assert log.actionId == aid
+
+    # Check action type
+    action_type = switchboard_delta.actionType(aid)
+    assert action_type == 2048  # ActionType.BOND_BOOSTER_ADD
+
+
+def test_set_many_bond_boosters_validation(switchboard_delta, governance):
+    """Test setManyBondBoosters validation"""
+    # Empty list should fail
+    with boa.reverts("no boosters"):
+        switchboard_delta.setManyBondBoosters([], sender=governance.address)
+
+
+def test_set_many_bond_boosters_execute_success(switchboard_delta, governance, alice, bob, bond_booster):
+    """Test executing pending many bond boosters action"""
+    max_boost = bond_booster.maxBoostRatio()
+    max_units = bond_booster.maxUnits()
+    future_block = boa.env.evm.patch.block_number + 100000
+
+    configs = [
+        (alice, max_boost, max_units, future_block),
+        (bob, max_boost, max_units, future_block),
+    ]
+
+    # Create pending action
+    aid = switchboard_delta.setManyBondBoosters(configs, sender=governance.address)
+
+    # Advance time past timelock
+    boa.env.time_travel(blocks=switchboard_delta.actionTimeLock())
+
+    # Execute action
+    success = switchboard_delta.executePendingAction(aid, sender=governance.address)
+    assert success
+
+    # Check execution event was emitted
+    logs = filter_logs(switchboard_delta, "ManyBondBoostersSet")
+    assert len(logs) == 1
+    assert logs[0].numBoosters == 2
+
+    # Verify configs were set in BondBooster
+    alice_config = bond_booster.config(alice)
+    assert alice_config[0] == alice
+
+    bob_config = bond_booster.config(bob)
+    assert bob_config[0] == bob
+
+    # Check action was cleared
+    assert switchboard_delta.actionType(aid) == 0
+
+
+# ========================================
+# Booster Boundaries Tests
+# ========================================
+
+
+def test_set_booster_boundaries_permissions(switchboard_delta, governance, alice):
+    """Test that only governance can call setBoosterBoundaries"""
+    with boa.reverts("no perms"):
+        switchboard_delta.setBoosterBoundaries(1000_00, 100, sender=alice)
+
+
+def test_set_booster_boundaries_creates_timelock(switchboard_delta, governance):
+    """Test setBoosterBoundaries creates timelock action correctly"""
+    max_boost = 1000_00  # 1000%
+    max_units = 100
+
+    aid = switchboard_delta.setBoosterBoundaries(max_boost, max_units, sender=governance.address)
+    assert aid > 0
+
+    # Check event was emitted
+    logs = filter_logs(switchboard_delta, "PendingBoosterBoundariesSet")
+    assert len(logs) == 1
+    log = logs[0]
+    assert log.maxBoostRatio == max_boost
+    assert log.maxUnits == max_units
+    assert log.actionId == aid
+
+    # Check action type
+    action_type = switchboard_delta.actionType(aid)
+    assert action_type == 4096  # ActionType.BOND_BOOSTER_BOUNDARIES
+
+
+def test_set_booster_boundaries_execute_success(switchboard_delta, governance, bond_booster):
+    """Test executing pending booster boundaries change"""
+    max_boost = 500_00  # 500%
+    max_units = 50
+
+    # Create pending action
+    aid = switchboard_delta.setBoosterBoundaries(max_boost, max_units, sender=governance.address)
+
+    # Advance time past timelock
+    boa.env.time_travel(blocks=switchboard_delta.actionTimeLock())
+
+    # Execute action
+    success = switchboard_delta.executePendingAction(aid, sender=governance.address)
+    assert success
+
+    # Check execution event was emitted
+    logs = filter_logs(switchboard_delta, "BoosterBoundariesSet")
+    assert len(logs) == 1
+    log = logs[0]
+    assert log.maxBoostRatio == max_boost
+    assert log.maxUnits == max_units
+
+    # Verify boundaries were set in BondBooster
+    assert bond_booster.maxBoostRatio() == max_boost
+    assert bond_booster.maxUnits() == max_units
+
+    # Check action was cleared
+    assert switchboard_delta.actionType(aid) == 0
+
+
+# ========================================
+# Remove Many Bond Boosters Tests
+# ========================================
+
+
+def test_remove_many_bond_boosters_permissions(switchboard_delta, governance, alice, bob, mission_control):
+    """Test removeManyBondBoosters requires governance or lite action permission to enable"""
+    users = [alice, bob]
+
+    # Non-governance without lite access cannot call
+    with boa.reverts("no perms"):
+        switchboard_delta.removeManyBondBoosters(users, sender=bob)
+
+    # Grant bob lite access
+    mission_control.setCanPerformLiteAction(bob, True, sender=switchboard_delta.address)
+
+    # Bob with lite access can call (enable-style action)
+    result = switchboard_delta.removeManyBondBoosters(users, sender=bob)
+    assert result
+
+
+def test_remove_many_bond_boosters_success(switchboard_delta, governance, alice, bob, bond_booster):
+    """Test removeManyBondBoosters successfully removes multiple boosters"""
+    # First set up boosters via the switchboard
+    max_boost = bond_booster.maxBoostRatio()
+    max_units = bond_booster.maxUnits()
+    future_block = boa.env.evm.patch.block_number + 100000
+
+    configs = [
+        (alice, max_boost, max_units, future_block),
+        (bob, max_boost, max_units, future_block),
+    ]
+
+    # Create and execute pending action to add boosters
+    aid = switchboard_delta.setManyBondBoosters(configs, sender=governance.address)
+    boa.env.time_travel(blocks=switchboard_delta.actionTimeLock())
+    switchboard_delta.executePendingAction(aid, sender=governance.address)
+
+    # Verify boosters were set
+    assert bond_booster.config(alice)[0] == alice
+    assert bond_booster.config(bob)[0] == bob
+
+    # Now remove the boosters
+    result = switchboard_delta.removeManyBondBoosters([alice, bob], sender=governance.address)
+    assert result
+
+    # Check event was emitted
+    logs = filter_logs(switchboard_delta, "ManyBondBoostersRemoved")
+    assert len(logs) == 1
+    assert logs[0].numUsers == 2
+
+    # Verify boosters were removed
+    assert bond_booster.config(alice)[0] == ZERO_ADDRESS
+    assert bond_booster.config(bob)[0] == ZERO_ADDRESS
+
+
+def test_remove_many_bond_boosters_immediate_execution(switchboard_delta, governance, alice, bob):
+    """Test that removeManyBondBoosters is immediate (no timelock)"""
+    users = [alice, bob]
+
+    # Should execute immediately and return True
+    result = switchboard_delta.removeManyBondBoosters(users, sender=governance.address)
+    assert result
+
+    # Check event was emitted immediately
+    logs = filter_logs(switchboard_delta, "ManyBondBoostersRemoved")
+    assert len(logs) == 1
+    assert logs[0].numUsers == 2
+
+
+# ========================================
+# Loot Reset Tests
+# ========================================
+
+
+def test_reset_many_user_balance_points_permissions(switchboard_delta, governance, alice, bob):
+    """Test that only governance can call resetManyUserBalancePoints"""
+    # Create a sample reset request - (user, asset, newValue)
+    resets = [(alice, bob, 0)]
+
+    with boa.reverts("no perms"):
+        switchboard_delta.resetManyUserBalancePoints(resets, sender=alice)
+
+
+def test_reset_many_user_balance_points_creates_timelock(switchboard_delta, governance, alice, ripe_token):
+    """Test resetManyUserBalancePoints creates timelock action correctly"""
+    # (user, asset, newValue)
+    resets = [(alice, ripe_token.address, 0)]
+
+    aid = switchboard_delta.resetManyUserBalancePoints(resets, sender=governance.address)
+    assert aid > 0
+
+    # Check event was emitted
+    logs = filter_logs(switchboard_delta, "PendingUserBalanceResetSet")
+    assert len(logs) == 1
+    log = logs[0]
+    assert log.numResets == 1
+    assert log.actionId == aid
+
+    # Check action type
+    action_type = switchboard_delta.actionType(aid)
+    assert action_type == 8192  # ActionType.LOOT_USER_BALANCE_RESET
+
+
+def test_reset_many_user_balance_points_validation(switchboard_delta, governance):
+    """Test resetManyUserBalancePoints validation"""
+    # Empty list should fail
+    with boa.reverts("no users"):
+        switchboard_delta.resetManyUserBalancePoints([], sender=governance.address)
+
+
+def test_reset_many_asset_points_permissions(switchboard_delta, governance, alice, ripe_token):
+    """Test that only governance can call resetManyAssetPoints"""
+    # (asset, newValue)
+    resets = [(ripe_token.address, 0)]
+
+    with boa.reverts("no perms"):
+        switchboard_delta.resetManyAssetPoints(resets, sender=alice)
+
+
+def test_reset_many_asset_points_creates_timelock(switchboard_delta, governance, ripe_token):
+    """Test resetManyAssetPoints creates timelock action correctly"""
+    # (asset, newValue)
+    resets = [(ripe_token.address, 0)]
+
+    aid = switchboard_delta.resetManyAssetPoints(resets, sender=governance.address)
+    assert aid > 0
+
+    # Check event was emitted
+    logs = filter_logs(switchboard_delta, "PendingAssetResetSet")
+    assert len(logs) == 1
+    log = logs[0]
+    assert log.numResets == 1
+    assert log.actionId == aid
+
+    # Check action type
+    action_type = switchboard_delta.actionType(aid)
+    assert action_type == 16384  # ActionType.LOOT_ASSET_RESET
+
+
+def test_reset_many_asset_points_validation(switchboard_delta, governance):
+    """Test resetManyAssetPoints validation"""
+    # Empty list should fail
+    with boa.reverts("no assets"):
+        switchboard_delta.resetManyAssetPoints([], sender=governance.address)
+
+
+def test_reset_many_user_borrow_points_permissions(switchboard_delta, governance, alice):
+    """Test that only governance can call resetManyUserBorrowPoints"""
+    users = [alice]
+
+    with boa.reverts("no perms"):
+        switchboard_delta.resetManyUserBorrowPoints(users, sender=alice)
+
+
+def test_reset_many_user_borrow_points_creates_timelock(switchboard_delta, governance, alice, bob):
+    """Test resetManyUserBorrowPoints creates timelock action correctly"""
+    users = [alice, bob]
+
+    aid = switchboard_delta.resetManyUserBorrowPoints(users, sender=governance.address)
+    assert aid > 0
+
+    # Check event was emitted
+    logs = filter_logs(switchboard_delta, "PendingUserBorrowResetSet")
+    assert len(logs) == 1
+    log = logs[0]
+    assert log.numResets == 2
+    assert log.actionId == aid
+
+    # Check action type
+    action_type = switchboard_delta.actionType(aid)
+    assert action_type == 32768  # ActionType.LOOT_USER_BORROW_RESET
+
+
+def test_reset_many_user_borrow_points_validation(switchboard_delta, governance):
+    """Test resetManyUserBorrowPoints validation"""
+    # Empty list should fail
+    with boa.reverts("no users"):
+        switchboard_delta.resetManyUserBorrowPoints([], sender=governance.address)
