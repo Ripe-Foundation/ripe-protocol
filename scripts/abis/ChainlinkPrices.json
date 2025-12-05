@@ -1961,6 +1961,10 @@
       {
         "name": "_btcUsdFeed",
         "type": "address"
+      },
+      {
+        "name": "_defaultStaleTime",
+        "type": "uint256"
       }
     ],
     "outputs": []

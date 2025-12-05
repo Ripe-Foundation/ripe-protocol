@@ -129,6 +129,7 @@ def __init__(
     _btcAddr: address,
     _ethUsdFeed: address,
     _btcUsdFeed: address,
+    _defaultStaleTime: uint256,
 ):
     gov.__init__(_ripeHq, _tempGov, 0, 0, 0)
     addys.__init__(_ripeHq)
@@ -143,26 +144,26 @@ def __init__(
 
     # set default feeds
     if _ethUsdFeed != empty(address):
-        assert self._setDefaultFeedOnDeploy(_ethAddr, _ethUsdFeed) # dev: invalid feed
-        assert self._setDefaultFeedOnDeploy(_wethAddr, _ethUsdFeed) # dev: invalid feed
+        assert self._setDefaultFeedOnDeploy(_ethAddr, _ethUsdFeed, _defaultStaleTime) # dev: invalid feed
+        assert self._setDefaultFeedOnDeploy(_wethAddr, _ethUsdFeed, _defaultStaleTime) # dev: invalid feed
     if _btcUsdFeed != empty(address):
-        assert self._setDefaultFeedOnDeploy(_btcAddr, _btcUsdFeed) # dev: invalid feed
+        assert self._setDefaultFeedOnDeploy(_btcAddr, _btcUsdFeed, _defaultStaleTime) # dev: invalid feed
 
 
 # set default feeds
 
 
 @internal
-def _setDefaultFeedOnDeploy(_asset: address, _newFeed: address) -> bool:
+def _setDefaultFeedOnDeploy(_asset: address, _newFeed: address, _staleTime: uint256) -> bool:
     decimals: uint256 = convert(staticcall ChainlinkFeed(_newFeed).decimals(), uint256)
-    if not self._isValidNewFeed(_asset, _newFeed, decimals, False, False, 0):
+    if not self._isValidNewFeed(_asset, _newFeed, decimals, False, False, _staleTime):
         return False
     self.feedConfig[_asset] = ChainlinkConfig(
         feed=_newFeed,
         decimals=decimals,
         needsEthToUsd=False,
         needsBtcToUsd=False,
-        staleTime=0,
+        staleTime=_staleTime,
     )
     priceData._addPricedAsset(_asset)
     return True
@@ -302,9 +303,9 @@ def _getChainlinkData(_feed: address, _decimals: uint256, _staleTime: uint256) -
 
 @external
 def addNewPriceFeed(
-    _asset: address, 
-    _newFeed: address, 
-    _staleTime: uint256 = 0,
+    _asset: address,
+    _newFeed: address,
+    _staleTime: uint256 = 60 * 60 * 24, # 1 day
     _needsEthToUsd: bool = False,
     _needsBtcToUsd: bool = False,
 ) -> bool:
@@ -408,9 +409,9 @@ def _isValidNewFeed(_asset: address, _newFeed: address, _decimals: uint256, _nee
 
 @external
 def updatePriceFeed(
-    _asset: address, 
-    _newFeed: address, 
-    _staleTime: uint256 = 0,
+    _asset: address,
+    _newFeed: address,
+    _staleTime: uint256 = 60 * 60 * 24, # 1 day
     _needsEthToUsd: bool = False,
     _needsBtcToUsd: bool = False,
 ) -> bool:

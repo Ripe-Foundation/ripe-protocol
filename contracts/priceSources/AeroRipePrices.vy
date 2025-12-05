@@ -96,7 +96,7 @@ def __init__(
             minSnapshotDelay = 60 * 5, # 5 minutes
             maxNumSnapshots = 20,
             maxUpsideDeviation = 10_00, # 10%
-            staleTime = 0,
+            staleTime = 60 * 60 * 24, # 1 day
             lastSnapshot = empty(PriceSnapshot),
             nextIndex = 0,
         )

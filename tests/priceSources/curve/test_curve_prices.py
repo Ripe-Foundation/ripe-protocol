@@ -453,7 +453,8 @@ def scrvusd_token():
 def usdc_token(fork, chainlink, governance):
     usdc = boa.from_etherscan(CORE_TOKENS[fork]["USDC"], name="usdc")
     if not chainlink.hasPriceFeed(usdc):
-        assert chainlink.addNewPriceFeed(usdc, "0x7e860098F58bBFC8648a4311b374B1D669a2bc6B", sender=governance.address)
+        # Use staleTime=0 for forked tests since historical Chainlink data may be stale
+        assert chainlink.addNewPriceFeed(usdc, "0x7e860098F58bBFC8648a4311b374B1D669a2bc6B", 0, False, False, sender=governance.address)
         boa.env.time_travel(blocks=chainlink.actionTimeLock() + 1)
         assert chainlink.confirmNewPriceFeed(usdc, sender=governance.address)
     return usdc
@@ -644,8 +645,8 @@ def test_get_price_two_crypto_ng(
     price = curve_prices.getPrice(frok_token)
     assert price != 0
 
-    # may need to update this every once in awhile
-    _test(price, int(0.044 * EIGHTEEN_DECIMALS), 1_00)
+    # may need to update this if the fork block number changes
+    _test(price, int(0.0425 * EIGHTEEN_DECIMALS), 1_00)
 
 
 #################

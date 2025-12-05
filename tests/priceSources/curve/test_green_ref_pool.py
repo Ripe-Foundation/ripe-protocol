@@ -10,7 +10,8 @@ from conf_utils import filter_logs
 def usdc_token(fork, chainlink, governance):
     usdc = boa.from_etherscan(CORE_TOKENS[fork]["USDC"], name="usdc")
     if not chainlink.hasPriceFeed(usdc):
-        assert chainlink.addNewPriceFeed(usdc, "0x7e860098F58bBFC8648a4311b374B1D669a2bc6B", sender=governance.address)
+        # Use staleTime=0 for forked tests since historical Chainlink data may be stale
+        assert chainlink.addNewPriceFeed(usdc, "0x7e860098F58bBFC8648a4311b374B1D669a2bc6B", 0, False, False, sender=governance.address)
         boa.env.time_travel(blocks=chainlink.actionTimeLock() + 1)
         assert chainlink.confirmNewPriceFeed(usdc, sender=governance.address)
     return usdc
@@ -208,13 +209,13 @@ def test_invalid_green_ref_pool_configs(
     with boa.reverts("invalid ref pool config"):
         curve_prices.setGreenRefPoolConfig(deployed_green_pool, 10, 60_00, 0, 10_00, 0, sender=governance.address)
 
-    # Test invalid stabilizerMaxPoolDebt (>1 million)
+    # Test invalid stabilizerMaxPoolDebt (>25 million)
     with boa.reverts("invalid ref pool config"):
-        curve_prices.setGreenRefPoolConfig(deployed_green_pool, 10, 60_00, 0, 10_00, 1_000_001 * EIGHTEEN_DECIMALS, sender=governance.address)
+        curve_prices.setGreenRefPoolConfig(deployed_green_pool, 10, 60_00, 0, 10_00, 25_000_001 * EIGHTEEN_DECIMALS, sender=governance.address)
 
     # Test valid edge cases
     aid1 = curve_prices.setGreenRefPoolConfig(deployed_green_pool, 1, 50_00, 0, 1, 1, sender=governance.address)  # Minimum valid values
-    aid2 = curve_prices.setGreenRefPoolConfig(deployed_green_pool, 100, 99_99, 0, 100_00, 1_000_000 * EIGHTEEN_DECIMALS, sender=governance.address)  # Maximum valid values
+    aid2 = curve_prices.setGreenRefPoolConfig(deployed_green_pool, 100, 99_99, 0, 100_00, 25_000_000 * EIGHTEEN_DECIMALS, sender=governance.address)  # Maximum valid values
     
     # Should be able to set these
     assert aid1 != 0

@@ -30,7 +30,7 @@ CLICK_PROMPTS = {
     },
     "environment": {
         "prompt": "Inform the environment name",
-        "default": "dev",
+        "default": "v1",
         "help": f"Environment of manifests that are written and read by migration scripts to pass state from previous migrations. Defaults to `dev`.",
     },
     "start_timestamp": {
@@ -53,12 +53,12 @@ CLICK_PROMPTS = {
     },
     "blueprint": {
         "prompt": "Blueprint",
-        "default": "",
+        "default": "base",
         "help": "Blueprint to use for the migration. Defaults to ``.",
     },
     "chain": {
         "prompt": "Chain name",
-        "default": "local",
+        "default": "base-mainnet",
         "help": "Chain name for custom configuration on the deployment (ex: eth-mainnet, eth-sepolia, base-mainnet, base-sepolia).  Defaults to `local`",
         "type": click.Choice(["local", "base-mainnet", "base-sepolia", "eth-sepolia", "eth-mainnet", "base-mainnet", "base-sepolia"], case_sensitive=False),
 
@@ -112,7 +112,7 @@ def param_prompt(ctx, param, value):
     if value != default_val:
         return value
 
-    if prompt is None or (ctx.params.get("silent") and optional):
+    if prompt is None or (not ctx.params.get("ask") and optional):
         return value
 
     should_prompt = True
@@ -144,7 +144,7 @@ def param_prompt(ctx, param, value):
 
 
 @click.command()
-@click.option("--silent", is_flag=True, default=False, help="Run command without prompts.")
+@click.option("--ask", is_flag=True, default=False, help="Shoild ask for missing parameters (Not use default values).")
 @click.option(
     "--safe",
     default=CLICK_PROMPTS["safe"]["default"],
@@ -215,7 +215,7 @@ def param_prompt(ctx, param, value):
     callback=param_prompt,
 )
 def cli(
-    silent,
+    ask,
     safe,
     fork,
     is_retry,

@@ -818,6 +818,9 @@ def chainlink(ripe_hq_deploy, fork, sally, bob, deploy3r, mock_chainlink_feed_on
     CHAINLINK_ETH_USD = ZERO_ADDRESS if fork == "local" else ADDYS[fork]["CHAINLINK_ETH_USD"]
     CHAINLINK_BTC_USD = ZERO_ADDRESS if fork == "local" else ADDYS[fork]["CHAINLINK_BTC_USD"]
 
+    # For forked tests, use staleTime=0 since historical Chainlink data may be stale
+    default_stale_time = 0 if fork != "local" else 60 * 60 * 24  # 1 day for local
+
     c = boa.load(
         "contracts/priceSources/ChainlinkPrices.vy",
         ripe_hq_deploy,
@@ -829,6 +832,7 @@ def chainlink(ripe_hq_deploy, fork, sally, bob, deploy3r, mock_chainlink_feed_on
         ADDYS[fork]["BTC"],
         CHAINLINK_ETH_USD,
         CHAINLINK_BTC_USD,
+        default_stale_time,
         name="chainlink",
     )
 

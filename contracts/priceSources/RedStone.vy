@@ -258,9 +258,9 @@ def _getRedStoneData(_feed: address, _decimals: uint256, _staleTime: uint256) ->
 
 @external
 def addNewPriceFeed(
-    _asset: address, 
-    _newFeed: address, 
-    _staleTime: uint256 = 0,
+    _asset: address,
+    _newFeed: address,
+    _staleTime: uint256 = 60 * 60 * 24, # 1 day
     _needsEthToUsd: bool = False,
 ) -> bool:
     assert gov._canGovern(msg.sender) # dev: no perms
@@ -362,9 +362,9 @@ def _isValidNewFeed(_asset: address, _newFeed: address, _decimals: uint256, _nee
 
 @external
 def updatePriceFeed(
-    _asset: address, 
-    _newFeed: address, 
-    _staleTime: uint256 = 0,
+    _asset: address,
+    _newFeed: address,
+    _staleTime: uint256 = 60 * 60 * 24, # 1 day
     _needsEthToUsd: bool = False,
 ) -> bool:
     assert gov._canGovern(msg.sender) # dev: no perms
