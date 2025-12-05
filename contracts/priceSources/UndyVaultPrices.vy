@@ -221,7 +221,7 @@ def addNewPriceFeed(
     _minSnapshotDelay: uint256 = 60 * 5, # 5 minutes
     _maxNumSnapshots: uint256 = 20,
     _maxUpsideDeviation: uint256 = 10_00, # 10%
-    _staleTime: uint256 = 0,
+    _staleTime: uint256 = 60 * 60 * 24, # 1 day
 ) -> bool:
     assert gov._canGovern(msg.sender) # dev: no perms
     assert not priceData.isPaused # dev: contract paused
@@ -408,7 +408,7 @@ def updatePriceConfig(
     _minSnapshotDelay: uint256 = 60 * 5, # 5 minutes
     _maxNumSnapshots: uint256 = 20,
     _maxUpsideDeviation: uint256 = 10_00, # 10%
-    _staleTime: uint256 = 0,
+    _staleTime: uint256 = 60 * 60 * 24, # 1 day
 ) -> bool:
     assert gov._canGovern(msg.sender) # dev: no perms
     assert not priceData.isPaused # dev: contract paused

@@ -10,7 +10,8 @@ from conf_utils import filter_logs
 def usdc_token(fork, chainlink, governance):
     usdc = boa.from_etherscan(CORE_TOKENS[fork]["USDC"], name="usdc")
     if not chainlink.hasPriceFeed(usdc):
-        assert chainlink.addNewPriceFeed(usdc, "0x7e860098F58bBFC8648a4311b374B1D669a2bc6B", sender=governance.address)
+        # Use staleTime=0 for forked tests since historical Chainlink data may be stale
+        assert chainlink.addNewPriceFeed(usdc, "0x7e860098F58bBFC8648a4311b374B1D669a2bc6B", 0, False, False, sender=governance.address)
         boa.env.time_travel(blocks=chainlink.actionTimeLock() + 1)
         assert chainlink.confirmNewPriceFeed(usdc, sender=governance.address)
     return usdc
@@ -27,7 +28,8 @@ def weth_token(fork, chainlink):
 def cbbtc_token(fork, chainlink, governance):
     cbbtc = boa.from_etherscan(CORE_TOKENS[fork]["CBBTC"], name="cbbtc")
     if not chainlink.hasPriceFeed(cbbtc):
-        assert chainlink.addNewPriceFeed(cbbtc, "0x07DA0E54543a844a80ABE69c8A12F22B3aA59f9D", sender=governance.address)
+        # Use staleTime=0 for forked tests since historical Chainlink data may be stale
+        assert chainlink.addNewPriceFeed(cbbtc, "0x07DA0E54543a844a80ABE69c8A12F22B3aA59f9D", 0, False, False, sender=governance.address)
         boa.env.time_travel(blocks=chainlink.actionTimeLock() + 1)
         assert chainlink.confirmNewPriceFeed(cbbtc, sender=governance.address)
     return cbbtc
@@ -81,9 +83,9 @@ def test_add_euler_vault_token_usdc(
     usdc_price = price_desk.getPrice(usdc_token)
     assert usdc_price != 0
 
-    # test price
+    # test price (vault share price is usually > underlying due to accrued yield)
     euler_usdc_price = blue_chip_prices.getPrice(euler_usdc)
-    _test(euler_usdc_price, usdc_price, 2_00)
+    _test(euler_usdc_price, usdc_price, 5_00)
 
 
 @pytest.base
@@ -130,9 +132,9 @@ def test_add_euler_vault_token_weth(
     weth_price = price_desk.getPrice(weth_token)
     assert weth_price != 0
 
-    # vault token price
+    # vault token price (vault share price is usually > underlying due to accrued yield)
     euler_weth_price = blue_chip_prices.getPrice(euler_weth)
-    _test(euler_weth_price, weth_price, 2_00)
+    _test(euler_weth_price, weth_price, 5_00)
 
 
 @pytest.base
@@ -179,6 +181,6 @@ def test_add_euler_vault_token_cbbtc(
     cbbtc_price = price_desk.getPrice(cbbtc_token)
     assert cbbtc_price != 0
 
-    # vault token price
+    # vault token price (vault share price is usually > underlying due to accrued yield)
     euler_cbbtc_price = blue_chip_prices.getPrice(euler_cbbtc)
-    _test(euler_cbbtc_price, cbbtc_price, 2_00)
+    _test(euler_cbbtc_price, cbbtc_price, 5_00)

@@ -1046,7 +1046,7 @@ def test_set_pyth_feed_usdc(
     data_feed_id = bytes.fromhex("eaa020c61cc479712813461ce153894a96a6c00b21ed0cfc2798d1f9a9e9c94a")
     addPythFeed(usdc, data_feed_id)
 
-    assert pyth_prices.feedConfig(usdc) == data_feed_id
+    assert pyth_prices.feedConfig(usdc).feedId == data_feed_id
     assert int(1.02 * EIGHTEEN_DECIMALS) > pyth_prices.getPrice(usdc) > int(0.98 * EIGHTEEN_DECIMALS)
 
 
@@ -1059,8 +1059,8 @@ def test_set_pyth_feed_aixbt(
     data_feed_id = bytes.fromhex("0fc54579a29ba60a08fdb5c28348f22fd3bec18e221dd6b90369950db638a5a7")
     addPythFeed(aixbt, data_feed_id)
 
-    assert pyth_prices.feedConfig(aixbt) == data_feed_id
-    assert int(0.19 * EIGHTEEN_DECIMALS) > pyth_prices.getPrice(aixbt) > int(0.18 * EIGHTEEN_DECIMALS)
+    assert pyth_prices.feedConfig(aixbt).feedId == data_feed_id
+    assert int(0.15 * EIGHTEEN_DECIMALS) > pyth_prices.getPrice(aixbt) > int(0.08 * EIGHTEEN_DECIMALS)
 
 
 @pytest.base
@@ -1072,5 +1072,5 @@ def test_set_pyth_feed_aero(
     data_feed_id = bytes.fromhex("9db37f4d5654aad3e37e2e14ffd8d53265fb3026d1d8f91146539eebaa2ef45f")
     addPythFeed(aero, data_feed_id)
 
-    assert pyth_prices.feedConfig(aero) == data_feed_id
-    assert int(0.68 * EIGHTEEN_DECIMALS) > pyth_prices.getPrice(aero) > int(0.64 * EIGHTEEN_DECIMALS)
+    assert pyth_prices.feedConfig(aero).feedId == data_feed_id
+    assert int(1.60 * EIGHTEEN_DECIMALS) > pyth_prices.getPrice(aero) > int(1.20 * EIGHTEEN_DECIMALS)

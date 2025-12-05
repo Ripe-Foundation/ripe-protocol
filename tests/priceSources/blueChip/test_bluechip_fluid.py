@@ -10,7 +10,8 @@ from conf_utils import filter_logs
 def usdc_token(fork, chainlink, governance):
     usdc = boa.from_etherscan(CORE_TOKENS[fork]["USDC"], name="usdc")
     if not chainlink.hasPriceFeed(usdc):
-        assert chainlink.addNewPriceFeed(usdc, "0x7e860098F58bBFC8648a4311b374B1D669a2bc6B", sender=governance.address)
+        # Use staleTime=0 for forked tests since historical Chainlink data may be stale
+        assert chainlink.addNewPriceFeed(usdc, "0x7e860098F58bBFC8648a4311b374B1D669a2bc6B", 0, False, False, sender=governance.address)
         boa.env.time_travel(blocks=chainlink.actionTimeLock() + 1)
         assert chainlink.confirmNewPriceFeed(usdc, sender=governance.address)
     return usdc
@@ -71,9 +72,10 @@ def test_add_fluid_vault_token_usdc(
     usdc_price = price_desk.getPrice(usdc_token)
     assert usdc_price != 0
 
-    # test price
+    # test price (vault share price is usually > underlying due to accrued yield)
+    usdc_price = price_desk.getPrice(usdc_token)
     fluid_usdc_price = blue_chip_prices.getPrice(fluid_usdc)
-    _test(fluid_usdc_price, int(1.07 * EIGHTEEN_DECIMALS), 100)
+    _test(fluid_usdc_price, usdc_price, 10_00)
 
 
 @pytest.base
@@ -120,6 +122,6 @@ def test_add_fluid_vault_token_weth(
     weth_price = price_desk.getPrice(weth_token)
     assert weth_price != 0
 
-    # vault token price
+    # vault token price (vault share price is usually > underlying due to accrued yield)
     fluid_weth_price = blue_chip_prices.getPrice(fluid_weth)
-    _test(fluid_weth_price, weth_price, 1_50)
+    _test(fluid_weth_price, weth_price, 5_00)

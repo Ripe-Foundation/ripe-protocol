@@ -200,7 +200,7 @@ def addPriceSnapshot(_asset: address) -> bool:
 
 
 @external
-def addNewPriceFeed(_asset: address, _feedId: bytes32, _staleTime: uint256 = 0) -> bool:
+def addNewPriceFeed(_asset: address, _feedId: bytes32, _staleTime: uint256 = 60 * 60 * 24) -> bool: # 1 day
     assert gov._canGovern(msg.sender) # dev: no perms
     assert not priceData.isPaused # dev: contract paused
 
@@ -291,7 +291,7 @@ def _isValidNewFeed(_asset: address, _feedId: bytes32, _staleTime: uint256) -> b
 
 
 @external
-def updatePriceFeed(_asset: address, _feedId: bytes32, _staleTime: uint256 = 0) -> bool:
+def updatePriceFeed(_asset: address, _feedId: bytes32, _staleTime: uint256 = 60 * 60 * 24) -> bool: # 1 day
     assert gov._canGovern(msg.sender) # dev: no perms
     assert not priceData.isPaused # dev: contract paused
 
