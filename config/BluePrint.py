@@ -46,23 +46,6 @@ ADDYS = {
         "ETH": "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE",
         "BTC": "0xbBbBBBBbbBBBbbbBbbBbbbbBBbBbbbbBbBbbBBbB",
     },
-    "sepolia": {
-        # important tokens / representations
-        "WETH": "0x4200000000000000000000000000000000000006",
-        "ETH": "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE",
-        "BTC": "0xbBbBBBBbbBBBbbbBbbBbbbbBBbBbbbbBbBbbBBbB",
-        "USDC": "0x611ce0729f6C052f49536c84a8fD717E619D5dc6",
-        "CBBTC": "0x003d1beA6B9C5193cDA8d747A5362eD2932a35d0",
-        "GOVERNANCE": "0xa6AC77Fb1Ac34d35F852456560bAef2d77239dcF",
-        "CURVE_ADDRESS_PROVIDER": "0x88953B3eBA73d6B5252b00B1827769b5a5617599",
-        "CURVE_STABLE_FACTORY": "0xa1ABe9e8F3C516c66F48cb318B62bFfa2CB5D1Cc",
-        "CURVE_CRYPTO_FACTORY": "0xe11286024334D79f8bA8d621dA8bCB177C7F988C",
-        # default chainlink feeds
-        "CHAINLINK_ETH_USD": "0x1D5C3Aa9027E237B39937d06D7d2619126C4050a",
-        "CHAINLINK_BTC_USD": "0x714F00cd890F88504B55a7118F194449cf5aDBA8",
-        "CHAINLINK_USDC_USD": "0x52aCc12CB7E69Da287b7aB9d0e48c9FcA16EdE6A",
-        "CHAINLINK_CBBTC_USD": "0x714F00cd890F88504B55a7118F194449cf5aDBA8",
-    },
 }
 
 
@@ -87,27 +70,7 @@ PARAMS = {
         "PRICE_DESK_MIN_REG_TIMELOCK": 3_600,  # 2 hours on Base
         "PRICE_DESK_MAX_REG_TIMELOCK": 302_400,  # 7 days on Base
         # vault book (blocks)
-        "VAULT_BOOK_MIN_REG_TIMELOCK": 21_600,  # 12 hours on Base
-        "VAULT_BOOK_MAX_REG_TIMELOCK": 302_400,  # 7 days on Base
-    },
-    "sepolia": {
-        # ripe hq - gov changes (blocks)
-        "RIPE_HQ_MIN_GOV_TIMELOCK": 43_200,  # 1 day on Base
-        "RIPE_HQ_MAX_GOV_TIMELOCK": 302_400,  # 7 days on Base
-        # ripe hq - registry changes (blocks)
-        "RIPE_HQ_MIN_REG_TIMELOCK": 21_600,  # 12 hours on Base
-        "RIPE_HQ_MAX_REG_TIMELOCK": 302_400,  # 7 days on Base
-        # tokens (green / ripe)
-        "MIN_HQ_CHANGE_TIMELOCK": 43_200,  # 1 day on Base
-        "MAX_HQ_CHANGE_TIMELOCK": 302_400,  # 7 days on Base
-        # price desk (timestamps, not blocks!)
-        "PRICE_DESK_MIN_STALE_TIME": 60 * 5,  # 5 mins
-        "PRICE_DESK_MAX_STALE_TIME": 60 * 60 * 24 * 3,  # 3 days
-        # price desk (blocks)
-        "PRICE_DESK_MIN_REG_TIMELOCK": 21_600,  # 12 hours on Base
-        "PRICE_DESK_MAX_REG_TIMELOCK": 302_400,  # 7 days on Base
-        # vault book (blocks)
-        "VAULT_BOOK_MIN_REG_TIMELOCK": 21_600,  # 12 hours on Base
+        "VAULT_BOOK_MIN_REG_TIMELOCK": 3_600,  # 12 hours on Base
         "VAULT_BOOK_MAX_REG_TIMELOCK": 302_400,  # 7 days on Base
     },
     "local": {
@@ -163,37 +126,11 @@ CORE_TOKENS = {
         "USOL": "0x9B8Df6E244526ab5F6e6400d331DB28C8fdDdb55",
         "CBDOGE": "0xcbD06E5A2B0C65597161de254AA074E489dEb510",
     },
-    "sepolia": {
-        "WETH": "0x4200000000000000000000000000000000000006",
-        "USDC": "0x611ce0729f6C052f49536c84a8fD717E619D5dc6",
-        "CBBTC": "0x003d1beA6B9C5193cDA8d747A5362eD2932a35d0",
-    },
 }
 
 
 CURVE_PARAMS = {
     "base": {
-        # green pool parameters
-        "GREEN_POOL_NAME": "GREEN/USDC Pool",
-        "GREEN_POOL_SYMBOL": "GREEN/USDC",
-        "GREEN_POOL_A": 100,
-        "GREEN_POOL_FEE": 4000000,
-        "GREEN_POOL_OFFPEG_MULTIPLIER": 20000000000,
-        "GREEN_POOL_MA_EXP_TIME": 600,
-        # ripe pool params
-        "RIPE_POOL_NAME": "RIPE/WETH Pool",
-        "RIPE_POOL_SYMBOL": "RIPE/WETH",
-        "RIPE_POOL_A": 2700000,
-        "RIPE_POOL_GAMMA": 1300000000000,
-        "RIPE_POOL_MID_FEE": 2999999,
-        "RIPE_POOL_OUT_FEE": 80000000,
-        "RIPE_POOL_FEE_GAMMA": 350000000000000,
-        "RIPE_POOL_EXTRA_PROFIT": 100000000000,
-        "RIPE_POOL_ADJ_STEP": 100000000000,
-        "RIPE_POOL_MA_EXP_TIME": 600,
-        "RIPE_POOL_INIT_PRICE": 10 ** 13,
-    },
-    "sepolia": {
         # green pool parameters
         "GREEN_POOL_NAME": "GREEN/USDC Pool",
         "GREEN_POOL_SYMBOL": "GREEN/USDC",
@@ -305,5 +242,4 @@ YIELD_TOKENS = {
         "UNDY_CBETH": "0xe9EA27C1c67F12D04cb4694F8618AE8Bdb278E50",
         "UNDY_USDS": "0x04e77BC5885c82d68f523d1deE2e8b88c3036784",
     },
-    "sepolia": {},
 }
