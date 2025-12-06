@@ -96,10 +96,40 @@ def trainingWheels() -> address:
     ...
 
 
-# shouldCheckLastTouchy
+# shouldCheckLastTouch
 
 
 @view
 @external
 def shouldCheckLastTouch() -> bool:
+    ...
+
+
+# asset configs
+
+
+@view
+@external
+def assetConfigs() -> DynArray[cs.AssetConfigEntry, 100]:
+    ...
+
+
+# priority lists
+
+
+@view
+@external
+def priorityLiqAssetVaults() -> DynArray[cs.VaultLite, 20]:
+    ...
+
+
+@view
+@external
+def priorityStabVaults() -> DynArray[cs.VaultLite, 20]:
+    ...
+
+
+@view
+@external
+def priorityPriceSourceIds() -> DynArray[uint256, 10]:
     ...

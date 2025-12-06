@@ -237,6 +237,16 @@ def __init__(_ripeHq: address, _defaults: address):
         if ripeTokenVaultConfig.assetWeight != 0:
             self.ripeGovVaultConfig[addys._getRipeToken()] = ripeTokenVaultConfig
 
+        # asset configs
+        assetConfigs: DynArray[cs.AssetConfigEntry, 100] = staticcall Defaults(_defaults).assetConfigs()
+        for entry: cs.AssetConfigEntry in assetConfigs:
+            self._setAssetConfig(entry.asset, entry.config)
+
+        # priority lists
+        self.priorityLiqAssetVaults = staticcall Defaults(_defaults).priorityLiqAssetVaults()
+        self.priorityStabVaults = staticcall Defaults(_defaults).priorityStabVaults()
+        self.priorityPriceSourceIds = staticcall Defaults(_defaults).priorityPriceSourceIds()
+
 
 #################
 # Global Config #
@@ -275,6 +285,11 @@ def setRipeBondConfig(_config: cs.RipeBondConfig):
 @external
 def setAssetConfig(_asset: address, _config: cs.AssetConfig):
     assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
+    self._setAssetConfig(_asset, _config)
+
+
+@internal
+def _setAssetConfig(_asset: address, _config: cs.AssetConfig):
     self._updatePointsAllocs(_asset, _config.stakersPointsAlloc, _config.voterPointsAlloc) # do first!
     self.assetConfig[_asset] = _config
 

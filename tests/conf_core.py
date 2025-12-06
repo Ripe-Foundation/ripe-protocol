@@ -976,6 +976,7 @@ def wsuper_oethb_prices(ripe_hq_deploy, fork, deploy3r, mock_yield_registry):
     c = boa.load(
         "contracts/priceSources/wsuperOETHbPrices.vy",
         ripe_hq_deploy,
+        ZERO_ADDRESS,
         super_oeth,
         wrapped_super_oeth,
         PARAMS[fork]["PRICE_DESK_MIN_REG_TIMELOCK"],
