@@ -2,11 +2,14 @@ from scripts.utils.migration import Migration
 from tests.constants import ZERO_ADDRESS
 
 
+DEFAULT_STALE_TIME = 60 * 60 * 24
+
+
 def migrate(migration: Migration):
     hq = migration.get_contract("RipeHq")
     blueprint = migration.blueprint()
 
-    old_chainlink = migration.get_contract("ChainlinkPrices")
+    old_chainlink = migration.get_contract("ChainlinkPrices", '0x253f55e455701fF0B835128f55668ed159aAB3D9')
     chainlink = migration.deploy(
         "ChainlinkPrices",
         hq,
@@ -18,16 +21,18 @@ def migrate(migration: Migration):
         blueprint.ADDYS["BTC"],
         blueprint.ADDYS["CHAINLINK_ETH_USD"],
         blueprint.ADDYS["CHAINLINK_BTC_USD"],
-        60 * 60 * 24,  # default stale time
+        DEFAULT_STALE_TIME,
     )
     for asset in (old_chainlink.getPricedAssets()):
         new_feed = chainlink.feedConfig(asset)
         if new_feed.feed != ZERO_ADDRESS:
             continue
+        if asset.lower() in ['0xd6a34b430C05ac78c24985f8abEE2616BC1788Cb'.lower(), '0x239b9C1F24F3423062B0d364796e07Ee905E9FcE'.lower()]:
+            continue
         addr = old_chainlink.feedConfig(asset)
         print(addr)
         migration.execute(chainlink.addNewPriceFeed, asset, addr.feed,
-                          addr.staleTime, addr.needsEthToUsd, addr.needsBtcToUsd)
+                          DEFAULT_STALE_TIME, addr.needsEthToUsd, addr.needsBtcToUsd)
         migration.execute(chainlink.confirmNewPriceFeed, asset)
 
     undy_vault_prices = migration.deploy(
