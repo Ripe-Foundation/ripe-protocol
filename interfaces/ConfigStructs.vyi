@@ -134,3 +134,7 @@ struct VaultLite:
 struct AssetConfigEntry:
     asset: address
     config: AssetConfig
+
+struct RipeGovVaultConfigEntry:
+    asset: address
+    config: RipeGovVaultConfig

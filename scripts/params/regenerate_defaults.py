@@ -405,7 +405,7 @@ def generate_asset_configs_vyper(asset_configs: list) -> str:
 
 @view
 @external
-def assetConfigs() -> DynArray[cs.AssetConfigEntry, 100]:
+def assetConfigs() -> DynArray[cs.AssetConfigEntry, 50]:
     return [
 {entries_code}
     ]
@@ -471,13 +471,66 @@ def priorityPriceSourceIds() -> DynArray[uint256, 10]:
 '''
 
 
+def generate_lite_signers_vyper() -> str:
+    """Generate liteSigners() function returning empty DynArray of addresses."""
+    return '''
+# lite signers
+
+
+@view
+@external
+def liteSigners() -> DynArray[address, 10]:
+    return []
+'''
+
+
+def generate_ripe_gov_vault_configs_vyper(ripe_gov_vault_configs: list, symbol_map: dict) -> str:
+    """Generate ripeGovVaultConfigs() function returning DynArray of RipeGovVaultConfigEntry.
+
+    ripe_gov_vault_configs: list of (address, config, symbol) tuples
+    """
+    entries = []
+    for addr, config, symbol in ripe_gov_vault_configs:
+        lock_terms = config[0]  # lockTerms tuple
+        entry = f"""        # {symbol}
+        cs.RipeGovVaultConfigEntry(
+            asset={addr},
+            config=cs.RipeGovVaultConfig(
+                lockTerms=cs.LockTerms(
+                    minLockDuration={format_vyper_uint(lock_terms[0], "blocks")},
+                    maxLockDuration={format_vyper_uint(lock_terms[1], "blocks")},
+                    maxLockBoost={format_vyper_uint(lock_terms[2], "boost")},
+                    canExit={format_vyper_bool(lock_terms[3])},
+                    exitFee={format_vyper_uint(lock_terms[4], "fee")},
+                ),
+                assetWeight={format_vyper_uint(config[1], "percent")},
+                shouldFreezeWhenBadDebt={format_vyper_bool(config[2])},
+            ),
+        ),"""
+        entries.append(entry)
+
+    entries_code = "\n".join(entries)
+
+    return f'''
+# ripe gov vault configs
+
+
+@view
+@external
+def ripeGovVaultConfigs() -> DynArray[cs.RipeGovVaultConfigEntry, 5]:
+    return [
+{entries_code}
+    ]
+'''
+
+
 def generate_defaults_vyper(
     gen_config: tuple,
     gen_debt_config: tuple,
     hr_config: tuple,
     ripe_bond_config: tuple,
     rewards_config: tuple,
-    ripe_gov_vault_config: tuple,
+    ripe_gov_vault_configs: list,
     should_check_last_touch: bool,
     contrib_template: str,
     underscore_registry: str,
@@ -492,10 +545,12 @@ def generate_defaults_vyper(
 
     # Extract nested structs
     auction_params = gen_debt_config[16]  # genAuctionParams
-    lock_terms = ripe_gov_vault_config[0]  # lockTerms
 
     # Generate asset config code
     asset_config_code = generate_asset_configs_vyper(asset_configs)
+
+    # Generate ripe gov vault configs code
+    ripe_gov_vault_configs_code = generate_ripe_gov_vault_configs_vyper(ripe_gov_vault_configs, symbol_map)
 
     # Generate priority lists code
     priority_lists_code = generate_priority_lists_vyper(
@@ -653,24 +708,7 @@ def rewardsConfig() -> cs.RipeRewardsConfig:
     )
 
 
-# ripe token config for ripe gov vault
-
-
-@view
-@external
-def ripeTokenVaultConfig() -> cs.RipeGovVaultConfig:
-    return cs.RipeGovVaultConfig(
-        lockTerms = cs.LockTerms(
-            minLockDuration = {format_vyper_uint(lock_terms[0], "blocks")},
-            maxLockDuration = {format_vyper_uint(lock_terms[1], "blocks")},
-            maxLockBoost = {format_vyper_uint(lock_terms[2], "boost")},
-            canExit = {format_vyper_bool(lock_terms[3])},
-            exitFee = {format_vyper_uint(lock_terms[4], "fee")},
-        ),
-        assetWeight = {format_vyper_uint(ripe_gov_vault_config[1], "percent")},
-        shouldFreezeWhenBadDebt = {format_vyper_bool(ripe_gov_vault_config[2])},
-    )
-
+{ripe_gov_vault_configs_code}
 
 # hr config
 
@@ -715,9 +753,10 @@ def shouldCheckLastTouch() -> bool:
     return {format_vyper_bool(should_check_last_touch)}
 '''
 
-    # Append asset configs and priority lists
+    # Append asset configs, priority lists, and lite signers
     vyper_code += asset_config_code
     vyper_code += priority_lists_code
+    vyper_code += generate_lite_signers_vyper()
 
     return vyper_code
 
@@ -782,10 +821,6 @@ def main():
         print("  - rewardsConfig()")
         time.sleep(RPC_DELAY)
         rewards_config = mc.rewardsConfig()
-
-        print("  - ripeGovVaultConfig(ripeToken)")
-        time.sleep(RPC_DELAY)
-        ripe_gov_vault_config = mc.ripeGovVaultConfig(ripe_addr)
 
         print("  - shouldCheckLastTouch()")
         time.sleep(RPC_DELAY)
@@ -870,6 +905,22 @@ def main():
             ltv = config[6][0]
             print(f"  - {symbol}: LTV={ltv/100:.0f}%, USD={format_usd_value(usd_value)}")
 
+        # Read ripeGovVaultConfigs for assets with vault ID 2 (Ripe Gov Vault)
+        RIPE_GOV_VAULT_ID = 2
+        print(f"\nReading ripeGovVaultConfigs (vault ID {RIPE_GOV_VAULT_ID})...")
+        ripe_gov_vault_configs = []  # List of (address, config, symbol) tuples
+        for addr, config, symbol, usd_value, price, decimals in asset_configs:
+            vault_ids = list(config[0])  # vaultIds is first field
+            can_deposit = config[11]  # canDeposit field
+            if RIPE_GOV_VAULT_ID in vault_ids and can_deposit:
+                time.sleep(RPC_DELAY)
+                gov_vault_config = mc.ripeGovVaultConfig(addr)
+                # Only include if assetWeight > 0 (configured)
+                if gov_vault_config[1] > 0:  # assetWeight
+                    ripe_gov_vault_configs.append((addr, gov_vault_config, symbol))
+                    print(f"  - {symbol}: assetWeight={gov_vault_config[1]}")
+        print(f"  Total: {len(ripe_gov_vault_configs)} ripeGovVaultConfigs")
+
         # Read priority lists
         print("\nReading priority lists...")
         time.sleep(RPC_DELAY)
@@ -914,10 +965,10 @@ def main():
         print(f"  arePointsEnabled: {rewards_config[0]}")
         print(f"  ripePerBlock: {rewards_config[1]}")
 
-        print("\nripeGovVaultConfig:")
-        lock_terms = ripe_gov_vault_config[0]
-        print(f"  minLockDuration: {lock_terms[0] / DAY_IN_BLOCKS:.1f} days")
-        print(f"  maxLockDuration: {lock_terms[1] / DAY_IN_BLOCKS:.1f} days")
+        print(f"\nripeGovVaultConfigs: {len(ripe_gov_vault_configs)} entries")
+        for addr, config, symbol in ripe_gov_vault_configs:
+            lock_terms = config[0]
+            print(f"  - {symbol}: minLock={lock_terms[0] / DAY_IN_BLOCKS:.1f}d, maxLock={lock_terms[1] / DAY_IN_BLOCKS:.1f}d, weight={config[1]}")
 
         print(f"\nshouldCheckLastTouch: {should_check_last_touch}")
 
@@ -937,7 +988,7 @@ def main():
             hr_config=hr_config,
             ripe_bond_config=ripe_bond_config,
             rewards_config=rewards_config,
-            ripe_gov_vault_config=ripe_gov_vault_config,
+            ripe_gov_vault_configs=ripe_gov_vault_configs,
             should_check_last_touch=should_check_last_touch,
             contrib_template=contrib_template,
             underscore_registry=underscore_registry,
