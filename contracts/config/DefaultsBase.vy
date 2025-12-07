@@ -43,7 +43,7 @@ def genConfig() -> cs.GenConfig:
     return cs.GenConfig(
         perUserMaxVaults = 5,
         perUserMaxAssetsPerVault = 15,
-        priceStaleTime = 0,
+        priceStaleTime = 1 * DAY_IN_SECONDS,
         canDeposit = True,
         canWithdraw = True,
         canBorrow = True,
@@ -245,9 +245,9 @@ def assetConfigs() -> DynArray[cs.AssetConfigEntry, 50]:
             vaultIds=[5],
             stakersPointsAlloc=0,
             voterPointsAlloc=0,
-            perUserDepositLimit=5 * 10**10,  # $50.2k
-            globalDepositLimit=25 * 10**10,  # $251.0k
-            minDepositBalance=100_000,  # $0.1004
+            perUserDepositLimit=49_796_932_480,  # $50.0k
+            globalDepositLimit=248_984_662_440,  # $250.0k
+            minDepositBalance=99_593,  # $0.1000
             debtTerms=cs.DebtTerms(
                 ltv=80_00,
                 redemptionThreshold=85_00,
@@ -278,14 +278,14 @@ def assetConfigs() -> DynArray[cs.AssetConfigEntry, 50]:
             isNft=False,
         )),
         # USDC
-        # USD Value: $762.41
+        # USD Value: $762.33
         cs.AssetConfigEntry(asset=0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913, config=cs.AssetConfig(
             vaultIds=[3],
             stakersPointsAlloc=0,
             voterPointsAlloc=0,
-            perUserDepositLimit=100_000_000,  # $99.99
-            globalDepositLimit=1 * 10**9,  # $999.88
-            minDepositBalance=250_000,  # $0.2500
+            perUserDepositLimit=100_000_000,  # $99.98
+            globalDepositLimit=1 * 10**9,  # $999.77
+            minDepositBalance=250_000,  # $0.2499
             debtTerms=cs.DebtTerms(
                 ltv=80_00,
                 redemptionThreshold=85_00,
@@ -321,9 +321,9 @@ def assetConfigs() -> DynArray[cs.AssetConfigEntry, 50]:
             vaultIds=[3],
             stakersPointsAlloc=0,
             voterPointsAlloc=0,
-            perUserDepositLimit=6_000 * EIGHTEEN_DECIMALS,  # $7.2k
-            globalDepositLimit=60_000 * EIGHTEEN_DECIMALS,  # $72.4k
-            minDepositBalance=1 * 10**16,  # $0.0121
+            perUserDepositLimit=4_138_925_278_549_878_192_670,  # $5.0k
+            globalDepositLimit=20_694_626_392_749_390_963_353,  # $25.0k
+            minDepositBalance=82_778_505_570_997_563,  # $0.1000
             debtTerms=cs.DebtTerms(
                 ltv=80_00,
                 redemptionThreshold=85_00,
@@ -359,9 +359,9 @@ def assetConfigs() -> DynArray[cs.AssetConfigEntry, 50]:
             vaultIds=[5],
             stakersPointsAlloc=0,
             voterPointsAlloc=0,
-            perUserDepositLimit=1 * 10**9,  # $1.2k
-            globalDepositLimit=1 * 10**10,  # $11.7k
-            minDepositBalance=100_000,  # $0.1165
+            perUserDepositLimit=4_290_904_101,  # $5.0k
+            globalDepositLimit=21_454_520_508,  # $25.0k
+            minDepositBalance=85_818,  # $0.1000
             debtTerms=cs.DebtTerms(
                 ltv=80_00,
                 redemptionThreshold=85_00,
@@ -397,9 +397,9 @@ def assetConfigs() -> DynArray[cs.AssetConfigEntry, 50]:
             vaultIds=[3],
             stakersPointsAlloc=0,
             voterPointsAlloc=0,
-            perUserDepositLimit=8 * 10**17,  # $2.4k
-            globalDepositLimit=8 * EIGHTEEN_DECIMALS,  # $24.3k
-            minDepositBalance=8 * 10**13,  # $0.2430
+            perUserDepositLimit=1_646_052_728_169_408_091,  # $5.0k
+            globalDepositLimit=8_230_263_640_847_040_458,  # $25.0k
+            minDepositBalance=32_921_054_563_388,  # $0.1000
             debtTerms=cs.DebtTerms(
                 ltv=70_00,
                 redemptionThreshold=77_00,
@@ -435,9 +435,9 @@ def assetConfigs() -> DynArray[cs.AssetConfigEntry, 50]:
             vaultIds=[5],
             stakersPointsAlloc=0,
             voterPointsAlloc=0,
-            perUserDepositLimit=25 * 10**16,  # $759.93
-            globalDepositLimit=25 * 10**17,  # $7.6k
-            minDepositBalance=25 * 10**12,  # $0.0760
+            perUserDepositLimit=16_447_676_038_471_417_830,  # $50.0k
+            globalDepositLimit=82_238_380_192_357_089_170,  # $250.0k
+            minDepositBalance=32_895_352_076_942,  # $0.1000
             debtTerms=cs.DebtTerms(
                 ltv=70_00,
                 redemptionThreshold=77_00,
@@ -473,9 +473,9 @@ def assetConfigs() -> DynArray[cs.AssetConfigEntry, 50]:
             vaultIds=[3],
             stakersPointsAlloc=0,
             voterPointsAlloc=0,
-            perUserDepositLimit=8 * 10**17,  # $2.7k
-            globalDepositLimit=8 * EIGHTEEN_DECIMALS,  # $27.1k
-            minDepositBalance=8 * 10**13,  # $0.2707
+            perUserDepositLimit=1_478_101_461_711_344_160,  # $5.0k
+            globalDepositLimit=7_390_507_308_556_720_802,  # $25.0k
+            minDepositBalance=29_562_029_234_226,  # $0.1000
             debtTerms=cs.DebtTerms(
                 ltv=70_00,
                 redemptionThreshold=77_00,
@@ -511,9 +511,9 @@ def assetConfigs() -> DynArray[cs.AssetConfigEntry, 50]:
             vaultIds=[3],
             stakersPointsAlloc=0,
             voterPointsAlloc=0,
-            perUserDepositLimit=2_500_000,  # $2.2k
-            globalDepositLimit=25_000_000,  # $22.3k
-            minDepositBalance=25,  # $0.0223
+            perUserDepositLimit=5_554_381,  # $5.0k
+            globalDepositLimit=27_771_905,  # $25.0k
+            minDepositBalance=111,  # $0.0999
             debtTerms=cs.DebtTerms(
                 ltv=70_00,
                 redemptionThreshold=77_00,
@@ -549,9 +549,9 @@ def assetConfigs() -> DynArray[cs.AssetConfigEntry, 50]:
             vaultIds=[3],
             stakersPointsAlloc=0,
             voterPointsAlloc=0,
-            perUserDepositLimit=16 * 10**17,  # $5.3k
-            globalDepositLimit=16 * EIGHTEEN_DECIMALS,  # $52.7k
-            minDepositBalance=8 * 10**13,  # $0.2634
+            perUserDepositLimit=1_518_552_436_330_112_774,  # $5.0k
+            globalDepositLimit=7_592_762_181_650_563_870,  # $25.0k
+            minDepositBalance=30_371_048_726_602,  # $0.1000
             debtTerms=cs.DebtTerms(
                 ltv=70_00,
                 redemptionThreshold=77_00,
@@ -582,14 +582,14 @@ def assetConfigs() -> DynArray[cs.AssetConfigEntry, 50]:
             isNft=False,
         )),
         # undyBTC
-        # USD Value: $106.52
+        # USD Value: $107.28
         cs.AssetConfigEntry(asset=0x3fb0fC9D3Ddd543AD1b748Ed2286a022f4638493, config=cs.AssetConfig(
             vaultIds=[5],
             stakersPointsAlloc=0,
             voterPointsAlloc=0,
-            perUserDepositLimit=1_000_000,  # $893.90
-            globalDepositLimit=10_000_000,  # $8.9k
-            minDepositBalance=100,  # $0.0894
+            perUserDepositLimit=55_541_110,  # $50.0k
+            globalDepositLimit=277_705_550,  # $250.0k
+            minDepositBalance=111,  # $0.0999
             debtTerms=cs.DebtTerms(
                 ltv=70_00,
                 redemptionThreshold=77_00,
@@ -620,14 +620,14 @@ def assetConfigs() -> DynArray[cs.AssetConfigEntry, 50]:
             isNft=False,
         )),
         # VIRTUAL
-        # USD Value: $1.1k
+        # USD Value: $1.0k
         cs.AssetConfigEntry(asset=0x0b3e328455c4059EEb9e3f84b5543F74E24e7E1b, config=cs.AssetConfig(
             vaultIds=[3],
             stakersPointsAlloc=0,
             voterPointsAlloc=0,
-            perUserDepositLimit=2_000 * EIGHTEEN_DECIMALS,  # $1.7k
-            globalDepositLimit=20_000 * EIGHTEEN_DECIMALS,  # $17.0k
-            minDepositBalance=1 * EIGHTEEN_DECIMALS,  # $0.8495
+            perUserDepositLimit=6_041_731_690_803_988_944_597,  # $5.0k
+            globalDepositLimit=30_208_658_454_019_944_722_988,  # $25.0k
+            minDepositBalance=120_834_633_816_079_778,  # $0.1000
             debtTerms=cs.DebtTerms(
                 ltv=50_00,
                 redemptionThreshold=60_00,
@@ -658,14 +658,14 @@ def assetConfigs() -> DynArray[cs.AssetConfigEntry, 50]:
             isNft=False,
         )),
         # AERO
-        # USD Value: $881.58
+        # USD Value: $846.54
         cs.AssetConfigEntry(asset=0x940181a94A35A4569E4529A3CDfB74e38FD98631, config=cs.AssetConfig(
             vaultIds=[3],
             stakersPointsAlloc=0,
             voterPointsAlloc=0,
-            perUserDepositLimit=3_000 * EIGHTEEN_DECIMALS,  # $2.0k
-            globalDepositLimit=30_000 * EIGHTEEN_DECIMALS,  # $20.4k
-            minDepositBalance=1 * EIGHTEEN_DECIMALS,  # $0.6787
+            perUserDepositLimit=7_671_774_247_547_778_735_965,  # $5.0k
+            globalDepositLimit=38_358_871_237_738_893_679_826,  # $25.0k
+            minDepositBalance=153_435_484_950_955_574,  # $0.1000
             debtTerms=cs.DebtTerms(
                 ltv=50_00,
                 redemptionThreshold=60_00,
@@ -696,14 +696,14 @@ def assetConfigs() -> DynArray[cs.AssetConfigEntry, 50]:
             isNft=False,
         )),
         # uSOL
-        # USD Value: $224.19
+        # USD Value: $222.96
         cs.AssetConfigEntry(asset=0x9B8Df6E244526ab5F6e6400d331DB28C8fdDdb55, config=cs.AssetConfig(
             vaultIds=[3],
             stakersPointsAlloc=0,
             voterPointsAlloc=0,
-            perUserDepositLimit=15 * EIGHTEEN_DECIMALS,  # $2.0k
-            globalDepositLimit=150 * EIGHTEEN_DECIMALS,  # $19.8k
-            minDepositBalance=15 * 10**14,  # $0.1983
+            perUserDepositLimit=38_021_075_364_647_256_084,  # $5.0k
+            globalDepositLimit=190_105_376_823_236_280_420,  # $25.0k
+            minDepositBalance=760_421_507_292_945,  # $0.1000
             debtTerms=cs.DebtTerms(
                 ltv=50_00,
                 redemptionThreshold=60_00,
@@ -734,14 +734,14 @@ def assetConfigs() -> DynArray[cs.AssetConfigEntry, 50]:
             isNft=False,
         )),
         # cbDOGE
-        # USD Value: $39.94
+        # USD Value: $39.37
         cs.AssetConfigEntry(asset=0xcbD06E5A2B0C65597161de254AA074E489dEb510, config=cs.AssetConfig(
             vaultIds=[3],
             stakersPointsAlloc=0,
             voterPointsAlloc=0,
-            perUserDepositLimit=15 * 10**11,  # $2.1k
-            globalDepositLimit=15 * 10**12,  # $21.0k
-            minDepositBalance=150_000_000,  # $0.2100
+            perUserDepositLimit=3_623_605_908_216,  # $5.0k
+            globalDepositLimit=18_118_029_541_084,  # $25.0k
+            minDepositBalance=72_472_118,  # $0.1000
             debtTerms=cs.DebtTerms(
                 ltv=50_00,
                 redemptionThreshold=60_00,
@@ -772,14 +772,14 @@ def assetConfigs() -> DynArray[cs.AssetConfigEntry, 50]:
             isNft=False,
         )),
         # undyAERO
-        # USD Value: $11.32
+        # USD Value: $10.87
         cs.AssetConfigEntry(asset=0x96F1a7ce331F40afe866F3b707c223e377661087, config=cs.AssetConfig(
             vaultIds=[5],
             stakersPointsAlloc=0,
             voterPointsAlloc=0,
-            perUserDepositLimit=1_000 * EIGHTEEN_DECIMALS,  # $679.46
-            globalDepositLimit=10_000 * EIGHTEEN_DECIMALS,  # $6.8k
-            minDepositBalance=1 * 10**17,  # $0.0679
+            perUserDepositLimit=7_663_356_320_898_015_168_529,  # $5.0k
+            globalDepositLimit=38_316_781_604_490_075_842_648,  # $25.0k
+            minDepositBalance=153_267_126_417_960_303,  # $0.1000
             debtTerms=cs.DebtTerms(
                 ltv=50_00,
                 redemptionThreshold=60_00,
@@ -815,9 +815,9 @@ def assetConfigs() -> DynArray[cs.AssetConfigEntry, 50]:
             vaultIds=[3],
             stakersPointsAlloc=0,
             voterPointsAlloc=0,
-            perUserDepositLimit=375 * 10**7,  # $1.5k
-            globalDepositLimit=375 * 10**8,  # $15.5k
-            minDepositBalance=1_000_000,  # $0.4124
+            perUserDepositLimit=12_008_521_246,  # $5.0k
+            globalDepositLimit=60_042_606_233,  # $25.0k
+            minDepositBalance=240_170,  # $0.1000
             debtTerms=cs.DebtTerms(
                 ltv=50_00,
                 redemptionThreshold=60_00,
@@ -853,9 +853,9 @@ def assetConfigs() -> DynArray[cs.AssetConfigEntry, 50]:
             vaultIds=[3],
             stakersPointsAlloc=0,
             voterPointsAlloc=0,
-            perUserDepositLimit=1 * 10**9,  # $2.0k
-            globalDepositLimit=1 * 10**10,  # $20.3k
-            minDepositBalance=333_333,  # $0.6753
+            perUserDepositLimit=2_458_282_938,  # $5.0k
+            globalDepositLimit=12_291_414_692,  # $25.0k
+            minDepositBalance=49_165,  # $0.1000
             debtTerms=cs.DebtTerms(
                 ltv=50_00,
                 redemptionThreshold=60_00,
@@ -891,9 +891,9 @@ def assetConfigs() -> DynArray[cs.AssetConfigEntry, 50]:
             vaultIds=[3],
             stakersPointsAlloc=0,
             voterPointsAlloc=0,
-            perUserDepositLimit=25 * 10**8,  # $2.0k
-            globalDepositLimit=25 * 10**9,  # $20.4k
-            minDepositBalance=800_000,  # $0.6535
+            perUserDepositLimit=6_169_282_648,  # $5.0k
+            globalDepositLimit=30_846_413_240,  # $25.0k
+            minDepositBalance=123_385,  # $0.1000
             debtTerms=cs.DebtTerms(
                 ltv=50_00,
                 redemptionThreshold=60_00,
@@ -924,14 +924,14 @@ def assetConfigs() -> DynArray[cs.AssetConfigEntry, 50]:
             isNft=False,
         )),
         # VVV
-        # USD Value: $325.24
+        # USD Value: $320.26
         cs.AssetConfigEntry(asset=0xacfE6019Ed1A7Dc6f7B508C02d1b04ec88cC21bf, config=cs.AssetConfig(
             vaultIds=[3],
             stakersPointsAlloc=0,
             voterPointsAlloc=0,
-            perUserDepositLimit=1_100 * EIGHTEEN_DECIMALS,  # $1.2k
-            globalDepositLimit=11_000 * EIGHTEEN_DECIMALS,  # $12.1k
-            minDepositBalance=11 * 10**16,  # $0.1213
+            perUserDepositLimit=4_606_534_640_251_433_505_211,  # $5.0k
+            globalDepositLimit=23_032_673_201_257_167_526_057,  # $25.0k
+            minDepositBalance=92_130_692_805_028_670,  # $0.1000
             debtTerms=cs.DebtTerms(
                 ltv=40_00,
                 redemptionThreshold=45_00,
@@ -962,14 +962,14 @@ def assetConfigs() -> DynArray[cs.AssetConfigEntry, 50]:
             isNft=False,
         )),
         # DEGEN
-        # USD Value: $202.52
+        # USD Value: $216.84
         cs.AssetConfigEntry(asset=0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed, config=cs.AssetConfig(
             vaultIds=[3],
             stakersPointsAlloc=0,
             voterPointsAlloc=0,
-            perUserDepositLimit=750_000 * EIGHTEEN_DECIMALS,  # $1.0k
-            globalDepositLimit=7_500_000 * EIGHTEEN_DECIMALS,  # $10.4k
-            minDepositBalance=75 * EIGHTEEN_DECIMALS,  # $0.1043
+            perUserDepositLimit=3_358_702_734_655_766_556_725_130,  # $5.0k
+            globalDepositLimit=16_793_513_673_278_832_783_625_652,  # $25.0k
+            minDepositBalance=67_174_054_693_115_331_134,  # $0.1000
             debtTerms=cs.DebtTerms(
                 ltv=40_00,
                 redemptionThreshold=45_00,
@@ -1000,14 +1000,14 @@ def assetConfigs() -> DynArray[cs.AssetConfigEntry, 50]:
             isNft=False,
         )),
         # WELL
-        # USD Value: $121.52
+        # USD Value: $117.56
         cs.AssetConfigEntry(asset=0xA88594D404727625A9437C3f886C7643872296AE, config=cs.AssetConfig(
             vaultIds=[3],
             stakersPointsAlloc=0,
             voterPointsAlloc=0,
-            perUserDepositLimit=100_000 * EIGHTEEN_DECIMALS,  # $1.0k
-            globalDepositLimit=1_000_000 * EIGHTEEN_DECIMALS,  # $10.1k
-            minDepositBalance=10 * EIGHTEEN_DECIMALS,  # $0.1014
+            perUserDepositLimit=509_796_764_421_895_567_113_214,  # $5.0k
+            globalDepositLimit=2_548_983_822_109_477_835_566_073,  # $25.0k
+            minDepositBalance=10_195_935_288_437_911_342,  # $0.1000
             debtTerms=cs.DebtTerms(
                 ltv=40_00,
                 redemptionThreshold=45_00,
@@ -1038,13 +1038,13 @@ def assetConfigs() -> DynArray[cs.AssetConfigEntry, 50]:
             isNft=False,
         )),
         # RIPE
-        # USD Value: $295.5k
+        # USD Value: $295.7k
         cs.AssetConfigEntry(asset=0x2A0a59d6B975828e781EcaC125dBA40d7ee5dDC0, config=cs.AssetConfig(
             vaultIds=[2],
             stakersPointsAlloc=15_00,
             voterPointsAlloc=0,
             perUserDepositLimit=100_000_000 * EIGHTEEN_DECIMALS,  # $108.7M
-            globalDepositLimit=1_000_000_000 * EIGHTEEN_DECIMALS,  # $1087.0M
+            globalDepositLimit=1_000_000_000 * EIGHTEEN_DECIMALS,  # $1086.5M
             minDepositBalance=1 * 10**14,  # $0.000109
             debtTerms=cs.DebtTerms(
                 ltv=0,
@@ -1076,13 +1076,13 @@ def assetConfigs() -> DynArray[cs.AssetConfigEntry, 50]:
             isNft=False,
         )),
         # GREEN/USDC
-        # USD Value: $59.5k
+        # USD Value: $58.7k
         cs.AssetConfigEntry(asset=0xd6c283655B42FA0eb2685F7AB819784F071459dc, config=cs.AssetConfig(
             vaultIds=[1],
             stakersPointsAlloc=25_00,
             voterPointsAlloc=0,
             perUserDepositLimit=100_000_000 * EIGHTEEN_DECIMALS,  # $100.2M
-            globalDepositLimit=1_000_000_000 * EIGHTEEN_DECIMALS,  # $1001.9M
+            globalDepositLimit=1_000_000_000 * EIGHTEEN_DECIMALS,  # $1001.8M
             minDepositBalance=1 * 10**16,  # $0.0100
             debtTerms=cs.DebtTerms(
                 ltv=0,
@@ -1120,7 +1120,7 @@ def assetConfigs() -> DynArray[cs.AssetConfigEntry, 50]:
             stakersPointsAlloc=15_00,
             voterPointsAlloc=0,
             perUserDepositLimit=100_000_000 * EIGHTEEN_DECIMALS,  # $106.3M
-            globalDepositLimit=1_000_000_000 * EIGHTEEN_DECIMALS,  # $1062.7M
+            globalDepositLimit=1_000_000_000 * EIGHTEEN_DECIMALS,  # $1062.5M
             minDepositBalance=1 * 10**16,  # $0.0106
             debtTerms=cs.DebtTerms(
                 ltv=0,
@@ -1236,11 +1236,17 @@ def assetConfigs() -> DynArray[cs.AssetConfigEntry, 50]:
 @external
 def priorityLiqAssetVaults() -> DynArray[cs.VaultLite, 20]:
     return [
-    cs.VaultLite(vaultId=3, asset=0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913), # USDC
-    cs.VaultLite(vaultId=3, asset=0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf), # cbBTC
     cs.VaultLite(vaultId=3, asset=0x4200000000000000000000000000000000000006), # WETH
+    cs.VaultLite(vaultId=3, asset=0x2Ae3F1Ec7F1F5012CFEab0185bfc7aa3cf0DEc22), # cbETH
+    cs.VaultLite(vaultId=3, asset=0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf), # cbBTC
+    cs.VaultLite(vaultId=5, asset=0x3fb0fC9D3Ddd543AD1b748Ed2286a022f4638493), # undyBTC
+    cs.VaultLite(vaultId=5, asset=0x02981DB1a99A14912b204437e7a2E02679B57668), # undyETH
+    cs.VaultLite(vaultId=3, asset=0x940181a94A35A4569E4529A3CDfB74e38FD98631), # AERO
+    cs.VaultLite(vaultId=5, asset=0x96F1a7ce331F40afe866F3b707c223e377661087), # undyAERO
+    cs.VaultLite(vaultId=3, asset=0xcbADA732173e39521CDBE8bf59a6Dc85A9fc7b8c), # cbADA
+    cs.VaultLite(vaultId=3, asset=0xcb585250f852C6c6bf90434AB21A00f02833a4af), # cbXRP
+    cs.VaultLite(vaultId=3, asset=0xcb17C9Db87B595717C857a08468793f5bAb6445F), # cbLTC
     cs.VaultLite(vaultId=3, asset=0x9B8Df6E244526ab5F6e6400d331DB28C8fdDdb55), # uSOL
-    cs.VaultLite(vaultId=3, asset=0xcbD06E5A2B0C65597161de254AA074E489dEb510), # cbDOGE
     ]
 
 
@@ -1256,7 +1262,7 @@ def priorityStabVaults() -> DynArray[cs.VaultLite, 20]:
 @view
 @external
 def priorityPriceSourceIds() -> DynArray[uint256, 10]:
-    return [1, 3, 4, 5, 2]
+    return [1, 8, 2, 9, 4, 5]
 
 # lite signers
 

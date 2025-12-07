@@ -28,6 +28,15 @@ from params_utils import (
 )
 
 # ============================================================================
+# DEPOSIT LIMIT CONSTANTS (USD values - adjust these as needed)
+# ============================================================================
+
+# These USD values will be converted to asset amounts using PriceDesk.getAssetAmount
+PER_USER_DEPOSIT_LIMIT_USD = 5_000    # $5,000 USD per user per asset
+GLOBAL_DEPOSIT_LIMIT_USD = 25_000     # $25,000 USD global per asset
+MIN_DEPOSIT_BALANCE_USD = 0.10        # $0.10 USD minimum deposit
+
+# ============================================================================
 # CONSTANTS FOR VYPER VALUE FORMATTING
 # ============================================================================
 
@@ -45,6 +54,29 @@ MONTH_IN_SECONDS = 30 * DAY_IN_SECONDS
 YEAR_IN_SECONDS = 365 * DAY_IN_SECONDS
 
 ZERO_ADDRESS = "0x0000000000000000000000000000000000000000"
+
+# Asset addresses to preserve production deposit limits for (not recalculated from USD)
+PRESERVE_DEPOSIT_LIMITS_ADDRESSES = {
+    # Stability Pool assets (vault ID 1)
+    "0xd6c283655B42FA0eb2685F7AB819784F071459dc",  # GREEN/USDC
+    "0xaa0f13488CE069A7B5a099457c753A7CFBE04d36",  # sGREEN
+    # Ripe Gov Vault assets (vault ID 2)
+    "0x2A0a59d6B975828e781EcaC125dBA40d7ee5dDC0",  # RIPE
+    "0x765824aD2eD0ECB70ECc25B0Cf285832b335d6A9",  # vAMM-RIPE/WETH
+    # Other assets
+    "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",  # USDC
+    "0xd1Eac76497D06Cf15475A5e3984D5bC03de7C707",  # GREEN
+}
+
+# Asset addresses to apply deposit limit multiplier to
+MULTIPLY_LIMIT_ASSETS = {
+    "0xb33852cfd0c22647AAC501a6Af59Bc4210a686Bf", # undyUSD
+    "0x02981DB1a99A14912b204437e7a2E02679B57668", # undyETH
+    "0x3fb0fC9D3Ddd543AD1b748Ed2286a022f4638493", # undyBTC
+}
+
+# Multiplier for deposit limits (applied to perUserDepositLimit and globalDepositLimit)
+MULTIPLY_FACTOR = 10
 
 # Minimal ERC20 ABI for symbol()
 ERC20_ABI = """
@@ -67,11 +99,12 @@ VAULT_ABI = """
 ]
 """
 
-# Minimal PriceDesk ABI for getPrice() and getUsdValue()
+# Minimal PriceDesk ABI for getPrice(), getUsdValue(), and getAssetAmount()
 PRICE_DESK_ABI = """
 [
     {"name": "getPrice", "type": "function", "stateMutability": "view", "inputs": [{"name": "_asset", "type": "address"}], "outputs": [{"name": "", "type": "uint256"}]},
-    {"name": "getUsdValue", "type": "function", "stateMutability": "view", "inputs": [{"name": "_asset", "type": "address"}, {"name": "_amount", "type": "uint256"}, {"name": "_shouldRaise", "type": "bool"}], "outputs": [{"name": "", "type": "uint256"}]}
+    {"name": "getUsdValue", "type": "function", "stateMutability": "view", "inputs": [{"name": "_asset", "type": "address"}, {"name": "_amount", "type": "uint256"}, {"name": "_shouldRaise", "type": "bool"}], "outputs": [{"name": "", "type": "uint256"}]},
+    {"name": "getAssetAmount", "type": "function", "stateMutability": "view", "inputs": [{"name": "_asset", "type": "address"}, {"name": "_usdValue", "type": "uint256"}, {"name": "_shouldRaise", "type": "bool"}], "outputs": [{"name": "", "type": "uint256"}]}
 ]
 """
 
@@ -110,6 +143,48 @@ def get_token_decimals(addr: str) -> int:
         return token.decimals()
     except Exception:
         return 18  # Default to 18
+
+
+# ============================================================================
+# DEPOSIT LIMIT CALCULATION
+# ============================================================================
+
+
+def calculate_deposit_limits(price_desk, asset_addr: str) -> tuple:
+    """Calculate deposit limits for an asset using USD constants.
+
+    Uses PriceDesk.getAssetAmount to convert USD values to asset amounts.
+    USD values are in 18 decimals for the contract call.
+
+    Returns:
+        (perUserDepositLimit, globalDepositLimit, minDepositBalance)
+    """
+    try:
+        time.sleep(RPC_DELAY)
+        per_user = price_desk.getAssetAmount(
+            asset_addr,
+            int(PER_USER_DEPOSIT_LIMIT_USD * EIGHTEEN_DECIMALS),
+            False
+        )
+
+        time.sleep(RPC_DELAY)
+        global_limit = price_desk.getAssetAmount(
+            asset_addr,
+            int(GLOBAL_DEPOSIT_LIMIT_USD * EIGHTEEN_DECIMALS),
+            False
+        )
+
+        time.sleep(RPC_DELAY)
+        min_balance = price_desk.getAssetAmount(
+            asset_addr,
+            int(MIN_DEPOSIT_BALANCE_USD * EIGHTEEN_DECIMALS),
+            False
+        )
+
+        return (per_user, global_limit, min_balance)
+    except Exception as e:
+        print(f"    Warning: Could not calculate deposit limits for {asset_addr}: {e}")
+        return (0, 0, 0)
 
 
 # ============================================================================
@@ -882,13 +957,50 @@ def main():
             except Exception:
                 price = 0
 
+            # Check if this asset should keep production deposit limits or have multiplied limits
+            preserve_limits = str(asset_addr) in PRESERVE_DEPOSIT_LIMITS_ADDRESSES
+            multiply_limits = str(asset_addr) in MULTIPLY_LIMIT_ASSETS
+            vault_ids = list(config[0])  # vaultIds for balance calculation
+
+            if preserve_limits:
+                # Keep production values unchanged
+                modified_config = config
+            elif multiply_limits:
+                # Calculate deposit limits from USD constants with multiplier
+                per_user_limit, global_limit, min_balance = calculate_deposit_limits(
+                    price_desk, str(asset_addr)
+                )
+                config_list = list(config)
+                config_list[3] = per_user_limit * MULTIPLY_FACTOR
+                config_list[4] = global_limit * MULTIPLY_FACTOR
+                config_list[5] = min_balance  # minDepositBalance not multiplied
+                modified_config = tuple(config_list)
+            else:
+                # Calculate deposit limits from USD constants
+                per_user_limit, global_limit, min_balance = calculate_deposit_limits(
+                    price_desk, str(asset_addr)
+                )
+
+                # Create modified config with calculated deposit limits
+                # Config tuple indices: [3]=perUserDepositLimit, [4]=globalDepositLimit, [5]=minDepositBalance
+                config_list = list(config)
+                config_list[3] = per_user_limit
+                config_list[4] = global_limit
+                config_list[5] = min_balance
+                modified_config = tuple(config_list)
+
             # Get total balance and calculate USD value for sorting
-            vault_ids = list(config[0])  # vaultIds is first field
             total_balance = get_asset_total_balance(vault_book, str(asset_addr), vault_ids)
             usd_value = calc_usd_value(total_balance, price, decimals)
 
-            asset_configs.append((str(asset_addr), config, symbol, usd_value, price, decimals))
-            print(f"  - Asset {i}: {symbol} ({asset_addr[:10]}...) - {format_usd_value(usd_value)}")
+            asset_configs.append((str(asset_addr), modified_config, symbol, usd_value, price, decimals))
+            if preserve_limits:
+                note = " (keeping production limits)"
+            elif multiply_limits:
+                note = f" (limits x{MULTIPLY_FACTOR})"
+            else:
+                note = ""
+            print(f"  - Asset {i}: {symbol} ({asset_addr[:10]}...) - {format_usd_value(usd_value)}{note}")
         print(f"  Total: {len(asset_configs)} assets (skipped {skipped_count} with canDeposit=False)")
 
         # Sort assets: highest LTV first, then by USD value for same LTV
@@ -977,6 +1089,11 @@ def main():
         print(f"  underscoreRegistry: {underscore_registry}")
         print(f"  trainingWheels: {training_wheels}")
 
+        print(f"\nDeposit Limit Constants (converted to asset amounts via PriceDesk):")
+        print(f"  PER_USER_DEPOSIT_LIMIT_USD: ${PER_USER_DEPOSIT_LIMIT_USD:,}")
+        print(f"  GLOBAL_DEPOSIT_LIMIT_USD: ${GLOBAL_DEPOSIT_LIMIT_USD:,}")
+        print(f"  MIN_DEPOSIT_BALANCE_USD: ${MIN_DEPOSIT_BALANCE_USD}")
+
         # Generate Vyper code
         print("\n" + "=" * 60)
         print("Generating DefaultsBase.vy...")
@@ -1012,7 +1129,12 @@ def main():
 
         print("\nDone!")
         print(f"\nGenerated DefaultsBase.vy at block {block_number}")
-        print("\nNote: ripeAvailFor* values are kept as hardcoded defaults (1000 * 10^18)")
+        print("\nNotes:")
+        print("  - ripeAvailFor* values are kept as hardcoded defaults (1000 * 10^18)")
+        print(f"  - Deposit limits calculated from USD constants:")
+        print(f"      PER_USER_DEPOSIT_LIMIT_USD = ${PER_USER_DEPOSIT_LIMIT_USD:,}")
+        print(f"      GLOBAL_DEPOSIT_LIMIT_USD = ${GLOBAL_DEPOSIT_LIMIT_USD:,}")
+        print(f"      MIN_DEPOSIT_BALANCE_USD = ${MIN_DEPOSIT_BALANCE_USD}")
         print("\nTo verify syntax, run:")
         print(f"  vyper {output_path}")
 
