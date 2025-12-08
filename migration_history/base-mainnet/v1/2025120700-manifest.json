@@ -1,0 +1,3547 @@
+{
+  "contracts": {
+    "DefaultsBase": {
+      "address": "0x26b8733836aEeb3aa3B8Acee09dBa8E231299A87",
+      "abi": [
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "genConfig",
+          "inputs": [],
+          "outputs": [
+            {
+              "name": "",
+              "type": "tuple",
+              "components": [
+                {
+                  "name": "perUserMaxVaults",
+                  "type": "uint256"
+                },
+                {
+                  "name": "perUserMaxAssetsPerVault",
+                  "type": "uint256"
+                },
+                {
+                  "name": "priceStaleTime",
+                  "type": "uint256"
+                },
+                {
+                  "name": "canDeposit",
+                  "type": "bool"
+                },
+                {
+                  "name": "canWithdraw",
+                  "type": "bool"
+                },
+                {
+                  "name": "canBorrow",
+                  "type": "bool"
+                },
+                {
+                  "name": "canRepay",
+                  "type": "bool"
+                },
+                {
+                  "name": "canClaimLoot",
+                  "type": "bool"
+                },
+                {
+                  "name": "canLiquidate",
+                  "type": "bool"
+                },
+                {
+                  "name": "canRedeemCollateral",
+                  "type": "bool"
+                },
+                {
+                  "name": "canRedeemInStabPool",
+                  "type": "bool"
+                },
+                {
+                  "name": "canBuyInAuction",
+                  "type": "bool"
+                },
+                {
+                  "name": "canClaimInStabPool",
+                  "type": "bool"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "genDebtConfig",
+          "inputs": [],
+          "outputs": [
+            {
+              "name": "",
+              "type": "tuple",
+              "components": [
+                {
+                  "name": "perUserDebtLimit",
+                  "type": "uint256"
+                },
+                {
+                  "name": "globalDebtLimit",
+                  "type": "uint256"
+                },
+                {
+                  "name": "minDebtAmount",
+                  "type": "uint256"
+                },
+                {
+                  "name": "numAllowedBorrowers",
+                  "type": "uint256"
+                },
+                {
+                  "name": "maxBorrowPerInterval",
+                  "type": "uint256"
+                },
+                {
+                  "name": "numBlocksPerInterval",
+                  "type": "uint256"
+                },
+                {
+                  "name": "minDynamicRateBoost",
+                  "type": "uint256"
+                },
+                {
+                  "name": "maxDynamicRateBoost",
+                  "type": "uint256"
+                },
+                {
+                  "name": "increasePerDangerBlock",
+                  "type": "uint256"
+                },
+                {
+                  "name": "maxBorrowRate",
+                  "type": "uint256"
+                },
+                {
+                  "name": "maxLtvDeviation",
+                  "type": "uint256"
+                },
+                {
+                  "name": "keeperFeeRatio",
+                  "type": "uint256"
+                },
+                {
+                  "name": "minKeeperFee",
+                  "type": "uint256"
+                },
+                {
+                  "name": "maxKeeperFee",
+                  "type": "uint256"
+                },
+                {
+                  "name": "isDaowryEnabled",
+                  "type": "bool"
+                },
+                {
+                  "name": "ltvPaybackBuffer",
+                  "type": "uint256"
+                },
+                {
+                  "name": "genAuctionParams",
+                  "type": "tuple",
+                  "components": [
+                    {
+                      "name": "hasParams",
+                      "type": "bool"
+                    },
+                    {
+                      "name": "startDiscount",
+                      "type": "uint256"
+                    },
+                    {
+                      "name": "maxDiscount",
+                      "type": "uint256"
+                    },
+                    {
+                      "name": "delay",
+                      "type": "uint256"
+                    },
+                    {
+                      "name": "duration",
+                      "type": "uint256"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "ripeAvailForRewards",
+          "inputs": [],
+          "outputs": [
+            {
+              "name": "",
+              "type": "uint256"
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "ripeAvailForHr",
+          "inputs": [],
+          "outputs": [
+            {
+              "name": "",
+              "type": "uint256"
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "ripeAvailForBonds",
+          "inputs": [],
+          "outputs": [
+            {
+              "name": "",
+              "type": "uint256"
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "ripeBondConfig",
+          "inputs": [],
+          "outputs": [
+            {
+              "name": "",
+              "type": "tuple",
+              "components": [
+                {
+                  "name": "asset",
+                  "type": "address"
+                },
+                {
+                  "name": "amountPerEpoch",
+                  "type": "uint256"
+                },
+                {
+                  "name": "canBond",
+                  "type": "bool"
+                },
+                {
+                  "name": "minRipePerUnit",
+                  "type": "uint256"
+                },
+                {
+                  "name": "maxRipePerUnit",
+                  "type": "uint256"
+                },
+                {
+                  "name": "maxRipePerUnitLockBonus",
+                  "type": "uint256"
+                },
+                {
+                  "name": "epochLength",
+                  "type": "uint256"
+                },
+                {
+                  "name": "shouldAutoRestart",
+                  "type": "bool"
+                },
+                {
+                  "name": "restartDelayBlocks",
+                  "type": "uint256"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "rewardsConfig",
+          "inputs": [],
+          "outputs": [
+            {
+              "name": "",
+              "type": "tuple",
+              "components": [
+                {
+                  "name": "arePointsEnabled",
+                  "type": "bool"
+                },
+                {
+                  "name": "ripePerBlock",
+                  "type": "uint256"
+                },
+                {
+                  "name": "borrowersAlloc",
+                  "type": "uint256"
+                },
+                {
+                  "name": "stakersAlloc",
+                  "type": "uint256"
+                },
+                {
+                  "name": "votersAlloc",
+                  "type": "uint256"
+                },
+                {
+                  "name": "genDepositorsAlloc",
+                  "type": "uint256"
+                },
+                {
+                  "name": "autoStakeRatio",
+                  "type": "uint256"
+                },
+                {
+                  "name": "autoStakeDurationRatio",
+                  "type": "uint256"
+                },
+                {
+                  "name": "stabPoolRipePerDollarClaimed",
+                  "type": "uint256"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "ripeGovVaultConfigs",
+          "inputs": [],
+          "outputs": [
+            {
+              "name": "",
+              "type": "tuple[]",
+              "components": [
+                {
+                  "name": "asset",
+                  "type": "address"
+                },
+                {
+                  "name": "config",
+                  "type": "tuple",
+                  "components": [
+                    {
+                      "name": "lockTerms",
+                      "type": "tuple",
+                      "components": [
+                        {
+                          "name": "minLockDuration",
+                          "type": "uint256"
+                        },
+                        {
+                          "name": "maxLockDuration",
+                          "type": "uint256"
+                        },
+                        {
+                          "name": "maxLockBoost",
+                          "type": "uint256"
+                        },
+                        {
+                          "name": "canExit",
+                          "type": "bool"
+                        },
+                        {
+                          "name": "exitFee",
+                          "type": "uint256"
+                        }
+                      ]
+                    },
+                    {
+                      "name": "assetWeight",
+                      "type": "uint256"
+                    },
+                    {
+                      "name": "shouldFreezeWhenBadDebt",
+                      "type": "bool"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "hrConfig",
+          "inputs": [],
+          "outputs": [
+            {
+              "name": "",
+              "type": "tuple",
+              "components": [
+                {
+                  "name": "contribTemplate",
+                  "type": "address"
+                },
+                {
+                  "name": "maxCompensation",
+                  "type": "uint256"
+                },
+                {
+                  "name": "minCliffLength",
+                  "type": "uint256"
+                },
+                {
+                  "name": "maxStartDelay",
+                  "type": "uint256"
+                },
+                {
+                  "name": "minVestingLength",
+                  "type": "uint256"
+                },
+                {
+                  "name": "maxVestingLength",
+                  "type": "uint256"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "underscoreRegistry",
+          "inputs": [],
+          "outputs": [
+            {
+              "name": "",
+              "type": "address"
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "trainingWheels",
+          "inputs": [],
+          "outputs": [
+            {
+              "name": "",
+              "type": "address"
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "shouldCheckLastTouch",
+          "inputs": [],
+          "outputs": [
+            {
+              "name": "",
+              "type": "bool"
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "assetConfigs",
+          "inputs": [],
+          "outputs": [
+            {
+              "name": "",
+              "type": "tuple[]",
+              "components": [
+                {
+                  "name": "asset",
+                  "type": "address"
+                },
+                {
+                  "name": "config",
+                  "type": "tuple",
+                  "components": [
+                    {
+                      "name": "vaultIds",
+                      "type": "uint256[]"
+                    },
+                    {
+                      "name": "stakersPointsAlloc",
+                      "type": "uint256"
+                    },
+                    {
+                      "name": "voterPointsAlloc",
+                      "type": "uint256"
+                    },
+                    {
+                      "name": "perUserDepositLimit",
+                      "type": "uint256"
+                    },
+                    {
+                      "name": "globalDepositLimit",
+                      "type": "uint256"
+                    },
+                    {
+                      "name": "minDepositBalance",
+                      "type": "uint256"
+                    },
+                    {
+                      "name": "debtTerms",
+                      "type": "tuple",
+                      "components": [
+                        {
+                          "name": "ltv",
+                          "type": "uint256"
+                        },
+                        {
+                          "name": "redemptionThreshold",
+                          "type": "uint256"
+                        },
+                        {
+                          "name": "liqThreshold",
+                          "type": "uint256"
+                        },
+                        {
+                          "name": "liqFee",
+                          "type": "uint256"
+                        },
+                        {
+                          "name": "borrowRate",
+                          "type": "uint256"
+                        },
+                        {
+                          "name": "daowry",
+                          "type": "uint256"
+                        }
+                      ]
+                    },
+                    {
+                      "name": "shouldBurnAsPayment",
+                      "type": "bool"
+                    },
+                    {
+                      "name": "shouldTransferToEndaoment",
+                      "type": "bool"
+                    },
+                    {
+                      "name": "shouldSwapInStabPools",
+                      "type": "bool"
+                    },
+                    {
+                      "name": "shouldAuctionInstantly",
+                      "type": "bool"
+                    },
+                    {
+                      "name": "canDeposit",
+                      "type": "bool"
+                    },
+                    {
+                      "name": "canWithdraw",
+                      "type": "bool"
+                    },
+                    {
+                      "name": "canRedeemCollateral",
+                      "type": "bool"
+                    },
+                    {
+                      "name": "canRedeemInStabPool",
+                      "type": "bool"
+                    },
+                    {
+                      "name": "canBuyInAuction",
+                      "type": "bool"
+                    },
+                    {
+                      "name": "canClaimInStabPool",
+                      "type": "bool"
+                    },
+                    {
+                      "name": "specialStabPoolId",
+                      "type": "uint256"
+                    },
+                    {
+                      "name": "customAuctionParams",
+                      "type": "tuple",
+                      "components": [
+                        {
+                          "name": "hasParams",
+                          "type": "bool"
+                        },
+                        {
+                          "name": "startDiscount",
+                          "type": "uint256"
+                        },
+                        {
+                          "name": "maxDiscount",
+                          "type": "uint256"
+                        },
+                        {
+                          "name": "delay",
+                          "type": "uint256"
+                        },
+                        {
+                          "name": "duration",
+                          "type": "uint256"
+                        }
+                      ]
+                    },
+                    {
+                      "name": "whitelist",
+                      "type": "address"
+                    },
+                    {
+                      "name": "isNft",
+                      "type": "bool"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "priorityLiqAssetVaults",
+          "inputs": [],
+          "outputs": [
+            {
+              "name": "",
+              "type": "tuple[]",
+              "components": [
+                {
+                  "name": "vaultId",
+                  "type": "uint256"
+                },
+                {
+                  "name": "asset",
+                  "type": "address"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "priorityStabVaults",
+          "inputs": [],
+          "outputs": [
+            {
+              "name": "",
+              "type": "tuple[]",
+              "components": [
+                {
+                  "name": "vaultId",
+                  "type": "uint256"
+                },
+                {
+                  "name": "asset",
+                  "type": "address"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "priorityPriceSourceIds",
+          "inputs": [],
+          "outputs": [
+            {
+              "name": "",
+              "type": "uint256[]"
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "liteSigners",
+          "inputs": [],
+          "outputs": [
+            {
+              "name": "",
+              "type": "address[]"
+            }
+          ]
+        },
+        {
+          "stateMutability": "nonpayable",
+          "type": "constructor",
+          "inputs": [],
+          "outputs": []
+        }
+      ],
+      "solc_json": {
+        "language": "Vyper",
+        "sources": {
+          "interfaces/ConfigStructs.vyi": {
+            "content": "# @version 0.4.3\n\nMAX_VAULTS_PER_ASSET: constant(uint256) = 10\n\nstruct GenConfig:\n    perUserMaxVaults: uint256\n    perUserMaxAssetsPerVault: uint256\n    priceStaleTime: uint256\n    canDeposit: bool\n    canWithdraw: bool\n    canBorrow: bool\n    canRepay: bool\n    canClaimLoot: bool\n    canLiquidate: bool\n    canRedeemCollateral: bool\n    canRedeemInStabPool: bool\n    canBuyInAuction: bool\n    canClaimInStabPool: bool\n\nstruct GenDebtConfig:\n    perUserDebtLimit: uint256\n    globalDebtLimit: uint256\n    minDebtAmount: uint256\n    numAllowedBorrowers: uint256\n    maxBorrowPerInterval: uint256\n    numBlocksPerInterval: uint256\n    minDynamicRateBoost: uint256\n    maxDynamicRateBoost: uint256\n    increasePerDangerBlock: uint256\n    maxBorrowRate: uint256\n    maxLtvDeviation: uint256\n    keeperFeeRatio: uint256\n    minKeeperFee: uint256\n    maxKeeperFee: uint256\n    isDaowryEnabled: bool\n    ltvPaybackBuffer: uint256\n    genAuctionParams: AuctionParams\n\nstruct HrConfig:\n    contribTemplate: address\n    maxCompensation: uint256\n    minCliffLength: uint256\n    maxStartDelay: uint256\n    minVestingLength: uint256\n    maxVestingLength: uint256\n\nstruct RipeBondConfig:\n    asset: address\n    amountPerEpoch: uint256\n    canBond: bool\n    minRipePerUnit: uint256\n    maxRipePerUnit: uint256\n    maxRipePerUnitLockBonus: uint256\n    epochLength: uint256\n    shouldAutoRestart: bool\n    restartDelayBlocks: uint256\n\nstruct RipeRewardsConfig:\n    arePointsEnabled: bool\n    ripePerBlock: uint256\n    borrowersAlloc: uint256\n    stakersAlloc: uint256\n    votersAlloc: uint256\n    genDepositorsAlloc: uint256\n    autoStakeRatio: uint256\n    autoStakeDurationRatio: uint256\n    stabPoolRipePerDollarClaimed: uint256\n\nstruct RipeGovVaultConfig:\n    lockTerms: LockTerms\n    assetWeight: uint256\n    shouldFreezeWhenBadDebt: bool\n\nstruct LockTerms:\n    minLockDuration: uint256\n    maxLockDuration: uint256\n    maxLockBoost: uint256\n    canExit: bool\n    exitFee: uint256\n\nstruct AuctionParams:\n    hasParams: bool\n    startDiscount: uint256\n    maxDiscount: uint256\n    delay: uint256\n    duration: uint256\n\nstruct AssetConfig:\n    vaultIds: DynArray[uint256, MAX_VAULTS_PER_ASSET]\n    stakersPointsAlloc: uint256\n    voterPointsAlloc: uint256\n    perUserDepositLimit: uint256\n    globalDepositLimit: uint256\n    minDepositBalance: uint256\n    debtTerms: DebtTerms\n    shouldBurnAsPayment: bool\n    shouldTransferToEndaoment: bool\n    shouldSwapInStabPools: bool\n    shouldAuctionInstantly: bool\n    canDeposit: bool\n    canWithdraw: bool\n    canRedeemCollateral: bool\n    canRedeemInStabPool: bool\n    canBuyInAuction: bool\n    canClaimInStabPool: bool\n    specialStabPoolId: uint256\n    customAuctionParams: AuctionParams\n    whitelist: address\n    isNft: bool\n\nstruct DebtTerms:\n    ltv: uint256\n    redemptionThreshold: uint256\n    liqThreshold: uint256\n    liqFee: uint256\n    borrowRate: uint256\n    daowry: uint256\n\nstruct UserConfig:\n    canAnyoneDeposit: bool\n    canAnyoneRepayDebt: bool\n    canAnyoneBondForUser: bool\n\nstruct ActionDelegation:\n    canWithdraw: bool\n    canBorrow: bool\n    canClaimFromStabPool: bool\n    canClaimLoot: bool\n\nstruct VaultLite:\n    vaultId: uint256\n    asset: address\n\nstruct AssetConfigEntry:\n    asset: address\n    config: AssetConfig\n\nstruct RipeGovVaultConfigEntry:\n    asset: address\n    config: RipeGovVaultConfig",
+            "sha256sum": "def6208cd81de43d0d33656f9d05b5394d3a74c695fdc27ffe3c9711ccd67c2c"
+          },
+          "interfaces/Defaults.vyi": {
+            "content": "# @version 0.4.3\n\nimport interfaces.ConfigStructs as cs\n\n\n# general config\n\n\n@view\n@external\ndef genConfig() -> cs.GenConfig:\n    ...\n\n\n# debt config\n\n\n@view\n@external\ndef genDebtConfig() -> cs.GenDebtConfig:\n    ...\n\n\n# ripe available\n\n\n@view\n@external\ndef ripeAvailForRewards() -> uint256:\n    ...\n\n\n@view\n@external\ndef ripeAvailForHr() -> uint256:\n    ...\n\n\n@view\n@external\ndef ripeAvailForBonds() -> uint256:\n    ...\n\n\n# ripe bond config\n\n\n@view\n@external\ndef ripeBondConfig() -> cs.RipeBondConfig:\n    ...\n\n\n# ripe rewards config\n\n\n@view\n@external\ndef rewardsConfig() -> cs.RipeRewardsConfig:\n    ...\n\n\n# ripe gov vault configs\n\n\n@view\n@external\ndef ripeGovVaultConfigs() -> DynArray[cs.RipeGovVaultConfigEntry, 5]:\n    ...\n\n\n# hr config\n\n\n@view\n@external\ndef hrConfig() -> cs.HrConfig:\n    ...\n\n\n# underscore registry\n\n\n@view\n@external\ndef underscoreRegistry() -> address:\n    ...\n\n\n# training wheels\n\n\n@view\n@external\ndef trainingWheels() -> address:\n    ...\n\n\n# shouldCheckLastTouch\n\n\n@view\n@external\ndef shouldCheckLastTouch() -> bool:\n    ...\n\n\n# asset configs\n\n\n@view\n@external\ndef assetConfigs() -> DynArray[cs.AssetConfigEntry, 50]:\n    ...\n\n\n# priority lists\n\n\n@view\n@external\ndef priorityLiqAssetVaults() -> DynArray[cs.VaultLite, 20]:\n    ...\n\n\n@view\n@external\ndef priorityStabVaults() -> DynArray[cs.VaultLite, 20]:\n    ...\n\n\n@view\n@external\ndef priorityPriceSourceIds() -> DynArray[uint256, 10]:\n    ...\n\n\n# lite signers\n\n\n@view\n@external\ndef liteSigners() -> DynArray[address, 10]:\n    ...\n",
+            "sha256sum": "933230ff3a1c02fa91f50262e4121075d232297b8e030e8f387b5641a0aa8e3f"
+          },
+          "contracts/config/DefaultsBase.vy": {
+            "content": "# Ripe Protocol License: https://github.com/ripe-foundation/ripe-protocol/blob/master/LICENSE.md\n# Ripe Foundation (C) 2025\n\n# @version 0.4.3\n\nimplements: Defaults\nfrom interfaces import Defaults\nimport interfaces.ConfigStructs as cs\n\nEIGHTEEN_DECIMALS: constant(uint256) = 10 ** 18\nHUNDRED_PERCENT: constant(uint256) = 100_00\n\n# seconds\nDAY_IN_SECONDS: constant(uint256) = 60 * 60 * 24\nWEEK_IN_SECONDS: constant(uint256) = 7 * DAY_IN_SECONDS\nMONTH_IN_SECONDS: constant(uint256) = 30 * DAY_IN_SECONDS\nYEAR_IN_SECONDS: constant(uint256) = 365 * DAY_IN_SECONDS\n\n# blocks\nHOUR_IN_BLOCKS: constant(uint256) = 1_800\nDAY_IN_BLOCKS: constant(uint256) = 24 * HOUR_IN_BLOCKS\nWEEK_IN_BLOCKS: constant(uint256) = 7 * DAY_IN_BLOCKS\nMONTH_IN_BLOCKS: constant(uint256) = 30 * DAY_IN_BLOCKS\nYEAR_IN_BLOCKS: constant(uint256) = 365 * DAY_IN_BLOCKS\n\n# addresses\nCONTRIB_TEMPLATE: constant(address) = 0x4965578D80E54b5EbE3BB5D7b1B3E0425559C1D1\nTRAINING_WHEELS: constant(address) = 0x2255b0006A3DA38AA184E0F9d5e056C2d0448065\nUNDERSCORE_REGISTRY: constant(address) = 0x44Cf3c4f000DFD76a35d03298049D37bE688D6F9\n\n\n@deploy\ndef __init__():\n    pass\n\n\n# general config\n\n\n@view\n@external\ndef genConfig() -> cs.GenConfig:\n    return cs.GenConfig(\n        perUserMaxVaults = 5,\n        perUserMaxAssetsPerVault = 15,\n        priceStaleTime = 1 * DAY_IN_SECONDS,\n        canDeposit = True,\n        canWithdraw = True,\n        canBorrow = True,\n        canRepay = True,\n        canClaimLoot = True,\n        canLiquidate = True,\n        canRedeemCollateral = True,\n        canRedeemInStabPool = True,\n        canBuyInAuction = True,\n        canClaimInStabPool = True,\n    )\n\n\n# debt config\n\n\n@view\n@external\ndef genDebtConfig() -> cs.GenDebtConfig:\n    return cs.GenDebtConfig(\n        perUserDebtLimit = 20_000 * EIGHTEEN_DECIMALS,\n        globalDebtLimit = 200_000 * EIGHTEEN_DECIMALS,\n        minDebtAmount = 1 * EIGHTEEN_DECIMALS,\n        numAllowedBorrowers = 1000,\n        maxBorrowPerInterval = 10_000 * EIGHTEEN_DECIMALS,\n        numBlocksPerInterval = 1 * DAY_IN_BLOCKS,\n        minDynamicRateBoost = 1 * HUNDRED_PERCENT,\n        maxDynamicRateBoost = 5 * HUNDRED_PERCENT,\n        increasePerDangerBlock = 10,\n        maxBorrowRate = 1 * HUNDRED_PERCENT,\n        maxLtvDeviation = 10_00,\n        keeperFeeRatio = 1_00,\n        minKeeperFee = 1 * EIGHTEEN_DECIMALS,\n        maxKeeperFee = 25_000 * EIGHTEEN_DECIMALS,\n        isDaowryEnabled = True,\n        ltvPaybackBuffer = 10_00,\n        genAuctionParams = cs.AuctionParams(\n            hasParams = True,\n            startDiscount = 1_00,\n            maxDiscount = 50_00,\n            delay = 0,\n            duration = 1 * DAY_IN_BLOCKS,\n        ),\n    )\n\n\n# ripe available\n\n\n@view\n@external\ndef ripeAvailForRewards() -> uint256:\n    return 1_000 * EIGHTEEN_DECIMALS\n\n\n@view\n@external\ndef ripeAvailForHr() -> uint256:\n    return 1_000 * EIGHTEEN_DECIMALS\n\n\n@view\n@external\ndef ripeAvailForBonds() -> uint256:\n    return 1_000 * EIGHTEEN_DECIMALS\n\n\n# ripe bond config\n\n\n@view\n@external\ndef ripeBondConfig() -> cs.RipeBondConfig:\n    return cs.RipeBondConfig(\n        asset = 0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913,\n        amountPerEpoch = 2000 * (10 ** 6),\n        canBond = False,\n        minRipePerUnit = 0,\n        maxRipePerUnit = 1 * EIGHTEEN_DECIMALS,\n        maxRipePerUnitLockBonus = 2 * HUNDRED_PERCENT,\n        epochLength = 8 * HOUR_IN_BLOCKS,\n        shouldAutoRestart = True,\n        restartDelayBlocks = 0,\n    )\n\n\n# ripe rewards config\n\n\n@view\n@external\ndef rewardsConfig() -> cs.RipeRewardsConfig:\n    return cs.RipeRewardsConfig(\n        arePointsEnabled = True,\n        ripePerBlock = 75 * 10**14,\n        borrowersAlloc = 10_00,\n        stakersAlloc = 90_00,\n        votersAlloc = 0,\n        genDepositorsAlloc = 0,\n        autoStakeRatio = 75_00,\n        autoStakeDurationRatio = 33_00,\n        stabPoolRipePerDollarClaimed = 1 * 10**16,\n    )\n\n\n\n# ripe gov vault configs\n\n\n@view\n@external\ndef ripeGovVaultConfigs() -> DynArray[cs.RipeGovVaultConfigEntry, 5]:\n    return [\n        # RIPE\n        cs.RipeGovVaultConfigEntry(\n            asset=0x2A0a59d6B975828e781EcaC125dBA40d7ee5dDC0,\n            config=cs.RipeGovVaultConfig(\n                lockTerms=cs.LockTerms(\n                    minLockDuration=1 * DAY_IN_BLOCKS,\n                    maxLockDuration=3 * YEAR_IN_BLOCKS,\n                    maxLockBoost=2 * HUNDRED_PERCENT,\n                    canExit=True,\n                    exitFee=80_00,\n                ),\n                assetWeight=1 * HUNDRED_PERCENT,\n                shouldFreezeWhenBadDebt=True,\n            ),\n        ),\n        # vAMM-RIPE/WETH\n        cs.RipeGovVaultConfigEntry(\n            asset=0x765824aD2eD0ECB70ECc25B0Cf285832b335d6A9,\n            config=cs.RipeGovVaultConfig(\n                lockTerms=cs.LockTerms(\n                    minLockDuration=1 * DAY_IN_BLOCKS,\n                    maxLockDuration=3 * YEAR_IN_BLOCKS,\n                    maxLockBoost=2 * HUNDRED_PERCENT,\n                    canExit=True,\n                    exitFee=80_00,\n                ),\n                assetWeight=150_00,\n                shouldFreezeWhenBadDebt=True,\n            ),\n        ),\n    ]\n\n\n# hr config\n\n\n@view\n@external\ndef hrConfig() -> cs.HrConfig:\n    return cs.HrConfig(\n        contribTemplate = CONTRIB_TEMPLATE,\n        maxCompensation = 0, # set this later, after core contributor vesting setup\n        minCliffLength = 1 * WEEK_IN_SECONDS,\n        maxStartDelay = 3 * MONTH_IN_SECONDS,\n        minVestingLength = 1 * WEEK_IN_SECONDS,\n        maxVestingLength = 10 * YEAR_IN_SECONDS,\n    )\n\n\n# underscore registry\n\n\n@view\n@external\ndef underscoreRegistry() -> address:\n    return UNDERSCORE_REGISTRY\n\n\n# training wheels\n\n\n@view\n@external\ndef trainingWheels() -> address:\n    return TRAINING_WHEELS\n\n\n# should check last touch\n\n\n@view\n@external\ndef shouldCheckLastTouch() -> bool:\n    return True\n\n# asset configs\n\n\n@view\n@external\ndef assetConfigs() -> DynArray[cs.AssetConfigEntry, 50]:\n    return [\n        # undyUSD\n        # USD Value: $114.3k\n        cs.AssetConfigEntry(asset=0xb33852cfd0c22647AAC501a6Af59Bc4210a686Bf, config=cs.AssetConfig(\n            vaultIds=[5],\n            stakersPointsAlloc=0,\n            voterPointsAlloc=0,\n            perUserDepositLimit=49_796_932_480,  # $50.0k\n            globalDepositLimit=248_984_662_440,  # $250.0k\n            minDepositBalance=99_593,  # $0.1000\n            debtTerms=cs.DebtTerms(\n                ltv=80_00,\n                redemptionThreshold=85_00,\n                liqThreshold=90_00,\n                liqFee=5_00,\n                borrowRate=5_00,\n                daowry=25,\n            ),\n            shouldBurnAsPayment=False,\n            shouldTransferToEndaoment=True,\n            shouldSwapInStabPools=False,\n            shouldAuctionInstantly=False,\n            canDeposit=True,\n            canWithdraw=True,\n            canRedeemCollateral=False,\n            canRedeemInStabPool=True,\n            canBuyInAuction=True,\n            canClaimInStabPool=True,\n            specialStabPoolId=0,\n            customAuctionParams=cs.AuctionParams(\n                hasParams=False,\n                startDiscount=0,\n                maxDiscount=0,\n                delay=0,\n                duration=0,\n            ),\n            whitelist=empty(address),\n            isNft=False,\n        )),\n        # USDC\n        # USD Value: $762.33\n        cs.AssetConfigEntry(asset=0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913, config=cs.AssetConfig(\n            vaultIds=[3],\n            stakersPointsAlloc=0,\n            voterPointsAlloc=0,\n            perUserDepositLimit=100_000_000,  # $99.98\n            globalDepositLimit=1 * 10**9,  # $999.77\n            minDepositBalance=250_000,  # $0.2499\n            debtTerms=cs.DebtTerms(\n                ltv=80_00,\n                redemptionThreshold=85_00,\n                liqThreshold=90_00,\n                liqFee=5_00,\n                borrowRate=5_00,\n                daowry=25,\n            ),\n            shouldBurnAsPayment=False,\n            shouldTransferToEndaoment=True,\n            shouldSwapInStabPools=False,\n            shouldAuctionInstantly=False,\n            canDeposit=True,\n            canWithdraw=True,\n            canRedeemCollateral=False,\n            canRedeemInStabPool=True,\n            canBuyInAuction=True,\n            canClaimInStabPool=True,\n            specialStabPoolId=0,\n            customAuctionParams=cs.AuctionParams(\n                hasParams=False,\n                startDiscount=0,\n                maxDiscount=0,\n                delay=0,\n                duration=0,\n            ),\n            whitelist=empty(address),\n            isNft=False,\n        )),\n        # sUSDe\n        # USD Value: $1.00\n        cs.AssetConfigEntry(asset=0x211Cc4DD073734dA055fbF44a2b4667d5E5fE5d2, config=cs.AssetConfig(\n            vaultIds=[3],\n            stakersPointsAlloc=0,\n            voterPointsAlloc=0,\n            perUserDepositLimit=4_138_925_278_549_878_192_670,  # $5.0k\n            globalDepositLimit=20_694_626_392_749_390_963_353,  # $25.0k\n            minDepositBalance=82_778_505_570_997_563,  # $0.1000\n            debtTerms=cs.DebtTerms(\n                ltv=80_00,\n                redemptionThreshold=85_00,\n                liqThreshold=90_00,\n                liqFee=5_00,\n                borrowRate=5_00,\n                daowry=25,\n            ),\n            shouldBurnAsPayment=False,\n            shouldTransferToEndaoment=True,\n            shouldSwapInStabPools=False,\n            shouldAuctionInstantly=False,\n            canDeposit=True,\n            canWithdraw=True,\n            canRedeemCollateral=False,\n            canRedeemInStabPool=True,\n            canBuyInAuction=True,\n            canClaimInStabPool=True,\n            specialStabPoolId=0,\n            customAuctionParams=cs.AuctionParams(\n                hasParams=False,\n                startDiscount=0,\n                maxDiscount=0,\n                delay=0,\n                duration=0,\n            ),\n            whitelist=empty(address),\n            isNft=False,\n        )),\n        # undyEURC\n        # USD Value: $0.00\n        cs.AssetConfigEntry(asset=0x1cb8DAB80f19fC5Aca06C2552AECd79015008eA8, config=cs.AssetConfig(\n            vaultIds=[5],\n            stakersPointsAlloc=0,\n            voterPointsAlloc=0,\n            perUserDepositLimit=4_290_904_101,  # $5.0k\n            globalDepositLimit=21_454_520_508,  # $25.0k\n            minDepositBalance=85_818,  # $0.1000\n            debtTerms=cs.DebtTerms(\n                ltv=80_00,\n                redemptionThreshold=85_00,\n                liqThreshold=90_00,\n                liqFee=5_00,\n                borrowRate=5_00,\n                daowry=25,\n            ),\n            shouldBurnAsPayment=False,\n            shouldTransferToEndaoment=True,\n            shouldSwapInStabPools=False,\n            shouldAuctionInstantly=False,\n            canDeposit=True,\n            canWithdraw=True,\n            canRedeemCollateral=False,\n            canRedeemInStabPool=True,\n            canBuyInAuction=True,\n            canClaimInStabPool=True,\n            specialStabPoolId=0,\n            customAuctionParams=cs.AuctionParams(\n                hasParams=False,\n                startDiscount=0,\n                maxDiscount=0,\n                delay=0,\n                duration=0,\n            ),\n            whitelist=empty(address),\n            isNft=False,\n        )),\n        # WETH\n        # USD Value: $4.7k\n        cs.AssetConfigEntry(asset=0x4200000000000000000000000000000000000006, config=cs.AssetConfig(\n            vaultIds=[3],\n            stakersPointsAlloc=0,\n            voterPointsAlloc=0,\n            perUserDepositLimit=1_646_052_728_169_408_091,  # $5.0k\n            globalDepositLimit=8_230_263_640_847_040_458,  # $25.0k\n            minDepositBalance=32_921_054_563_388,  # $0.1000\n            debtTerms=cs.DebtTerms(\n                ltv=70_00,\n                redemptionThreshold=77_00,\n                liqThreshold=80_00,\n                liqFee=10_00,\n                borrowRate=7_00,\n                daowry=25,\n            ),\n            shouldBurnAsPayment=False,\n            shouldTransferToEndaoment=False,\n            shouldSwapInStabPools=True,\n            shouldAuctionInstantly=True,\n            canDeposit=True,\n            canWithdraw=True,\n            canRedeemCollateral=True,\n            canRedeemInStabPool=True,\n            canBuyInAuction=True,\n            canClaimInStabPool=True,\n            specialStabPoolId=0,\n            customAuctionParams=cs.AuctionParams(\n                hasParams=False,\n                startDiscount=0,\n                maxDiscount=0,\n                delay=0,\n                duration=0,\n            ),\n            whitelist=empty(address),\n            isNft=False,\n        )),\n        # undyETH\n        # USD Value: $3.1k\n        cs.AssetConfigEntry(asset=0x02981DB1a99A14912b204437e7a2E02679B57668, config=cs.AssetConfig(\n            vaultIds=[5],\n            stakersPointsAlloc=0,\n            voterPointsAlloc=0,\n            perUserDepositLimit=16_447_676_038_471_417_830,  # $50.0k\n            globalDepositLimit=82_238_380_192_357_089_170,  # $250.0k\n            minDepositBalance=32_895_352_076_942,  # $0.1000\n            debtTerms=cs.DebtTerms(\n                ltv=70_00,\n                redemptionThreshold=77_00,\n                liqThreshold=80_00,\n                liqFee=10_00,\n                borrowRate=7_00,\n                daowry=25,\n            ),\n            shouldBurnAsPayment=False,\n            shouldTransferToEndaoment=False,\n            shouldSwapInStabPools=True,\n            shouldAuctionInstantly=True,\n            canDeposit=True,\n            canWithdraw=True,\n            canRedeemCollateral=True,\n            canRedeemInStabPool=True,\n            canBuyInAuction=True,\n            canClaimInStabPool=True,\n            specialStabPoolId=0,\n            customAuctionParams=cs.AuctionParams(\n                hasParams=False,\n                startDiscount=0,\n                maxDiscount=0,\n                delay=0,\n                duration=0,\n            ),\n            whitelist=empty(address),\n            isNft=False,\n        )),\n        # cbETH\n        # USD Value: $2.7k\n        cs.AssetConfigEntry(asset=0x2Ae3F1Ec7F1F5012CFEab0185bfc7aa3cf0DEc22, config=cs.AssetConfig(\n            vaultIds=[3],\n            stakersPointsAlloc=0,\n            voterPointsAlloc=0,\n            perUserDepositLimit=1_478_101_461_711_344_160,  # $5.0k\n            globalDepositLimit=7_390_507_308_556_720_802,  # $25.0k\n            minDepositBalance=29_562_029_234_226,  # $0.1000\n            debtTerms=cs.DebtTerms(\n                ltv=70_00,\n                redemptionThreshold=77_00,\n                liqThreshold=80_00,\n                liqFee=10_00,\n                borrowRate=7_00,\n                daowry=25,\n            ),\n            shouldBurnAsPayment=False,\n            shouldTransferToEndaoment=False,\n            shouldSwapInStabPools=True,\n            shouldAuctionInstantly=True,\n            canDeposit=True,\n            canWithdraw=True,\n            canRedeemCollateral=True,\n            canRedeemInStabPool=True,\n            canBuyInAuction=True,\n            canClaimInStabPool=True,\n            specialStabPoolId=0,\n            customAuctionParams=cs.AuctionParams(\n                hasParams=False,\n                startDiscount=0,\n                maxDiscount=0,\n                delay=0,\n                duration=0,\n            ),\n            whitelist=empty(address),\n            isNft=False,\n        )),\n        # cbBTC\n        # USD Value: $1.8k\n        cs.AssetConfigEntry(asset=0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf, config=cs.AssetConfig(\n            vaultIds=[3],\n            stakersPointsAlloc=0,\n            voterPointsAlloc=0,\n            perUserDepositLimit=5_554_381,  # $5.0k\n            globalDepositLimit=27_771_905,  # $25.0k\n            minDepositBalance=111,  # $0.0999\n            debtTerms=cs.DebtTerms(\n                ltv=70_00,\n                redemptionThreshold=77_00,\n                liqThreshold=80_00,\n                liqFee=10_00,\n                borrowRate=7_00,\n                daowry=25,\n            ),\n            shouldBurnAsPayment=False,\n            shouldTransferToEndaoment=False,\n            shouldSwapInStabPools=True,\n            shouldAuctionInstantly=True,\n            canDeposit=True,\n            canWithdraw=True,\n            canRedeemCollateral=True,\n            canRedeemInStabPool=True,\n            canBuyInAuction=True,\n            canClaimInStabPool=True,\n            specialStabPoolId=0,\n            customAuctionParams=cs.AuctionParams(\n                hasParams=False,\n                startDiscount=0,\n                maxDiscount=0,\n                delay=0,\n                duration=0,\n            ),\n            whitelist=empty(address),\n            isNft=False,\n        )),\n        # wsuperOETHb\n        # USD Value: $1.2k\n        cs.AssetConfigEntry(asset=0x7FcD174E80f264448ebeE8c88a7C4476AAF58Ea6, config=cs.AssetConfig(\n            vaultIds=[3],\n            stakersPointsAlloc=0,\n            voterPointsAlloc=0,\n            perUserDepositLimit=1_518_552_436_330_112_774,  # $5.0k\n            globalDepositLimit=7_592_762_181_650_563_870,  # $25.0k\n            minDepositBalance=30_371_048_726_602,  # $0.1000\n            debtTerms=cs.DebtTerms(\n                ltv=70_00,\n                redemptionThreshold=77_00,\n                liqThreshold=80_00,\n                liqFee=10_00,\n                borrowRate=7_00,\n                daowry=25,\n            ),\n            shouldBurnAsPayment=False,\n            shouldTransferToEndaoment=False,\n            shouldSwapInStabPools=True,\n            shouldAuctionInstantly=True,\n            canDeposit=True,\n            canWithdraw=True,\n            canRedeemCollateral=True,\n            canRedeemInStabPool=True,\n            canBuyInAuction=True,\n            canClaimInStabPool=True,\n            specialStabPoolId=0,\n            customAuctionParams=cs.AuctionParams(\n                hasParams=False,\n                startDiscount=0,\n                maxDiscount=0,\n                delay=0,\n                duration=0,\n            ),\n            whitelist=empty(address),\n            isNft=False,\n        )),\n        # undyBTC\n        # USD Value: $107.28\n        cs.AssetConfigEntry(asset=0x3fb0fC9D3Ddd543AD1b748Ed2286a022f4638493, config=cs.AssetConfig(\n            vaultIds=[5],\n            stakersPointsAlloc=0,\n            voterPointsAlloc=0,\n            perUserDepositLimit=55_541_110,  # $50.0k\n            globalDepositLimit=277_705_550,  # $250.0k\n            minDepositBalance=111,  # $0.0999\n            debtTerms=cs.DebtTerms(\n                ltv=70_00,\n                redemptionThreshold=77_00,\n                liqThreshold=80_00,\n                liqFee=10_00,\n                borrowRate=7_00,\n                daowry=25,\n            ),\n            shouldBurnAsPayment=False,\n            shouldTransferToEndaoment=False,\n            shouldSwapInStabPools=True,\n            shouldAuctionInstantly=True,\n            canDeposit=True,\n            canWithdraw=True,\n            canRedeemCollateral=True,\n            canRedeemInStabPool=True,\n            canBuyInAuction=True,\n            canClaimInStabPool=True,\n            specialStabPoolId=0,\n            customAuctionParams=cs.AuctionParams(\n                hasParams=False,\n                startDiscount=0,\n                maxDiscount=0,\n                delay=0,\n                duration=0,\n            ),\n            whitelist=empty(address),\n            isNft=False,\n        )),\n        # VIRTUAL\n        # USD Value: $1.0k\n        cs.AssetConfigEntry(asset=0x0b3e328455c4059EEb9e3f84b5543F74E24e7E1b, config=cs.AssetConfig(\n            vaultIds=[3],\n            stakersPointsAlloc=0,\n            voterPointsAlloc=0,\n            perUserDepositLimit=6_041_731_690_803_988_944_597,  # $5.0k\n            globalDepositLimit=30_208_658_454_019_944_722_988,  # $25.0k\n            minDepositBalance=120_834_633_816_079_778,  # $0.1000\n            debtTerms=cs.DebtTerms(\n                ltv=50_00,\n                redemptionThreshold=60_00,\n                liqThreshold=65_00,\n                liqFee=12_00,\n                borrowRate=11_00,\n                daowry=25,\n            ),\n            shouldBurnAsPayment=False,\n            shouldTransferToEndaoment=False,\n            shouldSwapInStabPools=True,\n            shouldAuctionInstantly=True,\n            canDeposit=True,\n            canWithdraw=True,\n            canRedeemCollateral=True,\n            canRedeemInStabPool=True,\n            canBuyInAuction=True,\n            canClaimInStabPool=True,\n            specialStabPoolId=0,\n            customAuctionParams=cs.AuctionParams(\n                hasParams=False,\n                startDiscount=0,\n                maxDiscount=0,\n                delay=0,\n                duration=0,\n            ),\n            whitelist=empty(address),\n            isNft=False,\n        )),\n        # AERO\n        # USD Value: $846.54\n        cs.AssetConfigEntry(asset=0x940181a94A35A4569E4529A3CDfB74e38FD98631, config=cs.AssetConfig(\n            vaultIds=[3],\n            stakersPointsAlloc=0,\n            voterPointsAlloc=0,\n            perUserDepositLimit=7_671_774_247_547_778_735_965,  # $5.0k\n            globalDepositLimit=38_358_871_237_738_893_679_826,  # $25.0k\n            minDepositBalance=153_435_484_950_955_574,  # $0.1000\n            debtTerms=cs.DebtTerms(\n                ltv=50_00,\n                redemptionThreshold=60_00,\n                liqThreshold=65_00,\n                liqFee=10_00,\n                borrowRate=8_00,\n                daowry=25,\n            ),\n            shouldBurnAsPayment=False,\n            shouldTransferToEndaoment=False,\n            shouldSwapInStabPools=True,\n            shouldAuctionInstantly=True,\n            canDeposit=True,\n            canWithdraw=True,\n            canRedeemCollateral=True,\n            canRedeemInStabPool=True,\n            canBuyInAuction=True,\n            canClaimInStabPool=True,\n            specialStabPoolId=0,\n            customAuctionParams=cs.AuctionParams(\n                hasParams=False,\n                startDiscount=0,\n                maxDiscount=0,\n                delay=0,\n                duration=0,\n            ),\n            whitelist=empty(address),\n            isNft=False,\n        )),\n        # uSOL\n        # USD Value: $222.96\n        cs.AssetConfigEntry(asset=0x9B8Df6E244526ab5F6e6400d331DB28C8fdDdb55, config=cs.AssetConfig(\n            vaultIds=[3],\n            stakersPointsAlloc=0,\n            voterPointsAlloc=0,\n            perUserDepositLimit=38_021_075_364_647_256_084,  # $5.0k\n            globalDepositLimit=190_105_376_823_236_280_420,  # $25.0k\n            minDepositBalance=760_421_507_292_945,  # $0.1000\n            debtTerms=cs.DebtTerms(\n                ltv=50_00,\n                redemptionThreshold=60_00,\n                liqThreshold=65_00,\n                liqFee=12_00,\n                borrowRate=11_00,\n                daowry=25,\n            ),\n            shouldBurnAsPayment=False,\n            shouldTransferToEndaoment=False,\n            shouldSwapInStabPools=True,\n            shouldAuctionInstantly=True,\n            canDeposit=True,\n            canWithdraw=True,\n            canRedeemCollateral=True,\n            canRedeemInStabPool=True,\n            canBuyInAuction=True,\n            canClaimInStabPool=True,\n            specialStabPoolId=0,\n            customAuctionParams=cs.AuctionParams(\n                hasParams=False,\n                startDiscount=0,\n                maxDiscount=0,\n                delay=0,\n                duration=0,\n            ),\n            whitelist=empty(address),\n            isNft=False,\n        )),\n        # cbDOGE\n        # USD Value: $39.37\n        cs.AssetConfigEntry(asset=0xcbD06E5A2B0C65597161de254AA074E489dEb510, config=cs.AssetConfig(\n            vaultIds=[3],\n            stakersPointsAlloc=0,\n            voterPointsAlloc=0,\n            perUserDepositLimit=3_623_605_908_216,  # $5.0k\n            globalDepositLimit=18_118_029_541_084,  # $25.0k\n            minDepositBalance=72_472_118,  # $0.1000\n            debtTerms=cs.DebtTerms(\n                ltv=50_00,\n                redemptionThreshold=60_00,\n                liqThreshold=65_00,\n                liqFee=12_00,\n                borrowRate=11_00,\n                daowry=25,\n            ),\n            shouldBurnAsPayment=False,\n            shouldTransferToEndaoment=False,\n            shouldSwapInStabPools=True,\n            shouldAuctionInstantly=True,\n            canDeposit=True,\n            canWithdraw=True,\n            canRedeemCollateral=True,\n            canRedeemInStabPool=True,\n            canBuyInAuction=True,\n            canClaimInStabPool=True,\n            specialStabPoolId=0,\n            customAuctionParams=cs.AuctionParams(\n                hasParams=False,\n                startDiscount=0,\n                maxDiscount=0,\n                delay=0,\n                duration=0,\n            ),\n            whitelist=empty(address),\n            isNft=False,\n        )),\n        # undyAERO\n        # USD Value: $10.87\n        cs.AssetConfigEntry(asset=0x96F1a7ce331F40afe866F3b707c223e377661087, config=cs.AssetConfig(\n            vaultIds=[5],\n            stakersPointsAlloc=0,\n            voterPointsAlloc=0,\n            perUserDepositLimit=7_663_356_320_898_015_168_529,  # $5.0k\n            globalDepositLimit=38_316_781_604_490_075_842_648,  # $25.0k\n            minDepositBalance=153_267_126_417_960_303,  # $0.1000\n            debtTerms=cs.DebtTerms(\n                ltv=50_00,\n                redemptionThreshold=60_00,\n                liqThreshold=65_00,\n                liqFee=12_00,\n                borrowRate=8_00,\n                daowry=25,\n            ),\n            shouldBurnAsPayment=False,\n            shouldTransferToEndaoment=False,\n            shouldSwapInStabPools=True,\n            shouldAuctionInstantly=True,\n            canDeposit=True,\n            canWithdraw=True,\n            canRedeemCollateral=True,\n            canRedeemInStabPool=True,\n            canBuyInAuction=True,\n            canClaimInStabPool=True,\n            specialStabPoolId=0,\n            customAuctionParams=cs.AuctionParams(\n                hasParams=False,\n                startDiscount=0,\n                maxDiscount=0,\n                delay=0,\n                duration=0,\n            ),\n            whitelist=empty(address),\n            isNft=False,\n        )),\n        # cbADA\n        # USD Value: $0.00\n        cs.AssetConfigEntry(asset=0xcbADA732173e39521CDBE8bf59a6Dc85A9fc7b8c, config=cs.AssetConfig(\n            vaultIds=[3],\n            stakersPointsAlloc=0,\n            voterPointsAlloc=0,\n            perUserDepositLimit=12_008_521_246,  # $5.0k\n            globalDepositLimit=60_042_606_233,  # $25.0k\n            minDepositBalance=240_170,  # $0.1000\n            debtTerms=cs.DebtTerms(\n                ltv=50_00,\n                redemptionThreshold=60_00,\n                liqThreshold=65_00,\n                liqFee=12_00,\n                borrowRate=11_00,\n                daowry=25,\n            ),\n            shouldBurnAsPayment=False,\n            shouldTransferToEndaoment=False,\n            shouldSwapInStabPools=True,\n            shouldAuctionInstantly=True,\n            canDeposit=True,\n            canWithdraw=True,\n            canRedeemCollateral=True,\n            canRedeemInStabPool=True,\n            canBuyInAuction=True,\n            canClaimInStabPool=True,\n            specialStabPoolId=0,\n            customAuctionParams=cs.AuctionParams(\n                hasParams=False,\n                startDiscount=0,\n                maxDiscount=0,\n                delay=0,\n                duration=0,\n            ),\n            whitelist=empty(address),\n            isNft=False,\n        )),\n        # cbXRP\n        # USD Value: $0.00\n        cs.AssetConfigEntry(asset=0xcb585250f852C6c6bf90434AB21A00f02833a4af, config=cs.AssetConfig(\n            vaultIds=[3],\n            stakersPointsAlloc=0,\n            voterPointsAlloc=0,\n            perUserDepositLimit=2_458_282_938,  # $5.0k\n            globalDepositLimit=12_291_414_692,  # $25.0k\n            minDepositBalance=49_165,  # $0.1000\n            debtTerms=cs.DebtTerms(\n                ltv=50_00,\n                redemptionThreshold=60_00,\n                liqThreshold=65_00,\n                liqFee=12_00,\n                borrowRate=11_00,\n                daowry=25,\n            ),\n            shouldBurnAsPayment=False,\n            shouldTransferToEndaoment=False,\n            shouldSwapInStabPools=True,\n            shouldAuctionInstantly=True,\n            canDeposit=True,\n            canWithdraw=True,\n            canRedeemCollateral=True,\n            canRedeemInStabPool=True,\n            canBuyInAuction=True,\n            canClaimInStabPool=True,\n            specialStabPoolId=0,\n            customAuctionParams=cs.AuctionParams(\n                hasParams=False,\n                startDiscount=0,\n                maxDiscount=0,\n                delay=0,\n                duration=0,\n            ),\n            whitelist=empty(address),\n            isNft=False,\n        )),\n        # cbLTC\n        # USD Value: $0.00\n        cs.AssetConfigEntry(asset=0xcb17C9Db87B595717C857a08468793f5bAb6445F, config=cs.AssetConfig(\n            vaultIds=[3],\n            stakersPointsAlloc=0,\n            voterPointsAlloc=0,\n            perUserDepositLimit=6_169_282_648,  # $5.0k\n            globalDepositLimit=30_846_413_240,  # $25.0k\n            minDepositBalance=123_385,  # $0.1000\n            debtTerms=cs.DebtTerms(\n                ltv=50_00,\n                redemptionThreshold=60_00,\n                liqThreshold=65_00,\n                liqFee=12_00,\n                borrowRate=11_00,\n                daowry=25,\n            ),\n            shouldBurnAsPayment=False,\n            shouldTransferToEndaoment=False,\n            shouldSwapInStabPools=True,\n            shouldAuctionInstantly=True,\n            canDeposit=True,\n            canWithdraw=True,\n            canRedeemCollateral=True,\n            canRedeemInStabPool=True,\n            canBuyInAuction=True,\n            canClaimInStabPool=True,\n            specialStabPoolId=0,\n            customAuctionParams=cs.AuctionParams(\n                hasParams=False,\n                startDiscount=0,\n                maxDiscount=0,\n                delay=0,\n                duration=0,\n            ),\n            whitelist=empty(address),\n            isNft=False,\n        )),\n        # VVV\n        # USD Value: $320.26\n        cs.AssetConfigEntry(asset=0xacfE6019Ed1A7Dc6f7B508C02d1b04ec88cC21bf, config=cs.AssetConfig(\n            vaultIds=[3],\n            stakersPointsAlloc=0,\n            voterPointsAlloc=0,\n            perUserDepositLimit=4_606_534_640_251_433_505_211,  # $5.0k\n            globalDepositLimit=23_032_673_201_257_167_526_057,  # $25.0k\n            minDepositBalance=92_130_692_805_028_670,  # $0.1000\n            debtTerms=cs.DebtTerms(\n                ltv=40_00,\n                redemptionThreshold=45_00,\n                liqThreshold=50_00,\n                liqFee=15_00,\n                borrowRate=13_00,\n                daowry=25,\n            ),\n            shouldBurnAsPayment=False,\n            shouldTransferToEndaoment=False,\n            shouldSwapInStabPools=True,\n            shouldAuctionInstantly=True,\n            canDeposit=True,\n            canWithdraw=True,\n            canRedeemCollateral=True,\n            canRedeemInStabPool=True,\n            canBuyInAuction=True,\n            canClaimInStabPool=True,\n            specialStabPoolId=0,\n            customAuctionParams=cs.AuctionParams(\n                hasParams=False,\n                startDiscount=0,\n                maxDiscount=0,\n                delay=0,\n                duration=0,\n            ),\n            whitelist=empty(address),\n            isNft=False,\n        )),\n        # DEGEN\n        # USD Value: $216.84\n        cs.AssetConfigEntry(asset=0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed, config=cs.AssetConfig(\n            vaultIds=[3],\n            stakersPointsAlloc=0,\n            voterPointsAlloc=0,\n            perUserDepositLimit=3_358_702_734_655_766_556_725_130,  # $5.0k\n            globalDepositLimit=16_793_513_673_278_832_783_625_652,  # $25.0k\n            minDepositBalance=67_174_054_693_115_331_134,  # $0.1000\n            debtTerms=cs.DebtTerms(\n                ltv=40_00,\n                redemptionThreshold=45_00,\n                liqThreshold=50_00,\n                liqFee=15_00,\n                borrowRate=13_00,\n                daowry=25,\n            ),\n            shouldBurnAsPayment=False,\n            shouldTransferToEndaoment=False,\n            shouldSwapInStabPools=True,\n            shouldAuctionInstantly=True,\n            canDeposit=True,\n            canWithdraw=True,\n            canRedeemCollateral=True,\n            canRedeemInStabPool=True,\n            canBuyInAuction=True,\n            canClaimInStabPool=True,\n            specialStabPoolId=0,\n            customAuctionParams=cs.AuctionParams(\n                hasParams=False,\n                startDiscount=0,\n                maxDiscount=0,\n                delay=0,\n                duration=0,\n            ),\n            whitelist=empty(address),\n            isNft=False,\n        )),\n        # WELL\n        # USD Value: $117.56\n        cs.AssetConfigEntry(asset=0xA88594D404727625A9437C3f886C7643872296AE, config=cs.AssetConfig(\n            vaultIds=[3],\n            stakersPointsAlloc=0,\n            voterPointsAlloc=0,\n            perUserDepositLimit=509_796_764_421_895_567_113_214,  # $5.0k\n            globalDepositLimit=2_548_983_822_109_477_835_566_073,  # $25.0k\n            minDepositBalance=10_195_935_288_437_911_342,  # $0.1000\n            debtTerms=cs.DebtTerms(\n                ltv=40_00,\n                redemptionThreshold=45_00,\n                liqThreshold=50_00,\n                liqFee=15_00,\n                borrowRate=13_00,\n                daowry=25,\n            ),\n            shouldBurnAsPayment=False,\n            shouldTransferToEndaoment=False,\n            shouldSwapInStabPools=True,\n            shouldAuctionInstantly=True,\n            canDeposit=True,\n            canWithdraw=True,\n            canRedeemCollateral=True,\n            canRedeemInStabPool=True,\n            canBuyInAuction=True,\n            canClaimInStabPool=True,\n            specialStabPoolId=0,\n            customAuctionParams=cs.AuctionParams(\n                hasParams=False,\n                startDiscount=0,\n                maxDiscount=0,\n                delay=0,\n                duration=0,\n            ),\n            whitelist=empty(address),\n            isNft=False,\n        )),\n        # RIPE\n        # USD Value: $295.7k\n        cs.AssetConfigEntry(asset=0x2A0a59d6B975828e781EcaC125dBA40d7ee5dDC0, config=cs.AssetConfig(\n            vaultIds=[2],\n            stakersPointsAlloc=15_00,\n            voterPointsAlloc=0,\n            perUserDepositLimit=100_000_000 * EIGHTEEN_DECIMALS,  # $108.7M\n            globalDepositLimit=1_000_000_000 * EIGHTEEN_DECIMALS,  # $1086.5M\n            minDepositBalance=1 * 10**14,  # $0.000109\n            debtTerms=cs.DebtTerms(\n                ltv=0,\n                redemptionThreshold=0,\n                liqThreshold=0,\n                liqFee=0,\n                borrowRate=0,\n                daowry=0,\n            ),\n            shouldBurnAsPayment=False,\n            shouldTransferToEndaoment=False,\n            shouldSwapInStabPools=False,\n            shouldAuctionInstantly=False,\n            canDeposit=True,\n            canWithdraw=True,\n            canRedeemCollateral=False,\n            canRedeemInStabPool=True,\n            canBuyInAuction=True,\n            canClaimInStabPool=True,\n            specialStabPoolId=0,\n            customAuctionParams=cs.AuctionParams(\n                hasParams=False,\n                startDiscount=0,\n                maxDiscount=0,\n                delay=0,\n                duration=0,\n            ),\n            whitelist=empty(address),\n            isNft=False,\n        )),\n        # GREEN/USDC\n        # USD Value: $58.7k\n        cs.AssetConfigEntry(asset=0xd6c283655B42FA0eb2685F7AB819784F071459dc, config=cs.AssetConfig(\n            vaultIds=[1],\n            stakersPointsAlloc=25_00,\n            voterPointsAlloc=0,\n            perUserDepositLimit=100_000_000 * EIGHTEEN_DECIMALS,  # $100.2M\n            globalDepositLimit=1_000_000_000 * EIGHTEEN_DECIMALS,  # $1001.8M\n            minDepositBalance=1 * 10**16,  # $0.0100\n            debtTerms=cs.DebtTerms(\n                ltv=0,\n                redemptionThreshold=0,\n                liqThreshold=0,\n                liqFee=0,\n                borrowRate=0,\n                daowry=0,\n            ),\n            shouldBurnAsPayment=False,\n            shouldTransferToEndaoment=True,\n            shouldSwapInStabPools=False,\n            shouldAuctionInstantly=False,\n            canDeposit=True,\n            canWithdraw=True,\n            canRedeemCollateral=False,\n            canRedeemInStabPool=False,\n            canBuyInAuction=False,\n            canClaimInStabPool=False,\n            specialStabPoolId=0,\n            customAuctionParams=cs.AuctionParams(\n                hasParams=False,\n                startDiscount=0,\n                maxDiscount=0,\n                delay=0,\n                duration=0,\n            ),\n            whitelist=empty(address),\n            isNft=False,\n        )),\n        # sGREEN\n        # USD Value: $58.3k\n        cs.AssetConfigEntry(asset=0xaa0f13488CE069A7B5a099457c753A7CFBE04d36, config=cs.AssetConfig(\n            vaultIds=[1],\n            stakersPointsAlloc=15_00,\n            voterPointsAlloc=0,\n            perUserDepositLimit=100_000_000 * EIGHTEEN_DECIMALS,  # $106.3M\n            globalDepositLimit=1_000_000_000 * EIGHTEEN_DECIMALS,  # $1062.5M\n            minDepositBalance=1 * 10**16,  # $0.0106\n            debtTerms=cs.DebtTerms(\n                ltv=0,\n                redemptionThreshold=0,\n                liqThreshold=0,\n                liqFee=0,\n                borrowRate=0,\n                daowry=0,\n            ),\n            shouldBurnAsPayment=True,\n            shouldTransferToEndaoment=False,\n            shouldSwapInStabPools=False,\n            shouldAuctionInstantly=False,\n            canDeposit=True,\n            canWithdraw=True,\n            canRedeemCollateral=False,\n            canRedeemInStabPool=False,\n            canBuyInAuction=False,\n            canClaimInStabPool=False,\n            specialStabPoolId=0,\n            customAuctionParams=cs.AuctionParams(\n                hasParams=False,\n                startDiscount=0,\n                maxDiscount=0,\n                delay=0,\n                duration=0,\n            ),\n            whitelist=empty(address),\n            isNft=False,\n        )),\n        # vAMM-RIPE/WETH\n        # USD Value: $0.00\n        cs.AssetConfigEntry(asset=0x765824aD2eD0ECB70ECc25B0Cf285832b335d6A9, config=cs.AssetConfig(\n            vaultIds=[2],\n            stakersPointsAlloc=45_00,\n            voterPointsAlloc=0,\n            perUserDepositLimit=100_000_000 * EIGHTEEN_DECIMALS,\n            globalDepositLimit=1_000_000_000 * EIGHTEEN_DECIMALS,\n            minDepositBalance=1 * 10**15,\n            debtTerms=cs.DebtTerms(\n                ltv=0,\n                redemptionThreshold=0,\n                liqThreshold=0,\n                liqFee=0,\n                borrowRate=0,\n                daowry=0,\n            ),\n            shouldBurnAsPayment=False,\n            shouldTransferToEndaoment=False,\n            shouldSwapInStabPools=False,\n            shouldAuctionInstantly=False,\n            canDeposit=True,\n            canWithdraw=True,\n            canRedeemCollateral=False,\n            canRedeemInStabPool=True,\n            canBuyInAuction=True,\n            canClaimInStabPool=True,\n            specialStabPoolId=0,\n            customAuctionParams=cs.AuctionParams(\n                hasParams=False,\n                startDiscount=0,\n                maxDiscount=0,\n                delay=0,\n                duration=0,\n            ),\n            whitelist=empty(address),\n            isNft=False,\n        )),\n        # GREEN\n        # USD Value: $0.00\n        cs.AssetConfigEntry(asset=0xd1Eac76497D06Cf15475A5e3984D5bC03de7C707, config=cs.AssetConfig(\n            vaultIds=[],\n            stakersPointsAlloc=0,\n            voterPointsAlloc=0,\n            perUserDepositLimit=1,  # $0.00\n            globalDepositLimit=2,  # $0.00\n            minDepositBalance=1,  # $0.00000000\n            debtTerms=cs.DebtTerms(\n                ltv=0,\n                redemptionThreshold=0,\n                liqThreshold=0,\n                liqFee=0,\n                borrowRate=0,\n                daowry=0,\n            ),\n            shouldBurnAsPayment=False,\n            shouldTransferToEndaoment=False,\n            shouldSwapInStabPools=False,\n            shouldAuctionInstantly=False,\n            canDeposit=False,\n            canWithdraw=False,\n            canRedeemCollateral=False,\n            canRedeemInStabPool=False,\n            canBuyInAuction=False,\n            canClaimInStabPool=True,\n            specialStabPoolId=0,\n            customAuctionParams=cs.AuctionParams(\n                hasParams=False,\n                startDiscount=0,\n                maxDiscount=0,\n                delay=0,\n                duration=0,\n            ),\n            whitelist=empty(address),\n            isNft=False,\n        )),\n    ]\n\n# priority lists\n\n\n@view\n@external\ndef priorityLiqAssetVaults() -> DynArray[cs.VaultLite, 20]:\n    return [\n    cs.VaultLite(vaultId=3, asset=0x4200000000000000000000000000000000000006), # WETH\n    cs.VaultLite(vaultId=3, asset=0x2Ae3F1Ec7F1F5012CFEab0185bfc7aa3cf0DEc22), # cbETH\n    cs.VaultLite(vaultId=3, asset=0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf), # cbBTC\n    cs.VaultLite(vaultId=5, asset=0x3fb0fC9D3Ddd543AD1b748Ed2286a022f4638493), # undyBTC\n    cs.VaultLite(vaultId=5, asset=0x02981DB1a99A14912b204437e7a2E02679B57668), # undyETH\n    cs.VaultLite(vaultId=3, asset=0x940181a94A35A4569E4529A3CDfB74e38FD98631), # AERO\n    cs.VaultLite(vaultId=5, asset=0x96F1a7ce331F40afe866F3b707c223e377661087), # undyAERO\n    cs.VaultLite(vaultId=3, asset=0xcbADA732173e39521CDBE8bf59a6Dc85A9fc7b8c), # cbADA\n    cs.VaultLite(vaultId=3, asset=0xcb585250f852C6c6bf90434AB21A00f02833a4af), # cbXRP\n    cs.VaultLite(vaultId=3, asset=0xcb17C9Db87B595717C857a08468793f5bAb6445F), # cbLTC\n    cs.VaultLite(vaultId=3, asset=0x9B8Df6E244526ab5F6e6400d331DB28C8fdDdb55), # uSOL\n    ]\n\n\n@view\n@external\ndef priorityStabVaults() -> DynArray[cs.VaultLite, 20]:\n    return [\n    cs.VaultLite(vaultId=1, asset=0xd6c283655B42FA0eb2685F7AB819784F071459dc), # GREEN/USDC\n    cs.VaultLite(vaultId=1, asset=0xaa0f13488CE069A7B5a099457c753A7CFBE04d36), # sGREEN\n    ]\n\n\n@view\n@external\ndef priorityPriceSourceIds() -> DynArray[uint256, 10]:\n    return [1, 8, 2, 9, 4, 5]\n\n# lite signers\n\n\n@view\n@external\ndef liteSigners() -> DynArray[address, 10]:\n    return [\n        0x1c419AeF78b44F30D8F3Dfa2aB13D3538466dc48,\n        0x6f5ef229d7F07183Bf91dF68702D01E9bDa37cA2\n    ]\n",
+            "sha256sum": "be475cce20fb66baf62fbdf3815a3e5afca1881fc5174484fd38cb508bf8e50b"
+          }
+        },
+        "settings": {
+          "outputSelection": {
+            "contracts/config/DefaultsBase.vy": ["*"]
+          },
+          "search_paths": ["."]
+        },
+        "compiler_version": "v0.4.3+commit.bff19ea2",
+        "integrity": "b00a28ead31846b2bcca1d90cd277749d103e9ffa23c1ec036134349ea69c6f2"
+      },
+      "args": "",
+      "file": "contracts/config/DefaultsBase.vy"
+    },
+    "MissionControl": {
+      "address": "0x559E53F42b68b4995732Dba4aF300796761DBC19",
+      "abi": [
+        {
+          "name": "DepartmentPauseModified",
+          "inputs": [
+            {
+              "name": "isPaused",
+              "type": "bool",
+              "indexed": false
+            }
+          ],
+          "anonymous": false,
+          "type": "event"
+        },
+        {
+          "name": "DepartmentFundsRecovered",
+          "inputs": [
+            {
+              "name": "asset",
+              "type": "address",
+              "indexed": true
+            },
+            {
+              "name": "recipient",
+              "type": "address",
+              "indexed": true
+            },
+            {
+              "name": "balance",
+              "type": "uint256",
+              "indexed": false
+            }
+          ],
+          "anonymous": false,
+          "type": "event"
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "getAddys",
+          "inputs": [],
+          "outputs": [
+            {
+              "name": "",
+              "type": "tuple",
+              "components": [
+                {
+                  "name": "hq",
+                  "type": "address"
+                },
+                {
+                  "name": "greenToken",
+                  "type": "address"
+                },
+                {
+                  "name": "savingsGreen",
+                  "type": "address"
+                },
+                {
+                  "name": "ripeToken",
+                  "type": "address"
+                },
+                {
+                  "name": "ledger",
+                  "type": "address"
+                },
+                {
+                  "name": "missionControl",
+                  "type": "address"
+                },
+                {
+                  "name": "switchboard",
+                  "type": "address"
+                },
+                {
+                  "name": "priceDesk",
+                  "type": "address"
+                },
+                {
+                  "name": "vaultBook",
+                  "type": "address"
+                },
+                {
+                  "name": "auctionHouse",
+                  "type": "address"
+                },
+                {
+                  "name": "auctionHouseNft",
+                  "type": "address"
+                },
+                {
+                  "name": "boardroom",
+                  "type": "address"
+                },
+                {
+                  "name": "bondRoom",
+                  "type": "address"
+                },
+                {
+                  "name": "creditEngine",
+                  "type": "address"
+                },
+                {
+                  "name": "endaoment",
+                  "type": "address"
+                },
+                {
+                  "name": "humanResources",
+                  "type": "address"
+                },
+                {
+                  "name": "lootbox",
+                  "type": "address"
+                },
+                {
+                  "name": "teller",
+                  "type": "address"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "getRipeHq",
+          "inputs": [],
+          "outputs": [
+            {
+              "name": "",
+              "type": "address"
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "canMintGreen",
+          "inputs": [],
+          "outputs": [
+            {
+              "name": "",
+              "type": "bool"
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "canMintRipe",
+          "inputs": [],
+          "outputs": [
+            {
+              "name": "",
+              "type": "bool"
+            }
+          ]
+        },
+        {
+          "stateMutability": "nonpayable",
+          "type": "function",
+          "name": "pause",
+          "inputs": [
+            {
+              "name": "_shouldPause",
+              "type": "bool"
+            }
+          ],
+          "outputs": []
+        },
+        {
+          "stateMutability": "nonpayable",
+          "type": "function",
+          "name": "recoverFunds",
+          "inputs": [
+            {
+              "name": "_recipient",
+              "type": "address"
+            },
+            {
+              "name": "_asset",
+              "type": "address"
+            }
+          ],
+          "outputs": []
+        },
+        {
+          "stateMutability": "nonpayable",
+          "type": "function",
+          "name": "recoverFundsMany",
+          "inputs": [
+            {
+              "name": "_recipient",
+              "type": "address"
+            },
+            {
+              "name": "_assets",
+              "type": "address[]"
+            }
+          ],
+          "outputs": []
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "isPaused",
+          "inputs": [],
+          "outputs": [
+            {
+              "name": "",
+              "type": "bool"
+            }
+          ]
+        },
+        {
+          "stateMutability": "nonpayable",
+          "type": "function",
+          "name": "setGeneralConfig",
+          "inputs": [
+            {
+              "name": "_config",
+              "type": "tuple",
+              "components": [
+                {
+                  "name": "perUserMaxVaults",
+                  "type": "uint256"
+                },
+                {
+                  "name": "perUserMaxAssetsPerVault",
+                  "type": "uint256"
+                },
+                {
+                  "name": "priceStaleTime",
+                  "type": "uint256"
+                },
+                {
+                  "name": "canDeposit",
+                  "type": "bool"
+                },
+                {
+                  "name": "canWithdraw",
+                  "type": "bool"
+                },
+                {
+                  "name": "canBorrow",
+                  "type": "bool"
+                },
+                {
+                  "name": "canRepay",
+                  "type": "bool"
+                },
+                {
+                  "name": "canClaimLoot",
+                  "type": "bool"
+                },
+                {
+                  "name": "canLiquidate",
+                  "type": "bool"
+                },
+                {
+                  "name": "canRedeemCollateral",
+                  "type": "bool"
+                },
+                {
+                  "name": "canRedeemInStabPool",
+                  "type": "bool"
+                },
+                {
+                  "name": "canBuyInAuction",
+                  "type": "bool"
+                },
+                {
+                  "name": "canClaimInStabPool",
+                  "type": "bool"
+                }
+              ]
+            }
+          ],
+          "outputs": []
+        },
+        {
+          "stateMutability": "nonpayable",
+          "type": "function",
+          "name": "setGeneralDebtConfig",
+          "inputs": [
+            {
+              "name": "_config",
+              "type": "tuple",
+              "components": [
+                {
+                  "name": "perUserDebtLimit",
+                  "type": "uint256"
+                },
+                {
+                  "name": "globalDebtLimit",
+                  "type": "uint256"
+                },
+                {
+                  "name": "minDebtAmount",
+                  "type": "uint256"
+                },
+                {
+                  "name": "numAllowedBorrowers",
+                  "type": "uint256"
+                },
+                {
+                  "name": "maxBorrowPerInterval",
+                  "type": "uint256"
+                },
+                {
+                  "name": "numBlocksPerInterval",
+                  "type": "uint256"
+                },
+                {
+                  "name": "minDynamicRateBoost",
+                  "type": "uint256"
+                },
+                {
+                  "name": "maxDynamicRateBoost",
+                  "type": "uint256"
+                },
+                {
+                  "name": "increasePerDangerBlock",
+                  "type": "uint256"
+                },
+                {
+                  "name": "maxBorrowRate",
+                  "type": "uint256"
+                },
+                {
+                  "name": "maxLtvDeviation",
+                  "type": "uint256"
+                },
+                {
+                  "name": "keeperFeeRatio",
+                  "type": "uint256"
+                },
+                {
+                  "name": "minKeeperFee",
+                  "type": "uint256"
+                },
+                {
+                  "name": "maxKeeperFee",
+                  "type": "uint256"
+                },
+                {
+                  "name": "isDaowryEnabled",
+                  "type": "bool"
+                },
+                {
+                  "name": "ltvPaybackBuffer",
+                  "type": "uint256"
+                },
+                {
+                  "name": "genAuctionParams",
+                  "type": "tuple",
+                  "components": [
+                    {
+                      "name": "hasParams",
+                      "type": "bool"
+                    },
+                    {
+                      "name": "startDiscount",
+                      "type": "uint256"
+                    },
+                    {
+                      "name": "maxDiscount",
+                      "type": "uint256"
+                    },
+                    {
+                      "name": "delay",
+                      "type": "uint256"
+                    },
+                    {
+                      "name": "duration",
+                      "type": "uint256"
+                    }
+                  ]
+                }
+              ]
+            }
+          ],
+          "outputs": []
+        },
+        {
+          "stateMutability": "nonpayable",
+          "type": "function",
+          "name": "setHrConfig",
+          "inputs": [
+            {
+              "name": "_config",
+              "type": "tuple",
+              "components": [
+                {
+                  "name": "contribTemplate",
+                  "type": "address"
+                },
+                {
+                  "name": "maxCompensation",
+                  "type": "uint256"
+                },
+                {
+                  "name": "minCliffLength",
+                  "type": "uint256"
+                },
+                {
+                  "name": "maxStartDelay",
+                  "type": "uint256"
+                },
+                {
+                  "name": "minVestingLength",
+                  "type": "uint256"
+                },
+                {
+                  "name": "maxVestingLength",
+                  "type": "uint256"
+                }
+              ]
+            }
+          ],
+          "outputs": []
+        },
+        {
+          "stateMutability": "nonpayable",
+          "type": "function",
+          "name": "setRipeBondConfig",
+          "inputs": [
+            {
+              "name": "_config",
+              "type": "tuple",
+              "components": [
+                {
+                  "name": "asset",
+                  "type": "address"
+                },
+                {
+                  "name": "amountPerEpoch",
+                  "type": "uint256"
+                },
+                {
+                  "name": "canBond",
+                  "type": "bool"
+                },
+                {
+                  "name": "minRipePerUnit",
+                  "type": "uint256"
+                },
+                {
+                  "name": "maxRipePerUnit",
+                  "type": "uint256"
+                },
+                {
+                  "name": "maxRipePerUnitLockBonus",
+                  "type": "uint256"
+                },
+                {
+                  "name": "epochLength",
+                  "type": "uint256"
+                },
+                {
+                  "name": "shouldAutoRestart",
+                  "type": "bool"
+                },
+                {
+                  "name": "restartDelayBlocks",
+                  "type": "uint256"
+                }
+              ]
+            }
+          ],
+          "outputs": []
+        },
+        {
+          "stateMutability": "nonpayable",
+          "type": "function",
+          "name": "setAssetConfig",
+          "inputs": [
+            {
+              "name": "_asset",
+              "type": "address"
+            },
+            {
+              "name": "_config",
+              "type": "tuple",
+              "components": [
+                {
+                  "name": "vaultIds",
+                  "type": "uint256[]"
+                },
+                {
+                  "name": "stakersPointsAlloc",
+                  "type": "uint256"
+                },
+                {
+                  "name": "voterPointsAlloc",
+                  "type": "uint256"
+                },
+                {
+                  "name": "perUserDepositLimit",
+                  "type": "uint256"
+                },
+                {
+                  "name": "globalDepositLimit",
+                  "type": "uint256"
+                },
+                {
+                  "name": "minDepositBalance",
+                  "type": "uint256"
+                },
+                {
+                  "name": "debtTerms",
+                  "type": "tuple",
+                  "components": [
+                    {
+                      "name": "ltv",
+                      "type": "uint256"
+                    },
+                    {
+                      "name": "redemptionThreshold",
+                      "type": "uint256"
+                    },
+                    {
+                      "name": "liqThreshold",
+                      "type": "uint256"
+                    },
+                    {
+                      "name": "liqFee",
+                      "type": "uint256"
+                    },
+                    {
+                      "name": "borrowRate",
+                      "type": "uint256"
+                    },
+                    {
+                      "name": "daowry",
+                      "type": "uint256"
+                    }
+                  ]
+                },
+                {
+                  "name": "shouldBurnAsPayment",
+                  "type": "bool"
+                },
+                {
+                  "name": "shouldTransferToEndaoment",
+                  "type": "bool"
+                },
+                {
+                  "name": "shouldSwapInStabPools",
+                  "type": "bool"
+                },
+                {
+                  "name": "shouldAuctionInstantly",
+                  "type": "bool"
+                },
+                {
+                  "name": "canDeposit",
+                  "type": "bool"
+                },
+                {
+                  "name": "canWithdraw",
+                  "type": "bool"
+                },
+                {
+                  "name": "canRedeemCollateral",
+                  "type": "bool"
+                },
+                {
+                  "name": "canRedeemInStabPool",
+                  "type": "bool"
+                },
+                {
+                  "name": "canBuyInAuction",
+                  "type": "bool"
+                },
+                {
+                  "name": "canClaimInStabPool",
+                  "type": "bool"
+                },
+                {
+                  "name": "specialStabPoolId",
+                  "type": "uint256"
+                },
+                {
+                  "name": "customAuctionParams",
+                  "type": "tuple",
+                  "components": [
+                    {
+                      "name": "hasParams",
+                      "type": "bool"
+                    },
+                    {
+                      "name": "startDiscount",
+                      "type": "uint256"
+                    },
+                    {
+                      "name": "maxDiscount",
+                      "type": "uint256"
+                    },
+                    {
+                      "name": "delay",
+                      "type": "uint256"
+                    },
+                    {
+                      "name": "duration",
+                      "type": "uint256"
+                    }
+                  ]
+                },
+                {
+                  "name": "whitelist",
+                  "type": "address"
+                },
+                {
+                  "name": "isNft",
+                  "type": "bool"
+                }
+              ]
+            }
+          ],
+          "outputs": []
+        },
+        {
+          "stateMutability": "nonpayable",
+          "type": "function",
+          "name": "deregisterAsset",
+          "inputs": [
+            {
+              "name": "_asset",
+              "type": "address"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "bool"
+            }
+          ]
+        },
+        {
+          "stateMutability": "nonpayable",
+          "type": "function",
+          "name": "setUserConfig",
+          "inputs": [
+            {
+              "name": "_user",
+              "type": "address"
+            },
+            {
+              "name": "_config",
+              "type": "tuple",
+              "components": [
+                {
+                  "name": "canAnyoneDeposit",
+                  "type": "bool"
+                },
+                {
+                  "name": "canAnyoneRepayDebt",
+                  "type": "bool"
+                },
+                {
+                  "name": "canAnyoneBondForUser",
+                  "type": "bool"
+                }
+              ]
+            }
+          ],
+          "outputs": []
+        },
+        {
+          "stateMutability": "nonpayable",
+          "type": "function",
+          "name": "setUserDelegation",
+          "inputs": [
+            {
+              "name": "_user",
+              "type": "address"
+            },
+            {
+              "name": "_delegate",
+              "type": "address"
+            },
+            {
+              "name": "_config",
+              "type": "tuple",
+              "components": [
+                {
+                  "name": "canWithdraw",
+                  "type": "bool"
+                },
+                {
+                  "name": "canBorrow",
+                  "type": "bool"
+                },
+                {
+                  "name": "canClaimFromStabPool",
+                  "type": "bool"
+                },
+                {
+                  "name": "canClaimLoot",
+                  "type": "bool"
+                }
+              ]
+            }
+          ],
+          "outputs": []
+        },
+        {
+          "stateMutability": "nonpayable",
+          "type": "function",
+          "name": "setRipeRewardsConfig",
+          "inputs": [
+            {
+              "name": "_config",
+              "type": "tuple",
+              "components": [
+                {
+                  "name": "arePointsEnabled",
+                  "type": "bool"
+                },
+                {
+                  "name": "ripePerBlock",
+                  "type": "uint256"
+                },
+                {
+                  "name": "borrowersAlloc",
+                  "type": "uint256"
+                },
+                {
+                  "name": "stakersAlloc",
+                  "type": "uint256"
+                },
+                {
+                  "name": "votersAlloc",
+                  "type": "uint256"
+                },
+                {
+                  "name": "genDepositorsAlloc",
+                  "type": "uint256"
+                },
+                {
+                  "name": "autoStakeRatio",
+                  "type": "uint256"
+                },
+                {
+                  "name": "autoStakeDurationRatio",
+                  "type": "uint256"
+                },
+                {
+                  "name": "stabPoolRipePerDollarClaimed",
+                  "type": "uint256"
+                }
+              ]
+            }
+          ],
+          "outputs": []
+        },
+        {
+          "stateMutability": "nonpayable",
+          "type": "function",
+          "name": "setRipeGovVaultConfig",
+          "inputs": [
+            {
+              "name": "_asset",
+              "type": "address"
+            },
+            {
+              "name": "_assetWeight",
+              "type": "uint256"
+            },
+            {
+              "name": "_shouldFreezeWhenBadDebt",
+              "type": "bool"
+            },
+            {
+              "name": "_lockTerms",
+              "type": "tuple",
+              "components": [
+                {
+                  "name": "minLockDuration",
+                  "type": "uint256"
+                },
+                {
+                  "name": "maxLockDuration",
+                  "type": "uint256"
+                },
+                {
+                  "name": "maxLockBoost",
+                  "type": "uint256"
+                },
+                {
+                  "name": "canExit",
+                  "type": "bool"
+                },
+                {
+                  "name": "exitFee",
+                  "type": "uint256"
+                }
+              ]
+            }
+          ],
+          "outputs": []
+        },
+        {
+          "stateMutability": "nonpayable",
+          "type": "function",
+          "name": "setPriorityLiqAssetVaults",
+          "inputs": [
+            {
+              "name": "_priorityLiqAssetVaults",
+              "type": "tuple[]",
+              "components": [
+                {
+                  "name": "vaultId",
+                  "type": "uint256"
+                },
+                {
+                  "name": "asset",
+                  "type": "address"
+                }
+              ]
+            }
+          ],
+          "outputs": []
+        },
+        {
+          "stateMutability": "nonpayable",
+          "type": "function",
+          "name": "setPriorityStabVaults",
+          "inputs": [
+            {
+              "name": "_priorityStabVaults",
+              "type": "tuple[]",
+              "components": [
+                {
+                  "name": "vaultId",
+                  "type": "uint256"
+                },
+                {
+                  "name": "asset",
+                  "type": "address"
+                }
+              ]
+            }
+          ],
+          "outputs": []
+        },
+        {
+          "stateMutability": "nonpayable",
+          "type": "function",
+          "name": "setCanPerformLiteAction",
+          "inputs": [
+            {
+              "name": "_signer",
+              "type": "address"
+            },
+            {
+              "name": "_canDo",
+              "type": "bool"
+            }
+          ],
+          "outputs": []
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "canPerformLiteAction",
+          "inputs": [
+            {
+              "name": "_signer",
+              "type": "address"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "bool"
+            }
+          ]
+        },
+        {
+          "stateMutability": "nonpayable",
+          "type": "function",
+          "name": "setTrainingWheels",
+          "inputs": [
+            {
+              "name": "_trainingWheels",
+              "type": "address"
+            }
+          ],
+          "outputs": []
+        },
+        {
+          "stateMutability": "nonpayable",
+          "type": "function",
+          "name": "setUnderscoreRegistry",
+          "inputs": [
+            {
+              "name": "_underscoreRegistry",
+              "type": "address"
+            }
+          ],
+          "outputs": []
+        },
+        {
+          "stateMutability": "nonpayable",
+          "type": "function",
+          "name": "setPriorityPriceSourceIds",
+          "inputs": [
+            {
+              "name": "_priorityIds",
+              "type": "uint256[]"
+            }
+          ],
+          "outputs": []
+        },
+        {
+          "stateMutability": "nonpayable",
+          "type": "function",
+          "name": "setShouldCheckLastTouch",
+          "inputs": [
+            {
+              "name": "_shouldCheck",
+              "type": "bool"
+            }
+          ],
+          "outputs": []
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "isSupportedAsset",
+          "inputs": [
+            {
+              "name": "_asset",
+              "type": "address"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "bool"
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "isSupportedAssetInVault",
+          "inputs": [
+            {
+              "name": "_vaultId",
+              "type": "uint256"
+            },
+            {
+              "name": "_asset",
+              "type": "address"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "bool"
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "getNumAssets",
+          "inputs": [],
+          "outputs": [
+            {
+              "name": "",
+              "type": "uint256"
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "getFirstVaultIdForAsset",
+          "inputs": [
+            {
+              "name": "_asset",
+              "type": "address"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "uint256"
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "getTellerDepositConfig",
+          "inputs": [
+            {
+              "name": "_vaultId",
+              "type": "uint256"
+            },
+            {
+              "name": "_asset",
+              "type": "address"
+            },
+            {
+              "name": "_user",
+              "type": "address"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "tuple",
+              "components": [
+                {
+                  "name": "canDepositGeneral",
+                  "type": "bool"
+                },
+                {
+                  "name": "canDepositAsset",
+                  "type": "bool"
+                },
+                {
+                  "name": "doesVaultSupportAsset",
+                  "type": "bool"
+                },
+                {
+                  "name": "isUserAllowed",
+                  "type": "bool"
+                },
+                {
+                  "name": "perUserDepositLimit",
+                  "type": "uint256"
+                },
+                {
+                  "name": "globalDepositLimit",
+                  "type": "uint256"
+                },
+                {
+                  "name": "perUserMaxAssetsPerVault",
+                  "type": "uint256"
+                },
+                {
+                  "name": "perUserMaxVaults",
+                  "type": "uint256"
+                },
+                {
+                  "name": "canAnyoneDeposit",
+                  "type": "bool"
+                },
+                {
+                  "name": "minDepositBalance",
+                  "type": "uint256"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "getTellerWithdrawConfig",
+          "inputs": [
+            {
+              "name": "_asset",
+              "type": "address"
+            },
+            {
+              "name": "_user",
+              "type": "address"
+            },
+            {
+              "name": "_caller",
+              "type": "address"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "tuple",
+              "components": [
+                {
+                  "name": "canWithdrawGeneral",
+                  "type": "bool"
+                },
+                {
+                  "name": "canWithdrawAsset",
+                  "type": "bool"
+                },
+                {
+                  "name": "isUserAllowed",
+                  "type": "bool"
+                },
+                {
+                  "name": "canWithdrawForUser",
+                  "type": "bool"
+                },
+                {
+                  "name": "minDepositBalance",
+                  "type": "uint256"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "getDebtTerms",
+          "inputs": [
+            {
+              "name": "_asset",
+              "type": "address"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "tuple",
+              "components": [
+                {
+                  "name": "ltv",
+                  "type": "uint256"
+                },
+                {
+                  "name": "redemptionThreshold",
+                  "type": "uint256"
+                },
+                {
+                  "name": "liqThreshold",
+                  "type": "uint256"
+                },
+                {
+                  "name": "liqFee",
+                  "type": "uint256"
+                },
+                {
+                  "name": "borrowRate",
+                  "type": "uint256"
+                },
+                {
+                  "name": "daowry",
+                  "type": "uint256"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "getBorrowConfig",
+          "inputs": [
+            {
+              "name": "_user",
+              "type": "address"
+            },
+            {
+              "name": "_caller",
+              "type": "address"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "tuple",
+              "components": [
+                {
+                  "name": "canBorrow",
+                  "type": "bool"
+                },
+                {
+                  "name": "canBorrowForUser",
+                  "type": "bool"
+                },
+                {
+                  "name": "numAllowedBorrowers",
+                  "type": "uint256"
+                },
+                {
+                  "name": "maxBorrowPerInterval",
+                  "type": "uint256"
+                },
+                {
+                  "name": "numBlocksPerInterval",
+                  "type": "uint256"
+                },
+                {
+                  "name": "perUserDebtLimit",
+                  "type": "uint256"
+                },
+                {
+                  "name": "globalDebtLimit",
+                  "type": "uint256"
+                },
+                {
+                  "name": "minDebtAmount",
+                  "type": "uint256"
+                },
+                {
+                  "name": "isDaowryEnabled",
+                  "type": "bool"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "maxLtvDeviation",
+          "inputs": [],
+          "outputs": [
+            {
+              "name": "",
+              "type": "uint256"
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "getRepayConfig",
+          "inputs": [
+            {
+              "name": "_user",
+              "type": "address"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "tuple",
+              "components": [
+                {
+                  "name": "canRepay",
+                  "type": "bool"
+                },
+                {
+                  "name": "canAnyoneRepayDebt",
+                  "type": "bool"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "getRedeemCollateralConfig",
+          "inputs": [
+            {
+              "name": "_asset",
+              "type": "address"
+            },
+            {
+              "name": "_recipient",
+              "type": "address"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "tuple",
+              "components": [
+                {
+                  "name": "canRedeemCollateralGeneral",
+                  "type": "bool"
+                },
+                {
+                  "name": "canRedeemCollateralAsset",
+                  "type": "bool"
+                },
+                {
+                  "name": "isUserAllowed",
+                  "type": "bool"
+                },
+                {
+                  "name": "ltvPaybackBuffer",
+                  "type": "uint256"
+                },
+                {
+                  "name": "canAnyoneDeposit",
+                  "type": "bool"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "getLtvPaybackBuffer",
+          "inputs": [],
+          "outputs": [
+            {
+              "name": "",
+              "type": "uint256"
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "getAuctionBuyConfig",
+          "inputs": [
+            {
+              "name": "_asset",
+              "type": "address"
+            },
+            {
+              "name": "_recipient",
+              "type": "address"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "tuple",
+              "components": [
+                {
+                  "name": "canBuyInAuctionGeneral",
+                  "type": "bool"
+                },
+                {
+                  "name": "canBuyInAuctionAsset",
+                  "type": "bool"
+                },
+                {
+                  "name": "isUserAllowed",
+                  "type": "bool"
+                },
+                {
+                  "name": "canAnyoneDeposit",
+                  "type": "bool"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "getGenLiqConfig",
+          "inputs": [],
+          "outputs": [
+            {
+              "name": "",
+              "type": "tuple",
+              "components": [
+                {
+                  "name": "canLiquidate",
+                  "type": "bool"
+                },
+                {
+                  "name": "keeperFeeRatio",
+                  "type": "uint256"
+                },
+                {
+                  "name": "minKeeperFee",
+                  "type": "uint256"
+                },
+                {
+                  "name": "maxKeeperFee",
+                  "type": "uint256"
+                },
+                {
+                  "name": "ltvPaybackBuffer",
+                  "type": "uint256"
+                },
+                {
+                  "name": "genAuctionParams",
+                  "type": "tuple",
+                  "components": [
+                    {
+                      "name": "hasParams",
+                      "type": "bool"
+                    },
+                    {
+                      "name": "startDiscount",
+                      "type": "uint256"
+                    },
+                    {
+                      "name": "maxDiscount",
+                      "type": "uint256"
+                    },
+                    {
+                      "name": "delay",
+                      "type": "uint256"
+                    },
+                    {
+                      "name": "duration",
+                      "type": "uint256"
+                    }
+                  ]
+                },
+                {
+                  "name": "priorityLiqAssetVaults",
+                  "type": "tuple[]",
+                  "components": [
+                    {
+                      "name": "vaultId",
+                      "type": "uint256"
+                    },
+                    {
+                      "name": "vaultAddr",
+                      "type": "address"
+                    },
+                    {
+                      "name": "asset",
+                      "type": "address"
+                    }
+                  ]
+                },
+                {
+                  "name": "priorityStabVaults",
+                  "type": "tuple[]",
+                  "components": [
+                    {
+                      "name": "vaultId",
+                      "type": "uint256"
+                    },
+                    {
+                      "name": "vaultAddr",
+                      "type": "address"
+                    },
+                    {
+                      "name": "asset",
+                      "type": "address"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "getGenAuctionParams",
+          "inputs": [],
+          "outputs": [
+            {
+              "name": "",
+              "type": "tuple",
+              "components": [
+                {
+                  "name": "hasParams",
+                  "type": "bool"
+                },
+                {
+                  "name": "startDiscount",
+                  "type": "uint256"
+                },
+                {
+                  "name": "maxDiscount",
+                  "type": "uint256"
+                },
+                {
+                  "name": "delay",
+                  "type": "uint256"
+                },
+                {
+                  "name": "duration",
+                  "type": "uint256"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "getAssetLiqConfig",
+          "inputs": [
+            {
+              "name": "_asset",
+              "type": "address"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "tuple",
+              "components": [
+                {
+                  "name": "hasConfig",
+                  "type": "bool"
+                },
+                {
+                  "name": "shouldBurnAsPayment",
+                  "type": "bool"
+                },
+                {
+                  "name": "shouldTransferToEndaoment",
+                  "type": "bool"
+                },
+                {
+                  "name": "shouldSwapInStabPools",
+                  "type": "bool"
+                },
+                {
+                  "name": "shouldAuctionInstantly",
+                  "type": "bool"
+                },
+                {
+                  "name": "customAuctionParams",
+                  "type": "tuple",
+                  "components": [
+                    {
+                      "name": "hasParams",
+                      "type": "bool"
+                    },
+                    {
+                      "name": "startDiscount",
+                      "type": "uint256"
+                    },
+                    {
+                      "name": "maxDiscount",
+                      "type": "uint256"
+                    },
+                    {
+                      "name": "delay",
+                      "type": "uint256"
+                    },
+                    {
+                      "name": "duration",
+                      "type": "uint256"
+                    }
+                  ]
+                },
+                {
+                  "name": "specialStabPool",
+                  "type": "tuple",
+                  "components": [
+                    {
+                      "name": "vaultId",
+                      "type": "uint256"
+                    },
+                    {
+                      "name": "vaultAddr",
+                      "type": "address"
+                    },
+                    {
+                      "name": "asset",
+                      "type": "address"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "getStabPoolClaimsConfig",
+          "inputs": [
+            {
+              "name": "_claimAsset",
+              "type": "address"
+            },
+            {
+              "name": "_claimer",
+              "type": "address"
+            },
+            {
+              "name": "_caller",
+              "type": "address"
+            },
+            {
+              "name": "_ripeToken",
+              "type": "address"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "tuple",
+              "components": [
+                {
+                  "name": "canClaimInStabPoolGeneral",
+                  "type": "bool"
+                },
+                {
+                  "name": "canClaimInStabPoolAsset",
+                  "type": "bool"
+                },
+                {
+                  "name": "canClaimFromStabPoolForUser",
+                  "type": "bool"
+                },
+                {
+                  "name": "isUserAllowed",
+                  "type": "bool"
+                },
+                {
+                  "name": "rewardsLockDuration",
+                  "type": "uint256"
+                },
+                {
+                  "name": "ripePerDollarClaimed",
+                  "type": "uint256"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "getStabPoolRedemptionsConfig",
+          "inputs": [
+            {
+              "name": "_asset",
+              "type": "address"
+            },
+            {
+              "name": "_recipient",
+              "type": "address"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "tuple",
+              "components": [
+                {
+                  "name": "canRedeemInStabPoolGeneral",
+                  "type": "bool"
+                },
+                {
+                  "name": "canRedeemInStabPoolAsset",
+                  "type": "bool"
+                },
+                {
+                  "name": "isUserAllowed",
+                  "type": "bool"
+                },
+                {
+                  "name": "canAnyoneDeposit",
+                  "type": "bool"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "getClaimLootConfig",
+          "inputs": [
+            {
+              "name": "_user",
+              "type": "address"
+            },
+            {
+              "name": "_caller",
+              "type": "address"
+            },
+            {
+              "name": "_ripeToken",
+              "type": "address"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "tuple",
+              "components": [
+                {
+                  "name": "canClaimLoot",
+                  "type": "bool"
+                },
+                {
+                  "name": "canClaimLootForUser",
+                  "type": "bool"
+                },
+                {
+                  "name": "autoStakeRatio",
+                  "type": "uint256"
+                },
+                {
+                  "name": "rewardsLockDuration",
+                  "type": "uint256"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "getRewardsConfig",
+          "inputs": [],
+          "outputs": [
+            {
+              "name": "",
+              "type": "tuple",
+              "components": [
+                {
+                  "name": "arePointsEnabled",
+                  "type": "bool"
+                },
+                {
+                  "name": "ripePerBlock",
+                  "type": "uint256"
+                },
+                {
+                  "name": "borrowersAlloc",
+                  "type": "uint256"
+                },
+                {
+                  "name": "stakersAlloc",
+                  "type": "uint256"
+                },
+                {
+                  "name": "votersAlloc",
+                  "type": "uint256"
+                },
+                {
+                  "name": "genDepositorsAlloc",
+                  "type": "uint256"
+                },
+                {
+                  "name": "stakersPointsAllocTotal",
+                  "type": "uint256"
+                },
+                {
+                  "name": "voterPointsAllocTotal",
+                  "type": "uint256"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "getDepositPointsConfig",
+          "inputs": [
+            {
+              "name": "_asset",
+              "type": "address"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "tuple",
+              "components": [
+                {
+                  "name": "stakersPointsAlloc",
+                  "type": "uint256"
+                },
+                {
+                  "name": "voterPointsAlloc",
+                  "type": "uint256"
+                },
+                {
+                  "name": "isNft",
+                  "type": "bool"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "getPriceConfig",
+          "inputs": [],
+          "outputs": [
+            {
+              "name": "",
+              "type": "tuple",
+              "components": [
+                {
+                  "name": "staleTime",
+                  "type": "uint256"
+                },
+                {
+                  "name": "priorityPriceSourceIds",
+                  "type": "uint256[]"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "getPurchaseRipeBondConfig",
+          "inputs": [
+            {
+              "name": "_user",
+              "type": "address"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "tuple",
+              "components": [
+                {
+                  "name": "asset",
+                  "type": "address"
+                },
+                {
+                  "name": "amountPerEpoch",
+                  "type": "uint256"
+                },
+                {
+                  "name": "canBond",
+                  "type": "bool"
+                },
+                {
+                  "name": "minRipePerUnit",
+                  "type": "uint256"
+                },
+                {
+                  "name": "maxRipePerUnit",
+                  "type": "uint256"
+                },
+                {
+                  "name": "maxRipePerUnitLockBonus",
+                  "type": "uint256"
+                },
+                {
+                  "name": "epochLength",
+                  "type": "uint256"
+                },
+                {
+                  "name": "shouldAutoRestart",
+                  "type": "bool"
+                },
+                {
+                  "name": "restartDelayBlocks",
+                  "type": "uint256"
+                },
+                {
+                  "name": "minLockDuration",
+                  "type": "uint256"
+                },
+                {
+                  "name": "maxLockDuration",
+                  "type": "uint256"
+                },
+                {
+                  "name": "canAnyoneBondForUser",
+                  "type": "bool"
+                },
+                {
+                  "name": "isUserAllowed",
+                  "type": "bool"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "getDynamicBorrowRateConfig",
+          "inputs": [],
+          "outputs": [
+            {
+              "name": "",
+              "type": "tuple",
+              "components": [
+                {
+                  "name": "minDynamicRateBoost",
+                  "type": "uint256"
+                },
+                {
+                  "name": "maxDynamicRateBoost",
+                  "type": "uint256"
+                },
+                {
+                  "name": "increasePerDangerBlock",
+                  "type": "uint256"
+                },
+                {
+                  "name": "maxBorrowRate",
+                  "type": "uint256"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "getPriceStaleTime",
+          "inputs": [],
+          "outputs": [
+            {
+              "name": "",
+              "type": "uint256"
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "getPriorityPriceSourceIds",
+          "inputs": [],
+          "outputs": [
+            {
+              "name": "",
+              "type": "uint256[]"
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "getPriorityLiqAssetVaults",
+          "inputs": [],
+          "outputs": [
+            {
+              "name": "",
+              "type": "tuple[]",
+              "components": [
+                {
+                  "name": "vaultId",
+                  "type": "uint256"
+                },
+                {
+                  "name": "asset",
+                  "type": "address"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "getPriorityStabVaults",
+          "inputs": [],
+          "outputs": [
+            {
+              "name": "",
+              "type": "tuple[]",
+              "components": [
+                {
+                  "name": "vaultId",
+                  "type": "uint256"
+                },
+                {
+                  "name": "asset",
+                  "type": "address"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "doesUndyLegoHaveAccess",
+          "inputs": [
+            {
+              "name": "_wallet",
+              "type": "address"
+            },
+            {
+              "name": "_legoAddr",
+              "type": "address"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "bool"
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "genConfig",
+          "inputs": [],
+          "outputs": [
+            {
+              "name": "",
+              "type": "tuple",
+              "components": [
+                {
+                  "name": "perUserMaxVaults",
+                  "type": "uint256"
+                },
+                {
+                  "name": "perUserMaxAssetsPerVault",
+                  "type": "uint256"
+                },
+                {
+                  "name": "priceStaleTime",
+                  "type": "uint256"
+                },
+                {
+                  "name": "canDeposit",
+                  "type": "bool"
+                },
+                {
+                  "name": "canWithdraw",
+                  "type": "bool"
+                },
+                {
+                  "name": "canBorrow",
+                  "type": "bool"
+                },
+                {
+                  "name": "canRepay",
+                  "type": "bool"
+                },
+                {
+                  "name": "canClaimLoot",
+                  "type": "bool"
+                },
+                {
+                  "name": "canLiquidate",
+                  "type": "bool"
+                },
+                {
+                  "name": "canRedeemCollateral",
+                  "type": "bool"
+                },
+                {
+                  "name": "canRedeemInStabPool",
+                  "type": "bool"
+                },
+                {
+                  "name": "canBuyInAuction",
+                  "type": "bool"
+                },
+                {
+                  "name": "canClaimInStabPool",
+                  "type": "bool"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "genDebtConfig",
+          "inputs": [],
+          "outputs": [
+            {
+              "name": "",
+              "type": "tuple",
+              "components": [
+                {
+                  "name": "perUserDebtLimit",
+                  "type": "uint256"
+                },
+                {
+                  "name": "globalDebtLimit",
+                  "type": "uint256"
+                },
+                {
+                  "name": "minDebtAmount",
+                  "type": "uint256"
+                },
+                {
+                  "name": "numAllowedBorrowers",
+                  "type": "uint256"
+                },
+                {
+                  "name": "maxBorrowPerInterval",
+                  "type": "uint256"
+                },
+                {
+                  "name": "numBlocksPerInterval",
+                  "type": "uint256"
+                },
+                {
+                  "name": "minDynamicRateBoost",
+                  "type": "uint256"
+                },
+                {
+                  "name": "maxDynamicRateBoost",
+                  "type": "uint256"
+                },
+                {
+                  "name": "increasePerDangerBlock",
+                  "type": "uint256"
+                },
+                {
+                  "name": "maxBorrowRate",
+                  "type": "uint256"
+                },
+                {
+                  "name": "maxLtvDeviation",
+                  "type": "uint256"
+                },
+                {
+                  "name": "keeperFeeRatio",
+                  "type": "uint256"
+                },
+                {
+                  "name": "minKeeperFee",
+                  "type": "uint256"
+                },
+                {
+                  "name": "maxKeeperFee",
+                  "type": "uint256"
+                },
+                {
+                  "name": "isDaowryEnabled",
+                  "type": "bool"
+                },
+                {
+                  "name": "ltvPaybackBuffer",
+                  "type": "uint256"
+                },
+                {
+                  "name": "genAuctionParams",
+                  "type": "tuple",
+                  "components": [
+                    {
+                      "name": "hasParams",
+                      "type": "bool"
+                    },
+                    {
+                      "name": "startDiscount",
+                      "type": "uint256"
+                    },
+                    {
+                      "name": "maxDiscount",
+                      "type": "uint256"
+                    },
+                    {
+                      "name": "delay",
+                      "type": "uint256"
+                    },
+                    {
+                      "name": "duration",
+                      "type": "uint256"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "hrConfig",
+          "inputs": [],
+          "outputs": [
+            {
+              "name": "",
+              "type": "tuple",
+              "components": [
+                {
+                  "name": "contribTemplate",
+                  "type": "address"
+                },
+                {
+                  "name": "maxCompensation",
+                  "type": "uint256"
+                },
+                {
+                  "name": "minCliffLength",
+                  "type": "uint256"
+                },
+                {
+                  "name": "maxStartDelay",
+                  "type": "uint256"
+                },
+                {
+                  "name": "minVestingLength",
+                  "type": "uint256"
+                },
+                {
+                  "name": "maxVestingLength",
+                  "type": "uint256"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "ripeBondConfig",
+          "inputs": [],
+          "outputs": [
+            {
+              "name": "",
+              "type": "tuple",
+              "components": [
+                {
+                  "name": "asset",
+                  "type": "address"
+                },
+                {
+                  "name": "amountPerEpoch",
+                  "type": "uint256"
+                },
+                {
+                  "name": "canBond",
+                  "type": "bool"
+                },
+                {
+                  "name": "minRipePerUnit",
+                  "type": "uint256"
+                },
+                {
+                  "name": "maxRipePerUnit",
+                  "type": "uint256"
+                },
+                {
+                  "name": "maxRipePerUnitLockBonus",
+                  "type": "uint256"
+                },
+                {
+                  "name": "epochLength",
+                  "type": "uint256"
+                },
+                {
+                  "name": "shouldAutoRestart",
+                  "type": "bool"
+                },
+                {
+                  "name": "restartDelayBlocks",
+                  "type": "uint256"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "assetConfig",
+          "inputs": [
+            {
+              "name": "arg0",
+              "type": "address"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "tuple",
+              "components": [
+                {
+                  "name": "vaultIds",
+                  "type": "uint256[]"
+                },
+                {
+                  "name": "stakersPointsAlloc",
+                  "type": "uint256"
+                },
+                {
+                  "name": "voterPointsAlloc",
+                  "type": "uint256"
+                },
+                {
+                  "name": "perUserDepositLimit",
+                  "type": "uint256"
+                },
+                {
+                  "name": "globalDepositLimit",
+                  "type": "uint256"
+                },
+                {
+                  "name": "minDepositBalance",
+                  "type": "uint256"
+                },
+                {
+                  "name": "debtTerms",
+                  "type": "tuple",
+                  "components": [
+                    {
+                      "name": "ltv",
+                      "type": "uint256"
+                    },
+                    {
+                      "name": "redemptionThreshold",
+                      "type": "uint256"
+                    },
+                    {
+                      "name": "liqThreshold",
+                      "type": "uint256"
+                    },
+                    {
+                      "name": "liqFee",
+                      "type": "uint256"
+                    },
+                    {
+                      "name": "borrowRate",
+                      "type": "uint256"
+                    },
+                    {
+                      "name": "daowry",
+                      "type": "uint256"
+                    }
+                  ]
+                },
+                {
+                  "name": "shouldBurnAsPayment",
+                  "type": "bool"
+                },
+                {
+                  "name": "shouldTransferToEndaoment",
+                  "type": "bool"
+                },
+                {
+                  "name": "shouldSwapInStabPools",
+                  "type": "bool"
+                },
+                {
+                  "name": "shouldAuctionInstantly",
+                  "type": "bool"
+                },
+                {
+                  "name": "canDeposit",
+                  "type": "bool"
+                },
+                {
+                  "name": "canWithdraw",
+                  "type": "bool"
+                },
+                {
+                  "name": "canRedeemCollateral",
+                  "type": "bool"
+                },
+                {
+                  "name": "canRedeemInStabPool",
+                  "type": "bool"
+                },
+                {
+                  "name": "canBuyInAuction",
+                  "type": "bool"
+                },
+                {
+                  "name": "canClaimInStabPool",
+                  "type": "bool"
+                },
+                {
+                  "name": "specialStabPoolId",
+                  "type": "uint256"
+                },
+                {
+                  "name": "customAuctionParams",
+                  "type": "tuple",
+                  "components": [
+                    {
+                      "name": "hasParams",
+                      "type": "bool"
+                    },
+                    {
+                      "name": "startDiscount",
+                      "type": "uint256"
+                    },
+                    {
+                      "name": "maxDiscount",
+                      "type": "uint256"
+                    },
+                    {
+                      "name": "delay",
+                      "type": "uint256"
+                    },
+                    {
+                      "name": "duration",
+                      "type": "uint256"
+                    }
+                  ]
+                },
+                {
+                  "name": "whitelist",
+                  "type": "address"
+                },
+                {
+                  "name": "isNft",
+                  "type": "bool"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "assets",
+          "inputs": [
+            {
+              "name": "arg0",
+              "type": "uint256"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "address"
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "indexOfAsset",
+          "inputs": [
+            {
+              "name": "arg0",
+              "type": "address"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "uint256"
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "numAssets",
+          "inputs": [],
+          "outputs": [
+            {
+              "name": "",
+              "type": "uint256"
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "userConfig",
+          "inputs": [
+            {
+              "name": "arg0",
+              "type": "address"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "tuple",
+              "components": [
+                {
+                  "name": "canAnyoneDeposit",
+                  "type": "bool"
+                },
+                {
+                  "name": "canAnyoneRepayDebt",
+                  "type": "bool"
+                },
+                {
+                  "name": "canAnyoneBondForUser",
+                  "type": "bool"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "userDelegation",
+          "inputs": [
+            {
+              "name": "arg0",
+              "type": "address"
+            },
+            {
+              "name": "arg1",
+              "type": "address"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "tuple",
+              "components": [
+                {
+                  "name": "canWithdraw",
+                  "type": "bool"
+                },
+                {
+                  "name": "canBorrow",
+                  "type": "bool"
+                },
+                {
+                  "name": "canClaimFromStabPool",
+                  "type": "bool"
+                },
+                {
+                  "name": "canClaimLoot",
+                  "type": "bool"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "rewardsConfig",
+          "inputs": [],
+          "outputs": [
+            {
+              "name": "",
+              "type": "tuple",
+              "components": [
+                {
+                  "name": "arePointsEnabled",
+                  "type": "bool"
+                },
+                {
+                  "name": "ripePerBlock",
+                  "type": "uint256"
+                },
+                {
+                  "name": "borrowersAlloc",
+                  "type": "uint256"
+                },
+                {
+                  "name": "stakersAlloc",
+                  "type": "uint256"
+                },
+                {
+                  "name": "votersAlloc",
+                  "type": "uint256"
+                },
+                {
+                  "name": "genDepositorsAlloc",
+                  "type": "uint256"
+                },
+                {
+                  "name": "autoStakeRatio",
+                  "type": "uint256"
+                },
+                {
+                  "name": "autoStakeDurationRatio",
+                  "type": "uint256"
+                },
+                {
+                  "name": "stabPoolRipePerDollarClaimed",
+                  "type": "uint256"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "totalPointsAllocs",
+          "inputs": [],
+          "outputs": [
+            {
+              "name": "",
+              "type": "tuple",
+              "components": [
+                {
+                  "name": "stakersPointsAllocTotal",
+                  "type": "uint256"
+                },
+                {
+                  "name": "voterPointsAllocTotal",
+                  "type": "uint256"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "ripeGovVaultConfig",
+          "inputs": [
+            {
+              "name": "arg0",
+              "type": "address"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "tuple",
+              "components": [
+                {
+                  "name": "lockTerms",
+                  "type": "tuple",
+                  "components": [
+                    {
+                      "name": "minLockDuration",
+                      "type": "uint256"
+                    },
+                    {
+                      "name": "maxLockDuration",
+                      "type": "uint256"
+                    },
+                    {
+                      "name": "maxLockBoost",
+                      "type": "uint256"
+                    },
+                    {
+                      "name": "canExit",
+                      "type": "bool"
+                    },
+                    {
+                      "name": "exitFee",
+                      "type": "uint256"
+                    }
+                  ]
+                },
+                {
+                  "name": "assetWeight",
+                  "type": "uint256"
+                },
+                {
+                  "name": "shouldFreezeWhenBadDebt",
+                  "type": "bool"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "priorityLiqAssetVaults",
+          "inputs": [
+            {
+              "name": "arg0",
+              "type": "uint256"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "tuple",
+              "components": [
+                {
+                  "name": "vaultId",
+                  "type": "uint256"
+                },
+                {
+                  "name": "asset",
+                  "type": "address"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "priorityStabVaults",
+          "inputs": [
+            {
+              "name": "arg0",
+              "type": "uint256"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "tuple",
+              "components": [
+                {
+                  "name": "vaultId",
+                  "type": "uint256"
+                },
+                {
+                  "name": "asset",
+                  "type": "address"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "liteSigners",
+          "inputs": [
+            {
+              "name": "arg0",
+              "type": "uint256"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "address"
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "indexOfLiteSigner",
+          "inputs": [
+            {
+              "name": "arg0",
+              "type": "address"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "uint256"
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "numLiteSigners",
+          "inputs": [],
+          "outputs": [
+            {
+              "name": "",
+              "type": "uint256"
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "priorityPriceSourceIds",
+          "inputs": [
+            {
+              "name": "arg0",
+              "type": "uint256"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "uint256"
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "underscoreRegistry",
+          "inputs": [],
+          "outputs": [
+            {
+              "name": "",
+              "type": "address"
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "trainingWheels",
+          "inputs": [],
+          "outputs": [
+            {
+              "name": "",
+              "type": "address"
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "shouldCheckLastTouch",
+          "inputs": [],
+          "outputs": [
+            {
+              "name": "",
+              "type": "bool"
+            }
+          ]
+        },
+        {
+          "stateMutability": "nonpayable",
+          "type": "constructor",
+          "inputs": [
+            {
+              "name": "_ripeHq",
+              "type": "address"
+            },
+            {
+              "name": "_defaults",
+              "type": "address"
+            }
+          ],
+          "outputs": []
+        }
+      ],
+      "solc_json": {
+        "language": "Vyper",
+        "sources": {
+          "contracts/modules/Addys.vy": {
+            "content": "# Ripe Protocol License: https://github.com/ripe-foundation/ripe-protocol/blob/master/LICENSE.md\n# Ripe Foundation (C) 2025\n\n# @version 0.4.3\n\ninterface RipeHq:\n    def isValidAddr(_addr: address) -> bool: view\n    def getAddr(_regId: uint256) -> address: view\n\ninterface Switchboard:\n    def isSwitchboardAddr(_addr: address) -> bool: view\n\ninterface VaultBook:\n    def isVaultBookAddr(_addr: address) -> bool: view\n\nstruct Addys:\n    hq: address\n    greenToken: address\n    savingsGreen: address\n    ripeToken: address\n    ledger: address\n    missionControl: address\n    switchboard: address\n    priceDesk: address\n    vaultBook: address\n    auctionHouse: address\n    auctionHouseNft: address\n    boardroom: address\n    bondRoom: address\n    creditEngine: address\n    endaoment: address\n    humanResources: address\n    lootbox: address\n    teller: address\n\n# hq\nRIPE_HQ_FOR_ADDYS: immutable(address)\n\n# core addys\nGREEN_TOKEN_ID: constant(uint256) = 1\nSAVINGS_GREEN_ID: constant(uint256) = 2\nRIPE_TOKEN_ID: constant(uint256) = 3\nLEDGER_ID: constant(uint256) = 4\nMISSION_CONTROL_ID: constant(uint256) = 5\nSWITCHBOARD_ID: constant(uint256) = 6\nPRICE_DESK_ID: constant(uint256) = 7\nVAULT_BOOK_ID: constant(uint256) = 8\nAUCTION_HOUSE_ID: constant(uint256) = 9\nAUCTION_HOUSE_NFT_ID: constant(uint256) = 10\nBOARDROOM_ID: constant(uint256) = 11\nBOND_ROOM_ID: constant(uint256) = 12\nCREDIT_ENGINE_ID: constant(uint256) = 13\nENDAOMENT_ID: constant(uint256) = 14\nHUMAN_RESOURCES_ID: constant(uint256) = 15\nLOOTBOX_ID: constant(uint256) = 16\nTELLER_ID: constant(uint256) = 17\nDELEVERAGE_ID: constant(uint256) = 18\nCREDIT_REDEEM_ID: constant(uint256) = 19\nTELLER_UTILS_ID: constant(uint256) = 20\nENDAOMENT_FUNDS_ID: constant(uint256) = 21\nENDAOMENT_PSM_ID: constant(uint256) = 22\n\n\n@deploy\ndef __init__(_ripeHq: address):\n    assert _ripeHq != empty(address) # dev: invalid ripe hq\n    RIPE_HQ_FOR_ADDYS = _ripeHq\n\n\n########\n# Core #\n########\n\n\n@view\n@external\ndef getAddys() -> Addys:\n    return self._generateAddys()\n\n\n@view\n@internal\ndef _getAddys(_addys: Addys = empty(Addys)) -> Addys:\n    if _addys.hq != empty(address):\n        return _addys\n    return self._generateAddys()\n\n\n@view\n@internal\ndef _generateAddys() -> Addys:\n    hq: address = RIPE_HQ_FOR_ADDYS\n    return Addys(\n        hq=hq,\n        greenToken=staticcall RipeHq(hq).getAddr(GREEN_TOKEN_ID),\n        savingsGreen=staticcall RipeHq(hq).getAddr(SAVINGS_GREEN_ID),\n        ripeToken=staticcall RipeHq(hq).getAddr(RIPE_TOKEN_ID),\n        ledger=staticcall RipeHq(hq).getAddr(LEDGER_ID),\n        missionControl=staticcall RipeHq(hq).getAddr(MISSION_CONTROL_ID),\n        switchboard=staticcall RipeHq(hq).getAddr(SWITCHBOARD_ID),\n        priceDesk=staticcall RipeHq(hq).getAddr(PRICE_DESK_ID),\n        vaultBook=staticcall RipeHq(hq).getAddr(VAULT_BOOK_ID),\n        auctionHouse=staticcall RipeHq(hq).getAddr(AUCTION_HOUSE_ID),\n        auctionHouseNft=staticcall RipeHq(hq).getAddr(AUCTION_HOUSE_NFT_ID),\n        boardroom=staticcall RipeHq(hq).getAddr(BOARDROOM_ID),\n        bondRoom=staticcall RipeHq(hq).getAddr(BOND_ROOM_ID),\n        creditEngine=staticcall RipeHq(hq).getAddr(CREDIT_ENGINE_ID),\n        endaoment=staticcall RipeHq(hq).getAddr(ENDAOMENT_ID),\n        humanResources=staticcall RipeHq(hq).getAddr(HUMAN_RESOURCES_ID),\n        lootbox=staticcall RipeHq(hq).getAddr(LOOTBOX_ID),\n        teller=staticcall RipeHq(hq).getAddr(TELLER_ID),\n    )\n\n\n##########\n# Tokens #\n##########\n\n\n@view\n@internal\ndef _getGreenToken() -> address:\n    return staticcall RipeHq(RIPE_HQ_FOR_ADDYS).getAddr(GREEN_TOKEN_ID)\n\n\n@view\n@internal\ndef _getSavingsGreen() -> address:\n    return staticcall RipeHq(RIPE_HQ_FOR_ADDYS).getAddr(SAVINGS_GREEN_ID)\n\n\n@view\n@internal\ndef _getRipeToken() -> address:\n    return staticcall RipeHq(RIPE_HQ_FOR_ADDYS).getAddr(RIPE_TOKEN_ID)\n\n\n###########\n# Helpers #\n###########\n\n\n# ripe hq\n\n\n@view\n@external\ndef getRipeHq() -> address:\n    return self._getRipeHq()\n\n\n@view\n@internal\ndef _getRipeHq() -> address:\n    return RIPE_HQ_FOR_ADDYS\n\n\n# utils\n\n\n@view\n@internal\ndef _isValidRipeAddr(_addr: address) -> bool:\n    hq: address = RIPE_HQ_FOR_ADDYS\n    \n    # core departments\n    if staticcall RipeHq(hq).isValidAddr(_addr):\n        return True\n\n    # vault book\n    vaultBook: address = staticcall RipeHq(hq).getAddr(VAULT_BOOK_ID)\n    if vaultBook != empty(address) and staticcall VaultBook(vaultBook).isVaultBookAddr(_addr):\n        return True\n\n    # switchboard config\n    switchboard: address = staticcall RipeHq(hq).getAddr(SWITCHBOARD_ID)\n    if switchboard != empty(address) and staticcall Switchboard(switchboard).isSwitchboardAddr(_addr):\n        return True\n\n    return False\n\n\n@view\n@internal\ndef _isSwitchboardAddr(_addr: address) -> bool:\n    switchboard: address = staticcall RipeHq(RIPE_HQ_FOR_ADDYS).getAddr(SWITCHBOARD_ID)\n    if switchboard == empty(address):\n        return False\n    return staticcall Switchboard(switchboard).isSwitchboardAddr(_addr)\n\n\n###############\n# Departments #\n###############\n\n\n# ledger\n\n\n@view\n@internal\ndef _getLedgerId() -> uint256:\n    return LEDGER_ID\n\n\n@view\n@internal\ndef _getLedgerAddr() -> address:\n    return staticcall RipeHq(RIPE_HQ_FOR_ADDYS).getAddr(LEDGER_ID)\n\n\n# mission control\n\n\n@view\n@internal\ndef _getMissionControlId() -> uint256:\n    return MISSION_CONTROL_ID\n\n\n@view\n@internal\ndef _getMissionControlAddr() -> address:\n    return staticcall RipeHq(RIPE_HQ_FOR_ADDYS).getAddr(MISSION_CONTROL_ID)\n\n\n# switchboard\n\n\n@view\n@internal\ndef _getSwitchboardId() -> uint256:\n    return SWITCHBOARD_ID\n\n\n@view\n@internal\ndef _getSwitchboardAddr() -> address:\n    return staticcall RipeHq(RIPE_HQ_FOR_ADDYS).getAddr(SWITCHBOARD_ID)\n\n\n# price desk\n\n\n@view\n@internal\ndef _getPriceDeskId() -> uint256:\n    return PRICE_DESK_ID\n\n\n@view\n@internal\ndef _getPriceDeskAddr() -> address:\n    return staticcall RipeHq(RIPE_HQ_FOR_ADDYS).getAddr(PRICE_DESK_ID)\n\n\n# vault book\n\n\n@view\n@internal\ndef _getVaultBookId() -> uint256:\n    return VAULT_BOOK_ID\n\n\n@view\n@internal\ndef _getVaultBookAddr() -> address:\n    return staticcall RipeHq(RIPE_HQ_FOR_ADDYS).getAddr(VAULT_BOOK_ID)\n\n\n# auction house\n\n\n@view\n@internal\ndef _getAuctionHouseId() -> uint256:\n    return AUCTION_HOUSE_ID\n\n\n@view\n@internal\ndef _getAuctionHouseAddr() -> address:\n    return staticcall RipeHq(RIPE_HQ_FOR_ADDYS).getAddr(AUCTION_HOUSE_ID)\n\n\n# auction house nft\n\n\n@view\n@internal\ndef _getAuctionHouseNftId() -> uint256:\n    return AUCTION_HOUSE_NFT_ID\n\n\n@view\n@internal\ndef _getAuctionHouseNftAddr() -> address:\n    return staticcall RipeHq(RIPE_HQ_FOR_ADDYS).getAddr(AUCTION_HOUSE_NFT_ID)\n\n\n# boardroom\n\n\n@view\n@internal\ndef _getBoardroomId() -> uint256:\n    return BOARDROOM_ID\n\n\n@view\n@internal\ndef _getBoardroomAddr() -> address:\n    return staticcall RipeHq(RIPE_HQ_FOR_ADDYS).getAddr(BOARDROOM_ID)\n\n\n# bond room\n\n\n@view\n@internal\ndef _getBondRoomId() -> uint256:\n    return BOND_ROOM_ID\n\n\n@view\n@internal\ndef _getBondRoomAddr() -> address:\n    return staticcall RipeHq(RIPE_HQ_FOR_ADDYS).getAddr(BOND_ROOM_ID)\n\n\n# credit engine\n\n\n@view\n@internal\ndef _getCreditEngineId() -> uint256:\n    return CREDIT_ENGINE_ID\n\n\n@view\n@internal\ndef _getCreditEngineAddr() -> address:\n    return staticcall RipeHq(RIPE_HQ_FOR_ADDYS).getAddr(CREDIT_ENGINE_ID)\n\n\n# endaoment\n\n\n@view\n@internal\ndef _getEndaomentId() -> uint256:\n    return ENDAOMENT_ID\n\n\n@view\n@internal\ndef _getEndaomentAddr() -> address:\n    return staticcall RipeHq(RIPE_HQ_FOR_ADDYS).getAddr(ENDAOMENT_ID)\n\n\n# human resources\n\n\n@view\n@internal\ndef _getHumanResourcesId() -> uint256:\n    return HUMAN_RESOURCES_ID\n\n\n@view\n@internal\ndef _getHumanResourcesAddr() -> address:\n    return staticcall RipeHq(RIPE_HQ_FOR_ADDYS).getAddr(HUMAN_RESOURCES_ID)\n\n\n# lootbox\n\n\n@view\n@internal\ndef _getLootboxId() -> uint256:\n    return LOOTBOX_ID\n\n\n@view\n@internal\ndef _getLootboxAddr() -> address:\n    return staticcall RipeHq(RIPE_HQ_FOR_ADDYS).getAddr(LOOTBOX_ID)\n\n\n# teller\n\n\n@view\n@internal\ndef _getTellerId() -> uint256:\n    return TELLER_ID\n\n\n@view\n@internal\ndef _getTellerAddr() -> address:\n    return staticcall RipeHq(RIPE_HQ_FOR_ADDYS).getAddr(TELLER_ID)\n\n\n# deleverage\n\n\n@view\n@internal\ndef _getDeleverageId() -> uint256:\n    return DELEVERAGE_ID\n\n\n@view\n@internal\ndef _getDeleverageAddr() -> address:\n    return staticcall RipeHq(RIPE_HQ_FOR_ADDYS).getAddr(DELEVERAGE_ID)\n\n\n# creditRedeem\n\n\n@view\n@internal\ndef _getCreditRedeemId() -> uint256:\n    return CREDIT_REDEEM_ID\n\n\n@view\n@internal\ndef _getCreditRedeemAddr() -> address:\n    return staticcall RipeHq(RIPE_HQ_FOR_ADDYS).getAddr(CREDIT_REDEEM_ID)\n\n\n# teller utils\n\n\n@view\n@internal\ndef _getTellerUtilsId() -> uint256:\n    return TELLER_UTILS_ID\n\n\n@view\n@internal\ndef _getTellerUtilsAddr() -> address:\n    return staticcall RipeHq(RIPE_HQ_FOR_ADDYS).getAddr(TELLER_UTILS_ID)\n\n\n# endaoment funds\n\n\n@view\n@internal\ndef _getEndaomentFundsId() -> uint256:\n    return ENDAOMENT_FUNDS_ID\n\n\n@view\n@internal\ndef _getEndaomentFundsAddr() -> address:\n    return staticcall RipeHq(RIPE_HQ_FOR_ADDYS).getAddr(ENDAOMENT_FUNDS_ID)\n\n\n# endaoment psm\n\n\n@view\n@internal\ndef _getEndaomentPsmId() -> uint256:\n    return ENDAOMENT_PSM_ID\n\n\n@view\n@internal\ndef _getEndaomentPsmAddr() -> address:\n    return staticcall RipeHq(RIPE_HQ_FOR_ADDYS).getAddr(ENDAOMENT_PSM_ID)",
+            "sha256sum": "2a46a2fbb26fed9ed5d59414833fb6c2f85a7ddf72e82ffc2d6e122296e1d4e6"
+          },
+          "interfaces/Department.vyi": {
+            "content": "# @version 0.4.3\n\n\n###########\n# Minting #\n###########\n\n\n@view\n@external\ndef canMintGreen() -> bool:\n    # used in RipeHq.vy\n    ...\n\n\n@view\n@external\ndef canMintRipe() -> bool:\n    # used in RipeHq.vy\n    ...\n\n\n########\n# Ripe #\n########\n\n\n@view\n@external\ndef isPaused() -> bool:\n    ...\n\n\n@external\ndef pause(_shouldPause: bool):\n    ...\n\n\n@external\ndef recoverFunds(_recipient: address, _asset: address):\n    ...\n\n@external\ndef recoverFundsMany(_recipient: address, _assets: DynArray[address, 20]):\n    ...",
+            "sha256sum": "4022e08f4321cf2a061b4e6b15820958c96ff499d4fa72fcf789ed97dc234ed8"
+          },
+          "contracts/modules/DeptBasics.vy": {
+            "content": "# Ripe Protocol License: https://github.com/ripe-foundation/ripe-protocol/blob/master/LICENSE.md\n# Ripe Foundation (C) 2025\n\n# @version 0.4.3\n\nuses: addys\nimplements: dept\n\nimport contracts.modules.Addys as addys\nimport interfaces.Department as dept\nfrom ethereum.ercs import IERC20\n\nevent DepartmentPauseModified:\n    isPaused: bool\n\nevent DepartmentFundsRecovered:\n    asset: indexed(address)\n    recipient: indexed(address)\n    balance: uint256\n\n# config\nisPaused: public(bool)\n\nCAN_MINT_GREEN: immutable(bool)\nCAN_MINT_RIPE: immutable(bool)\n\nMAX_RECOVER_ASSETS: constant(uint256) = 20\n\n\n@deploy\ndef __init__(_shouldPause: bool, _canMintGreen: bool, _canMintRipe: bool):\n    self.isPaused = _shouldPause\n\n    CAN_MINT_GREEN = _canMintGreen\n    CAN_MINT_RIPE = _canMintRipe\n\n\n###########\n# Minting #\n###########\n\n\n@view\n@external\ndef canMintGreen() -> bool:\n    return CAN_MINT_GREEN\n\n\n@view\n@external\ndef canMintRipe() -> bool:\n    return CAN_MINT_RIPE\n\n\n########\n# Ripe #\n########\n\n\n# activate\n\n\n@external\ndef pause(_shouldPause: bool):\n    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms\n    assert _shouldPause != self.isPaused # dev: no change\n    self.isPaused = _shouldPause\n    log DepartmentPauseModified(isPaused=_shouldPause)\n\n\n# recover funds\n\n\n@external\ndef recoverFunds(_recipient: address, _asset: address):\n    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms\n    self._recoverFunds(_recipient, _asset)\n\n\n@external\ndef recoverFundsMany(_recipient: address, _assets: DynArray[address, MAX_RECOVER_ASSETS]):\n    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms\n    for a: address in _assets:\n        self._recoverFunds(_recipient, a)\n\n\n@internal\ndef _recoverFunds(_recipient: address, _asset: address):\n    assert empty(address) not in [_recipient, _asset] # dev: invalid recipient or asset\n    balance: uint256 = staticcall IERC20(_asset).balanceOf(self)\n    assert balance != 0 # dev: nothing to recover\n\n    assert extcall IERC20(_asset).transfer(_recipient, balance, default_return_value=True) # dev: recovery failed\n    log DepartmentFundsRecovered(asset=_asset, recipient=_recipient, balance=balance)\n",
+            "sha256sum": "9a59ebe09a5c42dc943976e0cd48bc28ca56b7209a516514f11bf9162114043f"
+          },
+          "interfaces/ConfigStructs.vyi": {
+            "content": "# @version 0.4.3\n\nMAX_VAULTS_PER_ASSET: constant(uint256) = 10\n\nstruct GenConfig:\n    perUserMaxVaults: uint256\n    perUserMaxAssetsPerVault: uint256\n    priceStaleTime: uint256\n    canDeposit: bool\n    canWithdraw: bool\n    canBorrow: bool\n    canRepay: bool\n    canClaimLoot: bool\n    canLiquidate: bool\n    canRedeemCollateral: bool\n    canRedeemInStabPool: bool\n    canBuyInAuction: bool\n    canClaimInStabPool: bool\n\nstruct GenDebtConfig:\n    perUserDebtLimit: uint256\n    globalDebtLimit: uint256\n    minDebtAmount: uint256\n    numAllowedBorrowers: uint256\n    maxBorrowPerInterval: uint256\n    numBlocksPerInterval: uint256\n    minDynamicRateBoost: uint256\n    maxDynamicRateBoost: uint256\n    increasePerDangerBlock: uint256\n    maxBorrowRate: uint256\n    maxLtvDeviation: uint256\n    keeperFeeRatio: uint256\n    minKeeperFee: uint256\n    maxKeeperFee: uint256\n    isDaowryEnabled: bool\n    ltvPaybackBuffer: uint256\n    genAuctionParams: AuctionParams\n\nstruct HrConfig:\n    contribTemplate: address\n    maxCompensation: uint256\n    minCliffLength: uint256\n    maxStartDelay: uint256\n    minVestingLength: uint256\n    maxVestingLength: uint256\n\nstruct RipeBondConfig:\n    asset: address\n    amountPerEpoch: uint256\n    canBond: bool\n    minRipePerUnit: uint256\n    maxRipePerUnit: uint256\n    maxRipePerUnitLockBonus: uint256\n    epochLength: uint256\n    shouldAutoRestart: bool\n    restartDelayBlocks: uint256\n\nstruct RipeRewardsConfig:\n    arePointsEnabled: bool\n    ripePerBlock: uint256\n    borrowersAlloc: uint256\n    stakersAlloc: uint256\n    votersAlloc: uint256\n    genDepositorsAlloc: uint256\n    autoStakeRatio: uint256\n    autoStakeDurationRatio: uint256\n    stabPoolRipePerDollarClaimed: uint256\n\nstruct RipeGovVaultConfig:\n    lockTerms: LockTerms\n    assetWeight: uint256\n    shouldFreezeWhenBadDebt: bool\n\nstruct LockTerms:\n    minLockDuration: uint256\n    maxLockDuration: uint256\n    maxLockBoost: uint256\n    canExit: bool\n    exitFee: uint256\n\nstruct AuctionParams:\n    hasParams: bool\n    startDiscount: uint256\n    maxDiscount: uint256\n    delay: uint256\n    duration: uint256\n\nstruct AssetConfig:\n    vaultIds: DynArray[uint256, MAX_VAULTS_PER_ASSET]\n    stakersPointsAlloc: uint256\n    voterPointsAlloc: uint256\n    perUserDepositLimit: uint256\n    globalDepositLimit: uint256\n    minDepositBalance: uint256\n    debtTerms: DebtTerms\n    shouldBurnAsPayment: bool\n    shouldTransferToEndaoment: bool\n    shouldSwapInStabPools: bool\n    shouldAuctionInstantly: bool\n    canDeposit: bool\n    canWithdraw: bool\n    canRedeemCollateral: bool\n    canRedeemInStabPool: bool\n    canBuyInAuction: bool\n    canClaimInStabPool: bool\n    specialStabPoolId: uint256\n    customAuctionParams: AuctionParams\n    whitelist: address\n    isNft: bool\n\nstruct DebtTerms:\n    ltv: uint256\n    redemptionThreshold: uint256\n    liqThreshold: uint256\n    liqFee: uint256\n    borrowRate: uint256\n    daowry: uint256\n\nstruct UserConfig:\n    canAnyoneDeposit: bool\n    canAnyoneRepayDebt: bool\n    canAnyoneBondForUser: bool\n\nstruct ActionDelegation:\n    canWithdraw: bool\n    canBorrow: bool\n    canClaimFromStabPool: bool\n    canClaimLoot: bool\n\nstruct VaultLite:\n    vaultId: uint256\n    asset: address\n\nstruct AssetConfigEntry:\n    asset: address\n    config: AssetConfig\n\nstruct RipeGovVaultConfigEntry:\n    asset: address\n    config: RipeGovVaultConfig",
+            "sha256sum": "def6208cd81de43d0d33656f9d05b5394d3a74c695fdc27ffe3c9711ccd67c2c"
+          },
+          "interfaces/Defaults.vyi": {
+            "content": "# @version 0.4.3\n\nimport interfaces.ConfigStructs as cs\n\n\n# general config\n\n\n@view\n@external\ndef genConfig() -> cs.GenConfig:\n    ...\n\n\n# debt config\n\n\n@view\n@external\ndef genDebtConfig() -> cs.GenDebtConfig:\n    ...\n\n\n# ripe available\n\n\n@view\n@external\ndef ripeAvailForRewards() -> uint256:\n    ...\n\n\n@view\n@external\ndef ripeAvailForHr() -> uint256:\n    ...\n\n\n@view\n@external\ndef ripeAvailForBonds() -> uint256:\n    ...\n\n\n# ripe bond config\n\n\n@view\n@external\ndef ripeBondConfig() -> cs.RipeBondConfig:\n    ...\n\n\n# ripe rewards config\n\n\n@view\n@external\ndef rewardsConfig() -> cs.RipeRewardsConfig:\n    ...\n\n\n# ripe gov vault configs\n\n\n@view\n@external\ndef ripeGovVaultConfigs() -> DynArray[cs.RipeGovVaultConfigEntry, 5]:\n    ...\n\n\n# hr config\n\n\n@view\n@external\ndef hrConfig() -> cs.HrConfig:\n    ...\n\n\n# underscore registry\n\n\n@view\n@external\ndef underscoreRegistry() -> address:\n    ...\n\n\n# training wheels\n\n\n@view\n@external\ndef trainingWheels() -> address:\n    ...\n\n\n# shouldCheckLastTouch\n\n\n@view\n@external\ndef shouldCheckLastTouch() -> bool:\n    ...\n\n\n# asset configs\n\n\n@view\n@external\ndef assetConfigs() -> DynArray[cs.AssetConfigEntry, 50]:\n    ...\n\n\n# priority lists\n\n\n@view\n@external\ndef priorityLiqAssetVaults() -> DynArray[cs.VaultLite, 20]:\n    ...\n\n\n@view\n@external\ndef priorityStabVaults() -> DynArray[cs.VaultLite, 20]:\n    ...\n\n\n@view\n@external\ndef priorityPriceSourceIds() -> DynArray[uint256, 10]:\n    ...\n\n\n# lite signers\n\n\n@view\n@external\ndef liteSigners() -> DynArray[address, 10]:\n    ...\n",
+            "sha256sum": "933230ff3a1c02fa91f50262e4121075d232297b8e030e8f387b5641a0aa8e3f"
+          },
+          "contracts/data/MissionControl.vy": {
+            "content": "#\n#       __  __  _   ____   ____  _  ____  __  _     ____  ____  __  _  _____ _____  ____  _    \n#      |  \\/  || | (_ (_` (_ (_`| |/ () \\|  \\| |   / (__`/ () \\|  \\| ||_   _|| () )/ () \\| |__ \n#      |_|\\/|_||_|.__)__).__)__)|_|\\____/|_|\\__|   \\____)\\____/|_|\\__|  |_|  |_|\\_\\\\____/|____|\n#\n#     \u2554\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2557\n#     \u2551  ** Mission Control **                            \u2551\n#     \u2551  Stores all configuration data for Ripe protocol  \u2551\n#     \u255a\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u255d\n#\n#     Ripe Protocol License: https://github.com/ripe-foundation/ripe-protocol/blob/master/LICENSE.md\n#     Ripe Foundation (C) 2025    \n\n# @version 0.4.3\n# pragma optimize codesize\n\nimplements: Department\n\nexports: addys.__interface__\nexports: deptBasics.__interface__\n\ninitializes: addys\ninitializes: deptBasics[addys := addys]\n\nimport contracts.modules.Addys as addys\nimport contracts.modules.DeptBasics as deptBasics\nimport interfaces.ConfigStructs as cs\nfrom interfaces import Department\nfrom interfaces import Defaults\n\ninterface Whitelist:\n    def isUserAllowed(_user: address, _asset: address) -> bool: view\n\ninterface Vault:\n    def vaultAssets(_index: uint256) -> address: view\n\ninterface VaultBook:\n    def getAddr(_regId: uint256) -> address: view\n\nstruct TotalPointsAllocs:\n    stakersPointsAllocTotal: uint256\n    voterPointsAllocTotal: uint256\n\nstruct TellerDepositConfig:\n    canDepositGeneral: bool\n    canDepositAsset: bool\n    doesVaultSupportAsset: bool\n    isUserAllowed: bool\n    perUserDepositLimit: uint256\n    globalDepositLimit: uint256\n    perUserMaxAssetsPerVault: uint256\n    perUserMaxVaults: uint256\n    canAnyoneDeposit: bool\n    minDepositBalance: uint256\n\nstruct TellerWithdrawConfig:\n    canWithdrawGeneral: bool\n    canWithdrawAsset: bool\n    isUserAllowed: bool\n    canWithdrawForUser: bool\n    minDepositBalance: uint256\n\nstruct BorrowConfig:\n    canBorrow: bool\n    canBorrowForUser: bool\n    numAllowedBorrowers: uint256\n    maxBorrowPerInterval: uint256\n    numBlocksPerInterval: uint256\n    perUserDebtLimit: uint256\n    globalDebtLimit: uint256\n    minDebtAmount: uint256\n    isDaowryEnabled: bool\n\nstruct RepayConfig:\n    canRepay: bool\n    canAnyoneRepayDebt: bool\n\nstruct RedeemCollateralConfig:\n    canRedeemCollateralGeneral: bool\n    canRedeemCollateralAsset: bool\n    isUserAllowed: bool\n    ltvPaybackBuffer: uint256\n    canAnyoneDeposit: bool\n\nstruct AuctionBuyConfig:\n    canBuyInAuctionGeneral: bool\n    canBuyInAuctionAsset: bool\n    isUserAllowed: bool\n    canAnyoneDeposit: bool\n\nstruct GenLiqConfig:\n    canLiquidate: bool\n    keeperFeeRatio: uint256\n    minKeeperFee: uint256\n    maxKeeperFee: uint256\n    ltvPaybackBuffer: uint256\n    genAuctionParams: cs.AuctionParams\n    priorityLiqAssetVaults: DynArray[VaultData, PRIORITY_VAULT_DATA]\n    priorityStabVaults: DynArray[VaultData, PRIORITY_VAULT_DATA]\n\nstruct VaultData:\n    vaultId: uint256\n    vaultAddr: address\n    asset: address\n\nstruct AssetLiqConfig:\n    hasConfig: bool\n    shouldBurnAsPayment: bool\n    shouldTransferToEndaoment: bool\n    shouldSwapInStabPools: bool\n    shouldAuctionInstantly: bool\n    customAuctionParams: cs.AuctionParams\n    specialStabPool: VaultData\n\nstruct StabPoolClaimsConfig:\n    canClaimInStabPoolGeneral: bool\n    canClaimInStabPoolAsset: bool\n    canClaimFromStabPoolForUser: bool\n    isUserAllowed: bool\n    rewardsLockDuration: uint256\n    ripePerDollarClaimed: uint256\n\nstruct StabPoolRedemptionsConfig:\n    canRedeemInStabPoolGeneral: bool\n    canRedeemInStabPoolAsset: bool\n    isUserAllowed: bool\n    canAnyoneDeposit: bool\n\nstruct ClaimLootConfig:\n    canClaimLoot: bool\n    canClaimLootForUser: bool\n    autoStakeRatio: uint256\n    rewardsLockDuration: uint256\n\nstruct RewardsConfig:\n    arePointsEnabled: bool\n    ripePerBlock: uint256\n    borrowersAlloc: uint256\n    stakersAlloc: uint256\n    votersAlloc: uint256\n    genDepositorsAlloc: uint256\n    stakersPointsAllocTotal: uint256\n    voterPointsAllocTotal: uint256\n\nstruct DepositPointsConfig:\n    stakersPointsAlloc: uint256\n    voterPointsAlloc: uint256\n    isNft: bool\n\nstruct PriceConfig:\n    staleTime: uint256\n    priorityPriceSourceIds: DynArray[uint256, MAX_PRIORITY_PRICE_SOURCES]\n\nstruct PurchaseRipeBondConfig:\n    asset: address\n    amountPerEpoch: uint256\n    canBond: bool\n    minRipePerUnit: uint256\n    maxRipePerUnit: uint256\n    maxRipePerUnitLockBonus: uint256\n    epochLength: uint256\n    shouldAutoRestart: bool\n    restartDelayBlocks: uint256\n    minLockDuration: uint256\n    maxLockDuration: uint256\n    canAnyoneBondForUser: bool\n    isUserAllowed: bool\n\nstruct DynamicBorrowRateConfig:\n    minDynamicRateBoost: uint256\n    maxDynamicRateBoost: uint256\n    increasePerDangerBlock: uint256\n    maxBorrowRate: uint256\n\n# global cs\ngenConfig: public(cs.GenConfig)\ngenDebtConfig: public(cs.GenDebtConfig)\nhrConfig: public(cs.HrConfig)\nripeBondConfig: public(cs.RipeBondConfig)\n\n# asset cs\nassetConfig: public(HashMap[address, cs.AssetConfig]) # asset -> cs\nassets: public(HashMap[uint256, address]) # index -> asset\nindexOfAsset: public(HashMap[address, uint256]) # asset -> index\nnumAssets: public(uint256) # num assets\n\n# user cs\nuserConfig: public(HashMap[address, cs.UserConfig]) # user -> cs\nuserDelegation: public(HashMap[address, HashMap[address, cs.ActionDelegation]]) # user -> delegate -> cs\n\n# ripe rewards\nrewardsConfig: public(cs.RipeRewardsConfig)\ntotalPointsAllocs: public(TotalPointsAllocs)\n\n# vault cs\nripeGovVaultConfig: public(HashMap[address, cs.RipeGovVaultConfig]) # asset -> cs\npriorityLiqAssetVaults: public(DynArray[cs.VaultLite, PRIORITY_VAULT_DATA])\npriorityStabVaults: public(DynArray[cs.VaultLite, PRIORITY_VAULT_DATA])\n\n# lite signers (iterable)\nliteSigners: public(HashMap[uint256, address]) # index -> signer\nindexOfLiteSigner: public(HashMap[address, uint256]) # signer -> index\nnumLiteSigners: public(uint256)\n\n# other\npriorityPriceSourceIds: public(DynArray[uint256, MAX_PRIORITY_PRICE_SOURCES])\nunderscoreRegistry: public(address)\ntrainingWheels: public(address)\nshouldCheckLastTouch: public(bool)\n\nMAX_VAULTS_PER_ASSET: constant(uint256) = 10\nMAX_PRIORITY_PRICE_SOURCES: constant(uint256) = 10\nPRIORITY_VAULT_DATA: constant(uint256) = 20\nHUNDRED_PERCENT: constant(uint256) = 100_00 # 100.00%\n\n\n@deploy\ndef __init__(_ripeHq: address, _defaults: address):\n    addys.__init__(_ripeHq)\n    deptBasics.__init__(False, False, False) # no minting\n\n    self.numAssets = 1 # not using 0 index\n    self.numLiteSigners = 1 # not using 0 index, 0 means \"not in list\"\n\n    # defaults\n    if _defaults != empty(address):\n        self.genConfig = staticcall Defaults(_defaults).genConfig()\n        self.genDebtConfig = staticcall Defaults(_defaults).genDebtConfig()\n        self.hrConfig = staticcall Defaults(_defaults).hrConfig()\n        self.ripeBondConfig = staticcall Defaults(_defaults).ripeBondConfig()\n        self.rewardsConfig = staticcall Defaults(_defaults).rewardsConfig()\n        self.underscoreRegistry = staticcall Defaults(_defaults).underscoreRegistry()\n        self.trainingWheels = staticcall Defaults(_defaults).trainingWheels()\n        self.shouldCheckLastTouch = staticcall Defaults(_defaults).shouldCheckLastTouch()\n\n        ripeGovVaultConfigs: DynArray[cs.RipeGovVaultConfigEntry, 5] = staticcall Defaults(_defaults).ripeGovVaultConfigs()\n        for entry: cs.RipeGovVaultConfigEntry in ripeGovVaultConfigs:\n            self.ripeGovVaultConfig[entry.asset] = entry.config\n\n        # asset configs\n        assetConfigs: DynArray[cs.AssetConfigEntry, 50] = staticcall Defaults(_defaults).assetConfigs()\n        for entry: cs.AssetConfigEntry in assetConfigs:\n            self._setAssetConfig(entry.asset, entry.config)\n\n        # priority lists\n        self.priorityLiqAssetVaults = staticcall Defaults(_defaults).priorityLiqAssetVaults()\n        self.priorityStabVaults = staticcall Defaults(_defaults).priorityStabVaults()\n        self.priorityPriceSourceIds = staticcall Defaults(_defaults).priorityPriceSourceIds()\n\n        # lite signers\n        liteSigners: DynArray[address, 10] = staticcall Defaults(_defaults).liteSigners()\n        for signer: address in liteSigners:\n            self._addLiteSigner(signer)\n\n\n#################\n# Global Config #\n#################\n\n\n@external\ndef setGeneralConfig(_config: cs.GenConfig):\n    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms\n    self.genConfig = _config\n\n\n@external\ndef setGeneralDebtConfig(_config: cs.GenDebtConfig):\n    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms\n    self.genDebtConfig = _config\n\n\n@external\ndef setHrConfig(_config: cs.HrConfig):\n    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms\n    self.hrConfig = _config\n\n\n@external\ndef setRipeBondConfig(_config: cs.RipeBondConfig):\n    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms\n    self.ripeBondConfig = _config\n\n\n################\n# Asset Config #\n################\n\n\n@external\ndef setAssetConfig(_asset: address, _config: cs.AssetConfig):\n    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms\n    self._setAssetConfig(_asset, _config)\n\n\n@internal\ndef _setAssetConfig(_asset: address, _config: cs.AssetConfig):\n    self._updatePointsAllocs(_asset, _config.stakersPointsAlloc, _config.voterPointsAlloc) # do first!\n    self.assetConfig[_asset] = _config\n\n    # register asset (if necessary)\n    if self.indexOfAsset[_asset] == 0:\n        self._registerAsset(_asset)\n\n\n# asset registration\n\n\n@internal\ndef _registerAsset(_asset: address):\n    aid: uint256 = self.numAssets\n    self.assets[aid] = _asset\n    self.indexOfAsset[_asset] = aid\n    self.numAssets = aid + 1\n\n\n@external\ndef deregisterAsset(_asset: address) -> bool:\n    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms\n\n    numAssets: uint256 = self.numAssets\n    if numAssets == 0:\n        return False\n\n    targetIndex: uint256 = self.indexOfAsset[_asset]\n    if targetIndex == 0:\n        return False\n\n    # update data\n    lastIndex: uint256 = numAssets - 1\n    self.numAssets = lastIndex\n    self.indexOfAsset[_asset] = 0\n\n    # get last item, replace the removed item\n    if targetIndex != lastIndex:\n        lastItem: address = self.assets[lastIndex]\n        self.assets[targetIndex] = lastItem\n        self.indexOfAsset[lastItem] = targetIndex\n\n    return True\n\n\n###############\n# User Config #\n###############\n\n\n@external\ndef setUserConfig(_user: address, _config: cs.UserConfig):\n    assert addys._isSwitchboardAddr(msg.sender) or msg.sender == addys._getTellerAddr() # dev: no perms\n    self.userConfig[_user] = _config\n\n\n@external\ndef setUserDelegation(_user: address, _delegate: address, _config: cs.ActionDelegation):\n    assert addys._isSwitchboardAddr(msg.sender) or msg.sender == addys._getTellerAddr() # dev: no perms\n    self.userDelegation[_user][_delegate] = _config\n\n\n##################\n# Rewards Config #\n##################\n\n\n@external\ndef setRipeRewardsConfig(_config: cs.RipeRewardsConfig):\n    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms\n    self.rewardsConfig = _config\n\n\n# points allocs\n\n\n@internal\ndef _updatePointsAllocs(_asset: address, _newStakersPointsAlloc: uint256, _newVoterPointsAlloc: uint256):\n    totalPointsAllocs: TotalPointsAllocs = self.totalPointsAllocs\n\n    # remove old allocs\n    prevConfig: cs.AssetConfig = self.assetConfig[_asset]\n    totalPointsAllocs.stakersPointsAllocTotal -= prevConfig.stakersPointsAlloc\n    totalPointsAllocs.voterPointsAllocTotal -= prevConfig.voterPointsAlloc\n\n    # add new allocs\n    totalPointsAllocs.stakersPointsAllocTotal += _newStakersPointsAlloc\n    totalPointsAllocs.voterPointsAllocTotal += _newVoterPointsAlloc\n    self.totalPointsAllocs = totalPointsAllocs\n\n\n################\n# Vault Config #\n################\n\n\n# ripe gov vault\n\n\n@external\ndef setRipeGovVaultConfig(\n    _asset: address,\n    _assetWeight: uint256,\n    _shouldFreezeWhenBadDebt: bool,\n    _lockTerms: cs.LockTerms,\n):\n    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms\n    self.ripeGovVaultConfig[_asset] = cs.RipeGovVaultConfig(\n        lockTerms=_lockTerms,\n        assetWeight=_assetWeight,\n        shouldFreezeWhenBadDebt=_shouldFreezeWhenBadDebt,\n    )\n\n\n# priority liq asset vaults\n\n\n@external\ndef setPriorityLiqAssetVaults(_priorityLiqAssetVaults: DynArray[cs.VaultLite, PRIORITY_VAULT_DATA]):\n    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms\n    self.priorityLiqAssetVaults = _priorityLiqAssetVaults\n\n\n# stability pool vaults\n\n\n@external\ndef setPriorityStabVaults(_priorityStabVaults: DynArray[cs.VaultLite, PRIORITY_VAULT_DATA]):\n    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms\n    self.priorityStabVaults = _priorityStabVaults\n\n\n################\n# Lite Signers #\n################\n\n\n@external\ndef setCanPerformLiteAction(_signer: address, _canDo: bool):\n    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms\n    if _canDo:\n        self._addLiteSigner(_signer)\n    else:\n        self._removeLiteSigner(_signer)\n\n\n@view\n@external\ndef canPerformLiteAction(_signer: address) -> bool:\n    return self.indexOfLiteSigner[_signer] != 0\n\n\n# add lite signer\n\n\n@internal\ndef _addLiteSigner(_signer: address):\n    if self.indexOfLiteSigner[_signer] != 0:\n        return\n    idx: uint256 = self.numLiteSigners\n    self.liteSigners[idx] = _signer\n    self.indexOfLiteSigner[_signer] = idx\n    self.numLiteSigners = idx + 1\n\n\n# remove lite signer\n\n\n@internal\ndef _removeLiteSigner(_signer: address):\n    targetIndex: uint256 = self.indexOfLiteSigner[_signer]\n    if targetIndex == 0:\n        return\n\n    lastIndex: uint256 = self.numLiteSigners - 1\n    self.numLiteSigners = lastIndex\n    self.indexOfLiteSigner[_signer] = 0\n\n    # swap with last item if not already last\n    if targetIndex != lastIndex:\n        lastItem: address = self.liteSigners[lastIndex]\n        self.liteSigners[targetIndex] = lastItem\n        self.indexOfLiteSigner[lastItem] = targetIndex\n\n    self.liteSigners[lastIndex] = empty(address)\n\n\n#########\n# Other #\n#########\n\n\n# training wheels\n\n\n@external\ndef setTrainingWheels(_trainingWheels: address):\n    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms\n    self.trainingWheels = _trainingWheels\n\n\n# underscore registry\n\n\n@external\ndef setUnderscoreRegistry(_underscoreRegistry: address):\n    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms\n    self.underscoreRegistry = _underscoreRegistry\n\n\n# price sources\n\n\n@external\ndef setPriorityPriceSourceIds(_priorityIds: DynArray[uint256, MAX_PRIORITY_PRICE_SOURCES]):\n    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms\n    self.priorityPriceSourceIds = _priorityIds\n\n\n# should check last touch\n\n\n@external\ndef setShouldCheckLastTouch(_shouldCheck: bool):\n    assert addys._isSwitchboardAddr(msg.sender) # dev: no perms\n    self.shouldCheckLastTouch = _shouldCheck\n\n\n###################\n# Helpers / Views #\n###################\n\n\n# asset utils\n\n\n@view\n@external\ndef isSupportedAsset(_asset: address) -> bool:\n    return self.indexOfAsset[_asset] != 0\n\n\n@view\n@external\ndef isSupportedAssetInVault(_vaultId: uint256, _asset: address) -> bool:\n    return _vaultId in self.assetConfig[_asset].vaultIds\n\n\n@view\n@external\ndef getNumAssets() -> uint256:\n    return self._getNumAssets()\n\n\n@view\n@internal\ndef _getNumAssets() -> uint256:\n    numAssets: uint256 = self.numAssets\n    if numAssets == 0:\n        return 0\n    return numAssets - 1\n\n\n@view\n@external\ndef getFirstVaultIdForAsset(_asset: address) -> uint256:\n    vaultIds: DynArray[uint256, MAX_VAULTS_PER_ASSET] = self.assetConfig[_asset].vaultIds\n    if len(vaultIds) == 0:\n        return 0\n    return vaultIds[0]\n\n\n# is user allowed\n\n\n@view\n@internal\ndef _isUserAllowed(_whitelist: address, _user: address, _asset: address) -> bool:\n    isUserAllowed: bool = True \n    if _whitelist != empty(address):\n        isUserAllowed = staticcall Whitelist(_whitelist).isUserAllowed(_user, _asset)\n    return isUserAllowed\n\n\n# auto stake lock duration\n\n\n@view\n@internal\ndef _getLockDuration(_minLockDuration: uint256, _maxLockDuration: uint256, _autoStakeDurationRatio: uint256) -> uint256:\n    if _maxLockDuration <= _minLockDuration or _autoStakeDurationRatio == 0:\n        return _minLockDuration\n    durationRange: uint256 = _maxLockDuration - _minLockDuration\n    return durationRange * _autoStakeDurationRatio // HUNDRED_PERCENT\n\n\n# deposits\n\n\n@view\n@external\ndef getTellerDepositConfig(_vaultId: uint256, _asset: address, _user: address) -> TellerDepositConfig:\n    assetConfig: cs.AssetConfig = self.assetConfig[_asset]\n    genConfig: cs.GenConfig = self.genConfig\n    return TellerDepositConfig(\n        canDepositGeneral=genConfig.canDeposit,\n        canDepositAsset=assetConfig.canDeposit,\n        doesVaultSupportAsset=_vaultId in assetConfig.vaultIds,\n        isUserAllowed=self._isUserAllowed(assetConfig.whitelist, _user, _asset),\n        perUserDepositLimit=assetConfig.perUserDepositLimit,\n        globalDepositLimit=assetConfig.globalDepositLimit,\n        perUserMaxAssetsPerVault=genConfig.perUserMaxAssetsPerVault,\n        perUserMaxVaults=genConfig.perUserMaxVaults,\n        canAnyoneDeposit=self.userConfig[_user].canAnyoneDeposit,\n        minDepositBalance=assetConfig.minDepositBalance,\n    )\n\n\n# withdrawals\n\n\n@view\n@external\ndef getTellerWithdrawConfig(_asset: address, _user: address, _caller: address) -> TellerWithdrawConfig:\n    assetConfig: cs.AssetConfig = self.assetConfig[_asset]\n\n    canWithdrawForUser: bool = True\n    if _user != _caller:\n        delegation: cs.ActionDelegation = self.userDelegation[_user][_caller]\n        canWithdrawForUser = delegation.canWithdraw\n\n    return TellerWithdrawConfig(\n        canWithdrawGeneral=self.genConfig.canWithdraw,\n        canWithdrawAsset=assetConfig.canWithdraw,\n        isUserAllowed=self._isUserAllowed(assetConfig.whitelist, _user, _asset),\n        canWithdrawForUser=canWithdrawForUser,\n        minDepositBalance=assetConfig.minDepositBalance,\n    )\n\n\n# borrow\n\n\n@view\n@external\ndef getDebtTerms(_asset: address) -> cs.DebtTerms:\n    return self.assetConfig[_asset].debtTerms\n\n\n@view\n@external\ndef getBorrowConfig(_user: address, _caller: address) -> BorrowConfig:\n    genDebtConfig: cs.GenDebtConfig = self.genDebtConfig\n\n    canBorrowForUser: bool = True\n    if _user != _caller:\n        delegation: cs.ActionDelegation = self.userDelegation[_user][_caller]\n        canBorrowForUser = delegation.canBorrow\n\n    return BorrowConfig(\n        canBorrow=self.genConfig.canBorrow,\n        canBorrowForUser=canBorrowForUser,\n        numAllowedBorrowers=genDebtConfig.numAllowedBorrowers,\n        maxBorrowPerInterval=genDebtConfig.maxBorrowPerInterval,\n        numBlocksPerInterval=genDebtConfig.numBlocksPerInterval,\n        perUserDebtLimit=genDebtConfig.perUserDebtLimit,\n        globalDebtLimit=genDebtConfig.globalDebtLimit,\n        minDebtAmount=genDebtConfig.minDebtAmount,\n        isDaowryEnabled=genDebtConfig.isDaowryEnabled,\n    )\n\n\n@view\n@external\ndef maxLtvDeviation() -> uint256:\n    return self.genDebtConfig.maxLtvDeviation\n\n\n# repay\n\n\n@view\n@external\ndef getRepayConfig(_user: address) -> RepayConfig:\n    return RepayConfig(\n        canRepay=self.genConfig.canRepay,\n        canAnyoneRepayDebt=self.userConfig[_user].canAnyoneRepayDebt,\n    )\n\n\n# redeem collateral\n\n\n@view\n@external\ndef getRedeemCollateralConfig(_asset: address, _recipient: address) -> RedeemCollateralConfig:\n    assetConfig: cs.AssetConfig = self.assetConfig[_asset]\n    return RedeemCollateralConfig(\n        canRedeemCollateralGeneral=self.genConfig.canRedeemCollateral,\n        canRedeemCollateralAsset=assetConfig.canRedeemCollateral,\n        isUserAllowed=self._isUserAllowed(assetConfig.whitelist, _recipient, _asset),\n        ltvPaybackBuffer=self.genDebtConfig.ltvPaybackBuffer,\n        canAnyoneDeposit=self.userConfig[_recipient].canAnyoneDeposit,\n    )\n\n\n@view\n@external\ndef getLtvPaybackBuffer() -> uint256:\n    return self.genDebtConfig.ltvPaybackBuffer\n\n\n# auction purchases\n\n\n@view\n@external\ndef getAuctionBuyConfig(_asset: address, _recipient: address) -> AuctionBuyConfig:\n    assetConfig: cs.AssetConfig = self.assetConfig[_asset]\n    return AuctionBuyConfig(\n        canBuyInAuctionGeneral=self.genConfig.canBuyInAuction,\n        canBuyInAuctionAsset=assetConfig.canBuyInAuction,\n        isUserAllowed=self._isUserAllowed(assetConfig.whitelist, _recipient, _asset),\n        canAnyoneDeposit=self.userConfig[_recipient].canAnyoneDeposit,\n    )\n\n\n# general liquidation config\n\n\n@view\n@external\ndef getGenLiqConfig() -> GenLiqConfig:\n    genDebtConfig: cs.GenDebtConfig = self.genDebtConfig\n    vaultBook: address = addys._getVaultBookAddr()\n\n    # priority liq asset vault data\n    priorityLiqAssetVaults: DynArray[VaultData, PRIORITY_VAULT_DATA] = []\n    for pData: cs.VaultLite in self.priorityLiqAssetVaults:\n        vaultAddr: address = staticcall VaultBook(vaultBook).getAddr(pData.vaultId)\n        priorityLiqAssetVaults.append(VaultData(vaultId=pData.vaultId, vaultAddr=vaultAddr, asset=pData.asset))\n\n    # stability pool vault data\n    priorityStabVaults: DynArray[VaultData, PRIORITY_VAULT_DATA] = []\n    for pData: cs.VaultLite in self.priorityStabVaults:\n        vaultAddr: address = staticcall VaultBook(vaultBook).getAddr(pData.vaultId)\n        priorityStabVaults.append(VaultData(vaultId=pData.vaultId, vaultAddr=vaultAddr, asset=pData.asset))\n\n    return GenLiqConfig(\n        canLiquidate=self.genConfig.canLiquidate,\n        keeperFeeRatio=genDebtConfig.keeperFeeRatio,\n        minKeeperFee=genDebtConfig.minKeeperFee,\n        maxKeeperFee=genDebtConfig.maxKeeperFee,\n        ltvPaybackBuffer=genDebtConfig.ltvPaybackBuffer,\n        genAuctionParams=genDebtConfig.genAuctionParams,\n        priorityLiqAssetVaults=priorityLiqAssetVaults,\n        priorityStabVaults=priorityStabVaults,\n    )\n\n\n@view\n@external\ndef getGenAuctionParams() -> cs.AuctionParams:\n    return self.genDebtConfig.genAuctionParams\n\n\n# asset liquidation config\n\n\n@view\n@external\ndef getAssetLiqConfig(_asset: address) -> AssetLiqConfig:\n    assetConfig: cs.AssetConfig = self.assetConfig[_asset]\n    vaultBook: address = addys._getVaultBookAddr()\n\n    # handle special stab pool\n    specialStabPool: VaultData = empty(VaultData)\n    if assetConfig.specialStabPoolId != 0:\n        specialVaultAddr: address = staticcall VaultBook(vaultBook).getAddr(assetConfig.specialStabPoolId)\n        if specialVaultAddr != empty(address):\n            firstAsset: address = staticcall Vault(specialVaultAddr).vaultAssets(1) # get first asset\n            if firstAsset != empty(address):\n                specialStabPool = VaultData(\n                    vaultId=assetConfig.specialStabPoolId,\n                    vaultAddr=specialVaultAddr,\n                    asset=firstAsset\n                )\n\n    return AssetLiqConfig(\n        hasConfig=True,\n        shouldBurnAsPayment=assetConfig.shouldBurnAsPayment,\n        shouldTransferToEndaoment=assetConfig.shouldTransferToEndaoment,\n        shouldSwapInStabPools=assetConfig.shouldSwapInStabPools,\n        shouldAuctionInstantly=assetConfig.shouldAuctionInstantly,\n        customAuctionParams=assetConfig.customAuctionParams,\n        specialStabPool=specialStabPool,\n    )\n\n\n# stability pool claims\n\n\n@view\n@external\ndef getStabPoolClaimsConfig(_claimAsset: address, _claimer: address, _caller: address, _ripeToken: address) -> StabPoolClaimsConfig:\n    assetConfig: cs.AssetConfig = self.assetConfig[_claimAsset]\n\n    canClaimFromStabPoolForUser: bool = True\n    if _claimer != _caller:\n        delegation: cs.ActionDelegation = self.userDelegation[_claimer][_caller]\n        canClaimFromStabPoolForUser = delegation.canClaimFromStabPool\n\n    vaultConfig: cs.RipeGovVaultConfig = self.ripeGovVaultConfig[_ripeToken]\n    rewardsConfig: cs.RipeRewardsConfig = self.rewardsConfig\n    lockDuration: uint256 = self._getLockDuration(vaultConfig.lockTerms.minLockDuration, vaultConfig.lockTerms.maxLockDuration, rewardsConfig.autoStakeDurationRatio)\n\n    return StabPoolClaimsConfig(\n        canClaimInStabPoolGeneral=self.genConfig.canClaimInStabPool,\n        canClaimInStabPoolAsset=assetConfig.canClaimInStabPool,\n        canClaimFromStabPoolForUser=canClaimFromStabPoolForUser,\n        isUserAllowed=self._isUserAllowed(assetConfig.whitelist, _claimer, _claimAsset),\n        rewardsLockDuration=lockDuration,\n        ripePerDollarClaimed=rewardsConfig.stabPoolRipePerDollarClaimed,\n    )\n\n\n# stability pool redemptions\n\n\n@view\n@external\ndef getStabPoolRedemptionsConfig(_asset: address, _recipient: address) -> StabPoolRedemptionsConfig:\n    assetConfig: cs.AssetConfig = self.assetConfig[_asset]\n    return StabPoolRedemptionsConfig(\n        canRedeemInStabPoolGeneral=self.genConfig.canRedeemInStabPool,\n        canRedeemInStabPoolAsset=assetConfig.canRedeemInStabPool,\n        isUserAllowed=self._isUserAllowed(assetConfig.whitelist, _recipient, _asset),\n        canAnyoneDeposit=self.userConfig[_recipient].canAnyoneDeposit,\n    )\n\n\n# loot claims\n\n\n@view\n@external\ndef getClaimLootConfig(_user: address, _caller: address, _ripeToken: address) -> ClaimLootConfig:\n    canClaimLootForUser: bool = True\n    if _user != _caller:\n        delegation: cs.ActionDelegation = self.userDelegation[_user][_caller]\n        canClaimLootForUser = delegation.canClaimLoot\n\n    vaultConfig: cs.RipeGovVaultConfig = self.ripeGovVaultConfig[_ripeToken]\n    rewardsConfig: cs.RipeRewardsConfig = self.rewardsConfig\n    lockDuration: uint256 = self._getLockDuration(vaultConfig.lockTerms.minLockDuration, vaultConfig.lockTerms.maxLockDuration, rewardsConfig.autoStakeDurationRatio)\n\n    return ClaimLootConfig(\n        canClaimLoot=self.genConfig.canClaimLoot,\n        canClaimLootForUser=canClaimLootForUser,\n        autoStakeRatio=rewardsConfig.autoStakeRatio,\n        rewardsLockDuration=lockDuration,\n    )\n\n\n# rewards config\n\n\n@view\n@external\ndef getRewardsConfig() -> RewardsConfig:\n    rewardsConfig: cs.RipeRewardsConfig = self.rewardsConfig\n    totalPointsAllocs: TotalPointsAllocs = self.totalPointsAllocs\n    return RewardsConfig(\n        arePointsEnabled=rewardsConfig.arePointsEnabled,\n        ripePerBlock=rewardsConfig.ripePerBlock,\n        borrowersAlloc=rewardsConfig.borrowersAlloc,\n        stakersAlloc=rewardsConfig.stakersAlloc,\n        votersAlloc=rewardsConfig.votersAlloc,\n        genDepositorsAlloc=rewardsConfig.genDepositorsAlloc,\n        stakersPointsAllocTotal=totalPointsAllocs.stakersPointsAllocTotal,\n        voterPointsAllocTotal=totalPointsAllocs.voterPointsAllocTotal,\n    )\n\n\n# deposit points\n\n\n@view\n@external\ndef getDepositPointsConfig(_asset: address) -> DepositPointsConfig:\n    assetConfig: cs.AssetConfig = self.assetConfig[_asset]\n    return DepositPointsConfig(\n        stakersPointsAlloc=assetConfig.stakersPointsAlloc,\n        voterPointsAlloc=assetConfig.voterPointsAlloc,\n        isNft=assetConfig.isNft,\n    )\n\n\n# price config\n\n\n@view\n@external\ndef getPriceConfig() -> PriceConfig:\n    return PriceConfig(\n        staleTime=self.genConfig.priceStaleTime,\n        priorityPriceSourceIds=self.priorityPriceSourceIds,\n    )\n\n\n# ripe bond config\n\n\n@view\n@external\ndef getPurchaseRipeBondConfig(_user: address) -> PurchaseRipeBondConfig:\n    bondConfig: cs.RipeBondConfig = self.ripeBondConfig\n    vaultConfig: cs.RipeGovVaultConfig = self.ripeGovVaultConfig[addys._getRipeToken()]\n    assetConfig: cs.AssetConfig = self.assetConfig[bondConfig.asset]\n    return PurchaseRipeBondConfig(\n        asset=bondConfig.asset,\n        amountPerEpoch=bondConfig.amountPerEpoch,\n        canBond=bondConfig.canBond,\n        minRipePerUnit=bondConfig.minRipePerUnit,\n        maxRipePerUnit=bondConfig.maxRipePerUnit,\n        maxRipePerUnitLockBonus=bondConfig.maxRipePerUnitLockBonus,\n        epochLength=bondConfig.epochLength,\n        shouldAutoRestart=bondConfig.shouldAutoRestart,\n        restartDelayBlocks=bondConfig.restartDelayBlocks,\n        minLockDuration=vaultConfig.lockTerms.minLockDuration,\n        maxLockDuration=vaultConfig.lockTerms.maxLockDuration,\n        canAnyoneBondForUser=self.userConfig[_user].canAnyoneBondForUser,\n        isUserAllowed=self._isUserAllowed(assetConfig.whitelist, _user, bondConfig.asset),\n    )\n\n\n# dynamic borrow rate config\n\n\n@view\n@external\ndef getDynamicBorrowRateConfig() -> DynamicBorrowRateConfig:\n    genDebtConfig: cs.GenDebtConfig = self.genDebtConfig\n    return DynamicBorrowRateConfig(\n        minDynamicRateBoost=genDebtConfig.minDynamicRateBoost,\n        maxDynamicRateBoost=genDebtConfig.maxDynamicRateBoost,\n        increasePerDangerBlock=genDebtConfig.increasePerDangerBlock,\n        maxBorrowRate=genDebtConfig.maxBorrowRate,\n    )\n\n\n# stale price time\n\n\n@view\n@external\ndef getPriceStaleTime() -> uint256:\n    # used by some price sources\n    return self.genConfig.priceStaleTime\n\n\n# priority data\n\n\n@view \n@external \ndef getPriorityPriceSourceIds() -> DynArray[uint256, MAX_PRIORITY_PRICE_SOURCES]:\n    return self.priorityPriceSourceIds\n\n\n@view \n@external \ndef getPriorityLiqAssetVaults() -> DynArray[cs.VaultLite, PRIORITY_VAULT_DATA]:\n    return self.priorityLiqAssetVaults\n\n\n@view \n@external \ndef getPriorityStabVaults() -> DynArray[cs.VaultLite, PRIORITY_VAULT_DATA]:\n    return self.priorityStabVaults\n\n\n# underscore helper\n\n\n@view\n@external\ndef doesUndyLegoHaveAccess(_wallet: address, _legoAddr: address) -> bool:\n    config: cs.UserConfig = self.userConfig[_wallet]\n    if not config.canAnyoneDeposit or not config.canAnyoneRepayDebt:\n        return False\n\n    delegation: cs.ActionDelegation = self.userDelegation[_wallet][_legoAddr]\n    if not delegation.canWithdraw or not delegation.canBorrow or not delegation.canClaimLoot:\n        return False\n\n    return True",
+            "sha256sum": "5c4683206d4b0dae4e6db9a67347d87f6dd713506faa8cb828100ad7058c7726"
+          }
+        },
+        "settings": {
+          "outputSelection": {
+            "contracts/data/MissionControl.vy": ["*"]
+          },
+          "search_paths": ["."]
+        },
+        "compiler_version": "v0.4.3+commit.bff19ea2",
+        "integrity": "0e7ad25d2aad4d1f32885dfe3cc0eaff22b00eed9c8e6fa358ae87e9fbec261d"
+      },
+      "args": "0000000000000000000000006162df1b329e157479f8f1407e888260e0ec3d2b00000000000000000000000026b8733836aeeb3aa3b8acee09dba8e231299a87",
+      "file": "contracts/data/MissionControl.vy"
+    }
+  }
+}

@@ -1270,4 +1270,7 @@ def priorityPriceSourceIds() -> DynArray[uint256, 10]:
 @view
 @external
 def liteSigners() -> DynArray[address, 10]:
-    return []
+    return [
+        0x1c419AeF78b44F30D8F3Dfa2aB13D3538466dc48,
+        0x6f5ef229d7F07183Bf91dF68702D01E9bDa37cA2
+    ]
