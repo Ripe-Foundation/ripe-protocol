@@ -29366,7 +29366,7 @@
       "file": "contracts/registries/PriceDesk.vy"
     },
     "ChainlinkPrices": {
-      "address": "0x6C632be9c49f5124bF4B3100fc4655C30c9B0E50",
+      "address": "0xD11B23b6391e294DF49961E64231bddDE5bB5E89",
       "abi": [
         {
           "name": "NewChainlinkFeedPending",
