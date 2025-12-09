@@ -72,13 +72,13 @@ def rewardsConfig() -> cs.RipeRewardsConfig:
     return empty(cs.RipeRewardsConfig)
 
 
-# ripe token config for ripe gov vault
+# ripe gov vault configs
 
 
 @view
 @external
-def ripeTokenVaultConfig() -> cs.RipeGovVaultConfig:
-    return empty(cs.RipeGovVaultConfig)
+def ripeGovVaultConfigs() -> DynArray[cs.RipeGovVaultConfigEntry, 5]:
+    return []
 
 
 # hr config
@@ -116,3 +116,41 @@ def trainingWheels() -> address:
 def shouldCheckLastTouch() -> bool:
     return False
 
+
+# asset configs
+
+
+@view
+@external
+def assetConfigs() -> DynArray[cs.AssetConfigEntry, 50]:
+    return []
+
+
+# priority lists
+
+
+@view
+@external
+def priorityLiqAssetVaults() -> DynArray[cs.VaultLite, 20]:
+    return []
+
+
+@view
+@external
+def priorityStabVaults() -> DynArray[cs.VaultLite, 20]:
+    return []
+
+
+@view
+@external
+def priorityPriceSourceIds() -> DynArray[uint256, 10]:
+    return []
+
+
+# lite signers
+
+
+@view
+@external
+def liteSigners() -> DynArray[address, 10]:
+    return []

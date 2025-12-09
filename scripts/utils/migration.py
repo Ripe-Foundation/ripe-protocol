@@ -219,11 +219,16 @@ class Migration:
         contract = self._contracts[contract_name]
         contracts = {contract_name: contract}
 
+        try:
+            current_manifest = json_file.load(self._manifest_filename(self._timestamp))
+        except:
+            current_manifest = {}
         manifest = deployed_contracts_manifest(contracts, self._contract_files, self._args, self._files)
         merged_manifest = merge({}, self._previous_manifest, manifest)
+        current_manifest = merge({}, current_manifest, manifest)
         self._previous_manifest = merged_manifest
 
-        json_file.save(self._manifest_filename(self._timestamp), merged_manifest)
+        json_file.save(self._manifest_filename(self._timestamp), current_manifest)
         json_file.save(self._manifest_filename("current"), merged_manifest)
 
         log.h3(f"{contract_name} added to manifest")

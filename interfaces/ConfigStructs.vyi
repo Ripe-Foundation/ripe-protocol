@@ -130,3 +130,11 @@ struct ActionDelegation:
 struct VaultLite:
     vaultId: uint256
     asset: address
+
+struct AssetConfigEntry:
+    asset: address
+    config: AssetConfig
+
+struct RipeGovVaultConfigEntry:
+    asset: address
+    config: RipeGovVaultConfig

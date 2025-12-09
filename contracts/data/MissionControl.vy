@@ -233,9 +233,24 @@ def __init__(_ripeHq: address, _defaults: address):
         self.trainingWheels = staticcall Defaults(_defaults).trainingWheels()
         self.shouldCheckLastTouch = staticcall Defaults(_defaults).shouldCheckLastTouch()
 
-        ripeTokenVaultConfig: cs.RipeGovVaultConfig = staticcall Defaults(_defaults).ripeTokenVaultConfig()
-        if ripeTokenVaultConfig.assetWeight != 0:
-            self.ripeGovVaultConfig[addys._getRipeToken()] = ripeTokenVaultConfig
+        ripeGovVaultConfigs: DynArray[cs.RipeGovVaultConfigEntry, 5] = staticcall Defaults(_defaults).ripeGovVaultConfigs()
+        for entry: cs.RipeGovVaultConfigEntry in ripeGovVaultConfigs:
+            self.ripeGovVaultConfig[entry.asset] = entry.config
+
+        # asset configs
+        assetConfigs: DynArray[cs.AssetConfigEntry, 50] = staticcall Defaults(_defaults).assetConfigs()
+        for entry: cs.AssetConfigEntry in assetConfigs:
+            self._setAssetConfig(entry.asset, entry.config)
+
+        # priority lists
+        self.priorityLiqAssetVaults = staticcall Defaults(_defaults).priorityLiqAssetVaults()
+        self.priorityStabVaults = staticcall Defaults(_defaults).priorityStabVaults()
+        self.priorityPriceSourceIds = staticcall Defaults(_defaults).priorityPriceSourceIds()
+
+        # lite signers
+        liteSigners: DynArray[address, 10] = staticcall Defaults(_defaults).liteSigners()
+        for signer: address in liteSigners:
+            self._addLiteSigner(signer)
 
 
 #################
@@ -275,6 +290,11 @@ def setRipeBondConfig(_config: cs.RipeBondConfig):
 @external
 def setAssetConfig(_asset: address, _config: cs.AssetConfig):
     assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
+    self._setAssetConfig(_asset, _config)
+
+
+@internal
+def _setAssetConfig(_asset: address, _config: cs.AssetConfig):
     self._updatePointsAllocs(_asset, _config.stakersPointsAlloc, _config.voterPointsAlloc) # do first!
     self.assetConfig[_asset] = _config
 
