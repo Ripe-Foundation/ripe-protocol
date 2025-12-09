@@ -258,9 +258,8 @@ def borrowForUser(
     userDebt.principal += newBorrowAmount
     userDebt.debtTerms = bt.debtTerms
 
-    # check debt health
-    hasGoodDebtHealth: bool = self._hasGoodDebtHealth(userDebt.amount, bt.collateralVal, bt.debtTerms.ltv)
-    assert hasGoodDebtHealth # dev: bad debt health
+    # check debt health (use bt.totalMaxDebt directly to avoid rounding discrepancy)
+    assert userDebt.amount <= bt.totalMaxDebt # dev: bad debt health
     userDebt.inLiquidation = False
 
     # save debt
@@ -559,8 +558,8 @@ def _repayDebt(
     bt: UserBorrowTerms = self._getUserBorrowTerms(_user, _numUserVaults, True, 0, empty(address), isUndyVault, _a)
     userDebt.debtTerms = bt.debtTerms
 
-    # check debt health
-    hasGoodDebtHealth: bool = self._hasGoodDebtHealth(userDebt.amount, bt.collateralVal, bt.debtTerms.ltv)
+    # check debt health (use bt.totalMaxDebt directly to avoid rounding discrepancy)
+    hasGoodDebtHealth: bool = userDebt.amount <= bt.totalMaxDebt
     if hasGoodDebtHealth:
         userDebt.inLiquidation = False
 
@@ -942,9 +941,9 @@ def _checkDebtHealth(_user: address, _debtType: uint256, _a: addys.Addys) -> boo
     if userDebt.inLiquidation:
         return False
 
-    # check debt health
+    # check debt health (use bt.totalMaxDebt directly to avoid rounding discrepancy)
     if _debtType == 1:
-        return self._hasGoodDebtHealth(userDebt.amount, bt.collateralVal, bt.debtTerms.ltv)
+        return userDebt.amount <= bt.totalMaxDebt
     elif _debtType == 2:
         return self._canLiquidateUser(userDebt.amount, bt.collateralVal, bt.debtTerms.liqThreshold)
     elif _debtType == 3:
@@ -1124,8 +1123,8 @@ def updateDebtForUser(_user: address, _a: addys.Addys = empty(addys.Addys)) -> b
     if userDebt.amount == 0:
         return True
 
-    # debt health
-    hasGoodDebtHealth: bool = self._hasGoodDebtHealth(userDebt.amount, bt.collateralVal, bt.debtTerms.ltv)
+    # debt health (use bt.totalMaxDebt directly to avoid rounding discrepancy)
+    hasGoodDebtHealth: bool = userDebt.amount <= bt.totalMaxDebt
     if hasGoodDebtHealth:
         userDebt.inLiquidation = False
 
