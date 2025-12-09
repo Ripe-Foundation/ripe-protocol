@@ -226,8 +226,11 @@ def borrowForUser(
     newInterest: uint256 = 0
     userDebt, newInterest = self._getLatestUserDebtWithInterest(d.userDebt)
 
+    # check if underscore vault (used for daowry, borrow rate discount)
+    isUndyVault: bool = self._isUnderscoreVault(_user, a.missionControl)
+
     # get borrow data (debt terms for user)
-    bt: UserBorrowTerms = self._getUserBorrowTerms(_user, d.numUserVaults, True, 0, empty(address), a)
+    bt: UserBorrowTerms = self._getUserBorrowTerms(_user, d.numUserVaults, True, 0, empty(address), isUndyVault, a)
 
     # get config
     config: BorrowConfig = staticcall MissionControl(a.missionControl).getBorrowConfig(_user, _caller)
@@ -259,12 +262,6 @@ def borrowForUser(
     hasGoodDebtHealth: bool = self._hasGoodDebtHealth(userDebt.amount, bt.collateralVal, bt.debtTerms.ltv)
     assert hasGoodDebtHealth # dev: bad debt health
     userDebt.inLiquidation = False
-
-    # apply discount for underscore vaults
-    isUndyVault: bool = self._isUnderscoreVault(_user, a.missionControl)
-    undyVaulDiscount: uint256 = self.undyVaulDiscount
-    if undyVaulDiscount != 0 and isUndyVault:
-        userDebt.debtTerms.borrowRate = userDebt.debtTerms.borrowRate * (HUNDRED_PERCENT - undyVaulDiscount) // HUNDRED_PERCENT
 
     # save debt
     extcall Ledger(a.ledger).setUserDebt(_user, userDebt, newInterest, userBorrowInterval)
@@ -398,9 +395,10 @@ def getMaxBorrowAmount(_user: address) -> uint256:
 
     # main var
     newBorrowAmount: uint256 = max_value(uint256)
+    isUndyVault: bool = self._isUnderscoreVault(_user, a.missionControl)
 
     # avail debt based on collateral value / ltv
-    bt: UserBorrowTerms = self._getUserBorrowTerms(_user, d.numUserVaults, False, 0, empty(address), a)
+    bt: UserBorrowTerms = self._getUserBorrowTerms(_user, d.numUserVaults, False, 0, empty(address), isUndyVault, a)
     availDebtPerLtv: uint256 = 0
     if bt.totalMaxDebt > userDebt.amount:
         availDebtPerLtv = bt.totalMaxDebt - userDebt.amount
@@ -555,20 +553,16 @@ def _repayDebt(
     _a: addys.Addys,
 ) -> bool:
     userDebt: UserDebt = self._reduceDebtAmount(_userDebt, _repayValue)
+    isUndyVault: bool = self._isUnderscoreVault(_user, _a.missionControl)
 
     # get latest debt terms
-    bt: UserBorrowTerms = self._getUserBorrowTerms(_user, _numUserVaults, True, 0, empty(address), _a)
+    bt: UserBorrowTerms = self._getUserBorrowTerms(_user, _numUserVaults, True, 0, empty(address), isUndyVault, _a)
     userDebt.debtTerms = bt.debtTerms
 
     # check debt health
     hasGoodDebtHealth: bool = self._hasGoodDebtHealth(userDebt.amount, bt.collateralVal, bt.debtTerms.ltv)
     if hasGoodDebtHealth:
         userDebt.inLiquidation = False
-
-    # apply discount for underscore vaults
-    undyVaulDiscount: uint256 = self.undyVaulDiscount
-    if undyVaulDiscount != 0 and self._isUnderscoreVault(_user, _a.missionControl):
-        userDebt.debtTerms.borrowRate = userDebt.debtTerms.borrowRate * (HUNDRED_PERCENT - undyVaulDiscount) // HUNDRED_PERCENT
 
     # update user debt, borrow points
     extcall Ledger(_a.ledger).setUserDebt(_user, userDebt, _newInterest, empty(IntervalBorrow))
@@ -661,7 +655,8 @@ def getUserBorrowTerms(
     _a: addys.Addys = empty(addys.Addys),
 ) -> UserBorrowTerms:
     a: addys.Addys = addys._getAddys(_a)
-    return self._getUserBorrowTerms(_user, staticcall Ledger(a.ledger).numUserVaults(_user), _shouldRaise, _skipVaultId, _skipAsset, a)
+    isUndyVault: bool = self._isUnderscoreVault(_user, a.missionControl)
+    return self._getUserBorrowTerms(_user, staticcall Ledger(a.ledger).numUserVaults(_user), _shouldRaise, _skipVaultId, _skipAsset, isUndyVault, a)
 
 
 @view
@@ -674,7 +669,9 @@ def getUserBorrowTermsWithNumVaults(
     _skipAsset: address = empty(address),
     _a: addys.Addys = empty(addys.Addys),
 ) -> UserBorrowTerms:
-    return self._getUserBorrowTerms(_user, _numUserVaults, _shouldRaise, _skipVaultId, _skipAsset, addys._getAddys(_a))
+    a: addys.Addys = addys._getAddys(_a)
+    isUndyVault: bool = self._isUnderscoreVault(_user, a.missionControl)
+    return self._getUserBorrowTerms(_user, _numUserVaults, _shouldRaise, _skipVaultId, _skipAsset, isUndyVault, a)
 
 
 @view
@@ -685,6 +682,7 @@ def _getUserBorrowTerms(
     _shouldRaise: bool,
     _skipVaultId: uint256,
     _skipAsset: address,
+    _isUndyVault: bool,
     _a: addys.Addys,
 ) -> UserBorrowTerms:
 
@@ -788,8 +786,16 @@ def _getUserBorrowTerms(
     else:
         bt.debtTerms.liqFee = 0
 
-    # dynamic borrow rate
-    bt.debtTerms.borrowRate = self._getDynamicBorrowRate(bt.debtTerms.borrowRate, _a.missionControl, _a.priceDesk)
+    # apply discount for underscore vaults
+    if _isUndyVault:
+        undyVaulDiscount: uint256 = self.undyVaulDiscount
+        if undyVaulDiscount != 0:
+            bt.debtTerms.borrowRate = bt.debtTerms.borrowRate * (HUNDRED_PERCENT - undyVaulDiscount) // HUNDRED_PERCENT
+
+    # dynamic borrow rate (for normal users)
+    else:
+        bt.debtTerms.borrowRate = self._getDynamicBorrowRate(bt.debtTerms.borrowRate, _a.missionControl, _a.priceDesk)
+
     return bt
 
 
@@ -804,7 +810,8 @@ def getUserCollateralValueAndDebtAmount(_user: address) -> (uint256, uint256):
     userDebt: UserDebt = empty(UserDebt)
     na: uint256 = 0
     userDebt, na = self._getLatestUserDebtWithInterest(d.userDebt)
-    bt: UserBorrowTerms = self._getUserBorrowTerms(_user, d.numUserVaults, False, 0, empty(address), a)
+    isUndyVault: bool = self._isUnderscoreVault(_user, a.missionControl)
+    bt: UserBorrowTerms = self._getUserBorrowTerms(_user, d.numUserVaults, False, 0, empty(address), isUndyVault, a)
     return bt.collateralVal, userDebt.amount
 
 
@@ -812,7 +819,8 @@ def getUserCollateralValueAndDebtAmount(_user: address) -> (uint256, uint256):
 @external
 def getCollateralValue(_user: address) -> uint256:
     a: addys.Addys = addys._getAddys()
-    bt: UserBorrowTerms = self._getUserBorrowTerms(_user, staticcall Ledger(a.ledger).numUserVaults(_user), True, 0, empty(address), a)
+    isUndyVault: bool = self._isUnderscoreVault(_user, a.missionControl)
+    bt: UserBorrowTerms = self._getUserBorrowTerms(_user, staticcall Ledger(a.ledger).numUserVaults(_user), True, 0, empty(address), isUndyVault, a)
     return bt.collateralVal
 
 
@@ -858,7 +866,8 @@ def _getLatestUserDebtAndTerms(
     userDebt, newInterest = self._getLatestUserDebtWithInterest(d.userDebt)
 
     # debt terms for user
-    bt: UserBorrowTerms = self._getUserBorrowTerms(_user, d.numUserVaults, _shouldRaise, 0, empty(address), _a)
+    isUndyVault: bool = self._isUnderscoreVault(_user, _a.missionControl)
+    bt: UserBorrowTerms = self._getUserBorrowTerms(_user, d.numUserVaults, _shouldRaise, 0, empty(address), isUndyVault, _a)
 
     return userDebt, bt, newInterest
 
@@ -1122,11 +1131,6 @@ def updateDebtForUser(_user: address, _a: addys.Addys = empty(addys.Addys)) -> b
 
     userDebt.debtTerms = bt.debtTerms
 
-    # apply discount for underscore vaults
-    undyVaulDiscount: uint256 = self.undyVaulDiscount
-    if undyVaulDiscount != 0 and self._isUnderscoreVault(_user, a.missionControl):
-        userDebt.debtTerms.borrowRate = userDebt.debtTerms.borrowRate * (HUNDRED_PERCENT - undyVaulDiscount) // HUNDRED_PERCENT
-
     extcall Ledger(a.ledger).setUserDebt(_user, userDebt, newInterest, empty(IntervalBorrow))
 
     # update borrow points
@@ -1243,7 +1247,8 @@ def getMaxWithdrawableForAsset(
         return 0 # cannot determine value
 
     # get borrow terms excluding the asset to withdraw
-    btExcluding: UserBorrowTerms = self._getUserBorrowTerms(_user, d.numUserVaults, True, _vaultId, _asset, a)
+    isUndyVault: bool = self._isUnderscoreVault(_user, a.missionControl)
+    btExcluding: UserBorrowTerms = self._getUserBorrowTerms(_user, d.numUserVaults, True, _vaultId, _asset, isUndyVault, a)
 
     # calculate minimum asset value that must remain
     minAssetValueToRemain: uint256 = 0

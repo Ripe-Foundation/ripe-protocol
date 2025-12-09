@@ -385,3 +385,226 @@ def test_set_discount_permissions_and_validation(
     # 0% discount should succeed (disables discount)
     credit_engine.setUnderscoreVaultDiscount(0, sender=switchboard_alpha.address)
     assert credit_engine.undyVaulDiscount() == 0
+
+
+def test_view_functions_return_discounted_rate(
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    setGeneralDebtConfig,
+    performDeposit,
+    mock_price_source,
+    teller,
+    ledger,
+    credit_engine,
+    mission_control,
+    switchboard_alpha,
+    mock_undy_v2,
+    createDebtTerms,
+):
+    """Test that getUserBorrowTerms() and getLatestUserDebtAndTerms() return discounted rates for underscore vaults"""
+    # Setup underscore registry and discount
+    mission_control.setUnderscoreRegistry(mock_undy_v2.address, sender=switchboard_alpha.address)
+    credit_engine.setUnderscoreVaultDiscount(50_00, sender=switchboard_alpha.address)
+
+    # Setup with 10% borrow rate
+    setGeneralConfig()
+    debt_terms = createDebtTerms(_borrowRate=10_00)
+    setAssetConfig(alpha_token, _debtTerms=debt_terms)
+    setGeneralDebtConfig()
+
+    # Deposit collateral
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    performDeposit(bob, deposit_amount, alpha_token, alpha_token_whale)
+
+    alpha_price = 1 * EIGHTEEN_DECIMALS
+    mock_price_source.setPrice(alpha_token, alpha_price)
+
+    # Test getUserBorrowTerms() returns discounted rate BEFORE borrowing
+    terms_before_borrow = credit_engine.getUserBorrowTerms(bob, True)
+    assert terms_before_borrow.debtTerms.borrowRate == 5_00  # 50% discount on 10%
+
+    # Borrow
+    borrow_amount = 25 * EIGHTEEN_DECIMALS
+    teller.borrow(borrow_amount, bob, False, sender=bob)
+
+    # Test getUserBorrowTerms() returns discounted rate AFTER borrowing
+    terms_after_borrow = credit_engine.getUserBorrowTerms(bob, True)
+    assert terms_after_borrow.debtTerms.borrowRate == 5_00  # 50% discount on 10%
+
+    # Test getLatestUserDebtAndTerms() returns discounted rate in bt
+    user_debt, bt, _ = credit_engine.getLatestUserDebtAndTerms(bob, True)
+    assert bt.debtTerms.borrowRate == 5_00  # 50% discount on 10%
+    assert user_debt.debtTerms.borrowRate == 5_00  # Stored debt also has discount
+
+
+def test_discount_with_multiple_collateral_assets(
+    alpha_token,
+    alpha_token_whale,
+    bravo_token,
+    bravo_token_whale,
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    setGeneralDebtConfig,
+    performDeposit,
+    mock_price_source,
+    teller,
+    ledger,
+    credit_engine,
+    mission_control,
+    switchboard_alpha,
+    mock_undy_v2,
+    createDebtTerms,
+):
+    """Test that discount applies correctly to weighted average rate across multiple assets"""
+    # Setup underscore registry and discount
+    mission_control.setUnderscoreRegistry(mock_undy_v2.address, sender=switchboard_alpha.address)
+    credit_engine.setUnderscoreVaultDiscount(50_00, sender=switchboard_alpha.address)
+
+    setGeneralConfig()
+
+    # Setup alpha with 10% rate, bravo with 20% rate
+    alpha_debt_terms = createDebtTerms(_borrowRate=10_00)
+    bravo_debt_terms = createDebtTerms(_borrowRate=20_00)
+    setAssetConfig(alpha_token, _debtTerms=alpha_debt_terms)
+    setAssetConfig(bravo_token, _debtTerms=bravo_debt_terms)
+    setGeneralDebtConfig()
+
+    # Deposit equal amounts of both tokens
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    performDeposit(bob, deposit_amount, alpha_token, alpha_token_whale)
+    performDeposit(bob, deposit_amount, bravo_token, bravo_token_whale)
+
+    # Set equal prices
+    alpha_price = 1 * EIGHTEEN_DECIMALS
+    bravo_price = 1 * EIGHTEEN_DECIMALS
+    mock_price_source.setPrice(alpha_token, alpha_price)
+    mock_price_source.setPrice(bravo_token, bravo_price)
+
+    # Borrow
+    borrow_amount = 25 * EIGHTEEN_DECIMALS
+    teller.borrow(borrow_amount, bob, False, sender=bob)
+
+    # Weighted average of 10% and 20% with equal weights = 15%
+    # With 50% discount = 7.5% = 7_50
+    bob_debt = ledger.userDebt(bob)
+    expected_weighted_rate = 15_00  # (10 + 20) / 2
+    expected_discounted_rate = expected_weighted_rate * 50_00 // 100_00  # 7_50
+    assert bob_debt.debtTerms.borrowRate == expected_discounted_rate
+
+
+def test_100_percent_discount_results_in_zero_rate(
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    setGeneralDebtConfig,
+    performDeposit,
+    mock_price_source,
+    teller,
+    ledger,
+    credit_engine,
+    mission_control,
+    switchboard_alpha,
+    mock_undy_v2,
+    createDebtTerms,
+):
+    """Test that 100% discount results in 0% borrow rate"""
+    # Setup underscore registry and 100% discount
+    mission_control.setUnderscoreRegistry(mock_undy_v2.address, sender=switchboard_alpha.address)
+    credit_engine.setUnderscoreVaultDiscount(100_00, sender=switchboard_alpha.address)
+
+    # Setup with 10% borrow rate
+    setGeneralConfig()
+    debt_terms = createDebtTerms(_borrowRate=10_00)
+    setAssetConfig(alpha_token, _debtTerms=debt_terms)
+    setGeneralDebtConfig()
+
+    # Deposit collateral
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    performDeposit(bob, deposit_amount, alpha_token, alpha_token_whale)
+
+    alpha_price = 1 * EIGHTEEN_DECIMALS
+    mock_price_source.setPrice(alpha_token, alpha_price)
+
+    # Borrow
+    borrow_amount = 25 * EIGHTEEN_DECIMALS
+    teller.borrow(borrow_amount, bob, False, sender=bob)
+
+    # Verify 0% rate
+    bob_debt = ledger.userDebt(bob)
+    assert bob_debt.debtTerms.borrowRate == 0  # 100% discount = 0% rate
+
+    # Verify no interest accrues over time
+    initial_amount = bob_debt.amount
+
+    # Advance time by 1 year
+    boa.env.time_travel(seconds=365 * 24 * 60 * 60)
+
+    # Update debt
+    credit_engine.updateDebtForUser(bob, sender=credit_engine.address)
+
+    # Verify no interest accrued
+    bob_debt_after = ledger.userDebt(bob)
+    assert bob_debt_after.amount == initial_amount  # No interest with 0% rate
+
+
+def test_0_percent_discount_has_no_effect(
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    alice,
+    setGeneralConfig,
+    setAssetConfig,
+    setGeneralDebtConfig,
+    performDeposit,
+    mock_price_source,
+    teller,
+    ledger,
+    credit_engine,
+    mission_control,
+    switchboard_alpha,
+    mock_undy_v2,
+    createDebtTerms,
+):
+    """Test that 0% discount doesn't change rates (same as regular user)"""
+    # Setup underscore registry but 0% discount
+    mission_control.setUnderscoreRegistry(mock_undy_v2.address, sender=switchboard_alpha.address)
+    credit_engine.setUnderscoreVaultDiscount(0, sender=switchboard_alpha.address)
+
+    # Setup with 10% borrow rate
+    setGeneralConfig()
+    debt_terms = createDebtTerms(_borrowRate=10_00)
+    setAssetConfig(alpha_token, _debtTerms=debt_terms)
+    setGeneralDebtConfig()
+
+    # Deposit collateral for both users
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    performDeposit(bob, deposit_amount, alpha_token, alpha_token_whale)
+    performDeposit(alice, deposit_amount, alpha_token, alpha_token_whale)
+
+    alpha_price = 1 * EIGHTEEN_DECIMALS
+    mock_price_source.setPrice(alpha_token, alpha_price)
+
+    # Bob is underscore vault, alice is not (remove registry temporarily for alice)
+    borrow_amount = 25 * EIGHTEEN_DECIMALS
+
+    # Bob borrows (underscore vault with 0% discount)
+    teller.borrow(borrow_amount, bob, False, sender=bob)
+    bob_debt = ledger.userDebt(bob)
+
+    # Remove registry so alice is regular user
+    mission_control.setUnderscoreRegistry(ZERO_ADDRESS, sender=switchboard_alpha.address)
+
+    # Alice borrows (regular user)
+    teller.borrow(borrow_amount, alice, False, sender=alice)
+    alice_debt = ledger.userDebt(alice)
+
+    # Both should have same rate (0% discount = no effect)
+    assert bob_debt.debtTerms.borrowRate == 10_00
+    assert alice_debt.debtTerms.borrowRate == 10_00
+    assert bob_debt.debtTerms.borrowRate == alice_debt.debtTerms.borrowRate
