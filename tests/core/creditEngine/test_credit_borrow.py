@@ -1561,3 +1561,217 @@ def test_interest_precision_with_large_amounts(
     # Allow small rounding difference due to leap year calculations
     assert abs(actual_yearly_interest - expected_yearly_interest) <= 1, \
         f"Yearly interest mismatch: expected {expected_yearly_interest}, got {actual_yearly_interest}"
+
+
+############################
+# max_uint Borrow Scenarios #
+############################
+
+
+def test_borrow_max_uint_with_existing_debt(
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    setGeneralDebtConfig,
+    performDeposit,
+    mock_price_source,
+    teller,
+    credit_engine,
+    ledger,
+):
+    """
+    Regression test: Borrowing max_uint after already having debt should succeed.
+
+    Previously, this would fail due to integer rounding discrepancy between
+    bt.totalMaxDebt (used in _validateOnBorrow) and the health check which
+    recalculated max debt from collateralVal * ltv // 100_00.
+    """
+    # basic setup
+    setGeneralConfig()
+    setAssetConfig(alpha_token)
+    setGeneralDebtConfig()
+
+    # deposits
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    performDeposit(bob, deposit_amount, alpha_token, alpha_token_whale)
+
+    # set mock prices
+    alpha_price = 1 * EIGHTEEN_DECIMALS
+    mock_price_source.setPrice(alpha_token, alpha_price)
+
+    # First borrow - partial amount
+    first_borrow = 25 * EIGHTEEN_DECIMALS
+    teller.borrow(first_borrow, bob, False, sender=bob)
+
+    # Verify first borrow
+    user_debt = ledger.userDebt(bob)
+    assert user_debt.amount == first_borrow
+
+    # Second borrow - max_uint should borrow up to LTV limit
+    max_uint = 2**256 - 1
+    amount = teller.borrow(max_uint, bob, False, sender=bob)
+
+    # Should have borrowed the remaining amount up to 50% LTV
+    # Collateral = 100, LTV = 50%, max debt = 50
+    # Already borrowed 25, so should borrow 25 more
+    expected_second_borrow = 25 * EIGHTEEN_DECIMALS
+    assert amount == expected_second_borrow
+
+    # Total debt should be at max LTV
+    user_debt = ledger.userDebt(bob)
+    assert user_debt.amount == 50 * EIGHTEEN_DECIMALS
+
+
+def test_borrow_max_uint_with_existing_debt_multiple_assets(
+    alpha_token,
+    alpha_token_whale,
+    bravo_token,
+    bravo_token_whale,
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    setGeneralDebtConfig,
+    performDeposit,
+    mock_price_source,
+    teller,
+    credit_engine,
+    ledger,
+    createDebtTerms,
+):
+    """
+    Regression test: Borrowing max_uint with multiple collateral assets.
+
+    This tests the edge case where per-asset max debt calculations sum to
+    a different value than recalculating from the aggregate collateral * ltv.
+    """
+    # basic setup with different LTVs per asset
+    setGeneralConfig()
+
+    # Asset 1: 75% LTV
+    alpha_debt_terms = createDebtTerms(_ltv=75_00)
+    setAssetConfig(alpha_token, _debtTerms=alpha_debt_terms)
+
+    # Asset 2: 75% LTV
+    bravo_debt_terms = createDebtTerms(_ltv=75_00)
+    setAssetConfig(bravo_token, _debtTerms=bravo_debt_terms)
+
+    setGeneralDebtConfig()
+
+    # Deposit amounts that could cause rounding issues (odd numbers)
+    # 101 tokens at $1 each = $101 collateral per asset
+    deposit_amount = 101 * EIGHTEEN_DECIMALS
+    performDeposit(bob, deposit_amount, alpha_token, alpha_token_whale)
+    performDeposit(bob, deposit_amount, bravo_token, bravo_token_whale)
+
+    # set mock prices
+    alpha_price = 1 * EIGHTEEN_DECIMALS
+    bravo_price = 1 * EIGHTEEN_DECIMALS
+    mock_price_source.setPrice(alpha_token, alpha_price)
+    mock_price_source.setPrice(bravo_token, bravo_price)
+
+    # Get borrow terms to verify max debt calculation
+    terms = credit_engine.getUserBorrowTerms(bob, True)
+    # Per-asset: 101 * 75% = 75.75
+    # Total max debt = 75.75 + 75.75 = 151.5
+    total_max_debt = terms.totalMaxDebt
+    assert total_max_debt > 0
+
+    # First borrow - partial amount
+    first_borrow = 50 * EIGHTEEN_DECIMALS
+    teller.borrow(first_borrow, bob, False, sender=bob)
+
+    # Second borrow - max_uint should work without failing health check
+    max_uint = 2**256 - 1
+    amount = teller.borrow(max_uint, bob, False, sender=bob)
+
+    # Should have borrowed remaining up to totalMaxDebt
+    expected_second_borrow = total_max_debt - first_borrow
+    assert amount == expected_second_borrow
+
+    # Total debt should equal totalMaxDebt
+    user_debt = ledger.userDebt(bob)
+    assert user_debt.amount == total_max_debt
+
+
+def test_borrow_max_uint_at_max_debt_fails(
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    setGeneralDebtConfig,
+    performDeposit,
+    mock_price_source,
+    teller,
+    ledger,
+):
+    """
+    Verify that attempting to borrow when already at max debt fails correctly.
+    """
+    # basic setup
+    setGeneralConfig()
+    setAssetConfig(alpha_token)
+    setGeneralDebtConfig()
+
+    # deposits
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    performDeposit(bob, deposit_amount, alpha_token, alpha_token_whale)
+
+    # set mock prices
+    alpha_price = 1 * EIGHTEEN_DECIMALS
+    mock_price_source.setPrice(alpha_token, alpha_price)
+
+    # Borrow up to max LTV
+    max_uint = 2**256 - 1
+    amount = teller.borrow(max_uint, bob, False, sender=bob)
+    assert amount == 50 * EIGHTEEN_DECIMALS  # 50% LTV of $100 collateral
+
+    # Verify at max debt
+    user_debt = ledger.userDebt(bob)
+    assert user_debt.amount == 50 * EIGHTEEN_DECIMALS
+
+    # Subsequent borrow should fail
+    with boa.reverts("no debt available"):
+        teller.borrow(1, bob, False, sender=bob)
+
+
+def test_borrow_max_uint_first_borrow(
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    setGeneralDebtConfig,
+    performDeposit,
+    mock_price_source,
+    teller,
+    ledger,
+):
+    """
+    Verify that max_uint borrow works correctly as the first borrow.
+    """
+    # basic setup
+    setGeneralConfig()
+    setAssetConfig(alpha_token)
+    setGeneralDebtConfig()
+
+    # deposits
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    performDeposit(bob, deposit_amount, alpha_token, alpha_token_whale)
+
+    # set mock prices
+    alpha_price = 1 * EIGHTEEN_DECIMALS
+    mock_price_source.setPrice(alpha_token, alpha_price)
+
+    # First borrow with max_uint
+    max_uint = 2**256 - 1
+    amount = teller.borrow(max_uint, bob, False, sender=bob)
+
+    # Should borrow up to 50% LTV
+    assert amount == 50 * EIGHTEEN_DECIMALS
+
+    # Verify debt is correct
+    user_debt = ledger.userDebt(bob)
+    assert user_debt.amount == 50 * EIGHTEEN_DECIMALS
