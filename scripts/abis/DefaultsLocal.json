@@ -308,46 +308,56 @@
   {
     "stateMutability": "view",
     "type": "function",
-    "name": "ripeTokenVaultConfig",
+    "name": "ripeGovVaultConfigs",
     "inputs": [],
     "outputs": [
       {
         "name": "",
-        "type": "tuple",
+        "type": "tuple[]",
         "components": [
           {
-            "name": "lockTerms",
+            "name": "asset",
+            "type": "address"
+          },
+          {
+            "name": "config",
             "type": "tuple",
             "components": [
               {
-                "name": "minLockDuration",
+                "name": "lockTerms",
+                "type": "tuple",
+                "components": [
+                  {
+                    "name": "minLockDuration",
+                    "type": "uint256"
+                  },
+                  {
+                    "name": "maxLockDuration",
+                    "type": "uint256"
+                  },
+                  {
+                    "name": "maxLockBoost",
+                    "type": "uint256"
+                  },
+                  {
+                    "name": "canExit",
+                    "type": "bool"
+                  },
+                  {
+                    "name": "exitFee",
+                    "type": "uint256"
+                  }
+                ]
+              },
+              {
+                "name": "assetWeight",
                 "type": "uint256"
               },
               {
-                "name": "maxLockDuration",
-                "type": "uint256"
-              },
-              {
-                "name": "maxLockBoost",
-                "type": "uint256"
-              },
-              {
-                "name": "canExit",
+                "name": "shouldFreezeWhenBadDebt",
                 "type": "bool"
-              },
-              {
-                "name": "exitFee",
-                "type": "uint256"
               }
             ]
-          },
-          {
-            "name": "assetWeight",
-            "type": "uint256"
-          },
-          {
-            "name": "shouldFreezeWhenBadDebt",
-            "type": "bool"
           }
         ]
       }
@@ -424,6 +434,230 @@
       {
         "name": "",
         "type": "bool"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "assetConfigs",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple[]",
+        "components": [
+          {
+            "name": "asset",
+            "type": "address"
+          },
+          {
+            "name": "config",
+            "type": "tuple",
+            "components": [
+              {
+                "name": "vaultIds",
+                "type": "uint256[]"
+              },
+              {
+                "name": "stakersPointsAlloc",
+                "type": "uint256"
+              },
+              {
+                "name": "voterPointsAlloc",
+                "type": "uint256"
+              },
+              {
+                "name": "perUserDepositLimit",
+                "type": "uint256"
+              },
+              {
+                "name": "globalDepositLimit",
+                "type": "uint256"
+              },
+              {
+                "name": "minDepositBalance",
+                "type": "uint256"
+              },
+              {
+                "name": "debtTerms",
+                "type": "tuple",
+                "components": [
+                  {
+                    "name": "ltv",
+                    "type": "uint256"
+                  },
+                  {
+                    "name": "redemptionThreshold",
+                    "type": "uint256"
+                  },
+                  {
+                    "name": "liqThreshold",
+                    "type": "uint256"
+                  },
+                  {
+                    "name": "liqFee",
+                    "type": "uint256"
+                  },
+                  {
+                    "name": "borrowRate",
+                    "type": "uint256"
+                  },
+                  {
+                    "name": "daowry",
+                    "type": "uint256"
+                  }
+                ]
+              },
+              {
+                "name": "shouldBurnAsPayment",
+                "type": "bool"
+              },
+              {
+                "name": "shouldTransferToEndaoment",
+                "type": "bool"
+              },
+              {
+                "name": "shouldSwapInStabPools",
+                "type": "bool"
+              },
+              {
+                "name": "shouldAuctionInstantly",
+                "type": "bool"
+              },
+              {
+                "name": "canDeposit",
+                "type": "bool"
+              },
+              {
+                "name": "canWithdraw",
+                "type": "bool"
+              },
+              {
+                "name": "canRedeemCollateral",
+                "type": "bool"
+              },
+              {
+                "name": "canRedeemInStabPool",
+                "type": "bool"
+              },
+              {
+                "name": "canBuyInAuction",
+                "type": "bool"
+              },
+              {
+                "name": "canClaimInStabPool",
+                "type": "bool"
+              },
+              {
+                "name": "specialStabPoolId",
+                "type": "uint256"
+              },
+              {
+                "name": "customAuctionParams",
+                "type": "tuple",
+                "components": [
+                  {
+                    "name": "hasParams",
+                    "type": "bool"
+                  },
+                  {
+                    "name": "startDiscount",
+                    "type": "uint256"
+                  },
+                  {
+                    "name": "maxDiscount",
+                    "type": "uint256"
+                  },
+                  {
+                    "name": "delay",
+                    "type": "uint256"
+                  },
+                  {
+                    "name": "duration",
+                    "type": "uint256"
+                  }
+                ]
+              },
+              {
+                "name": "whitelist",
+                "type": "address"
+              },
+              {
+                "name": "isNft",
+                "type": "bool"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "priorityLiqAssetVaults",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple[]",
+        "components": [
+          {
+            "name": "vaultId",
+            "type": "uint256"
+          },
+          {
+            "name": "asset",
+            "type": "address"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "priorityStabVaults",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple[]",
+        "components": [
+          {
+            "name": "vaultId",
+            "type": "uint256"
+          },
+          {
+            "name": "asset",
+            "type": "address"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "priorityPriceSourceIds",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256[]"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "liteSigners",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address[]"
       }
     ]
   },

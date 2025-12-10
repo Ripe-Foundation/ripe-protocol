@@ -1212,11 +1212,27 @@
     ]
   },
   {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "MCBETH",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address"
+      }
+    ]
+  },
+  {
     "stateMutability": "nonpayable",
     "type": "constructor",
     "inputs": [
       {
         "name": "_ripeHq",
+        "type": "address"
+      },
+      {
+        "name": "_mcbeth",
         "type": "address"
       },
       {

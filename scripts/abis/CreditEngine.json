@@ -1758,6 +1758,23 @@
   {
     "stateMutability": "view",
     "type": "function",
+    "name": "getBorrowRate",
+    "inputs": [
+      {
+        "name": "_user",
+        "type": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
+    "stateMutability": "view",
+    "type": "function",
     "name": "getUserCollateralValueAndDebtAmount",
     "inputs": [
       {
