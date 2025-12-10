@@ -674,6 +674,15 @@ def getUserBorrowTermsWithNumVaults(
 
 
 @view
+@external
+def getBorrowRate(_user: address) -> uint256:
+    a: addys.Addys = addys._getAddys()
+    isUndyVault: bool = self._isUnderscoreVault(_user, a.missionControl)
+    bt: UserBorrowTerms = self._getUserBorrowTerms(_user, staticcall Ledger(a.ledger).numUserVaults(_user), False, 0, empty(address), isUndyVault, a)
+    return bt.debtTerms.borrowRate
+
+
+@view
 @internal
 def _getUserBorrowTerms(
     _user: address,
