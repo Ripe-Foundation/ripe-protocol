@@ -50,6 +50,8 @@ interface CreditEngine:
 interface PriceDesk:
     def isValidRegId(_regId: uint256) -> bool: view
     def getAddr(_regId: uint256) -> address: view
+
+interface PriceSource:
     def addPriceSnapshot(_asset: address) -> bool: nonpayable
 
 interface PythPrices:
@@ -369,6 +371,9 @@ event RipeGovVaultConfigSet:
 
 event PriceSnapshotAdded:
     asset: indexed(address)
+    priceSourceId: indexed(uint256)
+    priceSourceAddr: indexed(address)
+    didUpdate: bool
 
 # pending config changes
 actionType: public(HashMap[uint256, ActionType]) # aid -> type
@@ -1307,13 +1312,16 @@ def _sanitizePrioritySources(_priorityIds: DynArray[uint256, MAX_PRIORITY_PRICE_
 #######################
 
 @external
-def addPriceSnapshot(_asset: address) -> bool:
+def addPriceSnapshot(_asset: address, _priceSourceId: uint256) -> bool:
     if not gov._canGovern(msg.sender):
-        assert staticcall MissionControl(self._getMissionControlAddr()).canPerformLiteAction(msg.sender)
+        assert staticcall MissionControl(self._getMissionControlAddr()).canPerformLiteAction(msg.sender) # dev: no perms
+    
+    priceSourceAddr: address = staticcall PriceDesk(self._getPriceDeskAddr()).getAddr(_priceSourceId)
+    assert priceSourceAddr != empty(address) # dev: invalid price source id
 
-    extcall PriceDesk(self._getPriceDeskAddr()).addPriceSnapshot(_asset)
-    log PriceSnapshotAdded(asset=_asset)
-    return True
+    didUpdate: bool = extcall PriceSource(priceSourceAddr).addPriceSnapshot(_asset) 
+    log PriceSnapshotAdded(asset=_asset, priceSourceId=_priceSourceId, priceSourceAddr=priceSourceAddr, didUpdate=didUpdate)
+    return didUpdate
 
 
 ###########################
