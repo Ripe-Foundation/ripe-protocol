@@ -2468,3 +2468,293 @@ def test_failed_redeem_does_not_burn_tokens(endaoment_psm, charlie_token, green_
     user_balance_after = green_token.balanceOf(user)
     assert total_supply_after == total_supply_before
     assert user_balance_after == user_balance_before
+
+
+###############################################
+# Vault Favorable Redemption Rate Tests       #
+###############################################
+
+
+def test_vault_redeem_favorable_when_usdc_below_peg(endaoment_psm, charlie_token, green_token, mock_price_source, switchboard_charlie, governance, mission_control, mock_undy_v2, switchboard_alpha, whale):
+    """When USDC < $1, vault gets more USDC than regular users (uses priceDesk amount via max())"""
+    # Setup underscore registry so vault addresses are recognized
+    mission_control.setUnderscoreRegistry(mock_undy_v2.address, sender=switchboard_alpha.address)
+
+    green_amount = 1000 * EIGHTEEN_DECIMALS
+
+    # Setup: mint GREEN to a vault address (mock_undy_v2 returns True for isEarnVault)
+    vault = boa.env.generate_address()
+    mock_price_source.setPrice(charlie_token.address, 1 * EIGHTEEN_DECIMALS)
+    endaoment_psm.setCanMint(True, sender=switchboard_charlie.address)
+    charlie_token.mint(vault, 1000 * SIX_DECIMALS, sender=governance.address)
+    charlie_token.approve(endaoment_psm.address, 1000 * SIX_DECIMALS, sender=vault)
+    endaoment_psm.mintGreen(sender=vault)
+
+    # Fund PSM with plenty of USDC
+    charlie_token.mint(endaoment_psm.address, 50000 * SIX_DECIMALS, sender=governance.address)
+
+    # Set USDC price to $0.95 (below peg)
+    mock_price_source.setPrice(charlie_token.address, int(0.95 * EIGHTEEN_DECIMALS))
+
+    # Enable redemption and redeem (vault redeems to itself)
+    endaoment_psm.setCanRedeem(True, sender=switchboard_charlie.address)
+    green_token.approve(endaoment_psm.address, green_amount, sender=vault)
+    usdc_received = endaoment_psm.redeemGreen(green_amount, vault, False, sender=vault)
+
+    # At $0.95 per USDC:
+    # - greenInUsdcDecimals = 1000 USDC (1:1 decimal conversion)
+    # - usdcFromPriceDesk = 1000 GREEN * $1 / $0.95 = 1052.631578... USDC
+    # - Vault uses max(1052.6, 1000) = 1052.6 USDC (favorable!)
+    # Expected: ~1052631578 (in 6 decimals)
+    expected_usdc = 1052631578
+    assert usdc_received == expected_usdc
+
+
+def test_vault_redeem_favorable_when_usdc_above_peg(endaoment_psm, charlie_token, green_token, mock_price_source, switchboard_charlie, governance, mission_control, mock_undy_v2, switchboard_alpha, whale):
+    """When USDC > $1, vault gets 1:1 USDC instead of reduced priceDesk amount (uses max())"""
+    # Setup underscore registry so vault addresses are recognized
+    mission_control.setUnderscoreRegistry(mock_undy_v2.address, sender=switchboard_alpha.address)
+
+    green_amount = 1000 * EIGHTEEN_DECIMALS
+
+    # Setup: mint GREEN to a vault address
+    vault = boa.env.generate_address()
+    mock_price_source.setPrice(charlie_token.address, 1 * EIGHTEEN_DECIMALS)
+    endaoment_psm.setCanMint(True, sender=switchboard_charlie.address)
+    charlie_token.mint(vault, 1000 * SIX_DECIMALS, sender=governance.address)
+    charlie_token.approve(endaoment_psm.address, 1000 * SIX_DECIMALS, sender=vault)
+    endaoment_psm.mintGreen(sender=vault)
+
+    # Fund PSM with plenty of USDC
+    charlie_token.mint(endaoment_psm.address, 50000 * SIX_DECIMALS, sender=governance.address)
+
+    # Set USDC price to $1.05 (above peg)
+    mock_price_source.setPrice(charlie_token.address, int(1.05 * EIGHTEEN_DECIMALS))
+
+    # Enable redemption and redeem (vault redeems to itself)
+    endaoment_psm.setCanRedeem(True, sender=switchboard_charlie.address)
+    green_token.approve(endaoment_psm.address, green_amount, sender=vault)
+    usdc_received = endaoment_psm.redeemGreen(green_amount, vault, False, sender=vault)
+
+    # At $1.05 per USDC:
+    # - greenInUsdcDecimals = 1000 USDC (1:1 decimal conversion)
+    # - usdcFromPriceDesk = 1000 GREEN * $1 / $1.05 = 952.38 USDC
+    # - Vault uses max(952.38, 1000) = 1000 USDC (favorable!)
+    expected_usdc = 1000 * SIX_DECIMALS
+    assert usdc_received == expected_usdc
+
+
+def test_vault_vs_regular_user_redeem_usdc_below_peg(endaoment_psm, charlie_token, green_token, mock_price_source, switchboard_charlie, governance, mission_control, mock_undy_v2, switchboard_alpha, whale):
+    """Compare vault vs regular user redemption when USDC is below peg - vault gets more"""
+    # Setup underscore registry
+    mission_control.setUnderscoreRegistry(mock_undy_v2.address, sender=switchboard_alpha.address)
+
+    # Configure mock to only treat specific addresses as vaults (not all addresses)
+    mock_undy_v2.setAllAddressesAreVaults(False)
+
+    green_amount = 1000 * EIGHTEEN_DECIMALS
+
+    # Setup: mint GREEN to both vault and regular user
+    vault = boa.env.generate_address()
+    regular_user = boa.env.generate_address()
+
+    # Only mark vault address as an earn vault
+    mock_undy_v2.setEarnVault(vault, True)
+
+    mock_price_source.setPrice(charlie_token.address, 1 * EIGHTEEN_DECIMALS)
+    endaoment_psm.setCanMint(True, sender=switchboard_charlie.address)
+
+    # Vault gets GREEN
+    charlie_token.mint(vault, 1000 * SIX_DECIMALS, sender=governance.address)
+    charlie_token.approve(endaoment_psm.address, 1000 * SIX_DECIMALS, sender=vault)
+    endaoment_psm.mintGreen(sender=vault)
+
+    # Regular user gets GREEN
+    charlie_token.mint(regular_user, 1000 * SIX_DECIMALS, sender=governance.address)
+    charlie_token.approve(endaoment_psm.address, 1000 * SIX_DECIMALS, sender=regular_user)
+    endaoment_psm.mintGreen(sender=regular_user)
+
+    # Fund PSM with plenty of USDC
+    charlie_token.mint(endaoment_psm.address, 100000 * SIX_DECIMALS, sender=governance.address)
+
+    # Set USDC price to $0.95 (below peg)
+    mock_price_source.setPrice(charlie_token.address, int(0.95 * EIGHTEEN_DECIMALS))
+
+    # Enable redemption
+    endaoment_psm.setCanRedeem(True, sender=switchboard_charlie.address)
+
+    # Vault redeems (to itself, so _isUnderscoreVault=True)
+    green_token.approve(endaoment_psm.address, green_amount, sender=vault)
+    vault_usdc_received = endaoment_psm.redeemGreen(green_amount, vault, False, sender=vault)
+
+    # Regular user redeems (to themselves, not a vault)
+    green_token.approve(endaoment_psm.address, green_amount, sender=regular_user)
+    user_usdc_received = endaoment_psm.redeemGreen(green_amount, regular_user, False, sender=regular_user)
+
+    # Vault should get MORE USDC than regular user
+    # - Vault: max(1052.6, 1000) = 1052.6 USDC
+    # - User: min(1052.6, 1000) = 1000 USDC
+    assert vault_usdc_received > user_usdc_received
+    assert vault_usdc_received == 1052631578  # ~1052.63 USDC
+    assert user_usdc_received == 1000 * SIX_DECIMALS  # 1000 USDC
+
+    # Restore default behavior
+    mock_undy_v2.setAllAddressesAreVaults(True)
+
+
+def test_vault_vs_regular_user_redeem_usdc_above_peg(endaoment_psm, charlie_token, green_token, mock_price_source, switchboard_charlie, governance, mission_control, mock_undy_v2, switchboard_alpha, whale):
+    """Compare vault vs regular user redemption when USDC is above peg - vault gets more"""
+    # Setup underscore registry
+    mission_control.setUnderscoreRegistry(mock_undy_v2.address, sender=switchboard_alpha.address)
+
+    # Configure mock to only treat specific addresses as vaults (not all addresses)
+    mock_undy_v2.setAllAddressesAreVaults(False)
+
+    green_amount = 1000 * EIGHTEEN_DECIMALS
+
+    # Setup: mint GREEN to both vault and regular user
+    vault = boa.env.generate_address()
+    regular_user = boa.env.generate_address()
+
+    # Only mark vault address as an earn vault
+    mock_undy_v2.setEarnVault(vault, True)
+
+    mock_price_source.setPrice(charlie_token.address, 1 * EIGHTEEN_DECIMALS)
+    endaoment_psm.setCanMint(True, sender=switchboard_charlie.address)
+
+    # Vault gets GREEN
+    charlie_token.mint(vault, 1000 * SIX_DECIMALS, sender=governance.address)
+    charlie_token.approve(endaoment_psm.address, 1000 * SIX_DECIMALS, sender=vault)
+    endaoment_psm.mintGreen(sender=vault)
+
+    # Regular user gets GREEN
+    charlie_token.mint(regular_user, 1000 * SIX_DECIMALS, sender=governance.address)
+    charlie_token.approve(endaoment_psm.address, 1000 * SIX_DECIMALS, sender=regular_user)
+    endaoment_psm.mintGreen(sender=regular_user)
+
+    # Fund PSM with plenty of USDC
+    charlie_token.mint(endaoment_psm.address, 100000 * SIX_DECIMALS, sender=governance.address)
+
+    # Set USDC price to $1.05 (above peg)
+    mock_price_source.setPrice(charlie_token.address, int(1.05 * EIGHTEEN_DECIMALS))
+
+    # Enable redemption
+    endaoment_psm.setCanRedeem(True, sender=switchboard_charlie.address)
+
+    # Vault redeems (to itself, so _isUnderscoreVault=True)
+    green_token.approve(endaoment_psm.address, green_amount, sender=vault)
+    vault_usdc_received = endaoment_psm.redeemGreen(green_amount, vault, False, sender=vault)
+
+    # Regular user redeems (to themselves, not a vault)
+    green_token.approve(endaoment_psm.address, green_amount, sender=regular_user)
+    user_usdc_received = endaoment_psm.redeemGreen(green_amount, regular_user, False, sender=regular_user)
+
+    # Vault should get MORE USDC than regular user
+    # - Vault: max(952.38, 1000) = 1000 USDC
+    # - User: min(952.38, 1000) = 952.38 USDC
+    assert vault_usdc_received > user_usdc_received
+    assert vault_usdc_received == 1000 * SIX_DECIMALS  # 1000 USDC
+    assert user_usdc_received == 952380952  # ~952.38 USDC
+
+    # Restore default behavior
+    mock_undy_v2.setAllAddressesAreVaults(True)
+
+
+def test_vault_redeem_at_peg_same_as_regular_user(endaoment_psm, charlie_token, green_token, mock_price_source, switchboard_charlie, governance, mission_control, mock_undy_v2, switchboard_alpha, whale):
+    """When USDC is at $1 peg, vault and regular user get same amount (max and min are equal)"""
+    # Setup underscore registry
+    mission_control.setUnderscoreRegistry(mock_undy_v2.address, sender=switchboard_alpha.address)
+
+    green_amount = 1000 * EIGHTEEN_DECIMALS
+
+    # Setup: mint GREEN to both vault and regular user
+    vault = boa.env.generate_address()
+    regular_user = boa.env.generate_address()
+
+    mock_price_source.setPrice(charlie_token.address, 1 * EIGHTEEN_DECIMALS)
+    endaoment_psm.setCanMint(True, sender=switchboard_charlie.address)
+
+    # Vault gets GREEN
+    charlie_token.mint(vault, 1000 * SIX_DECIMALS, sender=governance.address)
+    charlie_token.approve(endaoment_psm.address, 1000 * SIX_DECIMALS, sender=vault)
+    endaoment_psm.mintGreen(sender=vault)
+
+    # Regular user gets GREEN
+    charlie_token.mint(regular_user, 1000 * SIX_DECIMALS, sender=governance.address)
+    charlie_token.approve(endaoment_psm.address, 1000 * SIX_DECIMALS, sender=regular_user)
+    endaoment_psm.mintGreen(sender=regular_user)
+
+    # Fund PSM with plenty of USDC
+    charlie_token.mint(endaoment_psm.address, 100000 * SIX_DECIMALS, sender=governance.address)
+
+    # USDC price at $1.00 (at peg)
+    # Already set to $1 from minting setup
+
+    # Enable redemption
+    endaoment_psm.setCanRedeem(True, sender=switchboard_charlie.address)
+
+    # Vault redeems
+    green_token.approve(endaoment_psm.address, green_amount, sender=vault)
+    vault_usdc_received = endaoment_psm.redeemGreen(green_amount, vault, False, sender=vault)
+
+    # Regular user redeems
+    green_token.approve(endaoment_psm.address, green_amount, sender=regular_user)
+    user_usdc_received = endaoment_psm.redeemGreen(green_amount, regular_user, False, sender=regular_user)
+
+    # At peg, both should get 1:1 (max and min both equal 1000)
+    # - Vault: max(1000, 1000) = 1000 USDC
+    # - User: min(1000, 1000) = 1000 USDC
+    assert vault_usdc_received == user_usdc_received
+    assert vault_usdc_received == 1000 * SIX_DECIMALS
+
+
+def test_vault_favorable_redeem_requires_vault_recipient(endaoment_psm, charlie_token, green_token, mock_price_source, switchboard_charlie, governance, mission_control, mock_undy_v2, switchboard_alpha, whale):
+    """Vault favorable rate only applies when _recipient is a vault, not just caller"""
+    # Setup underscore registry
+    mission_control.setUnderscoreRegistry(mock_undy_v2.address, sender=switchboard_alpha.address)
+
+    # Configure mock to only treat specific addresses as vaults (not all addresses)
+    mock_undy_v2.setAllAddressesAreVaults(False)
+
+    green_amount = 1000 * EIGHTEEN_DECIMALS
+
+    # Setup: mint GREEN to a vault
+    vault = boa.env.generate_address()
+    regular_user = boa.env.generate_address()
+
+    # Only mark vault address as an earn vault
+    mock_undy_v2.setEarnVault(vault, True)
+
+    mock_price_source.setPrice(charlie_token.address, 1 * EIGHTEEN_DECIMALS)
+    endaoment_psm.setCanMint(True, sender=switchboard_charlie.address)
+
+    # Vault gets GREEN
+    charlie_token.mint(vault, 2000 * SIX_DECIMALS, sender=governance.address)
+    charlie_token.approve(endaoment_psm.address, 2000 * SIX_DECIMALS, sender=vault)
+    endaoment_psm.mintGreen(MAX_UINT256, vault, sender=vault)
+
+    # Fund PSM with plenty of USDC
+    charlie_token.mint(endaoment_psm.address, 100000 * SIX_DECIMALS, sender=governance.address)
+
+    # Set USDC price to $0.95 (below peg)
+    mock_price_source.setPrice(charlie_token.address, int(0.95 * EIGHTEEN_DECIMALS))
+
+    # Enable redemption
+    endaoment_psm.setCanRedeem(True, sender=switchboard_charlie.address)
+
+    # Vault redeems to itself (should get favorable rate)
+    green_token.approve(endaoment_psm.address, green_amount, sender=vault)
+    vault_to_vault_usdc = endaoment_psm.redeemGreen(green_amount, vault, False, sender=vault)
+
+    # Vault redeems to a regular user (should NOT get favorable rate because recipient is not vault)
+    green_token.approve(endaoment_psm.address, green_amount, sender=vault)
+    vault_to_user_usdc = endaoment_psm.redeemGreen(green_amount, regular_user, False, sender=vault)
+
+    # Vault-to-vault gets favorable rate (max)
+    # Vault-to-user gets conservative rate (min) because _recipient is not a vault
+    assert vault_to_vault_usdc > vault_to_user_usdc
+    assert vault_to_vault_usdc == 1052631578  # ~1052.63 USDC (favorable)
+    assert vault_to_user_usdc == 1000 * SIX_DECIMALS  # 1000 USDC (conservative)
+
+    # Restore default behavior
+    mock_undy_v2.setAllAddressesAreVaults(True)

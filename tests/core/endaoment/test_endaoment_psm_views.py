@@ -187,12 +187,12 @@ def test_get_underlying_yield_amount_zero_when_no_position(endaoment_psm):
 
 
 ################################################
-# Underscore Address Tests for getMaxRedeemableGreenAmount #
+# Underscore Vault Tests for getMaxRedeemableGreenAmount #
 ################################################
 
 
-def test_get_max_redeemable_green_amount_underscore_bypasses_interval_limits(endaoment_psm, charlie_token, switchboard_charlie, governance, mock_price_source):
-    """getMaxRedeemableGreenAmount with _isUnderscoreAddr=True should bypass interval limits"""
+def test_get_max_redeemable_green_amount_vault_bypasses_interval_limits(endaoment_psm, charlie_token, switchboard_charlie, governance, mock_price_source):
+    """getMaxRedeemableGreenAmount with _isUnderscoreVault=True should bypass interval limits"""
     # Enable redemption
     mock_price_source.setPrice(charlie_token.address, 1 * EIGHTEEN_DECIMALS)
     endaoment_psm.setCanRedeem(True, sender=switchboard_charlie.address)
@@ -200,17 +200,17 @@ def test_get_max_redeemable_green_amount_underscore_bypasses_interval_limits(end
     # Fund PSM with 200k USDC (more than 100k interval limit)
     charlie_token.mint(endaoment_psm.address, 200_000 * SIX_DECIMALS, sender=governance.address)
 
-    # Non-Underscore address should be limited by interval (100k GREEN)
+    # Non-Underscore vault should be limited by interval (100k GREEN)
     max_redeemable_regular = endaoment_psm.getMaxRedeemableGreenAmount(ZERO_ADDRESS, False)
     assert max_redeemable_regular == 100_000 * EIGHTEEN_DECIMALS
 
-    # Underscore address should bypass interval limit and get full USDC-based amount (200k GREEN)
-    max_redeemable_underscore = endaoment_psm.getMaxRedeemableGreenAmount(ZERO_ADDRESS, True)
-    assert max_redeemable_underscore == 200_000 * EIGHTEEN_DECIMALS
+    # Underscore vault should bypass interval limit and get full USDC-based amount (200k GREEN)
+    max_redeemable_vault = endaoment_psm.getMaxRedeemableGreenAmount(ZERO_ADDRESS, True)
+    assert max_redeemable_vault == 200_000 * EIGHTEEN_DECIMALS
 
 
-def test_get_max_redeemable_green_amount_underscore_bypasses_fees(endaoment_psm, charlie_token, switchboard_charlie, governance, mock_price_source):
-    """getMaxRedeemableGreenAmount with _isUnderscoreAddr=True should bypass fee adjustments"""
+def test_get_max_redeemable_green_amount_vault_bypasses_fees(endaoment_psm, charlie_token, switchboard_charlie, governance, mock_price_source):
+    """getMaxRedeemableGreenAmount with _isUnderscoreVault=True should bypass fee adjustments"""
     # Enable redemption with 5% fee
     mock_price_source.setPrice(charlie_token.address, 1 * EIGHTEEN_DECIMALS)
     endaoment_psm.setCanRedeem(True, sender=switchboard_charlie.address)
@@ -219,20 +219,20 @@ def test_get_max_redeemable_green_amount_underscore_bypasses_fees(endaoment_psm,
     # Fund PSM with 50k USDC (less than interval limit, so USDC becomes constraining)
     charlie_token.mint(endaoment_psm.address, 50_000 * SIX_DECIMALS, sender=governance.address)
 
-    # Non-Underscore: with 5% fee and 50k USDC available
+    # Non-vault: with 5% fee and 50k USDC available
     # maxGreenFromUsdc = 50k * 100 / (100 - 5) = 50k * 100/95 ≈ 52,631 GREEN
     # min(100k interval, 52,631) = 52,631 GREEN
     max_redeemable_regular = endaoment_psm.getMaxRedeemableGreenAmount(ZERO_ADDRESS, False)
     expected_with_fee = 50_000 * EIGHTEEN_DECIMALS * 100_00 // (100_00 - 500)
     assert max_redeemable_regular == expected_with_fee
 
-    # Underscore: no fee adjustment, returns 50k GREEN (1:1 with USDC)
-    max_redeemable_underscore = endaoment_psm.getMaxRedeemableGreenAmount(ZERO_ADDRESS, True)
-    assert max_redeemable_underscore == 50_000 * EIGHTEEN_DECIMALS
+    # Vault: no fee adjustment, returns 50k GREEN (1:1 with USDC)
+    max_redeemable_vault = endaoment_psm.getMaxRedeemableGreenAmount(ZERO_ADDRESS, True)
+    assert max_redeemable_vault == 50_000 * EIGHTEEN_DECIMALS
 
 
-def test_get_max_redeemable_green_amount_underscore_respects_usdc_availability(endaoment_psm, charlie_token, switchboard_charlie, governance, mock_price_source):
-    """getMaxRedeemableGreenAmount with _isUnderscoreAddr=True should still respect USDC availability"""
+def test_get_max_redeemable_green_amount_vault_respects_usdc_availability(endaoment_psm, charlie_token, switchboard_charlie, governance, mock_price_source):
+    """getMaxRedeemableGreenAmount with _isUnderscoreVault=True should still respect USDC availability"""
     # Enable redemption
     mock_price_source.setPrice(charlie_token.address, 1 * EIGHTEEN_DECIMALS)
     endaoment_psm.setCanRedeem(True, sender=switchboard_charlie.address)
@@ -240,13 +240,13 @@ def test_get_max_redeemable_green_amount_underscore_respects_usdc_availability(e
     # Fund PSM with only 10k USDC (less than interval limit)
     charlie_token.mint(endaoment_psm.address, 10_000 * SIX_DECIMALS, sender=governance.address)
 
-    # Even as Underscore, should be limited by USDC availability (10k GREEN)
-    max_redeemable_underscore = endaoment_psm.getMaxRedeemableGreenAmount(ZERO_ADDRESS, True)
-    assert max_redeemable_underscore == 10_000 * EIGHTEEN_DECIMALS
+    # Even as vault, should be limited by USDC availability (10k GREEN)
+    max_redeemable_vault = endaoment_psm.getMaxRedeemableGreenAmount(ZERO_ADDRESS, True)
+    assert max_redeemable_vault == 10_000 * EIGHTEEN_DECIMALS
 
 
-def test_get_max_redeemable_green_amount_underscore_with_user_balance(endaoment_psm, charlie_token, green_token, switchboard_charlie, governance, mock_price_source, whale):
-    """getMaxRedeemableGreenAmount with _isUnderscoreAddr=True and user address should respect user balance"""
+def test_get_max_redeemable_green_amount_vault_with_user_balance(endaoment_psm, charlie_token, green_token, switchboard_charlie, governance, mock_price_source, whale):
+    """getMaxRedeemableGreenAmount with _isUnderscoreVault=True and user address should respect user balance"""
     user = boa.env.generate_address()
 
     # Enable redemption
@@ -259,50 +259,50 @@ def test_get_max_redeemable_green_amount_underscore_with_user_balance(endaoment_
     # Give user only 5k GREEN
     green_token.transfer(user, 5_000 * EIGHTEEN_DECIMALS, sender=whale)
 
-    # Even as Underscore, should be limited by user's GREEN balance (5k GREEN)
-    max_redeemable_underscore = endaoment_psm.getMaxRedeemableGreenAmount(user, True)
-    assert max_redeemable_underscore == 5_000 * EIGHTEEN_DECIMALS
+    # Even as vault, should be limited by user's GREEN balance (5k GREEN)
+    max_redeemable_vault = endaoment_psm.getMaxRedeemableGreenAmount(user, True)
+    assert max_redeemable_vault == 5_000 * EIGHTEEN_DECIMALS
 
 
 ################################################
-# Underscore Address Tests for getMaxUsdcAmountForMint #
+# Underscore Vault Tests for getMaxUsdcAmountForMint #
 ################################################
 
 
-def test_get_max_usdc_amount_for_mint_underscore_bypasses_interval_limits(endaoment_psm, charlie_token, switchboard_charlie, mock_price_source):
-    """getMaxUsdcAmountForMint with _isUnderscoreAddr=True should bypass interval limits"""
+def test_get_max_usdc_amount_for_mint_vault_bypasses_interval_limits(endaoment_psm, charlie_token, switchboard_charlie, mock_price_source):
+    """getMaxUsdcAmountForMint with _isUnderscoreVault=True should bypass interval limits"""
     # Enable minting
     mock_price_source.setPrice(charlie_token.address, 1 * EIGHTEEN_DECIMALS)
     endaoment_psm.setCanMint(True, sender=switchboard_charlie.address)
 
-    # Non-Underscore address should be limited by interval (100k GREEN = 100k USDC)
+    # Non-Underscore vault should be limited by interval (100k GREEN = 100k USDC)
     max_usdc_regular = endaoment_psm.getMaxUsdcAmountForMint(ZERO_ADDRESS, False)
     assert max_usdc_regular == 100_000 * SIX_DECIMALS
 
-    # Underscore address should bypass interval limit and return MAX_UINT256 (unlimited)
-    max_usdc_underscore = endaoment_psm.getMaxUsdcAmountForMint(ZERO_ADDRESS, True)
-    assert max_usdc_underscore == MAX_UINT256
+    # Underscore vault should bypass interval limit and return MAX_UINT256 (unlimited)
+    max_usdc_vault = endaoment_psm.getMaxUsdcAmountForMint(ZERO_ADDRESS, True)
+    assert max_usdc_vault == MAX_UINT256
 
 
-def test_get_max_usdc_amount_for_mint_underscore_bypasses_fees(endaoment_psm, charlie_token, switchboard_charlie, mock_price_source):
-    """getMaxUsdcAmountForMint with _isUnderscoreAddr=True should bypass fee adjustments"""
+def test_get_max_usdc_amount_for_mint_vault_bypasses_fees(endaoment_psm, charlie_token, switchboard_charlie, mock_price_source):
+    """getMaxUsdcAmountForMint with _isUnderscoreVault=True should bypass fee adjustments"""
     # Enable minting with 5% fee
     mock_price_source.setPrice(charlie_token.address, 1 * EIGHTEEN_DECIMALS)
     endaoment_psm.setCanMint(True, sender=switchboard_charlie.address)
     endaoment_psm.setMintFee(500, sender=switchboard_charlie.address)  # 5%
 
-    # Non-Underscore: with 5% fee, to mint 100k GREEN need ~105,263 USDC
+    # Non-vault: with 5% fee, to mint 100k GREEN need ~105,263 USDC
     max_usdc_regular = endaoment_psm.getMaxUsdcAmountForMint(ZERO_ADDRESS, False)
     expected_with_fee = 100_000 * SIX_DECIMALS * 100_00 // (100_00 - 500)
     assert max_usdc_regular == expected_with_fee
 
-    # Underscore: should return unlimited (MAX_UINT256), no fee adjustment
-    max_usdc_underscore = endaoment_psm.getMaxUsdcAmountForMint(ZERO_ADDRESS, True)
-    assert max_usdc_underscore == MAX_UINT256
+    # Vault: should return unlimited (MAX_UINT256), no fee adjustment
+    max_usdc_vault = endaoment_psm.getMaxUsdcAmountForMint(ZERO_ADDRESS, True)
+    assert max_usdc_vault == MAX_UINT256
 
 
-def test_get_max_usdc_amount_for_mint_underscore_respects_user_balance(endaoment_psm, charlie_token, switchboard_charlie, governance, mock_price_source):
-    """getMaxUsdcAmountForMint with _isUnderscoreAddr=True and user address should respect user balance"""
+def test_get_max_usdc_amount_for_mint_vault_respects_user_balance(endaoment_psm, charlie_token, switchboard_charlie, governance, mock_price_source):
+    """getMaxUsdcAmountForMint with _isUnderscoreVault=True and user address should respect user balance"""
     user = boa.env.generate_address()
 
     # Enable minting
@@ -312,17 +312,17 @@ def test_get_max_usdc_amount_for_mint_underscore_respects_user_balance(endaoment
     # Give user only 50k USDC
     charlie_token.mint(user, 50_000 * SIX_DECIMALS, sender=governance.address)
 
-    # Even as Underscore, should be limited by user's USDC balance (50k USDC)
-    max_usdc_underscore = endaoment_psm.getMaxUsdcAmountForMint(user, True)
-    assert max_usdc_underscore == 50_000 * SIX_DECIMALS
+    # Even as vault, should be limited by user's USDC balance (50k USDC)
+    max_usdc_vault = endaoment_psm.getMaxUsdcAmountForMint(user, True)
+    assert max_usdc_vault == 50_000 * SIX_DECIMALS
 
 
-def test_get_max_usdc_amount_for_mint_underscore_unlimited_when_no_user(endaoment_psm, charlie_token, switchboard_charlie, mock_price_source):
-    """getMaxUsdcAmountForMint with _isUnderscoreAddr=True and no user should return unlimited"""
+def test_get_max_usdc_amount_for_mint_vault_unlimited_when_no_user(endaoment_psm, charlie_token, switchboard_charlie, mock_price_source):
+    """getMaxUsdcAmountForMint with _isUnderscoreVault=True and no user should return unlimited"""
     # Enable minting
     mock_price_source.setPrice(charlie_token.address, 1 * EIGHTEEN_DECIMALS)
     endaoment_psm.setCanMint(True, sender=switchboard_charlie.address)
 
-    # Underscore without user address should return MAX_UINT256 (truly unlimited)
-    max_usdc_underscore = endaoment_psm.getMaxUsdcAmountForMint(ZERO_ADDRESS, True)
-    assert max_usdc_underscore == MAX_UINT256
+    # Vault without user address should return MAX_UINT256 (truly unlimited)
+    max_usdc_vault = endaoment_psm.getMaxUsdcAmountForMint(ZERO_ADDRESS, True)
+    assert max_usdc_vault == MAX_UINT256
