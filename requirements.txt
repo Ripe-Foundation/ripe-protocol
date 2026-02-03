@@ -147,6 +147,7 @@ packaging==24.2
     #   pytest
     #   vvm
     #   vyper
+    #   wheel
 paginate==0.5.7
     # via mkdocs-material
 parsimonious==0.10.0
@@ -269,5 +270,5 @@ watchdog==6.0.0
     # via mkdocs
 wcwidth==0.2.14
     # via prompt-toolkit
-wheel==0.45.1
+wheel==0.46.2
     # via vyper
