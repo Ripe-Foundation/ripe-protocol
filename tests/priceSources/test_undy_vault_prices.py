@@ -572,7 +572,7 @@ def test_vault_registry_validation(
     assert not undy_vault_prices.isValidNewFeed(bravo_token_vault, 0, 10, 0, 10)
 
 
-def test_convertToAssetsSafe_validation(
+def test_convertToAssets_validation(
     undy_vault_prices,
     alpha_token_vault,
     mock_price_source,
@@ -581,15 +581,55 @@ def test_convertToAssetsSafe_validation(
     mock_undy_v2,
     switchboard_alpha,
 ):
-    """Test that validation checks convertToAssetsSafe implementation"""
+    """Test that validation checks convertToAssets implementation"""
     mission_control.setUnderscoreRegistry(mock_undy_v2.address, sender=switchboard_alpha.address)
     mock_price_source.setPrice(alpha_token, 1 * EIGHTEEN_DECIMALS)
 
-    # alpha_token_vault has convertToAssetsSafe implementation
+    # alpha_token_vault has convertToAssets implementation
     assert undy_vault_prices.isValidNewFeed(alpha_token_vault, 0, 10, 0, 10)
 
-    # If we try with an address that doesn't have convertToAssetsSafe,
+    # If we try with an address that doesn't have convertToAssets,
     # it should fail (but our mock vaults all have it, so this test verifies the happy path)
+
+
+def test_snapshots_use_convertToAssets_not_convertToAssetsSafe(
+    undy_vault_prices,
+    governance,
+    alpha_token_vault_with_safe_gap,
+    alpha_token,
+    alpha_token_whale,
+    mock_price_source,
+    teller,
+    mission_control,
+    mock_undy_v2,
+    switchboard_alpha,
+):
+    """Regression: snapshots should use convertToAssets, not convertToAssetsSafe."""
+    mission_control.setUnderscoreRegistry(mock_undy_v2.address, sender=switchboard_alpha.address)
+    mock_price_source.setPrice(alpha_token, 1 * EIGHTEEN_DECIMALS)
+
+    # Seed vault with shares at 1:1
+    alpha_token.approve(alpha_token_vault_with_safe_gap, 100 * EIGHTEEN_DECIMALS, sender=alpha_token_whale)
+    alpha_token_vault_with_safe_gap.deposit(100 * EIGHTEEN_DECIMALS, alpha_token_whale, sender=alpha_token_whale)
+
+    # Register feed and create initial snapshot
+    assert undy_vault_prices.isValidNewFeed(alpha_token_vault_with_safe_gap, 0, 5, 0, 100)
+    undy_vault_prices.addNewPriceFeed(alpha_token_vault_with_safe_gap, 0, 5, 0, 100, sender=governance.address)
+    boa.env.time_travel(blocks=undy_vault_prices.actionTimeLock() + 1)
+    undy_vault_prices.confirmNewPriceFeed(alpha_token_vault_with_safe_gap, sender=governance.address)
+
+    # Simulate yield accrual (pps doubles)
+    alpha_token.transfer(alpha_token_vault_with_safe_gap, 100 * EIGHTEEN_DECIMALS, sender=alpha_token_whale)
+    boa.env.time_travel(seconds=1)
+    undy_vault_prices.addPriceSnapshot(alpha_token_vault_with_safe_gap, sender=teller.address)
+
+    latest_snapshot = undy_vault_prices.getLatestSnapshot(alpha_token_vault_with_safe_gap)
+    one_share = 10 ** alpha_token_vault_with_safe_gap.decimals()
+    raw_pps = alpha_token_vault_with_safe_gap.convertToAssets(one_share)
+    safe_pps = alpha_token_vault_with_safe_gap.convertToAssetsSafe(one_share)
+
+    assert latest_snapshot.pricePerShare == raw_pps
+    assert latest_snapshot.pricePerShare > safe_pps
 
 
 def test_no_price_for_underlying_asset(

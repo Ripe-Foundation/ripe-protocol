@@ -29,7 +29,7 @@ interface PriceDesk:
     def getPrice(_asset: address, _shouldRaise: bool = False) -> uint256: view
 
 interface UnderscoreVault:
-    def convertToAssetsSafe(_shareAmount: uint256) -> uint256: view
+    def convertToAssets(_shareAmount: uint256) -> uint256: view
 
 interface VaultRegistry:
     def isEarnVault(_vaultAddr: address) -> bool: view
@@ -356,8 +356,8 @@ def _isValidFeedConfig(_asset: address, _config: PriceConfig) -> bool:
     if staticcall PriceDesk(addys._getPriceDeskAddr()).getPrice(_config.underlyingAsset, False) == 0:
         return False
 
-    # verify the vault implements convertToAssetsSafe and returns a valid price
-    pricePerShare: uint256 = staticcall UnderscoreVault(_asset).convertToAssetsSafe(10 ** _config.vaultTokenDecimals)
+    # verify the vault implements convertToAssets and returns a valid price
+    pricePerShare: uint256 = staticcall UnderscoreVault(_asset).convertToAssets(10 ** _config.vaultTokenDecimals)
     return pricePerShare != 0
 
 
@@ -771,4 +771,4 @@ def _getUnderscoreVaultPrice(
 @view
 @internal
 def _getCurrentVaultPricePerShare(_asset: address, _decimals: uint256) -> uint256:
-    return staticcall UnderscoreVault(_asset).convertToAssetsSafe(10 ** _decimals)
+    return staticcall UnderscoreVault(_asset).convertToAssets(10 ** _decimals)

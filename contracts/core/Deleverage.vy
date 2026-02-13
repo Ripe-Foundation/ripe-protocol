@@ -19,6 +19,7 @@ import interfaces.ConfigStructs as cs
 
 from ethereum.ercs import IERC4626
 from ethereum.ercs import IERC20
+from ethereum.ercs import IERC20Detailed
 
 interface MissionControl:
     def userDelegation(_user: address, _caller: address) -> cs.ActionDelegation: view
@@ -59,6 +60,10 @@ interface EndaomentPSM:
 
 interface VaultRegistry:
     def isEarnVault(_vaultAddr: address) -> bool: view
+    def isBasicEarnVault(_vaultAddr: address) -> bool: view
+
+interface UnderscoreVault:
+    def convertToAssetsSafe(_shares: uint256) -> uint256: view
 
 interface GreenToken:
     def burn(_amount: uint256) -> bool: nonpayable
@@ -166,6 +171,7 @@ PRIORITY_LIQ_VAULT_DATA: constant(uint256) = 20
 MAX_STAB_VAULT_DATA: constant(uint256) = 10
 MAX_DELEVERAGE_USERS: constant(uint256) = 25
 MAX_DELEVERAGE_ASSETS: constant(uint256) = 25
+MAX_UNDERSCORE_SAFE_SPREAD_BPS: constant(uint256) = 50 # 0.50%
 
 
 @deploy
@@ -988,7 +994,14 @@ def _transferCollateral(
     _targetUsdValue: uint256,
     _a: addys.Addys,
 ) -> (uint256, uint256, bool):
-    maxAssetAmount: uint256 = self._getMaxAssetAmount(_asset, _targetUsdValue, _a.greenToken, _a.savingsGreen, _a.priceDesk)
+    isUnderscoreEarnVault: bool = self._isUnderscoreEarnVault(_asset, _a.missionControl)
+    underlyingAsset: address = empty(address)
+    if isUnderscoreEarnVault:
+        self._assertUnderscoreSafeSpread(_asset)
+        underlyingAsset = staticcall IERC4626(_asset).asset()
+
+    # calculate max asset amount
+    maxAssetAmount: uint256 = self._getMaxAssetAmount(_asset, _targetUsdValue, isUnderscoreEarnVault, underlyingAsset, _a.greenToken, _a.savingsGreen, _a.priceDesk)
     if maxAssetAmount == 0:
         return 0, 0, False
 
@@ -998,6 +1011,16 @@ def _transferCollateral(
     amountSent, isPositionDepleted = extcall AuctionHouse(_a.auctionHouse).withdrawTokensFromVault(_fromUser, _asset, maxAssetAmount, _toUser, _vaultAddr, _a)
 
     usdValue: uint256 = _targetUsdValue * amountSent // maxAssetAmount
+
+    # For underscore earn vault assets, credit debt using actual transferred value.
+    # Intentionally uses convertToAssets (not convertToAssetsSafe) so users are
+    # credited for the real underlying value received by Endaoment.
+    # Safety assumption: underscore earn-vault registry only includes trusted,
+    # monotonically-accruing vaults where convertToAssets cannot be price-manipulated.
+    if amountSent != 0 and underlyingAsset != empty(address) and isUnderscoreEarnVault:
+        underlyingAmount: uint256 = staticcall IERC4626(_asset).convertToAssets(amountSent)
+        usdValue = staticcall PriceDesk(_a.priceDesk).getUsdValue(underlyingAsset, underlyingAmount, True)
+
     return usdValue, amountSent, isPositionDepleted
 
 
@@ -1011,11 +1034,8 @@ def _isUnderscoreAddr(_addr: address, _mc: address) -> bool:
     if underscore == empty(address):
         return False
 
-    # check if underscore vault
-    vaultRegistry: address = staticcall Registry(underscore).getAddr(UNDERSCORE_VAULT_REGISTRY_ID)
-    if vaultRegistry == empty(address):
-        return False
-    if staticcall VaultRegistry(vaultRegistry).isEarnVault(_addr):
+    # trust underscore earn vaults
+    if self._isUnderscoreEarnVaultWithRegistry(_addr, underscore):
         return True
 
     # check if underscore lego
@@ -1023,6 +1043,42 @@ def _isUnderscoreAddr(_addr: address, _mc: address) -> bool:
     if undyLegoBook == empty(address):
         return False
     return staticcall Registry(undyLegoBook).isValidAddr(_addr)
+
+
+@view
+@internal
+def _isUnderscoreEarnVault(_asset: address, _mc: address) -> bool:
+    underscore: address = staticcall MissionControl(_mc).underscoreRegistry()
+    return self._isUnderscoreEarnVaultWithRegistry(_asset, underscore)
+
+
+@view
+@internal
+def _isUnderscoreEarnVaultWithRegistry(_asset: address, _underscore: address) -> bool:
+    if _underscore == empty(address):
+        return False
+
+    # check if underscore vault
+    vaultRegistry: address = staticcall Registry(_underscore).getAddr(UNDERSCORE_VAULT_REGISTRY_ID)
+    if vaultRegistry == empty(address):
+        return False
+    return staticcall VaultRegistry(vaultRegistry).isBasicEarnVault(_asset)
+
+
+@view
+@internal
+def _assertUnderscoreSafeSpread(_asset: address):
+    # Sample one whole share unit (capped at 1e18 shares) to reduce dust-rounding noise.
+    sampleDecimals: uint256 = min(convert(staticcall IERC20Detailed(_asset).decimals(), uint256), 18)
+    sampleShares: uint256 = 10 ** sampleDecimals
+    maxUnderlying: uint256 = staticcall IERC4626(_asset).convertToAssets(sampleShares)
+    safeUnderlying: uint256 = staticcall UnderscoreVault(_asset).convertToAssetsSafe(sampleShares)
+
+    if maxUnderlying == 0:
+        return
+
+    assert safeUnderlying != 0 # dev: unsafe underscore vault spread
+    assert maxUnderlying * HUNDRED_PERCENT <= safeUnderlying * (HUNDRED_PERCENT + MAX_UNDERSCORE_SAFE_SPREAD_BPS) # dev: unsafe underscore vault spread
 
 
 # get asset amount
@@ -1033,6 +1089,8 @@ def _isUnderscoreAddr(_addr: address, _mc: address) -> bool:
 def _getMaxAssetAmount(
     _asset: address,
     _targetUsdValue: uint256,
+    _isUnderscoreEarnVault: bool,
+    _underlyingAsset: address,
     _greenToken: address,
     _savingsGreen: address,
     _priceDesk: address,
@@ -1042,6 +1100,11 @@ def _getMaxAssetAmount(
         amount = _targetUsdValue
     elif _asset == _savingsGreen:
         amount = staticcall IERC4626(_savingsGreen).convertToShares(_targetUsdValue)
+    elif _isUnderscoreEarnVault:
+        if _underlyingAsset == empty(address):
+            return 0
+        underlyingAmount: uint256 = staticcall PriceDesk(_priceDesk).getAssetAmount(_underlyingAsset, _targetUsdValue, True)
+        amount = staticcall IERC4626(_asset).convertToShares(underlyingAmount)
     else:
         amount = staticcall PriceDesk(_priceDesk).getAssetAmount(_asset, _targetUsdValue, True)
     return amount

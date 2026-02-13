@@ -15,11 +15,15 @@ UNDY_REGISTRY: public(immutable(address))
 
 useThisLegoId: public(uint256)
 _isUserWallet: public(bool)
+_earnVaults: public(HashMap[address, bool])
+_basicEarnVaults: public(HashMap[address, bool])
+_allAddressesAreVaults: public(bool)
 
 
 @deploy
 def __init__(_undyLegacy: address):
     UNDY_REGISTRY = _undyLegacy
+    self._allAddressesAreVaults = True  # default behavior for backwards compatibility
 
 
 @view
@@ -60,7 +64,34 @@ def setUseThisLegoId(_legoId: uint256):
 @view
 @external
 def isEarnVault(_vaultAddr: address) -> bool:
-    return True
+    if self._allAddressesAreVaults:
+        return True
+    return self._earnVaults[_vaultAddr]
+
+
+@view
+@external
+def isBasicEarnVault(_vaultAddr: address) -> bool:
+    if self._allAddressesAreVaults:
+        return True
+    return self._basicEarnVaults[_vaultAddr]
+
+
+@external
+def setEarnVault(_vaultAddr: address, _isVault: bool):
+    self._earnVaults[_vaultAddr] = _isVault
+    # Backwards-compatible default for tests that only call setEarnVault.
+    self._basicEarnVaults[_vaultAddr] = _isVault
+
+
+@external
+def setBasicEarnVault(_vaultAddr: address, _isVault: bool):
+    self._basicEarnVaults[_vaultAddr] = _isVault
+
+
+@external
+def setAllAddressesAreVaults(_allAreVaults: bool):
+    self._allAddressesAreVaults = _allAreVaults
 
 
 #############
