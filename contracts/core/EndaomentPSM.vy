@@ -211,7 +211,7 @@ def __init__(
 ##############
 
 
-# mint
+# mint - USDC -> GREEN
 
 
 @nonreentrant
@@ -222,14 +222,14 @@ def mintGreen(_usdcAmount: uint256 = max_value(uint256), _recipient: address = m
     a: addys.Addys = addys._getAddys()
     assert _recipient != empty(address) # dev: invalid recipient
 
-    # allowlist check (Underscore addresses bypass)
-    isUnderscore: bool = self._isUnderscoreAddr(msg.sender, a.missionControl)
-    if not isUnderscore and self.shouldEnforceMintAllowlist:
+    # check if recipient is underscore vault (only vaults get favorable treatment)
+    isUnderscoreVault: bool = self._isUnderscoreVault(_recipient, a.missionControl)
+    if not isUnderscoreVault and self.shouldEnforceMintAllowlist:
         assert self.mintAllowlist[msg.sender] # dev: not on mint allowlist
 
     # usdc amount to transfer (cap by user balance and interval limit)
     usdc: address = USDC
-    maxUsdcAmount: uint256 = min(self._calculateMaxUsdcForMint(isUnderscore, usdc, a.priceDesk), staticcall IERC20(usdc).balanceOf(msg.sender))
+    maxUsdcAmount: uint256 = min(self._calculateMaxUsdcForMint(isUnderscoreVault, usdc, a.priceDesk), staticcall IERC20(usdc).balanceOf(msg.sender))
     usdcAmount: uint256 = min(_usdcAmount, maxUsdcAmount)
     assert usdcAmount != 0 # dev: zero amount
 
@@ -240,19 +240,19 @@ def mintGreen(_usdcAmount: uint256 = max_value(uint256), _recipient: address = m
     feeAmount: uint256 = 0
     usdcAfterFee: uint256 = usdcAmount
 
-    # apply fee only for non-Underscore addresses
-    if not isUnderscore:
+    # apply fee only for non-underscore vaults
+    if not isUnderscoreVault:
         feeAmount = usdcAmount * self.mintFee // HUNDRED_PERCENT
         usdcAfterFee = usdcAmount - feeAmount
 
-    # green to mint
+    # green to mint (conservative for all users: USDC maxed at $1)
     usdValue: uint256 = staticcall PriceDesk(a.priceDesk).getUsdValue(usdc, usdcAfterFee, True)
     usdcInGreenDecimals: uint256 = usdcAfterFee * ONE_GREEN // ONE_USDC
     greenToMint: uint256 = min(usdValue, usdcInGreenDecimals)
     assert greenToMint != 0 # dev: zero mint amount
 
-    # update interval storage (Underscore addresses bypass)
-    if not isUnderscore:
+    # update interval storage (underscore vaults bypass)
+    if not isUnderscoreVault:
         self._updateMintInterval(greenToMint)
 
     receivedSavingsGreen: bool = False
@@ -282,9 +282,9 @@ def mintGreen(_usdcAmount: uint256 = max_value(uint256), _recipient: address = m
 
 @view
 @internal
-def _calculateMaxUsdcForMint(_isUnderscoreAddr: bool, _usdc: address, _priceDesk: address) -> uint256:
-    if _isUnderscoreAddr:
-        return max_value(uint256) # underscore addresses have unlimited capacity
+def _calculateMaxUsdcForMint(_isUnderscoreVault: bool, _usdc: address, _priceDesk: address) -> uint256:
+    if _isUnderscoreVault:
+        return max_value(uint256) # underscore vaults have unlimited capacity
 
     # convert interval capacity (GREEN) back to USDC needed
     intervalCapacity: uint256 = self._getAvailIntervalMint()
@@ -311,9 +311,9 @@ def _calculateMaxUsdcForMint(_isUnderscoreAddr: bool, _usdc: address, _priceDesk
 
 @view
 @external
-def getMaxUsdcAmountForMint(_user: address = empty(address), _isUnderscoreAddr: bool = False) -> uint256:
+def getMaxUsdcAmountForMint(_user: address = empty(address), _isUnderscoreVault: bool = False) -> uint256:
     usdc: address = USDC
-    usdcAmount: uint256 = self._calculateMaxUsdcForMint(_isUnderscoreAddr, usdc, addys._getPriceDeskAddr())
+    usdcAmount: uint256 = self._calculateMaxUsdcForMint(_isUnderscoreVault, usdc, addys._getPriceDeskAddr())
 
     # if user provided, also consider their usdc balance
     if _user != empty(address):
@@ -366,7 +366,7 @@ def _updateMintInterval(_amount: uint256):
 #####################
 
 
-# redeem
+# redeem - GREEN -> USDC
 
 
 @nonreentrant
@@ -377,15 +377,15 @@ def redeemGreen(_paymentAmount: uint256 = max_value(uint256), _recipient: addres
     a: addys.Addys = addys._getAddys()
     assert _recipient != empty(address) # dev: invalid recipient
 
-    # allowlist check (Underscore addresses bypass)
-    isUnderscore: bool = self._isUnderscoreAddr(msg.sender, a.missionControl)
-    if not isUnderscore and self.shouldEnforceRedeemAllowlist:
+    # check if recipient is underscore vault (only vaults get favorable treatment)
+    isUnderscoreVault: bool = self._isUnderscoreVault(_recipient, a.missionControl)
+    if not isUnderscoreVault and self.shouldEnforceRedeemAllowlist:
         assert self.redeemAllowlist[msg.sender] # dev: not on redeem allowlist
 
     # calculate max allowed to redeem (cap by interval and USDC availability)
     usdc: address = USDC
     usdcYieldPosition: UsdcYieldPosition = self.usdcYieldPosition
-    maxGreenAllowed: uint256 = self._calculateMaxRedeemableGreen(isUnderscore, usdcYieldPosition.legoId, usdcYieldPosition.vaultToken, usdc, a.priceDesk, a.missionControl)
+    maxGreenAllowed: uint256 = self._calculateMaxRedeemableGreen(isUnderscoreVault, usdcYieldPosition.legoId, usdcYieldPosition.vaultToken, usdc, a.priceDesk, a.missionControl)
 
     # transfer sGREEN from user and redeem to GREEN (cap by max allowed)
     greenAmount: uint256 = 0
@@ -406,14 +406,19 @@ def redeemGreen(_paymentAmount: uint256 = max_value(uint256), _recipient: addres
     # usdc to give
     usdcFromPriceDesk: uint256 = staticcall PriceDesk(a.priceDesk).getAssetAmount(usdc, greenAmount, True)
     greenInUsdcDecimals: uint256 = greenAmount * ONE_USDC // ONE_GREEN
-    usdcToGive: uint256 = min(usdcFromPriceDesk, greenInUsdcDecimals)
+
+    usdcToGive: uint256 = 0
+    if isUnderscoreVault:
+        usdcToGive = max(usdcFromPriceDesk, greenInUsdcDecimals) # vault gets favorable rate: max of priceDesk and 1:1
+    else:
+        usdcToGive = min(usdcFromPriceDesk, greenInUsdcDecimals) # regular users: conservative (cannot get more than 1:1)
     assert usdcToGive != 0 # dev: zero redeem amount
 
     feeAmount: uint256 = 0
     usdcAfterFee: uint256 = usdcToGive
 
-    # update interval storage (Underscore addresses bypass)
-    if not isUnderscore:
+    # update interval storage (underscore vaults bypass)
+    if not isUnderscoreVault:
         self._updateRedeemInterval(greenAmount)
 
         # redeem fee
@@ -442,7 +447,7 @@ def redeemGreen(_paymentAmount: uint256 = max_value(uint256), _recipient: addres
 
 @view
 @internal
-def _calculateMaxRedeemableGreen(_isUnderscoreAddr: bool, _legoId: uint256, _vaultToken: address, _usdc: address, _priceDesk: address, _missionControl: address) -> uint256:
+def _calculateMaxRedeemableGreen(_isUnderscoreVault: bool, _legoId: uint256, _vaultToken: address, _usdc: address, _priceDesk: address, _missionControl: address) -> uint256:
     # usdc available (idle + yield) - always limited by this
     usdcAvailable: uint256 = self._getAvailableUsdc(_usdc, _legoId, _vaultToken, _missionControl)
 
@@ -451,8 +456,8 @@ def _calculateMaxRedeemableGreen(_isUnderscoreAddr: bool, _legoId: uint256, _vau
     usdcInGreenDecimals: uint256 = usdcAvailable * ONE_GREEN // ONE_USDC
     maxGreenFromUsdc: uint256 = min(usdValue, usdcInGreenDecimals)
 
-    # underscore addresses bypass interval limits and fees, but still limited by USDC
-    if _isUnderscoreAddr:
+    # underscore vaults bypass interval limits and fees, but still limited by USDC
+    if _isUnderscoreVault:
         return maxGreenFromUsdc
 
     # account for redeem fee: usdcAfterFee = usdcToGive * (1 - fee)
@@ -476,11 +481,11 @@ def _calculateMaxRedeemableGreen(_isUnderscoreAddr: bool, _legoId: uint256, _vau
 
 @view
 @external
-def getMaxRedeemableGreenAmount(_user: address = empty(address), _isUnderscoreAddr: bool = False) -> uint256:
+def getMaxRedeemableGreenAmount(_user: address = empty(address), _isUnderscoreVault: bool = False) -> uint256:
     a: addys.Addys = addys._getAddys()
     usdc: address = USDC
     usdcYieldPosition: UsdcYieldPosition = self.usdcYieldPosition
-    maxRedeemable: uint256 = self._calculateMaxRedeemableGreen(_isUnderscoreAddr, usdcYieldPosition.legoId, usdcYieldPosition.vaultToken, usdc, a.priceDesk, a.missionControl)
+    maxRedeemable: uint256 = self._calculateMaxRedeemableGreen(_isUnderscoreVault, usdcYieldPosition.legoId, usdcYieldPosition.vaultToken, usdc, a.priceDesk, a.missionControl)
 
     # if user provided, also consider their green balance
     if _user != empty(address):
@@ -710,28 +715,21 @@ def _getLegoAddr(_legoId: uint256, _missionControl: address) -> address:
     return legoAddr
 
 
-# is underscore addr
+# is underscore vault
 
 
 @view
 @internal
-def _isUnderscoreAddr(_addr: address, _missionControl: address) -> bool:
+def _isUnderscoreVault(_addr: address, _missionControl: address) -> bool:
     underscore: address = staticcall MissionControl(_missionControl).underscoreRegistry()
     if underscore == empty(address):
         return False
 
-    # check if underscore vault
     vaultRegistry: address = staticcall Registry(underscore).getAddr(UNDERSCORE_VAULT_REGISTRY_ID)
-    if vaultRegistry != empty(address):
-        if staticcall VaultRegistry(vaultRegistry).isEarnVault(_addr):
-            return True
+    if vaultRegistry == empty(address):
+        return False
 
-    # check if underscore lego
-    undyLegoBook: address = staticcall Registry(underscore).getAddr(UNDERSCORE_LEGOBOOK_ID)
-    if undyLegoBook != empty(address):
-        return staticcall Registry(undyLegoBook).isValidAddr(_addr)
-
-    return False
+    return staticcall VaultRegistry(vaultRegistry).isEarnVault(_addr)
 
 
 # max usdc available
