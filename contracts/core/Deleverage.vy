@@ -171,7 +171,7 @@ PRIORITY_LIQ_VAULT_DATA: constant(uint256) = 20
 MAX_STAB_VAULT_DATA: constant(uint256) = 10
 MAX_DELEVERAGE_USERS: constant(uint256) = 25
 MAX_DELEVERAGE_ASSETS: constant(uint256) = 25
-MAX_UNDERSCORE_SAFE_SPREAD_BPS: constant(uint256) = 50 # 0.50%
+MAX_UNDERSCORE_SAFE_SPREAD_BPS: constant(uint256) = 100 # 1%
 
 
 @deploy
@@ -997,7 +997,6 @@ def _transferCollateral(
     isUnderscoreEarnVault: bool = self._isUnderscoreEarnVault(_asset, _a.missionControl)
     underlyingAsset: address = empty(address)
     if isUnderscoreEarnVault:
-        self._assertUnderscoreSafeSpread(_asset)
         underlyingAsset = staticcall IERC4626(_asset).asset()
 
     # calculate max asset amount
@@ -1012,14 +1011,14 @@ def _transferCollateral(
 
     usdValue: uint256 = _targetUsdValue * amountSent // maxAssetAmount
 
-    # For underscore earn vault assets, credit debt using actual transferred value.
-    # Intentionally uses convertToAssets (not convertToAssetsSafe) so users are
-    # credited for the real underlying value received by Endaoment.
-    # Safety assumption: underscore earn-vault registry only includes trusted,
-    # monotonically-accruing vaults where convertToAssets cannot be price-manipulated.
-    if amountSent != 0 and underlyingAsset != empty(address) and isUnderscoreEarnVault:
-        underlyingAmount: uint256 = staticcall IERC4626(_asset).convertToAssets(amountSent)
-        usdValue = staticcall PriceDesk(_a.priceDesk).getUsdValue(underlyingAsset, underlyingAmount, True)
+    # For underscore basic earn vault assets, cap max conversion at
+    # convertToAssetsSafe + configured spread so crediting remains bounded.
+    if isUnderscoreEarnVault and amountSent != 0 and underlyingAsset != empty(address):
+        na: uint256 = 0
+        cappedUnderlying: uint256 = 0
+        na, cappedUnderlying = self._getMaxAndCappedUnderlyingForShares(_asset, amountSent)
+        if cappedUnderlying != 0:
+            usdValue = staticcall PriceDesk(_a.priceDesk).getUsdValue(underlyingAsset, cappedUnderlying, True)
 
     return usdValue, amountSent, isPositionDepleted
 
@@ -1067,18 +1066,17 @@ def _isUnderscoreEarnVaultWithRegistry(_asset: address, _underscore: address) ->
 
 @view
 @internal
-def _assertUnderscoreSafeSpread(_asset: address):
-    # Sample one whole share unit (capped at 1e18 shares) to reduce dust-rounding noise.
-    sampleDecimals: uint256 = min(convert(staticcall IERC20Detailed(_asset).decimals(), uint256), 18)
-    sampleShares: uint256 = 10 ** sampleDecimals
-    maxUnderlying: uint256 = staticcall IERC4626(_asset).convertToAssets(sampleShares)
-    safeUnderlying: uint256 = staticcall UnderscoreVault(_asset).convertToAssetsSafe(sampleShares)
-
+def _getMaxAndCappedUnderlyingForShares(_asset: address, _shares: uint256) -> (uint256, uint256):
+    maxUnderlying: uint256 = staticcall IERC4626(_asset).convertToAssets(_shares)
     if maxUnderlying == 0:
-        return
+        return 0, 0
 
-    assert safeUnderlying != 0 # dev: unsafe underscore vault spread
-    assert maxUnderlying * HUNDRED_PERCENT <= safeUnderlying * (HUNDRED_PERCENT + MAX_UNDERSCORE_SAFE_SPREAD_BPS) # dev: unsafe underscore vault spread
+    safeUnderlying: uint256 = staticcall UnderscoreVault(_asset).convertToAssetsSafe(_shares)
+    if safeUnderlying == 0:
+        return 0, 0
+
+    maxAllowedUnderlying: uint256 = safeUnderlying * (HUNDRED_PERCENT + MAX_UNDERSCORE_SAFE_SPREAD_BPS) // HUNDRED_PERCENT
+    return maxUnderlying, min(maxUnderlying, maxAllowedUnderlying)
 
 
 # get asset amount
@@ -1101,10 +1099,23 @@ def _getMaxAssetAmount(
     elif _asset == _savingsGreen:
         amount = staticcall IERC4626(_savingsGreen).convertToShares(_targetUsdValue)
     elif _isUnderscoreEarnVault:
+
         if _underlyingAsset == empty(address):
             return 0
         underlyingAmount: uint256 = staticcall PriceDesk(_priceDesk).getAssetAmount(_underlyingAsset, _targetUsdValue, True)
-        amount = staticcall IERC4626(_asset).convertToShares(underlyingAmount)
+        adjustedUnderlyingAmount: uint256 = underlyingAmount
+
+        # Compare max vs capped value for one whole-share unit.
+        # Using a fixed share unit avoids noisy tiny-amount rounding.
+        sampleShareUnit: uint256 = 10 ** convert(staticcall IERC20Detailed(_asset).decimals(), uint256)
+        maxSampleUnderlying: uint256 = 0
+        cappedSampleUnderlying: uint256 = 0
+        maxSampleUnderlying, cappedSampleUnderlying = self._getMaxAndCappedUnderlyingForShares(_asset, sampleShareUnit)
+        if maxSampleUnderlying > cappedSampleUnderlying and cappedSampleUnderlying != 0:
+            # ceil(a / b) = (a + b - 1) // b
+            adjustedUnderlyingAmount = (underlyingAmount * maxSampleUnderlying + cappedSampleUnderlying - 1) // cappedSampleUnderlying
+
+        amount = staticcall IERC4626(_asset).convertToShares(adjustedUnderlyingAmount)
     else:
         amount = staticcall PriceDesk(_priceDesk).getAssetAmount(_asset, _targetUsdValue, True)
     return amount
