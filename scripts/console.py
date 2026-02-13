@@ -263,7 +263,12 @@ def create_console_banner(console: Console) -> str:
     default="",
     help="Address to impersonate as the default sender",
 )
-def main(chain, environment, blueprint, rpc, account):
+@click.option(
+    "--block",
+    default="0",
+    help="Block to fork from (default: 0)",
+)
+def main(chain, environment, blueprint, rpc, account, block):
     """
     Start an interactive IPython console with forked mainnet.
 
@@ -278,9 +283,15 @@ def main(chain, environment, blueprint, rpc, account):
 
     # Create console instance
     console = Console(chain, environment, blueprint, final_rpc)
+    kwargs = {
+        "allow_dirty": True,
+    }
+    if block != '0':
+        kwargs["block_identifier"] = int(block)
 
     # Start fork environment
-    with boa.fork(final_rpc, allow_dirty=True) as env:
+    with boa.fork(final_rpc, **kwargs) as env:
+
         # Set up impersonation if specified
         if account:
             env.eoa = account
