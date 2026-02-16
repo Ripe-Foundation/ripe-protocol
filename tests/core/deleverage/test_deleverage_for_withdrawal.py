@@ -2361,3 +2361,510 @@ def test_recursive_usdc_leverage_complete_cycle(
     assert len(events) == 1
     assert events[0].user == bob
     assert events[0].asset == charlie_token.address
+
+
+#########################################
+# minDeleverageBps Threshold Tests
+#########################################
+
+
+def test_min_deleverage_bps_default_zero(deleverage):
+    """Test that minDeleverageBps defaults to 0 (disabled)"""
+    assert deleverage.minDeleverageBps() == 0
+
+
+def test_set_min_deleverage_bps_from_switchboard(deleverage, switchboard_alpha):
+    """Test that a registered switchboard can set minDeleverageBps"""
+    deleverage.setMinDeleverageBps(5_00, sender=switchboard_alpha.address)
+
+    # Verify event emitted (check before view call to avoid clearing logs)
+    logs = filter_logs(deleverage, "MinDeleverageBpsSet")
+    assert len(logs) == 1
+    assert logs[0].bps == 5_00
+
+    assert deleverage.minDeleverageBps() == 5_00
+
+
+def test_set_min_deleverage_bps_rejects_non_switchboard(deleverage, bob):
+    """Test that non-switchboard addresses cannot set minDeleverageBps"""
+    with boa.reverts("only switchboard allowed"):
+        deleverage.setMinDeleverageBps(5_00, sender=bob)
+
+
+def test_set_min_deleverage_bps_rejects_over_hundred_percent(deleverage, switchboard_alpha):
+    """Test that minDeleverageBps cannot exceed HUNDRED_PERCENT"""
+    with boa.reverts("invalid bps"):
+        deleverage.setMinDeleverageBps(HUNDRED_PERCENT + 1, sender=switchboard_alpha.address)
+
+    # Exactly HUNDRED_PERCENT should be allowed
+    deleverage.setMinDeleverageBps(HUNDRED_PERCENT, sender=switchboard_alpha.address)
+    assert deleverage.minDeleverageBps() == HUNDRED_PERCENT
+
+
+def test_set_min_deleverage_bps_to_zero_disables(deleverage, switchboard_alpha):
+    """Test that setting minDeleverageBps to 0 disables the threshold"""
+    # Set a non-zero value first
+    deleverage.setMinDeleverageBps(5_00, sender=switchboard_alpha.address)
+    assert deleverage.minDeleverageBps() == 5_00
+
+    # Reset to 0
+    deleverage.setMinDeleverageBps(0, sender=switchboard_alpha.address)
+    assert deleverage.minDeleverageBps() == 0
+
+
+def test_small_withdrawal_skipped_when_below_min_threshold(
+    deleverage,
+    teller,
+    credit_engine,
+    simple_erc20_vault,
+    bob,
+    alpha_token,
+    alpha_token_whale,
+    charlie_token,
+    charlie_token_whale,
+    switchboard_alpha,
+    setupDeleverage,
+    performDeposit,
+    setup_priority_configs,
+):
+    """
+    Test that a small withdrawal is skipped when required repayment
+    is below the minDeleverageBps threshold.
+
+    Setup: $1000 alpha (70% LTV), $700 USDC (90% LTV), $700 debt
+    Withdraw $10 alpha:
+      lostCapacity = $10 * 70% = $7
+      requiredRepayment = ($700 * $7) / ($1330 - $630) = $7
+      As % of debt: $7 / $700 = 1%
+    With minDeleverageBps = 5_00 (5%), this is below threshold -> skip
+    """
+    # Setup position
+    setupDeleverage(
+        bob, alpha_token, alpha_token_whale,
+        deposit_amount=1000 * EIGHTEEN_DECIMALS,
+        borrow_amount=700 * EIGHTEEN_DECIMALS,
+    )
+    performDeposit(bob, 700 * SIX_DECIMALS, charlie_token, charlie_token_whale, simple_erc20_vault)
+    setup_priority_configs(
+        priority_stab_assets=[],
+        priority_liq_assets=[(simple_erc20_vault, charlie_token)],
+    )
+
+    # Set threshold to 5%
+    deleverage.setMinDeleverageBps(5_00, sender=switchboard_alpha.address)
+
+    # Pre-state
+    pre_debt = credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount
+
+    # Action: Withdraw $10 alpha (requires ~1% of debt repayment)
+    result = deleverage.deleverageForWithdrawal(
+        bob, 3, alpha_token, 10 * EIGHTEEN_DECIMALS, sender=teller.address
+    )
+
+    # Should return False (skipped, below threshold)
+    assert result == False
+
+    # Verify debt unchanged
+    post_debt = credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount
+    assert post_debt == pre_debt
+
+
+def test_large_withdrawal_proceeds_when_above_min_threshold(
+    deleverage,
+    teller,
+    credit_engine,
+    simple_erc20_vault,
+    endaoment_funds,
+    bob,
+    alpha_token,
+    alpha_token_whale,
+    charlie_token,
+    charlie_token_whale,
+    switchboard_alpha,
+    setupDeleverage,
+    performDeposit,
+    setup_priority_configs,
+    _test,
+):
+    """
+    Test that a large withdrawal proceeds when required repayment
+    exceeds the minDeleverageBps threshold.
+
+    Same setup as above, but withdraw $100 alpha:
+      requiredRepayment = ($700 * $70) / $700 = $70
+      As % of debt: $70 / $700 = 10%
+    With minDeleverageBps = 5_00 (5%), this is above threshold -> proceed
+    """
+    # Setup position
+    setupDeleverage(
+        bob, alpha_token, alpha_token_whale,
+        deposit_amount=1000 * EIGHTEEN_DECIMALS,
+        borrow_amount=700 * EIGHTEEN_DECIMALS,
+    )
+    performDeposit(bob, 700 * SIX_DECIMALS, charlie_token, charlie_token_whale, simple_erc20_vault)
+    setup_priority_configs(
+        priority_stab_assets=[],
+        priority_liq_assets=[(simple_erc20_vault, charlie_token)],
+    )
+
+    # Set threshold to 5%
+    deleverage.setMinDeleverageBps(5_00, sender=switchboard_alpha.address)
+
+    # Pre-state
+    pre_debt = credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount
+    pre_usdc = simple_erc20_vault.getTotalAmountForUser(bob, charlie_token)
+
+    # Action: Withdraw $100 alpha (requires ~10% of debt repayment)
+    result = deleverage.deleverageForWithdrawal(
+        bob, 3, alpha_token, 100 * EIGHTEEN_DECIMALS, sender=teller.address
+    )
+
+    # Should proceed (above threshold)
+    assert result == True
+
+    # Verify debt was reduced
+    post_debt = credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount
+    assert post_debt < pre_debt
+
+    # Verify USDC was transferred for deleverage
+    post_usdc = simple_erc20_vault.getTotalAmountForUser(bob, charlie_token)
+    assert post_usdc < pre_usdc
+
+    # Expected repayment ~$70 * 1.01 (1% buffer) = ~$70.70
+    expected_repay = 70_70 * EIGHTEEN_DECIMALS // 100
+    debt_reduced = pre_debt - post_debt
+    _test(expected_repay, debt_reduced, 100)
+
+
+def test_threshold_boundary_at_exact_minimum(
+    deleverage,
+    teller,
+    credit_engine,
+    simple_erc20_vault,
+    bob,
+    alpha_token,
+    alpha_token_whale,
+    charlie_token,
+    charlie_token_whale,
+    switchboard_alpha,
+    setupDeleverage,
+    performDeposit,
+    setup_priority_configs,
+):
+    """
+    Test boundary: when effective repayment is at or above the threshold,
+    the deleverage should proceed (the check is strictly less-than).
+
+    Setup: $1000 alpha (70% LTV), $700 USDC (90% LTV), $700 debt
+    Withdraw $100 alpha -> formula requiredRepayment = $70 (10% of debt).
+    After 1% buffer: $70.7 effective (~10.1% of debt).
+    Set minDeleverageBps = 10_00 (10%) -> 10.1% >= 10% -> NOT below threshold.
+    So it should NOT skip (proceeds with deleverage).
+    """
+    # Setup position
+    setupDeleverage(
+        bob, alpha_token, alpha_token_whale,
+        deposit_amount=1000 * EIGHTEEN_DECIMALS,
+        borrow_amount=700 * EIGHTEEN_DECIMALS,
+    )
+    performDeposit(bob, 700 * SIX_DECIMALS, charlie_token, charlie_token_whale, simple_erc20_vault)
+    setup_priority_configs(
+        priority_stab_assets=[],
+        priority_liq_assets=[(simple_erc20_vault, charlie_token)],
+    )
+
+    # Set threshold to exactly 10% (the exact ratio of the required repayment)
+    deleverage.setMinDeleverageBps(10_00, sender=switchboard_alpha.address)
+
+    # Pre-state
+    pre_debt = credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount
+
+    # Action: Withdraw $100 alpha (requires exactly ~10% of debt)
+    result = deleverage.deleverageForWithdrawal(
+        bob, 3, alpha_token, 100 * EIGHTEEN_DECIMALS, sender=teller.address
+    )
+
+    # Should proceed (strict less-than means at-boundary passes)
+    assert result == True
+    post_debt = credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount
+    assert post_debt < pre_debt
+
+
+def test_threshold_boundary_just_above_skips(
+    deleverage,
+    teller,
+    credit_engine,
+    simple_erc20_vault,
+    bob,
+    alpha_token,
+    alpha_token_whale,
+    charlie_token,
+    charlie_token_whale,
+    switchboard_alpha,
+    setupDeleverage,
+    performDeposit,
+    setup_priority_configs,
+):
+    """
+    Test boundary: when minDeleverageBps is just above the effective ratio, skip.
+
+    Same setup: $100 alpha withdrawal -> formula requiredRepayment = $70.
+    After 1% buffer: $70.7 effective repay (~10.1% of $700 debt).
+    Set minDeleverageBps = 10_11 (10.11%) -> check is 70.7*10000 < 700*1011
+    -> 707000 < 707700 -> True. So it should skip.
+    """
+    # Setup position
+    setupDeleverage(
+        bob, alpha_token, alpha_token_whale,
+        deposit_amount=1000 * EIGHTEEN_DECIMALS,
+        borrow_amount=700 * EIGHTEEN_DECIMALS,
+    )
+    performDeposit(bob, 700 * SIX_DECIMALS, charlie_token, charlie_token_whale, simple_erc20_vault)
+    setup_priority_configs(
+        priority_stab_assets=[],
+        priority_liq_assets=[(simple_erc20_vault, charlie_token)],
+    )
+
+    # Set threshold to 10.11% (just above effective ratio after 1% buffer)
+    deleverage.setMinDeleverageBps(10_11, sender=switchboard_alpha.address)
+
+    # Pre-state
+    pre_debt = credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount
+
+    # Action: Withdraw $100 alpha
+    result = deleverage.deleverageForWithdrawal(
+        bob, 3, alpha_token, 100 * EIGHTEEN_DECIMALS, sender=teller.address
+    )
+
+    # Should skip (just above threshold)
+    assert result == False
+    post_debt = credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount
+    assert post_debt == pre_debt
+
+
+def test_zero_threshold_does_not_skip_small_withdrawal(
+    deleverage,
+    teller,
+    credit_engine,
+    simple_erc20_vault,
+    bob,
+    alpha_token,
+    alpha_token_whale,
+    charlie_token,
+    charlie_token_whale,
+    setupDeleverage,
+    performDeposit,
+    setup_priority_configs,
+):
+    """
+    Test that with minDeleverageBps = 0 (default), even tiny withdrawals
+    still trigger deleverage (threshold is disabled).
+    """
+    # Setup position
+    setupDeleverage(
+        bob, alpha_token, alpha_token_whale,
+        deposit_amount=1000 * EIGHTEEN_DECIMALS,
+        borrow_amount=700 * EIGHTEEN_DECIMALS,
+    )
+    performDeposit(bob, 700 * SIX_DECIMALS, charlie_token, charlie_token_whale, simple_erc20_vault)
+    setup_priority_configs(
+        priority_stab_assets=[],
+        priority_liq_assets=[(simple_erc20_vault, charlie_token)],
+    )
+
+    # Confirm default is 0
+    assert deleverage.minDeleverageBps() == 0
+
+    # Pre-state
+    pre_debt = credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount
+
+    # Action: Withdraw $10 alpha (tiny, ~1% of debt)
+    result = deleverage.deleverageForWithdrawal(
+        bob, 3, alpha_token, 10 * EIGHTEEN_DECIMALS, sender=teller.address
+    )
+
+    # Should still proceed (threshold disabled)
+    assert result == True
+    post_debt = credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount
+    assert post_debt < pre_debt
+
+
+def test_small_withdrawal_bypasses_threshold_when_near_redemption(
+    deleverage,
+    teller,
+    credit_engine,
+    simple_erc20_vault,
+    bob,
+    alpha_token,
+    alpha_token_whale,
+    charlie_token,
+    charlie_token_whale,
+    mock_price_source,
+    switchboard_alpha,
+    setupDeleverage,
+    performDeposit,
+    setup_priority_configs,
+):
+    """
+    Test that the minDeleverageBps threshold is bypassed when the
+    position is near the redemption threshold.
+
+    Setup: $1000 alpha (70% LTV), $700 USDC (90% LTV), $700 debt
+    Then drop alpha price so position is near redemption.
+
+    bt.debtTerms.redemptionThreshold is a weighted average across assets.
+    At alpha=$0.01: alpha maxDebt=$7, charlie maxDebt=$630
+    weighted redemptionThreshold ≈ (7*8000 + 630*9200) / 637 ≈ 91.87%
+    _canDeleverageUserDebtPosition returns True when:
+      collateralVal <= debt * 10000 / 9187 ≈ $762
+
+    With alpha at $1: collateralVal = $1000 + $700 = $1700 (healthy)
+    Drop alpha to $0.01: collateralVal = $10 + $700 = $710 (below $762, near redemption)
+
+    Small withdrawal ($10 alpha) with high threshold (50%) should still deleverage
+    because the projected post-withdrawal position is near redemption.
+    """
+    # Setup position at $1
+    setupDeleverage(
+        bob, alpha_token, alpha_token_whale,
+        deposit_amount=1000 * EIGHTEEN_DECIMALS,
+        borrow_amount=700 * EIGHTEEN_DECIMALS,
+    )
+    performDeposit(bob, 700 * SIX_DECIMALS, charlie_token, charlie_token_whale, simple_erc20_vault)
+    setup_priority_configs(
+        priority_stab_assets=[],
+        priority_liq_assets=[(simple_erc20_vault, charlie_token)],
+    )
+
+    # Set a very high threshold that would normally skip small withdrawals
+    deleverage.setMinDeleverageBps(50_00, sender=switchboard_alpha.address)
+
+    # Drop alpha price to make position near redemption
+    # At $0.01: collateralVal=$710, weighted threshold≈$762 -> near redemption
+    mock_price_source.setPrice(alpha_token, EIGHTEEN_DECIMALS // 100)  # $0.01
+
+    # Pre-state
+    pre_debt = credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount
+
+    # Action: Small withdrawal that would normally be below threshold
+    result = deleverage.deleverageForWithdrawal(
+        bob, 3, alpha_token, 10 * EIGHTEEN_DECIMALS, sender=teller.address
+    )
+
+    # Should proceed despite being below threshold (position is near redemption)
+    assert result == True
+    post_debt = credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount
+    assert post_debt < pre_debt
+
+
+def test_small_withdrawal_skipped_when_healthy_but_below_threshold(
+    deleverage,
+    teller,
+    credit_engine,
+    simple_erc20_vault,
+    bob,
+    alpha_token,
+    alpha_token_whale,
+    charlie_token,
+    charlie_token_whale,
+    mock_price_source,
+    switchboard_alpha,
+    setupDeleverage,
+    performDeposit,
+    setup_priority_configs,
+):
+    """
+    Counterpart to the above test: same small withdrawal with same high threshold,
+    but position is healthy -> skip deleverage.
+
+    With alpha at $1: collateralVal = $1700, weighted redemption threshold ≈ $862
+    Position is well above threshold, so bypass does not trigger.
+    Small withdrawal ($10 alpha, ~1% of debt) with 50% threshold -> skip.
+    """
+    # Setup position at $1
+    setupDeleverage(
+        bob, alpha_token, alpha_token_whale,
+        deposit_amount=1000 * EIGHTEEN_DECIMALS,
+        borrow_amount=700 * EIGHTEEN_DECIMALS,
+    )
+    performDeposit(bob, 700 * SIX_DECIMALS, charlie_token, charlie_token_whale, simple_erc20_vault)
+    setup_priority_configs(
+        priority_stab_assets=[],
+        priority_liq_assets=[(simple_erc20_vault, charlie_token)],
+    )
+
+    # Set high threshold
+    deleverage.setMinDeleverageBps(50_00, sender=switchboard_alpha.address)
+
+    # Price stays at $1 (healthy)
+    pre_debt = credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount
+
+    # Action: Small withdrawal
+    result = deleverage.deleverageForWithdrawal(
+        bob, 3, alpha_token, 10 * EIGHTEEN_DECIMALS, sender=teller.address
+    )
+
+    # Should skip (healthy position + below threshold)
+    assert result == False
+    post_debt = credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount
+    assert post_debt == pre_debt
+
+
+def test_bypass_triggers_on_projected_post_withdrawal_health(
+    deleverage,
+    teller,
+    credit_engine,
+    simple_erc20_vault,
+    bob,
+    alpha_token,
+    alpha_token_whale,
+    charlie_token,
+    charlie_token_whale,
+    mock_price_source,
+    switchboard_alpha,
+    setupDeleverage,
+    performDeposit,
+    setup_priority_configs,
+):
+    """
+    Test that the threshold bypass uses projected post-withdrawal collateral,
+    not the current collateral value.
+
+    Setup: $1000 alpha (70% LTV), $100 USDC (90% LTV), $700 debt
+    collateralVal = $1100, weighted redemption threshold ≈ $862
+    Currently healthy ($1100 > $862)
+
+    Withdraw $900 alpha:
+    - Formula repay is large but capped at maxDeleveragable (~$100)
+    - Effective repay ~$100 / $700 = ~14% of debt, below 50% threshold
+    - Projected collateralVal = $1100 - $900 = $200 < $862 -> near redemption
+    - Bypass triggers: deleverage proceeds despite being below threshold
+    """
+    # Setup position with limited USDC (small deleveragable pool)
+    setupDeleverage(
+        bob, alpha_token, alpha_token_whale,
+        deposit_amount=1000 * EIGHTEEN_DECIMALS,
+        borrow_amount=700 * EIGHTEEN_DECIMALS,
+    )
+    performDeposit(bob, 100 * SIX_DECIMALS, charlie_token, charlie_token_whale, simple_erc20_vault)
+    setup_priority_configs(
+        priority_stab_assets=[],
+        priority_liq_assets=[(simple_erc20_vault, charlie_token)],
+    )
+
+    # Set high threshold that would normally skip
+    deleverage.setMinDeleverageBps(50_00, sender=switchboard_alpha.address)
+
+    # Pre-state: position is healthy (collateralVal $1100 > redemption $862)
+    pre_debt = credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount
+
+    # Action: Large withdrawal, effective repay capped by limited USDC
+    # Projected collateralVal = $1100 - $900 = $200 < $862 -> near redemption -> bypass
+    result = deleverage.deleverageForWithdrawal(
+        bob, 3, alpha_token, 900 * EIGHTEEN_DECIMALS, sender=teller.address
+    )
+
+    # Should proceed (projected post-withdrawal collateral is near redemption)
+    assert result == True
+    post_debt = credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount
+    assert post_debt < pre_debt

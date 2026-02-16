@@ -75,6 +75,7 @@ interface Ledger:
 
 interface Deleverage:
     def deleverageWithVolAssets(_user: address, _assets: DynArray[DeleverageAsset, MAX_DELEVERAGE_ASSETS]) -> uint256: nonpayable
+    def setMinDeleverageBps(_bps: uint256): nonpayable
 
 interface UnderscoreLedger:
     def isUserWallet(_addr: address) -> bool: view
@@ -107,6 +108,7 @@ flag ActionType:
     RIPE_AVAIL_BONDS
     OTHER_UNDERSCORE_REGISTRY
     OTHER_SHOULD_CHECK_LAST_TOUCH
+    DELEVERAGE_MIN_BPS
 
 struct DeleverageUserRequest:
     user: address
@@ -368,6 +370,14 @@ event UnderscoreRegistrySet:
 event ShouldCheckLastTouchSet:
     shouldCheck: bool
 
+event PendingMinDeleverageBpsChange:
+    bps: uint256
+    confirmationBlock: uint256
+    actionId: uint256
+
+event MinDeleverageBpsSet:
+    bps: uint256
+
 # pending config changes
 actionType: public(HashMap[uint256, ActionType]) # aid -> type
 pendingHrConfig: public(HashMap[uint256, cs.HrConfig]) # aid -> config
@@ -384,6 +394,7 @@ pendingUserBorrowReset: public(HashMap[uint256, DynArray[address, MAX_USERS]]) #
 pendingRipeAvailable: public(HashMap[uint256, uint256]) # aid -> amount
 pendingUnderscoreRegistry: public(HashMap[uint256, address])
 pendingShouldCheckLastTouch: public(HashMap[uint256, bool])
+pendingMinDeleverageBps: public(HashMap[uint256, uint256]) # aid -> bps
 pendingMissionControl: public(HashMap[uint256, address]) # aid -> target mission control
 
 TELLER_ID: constant(uint256) = 3
@@ -475,6 +486,12 @@ def _getLootboxAddr() -> address:
     return staticcall RipeHq(gov._getRipeHqFromGov()).getAddr(LOOTBOX_ID)
 
 
+@view
+@internal
+def _getDeleverageAddr() -> address:
+    return staticcall RipeHq(gov._getRipeHqFromGov()).getAddr(DELEVERAGE_ID)
+
+
 ##############
 # Deleverage #
 ##############
@@ -501,8 +518,27 @@ def deleverageWithSpecificAssets(_assets: DynArray[DeleverageAsset, MAX_DELEVERA
 @external
 def deleverageWithVolAssets(_user: address, _assets: DynArray[DeleverageAsset, MAX_DELEVERAGE_ASSETS]) -> uint256:
     assert gov._canGovern(msg.sender) # dev: no perms
-    deleverage: address = staticcall RipeHq(gov._getRipeHqFromGov()).getAddr(DELEVERAGE_ID)
-    return extcall Deleverage(deleverage).deleverageWithVolAssets(_user, _assets)
+    return extcall Deleverage(self._getDeleverageAddr()).deleverageWithVolAssets(_user, _assets)
+
+
+# set min deleverage bps
+
+
+@external
+def setMinDeleverageBps(_bps: uint256) -> uint256:
+    assert gov._canGovern(msg.sender) # dev: no perms
+    assert _bps <= HUNDRED_PERCENT # dev: invalid bps
+
+    aid: uint256 = timeLock._initiateAction()
+    self.actionType[aid] = ActionType.DELEVERAGE_MIN_BPS
+    self.pendingMinDeleverageBps[aid] = _bps
+    confirmationBlock: uint256 = timeLock._getActionConfirmationBlock(aid)
+    log PendingMinDeleverageBpsChange(
+        bps=_bps,
+        confirmationBlock=confirmationBlock,
+        actionId=aid,
+    )
+    return aid
 
 
 #############
@@ -1231,6 +1267,11 @@ def executePendingAction(_aid: uint256) -> bool:
         shouldCheck: bool = self.pendingShouldCheckLastTouch[_aid]
         extcall MissionControl(mc).setShouldCheckLastTouch(shouldCheck)
         log ShouldCheckLastTouchSet(shouldCheck=shouldCheck)
+
+    elif actionType == ActionType.DELEVERAGE_MIN_BPS:
+        bps: uint256 = self.pendingMinDeleverageBps[_aid]
+        extcall Deleverage(self._getDeleverageAddr()).setMinDeleverageBps(bps)
+        log MinDeleverageBpsSet(bps=bps)
 
     self.actionType[_aid] = empty(ActionType)
     return True

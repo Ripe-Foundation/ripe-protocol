@@ -2352,3 +2352,130 @@ def test_reset_many_user_borrow_points_validation(switchboard_delta, governance)
     # Empty list should fail
     with boa.reverts("no users"):
         switchboard_delta.resetManyUserBorrowPoints([], sender=governance.address)
+
+
+# =========================================
+# Min Deleverage BPS Tests
+# =========================================
+
+
+def test_set_min_deleverage_bps_permissions(switchboard_delta, governance, bob):
+    """Test that only governance can call setMinDeleverageBps"""
+    with boa.reverts("no perms"):
+        switchboard_delta.setMinDeleverageBps(5_00, sender=bob)
+
+    # Governance can call it
+    aid = switchboard_delta.setMinDeleverageBps(5_00, sender=governance.address)
+    assert aid > 0
+
+
+def test_set_min_deleverage_bps_validation(switchboard_delta, governance):
+    """Test that bps cannot exceed HUNDRED_PERCENT"""
+    with boa.reverts("invalid bps"):
+        switchboard_delta.setMinDeleverageBps(HUNDRED_PERCENT + 1, sender=governance.address)
+
+    # Exactly HUNDRED_PERCENT should be allowed
+    aid = switchboard_delta.setMinDeleverageBps(HUNDRED_PERCENT, sender=governance.address)
+    assert aid > 0
+
+    # Zero should be allowed (disables threshold)
+    aid = switchboard_delta.setMinDeleverageBps(0, sender=governance.address)
+    assert aid > 0
+
+
+def test_set_min_deleverage_bps_creates_timelock(switchboard_delta, governance):
+    """Test that setMinDeleverageBps creates a timelock action correctly"""
+    bps = 5_00  # 5%
+    aid = switchboard_delta.setMinDeleverageBps(bps, sender=governance.address)
+    assert aid > 0
+
+    # Check pending event was emitted
+    logs = filter_logs(switchboard_delta, "PendingMinDeleverageBpsChange")
+    assert len(logs) == 1
+    log = logs[0]
+    assert log.bps == bps
+    assert log.actionId == aid
+    assert log.confirmationBlock > 0
+
+    # Check action type was stored (DELEVERAGE_MIN_BPS = 2^21 = 2097152)
+    action_type = switchboard_delta.actionType(aid)
+    assert action_type == 2097152
+
+    # Check pending value was stored
+    pending_bps = switchboard_delta.pendingMinDeleverageBps(aid)
+    assert pending_bps == bps
+
+    # Verify action is pending
+    assert switchboard_delta.hasPendingAction(aid)
+
+
+def test_set_min_deleverage_bps_execute_before_timelock_fails(switchboard_delta, governance):
+    """Test that executing before timelock passes fails"""
+    aid = switchboard_delta.setMinDeleverageBps(5_00, sender=governance.address)
+
+    # Try to execute immediately (should fail)
+    success = switchboard_delta.executePendingAction(aid, sender=governance.address)
+    assert not success
+
+
+def test_set_min_deleverage_bps_success_and_execute(switchboard_delta, deleverage, governance):
+    """Test full workflow: create pending action -> wait -> execute -> verify"""
+    bps = 3_00  # 3%
+
+    # Verify initial state
+    assert deleverage.minDeleverageBps() == 0
+
+    # Step 1: Create pending action
+    aid = switchboard_delta.setMinDeleverageBps(bps, sender=governance.address)
+    assert aid > 0
+
+    # Check pending event
+    logs = filter_logs(switchboard_delta, "PendingMinDeleverageBpsChange")
+    assert len(logs) == 1
+    assert logs[0].bps == bps
+
+    # Step 2: Time travel past timelock
+    boa.env.time_travel(blocks=switchboard_delta.actionTimeLock())
+
+    # Step 3: Execute
+    success = switchboard_delta.executePendingAction(aid, sender=governance.address)
+    assert success
+
+    # Verify deleverage contract was updated
+    assert deleverage.minDeleverageBps() == bps
+
+    # Check execution event was emitted (filter by contract address,
+    # since Deleverage also emits MinDeleverageBpsSet in the same tx)
+    execution_logs = [e for e in filter_logs(switchboard_delta, "MinDeleverageBpsSet") if e.address == switchboard_delta.address]
+    assert len(execution_logs) == 1
+    assert execution_logs[0].bps == bps
+
+    # Verify action was cleaned up
+    assert switchboard_delta.actionType(aid) == 0
+    assert not switchboard_delta.hasPendingAction(aid)
+
+    # Step 4: Set back to 0 (disable)
+    aid2 = switchboard_delta.setMinDeleverageBps(0, sender=governance.address)
+    boa.env.time_travel(blocks=switchboard_delta.actionTimeLock())
+    assert switchboard_delta.executePendingAction(aid2, sender=governance.address)
+    assert deleverage.minDeleverageBps() == 0
+
+
+def test_set_min_deleverage_bps_cancel_pending(switchboard_delta, deleverage, governance):
+    """Test cancelling a pending minDeleverageBps action"""
+    bps = 5_00
+
+    # Create pending action
+    aid = switchboard_delta.setMinDeleverageBps(bps, sender=governance.address)
+    assert switchboard_delta.hasPendingAction(aid)
+
+    # Cancel the action
+    success = switchboard_delta.cancelPendingAction(aid, sender=governance.address)
+    assert success
+
+    # Verify action was cleared
+    assert switchboard_delta.actionType(aid) == 0
+    assert not switchboard_delta.hasPendingAction(aid)
+
+    # Verify deleverage was NOT updated
+    assert deleverage.minDeleverageBps() == 0

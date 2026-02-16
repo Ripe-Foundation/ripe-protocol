@@ -157,6 +157,12 @@ event DeleverageUserWithVolatileAssets:
     repaidAmount: uint256
     hasGoodDebtHealth: bool
 
+event MinDeleverageBpsSet:
+    bps: uint256
+
+# min deleverage threshold for withdrawal-triggered deleverages
+minDeleverageBps: public(uint256)
+
 # cache
 vaultAddrs: transient(HashMap[uint256, address]) # vaultId -> vaultAddr
 assetLiqConfig: transient(HashMap[address, AssetLiqConfig]) # asset -> config
@@ -520,6 +526,14 @@ def deleverageForWithdrawal(_user: address, _vaultId: uint256, _asset: address, 
 
     # final cap at total debt
     requiredRepayment = min(userDebt.amount, requiredRepayment)
+
+    # skip if effective repayment is below minimum threshold (% of total debt)
+    # unless position would be near redemption after withdrawal
+    minBps: uint256 = self.minDeleverageBps
+    if minBps != 0 and requiredRepayment * HUNDRED_PERCENT < userDebt.amount * minBps:
+        projectedCollateralVal: uint256 = bt.collateralVal - withdrawUsdValue if bt.collateralVal > withdrawUsdValue else 0
+        if not self._canDeleverageUserDebtPosition(userDebt.amount, projectedCollateralVal, bt.debtTerms.redemptionThreshold):
+            return False
 
     # execute deleveraging
     config: GenLiqConfig = staticcall MissionControl(a.missionControl).getGenLiqConfig()
@@ -1140,3 +1154,15 @@ def _getVaultAddr(_vaultId: uint256, _vaultBook: address) -> (address, bool):
     if vaultAddr != empty(address):
         return vaultAddr, True
     return staticcall Registry(_vaultBook).getAddr(_vaultId), False
+
+
+# set min deleverage threshold
+
+
+@external
+def setMinDeleverageBps(_bps: uint256):
+    assert addys._isSwitchboardAddr(msg.sender) # dev: only switchboard allowed
+    assert not deptBasics.isPaused # dev: contract paused
+    assert _bps <= HUNDRED_PERCENT # dev: invalid bps
+    self.minDeleverageBps = _bps
+    log MinDeleverageBpsSet(bps=_bps)
