@@ -2479,3 +2479,246 @@ def test_set_min_deleverage_bps_cancel_pending(switchboard_delta, deleverage, go
 
     # Verify deleverage was NOT updated
     assert deleverage.minDeleverageBps() == 0
+
+
+#########################################
+# Deleverage Buffer Tests
+#########################################
+
+
+def test_set_deleverage_buffer_permissions(switchboard_delta, governance, bob):
+    """Test that only governance can call setDeleverageBuffer"""
+    with boa.reverts("no perms"):
+        switchboard_delta.setDeleverageBuffer(1_00, sender=bob)
+
+    # Governance can call it
+    aid = switchboard_delta.setDeleverageBuffer(1_00, sender=governance.address)
+    assert aid > 0
+
+
+def test_set_deleverage_buffer_validation(switchboard_delta, governance):
+    """Test that bps cannot exceed HUNDRED_PERCENT"""
+    with boa.reverts("invalid bps"):
+        switchboard_delta.setDeleverageBuffer(HUNDRED_PERCENT + 1, sender=governance.address)
+
+    # Exactly HUNDRED_PERCENT should be allowed
+    aid = switchboard_delta.setDeleverageBuffer(HUNDRED_PERCENT, sender=governance.address)
+    assert aid > 0
+
+    # Zero should be allowed (disables buffer)
+    aid = switchboard_delta.setDeleverageBuffer(0, sender=governance.address)
+    assert aid > 0
+
+
+def test_set_deleverage_buffer_creates_timelock(switchboard_delta, governance):
+    """Test that setDeleverageBuffer creates a timelock action correctly"""
+    bps = 1_00  # 1%
+    aid = switchboard_delta.setDeleverageBuffer(bps, sender=governance.address)
+    assert aid > 0
+
+    # Check pending event was emitted
+    logs = filter_logs(switchboard_delta, "PendingDeleverageBufferChange")
+    assert len(logs) == 1
+    log = logs[0]
+    assert log.bps == bps
+    assert log.actionId == aid
+    assert log.confirmationBlock > 0
+
+    # Check pending value was stored
+    pending_bps = switchboard_delta.pendingDeleverageBuffer(aid)
+    assert pending_bps == bps
+
+    # Verify action is pending
+    assert switchboard_delta.hasPendingAction(aid)
+
+
+def test_set_deleverage_buffer_execute_before_timelock_fails(switchboard_delta, governance):
+    """Test that executing before timelock passes fails"""
+    aid = switchboard_delta.setDeleverageBuffer(1_00, sender=governance.address)
+
+    # Try to execute immediately (should fail)
+    success = switchboard_delta.executePendingAction(aid, sender=governance.address)
+    assert not success
+
+
+def test_set_deleverage_buffer_success_and_execute(switchboard_delta, deleverage, governance):
+    """Test full workflow: create pending action -> wait -> execute -> verify"""
+    bps = 1_00  # 1%
+
+    # Verify initial state
+    assert deleverage.deleverageBuffer() == 0
+
+    # Step 1: Create pending action
+    aid = switchboard_delta.setDeleverageBuffer(bps, sender=governance.address)
+    assert aid > 0
+
+    # Check pending event
+    logs = filter_logs(switchboard_delta, "PendingDeleverageBufferChange")
+    assert len(logs) == 1
+    assert logs[0].bps == bps
+
+    # Step 2: Time travel past timelock
+    boa.env.time_travel(blocks=switchboard_delta.actionTimeLock())
+
+    # Step 3: Execute
+    success = switchboard_delta.executePendingAction(aid, sender=governance.address)
+    assert success
+
+    # Verify deleverage contract was updated
+    assert deleverage.deleverageBuffer() == bps
+
+    # Check execution event was emitted (filter by contract address,
+    # since Deleverage also emits DeleverageBufferSet in the same tx)
+    execution_logs = [e for e in filter_logs(switchboard_delta, "DeleverageBufferSet") if e.address == switchboard_delta.address]
+    assert len(execution_logs) == 1
+    assert execution_logs[0].bps == bps
+
+    # Verify action was cleaned up
+    assert switchboard_delta.actionType(aid) == 0
+    assert not switchboard_delta.hasPendingAction(aid)
+
+    # Step 4: Set back to 0 (disable)
+    aid2 = switchboard_delta.setDeleverageBuffer(0, sender=governance.address)
+    boa.env.time_travel(blocks=switchboard_delta.actionTimeLock())
+    assert switchboard_delta.executePendingAction(aid2, sender=governance.address)
+    assert deleverage.deleverageBuffer() == 0
+
+
+def test_set_deleverage_buffer_cancel_pending(switchboard_delta, deleverage, governance):
+    """Test cancelling a pending deleverageBuffer action"""
+    bps = 1_00
+
+    # Create pending action
+    aid = switchboard_delta.setDeleverageBuffer(bps, sender=governance.address)
+    assert switchboard_delta.hasPendingAction(aid)
+
+    # Cancel the action
+    success = switchboard_delta.cancelPendingAction(aid, sender=governance.address)
+    assert success
+
+    # Verify action was cleared
+    assert switchboard_delta.actionType(aid) == 0
+    assert not switchboard_delta.hasPendingAction(aid)
+
+    # Verify deleverage was NOT updated
+    assert deleverage.deleverageBuffer() == 0
+
+
+#########################################
+# Deleverage Cooldown Tests
+#########################################
+
+
+def test_set_deleverage_cooldown_permissions(switchboard_delta, governance, bob):
+    """Test that only governance can call setDeleverageCooldown"""
+    with boa.reverts("no perms"):
+        switchboard_delta.setDeleverageCooldown(100, sender=bob)
+
+    # Governance can call it
+    aid = switchboard_delta.setDeleverageCooldown(100, sender=governance.address)
+    assert aid > 0
+
+
+def test_set_deleverage_cooldown_creates_timelock(switchboard_delta, governance):
+    """Test that setDeleverageCooldown creates a timelock action correctly"""
+    blocks = 50
+    aid = switchboard_delta.setDeleverageCooldown(blocks, sender=governance.address)
+    assert aid > 0
+
+    # Check pending event was emitted
+    logs = filter_logs(switchboard_delta, "PendingDeleverageCooldownChange")
+    assert len(logs) == 1
+    log = logs[0]
+    assert log.blocks == blocks
+    assert log.actionId == aid
+    assert log.confirmationBlock > 0
+
+    # Check pending value was stored
+    pending_blocks = switchboard_delta.pendingDeleverageCooldown(aid)
+    assert pending_blocks == blocks
+
+    # Verify action is pending
+    assert switchboard_delta.hasPendingAction(aid)
+
+
+def test_set_deleverage_cooldown_execute_before_timelock_fails(switchboard_delta, governance):
+    """Test that executing before timelock passes fails"""
+    aid = switchboard_delta.setDeleverageCooldown(50, sender=governance.address)
+
+    # Try to execute immediately (should fail)
+    success = switchboard_delta.executePendingAction(aid, sender=governance.address)
+    assert not success
+
+
+def test_set_deleverage_cooldown_success_and_execute(switchboard_delta, deleverage, governance):
+    """Test full workflow: create pending action -> wait -> execute -> verify"""
+    blocks = 50
+
+    # Verify initial state
+    assert deleverage.deleverageCooldown() == 0
+
+    # Step 1: Create pending action
+    aid = switchboard_delta.setDeleverageCooldown(blocks, sender=governance.address)
+    assert aid > 0
+
+    # Check pending event
+    logs = filter_logs(switchboard_delta, "PendingDeleverageCooldownChange")
+    assert len(logs) == 1
+    assert logs[0].blocks == blocks
+
+    # Step 2: Time travel past timelock
+    boa.env.time_travel(blocks=switchboard_delta.actionTimeLock())
+
+    # Step 3: Execute
+    success = switchboard_delta.executePendingAction(aid, sender=governance.address)
+    assert success
+
+    # Verify deleverage contract was updated
+    assert deleverage.deleverageCooldown() == blocks
+
+    # Check execution event was emitted (filter by contract address,
+    # since Deleverage also emits DeleverageCooldownSet in the same tx)
+    execution_logs = [e for e in filter_logs(switchboard_delta, "DeleverageCooldownSet") if e.address == switchboard_delta.address]
+    assert len(execution_logs) == 1
+    assert execution_logs[0].blocks == blocks
+
+    # Verify action was cleaned up
+    assert switchboard_delta.actionType(aid) == 0
+    assert not switchboard_delta.hasPendingAction(aid)
+
+    # Step 4: Set back to 0 (disable)
+    aid2 = switchboard_delta.setDeleverageCooldown(0, sender=governance.address)
+    boa.env.time_travel(blocks=switchboard_delta.actionTimeLock())
+    assert switchboard_delta.executePendingAction(aid2, sender=governance.address)
+    assert deleverage.deleverageCooldown() == 0
+
+
+def test_set_deleverage_cooldown_cancel_pending(switchboard_delta, deleverage, governance):
+    """Test cancelling a pending deleverageCooldown action"""
+    blocks = 50
+
+    # Create pending action
+    aid = switchboard_delta.setDeleverageCooldown(blocks, sender=governance.address)
+    assert switchboard_delta.hasPendingAction(aid)
+
+    # Cancel the action
+    success = switchboard_delta.cancelPendingAction(aid, sender=governance.address)
+    assert success
+
+    # Verify action was cleared
+    assert switchboard_delta.actionType(aid) == 0
+    assert not switchboard_delta.hasPendingAction(aid)
+
+    # Verify deleverage was NOT updated
+    assert deleverage.deleverageCooldown() == 0
+
+
+def test_set_deleverage_cooldown_rejects_over_max(switchboard_delta, governance):
+    """Test that setDeleverageCooldown rejects values over MAX_COOLDOWN_BLOCKS (7_200)"""
+    # Exactly at max should succeed
+    aid = switchboard_delta.setDeleverageCooldown(7_200, sender=governance.address)
+    assert aid > 0
+
+    # Over max should revert
+    with boa.reverts("cooldown too large"):
+        switchboard_delta.setDeleverageCooldown(7_201, sender=governance.address)

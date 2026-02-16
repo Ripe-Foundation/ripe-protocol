@@ -160,8 +160,18 @@ event DeleverageUserWithVolatileAssets:
 event MinDeleverageBpsSet:
     bps: uint256
 
-# min deleverage threshold for withdrawal-triggered deleverages
+event DeleverageBufferSet:
+    bps: uint256
+
+event DeleverageCooldownSet:
+    blocks: uint256
+
+# deleverage params
 minDeleverageBps: public(uint256)
+deleverageBuffer: public(uint256)
+deleverageCooldown: public(uint256)
+
+lastDeleverageBlock: public(HashMap[address, uint256]) # user -> block number
 
 # cache
 vaultAddrs: transient(HashMap[uint256, address]) # vaultId -> vaultAddr
@@ -178,6 +188,7 @@ MAX_STAB_VAULT_DATA: constant(uint256) = 10
 MAX_DELEVERAGE_USERS: constant(uint256) = 25
 MAX_DELEVERAGE_ASSETS: constant(uint256) = 25
 MAX_UNDERSCORE_SAFE_SPREAD_BPS: constant(uint256) = 100 # 1%
+MAX_COOLDOWN_BLOCKS: constant(uint256) = 7_200 # ~1 day at 12s/block
 
 
 @deploy
@@ -490,6 +501,14 @@ def deleverageForWithdrawal(_user: address, _vaultId: uint256, _asset: address, 
     if _amount < userBalance:
         withdrawUsdValue = userUsdValue * _amount // userBalance
 
+    # cooldown: skip if recently deleveraged, unless near redemption after withdrawal
+    cooldown: uint256 = self.deleverageCooldown
+    lastBlock: uint256 = self.lastDeleverageBlock[_user]
+    if cooldown != 0 and lastBlock != 0 and block.number > lastBlock and block.number < lastBlock + cooldown:
+        projectedCollateralVal: uint256 = bt.collateralVal - withdrawUsdValue if bt.collateralVal > withdrawUsdValue else 0
+        if not self._canDeleverageUserDebtPosition(userDebt.amount, projectedCollateralVal, bt.debtTerms.redemptionThreshold):
+            return False
+
     # asset debt terms
     assetDebtTerms: cs.DebtTerms = staticcall MissionControl(a.missionControl).getDebtTerms(_asset)
     if assetDebtTerms.ltv == 0:
@@ -510,16 +529,19 @@ def deleverageForWithdrawal(_user: address, _vaultId: uint256, _asset: address, 
     # calculate required repayment to maintain utilization ratio
     # Formula: requiredRepayment = (debt × lostCapacity) / (capacity - debt × effectiveLtv)
     numerator: uint256 = userDebt.amount * lostCapacity
-    denominator: uint256 = bt.totalMaxDebt - (userDebt.amount * effectiveLtv // HUNDRED_PERCENT)
-    if denominator == 0:
-        return False # edge case: capacity exactly equals debt × effectiveLtv
+    debtTimesEffectiveLtv: uint256 = userDebt.amount * effectiveLtv // HUNDRED_PERCENT
+    if bt.totalMaxDebt <= debtTimesEffectiveLtv:
+        return False
+    denominator: uint256 = bt.totalMaxDebt - debtTimesEffectiveLtv
 
     requiredRepayment: uint256 = numerator // denominator
     if requiredRepayment == 0:
         return False
 
-    # apply 1% buffer to be more conservative
-    requiredRepayment = requiredRepayment * (HUNDRED_PERCENT + ONE_PERCENT) // HUNDRED_PERCENT
+    # apply configurable buffer to be more conservative
+    bufferBps: uint256 = self.deleverageBuffer
+    if bufferBps != 0:
+        requiredRepayment = requiredRepayment * (HUNDRED_PERCENT + bufferBps) // HUNDRED_PERCENT
 
     # cap at max deleveragable amount
     requiredRepayment = min(maxDeleveragable, requiredRepayment)
@@ -540,6 +562,8 @@ def deleverageForWithdrawal(_user: address, _vaultId: uint256, _asset: address, 
     endaomentPsm: address = addys._getEndaomentPsmAddr()
     psmYieldPositionToken: address = staticcall EndaomentPSM(endaomentPsm).getUsdcYieldPositionVaultToken()
     repaidAmount: uint256 = self._deleverageUser(_user, msg.sender, True, requiredRepayment, config, addys._getEndaomentFundsAddr(), endaomentPsm, psmYieldPositionToken, a)
+    if repaidAmount != 0:
+        self.lastDeleverageBlock[_user] = block.number
     return repaidAmount != 0
 
 
@@ -1156,7 +1180,7 @@ def _getVaultAddr(_vaultId: uint256, _vaultBook: address) -> (address, bool):
     return staticcall Registry(_vaultBook).getAddr(_vaultId), False
 
 
-# set min deleverage threshold
+# deleverage params
 
 
 @external
@@ -1166,3 +1190,21 @@ def setMinDeleverageBps(_bps: uint256):
     assert _bps <= HUNDRED_PERCENT # dev: invalid bps
     self.minDeleverageBps = _bps
     log MinDeleverageBpsSet(bps=_bps)
+
+
+@external
+def setDeleverageBuffer(_bps: uint256):
+    assert addys._isSwitchboardAddr(msg.sender) # dev: only switchboard allowed
+    assert not deptBasics.isPaused # dev: contract paused
+    assert _bps <= HUNDRED_PERCENT # dev: invalid bps
+    self.deleverageBuffer = _bps
+    log DeleverageBufferSet(bps=_bps)
+
+
+@external
+def setDeleverageCooldown(_blocks: uint256):
+    assert addys._isSwitchboardAddr(msg.sender) # dev: only switchboard allowed
+    assert not deptBasics.isPaused # dev: contract paused
+    assert _blocks <= MAX_COOLDOWN_BLOCKS # dev: cooldown too large
+    self.deleverageCooldown = _blocks
+    log DeleverageCooldownSet(blocks=_blocks)
