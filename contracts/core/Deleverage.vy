@@ -502,6 +502,9 @@ def deleverageForWithdrawal(_user: address, _vaultId: uint256, _asset: address, 
         withdrawUsdValue = userUsdValue * _amount // userBalance
 
     # cooldown: skip if recently deleveraged, unless near redemption after withdrawal
+    # NOTE: uses strict `>` (not `>=`) so same-block calls are allowed -- this is intentional
+    # to support multi-asset withdrawals that trigger multiple deleverages in a single tx.
+    # tradeoff: same-block spam (e.g. bundled txs) also bypasses cooldown.
     cooldown: uint256 = self.deleverageCooldown
     lastBlock: uint256 = self.lastDeleverageBlock[_user]
     if cooldown != 0 and lastBlock != 0 and block.number > lastBlock and block.number < lastBlock + cooldown:

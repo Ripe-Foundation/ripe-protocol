@@ -3345,11 +3345,11 @@ def test_cooldown_zero_means_disabled(
 
 
 def test_set_deleverage_cooldown_rejects_over_max(deleverage, switchboard_alpha):
-    """Test that setDeleverageCooldown rejects values over MAX_COOLDOWN_BLOCKS (50_400)"""
+    """Test that setDeleverageCooldown rejects values over MAX_COOLDOWN_BLOCKS (7_200)"""
     # Exactly at max should succeed
-    deleverage.setDeleverageCooldown(50_400, sender=switchboard_alpha.address)
-    assert deleverage.deleverageCooldown() == 50_400
+    deleverage.setDeleverageCooldown(7_200, sender=switchboard_alpha.address)
+    assert deleverage.deleverageCooldown() == 7_200
 
     # Over max should revert
     with boa.reverts("cooldown too large"):
-        deleverage.setDeleverageCooldown(50_401, sender=switchboard_alpha.address)
+        deleverage.setDeleverageCooldown(7_201, sender=switchboard_alpha.address)
