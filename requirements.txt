@@ -18,7 +18,7 @@ bitarray==3.7.1
     # via eth-account
 cached-property==2.0.1
     # via py-evm
-cbor2==5.7.0
+cbor2==5.8.0
     # via vyper
 certifi==2025.8.3
     # via requests
