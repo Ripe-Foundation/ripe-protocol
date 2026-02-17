@@ -48,6 +48,10 @@ interface PriceDesk:
     def getAssetAmount(_asset: address, _usdValue: uint256, _shouldRaise: bool = False) -> uint256: view
     def getUsdValue(_asset: address, _amount: uint256, _shouldRaise: bool = False) -> uint256: view
 
+interface VaultRegistry:
+    def isBasicEarnVault(_vaultAddr: address) -> bool: view
+    def isEarnVault(_vaultAddr: address) -> bool: view
+
 interface Registry:
     def getAddr(_vaultId: uint256) -> address: view
     def isValidAddr(_addr: address) -> bool: view
@@ -55,15 +59,11 @@ interface Registry:
 interface AuctionHouse:
     def withdrawTokensFromVault(_user: address, _asset: address, _amount: uint256, _recipient: address, _vaultAddr: address, _a: addys.Addys) -> (uint256, bool): nonpayable
 
-interface EndaomentPSM:
-    def getUsdcYieldPositionVaultToken() -> address: view
-
-interface VaultRegistry:
-    def isEarnVault(_vaultAddr: address) -> bool: view
-    def isBasicEarnVault(_vaultAddr: address) -> bool: view
-
 interface UnderscoreVault:
     def convertToAssetsSafe(_shares: uint256) -> uint256: view
+
+interface EndaomentPSM:
+    def getUsdcYieldPositionVaultToken() -> address: view
 
 interface GreenToken:
     def burn(_amount: uint256) -> bool: nonpayable
@@ -501,6 +501,11 @@ def deleverageForWithdrawal(_user: address, _vaultId: uint256, _asset: address, 
     if _amount < userBalance:
         withdrawUsdValue = userUsdValue * _amount // userBalance
 
+    # projected collateral after withdrawal (lazy-cached for near-redemption bypass checks)
+    projectedCollateralVal: uint256 = bt.collateralVal - withdrawUsdValue if bt.collateralVal > withdrawUsdValue else 0
+    didCheckNearRedemption: bool = False
+    isNearRedemption: bool = False
+
     # cooldown: skip if recently deleveraged, unless near redemption after withdrawal
     # NOTE: uses strict `>` (not `>=`) so same-block calls are allowed -- this is intentional
     # to support multi-asset withdrawals that trigger multiple deleverages in a single tx.
@@ -508,8 +513,10 @@ def deleverageForWithdrawal(_user: address, _vaultId: uint256, _asset: address, 
     cooldown: uint256 = self.deleverageCooldown
     lastBlock: uint256 = self.lastDeleverageBlock[_user]
     if cooldown != 0 and lastBlock != 0 and block.number > lastBlock and block.number < lastBlock + cooldown:
-        projectedCollateralVal: uint256 = bt.collateralVal - withdrawUsdValue if bt.collateralVal > withdrawUsdValue else 0
-        if not self._canDeleverageUserDebtPosition(userDebt.amount, projectedCollateralVal, bt.debtTerms.redemptionThreshold):
+        if not didCheckNearRedemption:
+            isNearRedemption = self._canDeleverageUserDebtPosition(userDebt.amount, projectedCollateralVal, bt.debtTerms.redemptionThreshold)
+            didCheckNearRedemption = True
+        if not isNearRedemption:
             return False
 
     # asset debt terms
@@ -556,8 +563,10 @@ def deleverageForWithdrawal(_user: address, _vaultId: uint256, _asset: address, 
     # unless position would be near redemption after withdrawal
     minBps: uint256 = self.minDeleverageBps
     if minBps != 0 and requiredRepayment * HUNDRED_PERCENT < userDebt.amount * minBps:
-        projectedCollateralVal: uint256 = bt.collateralVal - withdrawUsdValue if bt.collateralVal > withdrawUsdValue else 0
-        if not self._canDeleverageUserDebtPosition(userDebt.amount, projectedCollateralVal, bt.debtTerms.redemptionThreshold):
+        if not didCheckNearRedemption:
+            isNearRedemption = self._canDeleverageUserDebtPosition(userDebt.amount, projectedCollateralVal, bt.debtTerms.redemptionThreshold)
+            didCheckNearRedemption = True
+        if not isNearRedemption:
             return False
 
     # execute deleveraging
