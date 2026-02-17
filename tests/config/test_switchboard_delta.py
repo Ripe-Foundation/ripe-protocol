@@ -2722,3 +2722,121 @@ def test_set_deleverage_cooldown_rejects_over_max(switchboard_delta, governance)
     # Over max should revert
     with boa.reverts("cooldown too large"):
         switchboard_delta.setDeleverageCooldown(7_201, sender=governance.address)
+
+
+###############################################
+# Underscore Safe Spread BPS (Deleverage)     #
+###############################################
+
+
+def test_set_underscore_safe_spread_bps_permissions(switchboard_delta, governance, bob):
+    """Test that only governance can call setUnderscoreSafeSpreadBps"""
+    with boa.reverts("no perms"):
+        switchboard_delta.setUnderscoreSafeSpreadBps(200, sender=bob)
+
+    # Governance can call it
+    aid = switchboard_delta.setUnderscoreSafeSpreadBps(200, sender=governance.address)
+    assert aid > 0
+
+
+def test_set_underscore_safe_spread_bps_rejects_over_max(switchboard_delta, governance):
+    """Test that setUnderscoreSafeSpreadBps rejects values over hard ceiling (500 = 5%)"""
+    # Exactly at max should succeed
+    aid = switchboard_delta.setUnderscoreSafeSpreadBps(500, sender=governance.address)
+    assert aid > 0
+
+    # Over max should revert
+    with boa.reverts("exceeds hard ceiling"):
+        switchboard_delta.setUnderscoreSafeSpreadBps(501, sender=governance.address)
+
+
+def test_set_underscore_safe_spread_bps_creates_timelock(switchboard_delta, governance):
+    """Test that setUnderscoreSafeSpreadBps creates a timelock action correctly"""
+    bps = 200
+    aid = switchboard_delta.setUnderscoreSafeSpreadBps(bps, sender=governance.address)
+    assert aid > 0
+
+    # Check pending event was emitted
+    logs = filter_logs(switchboard_delta, "PendingUnderscoreSafeSpreadBpsChange")
+    assert len(logs) == 1
+    log = logs[0]
+    assert log.bps == bps
+    assert log.actionId == aid
+    assert log.confirmationBlock > 0
+
+    # Check pending value was stored
+    assert switchboard_delta.pendingUnderscoreSafeSpreadBps(aid) == bps
+
+    # Verify action is pending
+    assert switchboard_delta.hasPendingAction(aid)
+
+
+def test_set_underscore_safe_spread_bps_execute_before_timelock_fails(switchboard_delta, governance):
+    """Test that executing before timelock passes fails"""
+    aid = switchboard_delta.setUnderscoreSafeSpreadBps(200, sender=governance.address)
+
+    # Try to execute immediately (should fail)
+    success = switchboard_delta.executePendingAction(aid, sender=governance.address)
+    assert not success
+
+
+def test_set_underscore_safe_spread_bps_success_and_execute(switchboard_delta, deleverage, governance):
+    """Test full workflow: create pending action -> wait -> execute -> verify"""
+    bps = 250
+
+    # Verify initial state (default = 100 bps = 1%)
+    assert deleverage.underscoreSafeSpreadBps() == 100
+
+    # Step 1: Create pending action
+    aid = switchboard_delta.setUnderscoreSafeSpreadBps(bps, sender=governance.address)
+    assert aid > 0
+
+    # Check pending event
+    logs = filter_logs(switchboard_delta, "PendingUnderscoreSafeSpreadBpsChange")
+    assert len(logs) == 1
+    assert logs[0].bps == bps
+
+    # Step 2: Time travel past timelock
+    boa.env.time_travel(blocks=switchboard_delta.actionTimeLock())
+
+    # Step 3: Execute
+    success = switchboard_delta.executePendingAction(aid, sender=governance.address)
+    assert success
+
+    # Verify deleverage contract was updated
+    assert deleverage.underscoreSafeSpreadBps() == bps
+
+    # Check execution event was emitted
+    execution_logs = [e for e in filter_logs(switchboard_delta, "UnderscoreSafeSpreadBpsSet") if e.address == switchboard_delta.address]
+    assert len(execution_logs) == 1
+    assert execution_logs[0].bps == bps
+
+    # Verify action was cleaned up
+    assert switchboard_delta.actionType(aid) == 0
+    assert not switchboard_delta.hasPendingAction(aid)
+
+    # Step 4: Set back to default
+    aid2 = switchboard_delta.setUnderscoreSafeSpreadBps(100, sender=governance.address)
+    boa.env.time_travel(blocks=switchboard_delta.actionTimeLock())
+    assert switchboard_delta.executePendingAction(aid2, sender=governance.address)
+    assert deleverage.underscoreSafeSpreadBps() == 100
+
+
+def test_set_underscore_safe_spread_bps_cancel_pending(switchboard_delta, deleverage, governance):
+    """Test cancelling a pending underscoreSafeSpreadBps action"""
+    bps = 300
+
+    # Create pending action
+    aid = switchboard_delta.setUnderscoreSafeSpreadBps(bps, sender=governance.address)
+    assert switchboard_delta.hasPendingAction(aid)
+
+    # Cancel the action
+    success = switchboard_delta.cancelPendingAction(aid, sender=governance.address)
+    assert success
+
+    # Verify action was cleared
+    assert switchboard_delta.actionType(aid) == 0
+    assert not switchboard_delta.hasPendingAction(aid)
+
+    # Verify deleverage was NOT updated (still default)
+    assert deleverage.underscoreSafeSpreadBps() == 100

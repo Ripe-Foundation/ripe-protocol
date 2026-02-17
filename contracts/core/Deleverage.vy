@@ -166,10 +166,14 @@ event DeleverageBufferSet:
 event DeleverageCooldownSet:
     blocks: uint256
 
+event UnderscoreSafeSpreadBpsSet:
+    bps: uint256
+
 # deleverage params
 minDeleverageBps: public(uint256)
 deleverageBuffer: public(uint256)
 deleverageCooldown: public(uint256)
+underscoreSafeSpreadBps: public(uint256)
 
 lastDeleverageBlock: public(HashMap[address, uint256]) # user -> block number
 
@@ -187,7 +191,7 @@ PRIORITY_LIQ_VAULT_DATA: constant(uint256) = 20
 MAX_STAB_VAULT_DATA: constant(uint256) = 10
 MAX_DELEVERAGE_USERS: constant(uint256) = 25
 MAX_DELEVERAGE_ASSETS: constant(uint256) = 25
-MAX_UNDERSCORE_SAFE_SPREAD_BPS: constant(uint256) = 100 # 1%
+MAX_UNDERSCORE_SAFE_SPREAD_BPS: constant(uint256) = 500 # 5% hard ceiling
 MAX_COOLDOWN_BLOCKS: constant(uint256) = 7_200 # ~1 day at 12s/block
 
 
@@ -195,6 +199,7 @@ MAX_COOLDOWN_BLOCKS: constant(uint256) = 7_200 # ~1 day at 12s/block
 def __init__(_ripeHq: address):
     addys.__init__(_ripeHq)
     deptBasics.__init__(False, False, False) # no special permissions needed
+    self.underscoreSafeSpreadBps = 100 # 1%
 
 
 ###################
@@ -1125,7 +1130,7 @@ def _getMaxAndCappedUnderlyingForShares(_asset: address, _shares: uint256) -> (u
     if safeUnderlying == 0:
         return 0, 0
 
-    maxAllowedUnderlying: uint256 = safeUnderlying * (HUNDRED_PERCENT + MAX_UNDERSCORE_SAFE_SPREAD_BPS) // HUNDRED_PERCENT
+    maxAllowedUnderlying: uint256 = safeUnderlying * (HUNDRED_PERCENT + self.underscoreSafeSpreadBps) // HUNDRED_PERCENT
     return maxUnderlying, min(maxUnderlying, maxAllowedUnderlying)
 
 
@@ -1220,3 +1225,12 @@ def setDeleverageCooldown(_blocks: uint256):
     assert _blocks <= MAX_COOLDOWN_BLOCKS # dev: cooldown too large
     self.deleverageCooldown = _blocks
     log DeleverageCooldownSet(blocks=_blocks)
+
+
+@external
+def setUnderscoreSafeSpreadBps(_bps: uint256):
+    assert addys._isSwitchboardAddr(msg.sender) # dev: only switchboard allowed
+    assert not deptBasics.isPaused # dev: contract paused
+    assert _bps <= MAX_UNDERSCORE_SAFE_SPREAD_BPS # dev: exceeds hard ceiling
+    self.underscoreSafeSpreadBps = _bps
+    log UnderscoreSafeSpreadBpsSet(bps=_bps)

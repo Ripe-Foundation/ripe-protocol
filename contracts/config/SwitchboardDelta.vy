@@ -51,18 +51,19 @@ interface HrContributor:
     def cancelRipeTransfer(): nonpayable
     def cancelPaycheck(): nonpayable
 
+interface Deleverage:
+    def deleverageWithVolAssets(_user: address, _assets: DynArray[DeleverageAsset, MAX_DELEVERAGE_ASSETS]) -> uint256: nonpayable
+    def setUnderscoreSafeSpreadBps(_bps: uint256): nonpayable
+    def setDeleverageCooldown(_blocks: uint256): nonpayable
+    def setMinDeleverageBps(_bps: uint256): nonpayable
+    def setDeleverageBuffer(_bps: uint256): nonpayable
+
 interface Ledger:
     def isHrContributor(_contributor: address) -> bool: view
     def setRipeAvailForRewards(_amount: uint256): nonpayable
     def setRipeAvailForBonds(_amount: uint256): nonpayable
     def setRipeAvailForHr(_amount: uint256): nonpayable
     def setBadDebt(_amount: uint256): nonpayable
-
-interface Deleverage:
-    def deleverageWithVolAssets(_user: address, _assets: DynArray[DeleverageAsset, MAX_DELEVERAGE_ASSETS]) -> uint256: nonpayable
-    def setDeleverageCooldown(_blocks: uint256): nonpayable
-    def setMinDeleverageBps(_bps: uint256): nonpayable
-    def setDeleverageBuffer(_bps: uint256): nonpayable
 
 interface Teller:
     def deleverageWithSpecificAssets(_assets: DynArray[DeleverageAsset, MAX_DELEVERAGE_ASSETS], _user: address = msg.sender) -> uint256: nonpayable
@@ -113,6 +114,7 @@ flag ActionType:
     DELEVERAGE_MIN_BPS
     DELEVERAGE_BUFFER
     DELEVERAGE_COOLDOWN
+    DELEVERAGE_UNDERSCORE_SAFE_SPREAD
 
 struct DeleverageUserRequest:
     user: address
@@ -398,6 +400,14 @@ event PendingDeleverageCooldownChange:
 event DeleverageCooldownSet:
     blocks: uint256
 
+event PendingUnderscoreSafeSpreadBpsChange:
+    bps: uint256
+    confirmationBlock: uint256
+    actionId: uint256
+
+event UnderscoreSafeSpreadBpsSet:
+    bps: uint256
+
 # pending config changes
 actionType: public(HashMap[uint256, ActionType]) # aid -> type
 pendingHrConfig: public(HashMap[uint256, cs.HrConfig]) # aid -> config
@@ -417,6 +427,7 @@ pendingShouldCheckLastTouch: public(HashMap[uint256, bool])
 pendingMinDeleverageBps: public(HashMap[uint256, uint256]) # aid -> bps
 pendingDeleverageBuffer: public(HashMap[uint256, uint256]) # aid -> bps
 pendingDeleverageCooldown: public(HashMap[uint256, uint256]) # aid -> blocks
+pendingUnderscoreSafeSpreadBps: public(HashMap[uint256, uint256]) # aid -> bps
 pendingMissionControl: public(HashMap[uint256, address]) # aid -> target mission control
 
 TELLER_ID: constant(uint256) = 3
@@ -434,6 +445,7 @@ MAX_ASSETS: constant(uint256) = 20
 MAX_DELEVERAGE_USERS: constant(uint256) = 25
 MAX_DELEVERAGE_ASSETS: constant(uint256) = 25
 MAX_COOLDOWN_BLOCKS: constant(uint256) = 7_200 # ~1 day at 12s/block
+MAX_UNDERSCORE_SAFE_SPREAD_BPS: constant(uint256) = 500 # 5% hard ceiling
 
 # timestamp units (not blocks!)
 DAY_IN_SECONDS: constant(uint256) = 60 * 60 * 24
@@ -598,6 +610,26 @@ def setDeleverageCooldown(_blocks: uint256) -> uint256:
     confirmationBlock: uint256 = timeLock._getActionConfirmationBlock(aid)
     log PendingDeleverageCooldownChange(
         blocks=_blocks,
+        confirmationBlock=confirmationBlock,
+        actionId=aid,
+    )
+    return aid
+
+
+# set underscore safe spread bps
+
+
+@external
+def setUnderscoreSafeSpreadBps(_bps: uint256) -> uint256:
+    assert gov._canGovern(msg.sender) # dev: no perms
+    assert _bps <= MAX_UNDERSCORE_SAFE_SPREAD_BPS # dev: exceeds hard ceiling
+
+    aid: uint256 = timeLock._initiateAction()
+    self.actionType[aid] = ActionType.DELEVERAGE_UNDERSCORE_SAFE_SPREAD
+    self.pendingUnderscoreSafeSpreadBps[aid] = _bps
+    confirmationBlock: uint256 = timeLock._getActionConfirmationBlock(aid)
+    log PendingUnderscoreSafeSpreadBpsChange(
+        bps=_bps,
         confirmationBlock=confirmationBlock,
         actionId=aid,
     )
@@ -1345,6 +1377,11 @@ def executePendingAction(_aid: uint256) -> bool:
         blocks: uint256 = self.pendingDeleverageCooldown[_aid]
         extcall Deleverage(self._getDeleverageAddr()).setDeleverageCooldown(blocks)
         log DeleverageCooldownSet(blocks=blocks)
+
+    elif actionType == ActionType.DELEVERAGE_UNDERSCORE_SAFE_SPREAD:
+        bps: uint256 = self.pendingUnderscoreSafeSpreadBps[_aid]
+        extcall Deleverage(self._getDeleverageAddr()).setUnderscoreSafeSpreadBps(bps)
+        log UnderscoreSafeSpreadBpsSet(bps=bps)
 
     self.actionType[_aid] = empty(ActionType)
     return True
