@@ -1,4 +1,5 @@
 import pytest
+import boa
 from constants import EIGHTEEN_DECIMALS
 from conf_utils import filter_logs
 
@@ -1637,3 +1638,745 @@ def test_phase2_tiny_debt_amount(
     _test(pre_debt, 1)  # Debt was 1 wei
     _test(post_debt, 0)  # Debt now 0
     _test(repaid_amount, 1)  # Repaid 1 wei
+
+
+def test_phase2_underscore_earn_vault_uses_underlying_share_conversion(
+    ripe_hq,  # Ensures switchboard is registered
+    switchboard,  # Ensures switchboard_alpha is registered
+    teller,
+    simple_erc20_vault,
+    bob,
+    alpha_token,
+    alpha_token_whale,
+    alpha_token_vault,
+    performDeposit,
+    setupDeleverage,
+    setup_priority_configs,
+    setAssetConfig,
+    createDebtTerms,
+    mock_price_source,
+    price_desk,
+    undy_vault_prices,
+    governance,
+    mission_control,
+    mock_undy_v2,
+    switchboard_alpha,
+    _test,
+):
+    """
+    Regression: underscore earn-vault deleverage should size shares from underlying
+    and account usdValue from actual underlying transferred.
+    """
+    mission_control.setUnderscoreRegistry(mock_undy_v2.address, sender=switchboard_alpha.address)
+    mock_undy_v2.setAllAddressesAreVaults(False)
+    mock_undy_v2.setEarnVault(alpha_token_vault.address, True)
+    mock_undy_v2.setBasicEarnVault(alpha_token_vault.address, True)
+
+    mock_price_source.setPrice(alpha_token, 1 * EIGHTEEN_DECIMALS)
+
+    # Register Undy feed for the vault token and snapshot at 1:1 pps.
+    assert undy_vault_prices.isValidNewFeed(alpha_token_vault, 0, 5, 0, 3600)
+    undy_vault_prices.addNewPriceFeed(alpha_token_vault, 0, 5, 0, 3600, sender=governance.address)
+    boa.env.time_travel(blocks=undy_vault_prices.actionTimeLock() + 1)
+    undy_vault_prices.confirmNewPriceFeed(alpha_token_vault, sender=governance.address)
+
+    # Ensure this vault token is deleveragable in phase 2.
+    debt_terms = createDebtTerms(
+        _ltv=80_00,
+        _redemptionThreshold=85_00,
+        _liqThreshold=90_00,
+        _liqFee=5_00,
+        _borrowRate=0,
+    )
+    setAssetConfig(
+        alpha_token_vault,
+        _vaultIds=[3],
+        _debtTerms=debt_terms,
+        _shouldBurnAsPayment=False,
+        _shouldTransferToEndaoment=True,
+    )
+
+    # Create debt position.
+    setupDeleverage(
+        bob,
+        alpha_token,
+        alpha_token_whale,
+        deposit_amount=1_000 * EIGHTEEN_DECIMALS,
+        borrow_amount=20 * EIGHTEEN_DECIMALS,
+        get_sgreen=False,
+    )
+
+    # Give Bob vault shares and deposit those shares as collateral in simple_erc20_vault.
+    alpha_token.transfer(bob, 100 * EIGHTEEN_DECIMALS, sender=alpha_token_whale)
+    alpha_token.approve(alpha_token_vault, 100 * EIGHTEEN_DECIMALS, sender=bob)
+    alpha_token_vault.deposit(100 * EIGHTEEN_DECIMALS, bob, sender=bob)
+    performDeposit(bob, 100 * EIGHTEEN_DECIMALS, alpha_token_vault, bob, simple_erc20_vault)
+
+    # Simulate yield accrual so true pps is 2.0, but snapshot price remains 1.0.
+    alpha_token.transfer(alpha_token_vault, 100 * EIGHTEEN_DECIMALS, sender=alpha_token_whale)
+    assert alpha_token_vault.convertToAssets(EIGHTEEN_DECIMALS) == 2 * EIGHTEEN_DECIMALS
+    assert price_desk.getPrice(alpha_token_vault) == 1 * EIGHTEEN_DECIMALS
+
+    setup_priority_configs(
+        priority_stab_assets=[],
+        priority_liq_assets=[(simple_erc20_vault, alpha_token_vault)],
+    )
+
+    target_repay = 10 * EIGHTEEN_DECIMALS
+    repaid_amount = teller.deleverageUser(bob, target_repay, sender=switchboard_alpha.address)
+
+    transfer_logs = filter_logs(teller, "EndaomentTransferDuringDeleverage")
+    vault_transfer_log = next(e for e in transfer_logs if e.asset == alpha_token_vault.address)
+
+    expected_underlying = price_desk.getAssetAmount(alpha_token, target_repay, True)
+    expected_shares = alpha_token_vault.convertToShares(expected_underlying)
+    assert vault_transfer_log.amountSent == expected_shares
+
+    underlying_sent = alpha_token_vault.convertToAssets(vault_transfer_log.amountSent)
+    expected_usd_value = price_desk.getUsdValue(alpha_token, underlying_sent, True)
+    assert vault_transfer_log.usdValue == expected_usd_value
+
+    stale_token_usd_value = price_desk.getUsdValue(alpha_token_vault, vault_transfer_log.amountSent, True)
+    assert stale_token_usd_value < vault_transfer_log.usdValue
+    _test(repaid_amount, target_repay)
+
+    # Restore default mock behavior for other tests.
+    mock_undy_v2.setAllAddressesAreVaults(True)
+
+
+def test_phase2_non_basic_underscore_vault_uses_standard_pricedesk_amount(
+    ripe_hq,  # Ensures switchboard is registered
+    switchboard,  # Ensures switchboard_alpha is registered
+    teller,
+    simple_erc20_vault,
+    bob,
+    alpha_token,
+    alpha_token_whale,
+    alpha_token_vault,
+    performDeposit,
+    setupDeleverage,
+    setup_priority_configs,
+    setAssetConfig,
+    createDebtTerms,
+    mock_price_source,
+    price_desk,
+    undy_vault_prices,
+    governance,
+    mission_control,
+    mock_undy_v2,
+    switchboard_alpha,
+):
+    """
+    Regression: underscore fast-path should only apply to basic earn vaults.
+    Non-basic underscore earn vaults use standard PriceDesk token pricing.
+    """
+    mission_control.setUnderscoreRegistry(mock_undy_v2.address, sender=switchboard_alpha.address)
+    mock_undy_v2.setAllAddressesAreVaults(False)
+    mock_undy_v2.setEarnVault(alpha_token_vault.address, True)
+    mock_undy_v2.setBasicEarnVault(alpha_token_vault.address, False)
+
+    mock_price_source.setPrice(alpha_token, 1 * EIGHTEEN_DECIMALS)
+
+    assert undy_vault_prices.isValidNewFeed(alpha_token_vault, 0, 5, 0, 3600)
+    undy_vault_prices.addNewPriceFeed(alpha_token_vault, 0, 5, 0, 3600, sender=governance.address)
+    boa.env.time_travel(blocks=undy_vault_prices.actionTimeLock() + 1)
+    undy_vault_prices.confirmNewPriceFeed(alpha_token_vault, sender=governance.address)
+
+    debt_terms = createDebtTerms(
+        _ltv=80_00,
+        _redemptionThreshold=85_00,
+        _liqThreshold=90_00,
+        _liqFee=5_00,
+        _borrowRate=0,
+    )
+    setAssetConfig(
+        alpha_token_vault,
+        _vaultIds=[3],
+        _debtTerms=debt_terms,
+        _shouldBurnAsPayment=False,
+        _shouldTransferToEndaoment=True,
+    )
+
+    setupDeleverage(
+        bob,
+        alpha_token,
+        alpha_token_whale,
+        deposit_amount=1_000 * EIGHTEEN_DECIMALS,
+        borrow_amount=20 * EIGHTEEN_DECIMALS,
+        get_sgreen=False,
+    )
+
+    alpha_token.transfer(bob, 100 * EIGHTEEN_DECIMALS, sender=alpha_token_whale)
+    alpha_token.approve(alpha_token_vault, 100 * EIGHTEEN_DECIMALS, sender=bob)
+    alpha_token_vault.deposit(100 * EIGHTEEN_DECIMALS, bob, sender=bob)
+    performDeposit(bob, 100 * EIGHTEEN_DECIMALS, alpha_token_vault, bob, simple_erc20_vault)
+
+    # True PPS rises to 2.0 while token-level feed remains stale at 1.0.
+    alpha_token.transfer(alpha_token_vault, 100 * EIGHTEEN_DECIMALS, sender=alpha_token_whale)
+    assert alpha_token_vault.convertToAssets(EIGHTEEN_DECIMALS) == 2 * EIGHTEEN_DECIMALS
+    assert price_desk.getPrice(alpha_token_vault) == 1 * EIGHTEEN_DECIMALS
+
+    setup_priority_configs(
+        priority_stab_assets=[],
+        priority_liq_assets=[(simple_erc20_vault, alpha_token_vault)],
+    )
+
+    target_repay = 10 * EIGHTEEN_DECIMALS
+    teller.deleverageUser(bob, target_repay, sender=switchboard_alpha.address)
+
+    transfer_logs = filter_logs(teller, "EndaomentTransferDuringDeleverage")
+    vault_transfer_log = next(e for e in transfer_logs if e.asset == alpha_token_vault.address)
+
+    stale_token_shares = price_desk.getAssetAmount(alpha_token_vault, target_repay, True)
+    underlying_amount = price_desk.getAssetAmount(alpha_token, target_repay, True)
+    underlying_based_shares = alpha_token_vault.convertToShares(underlying_amount)
+
+    assert vault_transfer_log.amountSent == stale_token_shares
+    assert stale_token_shares > underlying_based_shares
+
+    mock_undy_v2.setBasicEarnVault(alpha_token_vault.address, True)
+    mock_undy_v2.setAllAddressesAreVaults(True)
+
+
+def test_phase2_underscore_earn_vault_credit_uses_convertToAssets_when_spread_is_within_bound(
+    ripe_hq,  # Ensures switchboard is registered
+    switchboard,  # Ensures switchboard_alpha is registered
+    teller,
+    simple_erc20_vault,
+    bob,
+    alpha_token,
+    alpha_token_whale,
+    alpha_token_vault_with_safe_gap,
+    performDeposit,
+    setupDeleverage,
+    setup_priority_configs,
+    setAssetConfig,
+    createDebtTerms,
+    mock_price_source,
+    price_desk,
+    mission_control,
+    mock_undy_v2,
+    switchboard_alpha,
+):
+    """
+    Regression: underscore earn-vault debt credit intentionally uses convertToAssets
+    (max) rather than convertToAssetsSafe when safe/max spread is within guard bound.
+    """
+    mission_control.setUnderscoreRegistry(mock_undy_v2.address, sender=switchboard_alpha.address)
+    mock_undy_v2.setAllAddressesAreVaults(False)
+    mock_undy_v2.setEarnVault(alpha_token_vault_with_safe_gap.address, True)
+    mock_undy_v2.setBasicEarnVault(alpha_token_vault_with_safe_gap.address, True)
+
+    # Keep safe/max spread below Deleverage MAX_UNDERSCORE_SAFE_SPREAD_BPS (100 bps).
+    alpha_token_vault_with_safe_gap.setSafeDiscountBps(25)
+
+    mock_price_source.setPrice(alpha_token, 1 * EIGHTEEN_DECIMALS)
+
+    debt_terms = createDebtTerms(
+        _ltv=80_00,
+        _redemptionThreshold=85_00,
+        _liqThreshold=90_00,
+        _liqFee=5_00,
+        _borrowRate=0,
+    )
+    setAssetConfig(
+        alpha_token_vault_with_safe_gap,
+        _vaultIds=[3],
+        _debtTerms=debt_terms,
+        _shouldBurnAsPayment=False,
+        _shouldTransferToEndaoment=True,
+    )
+
+    setupDeleverage(
+        bob,
+        alpha_token,
+        alpha_token_whale,
+        deposit_amount=1_000 * EIGHTEEN_DECIMALS,
+        borrow_amount=20 * EIGHTEEN_DECIMALS,
+        get_sgreen=False,
+    )
+
+    alpha_token.transfer(bob, 100 * EIGHTEEN_DECIMALS, sender=alpha_token_whale)
+    alpha_token.approve(alpha_token_vault_with_safe_gap, 100 * EIGHTEEN_DECIMALS, sender=bob)
+    alpha_token_vault_with_safe_gap.deposit(100 * EIGHTEEN_DECIMALS, bob, sender=bob)
+    performDeposit(bob, 100 * EIGHTEEN_DECIMALS, alpha_token_vault_with_safe_gap, bob, simple_erc20_vault)
+
+    # Increase PPS so the safe discount creates a measurable gap.
+    alpha_token.transfer(alpha_token_vault_with_safe_gap, 100 * EIGHTEEN_DECIMALS, sender=alpha_token_whale)
+
+    setup_priority_configs(
+        priority_stab_assets=[],
+        priority_liq_assets=[(simple_erc20_vault, alpha_token_vault_with_safe_gap)],
+    )
+
+    target_repay = 10 * EIGHTEEN_DECIMALS
+    teller.deleverageUser(bob, target_repay, sender=switchboard_alpha.address)
+
+    transfer_logs = filter_logs(teller, "EndaomentTransferDuringDeleverage")
+    vault_transfer_log = next(e for e in transfer_logs if e.asset == alpha_token_vault_with_safe_gap.address)
+
+    underlying_amount_max = alpha_token_vault_with_safe_gap.convertToAssets(vault_transfer_log.amountSent)
+    underlying_amount_safe = alpha_token_vault_with_safe_gap.convertToAssetsSafe(vault_transfer_log.amountSent)
+
+    expected_usd_max = price_desk.getUsdValue(alpha_token, underlying_amount_max, True)
+    expected_usd_safe = price_desk.getUsdValue(alpha_token, underlying_amount_safe, True)
+
+    assert vault_transfer_log.usdValue == expected_usd_max
+    assert vault_transfer_log.usdValue > expected_usd_safe
+
+    alpha_token_vault_with_safe_gap.setSafeDiscountBps(500)
+    # Restore default mock behavior for other tests.
+    mock_undy_v2.setAllAddressesAreVaults(True)
+
+
+def test_phase2_underscore_earn_vault_clamps_credit_and_sizing_when_safe_spread_too_wide(
+    ripe_hq,  # Ensures switchboard is registered
+    switchboard,  # Ensures switchboard_alpha is registered
+    teller,
+    simple_erc20_vault,
+    bob,
+    alpha_token,
+    alpha_token_whale,
+    alpha_token_vault_with_safe_gap,
+    performDeposit,
+    setupDeleverage,
+    setup_priority_configs,
+    setAssetConfig,
+    createDebtTerms,
+    mock_price_source,
+    price_desk,
+    mission_control,
+    mock_undy_v2,
+    switchboard_alpha,
+):
+    """
+    Regression: when safe/max spread exceeds threshold, underscore path should clamp
+    max conversion to (safe + allowed spread) for both sizing and crediting.
+    """
+    mission_control.setUnderscoreRegistry(mock_undy_v2.address, sender=switchboard_alpha.address)
+    mock_undy_v2.setAllAddressesAreVaults(False)
+    mock_undy_v2.setEarnVault(alpha_token_vault_with_safe_gap.address, True)
+    mock_undy_v2.setBasicEarnVault(alpha_token_vault_with_safe_gap.address, True)
+
+    # Exceeds Deleverage MAX_UNDERSCORE_SAFE_SPREAD_BPS (100 bps).
+    alpha_token_vault_with_safe_gap.setSafeDiscountBps(500)
+    mock_price_source.setPrice(alpha_token, 1 * EIGHTEEN_DECIMALS)
+
+    debt_terms = createDebtTerms(
+        _ltv=80_00,
+        _redemptionThreshold=85_00,
+        _liqThreshold=90_00,
+        _liqFee=5_00,
+        _borrowRate=0,
+    )
+    setAssetConfig(
+        alpha_token_vault_with_safe_gap,
+        _vaultIds=[3],
+        _debtTerms=debt_terms,
+        _shouldBurnAsPayment=False,
+        _shouldTransferToEndaoment=True,
+    )
+
+    setupDeleverage(
+        bob,
+        alpha_token,
+        alpha_token_whale,
+        deposit_amount=1_000 * EIGHTEEN_DECIMALS,
+        borrow_amount=20 * EIGHTEEN_DECIMALS,
+        get_sgreen=False,
+    )
+
+    alpha_token.transfer(bob, 100 * EIGHTEEN_DECIMALS, sender=alpha_token_whale)
+    alpha_token.approve(alpha_token_vault_with_safe_gap, 100 * EIGHTEEN_DECIMALS, sender=bob)
+    alpha_token_vault_with_safe_gap.deposit(100 * EIGHTEEN_DECIMALS, bob, sender=bob)
+    performDeposit(bob, 100 * EIGHTEEN_DECIMALS, alpha_token_vault_with_safe_gap, bob, simple_erc20_vault)
+
+    setup_priority_configs(
+        priority_stab_assets=[],
+        priority_liq_assets=[(simple_erc20_vault, alpha_token_vault_with_safe_gap)],
+    )
+
+    target_repay = 10 * EIGHTEEN_DECIMALS
+    repaid_amount = teller.deleverageUser(bob, target_repay, sender=switchboard_alpha.address)
+
+    transfer_logs = filter_logs(teller, "EndaomentTransferDuringDeleverage")
+    vault_transfer_log = next(e for e in transfer_logs if e.asset == alpha_token_vault_with_safe_gap.address)
+
+    target_underlying = price_desk.getAssetAmount(alpha_token, target_repay, True)
+
+    sample_shares = 10 ** alpha_token_vault_with_safe_gap.decimals()
+    sample_max_underlying = alpha_token_vault_with_safe_gap.convertToAssets(sample_shares)
+    sample_safe_underlying = alpha_token_vault_with_safe_gap.convertToAssetsSafe(sample_shares)
+    sample_capped_underlying = sample_safe_underlying * 10100 // 10000
+    adjusted_underlying = (target_underlying * sample_max_underlying + sample_capped_underlying - 1) // sample_capped_underlying
+
+    expected_shares = alpha_token_vault_with_safe_gap.convertToShares(adjusted_underlying)
+    assert vault_transfer_log.amountSent == expected_shares
+
+    max_underlying_sent = alpha_token_vault_with_safe_gap.convertToAssets(vault_transfer_log.amountSent)
+    safe_underlying_sent = alpha_token_vault_with_safe_gap.convertToAssetsSafe(vault_transfer_log.amountSent)
+    capped_underlying_sent = safe_underlying_sent * 10100 // 10000
+    expected_credited_underlying = min(max_underlying_sent, capped_underlying_sent)
+    expected_usd = price_desk.getUsdValue(alpha_token, expected_credited_underlying, True)
+
+    assert vault_transfer_log.usdValue == expected_usd
+    assert vault_transfer_log.usdValue <= price_desk.getUsdValue(alpha_token, max_underlying_sent, True)
+    assert repaid_amount == target_repay
+
+    # Restore defaults for other tests.
+    alpha_token_vault_with_safe_gap.setSafeDiscountBps(500)
+    mock_undy_v2.setAllAddressesAreVaults(True)
+
+
+def test_phase2_underscore_earn_vault_no_sizing_adjustment_at_99bps_gap(
+    ripe_hq,  # Ensures switchboard is registered
+    switchboard,  # Ensures switchboard_alpha is registered
+    teller,
+    simple_erc20_vault,
+    bob,
+    alpha_token,
+    alpha_token_whale,
+    alpha_token_vault_with_safe_gap,
+    performDeposit,
+    setupDeleverage,
+    setup_priority_configs,
+    setAssetConfig,
+    createDebtTerms,
+    mock_price_source,
+    price_desk,
+    mission_control,
+    mock_undy_v2,
+    switchboard_alpha,
+):
+    """
+    Boundary test: with 99 bps safe discount, safe+100bps cap should not require
+    extra share sizing.
+    """
+    mission_control.setUnderscoreRegistry(mock_undy_v2.address, sender=switchboard_alpha.address)
+    mock_undy_v2.setAllAddressesAreVaults(False)
+    mock_undy_v2.setEarnVault(alpha_token_vault_with_safe_gap.address, True)
+    mock_undy_v2.setBasicEarnVault(alpha_token_vault_with_safe_gap.address, True)
+    alpha_token_vault_with_safe_gap.setSafeDiscountBps(99)
+
+    mock_price_source.setPrice(alpha_token, 1 * EIGHTEEN_DECIMALS)
+    debt_terms = createDebtTerms(
+        _ltv=80_00,
+        _redemptionThreshold=85_00,
+        _liqThreshold=90_00,
+        _liqFee=5_00,
+        _borrowRate=0,
+    )
+    setAssetConfig(
+        alpha_token_vault_with_safe_gap,
+        _vaultIds=[3],
+        _debtTerms=debt_terms,
+        _shouldBurnAsPayment=False,
+        _shouldTransferToEndaoment=True,
+    )
+
+    setupDeleverage(
+        bob,
+        alpha_token,
+        alpha_token_whale,
+        deposit_amount=1_000 * EIGHTEEN_DECIMALS,
+        borrow_amount=20 * EIGHTEEN_DECIMALS,
+        get_sgreen=False,
+    )
+
+    alpha_token.transfer(bob, 100 * EIGHTEEN_DECIMALS, sender=alpha_token_whale)
+    alpha_token.approve(alpha_token_vault_with_safe_gap, 100 * EIGHTEEN_DECIMALS, sender=bob)
+    alpha_token_vault_with_safe_gap.deposit(100 * EIGHTEEN_DECIMALS, bob, sender=bob)
+    performDeposit(bob, 100 * EIGHTEEN_DECIMALS, alpha_token_vault_with_safe_gap, bob, simple_erc20_vault)
+    alpha_token.transfer(alpha_token_vault_with_safe_gap, 100 * EIGHTEEN_DECIMALS, sender=alpha_token_whale)
+
+    setup_priority_configs(
+        priority_stab_assets=[],
+        priority_liq_assets=[(simple_erc20_vault, alpha_token_vault_with_safe_gap)],
+    )
+
+    target_repay = 10 * EIGHTEEN_DECIMALS
+    teller.deleverageUser(bob, target_repay, sender=switchboard_alpha.address)
+
+    transfer_logs = filter_logs(teller, "EndaomentTransferDuringDeleverage")
+    vault_transfer_log = next(e for e in transfer_logs if e.asset == alpha_token_vault_with_safe_gap.address)
+
+    target_underlying = price_desk.getAssetAmount(alpha_token, target_repay, True)
+    expected_shares_no_adjust = alpha_token_vault_with_safe_gap.convertToShares(target_underlying)
+    assert vault_transfer_log.amountSent == expected_shares_no_adjust
+
+    alpha_token_vault_with_safe_gap.setSafeDiscountBps(500)
+    mock_undy_v2.setAllAddressesAreVaults(True)
+
+
+def test_phase2_underscore_earn_vault_applies_sizing_adjustment_at_100bps_gap(
+    ripe_hq,  # Ensures switchboard is registered
+    switchboard,  # Ensures switchboard_alpha is registered
+    teller,
+    simple_erc20_vault,
+    bob,
+    alpha_token,
+    alpha_token_whale,
+    alpha_token_vault_with_safe_gap,
+    performDeposit,
+    setupDeleverage,
+    setup_priority_configs,
+    setAssetConfig,
+    createDebtTerms,
+    mock_price_source,
+    price_desk,
+    mission_control,
+    mock_undy_v2,
+    switchboard_alpha,
+):
+    """
+    Boundary test: at 100 bps safe discount, tiny scaling should kick in because
+    safe*(1+100bps) is slightly below max.
+    """
+    mission_control.setUnderscoreRegistry(mock_undy_v2.address, sender=switchboard_alpha.address)
+    mock_undy_v2.setAllAddressesAreVaults(False)
+    mock_undy_v2.setEarnVault(alpha_token_vault_with_safe_gap.address, True)
+    mock_undy_v2.setBasicEarnVault(alpha_token_vault_with_safe_gap.address, True)
+    alpha_token_vault_with_safe_gap.setSafeDiscountBps(100)
+
+    mock_price_source.setPrice(alpha_token, 1 * EIGHTEEN_DECIMALS)
+    debt_terms = createDebtTerms(
+        _ltv=80_00,
+        _redemptionThreshold=85_00,
+        _liqThreshold=90_00,
+        _liqFee=5_00,
+        _borrowRate=0,
+    )
+    setAssetConfig(
+        alpha_token_vault_with_safe_gap,
+        _vaultIds=[3],
+        _debtTerms=debt_terms,
+        _shouldBurnAsPayment=False,
+        _shouldTransferToEndaoment=True,
+    )
+
+    setupDeleverage(
+        bob,
+        alpha_token,
+        alpha_token_whale,
+        deposit_amount=1_000 * EIGHTEEN_DECIMALS,
+        borrow_amount=20 * EIGHTEEN_DECIMALS,
+        get_sgreen=False,
+    )
+
+    alpha_token.transfer(bob, 100 * EIGHTEEN_DECIMALS, sender=alpha_token_whale)
+    alpha_token.approve(alpha_token_vault_with_safe_gap, 100 * EIGHTEEN_DECIMALS, sender=bob)
+    alpha_token_vault_with_safe_gap.deposit(100 * EIGHTEEN_DECIMALS, bob, sender=bob)
+    performDeposit(bob, 100 * EIGHTEEN_DECIMALS, alpha_token_vault_with_safe_gap, bob, simple_erc20_vault)
+    alpha_token.transfer(alpha_token_vault_with_safe_gap, 100 * EIGHTEEN_DECIMALS, sender=alpha_token_whale)
+
+    setup_priority_configs(
+        priority_stab_assets=[],
+        priority_liq_assets=[(simple_erc20_vault, alpha_token_vault_with_safe_gap)],
+    )
+
+    target_repay = 10 * EIGHTEEN_DECIMALS
+    teller.deleverageUser(bob, target_repay, sender=switchboard_alpha.address)
+
+    transfer_logs = filter_logs(teller, "EndaomentTransferDuringDeleverage")
+    vault_transfer_log = next(e for e in transfer_logs if e.asset == alpha_token_vault_with_safe_gap.address)
+
+    target_underlying = price_desk.getAssetAmount(alpha_token, target_repay, True)
+    unadjusted_shares = alpha_token_vault_with_safe_gap.convertToShares(target_underlying)
+
+    sample_shares = 10 ** alpha_token_vault_with_safe_gap.decimals()
+    sample_max_underlying = alpha_token_vault_with_safe_gap.convertToAssets(sample_shares)
+    sample_safe_underlying = alpha_token_vault_with_safe_gap.convertToAssetsSafe(sample_shares)
+    sample_capped_underlying = sample_safe_underlying * 10100 // 10000
+    adjusted_underlying = (target_underlying * sample_max_underlying + sample_capped_underlying - 1) // sample_capped_underlying
+    expected_adjusted_shares = alpha_token_vault_with_safe_gap.convertToShares(adjusted_underlying)
+
+    assert sample_max_underlying > sample_capped_underlying
+    assert expected_adjusted_shares > unadjusted_shares
+    assert vault_transfer_log.amountSent == expected_adjusted_shares
+
+    alpha_token_vault_with_safe_gap.setSafeDiscountBps(500)
+    mock_undy_v2.setAllAddressesAreVaults(True)
+
+
+def test_phase2_underscore_earn_vault_safe_zero_does_not_overcredit(
+    ripe_hq,  # Ensures switchboard is registered
+    switchboard,  # Ensures switchboard_alpha is registered
+    teller,
+    simple_erc20_vault,
+    bob,
+    alpha_token,
+    alpha_token_whale,
+    alpha_token_vault_with_safe_gap,
+    performDeposit,
+    setupDeleverage,
+    setup_priority_configs,
+    setAssetConfig,
+    createDebtTerms,
+    mock_price_source,
+    mission_control,
+    mock_undy_v2,
+    switchboard_alpha,
+):
+    """
+    Safety test: if convertToAssetsSafe returns 0 for nonzero shares, deleverage
+    flow must not over-credit relative to requested repay.
+    """
+    mission_control.setUnderscoreRegistry(mock_undy_v2.address, sender=switchboard_alpha.address)
+    mock_undy_v2.setAllAddressesAreVaults(False)
+    mock_undy_v2.setEarnVault(alpha_token_vault_with_safe_gap.address, True)
+    mock_undy_v2.setBasicEarnVault(alpha_token_vault_with_safe_gap.address, True)
+    alpha_token_vault_with_safe_gap.setSafeDiscountBps(10000)
+
+    mock_price_source.setPrice(alpha_token, 1 * EIGHTEEN_DECIMALS)
+    debt_terms = createDebtTerms(
+        _ltv=80_00,
+        _redemptionThreshold=85_00,
+        _liqThreshold=90_00,
+        _liqFee=5_00,
+        _borrowRate=0,
+    )
+    setAssetConfig(
+        alpha_token_vault_with_safe_gap,
+        _vaultIds=[3],
+        _debtTerms=debt_terms,
+        _shouldBurnAsPayment=False,
+        _shouldTransferToEndaoment=True,
+    )
+    # Disable fallback deleverage on raw alpha collateral so this test must route
+    # through the underscore vault path.
+    setAssetConfig(
+        alpha_token,
+        _vaultIds=[3],
+        _debtTerms=debt_terms,
+        _shouldBurnAsPayment=False,
+        _shouldTransferToEndaoment=False,
+    )
+
+    setupDeleverage(
+        bob,
+        alpha_token,
+        alpha_token_whale,
+        deposit_amount=1_000 * EIGHTEEN_DECIMALS,
+        borrow_amount=20 * EIGHTEEN_DECIMALS,
+        get_sgreen=False,
+    )
+
+    alpha_token.transfer(bob, 100 * EIGHTEEN_DECIMALS, sender=alpha_token_whale)
+    alpha_token.approve(alpha_token_vault_with_safe_gap, 100 * EIGHTEEN_DECIMALS, sender=bob)
+    alpha_token_vault_with_safe_gap.deposit(100 * EIGHTEEN_DECIMALS, bob, sender=bob)
+    performDeposit(bob, 100 * EIGHTEEN_DECIMALS, alpha_token_vault_with_safe_gap, bob, simple_erc20_vault)
+    alpha_token.transfer(alpha_token_vault_with_safe_gap, 100 * EIGHTEEN_DECIMALS, sender=alpha_token_whale)
+    assert alpha_token_vault_with_safe_gap.convertToAssetsSafe(EIGHTEEN_DECIMALS) == 0
+
+    setup_priority_configs(
+        priority_stab_assets=[],
+        priority_liq_assets=[(simple_erc20_vault, alpha_token_vault_with_safe_gap)],
+    )
+
+    target_repay = 10 * EIGHTEEN_DECIMALS
+    repaid_amount = teller.deleverageUser(bob, target_repay, sender=switchboard_alpha.address)
+    transfer_logs = filter_logs(teller, "EndaomentTransferDuringDeleverage")
+    vault_transfer_log = next(e for e in transfer_logs if e.asset == alpha_token_vault_with_safe_gap.address)
+    assert vault_transfer_log.usdValue <= target_repay
+    assert repaid_amount <= target_repay
+
+    alpha_token_vault_with_safe_gap.setSafeDiscountBps(500)
+    # restore alpha token deleverage behavior for following tests
+    setAssetConfig(
+        alpha_token,
+        _vaultIds=[3],
+        _debtTerms=debt_terms,
+        _shouldBurnAsPayment=False,
+        _shouldTransferToEndaoment=True,
+    )
+    mock_undy_v2.setAllAddressesAreVaults(True)
+
+
+def test_phase2_underscore_earn_vault_depleted_position_credits_from_amount_sent(
+    ripe_hq,  # Ensures switchboard is registered
+    switchboard,  # Ensures switchboard_alpha is registered
+    teller,
+    simple_erc20_vault,
+    bob,
+    alpha_token,
+    alpha_token_whale,
+    alpha_token_vault_with_safe_gap,
+    performDeposit,
+    setupDeleverage,
+    setup_priority_configs,
+    setAssetConfig,
+    createDebtTerms,
+    mock_price_source,
+    price_desk,
+    mission_control,
+    mock_undy_v2,
+    switchboard_alpha,
+):
+    """
+    If requested shares exceed user balance, transfer depletes position.
+    Credit must use capped conversion of actual amountSent, not requested amount.
+    """
+    mission_control.setUnderscoreRegistry(mock_undy_v2.address, sender=switchboard_alpha.address)
+    mock_undy_v2.setAllAddressesAreVaults(False)
+    mock_undy_v2.setEarnVault(alpha_token_vault_with_safe_gap.address, True)
+    mock_undy_v2.setBasicEarnVault(alpha_token_vault_with_safe_gap.address, True)
+    alpha_token_vault_with_safe_gap.setSafeDiscountBps(500)
+
+    mock_price_source.setPrice(alpha_token, 1 * EIGHTEEN_DECIMALS)
+    debt_terms = createDebtTerms(
+        _ltv=80_00,
+        _redemptionThreshold=85_00,
+        _liqThreshold=90_00,
+        _liqFee=5_00,
+        _borrowRate=0,
+    )
+    setAssetConfig(
+        alpha_token_vault_with_safe_gap,
+        _vaultIds=[3],
+        _debtTerms=debt_terms,
+        _shouldBurnAsPayment=False,
+        _shouldTransferToEndaoment=True,
+    )
+
+    setupDeleverage(
+        bob,
+        alpha_token,
+        alpha_token_whale,
+        deposit_amount=1_000 * EIGHTEEN_DECIMALS,
+        borrow_amount=20 * EIGHTEEN_DECIMALS,
+        get_sgreen=False,
+    )
+
+    # Intentionally tiny share position so deleverage request depletes this asset.
+    alpha_token.transfer(bob, 2 * EIGHTEEN_DECIMALS, sender=alpha_token_whale)
+    alpha_token.approve(alpha_token_vault_with_safe_gap, 2 * EIGHTEEN_DECIMALS, sender=bob)
+    alpha_token_vault_with_safe_gap.deposit(2 * EIGHTEEN_DECIMALS, bob, sender=bob)
+    performDeposit(bob, 2 * EIGHTEEN_DECIMALS, alpha_token_vault_with_safe_gap, bob, simple_erc20_vault)
+    alpha_token.transfer(alpha_token_vault_with_safe_gap, 2 * EIGHTEEN_DECIMALS, sender=alpha_token_whale)
+
+    pre_shares = simple_erc20_vault.getTotalAmountForUser(bob, alpha_token_vault_with_safe_gap)
+    assert pre_shares != 0
+
+    setup_priority_configs(
+        priority_stab_assets=[],
+        priority_liq_assets=[(simple_erc20_vault, alpha_token_vault_with_safe_gap)],
+    )
+
+    teller.deleverageUser(bob, 10 * EIGHTEEN_DECIMALS, sender=switchboard_alpha.address)
+
+    transfer_logs = filter_logs(teller, "EndaomentTransferDuringDeleverage")
+    vault_transfer_log = next(e for e in transfer_logs if e.asset == alpha_token_vault_with_safe_gap.address)
+
+    post_shares = simple_erc20_vault.getTotalAmountForUser(bob, alpha_token_vault_with_safe_gap)
+    assert post_shares == 0
+    assert vault_transfer_log.isDepleted == True
+
+    max_underlying_sent = alpha_token_vault_with_safe_gap.convertToAssets(vault_transfer_log.amountSent)
+    safe_underlying_sent = alpha_token_vault_with_safe_gap.convertToAssetsSafe(vault_transfer_log.amountSent)
+    capped_underlying_sent = safe_underlying_sent * 10100 // 10000
+    expected_credited_underlying = min(max_underlying_sent, capped_underlying_sent)
+    expected_usd = price_desk.getUsdValue(alpha_token, expected_credited_underlying, True)
+    assert vault_transfer_log.usdValue == expected_usd
+
+    alpha_token_vault_with_safe_gap.setSafeDiscountBps(500)
+    mock_undy_v2.setAllAddressesAreVaults(True)

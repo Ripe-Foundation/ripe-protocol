@@ -19,6 +19,7 @@ import interfaces.ConfigStructs as cs
 
 from ethereum.ercs import IERC4626
 from ethereum.ercs import IERC20
+from ethereum.ercs import IERC20Detailed
 
 interface MissionControl:
     def userDelegation(_user: address, _caller: address) -> cs.ActionDelegation: view
@@ -47,6 +48,10 @@ interface PriceDesk:
     def getAssetAmount(_asset: address, _usdValue: uint256, _shouldRaise: bool = False) -> uint256: view
     def getUsdValue(_asset: address, _amount: uint256, _shouldRaise: bool = False) -> uint256: view
 
+interface VaultRegistry:
+    def isBasicEarnVault(_vaultAddr: address) -> bool: view
+    def isEarnVault(_vaultAddr: address) -> bool: view
+
 interface Registry:
     def getAddr(_vaultId: uint256) -> address: view
     def isValidAddr(_addr: address) -> bool: view
@@ -54,11 +59,11 @@ interface Registry:
 interface AuctionHouse:
     def withdrawTokensFromVault(_user: address, _asset: address, _amount: uint256, _recipient: address, _vaultAddr: address, _a: addys.Addys) -> (uint256, bool): nonpayable
 
+interface UnderscoreVault:
+    def convertToAssetsSafe(_shares: uint256) -> uint256: view
+
 interface EndaomentPSM:
     def getUsdcYieldPositionVaultToken() -> address: view
-
-interface VaultRegistry:
-    def isEarnVault(_vaultAddr: address) -> bool: view
 
 interface GreenToken:
     def burn(_amount: uint256) -> bool: nonpayable
@@ -152,6 +157,26 @@ event DeleverageUserWithVolatileAssets:
     repaidAmount: uint256
     hasGoodDebtHealth: bool
 
+event MinDeleverageBpsSet:
+    bps: uint256
+
+event DeleverageBufferSet:
+    bps: uint256
+
+event DeleverageCooldownSet:
+    blocks: uint256
+
+event UnderscoreSafeSpreadBpsSet:
+    bps: uint256
+
+# deleverage params
+minDeleverageBps: public(uint256)
+deleverageBuffer: public(uint256)
+deleverageCooldown: public(uint256)
+underscoreSafeSpreadBps: public(uint256)
+
+lastDeleverageBlock: public(HashMap[address, uint256]) # user -> block number
+
 # cache
 vaultAddrs: transient(HashMap[uint256, address]) # vaultId -> vaultAddr
 assetLiqConfig: transient(HashMap[address, AssetLiqConfig]) # asset -> config
@@ -166,12 +191,15 @@ PRIORITY_LIQ_VAULT_DATA: constant(uint256) = 20
 MAX_STAB_VAULT_DATA: constant(uint256) = 10
 MAX_DELEVERAGE_USERS: constant(uint256) = 25
 MAX_DELEVERAGE_ASSETS: constant(uint256) = 25
+MAX_UNDERSCORE_SAFE_SPREAD_BPS: constant(uint256) = 500 # 5% hard ceiling
+MAX_COOLDOWN_BLOCKS: constant(uint256) = 7_200 # ~1 day at 12s/block
 
 
 @deploy
 def __init__(_ripeHq: address):
     addys.__init__(_ripeHq)
     deptBasics.__init__(False, False, False) # no special permissions needed
+    self.underscoreSafeSpreadBps = 100 # 1%
 
 
 ###################
@@ -478,6 +506,24 @@ def deleverageForWithdrawal(_user: address, _vaultId: uint256, _asset: address, 
     if _amount < userBalance:
         withdrawUsdValue = userUsdValue * _amount // userBalance
 
+    # projected collateral after withdrawal (lazy-cached for near-redemption bypass checks)
+    projectedCollateralVal: uint256 = bt.collateralVal - withdrawUsdValue if bt.collateralVal > withdrawUsdValue else 0
+    didCheckNearRedemption: bool = False
+    isNearRedemption: bool = False
+
+    # cooldown: skip if recently deleveraged, unless near redemption after withdrawal
+    # NOTE: uses strict `>` (not `>=`) so same-block calls are allowed -- this is intentional
+    # to support multi-asset withdrawals that trigger multiple deleverages in a single tx.
+    # tradeoff: same-block spam (e.g. bundled txs) also bypasses cooldown.
+    cooldown: uint256 = self.deleverageCooldown
+    lastBlock: uint256 = self.lastDeleverageBlock[_user]
+    if cooldown != 0 and lastBlock != 0 and block.number > lastBlock and block.number < lastBlock + cooldown:
+        if not didCheckNearRedemption:
+            isNearRedemption = self._canDeleverageUserDebtPosition(userDebt.amount, projectedCollateralVal, bt.debtTerms.redemptionThreshold)
+            didCheckNearRedemption = True
+        if not isNearRedemption:
+            return False
+
     # asset debt terms
     assetDebtTerms: cs.DebtTerms = staticcall MissionControl(a.missionControl).getDebtTerms(_asset)
     if assetDebtTerms.ltv == 0:
@@ -498,16 +544,19 @@ def deleverageForWithdrawal(_user: address, _vaultId: uint256, _asset: address, 
     # calculate required repayment to maintain utilization ratio
     # Formula: requiredRepayment = (debt × lostCapacity) / (capacity - debt × effectiveLtv)
     numerator: uint256 = userDebt.amount * lostCapacity
-    denominator: uint256 = bt.totalMaxDebt - (userDebt.amount * effectiveLtv // HUNDRED_PERCENT)
-    if denominator == 0:
-        return False # edge case: capacity exactly equals debt × effectiveLtv
+    debtTimesEffectiveLtv: uint256 = userDebt.amount * effectiveLtv // HUNDRED_PERCENT
+    if bt.totalMaxDebt <= debtTimesEffectiveLtv:
+        return False
+    denominator: uint256 = bt.totalMaxDebt - debtTimesEffectiveLtv
 
     requiredRepayment: uint256 = numerator // denominator
     if requiredRepayment == 0:
         return False
 
-    # apply 1% buffer to be more conservative
-    requiredRepayment = requiredRepayment * (HUNDRED_PERCENT + ONE_PERCENT) // HUNDRED_PERCENT
+    # apply configurable buffer to be more conservative
+    bufferBps: uint256 = self.deleverageBuffer
+    if bufferBps != 0:
+        requiredRepayment = requiredRepayment * (HUNDRED_PERCENT + bufferBps) // HUNDRED_PERCENT
 
     # cap at max deleveragable amount
     requiredRepayment = min(maxDeleveragable, requiredRepayment)
@@ -515,11 +564,23 @@ def deleverageForWithdrawal(_user: address, _vaultId: uint256, _asset: address, 
     # final cap at total debt
     requiredRepayment = min(userDebt.amount, requiredRepayment)
 
+    # skip if effective repayment is below minimum threshold (% of total debt)
+    # unless position would be near redemption after withdrawal
+    minBps: uint256 = self.minDeleverageBps
+    if minBps != 0 and requiredRepayment * HUNDRED_PERCENT < userDebt.amount * minBps:
+        if not didCheckNearRedemption:
+            isNearRedemption = self._canDeleverageUserDebtPosition(userDebt.amount, projectedCollateralVal, bt.debtTerms.redemptionThreshold)
+            didCheckNearRedemption = True
+        if not isNearRedemption:
+            return False
+
     # execute deleveraging
     config: GenLiqConfig = staticcall MissionControl(a.missionControl).getGenLiqConfig()
     endaomentPsm: address = addys._getEndaomentPsmAddr()
     psmYieldPositionToken: address = staticcall EndaomentPSM(endaomentPsm).getUsdcYieldPositionVaultToken()
     repaidAmount: uint256 = self._deleverageUser(_user, msg.sender, True, requiredRepayment, config, addys._getEndaomentFundsAddr(), endaomentPsm, psmYieldPositionToken, a)
+    if repaidAmount != 0:
+        self.lastDeleverageBlock[_user] = block.number
     return repaidAmount != 0
 
 
@@ -988,7 +1049,13 @@ def _transferCollateral(
     _targetUsdValue: uint256,
     _a: addys.Addys,
 ) -> (uint256, uint256, bool):
-    maxAssetAmount: uint256 = self._getMaxAssetAmount(_asset, _targetUsdValue, _a.greenToken, _a.savingsGreen, _a.priceDesk)
+    isUnderscoreEarnVault: bool = self._isUnderscoreEarnVault(_asset, _a.missionControl)
+    underlyingAsset: address = empty(address)
+    if isUnderscoreEarnVault:
+        underlyingAsset = staticcall IERC4626(_asset).asset()
+
+    # calculate max asset amount
+    maxAssetAmount: uint256 = self._getMaxAssetAmount(_asset, _targetUsdValue, isUnderscoreEarnVault, underlyingAsset, _a.greenToken, _a.savingsGreen, _a.priceDesk)
     if maxAssetAmount == 0:
         return 0, 0, False
 
@@ -998,6 +1065,16 @@ def _transferCollateral(
     amountSent, isPositionDepleted = extcall AuctionHouse(_a.auctionHouse).withdrawTokensFromVault(_fromUser, _asset, maxAssetAmount, _toUser, _vaultAddr, _a)
 
     usdValue: uint256 = _targetUsdValue * amountSent // maxAssetAmount
+
+    # For underscore basic earn vault assets, cap max conversion at
+    # convertToAssetsSafe + configured spread so crediting remains bounded.
+    if isUnderscoreEarnVault and amountSent != 0 and underlyingAsset != empty(address):
+        na: uint256 = 0
+        cappedUnderlying: uint256 = 0
+        na, cappedUnderlying = self._getMaxAndCappedUnderlyingForShares(_asset, amountSent)
+        if cappedUnderlying != 0:
+            usdValue = staticcall PriceDesk(_a.priceDesk).getUsdValue(underlyingAsset, cappedUnderlying, True)
+
     return usdValue, amountSent, isPositionDepleted
 
 
@@ -1011,11 +1088,8 @@ def _isUnderscoreAddr(_addr: address, _mc: address) -> bool:
     if underscore == empty(address):
         return False
 
-    # check if underscore vault
-    vaultRegistry: address = staticcall Registry(underscore).getAddr(UNDERSCORE_VAULT_REGISTRY_ID)
-    if vaultRegistry == empty(address):
-        return False
-    if staticcall VaultRegistry(vaultRegistry).isEarnVault(_addr):
+    # trust underscore earn vaults
+    if self._isUnderscoreEarnVaultWithRegistry(_addr, underscore):
         return True
 
     # check if underscore lego
@@ -1023,6 +1097,41 @@ def _isUnderscoreAddr(_addr: address, _mc: address) -> bool:
     if undyLegoBook == empty(address):
         return False
     return staticcall Registry(undyLegoBook).isValidAddr(_addr)
+
+
+@view
+@internal
+def _isUnderscoreEarnVault(_asset: address, _mc: address) -> bool:
+    underscore: address = staticcall MissionControl(_mc).underscoreRegistry()
+    return self._isUnderscoreEarnVaultWithRegistry(_asset, underscore)
+
+
+@view
+@internal
+def _isUnderscoreEarnVaultWithRegistry(_asset: address, _underscore: address) -> bool:
+    if _underscore == empty(address):
+        return False
+
+    # check if underscore vault
+    vaultRegistry: address = staticcall Registry(_underscore).getAddr(UNDERSCORE_VAULT_REGISTRY_ID)
+    if vaultRegistry == empty(address):
+        return False
+    return staticcall VaultRegistry(vaultRegistry).isBasicEarnVault(_asset)
+
+
+@view
+@internal
+def _getMaxAndCappedUnderlyingForShares(_asset: address, _shares: uint256) -> (uint256, uint256):
+    maxUnderlying: uint256 = staticcall IERC4626(_asset).convertToAssets(_shares)
+    if maxUnderlying == 0:
+        return 0, 0
+
+    safeUnderlying: uint256 = staticcall UnderscoreVault(_asset).convertToAssetsSafe(_shares)
+    if safeUnderlying == 0:
+        return 0, 0
+
+    maxAllowedUnderlying: uint256 = safeUnderlying * (HUNDRED_PERCENT + self.underscoreSafeSpreadBps) // HUNDRED_PERCENT
+    return maxUnderlying, min(maxUnderlying, maxAllowedUnderlying)
 
 
 # get asset amount
@@ -1033,6 +1142,8 @@ def _isUnderscoreAddr(_addr: address, _mc: address) -> bool:
 def _getMaxAssetAmount(
     _asset: address,
     _targetUsdValue: uint256,
+    _isUnderscoreEarnVault: bool,
+    _underlyingAsset: address,
     _greenToken: address,
     _savingsGreen: address,
     _priceDesk: address,
@@ -1042,6 +1153,24 @@ def _getMaxAssetAmount(
         amount = _targetUsdValue
     elif _asset == _savingsGreen:
         amount = staticcall IERC4626(_savingsGreen).convertToShares(_targetUsdValue)
+    elif _isUnderscoreEarnVault:
+
+        if _underlyingAsset == empty(address):
+            return 0
+        underlyingAmount: uint256 = staticcall PriceDesk(_priceDesk).getAssetAmount(_underlyingAsset, _targetUsdValue, True)
+        adjustedUnderlyingAmount: uint256 = underlyingAmount
+
+        # Compare max vs capped value for one whole-share unit.
+        # Using a fixed share unit avoids noisy tiny-amount rounding.
+        sampleShareUnit: uint256 = 10 ** convert(staticcall IERC20Detailed(_asset).decimals(), uint256)
+        maxSampleUnderlying: uint256 = 0
+        cappedSampleUnderlying: uint256 = 0
+        maxSampleUnderlying, cappedSampleUnderlying = self._getMaxAndCappedUnderlyingForShares(_asset, sampleShareUnit)
+        if maxSampleUnderlying > cappedSampleUnderlying and cappedSampleUnderlying != 0:
+            # ceil(a / b) = (a + b - 1) // b
+            adjustedUnderlyingAmount = (underlyingAmount * maxSampleUnderlying + cappedSampleUnderlying - 1) // cappedSampleUnderlying
+
+        amount = staticcall IERC4626(_asset).convertToShares(adjustedUnderlyingAmount)
     else:
         amount = staticcall PriceDesk(_priceDesk).getAssetAmount(_asset, _targetUsdValue, True)
     return amount
@@ -1066,3 +1195,42 @@ def _getVaultAddr(_vaultId: uint256, _vaultBook: address) -> (address, bool):
     if vaultAddr != empty(address):
         return vaultAddr, True
     return staticcall Registry(_vaultBook).getAddr(_vaultId), False
+
+
+# deleverage params
+
+
+@external
+def setMinDeleverageBps(_bps: uint256):
+    assert addys._isSwitchboardAddr(msg.sender) # dev: only switchboard allowed
+    assert not deptBasics.isPaused # dev: contract paused
+    assert _bps <= HUNDRED_PERCENT # dev: invalid bps
+    self.minDeleverageBps = _bps
+    log MinDeleverageBpsSet(bps=_bps)
+
+
+@external
+def setDeleverageBuffer(_bps: uint256):
+    assert addys._isSwitchboardAddr(msg.sender) # dev: only switchboard allowed
+    assert not deptBasics.isPaused # dev: contract paused
+    assert _bps <= HUNDRED_PERCENT # dev: invalid bps
+    self.deleverageBuffer = _bps
+    log DeleverageBufferSet(bps=_bps)
+
+
+@external
+def setDeleverageCooldown(_blocks: uint256):
+    assert addys._isSwitchboardAddr(msg.sender) # dev: only switchboard allowed
+    assert not deptBasics.isPaused # dev: contract paused
+    assert _blocks <= MAX_COOLDOWN_BLOCKS # dev: cooldown too large
+    self.deleverageCooldown = _blocks
+    log DeleverageCooldownSet(blocks=_blocks)
+
+
+@external
+def setUnderscoreSafeSpreadBps(_bps: uint256):
+    assert addys._isSwitchboardAddr(msg.sender) # dev: only switchboard allowed
+    assert not deptBasics.isPaused # dev: contract paused
+    assert _bps <= MAX_UNDERSCORE_SAFE_SPREAD_BPS # dev: exceeds hard ceiling
+    self.underscoreSafeSpreadBps = _bps
+    log UnderscoreSafeSpreadBpsSet(bps=_bps)

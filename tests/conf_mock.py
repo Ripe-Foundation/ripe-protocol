@@ -71,6 +71,12 @@ def alpha_token_vault(alpha_token):
     return boa.load("contracts/mock/MockErc4626Vault.vy", alpha_token, name="alpha_erc4626_vault")
 
 
+@pytest.fixture(scope="session")
+def alpha_token_vault_with_safe_gap(alpha_token):
+    # 5% safe discount so convertToAssetsSafe is lower than convertToAssets
+    return boa.load("contracts/mock/MockErc4626VaultWithSafeGap.vy", alpha_token, 500, name="alpha_erc4626_vault_with_safe_gap")
+
+
 # bravo token
 
 

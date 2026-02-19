@@ -979,6 +979,7 @@ def wsuper_oethb_prices(ripe_hq_deploy, fork, deploy3r, mock_yield_registry):
         ZERO_ADDRESS,
         super_oeth,
         wrapped_super_oeth,
+        ZERO_ADDRESS,
         PARAMS[fork]["PRICE_DESK_MIN_REG_TIMELOCK"],
         PARAMS[fork]["PRICE_DESK_MAX_REG_TIMELOCK"],
         name="wsuper_oethb_prices",
