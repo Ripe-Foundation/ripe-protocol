@@ -1676,3 +1676,204 @@ def test_deleverageManyUsers_trusted_no_caps(
 
     _test(bob_debt, 0)
     _test(alice_debt, 0)
+
+
+###############################################################################
+# 7. UNDERSCORE EARN VAULT PERMISSION TESTS (deleverageForWithdrawal)
+#
+# Regression tests for commit a487ca0 which changed isEarnVault() to
+# isBasicEarnVault() in _isUnderscoreEarnVaultWithRegistry(), breaking
+# permission checks for leveraged/amplified vaults.
+###############################################################################
+
+
+def test_leveraged_underscore_vault_passes_deleverageForWithdrawal_permission(
+    switchboard_alpha,
+    deleverage,
+    alpha_token,
+    bob,
+    alice,
+    mission_control,
+    mock_undy_v2,
+    setGeneralConfig,
+    setGeneralDebtConfig,
+    setAssetConfig,
+    createDebtTerms,
+    mock_price_source,
+):
+    """
+    Regression test: leveraged/amplified underscore earn vaults
+    (isEarnVault=True, isBasicEarnVault=False) must pass the
+    _isUnderscoreAddr() permission check in deleverageForWithdrawal().
+
+    The bug was that _isUnderscoreEarnVaultWithRegistry() called
+    isBasicEarnVault() instead of isEarnVault(), causing leveraged
+    vaults to fail the permission check.
+    """
+    setGeneralConfig()
+    setGeneralDebtConfig()
+    mock_price_source.setPrice(alpha_token, 1 * EIGHTEEN_DECIMALS)
+
+    debt_terms = createDebtTerms(_ltv=50_00, _redemptionThreshold=70_00)
+    setAssetConfig(alpha_token, _vaultIds=[3], _debtTerms=debt_terms)
+
+    # Set up underscore registry
+    mission_control.setUnderscoreRegistry(mock_undy_v2.address, sender=switchboard_alpha.address)
+    mock_undy_v2.setAllAddressesAreVaults(False)
+
+    # Configure alice as a leveraged earn vault (earn=True, basic=False)
+    mock_undy_v2.setEarnVault(alice, True)
+    mock_undy_v2.setBasicEarnVault(alice, False)
+
+    # alice calls deleverageForWithdrawal — should NOT revert with "no perms"
+    # Returns False because bob has no debt, but the earn vault permission check passed
+    result = deleverage.deleverageForWithdrawal(
+        bob, 3, alpha_token, 100 * EIGHTEEN_DECIMALS, sender=alice
+    )
+    assert result == False  # No debt to deleverage, but permission was granted
+
+    # Restore default mock behavior
+    mock_undy_v2.setAllAddressesAreVaults(True)
+
+
+def test_basic_underscore_vault_passes_deleverageForWithdrawal_permission(
+    switchboard_alpha,
+    deleverage,
+    alpha_token,
+    bob,
+    alice,
+    mission_control,
+    mock_undy_v2,
+    setGeneralConfig,
+    setGeneralDebtConfig,
+    setAssetConfig,
+    createDebtTerms,
+    mock_price_source,
+):
+    """
+    Sanity check: basic underscore earn vaults (isEarnVault=True,
+    isBasicEarnVault=True) still pass the permission check.
+    """
+    setGeneralConfig()
+    setGeneralDebtConfig()
+    mock_price_source.setPrice(alpha_token, 1 * EIGHTEEN_DECIMALS)
+
+    debt_terms = createDebtTerms(_ltv=50_00, _redemptionThreshold=70_00)
+    setAssetConfig(alpha_token, _vaultIds=[3], _debtTerms=debt_terms)
+
+    mission_control.setUnderscoreRegistry(mock_undy_v2.address, sender=switchboard_alpha.address)
+    mock_undy_v2.setAllAddressesAreVaults(False)
+
+    # Configure alice as a basic earn vault (earn=True, basic=True)
+    mock_undy_v2.setEarnVault(alice, True)
+    # setEarnVault already sets basicEarnVault=True as backwards-compatible default
+
+    result = deleverage.deleverageForWithdrawal(
+        bob, 3, alpha_token, 100 * EIGHTEEN_DECIMALS, sender=alice
+    )
+    assert result == False  # No debt, but permission passed
+
+    mock_undy_v2.setAllAddressesAreVaults(True)
+
+
+def test_leveraged_underscore_vault_deleverageForWithdrawal_full_flow(
+    switchboard_alpha,
+    deleverage,
+    credit_engine,
+    simple_erc20_vault,
+    alpha_token,
+    alpha_token_whale,
+    charlie_token,
+    charlie_token_whale,
+    bob,
+    alice,
+    teller,
+    performDeposit,
+    mission_control,
+    mock_undy_v2,
+    setup_priority_configs,
+    setGeneralConfig,
+    setGeneralDebtConfig,
+    setAssetConfig,
+    createDebtTerms,
+    mock_price_source,
+):
+    """
+    End-to-end regression test: a leveraged underscore earn vault
+    (isEarnVault=True, isBasicEarnVault=False) can call
+    deleverageForWithdrawal() and actually execute a deleverage.
+
+    Before the fix, this would revert with "no perms" because the
+    isBasicEarnVault() check returned False for leveraged vaults.
+    """
+    setGeneralConfig()
+    setGeneralDebtConfig()
+
+    # Configure alpha_token as main collateral (not deleveragable)
+    alpha_terms = createDebtTerms(
+        _ltv=70_00,
+        _redemptionThreshold=80_00,
+        _liqThreshold=85_00,
+        _liqFee=10_00,
+        _borrowRate=0,
+    )
+    setAssetConfig(
+        alpha_token,
+        _vaultIds=[3],
+        _debtTerms=alpha_terms,
+        _shouldBurnAsPayment=False,
+        _shouldTransferToEndaoment=False,
+    )
+
+    # Configure charlie_token (USDC) as deleveragable Phase 2 asset
+    charlie_terms = createDebtTerms(
+        _ltv=90_00,
+        _redemptionThreshold=92_00,
+        _liqThreshold=95_00,
+        _liqFee=5_00,
+        _borrowRate=0,
+    )
+    setAssetConfig(
+        charlie_token,
+        _vaultIds=[3],
+        _debtTerms=charlie_terms,
+        _shouldBurnAsPayment=False,
+        _shouldTransferToEndaoment=True,
+    )
+
+    mock_price_source.setPrice(alpha_token, 1 * EIGHTEEN_DECIMALS)
+    mock_price_source.setPrice(charlie_token, 1 * EIGHTEEN_DECIMALS)
+
+    # Set up bob's position: $1000 alpha + $700 USDC collateral, $500 debt
+    performDeposit(bob, 1000 * EIGHTEEN_DECIMALS, alpha_token, alpha_token_whale, simple_erc20_vault)
+    performDeposit(bob, 700 * SIX_DECIMALS, charlie_token, charlie_token_whale, simple_erc20_vault)
+    teller.borrow(500 * EIGHTEEN_DECIMALS, bob, False, sender=bob)
+
+    # Configure USDC as priority liquidation asset for Phase 2
+    setup_priority_configs(
+        priority_stab_assets=[],
+        priority_liq_assets=[(simple_erc20_vault, charlie_token)],
+    )
+
+    # Set up underscore registry with alice as a leveraged vault
+    mission_control.setUnderscoreRegistry(mock_undy_v2.address, sender=switchboard_alpha.address)
+    mock_undy_v2.setAllAddressesAreVaults(False)
+    mock_undy_v2.setEarnVault(alice, True)
+    mock_undy_v2.setBasicEarnVault(alice, False)
+
+    pre_debt = credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount
+    assert pre_debt == 500 * EIGHTEEN_DECIMALS
+
+    # alice (leveraged vault) calls deleverageForWithdrawal
+    withdraw_amount = 200 * EIGHTEEN_DECIMALS
+    result = deleverage.deleverageForWithdrawal(
+        bob, 3, alpha_token, withdraw_amount, sender=alice
+    )
+    assert result == True, "Leveraged vault should trigger deleverage"
+
+    # Verify debt was reduced
+    post_debt = credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount
+    assert post_debt < pre_debt, "Debt should be reduced after deleverage"
+
+    # Restore default mock behavior
+    mock_undy_v2.setAllAddressesAreVaults(True)

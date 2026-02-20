@@ -48,10 +48,6 @@ interface PriceDesk:
     def getAssetAmount(_asset: address, _usdValue: uint256, _shouldRaise: bool = False) -> uint256: view
     def getUsdValue(_asset: address, _amount: uint256, _shouldRaise: bool = False) -> uint256: view
 
-interface VaultRegistry:
-    def isBasicEarnVault(_vaultAddr: address) -> bool: view
-    def isEarnVault(_vaultAddr: address) -> bool: view
-
 interface Registry:
     def getAddr(_vaultId: uint256) -> address: view
     def isValidAddr(_addr: address) -> bool: view
@@ -64,6 +60,10 @@ interface UnderscoreVault:
 
 interface EndaomentPSM:
     def getUsdcYieldPositionVaultToken() -> address: view
+
+interface VaultRegistry:
+    def isEarnVault(_vaultAddr: address) -> bool: view
+    def isBasicEarnVault(_vaultAddr: address) -> bool: view
 
 interface GreenToken:
     def burn(_amount: uint256) -> bool: nonpayable
@@ -1088,9 +1088,11 @@ def _isUnderscoreAddr(_addr: address, _mc: address) -> bool:
     if underscore == empty(address):
         return False
 
-    # trust underscore earn vaults
-    if self._isUnderscoreEarnVaultWithRegistry(_addr, underscore):
-        return True
+    # trust any underscore earn vault (basic + leveraged/amplified)
+    vaultRegistry: address = staticcall Registry(underscore).getAddr(UNDERSCORE_VAULT_REGISTRY_ID)
+    if vaultRegistry != empty(address):
+        if staticcall VaultRegistry(vaultRegistry).isEarnVault(_addr):
+            return True
 
     # check if underscore lego
     undyLegoBook: address = staticcall Registry(underscore).getAddr(UNDERSCORE_LEGOBOOK_ID)
@@ -1112,7 +1114,7 @@ def _isUnderscoreEarnVaultWithRegistry(_asset: address, _underscore: address) ->
     if _underscore == empty(address):
         return False
 
-    # check if underscore vault
+    # check if underscore basic vault (for share-based pricing in collateral processing)
     vaultRegistry: address = staticcall Registry(_underscore).getAddr(UNDERSCORE_VAULT_REGISTRY_ID)
     if vaultRegistry == empty(address):
         return False
