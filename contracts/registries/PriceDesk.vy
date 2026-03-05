@@ -91,7 +91,9 @@ def getUsdValue(_asset: address, _amount: uint256, _shouldRaise: bool = False) -
         return 0
 
     numerator: uint256 = price * _amount
-    denominator: uint256 = 10 ** convert(staticcall IERC20Detailed(_asset).decimals(), uint256)
+    denominator: uint256 = 10 ** 18
+    if _asset != ETH:
+        denominator = 10 ** convert(staticcall IERC20Detailed(_asset).decimals(), uint256)
 
     # important to return non-zero value -- Stability Pool dust issues 
     if numerator < denominator:
@@ -110,10 +112,15 @@ def getUsdValue(_asset: address, _amount: uint256, _shouldRaise: bool = False) -
 def getAssetAmount(_asset: address, _usdValue: uint256, _shouldRaise: bool = False) -> uint256:
     if _usdValue == 0 or _asset == empty(address):
         return 0
+
     price: uint256 = self._getPrice(_asset, _shouldRaise)
     if price == 0:
         return 0
-    decimals: uint256 = convert(staticcall IERC20Detailed(_asset).decimals(), uint256)
+
+    decimals: uint256 = 18
+    if _asset != ETH:
+        decimals = convert(staticcall IERC20Detailed(_asset).decimals(), uint256)
+
     return _usdValue * (10 ** decimals) // price
 
 
