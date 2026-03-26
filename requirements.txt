@@ -216,7 +216,7 @@ regex==2025.9.1
     # via
     #   mkdocs-material
     #   parsimonious
-requests==2.32.5
+requests==2.33.0
     # via
     #   mkdocs-material
     #   titanoboa
