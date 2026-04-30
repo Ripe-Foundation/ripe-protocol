@@ -1,0 +1,3387 @@
+{
+  "contracts": {
+    "SwitchboardDelta": {
+      "address": "0xCdD15077231FEbe9e6393cf91d500984973FFcA0",
+      "abi": [
+        {
+          "name": "PendingHrContribTemplateChange",
+          "inputs": [
+            {
+              "name": "contribTemplate",
+              "type": "address",
+              "indexed": true
+            },
+            {
+              "name": "confirmationBlock",
+              "type": "uint256",
+              "indexed": false
+            },
+            {
+              "name": "actionId",
+              "type": "uint256",
+              "indexed": false
+            }
+          ],
+          "anonymous": false,
+          "type": "event"
+        },
+        {
+          "name": "PendingHrMaxCompensationChange",
+          "inputs": [
+            {
+              "name": "maxCompensation",
+              "type": "uint256",
+              "indexed": false
+            },
+            {
+              "name": "confirmationBlock",
+              "type": "uint256",
+              "indexed": false
+            },
+            {
+              "name": "actionId",
+              "type": "uint256",
+              "indexed": false
+            }
+          ],
+          "anonymous": false,
+          "type": "event"
+        },
+        {
+          "name": "PendingHrMinCliffLengthChange",
+          "inputs": [
+            {
+              "name": "minCliffLength",
+              "type": "uint256",
+              "indexed": false
+            },
+            {
+              "name": "confirmationBlock",
+              "type": "uint256",
+              "indexed": false
+            },
+            {
+              "name": "actionId",
+              "type": "uint256",
+              "indexed": false
+            }
+          ],
+          "anonymous": false,
+          "type": "event"
+        },
+        {
+          "name": "PendingHrMaxStartDelayChange",
+          "inputs": [
+            {
+              "name": "maxStartDelay",
+              "type": "uint256",
+              "indexed": false
+            },
+            {
+              "name": "confirmationBlock",
+              "type": "uint256",
+              "indexed": false
+            },
+            {
+              "name": "actionId",
+              "type": "uint256",
+              "indexed": false
+            }
+          ],
+          "anonymous": false,
+          "type": "event"
+        },
+        {
+          "name": "PendingHrVestingLengthBoundariesChange",
+          "inputs": [
+            {
+              "name": "minVestingLength",
+              "type": "uint256",
+              "indexed": false
+            },
+            {
+              "name": "maxVestingLength",
+              "type": "uint256",
+              "indexed": false
+            },
+            {
+              "name": "confirmationBlock",
+              "type": "uint256",
+              "indexed": false
+            },
+            {
+              "name": "actionId",
+              "type": "uint256",
+              "indexed": false
+            }
+          ],
+          "anonymous": false,
+          "type": "event"
+        },
+        {
+          "name": "PendingManagerSet",
+          "inputs": [
+            {
+              "name": "contributor",
+              "type": "address",
+              "indexed": true
+            },
+            {
+              "name": "manager",
+              "type": "address",
+              "indexed": true
+            },
+            {
+              "name": "confirmationBlock",
+              "type": "uint256",
+              "indexed": false
+            },
+            {
+              "name": "actionId",
+              "type": "uint256",
+              "indexed": false
+            }
+          ],
+          "anonymous": false,
+          "type": "event"
+        },
+        {
+          "name": "PendingCancelPaycheckSet",
+          "inputs": [
+            {
+              "name": "contributor",
+              "type": "address",
+              "indexed": true
+            },
+            {
+              "name": "confirmationBlock",
+              "type": "uint256",
+              "indexed": false
+            },
+            {
+              "name": "actionId",
+              "type": "uint256",
+              "indexed": false
+            }
+          ],
+          "anonymous": false,
+          "type": "event"
+        },
+        {
+          "name": "RipeCheckCashedFromSwitchboard",
+          "inputs": [
+            {
+              "name": "contributor",
+              "type": "address",
+              "indexed": true
+            },
+            {
+              "name": "cashedBy",
+              "type": "address",
+              "indexed": true
+            },
+            {
+              "name": "amount",
+              "type": "uint256",
+              "indexed": false
+            }
+          ],
+          "anonymous": false,
+          "type": "event"
+        },
+        {
+          "name": "RipeTransferCancelledFromSwitchboard",
+          "inputs": [
+            {
+              "name": "contributor",
+              "type": "address",
+              "indexed": true
+            },
+            {
+              "name": "cancelledBy",
+              "type": "address",
+              "indexed": true
+            }
+          ],
+          "anonymous": false,
+          "type": "event"
+        },
+        {
+          "name": "OwnershipChangeCancelledFromSwitchboard",
+          "inputs": [
+            {
+              "name": "contributor",
+              "type": "address",
+              "indexed": true
+            },
+            {
+              "name": "cancelledBy",
+              "type": "address",
+              "indexed": true
+            }
+          ],
+          "anonymous": false,
+          "type": "event"
+        },
+        {
+          "name": "ContributorFrozenFromSwitchboard",
+          "inputs": [
+            {
+              "name": "contributor",
+              "type": "address",
+              "indexed": true
+            },
+            {
+              "name": "frozenBy",
+              "type": "address",
+              "indexed": true
+            },
+            {
+              "name": "shouldFreeze",
+              "type": "bool",
+              "indexed": false
+            }
+          ],
+          "anonymous": false,
+          "type": "event"
+        },
+        {
+          "name": "PendingRipeBondConfigSet",
+          "inputs": [
+            {
+              "name": "asset",
+              "type": "address",
+              "indexed": true
+            },
+            {
+              "name": "amountPerEpoch",
+              "type": "uint256",
+              "indexed": false
+            },
+            {
+              "name": "minRipePerUnit",
+              "type": "uint256",
+              "indexed": false
+            },
+            {
+              "name": "maxRipePerUnit",
+              "type": "uint256",
+              "indexed": false
+            },
+            {
+              "name": "maxRipePerUnitLockBonus",
+              "type": "uint256",
+              "indexed": false
+            },
+            {
+              "name": "shouldAutoRestart",
+              "type": "bool",
+              "indexed": false
+            },
+            {
+              "name": "restartDelayBlocks",
+              "type": "uint256",
+              "indexed": false
+            },
+            {
+              "name": "confirmationBlock",
+              "type": "uint256",
+              "indexed": false
+            },
+            {
+              "name": "actionId",
+              "type": "uint256",
+              "indexed": false
+            }
+          ],
+          "anonymous": false,
+          "type": "event"
+        },
+        {
+          "name": "PendingRipeBondEpochLengthSet",
+          "inputs": [
+            {
+              "name": "epochLength",
+              "type": "uint256",
+              "indexed": false
+            },
+            {
+              "name": "confirmationBlock",
+              "type": "uint256",
+              "indexed": false
+            },
+            {
+              "name": "actionId",
+              "type": "uint256",
+              "indexed": false
+            }
+          ],
+          "anonymous": false,
+          "type": "event"
+        },
+        {
+          "name": "CanPurchaseRipeBondModified",
+          "inputs": [
+            {
+              "name": "canPurchaseRipeBond",
+              "type": "bool",
+              "indexed": false
+            },
+            {
+              "name": "modifier",
+              "type": "address",
+              "indexed": true
+            }
+          ],
+          "anonymous": false,
+          "type": "event"
+        },
+        {
+          "name": "PendingBadDebtSet",
+          "inputs": [
+            {
+              "name": "badDebt",
+              "type": "uint256",
+              "indexed": false
+            },
+            {
+              "name": "confirmationBlock",
+              "type": "uint256",
+              "indexed": false
+            },
+            {
+              "name": "actionId",
+              "type": "uint256",
+              "indexed": false
+            }
+          ],
+          "anonymous": false,
+          "type": "event"
+        },
+        {
+          "name": "PendingBondBoosterSet",
+          "inputs": [
+            {
+              "name": "bondBooster",
+              "type": "address",
+              "indexed": true
+            },
+            {
+              "name": "confirmationBlock",
+              "type": "uint256",
+              "indexed": false
+            },
+            {
+              "name": "actionId",
+              "type": "uint256",
+              "indexed": false
+            }
+          ],
+          "anonymous": false,
+          "type": "event"
+        },
+        {
+          "name": "PendingBoosterBoundariesSet",
+          "inputs": [
+            {
+              "name": "maxBoostRatio",
+              "type": "uint256",
+              "indexed": false
+            },
+            {
+              "name": "maxUnits",
+              "type": "uint256",
+              "indexed": false
+            },
+            {
+              "name": "confirmationBlock",
+              "type": "uint256",
+              "indexed": false
+            },
+            {
+              "name": "actionId",
+              "type": "uint256",
+              "indexed": false
+            }
+          ],
+          "anonymous": false,
+          "type": "event"
+        },
+        {
+          "name": "BoosterMinLockDurationSet",
+          "inputs": [
+            {
+              "name": "minLockDuration",
+              "type": "uint256",
+              "indexed": false
+            }
+          ],
+          "anonymous": false,
+          "type": "event"
+        },
+        {
+          "name": "PendingBoosterConfigsSet",
+          "inputs": [
+            {
+              "name": "numBoosters",
+              "type": "uint256",
+              "indexed": false
+            },
+            {
+              "name": "confirmationBlock",
+              "type": "uint256",
+              "indexed": false
+            },
+            {
+              "name": "actionId",
+              "type": "uint256",
+              "indexed": false
+            }
+          ],
+          "anonymous": false,
+          "type": "event"
+        },
+        {
+          "name": "ManyBondBoostersRemoved",
+          "inputs": [
+            {
+              "name": "numUsers",
+              "type": "uint256",
+              "indexed": false
+            }
+          ],
+          "anonymous": false,
+          "type": "event"
+        },
+        {
+          "name": "BondBoosterRemoved",
+          "inputs": [
+            {
+              "name": "user",
+              "type": "address",
+              "indexed": true
+            }
+          ],
+          "anonymous": false,
+          "type": "event"
+        },
+        {
+          "name": "PendingBoosterConfigSet",
+          "inputs": [
+            {
+              "name": "user",
+              "type": "address",
+              "indexed": true
+            },
+            {
+              "name": "confirmationBlock",
+              "type": "uint256",
+              "indexed": false
+            },
+            {
+              "name": "actionId",
+              "type": "uint256",
+              "indexed": false
+            }
+          ],
+          "anonymous": false,
+          "type": "event"
+        },
+        {
+          "name": "HrContribTemplateSet",
+          "inputs": [
+            {
+              "name": "contribTemplate",
+              "type": "address",
+              "indexed": true
+            }
+          ],
+          "anonymous": false,
+          "type": "event"
+        },
+        {
+          "name": "HrMaxCompensationSet",
+          "inputs": [
+            {
+              "name": "maxCompensation",
+              "type": "uint256",
+              "indexed": false
+            }
+          ],
+          "anonymous": false,
+          "type": "event"
+        },
+        {
+          "name": "HrMinCliffLengthSet",
+          "inputs": [
+            {
+              "name": "minCliffLength",
+              "type": "uint256",
+              "indexed": false
+            }
+          ],
+          "anonymous": false,
+          "type": "event"
+        },
+        {
+          "name": "HrMaxStartDelaySet",
+          "inputs": [
+            {
+              "name": "maxStartDelay",
+              "type": "uint256",
+              "indexed": false
+            }
+          ],
+          "anonymous": false,
+          "type": "event"
+        },
+        {
+          "name": "HrVestingLengthBoundariesSet",
+          "inputs": [
+            {
+              "name": "minVestingLength",
+              "type": "uint256",
+              "indexed": false
+            },
+            {
+              "name": "maxVestingLength",
+              "type": "uint256",
+              "indexed": false
+            }
+          ],
+          "anonymous": false,
+          "type": "event"
+        },
+        {
+          "name": "HrContributorManagerSet",
+          "inputs": [
+            {
+              "name": "contributor",
+              "type": "address",
+              "indexed": true
+            },
+            {
+              "name": "manager",
+              "type": "address",
+              "indexed": true
+            }
+          ],
+          "anonymous": false,
+          "type": "event"
+        },
+        {
+          "name": "HrContributorCancelPaycheckSet",
+          "inputs": [
+            {
+              "name": "contributor",
+              "type": "address",
+              "indexed": true
+            }
+          ],
+          "anonymous": false,
+          "type": "event"
+        },
+        {
+          "name": "RipeBondConfigSet",
+          "inputs": [
+            {
+              "name": "asset",
+              "type": "address",
+              "indexed": true
+            },
+            {
+              "name": "amountPerEpoch",
+              "type": "uint256",
+              "indexed": false
+            },
+            {
+              "name": "minRipePerUnit",
+              "type": "uint256",
+              "indexed": false
+            },
+            {
+              "name": "maxRipePerUnit",
+              "type": "uint256",
+              "indexed": false
+            },
+            {
+              "name": "maxRipePerUnitLockBonus",
+              "type": "uint256",
+              "indexed": false
+            },
+            {
+              "name": "shouldAutoRestart",
+              "type": "bool",
+              "indexed": false
+            }
+          ],
+          "anonymous": false,
+          "type": "event"
+        },
+        {
+          "name": "RipeBondEpochLengthSet",
+          "inputs": [
+            {
+              "name": "epochLength",
+              "type": "uint256",
+              "indexed": false
+            }
+          ],
+          "anonymous": false,
+          "type": "event"
+        },
+        {
+          "name": "RipeBondStartEpochAtBlockSet",
+          "inputs": [
+            {
+              "name": "startBlock",
+              "type": "uint256",
+              "indexed": false
+            }
+          ],
+          "anonymous": false,
+          "type": "event"
+        },
+        {
+          "name": "BadDebtSet",
+          "inputs": [
+            {
+              "name": "badDebt",
+              "type": "uint256",
+              "indexed": false
+            }
+          ],
+          "anonymous": false,
+          "type": "event"
+        },
+        {
+          "name": "RipeBondBoosterSet",
+          "inputs": [
+            {
+              "name": "bondBooster",
+              "type": "address",
+              "indexed": true
+            }
+          ],
+          "anonymous": false,
+          "type": "event"
+        },
+        {
+          "name": "ManyBondBoostersSet",
+          "inputs": [
+            {
+              "name": "numBoosters",
+              "type": "uint256",
+              "indexed": false
+            }
+          ],
+          "anonymous": false,
+          "type": "event"
+        },
+        {
+          "name": "BoosterBoundariesSet",
+          "inputs": [
+            {
+              "name": "maxBoostRatio",
+              "type": "uint256",
+              "indexed": false
+            },
+            {
+              "name": "maxUnits",
+              "type": "uint256",
+              "indexed": false
+            }
+          ],
+          "anonymous": false,
+          "type": "event"
+        },
+        {
+          "name": "PendingUserBalanceResetSet",
+          "inputs": [
+            {
+              "name": "numResets",
+              "type": "uint256",
+              "indexed": false
+            },
+            {
+              "name": "confirmationBlock",
+              "type": "uint256",
+              "indexed": false
+            },
+            {
+              "name": "actionId",
+              "type": "uint256",
+              "indexed": false
+            }
+          ],
+          "anonymous": false,
+          "type": "event"
+        },
+        {
+          "name": "PendingAssetResetSet",
+          "inputs": [
+            {
+              "name": "numResets",
+              "type": "uint256",
+              "indexed": false
+            },
+            {
+              "name": "confirmationBlock",
+              "type": "uint256",
+              "indexed": false
+            },
+            {
+              "name": "actionId",
+              "type": "uint256",
+              "indexed": false
+            }
+          ],
+          "anonymous": false,
+          "type": "event"
+        },
+        {
+          "name": "UserBalanceResetExecuted",
+          "inputs": [
+            {
+              "name": "numResets",
+              "type": "uint256",
+              "indexed": false
+            }
+          ],
+          "anonymous": false,
+          "type": "event"
+        },
+        {
+          "name": "AssetResetExecuted",
+          "inputs": [
+            {
+              "name": "numResets",
+              "type": "uint256",
+              "indexed": false
+            }
+          ],
+          "anonymous": false,
+          "type": "event"
+        },
+        {
+          "name": "PendingUserBorrowResetSet",
+          "inputs": [
+            {
+              "name": "numResets",
+              "type": "uint256",
+              "indexed": false
+            },
+            {
+              "name": "confirmationBlock",
+              "type": "uint256",
+              "indexed": false
+            },
+            {
+              "name": "actionId",
+              "type": "uint256",
+              "indexed": false
+            }
+          ],
+          "anonymous": false,
+          "type": "event"
+        },
+        {
+          "name": "UserBorrowResetExecuted",
+          "inputs": [
+            {
+              "name": "numResets",
+              "type": "uint256",
+              "indexed": false
+            }
+          ],
+          "anonymous": false,
+          "type": "event"
+        },
+        {
+          "name": "PendingRipeAvailableForRewardsChange",
+          "inputs": [
+            {
+              "name": "amount",
+              "type": "uint256",
+              "indexed": false
+            },
+            {
+              "name": "confirmationBlock",
+              "type": "uint256",
+              "indexed": false
+            },
+            {
+              "name": "actionId",
+              "type": "uint256",
+              "indexed": false
+            }
+          ],
+          "anonymous": false,
+          "type": "event"
+        },
+        {
+          "name": "PendingRipeAvailableForHrChange",
+          "inputs": [
+            {
+              "name": "amount",
+              "type": "uint256",
+              "indexed": false
+            },
+            {
+              "name": "confirmationBlock",
+              "type": "uint256",
+              "indexed": false
+            },
+            {
+              "name": "actionId",
+              "type": "uint256",
+              "indexed": false
+            }
+          ],
+          "anonymous": false,
+          "type": "event"
+        },
+        {
+          "name": "PendingRipeAvailableForBondsChange",
+          "inputs": [
+            {
+              "name": "amount",
+              "type": "uint256",
+              "indexed": false
+            },
+            {
+              "name": "confirmationBlock",
+              "type": "uint256",
+              "indexed": false
+            },
+            {
+              "name": "actionId",
+              "type": "uint256",
+              "indexed": false
+            }
+          ],
+          "anonymous": false,
+          "type": "event"
+        },
+        {
+          "name": "RipeAvailableForRewardsSet",
+          "inputs": [
+            {
+              "name": "amount",
+              "type": "uint256",
+              "indexed": false
+            }
+          ],
+          "anonymous": false,
+          "type": "event"
+        },
+        {
+          "name": "RipeAvailableForHrSet",
+          "inputs": [
+            {
+              "name": "amount",
+              "type": "uint256",
+              "indexed": false
+            }
+          ],
+          "anonymous": false,
+          "type": "event"
+        },
+        {
+          "name": "RipeAvailableForBondsSet",
+          "inputs": [
+            {
+              "name": "amount",
+              "type": "uint256",
+              "indexed": false
+            }
+          ],
+          "anonymous": false,
+          "type": "event"
+        },
+        {
+          "name": "PendingUnderscoreRegistryChange",
+          "inputs": [
+            {
+              "name": "underscoreRegistry",
+              "type": "address",
+              "indexed": false
+            },
+            {
+              "name": "confirmationBlock",
+              "type": "uint256",
+              "indexed": false
+            },
+            {
+              "name": "actionId",
+              "type": "uint256",
+              "indexed": false
+            }
+          ],
+          "anonymous": false,
+          "type": "event"
+        },
+        {
+          "name": "PendingShouldCheckLastTouchChange",
+          "inputs": [
+            {
+              "name": "shouldCheck",
+              "type": "bool",
+              "indexed": false
+            },
+            {
+              "name": "confirmationBlock",
+              "type": "uint256",
+              "indexed": false
+            },
+            {
+              "name": "actionId",
+              "type": "uint256",
+              "indexed": false
+            }
+          ],
+          "anonymous": false,
+          "type": "event"
+        },
+        {
+          "name": "UnderscoreRegistrySet",
+          "inputs": [
+            {
+              "name": "addr",
+              "type": "address",
+              "indexed": true
+            }
+          ],
+          "anonymous": false,
+          "type": "event"
+        },
+        {
+          "name": "ShouldCheckLastTouchSet",
+          "inputs": [
+            {
+              "name": "shouldCheck",
+              "type": "bool",
+              "indexed": false
+            }
+          ],
+          "anonymous": false,
+          "type": "event"
+        },
+        {
+          "name": "PendingMinDeleverageBpsChange",
+          "inputs": [
+            {
+              "name": "bps",
+              "type": "uint256",
+              "indexed": false
+            },
+            {
+              "name": "confirmationBlock",
+              "type": "uint256",
+              "indexed": false
+            },
+            {
+              "name": "actionId",
+              "type": "uint256",
+              "indexed": false
+            }
+          ],
+          "anonymous": false,
+          "type": "event"
+        },
+        {
+          "name": "MinDeleverageBpsSet",
+          "inputs": [
+            {
+              "name": "bps",
+              "type": "uint256",
+              "indexed": false
+            }
+          ],
+          "anonymous": false,
+          "type": "event"
+        },
+        {
+          "name": "PendingDeleverageBufferChange",
+          "inputs": [
+            {
+              "name": "bps",
+              "type": "uint256",
+              "indexed": false
+            },
+            {
+              "name": "confirmationBlock",
+              "type": "uint256",
+              "indexed": false
+            },
+            {
+              "name": "actionId",
+              "type": "uint256",
+              "indexed": false
+            }
+          ],
+          "anonymous": false,
+          "type": "event"
+        },
+        {
+          "name": "DeleverageBufferSet",
+          "inputs": [
+            {
+              "name": "bps",
+              "type": "uint256",
+              "indexed": false
+            }
+          ],
+          "anonymous": false,
+          "type": "event"
+        },
+        {
+          "name": "PendingDeleverageCooldownChange",
+          "inputs": [
+            {
+              "name": "blocks",
+              "type": "uint256",
+              "indexed": false
+            },
+            {
+              "name": "confirmationBlock",
+              "type": "uint256",
+              "indexed": false
+            },
+            {
+              "name": "actionId",
+              "type": "uint256",
+              "indexed": false
+            }
+          ],
+          "anonymous": false,
+          "type": "event"
+        },
+        {
+          "name": "DeleverageCooldownSet",
+          "inputs": [
+            {
+              "name": "blocks",
+              "type": "uint256",
+              "indexed": false
+            }
+          ],
+          "anonymous": false,
+          "type": "event"
+        },
+        {
+          "name": "PendingUnderscoreSafeSpreadBpsChange",
+          "inputs": [
+            {
+              "name": "bps",
+              "type": "uint256",
+              "indexed": false
+            },
+            {
+              "name": "confirmationBlock",
+              "type": "uint256",
+              "indexed": false
+            },
+            {
+              "name": "actionId",
+              "type": "uint256",
+              "indexed": false
+            }
+          ],
+          "anonymous": false,
+          "type": "event"
+        },
+        {
+          "name": "UnderscoreSafeSpreadBpsSet",
+          "inputs": [
+            {
+              "name": "bps",
+              "type": "uint256",
+              "indexed": false
+            }
+          ],
+          "anonymous": false,
+          "type": "event"
+        },
+        {
+          "name": "GovChangeTimeLockModified",
+          "inputs": [
+            {
+              "name": "prevTimeLock",
+              "type": "uint256",
+              "indexed": false
+            },
+            {
+              "name": "newTimeLock",
+              "type": "uint256",
+              "indexed": false
+            }
+          ],
+          "anonymous": false,
+          "type": "event"
+        },
+        {
+          "name": "ExpirationSet",
+          "inputs": [
+            {
+              "name": "expiration",
+              "type": "uint256",
+              "indexed": false
+            }
+          ],
+          "anonymous": false,
+          "type": "event"
+        },
+        {
+          "name": "ActionTimeLockSet",
+          "inputs": [
+            {
+              "name": "newTimeLock",
+              "type": "uint256",
+              "indexed": false
+            },
+            {
+              "name": "prevTimeLock",
+              "type": "uint256",
+              "indexed": false
+            }
+          ],
+          "anonymous": false,
+          "type": "event"
+        },
+        {
+          "name": "GovChangeStarted",
+          "inputs": [
+            {
+              "name": "prevGov",
+              "type": "address",
+              "indexed": true
+            },
+            {
+              "name": "newGov",
+              "type": "address",
+              "indexed": true
+            },
+            {
+              "name": "confirmBlock",
+              "type": "uint256",
+              "indexed": false
+            }
+          ],
+          "anonymous": false,
+          "type": "event"
+        },
+        {
+          "name": "GovChangeConfirmed",
+          "inputs": [
+            {
+              "name": "prevGov",
+              "type": "address",
+              "indexed": true
+            },
+            {
+              "name": "newGov",
+              "type": "address",
+              "indexed": true
+            },
+            {
+              "name": "initiatedBlock",
+              "type": "uint256",
+              "indexed": false
+            },
+            {
+              "name": "confirmBlock",
+              "type": "uint256",
+              "indexed": false
+            }
+          ],
+          "anonymous": false,
+          "type": "event"
+        },
+        {
+          "name": "GovChangeCancelled",
+          "inputs": [
+            {
+              "name": "cancelledGov",
+              "type": "address",
+              "indexed": true
+            },
+            {
+              "name": "initiatedBlock",
+              "type": "uint256",
+              "indexed": false
+            },
+            {
+              "name": "confirmBlock",
+              "type": "uint256",
+              "indexed": false
+            }
+          ],
+          "anonymous": false,
+          "type": "event"
+        },
+        {
+          "name": "GovRelinquished",
+          "inputs": [
+            {
+              "name": "prevGov",
+              "type": "address",
+              "indexed": true
+            }
+          ],
+          "anonymous": false,
+          "type": "event"
+        },
+        {
+          "name": "RipeHqSetupFinished",
+          "inputs": [
+            {
+              "name": "prevGov",
+              "type": "address",
+              "indexed": true
+            },
+            {
+              "name": "newGov",
+              "type": "address",
+              "indexed": true
+            },
+            {
+              "name": "timeLock",
+              "type": "uint256",
+              "indexed": false
+            }
+          ],
+          "anonymous": false,
+          "type": "event"
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "getRipeHqFromGov",
+          "inputs": [],
+          "outputs": [
+            {
+              "name": "",
+              "type": "address"
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "canGovern",
+          "inputs": [
+            {
+              "name": "_addr",
+              "type": "address"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "bool"
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "getGovernors",
+          "inputs": [],
+          "outputs": [
+            {
+              "name": "",
+              "type": "address[]"
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "hasPendingGovChange",
+          "inputs": [],
+          "outputs": [
+            {
+              "name": "",
+              "type": "bool"
+            }
+          ]
+        },
+        {
+          "stateMutability": "nonpayable",
+          "type": "function",
+          "name": "startGovernanceChange",
+          "inputs": [
+            {
+              "name": "_newGov",
+              "type": "address"
+            }
+          ],
+          "outputs": []
+        },
+        {
+          "stateMutability": "nonpayable",
+          "type": "function",
+          "name": "confirmGovernanceChange",
+          "inputs": [],
+          "outputs": []
+        },
+        {
+          "stateMutability": "nonpayable",
+          "type": "function",
+          "name": "cancelGovernanceChange",
+          "inputs": [],
+          "outputs": []
+        },
+        {
+          "stateMutability": "nonpayable",
+          "type": "function",
+          "name": "relinquishGov",
+          "inputs": [],
+          "outputs": []
+        },
+        {
+          "stateMutability": "nonpayable",
+          "type": "function",
+          "name": "setGovTimeLock",
+          "inputs": [
+            {
+              "name": "_numBlocks",
+              "type": "uint256"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "bool"
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "isValidGovTimeLock",
+          "inputs": [
+            {
+              "name": "_newTimeLock",
+              "type": "uint256"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "bool"
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "minGovChangeTimeLock",
+          "inputs": [],
+          "outputs": [
+            {
+              "name": "",
+              "type": "uint256"
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "maxGovChangeTimeLock",
+          "inputs": [],
+          "outputs": [
+            {
+              "name": "",
+              "type": "uint256"
+            }
+          ]
+        },
+        {
+          "stateMutability": "nonpayable",
+          "type": "function",
+          "name": "finishRipeHqSetup",
+          "inputs": [
+            {
+              "name": "_newGov",
+              "type": "address"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "bool"
+            }
+          ]
+        },
+        {
+          "stateMutability": "nonpayable",
+          "type": "function",
+          "name": "finishRipeHqSetup",
+          "inputs": [
+            {
+              "name": "_newGov",
+              "type": "address"
+            },
+            {
+              "name": "_timeLock",
+              "type": "uint256"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "bool"
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "governance",
+          "inputs": [],
+          "outputs": [
+            {
+              "name": "",
+              "type": "address"
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "pendingGov",
+          "inputs": [],
+          "outputs": [
+            {
+              "name": "",
+              "type": "tuple",
+              "components": [
+                {
+                  "name": "newGov",
+                  "type": "address"
+                },
+                {
+                  "name": "initiatedBlock",
+                  "type": "uint256"
+                },
+                {
+                  "name": "confirmBlock",
+                  "type": "uint256"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "numGovChanges",
+          "inputs": [],
+          "outputs": [
+            {
+              "name": "",
+              "type": "uint256"
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "govChangeTimeLock",
+          "inputs": [],
+          "outputs": [
+            {
+              "name": "",
+              "type": "uint256"
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "canConfirmAction",
+          "inputs": [
+            {
+              "name": "_actionId",
+              "type": "uint256"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "bool"
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "isExpired",
+          "inputs": [
+            {
+              "name": "_actionId",
+              "type": "uint256"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "bool"
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "hasPendingAction",
+          "inputs": [
+            {
+              "name": "_actionId",
+              "type": "uint256"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "bool"
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "getActionConfirmationBlock",
+          "inputs": [
+            {
+              "name": "_actionId",
+              "type": "uint256"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "uint256"
+            }
+          ]
+        },
+        {
+          "stateMutability": "nonpayable",
+          "type": "function",
+          "name": "setActionTimeLock",
+          "inputs": [
+            {
+              "name": "_newTimeLock",
+              "type": "uint256"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "bool"
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "isValidActionTimeLock",
+          "inputs": [
+            {
+              "name": "_newTimeLock",
+              "type": "uint256"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "bool"
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "minActionTimeLock",
+          "inputs": [],
+          "outputs": [
+            {
+              "name": "",
+              "type": "uint256"
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "maxActionTimeLock",
+          "inputs": [],
+          "outputs": [
+            {
+              "name": "",
+              "type": "uint256"
+            }
+          ]
+        },
+        {
+          "stateMutability": "nonpayable",
+          "type": "function",
+          "name": "setExpiration",
+          "inputs": [
+            {
+              "name": "_expiration",
+              "type": "uint256"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "bool"
+            }
+          ]
+        },
+        {
+          "stateMutability": "nonpayable",
+          "type": "function",
+          "name": "setActionTimeLockAfterSetup",
+          "inputs": [],
+          "outputs": [
+            {
+              "name": "",
+              "type": "bool"
+            }
+          ]
+        },
+        {
+          "stateMutability": "nonpayable",
+          "type": "function",
+          "name": "setActionTimeLockAfterSetup",
+          "inputs": [
+            {
+              "name": "_newTimeLock",
+              "type": "uint256"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "bool"
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "pendingActions",
+          "inputs": [
+            {
+              "name": "arg0",
+              "type": "uint256"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "tuple",
+              "components": [
+                {
+                  "name": "initiatedBlock",
+                  "type": "uint256"
+                },
+                {
+                  "name": "confirmBlock",
+                  "type": "uint256"
+                },
+                {
+                  "name": "expiration",
+                  "type": "uint256"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "actionId",
+          "inputs": [],
+          "outputs": [
+            {
+              "name": "",
+              "type": "uint256"
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "actionTimeLock",
+          "inputs": [],
+          "outputs": [
+            {
+              "name": "",
+              "type": "uint256"
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "expiration",
+          "inputs": [],
+          "outputs": [
+            {
+              "name": "",
+              "type": "uint256"
+            }
+          ]
+        },
+        {
+          "stateMutability": "nonpayable",
+          "type": "function",
+          "name": "deleverageUser",
+          "inputs": [
+            {
+              "name": "_user",
+              "type": "address"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "uint256"
+            }
+          ]
+        },
+        {
+          "stateMutability": "nonpayable",
+          "type": "function",
+          "name": "deleverageUser",
+          "inputs": [
+            {
+              "name": "_user",
+              "type": "address"
+            },
+            {
+              "name": "_targetRepayAmount",
+              "type": "uint256"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "uint256"
+            }
+          ]
+        },
+        {
+          "stateMutability": "nonpayable",
+          "type": "function",
+          "name": "deleverageManyUsers",
+          "inputs": [
+            {
+              "name": "_users",
+              "type": "tuple[]",
+              "components": [
+                {
+                  "name": "user",
+                  "type": "address"
+                },
+                {
+                  "name": "targetRepayAmount",
+                  "type": "uint256"
+                }
+              ]
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "uint256"
+            }
+          ]
+        },
+        {
+          "stateMutability": "nonpayable",
+          "type": "function",
+          "name": "deleverageWithSpecificAssets",
+          "inputs": [
+            {
+              "name": "_assets",
+              "type": "tuple[]",
+              "components": [
+                {
+                  "name": "vaultId",
+                  "type": "uint256"
+                },
+                {
+                  "name": "asset",
+                  "type": "address"
+                },
+                {
+                  "name": "targetRepayAmount",
+                  "type": "uint256"
+                }
+              ]
+            },
+            {
+              "name": "_user",
+              "type": "address"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "uint256"
+            }
+          ]
+        },
+        {
+          "stateMutability": "nonpayable",
+          "type": "function",
+          "name": "deleverageWithVolAssets",
+          "inputs": [
+            {
+              "name": "_user",
+              "type": "address"
+            },
+            {
+              "name": "_assets",
+              "type": "tuple[]",
+              "components": [
+                {
+                  "name": "vaultId",
+                  "type": "uint256"
+                },
+                {
+                  "name": "asset",
+                  "type": "address"
+                },
+                {
+                  "name": "targetRepayAmount",
+                  "type": "uint256"
+                }
+              ]
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "uint256"
+            }
+          ]
+        },
+        {
+          "stateMutability": "nonpayable",
+          "type": "function",
+          "name": "setMinDeleverageBps",
+          "inputs": [
+            {
+              "name": "_bps",
+              "type": "uint256"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "uint256"
+            }
+          ]
+        },
+        {
+          "stateMutability": "nonpayable",
+          "type": "function",
+          "name": "setDeleverageBuffer",
+          "inputs": [
+            {
+              "name": "_bps",
+              "type": "uint256"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "uint256"
+            }
+          ]
+        },
+        {
+          "stateMutability": "nonpayable",
+          "type": "function",
+          "name": "setDeleverageCooldown",
+          "inputs": [
+            {
+              "name": "_blocks",
+              "type": "uint256"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "uint256"
+            }
+          ]
+        },
+        {
+          "stateMutability": "nonpayable",
+          "type": "function",
+          "name": "setUnderscoreSafeSpreadBps",
+          "inputs": [
+            {
+              "name": "_bps",
+              "type": "uint256"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "uint256"
+            }
+          ]
+        },
+        {
+          "stateMutability": "nonpayable",
+          "type": "function",
+          "name": "setContributorTemplate",
+          "inputs": [
+            {
+              "name": "_contribTemplate",
+              "type": "address"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "uint256"
+            }
+          ]
+        },
+        {
+          "stateMutability": "nonpayable",
+          "type": "function",
+          "name": "setContributorTemplate",
+          "inputs": [
+            {
+              "name": "_contribTemplate",
+              "type": "address"
+            },
+            {
+              "name": "_missionControl",
+              "type": "address"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "uint256"
+            }
+          ]
+        },
+        {
+          "stateMutability": "nonpayable",
+          "type": "function",
+          "name": "setMaxCompensation",
+          "inputs": [
+            {
+              "name": "_maxComp",
+              "type": "uint256"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "uint256"
+            }
+          ]
+        },
+        {
+          "stateMutability": "nonpayable",
+          "type": "function",
+          "name": "setMaxCompensation",
+          "inputs": [
+            {
+              "name": "_maxComp",
+              "type": "uint256"
+            },
+            {
+              "name": "_missionControl",
+              "type": "address"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "uint256"
+            }
+          ]
+        },
+        {
+          "stateMutability": "nonpayable",
+          "type": "function",
+          "name": "setMinCliffLength",
+          "inputs": [
+            {
+              "name": "_minCliffLength",
+              "type": "uint256"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "uint256"
+            }
+          ]
+        },
+        {
+          "stateMutability": "nonpayable",
+          "type": "function",
+          "name": "setMinCliffLength",
+          "inputs": [
+            {
+              "name": "_minCliffLength",
+              "type": "uint256"
+            },
+            {
+              "name": "_missionControl",
+              "type": "address"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "uint256"
+            }
+          ]
+        },
+        {
+          "stateMutability": "nonpayable",
+          "type": "function",
+          "name": "setMaxStartDelay",
+          "inputs": [
+            {
+              "name": "_maxStartDelay",
+              "type": "uint256"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "uint256"
+            }
+          ]
+        },
+        {
+          "stateMutability": "nonpayable",
+          "type": "function",
+          "name": "setMaxStartDelay",
+          "inputs": [
+            {
+              "name": "_maxStartDelay",
+              "type": "uint256"
+            },
+            {
+              "name": "_missionControl",
+              "type": "address"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "uint256"
+            }
+          ]
+        },
+        {
+          "stateMutability": "nonpayable",
+          "type": "function",
+          "name": "setVestingLengthBoundaries",
+          "inputs": [
+            {
+              "name": "_minVestingLength",
+              "type": "uint256"
+            },
+            {
+              "name": "_maxVestingLength",
+              "type": "uint256"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "uint256"
+            }
+          ]
+        },
+        {
+          "stateMutability": "nonpayable",
+          "type": "function",
+          "name": "setVestingLengthBoundaries",
+          "inputs": [
+            {
+              "name": "_minVestingLength",
+              "type": "uint256"
+            },
+            {
+              "name": "_maxVestingLength",
+              "type": "uint256"
+            },
+            {
+              "name": "_missionControl",
+              "type": "address"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "uint256"
+            }
+          ]
+        },
+        {
+          "stateMutability": "nonpayable",
+          "type": "function",
+          "name": "cancelPaycheckForContributor",
+          "inputs": [
+            {
+              "name": "_contributor",
+              "type": "address"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "uint256"
+            }
+          ]
+        },
+        {
+          "stateMutability": "nonpayable",
+          "type": "function",
+          "name": "setManagerForContributor",
+          "inputs": [
+            {
+              "name": "_contributor",
+              "type": "address"
+            },
+            {
+              "name": "_manager",
+              "type": "address"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "uint256"
+            }
+          ]
+        },
+        {
+          "stateMutability": "nonpayable",
+          "type": "function",
+          "name": "cashRipeCheckForContributor",
+          "inputs": [
+            {
+              "name": "_contributor",
+              "type": "address"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "bool"
+            }
+          ]
+        },
+        {
+          "stateMutability": "nonpayable",
+          "type": "function",
+          "name": "cancelRipeTransferForContributor",
+          "inputs": [
+            {
+              "name": "_contributor",
+              "type": "address"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "bool"
+            }
+          ]
+        },
+        {
+          "stateMutability": "nonpayable",
+          "type": "function",
+          "name": "cancelOwnershipChangeForContributor",
+          "inputs": [
+            {
+              "name": "_contributor",
+              "type": "address"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "bool"
+            }
+          ]
+        },
+        {
+          "stateMutability": "nonpayable",
+          "type": "function",
+          "name": "freezeContributor",
+          "inputs": [
+            {
+              "name": "_contributor",
+              "type": "address"
+            },
+            {
+              "name": "_shouldFreeze",
+              "type": "bool"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "bool"
+            }
+          ]
+        },
+        {
+          "stateMutability": "nonpayable",
+          "type": "function",
+          "name": "setRipeBondConfig",
+          "inputs": [
+            {
+              "name": "_asset",
+              "type": "address"
+            },
+            {
+              "name": "_amountPerEpoch",
+              "type": "uint256"
+            },
+            {
+              "name": "_minRipePerUnit",
+              "type": "uint256"
+            },
+            {
+              "name": "_maxRipePerUnit",
+              "type": "uint256"
+            },
+            {
+              "name": "_maxRipePerUnitLockBonus",
+              "type": "uint256"
+            },
+            {
+              "name": "_shouldAutoRestart",
+              "type": "bool"
+            },
+            {
+              "name": "_restartDelayBlocks",
+              "type": "uint256"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "uint256"
+            }
+          ]
+        },
+        {
+          "stateMutability": "nonpayable",
+          "type": "function",
+          "name": "setRipeBondConfig",
+          "inputs": [
+            {
+              "name": "_asset",
+              "type": "address"
+            },
+            {
+              "name": "_amountPerEpoch",
+              "type": "uint256"
+            },
+            {
+              "name": "_minRipePerUnit",
+              "type": "uint256"
+            },
+            {
+              "name": "_maxRipePerUnit",
+              "type": "uint256"
+            },
+            {
+              "name": "_maxRipePerUnitLockBonus",
+              "type": "uint256"
+            },
+            {
+              "name": "_shouldAutoRestart",
+              "type": "bool"
+            },
+            {
+              "name": "_restartDelayBlocks",
+              "type": "uint256"
+            },
+            {
+              "name": "_missionControl",
+              "type": "address"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "uint256"
+            }
+          ]
+        },
+        {
+          "stateMutability": "nonpayable",
+          "type": "function",
+          "name": "setRipeBondEpochLength",
+          "inputs": [
+            {
+              "name": "_epochLength",
+              "type": "uint256"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "uint256"
+            }
+          ]
+        },
+        {
+          "stateMutability": "nonpayable",
+          "type": "function",
+          "name": "setRipeBondEpochLength",
+          "inputs": [
+            {
+              "name": "_epochLength",
+              "type": "uint256"
+            },
+            {
+              "name": "_missionControl",
+              "type": "address"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "uint256"
+            }
+          ]
+        },
+        {
+          "stateMutability": "nonpayable",
+          "type": "function",
+          "name": "setStartEpochAtBlock",
+          "inputs": [],
+          "outputs": []
+        },
+        {
+          "stateMutability": "nonpayable",
+          "type": "function",
+          "name": "setStartEpochAtBlock",
+          "inputs": [
+            {
+              "name": "_block",
+              "type": "uint256"
+            }
+          ],
+          "outputs": []
+        },
+        {
+          "stateMutability": "nonpayable",
+          "type": "function",
+          "name": "setCanPurchaseRipeBond",
+          "inputs": [
+            {
+              "name": "_canBond",
+              "type": "bool"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "bool"
+            }
+          ]
+        },
+        {
+          "stateMutability": "nonpayable",
+          "type": "function",
+          "name": "setCanPurchaseRipeBond",
+          "inputs": [
+            {
+              "name": "_canBond",
+              "type": "bool"
+            },
+            {
+              "name": "_missionControl",
+              "type": "address"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "bool"
+            }
+          ]
+        },
+        {
+          "stateMutability": "nonpayable",
+          "type": "function",
+          "name": "setBadDebt",
+          "inputs": [
+            {
+              "name": "_amount",
+              "type": "uint256"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "uint256"
+            }
+          ]
+        },
+        {
+          "stateMutability": "nonpayable",
+          "type": "function",
+          "name": "setRipeAvailableForRewards",
+          "inputs": [
+            {
+              "name": "_amount",
+              "type": "uint256"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "uint256"
+            }
+          ]
+        },
+        {
+          "stateMutability": "nonpayable",
+          "type": "function",
+          "name": "setRipeAvailableForHr",
+          "inputs": [
+            {
+              "name": "_amount",
+              "type": "uint256"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "uint256"
+            }
+          ]
+        },
+        {
+          "stateMutability": "nonpayable",
+          "type": "function",
+          "name": "setRipeAvailableForBonds",
+          "inputs": [
+            {
+              "name": "_amount",
+              "type": "uint256"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "uint256"
+            }
+          ]
+        },
+        {
+          "stateMutability": "nonpayable",
+          "type": "function",
+          "name": "setUnderscoreRegistry",
+          "inputs": [
+            {
+              "name": "_underscoreRegistry",
+              "type": "address"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "uint256"
+            }
+          ]
+        },
+        {
+          "stateMutability": "nonpayable",
+          "type": "function",
+          "name": "setUnderscoreRegistry",
+          "inputs": [
+            {
+              "name": "_underscoreRegistry",
+              "type": "address"
+            },
+            {
+              "name": "_missionControl",
+              "type": "address"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "uint256"
+            }
+          ]
+        },
+        {
+          "stateMutability": "nonpayable",
+          "type": "function",
+          "name": "setShouldCheckLastTouch",
+          "inputs": [
+            {
+              "name": "_shouldCheck",
+              "type": "bool"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "uint256"
+            }
+          ]
+        },
+        {
+          "stateMutability": "nonpayable",
+          "type": "function",
+          "name": "setShouldCheckLastTouch",
+          "inputs": [
+            {
+              "name": "_shouldCheck",
+              "type": "bool"
+            },
+            {
+              "name": "_missionControl",
+              "type": "address"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "uint256"
+            }
+          ]
+        },
+        {
+          "stateMutability": "nonpayable",
+          "type": "function",
+          "name": "setRipeBondBooster",
+          "inputs": [
+            {
+              "name": "_bondBooster",
+              "type": "address"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "uint256"
+            }
+          ]
+        },
+        {
+          "stateMutability": "nonpayable",
+          "type": "function",
+          "name": "setManyBondBoosters",
+          "inputs": [
+            {
+              "name": "_boosters",
+              "type": "tuple[]",
+              "components": [
+                {
+                  "name": "user",
+                  "type": "address"
+                },
+                {
+                  "name": "boostRatio",
+                  "type": "uint256"
+                },
+                {
+                  "name": "maxUnitsAllowed",
+                  "type": "uint256"
+                },
+                {
+                  "name": "expireBlock",
+                  "type": "uint256"
+                }
+              ]
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "uint256"
+            }
+          ]
+        },
+        {
+          "stateMutability": "nonpayable",
+          "type": "function",
+          "name": "setBondBooster",
+          "inputs": [
+            {
+              "name": "_config",
+              "type": "tuple",
+              "components": [
+                {
+                  "name": "user",
+                  "type": "address"
+                },
+                {
+                  "name": "boostRatio",
+                  "type": "uint256"
+                },
+                {
+                  "name": "maxUnitsAllowed",
+                  "type": "uint256"
+                },
+                {
+                  "name": "expireBlock",
+                  "type": "uint256"
+                }
+              ]
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "uint256"
+            }
+          ]
+        },
+        {
+          "stateMutability": "nonpayable",
+          "type": "function",
+          "name": "removeManyBondBoosters",
+          "inputs": [
+            {
+              "name": "_users",
+              "type": "address[]"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "bool"
+            }
+          ]
+        },
+        {
+          "stateMutability": "nonpayable",
+          "type": "function",
+          "name": "removeBondBooster",
+          "inputs": [
+            {
+              "name": "_user",
+              "type": "address"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "bool"
+            }
+          ]
+        },
+        {
+          "stateMutability": "nonpayable",
+          "type": "function",
+          "name": "setBoosterBoundaries",
+          "inputs": [
+            {
+              "name": "_maxBoostRatio",
+              "type": "uint256"
+            },
+            {
+              "name": "_maxUnits",
+              "type": "uint256"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "uint256"
+            }
+          ]
+        },
+        {
+          "stateMutability": "nonpayable",
+          "type": "function",
+          "name": "setBoosterMinLockDuration",
+          "inputs": [
+            {
+              "name": "_minLockDuration",
+              "type": "uint256"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "bool"
+            }
+          ]
+        },
+        {
+          "stateMutability": "nonpayable",
+          "type": "function",
+          "name": "resetManyUserBalancePoints",
+          "inputs": [
+            {
+              "name": "_users",
+              "type": "tuple[]",
+              "components": [
+                {
+                  "name": "user",
+                  "type": "address"
+                },
+                {
+                  "name": "asset",
+                  "type": "address"
+                },
+                {
+                  "name": "vaultId",
+                  "type": "uint256"
+                }
+              ]
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "uint256"
+            }
+          ]
+        },
+        {
+          "stateMutability": "nonpayable",
+          "type": "function",
+          "name": "resetManyAssetPoints",
+          "inputs": [
+            {
+              "name": "_assets",
+              "type": "tuple[]",
+              "components": [
+                {
+                  "name": "asset",
+                  "type": "address"
+                },
+                {
+                  "name": "vaultId",
+                  "type": "uint256"
+                }
+              ]
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "uint256"
+            }
+          ]
+        },
+        {
+          "stateMutability": "nonpayable",
+          "type": "function",
+          "name": "resetManyUserBorrowPoints",
+          "inputs": [
+            {
+              "name": "_users",
+              "type": "address[]"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "uint256"
+            }
+          ]
+        },
+        {
+          "stateMutability": "nonpayable",
+          "type": "function",
+          "name": "executePendingAction",
+          "inputs": [
+            {
+              "name": "_aid",
+              "type": "uint256"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "bool"
+            }
+          ]
+        },
+        {
+          "stateMutability": "nonpayable",
+          "type": "function",
+          "name": "cancelPendingAction",
+          "inputs": [
+            {
+              "name": "_aid",
+              "type": "uint256"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "bool"
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "actionType",
+          "inputs": [
+            {
+              "name": "arg0",
+              "type": "uint256"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "uint256"
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "pendingHrConfig",
+          "inputs": [
+            {
+              "name": "arg0",
+              "type": "uint256"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "tuple",
+              "components": [
+                {
+                  "name": "contribTemplate",
+                  "type": "address"
+                },
+                {
+                  "name": "maxCompensation",
+                  "type": "uint256"
+                },
+                {
+                  "name": "minCliffLength",
+                  "type": "uint256"
+                },
+                {
+                  "name": "maxStartDelay",
+                  "type": "uint256"
+                },
+                {
+                  "name": "minVestingLength",
+                  "type": "uint256"
+                },
+                {
+                  "name": "maxVestingLength",
+                  "type": "uint256"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "pendingManager",
+          "inputs": [
+            {
+              "name": "arg0",
+              "type": "uint256"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "tuple",
+              "components": [
+                {
+                  "name": "contributor",
+                  "type": "address"
+                },
+                {
+                  "name": "pendingManager",
+                  "type": "address"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "pendingCancelPaycheck",
+          "inputs": [
+            {
+              "name": "arg0",
+              "type": "uint256"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "address"
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "pendingRipeBondConfig",
+          "inputs": [
+            {
+              "name": "arg0",
+              "type": "uint256"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "tuple",
+              "components": [
+                {
+                  "name": "asset",
+                  "type": "address"
+                },
+                {
+                  "name": "amountPerEpoch",
+                  "type": "uint256"
+                },
+                {
+                  "name": "canBond",
+                  "type": "bool"
+                },
+                {
+                  "name": "minRipePerUnit",
+                  "type": "uint256"
+                },
+                {
+                  "name": "maxRipePerUnit",
+                  "type": "uint256"
+                },
+                {
+                  "name": "maxRipePerUnitLockBonus",
+                  "type": "uint256"
+                },
+                {
+                  "name": "epochLength",
+                  "type": "uint256"
+                },
+                {
+                  "name": "shouldAutoRestart",
+                  "type": "bool"
+                },
+                {
+                  "name": "restartDelayBlocks",
+                  "type": "uint256"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "pendingRipeBondConfigValue",
+          "inputs": [
+            {
+              "name": "arg0",
+              "type": "uint256"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "uint256"
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "pendingBondBooster",
+          "inputs": [
+            {
+              "name": "arg0",
+              "type": "uint256"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "address"
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "pendingBoosterConfigs",
+          "inputs": [
+            {
+              "name": "arg0",
+              "type": "uint256"
+            },
+            {
+              "name": "arg1",
+              "type": "uint256"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "tuple",
+              "components": [
+                {
+                  "name": "user",
+                  "type": "address"
+                },
+                {
+                  "name": "boostRatio",
+                  "type": "uint256"
+                },
+                {
+                  "name": "maxUnitsAllowed",
+                  "type": "uint256"
+                },
+                {
+                  "name": "expireBlock",
+                  "type": "uint256"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "pendingBoosterBoundaries",
+          "inputs": [
+            {
+              "name": "arg0",
+              "type": "uint256"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "tuple",
+              "components": [
+                {
+                  "name": "maxBoostRatio",
+                  "type": "uint256"
+                },
+                {
+                  "name": "maxUnits",
+                  "type": "uint256"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "pendingUserBalanceReset",
+          "inputs": [
+            {
+              "name": "arg0",
+              "type": "uint256"
+            },
+            {
+              "name": "arg1",
+              "type": "uint256"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "tuple",
+              "components": [
+                {
+                  "name": "user",
+                  "type": "address"
+                },
+                {
+                  "name": "asset",
+                  "type": "address"
+                },
+                {
+                  "name": "vaultId",
+                  "type": "uint256"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "pendingAssetReset",
+          "inputs": [
+            {
+              "name": "arg0",
+              "type": "uint256"
+            },
+            {
+              "name": "arg1",
+              "type": "uint256"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "tuple",
+              "components": [
+                {
+                  "name": "asset",
+                  "type": "address"
+                },
+                {
+                  "name": "vaultId",
+                  "type": "uint256"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "pendingUserBorrowReset",
+          "inputs": [
+            {
+              "name": "arg0",
+              "type": "uint256"
+            },
+            {
+              "name": "arg1",
+              "type": "uint256"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "address"
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "pendingRipeAvailable",
+          "inputs": [
+            {
+              "name": "arg0",
+              "type": "uint256"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "uint256"
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "pendingUnderscoreRegistry",
+          "inputs": [
+            {
+              "name": "arg0",
+              "type": "uint256"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "address"
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "pendingShouldCheckLastTouch",
+          "inputs": [
+            {
+              "name": "arg0",
+              "type": "uint256"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "bool"
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "pendingMinDeleverageBps",
+          "inputs": [
+            {
+              "name": "arg0",
+              "type": "uint256"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "uint256"
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "pendingDeleverageBuffer",
+          "inputs": [
+            {
+              "name": "arg0",
+              "type": "uint256"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "uint256"
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "pendingDeleverageCooldown",
+          "inputs": [
+            {
+              "name": "arg0",
+              "type": "uint256"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "uint256"
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "pendingUnderscoreSafeSpreadBps",
+          "inputs": [
+            {
+              "name": "arg0",
+              "type": "uint256"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "uint256"
+            }
+          ]
+        },
+        {
+          "stateMutability": "view",
+          "type": "function",
+          "name": "pendingMissionControl",
+          "inputs": [
+            {
+              "name": "arg0",
+              "type": "uint256"
+            }
+          ],
+          "outputs": [
+            {
+              "name": "",
+              "type": "address"
+            }
+          ]
+        },
+        {
+          "stateMutability": "nonpayable",
+          "type": "constructor",
+          "inputs": [
+            {
+              "name": "_ripeHq",
+              "type": "address"
+            },
+            {
+              "name": "_tempGov",
+              "type": "address"
+            },
+            {
+              "name": "_minConfigTimeLock",
+              "type": "uint256"
+            },
+            {
+              "name": "_maxConfigTimeLock",
+              "type": "uint256"
+            }
+          ],
+          "outputs": []
+        }
+      ],
+      "solc_json": {
+        "language": "Vyper",
+        "sources": {
+          "contracts/modules/LocalGov.vy": {
+            "content": "# Ripe Protocol License: https://github.com/ripe-foundation/ripe-protocol/blob/master/LICENSE.md\n# Ripe Foundation (C) 2025\n\n# @version 0.4.3\n\ninterface RipeHq:\n    def minGovChangeTimeLock() -> uint256: view\n    def maxGovChangeTimeLock() -> uint256: view\n    def governance() -> address: view\n\nstruct PendingGovernance:\n    newGov: address\n    initiatedBlock: uint256\n    confirmBlock: uint256\n\nevent GovChangeStarted:\n    prevGov: indexed(address)\n    newGov: indexed(address)\n    confirmBlock: uint256\n\nevent GovChangeConfirmed:\n    prevGov: indexed(address)\n    newGov: indexed(address)\n    initiatedBlock: uint256\n    confirmBlock: uint256\n\nevent GovChangeCancelled:\n    cancelledGov: indexed(address)\n    initiatedBlock: uint256\n    confirmBlock: uint256\n\nevent GovRelinquished:\n    prevGov: indexed(address)\n\nevent GovChangeTimeLockModified:\n    prevTimeLock: uint256\n    newTimeLock: uint256\n\nevent RipeHqSetupFinished:\n    prevGov: indexed(address)\n    newGov: indexed(address)\n    timeLock: uint256\n\n# governance\ngovernance: public(address)\npendingGov: public(PendingGovernance)\nnumGovChanges: public(uint256)\n\n# time lock\ngovChangeTimeLock: public(uint256)\n\n# config\nRIPE_HQ_FOR_GOV: immutable(address)\nMIN_GOV_TIME_LOCK: immutable(uint256)\nMAX_GOV_TIME_LOCK: immutable(uint256)\n\n\n@deploy\ndef __init__(\n    _ripeHq: address,\n    _initialGov: address,\n    _minTimeLock: uint256,\n    _maxTimeLock: uint256,\n    _initialTimeLock: uint256,\n):\n    RIPE_HQ_FOR_GOV = _ripeHq\n    self.governance = _initialGov\n\n    # ripe hq\n    if _ripeHq == empty(address):\n        assert _initialGov != empty(address) # dev: ripe hq must have gov\n\n    # local gov (department, other smart contracts)\n    else:\n        hqGov: address = staticcall RipeHq(_ripeHq).governance()\n        assert hqGov != empty(address) # dev: ripe hq must have gov\n        assert _initialGov != hqGov # dev: ripe hq cannot set same gov\n\n    # time locks\n    minTimeLock: uint256 = _minTimeLock\n    maxTimeLock: uint256 = _maxTimeLock\n    if minTimeLock == 0 or maxTimeLock == 0:\n        assert _ripeHq != empty(address) # dev: need ripe hq if no time locks\n        minTimeLock = staticcall RipeHq(_ripeHq).minGovChangeTimeLock()\n        maxTimeLock = staticcall RipeHq(_ripeHq).maxGovChangeTimeLock()\n\n    # set min and max time locks\n    assert minTimeLock < maxTimeLock # dev: invalid time lock\n    assert minTimeLock != 0 and maxTimeLock != max_value(uint256) # dev: invalid time lock\n    MIN_GOV_TIME_LOCK = minTimeLock\n    MAX_GOV_TIME_LOCK = maxTimeLock\n\n    # this contract is top level governance from Ripe HQ -- not setting initial time lock during setup\n    if _ripeHq == empty(address):\n        return\n\n    # set initial time lock (for local gov)\n    initialTimeLock: uint256 = max(minTimeLock, _initialTimeLock)\n    assert self._setGovTimeLock(initialTimeLock) # dev: invalid time lock\n\n\n@view\n@external\ndef getRipeHqFromGov() -> address:\n    return self._getRipeHqFromGov()\n\n\n@view\n@internal\ndef _getRipeHqFromGov() -> address:\n    return RIPE_HQ_FOR_GOV\n\n\n##############\n# Gov Access #\n##############\n\n\n@view\n@external\ndef canGovern(_addr: address) -> bool:\n    return self._canGovern(_addr)\n\n\n@view\n@internal\ndef _canGovern(_addr: address) -> bool:\n    if _addr == empty(address):\n        return False\n    return _addr in self._getGovernors()\n\n\n@view\n@external\ndef getGovernors() -> DynArray[address, 2]:\n    return self._getGovernors()\n\n\n@view\n@internal\ndef _getGovernors() -> DynArray[address, 2]:\n    governors: DynArray[address, 2] = []\n\n    # local governance\n    localGov: address = self.governance\n    if localGov != empty(address):\n        governors.append(localGov)\n\n    # ripe hq governance\n    ripeHq: address = RIPE_HQ_FOR_GOV\n    if ripeHq == empty(address):\n        return governors\n\n    hqGov: address = staticcall RipeHq(ripeHq).governance()\n    if hqGov != empty(address):\n        governors.append(hqGov)\n\n    return governors\n\n\n######################\n# Governance Changes #\n######################\n\n\n@view\n@external\ndef hasPendingGovChange() -> bool:\n    return self.pendingGov.confirmBlock != 0\n\n\n@view\n@internal\ndef _isRipeHqGov() -> bool:\n    return RIPE_HQ_FOR_GOV == empty(address)\n\n\n# start gov change\n\n\n@external\ndef startGovernanceChange(_newGov: address):\n    governors: DynArray[address, 2] = self._getGovernors()\n    assert msg.sender in governors # dev: no perms\n\n    # validation\n    if _newGov != empty(address):\n        assert _newGov not in governors # dev: invalid _newGov\n        assert _newGov.is_contract # dev: _newGov must be a contract\n    else:\n        assert not self._isRipeHqGov() # dev: ripe hq cannot set 0x0\n\n    confirmBlock: uint256 = block.number + self.govChangeTimeLock\n    self.pendingGov = PendingGovernance(\n        newGov= _newGov,\n        initiatedBlock= block.number,\n        confirmBlock= confirmBlock,\n    )\n    log GovChangeStarted(prevGov=self.governance, newGov=_newGov, confirmBlock=confirmBlock)\n\n\n# confirm gov change\n\n\n@external\ndef confirmGovernanceChange():\n    data: PendingGovernance = self.pendingGov\n    assert data.confirmBlock != 0 and block.number >= data.confirmBlock # dev: time lock not reached\n\n    # check permissions\n    if data.newGov != empty(address):\n        assert msg.sender == data.newGov # dev: only new gov can confirm\n    else:\n        assert self._canGovern(msg.sender) # dev: no perms\n        assert not self._isRipeHqGov() # dev: ripe hq cannot set 0x0\n\n    # set new governance\n    prevGov: address = self.governance\n    self.governance = data.newGov\n    self.numGovChanges += 1\n    self.pendingGov = empty(PendingGovernance)\n    log GovChangeConfirmed(prevGov=prevGov, newGov=data.newGov, initiatedBlock=data.initiatedBlock, confirmBlock=data.confirmBlock)\n\n\n# cancel gov change\n\n\n@external\ndef cancelGovernanceChange():\n    assert self._canGovern(msg.sender) # dev: no perms\n    data: PendingGovernance = self.pendingGov\n    assert data.confirmBlock != 0 # dev: no pending change\n    self.pendingGov = empty(PendingGovernance)\n    log GovChangeCancelled(cancelledGov=data.newGov, initiatedBlock=data.initiatedBlock, confirmBlock=data.confirmBlock)\n\n\n# relinquish gov (only for local gov)\n\n\n@external\ndef relinquishGov():\n    assert msg.sender == self.governance # dev: no perms\n    assert not self._isRipeHqGov() # dev: ripe hq cannot relinquish gov\n\n    self.governance = empty(address)\n    self.numGovChanges += 1\n    log GovRelinquished(prevGov=msg.sender)\n\n\n####################\n# Time Lock Config #\n####################\n\n\n# set time lock\n\n\n@external\ndef setGovTimeLock(_numBlocks: uint256) -> bool:\n    assert self._canGovern(msg.sender) # dev: no perms\n    return self._setGovTimeLock(_numBlocks)\n\n\n@internal\ndef _setGovTimeLock(_numBlocks: uint256) -> bool:\n    prevTimeLock: uint256 = self.govChangeTimeLock\n    assert self._isValidGovTimeLock(_numBlocks, prevTimeLock) # dev: invalid time lock\n    self.govChangeTimeLock = _numBlocks\n    log GovChangeTimeLockModified(prevTimeLock=prevTimeLock, newTimeLock=_numBlocks)\n    return True\n\n\n# validation\n\n\n@view\n@external\ndef isValidGovTimeLock(_newTimeLock: uint256) -> bool:\n    return self._isValidGovTimeLock(_newTimeLock, self.govChangeTimeLock)\n\n\n@view\n@internal\ndef _isValidGovTimeLock(_newTimeLock: uint256, _prevTimeLock: uint256) -> bool:\n    if _newTimeLock == _prevTimeLock:\n        return False # no change\n    if self.pendingGov.confirmBlock != 0:\n        return False # cannot change while pending gov change\n    return _newTimeLock >= MIN_GOV_TIME_LOCK and _newTimeLock <= MAX_GOV_TIME_LOCK\n\n\n# utils\n\n\n@view\n@external\ndef minGovChangeTimeLock() -> uint256:\n    return MIN_GOV_TIME_LOCK\n\n\n@view\n@external\ndef maxGovChangeTimeLock() -> uint256:\n    return MAX_GOV_TIME_LOCK\n\n\n#################\n# Ripe Hq Setup #\n#################\n\n\n@external\ndef finishRipeHqSetup(_newGov: address, _timeLock: uint256 = 0) -> bool:\n    assert self._isRipeHqGov() # dev: only ripe hq\n    assert msg.sender == self.governance # dev: no perms\n    assert self.numGovChanges == 0 # dev: already changed gov\n\n    # validation\n    assert _newGov != empty(address) and _newGov.is_contract # dev: invalid _newGov\n    prevGov: address = self.governance\n\n    # set new gov\n    self.governance = _newGov\n    self.numGovChanges += 1\n\n    # set time lock\n    timeLock: uint256 = _timeLock\n    if timeLock == 0:\n        timeLock = MIN_GOV_TIME_LOCK\n    assert self._setGovTimeLock(timeLock) # dev: invalid time lock\n\n    log RipeHqSetupFinished(prevGov=prevGov, newGov=_newGov, timeLock=timeLock)\n    return True",
+            "sha256sum": "4ffcc0fe78019515e484beb8bd5d700dce92d785b6bf26af25f52ea1289a5950"
+          },
+          "contracts/modules/TimeLock.vy": {
+            "content": "# Ripe Protocol License: https://github.com/ripe-foundation/ripe-protocol/blob/master/LICENSE.md\n# Ripe Foundation (C) 2025\n\n# @version 0.4.3\n\nuses: gov\nimport contracts.modules.LocalGov as gov\n\nstruct PendingAction:\n    initiatedBlock: uint256\n    confirmBlock: uint256\n    expiration: uint256\n\nevent ActionTimeLockSet:\n    newTimeLock: uint256\n    prevTimeLock: uint256\n\nevent ExpirationSet:\n    expiration: uint256\n\n# core data\npendingActions: public(HashMap[uint256, PendingAction])\nactionId: public(uint256)\n\n# config\nactionTimeLock: public(uint256)\nexpiration: public(uint256)\n\nMIN_ACTION_TIMELOCK: immutable(uint256)\nMAX_ACTION_TIMELOCK: immutable(uint256)\n\n\n@deploy\ndef __init__(\n    _minActionTimeLock: uint256,\n    _maxActionTimeLock: uint256,\n    _initialTimeLock: uint256,\n    _expiration: uint256,\n):\n    # start at 1 index\n    self.actionId = 1\n\n    # set time lock boundaries\n    assert _minActionTimeLock < _maxActionTimeLock # dev: invalid time lock boundaries\n    assert _minActionTimeLock != 0 and _maxActionTimeLock != max_value(uint256) # dev: invalid time lock boundaries\n    MIN_ACTION_TIMELOCK = _minActionTimeLock\n    MAX_ACTION_TIMELOCK = _maxActionTimeLock\n\n    # set expiration time\n    self._setExpiration(_expiration, _initialTimeLock)\n\n    # set initial time lock\n    if _initialTimeLock != 0:\n        assert self._setActionTimeLock(_initialTimeLock, 0) # dev: failed to set initial time lock\n\n\n########\n# Core #\n########\n\n\n# initiate\n\n\n@internal\ndef _initiateAction() -> uint256:\n    actionId: uint256 = self.actionId\n    confirmBlock: uint256 = block.number + self.actionTimeLock\n    self.pendingActions[actionId] = PendingAction(\n        initiatedBlock= block.number,\n        confirmBlock= confirmBlock,\n        expiration= confirmBlock + self.expiration,\n    )\n    self.actionId += 1\n    return actionId\n\n\n# confirm\n\n\n@internal\ndef _confirmAction(_actionId: uint256) -> bool:\n    if not self._canConfirmAction(_actionId):\n        return False\n    self.pendingActions[_actionId] = empty(PendingAction)\n    return True\n\n\n# cancel\n\n\n@internal\ndef _cancelAction(_actionId: uint256) -> bool:\n    data: PendingAction = self.pendingActions[_actionId]\n    if data.confirmBlock == 0:\n        return False\n    self.pendingActions[_actionId] = empty(PendingAction)\n    return True\n\n\n#########\n# Utils #\n#########\n\n\n# can confirm\n\n\n@view\n@external\ndef canConfirmAction(_actionId: uint256) -> bool:\n    return self._canConfirmAction(_actionId)\n\n\n@view\n@internal\ndef _canConfirmAction(_actionId: uint256) -> bool:\n    data: PendingAction = self.pendingActions[_actionId]\n    if data.confirmBlock == 0 or block.number < data.confirmBlock:\n        return False\n    if block.number >= data.expiration:\n        return False\n    return True\n\n\n# is expired\n\n\n@view\n@external\ndef isExpired(_actionId: uint256) -> bool:\n    return self._isExpired(_actionId)\n\n\n@view\n@internal\ndef _isExpired(_actionId: uint256) -> bool:\n    data: PendingAction = self.pendingActions[_actionId]\n    if data.confirmBlock == 0:\n        return False\n    return block.number >= data.expiration\n\n\n# pending action\n\n\n@view\n@external\ndef hasPendingAction(_actionId: uint256) -> bool:\n    return self._hasPendingAction(_actionId)\n\n\n@view\n@internal\ndef _hasPendingAction(_actionId: uint256) -> bool:\n    return self.pendingActions[_actionId].confirmBlock != 0\n\n\n# confirmation block\n\n\n@view\n@external\ndef getActionConfirmationBlock(_actionId: uint256) -> uint256:\n    return self._getActionConfirmationBlock(_actionId)\n\n\n@view\n@internal\ndef _getActionConfirmationBlock(_actionId: uint256) -> uint256:\n    return self.pendingActions[_actionId].confirmBlock\n\n\n######################\n# Config - Time Lock #\n######################\n\n\n@external\ndef setActionTimeLock(_newTimeLock: uint256) -> bool:\n    assert gov._canGovern(msg.sender) # dev: no perms\n    return self._setActionTimeLock(_newTimeLock, self.actionTimeLock)\n\n\n@internal\ndef _setActionTimeLock(_newTimeLock: uint256, _prevTimeLock: uint256) -> bool:\n    assert self._isValidActionTimeLock(_newTimeLock, _prevTimeLock) # dev: invalid time lock\n    self.actionTimeLock = _newTimeLock\n    log ActionTimeLockSet(newTimeLock=_newTimeLock, prevTimeLock=_prevTimeLock)\n    return True\n\n\n# validation\n\n\n@view\n@external\ndef isValidActionTimeLock(_newTimeLock: uint256) -> bool:\n    return self._isValidActionTimeLock(_newTimeLock, self.actionTimeLock)\n\n\n@view\n@internal\ndef _isValidActionTimeLock(_newTimeLock: uint256, _prevTimeLock: uint256) -> bool:\n    if _newTimeLock == _prevTimeLock:\n        return False # no change\n    return _newTimeLock >= MIN_ACTION_TIMELOCK and _newTimeLock <= MAX_ACTION_TIMELOCK\n\n\n# utils\n\n\n@view\n@external\ndef minActionTimeLock() -> uint256:\n    return MIN_ACTION_TIMELOCK\n\n\n@view\n@external\ndef maxActionTimeLock() -> uint256:\n    return MAX_ACTION_TIMELOCK\n\n\n#######################\n# Config - Expiration #\n#######################\n\n\n@external\ndef setExpiration(_expiration: uint256) -> bool:\n    assert gov._canGovern(msg.sender) # dev: no perms\n    return self._setExpiration(_expiration, self.actionTimeLock)\n\n\n@internal\ndef _setExpiration(_expiration: uint256, _timeLock: uint256) -> bool:\n    assert self._isValidExpiration(_expiration, _timeLock) # dev: invalid expiration\n    self.expiration = _expiration\n    log ExpirationSet(expiration=_expiration)\n    return True\n\n\n# validation\n\n\n@view\n@internal\ndef _isValidExpiration(_expiration: uint256, _timeLock: uint256) -> bool:\n    if _expiration == 0 or _expiration == max_value(uint256):\n        return False\n    if _expiration < _timeLock:\n        return False\n    return True\n\n\n################\n# Finish Setup #\n################\n\n\n@external\ndef setActionTimeLockAfterSetup(_newTimeLock: uint256 = 0) -> bool:\n    assert gov._canGovern(msg.sender) # dev: no perms\n\n    prevTimeLock: uint256 = self.actionTimeLock\n    assert prevTimeLock == 0 # dev: already set\n\n    timeLock: uint256 = _newTimeLock\n    if timeLock == 0:\n        timeLock = MIN_ACTION_TIMELOCK\n    return self._setActionTimeLock(timeLock, prevTimeLock)",
+            "sha256sum": "2c45da650f92c6891ed37a165a365934d31ed144b03e13c79f4f4fc68f2b7851"
+          },
+          "interfaces/ConfigStructs.vyi": {
+            "content": "# @version 0.4.3\n\nMAX_VAULTS_PER_ASSET: constant(uint256) = 10\n\nstruct GenConfig:\n    perUserMaxVaults: uint256\n    perUserMaxAssetsPerVault: uint256\n    priceStaleTime: uint256\n    canDeposit: bool\n    canWithdraw: bool\n    canBorrow: bool\n    canRepay: bool\n    canClaimLoot: bool\n    canLiquidate: bool\n    canRedeemCollateral: bool\n    canRedeemInStabPool: bool\n    canBuyInAuction: bool\n    canClaimInStabPool: bool\n\nstruct GenDebtConfig:\n    perUserDebtLimit: uint256\n    globalDebtLimit: uint256\n    minDebtAmount: uint256\n    numAllowedBorrowers: uint256\n    maxBorrowPerInterval: uint256\n    numBlocksPerInterval: uint256\n    minDynamicRateBoost: uint256\n    maxDynamicRateBoost: uint256\n    increasePerDangerBlock: uint256\n    maxBorrowRate: uint256\n    maxLtvDeviation: uint256\n    keeperFeeRatio: uint256\n    minKeeperFee: uint256\n    maxKeeperFee: uint256\n    isDaowryEnabled: bool\n    ltvPaybackBuffer: uint256\n    genAuctionParams: AuctionParams\n\nstruct HrConfig:\n    contribTemplate: address\n    maxCompensation: uint256\n    minCliffLength: uint256\n    maxStartDelay: uint256\n    minVestingLength: uint256\n    maxVestingLength: uint256\n\nstruct RipeBondConfig:\n    asset: address\n    amountPerEpoch: uint256\n    canBond: bool\n    minRipePerUnit: uint256\n    maxRipePerUnit: uint256\n    maxRipePerUnitLockBonus: uint256\n    epochLength: uint256\n    shouldAutoRestart: bool\n    restartDelayBlocks: uint256\n\nstruct RipeRewardsConfig:\n    arePointsEnabled: bool\n    ripePerBlock: uint256\n    borrowersAlloc: uint256\n    stakersAlloc: uint256\n    votersAlloc: uint256\n    genDepositorsAlloc: uint256\n    autoStakeRatio: uint256\n    autoStakeDurationRatio: uint256\n    stabPoolRipePerDollarClaimed: uint256\n\nstruct RipeGovVaultConfig:\n    lockTerms: LockTerms\n    assetWeight: uint256\n    shouldFreezeWhenBadDebt: bool\n\nstruct LockTerms:\n    minLockDuration: uint256\n    maxLockDuration: uint256\n    maxLockBoost: uint256\n    canExit: bool\n    exitFee: uint256\n\nstruct AuctionParams:\n    hasParams: bool\n    startDiscount: uint256\n    maxDiscount: uint256\n    delay: uint256\n    duration: uint256\n\nstruct AssetConfig:\n    vaultIds: DynArray[uint256, MAX_VAULTS_PER_ASSET]\n    stakersPointsAlloc: uint256\n    voterPointsAlloc: uint256\n    perUserDepositLimit: uint256\n    globalDepositLimit: uint256\n    minDepositBalance: uint256\n    debtTerms: DebtTerms\n    shouldBurnAsPayment: bool\n    shouldTransferToEndaoment: bool\n    shouldSwapInStabPools: bool\n    shouldAuctionInstantly: bool\n    canDeposit: bool\n    canWithdraw: bool\n    canRedeemCollateral: bool\n    canRedeemInStabPool: bool\n    canBuyInAuction: bool\n    canClaimInStabPool: bool\n    specialStabPoolId: uint256\n    customAuctionParams: AuctionParams\n    whitelist: address\n    isNft: bool\n\nstruct DebtTerms:\n    ltv: uint256\n    redemptionThreshold: uint256\n    liqThreshold: uint256\n    liqFee: uint256\n    borrowRate: uint256\n    daowry: uint256\n\nstruct UserConfig:\n    canAnyoneDeposit: bool\n    canAnyoneRepayDebt: bool\n    canAnyoneBondForUser: bool\n\nstruct ActionDelegation:\n    canWithdraw: bool\n    canBorrow: bool\n    canClaimFromStabPool: bool\n    canClaimLoot: bool\n\nstruct VaultLite:\n    vaultId: uint256\n    asset: address\n\nstruct AssetConfigEntry:\n    asset: address\n    config: AssetConfig\n\nstruct RipeGovVaultConfigEntry:\n    asset: address\n    config: RipeGovVaultConfig",
+            "sha256sum": "def6208cd81de43d0d33656f9d05b5394d3a74c695fdc27ffe3c9711ccd67c2c"
+          },
+          "contracts/config/SwitchboardDelta.vy": {
+            "content": "#        ______   __     __   __   ______  ______   __  __   ______   ______   ______   ______   _____    \n#       /\\  ___\\ /\\ \\  _ \\ \\ /\\ \\ /\\__  _\\/\\  ___\\ /\\ \\_\\ \\ /\\  == \\ /\\  __ \\ /\\  __ \\ /\\  == \\ /\\  __-.  \n#       \\ \\___  \\\\ \\ \\/ \".\\ \\\\ \\ \\\\/_/\\ \\/\\ \\ \\____\\ \\  __ \\\\ \\  __< \\ \\ \\/\\ \\\\ \\  __ \\\\ \\  __< \\ \\ \\/\\ \\ \n#        \\/\\_____\\\\ \\__/\".~\\_\\\\ \\_\\  \\ \\_\\ \\ \\_____\\\\ \\_\\ \\_\\\\ \\_____\\\\ \\_____\\\\ \\_\\ \\_\\\\ \\_\\ \\_\\\\ \\____- \n#         \\/_____/ \\/_/   \\/_/ \\/_/   \\/_/  \\/_____/ \\/_/\\/_/ \\/_____/ \\/_____/ \\/_/\\/_/ \\/_/ /_/ \\/____/ \n#                                                      \u2513  \u2513   \n#                                                     \u250f\u252b\u250f\u2513\u2503\u254b\u250f\u2513\n#                                                     \u2517\u253b\u2517 \u2517\u2517\u2517\u253b\n#\n#      Ripe Protocol License: https://github.com/ripe-foundation/ripe-protocol/blob/master/LICENSE.md\n#      Ripe Foundation (C) 2025 \n\n# @version 0.4.3\n# pragma optimize codesize\n\nexports: gov.__interface__\nexports: timeLock.__interface__\n\ninitializes: gov\ninitializes: timeLock[gov := gov]\n\nimport contracts.modules.LocalGov as gov\nimport contracts.modules.TimeLock as timeLock\nimport interfaces.ConfigStructs as cs\n\ninterface MissionControl:\n    def setUnderscoreRegistry(_underscoreRegistry: address): nonpayable\n    def setRipeBondConfig(_config: cs.RipeBondConfig): nonpayable\n    def setShouldCheckLastTouch(_shouldCheck: bool): nonpayable\n    def canPerformLiteAction(_user: address) -> bool: view\n    def setHrConfig(_config: cs.HrConfig): nonpayable\n    def ripeBondConfig() -> cs.RipeBondConfig: view\n    def underscoreRegistry() -> address: view\n    def shouldCheckLastTouch() -> bool: view\n    def hrConfig() -> cs.HrConfig: view\n\ninterface BondBooster:\n    def setManyBondBoosters(_boosters: DynArray[BoosterConfig, MAX_BOOSTERS]): nonpayable\n    def setMaxBoostAndMaxUnits(_maxBoostRatio: uint256, _maxUnits: uint256): nonpayable\n    def removeManyBondBoosters(_users: DynArray[address, MAX_BOOSTERS]): nonpayable\n    def getBoostRatio(_user: address, _units: uint256) -> uint256: view\n    def setMinLockDuration(_minLockDuration: uint256): nonpayable\n    def setBondBooster(_config: BoosterConfig): nonpayable\n    def removeBondBooster(_user: address): nonpayable\n\ninterface HrContributor:\n    def setIsFrozen(_shouldFreeze: bool) -> bool: nonpayable\n    def setManager(_manager: address): nonpayable\n    def cashRipeCheck() -> uint256: nonpayable\n    def cancelOwnershipChange(): nonpayable\n    def cancelRipeTransfer(): nonpayable\n    def cancelPaycheck(): nonpayable\n\ninterface Deleverage:\n    def deleverageWithVolAssets(_user: address, _assets: DynArray[DeleverageAsset, MAX_DELEVERAGE_ASSETS]) -> uint256: nonpayable\n    def setUnderscoreSafeSpreadBps(_bps: uint256): nonpayable\n    def setDeleverageCooldown(_blocks: uint256): nonpayable\n    def setMinDeleverageBps(_bps: uint256): nonpayable\n    def setDeleverageBuffer(_bps: uint256): nonpayable\n\ninterface Ledger:\n    def isHrContributor(_contributor: address) -> bool: view\n    def setRipeAvailForRewards(_amount: uint256): nonpayable\n    def setRipeAvailForBonds(_amount: uint256): nonpayable\n    def setRipeAvailForHr(_amount: uint256): nonpayable\n    def setBadDebt(_amount: uint256): nonpayable\n\ninterface Teller:\n    def deleverageWithSpecificAssets(_assets: DynArray[DeleverageAsset, MAX_DELEVERAGE_ASSETS], _user: address = msg.sender) -> uint256: nonpayable\n    def deleverageUser(_user: address = msg.sender, _targetRepayAmount: uint256 = max_value(uint256)) -> uint256: nonpayable\n    def deleverageManyUsers(_users: DynArray[DeleverageUserRequest, MAX_DELEVERAGE_USERS]) -> uint256: nonpayable\n\ninterface Lootbox:\n    def resetUserBalancePoints(_user: address, _asset: address, _vaultId: uint256): nonpayable\n    def resetAssetPoints(_asset: address, _vaultId: uint256): nonpayable\n    def resetUserBorrowPoints(_user: address): nonpayable\n\ninterface BondRoom:\n    def startBondEpochAtBlock(_block: uint256): nonpayable\n    def setBondBooster(_bondBooster: address): nonpayable\n    def bondBooster() -> address: view\n\ninterface UnderscoreLedger:\n    def isUserWallet(_addr: address) -> bool: view\n\ninterface UnderscoreRegistry:\n    def getAddr(_addyId: uint256) -> address: view\n\ninterface RipeHq:\n    def getAddr(_regId: uint256) -> address: view\n\nflag ActionType:\n    HR_CONFIG_TEMPLATE\n    HR_CONFIG_MAX_COMP\n    HR_CONFIG_MIN_CLIFF\n    HR_CONFIG_MAX_START_DELAY\n    HR_CONFIG_VESTING\n    HR_MANAGER\n    HR_CANCEL_PAYCHECK\n    RIPE_BOND_CONFIG\n    RIPE_BOND_EPOCH_LENGTH\n    RIPE_BAD_DEBT\n    RIPE_BOND_BOOSTER\n    BOND_BOOSTER_ADD\n    BOND_BOOSTER_BOUNDARIES\n    LOOT_USER_BALANCE_RESET\n    LOOT_ASSET_RESET\n    LOOT_USER_BORROW_RESET\n    RIPE_AVAIL_REWARDS\n    RIPE_AVAIL_HR\n    RIPE_AVAIL_BONDS\n    OTHER_UNDERSCORE_REGISTRY\n    OTHER_SHOULD_CHECK_LAST_TOUCH\n    DELEVERAGE_MIN_BPS\n    DELEVERAGE_BUFFER\n    DELEVERAGE_COOLDOWN\n    DELEVERAGE_UNDERSCORE_SAFE_SPREAD\n\nstruct DeleverageUserRequest:\n    user: address\n    targetRepayAmount: uint256\n\nstruct DeleverageAsset:\n    vaultId: uint256\n    asset: address\n    targetRepayAmount: uint256\n\nstruct PendingManager:\n    contributor: address\n    pendingManager: address\n\nstruct PendingCancelPaycheck:\n    contributor: address\n    pendingShouldCancel: bool\n\nstruct BoosterConfig:\n    user: address\n    boostRatio: uint256\n    maxUnitsAllowed: uint256\n    expireBlock: uint256\n\nstruct UserBalanceReset:\n    user: address\n    asset: address\n    vaultId: uint256\n\nstruct AssetReset:\n    asset: address\n    vaultId: uint256\n\nstruct BoosterBoundaries:\n    maxBoostRatio: uint256\n    maxUnits: uint256\n\nevent PendingHrContribTemplateChange:\n    contribTemplate: indexed(address)\n    confirmationBlock: uint256\n    actionId: uint256\n\nevent PendingHrMaxCompensationChange:\n    maxCompensation: uint256\n    confirmationBlock: uint256\n    actionId: uint256\n\nevent PendingHrMinCliffLengthChange:\n    minCliffLength: uint256\n    confirmationBlock: uint256\n    actionId: uint256\n\nevent PendingHrMaxStartDelayChange:\n    maxStartDelay: uint256\n    confirmationBlock: uint256\n    actionId: uint256\n\nevent PendingHrVestingLengthBoundariesChange:\n    minVestingLength: uint256\n    maxVestingLength: uint256\n    confirmationBlock: uint256\n    actionId: uint256\n\nevent PendingManagerSet:\n    contributor: indexed(address)\n    manager: indexed(address)\n    confirmationBlock: uint256\n    actionId: uint256\n\nevent PendingCancelPaycheckSet:\n    contributor: indexed(address)\n    confirmationBlock: uint256\n    actionId: uint256\n\nevent RipeCheckCashedFromSwitchboard:\n    contributor: indexed(address)\n    cashedBy: indexed(address)\n    amount: uint256\n\nevent RipeTransferCancelledFromSwitchboard:\n    contributor: indexed(address)\n    cancelledBy: indexed(address)\n\nevent OwnershipChangeCancelledFromSwitchboard:\n    contributor: indexed(address)\n    cancelledBy: indexed(address)\n\nevent ContributorFrozenFromSwitchboard:\n    contributor: indexed(address)\n    frozenBy: indexed(address)\n    shouldFreeze: bool\n\nevent PendingRipeBondConfigSet:\n    asset: indexed(address)\n    amountPerEpoch: uint256\n    minRipePerUnit: uint256\n    maxRipePerUnit: uint256\n    maxRipePerUnitLockBonus: uint256\n    shouldAutoRestart: bool\n    restartDelayBlocks: uint256\n    confirmationBlock: uint256\n    actionId: uint256\n\nevent PendingRipeBondEpochLengthSet:\n    epochLength: uint256\n    confirmationBlock: uint256\n    actionId: uint256\n\nevent CanPurchaseRipeBondModified:\n    canPurchaseRipeBond: bool\n    modifier: indexed(address)\n\nevent PendingBadDebtSet:\n    badDebt: uint256\n    confirmationBlock: uint256\n    actionId: uint256\n\nevent PendingBondBoosterSet:\n    bondBooster: indexed(address)\n    confirmationBlock: uint256\n    actionId: uint256\n\nevent PendingBoosterBoundariesSet:\n    maxBoostRatio: uint256\n    maxUnits: uint256\n    confirmationBlock: uint256\n    actionId: uint256\n\nevent BoosterMinLockDurationSet:\n    minLockDuration: uint256\n\nevent PendingBoosterConfigsSet:\n    numBoosters: uint256\n    confirmationBlock: uint256\n    actionId: uint256\n\nevent ManyBondBoostersRemoved:\n    numUsers: uint256\n\nevent BondBoosterRemoved:\n    user: indexed(address)\n\nevent PendingBoosterConfigSet:\n    user: indexed(address)\n    confirmationBlock: uint256\n    actionId: uint256\n\nevent HrContribTemplateSet:\n    contribTemplate: indexed(address)\n\nevent HrMaxCompensationSet:\n    maxCompensation: uint256\n\nevent HrMinCliffLengthSet:\n    minCliffLength: uint256\n\nevent HrMaxStartDelaySet:\n    maxStartDelay: uint256\n\nevent HrVestingLengthBoundariesSet:\n    minVestingLength: uint256\n    maxVestingLength: uint256\n\nevent HrContributorManagerSet:\n    contributor: indexed(address)\n    manager: indexed(address)\n\nevent HrContributorCancelPaycheckSet:\n    contributor: indexed(address)\n\nevent RipeBondConfigSet:\n    asset: indexed(address)\n    amountPerEpoch: uint256\n    minRipePerUnit: uint256\n    maxRipePerUnit: uint256\n    maxRipePerUnitLockBonus: uint256\n    shouldAutoRestart: bool\n\nevent RipeBondEpochLengthSet:\n    epochLength: uint256\n\nevent RipeBondStartEpochAtBlockSet:\n    startBlock: uint256\n\nevent BadDebtSet:\n    badDebt: uint256\n\nevent RipeBondBoosterSet:\n    bondBooster: indexed(address)\n\nevent ManyBondBoostersSet:\n    numBoosters: uint256\n\nevent BoosterBoundariesSet:\n    maxBoostRatio: uint256\n    maxUnits: uint256\n\nevent PendingUserBalanceResetSet:\n    numResets: uint256\n    confirmationBlock: uint256\n    actionId: uint256\n\nevent PendingAssetResetSet:\n    numResets: uint256\n    confirmationBlock: uint256\n    actionId: uint256\n\nevent UserBalanceResetExecuted:\n    numResets: uint256\n\nevent AssetResetExecuted:\n    numResets: uint256\n\nevent PendingUserBorrowResetSet:\n    numResets: uint256\n    confirmationBlock: uint256\n    actionId: uint256\n\nevent UserBorrowResetExecuted:\n    numResets: uint256\n\nevent PendingRipeAvailableForRewardsChange:\n    amount: uint256\n    confirmationBlock: uint256\n    actionId: uint256\n\nevent PendingRipeAvailableForHrChange:\n    amount: uint256\n    confirmationBlock: uint256\n    actionId: uint256\n\nevent PendingRipeAvailableForBondsChange:\n    amount: uint256\n    confirmationBlock: uint256\n    actionId: uint256\n\nevent RipeAvailableForRewardsSet:\n    amount: uint256\n\nevent RipeAvailableForHrSet:\n    amount: uint256\n\nevent RipeAvailableForBondsSet:\n    amount: uint256\n\nevent PendingUnderscoreRegistryChange:\n    underscoreRegistry: address\n    confirmationBlock: uint256\n    actionId: uint256\n\nevent PendingShouldCheckLastTouchChange:\n    shouldCheck: bool\n    confirmationBlock: uint256\n    actionId: uint256\n\nevent UnderscoreRegistrySet:\n    addr: indexed(address)\n\nevent ShouldCheckLastTouchSet:\n    shouldCheck: bool\n\nevent PendingMinDeleverageBpsChange:\n    bps: uint256\n    confirmationBlock: uint256\n    actionId: uint256\n\nevent MinDeleverageBpsSet:\n    bps: uint256\n\nevent PendingDeleverageBufferChange:\n    bps: uint256\n    confirmationBlock: uint256\n    actionId: uint256\n\nevent DeleverageBufferSet:\n    bps: uint256\n\nevent PendingDeleverageCooldownChange:\n    blocks: uint256\n    confirmationBlock: uint256\n    actionId: uint256\n\nevent DeleverageCooldownSet:\n    blocks: uint256\n\nevent PendingUnderscoreSafeSpreadBpsChange:\n    bps: uint256\n    confirmationBlock: uint256\n    actionId: uint256\n\nevent UnderscoreSafeSpreadBpsSet:\n    bps: uint256\n\n# pending config changes\nactionType: public(HashMap[uint256, ActionType]) # aid -> type\npendingHrConfig: public(HashMap[uint256, cs.HrConfig]) # aid -> config\npendingManager: public(HashMap[uint256, PendingManager]) # aid -> pending manager\npendingCancelPaycheck: public(HashMap[uint256, address]) # aid -> contributor\npendingRipeBondConfig: public(HashMap[uint256, cs.RipeBondConfig]) # aid -> config\npendingRipeBondConfigValue: public(HashMap[uint256, uint256]) # aid -> block\npendingBondBooster: public(HashMap[uint256, address]) # aid -> bond booster\npendingBoosterConfigs: public(HashMap[uint256, DynArray[BoosterConfig, MAX_BOOSTERS]]) # aid -> configs\npendingBoosterBoundaries: public(HashMap[uint256, BoosterBoundaries]) # aid -> boundaries\npendingUserBalanceReset: public(HashMap[uint256, DynArray[UserBalanceReset, MAX_USERS]]) # aid -> users\npendingAssetReset: public(HashMap[uint256, DynArray[AssetReset, MAX_ASSETS]]) # aid -> assets\npendingUserBorrowReset: public(HashMap[uint256, DynArray[address, MAX_USERS]]) # aid -> users\npendingRipeAvailable: public(HashMap[uint256, uint256]) # aid -> amount\npendingUnderscoreRegistry: public(HashMap[uint256, address])\npendingShouldCheckLastTouch: public(HashMap[uint256, bool])\npendingMinDeleverageBps: public(HashMap[uint256, uint256]) # aid -> bps\npendingDeleverageBuffer: public(HashMap[uint256, uint256]) # aid -> bps\npendingDeleverageCooldown: public(HashMap[uint256, uint256]) # aid -> blocks\npendingUnderscoreSafeSpreadBps: public(HashMap[uint256, uint256]) # aid -> bps\npendingMissionControl: public(HashMap[uint256, address]) # aid -> target mission control\n\nTELLER_ID: constant(uint256) = 17\nLEDGER_ID: constant(uint256) = 4\nMISSION_CONTROL_ID: constant(uint256) = 5\nUNDERSCORE_LEDGER_ID: constant(uint256) = 1\nBOND_ROOM_ID: constant(uint256) = 12\nLOOTBOX_ID: constant(uint256) = 16\nDELEVERAGE_ID: constant(uint256) = 18\nEIGHTEEN_DECIMALS: constant(uint256) = 10 ** 18\nMAX_BOOSTERS: constant(uint256) = 50\nHUNDRED_PERCENT: constant(uint256) = 100_00\nMAX_USERS: constant(uint256) = 40\nMAX_ASSETS: constant(uint256) = 20\nMAX_DELEVERAGE_USERS: constant(uint256) = 25\nMAX_DELEVERAGE_ASSETS: constant(uint256) = 25\nMAX_COOLDOWN_BLOCKS: constant(uint256) = 7_200 # ~1 day at 12s/block\nMAX_UNDERSCORE_SAFE_SPREAD_BPS: constant(uint256) = 500 # 5% hard ceiling\n\n# timestamp units (not blocks!)\nDAY_IN_SECONDS: constant(uint256) = 60 * 60 * 24\nWEEK_IN_SECONDS: constant(uint256) = 7 * DAY_IN_SECONDS\nMONTH_IN_SECONDS: constant(uint256) = 30 * DAY_IN_SECONDS\nYEAR_IN_SECONDS: constant(uint256) = 365 * DAY_IN_SECONDS\n\n\n@deploy\ndef __init__(\n    _ripeHq: address,\n    _tempGov: address,\n    _minConfigTimeLock: uint256,\n    _maxConfigTimeLock: uint256,\n):\n    gov.__init__(_ripeHq, _tempGov, 0, 0, 0)\n    timeLock.__init__(_minConfigTimeLock, _maxConfigTimeLock, 0, _maxConfigTimeLock)\n\n\n# access control\n\n\n@view\n@internal\ndef _hasPermsToEnable(_caller: address, _isLite: bool) -> bool:\n    if gov._canGovern(_caller):\n        return True\n    if _isLite:\n        return staticcall MissionControl(self._getMissionControlAddr()).canPerformLiteAction(_caller)\n    return False\n\n\n# addys lite\n\n\n@view\n@internal\ndef _getMissionControlAddr() -> address:\n    return staticcall RipeHq(gov._getRipeHqFromGov()).getAddr(MISSION_CONTROL_ID)\n\n\n@view\n@internal\ndef _resolveMissionControl(_missionControl: address) -> address:\n    mc: address = self._getMissionControlAddr()\n    if _missionControl == empty(address):\n        return mc\n    assert _missionControl != mc # dev: use empty for current mission control\n    return _missionControl\n\n\n@view\n@internal\ndef _getLedgerAddr() -> address:\n    return staticcall RipeHq(gov._getRipeHqFromGov()).getAddr(LEDGER_ID)\n\n\n@view\n@internal\ndef _getTellerAddr() -> address:\n    return staticcall RipeHq(gov._getRipeHqFromGov()).getAddr(TELLER_ID)\n\n\n@view\n@internal\ndef _getBondRoomAddr() -> address:\n    return staticcall RipeHq(gov._getRipeHqFromGov()).getAddr(BOND_ROOM_ID)\n\n\n@view\n@internal\ndef _getLootboxAddr() -> address:\n    return staticcall RipeHq(gov._getRipeHqFromGov()).getAddr(LOOTBOX_ID)\n\n\n@view\n@internal\ndef _getDeleverageAddr() -> address:\n    return staticcall RipeHq(gov._getRipeHqFromGov()).getAddr(DELEVERAGE_ID)\n\n\n##############\n# Deleverage #\n##############\n\n\n@external\ndef deleverageUser(_user: address, _targetRepayAmount: uint256 = max_value(uint256)) -> uint256:\n    assert self._hasPermsToEnable(msg.sender, True) # dev: no perms\n    return extcall Teller(self._getTellerAddr()).deleverageUser(_user, _targetRepayAmount)\n\n\n@external\ndef deleverageManyUsers(_users: DynArray[DeleverageUserRequest, MAX_DELEVERAGE_USERS]) -> uint256:\n    assert self._hasPermsToEnable(msg.sender, True) # dev: no perms\n    return extcall Teller(self._getTellerAddr()).deleverageManyUsers(_users)\n\n\n@external\ndef deleverageWithSpecificAssets(_assets: DynArray[DeleverageAsset, MAX_DELEVERAGE_ASSETS], _user: address) -> uint256:\n    assert self._hasPermsToEnable(msg.sender, True) # dev: no perms\n    return extcall Teller(self._getTellerAddr()).deleverageWithSpecificAssets(_assets, _user)\n\n\n@external\ndef deleverageWithVolAssets(_user: address, _assets: DynArray[DeleverageAsset, MAX_DELEVERAGE_ASSETS]) -> uint256:\n    assert gov._canGovern(msg.sender) # dev: no perms\n    return extcall Deleverage(self._getDeleverageAddr()).deleverageWithVolAssets(_user, _assets)\n\n\n# set min deleverage bps\n\n\n@external\ndef setMinDeleverageBps(_bps: uint256) -> uint256:\n    assert gov._canGovern(msg.sender) # dev: no perms\n    assert _bps <= HUNDRED_PERCENT # dev: invalid bps\n\n    aid: uint256 = timeLock._initiateAction()\n    self.actionType[aid] = ActionType.DELEVERAGE_MIN_BPS\n    self.pendingMinDeleverageBps[aid] = _bps\n    confirmationBlock: uint256 = timeLock._getActionConfirmationBlock(aid)\n    log PendingMinDeleverageBpsChange(\n        bps=_bps,\n        confirmationBlock=confirmationBlock,\n        actionId=aid,\n    )\n    return aid\n\n\n# set deleverage buffer\n\n\n@external\ndef setDeleverageBuffer(_bps: uint256) -> uint256:\n    assert gov._canGovern(msg.sender) # dev: no perms\n    assert _bps <= HUNDRED_PERCENT # dev: invalid bps\n\n    aid: uint256 = timeLock._initiateAction()\n    self.actionType[aid] = ActionType.DELEVERAGE_BUFFER\n    self.pendingDeleverageBuffer[aid] = _bps\n    confirmationBlock: uint256 = timeLock._getActionConfirmationBlock(aid)\n    log PendingDeleverageBufferChange(\n        bps=_bps,\n        confirmationBlock=confirmationBlock,\n        actionId=aid,\n    )\n    return aid\n\n\n# set deleverage cooldown\n\n\n@external\ndef setDeleverageCooldown(_blocks: uint256) -> uint256:\n    assert gov._canGovern(msg.sender) # dev: no perms\n    assert _blocks <= MAX_COOLDOWN_BLOCKS # dev: cooldown too large\n\n    aid: uint256 = timeLock._initiateAction()\n    self.actionType[aid] = ActionType.DELEVERAGE_COOLDOWN\n    self.pendingDeleverageCooldown[aid] = _blocks\n    confirmationBlock: uint256 = timeLock._getActionConfirmationBlock(aid)\n    log PendingDeleverageCooldownChange(\n        blocks=_blocks,\n        confirmationBlock=confirmationBlock,\n        actionId=aid,\n    )\n    return aid\n\n\n# set underscore safe spread bps\n\n\n@external\ndef setUnderscoreSafeSpreadBps(_bps: uint256) -> uint256:\n    assert gov._canGovern(msg.sender) # dev: no perms\n    assert _bps <= MAX_UNDERSCORE_SAFE_SPREAD_BPS # dev: exceeds hard ceiling\n\n    aid: uint256 = timeLock._initiateAction()\n    self.actionType[aid] = ActionType.DELEVERAGE_UNDERSCORE_SAFE_SPREAD\n    self.pendingUnderscoreSafeSpreadBps[aid] = _bps\n    confirmationBlock: uint256 = timeLock._getActionConfirmationBlock(aid)\n    log PendingUnderscoreSafeSpreadBpsChange(\n        bps=_bps,\n        confirmationBlock=confirmationBlock,\n        actionId=aid,\n    )\n    return aid\n\n\n#############\n# HR Config #\n#############\n\n\n# contrib template\n\n\n@external\ndef setContributorTemplate(_contribTemplate: address, _missionControl: address = empty(address)) -> uint256:\n    assert gov._canGovern(msg.sender) # dev: no perms\n    assert _contribTemplate.is_contract and _contribTemplate != empty(address) # dev: invalid contrib template\n    aid: uint256 = self._setPendingHrConfig(ActionType.HR_CONFIG_TEMPLATE, _contribTemplate)\n    self.pendingMissionControl[aid] = self._resolveMissionControl(_missionControl)\n    return aid\n\n\n# max compensation\n\n\n@external\ndef setMaxCompensation(_maxComp: uint256, _missionControl: address = empty(address)) -> uint256:\n    assert gov._canGovern(msg.sender) # dev: no perms\n    assert _maxComp != 0 and _maxComp <= 20_000_000 * EIGHTEEN_DECIMALS # dev: invalid max compensation\n    aid: uint256 = self._setPendingHrConfig(ActionType.HR_CONFIG_MAX_COMP, empty(address), _maxComp)\n    self.pendingMissionControl[aid] = self._resolveMissionControl(_missionControl)\n    return aid\n\n\n# min cliff length\n\n\n@external\ndef setMinCliffLength(_minCliffLength: uint256, _missionControl: address = empty(address)) -> uint256:\n    assert gov._canGovern(msg.sender) # dev: no perms\n    assert _minCliffLength > WEEK_IN_SECONDS # dev: invalid min cliff length\n    aid: uint256 = self._setPendingHrConfig(ActionType.HR_CONFIG_MIN_CLIFF, empty(address), 0, _minCliffLength)\n    self.pendingMissionControl[aid] = self._resolveMissionControl(_missionControl)\n    return aid\n\n\n# max start delay\n\n\n@external\ndef setMaxStartDelay(_maxStartDelay: uint256, _missionControl: address = empty(address)) -> uint256:\n    assert gov._canGovern(msg.sender) # dev: no perms\n    assert _maxStartDelay <= 3 * MONTH_IN_SECONDS # dev: invalid max start delay\n    aid: uint256 = self._setPendingHrConfig(ActionType.HR_CONFIG_MAX_START_DELAY, empty(address), 0, 0, _maxStartDelay)\n    self.pendingMissionControl[aid] = self._resolveMissionControl(_missionControl)\n    return aid\n\n\n# min vesting length\n\n\n@external\ndef setVestingLengthBoundaries(_minVestingLength: uint256, _maxVestingLength: uint256, _missionControl: address = empty(address)) -> uint256:\n    assert gov._canGovern(msg.sender) # dev: no perms\n    assert _minVestingLength < _maxVestingLength # dev: invalid vesting length boundaries\n    assert _minVestingLength > MONTH_IN_SECONDS # dev: invalid min vesting length\n    assert _maxVestingLength <= 5 * YEAR_IN_SECONDS # dev: invalid max vesting length\n    aid: uint256 = self._setPendingHrConfig(ActionType.HR_CONFIG_VESTING, empty(address), 0, 0, 0, _minVestingLength, _maxVestingLength)\n    self.pendingMissionControl[aid] = self._resolveMissionControl(_missionControl)\n    return aid\n\n\n# set pending hr config\n\n\n@internal\ndef _setPendingHrConfig(\n    _actionType: ActionType,\n    _contribTemplate: address = empty(address),\n    _maxCompensation: uint256 = 0,\n    _minCliffLength: uint256 = 0,\n    _maxStartDelay: uint256 = 0,\n    _minVestingLength: uint256 = 0,\n    _maxVestingLength: uint256 = 0,\n) -> uint256:\n    aid: uint256 = timeLock._initiateAction()\n\n    self.actionType[aid] = _actionType\n    self.pendingHrConfig[aid] = cs.HrConfig(\n        contribTemplate=_contribTemplate,\n        maxCompensation=_maxCompensation,\n        minCliffLength=_minCliffLength,\n        maxStartDelay=_maxStartDelay,\n        minVestingLength=_minVestingLength,\n        maxVestingLength=_maxVestingLength,\n    )\n\n    confirmationBlock: uint256 = timeLock._getActionConfirmationBlock(aid)\n    if _actionType == ActionType.HR_CONFIG_TEMPLATE:\n        log PendingHrContribTemplateChange(\n            contribTemplate=_contribTemplate,\n            confirmationBlock=confirmationBlock,\n            actionId=aid,\n        )\n    elif _actionType == ActionType.HR_CONFIG_MAX_COMP:\n        log PendingHrMaxCompensationChange(\n            maxCompensation=_maxCompensation,\n            confirmationBlock=confirmationBlock,\n            actionId=aid,\n        )\n    elif _actionType == ActionType.HR_CONFIG_MIN_CLIFF:\n        log PendingHrMinCliffLengthChange(\n            minCliffLength=_minCliffLength,\n            confirmationBlock=confirmationBlock,\n            actionId=aid,\n        )\n    elif _actionType == ActionType.HR_CONFIG_MAX_START_DELAY:\n        log PendingHrMaxStartDelayChange(\n            maxStartDelay=_maxStartDelay,\n            confirmationBlock=confirmationBlock,\n            actionId=aid,\n        )\n    elif _actionType == ActionType.HR_CONFIG_VESTING:\n        log PendingHrVestingLengthBoundariesChange(\n            minVestingLength=_minVestingLength,\n            maxVestingLength=_maxVestingLength,\n            confirmationBlock=confirmationBlock,\n            actionId=aid,\n        )\n    return aid\n\n\n#######################\n# Contributor Options #\n#######################\n\n\n# cancel paycheck\n\n\n@external\ndef cancelPaycheckForContributor(_contributor: address) -> uint256:\n    assert gov._canGovern(msg.sender) # dev: no perms\n    assert staticcall Ledger(self._getLedgerAddr()).isHrContributor(_contributor) # dev: not a contributor\n    aid: uint256 = timeLock._initiateAction()\n    self.actionType[aid] = ActionType.HR_CANCEL_PAYCHECK\n    self.pendingCancelPaycheck[aid] = _contributor\n    confirmationBlock: uint256 = timeLock._getActionConfirmationBlock(aid)\n    log PendingCancelPaycheckSet(contributor=_contributor, confirmationBlock=confirmationBlock, actionId=aid)\n    return aid\n\n\n# set manager\n\n\n@external\ndef setManagerForContributor(_contributor: address, _manager: address) -> uint256:\n    assert gov._canGovern(msg.sender) # dev: no perms\n    assert _manager != empty(address) # dev: invalid manager\n    assert staticcall Ledger(self._getLedgerAddr()).isHrContributor(_contributor) # dev: not a contributor\n    aid: uint256 = timeLock._initiateAction()\n    self.actionType[aid] = ActionType.HR_MANAGER\n    self.pendingManager[aid] = PendingManager(contributor=_contributor, pendingManager=_manager)\n    confirmationBlock: uint256 = timeLock._getActionConfirmationBlock(aid)\n    log PendingManagerSet(contributor=_contributor, manager=_manager, confirmationBlock=confirmationBlock, actionId=aid)\n    return aid\n\n\n# lite actions\n\n\n@external\ndef cashRipeCheckForContributor(_contributor: address) -> bool:\n    assert self._hasPermsToEnable(msg.sender, True) # dev: no perms\n    amount: uint256 = extcall HrContributor(_contributor).cashRipeCheck()\n    log RipeCheckCashedFromSwitchboard(contributor=_contributor, cashedBy=msg.sender, amount=amount)\n    return True\n\n\n@external\ndef cancelRipeTransferForContributor(_contributor: address) -> bool:\n    assert self._hasPermsToEnable(msg.sender, True) # dev: no perms\n    extcall HrContributor(_contributor).cancelRipeTransfer()\n    log RipeTransferCancelledFromSwitchboard(contributor=_contributor, cancelledBy=msg.sender)\n    return True\n\n\n@external\ndef cancelOwnershipChangeForContributor(_contributor: address) -> bool:\n    assert self._hasPermsToEnable(msg.sender, True) # dev: no perms\n    extcall HrContributor(_contributor).cancelOwnershipChange()\n    log OwnershipChangeCancelledFromSwitchboard(contributor=_contributor, cancelledBy=msg.sender)\n    return True\n\n\n@external\ndef freezeContributor(_contributor: address, _shouldFreeze: bool) -> bool:\n    assert self._hasPermsToEnable(msg.sender, _shouldFreeze) # dev: no perms\n    assert extcall HrContributor(_contributor).setIsFrozen(_shouldFreeze) # dev: could not freeze\n    log ContributorFrozenFromSwitchboard(contributor=_contributor, frozenBy=msg.sender, shouldFreeze=_shouldFreeze)\n    return True\n\n\n####################\n# Ripe Bond Config #\n####################\n\n\n# main config\n\n\n@external\ndef setRipeBondConfig(\n    _asset: address,\n    _amountPerEpoch: uint256,\n    _minRipePerUnit: uint256,\n    _maxRipePerUnit: uint256,\n    _maxRipePerUnitLockBonus: uint256,\n    _shouldAutoRestart: bool,\n    _restartDelayBlocks: uint256,\n    _missionControl: address = empty(address),\n) -> uint256:\n    assert gov._canGovern(msg.sender) # dev: no perms\n    aid: uint256 = timeLock._initiateAction()\n    self.actionType[aid] = ActionType.RIPE_BOND_CONFIG\n\n    assert _asset != empty(address) # dev: invalid asset\n    assert 0 not in [_amountPerEpoch, _maxRipePerUnit] # dev: invalid config\n    assert _minRipePerUnit < _maxRipePerUnit # dev: invalid min/max ripe per unit\n    assert _maxRipePerUnitLockBonus <= (10 * HUNDRED_PERCENT) # dev: max is 1000%\n\n    self.pendingRipeBondConfig[aid] = cs.RipeBondConfig(\n        asset=_asset,\n        amountPerEpoch=_amountPerEpoch,\n        canBond=False,\n        minRipePerUnit=_minRipePerUnit,\n        maxRipePerUnit=_maxRipePerUnit,\n        maxRipePerUnitLockBonus=_maxRipePerUnitLockBonus,\n        epochLength=0,\n        shouldAutoRestart=_shouldAutoRestart,\n        restartDelayBlocks=_restartDelayBlocks,\n    )\n    self.pendingMissionControl[aid] = self._resolveMissionControl(_missionControl)\n    confirmationBlock: uint256 = timeLock._getActionConfirmationBlock(aid)\n    log PendingRipeBondConfigSet(\n        asset=_asset,\n        amountPerEpoch=_amountPerEpoch,\n        minRipePerUnit=_minRipePerUnit,\n        maxRipePerUnit=_maxRipePerUnit,\n        maxRipePerUnitLockBonus=_maxRipePerUnitLockBonus,\n        shouldAutoRestart=_shouldAutoRestart,\n        restartDelayBlocks=_restartDelayBlocks,\n        confirmationBlock=confirmationBlock,\n        actionId=aid,\n    )\n    return aid\n\n\n# epoch length\n\n\n@external\ndef setRipeBondEpochLength(_epochLength: uint256, _missionControl: address = empty(address)) -> uint256:\n    assert gov._canGovern(msg.sender) # dev: no perms\n    assert _epochLength != 0 # dev: invalid epoch length\n    aid: uint256 = timeLock._initiateAction()\n    self.actionType[aid] = ActionType.RIPE_BOND_EPOCH_LENGTH\n    self.pendingRipeBondConfigValue[aid] = _epochLength\n    self.pendingMissionControl[aid] = self._resolveMissionControl(_missionControl)\n    confirmationBlock: uint256 = timeLock._getActionConfirmationBlock(aid)\n    log PendingRipeBondEpochLengthSet(epochLength=_epochLength, confirmationBlock=confirmationBlock, actionId=aid)\n    return aid\n\n\n# start epoch at block\n\n\n@external\ndef setStartEpochAtBlock(_block: uint256 = 0):\n    assert gov._canGovern(msg.sender) # dev: no perms\n\n    blockNum: uint256 = max(_block, block.number)\n    bondRoom: address = self._getBondRoomAddr()\n    extcall BondRoom(bondRoom).startBondEpochAtBlock(blockNum)\n    log RipeBondStartEpochAtBlockSet(startBlock=blockNum)\n\n\n# disable / enable bonding\n\n\n@external\ndef setCanPurchaseRipeBond(_canBond: bool, _missionControl: address = empty(address)) -> bool:\n    assert self._hasPermsToEnable(msg.sender, not _canBond) # dev: no perms\n    mc: address = self._resolveMissionControl(_missionControl)\n    config: cs.RipeBondConfig = staticcall MissionControl(mc).ripeBondConfig()\n    assert config.canBond != _canBond # dev: no change\n    config.canBond = _canBond\n    extcall MissionControl(mc).setRipeBondConfig(config)\n    log CanPurchaseRipeBondModified(canPurchaseRipeBond=_canBond, modifier=msg.sender)\n    return True\n\n\n# set bad debt\n\n\n@external\ndef setBadDebt(_amount: uint256) -> uint256:\n    assert gov._canGovern(msg.sender) # dev: no perms\n    aid: uint256 = timeLock._initiateAction()\n    self.actionType[aid] = ActionType.RIPE_BAD_DEBT\n    self.pendingRipeBondConfigValue[aid] = _amount\n    confirmationBlock: uint256 = timeLock._getActionConfirmationBlock(aid)\n    log PendingBadDebtSet(badDebt=_amount, confirmationBlock=confirmationBlock, actionId=aid)\n    return aid\n\n\n##################\n# Ripe Available #\n##################\n\n\n@external\ndef setRipeAvailableForRewards(_amount: uint256) -> uint256:\n    assert gov._canGovern(msg.sender) # dev: no perms\n\n    aid: uint256 = timeLock._initiateAction()\n    self.actionType[aid] = ActionType.RIPE_AVAIL_REWARDS\n    self.pendingRipeAvailable[aid] = _amount\n    confirmationBlock: uint256 = timeLock._getActionConfirmationBlock(aid)\n    log PendingRipeAvailableForRewardsChange(\n        amount=_amount,\n        confirmationBlock=confirmationBlock,\n        actionId=aid,\n    )\n    return aid\n\n\n@external\ndef setRipeAvailableForHr(_amount: uint256) -> uint256:\n    assert gov._canGovern(msg.sender) # dev: no perms\n\n    aid: uint256 = timeLock._initiateAction()\n    self.actionType[aid] = ActionType.RIPE_AVAIL_HR\n    self.pendingRipeAvailable[aid] = _amount\n    confirmationBlock: uint256 = timeLock._getActionConfirmationBlock(aid)\n    log PendingRipeAvailableForHrChange(\n        amount=_amount,\n        confirmationBlock=confirmationBlock,\n        actionId=aid,\n    )\n    return aid\n\n\n@external\ndef setRipeAvailableForBonds(_amount: uint256) -> uint256:\n    assert gov._canGovern(msg.sender) # dev: no perms\n\n    aid: uint256 = timeLock._initiateAction()\n    self.actionType[aid] = ActionType.RIPE_AVAIL_BONDS\n    self.pendingRipeAvailable[aid] = _amount\n    confirmationBlock: uint256 = timeLock._getActionConfirmationBlock(aid)\n    log PendingRipeAvailableForBondsChange(\n        amount=_amount,\n        confirmationBlock=confirmationBlock,\n        actionId=aid,\n    )\n    return aid\n\n\n#######################\n# Underscore Registry #\n#######################\n\n\n@external\ndef setUnderscoreRegistry(_underscoreRegistry: address, _missionControl: address = empty(address)) -> uint256:\n    assert gov._canGovern(msg.sender) # dev: no perms\n    assert self._isValidUnderscoreAddr(_underscoreRegistry) # dev: invalid underscore registry\n\n    aid: uint256 = timeLock._initiateAction()\n    self.actionType[aid] = ActionType.OTHER_UNDERSCORE_REGISTRY\n    self.pendingUnderscoreRegistry[aid] = _underscoreRegistry\n    self.pendingMissionControl[aid] = self._resolveMissionControl(_missionControl)\n    confirmationBlock: uint256 = timeLock._getActionConfirmationBlock(aid)\n    log PendingUnderscoreRegistryChange(\n        underscoreRegistry=_underscoreRegistry,\n        confirmationBlock=confirmationBlock,\n        actionId=aid,\n    )\n    return aid\n\n\n@view\n@internal\ndef _isValidUnderscoreAddr(_addr: address) -> bool:\n    if _addr == empty(address):\n        return True # allowing setting to empty address\n\n    undyLedger: address = staticcall UnderscoreRegistry(_addr).getAddr(UNDERSCORE_LEDGER_ID)\n    if undyLedger == empty(address):\n        return False\n\n    # make sure has interface\n    return not staticcall UnderscoreLedger(undyLedger).isUserWallet(empty(address))\n\n\n###########################\n# Should Check Last Touch #\n###########################\n\n\n@external\ndef setShouldCheckLastTouch(_shouldCheck: bool, _missionControl: address = empty(address)) -> uint256:\n    assert gov._canGovern(msg.sender) # dev: no perms\n\n    aid: uint256 = timeLock._initiateAction()\n    self.actionType[aid] = ActionType.OTHER_SHOULD_CHECK_LAST_TOUCH\n    self.pendingShouldCheckLastTouch[aid] = _shouldCheck\n    self.pendingMissionControl[aid] = self._resolveMissionControl(_missionControl)\n    confirmationBlock: uint256 = timeLock._getActionConfirmationBlock(aid)\n    log PendingShouldCheckLastTouchChange(shouldCheck=_shouldCheck, confirmationBlock=confirmationBlock, actionId=aid)\n    return aid\n\n\n################\n# Bond Booster #\n################\n\n\n# setting bond booster contract\n\n\n@external\ndef setRipeBondBooster(_bondBooster: address) -> uint256:\n    assert gov._canGovern(msg.sender) # dev: no perms\n    assert self._isValidRipeBondBoosterAddr(_bondBooster) # dev: invalid bond booster\n\n    aid: uint256 = timeLock._initiateAction()\n    self.actionType[aid] = ActionType.RIPE_BOND_BOOSTER\n    self.pendingBondBooster[aid] = _bondBooster\n    confirmationBlock: uint256 = timeLock._getActionConfirmationBlock(aid)\n    log PendingBondBoosterSet(\n        bondBooster=_bondBooster,\n        confirmationBlock=confirmationBlock,\n        actionId=aid,\n    )\n    return aid\n\n\n@view\n@internal\ndef _isValidRipeBondBoosterAddr(_addr: address) -> bool:\n    # make sure has interface\n    if _addr != empty(address):\n        na: uint256 = staticcall BondBooster(_addr).getBoostRatio(empty(address), 10)\n    return True\n\n\n# add booster configs\n\n\n@external\ndef setManyBondBoosters(_boosters: DynArray[BoosterConfig, MAX_BOOSTERS]) -> uint256:\n    assert gov._canGovern(msg.sender) # dev: no perms\n    assert len(_boosters) != 0 # dev: no boosters\n    aid: uint256 = timeLock._initiateAction()\n    self.actionType[aid] = ActionType.BOND_BOOSTER_ADD\n    self.pendingBoosterConfigs[aid] = _boosters\n    confirmationBlock: uint256 = timeLock._getActionConfirmationBlock(aid)\n    log PendingBoosterConfigsSet(numBoosters=len(_boosters), confirmationBlock=confirmationBlock, actionId=aid)\n    return aid\n\n\n# add single booster config\n\n\n@external\ndef setBondBooster(_config: BoosterConfig) -> uint256:\n    assert gov._canGovern(msg.sender) # dev: no perms\n    aid: uint256 = timeLock._initiateAction()\n    self.actionType[aid] = ActionType.BOND_BOOSTER_ADD\n    self.pendingBoosterConfigs[aid] = [_config]\n    confirmationBlock: uint256 = timeLock._getActionConfirmationBlock(aid)\n    log PendingBoosterConfigSet(user=_config.user, confirmationBlock=confirmationBlock, actionId=aid)\n    return aid\n\n\n# remove boosted users\n\n\n@external\ndef removeManyBondBoosters(_users: DynArray[address, MAX_BOOSTERS]) -> bool:\n    assert self._hasPermsToEnable(msg.sender, True) # dev: no perms\n    bondBooster: address = staticcall BondRoom(self._getBondRoomAddr()).bondBooster()\n    extcall BondBooster(bondBooster).removeManyBondBoosters(_users)\n    log ManyBondBoostersRemoved(numUsers=len(_users))\n    return True\n\n\n# remove single boosted user\n\n\n@external\ndef removeBondBooster(_user: address) -> bool:\n    assert self._hasPermsToEnable(msg.sender, True) # dev: no perms\n    bondBooster: address = staticcall BondRoom(self._getBondRoomAddr()).bondBooster()\n    extcall BondBooster(bondBooster).removeBondBooster(_user)\n    log BondBoosterRemoved(user=_user)\n    return True\n\n\n# set booster boundaries\n\n\n@external\ndef setBoosterBoundaries(_maxBoostRatio: uint256, _maxUnits: uint256) -> uint256:\n    assert gov._canGovern(msg.sender) # dev: no perms\n    aid: uint256 = timeLock._initiateAction()\n    self.actionType[aid] = ActionType.BOND_BOOSTER_BOUNDARIES\n    self.pendingBoosterBoundaries[aid] = BoosterBoundaries(maxBoostRatio=_maxBoostRatio, maxUnits=_maxUnits)\n    confirmationBlock: uint256 = timeLock._getActionConfirmationBlock(aid)\n    log PendingBoosterBoundariesSet(maxBoostRatio=_maxBoostRatio, maxUnits=_maxUnits, confirmationBlock=confirmationBlock, actionId=aid)\n    return aid\n\n\n# set booster min lock duration\n\n\n@external\ndef setBoosterMinLockDuration(_minLockDuration: uint256) -> bool:\n    assert gov._canGovern(msg.sender) # dev: no perms\n    bondBooster: address = staticcall BondRoom(self._getBondRoomAddr()).bondBooster()\n    extcall BondBooster(bondBooster).setMinLockDuration(_minLockDuration)\n    log BoosterMinLockDurationSet(minLockDuration=_minLockDuration)\n    return True\n\n\n################\n# Loot Cleanup #\n################\n\n\n@external\ndef resetManyUserBalancePoints(_users: DynArray[UserBalanceReset, MAX_USERS]) -> uint256:\n    assert gov._canGovern(msg.sender) # dev: no perms\n    assert len(_users) != 0 # dev: no users\n    aid: uint256 = timeLock._initiateAction()\n    self.actionType[aid] = ActionType.LOOT_USER_BALANCE_RESET\n    self.pendingUserBalanceReset[aid] = _users\n    confirmationBlock: uint256 = timeLock._getActionConfirmationBlock(aid)\n    log PendingUserBalanceResetSet(numResets=len(_users), confirmationBlock=confirmationBlock, actionId=aid)\n    return aid\n\n\n@external\ndef resetManyAssetPoints(_assets: DynArray[AssetReset, MAX_ASSETS]) -> uint256:\n    assert gov._canGovern(msg.sender) # dev: no perms\n    assert len(_assets) != 0 # dev: no assets\n    aid: uint256 = timeLock._initiateAction()\n    self.actionType[aid] = ActionType.LOOT_ASSET_RESET\n    self.pendingAssetReset[aid] = _assets\n    confirmationBlock: uint256 = timeLock._getActionConfirmationBlock(aid)\n    log PendingAssetResetSet(numResets=len(_assets), confirmationBlock=confirmationBlock, actionId=aid)\n    return aid\n\n\n@external\ndef resetManyUserBorrowPoints(_users: DynArray[address, MAX_USERS]) -> uint256:\n    assert gov._canGovern(msg.sender) # dev: no perms\n    assert len(_users) != 0 # dev: no users\n    aid: uint256 = timeLock._initiateAction()\n    self.actionType[aid] = ActionType.LOOT_USER_BORROW_RESET\n    self.pendingUserBorrowReset[aid] = _users\n    confirmationBlock: uint256 = timeLock._getActionConfirmationBlock(aid)\n    log PendingUserBorrowResetSet(numResets=len(_users), confirmationBlock=confirmationBlock, actionId=aid)\n    return aid\n\n\n#############\n# Execution #\n#############\n\n\n@external\ndef executePendingAction(_aid: uint256) -> bool:\n    assert gov._canGovern(msg.sender) # dev: no perms\n\n    # check time lock\n    if not timeLock._confirmAction(_aid):\n        if timeLock._isExpired(_aid):\n            self._cancelPendingAction(_aid)\n        return False\n\n    actionType: ActionType = self.actionType[_aid]\n\n    # use stored MC if set, otherwise fallback to current (for backwards compat)\n    mc: address = self.pendingMissionControl[_aid]\n    if mc == empty(address):\n        mc = self._getMissionControlAddr()\n\n    if actionType == ActionType.HR_CONFIG_TEMPLATE:\n        config: cs.HrConfig = staticcall MissionControl(mc).hrConfig()\n        config.contribTemplate = self.pendingHrConfig[_aid].contribTemplate\n        extcall MissionControl(mc).setHrConfig(config)\n        log HrContribTemplateSet(contribTemplate=config.contribTemplate)\n\n    elif actionType == ActionType.HR_CONFIG_MAX_COMP:\n        config: cs.HrConfig = staticcall MissionControl(mc).hrConfig()\n        p: cs.HrConfig = self.pendingHrConfig[_aid]\n        config.maxCompensation = p.maxCompensation\n        extcall MissionControl(mc).setHrConfig(config)\n        log HrMaxCompensationSet(maxCompensation=p.maxCompensation)\n\n    elif actionType == ActionType.HR_CONFIG_MIN_CLIFF:\n        config: cs.HrConfig = staticcall MissionControl(mc).hrConfig()\n        p: cs.HrConfig = self.pendingHrConfig[_aid]\n        config.minCliffLength = p.minCliffLength\n        extcall MissionControl(mc).setHrConfig(config)\n        log HrMinCliffLengthSet(minCliffLength=p.minCliffLength)\n\n    elif actionType == ActionType.HR_CONFIG_MAX_START_DELAY:\n        config: cs.HrConfig = staticcall MissionControl(mc).hrConfig()\n        p: cs.HrConfig = self.pendingHrConfig[_aid]\n        config.maxStartDelay = p.maxStartDelay\n        extcall MissionControl(mc).setHrConfig(config)\n        log HrMaxStartDelaySet(maxStartDelay=p.maxStartDelay)\n\n    elif actionType == ActionType.HR_CONFIG_VESTING:\n        config: cs.HrConfig = staticcall MissionControl(mc).hrConfig()\n        p: cs.HrConfig = self.pendingHrConfig[_aid]\n        config.minVestingLength = p.minVestingLength\n        config.maxVestingLength = p.maxVestingLength\n        extcall MissionControl(mc).setHrConfig(config)\n        log HrVestingLengthBoundariesSet(minVestingLength=p.minVestingLength, maxVestingLength=p.maxVestingLength)\n\n    elif actionType == ActionType.HR_MANAGER:\n        p: PendingManager = self.pendingManager[_aid]\n        extcall HrContributor(p.contributor).setManager(p.pendingManager)\n        log HrContributorManagerSet(contributor=p.contributor, manager=p.pendingManager)\n\n    elif actionType == ActionType.HR_CANCEL_PAYCHECK:\n        p: address = self.pendingCancelPaycheck[_aid]\n        extcall HrContributor(p).cancelPaycheck()\n        log HrContributorCancelPaycheckSet(contributor=p)\n\n    elif actionType == ActionType.RIPE_BOND_CONFIG:\n        p: cs.RipeBondConfig = self.pendingRipeBondConfig[_aid]\n        config: cs.RipeBondConfig = staticcall MissionControl(mc).ripeBondConfig()\n        config.asset = p.asset\n        config.amountPerEpoch = p.amountPerEpoch\n        config.minRipePerUnit = p.minRipePerUnit\n        config.maxRipePerUnit = p.maxRipePerUnit\n        config.maxRipePerUnitLockBonus = p.maxRipePerUnitLockBonus\n        config.shouldAutoRestart = p.shouldAutoRestart\n        config.restartDelayBlocks = p.restartDelayBlocks\n        extcall MissionControl(mc).setRipeBondConfig(config)\n        log RipeBondConfigSet(asset=p.asset, amountPerEpoch=p.amountPerEpoch, minRipePerUnit=p.minRipePerUnit, maxRipePerUnit=p.maxRipePerUnit, maxRipePerUnitLockBonus=p.maxRipePerUnitLockBonus, shouldAutoRestart=p.shouldAutoRestart)\n\n    elif actionType == ActionType.RIPE_BOND_EPOCH_LENGTH:\n        config: cs.RipeBondConfig = staticcall MissionControl(mc).ripeBondConfig()\n        config.epochLength = self.pendingRipeBondConfigValue[_aid]\n        extcall MissionControl(mc).setRipeBondConfig(config)\n        log RipeBondEpochLengthSet(epochLength=config.epochLength)\n\n    elif actionType == ActionType.RIPE_BAD_DEBT:\n        amount: uint256 = self.pendingRipeBondConfigValue[_aid]\n        extcall Ledger(self._getLedgerAddr()).setBadDebt(amount)\n        log BadDebtSet(badDebt=amount)\n\n    elif actionType == ActionType.RIPE_BOND_BOOSTER:\n        bondBooster: address = self.pendingBondBooster[_aid]\n        extcall BondRoom(self._getBondRoomAddr()).setBondBooster(bondBooster)\n        log RipeBondBoosterSet(bondBooster=bondBooster)\n\n    elif actionType == ActionType.BOND_BOOSTER_ADD:\n        boosters: DynArray[BoosterConfig, MAX_BOOSTERS] = self.pendingBoosterConfigs[_aid]\n        bondBooster: address = staticcall BondRoom(self._getBondRoomAddr()).bondBooster()\n        extcall BondBooster(bondBooster).setManyBondBoosters(boosters)\n        log ManyBondBoostersSet(numBoosters=len(boosters))\n\n    elif actionType == ActionType.BOND_BOOSTER_BOUNDARIES:\n        boundaries: BoosterBoundaries = self.pendingBoosterBoundaries[_aid]\n        bondBooster: address = staticcall BondRoom(self._getBondRoomAddr()).bondBooster()\n        extcall BondBooster(bondBooster).setMaxBoostAndMaxUnits(boundaries.maxBoostRatio, boundaries.maxUnits)\n        log BoosterBoundariesSet(maxBoostRatio=boundaries.maxBoostRatio, maxUnits=boundaries.maxUnits)\n\n    elif actionType == ActionType.LOOT_USER_BALANCE_RESET:\n        resets: DynArray[UserBalanceReset, MAX_USERS] = self.pendingUserBalanceReset[_aid]\n        lootbox: address = self._getLootboxAddr()\n        for reset: UserBalanceReset in resets:\n            extcall Lootbox(lootbox).resetUserBalancePoints(reset.user, reset.asset, reset.vaultId)\n        log UserBalanceResetExecuted(numResets=len(resets))\n\n    elif actionType == ActionType.LOOT_ASSET_RESET:\n        resets: DynArray[AssetReset, MAX_ASSETS] = self.pendingAssetReset[_aid]\n        lootbox: address = self._getLootboxAddr()\n        for reset: AssetReset in resets:\n            extcall Lootbox(lootbox).resetAssetPoints(reset.asset, reset.vaultId)\n        log AssetResetExecuted(numResets=len(resets))\n\n    elif actionType == ActionType.LOOT_USER_BORROW_RESET:\n        users: DynArray[address, MAX_USERS] = self.pendingUserBorrowReset[_aid]\n        lootbox: address = self._getLootboxAddr()\n        for user: address in users:\n            extcall Lootbox(lootbox).resetUserBorrowPoints(user)\n        log UserBorrowResetExecuted(numResets=len(users))\n\n    elif actionType == ActionType.RIPE_AVAIL_REWARDS:\n        amount: uint256 = self.pendingRipeAvailable[_aid]\n        extcall Ledger(self._getLedgerAddr()).setRipeAvailForRewards(amount)\n        log RipeAvailableForRewardsSet(amount=amount)\n\n    elif actionType == ActionType.RIPE_AVAIL_HR:\n        amount: uint256 = self.pendingRipeAvailable[_aid]\n        extcall Ledger(self._getLedgerAddr()).setRipeAvailForHr(amount)\n        log RipeAvailableForHrSet(amount=amount)\n\n    elif actionType == ActionType.RIPE_AVAIL_BONDS:\n        amount: uint256 = self.pendingRipeAvailable[_aid]\n        extcall Ledger(self._getLedgerAddr()).setRipeAvailForBonds(amount)\n        log RipeAvailableForBondsSet(amount=amount)\n\n    elif actionType == ActionType.OTHER_UNDERSCORE_REGISTRY:\n        underscoreRegistry: address = self.pendingUnderscoreRegistry[_aid]\n        extcall MissionControl(mc).setUnderscoreRegistry(underscoreRegistry)\n        log UnderscoreRegistrySet(addr=underscoreRegistry)\n\n    elif actionType == ActionType.OTHER_SHOULD_CHECK_LAST_TOUCH:\n        shouldCheck: bool = self.pendingShouldCheckLastTouch[_aid]\n        extcall MissionControl(mc).setShouldCheckLastTouch(shouldCheck)\n        log ShouldCheckLastTouchSet(shouldCheck=shouldCheck)\n\n    elif actionType == ActionType.DELEVERAGE_MIN_BPS:\n        bps: uint256 = self.pendingMinDeleverageBps[_aid]\n        extcall Deleverage(self._getDeleverageAddr()).setMinDeleverageBps(bps)\n        log MinDeleverageBpsSet(bps=bps)\n\n    elif actionType == ActionType.DELEVERAGE_BUFFER:\n        bps: uint256 = self.pendingDeleverageBuffer[_aid]\n        extcall Deleverage(self._getDeleverageAddr()).setDeleverageBuffer(bps)\n        log DeleverageBufferSet(bps=bps)\n\n    elif actionType == ActionType.DELEVERAGE_COOLDOWN:\n        blocks: uint256 = self.pendingDeleverageCooldown[_aid]\n        extcall Deleverage(self._getDeleverageAddr()).setDeleverageCooldown(blocks)\n        log DeleverageCooldownSet(blocks=blocks)\n\n    elif actionType == ActionType.DELEVERAGE_UNDERSCORE_SAFE_SPREAD:\n        bps: uint256 = self.pendingUnderscoreSafeSpreadBps[_aid]\n        extcall Deleverage(self._getDeleverageAddr()).setUnderscoreSafeSpreadBps(bps)\n        log UnderscoreSafeSpreadBpsSet(bps=bps)\n\n    self.actionType[_aid] = empty(ActionType)\n    return True\n\n\n# cancel action\n\n\n@external\ndef cancelPendingAction(_aid: uint256) -> bool:\n    assert gov._canGovern(msg.sender) # dev: no perms\n    self._cancelPendingAction(_aid)\n    return True\n\n\n@internal\ndef _cancelPendingAction(_aid: uint256):\n    assert timeLock._cancelAction(_aid) # dev: cannot cancel action\n    self.actionType[_aid] = empty(ActionType)\n",
+            "sha256sum": "2c76e1a2b985884adc2db1b419776eddf7bd6c355268dc527d573453421bfbe1"
+          }
+        },
+        "settings": {
+          "outputSelection": {
+            "contracts/config/SwitchboardDelta.vy": [
+              "*"
+            ]
+          },
+          "search_paths": [
+            "."
+          ]
+        },
+        "compiler_version": "v0.4.3+commit.bff19ea2",
+        "integrity": "ee5bb5bc2eaa9cbd1247c17248f1f2b7237faba7353d2520deddcf722dd4e40a"
+      },
+      "args": "0000000000000000000000006162df1b329e157479f8f1407e888260e0ec3d2b000000000000000000000000ef3cb7750ff6158d9f9b27651bbba2299096483b0000000000000000000000000000000000000000000000000000000000000e100000000000000000000000000000000000000000000000000000000000049d40",
+      "file": "contracts/config/SwitchboardDelta.vy"
+    }
+  }
+}
