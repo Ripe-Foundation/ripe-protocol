@@ -170,7 +170,7 @@ def test_single_asset_sgreen_burn(
     assert main_log.user == bob
     assert main_log.caller == switchboard_alpha.address
     _test(main_log.targetRepayAmount, target_amount)
-    _test(main_log.repaidAmount, repaid_amount)
+    _test(main_log.debtToClear, repaid_amount)
     assert main_log.hasGoodDebtHealth == True
 
 
@@ -248,7 +248,7 @@ def test_single_asset_endaoment_transfer(
     assert main_log.user == bob
     assert main_log.caller == switchboard_alpha.address
     _test(main_log.targetRepayAmount, target_amount)
-    _test(main_log.repaidAmount, repaid_amount)
+    _test(main_log.debtToClear, repaid_amount)
 
 
 def test_multiple_assets_custom_order(
@@ -533,7 +533,7 @@ def test_max_uint_amount_uses_all_available(
 
     # trueTargetRepayAmount should be capped amount, not max_uint
     _test(main_log.targetRepayAmount, repaid_amount)
-    _test(main_log.repaidAmount, repaid_amount)
+    _test(main_log.debtToClear, repaid_amount)
 
 
 def test_caps_per_asset_when_debt_runs_out(

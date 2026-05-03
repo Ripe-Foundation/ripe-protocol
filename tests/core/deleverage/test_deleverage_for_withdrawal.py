@@ -2382,6 +2382,29 @@ def test_min_deleverage_bps_default_zero(deleverage):
     assert deleverage.minDeleverageBps() == 0
 
 
+def test_deleverage_constructor_uses_param_defaults(deploy_deleverage):
+    """Test that Deleverage constructor defaults initialize all deleverage params."""
+    fresh_deleverage = deploy_deleverage(
+        min_deleverage_bps=5_00,
+        deleverage_buffer=1_00,
+        deleverage_cooldown=123,
+        underscore_safe_spread_bps=150,
+        deleverage_full_payoff_buffer=10**15,
+        deleverage_overage_bps=100,
+        deleverage_dust_threshold=10**14,
+        deleverage_dust_bps=50,
+    )
+
+    assert fresh_deleverage.minDeleverageBps() == 5_00
+    assert fresh_deleverage.deleverageBuffer() == 1_00
+    assert fresh_deleverage.deleverageCooldown() == 123
+    assert fresh_deleverage.underscoreSafeSpreadBps() == 150
+    assert fresh_deleverage.deleverageFullPayoffBuffer() == 10**15
+    assert fresh_deleverage.deleverageOverageBps() == 100
+    assert fresh_deleverage.deleverageDustThreshold() == 10**14
+    assert fresh_deleverage.deleverageDustBps() == 50
+
+
 def test_set_min_deleverage_bps_from_switchboard(deleverage, switchboard_alpha):
     """Test that a registered switchboard can set minDeleverageBps"""
     deleverage.setMinDeleverageBps(5_00, sender=switchboard_alpha.address)
@@ -2400,14 +2423,10 @@ def test_set_min_deleverage_bps_rejects_non_switchboard(deleverage, bob):
         deleverage.setMinDeleverageBps(5_00, sender=bob)
 
 
-def test_set_min_deleverage_bps_rejects_over_hundred_percent(deleverage, switchboard_alpha):
-    """Test that minDeleverageBps cannot exceed HUNDRED_PERCENT"""
-    with boa.reverts("invalid bps"):
-        deleverage.setMinDeleverageBps(HUNDRED_PERCENT + 1, sender=switchboard_alpha.address)
-
-    # Exactly HUNDRED_PERCENT should be allowed
-    deleverage.setMinDeleverageBps(HUNDRED_PERCENT, sender=switchboard_alpha.address)
-    assert deleverage.minDeleverageBps() == HUNDRED_PERCENT
+def test_set_min_deleverage_bps_allows_switchboard_value(deleverage, switchboard_alpha):
+    """Test that Deleverage relies on SwitchboardDelta to cap minDeleverageBps"""
+    deleverage.setMinDeleverageBps(HUNDRED_PERCENT + 1, sender=switchboard_alpha.address)
+    assert deleverage.minDeleverageBps() == HUNDRED_PERCENT + 1
 
 
 def test_set_min_deleverage_bps_to_zero_disables(deleverage, switchboard_alpha):
@@ -2983,14 +3002,10 @@ def test_set_deleverage_buffer_rejects_non_switchboard(deleverage, bob):
         deleverage.setDeleverageBuffer(1_00, sender=bob)
 
 
-def test_set_deleverage_buffer_rejects_over_hundred_percent(deleverage, switchboard_alpha):
-    """Test that deleverageBuffer cannot exceed HUNDRED_PERCENT"""
-    with boa.reverts("invalid bps"):
-        deleverage.setDeleverageBuffer(HUNDRED_PERCENT + 1, sender=switchboard_alpha.address)
-
-    # Exactly HUNDRED_PERCENT should be allowed
-    deleverage.setDeleverageBuffer(HUNDRED_PERCENT, sender=switchboard_alpha.address)
-    assert deleverage.deleverageBuffer() == HUNDRED_PERCENT
+def test_set_deleverage_buffer_allows_switchboard_value(deleverage, switchboard_alpha):
+    """Test that Deleverage relies on SwitchboardDelta to cap deleverageBuffer"""
+    deleverage.setDeleverageBuffer(HUNDRED_PERCENT + 1, sender=switchboard_alpha.address)
+    assert deleverage.deleverageBuffer() == HUNDRED_PERCENT + 1
 
 
 def test_buffer_zero_means_no_buffer_applied(
@@ -3344,12 +3359,7 @@ def test_cooldown_zero_means_disabled(
     assert result2 == False
 
 
-def test_set_deleverage_cooldown_rejects_over_max(deleverage, switchboard_alpha):
-    """Test that setDeleverageCooldown rejects values over MAX_COOLDOWN_BLOCKS (7_200)"""
-    # Exactly at max should succeed
-    deleverage.setDeleverageCooldown(7_200, sender=switchboard_alpha.address)
-    assert deleverage.deleverageCooldown() == 7_200
-
-    # Over max should revert
-    with boa.reverts("cooldown too large"):
-        deleverage.setDeleverageCooldown(7_201, sender=switchboard_alpha.address)
+def test_set_deleverage_cooldown_allows_switchboard_value(deleverage, switchboard_alpha):
+    """Test that Deleverage relies on SwitchboardDelta to cap deleverageCooldown"""
+    deleverage.setDeleverageCooldown(7_201, sender=switchboard_alpha.address)
+    assert deleverage.deleverageCooldown() == 7_201

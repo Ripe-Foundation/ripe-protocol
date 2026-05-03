@@ -295,6 +295,14 @@ def deleverage(ripe_hq_deploy):
     return boa.load(
         "contracts/core/Deleverage.vy",
         ripe_hq_deploy,
+        0,
+        0,
+        0,
+        100,
+        10**15,
+        100,
+        10**15,
+        100,
         name="deleverage",
     )
 

@@ -124,7 +124,7 @@ def test_phase1_burns_users_sgreen_from_stability_pool(
     assert log.user == bob
     assert log.caller == switchboard_alpha.address  # caller is now the actual sender
     assert log.targetRepayAmount == pre_debt
-    assert log.repaidAmount == repaid_amount
+    assert log.debtToClear == repaid_amount
     assert log.hasGoodDebtHealth == True
 
 
@@ -199,7 +199,7 @@ def test_phase1_burns_users_green_from_stability_pool(
     assert log.user == bob
     assert log.caller == switchboard_alpha.address  # caller is now the actual sender
     assert log.targetRepayAmount == pre_debt
-    assert log.repaidAmount == repaid_amount
+    assert log.debtToClear == repaid_amount
     assert log.hasGoodDebtHealth == True
 
 
@@ -280,7 +280,7 @@ def test_phase1_partial_burn_when_sgreen_exceeds_debt(
     assert logDetail.amountBurned == sgreen_burned
     assert logDetail.isDepleted == False  # Not fully depleted
 
-    assert log.repaidAmount == repaid_amount
+    assert log.debtToClear == repaid_amount
     assert log.hasGoodDebtHealth == True
 
 
@@ -495,7 +495,7 @@ def test_phase1_with_target_repay_amount(
 
     # Verify event
     assert log.targetRepayAmount == target_repay
-    _test(log.repaidAmount, target_repay)
+    _test(log.debtToClear, target_repay)
 
 
 def test_phase1_processes_green_after_sgreen_depleted(
