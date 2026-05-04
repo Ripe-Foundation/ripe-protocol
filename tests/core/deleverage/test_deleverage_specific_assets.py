@@ -6,6 +6,20 @@ from conf_utils import filter_logs
 SIX_DECIMALS = 10**6  # For tokens like USDC/Charlie that have 6 decimals
 
 
+def _set_full_payoff_cleanup_params(
+    deleverage,
+    switchboard_alpha,
+    buffer_amount=0,
+    overage_bps=0,
+    dust_threshold=0,
+    dust_bps=0,
+):
+    deleverage.setDeleverageFullPayoffParam(1, buffer_amount, sender=switchboard_alpha.address)
+    deleverage.setDeleverageFullPayoffParam(2, overage_bps, sender=switchboard_alpha.address)
+    deleverage.setDeleverageFullPayoffParam(3, dust_threshold, sender=switchboard_alpha.address)
+    deleverage.setDeleverageFullPayoffParam(4, dust_bps, sender=switchboard_alpha.address)
+
+
 @pytest.fixture(autouse=True)
 def setup(
     setGeneralConfig,
@@ -20,7 +34,18 @@ def setup(
     stability_pool,
     setup_priority_configs,
     mock_price_source,
+    mock_undy_v2,
+    deleverage,
+    switchboard_alpha,
 ):
+    _set_full_payoff_cleanup_params(
+        deleverage,
+        switchboard_alpha,
+        buffer_amount=10**15,
+        overage_bps=100,
+        dust_threshold=10**15,
+        dust_bps=100,
+    )
     setGeneralConfig()
     setGeneralDebtConfig()
 
@@ -88,6 +113,9 @@ def setup(
         priority_stab_assets=[],
         priority_liq_assets=[],
     )
+
+    yield
+    mock_undy_v2.setAllAddressesAreVaults(True)
 
 
 ######################
@@ -249,6 +277,174 @@ def test_single_asset_endaoment_transfer(
     assert main_log.caller == switchboard_alpha.address
     _test(main_log.targetRepayAmount, target_amount)
     _test(main_log.debtToClear, repaid_amount)
+
+
+def test_full_payoff_single_specific_asset_uses_buffer(
+    switchboard_alpha,
+    teller,
+    credit_engine,
+    simple_erc20_vault,
+    bob,
+    bravo_token,
+    bravo_token_whale,
+    endaoment_funds,
+    setupDeleverage,
+):
+    """
+    Full-payoff specific-asset calls lift the collateral target by the configured buffer,
+    while debt clearing stays capped at the real debt amount.
+    """
+    setupDeleverage(
+        bob,
+        bravo_token,
+        bravo_token_whale,
+        deposit_amount=500 * EIGHTEEN_DECIMALS,
+        borrow_amount=300 * EIGHTEEN_DECIMALS,
+        get_sgreen=False,
+    )
+
+    pre_debt = credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount
+    expected_buffer = min(10**15, pre_debt * 100 // 100_00)
+    pre_bravo_vault = simple_erc20_vault.getTotalAmountForUser(bob, bravo_token)
+    pre_endaoment_bravo = bravo_token.balanceOf(endaoment_funds)
+
+    assets = [(3, bravo_token.address, pre_debt)]
+    repaid_amount = teller.deleverageWithSpecificAssets(
+        assets, bob, sender=switchboard_alpha.address
+    )
+
+    transfer_log = filter_logs(teller, "EndaomentTransferDuringDeleverage")[0]
+    main_log = filter_logs(teller, "DeleverageUser")[0]
+
+    post_bravo_vault = simple_erc20_vault.getTotalAmountForUser(bob, bravo_token)
+    post_endaoment_bravo = bravo_token.balanceOf(endaoment_funds)
+    bravo_transferred = pre_bravo_vault - post_bravo_vault
+
+    assert repaid_amount == pre_debt
+    assert credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount == 0
+    assert bravo_transferred == pre_debt + expected_buffer
+    assert post_endaoment_bravo - pre_endaoment_bravo == bravo_transferred
+    assert transfer_log.usdValue == pre_debt + expected_buffer
+    assert main_log.targetRepayAmount == pre_debt
+    assert main_log.targetRepayAmountWithBuffer == pre_debt + expected_buffer
+    assert main_log.collateralValueRepaid == pre_debt + expected_buffer
+    assert main_log.debtToClear == pre_debt
+
+
+def test_full_payoff_specific_assets_forgives_dust_after_real_collateral(
+    switchboard_alpha,
+    deleverage,
+    teller,
+    credit_engine,
+    simple_erc20_vault,
+    bob,
+    alpha_token,
+    alpha_token_whale,
+    bravo_token,
+    bravo_token_whale,
+    setupDeleverage,
+    performDeposit,
+):
+    """
+    Dust forgiveness applies to specific-assets full payoff only after nonzero
+    collateral was consumed and both dust caps allow the remainder.
+    """
+    _set_full_payoff_cleanup_params(
+        deleverage,
+        switchboard_alpha,
+        dust_threshold=1,
+        dust_bps=100,
+    )
+
+    setupDeleverage(
+        bob,
+        alpha_token,
+        alpha_token_whale,
+        deposit_amount=1_000 * EIGHTEEN_DECIMALS,
+        borrow_amount=500 * EIGHTEEN_DECIMALS,
+        get_sgreen=False,
+    )
+    pre_debt = credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount
+    performDeposit(bob, pre_debt - 1, bravo_token, bravo_token_whale, simple_erc20_vault)
+
+    assets = [(3, bravo_token.address, pre_debt)]
+    repaid_amount = teller.deleverageWithSpecificAssets(
+        assets, bob, sender=switchboard_alpha.address
+    )
+
+    transfer_log = filter_logs(teller, "EndaomentTransferDuringDeleverage")[0]
+    main_log = filter_logs(teller, "DeleverageUser")[0]
+
+    assert repaid_amount == pre_debt
+    assert credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount == 0
+    assert transfer_log.usdValue == pre_debt - 1
+    assert main_log.targetRepayAmount == pre_debt
+    assert main_log.targetRepayAmountWithBuffer == pre_debt
+    assert main_log.collateralValueRepaid == pre_debt - 1
+    assert main_log.debtToClear == pre_debt
+
+
+def test_full_payoff_specific_assets_excludes_underscore_earn_vault_caller(
+    switchboard_alpha,
+    deleverage,
+    teller,
+    credit_engine,
+    simple_erc20_vault,
+    bob,
+    alice,
+    bravo_token,
+    bravo_token_whale,
+    setupDeleverage,
+    mission_control,
+    mock_undy_v2,
+):
+    """
+    Underscore earn-vault callers remain trusted, but they do not get the new
+    full-payoff buffer or dust behavior.
+    """
+    mission_control.setUnderscoreRegistry(mock_undy_v2.address, sender=switchboard_alpha.address)
+    mock_undy_v2.setAllAddressesAreVaults(False)
+    mock_undy_v2.setEarnVault(alice, True)
+    mock_undy_v2.setBasicEarnVault(alice, False)
+
+    _set_full_payoff_cleanup_params(
+        deleverage,
+        switchboard_alpha,
+        buffer_amount=10**15,
+        overage_bps=100,
+        dust_threshold=10**15,
+        dust_bps=100,
+    )
+
+    setupDeleverage(
+        bob,
+        bravo_token,
+        bravo_token_whale,
+        deposit_amount=500 * EIGHTEEN_DECIMALS,
+        borrow_amount=300 * EIGHTEEN_DECIMALS,
+        get_sgreen=False,
+    )
+
+    pre_debt = credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount
+    pre_bravo_vault = simple_erc20_vault.getTotalAmountForUser(bob, bravo_token)
+
+    assets = [(3, bravo_token.address, pre_debt)]
+    repaid_amount = teller.deleverageWithSpecificAssets(
+        assets, bob, sender=alice
+    )
+
+    transfer_log = filter_logs(teller, "EndaomentTransferDuringDeleverage")[0]
+    main_log = filter_logs(teller, "DeleverageUser")[0]
+    post_bravo_vault = simple_erc20_vault.getTotalAmountForUser(bob, bravo_token)
+
+    assert repaid_amount == pre_debt
+    assert credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount == 0
+    assert pre_bravo_vault - post_bravo_vault == pre_debt
+    assert transfer_log.usdValue == pre_debt
+    assert main_log.targetRepayAmount == pre_debt
+    assert main_log.targetRepayAmountWithBuffer == pre_debt
+    assert main_log.collateralValueRepaid == pre_debt
+    assert main_log.debtToClear == pre_debt
 
 
 def test_multiple_assets_custom_order(
@@ -586,6 +782,7 @@ def test_caps_per_asset_when_debt_runs_out(
     # Get events
     transfer_logs = filter_logs(teller, "EndaomentTransferDuringDeleverage")
     main_log = filter_logs(teller, "DeleverageUser")[0]
+    expected_buffer = min(10**15, main_log.targetRepayAmount * 100 // 100_00)
 
     # Should have 2 events: bravo (150) and charlie (50)
     assert len(transfer_logs) == 2
@@ -593,7 +790,7 @@ def test_caps_per_asset_when_debt_runs_out(
     _test(transfer_logs[0].usdValue, 150 * EIGHTEEN_DECIMALS)
 
     assert transfer_logs[1].asset == charlie_token.address
-    _test(transfer_logs[1].usdValue, 50 * EIGHTEEN_DECIMALS)
+    _test(transfer_logs[1].usdValue, 50 * EIGHTEEN_DECIMALS + expected_buffer)
 
     # Verify balances
     post_bravo = simple_erc20_vault.getTotalAmountForUser(bob, bravo_token)
@@ -603,13 +800,16 @@ def test_caps_per_asset_when_debt_runs_out(
     charlie_used = pre_charlie - post_charlie
 
     _test(bravo_used, 150 * EIGHTEEN_DECIMALS)
-    _test(charlie_used, 50 * SIX_DECIMALS)
+    _test(charlie_used, 50 * SIX_DECIMALS + expected_buffer // 10**12)
 
     # Total repaid should be 200 (debt fully cleared)
     _test(repaid_amount, 200 * EIGHTEEN_DECIMALS)
 
     # trueTargetRepayAmount should be 200 (capped total)
     _test(main_log.targetRepayAmount, 200 * EIGHTEEN_DECIMALS)
+    _test(main_log.targetRepayAmountWithBuffer, 200 * EIGHTEEN_DECIMALS + expected_buffer)
+    _test(main_log.collateralValueRepaid, 200 * EIGHTEEN_DECIMALS + expected_buffer)
+    _test(main_log.debtToClear, 200 * EIGHTEEN_DECIMALS)
 
 
 def test_partial_asset_depletion_midway(
@@ -678,7 +878,8 @@ def test_partial_asset_depletion_midway(
 
     # Total repaid should be bravo + charlie
     total_from_events = bravo_log.usdValue + charlie_log.usdValue
-    _test(repaid_amount, total_from_events)
+    expected_buffer = min(10**15, pre_debt * 100 // 100_00)
+    _test(total_from_events, repaid_amount + expected_buffer)
 
     # Total repaid should match debt reduction
     post_debt = credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount

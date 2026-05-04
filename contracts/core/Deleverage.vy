@@ -316,7 +316,8 @@ def deleverageWithSpecificAssets(_user: address, _assets: DynArray[DeleverageAss
         return 0
 
     maxTargetRepayAmount: uint256 = userDebt.amount
-    trueTargetRepayAmount: uint256 = 0
+    targetRepayAmount: uint256 = 0
+    effectiveBuffer: uint256 = 0
 
     # process each asset in the specified order
     for data: DeleverageAsset in _assets:
@@ -338,28 +339,34 @@ def deleverageWithSpecificAssets(_user: address, _assets: DynArray[DeleverageAss
 
         # handle this specific asset
         repayForAsset: uint256 = min(maxTargetRepayAmount, data.targetRepayAmount)
-        trueTargetRepayAmount += repayForAsset
+        if targetRepayAmount != userDebt.amount:
+            targetRepayAmount = unsafe_add(targetRepayAmount, min(unsafe_sub(userDebt.amount, targetRepayAmount), data.targetRepayAmount))
+            if underscoreCallerType != UNDERSCORE_EARN_VAULT_CALLER_TYPE and targetRepayAmount == userDebt.amount:
+                effectiveBuffer = self._getFullPayoffBuffer(userDebt.amount)
+                maxTargetRepayAmount = unsafe_add(maxTargetRepayAmount, effectiveBuffer)
+                repayForAsset = unsafe_add(repayForAsset, effectiveBuffer)
         remainingToRepayForAsset: uint256 = self._handleSpecificAsset(_user, data.vaultId, vaultAddr, data.asset, repayForAsset, False, endaoFunds, endaomentPsm, psmYieldPositionToken, a)
-        paidAmountForAsset: uint256 = repayForAsset - remainingToRepayForAsset
-        maxTargetRepayAmount -= paidAmountForAsset
+        paidAmountForAsset: uint256 = unsafe_sub(repayForAsset, remainingToRepayForAsset)
+        maxTargetRepayAmount = unsafe_sub(maxTargetRepayAmount, paidAmountForAsset)
 
     # calculate how much we actually repaid
-    totalRepaidAmount: uint256 = userDebt.amount - maxTargetRepayAmount
+    totalRepaidAmount: uint256 = unsafe_sub(unsafe_add(userDebt.amount, effectiveBuffer), maxTargetRepayAmount)
     assert totalRepaidAmount != 0 # dev: no assets processed
 
     # repay debt
-    hasGoodDebtHealth: bool = extcall CreditEngine(a.creditEngine).repayFromDept(_user, userDebt, min(totalRepaidAmount, userDebt.amount), newInterest, 0, a)
+    debtToClear: uint256 = self._getDebtToClear(underscoreCallerType != UNDERSCORE_EARN_VAULT_CALLER_TYPE and targetRepayAmount == userDebt.amount, totalRepaidAmount, userDebt.amount)
+    hasGoodDebtHealth: bool = extcall CreditEngine(a.creditEngine).repayFromDept(_user, userDebt, debtToClear, newInterest, 0, a)
 
     log DeleverageUser(
         user=_user,
         caller=_caller,
-        targetRepayAmount=trueTargetRepayAmount,
-        targetRepayAmountWithBuffer=trueTargetRepayAmount,
+        targetRepayAmount=targetRepayAmount,
+        targetRepayAmountWithBuffer=unsafe_add(targetRepayAmount, effectiveBuffer),
         collateralValueRepaid=totalRepaidAmount,
-        debtToClear=min(totalRepaidAmount, userDebt.amount),
+        debtToClear=debtToClear,
         hasGoodDebtHealth=hasGoodDebtHealth,
     )
-    return totalRepaidAmount
+    return debtToClear
 
 
 ######################
@@ -678,13 +685,10 @@ def _deleverageUser(
     # get extra collateral if buffer params set (either usd value or bps over debt amount)
     effectiveBuffer: uint256 = 0
     if useFullPayoffExtras:
-        deleverageFullPayoffBuffer: uint256 = self.deleverageFullPayoffBuffer
-        deleverageOverageBps: uint256 = self.deleverageOverageBps
-        if deleverageFullPayoffBuffer != 0 and deleverageOverageBps != 0:
-            effectiveBuffer = min(deleverageFullPayoffBuffer, userDebt.amount * deleverageOverageBps // HUNDRED_PERCENT)
+        effectiveBuffer = self._getFullPayoffBuffer(userDebt.amount)
 
     # add extra buffer to account for rounding down collateral to ensure we hit target debt amount
-    collateralTargetRepayAmount: uint256 = targetRepayAmount + effectiveBuffer
+    collateralTargetRepayAmount: uint256 = unsafe_add(targetRepayAmount, effectiveBuffer)
 
     # perform deleverage phases
     collateralValueRepaid: uint256 = self._performDeleveragePhases(_user, collateralTargetRepayAmount, _config.priorityStabVaults, _config.priorityLiqAssetVaults, _endaoFunds, _endaomentPsm, _psmYieldPositionToken, _a)
@@ -692,16 +696,7 @@ def _deleverageUser(
         return 0
 
     # repay debt
-    debtToClear: uint256 = min(collateralValueRepaid, userDebt.amount)
-
-    # forgive microscopic debt (if the buffer didn't cover it) -- params must be set
-    if useFullPayoffExtras and collateralValueRepaid != 0 and debtToClear < userDebt.amount:
-        deleverageDustThreshold: uint256 = self.deleverageDustThreshold
-        deleverageDustBps: uint256 = self.deleverageDustBps
-        if deleverageDustThreshold != 0 and deleverageDustBps != 0:
-            dustRemaining: uint256 = userDebt.amount - debtToClear
-            if dustRemaining <= deleverageDustThreshold and dustRemaining * HUNDRED_PERCENT <= userDebt.amount * deleverageDustBps:
-                debtToClear = userDebt.amount
+    debtToClear: uint256 = self._getDebtToClear(useFullPayoffExtras, collateralValueRepaid, userDebt.amount)
 
     hasGoodDebtHealth: bool = extcall CreditEngine(_a.creditEngine).repayFromDept(_user, userDebt, debtToClear, newInterest, 0, _a)
 
@@ -714,6 +709,23 @@ def _deleverageUser(
         debtToClear=debtToClear,
         hasGoodDebtHealth=hasGoodDebtHealth,
     )
+    return debtToClear
+
+
+@view
+@internal
+def _getFullPayoffBuffer(_debtAmount: uint256) -> uint256:
+    return min(self.deleverageFullPayoffBuffer, unsafe_mul(_debtAmount, self.deleverageOverageBps) // HUNDRED_PERCENT)
+
+
+@view
+@internal
+def _getDebtToClear(_useFullPayoffExtras: bool, _collateralValueRepaid: uint256, _debtAmount: uint256) -> uint256:
+    debtToClear: uint256 = min(_collateralValueRepaid, _debtAmount)
+    if _useFullPayoffExtras and _collateralValueRepaid != 0 and debtToClear < _debtAmount:
+        dustRemaining: uint256 = unsafe_sub(_debtAmount, debtToClear)
+        if dustRemaining <= self.deleverageDustThreshold and unsafe_mul(dustRemaining, HUNDRED_PERCENT) <= unsafe_mul(_debtAmount, self.deleverageDustBps):
+            debtToClear = _debtAmount
     return debtToClear
 
 
