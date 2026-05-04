@@ -718,13 +718,22 @@ def _deleverageUser(
 @view
 @internal
 def _getFullPayoffBuffer(_debtAmount: uint256) -> uint256:
+    # Returns the extra collateral budget for full-payoff intent.
+    # The buffer is capped by both an absolute amount and a debt-relative bps cap
+    # so small debts cannot over-consume disproportionate collateral.
     return min(self.deleverageFullPayoffBuffer, unsafe_mul(_debtAmount, self.deleverageOverageBps) // HUNDRED_PERCENT)
 
 
 @view
 @internal
 def _getDebtToClear(_useFullPayoffExtras: bool, _collateralValueRepaid: uint256, _debtAmount: uint256) -> uint256:
+    # Debt accounting is capped at the real debt even when buffer causes extra
+    # collateral to be consumed.
     debtToClear: uint256 = min(_collateralValueRepaid, _debtAmount)
+
+    # Only full-payoff flows may forgive tiny residual debt, and only after
+    # nonzero collateral was actually consumed. This prevents free debt clearing
+    # while still removing floor-rounding dust within the configured caps.
     if _useFullPayoffExtras and _collateralValueRepaid != 0 and debtToClear < _debtAmount:
         dustRemaining: uint256 = unsafe_sub(_debtAmount, debtToClear)
         if dustRemaining <= self.deleverageDustThreshold and unsafe_mul(dustRemaining, HUNDRED_PERCENT) <= unsafe_mul(_debtAmount, self.deleverageDustBps):
