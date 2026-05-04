@@ -379,6 +379,57 @@ def test_full_payoff_single_specific_asset_uses_buffer(
     assert main_log.debtToClear == pre_debt
 
 
+def test_full_payoff_specific_assets_max_buffer_params_stay_bounded(
+    switchboard_alpha,
+    deleverage,
+    teller,
+    credit_engine,
+    simple_erc20_vault,
+    bob,
+    bravo_token,
+    bravo_token_whale,
+    setupDeleverage,
+):
+    """
+    Specific-asset full payoff remains bounded when buffer params are at Switchboard caps.
+    """
+    _set_full_payoff_params(
+        deleverage,
+        switchboard_alpha,
+        buffer_amount=10**18,
+        overage_bps=500,
+    )
+
+    setupDeleverage(
+        bob,
+        bravo_token,
+        bravo_token_whale,
+        deposit_amount=2_000 * EIGHTEEN_DECIMALS,
+        borrow_amount=500 * EIGHTEEN_DECIMALS,
+        get_sgreen=False,
+    )
+
+    pre_debt = credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount
+    expected_buffer = min(10**18, pre_debt * 500 // 100_00)
+    assets = [(3, bravo_token.address, pre_debt)]
+
+    repaid_amount = teller.deleverageWithSpecificAssets(
+        assets, bob, sender=switchboard_alpha.address
+    )
+
+    transfer_log = filter_logs(teller, "EndaomentTransferDuringDeleverage")[0]
+    main_log = filter_logs(teller, "DeleverageUser")[0]
+
+    assert repaid_amount == pre_debt
+    assert expected_buffer == 10**18
+    assert credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount == 0
+    assert transfer_log.usdValue == pre_debt + expected_buffer
+    assert main_log.targetRepayAmount == pre_debt
+    assert main_log.targetRepayAmountWithBuffer == pre_debt + expected_buffer
+    assert main_log.collateralValueRepaid == pre_debt + expected_buffer
+    assert main_log.debtToClear == pre_debt
+
+
 def test_full_payoff_specific_assets_forgives_dust_after_real_collateral(
     switchboard_alpha,
     deleverage,
@@ -558,6 +609,7 @@ def test_full_payoff_specific_assets_carries_buffer_after_depleted_trigger_asset
     assets = [
         (3, bravo_token.address, bravo_target),
         (3, charlie_token.address, charlie_target),
+        (999, savings_green.address, 2**256 - 1),
         (1, savings_green.address, 2**256 - 1),
     ]
     repaid_amount = teller.deleverageWithSpecificAssets(
@@ -570,6 +622,7 @@ def test_full_payoff_specific_assets_carries_buffer_after_depleted_trigger_asset
 
     assert repaid_amount == pre_debt
     assert credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount == 0
+    assert len(transfer_logs) == 2
     assert transfer_logs[0].asset == bravo_token.address
     assert transfer_logs[0].usdValue == bravo_target
     assert transfer_logs[1].asset == charlie_token.address

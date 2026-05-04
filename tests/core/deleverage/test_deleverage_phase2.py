@@ -2565,6 +2565,61 @@ def test_full_payoff_buffer_consumes_extra_collateral_and_exposes_overage(
     )
 
 
+def test_full_payoff_max_buffer_params_stay_bounded(
+    ripe_hq,
+    switchboard,
+    teller,
+    credit_engine,
+    simple_erc20_vault,
+    bob,
+    alpha_token,
+    alpha_token_whale,
+    setupDeleverage,
+    setup_priority_configs,
+    deleverage,
+    switchboard_alpha,
+):
+    """Max Switchboard buffer params exercise cap-bounded unsafe math without changing debt accounting."""
+    _set_full_payoff_params(
+        deleverage,
+        switchboard_alpha,
+        buffer_amount=10**18,
+        overage_bps=500,
+    )
+
+    setupDeleverage(
+        bob,
+        alpha_token,
+        alpha_token_whale,
+        deposit_amount=2_000 * EIGHTEEN_DECIMALS,
+        borrow_amount=500 * EIGHTEEN_DECIMALS,
+        get_sgreen=False,
+    )
+    setup_priority_configs(
+        priority_stab_assets=[],
+        priority_liq_assets=[(simple_erc20_vault, alpha_token)],
+    )
+
+    pre_debt = credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount
+    expected_overage = min(10**18, pre_debt * 500 // 100_00)
+
+    repaid_amount = teller.deleverageUser(bob, 0, sender=switchboard_alpha.address)
+    transfer_log = filter_logs(teller, "EndaomentTransferDuringDeleverage")[-1]
+    deleverage_log = filter_logs(teller, "DeleverageUser")[-1]
+
+    assert repaid_amount == pre_debt
+    assert expected_overage == 10**18
+    assert credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount == 0
+    assert transfer_log.usdValue == pre_debt + expected_overage
+    _assert_deleverage_user_amounts(
+        deleverage_log,
+        pre_debt,
+        pre_debt + expected_overage,
+        pre_debt + expected_overage,
+        pre_debt,
+    )
+
+
 @pytest.mark.parametrize("buffer_amount,overage_bps", [(10**15, 0), (0, 100)])
 def test_full_payoff_buffer_requires_both_absolute_and_bps_config(
     ripe_hq,
@@ -2682,6 +2737,71 @@ def test_full_payoff_dust_forgiveness_clears_sub_threshold_remainder(
         pre_debt,
         pre_debt,
         pre_debt - 1,
+        pre_debt,
+    )
+
+
+def test_full_payoff_max_dust_params_clear_threshold_boundary(
+    ripe_hq,
+    switchboard,
+    teller,
+    credit_engine,
+    simple_erc20_vault,
+    bob,
+    alpha_token,
+    alpha_token_whale,
+    bravo_token,
+    bravo_token_whale,
+    setupDeleverage,
+    performDeposit,
+    setup_priority_configs,
+    setAssetConfig,
+    createDebtTerms,
+    deleverage,
+    switchboard_alpha,
+):
+    """Max dust params can clear exactly the absolute threshold, after real collateral is consumed."""
+    _configure_alpha_borrow_bravo_deleverage(
+        setAssetConfig,
+        createDebtTerms,
+        alpha_token,
+        bravo_token,
+    )
+    _set_full_payoff_params(
+        deleverage,
+        switchboard_alpha,
+        dust_threshold=10**16,
+        dust_bps=500,
+    )
+
+    setupDeleverage(
+        bob,
+        alpha_token,
+        alpha_token_whale,
+        deposit_amount=2_000 * EIGHTEEN_DECIMALS,
+        borrow_amount=500 * EIGHTEEN_DECIMALS,
+        get_sgreen=False,
+    )
+    pre_debt = credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount
+    dust_amount = 10**16
+    performDeposit(bob, pre_debt - dust_amount, bravo_token, bravo_token_whale, simple_erc20_vault)
+    setup_priority_configs(
+        priority_stab_assets=[],
+        priority_liq_assets=[(simple_erc20_vault, bravo_token)],
+    )
+
+    repaid_amount = teller.deleverageUser(bob, 0, sender=switchboard_alpha.address)
+    transfer_log = filter_logs(teller, "EndaomentTransferDuringDeleverage")[-1]
+    deleverage_log = filter_logs(teller, "DeleverageUser")[-1]
+
+    assert repaid_amount == pre_debt
+    assert credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount == 0
+    assert transfer_log.usdValue == pre_debt - dust_amount
+    _assert_deleverage_user_amounts(
+        deleverage_log,
+        pre_debt,
+        pre_debt,
+        pre_debt - dust_amount,
         pre_debt,
     )
 
