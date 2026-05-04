@@ -7,6 +7,12 @@ SIX_DECIMALS = 10**6
 EIGHT_DECIMALS = 10**8
 
 
+@pytest.fixture(autouse=True)
+def reset_undy_v2_mock(mock_undy_v2):
+    yield
+    mock_undy_v2.setAllAddressesAreVaults(True)
+
+
 @pytest.fixture
 def setup_redemption_zone(
     setGeneralConfig,

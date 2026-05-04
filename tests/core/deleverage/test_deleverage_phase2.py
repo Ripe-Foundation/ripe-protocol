@@ -18,6 +18,8 @@ def setup(
     delta_token,
     setup_priority_configs,
     mock_price_source,
+    mock_undy_v2,
+    alpha_token_vault_with_safe_gap,
 ):
     setGeneralConfig()
     setGeneralDebtConfig()
@@ -81,6 +83,11 @@ def setup(
         priority_stab_assets=[],  # Empty - skip Phase 1
         priority_liq_assets=[],  # Will be set per test
     )
+
+    yield
+
+    mock_undy_v2.setAllAddressesAreVaults(True)
+    alpha_token_vault_with_safe_gap.setSafeDiscountBps(500)
 
 
 def test_basic_endaoment_transfer(
@@ -2220,11 +2227,12 @@ def test_phase2_underscore_earn_vault_safe_zero_does_not_overcredit(
     mock_price_source,
     mission_control,
     mock_undy_v2,
+    endaoment_funds,
     switchboard_alpha,
 ):
     """
     Safety test: if convertToAssetsSafe returns 0 for nonzero shares, deleverage
-    flow must not over-credit relative to requested repay.
+    skips the basic earn vault before withdrawing shares.
     """
     mission_control.setUnderscoreRegistry(mock_undy_v2.address, sender=switchboard_alpha.address)
     mock_undy_v2.setAllAddressesAreVaults(False)
@@ -2279,22 +2287,14 @@ def test_phase2_underscore_earn_vault_safe_zero_does_not_overcredit(
     )
 
     target_repay = 10 * EIGHTEEN_DECIMALS
-    repaid_amount = teller.deleverageUser(bob, target_repay, sender=switchboard_alpha.address)
-    transfer_logs = filter_logs(teller, "EndaomentTransferDuringDeleverage")
-    vault_transfer_log = next(e for e in transfer_logs if e.asset == alpha_token_vault_with_safe_gap.address)
-    assert vault_transfer_log.usdValue <= target_repay
-    assert repaid_amount <= target_repay
+    pre_vault_shares = simple_erc20_vault.getTotalAmountForUser(bob, alpha_token_vault_with_safe_gap)
+    pre_endaoment_shares = alpha_token_vault_with_safe_gap.balanceOf(endaoment_funds)
 
-    alpha_token_vault_with_safe_gap.setSafeDiscountBps(500)
-    # restore alpha token deleverage behavior for following tests
-    setAssetConfig(
-        alpha_token,
-        _vaultIds=[3],
-        _debtTerms=debt_terms,
-        _shouldBurnAsPayment=False,
-        _shouldTransferToEndaoment=True,
-    )
-    mock_undy_v2.setAllAddressesAreVaults(True)
+    with boa.reverts("cannot deleverage"):
+        teller.deleverageUser(bob, target_repay, sender=switchboard_alpha.address)
+
+    assert simple_erc20_vault.getTotalAmountForUser(bob, alpha_token_vault_with_safe_gap) == pre_vault_shares
+    assert alpha_token_vault_with_safe_gap.balanceOf(endaoment_funds) == pre_endaoment_shares
 
 
 def test_phase2_underscore_earn_vault_depleted_position_credits_from_amount_sent(

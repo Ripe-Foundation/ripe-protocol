@@ -176,7 +176,7 @@ event DeleverageFullPayoffParamSet:
     param: uint256
     amount: uint256
 
-lastDeleverageBlock: public(HashMap[address, uint256]) # user -> block number
+lastDeleverageBlock: public(HashMap[address, uint256]) # user -> block number, only for deleverageForWithdrawal
 
 # deleverage params
 minDeleverageBps: public(uint256)
@@ -1136,8 +1136,8 @@ def _transferCollateral(
         na: uint256 = 0
         cappedUnderlying: uint256 = 0
         na, cappedUnderlying = self._getMaxAndCappedUnderlyingForShares(_asset, amountSent)
-        if cappedUnderlying != 0:
-            usdValue = staticcall PriceDesk(_a.priceDesk).getUsdValue(underlyingAsset, cappedUnderlying, True)
+        assert cappedUnderlying != 0 # dev: zero safe underlying
+        usdValue = staticcall PriceDesk(_a.priceDesk).getUsdValue(underlyingAsset, cappedUnderlying, True)
 
     return usdValue, amountSent, isPositionDepleted
 
@@ -1232,7 +1232,9 @@ def _getMaxAssetAmount(
         maxSampleUnderlying: uint256 = 0
         cappedSampleUnderlying: uint256 = 0
         maxSampleUnderlying, cappedSampleUnderlying = self._getMaxAndCappedUnderlyingForShares(_asset, sampleShareUnit)
-        if maxSampleUnderlying > cappedSampleUnderlying and cappedSampleUnderlying != 0:
+        if cappedSampleUnderlying == 0:
+            return 0
+        if maxSampleUnderlying > cappedSampleUnderlying:
             # ceil(a / b) = (a + b - 1) // b
             adjustedUnderlyingAmount = (underlyingAmount * maxSampleUnderlying + cappedSampleUnderlying - 1) // cappedSampleUnderlying
 
