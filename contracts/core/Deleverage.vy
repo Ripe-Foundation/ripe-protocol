@@ -202,6 +202,12 @@ UNDERSCORE_VAULT_REGISTRY_ID: constant(uint256) = 10
 UNDERSCORE_LEGO_CALLER_TYPE: constant(uint256) = 1
 UNDERSCORE_EARN_VAULT_CALLER_TYPE: constant(uint256) = 2
 HUNDRED_PERCENT: constant(uint256) = 100_00 # 100.00%
+MAX_COOLDOWN_BLOCKS: constant(uint256) = 7_200 # ~1 day at 12s/block
+MAX_UNDERSCORE_SAFE_SPREAD_BPS: constant(uint256) = 500 # 5% hard ceiling
+MAX_DELEVERAGE_FULL_PAYOFF_BUFFER: constant(uint256) = 10 ** 18
+MAX_DELEVERAGE_DUST_THRESHOLD: constant(uint256) = 10 ** 16
+MAX_DELEVERAGE_OVERAGE_BPS: constant(uint256) = 500 # 5% hard ceiling
+MAX_DELEVERAGE_DUST_BPS: constant(uint256) = 500 # 5% hard ceiling
 PRIORITY_LIQ_VAULT_DATA: constant(uint256) = 20
 MAX_STAB_VAULT_DATA: constant(uint256) = 10
 MAX_DELEVERAGE_USERS: constant(uint256) = 25
@@ -222,6 +228,15 @@ def __init__(
 ):
     addys.__init__(_ripeHq)
     deptBasics.__init__(False, False, False) # no special permissions needed
+
+    assert _minDeleverageBps <= HUNDRED_PERCENT # dev: invalid bps
+    assert _deleverageBuffer <= HUNDRED_PERCENT # dev: invalid bps
+    assert _deleverageCooldown <= MAX_COOLDOWN_BLOCKS # dev: cooldown too large
+    assert _underscoreSafeSpreadBps <= MAX_UNDERSCORE_SAFE_SPREAD_BPS # dev: exceeds hard ceiling
+    assert _deleverageFullPayoffBuffer <= MAX_DELEVERAGE_FULL_PAYOFF_BUFFER # dev: exceeds hard ceiling
+    assert _deleverageOverageBps <= MAX_DELEVERAGE_OVERAGE_BPS # dev: exceeds hard ceiling
+    assert _deleverageDustThreshold <= MAX_DELEVERAGE_DUST_THRESHOLD # dev: exceeds hard ceiling
+    assert _deleverageDustBps <= MAX_DELEVERAGE_DUST_BPS # dev: exceeds hard ceiling
 
     self.minDeleverageBps = _minDeleverageBps
     self.deleverageBuffer = _deleverageBuffer
@@ -356,7 +371,8 @@ def deleverageWithSpecificAssets(_user: address, _assets: DynArray[DeleverageAss
     totalRepaidAmount: uint256 = unsafe_sub(unsafe_add(userDebt.amount, effectiveBuffer), maxTargetRepayAmount)
     assert totalRepaidAmount != 0 # dev: no assets processed
 
-    # repay debt
+    # Repay debt. This repeats the full-payoff check from the buffer branch above;
+    # it relies on targetRepayAmount only moving up toward userDebt.amount in the loop.
     debtToClear: uint256 = self._getDebtToClear(underscoreCallerType != UNDERSCORE_EARN_VAULT_CALLER_TYPE and targetRepayAmount == userDebt.amount, totalRepaidAmount, userDebt.amount)
     hasGoodDebtHealth: bool = extcall CreditEngine(a.creditEngine).repayFromDept(_user, userDebt, debtToClear, newInterest, 0, a)
 
@@ -1172,6 +1188,7 @@ def _transferCollateral(
 @internal
 def _getUnderscoreCallerType(_addr: address, _mc: address) -> uint256:
     # 0 = not underscore, 1 = underscore lego/other trusted caller, 2 = earn vault
+    # Writes the underscore vault registry to transient cache, so do not use from @view paths.
     underscore: address = staticcall MissionControl(_mc).underscoreRegistry()
     if underscore == empty(address):
         return 0
@@ -1291,6 +1308,11 @@ def _getVaultAddr(_vaultId: uint256, _vaultBook: address) -> (address, bool):
 
 # deleverage params
 
+# Param ceilings are enforced in SwitchboardDelta after deployment to preserve
+# Deleverage runtime bytecode size. Constructor args are validated above.
+# WARNING: future switchboards with access to these setters must enforce the same caps,
+# or unsafe math in deleverage flows can overflow under malicious values.
+
 
 @external
 def setMinDeleverageBps(_bps: uint256):
@@ -1328,9 +1350,7 @@ def setUnderscoreSafeSpreadBps(_bps: uint256):
 def setDeleverageFullPayoffParam(_param: uint256, _amount: uint256):
     assert addys._isSwitchboardAddr(msg.sender) # dev: only switchboard allowed
     assert not deptBasics.isPaused # dev: contract paused
-    # Param ceilings are enforced in SwitchboardDelta to preserve Deleverage bytecode size.
-    # WARNING: future switchboards with access must enforce the same caps,
-    # or unsafe_mul math in full-payoff helpers can overflow under malicious values.
+    # _param values: 1=fullPayoffBuffer, 2=overageBps, 3=dustThreshold, 4=dustBps
     if _param == 1:
         self.deleverageFullPayoffBuffer = _amount
     elif _param == 2:

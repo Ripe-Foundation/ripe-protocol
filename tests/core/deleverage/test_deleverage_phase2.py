@@ -2232,7 +2232,7 @@ def test_phase2_underscore_earn_vault_safe_zero_does_not_overcredit(
 ):
     """
     Safety test: if convertToAssetsSafe returns 0 for nonzero shares, deleverage
-    skips the basic earn vault before withdrawing shares.
+    reverts before withdrawing shares.
     """
     mission_control.setUnderscoreRegistry(mock_undy_v2.address, sender=switchboard_alpha.address)
     mock_undy_v2.setAllAddressesAreVaults(False)
@@ -2292,6 +2292,96 @@ def test_phase2_underscore_earn_vault_safe_zero_does_not_overcredit(
 
     with boa.reverts("cannot deleverage"):
         teller.deleverageUser(bob, target_repay, sender=switchboard_alpha.address)
+
+    assert simple_erc20_vault.getTotalAmountForUser(bob, alpha_token_vault_with_safe_gap) == pre_vault_shares
+    assert alpha_token_vault_with_safe_gap.balanceOf(endaoment_funds) == pre_endaoment_shares
+
+
+def test_phase2_underscore_earn_vault_dust_amount_safe_zero_reverts(
+    ripe_hq,  # Ensures switchboard is registered
+    switchboard,  # Ensures switchboard_alpha is registered
+    teller,
+    simple_erc20_vault,
+    bob,
+    alpha_token,
+    alpha_token_whale,
+    alpha_token_vault_with_safe_gap,
+    performDeposit,
+    setupDeleverage,
+    setup_priority_configs,
+    setAssetConfig,
+    createDebtTerms,
+    mock_price_source,
+    mission_control,
+    mock_undy_v2,
+    endaoment_funds,
+    switchboard_alpha,
+):
+    """
+    Sample-size safe conversion can pass while a depleted dust position converts
+    to zero safely. That must revert instead of crediting fallback USD value.
+    """
+    mission_control.setUnderscoreRegistry(mock_undy_v2.address, sender=switchboard_alpha.address)
+    mock_undy_v2.setAllAddressesAreVaults(False)
+    mock_undy_v2.setEarnVault(alpha_token_vault_with_safe_gap.address, True)
+    mock_undy_v2.setBasicEarnVault(alpha_token_vault_with_safe_gap.address, True)
+    alpha_token_vault_with_safe_gap.setSafeDiscountBps(9999)
+
+    mock_price_source.setPrice(alpha_token, 1 * EIGHTEEN_DECIMALS)
+    debt_terms = createDebtTerms(
+        _ltv=80_00,
+        _redemptionThreshold=85_00,
+        _liqThreshold=90_00,
+        _liqFee=5_00,
+        _borrowRate=0,
+    )
+    setAssetConfig(
+        alpha_token_vault_with_safe_gap,
+        _vaultIds=[3],
+        _debtTerms=debt_terms,
+        _shouldBurnAsPayment=False,
+        _shouldTransferToEndaoment=True,
+    )
+    # Disable fallback deleverage on raw alpha collateral so the tx must process
+    # the underscore vault dust position.
+    setAssetConfig(
+        alpha_token,
+        _vaultIds=[3],
+        _debtTerms=debt_terms,
+        _shouldBurnAsPayment=False,
+        _shouldTransferToEndaoment=False,
+    )
+
+    setupDeleverage(
+        bob,
+        alpha_token,
+        alpha_token_whale,
+        deposit_amount=1_000 * EIGHTEEN_DECIMALS,
+        borrow_amount=20 * EIGHTEEN_DECIMALS,
+        get_sgreen=False,
+    )
+
+    alpha_token.transfer(bob, 100 * EIGHTEEN_DECIMALS, sender=alpha_token_whale)
+    alpha_token.approve(alpha_token_vault_with_safe_gap, 100 * EIGHTEEN_DECIMALS, sender=bob)
+    alpha_token_vault_with_safe_gap.deposit(100 * EIGHTEEN_DECIMALS, bob, sender=bob)
+    alpha_token.transfer(alpha_token_vault_with_safe_gap, 100 * EIGHTEEN_DECIMALS, sender=alpha_token_whale)
+
+    sample_shares = 10 ** alpha_token_vault_with_safe_gap.decimals()
+    assert alpha_token_vault_with_safe_gap.convertToAssetsSafe(sample_shares) != 0
+    assert alpha_token_vault_with_safe_gap.convertToAssetsSafe(1) == 0
+
+    performDeposit(bob, 1, alpha_token_vault_with_safe_gap, bob, simple_erc20_vault)
+    pre_vault_shares = simple_erc20_vault.getTotalAmountForUser(bob, alpha_token_vault_with_safe_gap)
+    pre_endaoment_shares = alpha_token_vault_with_safe_gap.balanceOf(endaoment_funds)
+    assert pre_vault_shares == 1
+
+    setup_priority_configs(
+        priority_stab_assets=[],
+        priority_liq_assets=[(simple_erc20_vault, alpha_token_vault_with_safe_gap)],
+    )
+
+    with boa.reverts("zero safe underlying"):
+        teller.deleverageUser(bob, 10 * EIGHTEEN_DECIMALS, sender=switchboard_alpha.address)
 
     assert simple_erc20_vault.getTotalAmountForUser(bob, alpha_token_vault_with_safe_gap) == pre_vault_shares
     assert alpha_token_vault_with_safe_gap.balanceOf(endaoment_funds) == pre_endaoment_shares

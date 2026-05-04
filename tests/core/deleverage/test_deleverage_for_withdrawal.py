@@ -2405,6 +2405,25 @@ def test_deleverage_constructor_uses_param_defaults(deploy_deleverage):
     assert fresh_deleverage.deleverageDustBps() == 50
 
 
+@pytest.mark.parametrize(
+    "kwargs,revert_msg",
+    [
+        ({"min_deleverage_bps": HUNDRED_PERCENT + 1}, "invalid bps"),
+        ({"deleverage_buffer": HUNDRED_PERCENT + 1}, "invalid bps"),
+        ({"deleverage_cooldown": 7_201}, "cooldown too large"),
+        ({"underscore_safe_spread_bps": 501}, "exceeds hard ceiling"),
+        ({"deleverage_full_payoff_buffer": 10**18 + 1}, "exceeds hard ceiling"),
+        ({"deleverage_overage_bps": 501}, "exceeds hard ceiling"),
+        ({"deleverage_dust_threshold": 10**16 + 1}, "exceeds hard ceiling"),
+        ({"deleverage_dust_bps": 501}, "exceeds hard ceiling"),
+    ],
+)
+def test_deleverage_constructor_rejects_params_above_caps(deploy_deleverage, kwargs, revert_msg):
+    """Constructor validates deploy-time params because setters rely on Switchboard caps."""
+    with boa.reverts(revert_msg):
+        deploy_deleverage(**kwargs)
+
+
 def test_set_min_deleverage_bps_from_switchboard(deleverage, switchboard_alpha):
     """Test that a registered switchboard can set minDeleverageBps"""
     deleverage.setMinDeleverageBps(5_00, sender=switchboard_alpha.address)
