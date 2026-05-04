@@ -315,6 +315,7 @@ def deleverageWithSpecificAssets(_user: address, _assets: DynArray[DeleverageAss
     if userDebt.amount == 0:
         return 0
 
+    # This tracks remaining collateral budget, not just remaining debt, once the buffer fires.
     maxTargetRepayAmount: uint256 = userDebt.amount
     targetRepayAmount: uint256 = 0
     effectiveBuffer: uint256 = 0
@@ -342,6 +343,8 @@ def deleverageWithSpecificAssets(_user: address, _assets: DynArray[DeleverageAss
         if targetRepayAmount != userDebt.amount:
             targetRepayAmount = unsafe_add(targetRepayAmount, min(unsafe_sub(userDebt.amount, targetRepayAmount), data.targetRepayAmount))
             if underscoreCallerType != UNDERSCORE_EARN_VAULT_CALLER_TYPE and targetRepayAmount == userDebt.amount:
+                # Full-payoff intent lets the buffer exceed this asset's target.
+                # If this asset cannot fill it, the extra budget carries to later assets.
                 effectiveBuffer = self._getFullPayoffBuffer(userDebt.amount)
                 maxTargetRepayAmount = unsafe_add(maxTargetRepayAmount, effectiveBuffer)
                 repayForAsset = unsafe_add(repayForAsset, effectiveBuffer)
@@ -349,7 +352,7 @@ def deleverageWithSpecificAssets(_user: address, _assets: DynArray[DeleverageAss
         paidAmountForAsset: uint256 = unsafe_sub(repayForAsset, remainingToRepayForAsset)
         maxTargetRepayAmount = unsafe_sub(maxTargetRepayAmount, paidAmountForAsset)
 
-    # calculate how much we actually repaid
+    # Budget starts as debt and may be lifted by buffer; consumed collateral is budget minus remainder.
     totalRepaidAmount: uint256 = unsafe_sub(unsafe_add(userDebt.amount, effectiveBuffer), maxTargetRepayAmount)
     assert totalRepaidAmount != 0 # dev: no assets processed
 
@@ -1316,6 +1319,9 @@ def setUnderscoreSafeSpreadBps(_bps: uint256):
 def setDeleverageFullPayoffParam(_param: uint256, _amount: uint256):
     assert addys._isSwitchboardAddr(msg.sender) # dev: only switchboard allowed
     assert not deptBasics.isPaused # dev: contract paused
+    # Param ceilings are enforced in SwitchboardDelta to preserve Deleverage bytecode size.
+    # WARNING: future switchboards with access must enforce the same caps,
+    # or unsafe_mul math in full-payoff helpers can overflow under malicious values.
     if _param == 1:
         self.deleverageFullPayoffBuffer = _amount
     elif _param == 2:

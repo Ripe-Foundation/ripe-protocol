@@ -2391,7 +2391,7 @@ def test_phase2_underscore_earn_vault_depleted_position_credits_from_amount_sent
 # Full-Payoff Dust Cleanup Settings
 #################################################
 
-def _set_full_payoff_cleanup_params(
+def _set_full_payoff_params(
     deleverage,
     switchboard_alpha,
     buffer_amount=0,
@@ -2462,7 +2462,7 @@ def test_deleverage_full_payoff_cleanup_setters(
     value,
     getter,
 ):
-    """Full-payoff cleanup params live on Deleverage and rely on Switchboard caps."""
+    """Full-payoff cleanup params live on Deleverage; Switchboard enforces caps."""
     with boa.reverts("only switchboard allowed"):
         deleverage.setDeleverageFullPayoffParam(param_id, value, sender=bob)
 
@@ -2524,7 +2524,7 @@ def test_full_payoff_buffer_consumes_extra_collateral_and_exposes_overage(
     switchboard_alpha,
 ):
     """Full-payoff buffer lifts collateral target, caps debt repayment, and exposes overage in events."""
-    _set_full_payoff_cleanup_params(
+    _set_full_payoff_params(
         deleverage,
         switchboard_alpha,
         buffer_amount=10**15,
@@ -2583,7 +2583,7 @@ def test_full_payoff_buffer_requires_both_absolute_and_bps_config(
     overage_bps,
 ):
     """The buffer path is disabled until both the absolute buffer and overage bps are nonzero."""
-    _set_full_payoff_cleanup_params(
+    _set_full_payoff_params(
         deleverage,
         switchboard_alpha,
         buffer_amount=buffer_amount,
@@ -2643,7 +2643,7 @@ def test_full_payoff_dust_forgiveness_clears_sub_threshold_remainder(
         bravo_token,
     )
 
-    _set_full_payoff_cleanup_params(
+    _set_full_payoff_params(
         deleverage,
         switchboard_alpha,
         dust_threshold=1,
@@ -2713,7 +2713,7 @@ def test_full_payoff_dust_forgiveness_respects_bps_cap_for_small_debt(
         bravo_token,
     )
 
-    _set_full_payoff_cleanup_params(
+    _set_full_payoff_params(
         deleverage,
         switchboard_alpha,
         dust_threshold=10**15,
@@ -2778,7 +2778,7 @@ def test_full_payoff_dust_forgiveness_requires_absolute_and_bps_config(
         alpha_token,
         bravo_token,
     )
-    _set_full_payoff_cleanup_params(
+    _set_full_payoff_params(
         deleverage,
         switchboard_alpha,
         dust_threshold=dust_threshold,
@@ -2840,7 +2840,7 @@ def test_full_payoff_dust_forgiveness_respects_absolute_threshold(
         alpha_token,
         bravo_token,
     )
-    _set_full_payoff_cleanup_params(
+    _set_full_payoff_params(
         deleverage,
         switchboard_alpha,
         dust_threshold=1,
@@ -2902,7 +2902,7 @@ def test_full_payoff_dust_forgiveness_blocks_when_both_caps_fail(
         alpha_token,
         bravo_token,
     )
-    _set_full_payoff_cleanup_params(
+    _set_full_payoff_params(
         deleverage,
         switchboard_alpha,
         dust_threshold=1,
@@ -2953,7 +2953,7 @@ def test_full_payoff_extras_do_not_apply_to_partial_targets(
     switchboard_alpha,
 ):
     """Partial deleverage targets use the requested debt target without buffer or forgiveness."""
-    _set_full_payoff_cleanup_params(
+    _set_full_payoff_params(
         deleverage,
         switchboard_alpha,
         buffer_amount=10**15,
@@ -3006,7 +3006,7 @@ def test_full_payoff_extras_do_not_turn_zero_repayment_into_forgiveness(
     switchboard_alpha,
 ):
     """Even with permissive params, a full-payoff call with no eligible collateral still reverts."""
-    _set_full_payoff_cleanup_params(
+    _set_full_payoff_params(
         deleverage,
         switchboard_alpha,
         buffer_amount=10**15,
@@ -3070,7 +3070,7 @@ def test_full_payoff_buffer_applies_to_admin_with_basic_underscore_collateral(
     mock_undy_v2.setBasicEarnVault(alpha_token_vault_with_safe_gap.address, True)
     alpha_token_vault_with_safe_gap.setSafeDiscountBps(500)
 
-    _set_full_payoff_cleanup_params(
+    _set_full_payoff_params(
         deleverage,
         switchboard_alpha,
         buffer_amount=10**15,
