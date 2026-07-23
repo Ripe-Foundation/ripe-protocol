@@ -252,7 +252,7 @@ def cli(
     Different history directories should be used to record the
     manifests for different networks/environments,
     under a subfolder named with the network ID, e.g.,
-    `.migration_history/network-219183`.
+    `migration_history/network-219183`.
     """
 
     final_rpc = rpc if rpc else (
