@@ -4,7 +4,7 @@
 
 **Recommended outcome:** `conditional — shared vault change specification required`
 
-**Owner approval status:** Not approved
+**Owner production-behavior approval status:** Not approved
 
 **Evidence commit:** `05940a5273cb7ff625ad0dc9bfb5ddc52c22844d`
 
@@ -46,6 +46,11 @@ continue repository analysis. That approval did **not**:
 - authorize a production contract change;
 - authorize defaults, migration, manifest, or asset-configuration changes; or
 - authorize deployment or a live transaction.
+
+The owner later reconfirmed this boundary: “That's correct. I approved the
+analysis to keep going forward but I'm not approving the underlying behavior.”
+This later confirmation is also conversation evidence rather than a repository
+artifact.
 
 All of those gates remain closed.
 
