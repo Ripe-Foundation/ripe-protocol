@@ -22,8 +22,8 @@ required.
 This is a technical recommendation, not launch authorization. The PSM remains
 omitted from Robinhood until the owner approves the issuer/admin risk,
 market-price depeg policy, stale-price ceiling, economic parameters,
-SavingsGreen disposition, shared live-version/naming work, and implementation
-specification below.
+SavingsGreen disposition, implementation of the approved shared naming policy,
+and the implementation specification below.
 
 If implementation is approved, the selected staging posture is **deploy
 disabled, then register without GREEN mint authority**. Do not omit the PSM
@@ -195,9 +195,10 @@ is mechanically safe, but the current interfaces are operationally ambiguous:
   `usdcYieldPosition`; and
 - `scripts/params/params_utils.py` documents USDC-specific decimals.
 
-**Track 4 recommendation:** a shared, chain-agnostic reserve-asset naming
-revision is required before Robinhood operator tooling is considered
-launch-ready. Do not fork or rename only the Robinhood contract.
+**Owner-approved decision — 23 July 2026:** use shared, chain-agnostic
+reserve-asset aliases and generic operator output while preserving
+compatibility-required legacy selectors (option 2). Do not fork or rename only
+the Robinhood contract.
 
 The follow-on shared specification should preserve legacy Base ABI selectors
 where compatibility requires them, add canonical reserve-asset aliases/output,
@@ -219,18 +220,12 @@ not change, and it does not require removing legacy selectors; it finds that
 silently presenting USDG as USDC in manifests, reports, smoke output, or new
 operator workflows is not launch-ready.
 
-The owner must consciously adjudicate this difference. The available choices
-are:
-
-1. retain legacy contract/ABI labels, accept their residual ambiguity, and at
-   minimum require every manifest, report, and smoke output to identify the
-   actual reserve symbol and address; or
-2. approve this track's recommended shared aliases and generic operator
-   output while preserving compatibility-required legacy selectors.
-
-Until that choice is approved, naming/live-version work remains an owner gate.
-This track does not amend the executive summary or authorize either
-implementation.
+The owner consciously adjudicated this difference on 23 July 2026 and selected
+Track 4's option 2. The alternative—retaining only legacy contract/ABI labels
+while making operator surfaces identify the actual reserve—was not selected.
+This closes the naming-policy choice only. It does not amend the executive
+summary, authorize implementation, decide whether new generic events accompany
+legacy events, or permit full selector/event replacement.
 
 ## Yield-disabled and Base-only isolation
 
@@ -550,8 +545,6 @@ approve:
 - mint/redeem fees, capacities, interval value, initial reserve, and allowlists;
 - SavingsGreen deployed/omitted behavior;
 - deployed-and-registered-disabled posture and the exact authority sequence;
-- whether to accept the executive summary's legacy-label lean or approve Track
-  4's stricter shared reserve naming/live-version recommendation; and
 - the implementation/test/smoke specification.
 
 If any approval is declined or any pinned identity/interface changes, fallback
@@ -565,10 +558,9 @@ Do not mark these in this track. After reviewing this record, the owner may:
 1. close `rh-summary.md:89-93`, **“Resolve the USDG price path”**, by approving
    `existing Chainlink feed`;
 2. close the research/decision portion of `rh-summary.md:205`, **“Keep the
-   existing USDC-named storage, methods, and events only if…”**, by consciously
-   adjudicating the executive summary's legacy-label lean against Track 4's
-   stricter recommendation and documenting the accepted operator-output and
-   compatibility policy; and
+   existing USDC-named storage, methods, and events only if…”**, by recording
+   the 23 July 2026 owner approval of option 2: shared reserve aliases and
+   generic operator output with compatibility-required legacy selectors; and
 3. treat the evidence/analysis portion of `rh-summary.md:290`, **“USDG pricing
    and PSM behavior are validated…”**, as review-complete, while leaving the
    checkbox open until Robinhood-specific implementation tests or a verifiably
