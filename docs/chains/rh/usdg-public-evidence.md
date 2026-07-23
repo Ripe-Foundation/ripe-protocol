@@ -191,18 +191,25 @@ USDG/USD proxy's AggregatorV3 compatibility.
 
 ### Compatibility with Ripe
 
-`contracts/priceSources/ChainlinkPrices.vy:182-197,261-291` calls
-`latestRoundData()` and `decimals()` on a standard proxy, rejects nonpositive
-answers, feed decimals above 18, future timestamps, zero or incomplete rounds,
-and answers older than the effective stale time, then normalizes to 18
-decimals. The Robinhood feed meets that interface without a new adapter.
+`contracts/priceSources/ChainlinkPrices.vy:306-319` reads and stores
+`decimals()` when a governed feed is proposed; `:182-197,261-293` uses those
+stored decimals and calls `latestRoundData()` on the configured standard
+proxy. It rejects nonpositive answers, feed decimals above 18, future
+timestamps, zero or incomplete rounds, and answers older than a nonzero
+effective stale time, then normalizes to 18 decimals. The Robinhood feed meets
+that interface without a new adapter.
 
 The effective stale time is
 `max(MissionControl.priceStaleTime, feedConfig.staleTime)`. Therefore a
-feed-specific value cannot tighten a larger global value. An approved
-Robinhood stale ceiling must constrain both settings. `PriceSourceData.pause`
-blocks configuration changes but is not consulted by `getPrice`; feed/source
-disablement and PSM pause are the actual runtime stop paths.
+feed-specific value cannot tighten a larger global value. The stale-round
+check is conditional on this effective value being nonzero: if both settings
+are zero, otherwise-valid answers of any age pass. Robinhood manifest and
+smoke validation must therefore require
+`0 < max(globalStaleTime, feedStaleTime) <= approvedCeiling`; at least one
+setting must be positive and neither may exceed the ceiling.
+`PriceSourceData.pause` blocks configuration changes but is not consulted by
+`getPrice`; feed/source disablement and PSM pause are the actual runtime stop
+paths.
 
 ### Testnet feed evidence
 
@@ -233,7 +240,7 @@ configuration is source-specific and, where present, follows the repository's
 
 | Source | Price premise / update path | Failure behavior relevant here | USDG disposition |
 | --- | --- | --- | --- |
-| `ChainlinkPrices` | Governed, timelocked standard Aggregator feed config | Invalid/stale round returns zero; proxy revert propagates | **Usable existing path** |
+| `ChainlinkPrices` | Governed, timelocked standard Aggregator feed config | Invalid round returns zero; stale round returns zero only under a nonzero effective threshold; proxy revert propagates | **Usable existing path with nonzero stale-time invariant** |
 | `RedStone` | Chainlink-like RedStone aggregator endpoints | Endpoint-specific freshness and feed assumptions | Reject label-level reuse; exact Robinhood USDG product is Chainlink |
 | `PythPrices` | Pyth network and feed ID | Requires Pyth product/config and update semantics | No current exact-network USDG evidence |
 | `StorkPrices` | Stork network and feed ID | Requires Stork product/config | No current exact-network USDG evidence |
@@ -262,7 +269,10 @@ MAINNET_BLOCK=17572269
 TESTNET_BLOCK=92773516
 USDG=0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168
 TEST_USDG=0x7E955252E15c84f5768B83c41a71F9eba181802F
+MAINNET_IMPL=0x68184C449E1a8f34fA18d289737129FD27B66f8F
+TESTNET_IMPL=0xF0863D7A29a55d0c4263c11bFac754312ff078DF
 FEED=0x61B7e5650328764B076A108EFF5fa7282a1B9aD2
+AGGREGATOR=0x8bEeE3503F6860D5dac4cE26b5eEe92982951c2e
 IMPLEMENTATION_SLOT=0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc
 
 cast chain-id --rpc-url "$MAINNET_RPC"
@@ -272,21 +282,47 @@ cast call "$USDG" 'symbol()(string)' --block "$MAINNET_BLOCK" --rpc-url "$MAINNE
 cast call "$USDG" 'decimals()(uint8)' --block "$MAINNET_BLOCK" --rpc-url "$MAINNET_RPC"
 cast call "$USDG" 'totalSupply()(uint256)' --block "$MAINNET_BLOCK" --rpc-url "$MAINNET_RPC"
 cast call "$USDG" 'paused()(bool)' --block "$MAINNET_BLOCK" --rpc-url "$MAINNET_RPC"
+cast call "$USDG" 'defaultAdmin()(address)' --block "$MAINNET_BLOCK" --rpc-url "$MAINNET_RPC"
+cast call "$USDG" 'defaultAdminDelay()(uint48)' --block "$MAINNET_BLOCK" --rpc-url "$MAINNET_RPC"
 cast storage "$USDG" "$IMPLEMENTATION_SLOT" --block "$MAINNET_BLOCK" --rpc-url "$MAINNET_RPC"
-cast code "$USDG" --block "$MAINNET_BLOCK" --rpc-url "$MAINNET_RPC" | cast keccak
+cast keccak "$(cast code "$USDG" --block "$MAINNET_BLOCK" --rpc-url "$MAINNET_RPC")"
+cast keccak "$(cast code "$MAINNET_IMPL" --block "$MAINNET_BLOCK" --rpc-url "$MAINNET_RPC")"
 
 cast call "$FEED" 'description()(string)' --block "$MAINNET_BLOCK" --rpc-url "$MAINNET_RPC"
 cast call "$FEED" 'decimals()(uint8)' --block "$MAINNET_BLOCK" --rpc-url "$MAINNET_RPC"
+cast call "$FEED" 'version()(uint256)' --block "$MAINNET_BLOCK" --rpc-url "$MAINNET_RPC"
+cast call "$FEED" 'owner()(address)' --block "$MAINNET_BLOCK" --rpc-url "$MAINNET_RPC"
 cast call "$FEED" 'aggregator()(address)' --block "$MAINNET_BLOCK" --rpc-url "$MAINNET_RPC"
+cast call "$FEED" 'proposedAggregator()(address)' --block "$MAINNET_BLOCK" --rpc-url "$MAINNET_RPC"
+cast call "$FEED" 'accessController()(address)' --block "$MAINNET_BLOCK" --rpc-url "$MAINNET_RPC"
 cast call "$FEED" 'latestRoundData()(uint80,int256,uint256,uint256,uint80)' \
   --block "$MAINNET_BLOCK" --rpc-url "$MAINNET_RPC"
+cast call "$AGGREGATOR" 'owner()(address)' --block "$MAINNET_BLOCK" --rpc-url "$MAINNET_RPC"
+cast call "$AGGREGATOR" 'typeAndVersion()(string)' --block "$MAINNET_BLOCK" --rpc-url "$MAINNET_RPC"
+cast keccak "$(cast code "$FEED" --block "$MAINNET_BLOCK" --rpc-url "$MAINNET_RPC")"
+cast keccak "$(cast code "$AGGREGATOR" --block "$MAINNET_BLOCK" --rpc-url "$MAINNET_RPC")"
 
 cast chain-id --rpc-url "$TESTNET_RPC"
 cast block "$TESTNET_BLOCK" --rpc-url "$TESTNET_RPC" --json
+cast call "$TEST_USDG" 'name()(string)' --block "$TESTNET_BLOCK" --rpc-url "$TESTNET_RPC"
+cast call "$TEST_USDG" 'symbol()(string)' --block "$TESTNET_BLOCK" --rpc-url "$TESTNET_RPC"
 cast call "$TEST_USDG" 'decimals()(uint8)' --block "$TESTNET_BLOCK" --rpc-url "$TESTNET_RPC"
 cast call "$TEST_USDG" 'totalSupply()(uint256)' --block "$TESTNET_BLOCK" --rpc-url "$TESTNET_RPC"
+cast call "$TEST_USDG" 'paused()(bool)' --block "$TESTNET_BLOCK" --rpc-url "$TESTNET_RPC"
+cast call "$TEST_USDG" 'defaultAdmin()(address)' --block "$TESTNET_BLOCK" --rpc-url "$TESTNET_RPC"
+cast call "$TEST_USDG" 'defaultAdminDelay()(uint48)' --block "$TESTNET_BLOCK" --rpc-url "$TESTNET_RPC"
 cast storage "$TEST_USDG" "$IMPLEMENTATION_SLOT" --block "$TESTNET_BLOCK" --rpc-url "$TESTNET_RPC"
+cast keccak "$(cast code "$TEST_USDG" --block "$TESTNET_BLOCK" --rpc-url "$TESTNET_RPC")"
+cast keccak "$(cast code "$TESTNET_IMPL" --block "$TESTNET_BLOCK" --rpc-url "$TESTNET_RPC")"
 ```
+
+Pinned calls require an archive-capable endpoint. On a follow-up check later on
+23 July 2026, Robinhood's public testnet RPC returned `missing trie node` for
+the pinned historical state while unpinned current calls still returned the
+same identity, controls, implementation, and code hashes. Use an archival
+endpoint or explorer evidence to reproduce the exact pinned block; omit
+`--block` only for a current drift check and do not present that result as the
+pinned observation.
 
 ## Contradictions, inferences, and unresolved facts
 

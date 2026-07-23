@@ -130,9 +130,11 @@ Assumptions for the representative table:
 - `R` is available USDG reserve units expressed as whole tokens; and
 - floor division may remove atomic dust.
 
-Code paths are `EndaomentPSM.vy:219-276,285-306` for mint,
-`:374-441,450-476` for redemption/maxima, and
-`PriceDesk.vy:79-124,142-187` for conversion/routing.
+Code paths are `EndaomentPSM.vy:219-277,285-306` for mint,
+`:374-442,450-476` for redemption/maxima, and
+`PriceDesk.vy:86-102,112-124,142-187` for conversion/routing. Fees and
+privileged treatment are broken out immediately below rather than repeated in
+each price row.
 
 | USDG oracle price | Regular mint for 1 USDG | Regular redeem for 1 GREEN | Regular max mint input before user-balance cap | Regular max redeem payment before user-balance cap | Classification |
 | ---: | ---: | ---: | ---: | ---: | --- |
@@ -162,14 +164,15 @@ reverting unit at each selected fee.
 | Condition | Mint execution / max view | Redeem execution / max view | Result |
 | --- | --- | --- | --- |
 | No source registered anywhere | Strict mint pricing returns zero rather than raising; mint reverts `zero mint amount`. Mint max uses nominal `C` because `max(0, nominal)`. | Strict redemption cannot proceed because reserve-backed max is zero; max view is zero | Execution disabled by zero, but mint max alone is misleading |
-| Feed configured but stale/nonpositive/future/incomplete | `ChainlinkPrices` returns zero with `hasFeed=true`; strict mint raises `has price config, no price`. Mint max still uses nominal `C` | Reserve max is zero; redemption reaches zero amount. Direct strict conversion would raise | Zero/revert fail closed |
+| Feed configured but stale under a nonzero threshold, nonpositive, future, or incomplete | `ChainlinkPrices` returns zero with `hasFeed=true`; strict mint raises `has price config, no price`. Mint max still uses nominal `C` | Reserve max is zero; redemption reaches zero amount. Direct strict conversion would raise | Zero/revert fail closed |
+| Effective stale time is zero | An otherwise-valid feed answer is accepted regardless of age; mint and max views use that old price | Redemption and max views use that old price | **Freshness enforcement is disabled**; manifest validation must reject this configuration |
 | Feed or PriceDesk source confirmed disabled | The feed/source is absent, so behavior matches “no source”: mint reverts on zero output while mint max reports nominal `C` | Max view is zero; execution cannot obtain a nonzero payment allowance | Returns zero, then user path reverts |
 | Price-source call itself reverts | Revert propagates through `PriceDesk` | Revert propagates | Reverts |
 | Price source is `PriceSourceData.pause(true)` only | Reads continue; pause is not checked by `getPrice` | Reads continue | **Not a runtime oracle kill switch** |
 | PSM contract paused | Both user operations fail before pricing | Both user operations fail before pricing | Immediate stop via `SwitchboardCharlie.pause` |
 | Insufficient idle reserve, no yield configured | Not relevant to mint; received USDG remains idle | Internal yield withdrawal returns zero, then balance assertion fails | Reverts atomically |
 | Mint/redeem allowlist enabled | Checks `msg.sender` for ordinary recipient | Checks `msg.sender` for ordinary recipient | Depends on owner-selected allowlist |
-| SavingsGreen requested/payment | Uses ERC-4626 path only if deployed/configured; mint falls back to direct GREEN at `<= 1 GREEN` | Converts max GREEN to shares, transfers shares, redeems to GREEN, then burns GREEN | Depends on unresolved SavingsGreen decision |
+| SavingsGreen requested/payment | If requested and `greenToMint > 1 GREEN`, resolves RipeHq token slot 2 and attempts approval/deposit without a nonzero/deployment guard; mint falls back to direct GREEN at `<= 1 GREEN` | If the payment flag is true, resolves slot 2 and attempts share conversion, transfer, and redemption without a nonzero/deployment guard | Absent/sentinel behavior must be specified and proven; ordinary GREEN paths make no SavingsGreen contract calls when their flags are false |
 | Recipient is recognized Underscore earn vault | No fee or allowlist; unlimited mint input capacity; still `min(market, $1)` output pricing | No fee/allowlist/interval; `max(market reserve amount, 1:1)` output; still reserve-limited | Forbidden privilege on Robinhood |
 
 The external max-view boolean `_isUnderscoreVault` is caller-supplied and is
@@ -192,9 +195,9 @@ is mechanically safe, but the current interfaces are operationally ambiguous:
   `usdcYieldPosition`; and
 - `scripts/params/params_utils.py` documents USDC-specific decimals.
 
-**Decision:** a shared, chain-agnostic reserve-asset naming revision is
-required before Robinhood operator tooling is considered launch-ready. Do not
-fork or rename only the Robinhood contract.
+**Track 4 recommendation:** a shared, chain-agnostic reserve-asset naming
+revision is required before Robinhood operator tooling is considered
+launch-ready. Do not fork or rename only the Robinhood contract.
 
 The follow-on shared specification should preserve legacy Base ABI selectors
 where compatibility requires them, add canonical reserve-asset aliases/output,
@@ -202,6 +205,29 @@ make manifests and operator reports display the actual token symbol/address,
 and define whether new generic events are emitted alongside legacy events.
 Full selector/event replacement is a live-version decision and is not
 authorized here.
+
+### Divergence from the controlling architecture note
+
+The controlling executive summary currently says the USDC-oriented variable
+and event names “may remain as legacy labels to avoid unnecessary code churn”
+at line 173. This track deliberately takes a stricter operator-safety posture.
+It agrees that the six-decimal core conversion need not change, and it does
+not require removing legacy selectors; it finds that silently presenting USDG
+as USDC in manifests, reports, smoke output, or new operator workflows is not
+launch-ready.
+
+The owner must consciously adjudicate this difference. The available choices
+are:
+
+1. retain legacy contract/ABI labels, accept their residual ambiguity, and at
+   minimum require every manifest, report, and smoke output to identify the
+   actual reserve symbol and address; or
+2. approve this track's recommended shared aliases and generic operator
+   output while preserving compatibility-required legacy selectors.
+
+Until that choice is approved, naming/live-version work remains an owner gate.
+This track does not amend the executive summary or authorize either
+implementation.
 
 ## Yield-disabled and Base-only isolation
 
@@ -280,14 +306,19 @@ accidentally install the full Base Endaoment feature set.
 
 This track does not decide whether CM-003 SavingsGreen is deployed.
 
+- `Addys` resolves SavingsGreen through `RipeHq.getAddr(2)`. An unregistered
+  address-registry slot reads as zero; the PSM itself does not check for zero
+  before the ERC-4626 calls.
 - If SavingsGreen exists, test both direct GREEN and ERC-4626 mint/payment
   paths, share rounding, the strict `greenToMint > 1e18` threshold, approvals,
   and failure atomicity.
 - If SavingsGreen is omitted, user interfaces and smoke scripts must always
   pass `_wantsSavingsGreen=false` and `_isPaymentSavingsGreen=false`.
-  Implementation tests must prove `true` fails closed without affecting the
-  ordinary GREEN paths. A valid zero/sentinel registry strategy for RipeHq
-  token slot 2 must come from the owner-level SavingsGreen decision.
+  `Addys` still reads slot 2, but those false branches make no ERC-4626 or
+  token call to the resolved address, so ordinary GREEN paths are unaffected.
+  Implementation tests must still prove `true` fails closed atomically. A
+  valid zero/sentinel registry strategy for RipeHq token slot 2 must come from
+  the owner-level SavingsGreen decision.
 
 ## Configuration recommendation and owner inputs
 
@@ -302,7 +333,7 @@ No numeric production fee or capacity was approved by this track.
 | `maxIntervalRedeem` | Nonzero constructor placeholder, but flag off | Must be no more than the lesser of approved outflow and immediately funded idle reserve after fee/price stress | Yes |
 | `numBlocksPerInterval` | Track 3 provisional `7,200` | Intended economic duration is one day; final value belongs to shared clock spec using BN-027/BN-028 | Yes |
 | Mint/redeem allowlists | Enforced during initial canary unless owner explicitly approves public access | Seed only approved canary addresses; sender is checked | Yes |
-| Feed stale time | No silent default | Owner approves a positive ceiling around the published 86,400-second heartbeat; both global and feed settings must be at or below that ceiling because code takes `max` | Yes |
+| Feed stale time | Reject zero effective stale time; no silent default | Owner approves `0 < max(global, feed) <= ceiling` around the published 86,400-second heartbeat; at least one setting must be positive and neither may exceed the ceiling | Yes |
 | Sequencer/restart policy | No separate uptime feed is present in the current public RDD or current Ripe adapter | Owner approves monitoring and post-restart freshness/soak assertions before activation | Yes |
 | Yield | `(0, zero)`, auto-deposit `false` | No other value allowed | Architecture invariant |
 | Underscore | registry zero | No other value allowed | Architecture invariant |
@@ -330,11 +361,12 @@ The safe order is:
    already part of the Robinhood inventory, register only approved price
    sources in `PriceDesk`, and timelock-add canonical USDG with the exact
    standard proxy, `needsEthToUsd=false`, `needsBtcToUsd=false`, and approved
-   stale time.
+   nonzero effective stale time.
 3. **Validate pricing while no PSM exists.** Assert pair, decimals, positive
-   complete round, timestamp, effective stale time, normalization to
-   18 decimals, source priority, no competing USDG source, and expected zero /
-   strict-revert behavior for mock failure states. Note that
+   complete round, timestamp,
+   `0 < max(globalStaleTime, feedStaleTime) <= approvedCeiling`,
+   normalization to 18 decimals, source priority, no competing USDG source,
+   and expected zero / strict-revert behavior for mock failure states. Note that
    `PriceSourceData.pause` is not a read kill switch.
 4. **Deploy PSM disabled and unregistered.** Constructor inputs must use
    canonical USDG, owner-recorded nonzero bounded caps/interval, and
@@ -380,7 +412,7 @@ All changes below require a separately approved implementation specification:
 
 1. Add chain-data-only `contracts/config/DefaultsRobinhood.vy` (CM-049), with
    canonical USDG, zero Underscore, no Base DEX/yield/treasury addresses, an
-   owner-approved price stale time, and Track 3 clock values.
+   owner-approved nonzero effective price stale time, and Track 3 clock values.
 2. Extend the blueprint/deploy-argument layer for Robinhood mainnet/testnet;
    current `config/BluePrint.py` and `scripts/migrate.py` enumerate Base/Ethereum
    environments and are not Robinhood-ready.
@@ -389,10 +421,13 @@ All changes below require a separately approved implementation specification:
    `(0, zero)`, register it without HQ mint authority, and encode the staged
    order above. Never copy
    `migrations/base-mainnet/2026011400_EndaomentPSM.py`, which hardcodes Base
-   USDC, lego 13, a Base vault token, and 43,200 blocks.
+   USDC, lego 13, a Base vault token, and 43,200 blocks. The vault address is a
+   bare migration literal rather than a `BluePrint.py` value, so centralized
+   defaults alone do not prevent this copy-paste failure.
 4. Add explicit address/parameter manifest validation rejecting Base USDC,
    Base Chainlink proxy, any Base yield vault/lego, Curve/Aerodrome, Endaoment
-   partner routes, and nonzero Underscore on Robinhood.
+   partner routes, nonzero Underscore, effective price stale time `0`, and any
+   stale time above the owner-approved ceiling on Robinhood.
 5. Implement the approved shared reserve-asset naming/ABI/operator-output
    revision; regenerate `scripts/abis/EndaomentPSM.json`,
    `scripts/abis/Endaoment.json`, `scripts/abis/SwitchboardEcho.json`, and any
@@ -401,9 +436,9 @@ All changes below require a separately approved implementation specification:
    reports, and smoke output to say USDG or generic reserve asset based on the
    actual token. Remove the hardcoded “USDC Address” interpretation.
 7. Add unit/property tests for `$0.90/$1.00/$1.10`, fee/cap boundary rounding,
-   no source, configured-zero, stale, future, incomplete, disabled, and
-   reverting feeds; exact last-unit interval capacity; insufficient idle
-   reserves; and 100% fee behavior.
+   no source, configured-zero, zero-effective-stale-time, stale, future,
+   incomplete, disabled, and reverting feeds; exact last-unit interval
+   capacity; insufficient idle reserves; and 100% fee behavior.
 8. Add canonical testnet-USDG plus clearly labeled mock-feed tests, and a
    pinned mainnet-fork integration test against
    `0x61B7…9aD2`, including 8-to-18 feed and 6-to-18 token normalization.
@@ -423,11 +458,12 @@ All changes below require a separately approved implementation specification:
 
 ## Tests run for this decision
 
-The six contract suites required by the brief were executed from the isolated
-worktree:
+The six contract suites required by the brief and three additional
+governance/isolation suites were executed from the isolated worktree. Pytest
+collection and execution both produce **324 total test items**:
 
 ```text
-226 passed:
+225 passed:
   test_endaoment_psm_mint.py
   test_endaoment_psm_redeem.py
   test_endaoment_psm_config.py
@@ -445,6 +481,13 @@ worktree:
   test_ripe_hq.py
 ```
 
+The PSM subtotal was rechecked with `pytest --collect-only` after review; its
+per-file counts are 72, 90, 37, 18, and 8, totaling 225. The earlier recorded
+subtotal of 226 was incorrect. A combined follow-up execution of all nine
+suites produced `324 passed, 3 warnings in 121.84s`; the warnings were the
+same pytest import-rewrite warnings caused by setting Titanoboa's cache
+programmatically.
+
 The initial Chainlink run could not write Titanoboa's default compiler cache
 under the sandbox. It was rerun unchanged with `boa.interpret.set_cache_dir`
 pointing to `/tmp/ripe-track4-titanoboa`; all 18 tests passed. No production or
@@ -460,23 +503,37 @@ conversion and routing paths are exercised transitively by the PSM and price
 source suites; the follow-on work above requires explicit PriceDesk-level USDG
 failure and rounding coverage.
 
+Documentation validation for the review follow-up comprises:
+
+- `git diff --check`;
+- a no-match scan for trailing whitespace and unfinished
+  placeholder/checklist markers in both deliverables; and
+- staged scope inspection confirming only these two Track 4 documents changed.
+
 ## Cross-track reconciliation
 
 Track 3 is clean at commit
-`19111bf1735d8e921276570c656107b53e8578ee`. Reconcile this decision into its
-stable inventory as follows:
+`86202423112ac5a4401f91acbb74988dd6bb1537`. This supersedes this decision's
+earlier check at `19111bf1735d8e921276570c656107b53e8578ee`; both intervening
+review commits (`e012fd1`, `8620242`) were re-read. The relevant component and
+clock dispositions remain compatible, with the newer matrix making
+`SwitchboardEcho`'s dependency explicit. Reconcile this decision into the
+current inventory as follows:
 
 | Track 3 ID | Reconciliation |
 | --- | --- |
 | CM-015 `PriceDesk` | Remains `reused unchanged`; configure only approved Robinhood sources |
 | CM-016 `ChainlinkPrices` | Resolve “any approved USDG feed” to the official mainnet proxy in this record; source remains unchanged |
+| CM-046 `SwitchboardEcho` | Remains `reused unchanged`; required and registered if the PSM is deployed for governed later configuration |
 | CM-048 `EndaomentPSM` | Change dependency from unresolved to technically approved existing feed; retain `deferred` until owner risk/parameter/implementation gates pass; stage deployed/registered disabled |
-| CM-049 `DefaultsRobinhood` | Add canonical USDG, zero yield/Underscore, approved stale time, and no Base addresses |
+| CM-049 `DefaultsRobinhood` | Add canonical USDG, zero yield/Underscore, approved nonzero effective stale time, and no Base addresses |
 | BN-027 / BN-028 | Intended duration remains one economic day; provisional `7,200` is not accepted here and must be finalized by the shared clock specification |
 
 Track 1 outreach is unnecessary for USDG feed availability because current
 public official evidence answers the question. Track 2 does not block this
-decision. The owner-level SavingsGreen decision remains a dependency.
+decision. The owner-level SavingsGreen decision remains a dependency. Because
+Track 3 is independently reviewed, integration must compare this table with
+its then-current head rather than assuming `8620242` remains final.
 
 ## Owner approvals still required
 
@@ -489,7 +546,8 @@ approve:
 - mint/redeem fees, capacities, interval value, initial reserve, and allowlists;
 - SavingsGreen deployed/omitted behavior;
 - deployed-and-registered-disabled posture and the exact authority sequence;
-- the shared reserve naming/live-version revision; and
+- whether to accept the executive summary's legacy-label lean or approve Track
+  4's stricter shared reserve naming/live-version recommendation; and
 - the implementation/test/smoke specification.
 
 If any approval is declined or any pinned identity/interface changes, fallback
@@ -503,8 +561,10 @@ Do not mark these in this track. After reviewing this record, the owner may:
 1. close `rh-summary.md:89-93`, **“Resolve the USDG price path”**, by approving
    `existing Chainlink feed`;
 2. close the research/decision portion of `rh-summary.md:205`, **“Keep the
-   existing USDC-named storage, methods, and events only if…”**, by accepting
-   the required shared naming revision rather than accepting ambiguity; and
+   existing USDC-named storage, methods, and events only if…”**, by consciously
+   adjudicating the executive summary's legacy-label lean against Track 4's
+   stricter recommendation and documenting the accepted operator-output and
+   compatibility policy; and
 3. treat the evidence/analysis portion of `rh-summary.md:290`, **“USDG pricing
    and PSM behavior are validated…”**, as review-complete, while leaving the
    checkbox open until Robinhood-specific implementation tests or a verifiably
