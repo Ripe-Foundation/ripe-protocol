@@ -513,11 +513,13 @@ Documentation validation for the review follow-up comprises:
 ## Cross-track reconciliation
 
 Track 3 is clean at commit
-`86202423112ac5a4401f91acbb74988dd6bb1537`. This supersedes this decision's
-earlier check at `19111bf1735d8e921276570c656107b53e8578ee`; both intervening
-review commits (`e012fd1`, `8620242`) were re-read. The relevant component and
-clock dispositions remain compatible, with the newer matrix making
-`SwitchboardEcho`'s dependency explicit. Reconcile this decision into the
+`3402380f7a35a8dcdf823a46915027d972abd982`. This supersedes this decision's
+earlier check at `19111bf1735d8e921276570c656107b53e8578ee`; the subsequent
+review commits (`e012fd1`, `8620242`, and `3402380`) were re-read. The relevant
+component and clock dispositions remain compatible. The newer matrix makes
+`SwitchboardEcho`'s dependency explicit, while the latest commit clarifies
+unrelated CAD-001 rate/reporting semantics without changing CM-015, CM-016,
+CM-046, CM-048, CM-049, BN-027, or BN-028. Reconcile this decision into the
 current inventory as follows:
 
 | Track 3 ID | Reconciliation |
@@ -533,7 +535,7 @@ Track 1 outreach is unnecessary for USDG feed availability because current
 public official evidence answers the question. Track 2 does not block this
 decision. The owner-level SavingsGreen decision remains a dependency. Because
 Track 3 is independently reviewed, integration must compare this table with
-its then-current head rather than assuming `8620242` remains final.
+its then-current head rather than assuming `3402380` remains final.
 
 ## Owner approvals still required
 
