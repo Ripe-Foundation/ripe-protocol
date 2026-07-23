@@ -6,7 +6,8 @@ Decision date: 2026-07-23
 
 Scope: GREEN and RIPE on Base <-> Robinhood Chain
 
-Current gate: Owner review of Track 1 evidence and outbound question packet
+Current gate: Packet text approved; owner-managed recipient, channel, and
+delivery remain pending
 
 ## Decision
 
@@ -336,15 +337,16 @@ channel, full text or exact durable summary, and source links in:
 
 ## Current approval gate
 
-The owner may now review the three Track 1 artifacts and request edits. To
-contact Chainlink, the next approval must explicitly identify and approve:
+The owner approved the exact outbound packet text on 2026-07-23 and will handle
+recipient selection, channel selection, and delivery. No agent is authorized to
+contact Chainlink. When delivery occurs, the record must capture:
 
 - the exact outbound text;
 - the recipient or form;
 - the channel; and
-- the act of sending.
+- the delivery date and sender.
 
-That approval would not cover terms acceptance, dependency installation,
+Text approval does not cover terms acceptance, dependency installation,
 contract implementation, role changes, deployments, or transaction broadcast.
 
 ## Exact `rh-summary.md` checklist mapping

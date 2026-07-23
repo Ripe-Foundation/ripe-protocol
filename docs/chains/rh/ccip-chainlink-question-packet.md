@@ -1,12 +1,16 @@
 # Chainlink question packet: Base <-> Robinhood Chain Ripe tokens
 
-Status: **DRAFT — NOT SENT — OWNER APPROVAL REQUIRED**
+Status: **MESSAGE TEXT APPROVED — NOT SENT — DELIVERY DETAILS PENDING**
 
 Prepared: 2026-07-23
 
 Recipient and channel: Pending owner selection
 
 External actions taken: None
+
+Owner approval: The exact message text was approved on 2026-07-23. The owner
+will separately select the recipient and channel and handle delivery. This
+approval does not authorize an agent to contact Chainlink or accept terms.
 
 This is the proposed external question packet. Sending it, submitting a form,
 contacting Chainlink, or accepting any terms requires separate explicit owner
@@ -226,9 +230,10 @@ Thank you.
 
 ## Approval gate
 
-Before this packet can leave the repository, the owner must explicitly approve:
+The owner approved item 1 on 2026-07-23. Items 2–4 remain outside agent
+authorization and will be handled by the owner:
 
-1. the exact message text;
+1. the exact message text — **approved**;
 2. the named recipient or form;
 3. the delivery channel; and
 4. the act of sending.
