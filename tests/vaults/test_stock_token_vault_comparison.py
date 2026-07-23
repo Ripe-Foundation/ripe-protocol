@@ -6,14 +6,14 @@ N-02/N-03 -> multi-user lifecycle and internal transfer
 D-01/D-03 -> donation before first deposit, cleanup, and recovery
 D-02 -> donation between deposits
 M-01 -> short-received second deposit
-L-01/R-01 -> partial issuer reductions and Lootbox state
+L-01/B-01/R-01 -> partial issuer reductions, borrowing power, and Lootbox state
 L-02/B-02/B-03 -> total-loss debt health and new borrowing
 L-03 -> two-user withdrawal ordering
 L-04 -> partial/total-loss deregistration and recovery constraints
 Z-01/Z-02 -> donation/deposit after total loss
 I-01/I-05 -> guarded deposit and retry
-I-02/I-07 -> paused direct/internal-auction transfers
-I-03/I-04/I-06/I-08 -> role blocklists and external auction atomicity
+I-02/I-06/I-07 -> pause across direct, external, and internal paths
+I-03/I-04/I-08 -> role blocklists and external auction atomicity
 A-01/A-02/A-03/A-04 -> pre-loss auction initiation and settlement
 A-05 -> two-buyer ordering after partial loss
 A-06/A-07 -> post-loss auction initiation and settlement
@@ -1518,15 +1518,25 @@ def test_auction_started_after_partial_issuer_loss_settles(
     purchase_event = filter_logs(teller, "FungAuctionPurchased")
     assert len(purchase_event) == 1
     assert purchase_event[0].greenSpent == payment
-    assert purchase_event[0].collateralAmountSent in (collateral, collateral - 1)
+    if vault_kind == "simple":
+        assert purchase_event[0].collateralAmountSent == collateral
+    else:
+        assert purchase_event[0].collateralAmountSent in (collateral, collateral - 1)
     assert purchase_event[0].collateralUsdValueSent == 20 * EIGHTEEN_DECIMALS
     if should_transfer_balance:
         assert stock_token.balanceOf(alice) == 0
-        assert collateral - 1 <= vault.getTotalAmountForUser(alice, stock_token) <= collateral
+        if vault_kind == "simple":
+            assert vault.getTotalAmountForUser(alice, stock_token) == collateral
+        else:
+            assert collateral - 1 <= vault.getTotalAmountForUser(alice, stock_token) <= collateral
         assert stock_token.balanceOf(vault) == live_before
     else:
-        assert collateral - 1 <= stock_token.balanceOf(alice) <= collateral
-        assert live_before - collateral <= stock_token.balanceOf(vault) <= live_before - collateral + 1
+        if vault_kind == "simple":
+            assert stock_token.balanceOf(alice) == collateral
+            assert stock_token.balanceOf(vault) == live_before - collateral
+        else:
+            assert collateral - 1 <= stock_token.balanceOf(alice) <= collateral
+            assert live_before - collateral <= stock_token.balanceOf(vault) <= live_before - collateral + 1
 
 
 @pytest.mark.parametrize(
@@ -1577,9 +1587,10 @@ def test_auction_started_after_total_issuer_loss(
     mock_price_source.setPrice(stock_token, EIGHTEEN_DECIMALS // 2)
 
     assert credit_engine.canLiquidateUser(bob) is can_start_after_loss
-    teller.liquidateUser(bob, False, sender=sally)
+    liquidation_result = teller.liquidateUser(bob, False, sender=sally)
     assert ledger.hasFungibleAuction(bob, vault_id, stock_token) is can_start_after_loss
     if not can_start_after_loss:
+        assert liquidation_result == 0
         assert not ledger.userDebt(bob).inLiquidation
         return
 
@@ -1771,10 +1782,11 @@ def test_blocklisted_external_auction_purchase_is_atomic_and_retryable(
         False,
         sender=alice,
     ) == payment
-    assert stock_token.balanceOf(alice) in (
-        40 * EIGHTEEN_DECIMALS,
-        40 * EIGHTEEN_DECIMALS - 1,
-    )
+    collateral = 40 * EIGHTEEN_DECIMALS
+    if vault_kind == "simple":
+        assert stock_token.balanceOf(alice) == collateral
+    else:
+        assert stock_token.balanceOf(alice) in (collateral, collateral - 1)
 
 
 @pytest.mark.parametrize(("vault_kind", "vault_id"), VAULT_CASES)
