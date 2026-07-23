@@ -1,0 +1,1154 @@
+import boa
+import pytest
+
+from constants import EIGHTEEN_DECIMALS, MAX_UINT256
+
+
+VAULT_CASES = (
+    pytest.param("simple", 3, id="simple-erc20"),
+    pytest.param("rebase", 4, id="rebase-erc20"),
+)
+
+LIQUIDATION_AFTER_TOTAL_LOSS_CASES = (
+    pytest.param("simple", 3, True, id="simple-erc20"),
+    pytest.param("rebase", 4, False, id="rebase-erc20"),
+)
+
+
+@pytest.fixture
+def stock_token(deploy3r):
+    return boa.load(
+        "contracts/mock/MockStockTokenControls.vy",
+        deploy3r,
+        18,
+        name="mock_stock_token_controls",
+    )
+
+
+def _vault_for_case(vault_kind, simple_erc20_vault, rebase_erc20_vault):
+    return simple_erc20_vault if vault_kind == "simple" else rebase_erc20_vault
+
+
+def _configure_stock_asset(
+    token,
+    vault_id,
+    setGeneralConfig,
+    setGeneralDebtConfig,
+    setAssetConfig,
+    createDebtTerms,
+    *,
+    should_auction=True,
+):
+    setGeneralConfig()
+    setGeneralDebtConfig(_ltvPaybackBuffer=0)
+    debt_terms = createDebtTerms(
+        _ltv=50_00,
+        _redemptionThreshold=60_00,
+        _liqThreshold=80_00,
+        _liqFee=0,
+        _borrowRate=0,
+    )
+    setAssetConfig(
+        token,
+        _vaultIds=[vault_id],
+        _debtTerms=debt_terms,
+        _shouldSwapInStabPools=False,
+        _shouldAuctionInstantly=should_auction,
+        _canRedeemCollateral=False,
+    )
+
+
+def _direct_deposit(token, vault, teller, user, amount, admin):
+    token.mint(vault, amount, sender=admin)
+    return vault.depositTokensInVault(user, token, amount, sender=teller.address)
+
+
+@pytest.mark.parametrize(
+    ("vault_kind", "vault_id", "can_liquidate_after_loss"),
+    LIQUIDATION_AFTER_TOTAL_LOSS_CASES,
+)
+def test_liquidation_eligibility_after_total_issuer_burn(
+    vault_kind,
+    vault_id,
+    can_liquidate_after_loss,
+    stock_token,
+    simple_erc20_vault,
+    rebase_erc20_vault,
+    setGeneralConfig,
+    setGeneralDebtConfig,
+    setAssetConfig,
+    createDebtTerms,
+    mock_price_source,
+    teller,
+    credit_engine,
+    deploy3r,
+    bob,
+):
+    """Total custody loss produces phantom collateral only in SimpleErc20."""
+
+    vault = _vault_for_case(vault_kind, simple_erc20_vault, rebase_erc20_vault)
+    _configure_stock_asset(
+        stock_token,
+        vault_id,
+        setGeneralConfig,
+        setGeneralDebtConfig,
+        setAssetConfig,
+        createDebtTerms,
+    )
+    mock_price_source.setPrice(stock_token, EIGHTEEN_DECIMALS)
+
+    deposit_amount = 200 * EIGHTEEN_DECIMALS
+    debt_amount = 100 * EIGHTEEN_DECIMALS
+    stock_token.mint(bob, deposit_amount, sender=deploy3r)
+    stock_token.approve(teller, deposit_amount, sender=bob)
+    assert teller.deposit(stock_token, deposit_amount, bob, vault, sender=bob) == deposit_amount
+    teller.borrow(debt_amount, bob, False, sender=bob)
+
+    stock_token.adminBurn(vault, deposit_amount, sender=deploy3r)
+    mock_price_source.setPrice(stock_token, EIGHTEEN_DECIMALS // 2)
+
+    assert stock_token.balanceOf(vault) == 0
+    assert credit_engine.getUserDebtAmount(bob) == debt_amount
+    assert credit_engine.canLiquidateUser(bob) is can_liquidate_after_loss
+    if vault_kind == "simple":
+        assert credit_engine.getCollateralValue(bob) == 100 * EIGHTEEN_DECIMALS
+    else:
+        assert credit_engine.getCollateralValue(bob) == 0
+
+
+@pytest.mark.parametrize(("vault_kind", "vault_id"), VAULT_CASES)
+def test_internal_auction_after_total_issuer_burn(
+    vault_kind,
+    vault_id,
+    stock_token,
+    simple_erc20_vault,
+    rebase_erc20_vault,
+    setGeneralConfig,
+    setGeneralDebtConfig,
+    setAssetConfig,
+    createDebtTerms,
+    mock_price_source,
+    teller,
+    credit_engine,
+    ledger,
+    green_token,
+    whale,
+    deploy3r,
+    bob,
+    alice,
+    sally,
+):
+    """A liquidator must not pay GREEN for collateral with zero live custody."""
+
+    vault = _vault_for_case(vault_kind, simple_erc20_vault, rebase_erc20_vault)
+    _configure_stock_asset(
+        stock_token,
+        vault_id,
+        setGeneralConfig,
+        setGeneralDebtConfig,
+        setAssetConfig,
+        createDebtTerms,
+    )
+    mock_price_source.setPrice(stock_token, EIGHTEEN_DECIMALS)
+    mock_price_source.setPrice(green_token, EIGHTEEN_DECIMALS)
+
+    deposit_amount = 200 * EIGHTEEN_DECIMALS
+    debt_amount = 100 * EIGHTEEN_DECIMALS
+    stock_token.mint(bob, deposit_amount, sender=deploy3r)
+    stock_token.approve(teller, deposit_amount, sender=bob)
+    deposited = teller.deposit(stock_token, deposit_amount, bob, vault, sender=bob)
+    assert deposited == deposit_amount
+    teller.borrow(debt_amount, bob, False, sender=bob)
+
+    # Open the auction while both vaults still hold the collateral. This isolates
+    # settlement behavior from RebaseErc20's separate post-zero liquidation
+    # eligibility behavior.
+    mock_price_source.setPrice(stock_token, EIGHTEEN_DECIMALS // 2)
+    assert credit_engine.canLiquidateUser(bob)
+    teller.liquidateUser(bob, False, sender=sally)
+    assert ledger.hasFungibleAuction(bob, vault_id, stock_token)
+
+    # Exercise issuer authority rather than impersonating the vault after the
+    # auction exists.
+    stock_token.adminBurn(vault, deposit_amount, sender=deploy3r)
+    assert stock_token.balanceOf(vault) == 0
+
+    payment = 20 * EIGHTEEN_DECIMALS
+    green_token.transfer(alice, payment, sender=whale)
+    green_token.approve(teller, payment, sender=alice)
+    alice_green_before = green_token.balanceOf(alice)
+    debt_before = credit_engine.getUserDebtAmount(bob)
+
+    if vault_kind == "simple":
+        green_spent = teller.buyFungibleAuction(
+            bob,
+            vault_id,
+            stock_token,
+            payment,
+            False,
+            True,
+            False,
+            sender=alice,
+        )
+
+        assert green_spent == payment
+        assert green_token.balanceOf(alice) == alice_green_before - green_spent
+        assert credit_engine.getUserDebtAmount(bob) == debt_before - green_spent
+        assert stock_token.balanceOf(vault) == 0
+        assert stock_token.balanceOf(alice) == 0
+        assert vault.getTotalAmountForUser(alice, stock_token) > 0
+        assert credit_engine.getCollateralValue(alice) > 0
+
+        # The purchased nominal claim is not deliverable.
+        with boa.reverts("no withdrawal amount"):
+            teller.withdraw(stock_token, MAX_UINT256, alice, vault, sender=alice)
+
+    else:
+        # SharesVault refuses to calculate a withdrawal/internal transfer when
+        # the live token balance is zero. Teller's prior GREEN transfer and all
+        # downstream debt/accounting changes therefore revert atomically.
+        with boa.reverts("no asset to withdraw"):
+            teller.buyFungibleAuction(
+                bob,
+                vault_id,
+                stock_token,
+                payment,
+                False,
+                True,
+                False,
+                sender=alice,
+            )
+
+        assert green_token.balanceOf(alice) == alice_green_before
+        assert credit_engine.getUserDebtAmount(bob) == debt_before
+        assert vault.getTotalAmountForUser(alice, stock_token) == 0
+        assert stock_token.balanceOf(vault) == 0
+
+
+@pytest.mark.parametrize(("vault_kind", "vault_id"), VAULT_CASES)
+@pytest.mark.parametrize("bob_withdraws_first", (True, False), ids=("bob-first", "alice-first"))
+def test_partial_loss_withdrawal_order(
+    vault_kind,
+    vault_id,
+    bob_withdraws_first,
+    stock_token,
+    simple_erc20_vault,
+    rebase_erc20_vault,
+    teller,
+    deploy3r,
+    bob,
+    alice,
+):
+    """Partial custody loss is first-mover-takes-all only in SimpleErc20."""
+
+    del vault_id
+    vault = _vault_for_case(vault_kind, simple_erc20_vault, rebase_erc20_vault)
+    amount = 100 * EIGHTEEN_DECIMALS
+    assert _direct_deposit(stock_token, vault, teller, bob, amount, deploy3r) == amount
+    assert _direct_deposit(stock_token, vault, teller, alice, amount, deploy3r) == amount
+
+    stock_token.adminBurn(vault, amount, sender=deploy3r)
+    assert stock_token.balanceOf(vault) == amount
+
+    first = bob if bob_withdraws_first else alice
+    second = alice if bob_withdraws_first else bob
+    first_amount, first_depleted = vault.withdrawTokensFromVault(
+        first,
+        stock_token,
+        MAX_UINT256,
+        first,
+        sender=teller.address,
+    )
+    assert first_depleted
+
+    if vault_kind == "simple":
+        assert first_amount == amount
+        with boa.reverts("no withdrawal amount"):
+            vault.withdrawTokensFromVault(
+                second,
+                stock_token,
+                MAX_UINT256,
+                second,
+                sender=teller.address,
+            )
+        assert vault.getTotalAmountForUser(second, stock_token) == amount
+        assert stock_token.balanceOf(vault) == 0
+    else:
+        second_amount, second_depleted = vault.withdrawTokensFromVault(
+            second,
+            stock_token,
+            MAX_UINT256,
+            second,
+            sender=teller.address,
+        )
+        assert second_depleted
+        assert abs(first_amount - second_amount) <= 1
+        assert amount - 2 <= first_amount + second_amount <= amount
+        assert stock_token.balanceOf(vault) <= 2
+
+
+@pytest.mark.parametrize(("vault_kind", "vault_id"), VAULT_CASES)
+def test_donation_between_deposits_and_common_views(
+    vault_kind,
+    vault_id,
+    stock_token,
+    simple_erc20_vault,
+    rebase_erc20_vault,
+    teller,
+    deploy3r,
+    bob,
+    alice,
+):
+    """Donation allocation and raw/common views remain intentionally distinct."""
+
+    del vault_id
+    vault = _vault_for_case(vault_kind, simple_erc20_vault, rebase_erc20_vault)
+    amount = 100 * EIGHTEEN_DECIMALS
+    assert _direct_deposit(stock_token, vault, teller, bob, amount, deploy3r) == amount
+
+    bob_raw_before = vault.userBalances(bob, stock_token)
+    bob_loot_before = vault.getUserLootBoxShare(bob, stock_token)
+    stock_token.mint(vault, amount, sender=deploy3r)
+
+    bob_claim_after_donation = vault.getTotalAmountForUser(bob, stock_token)
+    assert vault.getUserLootBoxShare(bob, stock_token) == bob_loot_before
+    assert vault.userBalances(bob, stock_token) == bob_raw_before
+    assert _direct_deposit(stock_token, vault, teller, alice, amount, deploy3r) == amount
+
+    actual = stock_token.balanceOf(vault)
+    bob_claim = vault.getTotalAmountForUser(bob, stock_token)
+    alice_claim = vault.getTotalAmountForUser(alice, stock_token)
+    assert actual == 3 * amount
+
+    if vault_kind == "simple":
+        assert bob_claim_after_donation == amount
+        assert bob_claim == amount
+        assert alice_claim == amount
+        assert vault.getTotalAmountForVault(stock_token) == 2 * amount
+        assert vault.totalBalances(stock_token) == 2 * amount
+    else:
+        assert 2 * amount - 2 <= bob_claim_after_donation <= 2 * amount
+        assert 2 * amount - 2 <= bob_claim <= 2 * amount
+        assert amount - 2 <= alice_claim <= amount
+        assert actual - 3 <= bob_claim + alice_claim <= actual
+        assert vault.getTotalAmountForVault(stock_token) == actual
+        assert vault.getUserLootBoxShare(bob, stock_token) == bob_raw_before // 10**8
+
+
+@pytest.mark.parametrize(("vault_kind", "vault_id"), VAULT_CASES)
+def test_donation_before_first_deposit_can_be_deregistered_and_recovered(
+    vault_kind,
+    vault_id,
+    stock_token,
+    simple_erc20_vault,
+    rebase_erc20_vault,
+    teller,
+    lootbox,
+    switchboard_alpha,
+    deploy3r,
+    bob,
+    sally,
+):
+    """Unallocated/dead-share donation residue is recoverable only after cleanup."""
+
+    del vault_id
+    vault = _vault_for_case(vault_kind, simple_erc20_vault, rebase_erc20_vault)
+    donation = 100 * EIGHTEEN_DECIMALS
+    deposit = 100 * EIGHTEEN_DECIMALS
+    stock_token.mint(vault, donation, sender=deploy3r)
+    assert _direct_deposit(stock_token, vault, teller, bob, deposit, deploy3r) == deposit
+
+    expected_withdrawn = vault.getTotalAmountForUser(bob, stock_token)
+    withdrawn, depleted = vault.withdrawTokensFromVault(
+        bob,
+        stock_token,
+        MAX_UINT256,
+        bob,
+        sender=teller.address,
+    )
+    assert depleted
+    assert withdrawn == expected_withdrawn
+    if vault_kind == "simple":
+        assert withdrawn == deposit
+    else:
+        # The pre-deposit donation and SharesVault's virtual assets/shares dilute
+        # the first depositor by about 0.0000005 token at this scale.
+        assert deposit - 10**12 <= withdrawn < deposit
+    assert vault.totalBalances(stock_token) == 0
+    assert stock_token.balanceOf(vault) == donation + deposit - withdrawn
+
+    assert not vault.deregisterUserAsset(bob, stock_token, sender=lootbox.address)
+    assert vault.deregisterVaultAsset(stock_token, sender=switchboard_alpha.address)
+
+    residue = stock_token.balanceOf(vault)
+    sally_before = stock_token.balanceOf(sally)
+    vault.recoverFunds(sally, stock_token, sender=switchboard_alpha.address)
+    assert stock_token.balanceOf(vault) == 0
+    assert stock_token.balanceOf(sally) == sally_before + residue
+
+
+@pytest.mark.parametrize(("vault_kind", "vault_id"), VAULT_CASES)
+def test_issuer_pause_blocks_external_transfer_but_not_internal_balance_transfer(
+    vault_kind,
+    vault_id,
+    stock_token,
+    simple_erc20_vault,
+    rebase_erc20_vault,
+    teller,
+    auction_house,
+    deploy3r,
+    bob,
+    alice,
+):
+    """Internal accounting can move while the issuer has stopped token movement."""
+
+    del vault_id
+    vault = _vault_for_case(vault_kind, simple_erc20_vault, rebase_erc20_vault)
+    amount = 100 * EIGHTEEN_DECIMALS
+    transfer_amount = 40 * EIGHTEEN_DECIMALS
+    assert _direct_deposit(stock_token, vault, teller, bob, amount, deploy3r) == amount
+
+    stock_token.setPaused(True, sender=deploy3r)
+    moved, _ = vault.transferBalanceWithinVault(
+        stock_token,
+        bob,
+        alice,
+        transfer_amount,
+        sender=auction_house.address,
+    )
+    assert moved == transfer_amount
+    alice_claim = vault.getTotalAmountForUser(alice, stock_token)
+    assert alice_claim == transfer_amount
+
+    with boa.reverts("token paused"):
+        vault.withdrawTokensFromVault(
+            alice,
+            stock_token,
+            transfer_amount,
+            alice,
+            sender=teller.address,
+        )
+    assert vault.getTotalAmountForUser(alice, stock_token) == alice_claim
+
+    stock_token.setPaused(False, sender=deploy3r)
+    withdrawn, depleted = vault.withdrawTokensFromVault(
+        alice,
+        stock_token,
+        transfer_amount,
+        alice,
+        sender=teller.address,
+    )
+    assert withdrawn == transfer_amount
+    assert depleted
+
+
+DEPOSIT_BLOCKLIST_CASES = (
+    pytest.param("setSenderBlocked", "sender blocked", id="borrower-as-sender"),
+    pytest.param("setRecipientBlocked", "recipient blocked", id="vault-as-recipient"),
+    pytest.param("setOperatorBlocked", "operator blocked", id="teller-as-operator"),
+)
+
+
+@pytest.mark.parametrize(("vault_kind", "vault_id"), VAULT_CASES)
+@pytest.mark.parametrize(("setter_name", "revert_reason"), DEPOSIT_BLOCKLIST_CASES)
+def test_deposit_blocklist_roles_and_retry(
+    vault_kind,
+    vault_id,
+    setter_name,
+    revert_reason,
+    stock_token,
+    simple_erc20_vault,
+    rebase_erc20_vault,
+    setGeneralConfig,
+    setGeneralDebtConfig,
+    setAssetConfig,
+    createDebtTerms,
+    teller,
+    deploy3r,
+    bob,
+):
+    """Deposit identifies borrower, vault, and Teller ERC-20 roles separately."""
+
+    vault = _vault_for_case(vault_kind, simple_erc20_vault, rebase_erc20_vault)
+    _configure_stock_asset(
+        stock_token,
+        vault_id,
+        setGeneralConfig,
+        setGeneralDebtConfig,
+        setAssetConfig,
+        createDebtTerms,
+    )
+    amount = 100 * EIGHTEEN_DECIMALS
+    stock_token.mint(bob, amount, sender=deploy3r)
+    stock_token.approve(teller, amount, sender=bob)
+
+    blocked = bob
+    if setter_name == "setRecipientBlocked":
+        blocked = vault.address
+    elif setter_name == "setOperatorBlocked":
+        blocked = teller.address
+    setter = getattr(stock_token, setter_name)
+    setter(blocked, True, sender=deploy3r)
+
+    with boa.reverts(revert_reason):
+        teller.deposit(stock_token, amount, bob, vault, sender=bob)
+    assert stock_token.balanceOf(vault) == 0
+    assert vault.getTotalAmountForUser(bob, stock_token) == 0
+
+    setter(blocked, False, sender=deploy3r)
+    assert teller.deposit(stock_token, amount, bob, vault, sender=bob) == amount
+
+
+WITHDRAW_BLOCKLIST_CASES = (
+    pytest.param("setSenderBlocked", "sender blocked", id="vault-as-sender"),
+    pytest.param("setRecipientBlocked", "recipient blocked", id="user-as-recipient"),
+    pytest.param("setOperatorBlocked", "operator blocked", id="vault-as-operator"),
+)
+
+
+@pytest.mark.parametrize(("vault_kind", "vault_id"), VAULT_CASES)
+@pytest.mark.parametrize(("setter_name", "revert_reason"), WITHDRAW_BLOCKLIST_CASES)
+def test_withdraw_blocklist_roles_and_retry(
+    vault_kind,
+    vault_id,
+    setter_name,
+    revert_reason,
+    stock_token,
+    simple_erc20_vault,
+    rebase_erc20_vault,
+    setGeneralConfig,
+    setGeneralDebtConfig,
+    setAssetConfig,
+    createDebtTerms,
+    teller,
+    deploy3r,
+    bob,
+):
+    """Withdrawal identifies the vault as sender/operator and user as recipient."""
+
+    vault = _vault_for_case(vault_kind, simple_erc20_vault, rebase_erc20_vault)
+    _configure_stock_asset(
+        stock_token,
+        vault_id,
+        setGeneralConfig,
+        setGeneralDebtConfig,
+        setAssetConfig,
+        createDebtTerms,
+    )
+    amount = 100 * EIGHTEEN_DECIMALS
+    stock_token.mint(bob, amount, sender=deploy3r)
+    stock_token.approve(teller, amount, sender=bob)
+    teller.deposit(stock_token, amount, bob, vault, sender=bob)
+    claim_before = vault.getTotalAmountForUser(bob, stock_token)
+
+    blocked = vault.address
+    if setter_name == "setRecipientBlocked":
+        blocked = bob
+    setter = getattr(stock_token, setter_name)
+    setter(blocked, True, sender=deploy3r)
+
+    with boa.reverts(revert_reason):
+        teller.withdraw(stock_token, amount // 2, bob, vault, sender=bob)
+    assert vault.getTotalAmountForUser(bob, stock_token) == claim_before
+
+    setter(blocked, False, sender=deploy3r)
+    assert teller.withdraw(stock_token, amount // 2, bob, vault, sender=bob) == amount // 2
+
+
+@pytest.mark.parametrize(("vault_kind", "vault_id"), VAULT_CASES)
+def test_short_received_second_deposit_is_reported_as_requested_amount(
+    vault_kind,
+    vault_id,
+    stock_token,
+    simple_erc20_vault,
+    rebase_erc20_vault,
+    setGeneralConfig,
+    setGeneralDebtConfig,
+    setAssetConfig,
+    createDebtTerms,
+    teller,
+    deploy3r,
+    bob,
+    alice,
+):
+    """Aggregate post-transfer balance masks a one-unit short receipt after deposit one."""
+
+    vault = _vault_for_case(vault_kind, simple_erc20_vault, rebase_erc20_vault)
+    _configure_stock_asset(
+        stock_token,
+        vault_id,
+        setGeneralConfig,
+        setGeneralDebtConfig,
+        setAssetConfig,
+        createDebtTerms,
+    )
+    stock_token.setUpgradeBehavior(3, sender=deploy3r)
+    requested = 100 * EIGHTEEN_DECIMALS
+
+    stock_token.mint(bob, requested, sender=deploy3r)
+    stock_token.approve(teller, requested, sender=bob)
+    first_reported = teller.deposit(stock_token, requested, bob, vault, sender=bob)
+    assert first_reported == requested - 1
+
+    raw_total_before = vault.totalBalances(stock_token)
+    stock_token.mint(alice, requested, sender=deploy3r)
+    stock_token.approve(teller, requested, sender=alice)
+    second_reported = teller.deposit(stock_token, requested, alice, vault, sender=alice)
+
+    assert second_reported == requested
+    assert stock_token.balanceOf(vault) == 2 * requested - 2
+    if vault_kind == "simple":
+        assert vault.getTotalAmountForVault(stock_token) == 2 * requested - 1
+    else:
+        minted_shares = vault.totalBalances(stock_token) - raw_total_before
+        correct_measured_shares = (
+            (requested - 1) * (raw_total_before + 10**8) // requested
+        )
+        assert minted_shares != correct_measured_shares
+        assert vault.getTotalAmountForVault(stock_token) == 2 * requested - 2
+
+
+@pytest.mark.parametrize(("vault_kind", "vault_id"), VAULT_CASES)
+@pytest.mark.parametrize("decimals", (6, 18), ids=("six-decimals", "eighteen-decimals"))
+def test_first_deposit_and_withdrawal_at_token_decimals(
+    vault_kind,
+    vault_id,
+    decimals,
+    simple_erc20_vault,
+    rebase_erc20_vault,
+    teller,
+    deploy3r,
+    bob,
+):
+    """Both vaults accept exact base units independently of token decimals."""
+
+    del vault_id
+    token = boa.load(
+        "contracts/mock/MockStockTokenControls.vy",
+        deploy3r,
+        decimals,
+        name=f"mock_stock_token_{vault_kind}_{decimals}",
+    )
+    vault = _vault_for_case(vault_kind, simple_erc20_vault, rebase_erc20_vault)
+    amount = 123 * 10**decimals + 7
+    assert _direct_deposit(token, vault, teller, bob, amount, deploy3r) == amount
+    withdrawn, depleted = vault.withdrawTokensFromVault(
+        bob,
+        token,
+        MAX_UINT256,
+        bob,
+        sender=teller.address,
+    )
+    assert depleted
+    assert amount - 1 <= withdrawn <= amount
+
+
+@pytest.mark.parametrize(("vault_kind", "vault_id"), VAULT_CASES)
+def test_external_auction_after_total_issuer_burn_reverts_atomically(
+    vault_kind,
+    vault_id,
+    stock_token,
+    simple_erc20_vault,
+    rebase_erc20_vault,
+    setGeneralConfig,
+    setGeneralDebtConfig,
+    setAssetConfig,
+    createDebtTerms,
+    mock_price_source,
+    teller,
+    credit_engine,
+    ledger,
+    green_token,
+    whale,
+    deploy3r,
+    bob,
+    alice,
+    sally,
+):
+    """External settlement cannot charge GREEN when the token transfer cannot occur."""
+
+    vault = _vault_for_case(vault_kind, simple_erc20_vault, rebase_erc20_vault)
+    _configure_stock_asset(
+        stock_token,
+        vault_id,
+        setGeneralConfig,
+        setGeneralDebtConfig,
+        setAssetConfig,
+        createDebtTerms,
+    )
+    mock_price_source.setPrice(stock_token, EIGHTEEN_DECIMALS)
+    mock_price_source.setPrice(green_token, EIGHTEEN_DECIMALS)
+
+    deposit_amount = 200 * EIGHTEEN_DECIMALS
+    debt_amount = 100 * EIGHTEEN_DECIMALS
+    stock_token.mint(bob, deposit_amount, sender=deploy3r)
+    stock_token.approve(teller, deposit_amount, sender=bob)
+    teller.deposit(stock_token, deposit_amount, bob, vault, sender=bob)
+    teller.borrow(debt_amount, bob, False, sender=bob)
+    mock_price_source.setPrice(stock_token, EIGHTEEN_DECIMALS // 2)
+    teller.liquidateUser(bob, False, sender=sally)
+    assert ledger.hasFungibleAuction(bob, vault_id, stock_token)
+    stock_token.adminBurn(vault, deposit_amount, sender=deploy3r)
+
+    payment = 20 * EIGHTEEN_DECIMALS
+    green_token.transfer(alice, payment, sender=whale)
+    green_token.approve(teller, payment, sender=alice)
+    green_before = green_token.balanceOf(alice)
+    debt_before = credit_engine.getUserDebtAmount(bob)
+    expected_revert = "no withdrawal amount" if vault_kind == "simple" else "no asset to withdraw"
+
+    with boa.reverts(expected_revert):
+        teller.buyFungibleAuction(
+            bob,
+            vault_id,
+            stock_token,
+            payment,
+            False,
+            False,
+            False,
+            sender=alice,
+        )
+
+    assert green_token.balanceOf(alice) == green_before
+    assert credit_engine.getUserDebtAmount(bob) == debt_before
+    assert stock_token.balanceOf(alice) == 0
+    assert ledger.hasFungibleAuction(bob, vault_id, stock_token)
+
+
+@pytest.mark.parametrize(("vault_kind", "vault_id"), VAULT_CASES)
+def test_normal_multi_user_lifecycle_and_internal_transfer(
+    vault_kind,
+    vault_id,
+    stock_token,
+    simple_erc20_vault,
+    rebase_erc20_vault,
+    teller,
+    auction_house,
+    deploy3r,
+    bob,
+    alice,
+):
+    """Equivalent ordinary deposits, transfers, and withdrawals reconcile."""
+
+    del vault_id
+    vault = _vault_for_case(vault_kind, simple_erc20_vault, rebase_erc20_vault)
+    bob_amount = 100 * EIGHTEEN_DECIMALS
+    alice_amount = 60 * EIGHTEEN_DECIMALS
+    moved_amount = 20 * EIGHTEEN_DECIMALS
+
+    assert _direct_deposit(stock_token, vault, teller, bob, bob_amount, deploy3r) == bob_amount
+    assert _direct_deposit(stock_token, vault, teller, alice, alice_amount, deploy3r) == alice_amount
+    moved, depleted = vault.transferBalanceWithinVault(
+        stock_token,
+        bob,
+        alice,
+        moved_amount,
+        sender=auction_house.address,
+    )
+    assert moved == moved_amount
+    assert not depleted
+    assert vault.getTotalAmountForUser(bob, stock_token) == bob_amount - moved_amount
+    assert vault.getTotalAmountForUser(alice, stock_token) == alice_amount + moved_amount
+
+    partial, depleted = vault.withdrawTokensFromVault(
+        bob,
+        stock_token,
+        30 * EIGHTEEN_DECIMALS,
+        bob,
+        sender=teller.address,
+    )
+    assert partial == 30 * EIGHTEEN_DECIMALS
+    assert not depleted
+
+    alice_final, alice_depleted = vault.withdrawTokensFromVault(
+        alice,
+        stock_token,
+        MAX_UINT256,
+        alice,
+        sender=teller.address,
+    )
+    bob_final, bob_depleted = vault.withdrawTokensFromVault(
+        bob,
+        stock_token,
+        MAX_UINT256,
+        bob,
+        sender=teller.address,
+    )
+    assert alice_amount + moved_amount - 1 <= alice_final <= alice_amount + moved_amount
+    assert bob_amount - moved_amount - partial - 1 <= bob_final <= bob_amount - moved_amount - partial
+    assert alice_depleted and bob_depleted
+    assert stock_token.balanceOf(vault) <= 2
+
+
+ISSUER_REDUCTION_CASES = (
+    pytest.param("adminBurn", id="administrative-burn"),
+    pytest.param("forceRedeem", id="forced-redemption"),
+    pytest.param("forceTransfer", id="forced-transfer"),
+)
+
+
+@pytest.mark.parametrize(("vault_kind", "vault_id"), VAULT_CASES)
+@pytest.mark.parametrize("issuer_action", ISSUER_REDUCTION_CASES)
+def test_partial_issuer_reduction_updates_only_live_share_claims(
+    vault_kind,
+    vault_id,
+    issuer_action,
+    stock_token,
+    simple_erc20_vault,
+    rebase_erc20_vault,
+    teller,
+    deploy3r,
+    bob,
+    sally,
+):
+    """All modeled issuer reductions bypass VaultData in the same way."""
+
+    del vault_id
+    vault = _vault_for_case(vault_kind, simple_erc20_vault, rebase_erc20_vault)
+    amount = 100 * EIGHTEEN_DECIMALS
+    loss = 25 * EIGHTEEN_DECIMALS
+    assert _direct_deposit(stock_token, vault, teller, bob, amount, deploy3r) == amount
+    raw_before = vault.userBalances(bob, stock_token)
+    loot_share_before = vault.getUserLootBoxShare(bob, stock_token)
+
+    if issuer_action == "forceTransfer":
+        stock_token.forceTransfer(vault, sally, loss, sender=deploy3r)
+        assert stock_token.balanceOf(sally) == loss
+    else:
+        getattr(stock_token, issuer_action)(vault, loss, sender=deploy3r)
+
+    assert stock_token.balanceOf(vault) == amount - loss
+    assert vault.userBalances(bob, stock_token) == raw_before
+    assert vault.getUserLootBoxShare(bob, stock_token) == loot_share_before
+    if vault_kind == "simple":
+        assert vault.getTotalAmountForUser(bob, stock_token) == amount
+        assert vault.getTotalAmountForVault(stock_token) == amount
+    else:
+        assert amount - loss - 1 <= vault.getTotalAmountForUser(bob, stock_token) <= amount - loss
+        assert vault.getTotalAmountForVault(stock_token) == amount - loss
+
+
+@pytest.mark.parametrize(("vault_kind", "vault_id"), VAULT_CASES)
+def test_donation_after_total_loss_revalues_only_share_claims(
+    vault_kind,
+    vault_id,
+    stock_token,
+    simple_erc20_vault,
+    rebase_erc20_vault,
+    teller,
+    deploy3r,
+    bob,
+):
+    """A later unallocated balance restores old Rebase claims but not nominal solvency."""
+
+    del vault_id
+    vault = _vault_for_case(vault_kind, simple_erc20_vault, rebase_erc20_vault)
+    amount = 100 * EIGHTEEN_DECIMALS
+    donation = 25 * EIGHTEEN_DECIMALS
+    assert _direct_deposit(stock_token, vault, teller, bob, amount, deploy3r) == amount
+    stock_token.adminBurn(vault, amount, sender=deploy3r)
+    assert stock_token.balanceOf(vault) == 0
+    stock_token.mint(vault, donation, sender=deploy3r)
+
+    if vault_kind == "simple":
+        assert vault.getTotalAmountForUser(bob, stock_token) == amount
+        assert vault.getTotalAmountForVault(stock_token) == amount
+    else:
+        assert donation - 1 <= vault.getTotalAmountForUser(bob, stock_token) <= donation
+        assert vault.getTotalAmountForVault(stock_token) == donation
+
+
+@pytest.mark.parametrize(("vault_kind", "vault_id"), VAULT_CASES)
+def test_new_deposit_after_total_loss_with_old_accounting(
+    vault_kind,
+    vault_id,
+    stock_token,
+    simple_erc20_vault,
+    rebase_erc20_vault,
+    setGeneralConfig,
+    setGeneralDebtConfig,
+    setAssetConfig,
+    createDebtTerms,
+    teller,
+    deploy3r,
+    bob,
+    alice,
+):
+    """Fresh deposits after zero expose stale-nominal capture versus share dilution."""
+
+    vault = _vault_for_case(vault_kind, simple_erc20_vault, rebase_erc20_vault)
+    _configure_stock_asset(
+        stock_token,
+        vault_id,
+        setGeneralConfig,
+        setGeneralDebtConfig,
+        setAssetConfig,
+        createDebtTerms,
+    )
+    old_amount = 100 * EIGHTEEN_DECIMALS
+    fresh_amount = 50 * EIGHTEEN_DECIMALS
+    stock_token.mint(bob, old_amount, sender=deploy3r)
+    stock_token.approve(teller, old_amount, sender=bob)
+    assert teller.deposit(stock_token, old_amount, bob, vault, sender=bob) == old_amount
+    stock_token.adminBurn(vault, old_amount, sender=deploy3r)
+
+    stock_token.mint(alice, fresh_amount, sender=deploy3r)
+    stock_token.approve(teller, fresh_amount, sender=alice)
+    assert teller.deposit(stock_token, fresh_amount, alice, vault, sender=alice) == fresh_amount
+    assert stock_token.balanceOf(vault) == fresh_amount
+
+    if vault_kind == "simple":
+        assert vault.getTotalAmountForUser(bob, stock_token) == old_amount
+        assert vault.getTotalAmountForUser(alice, stock_token) == fresh_amount
+        # The stale claimant can take the fresh depositor's entire live balance.
+        assert teller.withdraw(stock_token, MAX_UINT256, bob, vault, sender=bob) == fresh_amount
+        with boa.reverts("no withdrawal amount"):
+            teller.withdraw(stock_token, MAX_UINT256, alice, vault, sender=alice)
+    else:
+        # With live assets at zero but old shares outstanding, the fresh deposit
+        # mints against a virtual one-unit denominator. Old shares are diluted to
+        # a zero-rounded claim and the fresh depositor owns the live balance.
+        assert vault.getTotalAmountForUser(bob, stock_token) == 0
+        assert fresh_amount - 1 <= vault.getTotalAmountForUser(alice, stock_token) <= fresh_amount
+        assert fresh_amount - 1 <= teller.withdraw(
+            stock_token,
+            MAX_UINT256,
+            alice,
+            vault,
+            sender=alice,
+        ) <= fresh_amount
+
+
+TRANSFER_GUARD_CASES = (
+    pytest.param("pause", 0, id="issuer-pause"),
+    pytest.param("upgrade", 1, id="upgrade-revert"),
+    pytest.param("upgrade", 2, id="upgrade-false-return"),
+)
+
+
+@pytest.mark.parametrize(("vault_kind", "vault_id"), VAULT_CASES)
+@pytest.mark.parametrize(("guard_kind", "upgrade_mode"), TRANSFER_GUARD_CASES)
+def test_transfer_guards_block_deposit_atomically_and_retry(
+    vault_kind,
+    vault_id,
+    guard_kind,
+    upgrade_mode,
+    stock_token,
+    simple_erc20_vault,
+    rebase_erc20_vault,
+    setGeneralConfig,
+    setGeneralDebtConfig,
+    setAssetConfig,
+    createDebtTerms,
+    teller,
+    deploy3r,
+    bob,
+):
+    """Pause and behavior-switch failures leave both deposits atomic and retryable."""
+
+    vault = _vault_for_case(vault_kind, simple_erc20_vault, rebase_erc20_vault)
+    _configure_stock_asset(
+        stock_token,
+        vault_id,
+        setGeneralConfig,
+        setGeneralDebtConfig,
+        setAssetConfig,
+        createDebtTerms,
+    )
+    amount = 100 * EIGHTEEN_DECIMALS
+    stock_token.mint(bob, amount, sender=deploy3r)
+    stock_token.approve(teller, amount, sender=bob)
+    if guard_kind == "pause":
+        stock_token.setPaused(True, sender=deploy3r)
+    else:
+        stock_token.setUpgradeBehavior(upgrade_mode, sender=deploy3r)
+
+    with boa.reverts():
+        teller.deposit(stock_token, amount, bob, vault, sender=bob)
+    assert stock_token.balanceOf(bob) == amount
+    assert stock_token.balanceOf(vault) == 0
+    assert vault.getTotalAmountForUser(bob, stock_token) == 0
+
+    if guard_kind == "pause":
+        stock_token.setPaused(False, sender=deploy3r)
+    else:
+        stock_token.setUpgradeBehavior(0, sender=deploy3r)
+    assert teller.deposit(stock_token, amount, bob, vault, sender=bob) == amount
+
+
+@pytest.mark.parametrize(("vault_kind", "vault_id"), VAULT_CASES)
+@pytest.mark.parametrize(
+    "should_transfer_balance",
+    (True, False),
+    ids=("internal-balance-transfer", "external-token-transfer"),
+)
+def test_auction_after_partial_issuer_loss_reconciles_payment_and_delivery(
+    vault_kind,
+    vault_id,
+    should_transfer_balance,
+    stock_token,
+    simple_erc20_vault,
+    rebase_erc20_vault,
+    setGeneralConfig,
+    setGeneralDebtConfig,
+    setAssetConfig,
+    createDebtTerms,
+    mock_price_source,
+    teller,
+    credit_engine,
+    ledger,
+    green_token,
+    whale,
+    deploy3r,
+    bob,
+    alice,
+    sally,
+):
+    """Both modes settle while enough live collateral remains after a partial loss."""
+
+    vault = _vault_for_case(vault_kind, simple_erc20_vault, rebase_erc20_vault)
+    _configure_stock_asset(
+        stock_token,
+        vault_id,
+        setGeneralConfig,
+        setGeneralDebtConfig,
+        setAssetConfig,
+        createDebtTerms,
+    )
+    mock_price_source.setPrice(stock_token, EIGHTEEN_DECIMALS)
+    mock_price_source.setPrice(green_token, EIGHTEEN_DECIMALS)
+    deposit_amount = 200 * EIGHTEEN_DECIMALS
+    debt_amount = 100 * EIGHTEEN_DECIMALS
+    stock_token.mint(bob, deposit_amount, sender=deploy3r)
+    stock_token.approve(teller, deposit_amount, sender=bob)
+    teller.deposit(stock_token, deposit_amount, bob, vault, sender=bob)
+    teller.borrow(debt_amount, bob, False, sender=bob)
+    mock_price_source.setPrice(stock_token, EIGHTEEN_DECIMALS // 2)
+    teller.liquidateUser(bob, False, sender=sally)
+    assert ledger.hasFungibleAuction(bob, vault_id, stock_token)
+
+    stock_token.adminBurn(vault, 100 * EIGHTEEN_DECIMALS, sender=deploy3r)
+    payment = 20 * EIGHTEEN_DECIMALS
+    green_token.transfer(alice, payment, sender=whale)
+    green_token.approve(teller, payment, sender=alice)
+    green_before = green_token.balanceOf(alice)
+    debt_before = credit_engine.getUserDebtAmount(bob)
+    vault_live_before = stock_token.balanceOf(vault)
+
+    green_spent = teller.buyFungibleAuction(
+        bob,
+        vault_id,
+        stock_token,
+        payment,
+        False,
+        should_transfer_balance,
+        False,
+        sender=alice,
+    )
+    assert green_spent == payment
+    assert green_token.balanceOf(alice) == green_before - payment
+    assert credit_engine.getUserDebtAmount(bob) == debt_before - payment
+
+    collateral = 40 * EIGHTEEN_DECIMALS
+    if should_transfer_balance:
+        assert stock_token.balanceOf(alice) == 0
+        assert collateral - 1 <= vault.getTotalAmountForUser(alice, stock_token) <= collateral
+        assert stock_token.balanceOf(vault) == vault_live_before
+    else:
+        assert collateral - 1 <= stock_token.balanceOf(alice) <= collateral
+        assert vault_live_before - collateral <= stock_token.balanceOf(vault) <= vault_live_before - collateral + 1
+
+
+@pytest.mark.parametrize(("vault_kind", "vault_id"), VAULT_CASES)
+def test_deleverage_external_withdrawal_after_partial_and_total_loss(
+    vault_kind,
+    vault_id,
+    stock_token,
+    simple_erc20_vault,
+    rebase_erc20_vault,
+    setGeneralConfig,
+    setGeneralDebtConfig,
+    setAssetConfig,
+    createDebtTerms,
+    mock_price_source,
+    teller,
+    credit_engine,
+    deleverage,
+    switchboard_alpha,
+    deploy3r,
+    bob,
+):
+    """The governance volatile-asset path is live-backed and atomic at zero."""
+
+    vault = _vault_for_case(vault_kind, simple_erc20_vault, rebase_erc20_vault)
+    _configure_stock_asset(
+        stock_token,
+        vault_id,
+        setGeneralConfig,
+        setGeneralDebtConfig,
+        setAssetConfig,
+        createDebtTerms,
+    )
+    mock_price_source.setPrice(stock_token, EIGHTEEN_DECIMALS)
+    deposit_amount = 200 * EIGHTEEN_DECIMALS
+    debt_amount = 100 * EIGHTEEN_DECIMALS
+    stock_token.mint(bob, deposit_amount, sender=deploy3r)
+    stock_token.approve(teller, deposit_amount, sender=bob)
+    teller.deposit(stock_token, deposit_amount, bob, vault, sender=bob)
+    teller.borrow(debt_amount, bob, False, sender=bob)
+    stock_token.adminBurn(vault, 100 * EIGHTEEN_DECIMALS, sender=deploy3r)
+
+    target = 20 * EIGHTEEN_DECIMALS
+    debt_before = credit_engine.getUserDebtAmount(bob)
+    assert deleverage.deleverageWithVolAssets(
+        bob,
+        [(vault_id, stock_token.address, target)],
+        sender=switchboard_alpha.address,
+    ) == target
+    assert credit_engine.getUserDebtAmount(bob) == debt_before - target
+    assert stock_token.balanceOf(vault) == 80 * EIGHTEEN_DECIMALS
+
+    stock_token.adminBurn(vault, stock_token.balanceOf(vault), sender=deploy3r)
+    debt_before_zero_attempt = credit_engine.getUserDebtAmount(bob)
+    with boa.reverts():
+        deleverage.deleverageWithVolAssets(
+            bob,
+            [(vault_id, stock_token.address, target)],
+            sender=switchboard_alpha.address,
+        )
+    assert credit_engine.getUserDebtAmount(bob) == debt_before_zero_attempt
+    assert stock_token.balanceOf(vault) == 0
+
+
+@pytest.mark.parametrize(("vault_kind", "vault_id"), VAULT_CASES)
+def test_registry_and_required_asset_flags(
+    vault_kind,
+    vault_id,
+    stock_token,
+    simple_erc20_vault,
+    rebase_erc20_vault,
+    setGeneralConfig,
+    setGeneralDebtConfig,
+    setAssetConfig,
+    createDebtTerms,
+    mission_control,
+    vault_book,
+    bob,
+):
+    """The harness pins test IDs and the required Robinhood risk flags."""
+
+    vault = _vault_for_case(vault_kind, simple_erc20_vault, rebase_erc20_vault)
+    _configure_stock_asset(
+        stock_token,
+        vault_id,
+        setGeneralConfig,
+        setGeneralDebtConfig,
+        setAssetConfig,
+        createDebtTerms,
+    )
+    assert vault_book.getRegId(vault) == vault_id
+    assert mission_control.getFirstVaultIdForAsset(stock_token) == vault_id
+    redeem_config = mission_control.getRedeemCollateralConfig(stock_token, bob)
+    liq_config = mission_control.getAssetLiqConfig(stock_token)
+    assert not redeem_config.canRedeemCollateralAsset
+    assert not liq_config.shouldSwapInStabPools
