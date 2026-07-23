@@ -1,0 +1,31 @@
+{
+  "schema_version": 2,
+  "scope": "fork-only",
+  "broadcast_allowed": false,
+  "network": "Robinhood Chain mainnet",
+  "chain_id": 4663,
+  "pinned_block": 17558441,
+  "pinned_block_hash": "0x35e8e2a3803cb42c4553cb5f3528b187508c6cc200a8b761943374003b8f0243",
+  "token": {
+    "address": "0xaF3D76f1834A1d425780943C99Ea8A608f8a93f9",
+    "name": "Apple • Robinhood Token",
+    "symbol": "AAPL",
+    "decimals": 18,
+    "code_hash": "0x6c1fdd40002dcb440c7fff6a84171404d279ccb057803b65826f7546acd65630",
+    "ui_multiplier": "1000000000000000000",
+    "new_ui_multiplier": "1000000000000000000",
+    "multiplier_effective_at": "0",
+    "beacon": "0xe10b6f6B275de231345c20D14Ab812db62151b00",
+    "implementation": "0xb35490d6f9163DE4F80d88dc75c3516eb64C5aE2",
+    "implementation_code_hash": "0xdc07e86ee482f99641bdafb9a0d772846b167401e094d90a666b94dbdcd1eec7",
+    "registry": "0xe10b6f6B275de231345c20D14Ab812db62151b00"
+  },
+  "sender": "0x9f736F87E6293AC1Bd9142E257dbfAC8b7AcF1ae",
+  "owner": "0x9f736F87E6293AC1Bd9142E257dbfAC8b7AcF1ae",
+  "recipient": "0x9f736F87E6293AC1Bd9142E257dbfAC8b7AcF1ae",
+  "amount": "1000000000000000",
+  "probe": {
+    "expected_address": "0xdC40b17919c0a684Cf553C22B394fD44Dd7a712F",
+    "runtime_code_hash": "0xaa9b728174d048a5d65f49f5b4c851413008d6b89f315d36256191bd1a402949"
+  }
+}

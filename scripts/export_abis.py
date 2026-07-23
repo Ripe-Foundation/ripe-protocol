@@ -14,7 +14,8 @@ from vyper.compiler import compile_code
 
 
 def export_abis(contracts_dir: Path, output_dir: Path, exclude_dirs: list[str] = None):
-    exclude_dirs = exclude_dirs or ["mock"]
+    # Test doubles and live-capable probes are not production ABI artifacts.
+    exclude_dirs = exclude_dirs or ["mock", "testing"]
     output_dir.mkdir(parents=True, exist_ok=True)
 
     contract_files = list(contracts_dir.rglob("*.vy"))
