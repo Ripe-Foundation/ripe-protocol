@@ -227,8 +227,10 @@ Consequences:
 - The GREEN pool must implement `canMintGreen() -> true`; the RIPE pool must
   implement `canMintRipe() -> true`. The implementations should not claim the
   other token capability.
-- Each deployed pool must be registered in RipeHq and enabled only for its
-  corresponding mint permission before CCIP minting can work.
+- Functional prerequisite: each deployed pool must be registered in RipeHq and
+  have its matching mint permission enabled before CCIP minting can work.
+- Ripe policy additionally requires the other token's mint permission to remain
+  disabled.
 - `setMintingEnabled(false)` is a true chain-local stop for every GREEN and RIPE
   mint authorized by that RipeHq, not only CCIP inbound minting. It also halts
   protocol-native issuance but does not stop outbound burns.
