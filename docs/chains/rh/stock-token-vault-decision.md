@@ -333,6 +333,21 @@ invariants cannot be met by an approved shared change, the valid outcome is
 
 ## Required follow-on shared vault-change specification
 
+The owner-requested concrete mitigation and implementation recommendation is
+recorded in
+[`stock-token-vault-fix-recommendations.md`](stock-token-vault-fix-recommendations.md).
+It distinguishes:
+
+- immediate controls available on the current Base deployment;
+- the smallest fail-closed change that prevents new phantom-backed borrowing;
+- required deposit and auction companion fixes;
+- the preferred permanent share-based behavior;
+- total-loss and bad-debt requirements; and
+- implementation order, tests, migration implications, and owner gates.
+
+The recommendation does not authorize a production contract or configuration
+change.
+
 The specification must define, without implementing yet:
 
 1. **Deposit delta:** actual per-call token balance delta, returned/event amount,
@@ -419,8 +434,10 @@ Eligible to activate as the required next step:
 > `- [ ] If the chosen behavior is unacceptable, stop and write a separate vault-change specification before modifying custody code.`
 
 Track 5 establishes that a separate shared vault-change specification is
-required. That specification is a new owner-approved track; it is not written or
-implemented here.
+required. At the owner's later request, the unapproved technical recommendation
+is now recorded in `stock-token-vault-fix-recommendations.md`. A dedicated
+implementation track, approved specification baseline, production code change,
+and deployment authorization remain unopened.
 
 Also not eligible for closure are the Phase 0 deployable-vault choice at
 `rh-summary.md:85-88`, the complete chosen-vault exit condition at
