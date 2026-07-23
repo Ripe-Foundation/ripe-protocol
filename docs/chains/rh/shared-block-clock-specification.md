@@ -31,12 +31,10 @@ or `rh-summary.md` is changed by this track.
 The local `rh` integration worktree was clean at launch. Its reviewed Track 3 merge
 contains both authoritative inventory files, all required inventory sections, and
 the component IDs they reference. On 23 July 2026 the owner said the work was
-“totally unblocked” and asked that the Track 3 items be verified; that statement,
-together with the reviewed merge, was treated as confirmation that the review
-cycle was closed. To remove any ambiguity in precondition 5, the owner should
-explicitly confirm “the Track 3 review cycle is closed” before integrating Track
-6. No production-contract delta exists between the Track 3 content commit and the
-launch commit.
+“totally unblocked” and asked that the Track 3 items be verified. After re-review,
+the owner explicitly confirmed on 23 July 2026: “The Track 3 review cycle is
+closed.” Precondition 5 is therefore satisfied. No production-contract delta
+exists between the Track 3 content commit and the launch commit.
 
 ### Post-launch integration movement
 
