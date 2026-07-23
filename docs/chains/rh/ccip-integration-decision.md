@@ -36,10 +36,11 @@ build or deploy.
 - Use the direct public Base <-> Robinhood Chain lane and the direct Base
   Sepolia <-> Robinhood Chain Testnet lane.
 - Start with conservative independent per-token, per-direction rate limits.
-- Treat `RipeHq.setMintingEnabled(false)` as the immediate chain-local inbound
-  mint stop, token pause as the broader token-wide stop, and CCIP rate limits as
-  velocity controls. The final incident order and in-flight recovery procedure
-  remain pending Chainlink confirmation and test evidence.
+- Treat `RipeHq.setMintingEnabled(false)` as the immediate chain-local stop for
+  all RipeHq-authorized issuance, token pause as the broader token-wide stop,
+  and CCIP rate limits as velocity controls. The final incident order and
+  in-flight recovery procedure remain pending Chainlink confirmation and test
+  evidence.
 
 An adapter is rejected because RipeHq authorizes the direct `msg.sender` of each
 token's mint call. A wrapping topology is rejected because it changes the asset
@@ -53,8 +54,8 @@ interface.
 | Production lane | Direct Base <-> Robinhood Chain | Confirmed by current public directory |
 | Test lane | Direct Base Sepolia <-> Robinhood Chain Testnet | Confirmed by current public directory |
 | Pool model | Thin direct custom burn/mint pool; no adapter | Selected from code and interface evidence |
-| GREEN capability | GREEN pool exposes only `canMintGreen() -> true` | Required by RipeHq |
-| RIPE capability | RIPE pool exposes only `canMintRipe() -> true` | Required by RipeHq |
+| GREEN capability | GREEN pool exposes only `canMintGreen() -> true` | Exact-one-capability policy selected by Ripe; RipeHq checks the matching flag and view but not exclusivity |
+| RIPE capability | RIPE pool exposes only `canMintRipe() -> true` | Exact-one-capability policy selected by Ripe; RipeHq checks the matching flag and view but not exclusivity |
 | Final inheritance base | `BurnMintTokenPool` subclass or `BurnMintTokenPoolAbstract` | Chainlink answer required |
 | Candidate CCIP pin | `1.6.1` commit `bbab0601244ce58e2ffac0dbc178a80aab1fa4a3` | Provisional; compatibility confirmation required |
 | Candidate shared EVM pin | `e06cc226086ad91cfede63e96c63e5b3440c9801` | Provisional exact dependency pin |
@@ -65,7 +66,7 @@ interface.
 | Token administrator | Production multisig | Proposed; registration sequence pending |
 | Rate-limit administrator | Separate narrowly scoped incident multisig | Proposed; operational confirmation pending |
 | RipeHq authority | Existing Ripe governance | Required for department registration and matching mint flag |
-| Inbound mint circuit breaker | Immediate governance call to `RipeHq.setMintingEnabled(false)` | Verified in Ripe code; retry behavior must be confirmed |
+| Global mint circuit breaker | Immediate governance call to `RipeHq.setMintingEnabled(false)` | Stops every RipeHq-authorized GREEN and RIPE mint on that chain; CCIP retry behavior must be confirmed |
 | Token pause/blacklist | Pause stops transfer, burn, and mint; blacklist can reject source or receiver | Verified in Ripe code; CCIP failure recovery must be tested |
 | Department lifecycle surface | Capability views required; `pause`/recovery surface undecided | Chainlink compatibility answer required |
 | Ripe registration schedule | Deploy pool, timelocked address registration, then timelocked Hq config | Verified in Ripe code; Robinhood block semantics must be tested |
@@ -225,8 +226,8 @@ The intended production role separation is:
 
 The incident-control hierarchy is:
 
-1. set `RipeHq.mintEnabled` false for an immediate stop to all inbound GREEN and
-   RIPE mints on that chain;
+1. call `RipeHq.setMintingEnabled(false)` for an immediate stop to every
+   RipeHq-authorized GREEN and RIPE mint on that chain;
 2. pause the affected token only when a broader stop to transfers, outbound
    burns, and inbound mints is justified;
 3. reduce both lane-direction rate limits to Chainlink's documented emergency
@@ -234,9 +235,13 @@ The incident-control hierarchy is:
 4. monitor failed and in-flight messages, then use only the confirmed retry or
    manual-execution path after recovery.
 
-Because step 1 affects both tokens and step 2 affects all token activity, the
-final runbook must define who may invoke each control, escalation thresholds,
-cross-chain coordination, and re-enable sequencing.
+Step 1 is protocol-wide issuance control, not a bridge-local switch. It also
+halts fresh GREEN or RIPE issuance through native paths such as CreditEngine
+borrowing, EndaomentPSM issuance, and Lootbox rewards, plus every other
+Department routed through the same RipeHq checks. Because that blast radius is
+larger than the CCIP incident itself, the final runbook must define who may
+invoke each control, escalation thresholds, cross-chain coordination, and
+re-enable sequencing.
 
 The final signer matrix, delay policy, role-transfer order, rate-limit values,
 monitoring, manual-execution coverage, and emergency response require

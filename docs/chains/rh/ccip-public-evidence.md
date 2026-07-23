@@ -229,8 +229,9 @@ Consequences:
   other token capability.
 - Each deployed pool must be registered in RipeHq and enabled only for its
   corresponding mint permission before CCIP minting can work.
-- `setMintingEnabled(false)` is a true chain-local stop for all inbound GREEN
-  and RIPE mints governed by that RipeHq. It does not stop outbound burns.
+- `setMintingEnabled(false)` is a true chain-local stop for every GREEN and RIPE
+  mint authorized by that RipeHq, not only CCIP inbound minting. It also halts
+  protocol-native issuance but does not stop outbound burns.
 
 ### Interface comparison
 
@@ -244,7 +245,7 @@ Consequences:
 | `owner()` | Absent | One self-service admin-discovery path | Assisted registration required |
 | `getCCIPAdmin()` | Absent | Another self-service admin-discovery path | Assisted registration required |
 | Ripe capability view | Token does not supply it; department must | Not present in standard pool | Thin custom pool required |
-| Global mint circuit breaker | `RipeHq.setMintingEnabled(false)` immediately makes both mint checks return false | Destination release/mint reverts when token mint reverts | True inbound stop; in-flight recovery behavior must be confirmed and tested |
+| Global mint circuit breaker | `RipeHq.setMintingEnabled(false)` immediately makes both mint checks return false | Destination release/mint reverts when token mint reverts | Protocol-wide issuance stop for every RipeHq-authorized minter; in-flight recovery must be confirmed and tested |
 | Token pause | Transfer, mint, and burn revert while paused | Source transfer/burn or destination mint can fail | True token-wide stop with broader protocol impact |
 | Token blacklist | Transfer rejects blacklisted parties; mint rejects blacklisted receiver | Destination mint can fail for a particular receiver | Disclose and test failed-message recovery |
 
@@ -260,7 +261,11 @@ Local source anchors at the recorded track start commit:
   contract-address registration;
 - `contracts/tokens/modules/Erc20Token.vy:187-215`, `291-317`, `404-421`, and
   `587-592`: transfer, mint/burn, blacklist, and governance pause behavior;
-- `interfaces/Department.vyi:9-45`: Ripe's full Department convention; and
+- `contracts/core/CreditEngine.vy:271-274`,
+  `contracts/core/EndaomentPSM.vy:260-270`, and
+  `contracts/core/Lootbox.vy:1139-1145`: representative protocol-native GREEN
+  and RIPE mint paths affected by the global circuit breaker;
+- `interfaces/Department.vyi:9-44`: Ripe's full Department convention; and
 - `contracts/config/SwitchboardCharlie.vy:490-496`: generic targeted pause
   action.
 
@@ -343,11 +348,13 @@ item. Ripe-specific controls come from the local source anchors above.
   rate `1` in both directions. It is not a true zero-rate pause, and a minimal
   transfer can still succeed. See [emergency
   actions](https://docs.chain.link/ccip/concepts/rate-limit-management/emergency-actions).
-- Ripe has two stronger but broader controls. Governance can immediately set
-  `RipeHq.mintEnabled` false to stop every inbound mint authorized by that
-  RipeHq, while pausing a token stops its transfers, burns, and mints on that
-  chain. The incident playbook should coordinate these controls with CCIP rate
-  limits and explicitly handle in-flight messages.
+- Ripe has two stronger but broader controls. Governance can immediately call
+  `RipeHq.setMintingEnabled(false)` to stop every GREEN and RIPE mint authorized
+  by that RipeHq—including CreditEngine borrowing, EndaomentPSM issuance,
+  Lootbox rewards, CCIP inbound minting, and other registered minters—while
+  pausing a token stops its transfers, burns, and mints on that chain. The
+  incident playbook should coordinate these controls with CCIP rate limits and
+  explicitly handle in-flight messages.
 - Pool ownership controls remote-chain updates and can add a replacement remote
   pool. Current contracts support overlapping old and new pools for in-flight
   upgrades; Chainlink recommends testnet validation and coordinated multi-chain

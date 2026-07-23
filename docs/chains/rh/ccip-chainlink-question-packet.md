@@ -58,8 +58,9 @@ There is an additional authorization layer. GREEN minting calls
 `RipeHq.canMintGreen(msg.sender)`, and RIPE minting calls
 `RipeHq.canMintRipe(msg.sender)`. RipeHq first checks its global `mintEnabled`
 circuit breaker, then requires the direct mint caller to be a registered
-department, have only the corresponding mint permission enabled, and expose the
-corresponding view:
+department with the corresponding mint permission enabled and the corresponding
+view exposed. RipeHq does not enforce capability exclusivity; Ripe's integration
+policy separately restricts each pool to exactly one mint capability:
 
 ```solidity
 // GREEN pool only
@@ -167,15 +168,21 @@ Could you please confirm the following?
 
 ### Operations, security, and commercial questions
 
-15. Ripe governance can immediately call `RipeHq.setMintingEnabled(false)`,
-    which hard-stops inbound GREEN and RIPE minting on that chain but does not
-    stop outbound burns. Token pause is broader and stops transfers, burns, and
-    mints. What initial per-token inbound/outbound capacities and refill rates
-    do you recommend, and how should those controls be coordinated for a
-    guarded launch and emergency response? If an in-flight message fails
-    because `mintEnabled` is false, the token is paused, or the receiver is
-    blacklisted, what state does it enter and what is the supported retry or
-    manual-execution procedure after re-enable?
+15. Ripe governance can immediately call `RipeHq.setMintingEnabled(false)`.
+    This stops every RipeHq-authorized GREEN and RIPE mint on that chain,
+    including CCIP inbound and protocol-native issuance, but does not stop
+    outbound burns. Token pause is narrower by asset but broader by operation:
+    it stops that token's transfers, burns, and mints. For a guarded launch and
+    emergency response:
+
+    - what initial per-token inbound/outbound capacities and refill rates do
+      you recommend;
+    - how should the global Ripe circuit breaker, token pause, and CCIP rate
+      controls be coordinated; and
+    - if an in-flight message fails because `mintEnabled` is false, the token is
+      paused, or the receiver is blacklisted, what state does it enter and what
+      is the supported retry or manual-execution procedure after re-enable?
+
 16. What monitoring, alerting, manual-execution coverage, upgrade coordination,
     incident-response, and support responsibilities should Ripe plan to own?
 17. Where is the 90,000 combined token-pool execution gas allowance enforced,
