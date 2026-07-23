@@ -178,7 +178,7 @@ The tests must run equivalent scenarios against both `SimpleErc20` and `RebaseEr
 
 ### Issuer-control mock
 
-The existing `MockBlacklistErc20` does not model the complete Stock Token control surface. Reuse or extend existing mocks where doing so remains clear, or add a dedicated test-only mock under `contracts/mock/` that can model:
+The existing `MockBlacklistErc20` does not model the complete Stock Token control surface. Reuse or extend existing mocks where doing so remains clear, or add the dedicated test-only mock `contracts/mock/MockStockTokenControls.vy`, which must model:
 
 - ordinary ERC-20 transfers and `transferFrom`;
 - global token pause and resume;
