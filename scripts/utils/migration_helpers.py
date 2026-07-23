@@ -17,7 +17,7 @@ INTERFACES_DIR = "./interfaces"
 TEST_PRIVATE_KEY = '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80'
 
 
-def load_vyper_files(directories=[CONTRACTS_DIR, INTERFACES_DIR]):
+def load_vyper_files(directories=[CONTRACTS_DIR, INTERFACES_DIR], excluded_dirs=("testing",)):
     """
     Load all Vyper files from the specified directories and their subdirectories.
     Returns relative paths from the project root.
@@ -29,6 +29,8 @@ def load_vyper_files(directories=[CONTRACTS_DIR, INTERFACES_DIR]):
             continue
 
         for root, _, files in os.walk(directory):
+            if any(excluded in os.path.normpath(root).split(os.sep) for excluded in excluded_dirs):
+                continue
             for file in files:
                 if file.endswith('.vy'):
                     # Get the relative path from the current directory
