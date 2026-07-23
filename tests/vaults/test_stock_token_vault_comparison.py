@@ -1152,3 +1152,156 @@ def test_registry_and_required_asset_flags(
     liq_config = mission_control.getAssetLiqConfig(stock_token)
     assert not redeem_config.canRedeemCollateralAsset
     assert not liq_config.shouldSwapInStabPools
+
+
+@pytest.mark.parametrize(("vault_kind", "vault_id"), VAULT_CASES)
+def test_new_borrow_after_total_issuer_burn(
+    vault_kind,
+    vault_id,
+    stock_token,
+    simple_erc20_vault,
+    rebase_erc20_vault,
+    setGeneralConfig,
+    setGeneralDebtConfig,
+    setAssetConfig,
+    createDebtTerms,
+    mock_price_source,
+    teller,
+    credit_engine,
+    deploy3r,
+    bob,
+):
+    """Only nominal accounting permits new debt against fully missing custody."""
+
+    vault = _vault_for_case(vault_kind, simple_erc20_vault, rebase_erc20_vault)
+    _configure_stock_asset(
+        stock_token,
+        vault_id,
+        setGeneralConfig,
+        setGeneralDebtConfig,
+        setAssetConfig,
+        createDebtTerms,
+    )
+    mock_price_source.setPrice(stock_token, EIGHTEEN_DECIMALS)
+    amount = 100 * EIGHTEEN_DECIMALS
+    borrow_amount = 40 * EIGHTEEN_DECIMALS
+    stock_token.mint(bob, amount, sender=deploy3r)
+    stock_token.approve(teller, amount, sender=bob)
+    teller.deposit(stock_token, amount, bob, vault, sender=bob)
+    stock_token.adminBurn(vault, amount, sender=deploy3r)
+
+    if vault_kind == "simple":
+        teller.borrow(borrow_amount, bob, False, sender=bob)
+        assert credit_engine.getUserDebtAmount(bob) == borrow_amount
+    else:
+        with boa.reverts():
+            teller.borrow(borrow_amount, bob, False, sender=bob)
+        assert credit_engine.getUserDebtAmount(bob) == 0
+
+
+@pytest.mark.parametrize(("vault_kind", "vault_id"), VAULT_CASES)
+def test_paused_external_auction_purchase_is_atomic_and_retryable(
+    vault_kind,
+    vault_id,
+    stock_token,
+    simple_erc20_vault,
+    rebase_erc20_vault,
+    setGeneralConfig,
+    setGeneralDebtConfig,
+    setAssetConfig,
+    createDebtTerms,
+    mock_price_source,
+    teller,
+    credit_engine,
+    ledger,
+    green_token,
+    whale,
+    deploy3r,
+    bob,
+    alice,
+    sally,
+):
+    """An issuer pause cannot strand GREEN in a failed external settlement."""
+
+    vault = _vault_for_case(vault_kind, simple_erc20_vault, rebase_erc20_vault)
+    _configure_stock_asset(
+        stock_token,
+        vault_id,
+        setGeneralConfig,
+        setGeneralDebtConfig,
+        setAssetConfig,
+        createDebtTerms,
+    )
+    mock_price_source.setPrice(stock_token, EIGHTEEN_DECIMALS)
+    mock_price_source.setPrice(green_token, EIGHTEEN_DECIMALS)
+    deposit_amount = 200 * EIGHTEEN_DECIMALS
+    stock_token.mint(bob, deposit_amount, sender=deploy3r)
+    stock_token.approve(teller, deposit_amount, sender=bob)
+    teller.deposit(stock_token, deposit_amount, bob, vault, sender=bob)
+    teller.borrow(100 * EIGHTEEN_DECIMALS, bob, False, sender=bob)
+    mock_price_source.setPrice(stock_token, EIGHTEEN_DECIMALS // 2)
+    teller.liquidateUser(bob, False, sender=sally)
+    assert ledger.hasFungibleAuction(bob, vault_id, stock_token)
+
+    payment = 20 * EIGHTEEN_DECIMALS
+    green_token.transfer(alice, payment, sender=whale)
+    green_token.approve(teller, payment, sender=alice)
+    stock_token.setPaused(True, sender=deploy3r)
+    green_before = green_token.balanceOf(alice)
+    debt_before = credit_engine.getUserDebtAmount(bob)
+
+    with boa.reverts("token paused"):
+        teller.buyFungibleAuction(
+            bob,
+            vault_id,
+            stock_token,
+            payment,
+            False,
+            False,
+            False,
+            sender=alice,
+        )
+    assert green_token.balanceOf(alice) == green_before
+    assert credit_engine.getUserDebtAmount(bob) == debt_before
+    assert stock_token.balanceOf(alice) == 0
+
+    stock_token.setPaused(False, sender=deploy3r)
+    assert teller.buyFungibleAuction(
+        bob,
+        vault_id,
+        stock_token,
+        payment,
+        False,
+        False,
+        False,
+        sender=alice,
+    ) == payment
+    assert stock_token.balanceOf(alice) == 40 * EIGHTEEN_DECIMALS
+
+
+@pytest.mark.parametrize(("vault_kind", "vault_id"), VAULT_CASES)
+def test_one_base_unit_lifecycle(
+    vault_kind,
+    vault_id,
+    stock_token,
+    simple_erc20_vault,
+    rebase_erc20_vault,
+    teller,
+    deploy3r,
+    bob,
+):
+    """The smallest positive unit survives the empty-vault conversion."""
+
+    del vault_id
+    vault = _vault_for_case(vault_kind, simple_erc20_vault, rebase_erc20_vault)
+    assert _direct_deposit(stock_token, vault, teller, bob, 1, deploy3r) == 1
+    withdrawn, depleted = vault.withdrawTokensFromVault(
+        bob,
+        stock_token,
+        MAX_UINT256,
+        bob,
+        sender=teller.address,
+    )
+    assert withdrawn == 1
+    assert depleted
+    assert stock_token.balanceOf(vault) == 0
