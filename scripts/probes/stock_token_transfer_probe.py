@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
-"""Fail-closed dry-run and fork executor for StockTokenTransferProbe.
+"""Fail-closed Robinhood Stock Token runner for StockTokenTransferProbe.
 
 This script never signs or broadcasts. The only state-changing mode executes
-against a pinned local fork using an impersonated public address.
+against a pinned local fork using an impersonated public address. The probe
+contract is generic ERC-20 infrastructure; this runner intentionally validates
+Robinhood Stock Token proxy, pause, blocklist, and multiplier interfaces.
 """
 
 from __future__ import annotations
@@ -10,6 +12,7 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import sys
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
@@ -33,16 +36,6 @@ HASH_RE = re.compile(r"^0x[0-9a-fA-F]{64}$")
 set_cache_dir(BOA_CACHE_ROOT / "compiler")
 
 TOKEN_ABI = [
-    {
-        "type": "event",
-        "name": "Transfer",
-        "anonymous": False,
-        "inputs": [
-            {"name": "sender", "type": "address", "indexed": True},
-            {"name": "recipient", "type": "address", "indexed": True},
-            {"name": "amount", "type": "uint256", "indexed": False},
-        ],
-    },
     {
         "type": "function",
         "name": "approve",
@@ -99,6 +92,9 @@ class ApprovedRun:
     token_symbol: str
     token_decimals: int
     token_code_hash: str
+    ui_multiplier: int
+    new_ui_multiplier: int
+    multiplier_effective_at: int
     beacon: str
     implementation: str
     implementation_code_hash: str
@@ -147,6 +143,17 @@ def parse_approval(data: dict[str, Any]) -> ApprovedRun:
     if amount <= 0:
         raise ApprovalError("approved amount must be positive")
 
+    sender = _address(_required(data, "sender"), "sender")
+    owner = _address(_required(data, "owner"), "owner")
+    if sender != owner:
+        raise ApprovalError("approved sender must equal probe owner")
+
+    ui_multiplier = int(_required(token, "ui_multiplier"))
+    new_ui_multiplier = int(_required(token, "new_ui_multiplier"))
+    multiplier_effective_at = int(_required(token, "multiplier_effective_at"))
+    if ui_multiplier <= 0 or new_ui_multiplier <= 0 or multiplier_effective_at < 0:
+        raise ApprovalError("invalid approved multiplier state")
+
     return ApprovedRun(
         network=str(_required(data, "network")),
         chain_id=int(_required(data, "chain_id")),
@@ -157,6 +164,9 @@ def parse_approval(data: dict[str, Any]) -> ApprovedRun:
         token_symbol=str(_required(token, "symbol")),
         token_decimals=int(_required(token, "decimals")),
         token_code_hash=_hash(_required(token, "code_hash"), "token.code_hash"),
+        ui_multiplier=ui_multiplier,
+        new_ui_multiplier=new_ui_multiplier,
+        multiplier_effective_at=multiplier_effective_at,
         beacon=_address(_required(token, "beacon"), "token.beacon"),
         implementation=_address(_required(token, "implementation"), "token.implementation"),
         implementation_code_hash=_hash(
@@ -164,8 +174,8 @@ def parse_approval(data: dict[str, Any]) -> ApprovedRun:
             "token.implementation_code_hash",
         ),
         registry=_address(_required(token, "registry"), "token.registry"),
-        sender=_address(_required(data, "sender"), "sender"),
-        owner=_address(_required(data, "owner"), "owner"),
+        sender=sender,
+        owner=owner,
         recipient=_address(_required(data, "recipient"), "recipient"),
         amount=amount,
         expected_probe_address=_address(
@@ -235,8 +245,44 @@ def _predict_create_address(sender: str, nonce: int) -> str:
     return to_checksum_address(keccak(encoded)[-20:])
 
 
+def _format_token_amount(amount: int, decimals: int) -> str:
+    if decimals == 0:
+        return str(amount)
+    whole, fractional = divmod(amount, 10**decimals)
+    if fractional == 0:
+        return str(whole)
+    return f"{whole}.{fractional:0{decimals}d}".rstrip("0")
+
+
+def _validate_multiplier_state(
+    approved: ApprovedRun,
+    ui_multiplier: int,
+    new_ui_multiplier: int,
+    effective_at: int,
+    block_timestamp: int,
+):
+    _assert_equal("ui_multiplier", ui_multiplier, approved.ui_multiplier)
+    _assert_equal("new_ui_multiplier", new_ui_multiplier, approved.new_ui_multiplier)
+    _assert_equal(
+        "multiplier_effective_at",
+        effective_at,
+        approved.multiplier_effective_at,
+    )
+    if effective_at > block_timestamp:
+        raise ApprovalError(
+            f"pending UI multiplier becomes effective at {effective_at}, "
+            f"after pinned block timestamp {block_timestamp}"
+        )
+    if ui_multiplier != new_ui_multiplier:
+        raise ApprovalError("current and scheduled UI multipliers do not reconcile")
+
+
 def compile_probe_runtime_code_hash(approved: ApprovedRun) -> str:
     with boa.set_env(Env()):
+        # Satisfy the constructor's code-presence check in this isolated local
+        # environment while preserving the exact approved token address in the
+        # immutable runtime configuration.
+        boa.env.set_code(approved.token, b"\x00")
         probe = boa.load(
             str(PROBE_CONTRACT),
             approved.owner,
@@ -256,6 +302,7 @@ def preflight(approved: ApprovedRun, rpc_url: str) -> dict[str, Any]:
     if block is None:
         raise ApprovalError("approved pinned block is unavailable")
     _assert_equal("pinned_block_hash", block["hash"].lower(), approved.pinned_block_hash)
+    block_timestamp = int(block["timestamp"], 16)
 
     token_code = _rpc(rpc_url, "eth_getCode", [approved.token, block_tag])
     if token_code == "0x":
@@ -268,6 +315,35 @@ def preflight(approved: ApprovedRun, rpc_url: str) -> dict[str, Any]:
     _assert_equal("token_name", name, approved.token_name)
     _assert_equal("token_symbol", symbol, approved.token_symbol)
     _assert_equal("token_decimals", decimals, approved.token_decimals)
+
+    ui_multiplier = _rpc_call(
+        rpc_url,
+        approved.pinned_block,
+        approved.token,
+        "uiMultiplier()",
+        ["uint256"],
+    )[0]
+    new_ui_multiplier = _rpc_call(
+        rpc_url,
+        approved.pinned_block,
+        approved.token,
+        "newUIMultiplier()",
+        ["uint256"],
+    )[0]
+    multiplier_effective_at = _rpc_call(
+        rpc_url,
+        approved.pinned_block,
+        approved.token,
+        "effectiveAt()",
+        ["uint256"],
+    )[0]
+    _validate_multiplier_state(
+        approved,
+        ui_multiplier,
+        new_ui_multiplier,
+        multiplier_effective_at,
+        block_timestamp,
+    )
 
     beacon_word = _rpc(
         rpc_url,
@@ -393,15 +469,22 @@ def preflight(approved: ApprovedRun, rpc_url: str) -> dict[str, Any]:
         "chain_id": approved.chain_id,
         "pinned_block": approved.pinned_block,
         "pinned_block_hash": approved.pinned_block_hash,
+        "pinned_block_timestamp": block_timestamp,
         "token": approved.token,
         "token_symbol": approved.token_symbol,
         "sender": approved.sender,
         "owner": approved.owner,
         "recipient": approved.recipient,
         "amount": str(approved.amount),
-        "amount_formatted": approved.amount / (10 ** approved.token_decimals),
+        "amount_formatted": _format_token_amount(approved.amount, approved.token_decimals),
         "predicted_probe": predicted_probe,
         "probe_runtime_code_hash": compiled_hash,
+        "multiplier_state": {
+            "ui_multiplier": str(ui_multiplier),
+            "new_ui_multiplier": str(new_ui_multiplier),
+            "effective_at": str(multiplier_effective_at),
+            "pending": False,
+        },
         "blocked": blocked,
         "expected_balance_changes": {
             "sender_before": str(sender_balance),
@@ -417,6 +500,7 @@ def preflight(approved: ApprovedRun, rpc_url: str) -> dict[str, Any]:
             "allowance_after_cleanup": "0",
         },
         "sender_native_balance": str(native_balance),
+        "sender_native_balance_check": "nonzero-fork-only",
         "transaction_sequence": [
             "deploy StockTokenTransferProbe",
             "approve exact amount",
@@ -467,7 +551,13 @@ def execute_fork(approved: ApprovedRun, rpc_url: str) -> dict[str, Any]:
         if registry.isBlocked(probe.address):
             raise ApprovalError("deployed probe is blocked")
 
-        assert token.approve(probe.address, approved.amount, sender=approved.sender)
+        approval_succeeded = token.approve(
+            probe.address,
+            approved.amount,
+            sender=approved.sender,
+        )
+        if not approval_succeeded:
+            raise ApprovalError("exact token approval returned false")
         approve_gas_used = token._computation.get_gas_used()
         _assert_equal(
             "allowance_after_approve",
@@ -517,7 +607,9 @@ def execute_fork(approved: ApprovedRun, rpc_url: str) -> dict[str, Any]:
             expected_recipient_final,
         )
 
-        assert token.approve(probe.address, 0, sender=approved.sender)
+        cleanup_succeeded = token.approve(probe.address, 0, sender=approved.sender)
+        if not cleanup_succeeded:
+            raise ApprovalError("allowance cleanup returned false")
         cleanup_gas_used = token._computation.get_gas_used()
         _assert_equal(
             "allowance_after_cleanup",
@@ -580,7 +672,7 @@ def main() -> int:
     parser.add_argument("--approval-file", type=Path, required=True)
     parser.add_argument("--rpc-url", required=True)
     parser.add_argument("--fork", action="store_true", help="Execute on local pinned fork state")
-    parser.add_argument("--broadcast", action="store_true", help="Not supported; always fails closed")
+    parser.add_argument("--broadcast", action="store_true", help="Rejected; broadcasting is not implemented")
     args = parser.parse_args()
 
     if args.broadcast:
@@ -592,5 +684,13 @@ def main() -> int:
     return 0
 
 
+def cli() -> int:
+    try:
+        return main()
+    except ApprovalError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
+
+
 if __name__ == "__main__":
-    raise SystemExit(main())
+    raise SystemExit(cli())

@@ -38,6 +38,7 @@ RECIPIENT: public(immutable(address))
 @deploy
 def __init__(_owner: address, _token: address, _recipient: address):
     assert empty(address) not in [_owner, _token, _recipient]  # dev: invalid configuration
+    assert _token.is_contract  # dev: invalid token
     OWNER = _owner
     TOKEN = _token
     RECIPIENT = _recipient
@@ -49,6 +50,7 @@ def deposit(_amount: uint256) -> uint256:
     """
     @notice Pull the configured token from the caller and require an exact balance delta.
     """
+    assert msg.sender == OWNER  # dev: only owner
     assert _amount != 0  # dev: invalid amount
 
     balanceBefore: uint256 = staticcall IERC20(TOKEN).balanceOf(self)

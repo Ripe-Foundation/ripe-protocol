@@ -1,3 +1,4 @@
+from dataclasses import replace
 import json
 from pathlib import Path
 import sys
@@ -7,9 +8,11 @@ import pytest
 from scripts.export_abis import export_abis
 from scripts.probes.stock_token_transfer_probe import (
     ApprovalError,
+    _format_token_amount,
+    _validate_multiplier_state,
+    cli,
     compile_probe_runtime_code_hash,
     load_approval,
-    main,
     parse_approval,
 )
 from scripts.utils.migration_helpers import load_vyper_files
@@ -32,7 +35,7 @@ def test_approved_probe_bytecode_hash_matches_current_contract():
     assert compile_probe_runtime_code_hash(approved) == approved.expected_probe_runtime_code_hash
 
 
-def test_broadcast_flag_always_fails_closed(monkeypatch):
+def test_broadcast_flag_always_fails_closed_without_traceback(monkeypatch, capsys):
     monkeypatch.setattr(
         sys,
         "argv",
@@ -45,14 +48,49 @@ def test_broadcast_flag_always_fails_closed(monkeypatch):
             "--broadcast",
         ],
     )
-    with pytest.raises(ApprovalError, match="broadcast is disabled"):
-        main()
+    assert cli() == 2
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert captured.err == (
+        "error: broadcast is disabled; Phase D approval and implementation are required\n"
+    )
+    assert "Traceback" not in captured.err
+
+
+@pytest.mark.parametrize(
+    ("amount", "decimals", "formatted"),
+    [
+        (10**15, 18, "0.001"),
+        (1234567890123456789, 18, "1.234567890123456789"),
+        (42, 0, "42"),
+        (10**18, 18, "1"),
+    ],
+)
+def test_amount_formatting_is_exact(amount, decimals, formatted):
+    assert _format_token_amount(amount, decimals) == formatted
+
+
+def test_pending_multiplier_fails_closed():
+    approved = load_approval(APPROVAL_PATH)
+    block_timestamp = 1_000
+    effective_at = block_timestamp + 1
+    pending_approval = replace(
+        approved,
+        multiplier_effective_at=effective_at,
+    )
+    with pytest.raises(ApprovalError, match="pending UI multiplier"):
+        _validate_multiplier_state(
+            pending_approval,
+            approved.ui_multiplier,
+            approved.new_ui_multiplier,
+            effective_at,
+            block_timestamp,
+        )
 
 
 @pytest.mark.parametrize(
     ("field", "value"),
     [
-        ("chain_id", 1),
         ("sender", "0x0000000000000000000000000000000000000000"),
         ("amount", "0"),
         ("broadcast_allowed", True),
@@ -61,9 +99,21 @@ def test_broadcast_flag_always_fails_closed(monkeypatch):
 def test_approval_validation_fails_closed(field, value):
     data = json.loads(APPROVAL_PATH.read_text())
     data[field] = value
-    if field == "chain_id":
-        data.pop("chain_id")
     with pytest.raises(ApprovalError):
+        parse_approval(data)
+
+
+def test_approval_validation_rejects_missing_chain_id():
+    data = json.loads(APPROVAL_PATH.read_text())
+    data.pop("chain_id")
+    with pytest.raises(ApprovalError, match="missing approved input: chain_id"):
+        parse_approval(data)
+
+
+def test_approval_validation_requires_sender_to_equal_owner():
+    data = json.loads(APPROVAL_PATH.read_text())
+    data["owner"] = "0x0000000000000000000000000000000000000002"
+    with pytest.raises(ApprovalError, match="sender must equal probe owner"):
         parse_approval(data)
 
 

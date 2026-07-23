@@ -36,6 +36,17 @@ def probe(token, actors):
     )
 
 
+def test_constructor_rejects_non_contract_token(actors):
+    with boa.reverts("invalid token"):
+        boa.load(
+            "contracts/testing/StockTokenTransferProbe.vy",
+            actors["owner"],
+            actors["other"],
+            actors["recipient"],
+            name="invalid_stock_token_transfer_probe",
+        )
+
+
 def approve_and_deposit(token, probe, owner, amount=AMOUNT):
     assert token.approve(probe.address, amount, sender=owner)
     probe.deposit(amount, sender=owner)
@@ -118,9 +129,19 @@ def test_insufficient_allowance_fails(token, probe, actors):
 
 
 def test_insufficient_balance_fails(token, probe, actors):
+    owner = actors["owner"]
+    other = actors["other"]
+    token.transfer(other, SUPPLY, sender=owner)
+    token.approve(probe.address, AMOUNT, sender=owner)
+    with boa.reverts():
+        probe.deposit(AMOUNT, sender=owner)
+    assert token.balanceOf(probe.address) == 0
+
+
+def test_only_owner_can_deposit(token, probe, actors):
     other = actors["other"]
     token.approve(probe.address, AMOUNT, sender=other)
-    with boa.reverts():
+    with boa.reverts("only owner"):
         probe.deposit(AMOUNT, sender=other)
     assert token.balanceOf(probe.address) == 0
 
@@ -201,11 +222,79 @@ def test_blocked_address_behavior(token, probe, actors, blocked_party):
         probe.withdraw(AMOUNT, sender=owner)
 
 
+def test_mock_isolates_blocked_transfer_from_operator(token, probe, actors):
+    owner = actors["owner"]
+    other = actors["other"]
+    token.approve(probe.address, AMOUNT, sender=owner)
+    token.setBlocked(probe.address, True, sender=owner)
+
+    with boa.reverts("operator blocked"):
+        token.transferFrom(owner, other, AMOUNT, sender=probe.address)
+
+
 def test_unauthorized_withdrawal_does_not_change_balance(token, probe, actors):
     approve_and_deposit(token, probe, actors["owner"])
     with boa.reverts("only owner"):
         probe.withdraw(AMOUNT, sender=actors["other"])
     assert token.balanceOf(probe.address) == AMOUNT
+
+
+def test_withdraw_and_recovery_reject_amount_above_probe_balance(token, probe, actors):
+    owner = actors["owner"]
+    approve_and_deposit(token, probe, owner)
+    with boa.reverts("insufficient probe balance"):
+        probe.withdraw(AMOUNT + 1, sender=owner)
+    assert token.balanceOf(probe.address) == AMOUNT
+
+    recovery_token = boa.load(
+        "contracts/mock/MockProbeErc20.vy",
+        owner,
+        AMOUNT,
+        name="insufficient_recovery_token",
+    )
+    recovery_token.transfer(probe.address, AMOUNT, sender=owner)
+    with boa.reverts("insufficient probe balance"):
+        probe.recoverToken(recovery_token, AMOUNT + 1, sender=owner)
+    assert recovery_token.balanceOf(probe.address) == AMOUNT
+
+
+def test_recovery_fails_closed_for_false_returning_token(token, probe, actors):
+    owner = actors["owner"]
+    token.transfer(probe.address, AMOUNT, sender=owner)
+    token.setReturnFalse(True, sender=owner)
+
+    with boa.reverts("token transfer failed"):
+        probe.recoverToken(token, AMOUNT, sender=owner)
+
+    assert token.balanceOf(probe.address) == AMOUNT
+
+
+def test_fee_on_transfer_deposit_and_recovery_fail_closed(actors):
+    owner = actors["owner"]
+    fee_token = boa.load(
+        "contracts/mock/MockFeeOnTransferErc20.vy",
+        owner,
+        100,
+        name="fee_on_transfer_probe_token",
+    )
+    fee_probe = boa.load(
+        "contracts/testing/StockTokenTransferProbe.vy",
+        owner,
+        fee_token,
+        actors["recipient"],
+        name="fee_on_transfer_probe",
+    )
+
+    fee_token.approve(fee_probe.address, AMOUNT, sender=owner)
+    with boa.reverts("unexpected deposit delta"):
+        fee_probe.deposit(AMOUNT, sender=owner)
+    assert fee_token.balanceOf(fee_probe.address) == 0
+
+    fee_token.transfer(fee_probe.address, AMOUNT, sender=owner)
+    retained = fee_token.balanceOf(fee_probe.address)
+    with boa.reverts("unexpected recipient delta"):
+        fee_probe.recoverToken(fee_token, retained, sender=owner)
+    assert fee_token.balanceOf(fee_probe.address) == retained
 
 
 def test_partial_withdraw_and_recovery_leave_no_balance(token, probe, actors):

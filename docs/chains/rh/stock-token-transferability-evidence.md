@@ -74,6 +74,7 @@ The official public RPC used for state reads and the fork was
 | Token pause | `false` |
 | Oracle pause | `false` |
 | UI multiplier | `1000000000000000000` |
+| New UI multiplier | `1000000000000000000` |
 | Pending multiplier | none; effective time `0` |
 
 The proxy, implementation, and registry were also inspected through verified
@@ -96,6 +97,8 @@ Blockscout source:
   through a beacon upgrade or exercised outside the inspected interface.
 - No transfer fee or receiver hook was observed. The token does use scaled-UI
   multiplier accounting. Its multiplier was exactly `1e18` at the pinned block,
+  `newUIMultiplier()` also returned `1e18`, and `effectiveAt()` returned `0`.
+  The preflight now rejects any future-effective multiplier before execution,
   and the fork verified exact base-unit balance deltas.
 - Standard ERC-20 calls returned successfully in the fork. The token emitted
   standard and issuer-specific logs; probe event validation did not depend on
@@ -128,7 +131,7 @@ No oracle or collateral configuration was performed in this track.
 | Sender nonce at pinned block | `83` |
 | Test amount | `1000000000000000` base units (`0.001 AAPL`) |
 | Predicted fork probe | `0xdC40b17919c0a684Cf553C22B394fD44Dd7a712F` |
-| Probe runtime code hash | `0x27900c1ae88881ae313b10495404872f7d5779d4c082f15ec042608380bb3121` |
+| Probe runtime code hash | `0xaa9b728174d048a5d65f49f5b4c851413008d6b89f315d36256191bd1a402949` |
 
 The sender was selected from public explorer state solely to make the fork
 reproducible. No private key was used or sought, and this address is not
@@ -148,8 +151,9 @@ and explicitly sets `broadcast_allowed` to `false`.
 
 The fork runner revalidated chain ID, block hash, token code hash, beacon,
 implementation, implementation code hash, name, symbol, decimals, pause state,
-blocklist state, sender balances, sender nonce, predicted probe address, and
-compiled runtime bytecode hash before modifying local fork state.
+UI multiplier, new UI multiplier, multiplier effective time, blocklist state,
+sender balances, sender nonce, predicted probe address, and compiled runtime
+bytecode hash before modifying local fork state.
 
 Sequence and observed balances:
 
@@ -172,12 +176,12 @@ Fork-measured EVM execution gas:
 
 | Step | Gas used |
 | --- | ---: |
-| Deploy | `358,361` |
+| Deploy | `363,991` |
 | Approve | `30,893` |
-| Deposit | `52,783` |
+| Deposit | `50,320` |
 | Withdraw | `22,136` |
 | Allowance cleanup | `6,993` |
-| Total | `471,166` |
+| Total | `474,333` |
 
 These figures are fork execution gas, not a live fee quote or an approved
 maximum. A live estimate must be regenerated against the owner-approved sender,
@@ -186,8 +190,10 @@ broadcast.
 
 No fork transfer reverted. Local negative tests captured expected failures for
 zero amount, insufficient allowance, insufficient balance, wrong token,
-unauthorized withdrawal/recovery, false-returning and reverting tokens, paused
-transfers, and blocked sender/probe/recipient.
+unauthorized deposit/withdrawal/recovery, over-balance withdrawal/recovery,
+false-returning and reverting tokens, paused transfers, blocked
+sender/probe/recipient, and an independently isolated blocked `transferFrom`
+operator.
 
 Fork limitations:
 
@@ -196,8 +202,12 @@ Fork limitations:
 - The predicted probe address depends on the sender nonce at the pinned block.
 - Sender and recipient were the same address; local tests separately cover a
   distinct configured recipient.
+- Fork preflight requires only a nonzero native balance. Phase D must instead
+  prove that the approved sender covers the owner-approved maximum gas spend.
 - Mainnet state, proxy implementation, administrative flags, blocklists,
   multiplier, nonce, balances, gas price, and legal restrictions can change.
+- A fresh Phase D preflight must repeat the multiplier check immediately before
+  every proposed broadcast; the pinned fork cannot rule out later scheduling.
 - Fork success is not final live transferability proof.
 
 ## Reusable probe and tooling isolation
@@ -205,6 +215,8 @@ Fork limitations:
 `contracts/testing/StockTokenTransferProbe.vy`:
 
 - binds immutable owner, token, and recipient addresses;
+- rejects a zero address or configured token address without deployed code;
+- allows only the configured owner to initiate a deposit;
 - pulls only the configured token through `transferFrom`;
 - requires exact probe balance deltas;
 - allows only the owner to withdraw to the configured recipient;
@@ -212,9 +224,41 @@ Fork limitations:
 - emits deposit, withdrawal, and recovery evidence; and
 - provides owner-only ERC-20 recovery to the configured recipient.
 
-Production migration discovery and default ABI export were changed to exclude
-`contracts/testing/`. Focused tests verify that the probe is not discovered by
-production migrations or emitted with default production ABI artifacts.
+Recovery deliberately retains the same exact-delta invariant as the transfer
+probe. A fee-on-transfer token, false-returning token, token that blocklists the
+configured recipient, or otherwise nonconforming junk token can therefore
+remain unrecoverable. Relaxing the recipient-delta check would make recovery
+appear successful while delivering less than the requested amount, so this
+throwaway per-run probe fails closed instead. A focused test records the
+false-returning-token case, and a fee-on-transfer test demonstrates both failed
+deposit and deliberately unrecoverable retained-token behavior.
+
+The four Phase-B tooling surfaces were audited:
+
+- **ABI export:** default export excludes both `contracts/mock/` and
+  `contracts/testing/`; a focused test verifies the behavior.
+- **Production migration:** `load_vyper_files()` excludes
+  `contracts/testing/`, and a focused test verifies the probe is absent.
+- **Explorer verification:** `scripts/verify.py` iterates only contracts already
+  present in a selected migration manifest; it does not glob contract source.
+  Because production migration discovery excludes the probe, it is not swept
+  into a production verification manifest. The console's source catalog uses
+  the same excluded `load_vyper_files()` path.
+- **Packaging:** no `pyproject.toml`, `setup.py`, `setup.cfg`, `MANIFEST.in`,
+  `package.json`, Dockerfile, or other repository packaging configuration was
+  present to sweep `contracts/testing/`.
+
+The Vyper probe is generic for ERC-20 candidates. The Python runner is
+intentionally Robinhood-Stock-Token-specific: it requires the current
+beacon/registry, pause, blocklist, and scaled-UI multiplier interfaces. A
+non-Robinhood candidate needs an adapted preflight, not changes to the probe.
+
+Integration note: Track 5 should reuse or extend
+`contracts/mock/MockProbeErc20.vy` for overlapping pause, blocklist,
+false-return, and revert behavior rather than introduce a redundant test
+double. Until this Track 2 branch is integrated, other branches cut from an
+older baseline do not inherit the `contracts/testing/` migration and ABI-export
+exclusions.
 
 Reproduction commands:
 
@@ -233,7 +277,23 @@ python scripts/probes/stock_token_transfer_probe.py \
 
 The first runner command is read-only dry-run output. The second modifies only
 ephemeral local fork state. Supplying `--broadcast` always raises an error; the
-runner contains no signing or broadcast implementation.
+CLI prints a concise error without a traceback, and the runner contains no
+signing or broadcast implementation.
+
+### Validation results after reviewer hardening
+
+- `python -m pytest tests/probes -q`: **35 passed**.
+- Combined `tests/probes`, BasicVault, SharesVault, and ERC-20 selection:
+  **70 passed** (`35` Track 2 tests plus `35` existing regression tests).
+- Scoped `ruff check` over the runner and two probe test files: passed.
+- Repository-wide Ruff was not used as an acceptance claim: the repository has
+  no Ruff configuration and reports `445` pre-existing errors. The `F541` in
+  touched `scripts/utils/migration_helpers.py` exists unchanged at the recorded
+  starting commit.
+- Python syntax compilation, Vyper compilation for the probe and mock, and
+  `git diff --check`: passed.
+- Read-only dry-run and the pinned fork sequence: passed with the exact state,
+  balances, events, runtime hash, and gas figures recorded above.
 
 ## Live approval gate and blockers
 

@@ -12,6 +12,9 @@
     "symbol": "AAPL",
     "decimals": 18,
     "code_hash": "0x6c1fdd40002dcb440c7fff6a84171404d279ccb057803b65826f7546acd65630",
+    "ui_multiplier": "1000000000000000000",
+    "new_ui_multiplier": "1000000000000000000",
+    "multiplier_effective_at": "0",
     "beacon": "0xe10b6f6B275de231345c20D14Ab812db62151b00",
     "implementation": "0xb35490d6f9163DE4F80d88dc75c3516eb64C5aE2",
     "implementation_code_hash": "0xdc07e86ee482f99641bdafb9a0d772846b167401e094d90a666b94dbdcd1eec7",
@@ -23,6 +26,6 @@
   "amount": "1000000000000000",
   "probe": {
     "expected_address": "0xdC40b17919c0a684Cf553C22B394fD44Dd7a712F",
-    "runtime_code_hash": "0x27900c1ae88881ae313b10495404872f7d5779d4c082f15ec042608380bb3121"
+    "runtime_code_hash": "0xaa9b728174d048a5d65f49f5b4c851413008d6b89f315d36256191bd1a402949"
   }
 }
