@@ -19,8 +19,13 @@ this analysis depends.
 
 The controlling architecture is
 `/Users/wigglez/dev/hightop-notes/random/hood/hood-chain-executive-summary.md`
-and [`../rh-summary.md`](../rh-summary.md). This evidence record does not modify
-either source.
+at Hightop Notes commit
+`a94decfd23e627e8079e7fcd6ce22b873f6371d0` (file blob
+`a64a895e0542ed2482d7d5e857960d78eef1ffd8`) and
+[`../rh-summary.md`](../rh-summary.md). The working copy of the architecture
+file matched that committed blob during the follow-up review; unrelated dirty
+media files in Hightop Notes were not used. This evidence record does not
+modify either source.
 
 ## Intended environments
 
@@ -191,13 +196,15 @@ USDG/USD proxy's AggregatorV3 compatibility.
 
 ### Compatibility with Ripe
 
-`contracts/priceSources/ChainlinkPrices.vy:306-319` reads and stores
-`decimals()` when a governed feed is proposed; `:182-197,261-293` uses those
-stored decimals and calls `latestRoundData()` on the configured standard
-proxy. It rejects nonpositive answers, feed decimals above 18, future
-timestamps, zero or incomplete rounds, and answers older than a nonzero
-effective stale time, then normalizes to 18 decimals. The Robinhood feed meets
-that interface without a new adapter.
+`contracts/priceSources/ChainlinkPrices.vy:306-335` reads `decimals()` and
+records it in the pending timelocked config when a governed feed is proposed;
+`:342-362` revalidates and copies that config into live `feedConfig` only on
+confirmation. The runtime path at `:182-197,261-293` uses the live stored
+decimals and calls `latestRoundData()` on the configured standard proxy. It
+rejects nonpositive answers, feed decimals above 18, future timestamps, zero
+or incomplete rounds, and answers older than a nonzero effective stale time,
+then normalizes to 18 decimals. The Robinhood feed meets that interface
+without a new adapter.
 
 The effective stale time is
 `max(MissionControl.priceStaleTime, feedConfig.staleTime)`. Therefore a

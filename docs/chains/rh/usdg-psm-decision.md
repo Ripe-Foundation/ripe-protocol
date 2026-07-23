@@ -208,13 +208,16 @@ authorized here.
 
 ### Divergence from the controlling architecture note
 
-The controlling executive summary currently says the USDC-oriented variable
+The controlling executive summary at Hightop Notes commit
+`a94decfd23e627e8079e7fcd6ce22b873f6371d0` (file blob
+`a64a895e0542ed2482d7d5e857960d78eef1ffd8`) says the USDC-oriented variable
 and event names “may remain as legacy labels to avoid unnecessary code churn”
-at line 173. This track deliberately takes a stricter operator-safety posture.
-It agrees that the six-decimal core conversion need not change, and it does
-not require removing legacy selectors; it finds that silently presenting USDG
-as USDC in manifests, reports, smoke output, or new operator workflows is not
-launch-ready.
+at line 173. Pinning both revision and blob makes this quote durable even if
+that repository later moves. This track deliberately takes a stricter
+operator-safety posture. It agrees that the six-decimal core conversion need
+not change, and it does not require removing legacy selectors; it finds that
+silently presenting USDG as USDC in manifests, reports, smoke output, or new
+operator workflows is not launch-ready.
 
 The owner must consciously adjudicate this difference. The available choices
 are:
