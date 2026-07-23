@@ -5,6 +5,10 @@ their dependent implementation slices
 
 **Prepared:** 23 July 2026
 
+**Review revision:** 23 July 2026 — corrected BN-002's any-touch baseline,
+recorded post-launch `rh` movement, and closed reviewer-requested evidence and
+handoff gaps
+
 **Track:** `rh-track-6-block-clock-spec`
 
 **Integrated `rh` launch commit:** `5018da6d19516509e0d8674b3728e73bca92e2ad`
@@ -26,9 +30,27 @@ or `rh-summary.md` is changed by this track.
 
 The local `rh` integration worktree was clean at launch. Its reviewed Track 3 merge
 contains both authoritative inventory files, all required inventory sections, and
-the component IDs they reference. The owner confirmed on 23 July 2026 that Track 3
-was unblocked and asked that its completion be verified. No production-contract
-delta exists between the Track 3 content commit and the launch commit.
+the component IDs they reference. On 23 July 2026 the owner said the work was
+“totally unblocked” and asked that the Track 3 items be verified; that statement,
+together with the reviewed merge, was treated as confirmation that the review
+cycle was closed. To remove any ambiguity in precondition 5, the owner should
+explicitly confirm “the Track 3 review cycle is closed” before integrating Track
+6. No production-contract delta exists between the Track 3 content commit and the
+launch commit.
+
+### Post-launch integration movement
+
+The Track 6 branch was correctly created when `rh` pointed to the launch commit
+recorded above. During the run, `rh` advanced to
+`cfb6762c740a196e3d187f779a3e2b1060c2128a` through the Track 2 Stock Token
+transferability merge. Track 6 was not rebased because its contract pins the
+launch baseline. The intervening diff adds probe/testing contracts, probe scripts,
+tests, and Track 2 evidence, including
+`contracts/testing/StockTokenTransferProbe.vy`; it adds no `block.number` or
+reviewed indirect cadence pattern. Counts on the newer tip therefore remain 100
+literal occurrences, 95 matching lines, and 17 production files. The Track 6
+change is docs-only, so no content conflict is expected, but the integrating owner
+must still review the merge diff rather than assume the old tip is current.
 
 This document consumes:
 
@@ -111,7 +133,12 @@ the named state-changing call.
 Every boundary suite also sets exactly `B`, `B+1`, `S`, `S+1`, `E-1`, `E`, and
 `E+1`; a skipped sequence does not replace exact-boundary assertions. The pinned
 `titanoboa==0.2.7` runtime permits direct, independent assignment to
-`boa.env.evm.patch.block_number` and `.timestamp`; no new runtime is needed.
+`boa.env.evm.patch.block_number` and `.timestamp`; no new runtime is needed. This
+was verified in the active Python environment by assigning `+7` NUMBER and `+11`
+seconds inside `boa.env.anchor()` and observing exact restoration. Because the
+repository does not contain a venv, S1 must repeat that primitive check in the
+dependency-installed implementation checkout before any protocol test relies on
+it.
 
 ### Conversion rule
 
@@ -142,6 +169,10 @@ historical evidence but are not current-chain proof. Read-only calls on 23 July
 2026 through `https://base-rpc.publicnode.com`, anchored by the endpoint height
 `49,026,989`, confirmed the key live scalar values used below. The current
 manifest supplied the addresses; `eth_getCode` supplied the current runtime bytes.
+The Track 6 output contract permits only the two specification files, so raw RPC
+responses were not committed. Track 7 should either re-run these reads or, with
+owner approval, commit a sanitized dated evidence artifact and retrieval metadata;
+the derived values below must not be treated as a permanent oracle.
 
 | Contract | Manifest address | Runtime bytes | Keccak-256 runtime hash |
 | --- | --- | ---: | --- |
@@ -173,7 +204,7 @@ source/default evidence only. Values in the `RH target` column remain candidates
 | ID; components | Contract/function; setter, validator, source | Category; current Base evidence | Intended meaning | Base target and bounds | RH target and bounds; conversion |
 | --- | --- | --- | --- | --- | --- |
 | BN-001; CM-001,002,009 | `Erc20Token.initiate/confirmHqChange`; `setHqChangeTimeLock`; immutable min/max; Blueprint/Defaults | Governance duration; live GREEN and RIPE `43,200`, bounds `43,200..302,400` | HQ authority waits 1d; governed range 1–7d | `43,200`; `43,200..302,400` | `7,200`; `7,200..50,400`; ceil duration `/6` |
-| BN-002; CM-008,009,034 | `Ledger.checkAndUpdateLastTouch`; `MissionControl.shouldCheckLastTouch`; Delta setter; Defaults | Same-number security guard; live flag `true` | Current property: at most one checked higher-risk Teller housekeeping action per user per EVM `NUMBER`; Underscore callers are exempt | Policy unresolved; current Base stays enabled until replacement approval | Same shared policy; no cadence conversion |
+| BN-002; CM-008,009,034 | `Ledger.checkAndUpdateLastTouch`; `MissionControl.shouldCheckLastTouch`; Delta setter; Defaults | Same-number security guard; live flag `true` | Every housekeeping call writes the user's `lastTouch`; a checked higher-risk action requires no prior housekeeping touch of any kind for that user at the same EVM `NUMBER`. Users classified as Underscore wallets/vaults are not checked, but their calls still write `lastTouch` | Policy unresolved; current Base stays enabled until replacement approval | Same shared policy; no cadence conversion |
 | BN-003; CM-004,009–014,021,032 | inherited `LocalGov.start/confirmGovernanceChange`; governed setter; immutable Blueprint bounds | Governance duration; live HQ/VaultBook/PriceDesk `43,200`, bounds `43,200..302,400` | Governance replacement waits 1d, range 1–7d | `43,200`; `43,200..302,400` | `7,200`; `7,200..50,400`; ceil `/6` |
 | BN-004; CM-011–014,016–020,032,039–041,046,050 | `TimeLock._initiateAction/_canConfirmAction/_isExpired`; action setter; immutable min/max and `expiration`; per-deployment config | Governance duration/window; live values in inheritor table below | Delay before a queued action, then finite exclusive confirmation window | Per inheritor below | Per inheritor below; ceil `/6`, zero preserved |
 | BN-005; CM-005,032 | `Contributor.initiateRipeTransfer/confirm`; `keyActionDelay` constructor/config validation | Treasury duration; dated/repo `43,200` | RIPE transfer authority waits 1d | `43,200`; constructor term must be nonzero/not max | `7,200`; same semantic validator; ceil `/6` |
@@ -214,7 +245,7 @@ Abbreviations: `R` repeat, `+1` exact advance, `J` ordinary `+2/+4` jump,
 | ID | Required profile result | Disposition and exact follow-on change | Tests | Owner/status | Artifact consequence; slice/dependency |
 | --- | --- | --- | --- | --- | --- |
 | BN-001 | R holds; +1/J reduce wait; B/S crossing confirm enables once; no expiry | Configuration-only: add RH constructor/default/bounds and migration values | token HQ before/exact/after confirm on all profiles | Protocol/security; recommended/open | Same source; RH artifact differs only immutables; S6 after parameter approval |
-| BN-002 | R currently rejects all later checked calls; +1/J clear; B/S have no separate meaning | Shared-source change, separately gated: replace `NUMBER` identity only after threat choice; preserve locked-account check and Teller-only authority | same-user independent txs, nested/reentrant calls, borrow/withdraw/liquidation, Underscore exemption | Security; blocked pending threat/policy approval | New Ledger artifact and Base upgrade required; S5 |
+| BN-002 | R: every touch writes `lastTouch`, so a checked higher-risk action rejects after either a lower- or higher-risk prior touch; +1/J clear; B/S have no separate meaning | Shared-source change, separately gated: replace `NUMBER` identity only after threat choice and decide whether lower-risk touches arm the replacement; preserve locked-account check and Teller-only authority | lower-risk then higher-risk, higher-risk then lower-risk then higher-risk, same-user independent txs, nested/reentrant calls, borrow/withdraw/liquidation, Underscore-user exemption | Security; blocked pending threat/policy approval | New Ledger artifact and Base upgrade required; S5 |
 | BN-003 | R holds; +1/J progress; B/S crossing opens once | Configuration-only RH LocalGov values | every deployable LocalGov flow at `B-1/B/B+1` | Protocol; recommended/open | No shared logic change; S6/S7 |
 | BN-004 | R holds; +1/J progress; open at confirm; valid through expiry-1; invalid at expiry; B/S can erase window | Configuration-only per-inheritor values; require expiration headroom greater than approved stress jump | module plus every inheritor, including jump past entire window | Protocol/security; open | No logic change; S7 after headroom/value approval |
 | BN-005 | R holds; +1/J progress; B/S opens once; timestamp vesting independent | Configuration-only key delay | transfer authority plus `MIXED` vesting | Treasury/protocol; open | No shared change; S6/S7 |
@@ -294,25 +325,36 @@ address, mint capability must be false.
 
 ### BN-002: Ledger guard — separate security gate
 
-The current code-enforced property is precise: when the MissionControl flag is
-true, a non-Underscore user's second higher-risk Teller housekeeping action with
-the same EVM `NUMBER` reverts. Lower-risk calls and Underscore wallet/vault users
-are not checked. This can prevent atomic sequencing of multiple debt-sensitive
-actions, but the repository does not identify whether the protected threat is
-reentrancy/nested execution, multiple separately ordered transactions before a
-price/snapshot change, or both. Robinhood turns the property into a potentially
-long multi-transaction throttle, so keeping it unchanged is not recommended.
+The current code-enforced property is precise: every Teller housekeeping call
+invokes `Ledger.checkAndUpdateLastTouch`, and every successful invocation writes
+the user's `lastTouch = NUMBER`. When the MissionControl flag is true, a
+higher-risk action for a user not classified as an Underscore wallet/vault first
+requires `lastTouch != NUMBER`. Therefore the checked action reverts after **any**
+earlier housekeeping touch for that user at the same NUMBER, including an
+unchecked lower-risk touch; a lower-risk call itself is not checked. An
+Underscore-classified user's call skips the assertion but still writes
+`lastTouch`. This is wider than “at most one higher-risk action per number.”
+
+The behavior can prevent atomic sequencing of multiple debt-sensitive actions or
+lower-risk-then-higher-risk composition, but the repository does not identify
+whether the protected threat is reentrancy/nested execution, multiple separately
+ordered transactions before a price/snapshot change, lower-risk state changes
+arming a later high-risk block, or some combination. Robinhood turns the property
+into a potentially long multi-transaction throttle, so keeping it unchanged is
+not recommended.
 
 The decision-ready replacement is:
 
 - If the owner confirms the threat is nested/reentrant composition, use a
   transient per-user `higherRiskActionActive` guard entered by Teller for the
-  whole top-level action and cleared by transaction end. Separate transactions
-  are allowed.
+  whole top-level action and cleared by transaction end. The owner must decide
+  whether any housekeeping touch or only a higher-risk entry arms it. Separate
+  transactions are allowed.
 - If the owner confirms a cross-transaction pacing threat, use an explicit
   governed minimum elapsed-seconds policy stored per user. The owner must select
-  the seconds value and accept timestamp trust/bounds; a one-second placeholder
-  is not approval.
+  the seconds value, decide whether lower-risk touches update the pacing
+  timestamp, and accept timestamp trust/bounds; a one-second placeholder is not
+  approval.
 - If both threats apply, use both layers. Do not use EVM `NUMBER` equality as the
   second layer.
 
@@ -320,11 +362,13 @@ The recommended starting point is both layers with the elapsed-seconds value lef
 unset until a security review demonstrates the required pacing. The implementation
 must add explicit mode/value fields rather than silently repurpose
 `shouldCheckLastTouch`; retain the Teller-only Ledger call, locked-account check,
-and an event for governed persistent policy changes. Transient entry/exit needs no
-persistent migration, but persistent last-action timestamps and policy config do.
-The ABI should expose policy and last-action time for diagnostics. Base keeps the
-old binary and enabled flag until its reviewed migration; Robinhood must not
-launch the old policy.
+and an event for governed persistent policy changes. The selected policy must
+state whether a successful lower-risk touch arms the transient/persistent guard;
+failing to decide that would silently widen or narrow current behavior. Transient
+entry/exit needs no persistent migration, but persistent last-action timestamps
+and policy config do. The ABI should expose policy and last-action time for
+diagnostics. Base keeps the old binary and enabled flag until its reviewed
+migration; Robinhood must not launch the old policy.
 
 Rejected designs are: `chain.id` branching; an injected Robinhood-only contract;
 unconditionally setting the existing flag false; timestamp equality with no
@@ -503,7 +547,7 @@ The canonical follow-on artifact is
 {
   "schemaVersion": 1,
   "productionRoots": ["contracts"],
-  "excludedProductionGlobs": ["contracts/mock/**"],
+  "excludedProductionGlobs": ["contracts/mock/**", "contracts/testing/**"],
   "directOccurrences": [
     {
       "id": "BN-001",
@@ -516,7 +560,11 @@ The canonical follow-on artifact is
   ],
   "indirectCadence": [],
   "timestampContext": [],
-  "allowedNonProductionGlobs": ["tests/**", "contracts/mock/**"]
+  "allowedNonProductionGlobs": [
+    "tests/**",
+    "contracts/mock/**",
+    "contracts/testing/**"
+  ]
 }
 ```
 
@@ -528,12 +576,22 @@ occurrence with the same function/expression is reported as moved; a rename,
 addition, removal, duplicate, or changed expression is unmapped until semantic
 review updates the record.
 
+`contracts/testing/**` did not exist at the Track 6 launch commit. The newer `rh`
+tip adds it for non-production Track 2 probe contracts. S2 classifies it alongside
+`contracts/mock/**`: excluded from the production denominator, counted and
+reported separately, and forbidden as an import from production contracts. A new
+cadence dependency there still appears in diagnostics and requires test/probe
+review, but it does not alter the 100/95/17 production baseline. Moving a contract
+between production and `contracts/testing/**` is itself a review-requiring
+classification change.
+
 `scripts/check_block_clock_inventory.py --check` and
 `pytest -q tests/inventory/test_block_clock_inventory.py` must both:
 
 - find exactly 100 literal production `block.number` occurrences on the launch
   baseline, 95 matching lines, and 17 files, while reporting mock/test counts
-  separately;
+  separately; the same counts were rechecked on `rh` at `cfb6762`, where
+  `contracts/testing/**` contributes zero;
 - map every literal occurrence to exactly one `BN-*`;
 - validate all 32 BN records, CAD-001, and 11 timestamp-context records;
 - scan production/config/migration/tool paths for approved cadence patterns,
@@ -541,6 +599,8 @@ review updates the record.
   `numBlocksPerInterval`, `ripePerBlock`, `increasePerDangerBlock`, cadence
   comments, Base/RH defaults, and generated report metadata;
 - keep `block.timestamp` and `*_IN_SECONDS` in the separate TS domain;
+- fail if production source imports `contracts/mock/**` or
+  `contracts/testing/**`;
 - fail on an unmapped addition, missing occurrence, duplicate mapping, moved
   occurrence requiring review, stale count, new indirect pattern, or schema
   record without non-placeholder semantic owner/status/commit;
@@ -572,11 +632,11 @@ one. No slice may combine with S5 merely because both touch a clock.
 
 | Slice | IDs/components; exact expected files | Prerequisites and owner decisions | Artifact/Base policy | Commands and acceptance | Review, abort, and consumer |
 | --- | --- | --- | --- | --- | --- |
-| S1 — harness foundation | all BN/CAD/TS; CM-059. New `tests/utils/clock_profiles.py`, `tests/clock/test_clock_profiles.py`; update `tests/conftest.py` only to register fixture | Approve `J2/J4` and stress `+60`; pinned Boa/pytest already sufficient | Test-only; identical compiled artifacts, no production bytecode | `pytest -q tests/clock/test_clock_profiles.py`; prove exact sequences, independent clocks, trace output, snapshot isolation | Test-infra review; abort on runtime auto-mining or non-isolation; consumed by S3–S10 |
-| S2 — checked inventory | BN-001–032, CAD-001, TS-001–011; CM-055,059. New `config/block-clock-inventory.json`, `scripts/check_block_clock_inventory.py`, `tests/inventory/test_block_clock_inventory.py` | Approve inventory ownership and local/CI posture; no CI dependency selected here | Tool/test only | the two commands above; baseline 100/95/17; mutation tests add/remove/move/direct/indirect dependencies and must fail | Protocol/security + tooling review; abort if parser can suppress fixed-string delta; consumed by every source PR |
+| S1 — harness foundation | all BN/CAD/TS; CM-059. New `tests/utils/clock_profiles.py`, `tests/clock/test_clock_profiles.py`; update `tests/conftest.py` only to register fixture | Approve `J2/J4` and stress `+60`; pinned Boa/pytest already sufficient | Test-only; identical compiled artifacts, no production bytecode | `pytest -q tests/clock/test_clock_profiles.py`; first verify installed version 0.2.7, direct NUMBER/timestamp assignment, and anchor restoration, then prove exact sequences, independent clocks, trace output, snapshot isolation | Test-infra review; abort on version drift, runtime auto-mining, failed restoration, or non-isolation; consumed by S3–S10 |
+| S2 — checked inventory | BN-001–032, CAD-001, TS-001–011; CM-055,059. New `config/block-clock-inventory.json`, `scripts/check_block_clock_inventory.py`, `tests/inventory/test_block_clock_inventory.py` | Approve inventory ownership and local/CI posture; no CI dependency selected here | Tool/test only | the two commands above; baseline 100/95/17; explicit `contracts/testing/**` non-production classification and production-import prohibition; mutation tests add/remove/move/direct/indirect dependencies and must fail | Protocol/security + tooling review; abort if parser can suppress fixed-string delta or a path can evade classification; consumed by every source PR |
 | S3 — Lootbox floor | BN-025/026; CM-033,013. `contracts/core/Lootbox.vy`, `contracts/config/DefaultsBase.vy`, future `contracts/config/DefaultsRobinhood.vy`, `tests/core/lootbox/test_underscore_rewards.py`, `tests/config/test_switchboard_charlie.py`, `scripts/abis/Lootbox.json`, Track 7-reserved RH and owner-reserved Base migrations | Approve immutable floor, strict `>` parity, Base rollout | New Lootbox bytecode/constructor; Base deploy/rewire required, old/new hash record and rollback | targeted pytest files plus S1/S2; Base 43,200 and RH 7,200 floor/min-1/min/min+1; RH distributor absent | Protocol/rewards + contract audit; abort before migration if ABI/rewire plan incomplete; consumed by S6/Track 7 |
 | S4 — Deleverage cooldown/context | BN-012; CM-044,014,034. `contracts/core/Deleverage.vy`, `contracts/config/SwitchboardDelta.vy`, `contracts/core/Teller.vy`, `tests/core/deleverage/test_deleverage_for_withdrawal.py`, `tests/config/test_switchboard_delta.py`, `tests/core/teller/test_teller_withdraw.py`, `scripts/abis/Deleverage.json`, `scripts/abis/SwitchboardDelta.json`, `scripts/abis/Teller.json`, Track 7-reserved RH and owner-reserved Base migrations | Owner selects 4h vs 1d, configured default, Teller context, ABI compatibility, Base rollout | New Deleverage/Delta/Teller bytecode; coordinated Base upgrade | targeted suites plus S1/S2; independent same-N call blocked; only bound transient context bypasses; exact expiry and near-redemption pass | Security audit mandatory; abort if context is reusable/forgeable or migration cannot be atomic; consumed by S6/Track 7 |
-| S5 — Ledger portable guard | BN-002; CM-008,009,014,034. `contracts/data/Ledger.vy`, `contracts/core/Teller.vy`, `contracts/data/MissionControl.vy`, `contracts/config/SwitchboardDelta.vy`, `contracts/config/DefaultsBase.vy`, future `contracts/config/DefaultsRobinhood.vy`, `tests/data/test_ledger.py`, `tests/core/teller/test_teller_withdraw.py`, `tests/core/creditEngine/test_credit_borrow.py`, `tests/config/test_switchboard_delta.py`, `scripts/abis/Ledger.json`, `scripts/abis/Teller.json`, `scripts/abis/MissionControl.json`, `scripts/abis/SwitchboardDelta.json`, reserved migrations | Security owner identifies protected threat and chooses nested, elapsed-seconds, both, or explicitly accepts disable; approve seconds and Base rollout | New Ledger and possibly Teller/MissionControl/Delta bytecode; no permanent Base divergence | targeted suites plus S1/S2; exact selected property, locked accounts, delegation, Underscore, reentrancy, migration | Independent security PR/audit; abort if threat remains ambiguous or seconds trust is unacceptable; consumed by Track 7 only after approval |
+| S5 — Ledger portable guard | BN-002; CM-008,009,014,034. `contracts/data/Ledger.vy`, `contracts/core/Teller.vy`, `contracts/data/MissionControl.vy`, `contracts/config/SwitchboardDelta.vy`, `contracts/config/DefaultsBase.vy`, future `contracts/config/DefaultsRobinhood.vy`, `tests/data/test_ledger.py`, `tests/core/teller/test_teller_withdraw.py`, `tests/core/creditEngine/test_credit_borrow.py`, `tests/config/test_switchboard_delta.py`, `scripts/abis/Ledger.json`, `scripts/abis/Teller.json`, `scripts/abis/MissionControl.json`, `scripts/abis/SwitchboardDelta.json`, reserved migrations | Security owner identifies protected threat and whether lower-risk touches arm the replacement; choose nested, elapsed-seconds, both, or explicitly accept disable; approve seconds and Base rollout | New Ledger and possibly Teller/MissionControl/Delta bytecode; no permanent Base divergence | targeted suites plus S1/S2; preserve current Base lower-risk→higher-risk rejection in comparison tests; prove the selected canonical low-risk arming rule, locked accounts, delegation, Underscore-user handling, reentrancy, migration | Independent security PR/audit; abort if threat/low-risk arming remains ambiguous or seconds trust is unacceptable; consumed by Track 7 only after approval |
 | S6 — per-chain defaults/bounds/rates | BN-001,003–009,012–025,027–032, CAD-001; CM-007,009,049,055,060. New `contracts/config/DefaultsRobinhood.vy` and `tests/config/test_defaults_robinhood.py`; `config/BluePrint.py`, `contracts/config/DefaultsBase.vy` only for approved shared constructor interfaces, `scripts/params/params_utils.py`, `scripts/params/general.py`, `scripts/params/regenerate_defaults.py`, Track 7-reserved RH migrations | Approve every included parameter; point/emission economics; Track 4 activation fields; S3/S4 interfaces if included | Chain default artifact/config changes; core artifacts only where approved constructors changed; existing Base values otherwise unchanged | defaults/config/parameter tests plus S1/S2; generated table equals approved manifest and rejects Base/local fallback | Protocol, risk, tokenomics, deployment reviews; omit any unresolved field/slice rather than guess; consumed by S7–S9/Track 7 |
 | S7 — timelock/registry flows | BN-001,003–006,018–021; CM-001,002,004,005,010–021,032,046. `tests/modules/test_time_lock.py`, `tests/modules/test_local_gov.py`, `tests/core/humanResources/test_hr_contributor.py`, `tests/core/humanResources/test_hr_add_contributor.py`, `tests/registries/test_address_registry.py`, `tests/registries/test_ripe_hq.py`, `tests/tokens/test_erc20.py`, `tests/config/test_switchboard_alpha.py`, `tests/config/test_switchboard_bravo.py`, `tests/config/test_switchboard_charlie.py`, `tests/config/test_switchboard_delta.py`, `tests/config/test_switchboard_echo.py`, `tests/priceSources/test_chainlink_prices.py`, `tests/priceSources/curve/test_curve_prices.py`, `tests/priceSources/blueChip/test_bluechip_local.py`, `tests/priceSources/test_pyth_prices.py`, `tests/priceSources/test_stork_prices.py`, `tests/priceSources/test_aero_ripe.py`, `tests/priceSources/test_superoethb.py`, `tests/priceSources/test_undy_vault_prices.py`, new `tests/priceSources/test_redstone_prices.py`, new `tests/integration/test_ccip_department_registration.py` | Approve per-inheritor table, expiration headroom, one registry delay, CCIP pool authority facts | Tests/config only unless S6 changes deployment args; no shared runtime logic | targeted suites plus S1/S2; every inheritor exact open/expiry/jump; CCIP pool has no capability early | Protocol/security/CCIP review; abort on jump-erased approved window; consumed by Track 7/CCIP implementation |
 | S8 — capacity/economic lifecycle tests | BN-007–009,013–017,022–024,027–032; TS-010; CM-023,026,029,030,033,038,048. `tests/vaults/test_ripe_gov_vault.py`, `tests/core/lootbox/test_loot_deposit_points.py`, `tests/core/lootbox/test_loot_borrow_points.py`, `tests/core/lootbox/test_loot_ripe_rewards.py`, `tests/core/endaoment/test_endaoment_psm_mint.py`, `tests/core/endaoment/test_endaoment_psm_redeem.py`, `tests/core/endaoment/test_endaoment_psm_config.py`, `tests/core/creditEngine/test_credit_borrow.py`, `tests/core/creditEngine/test_credit_dyn_rate.py`, `tests/core/auctionHouse/test_ah_auctions.py`, `tests/core/bondRoom/test_ripe_bonds.py`, `tests/config/test_bond_booster.py`, new `tests/integration/test_block_clock_lifecycle.py` | Approved points/emission, capacity, auction, epoch, lock, PSM fields and jump policy | Test/config only; no chain-specific artifact | targeted suites plus S1/S2; every exact boundary, one/multi epoch jump, no carry, mint/redeem independence, preview parity, seconds interest | Risk/rewards/tokenomics review; abort dependent cases only when their decision is open; consumed by Track 7 |
@@ -598,9 +658,11 @@ Recommendations are not approvals. No clock parameter in this register is final.
 | Cadence basis | 2s/12s; other measured quantile; no wall-time mapping | Base/Arbitrum docs and RH sample | 2s Base, 12s RH nominal; ceil duration `/6`; label assumptions | duration/rate IDs | Protocol/risk | S6 | recommended/open |
 | Representative jumps | `+2/+4`; another set | RH live `+2`; Arbitrum example `+4` | approve `+2/+4` | all number IDs; CM-059 | Protocol/security | S1 | recommended/open |
 | Stress jump | `+60`; larger owner value; no stress | no authoritative max; occasional longer sync documented | test `+60` as conservative, not maximum | all number IDs; CM-059 | Protocol/security/risk | S1 and parameter signoff | recommended/open |
-| Shared-change Base policy | coordinated upgrade; time-bounded drift; permanent divergence | live hashes above; canonical-source constraint | coordinated upgrade, with bounded drift only as explicit fallback | BN-002/012/025; CM-008,014,033,044 | Protocol/security/deployment | S3–S5 | open |
-| Ledger threat | nested/reentrant; cross-tx pacing; both; disable accepted | current one-checked-action-per-NUMBER property, no threat document | security review selects threat before code | BN-002; CM-008,009,034 | Security | S5 | blocked |
-| Ledger replacement | transient guard; elapsed-seconds; both; explicit disable | repeated RH NUMBER makes current guard a long throttle | both layers if both threats confirmed; seconds unset until evidence | BN-002 | Security | S5 | blocked |
+| Ledger Base version policy | coordinated Base upgrade; time-bounded old-policy drift; permanent divergence | live Ledger hash above; current any-touch→checked-action property; canonical-source constraint | approve the threat/policy first, then coordinate Base migration; no permanent divergence | BN-002; CM-008,009,034 | Security/protocol/deployment | S5 | blocked |
+| Deleverage Base version policy | coordinated Deleverage/Delta/Teller upgrade; time-bounded drift; permanent divergence | three shared artifacts and ABI/context must move together | one atomic reviewed Base rollout after duration/context approval; no permanent divergence | BN-012; CM-014,034,044 | Security/protocol/deployment | S4 | blocked |
+| Lootbox Base version policy | coordinated Lootbox redeploy/rewire; time-bounded drift; permanent divergence | live Lootbox hash; constructor ABI changes while strict `>` behavior is retained | coordinated upgrade, with explicit old/new hashes and rollback; no permanent divergence | BN-025; CM-013,033 | Protocol/rewards/deployment | S3 | open |
+| Ledger threat | nested/reentrant; cross-tx pacing; lower-risk touch arming; combinations; disable accepted | current checked action rejects after any same-NUMBER housekeeping touch; no threat document | security review selects the threat and low-risk arming rule before code | BN-002; CM-008,009,034 | Security | S5 | blocked |
+| Ledger replacement | transient guard; elapsed-seconds; both; explicit disable; arm on any touch or high-risk only | repeated RH NUMBER makes current guard a long throttle; proposed guards otherwise widen behavior after a lower-risk touch | select layers and low-risk arming explicitly; seconds unset until evidence | BN-002 | Security | S5 | blocked |
 | Deleverage maximum | Base 7,200/RH 1,200 (~4h); Base 43,200/RH 7,200 (~1d) | code cap vs comment intent conflict; live value 0 | owner resolves intent | BN-012; CM-014,044 | Security/protocol | S4/S6 | blocked |
 | Deleverage exception | authorized transient context; no exception; retain same NUMBER | multi-leg intent and repeated-number bypass | authorized user/caller-bound transient context | BN-012 | Security/protocol | S4 | recommended/open |
 | Lootbox interval floor | immutable constructor floor; governed floor; retain constant | Base hardcode rejects RH day | immutable per-deployment floor; strict `>` retained | BN-025; CM-033 | Protocol/rewards | S3 | recommended/open |
@@ -615,6 +677,7 @@ Recommendations are not approvals. No clock parameter in this register is final.
 | CAD report correction | field metadata; special-case formatter; leave wrong | raw/display/runtime trace | field-specific denominator metadata and regression | CAD-001; CM-055 | Risk/oracle/tooling | S10 | recommended/open |
 | Harness mechanism | Boa patch; Anvil; new runtime | pinned Boa direct patch verified | Boa patch with snapshot/reset; no dependency | all; CM-059 | Engineering/test | S1 | recommended/open |
 | Inventory/CI integration | script+pytest local; future CI; workflow now | no committed `.github`; fixed-string baseline | script+pytest now, identical future CI command | all; CM-055,059 | Protocol/security/tooling | S2 | recommended/open |
+| Durable RPC evidence | derived dated summary only; re-run at implementation; sanitized raw responses plus metadata | Track 6 recorded endpoints/date but output scope excluded an evidence artifact | Track 7 re-runs reads and, if owner approves, commits sanitized raw responses and retrieval metadata | live Base version evidence and RH profiles; CM-055,056 | Deployment/operations | Base rollout and RH deployment evidence | recommended/open |
 | PSM posture consumed from Track 4 | omit; deploy disabled; activate | integrated `go — existing feed`; activation gates remain | if implemented, deploy disabled/no GREEN mint; otherwise omit | BN-027/028; CM-046,048 | Track 4 owners/risk | S6/S8/S9 | approved only as Track 4 decision; activation blocked |
 
 ## Approval boundary and completion
@@ -624,12 +687,24 @@ decisions above block only their listed slices: S1/S2 analysis tooling can proce
 after their narrow mechanism/ownership approvals; S3, S4, S5, economic portions
 of S6/S8, and parameterized governance flows cannot.
 
-The following Section 2 surfaces are eligible for owner review, not closure:
-shared clock posture and profiles; BN-002 guard threat/policy; BN-012 duration and
-context; BN-025 immutable floor; point/emission economics; all timelocks,
-capacities, auctions, epochs, and locks; disabled price/dynamic-rate posture;
-CAD-001 reporting; harness; inventory guard; and Base rollout policy.
-`rh-summary.md` remains unchanged.
+The exact Section 2 checkbox handoff is:
+
+| Section 2 checkbox | Track 6 status | Owner-review / closure status |
+| --- | --- | --- |
+| “Classify every retained `block.number` use” | Track 3 inventory and both Track 6 disposition tables cover every occurrence and category | Eligible for owner review; not yet closure-ready. The owner may close it after Track 6 integration |
+| “Define Base and Robinhood values for all block-denominated defaults” | Candidate values/bounds are complete; owner approvals are open | Eligible for owner review; not closure-ready |
+| “Recalculate per-number rates, especially RIPE rewards” | Wall-time math, jump attribution, floors, dust, and CAD-001 are modeled | Eligible for tokenomics/risk review; not closure-ready |
+| “Move hardcoded cadence assumptions out of shared contracts … beginning with `Lootbox.ONE_DAY`” | S3 specifies the immutable-floor design and Base rollout | Design eligible for review; not closure-ready until implemented and validated |
+| “Replace the duplicated `7_200` maximum deleverage cooldown constants” | S4 specifies one getter/validator and transient context; 4h-vs-1d remains open | Design eligible for security/owner review; not closure-ready |
+| “Resolve `Ledger`'s one-action-per-`block.number` rule” | Current any-touch→checked-action behavior is now precise; threat, low-risk arming, and replacement remain blocked | Eligible for security review; not closure-ready |
+| “Review repeated and jumping numbers across” every listed domain | Every domain has repeat, `+1`, ordinary-jump, boundary-skip, and stress behavior plus tests | Eligible for owner review; not yet closure-ready. The owner may close it after accepting the jump profiles and dispositions |
+| “Add a checked inventory or CI guard” | S2 defines schema, commands, path classification, failures, and ownership | Plan eligible for review; not closure-ready until implemented |
+| “Run the same contract artifacts under a Base clock profile and a Robinhood clock profile” | S1 and the validation plan define the identical-artifact harness and re-verification gate | Plan eligible for review; not closure-ready until tests run |
+| “Confirm that RipeHq and registry timelocks behave correctly before using them to register CCIP pools as Departments” | S7 defines the exact registration sequence and negative/boundary tests | Plan eligible for protocol/security review; not closure-ready until tests pass |
+
+No checkbox has been edited or closed in `rh-summary.md`. The Section 2 exit
+condition is not met because parameters, shared changes, and Base/Robinhood test
+execution remain gated follow-on work.
 
 The specification is reproducible from the recorded launch commit and hashes,
 dispositions BN-001–BN-032, CAD-001, and TS-001–TS-011, records current Base

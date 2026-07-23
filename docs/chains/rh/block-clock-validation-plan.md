@@ -5,6 +5,9 @@ currently pinned stack remain owner-gated
 
 **Prepared:** 23 July 2026
 
+**Review revision:** 23 July 2026 — added the lower-risk-to-higher-risk Ledger
+case, runtime primitive gate, and `contracts/testing/**` classification
+
 **Authority:** [`shared-block-clock-specification.md`](shared-block-clock-specification.md),
 the integrated Track 3 inventory, and the integrated component matrix
 
@@ -28,8 +31,21 @@ The pinned environment is:
 
 Direct assignment to `boa.env.evm.patch.block_number` and
 `boa.env.evm.patch.timestamp` was verified during Track 6, including independent
-arbitrary jumps. `boa.env.anchor()` provides snapshot/revert isolation. The
-required profiles therefore need no Anvil instance, plugin, or new dependency.
+arbitrary jumps. The active Python environment resolved
+`titanoboa==0.2.7`; assignment of `+7` NUMBER and `+11` seconds inside
+`boa.env.anchor()` produced the exact values and restored both afterward. The
+repository has no venv, so `test_clock_profiles.py` must make installed-version,
+direct-assignment, and anchor-restoration checks its first S1 gate. The required
+profiles therefore need no Anvil instance, plugin, or new dependency if that gate
+passes.
+
+Track 6 launched from `rh` at `5018da6d19516509e0d8674b3728e73bca92e2ad`.
+The `rh` integration branch later advanced to
+`cfb6762c740a196e3d187f779a3e2b1060c2128a`, which adds
+`contracts/testing/StockTokenTransferProbe.vy` but no clock or cadence dependency.
+S2 must classify `contracts/testing/**` as non-production, count it separately,
+prohibit production imports from it, and reproduce the unchanged
+100-occurrence/95-line/17-file production baseline on both commits.
 
 ## Fixture and helper API
 
@@ -167,7 +183,7 @@ profile.
 | ID; components | Primary test location | Required assertions |
 | --- | --- | --- |
 | BN-001; CM-001,002 | `tests/tokens/test_erc20.py` | Base/RH values and bounds; pending data observes NUMBER; before/exact/after confirmation |
-| BN-002; CM-008,009,034 | `tests/data/test_ledger.py` plus Teller domain tests | current repeat rejection; selected canonical nested/cross-tx property; locked account, delegation, Underscore, migration |
+| BN-002; CM-008,009,034 | `tests/data/test_ledger.py` plus Teller domain tests | current same-NUMBER lower-risk touch then checked higher-risk rejection; higher-risk then lower-risk succeeds but a later checked action rejects; selected canonical low-risk arming and nested/cross-tx property; locked account, delegation, Underscore-user handling, migration |
 | BN-003; LocalGov components | `tests/modules/test_local_gov.py` and inheritor suites | all LocalGov values/bounds and exact confirmation |
 | BN-004; all TimeLock components | `tests/modules/test_time_lock.py` and each inheritor suite | before/open/last-valid/exact-expiry/jump-past; stress headroom |
 | BN-005; CM-005,032 | `tests/core/humanResources/test_hr_contributor.py` | transfer authority delay plus independent vesting seconds |
@@ -224,6 +240,17 @@ assert no Robinhood deployment/registration.
 
 ### Ledger
 
+- Current-Base comparison proves every successful housekeeping call writes
+  `lastTouch`, an unchecked lower-risk touch followed by a checked higher-risk
+  action at the same NUMBER reverts, and a `+1` clears that rejection.
+- Current-Base comparison also proves a checked higher-risk action followed by an
+  unchecked lower-risk touch succeeds, while a later checked action at the same
+  NUMBER reverts.
+- Users classified as Underscore wallets/vaults skip the assertion; the test does
+  not substitute caller identity for user classification and still verifies the
+  `lastTouch` write.
+- The canonical test names whether lower-risk touches arm transient protection,
+  cross-transaction pacing, both, or neither; a silent behavior change fails.
 - Only the owner-selected threat property is encoded; the test name states it.
 - A transient guard cannot survive transaction/anchor reset.
 - A cross-transaction seconds guard, if selected, tests exact seconds boundary,
@@ -282,8 +309,9 @@ The minimum cross-contract scenarios are:
 
 1. RipeHq/AddressRegistry CCIP Department add, confirm, capability initiate,
    confirm, permitted mint, disable, and negative premature/unknown-address calls.
-2. Teller higher-risk action through Ledger, CreditEngine debt update, Lootbox
-   borrow points, repeat/jump, repay, and locked-account checks.
+2. Teller lower-risk housekeeping followed by higher-risk action, then the reverse
+   order, through Ledger, CreditEngine debt update, Lootbox borrow points,
+   repeat/jump, repay, Underscore-user classification, and locked-account checks.
 3. Multi-asset withdrawal through Teller and Deleverage using one authorized
    context, followed by an independent same-NUMBER attempt and exact cooldown end.
 4. PSM mint/redeem bucket independence with both flags false, governed interval
