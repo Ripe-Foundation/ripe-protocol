@@ -31,7 +31,7 @@ The pinned environment is:
 
 Direct assignment to `boa.env.evm.patch.block_number` and
 `boa.env.evm.patch.timestamp` was verified during Track 6, including independent
-arbitrary jumps. The active Python environment resolved
+arbitrary jumps. The active pyenv `ripe-lite` environment resolved
 `titanoboa==0.2.7`; assignment of `+7` NUMBER and `+11` seconds inside
 `boa.env.anchor()` produced the exact values and restored both afterward. The
 repository has no venv, so `test_clock_profiles.py` must make installed-version,

@@ -134,11 +134,11 @@ Every boundary suite also sets exactly `B`, `B+1`, `S`, `S+1`, `E-1`, `E`, and
 `E+1`; a skipped sequence does not replace exact-boundary assertions. The pinned
 `titanoboa==0.2.7` runtime permits direct, independent assignment to
 `boa.env.evm.patch.block_number` and `.timestamp`; no new runtime is needed. This
-was verified in the active Python environment by assigning `+7` NUMBER and `+11`
-seconds inside `boa.env.anchor()` and observing exact restoration. Because the
-repository does not contain a venv, S1 must repeat that primitive check in the
-dependency-installed implementation checkout before any protocol test relies on
-it.
+was verified in the active pyenv `ripe-lite` environment by assigning `+7` NUMBER
+and `+11` seconds inside `boa.env.anchor()` and observing exact restoration.
+Because the repository does not contain a venv, S1 must repeat that primitive
+check in the dependency-installed implementation checkout before any protocol
+test relies on it.
 
 ### Conversion rule
 
@@ -691,13 +691,13 @@ The exact Section 2 checkbox handoff is:
 
 | Section 2 checkbox | Track 6 status | Owner-review / closure status |
 | --- | --- | --- |
-| “Classify every retained `block.number` use” | Track 3 inventory and both Track 6 disposition tables cover every occurrence and category | Eligible for owner review; not yet closure-ready. The owner may close it after Track 6 integration |
+| “Classify every retained `block.number` use” | Track 3 inventory and both Track 6 disposition tables cover every occurrence and category | Eligible for owner review. Closure of this individual classification item after Track 6 integration is an owner judgment and does not satisfy the Section 2 exit condition |
 | “Define Base and Robinhood values for all block-denominated defaults” | Candidate values/bounds are complete; owner approvals are open | Eligible for owner review; not closure-ready |
 | “Recalculate per-number rates, especially RIPE rewards” | Wall-time math, jump attribution, floors, dust, and CAD-001 are modeled | Eligible for tokenomics/risk review; not closure-ready |
 | “Move hardcoded cadence assumptions out of shared contracts … beginning with `Lootbox.ONE_DAY`” | S3 specifies the immutable-floor design and Base rollout | Design eligible for review; not closure-ready until implemented and validated |
 | “Replace the duplicated `7_200` maximum deleverage cooldown constants” | S4 specifies one getter/validator and transient context; 4h-vs-1d remains open | Design eligible for security/owner review; not closure-ready |
 | “Resolve `Ledger`'s one-action-per-`block.number` rule” | Current any-touch→checked-action behavior is now precise; threat, low-risk arming, and replacement remain blocked | Eligible for security review; not closure-ready |
-| “Review repeated and jumping numbers across” every listed domain | Every domain has repeat, `+1`, ordinary-jump, boundary-skip, and stress behavior plus tests | Eligible for owner review; not yet closure-ready. The owner may close it after accepting the jump profiles and dispositions |
+| “Review repeated and jumping numbers across” every listed domain | Every domain has repeat, `+1`, ordinary-jump, boundary-skip, and stress behavior plus tests | Eligible for owner review. Closure of this individual review item after accepting the profiles and dispositions is an owner judgment; Section 2 still requires the follow-on tests to pass |
 | “Add a checked inventory or CI guard” | S2 defines schema, commands, path classification, failures, and ownership | Plan eligible for review; not closure-ready until implemented |
 | “Run the same contract artifacts under a Base clock profile and a Robinhood clock profile” | S1 and the validation plan define the identical-artifact harness and re-verification gate | Plan eligible for review; not closure-ready until tests run |
 | “Confirm that RipeHq and registry timelocks behave correctly before using them to register CCIP pools as Departments” | S7 defines the exact registration sequence and negative/boundary tests | Plan eligible for protocol/security review; not closure-ready until tests pass |
