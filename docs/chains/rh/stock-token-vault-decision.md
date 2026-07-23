@@ -6,7 +6,7 @@
 
 **Owner approval status:** Not approved
 
-**Evidence commit:** `ee270abd317daae25d434a4a256346b5a0cb95d3`
+**Evidence commit:** `c5d09f0848888750843ef6a0a637a0716522948a`
 
 ## Decision
 
@@ -35,8 +35,11 @@ change.
 
 ## Approval boundary
 
-The owner approved continuation of repository analysis after the
-zero-backed-liquidation stop condition was found. That approval did **not**:
+After the agent paused on the zero-backed-liquidation stop condition and
+reported the issue, the owner explicitly replied, “yes you can continue” and
+asked that the issue be clearly documented before continuing. This
+conversation—not a repository artifact—is the evidence for approval to
+continue repository analysis. That approval did **not**:
 
 - accept the custody, liquidation, first-mover, post-zero, or monitoring risk;
 - select a production vault;
@@ -45,6 +48,25 @@ zero-backed-liquidation stop condition was found. That approval did **not**:
 - authorize deployment or a live transaction.
 
 All of those gates remain closed.
+
+## Relationship to the earlier phantom-collateral posture
+
+The controlling executive summary had already accepted interim vault-balance
+overstatement, missing-asset borrowing power, and first-withdrawer advantage
+after an administrative burn
+(`hood-chain-executive-summary.md:190-201`, especially line 196). Track 5
+reopens that interim posture because the new evidence is more severe than
+passive overstatement: AuctionHouse can actively accept the stale amount as
+delivered collateral, charge a third-party buyer GREEN, reduce borrower debt,
+and leave the buyer with an undeliverable claim. The two-buyer test also proves
+that separately purchased internal claims can exceed live custody and become
+withdrawal-order dependent.
+
+Accordingly, this record supersedes the earlier accepted-consequence framing
+for vault selection. It does not reject the architectural decision to tolerate
+issuer authority, and it does not silently revoke an owner decision. It
+identifies an active settlement invariant that was not captured by the earlier
+summary and returns the vault choice to an explicit owner/specification gate.
 
 ## Selected and rejected paths
 
@@ -115,9 +137,13 @@ the behavior can be carried into a follow-on specification for owner review.
 | Fresh deposit after zero | Old claimant can capture it | Old shares can round to zero | Rejected pending specification |
 | Pause/blocklist on token transfer | Atomic revert/retry | Atomic revert/retry | Candidate-acceptable with monitoring |
 | Internal move while paused | Succeeds nominally | Succeeds in shares | Not evidence of deliverability |
+| Internal auction purchase while paused | Charges GREEN; buyer gets nominal claim but cannot withdraw | Charges GREEN; buyer gets live-share claim but cannot withdraw | Not accepted as delivery proof; operations policy required |
+| External auction purchase while blocklisted | Atomic revert for sender, recipient, and operator roles; retry succeeds | Same | Candidate-acceptable with monitoring |
 | Partial-loss external liquidation | Delivers while live balance remains | Delivers pro-rata live claim | Candidate-acceptable |
+| Auction initiated after partial loss | Internal/external modes settle, with Simple ordering risk | Internal/external modes settle pro rata | Rebase direction preferred |
 | Total-loss external liquidation | Atomic revert | Atomic revert | Safe funds; blocked progress |
-| Total-loss internal liquidation | Charges for zero-backed nominal claim | Atomic revert | Simple rejected; Rebase still blocked |
+| Total-loss liquidation initiated after loss | Starts and charges for zero-backed nominal claim | Does not enter liquidation or start an auction | Simple rejected; Rebase still blocked |
+| Total-loss internal liquidation opened before loss | Charges for zero-backed nominal claim | Atomic revert | Simple rejected; Rebase still blocked |
 | Deleverage at partial loss | External delivery reconciles | External delivery reconciles | Candidate-acceptable |
 | Deleverage at total loss | Reverts | Reverts | Requires defined bad-debt path |
 | Behavior-switch upgrade test | Transfer failure is atomic | Transfer failure is atomic | Proxy behavior still unproven |
@@ -155,9 +181,31 @@ At total live loss:
   revert the whole purchase. GREEN, debt, buyer balances, and auction state are
   unchanged.
 
+The suite starts auctions on both sides of the issuer action. After partial
+loss, both vaults can enter liquidation and settle through either mode. After
+total loss, Simple still enters liquidation and repeats the unsafe internal
+settlement; Rebase's zero weighted threshold prevents liquidation mode and no
+auction starts.
+
 Thus a successful internal balance move cannot be treated as proof that an
 issuer-controlled token is deliverable. A follow-on specification must make
 live backing an explicit precondition of the amount returned to settlement.
+
+The integration suite also proves the paused-but-live case: a real internal
+auction purchase succeeds, charges 20 GREEN, reduces debt by 20 GREEN, and
+assigns about 40 tokens of vault claim while the buyer's withdrawal is blocked
+until unpause. This is distinct from the zero-backed failure—the claim is live
+backed but not presently deliverable—and still requires explicit settlement
+and operations policy.
+
+For external settlement, sender-blocked vault, recipient-blocked buyer, and
+operator-blocked vault cases all revert atomically. GREEN, debt, custody, and
+auction state remain unchanged; clearing the exact role permits retry.
+
+Deleverage has no internal-transfer settlement branch. Its applicable volatile
+asset and collateral-swap paths call the AuctionHouse external-withdrawal
+wrapper (`Deleverage.vy:433,1065`). The tested partial/total-loss external
+withdrawal therefore covers its complete current Stock Token custody surface.
 
 ## Reward, view, ABI, event, and monitoring implications
 
@@ -186,6 +234,19 @@ Consequences if the Rebase direction later wins approval:
 5. the per-call deposit-delta fix may require an internal or external API/event
    decision in the follow-on specification.
 
+The event requirement is behaviorally covered, not inferred. For both vaults,
+the suite reconciles Teller deposit/withdraw events and vault
+deposit/withdraw/internal-transfer events to return values, token deltas, stored
+balance deltas, and—on Rebase—the emitted `shares`/`transferShares` fields.
+
+The reward implication is also covered through the real
+`Lootbox.updateDepositPoints` and Ledger state path. After donation and total
+loss, both vaults continue accruing user balance points from the unchanged
+nominal/raw-share weight. Simple's asset/global USD input remains nominal at
+$100; Rebase refreshes from $100 to $200 after donation and to $0 after total
+loss. This divergence is an explicit policy and monitoring decision, not merely
+a view-level observation.
+
 No ABI or event change is authorized here.
 
 ## VaultBook and `DefaultsRobinhood` implications
@@ -209,6 +270,12 @@ Production implications:
 5. A post-deployment smoke check must reconcile
    `VaultBook.getRegId(vault)`, `getAddr(id)`, and
    `MissionControl.getFirstVaultIdForAsset(token)`.
+
+The suite now tests cleanup after both partial and total issuer loss. User and
+asset deregistration remain blocked by nonzero raw nominal/share accounting.
+Governance recovery rejects a partially live registered balance and has
+nothing to recover at total live loss. A zero live balance alone is not a
+cleanup or migration path.
 
 ### `DefaultsRobinhood`
 
@@ -293,7 +360,8 @@ The specification must define, without implementing yet:
 ### Pending Track 2
 
 - exact candidate Stock Token proxy, implementation, decimals, and code hash;
-- observed pause/blocklist/forced-action/upgrade behavior;
+- observed pause/blocklist/forced-action/upgrade behavior, including whether
+  approvals are gated and whether transfers can invoke callbacks;
 - pinned-fork transfer behavior; and
 - owner-approved live third-party-contract transferability evidence.
 
