@@ -145,7 +145,9 @@ starting balance.
 
 The fail-closed input file is
 `scripts/probes/aapl-robinhood-mainnet-fork.json`. It permits `fork-only` scope
-and explicitly sets `broadcast_allowed` to `false`.
+and explicitly sets `broadcast_allowed` to `false`. Approval schema version `2`
+requires the exact current, new, and effective-at multiplier fields; version
+`1` inputs are rejected rather than silently defaulted.
 
 ## Fork execution evidence
 
@@ -182,6 +184,12 @@ Fork-measured EVM execution gas:
 | Withdraw | `22,136` |
 | Allowance cleanup | `6,993` |
 | Total | `474,333` |
+
+Deposit execution gas decreased from `52,783` to `50,320` after the owner-only
+check was added, while deployment increased as expected. Repeated pinned-fork
+runs reproduced both figures and the `474,333` total. The decrease is a
+deterministic result consistent with compiler code-layout/dispatch changes from
+recompiling the contract, not measurement drift.
 
 These figures are fork execution gas, not a live fee quote or an approved
 maximum. A live estimate must be regenerated against the owner-approved sender,
@@ -223,6 +231,12 @@ Fork limitations:
 - has no arbitrary external-call surface;
 - emits deposit, withdrawal, and recovery evidence; and
 - provides owner-only ERC-20 recovery to the configured recipient.
+
+All three state-changing probe entry points use Vyper's `@nonreentrant`
+protection. No adversarial callback mock was added because the verified AAPL
+target has no receiver-hook path and this track does not generalize the runner
+to hook-bearing assets. A candidate with hooks or callbacks would require
+candidate-specific reentrancy coverage before use.
 
 Recovery deliberately retains the same exact-delta invariant as the transfer
 probe. A fee-on-transfer token, false-returning token, token that blocklists the
@@ -278,13 +292,15 @@ python scripts/probes/stock_token_transfer_probe.py \
 The first runner command is read-only dry-run output. The second modifies only
 ephemeral local fork state. Supplying `--broadcast` always raises an error; the
 CLI prints a concise error without a traceback, and the runner contains no
-signing or broadcast implementation.
+signing or broadcast implementation. The CLI formats expected `ApprovalError`
+stops; unexpected transport or runtime failures deliberately retain tracebacks
+so infrastructure faults are not mistaken for transferability findings.
 
 ### Validation results after reviewer hardening
 
-- `python -m pytest tests/probes -q`: **35 passed**.
+- `python -m pytest tests/probes -q`: **40 passed**.
 - Combined `tests/probes`, BasicVault, SharesVault, and ERC-20 selection:
-  **70 passed** (`35` Track 2 tests plus `35` existing regression tests).
+  **75 passed** (`40` Track 2 tests plus `35` existing regression tests).
 - Scoped `ruff check` over the runner and two probe test files: passed.
 - Repository-wide Ruff was not used as an acceptance claim: the repository has
   no Ruff configuration and reports `445` pre-existing errors. The `F541` in
@@ -305,8 +321,10 @@ following after a fresh preflight:
    runtime code hashes.
 3. A live test amount. The fork used `0.001 AAPL`; that value is a proposal, not
    live approval.
-4. A funded sender whose legal and contractual eligibility has been determined
-   outside this track by the owner and counsel.
+4. A funded sender who will also deploy and own the probe: the live sender,
+   deployer, and immutable `OWNER` must be the same public address. That
+   address's legal and contractual eligibility must be determined outside this
+   track by the owner and counsel.
 5. The recipient and any owner/counsel eligibility determination that applies.
 6. The approved acquisition/provenance path for the test amount.
 7. The signing and broadcast mechanism.

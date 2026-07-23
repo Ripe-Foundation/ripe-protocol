@@ -6,6 +6,7 @@ import sys
 import pytest
 
 from scripts.export_abis import export_abis
+from scripts.probes import stock_token_transfer_probe as probe_runner
 from scripts.probes.stock_token_transfer_probe import (
     ApprovalError,
     _format_token_amount,
@@ -24,6 +25,7 @@ APPROVAL_PATH = Path("scripts/probes/aapl-robinhood-mainnet-fork.json")
 def test_fork_approval_is_explicitly_non_broadcast():
     data = json.loads(APPROVAL_PATH.read_text())
     approved = parse_approval(data)
+    assert data["schema_version"] == 2
     assert data["scope"] == "fork-only"
     assert data["broadcast_allowed"] is False
     assert approved.chain_id == 4663
@@ -88,6 +90,19 @@ def test_pending_multiplier_fails_closed():
         )
 
 
+def test_preflight_rejects_rpc_chain_id_mismatch(monkeypatch):
+    approved = load_approval(APPROVAL_PATH)
+
+    def wrong_chain_rpc(_rpc_url, method, params):
+        assert method == "eth_chainId"
+        assert params == []
+        return hex(approved.chain_id + 1)
+
+    monkeypatch.setattr(probe_runner, "_rpc", wrong_chain_rpc)
+    with pytest.raises(ApprovalError, match="chain_id mismatch"):
+        probe_runner.preflight(approved, "https://rpc.invalid.example")
+
+
 @pytest.mark.parametrize(
     ("field", "value"),
     [
@@ -107,6 +122,24 @@ def test_approval_validation_rejects_missing_chain_id():
     data = json.loads(APPROVAL_PATH.read_text())
     data.pop("chain_id")
     with pytest.raises(ApprovalError, match="missing approved input: chain_id"):
+        parse_approval(data)
+
+
+def test_approval_validation_rejects_obsolete_schema():
+    data = json.loads(APPROVAL_PATH.read_text())
+    data["schema_version"] = 1
+    with pytest.raises(ApprovalError, match="unsupported approval schema"):
+        parse_approval(data)
+
+
+@pytest.mark.parametrize(
+    "field",
+    ["ui_multiplier", "new_ui_multiplier", "multiplier_effective_at"],
+)
+def test_schema_v2_requires_multiplier_fields(field):
+    data = json.loads(APPROVAL_PATH.read_text())
+    data["token"].pop(field)
+    with pytest.raises(ApprovalError, match=f"missing approved input: {field}"):
         parse_approval(data)
 
 

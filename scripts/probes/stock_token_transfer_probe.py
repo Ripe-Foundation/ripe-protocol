@@ -130,7 +130,7 @@ def _hash(value: Any, field: str) -> str:
 
 
 def parse_approval(data: dict[str, Any]) -> ApprovedRun:
-    if _required(data, "schema_version") != 1:
+    if _required(data, "schema_version") != 2:
         raise ApprovalError("unsupported approval schema")
     if _required(data, "scope") != "fork-only":
         raise ApprovalError("approval scope must be fork-only")
