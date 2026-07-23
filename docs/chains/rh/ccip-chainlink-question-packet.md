@@ -48,11 +48,18 @@ function decimals() external view returns (uint8);
 
 They do not expose `burnFrom`, `owner`, or `getCCIPAdmin`.
 
-There is one additional authorization layer. GREEN minting calls
+They are pausable and blacklistable. While paused, transfer, mint, and burn
+revert. Mint also reverts for a blacklisted receiver, while transfer rejects a
+blacklisted sender or receiver. We therefore expect a paused destination token
+or blacklisted destination receiver to make CCIP release/mint fail until the
+condition is removed.
+
+There is an additional authorization layer. GREEN minting calls
 `RipeHq.canMintGreen(msg.sender)`, and RIPE minting calls
-`RipeHq.canMintRipe(msg.sender)`. RipeHq requires the direct mint caller to be a
-registered department, have only the corresponding mint permission enabled,
-and expose the corresponding view:
+`RipeHq.canMintRipe(msg.sender)`. RipeHq first checks its global `mintEnabled`
+circuit breaker, then requires the direct mint caller to be a registered
+department, have only the corresponding mint permission enabled, and expose the
+corresponding view:
 
 ```solidity
 // GREEN pool only
@@ -70,6 +77,28 @@ separate mint adapter is not viable. Our proposed shape is:
 - the standard CCIP burn/mint path unchanged;
 - only the appropriate Ripe capability view added to each implementation;
 - each pool registered in RipeHq and enabled only for its corresponding token.
+
+Illustrative compatibility layer, with constructor forwarding and the final
+Chainlink base class omitted pending your answer:
+
+```solidity
+contract GreenTokenBurnMintPool is BurnMintTokenPool {
+    function canMintGreen() external pure returns (bool) { return true; }
+}
+
+contract RipeTokenBurnMintPool is BurnMintTokenPool {
+    function canMintRipe() external pure returns (bool) { return true; }
+}
+```
+
+Each implementation deliberately omits the opposite mint capability.
+
+Although the tokens lack Chainlink's self-service admin-discovery functions,
+they are not ownerless. Each token exposes `ripeHq()`, that RipeHq exposes
+`governance()`, and token `pause(bool)` accepts only that governance address.
+Subject to owner approval, governance can provide a proof signature or a
+non-disruptive demonstration transaction in whatever format your assisted
+registration process requires.
 
 Could you please confirm the following?
 
@@ -101,48 +130,63 @@ Could you please confirm the following?
 8. Please confirm which burn function the recommended pool calls. Is its
    direct `burn(uint256)` call compatible with the tokens' self-burn behavior
    without changing GREEN or RIPE?
-9. Are there any Robinhood-specific Router, RMN, pool factory, allowlist,
+9. Ripe's broader Department convention includes `isPaused()`, `pause(bool)`,
+   and fund-recovery methods, although RipeHq validates only the enabled mint
+   capability. Should this pool implement a Chainlink-approved lifecycle/pause
+   surface, or should it remain capability-only and rely on standard CCIP rate
+   controls plus Ripe's token and global mint circuit breakers?
+10. Are there any Robinhood-specific Router, RMN, pool factory, allowlist,
    decimal, gas, or remote-pool constraints not represented in the public
    directory and EVM pool documentation?
 
 ### Registration and administration questions
 
-10. Because the immutable Base tokens expose neither `owner()` nor
-   `getCCIPAdmin()`, is assisted/manual Token Admin Registry registration the
-   correct path? What evidence, authorization signatures, contracts, and
-   contacts are required?
-11. For newly deployed Robinhood GREEN and RIPE, is self-service registration
+11. Because the immutable Base tokens expose neither `owner()` nor
+    `getCCIPAdmin()`, is assisted/manual Token Admin Registry registration the
+    correct path? Is the onchain `token.ripeHq() -> RipeHq.governance()`
+    authority chain sufficient, and what additional signature or
+    demonstration transaction, contracts, contacts, and review steps are
+    required?
+12. For newly deployed Robinhood GREEN and RIPE, is self-service registration
     preferred? If so, is `getCCIPAdmin()` required, or can the same portable
     token source use assisted registration on both sides? We do not want a
     Robinhood-only token variant.
-12. What is the required ordering for:
-   - establishing token administrators;
-   - associating local tokens and pools;
-   - registering the pools in RipeHq;
-   - granting the corresponding Ripe mint permissions;
-   - applying remote-chain and remote-pool configuration;
-   - configuring rate limits; and
-   - activating production transfers?
-13. Do you support separate multisigs for pool ownership, Token Admin Registry
+13. Ripe must deploy the pool before starting its two-step, block-timelocked
+    address registration, then complete a second timelocked Hq-config change
+    that rechecks the pool's capability at confirmation. Around that fixed
+    Ripe-side sequence, what is Chainlink's required ordering for:
+
+    - establishing token administrators;
+    - associating local tokens and pools;
+    - applying remote-chain and remote-pool configuration;
+    - configuring rate limits; and
+    - activating production transfers?
+14. Do you support separate multisigs for pool ownership, Token Admin Registry
    administration, and the `rateLimitAdmin` incident role? Are there prescribed
    role-transition or two-step ownership procedures?
 
 ### Operations, security, and commercial questions
 
-14. What initial per-token inbound/outbound capacities and refill rates do you
-    recommend for a guarded launch, and what emergency-halt procedure should we
-    adopt given that the documented `1/1` configuration is not an absolute
-    pause?
-15. What monitoring, alerting, manual-execution coverage, upgrade coordination,
+15. Ripe governance can immediately call `RipeHq.setMintingEnabled(false)`,
+    which hard-stops inbound GREEN and RIPE minting on that chain but does not
+    stop outbound burns. Token pause is broader and stops transfers, burns, and
+    mints. What initial per-token inbound/outbound capacities and refill rates
+    do you recommend, and how should those controls be coordinated for a
+    guarded launch and emergency response? If an in-flight message fails
+    because `mintEnabled` is false, the token is paused, or the receiver is
+    blacklisted, what state does it enter and what is the supported retry or
+    manual-execution procedure after re-enable?
+16. What monitoring, alerting, manual-execution coverage, upgrade coordination,
     incident-response, and support responsibilities should Ripe plan to own?
-16. Is the default 90,000 combined token-pool execution gas allowance expected
-    to accommodate the additional RipeHq static calls, assuming measurements
-    remain below the limit? What gas evidence should accompany review?
-17. Beyond public per-message CCIP billing, are there onboarding fees,
+17. Where is the 90,000 combined token-pool execution gas allowance enforced,
+    what measurements and margin should accompany review, and what supported
+    configuration or assistance path applies if the RipeHq authorization path
+    cannot be kept below it?
+18. Beyond public per-message CCIP billing, are there onboarding fees,
     liquidity or volume requirements, recurring fees, support commitments,
     SLAs, audits, security-review requirements, program/deprecation conditions,
     or external terms that apply to this integration?
-18. Is there a recommended testnet acceptance checklist before requesting
+19. Is there a recommended testnet acceptance checklist before requesting
     mainnet registration?
 
 For an actionable response, it would help if you could identify each answer as
@@ -165,10 +209,11 @@ Thank you.
 | Standard-pool subclass | Add only the appropriate Ripe capability view | Use the accepted abstract/custom form without changing the direct caller |
 | Thin pool review/support | Proceed to an implementation and review specification | Block and escalate; do not add an adapter or token fork |
 | Direct mint and self-burn compatibility | Keep GREEN, RIPE, and RipeHq unchanged | Block and escalate any required token migration or nonstandard mint authority |
+| Department lifecycle surface | Implement only the approved pause/recovery shape | Keep the pool capability-only and document the Switchboard limitation |
 | Assisted Base registration | Write the authority-evidence and registration runbook | Block if immutable Base tokens cannot be registered |
 | Portable Robinhood registration | Deploy the same canonical token source on both chains | Escalate before any `getCCIPAdmin()` or Robinhood-only source change |
 | Configuration order and roles | Freeze the governance transaction and signer matrix | Revise the matrix before preparing transactions |
-| Limits and emergency controls | Set guarded-launch parameters and incident steps | Keep quantitative parameters pending |
+| Token restrictions and emergency controls | Define rate limits, circuit-breaker order, and in-flight recovery | Keep activation blocked until retry behavior is accepted |
 | Gas expectations | Adopt the confirmed measured acceptance threshold | Redesign only within the direct-pool constraint or block |
 | Commercial/security requirements | Add the stated budget, review, agreements, and gates | Keep launch blocked until requirements are known |
 

@@ -135,6 +135,17 @@ constructor values: the pool constructor takes the local token, decimals,
 allowlist, RMN proxy, and Router, while remote-chain configuration is applied
 separately.
 
+### Existing token-transfer configuration
+
+The [Robinhood mainnet
+directory](https://docs.chain.link/ccip/directory/mainnet/chain/robinhood-mainnet)
+structured data, retrieved 2026-07-23, lists `BWLK`, `SDM`, and `VIRTUAL` as
+supported tokens in both directions on the Base <-> Robinhood Chain lane. This
+is stronger evidence than the existence of lane contracts alone: the lane is
+configured for third-party cross-chain token transfers. It is not, by itself,
+proof of a recent successful transfer or a commitment to support Ripe's custom
+pool.
+
 ## Release and source evidence
 
 As retrieved on 2026-07-23, Chainlink's current [EVM API
@@ -177,6 +188,18 @@ recommended production version.
 
 Both tokens implement standard `transfer` and `transferFrom`. Their burn
 function burns the caller's balance; neither token implements `burnFrom`.
+Both tokens are also pausable and blacklistable:
+
+- token pause makes `transfer`, `transferFrom`, `mint`, and `burn` revert;
+- transfer rejects a blacklisted sender or recipient, and `transferFrom` also
+  rejects a blacklisted spender; and
+- mint rejects a blacklisted receiver.
+
+Therefore an outbound CCIP transfer fails while its source token is paused, and
+an inbound release/mint fails while its destination token is paused or its
+receiver is blacklisted. A failed inbound message requires recovery after the
+blocking condition is removed; the exact CCIP retry/manual-execution behavior
+is included in the question packet for confirmation.
 
 ### Direct-caller requirement
 
@@ -184,13 +207,17 @@ The GREEN mint path is:
 
 1. `GreenToken.mint(recipient, amount)` calls
    `RipeHq.canMintGreen(msg.sender)`.
-2. `RipeHq.canMintGreen(pool)` requires the pool to be a registered department,
-   the registered configuration to enable GREEN minting, and the pool itself to
+2. `RipeHq.canMintGreen(pool)` first requires the global `mintEnabled` circuit
+   breaker to be true.
+3. It then requires a nonzero pool address, a registered department, a
+   registered configuration that enables GREEN minting, and the pool itself to
    return true from `canMintGreen()`.
-3. Only after those checks does the token credit the receiver.
+4. Only after those checks does the token credit the receiver.
 
 RIPE uses the same path through `RipeHq.canMintRipe` and `canMintRipe()`.
 Registration-time validation also calls the configured capability view.
+Governance can change `mintEnabled` immediately through
+`setMintingEnabled(bool)`; that action has no RipeHq timelock.
 
 Consequences:
 
@@ -202,6 +229,8 @@ Consequences:
   other token capability.
 - Each deployed pool must be registered in RipeHq and enabled only for its
   corresponding mint permission before CCIP minting can work.
+- `setMintingEnabled(false)` is a true chain-local stop for all inbound GREEN
+  and RIPE mints governed by that RipeHq. It does not stop outbound burns.
 
 ### Interface comparison
 
@@ -215,6 +244,25 @@ Consequences:
 | `owner()` | Absent | One self-service admin-discovery path | Assisted registration required |
 | `getCCIPAdmin()` | Absent | Another self-service admin-discovery path | Assisted registration required |
 | Ripe capability view | Token does not supply it; department must | Not present in standard pool | Thin custom pool required |
+| Global mint circuit breaker | `RipeHq.setMintingEnabled(false)` immediately makes both mint checks return false | Destination release/mint reverts when token mint reverts | True inbound stop; in-flight recovery behavior must be confirmed and tested |
+| Token pause | Transfer, mint, and burn revert while paused | Source transfer/burn or destination mint can fail | True token-wide stop with broader protocol impact |
+| Token blacklist | Transfer rejects blacklisted parties; mint rejects blacklisted receiver | Destination mint can fail for a particular receiver | Disclose and test failed-message recovery |
+
+Local source anchors at the recorded track start commit:
+
+- `contracts/tokens/GreenToken.vy:61-64` and
+  `contracts/tokens/RipeToken.vy:61-64`: token-to-RipeHq mint checks;
+- `contracts/registries/RipeHq.vy:378-424`: mint authorization and immediate
+  global circuit breaker;
+- `contracts/registries/RipeHq.vy:215-277` and `318-344`: timelocked Hq config
+  plus capability revalidation;
+- `contracts/registries/modules/AddressRegistry.vy:156-198`: timelocked
+  contract-address registration;
+- `contracts/tokens/modules/Erc20Token.vy:187-215`, `291-317`, `404-421`, and
+  `587-592`: transfer, mint/burn, blacklist, and governance pause behavior;
+- `interfaces/Department.vyi:9-45`: Ripe's full Department convention; and
+- `contracts/config/SwitchboardCharlie.vy:490-496`: generic targeted pause
+  action.
 
 As retrieved on 2026-07-23, Chainlink's [token-pool
 documentation](https://docs.chain.link/ccip/concepts/cross-chain-token/evm/token-pools)
@@ -229,9 +277,9 @@ only addition is a Ripe capability view. That is a blocking question.
 As retrieved on 2026-07-23, Chainlink's [registration and administration
 documentation](https://docs.chain.link/ccip/concepts/cross-chain-token/evm/registration-administration)
 says self-service token-admin registration relies on a supported discoverable
-administrator such as `owner()`, `getCCIPAdmin()`, or the documented
-AccessControl path. If the token does not expose a supported administrator,
-Chainlink directs the developer to its assisted/manual registration process.
+administrator exposed through `owner()` or `getCCIPAdmin()`. If the token does
+not expose either function, Chainlink directs the developer to its
+assisted/manual registration process.
 
 | Chain/token state | Publicly supported path | Remaining confirmation |
 | --- | --- | --- |
@@ -243,6 +291,18 @@ Adding a discovery hook only to the future Robinhood deployments would create
 source and bytecode divergence from the immutable Base tokens. No such token
 change is recommended without an explicit decision.
 
+The existing contracts provide an onchain authority chain even though they do
+not provide Chainlink's self-service discovery functions:
+
+1. each token exposes `ripeHq()`;
+2. that address exposes `governance()`; and
+3. the token's `pause(bool)` function accepts only that governance address.
+
+This is candidate proof for assisted registration. If Chainlink requires an
+active proof, Ripe governance can provide an owner-approved signature or
+non-disruptive demonstration transaction in the form Chainlink specifies. No
+such signature or transaction has been produced.
+
 After an administrator is established, public documentation describes these
 separate actions:
 
@@ -252,13 +312,28 @@ separate actions:
 4. token permissions allow the pool to burn and mint; for Ripe, this means
    RipeHq department registration and the single corresponding mint flag.
 
+Ripe's own ordering adds two sequential, block-denominated timelocks:
+
+1. the pool must already be deployed with its capability view callable;
+2. governance starts and later confirms its addition to the RipeHq address
+   registry;
+3. only after the registry assigns a valid ID can governance initiate the
+   matching Hq config; and
+4. governance later confirms that config, at which time RipeHq staticcalls the
+   capability view again and cancels an invalid pending config.
+
+Both waits use `registryChangeTimeLock` measured in `block.number`. Robinhood's
+documented L2 block-number semantics therefore require a chain-specific timing
+test and approved value before pool registration. Chainlink cannot determine
+this Ripe-side schedule.
+
 No action above was performed.
 
 ## Operational controls and limits
 
-The statements below were retrieved from Chainlink's current public
-documentation on 2026-07-23. The relevant primary pages are linked in each
-item.
+The Chainlink-specific statements below were retrieved from its current public
+documentation on 2026-07-23, with the relevant primary page linked in each
+item. Ripe-specific controls come from the local source anchors above.
 
 - [CCIP rate
   limits](https://docs.chain.link/ccip/concepts/rate-limit-management/overview)
@@ -268,15 +343,24 @@ item.
   rate `1` in both directions. It is not a true zero-rate pause, and a minimal
   transfer can still succeed. See [emergency
   actions](https://docs.chain.link/ccip/concepts/rate-limit-management/emergency-actions).
+- Ripe has two stronger but broader controls. Governance can immediately set
+  `RipeHq.mintEnabled` false to stop every inbound mint authorized by that
+  RipeHq, while pausing a token stops its transfers, burns, and mints on that
+  chain. The incident playbook should coordinate these controls with CCIP rate
+  limits and explicitly handle in-flight messages.
 - Pool ownership controls remote-chain updates and can add a replacement remote
   pool. Current contracts support overlapping old and new pools for in-flight
   upgrades; Chainlink recommends testnet validation and coordinated multi-chain
   upgrades. See [token
   pools](https://docs.chain.link/ccip/concepts/cross-chain-token/evm/token-pools).
 - Token-pool execution receives a combined default gas allowance of `90,000`.
-  The custom capability check plus RipeHq authorization must fit within the
-  measured release/mint budget. See [EVM service
-  limits](https://docs.chain.link/ccip/service-limits/evm).
+  It covers the pre-mint `balanceOf` check, `releaseOrMint`, and the post-mint
+  `balanceOf` check. Exceeding it makes destination execution fail; the public
+  guidance recommends optimization, permits a one-off manual gas override, and
+  directs consistently higher requirements to Chainlink. The custom capability
+  check plus RipeHq authorization must fit within a measured budget with margin.
+  See [EVM service limits](https://docs.chain.link/ccip/service-limits/evm) and
+  [manual execution](https://docs.chain.link/ccip/concepts/manual-execution).
 - If automatic execution fails, any externally owned account can manually
   execute after the documented smart-execution window by supplying gas.
   See [manual execution](https://docs.chain.link/ccip/concepts/manual-execution).
@@ -294,6 +378,21 @@ The recommended administrative split is:
 - a narrowly scoped incident multisig as `rateLimitAdmin`;
 - existing Ripe governance for RipeHq registration and mint enablement;
 - no long-lived externally owned account as a production administrator.
+
+The repository's `Department.vyi` convention also declares `isPaused()`,
+`pause(bool)`, and fund-recovery functions. RipeHq registration does not
+runtime-check that full interface; it checks only the enabled mint capability.
+`SwitchboardCharlie.pause(address,bool)` is a generic targeted call, not an
+automatic registry sweep, but targeting a CCIP pool that lacks `pause(bool)`
+would revert. The implementation must explicitly choose between:
+
+- adding a Chainlink-approved pool pause/lifecycle surface and testing how it
+  gates lock/burn and release/mint; or
+- intentionally relying on RipeHq `mintEnabled`, token pause, and CCIP rate
+  limits while documenting that SwitchboardCharlie cannot pause the pool.
+
+This is unresolved because adding lifecycle methods expands the thin custom
+pool beyond a capability-only extension.
 
 The exact supported multisig setup, role-transition sequence, emergency
 playbook, monitoring/SLA options, and commercial terms require confirmation.
@@ -318,6 +417,12 @@ playbook, monitoring/SLA options, and commercial terms require confirmation.
 8. Are there onboarding fees, liquidity or volume requirements, recurring
    costs, support commitments, SLAs, security review requirements, or external
    terms beyond the public per-message billing model?
+9. Should the pool implement Ripe's Department pause/recovery surface, or should
+   pool emergencies rely on standard CCIP controls plus Ripe's token and global
+   mint circuit breakers?
+10. When token pause, receiver blacklist, or `mintEnabled == false` causes
+    destination minting to revert, what is the precise message state and
+    supported retry/manual-execution procedure after re-enable?
 
 These questions are formatted for external review in
 `ccip-chainlink-question-packet.md`. That packet has not been sent.
