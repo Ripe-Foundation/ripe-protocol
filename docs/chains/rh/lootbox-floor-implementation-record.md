@@ -685,6 +685,13 @@ CLOCK_INVENTORY_NONPROD mock=0/0/0 testing=0/0/0 test=31/29/5
 CLOCK_INVENTORY_NONPROD_CADENCE mock=0 testing=0 test=159
 ```
 
+The nonproduction direct summary moves from the untouched baseline's
+`test=27/25/4` to `test=31/29/5` because the S3 boundary tests add four literal
+`block.number` references, on four lines in one previously unaffected test
+file, inside `observed_by` diagnostic strings. The fixed-string nonproduction
+scan intentionally counts those strings. They are test diagnostics, not new
+production clock reads; the production baseline remains exactly `100/95/17`.
+
 The three structurally expected Stage 1 inventory failures are green after
 reconciliation. The inventory suite grows from 56 to 60 tests through the
 exact-match check plus the three deletion/rename/move cases. The full suite
@@ -716,14 +723,24 @@ Both immutable history trees remain byte-identical. Their tree IDs are:
 files, dependencies, CI, unrelated ABIs, and `docs/chains/rh-summary.md`
 remain unchanged.
 
-During final validation, local `rh` advanced from the starting commit to
+The freshness figures below are explicitly the snapshot at inventory
+reconciliation commit `51e5c5a`, before the Gate 2 evidence record commit was
+created. At that snapshot, local `rh` had advanced from the starting commit to
 `127b4bf287bf63c5ed662d82fbf3db8bf66d06a3`, adding two documentation-only
 commits in Track 7 H1 and Track 6 S4 files. Those commits do not overlap any S3
 owned file. The merge base remains `f0bfd0f`; local `rh` is two commits ahead
 on its side and this branch is seven commits ahead on its side. A read-only
 synthetic merge succeeds with tree
-`6583ffe555a2a5336db634cd82cf632e57030ee6`. The branch was not rebased,
-merged, or pushed and has no upstream.
+`6583ffe555a2a5336db634cd82cf632e57030ee6`.
+
+At Gate 2 evidence commit `22ece8f`, the branch-side count became eight and a
+second read-only synthetic merge succeeded with tree
+`f8db22016800e40194e0275b343d4e2d799aee0f`. A later record-only review
+clarification can change the branch-side count again without changing the
+reviewed implementation or inventory. The merge owner must therefore rerun
+ahead/behind, overlap, and synthetic-merge checks against then-current `rh`
+immediately before merging. The branch was not rebased, merged, or pushed and
+has no upstream.
 
 ## Proposed Base forward rollout — not authorized or executed
 
