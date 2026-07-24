@@ -545,9 +545,10 @@ mechanisms remain gated.
 
 No test in this section exists yet. The policy outcomes are owner-confirmed;
 the all-external-versus-per-asset enforcement mechanism and the proposed
-CreditEngine/Ledger selectors remain unapproved. Common tests below are
-mandatory under either settlement mechanism. Branch-specific tests become
-mandatory only if the owner later selects that mechanism.
+CreditEngine/Ledger selectors and transition caller policy remain unapproved.
+Common tests below are mandatory under either settlement mechanism. Branch-
+specific tests become mandatory only if the owner later selects that
+mechanism/caller policy.
 
 ### 8.1 Current-behavior and mechanism boundary
 
@@ -662,6 +663,10 @@ no liability is simultaneously user debt and newly added bad debt
 | `test_department_pause_blocks_total_loss_transition` | CreditEngine or Ledger pause causes atomic failure |
 | `test_unpause_retries_same_eligible_transition` | No stale marker/state blocks progress after resume |
 | `test_repayment_remains_available_before_transition` | Existing repay control succeeds while deposit/borrow/auction are frozen |
+| `test_permissionless_caller_has_no_resolution_discretion` | If permissionless calling is selected, caller cannot choose eligibility, `X`, recipient, allocation, bad-debt destination, or any value-sensitive input |
+| `test_repayment_and_permissionless_resolution_race_is_accounting_safe` | Both mined orders conserve liability; security evidence separately assesses whether keeper timing/griefing is acceptable |
+| `test_restricted_caller_option_rejects_unapproved_sender` | If a restricted caller is selected, every unapproved caller fails without state change and the approved role remains live |
+| `test_phase_h_resolution_pause_matrix_matches_approved_control` | Final Phase H tests cover the selected pause/resume authority, timing, caller interaction, events, and repayment-while-paused behavior |
 | `test_transition_event_reconstructs_liability_move` | User, stored debt, `Y`, `X`, `BD_0`, `BD_1`, caller, and canceled-auction count are reconstructible |
 | `test_settlement_event_reconstructs_q_w_r_e_and_payment` | Requested, vault-debited, recipient-received, chargeable, GREEN, debt, route, and recipient values reconcile |
 | `test_repay_event_not_emitted_for_bad_debt_transition` | A write-off is not mislabeled as repayment |
@@ -678,14 +683,17 @@ A future Phase F implementation is not acceptable unless:
 3. the owner separately approves one settlement enforcement mechanism;
 4. accounting/security separately approve the exact atomic interface and
    source-consistent accrued-interest/yield-booking treatment;
-5. no nominal partial-loss or recovery allocation is inferred;
-6. exact source/interface/storage/ABI diffs match the later Phase I table;
-7. the implementation is included in the atomic containment/release grouping;
-8. Base and exact-token fork evidence is attached; and
-9. reviewer, security, and owner gates are recorded.
+5. the owner/security review separately approves the total-loss transition
+   caller policy after repayment-race and griefing analysis;
+6. Phase H explicitly closes the resolution pause/resume control model;
+7. no nominal partial-loss or recovery allocation is inferred;
+8. exact source/interface/storage/ABI diffs match the later Phase I table;
+9. the implementation is included in the atomic containment/release grouping;
+10. Base and exact-token fork evidence is attached; and
+11. reviewer, security, and owner gates are recorded.
 
-This validation contract does not approve either mechanism, any new selector or
-storage field, implementation, Phase G, or launch.
+This validation contract does not approve any mechanism or caller policy, any
+new selector or storage field, implementation, Phase G, or launch.
 
 ## 9. Exact-token fork plan
 
@@ -815,7 +823,9 @@ implementation/release gates remain blocked on the following decisions at
 their recorded boundaries:
 
 - all-external versus per-asset settlement enforcement mechanism;
-- exact CreditEngine/Ledger transition interfaces and caller policy;
+- exact CreditEngine/Ledger transition interfaces;
+- permissionless versus restricted/governed total-loss caller policy;
+- Phase H resolution pause/resume authority, timing, and caller interaction;
 - post-zero/restoration/loss-allocation policy;
 - reward-unit decision;
 - Base live-version/migration posture;

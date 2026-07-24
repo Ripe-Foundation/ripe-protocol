@@ -11,7 +11,7 @@ formal state and invariant model, architecture comparison, mandatory early
 owner checkpoint, exact deposit-accounting design, and backing/debt-health
 design, plus the settlement/liquidation/total-loss design. It does not select a
 production vault, approve a partial-loss or recovery allocation, authorize a
-Base migration, approve either newly identified implementation mechanism, or
+Base migration, approve any newly identified implementation mechanism, or
 authorize implementation.
 
 The owner-confirmed instruction selects option 4 as the architecture direction
@@ -1382,8 +1382,8 @@ The product/architecture direction required for Phase D, the existing-controls
 direction required for Phase E, and the two policy directions required for
 Phase F are owner-confirmed as satisfied for specification work. The remaining
 five original decisions gate the later phases shown below. The Phase F source
-trace also creates two narrower implementation-mechanism decisions; neither is
-implied by the policy approval.
+trace also creates three narrower implementation-mechanism/caller decisions;
+none is implied by the policy approval.
 
 | Decision | Options | Evidence and recommendation | Owner | Affected components | Prerequisite / milestone | Status |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -1397,13 +1397,15 @@ implied by the policy approval.
 | Base live-version posture | Migrate before RH / bounded temporary drift / justified permanent exception | Funded ID 3 and live controlled assets make this material; recommend Release 1 Base migration subject to plan | Protocol owner + security/operations | Base vault consumers, VaultBook, manifests | Before Phase I/release | Requested at checkpoint; gates Phase I/release |
 | Release 1 Base priority | Hardening requirement / RH prerequisite only / no release | Recommend urgent Base hardening | Protocol owner + security | Containment atomic group | Before implementation track | Requested at checkpoint; gates implementation split |
 
-New Phase F implementation-mechanism decisions, returned because no current
-field or selector safely expresses the approved policies:
+New Phase F implementation-mechanism/caller decisions, returned because no
+current field or selector safely expresses the approved policies and the
+transition caller's timing authority requires separate security review:
 
 | Decision | Options | Recommendation | Required before | Status |
 | --- | --- | --- | --- | --- |
 | External-settlement enforcement | Disable buyer-selected internal settlement for all fungible auctions / add a generic per-asset settlement mode if bounded internal settlement must survive for other assets | Prefer the all-external simplification if product compatibility permits; otherwise approve the narrowly named per-asset mode after Phase I impact review | Any Phase F implementation design | **Returned; no new field, getter, setter, default, migration, or ABI selected** |
-| Atomic bad-debt mechanism | Approve the two-selector CreditEngine→Ledger transition in Section 16.8 / approve another reviewed atomic shared-contract design / do not list | Approve the no-new-storage, compare-and-set two-selector design after accounting/security review | Any Phase F implementation design | **Returned; interfaces and implementation not approved** |
+| Atomic bad-debt mechanism | Approve the two-selector CreditEngine→Ledger transition in Section 16.10 / approve another reviewed atomic shared-contract design / do not list | Approve the no-new-storage, compare-and-set two-selector design after accounting/security review | Any Phase F implementation design | **Returned; interfaces and implementation not approved** |
+| Total-loss transition caller | Permissionless/keeper-callable under deterministic predicates / restricted approved keeper or Department / governed per-transition action | Review repayment-race timing and griefing explicitly; prefer permissionless only if the final predicates leave no caller discretion over eligibility, amount, recipient, or timing-sensitive value | Any Phase F implementation design | **Returned; caller policy not approved** |
 
 ### 12.3 Decisions explicitly deferred but registered
 
@@ -1415,7 +1417,7 @@ These must not be treated as approved by the checkpoint recommendation:
 | Requested/received/excess semantics | Validated transfer attempt `Q`; received/credited `R`; zero, negative, or excess delta reverts; see Section 14 | Phase D completion | **Specified; implementation not approved** |
 | Nominal partial loss | Freeze unresolved or owner-approved allocation; never silent pro rata | Phase E/F | Deferred |
 | Rounding | Offset, directions, minimum, dust bound | Phase G | Deferred |
-| Emergency disable/re-enable | Existing fast per-asset disable and governance-only re-enable are specified in Phase E; final runbook/timing remains Phase H | Phase H | Partially specified; no live action approved |
+| Emergency disable/re-enable | Existing fast per-asset disable and governance-only re-enable are specified in Phase E. Phase F provisionally relies on existing Department pauses for total-loss resolution. Phase H must explicitly decide whether those pauses are sufficient or a dedicated resolution pause is needed, define pause/resume authority and timing, coordinate it with the selected transition caller, and preserve repayment liveness. | Phase H | Partially specified; Phase H closure is mandatory and no live action is approved |
 | Vault selection | No production vault selected | Phase I owner gate | Deferred |
 | Migration atomicity/rollback | Explicit live users/funds/debt/auctions plan | Phase I | Pending Track 7 |
 | Exact-token evidence | Pinned AAPL fork plus behavior-switch/loss tests | Phase J | Pending implementation |
@@ -2543,16 +2545,32 @@ new selectors:
 
 1. `CreditEngine.resolveUserTotalLoss(user, ...) -> transitionedAmount`
    performs the complete Section 16.8 scan, accrues `Y`, pins the Ledger debt
-   snapshot, and invokes the Ledger transition. The recommended caller policy
-   is permissionless/keeper-callable behind exact predicates and the existing
-   Department pause, so no new governance queue is needed merely to make a
-   deterministic unsafe account progress.
+   snapshot, and invokes the Ledger transition. Its caller policy is a separate
+   returned decision rather than part of the selected interface.
 2. `Ledger.moveUserDebtToBadDebt(user, expectedStoredAmount,
    expectedLastTimestamp, finalDebtAmount, accruedInterest)` is CreditEngine-
    only. It asserts the expected stored snapshot, `finalDebtAmount =
    expectedStoredAmount + accruedInterest`, positive debt, and the required
    liquidation state; then performs every state change in Section 16.9 and
    returns `X`.
+
+The caller-policy options are:
+
+1. permissionless/keeper-callable behind exact predicates and existing
+   Department pauses;
+2. restricted to an approved keeper, Department, or Switchboard role; or
+3. a governed action for each transition.
+
+Permissionless progress avoids a governance queue for a deterministic unsafe
+account, but it also lets an unrelated keeper choose transaction ordering
+against a borrower's intended repayment. Compare-and-set makes either mined
+order accounting-safe; it does not by itself decide whether that timing power
+is an acceptable product/security property. Before selection, security review
+must prove that the caller cannot choose the amount, recipient, collateral
+allocation, bad-debt destination, or any value-sensitive eligibility input;
+model public-mempool and same-block repayment races; and compare the liveness,
+griefing, and operational risk of all three options. The owner must approve the
+caller policy separately.
 
 This proposal adds no new storage slot, no asset parameter, no insurer, and no
 recovery asset. It does add one CreditEngine ABI selector, one Ledger ABI
@@ -2578,10 +2596,10 @@ audited global reconciliation tool. It must not be used for individual
 transitions, and future Phase I review must ensure an overwrite cannot
 accidentally erase bad debt accumulated by atomic transitions.
 
-The two selectors, caller policy, and event/ABI changes are an exact proposal,
-not an approval. They are returned to the owner for accounting/security review
-before any implementation design. If rejected, the fallback remains: do not
-list.
+The two selectors and event/ABI changes are an exact proposal, not an
+approval. The caller policy is an explicit unresolved sub-decision. All are
+returned to the owner for accounting/security review before any implementation
+design. If rejected, the fallback remains: do not list.
 
 ### 16.11 Controls, liveness, and evidence
 
@@ -2599,6 +2617,15 @@ price. Once unpaused, a still-eligible account can be retried from current
 state. Ordinary repayment stays available whenever Teller, CreditEngine,
 Ledger, and the existing repay control are active, even if asset deposit,
 borrow, liquidation, or auction buying is disabled.
+
+This Phase F control treatment is provisional, not the final operational
+design. Phase H must explicitly close whether the existing Department pauses
+are sufficient or whether total-loss resolution needs a dedicated pause. It
+must name pause and resume authorities, define fast-stop versus stronger
+restart timing, specify interaction with the selected transition caller,
+preserve repayment while resolution is paused, and add the corresponding
+event/runbook/test evidence. Phase H may not inherit “Department pause is
+enough” merely because Phase F used it as the minimum current-source control.
 
 Operational evidence must distinguish:
 
@@ -2639,20 +2666,23 @@ Section 8. A future implementation must prove:
 11. newly accrued `Y` is included in `X`, added to `unrealizedYield` exactly
     once under current accrual semantics, and not minted during transition;
 12. repayment/auction/transition race orders conserve liability and custody;
-13. existing Department pauses stop and resume resolution; and
+13. existing Department pauses stop and resume resolution under the
+    provisional Phase F model, with the final control design explicitly closed
+    in Phase H; and
 14. no new storage, interface, ABI, default, migration, or production behavior
     is treated as approved by this document.
 
-Phase F does not select either returned mechanism. The work stops here for the
-owner-requested pause. Phase G and all implementation/interface/storage work
-remain unauthorized.
+Phase F does not select any returned mechanism or caller/control sub-decision.
+The work stops here for the owner-requested pause. Phase G and all
+implementation/interface/storage work remain unauthorized.
 
 ## 17. Phases G–K hold
 
 The following are deliberately **not finalized**:
 
 - corrected permanent share formulas and post-zero allocation;
-- remaining control roles and clock behavior;
+- remaining control roles and clock behavior, including Phase H's explicit
+  total-loss pause/resume and caller-coordination decision;
 - exact source/storage/interface/migration impact table;
 - final Phase J validation plan;
 - implementation PR split and atomic deployable groups; and
