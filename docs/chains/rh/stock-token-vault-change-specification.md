@@ -479,9 +479,9 @@ git -C /Users/wigglez/dev/ripe-protocol diff --name-status \
 ```
 
 Phase H also required reconciliation edits in previously approved Sections
-11–17 and the corresponding earlier validation-plan surfaces. Phase H handoff
-commit `1e414983946633c5f58e15c9bfb464aa84d067b5` did not enumerate that
-reach-back clearly enough. For an explicit audit trail, those edits were:
+11–13 and 15–17 and the corresponding earlier validation-plan surfaces. Phase
+H handoff commit `1e414983946633c5f58e15c9bfb464aa84d067b5` did not enumerate
+that reach-back clearly enough. For an explicit audit trail, those edits were:
 
 | Earlier surface | Phase H reconciliation |
 | --- | --- |
