@@ -1,8 +1,8 @@
 # Stock Token Vault-Change Validation Plan
 
-Status: **Phases D–I behavior, compatibility, artifact, and migration test
-contracts specified under owner-confirmed instructions; owner-returned Phase I
-mechanisms remain open — not a finalized Phase J plan**
+Status: **Phase J validation specification complete under the owner-confirmed
+validation-only directions; Phase I mechanisms remain unimplemented and
+production-unselected; Phase K not started**
 
 Date: 2026-07-24 (America/Denver)
 
@@ -41,11 +41,20 @@ getter, ABI, artifact/runtime rules, and still-open Base rollout window. It
 does not import that commit into the Track 8 worktree, claim S3 is deployed,
 or treat S3's Underscore send floor as the separate Track 8 loss interval.
 
-The Phase D–I test contracts are now specific enough for later mechanism
-selection and implementation planning. The full Phase J plan cannot be
-finalized until the owner resolves the returned decisions in specification
-Sections 12 and 19.9.
-Specification Sections 3.8 and 3.10 enumerate the Phase H and Phase I
+On 2026-07-24 the owner authorized Phase J specification work only. The
+instruction makes all-external fungible settlement the preferred validation
+branch subject to complete integration and historical-use evidence; uses an
+isolated generic corrected-share variant and `A^s/U^s` as validation targets;
+models the two-selector transition without approving the Ledger migration;
+preserves S3 independently if Track 8 would delay it; requires Base-first or
+atomic convergence; and classifies any empty gated deployment as inactive
+staging rather than launch. It expressly does not select a production vault
+or ID, authorize implementation or migration, or begin Phase K.
+
+The Phase D–I test contracts and the Phase J record/coverage model now form
+the complete future validation specification. Preferred branches remain
+conditional and all production mechanisms remain unapproved. Specification
+Sections 3.8, 3.10, and 3.12 enumerate the Phase H, Phase I, and Phase J
 reconciliation edits made to previously approved specification and
 validation-plan surfaces, including gate updates and section renumbering.
 
@@ -105,6 +114,7 @@ against the owner-approved shared implementation.
 | `tests/data/test_ledger_state_migration.py` | Full Ledger state migration | `CM-008`, `CM-030`, all Ledger readers/writers | Proposed; mandatory if the returned two-selector design is approved |
 | `tests/registries/test_vault_book_migration.py` | Vault migration/registry | `CM-021`, vaults, Ledger, manifests | Proposed; Phase I sequence specified, exact IDs/tooling pending Track 7 |
 | `tests/probes/test_stock_token_artifact_parity.py` | Artifact/live-version evidence | all changed shared components | Proposed; creation/runtime/registry/manifest parity, no deployment authorized |
+| `tests/probes/test_fungible_settlement_usage.py` | Read-only integration/history evidence | `CM-026`, `CM-034`, every deployed Teller/AuctionHouse generation | Proposed; required before the preferred all-external branch can become implementation-eligible |
 | `tests/probes/test_stock_token_vault_evidence.py` | Read-only operational evidence | all control/accounting readers | Proposed; Phase H schema/absence/first-observation semantics specified, no probe created |
 | `tests/vaults/test_stock_token_vault_lifecycle.py` | Full lifecycle | all primary IDs | Proposed; production direction required |
 | `tests/probes/test_aapl_vault_behavior_fork.py` | Exact-token fork | Track 2 AAPL + selected shared path | Proposed; no broadcast |
@@ -584,12 +594,15 @@ mechanisms remain gated.
 
 ## 8. Phase F settlement and total-loss validation contract
 
-No test in this section exists yet. The policy outcomes are owner-confirmed;
-the all-external-versus-per-asset enforcement mechanism and the proposed
-CreditEngine/Ledger selectors and transition caller policy remain unapproved.
-Common tests below are mandatory under either settlement mechanism. Branch-
-specific tests become mandatory only if the owner later selects that
-mechanism/caller policy.
+No test in this section exists yet. The policy outcomes are owner-confirmed.
+Phase J uses all-external as the preferred validation branch, conditional on
+complete integration and historical-use evidence; it does not approve that
+behavior change. The per-asset branch remains an unselected comparison/fallback.
+The proposed CreditEngine/Ledger selectors and transition caller policy also
+remain unapproved. Common tests below are mandatory under either settlement
+mechanism. Branch-specific all-external evidence is active for Phase J
+planning; no branch becomes production-eligible until its prerequisite owner,
+product, security, and migration decisions close.
 
 ### 8.1 Current-behavior and mechanism boundary
 
@@ -598,9 +611,9 @@ mechanism/caller policy.
 | `test_current_internal_auction_reproduces_nominal_only_delivery` | Pinned current Simple path after total issuer burn, buyer selects internal | Preserve the Track 5 regression: nominal buyer balance moves and GREEN/debt commit without token delivery |
 | `test_current_external_auction_delivery_precedes_payment` | Pinned ordinary external purchase | Token transfer occurs before GREEN transfer and debt reduction |
 | `test_no_existing_asset_config_field_means_external_settlement` | Inspect compiled/source `AssetConfig`, `AuctionBuyConfig`, and getters | No existing field is mislabeled or overloaded as the new policy |
-| `test_all_external_option_rejects_internal_for_every_fungible_asset` | Only if the all-external mechanism is owner-selected | Every `_shouldTransferBalance = true` auction request fails/skips without payment; external mode remains functional |
+| `test_all_external_option_rejects_internal_for_every_fungible_asset` | Preferred Phase J branch after the Section 11.3 usage-evidence gate | Every `_shouldTransferBalance = true` auction request fails/skips without payment; external mode remains functional |
 | `test_per_asset_mode_option_is_generic_and_default_safe` | Only if the per-asset mechanism is owner-selected | No token/name/vault/chain branch; issuer fixture is external-required; every migrated existing asset has an explicit reviewed value |
-| `test_unselected_mechanism_has_no_schema_or_abi_delta` | Compare approved implementation against the selected option | No field/selector/default/migration from the rejected option appears |
+| `test_unselected_mechanism_has_no_schema_or_abi_delta` | Compare a future approved implementation against the selected option | No field/selector/default/migration from the rejected option appears |
 
 The first current-behavior test must remain pinned and passing against the
 unsafe baseline. The corresponding future behavior test must fail against that
@@ -883,6 +896,9 @@ not an acceptable generic migration shortcut.
 | `test_price_failure_does_not_change_A_or_backing` | Reward USD may be zero/unavailable, but custody/allocation safety remains visible |
 | `test_ripe_gov_lock_points_keep_separate_semantics` | Vault ID 2 governance points are not interpreted as token live claims |
 | `test_existing_positive_rebase_mode_is_not_silently_quarantined` | Any retained yield/rebase behavior is an explicit generic mode/variant with separate tests and approval |
+| `test_zero_asset_reward_allocations_do_not_prove_stock_rewards_disabled` | Zero staker/voter allocations can enter the current general-depositor value path; they are not accepted as a Stock-specific reward-off switch |
+| `test_stock_deposits_remain_disabled_until_loss_reward_gate_closes` | Before the Track 8 loss interval/index/callback is approved, the Stock asset remains omitted or `canDeposit=false`; no live claim can begin accruing stale reward weight |
+| `test_inactive_staging_has_zero_stock_reward_state` | Empty gated staging has no Stock users, points, claims, eligible USD value, or reward events and is not reported as launch-ready |
 
 Integrated S3 tests remain mandatory and unchanged for
 `MIN_UNDERSCORE_SEND_INTERVAL`, the five-argument constructor, getter, strict
@@ -1205,9 +1221,11 @@ vault.
 | `test_track8_lootbox_preserves_integrated_s3_abi_and_boundary` | Candidate keeps S3's five-argument constructor order, immutable floor, getter, strict send condition, and approved Base/Robinhood floor profiles byte-for-byte unless a separately reviewed S3 reopening approves a delta. |
 | `test_s3_send_floor_is_not_treated_as_loss_interval` | The existing S3 getter/floor cannot make untouched users adopt a changed vault claim; Track 8 loss-interval tests stay skipped until their own mechanism is approved. |
 
-### 11.3 Settlement-mechanism alternatives
+### 11.3 Settlement-mechanism alternatives and usage evidence
 
-These are branch tests; neither branch is implementation-approved.
+These are branch tests. All-external is the owner-directed preferred Phase J
+validation path, not an approved behavior change; the per-asset mode is an
+unselected fallback comparison.
 
 | Test | All-external candidate | Per-asset-mode candidate |
 | --- | --- | --- |
@@ -1218,9 +1236,54 @@ These are branch tests; neither branch is implementation-approved.
 | `test_no_current_product_depends_on_internal_auction_settlement` | Inventory/fork every current asset and historical relevant event; product owner evidence required before branch approval | Existing internal consumers are identified and explicitly configured |
 | `test_external_delivery_is_measured_for_every_asset` | Required | Required for every external-mode asset |
 
-The recommended all-external branch cannot pass on code reasoning alone; it
-requires product/runtime evidence that current internal auction settlement is
-unused or intentionally removable.
+The preferred all-external branch cannot pass on code reasoning or default
+arguments alone. The proposed
+`tests/probes/test_fungible_settlement_usage.py` evidence job must:
+
+1. enumerate every chain/environment in which the shared fungible
+   Teller/AuctionHouse path has been production-reachable, every registry
+   address generation, activation/retirement block, selector, and runtime
+   hash;
+2. inventory every repository, frontend, SDK, keeper, bot, and operational
+   integration identified by product/operations, pinning its revision and
+   searching both named and encoded calls for `buyFungibleAuction`,
+   `buyManyFungibleAuctions`, and `_shouldTransferBalance=true`;
+3. scan the complete activation-block-to-pinned-tip transaction range for
+   calls to every Teller generation, decode both fungible purchase selectors,
+   and record the boolean argument for successful and reverted transactions;
+4. correlate decoded calls with AuctionHouse purchase events, token transfers,
+   vault nominal/share changes, and internal `transferBalanceWithinVault`
+   effects so an indexer omission cannot be mistaken for external-only use;
+5. record RPC/indexer providers, chain IDs, block hashes/ranges, archive
+   capability, pagination, rate limits, failed ranges, duplicate handling,
+   raw transaction hashes/calldata, decoder/source/ABI hashes, and a coverage
+   root;
+6. fail closed on any unscanned block range, unknown historical runtime,
+   undecodable relevant calldata, incomplete offchain integration inventory,
+   or disagreement between providers; and
+7. require product plus protocol/security sign-off that every discovered
+   internal-mode dependency is absent or intentionally removable.
+
+Named assertions:
+
+- `test_every_teller_generation_has_complete_history_coverage`;
+- `test_fungible_purchase_calldata_decodes_settlement_boolean`;
+- `test_true_internal_mode_call_is_reported_with_transaction_evidence`;
+- `test_history_gap_or_unknown_runtime_blocks_all_external_approval`;
+- `test_offchain_integration_inventory_is_revision_pinned`;
+- `test_default_false_is_not_usage_evidence`; and
+- `test_no_current_product_depends_on_internal_auction_settlement`.
+
+Zero matching `true` calls is meaningful only when all seven conditions pass.
+Any `true` call does not automatically select the per-asset mode, but it
+returns the behavior/removal decision to product, protocol, and security
+before implementation.
+
+Acquisition is a separately authorized read-only RPC/indexer operation. The
+pytest surface consumes a sanitized, content-hashed evidence artifact and
+replays decoding/coverage checks offline; it contains no private key, signer,
+transaction builder, or broadcast method. Phase J neither performs the scan
+nor creates that artifact.
 
 ### 11.4 Corrected-variant compatibility and migration import
 
@@ -1233,12 +1296,15 @@ unused or intentionally removable.
 | `test_migration_import_sets_proven_allocated_and_quarantine_buckets` | Seeding requires a pinned entitlement/custody proof; it never defaults `A^s=C`. |
 | `test_migration_import_is_paused_authorized_idempotent_and_sealed` | Unauthorized/duplicate/post-finalize imports fail; finalization is irreversible and leaves no standing migration mint power. |
 | `test_ordinary_deposit_replay_is_not_accepted_as_state_migration` | Reordered deposits/rounding/donation setup demonstrates non-equivalence and the rehearsal rejects it. |
-| `test_empty_robinhood_launch_needs_no_user_import_but_still_needs_artifact_gate` | Fresh empty state has zero users/shares/buckets; no claim is made about Base migration. |
+| `test_empty_robinhood_inactive_staging_needs_no_user_import` | Fresh empty state has zero users/shares/buckets and needs no user import; it remains unreachable/disabled and makes no claim about Base migration or production eligibility. |
+| `test_empty_gated_state_is_not_launch_evidence` | Empty custody plus disabled deposit/borrow/auction/reward paths can prove artifact/config staging only; launch/listing/selected-vault gates remain failed. |
+| `test_inactive_staging_can_be_abandoned_without_registry_or_user_state` | Before any activation, seed, custody, or economic write, abandoning the candidate leaves all live registries, users, custody, debt, auctions, and rewards unchanged. |
 
 ### 11.5 Ledger full-state migration
 
-If the two-selector option is selected, migrate and reconcile every current
-Ledger domain. Named assertions:
+Phase J models the two-selector transition for atomicity but does not authorize
+its interfaces or Ledger migration. If that option is later selected, every
+current Ledger domain must migrate and reconcile. Named assertions:
 
 - `test_ledger_migration_preserves_last_touch_and_locked_accounts`;
 - `test_ledger_migration_preserves_user_vault_indexes_bidirectionally`;
@@ -1256,6 +1322,9 @@ Ledger domain. Named assertions:
 
 No partial domain migration may pass. The fixture must populate every mapping
 class, not only debt/bad debt.
+`test_two_selector_runtime_cannot_activate_without_full_ledger_migration`
+must fail any plan that treats interface approval, a manifest address, or an
+empty fresh Ledger as sufficient activation evidence.
 
 ### 11.6 Vault migration state machine
 
@@ -1300,10 +1369,13 @@ Required named tests:
 | `test_track_8_does_not_invent_or_reuse_track_7_ids` | Every Track 8 RH migration ID/namespace remains `pending Track 7`; S3's recorded `0010_Track6S3LootboxFloor.py` meaning is recognized as S3-owned and cannot be reused for Track 8. Duplicate/ad-hoc values fail. |
 | `test_base_and_robinhood_shared_artifact_and_immutable_runtime_derivation` | Source/compiler/constructor schema/creation artifact match; each runtime hash is reproduced from approved chain constructor args, including S3 RipeHq/floor immutables. Any other difference is version skew with expiry/abort evidence. |
 | `test_s3_source_live_skew_and_pending_window_are_explicit` | Integrated S3 source/ABI and the dated old Base Lootbox runtime are reported separately; no Track 8 record claims S3 deployment or resolves its open distribution window. |
-| `test_track8_lootbox_delta_reopens_or_sequences_after_s3_review` | A combined source delta fails unless S3 review is explicitly reopened; a later separate cutover includes two migration/window/rollback records rather than treating the first as reusable state. |
+| `test_track8_lootbox_delta_reopens_or_sequences_after_s3_review` | A combined source delta fails unless it is ready without delaying S3 and S3 review is explicitly reopened; otherwise S3 proceeds independently and a later Track 8 cutover includes its own migration/window/rollback record. |
+| `test_track8_cannot_delay_required_s3_safety_rollout` | If Track 8 loss-weighting design, economics, audit, or migration gates are still open at the S3 release decision, the combined branch fails and the independent S3 branch remains available. |
 | `test_base_release_one_can_retain_reconciled_simple_storage` | ID-3 custody need not move when live nominal state is fully backed/reconciled and remains disabled for Stock listing, but every Teller exact-receipt caller and its local/Ledger/vault state satisfies the reviewed cutover plan. |
 | `test_teller_and_affected_consumers_never_run_mixed_while_value_paths_are_live` | Any staggered registry update keeps affected deposits, claims, payouts, stakes, redemptions, and deleverage routes contained until Teller and every measured/exact consumer are compatible; repayment remains available throughout. |
 | `test_release_two_requires_custody_bearing_vault_migration` | Corrected share adoption cannot be represented by a core-only registry change. |
+| `test_robinhood_enablement_requires_base_first_or_atomic_convergence` | RH deposit/borrow/auction/reward enablement fails unless Base already runs the approved shared safety semantics or the reviewed atomic cutover proves both chains converge without a live unsafe value path. |
+| `test_inactive_preconvergence_staging_is_unreachable_and_time_bounded` | If an artifact is staged before convergence, no registry/config/value path can reach it, all Stock features remain disabled, an expiry/abort owner is recorded, and the state is never labeled deployment completion or launch. |
 | `test_post_deploy_bundle_reconciles_all_roots_and_controls` | Code, registry, immutable/constructor posture, pause, core-local config/cooldown timing, custody, claims, buckets, debt, auctions, rewards, flags, and pending actions match the reviewed bundle before enablement. |
 | `test_failed_post_deploy_assertion_keeps_asset_disabled` | No probe auto-repairs or re-enables state. |
 
@@ -1317,7 +1389,7 @@ Required named tests:
 | `test_rollback_never_erases_new_bad_debt_or_rewards` | Reverse reconciliation includes every post-cutover write exactly once. |
 | `test_security_review_boundaries_match_source_impact_table` | Teller delta/mutex, Credit backing, Auction delivery, Ledger transition/migration, share math/storage/import, rewards/S3, registry/config, and exact-token behavior each have named reviewers and artifacts. |
 
-### 11.9 Phase I acceptance and owner stop
+### 11.9 Phase I acceptance and historical owner stop
 
 Phase I validation specification is acceptable when:
 
@@ -1338,11 +1410,11 @@ Phase I validation specification is acceptable when:
    separate interval/index or checkpoint authority and S3 rollout sequencing;
 8. Track 7 owns exact IDs/manifests/tooling and no identifier is improvised;
 9. Base/RH artifact parity and post-state reconciliation fail closed; and
-10. work stops before Phase J.
+10. work stopped before Phase J at the historical Phase I handoff.
 
-Owner decisions still required are listed in specification Section 19.9. No
-test implementation, new selector, storage, production vault, migration, or
-Phase J is passed by this validation contract.
+The later Phase J authorization selects validation targets only; it does not
+retroactively approve a test implementation, new selector, storage,
+production vault, or migration.
 
 ## 12. Exact-token fork plan
 
@@ -1374,7 +1446,11 @@ Required fork cases after an implementation exists:
 7. implementation behavior switch;
 8. external-only auction delivery;
 9. total-loss repayment and exactly-once resolution; and
-10. post-zero freeze/restoration policy.
+10. post-zero freeze/restoration policy;
+11. loss-aware reward weighting with no raw-share or quarantine attribution;
+12. proxy/beacon/implementation identity before every behavior-sensitive
+    phase and fail-closed behavior on an unapproved implementation switch; and
+13. inactive staged configuration remains disabled and cannot satisfy launch.
 
 No live signing or broadcast is part of this plan. Live sender/recipient
 eligibility, acquisition, gas, approvals, and legal permission remain separate
@@ -1385,7 +1461,7 @@ owner/counsel gates.
 The narrow S1/S2 kickoff choices were owner-approved in post-bootstrap
 integration commit `ce3805d6079ee87d727486ea82b75cbddc12e46d`. Their implementation
 and checked inventory are now available on integrated `rh`; Track 8 has not
-imported them and Phase J remains unauthorized. Once Phase J is authorized:
+imported them. Phase J consumes their reviewed interfaces as future gates:
 
 - run the same reviewed source/compiler/creation artifact under Base and
   Robinhood profiles and reproduce approved immutable-derived runtime
@@ -1398,6 +1474,22 @@ imported them and Phase J remains unauthorized. Once Phase J is authorized:
 - record source hash, creation/runtime hash, constructor/config differences,
   and approved live-version exceptions.
 
+The integrated command contract is:
+
+```text
+pytest -q tests/clock/test_clock_profiles.py
+python scripts/check_block_clock_inventory.py
+pytest -q tests/inventory/test_block_clock_inventory.py
+pytest -q
+```
+
+Track 8-specific future tests use the integrated `clock_controller` and
+`deployed_system(clock_profile, parameter_profile)` fixtures rather than
+copying or approximating repeated `NUMBER`. Every applicable state-machine
+case runs ordinary Base, Robinhood `+1`, repeated-number, ordinary-jump, and
+stress-jump profiles. A fixture/runtime/version mismatch is a stop, not a
+reason to silently replace the integrated harness.
+
 Clock behavior must not change custody conservation. Repeated or jumping numbers
 may delay a timelock or auction but cannot permit payment for undelivered
 collateral or duplicate bad debt.
@@ -1406,8 +1498,9 @@ collateral or duplicate bad debt.
 
 This concise scaffold is retained for test-run orchestration and is
 subordinate to the complete Phase I state machine in Sections 11.5–11.8 and
-specification Section 19.6. Exact live-version policy remains owner-returned,
-and Track 7 still owns namespace/tooling:
+specification Section 19.6. Phase J requires Base-first or atomic convergence
+before RH enablement but authorizes no migration; Track 7 still owns
+namespace/tooling:
 
 1. pin old/new source, runtime, registry, and manifest identities;
 2. enumerate every old-vault asset/user plus `C`, `A^s`, `U^s`, `A`, `U`,
@@ -1453,56 +1546,217 @@ Unknown pause/blocklist/upgrade state must be labeled unknown, not false.
 
 ## 16. Proposed tiers and commands
 
-Commands are placeholders until files exist and the owner approves
-implementation:
+Commands are exact future test-surface shapes; they remain non-runnable until
+the proposed files and an owner-approved implementation exist:
 
 | Tier | Purpose | Proposed command shape |
 | --- | --- | --- |
 | T0 | Existing evidence | `PYTHONPATH=. pytest -q tests/vaults/test_stock_token_vault_comparison.py` |
-| T1 | Math/vault/credit focused | `PYTHONPATH=. pytest -q <approved focused files>` |
-| T2 | Core settlement/governance | `PYTHONPATH=. pytest -q <approved AuctionHouse/Deleverage/control files>` |
-| T3 | Base full regression | repository-standard full test command, serial if required by environment |
-| T4 | Exact AAPL fork | approved no-broadcast fork command with pinned block |
-| T5 | Dual-clock/clean migration | integrated S1/S2 profile commands plus Track 7 rehearsal |
+| T1 | Math/vault/credit focused | `PYTHONPATH=. pytest -q tests/vaults/test_vault_receipt_accounting.py tests/vaults/modules/test_vault_loss_properties.py tests/core/teller/test_teller_deposit_receipts.py tests/core/creditEngine/test_deficit_aware_credit.py tests/core/creditEngine/test_stock_token_repay_liveness.py` |
+| T2 | Settlement, debt, rewards, and controls | `PYTHONPATH=. pytest -q tests/core/auctionHouse/test_loss_aware_auctions.py tests/core/auctionHouse/test_stock_token_resolution_controls.py tests/core/deleverage/test_loss_aware_deleverage.py tests/data/test_ledger_bad_debt_transition.py tests/core/lootbox/test_vault_loss_rewards.py tests/config/test_asset_collateral_controls.py tests/config/test_stock_token_incident_controls.py` |
+| T3 | Compatibility, migration, and evidence | `PYTHONPATH=. pytest -q tests/vaults/test_corrected_share_compatibility.py tests/config/test_asset_config_schema_compatibility.py tests/config/test_core_cutover_state.py tests/data/test_ledger_state_migration.py tests/registries/test_vault_book_migration.py tests/probes/test_stock_token_artifact_parity.py tests/probes/test_fungible_settlement_usage.py tests/probes/test_stock_token_vault_evidence.py` |
+| T4 | Exact AAPL fork, no broadcast | `PYTHONPATH=. pytest -q tests/probes/test_aapl_vault_behavior_fork.py` under the approved pinned Track 2 fork profile |
+| T5 | Integrated dual-clock and checked inventory | `pytest -q tests/clock/test_clock_profiles.py`; `python scripts/check_block_clock_inventory.py`; `pytest -q tests/inventory/test_block_clock_inventory.py`; then the approved Track 8 cases under every applicable profile |
+| T6 | Full Base/RH regression | serial `pytest -q`, followed by the Track 7 clean migration rehearsal only after its identifiers/tooling and the relevant migration are approved |
 
-No dependency or tool addition is authorized by this scaffold.
+Every command records duration, source/compiler/runtime hashes, fixture/profile
+versions, seed, and failure diagnostics. No dependency, tool, network secret,
+test implementation, migration, or live action is authorized by this
+scaffold.
 
-## 17. Review and launch gates
+## 17. Phase J authorization and decision-bound validation branches
 
-The owner-confirmed instructions select option 4, authorize Phase D
-specification, then authorize Phase E specification under the explicit
-existing-controls/no-new-storage constraint, then approve the Phase F
-external-settlement and exactly-once total-loss directions for specification
-only, and then approve the Phase G freeze, no-automatic-allocation, and
-live-claim reward directions for specification only. The owner then authorized
-Phase H specification only under the existing-controls, repayment-liveness,
-and return-before-new-surface boundary, and subsequently authorized Phase I
-specification under the five directions recorded in specification Section
-12.1. Phases A–I and their future test contracts are complete for owner
-review; no implementation or test change is authorized. Phase J and later
-implementation/release work remain blocked on these decisions and external
-inputs at their recorded boundaries:
+The owner authorized Phase J on 2026-07-24:
 
-- all-external versus per-asset settlement enforcement mechanism;
-- exact CreditEngine/Ledger transition interfaces;
-- allocated/quarantine checkpoint storage/wrapper mechanism;
+> I authorize Phase J specification work only. Use all-external fungible
+> settlement as the preferred path subject to complete integration and
+> historical-usage evidence; use an isolated generic corrected-share variant
+> and the A^s/U^s model as validation targets; and model the two-selector
+> bad-debt transition without authorizing a Ledger migration. Preserve S3
+> independently if Track 8 would delay it, require Base-first or atomic
+> convergence, and treat any empty gated deployment as inactive staging
+> rather than launch. Do not select a production vault or ID, authorize
+> implementation or migration, or begin Phase K.
+
+The resulting branch contract is:
+
+| Area | Active Phase J validation target | Branches kept open or blocked | What remains unapproved |
+| --- | --- | --- | --- |
+| Fungible settlement | All-external after the complete Section 11.3 integration/history gate | Per-asset generic mode and `do not list` remain comparisons/fallbacks; a discovered dependency returns the choice | Behavior change, config field, ABI, defaults, migration |
+| Corrected-share boundary | Isolated generic variant; existing Rebase/RipeGov semantics are controls | Blanket module change and generic positive-delta mode remain rejected/unselected; `do not list` remains safe fallback | File, wrapper, storage layout, ABI, vault, ID |
+| Allocated backing | Reference `A^s/U^s/A/U` formulas and checkpoint evidence | Audited equivalent may be returned; migration import remains a separate gate | Mappings, selector names/tuples/events, import/finalizer |
+| Total-loss transition | Two-selector compare-and-set model | Another atomic design or `do not list` remains possible | Both selectors, event, implementation, full Ledger migration |
+| Rewards/S3 | Preserve S3 unchanged and independently releasable; test Track 8 loss weighting separately | Combined cutover only if it does not delay S3 and reopens review | Loss epoch/index/callback, economics, window policy, migrations |
+| Live versions | Base-first or atomic convergence before RH enablement | Inactive unreachable staging may be rehearsed but is not convergence or launch | Base/RH migration, cutover, runtime, registry/config action |
+| Production identity | None | Track 7 retains ID/manifest/tooling ownership | Production vault, VaultBook ID, listing, launch |
+
+An inactive staging test may prove code identity, constructor/config posture,
+disabled reachability, and abandonment. It may not contain users, custody,
+debt, auctions, or Stock reward state; may not enable a value path; and may
+not satisfy any production launch row.
+
+## 18. Complete future-test record model
+
+### 18.1 Record composition
+
+Every backticked `test_...` identifier in Sections 3–11 is a named future
+assertion. Its complete test record is the deterministic union of:
+
+1. the exact case row or bullet, which owns setup-specific token behavior and
+   the expected state transition/result;
+2. the most-specific profile in Section 18.3, which owns the primary proposed
+   file, components, prerequisite, actors/behavior domain, invariant or
+   validation obligation, clock, diagnostics, tier, and reviewers;
+3. any explicit file path in the case row, which overrides the profile's
+   primary path for that case only; and
+4. Sections 15–16, which add the common evidence schema and command/tier
+   contract.
+
+Sections 3–5 are index/coverage views. A name introduced there and not
+repeated in Sections 6–11 uses profile J-P00. A repeated name uses its
+most-specific detailed-section profile and is not a second test record.
+Conflicting profiles, an absent profile, a missing field, or a fixture that
+weakens the case result is a document/test-review failure.
+
+### 18.2 Validation obligations beyond economic invariants
+
+Economic tests cite I-01–I-13. Tests whose primary subject is compatibility,
+evidence, or process cite one or more of these equally normative Phase J
+obligations:
+
+| ID | Validation obligation |
+| --- | --- |
+| J-01 authorization exactness | No unapproved storage, selector, ABI, event, default, role, migration, vault, ID, or live action appears in a passing branch. |
+| J-02 source/artifact identity | Source, compiler input, constructor schema/args, creation/runtime hashes, ABI, registry address, and accounting version reconcile. |
+| J-03 state/migration completeness | Every user, index, aggregate, custody bucket, debt, auction, reward, config, pause, cooldown, and pending action is reconciled exactly or migration stops. |
+| J-04 fail-closed evidence | Missing, malformed, stale, unscanned, rate-limited, or inconsistent evidence is unknown/failure, never zero, safe, or complete. |
+| J-05 clock/profile invariance | Ordinary, repeated, `+1`, jump, and stress profiles change only approved timing; custody/payment/liability invariants remain identical. |
+| J-06 standing Stock constraints | Redemption, Stability Pool swap, unsupported integrations, and unapproved deposit/borrow/auction/reward routes remain disabled or absent. |
+| J-07 inactive is not launch | Empty gated staging cannot satisfy production selection, migration, listing, enablement, behavior, or launch evidence. |
+| J-08 reviewer/provenance closure | Every result names the frozen inputs, owner prerequisite, reviewer/security/accounting/economics/counsel gates, and approval state. |
+| J-09 settlement-usage completeness | All current integrations and every historical Teller generation/range are pinned, decoded, gap-free, provider-reconciled, and product-dispositioned before all-external eligibility. |
+| J-10 S3 and convergence sequencing | S3 remains independently releasable if Track 8 is late, and RH value paths cannot enable before Base-first or atomic convergence. |
+
+### 18.3 Test profiles
+
+The “actors/behavior” column supplements, rather than replaces, each case's
+exact setup. “All relevant” clock means Base ordinary plus Robinhood
+ordinary/`+1`/repeated/jump/stress where the path consumes `NUMBER`; otherwise
+the recorded clock is `N/A`.
+
+| Profile | Governs | Primary proposed file | Components | Prerequisite | Actors / token behavior | Invariant or obligation; clock | Diagnostics; tier; required review |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| J-P00 | Sections 3–5 names not repeated later | `tests/vaults/test_stock_token_vault_lifecycle.py` | all primary IDs plus exact row IDs | option 4; detailed branch prerequisite | users, buyer, issuer/admin, operator, governance; ordinary/controlled token selected by row | exact cited I-01–I-13, J-06/J-07; all relevant | Section 15 full state; T1/T2; protocol + security + row owner |
+| J-P01 | Sections 6.1–6.3 | `tests/vaults/test_vault_receipt_accounting.py` | `CM-024`, `CM-025`, `CM-034`, `CM-045` | Phase D behavior; implementation approval later | depositor, recipient, Teller, vault, token admin/callback; ordinary/no-return/short/fee/negative/excess/reentrant | I-01/I-02/I-05/I-10; all relevant | `A_req/Q/C0..C3/R/V`, shares, events, full failure root; T1; protocol + vault/Teller security |
+| J-P02 | Sections 6.4–6.5 | row's exact existing test path, otherwise `tests/core/teller/test_teller_deposit_receipts.py` | `CM-034`, `CM-045` plus named consumer | Phase D behavior and consumer disposition | caller-specific producer/recipient, Teller, vault, Ledger/Lootbox; short and exact receipt | I-01/I-05; all relevant | upstream payout/mint/claim plus receipt/events/root; T1/T2; consumer owner + protocol/security |
+| J-P03 | Section 7.1 | `tests/config/test_asset_collateral_controls.py` | `CM-009`, `CM-011`–`CM-013`, `CM-030` | owner no-new-collateral-flag direction | governance, lite actor, borrower; solvent ordinary token | I-07/I-09, J-01/J-06; ordinary and TimeLock profiles | config/debt-term tuples, events, capacity/debt roots; T1/T2; protocol + config security |
+| J-P04 | Sections 7.2–7.4 | `tests/core/creditEngine/test_deficit_aware_credit.py` | `CM-030`, `CM-009`, Ledger, vault IDs from case | Phase E behavior | multiple users/vaults, borrower, repayer, issuer/admin; ordinary/short/deficit/zero/read-failure | I-02/I-06/I-07/I-09/I-12; all relevant | custody/accounting/terms/value/capacity/health/debt/gas; T1; credit + protocol/security |
+| J-P05 | Section 7.5 | `tests/probes/test_stock_token_vault_evidence.py` | `CM-009`, `CM-030`, vaults, token | Phase E evidence model | read-only observer; safe/deficit/missing-read fixtures | I-02/I-06/I-07/I-12, J-04/J-08; pinned same block | raw/decoded calls, block hash, derivation and gas/staticcalls; T3; protocol + security/operations |
+| J-P06 | Sections 8.1 and 11.3 | `tests/probes/test_fungible_settlement_usage.py` | `CM-026`, `CM-034`, every Teller/AuctionHouse generation | complete integration/history plus product inventory | read-only product/integration inventory; decoded successful/reverted auction calls | I-11, J-01/J-04/J-09; every production block range | runtimes, ranges, raw calldata/tx/events/provider gaps/coverage root; T3; product + protocol/security + operations |
+| J-P07 | Sections 8.2–8.3 | `tests/core/auctionHouse/test_loss_aware_auctions.py`; row-named Deleverage path overrides | `CM-026`, `CM-030`, `CM-034`, `CM-044`, Ledger, vault | Phase F policy; all-external branch still conditional | liquidated user, one/two buyers, recipient, issuer/operator, Deleverage; ordinary/short/paused/blocked/loss | I-03/I-04/I-05/I-11; all relevant | `Q/W/R/E`, custody/claims/GREEN/debt/auction/points/events/root; T2; protocol + auction/security |
+| J-P08 | Sections 8.4, 8.6, 10.5–10.6 | `tests/core/auctionHouse/test_stock_token_resolution_controls.py` | `CM-026`, `CM-030`, `CM-009`, Ledger | deterministic existing-`canLiquidate` direction; selectors unapproved | borrower, repayer, caller/keeper/governance, buyer; total/partial/paused/price-failure | I-06/I-08/I-09/I-12, J-01; all relevant | eligibility scan, caller inputs, debt/auction/gate/events/root/gas; T2; accounting + protocol/security |
+| J-P09 | Section 8.5 | `tests/data/test_ledger_bad_debt_transition.py` | `CM-008`, `CM-030`, `CM-026` | two-selector validation target; no migration approval | two borrowers, repayer/resolver, CreditEngine, unauthorized caller; debt/yield/auction races | I-08/I-09, J-01; same/repeated/jump around interest/touch state | user/global debt, yield, bad debt, indexes, auctions, GREEN/events/root; T2; accounting + Ledger/security |
+| J-P10 | Sections 9.2–9.6 | `tests/vaults/modules/test_vault_loss_properties.py` | `CM-025`, `CM-021`, Vault interfaces | isolated generic `A^s/U^s` target; mechanism unapproved | multiple users/orderings, issuer/admin, donor; 6/18 decimal, donation, partial/total loss, restoration | I-01–I-05/I-10/I-13; all relevant | `C/A^s/U^s/A/U/S/s_u`, claims, delivery, dust, events/root; T1; vault/math security + economics/counsel-risk where allocation relevant |
+| J-P11 | Section 9.7 | `tests/core/lootbox/test_vault_loss_rewards.py` | `CM-033`, `CM-025`, Ledger, S3 `CM-013` | live-claim units; loss mechanism unapproved; S3 independent | touched/untouched users, reward operator, issuer/donor; partial/total loss, restoration, global rewards on/off | I-10/I-13, J-06/J-10; ordinary/repeated/jump/interval boundaries | raw shares/live weight/global value/points/epochs/S3 config/events; T2; economics + Track 6 + protocol/security |
+| J-P12 | Sections 9.8, 11.1–11.2, 11.4 | `tests/vaults/test_corrected_share_compatibility.py`; direct-Department cases use `tests/config/test_core_cutover_state.py` | `CM-021`, `CM-024`, `CM-025`, `CM-033`, interfaces and affected consumers | isolated variant and `A^s/U^s` test targets only | existing Rebase/RipeGov users plus fresh corrected fixture; positive rebase/donation/loss | I-10/I-13, J-01/J-02; all relevant | compiler layout, selectors/ABI/events/units/consumer inventory/code hashes; T3; protocol + compiler/vault/security + economics |
+| J-P13 | Sections 10.1–10.4 | `tests/config/test_stock_token_incident_controls.py`; repayment cases use `tests/core/creditEngine/test_stock_token_repay_liveness.py` | T8H-01–T8H-12 and named component IDs | existing-control and repay-liveness directions | governance, lite/unapproved actors, indebted user; ordinary/paused/missing integration | I-07/I-09, J-01/J-04/J-06; immediate and TimeLock profiles | roles/getters/events/flags/debt/withdrawal/root; T2; protocol + governance/security/operations |
+| J-P14 | Section 10.7 | `tests/vaults/test_corrected_share_compatibility.py` | `CM-025`, `CM-009`, `CM-011`–`CM-013` | existing Switchboard checkpoint caller; selector/storage unapproved | Switchboard, unauthorized caller, users/donor/issuer; reduce/checkpoint/restore | I-10/I-13, J-01; ordinary/repeated/jump | flags, authority, bucket/claim/reward evidence and root; T2/T3; protocol + vault/security + counsel-risk |
+| J-P15 | Sections 10.8–10.9 | `tests/probes/test_stock_token_vault_evidence.py` | all accounting/control readers, `CM-021`, `CM-008`, `CM-009` | read-only evidence only | observer; missing registry/archive/rate-limit/revert and same-block multi-log cases | I-02/I-06/I-12/I-13, J-04/J-05/J-08; pinned/repeated/jump | raw calls, block/log identity, enumerations, unknown/failure class; T3; security/operations + protocol |
+| J-P16 | Section 11.5 | `tests/data/test_ledger_state_migration.py` | `CM-008` and every Ledger reader/writer | only if two-selector interface and full migration later approved | migration authority/reviewer, users across every Ledger domain; populated source and fresh target | I-08/I-09, J-01/J-03; all relevant | complete source/target roots, sums/indexes, pause/constructor, cutover event; T3/T6; accounting + Ledger/security/operations |
+| J-P17 | Sections 11.6 and 14 | `tests/registries/test_vault_book_migration.py` | `CM-021`, vaults, Ledger, Track 7 tooling | migration/interface/vault/ID approvals all later | users, governance, migration actor, issuer/operator; live funds/debt/auctions/dust/failures | I-02–I-05/I-08–I-10/I-13, J-03/J-04/J-07; all relevant | old/new roots, custody, buckets, debt/rewards/auctions/registry/pending actions; T3/T6; protocol + security/operations + accounting/counsel-risk |
+| J-P18 | Sections 11.7–11.8 | `tests/probes/test_stock_token_artifact_parity.py`; local-state cases use `tests/config/test_core_cutover_state.py` | all changed shared components, manifests/registries | Base-first/atomic posture; no live action | read-only/build observer, governance cutover model; old/new/inactive/mixed artifacts | J-01–J-05/J-07/J-08/J-10; both chain profiles | source/compiler/creation/runtime/ABI/config/state roots, expiry/abort/rollback; T3/T5/T6; protocol + security/operations + compiler/deployment |
+| J-P19 | Section 12 | `tests/probes/test_aapl_vault_behavior_fork.py` | Track 2 AAPL plus selected shared components | implementation, exact-token and counsel/live-probe gates | fork users, buyer, issuer/admin/operator; exact proxy at pinned block and behavior switch | I-01–I-13, J-02/J-04/J-06/J-07; RH profiles | proxy/beacon/implementation hashes, custody/buckets/debt/rewards/events/root; T4; Track 2 + protocol/security + counsel |
+| J-P20 | Section 13 | integrated `tests/clock/test_clock_profiles.py` and `tests/inventory/test_block_clock_inventory.py`, plus the detailed case's primary path | `CM-059` and every referenced BN/CAD/TS/component | integrated S1/S2 plus later implementation | actors/token from detailed case; same source under Base/RH parameter profiles | detailed I/J obligation plus J-05; every applicable profile | trace/profile/seed/source/artifact/inventory delta; T5 then T6; Track 6 + test-infra + component reviewer |
+
+### 18.4 Required-layer and scenario closure
+
+| Task-contract layer | Normative plan coverage |
+| --- | --- |
+| Math/property | Sections 7.4, 8.5, 9.2–9.5; profiles J-P04/J-P09/J-P10 |
+| Vault unit | Sections 6, 9; J-P01/J-P02/J-P10/J-P12 |
+| CreditEngine | Sections 7, 8.4–8.6; J-P04/J-P08/J-P09 |
+| AuctionHouse | Sections 8.1–8.6; J-P06–J-P09 |
+| Teller/Deleverage | Sections 6 and 8.3; J-P01/J-P02/J-P07 |
+| Rewards/monitoring | Sections 7.5, 9.7–9.8, 10.8; J-P05/J-P11/J-P12/J-P15 |
+| Governance/config | Sections 7.1, 10; J-P03/J-P13–J-P15 |
+| Migration | Sections 11.4–11.8 and 14; J-P12/J-P16–J-P18 |
+| Exact-token fork | Section 12; J-P19 |
+| Dual-clock/cross-chain | Section 13; J-P20, composed with every detailed profile |
+
+| Required scenario family | Named coverage location |
+| --- | --- |
+| 6/18 decimals, ordinary lifecycle, one base unit, minimum deposit | Sections 4, 6.1, 6.3, 9.2–9.3 |
+| Donation before/between deposits, short receipt, fee on transfer | Sections 4, 6.1, 9.4 |
+| Partial/total issuer loss, post-zero donation/restoration/new deposit | Sections 4, 7.2–7.4, 9.4 |
+| Two users and both withdrawal orders; two buyers and both orders | Sections 5.3, 8.2, 9.2, 9.5 |
+| Active internal/external auction before loss; liquidation after loss | Sections 8.1–8.4 |
+| Pause and sender/recipient/operator blocklists | Sections 6.1, 8.2, 10.3–10.4, 12 |
+| Implementation/proxy behavior switch | Sections 4, 10.8, 11.1–11.2, 12 |
+| Mixed collateral and existing debt at deficit/zero | Sections 7.2–7.4, 8.4 |
+| Repayment before transition and exactly-once bad debt | Sections 7.3, 8.5–8.6 |
+| Failed settlement leaves every relevant state unchanged | Sections 8.2, 8.5 |
+| Migration with live users/funds/debt/auctions and partial failure | Sections 11.5–11.8, 14 |
+| Unsupported Stock Token features remain disabled | Sections 5.4, 8.3, 10.2, 12 |
+| Historical all-external compatibility | Sections 8.1 and 11.3 |
+| S3 independence, loss-aware rewards, Base/RH convergence | Sections 9.7, 11.2, 11.7, 13 |
+| Empty gated staging is not launch | Sections 11.4, 11.7, 12, 17 |
+
+### 18.5 Phase J document and future-result acceptance
+
+The Phase J authoring audit found 441 backticked future-test mentions, 436
+unique names, and zero names outside the profiled Sections 3–11. Repeated
+mentions are invariant/state/architecture indexes pointing to one detailed
+record, not duplicate execution requirements.
+
+The Phase J document is acceptable only if:
+
+1. every named assertion resolves to exactly one J-P profile;
+2. every case has a setup/result plus all Section 18.1 inherited fields;
+3. every I-01–I-13 invariant, J-01–J-10 obligation, formal state, required
+   layer, and required scenario has a coverage location;
+4. the all-external branch fails on any integration/history gap and requires
+   product plus protocol/security disposition;
+5. the isolated variant, `A^s/U^s`, and two-selector model remain test targets,
+   never production selections;
+6. zero staker/voter allocation is not accepted as Stock reward disablement;
+7. Track 8 cannot delay required S3 safety, and any later Track 8 Lootbox
+   cutover has a separate reviewed migration/window/rollback record;
+8. no RH value path enables before Base-first or atomic convergence;
+9. empty gated staging cannot satisfy launch or production-vault evidence;
+10. the full Ledger migration stays blocked and inseparable from any future
+    two-selector activation;
+11. exact-token, S1/S2, Base regression, migration, artifact, and diagnostics
+    fail closed; and
+12. document-integrity, scope, reviewer, and owner gates pass.
+
+These conditions define future evidence. Phase J creates no tests and does not
+claim that any future command passes.
+
+## 19. Review and launch gates
+
+Phases A–J and the complete future validation contract are ready for owner and
+independent review. Work stops before Phase K. The remaining decisions and
+external inputs are:
+
+- complete integration/codebase and historical onchain usage evidence before
+  all-external behavior can be implementation-eligible;
+- exact corrected-share source path, storage declarations, selectors, events,
+  ABI, and any migration-import authority/finalizer;
 - accounting/counsel-risk confirmation that observed losses reduce `A` before
-  checkpointed `U`;
-- positive-delta compatibility boundary for existing yield/rebase assets;
-- Vault/Lootbox/Ledger loss-interval surface and integrated-S3 rollout
-  sequencing;
-- Base live-version/migration posture;
-- Phase J consumption of integrated S1/S2 plus Track 7-owned interfaces;
-- production vault and Track 7-owned VaultBook ID;
-- implementation review and audit decision; and
-- exact-token, Base regression, migration, testnet, and smoke evidence.
+  checkpointed `U`, and any future quarantine disposition;
+- exact CreditEngine/Ledger transition interfaces, accrued-interest booking,
+  and separately audited full Ledger migration;
+- positive-delta compatibility for existing yield/rebase assets;
+- Vault/Lootbox/Ledger loss-interval surface, economics, S3 sequencing, and
+  Base window policy;
+- an owner-approved Base-first or atomic migration/cutover plan;
+- Track 7 IDs, namespaces, manifests, tooling, and post-deployment assertions;
+- production vault and VaultBook ID;
+- Phase K implementation/release split and audit boundaries; and
+- implementation, exact-token, Base regression, migration, testnet, smoke,
+  soak, and live evidence.
 
-At this checkpoint, the evidence baseline, formal invariant map, Phase C
-comparison, Phase D deposit-accounting design, Phase E backing/debt-health
-design, Phase F settlement/total-loss design, Phase G corrected-share design,
-Phase H control/evidence analysis, Phase I compatibility/artifact/migration
-inventory, proposed test names, and required matrices are ready for owner
-review. Work stops before Phase J. No implementation, interface, storage,
-test, dedicated pause, migration, production vault, Phase J, or launch gate
-is passed by this specification. The Phase I-directed existing control/caller
-conditions do not approve the selectors or storage they would govern.
+No implementation, interface, storage, test, dedicated pause, migration,
+production vault/ID, live action, Phase K, or launch gate is passed by this
+specification. `Do not list Stock Tokens under the current vault designs`
+remains operative.
