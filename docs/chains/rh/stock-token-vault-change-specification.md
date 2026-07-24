@@ -203,12 +203,16 @@ nevertheless rerun rather than assumed.
 | External auction transfer failure is atomic | Tested and source-traced | Vault transfer reverts before `_buyFungibleAuction` sends GREEN or calls debt repayment. |
 | Paused internal settlement can still charge GREEN | Tested | Internal balance transfer does not exercise token transferability. |
 | Total loss has no automatic exactly-once user-debt-to-bad-debt transition | Source-traced | Ledger exposes a Switchboard `setBadDebt` overwrite, but no current loss path atomically removes the same liability from user debt and increments protocol bad debt. |
+| Phase E discovery: repayment can be blocked by an unavailable configured collateral price | Source-traced | `_repayDebt` calls `_getUserBorrowTerms(..., True, ...)` at `CreditEngine.vy:558`; each nonzero-amount, nonzero-LTV position reaches `PriceDesk.getUsdValue(..., True)` at line 741. `PriceDesk.vy:174-176` raises when a configured feed yields no price, so a stale/unavailable configured feed can revert repayment today. Phase E's non-raising repayment refresh is an intentional behavior fix and a required Phase I impact item. |
 | Dedicated per-asset collateral-use safety flag exists | Source-traced | False. `AssetConfig` already has `canDeposit`, deposit limits, and per-asset `DebtTerms.ltv`; only the general `canBorrow` switch is global. Phase E rejects adding another stored flag and instead defines one fail-closed eligibility predicate from those existing controls plus automatic backing state. |
 
 The evidence does not prove that every ordinary ERC-20 can spontaneously lose
 vault custody. It proves what happens if custody falls independently of Ripe
 accounting and that current deposit accounting can itself create an accounted
-deficit after a short receipt.
+deficit after a short receipt. The repayment finding is independent additional
+hardening evidence: even without a custody loss, oracle unavailability can
+currently obstruct the risk-reducing action that invariant I-09 requires to
+remain open.
 
 ### 3.3 Post-bootstrap integration delta
 
@@ -1275,6 +1279,9 @@ the owner gave the controlling Phase E instruction:
 > proposing any new storage or interface. This does not authorize
 > implementation or Phase F.
 
+Both block quotes above are genuine, verbatim owner messages in this Track 8
+work session. Neither is inferred from a recommendation or reviewer comment.
+
 Phase E therefore may specify only a composition of existing controls and
 automatic backing state. It may not propose new storage or a new external
 interface without first returning to the owner.
@@ -1329,7 +1336,7 @@ This is a Phase C impact boundary, not the finalized Phase I change table.
 | `CM-025` Rebase/Shares path | Live claim, post-zero, restoration, rounding |
 | `CM-026` AuctionHouse | Settlement policy, delivery/payment ordering, active auctions |
 | `CM-027` AuctionHouseNFT | Current temporary stub has no common Vault consumer; reused unchanged/inapplicable unless later implemented |
-| `CM-030` CreditEngine | Borrow amount, deficit propagation, health, resolution |
+| `CM-030` CreditEngine | Borrow amount, deficit propagation, health, resolution, and intentional raising-to-non-raising repayment price refresh |
 | `CM-043` CreditRedeem | Transfer/withdraw settlement consumer and unsupported Stock Token posture |
 | `CM-033` Lootbox | Raw shares versus live-value reward units |
 | `CM-034` Teller | Transfer/credit/event/limit/housekeeping ordering |
@@ -1763,7 +1770,8 @@ Pinned source anchors are `interfaces/ConfigStructs.vyi:88-117`;
 `MissionControl.vy:599-613,643-667`; `SwitchboardCharlie.vy:428-433,
 1140-1185`; `SwitchboardBravo.vy:501-527,555-565`;
 `CreditEngine.vy:373-425,542-579,687-807,920-979,1246-1285`;
-`BasicVault.vy:116-148`; `SharesVault.vy:123-165`; and
+`PriceDesk.vy:86-100,142-176`; `BasicVault.vy:116-148`;
+`SharesVault.vy:123-165`; and
 `StabVault.vy:219-222`. The relevant existing event definitions are
 `SwitchboardCharlie.vy:311-314` and `SwitchboardBravo.vy:117-126,158-165`.
 
@@ -1912,6 +1920,24 @@ invoke PriceDesk as a prerequisite to repayment. A missing or stale price
 therefore cannot stop the user from reducing debt. The repayment amount and
 Ledger debt remain independent of collateral valuation.
 
+This is an intentional current-behavior delta, not merely a refactor.
+`CreditEngine._repayDebt` currently passes `True` at line 558, and the shared
+loop passes that raising mode to PriceDesk at line 741. The Phase I impact
+table must call out the change to non-raising repayment refresh, its
+conservative zero-value/weight behavior, all repay event fields affected by the
+recomputed collateral/health result, and the regression proof that debt still
+decreases when a configured feed is unavailable.
+
+The backing model also adds at least two CreditEngine-initiated staticcalls per
+enumerated position: token `balanceOf(vault)` and
+`Vault.getTotalAmountForVault(asset)`. A share vault's total getter may itself
+perform another token balance read. Phase I and security review must inventory
+these hot-path calls, benchmark worst-case configured user vault/asset counts
+for borrow, preview, health, liquidation, repay, and withdrawal preview, and
+consider safe per-traversal reuse of an identical `(vault, asset)` observation.
+Gas optimization may not weaken same-call backing consistency or introduce
+stored/stale backing state.
+
 ### 15.5 Required consumer behavior
 
 | Surface | Required Phase E behavior |
@@ -1973,6 +1999,18 @@ Existing permissions already implement the required asymmetry:
   re-enable requires governance.
 - `SwitchboardBravo.setAssetDebtTerms` remains governed and pending. It is not
   the incident response path.
+
+Under the future Phase E implementation, this fast disable is not a neutral
+deposit pause. For an existing borrower, it immediately removes the affected
+asset's `totalMaxDebt` contribution. Depending on the user's other collateral
+and debt, `getMaxBorrowAmount` may become zero, `hasGoodDebtHealth` may become
+false, and indebted withdrawal capacity may tighten. Because backing-safe
+custody remains in `collateralVal` with its configured resolution terms, the
+disable alone does **not** manufacture liquidation eligibility for an
+otherwise solvent position; liquidation still uses live deliverable value and
+its threshold. A lite actor must assess affected borrowers and be prepared to
+hold the broader borrow/auction controls before using this asset-level safety
+freeze.
 
 The recommended incident sequence is:
 
@@ -2060,8 +2098,10 @@ matrix. A future implementation must prove:
 6. fast disable and governance-only re-enable retain their existing authority
    boundary;
 7. no new storage field, canonical interface, selector, ABI, default, or
-   migration is introduced; and
-8. the change is generic—no asset name, issuer, vault ID, or chain branch.
+   migration is introduced;
+8. the change is generic—no asset name, issuer, vault ID, or chain branch; and
+9. worst-case hot-path call count and gas remain within reviewed bounds without
+   caching stale backing state.
 
 Phase E does not select a production vault, approve implementation, change a
 live flag, allocate a loss, authorize liquidation settlement, or create a

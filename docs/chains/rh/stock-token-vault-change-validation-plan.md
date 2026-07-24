@@ -422,13 +422,16 @@ behavior; no test or implementation is authorized by this document.
 | `test_preview_and_borrow_share_identical_phase_e_capacity` | Snapshot state with safe, disabled, and deficit positions | At unchanged state and valid prices, preview and state-changing validation derive identical per-position and aggregate capacity |
 | `test_preview_never_optimistic_when_borrow_would_revert` | Required safe-asset price invalid or backing read fails | Preview is zero/failing, never positive while the matching borrow fails |
 | `test_disabled_solvent_asset_has_zero_capacity_but_live_resolution_value` | `C>=T`, valid price, nonzero LTV, then `canDeposit=false` | New-borrow contribution is zero; safely deliverable existing collateral remains in liquidation/redemption value and uses its configured terms |
+| `test_fast_disable_existing_borrower_blast_radius` | Existing debt supported partly/wholly by a solvent asset, then lite actor sets `canDeposit=false` | Affected capacity becomes zero; max borrow never increases and falls when collateral capacity binds; health/withdraw preview tighten according to remaining collateral; live resolution value prevents disable-only spurious liquidation |
 | `test_deficit_cannot_appear_healthy_via_amount_zero_skip` | Existing debt supported only by a now-zero-claim or deficient asset | `hasGoodDebtHealth` is false; the unsafe entry is processed rather than skipped |
 | `test_deficit_preserves_nonzero_liquidation_terms` | Existing debt and only configured asset becomes fully missing | Collateral value/capacity are zero, but configured liquidation threshold remains nonzero and `canLiquidateUser` is not false merely because amount is zero |
 | `test_mixed_collateral_preserves_exact_solvent_capacity` | One deficient position and one unrelated solvent/enabled/priced position | Unsafe contribution is zero; solvent value and capacity exactly equal the single-position control case |
 | `test_mixed_collateral_health_uses_only_actual_capacity` | Vary debt below/above the solvent position's capacity | Health is true only when unrelated eligible collateral alone covers debt |
 | `test_missing_price_cannot_hide_deficit` | Deficit position with stale, zero, or missing price | Deficit remains fail-closed and terms remain visible without a price call |
 | `test_safe_missing_price_is_independently_fail_closed` | Backing-safe enabled position with invalid price | Preview/health give no optimistic value; state-changing borrow reverts under the existing raising mode |
+| `test_current_repayment_raising_price_regression` | On the pinned pre-fix implementation, configure a nonzero-LTV position whose configured feed yields no price | Repayment reproduces the current revert caused by `_getUserBorrowTerms(..., True, ...)`; the test is retained as explicit before/after evidence |
 | `test_repayment_succeeds_without_unsafe_asset_price` | Existing debt, known disabled/deficit position, unusable price | Repayment reduces Ledger debt, updates conservatively, and does not require the unsafe asset price |
+| `test_repayment_succeeds_without_any_configured_collateral_price` | Existing debt and one or more LTV-bearing positions whose configured feeds yield no price | Future non-raising refresh permits repayment, records conservative value/health fields, and decreases debt exactly by payment |
 | `test_repayment_does_not_clear_or_allocate_deficit` | Repay during deficit freeze | Debt decreases only by paid amount; custody/accounting and deficit state are unchanged; no bad debt is created |
 | `test_max_withdraw_preview_uses_same_backing_state` | Existing debt with disabled or deficient target asset | Preview returns zero for unsafe collateral and uses exact Phase E contributions for remaining assets |
 | `test_debt_free_solvent_disabled_asset_keeps_normal_exit` | No user debt, `C>=T`, per-asset deposits disabled, withdrawals enabled | CreditEngine does not unnecessarily block ordinary solvent exit; Teller/Vault withdrawal controls remain authoritative |
@@ -496,13 +499,17 @@ Required assertions:
 - `test_same_block_getter_bundle_reconstructs_backing_and_capacity`;
 - `test_can_deposit_event_matches_applied_asset_config`;
 - `test_pending_and_applied_debt_term_events_match_getter`;
-- `test_no_stored_deficit_bit_can_disagree_with_live_backing`; and
-- `test_monitoring_labels_read_failure_unknown_not_solvent`.
+- `test_no_stored_deficit_bit_can_disagree_with_live_backing`;
+- `test_monitoring_labels_read_failure_unknown_not_solvent`;
+- `test_phase_e_hot_path_staticcall_inventory`; and
+- `test_phase_e_worst_case_gas_budget`.
 
 The bundle must record block number/hash, vault/asset/user identities, raw
 responses, decoded values, and derived `C<T`, zero-claim, eligibility, value,
 capacity, and health results. Event evidence proves config transitions; live
-getters prove current backing.
+getters prove current backing. Gas evidence must cover maximum configured user
+vault/asset enumeration for borrow, preview, health, liquidation, repayment,
+and withdrawal preview; record external/staticcall counts as well as gas.
 
 ### 7.6 Phase E implementation acceptance
 
@@ -519,8 +526,11 @@ A future Phase E implementation cannot be accepted unless:
 7. every CreditEngine preview/state/health/repay/withdraw consumer is covered;
 8. source and tests contain no asset-name, issuer, vault-ID, or chain-ID branch;
 9. security review accepts the deliberate coupling between per-asset deposit
-   disable and zero new-borrow support; and
-10. the owner separately authorizes implementation.
+   disable and zero new-borrow support;
+10. the Phase I impact table explicitly records the repayment
+    raising-to-non-raising price behavior change and worst-case hot-path call/gas
+    results; and
+11. the owner separately authorizes implementation.
 
 These are future acceptance conditions, not evidence that any implementation
 exists. Phase F settlement and bad-debt behavior remains separately gated.
