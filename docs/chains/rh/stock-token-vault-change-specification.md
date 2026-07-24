@@ -1210,6 +1210,15 @@ On 2026-07-23, the owner approved **option 4: containment followed by the
 corrected share path**, and authorized **Phase D specification work only**.
 This is checkpoint option 4—the staged combination of Section 9 outcomes 2 and
 3—not Section 9.5's separately numbered “another generic shared design.”
+
+Approval provenance is the owner's direct instruction in this Track 8 work
+session immediately before Phase D began:
+
+> I approve option 4 as the Track 8 architecture direction and authorize Phase
+> D specification work only. This does not select a production vault, approve
+> implementation, authorize a Base migration, or approve any loss-allocation
+> policy. Later phases remain subject to their documented owner checkpoints.
+
 That authorization explicitly did not:
 
 - select a production vault;
@@ -1376,6 +1385,16 @@ while rejecting any nested deposit after a deposit-bearing route has begun.
 and the Teller-held sGREEN and `depositIntoGovVault` routes hold it across their
 respective `_deposit` calls and returns.
 
+The mutex is deliberately global across Teller deposits, not keyed by asset or
+vault. A token hook therefore cannot synchronously open an otherwise-legitimate
+deposit for a different asset or vault. This is an accepted liveness
+restriction: a keyed lock would preserve a nested path capable of interleaving
+shared Ledger, Lootbox, housekeeping, price-snapshot, and event effects with
+the outer deposit. The cross-asset deposit can be submitted separately after
+the outer transaction. Any future requirement for synchronous composability
+must reopen this design under security review rather than weakening the mutex
+implicitly.
+
 The `C2 == C1` check makes vault crediting a bookkeeping-only step for the
 measured asset. It catches vault code, hooks, or callbacks that move the asset
 again before credit finalization. The `C3 == C1` check extends that protection
@@ -1385,6 +1404,16 @@ during that critical section. Batch-final housekeeping and rebalance
 withdrawal occur after the per-deposit event but remain transaction-atomic and
 inside the deposit mutex; the latter may intentionally change custody. No
 callback may open a nested Teller deposit while the mutex is held.
+
+`C3 == C1` relies on an explicit liveness assumption: Ledger participation,
+Lootbox point updates, per-deposit housekeeping, and PriceDesk snapshot work do
+not legitimately move the target vault's custody of the measured asset. That
+assumption holds in the pinned caller trace, but implementation must repeat the
+call-graph inventory against its integrated source and prove both sides:
+ordinary housekeeping-enabled deposits still succeed, and an actual custody
+mutation reverts before success events. If a future post-credit module must
+legitimately move the measured custody, this ordering must be redesigned rather
+than deleting or bypassing `C3`.
 
 ### 14.4 Token behavior and failure semantics
 
@@ -1509,7 +1538,7 @@ The pinned caller trace supporting this matrix is:
 | Source | Deposit use |
 | --- | --- |
 | `contracts/core/Teller.vy:229-320` | Public single/batch/trusted entry points and shared `_deposit` ordering |
-| `contracts/core/Teller.vy:400-444` | Rebalance consumes `_deposit` return |
+| `contracts/core/Teller.vy:400-446` | Rebalance consumes `_deposit` return and emits `TellerRebalance` |
 | `contracts/core/Teller.vy:626-642` | Teller-held sGREEN deposit |
 | `contracts/core/Teller.vy:761-772` | RipeGov deposit with lock |
 | `contracts/vaults/modules/BasicVault.vy:23-39` | Current nominal aggregate-balance clamp |

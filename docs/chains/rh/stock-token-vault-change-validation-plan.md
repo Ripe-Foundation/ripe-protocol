@@ -12,7 +12,8 @@ authorized Phase D specification work only. This is checkpoint option 4, the
 combination of architecture outcomes 2 and 3, not the separately numbered
 “another generic shared design.” All paths below are proposed future paths. No
 test, fixture, mock, production contract, interface, dependency, CI file,
-manifest, or ABI was created or changed.
+manifest, or ABI was created or changed. The direct owner instruction is
+preserved verbatim in `stock-token-vault-change-specification.md` Section 12.1.
 
 The Phase D test contract is now specific enough for later implementation
 planning. The full Phase J plan cannot be finalized until the owner resolves
@@ -259,10 +260,16 @@ Required cases in
 | `test_vault_return_mismatch_reverts` | Vault test double returns `V != R` | Whole transaction reverts. |
 | `test_vault_credit_cannot_mutate_custody` | Vault test double changes token balance during credit | `C2 != C1` reverts. |
 | `test_postcredit_callback_cannot_mutate_custody` | Ledger/Lootbox/housekeeping/PriceDesk test double changes custody | `C3 != C1` reverts before success events. |
+| `test_ordinary_housekeeping_enabled_deposit_preserves_custody_and_succeeds` | Ordinary deposit with real Ledger, Lootbox, housekeeping, and PriceDesk paths enabled | `C3 == C1`; credit and success events complete, proving the guard does not break the pinned ordinary path. |
 
 The short-receipt cases must run against both Simple/Basic and
 Rebase/Shares-backed wrappers. At minimum, include 6-decimal, 18-decimal, and
 one-base-unit ordinary-token cases.
+
+Implementation review must repeat a call-graph inventory of every operation
+between `C2` and `C3` and confirm none legitimately moves the target vault's
+measured asset. The positive liveness test above and the mutation-revert test
+are a required pair; either one alone is insufficient.
 
 ### 6.2 Reentrancy, callback, and behavior-change matrix
 
@@ -284,6 +291,11 @@ The first case is mandatory because placing the existing global
 `@nonreentrant` guard directly on `depositFromTrusted` would break this
 legitimate call graph. The remaining cases prove that the dedicated mutex
 protects the measurement window across every deposit entry point.
+
+The other-asset/other-vault case must assert the selected policy, not treat the
+failure as an accidental limitation: the mutex is global across Teller
+deposits, the nested cross-asset deposit fails closed, and the caller may retry
+it only as a separate transaction after the outer deposit completes.
 
 ### 6.3 Limit, minimum, rounding, and post-credit ordering
 
@@ -359,9 +371,12 @@ A future Phase D implementation cannot be accepted unless:
 3. full repository regression passes;
 4. the diff contains no asset-name, issuer, vault-ID, or chain-ID behavior
    branch;
-5. generated ABI/interface consequences are reviewed under the later Phase I
+5. the integrated-source call graph proves that all operations between `C2`
+   and `C3` preserve measured custody, with both the positive housekeeping
+   liveness case and negative mutation case passing;
+6. generated ABI/interface consequences are reviewed under the later Phase I
    inventory; and
-6. the owner separately authorizes implementation.
+7. the owner separately authorizes implementation.
 
 These are future acceptance conditions, not evidence that any implementation
 now exists.
