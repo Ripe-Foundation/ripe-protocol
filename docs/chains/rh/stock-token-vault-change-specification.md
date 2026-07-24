@@ -1,16 +1,18 @@
 # Shared Stock Token Vault-Change Specification
 
-Status: **Phase E specification complete under the owner-confirmed
-existing-controls instruction; Phases F–K intentionally not finalized**
+Status: **Phase F specification complete under the owner-confirmed settlement
+and total-loss directions; Phases G–K intentionally not finalized**
 
-Date: 2026-07-23 (America/Denver)
+Date: 2026-07-24 (America/Denver)
 
 This document is the Track 8 working specification required by
 `track-8-stock-token-vault-change.md`. It records the evidence reconciliation,
 formal state and invariant model, architecture comparison, mandatory early
 owner checkpoint, exact deposit-accounting design, and backing/debt-health
-design. It does not select a production vault, approve a loss-allocation
-policy, authorize a Base migration, or authorize implementation.
+design, plus the settlement/liquidation/total-loss design. It does not select a
+production vault, approve a partial-loss or recovery allocation, authorize a
+Base migration, approve either newly identified implementation mechanism, or
+authorize implementation.
 
 The owner-confirmed instruction selects option 4 as the architecture direction
 for specification work only. Until the later gates are approved and
@@ -35,7 +37,8 @@ implemented, the operative conclusion remains:
 - Production code, interfaces, tests, mocks, defaults, migrations, manifests,
   ABIs, dependencies, CI, generated artifacts, and `rh-summary.md`: unchanged by
   Track 8
-- Push, merge, deployment, live configuration, and transaction actions: not
+- Track branch push: owner-authorized backup only; no merge
+- Merge, deployment, live configuration, and transaction actions: not
   performed
 
 Parallel Track 6 S1, Track 6 S2, and Track 7 implementation outputs were not
@@ -280,6 +283,46 @@ externally to `f0bfd0fd5ac2be1d27321463b77248c7cd91d829`, committing only those
 same two documentation paths. A direct `c2ded229..f0bfd0f` comparison over the
 Phase E source set in Section 3.4 returned no paths. The Track 8 worktree was
 not rebased, merged, or otherwise moved to that integration commit.
+
+### 3.6 Phase F source and branch recheck
+
+Immediately before Phase F, the isolated Track 8 worktree was clean at
+`0d389625b7f11f92b322d79e4156ff25188f812c`. The branch tracked
+`origin/rh-track-8-stock-token-vault-change` at zero ahead and zero behind
+because the owner had authorized a backup push only. Integration `rh` was clean
+at `f0bfd0fd5ac2be1d27321463b77248c7cd91d829`.
+
+A direct comparison from the Track 8 entry commit to that integration commit
+returned no path in the Phase F source set:
+
+- `AuctionHouse`, `CreditEngine`, `CreditRedeem`, `Deleverage`, `Teller`, and
+  `TellerUtils`;
+- Ledger, MissionControl, and Switchboards Bravo, Charlie, and Delta;
+- `ConfigStructs` and the common Vault interface; and
+- Simple/Rebase wrappers plus BasicVault, SharesVault, and VaultData.
+
+Phase F therefore specifies the same pinned source behavior already reconciled
+in Sections 3.2–3.5. No integration commit was imported, no production source
+was changed, and the backup push did not merge the track branch.
+
+Captured at Phase F entry:
+
+```text
+git status --short --branch
+=> ## rh-track-8-stock-token-vault-change...origin/rh-track-8-stock-token-vault-change
+
+git rev-parse HEAD
+=> 0d389625b7f11f92b322d79e4156ff25188f812c
+
+git -C /Users/wigglez/dev/ripe-protocol status --short --branch
+=> ## rh...origin/rh
+
+git -C /Users/wigglez/dev/ripe-protocol rev-parse HEAD
+=> f0bfd0fd5ac2be1d27321463b77248c7cd91d829
+
+git diff --name-only 0d389625 f0bfd0f -- <Phase F source set above>
+=> no output
+```
 
 ## 4. Current consumer and ordering trace
 
@@ -1238,9 +1281,9 @@ policy.
 | Reject Simple internal transfer while underbacked | **Accepted into the atomic containment group**; exact guard/result behavior is deferred. |
 | Add generic per-asset collateral-use flag | **Functional requirement accepted; new stored flag rejected by the owner.** Phase E derives effective eligibility from existing `canDeposit`, `DebtTerms.ltv`, and automatic backing state without changing `AssetConfig`, storage, or the deployed interface. |
 | Exact per-call deposit delta in the same release | **Specified in Phase D at the shared Teller boundary**; implementation remains unauthorized. |
-| External-only issuer-controlled settlement | **Returned for owner approval**, with a positive recommendation. |
+| External-only issuer-controlled settlement | **Owner-approved for Phase F specification.** Section 16 proves that the policy cannot be enforced per asset by any current field; the exact implementation mechanism is returned without selecting new storage/interface. |
 | Keep generic backing checks even with external-only settlement | **Accepted as invariants I-02, I-06, and I-07**. |
-| Define deficit and total-loss debt progress | **Partially accepted**: containment freezes unsafe progress and keeps repayment open; final exactly-once transition is returned for owner/accounting/security decision. |
+| Define deficit and total-loss debt progress | **Owner-approved for Phase F specification.** Section 16 defines the atomic exactly-once transition and identifies the minimum shared interfaces required; those interfaces and implementation remain unapproved. |
 | Corrected share-based permanent behavior | **Accepted as the recommended permanent architecture**, not selected as a production vault. |
 | Freeze post-zero deposits | **Returned for owner approval**, with a positive default recommendation. |
 | Do not auto-allocate later donations/restoration | **Accepted as a prohibition**; positive allocation remains an owner/counsel/risk decision. |
@@ -1307,27 +1350,60 @@ Phase E therefore may specify only a composition of existing controls and
 automatic backing state. It may not propose new storage or a new external
 interface without first returning to the owner.
 
+On 2026-07-24, the immediately preceding Phase F decision restatement was:
+
+1. issuer-controlled collateral is always external-settlement-only, with no
+   buyer-selected internal ledger settlement; and
+2. Phase F specifies an atomic, exactly-once total-loss transition from user
+   debt to Ledger bad debt; if source proves minimal new storage/interface is
+   necessary, return before selection.
+
+That restatement also excluded implementation, migration, loss allocation,
+production-vault selection, and Phase G. The owner then replied:
+
+> yes i agree iwth your phase F decisions. but once documented, let's pause on
+> work for the night
+
+This owner-confirmed message authorizes Phase F specification work for those
+two directions and requires a stop after documentation. It does not select a
+production vault, approve implementation, approve a Base migration, approve a
+partial-loss/recovery allocation, approve new storage or interfaces, or
+authorize Phase G. Because the source trace below proves that current
+accounting and configuration cannot fully express the directions, Section 16
+identifies the exact minimal shared-interface choices and returns them for a
+later owner decision rather than silently selecting them.
+
 The remaining phase gates below remain operative. The current production
 posture is still `do not list Stock Tokens under the current vault designs`.
 
 ### 12.2 Checkpoint decisions and their actual gates
 
-The product/architecture direction required for Phase D and the existing-
-controls direction required for Phase E are owner-confirmed as satisfied for
-specification work. The remaining seven decisions gate the later phases shown
-below; none is implied by either instruction.
+The product/architecture direction required for Phase D, the existing-controls
+direction required for Phase E, and the two policy directions required for
+Phase F are owner-confirmed as satisfied for specification work. The remaining
+five original decisions gate the later phases shown below. The Phase F source
+trace also creates two narrower implementation-mechanism decisions; neither is
+implied by the policy approval.
 
 | Decision | Options | Evidence and recommendation | Owner | Affected components | Prerequisite / milestone | Status |
 | --- | --- | --- | --- | --- | --- | --- |
 | Product outcome | Five checkpoint options above | Staged containment then corrected share path | Product + protocol owner | Whole track | Before Phase D | **Owner-confirmed: option 4, specification work only** |
-| Per-asset collateral use | Add a stored flag / compose existing controls | Reuse `canDeposit`, `DebtTerms.ltv`, and automatic backing state; do not add storage or a deployed selector | Protocol owner + security | `CM-009`, `CM-011`–`013`, `CM-030`, existing config/getters | Before Phase E | **Owner-confirmed: existing-controls Phase E specification only; implementation and Phase F not approved** |
-| Issuer-controlled settlement | Always external / permit bounded internal | Current internal mode can charge for undeliverable nominal claims; recommend external-only | Protocol owner + risk/security | `CM-026`, `CM-030`, `CM-043`, `CM-044`, Vault interface | Before Phase F | Requested at checkpoint; gates Phase F |
-| Total-loss transition | Approved user-debt→Ledger-bad-debt design / another existing-accounting design / no listing | Current system has no atomic exactly-once path; recommend a separate shared transition specification within the selected release | Protocol owner + accounting/security | `CM-026`, `CM-030`, Ledger, interfaces | Before Phase F | Requested at checkpoint; gates Phase F |
+| Per-asset collateral use | Add a stored flag / compose existing controls | Reuse `canDeposit`, `DebtTerms.ltv`, and automatic backing state; do not add storage or a deployed selector | Protocol owner + security | `CM-009`, `CM-011`–`013`, `CM-030`, existing config/getters | Before Phase E | **Owner-confirmed: existing-controls Phase E specification only; implementation not approved; Phase F was authorized separately on 2026-07-24** |
+| Issuer-controlled settlement | Always external / permit bounded internal | Current internal mode can charge for undeliverable nominal claims; external-only selected | Protocol owner + risk/security | `CM-026`, `CM-030`, `CM-043`, `CM-044`, Vault interface | Before Phase F | **Owner-confirmed: external-only Phase F specification; enforcement mechanism and implementation not approved** |
+| Total-loss transition | Approved user-debt→Ledger-bad-debt design / another existing-accounting design / no listing | Current system has no atomic exactly-once path; atomic transition selected for specification | Protocol owner + accounting/security | `CM-026`, `CM-030`, Ledger, interfaces | Before Phase F | **Owner-confirmed: atomic exactly-once Phase F specification; identified interfaces and implementation not approved** |
 | Post-zero state | Freeze / explicit recapitalization | Recommend freeze by default | Protocol owner + risk | `CM-025`, deposit callers, controls | Before Phase G | Requested at checkpoint; gates Phase G |
 | Later donation/restoration | Old holders / donor return / protocol / explicit recapitalization allocation | No automatic inference is safe; owner must select only with legal/risk review | Protocol owner + counsel/risk | Share math, recovery, migration | Before Phase G | Requested at checkpoint; gates Phase G |
 | Reward attribution | Raw shares / live claims / hybrid explicit units | Current Lootbox uses raw shares and global live value; recommend explicit units, final choice pending S3 coordination | Protocol owner + economics | `CM-033`, `CM-025` | Before Phase G/H | Requested at checkpoint; gates Phase G/H |
 | Base live-version posture | Migrate before RH / bounded temporary drift / justified permanent exception | Funded ID 3 and live controlled assets make this material; recommend Release 1 Base migration subject to plan | Protocol owner + security/operations | Base vault consumers, VaultBook, manifests | Before Phase I/release | Requested at checkpoint; gates Phase I/release |
 | Release 1 Base priority | Hardening requirement / RH prerequisite only / no release | Recommend urgent Base hardening | Protocol owner + security | Containment atomic group | Before implementation track | Requested at checkpoint; gates implementation split |
+
+New Phase F implementation-mechanism decisions, returned because no current
+field or selector safely expresses the approved policies:
+
+| Decision | Options | Recommendation | Required before | Status |
+| --- | --- | --- | --- | --- |
+| External-settlement enforcement | Disable buyer-selected internal settlement for all fungible auctions / add a generic per-asset settlement mode if bounded internal settlement must survive for other assets | Prefer the all-external simplification if product compatibility permits; otherwise approve the narrowly named per-asset mode after Phase I impact review | Any Phase F implementation design | **Returned; no new field, getter, setter, default, migration, or ABI selected** |
+| Atomic bad-debt mechanism | Approve the two-selector CreditEngine→Ledger transition in Section 16.8 / approve another reviewed atomic shared-contract design / do not list | Approve the no-new-storage, compare-and-set two-selector design after accounting/security review | Any Phase F implementation design | **Returned; interfaces and implementation not approved** |
 
 ### 12.3 Decisions explicitly deferred but registered
 
@@ -1364,10 +1440,12 @@ This is a Phase C impact boundary, not the finalized Phase I change table.
 | `CM-044` Deleverage | Delivered amount and zero-custody progress |
 | `CM-045` TellerUtils | Deposit limit inputs and pre-transfer vault views |
 | `CM-007`–`CM-013`, `CM-049` | Defaults, MissionControl, Switchboards, per-asset controls, Robinhood configuration |
-| Ledger | User debt, auctions, and exactly-once protocol bad debt |
-| Existing `ConfigStructs`, MissionControl, and `Vault` interfaces | Phase E reuses current controls/getters; later settlement/result compatibility remains subject to Phase I |
-| StabilityPool, RipeGov, StabVault | Shared Teller deposit boundary must preserve semantics |
-| BondRoom, HumanResources, CreditEngine/CreditRedeem reward paths | Trusted RIPE/sGREEN deposits must consume and verify Teller's returned receipt |
+| Ledger | User debt, aggregate debt/yield, auction removal, and exactly-once protocol bad debt; Phase F identifies but does not approve one new transition selector |
+| Existing `ConfigStructs`, MissionControl, and `Vault` interfaces | Phase E reuses current controls/getters; Phase F proves no current settlement-mode field exists and returns all-external versus a new per-asset mode for Phase I |
+| StabilityPool, StabVault | Shared Teller deposit semantics remain; Stock Token swap/custody route stays disabled |
+| RipeGov | Shared Teller deposit semantics plus the protocol-wide withdrawal-freeze consequence of nonzero bad debt |
+| BondRoom | Existing global bad-debt clearing consumer; clearing cannot restore resolved user debt |
+| HumanResources, CreditEngine/CreditRedeem reward paths | Trusted RIPE/sGREEN deposits must consume and verify Teller's returned receipt |
 | Base/RH migration and manifests | Same canonical source, live-version policy, custody migration, verification |
 
 Track 7 owns exact Robinhood migration IDs/namespaces/tooling. Track 8 will not
@@ -2129,11 +2207,450 @@ Phase E does not select a production vault, approve implementation, change a
 live flag, allocate a loss, authorize liquidation settlement, or create a
 bad-debt transition.
 
-## 16. Phases F–K hold
+## 16. Phase F — settlement, liquidation, and bad-debt progress
+
+### 16.1 Authorization and design boundary
+
+The owner-confirmed Phase F direction is:
+
+1. issuer-controlled collateral is external-settlement-only; and
+2. total loss uses an atomic, exactly-once transition from user debt to
+   Ledger bad debt.
+
+The approval is for specification work only and requires a stop after this
+section and its validation contract are documented. It does not approve:
+
+- a production vault or listed asset;
+- production code, interface, ABI, storage, default, migration, or test
+  changes;
+- a Base transaction or migration;
+- Stability Pool, Endaoment, Curve, Aerodrome, Underscore, or yield routing for
+  Stock Tokens;
+- a nominal partial-loss allocation, restoration/donation allocation, insurer,
+  or recovery token;
+- either implementation mechanism returned in Section 12.2; or
+- Phase G.
+
+The standing `canRedeemCollateral = false` and
+`shouldSwapInStabPools = false` requirements remain mandatory. Phase F defines
+how a future shared implementation must behave; it does not enable either
+route.
+
+### 16.2 Pinned current-path findings
+
+The Phase F source trace at the pinned tree establishes:
+
+| Path | Current ordering and authority | Required Phase F delta |
+| --- | --- | --- |
+| Auction purchase, external mode | `AuctionHouse._buyFungibleAuction` calls `withdrawTokensFromVault` and returns on zero before transferring GREEN and calling `repayDuringAuctionPurchase` (`AuctionHouse.vy:1130-1148`) | Preserve delivery-before-payment ordering; measure what the recipient actually receives and re-check current backing |
+| Auction purchase, internal mode | The buyer controls `_shouldTransferBalance`; `transferBalanceWithinVault` moves only vault accounting, after which GREEN and debt commit (`AuctionHouse.vy:1014-1085`, `1217-1228`) | Unavailable for issuer-controlled collateral; no paid nominal-only move |
+| Stability Pool liquidation | `_swapAssetsWithStabPool` forces external mode, returns on zero, then swaps and reduces the repayment target (`AuctionHouse.vy:735-778`) | Stock Token route remains disabled; if another asset uses it, credit remains bounded by actual delivery |
+| Deleverage | It withdraws externally through AuctionHouse, derives USD value from the returned amount, and calls `repayFromDept` only for the resulting value (`Deleverage.vy:857-907`, `1044-1078`) | Preserve and strengthen delivery measurement; never repay more than recipient receipt |
+| Credit redemption | A caller-selected internal/external mode exists; Stock Tokens are blocked by `canRedeemCollateral`, but the common path burns GREEN after the vault result (`CreditRedeem.vy:197-260`; `CreditEngine.vy:1153-1175`) | Standing Stock Token disable remains; any future external-required asset must reject internal mode and require positive measured delivery before burn/debt change |
+| Auction creation | `_canStartAuction` checks a nominal/user balance and liquidation state, not live custody (`AuctionHouse.vy:876-888`) | Require a positive safely allocable live amount at creation and restart |
+| Active auction | Ledger stores timing/identity, but no custody reservation or snapshot (`Ledger.vy:575-754`) | Re-evaluate live allocable custody on every purchase; an auction never reserves custody |
+| User debt | Only CreditEngine can call `Ledger.setUserDebt`; clearing liquidation removes all fungible auctions (`Ledger.vy:318-353`) | Keep CreditEngine as debt-policy owner |
+| Protocol bad debt | `Ledger.setBadDebt` is a Switchboard-only global overwrite; Switchboard Delta reaches it through a pending governed action (`Ledger.vy:829-841`; `SwitchboardDelta.vy:936-947`, `1298-1301`) | Do not use this manual overwrite to simulate an atomic per-user transition |
+
+The source contains no automatic current path that both removes a specific
+liability from `userDebt` and increments `badDebt`. It also contains no
+per-user bad-debt marker. Those are current-behavior facts, not proposed
+changes.
+
+### 16.3 Settlement vocabulary
+
+For one `(vault, asset, user, recipient)` settlement attempt:
+
+| Symbol | Meaning |
+| --- | --- |
+| `C` | Live token custody at the vault immediately before delivery. |
+| `K_u` | User's live economic claim under the selected vault math. |
+| `L_u` | Amount safely allocable to the user now, after aggregate backing, allocation, and route policy. |
+| `Q` | Maximum token amount requested from the vault for this settlement. |
+| `W` | Amount the vault deducts from the user's claim and reports as withdrawn. |
+| `R` | Positive call-local increase in the external recipient's token balance. |
+| `E` | Chargeable delivery amount: `min(Q, W, R)`, subject to the mismatch rules below. |
+| `V(E)` | GREEN-denominated value of `E` under the approved price calculation. |
+| `P` | GREEN actually committed for this settlement. |
+
+For total-loss debt resolution:
+
+| Symbol | Meaning |
+| --- | --- |
+| `D_s` | User debt stored in Ledger at the transition's compare-and-set point. |
+| `Y` | Interest accrued from `D_s.lastTimestamp` to the transition timestamp but not yet stored or added to `unrealizedYield`. |
+| `D_f` | Final current user liability, `D_s.amount + Y`, after all earlier actual repayments are reflected. |
+| `X` | Residual liability moved atomically from user debt to bad debt; for the selected full total-loss transition, `X = D_f`. |
+| `BD_0`, `BD_1` | Ledger bad debt immediately before and after the transition. |
+
+`W` is not proof of delivery. A fee-on-transfer or otherwise nonstandard token
+can debit the vault by `W` while increasing the recipient by less. Payment and
+debt reduction use `E`, never `W` alone.
+
+### 16.4 Generic settlement contract
+
+Issuer-controlled collateral has one allowed settlement result: externally
+delivered tokens. A buyer cannot opt into an internal vault-balance transfer.
+This applies to auction purchases and to any other common path that later
+permits settlement of that asset. The current Stock Token redemption and
+Stability Pool flags remain false, so the rule does not imply enabling those
+paths.
+
+An external settlement must execute in this order:
+
+1. validate the asset route, buyer/recipient, auction state, backing state, and
+   maximum current `L_u`;
+2. snapshot recipient balance and relevant vault/user accounting;
+3. request `Q <= L_u` from the vault;
+4. execute the token transfer;
+5. measure `W` and recipient delta `R`;
+6. reject a negative recipient delta, `W = 0`, `R = 0`, `W > L_u`,
+   `R > W`, or any unexplained accounting increase;
+7. set `E = min(Q, W, R)` and price only `E`;
+8. commit GREEN transfer/burn/swap and reduce user debt by no more than the
+   corresponding paid value;
+9. update auction state, vault participation, rewards, and housekeeping from
+   the committed `E`; and
+10. emit the complete requested/debited/received/paid result.
+
+`R < W` is an explicit short-delivery result, not a reason to overcharge the
+buyer. Only `R` can support payment. The difference `W - R` is a collateral
+transfer loss and must remain visible in the ending custody/claim evidence; it
+cannot be silently reassigned to another user. An implementation may instead
+reject all `R != W` tokens as unsupported, but it may not charge on `W` when
+the recipient received less. `R > W` is rejected because recipient reflection,
+rebase, or unrelated inflow is not collateral delivered from the liquidated
+claim.
+
+If the transfer reverts, returns false, produces an invalid delta, or fails
+because of pause/blocklist/operator controls, the complete EVM transaction
+reverts. GREEN ownership, user debt, vault accounting, auction data, rewards,
+and housekeeping remain unchanged. The auction stays retryable after the token
+restriction is removed; a temporary transfer restriction is not total loss.
+
+For a batch, each row re-checks the policy and current `L_u`. A disallowed
+internal issuer-controlled row contributes zero and cannot consume GREEN or
+custody. Any later row sees custody and debt after prior committed rows in the
+same transaction, so two buyers or two rows cannot allocate the same units.
+
+### 16.5 Internal settlement for other assets
+
+The task contract permits, but does not require, retaining internal settlement
+for other assets. If retained, all of the following are mandatory:
+
+- the asset's approved settlement mode permits it;
+- the vault exposes a live claim, not raw nominal accounting;
+- `L_u > 0`;
+- the aggregate post-transfer claims remain no greater than live custody;
+- a nominal vault is fully backed (`C >= N`) before and after the move;
+- a share vault moves only the shares corresponding to the current live claim;
+- the returned amount is no greater than `L_u`; and
+- payment, debt, participation, points, and events commit only after the
+  accounting move succeeds.
+
+Under a nominal deficit, current Simple-vault internal and external settlement
+remain frozen. `min(userNominal, C)` is still rejected because it assigns
+shared loss by caller order. Under a corrected share path, the current live
+pro-rata claim can be safely allocable once Phase G approves the formulas and
+post-zero policy.
+
+This bounded-other-asset rule is not an exception for Stock Tokens.
+Issuer-controlled collateral remains external-only even while fully backed
+and even if an internal share transfer would be mathematically conserved. That
+is necessary because an internal move does not exercise issuer pause,
+blocklist, confiscation, or recipient eligibility.
+
+### 16.6 No existing settlement-mode parameter
+
+The source was re-searched specifically to avoid adding a parameter
+unnecessarily. `AssetConfig` contains deposit limits, `DebtTerms`, liquidation
+routes, auction/redemption permissions, whitelist, and NFT state, but no field
+that means issuer-controlled or external-only settlement
+(`ConfigStructs.vyi:88-109`). `MissionControl.getAuctionBuyConfig` returns only
+general/asset buy permissions, recipient allowlisting, and deposit-for-user
+permission (`MissionControl.vy:713-722`).
+
+Existing fields cannot safely stand in for settlement mode:
+
+| Existing field | Why it is not the policy |
+| --- | --- |
+| `canBuyInAuction` | Enables or disables the entire purchase; it does not choose external versus internal delivery. |
+| `canRedeemCollateral` | Controls a different route. Base USDC and other non-issuer assets also use `false`, so it is not an issuer classifier. |
+| `shouldSwapInStabPools` | Selects a Stability Pool liquidation route, which Stock Tokens must keep disabled. |
+| `shouldAuctionInstantly` | Selects auction creation, not settlement delivery. |
+| `shouldTransferToEndaoment` / `shouldBurnAsPayment` | Select deleverage destinations/payment assets and do not describe buyer delivery. |
+| `DebtTerms.ltv` or `canDeposit` | Govern credit capacity/admission; overloading either would reintroduce the Phase E semantic coupling this track carefully bounded. |
+| whitelist, vault ID, token address/name, or chain ID | Either controls a different permission or violates the generic-design rule. |
+
+There are therefore only two honest implementation shapes:
+
+1. **All fungible auctions external.** Remove or reject buyer-selected internal
+   settlement for every fungible asset. This needs no new stored mode and is
+   the preferred simplification if product compatibility permits the broader
+   behavior change.
+2. **Generic per-asset mode.** If internal settlement must remain for some
+   assets, add a narrowly named `requiresExternalSettlement`/settlement-mode
+   field, carry it through the auction/redemption config getters, govern
+   disable/re-enable semantics, default issuer-controlled assets to external,
+   and migrate existing assets explicitly.
+
+Option 2 is the exact new-storage/interface proposal that would be required;
+it is **not selected or approved**. Option 1 is also not silently selected
+because the owner's policy approval covered issuer-controlled collateral, not
+a behavior change for every existing asset. The owner must choose after the
+Phase I compatibility inventory.
+
+### 16.7 Auction, liquidation, redemption, and deleverage behavior
+
+Auction creation and restart require all current checks plus
+`L_u > 0`. A nominal deficit with unresolved allocation, `C = 0`, a zero live
+share claim, or an external-required asset that cannot currently deliver
+cannot create a paid auction. Liquidation eligibility remains distinct:
+existing debt can be unsafe and resolution-eligible even when auction
+eligibility is false.
+
+An auction is not a custody reservation. On every purchase:
+
+- re-read the vault address, asset policy, current custody, user claim, and
+  `L_u`;
+- cap `Q` to the lower of remaining GREEN capacity and current `L_u`;
+- settle only `E`;
+- if live custody fell after creation, reduce the purchase to current `E`;
+- if `L_u = 0` because custody is gone, make no payment/debt change and mark or
+  remove the stale auction before total-loss finalization; and
+- if positive custody exists but transfer is temporarily blocked, revert and
+  retain the auction for retry rather than declaring total loss.
+
+Auction purchase serialization plus the fresh `L_u` read proves that the first
+purchase changes the second purchase's bound. No static auction snapshot can
+allocate the same custody twice.
+
+Credit redemption remains disabled for Stock Tokens. If governance ever asks
+to enable redemption for another external-required asset, its common
+`_shouldTransferBalance` input must reject/skip internal mode and its GREEN burn
+and debt change must use positive measured `E`, not the vault's raw return.
+That future enablement is outside this approval.
+
+Deleverage remains external-only. Each asset leg must use measured `E` and
+return an actual paid value. `totalRepaidAmount` is the sum of those paid
+values, capped by current user debt. A zero/failed delivery contributes zero;
+it cannot be converted into repayment by a target amount, nominal balance, or
+price alone. The Stock Token standing constraints prohibit routing through
+Endaoment, a Stability Pool, Curve, Aerodrome, Underscore, or a yield adapter.
+
+### 16.8 Total-loss resolution eligibility
+
+Total-loss resolution is a terminal liability transition, not another auction
+or a loss-allocation shortcut. A user is eligible only when one same-
+transaction scan proves all of the following:
+
+1. current `D_f > 0`;
+2. the account is in liquidation under preserved nonzero resolution terms;
+3. at least one debt-supporting position is zero- or deficit-backed;
+4. every safely deliverable positive claim in every participating vault has
+   already been exhausted through an approved route;
+5. no positive live custody remains whose ownership is unresolved by the
+   nominal partial-loss policy;
+6. no positive custody is merely paused, blocklisted, stale-priced, or
+   otherwise temporarily undeliverable;
+7. no active auction can still deliver positive collateral;
+8. every zero-backed auction is canceled in the transition or was already
+   removed; and
+9. the debt snapshot used for transition still matches Ledger at commit.
+
+Mixed collateral cannot jump this gate. Solvent collateral must be delivered
+and applied first. A nominal partial deficit with `C > 0` remains frozen until
+the owner approves an allocation; Phase F does not use total-loss resolution
+to award that custody to a particular borrower, buyer, or the protocol.
+
+Missing/stale price alone never proves total loss. Conversely, `C = 0` and no
+other positive claim are token-unit facts and must not be hidden by a missing
+price. Repayment remains available until the transition transaction commits.
+A repayment mined first changes `D_s`/`D_f`, causing a stale transition
+compare-and-set to fail or recompute. A transition mined first leaves user debt
+zero, so a later `repayForUser` rejects at the existing no-debt validation
+without changing liability.
+
+### 16.9 Atomic exactly-once accounting
+
+At the commit point, let current user liability be
+`D_f = D_s.amount + Y`. The selected transition moves the full residual:
+
+```text
+X = D_f
+userDebt_before = D_f
+userDebt_after  = 0
+BD_1            = BD_0 + X
+```
+
+The same call must also:
+
+- remove `D_s.amount` from aggregate `totalDebt`;
+- set principal to zero, `inLiquidation` to false, and remove the borrower;
+- remove all of the user's fungible auctions;
+- leave every vault balance/share/custody value unchanged;
+- leave GREEN supply and ownership unchanged;
+- leave pre-existing `unrealizedYield` unchanged; and
+- add the newly accrued `Y` to `unrealizedYield` exactly once, matching current
+  `setUserDebt` accrual semantics, without flushing or minting it during the
+  transition.
+
+`Y` is included in both the final user liability moved to `badDebt` and the
+global pending-yield accumulator for different accounting purposes: `badDebt`
+records the unpaid liability, while `unrealizedYield` preserves the protocol's
+current accrued-interest booking. A later ordinary borrow can flush and mint
+that pending yield under current behavior. Accounting/security review must
+accept that consequence with the proposed interface; silently dropping `Y`
+from either `X` or the current yield-booking path is not approved.
+
+No new liquidation fee is created merely because no collateral can be
+delivered. Fees already persisted in `D_s.amount` are part of the existing
+liability; any alternative fee write-off policy requires a separate accounting
+decision.
+
+Exactly-once does not require a new per-user storage marker. The terminal
+`userDebt.amount = 0`, an expected-debt/expected-timestamp compare-and-set, and
+the atomic `badDebt += X` operation are the marker:
+
+- a duplicate call sees zero user debt and cannot add `X` again;
+- a concurrent repayment changes the expected debt snapshot and prevents a
+  stale addition;
+- an auction purchase that commits first changes debt/custody and invalidates
+  eligibility;
+- a transition that commits first removes auctions, so a later purchase cannot
+  pay; and
+- any revert rolls back debt, bad debt, auction removal, borrower removal, and
+  events together.
+
+Later recovery, donation, or issuer restoration does not reverse this
+transition automatically. Allocation of recovered property remains a Phase G
+owner/counsel/risk decision.
+
+### 16.10 Exact shared-contract interface needed
+
+Current accounting cannot safely express Section 16.9:
+
+- only CreditEngine may call `Ledger.setUserDebt`;
+- only a Switchboard may call `Ledger.setBadDebt`;
+- `setBadDebt` overwrites the global value rather than incrementing it;
+- the two calls cannot currently be authorized and validated as one
+  per-user compare-and-set; and
+- using `repayFromDept` without delivered value would mislabel a write-off as a
+  repayment and still would not increment bad debt.
+
+The minimum coherent shared-contract proposal uses existing storage and two
+new selectors:
+
+1. `CreditEngine.resolveUserTotalLoss(user, ...) -> transitionedAmount`
+   performs the complete Section 16.8 scan, accrues `Y`, pins the Ledger debt
+   snapshot, and invokes the Ledger transition. The recommended caller policy
+   is permissionless/keeper-callable behind exact predicates and the existing
+   Department pause, so no new governance queue is needed merely to make a
+   deterministic unsafe account progress.
+2. `Ledger.moveUserDebtToBadDebt(user, expectedStoredAmount,
+   expectedLastTimestamp, finalDebtAmount, accruedInterest)` is CreditEngine-
+   only. It asserts the expected stored snapshot, `finalDebtAmount =
+   expectedStoredAmount + accruedInterest`, positive debt, and the required
+   liquidation state; then performs every state change in Section 16.9 and
+   returns `X`.
+
+This proposal adds no new storage slot, no asset parameter, no insurer, and no
+recovery asset. It does add one CreditEngine ABI selector, one Ledger ABI
+selector/interface declaration, and corresponding events. The conceptual
+Ledger event must include at least:
+
+```text
+user
+expectedStoredAmount
+accruedInterest
+transitionedAmount
+badDebtBefore
+badDebtAfter
+caller
+```
+
+CreditEngine must emit the eligibility/consumer result or the Ledger event must
+also carry the resolution caller and canceled-auction count. Existing
+`RepayDebt` must not be reused because no GREEN was repaid.
+
+The current governed `setBadDebt(amount)` may remain only as an explicitly
+audited global reconciliation tool. It must not be used for individual
+transitions, and future Phase I review must ensure an overwrite cannot
+accidentally erase bad debt accumulated by atomic transitions.
+
+The two selectors, caller policy, and event/ABI changes are an exact proposal,
+not an approval. They are returned to the owner for accounting/security review
+before any implementation design. If rejected, the fallback remains: do not
+list.
+
+### 16.11 Controls, liveness, and evidence
+
+The existing fast `canDeposit = false` action remains the incident containment
+switch described in Phase E. `canBuyInAuction = false` prevents new purchases
+but does not itself cancel custody claims or move debt. The general
+`canLiquidate` control governs liquidation entry. Department pauses on Teller,
+AuctionHouse, CreditEngine, vaults, and Ledger retain their existing authority
+and can stop the relevant call path; resumption uses the same existing
+governance/department controls.
+
+The proposed total-loss entry must fail while CreditEngine or Ledger is paused.
+That is the emergency stop. It must not depend on a new live asset flag or a
+price. Once unpaused, a still-eligible account can be retried from current
+state. Ordinary repayment stays available whenever Teller, CreditEngine,
+Ledger, and the existing repay control are active, even if asset deposit,
+borrow, liquidation, or auction buying is disabled.
+
+Operational evidence must distinguish:
+
+- unsafe debt health;
+- auction eligibility;
+- live custody and safely allocable claim;
+- external transfer blocked versus custody absent;
+- active, stale, paused, and removed auction;
+- user debt before/after;
+- newly accrued interest included in `X`;
+- aggregate total debt before/after;
+- bad debt before/after; and
+- transition caller, transaction, block/time, and source/runtime hashes.
+
+The global effects of increasing `badDebt` are intentional but must be
+reviewed: BondRoom bond proceeds can clear it, and RipeGov configurations with
+`shouldFreezeWhenBadDebt` prevent withdrawal while it is nonzero
+(`BondRoom.vy:202-214`; `RipeGov.vy:283-286`). A per-user transition therefore
+has protocol-wide governance-token liveness consequences even though it
+touches no RipeGov balance directly.
+
+### 16.12 Phase F acceptance and stop boundary
+
+Phase F is specification-complete only with companion validation-plan
+Section 8. A future implementation must prove:
+
+1. an issuer-controlled auction cannot use buyer-selected internal settlement;
+2. external delivery precedes and bounds every GREEN/debt commit;
+3. short or fee-charged delivery cannot overcharge;
+4. two rows/buyers cannot allocate the same custody;
+5. custody loss after auction creation is re-evaluated at purchase;
+6. total loss cannot create or preserve a paid zero-backed auction;
+7. pause/blocklist failure is atomic and retryable, not bad debt;
+8. deleverage repayment is no greater than actual delivered value;
+9. mixed solvent collateral is exhausted before resolution;
+10. user debt decreases by exactly `X` while bad debt increases by exactly
+    `X`, once;
+11. newly accrued `Y` is included in `X`, added to `unrealizedYield` exactly
+    once under current accrual semantics, and not minted during transition;
+12. repayment/auction/transition race orders conserve liability and custody;
+13. existing Department pauses stop and resume resolution; and
+14. no new storage, interface, ABI, default, migration, or production behavior
+    is treated as approved by this document.
+
+Phase F does not select either returned mechanism. The work stops here for the
+owner-requested pause. Phase G and all implementation/interface/storage work
+remain unauthorized.
+
+## 17. Phases G–K hold
 
 The following are deliberately **not finalized**:
 
-- settlement, liquidation, and total-loss bad-debt transition mechanics;
 - corrected permanent share formulas and post-zero allocation;
 - remaining control roles and clock behavior;
 - exact source/storage/interface/migration impact table;
@@ -2141,10 +2658,10 @@ The following are deliberately **not finalized**:
 - implementation PR split and atomic deployable groups; and
 - exact `rh-summary.md` handoff.
 
-Work must not continue into Phase F or later until the owner resolves the
+Work must not continue into Phase G or later until the owner resolves the
 corresponding Section 12 gate and expressly authorizes that phase.
 
-## 17. Checklist handoff at this checkpoint
+## 18. Checklist handoff at this checkpoint
 
 No `rh-summary.md` checkbox is edited or closed.
 
@@ -2157,8 +2674,8 @@ Eligible for owner review:
 - Section 4, **finish the Simple versus Rebase comparison** (line 186 at the
   baseline) — Track 5 evidence is hash-verified, source-reconciled, and rerun.
 - Section 4, **write a separate vault-change specification if current behavior
-  is unacceptable** (line 190 at the baseline) — Phases A–E are specified, but
-  the item is not eligible for closure until Phases F–K are owner-directed and
+  is unacceptable** (line 190 at the baseline) — Phases A–F are specified, but
+  the item is not eligible for closure until Phases G–K are owner-directed and
   completed.
 
 Not eligible for closure:

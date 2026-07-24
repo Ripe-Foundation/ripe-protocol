@@ -1,23 +1,26 @@
 # Stock Token Vault-Change Validation Plan
 
-Status: **Phases D–E test contracts specified under owner-confirmed
+Status: **Phases D–F test contracts specified under owner-confirmed
 instructions — not a finalized Phase J plan**
 
-Date: 2026-07-23 (America/Denver)
+Date: 2026-07-24 (America/Denver)
 
 This document keeps the Phase B invariant model, Phase C architecture
 comparison, owner-confirmed Phase D deposit design, and owner-confirmed Phase E
-backing/debt-health design testable. The instructions select option 4,
+backing/debt-health design testable, together with the owner-confirmed Phase F
+external-settlement and total-loss directions. The instructions select option 4,
 containment followed by the corrected share path, then reject a new stored
 per-asset collateral-use parameter and authorize Phase E specification using
 existing deposit controls and `DebtTerms.ltv`. The owner confirmed both quotes
-under `stock-token-vault-change-specification.md` Section 12.1. This is
-checkpoint option 4, the combination of architecture outcomes 2 and 3, not the
-separately numbered “another generic shared design.” All paths below are
-proposed future paths. No test, fixture, mock, production contract, interface,
-dependency, CI file, manifest, or ABI was created or changed.
+under `stock-token-vault-change-specification.md` Section 12.1. On 2026-07-24,
+the owner also approved the two Phase F policy directions and required work to
+pause after they were documented. This is checkpoint option 4, the combination
+of architecture outcomes 2 and 3, not the separately numbered “another generic
+shared design.” All paths below are proposed future paths. No test, fixture,
+mock, production contract, interface, dependency, CI file, manifest, or ABI
+was created or changed.
 
-The Phase D and E test contracts are now specific enough for later
+The Phase D–F test contracts are now specific enough for later
 implementation planning. The full Phase J plan cannot be finalized until the
 owner resolves the later policy decisions in
 `stock-token-vault-change-specification.md` Section 12.
@@ -64,8 +67,9 @@ against the owner-approved shared implementation.
 | `tests/core/teller/test_teller_deposit_receipts.py` | Teller integration | `CM-034`, `CM-045`, every deposit entry point | Proposed; Phase D behavior specified, implementation not approved |
 | `tests/vaults/modules/test_vault_loss_properties.py` | Math/property | `CM-024`, `CM-025` | Proposed; loss/rounding policy required |
 | `tests/core/creditEngine/test_deficit_aware_credit.py` | CreditEngine | `CM-030`, `CM-009`, Ledger | Proposed; Phase E existing-controls behavior specified, implementation not approved |
-| `tests/core/auctionHouse/test_loss_aware_auctions.py` | AuctionHouse | `CM-026`, `CM-030`, Ledger | Proposed; settlement and bad-debt policy required |
-| `tests/core/deleverage/test_loss_aware_deleverage.py` | Teller/Deleverage | `CM-034`, `CM-044`, `CM-026` | Proposed |
+| `tests/core/auctionHouse/test_loss_aware_auctions.py` | AuctionHouse | `CM-026`, `CM-030`, Ledger | Proposed; Phase F policy specified, enforcement mechanism not approved |
+| `tests/core/deleverage/test_loss_aware_deleverage.py` | Teller/Deleverage | `CM-034`, `CM-044`, `CM-026` | Proposed; Phase F delivery bound specified |
+| `tests/data/test_ledger_bad_debt_transition.py` | Ledger/CreditEngine | Ledger, `CM-030`, `CM-026` | Proposed; Phase F atomic transition specified, two selectors not approved |
 | `tests/core/lootbox/test_vault_loss_rewards.py` | Rewards/monitoring | `CM-033`, `CM-025` | Proposed; rewards-unit decision required |
 | `tests/config/test_asset_collateral_controls.py` | Governance/config | `CM-009`, `CM-011`–`CM-013`, existing config/getters | Proposed; Phase E no-new-storage control semantics specified |
 | `tests/registries/test_vault_book_migration.py` | Migration | `CM-021`, vaults, Ledger, manifests | Proposed; pending Track 7 and owner migration policy |
@@ -92,19 +96,19 @@ Likely reusable fixtures, subject to post-checkpoint design:
 | I-01 exact receipt | `test_short_second_deposit_cannot_overcredit_either_path` | Vault/Teller | Both nominal and share paths credit only actual receipt | Phase D specified |
 | I-02 borrowing conservation | `test_sum_borrow_amounts_never_exceeds_live_custody` | Property/Credit | Invariant holds across users, deposits, losses, and withdrawals | Architecture |
 | I-03 claim conservation | `test_all_withdrawal_orders_are_custody_bounded` | Property/Vault | Two-user orders cannot allocate more than custody | Loss allocation |
-| I-03 claim conservation | `test_two_buyers_cannot_allocate_same_remaining_custody` | Auction | Both purchase orders conserve custody | Settlement model |
-| I-04 pay for delivery | `test_green_and_debt_commit_only_after_actual_delivery` | Auction/Deleverage | Payment/debt value is bounded by delivered amount/value | Settlement policy |
-| I-05 atomic failure | `test_pause_blocklist_false_return_and_revert_leave_state_unchanged` | Vault/Auction | Balances, debt, GREEN, rewards, and auction state unchanged | External-only policy |
+| I-03 claim conservation | `test_two_buyers_cannot_allocate_same_remaining_custody` | Auction | Both purchase orders conserve custody | Phase F specified |
+| I-04 pay for delivery | `test_green_and_debt_commit_only_after_actual_delivery` | Auction/Deleverage | Payment/debt value is bounded by delivered amount/value | Phase F specified |
+| I-05 atomic failure | `test_pause_blocklist_false_return_and_revert_leave_state_unchanged` | Vault/Auction | Balances, debt, GREEN, rewards, and auction state unchanged | Phase F specified |
 | I-06 deficit visibility | `test_zero_borrow_value_does_not_erase_existing_debt_terms` | Credit | Deficit remains resolution/liquidation-visible | Phase E specified |
 | I-06 deficit visibility | `test_mixed_collateral_preserves_solvent_terms_and_unsafe_debt_signal` | Credit | Solvent collateral remains valued; deficit cannot create false health | Phase E specified |
 | I-07 no new unsafe debt | `test_one_unit_deficit_contributes_zero_new_capacity` | Credit | Preview and state-changing borrow match and return/revert safely | Phase E specified |
 | I-07 no new unsafe debt | `test_disabled_asset_cannot_support_new_borrow` | Governance/Credit | Existing fast disable affects every credit surface | Phase E specified |
-| I-08 exactly once | `test_total_loss_moves_liability_to_bad_debt_exactly_once` | Credit/Auction/Ledger | User debt decreases by `x`, bad debt increases by `x`, repeat is no-op/revert | Bad-debt policy |
-| I-08 exactly once | `test_repayment_race_uses_one_pinned_debt_state` | Credit/Ledger | Repay and transition cannot duplicate or lose liability | Bad-debt policy |
+| I-08 exactly once | `test_total_loss_moves_liability_to_bad_debt_exactly_once` | Credit/Auction/Ledger | User debt decreases by `x`, bad debt increases by `x`, repeat is no-op/revert | Phase F specified; interfaces pending |
+| I-08 exactly once | `test_repayment_race_uses_one_pinned_debt_state` | Credit/Ledger | Repay and transition cannot duplicate or lose liability | Phase F specified; interfaces pending |
 | I-09 repay liveness | `test_repayment_remains_available_during_deficit_freeze` | Credit/Teller | Repay succeeds while borrow/deposit/settlement are frozen | Product direction |
 | I-10 post-zero | `test_new_deposit_reverts_while_old_shares_exist_at_zero` | Share vault | No new shares or value transfer | Freeze/recap decision |
 | I-10 post-zero | `test_restoration_has_only_owner_approved_allocation` | Share/property | No automatic capture by old/new users outside selected policy | Donation policy |
-| I-11 external-only | `test_issuer_asset_rejects_buyer_internal_override` | Auction/config | Internal mode unavailable; external delivery enforced | Settlement policy |
+| I-11 external-only | `test_issuer_asset_rejects_buyer_internal_override` | Auction/config | Internal mode unavailable; external delivery enforced | Phase F specified; mechanism pending |
 | I-12 price independence | `test_deficit_guard_survives_missing_or_zero_price` | Credit | Custody status remains visible and fail-closed without price | Phase E specified |
 
 ## 4. Sixteen-state matrix
@@ -534,9 +538,156 @@ A future Phase E implementation cannot be accepted unless:
 11. the owner separately authorizes implementation.
 
 These are future acceptance conditions, not evidence that any implementation
-exists. Phase F settlement and bad-debt behavior remains separately gated.
+exists. Phase F policy is specified separately below; its implementation
+mechanisms remain gated.
 
-## 8. Exact-token fork plan
+## 8. Phase F settlement and total-loss validation contract
+
+No test in this section exists yet. The policy outcomes are owner-confirmed;
+the all-external-versus-per-asset enforcement mechanism and the proposed
+CreditEngine/Ledger selectors remain unapproved. Common tests below are
+mandatory under either settlement mechanism. Branch-specific tests become
+mandatory only if the owner later selects that mechanism.
+
+### 8.1 Current-behavior and mechanism boundary
+
+| Test | Setup | Required result |
+| --- | --- | --- |
+| `test_current_internal_auction_reproduces_nominal_only_delivery` | Pinned current Simple path after total issuer burn, buyer selects internal | Preserve the Track 5 regression: nominal buyer balance moves and GREEN/debt commit without token delivery |
+| `test_current_external_auction_delivery_precedes_payment` | Pinned ordinary external purchase | Token transfer occurs before GREEN transfer and debt reduction |
+| `test_no_existing_asset_config_field_means_external_settlement` | Inspect compiled/source `AssetConfig`, `AuctionBuyConfig`, and getters | No existing field is mislabeled or overloaded as the new policy |
+| `test_all_external_option_rejects_internal_for_every_fungible_asset` | Only if the all-external mechanism is owner-selected | Every `_shouldTransferBalance = true` auction request fails/skips without payment; external mode remains functional |
+| `test_per_asset_mode_option_is_generic_and_default_safe` | Only if the per-asset mechanism is owner-selected | No token/name/vault/chain branch; issuer fixture is external-required; every migrated existing asset has an explicit reviewed value |
+| `test_unselected_mechanism_has_no_schema_or_abi_delta` | Compare approved implementation against the selected option | No field/selector/default/migration from the rejected option appears |
+
+The first current-behavior test must remain pinned and passing against the
+unsafe baseline. The corresponding future behavior test must fail against that
+baseline and pass only against the approved shared implementation.
+
+### 8.2 Delivery, payment, and custody conservation
+
+For every test below, record vault custody, liquidated-user claim, recipient
+balance, vault-reported withdrawal `W`, measured recipient delta `R`,
+chargeable delivery `E`, GREEN owner balances, user debt, aggregate debt,
+auction data, participation, points, and events before and after.
+
+| Test | Scenario | Required result |
+| --- | --- | --- |
+| `test_issuer_asset_rejects_buyer_internal_override` | Solvent issuer-controlled asset, buyer requests internal mode | No claim move, token move, GREEN spend, debt change, point change, or auction mutation |
+| `test_external_delivery_commits_before_green_and_debt` | Ordinary external purchase | Positive `E` exists before GREEN/debt commit; `P <= V(E)` |
+| `test_zero_recipient_delta_cannot_charge_green` | Transfer returns true but recipient delta is zero | Entire purchase reverts or contributes zero with all payment/debt state unchanged |
+| `test_short_outbound_receipt_cannot_overcharge` | Vault debit/return `W`, recipient gets `R < W` | Charge and debt reduction use at most `V(R)`; `W-R` remains explicit in diagnostics, or the transaction rejects the token atomically |
+| `test_recipient_delta_above_vault_debit_reverts` | Reflection/rebase gives `R > W` | No collateral windfall is priced as liquidated delivery; full atomic revert |
+| `test_paused_external_settlement_is_atomic_and_retryable` | Issuer pause before purchase, then unpause | Paused attempt changes nothing and does not create bad debt; same auction can settle after unpause |
+| `test_sender_recipient_operator_blocklist_is_atomic` | Each relevant token role blocked separately | All affected state unchanged; removal of the block permits retry |
+| `test_two_buyers_cannot_allocate_same_remaining_custody` | Both buyer orders after partial custody reduction | Sum of `E` across purchases is no greater than safely allocable custody in either order |
+| `test_batch_rows_recheck_live_custody` | Duplicate asset/user rows in one batch | Later row sees prior row's custody/claim/debt result and cannot reuse it |
+| `test_custody_loss_after_auction_creation_reprices_delivery` | Start solvent auction, then reduce custody before buy | Purchase uses current `L_u`/`E`, not creation-time nominal amount |
+| `test_total_loss_after_auction_creation_cannot_be_paid` | Start auction, then make `C = 0` | No GREEN or debt commit; stale auction is removed/canceled before resolution |
+| `test_new_total_loss_position_cannot_start_paid_auction` | `C = 0` before liquidation/start/restart | Liquidation may be resolution-eligible, but no paid auction is created |
+| `test_nominal_partial_deficit_freezes_settlement` | `0 < C < N` with no approved allocation | Internal and external settlement remain frozen; no first-caller allocation |
+| `test_bounded_internal_other_asset_is_aggregate_safe` | Only if internal mode is retained for a non-issuer asset | Returned internal amount is live-claim bounded and aggregate post-move claims remain `<= C` |
+
+Atomic-failure tests must compare complete relevant state or state roots, not
+only the function return value.
+
+### 8.3 Settlement consumer matrix
+
+| Consumer | Named test | Required result |
+| --- | --- | --- |
+| AuctionHouse single | `test_single_auction_uses_measured_external_delivery` | `E` controls payment, debt, event, and depletion |
+| AuctionHouse batch | `test_batch_mixed_policy_rows_do_not_cross_charge` | Disallowed issuer/internal row consumes neither GREEN nor custody; allowed rows reconcile independently |
+| CreditRedeem | `test_stock_token_redemption_remains_disabled` | General and asset config reads remain false for Stock Tokens; no internal or external redemption |
+| CreditRedeem future external-required fixture | `test_external_required_redemption_cannot_use_internal_mode` | If this route is ever separately enabled, positive measured `E` precedes burn/debt; zero `E` cannot burn |
+| Deleverage | `test_deleverage_repay_is_bounded_by_recipient_delta` | Sum repaid is no greater than sum of delivered values; target amount alone has no effect |
+| Deleverage zero/failed leg | `test_deleverage_zero_delivery_contributes_zero_repayment` | Later valid legs may continue if designed to do so; missing leg cannot repay |
+| Stability Pool | `test_stock_token_stability_pool_route_remains_disabled` | `shouldSwapInStabPools = false`; no Stock Token custody enters a pool |
+| Standing integration exclusions | `test_stock_token_has_no_unsupported_settlement_route` | No Endaoment, Curve, Aerodrome, Underscore, or yield path |
+
+### 8.4 Total-loss eligibility matrix
+
+| Test | Setup | Required result |
+| --- | --- | --- |
+| `test_total_loss_resolution_requires_positive_current_debt` | Zero-debt user with missing collateral accounting | No transition and no bad-debt increment |
+| `test_total_loss_resolution_requires_liquidation_state` | Unhealthy/zero-backed but not yet in liquidation | Resolution entry rejects until the approved liquidation state is established |
+| `test_mixed_solvent_collateral_must_be_exhausted_first` | Missing issuer asset plus another positive deliverable claim | No bad-debt transition while any safely deliverable claim remains |
+| `test_nominal_partial_deficit_is_not_total_loss` | Positive shared custody with unresolved nominal ownership | No transition; no allocation of residual custody |
+| `test_paused_positive_custody_is_not_total_loss` | Positive custody but token paused/blocklisted | No transition; retry after token control clears |
+| `test_missing_price_is_not_total_loss` | Positive custody and missing/stale price | No transition based solely on price failure |
+| `test_zero_custody_eligibility_is_price_independent` | No live custody or other claim, missing price | Token-unit zero remains visible and can satisfy the custody part of eligibility |
+| `test_active_positive_auction_blocks_resolution` | Purchasable active auction | No transition |
+| `test_zero_backed_auction_is_canceled_atomically` | Active stale auction with zero live claim | Transition removes it in the same transaction |
+| `test_resolution_scan_covers_every_user_vault_and_asset` | Mixed vault types and ordering | Omission of any positive claim blocks acceptance; iteration order cannot change result |
+
+### 8.5 Atomic Ledger transition and exactly-once properties
+
+Use at least two borrowers so aggregate `totalDebt`, borrower indexes, auctions,
+and unrelated state can be checked independently.
+
+| Test | Required result |
+| --- | --- |
+| `test_total_loss_moves_full_liability_to_bad_debt_once` | For `X = D_s.amount + Y`, user debt becomes zero and `badDebt` increases by exactly `X` in one transaction |
+| `test_transition_reduces_total_debt_by_stored_amount` | Aggregate `totalDebt_after = totalDebt_before - D_s.amount`; unrelated borrower debt is unchanged |
+| `test_accrued_interest_moves_and_books_once` | `Y` is included in `X`; `unrealizedYield_after = unrealizedYield_before + Y`; no flush or mint occurs during transition |
+| `test_transition_clears_principal_borrower_and_auctions` | Principal/amount zero, liquidation false, borrower removed, all fungible auctions removed |
+| `test_transition_does_not_mutate_vault_claim_or_custody` | Raw accounting/shares and token custody are byte-for-byte unchanged |
+| `test_transition_does_not_mint_burn_or_transfer_green` | GREEN supply and all relevant balances are unchanged |
+| `test_duplicate_transition_cannot_increment_bad_debt` | Second call is no-op/revert and `badDebt` stays at first result |
+| `test_expected_debt_compare_and_set_rejects_stale_snapshot` | Change amount or last timestamp before commit; stale transition changes nothing |
+| `test_repay_then_transition_uses_reduced_debt` | Repayment first reduces `D_f`; only residual enters bad debt |
+| `test_transition_then_repay_cannot_retain_duplicate_liability` | Transition first leaves zero user debt; later `repayForUser` rejects without changing liability |
+| `test_auction_purchase_then_transition_rechecks_state` | Successful delivery/payment first changes custody/debt; transition uses new residual or is ineligible |
+| `test_transition_then_auction_purchase_cannot_pay` | Auction removal/zero debt makes later purchase return/revert without GREEN spend |
+| `test_transition_revert_rolls_back_every_state_write` | Force failure at final Ledger step/event boundary; debt, bad debt, borrower, auctions, and yield all equal pre-state |
+| `test_manual_bad_debt_setter_cannot_erase_atomic_addition_silently` | Governed reconciliation after accumulated transitions is explicitly reviewed/evented and cannot masquerade as a per-user transition |
+| `test_bad_debt_global_consumers_observe_increment` | BondRoom data and configured RipeGov freeze read the exact new global bad debt |
+| `test_clearing_bad_debt_does_not_restore_user_liability` | BondRoom `didClearBadDebt` lowers global bad debt only; resolved user debt remains zero |
+
+Property sequences must randomize deposits, issuer reductions, auction starts,
+external purchase attempts, repayments, pauses, blocklists, total-loss
+finalization, duplicate finalization, and bad-debt clearing. At every step:
+
+```text
+sum(chargeable delivered collateral) <= safely allocable live custody
+GREEN/debt committed for settlement <= priced chargeable delivery
+userDebt_reduction_on_transition == badDebt_increase_on_transition
+no liability is simultaneously user debt and newly added bad debt
+```
+
+### 8.6 Controls, liveness, events, and ABI gates
+
+| Test | Required result |
+| --- | --- |
+| `test_can_buy_false_blocks_purchase_not_repayment_or_writeoff_accounting` | Purchase control has its documented blast radius only |
+| `test_department_pause_blocks_total_loss_transition` | CreditEngine or Ledger pause causes atomic failure |
+| `test_unpause_retries_same_eligible_transition` | No stale marker/state blocks progress after resume |
+| `test_repayment_remains_available_before_transition` | Existing repay control succeeds while deposit/borrow/auction are frozen |
+| `test_transition_event_reconstructs_liability_move` | User, stored debt, `Y`, `X`, `BD_0`, `BD_1`, caller, and canceled-auction count are reconstructible |
+| `test_settlement_event_reconstructs_q_w_r_e_and_payment` | Requested, vault-debited, recipient-received, chargeable, GREEN, debt, route, and recipient values reconcile |
+| `test_repay_event_not_emitted_for_bad_debt_transition` | A write-off is not mislabeled as repayment |
+| `test_no_new_storage_for_two_selector_bad_debt_design` | If selected, storage layout is byte-for-byte unchanged |
+| `test_interface_delta_matches_owner_approved_mechanism_only` | ABI/interface diff contains exactly the later-approved selectors/fields/events and nothing from an unselected option |
+| `test_total_loss_scan_worst_case_gas` | Maximum allowed vault/asset/auction traversal stays within reviewed gas bounds |
+
+### 8.7 Phase F implementation acceptance
+
+A future Phase F implementation is not acceptable unless:
+
+1. every common and selected-mechanism test above passes;
+2. all unsafe current-behavior regressions remain pinned rather than rewritten;
+3. the owner separately approves one settlement enforcement mechanism;
+4. accounting/security separately approve the exact atomic interface and
+   source-consistent accrued-interest/yield-booking treatment;
+5. no nominal partial-loss or recovery allocation is inferred;
+6. exact source/interface/storage/ABI diffs match the later Phase I table;
+7. the implementation is included in the atomic containment/release grouping;
+8. Base and exact-token fork evidence is attached; and
+9. reviewer, security, and owner gates are recorded.
+
+This validation contract does not approve either mechanism, any new selector or
+storage field, implementation, Phase G, or launch.
+
+## 9. Exact-token fork plan
 
 Proposed future file:
 `tests/probes/test_aapl_vault_behavior_fork.py`.
@@ -572,7 +723,7 @@ No live signing or broadcast is part of this plan. Live sender/recipient
 eligibility, acquisition, gas, approvals, and legal permission remain separate
 owner/counsel gates.
 
-## 9. Dual-clock and identical-artifact integration
+## 10. Dual-clock and identical-artifact integration
 
 The narrow S1/S2 kickoff choices were owner-approved in post-bootstrap
 integration commit `ce3805d6079ee87d727486ea82b75cbddc12e46d`. Their implementation
@@ -591,7 +742,7 @@ Clock behavior must not change custody conservation. Repeated or jumping numbers
 may delay a timelock or auction but cannot permit payment for undelivered
 collateral or duplicate bad debt.
 
-## 10. Migration validation scaffold
+## 11. Migration validation scaffold
 
 Pending owner live-version policy and Track 7 namespace/tooling:
 
@@ -615,7 +766,7 @@ Pending owner live-version policy and Track 7 namespace/tooling:
 Rollback reality must be tested as a state migration, not described as merely
 switching an address back.
 
-## 11. Diagnostics and evidence requirements
+## 12. Diagnostics and evidence requirements
 
 Every future test record must include:
 
@@ -636,7 +787,7 @@ Every future test record must include:
 
 Unknown pause/blocklist/upgrade state must be labeled unknown, not false.
 
-## 12. Proposed tiers and commands
+## 13. Proposed tiers and commands
 
 Commands are placeholders until files exist and the owner approves
 implementation:
@@ -652,18 +803,19 @@ implementation:
 
 No dependency or tool addition is authorized by this scaffold.
 
-## 13. Review and launch gates
+## 14. Review and launch gates
 
 The owner-confirmed instructions select option 4, authorize Phase D
 specification, then authorize Phase E specification under the explicit
-existing-controls/no-new-storage constraint. The Phase D and E designs and
-future test contracts are complete; no implementation or test change is
-authorized. Entry into Phase F and finalization of later
+existing-controls/no-new-storage constraint, then approve the Phase F
+external-settlement and exactly-once total-loss directions for specification
+only. The Phase D–F designs and future test contracts are complete; no
+implementation or test change is authorized. Phase G and later
 implementation/release gates remain blocked on the following decisions at
-their recorded phase boundaries:
+their recorded boundaries:
 
-- external-only issuer settlement decision;
-- total-loss and exactly-once bad-debt policy;
+- all-external versus per-asset settlement enforcement mechanism;
+- exact CreditEngine/Ledger transition interfaces and caller policy;
 - post-zero/restoration/loss-allocation policy;
 - reward-unit decision;
 - Base live-version/migration posture;
@@ -673,5 +825,7 @@ their recorded phase boundaries:
 
 At this checkpoint, the evidence baseline, formal invariant map, Phase C
 comparison, Phase D deposit-accounting design, Phase E backing/debt-health
-design, proposed test names, and required matrices are ready for owner review.
-No implementation, test, or launch gate is passed by this specification.
+design, Phase F settlement/total-loss design, proposed test names, and required
+matrices are ready for owner review. Work pauses here under the owner's
+2026-07-24 instruction. No implementation, interface, storage, test, Phase G,
+or launch gate is passed by this specification.
