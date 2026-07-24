@@ -16,7 +16,7 @@ import re
 import sys
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
-from typing import Any, Iterable, Mapping, Sequence
+from typing import Any, Callable, Iterable, Mapping, Sequence
 
 
 EXPECTED_SCHEMA_VERSION = 1
@@ -25,6 +25,8 @@ EXPECTED_TIMESTAMP_COUNTS = (37, 37, 11)
 EXPECTED_BN_IDS = {f"BN-{number:03d}" for number in range(1, 33)}
 EXPECTED_CAD_IDS = {"CAD-001"}
 EXPECTED_TS_IDS = {f"TS-{number:03d}" for number in range(1, 12)}
+TRACK3_REVIEW_COMMIT = "c3040041a1254a774e0a305060330d6ab9cc04ca"
+HARDENING_REVIEW_COMMIT = "82db59cb35e7d687240d0fdec58808cdbb7c5174"
 EXPECTED_PRODUCTION_ROOTS = ["contracts"]
 EXPECTED_EXCLUDED_PRODUCTION_GLOBS = [
     "contracts/mock/**",
@@ -35,12 +37,38 @@ EXPECTED_ALLOWED_NONPRODUCTION_GLOBS = [
     "contracts/mock/**",
     "contracts/testing/**",
 ]
-EXPECTED_CADENCE_ROOTS = ["contracts", "config", "migrations", "scripts"]
+EXPECTED_INTERFACE_ROOTS = ["interfaces"]
+EXPECTED_CADENCE_ROOTS = [
+    "contracts",
+    "config",
+    "interfaces",
+    "migrations",
+    "migration_history",
+    "scripts",
+    "tests",
+    "README.md",
+]
 EXPECTED_CADENCE_EXCLUDED_GLOBS = [
     "config/block-clock-inventory.json",
+    "migration_history/base-mainnet/**",
     "scripts/check_block_clock_inventory.py",
     "tests/inventory/test_block_clock_inventory.py",
 ]
+EXPECTED_REVIEW_AUTHORITIES = {
+    "directOccurrences": "protocol/security",
+    "timestampContext": "protocol/security",
+    "cadenceCandidates": {
+        "CAD-001": "risk/oracle",
+        "other": "protocol/security",
+    },
+    "secondsUnitCandidates": "protocol/security",
+    "allowedMixedClockFunctions": "protocol/security",
+    "vyperPathClassifications": "engineering/tooling",
+}
+EXPECTED_REVIEW_PROVENANCE = {
+    "track3ReviewCommit": TRACK3_REVIEW_COMMIT,
+    "hardeningApprovalCommit": HARDENING_REVIEW_COMMIT,
+}
 PLACEHOLDERS = {
     "",
     "-",
@@ -54,10 +82,11 @@ PLACEHOLDERS = {
     "todo",
     "unknown",
 }
-SOURCE_SUFFIXES = {".json", ".md", ".py", ".vy"}
+SOURCE_SUFFIXES = {".json", ".md", ".py", ".vy", ".vyi"}
+VYPER_SUFFIXES = {".vy", ".vyi"}
 DIRECT_PATTERN = re.compile(r"\bblock\s*\.\s*number\b")
 TIMESTAMP_PATTERN = re.compile(r"\bblock\s*\.\s*timestamp\b")
-FUNCTION_PATTERN = re.compile(r"^\s*def\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(")
+FUNCTION_PATTERN = re.compile(r"^def\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(")
 IMPORT_PATTERN = re.compile(
     r"^\s*(?:from|import)\s+([A-Za-z_][A-Za-z0-9_./]*)", re.MULTILINE
 )
@@ -67,13 +96,27 @@ SECONDS_IDENTIFIER_PATTERN = re.compile(
 CADENCE_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
     (
         "block-unit-identifier",
-        re.compile(r"\b[A-Za-z_][A-Za-z0-9_]*BLOCKS[A-Za-z0-9_]*\b"),
+        re.compile(
+            r"\b(?:"
+            r"[A-Z][A-Z0-9_]*_BLOCKS?|"
+            r"[a-z][A-Za-z0-9_]*Blocks"
+            r")\b"
+        ),
     ),
     (
         "reviewed-cadence-identifier",
         re.compile(
             r"\b(?:ONE_DAY|staleBlocks|numBlocksPerInterval|ripePerBlock|"
             r"increasePerDangerBlock)\b"
+        ),
+    ),
+    (
+        "block-default-key",
+        re.compile(
+            r"""["'](?=[A-Za-z_][A-Za-z0-9_]*["']\s*:)[A-Za-z0-9_]*"""
+            r"""(?:TIMELOCK|BLOCKS?|INTERVAL|DURATION|DELAY|EXPIRY|"""
+            r"""EXPIRATION)["']\s*:""",
+            re.IGNORECASE,
         ),
     ),
     (
@@ -203,20 +246,38 @@ def classify_path(
     path: str,
     production_roots: Sequence[str],
     excluded_production_globs: Sequence[str],
+    interface_roots: Sequence[str] = EXPECTED_INTERFACE_ROOTS,
+    allowed_nonproduction_globs: Sequence[str] = EXPECTED_ALLOWED_NONPRODUCTION_GLOBS,
 ) -> str:
-    if _matches_glob(path, "contracts/mock/**"):
-        return "mock"
-    if _matches_glob(path, "contracts/testing/**"):
-        return "testing"
-    if _matches_glob(path, "tests/**"):
-        return "test"
+    for root in interface_roots:
+        normalized_root = root.rstrip("/")
+        if path == normalized_root or path.startswith(f"{normalized_root}/"):
+            return "interface"
+    for glob in allowed_nonproduction_globs:
+        if not _matches_glob(path, glob):
+            continue
+        parts = PurePosixPath(glob.lower()).parts
+        if "mock" in parts:
+            return "mock"
+        if "testing" in parts:
+            return "testing"
+        if "tests" in parts:
+            return "test"
+        return "excluded"
+    for glob in excluded_production_globs:
+        if not _matches_glob(path, glob):
+            continue
+        normalized_glob = glob.lower()
+        if "mock" in PurePosixPath(normalized_glob).parts:
+            return "mock"
+        if "testing" in PurePosixPath(normalized_glob).parts:
+            return "testing"
+        return "excluded"
     for root in production_roots:
         normalized_root = root.rstrip("/")
         if path == normalized_root or path.startswith(f"{normalized_root}/"):
-            if any(_matches_glob(path, glob) for glob in excluded_production_globs):
-                return "excluded"
             return "production"
-    if path.endswith(".vy"):
+    if Path(path).suffix in VYPER_SUFFIXES:
         return "unclassified"
     if path.startswith("config/"):
         return "config"
@@ -249,11 +310,17 @@ def _read_text(path: Path) -> str:
 
 def _line_functions(lines: Sequence[str]) -> list[str]:
     current = "<module>"
+    signature_depth = 0
     functions: list[str] = []
     for line in lines:
         match = FUNCTION_PATTERN.match(line)
         if match:
             current = match.group(1)
+            signature_depth = line.count("(") - line.count(")")
+        elif signature_depth:
+            signature_depth += line.count("(") - line.count(")")
+        elif line and not line[0].isspace():
+            current = "<module>"
         functions.append(current)
     return functions
 
@@ -312,6 +379,29 @@ def _candidate_from_record(record: Mapping[str, Any]) -> tuple[str, str, str, st
         str(record.get("normalizedSnippet", "")),
         int(record.get("ordinalInFunction", 0)),
     )
+
+
+def _candidate_semantic_ids(record: Mapping[str, Any]) -> tuple[str, ...]:
+    semantic_ids = record.get("semanticIds", [])
+    if not isinstance(semantic_ids, list):
+        return ()
+    return tuple(sorted(str(item) for item in semantic_ids if str(item)))
+
+
+def _candidate_label(record: Mapping[str, Any]) -> str:
+    semantic_ids = _candidate_semantic_ids(record)
+    if semantic_ids:
+        return ",".join(semantic_ids)
+    return str(record.get("reviewDomain", record.get("id", "UNMAPPED")))
+
+
+def _key_set_fingerprint(keys: set[tuple[Any, ...]]) -> str:
+    serialized = json.dumps(
+        [list(key) for key in sorted(keys)],
+        ensure_ascii=True,
+        separators=(",", ":"),
+    )
+    return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
 
 
 def _scan_candidates(
@@ -423,6 +513,8 @@ def _validate_semantic_review(
     domain: str,
     candidate: str,
     findings: list[Finding],
+    expected_owner: str | None = None,
+    expected_commit: str | None = None,
 ) -> None:
     review = record.get("semanticReview")
     if not isinstance(review, Mapping):
@@ -437,6 +529,30 @@ def _validate_semantic_review(
             )
         )
         return
+    if expected_owner is not None and review.get("owner") != expected_owner:
+        findings.append(
+            Finding(
+                code="INV-SCHEMA-OWNER",
+                domain=domain,
+                path=str(record.get("path", "-")),
+                candidate=candidate,
+                expected=expected_owner,
+                actual=str(review.get("owner", "missing")),
+                remediation="restore the approved semantic-review authority",
+            )
+        )
+    if expected_commit is not None and review.get("commit") != expected_commit:
+        findings.append(
+            Finding(
+                code="INV-SCHEMA-PROVENANCE",
+                domain=domain,
+                path=str(record.get("path", "-")),
+                candidate=candidate,
+                expected=expected_commit,
+                actual=str(review.get("commit", "missing")),
+                remediation="restore the immutable commit that actually reviewed this record",
+            )
+        )
     for field in ("owner", "status", "commit"):
         value = review.get(field)
         invalid = _placeholder(value)
@@ -556,6 +672,8 @@ def _validate_schema(data: Mapping[str, Any]) -> list[Finding]:
         "indirect": data.get("indirectCadence"),
         "timestamp": data.get("timestampContext"),
         "cadence": data.get("cadenceCandidates"),
+        "seconds": data.get("secondsUnitCandidates"),
+        "mixed": data.get("allowedMixedClockFunctions"),
         "classification": data.get("vyperPathClassifications"),
     }
     for domain, value in collections.items():
@@ -568,12 +686,22 @@ def _validate_schema(data: Mapping[str, Any]) -> list[Finding]:
                     actual=type(value).__name__,
                 )
             )
+        elif any(not isinstance(record, Mapping) for record in value):
+            findings.append(
+                Finding(
+                    code="INV-SCHEMA-RECORD",
+                    domain=domain,
+                    expected="object-records",
+                    actual="non-object-record",
+                )
+            )
     if findings:
         return findings
     expected_path_config = (
         EXPECTED_PRODUCTION_ROOTS,
         EXPECTED_EXCLUDED_PRODUCTION_GLOBS,
         EXPECTED_ALLOWED_NONPRODUCTION_GLOBS,
+        EXPECTED_INTERFACE_ROOTS,
         EXPECTED_CADENCE_ROOTS,
         EXPECTED_CADENCE_EXCLUDED_GLOBS,
     )
@@ -581,6 +709,7 @@ def _validate_schema(data: Mapping[str, Any]) -> list[Finding]:
         data.get("productionRoots"),
         data.get("excludedProductionGlobs"),
         data.get("allowedNonProductionGlobs"),
+        data.get("interfaceRoots"),
         data.get("cadenceRoots"),
         data.get("cadenceExcludedGlobs"),
     )
@@ -592,6 +721,60 @@ def _validate_schema(data: Mapping[str, Any]) -> list[Finding]:
                 expected=json.dumps(expected_path_config, separators=(",", ":")),
                 actual=json.dumps(actual_path_config, separators=(",", ":")),
                 remediation="restore the reviewed path roots and exclusions; paths may not evade discovery",
+            )
+        )
+    if data.get("reviewAuthorities") != EXPECTED_REVIEW_AUTHORITIES:
+        findings.append(
+            Finding(
+                code="INV-SCHEMA-AUTHORITY",
+                domain="schema",
+                expected=json.dumps(
+                    EXPECTED_REVIEW_AUTHORITIES, sort_keys=True, separators=(",", ":")
+                ),
+                actual=json.dumps(
+                    data.get("reviewAuthorities"), sort_keys=True, separators=(",", ":")
+                ),
+                remediation="restore the approved semantic-review ownership mapping",
+            )
+        )
+    if data.get("reviewProvenance") != EXPECTED_REVIEW_PROVENANCE:
+        findings.append(
+            Finding(
+                code="INV-SCHEMA-PROVENANCE",
+                domain="schema",
+                expected=json.dumps(
+                    EXPECTED_REVIEW_PROVENANCE,
+                    sort_keys=True,
+                    separators=(",", ":"),
+                ),
+                actual=json.dumps(
+                    data.get("reviewProvenance"),
+                    sort_keys=True,
+                    separators=(",", ":"),
+                ),
+                remediation="restore the Track 3 review and owner-approval commit references",
+            )
+        )
+    documentation = data.get("schemaDocumentation")
+    required_documentation = {
+        "pathModel",
+        "cadenceCoverage",
+        "historicalExclusions",
+        "functionAttribution",
+        "reviewAuthorities",
+        "reviewProvenance",
+    }
+    if not isinstance(documentation, Mapping) or any(
+        _placeholder(documentation.get(field))
+        for field in required_documentation
+    ):
+        findings.append(
+            Finding(
+                code="INV-SCHEMA-DOCUMENTATION",
+                domain="schema",
+                expected="non-placeholder-discovery-and-review-caveats",
+                actual=type(documentation).__name__,
+                remediation="restore the reviewed schema documentation and declared exclusions",
             )
         )
     expected_pattern_config = [
@@ -619,7 +802,14 @@ def _validate_schema(data: Mapping[str, Any]) -> list[Finding]:
             continue
         key = _record_key(record)
         direct_keys.setdefault(key, []).append(record)
-        _validate_semantic_review(record, "direct", str(record.get("id", "UNMAPPED")), findings)
+        _validate_semantic_review(
+            record,
+            "direct",
+            str(record.get("id", "UNMAPPED")),
+            findings,
+            "protocol/security",
+            TRACK3_REVIEW_COMMIT,
+        )
     for key, records in direct_keys.items():
         if len(records) != 1:
             findings.append(
@@ -631,6 +821,51 @@ def _validate_schema(data: Mapping[str, Any]) -> list[Finding]:
                     candidate=",".join(sorted(str(record.get("id")) for record in records)),
                     expected="1",
                     actual=str(len(records)),
+                )
+            )
+    duplicate_domains: tuple[
+        tuple[
+            str,
+            Sequence[Mapping[str, Any]],
+            Callable[[Mapping[str, Any]], tuple[Any, ...]],
+        ],
+        ...,
+    ] = (
+        ("timestamp", data["timestampContext"], _record_key),
+        (
+            "indirect",
+            data["indirectCadence"],
+            lambda record: (str(record.get("id", "")),),
+        ),
+        ("cadence", data["cadenceCandidates"], _candidate_from_record),
+        ("seconds", data["secondsUnitCandidates"], _candidate_from_record),
+        (
+            "mixed",
+            data["allowedMixedClockFunctions"],
+            lambda record: (
+                str(record.get("path", "")),
+                str(record.get("function", "")),
+            ),
+        ),
+    )
+    for domain, records, key_function in duplicate_domains:
+        records_by_key: dict[tuple[Any, ...], list[Mapping[str, Any]]] = {}
+        for record in records:
+            records_by_key.setdefault(key_function(record), []).append(record)
+        for key, duplicate_records in records_by_key.items():
+            if len(duplicate_records) == 1:
+                continue
+            first = duplicate_records[0]
+            findings.append(
+                Finding(
+                    code="INV-SCHEMA-DUPLICATE",
+                    domain=domain,
+                    path=str(first.get("path", "-")),
+                    function=str(first.get("function", "-")),
+                    candidate=_candidate_label(first),
+                    expected="1",
+                    actual=str(len(duplicate_records)),
+                    snippet=json.dumps(key, ensure_ascii=True),
                 )
             )
 
@@ -660,16 +895,97 @@ def _validate_schema(data: Mapping[str, Any]) -> list[Finding]:
                     remediation="reconcile stable IDs with the reviewed Track 3 inventory; never renumber",
                 )
             )
-    for domain, records in (
-        ("indirect", data["indirectCadence"]),
-        ("timestamp", data["timestampContext"]),
-        ("cadence", data["cadenceCandidates"]),
-        ("classification", data["vyperPathClassifications"]),
+    for domain, records, expected_owner, expected_commit in (
+        (
+            "indirect",
+            data["indirectCadence"],
+            "risk/oracle",
+            TRACK3_REVIEW_COMMIT,
+        ),
+        (
+            "timestamp",
+            data["timestampContext"],
+            "protocol/security",
+            TRACK3_REVIEW_COMMIT,
+        ),
+        (
+            "seconds",
+            data["secondsUnitCandidates"],
+            "protocol/security",
+            HARDENING_REVIEW_COMMIT,
+        ),
+        (
+            "mixed",
+            data["allowedMixedClockFunctions"],
+            "protocol/security",
+            HARDENING_REVIEW_COMMIT,
+        ),
+        (
+            "classification",
+            data["vyperPathClassifications"],
+            "engineering/tooling",
+            HARDENING_REVIEW_COMMIT,
+        ),
     ):
         for record in records:
             if isinstance(record, Mapping):
                 _validate_semantic_review(
-                    record, domain, str(record.get("id", record.get("semanticId", "UNMAPPED"))), findings
+                    record,
+                    domain,
+                    str(record.get("id", _candidate_label(record))),
+                    findings,
+                    expected_owner,
+                    expected_commit,
+                )
+    for record in data["cadenceCandidates"]:
+        semantic_ids = _candidate_semantic_ids(record)
+        expected_owner = "risk/oracle" if "CAD-001" in semantic_ids else "protocol/security"
+        expected_commit = (
+            TRACK3_REVIEW_COMMIT
+            if "CAD-001" in semantic_ids
+            else HARDENING_REVIEW_COMMIT
+        )
+        _validate_semantic_review(
+            record,
+            "cadence",
+            _candidate_label(record),
+            findings,
+            expected_owner,
+            expected_commit,
+        )
+    reviewed_semantic_ids = EXPECTED_BN_IDS | EXPECTED_CAD_IDS | EXPECTED_TS_IDS
+    for domain, records in (
+        ("cadence", data["cadenceCandidates"]),
+        ("seconds", data["secondsUnitCandidates"]),
+    ):
+        for record in records:
+            semantic_ids_value = record.get("semanticIds")
+            semantic_ids = _candidate_semantic_ids(record)
+            invalid_semantic_ids = (
+                not isinstance(semantic_ids_value, list)
+                or len(semantic_ids) != len(semantic_ids_value)
+                or len(semantic_ids) != len(set(semantic_ids))
+                or not set(semantic_ids).issubset(reviewed_semantic_ids)
+            )
+            if (
+                "semanticId" in record
+                or invalid_semantic_ids
+                or record.get("reviewDomain") != "cadence-surface"
+            ):
+                findings.append(
+                    Finding(
+                        code="INV-SCHEMA-SEMANTIC-LINK",
+                        domain=domain,
+                        path=str(record.get("path", "-")),
+                        candidate=_candidate_label(record),
+                        expected="semanticIds-list+cadence-surface-domain",
+                        actual=(
+                            f"semanticId={record.get('semanticId', 'absent')},"
+                            f"semanticIds={json.dumps(semantic_ids_value)},"
+                            f"reviewDomain={record.get('reviewDomain')}"
+                        ),
+                        remediation="use reviewed stable IDs only; do not invent pseudo-identifiers",
+                    )
                 )
     cad_site_keys = {
         _candidate_from_record(site)
@@ -681,7 +997,8 @@ def _validate_schema(data: Mapping[str, Any]) -> list[Finding]:
     reviewed_cad_keys = {
         _candidate_from_record(record)
         for record in data["cadenceCandidates"]
-        if isinstance(record, Mapping) and record.get("semanticId") == "CAD-001"
+        if isinstance(record, Mapping)
+        and "CAD-001" in _candidate_semantic_ids(record)
     }
     if cad_site_keys != reviewed_cad_keys:
         findings.append(
@@ -689,8 +1006,14 @@ def _validate_schema(data: Mapping[str, Any]) -> list[Finding]:
                 code="INV-SCHEMA-CAD-SITES",
                 domain="indirect",
                 candidate="CAD-001",
-                expected=str(len(reviewed_cad_keys)),
-                actual=str(len(cad_site_keys)),
+                expected=(
+                    f"count={len(reviewed_cad_keys)},"
+                    f"sha256={_key_set_fingerprint(reviewed_cad_keys)}"
+                ),
+                actual=(
+                    f"count={len(cad_site_keys)},"
+                    f"sha256={_key_set_fingerprint(cad_site_keys)}"
+                ),
                 remediation="restore the reviewed CAD-001 site mapping; do not suppress cadence candidates",
             )
         )
@@ -712,7 +1035,13 @@ def _validate_schema(data: Mapping[str, Any]) -> list[Finding]:
     for record in path_records:
         classification = record.get("classification")
         content_hash = record.get("contentSha256")
-        if classification not in {"production", "mock", "testing", "test"} or not (
+        if classification not in {
+            "production",
+            "mock",
+            "testing",
+            "test",
+            "interface",
+        } or not (
             isinstance(content_hash, str)
             and re.fullmatch(r"[0-9a-f]{64}", content_hash)
         ):
@@ -735,7 +1064,7 @@ def _current_vyper_classifications(
 ) -> dict[str, dict[str, str]]:
     records: dict[str, dict[str, str]] = {}
     for path in _iter_files(root, ["."]):
-        if path.suffix != ".vy":
+        if path.suffix not in VYPER_SUFFIXES:
             continue
         relative = path.relative_to(root).as_posix()
         records[relative] = {
@@ -788,7 +1117,10 @@ def _check_path_classifications(
                 snippet=f"{old_path}->{new_path}",
                 expected=expected[old_path]["classification"],
                 actual=actual[new_path]["classification"],
-                remediation="obtain path-classification review before moving the Vyper source",
+                remediation=(
+                    "obtain engineering/tooling path review and protocol/security "
+                    "review for any production-boundary move"
+                ),
             )
         )
     for path in sorted(added - consumed_added):
@@ -798,7 +1130,10 @@ def _check_path_classifications(
                 domain="classification",
                 path=path,
                 actual=actual[path]["classification"],
-                remediation="obtain path-classification review before adding the Vyper source",
+                remediation=(
+                    "obtain engineering/tooling path review and semantic-owner "
+                    "review before adding the Vyper source"
+                ),
             )
         )
     for path in sorted(missing - consumed_missing):
@@ -809,7 +1144,10 @@ def _check_path_classifications(
                 path=path,
                 expected=expected[path]["classification"],
                 actual="missing",
-                remediation="obtain path-classification review before removing the Vyper source",
+                remediation=(
+                    "obtain engineering/tooling path review and semantic-owner "
+                    "review before removing the Vyper source"
+                ),
             )
         )
     for path in sorted(set(expected) & set(actual)):
@@ -821,6 +1159,10 @@ def _check_path_classifications(
                     path=path,
                     expected=expected[path]["classification"],
                     actual=actual[path]["classification"],
+                    remediation=(
+                        "obtain engineering/tooling path review and protocol/security "
+                        "review for any production-boundary classification change"
+                    ),
                 )
             )
     return findings
@@ -834,13 +1176,13 @@ def _production_vyper_files(
     production: list[Path] = []
     findings: list[Finding] = []
     for path in _iter_files(root, ["."]):
-        if path.suffix != ".vy":
+        if path.suffix not in VYPER_SUFFIXES:
             continue
         relative = path.relative_to(root).as_posix()
         classification = classify_path(
             relative, production_roots, excluded_production_globs
         )
-        if classification == "production":
+        if classification == "production" and path.suffix == ".vy":
             production.append(path)
         elif classification == "unclassified":
             findings.append(
@@ -889,49 +1231,25 @@ def _compare_occurrences(
     move_code: str,
 ) -> list[Finding]:
     findings: list[Finding] = []
-    actual_by_key: dict[tuple[str, str, str, int], list[Occurrence]] = {}
-    for occurrence in actual:
-        actual_by_key.setdefault(occurrence.key, []).append(occurrence)
-    expected_by_key: dict[tuple[str, str, str, int], list[Mapping[str, Any]]] = {}
-    for record in expected_records:
-        expected_by_key.setdefault(_record_key(record), []).append(record)
+    actual_by_key = {occurrence.key: occurrence for occurrence in actual}
+    expected_by_key = {_record_key(record): record for record in expected_records}
 
     for key in sorted(actual_by_key):
-        occurrences = actual_by_key[key]
-        records = expected_by_key.get(key, [])
-        if len(occurrences) != 1 or len(records) != 1:
-            occurrence = occurrences[0]
-            if not records:
-                findings.append(
-                    Finding(
-                        code=new_code,
-                        domain=domain,
-                        path=occurrence.path,
-                        function=occurrence.function,
-                        line=occurrence.line,
-                        snippet=occurrence.snippet,
-                        actual=occurrence.normalized_expression,
-                    )
+        occurrence = actual_by_key[key]
+        record = expected_by_key.get(key)
+        if record is None:
+            findings.append(
+                Finding(
+                    code=new_code,
+                    domain=domain,
+                    path=occurrence.path,
+                    function=occurrence.function,
+                    line=occurrence.line,
+                    snippet=occurrence.snippet,
+                    actual=occurrence.normalized_expression,
                 )
-            elif len(occurrences) != 1 or len(records) != 1:
-                findings.append(
-                    Finding(
-                        code="INV-MAPPING-AMBIGUOUS",
-                        domain=domain,
-                        path=occurrence.path,
-                        function=occurrence.function,
-                        line=occurrence.line,
-                        snippet=occurrence.snippet,
-                        candidate=",".join(
-                            sorted(str(record.get("id", "UNMAPPED")) for record in records)
-                        ),
-                        expected="1:1",
-                        actual=f"{len(records)}:{len(occurrences)}",
-                    )
-                )
+            )
             continue
-        record = records[0]
-        occurrence = occurrences[0]
         reviewed_line = int(record.get("reviewedLine", 0))
         if reviewed_line != occurrence.line:
             findings.append(
@@ -952,7 +1270,7 @@ def _compare_occurrences(
     for key in sorted(expected_by_key):
         if key in actual_by_key:
             continue
-        record = expected_by_key[key][0]
+        record = expected_by_key[key]
         findings.append(
             Finding(
                 code=missing_code,
@@ -1027,7 +1345,7 @@ def _compare_candidates(
                     function=candidate.function,
                     line=candidate.line,
                     snippet=candidate.normalized_snippet,
-                    candidate=str(record.get("semanticId", record.get("id", "UNMAPPED"))),
+                    candidate=_candidate_label(record),
                     expected=str(reviewed_line),
                     actual=str(candidate.line),
                 )
@@ -1044,7 +1362,7 @@ def _compare_candidates(
                 function=key[1],
                 line=int(record.get("reviewedLine", 0)),
                 snippet=key[4],
-                candidate=str(record.get("semanticId", record.get("id", "UNMAPPED"))),
+                candidate=_candidate_label(record),
                 expected=f"{key[2]}:{key[3]}",
                 actual="missing",
             )
@@ -1309,8 +1627,11 @@ def check_repository(
             f"bn_records={len(data['directOccurrences'])} "
             f"indirect_ids={len(EXPECTED_CAD_IDS)} "
             f"cadence_candidates={len(cadence_actual)} "
+            f"seconds_unit_candidates={len(seconds_actual)} "
             f"timestamp_ids={len(EXPECTED_TS_IDS)} "
-            f"timestamp_occurrences={timestamp_counts[0]}"
+            f"timestamp_occurrences={timestamp_counts[0]} "
+            f"mixed_clock_functions={len(actual_mixed)} "
+            f"vyper_paths={len(data['vyperPathClassifications'])}"
         ),
         (
             "CLOCK_INVENTORY_NONPROD "

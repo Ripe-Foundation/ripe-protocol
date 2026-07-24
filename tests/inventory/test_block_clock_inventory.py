@@ -17,6 +17,11 @@ INVENTORY_RELATIVE = Path("config/block-clock-inventory.json")
 SCRIPT_RELATIVE = Path("scripts/check_block_clock_inventory.py")
 
 
+@pytest.fixture(scope="session")
+def ripe_hq() -> None:
+    """Override the repository's autouse deployment fixture for this stdlib guard."""
+
+
 def _load_inventory(root: Path) -> dict:
     return json.loads((root / INVENTORY_RELATIVE).read_text(encoding="utf-8"))
 
@@ -107,7 +112,11 @@ def test_clean_approved_fixture_passes_without_git_or_network(
     assert "bn_ids=32" in result.output
     assert "indirect_ids=1" in result.output
     assert "timestamp_ids=11" in result.output
+    assert "seconds_unit_candidates=58" in result.output
+    assert "mixed_clock_functions=4" in result.output
+    assert "vyper_paths=92" in result.output
     assert "CLOCK_INVENTORY_NONPROD" in result.output
+    assert "test=126" in result.output
 
 
 def test_unmapped_direct_addition_fails_with_actionable_context(
@@ -129,7 +138,10 @@ def test_unmapped_direct_addition_fails_with_actionable_context(
 def test_missing_direct_occurrence_fails(fixture_repo: Path) -> None:
     relative = "contracts/tokens/modules/Erc20Token.vy"
     _replace_once(fixture_repo / relative, "block.number", "42")
-    _assert_failure(fixture_repo, "INV-DIRECT-MISSING", path=relative)
+    result = _assert_failure(
+        fixture_repo, "INV-DIRECT-MISSING", path=relative
+    )
+    assert "INV-DIRECT-COUNT" in _codes(result), result.output
 
 
 def test_two_exact_occurrences_on_one_line_are_counted_separately(
@@ -197,11 +209,91 @@ def test_duplicate_schema_mapping_fails(fixture_repo: Path) -> None:
     _assert_failure(fixture_repo, "INV-SCHEMA-DUPLICATE")
 
 
+def test_duplicate_timestamp_context_fails(fixture_repo: Path) -> None:
+    inventory = _load_inventory(fixture_repo)
+    inventory["timestampContext"].append(
+        dict(inventory["timestampContext"][0])
+    )
+    _write_inventory(fixture_repo, inventory)
+    _assert_failure(fixture_repo, "INV-SCHEMA-DUPLICATE")
+
+
+def test_duplicate_mixed_clock_allowance_fails(fixture_repo: Path) -> None:
+    inventory = _load_inventory(fixture_repo)
+    inventory["allowedMixedClockFunctions"].append(
+        dict(inventory["allowedMixedClockFunctions"][0])
+    )
+    _write_inventory(fixture_repo, inventory)
+    _assert_failure(fixture_repo, "INV-SCHEMA-DUPLICATE")
+
+
+def test_expected_production_count_tampering_fails(fixture_repo: Path) -> None:
+    inventory = _load_inventory(fixture_repo)
+    inventory["expectedProductionCounts"]["occurrences"] -= 1
+    _write_inventory(fixture_repo, inventory)
+    _assert_failure(fixture_repo, "INV-SCHEMA-BASELINE")
+
+
+def test_path_discovery_configuration_tampering_fails(
+    fixture_repo: Path,
+) -> None:
+    inventory = _load_inventory(fixture_repo)
+    inventory["cadenceRoots"].remove("config")
+    _write_inventory(fixture_repo, inventory)
+    _assert_failure(fixture_repo, "INV-SCHEMA-PATH-CONFIG")
+
+
+def test_stable_id_renumbering_fails(fixture_repo: Path) -> None:
+    inventory = _load_inventory(fixture_repo)
+    inventory["directOccurrences"][0]["id"] = "BN-999"
+    _write_inventory(fixture_repo, inventory)
+    _assert_failure(fixture_repo, "INV-SCHEMA-ID-SET")
+
+
 def test_new_indirect_cadence_identifier_fails(fixture_repo: Path) -> None:
     relative = "config/BluePrint.py"
     _append(fixture_repo / relative, "\nFRESH_INTERVAL_BLOCKS = 123\n")
     result = _assert_failure(fixture_repo, "INV-CADENCE-NEW", path=relative)
     assert "block-unit-identifier" in result.output
+
+
+def test_blueprint_chain_default_value_change_fails(
+    fixture_repo: Path,
+) -> None:
+    relative = "config/BluePrint.py"
+    _replace_once(
+        fixture_repo / relative,
+        '"RIPE_HQ_MIN_GOV_TIMELOCK": 43_200',
+        '"RIPE_HQ_MIN_GOV_TIMELOCK": 21_600',
+    )
+    result = checker.check_repository(fixture_repo)
+    assert {"INV-CADENCE-MISSING", "INV-CADENCE-NEW"} <= _codes(
+        result
+    ), result.output
+
+
+@pytest.mark.parametrize("key", ("duration", "delay", "blocks"))
+def test_bare_block_default_keys_fail(
+    fixture_repo: Path, key: str
+) -> None:
+    relative = "config/BluePrint.py"
+    _append(fixture_repo / relative, f'\nMUTATED_DEFAULTS = {{"{key}": 10}}\n')
+    _assert_failure(fixture_repo, "INV-CADENCE-NEW", path=relative)
+
+
+@pytest.mark.parametrize(
+    "declaration",
+    (
+        "warmupBlocks: constant(uint256) = 10",
+        "SECONDS_PER_BLOCK: constant(uint256) = 2",
+    ),
+)
+def test_camel_case_and_singular_block_identifiers_fail(
+    fixture_repo: Path, declaration: str
+) -> None:
+    relative = "contracts/config/DefaultsBase.vy"
+    _append(fixture_repo / relative, f"\n{declaration}\n")
+    _assert_failure(fixture_repo, "INV-CADENCE-NEW", path=relative)
 
 
 def test_removed_or_changed_cad_001_site_fails(fixture_repo: Path) -> None:
@@ -217,6 +309,42 @@ def test_removed_or_changed_cad_001_site_fails(fixture_repo: Path) -> None:
         for finding in result.findings
         if finding.code == "INV-CADENCE-MISSING"
     )
+
+
+def test_cad_001_site_set_divergence_reports_fingerprints(
+    fixture_repo: Path,
+) -> None:
+    inventory = _load_inventory(fixture_repo)
+    replacement = next(
+        record
+        for record in inventory["cadenceCandidates"]
+        if "CAD-001" not in record["semanticIds"]
+    )
+    inventory["indirectCadence"][0]["sites"][0] = {
+        key: replacement[key]
+        for key in (
+            "path",
+            "function",
+            "pattern",
+            "matchedText",
+            "normalizedSnippet",
+            "ordinalInFunction",
+            "reviewedLine",
+            "classification",
+            "semanticIds",
+            "reviewDomain",
+        )
+    }
+    _write_inventory(fixture_repo, inventory)
+    result = _assert_failure(fixture_repo, "INV-SCHEMA-CAD-SITES")
+    finding = next(
+        item
+        for item in result.findings
+        if item.code == "INV-SCHEMA-CAD-SITES"
+    )
+    assert finding.expected.startswith("count=27,sha256=")
+    assert finding.actual.startswith("count=27,sha256=")
+    assert finding.expected != finding.actual
 
 
 def test_new_timestamp_context_fails(fixture_repo: Path) -> None:
@@ -239,6 +367,22 @@ def test_mixed_number_timestamp_arithmetic_fails(fixture_repo: Path) -> None:
     )
     result = _assert_failure(fixture_repo, "INV-MIXED-CLOCK-NEW", path=relative)
     assert {"INV-DIRECT-NEW", "INV-TIMESTAMP-NEW"} <= _codes(result), result.output
+
+
+def test_bare_mixed_clock_allowance_cannot_suppress_review(
+    fixture_repo: Path,
+) -> None:
+    relative = "contracts/tokens/modules/Erc20Token.vy"
+    _append(
+        fixture_repo / relative,
+        "\nSNEAKY_MIXED: constant(uint256) = block.number + block.timestamp\n",
+    )
+    inventory = _load_inventory(fixture_repo)
+    inventory["allowedMixedClockFunctions"].append(
+        {"path": relative, "function": "<module>"}
+    )
+    _write_inventory(fixture_repo, inventory)
+    _assert_failure(fixture_repo, "INV-SCHEMA-REVIEW", path=relative)
 
 
 def test_new_production_vyper_path_fails_classification_and_direct_review(
@@ -294,20 +438,37 @@ def test_cadence_use_in_testing_contract_is_reported_separately(
     assert "probe/mock review" in finding.remediation
 
 
+def test_cadence_use_in_mock_contract_is_reported_separately(
+    fixture_repo: Path,
+) -> None:
+    relative = "contracts/mock/MockErc20.vy"
+    _append(fixture_repo / relative, "\nMOCK_INTERVAL_BLOCKS: constant(uint256) = 1\n")
+    result = _assert_failure(fixture_repo, "INV-CADENCE-NEW", path=relative)
+    finding = next(
+        item
+        for item in result.findings
+        if item.code == "INV-CADENCE-NEW" and item.path == relative
+    )
+    assert finding.actual.startswith("mock:")
+    assert "probe/mock review" in finding.remediation
+
+
 @pytest.mark.parametrize(
-    "target",
+    "statement",
     (
-        "contracts.testing.StockTokenTransferProbe",
-        "contracts.mock.MockErc20",
+        "import contracts.testing.StockTokenTransferProbe",
+        "import contracts.mock.MockErc20",
+        "from contracts.testing.StockTokenTransferProbe import Probe",
+        "from contracts.mock.MockErc20 import MockErc20",
     ),
 )
 def test_production_import_from_testing_or_mock_fails(
-    fixture_repo: Path, target: str
+    fixture_repo: Path, statement: str
 ) -> None:
     relative = "contracts/tokens/modules/Erc20Token.vy"
     path = fixture_repo / relative
     path.write_text(
-        f"import {target}\n" + path.read_text(encoding="utf-8"),
+        f"{statement}\n" + path.read_text(encoding="utf-8"),
         encoding="utf-8",
     )
     _assert_failure(
@@ -320,6 +481,69 @@ def test_placeholder_semantic_review_fails(fixture_repo: Path) -> None:
     inventory["directOccurrences"][0]["semanticReview"]["owner"] = "TODO"
     _write_inventory(fixture_repo, inventory)
     _assert_failure(fixture_repo, "INV-SCHEMA-PLACEHOLDER")
+
+
+def test_missing_seconds_unit_review_fails(fixture_repo: Path) -> None:
+    inventory = _load_inventory(fixture_repo)
+    relative = inventory["secondsUnitCandidates"][0]["path"]
+    inventory["secondsUnitCandidates"][0].pop("semanticReview")
+    _write_inventory(fixture_repo, inventory)
+    _assert_failure(fixture_repo, "INV-SCHEMA-REVIEW", path=relative)
+
+
+def test_invalid_review_status_fails(fixture_repo: Path) -> None:
+    inventory = _load_inventory(fixture_repo)
+    inventory["secondsUnitCandidates"][0]["semanticReview"]["status"] = "skipped"
+    _write_inventory(fixture_repo, inventory)
+    _assert_failure(fixture_repo, "INV-SCHEMA-STATUS")
+
+
+def test_review_provenance_cannot_be_reassigned(
+    fixture_repo: Path,
+) -> None:
+    inventory = _load_inventory(fixture_repo)
+    record = inventory["secondsUnitCandidates"][0]
+    record["semanticReview"]["commit"] = checker.TRACK3_REVIEW_COMMIT
+    _write_inventory(fixture_repo, inventory)
+    _assert_failure(
+        fixture_repo, "INV-SCHEMA-PROVENANCE", path=record["path"]
+    )
+
+
+def test_seconds_unit_suppression_requires_review(
+    fixture_repo: Path,
+) -> None:
+    relative = "contracts/config/DefaultsBase.vy"
+    path = fixture_repo / relative
+    declaration = "SNEAKY_IN_SECONDS: constant(uint256) = 60"
+    _append(path, f"\n{declaration}\n")
+    reviewed_line = len(path.read_text(encoding="utf-8").splitlines())
+    inventory = _load_inventory(fixture_repo)
+    inventory["secondsUnitCandidates"].append(
+        {
+            "path": relative,
+            "function": "<module>",
+            "pattern": "seconds-unit-identifier",
+            "matchedText": "SNEAKY_IN_SECONDS",
+            "normalizedSnippet": declaration,
+            "ordinalInFunction": 1,
+            "reviewedLine": reviewed_line,
+            "classification": "production",
+            "semanticIds": [],
+            "reviewDomain": "cadence-surface",
+        }
+    )
+    _write_inventory(fixture_repo, inventory)
+    _assert_failure(fixture_repo, "INV-SCHEMA-REVIEW", path=relative)
+
+
+def test_new_seconds_unit_identifier_fails(fixture_repo: Path) -> None:
+    relative = "contracts/config/DefaultsBase.vy"
+    _append(
+        fixture_repo / relative,
+        "\nFRESH_IN_SECONDS: constant(uint256) = 60\n",
+    )
+    _assert_failure(fixture_repo, "INV-SECONDS-UNIT-NEW", path=relative)
 
 
 def test_unreviewed_ignore_fails(fixture_repo: Path) -> None:
@@ -354,6 +578,53 @@ def test_unclassified_vyper_path_fails(fixture_repo: Path) -> None:
     assert {"INV-PATH-NEW", "INV-PATH-UNCLASSIFIED"} <= _codes(result), result.output
 
 
+def test_path_classification_record_tampering_fails(
+    fixture_repo: Path,
+) -> None:
+    inventory = _load_inventory(fixture_repo)
+    record = next(
+        item
+        for item in inventory["vyperPathClassifications"]
+        if item["classification"] == "production"
+    )
+    relative = record["path"]
+    record["classification"] = "test"
+    _write_inventory(fixture_repo, inventory)
+    _assert_failure(fixture_repo, "INV-PATH-CLASSIFICATION", path=relative)
+
+
+def test_new_vyi_interface_cadence_field_is_discovered(
+    fixture_repo: Path,
+) -> None:
+    relative = "interfaces/NewClockConfig.vyi"
+    path = fixture_repo / relative
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        "struct NewClockConfig:\n    warmupBlocks: uint256\n",
+        encoding="utf-8",
+    )
+    result = checker.check_repository(fixture_repo)
+    assert {"INV-PATH-NEW", "INV-CADENCE-NEW"} <= _codes(result), result.output
+    cadence = next(
+        item
+        for item in result.findings
+        if item.code == "INV-CADENCE-NEW" and item.path == relative
+    )
+    assert cadence.actual.startswith("interface:")
+
+
+def test_existing_vyi_cadence_field_change_fails(
+    fixture_repo: Path,
+) -> None:
+    relative = "interfaces/ConfigStructs.vyi"
+    _replace_once(
+        fixture_repo / relative,
+        "numBlocksPerInterval",
+        "numIntervals",
+    )
+    _assert_failure(fixture_repo, "INV-CADENCE-MISSING", path=relative)
+
+
 def test_seconds_constant_renamed_to_ambiguous_blocks_fails_both_domains(
     fixture_repo: Path,
 ) -> None:
@@ -374,6 +645,75 @@ def test_seconds_constant_renamed_to_ambiguous_blocks_fails_both_domains(
     result = checker.check_repository(fixture_repo)
     assert "INV-SECONDS-UNIT-MISSING" in _codes(result), result.output
     assert "INV-CADENCE-NEW" in _codes(result), result.output
+
+
+def test_future_migration_history_namespace_is_scanned(
+    fixture_repo: Path,
+) -> None:
+    relative = "migration_history/robinhood/v1/manifest.json"
+    path = fixture_repo / relative
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text('{"warmupBlocks": 10}\n', encoding="utf-8")
+    _assert_failure(fixture_repo, "INV-CADENCE-NEW", path=relative)
+
+
+def test_readme_cadence_prose_is_scanned(fixture_repo: Path) -> None:
+    relative = "README.md"
+    (fixture_repo / relative).write_text(
+        "Robinhood warmupBlocks must be reviewed.\n", encoding="utf-8"
+    )
+    _assert_failure(fixture_repo, "INV-CADENCE-NEW", path=relative)
+
+
+def test_schema_documents_naming_and_historical_boundaries(
+    fixture_repo: Path,
+) -> None:
+    inventory = _load_inventory(fixture_repo)
+    documentation = inventory["schemaDocumentation"]
+    assert "lower-camel plural Blocks" in documentation["cadenceCoverage"]
+    assert "migration_history/base-mainnet/**" in documentation[
+        "historicalExclusions"
+    ]
+    assert "future" in documentation["historicalExclusions"]
+    assert "<module>" in documentation["functionAttribution"]
+    assert (
+        inventory["reviewAuthorities"]["vyperPathClassifications"]
+        == "engineering/tooling"
+    )
+    assert (
+        inventory["reviewProvenance"]["hardeningApprovalCommit"]
+        == checker.HARDENING_REVIEW_COMMIT
+    )
+    assert not any(
+        record.get("semanticId") == "REVIEWED-CADENCE-SURFACE"
+        for record in inventory["cadenceCandidates"]
+    )
+
+
+def test_function_attribution_ignores_interface_declarations_and_resets_module(
+) -> None:
+    lines = [
+        "interface External:",
+        "    def fake(value: uint256) -> uint256: view",
+        "MODULE_CLOCK: uint256 = block.number",
+        "@external",
+        "def real(",
+        "    value: uint256,",
+        ") -> uint256:",
+        "    return block.number",
+        "TRAILING_CLOCK: uint256 = block.number",
+    ]
+    assert checker._line_functions(lines) == [
+        "<module>",
+        "<module>",
+        "<module>",
+        "<module>",
+        "real",
+        "real",
+        "real",
+        "real",
+        "<module>",
+    ]
 
 
 def test_malformed_json_fails_deterministically(fixture_repo: Path) -> None:
