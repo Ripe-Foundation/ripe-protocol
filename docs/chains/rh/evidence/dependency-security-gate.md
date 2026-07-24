@@ -58,18 +58,42 @@ Its independent reviewer Gate 2 remains open. Stage B must wait for that gate
 and S3 integration, then reconcile under explicit owner direction and
 reproduce S1/S2/S3/full-suite and artifact evidence.
 
+### Reviewer follow-up disposition
+
+An independent Stage A review reported no blocking defect and seven evidence
+quality observations. This revision addresses all seven:
+
+1. the byte-identical K-02 raw preimage and a stricter canonical projection
+   are retained outside the repository with restrictive permissions;
+2. all four complete literal candidate lock diffs are embedded and were
+   mechanically checked against exact hash reproductions;
+3. the `local-placeholder` provenance is identified as unintegrated S3
+   authority;
+4. the shared Titanoboa compiler cache is acknowledged as a second
+   non-repository side effect and a future-brief correction;
+5. provider alert-number gaps are explained without inventing closed states;
+6. first-patched candidates are compared with current PyPI latest releases;
+   and
+7. the initial bootstrap freeze has an exact UTC/local timestamp.
+
+The follow-up also exposed and now records one important reproduction detail:
+the frozen output lock must seed pip-compile. Without it, the mutable current
+index produces broad unrelated churn. Stage B therefore requires a complete
+fresh literal diff review even if a candidate hash happens to match.
+
 ## Authority, bootstrap, and frozen inputs
 
 The task contract, merged Track 7 specification and validation plan, and the
 integrated Track 6 S1/S2 records were read from the starting `rh` commit. The
-integration worktree was clean at bootstrap. The requested branch and
-worktree did not exist, and no active branch diff owned `requirements.in`,
-`requirements.txt`, `tests/clock/test_clock_profiles.py`, or the proposed
-evidence path. The exact worktree-add command in the task contract initially
-failed in the managed sandbox because Git could not create the new ref lock;
-the same command was then approved for Git-metadata write access and
-succeeded. The isolated worktree was clean at the same starting commit and
-the hashes below matched.
+initial freeze was captured at `2026-07-24T16:52:20Z`
+(`2026-07-24T10:52:20-0600`, MDT). The integration worktree was clean at
+bootstrap. The requested branch and worktree did not exist, and no active
+branch diff owned `requirements.in`, `requirements.txt`,
+`tests/clock/test_clock_profiles.py`, or the proposed evidence path. The exact
+worktree-add command in the task contract initially failed in the managed
+sandbox because Git could not create the new ref lock; the same command was
+then approved for Git-metadata write access and succeeded. The isolated
+worktree was clean at the same starting commit and the hashes below matched.
 
 | Frozen input | SHA-256 |
 | --- | --- |
@@ -155,10 +179,23 @@ repository and had SHA-256
 `52eccab5e38769070f5310b753f018030587b673cc2637105983ba670bfe2f0a`.
 The normalized outside-repository ledger had SHA-256
 `db06f57169506b9cd01d44fd29fa4e9144d4963eb773296eee96e09813fe139a`.
-Both were destroyed after this record was captured. No authentication state,
-token, header value, user identity, private URL, or unrelated repository
-metadata is present here. No GitHub mutation endpoint, login flow, alert
-dismissal, setting change, or other write was used.
+Both original files were destroyed after the initial record was captured.
+
+Reviewer follow-up re-ran the identical approved K-02 query at
+`2026-07-24T17:26:39Z` (`2026-07-24T11:26:39-0600`, MDT). It returned the same
+13 rows and a byte-identical raw response with the same SHA-256 above. That
+recovered raw preimage and a stricter canonical projection are retained,
+mode `0600`, outside the repository under
+`~/dev/ripe-protocol-h1-private-evidence/`. The retained projection includes
+alert number/state, severity, package/manifest/scope, GHSA/CVE, vulnerable
+range, first patch, publication/update times, and advisory URL; its SHA-256 is
+`d2dd2d89acb63de901e164c3c7d69f402c04bc38da9a803fe9674734ab404b06`.
+This retention repairs the original reviewability weakness without committing
+the authenticated response.
+
+No authentication state, token, header value, user identity, private URL, or
+unrelated repository metadata is present here. No GitHub mutation endpoint,
+login flow, alert dismissal, setting change, or other write was used.
 
 The source is authoritative for the repository's current default-branch alert
 state at retrieval time. It is not evidence about an unmerged candidate lock,
@@ -168,7 +205,11 @@ and the state can become stale after retrieval.
 
 All entries were open in `requirements.txt`; every alerting package is
 transitive. “Disposition” below is a proposal for the checkpoint, not an
-accepted risk or approved version.
+accepted risk or approved version. Alert numbers are provider-assigned and not
+contiguous within an `state=open` filtered response. Numbers below 13 and gaps
+#17 and #20 were absent from the authoritative open-alert result; this record
+does not infer whether any absent number was fixed, dismissed, or otherwise
+closed.
 
 | # | Severity; package/version | Advisory; affected; first patch | Path, repository reachability, and proposed disposition |
 | --- | --- | --- | --- |
@@ -292,6 +333,44 @@ verify the selection boundary.
   [Pygments changelog](https://pygments.org/docs/changelog/) and
   [GHSA-5239-wwwm-4pmq](https://github.com/advisories/GHSA-5239-wwwm-4pmq).
 
+### First patched versus current latest
+
+The candidate plans intentionally use the smallest supported patch for each
+recorded advisory; they do not imply that the first patch is the newest
+release. Public PyPI project metadata was re-queried at
+`2026-07-24T17:26Z`:
+
+| Package | Current lock | Candidate / first patch needed here | PyPI latest | Checkpoint consequence |
+| --- | ---: | ---: | ---: | --- |
+| urllib3 | 2.5.0 | 2.7.0 | 2.7.0 | Candidate is latest and is required by alert #25. |
+| cbor2 | 5.7.0 | 5.9.0 | 6.1.3 | Latest is incompatible with Vyper 0.4.3's `cbor2<6`; do not substitute it without a separate Vyper decision. |
+| wheel | 0.45.1 | 0.46.2 | 0.47.0 | Latest adds post-patch change surface; owner must choose minimal patch versus separately reviewed latest. |
+| Requests | 2.32.5 | 2.33.0 | 2.34.2 | Later releases exist; Candidate A deliberately minimizes HTTP behavior churn. |
+| Pygments | 2.19.2 | 2.20.0 | 2.20.0 | Candidate is latest. |
+| pytest | 8.4.2 | 9.0.3 | 9.1.1 | Both cross the Vyper optional-extra `<9` boundary; later 9.x adds more unreviewed behavior. |
+| python-dotenv | 1.2.1 | 1.2.2 | 1.2.2 | Candidate is latest. |
+| idna | 3.10 | 3.15 | 3.18 | Later Unicode/normalization changes exist; Candidate A minimizes that behavior delta. |
+| Pymdown Extensions | 10.16.1 | 10.21.3 | 11.0.1 | Latest crosses a major boundary; the docs-only candidate stays on patched 10.x. |
+| Titanoboa | 0.2.7 | held 0.2.7 | 0.2.8 | A Titanoboa change is outside Candidate A and requires separate approval/S1 evidence. |
+| Vyper | 0.4.3 | held 0.4.3 | 0.4.3 | Current compiler remains latest and exactly held. |
+
+Primary metadata:
+[urllib3](https://pypi.org/project/urllib3/),
+[cbor2](https://pypi.org/project/cbor2/),
+[wheel](https://pypi.org/project/wheel/),
+[Requests](https://pypi.org/project/requests/),
+[Pygments](https://pypi.org/project/Pygments/),
+[pytest](https://pypi.org/project/pytest/),
+[python-dotenv](https://pypi.org/project/python-dotenv/),
+[idna](https://pypi.org/project/idna/),
+[Pymdown Extensions](https://pypi.org/project/pymdown-extensions/),
+[Titanoboa](https://pypi.org/project/titanoboa/), and
+[Vyper](https://pypi.org/project/vyper/).
+
+These latest-version observations expand checkpoint decision 2; they do not
+select a later version. Any non-candidate version needs its own release-note,
+resolver, compatibility, and artifact review.
+
 ## K-01 disposable resolver provenance
 
 K-01 was owner-approved in the brief on 24 July 2026. The approved installed
@@ -322,8 +401,13 @@ setuptools==83.0.0
 wheel==0.47.0
 ```
 
-`pip check` reported no broken requirements. The candidate resolver command
-was run separately in each candidate directory:
+`pip check` reported no broken requirements. Each candidate directory received
+both its proposed `requirements.in` and a byte-for-byte copy of the frozen
+`requirements.txt` before compilation. That existing output is a material
+resolver input: pip-compile preserves compatible frozen pins when it is not
+given `--upgrade`, which is how the trials avoid an unrelated broad refresh.
+The candidate resolver command was then run separately from inside each
+candidate directory:
 
 ```text
 env PIP_CONFIG_FILE=/dev/null \
@@ -342,11 +426,24 @@ An initial command without the explicit disposable `--cache-dir` stopped with
 change the repository or install a candidate. The corrected command above
 kept all resolver cache/output under the disposable root and succeeded.
 
+Reviewer follow-up repeated K-01 from a new Python 3.12.0 venv and the same
+public-index/tool inventory at `2026-07-24T17:29:31Z`. A deliberately observed
+control run without seeding the frozen output produced broad current-index
+churn, proving the frozen-output step above is essential rather than cosmetic.
+After restoring the frozen output, all four candidate input and lock hashes
+reproduced exactly. Each literal diff below was mechanically compared
+byte-for-byte with its regenerated lock before disposal. The diffs are
+committed below so future review does not depend on hash preimages or a
+mutable package index.
+
 No candidate lock was installed, no auditor was installed or run, no version
-was selected for production, and the worktree remained unchanged. The venv,
-cache, copied inputs, candidate locks, raw alert response, and normalized
-outside-repository alert data were destroyed after the hashes and results
-below were recorded.
+was selected for production, and the worktree remained unchanged. The original
+venv, cache, copied inputs, and candidate locks were destroyed after the hashes
+and results below were recorded. The follow-up K-01 venv, cache, copied inputs,
+and candidate locks were likewise destroyed after the literal diffs were
+recorded in this evidence. K-02's recovered raw response and canonical
+projection are the deliberate outside-repository exception retained for
+checkpoint review as described above.
 
 ## Realized candidate plans and complete lock deltas
 
@@ -448,6 +545,377 @@ The candidate lock contains no version in the 13 recorded vulnerable ranges.
 That is a prediction from resolution, not an audit or authoritative alert
 closure.
 
+### Literal realized lock diffs
+
+These are the complete `diff -u` outputs from the frozen lock to each
+reproduced candidate lock. They include the command-header and dependency-path
+annotation changes that the version tables summarize.
+
+#### Candidate A
+
+```diff
+--- requirements.txt
++++ candidate-a/requirements.txt
+@@ -2,7 +2,7 @@
+ # This file is autogenerated by pip-compile with Python 3.12
+ # by the following command:
+ #
+-#    pip-compile requirements.in
++#    pip-compile --cert=None --client-cert=None --index-url=https://pypi.org/simple --no-emit-index-url --output-file=requirements.txt --pip-args=None requirements.in
+ #
+ annotated-types==0.7.0
+     # via pydantic
+@@ -18,8 +18,10 @@
+     # via eth-account
+ cached-property==2.0.1
+     # via py-evm
+-cbor2==5.7.0
+-    # via vyper
++cbor2==5.9.0
++    # via
++    #   -r requirements.in
++    #   vyper
+ certifi==2025.8.3
+     # via requests
+ charset-normalizer==3.4.3
+@@ -94,8 +96,10 @@
+     #   trie
+ hypothesis==6.138.15
+     # via titanoboa
+-idna==3.10
+-    # via requests
++idna==3.15
++    # via
++    #   -r requirements.in
++    #   requests
+ immutables==0.21
+     # via vyper
+ iniconfig==2.1.0
+@@ -147,6 +151,7 @@
+     #   pytest
+     #   vvm
+     #   vyper
++    #   wheel
+ paginate==0.5.7
+     # via mkdocs-material
+ parsimonious==0.10.0
+@@ -196,14 +201,17 @@
+     # via mkdocs-material
+ pytest==8.4.2
+     # via
++    #   -r requirements.in
+     #   pytest-cov
+     #   titanoboa
+ pytest-cov==7.0.0
+     # via titanoboa
+ python-dateutil==2.9.0.post0
+     # via ghp-import
+-python-dotenv==1.2.1
+-    # via dotenv
++python-dotenv==1.2.2
++    # via
++    #   -r requirements.in
++    #   dotenv
+ pyyaml==6.0.2
+     # via
+     #   mkdocs
+@@ -216,8 +224,9 @@
+     # via
+     #   mkdocs-material
+     #   parsimonious
+-requests==2.32.5
++requests==2.33.0
+     # via
++    #   -r requirements.in
+     #   mkdocs-material
+     #   titanoboa
+     #   vvm
+@@ -257,8 +266,10 @@
+     #   typing-inspection
+ typing-inspection==0.4.1
+     # via pydantic
+-urllib3==2.5.0
+-    # via requests
++urllib3==2.7.0
++    # via
++    #   -r requirements.in
++    #   requests
+ vvm==0.3.2
+     # via titanoboa
+ vyper==0.4.3
+@@ -269,5 +280,7 @@
+     # via mkdocs
+ wcwidth==0.2.14
+     # via prompt-toolkit
+-wheel==0.45.1
+-    # via vyper
++wheel==0.46.2
++    # via
++    #   -r requirements.in
++    #   vyper
+```
+
+#### Candidate pytest
+
+```diff
+--- requirements.txt
++++ candidate-pytest/requirements.txt
+@@ -2,7 +2,7 @@
+ # This file is autogenerated by pip-compile with Python 3.12
+ # by the following command:
+ #
+-#    pip-compile requirements.in
++#    pip-compile --cert=None --client-cert=None --index-url=https://pypi.org/simple --no-emit-index-url --output-file=requirements.txt --pip-args=None requirements.in
+ #
+ annotated-types==0.7.0
+     # via pydantic
+@@ -18,8 +18,10 @@
+     # via eth-account
+ cached-property==2.0.1
+     # via py-evm
+-cbor2==5.7.0
+-    # via vyper
++cbor2==5.9.0
++    # via
++    #   -r requirements.in
++    #   vyper
+ certifi==2025.8.3
+     # via requests
+ charset-normalizer==3.4.3
+@@ -94,8 +96,10 @@
+     #   trie
+ hypothesis==6.138.15
+     # via titanoboa
+-idna==3.10
+-    # via requests
++idna==3.15
++    # via
++    #   -r requirements.in
++    #   requests
+ immutables==0.21
+     # via vyper
+ iniconfig==2.1.0
+@@ -147,6 +151,7 @@
+     #   pytest
+     #   vvm
+     #   vyper
++    #   wheel
+ paginate==0.5.7
+     # via mkdocs-material
+ parsimonious==0.10.0
+@@ -194,16 +199,19 @@
+     #   rich
+ pymdown-extensions==10.16.1
+     # via mkdocs-material
+-pytest==8.4.2
++pytest==9.0.3
+     # via
++    #   -r requirements.in
+     #   pytest-cov
+     #   titanoboa
+ pytest-cov==7.0.0
+     # via titanoboa
+ python-dateutil==2.9.0.post0
+     # via ghp-import
+-python-dotenv==1.2.1
+-    # via dotenv
++python-dotenv==1.2.2
++    # via
++    #   -r requirements.in
++    #   dotenv
+ pyyaml==6.0.2
+     # via
+     #   mkdocs
+@@ -216,8 +224,9 @@
+     # via
+     #   mkdocs-material
+     #   parsimonious
+-requests==2.32.5
++requests==2.33.0
+     # via
++    #   -r requirements.in
+     #   mkdocs-material
+     #   titanoboa
+     #   vvm
+@@ -257,8 +266,10 @@
+     #   typing-inspection
+ typing-inspection==0.4.1
+     # via pydantic
+-urllib3==2.5.0
+-    # via requests
++urllib3==2.7.0
++    # via
++    #   -r requirements.in
++    #   requests
+ vvm==0.3.2
+     # via titanoboa
+ vyper==0.4.3
+@@ -269,5 +280,7 @@
+     # via mkdocs
+ wcwidth==0.2.14
+     # via prompt-toolkit
+-wheel==0.45.1
+-    # via vyper
++wheel==0.46.2
++    # via
++    #   -r requirements.in
++    #   vyper
+```
+
+#### Candidate docs
+
+```diff
+--- requirements.txt
++++ candidate-docs/requirements.txt
+@@ -2,7 +2,7 @@
+ # This file is autogenerated by pip-compile with Python 3.12
+ # by the following command:
+ #
+-#    pip-compile requirements.in
++#    pip-compile --cert=None --client-cert=None --index-url=https://pypi.org/simple --no-emit-index-url --output-file=requirements.txt --pip-args=None requirements.in
+ #
+ annotated-types==0.7.0
+     # via pydantic
+@@ -192,10 +192,13 @@
+     #   mkdocs-material
+     #   pytest
+     #   rich
+-pymdown-extensions==10.16.1
+-    # via mkdocs-material
++pymdown-extensions==10.21.3
++    # via
++    #   -r requirements.in
++    #   mkdocs-material
+ pytest==8.4.2
+     # via
++    #   -r requirements.in
+     #   pytest-cov
+     #   titanoboa
+ pytest-cov==7.0.0
+```
+
+#### Candidate zero
+
+```diff
+--- requirements.txt
++++ candidate-zero/requirements.txt
+@@ -2,7 +2,7 @@
+ # This file is autogenerated by pip-compile with Python 3.12
+ # by the following command:
+ #
+-#    pip-compile requirements.in
++#    pip-compile --cert=None --client-cert=None --index-url=https://pypi.org/simple --no-emit-index-url --output-file=requirements.txt --pip-args=None requirements.in
+ #
+ annotated-types==0.7.0
+     # via pydantic
+@@ -18,8 +18,10 @@
+     # via eth-account
+ cached-property==2.0.1
+     # via py-evm
+-cbor2==5.7.0
+-    # via vyper
++cbor2==5.9.0
++    # via
++    #   -r requirements.in
++    #   vyper
+ certifi==2025.8.3
+     # via requests
+ charset-normalizer==3.4.3
+@@ -94,8 +96,10 @@
+     #   trie
+ hypothesis==6.138.15
+     # via titanoboa
+-idna==3.10
+-    # via requests
++idna==3.15
++    # via
++    #   -r requirements.in
++    #   requests
+ immutables==0.21
+     # via vyper
+ iniconfig==2.1.0
+@@ -147,6 +151,7 @@
+     #   pytest
+     #   vvm
+     #   vyper
++    #   wheel
+ paginate==0.5.7
+     # via mkdocs-material
+ parsimonious==0.10.0
+@@ -185,25 +190,31 @@
+     #   eth-utils
+ pydantic-core==2.33.2
+     # via pydantic
+-pygments==2.19.2
++pygments==2.20.0
+     # via
++    #   -r requirements.in
+     #   ipython
+     #   ipython-pygments-lexers
+     #   mkdocs-material
+     #   pytest
+     #   rich
+-pymdown-extensions==10.16.1
+-    # via mkdocs-material
+-pytest==8.4.2
++pymdown-extensions==10.21.3
++    # via
++    #   -r requirements.in
++    #   mkdocs-material
++pytest==9.0.3
+     # via
++    #   -r requirements.in
+     #   pytest-cov
+     #   titanoboa
+ pytest-cov==7.0.0
+     # via titanoboa
+ python-dateutil==2.9.0.post0
+     # via ghp-import
+-python-dotenv==1.2.1
+-    # via dotenv
++python-dotenv==1.2.2
++    # via
++    #   -r requirements.in
++    #   dotenv
+ pyyaml==6.0.2
+     # via
+     #   mkdocs
+@@ -216,8 +227,9 @@
+     # via
+     #   mkdocs-material
+     #   parsimonious
+-requests==2.32.5
++requests==2.33.0
+     # via
++    #   -r requirements.in
+     #   mkdocs-material
+     #   titanoboa
+     #   vvm
+@@ -257,8 +269,10 @@
+     #   typing-inspection
+ typing-inspection==0.4.1
+     # via pydantic
+-urllib3==2.5.0
+-    # via requests
++urllib3==2.7.0
++    # via
++    #   -r requirements.in
++    #   requests
+ vvm==0.3.2
+     # via titanoboa
+ vyper==0.4.3
+@@ -269,5 +283,7 @@
+     # via mkdocs
+ wcwidth==0.2.14
+     # via prompt-toolkit
+-wheel==0.45.1
+-    # via vyper
++wheel==0.46.2
++    # via
++    #   -r requirements.in
++    #   vyper
+```
+
 ## S3 sequencing and artifact consequence
 
 At H-01 bootstrap, the S3 worktree was clean at
@@ -458,15 +926,19 @@ immutable owner Gate 1 approval or inventory reconciliation.
 
 During Stage A, the S3 branch independently advanced through
 `51e5c5a47ac74083affb16516cd07dd8321c0fbb` and then to
-`22ece8f560b40f25e6ad2a651c9829fe2baf2120`, observed at
-`2026-07-24T17:15:58Z`. Commit `db7ae89` records owner Gate 1 approval,
-`51e5c5a` reconciles the checked clock inventory, and `22ece8f` records the
-green ordered Stage 2 evidence: 59 Lootbox reward tests, 91 Switchboard
-Charlie tests, 175 full Lootbox tests, 57 S1 tests, 60 inventory tests, a clean
-inventory checker, and 2,722 full-suite passes with 142 deselected. The branch
-remains clean and is not an ancestor of `rh`. Its mandatory independent
-reviewer Gate 2, production-contract security/audit review, rollout decisions,
-owner merge/push, and integration remain open.
+`22ece8f560b40f25e6ad2a651c9829fe2baf2120`. Commit `db7ae89` records owner
+Gate 1 approval, `51e5c5a` reconciles the checked clock inventory, and
+`22ece8f` records the green ordered Stage 2 evidence: 59 Lootbox reward tests,
+91 Switchboard Charlie tests, 175 full Lootbox tests, 57 S1 tests, 60
+inventory tests, a clean inventory checker, and 2,722 full-suite passes with
+142 deselected.
+
+Reviewer follow-up observed a later S3 documentation-only clarification,
+`c823300c7af418a7b226093e3a9ddf1d970e1998`, at
+`2026-07-24T17:32:56Z`. It changes only the S3 implementation record and does
+not close Gate 2. The branch remains clean and is not an ancestor of `rh`. Its
+mandatory independent reviewer Gate 2, production-contract security/audit
+review, rollout decisions, owner merge/push, and integration remain open.
 
 Every realized H-01 candidate changes at least cbor2 and wheel, which are
 Vyper/compiler/build inputs. Candidate pytest and candidate zero also change
@@ -494,8 +966,11 @@ The integration baseline and isolated worktree used the unchanged starting
 commit and dependency environment. The exact initial S1 command without a
 placeholder stopped during collection because `ETHERSCAN_API_KEY` was absent.
 The S3 record already sanctions the non-secret value `local-placeholder` for
-offline test collection; no live explorer call or secret access occurred.
-The effective reruns set that value.
+offline test collection, but that provenance is on the unintegrated,
+reviewer-Gate-2-pending S3 branch rather than integrated `rh` authority. The
+value is still manifestly non-secret and no live explorer call or secret access
+occurred. The effective reruns set that value and this authority limitation is
+not treated as checkpoint approval.
 
 | Command | Result |
 | --- | --- |
@@ -509,13 +984,19 @@ The effective reruns set that value.
 | cache-disabled equivalent collection | 2,699/2,841 collected, 142 deselected, in 1.52 s; this introduced only expected pre-import assertion-rewrite warnings |
 | canonical `ETHERSCAN_API_KEY=local-placeholder PYTHONPATH=. pytest --collect-only -q` after the contract-approved baseline populated the missing compiler cache | 2,699/2,841 collected, 142 deselected, in 1.24 s; 2.64 s wall |
 | canonical `ETHERSCAN_API_KEY=local-placeholder PYTHONPATH=. pytest -q` | 2,699 passed, 142 deselected in 310.03 s; 370.57 s wall |
+| reviewer-correction replay: `python -m pip check` and `ETHERSCAN_API_KEY=local-placeholder PYTHONPATH=. pytest -q tests/clock/test_clock_profiles.py` | no broken requirements; 57 passed in 28.28 s; 67.13 s wall |
 
 The canonical full suite initially required managed-filesystem approval solely
 to create Titanoboa compiler-cache entries outside the worktree. It used the
-unchanged dependency profile and no network or live service. This was an
+unchanged dependency profile and no network or live service. It was an
 environment-permission correction, not a test, source, dependency, or
-assertion change. A pre-worktree run at the same starting commit also passed
-2,699 tests with 142 deselected.
+assertion change, but it was also a second non-repository side effect beyond
+the brief's statement that K-01 would be the sole such side effect. The
+mandated baseline made compiler-cache population practically unavoidable in
+this managed environment; the exception was not concealed or converted into a
+broader authorization. Future briefs should explicitly permit or redirect the
+baseline compiler cache to a disposable path. A pre-worktree run at the same
+starting commit also passed 2,699 tests with 142 deselected.
 
 ### Operational command record
 
@@ -554,6 +1035,11 @@ gh api --method GET --paginate --slurp \
   '/repos/Ripe-Foundation/ripe-protocol/dependabot/alerts?state=open&per_page=100'
 jq '<sanitized alert projection>' <outside-repository raw response>
 shasum -a 256 <raw response> <sanitized projection>
+install -m 600 <raw response and projection> \
+  ~/dev/ripe-protocol-h1-private-evidence/
+
+# Public latest-version comparison
+curl -fsSL https://pypi.org/pypi/<package>/json
 
 # K-01
 python -m venv <disposable venv>
@@ -561,6 +1047,7 @@ python -m venv <disposable venv>
   --index-url https://pypi.org/simple pip-tools==7.4.1
 <disposable python> -m pip list --format=freeze
 <disposable python> -m pip check
+cp <frozen requirements.txt> <candidate directory>/requirements.txt
 env PIP_CONFIG_FILE=/dev/null PIP_INDEX_URL=https://pypi.org/simple \
   PIP_EXTRA_INDEX_URL= PIP_NO_CACHE_DIR=1 \
   <disposable pip-compile> --cache-dir=<disposable cache> \
@@ -587,7 +1074,7 @@ git diff --no-index --check /dev/null \
   docs/chains/rh/evidence/dependency-security-gate.md
 rg -n -i '<credential, token, private URL, username patterns>' \
   docs/chains/rh/evidence/dependency-security-gate.md
-rm -rf <exact validated disposable Stage A root>
+rm -rf <exact validated K-01 venv, cache, and candidate directories>
 ```
 
 Final pre-stage checks found exactly one untracked file, this evidence record.
@@ -595,9 +1082,11 @@ Final pre-stage checks found exactly one untracked file, this evidence record.
 this new file emitted no whitespace diagnostics (its exit 1 means the expected
 content difference exists). No prohibited tracked venv/cache/wheel/raw-response
 path and no high-confidence credential, authenticated URL, or unsanitized home
-path pattern was found. The exact K-01 disposable root was absent. The same
-scope and sanitization checks must be repeated after staging and before
-commit.
+path pattern was found. The original exact K-01 disposable root was absent.
+After reviewer correction, the repeated K-01 venv, cache, and candidate
+directories were also absent; only the deliberately retained, mode-`0600`
+K-02 raw/projection files exist outside the repository. The same scope and
+sanitization checks must be repeated after staging and before commit.
 
 ## Residual-risk register and blockers
 
@@ -605,6 +1094,7 @@ commit.
 | --- | --- |
 | Authoritative default-branch alerts | All 13 remain open as of the snapshot. Candidate resolution cannot close them before an observed merged manifest. |
 | Candidate evidence depth | No candidate was installed or audited under K-01. Resolver success proves neither runtime compatibility nor absence of newly surfaced vulnerabilities. Stage B tooling/commands need approval. |
+| Resolver reproducibility | The candidate hashes reproduced only when the frozen output lock was supplied to pip-compile; a no-output control floated broad current-index packages. Literal Stage A diffs are now committed, but mutable index state still requires a fresh full Stage B diff review even when hashes match. Any mismatch blocks implementation until every changed line is explained and approved. |
 | pytest major boundary | `9.0.3` resolves without Vyper extras but conflicts with Vyper 0.4.3 optional test/dev metadata and intentionally invalidates S1's exact `8.4.2` expectation. Upgrade, exception, paired upstream change, or blocked disposition required. |
 | cbor2/wheel artifact input | Candidate A changes compiler/build transitives. Old/new bytecode, ABI, known-vector, wheel/install, and S3 artifact equality are unproved until Stage B. |
 | HTTP/environment behavior | Release notes were reviewed, but redirects/retries/proxies/TLS/certificates/adapters/pooling/timeouts/exceptions, hostname handling, and dotenv load behavior require clean candidate validation. |
@@ -631,8 +1121,11 @@ To reproduce a candidate after approval:
    direction and re-freeze all inputs;
 2. create separate old and candidate Python 3.12.0 environments with the
    approved pip/pip-tools commands and public-index policy;
-3. regenerate from the exact candidate input above and require the recorded
-   lock hash or explain/review any fresh resolver result;
+3. seed the candidate compile with the frozen reviewed output lock, regenerate
+   from the exact candidate input above, and compare a complete literal diff
+   with the Stage A appendix regardless of whether the recorded hash matches;
+   any hash mismatch or extra diff line blocks implementation until a fresh
+   full lock-diff review explains and approves it;
 4. install old and candidate locks independently, run approved audit and
    `pip check`, record complete inventories, and exclude local/editable/private
    inputs;
@@ -659,7 +1152,9 @@ items:
    direct-input pins/constraints, including pin-versus-bounded-constraint
    form and removal conditions. Candidate A proposes cbor2 5.9.0, idna 3.15,
    python-dotenv 1.2.2, Requests 2.33.0, urllib3 2.7.0, wheel 0.46.2, and
-   explicit holds for Titanoboa 0.2.7 and pytest 8.4.2.
+   explicit holds for Titanoboa 0.2.7 and pytest 8.4.2. For each, explicitly
+   choose the minimal patch versus the current-latest alternative in the table
+   above; a different version reopens release-note and resolver review.
 3. **pytest:** choose exact 9.0.3 with S1 reapproval; exact 8.4.2 under a
    time-bounded exception; a separately approved Vyper/Titanoboa change; or
    blocked pending a compatible upstream path. Explicitly resolve the Vyper
@@ -673,8 +1168,9 @@ items:
    the explicit owner/S3/Track 6/security approval for the more expensive
    alternate sequence.
 7. **Stage B toolchain:** approve exact Python, pip, pip-tools/resolver,
-   indexes, old/new clean-environment, and audit commands. K-01 does not
-   authorize Stage B installation or an auditor.
+   indexes, frozen-output seeding, mandatory fresh literal lock-diff review,
+   old/new clean-environment, and audit commands. K-01 does not authorize
+   Stage B installation or an auditor.
 8. **Freshness:** define the exact time window or event trigger; what refreshes
    it; which alert classes, lock/environment/artifact evidence it covers; and
    which rehearsal/deployment actions stale evidence blocks. Keep ordinary
