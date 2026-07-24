@@ -1,8 +1,8 @@
 # Track 6 S4 Deleverage Cooldown Security and Compatibility Decision
 
-**Status:** Stage A no-code initial-launch recommendation prepared; mandatory
-checkpoint 0 open; owner and independent security approval pending; Stage B
-and Stage C must not begin
+**Status:** Stage A no-code initial-launch decisions 1-9 owner-approved;
+mandatory checkpoint 0 remains open for independent security and handoff
+evidence; Stage B and Stage C must not begin
 
 **Prepared:** 24 July 2026
 
@@ -14,6 +14,10 @@ and Stage C must not begin
 **Re-review correction date:** 24 July 2026
 
 **Owner direction update:** 24 July 2026
+
+**Owner checkpoint approval:** Decisions 1-9 at
+`4d6c3ff43c3ceacbad8ff24b860acfc21bb043e8`, approved by direct owner
+instruction on 24 July 2026
 
 **Stage A launch baseline:** `3e6e6f230169fc445d0b29454457480c62efd89a`
 
@@ -47,6 +51,13 @@ bound the risk. The owner directed Stage A to prepare the no-code recommendation
 below but explicitly did **not** approve the conclusion by giving that
 direction. No response to the revised checkpoint items means no S4 production
 edit and no Stage B or Stage C.
+
+The owner then separately and explicitly approved decisions 1-9 at
+`4d6c3ff43c3ceacbad8ff24b860acfc21bb043e8` on 24 July 2026. That approval
+accepts the no-code recommendation and its stated owner risks and handoffs. It
+does not constitute independent security approval, downstream handoff
+completion, implementation authority, deployment authority, or permission to
+begin Stage B or Stage C.
 
 ## Re-review disposition
 
@@ -83,8 +94,8 @@ exception are dormant. There is no normal initial-launch caller for the
 Underscore withdrawal flow, while the existing caller authorization,
 debt-position, withdrawal-value, repayment, and collateral checks remain.
 
-The revised Stage A recommendation, still pending explicit owner and
-independent security approval, is:
+The revised Stage A recommendation is owner-approved; independent security
+approval remains pending:
 
 - deploy the existing shared Deleverage and SwitchboardDelta source unchanged;
 - configure Robinhood `deleverageCooldown = 0`;
@@ -108,7 +119,8 @@ the production-contract change this recommendation avoids. The safety boundary
 therefore depends on approved defaults, an exact parameter manifest,
 post-deployment assertion, governance procedure, and mandatory S4 reopening.
 
-The bounded risks proposed for explicit initial-launch acceptance are real:
+The owner accepted the following bounded initial-launch risks; independent
+security acceptance remains pending:
 
 - cooldown `0` provides no pacing between otherwise valid deleverage actions;
 - Underscore is omitted, so there is no normal initial-launch caller for its
@@ -211,9 +223,9 @@ them.
 Because the batch planning-correction pass has not landed, section 10 records
 the required BN-012, decision-register, S6, Track 7 H-08, and migration-0020
 corrections as cross-track handoffs only. Their absence from the integrated
-documents does not authorize S4 to edit another active track. Checkpoint 0
-remains open until the no-code conclusion and its proposed risk acceptance
-receive explicit owner and independent security approval.
+documents does not authorize S4 to edit another active track. The owner
+approval is now recorded, but checkpoint 0 remains open for independent
+security approval and the named cross-track handoff evidence.
 
 ### 1.2 Frozen hashes
 
@@ -901,19 +913,18 @@ future gate.
 
 ## 12. Open blockers
 
-1. Explicit owner approval or rejection of the no-code initial-launch
-   conclusion in section 13.
-2. Independent security approval of the same conclusion and the bounded risks:
+1. Independent security approval of the owner-approved conclusion and bounded
+   risks:
    no pacing at `0`, procedural rather than onchain enforcement, retained
    governance ability, duplicated ceiling debt, and unsafe future nonzero
    same-number behavior.
-3. S6 acceptance of the exact defaults/manifest handoff.
-4. Track 7 acceptance of the exact H-08 and migration-0020 handoffs.
-5. An authorized planning-correction commit that updates BN-012 and the Track 6
+2. S6 acceptance of the exact defaults/manifest handoff.
+3. Track 7 acceptance of the exact H-08 and migration-0020 handoffs.
+4. An authorized planning-correction commit that updates BN-012 and the Track 6
    decision register without rewriting checked history in place.
-6. Governance/runbook ownership for stopping any nonzero proposal before queue
+5. Governance/runbook ownership for stopping any nonzero proposal before queue
    and reopening S4.
-7. Independent confirmation that the initial Robinhood graph omits Underscore.
+6. Independent confirmation that the initial Robinhood graph omits Underscore.
 
 Maximum intent, context architecture, ABI changes, Base convergence, current
 Delta registry identity, H-01 reconciliation, and an exact Stage B file set are
@@ -925,44 +936,44 @@ occurs.
 
 Stage A kickoff, H-01-first ordering for any implementation, omission of
 Underscore from the initial graph, and the standing minimum-change directive
-are recorded owner directions dated 24 July 2026. They establish the inputs to
-the recommendation; they do **not** approve the no-code conclusion or its risk
-acceptance.
+were recorded owner directions dated 24 July 2026. In a separate direct
+instruction on 24 July 2026, the owner approved decisions 1-9 exactly as
+recorded at `4d6c3ff43c3ceacbad8ff24b860acfc21bb043e8`.
 
 | # | Mandatory decision | Stage A recommendation | Owner status | Independent security status |
 | ---: | --- | --- | --- | --- |
-| 1 | Initial S4 production scope | Deploy existing shared Deleverage and SwitchboardDelta source unchanged; no S4 contract, interface, ABI, test, state-changing migration, Base, or Underscore change | **PENDING explicit conclusion approval** | **PENDING** |
-| 2 | Initial cooldown | Pin Robinhood `deleverageCooldown = 0` in S6 defaults and parameter manifest | **PENDING explicit conclusion approval** | **PENDING** |
-| 3 | Enforcement model | Accept that zero is procedural/configuration-enforced, not prohibited by current onchain code; governance technically retains the ability to queue nonzero | **PENDING explicit risk acceptance** | **PENDING** |
-| 4 | Latent debt | Retain duplicated `MAX_COOLDOWN_BLOCKS = 7_200` constants and stale wall-time comment as documented dormant debt | **PENDING explicit risk acceptance** | **PENDING** |
-| 5 | Initial caller graph | Omit Underscore; no Teller coordinator or context is added | **OWNER DIRECTION RECORDED; conclusion effect PENDING** | **PENDING graph/risk confirmation** |
-| 6 | Stage progression | Do not begin Stage B or Stage C; no Stage B file set exists | **PENDING explicit conclusion approval** | **PENDING** |
-| 7 | Reopening triggers | Reopen S4 before Underscore inclusion or before governance proposes/queues any nonzero cooldown | **PENDING explicit procedural approval** | **PENDING** |
-| 8 | Cheap enforcement handoffs | S6 manifest/default pin, H-08 live-zero assertion, inert 0020 hook, BN-012/decision-register correction | **PENDING handoff approval** | **PENDING** |
-| 9 | Initial risk proposed for acceptance | No cooldown pacing, no normal Underscore caller, underlying checks remain, same-number bypass unsafe on future activation | **PENDING explicit risk acceptance** | **PENDING** |
+| 1 | Initial S4 production scope | Deploy existing shared Deleverage and SwitchboardDelta source unchanged; no S4 contract, interface, ABI, test, state-changing migration, Base, or Underscore change | **APPROVED at `4d6c3ff`; 24 July 2026** | **PENDING** |
+| 2 | Initial cooldown | Pin Robinhood `deleverageCooldown = 0` in S6 defaults and parameter manifest | **APPROVED at `4d6c3ff`; 24 July 2026** | **PENDING** |
+| 3 | Enforcement model | Accept that zero is procedural/configuration-enforced, not prohibited by current onchain code; governance technically retains the ability to queue nonzero | **APPROVED at `4d6c3ff`; 24 July 2026** | **PENDING** |
+| 4 | Latent debt | Retain duplicated `MAX_COOLDOWN_BLOCKS = 7_200` constants and stale wall-time comment as documented dormant debt | **APPROVED at `4d6c3ff`; 24 July 2026** | **PENDING** |
+| 5 | Initial caller graph | Omit Underscore; no Teller coordinator or context is added | **APPROVED at `4d6c3ff`; 24 July 2026** | **PENDING graph/risk confirmation** |
+| 6 | Stage progression | Do not begin Stage B or Stage C; no Stage B file set exists | **APPROVED at `4d6c3ff`; 24 July 2026** | **PENDING** |
+| 7 | Reopening triggers | Reopen S4 before Underscore inclusion or before governance proposes/queues any nonzero cooldown | **APPROVED at `4d6c3ff`; 24 July 2026** | **PENDING** |
+| 8 | Cheap enforcement handoffs | S6 manifest/default pin, H-08 live-zero assertion, inert 0020 hook, BN-012/decision-register correction | **APPROVED at `4d6c3ff`; 24 July 2026** | **PENDING** |
+| 9 | Initial risk proposed for acceptance | No cooldown pacing, no normal Underscore caller, underlying checks remain, same-number bypass unsafe on future activation | **APPROVED at `4d6c3ff`; 24 July 2026** | **PENDING** |
 
 ### Required approval fields
 
 ```text
-Owner:
-Owner approval date:
-Owner-approved exact answers 1-9:
-Owner-approved initial Robinhood cooldown value:
-Owner acceptance that enforcement is procedural, not onchain:
-Owner acceptance of dormant duplicated-constant debt:
-Owner-approved reopening triggers:
-Owner-approved S6 / H-08 / 0020 / planning-correction handoffs:
+Owner: repository owner, by direct instruction
+Owner approval date: 24 July 2026
+Owner-approved exact answers 1-9: approved exactly as recorded at 4d6c3ff43c3ceacbad8ff24b860acfc21bb043e8
+Owner-approved initial Robinhood cooldown value: 0
+Owner acceptance that enforcement is procedural, not onchain: yes; governance retains technical ability to queue nonzero
+Owner acceptance of dormant duplicated-constant debt: yes
+Owner-approved reopening triggers: before Underscore inclusion or any nonzero cooldown proposal/queue
+Owner-approved S6 / H-08 / 0020 / planning-correction handoffs: yes, exactly as recorded in section 10
 
-Independent security reviewer:
-Security review date:
-Security review evidence/commit:
-Security-approved exact answers 1-9:
-Residual risks explicitly accepted:
+Independent security reviewer: PENDING
+Security review date: PENDING
+Security review evidence/commit: PENDING
+Security-approved exact answers 1-9: PENDING
+Residual risks explicitly accepted: PENDING
 
-S6 handoff owner/review evidence:
-Track 7 H-08 and 0020 handoff owner/review evidence:
-Planning-correction commit:
-Governance/runbook reopening owner:
+S6 handoff owner/review evidence: PENDING
+Track 7 H-08 and 0020 handoff owner/review evidence: PENDING
+Planning-correction commit: PENDING
+Governance/runbook reopening owner: PENDING
 ```
 
 Until every required field is complete, checkpoint 0 remains open. Stage B and
@@ -975,7 +986,8 @@ tests, inventory, dependencies, migrations, manifests, defaults, the
 Underscore repository, or live state. It did not push, merge, deploy, sign, or
 execute a governance or state-changing transaction.
 
-Checkpoint recommendation, pending explicit owner and independent security
-approval: **accept S4 as dormant for the initial Robinhood launch; deploy
-unchanged shared source with cooldown `0`; do not begin Stage B or Stage C;
-reopen before Underscore inclusion or any nonzero cooldown proposal**.
+Owner-approved checkpoint recommendation, still pending independent security
+approval and cross-track handoff evidence: **accept S4 as dormant for the
+initial Robinhood launch; deploy unchanged shared source with cooldown `0`; do
+not begin Stage B or Stage C; reopen before Underscore inclusion or any
+nonzero cooldown proposal**.
