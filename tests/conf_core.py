@@ -419,6 +419,7 @@ def lootbox(ripe_hq_deploy):
     return boa.load(
         "contracts/core/Lootbox.vy",
         ripe_hq_deploy,
+        43_200, # minimum interval floor: 1 day in Base blocks
         43_200, # 1 day in blocks
         100 * EIGHTEEN_DECIMALS, # deposit rewards amount
         100 * EIGHTEEN_DECIMALS, # yield bonus amount

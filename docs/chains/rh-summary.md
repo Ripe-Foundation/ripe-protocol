@@ -6,6 +6,14 @@
 
 **Source basis:** Hightop Notes research dated 22 July 2026 and decision-record updates/live verification through 23 July 2026
 
+**Checklist reconciliation baseline:** `27765d29094256fa9619dd44a0bfd145863de8b7` on 24 July 2026
+
+**Minimum-contract-change directive:** 24 July 2026 — implementation necessity
+is being re-evaluated in
+[`minimal-contract-change-reassessment.md`](rh/minimal-contract-change-reassessment.md)
+
+A checked planning or evidence item means that decision or artifact is complete at the reconciliation baseline. It does not imply that dependent implementation, deployment, activation, validation, or launch gates are complete unless the item itself says so. Any later reconciliation that closes or reopens an item must update the reconciliation baseline in the same commit.
+
 ## Purpose
 
 This document is the high-level engineering checklist for deploying the selected Ripe architecture on Robinhood Chain. It covers only work that belongs in or directly changes this repository: contracts, configuration, deployment and verification scripts, test infrastructure, and release artifacts.
@@ -19,6 +27,17 @@ Off-repo liquidity provisioning, hosted monitoring and dashboards, alert respons
 This checklist follows the selected architecture in [`random/hood/hood-chain-executive-summary.md`](https://github.com/mickhagen/hightop-notes/blob/main/random/hood/hood-chain-executive-summary.md) in the separate Hightop Notes repository, not the larger federated architecture proposed in that repository's `random/hood/hood-chain.md` research document.
 
 The primary implementation constraint is one canonical, chain-portable smart-contract codebase and release line. Do not create a Robinhood-only protocol branch, duplicate the contract suite, or add Robinhood-specific variants of core contracts. Except for `DefaultsRobinhood`, changes to Ripe-owned production contracts should be shared improvements that remain deployable on Base, Robinhood, and future EVM chains. Put chain differences in defaults, constructor arguments, governed parameters, address/configuration data, and migration scripts rather than in duplicated contracts or `chain.id` conditionals.
+
+The second controlling constraint is to make the absolute minimum necessary
+production smart-contract changes for the initial Robinhood release. Reuse
+existing source first; then prefer `DefaultsRobinhood`, constructor or governed
+values, omission, disabled features, explicit risk acceptance, tests, tooling,
+and deployment assertions. A shared improvement is not automatically required
+merely because it is cleaner or more portable. Before any production-contract
+change, present the owner with the no-source-change path, the concrete risk of
+accepting it, the smallest mitigation, and the incremental risk introduced by
+new code. The owner must explicitly reject the acceptable no-change paths
+before implementation proceeds.
 
 - Deploy a full, chain-local Ripe credit system on Robinhood.
 - Keep positions, collateral, pricing, liquidation, parameters, and governance local to each chain.
@@ -51,13 +70,13 @@ The Base-versus-Robinhood matrix is a deployment and configuration inventory, no
 Freeze release and inventory
         |
         v
-Resolve shared-source, live-version, clock, CCIP, vault, sGREEN, and USDG choices
+Resolve minimal inventory, accepted risks, CCIP, vault, sGREEN, and USDG choices
         |
         v
 Prove minimal GREEN bridge and Stock Token transferability
         |
         v
-Generalize shared contracts; add Robinhood defaults and deployment tooling
+Reuse contracts unchanged; add defaults/tooling; approve only indispensable changes
         |
         v
 Pass unit, deployment, cross-chain, and adversarial tests
@@ -71,34 +90,62 @@ Freeze and execute restricted mainnet release
 
 ## 0. Freeze scope and resolve blocking choices
 
-- [ ] Pin the exact release commit and regenerate the `block.number` inventory from that commit.
-- [ ] Commit to one canonical contract source and release line for Base and Robinhood; separate chain configuration and migration directories must not become separate protocol branches.
-- [ ] Create a Base-versus-Robinhood component matrix using the definitions above: `reused unchanged`, `modified`, `replaced`, `disabled`, or `deferred`.
+- [ ] Pin the exact release commit for implementation and release freeze.
+- [x] Regenerate and review the `block.number` inventory at the audited planning baseline.
+  - Evidence: [`block-number-inventory.md`](rh/block-number-inventory.md) and [`component-matrix.md`](rh/component-matrix.md).
+- [x] Commit to one canonical contract source and release line for Base and Robinhood; separate chain configuration and migration directories must not become separate protocol branches.
+  - Decision evidence: [`component-matrix.md`](rh/component-matrix.md) and [`shared-block-clock-specification.md`](rh/shared-block-clock-specification.md).
+- [ ] Reassess every `modified` or `replaced` component under the
+  minimum-contract-change directive. For each one, document the unchanged,
+  configuration-only, disabled, or omitted alternative; the concrete accepted
+  risk; and why any remaining source change is indispensable.
+  - Working record:
+    [`minimal-contract-change-reassessment.md`](rh/minimal-contract-change-reassessment.md).
+- [x] Create a Base-versus-Robinhood component matrix using the definitions above: `reused unchanged`, `modified`, `replaced`, `disabled`, or `deferred`.
+  - Evidence: [`component-matrix.md`](rh/component-matrix.md).
 - [ ] Freeze the contracts that will be deployed on Robinhood and the Base-only contracts that will be omitted.
 - [ ] Approve the live-version policy for every `modified` or `replaced` component while retaining one canonical source:
   - require the live Base deployment to migrate before Robinhood launches;
   - permit temporary deployed-version drift with an owner, bounds, and convergence plan; or
-  - explicitly accept permanent live-version divergence only where a component is immutable or migrating a custody-bearing deployment would be unacceptably risky.
+  - explicitly accept permanent live-version divergence only where a component is immutable or migrating its state-bearing or custody-bearing deployment would be unacceptably risky.
+  - **CM-008 decision recorded:** leave the deployed Base Ledger untouched
+    indefinitely because its state migration is unacceptably risky; Robinhood
+    will be the first deployment of the revised portable Ledger. This is a
+    live-bytecode exception, not a source fork.
 - [ ] Record every permanent live-version exception in the component matrix with its technical cause, risk, governance approval, and operational implications. This is an exception to live-bytecode parity, not permission to create chain-specific source.
 - [ ] If temporary drift makes Robinhood the first production deployment of generalized shared-contract revisions while Base retains its battle-tested bytecode, explicitly approve that rollout posture and apply the corresponding review, testnet, and soak requirements.
-- [ ] Approve the shared clock posture: retain `block.number` where its semantics are acceptable on both chains, move cadence assumptions into per-chain parameters, and change hardcoded or same-number behavior in the canonical shared contracts.
-- [ ] Resolve the deployable Stock Token vault path:
-  - nominal-balance `SimpleErc20`; or
-  - share-based `RebaseErc20`/`SharesVault`.
+- [x] Approve the shared clock analysis posture: retain `block.number` where its
+  semantics are acceptable and use per-chain parameters where required.
+  Production changes previously proposed for hardcoded or same-number behavior
+  are reopened for necessity review under the 24 July minimum-change directive.
+  - Decision evidence: [`shared-block-clock-specification.md`](rh/shared-block-clock-specification.md),
+    [`block-clock-validation-plan.md`](rh/block-clock-validation-plan.md), and
+    [`minimal-contract-change-reassessment.md`](rh/minimal-contract-change-reassessment.md).
+- [ ] Resolve the deployable Stock Token vault path through Track 8:
+  - treat Stock Tokens as mandatory for initial launch;
+  - specify the smallest demonstrably sufficient shared containment patch;
+  - prove its backing, settlement, debt, custody, and issuer-control invariants;
+    and
+  - require a separate necessity decision before any broader corrected-share,
+    reward, Ledger, or migration redesign.
 - [ ] Decide whether to deploy SavingsGreen/sGREEN on Robinhood; if it is omitted, identify the resulting Stability Pool, insurance, rewards, and lifecycle-test changes in the component matrix.
-- [ ] Resolve the USDG price path:
-  - existing Chainlink feed;
-  - existing reviewed adapter;
-  - new fixed/capped adapter with explicit depeg behavior; or
-  - PSM disabled.
+- [x] Resolve the USDG price path:
+  - **Selected:** use the existing official Chainlink USDG/USD feed through the shared `ChainlinkPrices`/`PriceDesk` path.
+  - Existing-adapter and new-adapter alternatives are not required for the selected path.
+  - The PSM deployment and activation posture remains separately gated.
+  - Decision evidence: [`usdg-psm-decision.md`](rh/usdg-psm-decision.md).
 - [ ] Pin the supported CCIP contracts release and decide how its Solidity contracts and artifacts will be built, tested, and deployed from this currently Vyper-focused repository.
-- [ ] Prefer Chainlink-assisted registration so Robinhood can deploy the same existing GREEN and RIPE token implementations without adding a Robinhood-only `getCCIPAdmin()` change.
+- [x] Prefer Chainlink-assisted registration so Robinhood can deploy the same existing GREEN and RIPE token implementations without adding a Robinhood-only `getCCIPAdmin()` change.
+  - Decision evidence: [`ccip-integration-decision.md`](rh/ccip-integration-decision.md). Chainlink confirmation of the supported registration path remains open below.
 - [ ] Confirm the supported registration path with Chainlink. If `getCCIPAdmin()` is unavoidable, design it as part of a new shared token revision usable on every chain and explicitly resolve the resulting Base migration, temporary live-version mismatch, or permanently accepted live divergence for the immutable Base tokens.
 - [ ] Prove the two highest-uncertainty paths before building the full deployment:
   - a Stock Token can transfer into and back out of a third-party test contract; and
   - test GREEN can bridge Base Sepolia → Robinhood testnet → Base Sepolia through the proposed RipeHq-authorized pool path.
 
-**Exit condition:** the release commit, shared-source and live-version policy, component inventory and any permanent live-version exceptions, clock posture, sGREEN decision, vault/CCIP/USDG choices, and minimal testnet bridge design are approved.
+**Exit condition:** the release commit, minimal unchanged deployment inventory,
+accepted-risk register, shared-source/live-version policy, any indispensable
+contract changes, sGREEN decision, vault/CCIP/USDG choices, and minimal testnet
+bridge design are approved.
 
 ## 1. Add Robinhood deployment support
 
@@ -125,19 +172,43 @@ Freeze and execute restricted mainnet release
 
 ## 2. Parameterize block-based behavior for Base and Robinhood
 
-Robinhood's EVM `block.number` advances as an approximate Ethereum L1-height estimate. Many Robinhood L2 blocks may share one number, followed by delayed or multi-number jumps. Most Ripe durations and rates are already supplied through constructors, Mission Control, or Defaults; those should use different Base and Robinhood values while the consuming contract stays identical. The first shared-contract changes should remove the remaining hardcoded cadence assumptions and generalize same-number behavior. Do not mechanically convert every site to timestamps or add chain-specific branches.
+Robinhood's EVM `block.number` advances as an approximate Ethereum L1-height
+estimate. Many Robinhood L2 blocks may share one number, followed by delayed or
+multi-number jumps. Most Ripe durations and rates are already supplied through
+constructors, Mission Control, or Defaults; those should use different Base and
+Robinhood values while the consuming contract stays identical. Hardcoded or
+same-number behavior does not automatically justify a source change when the
+affected feature can safely remain disabled or its risk can be explicitly
+accepted. Do not mechanically convert sites to timestamps, generalize dormant
+features for future use, or add chain-specific branches.
 
 - [ ] Classify every retained `block.number` use as:
   - configurable economic duration;
   - hardcoded economic duration;
   - per-number rate or reward accrual;
-  - true same-number guard; or
+  - true same-execution-block guard; or
   - telemetry only.
 - [ ] Define Base and Robinhood values for all block-denominated defaults, including governance and registry timelocks, borrow/PSM intervals, auctions, locks, rewards, cooldowns, and price snapshots.
 - [ ] Recalculate per-number rates, especially RIPE rewards, so each chain preserves the intended time-based economics through configuration.
-- [ ] Move hardcoded cadence assumptions out of shared contracts and into constructor, storage, governance, or Defaults-supplied parameters, beginning with `Lootbox.ONE_DAY`.
-- [ ] Replace the duplicated `7_200` maximum deleverage cooldown constants in `Deleverage` and `SwitchboardDelta` with one consistent configurable design. Before selecting each chain's value, resolve whether the intended wall-clock maximum is approximately four hours, as `7_200` produces at Base's roughly two-second cadence, or one day, as the existing 12-second-block comment states.
-- [ ] Resolve `Ledger`'s one-action-per-`block.number` rule as a chain-portable security policy. If it cannot safely tolerate repeated Robinhood numbers, change the shared guard for both chains rather than creating a Robinhood variant.
+- [x] Retain the integrated S3 Lootbox immutable-floor change as an approved
+  minimal shared improvement. Robinhood uses floor `7_200` and mutable interval
+  `0`; Base uses floor `43_200`. Deployment and Base convergence remain
+  separately gated.
+  - Decision evidence:
+    [`lootbox-floor-implementation-record.md`](rh/lootbox-floor-implementation-record.md)
+    and
+    [`minimal-contract-change-reassessment.md`](rh/minimal-contract-change-reassessment.md).
+- [ ] Decide whether S4 is needed at all. The current Deleverage cooldown
+  initializes to zero, so prefer the existing source plus a manifest assertion
+  that nonzero cooldown remains disabled unless the owner rejects the resulting
+  lack of pacing protection.
+- [ ] Implement S5's owner-selected portable action-block boundary only after
+  Stage A and independent security review select the smallest abstraction.
+  Preserve the existing same-execution-block action ordering; use native
+  `block.number` for ordinary EVM deployments and Robinhood
+  `ArbSys.arbBlockNumber()` for child-block identity. Do not migrate the
+  deployed Base Ledger, reinterpret the check as time/freshness, or use
+  `chain.id`.
 - [ ] Review repeated and jumping numbers across:
   - token, governance, registry, and Switchboard timelocks;
   - borrow and PSM interval capacity;
@@ -150,10 +221,15 @@ Robinhood's EVM `block.number` advances as an approximate Ethereum L1-height est
 - [ ] Run the same contract artifacts under a Base clock profile and a Robinhood clock profile that holds `block.number` constant across many transactions, advances it by one, and jumps it by several increments.
 - [ ] Confirm that RipeHq and registry timelocks behave correctly before using them to register CCIP pools as Departments.
 
-**Exit condition:** every deployed block-number dependency has one shared implementation, approved per-chain parameters, and passing Base plus repeated/jumping-number Robinhood tests.
+**Exit condition:** every deployed block-number dependency either uses the
+unchanged shared implementation with approved parameters/accepted risk or has
+an owner-approved indispensable change; Base and repeated/jumping-number
+Robinhood tests pass.
 
 ## 3. Implement GREEN and RIPE CCIP integration
 
+- [ ] Confirm that GREEN/RIPE bridging is required for the initial release. If
+  it is not launch-critical, prefer deferral over token or pool changes.
 - [ ] Add a pinned, reproducible CCIP build and test dependency instead of relying on unversioned external artifacts.
 - [ ] Implement the minimal Department-compatible BurnMint pool layer:
   - GREEN pool exposes `canMintGreen() == true` and no RIPE mint capability;
@@ -182,12 +258,20 @@ Robinhood's EVM `block.number` advances as an approximate Ethereum L1-height est
 
 ## 4. Configure Stock Token collateral and pricing
 
+- [x] Require Stock Tokens in the initial Robinhood launch and direct Track 8
+  to specify the smallest demonstrably sufficient shared containment patch.
+  This product decision does not approve unchanged listing, comprehensive
+  vault/Ledger redesign, implementation, deployment, or activation.
+  - Decision evidence:
+    [`minimal-contract-change-reassessment.md`](rh/minimal-contract-change-reassessment.md);
+    the revised Track 8 minimum-launch record remains required.
 - [ ] Add a reusable transferability probe for each candidate Stock Token and run it against the exact launch contract.
 - [ ] Finish the `SimpleErc20` versus `RebaseErc20`/`SharesVault` comparison:
   - `SimpleErc20` preserves nominal balances after an issuer burn and can create persistent phantom collateral plus first-withdrawer advantage;
   - `RebaseErc20` uses `SharesVault` live-balance accounting and socializes a custody loss pro rata.
 - [ ] Test the chosen vault's accepted behavior for donations, measured deposits, total-balance loss, zero-balance recovery, blocked transfers, withdrawals, and internal-share liquidation.
-- [ ] If the chosen behavior is unacceptable, stop and write a separate vault-change specification before modifying custody code.
+- [ ] Complete Track 8's separate vault-change specification and approve its
+  minimum-containment checkpoint before modifying custody or settlement code.
 - [ ] Add only canonical Stock Token addresses with exact official Chainlink feed mappings and verified decimals.
 - [ ] Confirm through tests that `ChainlinkPrices` and `PriceDesk` normalize token/feed decimals correctly and do not apply `uiMultiplier()` or any equivalent multiplier a second time.
 - [ ] Define and test the chosen staleness configuration across regular, extended, overnight, weekend, holiday, halt, and reopening-gap scenarios.
@@ -201,6 +285,9 @@ Robinhood's EVM `block.number` advances as an approximate Ethereum L1-height est
 
 ## 5. Configure the USDG PSM
 
+- [ ] Confirm that a PSM is required at initial launch. Prefer omission, or the
+  existing source deployed disabled and without GREEN mint authority, over a
+  source change.
 - [ ] Deploy `EndaomentPSM` with canonical six-decimal USDG as its reserve asset.
 - [ ] Keep the existing USDC-named storage, methods, and events only if passing USDG does not create unsafe logic or operational ambiguity.
 - [ ] Configure the yield lego ID and yield-vault address as disabled; no Base USDC yield route may remain reachable.
@@ -247,8 +334,11 @@ Robinhood's EVM `block.number` advances as an approximate Ethereum L1-height est
 ### Phase A — implementation freeze
 
 - [ ] Approve the task-level specs produced from sections 1–7.
+- [ ] For every changed production contract, approve a necessity record showing
+  why unchanged source, configuration, omission, disablement, or accepted risk
+  is insufficient.
 - [ ] Freeze one canonical contract implementation set, the CCIP version, configuration schema, deployment inventory, and address sources.
-- [ ] Record which components require live Base parity before Robinhood launch, which temporary live-version differences governance has accepted with convergence plans, and which immutable or custody-bearing components have approved permanent live-version divergence.
+- [ ] Record which components require live Base parity before Robinhood launch, which temporary live-version differences governance has accepted with convergence plans, and which immutable or state-bearing/custody-bearing components have approved permanent live-version divergence.
 - [ ] Re-verify all external addresses and chain metadata instead of copying the research snapshot.
 
 ### Phase B — full-stack testnet
@@ -281,6 +371,8 @@ Robinhood's EVM `block.number` advances as an approximate Ethereum L1-height est
 
 - [ ] Release commit, dependency versions, inventory, and parameter/address manifests are frozen.
 - [ ] No Robinhood-only protocol branch or core-contract variant exists; `DefaultsRobinhood` and network deployment/configuration artifacts contain the intended chain differences.
+- [ ] Every production-contract difference is the smallest indispensable
+  change after documented owner review of the no-source-change alternative.
 - [ ] Every deployed block-number dependency is implemented once and tested under both Base and Robinhood semantics.
 - [ ] Robinhood deployment and verification tooling works from a clean checkout.
 - [ ] GREEN and RIPE pool code has minimal, token-specific RipeHq permissions.
@@ -292,13 +384,15 @@ Robinhood's EVM `block.number` advances as an approximate Ethereum L1-height est
 - [ ] Each launch Stock Token has a verified contract/feed mapping, selected vault path, disabled CreditRedeem, and issuer-failure test record.
 - [ ] No unsupported Base integration is reachable.
 - [ ] Full-stack testnet, adversarial tests, Base regression tests, and deployment rehearsal pass.
-- [ ] Every live Base-versus-Robinhood implementation-version difference is explicitly approved and recorded in the component matrix: temporary differences are bounded and tracked to convergence; permanent differences are limited to components that are immutable or whose custody-bearing deployment would be unacceptably risky to migrate, and include their technical justification and accepted risk.
+- [ ] Every live Base-versus-Robinhood implementation-version difference is explicitly approved and recorded in the component matrix: temporary differences are bounded and tracked to convergence; permanent differences are limited to components that are immutable or whose state-bearing or custody-bearing deployment would be unacceptably risky to migrate, and include their technical justification and accepted risk.
 - [ ] Exact deployed code, roles, registry entries, feature flags, and parameters match the approved manifests.
 
 ## Explicit technical non-goals
 
 The selected release does not include:
 
+- broad contract modernization or portability changes that are not required by
+  the frozen initial Robinhood feature set;
 - a separate Robinhood protocol branch, duplicated core-contract suite, or Robinhood-only version of a shared Ripe contract;
 - `chain.id`-based behavior branches in core protocol logic where defaults, constructor arguments, storage, or governance parameters can express the difference;
 - global onchain GREEN quota or RIPE emission allocators;
