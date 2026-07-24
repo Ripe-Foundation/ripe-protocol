@@ -1,8 +1,10 @@
 # Track 7 H-01 Stage A Dependency-Security Gate
 
-**Status:** Candidate A implemented and fully validated against reviewed `rh`
-commit `4966969`; exception-gated; stopped at the mandatory Stage B reviewer
-gate; no merge, push, deployment, signing, or other live action authorized
+**Status:** Candidate A implemented and fully technically validated against
+reviewed `rh` commit `4966969`; reconciled and refrozen after the
+documentation-only `rh` advance to `dd51c63`; exception-gated; stopped at the
+mandatory Stage B reviewer gate; no merge, push, deployment, signing, or other
+live action authorized
 
 **Evidence date:** 24 July 2026
 
@@ -2709,3 +2711,78 @@ Vyper findings remain approved not-applicable determinations. H-01 is therefore
 not closed, merge-ready, pushed, deployed, signed, or authorized for any live
 action until the named independent security/Track 6 reviewer approves the
 complete Stage B bundle and the owner separately acts within the brief.
+
+### Final `rh` freshness stop, reconciliation, and refreeze
+
+After implementation commit
+`8459104d8917fe3b501870e24b1aaac1cb29f06c` and before the immediate
+pre-review K-02/audit sequence, the required branch-freshness check found that
+local and remote-tracking `rh` had advanced from `4966969` to:
+
+```text
+dd51c637f1462bede7529a53427bfb4327dbfb12
+docs(rh): close S4 no-code checkpoint
+```
+
+The freshness stop fired before any further K-02 or audit access. The committed
+delta is one new, independently reviewed 1,178-line authority record:
+`docs/chains/rh/deleverage-cooldown-security-decision.md`. The integration
+worktree also contained five modified planning documents and one untracked
+H-02 brief; those remain uncommitted, were treated as non-authoritative, and
+were not included in the reconciliation.
+
+The S4 record selects unchanged source, constructor-default Robinhood
+cooldown `0`, no initial Underscore deployment, and no S4 Stage B or Stage C.
+It explicitly makes no dependency, compiler-input, source, ABI, test,
+migration, manifest, or live-state change. It preserves H-01-first sequencing
+if S4 is ever reopened. It therefore changes review authority and branch
+freshness, but not Candidate A selection, the H-01 exception policy, or any
+technical validation input.
+
+H-01 merged only exact committed `dd51c637`, producing:
+
+```text
+079ab239f3d2aecc11e16a9b178c6da2d2033e3a
+parent 8459104d8917fe3b501870e24b1aaac1cb29f06c
+parent dd51c637f1462bede7529a53427bfb4327dbfb12
+```
+
+The refreeze was captured at `2026-07-24T21:52:30Z`
+(`2026-07-24T15:52:30-0600`, MDT):
+
+| Final reconciled/refrozen path | SHA-256 |
+|---|---|
+| `docs/chains/rh/track-7-h1-dependency-security-preflight.md` | `ac31478d185571c9b804c84a0f78de60bf40eeb3a0aec80b839b66f62befef22` |
+| `docs/chains/rh/robinhood-deployment-support-specification.md` | `ffd3f6a5d17d2c61b58ecbbe86d39230b38508b54ae44fb018bfa551f9cfd1e2` |
+| `docs/chains/rh/robinhood-deployment-validation-plan.md` | `ab39fd135c50f7d348788341a061511b50a854550234de9165554e5674ec2393` |
+| `docs/chains/rh/minimal-contract-change-reassessment.md` | `72c2d1fe13b6f551712935ff78eba0f801f56d80965f3f449a726c74e4a40186` |
+| `docs/chains/rh/deleverage-cooldown-security-decision.md` | `98cbe896e502ad280f4b3de74e45181937b5085988dd9c6d45d2ce0e167a755b` |
+| `docs/chains/rh-summary.md` | `bb1190bcc9bb26201ffdfdea8ede91ef7a3ea384c7d60a2285405a03e66184c2` |
+| `docs/chains/rh/block-clock-validation-plan.md` | `b6891973cea3cb72dade1975f443b49b7ef5c210c481ac62472d07f15ed8e5bc` |
+| `docs/chains/rh/block-number-inventory.md` | `d6f5e89a673bf74f6ebd68033348e48ba295cd2c5c0c903869a8b339a10699d4` |
+| `docs/chains/rh/component-matrix.md` | `bea64119069943534d6b877c04f453f82f8560540099593841c4c770706764c7` |
+| `docs/chains/rh/shared-block-clock-specification.md` | `9c501491c8a96a08ef5136f836baea04ea041eb525a703862d3925e19c7afec4` |
+| `docs/chains/rh/track-6-s4-deleverage-cooldown.md` | `865b459e6d630cb89feebc69edc6f058d72093ccaa81c00e6fb889f87e582962` |
+| `docs/chains/rh/track-6-s5-ledger-guard.md` | `266112d5ee1cb0f261d4d3b833ea6c5911d4b62c5646718063e6808a2c1a4dd5` |
+| `requirements.in` | `2523c04409946a6625e30e5e4aa4f711663924f4a674f4cfd5fee5b7bbb3b80d` |
+| `requirements.txt` | `d2e12a6f0cfd128c3891634efafbba8305878bef7a7c5db33e25ebe93b0d2bce` |
+| `tests/deployment/test_dependency_gate.py` | `c95340364a92f3bf07b4c0bb9ff44da941d7029c4b727167289e03f0001e040e` |
+| `tests/clock/test_clock_profiles.py` | `2b1bbd8c77f97e614c9db54fcb98b284d3db95a6bb47d1ee9ab020bf6d725cc4` |
+| `tests/utils/clock_profiles.py` | `69f3a616a78cb3a155962edb779533f56e362a68cc922c307dc7d40cbd4b34de` |
+| `docs/chains/rh/lootbox-floor-implementation-record.md` | `d577f44507954ee3d1eee3efc4e940833557287d1fdb2890c863070cfee9be7c` |
+| `contracts/core/Lootbox.vy` | `669c2857e2402ef0e8f9a508dd6f342426ffbd1affce11dd429e5b5b0129ae65` |
+| `scripts/abis/Lootbox.json` | `33aadc219718332ef9163f0b85c8e6fba93735d149db3fb0bb2e3fab814db17c` |
+| `config/block-clock-inventory.json` | `cebc434d4e2628afd404ff3c76874e26d6e947783dd75ec74dd10001458df6fb` |
+| `scripts/check_block_clock_inventory.py` | `cc86f73629589c6a2ee0c9b60e480761d88e1e033e452c1f0843c18db9e28642` |
+| `tests/conf_core.py` | `2ee8fa9222c99345fbc43ecbbf1641c185688724cc36e6a910f43069e4c06f0f` |
+| `tests/inventory/test_block_clock_inventory.py` | `d9007158565979f7e5027a012a0cf6efdc6be354f0a96b16b7d35c87ba58a39c` |
+| `tests/core/lootbox/test_underscore_rewards.py` | `20b86c2d5466863dc2afceaa580d8ae19c5beb363fb937090aabc1eca6bf7e7b` |
+| `tests/config/test_switchboard_charlie.py` | `a444c5fc64439ccb28f5634248cb9459e579336452d59fb741e1d076d7e1fd44` |
+
+All 25 pre-existing refrozen paths retain their previously validated bytes;
+only the S4 decision record is new. Consequently no package environment,
+resolver, audit input, S1/S2/S3 source, test collection, ABI, migration, or
+compiler artifact was affected. The complete 2,734-test run and old/new
+artifact comparisons remain applicable. The evidence-dependent offline gate,
+branch freshness, candidate audit, K-02, and custody checks must be repeated
+against the final reconciled reviewer bundle.
