@@ -67,19 +67,26 @@ internal-liquidation behavior.
 
 ### Cross-track evidence
 
-- **Track 2:** The integration baseline contains only the Track 2 task brief, not
-  a completed candidate-token or live-transfer evidence record. No live token
-  behavior is claimed here. Exact candidate identity, decimals, implementation,
-  and transferability remain **pending Track 2**.
-- **Track 3:** The integration baseline contains only the Track 3 task brief, not
-  `component-matrix.md`. Component IDs for `SimpleErc20`,
-  `RebaseErc20`/`SharesVault`, `VaultBook`, `AuctionHouse`,
-  `CreditEngine`, and `CreditRedeem` are **pending Track 3**. Test fixture IDs 3
-  and 4 are not production IDs.
-- **Reconciliation list:** replace all `pending Track 3` labels with the
-  integrated stable IDs; confirm the selected vault's source/live-version
-  status; reconcile any Track 2 mock overlap; rerun this suite with the exact
-  candidate token on a pinned fork after Track 2 identifies it.
+- **Track 2:** The Track 5 starting baseline contained only the Track 2 brief.
+  The integrated `rh` branch now contains
+  [`stock-token-transferability-evidence.md`](stock-token-transferability-evidence.md).
+  It identifies the 18-decimal AAPL proxy and implementation, records the
+  inspected issuer-control surface, and proves the probe round trip on a pinned
+  Robinhood mainnet fork. It does not provide an owner-approved live round trip.
+  This comparison suite remains mock-based and has not run the full Ripe vault
+  lifecycle against that proxy on a pinned fork.
+- **Track 3:** The integrated
+  [`component-matrix.md`](component-matrix.md) assigns `CM-021` to `VaultBook`,
+  `CM-024` to `SimpleErc20`, `CM-025` to
+  `RebaseErc20`/`SharesVault`, `CM-026` to `AuctionHouse`, `CM-030` to
+  `CreditEngine`, and `CM-043` to `CreditRedeem`. Test fixture IDs 3 and 4 are
+  not production IDs. The matrix now carries the Track 5 decision and leaves
+  the source/live-version classification of any follow-on shared changes to the
+  approved vault-change specification.
+- **Remaining reconciliation:** rerun the applicable vault lifecycle against
+  the exact candidate token on a pinned fork, complete the Track 2 live approval
+  gate or explicitly accept its blocker, and update the component matrix again
+  when the follow-on shared source changes are approved.
 
 ## Test environment and commands
 
@@ -127,11 +134,12 @@ change. It is **not** a proxy, and the tests do not prove proxy storage layout,
 upgrade authorization, initializer safety, or implementation compatibility.
 
 The mock deliberately applies pause/blocklist controls to token movement, not
-`approve()`. Exact Stock Token approval gating remains pending Track 2 and must
-not be inferred from these tests. Mode 3 overlaps the short-delivery behavior of
-`MockFeeOnTransferErc20`; it remains here so the same issuer-control fixture can
-switch behavior after setup and exercise both vaults uniformly. It is not
-presented as a separate fee-token model.
+`approve()`. The integrated Track 2 fork proves ordinary AAPL approval succeeds,
+but does not establish approval behavior under every pause and blocklist state;
+that behavior must not be inferred from these tests. Mode 3 overlaps the
+short-delivery behavior of `MockFeeOnTransferErc20`; it remains here so the same
+issuer-control fixture can switch behavior after setup and exercise both vaults
+uniformly. It is not presented as a separate fee-token model.
 
 No new reentrancy scenario was added. Both deployable vault entry points used by
 the matrix are `@nonreentrant`, and the issuer-control assumptions do not add an
@@ -356,7 +364,7 @@ extrapolations now have direct I-08 and A-05 tests.
 
 | ID | Setup and actors | Issuer action | Expected invariant | Simple result | Rebase result | Actual token balance | Stored nominal balance or shares | User-visible claim | Borrowing-power effect | Withdrawal effect | Internal-liquidation effect | External-liquidation effect | Rounding or dust | Implementation conformance | Safety invariant | Accepted-risk posture | Owner approval | Test name and commit | Evidence notes | Owner decision implication |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| N-01 | Bob first deposit/withdraw; 6 and 18 decimals | None | Exact base-unit lifecycle | Exact | Within one unit | Returns to ≤1 unit | Simple nominal; Rebase shares | Equals live claim | Normal | Completes | N/A | N/A | Rebase ≤1 | Both Conform | Safe | Acceptable ordinary behavior | Pending | `test_first_deposit_and_withdrawal_at_token_decimals` @ `05940a5` | Candidate decimals still pending Track 2 | No differentiator |
+| N-01 | Bob first deposit/withdraw; 6 and 18 decimals | None | Exact base-unit lifecycle | Exact | Within one unit | Returns to ≤1 unit | Simple nominal; Rebase shares | Equals live claim | Normal | Completes | N/A | N/A | Rebase ≤1 | Both Conform | Safe | Acceptable ordinary behavior | Pending | `test_first_deposit_and_withdrawal_at_token_decimals` @ `05940a5` | Includes AAPL's verified 18 decimals plus a six-decimal contrast | No differentiator |
 | N-02 | Bob 100, Alice 60; partial/final withdrawals | None | Multi-user conservation | Exact | Within ≤2 units | Ends ≤2 units | Nominal vs shares | Sum tracks accounting/live | Normal | Both complete | N/A | N/A | Rebase ≤2 | Both Conform | Safe | Acceptable | Pending | `test_normal_multi_user_lifecycle_and_internal_transfer` @ `05940a5` | Equivalent ordinary path | No differentiator |
 | N-03 | Bob internally transfers 20 to Alice | None | Recipient gets transferable live-backed claim | Nominal 20 | Live claim 20 | Unchanged | Nominal moved vs shares moved | 20 | Positive only while live-backed | Later succeeds normally | Both return 20 | N/A | None at scale | Both Conform | Safe while custody intact | Acceptable only with live-backing rule | Pending | same as N-02 | Token is not moved internally | Drives required invariant |
 | N-04 | Bob deposits and withdraws one base unit | None | Smallest positive unit survives conversion | Exact 1 | Exact 1 | 1 → 0 | Nominal 1 vs `10**8` shares | 1 | Normal | Completes | N/A | N/A | None | Both Conform | Safe | Acceptable ordinary behavior | Pending | `test_one_base_unit_lifecycle` @ `05940a5` | Empty-vault rounding boundary | No differentiator |
@@ -392,7 +400,7 @@ extrapolations now have direct I-08 and A-05 tests.
 | E-01 | Deposit 100, internally move 20, withdraw 30 | None | Events equal returned amounts, token deltas, and raw share deltas | Amount fields exact | Amount and share fields exact | Reconciles after each call | Nominal/share deltas equal events | Matches resulting state | Normal | Exact event/receipt | Exact event/internal delta | N/A | None at scale | Both Conform | Safe event-state reconciliation | Acceptable current interface | Pending | `test_vault_events_reconcile_amounts_shares_and_state` @ `05940a5` | **Tested:** Teller plus all three vault event families | Preserve/add explicit units in follow-on spec |
 | R-01 | Donation/loss while raw positions remain | Donation/reduction | Reward and monitoring units are explicit | User/global nominal | User raw-share weight unchanged; global total live | Varies live | Nominal vs shares | Nominal vs live claim | As common claim | As above | As above | As above | Share scaling `10**8` | Both Conform | Safe only if consumers label units | Monitoring risk not accepted silently | Pending | donation and issuer-reduction tests @ `05940a5` | **Tested:** direct Vault view invariants | Update schemas/dashboards if Rebase |
 | R-02 | Real Lootbox update after donation, elapsed blocks, then total loss | Donation then burn | Points state uses explicit user and global units | User weight and $100 global input remain nominal | User weight unchanged; global input $100→$200→$0 | 100→200→0 | Nominal vs shares unchanged | Reward weight unchanged | Balance points accrue for both; global USD diverges | N/A | N/A | N/A | Precision `10**9`; Rebase share offset applied before | Both Conform | Monitoring labels required | Not accepted silently | Pending | `test_lootbox_points_update_after_donation_and_total_loss` @ `05940a5` | **Tested:** `Lootbox.updateDepositPoints` and Ledger state, not view-only | Specify reward policy and alerts |
-| C-01 | Register/configure both fixture vaults | None | Required flags and exact registry selection | Test ID 3 | Test ID 4 | N/A | N/A | N/A | Configured | Enabled | Internal available | External available | N/A | Both Conform | `CreditRedeem=false`, Stab swap=false verified | Required posture | Pending | `test_registry_and_required_asset_flags` @ `05940a5` | IDs are fixtures, pending Track 3 for production | No production default yet |
+| C-01 | Register/configure both fixture vaults | None | Required flags and exact registry selection | Test ID 3 | Test ID 4 | N/A | N/A | N/A | Configured | Enabled | Internal available | External available | N/A | Both Conform | `CreditRedeem=false`, Stab swap=false verified | Required posture | Pending | `test_registry_and_required_asset_flags` @ `05940a5` | IDs 3/4 are fixtures; Track 3 component IDs are CM-024/025, while production VaultBook IDs remain manifest-derived | No production default yet |
 
 ## Observed behavior versus accepted behavior
 
@@ -430,20 +438,22 @@ Current Track 5 acceptance state:
 
 ## Remaining evidence gaps
 
-1. Track 2 exact token identity, decimals, current implementation, and live
-   third-party-contract transferability, including whether approval itself is
-   pause- or blocklist-gated.
-2. A pinned-fork rerun against that exact token; mock behavior is not live proof.
-3. Track 3 stable component IDs and source/live deployment status.
+1. Track 2 live third-party-contract transferability and the required
+   owner/counsel, provenance, signing, amount, and gas approvals.
+2. A pinned-fork rerun of the applicable vault lifecycle against the exact AAPL
+   proxy; the completed Track 2 probe fork and this mock suite do not substitute
+   for that integration test.
+3. Final source/live-version classification after the shared vault-change
+   specification selects the affected components.
 4. Owner-defined minimum invariants for total-loss bad-debt resolution,
    post-zero allocations, donation allocation, reward units, and monitoring.
 5. A separately approved shared vault-change specification and implementation
    review if the owner wants to proceed.
 6. Production manifest/default/migration/smoke evidence after—not before—the
    vault and change specification are approved.
-7. Proxy storage, upgrade authorization, initializer safety, and callback-token
-   behavior if Track 2 shows the candidate differs from the present
-   non-callback behavior-switch model.
+7. Proxy storage, upgrade authorization, initializer safety, and any future
+   callback-token behavior; Track 2 observed no current receiver hook but did
+   not prove future beacon implementations.
 
 No live transaction, deployment, signing key, production configuration, or
 production contract was used or changed in this track.

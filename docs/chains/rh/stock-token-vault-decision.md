@@ -428,24 +428,37 @@ The specification must define, without implementing yet:
 
 ## Unresolved dependencies and launch blockers
 
-### Pending Track 2
+### Integrated Track 2 evidence and remaining gate
 
-- exact candidate Stock Token proxy, implementation, decimals, and code hash;
-- observed pause/blocklist/forced-action/upgrade behavior, including whether
-  approvals are gated and whether transfers can invoke callbacks;
-- pinned-fork transfer behavior; and
-- owner-approved live third-party-contract transferability evidence.
+The integrated Track 2 evidence identifies the 18-decimal AAPL proxy,
+implementation, and code hashes; records its current pause, blocklist,
+administrative-burn, beacon-upgrade, and multiplier controls; and passes the
+probe lifecycle on a pinned Robinhood mainnet fork. No current forced-transfer,
+forced-redemption, transfer-fee, or receiver-hook entry point was observed.
 
-### Pending Track 3
+Still pending:
 
-Stable component IDs and source/live-version entries for:
+- the owner/counsel, provenance, sender/recipient, signing, amount, gas, and
+  broadcast approvals required for a live third-party-contract round trip;
+- the live result itself, unless the owner explicitly accepts that blocker; and
+- an applicable full Ripe vault lifecycle rerun against the exact proxy on a
+  pinned fork. The Track 2 probe fork and Track 5 mock suite are complementary,
+  not substitutes for that integration test.
 
-- `SimpleErc20`;
-- `RebaseErc20` and `SharesVault`;
-- `VaultBook`;
-- `AuctionHouse`;
-- `CreditEngine`; and
-- `CreditRedeem`.
+### Integrated Track 3 identifiers
+
+The integrated component matrix supplies:
+
+- `CM-021` — `VaultBook`;
+- `CM-024` — `SimpleErc20`;
+- `CM-025` — `RebaseErc20` and `SharesVault`;
+- `CM-026` — `AuctionHouse`;
+- `CM-030` — `CreditEngine`; and
+- `CM-043` — `CreditRedeem`.
+
+The matrix records the Track 5 decision. Any source/live-version changes to
+vault, auction, or debt-health components remain pending the approved shared
+vault-change specification and its live-version policy.
 
 ### Explicit launch blockers
 
@@ -454,11 +467,11 @@ Stable component IDs and source/live-version entries for:
 3. Rebase total-loss liquidation/deleveraging and post-zero policy are
    unresolved.
 4. Per-call short-received deposit measurement is unresolved for both paths.
-5. Track 2 exact-token evidence is not integrated.
-6. Track 3 stable IDs and live-version matrix are not integrated.
-7. The shared vault-change specification has not been approved, implemented,
+5. Track 2's live proof and the exact-token Ripe vault integration test remain
+   incomplete.
+6. The shared vault-change specification has not been approved, implemented,
    audited, migrated, or smoke-tested.
-8. Production addresses, feeds, limits, parameters, defaults, and manifests are
+7. Production addresses, feeds, limits, parameters, defaults, and manifests are
    intentionally absent.
 
 ## Exact `rh-summary.md` owner-review eligibility
