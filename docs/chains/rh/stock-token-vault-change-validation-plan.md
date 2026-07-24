@@ -95,7 +95,7 @@ Likely reusable fixtures, subject to post-checkpoint design:
 
 | Invariant | Named future assertion | Proposed layer | Required result | Owner prerequisite |
 | --- | --- | --- | --- | --- |
-| I-01 exact receipt | `test_credit_equals_call_local_balance_delta` | Vault/Teller | `A`, `Q`, `R`, credited, returned, and emitted amounts reconcile; prior donation excluded | Phase D specified |
+| I-01 exact receipt | `test_credit_equals_call_local_balance_delta` | Vault/Teller | `A_req`, `Q`, `R`, credited, returned, and emitted amounts reconcile; prior donation excluded | Phase D specified |
 | I-01 exact receipt | `test_short_second_deposit_cannot_overcredit_either_path` | Vault/Teller | Both nominal and share paths credit only actual receipt | Phase D specified |
 | I-02 borrowing conservation | `test_sum_borrow_amounts_never_exceeds_live_custody` | Property/Credit | Invariant holds across users, deposits, losses, and withdrawals | Architecture |
 | I-03 claim conservation | `test_all_withdrawal_orders_are_allocated_backing_bounded` | Property/Vault | Two-user orders cannot allocate more than `A <= C` and never consume `U` | Phase G specified |
@@ -228,7 +228,7 @@ changes now.
 For every successful case, capture:
 
 ```text
-A = raw Teller input
+A_req = raw Teller input
 Q = post-validation transfer attempt
 C0 = vault custody immediately before transfer
 C1 = vault custody immediately after transfer
@@ -241,16 +241,16 @@ C3 = vault custody after post-credit external work and before success events
 and assert:
 
 ```text
-0 < R <= Q <= A
+0 < R <= Q <= A_req
 V == R
 C1 == C0 + R
 C2 == C1
 C3 == C1
 existing Teller/vault deposit event amount == R
-TellerDepositMeasured == (A, Q, R, V, vault, vaultId)
+TellerDepositMeasured == (A_req, Q, R, V, vault, vaultId)
 ```
 
-The `Q <= A` comparison remains literal when `A` is
+The `Q <= A_req` comparison remains literal when `A_req` is
 `max_value(uint256)`; the test must also show the source-balance/limit cap that
 produced `Q`.
 
@@ -260,8 +260,8 @@ Required cases in
 
 | Test | Setup | Required result |
 | --- | --- | --- |
-| `test_ordinary_receipt_reconciles_all_amounts` | Ordinary token; `A == Q` | `R == Q == V`; all applicable events reconcile. |
-| `test_max_request_records_capped_transfer_attempt` | `A = max_value`; finite balance/limit | Event preserves `A`, records capped `Q`, and credits measured `R`. |
+| `test_ordinary_receipt_reconciles_all_amounts` | Ordinary token; `A_req == Q` | `R == Q == V`; all applicable events reconcile. |
+| `test_max_request_records_capped_transfer_attempt` | `A_req = max_value`; finite balance/limit | Event preserves `A_req`, records capped `Q`, and credits measured `R`. |
 | `test_preexisting_donation_is_not_depositor_receipt` | Donate `D` before call | `C0` includes `D`; only current call delta `R` is credited. |
 | `test_between_deposit_donation_is_not_second_receipt` | Deposit, donate, deposit again | Neither user's credit absorbs the donation; each call has an independent `C0`. |
 | `test_short_first_deposit_credits_only_receipt` | Transfer receives `0 < R < Q` | Simple and share paths credit/return/emit `R`, not `Q`. |
@@ -351,8 +351,8 @@ The following integration assertions are mandatory:
 | `tests/core/creditEngine/test_credit_repay.py` | Any CreditEngine sGREEN recipient deposit requires exact receipt. |
 | `tests/core/creditEngine/test_credit_redemptions.py` | Any CreditRedeem sGREEN recipient deposit requires exact receipt. |
 
-For every exact path, inject both `Q < A` source-capping and `R < Q`
-short-receipt results. Prove the caller compares Teller's return with `A` and
+For every exact path, inject both `Q < A_req` source-capping and `R < Q`
+short-receipt results. Prove the caller compares Teller's return with `A_req` and
 the entire upstream transaction rolls back, including minted/accrued payout
 state, withdrawn claim state, approvals, housekeeping, and events. For the one
 measured trusted exception, StabVault collateral-claim auto-deposit, prove only
@@ -372,7 +372,7 @@ Required assertions:
   emitted per successful `_deposit` item, in that order;
 - no success event is emitted on a reverted deposit;
 - `inputAmount`, `transferAmount`, `receivedAmount`, and `creditedAmount` map
-  exactly to `A`, `Q`, `R`, and `V`; and
+  exactly to `A_req`, `Q`, `R`, and `V`; and
 - every production deposit call enters through Teller. A checked caller
   inventory must fail if a new direct vault depositor appears.
 

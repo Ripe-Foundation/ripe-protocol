@@ -370,12 +370,37 @@ git -C /Users/wigglez/dev/ripe-protocol diff --name-status \
 => no output
 ```
 
+Phase G also required reconciliation edits in previously approved Sections
+6–8 and 12–16, plus the corresponding earlier validation-plan sections. The
+Phase G handoff did not enumerate that reach-back clearly enough. For an
+explicit audit trail, those edits were:
+
+| Earlier surface | Phase G reconciliation |
+| --- | --- |
+| Formal model, invariants, and state table (Sections 6–8) | Added allocated/quarantine state `A^s/U^s/A/U`, split the former zero predicate into `Z_custody/Z_live/Z_recorded`, propagated I-13, and updated the sixteen state rows to distinguish live custody, allocated backing, and quarantine. |
+| Decision register and component boundary (Sections 12–13) | Recorded the owner-confirmed Phase G policies and returned the unresolved storage/interface mechanism to Phase I. |
+| Deposit accounting (Section 14) | Composed the Phase D receipt rule with Section 17's pre-deposit allocated denominator `A0`; the call-local caller-request symbol is now `A_req` so it cannot collide with global allocated backing `A`. |
+| Backing/debt health (Section 15) | Renamed the user-position amount to `M(v,a,u)` and made the current-versus-corrected SharesVault total semantics explicit. |
+| Settlement/total loss (Section 16) | Propagated the three zero predicates and scoped Phase F settlement against allocated live claims without selecting a Phase I mechanism. |
+| Validation plan before Phase G | Propagated the same symbols, state diagnostics, formula composition, test prerequisites, and section renumbering into the already specified Phase D–F validation surfaces. |
+
+These were consistency reconciliations needed to compose Phase G with the
+approved A–F contracts; they did not reverse an owner-approved policy, select
+an implementation mechanism, or begin Phase H.
+
 During the final Phase G documentation audit, the integration worktree
 acquired an external untracked
 `docs/chains/rh/track-7-h1-dependency-security-preflight.md` while remaining at
 the same `f0bfd0f` commit. That file is outside Track 8's owned deliverables and
 source/evidence set. It was not read as controlling evidence, edited, staged,
 or imported.
+
+At this review-remediation pass, integration remained at `f0bfd0f` but also
+showed external modifications to
+`docs/chains/rh/robinhood-deployment-support-specification.md` and
+`docs/chains/rh/robinhood-deployment-validation-plan.md`. Those files and the
+untracked Track 7 file remain outside Track 8 scope; none was edited, staged,
+or imported here.
 
 ## 4. Current consumer and ordering trace
 
@@ -1173,7 +1198,7 @@ insufficient.
 | 1. Solvent ordinary operation | Credit exactly `R`; `ΣB`, `K`, and settlement remain bounded by `A <= C`. | Deposits, borrow, repay, withdrawal, and approved settlement can progress. | Phase G formulas round deposit shares down and withdrawal shares up; the last-share sweep is bounded by `A`. | `C`, `A`, `U`, raw shares, live claims, and normal events. |
 | 2. Pre-existing donation | The donation is neither the next depositor's `R` nor allocated backing. | Deposit may proceed if call-local receipt is measured and `A > 0` or `S = 0`. | Donation remains `U`; no automatic shareholder, depositor, or protocol allocation. | Expose `C`, `A`, and `U` separately. |
 | 3. Donation between deposits | Later depositor cannot capture the donation through receipt inference or share pricing. | Ordinary existing positions continue against unchanged `A`; separately approved recovery may progress later. | Donation remains `U` and does not change claims/rewards. | Record first `C > A` observation and resulting `U`. |
-| 4. Short receipt / fee on transfer | Credit `R`, not `Q`; zero receipt commits no credit. | General call succeeds only if `R` satisfies minimums; exact callers or invalid deltas revert atomically. | Transfer fee remains external; `R > Q` reverts rather than being allocated. | `A`, `Q`, `R`, credited, returned, and event amounts must reconcile. |
+| 4. Short receipt / fee on transfer | Credit `R`, not `Q`; zero receipt commits no credit. | General call succeeds only if `R` satisfies minimums; exact callers or invalid deltas revert atomically. | Transfer fee remains external; `R > Q` reverts rather than being allocated. | `A_req`, `Q`, `R`, credited, returned, and event amounts must reconcile. |
 | 5. Partial issuer reduction | Nominal path sets deficit and disables new borrowing/internal settlement; after a successful bucket checkpoint, the corrected share path reduces `A` before `U` and reprices shares pro rata. | Repay and safely allocable external delivery remain possible. | Checkpointed `U` is not silently consumed to shield shares; any later positive delta is new `U`, not automatic restoration. | Expose `C`, `A^s`, `U^s`, `A`, `U`, `N` or `S`, claims, `δ`, flags, and affected auctions. |
 | 6. Aggregate nominal deficit | `B=0` for affected asset while the derived deficit keeps existing debt unsafe/visible. | Repay remains open; loss settlement freezes absent policy. | No silent `min(userNominal,C)` or pro rata. | Reconstruct `C<T` and credit/health outputs from same-block getters independently of price. |
 | 7. Total custody loss with claims | No paid auction or collateral settlement for missing tokens; a successful state-changing checkpoint records `A^s = U^s = 0`. | Repay remains open; position becomes resolution-eligible under Phase F. | Exactly-once debt transition is specified; it does not erase shares or allocate later property. | `Z_custody`, `C=0`, `A=0`, raw shares positive, debt, and transition state observable. |
@@ -1617,7 +1642,7 @@ For one `_deposit` execution:
 
 | Symbol | Name | Definition |
 | --- | --- | --- |
-| `A` | caller request | Raw `_amount` supplied to the Teller entry point. It may be `max_value(uint256)` or exceed the depositor balance/limit. |
+| `A_req` | caller request | Raw `_amount` supplied to the Teller entry point. It may be `max_value(uint256)` or exceed the depositor balance/limit. |
 | `Q` | transfer attempt | Final nonzero amount returned by `TellerUtils.validateOnDeposit` after source-balance and applicable user/global limit caps. |
 | `C0` | custody before | Target vault's token `balanceOf` read immediately before the transfer. |
 | `C1` | custody after | Target vault's token `balanceOf` read immediately after the transfer returns successfully. |
@@ -1626,7 +1651,7 @@ For one `_deposit` execution:
 | `C2` | custody after credit | Target vault's token balance after the vault accounting call. It must equal `C1`. |
 | `C3` | custody before success events | Target vault's token balance after all post-credit external work and immediately before success events. It must equal `C1`. |
 
-`A` is user/operator intent, `Q` is the requested transfer after protocol
+`A_req` is user/operator intent, `Q` is the requested transfer after protocol
 validation, and `R` is the only amount delivered to and credited by the vault.
 The terms `requested`, `received`, and `credited` must not be used
 interchangeably in code, tests, events, or operational evidence.
@@ -1648,7 +1673,7 @@ Every path into Teller `_deposit` must perform this sequence atomically:
    result or revert fails the whole transaction.
 7. Read `C1 = token.balanceOf(vaultAddr)` immediately after transfer.
 8. Require `C1 >= C0`, compute `R = C1 - C0`, and require `0 < R <= Q`.
-9. Call the resolved vault deposit function with `R`, never `A` or `Q`.
+9. Call the resolved vault deposit function with `R`, never `A_req` or `Q`.
 10. Require the vault's returned credited amount `V` to equal `R`.
 11. Read `C2` after the vault call and require `C2 == C1`.
 12. For a non-trusted deposit, apply the post-credit minimum-balance check in
@@ -1791,7 +1816,7 @@ inventory in Phase I before implementation.
 ### 14.6 Limits, minimums, prices, and housekeeping
 
 Current `TellerUtils.validateOnDeposit` remains the pre-transfer policy source.
-It may reduce `A` to `Q` using available source balance and the applicable
+It may reduce `A_req` to `Q` using available source balance and the applicable
 per-user/global limits. Because the measurement requires `R <= Q`, a short
 receipt cannot exceed either upper limit.
 
@@ -1817,7 +1842,7 @@ post-credit state:
 - `rebalance` records `R` as `depositAmount`, then performs withdrawal and its
   final health check atomically while retaining the mutex.
 
-Neither Lootbox, housekeeping, nor PriceDesk receives `A` or `Q` as a credited
+Neither Lootbox, housekeeping, nor PriceDesk receives `A_req` or `Q` as a credited
 amount. They read the final vault/account state produced from `R`.
 
 ### 14.7 Deposit-consumer disposition
@@ -1850,13 +1875,13 @@ Every production call found in the pinned source is assigned one of two
 receipt policies:
 
 - **measured**: accept `0 < R <= Q` and expose the difference; or
-- **exact**: capture Teller's return and require `R == A`, which proves
-  `R == Q == A`; revert the entire upstream operation on a source-balance cap
+- **exact**: capture Teller's return and require `R == A_req`, which proves
+  `R == Q == A_req`; revert the entire upstream operation on a source-balance cap
   or short receipt.
 
 | Consumer / route | Policy | Required disposition |
 | --- | --- | --- |
-| Teller `deposit` | Measured | Return and emit `R`; caller-requested `A` and transfer attempt `Q` remain observable in the new event. |
+| Teller `deposit` | Measured | Return and emit `R`; caller-requested `A_req` and transfer attempt `Q` remain observable in the new event. |
 | Teller `depositMany` | Measured per item | Each item gets an independent delta and event; any failed item reverts the batch. Existing function return shape need not change. |
 | Teller `rebalance` | Measured | Use returned `R` in `TellerRebalance.depositAmount`; withdrawal and final health check remain atomic. |
 | Teller `depositIntoGovVault` | Measured | Pass `R` to RipeGov; lock and points derive from credited shares. |
@@ -1900,7 +1925,7 @@ TellerDepositMeasured(
     user,
     depositor,
     asset,
-    inputAmount=A,
+    inputAmount=A_req,
     transferAmount=Q,
     receivedAmount=R,
     creditedAmount=V,
@@ -1929,11 +1954,11 @@ Phase D is specification-complete when the companion validation plan maps
 tests to all rules above. The design establishes:
 
 ```text
-0 < credited = returned = emitted existing amount = R <= Q <= A
+0 < credited = returned = emitted existing amount = R <= Q <= A_req
 ```
 
-`A` may be the `max_value(uint256)` sentinel, but `validateOnDeposit` still
-derives `Q <= A`. It also establishes:
+`A_req` may be the `max_value(uint256)` sentinel, but `validateOnDeposit` still
+derives `Q <= A_req`. It also establishes:
 
 ```text
 C1 = C0 + R
@@ -1944,10 +1969,11 @@ prior donation is included in C0, not R
 
 For the nominal path, `N' = N + R` and `C1 = C0 + R`, so a successful
 deposit preserves the pre-call aggregate difference `C - N`; it cannot create
-a new accounted deficit. For the share path,
-`S' = S + floor(R * (S + 10^8) / (C0 + 1))` under the current Phase D
-conversion direction, so `Q - R` cannot mint shares and a prior donation
-affects the conversion base but never the receipt.
+a new accounted deficit. For the corrected share path, Section 17 supplies
+pre-deposit effective allocated backing `A0`, so
+`S' = S + floor(R * (S + 10^8) / (A0 + 1))`. Therefore `Q - R` cannot mint
+shares, and pre-existing quarantine `U` affects neither the call-local receipt
+nor the conversion denominator.
 
 The recorded option 4 direction and this deposit design did not by themselves
 resolve backing or existing-debt deficit behavior. Section 15 now specifies
@@ -2004,15 +2030,15 @@ Pinned source anchors are `interfaces/ConfigStructs.vyi:88-117`;
 `StabVault.vy:219-222`. The relevant existing event definitions are
 `SwitchboardCharlie.vy:311-314` and `SwitchboardBravo.vy:117-126,158-165`.
 
-For user position amount `M_u` in vault `v` and asset `a`, the selected effective
-new-borrow predicate is:
+For user position amount `M(v,a,u)` in vault `v` and asset `a`, the selected
+effective new-borrow predicate is:
 
 ```text
 capacityEligible(v,a,u) =
     AssetConfig[a].canDeposit
     and DebtTerms[a].ltv > 0
     and backingSafe(v,a,u)
-    and M_u > 0
+    and M(v,a,u) > 0
 ```
 
 There is deliberately no third boolean. The functional “collateral-use flag”
@@ -2037,11 +2063,11 @@ For every actual user position traversed by CreditEngine:
 ```text
 C(v,a) = IERC20(a).balanceOf(v)
 T(v,a) = Vault(v).getTotalAmountForVault(a)
-M_u(v,a) = amount returned with a by
+M(v,a,u) = amount returned with a by
            Vault(v).getUserAssetAndAmountAtIndex(u, index)
 
 aggregateDeficit(v,a) = C(v,a) < T(v,a)
-zeroClaimPosition(v,a,u) = a != empty(address) and M_u(v,a) == 0
+zeroClaimPosition(v,a,u) = a != empty(address) and M(v,a,u) == 0
 
 backingSafe(v,a,u) =
     not aggregateDeficit(v,a)
@@ -2094,8 +2120,9 @@ liquidation/redemption eligibility, debt-term refresh during repayment, and
 the excluding-asset calculation used by withdrawal preview. Phase E requires
 the following order for each enumerated position:
 
-1. Read `(asset, M_u)` from the Vault. Continue only when `asset` is empty. Do
-   **not** continue merely because `M_u == 0`.
+1. Read `(asset, M)` from the Vault, where `M` is the call-local value of
+   `M(v,a,u)`. Continue only when `asset` is empty. Do **not** continue merely
+   because `M == 0`.
 2. Read the existing asset configuration and `DebtTerms`.
 3. If `ltv == 0`, treat the ordinary asset as intentionally non-collateral.
    A position with no configured debt terms contributes neither capacity nor
@@ -2109,7 +2136,7 @@ the following order for each enumerated position:
 7. For an eligible position, compute:
 
    ```text
-   liveCollateralValue = price(M_u)
+   liveCollateralValue = price(M)
    configuredMaxDebt = liveCollateralValue * DebtTerms.ltv / 100%
    capacityContribution = configuredMaxDebt
    resolutionWeight = max(configuredMaxDebt, 1)
@@ -3030,7 +3057,10 @@ Z_recorded := S > 0 and A^s = 0
 `Z_custody` is the task contract's literal zero-custody state. `Z_live` is the
 stronger economic freeze and also applies when the only custody left is
 quarantined. It blocks any value-creating call that observes zero allocated
-backing. A reverting call cannot also persist a checkpoint because EVM
+backing. `Z_custody` is diagnostic-only rather than an independent admission
+gate: because `C = 0` implies `A = 0`, it always implies `Z_live`; every
+post-zero freeze is enforced through `Z_live` or `Z_recorded`. A reverting
+call cannot also persist a checkpoint because EVM
 atomicity rolls the write back. Therefore a separate successful
 loss-checkpoint call, or a successful Phase F total-loss transition that
 checkpoints before moving debt, establishes `Z_recorded`. `Z_recorded` makes
