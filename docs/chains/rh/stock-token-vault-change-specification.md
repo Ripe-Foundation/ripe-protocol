@@ -326,9 +326,11 @@ silently using one as another.
 - Vault recovery requires the asset to be unregistered and persisted total
   accounting to be zero.
 
-Therefore a funded Base vault cannot be casually replaced in the registry.
-Loss can also leave persisted nominal/share state that blocks deregistration
-and recovery even when live custody is zero.
+Therefore a vault that reports accounted funds cannot be casually replaced in
+the registry. The guard is not itself a live token-custody scan; Section 5.2
+records the concrete vault ID 4 case where donation dust exists while the
+accounted-funds result is false. Loss can also leave persisted nominal/share
+state that blocks deregistration and recovery even when live custody is zero.
 
 ### 4.7 Standing Stock Token configuration constraints
 
@@ -387,7 +389,8 @@ Read-only Base RPC was pinned to:
 - `SimpleErc20.getNumVaultAssets()`: `27`
 - `SimpleErc20.doesVaultHaveAnyFunds()`: `true`
 - `RebaseErc20.getNumVaultAssets()`: `6`
-- `RebaseErc20.doesVaultHaveAnyFunds()`: `false`
+- `RebaseErc20.doesVaultHaveAnyFunds()`: `false` (accounted-share semantics;
+  see Section 5.2)
 
 The control-surface assessment also used verified Base Blockscout source/ABI
 metadata retrieved on 2026-07-23 America/Denver. Explorer metadata is dated
@@ -453,6 +456,18 @@ Names/symbols were read from the listed tokens at the pinned block.
 shares. No live user-funded share exposure is evidenced at this block, but a
 future migration/recovery plan must reconcile registered assets and incidental
 custody separately.
+
+The three `C = 1, S = 0` rows are live instances of Section 8 state 2,
+**pre-existing donation**: custody exists without a user claim, and a later
+deposit must not treat that custody as the call's receipt.
+
+Operationally, the false funds result means VaultBook's live-funds precondition
+would not block an otherwise authorized
+`startAddressUpdateToRegistry(4, ...)` or
+`startAddressDisableInRegistry(4)` while those three raw units remain in vault
+4. The normal governance/registry timing still applies, and neither operation
+automatically moves the tokens. A migration or disable plan therefore cannot
+use this boolean alone as proof of empty custody.
 
 ### 5.3 Base urgency conclusion
 
@@ -552,11 +567,12 @@ SimpleErc20.doesVaultHaveAnyFunds() => true
 #### Raw historical-read snapshot
 
 The JSON below is committed inside this owned specification rather than as a
-third Track 8 deliverable. Each leaf under `result`/`asset`/`custody`/
-`accounting` is the unmodified hex string from the JSON-RPC `eth_call` result;
-only transport envelopes and request IDs are omitted. `accounting` means
-nominal `totalBalances` for Simple and raw-share `totalBalances` for Rebase.
-The request shapes are the commands above, all using block tag `0x2ec3d82`.
+third Track 8 deliverable. Requests are recorded as command shapes above; the
+per-asset request calldata is not duplicated here. Each response leaf under
+`result`/`asset`/`custody`/`accounting` is the verbatim hex string from the
+JSON-RPC `eth_call` result, with only transport envelopes and request IDs
+omitted. `accounting` means nominal `totalBalances` for Simple and raw-share
+`totalBalances` for Rebase. Every request used block tag `0x2ec3d82`.
 
 ```json
 {
