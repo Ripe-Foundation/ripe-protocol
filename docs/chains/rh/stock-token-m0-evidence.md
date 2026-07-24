@@ -126,8 +126,8 @@ transaction.
 | --- | --- | --- | --- | --- |
 | RH-M0-01 | Robinhood mainnet `4663`; block `18,538,327`; hash `0x1f3920aded6d22dd6afc0234d7b0088bdbdfcdc98bd40cddb8e6dbd8e8889eba`; `2026-07-24T23:18:57Z` | Official public Robinhood JSON-RPC, `https://rpc.mainnet.chain.robinhood.com`; credential-free, rate-limited | AAPL proxy, beacon/registry, implementation; exact hashes in Section 5 | Identity, pause, multiplier, supply, balance, and blocklist reads succeeded at `2026-07-24T23:18:59Z`. |
 | RH-T2-01 | Robinhood mainnet `4663`; block `17,558,441`; hash `0x35e8e2a3803cb42c4553cb5f3528b187508c6cc200a8b761943374003b8f0243`; `2026-07-23T18:52:41Z` | Official public Robinhood JSON-RPC; local `boa` fork; integrated Track 2 record | Same three AAPL identities and hashes as RH-M0-01; probe hash `0xaa9b728174d048a5d65f49f5b4c851413008d6b89f315d36256191bd1a402949` | Integrated exact approve/deposit/withdraw/cleanup fork passed; no live transaction. |
-| BASE-M0-01 | Base mainnet `8453`; block `49,072,790`; tag `0x2ecca96`; hash `0x40e350e456725c0e1801a32d8fd948f82b33a281365c826bd697f15d411db57b`; `2026-07-24T23:15:27Z` | PublicNode credential-free public RPC for the complete batched state snapshot, with the official Base public RPC `https://mainnet.base.org` used for exact-block runtime-hash and aggregate-debt confirmation | SimpleErc20 `0xf75b…ddfD`, hash `0x1d0ec5…34eb7`; MissionControl `0x559E…BC19`, hash `0x0428c8…90f5`; Ledger `0x3652…fA47`, hash `0xdcb945…1b7d`; all 27 token hashes in Section 6 | Complete 27-row custody/nominal/config snapshot, aggregate debt/reward state, and exact-block token runtime hashes. |
-| BASE-M0-02 | Base mainnet `8453`; block `49,072,974`; hash `0x221cc559c736530bfd88bbd1864e557e2aa6ff8ca239e486f17bc98de2f1022d`; `2026-07-24T23:21:35Z` | PublicNode credential-free public RPC | Twelve manifest-resolved Base core/token contracts; exact addresses and hashes in Section 7 | Companion live core-runtime inventory for the state-independence proof. |
+| BASE-M0-01 | Base mainnet `8453`; block `49,072,790`; tag `0x2ecca96`; hash `0x40e350e456725c0e1801a32d8fd948f82b33a281365c826bd697f15d411db57b`; `2026-07-24T23:15:27Z` | PublicNode credential-free public RPC, `https://base-rpc.publicnode.com`, for the complete batched state snapshot, with the official Base public RPC `https://mainnet.base.org` used for exact-block runtime-hash and aggregate-debt confirmation | SimpleErc20 `0xf75b…ddfD`, hash `0x1d0ec5…34eb7`; MissionControl `0x559E…BC19`, hash `0x0428c8…90f5`; Ledger `0x3652…fA47`, hash `0xdcb945…1b7d`; all 27 token hashes in Section 6 | Complete 27-row custody/nominal/config snapshot, aggregate debt/reward state, and exact-block token runtime hashes. |
+| BASE-M0-02 | Base mainnet `8453`; block `49,072,974`; hash `0x221cc559c736530bfd88bbd1864e557e2aa6ff8ca239e486f17bc98de2f1022d`; `2026-07-24T23:21:35Z` | PublicNode credential-free public RPC, `https://base-rpc.publicnode.com` | Twelve manifest-resolved Base core/token contracts; exact addresses and hashes in Section 7 | Companion live core-runtime inventory for the state-independence proof. |
 
 The official Base RPC first returned block `49,072,665`,
 `0xc5f0b240233c9bd26942bdd6b9fed0841d652ff3b2bfb46ee54c381995f81871`,
@@ -215,6 +215,42 @@ paused()
 isBlocked(address)
 balanceOf(address)
 ```
+
+### 3.2 Sanitized raw-evidence amendment
+
+The machine-readable companion is
+[`stock-token-m0-raw-evidence.json`](stock-token-m0-raw-evidence.json), SHA-256
+`53870cb53de9b772d8f6882ba8c41d28fa94d073d7a9c0503f3cb7977017e0f9`.
+It contains:
+
+- the exact JSON-RPC requests, parsed raw responses, decoded values, targets,
+  selectors, block numbers and hashes, block and retrieval timestamps, and
+  classifications for a credential-free replay at the immutable RH-M0-01,
+  BASE-M0-01, and BASE-M0-02 pins;
+- `20` successful RH-M0-01 requests through
+  `https://rpc.mainnet.chain.robinhood.com`;
+- `228` successful BASE-M0-01 requests and `14` successful BASE-M0-02 requests
+  through the credential-free archive replay endpoint
+  `https://base-mainnet.public.blastapi.io`;
+- the exact current PublicNode archive-replay rejection, the three retained
+  fresh-fork failure classifications, and explicit `null` raw fields wherever
+  a byte-exact request or response was not retained; and
+- no credential, private information, signature, broadcast, state-changing RPC
+  method, or transaction.
+
+The original M0 session retained decoded results, exact endpoints, and exact
+pins, but did not persist its raw JSON-RPC envelopes. This amendment does not
+reconstruct or relabel them. BASE-M0-01 and BASE-M0-02 retain
+`https://base-rpc.publicnode.com` as their original source; because that
+endpoint now requires a personal token for these historical reads, the
+companion replays the same immutable blocks through the separately named Blast
+public endpoint. No credential was supplied.
+
+RH-T2-01 remains **prior integrated evidence**, not a fresh M0 raw capture.
+Its committed input and decoded execution record remain authoritative for the
+historical fork. The companion deliberately leaves its raw requests and
+responses `null`; none were fabricated. The fresh-fork limitation stated above
+and in Section 5.3 remains unchanged.
 
 ## 4. Candidate Teller route and asset inventory
 
@@ -628,6 +664,15 @@ The following stop before M1:
 
 M0 requires decisions, not implementation authorization.
 
+The owner supplied the following **preliminary recommendations** with the raw
+provenance amendment: keep CCIP inactive during initial Stock activation;
+disable rewards globally at launch; accept RH-T2-01 plus the current AAPL
+identity match; leave Base unchanged; and require separate evidence and
+approval before any future Base cutover. These recommendations align with
+D-M0-02 through D-M0-06 but do not close them in this evidence amendment. The
+complete Robinhood launch-token and route table in D-M0-01 remains the
+load-bearing owner input and the principal M0 stop.
+
 ### D-M0-01 — Freeze the complete Robinhood Teller asset graph
 
 Provide one exhaustive table containing:
@@ -704,8 +749,11 @@ selected, and the three-contract mechanism remains unapproved.
 ## 11. M0 checklist
 
 - [x] Fresh worktree and branch created from exact integrated commit.
-- [x] Only this M0 file is an authorized repository delta.
+- [x] Only this M0 file and its sanitized raw-evidence companion are authorized
+  repository deltas.
 - [x] Controlling Track 8 specification and validation plan unchanged.
+- [x] Exact original Base RPC URL, raw replay provenance, companion SHA-256,
+  and unavailable-response classifications recorded without credentials.
 - [x] Current-source ordinary and trusted Teller caller inventory complete.
 - [ ] Exact Robinhood asset matrix complete — **blocked on D-M0-01**.
 - [x] Exact AAPL proxy/beacon/implementation and live hashes refreshed.
