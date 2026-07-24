@@ -9,6 +9,11 @@ their dependent implementation slices
 recorded post-launch `rh` movement, and closed reviewer-requested evidence and
 handoff gaps
 
+**S3 planning correction:** 23 July 2026 — removed the nonexistent
+`DefaultsBase` Lootbox-parameter touch, preserved historical migrations, and
+assigned runtime fixture, artifact-record, and reviewed S2-reconciliation
+surfaces to S3
+
 **Track:** `rh-track-6-block-clock-spec`
 
 **Integrated `rh` launch commit:** `5018da6d19516509e0d8674b3728e73bca92e2ad`
@@ -157,8 +162,10 @@ once at the smallest token unit; `0.0075 RIPE * 6 = 0.045 RIPE` is exact. Curren
 integer allocation floors remain explicit protocol behavior; no hidden remainder
 accumulator is introduced by configuration.
 
-These conversion rules and all numeric candidates are **recommended/open**, not
-approved.
+These conversion rules and numeric candidates remain **recommended/open** unless
+the decision register records narrower approval. The S3 Lootbox floor is the
+only current exception: its `43_200` Base and `7_200` Robinhood values use this
+cadence basis under the owner's dated, S3-only approval.
 
 ## Current Base deployment evidence and version rule
 
@@ -225,7 +232,7 @@ source/default evidence only. Values in the `RH target` column remain candidates
 | BN-022; CM-033,009,023 | `Lootbox` global/asset/user deposit checkpoints; rewards/point allocations | Relative reward points; repo, no cadence scalar | Prior balance/value earns points across elapsed `NUMBER`; allocation ratios, not supply, consume points | Retain pending rewards approval | Same formula candidate; no implicit multiplier |
 | BN-023; CM-033,009,030 | `Lootbox` global/user borrow checkpoints; same | Relative reward points | Prior principal earns points across elapsed `NUMBER` | Retain pending rewards approval | Same formula candidate |
 | BN-024; CM-033,009,028 | `Lootbox._getLatestGlobalRipeRewards`; governed `rewardsConfig.ripePerBlock` | Monetary emission; repo/dated `0.0075 RIPE` per number | Nominal `324 RIPE/day`, capped by available reward balance | `0.0075 RIPE`; current validator/config bounds retained | candidate `0.045 RIPE`; exact `*6`; tokenomics approval open |
-| BN-025; CM-033,013,055 | `Lootbox.distributeUnderscoreRewards`; constructor/setter enforce `ONE_DAY`; Charlie governance | Hardcoded minimum interval; live interval `43,200` | Underscore sends no more often than one nominal day; feature is absent on RH | floor and default `43,200`; setter `< max`; current strict `>` eligibility retained unless separately approved | immutable floor `7,200`; feature disabled/omitted; ceil `/6` |
+| BN-025; CM-033,013,055 | `Lootbox.distributeUnderscoreRewards`; constructor/setter enforce `ONE_DAY`; Charlie governance | Hardcoded minimum interval; live interval `43,200` | Underscore sends no more often than one nominal day; feature is absent on RH | floor and default `43,200`; setter `< max`; current strict `>` eligibility retained under S3 approval | owner-approved immutable floor `7,200`; feature disabled/omitted; ceil `/6` |
 | BN-026; CM-033,055 | Lootbox distribution event `blockNumber`; consumers/reports | Telemetry; observed-number field | Record EVM `NUMBER`, which may repeat or jump | Retain | Retain and document; no conversion |
 | BN-027; CM-048,046,009 | `EndaomentPSM` mint interval get/update; constructor and Echo-governed setter validate nonzero/not max | Capacity interval; live `43,200`; mint bucket independent | One nominal-day bucket; repeat shares capacity; equality starts one fresh bucket | `43,200`; `1..max-1` technical bounds, risk cap separately governed | candidate `7,200`; same validator; PSM deployed disabled and unregistered pending owner gates |
 | BN-028; CM-048,046,009 | same for redeem bucket | Capacity interval; live `43,200`; separate redeem bucket | Same duration, separate accounting | BN-027 | BN-027 |
@@ -266,7 +273,7 @@ Abbreviations: `R` repeat, `+1` exact advance, `J` ordinary `+2/+4` jump,
 | BN-022 | R zero; +1 one; J/S full gap to prior balances/value; B affects lock eligibility separately | Retain candidate; no automatic seconds conversion | old/new balance around jump, global/asset/user conservation and floors | Rewards; blocked on point attribution approval | No artifact change if retained; S6/S8 |
 | BN-023 | same BN-022 for prior principal | Retain candidate | borrow/repay immediately around jump; user/global conservation | Rewards; blocked on attribution | No artifact change if retained; S6/S8 |
 | BN-024 | R zero emission; +1 one rate unit; J/S full gap at prior rate, capped once; allocations floor and unallocated dust remains in available accounting | Configuration-only rate after tokenomics approval | rate change before/after J; cap, zero allocation, conservation, daily nominal comparison | Tokenomics/rewards; blocked | No source change; S6/S8 |
-| BN-025 | R holds; +1/J progress; current strict `>` means exact `last+interval` remains too early; B/S past it enables | Shared-source: constructor immutable `MIN_UNDERSCORE_SEND_INTERVAL`, public getter, constructor/setter validator; no chain branch; preserve strict `>` for Base parity unless separately approved | min-1/min/min+1, constructor/setter, disabled RH no address/permission | Protocol/rewards; recommended/open | New Lootbox artifact and Base upgrade; S3 |
+| BN-025 | R holds; +1/J progress; current strict `>` means exact `last+interval` remains too early; B/S past it enables | Shared-source: constructor immutable `MIN_UNDERSCORE_SEND_INTERVAL`, public getter, constructor/setter validator; no chain branch; preserve strict `>` for Base parity | min-1/min/min+1, constructor/setter, disabled RH no address/permission | Protocol/rewards; owner-approved for S3, implementation open | New Lootbox artifact and Base upgrade; S3 |
 | BN-026 | R may duplicate; J/S may gap; no state semantics | Retain; document dashboards/indexers must key by tx/log identity, not number | repeated/gapped event consumer fixture | Data/ops; recommended/open | No protocol artifact change; S8 |
 | BN-027 | R shares bucket; +1/J remain or cross; equality resets once; B/S crossing many intervals still resets once; no carry | Retain/configure; deploy disabled if Track 4 implementation approved, otherwise omit; changing interval mid-bucket immediately re-evaluates original start/amount | mint/redeem independence, exact equality, multi-interval J, interval shrink/grow, disabled flags | Risk/protocol; semantics recommended, value/activation open | No source change; S6/S8 after Track 4 gates |
 | BN-028 | same BN-027, independent redeem bucket | same BN-027 | same, prove mint does not consume redeem | Risk/protocol; same status | No source change; S6/S8 |
@@ -436,8 +443,9 @@ otherwise required.
 
 Rejected designs are `chain.id`, a mutable zero floor, leaving the Base constant
 in shared source because Robinhood disables the feature, and silently changing
-the exact boundary. S3 requires protocol/rewards approval of the immutable design
-and Base rollout.
+the exact boundary. The owner recorded protocol/rewards approval of the immutable
+design, exact values, strict boundary, and Base convergence policy on 23 July
+2026; implementation and live rollout remain open.
 
 ### CAD-001: units and inactive Robinhood path
 
@@ -632,7 +640,7 @@ one. No slice may combine with S5 merely because both touch a clock.
 | --- | --- | --- | --- | --- | --- |
 | S1 — harness foundation | all BN/CAD/TS; CM-059. New `tests/utils/clock_profiles.py`, `tests/clock/test_clock_profiles.py`; update `tests/conftest.py` only to register fixture | Approve `J2/J4` and stress `+60`; pinned Boa/pytest already sufficient | Test-only; identical compiled artifacts, no production bytecode | `pytest -q tests/clock/test_clock_profiles.py`; first verify installed version 0.2.7, direct NUMBER/timestamp assignment, and anchor restoration, then prove exact sequences, independent clocks, trace output, snapshot isolation | Test-infra review; abort on version drift, runtime auto-mining, failed restoration, or non-isolation; consumed by S3–S10 |
 | S2 — checked inventory | BN-001–032, CAD-001, TS-001–011; CM-055,059. New `config/block-clock-inventory.json`, `scripts/check_block_clock_inventory.py`, `tests/inventory/test_block_clock_inventory.py` | Approve inventory ownership and local/CI posture; no CI dependency selected here | Tool/test only | the two commands above; baseline 100/95/17; explicit `contracts/testing/**` non-production classification and production-import prohibition; mutation tests add/remove/move/direct/indirect dependencies and must fail | Protocol/security + tooling review; abort if parser can suppress fixed-string delta or a path can evade classification; consumed by every source PR |
-| S3 — Lootbox floor | BN-025/026; CM-033,013. `contracts/core/Lootbox.vy`, `contracts/config/DefaultsBase.vy`, future `contracts/config/DefaultsRobinhood.vy`, `tests/core/lootbox/test_underscore_rewards.py`, `tests/config/test_switchboard_charlie.py`, `scripts/abis/Lootbox.json`, Track 7-reserved RH and owner-reserved Base migrations | Approve immutable floor, strict `>` parity, Base rollout | New Lootbox bytecode/constructor; Base deploy/rewire required, old/new hash record and rollback | targeted pytest files plus S1/S2; Base 43,200 and RH 7,200 floor/min-1/min/min+1; RH distributor absent | Protocol/rewards + contract audit; abort before migration if ABI/rewire plan incomplete; consumed by S6/Track 7 |
+| S3 — Lootbox floor | BN-025/026; CM-033,013. `contracts/core/Lootbox.vy`, `tests/conf_core.py`, `tests/core/lootbox/test_underscore_rewards.py`, `tests/config/test_switchboard_charlie.py`, `scripts/abis/Lootbox.json`, the S3 implementation record, and reviewed S2 inventory reconciliation. S6 owns future `contracts/config/DefaultsRobinhood.vy`; no existing Base migration is edited | Owner approved immutable nonzero/non-maximum floor, strict `>` parity, S3-specific cadence basis and values, and bounded-drift Base convergence on 23 July 2026 | New Lootbox bytecode/constructor; Base deploy/rewire required through a later forward migration, with old/new hash record and rollback; S3 executes no migration | targeted pytest files plus S1/S2; Base 43,200 and RH 7,200 floor/min-1/min/min+1; interval-zero RH deployment retains its immutable floor while Underscore remains absent | Protocol/rewards + contract audit; abort before migration if ABI/rewire/state-reset plan is incomplete; consumed by S6/Track 7 |
 | S4 — Deleverage cooldown/context | BN-012; CM-044,014,034. `contracts/core/Deleverage.vy`, `contracts/config/SwitchboardDelta.vy`, `contracts/core/Teller.vy`, `tests/core/deleverage/test_deleverage_for_withdrawal.py`, `tests/config/test_switchboard_delta.py`, `tests/core/teller/test_teller_withdraw.py`, `scripts/abis/Deleverage.json`, `scripts/abis/SwitchboardDelta.json`, `scripts/abis/Teller.json`, Track 7-reserved RH and owner-reserved Base migrations | Owner selects 4h vs 1d, configured default, Teller context, ABI compatibility, Base rollout | New Deleverage/Delta/Teller bytecode; coordinated Base upgrade | targeted suites plus S1/S2; independent same-N call blocked; only bound transient context bypasses; exact expiry and near-redemption pass | Security audit mandatory; abort if context is reusable/forgeable or migration cannot be atomic; consumed by S6/Track 7 |
 | S5 — Ledger portable guard | BN-002; CM-008,009,014,034. `contracts/data/Ledger.vy`, `contracts/core/Teller.vy`, `contracts/data/MissionControl.vy`, `contracts/config/SwitchboardDelta.vy`, `contracts/config/DefaultsBase.vy`, future `contracts/config/DefaultsRobinhood.vy`, `tests/data/test_ledger.py`, `tests/core/teller/test_teller_withdraw.py`, `tests/core/creditEngine/test_credit_borrow.py`, `tests/config/test_switchboard_delta.py`, `scripts/abis/Ledger.json`, `scripts/abis/Teller.json`, `scripts/abis/MissionControl.json`, `scripts/abis/SwitchboardDelta.json`, reserved migrations | Security owner identifies protected threat and whether lower-risk touches arm the replacement; choose nested, elapsed-seconds, both, or explicitly accept disable; approve seconds and Base rollout | New Ledger and possibly Teller/MissionControl/Delta bytecode; no permanent Base divergence | targeted suites plus S1/S2; preserve current Base lower-risk→higher-risk rejection in comparison tests; prove the selected canonical low-risk arming rule, locked accounts, delegation, Underscore-user handling, reentrancy, migration | Independent security PR/audit; abort if threat/low-risk arming remains ambiguous or seconds trust is unacceptable; consumed by Track 7 only after approval |
 | S6 — per-chain defaults/bounds/rates | BN-001,003–009,012–025,027–032, CAD-001; CM-007,009,049,055,060. New `contracts/config/DefaultsRobinhood.vy` and `tests/config/test_defaults_robinhood.py`; `config/BluePrint.py`, `contracts/config/DefaultsBase.vy` only for approved shared constructor interfaces, `scripts/params/params_utils.py`, `scripts/params/general.py`, `scripts/params/regenerate_defaults.py`, Track 7-reserved RH migrations | Approve every included parameter; point/emission economics; Track 4 activation fields; S3/S4 interfaces if included | Chain default artifact/config changes; core artifacts only where approved constructors changed; existing Base values otherwise unchanged | defaults/config/parameter tests plus S1/S2; generated table equals approved manifest and rejects Base/local fallback | Protocol, risk, tokenomics, deployment reviews; omit any unresolved field/slice rather than guess; consumed by S7–S9/Track 7 |
@@ -648,7 +656,8 @@ new dependency returns to owner approval.
 
 ## Decision register
 
-Recommendations are not approvals. No clock parameter in this register is final.
+Recommendations are not approvals. Only an explicit status and dated approval
+provenance make a decision final; every other clock parameter remains open.
 
 On 23 July 2026, the owner approved the narrow S1/S2 kickoff decisions after
 review of their implementation briefs: `+2`/`+4` representative jumps, `+60`
@@ -659,20 +668,31 @@ approvals also confirm the shared clock posture underlying Track 6. They unblock
 S1 and S2; they do not mark either implementation complete or approve the
 remaining clock parameters.
 
+On 23 July 2026, the owner approved the four S3 decisions after independent
+review of the S3 implementation brief: a nonzero/non-maximum immutable
+per-deployment Lootbox floor and getter, preservation of strict `>` eligibility,
+Base floor `43_200`, Robinhood floor `7_200`, and coordinated eventual Base
+convergence with only bounded temporary live-bytecode drift and no permanent
+divergence. The owner selected the approximately 2-second Base / 12-second
+Robinhood cadence basis specifically for this isolated floor. That narrow
+approval does not approve the cadence basis for S6 rates, timelocks, capacities,
+or other parameters, and it does not mark S3 implementation or either live
+deployment complete.
+
 | Decision | Options | Evidence | Recommendation | Affected IDs/components | Owner | Needed before | Status |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | Shared clock posture | retain/configure; timestamp conversion; redesign all | Track 3 separates acceptable clocks from BN-002/012/025 defects | Retain observed-number semantics where valid; redesign only demonstrated failures; no chain branch | all BN/CAD; CM-007–059 | Protocol/security | S3–S9 | owner-approved; slice implementation open |
-| Cadence basis | 2s/12s; other measured quantile; no wall-time mapping | Base/Arbitrum docs and RH sample | 2s Base, 12s RH nominal; ceil duration `/6`; label assumptions | duration/rate IDs | Protocol/risk | S6 | recommended/open |
+| Cadence basis | 2s/12s; other measured quantile; no wall-time mapping | Base/Arbitrum docs and RH sample | 2s Base, 12s RH nominal; ceil duration `/6`; label assumptions | duration/rate IDs | Protocol/risk | S3/S6 | owner-approved for the S3 Lootbox floor only; broader S6/rate/timelock signoff open |
 | Representative jumps | `+2/+4`; another set | RH live `+2`; Arbitrum example `+4` | approve `+2/+4` | all number IDs; CM-059 | Protocol/security | S1 | owner-approved for S1 |
 | Stress jump | `+60`; larger owner value; no stress | no authoritative max; occasional longer sync documented | test `+60` as conservative, not maximum | all number IDs; CM-059 | Protocol/security/risk | S1 and parameter signoff | owner-approved for S1 as synthetic stress; production parameter signoff open |
 | Ledger Base version policy | coordinated Base upgrade; time-bounded old-policy drift; permanent divergence | live Ledger hash above; current any-touch→checked-action property; canonical-source constraint | approve the threat/policy first, then coordinate Base migration; no permanent divergence | BN-002; CM-008,009,034 | Security/protocol/deployment | S5 | blocked |
 | Deleverage Base version policy | coordinated Deleverage/Delta/Teller upgrade; time-bounded drift; permanent divergence | three shared artifacts and ABI/context must move together | one atomic reviewed Base rollout after duration/context approval; no permanent divergence | BN-012; CM-014,034,044 | Security/protocol/deployment | S4 | blocked |
-| Lootbox Base version policy | coordinated Lootbox redeploy/rewire; time-bounded drift; permanent divergence | live Lootbox hash; constructor ABI changes while strict `>` behavior is retained | coordinated upgrade, with explicit old/new hashes and rollback; no permanent divergence | BN-025; CM-013,033 | Protocol/rewards/deployment | S3 | open |
+| Lootbox Base version policy | coordinated Lootbox redeploy/rewire; time-bounded drift; permanent divergence | live Lootbox hash; constructor ABI changes while strict `>` behavior is retained | coordinated upgrade, with explicit old/new hashes and rollback; no permanent divergence | BN-025; CM-013,033 | Protocol/rewards/deployment | S3 | owner-approved; rollout implementation and migration remain open |
 | Ledger threat | nested/reentrant; cross-tx pacing; lower-risk touch arming; combinations; disable accepted | current checked action rejects after any same-NUMBER housekeeping touch; no threat document | security review selects the threat and low-risk arming rule before code | BN-002; CM-008,009,034 | Security | S5 | blocked |
 | Ledger replacement | transient guard; elapsed-seconds; both; explicit disable; arm on any touch or high-risk only | repeated RH NUMBER makes current guard a long throttle; proposed guards otherwise widen behavior after a lower-risk touch | select layers and low-risk arming explicitly; seconds unset until evidence | BN-002 | Security | S5 | blocked |
 | Deleverage maximum | Base 7,200/RH 1,200 (~4h); Base 43,200/RH 7,200 (~1d) | code cap vs comment intent conflict; live value 0 | owner resolves intent | BN-012; CM-014,044 | Security/protocol | S4/S6 | blocked |
 | Deleverage exception | authorized transient context; no exception; retain same NUMBER | multi-leg intent and repeated-number bypass | authorized user/caller-bound transient context | BN-012 | Security/protocol | S4 | recommended/open |
-| Lootbox interval floor | immutable constructor floor; governed floor; retain constant | Base hardcode rejects RH day | immutable per-deployment floor; strict `>` retained | BN-025; CM-033 | Protocol/rewards | S3 | recommended/open |
+| Lootbox interval floor | immutable constructor floor; governed floor; retain constant | Base hardcode rejects RH day | immutable nonzero/non-maximum per-deployment floor; Base `43_200`, RH `7_200`; strict `>` retained | BN-025; CM-033 | Protocol/rewards | S3 | owner-approved; implementation open |
 | Point attribution | prior checkpoint gets full gap; seconds normalization; checkpoint-before-config | current RipeGov/Lootbox math | retain prior-checkpoint gap attribution only with rewards acceptance | BN-007,022,023; CM-023,033 | Rewards/tokenomics | S6/S8 | blocked |
 | RIPE emission | RH 0.045; retain 0.0075; new economics | 324/day nominal comparison; jump/cap behavior | 0.045 candidate, current floor/dust explicit | BN-024; CM-033 | Tokenomics/rewards | S6/S8 | blocked |
 | Timelocks and headroom | table values; revised values; zero-delay policy | live calls and `+60` profile | ceil `/6`, expiry at least stress+1; review every live zero | BN-001,003–006,018–021; CM-001–021,032,046 | Protocol/security | S6/S7 | open |
