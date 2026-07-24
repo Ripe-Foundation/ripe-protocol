@@ -1,9 +1,9 @@
 # Robinhood deployment-support specification
 
-- Status: working draft for the early owner-review checkpoint
-- Review status: independent reviewer findings incorporated; early checkpoint approved
-- Scope completed: Phase A and the proposed Phase B network-profile schema
-- Scope not started: Phases C–H and Deliverable B
+- Status: Phases A–H completion draft for owner/reviewer scrutiny
+- Review status: independent checkpoint findings incorporated; specification directions approved where recorded
+- Scope completed: Phases A–H and Deliverables A–B at specification level
+- Scope not authorized: implementation, production values, push, merge, or live actions
 - Starting commit: `68a76dcd5ea9b95b9148d3e6ebdd12107d5cc88e`
 - Track branch: `rh-track-7-deployment-support`
 - Worktree: `/Users/wigglez/dev/ripe-protocol-track-7-deployment-support`
@@ -11,16 +11,20 @@
 
 ## 1. Checkpoint boundary
 
-This is Deliverable A in working-draft form at the optional early checkpoint
-defined by `track-7-robinhood-deployment-support.md`. It records:
+This document began as Deliverable A at the optional early checkpoint defined by
+`track-7-robinhood-deployment-support.md`. Following the recorded owner
+authorization, it now carries the specification through Phases C–H. It records:
 
 - the Phase A audit of the existing deployment system;
 - the dependency-security preflight;
 - a proposed Phase B network-profile schema;
 - a proposed Base/Robinhood network-profile table;
 - the primary-source record;
-- unresolved facts and owner gates; and
-- abstraction decisions that would materially shape Phases C–H.
+- unresolved facts and owner gates;
+- abstraction decisions that materially shape Phases C–H;
+- the component graph, migration reservations, evidence and artifact contracts;
+- the ordered follow-on implementation slices and full decision register; and
+- the exact `rh-summary.md` Section 1 handoff.
 
 It does **not** approve a Robinhood deployment, choose a production operator,
 authorize dependency changes, or approve production values. On 2026-07-23, the
@@ -116,8 +120,8 @@ is not an implementation source.
 | Track 2, stock transfer | Evidence exists, but launch-asset and live-environment applicability must be frozen for the selected release. | Owner/release review |
 | Track 4, USDG | Existing Chainlink-feed direction and disabled-by-default PSM posture are recorded. Implementation, parameters, risk gates, and SavingsGreen disposition are not complete. | Owner/risk approval |
 | Track 5, vault | Rebase/Shares accounting is the preferred direction, but the vault is not approved for deployment unchanged and remediations remain. | Owner/security approval |
-| Track 6, S1/S2 | Specifications exist but are still inputs, not proof that implementation or validation has landed. | Reconcile exact implementation commits before Phases C–H |
-| Track 8, vault change | Brief-only post-kickoff input at `be6a759`; it assigns Track 7 exact Robinhood migration IDs, namespaces, manifests, and deployment tooling while reserving vault-specific sequencing for Track 8. | Reconcile reviewed Track 8 outputs before finalizing Phase C vault rows or migration reservations; route collisions to the owner |
+| Track 6, S1/S2 | Specifications exist but are still inputs, not proof that implementation or validation has landed. | Reconcile exact implementation commits before H-09 or any rehearsal |
+| Track 8, vault change | Brief-only post-kickoff input at `be6a759`; it assigns Track 7 exact Robinhood migration IDs, namespaces, manifests, and deployment tooling while reserving vault-specific sequencing for Track 8. | Keep Phase C vault rows provisional; reconcile reviewed Track 8 outputs before H-03/H-05 implementation and route collisions to the owner |
 
 ### 2.6 Parallel-input reconciliation
 
@@ -133,6 +137,24 @@ Phase A audit and Phase B facts therefore remain frozen to `68a76dc`; the Track
 8 brief is recorded only as a pending input for Phases C–H. It does not collide
 with this track's owned document path. This worktree was not rebased, merged, or
 cherry-picked.
+
+### 2.7 Final parallel-worktree reconciliation
+
+Immediately before completion validation, integration remained at `be6a759` but
+contained uncommitted edits not made by Track 7:
+
+| Working-tree input | Observed SHA-256 | Reconciliation |
+| --- | --- | --- |
+| `docs/chains/rh-summary.md` | `b60f5c516b531d2cea67dfce08032e2fcd4f2ed6a26bff8c688d9e2fecf67c22` | Candidate Section 0 checklist-status clarifications; Section 1 text consumed by the exact handoff is unchanged |
+| `docs/chains/rh/shared-block-clock-specification.md` | `dd9e940aa03f065ad7ae9a0407074fe202dec7b563cf15972bad0fd3d6a154b0` | Candidate record of narrow S1/S2 owner directions; implementation and remaining clock values stay open |
+
+Uncommitted parallel edits are not a frozen Track 7 authority and do not replace
+the Section 2.3 hashes. Their content is compatible with this specification:
+the selected existing USDG Chainlink-feed direction, shared-source posture,
+assisted-registration preference and S1/S2 gates are already represented, while
+deployment, activation, exact values and implementation remain blocked. No
+owned Track 7 deliverable path or proposed migration ID collision was observed.
+The integration worktree was not edited, staged or cleaned by Track 7.
 
 ## 3. Phase A audit
 
@@ -730,7 +752,7 @@ semantics are material.
 | U-012 | Track 6 S1/S2 implementation commits and exact version profiles | Cross-track implementation gate | Reconcile before Phase G validation design |
 | U-013 | Dependency refresh compatible with pytest/Vyper/titanoboa and all open alerts | Security gate | Separate pin-refresh slice and complete revalidation |
 | U-014 | Disposition of four migrations without numeric manifests and the duplicate ID | Historical fact | Repository/chain reconciliation; do not infer success/failure |
-| U-015 | Reviewed Track 8 vault-change specification and validation plan do not yet exist | Parallel-track input | Keep vault-specific sequencing and requirements pending; reconcile before Phase C finalizes vault inventory/IDs and route any collision to the owner |
+| U-015 | Reviewed Track 8 vault-change specification and validation plan do not yet exist | Parallel-track input | Keep Phase C vault dispositions provisional; reconcile before H-03/H-05 implementation and route any collision to the owner |
 
 ## 9. Material abstraction decisions for owner review
 
@@ -881,3 +903,815 @@ done
 The changing block and fee values are observations, not approved defaults.
 Release freeze must repeat these methods against the selected provider without
 printing, storing, or committing a credential-bearing endpoint.
+
+## 13. Phase C — deployment inventory and graph
+
+### 13.1 Inventory status and graph rule
+
+This section specifies the deployable graph; it does not approve addresses,
+parameters, roles, account backends, or live versions. `Selected` means the
+component belongs in the provisional clean-deployment graph once every stated
+gate closes. `Scaffolded disabled` means the component is deployed/registered
+only to preserve a required shared registry topology, with every value path and
+capability disabled. `Omitted` means no Robinhood address, registry entry,
+permission, route, or manifest contract record. `Deferred` and `blocked` fail
+closed.
+
+The shared source hard-codes RipeHq registry IDs 1–22 in
+`contracts/modules/Addys.vy:40-61`, VaultBook IDs 1–2 in
+`contracts/core/CreditEngine.vy:184-185` and
+`contracts/core/BondRoom.vy:102`, and several Department IDs directly in the
+Switchboards. Those IDs are not merely Base deployment history. Therefore:
+
+1. Robinhood cannot shift later registrations when an optional component is
+   omitted.
+2. A component required to occupy a hard-coded slot must either be deployed in
+   an inert, reviewed posture or the canonical shared source must first gain an
+   approved sparse/optional-registry design.
+3. A zero address, unrelated placeholder, or deliberately wrong contract is not
+   an acceptable slot reservation.
+4. RipeHq IDs 23 and 24 are provisionally reserved for the GREEN and RIPE CCIP
+   pools only if Track 1 proves the pools implement the required Department
+   capability surface and the owner approves registration.
+
+### 13.2 Common row policies
+
+The following codes expand the repeated fields in every inventory row:
+
+| Code | Required behavior |
+| --- | --- |
+| `ARG-P` | Constructor shape comes from the canonical source ABI; every chain value comes from the frozen network profile, `DefaultsRobinhood`, or an approved parameter manifest. A missing value is `blocked`, never zero-filled. |
+| `ARG-HQ` | Constructor receives the newly deployed Robinhood RipeHq address plus only the additional values declared by the canonical constructor ABI. |
+| `ROLE-G` | Temporary deployment authority may perform setup only. Final governance/admin belongs to the owner-approved local timelock/Safe path; guardian/operations receives only explicitly enumerated pause/runbook powers; deployer authority must be absent after handoff. |
+| `ASSERT-S` | Address is nonzero, chain ID/profile match, creation/runtime/ABI/source hashes match, constructor values match, expected registry name/ID and capabilities match, ownership is correct, and every post-deployment call result is recorded. |
+| `ASSERT-O` | No address, registry row, capability, approval, route, feature flag, or callable configured path exists on Robinhood; manifest disposition is `omitted` or `deferred`, never a zero-valued deployed record. |
+| `ASSERT-D` | Contract may exist, but all named enablement flags/caps/roles are false or zero by explicit legitimate parameter; it has no mint capability or unsupported approval/route. |
+| `BASE-U` | Canonical source is unchanged. Base needs no bytecode action merely because Robinhood deploys a new address; configuration remains chain-local. |
+| `BASE-M` | Canonical shared source is modified. Base may diverge only through a separately approved, time-bounded live-version policy and convergence migration. |
+| `BASE-O` | Component remains Base-only; Robinhood omission does not alter Base. |
+| `ABORT-A` | Before registry/capability confirmation, stop and leave any already-created address explicitly orphaned in local evidence. A transaction cannot be undone. |
+| `ABORT-G` | After registry/capability/ownership confirmation, remediation requires governance cancellation, disablement, replacement, or a new migration. It is not rollback. |
+
+Registry names and numeric IDs below preserve the canonical constants. Any
+implementation that observes a different next ID must stop rather than accept a
+shifted registration.
+
+### 13.3 Components CM-001 through CM-020
+
+| ID / component | Robinhood disposition and form | Canonical source; constructor/value source | Order, reservation, registry and capability | Controls, assertions, Base policy, abort and approval |
+| --- | --- | --- | --- | --- |
+| CM-001 `GreenToken` | Selected ordinary Vyper contract | `contracts/tokens/GreenToken.vy`; current ABI with `ARG-P`; initial supply/recipient are owner values | `0100_TokensAndRipeHq.py`; RipeHq ID 1 `Green Token`; no self capability | `ROLE-G`; `ASSERT-S`; `BASE-U`; `ABORT-G`; production values open |
+| CM-002 `RipeToken` | Selected ordinary Vyper contract | `contracts/tokens/RipeToken.vy`; current ABI with `ARG-P`; supply/governance are owner values | `0100`; RipeHq ID 3 `Ripe Token`; no self capability | `ROLE-G`; `ASSERT-S`; `BASE-U`; `ABORT-G`; Track 1 token-admin contingency open |
+| CM-003 `SavingsGreen` | Provisionally selected registry scaffold; user-facing path remains disabled pending owner product decision | `contracts/tokens/SavingsGreen.vy`; GREEN/HQ dependencies and `ARG-P` | `0100` because RipeHq requires the address; RipeHq ID 2 `Savings Green`; downstream enablement reserved at `0700` | `ROLE-G`; `ASSERT-D`; `BASE-U`; `ABORT-G`; owner inclusion/omission redesign decision open |
+| CM-004 `RipeHq` | Selected authority/registry contract | `contracts/registries/RipeHq.vy`; GREEN/sGREEN/RIPE addresses, temporary deployer, and reviewed timelock bounds from `ARG-P` | `0100`, after CM-001–003 and before every Department | `ROLE-G`; verify minting globally disabled until handoff gates; `ASSERT-S`; `BASE-U`; `ABORT-G` |
+| CM-005 `Contributor` | Blueprint selected only as inert HR scaffold; no contributor instances unless HR approved | `contracts/modules/Contributor.vy`; blueprint has no constructor; instances derive from approved HR config | `0100` blueprint; not an HQ registry row; CM-032 owns instances | No employee data/roles; `ASSERT-D`; `BASE-U`; `ABORT-A`; product/HR owner open |
+| CM-006 `TrainingWheels` | Selected launch-control contract | `contracts/config/TrainingWheels.vy`; RipeHq plus owner-approved allowlist, never copied Base addresses | `0100`; referenced by `DefaultsRobinhood`, not an HQ row | `ROLE-G`; allowlist provenance/assertions; `BASE-U`; `ABORT-G`; role values open |
+| CM-007 `DefaultsBase` | Omitted from Robinhood | `contracts/config/DefaultsBase.vy`; Base-only artifact | No RH migration or registry; replaced by CM-049 | `ASSERT-O`; `BASE-O`; no rollback; omission approved by architecture |
+| CM-008 `Ledger` | Selected, but exact portable same-number guard artifact is pending Track 6 S5 | `contracts/data/Ledger.vy`; `ARG-HQ` | `0200_DataAndConfigRegistries.py`; RipeHq ID 4 `Ledger`; no mint/RIPE/blacklist capability | `ROLE-G`; `ASSERT-S`; `BASE-M` if S5 changes bytecode; `ABORT-G`; security approval required |
+| CM-009 `MissionControl` | Selected data contract | `contracts/data/MissionControl.vy`; RipeHq plus CM-049 defaults artifact | `0200`; RipeHq ID 5 `Mission Control`; no capability | `ROLE-G`; parameter hash/assertions; `BASE-U`; `ABORT-G`; all production parameters open |
+| CM-010 `Switchboard` | Selected configuration registry | `contracts/registries/Switchboard.vy`; RipeHq and reviewed registry timelock bounds | `0300_Switchboards.py`; RipeHq ID 6 `Switchboard`; blacklist capability true only after reviewed handoff | `ROLE-G`; IDs 1–5 below; `ASSERT-S`; `BASE-U`; `ABORT-G` |
+| CM-011 `SwitchboardAlpha` | Selected configuration Department | `contracts/config/SwitchboardAlpha.vy`; `ARG-HQ`, stale-time bounds, action timelocks | `0300`; Switchboard ID 1 `Switchboard Alpha` | `ROLE-G`; no unsupported addresses; `ASSERT-S`; `BASE-U`; `ABORT-G` |
+| CM-012 `SwitchboardBravo` | Selected auction configuration Department | `contracts/config/SwitchboardBravo.vy`; `ARG-HQ` and action timelocks | `0300`; Switchboard ID 2 `Switchboard Bravo` | `ROLE-G`; RH auction values blocked pending approval; `ASSERT-S`; `BASE-U`; `ABORT-G` |
+| CM-013 `SwitchboardCharlie` | Selected rewards/config Department | `contracts/config/SwitchboardCharlie.vy`; `ARG-HQ` and action timelocks | `0300`; Switchboard ID 3 `Switchboard Charlie` | `ROLE-G`; tokenomics values blocked; `ASSERT-S`; `BASE-U`; `ABORT-G` |
+| CM-014 `SwitchboardDelta` | Selected only with Track 6 S4/S5 portable artifact | `contracts/config/SwitchboardDelta.vy`; `ARG-HQ`, timelocks, approved cooldown bound | `0300`; Switchboard ID 4 `Switchboard Delta` | `ROLE-G`; duplicated-cap removal assertion; `BASE-M`; `ABORT-G`; security/protocol approval required |
+| CM-015 `PriceDesk` | Selected registry | `contracts/registries/PriceDesk.vy`; RipeHq, ETH sentinel/native metadata, registry timelocks | `0400_PriceSources.py`; RipeHq ID 7 `Price Desk`; no capability | `ROLE-G`; only approved sources registered; `ASSERT-S`; `BASE-U`; `ABORT-G` |
+| CM-016 `ChainlinkPrices` | Selected adapter, but no asset feed registered without dated feed approval | `contracts/priceSources/ChainlinkPrices.vy`; RipeHq, native/BTC sentinels and primary-source feed addresses through `ARG-P` | `0400`; PriceDesk ID 1 `Chainlink`; feed registrations follow adapter confirmation | `ROLE-G`; feed decimals/quote/heartbeat assertions; `BASE-U`; `ABORT-G`; oracle owner approval open |
+| CM-017 `CurvePrices` | Omitted and unregistered | `contracts/priceSources/CurvePrices.vy`; no RH constructor values | No migration; PriceDesk ID 2 remains empty | `ASSERT-O`; danger-rate path must return base behavior; `BASE-O`; no rollback |
+| CM-018 `BlueChipYieldPrices` | Omitted and unregistered | `contracts/priceSources/BlueChipYieldPrices.vy` | No migration; PriceDesk ID 3 remains empty | `ASSERT-O`; `BASE-O`; no rollback |
+| CM-019 `PythPrices` | Omitted and unregistered at launch | `contracts/priceSources/PythPrices.vy` | No migration; PriceDesk ID 4 remains empty | `ASSERT-O`; `BASE-O`; future use needs new decision/migration |
+| CM-020 `StorkPrices` | Omitted and unregistered | `contracts/priceSources/StorkPrices.vy` | No migration; PriceDesk ID 5 remains empty | `ASSERT-O`; `BASE-O`; no rollback |
+
+### 13.4 Components CM-021 through CM-040
+
+| ID / component | Robinhood disposition and form | Canonical source; constructor/value source | Order, reservation, registry and capability | Controls, assertions, Base policy, abort and approval |
+| --- | --- | --- | --- | --- |
+| CM-021 `VaultBook` | Selected registry, but final vault artifact set is blocked by Track 8 | `contracts/registries/VaultBook.vy`; RipeHq and registry timelocks | `0500_VaultsAndAssets.py`; RipeHq ID 8 `Vault Book`; canMintRIPE true only if canonical behavior still requires it | `ROLE-G`; exact IDs 1–4 below; `ASSERT-S`; `BASE-U`; `ABORT-G`; Track 8 reconciliation required |
+| CM-022 `StabilityPool` | Scaffolded disabled pending CM-003/SavingsGreen owner decision | `contracts/vaults/StabilityPool.vy`; `ARG-HQ` | `0500`, VaultBook ID 1 `Stability Pool`; enablement configuration in `0700_SavingsGreenPath.py` | `ROLE-G`; no Stock Token custody/swap; `ASSERT-D`; `BASE-U`; `ABORT-G` |
+| CM-023 `RipeGov` | Provisionally selected governance vault | `contracts/vaults/RipeGov.vy`; `ARG-HQ` | `0500`, VaultBook ID 2 `Ripe Gov Vault` | `ROLE-G`; lock/reward values pending; `ASSERT-S`; `BASE-U`; `ABORT-G` |
+| CM-024 `SimpleErc20` | Registry slot required, but current artifact blocked for Stock Tokens; deploy only the Track 8-approved canonical artifact | `contracts/vaults/SimpleErc20.vy`; `ARG-HQ` | `0500`, VaultBook ID 3 `Simple ERC20 Vault` | No Stock asset registration; `ASSERT-D`; live-backing tests required; `BASE-M` if changed; `ABORT-G`; Track 8 owner/security gate |
+| CM-025 `RebaseErc20` / `SharesVault` | Preferred direction but blocked unchanged; deploy only Track 8-approved canonical artifact | `contracts/vaults/RebaseErc20.vy`, `contracts/vaults/modules/SharesVault.vy`; `ARG-HQ` | `0500`, VaultBook ID 4 `Rebase ERC20 Vault` | No Stock asset registration; total-loss/post-zero assertions; `BASE-M` if changed; `ABORT-G`; Track 8 owner/security gate |
+| CM-026 `AuctionHouse` | Selected core Department; Stock settlement disabled pending Track 8 | `contracts/core/AuctionHouse.vy`; `ARG-HQ` | `0600_CoreDepartments.py`; RipeHq ID 9 `Auction House`; canMintGREEN true only after assertions | `ROLE-G`; external-only/disabled Stock path; `ASSERT-S`; `BASE-M` if Track 8 changes source; `ABORT-G` |
+| CM-027 `AuctionHouseNFT` | Selected ordinary Department | `contracts/core/AuctionHouseNFT.vy`; `ARG-HQ` | `0600`; RipeHq ID 10 `Auction House NFT`; no capability | `ROLE-G`; `ASSERT-S`; `BASE-U`; `ABORT-G` |
+| CM-028 `Boardroom` | Selected rewards Department | `contracts/core/Boardroom.vy`; `ARG-HQ` | `0600`; RipeHq ID 11 `Boardroom`; no capability | `ROLE-G`; rewards remain disabled until tokenomics approval; `ASSERT-S`; `BASE-U`; `ABORT-G` |
+| CM-029 `BondRoom` | Provisionally selected Department with derived BondBooster | `contracts/core/BondRoom.vy`, `contracts/config/BondBooster.vy`; `ARG-HQ` and booster address | `0600`; RipeHq ID 12 `Bond Room`; canMintRIPE true only after bond gates | `ROLE-G`; bond path disabled pending terms; `ASSERT-D`; `BASE-U`; `ABORT-G` |
+| CM-030 `CreditEngine` | Selected core Department; Stock borrowing disabled | `contracts/core/CreditEngine.vy`; `ARG-HQ` | `0600`; RipeHq ID 13 `Credit Engine`; canMintGREEN true only after assertions | `ROLE-G`; Curve danger and Stock deficit paths fail closed; `ASSERT-S`; `BASE-M` if Track 8 changes source; `ABORT-G` |
+| CM-031 `Endaoment` | Selected reserve coordinator with Base routes absent | `contracts/core/Endaoment.vy`; `ARG-HQ` plus approved wrapped/native token metadata | `0600`; RipeHq ID 14 `Endaoment`; canMintGREEN true only after supported-action allowlist | `ROLE-G`; no Curve/yield/partner route; `ASSERT-S`; `BASE-U`; `ABORT-G`; reserve policy open |
+| CM-032 `HumanResources` | Scaffolded inactive to preserve hard-coded RipeHq ID 15 unless owner approves active HR | `contracts/core/HumanResources.vy`; `ARG-HQ` and action timelocks | `0600`; RipeHq ID 15 `Human Resources`; canMintRIPE false while inactive | `ROLE-G`; no contributors/vesting; `ASSERT-D`; `BASE-U`; `ABORT-G`; HR owner decision open |
+| CM-033 `Lootbox` | Selected only with Track 6 S3 portable floor artifact; rewards disabled until tokenomics approval | `contracts/core/Lootbox.vy`; `ARG-HQ` plus approved interval/reward values | `0600`; RipeHq ID 16 `Lootbox`; canMintRIPE false until enablement | `ROLE-G`; Underscore path absent; `ASSERT-D`; `BASE-M`; `ABORT-G` |
+| CM-034 `Teller` | Selected user-entry Department | `contracts/core/Teller.vy`; `ARG-HQ` plus explicit Ledger-check policy | `0600`; RipeHq ID 17 `Teller`; no mint capability | `ROLE-G`; no Underscore wallet; `ASSERT-S`; `BASE-U`; `ABORT-G` |
+| CM-035 `GreenPool` | Omitted Base Curve external address | Base migration/current-manifest evidence only | No RH migration/registry | `ASSERT-O`; forbidden-address list; `BASE-O`; no rollback |
+| CM-036 `RipePoolCurve` | Omitted Base Curve external address | Base migration/current-manifest evidence only | No RH migration/registry | `ASSERT-O`; forbidden-address list; `BASE-O`; no rollback |
+| CM-037 `RipePoolAero` | Omitted Base Aerodrome external address | Base migration/current-manifest evidence only | No RH migration/registry | `ASSERT-O`; forbidden-address list; `BASE-O`; no rollback |
+| CM-038 `BondBooster` | Derived contract only if CM-029 is selected | `contracts/config/BondBooster.vy`; constructor values from approved bond terms | Created within `0600`, referenced by BondRoom; no HQ row | `ROLE-G`; disabled unless bond program approved; `ASSERT-D`; `BASE-U`; `ABORT-G` |
+| CM-039 `wsuperOETHbPrices` | Omitted | `contracts/priceSources/wsuperOETHbPrices.vy` | No migration/PriceDesk row | `ASSERT-O`; `BASE-O`; no rollback |
+| CM-040 `RedStone` | Omitted | `contracts/priceSources/RedStone.vy` | No migration/PriceDesk row | `ASSERT-O`; `BASE-O`; no rollback |
+
+### 13.5 Components CM-041 through CM-060
+
+| ID / component | Robinhood disposition and form | Canonical source; constructor/value source | Order, reservation, registry and capability | Controls, assertions, Base policy, abort and approval |
+| --- | --- | --- | --- | --- |
+| CM-041 `UndyVaultPrices` | Omitted | `contracts/priceSources/UndyVaultPrices.vy` | No migration/PriceDesk row | `ASSERT-O`; `BASE-O`; no rollback |
+| CM-042 `Underscore Vault` | Omitted external integration | Base migration/current-manifest evidence only | No migration/VaultBook row | `ASSERT-O`; no hooks, rewards, bypasses or registry dependencies; `BASE-O` |
+| CM-043 `CreditRedeem` | Selected scaffold for hard-coded ID; Stock Token path disabled | `contracts/core/CreditRedeem.vy`; `ARG-HQ` | `0600`; RipeHq ID 19 `Credit Redeem`; no capability | `ROLE-G`; `canRedeemCollateral=false` for Stock assets; `ASSERT-D`; `BASE-U`; `ABORT-G` |
+| CM-044 `Deleverage` | Selected only with Track 6 S4 portable artifact | `contracts/core/Deleverage.vy`; `ARG-HQ` and approved cooldown/context policy | `0600`; RipeHq ID 18 `Deleverage`; no capability | `ROLE-G`; no Underscore path; cooldown assertions; `BASE-M`; `ABORT-G`; security approval required |
+| CM-045 `TellerUtils` | Selected helper Department | `contracts/core/TellerUtils.vy`; `ARG-HQ` | `0600`; RipeHq ID 20 `Teller Utils`; no capability | `ROLE-G`; Underscore getters/routes fail closed; `ASSERT-S`; `BASE-U`; `ABORT-G` |
+| CM-046 `SwitchboardEcho` | Scaffolded disabled because CM-048 occupies hard-coded ID 22 and later activation needs governance | `contracts/config/SwitchboardEcho.vy`; `ARG-HQ` and action timelocks | `0300`; Switchboard ID 5 `Switchboard Echo`; PSM configuration in `0800_EndaomentPsmDisabled.py` | `ROLE-G`; only supported actions; `ASSERT-D`; `BASE-U`; `ABORT-G` |
+| CM-047 `EndaomentFunds` | Selected local custody Department | `contracts/core/EndaomentFunds.vy`; `ARG-HQ` | `0600`; RipeHq ID 21 `Endaoment Funds`; no capability | `ROLE-G`; no external/yield destinations; `ASSERT-S`; `BASE-U`; `ABORT-G` |
+| CM-048 `EndaomentPSM` | Scaffolded disabled to preserve ID 22; omission instead requires approved shared sparse-registry redesign | `contracts/core/EndaomentPSM.vy`; `ARG-HQ`; interval/fees/caps/reserve token from approved Track 4 manifest; yield `(0, zero address)` | `0600` deploy/register; `0800` proves disabled; RipeHq ID 22 `Endaoment PSM`; no GREEN capability | `canMint=false`, `canRedeem=false`, auto-deposit false, no approvals; `ASSERT-D`; `BASE-U`; `ABORT-G`; activation separately blocked |
+| CM-049 `DefaultsRobinhood` | Selected chain-specific configuration artifact; not divergent protocol logic | Proposed `contracts/config/DefaultsRobinhood.vy`; generated only from approved parameter manifest | Built before `0100`; constructor mirrors canonical defaults interface; not registered | Hash/parity/field-denominator assertions; no Base addresses; `BASE-O`; replacement approved in architecture, values open |
+| CM-050 `AeroRipePrices` | Omitted | `contracts/priceSources/AeroRipePrices.vy` | No migration/PriceDesk row | `ASSERT-O`; `BASE-O`; no rollback |
+| CM-051 GREEN CCIP BurnMint pool | Deferred Solidity contract | Exact shared Chainlink source/package/constructor pending Track 1 | `1000_CcipPoolsAndRegistration.py`; provisional RipeHq ID 23 `GREEN CCIP Pool`; direct `canMintGreen=true` only after registration/timelock | `ROLE-G` plus external token-admin/router roles; remote/rate-limit assertions; `BASE-M` new shared integration; `ABORT-G`; Track 1/owner blocked |
+| CM-052 RIPE CCIP BurnMint pool | Deferred Solidity contract | Exact shared Chainlink source/package/constructor pending Track 1 | `1000`; provisional RipeHq ID 24 `RIPE CCIP Pool`; direct `canMintRipe=true` only after registration/timelock | Same as CM-051; `ASSERT-D` until active; Track 1/owner blocked |
+| CM-053 CCIP token-admin registration | Deferred external configuration sequence | Chainlink Token Admin Registry/Router facts pending Track 1 | `1000`, after both pools and before capability enablement | Assisted registration preferred; no secret/signature in manifest; Base and RH mappings asserted; `ABORT-G`; external-action approval required |
+| CM-054 GREEN/RIPE local price adapter | Deferred; no fabricated peg | Source/artifact and constructor do not yet exist | No migration ID until separate oracle specification; dependent features disabled | `ASSERT-O`; `BASE-M` if new shared source; owner/oracle/security blocked |
+| CM-055 deployment/migration/report tooling | Selected follow-on shared tooling, not onchain | `config/BluePrint.py`, deployment scripts and parameter scripts; profile/schema inputs from this specification | No onchain migration; implementation slices H-01–H-08 | Secret-safe, deterministic, chain-neutral assertions; `BASE-M` tooling regression; normal code revert is rollback |
+| CM-056 manifests/history | Selected follow-on shared tooling and chain-local evidence | Migration utilities plus schema in Section 15 | No onchain migration; separate RH histories | Atomic/progression assertions; Base reader compatibility; normal code revert cannot erase already-published evidence |
+| CM-057 ABI/export/verifier | Selected follow-on shared tooling | `scripts/export_abis.py`, `scripts/verify.py`, provider adapters | No onchain migration; verification follows deployed receipt | Deterministic clean build and truthful provider status; Base regression; code revert only |
+| CM-058 Solidity toolchain | Deferred until Track 1 and explicit toolchain approval | No committed canonical source today | No migration; required before CM-051–053 | Pinned reproducible build only; no dependency selection authorized; owner/security blocked |
+| CM-059 Base/RH test profiles | Selected future test tooling | `tests/**`, `tests/conf_core.py`, `tests/conf_utils.py` plus Track 6 inputs | No onchain migration; Deliverable B Stages 1–5 | Pinned/clean fork evidence; Base regression; no production effect |
+| CM-060 `DefaultsLocal` | Omitted from RH artifacts; retained for generic local tests | `contracts/config/DefaultsLocal.vy` | No RH migration/manifest record | Assert CM-049 selected for RH; `BASE-U`; no rollback |
+
+### 13.6 Topological deployment graph
+
+The executable graph is:
+
+1. freeze source, dependencies, network profile, approved parameter manifest,
+   artifacts, proposed migration plan, and signer capability;
+2. build CM-049 and canonical Vyper artifacts; reject dirty/stale output;
+3. `0100`: deploy CM-001–006 and CM-004, finish token setup, and prove IDs 1–3;
+4. `0200`: deploy/register CM-008 and CM-009 at IDs 4–5;
+5. `0300`: deploy CM-010–014 and CM-046, prove Switchboard IDs 1–5, then register
+   Switchboard at HQ ID 6 without finalizing timelocks;
+6. `0400`: deploy CM-015/016, register Chainlink at PriceDesk ID 1 and PriceDesk
+   at HQ ID 7; do not populate unsupported price IDs;
+7. `0500`: deploy CM-021–025 only after Track 8 artifacts close, prove VaultBook
+   IDs 1–4, and register VaultBook at HQ ID 8;
+8. `0600`: deploy/register HQ IDs 9–22 in exact canonical order, initially
+   withholding optional mint capabilities and enablement;
+9. `0700` and `0800`: apply only owner-approved optional configuration; otherwise
+   produce explicit disabled assertions without enabling value paths;
+10. `0900`: finalize registry/action timelocks, confirm only approved
+    capabilities, transfer governance/admin, and prove deployer authority loss;
+11. `1000`: remains absent until Track 1/CM-058 close; if later approved, deploy
+    pools, complete external registration, verify remote mappings, then grant the
+    pool itself—not an adapter—the direct mint capability; and
+12. publish immutable step manifests only after each step's finality and
+    assertions; promote `current-manifest.json` only after a terminal successful
+    plan.
+
+No later step may execute if an earlier registry ID, artifact hash, capability,
+or omission assertion differs from the reviewed plan.
+
+## 14. Phase D — migration namespace, reservations, and execution
+
+### 14.1 Owner-approved namespace mapping
+
+The brief originally illustrated separate
+`migrations/robinhood-testnet/` and `migrations/robinhood-mainnet/` source
+directories. At the early checkpoint, the owner instead selected one canonical
+source:
+
+```text
+migrations/robinhood/
+```
+
+Both network profiles consume that same ordered source. Evidence is isolated:
+
+```text
+migration_history/robinhood-testnet/v1/
+migration_history/robinhood-mainnet/v1/
+```
+
+Canonical profile IDs are `robinhood-testnet` and `robinhood-mainnet`. Marketing
+aliases may resolve to these IDs at input validation, but aliases never create a
+directory, defaults artifact, plan, or history. This mapping is the explicit
+owner-approved replacement for the brief's separate-source examples.
+
+### 14.2 Identifier convention
+
+- Initial clean-deployment IDs are fixed-width four-digit decimal identifiers.
+- `0010`–`0080` are pre-deployment Track 6 artifact/assertion gates.
+- `0100`–`1000` are Track 7 clean-deployment steps in execution order.
+- `1100`–`1999` remain unassigned integration space until the first mainnet
+  freeze.
+- Post-launch shared migrations begin at `2000` and increase monotonically.
+- Before first mainnet execution, unused optional IDs receive an immutable
+  `skipped` or `deferred` step record and are never reassigned.
+- After first mainnet execution, insertion below the highest executed ID is
+  forbidden. Reordering or renaming an executed ID is forbidden.
+- Discovery rejects duplicate numeric IDs, duplicate semantic step IDs,
+  noncanonical filenames, gaps without an explicit disposition, and a different
+  source hash for an already-recorded ID.
+- The integration owner is the sole reassigner. Concurrent tracks propose
+  reservations; they do not take ownership by creating a colliding file.
+
+### 14.3 Reservation table
+
+All paths below are proposed. No migration file is created by this track.
+
+| ID and intended filename | Purpose / CM IDs | Prerequisites and expected artifacts | Execution class / dependencies | Reassignment owner |
+| --- | --- | --- | --- | --- |
+| `0010_Track6S3LootboxFloor.py` | S3 portable Lootbox floor; CM-033 | Integrated S3 source/tests and approved Base convergence policy | Pre-deploy artifact assertion; no RH transaction when included in initial bytecode | Integration owner with Track 6/7 owners |
+| `0020_Track6S4DeleverageCooldown.py` | S4 cooldown/context; CM-014/044 | Integrated S4 artifact, owner-selected wall-time policy, security review | Pre-deploy artifact assertion; upgrade-capable only through a later new ID | Integration owner |
+| `0030_Track6S5LedgerGuard.py` | S5 portable Ledger guard; CM-008/034 | Integrated S5 artifact and security-approved semantics | Pre-deploy artifact assertion | Integration owner |
+| `0040_Track6S6DefaultsAndParameters.py` | S6 CM-049/defaults and parameter manifest | Approved field inventory, generated artifact hashes, no Base/default leakage | Pre-deploy configuration-artifact assertion; no onchain action | Integration owner with parameter owners |
+| `0050_Track6S7TimelockRegistryValidation.py` | S7 timelock/registry setup | Integrated validation requirements and approved bounds | Assertion step before `0100`; later onchain values are applied by owning deployment step | Integration owner |
+| `0060_Track6S8LifecycleCapacity.py` | S8 lifecycle/capacity setup | Integrated capacity/lifecycle decisions | Assertion step; no independent transaction unless implementation proves a distinct governed action | Integration owner |
+| `0070_Track6S9DisabledIntegrationAssertions.py` | S9 omitted/disabled graph | Approved negative allowlist covering CM-017–020/035–037/039–042/050/054/060 | Assertion step before plan approval and after deployment | Integration owner |
+| `0080_Track6S10CadReportAssertion.py` | S10 CAD reporting correction; CM-055 | Integrated tooling fix and raw/formatted/runtime evidence | Tooling-only assertion, explicitly no onchain transaction or contract migration | Integration owner; a future onchain need receives a new ID |
+| `0100_TokensAndRipeHq.py` | Tokens, HQ, contributor blueprint, TrainingWheels, CM-049 binding; CM-001–006/049 | `0010`–`0080`, SavingsGreen disposition, approved constructor manifest, canonical artifacts | Initial-deployment-only; first onchain step | Integration owner |
+| `0200_DataAndConfigRegistries.py` | Ledger and MissionControl; CM-008/009 | Finalized `0100`, IDs 1–3, approved defaults hash | Initial deploy; depends on RipeHq | Integration owner |
+| `0300_Switchboards.py` | Switchboard and Alpha–Echo; CM-010–014/046 | Finalized `0200`, approved timelocks and supported-action allowlist | Initial deploy; registry IDs 1–5 then HQ ID 6 | Integration owner |
+| `0400_PriceSources.py` | PriceDesk and approved Chainlink adapter/feed records; CM-015–020/039–041/050/054 | Finalized `0300`, dated feed facts, external-address freeze | Initial deploy/config; unsupported sources receive negative assertions | Integration owner with oracle owner |
+| `0500_VaultsAndAssets.py` | VaultBook and vault artifacts/assets; CM-021–025/042 | Finalized `0400`, reviewed Track 8 outputs, selected assets and exact vault artifacts | Initial deploy/config; VaultBook IDs 1–4 | Integration owner with Track 8 owner |
+| `0600_CoreDepartments.py` | HQ IDs 9–22 and BondBooster; CM-026–034/038/043–048 | Finalized `0500`, complete registry/capability plan, all constructor values | Initial deploy; capabilities remain withheld unless separately enabled | Integration owner |
+| `0700_SavingsGreenPath.py` | CM-003/022 dependent enablement or explicit disabled record | Owner SavingsGreen/Stability Pool decision and lifecycle tests | Optional configuration; initial-deployment-only disposition | Integration owner with product/risk owner |
+| `0800_EndaomentPsmDisabled.py` | CM-046/048 disabled PSM posture | Track 4 parameter manifest; reserve asset/feed facts if deployed; no activation approval | Initial disabled configuration; upgrade-capable later only through a new ID | Integration owner with risk/oracle owner |
+| `0900_CapabilitiesRolesAndHandoff.py` | Final capabilities, timelocks, roles and deployer-authority loss; all selected CM rows | Every earlier step finalized; owner-approved accounts/roles/finality; assertion report clean | Irreversible governance handoff; no execution while any role value is unresolved | Integration owner and security/operations owners |
+| `1000_CcipPoolsAndRegistration.py` | CM-051–053 | Track 1 facts, CM-058 toolchain, Base/RH pool artifacts, selectors, remotes, limits, external permissions | Deferred upgrade-capable integration; never part of initial graph while pending | Integration owner with Track 1/security owners |
+
+### 14.4 Immutable plan and step model
+
+Before account loading, the tool produces a deterministic plan containing:
+
+- schema version, plan ID and plan hash;
+- canonical profile ID and expected chain ID;
+- source commit and clean-tree proof;
+- dependency/compiler/artifact hashes;
+- exact ordered migration/semantic step IDs and code hashes;
+- constructor and configuration arguments with provenance;
+- expected registry IDs, capabilities, roles, external permissions, and
+  dispositions;
+- expected transaction count only as diagnostic information, never resume
+  identity;
+- preconditions, postconditions, reversibility class, finality policy, and
+  evidence disposition for every step; and
+- prior immutable manifest hash for a resume or upgrade.
+
+Plan mode performs no account loading, signing, provider mutation, or manifest
+promotion. A plan changes if any source, dependency, artifact, argument, profile,
+address, step, assertion, or prior-manifest hash changes.
+
+### 14.5 Execution semantics
+
+| Operation | Required semantics |
+| --- | --- |
+| Preflight | Reject dirty source, unresolved required values, open dependency gate, unknown profile, absent RPC, chain-ID mismatch, duplicate/out-of-order IDs, stale artifacts, unsupported verifier, insufficient balance, unapproved backend, and forbidden Base addresses before signing. |
+| Dry run | Execute the immutable plan on a clean local environment or pinned clean fork with submission disabled. Produce local evidence linked to the same plan hash; never promote network history. |
+| Clean deploy | Require an empty target history and prove expected registry/code absence. An unexpected existing address/state aborts; it is not silently adopted. |
+| Checkpoint write | Write a local staged step record after receipt success, then add finality/assertions. Atomically rename it to an immutable step manifest only when complete. Never update `current-manifest.json` mid-step. |
+| Idempotent rerun | Recompute the semantic step hash and compare code, constructor values, registry state, capabilities and configuration. If all postconditions already hold, record `already_satisfied`; any difference aborts. |
+| Resume | Require the identical plan hash, source/profile/chain, prior immutable step chain and current onchain state. Resume at the first incomplete semantic action, not a positional transaction number. |
+| Explicit skip | Require a declared `skipped`/`deferred` disposition, reason, approver, negative assertions and proof that no later dependency requires the step. An operator flag alone cannot skip. |
+| Irreversible declaration | Deployment, registry confirmation, capability grant, ownership transfer, external CCIP registration and live-value enablement are individually labeled irreversible or governance-remediable before execution. |
+| Receipt/finality | Record transaction hash, receipt success, block number/hash, effective fees and required confirmation/finality result. A receipt without the selected finality rule is not complete. |
+| Manifest reconciliation | After every step, compare expected plan state, onchain reads, emitted events and staged evidence. Divergence blocks later steps and current-manifest promotion. |
+| Abort | Stop on first failed/ambiguous action; do not broad-retry state-changing calls. Persist sanitized local failure evidence and the last finalized immutable step. |
+| Retry | Retry transport reads under the profile policy. A state-changing submission is retried only when nonce, mempool/receipt state and idempotency prove no duplicate effect; otherwise require operator review. |
+| Address adoption | A pre-existing address is adoptable only through a separately reviewed adoption step proving source, constructor, runtime hash, ownership, registry absence/state, provenance and external permissions. |
+| Address retirement | Disable capabilities/value paths first, reconcile funds/debt/roles, update the registry through governance, and record the old address permanently. Deletion from history is forbidden. |
+| Role transfer | Verify target role capability and chain, initiate/confirm through the required timelock or multisig, then prove the prior deployer has no authority. |
+| Safe/multisig handoff | Record public Safe address, chain ID, threshold and proposal/transaction identifiers; never signatures, owner private data or complete wallet transcripts. Execution remains blocked until the backend is selected and approved. |
+
+### 14.6 Rollback truth
+
+Contract creation and confirmed external/registry actions are not reversible.
+Before confirmation, a pending governed action may be cancelled if the canonical
+contract supports cancellation. After confirmation, remediation may mean pause,
+capability removal, registry replacement, ownership transfer, a compensating
+migration, or abandoning an unused address. Redeployment is not rollback.
+
+The last safe abort boundary for `0900` is before the first final governance
+handoff transaction. The last safe abort boundary for `1000` is before external
+token-admin/pool registration. Each actual plan must split those transitions
+into separately acknowledged semantic actions.
+
+## 15. Phase E — manifest and release-evidence contract
+
+### 15.1 Artifact kinds and progression
+
+Manifest schema version 1 defines:
+
+| Artifact kind | Purpose | Mutability |
+| --- | --- | --- |
+| `deployment_plan` | Frozen expected graph, values, actions, assertions and reversibility | Immutable after approval; local until approved for retention |
+| `step_manifest` | One finalized deployed, configured, skipped or deferred migration step | Immutable and committed under the selected history |
+| `current_index` | Generated index of the terminal valid immutable step chain | Regenerated atomically; never the source of truth |
+| `release_bundle` | Frozen source/artifact/profile/manifest/runbook/gate summary | Immutable after owner release approval |
+| `failure_record` | Sanitized diagnostic linked to a plan/step | Local by default; committed only by separate owner approval |
+
+Every immutable artifact includes its own canonical-content SHA-256 and the prior
+artifact hash. A valid history is one linear hash chain. Replacing or deleting an
+older step invalidates every later artifact.
+
+### 15.2 Logical schema
+
+The following is a logical schema, not a committed implementation:
+
+```yaml
+schema_version: 1
+artifact_kind: deployment_plan | step_manifest | current_index | release_bundle
+manifest_id: canonical-string
+manifest_status: complete | already_satisfied | skipped | deferred
+created_at_utc: rfc3339
+content_sha256: hex
+previous_manifest_sha256: hex-or-null
+
+network:
+  profile_id: canonical-profile-id
+  display_name: string
+  chain_id: integer
+  environment: local | test | mainnet
+  history_namespace: repo-relative-path
+
+source:
+  repository: canonical-repository-id
+  commit: full-git-oid
+  dirty: false
+  plan_sha256: hex
+
+toolchain:
+  python: exact-version
+  titanoboa: exact-version
+  vyper: exact-version
+  pytest: exact-version
+  solidity_toolchain: exact-version-or-null
+  dependency_lock_sha256: hex
+  compiler_binary_sha256: hex
+
+migration:
+  id: four-digit-string
+  semantic_id: stable-string
+  filename: repo-relative-path
+  source_sha256: hex
+  execution_class: assertion | deploy | configure | handoff | external_registration
+  reversibility: reversible_pending | governance_remediable | irreversible
+
+components:
+  - component_id: CM-NNN
+    name: canonical-name
+    disposition: deployed | deployed_unregistered | registered_disabled |
+      feature_disabled | omitted | deferred | blocked
+    disposition_reason: string
+    dependencies: [CM-NNN]
+    contract:
+      address: checksummed-address-or-null
+      deployment_form: ordinary | blueprint | implementation | proxy |
+        external | configuration_only | null
+      canonical_source: repo-relative-path-or-null
+      source_sha256: hex-or-null
+      compiler_input_sha256: hex-or-null
+      abi_path: repo-relative-path-or-null
+      abi_sha256: hex-or-null
+      creation_bytecode_sha256: hex-or-null
+      deployed_bytecode_sha256: hex-or-null
+      compiler_version: exact-string-or-null
+      constructor:
+        normalized_typed_values: []
+        encoded_hex: hex-or-null
+      immutables: []
+    deployment:
+      deployer_address: public-address-or-null
+      transaction_hash: public-hash-or-null
+      receipt_status: integer-or-null
+      receipt_block_number: integer-or-null
+      receipt_block_hash: hex-or-null
+      confirmations_observed: integer-or-null
+      finality_policy_id: string-or-null
+      finality_result: passed | failed | pending | not_applicable
+    verification:
+      provider: blockscout | etherscan_v2 | unsupported | not_applicable
+      status: verified | failed | pending | provider_unsupported | not_applicable
+      browser_url: public-url-or-null
+      evidence_timestamp_utc: rfc3339-or-null
+      compiler_input_sha256: hex-or-null
+    registry:
+      registry_component_id: CM-NNN-or-null
+      registry_id: integer-or-null
+      description: string-or-null
+      registered: boolean
+    capabilities:
+      can_mint_green: boolean
+      can_mint_ripe: boolean
+      can_set_token_blacklist: boolean
+      other: []
+    roles:
+      governance: public-address-or-null
+      admin: public-address-or-null
+      guardian: public-address-or-null
+      operations: public-address-or-null
+      deployer_retains_authority: boolean
+    feature_flags: []
+    parameters:
+      - name: canonical-field
+        typed_value: explicit-value
+        unit: string
+        source: source-reference
+    external_addresses:
+      - purpose: string
+        address: checksummed-address
+        source_url: primary-url
+        retrieved_at_utc: rfc3339
+        source_sha256: hex-or-null
+    assertions:
+      - assertion_id: stable-string
+        status: passed | failed | blocked | not_applicable
+        expected: typed-value
+        observed: typed-value-or-redacted
+        evidence_sha256: hex-or-null
+
+live_version_policy:
+  base_source_commit: full-git-oid-or-null
+  robinhood_source_commit: full-git-oid
+  classification: strict_parity | bounded_temporary_drift | approved_exception
+  convergence_deadline: rfc3339-or-null
+  approval_reference: string-or-null
+
+pending_decisions: []
+launch_blockers: []
+```
+
+### 15.3 Disposition semantics
+
+| State | Required representation |
+| --- | --- |
+| Contract not deployed | `disposition: omitted`, `deferred`, or `blocked`; `contract.address: null`; explicit reason and negative assertions |
+| Deployed but not registered | `deployed_unregistered`; address/receipt/artifacts present; `registry.registered: false`; later plan dependency explicit |
+| Registered with capability disabled | `registered_disabled`; registry ID/name present; all capability booleans explicit |
+| Feature disabled | Contract/registry may be active, but the named flag is a typed false/zero value with source and assertion |
+| Legitimate zero | Parameter entry exists with typed zero, unit, source and assertion; it is not `null` |
+| Missing/unresolved value | No typed parameter value; related decision and launch blocker present; the plan cannot execute |
+
+An omitted component never receives an all-zero contract record. A deferred
+component may name a future source and reservation, but no address or verification
+status may imply deployment.
+
+### 15.4 Evidence storage policy
+
+Committed under `migration_history/<profile>/v1/`:
+
+- complete/already-satisfied/skipped/deferred immutable step manifests;
+- their canonical plan hash and prior-manifest link;
+- public addresses, public transaction/receipt/block evidence and sanitized
+  verification result;
+- source/dependency/compiler/artifact hashes;
+- registry/capability/role/flag/parameter dispositions;
+- sanitized primary-source provenance;
+- post-deployment assertion results; and
+- generated `current-manifest.json` only after terminal validation.
+
+Local/operator evidence:
+
+- staged/incomplete step records and failure diagnostics;
+- provider latency/rate-limit samples and complete request/response bodies;
+- gas estimates, balance checks, nonce/mempool diagnostics;
+- unsigned or partially signed transaction payloads;
+- full Safe proposal payloads and hardware-wallet interaction logs;
+- credentialed RPC endpoints; and
+- fork snapshots or dirty-state experiments.
+
+Never written to any repository artifact:
+
+- private keys, seed phrases, raw hardware-wallet data or signatures;
+- API keys, auth headers, credential-bearing RPC URLs;
+- complete wallet/Safe owner transcripts or personal data;
+- unsanitized provider responses that contain operational metadata;
+- dotenv contents or environment dumps; or
+- secrets disguised as constructor/configuration provenance.
+
+### 15.5 Atomic current-manifest generation
+
+`current-manifest.json` is a generated index, not an execution scratchpad:
+
+1. load and schema-validate the complete immutable step chain;
+2. verify content hashes, prior links, profile/chain/source/plan consistency and
+   the exact expected terminal step set;
+3. reject any failed, pending, missing, duplicated, reordered or unknown step;
+4. reduce component records by explicit semantic supersession rules, never a
+   blind dictionary merge;
+5. retain old/superseded addresses and progression references;
+6. run every graph, registry, capability, role, omission and artifact assertion;
+7. write to a same-directory temporary file, flush, and atomically rename; and
+8. record the index hash in the release bundle.
+
+A failed or incomplete run leaves the prior valid current index unchanged. An
+initial deployment has no current index until the terminal plan passes. The index
+must state `complete: true`, terminal plan hash, step count/list and immutable
+head hash; consumers must reject any index lacking them.
+
+## 16. Phase F — verification, ABI, and Solidity boundary
+
+### 16.1 Chain-neutral verifier interface
+
+Every verifier adapter implements:
+
+```text
+capabilities(profile) -> provider, languages, formats, key mode, rate policy
+is_verified(component_artifact, address) -> typed result
+submit(component_artifact, address, constructor_evidence) -> request id
+poll(request id, bounded policy) -> verified | failed | pending
+browser_url(address) -> public URL
+sanitize(evidence) -> committable result
+```
+
+Adapter selection occurs only from the validated network profile:
+
+- Base uses an explicit `etherscan_v2` adapter.
+- Robinhood uses an explicit `blockscout` adapter.
+- Local uses `unsupported`/`not_applicable`.
+- Unknown profile, provider, artifact language or format fails before a browser
+  link or request is constructed.
+- Browser availability is not verification capability.
+
+The Blockscout adapter uses the instance-confirmed interval/burst policy. Until
+that policy is known, production bulk verification is blocked; it does not assume
+three requests per second or an available key.
+
+### 16.2 Reproducible verification inputs
+
+Each request is derived from the manifest record and must include:
+
+- exact compiler and language;
+- canonical compiler standard input and its hash;
+- source paths/content hashes and settings;
+- optimization, EVM version and metadata settings;
+- contract/source name selected without filename guessing;
+- normalized typed constructor arguments plus encoded bytes;
+- immutable/library/link references;
+- creation/runtime bytecode hashes; and
+- target profile, chain ID and address.
+
+The adapter records provider response classification and timestamp, but never an
+API key or unsanitized request. A mismatch between rebuilt and deployed runtime
+hash is `failed`, not `pending`.
+
+### 16.3 Deployment-form behavior
+
+| Form | Verification behavior |
+| --- | --- |
+| Ordinary contract | Verify the exact source/compiler input and constructor evidence against the deployed address. |
+| Vyper blueprint | Record deployment form `blueprint`, blueprint creation/runtime hashes and blueprint address. Submit only if the provider explicitly supports that bytecode form; otherwise `provider_unsupported`. |
+| Inherited module | No independent address or verification record. Its source/hash is part of the parent's compiler input and source inventory. |
+| Implementation/proxy-like pair | Separate component records for implementation and proxy address, explicit linkage, proxy constructor/init call, storage/implementation slot assertion, and provider-specific verification of each supported address. |
+| External address | No source-verification claim by this repository. Record `not_applicable`, provenance, chain code-presence/type assertions and external owner/admin facts where approved. |
+| Configuration-only | No address verification; record governed call receipts and post-state assertions. |
+
+If Robinhood's provider cannot verify a deployment form, the truthful manifest
+state is `provider_unsupported`. Launch then requires an explicit owner decision;
+the tool cannot convert browser visibility or matching local bytecode into
+provider verification success.
+
+### 16.4 Deterministic ABI export
+
+The future exporter must:
+
+1. build from a clean temporary output directory;
+2. consume the frozen Vyper compiler inputs and, later, a declared Solidity
+   artifact index;
+3. emit deterministic JSON formatting and sort order;
+4. name outputs by language plus source-relative path and contract name, not
+   source stem alone;
+5. reject duplicate output identities and source/contract collisions;
+6. fail the whole run on any compile/export error;
+7. compare the complete expected set, rejecting missing and stale files;
+8. produce an artifact inventory with ABI/source/compiler hashes; and
+9. replace committed output only after the complete build passes.
+
+Proposed collision-safe identity:
+
+```text
+scripts/abis/vyper/<source-relative-path-without-extension>/<Contract>.json
+scripts/abis/solidity/<package>/<source-relative-path>/<Contract>.json
+```
+
+Changing the existing flat ABI layout requires a compatibility/migration plan for
+all consumers. The exact path is a Phase H implementation decision, not permission
+to move current files now. Every changed ABI receives semantic review for
+functions, events, errors, structs, mutability and selector compatibility; a JSON
+diff alone is insufficient.
+
+### 16.5 Solidity/CCIP boundary
+
+Track 1 recommends a pinned repository-native Solidity toolchain, with Foundry as
+the current recommendation, but neither the toolchain nor exact Chainlink release
+is approved or installed. CM-051–053 remain outside the executable graph.
+
+A future approved toolchain must produce a declared artifact index containing:
+
+- package/source/contract identity;
+- exact dependency lock and compiler version;
+- compiler input, ABI, creation/runtime bytecode and link-reference hashes;
+- test/fuzz result references; and
+- verification format/provider capability.
+
+Python deployment tooling consumes that index through a versioned interface; it
+does not search arbitrary `out/` directories, infer a "latest" artifact, rewrite
+Solidity metadata, or become a second compiler/package manager. The same declared
+pool artifact must be used for the Base and Robinhood counterpart deployment
+unless a separately approved source/version policy says otherwise.
+
+## 17. Phase G — clean-deployment validation plan
+
+Deliverable B is
+`docs/chains/rh/robinhood-deployment-validation-plan.md`. It is specification
+only and defines:
+
+- Stage 1 static/unit and dependency-security gates;
+- Stage 2 clean local deployment, semantic resume, manifest promotion and
+  reproducible artifact cases;
+- Stage 3 pinned, read-only fork/rehearsal behavior;
+- Stage 4 Robinhood test-environment validation behind a fresh state-changing
+  authorization;
+- Stage 5 mainnet rehearsal and restricted release behind a distinct exact-plan
+  authorization;
+- thirty-six named negative cases with proposed paths, fixtures, evidence,
+  tiers and owners;
+- lifecycle, governance, PSM, Stock Token, SavingsGreen and CCIP gates;
+- clean-checkout reproduction, diagnostics, evidence retention and launch-gate
+  mapping; and
+- the expected validation command progression for H-01 through H-12.
+
+No proposed test or runbook exists merely because it appears in that plan. The
+validation document is authoritative for future test scope; this document is
+authoritative for architecture, ownership and slice ordering.
+
+## 18. Phase H — ordered follow-on implementation slices
+
+### 18.1 File-path and ordering rule
+
+All paths in this section are **proposed future paths** unless they already
+exist at the starting commit. The exact file list is part of the review
+boundary: a slice that discovers materially different ownership must stop and
+update the specification before broadening its PR. Each slice begins from the
+previous accepted slice; H-10 through H-12 are not permission for live action.
+
+`Targeted` commands below are future commands that become required when their
+files exist. `Full` means the repository-authoritative full suite selected after
+H-01; the current candidate is `python -m pytest -q`, executed serially until
+isolation is proven.
+
+### 18.2 Slice register
+
+| Slice / purpose and exact expected files | Inputs, dependencies, CM / migration IDs | Allowed outputs and Base impact | Targeted / full validation | Boundary, review, abort/remediation and downstream |
+| --- | --- | --- | --- | --- |
+| **H-01 dependency-security preflight.** Existing `requirements.in`, `requirements.txt`; proposed `tests/deployment/test_dependency_gate.py` and sanitized gate record `docs/chains/rh/evidence/dependency-security-gate.md`. | Section 4; Track 6 S1 exact profile; CM-055/059; no migration ID. | Only narrowly reviewed pins and test/evidence changes. No contract, default or migration output. Base deployment/test environment can change, so all Base tests are mandatory. | Targeted: `python -m pytest -q tests/deployment/test_dependency_gate.py`; dependency resolution/audit command selected by security reviewer. Full: `python -m pytest -q`. | No dependency install/selection without fresh approval. Security and Track 6 owners review. Abort on unresolved deployment-path high/medium alert, incompatible Vyper/Boa/pytest metadata, or weakened S1 assertion. Remediation is pin rollback/new reviewed slice. Downstream H-02–H-09 and every rehearsal. |
+| **H-02 network profiles and CLI.** Existing `scripts/migrate.py`, `scripts/console.py`, `scripts/verify.py`; proposed `config/network_profiles.py`, `tests/deployment/test_network_profiles.py`, `tests/deployment/test_secret_handling.py`, `tests/deployment/test_base_profile_regression.py`. | D-001/002/004/013/014; U-001–008; CM-055/059; no migration. | Code/tests only; no credentials or network evidence. Preserve intended Base selection/history behavior while deleting unsafe fallbacks, eager key reads and non-Base `KeyError` paths. | Targeted: the three proposed test files. Full: `python -m pytest -q`. CLI help/import checks run with relevant env vars absent. | No secret access or live connection. Deployment-tooling plus security and Base owners review. Abort on label fallback, pre-identity account load, unredacted URL, history aliasing or unclear Base behavior. Revert code before use; downstream H-03/H-05/H-07. |
+| **H-03 Robinhood blueprint and omissions.** Existing `config/BluePrint.py`; proposed `config/robinhood_blueprint.py`, `tests/deployment/test_robinhood_blueprint.py`, `tests/deployment/test_robinhood_omissions.py`. | Approved H-02 profile interface; component rows CM-001–060; U-009–011/015; no migration. | Schema/code/tests with symbolic required fields and explicit `omitted`, `disabled`, `deferred`, `blocked`; never production addresses. Base blueprint remains value compatible unless separately reviewed. | Targeted: the two proposed files plus `tests/deployment/test_base_profile_regression.py`. Full suite. | No production value acceptance. Protocol, security and cross-track owners review. Abort if a required field can default to Base/zero, hard-coded registry slots shift, or unresolved Track inputs are flattened. Code revert is remediation; downstream H-04/H-05/H-09. |
+| **H-04 `DefaultsRobinhood` and parameter manifest.** Proposed `contracts/config/DefaultsRobinhood.vy`, `config/robinhood-parameters.json`, `tests/config/test_defaults_robinhood.py`; existing `scripts/params/regenerate_defaults.py`, `scripts/params/run_all.py`. | CM-049; Track 6 S3–S6; approved inventory/parameters still required; predeployment reservations `0010`–`0060`. | Shared interface-compatible contract source, generator and tests; generated parameter artifact only from approved typed input. No production values in the PR unless separately approved. `DefaultsBase.vy` must not change; Base parity/interface regression required. | Targeted defaults/generator tests, Track 6 S1 profile, deterministic regeneration/diff. Full suite. | No parameter approval implied. Protocol, risk, Track 6 and security owners review. Abort on protocol logic, denominator/unit ambiguity, Base address, unapproved value or non-deterministic generation. Remediation is source revert/new approved parameter artifact; downstream H-05/H-09. |
+| **H-05 migration namespace, discovery and skeletons.** Existing `scripts/migrate.py`, `scripts/utils/migration.py`, `scripts/utils/migration_runner.py`, `scripts/utils/migration_helpers.py`; proposed `tests/deployment/test_migration_discovery.py`, `tests/deployment/test_execution_plan.py` and `migrations/robinhood/{0010_Track6S3LootboxFloor.py,0020_Track6S4DeleverageCooldown.py,0030_Track6S5LedgerGuard.py,0040_Track6S6DefaultsAndParameters.py,0050_Track6S7TimelockRegistryValidation.py,0060_Track6S8LifecycleCapacity.py,0070_Track6S9DisabledIntegrationAssertions.py,0080_Track6S10CadReportAssertion.py,0100_TokensAndRipeHq.py,0200_DataAndConfigRegistries.py,0300_Switchboards.py,0400_PriceSources.py,0500_VaultsAndAssets.py,0600_CoreDepartments.py,0700_SavingsGreenPath.py,0800_EndaomentPsmDisabled.py,0900_CapabilitiesRolesAndHandoff.py,1000_CcipPoolsAndRegistration.py}`. | D-006/009/014; CM-001–060; Track 6 and Track 8; reservations `0010`–`1000`. | Discovery/plan code, inert skeletons and tests only. Skeletons cannot transact or contain values until later reviewed slices; `0080` remains a tooling-only assertion and can never submit an onchain transaction. Base migrations/histories are not renamed or rewritten; Base runner regression required. | Targeted migration discovery/execution-plan tests plus dry plan generation for both RH profiles; full suite. | No state-changing execution. Tooling, protocol, Track 6/8 and security reviewers. Abort on duplicate/order collision, source split, positional resume, executable placeholder or Base history write. Remove unused skeleton only before publication; after an ID is published, remediate forward. Downstream H-06/H-08/H-09. |
+| **H-06 manifest schema and evidence writer.** Existing `scripts/utils/migration.py`, `scripts/utils/json_file.py`; proposed `scripts/utils/manifest_schema.py`, `docs/chains/rh/schemas/deployment-manifest-v2.schema.json`, `tests/deployment/test_manifest_schema.py`, `tests/deployment/test_current_manifest_promotion.py`. | Section 15; D-009; CM-056; all migration IDs. | Schema/writer/tests and local fixtures. No live manifest. Preserve read compatibility for existing Base history; never rewrite it in place. | Targeted proposed files; parse every committed historical JSON; fault-inject partial writes; full suite. | No secrets/raw provider payloads. Release-evidence and security owners review. Abort if incomplete history can promote, legitimate zero equals missing, prior evidence mutates, or Base reader breaks. Code rollback cannot retract published evidence; remediate with new schema/version. Downstream H-07–H-11. |
+| **H-07 verification, ABI and artifact handling.** Existing `scripts/verify.py`, `scripts/export_abis.py`, `scripts/utils/verify_etherscan.py`; proposed `scripts/utils/verifier.py`, `scripts/utils/verify_blockscout.py`, `tests/deployment/test_verifier_adapters.py`, `tests/deployment/test_abi_export.py`; generated `scripts/abis/vyper/**` only after path compatibility approval. | D-005 recommendation; U-005; CM-057/058; Section 16; Track 1 interface only, no CCIP artifacts yet. | Adapter/export code, tests, deterministic ABI inventory. Base Etherscan-v2 behavior and ABI consumers require regression/migration review. No verification submission in PR validation. | Targeted verifier/ABI tests; clean two-build hash comparison; Base verifier mocks; full suite. | No key use or public submission. Compiler, verifier, security and Base owners review. Abort on provider fallback, guessed artifact, unsupported-success claim, rate-policy assumption, stale/colliding ABI or consumer break. Revert code/restore last reviewed generated set before publication. Downstream H-08–H-12. |
+| **H-08 post-deployment checker.** Proposed `scripts/check_deployment.py`, `scripts/utils/deployment_assertions.py`, `tests/deployment/test_post_deployment_assertions.py`, `tests/deployment/test_registry_topology.py`. | CM-001–060, Sections 13/15, Track 6 S9; migrations `0010`–`1000`. | Read-only checker code/tests and sanitized assertion fixtures. Must support Base via explicit profile expectations, not RH assumptions. | Targeted proposed tests; run checker against local golden Base/RH fixtures; full suite. | No live RPC unless separately approved read-only rehearsal. Protocol, security and evidence owners review. Abort if omitted state cannot be proved, any mismatch is warning-only, registry IDs can shift, or checker mutates state. Code revert/new assertion version is remediation. Downstream H-09–H-11. |
+| **H-09 clean-deployment and negative suite.** Proposed `tests/deployment/test_clean_deployment.py`, `test_resume_reconciliation.py`, `test_reproducible_artifacts.py`, `test_clock_profiles.py`, all Stage 1 files, and `tests/deployment/fork/**` fixtures with network disabled by default. | H-01–H-08; Track 6 S1/S2 and implemented S3–S10; Track 8 gates; CM-001–060; `0010`–`1000`. | Tests/fixtures only; local generated histories remain temporary. Base full suite and ordinary/repeated/jumping-number profiles mandatory. | Every Stage 1/2 target; two clean builds; `python -m pytest -q` serially. Fork tests remain skipped/blocked without explicit profile evidence. | No secret or public state change. QA, protocol, security and all cross-track owners review. Abort on nondeterminism, manual repair, unproved omission, flaky shared state or Base regression. Fix owning slice; downstream H-10/H-11. |
+| **H-10 test-environment deployment/runbook.** Proposed `docs/chains/rh/runbooks/robinhood-testnet-deployment.md`, `tests/deployment/live/test_robinhood_testnet_deployment.py`, `test_robinhood_testnet_lifecycle.py`, `test_robinhood_governance.py`, `test_robinhood_psm.py`, `test_robinhood_ccip.py`; authorized outputs only under `migration_history/robinhood-testnet/v1/`. | V-00–V-10; H-01–H-09; selected CM graph; `0010`–`1000`; exact approved test values/roles. | Runbook/live harness before action; public sanitized manifests only after a separately authorized run and review. No Base production change; Base Sepolia CCIP action is separately gated. | Stage 4 dry run, exact plan digest, then only separately authorized live commands; rerun full static/local suite before and after evidence review. | Requires fresh owner authorization, signer/provider/funds and external-action approvals. Operations, protocol, security, risk, Track owners approve. Abort on any stale fact/hash/gate, ambiguous receipt, assertion failure or unexpected authority. No chain rollback; pause/disable/orphan/adopt/forward migration only. Downstream H-11 and release decision. |
+| **H-11 production rehearsal/restricted-release runbook.** Proposed `docs/chains/rh/runbooks/robinhood-mainnet-rehearsal.md`, `docs/chains/rh/runbooks/robinhood-mainnet-restricted-release.md`, `tests/deployment/live/test_robinhood_mainnet_preflight.py`; authorized outputs only under `migration_history/robinhood-mainnet/v1/`. | Accepted H-10 evidence; every DR row closed for selected graph; exact production source/plan/roles/values; `0010`–`1000`. | Documentation, read-only/preflight harness and reviewed release bundle template. No production manifest until separately authorized transactions finalize. Base effects only through separately approved Base migrations/CCIP registration. | Stage 5 two-environment rebuild, full suite, exact-plan rehearsal and preflight. Production command is deliberately absent until separate authorization names plan hash/backend. | No production authority from this spec. Owner, operations, governance, security and risk approve. Abort on any unresolved required field, changed fact/hash, insufficient balance, verifier/finality mismatch or authority gap. Onchain remediation is pause/disable/forward migration; never claim rollback. Downstream restricted-release decision. |
+| **H-12 CCIP Solidity/artifact integration.** Proposed interface paths `contracts/ccip/GreenBurnMintPool.sol`, `contracts/ccip/RipeBurnMintPool.sol`, `scripts/artifacts/ccip-artifact-index.json`, `tests/deployment/test_ccip_artifact_index.py`; exact dependency/lock/build files remain unnamed until Track 1 and toolchain approval. | Track 1 supported release/interface; CM-051–053/058; migration `1000`; Base/RH mappings and role decisions. | Only pinned shared Solidity source, declared artifact index, tests and reviewed build metadata. Generated artifacts follow Section 16. Same pool artifact on both chains unless separately approved. | Approved toolchain build/test/fuzz commands, artifact-index/ABI/verifier tests, cross-chain integration tests and full Vyper/Base suite. | Fresh dependency/toolchain and external-action approvals required. Track 1, compiler, protocol and security owners review. Abort if exact build files cannot be named, pool is not direct mint caller, artifacts are guessed, versions unsupported, or remote/role facts remain open. Remediation before deployment is code revert; after registration use revoke/pause/forward migration and supply reconciliation. Downstream separate CCIP activation release. |
+
+The exact dependency/toolchain build files for H-12 cannot responsibly be fixed
+before Track 1 names the supported release and the owner approves a toolchain.
+That exception is deliberate: the four stable interface/output paths above
+reserve ownership, while inability to name the remaining files is an explicit
+pre-PR abort condition rather than a fabricated specification.
+
+## 19. Required decision register
+
+Recommendations in this table are not approvals. `Owner-approved specification
+direction` records only the user's 2026-07-23 authorization; it does not approve
+a provider, address, role, dependency, toolchain, parameter, inventory or live
+action.
+
+| ID / decision area | Options and evidence | Recommendation | Owner / prerequisite / deadline-slice | Status |
+| --- | --- | --- | --- | --- |
+| DR-001 Robinhood mainnet facts | Chain ID `4663`, official RPC/explorer facts and dated probes in Sections 6/12; production provider, gas and finality remain unknown. Options: official public RPC for operations or approved production provider. | Use verified identity/explorer facts; prohibit public RPC for production operations unless Robinhood explicitly approves it; freeze provider/fees/finality at H-11. | Operations + security; U-001–005; before H-10 rehearsal and H-11 freeze. | Facts verified; production values open. |
+| DR-002 Robinhood test environment | Official testnet chain ID `46630` and explorer are documented; adequacy/funding/soak/support are unconfirmed. Options: official testnet or owner-approved production-like alternative with stated limitations. | Prefer official testnet after provider/operational qualification; otherwise document the alternative's missing guarantees. | Owner + operations; V-07/V-09; before H-10. | Open; no environment approved. |
+| DR-003 network-profile API | Parallel dictionaries versus immutable registry; Sections 5/7 and A-001–A-017 evidence. | One immutable typed registry, opaque URL envs, exact chain-ID equality, pinned fork evidence and plan-bound acknowledgments. | Deployment tooling + security; D-001/002/004/013/014; H-02. | Owner-approved specification direction; implementation pending. |
+| DR-004 migration namespace/version | Split RH sources versus shared source; separate histories; current duplicate/history defects in Section 3. | Shared `migrations/robinhood/`; histories `migration_history/robinhood-{testnet,mainnet}/v1/`; IDs `0010`–`1000`, postlaunch from `2000`, duplicates fatal. | Deployment owner; D-006/009; H-05. Reassignment only by owner before publication. | Owner-approved specification direction; files not created. |
+| DR-005 manifest/release evidence | Mutable current manifest versus immutable hash-linked steps plus generated index; Section 15. | Use the Section 15 schema and committed/local/never-stored split; approve retention before H-10. | Release-evidence + security; H-06 then H-10. | Semantic plan/atomic-promotion direction approved via D-009; schema/retention still reviewable. |
+| DR-006 live-version policy | Strict parity, bounded temporary drift, or narrow permanent exception per component; component rows mark `BASE-U/M/O`. | Default strict parity; temporary drift needs owner-approved convergence commit/deadline; permanent exception only for documented immutable/custody risk. | Protocol + security + governance; Track 6/8/1 outputs; freeze before H-10/H-11 for selected components. | Open; no live divergence approved. |
+| DR-007 SavingsGreen/sGREEN | Active deployment; inert slot-preserving scaffold; or canonical sparse-registry redesign/omission. Hard-coded HQ ID 2 evidence in Section 13. | Keep CM-003 scaffolded and downstream paths disabled for implementation planning; owner must choose active versus reviewed inert posture before H-05 executable steps. | Product + protocol + risk; graph/lifecycle decision; H-03/H-05 deadline. | Open; no deployment/inventory approval. |
+| DR-008 Stock Token vault | Simple, current Rebase/Shares, remediated shared Rebase/Shares, or omit Stock launch; Track 8 brief and Track 5 evidence. | Use only the reviewed Track 8-selected shared artifact; keep Stock registration/borrowing/CreditRedeem/Stability swap disabled until acceptance. | Track 8 + security + risk + owner; before H-04/H-05 values and H-09 lifecycle. | Open; preferred direction is not approval. |
+| DR-009 USDG/PSM | Omit, or deploy ID-22 scaffold disabled, or activate after Track 4. Hard-coded topology and Track 4 evidence. | Preserve disabled scaffold only if shared topology requires it: `canMint=false`, `canRedeem=false`, no GREEN capability, auto-deposit/yield disabled. Activation is a separate release. | Track 4 + oracle + risk + owner; before H-05 `0800`, activation after separate gates. | Existing Chainlink price-path direction recorded; no reserve/address/parameter, deployment posture or activation approved. |
+| DR-010 CCIP | Supported release/toolchain/assisted registration versus shared token revision; Track 1 record. | Keep CM-051–053 and `1000` deferred; use direct pool mint capability, same pool artifact on both chains and declared artifact index after Track 1. | Track 1 + Chainlink channel + compiler/security/owner; before H-12. | Assisted registration is the recorded preference; supported path/release/toolchain/address/capability remain open. |
+| DR-011 governance/admin roles | EOA, Safe/multisig, timelock and scoped guardian/operations combinations. Current tooling exposes unsafe account assumptions. | Capability-based signer backend; local timelock/Safe governance; explicitly scoped guardian/operations; prove deployer authority absent. | Governance + security + operations; U-004 and final graph; before H-10. | Open; no address/backend/role approved. |
+| DR-012 external addresses | Copy research snapshot versus primary-source freeze and recheck. | Require checksum, code/type/decimals/interface, primary URL/retrieval date/hash and final pre-sign re-query; changed fact invalidates plan. | Component owner + security; relevant track gates; H-03 candidate data and H-10/H-11 freeze. | Open; no production address approved. |
+| DR-013 gas/finality/retries | Guessed confirmations/static fee/retry versus provider evidence, caps and semantic ambiguity handling. | Dynamic RPC estimation within approved caps; instance-tested confirmation/finality; no broad state retry; ambiguous submission stops for reconciliation. | Operations + security; U-002/003 and testnet evidence; before H-10/H-11. | Open; all production values unresolved. |
+| DR-014 CI | Local-only; fast/integration PR tiers plus protected fork/live jobs; no existing workflows. | Add fast/integration only after isolation; protected manual fork/live jobs with environment approvals and no untrusted secret access. | CI + security + QA; H-09 evidence; separate CI slice after H-09. | Proposed; no CI change authorized. |
+| DR-015 dependency supply chain | Accept alerts, non-pytest refresh plus separate pytest decision, or broader upgrade; Section 4 alert/metadata evidence. | Release-block deployment-path high/medium alerts until fixed or explicitly accepted; split mechanical pins from pytest; review upstream behavior per package and intentionally reapprove S1. | Security + Track 6 + dependency owner; before H-01 acceptance and any rehearsal. | Open; no pin refresh approved. |
+| DR-016 Base upgrades | No Base action; simultaneous convergence; bounded later migration; or approved permanent exception. Component `BASE-*` rows and current immutable deployments are evidence. | Preserve intended Base behavior in every slice; assign Base migration IDs only after a concrete shared-bytecode change; require convergence/rollback truth per component. | Base deployment + protocol + governance; each `BASE-M` slice before merge, final freeze H-11. | Open; no Base migration or divergence approved. |
+
+## 20. Operator and release-evidence workflow
+
+This is an implementation-ready control sequence, not a production runbook or
+authorization:
+
+1. freeze the full source commit and clean tree;
+2. close H-01 and record the reviewed dependency profile;
+3. select a canonical profile and resolve only its required environment
+   references;
+4. prove the RPC chain ID before account backend initialization;
+5. build from declared inputs and compare source/compiler/ABI/bytecode hashes;
+6. generate the semantic plan, graph, omissions, irreversible boundaries and
+   typed values; record its digest;
+7. obtain the approvals required for that exact plan, profile and action tier;
+8. preflight balance/nonce/fees/finality/provider/verifier/roles without
+   exposing credentials;
+9. execute one semantic step at a time, stopping on ambiguity or failed
+   receipt/finality/postcondition;
+10. write immutable sanitized step evidence atomically;
+11. reconcile code, constructors, registry IDs, capabilities, roles, flags,
+    parameters, omissions and external facts;
+12. transfer roles and prove deployer authority loss;
+13. promote `current-manifest.json` only from the complete validated chain;
+14. archive the release bundle and separately retained local diagnostics; and
+15. enable no optional value path without its own owner gate and new plan.
+
+Any failed transaction or already-created address is historical fact. The
+operator may stop, leave it unadopted, disable it where authority permits, or
+propose a forward migration. The operator must never edit history or call a new
+deployment/role transfer a rollback.
+
+## 21. Cross-track reconciliation and exact summary handoff
+
+### 21.1 Collision and ownership record
+
+| Interface | Track 7 reservation | Other-track boundary | Current collision status |
+| --- | --- | --- | --- |
+| Clock changes | `0010`–`0080` predeployment gates and assertions | Track 6 owns contract/tooling implementation and S1/S2 evidence | No file collision found; IDs are provisional until integrated outputs reconcile |
+| Vault/Stock | `0500_VaultsAndAssets.py`, manifest/assertion surfaces | Track 8 owns vault semantics, shared fixes and selected artifact; it explicitly delegates exact RH migration IDs/tooling to Track 7 | No collision in brief-only input; Track 8 must not create a second RH migration ID/history |
+| USDG/PSM | `0800_EndaomentPsmDisabled.py` | Track 4 owns price/reserve/activation decisions and implementation | No collision found; `0800` may assert omission instead if owner selects an approved sparse redesign |
+| CCIP | `1000_CcipPoolsAndRegistration.py`, CM-051–053/058 artifact interface | Track 1 owns supported release, questions, registration facts and Chainlink channel | No file collision found; source/build files remain blocked |
+| Component identities | CM-001–060 are consumed without renumbering | Track 3/component matrix owns stable identity/disposition reconciliation | No renumbering; provisional graph dispositions remain owner-review items |
+| Summary checklist | This section reports eligibility only | Owner alone edits/checks `docs/chains/rh-summary.md` | File intentionally unchanged |
+
+The integration branch's committed state advanced after kickoff only by the
+Track 8 brief at `be6a759e15e763b633feefdce91cf8f3ee31a10e`; its SHA-256 is
+`c885c25f5a19f0531a15ce947534a4a054bf6e18ef7f198734d879dfd6a52637`.
+Track 7 did not merge, cherry-pick or edit that branch. The brief was consumed as
+a pending interface input and cannot be treated as reviewed Track 8 output.
+The additional uncommitted integration edits and their compatibility disposition
+are recorded in Section 2.7; they were not copied or treated as frozen inputs.
+
+### 21.2 Exact `rh-summary.md` Section 1 checklist handoff
+
+The table quotes the Section 1 checklist item lead text exactly enough to
+identify the owner-controlled checkbox. `Eligible for owner review` means this
+specification supplies an implementation-ready direction; it does **not** mean
+the checkbox is complete.
+
+| `rh-summary.md` Section 1 item | Track 7 specification / implementation handoff | Eligibility |
+| --- | --- | --- |
+| “Add explicit Robinhood mainnet and testnet targets to the migration CLI and network configuration.” | Sections 5, 18 H-02; implement and pass Stages 1–3. | Eligible for owner review as a specification; implementation unchecked |
+| “Add Robinhood chain IDs, RPC selection, explorer/verification support, gas settings, confirmation policy, and environment-variable handling without inheriting Base/Alchemy/Basescan assumptions.” | Sections 5–8, 16, DR-001/002/003/013, H-02/H-07; production settings remain open. | Eligible for owner review with production-value blockers |
+| “Add a dedicated Robinhood blueprint containing only verified Robinhood addresses:” | Sections 13, 18 H-03, DR-012; exact addresses remain unapproved. | Eligible for owner review; implementation/value freeze unchecked |
+| “Add `DefaultsRobinhood` or an equivalent generated defaults artifact rather than modifying `DefaultsBase` in place.” | CM-049, H-04, DR-016. | Eligible for owner review; implementation/parameters unchecked |
+| “Treat `DefaultsRobinhood` as the intended chain-specific contract exception: it supplies Robinhood values and inventory but must not contain divergent protocol logic.” | CM-049 and H-04 abort conditions. | Eligible for owner review; implementation unchecked |
+| “Create separate Robinhood testnet and mainnet migration trees and manifest histories.” | Owner-approved variance in Section 14: one shared source tree, separate testnet/mainnet histories; H-05/H-06. | Eligible only with the recorded owner variance; implementation unchecked |
+| “Establish the Robinhood release-artifact convention: define the `migration_history/` paths, which manifests and verification outputs are committed, and where any evidence too large or sensitive for Git is retained.” | Sections 14–16 and 20; H-06/H-07. | Eligible for owner review; implementation/retention approval unchecked |
+| “Make the Robinhood migration sequence deploy the same canonical contract implementations selected for Base, plus only the explicitly approved shared additions such as CCIP pools, and configure all registries, Departments, Switchboards, assets, price sources, and governance roles.” | Sections 13–14; H-04/H-05/H-12. Inventory and production values remain owner gates. | Eligible for graph/reservation review; executable deployment unchecked |
+| “Make every omitted integration explicit in the deployment manifest; do not silently substitute zero addresses where downstream code expects a live contract.” | Sections 13/15; H-03/H-06/H-08/H-09; NEG-016/017/024. | Eligible for owner review; implementation unchecked |
+| “Add post-deployment verification that checks deployed bytecode, constructor arguments, registry IDs, Department mint permissions, governance ownership, token/feed mappings, feature flags, and parameter values.” | Sections 15/20; H-08; validation Stages 2–5. | Eligible for owner review; checker/tests unchecked |
+| “Ensure contract export/ABI and explorer-verification tooling supports every new Robinhood and CCIP contract.” | Section 16; H-07/H-12; CCIP remains Track 1/toolchain blocked. | Eligible for Vyper/adapter review; CCIP portion blocked |
+| “Prevent Robinhood manifests from containing accidental Base token, oracle, DEX, yield, treasury, or Underscore addresses.” | CM omission rows; H-03/H-08/H-09; NEG-003/016/024. | Eligible for owner review; implementation/test evidence unchecked |
+
+### 21.3 Completion status and open stop conditions
+
+Phases A–H and both owned deliverables are complete at specification level and
+eligible for owner/reviewer scrutiny. Track 7 is **not implementation-complete**
+and no `rh-summary.md` checkbox is eligible to be marked complete yet.
+
+The launch-critical open items are DR-001/002/006–016 and U-001–015 as
+applicable. In particular, dependencies, Track 6/8/4/1 outputs, component
+inventory, live versions, addresses, parameters, provider, finality/fees,
+signing backend, roles, test environment, toolchain and optional Savings/Stock/
+PSM/CCIP paths remain unapproved. Those open items do not prevent the two
+specification documents from review; they intentionally prevent implementation
+or live release from masquerading as approved.
+
+## 22. Final specification-validation record
+
+Validation was run in the isolated Track 7 worktree on 2026-07-23:
+
+| Check | Result |
+| --- | --- |
+| Frozen input SHA-256 recomputation | All six Section 2.3 values match |
+| Component inventory | Exactly one contiguous row for CM-001–060 |
+| Migration reservations | 18 unique ordered IDs: `0010`–`0080` by tens and `0100`–`1000` by hundreds |
+| Follow-on slices / decisions | H-01–H-12 and DR-001–DR-016 are contiguous and unique |
+| Negative validation | NEG-001–NEG-036 are contiguous and unique |
+| Section 1 handoff | 12 owner-controlled checklist rows; source text unchanged by observed parallel edits |
+| Historical JSON | All 58 committed `migration_history/**/*.json` files parse |
+| Existing numeric migration audit | 62 numeric files; only the recorded duplicate `2025071506` appears twice |
+| Markdown structure | Fenced blocks balanced; every table has a consistent column count |
+| Paths | Starting-commit source/runtime paths exist; absent paths are marked proposed/future, abstract schema paths, or the separately recorded Track 8 integration input |
+| Corrected facts | Mainnet chain ID consistently `4663`; interval-based verifier limit schema; documented default represented as 3 requests/minute with instance confirmation required |
+| Whitespace | `git diff --check` and the untracked-file `git diff --no-index --check` pass |
+| Repository-native Markdown command | None found; no documentation dependency added |
+| Changed-file scope | Only the two Track 7-owned Markdown deliverables |
+| Prohibited actions | No code/test/dependency/default/migration/manifest/ABI/CI edit; no secret access; no external state change; no push/merge |
+
+The searches for RPC, explorer, chain, environment, migration and manifest
+assumptions were rerun over `scripts/migrate.py`, `scripts/verify.py`,
+`scripts/console.py`, `scripts/utils/**` and `config/BluePrint.py`; the Phase A
+findings remain applicable. No implementation test suite was run because this
+track changes specifications only. The completion commit is recorded in the
+owner handoff because a commit cannot contain its own final object ID.
