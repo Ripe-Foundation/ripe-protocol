@@ -798,7 +798,7 @@ approval.
 | D-003: public RPC use | Allow all modes; restrict to facts/read-only/fork | Restrict official public Robinhood RPCs to facts/read-only/fork | Robinhood labels public RPCs rate-limited and not production-grade | Proposed |
 | D-004: network identity | Trust selected label; require runtime chain-ID equality | Require equality before account load/sign/submit/verify | Eliminates wrong-chain execution and explorer routing | Owner-approved specification direction, 2026-07-23 |
 | D-005: verifier architecture | One Etherscan helper; provider/language capability adapters | Explicit Blockscout and Etherscan-v2 adapters with no fallback | Shapes artifact metadata, verification tests, and rate/error evidence | Proposed |
-| D-006: migration namespaces | Share Base or Robinhood directories; split or share Robinhood test/main source | Never share Base. Use `migrations/robinhood/` for both Robinhood environments and isolate their history directories. | Determines graph reuse, ID ownership, and evidence isolation | Owner-approved specification direction, 2026-07-23 |
+| D-006: migration namespaces | Share Base or Robinhood directories; split or share Robinhood test/main source | Resolved: never share Base. Use `migrations/robinhood/` for both Robinhood environments and isolate their history directories; see Section 14.1 and DR-004. | Determines graph reuse, ID ownership, and evidence isolation | Owner-approved specification direction, 2026-07-23 |
 | D-007: finality defaults | Choose a guessed confirmation count; leave null and fail closed | Leave null until owner/provider evidence; reject live modes | Finality affects progression, manifests, rollback, and release evidence | Proposed; production value unresolved |
 | D-008: account abstraction | CLI labels tied to implementations; capability-based approved backends | Capability-based registry with no Robinhood live backend initially | Separates network profile from secret/signing implementation and enforces approval | Proposed; production backend unresolved |
 | D-009: execution progression | Positional transaction logs; semantic immutable plan plus observed receipts/state | Semantic plan with step IDs, pre/postconditions, receipts, and atomic promotion | Determines resume, partial failure, rollback, and manifest schema | Owner-approved specification direction, 2026-07-23 |
@@ -949,11 +949,30 @@ capability disabled. `Omitted` means no Robinhood address, registry entry,
 permission, route, or manifest contract record. `Deferred` and `blocked` fail
 closed.
 
-The shared source hard-codes RipeHq registry IDs 1–22 in
-`contracts/modules/Addys.vy:40-61`, VaultBook IDs 1–2 in
-`contracts/core/CreditEngine.vy:184-185` and
-`contracts/core/BondRoom.vy:102`, and several Department IDs directly in the
-Switchboards. Those IDs are not merely Base deployment history. Therefore:
+The shared source hard-codes registry topology in several places:
+
+- RipeHq IDs 1–22 are constants in `contracts/modules/Addys.vy:40-61`.
+- VaultBook Stability Pool ID 1 is repeated in
+  `contracts/core/CreditEngine.vy:184`,
+  `contracts/core/CreditRedeem.vy:110`, and `contracts/core/Teller.vy:213`;
+  RipeGov Vault ID 2 is repeated in `contracts/core/BondRoom.vy:102`,
+  `contracts/core/HumanResources.vy:127`, `contracts/core/Lootbox.vy:192`,
+  `contracts/core/Teller.vy:214`, and
+  `contracts/vaults/modules/StabVault.vy:95`.
+- PriceDesk ID 2 is hard-coded as `CURVE_PRICES_ID` in
+  `contracts/core/CreditEngine.vy:185`, `contracts/core/Teller.vy:215`, and
+  `contracts/core/Endaoment.vy:148`. Address registration is sequential in
+  `contracts/registries/modules/AddressRegistry.vy:184-198`, so the next source
+  after Chainlink would otherwise silently acquire Curve semantics.
+- SwitchboardBravo mirrors RipeHq IDs 1, 2, 5, 6, and 8 at
+  `contracts/config/SwitchboardBravo.vy:179-183`; SwitchboardDelta mirrors IDs
+  4, 5, 12, 16, 17, and 18 at
+  `contracts/config/SwitchboardDelta.vy:433-439`; and SwitchboardEcho mirrors
+  IDs 5, 14, and 22 at `contracts/config/SwitchboardEcho.vy:439-441`. The
+  adjacent Switchboard/Underscore registry constants are separate registry
+  domains and do not relax the RipeHq assignments.
+
+Those IDs are not merely Base deployment history. Therefore:
 
 1. Robinhood cannot shift later registrations when an optional component is
    omitted.
@@ -965,6 +984,12 @@ Switchboards. Those IDs are not merely Base deployment history. Therefore:
 4. RipeHq IDs 23 and 24 are provisionally reserved for the GREEN and RIPE CCIP
    pools only if Track 1 proves the pools implement the required Department
    capability surface and the owner approves registration.
+5. PriceDesk IDs 2–5 preserve their Base semantic assignments: Curve,
+   BlueChipYield, Pyth, and Stork. While omitted, a slot remains empty and is
+   permanently reserved to that semantic identity; a different source can never
+   consume it. Adding a supported source at its canonical later ID requires an
+   owner-approved sparse-registry design or legitimate occupation of every
+   earlier canonical slot, plus a new migration and topology review.
 
 ### 13.2 Common row policies
 
@@ -1008,10 +1033,10 @@ shifted registration.
 | CM-014 `SwitchboardDelta` | Selected only with Track 6 S4/S5 portable artifact | `contracts/config/SwitchboardDelta.vy`; `ARG-HQ`, timelocks, approved cooldown bound | `0300`; Switchboard ID 4 `Switchboard Delta` | `ROLE-G`; duplicated-cap removal assertion; `BASE-M`; `ABORT-G`; security/protocol approval required |
 | CM-015 `PriceDesk` | Selected registry | `contracts/registries/PriceDesk.vy`; RipeHq, ETH sentinel/native metadata, registry timelocks | `0400_PriceSources.py`; RipeHq ID 7 `Price Desk`; no capability | `ROLE-G`; only approved sources registered; `ASSERT-S`; `BASE-U`; `ABORT-G` |
 | CM-016 `ChainlinkPrices` | Selected adapter, but no asset feed registered without dated feed approval | `contracts/priceSources/ChainlinkPrices.vy`; RipeHq, native/BTC sentinels and primary-source feed addresses through `ARG-P` | `0400`; PriceDesk ID 1 `Chainlink`; feed registrations follow adapter confirmation | `ROLE-G`; feed decimals/quote/heartbeat assertions; `BASE-U`; `ABORT-G`; oracle owner approval open |
-| CM-017 `CurvePrices` | Omitted and unregistered | `contracts/priceSources/CurvePrices.vy`; no RH constructor values | No migration; PriceDesk ID 2 remains empty | `ASSERT-O`; danger-rate path must return base behavior; `BASE-O`; no rollback |
-| CM-018 `BlueChipYieldPrices` | Omitted and unregistered | `contracts/priceSources/BlueChipYieldPrices.vy` | No migration; PriceDesk ID 3 remains empty | `ASSERT-O`; `BASE-O`; no rollback |
-| CM-019 `PythPrices` | Omitted and unregistered at launch | `contracts/priceSources/PythPrices.vy` | No migration; PriceDesk ID 4 remains empty | `ASSERT-O`; `BASE-O`; future use needs new decision/migration |
-| CM-020 `StorkPrices` | Omitted and unregistered | `contracts/priceSources/StorkPrices.vy` | No migration; PriceDesk ID 5 remains empty | `ASSERT-O`; `BASE-O`; no rollback |
+| CM-017 `CurvePrices` | Omitted and unregistered | `contracts/priceSources/CurvePrices.vy`; no RH constructor values | No migration; PriceDesk ID 2 remains empty and reserved exclusively for Curve semantics | `ASSERT-O`; danger-rate path must return base behavior; topology asserts no other source at ID 2; `BASE-O`; no rollback |
+| CM-018 `BlueChipYieldPrices` | Omitted and unregistered | `contracts/priceSources/BlueChipYieldPrices.vy` | No migration; PriceDesk ID 3 remains empty and reserved exclusively for BlueChipYield semantics | `ASSERT-O`; no other source at ID 3; `BASE-O`; no rollback |
+| CM-019 `PythPrices` | Omitted and unregistered at launch | `contracts/priceSources/PythPrices.vy` | No migration; PriceDesk ID 4 remains empty and reserved for Pyth semantics | `ASSERT-O`; future use needs a new decision/migration and a reviewed way to preserve empty IDs 2–3; `BASE-O` |
+| CM-020 `StorkPrices` | Omitted and unregistered | `contracts/priceSources/StorkPrices.vy` | No migration; PriceDesk ID 5 remains empty and reserved for Stork semantics | `ASSERT-O`; no other source at ID 5; future use must preserve IDs 2–4; `BASE-O`; no rollback |
 
 ### 13.4 Components CM-021 through CM-040
 
@@ -1075,7 +1100,8 @@ The executable graph is:
 5. `0300`: deploy CM-010–014 and CM-046, prove Switchboard IDs 1–5, then register
    Switchboard at HQ ID 6 without finalizing timelocks;
 6. `0400`: deploy CM-015/016, register Chainlink at PriceDesk ID 1 and PriceDesk
-   at HQ ID 7; do not populate unsupported price IDs;
+   at HQ ID 7; keep PriceDesk IDs 2–5 empty and semantically reserved, and
+   reject any source that would acquire the wrong sequential ID;
 7. `0500`: deploy CM-021–025 only after Track 8 artifacts close, prove VaultBook
    IDs 1–4, and register VaultBook at HQ ID 8;
 8. `0600`: deploy/register HQ IDs 9–22 in exact canonical order, initially
@@ -1154,7 +1180,7 @@ All paths below are proposed. No migration file is created by this track.
 | `0100_TokensAndRipeHq.py` | Tokens, HQ, contributor blueprint, TrainingWheels, CM-049 binding; CM-001–006/049 | `0010`–`0080`, SavingsGreen disposition, approved constructor manifest, canonical artifacts | Initial-deployment-only; first onchain step | Integration owner |
 | `0200_DataAndConfigRegistries.py` | Ledger and MissionControl; CM-008/009 | Finalized `0100`, IDs 1–3, approved defaults hash | Initial deploy; depends on RipeHq | Integration owner |
 | `0300_Switchboards.py` | Switchboard and Alpha–Echo; CM-010–014/046 | Finalized `0200`, approved timelocks and supported-action allowlist | Initial deploy; registry IDs 1–5 then HQ ID 6 | Integration owner |
-| `0400_PriceSources.py` | PriceDesk and approved Chainlink adapter/feed records; CM-015–020/039–041/050/054 | Finalized `0300`, dated feed facts, external-address freeze | Initial deploy/config; unsupported sources receive negative assertions | Integration owner with oracle owner |
+| `0400_PriceSources.py` | PriceDesk and approved Chainlink adapter/feed records; CM-015–020/039–041/050/054 | Finalized `0300`, dated feed facts, external-address freeze | Initial deploy/config; unsupported sources receive negative assertions and PriceDesk IDs 2–5 remain empty/reserved to canonical semantics | Integration owner with oracle owner |
 | `0500_VaultsAndAssets.py` | VaultBook and vault artifacts/assets; CM-021–025/042 | Finalized `0400`, reviewed Track 8 outputs, selected assets and exact vault artifacts | Initial deploy/config; VaultBook IDs 1–4 | Integration owner with Track 8 owner |
 | `0600_CoreDepartments.py` | HQ IDs 9–22 and BondBooster; CM-026–034/038/043–048 | Finalized `0500`, complete registry/capability plan, all constructor values | Initial deploy; capabilities remain withheld unless separately enabled | Integration owner |
 | `0700_SavingsGreenPath.py` | CM-003/022 dependent enablement or explicit disabled record | Owner SavingsGreen/Stability Pool decision and lifecycle tests | Optional configuration; initial-deployment-only disposition | Integration owner with product/risk owner |
@@ -1570,7 +1596,7 @@ only and defines:
   authorization;
 - Stage 5 mainnet rehearsal and restricted release behind a distinct exact-plan
   authorization;
-- thirty-six named negative cases with proposed paths, fixtures, evidence,
+- thirty-seven named negative cases with proposed paths, fixtures, evidence,
   tiers and owners;
 - lifecycle, governance, PSM, Stock Token, SavingsGreen and CCIP gates;
 - clean-checkout reproduction, diagnostics, evidence retention and launch-gate
@@ -1744,7 +1770,7 @@ Validation was run in the isolated Track 7 worktree on 2026-07-23:
 | Component inventory | Exactly one contiguous row for CM-001–060 |
 | Migration reservations | 18 unique ordered IDs: `0010`–`0080` by tens and `0100`–`1000` by hundreds |
 | Follow-on slices / decisions | H-01–H-12 and DR-001–DR-016 are contiguous and unique |
-| Negative validation | NEG-001–NEG-036 are contiguous and unique |
+| Negative validation | NEG-001–NEG-037 are contiguous and unique |
 | Section 1 handoff | 12 owner-controlled checklist rows; source text unchanged by observed parallel edits |
 | Historical JSON | All 58 committed `migration_history/**/*.json` files parse |
 | Existing numeric migration audit | 62 numeric files; only the recorded duplicate `2025071506` appears twice |

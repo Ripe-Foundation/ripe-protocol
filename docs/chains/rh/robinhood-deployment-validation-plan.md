@@ -108,7 +108,7 @@ Stage 1 proves:
 | `tests/deployment/test_verifier_adapters.py` | Etherscan-v2/Blockscout selection, unsupported provider/language/form, timeout/rate/error states; CM-057 | Adapter implementation | Mocked HTTP/provider responses and virtual clock; external network disabled | Mocked request classifications | Fast / verifier owner |
 | `tests/deployment/test_abi_export.py` | Clean build, Vyper/Solidity index input, deterministic paths, collisions, stale/missing output, compile failure; CM-057/058 | Artifact index interface | Disposable source/output trees and declared artifact-index fixtures | Golden inventory/hashes | Fast / compiler owners |
 | `tests/deployment/test_robinhood_omissions.py` | Every component's omitted, deferred, blocked or disabled sub-surface, including Base-only CM-007/017–020/035–042/050/060, inactive scaffolds, Stock paths and CM-051–054/058 | Approved inventory | Synthetic RH graph/manifests and clean local EVM where state is needed | Negative graph/manifest fixtures and assertion report | Fast + Integration / protocol + deployment owners |
-| `tests/deployment/test_registry_topology.py` | HQ IDs 1–22, Switchboard 1–5, PriceDesk 1, VaultBook 1–4, no shifted IDs | Approved graph and Track 8 inputs | Synthetic registry plans plus clean local EVM | Registry-plan fixture and assertion report | Fast + Integration / protocol owner |
+| `tests/deployment/test_registry_topology.py` | HQ IDs 1–22, Switchboard 1–5, Chainlink at PriceDesk ID 1, reserved PriceDesk semantics at IDs 2–5, VaultBook 1–4, and no shifted/reused IDs | Approved graph and Track 8 inputs | Synthetic registry plans plus clean local EVM | Registry-plan fixture and assertion report | Fast + Integration / protocol-oracle owners |
 | `tests/deployment/test_base_profile_regression.py` | Base selection, history isolation, intended compatibility and rejection of known unsafe behavior | D-011 decision | Frozen Base profile/history fixtures; mocked provider; no external network | Base fixture diff | Fast / Base deployment owner |
 | `tests/deployment/test_dependency_gate.py` | Alert snapshot, pin provenance, upstream release-note checklist, S1 exact-profile trip | V-01/S1 | Dated sanitized alert/metadata fixtures and clean resolver environment when approved | Sanitized gate report | Fast / security + Track 6 owner |
 
@@ -167,6 +167,9 @@ until shared-state isolation is proven.
 - reject `DefaultsBase` and `DefaultsLocal` in a Robinhood plan;
 - apply only the approved CM-049 parameter manifest;
 - validate every RipeHq, Switchboard, PriceDesk and VaultBook ID;
+- prove PriceDesk IDs 2–5 remain empty/reserved and reject any sequential
+  registration that would assign a different source to Curve ID 2 or another
+  canonical source ID;
 - prove optional mint capabilities remain withheld until the owning step;
 - prove every unsupported integration has no address, registration, capability,
   route, approval or enabled flag;
@@ -352,6 +355,7 @@ Every row is a future named test. `Fast` uses mocks/local unit state,
 | NEG-034 inactive HR path enabled | `tests/deployment/test_robinhood_omissions.py::test_hr_scaffold_has_no_contributors_or_rewards` | CM-005/032 inactive scaffolds | No contributor instance, vesting, RIPE mint capability or payout | Integration / protocol |
 | NEG-035 bond/reward path premature | `tests/deployment/test_robinhood_omissions.py::test_bond_and_reward_paths_stay_disabled` | CM-028/029/033/038, terms/tokenomics open | No Boardroom/bond/Lootbox reward enablement or RIPE mint capability | Integration / tokenomics-risk |
 | NEG-036 disabled registry scaffold gains authority | `tests/deployment/test_robinhood_omissions.py::test_slot_scaffolds_have_exact_disabled_capabilities` | CM-003/029/032/033/043/046/048 | Exact registry IDs preserved while all unapproved flags/capabilities/routes remain absent | Integration / security |
+| NEG-037 PriceDesk semantic slot reuse | `tests/deployment/test_registry_topology.py::test_pricedesk_reserved_ids_cannot_be_repurposed` | Chainlink at ID 1; attempt to add a non-Curve source next or to add Pyth/Stork without preserving earlier slots | Plan/registration rejected before submission; IDs 2–5 remain empty or contain only their canonical source identities | Fast + Integration / protocol-oracle owners |
 
 ## 11. Approved-path lifecycle matrices
 
@@ -499,7 +503,7 @@ slice creates the named paths and closes its prerequisite gates.
 | H-06 | `python -m pytest -q tests/deployment/test_manifest_schema.py tests/deployment/test_current_manifest_promotion.py`; parse all historical JSON | Base history read compatibility; full suite |
 | H-07 | `python -m pytest -q tests/deployment/test_verifier_adapters.py tests/deployment/test_abi_export.py`; two clean artifact builds | Base verifier/ABI consumer regression; full suite |
 | H-08 | `python -m pytest -q tests/deployment/test_post_deployment_assertions.py tests/deployment/test_registry_topology.py tests/deployment/test_robinhood_omissions.py` | Golden Base/RH checker fixtures; full suite |
-| H-09 | All Stage 1/2 and NEG-001–036 cases; two-checkout reproduction | Base full suite, Track 6 profiles and serial `python -m pytest -q` |
+| H-09 | All Stage 1/2 and NEG-001–037 cases; two-checkout reproduction | Base full suite, Track 6 profiles and serial `python -m pytest -q` |
 | H-10 | Stage 4 dry plan and exact plan/hash review; live command intentionally withheld until fresh authorization | Re-run Stages 1–3; post-run evidence/soak review if authorized |
 | H-11 | Stage 5 rebuild, rehearsal and preflight; production command intentionally absent | Re-run Stages 1–4 and every selected launch gate |
 | H-12 | Approved Solidity build/test/fuzz command; `test_ccip_artifact_index.py`, verifier/ABI and two-chain tests | Full Vyper/Base/RH suites and cross-chain supply reconciliation |
