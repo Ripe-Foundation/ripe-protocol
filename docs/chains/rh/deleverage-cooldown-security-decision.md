@@ -71,7 +71,7 @@ creates the missing audit trail and resolves the review findings as follows:
 | BN-012 occurrence count was understated | Accepted. Deleverage has three occurrences on two source lines, not two occurrences. |
 | Strict-boundary matrix omitted required number jumps, expiry skip, and two-user independence | Accepted. The required future-reopening cases are retained in section 10.5 even though the no-code initial launch adds no tests. |
 | Active-cooldown context-open rule hid a legitimate multi-leg availability cost | Accepted. The trade-off and future alternatives remain explicit in sections 4 and 5; the initial launch avoids the active window by keeping cooldown `0`. |
-| H-01 snapshot was stale | Accepted. The latest inspected H-01 tip and its evidence-only branch delta are recorded without treating either as integration or approval. |
+| H-01 snapshot was stale | Accepted. Every H-01 tip is now time-qualified; the latest follow-up snapshot is recorded without treating a moving branch as integration or approval. |
 | Integration worktree contains uncommitted minimum-change material of unknown provenance | The later direct owner instruction now establishes the S4 decision inputs independently of those files. The files remain uncommitted and untouched; their planning corrections are handoffs, not integrated evidence. |
 
 ## Executive security conclusion
@@ -116,8 +116,9 @@ code**. SwitchboardDelta governance technically retains the ability to queue
 and later execute a nonzero value up to the existing duplicated `7_200`
 ceiling. Adding an onchain Robinhood-specific prohibition would itself require
 the production-contract change this recommendation avoids. The safety boundary
-therefore depends on approved defaults, an exact parameter manifest,
-post-deployment assertion, governance procedure, and mandatory S4 reopening.
+therefore depends on preserving the constructor-default zero, an exact
+parameter-manifest assertion, post-deployment validation, governance
+procedure, and mandatory S4 reopening.
 
 The owner accepted the following bounded initial-launch risks; independent
 security acceptance remains pending:
@@ -161,24 +162,32 @@ Ancestry and approval evidence:
 | S3 integration / S4 launch | `3e6e6f230169fc445d0b29454457480c62efd89a` |
 
 All active worktrees were checked before bootstrap. No active branch owned the
-Stage A file or the proposed Stage B files. The in-flight H-01 branch was
+Stage A file or the files later considered under the original implementation
+path. The in-flight H-01 branch was
 rechecked during original evidence collection at
 `cc0fd9977b854756114e2c3fda2185f2a81f0ce2`. During this re-review it had
 advanced to clean tip `22eb097e86a123c01a7117d5166b87ed11ae30c9`,
 `docs(rh): complete H-01 rereview evidence`. Its entire committed delta from
 the S4 launch baseline remains only
 `docs/chains/rh/evidence/dependency-security-gate.md`. Neither the earlier nor
-current H-01 tip is an ancestor of `rh`, so neither is an integrated dependency
-baseline. These observations are not an H-01 review or approval.
+then-current H-01 tip was an ancestor of `rh`, so neither was an integrated
+dependency baseline. At the owner-approval follow-up on 24 July 2026 at
+14:35 MDT, the clean H-01 branch tip was
+`3b8cf72f16ba8297ee6968d2d5b5d877e00b5cba`,
+`docs(rh): refresh H-01 Stage B authorization packet`; its delta from current
+local `rh` remained only
+`docs/chains/rh/evidence/dependency-security-gate.md`. That time-qualified
+snapshot is not an H-01 review, approval, or integration into `rh`.
 
 After S4 bootstrap, another local worktree advanced only the local `rh` ref to
 `27765d29094256fa9619dd44a0bfd145863de8b7` at 12:35:41 MDT with
 `docs: record owner-approved Track 6 S5 plan`. That commit adds only
 `docs/chains/rh/track-6-s5-ledger-guard.md`; it does not overlap this Stage A
-file or the proposed Stage B set. The live remote `rh` remained at the required
-launch commit. This S4 branch deliberately retains the exact authorized parent
-`3e6e6f230169fc445d0b29454457480c62efd89a`; no reconciliation with the
-post-bootstrap local-only S5 documentation commit was performed.
+file. No current S4 Stage B file set exists. The live remote `rh` remained at
+the required launch commit. This S4 branch deliberately retains the exact
+authorized parent `3e6e6f230169fc445d0b29454457480c62efd89a`; no
+reconciliation with the post-bootstrap local-only S5 documentation commit was
+performed.
 
 #### Post-launch integration-worktree hygiene and planning-correction status
 
@@ -743,7 +752,7 @@ documented latent debt, not approved portable timing semantics.
 | Robinhood stored value | Exactly `0` |
 | Underscore | Omitted from the initial Robinhood graph |
 | Nonzero activation | Procedurally prohibited until S4 is reopened |
-| Enforcement owners | S6 defaults/parameter manifest, Track 7 H-08 assertion, governance procedure |
+| Enforcement owners | S6 constructor-default/parameter-manifest assertion, Track 7 H-08 assertion, governance procedure |
 | Contract-enforced Robinhood prohibition | Deliberately not added because it would require production bytecode divergence or another shared production change |
 
 The prohibition is not an onchain invariant. SwitchboardDelta can still queue
@@ -784,8 +793,9 @@ The initial deployment must:
 1. deploy the existing shared Deleverage and SwitchboardDelta source without
    an S4 patch or Robinhood-only branch;
 2. omit Underscore addresses and caller integration from the Robinhood graph;
-3. source `deleverageCooldown = 0` from the approved Robinhood defaults and
-   parameter manifest;
+3. preserve the existing constructor-default `deleverageCooldown = 0` and
+   record that expected value in the approved Robinhood parameter manifest,
+   without adding a Defaults field;
 4. assert the deployed/live value is exactly `0`;
 5. keep reservation `0020_Track6S4DeleverageCooldown.py` inert as a
    predeployment/artifact assertion hook; and
@@ -819,9 +829,10 @@ modify:
 - production migrations, manifests, defaults, parameter files, dependencies,
   S1/S2 inventory, or the Underscore repository.
 
-If either reopening trigger occurs, the previous proposed Stage B subset is
-not automatically authorized. A new baseline, exact file set, owner approval,
-and independent security approval are required at that time.
+If either reopening trigger occurs, the implementation subset analyzed before
+the no-code conclusion is not automatically authorized. A new baseline, exact
+file set, owner approval, and independent security approval are required at
+that time.
 
 ## 10. Cheap enforcement and cross-track handoffs
 
@@ -830,15 +841,25 @@ the owning tracks because the batch planning-correction pass has not landed.
 
 ### 10.1 S6 defaults and parameter manifest
 
-S6 must ensure both `DefaultsRobinhood` and the approved Robinhood parameter
-manifest:
+`deleverageCooldown` is not currently a `DefaultsBase` or
+`DefaultsRobinhood` field. Fresh Deleverage storage is `0` because the existing
+constructor does not assign that field. This handoff does **not** authorize S6
+to add a Defaults field, Deleverage constructor argument, setter call,
+state-changing migration, or other production surface merely to assign zero.
 
-- set `deleverageCooldown` to the exact integer `0`;
-- do not inherit or infer a nonzero Base value;
+Instead, S6 must ensure its `DefaultsRobinhood` review and the approved
+Robinhood parameter manifest:
+
+- preserve the existing constructor-default mechanism;
+- record the expected post-deployment `deleverageCooldown` value as the exact
+  integer `0`;
+- contain no nonzero activation input or assignment;
 - state verbatim: **“activation requires reopening S4”**; and
-- fail generation or review if the field is absent, nonzero, or ambiguous.
+- fail generation or review if the expected value is absent, nonzero, or
+  ambiguous.
 
-This is configuration enforcement, not a contract-level prohibition.
+The manifest pin is an assertion of the expected deployed value, not a new
+onchain assignment. H-08 supplies the independent live-value proof.
 
 ### 10.2 Track 7 H-08 post-deployment validation
 
@@ -914,10 +935,9 @@ future gate.
 ## 12. Open blockers
 
 1. Independent security approval of the owner-approved conclusion and bounded
-   risks:
-   no pacing at `0`, procedural rather than onchain enforcement, retained
-   governance ability, duplicated ceiling debt, and unsafe future nonzero
-   same-number behavior.
+   risks: no pacing at `0`, procedural rather than onchain enforcement,
+   retained governance ability, duplicated ceiling debt, and unsafe future
+   nonzero same-number behavior.
 2. S6 acceptance of the exact defaults/manifest handoff.
 3. Track 7 acceptance of the exact H-08 and migration-0020 handoffs.
 4. An authorized planning-correction commit that updates BN-012 and the Track 6
@@ -940,16 +960,23 @@ were recorded owner directions dated 24 July 2026. In a separate direct
 instruction on 24 July 2026, the owner approved decisions 1-9 exactly as
 recorded at `4d6c3ff43c3ceacbad8ff24b860acfc21bb043e8`.
 
+That approval also confirms that, for this no-code initial-launch disposition,
+the nine-decision structure below supersedes the committed brief's earlier
+eleven mandatory checkpoint-0 decisions. It does not erase those implementation
+questions: the earlier eleven-decision structure, refreshed against the
+then-current baseline and scope, becomes mandatory again if either S4 reopening
+trigger occurs.
+
 | # | Mandatory decision | Stage A recommendation | Owner status | Independent security status |
 | ---: | --- | --- | --- | --- |
 | 1 | Initial S4 production scope | Deploy existing shared Deleverage and SwitchboardDelta source unchanged; no S4 contract, interface, ABI, test, state-changing migration, Base, or Underscore change | **APPROVED at `4d6c3ff`; 24 July 2026** | **PENDING** |
-| 2 | Initial cooldown | Pin Robinhood `deleverageCooldown = 0` in S6 defaults and parameter manifest | **APPROVED at `4d6c3ff`; 24 July 2026** | **PENDING** |
+| 2 | Initial cooldown | Preserve constructor-default Robinhood `deleverageCooldown = 0`; S6 records/asserts the expected value without adding a Defaults field or production assignment | **APPROVED at `4d6c3ff`; mechanism clarified under the same owner directive** | **PENDING** |
 | 3 | Enforcement model | Accept that zero is procedural/configuration-enforced, not prohibited by current onchain code; governance technically retains the ability to queue nonzero | **APPROVED at `4d6c3ff`; 24 July 2026** | **PENDING** |
 | 4 | Latent debt | Retain duplicated `MAX_COOLDOWN_BLOCKS = 7_200` constants and stale wall-time comment as documented dormant debt | **APPROVED at `4d6c3ff`; 24 July 2026** | **PENDING** |
 | 5 | Initial caller graph | Omit Underscore; no Teller coordinator or context is added | **APPROVED at `4d6c3ff`; 24 July 2026** | **PENDING graph/risk confirmation** |
 | 6 | Stage progression | Do not begin Stage B or Stage C; no Stage B file set exists | **APPROVED at `4d6c3ff`; 24 July 2026** | **PENDING** |
 | 7 | Reopening triggers | Reopen S4 before Underscore inclusion or before governance proposes/queues any nonzero cooldown | **APPROVED at `4d6c3ff`; 24 July 2026** | **PENDING** |
-| 8 | Cheap enforcement handoffs | S6 manifest/default pin, H-08 live-zero assertion, inert 0020 hook, BN-012/decision-register correction | **APPROVED at `4d6c3ff`; 24 July 2026** | **PENDING** |
+| 8 | Cheap enforcement handoffs | S6 constructor-default/manifest assertion, H-08 live-zero assertion, inert 0020 hook, BN-012/decision-register correction | **APPROVED at `4d6c3ff`; mechanism clarified under the same owner directive** | **PENDING** |
 | 9 | Initial risk proposed for acceptance | No cooldown pacing, no normal Underscore caller, underlying checks remain, same-number bypass unsafe on future activation | **APPROVED at `4d6c3ff`; 24 July 2026** | **PENDING** |
 
 ### Required approval fields
@@ -958,6 +985,7 @@ recorded at `4d6c3ff43c3ceacbad8ff24b860acfc21bb043e8`.
 Owner: repository owner, by direct instruction
 Owner approval date: 24 July 2026
 Owner-approved exact answers 1-9: approved exactly as recorded at 4d6c3ff43c3ceacbad8ff24b860acfc21bb043e8
+Owner-approved initial-launch checkpoint supersession: nine decisions supersede the brief's prior eleven only for this no-code launch; reopening restores the implementation checkpoint
 Owner-approved initial Robinhood cooldown value: 0
 Owner acceptance that enforcement is procedural, not onchain: yes; governance retains technical ability to queue nonzero
 Owner acceptance of dormant duplicated-constant debt: yes
