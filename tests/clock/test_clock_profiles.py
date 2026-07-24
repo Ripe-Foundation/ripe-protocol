@@ -223,6 +223,19 @@ def test_r_rep128_retains_all_128_exact_points():
     assert len({point.number for point in profile.points}) == 1
 
 
+def test_unknown_profile_evidence_detail_fails_clearly():
+    profile = ClockProfile(
+        "CUSTOM",
+        (ClockPoint(N, T),),
+        "custom evidence category",
+    )
+    with pytest.raises(
+        ValueError,
+        match=r"unknown clock profile 'CUSTOM'; no evidence detail is registered",
+    ):
+        _ = profile.evidence_detail
+
+
 def test_boundary_profiles_are_derived_from_scenario_state():
     opening = 4_000
     start = 9_000
@@ -559,7 +572,15 @@ def test_observed_call_rejects_environment_only_claims(
 
 @pytest.mark.parametrize(
     "observed_by",
-    ["untyped proof", "state:", "STATE:seen_number", "state:field\nextra", 7],
+    [
+        "untyped proof",
+        "state:",
+        "state: ",
+        "event:\t",
+        "STATE:seen_number",
+        "state:field\nextra",
+        7,
+    ],
 )
 def test_observed_call_rejects_invalid_observation_labels(
     clock_controller, observed_by
@@ -741,17 +762,35 @@ def test_scenario_restoration_failure_raises_without_body_exception():
             controller.set(number=101, timestamp=201)
 
 
-def test_cross_test_isolation_mutating_case(clock_controller):
-    clock_controller.assert_scenario_start()
-    clock_controller.set(number=N, timestamp=T)
-    assert clock_controller.trace
+def test_cross_test_isolation_lifecycle_restores_absolute_baseline(
+    clock_controller,
+):
+    baseline = clock_controller.current
+    changed = ClockPoint(
+        baseline.number + 2,
+        baseline.timestamp + 4,
+    )
 
+    with clock_controller.scenario():
+        clock_controller.assert_scenario_start()
+        clock_controller.set(
+            number=changed.number,
+            timestamp=changed.timestamp,
+        )
+        assert clock_controller.current == changed
+        assert clock_controller.trace
 
-def test_cross_test_isolation_clean_case(clock_controller):
-    clock_controller.assert_scenario_start()
+    assert clock_controller.current == baseline
     assert clock_controller.sequence_index == 0
     assert clock_controller.profile_step_index == 0
     assert clock_controller.trace == ()
+
+    with clock_controller.scenario():
+        clock_controller.assert_scenario_start()
+        assert clock_controller.current == baseline
+        assert clock_controller.sequence_index == 0
+        assert clock_controller.profile_step_index == 0
+        assert clock_controller.trace == ()
 
 
 def test_deployed_system_exposes_equal_fingerprints_for_all_parameter_labels(

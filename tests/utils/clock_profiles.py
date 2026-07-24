@@ -103,7 +103,9 @@ _STATIC_PROFILE_NAMES = frozenset(
     }
 )
 _STABLE_ID_RE = re.compile(r"^(?:BN|CAD|TS)-\d{3}$")
-_OBSERVED_BY_RE = re.compile(r"^(?:state|event|boundary):[^\r\n]+$")
+_OBSERVED_BY_RE = re.compile(
+    r"^(?:state|event|boundary):[^\r\n]*\S[^\r\n]*$"
+)
 _SENSITIVE_KEY_RE = re.compile(
     r"(?:secret|private.?key|mnemonic|password|credential|api.?key|access.?token)",
     re.IGNORECASE,
@@ -155,7 +157,13 @@ class ClockProfile:
     def evidence_detail(self) -> str:
         """Return the dated source/interpretation behind the category label."""
 
-        return PROFILE_EVIDENCE_DETAILS[self.name]
+        try:
+            return PROFILE_EVIDENCE_DETAILS[self.name]
+        except KeyError as exc:
+            raise ValueError(
+                f"unknown clock profile {self.name!r}; "
+                "no evidence detail is registered"
+            ) from exc
 
 
 @dataclass(frozen=True)
@@ -424,7 +432,11 @@ class ClockController:
         parameter_values: Mapping[str, Any] | None = None,
         parameter_bounds: Mapping[str, Any] | None = None,
     ) -> Iterator["ClockController"]:
-        """Run a clean scenario and restore Boa plus all controller state."""
+        """Run a clean scenario and restore Boa plus all controller state.
+
+        If the body and restoration both fail, preserve the body exception's
+        type and attach the restoration ``CLOCK_FAIL`` as a PEP 678 note.
+        """
 
         resolved_profile = (
             self._resolve_profile(profile) if profile is not None else None
