@@ -2786,3 +2786,178 @@ compiler artifact was affected. The complete 2,734-test run and old/new
 artifact comparisons remain applicable. The evidence-dependent offline gate,
 branch freshness, candidate audit, K-02, and custody checks must be repeated
 against the final reconciled reviewer bundle.
+
+## Independent Stage B approval, superseding `rh` movement, and reopened review
+
+### Formal review received for `dc3ef1d`
+
+On 24 July 2026, the owner supplied the formal decision of the designated
+independent security/Track 6 reviewer:
+
+> The Stage B bundle at `dc3ef1d` is approved by the independent
+> security/Track 6 reviewer.
+
+That reviewer reported inspecting the complete brief-defined surface and
+independently creating a clean CPython 3.12.0 environment from the committed
+lock. In that environment, `pip check` passed, the 12 selected/held packages
+matched, the dependency gate passed 12/12, and S1 passed 57/57 against the
+bytes at `dc3ef1d`. This independent execution closed the prior record's gap
+between the last agent-run gate and the final evidence-only commit.
+
+The approval retained all five bounded exceptions and their 15 August 2026
+review / 31 August 2026 hard-expiry controls. It also retained K-02 custody
+until the later of the post-merge alert refresh and final exception
+disposition, and required the post-merge default-branch refresh to distinguish
+candidate remediation from authoritative GitHub alert closure. No merge,
+push, alert mutation, deployment, signing, verification submission, or other
+live action was authorized.
+
+The reviewer expressly stated that a dependency, lock, expected-version,
+test-policy, evidence, or artifact change after review reopens the relevant
+reviewer scope. The approval therefore remains an immutable approval of
+`dc3ef1d`; it is not silently transferred to later bytes.
+
+### Freshness discrepancy and required stop
+
+The formal review record was received at 16:10 MDT. It reported that the H-01
+branch was 15 commits ahead and zero behind `rh`. Repository metadata instead
+showed that `rh` and `origin/rh` had already advanced at 16:01:54 MDT to:
+
+```text
+063d9459c4c0acf29a4d4e59251ad32bf2d71184
+docs: reconcile S4 and add Track 7 H-02 brief
+parent dd51c637f1462bede7529a53427bfb4327dbfb12
+```
+
+At `dc3ef1d`, the correct relationship was one commit behind and 15 commits
+ahead. The review's branch-freshness statement was therefore stale even
+though its independently checked H-01 files, lock, environment, tests,
+audits, K-02 records, and artifacts were accurate.
+
+This movement integrated the exact planning corrections that the replacement
+authorization had required H-01 to treat as non-authoritative while they were
+uncommitted. It occurred before the Stage B reviewer record. The owner's
+standing instruction therefore required H-01 to stop, reconcile/refreeze,
+and rerun every affected validation rather than relying on the stale
+zero-behind statement.
+
+The committed `dd51c637..063d945` delta contains only:
+
+```text
+docs/chains/rh-summary.md
+docs/chains/rh/component-matrix.md
+docs/chains/rh/minimal-contract-change-reassessment.md
+docs/chains/rh/robinhood-deployment-support-specification.md
+docs/chains/rh/shared-block-clock-specification.md
+docs/chains/rh/track-7-h2-network-profiles-cli.md
+```
+
+The first five files reconcile the approved S4 no-code posture and the
+reviewed H-02 ownership correction. The new H-02 brief explicitly blocks
+H-02 until reviewed H-01 requirements and evidence are integrated into `rh`;
+it prohibits H-02 from changing H-01 dependencies and makes the H-01 gate,
+S1, S2, and the full suite downstream validation inputs. The delta does not
+change the H-01 brief, requirements, lock, dependency gate, S1/S2/S3 source
+or tests, contract/compiler input, migration, ABI, artifact, exception,
+audit, K-02, or custody policy.
+
+Only exact committed `063d945` was merged into the H-01 track, producing:
+
+```text
+7cbaaf01fca73ae260a50a32f272ef7fec6ace26
+parent dc3ef1da98d51431659f9ad306b17d5312096fb9
+parent 063d9459c4c0acf29a4d4e59251ad32bf2d71184
+```
+
+Immediately after that reconciliation, the branch was zero behind and 16
+commits ahead of local and remote-tracking `rh`. The H-01 four-file diff
+against `rh` remained unchanged.
+
+### Refrozen authority and technical anchors
+
+The newly authoritative documentation bytes are:
+
+| Reconciled authority path | SHA-256 |
+|---|---|
+| `docs/chains/rh-summary.md` | `8a44754bccfbc7698e71421b57fb2c591808a838fa91c7005223bfdff2ae97ea` |
+| `docs/chains/rh/component-matrix.md` | `33747982b11a1f9430619710b8b2007113dfb5961a90162def4c852c1b6b18e6` |
+| `docs/chains/rh/minimal-contract-change-reassessment.md` | `e29a1163b4cb1b4837ed8857775e9d1ea557bd3dc56213a594fa3fde0267987f` |
+| `docs/chains/rh/robinhood-deployment-support-specification.md` | `9a85d0a0307ce8fc6d268d6c48ab9a27bc60a75f8cbb655e88220020e7482698` |
+| `docs/chains/rh/shared-block-clock-specification.md` | `7afcd89fe4b07c597ae1670f453010c66bbceaa7659cd7411ad2eb01b342a4cf` |
+| `docs/chains/rh/track-7-h2-network-profiles-cli.md` | `f37597f37d6cf785f50bac0954709e2f60dde7ab836ed2c699cab45e5d105b59` |
+
+The affected-scope analysis rechecked these H-01 and compiler/artifact
+anchors:
+
+| Refrozen H-01 path | SHA-256 | Disposition |
+|---|---|---|
+| `docs/chains/rh/track-7-h1-dependency-security-preflight.md` | `ac31478d185571c9b804c84a0f78de60bf40eeb3a0aec80b839b66f62befef22` | unchanged |
+| `docs/chains/rh/robinhood-deployment-validation-plan.md` | `ab39fd135c50f7d348788341a061511b50a854550234de9165554e5674ec2393` | unchanged |
+| `docs/chains/rh/deleverage-cooldown-security-decision.md` | `98cbe896e502ad280f4b3de74e45181937b5085988dd9c6d45d2ce0e167a755b` | unchanged |
+| `requirements.in` | `2523c04409946a6625e30e5e4aa4f711663924f4a674f4cfd5fee5b7bbb3b80d` | unchanged |
+| `requirements.txt` | `d2e12a6f0cfd128c3891634efafbba8305878bef7a7c5db33e25ebe93b0d2bce` | unchanged |
+| `tests/clock/test_clock_profiles.py` | `2b1bbd8c77f97e614c9db54fcb98b284d3db95a6bb47d1ee9ab020bf6d725cc4` | unchanged |
+| `tests/utils/clock_profiles.py` | `69f3a616a78cb3a155962edb779533f56e362a68cc922c307dc7d40cbd4b34de` | unchanged |
+| `contracts/core/Lootbox.vy` | `669c2857e2402ef0e8f9a508dd6f342426ffbd1affce11dd429e5b5b0129ae65` | unchanged |
+| `scripts/abis/Lootbox.json` | `33aadc219718332ef9163f0b85c8e6fba93735d149db3fb0bb2e3fab814db17c` | unchanged |
+
+No clean dependency environment, resolver, audit, alert, ABI export, compiler
+fingerprint, S1/S2/S3 test, or full-suite input changed. Their validated
+results remain applicable. The authority refreeze, H-01 gate, fixture
+isolation, branch topology, scope, and whitespace checks are the validations
+affected by this reconciliation and evidence/test correction.
+
+### Strict-sandbox fixture isolation correction
+
+The independent reviewer noted that, at `dc3ef1d`, collection of the
+dependency-only gate inherited the repository-wide autouse `ripe_hq` fixture.
+That fixture resolved through `env`, `anvil`, and `free_port`; `free_port`
+bound an ephemeral local socket even though the 12 H-01 tests made no external
+query. This was not an external network request and did not invalidate the
+reviewer's results, but it could fail during setup on a CI runner that blocks
+all socket creation.
+
+The H-01-owned gate now defines a module-local, session-scoped no-op
+`ripe_hq` fixture. It deliberately overrides only the irrelevant protocol
+autouse setup for this dependency-only module; it does not alter repository
+fixture policy or any production/runtime test. The 12 test bodies and every
+dependency, exception, hash, audit, freshness, and S1 assertion remain
+unchanged. The corrected gate SHA-256 is
+`a0d3dcc22d0754229c8226fb55a99c2f17cfb004766285ed67a3c5075a39d948`.
+
+A fresh CPython 3.12.0 environment was created from the unchanged committed
+lock under a new mode-`0700` disposable directory using
+`python -m venv`, followed by
+`python -m pip install --no-cache-dir -r requirements.txt`. Installation
+completed from public PyPI and `python -m pip check` reported no broken
+requirements. `pytest --fixtures-per-test` then showed the local `ripe_hq`
+override for all 12 tests, plus only `monkeypatch`, `tmp_path`, and
+`tmp_path_factory` where explicitly requested. It showed no `env`, `anvil`,
+`free_port`, or other protocol fixture in this module's resolved setup graph.
+
+This fixture isolation is a test-policy change after `dc3ef1d`; together with
+this evidence addition and the corrected branch baseline, it reopens the
+corresponding scope. H-01 remains exception-gated and stopped for renewed
+independent security/Track 6 review. The prior review is preserved as valid
+evidence for the immutable `dc3ef1d` bundle, not represented as approval of
+this corrected bundle.
+
+Final affected validation in the fresh Candidate A environment produced:
+
+| Command | Result |
+|---|---|
+| `python -m pip check` | no broken requirements |
+| `pytest --fixtures-per-test -q tests/deployment/test_dependency_gate.py` | all 12 cases resolve to the local `ripe_hq` override; no `env`, `anvil`, or `free_port`; collection-only fixture report completed cleanly |
+| `pytest -q tests/deployment/test_dependency_gate.py` | 12 passed in 0.05 s |
+| `pytest -q tests/clock/test_clock_profiles.py` | 57 passed in 27.10 s |
+| `pytest --collect-only -q` | 2,734 selected / 2,876 total collected; 142 deselected in 1.24 s |
+| `pytest -q -p no:cacheprovider` | 2,734 passed, 142 deselected in 293.40 s |
+| `git diff --check` | passed |
+
+S1 and collection were replayed even though their inputs were unchanged, to
+confirm the module-local fixture override neither escaped its H-01 test module
+nor altered the approved runtime profile or suite inventory. Although the
+reconciled commit changes documentation only and the fixture correction only
+removes irrelevant setup from the 12-test module, the complete serial suite
+was also replayed after all test-body changes. It passed exactly, so renewed
+review need not rely on an applicability argument for the final test bytes.

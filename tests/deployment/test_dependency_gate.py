@@ -65,6 +65,12 @@ EXPECTED_HEADER = (
 )
 
 
+@pytest.fixture(scope="session")
+def ripe_hq():
+    """Keep this dependency-only gate out of the protocol autouse setup graph."""
+    yield None
+
+
 def _sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
