@@ -1,8 +1,13 @@
 # Track 6 S4 Deleverage Cooldown Security and Compatibility Decision
 
-**Status:** Stage A complete; mandatory checkpoint 0 open; Stage B blocked
+**Status:** Stage A record revised after independent re-review; mandatory
+checkpoint 0 open; Stage B blocked
 
 **Prepared:** 24 July 2026
+
+**Original Stage A commit:** `a7414b5b56d20fc753c9263e7b494a75189eb223`
+
+**Re-review correction date:** 24 July 2026
 
 **Stage A launch baseline:** `3e6e6f230169fc445d0b29454457480c62efd89a`
 
@@ -31,6 +36,21 @@ The owner also selected **H-01 first**. S4 Stage B remains blocked until:
 This record therefore recommends a design but does not select it. No response
 to a checkpoint item means no production edit.
 
+## Re-review disposition
+
+The original handoff incorrectly presented the unchanged original Stage A
+commit as if it contained the requested re-review corrections. This revision
+creates the missing audit trail and resolves the review findings as follows:
+
+| Review item | Disposition in this revision |
+| --- | --- |
+| Current SwitchboardDelta registry identity was asserted from a stale historical migration | Accepted. Historical ID 4 registration, current manifest deployment, and current onchain registry identity are now separated. The actual current registry slot is an unresolved rollout input and a stop condition. |
+| BN-012 occurrence count was understated | Accepted. Deleverage has three occurrences on two source lines, not two occurrences. |
+| Strict-boundary matrix omitted required number jumps, expiry skip, and two-user independence | Accepted. Every required case is now explicit in section 10.2. |
+| Active-cooldown context-open rule hid a legitimate multi-leg availability cost | Accepted. The trade-off and three checkpoint alternatives are now explicit in sections 5.1, 10.3, 10.4, 12, and 13. |
+| H-01 snapshot was stale | Accepted. The latest inspected H-01 tip and its evidence-only branch delta are recorded without treating either as integration or approval. |
+| Integration worktree contains uncommitted minimum-change material of unknown provenance | Verified and quarantined logically, not modified. Section 1.1 records the exact dirty scope and requires an owner provenance decision before it can affect S4. |
+
 ## Executive security conclusion
 
 The current same-number exception is not a transaction boundary. Independent
@@ -58,6 +78,10 @@ The recommended direction is:
 - if an exact coordinator is approved, add a separately named context-aware
   path backed by a Deleverage-managed, transient, nonzero, opaque `bytes32`
   context bound to coordinator and user;
+- recognize that denying context opening during an active cooldown can block a
+  legitimate multi-leg redemption until expiry, and require checkpoint 0 to
+  choose that liveness cost, a tightly bounded alternative, or no active
+  nonzero-cooldown context release;
 - do not select Teller without a separately reviewed new Teller integration;
 - require a separate Underscore brief, owner, tests, and deployment gate if
   the existing Base multi-leg flow is to use the context; and
@@ -104,12 +128,14 @@ Ancestry and approval evidence:
 
 All active worktrees were checked before bootstrap. No active branch owned the
 Stage A file or the proposed Stage B files. The in-flight H-01 branch was
-rechecked during evidence collection at
-`cc0fd9977b854756114e2c3fda2185f2a81f0ce2`; its only committed or working-tree
-delta from `rh` was
-`docs/chains/rh/evidence/dependency-security-gate.md`. It was not an ancestor
-of `rh`, so it is not an integrated dependency baseline. This observation is
-not an H-01 review or approval.
+rechecked during original evidence collection at
+`cc0fd9977b854756114e2c3fda2185f2a81f0ce2`. During this re-review it had
+advanced to clean tip `22eb097e86a123c01a7117d5166b87ed11ae30c9`,
+`docs(rh): complete H-01 rereview evidence`. Its entire committed delta from
+the S4 launch baseline remains only
+`docs/chains/rh/evidence/dependency-security-gate.md`. Neither the earlier nor
+current H-01 tip is an ancestor of `rh`, so neither is an integrated dependency
+baseline. These observations are not an H-01 review or approval.
 
 After S4 bootstrap, another local worktree advanced only the local `rh` ref to
 `27765d29094256fa9619dd44a0bfd145863de8b7` at 12:35:41 MDT with
@@ -119,6 +145,52 @@ file or the proposed Stage B set. The live remote `rh` remained at the required
 launch commit. This S4 branch deliberately retains the exact authorized parent
 `3e6e6f230169fc445d0b29454457480c62efd89a`; no reconciliation with the
 post-bootstrap local-only S5 documentation commit was performed.
+
+#### Post-launch integration-worktree hygiene and candidate directive
+
+The integration worktree was rechecked read-only during this independent
+re-review. Local `rh` remains at
+`27765d29094256fa9619dd44a0bfd145863de8b7`, one local documentation commit
+ahead of `origin/rh`, but the worktree now also has nine modified tracked
+documents totaling 394 insertions and 136 deletions:
+
+- `docs/chains/rh-summary.md`;
+- `docs/chains/rh/block-clock-validation-plan.md`;
+- `docs/chains/rh/block-number-inventory.md`;
+- `docs/chains/rh/component-matrix.md`;
+- `docs/chains/rh/robinhood-deployment-support-specification.md`;
+- `docs/chains/rh/robinhood-deployment-validation-plan.md`;
+- `docs/chains/rh/shared-block-clock-specification.md`;
+- `docs/chains/rh/track-6-s4-deleverage-cooldown.md`; and
+- `docs/chains/rh/track-6-s5-ledger-guard.md`.
+
+It also has one untracked 373-line file,
+`docs/chains/rh/minimal-contract-change-reassessment.md`, with SHA-256
+`57c94b7f6b4e7a9609803567c0dd90442210f8aa88cbc9c2b06629fe222a769c`.
+The floating S4 edits appear to add a minimum-change amendment, Phase A0, and
+decision 0, while other files alter previously checked clock-plan statements.
+There is no commit or other Git provenance tying those working-copy edits to
+owner authorization.
+
+Those post-launch edits are therefore **candidate input, not S4 authority**.
+The owner's Stage A authorization named the committed launch brief as the
+complete contract, and this correction does not copy, modify, stage, discard,
+or otherwise normalize the integration-worktree material. Before the material
+can alter this decision record, the owner must choose one of two provenance
+paths:
+
+1. if authorized, preserve and land it through an explicitly reviewed commit,
+   repair any checked-item and baseline audit trail it changes, and direct
+   whether S4 must adopt its Phase A0/decision-0 contract; or
+2. if unauthorized or abandoned, preserve a reviewable patch or quarantine as
+   directed and restore the integration worktree only under explicit owner
+   authority.
+
+Until that provenance decision is recorded, checkpoint 0 is not final and
+Stage B remains blocked. The present recommendation—unchanged shared source,
+stored cooldown `0`, and no initial nonzero activation—is compatible with a
+minimum-change outcome, but the floating text cannot silently become the
+controlling decision.
 
 ### 1.2 Frozen hashes
 
@@ -210,6 +282,16 @@ deployment call sites are centralized at `tests/conf_core.py:295` for
 Deleverage, `:435` for Teller, and `:572` for SwitchboardDelta, plus the direct
 fresh-Deleverage loader at `tests/core/deleverage/conftest.py:82`.
 
+The SwitchboardDelta call sites prove deployments, not the current Switchboard
+registry mapping. `1006_Switchboard.py` registered the Delta deployed in that
+historical migration at ID 4. The Delta currently named in the committed
+manifest was instead deployed by `2026043000_RedeploySBDelta.py`, which deploys
+the contract and relinquishes temporary governance but contains no committed
+Switchboard address-update or confirmation for ID 4. Manifest bookkeeping in
+`scripts/utils/migration.py` does not update the onchain registry. Therefore
+the current manifest address must not be called the current ID 4 contract
+without a fresh registry read and version/pending-update proof.
+
 ### 1.5 Direct clock and cadence counts
 
 The checked inventory reports:
@@ -231,9 +313,13 @@ vyper_paths=92
 
 Within the S4 production trio, direct `block.number` occurrences are:
 
-- Deleverage: 2, both in BN-012 cooldown read/write;
-- SwitchboardDelta: 1, in the unrelated bond epoch-start helper; and
+- Deleverage: 3 occurrences on 2 source lines, all in BN-012—two reads on one
+  guard line and one checkpoint write;
+- SwitchboardDelta: 1 occurrence on 1 source line, in the unrelated bond
+  epoch-start helper; and
 - Teller: 0.
+
+The trio therefore has 4 direct occurrences on 3 source lines.
 
 The S4 cooldown maximum occurs twice, once in Deleverage and once in
 SwitchboardDelta. Both values are `7_200`.
@@ -296,10 +382,13 @@ new-file difference.
 - SwitchboardDelta validates `<= 7_200` when an action is queued. At execution
   it resolves current Deleverage from RipeHq ID 18 and calls its setter, which
   independently validates `<= 7_200`.
-- SwitchboardDelta is registered as Switchboard ID 4 by
-  `migrations/base-mainnet/1006_Switchboard.py`, whose confirmation assertion
-  requires ID 4. Deleverage and Teller are RipeHq IDs 18 and 17 respectively,
-  as encoded in `contracts/modules/Addys.vy`.
+- `migrations/base-mainnet/1006_Switchboard.py` historically registered the
+  Delta deployed by that migration as Switchboard ID 4. The current manifest
+  Delta was deployed by `2026043000_RedeploySBDelta.py`, which has no committed
+  current-registry update. The current Delta's Switchboard ID is therefore
+  ambiguous until rollout preflight proves it. Deleverage and Teller remain
+  source-defined RipeHq IDs 18 and 17 respectively in
+  `contracts/modules/Addys.vy`.
 - A fixed-string search of current Ripe production contracts finds only the
   Deleverage function definition. Teller, TellerUtils, and every other Ripe
   production contract contain no call to `deleverageForWithdrawal`.
@@ -317,6 +406,10 @@ The integrated Track 6 specification records read-only Base evidence from
 The current committed manifest additionally maps Teller to
 `0xae87deB25Bc5030991Aa5E27Cbab38f37a112C13` and RipeHq to
 `0x6162df1b329E157479F8f1407E888260E0EC3d2b`.
+
+This runtime and manifest evidence proves code at the named Delta address; it
+does not prove which Switchboard registry ID currently resolves to that
+address.
 
 The same dated read observed Base `deleverageCooldown == 0`. This is not a
 permanent onchain fact. No fresh RPC read was performed for Stage A. The other
@@ -473,7 +566,7 @@ independent security review.
 | Nested context opening | Scope uniqueness; approved coordinator or reentrant callback | No context exists. | Reject a second active context for the same `(coordinator,user)`; policy for separate users remains explicit. | Test direct and callback nesting; default multi-user/nested rollout off. Security owner. |
 | Token/vault/PriceDesk/CreditEngine/PSM/Teller callbacks | Context integrity and user assets; callback-capable dependency | Current broad permission and same-number bypass may be reentered from eligible callback actors. | Open context locks the user to its exact coordinator; no-context calls for that user reject while open; only context-aware calls by bound coordinator proceed. | Adversarial callback suite plus exact coordinator reentrancy review before registration. Security owner. |
 | Failed middle leg then recovery | Atomicity and liveness; normal coordinator/dependency failure | Uncaught Vyper external-call failure reverts checkpoint and transient flags. | Preserve atomic revert. If a future coordinator catches a failure, require explicit close and forbid continuation unless separately designed and tested. | Prove full unwind; no catch-and-continue rollout without a separately approved retry matrix. Downstream/security owner. |
-| Near-redemption manufactured between legs | Solvency exception; caller able to alter collateral/debt during callbacks | Each call may bypass cooldown when projected withdrawal leaves position near redemption. | Preserve near-redemption as a per-call independent safety bypass; it must not create, authenticate, or extend a context. Context open should require no active preexisting cooldown. | Test callback state changes and threshold recomputation; block activation if context broadens the bypass. Risk/security owner. |
+| Near-redemption manufactured between legs | Solvency exception and legitimate multi-leg availability; caller able to alter collateral/debt during callbacks | Each call may bypass cooldown when projected withdrawal leaves position near redemption. | Preserve near-redemption as a per-call independent safety bypass; it must not silently create, authenticate, or extend a context. Denying context open during an active cooldown protects that boundary but may defer a legitimate multi-leg redemption until expiry. | Test callback state changes, threshold recomputation, and the selected deny-open/qualified-bootstrap/no-active-release policy; block activation if context broadens the bypass or the liveness cost is unapproved. Risk/security owner. |
 | Cooldown `0 -> nonzero` | User availability; governance | Existing checkpoint immediately becomes relevant under new value; same-number bypass still exists. | Maximum/context artifact may deploy with stored `0`; activation is separate. On activation, document all existing-checkpoint jump behavior. | Transition tests and a fresh checkpoint report are an S6/later activation gate. S6/protocol owner. |
 | Cooldown `nonzero -> 0 -> nonzero` | Same | Zero disables checks but does not clear mapping; later nonzero can reactivate old checkpoints if still in range. | Preserve storage semantics and test transitions explicitly. | Test reactivation and require governance runbook language before nonzero rollout. Protocol owner. |
 | Maximum reduction/increase during window | Availability and governance bound; Delta governance | Delta validates its own fixed cap at queue; stored cooldown can change immediately on execution. | Delta queries current target at queue; target validates at execution. Immutable maximum itself changes only by deployment. | Test lower/higher target replacements and enumerate/drain pending actions before registry change. Deployment/protocol owner. |
@@ -546,6 +639,32 @@ closeDeleverageWithdrawalContext(user, contextId)
 The owner and reviewer may select different names, but they must approve the
 exact selectors and semantics before Stage B.
 
+#### Availability trade-off requiring decisions 5 and 6
+
+Rule 5 deliberately prevents a near-redemption result from becoming reusable
+context-opening authority, but it has a material liveness cost. If a user
+already has an active cooldown, a legitimate multi-leg redemption cannot open
+the context. Even if the first leg independently qualifies for the
+near-redemption bypass, later legs that do not independently qualify remain
+blocked, so the complete withdrawal may have to wait until cooldown expiry.
+This is a protocol availability decision, not an implementation detail.
+
+Checkpoint 0 must select and independently approve exactly one of:
+
+1. **deny active-window opening:** keep rule 5 and explicitly accept that a
+   legitimate multi-leg redemption may be unavailable until expiry;
+2. **qualified bootstrap:** allow opening only from a first leg that
+   independently satisfies the near-redemption condition, then specify the
+   exact continuation scope and prove that the condition cannot be
+   manufactured, cached, or broadened for later legs; or
+3. **no active context release:** keep governed cooldown `0` and ship no
+   active nonzero-cooldown context behavior in the initial release.
+
+The provisional recommendation remains option 1 only if checkpoint 0 accepts
+its liveness loss. Option 3 is the safer initial-release fallback. Option 2 is
+not recommended without a substantially stronger, flow-specific proof. No
+option is selected by this Stage A record.
+
 ### 5.2 Explicitly rejected designs
 
 - retaining the current `block.number > lastBlock` exception;
@@ -555,7 +674,7 @@ exact selectors and semantics before Stage B.
 - an unbound boolean;
 - caller-supplied ID treated as authority;
 - a context open to every valid Ripe or Underscore address;
-- context creation from the near-redemption result;
+- implicit or unreviewed context creation from the near-redemption result;
 - a context that survives the top-level transaction;
 - duplicate maximum constants;
 - `chain.id` branching or a Robinhood-only contract; and
@@ -645,8 +764,10 @@ At rollout preflight, re-read and record:
 
 - Deleverage RipeHq ID 18 address, code, ABI, pause and governance state;
 - Teller RipeHq ID 17 only if a later design changes Teller;
-- SwitchboardDelta Switchboard ID 4 address, code, ABI, governance, and
-  timelock state;
+- the actual Switchboard ID that resolves to the current manifest
+  SwitchboardDelta address, including `getAddr(4)`, the reverse registry lookup
+  for that address, registry version, and pending address updates; do not
+  assume the historical ID 4 mapping still applies;
 - `minDeleverageBps`;
 - `deleverageBuffer`;
 - `deleverageCooldown`;
@@ -681,8 +802,10 @@ design:
 7. deploy and verify the approved downstream coordinator version, if any,
    after new Deleverage is active;
 8. prove real context flows and retire or constrain old callers;
-9. deploy and replace SwitchboardDelta at Switchboard ID 4 after proving its
-   current-target queue check and execution-time target validation;
+9. after proving the current Delta's actual Switchboard registry slot, deploy
+   and replace it only at that proven slot after proving its current-target
+   queue check and execution-time target validation; stop and revise this
+   rollout if ID 4 does not resolve to the expected current address;
 10. close all temporary drift with fresh reads and old/new hashes; and
 11. leave nonzero cooldown activation to S6/later approval.
 
@@ -717,8 +840,10 @@ compatible rollback target. Forward remediation must then deploy/register a
 fixed Deleverage that preserves the approved selectors or roll the downstream
 caller back first under its own safe order.
 
-Delta rollback is independently staged at Switchboard ID 4. A pending action
-must never be assumed to bind the target code seen at queue time.
+Delta rollback is independently staged at the exact Switchboard registry slot
+proven during preflight; this record does not establish that the current slot
+is ID 4. A pending action must never be assumed to bind the target code seen at
+queue time.
 
 ### 8.4 Robinhood
 
@@ -795,6 +920,15 @@ within the brief's ceiling or a reviewed brief amendment.
 - second call at `+1` remains blocked;
 - exact `last + cooldown - 1` blocked;
 - exact `last + cooldown` succeeds;
+- exact `last + cooldown + 1` succeeds;
+- representative `+2` and `+4` number jumps are decided solely by the strict
+  boundary: blocked before expiry and eligible at or after expiry;
+- a synthetic `+60` jump has the same boundary behavior;
+- a direct skip from just before expiry to after expiry succeeds without
+  requiring an equality-number transaction;
+- two users evaluated at the same number have independent checkpoints: each
+  user's first eligible call succeeds, one user's write does not block the
+  other, and later calls are blocked per user;
 - unset checkpoint succeeds;
 - zero cooldown remains disabled;
 - maximum arithmetic is checked and does not wrap; and
@@ -809,6 +943,13 @@ within the brief's ceiling or a reviewed brief amendment.
 - wrong user and wrong coordinator reject;
 - first context leg obeys preexisting cooldown;
 - active preexisting cooldown prevents context opening;
+- under the recommended deny-open policy, a legitimate multi-leg redemption
+  attempted during the active window cannot complete through the context and
+  remains unavailable until expiry unless every leg independently qualifies;
+- if checkpoint 0 instead selects qualified bootstrap, the first leg must
+  independently satisfy near redemption and every continuation boundary,
+  state change, callback, close, and replay case must prove that authorization
+  cannot broaden;
 - successful first leg establishes only that context's continuation;
 - two approved distinct legs pass;
 - no-context call while context active rejects;
@@ -829,6 +970,11 @@ within the brief's ceiling or a reviewed brief amendment.
 
 - near-redemption no-context call retains its independent safety bypass;
 - near-redemption cannot open or forge a context;
+- deny-open behavior demonstrates the explicit legitimate multi-leg liveness
+  cost during an active cooldown;
+- any selected qualified-bootstrap alternative proves that the first-leg
+  condition cannot be manufactured and does not authorize an otherwise
+  ineligible later leg outside the exact approved continuation scope;
 - context cannot broaden or cache the redemption threshold;
 - state changes between legs are re-evaluated;
 - minimum-deleverage bypass remains independent;
@@ -849,7 +995,8 @@ within the brief's ceiling or a reviewed brief amendment.
 - separate Underscore tests cover raw underlying, collateral vault token,
   leverage vault token, early returns, delegated allowance caller, and real
   Ripe rather than `MockRipe`; and
-- Base staged-order and rollback simulations use exact registry IDs 18 and 4.
+- Base staged-order and rollback simulations use RipeHq ID 18 plus the actual
+  Switchboard ID proven for the current Delta; they must not assume ID 4.
 
 ### 10.6 Required gates
 
@@ -890,6 +1037,12 @@ When H-01 is integrated:
 No floating H-01 candidate lock, alert analysis, branch tip, or unreviewed
 working tree satisfies this gate.
 
+At this re-review's final read-only check, the clean H-01 branch tip was
+`22eb097e86a123c01a7117d5166b87ed11ae30c9` and its only committed delta from
+the S4 launch baseline was its dependency-security evidence document. That
+moving documentation branch is evidence of H-01 work in flight, not proof of
+independent approval or integration into `rh`.
+
 ## 12. Open blockers
 
 1. Exact maximum wall-time intent and S4-specific cadence approval.
@@ -898,26 +1051,38 @@ working tree satisfies this gate.
 4. Exact coordinator identity and authorization source. “Any valid
    Underscore address” is not exact enough.
 5. Exact context selectors, ID generation, binding, nesting, multiple-user,
-   callback, close, and replay policy.
+   callback, close, replay, and active-window opening policy, including explicit
+   acceptance of the deny-open availability cost or approval of a fully
+   specified alternative.
 6. Security acceptance of first-call cooldown grief under the unchanged broad
    trusted-caller policy.
-7. Exact near-redemption interaction with context opening.
+7. Exact near-redemption interaction with context opening, including selection
+   among deny-open, qualified bootstrap, and no active context release.
 8. Exact four-argument and old/new compatibility requirements.
 9. A separate Underscore brief, owner, tests, version order, and deployment
    gate if the real Base multi-leg flow is selected.
 10. Fresh Base governed values, pause/governance state, pending actions,
-    timelocks, and reset/rollback plan.
+    timelocks, reset/rollback plan, and proof of the current Delta's actual
+    Switchboard registry slot; historical ID 4 is insufficient.
 11. An owner/deadline for every temporary Base drift window.
 12. H-01 independent review, integration commit, S4 reconciliation direction,
     and post-H-01 validation.
 13. Exact Stage B file set and release atomicity.
 14. Independent security-review approval of the complete record.
 15. S6 ownership of any nonzero cooldown and Track 7 deployment assertions.
+16. Owner disposition of the ten floating integration-worktree documents:
+    confirm authorized provenance and land them through review, or explicitly
+    direct preservation/quarantine and restoration. If authorized, the owner
+    must also direct whether their proposed Phase A0/decision 0 amends S4.
 
 ## 13. Mandatory checkpoint 0 approval record
 
 Stage A kickoff approval and H-01-first direction are recorded from the owner
 instruction dated 24 July 2026. They are not approvals of the rows below.
+Before these rows can become final, the owner must separately resolve the
+post-launch integration-worktree provenance in section 1.1. That resolution
+does not become a new S4 decision 0 unless the owner confirms that the floating
+amendment was authorized and expressly adopts it.
 
 | # | Mandatory decision | Stage A recommendation | Owner status | Independent security status |
 | ---: | --- | --- | --- | --- |
@@ -925,11 +1090,11 @@ instruction dated 24 July 2026. They are not approvals of the rows below.
 | 2 | Per-chain immutable values and cadence | Base `7_200`; RH `1_200`, only with S4-specific cadence approval | **PENDING** | **PENDING** |
 | 3 | Activation posture | Preserve initial stored `0`; nonzero belongs to S6/later release | **PENDING** | **PENDING** |
 | 4 | Coordinator set | Exact identified Underscore coordinator if real multi-leg support is required; no Teller by default; none on initial RH | **PENDING exact identity** | **PENDING** |
-| 5 | Context architecture | Option 4 ABI envelope plus option 2 Deleverage-managed transient context with the semantics in section 5.1 | **PENDING exact selectors/policy** | **PENDING** |
-| 6 | Near-redemption policy | Preserve independent per-call bypass; never use it to create context | **PENDING** | **PENDING** |
+| 5 | Context architecture | Option 4 ABI envelope plus option 2 Deleverage-managed transient context; select deny-open and accept its liveness cost, approve a fully specified qualified-bootstrap alternative, or select no active context release | **PENDING exact selectors/opening policy** | **PENDING** |
+| 6 | Near-redemption policy | Preserve independent per-call bypass; never use it as reusable context authority; explicitly approve its interaction with the row-5 opening policy | **PENDING exact interaction/liveness acceptance** | **PENDING** |
 | 7 | ABI compatibility | Retain strict four-argument path; add separately named context path | **PENDING** | **PENDING** |
 | 8 | Cross-repository policy | Separate Underscore brief/change/deployment gate required if coordinator selected; no Underscore edits in S4 | **PENDING** | **PENDING** |
-| 9 | Base live-version policy | Staged two-registry convergence, cooldown `0`, bounded drift, no permanent divergence | **PENDING exact live plan** | **PENDING** |
+| 9 | Base live-version policy | Staged two-registry convergence using RipeHq ID 18 and the freshly proven current Delta registry slot, cooldown `0`, bounded drift, no permanent divergence | **PENDING exact live plan and registry proof** | **PENDING** |
 | 10 | H-01/S4 order | H-01 first | **OWNER DIRECTION RECORDED; exact integrated commit and reconciliation still PENDING** | **PENDING dependency baseline** |
 | 11 | Stage B file set and atomicity | Exact subset in section 9; separate commits allowed, one final artifact/release | **PENDING** | **PENDING** |
 
@@ -938,6 +1103,8 @@ instruction dated 24 July 2026. They are not approvals of the rows below.
 ```text
 Owner:
 Owner approval date:
+Owner disposition of integration-worktree provenance:
+Owner direction on proposed Phase A0/decision 0, if authorized:
 Owner-approved exact answers 1-11:
 Owner-approved exact Stage B files:
 Owner-approved H-01 integrated commit:
