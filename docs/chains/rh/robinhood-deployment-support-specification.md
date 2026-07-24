@@ -1,7 +1,7 @@
 # Robinhood deployment-support specification
 
 - Status: Phases A–H completion draft for owner/reviewer scrutiny
-- Review status: independent checkpoint findings incorporated; specification directions approved where recorded
+- Review status: independent checkpoint/completion findings incorporated; specification directions approved only where recorded
 - Scope completed: Phases A–H and Deliverables A–B at specification level
 - Scope not authorized: implementation, production values, push, merge, or live actions
 - Starting commit: `68a76dcd5ea9b95b9148d3e6ebdd12107d5cc88e`
@@ -428,6 +428,13 @@ Slice A is intentionally **not** called mechanical. Its packages touch network,
 environment, serialization/compiler, packaging, and documentation behavior and
 still require compatibility evidence.
 
+`pymdown-extensions` is a severable documentation-only sub-slice despite being
+listed in Slice A for complete alert accounting. A Markdown compatibility
+failure keeps that advisory and the documentation-build gate open, but must not
+block review or landing of an otherwise compatible deployment-path refresh.
+Conversely, clearing the docs alert cannot satisfy the deployment-security
+gate.
+
 The checkpoint has not completed the required upstream release-note and
 behavior-change review. That review is an explicit input to the separate pin
 implementation slice:
@@ -519,6 +526,12 @@ rpc:
   public_url_allowed_modes: [facts, read_only, fork]
   timeout_seconds: positive-integer
   read_retry_policy_id: policy-name
+  deployment_rate_policy_id: approved-policy-or-null
+  public_read_rate_limit:
+    requests: positive-integer-or-null
+    interval_seconds: positive-integer-or-null
+    burst: positive-integer-or-null
+    source: documented_default | instance_confirmed | owner_policy | unknown
   require_chain_id_match: true
 
 fees:
@@ -549,8 +562,7 @@ explorer:
 fork:
   source_url_env: env-var-name-or-null
   require_source_chain_id_match: true
-  block_policy: explicit_pin | latest_for_local_exploration
-  pinned_block_number: positive-integer-or-null
+  block_policy: explicit_pin_required | latest_for_local_exploration
   allow_dirty_state: false
   allow_submission: false
   evidence_disposition: local_only | sanitized_committable
@@ -602,12 +614,16 @@ Validation rules:
 11. Rate limits are interval-denominated. A documented default is not an
     instance guarantee; the effective explorer limit must be confirmed or an
     owner-approved conservative policy must apply.
-12. A fork used as reproducible or committable evidence requires an exact source
+12. Public and deployment RPC throttling are separate policies. A live-capable
+    provider requires an approved rate/quota policy; a public endpoint with an
+    unknown limit remains read-only/fork-only and must fail conservatively.
+13. A fork used as reproducible or committable evidence requires an exact source
     chain-ID match and pinned block. `latest` and dirty-state forks are
-    exploration-only and their evidence remains local.
-13. Fork mode never signs or submits to its source RPC. A fork profile with
+    exploration-only and their evidence remains local. The concrete source block
+    number/hash belongs to the per-run evidence bundle, never the static profile.
+14. Fork mode never signs or submits to its source RPC. A fork profile with
     `allow_submission: true` is invalid.
-14. Live mode requires a frozen plan digest, explicit network/chain
+15. Live mode requires a frozen plan digest, explicit network/chain
     acknowledgment, and irreversible-action acknowledgment. Generic `--ask`
     prompting does not satisfy those gates.
 
@@ -621,8 +637,8 @@ approves and implementation proves the value.
 | `local` | Local | Runtime-configured; ETH-like 18 decimals | Local runtime only; no public fallback | Unsupported; current CLI crashes at unconditional Base-only explorer setup | Current local blueprint is incomplete; migration/history paths are not established | Live forbidden; local test account only; finality immediate by local-runtime policy |
 | `base-mainnet` | Mainnet | `8453`; ETH, 18 | Proposed `BASE_MAINNET_RPC_URL`; preserve current behavior only through an explicit compatibility path | BaseScan browser; Etherscan-v2 adapter; one normalized key-env policy pending | Existing `base` blueprint / `DefaultsBase`; `migrations/base-mainnet`; `migration_history/base-mainnet/v1` | Existing private-key path is not safe enough for release; approved backend and confirmation policy pending |
 | `base-sepolia` | Test | `84532`; ETH, 18 | Proposed `BASE_SEPOLIA_RPC_URL` | BaseScan browser; Etherscan-v2 adapter | CLI advertises the chain, but no matching migration/history namespace exists; no implicit Base-mainnet reuse | Live deployment unsupported until paths, backend, and finality are approved |
-| `robinhood-mainnet` | Mainnet | `4663`; ETH, 18 | `ROBINHOOD_MAINNET_RPC_URL` required for deployment. Official public RPC is read-only/facts/fork only. | `https://robinhoodchain.blockscout.com`; Blockscout API at `/api/`; keyless supported; documented default is 3 requests/minute without a key, but effective instance/key policy is pending; Vyper and Solidity standard JSON | Proposed `robinhood` blueprint / `DefaultsRobinhood`; shared proposed source `migrations/robinhood/`; isolated proposed history `migration_history/robinhood-mainnet/v1/`; paths not yet created | No backend approved; confirmation, reorg, fee-cap, and finality policies pending; live mode rejected |
-| `robinhood-testnet` | Test | `46630`; ETH, 18 | `ROBINHOOD_TESTNET_RPC_URL` required for deployment. Official public RPC is read-only/facts/fork only. | `https://explorer.testnet.chain.robinhood.com`; Blockscout API at `/api/`; keyless supported; documented default is 3 requests/minute without a key, but effective instance/key policy is pending; Vyper and Solidity standard JSON | Same proposed Robinhood blueprint/default model and shared source `migrations/robinhood/`; isolated proposed history `migration_history/robinhood-testnet/v1/`; paths not yet created | No backend approved; confirmation, reorg, fee-cap, and finality policies pending; live mode rejected |
+| `robinhood-mainnet` | Mainnet | `4663`; ETH, 18 | `ROBINHOOD_MAINNET_RPC_URL` required for deployment. Official public RPC is rate-limited and read-only/facts/fork only; interval/burst are unknown and must fail conservatively. | `https://robinhoodchain.blockscout.com`; Blockscout API at `/api/`; keyless supported; documented default is 3 requests/minute without a key, but effective instance/key policy is pending; Vyper and Solidity standard JSON | Proposed `robinhood` blueprint / `DefaultsRobinhood`; shared proposed source `migrations/robinhood/`; isolated proposed history `migration_history/robinhood-mainnet/v1/`; paths not yet created | No backend approved; confirmation, reorg, fee-cap, and finality policies pending; live mode rejected |
+| `robinhood-testnet` | Test | `46630`; ETH, 18 | `ROBINHOOD_TESTNET_RPC_URL` required for deployment. Official public RPC is rate-limited and read-only/facts/fork only; interval/burst are unknown and must fail conservatively. | `https://explorer.testnet.chain.robinhood.com`; Blockscout API at `/api/`; keyless supported; documented default is 3 requests/minute without a key, but effective instance/key policy is pending; Vyper and Solidity standard JSON | Same proposed Robinhood blueprint/default model and shared source `migrations/robinhood/`; isolated proposed history `migration_history/robinhood-testnet/v1/`; paths not yet created | No backend approved; confirmation, reorg, fee-cap, and finality policies pending; live mode rejected |
 
 Fork-mode values are profile-specific:
 
@@ -645,6 +661,19 @@ The owner selected one shared future migration source,
 decision, not permission to create the directories. Phase C must define the
 shared graph and isolated evidence behavior before an implementation slice can
 create them.
+
+Testnet-only setup cannot fork that source tree:
+
+- faucet funding and signer funding are operator prerequisites recorded in the
+  testnet runbook/evidence bundle, never migration steps;
+- mock or test-token deployment belongs to isolated test fixtures outside
+  `migrations/robinhood/` and never appears in mainnet or canonical testnet
+  migration history;
+- the same migration step IDs consume profile-specific approved values, so a
+  testnet parameter/address differs without a second source path; and
+- if a production-intent step cannot be rehearsed through the shared graph, the
+  testnet run records the limitation and stops for owner review rather than
+  adding a conditional testnet-only migration.
 
 ### 5.4 Current-to-proposed compatibility map
 
@@ -1226,6 +1255,13 @@ network:
   chain_id: integer
   environment: local | test | mainnet
   history_namespace: repo-relative-path
+  fork_evidence:
+    present: boolean
+    source_chain_id: integer-or-null
+    source_block_number: integer-or-null
+    source_block_hash: hex-or-null
+    source_endpoint_id: approved-nonsecret-reference-or-null
+    observed_at_utc: rfc3339-or-null
 
 source:
   repository: canonical-repository-id
@@ -1333,6 +1369,13 @@ live_version_policy:
 pending_decisions: []
 launch_blockers: []
 ```
+
+For a non-fork artifact, `fork_evidence.present` is false and every other
+`fork_evidence` field is null. For pinned fork evidence it is true, every field
+is populated, the block hash is checked against the recorded source chain, and
+`source_endpoint_id` is a reviewed nonsecret reference rather than a URL or
+credential. A latest-block observation cannot be converted into committable
+evidence after the fact.
 
 ### 15.3 Disposition semantics
 
@@ -1557,13 +1600,13 @@ isolation is proven.
 
 | Slice / purpose and exact expected files | Inputs, dependencies, CM / migration IDs | Allowed outputs and Base impact | Targeted / full validation | Boundary, review, abort/remediation and downstream |
 | --- | --- | --- | --- | --- |
-| **H-01 dependency-security preflight.** Existing `requirements.in`, `requirements.txt`; proposed `tests/deployment/test_dependency_gate.py` and sanitized gate record `docs/chains/rh/evidence/dependency-security-gate.md`. | Section 4; Track 6 S1 exact profile; CM-055/059; no migration ID. | Only narrowly reviewed pins and test/evidence changes. No contract, default or migration output. Base deployment/test environment can change, so all Base tests are mandatory. | Targeted: `python -m pytest -q tests/deployment/test_dependency_gate.py`; dependency resolution/audit command selected by security reviewer. Full: `python -m pytest -q`. | No dependency install/selection without fresh approval. Security and Track 6 owners review. Abort on unresolved deployment-path high/medium alert, incompatible Vyper/Boa/pytest metadata, or weakened S1 assertion. Remediation is pin rollback/new reviewed slice. Downstream H-02–H-09 and every rehearsal. |
+| **H-01 dependency-security preflight.** Existing `requirements.in`, `requirements.txt`; proposed `tests/deployment/test_dependency_gate.py` and sanitized gate record `docs/chains/rh/evidence/dependency-security-gate.md`. | Section 4; Track 6 S1 exact profile; CM-055/059; no migration ID. | Only narrowly reviewed pins and test/evidence changes. No contract, default or migration output. `pymdown-extensions` is a separately reviewable docs-only sub-slice and cannot block a compatible deployment-path refresh. Base deployment/test environment can change, so all Base tests are mandatory. | Targeted: `python -m pytest -q tests/deployment/test_dependency_gate.py`; dependency resolution/audit command selected by security reviewer. Full: `python -m pytest -q`. | No dependency install/selection without fresh approval. Security and Track 6 owners review. Abort on unresolved deployment-path high/medium alert, incompatible Vyper/Boa/pytest metadata, or weakened S1 assertion. A docs-only alert remains visible but is not a deployment-path abort by itself. Remediation is pin rollback/new reviewed slice. Downstream H-02–H-09 and every rehearsal. |
 | **H-02 network profiles and CLI.** Existing `scripts/migrate.py`, `scripts/console.py`, `scripts/verify.py`; proposed `config/network_profiles.py`, `tests/deployment/test_network_profiles.py`, `tests/deployment/test_secret_handling.py`, `tests/deployment/test_base_profile_regression.py`. | D-001/002/004/013/014; U-001–008; CM-055/059; no migration. | Code/tests only; no credentials or network evidence. Preserve intended Base selection/history behavior while deleting unsafe fallbacks, eager key reads and non-Base `KeyError` paths. | Targeted: the three proposed test files. Full: `python -m pytest -q`. CLI help/import checks run with relevant env vars absent. | No secret access or live connection. Deployment-tooling plus security and Base owners review. Abort on label fallback, pre-identity account load, unredacted URL, history aliasing or unclear Base behavior. Revert code before use; downstream H-03/H-05/H-07. |
 | **H-03 Robinhood blueprint and omissions.** Existing `config/BluePrint.py`; proposed `config/robinhood_blueprint.py`, `tests/deployment/test_robinhood_blueprint.py`, `tests/deployment/test_robinhood_omissions.py`. | Approved H-02 profile interface; component rows CM-001–060; U-009–011/015; no migration. | Schema/code/tests with symbolic required fields and explicit `omitted`, `disabled`, `deferred`, `blocked`; never production addresses. Base blueprint remains value compatible unless separately reviewed. | Targeted: the two proposed files plus `tests/deployment/test_base_profile_regression.py`. Full suite. | No production value acceptance. Protocol, security and cross-track owners review. Abort if a required field can default to Base/zero, hard-coded registry slots shift, or unresolved Track inputs are flattened. Code revert is remediation; downstream H-04/H-05/H-09. |
 | **H-04 `DefaultsRobinhood` and parameter manifest.** Proposed `contracts/config/DefaultsRobinhood.vy`, `config/robinhood-parameters.json`, `tests/config/test_defaults_robinhood.py`; existing `scripts/params/regenerate_defaults.py`, `scripts/params/run_all.py`. | CM-049; Track 6 S3–S6; approved inventory/parameters still required; predeployment reservations `0010`–`0060`. | Shared interface-compatible contract source, generator and tests; generated parameter artifact only from approved typed input. No production values in the PR unless separately approved. `DefaultsBase.vy` must not change; Base parity/interface regression required. | Targeted defaults/generator tests, Track 6 S1 profile, deterministic regeneration/diff. Full suite. | No parameter approval implied. Protocol, risk, Track 6 and security owners review. Abort on protocol logic, denominator/unit ambiguity, Base address, unapproved value or non-deterministic generation. Remediation is source revert/new approved parameter artifact; downstream H-05/H-09. |
-| **H-05 migration namespace, discovery and skeletons.** Existing `scripts/migrate.py`, `scripts/utils/migration.py`, `scripts/utils/migration_runner.py`, `scripts/utils/migration_helpers.py`; proposed `tests/deployment/test_migration_discovery.py`, `tests/deployment/test_execution_plan.py` and `migrations/robinhood/{0010_Track6S3LootboxFloor.py,0020_Track6S4DeleverageCooldown.py,0030_Track6S5LedgerGuard.py,0040_Track6S6DefaultsAndParameters.py,0050_Track6S7TimelockRegistryValidation.py,0060_Track6S8LifecycleCapacity.py,0070_Track6S9DisabledIntegrationAssertions.py,0080_Track6S10CadReportAssertion.py,0100_TokensAndRipeHq.py,0200_DataAndConfigRegistries.py,0300_Switchboards.py,0400_PriceSources.py,0500_VaultsAndAssets.py,0600_CoreDepartments.py,0700_SavingsGreenPath.py,0800_EndaomentPsmDisabled.py,0900_CapabilitiesRolesAndHandoff.py,1000_CcipPoolsAndRegistration.py}`. | D-006/009/014; CM-001–060; Track 6 and Track 8; reservations `0010`–`1000`. | Discovery/plan code, inert skeletons and tests only. Skeletons cannot transact or contain values until later reviewed slices; `0080` remains a tooling-only assertion and can never submit an onchain transaction. Base migrations/histories are not renamed or rewritten; Base runner regression required. | Targeted migration discovery/execution-plan tests plus dry plan generation for both RH profiles; full suite. | No state-changing execution. Tooling, protocol, Track 6/8 and security reviewers. Abort on duplicate/order collision, source split, positional resume, executable placeholder or Base history write. Remove unused skeleton only before publication; after an ID is published, remediate forward. Downstream H-06/H-08/H-09. |
+| **H-05 migration namespace, discovery and skeletons.** Existing `scripts/migrate.py`, `scripts/utils/migration.py`, `scripts/utils/migration_runner.py`, `scripts/utils/migration_helpers.py`; proposed `tests/deployment/test_migration_discovery.py`, `tests/deployment/test_execution_plan.py` and `migrations/robinhood/{0010_Track6S3LootboxFloor.py,0020_Track6S4DeleverageCooldown.py,0030_Track6S5LedgerGuard.py,0040_Track6S6DefaultsAndParameters.py,0050_Track6S7TimelockRegistryValidation.py,0060_Track6S8LifecycleCapacity.py,0070_Track6S9DisabledIntegrationAssertions.py,0080_Track6S10CadReportAssertion.py,0100_TokensAndRipeHq.py,0200_DataAndConfigRegistries.py,0300_Switchboards.py,0400_PriceSources.py,0500_VaultsAndAssets.py,0600_CoreDepartments.py,0700_SavingsGreenPath.py,0800_EndaomentPsmDisabled.py,0900_CapabilitiesRolesAndHandoff.py,1000_CcipPoolsAndRegistration.py}`. | D-006/009/014; CM-001–060; Track 6 and Track 8; reservations `0010`–`1000`. | Discovery/plan code, inert skeletons and tests only. Skeletons cannot transact or contain values until later reviewed slices; `0080` remains a tooling-only assertion and can never submit an onchain transaction. Faucet/funding/test-token setup stays outside the canonical migration tree; profile values may differ without changing step identity. Base migrations/histories are not renamed or rewritten; Base runner regression required. | Targeted migration discovery/execution-plan tests plus dry plan generation for both RH profiles; full suite. | No state-changing execution. Tooling, protocol, Track 6/8 and security reviewers. Abort on duplicate/order collision, source split, a testnet-only canonical migration, positional resume, executable placeholder or Base history write. Remove unused skeleton only before publication; after an ID is published, remediate forward. Downstream H-06/H-08/H-09. |
 | **H-06 manifest schema and evidence writer.** Existing `scripts/utils/migration.py`, `scripts/utils/json_file.py`; proposed `scripts/utils/manifest_schema.py`, `docs/chains/rh/schemas/deployment-manifest-v2.schema.json`, `tests/deployment/test_manifest_schema.py`, `tests/deployment/test_current_manifest_promotion.py`. | Section 15; D-009; CM-056; all migration IDs. | Schema/writer/tests and local fixtures. No live manifest. Preserve read compatibility for existing Base history; never rewrite it in place. | Targeted proposed files; parse every committed historical JSON; fault-inject partial writes; full suite. | No secrets/raw provider payloads. Release-evidence and security owners review. Abort if incomplete history can promote, legitimate zero equals missing, prior evidence mutates, or Base reader breaks. Code rollback cannot retract published evidence; remediate with new schema/version. Downstream H-07–H-11. |
-| **H-07 verification, ABI and artifact handling.** Existing `scripts/verify.py`, `scripts/export_abis.py`, `scripts/utils/verify_etherscan.py`; proposed `scripts/utils/verifier.py`, `scripts/utils/verify_blockscout.py`, `tests/deployment/test_verifier_adapters.py`, `tests/deployment/test_abi_export.py`; generated `scripts/abis/vyper/**` only after path compatibility approval. | D-005 recommendation; U-005; CM-057/058; Section 16; Track 1 interface only, no CCIP artifacts yet. | Adapter/export code, tests, deterministic ABI inventory. Base Etherscan-v2 behavior and ABI consumers require regression/migration review. No verification submission in PR validation. | Targeted verifier/ABI tests; clean two-build hash comparison; Base verifier mocks; full suite. | No key use or public submission. Compiler, verifier, security and Base owners review. Abort on provider fallback, guessed artifact, unsupported-success claim, rate-policy assumption, stale/colliding ABI or consumer break. Revert code/restore last reviewed generated set before publication. Downstream H-08–H-12. |
+| **H-07 verification, ABI and artifact handling.** Existing `scripts/verify.py`, `scripts/export_abis.py`, `scripts/utils/verify_etherscan.py`; proposed `scripts/utils/verifier.py`, `scripts/utils/verify_blockscout.py`, `tests/deployment/test_verifier_adapters.py`, `tests/deployment/test_abi_export.py`; generated `scripts/abis/vyper/**` only after path compatibility approval. | D-005 owner approval required; U-005; CM-057/058; Section 16; Track 1 interface only, no CCIP artifacts yet. | Adapter/export code, tests, deterministic ABI inventory. Base Etherscan-v2 behavior and ABI consumers require regression/migration review. No verification submission in PR validation. | Targeted verifier/ABI tests; clean two-build hash comparison; Base verifier mocks; full suite. | No key use or public submission. Compiler, verifier, security and Base owners review. Abort if D-005 remains unapproved, or on provider fallback, guessed artifact, unsupported-success claim, rate-policy assumption, stale/colliding ABI or consumer break. Revert code/restore last reviewed generated set before publication. Downstream H-08–H-12. |
 | **H-08 post-deployment checker.** Proposed `scripts/check_deployment.py`, `scripts/utils/deployment_assertions.py`, `tests/deployment/test_post_deployment_assertions.py`, `tests/deployment/test_registry_topology.py`. | CM-001–060, Sections 13/15, Track 6 S9; migrations `0010`–`1000`. | Read-only checker code/tests and sanitized assertion fixtures. Must support Base via explicit profile expectations, not RH assumptions. | Targeted proposed tests; run checker against local golden Base/RH fixtures; full suite. | No live RPC unless separately approved read-only rehearsal. Protocol, security and evidence owners review. Abort if omitted state cannot be proved, any mismatch is warning-only, registry IDs can shift, or checker mutates state. Code revert/new assertion version is remediation. Downstream H-09–H-11. |
 | **H-09 clean-deployment and negative suite.** Proposed `tests/deployment/test_clean_deployment.py`, `test_resume_reconciliation.py`, `test_reproducible_artifacts.py`, `test_clock_profiles.py`, all Stage 1 files, and `tests/deployment/fork/**` fixtures with network disabled by default. | H-01–H-08; Track 6 S1/S2 and implemented S3–S10; Track 8 gates; CM-001–060; `0010`–`1000`. | Tests/fixtures only; local generated histories remain temporary. Base full suite and ordinary/repeated/jumping-number profiles mandatory. | Every Stage 1/2 target; two clean builds; `python -m pytest -q` serially. Fork tests remain skipped/blocked without explicit profile evidence. | No secret or public state change. QA, protocol, security and all cross-track owners review. Abort on nondeterminism, manual repair, unproved omission, flaky shared state or Base regression. Fix owning slice; downstream H-10/H-11. |
 | **H-10 test-environment deployment/runbook.** Proposed `docs/chains/rh/runbooks/robinhood-testnet-deployment.md`, `tests/deployment/live/test_robinhood_testnet_deployment.py`, `test_robinhood_testnet_lifecycle.py`, `test_robinhood_governance.py`, `test_robinhood_psm.py`, `test_robinhood_ccip.py`; authorized outputs only under `migration_history/robinhood-testnet/v1/`. | V-00–V-10; H-01–H-09; selected CM graph; `0010`–`1000`; exact approved test values/roles. | Runbook/live harness before action; public sanitized manifests only after a separately authorized run and review. No Base production change; Base Sepolia CCIP action is separately gated. | Stage 4 dry run, exact plan digest, then only separately authorized live commands; rerun full static/local suite before and after evidence review. | Requires fresh owner authorization, signer/provider/funds and external-action approvals. Operations, protocol, security, risk, Track owners approve. Abort on any stale fact/hash/gate, ambiguous receipt, assertion failure or unexpected authority. No chain rollback; pause/disable/orphan/adopt/forward migration only. Downstream H-11 and release decision. |

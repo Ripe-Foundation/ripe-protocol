@@ -100,9 +100,9 @@ Stage 1 proves:
 
 | Proposed file | Coverage / CM IDs | Prerequisite | Fixture / network | Expected evidence | Tier / owner |
 | --- | --- | --- | --- | --- | --- |
-| `tests/deployment/test_network_profiles.py` | Schema, canonical IDs, full-URL env references, fee/finality/fork fields, unknown profile; CM-055/059 | D-001/002/004/013 | Static profile fixtures and mocked RPC identities; external network disabled | Unit report and schema fixtures | Fast / deployment-tooling owner |
+| `tests/deployment/test_network_profiles.py` | Schema, canonical IDs, full-URL env references, RPC rate/quota policy, fee/finality/fork policy, per-run fork pin evidence and unknown profile; CM-055/059 | D-001/002/004/013 | Static profile fixtures, separate fork-evidence fixtures and mocked RPC identities; external network disabled | Unit report and schema fixtures | Fast / deployment-tooling owner |
 | `tests/deployment/test_secret_handling.py` | Lazy env lookup, no test-key fallback, full RPC redaction, no env/manifest leakage; CM-055 | V-01 | Isolated process environments and fake sensitive URLs/keys; external network disabled | Captured sanitized logs and negative assertions | Fast / security owner |
-| `tests/deployment/test_migration_discovery.py` | Numeric parsing, stable order, duplicate/gap/semantic-ID rejection, reservation ledger; CM-055 | Namespace implementation | Disposable migration/history trees; no EVM/network | Unit report | Fast / deployment-tooling owner |
+| `tests/deployment/test_migration_discovery.py` | Numeric parsing, stable order, duplicate/gap/semantic-ID rejection, reservation ledger, and rejection of testnet-only canonical migrations; CM-055 | Namespace implementation | Disposable shared-source and isolated-history trees; no EVM/network | Unit report | Fast / deployment-tooling owner |
 | `tests/deployment/test_execution_plan.py` | Plan hash, preconditions, explicit skips, irreversibility, idempotent satisfaction, source/profile drift rejection; CM-055 | D-009/014 | Synthetic plans, mocked receipts and typed state; no external network | Golden plan hashes and unit report | Fast / deployment-tooling + security |
 | `tests/deployment/test_manifest_schema.py` | Every disposition, legitimate zero vs missing, hash chain, immutable steps, atomic current index; CM-056 | Schema implementation | Disposable filesystem with valid/invalid golden manifests | Schema fixtures and golden hashes | Fast / release-evidence owner |
 | `tests/deployment/test_verifier_adapters.py` | Etherscan-v2/Blockscout selection, unsupported provider/language/form, timeout/rate/error states; CM-057 | Adapter implementation | Mocked HTTP/provider responses and virtual clock; external network disabled | Mocked request classifications | Fast / verifier owner |
@@ -160,6 +160,9 @@ until shared-state isolation is proven.
 
 - execute the same `migrations/robinhood/` source under both canonical profiles;
 - prove history paths cannot cross-read or cross-write;
+- prove faucet/funding and mock/test-token setup cannot enter the canonical
+  migration source or histories;
+- prove profile-specific approved values do not change migration step identity;
 - deploy only canonical artifacts intended for Base/Robinhood;
 - reject `DefaultsBase` and `DefaultsLocal` in a Robinhood plan;
 - apply only the approved CM-049 parameter manifest;
