@@ -58,10 +58,11 @@ Its independent reviewer Gate 2 remains open. Stage B must wait for that gate
 and S3 integration, then reconcile under explicit owner direction and
 reproduce S1/S2/S3/full-suite and artifact evidence.
 
-### Reviewer follow-up disposition
+### Independent review disposition
 
-An independent Stage A review reported no blocking defect and seven evidence
-quality observations. This revision maps and addresses them one-to-one:
+The first independent Stage A review reported no blocking defect and seven
+evidence-quality observations. The first follow-up revision maps and addresses
+them one-to-one:
 
 1. **Destroyed artifacts:** the byte-identical K-02 raw preimage and a stricter
    canonical projection are retained outside the repository with restrictive
@@ -85,6 +86,20 @@ The follow-up also exposed and now records one important reproduction detail:
 the frozen output lock must seed pip-compile. Without it, the mutable current
 index produces broad unrelated churn. Stage B therefore requires a complete
 fresh literal diff review even if a candidate hash happens to match.
+
+A second independent rereview verified all seven corrections and raised five
+minor follow-ups: retained-artifact lifecycle, exact lock-command/header form,
+the grammar and one-to-one mapping above, the targeted replay's full-suite
+rationale, and explicit local-versus-remote branch state. Those points are
+addressed in place, including the new residual-risk rows and the additions to
+checkpoint decisions 7 and 8.
+
+A third independent rereview mechanically rechecked the evidence-only scope,
+file and retained-artifact hashes, permissions, branch publication state, S3
+state, and every second-round correction. It found no new defect and raised
+only two cosmetic clarity points: multi-commit rollback wording and explicit
+review-round provenance. This revision addresses both without changing any
+candidate, risk judgment, checkpoint decision, or Stage A boundary.
 
 ## Authority, bootstrap, and frozen inputs
 
@@ -1160,8 +1175,9 @@ No residual risk is accepted by this record.
 
 ## Rollback and reproduction plan
 
-Stage A changes no dependency, so rollback is removal/revert of this evidence
-commit only. The frozen dependency rollback anchor is starting commit
+Stage A changes no dependency, so repository rollback consists only of
+reverting the H-01 evidence commits, which restores this evidence path to its
+absence at the starting commit. The frozen dependency rollback anchor is
 `382eb7d`, direct-input hash
 `2a6726cdc447cb71cc376ef14ee93cc645dbb43826893c5d2433586a89f26f63`,
 and lock hash
