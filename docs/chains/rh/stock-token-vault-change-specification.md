@@ -1,17 +1,20 @@
 # Shared Stock Token Vault-Change Specification
 
-Status: **owner-checkpoint draft — Phases A–C complete; Phases D–K intentionally
-not finalized**
+Status: **Phase D specification complete under owner-approved option 4;
+Phases E–K intentionally not finalized**
 
 Date: 2026-07-23 (America/Denver)
 
 This document is the Track 8 working specification required by
 `track-8-stock-token-vault-change.md`. It records the evidence reconciliation,
-formal state and invariant model, architecture comparison, and mandatory early
-owner checkpoint. It does not select a production vault, approve a
-loss-allocation policy, authorize a Base migration, or authorize implementation.
+formal state and invariant model, architecture comparison, mandatory early
+owner checkpoint, and exact deposit-accounting design. It does not select a
+production vault, approve a loss-allocation policy, authorize a Base migration,
+or authorize implementation.
 
-Until the owner selects a direction, the operative conclusion is:
+The owner selected option 4 as the architecture direction for specification
+work only. Until the later gates are approved and implemented, the operative
+conclusion remains:
 
 > **Do not list Stock Tokens under the current vault designs.**
 
@@ -247,9 +250,8 @@ fully received.
 `depositAmount = min(requested, totalAssetBalance)`. A prior donation can affect
 the conversion base, and a later short receipt remains indistinguishable from
 the requested amount. The same Teller entry point is also used for trusted
-Stability Pool and RipeGov flows, so a future measurement boundary must
-disposition those semantics explicitly. Selecting that boundary is Phase D and
-is not done at this checkpoint.
+Stability Pool and RipeGov flows. Section 14 selects Teller as the shared
+measurement boundary and dispositions every identified deposit consumer.
 
 ### 4.2 Credit and debt health
 
@@ -984,10 +986,10 @@ not hide or clear a custody deficit.
 
 | State | Safety behavior | Liveness result | Allocation/policy | Operator evidence |
 | --- | --- | --- | --- | --- |
-| 1. Solvent ordinary operation | Credit exactly `R`; `ΣB`, `K`, and settlement remain bounded by `C`. | Deposits, borrow, repay, withdrawal, and approved settlement can progress. | Normal rounding/dust policy pending Phase D/G. | Live/accounted/claim getters and normal events. |
+| 1. Solvent ordinary operation | Credit exactly `R`; `ΣB`, `K`, and settlement remain bounded by `C`. | Deposits, borrow, repay, withdrawal, and approved settlement can progress. | Deposit rounds shares down per Phase D; permanent bounded-dust policy remains Phase G. | Live/accounted/claim getters and normal events. |
 | 2. Pre-existing donation | The donation is not the next depositor's `R`. | Deposit may proceed only if measurement is call-local. | Surplus ownership/recovery remains owner policy. | Expose `C` separately from persisted accounting. |
 | 3. Donation between deposits | Later depositor cannot capture the donation through receipt inference. | Existing users may benefit only under an approved share/surplus policy. | Owner must decide who owns the donation. | Record first divergence and resulting surplus. |
-| 4. Short receipt / fee on transfer | Credit `R`, not `q`; zero receipt commits no credit. | Call succeeds only if `R` satisfies minimums, or reverts atomically. | Excess/fee treatment pending. | Requested, received, credited, and event amounts must reconcile. |
+| 4. Short receipt / fee on transfer | Credit `R`, not `Q`; zero receipt commits no credit. | General call succeeds only if `R` satisfies minimums; exact callers or invalid deltas revert atomically. | Transfer fee remains external; `R > Q` reverts rather than being allocated. | `A`, `Q`, `R`, credited, returned, and event amounts must reconcile. |
 | 5. Partial issuer reduction | Nominal path sets deficit and disables new borrowing/internal settlement; corrected share path reprices pro rata. | Repay and safely allocable external delivery remain possible. | Nominal partial-loss allocation is not selected. | Expose `C`, `N` or `S`, claims, `δ`, flags, and affected auctions. |
 | 6. Aggregate nominal deficit | `B=0` for affected asset while explicit deficit keeps existing debt unsafe/visible. | Repay remains open; loss settlement freezes absent policy. | No silent `min(userNominal,C)` or pro rata. | Emit/return deficit independently of price. |
 | 7. Total custody loss with claims | No paid auction or collateral settlement for missing tokens. | Repay remains open; position becomes resolution-eligible. | Owner must approve exactly-once bad-debt transition. | `C=0`, claims/accounting positive, debt and transition state observable. |
@@ -1158,7 +1160,8 @@ the corrected share path**, with these boundaries:
    without selecting a production vault at this checkpoint.
 4. Require external-only settlement for issuer-controlled collateral.
 5. Freeze post-zero deposits by default.
-6. Do not begin implementation until the owner approves the decision set below.
+6. Do not begin implementation until the later owner gates and implementation
+   authorization are satisfied.
 
 This recommendation is not production-vault selection, implementation
 authorization, Base migration approval, or acceptance of a loss-allocation
@@ -1175,7 +1178,7 @@ policy.
 | Deficit-aware existing-debt health | **Accepted into the atomic containment group**; no amount-view-only patch is acceptable. |
 | Reject Simple internal transfer while underbacked | **Accepted into the atomic containment group**; exact guard/result behavior is deferred. |
 | Add generic per-asset collateral-use flag | **Returned for owner approval in principle**, with a positive recommendation. |
-| Exact per-call deposit delta in the same release | **Accepted as invariant I-01**; Teller-versus-vault boundary remains a Phase D owner-directed design decision. |
+| Exact per-call deposit delta in the same release | **Specified in Phase D at the shared Teller boundary**; implementation remains unauthorized. |
 | External-only issuer-controlled settlement | **Returned for owner approval**, with a positive recommendation. |
 | Keep generic backing checks even with external-only settlement | **Accepted as invariants I-02, I-06, and I-07**. |
 | Define deficit and total-loss debt progress | **Partially accepted**: containment freezes unsafe progress and keeps repayment open; final exactly-once transition is returned for owner/accounting/security decision. |
@@ -1193,9 +1196,9 @@ authorization.
 
 ## 12. Mandatory owner checkpoint
 
-### 12.1 Direction required
+### 12.1 Direction decision
 
-The owner must select one:
+The checkpoint presented these options:
 
 1. no Stock Token listing;
 2. containment release only;
@@ -1203,19 +1206,29 @@ The owner must select one:
 4. containment followed by corrected share path; or
 5. another explicitly approved generic design.
 
-No selection has been made. If no direction is approved, Track 8 stops with
-`do not list Stock Tokens under the current vault designs`.
+On 2026-07-23, the owner approved **option 4: containment followed by the
+corrected share path**, and authorized **Phase D specification work only**.
+This is checkpoint option 4—the staged combination of Section 9 outcomes 2 and
+3—not Section 9.5's separately numbered “another generic shared design.”
+That authorization explicitly did not:
+
+- select a production vault;
+- approve implementation;
+- authorize a Base migration; or
+- approve a loss-allocation policy.
+
+The remaining phase gates below remain operative. The current production
+posture is still `do not list Stock Tokens under the current vault designs`.
 
 ### 12.2 Checkpoint decisions and their actual gates
 
-Only the product/architecture direction is required to begin Phase D. The
-checkpoint requests the remaining eight decisions now so the owner can resolve
-them early, but they gate the later phases shown below and need not delay Phase
-D if the owner prefers staged decisions.
+Only the product/architecture direction was required to begin Phase D. That
+gate is now satisfied for specification work. The remaining eight decisions
+gate the later phases shown below; none was implied by the option-4 approval.
 
 | Decision | Options | Evidence and recommendation | Owner | Affected components | Prerequisite / milestone | Status |
 | --- | --- | --- | --- | --- | --- | --- |
-| Product outcome | Five checkpoint options above | Recommend staged containment then corrected share path | Product + protocol owner | Whole track | Before Phase D | **Required now** |
+| Product outcome | Five checkpoint options above | Staged containment then corrected share path | Product + protocol owner | Whole track | Before Phase D | **Approved: option 4, specification work only** |
 | Per-asset collateral use | Approve generic flag / reject | Current config lacks it; recommend approve in principle | Protocol owner + security | `CM-009`, `CM-011`–`013`, `CM-030`, config/interfaces | Before Phase E | Requested at checkpoint; gates Phase E |
 | Issuer-controlled settlement | Always external / permit bounded internal | Current internal mode can charge for undeliverable nominal claims; recommend external-only | Protocol owner + risk/security | `CM-026`, `CM-030`, `CM-043`, `CM-044`, Vault interface | Before Phase F | Requested at checkpoint; gates Phase F |
 | Total-loss transition | Approved user-debt→Ledger-bad-debt design / another existing-accounting design / no listing | Current system has no atomic exactly-once path; recommend a separate shared transition specification within the selected release | Protocol owner + accounting/security | `CM-026`, `CM-030`, Ledger, interfaces | Before Phase F | Requested at checkpoint; gates Phase F |
@@ -1231,8 +1244,8 @@ These must not be treated as approved by the checkpoint recommendation:
 
 | Decision area | Options/recommendation | Needed before | Status |
 | --- | --- | --- | --- |
-| Deposit measurement boundary | Teller or inside each vault; select only after Phase D caller/failure analysis | Phase D completion | Deferred |
-| Requested/received/excess semantics | Revert excess, cap, or explicit credit rule; exact `R` required | Phase D completion | Deferred |
+| Deposit measurement boundary | Teller measures the call-local custody delta and passes only verified receipt to the vault; see Section 14 | Phase D completion | **Specified; implementation not approved** |
+| Requested/received/excess semantics | Validated transfer attempt `Q`; received/credited `R`; zero, negative, or excess delta reverts; see Section 14 | Phase D completion | **Specified; implementation not approved** |
 | Nominal partial loss | Freeze unresolved or owner-approved allocation; never silent pro rata | Phase E/F | Deferred |
 | Rounding | Offset, directions, minimum, dust bound | Phase G | Deferred |
 | Emergency disable/re-enable | Fast disable and stronger/timelocked re-enable recommended | Phase H | Deferred |
@@ -1263,42 +1276,398 @@ This is a Phase C impact boundary, not the finalized Phase I change table.
 | Ledger | User debt, auctions, and exactly-once protocol bad debt |
 | `ConfigStructs` and `Vault` interfaces | Missing flags/status/results; caller compatibility |
 | StabilityPool, RipeGov, StabVault | Shared Teller deposit boundary must preserve semantics |
+| BondRoom, HumanResources, CreditEngine/CreditRedeem reward paths | Trusted RIPE/sGREEN deposits must consume and verify Teller's returned receipt |
 | Base/RH migration and manifests | Same canonical source, live-version policy, custody migration, verification |
 
 Track 7 owns exact Robinhood migration IDs/namespaces/tooling. Track 8 will not
 reserve or invent them.
 
-## 14. Phases D–K hold
+## 14. Phase D — exact deposit accounting
+
+### 14.1 Authorization and design boundary
+
+The owner authorized Phase D specification work only when approving checkpoint
+option 4, the staged combination of containment and the corrected share path.
+This section therefore selects one shared deposit-accounting design, but does
+not authorize its implementation or select a production vault.
+
+The selected boundary is **Teller-side, call-local custody-delta
+measurement**. Teller owns the transfer source and mode, resolves the target
+vault, applies deposit limits, and is already the common entry point for every
+production deposit path found in the pinned source. Every participating vault
+must consume Teller's measured receipt; no vault may infer a call's receipt
+from its aggregate balance.
+
+The alternative, vault-side measurement, was rejected for the current
+architecture:
+
+- measuring only after Teller has transferred cannot recover the vault's
+  call-local pre-transfer balance;
+- moving `transferFrom` into every vault would change approvals, trusted
+  deposits, Teller-held deposits, and the common call boundary; and
+- a prepare/finalize pre-balance hook would introduce persistent or transient
+  state that callbacks, stale prepares, and partial integrations could misuse.
+
+Passing a Teller-captured pre-balance to each vault would still make Teller the
+measurement boundary while unnecessarily widening interfaces. The selected
+design therefore keeps measurement and enforcement in Teller and passes only
+the verified received amount through the existing vault deposit parameter.
+It is generic: no asset-name, issuer, vault-ID, or chain-ID branch is permitted.
+
+### 14.2 Amount vocabulary
+
+For one `_deposit` execution:
+
+| Symbol | Name | Definition |
+| --- | --- | --- |
+| `A` | caller request | Raw `_amount` supplied to the Teller entry point. It may be `max_value(uint256)` or exceed the depositor balance/limit. |
+| `Q` | transfer attempt | Final nonzero amount returned by `TellerUtils.validateOnDeposit` after source-balance and applicable user/global limit caps. |
+| `C0` | custody before | Target vault's token `balanceOf` read immediately before the transfer. |
+| `C1` | custody after | Target vault's token `balanceOf` read immediately after the transfer returns successfully. |
+| `R` | received | Checked delta `C1 - C0`, valid only when `C1 >= C0` and `0 < R <= Q`. |
+| `V` | credited/returned | Amount the vault reports after adding user accounting. It must equal `R`. |
+| `C2` | custody after credit | Target vault's token balance after the vault accounting call. It must equal `C1`. |
+| `C3` | custody before success events | Target vault's token balance after all post-credit external work and immediately before success events. It must equal `C1`. |
+
+`A` is user/operator intent, `Q` is the requested transfer after protocol
+validation, and `R` is the only amount delivered to and credited by the vault.
+The terms `requested`, `received`, and `credited` must not be used
+interchangeably in code, tests, events, or operational evidence.
+
+### 14.3 Required transaction ordering
+
+Every path into Teller `_deposit` must perform this sequence atomically:
+
+1. Its top-level deposit-bearing Teller route enters a **deposit-specific
+   mutex** before vault resolution, validation, token calls, or other external
+   work. `_deposit` may execute only while that route owns the mutex.
+2. Resolve the vault and vault ID and obtain the user's starting Ledger data.
+3. Run the existing `validateOnDeposit` policy to derive `Q`.
+4. Read `C0 = token.balanceOf(vaultAddr)` immediately before transfer.
+5. Execute the existing transfer mode for `Q`:
+   `transferFrom(depositor, vaultAddr, Q)` for ordinary/trusted-source funds or
+   `transfer(vaultAddr, Q)` when Teller already holds the funds.
+6. Require the token call to return true when it returns a value; a false
+   result or revert fails the whole transaction.
+7. Read `C1 = token.balanceOf(vaultAddr)` immediately after transfer.
+8. Require `C1 >= C0`, compute `R = C1 - C0`, and require `0 < R <= Q`.
+9. Call the resolved vault deposit function with `R`, never `A` or `Q`.
+10. Require the vault's returned credited amount `V` to equal `R`.
+11. Read `C2` after the vault call and require `C2 == C1`.
+12. For a non-trusted deposit, apply the post-credit minimum-balance check in
+    Section 14.6.
+13. Only after those checks may Teller register vault participation, update
+    Lootbox deposit points, perform requested housekeeping, add the PriceDesk
+    snapshot, and emit successful-deposit events.
+14. After `_deposit`'s post-credit external work and before its events, read
+    `C3` and require `C3 == C1`.
+15. Hold the deposit mutex through the final event and return `R`; a revert
+    rolls back both the mutex write and every earlier state/external effect.
+
+The current global `@nonreentrant` guard cannot simply be added to
+`depositFromTrusted`. Existing nonreentrant Teller claim flows can legitimately
+call Stability Pool/StabVault code that calls back into
+`depositFromTrusted`. The unrelated outer claim does not own the deposit mutex,
+so a separate deposit mutex permits that first callback to enter `_deposit`,
+while rejecting any nested deposit after a deposit-bearing route has begun.
+`deposit` and `depositFromTrusted` hold it through their returns;
+`depositMany` holds it once across every item and final batch housekeeping;
+`rebalance` holds it across deposit, withdrawal, final health check, and return;
+and the Teller-held sGREEN and `depositIntoGovVault` routes hold it across their
+respective `_deposit` calls and returns.
+
+The `C2 == C1` check makes vault crediting a bookkeeping-only step for the
+measured asset. It catches vault code, hooks, or callbacks that move the asset
+again before credit finalization. The `C3 == C1` check extends that protection
+across the Ledger, Lootbox, PriceDesk, and any housekeeping calls performed
+inside `_deposit`, so its successful events cannot describe a balance changed
+during that critical section. Batch-final housekeeping and rebalance
+withdrawal occur after the per-deposit event but remain transaction-atomic and
+inside the deposit mutex; the latter may intentionally change custody. No
+callback may open a nested Teller deposit while the mutex is held.
+
+### 14.4 Token behavior and failure semantics
+
+| Observed behavior | Required result |
+| --- | --- |
+| Ordinary receipt, `R == Q` | Credit and return `R`; continue with post-credit effects. |
+| Short receipt or fee on transfer, `0 < R < Q` | General deposit succeeds with only `R` credited. Exact-receipt callers in Section 14.7 revert atomically. |
+| Zero receipt, `R == 0` | Revert; no accounting, participation, points, housekeeping, snapshot, or event persists. |
+| Negative delta, `C1 < C0` | Revert before subtraction; no loss is assigned to the depositor. |
+| Excess delta, `R > Q` | Revert; do not cap or silently allocate the surplus. |
+| Transfer returns false or reverts | Revert atomically. |
+| Non-standard no-return ERC-20 | The existing default-true call convention may be retained, but the custody delta remains authoritative. |
+| Prior donation | It is already included in `C0`, cancels from `C1 - C0`, and is never credited to the new depositor. |
+| Donation between separate deposits | Each call has its own `C0`; neither depositor receives the inter-call donation. |
+| Callback/nested deposit | Deposit mutex rejects the nested deposit; outer transaction either continues without it or reverts according to callback behavior. |
+| Transfer-time upgrade or token logic change | The post-call balance is authoritative; invalid zero, negative, or excess observations revert. No cached token-behavior assumption is allowed. |
+| Vault-side mutation during credit | `C2 != C1` reverts the whole deposit. |
+| Mutation during post-credit external work | `C3 != C1` reverts the whole deposit before success events. |
+
+A net-delta measurement cannot prove causation. If token transfer logic both
+delivers tokens and changes unrelated vault custody in the same call, a net
+delta within `(0, Q]` can be observationally indistinguishable from a short
+receipt. Likewise, a simultaneous positive and negative mutation can net to an
+apparently valid `R`. Such token behavior is unsupported unless the later
+asset-behavior gate proves that transfer cannot mutate unrelated vault
+custody. Phase D does not approve any asset under that gate.
+
+Positive rebasing or unsolicited transfer during the measurement window that
+pushes `R > Q` is intentionally fail-closed. There is no cap-to-`Q` path:
+capping would leave an unassigned balance change inside the supposedly atomic
+receipt window and make the evidence ambiguous.
+
+### 14.5 Vault-specific credit contract
+
+The existing external vault deposit signatures can remain unchanged. Their
+`_amount` parameter changes semantically from a caller assertion to
+**Teller-verified `R`**, and each returns `R`. This avoids a function-ABI break,
+but the semantic change and new Teller event still require interface/ABI
+inventory in Phase I before implementation.
+
+**BasicVault / Simple path**
+
+- Remove the aggregate `min(_amount, totalAssetBalance)` inference.
+- Require `_amount > 0`; credit exactly `_amount == R`.
+- The vault may assert its current custody is at least `R`, but must not use
+  total custody to enlarge or redefine the receipt.
+- Nominal accounting, existing withdrawal behavior, and future deficit
+  controls remain Phase E/F subjects.
+
+**SharesVault / Rebase path**
+
+- Require `_amount == R > 0` and current custody `C1 >= R`.
+- Derive pre-deposit custody as `C0 = C1 - R`.
+- Mint from `R` using the current deposit direction, rounding shares down:
+  `floor(R * (S + 10^8) / (C0 + 1))`.
+- Require the minted share amount to be positive. A positive receipt that
+  rounds to zero must revert rather than become an uncredited donation.
+- This Phase D rule fixes the measurement input and rounding direction only.
+  Phase G still owns any corrected permanent formula, bounded-dust proof,
+  total-loss behavior, and owner-approved post-zero allocation.
+
+**StabVault / Stability Pool path**
+
+- Use verified `R` instead of `min(_amount, aggregate custody)`.
+- Preserve the current GREEN/sGREEN value conversion, claimable-value inputs,
+  virtual offset, and share-mint direction.
+- Compute the new-user value from `R` and the pre-deposit value represented by
+  custody excluding `R`; mint shares rounding down and require positive shares.
+- Ordinary GREEN and sGREEN regression cases must continue to produce
+  `R == Q`; a general Teller deposit still follows measured semantics if token
+  behavior later changes. Phase D must not silently alter Stability Pool
+  economics, redemption, or claim accounting.
+
+**RipeGov**
+
+- The RipeGov wrapper receives verified `R`, delegates it to SharesVault, and
+  must return `R`.
+- `RipeGovVaultDeposit.amount` is `R`; `shares` is the positive share result
+  minted from `R`. Lock-duration and governance-point rules are unchanged.
+- `depositTokensWithLockDuration` must be restricted to Teller, matching
+  `depositTokensInVault`, so production deposit accounting cannot bypass the
+  shared measurement boundary. No production direct caller was found in the
+  pinned tree; direct test helpers must be routed through Teller or an explicit
+  isolated vault-unit harness during implementation.
+
+### 14.6 Limits, minimums, prices, and housekeeping
+
+Current `TellerUtils.validateOnDeposit` remains the pre-transfer policy source.
+It may reduce `A` to `Q` using available source balance and the applicable
+per-user/global limits. Because the measurement requires `R <= Q`, a short
+receipt cannot exceed either upper limit.
+
+The existing pre-transfer minimum check uses `Q` and is insufficient when
+`R < Q` or share rounding reduces the user's live amount. For non-trusted
+deposits, Teller must re-read the user's final live amount after vault credit
+and require it to satisfy `minDepositBalance`. Trusted Ripe-department flows
+remain exempt from user/global/minimum policy, as they are today, but are never
+exempt from receipt measurement or their Section 14.7 exactness rule.
+
+Registration, reward points, health housekeeping, and pricing must consume
+post-credit state:
+
+- do not add a vault to the user's Ledger participation before nonzero credit
+  succeeds;
+- update Lootbox only after the vault records shares/nominal balance from `R`;
+- retain each entry point's current housekeeping policy, but run it only after
+  measured credit;
+- add the PriceDesk snapshot only after successful measured credit;
+- `depositMany` measures every item independently and remains batch-atomic,
+  with its existing single final housekeeping call and one mutex spanning the
+  whole batch; and
+- `rebalance` records `R` as `depositAmount`, then performs withdrawal and its
+  final health check atomically while retaining the mutex.
+
+Neither Lootbox, housekeeping, nor PriceDesk receives `A` or `Q` as a credited
+amount. They read the final vault/account state produced from `R`.
+
+### 14.7 Deposit-consumer disposition
+
+The pinned caller trace supporting this matrix is:
+
+| Source | Deposit use |
+| --- | --- |
+| `contracts/core/Teller.vy:229-320` | Public single/batch/trusted entry points and shared `_deposit` ordering |
+| `contracts/core/Teller.vy:400-444` | Rebalance consumes `_deposit` return |
+| `contracts/core/Teller.vy:626-642` | Teller-held sGREEN deposit |
+| `contracts/core/Teller.vy:761-772` | RipeGov deposit with lock |
+| `contracts/vaults/modules/BasicVault.vy:23-39` | Current nominal aggregate-balance clamp |
+| `contracts/vaults/modules/SharesVault.vy:25-46` | Current share receipt and mint inputs |
+| `contracts/vaults/modules/StabVault.vy:109-141` | Current Stability Pool receipt/value/share inputs |
+| `contracts/vaults/RipeGov.vy:131-179` | Teller wrapper, broader locked-deposit authorization, points, and event |
+| `contracts/vaults/modules/StabVault.vy:756,994` | RIPE reward stake and collateral-claim auto-deposit |
+| `contracts/core/BondRoom.vy:223` | RIPE bond payout/stake |
+| `contracts/core/Lootbox.vy:1157` | RIPE reward stake |
+| `contracts/core/HumanResources.vy:426` | RIPE compensation stake |
+| `contracts/core/CreditEngine.vy:1207` | sGREEN recipient deposit |
+| `contracts/core/CreditRedeem.vy:293` | sGREEN recipient deposit |
+| `contracts/core/Deleverage.vy:456` | Replacement-collateral deposit |
+
+Repository-wide production-source search found no other direct vault deposit
+caller. Implementation must repeat that inventory against the then-current
+integrated commit.
+
+Every production call found in the pinned source is assigned one of two
+receipt policies:
+
+- **measured**: accept `0 < R <= Q` and expose the difference; or
+- **exact**: capture Teller's return and require `R == A`, which proves
+  `R == Q == A`; revert the entire upstream operation on a source-balance cap
+  or short receipt.
+
+| Consumer / route | Policy | Required disposition |
+| --- | --- | --- |
+| Teller `deposit` | Measured | Return and emit `R`; caller-requested `A` and transfer attempt `Q` remain observable in the new event. |
+| Teller `depositMany` | Measured per item | Each item gets an independent delta and event; any failed item reverts the batch. Existing function return shape need not change. |
+| Teller `rebalance` | Measured | Use returned `R` in `TellerRebalance.depositAmount`; withdrawal and final health check remain atomic. |
+| Teller `depositIntoGovVault` | Measured | Pass `R` to RipeGov; lock and points derive from credited shares. |
+| Teller GREEN→sGREEN→Stability Pool | Exact | Capture `_deposit` result and require it equals the ERC-4626 `sGreenAmount`; return that exact amount. |
+| Stability Pool/StabVault ordinary GREEN or sGREEN deposit | Measured | Preserve current economics using `R`; regression must prove current GREEN/sGREEN behavior yields `R == Q`. |
+| StabVault collateral-claim auto-deposit | Measured | Credit only `R`. The claim event continues to describe collateral removed/routed; the Teller measurement event is the credited-amount record. |
+| StabVault RIPE claim reward | Exact | Capture return and require equality with minted `ripeAvailable` before clearing approval. |
+| BondRoom RIPE payout/stake | Exact | Capture return and require equality with `totalRipePayout`; payout accounting cannot exceed stake credit. |
+| Lootbox RIPE reward stake | Exact | Capture return and require equality with `amountToStake`; reward accounting cannot exceed stake credit. |
+| HumanResources RIPE stake | Exact | Capture return and require equality with `_amount`; compensation accounting cannot exceed stake credit. |
+| CreditEngine sGREEN deposit for recipient | Exact | Capture return and require equality with minted/routed `sGreenAmount`. |
+| CreditRedeem sGREEN deposit for recipient | Exact | Capture return and require equality with minted/routed `sGreenAmount`. |
+| Deleverage collateral swap | Exact | Capture return and require equality with calculated `depositAmount` before housekeeping/event; `CollateralSwapped.depositAmount` is the verified amount. |
+| Direct BasicVault, SharesVault, StabVault, or RipeGov production call | Prohibited | Teller is the only production deposit-accounting boundary. Vault-only unit harnesses may exercise internal math without representing an authorized production path. |
+
+An exact caller compares Teller's return to the amount it supplied, so it need
+not recover Teller's internal `Q`. The check occurs in the same transaction;
+a mismatch rolls back minting, withdrawal, claim accounting, approvals, and
+any intermediate bookkeeping. The StabVault collateral-claim auto-deposit is
+the sole identified trusted path allowed to accept a short receipt because it
+routes an already-determined user claim through a potentially
+behavior-changing asset; it must not describe `Q` as the vault credit.
+
+### 14.8 Event and ABI contract
+
+Existing successful-deposit events retain their signatures for compatibility:
+
+- `TellerDeposit.amount = R`;
+- `SimpleErc20VaultDeposit.amount = R`;
+- `RebaseErc20VaultDeposit.amount = R`;
+- `StabilityPoolDeposit.amount = R`;
+- `RipeGovVaultDeposit.amount = R`;
+- share fields report shares actually minted from `R`;
+- `TellerRebalance.depositAmount = R`; and
+- `CollateralSwapped.depositAmount = R` after its exact-receipt assertion.
+
+Teller must add one additive evidence event; its exact field contract is:
+
+```text
+TellerDepositMeasured(
+    user,
+    depositor,
+    asset,
+    inputAmount=A,
+    transferAmount=Q,
+    receivedAmount=R,
+    creditedAmount=V,
+    vaultAddr,
+    vaultId
+)
+```
+
+`user`, `depositor`, and `asset` should retain the existing indexed identity
+pattern. Emit this event only after every custody, credit, minimum, and
+post-credit check succeeds, immediately before the existing `TellerDeposit`.
+The explicit `creditedAmount` is intentionally redundant with `receivedAmount`;
+their equality is machine-checkable evidence of I-01 rather than an inference
+from two contracts.
+
+No existing function selector or return type must change for Phase D.
+Interfaces that already return the credited amount retain that type. Callers
+that currently ignore `depositFromTrusted` must consume it according to
+Section 14.7. The additive event and any authorization tightening are future
+ABI/source changes subject to Phase I inventory and separate implementation
+approval.
+
+### 14.9 Phase D acceptance and remaining gates
+
+Phase D is specification-complete when the companion validation plan maps
+tests to all rules above. The design establishes:
+
+```text
+0 < credited = returned = emitted existing amount = R <= Q <= A
+```
+
+`A` may be the `max_value(uint256)` sentinel, but `validateOnDeposit` still
+derives `Q <= A`. It also establishes:
+
+```text
+C1 = C0 + R
+C2 = C1
+C3 = C1
+prior donation is included in C0, not R
+```
+
+For the nominal path, `N' = N + R` and `C1 = C0 + R`, so a successful
+deposit preserves the pre-call aggregate difference `C - N`; it cannot create
+a new accounted deficit. For the share path,
+`S' = S + floor(R * (S + 10^8) / (C0 + 1))` under the current Phase D
+conversion direction, so `Q - R` cannot mint shares and a prior donation
+affects the conversion base but never the receipt.
+
+The owner-approved option 4 direction and this deposit design do not resolve
+backing flags, existing-debt deficit behavior, settlement policy, total-loss
+transition, post-zero allocation, rewards units, production-vault selection,
+or migration. Phase E remains blocked on its documented owner decision.
+
+## 15. Phases E–K hold
 
 The following are deliberately **not finalized**:
 
-- exact deposit measurement boundary and ABI/event behavior;
 - final backing/config storage and governance interface;
 - total-loss bad-debt transition mechanics;
-- corrected share formulas and post-zero allocation;
+- corrected permanent share formulas and post-zero allocation;
 - control roles and clock behavior;
 - exact source/storage/interface/migration table;
-- final validation plan;
+- final Phase J validation plan;
 - implementation PR split and atomic deployable groups; and
 - exact `rh-summary.md` handoff.
 
-Work must not continue into those phases until the owner resolves Section 12.
+Work must not continue into Phase E or later until the owner resolves the
+corresponding Section 12 gate and expressly authorizes that phase.
 
-## 15. Checklist handoff at this checkpoint
+## 16. Checklist handoff at this checkpoint
 
 No `rh-summary.md` checkbox is edited or closed.
 
 Eligible for owner review:
 
 - Phase 0, **resolve the deployable Stock Token vault path** (line 85 at the
-  `be6a759` reconciliation baseline) — the decision packet is now ready, but no
-  path is selected. The item remains unchecked in post-bootstrap `ce3805d`.
+  `be6a759` reconciliation baseline) — option 4 is the architecture direction,
+  but no production vault, implementation, or migration is approved. The item
+  remains unchecked in post-bootstrap `ce3805d`.
 - Section 4, **finish the Simple versus Rebase comparison** (line 186 at the
   baseline) — Track 5 evidence is hash-verified, source-reconciled, and rerun.
 - Section 4, **write a separate vault-change specification if current behavior
-  is unacceptable** (line 190 at the baseline) — Phases A–C and the owner
-  checkpoint are ready for review, but the item is not eligible for closure
-  until Phases D–K are owner-directed and completed.
+  is unacceptable** (line 190 at the baseline) — Phases A–D are specified, but
+  the item is not eligible for closure until Phases E–K are owner-directed and
+  completed.
 
 Not eligible for closure:
 
