@@ -7,6 +7,10 @@
 - Test history: proposed `migration_history/robinhood-testnet/v1/`
 - Mainnet history: proposed `migration_history/robinhood-mainnet/v1/`
 - Evidence date: 2026-07-23, America/Denver
+- Planning correction: on 2026-07-24, the proposed deployment clock-profile
+  test was renamed to `tests/deployment/test_network_clock_profiles.py` to
+  avoid a pytest basename collision with the integrated Track 6 S1 test; no
+  implementation is implied
 
 ## 1. Purpose and authority boundary
 
@@ -154,7 +158,7 @@ until shared-state isolation is proven.
 | `tests/deployment/test_current_manifest_promotion.py` | Partial run never changes current index; terminal run promotes atomically | CM-056 implementation | Local filesystem/EVM | Prior/current hash evidence and fault-injection results | Integration / evidence owner |
 | `tests/deployment/test_post_deployment_assertions.py` | Addresses, bytecode, constructors, registry, capabilities, flags, parameters, omissions | Approved graph/defaults | Local clean deployment | Complete assertion bundle | Integration / protocol owner |
 | `tests/deployment/test_reproducible_artifacts.py` | Two builds from frozen commit produce identical source/input/ABI/bytecode hashes | V-01 and compiler interface | Two disposable clean environments | Artifact inventories and hash equality | Slow / compiler owners |
-| `tests/deployment/test_clock_profiles.py` | Base ordinary plus Robinhood repeated, +1 and jump profiles | Integrated S1/S2 | Local EVM clock harness | S1/S2 coverage report | Integration / Track 6 owner |
+| `tests/deployment/test_network_clock_profiles.py` | Base ordinary plus Robinhood repeated, +1 and jump profiles | Integrated S1/S2 | Local EVM clock harness | S1/S2 coverage report | Integration / Track 6 owner |
 
 ### 6.2 Required local cases
 
@@ -498,7 +502,7 @@ slice creates the named paths and closes its prerequisite gates.
 | H-01 | `python -m pytest -q tests/deployment/test_dependency_gate.py`; approved resolver/audit and release-note review | Track 6 S1 exact profile; `python -m pytest -q` |
 | H-02 | `python -m pytest -q tests/deployment/test_network_profiles.py tests/deployment/test_secret_handling.py tests/deployment/test_base_profile_regression.py`; CLI help/import with env absent | Stage 1 subset; full suite |
 | H-03 | `python -m pytest -q tests/deployment/test_robinhood_blueprint.py tests/deployment/test_robinhood_omissions.py tests/deployment/test_registry_topology.py` | Base profile regression; full suite |
-| H-04 | `python -m pytest -q tests/config/test_defaults_robinhood.py tests/deployment/test_clock_profiles.py`; deterministic generator comparison | Track 6 S1/S2 and Base defaults regression; full suite |
+| H-04 | `python -m pytest -q tests/config/test_defaults_robinhood.py tests/deployment/test_network_clock_profiles.py`; deterministic generator comparison | Track 6 S1/S2 and Base defaults regression; full suite |
 | H-05 | `python -m pytest -q tests/deployment/test_migration_discovery.py tests/deployment/test_execution_plan.py`; dry plan for both RH profiles | Base runner/history regression; full suite |
 | H-06 | `python -m pytest -q tests/deployment/test_manifest_schema.py tests/deployment/test_current_manifest_promotion.py`; parse all historical JSON | Base history read compatibility; full suite |
 | H-07 | `python -m pytest -q tests/deployment/test_verifier_adapters.py tests/deployment/test_abi_export.py`; two clean artifact builds | Base verifier/ABI consumer regression; full suite |
@@ -518,7 +522,7 @@ required evidence, negative assertions or selected gates are missing.
 | --- | --- | --- |
 | Frozen commit, dependencies, inventory and parameter/address manifests | V-00/V-01 hashes, DR closure, two-checkout comparison | Stage 5; H-01 and V-08 |
 | One canonical source; no Robinhood-only protocol branch | Component/source inventory and bytecode policy matrix | Stage 1/3; Track 6/8/1 shared-source review |
-| Every block-number dependency tested on Base and RH semantics | Track 6 S1/S2 reports plus `test_clock_profiles.py` | Stage 2; V-02/V-03 |
+| Every block-number dependency tested on Base and RH semantics | Track 6 S1/S2 reports plus `tests/deployment/test_network_clock_profiles.py` | Stage 2; V-02/V-03 |
 | Clean-checkout deployment and verification tooling | Sections 15/16 evidence, complete local manifest chain | Stage 2 then provider rehearsal Stage 3 |
 | Minimal GREEN/RIPE pool permission and production registration | Exact artifact/role/remotes, negative capabilities and receipts | Stage 4/5; V-06 plus separate Base/RH action approvals |
 | Bidirectional bridge and total-supply reconciliation | Source burn, in-flight, destination mint and aggregate supply report | Stage 4/5; CCIP activation gate |
