@@ -33,6 +33,9 @@ The Phase D–H test contracts are now specific enough for later
 implementation planning. The full Phase J plan cannot be finalized until the
 owner resolves the later policy decisions in
 `stock-token-vault-change-specification.md` Section 12.
+Specification Section 3.8 enumerates the Phase H reconciliation edits made to
+previously approved specification and validation-plan surfaces, including the
+Phase F gate acceptance update and this document's section renumbering.
 
 ## 1. Existing regression baseline
 

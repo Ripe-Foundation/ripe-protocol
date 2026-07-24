@@ -478,6 +478,27 @@ git -C /Users/wigglez/dev/ripe-protocol diff --name-status \
 => no output
 ```
 
+Phase H also required reconciliation edits in previously approved Sections
+11–17 and the corresponding earlier validation-plan surfaces. Phase H handoff
+commit `1e414983946633c5f58e15c9bfb464aa84d067b5` did not enumerate that
+reach-back clearly enough. For an explicit audit trail, those edits were:
+
+| Earlier surface | Phase H reconciliation |
+| --- | --- |
+| Status, introduction, hold, and checklist progression | Advanced both deliverables from the Phase G checkpoint to owner-authorized Phase H, moved the hold from Phases H–K to Phases I–K, renumbered the closing sections, and marked Phases A–H as specified without closing `rh-summary.md` or any later gate. |
+| Track 5 recommendation disposition (Section 11.1) | Linked the already-accepted monitoring and incident-response recommendations to Section 18's concrete read-only evidence/control requirements. Also corrected the stale “Freeze post-zero deposits” row from “returned for owner approval” to the owner-confirmed Phase G specification status already recorded in Section 12.1; this was a delayed status correction, not a new Phase H approval. |
+| Owner authorization and decision register (Sections 12.1–12.3) | Recorded the exact Phase H authorization and boundary, updated the prior Phase F caller row with the completed alternatives analysis, registered the Phase H resolution/checkpoint gate, separate caller, and withdrawal-posture decisions as returned, and replaced the provisional emergency-control deferral with the evidence-complete-but-unselected status. |
+| Component boundary (Section 13) | Added the control/default component IDs, Ledger borrower/auction enumeration responsibility, and the explicit finding that Phase H maps current interfaces without selecting a replacement. |
+| Phase E operator evidence (Section 15.7) | Replaced the prospective “Phase H may add detail” marker with the completed Section 18 cross-reference while preserving the already-approved automatic fail-closed backing rule. |
+| Phase F controls and acceptance (Sections 16.11–16.12) | Reconciled the provisional Department-pause treatment with the Phase H proof that broad Teller/CreditEngine/Ledger pauses are not a repayment-safe normal gate, returned the existing-control/dedicated-gate/caller alternatives without selection, and made future acceptance depend on the later owner-selected gate and its tests. |
+| Phase G observation boundary (Section 17.5) | Removed the earlier preference for a permissionless checkpoint entry and retained only the approved liveness requirement; Phase H deliberately leaves the checkpoint caller unproposed and unselected. The post-zero freeze and quarantine semantics did not change. |
+| Validation plan before Phase H | Added the proposed Phase H paths, reconciled the Phase F gate test and acceptance language with the returned alternatives, added the Phase H test contract, renumbered the former Sections 10–15 to 11–16, and advanced the closing hold from Phase H to Phase I. No test or implementation file was created. |
+
+These were consistency and provenance reconciliations required to compose
+Phase H with the approved A–G contracts. They did not reverse an
+owner-approved policy, select a gate or caller, introduce a storage/interface
+proposal, authorize implementation or migration, or begin Phase I.
+
 At final Phase H handoff, integration `rh` and `origin/rh` remained at
 `382eb7da82bc4ed54be945311a8ccd30fae87dec`, but the integration worktree had
 gained an untracked
@@ -486,6 +507,15 @@ integration commit, was not imported, modified, or treated as Track 8
 evidence, and creates no Phase H source delta. Its presence is disclosed here
 rather than silently restating the entry-time clean-worktree observation as a
 handoff-time fact.
+
+During this reach-back audit remediation, local integration `rh` advanced
+externally from `382eb7da82bc4ed54be945311a8ccd30fae87dec` to
+`127b4bf287bf63c5ed662d82fbf3db8bf66d06a3` while `origin/rh` remained at
+`382eb7da82bc4ed54be945311a8ccd30fae87dec`. The new commit only adds the
+previously disclosed
+`docs/chains/rh/track-6-s4-deleverage-cooldown.md`; no Phase H
+source/evidence path changed. That commit was not imported or treated as Track
+8 evidence.
 
 ## 4. Current consumer and ordering trace
 
