@@ -705,6 +705,15 @@ authority. Its presence does not change the commit-pinned Phase J source
 recheck; it is disclosed so the clean-at-entry observation is not restated as
 a clean-at-handoff fact.
 
+During the Phase J review-remediation pass, local integration `rh` advanced
+externally from `3e6e6f2` to
+`27765d29094256fa9619dd44a0bfd145863de8b7`, one commit ahead of
+`origin/rh`. That commit only adds the previously disclosed
+`docs/chains/rh/track-6-s5-ledger-guard.md`; it changes no Track 8
+source/evidence path or deliverable. The commit was not imported or treated as
+Phase J authority, and the Track 8 merge base remains the pinned
+`be6a759e15e763b633feefdce91cf8f3ee31a10e`.
+
 ### 3.12 Phase J reconciliation audit trail
 
 Phase J necessarily advances earlier status and gate language while preserving
