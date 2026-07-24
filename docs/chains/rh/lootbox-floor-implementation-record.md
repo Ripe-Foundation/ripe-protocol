@@ -13,6 +13,12 @@ blocked
 **Production implementation commit:**
 `f40dc25ff0352b6ce79944fb28c37499da7bf0f0`
 
+**Initial Gate 1 evidence commit:**
+`7bd8c07aaad71cd47d5d6796e64aa0fe81b71b35`
+
+**Reviewer test-correction commit:**
+`3c1fea84d70e53e6b0947ee501ee7bbf6413dc57`
+
 **Branch:** `rh-track-6-s3-lootbox-floor`
 
 **Worktree:**
@@ -21,6 +27,12 @@ blocked
 This record covers only Stage 1 of
 `docs/chains/rh/track-6-s3-lootbox-floor.md`. It is not a deployment approval,
 an inventory approval, or a merge-readiness claim.
+
+The reviewer feedback recommending conditional Gate 1 approval is not itself
+the immutable approval provenance required by Phase G: it requests corrections
+and says a reviewer or owner must reference the corrected commits afterward.
+The correction therefore remains at Gate 1 and does not authorize S2
+reconciliation.
 
 ## Approval provenance and implemented decisions
 
@@ -120,6 +132,19 @@ CLOCK_INVENTORY_NONPROD_CADENCE mock=0 testing=0 test=130
   `0010_Track6S3LootboxFloor.py` meaning is a predeployment artifact assertion;
   S3 did not create that file.
 
+### Controlling Hightop Notes source
+
+The locally required
+`/Users/wigglez/dev/hightop-notes/random/hood/hood-chain-executive-summary.md`
+was available and read in full. Its SHA-256 on 24 July 2026 was
+`358372baedf3efec8ff5e3c990e1e8202589ba5c3ed0c1ae64d8633233950a5a`.
+
+The implementation follows that source's selected architecture: deploy the
+protocol locally, keep governance and positions chain-local, retain
+`block.number` as the approximate L1-cadence economic clock, recalibrate
+chain-specific parameters, and change only incompatible hardcoded or
+same-number behavior. No superseded federated design was imported.
+
 Historical file hashes remain:
 
 | Historical input | SHA-256 |
@@ -133,8 +158,9 @@ Historical file hashes remain:
 The starting Git tree IDs are
 `e7db6ed257f00d7ceb081716953920b897f01ee0` for
 `migrations/base-mainnet` and
-`12b59cf73855a673946f88f69e30000e51681992` for `migration_history`.
-Both trees are byte-identical on the implementation commit.
+`12b59cf73855a673946d88f69e30000e51681992` for `migration_history`.
+Both trees are byte-identical on the implementation and reviewer-correction
+commits.
 
 ## Production change
 
@@ -177,6 +203,14 @@ The exact Stage 1 changed-file set is:
 - `scripts/abis/Lootbox.json`; and
 - this new `docs/chains/rh/lootbox-floor-implementation-record.md`.
 
+The post-review correction changes only the owned test file and this record.
+It renames the two reverting constructor-case IDs from misleading `disabled`
+labels to `zero-floor-reverts` and `max-floor-reverts`, adds the successful
+post-profile BN-026 landing, corrects the migration-history tree ID, and
+strengthens the evidence qualifications. Production source, fixture,
+Switchboard test, and ABI are unchanged from the production implementation
+commit.
+
 ## Test evidence
 
 ### Constructor matrix
@@ -218,13 +252,18 @@ Using the integrated S1 controller under `base_canonical` and
   `UnderscoreRewardsDistributed.blockNumber`;
 - a repeated number remains ineligible under BN-025/CM-033; and
 - every point after the initial send in `R-J2-J4` and `R-STRESS60` remains
-  inside the interval and cannot bypass it.
+  inside the interval and cannot bypass it, after which an explicit
+  `last + interval + 1` landing succeeds and records BN-026 under both
+  parameter profiles.
 
 The optimized Vyper user assertion is exposed to the generic S1 observed-call
 normalizer as `0x`. Each checked rejection therefore first asserts the named
 `too early` revert directly with Titanoboa, then records the same call through
 the BN-025/CM-033 observed-call diagnostic as `0x`. The two assertions cover
 both the contract-level revert contract and the reusable S1 trace format.
+The S1 diagnostic stream alone cannot distinguish `too early` from another
+optimized revert; the paired named assertion is load-bearing and must not be
+removed during later refactoring.
 
 The same `contracts/core/Lootbox.vy` deployer supplies both parameter profiles.
 
@@ -241,7 +280,10 @@ failures in other modules. Comparison found pre-existing generated-output
 differences in `Deleverage.json`, `EndaomentPSM.json`,
 `SwitchboardAlpha.json`, `SwitchboardDelta.json`, and
 `wsuperOETHbPrices.json`. Those unrelated outputs are outside S3 and were not
-copied. Only the generated `Lootbox.json` was updated.
+copied. Only the generated `Lootbox.json` was updated. The five unrelated ABI
+drifts and exporter compile failures remain a latent repository-hygiene risk
+for a separately scoped task; the S3 contract expressly prohibits repairing
+unrelated ABIs or dependencies here.
 
 | ABI measure | Starting | Implementation |
 | --- | --- | --- |
@@ -315,8 +357,15 @@ The current committed Base manifest records:
   `0x1f90ef42Da9B41502d2311300E13FAcf70c64be7`.
 
 Read-only JSON-RPC verification used `https://base-rpc.publicnode.com` without
-a secret or transaction. At Base block `49,059,353`, timestamp
-`2026-07-24T15:47:33Z`:
+a secret or transaction. The task contract explicitly permits read-only public
+RPC verification without secrets, but no separate owner record names
+PublicNode as the specifically "approved public endpoint" contemplated by
+Phase E. The reads below are reproducible corroborating evidence. If
+"approved" requires provider-specific owner provenance, live verification
+remains an unresolved rollout input until the owner confirms this provider or
+names another endpoint.
+
+At Base block `49,059,353`, timestamp `2026-07-24T15:47:33Z`:
 
 - `RipeHq.getAddr(16)` returned the committed Lootbox address;
 - `eth_getCode` returned 21,637 bytes;
@@ -373,14 +422,49 @@ Commands ran serially from the clean integration worktree at
 | `git diff --check` | clean | 0.03 s |
 
 The full Lootbox directory supplies the requested claim, points, RIPE reward,
-and Underscore regression coverage. The full repository suite is intentionally
-reserved for the post-reconciliation Gate 2 sequence; its untouched baseline
-is green as shown above.
+and Underscore regression coverage.
+
+### Post-review correction replay
+
+The reviewer correction was replayed on
+`3c1fea84d70e53e6b0947ee501ee7bbf6413dc57`:
+
+| Command | Result | Wall time |
+| --- | --- | ---: |
+| `PYTHONPATH=. pytest -q tests/core/lootbox/test_underscore_rewards.py` | 59 passed | 68.85 s |
+| `PYTHONPATH=. pytest -q tests/config/test_switchboard_charlie.py` | 91 passed | 74.38 s |
+| `PYTHONPATH=. pytest -q tests/core/lootbox` | 175 passed | 79.52 s |
+| `PYTHONPATH=. pytest -q tests/clock/test_clock_profiles.py` | 57 passed | 68.97 s |
+| `PYTHONPATH=. python scripts/check_block_clock_inventory.py --check` | expected exit 1; same 120 diagnostics below | 1.51 s |
+| `PYTHONPATH=. pytest -q` | 2,715 passed, 3 failed, 142 deselected | 370.68 s |
+
+The supplemental full-suite failures are exactly the three inventory tests
+whose clean-fixture expectations cannot pass before the deliberately deferred
+Stage 2 reconciliation:
+
+- `test_clean_approved_fixture_passes_without_git_or_network`;
+- `test_discovery_order_does_not_change_output`; and
+- `test_command_runs_outside_repository_root_and_is_deterministic`.
+
+All 2,715 non-failing tests passed. The same three inventory tests passed on
+the untouched baseline as part of the 56-test inventory suite. They must be
+rerun, together with the full suite, after reviewed reconciliation for Gate 2;
+their expected Stage 1 failure is not suppressed or repaired before Gate 1.
 
 ## Expected S2 drift before reconciliation
 
 The S2 inventory and checker are unchanged. The Stage 1 checker emits exactly
 120 diagnostics:
+
+Crucially, zero `INV-CADENCE-NEW` diagnostics come from
+`contracts/core/Lootbox.vy`. This is not evidence that the new immutable is
+covered: `MIN_UNDERSCORE_SEND_INTERVAL` is currently invisible to cadence
+discovery. The checked patterns recognize uppercase identifiers ending in
+`_BLOCK`/`_BLOCKS`, camel-case identifiers ending in `Block`/`Blocks`, and a
+small reviewed list including `ONE_DAY`; the new identifier matches none of
+them. Phase G must deliberately extend the reviewed discovery pattern and add
+deterministic mutation coverage for the immutable before inventory
+reconciliation can pass.
 
 | Code and path | Count |
 | --- | ---: |
@@ -426,36 +510,37 @@ match the checker's cardinality.
 ### Thirty-five moved existing test cadence rows
 
 The new import moves module `ONE_DAY_BLOCKS` from `7->8`. The focused Section 0
-test block then moves these existing rows by 380 lines:
+test block, including the reviewer-requested eligible post-profile landing,
+then moves these existing rows by 408 lines:
 
-- `test_distribute_underscore_rewards_happy_path`: `51->431`;
-- `test_distribute_underscore_rewards_multiple_times`: `87->467`;
-- `test_distribute_returns_correct_amounts`: `113->493`;
-- `test_distribute_updates_last_send_block`: `138->518`, `147->527`;
-- `test_distribute_with_sufficient_ripe`: `167->547`;
-- `test_distribute_with_limited_ripe`: `195->575`;
-- `test_distribute_requires_switchboard_permission`: `229->609`;
-- `test_distribute_reverts_when_paused`: `247->627`;
-- `test_distribute_reverts_when_disabled`: `264->644`;
-- `test_distribute_reverts_too_early`: `284->664`, `287->667`;
-- `test_distribute_exactly_at_interval`: `303->683`, `310->690`;
-- `test_distribute_long_after_interval`: `328->708`, `332->712`;
-- `test_distribute_reverts_both_amounts_zero`: `387->767`;
-- `test_distribute_with_only_deposit_rewards`: `407->787`;
-- `test_distribute_with_only_yield_bonus`: `436->816`;
-- `test_distribute_with_zero_available_ripe`: `461->841`;
-- `test_distribute_with_one_wei`: `481->861`;
-- `test_distribute_exact_ripe_match`: `506->886`;
-- `test_distribute_reverts_no_underscore_distributor`: `530->910`;
-- `test_distribute_decrements_ripe_avail_for_rewards`: `551->931`;
-- `test_distribute_after_global_rewards_update`: `589->969`;
-- `test_distribute_respects_pending_allocations`: `615->995`, `623->1003`;
-- `test_distribute_updates_ledger_new_ripe_rewards`: `647->1027`;
-- `test_distribute_emits_correct_event`: `681->1061`;
-- `test_set_underscore_send_interval_success`: `767->1147`;
-- `test_set_underscore_send_interval_requires_switchboard`: `780->1160`;
-- `test_set_underscore_send_interval_reverts_when_paused`: `791->1171`; and
-- `test_set_underscore_send_interval_validation`: `803->1183`, `805->1185`.
+- `test_distribute_underscore_rewards_happy_path`: `51->459`;
+- `test_distribute_underscore_rewards_multiple_times`: `87->495`;
+- `test_distribute_returns_correct_amounts`: `113->521`;
+- `test_distribute_updates_last_send_block`: `138->546`, `147->555`;
+- `test_distribute_with_sufficient_ripe`: `167->575`;
+- `test_distribute_with_limited_ripe`: `195->603`;
+- `test_distribute_requires_switchboard_permission`: `229->637`;
+- `test_distribute_reverts_when_paused`: `247->655`;
+- `test_distribute_reverts_when_disabled`: `264->672`;
+- `test_distribute_reverts_too_early`: `284->692`, `287->695`;
+- `test_distribute_exactly_at_interval`: `303->711`, `310->718`;
+- `test_distribute_long_after_interval`: `328->736`, `332->740`;
+- `test_distribute_reverts_both_amounts_zero`: `387->795`;
+- `test_distribute_with_only_deposit_rewards`: `407->815`;
+- `test_distribute_with_only_yield_bonus`: `436->844`;
+- `test_distribute_with_zero_available_ripe`: `461->869`;
+- `test_distribute_with_one_wei`: `481->889`;
+- `test_distribute_exact_ripe_match`: `506->914`;
+- `test_distribute_reverts_no_underscore_distributor`: `530->938`;
+- `test_distribute_decrements_ripe_avail_for_rewards`: `551->959`;
+- `test_distribute_after_global_rewards_update`: `589->997`;
+- `test_distribute_respects_pending_allocations`: `615->1023`, `623->1031`;
+- `test_distribute_updates_ledger_new_ripe_rewards`: `647->1055`;
+- `test_distribute_emits_correct_event`: `681->1089`;
+- `test_set_underscore_send_interval_success`: `767->1175`;
+- `test_set_underscore_send_interval_requires_switchboard`: `780->1188`;
+- `test_set_underscore_send_interval_reverts_when_paused`: `791->1199`; and
+- `test_set_underscore_send_interval_validation`: `803->1211`, `805->1213`.
 
 ### Twenty-nine new test cadence rows
 
@@ -599,8 +684,9 @@ manifest.
 
 ## Gate 1 unresolved items
 
-- An independent reviewer must approve the exact implementation commit,
-  generated ABI, hashes, tests, S2 diagnostics, and rollout analysis.
+- An independent reviewer must approve the exact production implementation,
+  reviewer test-correction commit, corrected record commit, generated ABI,
+  hashes, tests, S2 diagnostics, and rollout analysis.
 - The reviewer or owner must then provide immutable approval provenance before
   S2 inventory reconciliation begins.
 - Stage 2 inventory/checker/test changes, the reconciled S1/S2 run, full suite,
@@ -611,7 +697,13 @@ manifest.
 - The pending Underscore distribution-window/state-continuity decision remains
   open.
 - The temporary-drift owner, exact bounds, and deadline remain open.
+- Provider-specific owner confirmation of PublicNode, or a replacement
+  owner-approved public endpoint, remains open if Phase E's "approved public
+  endpoint" language requires more than the task contract's general read-only
+  RPC permission.
 - S6 defaults/manifest work and S10 interval-report correction remain open.
+- Pre-existing unrelated ABI drift and exporter compile failures remain a
+  separately scoped repository-hygiene task and are not S3 changes.
 - Every live deployment, registry, capability, configuration, verification,
   signing, and transaction approval remains open.
 - Owner merge and push remain open.
