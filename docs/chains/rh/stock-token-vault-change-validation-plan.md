@@ -361,7 +361,7 @@ it only as a separate transaction after the outer deposit completes.
 | `test_short_receipt_cannot_exceed_user_or_global_limit` | `Q` is pre-capped and `R <= Q`; final credited state remains within both upper limits. |
 | `test_short_receipt_rechecks_minimum_on_live_balance` | If final live user amount after credit is below `minDepositBalance`, the non-trusted deposit reverts atomically. |
 | `test_trusted_deposit_is_measured_despite_limit_exemption` | Trusted flow skips current user/global/min policy but still proves `0 < R <= Q` and `V == R`. |
-| `test_share_deposit_uses_predeposit_allocated_backing_and_rounds_down` | Under Section 17, shares equal `floor(R * (S + 10^8) / (A_0 + 1))`; `Q`, aggregate post-custody, and pre-existing `U` cannot enter as the call receipt or allocated denominator. |
+| `test_share_deposit_uses_predeposit_allocated_backing_and_rounds_down` | Under specification Section 17, shares equal `floor(R * (S + 10^8) / (A_0 + 1))`; `Q`, aggregate post-custody, and pre-existing `U` cannot enter as the call receipt or allocated denominator. |
 | `test_positive_receipt_that_mints_zero_shares_reverts` | No positive custody can be donated through zero-share credit. |
 | `test_stab_vault_uses_measured_receipt_without_economic_drift` | GREEN/sGREEN value, claimable-value, virtual-offset, and existing share rules are unchanged except for the verified receipt input. |
 | `test_registration_occurs_only_after_credit` | Failed/zero credit cannot add Ledger participation. |
@@ -370,7 +370,7 @@ it only as a separate transaction after the outer deposit completes.
 | `test_deposit_many_measures_each_item_and_is_atomic` | Independent `(C0,C1,R,V,C2,C3)` per item; one failed item rolls back all items and final housekeeping. |
 | `test_rebalance_uses_received_deposit_amount` | `TellerRebalance.depositAmount == R`; deposit, withdrawal, and final health check are atomic. |
 
-Section 17 supplies the permanent corrected-share denominator after the owner
+Specification Section 17 supplies the permanent corrected-share denominator after the owner
 approved the Phase G policies. These tests pin Phase D's receipt input and
 rounding direction and must now compose with `A_0`; they do not approve a
 storage/interface mechanism for representing `A_0`.
@@ -913,7 +913,7 @@ loss epoch/index or checkpoint callback.
 | `test_every_share_surface_declares_its_unit` | Raw shares, `C`, `A^s`, `U^s`, `A`, `U`, claims, normalized reward weight, and USD value are unambiguous |
 | `test_deposit_withdraw_transfer_events_reconcile_amount_and_shares` | Amount is allocated call-local token units; shares are raw units |
 | `test_loss_and_quarantine_evidence_reconstructs_state` | Asset, old/new `A^s/U^s`, `C`, `A`, `U`, caller, block/clock, and reason reconcile with getters |
-| `test_amount_share_conversion_getters_use_A` | Existing-signature or replacement getters match the Section 17 reference model and exclude `U` |
+| `test_amount_share_conversion_getters_use_A` | Existing-signature or replacement getters match the specification Section 17 reference model and exclude `U` |
 | `test_manifest_declares_accounting_version_not_dynamic_balance` | Manifest/runtime evidence identifies capability and getter semantics without stale balance claims |
 | `test_storage_upgrade_preserves_raw_share_units` | Existing user/total balances remain raw shares; any appended state follows the Phase I layout |
 | `test_rebase_and_ripe_gov_consumer_inventory_is_complete` | Every wrapper, reader, event, ABI, and reward path is dispositioned before semantic change |
@@ -1291,7 +1291,7 @@ nor creates that artifact.
 | --- | --- |
 | `test_existing_rebase_positive_delta_semantics_unchanged` | Current Rebase/yield assets continue to allocate their intended positive balance changes; corrected quarantine behavior is isolated. |
 | `test_ripe_gov_lock_and_points_semantics_unchanged` | RipeGov shares, locks, points, and exits remain exact; only the separately approved Teller-only locked-deposit authorization changes. |
-| `test_corrected_variant_positive_delta_is_quarantine` | Candidate variant alone applies Section 17 `U` semantics. |
+| `test_corrected_variant_positive_delta_is_quarantine` | Candidate variant alone applies specification Section 17 `U` semantics. |
 | `test_migration_import_preserves_exact_raw_shares_and_indexes` | One-time candidate import reproduces every user/asset share, aggregate, and one-based enumeration exactly. |
 | `test_migration_import_sets_proven_allocated_and_quarantine_buckets` | Seeding requires a pinned entitlement/custody proof; it never defaults `A^s=C`. |
 | `test_migration_import_is_paused_authorized_idempotent_and_sealed` | Unauthorized/duplicate/post-finalize imports fail; finalization is irreversible and leaves no standing migration mint power. |
@@ -1704,9 +1704,12 @@ the recorded clock is `N/A`.
 ### 18.5 Phase J document and future-result acceptance
 
 The Phase J authoring audit found 441 backticked future-test mentions, 436
-unique names, and zero names outside the profiled Sections 3–11. Repeated
+unique names, and zero names outside the profiled Sections 3–11. Four repeated
 mentions are invariant/state/architecture indexes pointing to one detailed
-record, not duplicate execution requirements.
+record. The fifth is the deliberate same-profile Section 11.3 repetition of
+the internal-settlement product-dependency assertion in both the
+branch-comparison table and the named-evidence summary. None is a duplicate
+execution requirement.
 
 The Phase J document is acceptable only if:
 
