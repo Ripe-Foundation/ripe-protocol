@@ -1388,21 +1388,39 @@ commit `cc0fd9977b854756114e2c3fda2185f2a81f0ce2`.
 
 | Re-frozen input | SHA-256 |
 |---|---|
-| `docs/chains/rh/track-7-h1-dependency-security-preflight.md` | `ac31478dc5aa740267a93083dc97ed10c8645326112e344c17025946c94fef22` |
-| `docs/chains/rh/track-6-block-clock-spec.md` | `a28db8423d68ce05494f0c75468e11a182df14503ee9e6e7fe761523f23269d` |
-| `docs/chains/rh/evidence/block-clock-validation.md` | `6b61a24b0ceae85f6cc175182686186d076c38e7f2ece44bbff235d3f9d22add` |
-| `requirements.in` | `2a6726cdd9dd0ce209a5bf905448f6545798e9ace74d77711ad7c6b568f26f63` |
+| `docs/chains/rh/track-7-h1-dependency-security-preflight.md` | `ac31478d185571c9b804c84a0f78de60bf40eeb3a0aec80b839b66f62befef22` |
+| `docs/chains/rh/robinhood-deployment-support-specification.md` | `a28db8424537d5f059a14a614265077fd4f64379f6596b6eaede9d2716d3269d` |
+| `docs/chains/rh/robinhood-deployment-validation-plan.md` | `6b61a24b838d84d87d88f9d04f95521f2e351a4c75e9511a86e8ac0e13422add` |
+| `requirements.in` | `2a6726cdc447cb71cc376ef14ee93cc645dbb43826893c5d2433586a89f26f63` |
 | `requirements.txt` | `18df0aad224f2a10febc9e155e4a530e1000ec553916c8ef78dc9859c6c92ba0` |
-| `tests/clock/test_clock_profiles.py` | `2b1bbd80249dadf23dcf7db8ecee455a8ec78d914f6ef639c0a8ee434925cc4` |
-| `tests/clock/clock_test_utils.py` | `69f3a616fe1a177e1436defe4205b15b121c642e4804c40029e5795252b34de` |
-| integrated S3 record | `d577f445bb2bcbe84ba68a6699811997076719bb70361641f0b8fb8a9e7be7c` |
-| integrated Lootbox source | `669c285713ab7e1b6ec060a4840f6d53b36b1ec7fac520b817e04e470f18ae65` |
-| integrated Lootbox ABI | `33aadc2148f9d38c6b34579f70d730f27e146304c96d543e0a09fb20a4f517c` |
-| integrated block-clock inventory | `cebc434dbec01492e7a2b2256cc37ac35b84c0e8fbf113ceee81858ba2ffb6fb` |
-| integrated inventory checker | `cc86f7368f924ec017a8ddbd244a803b01e3cdf27d0bd7432e7d42ca174d5642` |
-| integrated inventory test | `d9007158d03576f79044398cbb8d5de57150c2cd70f27885aa60bb48b3a4c39` |
-| integrated underscore-rewards test | `20b86c2d0e1de6577d1dbf80009648844980be899d74592c51a7a156454a6e7b` |
-| integrated Switchboard Charlie test | `a444c5fc2a6dba10fd69e260d828113af57e99ebf9eced04cdb1683c66e5fd44` |
+| `tests/clock/test_clock_profiles.py` | `2b1bbd8c77f97e614c9db54fcb98b284d3db95a6bb47d1ee9ab020bf6d725cc4` |
+| `tests/utils/clock_profiles.py` | `69f3a616a78cb3a155962edb779533f56e362a68cc922c307dc7d40cbd4b34de` |
+| `docs/chains/rh/lootbox-floor-implementation-record.md` | `d577f44507954ee3d1eee3efc4e940833557287d1fdb2890c863070cfee9be7c` |
+| `contracts/core/Lootbox.vy` | `669c2857e2402ef0e8f9a508dd6f342426ffbd1affce11dd429e5b5b0129ae65` |
+| `scripts/abis/Lootbox.json` | `33aadc219718332ef9163f0b85c8e6fba93735d149db3fb0bb2e3fab814db17c` |
+| `config/block-clock-inventory.json` | `cebc434d4e2628afd404ff3c76874e26d6e947783dd75ec74dd10001458df6fb` |
+| `scripts/check_block_clock_inventory.py` | `cc86f73629589c6a2ee0c9b60e480761d88e1e033e452c1f0843c18db9e28642` |
+| `tests/inventory/test_block_clock_inventory.py` | `d9007158565979f7e5027a012a0cf6efdc6be354f0a96b16b7d35c87ba58a39c` |
+| `tests/core/lootbox/test_underscore_rewards.py` | `20b86c2d5466863dc2afceaa580d8ae19c5beb363fb937090aabc1eca6bf7e7b` |
+| `tests/config/test_switchboard_charlie.py` | `a444c5fc64439ccb28f5634248cb9459e579336452d59fb741e1d076d7e1fd44` |
+
+Commit `09a17747b9c6bb985993dd18967daf06955007fe` originally recorded
+incorrect values and three nonexistent paths in this table. Several values
+were not even 64 hexadecimal characters and therefore could not be SHA-256
+outputs. That was an evidence-integrity defect, not candidate drift. The table
+above replaces every row with output recomputed directly from the reconciled
+commit, using each real repository path:
+
+```text
+git show cc0fd9977b854756114e2c3fda2185f2a81f0ce2:"$path" |
+  shasum -a 256
+```
+
+The seven H-01 input hashes are identical to their Stage A values, as expected
+because the S3 reconciliation did not change those files. The nine integrated
+S3 hashes now identify the exact paths added or changed between S3's first
+parent and integration commit. Every value above was also checked for the
+required 64-hex-character shape; path existence was checked at `cc0fd99`.
 
 The relevant read-only reconciliation commands and results were:
 
@@ -1442,7 +1460,7 @@ after reconciliation and before candidate implementation:
 The placeholder value supplied only the repository's collection-time
 environment guard; no explorer or other live service was called.
 
-### Fresh K-02 and candidate reproduction
+### Fresh K-02 and retained candidate evidence
 
 At approximately `2026-07-24T18:27:45Z`, the byte-for-byte approved K-02
 read-only query and canonical sanitization were repeated. The fresh response
@@ -1461,21 +1479,40 @@ hashes, and mode `0600`.
 The approved resolver was rebuilt from
 `/Users/wigglez/.pyenv/versions/3.12.0/bin/python3.12` with pip `23.2.1` and
 pip-tools `7.4.1`, using only public PyPI, no cache for tool installation, and
-a disposable compile cache. Its complete tool inventory remained the Stage A
-inventory (`build==1.3.0`, `click==8.4.2`, `packaging==26.2`,
+a disposable compile cache. Transient command output reported the Stage A
+tool inventory (`build==1.5.0`, `click==8.4.2`, `packaging==26.2`,
 `pip==23.2.1`, `pip-tools==7.4.1`, `pyproject_hooks==1.2.0`,
-`setuptools==83.0.0`, `wheel==0.47.0`) and `pip check` passed.
+`setuptools==83.0.0`, `wheel==0.47.0`) and a passing `pip check`, but that
+inventory output was not retained outside the repository.
 
-All four approved candidates reproduced byte-for-byte from their frozen inputs
-and emitted the exact Stage A lock diffs; therefore no candidate or index drift
-occurred:
+Commit `09a1774` also asserted that all four candidates reproduced
+byte-for-byte after reconciliation and followed that assertion with seven
+incorrect input/lock hashes. The disposable resolver root and generated
+candidate files had already been destroyed, and the resolver tool-environment
+inventory was not retained. This correction therefore withdraws the entire
+post-reconciliation four-candidate reproduction claim instead of replacing it
+with values that cannot now be checked against retained preimages.
 
-| Candidate | Input SHA-256 | Generated lock SHA-256 | Literal diff SHA-256 |
-|---|---|---|---|
-| A | `2523c044ef1050f5c38696579c17038594162353de3851412421368281533b80d` | `d2e12a6f276736add9b728e9d44a16b8b85b1856884a0c418e2c471f80d2bce` | `09915227fe00407d4849543353b76a363bedceb3226b50a8a4f22217bc261b05` |
-| pytest | `2b19212e5caa64b89ea4f58ca9f2cfe447b1bfa89310032739ef723bba3d82de` | `e2af4c14f8d77564aac91f39b0437d06891ec8d9e5024413120fdd42e92f5c07` | `abd03350934a9d16ab10ee1c06aaf3b407b8a6af7fd2861f0d36301735ef64fb` |
-| documentation/low | `26dbc8c7114d6c58c046f5454ad79db4532a686ebf1e6bd60831266ff71db7fb` | `d064cd53f27153b92a7ec4385a6259002c9083a0365cfe33523767c4b20dfb86` | `37389da2471de32127a937a6424845663868928453b7336eb6ef6b71a20baf3b` |
-| Zero | `c5d2e05d108e4ccfd87d8f714f287883e4715e7bffadbd35cc089b1db66113a4` | `b74b693a52d5b0b0f525bf9aae502af7936a35c52145ea54b8843bb7ccd10622` | `b226d0de0fb9363ff99db0ec8e8db39b872fb332e4db1de0ce413b0d1a545441` |
+The durable candidate evidence is narrower:
+
+- Stage A records the four exact candidate inputs, input and lock hashes, and
+  complete literal lock diffs; independent Stage A review mechanically
+  verified those embedded diffs before the preimages were disposed.
+- The retained old and Candidate Zero environment inventories below prove
+  that the two installed environments differed by exactly the nine approved
+  package versions.
+- The retained Candidate Zero audit JSON proves that the audited candidate
+  requirements specified the expected selected versions for the packages it
+  assessed.
+- None of those facts proves a fresh post-reconciliation resolution was
+  byte-for-byte identical across all four candidates.
+
+A resumed Stage B must create a new resolver environment after the required
+owner decisions and branch reconciliation, retain its complete tool inventory
+at mode `0600`, retain or otherwise hash-anchor mechanically generated
+candidate preimages before disposal, and record command-generated values
+without manual transcription. Fresh resolution, complete literal diff review,
+and candidate-drift determination remain unperformed for the next baseline.
 
 Independent old and Candidate Zero environments used CPython `3.12.0` and
 pip `23.2.1`; neither was upgraded in place. Both locks installed from public
@@ -1595,21 +1632,112 @@ worktree's old direct input and lock were never changed and remain reproducible
 at the re-frozen hashes above. The retained mode-`0600` evidence files were
 not moved or deleted.
 
+During independent blocker rereview, local `rh` had advanced from the
+approved reconciliation target to
+`27765d29094256fa9619dd44a0bfd145863de8b7`
+(`docs: record owner-approved Track 6 S5 plan`), while `origin/rh` remained
+`3e6e6f230169fc445d0b29454457480c62efd89a`. The only local-`rh` delta was
+new documentation file `docs/chains/rh/track-6-s5-ledger-guard.md`; the prior
+S3 integration remains its ancestor. This blocked H-01 branch was not
+reconciled again because the prior authorization named exact commit `3e6e6f2`
+and any later reconciliation requires fresh owner direction. Under decision
+8, the local baseline movement is independently sufficient to require a new
+freeze and fresh security evidence before any resumption.
+
+Independent blocker rereview also supplied the following decision guidance.
+It is recorded as reviewer analysis, not owner/security approval:
+
+- Retain a zero-vulnerability policy for applicable findings, with an explicit
+  applicability determination for every auditor result rather than treating
+  an advisory-database metadata defect as an automatically applicable
+  vulnerability.
+- Trial `click==8.3.3` in a refreshed candidate. The current lock records the
+  dependency path `titanoboa -> mkdocs-material -> mkdocs -> click`; OSV/PyPA
+  advisory
+  [`PYSEC-2026-2132`](https://osv.dev/vulnerability/PYSEC-2026-2132)
+  reports every Click version before `8.3.3` as affected.
+- Do not select Pymdown Extensions `10.21.3` again. GitHub's reviewed
+  [`CVE-2026-61632`](https://github.com/advisories/GHSA-9xwg-3r6f-jcx2)
+  record reports `<=10.21.3` affected and `11.0.0` as the first patched
+  version. A refreshed candidate must either trial `11.0.0` as an explicitly
+  reviewed major crossing or retain `10.16.1` with an explicit open
+  disposition.
+- Treat the two Vyper findings as applicability candidates, not silently as
+  accepted risk or as an automatic Vyper-upgrade instruction. GitHub's
+  reviewed records limit
+  [`CVE-2023-39363`](https://github.com/advisories/GHSA-5824-cm3x-3c38)
+  to `>=0.2.15,<0.3.1` with `0.3.1` patched, and
+  [`CVE-2025-21607`](https://github.com/advisories/GHSA-vgf2-gvx8-xwc3)
+  to `<0.4.1`. Both ranges exclude the held `vyper==0.4.3`. If the
+  owner/security reviewer adopts that determination, the refreshed audit
+  command must explicitly authorize and record the exact two ignore flags
+  because the current command forbids ignores:
+
+  ```text
+  --ignore-vuln PYSEC-2023-142
+  --ignore-vuln PYSEC-2025-33
+  ```
+
+  The applicability evidence and any upstream PyPA advisory-database report
+  must have an explicit re-review trigger. No ignore flag was used and no
+  upstream report was submitted in this blocked run.
+- Refresh the complete eight-item authorization bundle only after these
+  choices and the new `rh` reconciliation decision are explicit.
+
 Fresh owner/security decisions are required before any resumption:
 
-1. whether H-01 must retain the zero-known-vulnerability policy or may accept
-   any precisely scoped residual;
-2. whether scope may expand to resolve and review `click==8.3.3` and
-   `pymdown-extensions==11.0.0`, including a fresh complete resolver diff,
-   primary-source review, clean environments, compatibility tests, and a new
-   candidate approval;
-3. how to disposition the two Vyper `0.4.3` audit findings for which the
-   auditor reports no fixed version—hold and exception-gate them with owner,
-   scope, controls, expiry, and re-review trigger; establish with primary
-   evidence that they do not apply; or authorize a separately reviewed Vyper
-   profile change and its Track 6/S1/S3/artifact consequences; and
-4. after those choices, whether to refresh the complete eight-item
-   authorization bundle and resume from a newly frozen reconciled baseline.
+1. whether to adopt the reviewer's recommended zero-applicable-vulnerability
+   policy and per-finding applicability rule, or to define another precise
+   residual policy;
+2. whether scope may expand to trial and review exact `click==8.3.3` and
+   either exact `pymdown-extensions==11.0.0` or an explicit hold at the current
+   `10.16.1`, including a fresh complete resolver diff, primary-source review,
+   clean environments, compatibility tests, and a new candidate approval;
+3. whether to approve the primary-range determination that both Vyper
+   findings do not apply to `vyper==0.4.3`, and if so, the exact two audit
+   ignore flags, re-review trigger, and whether an upstream metadata report is
+   required; otherwise, whether to exception-gate them or authorize a
+   separately reviewed Vyper profile change and its Track 6/S1/S3/artifact
+   consequences; and
+4. whether to reconcile the H-01 branch with local `rh` commit `27765d2`,
+   re-freeze every baseline, refresh the complete eight-item authorization
+   bundle, and only then resume Stage B.
+
+### Evidence-integrity correction verification
+
+The correction parsed every row in the re-frozen table, read the file directly
+from `cc0fd99`, recomputed its hash, compared it to the recorded value, and
+checked the 64-hex-character shape:
+
+```text
+sed -n '/^| Re-frozen input | SHA-256 |$/,/^$/p' \
+  docs/chains/rh/evidence/dependency-security-gate.md |
+  rg '^\| `' |
+  while IFS='|' read -r _ file_path_field hash_field _; do
+    # trim Markdown delimiters into file_path and recorded
+    actual=$(git show cc0fd99:"$file_path" | shasum -a 256 |
+      awk '{print $1}')
+    test "$recorded" = "$actual"
+    printf '%s' "$recorded" | rg -q '^[0-9a-f]{64}$'
+  done
+```
+
+Result: all 15 rows passed. A first read-only draft of this verification loop
+used zsh's special `path` variable, which cleared the executable search path
+after the first row and produced `command not found` for subsequent commands.
+It made no file or Git change. Renaming the variable to `file_path` produced
+the all-green result above.
+
+An independent shape scan of every 50–70-character lowercase hexadecimal
+value in this Stage B record produced no non-64-character result. Searches for
+the three former nonexistent paths, the stale resolver-build value, all
+withdrawn post-reconciliation candidate-hash fragments, and the former
+reproduction sentence returned no match. `git diff --check` passed, and
+`git diff --name-only` listed only this evidence file. All seven retained
+K-02, audit, and environment files were rehashed and rechecked at mode `0600`;
+they still match the tables above. No dependency or runtime test was repeated:
+this correction changes only evidence text, and it deliberately withdraws an
+unsupported resolver claim rather than making a new runtime claim.
 
 Approval of the previous Candidate Zero bundle does not answer these new
 questions. Until they are explicit, dependency/test implementation and the
