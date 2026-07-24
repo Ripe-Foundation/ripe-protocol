@@ -61,20 +61,25 @@ reproduce S1/S2/S3/full-suite and artifact evidence.
 ### Reviewer follow-up disposition
 
 An independent Stage A review reported no blocking defect and seven evidence
-quality observations. This revision addresses all seven:
+quality observations. This revision maps and addresses them one-to-one:
 
-1. the byte-identical K-02 raw preimage and a stricter canonical projection
-   are retained outside the repository with restrictive permissions;
-2. all four complete literal candidate lock diffs are embedded and were
-   mechanically checked against exact hash reproductions;
-3. the `local-placeholder` provenance is identified as unintegrated S3
-   authority;
-4. the shared Titanoboa compiler cache is acknowledged as a second
-   non-repository side effect and a future-brief correction;
-5. provider alert-number gaps are explained without inventing closed states;
-6. first-patched candidates are compared with current PyPI latest releases;
-   and
-7. the initial bootstrap freeze has an exact UTC/local timestamp.
+1. **Destroyed artifacts:** the byte-identical K-02 raw preimage and a stricter
+   canonical projection are retained outside the repository with restrictive
+   permissions; candidate-lock comparability is restored through the embedded
+   literal diffs, exact hashes, and mandatory fresh Stage B diff review.
+2. **Literal lock diffs:** all four complete candidate diffs are embedded and
+   were mechanically checked against exact hash reproductions.
+3. **Placeholder authority:** the `local-placeholder` provenance is identified
+   as unintegrated S3 authority.
+4. **Compiler-cache side effect:** the shared Titanoboa compiler cache is
+   acknowledged as a second non-repository side effect and a future-brief
+   correction.
+5. **Alert-number gaps:** provider gaps are explained without inventing closed
+   states.
+6. **First-patched versus latest:** candidates are compared with current PyPI
+   latest releases.
+7. **Freeze timestamp:** the initial bootstrap freeze has an exact UTC/local
+   timestamp.
 
 The follow-up also exposed and now records one important reproduction detail:
 the frozen output lock must seed pip-compile. Without it, the mutable current
@@ -159,6 +164,15 @@ paths differ. H-01 was not rebased or reconciled because that requires fresh
 owner direction and is a Stage B precondition. This record and all tests are
 therefore anchored to `382eb7d`.
 
+At `2026-07-24T17:43:09Z` (`2026-07-24T11:43:09-0600`, MDT), a read-only
+`git ls-remote` confirmed `origin/rh` remained at
+`382eb7da82bc4ed54be945311a8ccd30fae87dec`; local `rh` remained at
+`127b4bf287bf63c5ed662d82fbf3db8bf66d06a3`, one commit ahead. The local S4
+brief was therefore not published through `rh`. The same remote read returned
+no `rh-track-7-h1-dependency-security` branch, confirming H-01 remained
+unpublished. This is an observation, not authorization to push, reconcile, or
+integrate either branch.
+
 ## K-02 authoritative alert snapshot
 
 K-02 was owner-approved in the brief on 24 July 2026. The sanitized remote
@@ -193,6 +207,14 @@ range, first patch, publication/update times, and advisory URL; its SHA-256 is
 This retention repairs the original reviewability weakness without committing
 the authenticated response.
 
+Interim custody is deliberately conservative while checkpoint decision 8 is
+open: both files must remain byte-for-byte unchanged at the recorded paths,
+mode `0600`, and must not be moved or deleted. Their committed hashes make
+integrity re-checkable, but no accountable custodian, durable-copy
+requirement, final retention period, or approved disposal trigger exists yet.
+Decision 8 must supply those lifecycle controls. The untracked directory is
+not durable repository storage and must not be treated as such.
+
 No authentication state, token, header value, user identity, private URL, or
 unrelated repository metadata is present here. No GitHub mutation endpoint,
 login flow, alert dismissal, setting change, or other write was used.
@@ -206,7 +228,7 @@ and the state can become stale after retrieval.
 All entries were open in `requirements.txt`; every alerting package is
 transitive. “Disposition” below is a proposal for the checkpoint, not an
 accepted risk or approved version. Alert numbers are provider-assigned and not
-contiguous within an `state=open` filtered response. Numbers below 13 and gaps
+contiguous within a `state=open` filtered response. Numbers below 13 and gaps
 #17 and #20 were absent from the authoritative open-alert result; this record
 does not infer whether any absent number was fixed, dismissed, or otherwise
 closed.
@@ -420,6 +442,20 @@ env PIP_CONFIG_FILE=/dev/null \
   --no-emit-index-url \
   --output-file=requirements.txt requirements.in
 ```
+
+That exact environment-wrapped invocation caused pip-tools 7.4.1 to emit this
+command-header form in every candidate lock:
+
+```text
+pip-compile --cert=None --client-cert=None --index-url=https://pypi.org/simple --no-emit-index-url --output-file=requirements.txt --pip-args=None requirements.in
+```
+
+The form truthfully reflects the completed candidate runs, but differs from
+the frozen repository lock's clean `pip-compile requirements.in` header.
+Neither header form is approved for Stage B. Checkpoint decision 7 must name
+the exact generation invocation and its expected emitted header. Stage B must
+not manually normalize the header or commit a header that differs from the
+approved command; an unexpected header is a blocking lock diff.
 
 An initial command without the explicit disposable `--cache-dir` stopped with
 `PermissionError` when pip-tools tried to use the user cache. It did not
@@ -986,6 +1022,16 @@ not treated as checkpoint approval.
 | canonical `ETHERSCAN_API_KEY=local-placeholder PYTHONPATH=. pytest -q` | 2,699 passed, 142 deselected in 310.03 s; 370.57 s wall |
 | reviewer-correction replay: `python -m pip check` and `ETHERSCAN_API_KEY=local-placeholder PYTHONPATH=. pytest -q tests/clock/test_clock_profiles.py` | no broken requirements; 57 passed in 28.28 s; 67.13 s wall |
 
+The reviewer-correction replay intentionally did not repeat collection,
+inventory, or the full suite. That correction changed only this evidence
+record and did not change dependencies, tests, configuration, source,
+artifacts, or the baseline runtime, so the original complete baseline result
+remains applicable; `pip check` plus exact S1 replay checked dependency
+consistency and the exact S1 version/runtime/fingerprint assertions. Any
+dependency, test, source, configuration, artifact, or runtime-profile change
+would invalidate that rationale and require the complete ordered validation
+again.
+
 The canonical full suite initially required managed-filesystem approval solely
 to create Titanoboa compiler-cache entries outside the worktree. It used the
 unchanged dependency profile and no network or live service. It was an
@@ -1012,9 +1058,11 @@ git worktree list --porcelain
 git branch --list rh-track-7-h1-dependency-security
 git diff --name-only <active-branch>...rh -- <owned paths>
 git merge-base --is-ancestor <S1-or-S2-head> rh
+git ls-remote --heads origin rh
+git ls-remote --heads origin rh-track-7-h1-dependency-security
 shasum -a 256 <frozen inputs>
 
-# Exact isolated worktree creation (first ref-lock attempt blocked by the
+# Isolated worktree creation (first ref-lock attempt blocked by the
 # managed sandbox; approved repeat succeeded)
 git -C ~/dev/ripe-protocol worktree add \
   -b rh-track-7-h1-dependency-security \
@@ -1072,6 +1120,8 @@ git diff --check
 git status --short --branch
 git diff --no-index --check /dev/null \
   docs/chains/rh/evidence/dependency-security-gate.md
+stat <retained raw response and projection>
+shasum -a 256 <retained raw response and projection>
 rg -n -i '<credential, token, private URL, username patterns>' \
   docs/chains/rh/evidence/dependency-security-gate.md
 rm -rf <exact validated K-01 venv, cache, and candidate directories>
@@ -1095,6 +1145,8 @@ sanitization checks must be repeated after staging and before commit.
 | Authoritative default-branch alerts | All 13 remain open as of the snapshot. Candidate resolution cannot close them before an observed merged manifest. |
 | Candidate evidence depth | No candidate was installed or audited under K-01. Resolver success proves neither runtime compatibility nor absence of newly surfaced vulnerabilities. Stage B tooling/commands need approval. |
 | Resolver reproducibility | The candidate hashes reproduced only when the frozen output lock was supplied to pip-compile; a no-output control floated broad current-index packages. Literal Stage A diffs are now committed, but mutable index state still requires a fresh full Stage B diff review even when hashes match. Any mismatch blocks implementation until every changed line is explained and approved. |
+| Lock command/header form | The isolated K-01 wrapper emitted expanded `--cert=None`/`--client-cert=None`/`--pip-args=None` header arguments rather than the frozen lock's clean header. Decision 7 must approve one exact invocation and truthful emitted header before Stage B. |
+| Private-evidence lifecycle | The two retained K-02 files are integrity-checkable and mode `0600`, but the untracked directory has no approved custodian, durable-copy rule, retention deadline, or disposal trigger. Interim no-move/no-delete custody applies until decision 8 defines them. |
 | pytest major boundary | `9.0.3` resolves without Vyper extras but conflicts with Vyper 0.4.3 optional test/dev metadata and intentionally invalidates S1's exact `8.4.2` expectation. Upgrade, exception, paired upstream change, or blocked disposition required. |
 | cbor2/wheel artifact input | Candidate A changes compiler/build transitives. Old/new bytecode, ABI, known-vector, wheel/install, and S3 artifact equality are unproved until Stage B. |
 | HTTP/environment behavior | Release notes were reviewed, but redirects/retries/proxies/TLS/certificates/adapters/pooling/timeouts/exceptions, hostname handling, and dotenv load behavior require clean candidate validation. |
@@ -1169,12 +1221,19 @@ items:
    alternate sequence.
 7. **Stage B toolchain:** approve exact Python, pip, pip-tools/resolver,
    indexes, frozen-output seeding, mandatory fresh literal lock-diff review,
-   old/new clean-environment, and audit commands. K-01 does not authorize
+   old/new clean-environment, and audit commands. Approve the exact
+   pip-compile invocation and the truthful header it must emit: either the
+   expanded K-01 wrapper form recorded above or a separately reproduced clean
+   form. Manual header normalization is not approved. K-01 does not authorize
    Stage B installation or an auditor.
 8. **Freshness:** define the exact time window or event trigger; what refreshes
    it; which alert classes, lock/environment/artifact evidence it covers; and
    which rehearsal/deployment actions stale evidence blocks. Keep ordinary
-   offline unit tests independent of network and wall-clock state.
+   offline unit tests independent of network and wall-clock state. Also define
+   the retained K-02 artifacts' named custodian, authoritative/durable storage
+   location, minimum retention event or deadline, hash/permission recheck
+   trigger, approved disposal event and method, and required disposal record.
+   Until then, the interim no-move/no-delete rule remains in force.
 
 Until those decisions are explicit, H-01 is **evidence incomplete / checkpoint
 blocked**. Stage B, dependency/test changes, branch reconciliation, merge,
