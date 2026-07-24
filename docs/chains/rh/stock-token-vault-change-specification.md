@@ -371,17 +371,18 @@ git -C /Users/wigglez/dev/ripe-protocol diff --name-status \
 ```
 
 Phase G also required reconciliation edits in previously approved Sections
-6–8 and 12–16, plus the corresponding earlier validation-plan sections. The
+6–9 and 12–16, plus the corresponding earlier validation-plan sections. The
 Phase G handoff did not enumerate that reach-back clearly enough. For an
 explicit audit trail, those edits were:
 
 | Earlier surface | Phase G reconciliation |
 | --- | --- |
 | Formal model, invariants, and state table (Sections 6–8) | Added allocated/quarantine state `A^s/U^s/A/U`, split the former zero predicate into `Z_custody/Z_live/Z_recorded`, propagated I-13, and updated the sixteen state rows to distinguish live custody, allocated backing, and quarantine. |
+| Architecture comparison (Section 9) | Expanded Outcome 3 from I-01–I-12 to I-01–I-13 and recorded the now-specified partial-loss, post-zero, donation/restoration, reward, issuer-settlement, and total-loss policies while leaving implementation mechanisms unresolved. |
 | Decision register and component boundary (Sections 12–13) | Recorded the owner-confirmed Phase G policies and returned the unresolved storage/interface mechanism to Phase I. |
-| Deposit accounting (Section 14) | Composed the Phase D receipt rule with Section 17's pre-deposit allocated denominator `A0`; the call-local caller-request symbol is now `A_req` so it cannot collide with global allocated backing `A`. |
+| Deposit accounting (Section 14) | Composed the Phase D receipt rule with Section 17's pre-deposit allocated denominator `A_0`; the call-local caller-request symbol is now `A_req` so it cannot collide with global allocated backing `A`. |
 | Backing/debt health (Section 15) | Renamed the user-position amount to `M(v,a,u)` and made the current-versus-corrected SharesVault total semantics explicit. |
-| Settlement/total loss (Section 16) | Propagated the three zero predicates and scoped Phase F settlement against allocated live claims without selecting a Phase I mechanism. |
+| Settlement/total loss (Section 16) | Scoped retained non-issuer internal settlement to Section 17 allocated live claims with quarantine excluded, and recorded Section 17's no-automatic-allocation rule for later recovery without selecting a Phase I mechanism. |
 | Validation plan before Phase G | Propagated the same symbols, state diagnostics, formula composition, test prerequisites, and section renumbering into the already specified Phase D–F validation surfaces. |
 
 These were consistency reconciliations needed to compose Phase G with the
@@ -1782,7 +1783,7 @@ inventory in Phase I before implementation.
 - Derive pre-deposit custody as `C0 = C1 - R`.
 - Mint from `R` using the permanent Section 17 allocated-backing denominator,
   rounding shares down:
-  `floor(R * (S + 10^8) / (A0 + 1))`.
+  `floor(R * (S + 10^8) / (A_0 + 1))`.
 - Require the minted share amount to be positive. A positive receipt that
   rounds to zero must revert rather than become an uncredited donation.
 - Phase D fixes the measurement input and rounding direction; Section 17 now
@@ -1970,8 +1971,8 @@ prior donation is included in C0, not R
 For the nominal path, `N' = N + R` and `C1 = C0 + R`, so a successful
 deposit preserves the pre-call aggregate difference `C - N`; it cannot create
 a new accounted deficit. For the corrected share path, Section 17 supplies
-pre-deposit effective allocated backing `A0`, so
-`S' = S + floor(R * (S + 10^8) / (A0 + 1))`. Therefore `Q - R` cannot mint
+pre-deposit effective allocated backing `A_0`, so
+`S' = S + floor(R * (S + 10^8) / (A_0 + 1))`. Therefore `Q - R` cannot mint
 shares, and pre-existing quarantine `U` affects neither the call-local receipt
 nor the conversion denominator.
 

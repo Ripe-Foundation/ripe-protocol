@@ -319,7 +319,7 @@ it only as a separate transaction after the outer deposit completes.
 | `test_short_receipt_cannot_exceed_user_or_global_limit` | `Q` is pre-capped and `R <= Q`; final credited state remains within both upper limits. |
 | `test_short_receipt_rechecks_minimum_on_live_balance` | If final live user amount after credit is below `minDepositBalance`, the non-trusted deposit reverts atomically. |
 | `test_trusted_deposit_is_measured_despite_limit_exemption` | Trusted flow skips current user/global/min policy but still proves `0 < R <= Q` and `V == R`. |
-| `test_share_deposit_uses_predeposit_allocated_backing_and_rounds_down` | Under Section 17, shares equal `floor(R * (S + 10^8) / (A0 + 1))`; `Q`, aggregate post-custody, and pre-existing `U` cannot enter as the call receipt or allocated denominator. |
+| `test_share_deposit_uses_predeposit_allocated_backing_and_rounds_down` | Under Section 17, shares equal `floor(R * (S + 10^8) / (A_0 + 1))`; `Q`, aggregate post-custody, and pre-existing `U` cannot enter as the call receipt or allocated denominator. |
 | `test_positive_receipt_that_mints_zero_shares_reverts` | No positive custody can be donated through zero-share credit. |
 | `test_stab_vault_uses_measured_receipt_without_economic_drift` | GREEN/sGREEN value, claimable-value, virtual-offset, and existing share rules are unchanged except for the verified receipt input. |
 | `test_registration_occurs_only_after_credit` | Failed/zero credit cannot add Ledger participation. |
@@ -330,8 +330,8 @@ it only as a separate transaction after the outer deposit completes.
 
 Section 17 supplies the permanent corrected-share denominator after the owner
 approved the Phase G policies. These tests pin Phase D's receipt input and
-rounding direction and must now compose with `A0`; they do not approve a
-storage/interface mechanism for representing `A0`.
+rounding direction and must now compose with `A_0`; they do not approve a
+storage/interface mechanism for representing `A_0`.
 
 ### 6.4 Consumer exactness and compatibility
 
@@ -749,7 +749,7 @@ map them only after Phase I records the exact semantics.
 | Test | Required result |
 | --- | --- |
 | `test_initial_share_mint_is_receipt_times_decimal_offset` | With `S=A=0`, receipt `R` mints exactly `R * 10^8` shares; pre-existing `U` is excluded |
-| `test_deposit_share_mint_rounds_down_against_predeposit_A` | Mint equals `floor(R*(S+10^8)/(A0+1))`, is positive, and no `C`, `U`, or `Q` substitution changes it |
+| `test_deposit_share_mint_rounds_down_against_predeposit_A` | Mint equals `floor(R*(S+10^8)/(A_0+1))`, is positive, and no `C`, `U`, or `Q` substitution changes it |
 | `test_live_claim_rounds_down_against_effective_A` | Non-final claim equals `floor(s*(A+1)/(S+10^8))` and never exceeds allocated backing |
 | `test_sole_holder_live_claim_matches_final_sweep` | When `s_u=S>0`, the getter/preview claim is exactly `A`, matching executable full withdrawal |
 | `test_partial_withdrawal_share_burn_rounds_up` | Burn equals `ceil(x*(S+10^8)/(A+1))`, capped by user shares; transfer is at most `x` |
