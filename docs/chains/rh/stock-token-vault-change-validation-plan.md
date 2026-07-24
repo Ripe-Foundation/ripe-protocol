@@ -1,22 +1,21 @@
 # Stock Token Vault-Change Validation Plan
 
-Status: **Phases D–E test contracts specified; explicit owner confirmation of
-the two quoted instructions is pending — not a finalized Phase J plan**
+Status: **Phases D–E test contracts specified under owner-confirmed
+instructions — not a finalized Phase J plan**
 
 Date: 2026-07-23 (America/Denver)
 
 This document keeps the Phase B invariant model, Phase C architecture
-comparison, recorded Phase D deposit design, and recorded Phase E
-backing/debt-health design testable. The quoted instructions select option 4,
+comparison, owner-confirmed Phase D deposit design, and owner-confirmed Phase E
+backing/debt-health design testable. The instructions select option 4,
 containment followed by the corrected share path, then reject a new stored
 per-asset collateral-use parameter and authorize Phase E specification using
-existing deposit controls and `DebtTerms.ltv`. Explicit owner confirmation of
-both quotes remains pending under
-`stock-token-vault-change-specification.md` Section 12.1. This is checkpoint
-option 4, the combination of architecture outcomes 2 and 3, not the separately
-numbered “another generic shared design.” All paths below are proposed future
-paths. No test, fixture, mock, production contract, interface, dependency, CI
-file, manifest, or ABI was created or changed.
+existing deposit controls and `DebtTerms.ltv`. The owner confirmed both quotes
+under `stock-token-vault-change-specification.md` Section 12.1. This is
+checkpoint option 4, the combination of architecture outcomes 2 and 3, not the
+separately numbered “another generic shared design.” All paths below are
+proposed future paths. No test, fixture, mock, production contract, interface,
+dependency, CI file, manifest, or ABI was created or changed.
 
 The Phase D and E test contracts are now specific enough for later
 implementation planning. The full Phase J plan cannot be finalized until the
@@ -655,14 +654,13 @@ No dependency or tool addition is authorized by this scaffold.
 
 ## 13. Review and launch gates
 
-The recorded instructions select option 4, authorize Phase D specification,
-then authorize Phase E specification under the explicit
-existing-controls/no-new-storage constraint. Explicit owner confirmation of
-both quotes remains pending. The Phase D and E designs and future test
-contracts are complete; no implementation or test change is authorized. Entry
-into Phase F and finalization of later implementation/release gates remain
-blocked on that confirmation and the following decisions at their recorded
-phase boundaries:
+The owner-confirmed instructions select option 4, authorize Phase D
+specification, then authorize Phase E specification under the explicit
+existing-controls/no-new-storage constraint. The Phase D and E designs and
+future test contracts are complete; no implementation or test change is
+authorized. Entry into Phase F and finalization of later
+implementation/release gates remain blocked on the following decisions at
+their recorded phase boundaries:
 
 - external-only issuer settlement decision;
 - total-loss and exactly-once bad-debt policy;

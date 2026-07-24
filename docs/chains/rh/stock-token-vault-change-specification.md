@@ -1,8 +1,7 @@
 # Shared Stock Token Vault-Change Specification
 
-Status: **Phase E specification complete under the recorded existing-controls
-instruction; explicit owner confirmation of the two quoted instructions is
-pending; Phases F–K intentionally not finalized**
+Status: **Phase E specification complete under the owner-confirmed
+existing-controls instruction; Phases F–K intentionally not finalized**
 
 Date: 2026-07-23 (America/Denver)
 
@@ -13,10 +12,9 @@ owner checkpoint, exact deposit-accounting design, and backing/debt-health
 design. It does not select a production vault, approve a loss-allocation
 policy, authorize a Base migration, or authorize implementation.
 
-The recorded owner instruction selects option 4 as the architecture direction
-for specification work only; explicit owner confirmation remains pending as
-described in Section 12.1. Until the later gates are approved and implemented,
-the operative conclusion remains:
+The owner-confirmed instruction selects option 4 as the architecture direction
+for specification work only. Until the later gates are approved and
+implemented, the operative conclusion remains:
 
 > **Do not list Stock Tokens under the current vault designs.**
 
@@ -1267,10 +1265,11 @@ The checkpoint presented these options:
 4. containment followed by corrected share path; or
 5. another explicitly approved generic design.
 
-The recorded 2026-07-23 message approves **option 4: containment followed by
-the corrected share path**, and authorizes **Phase D specification work only**.
-This is checkpoint option 4—the staged combination of Section 9 outcomes 2 and
-3—not Section 9.5's separately numbered “another generic shared design.”
+The owner-confirmed 2026-07-23 message approves **option 4: containment
+followed by the corrected share path**, and authorizes **Phase D specification
+work only**. This is checkpoint option 4—the staged combination of Section 9
+outcomes 2 and 3—not Section 9.5's separately numbered “another generic shared
+design.”
 
 Recorded approval provenance is the following message presented in this Track
 8 work session immediately before Phase D began:
@@ -1296,13 +1295,13 @@ after the deeper review of existing protocol parameters:
 > proposing any new storage or interface. This does not authorize
 > implementation or Phase F.
 
-Both block quotes are transcribed as received in this Track 8 work session, but
-the implementation agent cannot authenticate its own authorization record.
-Explicit owner confirmation that both quoted instructions were actually given
-remains pending. Until that confirmation is recorded, the table below treats
-the decisions as recorded instructions with an open governance-confirmation
-item. If either quote is denied, all work after the corresponding checkpoint
-requires owner-directed rollback and re-review.
+The implementation agent did not rely on self-attestation. On 2026-07-23, the
+owner directly closed the governance-confirmation item with:
+
+> I confirm I gave the option-4 and Phase E instructions as quoted in §12.1.
+
+This confirmation authenticates both quoted instructions for the Track 8
+record. It does not expand either instruction's scope.
 
 Phase E therefore may specify only a composition of existing controls and
 automatic backing state. It may not propose new storage or a new external
@@ -1314,15 +1313,14 @@ posture is still `do not list Stock Tokens under the current vault designs`.
 ### 12.2 Checkpoint decisions and their actual gates
 
 The product/architecture direction required for Phase D and the existing-
-controls direction required for Phase E are recorded as satisfied for
-specification work, subject to the explicit owner confirmation above. The
-remaining seven decisions gate the later phases shown below; none is implied by
-either recorded instruction.
+controls direction required for Phase E are owner-confirmed as satisfied for
+specification work. The remaining seven decisions gate the later phases shown
+below; none is implied by either instruction.
 
 | Decision | Options | Evidence and recommendation | Owner | Affected components | Prerequisite / milestone | Status |
 | --- | --- | --- | --- | --- | --- | --- |
-| Product outcome | Five checkpoint options above | Staged containment then corrected share path | Product + protocol owner | Whole track | Before Phase D | **Recorded: option 4, specification work only; explicit owner confirmation pending** |
-| Per-asset collateral use | Add a stored flag / compose existing controls | Reuse `canDeposit`, `DebtTerms.ltv`, and automatic backing state; do not add storage or a deployed selector | Protocol owner + security | `CM-009`, `CM-011`–`013`, `CM-030`, existing config/getters | Before Phase E | **Recorded: existing-controls Phase E specification only; explicit owner confirmation pending; implementation and Phase F not approved** |
+| Product outcome | Five checkpoint options above | Staged containment then corrected share path | Product + protocol owner | Whole track | Before Phase D | **Owner-confirmed: option 4, specification work only** |
+| Per-asset collateral use | Add a stored flag / compose existing controls | Reuse `canDeposit`, `DebtTerms.ltv`, and automatic backing state; do not add storage or a deployed selector | Protocol owner + security | `CM-009`, `CM-011`–`013`, `CM-030`, existing config/getters | Before Phase E | **Owner-confirmed: existing-controls Phase E specification only; implementation and Phase F not approved** |
 | Issuer-controlled settlement | Always external / permit bounded internal | Current internal mode can charge for undeliverable nominal claims; recommend external-only | Protocol owner + risk/security | `CM-026`, `CM-030`, `CM-043`, `CM-044`, Vault interface | Before Phase F | Requested at checkpoint; gates Phase F |
 | Total-loss transition | Approved user-debt→Ledger-bad-debt design / another existing-accounting design / no listing | Current system has no atomic exactly-once path; recommend a separate shared transition specification within the selected release | Protocol owner + accounting/security | `CM-026`, `CM-030`, Ledger, interfaces | Before Phase F | Requested at checkpoint; gates Phase F |
 | Post-zero state | Freeze / explicit recapitalization | Recommend freeze by default | Protocol owner + risk | `CM-025`, deposit callers, controls | Before Phase G | Requested at checkpoint; gates Phase G |
