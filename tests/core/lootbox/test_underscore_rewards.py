@@ -86,8 +86,8 @@ def _distribution_observation(candidate):
         (ROBINHOOD_DAY_BLOCKS, ROBINHOOD_DAY_BLOCKS + 1, None),
     ],
     ids=[
-        "zero-floor-disabled",
-        "max-floor-disabled",
+        "zero-floor-reverts",
+        "max-floor-reverts",
         "base-below-floor",
         "base-exact-floor",
         "base-above-floor",
@@ -398,6 +398,34 @@ def test_representative_and_stress_jumps_do_not_bypass_interval(
                 expected_revert="0x",
                 sender=switchboard_alpha.address,
             )
+
+        last_send = candidate.lastUnderscoreSend()
+        eligible_number = last_send + floor + 1
+        clock_controller.set(number=eligible_number)
+        result = clock_controller.observed_call(
+            "BN-026",
+            (
+                "representative or stress jump becomes eligible "
+                "strictly after interval"
+            ),
+            candidate.distributeUnderscoreRewards,
+            components=("CM-033",),
+            observed_by=(
+                "event:UnderscoreRewardsDistributed.blockNumber and "
+                "state:lastUnderscoreSend after jump profile"
+            ),
+            observation=lambda: _distribution_observation(candidate),
+            expected_observation=(eligible_number, eligible_number),
+            expected_result=(
+                100 * EIGHTEEN_DECIMALS,
+                100 * EIGHTEEN_DECIMALS,
+            ),
+            sender=switchboard_alpha.address,
+        )
+        assert result == (
+            100 * EIGHTEEN_DECIMALS,
+            100 * EIGHTEEN_DECIMALS,
+        )
 
 
 ########################################
