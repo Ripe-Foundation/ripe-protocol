@@ -1,11 +1,19 @@
 # Track 6 S5: Portable User-Action Guard and State-Safe Rollout
 
-**Status:** Draft for owner and security review; no implementation or kickoff is
-authorized
+**Status:** Revised draft after owner action-block direction; no implementation
+or kickoff is authorized
 
 **Prepared:** 24 July 2026
 
-**Planning baseline:** `3e6e6f230169fc445d0b29454457480c62efd89a`
+**Planning baseline:** `27765d29094256fa9619dd44a0bfd145863de8b7`
+
+**Owner action-block direction:** 24 July 2026 — preserve the existing
+same-execution-block security property through a narrow shared Ledger clock
+abstraction. Robinhood uses `ArbSys(0x64).arbBlockNumber()` as its child-chain
+block identity. The deployed Base Ledger remains untouched indefinitely because
+its accounting state makes migration risk disproportionate. Production
+implementation remains prohibited until Stage A proves the smallest safe
+abstraction and an independent security reviewer approves it.
 
 **Required launch baseline:** this brief must be reviewed and committed to `rh`.
 Stage A may run while H-01 and S4 are in progress. Stage B remains blocked on
@@ -15,9 +23,11 @@ every owner/security decision in Checkpoint 0.
 ## Fresh-agent instruction
 
 Treat this document as the task contract. Work only on Track 6 slice S5:
-identify the security property intended by BN-002, select a chain-portable
-replacement, and—only after explicit approval—implement that replacement
-without losing or corrupting live Ledger accounting state.
+validate the owner-selected same-execution-block property, choose the smallest
+chain-portable action-block abstraction, and—only after explicit approval—
+implement it without changing unrelated Ledger accounting. Robinhood is the
+first production deployment of the revised canonical Ledger. The existing Base
+Ledger is not migrated or replaced.
 
 S5 has three stages:
 
@@ -30,10 +40,13 @@ S5 has three stages:
 3. **Stage C — checked-inventory reconciliation:** blocked until an independent
    reviewer approves the Stage B production implementation and rollout record.
 
-The safe result of Stage A may be **do not implement yet**. Do not infer the
-threat model from the existing comment, treat the current guard as ordinary
-reentrancy protection, or assume that replacing Ledger is safe merely because
-RipeHq can register a new address.
+The required result of Stage A is an evidence-backed recommendation for the
+smallest safe action-block source boundary. It may recommend stopping if
+Robinhood does not expose the required child-block primitive or if the
+abstraction adds unacceptable risk. It may not silently fall back to disabling
+the guard, convert the policy into elapsed time or oracle freshness, broaden the
+protected action set, or assume that replacing the live Base Ledger is safe
+merely because RipeHq can register a new address.
 
 Use branch `rh-track-6-s5-ledger-guard`. Commit Stage A to that branch and stop
 at Checkpoint 0. Never push directly to or merge into `rh` or `master`; the
@@ -89,6 +102,34 @@ Do not create the S5 branch or worktree until:
 
 Stage A is evidence-only and may proceed while H-01, S4, and Track 8 run. It
 must record their exact current states rather than copying floating work.
+
+### Owner-selected minimum-change direction controls Stage A
+
+Stage A must consume
+`docs/chains/rh/minimal-contract-change-reassessment.md` and treat these owner
+decisions as fixed inputs:
+
+- preserve the existing same-execution-block identity policy;
+- this is not an elapsed-time, rate-limit, oracle-freshness, or price-snapshot
+  policy;
+- Robinhood's identity source is the Arbitrum child-chain block returned by
+  `ArbSys(0x64).arbBlockNumber()`;
+- ordinary EVM deployments use their native execution `block.number`;
+- the repository keeps one forward canonical Ledger source with no `chain.id`
+  branch;
+- Robinhood is the first production deployment of that revised source;
+- the current Base Ledger and its accounting state remain untouched
+  indefinitely; and
+- permanent Base/Robinhood live-bytecode divergence is accepted for this
+  state-bearing component and must be recorded, not “converged” through a risky
+  migration.
+
+Stage A must minimize how that decision is implemented. Compare at least an
+immutable generic action-block provider with the smallest reviewed
+native/external-source helper. A separate provider must justify its extra
+deployment and call-failure surface; an internal helper must justify its mode,
+source, and ABI. Neither may silently fall back from the configured child-block
+identity to ancestor `block.number`.
 
 ### H-01 controls the Stage B dependency baseline
 
@@ -206,6 +247,7 @@ Read and verify the integrated versions of the following sources.
 ### Program and Track 6 authority
 
 - `docs/chains/rh-summary.md`
+- `docs/chains/rh/minimal-contract-change-reassessment.md`
 - `docs/chains/rh/component-matrix.md`, especially CM-008, CM-009, CM-014,
   and CM-034
 - `docs/chains/rh/block-number-inventory.md`, especially BN-002
@@ -227,6 +269,20 @@ Read and verify the integrated versions of the following sources.
 
 If any required integrated file is missing, record it as a dependency. Do not
 read a floating branch as if it were the approved source of truth.
+
+### External primary sources
+
+- Robinhood Chain's current official network and Nitro/ArbOS documentation:
+  `https://docs.robinhood.com/chain/` and
+  `https://docs.robinhood.com/chain/run-a-full-node/`
+- Arbitrum's current official block-number documentation:
+  `https://docs.arbitrum.io/arbitrum-essentials/arbitrum-vs-ethereum/block-numbers-and-time`
+- the current authoritative Offchain Labs ArbSys interface/source for the
+  Robinhood Nitro/ArbOS release
+
+Record retrieval dates and exact versions. A documentation claim does not
+replace the required Robinhood testnet evidence, and a live probe remains
+owner-gated.
 
 ### Ripe production surfaces
 
@@ -261,10 +317,6 @@ state-safe. The architecture checkpoint may narrow or correct that file set.
 - `tests/core/creditEngine/test_credit_borrow.py`
 - `tests/core/creditEngine/test_credit_repay.py`
 - `tests/vaults/modules/test_stab_vault_claims.py`
-- `tests/core/deleverage/test_deleverage_for_withdrawal.py`, especially its
-  documented sequential-withdrawal transient-storage behavior
-- `tests/core/deleverage/conftest.py`, especially the fresh-Deleverage fixture
-  used as a transient-storage workaround
 - every Teller-domain test covering a higher-risk action identified in Stage A
 - `tests/clock/test_clock_profiles.py`
 - `config/block-clock-inventory.json`
@@ -320,32 +372,42 @@ Ignore unrelated untracked files. Do not clean or modify that repository.
 
 ## Controlling constraints
 
-1. **One canonical implementation.** No Robinhood branch, Robinhood-only
+1. **Minimum production change.** The owner has rejected disabling the
+   same-block property. Change only the narrow clock boundary required to
+   preserve it on Robinhood; unrelated Ledger accounting, action policy,
+   timing, freshness, and portability work are prohibited.
+2. **One canonical implementation.** No Robinhood branch, Robinhood-only
    production contract, `chain.id` conditional, or chain-selected source.
-2. **Threat before mechanism.** Do not select transient storage, elapsed
-   seconds, both, or disablement until the protected threat is explicit.
-3. **Live accounting state is an invariant.** Registration indirection does
-   not make Ledger state replaceable. No Ledger replacement may proceed without
-   an exhaustive, independently reviewed state-enumeration and atomic-migration
-   proof.
-4. **Preserve locked-account protection.** `isLockedAccount` enforcement must
+3. **Threat is same execution block.** Do not substitute transient-only
+   reentrancy, elapsed seconds, oracle freshness, or cross-block pacing. A
+   separate action in the next child block is allowed even if it follows
+   quickly.
+4. **Live accounting state is an invariant.** Registration indirection does
+   not make a deployed Ledger replaceable. Robinhood may deploy the revised
+   Ledger only from empty state; the existing Base Ledger must not be migrated
+   or replaced.
+5. **Preserve locked-account protection.** `isLockedAccount` enforcement must
    remain active in every selected mode, including guard-disabled mode.
-5. **Preserve authority or tighten it deliberately.** Do not widen callers,
+6. **Preserve authority or tighten it deliberately.** Do not widen callers,
    let callers self-select a weaker policy, or substitute `tx.origin`.
-6. **No silent semantic reuse.** Do not silently reinterpret
-   `shouldCheckLastTouch` as a different guard or unit.
-7. **No placeholder timing.** A one-second persistent interval is not an
-   approved security policy. Any seconds value needs a stated threat,
-   boundary semantics, and owner acceptance.
-8. **No test-only truth.** Titanoboa behavior must not be treated as EVM
-   transient-storage authority when its behavior is known to differ.
-9. **History is immutable.** Do not rewrite old migrations, manifests, or
+7. **No silent semantic reuse.** Do not reinterpret `shouldCheckLastTouch` as
+   elapsed time or freshness. Stage A must decide whether the existing Boolean
+   remains the enable/disable control for the portable same-block check.
+8. **No generic-clock scope creep.** The action-block source must not be used
+   for timelocks, cooldowns, rates, auctions, rewards, capacity, price
+   freshness, or telemetry without a separate specification.
+9. **Authoritative child-block evidence.** Local patched block numbers are not
+   proof of ArbSys behavior. Require official interface/version evidence plus
+   a read-only or separately approved testnet probe.
+10. **History is immutable.** Do not rewrite old migrations, manifests, or
    generated deployment evidence.
-10. **Base convergence is required.** Temporary reviewed live-bytecode drift
-    may be bounded; permanent Base/Robinhood source divergence is prohibited.
-11. **S5 does not own Robinhood defaults.** Future `DefaultsRobinhood` values
+11. **No Base Ledger migration.** The deployed Base Ledger remains on its
+    current bytecode indefinitely. This is an approved permanent live-version
+    exception caused by non-enumerable, high-value accounting state, not
+    permission for a Base source fork.
+12. **S5 does not own Robinhood defaults.** Future `DefaultsRobinhood` values
     and the broader S6 parameter profile remain S6-owned.
-12. **No implementation before approval.** Checkpoint 0 is a hard owner and
+13. **No implementation before approval.** Checkpoint 0 is a hard owner and
     independent-security-reviewer gate.
 
 ## Stage A ownership
@@ -374,7 +436,29 @@ set or “new Ledger artifact” posture is unsafe, record the conflict and requ
 an owner/security-approved planning correction. Do not silently follow it and
 do not silently diverge from it.
 
-## Stage A — threat model and architecture decision
+## Stage A — action-block architecture and security decision
+
+### Phase A0 — freeze the owner-selected property and minimize the change
+
+Before designing the abstraction:
+
+- record the owner decision verbatim and its 24 July 2026 provenance;
+- prove the exact current any-touch/checked-higher-risk ordering behavior rather
+  than simplifying it to “one transaction per block”;
+- prove that Robinhood ancestor `block.number` cannot represent the selected
+  child-block identity and that disabling the flag would remove an
+  owner-required property;
+- state explicitly that the next child block clears the guard regardless of
+  elapsed wall time or oracle state;
+- identify the smallest production boundary capable of supplying native block
+  identity on ordinary EVM chains and ArbSys child-block identity on
+  Robinhood;
+- compare the new-code, call, ABI, gas, deployment, failure, and audit risks of
+  each abstraction shape;
+- prove that no Base Ledger deployment, state migration, registry action, or
+  convergence deadline is part of S5; and
+- stop if the selected child-block source cannot be proven or the proposed
+  mechanism silently changes action classification.
 
 ### Phase A1 — Freeze and reproduce the baseline
 
@@ -403,6 +487,18 @@ At minimum prove:
 | Underscore-classified user | assertion skipped, `lastTouch` still written |
 | locked user, guard flag false | account remains rejected |
 | two different users, same `NUMBER` | per-user state remains isolated |
+
+Then define the selected Robinhood comparison without pretending it is already
+implemented:
+
+| Sequence | Selected portable result |
+|---|---|
+| two checked actions for one user in the same Robinhood child block | second action rejects |
+| two checked actions for one user in successive child blocks that share one ancestor `block.number` | second action may proceed |
+| unchecked lower-risk touch then checked higher-risk action in one child block | higher-risk action rejects, preserving current ordering |
+| checked higher-risk touch then unchecked lower-risk touch in one child block | lower-risk action may proceed, preserving current ordering |
+| two users in one child block | isolated per-user behavior |
+| configured child-block source reverts, returns malformed data, or violates monotonic assumptions | fail closed; never fall back to ancestor `block.number` |
 
 Do not inherit the present zero-address test’s “revert or success is
 acceptable” posture. Record the actual behavior and require Checkpoint 0 to
@@ -487,26 +583,29 @@ For each storage field or mapping, record:
 
 The audit must cover all Ledger storage, not just `lastTouch`.
 
-Compare at least these state-placement options:
+Compare at least these narrow clock-source placements:
 
-1. **Preserve the live Ledger and move the portable guard to Teller.** Continue
-   calling the existing Ledger with checking disabled only after the new guard
-   is active, so the existing locked-account check remains enforced.
-2. **Preserve the live Ledger and add a generic shared guard contract.** Define
-   its registration, authority, state, migration, pause, diagnostics, and
-   rollback model. Reject an issuer- or Robinhood-branded variant.
-3. **Change or replace Ledger.** This is admissible only if every live Ledger
-   state field is exhaustively enumerable and an atomic state migration can be
-   independently proven. A partial or offchain-best-effort migration fails.
-4. **Disable the present check without replacement.** This requires explicit
-   security acceptance of the lost property and is not the default.
+1. **Immutable generic provider interface.** The revised canonical Ledger calls
+   an immutable `ActionBlockClock` provider. Ordinary EVM deployments select a
+   native-number provider; Robinhood selects a provider that reads
+   `ArbSys(0x64).arbBlockNumber()`. Define provider code, authority, deployment,
+   failure, gas, diagnostics, and manifest assertions.
+2. **Immutable source/mode inside Ledger.** The revised Ledger uses a small
+   internal helper configured at deployment to read native `block.number` or a
+   reviewed external child-block source. Define mode validation, external-call
+   behavior, constructor/ABI impact, and why embedding the mode is smaller and
+   no less safe than a provider.
+3. **Another generic action-block boundary.** Admit it only if it preserves the
+   same Ledger call and action semantics with less code or failure surface.
 
-If a persistent per-user timestamp is proposed in Teller or a new guard,
-analyze how that new state affects later upgrades and whether the selected
-contract remains safely replaceable.
+Moving the guard to Teller, adding elapsed-time state, introducing a
+transaction-context guard, and disabling the policy are outside the
+owner-selected direction unless Stage A proves the action-block abstraction
+cannot satisfy it and returns to the owner.
 
-The safe default is to preserve the live Ledger bytecode and state unless the
-checkpoint establishes otherwise.
+The Base state inventory remains mandatory evidence for why the current Base
+Ledger must not migrate. It is not a request to design or prove a migration.
+The Robinhood Ledger is a fresh deployment with no state import.
 
 ### Phase A4 — Define the threat model
 
@@ -518,8 +617,8 @@ For each scenario below, state:
 - relevant caller or department authority;
 - whether current BN-002 prevents it;
 - whether Teller’s existing nonreentrant lock already prevents it;
-- whether the candidate transient layer prevents it;
-- whether the candidate elapsed-seconds layer prevents it;
+- whether native execution-block identity prevents it on Base-like chains;
+- whether ArbSys child-block identity prevents it on Robinhood;
 - bypasses and griefing risk;
 - false-positive user impact; and
 - evidence or test needed.
@@ -528,8 +627,10 @@ Required scenarios:
 
 - nested/reentrant higher-risk composition;
 - two separately submitted transactions in one Base `NUMBER`;
-- many separately submitted transactions during one Robinhood repeated
-  `NUMBER`;
+- two separately submitted transactions in one Robinhood child block;
+- transactions in successive Robinhood child blocks that share one ancestor
+  `block.number`;
+- many child blocks during one repeated ancestor `block.number`;
 - lower-risk then higher-risk sequencing;
 - higher-risk then lower-risk then higher-risk sequencing;
 - delegated actions and identity substitution;
@@ -545,12 +646,16 @@ Required scenarios:
 - two different users in the same transaction;
 - zero-address input;
 - paused Ledger, Teller, guard, or MissionControl;
-- timestamp repeat, small increment, boundary, large jump, and future-value
-  assumptions; and
-- mixed old/new deployments during rollout or rollback.
+- child-block source failure, malformed return, repeat, `+1`, and nonmonotonic
+  evidence;
+- native-provider behavior on a Base-like profile;
+- Robinhood child-block behavior under a dated testnet probe; and
+- current Base bytecode coexisting indefinitely with the revised Robinhood
+  artifact.
 
-The repository’s “Flash Loan Protection” heading is a lead, not proof that the
-current property is necessary or sufficient.
+The repository’s “Flash Loan Protection” heading is supporting provenance. The
+owner has clarified that the intended boundary is the same execution block,
+not a duration or a guarantee that external financial state refreshed.
 
 ### Phase A5 — Compare architectures
 
@@ -558,94 +663,96 @@ Compare at least:
 
 | Candidate | Required analysis |
 |---|---|
-| retain BN-002 unchanged | Robinhood throttling, cross-chain semantics, and explicit rejection rationale |
-| disable BN-002 | exact lost property and accepted risk |
-| transient guard only | entry/exit placement, existing `@nonreentrant` overlap, per-user semantics, external housekeeping, Underscore, EVM truth |
-| elapsed-seconds guard only | threat fit, value and bounds, low-risk arming, timestamp trust, griefing, persistent state migration |
-| transient plus elapsed seconds | independent purpose of each layer, interaction, failure/rollback, observability |
-| guard in existing Ledger | live-state upgrade/migration feasibility |
-| guard in Teller | action-boundary coverage, replacement/state implications, old Ledger call |
-| separate generic ActionGuard | registration, authority, pause, migration, diagnostics, added complexity |
+| immutable generic `ActionBlockClock` provider | one canonical provider interface; native and ArbSys source mechanics; extra deployment/staticcall, immutability, failure, gas, verification, and future-chain extension |
+| immutable source/mode helper in Ledger | constructor/immutable and ABI impact; native and ArbSys call path; mode validation; smaller deployment graph versus tighter chain-mechanism coupling |
+| direct ArbSys read in Ledger with no abstraction | smallest line count versus loss of ordinary-EVM portability; reject unless the shared source remains correct without `chain.id` or a Robinhood branch |
+| retain ancestor `block.number` on Robinhood | false throttling across multiple child blocks; conflicts with owner-selected execution-block identity |
+| disable BN-002 | exact lost property; recorded as considered and owner-rejected |
+| transient or elapsed-time replacement | conflicts with the selected block-identity property; retain only as rejected alternatives with evidence |
 
 Reject:
 
 - `chain.id` branching;
-- Robinhood-only source or an issuer-specific guard;
+- Robinhood-only Ledger source or an issuer-specific guard;
 - `tx.origin`;
-- retaining `block.number` identity;
+- treating ancestor `block.number` as the Robinhood action-block identity;
 - timestamp equality without an elapsed-seconds policy;
-- silently setting `shouldCheckLastTouch=False`;
+- setting `shouldCheckLastTouch=False` as the selected Robinhood policy;
+- silently falling back to ancestor `block.number` when the configured
+  child-block source fails;
+- a mutable clock source that can change the security boundary without the
+  separately approved governance and migration model;
 - letting an arbitrary caller self-select whether protection applies;
-- a guard entered only at end-of-action housekeeping when the selected threat
-  requires whole-action coverage;
-- relying on Teller’s `@nonreentrant` without analyzing the externally callable
-  `performHousekeeping` and cross-contract paths;
-- persistent state in a supposedly stateless/redeployable contract without a
-  migration model; and
-- replacing Ledger without complete state proof.
+- using the action clock for any duration, freshness, capacity, auction,
+  reward, or timelock policy;
+- changing current lower-risk/high-risk arming semantics without separate owner
+  approval; and
+- migrating or replacing the deployed Base Ledger.
 
 ### Phase A6 — Specify policy semantics
 
 The decision record must define:
 
-- protected threat or threats;
-- transient protection arming rule;
-- persistent pacing arming rule;
-- whether lower-risk touches arm either layer;
+- the selected same-execution-block property and explicit non-goals;
+- the portable action-block interface or helper contract;
+- native-number and ArbSys child-number source semantics;
+- provider/source immutability and validation;
+- source-call failure, malformed-return, and nonmonotonic-evidence behavior;
+- whether lower-risk touches preserve the current arming behavior;
 - canonical high-risk action set;
-- exact action-entry and exit timing;
+- exact existing housekeeping timing;
 - user identity for every action;
 - delegation semantics;
 - recipient/receiver/keeper/liquidator handling;
 - zero-address behavior;
-- Underscore exemption separately for each selected layer;
+- Underscore exemption under the same child-block policy;
 - external `performHousekeeping` caller and parameter policy;
-- locked-account behavior in every mode;
+- locked-account behavior;
 - failure/revert behavior;
 - pause behavior;
-- policy-update behavior;
 - observability and diagnostic views;
 - event requirements;
-- mode and value configuration;
+- constructor, immutable, provider, and mode configuration;
 - initialization/default behavior on Base, Robinhood, and local tests;
-- seconds value, lower/upper bounds, and exact boundary comparator if pacing is
-  selected;
-- whether policy changes apply immediately or prospectively;
 - compatibility with the old `shouldCheckLastTouch` getter/setter;
-- storage and ABI impact; and
-- emergency disable/rollback semantics.
+- storage and ABI impact;
+- Robinhood abort/rollback semantics before any state-bearing transaction;
+- the permanent Base live-version exception; and
+- manifest and post-deployment proof of the selected action-block source.
 
-Use an explicit mode/value model if the selected architecture has multiple
-layers. Do not encode an ambiguous set of booleans that allows an accidental
-unsupported combination.
+Do not encode an ambiguous set of booleans that permits an unsupported source
+or an accidental fallback. If the existing `shouldCheckLastTouch` Boolean is
+retained, it may only enable or disable the same approved block-identity guard;
+it may not select a different clock or policy.
 
-### Phase A7 — Verify transient-storage test authority
+### Phase A7 — Verify action-block-source authority
 
-The repository uses Vyper transient mappings in other contracts. The integrated
-test suite explicitly documents a Titanoboa behavior in
-`tests/core/deleverage/test_deleverage_for_withdrawal.py` where transient
-storage does not clear between simulated transactions, and
-`tests/core/deleverage/conftest.py` supplies a fresh-Deleverage fixture as a
-workaround. Treat those comments and tests as provenance for a reported
-environment-specific behavior, not proof that the behavior still exists under
-the post-H-01 pinned environment or that it applies identically to S5.
+Stage A must distinguish four values and never present them as interchangeable:
 
-If a transient S5 layer is proposed:
+- native EVM `block.number` on Base-like chains;
+- Robinhood's ancestor-height `block.number`;
+- Robinhood's RPC/receipt child-chain block number; and
+- `ArbSys(0x64).arbBlockNumber()` observed in contract execution.
 
-- verify the exact Vyper compiler output and opcode use;
-- state the EVM transaction-boundary property being relied on;
-- reproduce the Titanoboa behavior under the integrated H-01/S1 environment;
-- do not change production semantics to match a test-runner defect;
-- do not hide a mismatch with a skip, xfail, or silent reset;
-- identify the approved S1/reset mechanism, if it accurately models EVM
-  transaction boundaries;
-- require a second execution environment or other independently reviewable
-  evidence if Titanoboa cannot prove the property; and
-- include a negative test showing that the transient flag cannot persist into
-  an independent EVM transaction.
+Require:
 
-Stage A must stop if the proposed critical security property cannot be tested
-faithfully.
+- current official Robinhood Nitro/ArbOS version evidence;
+- the authoritative ArbSys interface, address, return type, and documented
+  child-block semantics;
+- a reproducible read-only or separately owner-approved Robinhood testnet probe
+  proving that the precompile exists and agrees with receipt child-block
+  identity;
+- same-child-block evidence, if the RPC/sequencer can intentionally construct
+  it, or an explicit stop if that property cannot be tested;
+- successive-child-block evidence while ancestor `block.number` repeats;
+- native-provider parity under the Base S1 profile;
+- local mock/provider tests for revert, malformed return, and forbidden
+  fallback; and
+- compiler, ABI, and staticcall evidence for the selected Vyper integration.
+
+The largest observed child-block gap or cadence is evidence, not a protocol
+maximum or time guarantee. Stage A must stop if the critical source semantics
+cannot be tested faithfully.
 
 ### Phase A8 — Specify state-safe rollout and rollback
 
@@ -654,30 +761,37 @@ For Base and Robinhood separately, define:
 - old and new artifact set;
 - registration and call graph before activation;
 - the single activation boundary;
-- initialization of any new policy or per-user state;
-- how the old NUMBER guard stays active until the replacement is active;
-- how the old guard is disabled without disabling locked-account protection;
+- initialization and verification of the immutable action-block source;
 - whether mixed versions are possible;
 - abort assertions;
 - rollback boundary;
 - behavior for transactions in flight;
 - event and monitoring requirements;
-- live-version drift owner and convergence bound; and
+- permanent live-version exception ownership and operational implications; and
 - proof that no permanent chain-specific source is created.
 
-If Ledger remains unchanged, require:
+For Base, require:
 
-- byte-identical Ledger source/artifact evidence;
-- unchanged accounting ABI unless explicitly justified;
-- preserved Teller-only Ledger call;
-- `_shouldCheck=False` only after the replacement is active;
-- locked-account regression proof; and
-- no attempt to migrate or rewrite Ledger accounting state.
+- the deployed Ledger address, bytecode, ABI, configuration, and behavior remain
+  unchanged;
+- no Base migration, registry action, state import/export, convergence
+  deadline, or rollback plan is created by S5;
+- the source repository clearly distinguishes current live Base evidence from
+  the new forward canonical source; and
+- the component matrix records why permanent live-bytecode divergence is safer
+  than migrating non-enumerable accounting state.
 
-If Ledger changes, require an exhaustive state migration specification,
-independent audit, rehearsed atomic migration, and owner approval before Stage B
-may be authorized. S5’s default Stage B scope does not include such a
-migration.
+For Robinhood, require:
+
+- a fresh Ledger deployment with no imported Base state;
+- the approved action-block source established and verified before any
+  state-bearing user action;
+- fail-closed behavior on a missing, malformed, or wrong source;
+- abort before activation if the provider, ArbSys, ABI, runtime hash, or
+  manifest assertion differs;
+- rollback only before the first state-bearing action unless a separately
+  reviewed state migration exists; and
+- no claim that a provider can be swapped casually after Ledger has state.
 
 ### Phase A9 — Define implementation and audit slices
 
@@ -731,37 +845,42 @@ Recommendations are not approvals.
 Stop after Stage A. Do not edit production code until the owner and an
 independent security reviewer explicitly decide all of the following:
 
-1. **Protected threat:** nested/reentrant composition, cross-transaction pacing,
-   both, or accepted disablement.
-2. **Guard location and Ledger posture:** preserve Ledger and use Teller;
-   preserve Ledger and use a generic guard; or approve a separately audited,
-   exhaustive Ledger state migration.
-3. **Transient layer:** whether it exists, what arms it, where it begins and
-   ends, and which actions it covers.
-4. **Persistent pacing layer:** whether it exists, its seconds value and bounds,
-   exact boundary, update timing, and timestamp-trust acceptance.
-5. **Lower-risk arming:** whether lower-risk touches arm the transient layer,
-   persistent layer, both, or neither.
-6. **High-risk action set:** the canonical protected actions and any explicit
+0. **Owner-direction validation:** confirm that Stage A evidence supports the
+   selected same-execution-block property, Robinhood child-block source, and
+   explicit non-goals. If not, return to the owner rather than substituting
+   another policy.
+1. **Abstraction shape:** immutable generic `ActionBlockClock` provider,
+   immutable native/external-source helper in Ledger, or another smaller
+   reviewed generic boundary.
+2. **Clock-source contract:** exact native and ArbSys interfaces, addresses,
+   constructor/immutable inputs, validation, failure behavior, and prohibition
+   on fallback.
+3. **Current arming semantics:** preserve or separately change the existing
+   lower-risk-touch and checked-higher-risk ordering behavior.
+4. **High-risk action set:** canonical protected actions and any explicit
    exclusions.
-7. **Underscore policy:** exemption or inclusion for each layer, with
-   downstream evidence.
-8. **Identity policy:** canonical user, caller, delegate, recipient, keeper,
+5. **Underscore policy:** preserve, remove, or revise the current user
+   classification exemption, noting Underscore is absent from the initial
+   Robinhood launch.
+6. **Identity policy:** canonical user, caller, delegate, recipient, keeper,
    liquidator, and zero-address semantics.
-9. **External housekeeping policy:** authorized callers, caller-supplied risk
+7. **External housekeeping policy:** authorized callers, caller-supplied risk
    flags, griefing controls, and Deleverage compatibility.
-10. **Configuration and compatibility:** explicit mode/value schema, old
-    `shouldCheckLastTouch` transition, events, views, defaults, and ABI.
-11. **Locked and paused behavior:** lock enforcement in every mode and
-    fail-closed pause behavior.
-12. **Base rollout:** live-version policy, activation order, rollback boundary,
-    convergence deadline, and whether a dedicated external audit is required.
-13. **H-01/S4 sequence:** exact integrated dependency and overlapping-file
+8. **Configuration and compatibility:** treatment of
+   `shouldCheckLastTouch`, events, views, defaults, constructor/ABI, and
+   diagnostics.
+9. **Locked and paused behavior:** lock enforcement and fail-closed pause and
+   clock-source failure behavior.
+10. **Base live-version exception:** no migration or convergence; record the
+    deployed artifact retained, technical cause, accepted risk, approval, and
+    operational implications.
+11. **H-01/S4 sequence:** exact integrated dependency and overlapping-file
     baseline for Stage B.
-14. **Stage B ownership:** exact allowed production, interface, test, fixture,
-    ABI, and record files.
-15. **Evidence bar:** required secondary EVM evidence, artifact checks,
-    migration rehearsal, targeted suites, S1/S2, and full-suite results.
+12. **Stage B ownership:** exact allowed production, interface, provider, test,
+    fixture, ABI, and record files.
+13. **Evidence bar:** official and live ArbSys evidence, artifact/storage/gas
+    checks, targeted suites, S1/S2, full suite, testnet soak, and external-audit
+    decision.
 
 The approval record must name each decision, date, approver, evidence commit,
 and any conditions. “Proceed,” approval of this brief, or approval of another
@@ -771,8 +890,8 @@ If no answer is provided, the default is:
 
 - no Stage B;
 - no change to live Base policy;
-- no Robinhood activation of the current NUMBER guard;
-- no Ledger replacement; and
+- no Robinhood Ledger deployment or guard activation;
+- no fallback to the ancestor-number guard or disabled guard; and
 - no migration or deployment work.
 
 ## Proposed Stage B ownership
@@ -783,15 +902,17 @@ architecture, it may include a strict subset of:
 ### Production and interfaces
 
 - `contracts/data/Ledger.vy`
-- `contracts/core/Teller.vy`
-- `contracts/data/MissionControl.vy`
-- `contracts/config/SwitchboardDelta.vy`
-- `contracts/config/DefaultsBase.vy`
-- `contracts/config/DefaultsLocal.vy`
-- a new generic shared guard contract, only if explicitly selected
-- `interfaces/Defaults.vyi`
-- `interfaces/ConfigStructs.vyi`
-- interfaces required by the approved call graph
+- one new narrowly named generic action-block provider contract, only if
+  explicitly selected;
+- one new provider interface, only if explicitly selected;
+- `contracts/core/Teller.vy`, only if Stage A proves a necessary call-contract
+  change rather than ordinary consumption of the revised Ledger;
+- `contracts/data/MissionControl.vy` and
+  `contracts/config/SwitchboardDelta.vy`, only if the existing Boolean cannot
+  safely remain the enable/disable control;
+- `contracts/config/DefaultsLocal.vy`, only for approved local-fixture
+  compatibility; and
+- interfaces required by the approved action-block call graph.
 
 ### Tests and fixtures
 
@@ -801,6 +922,7 @@ architecture, it may include a strict subset of:
 - relevant Teller domain tests
 - relevant CreditEngine and Stability Pool tests
 - new focused S5 tests under an owner-approved path
+- provider/source unit and failure tests under an owner-approved path
 - `tests/clock/test_clock_profiles.py`, only if new generic harness coverage is
   required
 
@@ -812,6 +934,7 @@ architecture, it may include a strict subset of:
 Stage B does not own:
 
 - future `contracts/config/DefaultsRobinhood.vy`;
+- `contracts/config/DefaultsBase.vy`;
 - `scripts/params/general.py` or CAD-001 work;
 - any historical migration or manifest;
 - Track 7’s reserved `0030_Track6S5LedgerGuard.py`;
@@ -822,9 +945,10 @@ Stage B does not own:
 - Underscore source; or
 - live execution.
 
-If the architecture preserves Ledger unchanged, `contracts/data/Ledger.vy` and
-`scripts/abis/Ledger.json` are prohibited Stage B edits. Record their hashes as
-negative evidence.
+Teller, MissionControl, SwitchboardDelta, Defaults interfaces, and config
+structs are prohibited unless Checkpoint 0 names the exact necessary line and
+rejects the unchanged-call/config alternative. No S5 file may contain
+Robinhood-branded production logic or `chain.id`.
 
 ## Stage B — conditional production implementation
 
@@ -850,18 +974,19 @@ Implement only the selected design.
 
 Required invariants:
 
-- no canonical guard decision depends on `block.number`;
+- ordinary-EVM deployments use native execution `block.number`;
+- Robinhood uses the configured ArbSys child-block identity and never its
+  ancestor-height `block.number`;
 - no `chain.id` or Robinhood-specific production branch exists;
-- an unauthorized caller cannot arm, clear, bypass, or weaken the guard;
+- an unauthorized caller cannot select, change, arm, clear, bypass, or weaken
+  the clock or guard;
 - user identity follows the approved action table;
-- lower-risk arming exactly matches approval;
-- every protected action enters the guard before the external effects relevant
-  to the selected threat;
-- a transient layer is scoped to the EVM transaction and cannot leak into the
-  next transaction;
-- a persistent layer uses the approved seconds value, bounds, comparator, and
-  update timing;
-- revert behavior does not leave partial guard state;
+- lower-risk arming and housekeeping ordering exactly preserve approval;
+- two checked actions for one user in one child block cannot both succeed;
+- a checked action in the next child block is not rejected merely because the
+  ancestor number or timestamp repeats;
+- source failure or malformed data reverts rather than falling back;
+- revert behavior does not leave partial `lastTouch` state;
 - different users remain isolated;
 - Underscore behavior exactly matches approval;
 - external housekeeping cannot be used as an unapproved griefing or bypass
@@ -871,50 +996,51 @@ Required invariants:
 - old protection is not disabled before new protection is active; and
 - unrelated accounting and economic semantics do not change.
 
-If both transient and persistent layers are selected, each must enforce its own
-named threat. Passing one layer must not silently bypass the other.
+### Phase B3 — Preserve Base state and establish fresh Robinhood state
 
-### Phase B3 — Preserve live Ledger state
+For Base:
 
-If Ledger is unchanged:
+- prove no production, ABI, migration, registry, defaults, governance, or live
+  deployment file changes the current Base Ledger;
+- record its deployed runtime and address as retained evidence;
+- do not create a state-enumeration or convergence procedure;
+- do not set a future migration deadline; and
+- record permanent live-version divergence with its technical cause and
+  accepted operational implications.
 
-- prove its source and generated artifact are unchanged;
-- preserve the existing Teller-only call;
-- preserve its locked-account assertion;
-- pass `_shouldCheck=False` only under the approved atomic transition;
-- retain existing `lastTouch` state without pretending it was migrated;
-- document that stale `lastTouch` values are harmless under the selected new
-  policy; and
-- prove no new code reads them as seconds or another unit.
+For Robinhood:
 
-If a Ledger change was exceptionally approved:
+- deploy the approved new Ledger only as a fresh component;
+- preserve all existing accounting storage layout and semantics unless a
+  separately approved line is indispensable to the clock boundary;
+- initialize the immutable provider/source from the reviewed manifest;
+- prove `lastTouch` stores only the approved action-block identity;
+- preserve the Teller-only call and locked-account assertion;
+- activate no user path until the source and runtime assertions pass; and
+- treat any proposal to import Base Ledger state as an immediate stop.
 
-- stop unless the separate state-migration specification and audit required by
-  Checkpoint 0 are integrated;
-- prove full storage compatibility or complete atomic migration;
-- prove every non-enumerable mapping is accounted for;
-- reconcile every accounting invariant before activation; and
-- treat any missing key or unexplained balance as an abort.
-
-No test fixture may stand in for live state-enumeration proof.
+No local fixture may be presented as Base migration evidence because S5 has no
+Base migration.
 
 ### Phase B4 — Implement explicit policy configuration
 
 If configuration changes are approved:
 
-- use explicit modes and units;
-- validate every bound at construction and governance-set time;
-- emit events for persistent policy changes;
+- use an explicit immutable provider/source contract;
+- validate the mode and source at construction;
+- prohibit a mutable source unless a separate security and migration decision
+  expressly approves it;
 - expose diagnostic views needed by operators;
 - preserve timelock/governance authority;
-- prevent unsupported mode combinations;
+- prevent unsupported source/mode combinations;
 - define initialization for Base and local fixtures;
 - leave Robinhood values to S6 unless Checkpoint 0 expressly grants a narrow
   exception; and
-- document the transition from `shouldCheckLastTouch`.
+- document how `shouldCheckLastTouch` continues to enable or disable only the
+  same approved block-identity check.
 
-Do not keep a misleading getter whose name says “last touch” if it now selects a
-different policy without a compatibility explanation and deprecation plan.
+Do not introduce seconds, durations, freshness windows, or another pacing
+policy into this configuration.
 
 ### Phase B5 — Build the canonical security matrix
 
@@ -923,9 +1049,9 @@ Tests must cover at least:
 | Dimension | Required cases |
 |---|---|
 | current comparison | all Phase A1 sequences under current policy |
-| EVM `NUMBER` | repeat, `+1`, `+2`, `+4`, `+60`, boundary skip |
-| timestamp | repeat, below boundary, exact boundary, above boundary, large jump |
-| transaction | nested same transaction, separate transactions, revert/reset |
+| native action block | repeat, `+1`, `+2`, `+4`, `+60`; source agrees with native Base-profile execution block |
+| Robinhood action block | same child block, next child block under repeated ancestor number, successive child blocks, source failure/malformed return, no fallback |
+| transaction | same child-block transactions, successive-child-block transactions, nested call, revert/reset |
 | risk order | low→high, high→low, high→low→high, high→high |
 | identity | user, caller, delegate, recipient, receiver, keeper, liquidator, zero |
 | caller authority | Teller internal route, valid Ripe external route, invalid caller |
@@ -933,22 +1059,23 @@ Tests must cover at least:
 | user isolation | same user and two-user interleaving |
 | Underscore | wallet, vault, ordinary user, caller/user distinction |
 | lock/pause | locked in every mode; relevant contracts paused |
-| policy | each supported mode, invalid modes, value bounds, governed update |
-| mixed version | old guard only, new guard only, forbidden partial activation |
-| migration | initialization, stale lastTouch, rollback boundary |
+| policy | existing enable/disable behavior, source/mode inputs, invalid source/mode, immutable selection |
+| coexistence | retained live Base artifact and new Robinhood artifact; no convergence assumption |
+| deployment | fresh Robinhood initialization, provider/source assertion, pre-state rollback boundary |
 
 Test names must state the protected property. A test that merely reproduces a
 revert without proving why does not close a security requirement.
 
 ### Phase B6 — Validate EVM semantics and artifacts
 
-For a transient design:
+For the action-block source:
 
-- inspect compiler output for transient opcodes;
-- prove transaction-boundary clearing in an authoritative environment;
-- document any Titanoboa reset workaround and why it is faithful;
-- fail if transient state survives a separate EVM transaction; and
-- do not suppress known framework discrepancies.
+- inspect compiler output and calldata/return decoding for every staticcall;
+- prove native and ArbSys source behavior in the approved environments;
+- prove missing, reverting, malformed, and wrong-mode sources fail closed;
+- prove there is no implicit `chain.id` dispatch or ancestor-number fallback;
+- measure the added gas on every protected Teller path; and
+- do not suppress provider or framework discrepancies.
 
 For every changed production contract:
 
@@ -961,8 +1088,9 @@ For every changed production contract:
   `contracts/testing/**`; and
 - record all bytecode differences with causes.
 
-If Ledger is intentionally unchanged, its runtime and ABI equality are required
-negative checks.
+The retained live Base Ledger is compared as deployment evidence, not expected
+to equal the revised Robinhood runtime. Creation input and source provenance
+for the new forward artifact remain canonical and reproducible.
 
 ### Phase B7 — Specify, but do not execute, rollout
 
@@ -977,7 +1105,8 @@ Update `docs/chains/rh/ledger-guard-implementation-record.md` with:
 - pre-activation assertions;
 - abort conditions;
 - rollback boundary;
-- live-version drift owner and convergence deadline;
+- permanent Base live-version-exception provenance and operational
+  implications;
 - Track 7 migration requirements;
 - external audit status; and
 - every unresolved deployment or governance action.
@@ -993,12 +1122,12 @@ An independent reviewer—not the implementation author—must verify:
 
 - the approved threat and architecture were implemented exactly;
 - no unapproved file or semantic change landed;
-- live Ledger state is preserved or the exceptional migration proof is
-  complete;
-- action entry timing protects the selected threat;
+- live Base Ledger state and deployment remain untouched;
+- fresh Robinhood Ledger initialization and action-block source are proven;
+- same-child-block identity protects the selected threat;
 - low-risk, identity, Underscore, external-housekeeping, lock, and pause
   semantics match approval;
-- transient and timestamp evidence is authoritative;
+- native and ArbSys source evidence is authoritative;
 - storage layouts and ABIs are safe;
 - H-01 and S4 compatibility is proven;
 - targeted, S1/S2, and full-suite validation passes;
@@ -1031,10 +1160,11 @@ Required reconciliation:
 
 - update BN-002 from `block.number` identity to the approved portable policy;
 - remove only reviewed production occurrences;
-- add any new indirect timestamp or transient-policy identifiers required by
-  the inventory schema;
+- add only reviewed action-block provider/source identifiers required by the
+  inventory schema;
 - preserve stable IDs and semantic owner;
-- record whether Ledger remained unchanged;
+- record the changed forward Ledger source and unchanged deployed Base
+  artifact;
 - correct the S5 file/artifact posture if the state-safe architecture differs
   from the planning assumption;
 - update the decision register with owner/security provenance;
@@ -1057,8 +1187,8 @@ An independent reviewer must verify:
 - commit scope is exact and whitespace is clean;
 - no migration, deployment, push to protected branches, or live action
   occurred; and
-- the merge recommendation names all remaining Track 7, S6, audit, Base
-  convergence, and launch gates.
+- the merge recommendation names all remaining Track 7, S6, audit, permanent
+  Base-exception, and Robinhood launch gates.
 
 Only the owner may integrate the branch into `rh`. Integration into `rh` is not
 approval to deploy or activate the guard.
@@ -1079,7 +1209,8 @@ have an explicit order and one semantic owner per line.
 ### S6
 
 S6 owns `DefaultsRobinhood`, final chain parameter profiles, and broad defaults
-generation. S5 supplies an approved mode/value schema and constraints; it does
+generation. S5 supplies the approved action-block provider/source constructor
+inputs, `shouldCheckLastTouch` compatibility, and manifest constraints; it does
 not choose unrelated Robinhood parameters.
 
 ### S7–S10
@@ -1092,7 +1223,9 @@ configuration.
 
 Track 7 owns migration namespace, execution planning, manifest schema,
 verification tooling, and rehearsal. S5 supplies reviewed artifacts and exact
-assertions for reserved migration `0030_Track6S5LedgerGuard.py`.
+assertions for reserved migration `0030_Track6S5LedgerGuard.py`, including the
+fresh Robinhood Ledger source, provider/source identity, ArbSys result, and
+permanent no-Base-migration disposition.
 
 ### Track 8
 
@@ -1118,8 +1251,7 @@ Requires Checkpoint 0 approval:
 
 - every production, interface, fixture, test, ABI, or implementation-record
   change;
-- the selected threat and architecture;
-- any elapsed-seconds value;
+- the selected abstraction and source/failure architecture;
 - any change to Underscore exemption;
 - any change to external housekeeping authorization;
 - any Ledger artifact change;
@@ -1150,16 +1282,14 @@ Stop and return to the owner if:
 - lower-risk arming is not explicitly decided;
 - Underscore compatibility cannot be established from committed evidence;
 - the chosen user identity is ambiguous;
-- the selected persistent seconds value is a placeholder;
-- timestamp trust is unacceptable for the selected threat;
-- transient behavior cannot be tested faithfully;
-- the proposed design duplicates an existing `@nonreentrant` lock without
-  closing a distinct threat;
+- ArbSys availability or child-block semantics cannot be proven;
+- same-child-block behavior cannot be tested faithfully;
+- the selected source can fail open or fall back to ancestor `block.number`;
+- the proposed design introduces time, freshness, or cross-block pacing;
 - a valid Ripe caller can grief or bypass the policy;
 - locked-account protection weakens in any mode;
-- the plan requires replacing Ledger without exhaustive state proof;
-- any Ledger mapping key set cannot be enumerated for a proposed migration;
-- the old guard must be disabled before the new one is active;
+- the plan requires migrating or replacing the deployed Base Ledger;
+- any Base migration or convergence deadline appears;
 - an unsupported mixed-version state can occur;
 - an ABI or storage-layout change is unexplained;
 - a historical migration or manifest would need editing;
@@ -1201,12 +1331,12 @@ Repeat the Stage A commands, plus:
 
 - every new focused S5 test;
 - every Teller domain suite mapped to a protected action;
-- compiler and opcode evidence for transient storage, if selected;
-- approved secondary EVM validation, if required;
+- compiler, ABI, and staticcall evidence for the selected action-block source;
+- approved Robinhood ArbSys and secondary EVM validation;
 - ABI generation and exact diff checks;
 - storage-layout comparison;
 - creation/runtime bytecode comparison;
-- unchanged Ledger hash check when Ledger is preserved;
+- unchanged deployed Base Ledger evidence;
 - Base and Robinhood parameter-profile runs;
 - migration-plan dry validation owned by Track 7, when available; and
 - full suite under the integrated H-01 environment.
@@ -1237,8 +1367,8 @@ Report:
 - exact files changed;
 - current behavior and intent evidence;
 - action/call graph;
-- Ledger state-migration feasibility;
-- threat and architecture comparison;
+- Base no-migration evidence;
+- action-block architecture comparison;
 - recommended policy;
 - Underscore findings;
 - H-01/S4 dependency state;
@@ -1257,9 +1387,9 @@ Report:
 - reconciled starting commit;
 - exact files and semantics changed;
 - source, ABI, storage, and bytecode evidence;
-- Ledger-preservation evidence;
+- unchanged Base deployment and fresh Robinhood Ledger evidence;
 - security-matrix results;
-- transient/timestamp authority;
+- native/ArbSys action-block authority;
 - targeted, S1/S2, and full-suite results;
 - rollout/rollback plan;
 - remaining Track 7/S6/audit/live gates; and
@@ -1277,7 +1407,8 @@ After Gate 2, report:
 - exact inventory reconciliation;
 - all validation evidence;
 - merge recommendation;
-- Base convergence and Robinhood deployment prerequisites;
+- permanent Base live-version exception and Robinhood deployment
+  prerequisites;
 - unresolved risks and owner actions; and
 - explicit statement that merge readiness does not authorize deployment,
   activation, migration execution, or launch.

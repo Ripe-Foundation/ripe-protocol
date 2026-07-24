@@ -7,6 +7,11 @@ authorized
 
 **Planning baseline:** `382eb7da82bc4ed54be945311a8ccd30fae87dec`
 
+**Minimum-change amendment:** 24 July 2026 — Stage A must first determine
+whether any production change is necessary when Robinhood leaves
+`deleverageCooldown = 0`. Stage B is prohibited unless the owner explicitly
+rejects that no-source-change path after reviewing its lost protection.
+
 **Required launch baseline:** the reviewed Track 6 S3 implementation and its
 checked-inventory reconciliation must be integrated into `rh`; the exact commit
 is intentionally not guessed in this draft
@@ -14,9 +19,10 @@ is intentionally not guessed in this draft
 ## Fresh-agent instruction
 
 Treat this document as the task contract. Work only on Track 6 slice S4:
-replace the duplicated Deleverage cooldown ceiling and repeated-number bypass
-with one shared, chain-portable maximum and one explicitly authorized
-multi-leg context.
+first determine whether the existing contracts with zero cooldown satisfy the
+selected launch scope. Only if the owner rejects the resulting no-pacing risk
+may S4 replace the duplicated ceiling and repeated-number bypass with a shared
+maximum and authorized multi-leg context.
 
 S4 has three stages:
 
@@ -29,9 +35,11 @@ S4 has three stages:
 3. **Stage C — checked-inventory reconciliation:** blocked until an independent
    reviewer approves the Stage B production implementation.
 
-The safe result of Stage A may be **do not implement yet**. Do not convert a
-recommendation into approval, infer that Teller is the coordinator, or silently
-change the Base Underscore integration.
+The default result of Stage A is **no production change** unless evidence
+demonstrates an indispensable nonzero launch cooldown and the owner rejects the
+configuration-only alternative. Do not convert a recommendation into approval,
+infer that Teller is the coordinator, or silently change the Base Underscore
+integration.
 
 Use branch `rh-track-6-s4-deleverage-cooldown`. Commit Stage A to that branch
 and stop at the first checkpoint. Never push directly to or merge into `rh` or
@@ -76,6 +84,24 @@ Before Stage B, verify that no active Track 8 or other branch owns an S4 file.
 The Underscore repository is a downstream compatibility input, not an S4
 write target. Any required Underscore source or deployment change needs its own
 reviewed brief, branch, approvals, and rollout.
+
+### Minimum-change directive controls Stage A
+
+Read `docs/chains/rh/minimal-contract-change-reassessment.md` from the current
+integration branch. If the S4 worktree predates that document, record the
+amendment as a post-launch input and ask the owner how the evidence record
+should cite the integrated directive. Do not copy or merge files blindly.
+
+Stage A must compare:
+
+1. current Deleverage/Delta/Teller source with cooldown fixed at zero and
+   nonzero activation prohibited;
+2. current source with an accepted future-enable risk;
+3. a smaller configuration or operational mitigation; and
+4. the proposed shared source change.
+
+Cleaning up the duplicated constant, correcting its comment, or improving
+future portability is not by itself sufficient to authorize Stage B.
 
 ## Worktree bootstrap
 
@@ -128,6 +154,7 @@ Read and verify the integrated versions of:
 ### Program and Track 6 authority
 
 - `docs/chains/rh-summary.md`
+- `docs/chains/rh/minimal-contract-change-reassessment.md`
 - `docs/chains/rh/component-matrix.md`, especially CM-014, CM-034, and CM-044
 - `docs/chains/rh/block-number-inventory.md`, especially BN-012
 - `docs/chains/rh/shared-block-clock-specification.md`, especially BN-012,
@@ -193,6 +220,9 @@ Teller is already the sole coordinator.
 
 ## Controlling constraints
 
+- Default to unchanged Deleverage, SwitchboardDelta, and Teller source with
+  `deleverageCooldown = 0`. Production changes require an owner-approved
+  necessity finding after the lost pacing protection is explained.
 - Preserve one canonical Ripe source for Base, Robinhood, and future EVM
   chains. No Robinhood-specific contract, branch, address check, or `chain.id`
   conditional is allowed.
@@ -237,6 +267,31 @@ The decision record must be committed to the S4 branch and presented at the
 mandatory checkpoint. Then stop.
 
 ## Stage A — security and compatibility decision
+
+### Phase A0: test whether S4 is necessary
+
+Before designing a maximum or context, prove from source, defaults, migrations,
+manifests, and dated read-only evidence:
+
+- the initial and observed cooldown posture;
+- whether any selected Robinhood launch flow requires a nonzero cooldown;
+- what exact exploit or abuse zero cooldown permits;
+- which existing authorization, nonreentrancy, liquidation, debt, limit, and
+  pause controls reduce that risk;
+- whether a manifest assertion and governance prohibition on nonzero activation
+  are sufficient for launch;
+- what monitoring or operational response can reduce residual risk without a
+  contract change; and
+- why new Deleverage/Delta/Teller code would create less total risk than
+  accepting zero cooldown.
+
+If the owner accepts zero cooldown after reviewing this analysis, recommend:
+
+- unchanged production contracts and ABIs;
+- no S4 migration;
+- explicit Robinhood zero-value configuration/assertions;
+- an activation gate requiring a later dedicated security review; and
+- closure of S4 with no Stage B or Stage C.
 
 ### Phase A1: freeze and reproduce the baseline
 
@@ -503,6 +558,10 @@ The record must contain:
 
 The checkpoint must ask the owner and security reviewer to decide:
 
+0. **Implementation necessity:** accept unchanged source with zero cooldown and
+   no pacing protection, or reject that risk and authorize consideration of a
+   production change. If unchanged source is accepted, decisions 1–11 are
+   deferred and Stage B does not exist for the initial release.
 1. **Maximum wall-time intent:** four hours, one day, or another exact duration.
 2. **Per-chain immutable values:** exact Base and Robinhood maxima and the
    cadence approval supporting them.
@@ -526,8 +585,8 @@ The checkpoint must ask the owner and security reviewer to decide:
 11. **Stage B file set and atomicity:** whether mechanical maximum and context
     changes land together or as separately reviewed releases.
 
-No response means no production edit. The Stage A author may recommend but may
-not select these decisions.
+No response means unchanged source, zero cooldown, and no production edit. The
+Stage A author may recommend but may not select these decisions.
 
 ## Proposed Stage B ownership
 
