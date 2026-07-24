@@ -1,10 +1,12 @@
 import boa
 import pytest
 from constants import EIGHTEEN_DECIMALS, MAX_UINT256, ZERO_ADDRESS
+from utils.clock_profiles import clock_profile
 
 
 # Constants
 ONE_DAY_BLOCKS = 43_200  # One day in blocks on Base (2 second blocks)
+ROBINHOOD_DAY_BLOCKS = 7_200
 
 
 # Fixtures
@@ -18,6 +20,384 @@ def setup_underscore_rewards(mission_control, mock_undy_v2, switchboard_alpha, l
         # Set available RIPE for rewards in Ledger
         ledger.setRipeAvailForRewards(ripe_available, sender=switchboard_alpha.address)
     return _setup
+
+
+@pytest.fixture(scope="module")
+def lootbox_deployer():
+    return boa.load_partial("contracts/core/Lootbox.vy")
+
+
+def _deploy_lootbox(
+    lootbox_deployer,
+    ripe_hq,
+    floor,
+    interval,
+    deposit_amount=100 * EIGHTEEN_DECIMALS,
+    yield_amount=100 * EIGHTEEN_DECIMALS,
+):
+    return lootbox_deployer.deploy(
+        ripe_hq,
+        floor,
+        interval,
+        deposit_amount,
+        yield_amount,
+    )
+
+
+def _replace_registered_lootbox(ripe_hq, candidate, governance):
+    assert ripe_hq.startAddressUpdateToRegistry(
+        16,
+        candidate,
+        sender=governance.address,
+    )
+    boa.env.time_travel(blocks=ripe_hq.registryChangeTimeLock())
+    assert ripe_hq.confirmAddressUpdateToRegistry(
+        16,
+        sender=governance.address,
+    )
+
+
+def _distribution_observation(candidate):
+    events = [
+        event
+        for event in candidate.get_logs()
+        if type(event).__name__ == "UnderscoreRewardsDistributed"
+    ]
+    assert len(events) == 1
+    return candidate.lastUnderscoreSend(), events[0].blockNumber
+
+
+#############################################
+# Section 0: Deployment Floor Configuration
+#############################################
+
+
+@pytest.mark.parametrize(
+    "floor,interval,error",
+    [
+        (0, 0, "invalid floor"),
+        (MAX_UINT256, 0, "invalid floor"),
+        (ONE_DAY_BLOCKS, ONE_DAY_BLOCKS - 1, "invalid interval"),
+        (ONE_DAY_BLOCKS, ONE_DAY_BLOCKS, None),
+        (ONE_DAY_BLOCKS, ONE_DAY_BLOCKS + 1, None),
+        (ROBINHOOD_DAY_BLOCKS, 0, None),
+        (ROBINHOOD_DAY_BLOCKS, ROBINHOOD_DAY_BLOCKS - 1, "invalid interval"),
+        (ROBINHOOD_DAY_BLOCKS, ROBINHOOD_DAY_BLOCKS, None),
+        (ROBINHOOD_DAY_BLOCKS, ROBINHOOD_DAY_BLOCKS + 1, None),
+    ],
+    ids=[
+        "zero-floor-disabled",
+        "max-floor-disabled",
+        "base-below-floor",
+        "base-exact-floor",
+        "base-above-floor",
+        "robinhood-disabled",
+        "robinhood-below-floor",
+        "robinhood-exact-floor",
+        "robinhood-above-floor",
+    ],
+)
+def test_constructor_floor_interval_matrix(
+    lootbox_deployer,
+    ripe_hq,
+    floor,
+    interval,
+    error,
+):
+    if error is not None:
+        with boa.reverts(error):
+            _deploy_lootbox(
+                lootbox_deployer,
+                ripe_hq,
+                floor,
+                interval,
+            )
+        return
+
+    candidate = _deploy_lootbox(
+        lootbox_deployer,
+        ripe_hq,
+        floor,
+        interval,
+    )
+    assert candidate.minUnderscoreSendInterval() == floor
+    assert candidate.underscoreSendInterval() == interval
+    assert candidate.hasUnderscoreRewards() == (interval != 0)
+
+
+def test_robinhood_disabled_deployment_retains_floor_without_rewards(
+    lootbox_deployer,
+    ripe_hq,
+    switchboard_alpha,
+):
+    candidate = _deploy_lootbox(
+        lootbox_deployer,
+        ripe_hq,
+        ROBINHOOD_DAY_BLOCKS,
+        0,
+    )
+
+    assert candidate.minUnderscoreSendInterval() == ROBINHOOD_DAY_BLOCKS
+    assert candidate.underscoreSendInterval() == 0
+    assert candidate.hasUnderscoreRewards() is False
+    assert candidate.undyDepositRewardsAmount() == 0
+    assert candidate.undyYieldBonusAmount() == 0
+
+    with boa.reverts("no underscore rewards"):
+        candidate.distributeUnderscoreRewards(sender=switchboard_alpha.address)
+
+    with boa.reverts("invalid interval"):
+        candidate.setUnderscoreSendInterval(
+            ROBINHOOD_DAY_BLOCKS - 1,
+            sender=switchboard_alpha.address,
+        )
+    candidate.setUnderscoreSendInterval(
+        ROBINHOOD_DAY_BLOCKS,
+        sender=switchboard_alpha.address,
+    )
+    assert candidate.underscoreSendInterval() == ROBINHOOD_DAY_BLOCKS
+    assert candidate.hasUnderscoreRewards() is False
+
+
+@pytest.mark.parametrize(
+    "floor",
+    [ONE_DAY_BLOCKS, ROBINHOOD_DAY_BLOCKS],
+    ids=["base-floor", "robinhood-floor"],
+)
+def test_setter_matrix_uses_deployment_floor(
+    lootbox_deployer,
+    ripe_hq,
+    switchboard_alpha,
+    alice,
+    floor,
+):
+    candidate = _deploy_lootbox(
+        lootbox_deployer,
+        ripe_hq,
+        floor,
+        0,
+    )
+
+    with boa.reverts("no perms"):
+        candidate.setUnderscoreSendInterval(floor, sender=alice)
+    with boa.reverts("invalid interval"):
+        candidate.setUnderscoreSendInterval(
+            floor - 1,
+            sender=switchboard_alpha.address,
+        )
+    with boa.reverts("invalid interval"):
+        candidate.setUnderscoreSendInterval(
+            MAX_UINT256,
+            sender=switchboard_alpha.address,
+        )
+
+    candidate.setUnderscoreSendInterval(
+        floor,
+        sender=switchboard_alpha.address,
+    )
+    events = [
+        event
+        for event in candidate.get_logs()
+        if type(event).__name__ == "UnderscoreSendIntervalUpdated"
+    ]
+    assert len(events) == 1
+    assert events[0].numBlocks == floor
+
+    candidate.setUnderscoreSendInterval(
+        floor + 1,
+        sender=switchboard_alpha.address,
+    )
+    events = [
+        event
+        for event in candidate.get_logs()
+        if type(event).__name__ == "UnderscoreSendIntervalUpdated"
+    ]
+    assert len(events) == 1
+    assert events[0].numBlocks == floor + 1
+
+    with boa.reverts("no change"):
+        candidate.setUnderscoreSendInterval(
+            floor + 1,
+            sender=switchboard_alpha.address,
+        )
+
+    candidate.pause(True, sender=switchboard_alpha.address)
+    with boa.reverts("contract paused"):
+        candidate.setUnderscoreSendInterval(
+            floor,
+            sender=switchboard_alpha.address,
+        )
+
+
+@pytest.mark.parametrize(
+    "floor,parameter_profile",
+    [
+        (ONE_DAY_BLOCKS, "base_canonical"),
+        (ROBINHOOD_DAY_BLOCKS, "robinhood_candidate"),
+    ],
+    ids=["base-boundary", "robinhood-boundary"],
+)
+def test_distribution_strict_boundary_under_both_parameter_profiles(
+    lootbox_deployer,
+    ripe_hq,
+    governance,
+    switchboard_alpha,
+    setup_underscore_rewards,
+    clock_controller,
+    floor,
+    parameter_profile,
+):
+    candidate = _deploy_lootbox(
+        lootbox_deployer,
+        ripe_hq,
+        floor,
+        floor,
+    )
+    _replace_registered_lootbox(ripe_hq, candidate, governance)
+    setup_underscore_rewards(10_000 * EIGHTEEN_DECIMALS)
+
+    with clock_controller.scenario(
+        parameter_profile=parameter_profile,
+        parameter_values={
+            "minimum_floor": floor,
+            "governed_interval": floor,
+        },
+        parameter_bounds={"minimum_floor": [floor, floor]},
+    ):
+        first_number = max(
+            1_000_000,
+            clock_controller.current.number + floor + 1,
+        )
+        clock_controller.set(number=first_number)
+        candidate.distributeUnderscoreRewards(sender=switchboard_alpha.address)
+        last_send = candidate.lastUnderscoreSend()
+
+        clock_controller.set(number=last_send + floor - 1)
+        with boa.reverts("too early"):
+            candidate.distributeUnderscoreRewards(
+                sender=switchboard_alpha.address,
+            )
+        clock_controller.observed_call(
+            "BN-025",
+            "interval minus one remains too early",
+            candidate.distributeUnderscoreRewards,
+            components=("CM-033",),
+            observed_by="boundary:block.number below strict send boundary",
+            expected_revert="0x",
+            sender=switchboard_alpha.address,
+        )
+
+        clock_controller.set(number=last_send + floor)
+        with boa.reverts("too early"):
+            candidate.distributeUnderscoreRewards(
+                sender=switchboard_alpha.address,
+            )
+        clock_controller.observed_call(
+            "BN-025",
+            "interval equality remains too early",
+            candidate.distributeUnderscoreRewards,
+            components=("CM-033",),
+            observed_by="boundary:block.number equals strict send boundary",
+            expected_revert="0x",
+            sender=switchboard_alpha.address,
+        )
+
+        eligible_number = last_send + floor + 1
+        clock_controller.set(number=eligible_number)
+        result = clock_controller.observed_call(
+            "BN-026",
+            "interval plus one distributes and records observed number",
+            candidate.distributeUnderscoreRewards,
+            components=("CM-033",),
+            observed_by=(
+                "event:UnderscoreRewardsDistributed.blockNumber and "
+                "state:lastUnderscoreSend"
+            ),
+            observation=lambda: _distribution_observation(candidate),
+            expected_observation=(eligible_number, eligible_number),
+            expected_result=(
+                100 * EIGHTEEN_DECIMALS,
+                100 * EIGHTEEN_DECIMALS,
+            ),
+            sender=switchboard_alpha.address,
+        )
+        assert result == (
+            100 * EIGHTEEN_DECIMALS,
+            100 * EIGHTEEN_DECIMALS,
+        )
+
+        with boa.reverts("too early"):
+            candidate.distributeUnderscoreRewards(
+                sender=switchboard_alpha.address,
+            )
+        clock_controller.observed_call(
+            "BN-025",
+            "repeated number cannot advance eligibility",
+            candidate.distributeUnderscoreRewards,
+            components=("CM-033",),
+            observed_by="boundary:block.number repeats last send number",
+            expected_revert="0x",
+            sender=switchboard_alpha.address,
+        )
+
+
+@pytest.mark.parametrize(
+    "floor,parameter_profile",
+    [
+        (ONE_DAY_BLOCKS, "base_canonical"),
+        (ROBINHOOD_DAY_BLOCKS, "robinhood_candidate"),
+    ],
+    ids=["base", "robinhood"],
+)
+@pytest.mark.parametrize("profile_name", ["R-J2-J4", "R-STRESS60"])
+def test_representative_and_stress_jumps_do_not_bypass_interval(
+    lootbox_deployer,
+    ripe_hq,
+    governance,
+    switchboard_alpha,
+    setup_underscore_rewards,
+    clock_controller,
+    floor,
+    parameter_profile,
+    profile_name,
+):
+    candidate = _deploy_lootbox(
+        lootbox_deployer,
+        ripe_hq,
+        floor,
+        floor,
+    )
+    _replace_registered_lootbox(ripe_hq, candidate, governance)
+    setup_underscore_rewards(10_000 * EIGHTEEN_DECIMALS)
+    profile = clock_profile(profile_name)
+
+    with clock_controller.scenario(
+        profile,
+        parameter_profile,
+        parameter_values={
+            "minimum_floor": floor,
+            "governed_interval": floor,
+        },
+        parameter_bounds={"minimum_floor": [floor, floor]},
+    ):
+        clock_controller.apply(profile, 0)
+        candidate.distributeUnderscoreRewards(sender=switchboard_alpha.address)
+
+        for step in range(1, len(profile.points)):
+            clock_controller.apply(profile, step)
+            with boa.reverts("too early"):
+                candidate.distributeUnderscoreRewards(
+                    sender=switchboard_alpha.address,
+                )
+            clock_controller.observed_call(
+                "BN-025",
+                "representative or stress jump remains inside interval",
+                candidate.distributeUnderscoreRewards,
+                components=("CM-033",),
+                observed_by="boundary:block.number has not passed interval",
+                expected_revert="0x",
+                sender=switchboard_alpha.address,
+            )
 
 
 ########################################
