@@ -1,7 +1,7 @@
 # Track 6 S3 Lootbox Floor Implementation Record
 
-**Status:** Mandatory reviewer gate 1; inventory reconciliation is intentionally
-blocked
+**Status:** Gate 1 owner-approved; Phase G inventory reconciliation authorized;
+mandatory reviewer gate 2 remains open
 
 **Evidence date:** 24 July 2026
 
@@ -19,20 +19,32 @@ blocked
 **Post-review test-correction commit:**
 `3c1fea84d70e53e6b0947ee501ee7bbf6413dc57`
 
+**Corrected Gate 1 record commit:**
+`23697faca5f522fd840be68f749a9237ab38c270`
+
+**Wording-only follow-up commit:**
+`5c888e589ad0ff6bd76ee2da3d8f7194558bcdb1`
+
 **Branch:** `rh-track-6-s3-lootbox-floor`
 
 **Worktree:**
 `/Users/wigglez/dev/ripe-protocol-track-6-s3-lootbox-floor`
 
-This record covers only Stage 1 of
+This record covers Stage 1 and its Gate 1 approval provenance under
 `docs/chains/rh/track-6-s3-lootbox-floor.md`. It is not a deployment approval,
-an inventory approval, or a merge-readiness claim.
+a Gate 2 approval, or a merge-readiness claim.
 
-The reviewer feedback recommending conditional Gate 1 approval is not itself
-the immutable approval provenance required by Phase G: it requests corrections
-and says a reviewer or owner must reference the corrected commits afterward.
-The correction therefore remains at Gate 1 and does not authorize S2
-reconciliation.
+On 24 July 2026, after the independent reviewer re-reviewed the wording-only
+follow-up and reported no findings, the owner explicitly approved both:
+
+1. `https://base-rpc.publicnode.com` as the approved public endpoint for the
+   Phase E read-only evidence; and
+2. Gate 1 on the exact commits `f40dc25`, `3c1fea8`, `23697fa`, and `5c888e5`.
+
+This owner-supplied approval is the immutable Gate 1 provenance required by
+Phase G once committed. It authorizes only the owned S2 inventory
+reconciliation. It does not authorize Gate 2, push, merge, deployment,
+verification, configuration, signing, or another live action.
 
 ## Approval provenance and implemented decisions
 
@@ -357,13 +369,10 @@ The current committed Base manifest records:
   `0x1f90ef42Da9B41502d2311300E13FAcf70c64be7`.
 
 Read-only JSON-RPC verification used `https://base-rpc.publicnode.com` without
-a secret or transaction. The task contract explicitly permits read-only public
-RPC verification without secrets, but no separate owner record names
-PublicNode as the specifically "approved public endpoint" contemplated by
-Phase E. The reads below are reproducible corroborating evidence. If
-"approved" requires provider-specific owner provenance, live verification
-remains an unresolved rollout input until the owner confirms this provider or
-names another endpoint.
+a secret or transaction. On 24 July 2026, the owner explicitly approved
+PublicNode as the public endpoint for this Phase E evidence. The reads below
+are therefore the plan's approved, reproducible live-version evidence; they do
+not authorize a transaction or other live action.
 
 At Base block `49,059,353`, timestamp `2026-07-24T15:47:33Z`:
 
@@ -682,13 +691,12 @@ same reviewed source/compiler/creation artifact. The reserved
 an onchain upgrade transaction. S6 still owns defaults and the parameter
 manifest.
 
-## Gate 1 unresolved items
+## Gate 1 resolution and remaining items
 
-- An independent reviewer must approve the exact production implementation,
-  post-review test-correction commit, corrected record commit, generated ABI,
-  hashes, tests, S2 diagnostics, and rollout analysis.
-- The reviewer or owner must then provide immutable approval provenance before
-  S2 inventory reconciliation begins.
+- The independent reviewer reproduced the Stage 1 evidence, reported no
+  findings after the wording follow-up, and recommended Gate 1 approval.
+- On 24 July 2026, the owner approved Gate 1 on `f40dc25`, `3c1fea8`,
+  `23697fa`, and `5c888e5`, authorizing Phase G inventory reconciliation.
 - Stage 2 inventory/checker/test changes, the reconciled S1/S2 run, full suite,
   and mandatory reviewer Gate 2 remain open.
 - Production-contract security/audit review remains open.
@@ -697,10 +705,6 @@ manifest.
 - The pending Underscore distribution-window/state-continuity decision remains
   open.
 - The temporary-drift owner, exact bounds, and deadline remain open.
-- Provider-specific owner confirmation of PublicNode, or a replacement
-  owner-approved public endpoint, remains open if Phase E's "approved public
-  endpoint" language requires more than the task contract's general read-only
-  RPC permission.
 - S6 defaults/manifest work and S10 interval-report correction remain open.
 - Pre-existing unrelated ABI drift and exporter compile failures remain a
   separately scoped repository-hygiene task and are not S3 changes.
