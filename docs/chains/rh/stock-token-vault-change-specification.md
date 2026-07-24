@@ -1,7 +1,7 @@
 # Shared Stock Token Vault-Change Specification
 
-Status: **Phase G specification complete under the owner-confirmed freeze,
-no-automatic-allocation, and live-claim reward directions; Phases H–K
+Status: **Phase H control/evidence analysis complete for owner review; no new
+storage, interface, dedicated pause, or caller policy selected; Phases I–K
 intentionally not finalized**
 
 Date: 2026-07-24 (America/Denver)
@@ -11,10 +11,11 @@ This document is the Track 8 working specification required by
 formal state and invariant model, architecture comparison, mandatory early
 owner checkpoint, exact deposit-accounting design, and backing/debt-health
 design, plus the settlement/liquidation/total-loss and corrected share-vault
-designs. It does not select a production vault, approve an automatic
+designs, and the Phase H current-control, governance, clock, and operational
+evidence analysis. It does not select a production vault, approve an automatic
 donation/restoration allocation or recapitalization, authorize a Base
-migration, approve any newly identified storage/interface mechanism, or
-authorize implementation.
+migration, approve any newly identified storage/interface mechanism, select a
+dedicated pause or caller policy, or authorize implementation.
 
 The owner-confirmed instruction selects option 4 as the architecture direction
 for specification work only. Until the later gates are approved and
@@ -415,6 +416,76 @@ of `origin/rh`; the remote subsequently synchronized to the same commit before
 this pass completed. That commit contains only the same three out-of-scope
 documentation paths identified above. No Track 8 source/evidence path changed,
 no integration commit was imported, and Phase H was not begun.
+
+### 3.8 Phase H source and branch recheck
+
+At Phase H entry, the isolated Track 8 worktree was clean and synchronized
+with its owner-authorized backup branch at
+`6c8984102968197b7634d5b3786b0adfd101901f`. Integration `rh` and
+`origin/rh` were clean and synchronized at
+`382eb7da82bc4ed54be945311a8ccd30fae87dec`.
+
+The integration increment `f0bfd0f..382eb7d` contains only:
+
+- `docs/chains/rh/robinhood-deployment-support-specification.md`;
+- `docs/chains/rh/robinhood-deployment-validation-plan.md`; and
+- `docs/chains/rh/track-7-h1-dependency-security-preflight.md`.
+
+The first two documents confirm that a Robinhood defaults contract and Stock
+Token asset configuration remain proposed, not deployed or selected. The
+third is Track 7's dependency-security preflight; its `H-01` label is not this
+Track 8 Phase H and creates no Track 8 authorization.
+
+A direct `be6a759..382eb7d` comparison returned no changed path in the Phase H
+source set:
+
+- MissionControl, Ledger, Teller, TellerUtils, CreditEngine, AuctionHouse, and
+  Deleverage;
+- Switchboards Alpha, Bravo, Charlie, and Delta plus LocalGov, TimeLock,
+  DeptBasics, and Addys;
+- VaultBook, AddressRegistry, VaultData, BasicVault, SharesVault,
+  SimpleErc20, RebaseErc20, and the common interfaces;
+- `DefaultsBase`; and
+- the Track 5 comparison test and Base current manifest.
+
+Phase H therefore maps the same pinned controls, events, getters, registry
+guards, pause blast radii, and observable accounting state used by Phases A–G.
+No integration commit was imported. The integrated deployment-support
+documents are used only to confirm the absence of a completed Robinhood
+defaults/configuration artifact; they do not select its future values.
+
+Captured at Phase H entry:
+
+```text
+git status --short --branch
+=> ## rh-track-8-stock-token-vault-change...origin/rh-track-8-stock-token-vault-change
+
+git rev-parse HEAD
+git rev-parse origin/rh-track-8-stock-token-vault-change
+=> 6c8984102968197b7634d5b3786b0adfd101901f
+   6c8984102968197b7634d5b3786b0adfd101901f
+
+git -C /Users/wigglez/dev/ripe-protocol status --short --branch
+=> ## rh...origin/rh
+
+git -C /Users/wigglez/dev/ripe-protocol rev-parse HEAD
+git -C /Users/wigglez/dev/ripe-protocol rev-parse origin/rh
+=> 382eb7da82bc4ed54be945311a8ccd30fae87dec
+   382eb7da82bc4ed54be945311a8ccd30fae87dec
+
+git -C /Users/wigglez/dev/ripe-protocol diff --name-status \
+  be6a759..382eb7d -- <Phase H source set above>
+=> no output
+```
+
+At final Phase H handoff, integration `rh` and `origin/rh` remained at
+`382eb7da82bc4ed54be945311a8ccd30fae87dec`, but the integration worktree had
+gained an untracked
+`docs/chains/rh/track-6-s4-deleverage-cooldown.md`. That path is not part of an
+integration commit, was not imported, modified, or treated as Track 8
+evidence, and creates no Phase H source delta. Its presence is disclosed here
+rather than silently restating the entry-time clean-worktree observation as a
+handoff-time fact.
 
 ## 4. Current consumer and ordering trace
 
@@ -1402,8 +1473,8 @@ policy.
 
 | Track 5 recommendation | Track 8 disposition at checkpoint |
 | --- | --- |
-| Continuous live/accounted solvency monitoring | **Accepted as an operational and future getter/event requirement**, but not as an onchain fix. Hosted monitoring is outside this repository track. |
-| Rehearsed global-borrow, per-asset-deposit, and per-asset-auction response | **Accepted as Release 0 preparation**. Any production flag change requires fresh owner approval. |
+| Continuous live/accounted solvency monitoring | **Accepted as an operational and future getter/event requirement** and specified as a read-only Phase H repository evidence contract, but not as an onchain fix. Hosted monitoring is outside this repository track. |
+| Rehearsed global-borrow, per-asset-deposit, and per-asset-auction response | **Accepted as Release 0 preparation and mapped in Phase H** with exact authority/event/getter/clock requirements. Any production flag change requires fresh owner approval. |
 | Keep Stock Tokens disabled until behavior is approved | **Accepted**. This is the current safe state. |
 | Fail-closed Simple borrowing amount under deficit | **Specified in Phase E** using existing vault/token getters and explicit debt-term propagation; no new external getter or stored flag is introduced. |
 | Deficit-aware existing-debt health | **Accepted into the atomic containment group**; no amount-view-only patch is acceptable. |
@@ -1414,7 +1485,7 @@ policy.
 | Keep generic backing checks even with external-only settlement | **Accepted as invariants I-02, I-06, and I-07**. |
 | Define deficit and total-loss debt progress | **Owner-approved for Phase F specification.** Section 16 defines the atomic exactly-once transition and identifies the minimum shared interfaces required; those interfaces and implementation remain unapproved. |
 | Corrected share-based permanent behavior | **Accepted as the recommended permanent architecture**, not selected as a production vault. |
-| Freeze post-zero deposits | **Returned for owner approval**, with a positive default recommendation. |
+| Freeze post-zero deposits | **Owner-approved for Phase G specification**; implementation and its checkpoint gate/caller remain unapproved. |
 | Do not auto-allocate later donations/restoration | **Accepted as a prohibition**; positive allocation remains an owner/counsel/risk decision. |
 | Base canonical shared-version hardening and migration | **Recommended as urgent**, pending owner live-version and migration approval. |
 | Fifteen acceptance-test outcomes | **Carried into the validation-plan scaffold** with invariant IDs and named future tests. |
@@ -1526,6 +1597,21 @@ recapitalization/recovery transaction, a Base migration, or Phase H. Section
 17 therefore defines the required behavior and explicitly returns the
 newly-proven storage/interface compatibility boundary for Phase I review.
 
+After Phase G and its review remediations were committed and backed up, the
+owner authorized the next phase with the following 2026-07-24 instruction:
+
+> I authorize Phase H specification work only. Prefer existing controls and
+> preserve repayment liveness. Return to me with evidence and alternatives
+> before proposing or selecting any new storage, interface, dedicated pause,
+> or caller policy. Do not implement contract changes, begin Phase I, select a
+> production vault, or authorize migration.
+
+Phase H may therefore inventory current controls, specify evidence and
+runbook requirements, reject controls that break repayment, and compare
+alternatives. It may not select a total-loss or checkpoint caller, introduce
+or select a dedicated pause, propose a new storage/interface mechanism, begin
+the Phase I compatibility table, or authorize implementation or migration.
+
 The remaining phase gates below remain operative. The current production
 posture is still `do not list Stock Tokens under the current vault designs`.
 
@@ -1534,10 +1620,12 @@ posture is still `do not list Stock Tokens under the current vault designs`.
 The product/architecture direction required for Phase D, the existing-controls
 direction required for Phase E, the two policy directions required for Phase
 F, and the three policy directions required for Phase G are owner-confirmed as
-satisfied for specification work. The remaining two original decisions gate
-Phase I and implementation planning. The Phase F and Phase G source traces
-also create narrower implementation-mechanism/caller/compatibility decisions;
-none is implied by a policy approval.
+satisfied for specification work. Phase H specification work is also
+owner-authorized, but its control/caller alternatives are deliberately
+returned without selection. The remaining two original decisions gate Phase I
+and implementation planning. The Phase F–H source traces also create narrower
+implementation-mechanism/caller/compatibility decisions; none is implied by a
+policy approval.
 
 | Decision | Options | Evidence and recommendation | Owner | Affected components | Prerequisite / milestone | Status |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -1559,7 +1647,7 @@ transition caller's timing authority requires separate security review:
 | --- | --- | --- | --- | --- |
 | External-settlement enforcement | Disable buyer-selected internal settlement for all fungible auctions / add a generic per-asset settlement mode if bounded internal settlement must survive for other assets | Prefer the all-external simplification if product compatibility permits; otherwise approve the narrowly named per-asset mode after Phase I impact review | Any Phase F implementation design | **Returned; no new field, getter, setter, default, migration, or ABI selected** |
 | Atomic bad-debt mechanism | Approve the two-selector CreditEngine→Ledger transition in Section 16.10 / approve another reviewed atomic shared-contract design / do not list | Approve the no-new-storage, compare-and-set two-selector design after accounting/security review | Any Phase F implementation design | **Returned; interfaces and implementation not approved** |
-| Total-loss transition caller | Permissionless/keeper-callable under deterministic predicates / restricted approved keeper or Department / governed per-transition action | Review repayment-race timing and griefing explicitly; prefer permissionless only if the final predicates leave no caller discretion over eligibility, amount, recipient, or timing-sensitive value | Any Phase F implementation design | **Returned; caller policy not approved** |
+| Total-loss transition caller | Permissionless/keeper-callable under deterministic predicates / restricted approved keeper or Department / governed per-transition action | Phase H Section 18.8 compares timing, griefing, liveness, and pause coordination without proposing or selecting a caller | Any Phase F implementation design | **Returned after Phase H analysis; caller policy not proposed or approved** |
 
 New Phase G compatibility decisions, returned because current source derives
 claims directly from all custody and existing reward/recovery surfaces cannot
@@ -1572,6 +1660,18 @@ express the approved policies:
 | Positive-delta compatibility | Quarantine unsolicited positive deltas in the corrected path / explicitly allocate positive rebases in a separately reviewed generic mode | Do not silently apply quarantine semantics to existing yield/rebase users; separate the generic behaviors explicitly and test both | Phase I source/storage/interface impact review | **Returned; no mode/configuration field approved** |
 | Reward integration surface | Reuse live-amount getters with explicit semantics / add an explicit economic-weight getter / global index or other S3-compatible model | Preserve raw shares for accounting, use live claims for economic weight, exclude `U` from global value, and let S3 close interval-boundary mechanics | Phase I plus integrated S3 | **Returned; no Vault/Lootbox/Ledger ABI or storage change approved** |
 
+New Phase H control decisions are returned because current source has useful
+fast controls but no dedicated total-loss/checkpoint gate and because broad
+contract pauses violate the owner-required repayment-liveness boundary:
+
+| Decision | Alternatives returned | Evidence and recommendation | Owner | Affected components | Prerequisite / needed-before milestone | Status |
+| --- | --- | --- | --- | --- | --- | --- |
+| Total-loss resolution gate | Reuse existing global `canLiquidate` consumption / rely on broad Department pauses / later consider a dedicated narrow gate / no listing | `canLiquidate` is immediate, fast-disable/governance-enable, observable, and does not gate repayment, but couples resolution to all ordinary liquidation. Broad Teller/CreditEngine/Ledger pauses block repayment or transition dependencies and are rejected as the normal gate. A dedicated gate would be more precise but is outside the no-new-interface/storage authorization. | Protocol owner + security | MissionControl, SwitchboardAlpha/Charlie, AuctionHouse, CreditEngine, Ledger | Owner/security accept an existing control's full blast radius, or separately authorize later dedicated-gate analysis, before Phase I or any Phase F implementation design | **Alternatives returned; existing-control reuse not selected; no dedicated pause proposed** |
+| Share-loss checkpoint gate | Require existing asset containment plus reuse an existing global control / broad vault pause / later consider a dedicated narrow gate / no listing | `canDeposit=false` and `canBuyInAuction=false` contain new exposure but do not authorize a checkpoint. Vault pause is immediate but affects every asset in the vault. No clean existing control is recommended; a dedicated gate would require later interface/storage review. | Protocol owner + security/risk | MissionControl, SwitchboardAlpha/Charlie, selected share-vault boundary, Teller, Lootbox | Owner/security accept an existing control's blast radius, or separately authorize later dedicated-gate analysis, before Phase I or any Phase G implementation design | **Alternatives returned; no checkpoint gate or dedicated pause selected** |
+| Total-loss transition caller | Permissionless deterministic / restricted existing Department or approved actor / governance per transition / no listing | Permissionless maximizes liveness but creates timing/griefing questions; a restricted existing actor bounds initiation but adds availability/trust; governance per transition is slow and `NUMBER`-dependent. Phase H returns the tradeoff without ranking it into policy. | Protocol owner + security/operations | CreditEngine, Ledger, AuctionHouse, selected resolution gate and evidence event | Resolution gate and caller-discretion/race analysis completed before interface design or any Phase F implementation design | **Returned; no caller policy proposed or selected** |
+| Share-loss checkpoint caller | Permissionless deterministic / restricted existing Department or approved actor / governance per checkpoint / combine atomically with a later approved total-loss transition / no listing | Timing determines whether later restoration is quarantined, so caller discretion and observation evidence are property-sensitive. Combining calls may reduce races but would itself be an interface choice. | Protocol owner + security/risk/operations | Selected share-vault boundary, checkpoint gate, Teller, Lootbox, operational evidence surface | Checkpoint gate, property/counsel-risk treatment, and timing analysis completed before interface design or any Phase G implementation design | **Returned; no caller or atomic-combination policy proposed or selected** |
+| Incident withdrawal posture | Preserve safe withdrawals asset-by-asset / disable affected-asset withdrawal when delivery is unsafe / broader freeze | Preserve repayment in every normal response and preserve withdrawals when actual delivery is safe. A per-asset freeze is the narrowest current fallback when delivery is unsafe; any broader freeze requires explicit incident evidence. | Protocol owner + security/operations | MissionControl, SwitchboardAlpha/Charlie, Teller/TellerUtils, selected vault and all co-resident assets | Exact delivery failure and blast radius evidenced before any incident action or later runbook approval | **Returned; no production flag action or standing withdrawal freeze approved** |
+
 ### 12.3 Decisions explicitly deferred but registered
 
 These must not be treated as approved by the checkpoint recommendation:
@@ -1582,7 +1682,7 @@ These must not be treated as approved by the checkpoint recommendation:
 | Requested/received/excess semantics | Validated transfer attempt `Q`; received/credited `R`; zero, negative, or excess delta reverts; see Section 14 | Phase D completion | **Specified; implementation not approved** |
 | Nominal partial loss | Freeze unresolved or owner-approved allocation; never silent pro rata | Phase E/F | Deferred |
 | Rounding | Retain `10^8` virtual shares and one virtual asset; deposit down, withdrawal share burn up, claim down, last-share sweep; see Section 17 | Phase G | **Specified; implementation not approved** |
-| Emergency disable/re-enable | Existing fast per-asset disable and governance-only re-enable are specified in Phase E. Phase F provisionally relies on existing Department pauses for total-loss resolution. Phase H must explicitly decide whether those pauses are sufficient or a dedicated resolution pause is needed, define pause/resume authority and timing, coordinate it with the selected transition caller, and preserve repayment liveness. | Phase H | Partially specified; Phase H closure is mandatory and no live action is approved |
+| Emergency disable/re-enable | Section 18 maps the current fast flags and broad pauses, rejects broad Teller/CreditEngine/Ledger pause as the normal resolution gate because it blocks repayment, and returns existing-`canLiquidate`, vault-pause, dedicated-gate, and caller alternatives without selecting any. | Owner/security decision before Phase I or implementation design | **Phase H evidence complete; control/caller selection pending and no live action approved** |
 | Vault selection | No production vault selected | Phase I owner gate | Deferred |
 | Migration atomicity/rollback | Explicit live users/funds/debt/auctions plan | Phase I | Pending Track 7 |
 | Exact-token evidence | Pinned AAPL fork plus behavior-switch/loss tests | Phase J | Pending implementation |
@@ -1606,9 +1706,9 @@ This is a Phase C impact boundary, not the finalized Phase I change table.
 | `CM-034` Teller | Transfer/credit/event/limit/housekeeping ordering |
 | `CM-044` Deleverage | Delivered amount and zero-custody progress |
 | `CM-045` TellerUtils | Deposit limit inputs and pre-transfer vault views |
-| `CM-007`–`CM-013`, `CM-049` | Defaults, MissionControl, Switchboards, per-asset controls, Robinhood configuration |
-| Ledger | User debt, aggregate debt/yield, auction removal, and exactly-once protocol bad debt; Phase F identifies but does not approve one new transition selector |
-| Existing `ConfigStructs`, MissionControl, and `Vault` interfaces | Phase E reuses current controls/getters; Phase F proves no current settlement-mode field exists; Phase G proves current Vault getters cannot expose `A^s/U^s/A/U` and returns the exact compatibility boundary for Phase I |
+| `CM-007`–`CM-013`, `CM-049` | Defaults, MissionControl, Switchboards, per-asset controls, Robinhood configuration, lite/governance authority, fast-disable/stronger-enable asymmetry, and Phase H evidence getters/events |
+| Ledger | User debt, aggregate debt/yield, auction removal, affected-user/auction enumeration, and exactly-once protocol bad debt; Phase F identifies but does not approve one new transition selector |
+| Existing `ConfigStructs`, MissionControl, and `Vault` interfaces | Phase E reuses current controls/getters; Phase F proves no current settlement-mode field exists; Phase G proves current Vault getters cannot expose `A^s/U^s/A/U`; Phase H maps existing controls and explicitly selects no replacement interface |
 | StabilityPool, StabVault | Shared Teller deposit semantics remain; Stock Token swap/custody route stays disabled |
 | RipeGov | Shared SharesVault/Teller semantics, separate lock-adjusted governance reward units, and the protocol-wide withdrawal-freeze consequence of nonzero bad debt |
 | BondRoom | Existing global bad-debt clearing consumer; clearing cannot restore resolved user debt |
@@ -2299,8 +2399,9 @@ The recommended incident sequence is:
    current, and the applicable settlement/migration plan is approved.
 
 Even if governance re-enables `canDeposit` prematurely, the automatic backing
-check still prevents an actual deficit from contributing capacity. Phase H may
-add operational detail but may not weaken this onchain fail-closed property.
+check still prevents an actual deficit from contributing capacity. Phase H
+Section 18 adds operational detail and explicitly preserves this onchain
+fail-closed property.
 
 No new event is required to prove configuration changes:
 
@@ -2783,21 +2884,21 @@ AuctionHouse, CreditEngine, vaults, and Ledger retain their existing authority
 and can stop the relevant call path; resumption uses the same existing
 governance/department controls.
 
-The proposed total-loss entry must fail while CreditEngine or Ledger is paused.
-That is the emergency stop. It must not depend on a new live asset flag or a
-price. Once unpaused, a still-eligible account can be retried from current
-state. Ordinary repayment stays available whenever Teller, CreditEngine,
-Ledger, and the existing repay control are active, even if asset deposit,
-borrow, liquidation, or auction buying is disabled.
+The proposed total-loss entry would necessarily fail while CreditEngine or
+Ledger is paused, but Phase H proves that this current-source stop is not an
+acceptable normal resolution gate: pausing Teller, CreditEngine, or Ledger
+also blocks standard repayment or its debt commit. Ordinary repayment stays
+available only when Teller, CreditEngine, Ledger, and the existing repay
+control are active, even if asset deposit, borrow, liquidation, or auction
+buying is disabled.
 
-This Phase F control treatment is provisional, not the final operational
-design. Phase H must explicitly close whether the existing Department pauses
-are sufficient or whether total-loss resolution needs a dedicated pause. It
-must name pause and resume authorities, define fast-stop versus stronger
-restart timing, specify interaction with the selected transition caller,
-preserve repayment while resolution is paused, and add the corresponding
-event/runbook/test evidence. Phase H may not inherit “Department pause is
-enough” merely because Phase F used it as the minimum current-source control.
+Phase H Section 18 now closes the evidence/control inventory, rejects broad
+Department pause as the normal gate, and returns the existing
+`canLiquidate`-reuse, dedicated-gate, and caller alternatives without selecting
+them. It defines fast-stop/governance-restart evidence and the repayment-safe
+runbook boundary. The final gate and caller remain owner/security decisions;
+Phase F may not inherit “Department pause is enough” or assume a dedicated
+pause merely because both appear as alternatives.
 
 Operational evidence must distinguish:
 
@@ -2838,9 +2939,9 @@ Section 8. A future implementation must prove:
 11. newly accrued `Y` is included in `X`, added to `unrealizedYield` exactly
     once under current accrual semantics, and not minted during transition;
 12. repayment/auction/transition race orders conserve liability and custody;
-13. existing Department pauses stop and resume resolution under the
-    provisional Phase F model, with the final control design explicitly closed
-    in Phase H; and
+13. the later owner-selected Phase H gate stops and resumes resolution without
+    blocking standard repayment, and its exact authority/event/getter/clock
+    tests pass; and
 14. no new storage, interface, ABI, default, migration, or production behavior
     is treated as approved by this document.
 
@@ -3115,8 +3216,9 @@ The exact onchain guarantee is therefore:
   also cannot persist the checkpoint, so a separate successful checkpoint path
   is required for durable post-zero memory;
 - any positive delta after that checkpoint is quarantined as `U`; and
-- a permissionless or otherwise liveness-safe checkpoint entry is recommended
-  so an observed loss need not wait for a borrower action.
+- a liveness-safe checkpoint path is required so an observed loss need not
+  wait for a borrower action, but Phase H intentionally leaves its caller
+  policy unproposed and unselected.
 
 The caller and selector for a standalone checkpoint are not approved here and
 must be resolved with Phase H controls and Phase I interfaces. Tests must
@@ -3349,23 +3451,468 @@ Phase G is specification-complete only with companion validation-plan Section
 14. no new storage/interface/ABI/migration or production vault is treated as
     approved by this document.
 
-## 18. Phases H–K hold
+## 18. Phase H — controls, governance, and operational evidence
+
+### 18.1 Authorization and specification boundary
+
+The owner-authorized Phase H instruction is quoted in Section 12.1. This phase
+maps current controls and defines repayment-safe incident evidence. In
+accordance with that instruction, it does **not**:
+
+- propose or select a new storage field, deployed getter/setter, interface,
+  event, ABI, dedicated pause, or caller policy;
+- select either returned Phase F interface, any Phase G allocated-backing
+  mechanism, or a production vault;
+- create a Robinhood default, migration, manifest, runbook script, monitor, or
+  test;
+- authorize a live disable, pause, re-enable, migration, or transaction; or
+- begin the Phase I source/storage/interface impact table.
+
+Pinned source anchors are:
+
+- `interfaces/ConfigStructs.vyi:5-18,88-117`;
+- `MissionControl.vy:175-208,261-340,439-482,534-558,599-755`;
+- `SwitchboardAlpha.vy:123-161,431-438,568-677`;
+- `SwitchboardBravo.vy:58-173,223-325,349-565,597-704,743-798`;
+- `SwitchboardCharlie.vy:181-183,311-368,428-495,755-830,899-935,
+  1008-1052,1140-1210`;
+- `SwitchboardDelta.vy:230-233,302-304,939-947,1298-1301`;
+- `LocalGov.vy:119-160`, `TimeLock.vy:7-25,45-138`, and
+  `DeptBasics.vy:13-22,63-68`;
+- `VaultBook.vy:62-147,171-174` and
+  `AddressRegistry.vy:7-100,109-198,226-370,404-467,478-547`;
+- `VaultData.vy:11-34,103-222,230-274,294-303`;
+- `BasicVault.vy:95-148` and `SharesVault.vy:103-165`;
+- `Ledger.vy:131-183,319-351,406-469,582-754,815-841`;
+- `Teller.vy:229-390,484-496,552-615`;
+- `TellerUtils.vy:105-142,198-229`;
+- `CreditEngine.vy:206-305,454-478,542-600,1217-1285`;
+- `AuctionHouse.vy:231-279,1088-1162,1199-1228`; and
+- `DefaultsBase.vy:42-57`.
+
+Line references are to the source-pinned Track 8 tree. The integrated
+deployment-support documents at `382eb7d` are used only for the negative fact
+that no `DefaultsRobinhood` or final Stock Token configuration exists.
+
+### 18.2 Roles, timing classes, and common failure semantics
+
+The current controls use four authority/timing classes:
+
+| Class | Current authority and behavior |
+| --- | --- |
+| Fast flag | Switchboard Alpha general flags and Switchboard Charlie asset flags write MissionControl immediately. Governance may set either value; a MissionControl lite signer may disable but may not enable. |
+| Fast broad pause | Switchboard Charlie may call `pause(target,true)` immediately as governance or a lite signer. Only governance may call `pause(target,false)`. Both `PauseExecuted` and the target's `DepartmentPauseModified` or `VaultPauseModified` are emitted. |
+| Config action | Switchboards Bravo, Charlie, and Delta initiate a governance-only `TimeLock` action. Confirmation is governance-only, valid at `confirmBlock <= NUMBER < expiration`, and otherwise returns false or expires/cancels according to the action executor. |
+| Registry action | VaultBook/AddressRegistry start and confirm governance-only registry changes. Confirmation requires `NUMBER >= confirmBlock`; the registry path has no action-expiration window. |
+
+`LocalGov.canGovern(addr)` and `getGovernors()` expose the local and Ripe HQ
+governance set. MissionControl exposes lite actors through
+`canPerformLiteAction`, `liteSigners(index)`, and `numLiteSigners`. These
+getters must be part of any authority snapshot; a role name in a runbook is
+not evidence that the executing address currently has the role.
+
+Common absence behavior is fail-closed but not uniform in shape:
+
+- an unset registry ID returns the empty address from `getAddr`;
+- consumers that explicitly test the returned address may return zero/false
+  without changing state, as AuctionHouse does for a missing vault;
+- consumers that immediately staticcall/extcall the required empty or
+  incompatible address revert or fail ABI decoding;
+- an unsupported asset causes false config membership or an explicit
+  `invalid asset` assertion before a fast asset flag can be changed; and
+- no path interprets an absent MissionControl, VaultBook, Ledger, vault, or
+  asset integration as permission to borrow, deposit, settle, write off debt,
+  or migrate.
+
+The operational interface must record the exact failure or empty-address
+result. It may not normalize all absence cases to `false`, because a revert,
+graceful zero, and a configured `false` flag are different evidence.
+
+### 18.3 Current control map: storage, caller, timing, event, and getter
+
+| ID / control | Contract and storage owner / current consumer | Caller, timing, and disable/re-enable asymmetry | Exact current event(s) and getter(s) |
+| --- | --- | --- | --- |
+| T8H-01 global borrowing | `MissionControl.genConfig.canBorrow`; consumed by `getBorrowConfig` and CreditEngine borrow validation | `SwitchboardAlpha.setCanBorrow`; immediate. Governance enables/disables; a current lite signer disables only. | `CanBorrowSet(canBorrow,caller)`; `MissionControl.genConfig()` and `getBorrowConfig(user,caller).canBorrow` |
+| T8H-02 per-asset collateral use | No dedicated field. Phase E derives capacity from `assetConfig(asset).canDeposit`, `DebtTerms.ltv`, automatic backing safety, and nonzero live position amount. MissionControl owns the two stored inputs; vault/token reads supply backing. | Charlie changes `canDeposit` immediately with fast-disable/governance-enable asymmetry. Bravo changes debt terms through governance plus `TimeLock`; current validation refuses nonzero LTV directly to zero. Automatic backing has no operator/caller. | `CanDepositAssetSet`; `PendingAssetDebtTermsChange`; `AssetDebtTermsSet`; `assetConfig(asset)`, `getDebtTerms(asset)`, vault getters, and ERC-20 `balanceOf(vault)`. There is deliberately no single “collateral-use” event/getter. |
+| T8H-03 per-asset deposits | `MissionControl.genConfig.canDeposit` plus `assetConfig(asset).canDeposit`; TellerUtils requires both and vault support. | Alpha general and Charlie asset fast flags. Both are immediate; lite actor may disable, governance may re-enable. | `CanDepositSet`; `CanDepositAssetSet`; `genConfig()`, `assetConfig(asset)`, and `getTellerDepositConfig(vaultId,asset,user)` |
+| T8H-04 per-asset auction purchases | `MissionControl.genConfig.canBuyInAuction` plus `assetConfig(asset).canBuyInAuction`; AuctionHouse rechecks both for every purchase. | Alpha general and Charlie asset fast flags. Both are immediate; lite actor may disable, governance may re-enable. Active auctions remain recorded but purchase returns zero while disabled. | `CanBuyInAuctionSet`; `CanBuyInAuctionAssetSet`; `genConfig()`, `assetConfig(asset)`, and `getAuctionBuyConfig(asset,recipient)` |
+| T8H-05 internal versus external settlement | No current config/storage owner. Teller exposes buyer input `_shouldTransferBalance`; AuctionHouse branches to `transferBalanceWithinVault` when true and external withdrawal when false. Phase F selects external-only behavior for issuer-controlled collateral but returns enforcement mechanism selection. | Current buyer chooses per call; no governance/timelock/asymmetry. The external route is only an entrypoint default, not an enforced policy. | No mode-change event/getter exists. The chosen route can be inferred only from call input plus settlement effects/events such as `FungAuctionPurchased`; `getAuctionBuyConfig` contains no mode. |
+| T8H-06 withdrawals | `MissionControl.genConfig.canWithdraw` plus `assetConfig(asset).canWithdraw`; Teller/TellerUtils require both, authorization, limits, and debt-safe maximum. | Alpha general and Charlie asset fast flags; immediate lite disable/governance re-enable. A vault or Teller broad pause independently blocks execution. | `CanWithdrawSet`; `CanWithdrawAssetSet`; `genConfig()`, `assetConfig(asset)`, `getTellerWithdrawConfig(asset,user,caller)`, vault `isPaused()`, Teller `isPaused()` |
+| T8H-07 repayment | `MissionControl.genConfig.canRepay`; CreditEngine `_validateOnRepay` consumes `getRepayConfig`. Teller, CreditEngine, and Ledger must also remain callable/unpaused. | Alpha fast flag; immediate lite disable/governance re-enable. Broad pause of Teller, CreditEngine, or Ledger can block repayment despite `canRepay=true`. | `CanRepaySet`; `genConfig()`, `getRepayConfig(user).canRepay`, and `isPaused()` on Teller/CreditEngine/Ledger; successful state evidence includes `RepayDebt` and Ledger debt getters. |
+| T8H-08 liquidation initiation | `MissionControl.genConfig.canLiquidate`; AuctionHouse requires it before ordinary liquidation. | Alpha fast flag; immediate lite disable/governance re-enable. Individual auction start/pause actions in Charlie are instead governance and timelocked. | `CanLiquidateSet`; `genConfig()` and `getGenLiqConfig().canLiquidate`; individual pending/executed auction events and Ledger auction getters |
+| T8H-09 bad-debt transition | Current `Ledger.badDebt` is a global amount. `SwitchboardDelta.setBadDebt` performs a governance-timelocked absolute overwrite. There is no current per-user, compare-and-set, exactly-once transition or dedicated control. Phase F returns a two-selector candidate without approval. | Current global overwrite is governance plus `TimeLock`; Ledger must be unpaused at execution. It has no fast dedicated disable/re-enable. A broad Ledger pause blocks this write and other Ledger mutations, including repayment dependencies. | `PendingBadDebtSet`; `BadDebtSet`; `Ledger.badDebt()`, Delta `pendingActions(actionId)`, and `getActionConfirmationBlock(actionId)`. No current event/getter identifies per-user loss resolution. |
+| T8H-10 vault/asset registration | Vault addresses live in VaultBook `AddressRegistry`. Protocol asset config/list lives in MissionControl. VaultData registers an asset lazily on first deposit and stores the vault-local iterable. MissionControl deregistration removes iterable membership but does not erase the `assetConfig` mapping. | New vault address: governance start/confirm under registry delay. New protocol asset: Bravo governance plus `TimeLock`. Protocol/vault-asset deregistration: Charlie governance plus `TimeLock`. Vault-local initial registration is a deposit side effect, not a governance control. | `NewAddressPending/Confirmed/Cancelled`; `NewAssetPending`, `AssetAdded`; `PendingDeregisterAssetAction`, `AssetDeregistered`; `PendingDeregisterVaultAssetAction`, `VaultAssetDeregistered`; `getAddrInfo`, `pendingNewAddr`, MissionControl `isSupportedAsset/assets/indexOfAsset/getNumAssets/assetConfig`, VaultData `isSupportedVaultAsset/vaultAssets/indexOfAsset/getNumVaultAssets` |
+| T8H-11 vault replacement/migration | VaultBook `AddressRegistry.addrInfo` owns the authoritative vault address. Update/disable starts only if current `doesVaultHaveAnyFunds()` reports false; neither operation moves token or user state. | Governance start/confirm under registry delay; no lite path. Disable has no fast re-enable: restoring/replacing an address is another governed registry action. Current funds guard uses vault-reported accounting and is not a complete live-custody scan. | `AddressUpdatePending/Confirmed/Cancelled`; `AddressDisablePending/Confirmed/Cancelled`; `addrInfo`, `getAddr`, `pendingAddrUpdate`, `pendingAddrDisable`, `registryChangeTimeLock`, and vault `doesVaultHaveAnyFunds()` |
+| T8H-12 emergency disable/re-enable | Composition of T8H-01/T8H-03/T8H-04/T8H-06/T8H-07/T8H-08 flags and Charlie broad pause. There is no single emergency state. | Fast flags and broad pause are immediate. Lite actors may only move toward disabled/paused; governance is required to re-enable/unpause. Timelocked LTV/registry actions are not incident switches. | All flag events/getters above; `PauseExecuted(contractAddr,shouldPause)` plus target `DepartmentPauseModified` or `VaultPauseModified`; target `isPaused()` |
+
+Events prove that a transaction emitted a claimed transition; current getters
+prove the post-state at a pinned block. Neither alone is sufficient. Every
+control assertion must pair the event transaction/block/log index with the
+post-state getter and the current authority snapshot.
+
+### 18.4 Base and Robinhood defaults
+
+“Default” is separated from live state:
+
+- **Base source default:** the value returned by committed `DefaultsBase` or
+  the default argument in the current entrypoint.
+- **Base live state:** a separately pinned onchain read; this section does not
+  imply that source defaults equal the current live configuration.
+- **Robinhood repository state:** no `DefaultsRobinhood` exists and no final
+  Stock Token asset config is approved.
+- **Track-required Robinhood posture:** an explicit fail-closed value required
+  before any later deployment proposal; it is not a deployed fact.
+
+| ID | Base source/default | Robinhood repository state and required posture |
+| --- | --- | --- |
+| T8H-01 | `DefaultsBase.genConfig.canBorrow=true` | No default contract. Required prelaunch posture is global borrow disabled until all launch gates pass. |
+| T8H-02 | Per-asset. `addAsset` defaults `canDeposit=true` but empty `DebtTerms` has `ltv=0`; existing Base entries must be read individually. | No asset config. Stock Token `canDeposit=false` and `ltv=0`/unconfigured until explicit later approval; no new collateral-use field. |
+| T8H-03 | General deposit true; `addAsset` asset deposit argument defaults true. | No asset config. Stock Token deposit must be explicitly false/omitted before activation. |
+| T8H-04 | General auction buy true; `addAsset` asset auction-buy argument defaults true. | No asset config. Stock Token auction purchase must be explicitly false/omitted before the external-only mechanism is approved and implemented. |
+| T8H-05 | Teller's public auction call defaults `_shouldTransferBalance=false`, but a buyer may pass true; there is no enforced mode. | No configured auction route. The owner-approved issuer policy is external-only, but its enforcement mechanism remains unselected. |
+| T8H-06 | General withdrawal true; `addAsset` asset withdrawal argument defaults true. | No asset config. Before custody exists it is absent/false by omission. Any future incident plan should leave an already-live safe withdrawal path open unless delivery itself is unsafe; no launch value is selected here. |
+| T8H-07 | `DefaultsBase.genConfig.canRepay=true`. | No default contract. Any future RH deployment proposal must explicitly keep repayment enabled and keep Teller/CreditEngine/Ledger unpaused during containment. |
+| T8H-08 | `DefaultsBase.genConfig.canLiquidate=true`. | No default contract and no value selected. No Stock liquidation path exists while Stock registration/LTV/auction support is omitted; a future global value must account for every non-Stock asset on the chain. |
+| T8H-09 | No DefaultsBase transition setting; Ledger storage begins at zero and the only current setter is a governed global overwrite. | No transition/default/interface. No debt write-off may be inferred from custody loss. |
+| T8H-10 | Base defaults contain asset entries and Base has live registries, but each actual value is registry/config state, not a universal constant. | No Robinhood vault/asset registration is approved. Omission is the safe default. |
+| T8H-11 | No migration default; Base has live VaultBook state and funded-vault guards. | No Robinhood vault address, replacement, or migration is approved. |
+| T8H-12 | General Base flags are true in `DefaultsBase`; pause initial values are constructor inputs and must be read from each live target. | No composed emergency default exists. Prelaunch Stock controls remain disabled/omitted; repayment liveness is an explicit future deployment assertion. |
+
+`SwitchboardBravo.addAsset` is especially unsafe as an implicit Robinhood
+template: when arguments are omitted it defaults
+`shouldSwapInStabPools=true`, `shouldAuctionInstantly=true`,
+`canDeposit=true`, `canWithdraw=true`, `canRedeemCollateral=true`,
+`canRedeemInStabPool=true`, `canBuyInAuction=true`, and
+`canClaimInStabPool=true`. A future Stock Token action must supply and verify
+every relevant boolean explicitly. The standing constraints remain:
+
+- `canRedeemCollateral=false`;
+- `shouldSwapInStabPools=false`;
+- no Endaoment, Curve, Aerodrome, Underscore, Stability Pool, or yield route;
+- no deposit, borrowing capacity, or auction purchase before its gates; and
+- no chain/token-name branch or Stock-specific vault contract.
+
+This finding does not authorize a default file or asset action. It is a
+required fail-closed validation assertion.
+
+### 18.5 `NUMBER` behavior and missing-integration matrix
+
+| IDs | Repeated or jumping EVM `NUMBER` | Absent/invalid integration behavior |
+| --- | --- | --- |
+| T8H-01, T8H-03, T8H-04, T8H-06, T8H-07, T8H-08, T8H-12 fast flags/pause | The state change is immediate and has no elapsed-block precondition. Repeated numbers do not delay the transaction; a jump grants no additional authority. Logs at the same block require transaction hash and log index for order. | Missing MissionControl/Switchboard/target or unsupported asset makes the write fail/revert; consumers see false/empty config or fail their required call. No optimistic enable. |
+| T8H-02 debt terms | Bravo stores `confirmBlock` and expiration. Repeated numbers prevent confirmation; a jump may enter or skip the valid window. Nonzero-to-zero LTV remains invalid regardless of clock. Automatic backing reads are immediate. | Missing MC/vault/token read fails or yields no eligible position; absence never creates capacity. |
+| T8H-05 settlement | Route choice itself has no timelock. Auction start/end still use `NUMBER`; repeated numbers hold progress and jumps may reach/end the auction. Per-purchase custody and flags must be re-read. | Missing auction/vault returns zero or reverts before payment depending on the exact boundary; Phase F still requires no payment/debt commit without delivery. |
+| T8H-09 current bad debt | Delta uses action confirmation plus expiration. Repeated numbers stall; a large jump can expire the action. | Missing/paused Ledger prevents execution. No partial global overwrite is accepted. |
+| T8H-10 Bravo/Charlie asset actions | Config `TimeLock` semantics: repeated stalls; jump can enter or skip the confirmation window. Vault-local registration occurs only in a successful deposit transaction. | Missing/unsupported targets fail validation or execution. A failed registration action cannot make the asset supported. |
+| T8H-10/T8H-11 registry actions | `confirmBlock=NUMBER+registryChangeTimeLock`. Repeated numbers stall; a jump makes confirmation eligible and there is no registry expiration. Confirmation still requires governance and revalidates address constraints. | Empty/invalid address or current funds guard blocks start/confirm. An address update/disable never migrates custody or accounting. |
+
+No operator may translate block delays to seconds for Robinhood, assume
+strictly increasing block numbers, or treat a jump as approval. The
+repository-side record must include `chainId`, block number, block hash,
+transaction hash, and log index. S1/S2 identical-artifact and checked-clock
+evidence remains a Phase J prerequisite.
+
+### 18.6 Repayment-safe incident sequence
+
+The following is a future runbook contract, not authorization to transact:
+
+1. Pin the chain, block number/hash, registry addresses, implementation/runtime
+   identity, vault ID/address, asset, current governance/lite actors, all
+   relevant flags, and target pause state.
+2. Capture the full accounting/economic tuple in Section 18.10 before any
+   control action when doing so does not prolong an active exploit.
+3. For a known affected asset, use the existing fast asset controls to set
+   `canDeposit=false` and `canBuyInAuction=false`. Under Phase E, the deposit
+   disable also removes that asset from new-borrow capacity.
+4. If the affected asset or blast radius is not yet known, use existing
+   general `canBorrow=false` and, if auction exposure is also uncertain,
+   `canBuyInAuction=false` as conservative bridges. Do not use a timelocked LTV
+   edit as an incident switch.
+5. Keep `canRepay=true` and keep Teller, CreditEngine, and Ledger unpaused.
+   Confirm an indebted user's standard repayment path succeeds under the
+   containment state. A broad pause of any of those three is not a
+   repayment-safe normal response.
+6. Leave withdrawals enabled when external delivery is safe. If the asset
+   cannot deliver safely, use the per-asset withdrawal disable and record that
+   exit liveness was intentionally sacrificed; do not casually use the global
+   withdrawal flag or whole-vault pause.
+7. Snapshot affected borrowers, raw positions, debt, liquidation state, and
+   auctions. Do not resolve debt, checkpoint a share loss, move quarantine,
+   replace the vault, or deregister the asset under this Phase H authority.
+8. Require governance, a fresh pinned evidence record, and the later approved
+   control/caller mechanism before re-enable. A monitor or lite signer may
+   never re-enable automatically.
+
+This sequence describes the required post-implementation operating model.
+Pinned current source does **not** yet consume asset `canDeposit=false` as zero
+borrow capacity; until the Phase E behavior is implemented, only the general
+`canBorrow=false` flag is the existing borrowing bridge. Pinned current source
+also has the raising-price repayment defect in Section 3.2. Therefore
+`canRepay=true` and unpaused targets are necessary but not sufficient current
+evidence: the runbook must execute or simulate the exact standard repayment
+path against the deployed version and may not claim I-09 from flags alone.
+
+The normal containment invariant is:
+
+```text
+new deposit = disabled
+new affected-asset borrow capacity = 0
+new affected-asset auction purchase = disabled
+standard repayment = enabled and executable
+withdrawal = enabled iff actual delivery remains safe
+resolution/checkpoint/migration = no action without later approval
+```
+
+If an active exploit forces a broader pause that blocks repayment, the record
+must label that as an exceptional owner/security decision and state the exact
+repayment outage. It may not be presented as satisfying I-09.
+
+### 18.7 Total-loss resolution gate alternatives
+
+Current source has no dedicated total-loss resolution pause. Phase H returns
+these alternatives without selecting an implementation:
+
+| Alternative | Existing/new surface | Repayment and liveness | Blast radius / evidence | Phase H disposition |
+| --- | --- | --- | --- | --- |
+| Reuse `genConfig.canLiquidate` as a required gate for both ordinary liquidation and total-loss resolution | Existing MissionControl storage, Alpha setter, event, and getter; later implementation would change only consumption semantics | Standard repayment does not consume this flag. Lite actor can stop immediately; only governance can resume. | Disabling also stops every ordinary liquidation, including solvent-asset liquidation. The transition must read the same pinned control at commit. | Strongest existing-control candidate; **not selected**. Owner/security must accept the global coupling before Phase I treats it as a design. |
+| Use broad Department pauses | Existing Charlie pause and target `isPaused` | Teller or CreditEngine pause blocks standard repayment; Ledger pause blocks debt writes and other repayment dependencies. Unpause is governance-only. | Very broad and target-dependent; event/getter exist. | **Rejected as the normal resolution gate** because it violates the repayment-liveness instruction. Retained only as an explicit catastrophic whole-contract fallback. |
+| Add a dedicated narrow resolution pause later | Would require a new or repurposed storage owner, setter/getter, event, authority/default, ABI and migration analysis | Could preserve repayment and ordinary liquidation if designed narrowly | Precise blast radius, but creates exactly the new surface the owner required Phase H to return before proposing | Alternative recorded only; **no dedicated pause is proposed or selected**. |
+| Do not implement automated total-loss resolution | No new surface | Repayment remains available, but unresolved debt can remain stuck after total loss | No caller/griefing exposure; fails Phase F resolution liveness | Safe fallback is no Stock Token listing, not silent manual accounting. |
+
+Reusing `canLiquidate` is technically compatible with the owner's
+existing-control preference, but Phase H does not promote it to an approved
+design. The owner must decide whether its global liquidation coupling is
+acceptable before any Phase I/interface work assumes it.
+
+### 18.8 Total-loss transition caller alternatives
+
+There is no current transition selector, so current source cannot answer who
+calls it. Phase H intentionally does not propose or select a caller policy:
+
+| Alternative | Benefit | Risk / required proof |
+| --- | --- | --- |
+| Permissionless deterministic call | Maximum liveness; no keeper registry or governance wait | Final predicates must leave the caller no discretion over user eligibility, amount, recipient, accounting bucket, or timing-sensitive value. Repayment/transition race is accounting-safe under compare-and-set but timing/griefing acceptability remains a separate security/product question. |
+| Restricted existing Department or approved operational actor | Bounds who may choose transaction timing and supports staffed incident coordination without inventing a new role | Creates availability/trust dependence and must identify an existing onchain authority getter. It cannot silently mean “any Ripe department,” and a paused required caller must not strand resolution or repayment. |
+| Governance per transition | Strong explicit authorization for each terminal action | Config `TimeLock` makes liveness depend on repeated/jumping `NUMBER`; repayment races and action expiration must be handled. Too slow for an automatic safety path unless the owner accepts that operational model. |
+| No callable transition / no listing | Avoids a new caller policy | Leaves Phase F unsatisfied; the safe product result is no listing. |
+
+The later caller decision must be coordinated with the selected gate, event
+evidence, repayment-first behavior, duplicate/auction removal semantics, and
+the exact `NUMBER` profile. No caller is implied by the phrase “keeper” in
+earlier tests or prose.
+
+### 18.9 Share-loss checkpoint control alternatives
+
+An observed share loss must be durably checkpointed to make `Z_recorded` and
+quarantine semantics survive later restoration. Existing source has no
+standalone checkpoint selector or checkpoint-specific pause.
+
+Existing asset containment is a prerequisite, not checkpoint authorization:
+`canDeposit=false` and `canBuyInAuction=false` stop new exposure but neither
+permits a caller to change `A^s/U^s`. The alternatives are:
+
+| Alternative | Repayment/property effect | Blast radius / Phase H status |
+| --- | --- | --- |
+| Require asset containment, then make checkpoint execution consume an existing global gate such as `canLiquidate` | Does not inherently block repayment. Checkpoint timing is property-sensitive because the first durable observation decides whether later restoration is `U`. | Reuses current evidence but couples checkpointing to all liquidation; **not selected**. |
+| Pause the affected vault, then allow a later approved checkpoint actor | Vault pause blocks deposits, withdrawals, and internal transfers for every asset in that vault; standard repayment reads can remain available, but exit liveness is reduced. | Existing control but overbroad. It is a containment fallback, not an approved checkpoint gate. |
+| Later propose a dedicated checkpoint gate and caller | Could isolate one vault/asset and make event/state requirements explicit | Requires new interface/storage/ABI/default/migration analysis. Recorded only as an alternative; **not proposed or selected**. |
+| No durable checkpoint / no listing | Avoids new control and caller surfaces | Cannot guarantee persistent post-zero freeze after restoration; safe result is no listing. |
+
+The total-loss transition and share-loss checkpoint may eventually share one
+atomic call or use separate calls. Phase H does not decide that interface.
+Whichever path is later proposed must ensure a caller cannot reclassify
+donations/restoration, allocate `U`, erase old shares, or choose a loss amount.
+
+### 18.10 Operational evidence model and current getters
+
+Every observation is pinned to one block and one accounting semantics:
+
+```text
+Observation O = (
+  chainId, blockNumber, blockHash, observedAt,
+  registry identities and code/runtime hashes,
+  vaultId, vaultAddr, asset,
+  C, N, S, A^s, U^s, A, U,
+  per-user raw balance/shares and live claim,
+  flags and pauses,
+  borrowers, debt, liquidation state, auctions,
+  lastCleanObservation, firstUnsafeObservation, observationWindow
+)
+```
+
+The current read map is:
+
+| Required datum | Current read/evidence | Required interpretation |
+| --- | --- | --- |
+| Live custody `C` | ERC-20 `balanceOf(vaultAddr)` | Raw token base units at the pinned block. Never infer ownership from custody alone. |
+| Nominal accounted amount `N` | Simple/Basic `VaultData.totalBalances(asset)` and `userBalances(user,asset)` | Nominal token units. Compare aggregate `N` with `C`; `C<N` is a deficit. |
+| Raw shares `S`, `s_u` | Rebase/Shares `VaultData.totalBalances(asset)` and `userBalances(user,asset)` | Raw share units, not tokens, USD, or reward value. |
+| Current live claim | `getTotalAmountForUser(user,asset)` and indexed `getUserAssetAndAmountAtIndex` | Current wrapper semantics. For existing SharesVault this derives from all custody and does not expose Phase G quarantine. |
+| Current vault total | `getTotalAmountForVault(asset)` | Must be labeled by vault type: nominal accounting for Basic, live custody for Shares. The shared name is not a shared unit. |
+| `A^s`, `U^s`, `A`, `U` | No current onchain getters/state implement the Phase G model | Report `null/not implemented`, not a guessed split. Future implementation evidence must use only the owner-approved Phase I surface. |
+| Deficit | Basic current: `max(N-C,0)`. Corrected share path: Section 17 model after implementation. | A monitor may detect arithmetic divergence but may not rewrite accounting or infer donation entitlement. |
+| General/asset flags | MissionControl `genConfig`, `assetConfig`, `isSupportedAsset`, and operation-specific config getters | Record raw flags plus supported membership and the composed decision; deregistration can leave stale mapping values, so do not collapse unsupported/absent/revert into disabled. |
+| Pauses/actors | Target `isPaused`; Alpha/Charlie events; LocalGov and MissionControl actor getters | Record target, caller, event transaction/log index, and post-state. |
+| Affected borrowers/debt | Ledger `getNumBorrowers()` plus `borrowers(1..count)`, `userDebt(user)`, and `getNumUserVaults(user)` plus `userVaults(user,1..count)` | Provides onchain iterables for current debtors and their registered vaults. The public `num*` storage uses a one-based next-index convention; the normalized getters return counts. Recompute affected positions from the pinned vault/asset reads. |
+| Active auctions | Ledger public `numFungLiqUsers` and `numFungibleAuctions(user)` are one-based next indices: enumerate `fungLiqUsers(1..value-1)` and `fungibleAuctions(user,1..value-1)`, then reconcile `getFungibleAuction` | Record active/paused status, amount left, block bounds, vault/asset, and user debt state. Zero means no iterable. |
+| Debt-free depositors | Per-known-user VaultData iterables plus indexed historical deposit/withdraw/transfer events | Current vault storage has no global user enumeration. An event index/operator address set is required; “no affected users” cannot be proven from Ledger borrowers alone. |
+| First observed divergence | Consecutive pinned snapshots and token/protocol event history | The exact statement is “first unsafe observation at block X, last clean observation at block Y.” External issuer balance changes may emit token events but no Ripe accounting event; without a prior sample the causal block is unknown. |
+
+`doesVaultHaveAnyFunds()` is a guard diagnostic, not the custody/accounting
+snapshot. Current SharesVault semantics can return false for positive custody
+with zero shares, as the live Base vault-ID-4 evidence proves. The runbook must
+read custody, raw accounting, registration, and the boolean independently.
+
+### 18.11 Repository-side validation/runbook interface
+
+No file is created in this specification-only track. A later implementation
+should provide a read-only repository command in the existing `scripts/probes`
+family, with a shape equivalent to:
+
+```text
+python scripts/probes/stock_token_vault_snapshot.py \
+  --chain-id <id> \
+  --rpc-url-env <environment-variable-name> \
+  --block <number-or-hash> \
+  --vault-id <id> \
+  --asset <full-address> \
+  --known-users <optional-input-file> \
+  --output <json-path>
+```
+
+This is a repository CLI/output contract, **not** a proposed deployed
+interface, dependency, or approved file path. It must:
+
+1. require a pinned block and resolve/record its hash;
+2. take RPC secrets only through an environment-variable name and never write
+   the endpoint credential;
+3. resolve registry addresses and record implementation/runtime identities;
+4. emit raw response hex plus decoded values and explicit unit labels;
+5. distinguish `unavailable`, `not implemented`, `empty address`, `revert`,
+   `unsupported`, and numeric zero;
+6. enumerate every onchain borrower and active auction, and state the source
+   and completeness limit of any depositor list;
+7. accept a prior snapshot and emit `lastClean`, `firstUnsafe`, and an
+   observation window without claiming an unobserved causal block;
+8. calculate only specified arithmetic such as `C-N`; it may not invent
+   `A^s/U^s`, allocate `U`, or infer a beneficiary;
+9. perform no transaction simulation that is presented as a live state
+   change, no signing, and no broadcast; and
+10. exit nonzero on inconsistent block identity, incomplete mandatory reads,
+    unit ambiguity, or an unsupported accounting version.
+
+The JSON record must contain at least:
+
+```text
+schemaVersion
+capturedAt
+chainId
+blockNumber
+blockHash
+addressesAndCodeHashes
+vaultId
+vaultAddress
+assetAddress
+accountingKind
+custody
+nominalAccounted
+rawTotalShares
+allocatedCheckpoint
+quarantineCheckpoint
+effectiveAllocated
+effectiveQuarantine
+aggregateDeficit
+flags
+pauses
+authorities
+users
+debts
+auctions
+events
+lastCleanObservation
+firstUnsafeObservation
+observationWindow
+readFailures
+sourceCommit
+```
+
+Dynamic values do not belong in a static deployment manifest. A manifest may
+declare accounting capability/version and getter semantics; each incident
+snapshot owns its pinned dynamic evidence.
+
+Hosted polling, paging, alert delivery, and staffing remain outside Track 8.
+Any hosted system consuming this record is read-only. It may alert, compare,
+and open a human review, but it may not write balances, mark `U` as anyone's
+property, resolve debt, checkpoint loss, migrate, or re-enable a control.
+
+### 18.12 Phase H recommendation and owner-returned decisions
+
+Phase H's recommendation, within the owner's existing-control preference, is:
+
+1. adopt the T8H-01–T8H-12 map and Section 18.6 repayment-safe sequence as the
+   control/runbook baseline;
+2. use the existing fast general/asset flags for containment and require
+   governance-only re-enable with pinned post-state evidence;
+3. reject broad Teller/CreditEngine/Ledger pause as the normal loss-resolution
+   gate because it blocks repayment;
+4. treat reuse of `canLiquidate` as the strongest no-new-state candidate for a
+   resolution gate, while returning its global-liquidation coupling for owner
+   and security judgment rather than selecting it;
+5. make no checkpoint gate or caller recommendation until the owner reviews
+   the timing/property alternatives in Sections 18.8–18.9; and
+6. keep the operative fallback `do not list`.
+
+Decisions required from the owner before Phase I or any implementation design:
+
+| Decision | Alternatives requiring owner direction | Current recommendation/status | Required owner/reviewers | Affected surface |
+| --- | --- | --- | --- | --- |
+| Resolution gate | Accept the global coupling of existing `canLiquidate` / authorize later analysis of a dedicated narrow gate / no listing | Existing `canLiquidate` is the preferred existing-control candidate, **not selected** | Protocol owner + security | MissionControl/Alpha, AuctionHouse, CreditEngine, Ledger |
+| Share-loss checkpoint gate | Reuse an existing global gate / tolerate whole-vault pause / authorize later dedicated-gate analysis / no listing | No clean current control; **no gate selected or dedicated pause proposed** | Protocol owner + security/risk | MissionControl/Charlie, share vault, Teller, Lootbox |
+| Total-loss caller | Permissionless deterministic / restricted existing actor / governance per transition / no listing | Evidence and tradeoffs returned; **no caller policy proposed or selected** | Protocol owner + security/operations | CreditEngine, Ledger, AuctionHouse, resolution gate |
+| Share-loss checkpoint caller | Permissionless deterministic / restricted existing actor / governance per checkpoint / combine atomically with later approved total-loss transition / no listing | Timing affects restoration/quarantine classification; **no caller policy proposed or selected** | Protocol owner + security/risk/operations | Share vault, checkpoint gate, evidence surface |
+| Incident withdrawal posture | Preserve safe withdrawals asset-by-asset / freeze affected asset withdrawal when delivery is unsafe / broader freeze | Preserve repayment always and preserve withdrawals when safe; any exit freeze must be explicit and evidenced | Protocol owner + security/operations | MissionControl/Alpha/Charlie, Teller, vault/co-resident assets |
+
+Approving the control map or one later option would not approve a storage
+layout, interface, event, ABI, production vault, implementation, Base
+migration, Robinhood registration, or live transaction. Phase I remains
+blocked until the owner expressly authorizes it.
+
+### 18.13 Phase H acceptance and stop boundary
+
+The companion validation plan Section 10 makes this phase testable. Phase H
+has completed its authorized specification work because it:
+
+1. maps all twelve required control areas to owner, caller, timing,
+   asymmetry, event, getter, defaults, clock behavior, and absence behavior;
+2. proves which existing fast controls are repayment-safe and which broad
+   pauses are not;
+3. identifies the omitted-argument enable defaults that a Robinhood asset
+   action must never inherit;
+4. defines the required custody/accounting/share/claim/deficit/control/user/
+   debt/auction evidence and its enumeration limits;
+5. defines first-observed divergence without claiming impossible historical
+   knowledge;
+6. defines a read-only repository runbook/output contract with no automatic
+   accounting or re-enable authority;
+7. returns resolution/checkpoint gate and caller alternatives without
+   selecting any new state/interface/dedicated pause/caller policy; and
+8. preserves the `do not list` fallback and stops before Phase I.
+
+## 19. Phases I–K hold
 
 The following are deliberately **not finalized**:
 
-- remaining control roles and clock behavior, including Phase H's explicit
-  total-loss pause/resume, share-loss checkpoint, and caller-coordination
-  decisions;
+- the owner-returned Phase H resolution/checkpoint gate and caller decisions;
 - exact source/storage/interface/migration impact table and the returned Phase
   F/G mechanisms;
 - final Phase J validation plan;
 - implementation PR split and atomic deployable groups; and
 - exact `rh-summary.md` handoff.
 
-Work must not continue into Phase H or later until the owner resolves the
-corresponding Section 12 gate and expressly authorizes that phase.
+Work must not continue into Phase I or later until the owner resolves the
+corresponding Section 12/18 gate and expressly authorizes that phase.
 
-## 19. Checklist handoff at this checkpoint
+## 20. Checklist handoff at this checkpoint
 
 No `rh-summary.md` checkbox is edited or closed.
 
@@ -3378,8 +3925,8 @@ Eligible for owner review:
 - Section 4, **finish the Simple versus Rebase comparison** (line 186 at the
   baseline) — Track 5 evidence is hash-verified, source-reconciled, and rerun.
 - Section 4, **write a separate vault-change specification if current behavior
-  is unacceptable** (line 190 at the baseline) — Phases A–G are specified, but
-  the item is not eligible for closure until Phases H–K are owner-directed and
+  is unacceptable** (line 190 at the baseline) — Phases A–H are specified, but
+  the item is not eligible for closure until Phases I–K are owner-directed and
   completed.
 
 Not eligible for closure:
