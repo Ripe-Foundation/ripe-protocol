@@ -190,12 +190,13 @@ MAX_ASSETS_TO_CLEAN: constant(uint256) = 20
 MAX_VAULTS_TO_CLEAN: constant(uint256) = 10
 MAX_CLAIM_USERS: constant(uint256) = 25
 RIPE_GOV_VAULT_ID: constant(uint256) = 2
-ONE_DAY: constant(uint256) = 43_200 # on Base
+MIN_UNDERSCORE_SEND_INTERVAL: immutable(uint256)
 
 
 @deploy
 def __init__(
     _ripeHq: address,
+    _minUnderscoreSendInterval: uint256,
     _underscoreSendInterval: uint256,
     _undyDepositRewardsAmount: uint256,
     _undyYieldBonusAmount: uint256,
@@ -204,8 +205,10 @@ def __init__(
     deptBasics.__init__(False, False, True) # can mint ripe only
 
     # underscore rewards
+    assert _minUnderscoreSendInterval != 0 and _minUnderscoreSendInterval != max_value(uint256) # dev: invalid floor
+    MIN_UNDERSCORE_SEND_INTERVAL = _minUnderscoreSendInterval
     if _underscoreSendInterval != 0:
-        assert _underscoreSendInterval >= ONE_DAY # dev: invalid interval
+        assert _underscoreSendInterval >= MIN_UNDERSCORE_SEND_INTERVAL # dev: invalid interval
         self.underscoreSendInterval = _underscoreSendInterval
         self.undyDepositRewardsAmount = _undyDepositRewardsAmount
         self.undyYieldBonusAmount = _undyYieldBonusAmount
@@ -1282,6 +1285,12 @@ def _getUnderscoreLootDistributor(_mc: address) -> address:
 # config setters
 
 
+@view
+@external
+def minUnderscoreSendInterval() -> uint256:
+    return MIN_UNDERSCORE_SEND_INTERVAL
+
+
 @external
 def setHasUnderscoreRewards(_hasRewards: bool):
     assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
@@ -1296,7 +1305,7 @@ def setUnderscoreSendInterval(_numBlocks: uint256):
     assert addys._isSwitchboardAddr(msg.sender) # dev: no perms
     assert not deptBasics.isPaused # dev: contract paused
     assert _numBlocks != max_value(uint256) # dev: invalid interval
-    assert _numBlocks >= ONE_DAY # dev: invalid interval
+    assert _numBlocks >= MIN_UNDERSCORE_SEND_INTERVAL # dev: invalid interval
     assert _numBlocks != self.underscoreSendInterval # dev: no change
     self.underscoreSendInterval = _numBlocks
     log UnderscoreSendIntervalUpdated(numBlocks=_numBlocks)

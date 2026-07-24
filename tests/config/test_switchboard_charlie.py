@@ -1794,6 +1794,35 @@ def test_switchboard_three_set_underscore_send_interval_timelock(
     assert switchboard_charlie.actionType(action_id) == 0
 
 
+def test_switchboard_three_forwards_below_floor_rejection(
+    switchboard_charlie,
+    governance,
+    lootbox,
+):
+    """The timelocked governance path forwards the exact rejected value."""
+    original_interval = lootbox.underscoreSendInterval()
+    rejected_interval = lootbox.minUnderscoreSendInterval() - 1
+
+    action_id = switchboard_charlie.setUnderscoreSendInterval(
+        rejected_interval,
+        sender=governance.address,
+    )
+    boa.env.time_travel(blocks=switchboard_charlie.actionTimeLock())
+
+    with boa.reverts("invalid interval"):
+        switchboard_charlie.executePendingAction(
+            action_id,
+            sender=governance.address,
+        )
+
+    assert lootbox.underscoreSendInterval() == original_interval
+    assert (
+        switchboard_charlie.pendingUnderscoreSendInterval(action_id)
+        == rejected_interval
+    )
+    assert switchboard_charlie.actionType(action_id) == 128
+
+
 def test_switchboard_three_set_undy_deposit_rewards_amount_timelock(
     switchboard_charlie,
     alice,
