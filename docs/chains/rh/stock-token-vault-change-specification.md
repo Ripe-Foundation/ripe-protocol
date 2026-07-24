@@ -1,7 +1,8 @@
 # Shared Stock Token Vault-Change Specification
 
-Status: **Phase F specification complete under the owner-confirmed settlement
-and total-loss directions; Phases G–K intentionally not finalized**
+Status: **Phase G specification complete under the owner-confirmed freeze,
+no-automatic-allocation, and live-claim reward directions; Phases H–K
+intentionally not finalized**
 
 Date: 2026-07-24 (America/Denver)
 
@@ -9,9 +10,10 @@ This document is the Track 8 working specification required by
 `track-8-stock-token-vault-change.md`. It records the evidence reconciliation,
 formal state and invariant model, architecture comparison, mandatory early
 owner checkpoint, exact deposit-accounting design, and backing/debt-health
-design, plus the settlement/liquidation/total-loss design. It does not select a
-production vault, approve a partial-loss or recovery allocation, authorize a
-Base migration, approve any newly identified implementation mechanism, or
+design, plus the settlement/liquidation/total-loss and corrected share-vault
+designs. It does not select a production vault, approve an automatic
+donation/restoration allocation or recapitalization, authorize a Base
+migration, approve any newly identified storage/interface mechanism, or
 authorize implementation.
 
 The owner-confirmed instruction selects option 4 as the architecture direction
@@ -323,6 +325,57 @@ git -C /Users/wigglez/dev/ripe-protocol rev-parse HEAD
 git diff --name-only 0d389625 f0bfd0f -- <Phase F source set above>
 => no output
 ```
+
+### 3.7 Phase G source and branch recheck
+
+At Phase G entry, the isolated worktree was clean and synchronized with its
+owner-authorized backup branch at
+`0d8423ef5d7f389fadc6f5797d6ad5fb18b5e5a0`. Integration `rh` and `origin/rh`
+were clean and synchronized at
+`f0bfd0fd5ac2be1d27321463b77248c7cd91d829`.
+
+A direct `be6a759..f0bfd0f` comparison returned no changed path in the Phase G
+source/evidence set:
+
+- `SharesVault`, `VaultData`, `RebaseErc20`, and `RipeGov`;
+- Lootbox, Ledger, and the common Vault interface;
+- `test_shares_vault.py`, `test_loot_deposit_points.py`, and the Track 5
+  comparison suite.
+
+Phase G therefore specifies the same pinned share math, raw-share reward
+weight, custody-valued global reward input, deregistration/recovery behavior,
+and current unsafe donation/restoration behavior already evidenced at the
+starting commit. No integration commit was imported and no floating track was
+used.
+
+Captured at Phase G entry:
+
+```text
+git status --short --branch
+=> ## rh-track-8-stock-token-vault-change...origin/rh-track-8-stock-token-vault-change
+
+git rev-parse HEAD
+=> 0d8423ef5d7f389fadc6f5797d6ad5fb18b5e5a0
+
+git -C /Users/wigglez/dev/ripe-protocol status --short --branch
+=> ## rh...origin/rh
+
+git -C /Users/wigglez/dev/ripe-protocol rev-parse HEAD
+git -C /Users/wigglez/dev/ripe-protocol rev-parse origin/rh
+=> f0bfd0fd5ac2be1d27321463b77248c7cd91d829
+   f0bfd0fd5ac2be1d27321463b77248c7cd91d829
+
+git -C /Users/wigglez/dev/ripe-protocol diff --name-status \
+  be6a759..f0bfd0f -- <Phase G source/evidence set above>
+=> no output
+```
+
+During the final Phase G documentation audit, the integration worktree
+acquired an external untracked
+`docs/chains/rh/track-7-h1-dependency-security-preflight.md` while remaining at
+the same `f0bfd0f` commit. That file is outside Track 8's owned deliverables and
+source/evidence set. It was not read as controlling evidence, edited, staged,
+or imported.
 
 ## 4. Current consumer and ordering trace
 
@@ -950,25 +1003,34 @@ For each vault `v`, asset `a`, user `u`, and state/time `t`:
 | Symbol | Definition |
 | --- | --- |
 | `C_t` | Actual live ERC-20 custody: `IERC20(a).balanceOf(v)` at `t`. |
+| `A^s_t` | Persisted token-denominated assets allocated to the share supply under the corrected share path. Current `SharesVault` has no such state. |
+| `U^s_t` | Persisted token-denominated quarantined custody at the last successful checkpoint. It has no automatic beneficiary and is kept distinct so a later observed loss cannot silently use a donation to shield shareholder backing. |
+| `A_t` | Effective allocated backing, `min(A^s_t, max(C_t - U^s_t, 0))`. Every successful state-changing share operation checkpoints both allocation buckets; conversion, credit, settlement, and rewards use `A`, never raw `C`. |
+| `U_t` | Effective unallocated/quarantined custody, `C_t - A_t`. An unsolicited donation, positive delta, or restoration does not increase `A^s`; therefore it cannot create a live user claim without a separately approved allocation transaction. |
 | `q` | Requested transfer amount for the current call. |
 | `C^-`, `C^+` | Custody immediately before and after the call's token-transfer boundary. |
 | `R` | Actual per-call receipt. When `C^+ >= C^-`, `R = C^+ - C^-`; a negative or unclassifiable delta must not create credit. |
 | `N_u`, `N` | Raw nominal user balance and aggregate nominal balance, with `N = ΣN_u`, for a nominal vault. |
 | `s_u`, `S` | Raw user shares and aggregate raw share supply, with `S = Σs_u`, for a share vault. |
-| `L_u(C,S)` | User's token-denominated live claim under the approved conversion/rounding formula. The current formula is approximately `floor(s_u × (C + 1) / (S + 10^8))`; its final status is Phase G. |
+| `L_u(A,S)` | User's token-denominated live claim under the Phase G conversion and rounding rules in Section 17. It is based on allocated backing `A`, not raw custody `C`, so quarantined `U` is not assigned to shareholders. |
 | `K` | Aggregate allocable live claims, `K = ΣL_u`, including defined rounding bounds. |
 | `B_u` | Token amount exposed by this asset to CreditEngine for borrowing and debt health. |
 | `D_u` | Amount currently and safely deliverable to or for `u`, after backing, allocation, settlement-policy, pause, and blocklist checks. |
 | `δ` | Nominal deficit: `max(N - C, 0)`. `deficit := δ > 0`. |
-| `Z` | Share total-loss state: `S > 0 ∧ C = 0`. |
-| `P/BL/U` | Observable pause, relevant sender/recipient/operator blocklist, and implementation/beacon identity or change state. Unknown is not equivalent to safe. |
+| `Z_custody` | Absolute custody-zero state, `S > 0 ∧ C = 0`. |
+| `Z_live` | Immediately observable allocated-backing total-loss state, `S > 0 ∧ A = 0`; it includes `Z_custody` and the case where only quarantined `U` remains. |
+| `Z_recorded` | Persistent post-zero state, `S > 0 ∧ A^s = 0`; after a loss checkpoint it remains true when later custody appears as `U`. |
+| `P/BL/I` | Observable pause, relevant sender/recipient/operator blocklist, and implementation/beacon identity or change state. Unknown is not equivalent to safe. |
 | `E_u` | User debt for an account that includes this asset. Current storage is account-level; no exact asset-attributed debt split exists. |
 | `X` | Active auction claims/targets for `(v,a)` and their settlement state. |
 | `BD` | Protocol bad debt recorded in Ledger. |
 
-For a nominal path, token-denominated persisted accounting is `N`. For a share
-path, persisted accounting is `S`, not token units; `L_u`, `K`, and `C` must be
-reported separately.
+For a nominal path, token-denominated persisted accounting is `N`. For the
+corrected share path, persisted accounting includes raw shares `S` plus the
+allocated/quarantine checkpoints `A^s` and `U^s`; `L_u`, `K`, `C`, `A`, and
+`U` must be reported separately. Current `SharesVault` persists only `S` and
+derives every claim directly from `C`, so it cannot enforce the approved
+no-automatic-allocation policy unchanged.
 
 ## 7. Formal invariants
 
@@ -991,6 +1053,7 @@ must revert or otherwise commit zero credit.
 
 ```text
 Σ B_u(v,a) <= C(v,a)
+for the corrected share path: Σ B_u(v,a) <= A(v,a) <= C(v,a)
 ```
 
 No user or combination of users may borrow against the same custody twice.
@@ -998,10 +1061,11 @@ No user or combination of users may borrow against the same custody twice.
 ### I-03 — claim and settlement conservation
 
 ```text
-Σ live claims allocated or settled from (v,a) <= C(v,a)
+Σ live claims allocated or settled from (v,a) <= A(v,a) <= C(v,a)
 ```
 
-Rounding dust must have an explicit bound and owner-approved disposition.
+Quarantined `U` is excluded. Rounding dust must have an explicit bound and
+disposition.
 
 ### I-04 — pay only for delivered collateral
 
@@ -1039,8 +1103,8 @@ required.
 
 ### I-07 — no new debt under an unsafe asset
 
-If existing `canDeposit` is disabled, `DebtTerms.ltv == 0`, `δ > 0`, `Z`, or
-the backing check is unknown/failing:
+If existing `canDeposit` is disabled, `DebtTerms.ltv == 0`, `δ > 0`,
+`Z_custody`, `Z_live`, `Z_recorded`, or the backing check is unknown/failing:
 
 ```text
 new borrowing capacity contributed by (v,a) = 0
@@ -1068,9 +1132,10 @@ borrowing, internal settlement, new auctions, or withdrawals are frozen.
 
 ### I-10 — post-zero non-interference
 
-When `Z` holds, a new depositor cannot recapitalize old claims, erase them, or
-capture later restoration by accident. New deposits remain frozen unless an
-explicit owner-approved recapitalization/allocation procedure proves otherwise.
+When `Z_live` or `Z_recorded` holds, a new depositor cannot recapitalize old
+claims, erase them, or capture later restoration by accident. New deposits
+remain frozen unless an explicit owner-approved recapitalization/allocation
+procedure proves otherwise.
 
 ### I-11 — issuer-controlled external settlement
 
@@ -1083,26 +1148,44 @@ Custody backing and the derived per-asset collateral-use check do not depend on
 a valid, nonzero oracle price. Missing price may independently block valuation;
 it must not hide or clear a custody deficit.
 
+### I-13 — unallocated custody is not a claim
+
+For the corrected share path:
+
+```text
+U = C - A
+deposit share price, live claims, borrowing value, settlement, and rewards
+    use A and exclude U
+an unsolicited positive custody delta cannot increase A
+after a successful checkpoint, an external negative delta reduces A before
+    reducing the separately checkpointed U
+```
+
+Only an explicit, separately owner-approved allocation or recapitalization
+transaction may move value from `U` into `A`. Merely observing restored
+custody, receiving a new user deposit, or changing an oracle price is
+insufficient.
+
 ## 8. Required state behavior
 
 | State | Safety behavior | Liveness result | Allocation/policy | Operator evidence |
 | --- | --- | --- | --- | --- |
-| 1. Solvent ordinary operation | Credit exactly `R`; `ΣB`, `K`, and settlement remain bounded by `C`. | Deposits, borrow, repay, withdrawal, and approved settlement can progress. | Deposit rounds shares down per Phase D; permanent bounded-dust policy remains Phase G. | Live/accounted/claim getters and normal events. |
-| 2. Pre-existing donation | The donation is not the next depositor's `R`. | Deposit may proceed only if measurement is call-local. | Surplus ownership/recovery remains owner policy. | Expose `C` separately from persisted accounting. |
-| 3. Donation between deposits | Later depositor cannot capture the donation through receipt inference. | Existing users may benefit only under an approved share/surplus policy. | Owner must decide who owns the donation. | Record first divergence and resulting surplus. |
+| 1. Solvent ordinary operation | Credit exactly `R`; `ΣB`, `K`, and settlement remain bounded by `A <= C`. | Deposits, borrow, repay, withdrawal, and approved settlement can progress. | Phase G formulas round deposit shares down and withdrawal shares up; the last-share sweep is bounded by `A`. | `C`, `A`, `U`, raw shares, live claims, and normal events. |
+| 2. Pre-existing donation | The donation is neither the next depositor's `R` nor allocated backing. | Deposit may proceed if call-local receipt is measured and `A > 0` or `S = 0`. | Donation remains `U`; no automatic shareholder, depositor, or protocol allocation. | Expose `C`, `A`, and `U` separately. |
+| 3. Donation between deposits | Later depositor cannot capture the donation through receipt inference or share pricing. | Ordinary existing positions continue against unchanged `A`; separately approved recovery may progress later. | Donation remains `U` and does not change claims/rewards. | Record first `C > A` observation and resulting `U`. |
 | 4. Short receipt / fee on transfer | Credit `R`, not `Q`; zero receipt commits no credit. | General call succeeds only if `R` satisfies minimums; exact callers or invalid deltas revert atomically. | Transfer fee remains external; `R > Q` reverts rather than being allocated. | `A`, `Q`, `R`, credited, returned, and event amounts must reconcile. |
-| 5. Partial issuer reduction | Nominal path sets deficit and disables new borrowing/internal settlement; corrected share path reprices pro rata. | Repay and safely allocable external delivery remain possible. | Nominal partial-loss allocation is not selected. | Expose `C`, `N` or `S`, claims, `δ`, flags, and affected auctions. |
+| 5. Partial issuer reduction | Nominal path sets deficit and disables new borrowing/internal settlement; after a successful bucket checkpoint, the corrected share path reduces `A` before `U` and reprices shares pro rata. | Repay and safely allocable external delivery remain possible. | Checkpointed `U` is not silently consumed to shield shares; any later positive delta is new `U`, not automatic restoration. | Expose `C`, `A^s`, `U^s`, `A`, `U`, `N` or `S`, claims, `δ`, flags, and affected auctions. |
 | 6. Aggregate nominal deficit | `B=0` for affected asset while the derived deficit keeps existing debt unsafe/visible. | Repay remains open; loss settlement freezes absent policy. | No silent `min(userNominal,C)` or pro rata. | Reconstruct `C<T` and credit/health outputs from same-block getters independently of price. |
-| 7. Total custody loss with claims | No paid auction or collateral settlement for missing tokens. | Repay remains open; position becomes resolution-eligible. | Owner must approve exactly-once bad-debt transition. | `C=0`, claims/accounting positive, debt and transition state observable. |
-| 8. Zero custody, nonzero shares | Withdrawal/internal transfer cannot invent value; new deposits frozen. | User exit is blocked until repayment, restoration policy, or bad-debt resolution. | Old shares remain explicit; no automatic erasure. | `Z` getter/event and raw-share reporting. |
-| 9. Donation/restoration after zero | No automatic reassignment or re-enable. | Progress only through approved restoration/recapitalization procedure. | Owner chooses old users, donor return, protocol, or another explicit allocation. | Amount, source, approval, and allocation event. |
-| 10. Attempted new deposit after zero | Revert before credit/share mint while `Z`. | Deposit intentionally unavailable. | Alternative requires owner-approved recapitalization proof. | Clear post-zero freeze reason. |
+| 7. Total custody loss with claims | No paid auction or collateral settlement for missing tokens; a successful state-changing checkpoint records `A^s = U^s = 0`. | Repay remains open; position becomes resolution-eligible under Phase F. | Exactly-once debt transition is specified; it does not erase shares or allocate later property. | `Z_custody`, `C=0`, `A=0`, raw shares positive, debt, and transition state observable. |
+| 8. Zero custody, nonzero shares | Withdrawal/internal value transfer cannot invent value; `Z_custody` and `Z_live` freeze immediately and `Z_recorded` persists after checkpoint. | Repayment and Phase F resolution remain open; new deposits and value-bearing share transfers are closed. | Old shares remain registered and explicit with zero live claim/reward weight; no automatic erasure. | All zero-state predicates, raw shares, zero claim, and checkpoint event. |
+| 9. Donation/restoration after zero | Custody becomes `U`; `A` and old claims remain zero after `Z_recorded`. | No allocation/recovery progresses without a separate owner, counsel/risk, and implementation approval. | The owner selected no automatic allocation and did not approve recapitalization. | Source/amount if knowable, `C`, `A=0`, `U`, unchanged claims, and no allocation event. |
+| 10. Attempted new deposit after zero | Revert atomically before credit/share mint when any applicable zero predicate holds. | Deposit intentionally unavailable; transfer rollback leaves custody/accounting unchanged. | No fresh depositor can recapitalize old shares or dilute/erase them. | Clear post-zero freeze reason and unchanged `C`, `A^s`, `U^s`, `A`, `U`, `S`, and user state. |
 | 11. Paused transfer | External delivery/deposit reverts; no downstream payment or accounting commits. | Retryable after unpause; repayment remains independent. | Internal settlement disabled for issuer-controlled assets. | Observable pause where supported; otherwise failure diagnostics. |
 | 12. Sender/recipient/operator blocklist | Relevant transfer reverts atomically. | Retry with an eligible endpoint only where policy permits. | No bypass via internal claim for issuer-controlled assets. | Report which role failed when observable. |
 | 13. Active auction before issuer action | Recheck backing/deliverability at purchase; do not rely on creation-time amount. | Auction may pause/fail without charging buyer. | Remaining custody cannot be allocated twice. | Auction state, custody-change point, and zero committed progress. |
 | 14. Liquidation after issuer action | Do not manufacture a zero-backed auction; preserve deficit in health/resolution state. | Repay or approved resolution can progress. | Owner chooses total-loss transition. | Distinguish liquidation eligibility from auction eligibility. |
 | 15. Implementation/beacon change | Re-evaluate receipt and delivery behavior; unsafe/unknown state fails closed. | Resume only after approved verification/re-enable. | Re-enable authority must be stronger than emergency disable. | Implementation/beacon/code identity and change evidence. |
-| 16. Recovery/migration with users/debt | Disable old deposits; reconcile users, custody, debt, auctions, and raw accounting before movement/retirement. | Abort/rollback must preserve one authoritative state. | Owner approves migration and partial-failure policy. | Before/after manifest, registry, balances, debt, auction, and reconciliation record. |
+| 16. Recovery/migration with users/debt | Disable old deposits; reconcile users, `C`, `A^s`, `U^s`, `A`, `U`, debt, auctions, and raw accounting before movement/retirement. | Abort/rollback must preserve one authoritative state. | Recovery can move only separately approved `U`, never allocated backing; migration remains owner-gated. | Before/after manifest, registry, balances, allocation, debt, auction, and reconciliation record. |
 
 The table intentionally separates safety from liveness. A revert can prevent
 theft while still leaving debt permanently unresolved.
@@ -1184,16 +1267,23 @@ Required properties:
 - live claims, never raw shares, used for credit and settlement;
 - explicit total-loss debt resolution;
 - post-zero deposit freeze;
-- owner-approved donation/restoration allocation;
+- no automatic donation/restoration allocation and no recapitalization without
+  a separate approval;
 - external-only issuer-controlled settlement;
 - bounded rounding/dust;
 - explicit reward and monitoring units; and
 - migration from any custody-bearing prior vault version.
 
-- **Invariant coverage:** capable of full I-01–I-12 coverage.
-- **Unresolved choices:** loss allocation acceptance, total-loss transition,
-  restoration/recapitalization, reward units, rounding bounds, migration, and
-  external-only policy approval.
+- **Invariant coverage:** capable of full I-01–I-13 coverage.
+- **Specified choices:** partial loss is pro rata against allocated backing;
+  post-zero deposits freeze; unsolicited positive deltas remain unallocated;
+  user reward weight and global value use live economic claims; issuer-
+  controlled settlement is external-only; total-loss liability progress is
+  atomic and exactly once.
+- **Unresolved choices:** the storage/interface boundary that distinguishes
+  allocated backing from raw custody, any future recapitalization/recovery
+  transaction, Phase F implementation mechanisms/caller, migration, and
+  production vault selection.
 - **Affected components:** `CM-025` plus the containment consumers above,
   common interfaces/config, VaultBook, defaults/migrations/manifests, and
   post-deployment verification.
@@ -1373,17 +1463,42 @@ accounting and configuration cannot fully express the directions, Section 16
 identifies the exact minimal shared-interface choices and returns them for a
 later owner decision rather than silently selecting them.
 
+After the requested overnight pause, the three Phase G recommendations were
+presented again in numbered order:
+
+1. freeze new deposits after zero;
+2. do not automatically allocate later donations/restoration, and require a
+   separately approved recapitalization or recovery with counsel/risk input;
+3. use explicit live-claim-based economic reward units coordinated with Track
+   6 S3, never raw shares alone.
+
+The owner replied on 2026-07-24:
+
+> 1. freeze is okay
+> 2. okay
+> 3. okay
+>
+> You can start Phase G now
+
+The numbered assent owner-confirms those three policy directions and
+authorizes Phase G **specification work only**. It does not approve a
+production vault, implementation, a storage field or interface, a
+recapitalization/recovery transaction, a Base migration, or Phase H. Section
+17 therefore defines the required behavior and explicitly returns the
+newly-proven storage/interface compatibility boundary for Phase I review.
+
 The remaining phase gates below remain operative. The current production
 posture is still `do not list Stock Tokens under the current vault designs`.
 
 ### 12.2 Checkpoint decisions and their actual gates
 
 The product/architecture direction required for Phase D, the existing-controls
-direction required for Phase E, and the two policy directions required for
-Phase F are owner-confirmed as satisfied for specification work. The remaining
-five original decisions gate the later phases shown below. The Phase F source
-trace also creates three narrower implementation-mechanism/caller decisions;
-none is implied by the policy approval.
+direction required for Phase E, the two policy directions required for Phase
+F, and the three policy directions required for Phase G are owner-confirmed as
+satisfied for specification work. The remaining two original decisions gate
+Phase I and implementation planning. The Phase F and Phase G source traces
+also create narrower implementation-mechanism/caller/compatibility decisions;
+none is implied by a policy approval.
 
 | Decision | Options | Evidence and recommendation | Owner | Affected components | Prerequisite / milestone | Status |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -1391,9 +1506,9 @@ none is implied by the policy approval.
 | Per-asset collateral use | Add a stored flag / compose existing controls | Reuse `canDeposit`, `DebtTerms.ltv`, and automatic backing state; do not add storage or a deployed selector | Protocol owner + security | `CM-009`, `CM-011`–`013`, `CM-030`, existing config/getters | Before Phase E | **Owner-confirmed: existing-controls Phase E specification only; implementation not approved; Phase F was authorized separately on 2026-07-24** |
 | Issuer-controlled settlement | Always external / permit bounded internal | Current internal mode can charge for undeliverable nominal claims; external-only selected | Protocol owner + risk/security | `CM-026`, `CM-030`, `CM-043`, `CM-044`, Vault interface | Before Phase F | **Owner-confirmed: external-only Phase F specification; enforcement mechanism and implementation not approved** |
 | Total-loss transition | Approved user-debt→Ledger-bad-debt design / another existing-accounting design / no listing | Current system has no atomic exactly-once path; atomic transition selected for specification | Protocol owner + accounting/security | `CM-026`, `CM-030`, Ledger, interfaces | Before Phase F | **Owner-confirmed: atomic exactly-once Phase F specification; identified interfaces and implementation not approved** |
-| Post-zero state | Freeze / explicit recapitalization | Recommend freeze by default | Protocol owner + risk | `CM-025`, deposit callers, controls | Before Phase G | Requested at checkpoint; gates Phase G |
-| Later donation/restoration | Old holders / donor return / protocol / explicit recapitalization allocation | No automatic inference is safe; owner must select only with legal/risk review | Protocol owner + counsel/risk | Share math, recovery, migration | Before Phase G | Requested at checkpoint; gates Phase G |
-| Reward attribution | Raw shares / live claims / hybrid explicit units | Current Lootbox uses raw shares and global live value; recommend explicit units, final choice pending S3 coordination | Protocol owner + economics | `CM-033`, `CM-025` | Before Phase G/H | Requested at checkpoint; gates Phase G/H |
+| Post-zero state | Freeze / explicit recapitalization | Freeze selected; old shares persist with zero claim and no fresh deposits | Protocol owner + risk | `CM-025`, deposit callers, controls | Before Phase G | **Owner-confirmed: freeze for Phase G specification; implementation not approved** |
+| Later donation/restoration | Old holders / donor return / protocol / explicit recapitalization allocation / no automatic allocation | No automatic allocation selected; any later allocation/recovery requires a separate owner plus counsel/risk decision | Protocol owner + counsel/risk | Share math, recovery, migration | Before Phase G | **Owner-confirmed: no automatic allocation; no recapitalization/recovery transaction approved** |
+| Reward attribution | Raw shares / live claims / hybrid explicit units | Live-claim-based economic units selected; raw shares remain accounting evidence only and S3 coordination is mandatory | Protocol owner + economics | `CM-033`, `CM-025` | Before Phase G/H | **Owner-confirmed: live-claim units for Phase G specification; Lootbox/interface implementation not approved** |
 | Base live-version posture | Migrate before RH / bounded temporary drift / justified permanent exception | Funded ID 3 and live controlled assets make this material; recommend Release 1 Base migration subject to plan | Protocol owner + security/operations | Base vault consumers, VaultBook, manifests | Before Phase I/release | Requested at checkpoint; gates Phase I/release |
 | Release 1 Base priority | Hardening requirement / RH prerequisite only / no release | Recommend urgent Base hardening | Protocol owner + security | Containment atomic group | Before implementation track | Requested at checkpoint; gates implementation split |
 
@@ -1407,6 +1522,17 @@ transition caller's timing authority requires separate security review:
 | Atomic bad-debt mechanism | Approve the two-selector CreditEngine→Ledger transition in Section 16.10 / approve another reviewed atomic shared-contract design / do not list | Approve the no-new-storage, compare-and-set two-selector design after accounting/security review | Any Phase F implementation design | **Returned; interfaces and implementation not approved** |
 | Total-loss transition caller | Permissionless/keeper-callable under deterministic predicates / restricted approved keeper or Department / governed per-transition action | Review repayment-race timing and griefing explicitly; prefer permissionless only if the final predicates leave no caller discretion over eligibility, amount, recipient, or timing-sensitive value | Any Phase F implementation design | **Returned; caller policy not approved** |
 
+New Phase G compatibility decisions, returned because current source derives
+claims directly from all custody and existing reward/recovery surfaces cannot
+express the approved policies:
+
+| Decision | Options | Recommendation | Required before | Status |
+| --- | --- | --- | --- | --- |
+| Allocated-backing mechanism | Append explicit allocated/quarantine checkpoint state to a generic share path / deploy a generic vault-level policy variant / another audited mechanism proving `A^s/U^s/A/U` / do not list | Preserve the Section 17 semantics and prefer a generic vault-level boundary over a new Stock-specific contract or token-name branch; assess storage and current positive-rebase compatibility in Phase I | Any Phase G implementation design | **Returned; no storage slot, selector, wrapper, or production vault approved** |
+| Quarantine loss ordering | Preserve checkpointed `U` and reduce `A` first / use `U` as shareholder loss insurance / pro-rata reduction | Preserve `U` and reduce `A` first; otherwise the donation is automatically allocated for shareholder benefit contrary to the selected policy. Counsel/risk must confirm this property treatment before implementation | Phase I/accounting/counsel-risk review | **Reference behavior specified; implementation approval pending counsel/risk confirmation** |
+| Positive-delta compatibility | Quarantine unsolicited positive deltas in the corrected path / explicitly allocate positive rebases in a separately reviewed generic mode | Do not silently apply quarantine semantics to existing yield/rebase users; separate the generic behaviors explicitly and test both | Phase I source/storage/interface impact review | **Returned; no mode/configuration field approved** |
+| Reward integration surface | Reuse live-amount getters with explicit semantics / add an explicit economic-weight getter / global index or other S3-compatible model | Preserve raw shares for accounting, use live claims for economic weight, exclude `U` from global value, and let S3 close interval-boundary mechanics | Phase I plus integrated S3 | **Returned; no Vault/Lootbox/Ledger ABI or storage change approved** |
+
 ### 12.3 Decisions explicitly deferred but registered
 
 These must not be treated as approved by the checkpoint recommendation:
@@ -1416,7 +1542,7 @@ These must not be treated as approved by the checkpoint recommendation:
 | Deposit measurement boundary | Teller measures the call-local custody delta and passes only verified receipt to the vault; see Section 14 | Phase D completion | **Specified; implementation not approved** |
 | Requested/received/excess semantics | Validated transfer attempt `Q`; received/credited `R`; zero, negative, or excess delta reverts; see Section 14 | Phase D completion | **Specified; implementation not approved** |
 | Nominal partial loss | Freeze unresolved or owner-approved allocation; never silent pro rata | Phase E/F | Deferred |
-| Rounding | Offset, directions, minimum, dust bound | Phase G | Deferred |
+| Rounding | Retain `10^8` virtual shares and one virtual asset; deposit down, withdrawal share burn up, claim down, last-share sweep; see Section 17 | Phase G | **Specified; implementation not approved** |
 | Emergency disable/re-enable | Existing fast per-asset disable and governance-only re-enable are specified in Phase E. Phase F provisionally relies on existing Department pauses for total-loss resolution. Phase H must explicitly decide whether those pauses are sufficient or a dedicated resolution pause is needed, define pause/resume authority and timing, coordinate it with the selected transition caller, and preserve repayment liveness. | Phase H | Partially specified; Phase H closure is mandatory and no live action is approved |
 | Vault selection | No production vault selected | Phase I owner gate | Deferred |
 | Migration atomicity/rollback | Explicit live users/funds/debt/auctions plan | Phase I | Pending Track 7 |
@@ -1432,20 +1558,20 @@ This is a Phase C impact boundary, not the finalized Phase I change table.
 | --- | --- |
 | `CM-021` VaultBook | Funded-vault replacement, disablement, migration, and retirement checks |
 | `CM-024` Basic/Simple vault path | Nominal accounting, deficit, internal transfer, receipt |
-| `CM-025` Rebase/Shares path | Live claim, post-zero, restoration, rounding |
+| `CM-025` Rebase/Shares path | Raw shares, allocated backing/quarantine, live claim, post-zero, restoration, rounding |
 | `CM-026` AuctionHouse | Settlement policy, delivery/payment ordering, active auctions |
 | `CM-027` AuctionHouseNFT | Current temporary stub has no common Vault consumer; reused unchanged/inapplicable unless later implemented |
 | `CM-030` CreditEngine | Borrow amount, deficit propagation, health, resolution, and intentional raising-to-non-raising repayment price refresh |
 | `CM-043` CreditRedeem | Transfer/withdraw settlement consumer and unsupported Stock Token posture |
-| `CM-033` Lootbox | Raw shares versus live-value reward units |
+| `CM-033` Lootbox | Live-claim reward weight, allocated global value, interval boundary, and raw-share evidence |
 | `CM-034` Teller | Transfer/credit/event/limit/housekeeping ordering |
 | `CM-044` Deleverage | Delivered amount and zero-custody progress |
 | `CM-045` TellerUtils | Deposit limit inputs and pre-transfer vault views |
 | `CM-007`–`CM-013`, `CM-049` | Defaults, MissionControl, Switchboards, per-asset controls, Robinhood configuration |
 | Ledger | User debt, aggregate debt/yield, auction removal, and exactly-once protocol bad debt; Phase F identifies but does not approve one new transition selector |
-| Existing `ConfigStructs`, MissionControl, and `Vault` interfaces | Phase E reuses current controls/getters; Phase F proves no current settlement-mode field exists and returns all-external versus a new per-asset mode for Phase I |
+| Existing `ConfigStructs`, MissionControl, and `Vault` interfaces | Phase E reuses current controls/getters; Phase F proves no current settlement-mode field exists; Phase G proves current Vault getters cannot expose `A^s/U^s/A/U` and returns the exact compatibility boundary for Phase I |
 | StabilityPool, StabVault | Shared Teller deposit semantics remain; Stock Token swap/custody route stays disabled |
-| RipeGov | Shared Teller deposit semantics plus the protocol-wide withdrawal-freeze consequence of nonzero bad debt |
+| RipeGov | Shared SharesVault/Teller semantics, separate lock-adjusted governance reward units, and the protocol-wide withdrawal-freeze consequence of nonzero bad debt |
 | BondRoom | Existing global bad-debt clearing consumer; clearing cannot restore resolved user debt |
 | HumanResources, CreditEngine/CreditRedeem reward paths | Trusted RIPE/sGREEN deposits must consume and verify Teller's returned receipt |
 | Base/RH migration and manifests | Same canonical source, live-version policy, custody migration, verification |
@@ -1629,13 +1755,14 @@ inventory in Phase I before implementation.
 
 - Require `_amount == R > 0` and current custody `C1 >= R`.
 - Derive pre-deposit custody as `C0 = C1 - R`.
-- Mint from `R` using the current deposit direction, rounding shares down:
-  `floor(R * (S + 10^8) / (C0 + 1))`.
+- Mint from `R` using the permanent Section 17 allocated-backing denominator,
+  rounding shares down:
+  `floor(R * (S + 10^8) / (A0 + 1))`.
 - Require the minted share amount to be positive. A positive receipt that
   rounds to zero must revert rather than become an uncredited donation.
-- This Phase D rule fixes the measurement input and rounding direction only.
-  Phase G still owns any corrected permanent formula, bounded-dust proof,
-  total-loss behavior, and owner-approved post-zero allocation.
+- Phase D fixes the measurement input and rounding direction; Section 17 now
+  supplies the allocated-backing denominator, bounded-dust proof, total-loss
+  behavior, and post-zero non-allocation.
 
 **StabVault / Stability Pool path**
 
@@ -1877,7 +2004,7 @@ Pinned source anchors are `interfaces/ConfigStructs.vyi:88-117`;
 `StabVault.vy:219-222`. The relevant existing event definitions are
 `SwitchboardCharlie.vy:311-314` and `SwitchboardBravo.vy:117-126,158-165`.
 
-For user amount `U` in vault `v` and asset `a`, the selected effective
+For user position amount `M_u` in vault `v` and asset `a`, the selected effective
 new-borrow predicate is:
 
 ```text
@@ -1885,7 +2012,7 @@ capacityEligible(v,a,u) =
     AssetConfig[a].canDeposit
     and DebtTerms[a].ltv > 0
     and backingSafe(v,a,u)
-    and U > 0
+    and M_u > 0
 ```
 
 There is deliberately no third boolean. The functional “collateral-use flag”
@@ -1910,11 +2037,11 @@ For every actual user position traversed by CreditEngine:
 ```text
 C(v,a) = IERC20(a).balanceOf(v)
 T(v,a) = Vault(v).getTotalAmountForVault(a)
-U(v,a,u) = amount returned with a by
+M_u(v,a) = amount returned with a by
            Vault(v).getUserAssetAndAmountAtIndex(u, index)
 
 aggregateDeficit(v,a) = C(v,a) < T(v,a)
-zeroClaimPosition(v,a,u) = a != empty(address) and U(v,a,u) == 0
+zeroClaimPosition(v,a,u) = a != empty(address) and M_u(v,a) == 0
 
 backingSafe(v,a,u) =
     not aggregateDeficit(v,a)
@@ -1931,12 +2058,14 @@ The same existing getters have vault-specific meaning:
   `T=N`, and any `C<T` is an aggregate nominal deficit. Every user's capacity
   for that `(vault, asset)` becomes zero; remaining custody is not silently
   assigned by user order.
-- SharesVault/Rebase returns each user's live, round-down claim and returns
-  live token custody as its vault total. Partial loss therefore remains
-  pro-rata and `C=T`; capacity uses the already-repriced `U`. At total loss,
-  the getter still returns the asset for a nonzero-share position but its
-  amount is zero, so `zeroClaimPosition` catches the state that CreditEngine
-  currently skips.
+- Current SharesVault/Rebase returns each user's live, round-down claim and
+  returns live token custody as its vault total, so current partial loss is
+  pro-rata and `C=T`. Under Section 17, the corrected user amount is the claim
+  against `A`, and the aggregate economic total is `T=A<=C`; quarantine `U`
+  is excluded. At total loss, the getter still returns the asset for a
+  nonzero-share position but its amount is zero, so `zeroClaimPosition`
+  catches the state that CreditEngine currently skips. Phase I must make the
+  selected getter semantics explicit.
 - A surplus `C>T` on a nominal vault is not a deficit and is not assigned to
   any depositor by this check. Phase D's receipt rule prevents a donation from
   becoming the next call's credit.
@@ -1965,8 +2094,8 @@ liquidation/redemption eligibility, debt-term refresh during repayment, and
 the excluding-asset calculation used by withdrawal preview. Phase E requires
 the following order for each enumerated position:
 
-1. Read `(asset, U)` from the Vault. Continue only when `asset` is empty. Do
-   **not** continue merely because `U == 0`.
+1. Read `(asset, M_u)` from the Vault. Continue only when `asset` is empty. Do
+   **not** continue merely because `M_u == 0`.
 2. Read the existing asset configuration and `DebtTerms`.
 3. If `ltv == 0`, treat the ordinary asset as intentionally non-collateral.
    A position with no configured debt terms contributes neither capacity nor
@@ -1980,7 +2109,7 @@ the following order for each enumerated position:
 7. For an eligible position, compute:
 
    ```text
-   liveCollateralValue = price(U)
+   liveCollateralValue = price(M_u)
    configuredMaxDebt = liveCollateralValue * DebtTerms.ltv / 100%
    capacityContribution = configuredMaxDebt
    resolutionWeight = max(configuredMaxDebt, 1)
@@ -2231,7 +2360,8 @@ section and its validation contract are documented. It does not approve:
 - a nominal partial-loss allocation, restoration/donation allocation, insurer,
   or recovery token;
 - either implementation mechanism returned in Section 12.2; or
-- Phase G.
+- Phase G at the time of that instruction. Phase G was authorized separately
+  only by the later owner message recorded in Section 12.1.
 
 The standing `canRedeemCollateral = false` and
 `shouldSwapInStabPools = false` requirements remain mandatory. Phase F defines
@@ -2352,9 +2482,9 @@ for other assets. If retained, all of the following are mandatory:
 
 Under a nominal deficit, current Simple-vault internal and external settlement
 remain frozen. `min(userNominal, C)` is still rejected because it assigns
-shared loss by caller order. Under a corrected share path, the current live
-pro-rata claim can be safely allocable once Phase G approves the formulas and
-post-zero policy.
+shared loss by caller order. Under the corrected share path, the Section 17
+live pro-rata claim against allocated backing can be safely allocable;
+quarantined custody is excluded.
 
 This bounded-other-asset rule is not an exception for Stock Tokens.
 Issuer-controlled collateral remains external-only even while fully backed
@@ -2525,8 +2655,9 @@ the atomic `badDebt += X` operation are the marker:
   events together.
 
 Later recovery, donation, or issuer restoration does not reverse this
-transition automatically. Allocation of recovered property remains a Phase G
-owner/counsel/risk decision.
+transition automatically. Section 17 records the owner's no-automatic-
+allocation decision; any future recovery or recapitalization still requires a
+separate owner plus counsel/risk decision.
 
 ### 16.10 Exact shared-contract interface needed
 
@@ -2673,25 +2804,524 @@ Section 8. A future implementation must prove:
     is treated as approved by this document.
 
 Phase F does not select any returned mechanism or caller/control sub-decision.
-The work stops here for the owner-requested pause. Phase G and all
-implementation/interface/storage work remain unauthorized.
+At the Phase F handoff, work stopped for the owner-requested pause and Phase G
+was unauthorized. The later owner message in Section 12.1 separately
+authorized Phase G specification only; implementation/interface/storage work
+remains unauthorized.
 
-## 17. Phases G–K hold
+## 17. Phase G — corrected share-vault behavior
+
+### 17.1 Authorization, selected policies, and current-source gap
+
+The owner-confirmed Phase G directions are:
+
+1. freeze new deposits after zero;
+2. do not automatically allocate a later donation or issuer restoration, and
+   do not create a recapitalization/recovery path without a separate owner plus
+   counsel/risk decision; and
+3. use explicit live-claim-based economic reward units coordinated with Track
+   6 S3, never raw shares alone.
+
+The authorization is specification-only. It does not select a production
+vault, approve implementation, storage, interfaces, recovery, recapitalization,
+migration, or Phase H.
+
+Pinned current source cannot express all three policies:
+
+- `SharesVault._depositTokensInVault` derives pre-deposit assets from the
+  aggregate token balance and converts with all custody in the denominator
+  (`SharesVault.vy:35-46`).
+- Every user amount and the aggregate vault amount are derived directly from
+  live `balanceOf` (`SharesVault.vy:151-165`), so every positive external
+  delta—including donation or restoration—is automatically shareholder value.
+- The current conversion is `(C + 1)/(S + 10^8)` with caller-selected
+  round direction (`SharesVault.vy:202-268`); at `C = 0`, withdrawal is blocked
+  but a new receipt can mint against the virtual one-asset denominator
+  (`SharesVault.vy:180-196`).
+- `getUserLootBoxShare` exposes raw shares divided by `10^8`, while Lootbox
+  separately prices aggregate vault custody (`SharesVault.vy:116-118`;
+  `Lootbox.vy:790-833`). Raw user weight therefore survives total loss and raw
+  custody value includes donations.
+- User deregistration checks raw user balance; asset deregistration and
+  `doesVaultHaveAnyFunds` check aggregate persisted accounting only; recovery
+  transfers the entire live balance only after deregistration
+  (`VaultData.vy:126-151`, `175-222`, `294-303`).
+
+A formula-only edit cannot distinguish shareholder backing from unallocated
+custody. The corrected path therefore requires the semantic distinction
+between allocated backing `A` and quarantined custody `U`, plus durable
+checkpoints for both buckets, as defined in Section 6. The exact storage,
+wrapper, selector, and deployment boundary is returned to Phase I; this
+section approves none of them.
+
+### 17.2 Allocated backing and mutation rules
+
+For every corrected share-vault `(vault, asset)` pair:
+
+```text
+C   = current ERC-20 balanceOf(vault)
+A^s = last persisted amount allocated to the share supply
+U^s = last persisted amount quarantined
+A   = min(A^s, max(C - U^s, 0))
+U   = C - A
+```
+
+`A` is the only asset denominator for share conversion, credit, settlement,
+withdrawal entitlement, and rewards. `U` is custody, but it is not a user
+claim, borrowing asset, settlement asset, reward asset, or depositor receipt.
+Persisting `U^s` is semantically necessary: after a donation has been
+successfully observed, a later observed issuer reduction must reduce allocated
+shareholder backing before consuming the separately quarantined amount. Using
+only `min(A^s,C)` would silently make the donation a shareholder loss buffer,
+which is an automatic allocation the owner rejected.
+
+Every state-changing share operation must first checkpoint a negative custody
+delta and any newly observed positive delta:
+
+```text
+A^s := A
+U^s := U
+```
+
+It must never checkpoint `A^s` upward merely because `C` increased. Required
+transitions are:
+
+| Transition | Required allocated-backing result |
+| --- | --- |
+| New asset with no approved migration balance | `A^s = 0`, `U^s = C`; any existing custody is quarantined |
+| Exact deposit receipt `R` | After synchronizing pre-transfer state and checking the freeze, `A^s_after = A_before + R`, `U^s_after = U_before`; only call-local `R` is allocated |
+| Share withdrawal with measured vault debit `W` | Require `W <= A_before`; persist `A^s_after = A_before - W`, `U^s_after = U_before`. An unclassifiable concurrent delta reverts |
+| Internal share transfer | `A^s/U^s` unchanged; only shares move, and the token-denominated amount is bounded by `A` |
+| Observed external negative delta | Effective `A` falls before checkpointed quarantine; persist the recomputed `A/U`, and all shares reprice pro rata if `A` fell |
+| Observed external positive delta | `A^s` unchanged; persist the entire delta in `U^s` |
+| Separately approved allocation | Not available in this specification; a future transaction would have to decrement `U^s` and increment `A^s` by the same exact amount atomically |
+| Migration initialization | Owner-approved reconciliation sets both buckets from proven entitlement/custody, never `A^s := C` by default |
+
+For a deposit, let `C_0` be custody before the token transfer and `R` the
+Phase D verified receipt. The vault observes `C_1 = C_0 + R`, derives
+`A_0 = min(A^s,max(C_0-U^s,0))` and `U_0 = C_0-A_0`, checks the
+post-zero rules, mints from `R` and `A_0`, then persists
+`A^s := A_0 + R` and `U^s := U_0`. Thus pre-existing quarantine neither
+changes the deposit price nor becomes the depositor's receipt.
+
+This is accounting state, not a new collateral-use parameter. It does not
+reopen the Phase E owner decision rejecting a new stored per-asset
+collateral-use flag.
+
+Valid corrected-share state also requires:
+
+```text
+S = 0  =>  A^s = 0
+A^s + U^s = custody at the last successful checkpoint
+```
+
+If `S = 0` with positive `A^s`, deposit, deregistration, recovery, and
+migration activation fail closed until reconciliation; the next depositor may
+not inherit that malformed allocation. Positive custody with `S = A^s = 0`
+is quarantine.
+
+### 17.3 Conversion, rounding, minimums, and dust
+
+Retain the current virtual constants:
+
+```text
+V_A = 1 asset base unit
+V_S = DECIMAL_OFFSET = 10^8 raw share units
+```
+
+For a deposit receipt `R`, pre-deposit allocated backing `A_0`, and aggregate
+shares `S_0`:
+
+```text
+mintedShares = floor(R * (S_0 + V_S) / (A_0 + V_A))
+```
+
+Deposits always round down. The call must require:
+
+```text
+R > 0
+R satisfies the existing post-receipt minimum-deposit rule
+mintedShares > 0
+not Z_live
+not Z_recorded
+```
+
+When `A_0 = 0` and `S_0 = 0`, the initial mint is exactly
+`R * 10^8`. If `S_0 > 0` and `A_0 = 0`, the formula is not evaluated; the
+post-zero freeze reverts.
+
+For non-final conversion of shares `s`:
+
+```text
+claimDown(s) = floor(s * (A + V_A) / (S + V_S))
+L_u =
+    A                    if s_u = S and S > 0
+    claimDown(s_u)       otherwise
+```
+
+The sole holder's live-claim view equals the final-sweep amount, so previews
+and execution do not disagree. All other credit, view, reward, maximum
+withdrawal, and settlement claims round down. A requested token withdrawal
+`x` below the user's full claim burns:
+
+```text
+burnShares = ceil(x * (S + V_S) / (A + V_A))
+```
+
+The burn rounds up, is capped by the user's shares, and cannot transfer more
+than `x`. A transfer of an internal token-denominated claim, where permitted
+for a non-issuer-controlled asset, uses the same round-up share conversion.
+
+If the final real-share burn consumes `s = S`, it transfers the remaining
+allocated backing `A`, not `U`, and leaves `A^s = 0` and `S = 0`. This
+last-share sweep makes virtual shares a pricing defense rather than a property
+owner. It also gives rounding residue a deterministic disposition: the final
+shareholder receives the remaining allocated dust; quarantined custody remains
+quarantined.
+
+The exact bounds are:
+
+- each deposit loses less than one raw share to floor rounding;
+- each non-final user conversion loses less than one asset base unit relative
+  to the exact rational claim;
+- each partial withdrawal burns less than one additional raw share relative
+  to the exact rational requirement;
+- for any partition of non-final user shares,
+  `Σ floor(s_i * (A + 1)/(S + 10^8)) <= A`; and
+- across any complete sequential withdrawal order, total transferred allocated
+  assets are at most the starting `A`, with the final sweep transferring the
+  remaining allocated residue exactly once.
+
+The aggregate claim bound follows because `Σs_i <= S`, so the sum of floors is
+no greater than `floor(S*(A+1)/(S+10^8))`; the unfloored expression is strictly
+less than `A+1`, hence the integer result is at most `A`. Withdrawal
+conservation then follows by induction from each successful
+`A_next = A_before - allocatedDebit` plus the one final sweep. Order can change
+which final holder receives sub-base-unit floor residue, but cannot change the
+aggregate bound; that order effect is itself bounded by the stated rounding
+dust and must be tested in both directions.
+
+No token-decimal branch is needed. All formulas use integer base units.
+Existing configured minimum deposit rules plus `R > 0` and
+`mintedShares > 0` apply identically to 6- and 18-decimal assets. Tests must
+cover one base unit, configured minimum minus/at/above, maximum safe operands,
+and overflow/revert behavior.
+
+### 17.4 Partial loss, total loss, and the persistent post-zero freeze
+
+After both buckets have been checkpointed, an external reduction lowers
+allocated backing first: every relevant view uses
+`A = min(A^s,max(C-U^s,0))` immediately, preserving checkpointed quarantine
+until `A` reaches zero. The next successful state-changing share, credit,
+settlement, or Phase F resolution operation checkpoints `A^s := A` and
+`U^s := U`. Raw shares do not change, so every holder absorbs the allocated
+loss pro rata subject only to the bounded virtual/floor effects in Section
+17.3. This ordering prevents a donation from silently becoming loss insurance
+for shareholders.
+
+Three zero predicates are reported:
+
+```text
+Z_custody  := S > 0 and C = 0
+Z_live     := S > 0 and A = 0
+Z_recorded := S > 0 and A^s = 0
+```
+
+`Z_custody` is the task contract's literal zero-custody state. `Z_live` is the
+stronger economic freeze and also applies when the only custody left is
+quarantined. It blocks any value-creating call that observes zero allocated
+backing. A reverting call cannot also persist a checkpoint because EVM
+atomicity rolls the write back. Therefore a separate successful
+loss-checkpoint call, or a successful Phase F total-loss transition that
+checkpoints before moving debt, establishes `Z_recorded`. `Z_recorded` makes
+the freeze persistent: if custody later appears, `A^s` remains zero and the
+new custody is `U`.
+
+While `Z_live` or `Z_recorded` holds:
+
+- every deposit preview reports the freeze and every final deposit check
+  reverts atomically;
+- no shares are minted, credited, or reassigned;
+- withdrawals and internal value transfers cannot create a positive amount;
+- old shares remain unchanged and registered;
+- old live claim, credit amount, settlement amount, and reward weight are zero;
+- repayment and the Phase F exactly-once debt transition remain available
+  under their independent controls; and
+- neither repayment nor bad-debt transition erases the old property record.
+
+The owner did not approve recapitalization. No user, issuer, keeper,
+Switchboard, or migration may clear `Z_recorded`, increase `A^s`, or burn old
+shares merely because new custody exists.
+
+### 17.5 Observation boundary and issuer action ordering
+
+An ERC-20 vault that can read only current `balanceOf` cannot prove an
+unobserved historical minimum. If an issuer reduces custody and fully restores
+it between all protocol observations, the final onchain state is
+indistinguishable from no reduction. No share formula, oracle, event emitted by
+the vault, or hosted monitor can reconstruct that transient history
+trustlessly.
+
+The exact onchain guarantee is therefore:
+
+- every protocol state transition and every safety-critical preview uses the
+  current `min(A^s,max(C-U^s,0))`;
+- any successful dependent state commit first checkpoints an observed loss;
+- a safety call that reverts on observed loss leaves no dependent state but
+  also cannot persist the checkpoint, so a separate successful checkpoint path
+  is required for durable post-zero memory;
+- any positive delta after that checkpoint is quarantined as `U`; and
+- a permissionless or otherwise liveness-safe checkpoint entry is recommended
+  so an observed loss need not wait for a borrower action.
+
+The caller and selector for a standalone checkpoint are not approved here and
+must be resolved with Phase H controls and Phase I interfaces. Tests must
+include reduce→checkpoint→restore and reduce→restore-without-observation. The
+second test must document the fundamental indistinguishability; it may not
+claim the vault detected an event it never observed. For issuer-controlled
+listing, operations must still use the Phase E fast disable and exact-token
+incident evidence; this limitation is not a rationale for monitoring-only
+safety.
+
+### 17.6 Donations, restoration, and recapitalization
+
+The selected allocation rule is uniform:
+
+- a donation before the first deposit is `U`;
+- a donation between deposits is `U`;
+- a positive rebase or other unsolicited positive custody delta is `U` in
+  this corrected behavior;
+- restoration after an observed partial loss is `U` above the reduced `A^s`;
+- restoration after `Z_recorded` is entirely `U`; and
+- a later depositor allocates only its verified `R`, never pre-existing `U`.
+
+No automatic rule awards `U` to old shareholders, the donor, a new depositor,
+the protocol, or a recovery recipient. This is deliberate non-allocation, not
+a protocol property claim.
+
+A future recapitalization or recovery proposal must return to the owner and
+must include counsel/risk disposition of beneficial ownership, eligible
+source/recipient, exact amount, old-share and debt treatment, effect on
+`A^s/S`, reward interval boundary, events, authority/timing, pause behavior,
+front-running analysis, and migration/rollback. Until that approval, `U` stays
+quarantined.
+
+This behavior must not be silently imposed on existing assets whose intended
+economics allocate positive rebases or yield. The live Base Rebase vault's six
+registered assets are receipt/yield-bearing tokens, and current
+`SharesVault` allocates their positive custody changes. Phase I must choose a
+generic compatibility boundary—such as a vault-level behavior variant or an
+explicitly reviewed generic mode—without a Stock-specific contract,
+token-name test, `chain.id` branch, or silently changed existing semantics. No
+mode or parameter is approved by Phase G.
+
+### 17.7 Withdrawal, settlement, and aggregate conservation
+
+Every withdrawal and settlement amount is bounded by the user's round-down
+claim against `A`, and aggregate allocated delivery is bounded by `A <= C`.
+`U` is never a fallback source for a user's claim.
+
+For external settlement, Phase F's call-local delivery rule still controls:
+
+```text
+E = min(requested Q, vault debit W, recipient receipt R)
+```
+
+GREEN payment and debt reduction are bounded by `E`; share burn and allocated
+backing reduction must reconcile to the same successful call. A revert,
+false-return, blocklist, pause, or invalid debit/receipt rolls back shares,
+`A^s`, `U^s`, payment, debt, auction progress, and reward state. Two auctions or
+withdrawals re-read current `A`, `C`, `S`, and user shares, so both orders
+cannot allocate the same backing.
+
+An issuer-controlled asset remains external-settlement-only. Internal share
+transfer for another asset may move only the rounded-up shares corresponding
+to a currently allocable claim and does not reserve custody for a later
+external withdrawal.
+
+### 17.8 User/asset deregistration, VaultBook, and recovery
+
+Corrected guards must distinguish accounting from custody:
+
+- user/asset deregistration is allowed only after the user's raw shares are
+  zero and reward state is checkpointed;
+- a vault asset cannot deregister while `S != 0`, `A^s != 0`, `U^s != 0`,
+  `C != 0`, or `U != 0`;
+- `doesVaultHaveAnyFunds` must report true for raw shares, allocated backing,
+  or live custody, including donation dust; and
+- VaultBook replacement/disable checks cannot treat raw-share accounting alone
+  as proof that custody is empty.
+
+At total loss, old `S > 0` blocks deregistration even though `C = A = 0`.
+When `S = A^s = 0` but donation dust exists, `U^s = C = U > 0` still blocks
+deregistration and replacement. The live Base vault-ID-4 rows with one raw unit
+of custody and zero shares are the pinned regression instance: corrected
+semantics classify each unit as `U` and must not report the vault empty.
+
+Current `recoverFunds` is not an approved quarantine mechanism: it requires
+deregistration and transfers the entire live balance. A future recovery must
+be separately approved, amount-bounded to proven `U`, incapable of touching
+`A`, and compatible with registered live positions. Until then, neither
+allocated backing nor quarantine is recoverable through a new Phase G path.
+
+### 17.9 Rewards and economic units
+
+For an ordinary corrected share-vault asset:
+
+```text
+rawShares_u       = s_u                         # accounting only
+liveClaim_u       = L_u                         # token base units
+rewardWeight_u    = floor(liveClaim_u / p_a)    # explicit normalized live claim
+globalAssetValue  = floor(USD(A) / 10^18)       # existing whole-USD scale
+```
+
+`p_a` is the explicitly reported normalization factor. If the existing
+Lootbox convention is retained, it is `10^decimals` below 8 decimals and
+`10^(decimals // 2)` at 8 or more decimals
+(`Lootbox.vy:838-844`). Tests must show the resulting floor for both 6- and
+18-decimal assets; reports may not label normalized reward weight as tokens,
+shares, or USD.
+
+Raw shares may remain a pro-rata accounting numerator, but they cannot alone
+be the economic reward balance. `U` contributes neither user reward weight nor
+global asset value. At total loss, future user weight and global value become
+zero; points earned before the loss remain historical and are not silently
+clawed back.
+
+The current lazy Lootbox snapshots create a second implementation requirement:
+a global loss changes every user's live claim without iterating users. A
+correct implementation must close the prior reward interval at the loss
+checkpoint and ensure subsequent blocks use the new live-claim economics,
+without letting untouched users accrue stale raw-share weight. Track 6 S3 owns
+the interval-floor design; Phase I must reconcile its integrated output before
+choosing a Vault/Lootbox/Ledger interface or global index.
+
+RipeGov is a separate governance-point consumer: its
+`getUserLootBoxShare` returns lock-adjusted governance points
+(`RipeGov.vy:412-422`), and Lootbox already treats vault ID 2 specially. Phase
+G does not redefine those governance units. A common-interface change must
+preserve that distinction rather than silently interpreting RipeGov points as
+token claims.
+
+### 17.10 Events, views, reports, and manifests
+
+Every future surface must name its unit:
+
+| Surface | Required meaning |
+| --- | --- |
+| Raw user/total shares | `s_u` / `S`, integer share units; never token or USD value |
+| Allocated checkpoint | `A^s`, token base units assigned to shares |
+| Quarantine checkpoint | `U^s`, token base units last observed as unallocated |
+| Effective allocated backing | `A = min(A^s,max(C-U^s,0))`, token base units used now |
+| Live custody | `C`, raw ERC-20 `balanceOf` |
+| Quarantine | `U = C - A`, token base units with no automatic beneficiary |
+| User live claim | `L_u(A,S)`, token base units, round down |
+| Reward weight | normalized live-claim units with `p_a` reported |
+| Global reward value | whole-USD-scaled value of `A`, excluding `U` |
+| Zero state | `Z_custody`, `Z_live`, and `Z_recorded`, with checkpoint block/caller where stored/emitted |
+
+Existing Deposit, Withdrawal, and Transfer events may retain their current
+amount/share fields only if `amount` means allocated call-local token amount
+and `shares` means raw shares. A loss checkpoint, observed quarantine, and any
+future allocation/recovery need distinct evidence carrying asset, previous/new
+`A^s/U^s`, `C`, `A`, `U`, caller, and reason. Exact event names and ABI are
+Phase I decisions.
+
+The existing `amountToShares`/`sharesToAmount` signatures can remain only if
+their denominators change from raw `C` to `A`; the existing
+`getTotalAmountForUser` is the natural live-claim surface. The current
+`getTotalAmountForVault` name is ambiguous because it returns custody for
+SharesVault and nominal accounting for Simple. Phase I must choose explicit
+getters or a precisely versioned semantic change; no selector is approved
+here.
+
+Repository reports must print `C`, `A^s`, `U^s`, `A`, `U`, `S`, per-user
+shares and claims, reward normalization, debt, and auctions separately. Static
+manifests record vault accounting version/capabilities and runtime identity;
+they must not pretend to snapshot dynamic balances or omit the getter
+semantics needed for post-deployment reconciliation.
+
+### 17.11 Storage and ABI compatibility boundary
+
+Current persisted `totalBalances` and `userBalances` are raw shares in
+SharesVault. They remain raw shares; changing their unit would corrupt every
+consumer. Enforcing no automatic positive-delta allocation requires some
+durable equivalent of `A^s`; current storage and getters cannot derive it from
+`C` and `S`. Preserving quarantine through a later observed loss also requires
+durable equivalent state for `U^s`; allocated backing alone is insufficient.
+
+That creates a real Phase I choice:
+
+1. append allocated/quarantine checkpoint state to a compatible generic share
+   implementation and migrate/reconcile every live asset;
+2. deploy a generic vault-level behavior variant that shares canonical modules
+   but isolates positive-delta policy;
+3. approve another audited generic mechanism that proves the same
+   `A^s/U^s/A/U` invariants; or
+4. do not list.
+
+Because SharesVault is consumed by both RebaseErc20 and RipeGov and existing
+positive-rebase assets may rely on automatic yield allocation, a blanket
+semantic/storage change is not assumed compatible. Phase I must map storage
+order, module export/runtime artifacts, selectors, events, every reader,
+upgrade versus redeployment, Base live state, migration initialization,
+rollback limits, and audit boundary before the owner selects an implementation
+mechanism or production vault.
+
+No Robinhood-only or issuer-branded vault, new collateral-use flag,
+positive-delta mode, storage slot, getter, event, ABI, default, migration, or
+manifest change is approved by this Phase G specification.
+
+### 17.12 Phase G acceptance and stop boundary
+
+Phase G is specification-complete only with companion validation-plan Section
+9. A future implementation must prove:
+
+1. after a successful bucket checkpoint, an observed negative delta reduces
+   allocated backing first and reprices every share pro rata against `A`
+   without using `U` as automatic shareholder insurance;
+2. deposits mint from call-local `R` and pre-deposit `A`, excluding `U`;
+3. deposits round down, withdrawal share burns round up, claims round down, and
+   all stated dust bounds hold;
+4. one-base-unit plus 6- and 18-decimal minimum/ordinary lifecycles work;
+5. `Z_custody` is reported, `Z_live` blocks the observing value-creating call,
+   and `Z_recorded` keeps the freeze after later custody appears;
+6. old shares survive zero with zero claim/reward weight and cannot be erased
+   by debt resolution;
+7. donations/restoration remain `U` before first deposit, between deposits,
+   and after a checkpointed partial/total loss;
+8. reduce→restore without an intervening observation is documented as
+   indistinguishable, not falsely claimed detected;
+9. aggregate withdrawals/settlements never exceed starting `A` and never
+   consume `U`;
+10. deregistration, VaultBook, and recovery guards account for raw shares and
+    live custody independently;
+11. user reward weight derives from live claim, global value derives from `A`,
+    and both exclude `U`;
+12. reward interval behavior is reconciled with integrated S3 and does not
+    accrue stale post-loss raw-share economics;
+13. RipeGov and existing positive-rebase/yield semantics are not silently
+    changed; and
+14. no new storage/interface/ABI/migration or production vault is treated as
+    approved by this document.
+
+## 18. Phases H–K hold
 
 The following are deliberately **not finalized**:
 
-- corrected permanent share formulas and post-zero allocation;
 - remaining control roles and clock behavior, including Phase H's explicit
-  total-loss pause/resume and caller-coordination decision;
-- exact source/storage/interface/migration impact table;
+  total-loss pause/resume, share-loss checkpoint, and caller-coordination
+  decisions;
+- exact source/storage/interface/migration impact table and the returned Phase
+  F/G mechanisms;
 - final Phase J validation plan;
 - implementation PR split and atomic deployable groups; and
 - exact `rh-summary.md` handoff.
 
-Work must not continue into Phase G or later until the owner resolves the
+Work must not continue into Phase H or later until the owner resolves the
 corresponding Section 12 gate and expressly authorizes that phase.
 
-## 18. Checklist handoff at this checkpoint
+## 19. Checklist handoff at this checkpoint
 
 No `rh-summary.md` checkbox is edited or closed.
 
@@ -2704,8 +3334,8 @@ Eligible for owner review:
 - Section 4, **finish the Simple versus Rebase comparison** (line 186 at the
   baseline) — Track 5 evidence is hash-verified, source-reconciled, and rerun.
 - Section 4, **write a separate vault-change specification if current behavior
-  is unacceptable** (line 190 at the baseline) — Phases A–F are specified, but
-  the item is not eligible for closure until Phases G–K are owner-directed and
+  is unacceptable** (line 190 at the baseline) — Phases A–G are specified, but
+  the item is not eligible for closure until Phases H–K are owner-directed and
   completed.
 
 Not eligible for closure:

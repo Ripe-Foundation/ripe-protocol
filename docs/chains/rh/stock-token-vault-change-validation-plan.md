@@ -1,6 +1,6 @@
 # Stock Token Vault-Change Validation Plan
 
-Status: **Phases D–F test contracts specified under owner-confirmed
+Status: **Phases D–G test contracts specified under owner-confirmed
 instructions — not a finalized Phase J plan**
 
 Date: 2026-07-24 (America/Denver)
@@ -8,19 +8,22 @@ Date: 2026-07-24 (America/Denver)
 This document keeps the Phase B invariant model, Phase C architecture
 comparison, owner-confirmed Phase D deposit design, and owner-confirmed Phase E
 backing/debt-health design testable, together with the owner-confirmed Phase F
-external-settlement and total-loss directions. The instructions select option 4,
-containment followed by the corrected share path, then reject a new stored
-per-asset collateral-use parameter and authorize Phase E specification using
-existing deposit controls and `DebtTerms.ltv`. The owner confirmed both quotes
-under `stock-token-vault-change-specification.md` Section 12.1. On 2026-07-24,
-the owner also approved the two Phase F policy directions and required work to
-pause after they were documented. This is checkpoint option 4, the combination
-of architecture outcomes 2 and 3, not the separately numbered “another generic
+external-settlement and total-loss directions and the owner-confirmed Phase G
+post-zero freeze, no-automatic-allocation, and live-claim reward directions.
+The instructions select option 4, containment followed by the corrected share
+path, then reject a new stored per-asset collateral-use parameter and authorize
+Phase E specification using existing deposit controls and `DebtTerms.ltv`.
+The owner confirmed both quotes under
+`stock-token-vault-change-specification.md` Section 12.1. On 2026-07-24, the
+owner also approved the two Phase F policy directions, paused after they were
+documented, then approved the three Phase G directions and authorized Phase G
+specification work. This is checkpoint option 4, the combination of
+architecture outcomes 2 and 3, not the separately numbered “another generic
 shared design.” All paths below are proposed future paths. No test, fixture,
-mock, production contract, interface, dependency, CI file, manifest, or ABI
-was created or changed.
+mock, production contract, interface, storage, dependency, CI file, manifest,
+or ABI was created or changed.
 
-The Phase D–F test contracts are now specific enough for later
+The Phase D–G test contracts are now specific enough for later
 implementation planning. The full Phase J plan cannot be finalized until the
 owner resolves the later policy decisions in
 `stock-token-vault-change-specification.md` Section 12.
@@ -65,12 +68,12 @@ against the owner-approved shared implementation.
 | --- | --- | --- | --- |
 | `tests/vaults/test_vault_receipt_accounting.py` | Vault/Teller unit | `CM-024`, `CM-025`, `CM-034`, `CM-045` | Proposed; Phase D behavior specified, implementation not approved |
 | `tests/core/teller/test_teller_deposit_receipts.py` | Teller integration | `CM-034`, `CM-045`, every deposit entry point | Proposed; Phase D behavior specified, implementation not approved |
-| `tests/vaults/modules/test_vault_loss_properties.py` | Math/property | `CM-024`, `CM-025` | Proposed; loss/rounding policy required |
+| `tests/vaults/modules/test_vault_loss_properties.py` | Math/property | `CM-024`, `CM-025` | Proposed; Phase G share/loss/rounding behavior specified, implementation not approved |
 | `tests/core/creditEngine/test_deficit_aware_credit.py` | CreditEngine | `CM-030`, `CM-009`, Ledger | Proposed; Phase E existing-controls behavior specified, implementation not approved |
 | `tests/core/auctionHouse/test_loss_aware_auctions.py` | AuctionHouse | `CM-026`, `CM-030`, Ledger | Proposed; Phase F policy specified, enforcement mechanism not approved |
 | `tests/core/deleverage/test_loss_aware_deleverage.py` | Teller/Deleverage | `CM-034`, `CM-044`, `CM-026` | Proposed; Phase F delivery bound specified |
 | `tests/data/test_ledger_bad_debt_transition.py` | Ledger/CreditEngine | Ledger, `CM-030`, `CM-026` | Proposed; Phase F atomic transition specified, two selectors not approved |
-| `tests/core/lootbox/test_vault_loss_rewards.py` | Rewards/monitoring | `CM-033`, `CM-025` | Proposed; rewards-unit decision required |
+| `tests/core/lootbox/test_vault_loss_rewards.py` | Rewards/monitoring | `CM-033`, `CM-025`, Ledger | Proposed; Phase G live-claim units specified, implementation and S3 integration pending |
 | `tests/config/test_asset_collateral_controls.py` | Governance/config | `CM-009`, `CM-011`–`CM-013`, existing config/getters | Proposed; Phase E no-new-storage control semantics specified |
 | `tests/registries/test_vault_book_migration.py` | Migration | `CM-021`, vaults, Ledger, manifests | Proposed; pending Track 7 and owner migration policy |
 | `tests/vaults/test_stock_token_vault_lifecycle.py` | Full lifecycle | all primary IDs | Proposed; production direction required |
@@ -95,7 +98,7 @@ Likely reusable fixtures, subject to post-checkpoint design:
 | I-01 exact receipt | `test_credit_equals_call_local_balance_delta` | Vault/Teller | `A`, `Q`, `R`, credited, returned, and emitted amounts reconcile; prior donation excluded | Phase D specified |
 | I-01 exact receipt | `test_short_second_deposit_cannot_overcredit_either_path` | Vault/Teller | Both nominal and share paths credit only actual receipt | Phase D specified |
 | I-02 borrowing conservation | `test_sum_borrow_amounts_never_exceeds_live_custody` | Property/Credit | Invariant holds across users, deposits, losses, and withdrawals | Architecture |
-| I-03 claim conservation | `test_all_withdrawal_orders_are_custody_bounded` | Property/Vault | Two-user orders cannot allocate more than custody | Loss allocation |
+| I-03 claim conservation | `test_all_withdrawal_orders_are_allocated_backing_bounded` | Property/Vault | Two-user orders cannot allocate more than `A <= C` and never consume `U` | Phase G specified |
 | I-03 claim conservation | `test_two_buyers_cannot_allocate_same_remaining_custody` | Auction | Both purchase orders conserve custody | Phase F specified |
 | I-04 pay for delivery | `test_green_and_debt_commit_only_after_actual_delivery` | Auction/Deleverage | Payment/debt value is bounded by delivered amount/value | Phase F specified |
 | I-05 atomic failure | `test_pause_blocklist_false_return_and_revert_leave_state_unchanged` | Vault/Auction | Balances, debt, GREEN, rewards, and auction state unchanged | Phase F specified |
@@ -106,31 +109,34 @@ Likely reusable fixtures, subject to post-checkpoint design:
 | I-08 exactly once | `test_total_loss_moves_liability_to_bad_debt_exactly_once` | Credit/Auction/Ledger | User debt decreases by `x`, bad debt increases by `x`, repeat is no-op/revert | Phase F specified; interfaces pending |
 | I-08 exactly once | `test_repayment_race_uses_one_pinned_debt_state` | Credit/Ledger | Repay and transition cannot duplicate or lose liability | Phase F specified; interfaces pending |
 | I-09 repay liveness | `test_repayment_remains_available_during_deficit_freeze` | Credit/Teller | Repay succeeds while borrow/deposit/settlement are frozen | Product direction |
-| I-10 post-zero | `test_new_deposit_reverts_while_old_shares_exist_at_zero` | Share vault | No new shares or value transfer | Freeze/recap decision |
-| I-10 post-zero | `test_restoration_has_only_owner_approved_allocation` | Share/property | No automatic capture by old/new users outside selected policy | Donation policy |
+| I-10 post-zero | `test_new_deposit_reverts_while_old_shares_exist_at_zero` | Share vault | No new shares or value transfer under `Z_custody`, `Z_live`, or `Z_recorded` | Phase G specified |
+| I-10 post-zero | `test_restoration_remains_quarantined_after_recorded_zero` | Share/property | Later custody is `U`; old/new users receive no automatic claim | Phase G specified |
 | I-11 external-only | `test_issuer_asset_rejects_buyer_internal_override` | Auction/config | Internal mode unavailable; external delivery enforced | Phase F specified; mechanism pending |
 | I-12 price independence | `test_deficit_guard_survives_missing_or_zero_price` | Credit | Custody status remains visible and fail-closed without price | Phase E specified |
+| I-13 quarantine | `test_unsolicited_positive_delta_never_increases_allocated_backing` | Share/property | Donation/restoration changes `C` and `U`, not `A`, claims, credit, settlement, or rewards | Phase G specified; storage/interface pending |
+| I-13 quarantine | `test_deposit_allocates_only_call_local_receipt_not_existing_surplus` | Vault/Teller | `A_after = A_before + R`; pre-existing `U` remains unchanged | Phase G specified |
+| I-13 quarantine | `test_checkpointed_quarantine_is_not_shareholder_loss_insurance` | Share/property | After bucket checkpoint, an observed negative delta reduces `A` before `U^s`; donation cannot silently shield claims | Phase G specified; storage/interface pending |
 
 ## 4. Sixteen-state matrix
 
 | State | Named future test(s) | Core diagnostics |
 | --- | --- | --- |
-| Solvent ordinary | `test_ordinary_lifecycle_6_decimals`, `test_ordinary_lifecycle_18_decimals`, `test_one_base_unit_lifecycle` | `C`, accounting, claim, credit, delivery, events |
-| Pre-existing donation | `test_preexisting_donation_is_not_depositor_receipt` | before/after custody, `R`, credited amount |
-| Donation between deposits | `test_between_deposit_donation_is_not_second_receipt` | both users' accounting/claims, surplus |
+| Solvent ordinary | `test_ordinary_lifecycle_6_decimals`, `test_ordinary_lifecycle_18_decimals`, `test_one_base_unit_lifecycle` | `C`, `A^s`, `U^s`, `A`, `U`, shares, claim, credit, delivery, events |
+| Pre-existing donation | `test_preexisting_donation_is_quarantined_and_not_depositor_receipt` | before/after `C`, `A^s`, `U^s`, `A`, `U`, `R`, credited amount |
+| Donation between deposits | `test_between_deposit_donation_stays_quarantined` | both users' shares/claims, unchanged `A`, increased `U` |
 | Short receipt / fee | `test_short_receipt`, `test_fee_on_transfer_receipt` | requested/received/credited/event amounts |
-| Partial issuer reduction | `test_partial_admin_burn_pro_rata_or_freeze` | `C`, `δ`, shares/nominal, credit, delivery |
+| Partial issuer reduction | `test_partial_admin_burn_checkpoints_allocated_backing_pro_rata` | `C`, `A^s`, `U^s`, `A`, `U`, shares, credit, delivery |
 | Aggregate nominal deficit | `test_nominal_deficit_propagates_to_health` | deficit status, weighted terms, max borrow |
 | Total custody loss | `test_total_loss_no_paid_auction`, `test_total_loss_bad_debt_once` | debt, bad debt, auctions, GREEN |
-| Zero custody/nonzero shares | `test_zero_custody_old_shares_freeze` | raw shares, `Z`, rejected deposit/withdraw |
-| Restoration after zero | `test_post_zero_restoration_policy` | source/amount/allocation event and claims |
-| New deposit after zero | `test_post_zero_new_deposit_reverts_atomically` | custody/accounting/shares unchanged |
+| Zero custody/nonzero shares | `test_zero_custody_old_shares_freeze` | raw shares, `Z_custody`, `Z_live`, `Z_recorded`, zero claim/reward, rejected deposit/withdraw |
+| Restoration after zero | `test_post_zero_restoration_is_quarantine_not_allocation` | `C`, `A^s=0`, `U^s`, `A=0`, `U`, unchanged shares/claims/rewards |
+| New deposit after zero | `test_post_zero_new_deposit_reverts_atomically` | `C`, `A^s`, `U^s`, `A`, `U`, shares, user state unchanged |
 | Paused transfer | `test_paused_deposit_withdraw_and_settlement_atomicity` | state roots or all relevant balances/state |
 | Sender/recipient/operator blocklist | parameterized `test_blocklist_role_atomicity` | actor role, revert reason, unchanged state |
 | Active auction before action | `test_active_auction_revalidates_after_loss` | pre/post custody, auction progress, buyer GREEN |
 | Liquidation after action | `test_post_loss_liquidation_uses_resolution_not_zero_auction` | health, auction count, debt resolution state |
 | Implementation/beacon change | `test_behavior_switch_fails_closed_until_reenabled` | implementation identity, flags, receipt/delivery |
-| Recovery/migration with debt | `test_live_state_migration_reconciles_or_aborts` | users, assets, custody, raw accounting, debt, auctions, registry |
+| Recovery/migration with debt | `test_live_state_migration_reconciles_or_aborts` | users, assets, `C`, `A^s`, `U^s`, `A`, `U`, raw accounting, debt, auctions, registry |
 
 Each test must separately report safety and liveness. A passing revert assertion
 is not evidence that debt can progress.
@@ -167,18 +173,21 @@ owner expands its scope.
 
 Required future property matrix:
 
-- `Σ claims <= C` for arbitrary user share vectors;
+- `Σ claims <= A <= C` for arbitrary user share vectors;
 - both two-user withdrawal orders;
 - both two-buyer settlement orders;
 - partial loss from one unit through `C-1`;
 - total loss with nonzero `S`;
-- donation before first deposit and between deposits;
-- restoration and attempted fresh deposit after zero;
-- amount→shares round down for deposit and round up where needed for bounded
-  withdrawal;
+- donation before first deposit and between deposits remain `U`;
+- checkpointed restoration remains `U` and attempted fresh deposit after zero
+  reverts;
+- unobserved reduce→restore is labeled indistinguishable rather than detected;
+- amount→shares round down for deposit, claim round down, withdrawal share burn
+  round up, and final-share allocated-backing sweep;
 - 6- and 18-decimal minimum-positive deposits;
 - `DECIMAL_OFFSET` and virtual-asset dust bounds;
-- raw shares versus live claims in rewards, events, getters, and reports; and
+- raw shares, `C`, `A`, `U`, live claims, and live-claim reward units in events,
+  getters, and reports; and
 - migration from nominal and prior share versions.
 
 ### 5.4 Standing configuration assertions for every listed outcome
@@ -310,7 +319,7 @@ it only as a separate transaction after the outer deposit completes.
 | `test_short_receipt_cannot_exceed_user_or_global_limit` | `Q` is pre-capped and `R <= Q`; final credited state remains within both upper limits. |
 | `test_short_receipt_rechecks_minimum_on_live_balance` | If final live user amount after credit is below `minDepositBalance`, the non-trusted deposit reverts atomically. |
 | `test_trusted_deposit_is_measured_despite_limit_exemption` | Trusted flow skips current user/global/min policy but still proves `0 < R <= Q` and `V == R`. |
-| `test_share_deposit_uses_predeposit_custody_and_rounds_down` | Shares equal `floor(R * (S + 10^8) / (C0 + 1))`, never a formula using `Q` or aggregate post-custody as the call receipt. |
+| `test_share_deposit_uses_predeposit_allocated_backing_and_rounds_down` | Under Section 17, shares equal `floor(R * (S + 10^8) / (A0 + 1))`; `Q`, aggregate post-custody, and pre-existing `U` cannot enter as the call receipt or allocated denominator. |
 | `test_positive_receipt_that_mints_zero_shares_reverts` | No positive custody can be donated through zero-share credit. |
 | `test_stab_vault_uses_measured_receipt_without_economic_drift` | GREEN/sGREEN value, claimable-value, virtual-offset, and existing share rules are unchanged except for the verified receipt input. |
 | `test_registration_occurs_only_after_credit` | Failed/zero credit cannot add Ledger participation. |
@@ -319,10 +328,10 @@ it only as a separate transaction after the outer deposit completes.
 | `test_deposit_many_measures_each_item_and_is_atomic` | Independent `(C0,C1,R,V,C2,C3)` per item; one failed item rolls back all items and final housekeeping. |
 | `test_rebalance_uses_received_deposit_amount` | `TellerRebalance.depositAmount == R`; deposit, withdrawal, and final health check are atomic. |
 
-Phase G may replace the permanent share formula after its loss/post-zero policy
-is approved. Until then, these tests pin Phase D's receipt input and rounding
-direction without purporting to approve the current formula as the permanent
-architecture.
+Section 17 supplies the permanent corrected-share denominator after the owner
+approved the Phase G policies. These tests pin Phase D's receipt input and
+rounding direction and must now compose with `A0`; they do not approve a
+storage/interface mechanism for representing `A0`.
 
 ### 6.4 Consumer exactness and compatibility
 
@@ -692,10 +701,200 @@ A future Phase F implementation is not acceptable unless:
 10. Base and exact-token fork evidence is attached; and
 11. reviewer, security, and owner gates are recorded.
 
-This validation contract does not approve any mechanism or caller policy, any
-new selector or storage field, implementation, Phase G, or launch.
+This Phase F validation contract does not approve any mechanism or caller
+policy, any new selector or storage field, implementation, or launch. Phase G
+was authorized separately and is specified in Section 9 below.
 
-## 9. Exact-token fork plan
+## 9. Phase G corrected share-vault validation contract
+
+These are future test contracts for specification Section 17. They do not
+authorize a storage field, selector, wrapper, positive-delta mode, Lootbox
+change, migration, or production vault.
+
+### 9.1 Current-behavior pins and future fixture state
+
+Keep the unchanged Track 5 cases that prove current behavior:
+
+- a donation between deposits increases current Rebase shareholder claims;
+- a donation after total loss revives current Rebase claims;
+- a fresh deposit after total loss mints against the one-unit virtual
+  denominator and dilutes old shares;
+- raw Lootbox user weight survives total loss while aggregate Rebase value
+  follows raw custody; and
+- vault ID 4 can report no accounted funds while live token dust exists.
+
+Future tests must not rewrite those assertions in place. New behavior belongs
+in:
+
+```text
+tests/vaults/modules/test_vault_loss_properties.py
+tests/vaults/test_stock_token_vault_lifecycle.py
+tests/core/lootbox/test_vault_loss_rewards.py
+tests/registries/test_vault_book_migration.py
+```
+
+The share fixture must expose, as distinct diagnostics:
+
+```text
+C, A^s, U^s, A=min(A^s,max(C-U^s,0)), U=C-A, S, each s_u,
+each live claim, each normalized reward weight, global eligible USD value,
+and all three zero flags
+```
+
+If the approved implementation chooses different names, the test adapter may
+map them only after Phase I records the exact semantics.
+
+### 9.2 Formula and rounding properties
+
+| Test | Required result |
+| --- | --- |
+| `test_initial_share_mint_is_receipt_times_decimal_offset` | With `S=A=0`, receipt `R` mints exactly `R * 10^8` shares; pre-existing `U` is excluded |
+| `test_deposit_share_mint_rounds_down_against_predeposit_A` | Mint equals `floor(R*(S+10^8)/(A0+1))`, is positive, and no `C`, `U`, or `Q` substitution changes it |
+| `test_live_claim_rounds_down_against_effective_A` | Non-final claim equals `floor(s*(A+1)/(S+10^8))` and never exceeds allocated backing |
+| `test_sole_holder_live_claim_matches_final_sweep` | When `s_u=S>0`, the getter/preview claim is exactly `A`, matching executable full withdrawal |
+| `test_partial_withdrawal_share_burn_rounds_up` | Burn equals `ceil(x*(S+10^8)/(A+1))`, capped by user shares; transfer is at most `x` |
+| `test_final_share_burn_sweeps_only_remaining_A` | Final real shares receive all remaining allocated backing and none of `U`; ending `S=A^s=0` while `U^s=U=C` if quarantine remains |
+| `test_positive_receipt_minting_zero_shares_reverts` | Receipt and custody transfer roll back rather than become uncredited custody |
+| `test_zero_shares_positive_allocated_checkpoint_fails_closed` | Malformed `S=0,A^s>0` cannot admit a deposit, deregister, recover, or activate migration until reconciled |
+| `test_claim_partition_is_allocated_backing_bounded` | For arbitrary positive share partitions, sum of non-final floor claims is `<= A <= C` |
+| `test_complete_withdrawal_orders_conserve_allocated_backing` | Every two-user order transfers at most starting `A`; final sweep occurs once; `U` is unchanged |
+| `test_rounding_loss_is_strictly_bounded` | Deposit loses `<1` raw share, non-final claim loses `<1` asset base unit, partial burn adds `<1` raw share |
+| `test_share_math_handles_safe_max_operands_or_reverts` | No wrap; implementation either returns the exact integer result or reverts before mutation |
+
+Property generators cover:
+
+- `S = 0`, one user, many users, one share, and highly skewed share vectors;
+- `A = 0`, one base unit, partial losses `1..A-1`, and near-maximum safe
+  integers;
+- prior `U = 0`, one unit, and greater than `A`;
+- both withdrawal orders and randomized complete permutations; and
+- exact floor/ceil comparison against an unbounded-integer reference model.
+
+### 9.3 Decimal and minimum-deposit matrix
+
+Run the same lifecycle for 6- and 18-decimal tokens:
+
+| Test | Required result |
+| --- | --- |
+| `test_share_lifecycle_one_base_unit_6_decimals` | One verified base unit mints `10^8` shares from empty allocated state and can exit under the final-sweep rule |
+| `test_share_lifecycle_one_base_unit_18_decimals` | Same invariant without an 18-decimal special case |
+| `test_share_deposit_below_configured_minimum_reverts_after_receipt` | Atomic rollback; no shares, `A`, points, registration, or event |
+| `test_share_deposit_at_and_above_minimum` | Uses actual `R`, not `Q`, for the minimum and formula |
+| `test_reward_normalization_reports_6_decimal_floor` | Explicit `p_a=10^6`; sub-unit reward floor is visible and labeled |
+| `test_reward_normalization_reports_18_decimal_floor` | Under the current compatible convention, `p_a=10^9`; label is normalized claim units, not token/share/USD |
+
+### 9.4 Loss checkpoint, donation, restoration, and zero state
+
+| Test | Required result |
+| --- | --- |
+| `test_partial_loss_checkpoints_A_and_reprices_all_users_pro_rata` | `A^s` decreases to `min(old A^s,max(C-U^s,0))`; `S` unchanged; user claims fall proportionally within rounding bounds |
+| `test_observed_external_reduction_hits_A_before_checkpointed_U` | After both buckets are checkpointed, a custody reduction lowers `A` and shareholder claims while preserving `U^s` until `A=0` |
+| `test_preexisting_donation_stays_U_through_first_deposit` | Donation changes only `C/U`; first receipt changes `A` by exactly `R` |
+| `test_between_deposit_donation_stays_U_and_does_not_change_price` | Existing claims/rewards and second depositor's share price exclude the donation |
+| `test_positive_delta_never_raises_A_without_approved_allocation` | Arbitrary external increases change `U` and checkpoint into `U^s`, never `A^s`, claims, credit, settlement, or rewards |
+| `test_observed_partial_loss_then_restoration_quarantines_recovery` | After checkpointing reduced `A^s` and preserved `U^s`, restoration is additional `U` |
+| `test_literal_total_custody_loss_sets_all_zero_predicates` | With `C=0` and `S>0`, `Z_custody` and `Z_live` are immediate; a successful checkpoint sets `A^s=U^s=0` and `Z_recorded` |
+| `test_successful_loss_checkpoint_sets_recorded_zero` | Explicit checkpoint or successful Phase F transition produces `A=A^s=0`, `S>0`, live claim/reward zero, and raw shares unchanged; `C/U^s/U` may remain positive quarantine |
+| `test_reverting_zero_observation_cannot_persist_checkpoint` | Deposit/settlement revert leaves all storage unchanged; test does not falsely expect a reverted write to set `Z_recorded` |
+| `test_post_zero_restoration_preserves_recorded_freeze` | New custody is entirely `U`; `A` and old claims remain zero |
+| `test_post_zero_deposit_reverts_before_any_commit` | Token transfer, shares, `A^s`, `U^s`, `A`, `U`, registration, points, snapshots, and events equal pre-state |
+| `test_old_shares_survive_bad_debt_transition` | Phase F liability move does not burn/reassign property shares or allocate later custody |
+| `test_reduce_restore_without_observation_is_indistinguishable` | Final state matches no-loss path; test labels the fundamental ERC-20 observation limit and does not expect impossible history detection |
+| `test_loss_checkpoint_then_restore_is_distinguishable` | The persisted lower `A^s` makes restoration `U`; evidence includes checkpoint caller/block/reason |
+
+The final two cases are a pair. An implementation may not pass the
+checkpointed case by claiming it detects the unobserved case, and it may not
+use the unobserved limitation to skip mandatory checkpoints on protocol state
+transitions.
+
+### 9.5 Withdrawal and settlement conservation
+
+| Test | Required result |
+| --- | --- |
+| `test_withdrawal_cannot_consume_quarantine` | User with all non-final claim can receive at most `A`; `U` stays in vault |
+| `test_two_withdrawal_orders_never_exceed_starting_A` | Both user orders conserve allocated backing and leave identical quarantine |
+| `test_two_settlement_orders_never_exceed_starting_A` | Both buyer orders re-read `A/C/S`; allocated delivery cannot repeat |
+| `test_share_burn_delivery_and_A_reduction_reconcile` | Successful external call reconciles shares, `A^s`, unchanged `U^s`, vault debit `W`, recipient receipt, GREEN, and debt |
+| `test_short_external_delivery_uses_phase_f_E_bound` | Payment/debt use `E=min(Q,W,R)`; no nominal share amount overcharges |
+| `test_failed_delivery_rolls_back_share_checkpoint_and_rewards` | Shares, `A^s`, `U^s`, debt, GREEN, auctions, and points equal pre-state |
+| `test_issuer_share_asset_has_no_internal_settlement_override` | Phase F external-only policy remains true under the corrected share path |
+
+### 9.6 Deregistration, recovery, and live-funds guards
+
+| Test | Required result |
+| --- | --- |
+| `test_zero_claim_nonzero_shares_block_user_deregistration` | Total loss does not erase the registered property record |
+| `test_zero_custody_nonzero_shares_block_asset_deregistration` | `S>0` is sufficient to block retirement |
+| `test_zero_shares_positive_U_blocks_asset_deregistration` | Donation dust cannot be made recoverable by declaring the asset empty |
+| `test_does_vault_have_funds_counts_shares_or_live_custody` | True for `S>0`, `A^s>0`, `U^s>0`, or `C/U>0` |
+| `test_base_id4_dust_inventory_is_not_empty_under_corrected_semantics` | The three pinned one-unit custody rows with zero shares are classified as `U` and keep the live-funds result true |
+| `test_current_whole_balance_recovery_is_not_used_for_quarantine` | No registered `A/U` split is passed to current all-balance recovery |
+| `test_future_recovery_cannot_exceed_separately_approved_U` | Placeholder remains skipped/blocked until owner plus counsel/risk approve recipient, amount, and interface |
+
+Migration tests later initialize `A^s` and `U^s` only from an owner-approved
+reconciliation of custody, user entitlement, and quarantine. `A^s := C` is
+not an acceptable generic migration shortcut.
+
+### 9.7 Reward and monitoring units
+
+| Test | Required result |
+| --- | --- |
+| `test_reward_user_weight_uses_live_claim_not_raw_shares` | Solvent weight follows normalized live claim; partial loss reduces it; total loss makes it zero |
+| `test_reward_global_value_prices_A_not_C` | Donation/restoration `U` never increases eligible global USD value |
+| `test_raw_shares_remain_visible_but_are_not_economic_weight` | Raw accounting is reported separately and cannot be mislabeled or consumed alone |
+| `test_loss_checkpoint_closes_reward_interval` | Pre-loss blocks accrue at prior economics; post-checkpoint blocks use reduced/zero live economics |
+| `test_untouched_user_cannot_accrue_stale_post_loss_weight` | Integrated S3 mechanism handles global share-price change without per-user iteration drift |
+| `test_pre_loss_points_are_not_clawed_back` | Historical earned points persist while future weight changes |
+| `test_price_failure_does_not_change_A_or_backing` | Reward USD may be zero/unavailable, but custody/allocation safety remains visible |
+| `test_ripe_gov_lock_points_keep_separate_semantics` | Vault ID 2 governance points are not interpreted as token live claims |
+| `test_existing_positive_rebase_mode_is_not_silently_quarantined` | Any retained yield/rebase behavior is an explicit generic mode/variant with separate tests and approval |
+
+The interval-boundary tests are **pending integrated S3**. They are mandatory
+before reward implementation approval; Phase G does not invent S3's storage or
+index.
+
+### 9.8 Events, getters, storage, and compatibility assertions
+
+| Test | Required result |
+| --- | --- |
+| `test_every_share_surface_declares_its_unit` | Raw shares, `C`, `A^s`, `U^s`, `A`, `U`, claims, normalized reward weight, and USD value are unambiguous |
+| `test_deposit_withdraw_transfer_events_reconcile_amount_and_shares` | Amount is allocated call-local token units; shares are raw units |
+| `test_loss_and_quarantine_evidence_reconstructs_state` | Asset, old/new `A^s/U^s`, `C`, `A`, `U`, caller, block/clock, and reason reconcile with getters |
+| `test_amount_share_conversion_getters_use_A` | Existing-signature or replacement getters match the Section 17 reference model and exclude `U` |
+| `test_manifest_declares_accounting_version_not_dynamic_balance` | Manifest/runtime evidence identifies capability and getter semantics without stale balance claims |
+| `test_storage_upgrade_preserves_raw_share_units` | Existing user/total balances remain raw shares; any appended state follows the Phase I layout |
+| `test_rebase_and_ripe_gov_consumer_inventory_is_complete` | Every wrapper, reader, event, ABI, and reward path is dispositioned before semantic change |
+
+Exact selector/event/storage assertions remain placeholders until the owner
+approves one Phase I mechanism. Tests must fail closed rather than guessing an
+ABI.
+
+### 9.9 Phase G implementation acceptance
+
+A future implementation is not eligible for review until:
+
+1. every Section 9 property/matrix test passes for 6- and 18-decimal assets;
+2. current unsafe-behavior tests remain pinned and new tests demonstrate the
+   intentional delta;
+3. owner/security approve an allocated-backing mechanism after Phase I maps
+   storage, ABI, wrappers, and live migration;
+4. positive-rebase/yield compatibility is explicitly separated and tested;
+5. no automatic donation/restoration/recovery/recapitalization path exists;
+6. counsel/risk remain a hard gate for any later quarantine disposition;
+7. Phase F delivery and exactly-once liability invariants compose with share
+   burn and allocated backing;
+8. integrated S3 closes reward interval semantics and stale-user weighting;
+9. RipeGov governance units remain intact;
+10. Base vault-ID-4 dust and every custody-bearing live vault are reconciled;
+11. exact-token fork, Base regression, dual-clock, migration, and audit gates
+    pass; and
+12. owner approval explicitly names the production vault/version and atomic
+    release group.
+
+This Phase G validation contract approves no implementation mechanism or
+later phase.
+
+## 10. Exact-token fork plan
 
 Proposed future file:
 `tests/probes/test_aapl_vault_behavior_fork.py`.
@@ -731,7 +930,7 @@ No live signing or broadcast is part of this plan. Live sender/recipient
 eligibility, acquisition, gas, approvals, and legal permission remain separate
 owner/counsel gates.
 
-## 10. Dual-clock and identical-artifact integration
+## 11. Dual-clock and identical-artifact integration
 
 The narrow S1/S2 kickoff choices were owner-approved in post-bootstrap
 integration commit `ce3805d6079ee87d727486ea82b75cbddc12e46d`. Their implementation
@@ -750,13 +949,13 @@ Clock behavior must not change custody conservation. Repeated or jumping numbers
 may delay a timelock or auction but cannot permit payment for undelivered
 collateral or duplicate bad debt.
 
-## 11. Migration validation scaffold
+## 12. Migration validation scaffold
 
 Pending owner live-version policy and Track 7 namespace/tooling:
 
 1. pin old/new source, runtime, registry, and manifest identities;
-2. enumerate every old-vault asset/user plus `C`, nominal/shares, claims, debt,
-   rewards, and active auctions;
+2. enumerate every old-vault asset/user plus `C`, `A^s`, `U^s`, `A`, `U`,
+   nominal/shares, claims, debt, rewards, and active auctions;
 3. disable old deposits before movement;
 4. prove debt and auction behavior is frozen or safely serviced during the
    window;
@@ -764,17 +963,18 @@ Pending owner live-version policy and Track 7 namespace/tooling:
 6. reconcile aggregate and per-user state before registry activation;
 7. abort on any mismatch without leaving two authoritative claim ledgers;
 8. prove partial-failure recovery;
-9. independently reconcile registered assets, live token custody, and
-   nominal/share accounting; specifically retain the pinned Base ID 4 inventory
-   of six registered assets and three one-unit custody donations with zero
-   shares as a `doesVaultHaveAnyFunds()` semantics regression;
+9. independently reconcile registered assets, live token custody,
+   allocated/quarantined backing, and nominal/share accounting; specifically
+   retain the pinned Base ID 4 inventory of six registered assets and three
+   one-unit custody donations with zero shares as a
+   `doesVaultHaveAnyFunds()` semantics regression;
 10. retire the old address only after live-funds/accounting checks pass; and
 11. run post-migration Base and Robinhood smoke/reconciliation tests.
 
 Rollback reality must be tested as a state migration, not described as merely
 switching an address back.
 
-## 12. Diagnostics and evidence requirements
+## 13. Diagnostics and evidence requirements
 
 Every future test record must include:
 
@@ -782,8 +982,8 @@ Every future test record must include:
 - prerequisite owner decision;
 - setup, users, buyer(s), issuer/admin, operator, and governance actor;
 - token behavior and exact implementation identity;
-- starting `C`, `N` or `S`, per-user nominal/shares/claims, `δ`, debt, bad debt,
-  and auctions;
+- starting `C`, `A^s`, `U^s`, `A`, `U`, `N` or `S`, per-user
+  nominal/shares/claims, `δ`, debt, bad debt, and auctions;
 - requested, received, credited, delivered, paid, and repaid amounts;
 - expected state transition and exact invariant ID;
 - clock profile;
@@ -795,7 +995,7 @@ Every future test record must include:
 
 Unknown pause/blocklist/upgrade state must be labeled unknown, not false.
 
-## 13. Proposed tiers and commands
+## 14. Proposed tiers and commands
 
 Commands are placeholders until files exist and the owner approves
 implementation:
@@ -811,23 +1011,28 @@ implementation:
 
 No dependency or tool addition is authorized by this scaffold.
 
-## 14. Review and launch gates
+## 15. Review and launch gates
 
 The owner-confirmed instructions select option 4, authorize Phase D
 specification, then authorize Phase E specification under the explicit
 existing-controls/no-new-storage constraint, then approve the Phase F
 external-settlement and exactly-once total-loss directions for specification
-only. The Phase D–F designs and future test contracts are complete; no
-implementation or test change is authorized. Phase G and later
-implementation/release gates remain blocked on the following decisions at
-their recorded boundaries:
+only, and then approve the Phase G freeze, no-automatic-allocation, and
+live-claim reward directions for specification only. The Phase D–G designs and
+future test contracts are complete; no implementation or test change is
+authorized. Phase H and later implementation/release gates remain blocked on
+the following decisions at their recorded boundaries:
 
 - all-external versus per-asset settlement enforcement mechanism;
 - exact CreditEngine/Ledger transition interfaces;
 - permissionless versus restricted/governed total-loss caller policy;
+- allocated/quarantine checkpoint storage/wrapper mechanism;
+- accounting/counsel-risk confirmation that observed losses reduce `A` before
+  checkpointed `U`;
+- positive-delta compatibility boundary for existing yield/rebase assets;
+- Vault/Lootbox/Ledger reward integration surface after S3;
 - Phase H resolution pause/resume authority, timing, and caller interaction;
-- post-zero/restoration/loss-allocation policy;
-- reward-unit decision;
+- share-loss checkpoint caller, pause, and evidence policy;
 - Base live-version/migration posture;
 - integrated S1/S2 and Track 7 interfaces;
 - implementation review and audit decision; and
@@ -835,7 +1040,7 @@ their recorded boundaries:
 
 At this checkpoint, the evidence baseline, formal invariant map, Phase C
 comparison, Phase D deposit-accounting design, Phase E backing/debt-health
-design, Phase F settlement/total-loss design, proposed test names, and required
-matrices are ready for owner review. Work pauses here under the owner's
-2026-07-24 instruction. No implementation, interface, storage, test, Phase G,
-or launch gate is passed by this specification.
+design, Phase F settlement/total-loss design, Phase G corrected-share design,
+proposed test names, and required matrices are ready for owner review. Work
+stops before Phase H. No implementation, interface, storage, test, migration,
+production-vault, Phase H, or launch gate is passed by this specification.
