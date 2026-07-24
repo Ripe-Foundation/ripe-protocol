@@ -1024,14 +1024,20 @@ The current pushed baseline was imported into this track branch, not the other
 way around:
 
 ```text
-origin/rh
+origin/rh first observed
 => 4966969265c6056bc7f3f139dc1a2437ef553c9f
 
-track merge commit
+initial track merge commit
 => 0df570a2cca7dde321b9d97630598e45d60df17c
 
-merge-base(track, origin/rh)
-=> 4966969265c6056bc7f3f139dc1a2437ef553c9f
+origin/rh final
+=> dd51c637f1462bede7529a53427bfb4327dbfb12
+
+final track merge commit
+=> b6828d036c0cd6204e090806fee6b025ed4ee6c4
+
+final merge-base(track, origin/rh)
+=> dd51c637f1462bede7529a53427bfb4327dbfb12
 
 git diff --name-status origin/rh...HEAD
 => A docs/chains/rh/stock-token-vault-change-specification.md
@@ -1046,6 +1052,13 @@ CreditEngine, AuctionHouse, Deleverage, SimpleErc20, BasicVault, VaultData,
 MissionControl, SwitchboardCharlie, the canonical Vault/ConfigStructs
 interfaces, or the 90-case Track 5 comparison test. The only changed contract
 in that relevant comparison is the separately owned S3 `Lootbox.vy`.
+
+During the final backup verification, pushed `rh` advanced from `4966969` to
+`dd51c63`. The seven-commit increment adds and reviews only
+`docs/chains/rh/deleverage-cooldown-security-decision.md`; it changes no Track
+8 source, interface, test, or owned document. The final merge above imports
+that exact documentation baseline and leaves the Track 8 delta at the same two
+files.
 
 The current-source SHA-256 pins used for the narrow proof are:
 

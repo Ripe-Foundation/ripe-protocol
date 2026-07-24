@@ -104,6 +104,9 @@ candidate: exact Teller receipt, the strict external-only nominal vault, and
 CreditEngine zero-amount term preservation. AuctionHouse/Deleverage stay
 byte-identical, Base remains on existing runtimes unless refreshed evidence
 proves urgent live exposure, and every production action remains unapproved.
+The final reconciled pushed baseline is
+`dd51c637f1462bede7529a53427bfb4327dbfb12`; its last increment is the
+documentation-only S4 no-code checkpoint and changes no Track 8 source or test.
 
 ## 1. Existing regression baseline
 
