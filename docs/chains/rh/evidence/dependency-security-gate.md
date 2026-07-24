@@ -1,7 +1,7 @@
 # Track 7 H-01 Stage A Dependency-Security Gate
 
-**Status:** Stage A evidence complete; H-01 and every dependency change remain
-blocked at the mandatory owner/security checkpoint
+**Status:** Stage A evidence complete; the owner/security checkpoint closed on
+24 July 2026 and Stage B is authorized under the exact record below
 
 **Evidence date:** 24 July 2026
 
@@ -1206,7 +1206,7 @@ A failed candidate is abandoned by disposing its environment and restoring
 the old lock/environment from the frozen hash; no in-place upgrade/downgrade
 counts as rollback evidence.
 
-## Mandatory owner/security checkpoint — open
+## Mandatory owner/security checkpoint — closed 24 July 2026
 
 No answer means no dependency edit. Recommendations above are not approvals.
 The owner and security reviewer must record exact decisions for all eight
@@ -1251,6 +1251,107 @@ items:
    trigger, approved disposal event and method, and required disposal record.
    Until then, the interim no-move/no-delete rule remains in force.
 
-Until those decisions are explicit, H-01 is **evidence incomplete / checkpoint
-blocked**. Stage B, dependency/test changes, branch reconciliation, merge,
-push, and live/state-changing actions are prohibited.
+### Owner/security approval record
+
+On 24 July 2026, the owner first authorized “the eight-item H-01 Stage B
+authorization as recommended,” explicitly directed reconciliation with
+integrated `rh` commit
+`3e6e6f230169fc445d0b29454457480c62efd89a`, and directed Stage B to proceed
+exactly under the brief. Because decisions 4, 7, and 8 contained choices rather
+than one recommendation, the implementing agent stopped without changing the
+branch and proposed a concrete bundle. After independent review and the
+reviewer's hardening riders, the owner stated: “I approve both and the revised
+bundle.” The owner also confirmed that they act as the Track 6 owner for this
+conditional exact-profile authorization.
+
+The closed decisions are:
+
+1. **Alert policy:** the final target is zero open alerts in the approved
+   candidate lock. Candidate Zero will be implemented incrementally—Candidate
+   A first, then pytest, then the documentation/low packages—to isolate any
+   failure. No partial candidate may merge or be described as H-01 closure.
+   Any candidate drift, unresolved alert, compatibility failure, S3 artifact
+   difference, or scope expansion stops Stage B.
+2. **Exact package selection and constraint form:** use exact direct pins
+   `titanoboa==0.2.7`, `pytest==9.0.3`, `requests==2.33.0`,
+   `urllib3==2.7.0`, `idna==3.15`, `python-dotenv==1.2.2`,
+   `cbor2==5.9.0`, `wheel==0.46.2`,
+   `pymdown-extensions==10.21.3`, and `Pygments==2.20.0`; retain
+   `vyper==0.4.3`, `rlp~=4.0.1`, `ipython`, and `dotenv`. These are the
+   recorded Candidate Zero minimal patched versions, not later PyPI releases.
+   An added transitive pin may be removed only when its direct parent's
+   upstream metadata guarantees at least the patched floor and a fresh
+   resolver plus security review approves the resulting complete lock diff.
+3. **pytest and S1:** use exact pytest `9.0.3`. The Vyper 0.4.3 optional
+   `test`/`dev` metadata conflict (`pytest<9`) is conditionally accepted only
+   because those extras are not installed; resolver success is not
+   compatibility proof. Run S1 unchanged first and record its intentional
+   exact-version failure, update only the exact pytest expectation, and
+   re-prove the complete S1/S2/S3/full-suite and artifact surface. The
+   approving owner is also the Track 6 owner. Final exact-profile acceptance
+   remains subject to the designated independent reviewer gate.
+4. **Documentation and low severity:** land exact Pymdown Extensions `10.21.3`
+   and Pygments `2.20.0` in the same final Candidate Zero profile, after the
+   separable Candidate A and pytest validations.
+5. **Residual acceptance:** no Stage A alert is accepted, deferred, ignored,
+   or suppressed. The approved final candidate must audit without a known
+   vulnerability; any residual or newly surfaced alert stops Stage B.
+6. **Sequence:** S3 must merge first. The owner explicitly directed the H-01
+   branch to reconcile with reviewed integration commit
+   `3e6e6f230169fc445d0b29454457480c62efd89a`. No alternate sequence is
+   approved.
+7. **Stage B toolchain and audit:** use CPython `3.12.0` from the recorded
+   K-01 seed, pip `23.2.1`, and pip-tools `7.4.1`. Do not upgrade pip in
+   place. Use only `https://pypi.org/simple`, no extra/private index,
+   `--no-cache-dir` for tool installation, a disposable pip-tools cache,
+   frozen-output seeding, a mandatory complete fresh literal lock-diff review,
+   and repeated resolution. The approved compile command and truthful emitted
+   header are the expanded K-01 wrapper form recorded above; manual header
+   normalization is prohibited. Build independent old and candidate clean
+   environments rather than upgrading in place. In a third disposable audit
+   tool environment, install exact `pip-audit==2.10.1` from public PyPI using:
+
+   ```text
+   python -m pip install --no-cache-dir \
+     --index-url https://pypi.org/simple pip-audit==2.10.1
+   ```
+
+   Audit both old and candidate locks, without dependency resolution, fixing,
+   ignores, or suppression:
+
+   ```text
+   PIP_CONFIG_FILE=/dev/null python -m pip_audit \
+     --no-deps --disable-pip -r requirements.txt --format=json
+   ```
+
+   The audit is an approved read-only live advisory-network query. It must
+   never run inside pytest; the committed dependency gate remains offline.
+   Sanitized audit results may be committed in this evidence record, but raw
+   output remains outside the repository.
+8. **Freshness and retained evidence:** there is no wall-clock window. The
+   sole staleness triggers are a change to direct inputs, the compiled lock,
+   any selected version, Python/pip/pip-tools/auditor provenance, the
+   integrated S3 source or artifact baseline, the authoritative alert ledger,
+   or another branch reconciliation. Refresh K-02 and both candidate audit
+   evidence after final lock generation and again immediately before the
+   Stage B reviewer gate. Stale evidence blocks Stage B acceptance and every
+   rehearsal/deployment action, but never makes ordinary offline tests depend
+   on network or wall-clock state.
+
+   The approving owner is custodian of the two retained K-02 files at
+   `~/dev/ripe-protocol-h1-private-evidence/`. They remain the sole
+   authoritative copies, mode `0600`; the owner explicitly accepts the
+   single-copy risk. Loss is detectable through the committed hashes but the
+   original bytes would not be recoverable without a new K-02 retrieval.
+   Retain them through the later of Stage B reviewer acceptance and a
+   post-merge authoritative default-branch alert refresh. Recheck path, hash,
+   and permissions at every K-02 refresh and immediately before the reviewer
+   gate. Move or delete them only under a separate owner instruction, and
+   record the paths, hashes, method, and timestamp of disposal.
+
+The owner designated the same independent reviewer agent that performed the
+Stage A reviews as the mandatory Stage B security/Track 6 reviewer. That
+reviewer must inspect the complete brief-defined reviewer surface after
+implementation. Until that review occurs, H-01 is **Stage B authorized but not
+accepted**. Merge, push, deployment, signing, verification submission, and
+every other live/state-changing action remain prohibited.
