@@ -1,10 +1,20 @@
 # Track 7 H-01 Stage A Dependency-Security Gate
 
-**Status:** Candidate A implemented and fully technically validated against
-reviewed `rh` commit `4966969`; reconciled and refrozen after the
-documentation-only `rh` advance to `dd51c63`; exception-gated; stopped at the
-mandatory Stage B reviewer gate; no merge, push, deployment, signing, or other
-live action authorized
+**Status:** The exact Candidate A dependency/test payload at commit
+`001ccaccdf473223ba33e3eeb37509a01990a60e` is implemented and technically
+approved by the independent security/Track 6 reviewer against the previous
+reviewed integration baseline
+`063d9459c4c0acf29a4d4e59251ad32bf2d71184`. Current `rh` and `origin/rh`
+have advanced to new integration baseline
+`2517eeb0013cdb277dc4815db4b524d7a090d682`; the H-01 branch has not yet
+reconciled that baseline and is not merge-ready. The evidence-only provenance
+amendment is directionally approved but remains uncommitted pending
+independent review of the complete current file. Final merge-readiness review
+of the actually reconciled branch remains open. All five recorded bounded
+exceptions and the post-merge alert-refresh, exception-review, custody,
+retention, and disposal obligations survive. The candidate remains unmerged
+and unpublished; no deployment, signing, verification submission, alert
+mutation, or other production action is authorized.
 
 **Evidence date:** 24 July 2026
 
@@ -20,6 +30,12 @@ authorization, Candidate A implementation, and validation. Nothing in this
 record is merge, push, deployment, signing, or other live-action approval, and
 it never claims an authoritative default-branch alert is closed merely because
 the unmerged candidate lock remediates its affected range.
+
+Statements below that say H-01 was `stopped`, `pending`, `blocked`, or awaiting
+the Stage B reviewer gate are preserved as contemporaneous checkpoint
+evidence. They do not describe the final current state. For current status,
+the top-level status above and the latest dated review/reconciliation section
+at the end of this record control.
 
 ## Executive decision summary
 
@@ -2961,3 +2977,159 @@ reconciled commit changes documentation only and the fixture correction only
 removes irrelevant setup from the 12-test module, the complete serial suite
 was also replayed after all test-body changes. It passed exactly, so renewed
 review need not rely on an applicability argument for the final test bytes.
+
+## Independent Candidate A payload review — technically approved 24 July 2026
+
+**Current integration-baseline review:** Pending.
+
+The designated independent security/Track 6 reviewer technically approved
+the exact H-01 Candidate A dependency/test payload at:
+
+```text
+001ccaccdf473223ba33e3eeb37509a01990a60e
+```
+
+That reviewed payload was reconciled against the then-current, now-previous
+reviewed `rh` integration baseline
+`063d9459c4c0acf29a4d4e59251ad32bf2d71184`. The technical payload approval
+superseded the current-state effect of earlier stopped, pending, blocked, or
+reviewer-gate-waiting statements while that baseline remained current, and
+those statements remain historical checkpoint evidence. It does not approve
+the uncommitted evidence-amendment bytes or establish merge readiness against
+the newer integration baseline
+`2517eeb0013cdb277dc4815db4b524d7a090d682`.
+
+### Exact reviewed scope and installation
+
+At the payload review, the approved committed bundle differed from the
+then-current `rh` by exactly these four permitted H-01 files:
+
+| Reviewed path | SHA-256 at `001ccac` |
+|---|---|
+| `docs/chains/rh/evidence/dependency-security-gate.md` | `a3fb8c90171ca24d93e1ab748ab7f1df2cd5a1c3dc0fd96b599c91fdb452306c` |
+| `requirements.in` | `2523c04409946a6625e30e5e4aa4f711663924f4a674f4cfd5fee5b7bbb3b80d` |
+| `requirements.txt` | `d2e12a6f0cfd128c3891634efafbba8305878bef7a7c5db33e25ebe93b0d2bce` |
+| `tests/deployment/test_dependency_gate.py` | `a0d3dcc22d0754229c8226fb55a99c2f17cfb004766285ed67a3c5075a39d948` |
+
+The reviewer independently created a clean CPython 3.12.0 environment from
+the committed Candidate A lock using public PyPI. Installation completed
+cleanly, every selected and held package matched the approved exact version,
+and `python -m pip check` reported no broken requirements.
+
+### Final no-ignore audit disposition
+
+The fresh approved no-ignore audit reported exactly seven findings in five
+packages, matching the committed ledger without any `--ignore-vuln` flag:
+
+| Package | Finding | Final disposition |
+|---|---|---|
+| Click `8.2.1` | `PYSEC-2026-2132` | bounded exception `EX-H01-CLICK-01` |
+| pytest `8.4.2` | `PYSEC-2026-1845` | bounded exception `EX-H01-PYTEST-01` |
+| Pygments `2.19.2` | `PYSEC-2026-2987` | bounded exception `EX-H01-PYGMENTS-01` |
+| Pymdown Extensions `10.16.1` | `PYSEC-2026-2999` | bounded exception `EX-H01-PYMDOWN-SNIPPETS-01` |
+| Pymdown Extensions `10.16.1` | `CVE-2026-61632` | bounded exception `EX-H01-PYMDOWN-B64-01` |
+| Vyper `0.4.3` | `PYSEC-2023-142` | not applicable; authoritative affected range is `>=0.2.15,<0.3.1` |
+| Vyper `0.4.3` | `PYSEC-2025-33` | not applicable; authoritative affected range is `<0.4.1` |
+
+Both Vyper findings are outside Vyper `0.4.3`'s authoritative affected
+ranges. They remain scanner-metadata dispositions, not ignored findings,
+bounded exceptions, or accepted compiler vulnerabilities.
+
+### Reviewed payload validation and prior topology
+
+The approved evidence includes the following final validation:
+
+| Validation | Result |
+|---|---|
+| Clean Candidate A installation | completed from the exact committed lock |
+| `python -m pip check` | no broken requirements |
+| Fresh no-ignore audit | seven findings in five packages; exact ledger match |
+| `pytest -q tests/deployment/test_dependency_gate.py` | 12 passed; the reviewer also reproduced 12/12 inside a restricted sandbox without protocol/socket setup |
+| `pytest -q tests/clock/test_clock_profiles.py` | 57 passed |
+| `python scripts/check_block_clock_inventory.py --check` | clean |
+| `pytest -q tests/inventory/test_block_clock_inventory.py` | 60 passed |
+| `pytest --collect-only -q` | 2,734 selected / 2,876 total; 142 deselected |
+| Complete serial `pytest -q` | **2,734 passed, 142 deselected** |
+| `git diff --check` | passed |
+
+At the payload review, local `rh` and `origin/rh` both resolved to
+`063d9459c4c0acf29a4d4e59251ad32bf2d71184`; the candidate was 17 commits
+ahead and zero behind with a clean worktree and no published track ref.
+`git merge-base rh 001ccac` returned exact `063d945`, and `rh` is an ancestor
+of the candidate. The virtual merge was therefore a conflict-free
+fast-forward at that reviewed baseline. This is historical payload-review
+evidence, not a claim about current merge readiness and not permission for the
+agent to merge or push.
+
+### New integration baseline awaiting reconciliation
+
+After payload approval, local `rh` and `origin/rh` advanced to:
+
+```text
+2517eeb0013cdb277dc4815db4b524d7a090d682
+merge: integrate Track 8 stock token vault specification
+parents:
+  063d9459c4c0acf29a4d4e59251ad32bf2d71184
+  4b4cb6021dda8bcc054970c03175077184f1311a
+```
+
+The complete tree delta from the previous reviewed integration baseline
+`063d9459c4c0acf29a4d4e59251ad32bf2d71184` to the new integration baseline
+`2517eeb0013cdb277dc4815db4b524d7a090d682` consists only of these two Track 8
+Markdown documents:
+
+| New Track 8 document | SHA-256 | Delta |
+|---|---|---:|
+| `docs/chains/rh/stock-token-vault-change-specification.md` | `71099e629734e7f001a8cbfa40792dfc2ab9fbc5490cd8b9c80a8431a994705c` | 6,659 insertions |
+| `docs/chains/rh/stock-token-vault-change-validation-plan.md` | `88edaf44fa375a7310cb73bec254d5801478e89479d51ded0c439f33a9a81bb1` | 2,460 insertions |
+
+There is no deletion or modification in that tree delta and no dependency,
+requirement, lock, test, compiler input, artifact, ABI, contract, migration,
+script, or H-01-owned file change. The two documents introduce Track 8
+planning/evidence authority only.
+
+Before reconciliation, H-01 HEAD remains exact reviewed payload commit
+`001ccaccdf473223ba33e3eeb37509a01990a60e`, its merge base with current `rh`
+remains `063d9459c4c0acf29a4d4e59251ad32bf2d71184`, and the branch is 35 commits
+behind and 17 ahead of current `rh`. No merge, rebase, history rewrite,
+dependency action, audit, or validation replay has occurred for
+`2517eeb0013cdb277dc4815db4b524d7a090d682`. Reconciliation must wait until an
+independent reviewer verifies the complete current evidence file and approves
+its exact uncommitted bytes.
+
+### Surviving exceptions and post-merge obligations
+
+All five bounded exceptions remain in force without amendment:
+
+- `EX-H01-CLICK-01`
+- `EX-H01-PYTEST-01`
+- `EX-H01-PYGMENTS-01`
+- `EX-H01-PYMDOWN-SNIPPETS-01`
+- `EX-H01-PYMDOWN-B64-01`
+
+Each requires security review on **15 August 2026** and has a hard expiry at
+`2026-08-31T23:59:59Z`; expiry blocks deployment rehearsal and merge until a
+fresh disposition is approved.
+
+After owner integration, the authorized read-only K-02/default-branch refresh
+must record what GitHub actually observes without claiming closure early.
+All 13 alerts may persist until GitHub re-observes the merged manifest; the
+expected steady residual set is alert #22 Pygments, #23 pytest, and #27
+Pymdown Extensions, each still governed by its recorded exception. Any
+different count, finding, severity, range, or package disposition requires
+reconciliation rather than normalization.
+
+Exception review and private-evidence custody also survive approval. Retention
+continues until the later of the post-merge K-02 refresh and final disposition
+of all five exceptions. The recorded custodian, mode/hash rechecks, permitted
+security-evidence use, retention events, and no-move/no-delete controls remain
+binding. Disposal requires the recorded event, method, and disposal record
+and may occur only on separate explicit owner instruction.
+
+The existing approval authorizes technical acceptance of the exact four-file
+Candidate A payload at `001ccac` only. It does not approve the uncommitted
+evidence amendment, the unreconciled `2517eeb` baseline, or the final branch
+merge-readiness state. It does not authorize deployment, signing,
+verification submission, alert mutation, production configuration, or any
+other live or production action. Merge and push remain gated by the required
+review sequence and owner direction.
