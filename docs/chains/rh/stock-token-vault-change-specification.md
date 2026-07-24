@@ -1,7 +1,8 @@
 # Shared Stock Token Vault-Change Specification
 
-Status: **Phase E specification complete under the owner-approved
-existing-controls constraint; Phases F–K intentionally not finalized**
+Status: **Phase E specification complete under the recorded existing-controls
+instruction; explicit owner confirmation of the two quoted instructions is
+pending; Phases F–K intentionally not finalized**
 
 Date: 2026-07-23 (America/Denver)
 
@@ -12,9 +13,10 @@ owner checkpoint, exact deposit-accounting design, and backing/debt-health
 design. It does not select a production vault, approve a loss-allocation
 policy, authorize a Base migration, or authorize implementation.
 
-The owner selected option 4 as the architecture direction for specification
-work only. Until the later gates are approved and implemented, the operative
-conclusion remains:
+The recorded owner instruction selects option 4 as the architecture direction
+for specification work only; explicit owner confirmation remains pending as
+described in Section 12.1. Until the later gates are approved and implemented,
+the operative conclusion remains:
 
 > **Do not list Stock Tokens under the current vault designs.**
 
@@ -244,6 +246,15 @@ between those commits showed no changes in the Phase E source set:
 
 Phase E therefore uses the same source behavior reconciled in Phases A–D. No
 integration commit was imported into the isolated worktree.
+
+The integration increment leading to `c2ded229` did change the S1
+test/config/script harness outside that source set, including
+`tests/conftest.py`, clock-profile and inventory tests,
+`config/block-clock-inventory.json`, and
+`scripts/check_block_clock_inventory.py`. The Track 5 comparison test itself
+was unchanged, and Track 8's reported 90-test evidence remains pinned to
+`be6a759`. Any later rerun at an integrated tip must record this harness delta
+and must not attribute a result difference to Track 8 without isolating it.
 
 Captured at Phase E entry:
 
@@ -1256,28 +1267,28 @@ The checkpoint presented these options:
 4. containment followed by corrected share path; or
 5. another explicitly approved generic design.
 
-On 2026-07-23, the owner approved **option 4: containment followed by the
-corrected share path**, and authorized **Phase D specification work only**.
+The recorded 2026-07-23 message approves **option 4: containment followed by
+the corrected share path**, and authorizes **Phase D specification work only**.
 This is checkpoint option 4—the staged combination of Section 9 outcomes 2 and
 3—not Section 9.5's separately numbered “another generic shared design.”
 
-Approval provenance is the owner's direct instruction in this Track 8 work
-session immediately before Phase D began:
+Recorded approval provenance is the following message presented in this Track
+8 work session immediately before Phase D began:
 
 > I approve option 4 as the Track 8 architecture direction and authorize Phase
 > D specification work only. This does not select a production vault, approve
 > implementation, authorize a Base migration, or approve any loss-allocation
 > policy. Later phases remain subject to their documented owner checkpoints.
 
-That authorization explicitly did not:
+That recorded authorization explicitly did not:
 
 - select a production vault;
 - approve implementation;
 - authorize a Base migration; or
 - approve a loss-allocation policy.
 
-On 2026-07-23, after requiring a deeper review of existing protocol parameters,
-the owner gave the controlling Phase E instruction:
+The following controlling Phase E message was then presented on 2026-07-23
+after the deeper review of existing protocol parameters:
 
 > I reject adding a new stored per-asset collateral-use parameter by default.
 > Authorize Phase E specification work to use existing deposit controls and
@@ -1285,8 +1296,13 @@ the owner gave the controlling Phase E instruction:
 > proposing any new storage or interface. This does not authorize
 > implementation or Phase F.
 
-Both block quotes above are genuine, verbatim owner messages in this Track 8
-work session. Neither is inferred from a recommendation or reviewer comment.
+Both block quotes are transcribed as received in this Track 8 work session, but
+the implementation agent cannot authenticate its own authorization record.
+Explicit owner confirmation that both quoted instructions were actually given
+remains pending. Until that confirmation is recorded, the table below treats
+the decisions as recorded instructions with an open governance-confirmation
+item. If either quote is denied, all work after the corresponding checkpoint
+requires owner-directed rollback and re-review.
 
 Phase E therefore may specify only a composition of existing controls and
 automatic backing state. It may not propose new storage or a new external
@@ -1298,14 +1314,15 @@ posture is still `do not list Stock Tokens under the current vault designs`.
 ### 12.2 Checkpoint decisions and their actual gates
 
 The product/architecture direction required for Phase D and the existing-
-controls direction required for Phase E are now satisfied for specification
-work. The remaining seven decisions gate the later phases shown below; none is
-implied by either approval.
+controls direction required for Phase E are recorded as satisfied for
+specification work, subject to the explicit owner confirmation above. The
+remaining seven decisions gate the later phases shown below; none is implied by
+either recorded instruction.
 
 | Decision | Options | Evidence and recommendation | Owner | Affected components | Prerequisite / milestone | Status |
 | --- | --- | --- | --- | --- | --- | --- |
-| Product outcome | Five checkpoint options above | Staged containment then corrected share path | Product + protocol owner | Whole track | Before Phase D | **Approved: option 4, specification work only** |
-| Per-asset collateral use | Add a stored flag / compose existing controls | Reuse `canDeposit`, `DebtTerms.ltv`, and automatic backing state; do not add storage or a deployed selector | Protocol owner + security | `CM-009`, `CM-011`–`013`, `CM-030`, existing config/getters | Before Phase E | **Approved: existing-controls Phase E specification only; implementation and Phase F not approved** |
+| Product outcome | Five checkpoint options above | Staged containment then corrected share path | Product + protocol owner | Whole track | Before Phase D | **Recorded: option 4, specification work only; explicit owner confirmation pending** |
+| Per-asset collateral use | Add a stored flag / compose existing controls | Reuse `canDeposit`, `DebtTerms.ltv`, and automatic backing state; do not add storage or a deployed selector | Protocol owner + security | `CM-009`, `CM-011`–`013`, `CM-030`, existing config/getters | Before Phase E | **Recorded: existing-controls Phase E specification only; explicit owner confirmation pending; implementation and Phase F not approved** |
 | Issuer-controlled settlement | Always external / permit bounded internal | Current internal mode can charge for undeliverable nominal claims; recommend external-only | Protocol owner + risk/security | `CM-026`, `CM-030`, `CM-043`, `CM-044`, Vault interface | Before Phase F | Requested at checkpoint; gates Phase F |
 | Total-loss transition | Approved user-debt→Ledger-bad-debt design / another existing-accounting design / no listing | Current system has no atomic exactly-once path; recommend a separate shared transition specification within the selected release | Protocol owner + accounting/security | `CM-026`, `CM-030`, Ledger, interfaces | Before Phase F | Requested at checkpoint; gates Phase F |
 | Post-zero state | Freeze / explicit recapitalization | Recommend freeze by default | Protocol owner + risk | `CM-025`, deposit callers, controls | Before Phase G | Requested at checkpoint; gates Phase G |
@@ -1362,8 +1379,8 @@ reserve or invent them.
 
 ### 14.1 Authorization and design boundary
 
-The owner authorized Phase D specification work only when approving checkpoint
-option 4, the staged combination of containment and the corrected share path.
+The recorded option-4 instruction authorizes Phase D specification work only,
+covering the staged combination of containment and the corrected share path.
 This section therefore selects one shared deposit-accounting design, but does
 not authorize its implementation or select a production vault.
 
@@ -1727,19 +1744,20 @@ a new accounted deficit. For the share path,
 conversion direction, so `Q - R` cannot mint shares and a prior donation
 affects the conversion base but never the receipt.
 
-The owner-approved option 4 direction and this deposit design did not by
-themselves resolve backing or existing-debt deficit behavior. Section 15 now
-specifies those Phase E concerns under the owner's existing-controls
-constraint. Settlement policy, total-loss transition, post-zero allocation,
-reward units, production-vault selection, and migration remain unresolved.
+The recorded option 4 direction and this deposit design did not by themselves
+resolve backing or existing-debt deficit behavior. Section 15 now specifies
+those Phase E concerns under the recorded existing-controls constraint.
+Settlement policy, total-loss transition, post-zero allocation, reward units,
+production-vault selection, and migration remain unresolved.
 
 ## 15. Phase E — backing, collateral-use, and debt health
 
 ### 15.1 Authorization and no-new-state boundary
 
-The owner rejected a new stored per-asset collateral-use parameter by default
-and authorized Phase E specification work to reuse existing deposit controls
-and `DebtTerms.ltv`. This phase therefore specifies no change to:
+The recorded Phase E instruction rejects a new stored per-asset collateral-use
+parameter by default and authorizes specification work to reuse existing
+deposit controls and `DebtTerms.ltv`. This phase therefore specifies no change
+to:
 
 - `AssetConfig` or `DebtTerms` layout;
 - MissionControl storage;
