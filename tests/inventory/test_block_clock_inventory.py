@@ -347,6 +347,24 @@ def test_cad_001_site_set_divergence_reports_fingerprints(
     assert finding.expected != finding.actual
 
 
+def test_duplicate_cad_001_site_row_fails(fixture_repo: Path) -> None:
+    inventory = _load_inventory(fixture_repo)
+    sites = inventory["indirectCadence"][0]["sites"]
+    sites.append(dict(sites[0]))
+    _write_inventory(fixture_repo, inventory)
+    result = _assert_failure(fixture_repo, "INV-SCHEMA-DUPLICATE")
+    finding = next(
+        item
+        for item in result.findings
+        if item.code == "INV-SCHEMA-DUPLICATE"
+        and item.domain == "indirect"
+        and item.candidate == "CAD-001"
+    )
+    assert finding.expected == "1"
+    assert finding.actual == "2"
+    assert "redundant" in finding.remediation
+
+
 def test_new_timestamp_context_fails(fixture_repo: Path) -> None:
     relative = "contracts/tokens/modules/Erc20Token.vy"
     _append(

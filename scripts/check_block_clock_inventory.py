@@ -26,7 +26,7 @@ EXPECTED_BN_IDS = {f"BN-{number:03d}" for number in range(1, 33)}
 EXPECTED_CAD_IDS = {"CAD-001"}
 EXPECTED_TS_IDS = {f"TS-{number:03d}" for number in range(1, 12)}
 TRACK3_REVIEW_COMMIT = "c3040041a1254a774e0a305060330d6ab9cc04ca"
-HARDENING_REVIEW_COMMIT = "82db59cb35e7d687240d0fdec58808cdbb7c5174"
+HARDENING_REVIEW_COMMIT = "fc61eb98b3b004c78d1e810044c74548fc7b80e8"
 EXPECTED_PRODUCTION_ROOTS = ["contracts"]
 EXPECTED_EXCLUDED_PRODUCTION_GLOBS = [
     "contracts/mock/**",
@@ -987,13 +987,56 @@ def _validate_schema(data: Mapping[str, Any]) -> list[Finding]:
                         remediation="use reviewed stable IDs only; do not invent pseudo-identifiers",
                     )
                 )
-    cad_site_keys = {
-        _candidate_from_record(site)
-        for record in data["indirectCadence"]
-        if isinstance(record, Mapping)
-        for site in record.get("sites", [])
-        if isinstance(site, Mapping)
-    }
+    cad_sites_by_key: dict[
+        tuple[str, str, str, str, str, int],
+        list[tuple[str, Mapping[str, Any]]],
+    ] = {}
+    for record in data["indirectCadence"]:
+        sites_value = record.get("sites")
+        if not isinstance(sites_value, list) or not sites_value:
+            findings.append(
+                Finding(
+                    code="INV-SCHEMA-COLLECTION",
+                    domain="indirect",
+                    candidate=str(record.get("id", "UNMAPPED")),
+                    expected="nonempty-sites-list",
+                    actual=type(sites_value).__name__,
+                )
+            )
+            continue
+        for site in sites_value:
+            if not isinstance(site, Mapping):
+                findings.append(
+                    Finding(
+                        code="INV-SCHEMA-RECORD",
+                        domain="indirect",
+                        candidate=str(record.get("id", "UNMAPPED")),
+                        expected="object-site-record",
+                        actual=type(site).__name__,
+                    )
+                )
+                continue
+            cad_sites_by_key.setdefault(
+                _candidate_from_record(site), []
+            ).append((str(record.get("id", "UNMAPPED")), site))
+    for key, sites in cad_sites_by_key.items():
+        if len(sites) == 1:
+            continue
+        stable_id, first = sites[0]
+        findings.append(
+            Finding(
+                code="INV-SCHEMA-DUPLICATE",
+                domain="indirect",
+                path=str(first.get("path", "-")),
+                function=str(first.get("function", "-")),
+                candidate=stable_id,
+                expected="1",
+                actual=str(len(sites)),
+                snippet=json.dumps(key, ensure_ascii=True),
+                remediation="remove the redundant reviewed cadence-site row",
+            )
+        )
+    cad_site_keys = set(cad_sites_by_key)
     reviewed_cad_keys = {
         _candidate_from_record(record)
         for record in data["cadenceCandidates"]
