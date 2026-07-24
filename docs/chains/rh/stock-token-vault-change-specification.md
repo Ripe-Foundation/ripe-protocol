@@ -1,9 +1,9 @@
 # Shared Stock Token Vault-Change Specification
 
-Status: **Phase J validation specification complete for owner review; no
-production vault or ID, new storage/interface mechanism, Ledger migration,
-implementation, or live migration selected; Phase K intentionally not
-started**
+Status: **Phases A–K specification complete for final owner and independent
+review; no production vault or ID, new storage/interface mechanism, Ledger
+migration, implementation, deployment, or live action selected or
+authorized**
 
 Date: 2026-07-24 (America/Denver)
 
@@ -13,12 +13,13 @@ formal state and invariant model, architecture comparison, mandatory early
 owner checkpoint, exact deposit-accounting design, and backing/debt-health
 design, plus the settlement/liquidation/total-loss and corrected share-vault
 designs, the Phase H current-control, governance, clock, and operational
-evidence analysis, and the Phase I compatibility and migration inventory. It
-also records the owner-authorized Phase J validation contract. It does not
-select a production vault or ID, approve an automatic donation/restoration
-allocation or recapitalization, authorize a Base or Robinhood migration,
-approve any newly identified storage/interface mechanism or the Ledger
-migration, authorize implementation, or begin Phase K.
+evidence analysis, the Phase I compatibility and migration inventory, the
+Phase J validation contract, and the Phase K reviewable implementation units
+and atomic Release 0/1/2 gates. It does not select a production vault or ID,
+approve an automatic donation/restoration allocation or recapitalization,
+authorize a Base or Robinhood migration, approve any newly identified
+storage/interface mechanism or the Ledger migration, authorize
+implementation, deployment, live configuration, or any transaction.
 
 The owner-confirmed instruction selects option 4 as the architecture direction
 for specification work only. Until the later gates are approved and
@@ -732,6 +733,141 @@ These are Phase J validation specifications only. They do not select a
 production vault or ID, approve a new storage declaration or selector,
 authorize the Ledger or vault migration, authorize implementation or live
 actions, or begin Phase K.
+
+### 3.13 Phase K source, branch, and cross-track recheck
+
+At Phase K entry, the isolated Track 8 worktree was clean and synchronized
+with its owner-authorized backup branch at
+`b18b4261f798b4d6daae3634b0ad747656944db9`. Local integration `rh` was at
+`27765d29094256fa9619dd44a0bfd145863de8b7`, one commit ahead of
+`origin/rh` at `3e6e6f230169fc445d0b29454457480c62efd89a`. The Track 8 merge
+base remained `be6a759e15e763b633feefdce91cf8f3ee31a10e`; no integration
+commit was imported.
+
+The sole committed local-only integration increment,
+`3e6e6f2..27765d2`, adds
+`docs/chains/rh/track-6-s5-ledger-guard.md` and no other path. Its SHA-256 is
+`37332bb560ba5591da10b08f1e2e8aca28d4d21142c6a61ef8ac210566b564e1`,
+recomputed directly from `rh` rather than from the mutable integration
+worktree. Phase K read that committed 1,283-line owner-approved planning brief
+completely because it owns a potentially overlapping Ledger/Teller security
+and migration boundary. The brief authorizes only its own Stage A decision
+record. It does not authorize S5 production code, a Ledger replacement, a
+migration, or any Track 8 change.
+
+The S5 cross-track constraints that bind a later Track 8 implementation are:
+
+- S5's state-safe default is to preserve live Ledger bytecode and state unless
+  an exhaustive, independently audited migration is separately approved;
+- S5 reserves `migrations/robinhood/0030_Track6S5LedgerGuard.py` to Track 7
+  for S5 only, so Track 8 may not reuse that identifier or file;
+- S5 may analyze Track 8 borrow, withdraw, and liquidation paths, but may not
+  implement Track 8 accounting fixes;
+- any S4/S5/Track 8 overlap in Teller, Ledger, MissionControl,
+  SwitchboardDelta, interfaces, ABIs, fixtures, or tests requires an explicit
+  integrated order and one semantic owner per hunk; and
+- no protection or accounting mechanism may be split across a deployment
+  state that silently disables the old protection before the replacement is
+  active.
+
+Accordingly, Section 21 treats the candidate Track 8
+CreditEngine-to-Ledger transition as one review unit, but treats any Ledger
+runtime/state migration as a separate highest-risk gate. If S5 selects a
+Ledger-preserving architecture, Track 8 may not silently override it. If a
+future owner instead considers one combined forward Ledger artifact and
+migration, both tracks' semantics, complete state inventories, independent
+audits, and Track 7 execution plan must be approved together. Combining one
+migration opportunity does not combine or weaken the two audit scopes.
+
+The integration worktree was no longer clean when the Phase K recheck was
+recorded: it had an external modification to `docs/chains/rh-summary.md` and
+an untracked `docs/chains/rh/minimal-contract-change-reassessment.md`. Track
+8 did not read either working-tree change as authority, did not edit or stage
+either path, and does not report them as committed integration state. The
+committed `be6a759..27765d2` production/artifact delta remains only the
+already-reconciled S3 `contracts/core/Lootbox.vy` and
+`scripts/abis/Lootbox.json` changes. No other Phase K production input
+changed.
+
+Captured at Phase K entry:
+
+```text
+git status --short --branch
+=> ## rh-track-8-stock-token-vault-change...origin/rh-track-8-stock-token-vault-change
+
+git rev-parse HEAD
+git rev-parse @{upstream}
+=> b18b4261f798b4d6daae3634b0ad747656944db9
+   b18b4261f798b4d6daae3634b0ad747656944db9
+
+git -C /Users/wigglez/dev/ripe-protocol status --short --branch
+=> ## rh...origin/rh [ahead 1]
+   M docs/chains/rh-summary.md
+   ?? docs/chains/rh/minimal-contract-change-reassessment.md
+
+git -C /Users/wigglez/dev/ripe-protocol rev-parse rh
+git -C /Users/wigglez/dev/ripe-protocol rev-parse origin/rh
+=> 27765d29094256fa9619dd44a0bfd145863de8b7
+   3e6e6f230169fc445d0b29454457480c62efd89a
+
+git merge-base HEAD rh
+=> be6a759e15e763b633feefdce91cf8f3ee31a10e
+```
+
+No existing test was rerun for Phase K because this phase changes only the
+two specification documents. Phase J already defines the future executable
+evidence contract; Phase K groups those targets without claiming they exist
+or pass.
+
+### 3.14 Phase K reconciliation audit trail
+
+Phase K changes earlier status and gate language only where necessary to
+compose the final handoff:
+
+| Earlier surface | Phase K reconciliation |
+| --- | --- |
+| Status and introduction | Advances both deliverables from the Phase J hold to Phases A–K specification-complete, while retaining every production/migration/live non-approval. |
+| Source/integration record (Sections 3.13 and 3.15) | Records the exact Phase K entry/handoff commits, dirty external integration paths, committed S5 brief provenance, and the separate Ledger-migration/cross-track boundary. No integration source was imported. |
+| Owner record and decision register (Sections 12.1–12.3) | Quotes the exact Phase K authorization, marks only release planning as authorized, and replaces the stale “Phase K deferred” audit row with the completed split and still-unapproved production gates. |
+| Phase J hold (former Section 21) | Replaced the hold with the thirteen review units, exact future/blocked files, assurance matrices, Release 0/1/2 groups, audit boundaries, stop conditions, consolidated decision register, and K-CP0–K-CP11 checkpoints. No candidate mechanism became selected. |
+| Checklist handoff (Section 22) | Makes the completed A–K documents eligible for final specification review while leaving every `rh-summary.md` checkbox and production gate untouched. |
+| Validation-plan status and closing gate | Maps J-P00–J-P20/T0–T6 to K-00–K-12 and Release 0/1/2, adds no new test assertion, and replaces the pre-Phase-K hold with the final owner/reviewer gate. |
+
+No Phase D–J behavior, storage/interface recommendation, validation case, or
+historical checkpoint was reversed. These edits do not approve an evidence
+scan, test, production file, audit engagement, migration, deployment,
+configuration, signer, transaction, or launch.
+
+### 3.15 Phase K handoff integration state
+
+During the Phase K drafting/validation pass, local `rh` and `origin/rh`
+remained at `27765d2` and `3e6e6f2`, respectively, but other workstreams
+expanded the integration worktree's uncommitted documentation changes. At
+handoff, the tracked working-tree paths were:
+
+- `docs/chains/rh-summary.md`;
+- `docs/chains/rh/block-clock-validation-plan.md`;
+- `docs/chains/rh/block-number-inventory.md`;
+- `docs/chains/rh/component-matrix.md`;
+- `docs/chains/rh/robinhood-deployment-support-specification.md`;
+- `docs/chains/rh/robinhood-deployment-validation-plan.md`;
+- `docs/chains/rh/shared-block-clock-specification.md`;
+- `docs/chains/rh/track-6-s4-deleverage-cooldown.md`; and
+- `docs/chains/rh/track-6-s5-ledger-guard.md`.
+
+The untracked
+`docs/chains/rh/minimal-contract-change-reassessment.md` also remained. Those
+working-tree versions are not commit-pinned authority. In particular, the
+uncommitted S5 edit is not the 1,283-line committed brief hashed in Section
+3.13 and was not used to change Track 8's release choices. No contract,
+interface, ABI, migration, manifest, default, dependency, test, or other
+production artifact was modified in the integration worktree at this
+handoff.
+
+Track 8 did not clean, stage, edit, import, or commit any integration-worktree
+path. K-CP2 and K-CP4 require a fresh integrated recheck; if any current
+working-tree proposal later becomes committed authority, its changed
+cross-track constraints must be reconciled then rather than anticipated here.
 
 ## 4. Current consumer and ordering trace
 
@@ -1915,6 +2051,34 @@ not production mechanisms. In particular:
   not a launch, listing, production-vault selection, or permission to enable
   deposits, borrowing, auctions, or rewards.
 
+After Phase J and its independent review closed without findings, the owner
+authorized Phase K on 2026-07-24:
+
+> I authorize Phase K specification work only. Define the reviewable
+> implementation units, dependencies, audit boundaries, stop conditions, and
+> atomic Release 0/1/2 groups using the Phase J validation targets and
+> evidence gates. Preserve all-external settlement as conditional on complete
+> integration and historical-usage evidence; keep the isolated generic
+> corrected-share variant, A^s/U^s model, and two-selector bad-debt transition
+> as unapproved implementation candidates; keep the full Ledger migration as
+> a separate high-risk gate; preserve S3 independently if Track 8 would delay
+> it; require Base-first or atomic convergence before Robinhood enablement;
+> and treat empty gated staging as inactive, not launch.
+> This authorization does not approve production code, tests, interfaces,
+> storage, ABIs, defaults, migrations, manifests, a Ledger migration, a
+> production vault or VaultBook ID, Base or Robinhood deployment, live
+> configuration, or any transaction. Do not modify rh-summary.md. Return the
+> final implementation/release split, unresolved decisions, owner
+> checkpoints, and checklist handoff for my review before any implementation
+> begins.
+
+This authorization permits Section 21 to name exact future review surfaces
+and to group them into activation-safe releases. It does not select any
+candidate mechanism or authorize creation of the named future files. The
+separate approval gates in Section 21.10 must be satisfied before evidence
+acquisition, test implementation, production implementation, migration,
+deployment, configuration, or enablement.
+
 The remaining phase gates below remain operative. The current production
 posture is still `do not list Stock Tokens under the current vault designs`.
 
@@ -1926,13 +2090,14 @@ F, and the three policy directions required for Phase G are owner-confirmed as
 satisfied for specification work. Phase H specification work and Phase I
 compatibility analysis are also owner-authorized. The five directions above
 resolve the Phase H analysis boundary for Phase I without approving a storage,
-interface, production vault, or migration. Phase J is now owner-authorized
-under the validation-only directions above. Base-first or atomic convergence
-is a future validation/release requirement, but no Base action is authorized.
-The remaining implementation, migration, vault-selection, and release
-decisions gate Phase K and any later production work. The Phase F–I source
+interface, production vault, or migration. Phase J and Phase K are
+owner-authorized under their validation-only and release-planning-only
+directions above. Base-first or atomic convergence is a future
+validation/release requirement, but no Base action is authorized. The
+remaining implementation, migration, vault-selection, evidence-acquisition,
+and live-release decisions are returned by Section 21. The Phase F–I source
 traces create narrower implementation-mechanism/compatibility decisions; none
-is implied by a validation-target approval.
+is implied by a validation-target or implementation-unit definition.
 
 | Decision | Options | Evidence and recommendation | Owner | Affected components | Prerequisite / milestone | Status |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -1944,7 +2109,7 @@ is implied by a validation-target approval.
 | Later donation/restoration | Old holders / donor return / protocol / explicit recapitalization allocation / no automatic allocation | No automatic allocation selected; any later allocation/recovery requires a separate owner plus counsel/risk decision | Protocol owner + counsel/risk | Share math, recovery, migration | Before Phase G | **Owner-confirmed: no automatic allocation; no recapitalization/recovery transaction approved** |
 | Reward attribution | Raw shares / live claims / hybrid explicit units | Live-claim-based economic units selected; raw shares remain accounting evidence only and S3 coordination is mandatory | Protocol owner + economics | `CM-033`, `CM-025` | Before Phase G/H | **Owner-confirmed: live-claim units for Phase G specification; Lootbox/interface implementation not approved** |
 | Base live-version posture | Base-first / atomic convergence / no release | Funded ID 3 and live controlled assets make this material; Phase J requires Base-first-or-atomic convergence before RH enablement. Inactive staging is not launch and does not satisfy this gate. | Protocol owner + security/operations | Base vault consumers, VaultBook, manifests | Before implementation/release | **Owner-directed Phase J validation/release posture; no migration, cutover, or live action approved** |
-| Release 1 Base priority | Base-first containment / atomic Base-RH convergence / no release | Phase J requires Base-first or atomic convergence before RH enablement; exact release topology, migration, and timing remain for Phase K/owner review | Protocol owner + security/operations | Containment atomic group and every affected stateful consumer | Before implementation track | **Validation/release posture owner-directed; no implementation or migration approved** |
+| Release 1 Base priority | Base-first containment / atomic Base-RH convergence / no release | Section 21.6 requires the full economically atomic containment group and Base-first or atomic convergence before RH enablement | Protocol owner + security/operations | Containment atomic group and every affected stateful consumer | K-CP2–K-CP7 | **Phase K topology specified; no mechanism, implementation, migration, or live action approved** |
 
 New Phase F implementation-mechanism/caller decisions, returned because no
 current field or selector safely expresses the approved policies and the
@@ -1990,11 +2155,11 @@ These must not be treated as approved by the checkpoint recommendation:
 | Nominal partial loss | Freeze unresolved or owner-approved allocation; never silent pro rata | Phase E/F | Deferred |
 | Rounding | Retain `10^8` virtual shares and one virtual asset; deposit down, withdrawal share burn up, claim down, last-share sweep; see Section 17 | Phase G | **Specified; implementation not approved** |
 | Emergency disable/re-enable | Sections 18–19 use existing `canLiquidate`, asset containment, Switchboard authority, and safe-withdraw posture; no dedicated stored gate/pause | Interface/security review before implementation | **Phase I direction specified; no selector, storage, implementation, or live action approved** |
-| Vault selection | No production vault selected; Section 19 recommends but does not select a new generic corrected-share boundary | Post-Phase-J owner/Phase K gate | Deferred |
+| Vault selection | No production vault selected; Section 19 recommends but does not select a new generic corrected-share boundary | K-CP8 before Release 2 implementation | Deferred |
 | Migration atomicity/rollback | Section 19.6 specifies live users/funds/debt/auctions/rewards, partial failure, retirement, and rollback reality | Before implementation/release | **Specified; exact IDs/manifests/tooling pending Track 7 and no migration approved** |
 | Exact-token evidence | Pinned AAPL fork plus behavior-switch/loss tests | Future implementation validation | **Phase J plan complete; no test, live probe, signing, or broadcast authorized** |
 | S1/S2 identical artifacts | Base/RH profiles and checked inventory | Future implementation validation | **Phase J reconciled the integrated command interfaces through `rh`; harness not imported or run against a Track 8 implementation** |
-| Audit/release | Atomic group, reviewers, testnet, smoke, soak | Phase K | **Deferred; Phase K not authorized** |
+| Audit/release | Section 21 defines reviewable units, required reviewers, stop conditions, Release 0 evidence readiness, the atomic Release 1 containment group, and the atomic Release 2 corrected-path group | Before any implementation/release authorization | **Phase K split specified; no test, production implementation, audit engagement, migration, deployment, or live action approved** |
 
 ## 13. Affected component map at checkpoint
 
@@ -4878,50 +5043,494 @@ Phase J does not run nonexistent future tests, change current tests, select a
 mechanism, or authorize implementation or migration. The operative posture
 remains `do not list Stock Tokens under the current vault designs`.
 
-## 21. Phase K hold
+## 21. Phase K — implementation and release split
 
-The following are deliberately **not finalized or authorized**:
+### 21.1 Authorization and non-selection boundary
 
-- implementation PR split and atomic deployable groups;
-- production source files, storage declarations, selectors, ABIs, events,
-  defaults, migrations, manifests, or parameters;
-- settlement-compatibility sign-off from complete integration/history
-  evidence;
-- counsel/risk approval of quarantine/loss ordering and any migration import;
-- accounting/security approval of the two-selector transition and full Ledger
-  migration;
-- the Track 8 reward loss mechanism and S3/Base rollout windows;
-- production vault and Track 7-owned VaultBook ID;
-- implementation, audit, deployment, Base/RH migration, live configuration,
-  or enablement; and
-- exact `rh-summary.md` closure.
+The exact Phase K authorization is recorded in Section 12.1. This phase
+defines future review and release boundaries only. Every path below is an
+**expected future file** or an explicitly blocked file choice; naming it does
+not authorize creating or changing it.
 
-Work must stop before Phase K until the owner reviews Phase J and expressly
-authorizes the next phase. No recommendation in Sections 19–20 is
-implementation authorization.
+The following distinctions are normative:
 
-## 22. Checklist handoff at this checkpoint
+- **reviewable unit** means one coherent semantic and audit surface. It may be
+  reviewed in its own PR after later authorization;
+- **deployable unit** means an artifact that can be activated without another
+  Track 8 unit. Most units below are deliberately not deployable alone;
+- **atomic release group** means no affected economic/value path may be live
+  under only part of the group. A state migration may use multiple
+  resumable transactions only while both old and new paths remain contained
+  and exactly one entitlement ledger is credit-eligible;
+- **inactive staging** means an empty, unreachable, disabled artifact with no
+  users, custody, debt, auctions, reward state, or live registry/config route.
+  It is neither convergence nor launch and may be abandoned before any
+  economic write; and
+- **rollback** after a new economic write means a separately reconciled state
+  transition. It never means merely pointing a registry back at an old
+  address.
 
-No `rh-summary.md` checkbox is edited or closed.
+All-external fungible settlement remains evidence-conditional. The isolated
+generic corrected-share variant, `A^s/U^s` state model, and two-selector
+bad-debt transition remain unapproved candidates. A full Ledger migration is
+not folded into the two-selector code review: it is a separate, highest-risk
+owner/security/accounting/operations gate constrained by Track 6 S5 and Track
+7.
 
-Eligible for owner review:
+### 21.2 Reviewable implementation units
+
+The paths in the following table are exact where the current design and
+repository establish them. A path marked **decision-bound** is deliberately
+not invented: opening that unit requires the named owner to approve the exact
+path first. Generated ABI files are changed only when the corresponding
+approved runtime ABI changes; otherwise regeneration must prove byte equality.
+
+| Unit | Review scope and expected future files | Stable components | Dependencies and owner decisions | Independently deployable? |
+| --- | --- | --- | --- | --- |
+| **K-00 — evidence and operations readiness** | Proposed `docs/chains/rh/stock-token-vault-implementation-record.md`, `docs/chains/rh/stock-token-vault-operations-runbook.md`, `docs/chains/rh/stock-token-settlement-usage-evidence.json`, `tests/probes/test_fungible_settlement_usage.py`, and `tests/probes/test_stock_token_vault_evidence.py` | `CM-021`, `CM-024`–`026`, `CM-030`, `CM-034`, every historical Teller/AuctionHouse generation | Separate read-only RPC/indexer authorization; complete integration and historical range inventory; product + protocol + security disposition; no production mechanism decision is implied | **No.** Release 0 evidence only; no production code, deployment, registry/config action, or Stock enablement |
+| **K-01 — Teller deposit delta, mutex, event, and return** | `contracts/core/Teller.vy`, `scripts/abis/Teller.json`, proposed `tests/vaults/test_vault_receipt_accounting.py`, and `tests/core/teller/test_teller_deposit_receipts.py` | `CM-034`, `CM-045`, `CM-024`, `CM-025` | Phase D semantics; exact transient-storage/EVM proof; S5/S4 Teller overlap reconciled at the implementation baseline | **No.** Must activate with K-02/K-03/K-04/K-05/K-06 and their state/config cutovers |
+| **K-02 — exact-receipt downstream consumers** | `contracts/vaults/RipeGov.vy`, `contracts/vaults/StabilityPool.vy`, `contracts/vaults/modules/StabVault.vy`, `contracts/core/BondRoom.vy`, `contracts/core/HumanResources.vy`, `contracts/core/CreditEngine.vy`, `contracts/core/CreditRedeem.vy`, `contracts/core/Deleverage.vy`, and `contracts/core/Lootbox.vy`; `scripts/abis/{RipeGov,StabilityPool,BondRoom,HumanResources,CreditEngine,CreditRedeem,Deleverage,Lootbox}.json`; proposed/affected tests resolved by validation profiles J-P02/J-P07 | `CM-022`, `CM-023`, `CM-029`, `CM-030`, `CM-032`, `CM-033`, `CM-043`, `CM-044` | K-01 exact `R`; integrated S3/S4 source; live local/pause/constructor/cooldown state inventory for every replaced stateful consumer | **No.** Every caller that assumes exact versus measured receipt must be compatible before K-01 is reachable |
+| **K-03 — existing collateral controls and governance** | Expected production diff is **none** in `interfaces/ConfigStructs.vyi`, `contracts/data/MissionControl.vy`, `contracts/config/SwitchboardAlpha.vy`, `contracts/config/SwitchboardBravo.vy`, and `contracts/config/SwitchboardCharlie.vy`; proposed `tests/config/test_asset_collateral_controls.py` and `tests/config/test_stock_token_incident_controls.py` prove the negative file/schema contract | `CM-009`, `CM-011`–`013`, `CM-030` | Owner-confirmed no-new-collateral-flag direction; existing `canDeposit`, `DebtTerms.ltv`, automatic backing, `canLiquidate`, and asset containment semantics | **No artifact to deploy.** It is a mandatory negative-evidence and configuration prerequisite for Releases 1/2 |
+| **K-04 — deficit detection, debt health, and repay liveness** | `contracts/core/CreditEngine.vy`, `scripts/abis/CreditEngine.json` only if changed/additive surfaces require it, proposed `tests/core/creditEngine/test_deficit_aware_credit.py` and `tests/core/creditEngine/test_stock_token_repay_liveness.py` | `CM-030`, `CM-009`, `CM-024`, `CM-025`, `CM-034`, `CM-045`, `CM-008` reader | K-03 controls; Phase E capacity/resolution split; current-price failure regression; K-06 existing-debt progress before activation | **No.** Fail-closed value/health cannot go live without settlement and debt-progress units |
+| **K-05 — live-backed delivery and fungible settlement** | `contracts/core/AuctionHouse.vy`, `contracts/core/Deleverage.vy`, `scripts/abis/AuctionHouse.json`, `scripts/abis/Deleverage.json`, proposed `tests/core/auctionHouse/test_loss_aware_auctions.py` and `tests/core/deleverage/test_loss_aware_deleverage.py` | `CM-026`, `CM-044`, `CM-030`, `CM-034`, vault implementations and Ledger auctions | K-00 complete usage evidence; product/protocol/security approval of all-external or another mechanism; Phase F `E=min(Q,W,R)`; active-auction inventory | **No.** All-external is not even implementation-eligible until K-00 closes; delivery, payment, debt, and points must activate with Release 1 |
+| **K-06 — total-loss resolver and atomic accounting candidate** | Candidate `contracts/core/CreditEngine.vy`, `contracts/data/Ledger.vy`, `scripts/abis/CreditEngine.json`, `scripts/abis/Ledger.json`, proposed `tests/core/auctionHouse/test_stock_token_resolution_controls.py` and `tests/data/test_ledger_bad_debt_transition.py` | `CM-030`, `CM-008`, `CM-026`, `CM-009` | Owner/accounting/security selection of the two selectors or another atomic design; accrued-interest booking; deterministic-caller proof; existing `canLiquidate` gate; S5 architecture decision | **No.** Candidate selectors are unapproved and, if selected, cannot activate without K-07 |
+| **K-07 — full Ledger state migration and cutover** | No legal Track 8 migration filename exists yet. The unit is blocked until Track 7/owner assigns one. Known exact review files are proposed `tests/data/test_ledger_state_migration.py` and the K-00 implementation record. `migrations/robinhood/0030_Track6S5LedgerGuard.py` is S5-owned and prohibited for Track 8 reuse. | `CM-008` plus every Ledger reader/writer and Track 7 migration tooling | K-06 mechanism approval; complete Ledger state/key enumerability; S5 Checkpoint 0; Track 7 namespace; independent accounting/security audit; rehearsed forward/reverse plan | **No. Highest-risk separate gate.** No fresh Ledger may become active on an incomplete or best-effort state copy |
+| **K-08 — isolated corrected-share candidate** | Candidate-only path set: `contracts/vaults/AllocatedErc20.vy`, `contracts/vaults/modules/AllocatedSharesVault.vy`, `interfaces/AllocatedSharesVault.vyi`, `scripts/abis/AllocatedErc20.json`, proposed `tests/vaults/modules/test_vault_loss_properties.py` and `tests/vaults/test_corrected_share_compatibility.py` | New generic counterpart to `CM-025`, plus `CM-021`, `CM-023`, `CM-024`, `CM-033` controls | Owner must approve even these candidate names; `A^s/U^s` storage/selectors/events; counsel/risk loss ordering; positive-delta isolation; migration-import design if live state moves | **No.** The file set is a review target, not a selected vault; it activates only in Release 2 |
+| **K-09 — reward units, getters, events, and monitoring** | Decision-bound production set: either a reviewed `contracts/core/Lootbox.vy`/`scripts/abis/Lootbox.json` loss-boundary mechanism composed with K-08, or another exact owner-approved set. A Ledger-based loss index would additionally enter K-07 and is not presumed. Proposed tests are `tests/core/lootbox/test_vault_loss_rewards.py` and the K-08 compatibility tests; K-00 owns the operator record/runbook | `CM-033`, `CM-025` candidate, `CM-008`, `CM-013` configuration | Economics/security selection of loss epoch/index/callback; S3 sequencing and final-window policy; `U` exclusion; untouched-user proof; exact unit labels | **No.** S3 proceeds independently if this unit would delay it; Stock deposits/rewards remain disabled until K-09 is approved and atomic with Release 2 |
+| **K-10 — Base/RH defaults and configuration contract** | Preferred path expects no Track 8 schema/runtime diff in `interfaces/Defaults.vyi`, `interfaces/ConfigStructs.vyi`, `contracts/data/MissionControl.vy`, `contracts/config/SwitchboardAlpha.vy`, `contracts/config/SwitchboardBravo.vy`, `contracts/config/SwitchboardCharlie.vy`, or `contracts/config/SwitchboardDelta.vy`. Review exact Base/local/Robinhood value sources `contracts/config/DefaultsBase.vy`, `contracts/config/DefaultsLocal.vy`, and future S6-owned `contracts/config/DefaultsRobinhood.vy`; generated ABIs only for an approved change. Proposed config tests are those in K-03 plus `tests/config/test_core_cutover_state.py` | `CM-007`, `CM-009`, `CM-011`–`014`, `CM-049` | S6 owns Robinhood defaults; Track 7 owns asset actions; standing Stock disables; no omitted-argument enable defaults; Base-first/atomic posture | **No.** Values/actions are part of the applicable atomic release and require separate live-configuration authorization |
+| **K-11 — vault/core migration, registry, manifests, and verification** | Track 7-owned proposed RH paths `migrations/robinhood/0500_VaultsAndAssets.py` and `migrations/robinhood/0600_CoreDepartments.py`, future `migration_history/robinhood-{testnet,mainnet}/v1/`, proposed `tests/registries/test_vault_book_migration.py` and `tests/probes/test_stock_token_artifact_parity.py`. The exact Base migration filename/ID and any additional RH step remain decision-bound; current `migration_history/base-mainnet/v1/current-manifest.json` is evidence, never edited retroactively | `CM-004`, `CM-008`, `CM-009`, `CM-021`, `CM-024`–`026`, `CM-030`, `CM-033`, `CM-034`, Track 7 | K-01–K-10 applicable artifacts approved; production vault/ID; exact Track 7 namespace; live users/funds/debt/auctions/rewards; Base-first/atomic plan; signer/timelock authorization later | **No.** Migration and activation are release-level operations; no partial state or registry-only “migration” is deployable |
+| **K-12 — exact-token, lifecycle, adversarial, dual-clock, and full regression** | Every proposed test path and fixture in companion Sections 3–14, especially `tests/probes/test_aapl_vault_behavior_fork.py`, integrated `tests/clock/test_clock_profiles.py`, `tests/inventory/test_block_clock_inventory.py`, and `scripts/check_block_clock_inventory.py` | `CM-059`, Track 2 AAPL, all affected Track 8 IDs | Approved implementation candidate; integrated S1/S2; exact-token permission/evidence; Track 7 rehearsal; every unit-level gate | **No.** Tests/evidence can reject a release but cannot authorize or constitute deployment |
+
+K-02 is an umbrella compatibility gate, not permission for one broad
+nine-contract PR. After later authorization it is divided into these small
+subreviews:
+
+- **K-02a — vault consumers:** `contracts/vaults/RipeGov.vy`,
+  `contracts/vaults/StabilityPool.vy`,
+  `contracts/vaults/modules/StabVault.vy`,
+  `scripts/abis/RipeGov.json`, and `scripts/abis/StabilityPool.json`; targeted
+  regressions include `tests/vaults/test_ripe_gov_vault.py`,
+  `tests/vaults/modules/test_stab_vault.py`,
+  `tests/vaults/modules/test_stab_vault_claims.py`, and
+  `tests/vaults/modules/test_stab_vault_redemptions.py`.
+- **K-02b — core stake/reward consumers:** `contracts/core/BondRoom.vy`,
+  `contracts/core/HumanResources.vy`, `contracts/core/CreditEngine.vy`,
+  `contracts/core/CreditRedeem.vy`, `contracts/core/Lootbox.vy`, and their
+  exact same-name `scripts/abis/*.json` files; targeted regressions include
+  the existing BondRoom, HumanResources, credit-redemption, and Lootbox claim/
+  reward suites plus J-P02's exact-receipt cases.
+- **K-02c — deleverage consumer:** `contracts/core/Deleverage.vy`,
+  `scripts/abis/Deleverage.json`, the existing
+  `tests/core/deleverage/**` suite, and proposed
+  `tests/core/deleverage/test_loss_aware_deleverage.py`.
+
+Each subreview may be its own PR and reviewer record. None is independently
+deployable, and K-02 remains failed until all production callers are accounted
+for and the combined artifacts pass Release 1 review.
+
+`AllocatedErc20.vy`, `AllocatedSharesVault.vy`, and
+`AllocatedSharesVault.vyi` are exact **candidate review paths**, introduced
+only so a future implementation authorization can name or reject a concrete
+file set. They do not select a production class, storage layout, interface,
+VaultBook ID, or artifact. If the owner does not approve those names and that
+boundary, K-08 remains unopened and the files must not be created.
+
+Files shared by multiple units have one owner per hunk. In particular:
+
+- K-02 owns exact-receipt call-site changes inside CreditEngine, Deleverage,
+  and Lootbox;
+- K-04 owns CreditEngine backing, health, capacity, and repayment semantics;
+- K-06 owns only a later approved CreditEngine resolver and Ledger transition;
+- K-05 owns Deleverage delivery/settlement semantics; and
+- K-09 owns only a later approved Lootbox loss-boundary mechanism built on
+  integrated S3.
+
+Those reviews may be separate commits, but the final combined artifacts and
+storage/config snapshots must be reviewed again before an atomic release.
+
+### 21.3 Unit assurance, consumers, and stop boundaries
+
+“S1/S2” below means use the integrated clock fixtures for every applicable
+case, run the checked inventory command and tests, explain every inventory
+delta, and pass the full integrated suite serially. A unit with no direct
+`NUMBER` dependency still runs the release-level S1/S2 gate so that a shared
+artifact or fixture cannot bypass it.
+
+| Unit | Storage / ABI / artifact effect | Targeted Phase J evidence and required S1/S2/Base regression | Audit boundary and downstream consumers | Migration/rollback boundary and unit stop conditions |
+| --- | --- | --- | --- | --- |
+| K-00 | Documentation, sanitized evidence, and read-only tests/probes only; no runtime artifact | J-P05/J-P06/J-P15, T0/T3; pinned Base snapshots and complete historical ranges; S1/S2 versions recorded | Operations + product + protocol/security; feeds K-05, K-10, K-11, K-12 | Stop on provider/range/runtime/calldata/integration gap, unapproved RPC acquisition, private data, or disagreement. Never infer “unused” from a default |
+| K-01 | Fresh Teller runtime; existing selectors/returns preserved; additive measured-deposit event; transient mutex; ABI changes only for event | J-P01, T1/T5/T6; ordinary/no-return/short/fee/negative/excess/reentrant and housekeeping-enabled Base regressions | Teller/vault security; all deposit producers and consumers | Reproduce pause/constructor state. Stop on unfaithful transient tests, C3 liveness failure, callback regression, or any caller bypass. No rollback after a downstream exact-`R` write without full reconciliation |
+| K-02 | Fresh runtimes for changed consumers; no intended public selector/event change; ABI equality expected except independently approved deltas | J-P02/J-P07 plus each existing component suite, T1/T2/T5/T6; integrated S3/S4 and Base stateful-consumer regressions | Each component owner + protocol/security; users of RipeGov, StabilityPool, bonds, HR, redeem, deleverage, rewards, and CreditEngine distributions | Every stateful replacement needs exact local/pause/constructor/cooldown/pending-action state. Stop on ignored return, mixed Teller/caller reachability, callback break, or incomplete state inventory |
+| K-03 | Required negative proof: no new storage, tuple, selector, event, default field, runtime, or ABI | J-P03/J-P13, T1/T2/T5/T6; current Base full-config round trip and lite-disable/governance-enable behavior | Config/governance/security; CreditEngine, AuctionHouse, operators, every asset config reader | Stop on any schema drift, hidden flag, LTV-as-incident-switch use, omitted-argument enable, or repayment-affecting pause |
+| K-04 | Fresh CreditEngine runtime; no new persistent storage; public ABI expected unchanged unless K-06 later adds a selector/event | J-P04/J-P08, T1/T2/T5/T6; mixed collateral, one-unit deficit, missing price, repay, withdrawal, gas/staticcalls, Base existing-debt regression | Credit/risk + protocol/security; borrow, health, withdrawal, liquidation, repay, previews | Reproduce local config/pause/constructor state. Stop on false health, price-dependent custody control, repay failure, preview/state divergence, unacceptable gas, or K-06 absence at total loss |
+| K-05 | Fresh AuctionHouse and affected Deleverage runtimes; no new persistent state; ABI-compatible buy inputs retained, with explicit rejection of unsupported internal mode; additive delivery evidence only if approved | J-P06/J-P07, T2/T3/T5/T6; two-buyer order, short/zero delivery, active auctions, Base fungible products, historical coverage | Auction/security + product; buyers, liquidated users, Teller, vaults, Ledger, Lootbox, Deleverage | Reconcile active auctions and local/pause/constructor/cooldown state. Stop until K-00 closes; stop on any internal-mode dependency without disposition, payment for `E=0`, or mixed old/new buyer path |
+| K-06 | Candidate additive CreditEngine/Ledger selectors/events; no intended new Ledger storage, but both runtime/ABI artifacts change | J-P08/J-P09, T2/T5/T6; exact debt/yield/borrower/auction/bad-debt conservation, duplicate/race/repay and Base existing-debt regressions | Accounting + Ledger/security; borrowers, repayment, liquidation, bad-debt and auction consumers | Cannot activate without K-07 for the candidate design. Stop on unresolved yield booking, caller discretion, partial eligibility scan, non-CAS write, S5 conflict, or any liability mismatch |
+| K-07 | Fresh Ledger state-owning runtime plus complete state transfer; migration artifact/manifest names remain owner/Track 7 blocked | J-P16, T3/T6 plus every Ledger domain suite and S5 state inventory; S1/S2 and Base full-state rehearsal mandatory | Separate external accounting/security audit + operations/Track 7; every protocol Department that reads/writes Ledger | Full forward/reverse roots only. Stop on one non-enumerable/unreconciled key, incomplete pause/constructor/locked/lastTouch state, reused S5 ID, stale snapshot, unapproved migration, or inability to keep repayment live |
+| K-08 | New generic wrapper/module runtime and specialized ABI; fresh `A^s/U^s` storage; canonical `Vault.vyi`, current SharesVault/Rebase/RipeGov artifacts remain unchanged | J-P10/J-P12/J-P14, T1/T2/T3/T5/T6; 6/18 decimals, ordering/property tests, loss/donation/restoration/freeze, existing positive-rebase and RipeGov Base controls | Independent vault/math security + economics/counsel-risk; Teller, CreditEngine, AuctionHouse, Lootbox, VaultBook, operators | Fresh empty staging needs no import but is inactive. Any live state requires approved seeding/finalizer and K-11. Stop on unapproved paths/layout/selectors, allocation ambiguity, positive-delta regression, dust leak, or non-reversible post-zero bypass |
+| K-09 | Decision-bound Lootbox and possibly corrected-vault runtime/ABI/storage; no Ledger involvement unless separately escalated through K-07 | J-P11/J-P12, T2/T3/T5/T6; untouched/touched users, interval boundaries, global value, `U` exclusion, S3 constructor/floor/getter/window regressions | Economics + Track 6 + protocol/security; deposit/yield points, RIPE distribution, Underscore path, RipeGov exception | S3 must remain independently releasable. Stop on raw-share reward, stale untouched-user accrual, unresolved S3 window, unapproved epoch/index/callback, or combined artifact that delays/reopens S3 without approval |
+| K-10 | Preferred negative schema/runtime proof plus exact per-chain values/actions; any actual default/interface/ABI change reopens owner review | J-P03/J-P13/J-P18, T2/T3/T5/T6; Base live config snapshot, RH disabled-profile generation, omitted-address/standing-disable regressions | Governance/config/security/operations + S6/Track 7; every core/vault consumer | Config is activated only with its release group. Stop on unapproved value, source fork, chain-id behavior branch, missing getter/event, inherited enable default, or any action that impairs repayment |
+| K-11 | New deployment/migration scripts and generated manifests only after exact approval; existing histories never rewritten | J-P17/J-P18, T3/T5/T6; clean dry plan, partial failure, roots, code/constructor/ABI parity, Base/RH and exact registry resolution | Independent migration/security/operations + Track 7; every replaced artifact, registry, user, and asset | Before seeding, abandon inactive artifacts. After seeding, forward or explicit reverse migration only. Stop on invented ID, manifest-only migration, duplicate credit eligibility, custody/read mismatch, signer/timelock gap, or failed post-state assertion |
+| K-12 | Tests/fixtures/evidence only; no production or live artifact | J-P00/J-P19/J-P20 and every other profile, T0–T6; exact AAPL fork, every clock, full lifecycle/adversarial, full Base regression and clean Track 7 rehearsal | Independent release reviewer + Track 2/6/7, protocol/security/accounting/economics/counsel as mapped | Stop on skip/xfail/relaxed assertion, unapproved exact-token behavior switch, harness drift, nondeterminism, test/live identity mismatch, or any failed mandatory tier |
+
+### 21.4 Dependency order and cross-track collision policy
+
+Review-unit order is:
+
+```text
+K-00 evidence
+    -> settlement/mechanism owner decisions
+    -> K-01/K-02/K-03/K-04/K-05/K-06 review
+    -> K-07 if the two-selector Ledger candidate is selected
+    -> Release 1 integrated audit/rehearsal/Base activation
+    -> Base soak and evidence
+    -> K-08/K-09/K-10/K-11/K-12 Release 2 work
+```
+
+K-03 negative-schema proof can run in parallel with K-00. K-08 math and
+compatibility review may be prepared after its exact candidate files,
+storage, interfaces, and counsel/risk ordering are approved, but it cannot
+activate before Release 1 containment is live and accepted. K-09 may not hold
+S3 open: if Track 8 is not implementation- and audit-ready at the S3 gate, S3
+continues independently and K-09 plans a later explicit cutover.
+
+A future implementation branch must start from the exact integrated,
+owner-approved H-01/S4/S5/Track 7 baseline. If S4 or S5 edits Teller,
+CreditEngine, Ledger, MissionControl, SwitchboardDelta, an ABI, a fixture, or
+a test used here, the affected Track 8 unit is re-traced before code begins.
+No agent may resolve a collision by silently copying one branch over another,
+coalescing two security policies into one event or flag, or reusing a
+migration identifier.
+
+### 21.5 Release 0 — operations and evidence readiness
+
+Release 0 is **not a software or chain release**. Its allowed future output,
+after separate authorization, is K-00 plus the read-only/evidence portions of
+K-10/K-12:
+
+1. freeze source, integration, runtime, proxy/beacon, registry, config, and
+   historical block-range inputs;
+2. build the complete current and historical fungible-settlement usage record;
+3. refresh Base custody/accounting/control evidence at one pinned block;
+4. prepare the incident and migration runbooks, named reviewers, audit scopes,
+   stop conditions, and immutable evidence schema;
+5. reproduce T0 and the integrated S1/S2 interfaces without changing
+   production code; and
+6. return every mechanism and evidence gap to the owner.
+
+Release 0 must not:
+
+- create or change production contracts, interfaces, storage, ABIs, defaults,
+  migrations, manifests, or live configuration;
+- enable a Stock Token path;
+- acquire live RPC/indexer evidence without the separate acquisition
+  authorization;
+- deploy even an empty artifact and call that Release 0; or
+- convert an evidence recommendation into the all-external, Ledger, vault,
+  reward, or migration decision.
+
+An empty gated deployment is a possible later pre-activation state inside an
+approved Release 1 or 2 execution plan. It is not Release 0 completion and is
+never launch.
+
+### 21.6 Release 1 — atomic shared containment
+
+Release 1 is the minimum shared Base hardening group. It is eligible only
+after the owner separately approves the complete mechanism, source, audit,
+migration, and Base execution bundle.
+
+Its atomic economic group is:
+
+```text
+K-01 Teller exact receipt
++ K-02 all exact-receipt consumers
++ K-03 existing-control/no-new-schema contract
++ K-04 deficit-aware capacity, health, and repay liveness
++ K-05 measured external delivery and approved settlement enforcement
++ K-06 exactly-once existing-debt progress
++ K-07 full Ledger migration, if K-06 uses the two-selector candidate
++ K-10 disabled/config posture
++ K-11 core/state/registry cutover
++ K-12 integrated validation
+```
+
+The group is logically atomic even if preparation and state migration require
+multiple transactions: all affected deposits, payouts, claims, borrowing,
+auction purchases, and other value paths remain contained until every new
+artifact and state root is compatible. Repayment remains live. One reviewed
+activation boundary then makes the full compatible set reachable.
+
+The following partial states are forbidden:
+
+- Teller returns fail-closed zero/short receipt while an old consumer assumes
+  the requested amount;
+- CreditEngine reports a deficit/zero value while old liquidation cannot
+  deliver or resolve the corresponding debt;
+- internal settlement can still charge GREEN for missing collateral;
+- AuctionHouse measures delivery but debt/points/payment use a larger amount;
+- a total-loss resolver can call an old Ledger, or a new Ledger is active
+  before all state reconciles;
+- an old and new core address are both reachable for the same economic path;
+  or
+- Robinhood enables a safer path while Base still runs the unsafe shared
+  semantics.
+
+All-external is part of Release 1 only if K-00 proves complete integration and
+historical compatibility and product/protocol/security explicitly approve the
+behavior change. Otherwise Release 1 stops for another approved generic
+mechanism or remains `do not list`; it may not infer approval from the current
+default argument.
+
+The candidate two-selector transition is part of Release 1 only if its
+interfaces, event, accounting, caller proof, and K-07 migration are
+separately approved. The Ledger migration remains a distinct high-risk
+checkpoint and audit even if it is scheduled in the same activation group.
+If that gate does not close and no equally atomic alternative is approved,
+Release 1 does not activate.
+
+Release 1 does not approve SimpleErc20 as the Stock Token vault and does not
+enable Stock Tokens. Base ID 3 may remain in place only after a current
+fully-reconciled snapshot and with the Section 19.7 constraints. Any nominal
+deficit at the cutover is a stop requiring an owner allocation/containment
+decision; it is not silently socialized or migrated.
+
+### 21.7 Release 2 — corrected issuer-controlled collateral completion
+
+Release 2 is separate from Release 1 and cannot begin economic activation
+until Release 1 is live, reconciled, and accepted on Base or is included in
+one explicitly approved atomic convergence plan.
+
+Its atomic economic group is:
+
+```text
+approved K-08 generic corrected-share artifact
++ approved K-09 reward/loss-boundary semantics
++ K-10 final disabled configuration and standing constraints
++ K-11 custody/state/registry/manifest migration
++ K-12 exact-token, lifecycle, adversarial, dual-clock, Base/RH evidence
+```
+
+Before Release 2 implementation or activation, the owner and named reviewers
+must approve:
+
+- the exact generic source paths, storage order, selectors, events, ABI, and
+  positive-delta boundary;
+- `A^s/U^s` or an audited equivalent plus counsel/risk confirmation of
+  loss-before-quarantine ordering;
+- any migration import authority/finalizer and its permanent removal;
+- the Track 8 loss interval/index/callback and S3 sequencing/window policy;
+- the production vault and Track 7-owned VaultBook ID;
+- complete state/custody/reward/debt/auction migration and rollback reality;
+- exact AAPL fork and approved live-evidence gates; and
+- one audited Base-first or atomic convergence plan.
+
+Base shared safety semantics must be live first or converge atomically before
+any Robinhood deposit, borrow, auction, reward, or other Stock value path is
+enabled. This does not automatically require migrating Base ID 3 or ID 4 into
+the new generic vault: any Base custody-bearing vault adoption is its own
+owner-approved migration. It does require every affected shared core/runtime
+and behavior to meet the approved Release 1/2 safety contract before
+Robinhood enablement. Permanent chain-specific logic is prohibited.
+
+An empty corrected vault may be deployed, code-hash verified, and left
+unregistered/disabled only under a later approved execution plan. That state
+has no users, custody, debt, auctions, or Stock reward state, has a named
+expiry/abort owner, and is recorded as **inactive staging**. It does not
+satisfy vault selection, migration, Base convergence, exact-token lifecycle,
+listing, launch, or enablement.
+
+### 21.8 Final audit boundaries
+
+Independent review is layered; one broad “audit passed” statement is
+insufficient:
+
+| Boundary | Minimum independent reviewers | Must include |
+| --- | --- | --- |
+| Teller receipt and consumer composition | Protocol + token/reentrancy security + each stateful consumer owner | Delta math, callback/mutex liveness, event/return compatibility, exact-versus-measured consumers, state reproduction |
+| Credit and settlement containment | Credit/risk + auction/security + product | Backing/capacity/resolution split, price-independent custody control, repayment, measured delivery/payment/debt/points, complete historical settlement evidence |
+| Total-loss accounting | Accounting + CreditEngine/Ledger security | Eligibility, caller discretion, CAS race, interest/yield booking, borrower/auction removal, exactly-once liability conservation |
+| Ledger migration | Separate external accounting/security audit + operations/Track 7 | Every storage domain/key, enumeration proof, roots/totals, S5 guard/lock state, activation/rollback, no partial Ledger |
+| Corrected share math/storage | Independent vault/math security + economics + counsel/risk | `A^s/U^s/A/U`, rounding/dust, loss/donation/restoration ordering, freeze, import/finalizer, positive-delta isolation |
+| Rewards/S3 | Economics + Track 6 owner + protocol/security | Live-claim weights, untouched-user boundary, global conservation, S3 floor/constructor/getter/window, second-cutover reality |
+| Configuration and migration | Governance/config security + operations/Track 7 | Existing-control schema, exact values/roles/timelocks, artifacts/manifests, state/custody roots, partial failure, Base/RH convergence |
+| Exact-token and release | Track 2 + independent release reviewer + all failed-row owners | AAPL identity/behavior, S1/S2, Base full regression, testnet/rehearsal, smoke/soak, no skipped mandatory evidence |
+
+A combined implementation may receive a combined audit report, but the report
+must render each boundary and reviewer conclusion separately. S5 and Track 8
+Ledger findings must remain distinguishable even if one forward Ledger
+artifact is considered.
+
+### 21.9 Stop conditions
+
+Stop and return to the owner before implementation or release if:
+
+- any named future source, interface, storage, ABI, default, migration,
+  manifest, vault, ID, role, value, or transaction lacks explicit approval;
+- K-00 cannot prove gap-free integration and historical settlement usage;
+- product evidence shows a current internal-settlement dependency without an
+  approved disposition;
+- the candidate corrected-share paths/layout/selectors or reward mechanism
+  remain unselected;
+- counsel/risk has not accepted the loss/quarantine property treatment;
+- the two-selector transition, interest booking, caller proof, or full Ledger
+  migration is unapproved;
+- S5 selects an incompatible Ledger posture or has not supplied the required
+  state/threat evidence for a shared Ledger change;
+- any Ledger state key/domain is not exhaustively enumerable and reconciled;
+- Track 8 would delay required S3 safety instead of sequencing independently;
+- any partial Release 1 state can make debt falsely healthy,
+  non-liquidatable, or chargeable against undeliverable collateral;
+- repayment fails in any containment, migration, pause, price, or loss state;
+- an old and new entitlement can both contribute borrow, settlement, or reward
+  value;
+- a Base regression, S1/S2 inventory/profile, exact-token, artifact, migration,
+  audit, or post-state assertion fails or requires a skip/xfail/relaxation;
+- a migration ID/path is invented, reused, or conflicts with Track 7/S5;
+- an issuer freeze/blocklist prevents forward or reverse custody movement;
+- Base cannot harden first or converge atomically before Robinhood enablement;
+- inactive staging gains custody/state/reachability or is described as launch;
+- a proposed rollback is only an address flip after an economic write;
+- the integration baseline or overlapping source changes after approval
+  without a fresh trace; or
+- a live RPC, signer, governance, registry, deployment, migration,
+  configuration, or transaction action becomes necessary without its own
+  authorization.
+
+The default on every stop is containment and **do not list**, not a narrower
+test, an assumed zero, an improvised configuration, or a partial release.
+
+### 21.10 Owner checkpoints before implementation and release
+
+None of the following checkpoints is passed by Phase K:
+
+| Checkpoint | Exact owner decision/evidence required | What passing it authorizes | Current status |
+| --- | --- | --- | --- |
+| **K-CP0 — final specification acceptance** | Owner and independent reviewer accept Phases A–K, decision register, unit split, and checklist handoff | Closes specification planning only | **Pending owner/reviewer acceptance; no implementation** |
+| **K-CP1 — Release 0 evidence acquisition/build** | Exact read-only RPC/indexer sources/ranges, sanitized artifact paths, proposed probe/test/doc files, and reviewers | Only the named Release 0 evidence/probe/document work | **Not authorized** |
+| **K-CP2 — Release 1 mechanism selection** | Complete K-00 record; approve all-external or another enforcement; approve two-selector or another atomic debt design; approve interest/caller semantics; resolve S5 posture | Selects architecture for an exact implementation proposal, not code or migration | **Pending; all-external and two-selector remain candidates** |
+| **K-CP3 — Ledger migration gate** | Exact Ledger artifact delta, every-key state proof, S5 compatibility, Track 7 filename/plan, external accounting/security audit plan, forward/reverse rehearsal | Only the specifically approved Ledger implementation/migration preparation | **Separate high-risk gate; not approved** |
+| **K-CP4 — Release 1 implementation authorization** | Exact branch/baseline, allowed files per K-01–K-07/K-10–K-12, test paths, reviewers, and atomic activation contract | Production/test/interface/ABI edits only in that exact file set | **Not authorized** |
+| **K-CP5 — Release 1 merge readiness** | Independent code/audit approvals, all tiers green, exact artifacts, accepted migration plan, and clean integrated commit graph | Only owner-approved merge/integration of the reviewed branch | **Merge not authorized** |
+| **K-CP6 — Base migration/deployment execution** | Exact pre-state roots, Track 7 migration, signer/role/timelock plan, abort/recovery boundary, and enumerated Base transactions/digests | Only the expressly listed Base transactions | **No live action authorized** |
+| **K-CP7 — Release 1 acceptance** | Pinned Base post-state, repayment/deficit/settlement/debt evidence, smoke/soak, incidents and unresolved risks | Marks containment accepted; does not select/list a Stock vault | **Pending future live evidence** |
+| **K-CP8 — Release 2 mechanism and vault selection** | Exact K-08 files/storage/interface/events, counsel/risk allocation approval, K-09 reward/S3 choice, production vault, Track 7 ID, migration/import/finalizer | Selects the Release 2 design for an exact implementation proposal | **Not approved; no production vault/ID** |
+| **K-CP9 — Release 2 implementation/audit authorization** | Exact files, tests, audit scopes, integrated baseline, Base/RH topology, and disabled staging rules | Only the approved Release 2 code/test/audit work | **Not authorized** |
+| **K-CP10 — migration/testnet/rehearsal** | Approved Track 7 plans, artifacts, state roots, exact-token permission, roles/signers, testnet and clean rehearsal evidence | Only each expressly named non-production action | **Not authorized** |
+| **K-CP11 — Robinhood deployment and enablement** | Accepted Base-first or atomic convergence, production vault/ID, final manifests/config, audits, exact AAPL lifecycle, smoke/soak, product/risk/security/operations approval, exact transactions | Only the separately listed deployment/config/enable transactions | **Not authorized; do not list remains operative** |
+
+Approval of one row does not imply the next. A phrase such as “proceed,” a
+merged implementation branch, an audit report, or an empty deployment is not
+transaction or launch authorization.
+
+### 21.11 Final decision register
+
+This table is the Phase K consolidated handoff. Recommendations remain
+recommendations.
+
+| Decision area | Options and evidence | Recommendation | Owner | Affected components | Prerequisite | Needed before | Status |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Product outcome | Do not list / containment / corrected path / staged option 4; Track 5/Phases A–C | Staged containment then corrected path | Product + protocol | Whole track | Phase C evidence | Specification direction | **Option 4 owner-confirmed for specification only** |
+| Custody invariant | Nominal / shares / live allocated claims; I-01–I-13 | `C`, accounted claims, allocable/deliverable amount, and borrow value remain distinct; fail closed | Protocol + risk/security | Vaults, Teller, CreditEngine, AuctionHouse | Formal model | Any implementation | **Specified; implementation unapproved** |
+| Deposit measurement | Teller delta / vault inference / token adapter | Teller measures `R`; zero/negative/excess revert, short credit exact | Protocol + security | `CM-034`, vaults, K-02 consumers | Phase D | K-CP4 | **Specified; K-01/K-02 unapproved** |
+| Per-asset collateral use | New flag / existing controls / no listing | Existing `canDeposit` + `ltv` + backing; no new flag | Protocol + security/governance | `CM-009`, `CM-011`–`013`, `CM-030` | Phase E | K-CP4 | **Owner-directed; negative schema proof pending** |
+| Nominal deficit policy | Silent nominal / pro rata / zero capacity-value + containment / no listing | Fail closed; no internal charge; owner decision for any live partial-deficit allocation | Protocol + risk/accounting | `CM-024`, `CM-030`, `CM-026` | Current live snapshot | Release 1 cutover/incident | **Safety behavior specified; allocation unresolved** |
+| Partial loss | Corrected-share pro rata / another allocation / no listing; nominal path differs | Pro rata live claims only in approved corrected share model; no silent nominal allocation | Protocol + economics/counsel-risk | `CM-024`, `CM-025` candidate | K-08/audit | Release 2 | **Share behavior specified; nominal allocation deferred** |
+| Total loss | Zero-backed auction / freeze only / atomic debt transition / no listing | Atomic exactly-once transition after deterministic eligibility | Protocol + accounting/security | `CM-030`, `CM-008`, `CM-026` | K-00, S5 | K-CP2/K-CP3 | **Direction specified; mechanism/migration unapproved** |
+| Post-zero state | Reopen / recapitalize / persistent freeze | Freeze old shares with zero claim; separate recapitalization only | Protocol + risk | K-08 vault, controls | Phase G | Release 2 | **Owner-confirmed behavior; storage/interface unapproved** |
+| Donation allocation | First depositor / old holders / protocol / quarantine / explicit recovery | No automatic allocation; preserve `U` and require counsel/risk for disposition | Protocol + counsel/risk | K-08/K-09/K-11 | Property treatment | Release 2 | **No-automatic-allocation owner-confirmed; final disposition open** |
+| Settlement policy | All external / per-asset mode / no listing | All-external preferred only after complete integration/history evidence | Product + protocol/security | `CM-026`, `CM-034`, vaults | K-00 | K-CP2 | **Conditional candidate; not selected for implementation** |
+| Rounding | Current virtual offset / another audited scheme | `10^8` virtual shares, one virtual asset; deposit/claim down, burn up, last-share sweep | Protocol + math/security | K-08 | Property tests | Release 2 | **Specified; candidate implementation unapproved** |
+| Rewards/monitoring | Raw shares / live claims / explicit hybrid | Live allocated claim weight, `U` excluded; select loss boundary with S3 independently releasable | Economics + Track 6 + security | `CM-033`, K-08, Ledger | K-09 design/S3 window | K-CP8 | **Units directed; mechanism and migration unapproved** |
+| Emergency controls | Existing globals/assets / dedicated pause / broad Department pause | Existing controls, preserve repayment and safe withdrawals; no new dedicated pause by default | Protocol + security/operations | `CM-009`, `CM-011`–`014`, cores/vaults | Phase H evidence | Implementation/runbook | **Specified; no live action** |
+| Vault selection | Simple / current Rebase / candidate generic / another generic / none | No current vault unchanged; candidate generic only after K-08/K-09/audit | Product + protocol/risk/security | `CM-021`, `CM-024`, `CM-025` | K-CP8 | Release 2/registration | **No production vault or ID selected** |
+| Base live version | Base first / atomic convergence / no release | Base first or atomic before RH enablement; staging is inactive | Protocol + security/operations | Every changed shared component | Approved migration/release | K-CP6/K-CP11 | **Owner-directed posture; no migration** |
+| Migration | Fresh deploy / complete state migration / no release | Track 7-owned exact plan; Ledger separate; vault custody/state/rewards exact | Protocol + accounting/security/operations + Track 7 | K-07/K-11 and all stateful artifacts | Exact files/IDs/roots | Live execution | **Unapproved; Base filename and production vault/ID open** |
+| Exact-token evidence | Mock only / pinned fork / authorized live evidence | Pinned AAPL full lifecycle plus implementation-switch and failure cases; live action separate | Track 2 + product/risk/security | AAPL proxy/beacon/implementation, all selected components | Approved candidate, permission | K-CP10/K-CP11 | **Plan complete; test/live evidence absent** |
+| Audit/release | Independent units / atomic groups / partial activation | Review units separately, re-review combined artifacts, Release 1/2 economically atomic | Owner + all boundary reviewers | K-00–K-12 | Phase K acceptance | K-CP4 onward | **Split specified; no implementation/audit/release authorized** |
+
+### 21.12 Phase K acceptance and final stop boundary
+
+Phase K is specification-complete with companion validation-plan Section 19
+because it:
+
+1. separates all ten task-contract implementation surfaces into thirteen
+   reviewable units with exact or explicitly blocked expected files;
+2. names component IDs, dependencies, owner decisions, deployability,
+   storage/ABI/artifact effects, targeted Phase J profiles, S1/S2 and Base
+   gates, audit boundaries, migration/rollback boundaries, consumers, and
+   stop conditions for every unit;
+3. distinguishes individually reviewable PRs from economically atomic
+   activation;
+4. makes fail-closed receipt/deficit semantics, debt health, live-backed
+   settlement, and existing-debt progress inseparable in Release 1;
+5. keeps all-external conditional on complete integration/history evidence;
+6. keeps the corrected-share, `A^s/U^s`, reward-boundary, and two-selector
+   designs unapproved while still giving them concrete review boundaries;
+7. keeps the full Ledger migration as a separate highest-risk S5/Track 7 and
+   independent-audit gate;
+8. preserves S3 independently, Base-first or atomic convergence, and inactive
+   staging as non-launch;
+9. defines Release 0 as evidence/runbook readiness with no production code,
+   Release 1 as atomic shared containment, and Release 2 as corrected
+   issuer-controlled collateral completion; and
+10. returns every remaining decision and K-CP0–K-CP11 checkpoint before any
+    implementation or live action.
+
+Work stops here for final owner and independent specification review. No
+future file named in Section 21 may be created or changed under the Phase K
+authorization.
+
+## 22. Final checklist handoff
+
+Track 8 did not edit, stage, or close any `rh-summary.md` checkbox. The
+external working-tree modification disclosed in Section 3.13 is not a Track 8
+change and is not part of this branch.
+
+Eligible for final owner and independent specification review:
 
 - Phase 0, **resolve the deployable Stock Token vault path** (line 85 at the
-  `be6a759` reconciliation baseline) — option 4 is the architecture direction,
-  but no production vault, implementation, or migration is approved. The item
-  remains unchecked in post-bootstrap `ce3805d`.
+  `be6a759` reconciliation baseline) — option 4 and its release architecture
+  are specified, but no production vault, implementation, or migration is
+  approved. This item remains open until the owner decides whether the
+  specification itself satisfies its planning portion and separately tracks
+  production selection.
 - Section 4, **finish the Simple versus Rebase comparison** (line 186 at the
   baseline) — Track 5 evidence is hash-verified, source-reconciled, and rerun.
 - Section 4, **write a separate vault-change specification if current behavior
-  is unacceptable** (line 190 at the baseline) — Phases A–J are specified, but
-  the item is not eligible for closure until Phase K is owner-directed and
-  completed and the full documents receive final reviewer/owner approval.
+  is unacceptable** (line 190 at the baseline) — Phases A–K and the companion
+  validation plan are now complete and eligible for final owner/independent
+  review. Track 8 still does not close the checkbox itself.
 
 Not eligible for closure:
 
 - chosen-vault behavior testing (line 189);
-- vault/feed/config/risk-parameter selection;
+- production vault or VaultBook ID selection;
+- vault/feed/config/risk-parameter implementation or live values;
 - issuer-failure implementation evidence;
+- Release 0 evidence acquisition, Release 1 or 2 implementation/audit/
+  migration/deployment evidence;
 - the Section 4 exit condition; or
-- any technical launch gate that requires a selected vault, production code,
-  migration, audit, exact-token lifecycle, or owner approval.
+- any technical launch gate requiring production code, an approved Ledger or
+  vault migration, exact-token lifecycle evidence, Base convergence, or live
+  owner authorization.
+
+The handoff to any future implementation owner is:
+
+1. obtain K-CP0 final specification acceptance;
+2. request K-CP1 before creating Release 0 evidence/probe/test files;
+3. close the unresolved decisions in Section 21.11 at their exact
+   checkpoints;
+4. request a file-exact implementation authorization before changing any
+   production, test, interface, storage, ABI, default, migration, or manifest;
+5. preserve the K-00–K-12 review boundaries and Release 1/2 atomic activation
+   groups;
+6. keep S3 independently releasable and reconcile S4/S5/Track 7 at the
+   implementation baseline;
+7. keep Base hardened first or converging atomically before any Robinhood
+   Stock value path; and
+8. stop before every merge, audit engagement, RPC acquisition, deployment,
+   migration, configuration, signer, transaction, and enablement action until
+   its named owner checkpoint passes.
+
+Until those gates close, the operative result of Track 8 remains:
+
+> **Do not list Stock Tokens under the current vault designs.**
