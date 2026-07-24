@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import contextlib
 from importlib.metadata import version
+from types import SimpleNamespace
 
 import boa
 import pytest
@@ -15,7 +17,9 @@ from utils.clock_profiles import (
     EVIDENCE_REPRESENTATIVE,
     EVIDENCE_STRESS,
     PARAMETER_PROFILES,
+    PROFILE_EVIDENCE_DETAILS,
     ArtifactMismatchError,
+    ClockController,
     ClockHarnessError,
     ClockPoint,
     ClockProfile,
@@ -29,6 +33,20 @@ from utils.clock_profiles import (
 
 N = DEFAULT_NUMBER
 T = DEFAULT_TIMESTAMP
+
+
+class _NonRestoringEnv:
+    """Small test double for the scenario restoration double-fault path."""
+
+    def __init__(self):
+        self.evm = SimpleNamespace(
+            patch=SimpleNamespace(block_number=100, timestamp=200)
+        )
+
+    @contextlib.contextmanager
+    def anchor(self):
+        yield
+
 
 CLOCK_OBSERVER_SOURCE = """
 #pragma version 0.4.3
@@ -191,6 +209,7 @@ def test_every_static_profile_has_the_exact_points_and_evidence(
     profile = clock_profile(name)
     assert _pairs(profile) == expected
     assert profile.evidence == evidence
+    assert profile.evidence_detail == PROFILE_EVIDENCE_DETAILS[name]
     assert CLOCK_PROFILES[name] == profile
 
 
@@ -198,6 +217,8 @@ def test_r_rep128_retains_all_128_exact_points():
     profile = clock_profile("R-REP128")
     assert len(profile.points) == 128
     assert profile.evidence == EVIDENCE_EMPIRICAL
+    assert "2026-07-23T21:36:01Z" in profile.evidence_detail
+    assert "88-block repeat" in profile.evidence_detail
     assert _pairs(profile) == tuple((N, T + (index // 4)) for index in range(128))
     assert len({point.number for point in profile.points}) == 1
 
@@ -219,6 +240,17 @@ def test_boundary_profiles_are_derived_from_scenario_state():
         (start - 1, T),
         (end + 1, T + 24),
     )
+    assert open_profile.evidence == EVIDENCE_DOCUMENTED_ROBINHOOD
+    assert window_profile.evidence == EVIDENCE_DOCUMENTED_ROBINHOOD
+    assert "synthetic" in open_profile.evidence_detail
+    assert "synthetic" in window_profile.evidence_detail
+
+
+def test_synthetic_mixed_profile_evidence_does_not_claim_observation():
+    profile = clock_profile("MIXED")
+    assert profile.evidence == EVIDENCE_DOCUMENTED_ROBINHOOD
+    assert "synthetic independent-clock scenario" in profile.evidence_detail
+    assert "empirical" not in profile.evidence_detail
 
 
 @pytest.mark.parametrize(
@@ -242,12 +274,43 @@ def test_apply_reaches_every_exact_profile_point(clock_controller, profile):
         assert clock_controller.apply(profile, step) == expected
 
     assert clock_controller.sequence_index == len(profile.points)
+    assert clock_controller.profile_step_index == len(profile.points)
     assert len(clock_controller.trace) == len(profile.points)
     assert all(entry["kind"] == "mutation" for entry in clock_controller.trace)
     assert clock_controller.trace[-1]["actual_after"] == {
         "number": profile.points[-1].number,
         "timestamp": profile.points[-1].timestamp,
     }
+
+
+def test_profile_progress_is_independent_of_global_mutation_sequence(
+    clock_controller,
+):
+    profile = clock_profile("B-ORD")
+
+    clock_controller.set(number=N, timestamp=T)
+    assert clock_controller.sequence_index == 1
+    assert clock_controller.profile_step_index == 0
+
+    assert clock_controller.apply(profile, 0) == profile.points[0]
+    clock_controller.hold_number(seconds=0)
+    assert clock_controller.sequence_index == 3
+    assert clock_controller.profile_step_index == 1
+
+    with pytest.raises(ClockHarnessError) as raised:
+        clock_controller.apply(profile, 2)
+    assert 'expected="next profile step 1"' in str(raised.value)
+    assert 'actual="requested step 2"' in str(raised.value)
+
+    assert clock_controller.apply(profile, 1) == profile.points[1]
+    assert clock_controller.sequence_index == 4
+    assert clock_controller.profile_step_index == 2
+    assert [entry["profile_step"] for entry in clock_controller.trace] == [
+        None,
+        0,
+        None,
+        1,
+    ]
 
 
 def test_controller_moves_number_and_timestamp_independently(clock_controller):
@@ -365,6 +428,8 @@ def test_mutation_trace_records_intended_and_actual_clocks(clock_controller):
         "sequence_index",
         "profile",
         "profile_evidence",
+        "profile_evidence_detail",
+        "profile_step",
         "step",
         "parameter_profile",
         "intended_before",
@@ -376,6 +441,12 @@ def test_mutation_trace_records_intended_and_actual_clocks(clock_controller):
         "number": N,
         "timestamp": T,
     }
+    assert entry["profile_step"] is None
+
+
+def test_clock_points_do_not_expose_misleading_lexicographic_ordering():
+    with pytest.raises(TypeError):
+        ClockPoint(5, 10) < ClockPoint(6, 3)
 
 
 def test_observed_call_success_trace_proves_persisted_clock_context(
@@ -408,6 +479,7 @@ def test_observed_call_success_trace_proves_persisted_clock_context(
         "stable_id",
         "components",
         "profile",
+        "profile_evidence_detail",
         "step",
         "seed",
         "intended_pre",
@@ -427,6 +499,7 @@ def test_observed_call_success_trace_proves_persisted_clock_context(
     assert entry["stable_id"] == "BN-026"
     assert entry["components"] == ["CM-033", "CM-059"]
     assert entry["profile"] == "R-J2-J4"
+    assert entry["profile_evidence_detail"] == profile.evidence_detail
     assert entry["step"] == 0
     assert entry["seed"] == 7
     assert entry["intended_pre"] == entry["actual_before"]
@@ -475,13 +548,52 @@ def test_observed_call_rejects_environment_only_claims(
     profile = clock_profile("B-ORD")
     clock_controller.apply(profile, 0)
     observer = observer_deployer.deploy()
-    with pytest.raises(ValueError, match="persisted field"):
+    with pytest.raises(ValueError, match="state:, event:, or boundary:"):
         clock_controller.observed_call(
             "BN-001",
             "environment-only assertion",
             observer.observe,
             components=("CM-001",),
         )
+
+
+@pytest.mark.parametrize(
+    "observed_by",
+    ["untyped proof", "state:", "STATE:seen_number", "state:field\nextra", 7],
+)
+def test_observed_call_rejects_invalid_observation_labels(
+    clock_controller, observed_by
+):
+    with pytest.raises(ValueError, match="state:, event:, or boundary:"):
+        clock_controller.observed_call(
+            "BN-001",
+            "invalid observation label",
+            lambda: None,
+            observed_by=observed_by,
+        )
+
+
+def test_expected_revert_matches_the_full_normalized_reason(
+    clock_controller, observer_deployer
+):
+    profile = clock_profile("R-PLUS1")
+    clock_controller.apply(profile, 0)
+    observer = observer_deployer.deploy()
+
+    with pytest.raises(ClockHarnessError) as raised:
+        clock_controller.observed_call(
+            "BN-004",
+            "partial revert reason must not match",
+            observer.fail_at,
+            N,
+            components=("CM-059",),
+            observed_by="boundary:block.number equals rejected boundary",
+            expected_revert="boundary",
+        )
+
+    message = str(raised.value)
+    assert 'expected="revert:boundary"' in message
+    assert 'actual="revert:clock boundary"' in message
 
 
 def test_observed_call_failure_diagnostic_is_searchable_and_deterministic(
@@ -551,6 +663,7 @@ def test_nested_scenario_restores_clock_and_controller_after_success(
 ):
     baseline = clock_controller.current
     assert clock_controller.sequence_index == 0
+    assert clock_controller.profile_step_index == 0
     assert clock_controller.trace == ()
 
     with clock_controller.scenario("R-STRESS60", "robinhood_candidate"):
@@ -561,6 +674,7 @@ def test_nested_scenario_restores_clock_and_controller_after_success(
 
     assert clock_controller.current == baseline
     assert clock_controller.sequence_index == 0
+    assert clock_controller.profile_step_index == 0
     assert clock_controller.trace == ()
     assert clock_controller.active_profile is None
 
@@ -574,6 +688,7 @@ def test_nested_scenario_restores_after_assertion_failure(clock_controller):
 
     assert clock_controller.current == baseline
     assert clock_controller.sequence_index == 0
+    assert clock_controller.profile_step_index == 0
     assert clock_controller.trace == ()
 
 
@@ -597,24 +712,46 @@ def test_nested_scenario_restores_after_caught_revert(
 
     assert clock_controller.current == baseline
     assert clock_controller.sequence_index == 0
+    assert clock_controller.profile_step_index == 0
     assert clock_controller.trace == ()
 
 
-_CROSS_TEST_BASELINE: ClockPoint | None = None
+def test_scenario_restoration_failure_does_not_mask_body_exception():
+    controller = ClockController(_NonRestoringEnv())
+    with pytest.raises(AssertionError, match="primary scenario failure") as raised:
+        with controller.scenario():
+            controller.set(number=101, timestamp=201)
+            raise AssertionError("primary scenario failure")
+
+    notes = getattr(raised.value, "__notes__", ())
+    assert len(notes) == 1
+    assert notes[0].startswith(
+        "CLOCK_FAIL id=HARNESS components=CM-059 profile=UNBOUND"
+    )
+    assert "function=boa.env.anchor label=restoration" in notes[0]
 
 
-@pytest.mark.parametrize("case", [0, 1])
-def test_cross_test_isolation(clock_controller, case):
-    global _CROSS_TEST_BASELINE
-    if case == 0:
-        _CROSS_TEST_BASELINE = clock_controller.current
-        clock_controller.set(number=N, timestamp=T)
-        assert clock_controller.trace
-    else:
-        assert _CROSS_TEST_BASELINE is not None
-        assert clock_controller.current == _CROSS_TEST_BASELINE
-        assert clock_controller.sequence_index == 0
-        assert clock_controller.trace == ()
+def test_scenario_restoration_failure_raises_without_body_exception():
+    controller = ClockController(_NonRestoringEnv())
+    with pytest.raises(
+        ClockHarnessError,
+        match=r"^CLOCK_FAIL id=HARNESS components=CM-059 profile=UNBOUND",
+    ):
+        with controller.scenario():
+            controller.set(number=101, timestamp=201)
+
+
+def test_cross_test_isolation_mutating_case(clock_controller):
+    clock_controller.assert_scenario_start()
+    clock_controller.set(number=N, timestamp=T)
+    assert clock_controller.trace
+
+
+def test_cross_test_isolation_clean_case(clock_controller):
+    clock_controller.assert_scenario_start()
+    assert clock_controller.sequence_index == 0
+    assert clock_controller.profile_step_index == 0
+    assert clock_controller.trace == ()
 
 
 def test_deployed_system_exposes_equal_fingerprints_for_all_parameter_labels(
@@ -638,10 +775,12 @@ def test_deployed_system_exposes_equal_fingerprints_for_all_parameter_labels(
             }
             assert system.artifact_id == "clock-observer"
             assert system.clock_controller.sequence_index == 1
+            assert system.clock_controller.profile_step_index == 1
             assert len(system.clock_controller.trace) == 1
             fingerprints[parameter_profile] = system.artifact_fingerprint
 
         assert clock_controller.sequence_index == 0
+        assert clock_controller.profile_step_index == 0
         assert clock_controller.trace == ()
 
     assert len({fingerprint.digest for fingerprint in fingerprints.values()}) == 1
@@ -692,7 +831,7 @@ def test_intentional_artifact_mismatch_fails_clearly(
     assert "creation_bytecode_sha256" in message
 
 
-def test_failing_deployed_scenario_does_not_contaminate_next_case(
+def test_failing_deployed_scenario_keeps_artifact_baseline_without_state_leak(
     deployed_system,
     clock_controller,
     observer_deployer,
@@ -711,14 +850,33 @@ def test_failing_deployed_scenario_does_not_contaminate_next_case(
 
     assert clock_controller.current == baseline
     assert clock_controller.sequence_index == 0
+    assert clock_controller.profile_step_index == 0
+    assert clock_controller.trace == ()
+
+    with pytest.raises(ArtifactMismatchError) as raised:
+        with deployed_system(
+            "B-ORD",
+            "base_canonical",
+            observer_deployer.deploy,
+            artifact=observer_deployer,
+            artifact_id="failure-isolation",
+        ):
+            pass
+    assert "baseline_profile=robinhood_candidate" in str(raised.value)
+    assert "candidate_profile=base_canonical" in str(raised.value)
+
+    assert clock_controller.current == baseline
+    assert clock_controller.sequence_index == 0
+    assert clock_controller.profile_step_index == 0
     assert clock_controller.trace == ()
 
     with deployed_system(
         "B-ORD",
         "base_canonical",
-        observer_deployer.deploy,
-        artifact=observer_deployer,
+        different_observer_deployer.deploy,
+        artifact=different_observer_deployer,
         artifact_id="failure-isolation",
     ) as system:
         assert system.clock_controller.current == ClockPoint(N, T)
         assert system.clock_controller.sequence_index == 1
+        assert system.clock_controller.profile_step_index == 1

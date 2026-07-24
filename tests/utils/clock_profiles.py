@@ -50,6 +50,48 @@ PROFILE_EVIDENCE = {
     "MIXED": EVIDENCE_DOCUMENTED_ROBINHOOD,
 }
 
+# These details preserve the five brief-mandated category labels above while
+# making their provenance and limits explicit.  The boundary and MIXED profiles
+# are synthetic scenarios specified by the reviewed model, not empirical
+# Robinhood sequences.
+PROFILE_EVIDENCE_DETAILS = {
+    "B-ORD": (
+        "shared-block-clock-specification.md documented Base model; "
+        "sources retrieved 2026-07-23"
+    ),
+    "R-REP128": (
+        "shared-block-clock-specification.md reproducible empirical evidence; "
+        "sampled 2026-07-23T21:36:01Z across 128 child blocks, including an "
+        "88-block repeat"
+    ),
+    "R-PLUS1": (
+        "shared-block-clock-specification.md exact-profile table; "
+        "documented Robinhood/Arbitrum repeat-and-jump model"
+    ),
+    "R-J2-J4": (
+        "owner-approved 2026-07-23 representative +2/+4 jumps; "
+        "not a maximum guarantee"
+    ),
+    "BOUNDARY-OPEN": (
+        "shared-block-clock-specification.md synthetic opening-boundary skip "
+        "derived from scenario state under the documented "
+        "Robinhood/Arbitrum model"
+    ),
+    "BOUNDARY-WINDOW": (
+        "shared-block-clock-specification.md synthetic whole-window skip "
+        "derived from scenario state under the documented "
+        "Robinhood/Arbitrum model"
+    ),
+    "R-STRESS60": (
+        "owner-approved 2026-07-23 synthetic +60 stress jump; "
+        "not observed, guaranteed, or an authoritative maximum"
+    ),
+    "MIXED": (
+        "shared-block-clock-specification.md synthetic independent-clock "
+        "scenario under the documented Robinhood/Arbitrum model"
+    ),
+}
+
 _STATIC_PROFILE_NAMES = frozenset(
     {
         "B-ORD",
@@ -61,6 +103,7 @@ _STATIC_PROFILE_NAMES = frozenset(
     }
 )
 _STABLE_ID_RE = re.compile(r"^(?:BN|CAD|TS)-\d{3}$")
+_OBSERVED_BY_RE = re.compile(r"^(?:state|event|boundary):[^\r\n]+$")
 _SENSITIVE_KEY_RE = re.compile(
     r"(?:secret|private.?key|mnemonic|password|credential|api.?key|access.?token)",
     re.IGNORECASE,
@@ -76,7 +119,7 @@ class ArtifactMismatchError(ClockHarnessError):
     """Raised when two parameter labels use different compilation artifacts."""
 
 
-@dataclass(frozen=True, order=True)
+@dataclass(frozen=True)
 class ClockPoint:
     """One exact EVM-observed NUMBER/timestamp pair."""
 
@@ -107,6 +150,12 @@ class ClockProfile:
                     f"clock profile {self.name!r} moves backwards: "
                     f"{_format_point(before)} -> {_format_point(after)}"
                 )
+
+    @property
+    def evidence_detail(self) -> str:
+        """Return the dated source/interpretation behind the category label."""
+
+        return PROFILE_EVIDENCE_DETAILS[self.name]
 
 
 @dataclass(frozen=True)
@@ -296,7 +345,11 @@ def assert_identical_artifacts(
 
 
 class ClockController:
-    """Control Boa NUMBER/timestamp without mining and retain searchable traces."""
+    """Control Boa NUMBER/timestamp without mining and retain searchable traces.
+
+    ``sequence_index`` counts every explicit mutation. ``profile_step_index``
+    separately identifies the next exact point required by ``apply``.
+    """
 
     def __init__(
         self,
@@ -312,6 +365,7 @@ class ClockController:
         self.parameter_values = _public_mapping(parameter_values)
         self.parameter_bounds = _public_mapping(parameter_bounds)
         self.sequence_index = 0
+        self._next_profile_step = 0
         self._trace: list[dict[str, Any]] = []
         self._active_profile: ClockProfile | None = None
         self._intended = self._actual()
@@ -326,6 +380,12 @@ class ClockController:
         return self._active_profile
 
     @property
+    def profile_step_index(self) -> int:
+        """Index of the next profile point that ``apply`` must receive."""
+
+        return self._next_profile_step
+
+    @property
     def current(self) -> ClockPoint:
         return self._actual()
 
@@ -335,6 +395,7 @@ class ClockController:
         actual = self._actual()
         if (
             self.sequence_index != 0
+            or self._next_profile_step != 0
             or self._trace
             or self._active_profile is not None
             or actual != self._scenario_initial
@@ -342,12 +403,13 @@ class ClockController:
         ):
             self._fail(
                 expected=(
-                    "initial clocks, sequence_index=0, empty trace, "
-                    "no active profile"
+                    "initial clocks, sequence_index=0, profile_step_index=0, "
+                    "empty trace, no active profile"
                 ),
                 actual={
                     "clock": actual,
                     "sequence_index": self.sequence_index,
+                    "profile_step_index": self._next_profile_step,
                     "trace_length": len(self._trace),
                     "profile": self._profile_name(),
                 },
@@ -385,10 +447,12 @@ class ClockController:
         )
         saved_state = self._snapshot_state()
         environment_before = self._actual()
+        pending_error: BaseException | None = None
 
         try:
             with self.env.anchor():
                 self.sequence_index = 0
+                self._next_profile_step = 0
                 self._trace = []
                 self._active_profile = None
                 self.parameter_profile = selected_parameter_profile
@@ -400,11 +464,14 @@ class ClockController:
                 if resolved_profile is not None:
                     self._validate_profile(resolved_profile)
                 yield self
+        except BaseException as exc:
+            pending_error = exc
+            raise
         finally:
             environment_after = self._actual()
             self._restore_state(saved_state)
             if environment_after != environment_before:
-                raise ClockHarnessError(
+                restoration_error = ClockHarnessError(
                     "CLOCK_FAIL id=HARNESS components=CM-059 profile=UNBOUND\n"
                     f"step=0 before={_format_point(environment_before)} "
                     f"after={_format_point(environment_after)}\n"
@@ -413,6 +480,10 @@ class ClockController:
                     f'actual="{_format_point(environment_after)}"\n'
                     "prefix=[]"
                 )
+                if pending_error is not None:
+                    pending_error.add_note(str(restoration_error))
+                else:
+                    raise restoration_error
 
     def set(
         self,
@@ -464,8 +535,12 @@ class ClockController:
             "sequence_index": self.sequence_index,
             "profile": self._profile_name(),
             "profile_evidence": self._profile_evidence(),
+            "profile_evidence_detail": self._profile_evidence_detail(),
+            "profile_step": _profile_step,
             "step": (
-                self.sequence_index if _profile_step is None else _profile_step
+                self._diagnostic_step()
+                if _profile_step is None
+                else _profile_step
             ),
             "parameter_profile": self.parameter_profile,
             "intended_before": _point_dict(intended_before),
@@ -497,9 +572,9 @@ class ClockController:
                 f"profile {resolved.name} step {step} out of range "
                 f"for {len(resolved.points)} points"
             )
-        if step != self.sequence_index:
+        if step != self._next_profile_step:
             self._fail(
-                expected=f"next profile step {self.sequence_index}",
+                expected=f"next profile step {self._next_profile_step}",
                 actual=f"requested step {step}",
             )
         if self._active_profile is not None and self._active_profile != resolved:
@@ -522,6 +597,7 @@ class ClockController:
                 before=actual,
                 after=actual,
             )
+        self._next_profile_step += 1
         return actual
 
     def hold_number(self, *, seconds: int) -> ClockPoint:
@@ -565,7 +641,11 @@ class ClockController:
     def at_interval(
         self, start_number: int, interval: int, offset: int = 0
     ) -> int:
-        """Return the exact next interval boundary."""
+        """Return ``start_number + interval + offset`` for one interval.
+
+        This helper intentionally derives one boundary from the supplied start.
+        It does not search recurring boundaries relative to the current NUMBER.
+        """
 
         _require_nonnegative_int("start_number", start_number)
         _require_positive_int("interval", interval)
@@ -662,10 +742,12 @@ class ClockController:
         component_ids = tuple(components)
         if any(not component.startswith("CM-") for component in component_ids):
             raise ValueError("component IDs must use CM-* stable identifiers")
-        if not observed_by:
+        if not isinstance(observed_by, str) or not _OBSERVED_BY_RE.fullmatch(
+            observed_by
+        ):
             raise ValueError(
-                "observed_call requires a persisted field, event, "
-                "or boundary assertion"
+                "observed_call requires observed_by with a non-empty "
+                "state:, event:, or boundary: prefix"
             )
         if expected_revert is None and (
             observation is None or expected_observation is _UNSET
@@ -739,7 +821,7 @@ class ClockController:
                     expected=f"clock held at {_format_point(actual_before)}",
                     actual=f"clock advanced to {_format_point(actual_after)}",
                 )
-            if expected_revert is None or expected_revert not in reason:
+            if expected_revert is None or expected_revert != reason:
                 self._fail_from_entry(
                     entry,
                     expected=expected_text,
@@ -871,7 +953,7 @@ class ClockController:
         after = _point_from_mapping(entry.get("actual_after"))
         components = ",".join(entry.get("components", ())) or "none"
         profile = entry.get("profile") or self._profile_name()
-        step = entry.get("step", max(self.sequence_index - 1, 0))
+        step = entry.get("step", self._diagnostic_step())
         seed = entry.get("seed")
         seed_text = "none" if seed is None else _single_line(seed)
         signature = entry.get("function_signature", "unknown")
@@ -905,7 +987,8 @@ class ClockController:
             "components": list(values["components"]),
             "profile": self._profile_name(),
             "profile_evidence": self._profile_evidence(),
-            "step": max(self.sequence_index - 1, 0),
+            "profile_evidence_detail": self._profile_evidence_detail(),
+            "step": self._diagnostic_step(),
             "seed": values["seed"],
             "parameter_profile": self.parameter_profile,
             "parameter_values": values["public_values"],
@@ -975,6 +1058,18 @@ class ClockController:
             else "none"
         )
 
+    def _profile_evidence_detail(self) -> str:
+        return (
+            self._active_profile.evidence_detail
+            if self._active_profile is not None
+            else "none"
+        )
+
+    def _diagnostic_step(self) -> int:
+        if self._active_profile is not None:
+            return max(self._next_profile_step - 1, 0)
+        return max(self.sequence_index - 1, 0)
+
     def _profile_prefix(self, step: int) -> list[tuple[int, int]]:
         if self._active_profile is None:
             return []
@@ -987,6 +1082,7 @@ class ClockController:
     def _snapshot_state(self) -> dict[str, Any]:
         return {
             "sequence_index": self.sequence_index,
+            "next_profile_step": self._next_profile_step,
             "trace": copy.deepcopy(self._trace),
             "active_profile": self._active_profile,
             "intended": self._intended,
@@ -998,6 +1094,7 @@ class ClockController:
 
     def _restore_state(self, state: Mapping[str, Any]) -> None:
         self.sequence_index = state["sequence_index"]
+        self._next_profile_step = state["next_profile_step"]
         self._trace = state["trace"]
         self._active_profile = state["active_profile"]
         self._intended = state["intended"]
@@ -1039,7 +1136,7 @@ class ClockController:
             "stable_id": stable_id,
             "components": list(components),
             "profile": self._profile_name(),
-            "step": max(self.sequence_index - 1, 0),
+            "step": self._diagnostic_step(),
             "seed": seed,
             "parameter_profile": self.parameter_profile,
             "actual_before": _point_dict(before_point),
@@ -1158,6 +1255,11 @@ class DeployedSystemBoundary:
                     baseline_profile=baseline_profile,
                     candidate_profile=parameter_profile,
                 )
+            else:
+                self._artifact_baselines[artifact_id] = (
+                    parameter_profile,
+                    fingerprint,
+                )
 
             yield DeployedSystem(
                 deployment=deployment,
@@ -1169,11 +1271,6 @@ class DeployedSystemBoundary:
                 artifact_fingerprint=fingerprint,
                 clock_controller=self.controller,
             )
-            if artifact_id not in self._artifact_baselines:
-                self._artifact_baselines[artifact_id] = (
-                    parameter_profile,
-                    fingerprint,
-                )
 
 
 @pytest.fixture
