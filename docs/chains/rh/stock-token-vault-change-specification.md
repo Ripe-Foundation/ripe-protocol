@@ -943,6 +943,45 @@ refinements of the four-source containment proposal. They add no production
 file, test, interface, storage, ABI, migration, manifest, implementation
 authorization, production vault/ID, or live action.
 
+### 3.18 Post-remediation integration advance
+
+After the remediation was committed locally, local `rh` advanced from
+`27765d29094256fa9619dd44a0bfd145863de8b7` to
+`4966969265c6056bc7f3f139dc1a2437ef553c9f`
+(`docs: record minimum-change directive and Robinhood planning decisions`).
+`origin/rh` remained
+`3e6e6f230169fc445d0b29454457480c62efd89a`, and the Track 8 merge base
+remained `be6a759e15e763b633feefdce91cf8f3ee31a10e`; the integration commit was
+not merged, rebased, or cherry-picked into this worktree.
+During final validation, `origin/rh` advanced to the same
+`4966969265c6056bc7f3f139dc1a2437ef553c9f`; this synchronized the already
+reviewed documentation increment and introduced no additional delta.
+
+The increment changes ten documentation paths only and commits the previously
+untracked `minimal-contract-change-reassessment.md`. That reassessment was read
+completely. Its Track 8 direction matches Section 23: Stock Tokens are
+mandatory at initial launch, neither current vault may be accepted unchanged,
+and every share/reward/total-loss/Ledger/storage/migration feature must prove
+launch necessity or move to backlog. Its owner-selected S5 direction also
+prohibits a Base Ledger migration, consistent with the minimum proposal's
+no-Ledger-change boundary. Its retained S3 direction remains independent of
+Track 8 and does not authorize Stock-linked reward accrual.
+
+The same integration increment still describes Track 8 outputs as pending
+because this branch is not integrated, and some broad deployment-checklist
+rows retain pre-minimum lifecycle language such as exactly-once bad-debt
+transition and RIPE reward distribution. Those rows do not silently override
+the later controlling minimum-change decision. Under Sections 23.5, 23.7, and
+23.10, automatic bad-debt transition and Stock-aware reward-loss accounting
+remain post-launch unless the owner rejects the accepted-risk/no-reward
+posture. Track 7 must reconcile those conditional lifecycle rows to the
+owner-approved Track 8 artifact before H-03/H-05 implementation or any launch
+claim.
+
+No contract, interface, test, mock, ABI, storage, default, migration, manifest,
+dependency, CI file, generated artifact, or `rh-summary.md` path was changed by
+Track 8 during this recheck.
+
 ## 4. Current consumer and ordering trace
 
 ### 4.1 Deposit

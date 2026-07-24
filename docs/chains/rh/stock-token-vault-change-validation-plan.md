@@ -87,6 +87,13 @@ routes remain exact, the launch vault rejects both existing Endaoment
 recipients onchain, the reward product answer moves to M0, and the Base-wide
 shared-core scope and eventual-debt bound are explicit.
 
+Specification Section 3.18 records the later local-`rh` documentation advance
+at `4966969`. The committed minimum-change reassessment aligns with this
+profile and selects no Base Ledger migration; integration lifecycle rows that
+still mention automatic bad-debt transition or Stock reward distribution are
+conditional, not launch requirements, until Track 7 reconciles them to the
+owner-approved Track 8 artifact.
+
 ## 1. Existing regression baseline
 
 Existing file, unchanged:
