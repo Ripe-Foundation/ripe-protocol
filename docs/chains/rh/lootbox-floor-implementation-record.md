@@ -16,7 +16,7 @@ blocked
 **Initial Gate 1 evidence commit:**
 `7bd8c07aaad71cd47d5d6796e64aa0fe81b71b35`
 
-**Reviewer test-correction commit:**
+**Post-review test-correction commit:**
 `3c1fea84d70e53e6b0947ee501ee7bbf6413dc57`
 
 **Branch:** `rh-track-6-s3-lootbox-floor`
@@ -685,7 +685,7 @@ manifest.
 ## Gate 1 unresolved items
 
 - An independent reviewer must approve the exact production implementation,
-  reviewer test-correction commit, corrected record commit, generated ABI,
+  post-review test-correction commit, corrected record commit, generated ABI,
   hashes, tests, S2 diagnostics, and rollout analysis.
 - The reviewer or owner must then provide immutable approval provenance before
   S2 inventory reconciliation begins.
