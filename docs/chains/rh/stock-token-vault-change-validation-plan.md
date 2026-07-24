@@ -1,8 +1,8 @@
 # Stock Token Vault-Change Validation Plan
 
-Status: **Phases D–H test contracts specified under owner-confirmed
-instructions; Phase H control/caller selections remain open — not a finalized
-Phase J plan**
+Status: **Phases D–I behavior, compatibility, artifact, and migration test
+contracts specified under owner-confirmed instructions; owner-returned Phase I
+mechanisms remain open — not a finalized Phase J plan**
 
 Date: 2026-07-24 (America/Denver)
 
@@ -12,7 +12,8 @@ backing/debt-health design testable, together with the owner-confirmed Phase F
 external-settlement and total-loss directions and the owner-confirmed Phase G
 post-zero freeze, no-automatic-allocation, and live-claim reward directions,
 plus the owner-authorized Phase H controls, governance, clock, and operational
-evidence analysis.
+evidence analysis and the owner-authorized Phase I compatibility/migration
+inventory.
 The instructions select option 4, containment followed by the corrected share
 path, then reject a new stored per-asset collateral-use parameter and authorize
 Phase E specification using existing deposit controls and `DebtTerms.ltv`.
@@ -23,19 +24,30 @@ documented, then approved the three Phase G directions and authorized Phase G
 specification work. The owner then authorized Phase H specification only,
 directed the work to prefer existing controls and preserve repayment
 liveness, and required evidence and alternatives before any new
-storage/interface/dedicated-pause/caller selection. This is checkpoint option
-4, the combination of architecture outcomes 2 and 3, not the separately
-numbered “another generic shared design.” All paths below are proposed future
-paths. No test, fixture, mock, production contract, interface, storage,
-dependency, CI file, manifest, runbook, or ABI was created or changed.
+storage/interface/dedicated-pause/caller selection. After Phase H review, the
+owner assented to Phase I specification under the five directions recorded in
+specification Section 12.1: existing `canLiquidate` baseline, no dedicated
+checkpoint gate by default, permissionless total-loss calling only when fully
+deterministic, an existing Switchboard checkpoint caller, and safe-withdraw
+preservation. This is checkpoint option 4, the combination of architecture
+outcomes 2 and 3, not the separately numbered “another generic shared
+design.” All paths below are proposed future paths. No test, fixture, mock,
+production contract, interface, storage, dependency, CI file, manifest,
+runbook, or ABI was created or changed.
 
-The Phase D–H test contracts are now specific enough for later
-implementation planning. The full Phase J plan cannot be finalized until the
-owner resolves the later policy decisions in
-`stock-token-vault-change-specification.md` Section 12.
-Specification Section 3.8 enumerates the Phase H reconciliation edits made to
-previously approved specification and validation-plan surfaces, including the
-Phase F gate acceptance update and this document's section renumbering.
+During final Phase I validation, integrated `rh` advanced to `3e6e6f2` with
+Track 6 S3. This plan reconciles S3's Lootbox immutable floor, constructor,
+getter, ABI, artifact/runtime rules, and still-open Base rollout window. It
+does not import that commit into the Track 8 worktree, claim S3 is deployed,
+or treat S3's Underscore send floor as the separate Track 8 loss interval.
+
+The Phase D–I test contracts are now specific enough for later mechanism
+selection and implementation planning. The full Phase J plan cannot be
+finalized until the owner resolves the returned decisions in specification
+Sections 12 and 19.9.
+Specification Sections 3.8 and 3.10 enumerate the Phase H and Phase I
+reconciliation edits made to previously approved specification and
+validation-plan surfaces, including gate updates and section renumbering.
 
 ## 1. Existing regression baseline
 
@@ -82,12 +94,17 @@ against the owner-approved shared implementation.
 | `tests/core/auctionHouse/test_loss_aware_auctions.py` | AuctionHouse | `CM-026`, `CM-030`, Ledger | Proposed; Phase F policy specified, enforcement mechanism not approved |
 | `tests/core/deleverage/test_loss_aware_deleverage.py` | Teller/Deleverage | `CM-034`, `CM-044`, `CM-026` | Proposed; Phase F delivery bound specified |
 | `tests/data/test_ledger_bad_debt_transition.py` | Ledger/CreditEngine | Ledger, `CM-030`, `CM-026` | Proposed; Phase F atomic transition specified, two selectors not approved |
-| `tests/core/lootbox/test_vault_loss_rewards.py` | Rewards/monitoring | `CM-033`, `CM-025`, Ledger | Proposed; Phase G live-claim units specified, implementation and S3 integration pending |
+| `tests/core/lootbox/test_vault_loss_rewards.py` | Rewards/monitoring | `CM-033`, `CM-025`, Ledger | Proposed; Phase G live-claim units specified, integrated S3 floor preserved, separate loss-interval mechanism unapproved |
 | `tests/config/test_asset_collateral_controls.py` | Governance/config | `CM-009`, `CM-011`–`CM-013`, existing config/getters | Proposed; Phase E no-new-storage control semantics specified |
-| `tests/config/test_stock_token_incident_controls.py` | Governance/operations | `CM-009`, `CM-011`–`CM-013`, MissionControl, LocalGov | Proposed; Phase H common control tests specified, gate/caller alternatives unselected |
+| `tests/config/test_stock_token_incident_controls.py` | Governance/operations | `CM-009`, `CM-011`–`CM-013`, MissionControl, LocalGov | Proposed; Phase I uses existing gate/caller directions, no dedicated gate or live action approved |
 | `tests/core/creditEngine/test_stock_token_repay_liveness.py` | Credit/control liveness | `CM-030`, `CM-034`, Ledger | Proposed; Phase H requires repayment under containment |
-| `tests/core/auctionHouse/test_stock_token_resolution_controls.py` | Resolution/control | `CM-026`, `CM-030`, Ledger | Proposed; common tests specified, alternative branch blocked on owner selection |
-| `tests/registries/test_vault_book_migration.py` | Migration | `CM-021`, vaults, Ledger, manifests | Proposed; pending Track 7 and owner migration policy |
+| `tests/core/auctionHouse/test_stock_token_resolution_controls.py` | Resolution/control | `CM-026`, `CM-030`, Ledger | Proposed; existing `canLiquidate` and conditional deterministic caller specified, resolver interface not approved |
+| `tests/vaults/test_corrected_share_compatibility.py` | Storage/interface compatibility | `CM-025`, `CM-021`, Vault interfaces | Proposed; Phase I recommends a generic variant but returns its storage/interface |
+| `tests/config/test_asset_config_schema_compatibility.py` | Config/ABI compatibility | `CM-009`, `CM-011`–`CM-013`, `ConfigStructs` | Proposed; proves recommended no-new-parameter path and compares the unapproved settlement-mode alternative |
+| `tests/config/test_core_cutover_state.py` | Direct-deployment compatibility | Teller, AuctionHouse, CreditEngine, Lootbox, Deleverage, BondRoom, HumanResources, CreditRedeem | Proposed; proves constructor/immutable, pause, local config, pending-action, and cooldown-state parity |
+| `tests/data/test_ledger_state_migration.py` | Full Ledger state migration | `CM-008`, `CM-030`, all Ledger readers/writers | Proposed; mandatory if the returned two-selector design is approved |
+| `tests/registries/test_vault_book_migration.py` | Vault migration/registry | `CM-021`, vaults, Ledger, manifests | Proposed; Phase I sequence specified, exact IDs/tooling pending Track 7 |
+| `tests/probes/test_stock_token_artifact_parity.py` | Artifact/live-version evidence | all changed shared components | Proposed; creation/runtime/registry/manifest parity, no deployment authorized |
 | `tests/probes/test_stock_token_vault_evidence.py` | Read-only operational evidence | all control/accounting readers | Proposed; Phase H schema/absence/first-observation semantics specified, no probe created |
 | `tests/vaults/test_stock_token_vault_lifecycle.py` | Full lifecycle | all primary IDs | Proposed; production direction required |
 | `tests/probes/test_aapl_vault_behavior_fork.py` | Exact-token fork | Track 2 AAPL + selected shared path | Proposed; no broadcast |
@@ -101,8 +118,10 @@ Likely reusable fixtures, subject to post-checkpoint design:
 - two-user/two-buyer state builder;
 - mixed solvent/deficit collateral builder;
 - active-auction and existing-debt builders;
-- Base and Robinhood clock profiles, **pending integrated S1**; and
-- checked block-number inventory assertion, **pending integrated S2**.
+- Base and Robinhood clock profiles, now available on integrated `rh` and to be
+  consumed only when Phase J is authorized; and
+- the integrated checked block-number inventory assertion, likewise pending
+  Phase J reconciliation rather than integration.
 
 ## 3. Invariant-to-test map
 
@@ -402,8 +421,8 @@ A future Phase D implementation cannot be accepted unless:
 5. the integrated-source call graph proves that all operations between `C2`
    and `C3` preserve measured custody, with both the positive housekeeping
    liveness case and negative mutation case passing;
-6. generated ABI/interface consequences are reviewed under the later Phase I
-   inventory; and
+6. generated ABI/interface consequences match specification Section 19's
+   Phase I inventory; and
 7. the owner separately authorizes implementation.
 
 These are future acceptance conditions, not evidence that any implementation
@@ -554,7 +573,7 @@ A future Phase E implementation cannot be accepted unless:
 8. source and tests contain no asset-name, issuer, vault-ID, or chain-ID branch;
 9. security review accepts the deliberate coupling between per-asset deposit
    disable and zero new-borrow support;
-10. the Phase I impact table explicitly records the repayment
+10. specification Section 19's Phase I impact table explicitly records the repayment
     raising-to-non-raising price behavior change and worst-case hot-path call/gas
     results; and
 11. the owner separately authorizes implementation.
@@ -688,7 +707,7 @@ no liability is simultaneously user debt and newly added bad debt
 | `test_permissionless_caller_has_no_resolution_discretion` | If permissionless calling is selected, caller cannot choose eligibility, `X`, recipient, allocation, bad-debt destination, or any value-sensitive input |
 | `test_repayment_and_permissionless_resolution_race_is_accounting_safe` | Both mined orders conserve liability; security evidence separately assesses whether keeper timing/griefing is acceptable |
 | `test_restricted_caller_option_rejects_unapproved_sender` | If a restricted caller is selected, every unapproved caller fails without state change and the approved role remains live |
-| `test_phase_h_resolution_gate_matches_later_approved_control` | Phase H common tests are defined, but the alternative-specific branch remains blocked until the owner later approves a gate and caller policy |
+| `test_phase_h_resolution_gate_matches_later_approved_control` | Existing `canLiquidate` is the Phase I-directed baseline; permissionless calling passes only for a resolver with no caller-supplied value-relevant discretion |
 | `test_transition_event_reconstructs_liability_move` | User, stored debt, `Y`, `X`, `BD_0`, `BD_1`, caller, and canceled-auction count are reconstructible |
 | `test_settlement_event_reconstructs_q_w_r_e_and_payment` | Requested, vault-debited, recipient-received, chargeable, GREEN, debt, route, and recipient values reconcile |
 | `test_repay_event_not_emitted_for_bad_debt_transition` | A write-off is not mislabeled as repayment |
@@ -705,12 +724,13 @@ A future Phase F implementation is not acceptable unless:
 3. the owner separately approves one settlement enforcement mechanism;
 4. accounting/security separately approve the exact atomic interface and
    source-consistent accrued-interest/yield-booking treatment;
-5. the owner/security review separately approves the total-loss transition
-   caller policy after repayment-race and griefing analysis;
-6. the owner later resolves Phase H's returned resolution gate and caller
-   alternatives, and the selected branch passes Section 10;
+5. security review proves the owner-directed conditional permissionless caller
+   has no eligibility, amount, recipient, subset, or timing-sensitive value
+   discretion and passes repayment-race/griefing analysis;
+6. the existing `canLiquidate` branch and caller condition pass Sections 10
+   and 11;
 7. no nominal partial-loss or recovery allocation is inferred;
-8. exact source/interface/storage/ABI diffs match the later Phase I table;
+8. exact source/interface/storage/ABI diffs match specification Section 19;
 9. the implementation is included in the atomic containment/release grouping;
 10. Base and exact-token fork evidence is attached; and
 11. reviewer, security, and owner gates are recorded.
@@ -756,7 +776,8 @@ and all three zero flags
 ```
 
 If the approved implementation chooses different names, the test adapter may
-map them only after Phase I records the exact semantics.
+map them only after the owner selects one of specification Section 19.9's
+returned semantics.
 
 ### 9.2 Formula and rounding properties
 
@@ -857,15 +878,17 @@ not an acceptable generic migration shortcut.
 | `test_reward_global_value_prices_A_not_C` | Donation/restoration `U` never increases eligible global USD value |
 | `test_raw_shares_remain_visible_but_are_not_economic_weight` | Raw accounting is reported separately and cannot be mislabeled or consumed alone |
 | `test_loss_checkpoint_closes_reward_interval` | Pre-loss blocks accrue at prior economics; post-checkpoint blocks use reduced/zero live economics |
-| `test_untouched_user_cannot_accrue_stale_post_loss_weight` | Integrated S3 mechanism handles global share-price change without per-user iteration drift |
+| `test_untouched_user_cannot_accrue_stale_post_loss_weight` | A separately approved Track 8 loss epoch/index or checkpoint mechanism handles global share-price change without per-user iteration drift; S3's send floor alone is insufficient |
 | `test_pre_loss_points_are_not_clawed_back` | Historical earned points persist while future weight changes |
 | `test_price_failure_does_not_change_A_or_backing` | Reward USD may be zero/unavailable, but custody/allocation safety remains visible |
 | `test_ripe_gov_lock_points_keep_separate_semantics` | Vault ID 2 governance points are not interpreted as token live claims |
 | `test_existing_positive_rebase_mode_is_not_silently_quarantined` | Any retained yield/rebase behavior is an explicit generic mode/variant with separate tests and approval |
 
-The interval-boundary tests are **pending integrated S3**. They are mandatory
-before reward implementation approval; Phase G does not invent S3's storage or
-index.
+Integrated S3 tests remain mandatory and unchanged for
+`MIN_UNDERSCORE_SEND_INTERVAL`, the five-argument constructor, getter, strict
+send boundary, and Base/Robinhood floor profiles. The loss-interval tests
+remain skipped pending the owner-selected Track 8 mechanism because S3 adds no
+loss epoch/index or checkpoint callback.
 
 ### 9.8 Events, getters, storage, and compatibility assertions
 
@@ -890,14 +913,16 @@ A future implementation is not eligible for review until:
 1. every Section 9 property/matrix test passes for 6- and 18-decimal assets;
 2. current unsafe-behavior tests remain pinned and new tests demonstrate the
    intentional delta;
-3. owner/security approve an allocated-backing mechanism after Phase I maps
-   storage, ABI, wrappers, and live migration;
+3. owner/security approve one of specification Section 19.9's returned
+   allocated-backing mechanisms, storage/ABI boundary, and live migration;
 4. positive-rebase/yield compatibility is explicitly separated and tested;
 5. no automatic donation/restoration/recovery/recapitalization path exists;
 6. counsel/risk remain a hard gate for any later quarantine disposition;
 7. Phase F delivery and exactly-once liability invariants compose with share
    burn and allocated backing;
-8. integrated S3 closes reward interval semantics and stale-user weighting;
+8. integrated S3's floor/constructor/getter/strict-boundary behavior remains
+   intact and a separately approved Track 8 mechanism closes loss-interval
+   semantics and stale-user weighting;
 9. RipeGov governance units remain intact;
 10. Base vault-ID-4 dust and every custody-bearing live vault are reconciled;
 11. exact-token fork, Base regression, dual-clock, migration, and audit gates
@@ -925,8 +950,12 @@ tests/registries/test_vault_book_migration.py
 tests/probes/test_stock_token_vault_evidence.py
 ```
 
-No path is created by Phase H. A selected-alternative test remains
-skipped/blocked until the owner approves that alternative.
+No path is created by Phase H. At the Phase H handoff every
+alternative-specific branch remained skipped. The later Phase I direction
+activates only the existing-`canLiquidate`, conditional zero-discretion
+resolver, existing-Switchboard checkpoint caller, and safe-withdraw test
+branches; any new-gate, new-role, or discretionary-caller alternative remains
+skipped pending a separate owner decision.
 
 ### 10.1 Current control-map assertions
 
@@ -1104,7 +1133,7 @@ Fixture coverage must include:
 | `test_unsupported_asset_fast_flag_fails_atomically` | Charlie rejects before MissionControl mutation/event |
 | `test_registry_update_guard_reads_accounting_and_snapshot_reads_custody` | Current guard result and independent custody/share/accounting evidence are both retained |
 
-### 10.10 Phase H acceptance and owner stop
+### 10.10 Phase H acceptance and historical owner stop
 
 Phase H validation specification is acceptable when:
 
@@ -1122,15 +1151,200 @@ Phase H validation specification is acceptable when:
    units;
 7. first divergence is an evidence window, not an invented historical fact;
 8. no monitor or probe can write, allocate, resolve, migrate, or re-enable;
-9. unselected gate/caller alternatives remain skipped and no expected new ABI
-   is invented; and
-10. work stops before Phase I.
+9. gate/caller alternatives remained skipped at the Phase H checkpoint and no
+   expected new ABI was invented; and
+10. Phase H stopped before Phase I.
 
-Owner/security decisions still required are the resolution gate, checkpoint
-gate, total-loss caller, checkpoint caller, and acceptance of any incident
-withdrawal freeze. Phase H does not pass those gates.
+The later owner direction recorded in specification Section 12.1 resolves the
+Phase I control/caller assumptions only as tested in Section 11 below. It does
+not retroactively make Phase H an interface/storage approval.
 
-## 11. Exact-token fork plan
+## 11. Phase I compatibility, artifact, and migration validation contract
+
+All tests in this section are proposed. They verify the alternatives and
+migration consequences returned by specification Section 19; they do not
+approve an interface, storage layout, artifact, migration, or production
+vault.
+
+### 11.1 Direct-deployment and storage-layout assertions
+
+| Test | Required result |
+| --- | --- |
+| `test_protocol_components_are_direct_deployments_not_upgradeable_proxies` | Pinned Base Ripe components have direct runtime code; no repository proxy/beacon/delegatecall upgrade path is assumed. A future live run resolves every registry address and code hash independently. |
+| `test_module_change_recompiles_every_consuming_wrapper` | A controlled compile demonstrates that changing `SharesVault`/`VaultData` changes every composing wrapper artifact; no module is treated as a separately patchable library. |
+| `test_teller_deposit_mutex_is_transient_only` | Approved implementation candidate adds no persistent Teller slot; lock is transaction-local, clears on every success/revert, and has no external getter/setting authority. |
+| `test_existing_vault_balance_units_never_change` | `VaultData.userBalances/totalBalances` remain nominal units for Basic and raw shares for share wrappers; no migration or source change reinterprets stored units. |
+| `test_corrected_variant_minimum_state_is_two_buckets` | Candidate fresh layout represents `A^s` and `U^s`; `S>0 && A^s==0` persists the freeze without an extra allocation/beneficiary/collateral-use field. |
+| `test_corrected_variant_storage_layout_matches_compiler_metadata` | Declared layout/order and compiled storage metadata match exactly; migration tooling refuses a different compiler/source/layout hash. |
+| `test_direct_department_cutover_preserves_pause_and_constructor_posture` | Teller, AuctionHouse, CreditEngine, Lootbox, and Deleverage reproduce reviewed RipeHq/mint-permission immutables and current pause state; constructor defaults are not substituted for live reads. |
+| `test_credit_engine_cutover_preserves_live_local_config` | `undyVaulDiscount` and `buybackRatio` match the pinned old deployment before activation and all setters/events remain compatible. |
+| `test_lootbox_cutover_reconciles_local_reward_timing_config` | Integrated S3 immutable floor/constructor posture plus Underscore enablement, send interval, reward amounts, and pause match the approved chain profile/live snapshot. `lastUnderscoreSend` follows the separately owner-selected S3 final-distribution/partial-window/continuity policy; zero-reset is not silently accepted. Ledger-owned point state is reconciled separately. |
+| `test_deleverage_cutover_cannot_shorten_user_cooldown` | Config and per-user `lastDeleverageBlock` migrate exactly, or a separately approved disable-and-wait cutover proves every remaining cooldown elapsed before activation; zero-map reset fails. |
+| `test_stability_pool_wrapper_change_requires_full_state_and_custody_migration` | A StabVault caller-exactness edit recompiles StabilityPool; every user/asset share, enumeration, claimable balance/asset, pause, and token custody root migrates exactly before activation. |
+| `test_bond_room_cutover_preserves_booster_pause_and_ledger_bond_state` | Local booster/pause/constructor state and Ledger bond/bad-debt epoch state reconcile; exact Teller stake return is atomic with payout accounting. |
+| `test_human_resources_cutover_preserves_governance_timelock_and_pending_actions` | LocalGov, TimeLock, pending contributor actions, pause, and Ledger contributor/reward state migrate without changing caller authority or confirmation windows. |
+| `test_credit_redeem_cutover_preserves_pause_and_stock_redemption_disable` | Exact Teller sGREEN return is enforced while constructor/pause parity and the standing Stock redemption-disabled posture remain unchanged. |
+| `test_fresh_ledger_deployment_starts_empty` | Demonstrates why registry replacement without full migration loses Ledger state; test must not normalize an empty fresh Ledger into success. |
+| `test_fresh_mission_control_deployment_requires_complete_config_import` | Every general/debt/reward/asset/user/config and enumeration value plus pause/constructor posture differs from or is unproven against a populated source unless explicitly migrated; manifest address replacement alone is insufficient. |
+
+### 11.2 Interface, selector, event, and schema compatibility
+
+| Test | Required result |
+| --- | --- |
+| `test_canonical_vault_interface_remains_unchanged` | Existing Vault selectors/return tuple shapes are byte-for-byte identical under the recommended generic-variant boundary. |
+| `test_corrected_variant_is_a_vault_abi_superset` | Candidate specialized state/checkpoint views are additive; every canonical Vault call retains its exact encoding and documented per-wrapper unit. |
+| `test_checkpoint_has_no_caller_supplied_value_or_allocation` | Candidate call accepts only the asset, derives bucket changes from current state, and gives caller no amount, recipient, beneficiary, or mode discretion. |
+| `test_checkpoint_requires_existing_asset_containment` | `canDeposit=false` and `canBuyInAuction=false` are required; neither flag alone authorizes the call. |
+| `test_checkpoint_requires_existing_switchboard_actor` | `addys._isSwitchboardAddr(caller)` is required with no new role mapping; unauthorized Ripe Departments, users, and keepers fail atomically. |
+| `test_checkpoint_remains_live_while_vault_paused` | Broad vault pause does not prevent the restricted accounting checkpoint; deposits/withdrawals retain their separate pause behavior. |
+| `test_resolution_consumes_existing_can_liquidate` | Resolver succeeds only while the existing global control is true; disabling it stops ordinary liquidation and resolution but not repayment. |
+| `test_permissionless_resolution_has_zero_caller_discretion` | Candidate resolver accepts only `user`; contract derives all positions, debt, amount, auction cleanup, and bad-debt target. An implementation with caller-supplied subsets/amounts fails this gate. |
+| `test_two_selector_transition_encoding_and_authority` | CreditEngine external selector and CreditEngine-only Ledger selector encode exactly as reviewed; unauthorized direct Ledger call fails. |
+| `test_existing_events_and_selectors_remain_compatible` | Teller/Auction/vault existing event signatures and public selectors are unchanged except explicitly approved additive surfaces. |
+| `test_new_events_report_units_and_before_after_state` | Measurement, checkpoint, and loss-transition events expose exact units, previous/new values, caller, and ordering without reusing `RepayDebt`. |
+| `test_track8_lootbox_preserves_integrated_s3_abi_and_boundary` | Candidate keeps S3's five-argument constructor order, immutable floor, getter, strict send condition, and approved Base/Robinhood floor profiles byte-for-byte unless a separately reviewed S3 reopening approves a delta. |
+| `test_s3_send_floor_is_not_treated_as_loss_interval` | The existing S3 getter/floor cannot make untouched users adopt a changed vault claim; Track 8 loss-interval tests stay skipped until their own mechanism is approved. |
+
+### 11.3 Settlement-mechanism alternatives
+
+These are branch tests; neither branch is implementation-approved.
+
+| Test | All-external candidate | Per-asset-mode candidate |
+| --- | --- | --- |
+| `test_internal_auction_request_is_never_silently_reinterpreted` | `_shouldTransferBalance=true` rejects before custody/payment/debt changes | Rejects for an external-required asset; succeeds only for a separately enabled internal-safe asset |
+| `test_all_external_preserves_config_schema` | `AssetConfig`, MissionControl storage, Switchboards, defaults, getters, and ABIs unchanged | Not applicable |
+| `test_per_asset_mode_full_struct_round_trip` | Not applicable | Every existing field survives add/update/migration byte-for-byte and new field is explicit |
+| `test_per_asset_mode_default_is_fail_closed` | Not applicable | Omitted/new assets cannot inherit internal settlement; every Base asset gets an explicit migrated value |
+| `test_no_current_product_depends_on_internal_auction_settlement` | Inventory/fork every current asset and historical relevant event; product owner evidence required before branch approval | Existing internal consumers are identified and explicitly configured |
+| `test_external_delivery_is_measured_for_every_asset` | Required | Required for every external-mode asset |
+
+The recommended all-external branch cannot pass on code reasoning alone; it
+requires product/runtime evidence that current internal auction settlement is
+unused or intentionally removable.
+
+### 11.4 Corrected-variant compatibility and migration import
+
+| Test | Required result |
+| --- | --- |
+| `test_existing_rebase_positive_delta_semantics_unchanged` | Current Rebase/yield assets continue to allocate their intended positive balance changes; corrected quarantine behavior is isolated. |
+| `test_ripe_gov_lock_and_points_semantics_unchanged` | RipeGov shares, locks, points, and exits remain exact; only the separately approved Teller-only locked-deposit authorization changes. |
+| `test_corrected_variant_positive_delta_is_quarantine` | Candidate variant alone applies Section 17 `U` semantics. |
+| `test_migration_import_preserves_exact_raw_shares_and_indexes` | One-time candidate import reproduces every user/asset share, aggregate, and one-based enumeration exactly. |
+| `test_migration_import_sets_proven_allocated_and_quarantine_buckets` | Seeding requires a pinned entitlement/custody proof; it never defaults `A^s=C`. |
+| `test_migration_import_is_paused_authorized_idempotent_and_sealed` | Unauthorized/duplicate/post-finalize imports fail; finalization is irreversible and leaves no standing migration mint power. |
+| `test_ordinary_deposit_replay_is_not_accepted_as_state_migration` | Reordered deposits/rounding/donation setup demonstrates non-equivalence and the rehearsal rejects it. |
+| `test_empty_robinhood_launch_needs_no_user_import_but_still_needs_artifact_gate` | Fresh empty state has zero users/shares/buckets; no claim is made about Base migration. |
+
+### 11.5 Ledger full-state migration
+
+If the two-selector option is selected, migrate and reconcile every current
+Ledger domain. Named assertions:
+
+- `test_ledger_migration_preserves_last_touch_and_locked_accounts`;
+- `test_ledger_migration_preserves_user_vault_indexes_bidirectionally`;
+- `test_ledger_migration_preserves_user_total_debt_borrowers_and_intervals`;
+- `test_ledger_migration_preserves_unrealized_yield`;
+- `test_ledger_migration_preserves_global_asset_user_deposit_points`;
+- `test_ledger_migration_preserves_global_and_user_borrow_points`;
+- `test_ledger_migration_preserves_fungible_auctions_and_liquidation_users`;
+- `test_ledger_migration_preserves_hr_bond_bad_debt_and_pool_debt`;
+- `test_ledger_migration_preserves_department_pause_and_constructor_posture`;
+- `test_ledger_migration_preserves_all_aggregate_sums_and_one_based_indexes`;
+- `test_ledger_migration_rejects_missing_duplicate_or_reordered_entries`;
+- `test_ledger_cutover_is_blocked_until_source_and_target_roots_match`; and
+- `test_post_cutover_total_loss_transition_is_exactly_once`.
+
+No partial domain migration may pass. The fixture must populate every mapping
+class, not only debt/bad debt.
+
+### 11.6 Vault migration state machine
+
+Run property/state-machine tests over:
+
+```text
+uncontained
+-> contained
+-> enumerated
+-> reconciled
+-> new artifacts deployed inactive
+-> batches seeded/moved
+-> roots reconciled
+-> registry/config activated disabled
+-> old address retired
+-> post-state soaked
+```
+
+Required named tests:
+
+| Test | Required result |
+| --- | --- |
+| `test_event_and_storage_user_enumeration_reconcile` | Historical candidates plus Vault/Ledger state produce no missing/duplicate user/asset; borrower enumeration alone is explicitly insufficient. |
+| `test_failed_token_read_is_not_zero_balance` | Revert/malformed/rate-limit/archive failure stops reconciliation. |
+| `test_nominal_deficit_blocks_migration_without_owner_allocation` | `C<T` never becomes implicit pro rata or first-user allocation. |
+| `test_positive_unresolved_custody_blocks_migration` | Donation/restoration cannot be assigned by migration order. |
+| `test_active_auction_is_settled_or_paused_before_move` | No auction retains a claim on moved custody; no zero-delivery payment occurs. |
+| `test_repayment_stays_live_for_every_migration_state` | Borrow/deposit/auction containment never pauses standard repay. |
+| `test_partial_batch_failure_is_atomic_and_resumable` | Failed transaction changes neither side; prior committed batches remain uniquely recorded and both vaults stay non-credit-eligible. |
+| `test_old_and_new_positions_are_never_both_credit_eligible` | Across every intermediate state, aggregate capacity counts each entitlement at most once. |
+| `test_literal_custody_blocks_old_vault_retirement` | ID-4-style `shares=0,C>0` fails retirement despite current legacy funds boolean. |
+| `test_old_user_asset_and_ledger_indexes_are_cleaned` | Zero raw balances, deregistration, points checkpoint, and Ledger participation removal all reconcile. |
+| `test_vault_book_address_change_never_moves_state` | Registry update alone leaves custody/storage at the old address and cannot satisfy migration. |
+| `test_forward_and_reverse_migration_stop_on_issuer_freeze` | Transfer restriction is a stop; no claim rewrite is permitted. |
+
+### 11.7 Artifact, manifest, and live-version checks
+
+| Test | Required result |
+| --- | --- |
+| `test_manifest_deployment_is_not_registry_activation` | New manifest address with old live registry resolution is reported as inactive/version-skew, not successful deployment. |
+| `test_manifest_records_source_abi_args_creation_and_runtime_hashes` | Every approved artifact has complete reproducible metadata and a content hash. |
+| `test_track_8_does_not_invent_or_reuse_track_7_ids` | Every Track 8 RH migration ID/namespace remains `pending Track 7`; S3's recorded `0010_Track6S3LootboxFloor.py` meaning is recognized as S3-owned and cannot be reused for Track 8. Duplicate/ad-hoc values fail. |
+| `test_base_and_robinhood_shared_artifact_and_immutable_runtime_derivation` | Source/compiler/constructor schema/creation artifact match; each runtime hash is reproduced from approved chain constructor args, including S3 RipeHq/floor immutables. Any other difference is version skew with expiry/abort evidence. |
+| `test_s3_source_live_skew_and_pending_window_are_explicit` | Integrated S3 source/ABI and the dated old Base Lootbox runtime are reported separately; no Track 8 record claims S3 deployment or resolves its open distribution window. |
+| `test_track8_lootbox_delta_reopens_or_sequences_after_s3_review` | A combined source delta fails unless S3 review is explicitly reopened; a later separate cutover includes two migration/window/rollback records rather than treating the first as reusable state. |
+| `test_base_release_one_can_retain_reconciled_simple_storage` | ID-3 custody need not move when live nominal state is fully backed/reconciled and remains disabled for Stock listing, but every Teller exact-receipt caller and its local/Ledger/vault state satisfies the reviewed cutover plan. |
+| `test_teller_and_affected_consumers_never_run_mixed_while_value_paths_are_live` | Any staggered registry update keeps affected deposits, claims, payouts, stakes, redemptions, and deleverage routes contained until Teller and every measured/exact consumer are compatible; repayment remains available throughout. |
+| `test_release_two_requires_custody_bearing_vault_migration` | Corrected share adoption cannot be represented by a core-only registry change. |
+| `test_post_deploy_bundle_reconciles_all_roots_and_controls` | Code, registry, immutable/constructor posture, pause, core-local config/cooldown timing, custody, claims, buckets, debt, auctions, rewards, flags, and pending actions match the reviewed bundle before enablement. |
+| `test_failed_post_deploy_assertion_keeps_asset_disabled` | No probe auto-repairs or re-enables state. |
+
+### 11.8 Rollback and audit assertions
+
+| Test | Required result |
+| --- | --- |
+| `test_inactive_deployment_can_be_abandoned_without_state_change` | Before seeding/activation, old live state is unchanged. |
+| `test_partial_migration_requires_forward_or_explicit_reverse_plan` | Address flip is rejected as rollback after any seed/custody batch. |
+| `test_post_economic-write_address_flip_is_not_rollback` | After borrow, settlement, reward, or bad-debt write under new semantics, old address activation cannot restore prior economics. |
+| `test_rollback_never_erases_new_bad_debt_or_rewards` | Reverse reconciliation includes every post-cutover write exactly once. |
+| `test_security_review_boundaries_match_source_impact_table` | Teller delta/mutex, Credit backing, Auction delivery, Ledger transition/migration, share math/storage/import, rewards/S3, registry/config, and exact-token behavior each have named reviewers and artifacts. |
+
+### 11.9 Phase I acceptance and owner stop
+
+Phase I validation specification is acceptable when:
+
+1. every required source-impact row has storage, compatibility, caller,
+   artifact, live-version, migration, rollback, and audit assertions;
+2. direct-deployment versus proxy behavior is proven from live/runtime and
+   source evidence;
+3. recommended no-new-parameter paths preserve ConfigStructs/MissionControl
+   schemas;
+4. every owner-returned alternative has branch-specific tests and is skipped
+   until selected;
+5. any Ledger selector approval is inseparable from the full-state migration
+   matrix;
+6. any corrected-vault approval is inseparable from bucket storage,
+   specialized evidence, and one-time import/finalization review;
+7. integrated S3 floor/constructor/getter tests stay green, while Track 8
+   reward-loss integration remains skipped until the owner approves a
+   separate interval/index or checkpoint authority and S3 rollout sequencing;
+8. Track 7 owns exact IDs/manifests/tooling and no identifier is improvised;
+9. Base/RH artifact parity and post-state reconciliation fail closed; and
+10. work stops before Phase J.
+
+Owner decisions still required are listed in specification Section 19.9. No
+test implementation, new selector, storage, production vault, migration, or
+Phase J is passed by this validation contract.
+
+## 12. Exact-token fork plan
 
 Proposed future file:
 `tests/probes/test_aapl_vault_behavior_fork.py`.
@@ -1166,13 +1380,16 @@ No live signing or broadcast is part of this plan. Live sender/recipient
 eligibility, acquisition, gas, approvals, and legal permission remain separate
 owner/counsel gates.
 
-## 12. Dual-clock and identical-artifact integration
+## 13. Dual-clock and identical-artifact integration
 
 The narrow S1/S2 kickoff choices were owner-approved in post-bootstrap
 integration commit `ce3805d6079ee87d727486ea82b75cbddc12e46d`. Their implementation
-artifacts remain pending. Once integrated:
+and checked inventory are now available on integrated `rh`; Track 8 has not
+imported them and Phase J remains unauthorized. Once Phase J is authorized:
 
-- run the same compiled artifacts under Base and Robinhood profiles;
+- run the same reviewed source/compiler/creation artifact under Base and
+  Robinhood profiles and reproduce approved immutable-derived runtime
+  differences;
 - exercise repeated `block.number`, `+1`, and multi-number jumps;
 - verify emergency disable, timelocked/stronger re-enable, auctions, debt
   transition, registry changes, and migration sequencing;
@@ -1185,9 +1402,12 @@ Clock behavior must not change custody conservation. Repeated or jumping numbers
 may delay a timelock or auction but cannot permit payment for undelivered
 collateral or duplicate bad debt.
 
-## 13. Migration validation scaffold
+## 14. Migration validation scaffold
 
-Pending owner live-version policy and Track 7 namespace/tooling:
+This concise scaffold is retained for test-run orchestration and is
+subordinate to the complete Phase I state machine in Sections 11.5–11.8 and
+specification Section 19.6. Exact live-version policy remains owner-returned,
+and Track 7 still owns namespace/tooling:
 
 1. pin old/new source, runtime, registry, and manifest identities;
 2. enumerate every old-vault asset/user plus `C`, `A^s`, `U^s`, `A`, `U`,
@@ -1210,7 +1430,7 @@ Pending owner live-version policy and Track 7 namespace/tooling:
 Rollback reality must be tested as a state migration, not described as merely
 switching an address back.
 
-## 14. Diagnostics and evidence requirements
+## 15. Diagnostics and evidence requirements
 
 Every future test record must include:
 
@@ -1231,7 +1451,7 @@ Every future test record must include:
 
 Unknown pause/blocklist/upgrade state must be labeled unknown, not false.
 
-## 15. Proposed tiers and commands
+## 16. Proposed tiers and commands
 
 Commands are placeholders until files exist and the owner approves
 implementation:
@@ -1247,7 +1467,7 @@ implementation:
 
 No dependency or tool addition is authorized by this scaffold.
 
-## 16. Review and launch gates
+## 17. Review and launch gates
 
 The owner-confirmed instructions select option 4, authorize Phase D
 specification, then authorize Phase E specification under the explicit
@@ -1256,32 +1476,33 @@ external-settlement and exactly-once total-loss directions for specification
 only, and then approve the Phase G freeze, no-automatic-allocation, and
 live-claim reward directions for specification only. The owner then authorized
 Phase H specification only under the existing-controls, repayment-liveness,
-and return-before-new-surface boundary. The Phase D–H designs, control
-alternatives, and future test contracts are complete for owner review; no
-implementation or test change is authorized. Phase I and later
-implementation/release gates remain blocked on the following decisions at
-their recorded boundaries:
+and return-before-new-surface boundary, and subsequently authorized Phase I
+specification under the five directions recorded in specification Section
+12.1. Phases A–I and their future test contracts are complete for owner
+review; no implementation or test change is authorized. Phase J and later
+implementation/release work remain blocked on these decisions and external
+inputs at their recorded boundaries:
 
 - all-external versus per-asset settlement enforcement mechanism;
 - exact CreditEngine/Ledger transition interfaces;
-- Phase H total-loss resolution gate and permissionless versus
-  restricted/governed caller policy;
 - allocated/quarantine checkpoint storage/wrapper mechanism;
 - accounting/counsel-risk confirmation that observed losses reduce `A` before
   checkpointed `U`;
 - positive-delta compatibility boundary for existing yield/rebase assets;
-- Vault/Lootbox/Ledger reward integration surface after S3;
-- share-loss checkpoint gate/caller policy after Phase H's alternatives;
-- incident withdrawal-freeze posture when delivery is unsafe;
+- Vault/Lootbox/Ledger loss-interval surface and integrated-S3 rollout
+  sequencing;
 - Base live-version/migration posture;
-- integrated S1/S2 and Track 7 interfaces;
+- Phase J consumption of integrated S1/S2 plus Track 7-owned interfaces;
+- production vault and Track 7-owned VaultBook ID;
 - implementation review and audit decision; and
 - exact-token, Base regression, migration, testnet, and smoke evidence.
 
 At this checkpoint, the evidence baseline, formal invariant map, Phase C
 comparison, Phase D deposit-accounting design, Phase E backing/debt-health
 design, Phase F settlement/total-loss design, Phase G corrected-share design,
-Phase H control/evidence analysis, proposed test names, and required matrices
-are ready for owner review. Work stops before Phase I. No implementation,
-interface, storage, test, dedicated pause, caller policy, migration,
-production-vault, Phase I, or launch gate is passed by this specification.
+Phase H control/evidence analysis, Phase I compatibility/artifact/migration
+inventory, proposed test names, and required matrices are ready for owner
+review. Work stops before Phase J. No implementation, interface, storage,
+test, dedicated pause, migration, production vault, Phase J, or launch gate
+is passed by this specification. The Phase I-directed existing control/caller
+conditions do not approve the selectors or storage they would govern.

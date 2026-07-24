@@ -1,8 +1,9 @@
 # Shared Stock Token Vault-Change Specification
 
-Status: **Phase H control/evidence analysis complete for owner review; no new
-storage, interface, dedicated pause, or caller policy selected; Phases I–K
-intentionally not finalized**
+Status: **Phase I source/interface/storage/artifact/migration analysis complete
+for owner review; no production vault, new storage/interface mechanism,
+migration, or implementation selected; Phases J–K intentionally not
+finalized**
 
 Date: 2026-07-24 (America/Denver)
 
@@ -11,11 +12,11 @@ This document is the Track 8 working specification required by
 formal state and invariant model, architecture comparison, mandatory early
 owner checkpoint, exact deposit-accounting design, and backing/debt-health
 design, plus the settlement/liquidation/total-loss and corrected share-vault
-designs, and the Phase H current-control, governance, clock, and operational
-evidence analysis. It does not select a production vault, approve an automatic
-donation/restoration allocation or recapitalization, authorize a Base
-migration, approve any newly identified storage/interface mechanism, select a
-dedicated pause or caller policy, or authorize implementation.
+designs, the Phase H current-control, governance, clock, and operational
+evidence analysis, and the Phase I compatibility and migration inventory. It
+does not select a production vault, approve an automatic donation/restoration
+allocation or recapitalization, authorize a Base migration, approve any newly
+identified storage/interface mechanism, or authorize implementation.
 
 The owner-confirmed instruction selects option 4 as the architecture direction
 for specification work only. Until the later gates are approved and
@@ -516,6 +517,113 @@ previously disclosed
 `docs/chains/rh/track-6-s4-deleverage-cooldown.md`; no Phase H
 source/evidence path changed. That commit was not imported or treated as Track
 8 evidence.
+
+### 3.9 Phase I source and branch recheck
+
+At Phase I entry, the isolated Track 8 worktree was clean and synchronized
+with its owner-authorized backup branch at
+`342ea34b372a415f5f2ddf43c6cc1e4ed2a7d762`. Local integration `rh` was
+clean at `127b4bf287bf63c5ed662d82fbf3db8bf66d06a3`, one documentation-only
+commit ahead of `origin/rh` at
+`382eb7da82bc4ed54be945311a8ccd30fae87dec`. The Track 8 merge base remained
+`be6a759e15e763b633feefdce91cf8f3ee31a10e`; no integration commit was
+imported.
+
+The sole local-only integration increment,
+`382eb7d..127b4bf`, adds
+`docs/chains/rh/track-6-s4-deleverage-cooldown.md`. It changes no contract,
+interface, ABI, migration, manifest, default, parameter generator, or Track 8
+deliverable. The Phase I source and artifact inventory is therefore performed
+against the same pinned contract tree and Base manifest used by Phases A–H.
+
+Captured at Phase I entry:
+
+```text
+git status --short --branch
+=> ## rh-track-8-stock-token-vault-change...origin/rh-track-8-stock-token-vault-change
+
+git rev-parse HEAD
+git rev-parse origin/rh-track-8-stock-token-vault-change
+=> 342ea34b372a415f5f2ddf43c6cc1e4ed2a7d762
+   342ea34b372a415f5f2ddf43c6cc1e4ed2a7d762
+
+git -C /Users/wigglez/dev/ripe-protocol status --short --branch
+=> ## rh...origin/rh [ahead 1]
+
+git -C /Users/wigglez/dev/ripe-protocol rev-parse HEAD
+git -C /Users/wigglez/dev/ripe-protocol rev-parse origin/rh
+=> 127b4bf287bf63c5ed662d82fbf3db8bf66d06a3
+   382eb7da82bc4ed54be945311a8ccd30fae87dec
+
+git merge-base HEAD origin/rh
+=> be6a759e15e763b633feefdce91cf8f3ee31a10e
+```
+
+During final Phase I validation, integrated `rh` and `origin/rh` advanced
+externally from the entry state to
+`3e6e6f230169fc445d0b29454457480c62efd89a`, merge commit
+`merge: integrate Track 6 S3 Lootbox floor`. The Track 8 worktree was not
+rebased and imported no integration commit; its merge base with `origin/rh`
+remained `be6a759e15e763b633feefdce91cf8f3ee31a10e`.
+
+The `127b4bf..3e6e6f2` delta changes `contracts/core/Lootbox.vy`, its
+generated ABI, S1/S2 inventory/tooling and tests, shared test configuration,
+and the new S3 implementation record. It changes no other Phase I production
+source and no Track 8 deliverable. Phase I therefore re-read the integrated
+Lootbox source, ABI, and implementation record through `origin/rh`, reconciled
+them in Sections 17 and 19, and kept the remaining pinned Track 8 source
+baseline unchanged. No S3 deployment, registry change, or live-state action is
+treated as complete. The Track 5 comparison file is unchanged; its 90-case
+evidence remains pinned to `be6a759`. Any later rerun at integrated `rh` must
+account for S3's `tests/conf_core.py` Lootbox constructor change before
+attributing a difference to Track 8.
+
+Captured after the integration advance:
+
+```text
+git -C /Users/wigglez/dev/ripe-protocol rev-parse HEAD
+git -C /Users/wigglez/dev/ripe-protocol rev-parse origin/rh
+=> 3e6e6f230169fc445d0b29454457480c62efd89a
+   3e6e6f230169fc445d0b29454457480c62efd89a
+
+git merge-base HEAD origin/rh
+=> be6a759e15e763b633feefdce91cf8f3ee31a10e
+
+git diff --name-status 127b4bf..origin/rh -- \
+  config contracts interfaces scripts \
+  migration_history/base-mainnet/v1/current-manifest.json
+=> M config/block-clock-inventory.json
+   M contracts/core/Lootbox.vy
+   M scripts/abis/Lootbox.json
+   M scripts/check_block_clock_inventory.py
+```
+
+The manifest addresses used in Phase I are repository-declared deployment
+records, not a substitute for a same-block live registry/code-hash read.
+Section 5 independently pinned only `VaultBook`, `SimpleErc20`, and
+`RebaseErc20` live identities. Every future core migration must repeat live
+`RipeHq`/`VaultBook` resolution and runtime-code verification before treating
+a manifest address as active.
+
+### 3.10 Phase I reconciliation audit trail
+
+Phase I required reach-back edits so the earlier phase records compose with
+the later owner direction without rewriting their historical checkpoints:
+
+| Earlier surface | Phase I reconciliation |
+| --- | --- |
+| Status, introduction, hold, and checklist | Advanced the deliverables from the Phase H checkpoint to Phase I owner review, moved the hold to Phases J–K, and left `rh-summary.md` unchanged. |
+| Owner record and decision register (Sections 12.1–12.3) | Recorded the exact five-direction Phase I authorization, distinguished the resolved control/caller assumptions from the still-unapproved selectors/storage, and registered the returned implementation, migration, and live-version choices. |
+| Phase C component map (Section 13) | Kept the original boundary as historical context and made Section 19.4 the exhaustive source/interface/storage/artifact impact inventory. |
+| Phase F caller, controls, and acceptance (Sections 16.10–16.12) | Applied the later conditional permissionless-caller and existing-`canLiquidate` directions without approving the proposed selectors or Ledger migration. |
+| Phase G observation, compatibility, and rewards (Sections 17.5–17.11) | Applied the later existing-Switchboard checkpoint-caller direction and returned the exact two-bucket/interface alternatives. After S3 integrated during Phase I, reconciled its Lootbox floor/constructor/getter/ABI change and recorded that it does not supply the separate loss-checkpoint reward interval/index. |
+| Phase H handoff (Sections 18.12–18.13) | Preserved the Phase H alternatives as the historical handoff, then recorded which assumptions the later Phase I instruction resolved and which new machinery remains unapproved. |
+| Validation plan | Added the Section 11 compatibility/artifact/migration contract, reconciled earlier acceptance gates with the later direction, renumbered the former Sections 11–16 to 12–17, and moved the stop boundary to Phase J. No test or implementation file was created. |
+
+These are composition and provenance edits, not retroactive Phase I authority.
+They do not select a new storage layout, interface, ABI, settlement mechanism,
+production vault, migration, or Phase J work. The companion validation-plan
+introduction links back to this audit trail.
 
 ## 4. Current consumer and ordering trace
 
@@ -1642,6 +1750,33 @@ alternatives. It may not select a total-loss or checkpoint caller, introduce
 or select a dedicated pause, propose a new storage/interface mechanism, begin
 the Phase I compatibility table, or authorize implementation or migration.
 
+After Phase H was signed off, Phase I continuation was recommended with five
+explicit directions:
+
+1. use existing global `canLiquidate` as the total-loss-resolution gate
+   baseline and accept its global liquidation coupling for design analysis;
+2. analyze a narrow share-loss checkpoint gate without treating new storage
+   or an interface as approved;
+3. permit a total-loss transition caller only if the final entry point is
+   deterministic and gives the caller no discretion over eligibility, amount,
+   recipient, or timing-sensitive value;
+4. use a restricted existing onchain operational actor for the share-loss
+   checkpoint; and
+5. preserve withdrawals when actual delivery is safe, disabling the affected
+   asset only when delivery is unsafe.
+
+The owner replied:
+
+> okay let's do it
+
+That assent authorizes **Phase I specification work only** under those five
+directions. It does not approve the two-selector bad-debt interface, any
+allocated/quarantine storage representation, a checkpoint selector, a
+production vault, an all-external behavior change for every asset, a new
+per-asset settlement field, a Base/Robinhood migration, implementation, or
+Phase J. Phase I may prove that an interface or storage mechanism is necessary
+and return exact alternatives; it may not silently select one.
+
 The remaining phase gates below remain operative. The current production
 posture is still `do not list Stock Tokens under the current vault designs`.
 
@@ -1650,12 +1785,13 @@ posture is still `do not list Stock Tokens under the current vault designs`.
 The product/architecture direction required for Phase D, the existing-controls
 direction required for Phase E, the two policy directions required for Phase
 F, and the three policy directions required for Phase G are owner-confirmed as
-satisfied for specification work. Phase H specification work is also
-owner-authorized, but its control/caller alternatives are deliberately
-returned without selection. The remaining two original decisions gate Phase I
-and implementation planning. The Phase F–H source traces also create narrower
-implementation-mechanism/caller/compatibility decisions; none is implied by a
-policy approval.
+satisfied for specification work. Phase H specification work and Phase I
+compatibility analysis are also owner-authorized. The five directions above
+resolve the Phase H analysis boundary for Phase I without approving a storage,
+interface, production vault, or migration. The remaining original live-version
+and release decisions gate implementation planning. The Phase F–I source
+traces create narrower implementation-mechanism/compatibility decisions; none
+is implied by a policy approval.
 
 | Decision | Options | Evidence and recommendation | Owner | Affected components | Prerequisite / milestone | Status |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -1666,7 +1802,7 @@ policy approval.
 | Post-zero state | Freeze / explicit recapitalization | Freeze selected; old shares persist with zero claim and no fresh deposits | Protocol owner + risk | `CM-025`, deposit callers, controls | Before Phase G | **Owner-confirmed: freeze for Phase G specification; implementation not approved** |
 | Later donation/restoration | Old holders / donor return / protocol / explicit recapitalization allocation / no automatic allocation | No automatic allocation selected; any later allocation/recovery requires a separate owner plus counsel/risk decision | Protocol owner + counsel/risk | Share math, recovery, migration | Before Phase G | **Owner-confirmed: no automatic allocation; no recapitalization/recovery transaction approved** |
 | Reward attribution | Raw shares / live claims / hybrid explicit units | Live-claim-based economic units selected; raw shares remain accounting evidence only and S3 coordination is mandatory | Protocol owner + economics | `CM-033`, `CM-025` | Before Phase G/H | **Owner-confirmed: live-claim units for Phase G specification; Lootbox/interface implementation not approved** |
-| Base live-version posture | Migrate before RH / bounded temporary drift / justified permanent exception | Funded ID 3 and live controlled assets make this material; recommend Release 1 Base migration subject to plan | Protocol owner + security/operations | Base vault consumers, VaultBook, manifests | Before Phase I/release | Requested at checkpoint; gates Phase I/release |
+| Base live-version posture | Migrate before RH / bounded temporary drift / justified permanent exception | Funded ID 3 and live controlled assets make this material; Section 19 recommends Base-first-or-atomic convergence, subject to owner migration approval | Protocol owner + security/operations | Base vault consumers, VaultBook, manifests | Before implementation/release | **Phase I impact analyzed; owner live-version and migration decision still required** |
 | Release 1 Base priority | Hardening requirement / RH prerequisite only / no release | Recommend urgent Base hardening | Protocol owner + security | Containment atomic group | Before implementation track | Requested at checkpoint; gates implementation split |
 
 New Phase F implementation-mechanism/caller decisions, returned because no
@@ -1677,7 +1813,7 @@ transition caller's timing authority requires separate security review:
 | --- | --- | --- | --- | --- |
 | External-settlement enforcement | Disable buyer-selected internal settlement for all fungible auctions / add a generic per-asset settlement mode if bounded internal settlement must survive for other assets | Prefer the all-external simplification if product compatibility permits; otherwise approve the narrowly named per-asset mode after Phase I impact review | Any Phase F implementation design | **Returned; no new field, getter, setter, default, migration, or ABI selected** |
 | Atomic bad-debt mechanism | Approve the two-selector CreditEngine→Ledger transition in Section 16.10 / approve another reviewed atomic shared-contract design / do not list | Approve the no-new-storage, compare-and-set two-selector design after accounting/security review | Any Phase F implementation design | **Returned; interfaces and implementation not approved** |
-| Total-loss transition caller | Permissionless/keeper-callable under deterministic predicates / restricted approved keeper or Department / governed per-transition action | Phase H Section 18.8 compares timing, griefing, liveness, and pause coordination without proposing or selecting a caller | Any Phase F implementation design | **Returned after Phase H analysis; caller policy not proposed or approved** |
+| Total-loss transition caller | Permissionless deterministic / restricted approved keeper or Department / governed per-transition action | Permissionless is acceptable only for the zero-discretion `resolveUserTotalLoss(user)` shape in Section 19; any caller-supplied amount, asset list, recipient, or timing-sensitive value voids that direction and returns to owner/security | Any Phase F implementation design | **Owner-directed condition for Phase I; interface and implementation not approved** |
 
 New Phase G compatibility decisions, returned because current source derives
 claims directly from all custody and existing reward/recovery surfaces cannot
@@ -1688,7 +1824,7 @@ express the approved policies:
 | Allocated-backing mechanism | Append explicit allocated/quarantine checkpoint state to a generic share path / deploy a generic vault-level policy variant / another audited mechanism proving `A^s/U^s/A/U` / do not list | Preserve the Section 17 semantics and prefer a generic vault-level boundary over a new Stock-specific contract or token-name branch; assess storage and current positive-rebase compatibility in Phase I | Any Phase G implementation design | **Returned; no storage slot, selector, wrapper, or production vault approved** |
 | Quarantine loss ordering | Preserve checkpointed `U` and reduce `A` first / use `U` as shareholder loss insurance / pro-rata reduction | Preserve `U` and reduce `A` first; otherwise the donation is automatically allocated for shareholder benefit contrary to the selected policy. Counsel/risk must confirm this property treatment before implementation | Phase I/accounting/counsel-risk review | **Reference behavior specified; implementation approval pending counsel/risk confirmation** |
 | Positive-delta compatibility | Quarantine unsolicited positive deltas in the corrected path / explicitly allocate positive rebases in a separately reviewed generic mode | Do not silently apply quarantine semantics to existing yield/rebase users; separate the generic behaviors explicitly and test both | Phase I source/storage/interface impact review | **Returned; no mode/configuration field approved** |
-| Reward integration surface | Reuse live-amount getters with explicit semantics / add an explicit economic-weight getter / global index or other S3-compatible model | Preserve raw shares for accounting, use live claims for economic weight, exclude `U` from global value, and let S3 close interval-boundary mechanics | Phase I plus integrated S3 | **Returned; no Vault/Lootbox/Ledger ABI or storage change approved** |
+| Reward integration surface | Reuse live-amount getters with explicit semantics / add an explicit economic-weight getter / global loss interval/index compatible with integrated S3 / do not list | Preserve raw shares for accounting, use live claims for economic weight, exclude `U` from global value, preserve S3's send-floor surfaces, and separately solve the untouched-user loss boundary because integrated S3 does not | Phase I owner/economics/security review | **Returned; no Vault/Lootbox/Ledger ABI or storage change approved** |
 
 New Phase H control decisions are returned because current source has useful
 fast controls but no dedicated total-loss/checkpoint gate and because broad
@@ -1696,11 +1832,11 @@ contract pauses violate the owner-required repayment-liveness boundary:
 
 | Decision | Alternatives returned | Evidence and recommendation | Owner | Affected components | Prerequisite / needed-before milestone | Status |
 | --- | --- | --- | --- | --- | --- | --- |
-| Total-loss resolution gate | Reuse existing global `canLiquidate` consumption / rely on broad Department pauses / later consider a dedicated narrow gate / no listing | `canLiquidate` is immediate, fast-disable/governance-enable, observable, and does not gate repayment, but couples resolution to all ordinary liquidation. Broad Teller/CreditEngine/Ledger pauses block repayment or transition dependencies and are rejected as the normal gate. A dedicated gate would be more precise but is outside the no-new-interface/storage authorization. | Protocol owner + security | MissionControl, SwitchboardAlpha/Charlie, AuctionHouse, CreditEngine, Ledger | Owner/security accept an existing control's full blast radius, or separately authorize later dedicated-gate analysis, before Phase I or any Phase F implementation design | **Alternatives returned; existing-control reuse not selected; no dedicated pause proposed** |
-| Share-loss checkpoint gate | Require existing asset containment plus reuse an existing global control / broad vault pause / later consider a dedicated narrow gate / no listing | `canDeposit=false` and `canBuyInAuction=false` contain new exposure but do not authorize a checkpoint. Vault pause is immediate but affects every asset in the vault. No clean existing control is recommended; a dedicated gate would require later interface/storage review. | Protocol owner + security/risk | MissionControl, SwitchboardAlpha/Charlie, selected share-vault boundary, Teller, Lootbox | Owner/security accept an existing control's blast radius, or separately authorize later dedicated-gate analysis, before Phase I or any Phase G implementation design | **Alternatives returned; no checkpoint gate or dedicated pause selected** |
-| Total-loss transition caller | Permissionless deterministic / restricted existing Department or approved actor / governance per transition / no listing | Permissionless maximizes liveness but creates timing/griefing questions; a restricted existing actor bounds initiation but adds availability/trust; governance per transition is slow and `NUMBER`-dependent. Phase H returns the tradeoff without ranking it into policy. | Protocol owner + security/operations | CreditEngine, Ledger, AuctionHouse, selected resolution gate and evidence event | Resolution gate and caller-discretion/race analysis completed before interface design or any Phase F implementation design | **Returned; no caller policy proposed or selected** |
-| Share-loss checkpoint caller | Permissionless deterministic / restricted existing Department or approved actor / governance per checkpoint / combine atomically with a later approved total-loss transition / no listing | Timing determines whether later restoration is quarantined, so caller discretion and observation evidence are property-sensitive. Combining calls may reduce races but would itself be an interface choice. | Protocol owner + security/risk/operations | Selected share-vault boundary, checkpoint gate, Teller, Lootbox, operational evidence surface | Checkpoint gate, property/counsel-risk treatment, and timing analysis completed before interface design or any Phase G implementation design | **Returned; no caller or atomic-combination policy proposed or selected** |
-| Incident withdrawal posture | Preserve safe withdrawals asset-by-asset / disable affected-asset withdrawal when delivery is unsafe / broader freeze | Preserve repayment in every normal response and preserve withdrawals when actual delivery is safe. A per-asset freeze is the narrowest current fallback when delivery is unsafe; any broader freeze requires explicit incident evidence. | Protocol owner + security/operations | MissionControl, SwitchboardAlpha/Charlie, Teller/TellerUtils, selected vault and all co-resident assets | Exact delivery failure and blast radius evidenced before any incident action or later runbook approval | **Returned; no production flag action or standing withdrawal freeze approved** |
+| Total-loss resolution gate | Reuse existing global `canLiquidate` consumption / dedicated narrow gate / no listing | `canLiquidate` is immediate, fast-disable/governance-enable, observable, and repayment-independent; its global ordinary-liquidation coupling is explicit. Broad Teller/CreditEngine/Ledger pauses remain rejected. | Protocol owner + security | MissionControl, SwitchboardAlpha/Charlie, AuctionHouse, CreditEngine, Ledger | Exact resolver interface/security review before implementation | **Owner-directed for Phase I: use existing `canLiquidate` baseline; no dedicated gate or implementation approved** |
+| Share-loss checkpoint gate | Existing asset containment as preconditions / dedicated narrow gate / no listing | Require `canDeposit=false` and `canBuyInAuction=false` before checkpoint; these contain exposure but do not themselves authorize state mutation. Do not add a dedicated stored gate by default. | Protocol owner + security/risk | MissionControl, SwitchboardCharlie, selected share-vault boundary, Teller, Lootbox | Corrected-share storage/interface review before implementation | **Owner-directed for Phase I: analyze narrow no-new-gate path; selector/storage remain unapproved** |
+| Total-loss transition caller | Permissionless deterministic / restricted existing actor / governance per transition / no listing | Permissionless only for a zero-discretion `resolveUserTotalLoss(user)` that derives every value and eligibility input onchain; any caller-supplied subset/amount/recipient returns the decision. | Protocol owner + security/operations | CreditEngine, Ledger, AuctionHouse, resolution gate and evidence event | Caller-discretion/race proof before implementation | **Owner-directed condition for Phase I; resolver selector and implementation not approved** |
+| Share-loss checkpoint caller | Restricted existing Switchboard actor / another approved actor / governance per checkpoint / no listing | Use existing `addys._isSwitchboardAddr` authority; no role mapping. The call must derive bucket changes and require containment, so the actor cannot choose allocation. | Protocol owner + security/risk/operations | Selected share-vault boundary, containment flags, evidence surface | Checkpoint storage/interface and counsel/risk review before implementation | **Owner-directed for Phase I: existing Switchboard actor; checkpoint selector/storage not approved** |
+| Incident withdrawal posture | Preserve safe withdrawals asset-by-asset / disable affected asset when unsafe / broader freeze | Preserve repayment always and withdrawals when measured delivery is safe. Use existing per-asset disable only when delivery is unsafe; no standing broader freeze. | Protocol owner + security/operations | MissionControl, SwitchboardAlpha/Charlie, Teller/TellerUtils, selected vault and all co-resident assets | Exact delivery failure and blast-radius evidence before incident action | **Owner-directed operating posture; no production flag action approved** |
 
 ### 12.3 Decisions explicitly deferred but registered
 
@@ -1712,11 +1848,11 @@ These must not be treated as approved by the checkpoint recommendation:
 | Requested/received/excess semantics | Validated transfer attempt `Q`; received/credited `R`; zero, negative, or excess delta reverts; see Section 14 | Phase D completion | **Specified; implementation not approved** |
 | Nominal partial loss | Freeze unresolved or owner-approved allocation; never silent pro rata | Phase E/F | Deferred |
 | Rounding | Retain `10^8` virtual shares and one virtual asset; deposit down, withdrawal share burn up, claim down, last-share sweep; see Section 17 | Phase G | **Specified; implementation not approved** |
-| Emergency disable/re-enable | Section 18 maps the current fast flags and broad pauses, rejects broad Teller/CreditEngine/Ledger pause as the normal resolution gate because it blocks repayment, and returns existing-`canLiquidate`, vault-pause, dedicated-gate, and caller alternatives without selecting any. | Owner/security decision before Phase I or implementation design | **Phase H evidence complete; control/caller selection pending and no live action approved** |
-| Vault selection | No production vault selected | Phase I owner gate | Deferred |
-| Migration atomicity/rollback | Explicit live users/funds/debt/auctions plan | Phase I | Pending Track 7 |
+| Emergency disable/re-enable | Sections 18–19 use existing `canLiquidate`, asset containment, Switchboard authority, and safe-withdraw posture; no dedicated stored gate/pause | Interface/security review before implementation | **Phase I direction specified; no selector, storage, implementation, or live action approved** |
+| Vault selection | No production vault selected; Section 19 recommends but does not select a new generic corrected-share boundary | Post-Phase-I owner gate | Deferred |
+| Migration atomicity/rollback | Section 19.6 specifies live users/funds/debt/auctions/rewards, partial failure, retirement, and rollback reality | Before implementation/release | **Specified; exact IDs/manifests/tooling pending Track 7 and no migration approved** |
 | Exact-token evidence | Pinned AAPL fork plus behavior-switch/loss tests | Phase J | Pending implementation |
-| S1/S2 identical artifacts | Base/RH profiles and checked inventory | Phase J | Pending integrated S1/S2 |
+| S1/S2 identical artifacts | Base/RH profiles and checked inventory | Phase J | **Available on integrated `rh`; not imported here; pending authorized Phase J reconciliation** |
 | Audit/release | Atomic group, reviewers, testnet, smoke, soak | Phase K | Deferred |
 
 ## 13. Affected component map at checkpoint
@@ -2846,10 +2982,10 @@ Current accounting cannot safely express Section 16.9:
 The minimum coherent shared-contract proposal uses existing storage and two
 new selectors:
 
-1. `CreditEngine.resolveUserTotalLoss(user, ...) -> transitionedAmount`
+1. `CreditEngine.resolveUserTotalLoss(user) -> transitionedAmount`
    performs the complete Section 16.8 scan, accrues `Y`, pins the Ledger debt
-   snapshot, and invokes the Ledger transition. Its caller policy is a separate
-   returned decision rather than part of the selected interface.
+   snapshot, and invokes the Ledger transition. The later Phase I direction
+   permits permissionless calling only for this zero-discretion shape.
 2. `Ledger.moveUserDebtToBadDebt(user, expectedStoredAmount,
    expectedLastTimestamp, finalDebtAmount, accruedInterest)` is CreditEngine-
    only. It asserts the expected stored snapshot, `finalDebtAmount =
@@ -2867,13 +3003,13 @@ The caller-policy options are:
 Permissionless progress avoids a governance queue for a deterministic unsafe
 account, but it also lets an unrelated keeper choose transaction ordering
 against a borrower's intended repayment. Compare-and-set makes either mined
-order accounting-safe; it does not by itself decide whether that timing power
-is an acceptable product/security property. Before selection, security review
-must prove that the caller cannot choose the amount, recipient, collateral
-allocation, bad-debt destination, or any value-sensitive eligibility input;
-model public-mempool and same-block repayment races; and compare the liveness,
-griefing, and operational risk of all three options. The owner must approve the
-caller policy separately.
+order accounting-safe. The later Phase I direction accepts that caller policy
+only if security review proves the caller cannot choose eligibility, amount,
+recipient, collateral allocation, bad-debt destination, partial position set,
+or any timing-sensitive value input. Public-mempool and same-block repayment
+races remain mandatory tests. If implementation requires any such
+caller-supplied discretion, the caller decision returns to the owner; it
+cannot inherit permissionless authority from this specification.
 
 This proposal adds no new storage slot, no asset parameter, no insurer, and no
 recovery asset. It does add one CreditEngine ABI selector, one Ledger ABI
@@ -2896,13 +3032,15 @@ also carry the resolution caller and canceled-auction count. Existing
 
 The current governed `setBadDebt(amount)` may remain only as an explicitly
 audited global reconciliation tool. It must not be used for individual
-transitions, and future Phase I review must ensure an overwrite cannot
+transitions, and implementation review must ensure an overwrite cannot
 accidentally erase bad debt accumulated by atomic transitions.
 
 The two selectors and event/ABI changes are an exact proposal, not an
-approval. The caller policy is an explicit unresolved sub-decision. All are
-returned to the owner for accounting/security review before any implementation
-design. If rejected, the fallback remains: do not list.
+approval. The conditional permissionless policy is owner-directed for Phase I,
+but the selector and Ledger migration remain returned for owner,
+accounting/security, and operations review before implementation. If the
+zero-discretion condition cannot be met or the interface is rejected, the
+fallback remains: do not list.
 
 ### 16.11 Controls, liveness, and evidence
 
@@ -2922,13 +3060,12 @@ available only when Teller, CreditEngine, Ledger, and the existing repay
 control are active, even if asset deposit, borrow, liquidation, or auction
 buying is disabled.
 
-Phase H Section 18 now closes the evidence/control inventory, rejects broad
-Department pause as the normal gate, and returns the existing
-`canLiquidate`-reuse, dedicated-gate, and caller alternatives without selecting
-them. It defines fast-stop/governance-restart evidence and the repayment-safe
-runbook boundary. The final gate and caller remain owner/security decisions;
-Phase F may not inherit “Department pause is enough” or assume a dedicated
-pause merely because both appear as alternatives.
+Phase H Section 18 closes the evidence/control inventory and rejects broad
+Department pause as the normal gate. The later Phase I direction selects
+existing `canLiquidate` as the resolution-gate baseline for design and permits
+permissionless calling only under the zero-discretion condition in Section
+16.10. No dedicated gate, selector, Ledger interface, or implementation is
+approved. Phase F may not inherit “Department pause is enough.”
 
 Operational evidence must distinguish:
 
@@ -2969,13 +3106,17 @@ Section 8. A future implementation must prove:
 11. newly accrued `Y` is included in `X`, added to `unrealizedYield` exactly
     once under current accrual semantics, and not minted during transition;
 12. repayment/auction/transition race orders conserve liability and custody;
-13. the later owner-selected Phase H gate stops and resumes resolution without
-    blocking standard repayment, and its exact authority/event/getter/clock
-    tests pass; and
+13. the Phase I-directed existing `canLiquidate` gate stops and resumes
+    resolution without blocking standard repayment, the conditional
+    permissionless caller has no value-relevant discretion, and the exact
+    authority/event/getter/clock tests pass; and
 14. no new storage, interface, ABI, default, migration, or production behavior
     is treated as approved by this document.
 
-Phase F does not select any returned mechanism or caller/control sub-decision.
+Phase F itself did not select any returned mechanism or caller/control
+sub-decision. The later Phase I direction resolves only the existing-gate and
+conditional caller assumptions described above; it does not approve the
+interfaces or implementation.
 At the Phase F handoff, work stopped for the owner-requested pause and Phase G
 was unauthorized. The later owner message in Section 12.1 separately
 authorized Phase G specification only; implementation/interface/storage work
@@ -3247,11 +3388,12 @@ The exact onchain guarantee is therefore:
   is required for durable post-zero memory;
 - any positive delta after that checkpoint is quarantined as `U`; and
 - a liveness-safe checkpoint path is required so an observed loss need not
-  wait for a borrower action, but Phase H intentionally leaves its caller
-  policy unproposed and unselected.
+  wait for a borrower action. Phase H returned the caller alternatives; the
+  later Phase I direction uses an existing Switchboard actor and containment
+  preconditions for the candidate analyzed in Section 19.5.
 
-The caller and selector for a standalone checkpoint are not approved here and
-must be resolved with Phase H controls and Phase I interfaces. Tests must
+The caller policy is resolved for Phase I analysis, but the selector, storage,
+and implementation remain unapproved. Tests must
 include reduce→checkpoint→restore and reduce→restore-without-observation. The
 second test must document the fundamental indistinguishability; it may not
 claim the vault detected an event it never observed. For issuer-controlled
@@ -3285,11 +3427,12 @@ quarantined.
 This behavior must not be silently imposed on existing assets whose intended
 economics allocate positive rebases or yield. The live Base Rebase vault's six
 registered assets are receipt/yield-bearing tokens, and current
-`SharesVault` allocates their positive custody changes. Phase I must choose a
-generic compatibility boundary—such as a vault-level behavior variant or an
-explicitly reviewed generic mode—without a Stock-specific contract,
-token-name test, `chain.id` branch, or silently changed existing semantics. No
-mode or parameter is approved by Phase G.
+`SharesVault` allocates their positive custody changes. This created the Phase
+I requirement for a generic compatibility boundary without a Stock-specific
+contract, token-name test, `chain.id` branch, or silently changed existing
+semantics. Section 19 recommends the isolated generic-variant boundary and
+returns its exact storage/interface design; no mode, parameter, or production
+vault is approved.
 
 ### 17.7 Withdrawal, settlement, and aggregate conservation
 
@@ -3368,9 +3511,17 @@ The current lazy Lootbox snapshots create a second implementation requirement:
 a global loss changes every user's live claim without iterating users. A
 correct implementation must close the prior reward interval at the loss
 checkpoint and ensure subsequent blocks use the new live-claim economics,
-without letting untouched users accrue stale raw-share weight. Track 6 S3 owns
-the interval-floor design; Phase I must reconcile its integrated output before
-choosing a Vault/Lootbox/Ledger interface or global index.
+without letting untouched users accrue stale raw-share weight.
+
+Integrated Track 6 S3 at `3e6e6f2` owns a different interval boundary: it
+replaces Lootbox's Base-specific `ONE_DAY` constant with immutable
+`MIN_UNDERSCORE_SEND_INTERVAL`, adds the constructor floor argument and
+`minUnderscoreSendInterval()` getter, and preserves the strict Underscore
+distribution condition. It does **not** add a per-vault loss checkpoint,
+global share-price epoch/index, or untouched-user reward rebase. Section 19
+therefore preserves the S3 source/ABI contract and returns the separate
+Vault/Lootbox/Ledger loss-interval mechanism to the owner rather than claiming
+S3 solved it.
 
 RipeGov is a separate governance-point consumer: its
 `getUserLootBoxShare` returns lock-adjusted governance points
@@ -3401,15 +3552,15 @@ amount/share fields only if `amount` means allocated call-local token amount
 and `shares` means raw shares. A loss checkpoint, observed quarantine, and any
 future allocation/recovery need distinct evidence carrying asset, previous/new
 `A^s/U^s`, `C`, `A`, `U`, caller, and reason. Exact event names and ABI are
-Phase I decisions.
+returned in Section 19.5 rather than selected.
 
 The existing `amountToShares`/`sharesToAmount` signatures can remain only if
 their denominators change from raw `C` to `A`; the existing
 `getTotalAmountForUser` is the natural live-claim surface. The current
 `getTotalAmountForVault` name is ambiguous because it returns custody for
-SharesVault and nominal accounting for Simple. Phase I must choose explicit
-getters or a precisely versioned semantic change; no selector is approved
-here.
+SharesVault and nominal accounting for Simple. Section 19 preserves canonical
+Vault selectors and returns specialized additive corrected-variant getters;
+no selector is approved.
 
 Repository reports must print `C`, `A^s`, `U^s`, `A`, `U`, `S`, per-user
 shares and claims, reward normalization, debt, and auctions separately. Static
@@ -3426,7 +3577,7 @@ durable equivalent of `A^s`; current storage and getters cannot derive it from
 `C` and `S`. Preserving quarantine through a later observed loss also requires
 durable equivalent state for `U^s`; allocated backing alone is insufficient.
 
-That creates a real Phase I choice:
+That created the Phase I choice:
 
 1. append allocated/quarantine checkpoint state to a compatible generic share
    implementation and migrate/reconcile every live asset;
@@ -3438,11 +3589,12 @@ That creates a real Phase I choice:
 
 Because SharesVault is consumed by both RebaseErc20 and RipeGov and existing
 positive-rebase assets may rely on automatic yield allocation, a blanket
-semantic/storage change is not assumed compatible. Phase I must map storage
+semantic/storage change is not assumed compatible. Section 19 maps storage
 order, module export/runtime artifacts, selectors, events, every reader,
 upgrade versus redeployment, Base live state, migration initialization,
-rollback limits, and audit boundary before the owner selects an implementation
-mechanism or production vault.
+rollback limits, and audit boundaries; it recommends the isolated generic
+boundary and returns the exact storage/interface and migration-import choices
+without selecting an implementation mechanism or production vault.
 
 No Robinhood-only or issuer-branded vault, new collateral-use flag,
 positive-delta mode, storage slot, getter, event, ABI, default, migration, or
@@ -3474,8 +3626,9 @@ Phase G is specification-complete only with companion validation-plan Section
     live custody independently;
 11. user reward weight derives from live claim, global value derives from `A`,
     and both exclude `U`;
-12. reward interval behavior is reconciled with integrated S3 and does not
-    accrue stale post-loss raw-share economics;
+12. reward interval behavior preserves the integrated S3 send-floor
+    constructor/getter/strict-boundary contract and separately prevents stale
+    post-loss raw-share economics;
 13. RipeGov and existing positive-rebase/yield semantics are not silently
     changed; and
 14. no new storage/interface/ABI/migration or production vault is treated as
@@ -3892,7 +4045,8 @@ Phase H's recommendation, within the owner's existing-control preference, is:
    the timing/property alternatives in Sections 18.8–18.9; and
 6. keep the operative fallback `do not list`.
 
-Decisions required from the owner before Phase I or any implementation design:
+At the Phase H handoff, the following decisions were required from the owner
+before Phase I or any implementation design:
 
 | Decision | Alternatives requiring owner direction | Current recommendation/status | Required owner/reviewers | Affected surface |
 | --- | --- | --- | --- | --- |
@@ -3902,10 +4056,13 @@ Decisions required from the owner before Phase I or any implementation design:
 | Share-loss checkpoint caller | Permissionless deterministic / restricted existing actor / governance per checkpoint / combine atomically with later approved total-loss transition / no listing | Timing affects restoration/quarantine classification; **no caller policy proposed or selected** | Protocol owner + security/risk/operations | Share vault, checkpoint gate, evidence surface |
 | Incident withdrawal posture | Preserve safe withdrawals asset-by-asset / freeze affected asset withdrawal when delivery is unsafe / broader freeze | Preserve repayment always and preserve withdrawals when safe; any exit freeze must be explicit and evidenced | Protocol owner + security/operations | MissionControl/Alpha/Charlie, Teller, vault/co-resident assets |
 
-Approving the control map or one later option would not approve a storage
-layout, interface, event, ABI, production vault, implementation, Base
-migration, Robinhood registration, or live transaction. Phase I remains
-blocked until the owner expressly authorizes it.
+The later owner instruction recorded in Section 12.1 authorized Phase I and
+resolved these rows only to the extent stated in Section 19.2: existing
+`canLiquidate` baseline, no dedicated checkpoint gate by default, conditional
+permissionless total-loss calling, existing Switchboard checkpoint authority,
+and safe-withdraw preservation. It did not approve a storage layout,
+interface, event, ABI, production vault, implementation, Base migration,
+Robinhood registration, or live transaction.
 
 ### 18.13 Phase H acceptance and stop boundary
 
@@ -3924,25 +4081,594 @@ has completed its authorized specification work because it:
    knowledge;
 6. defines a read-only repository runbook/output contract with no automatic
    accounting or re-enable authority;
-7. returns resolution/checkpoint gate and caller alternatives without
-   selecting any new state/interface/dedicated pause/caller policy; and
-8. preserves the `do not list` fallback and stops before Phase I.
+7. returned resolution/checkpoint gate and caller alternatives without
+   selecting any new state/interface/dedicated pause/caller policy at that
+   checkpoint; and
+8. preserved the `do not list` fallback and stopped before Phase I until the
+   later authorization recorded in Section 12.1.
 
-## 19. Phases I–K hold
+## 19. Phase I — interfaces, storage, artifacts, and migration
+
+### 19.1 Authorization and compatibility baseline
+
+The owner-authorized Phase I directions are recorded in Section 12.1. This
+phase inventories exact consequences and returns choices; it does not create
+or approve production code, a storage layout, an interface, an ABI, a
+deployment, a migration, or a production vault.
+
+The pinned repository establishes four compatibility facts that constrain
+every option:
+
+1. Repository deployment tooling and source model Ripe core Departments and
+   vaults as direct deployments. Repository search found no protocol proxy,
+   beacon, delegatecall, or in-place implementation-upgrade mechanism for
+   Teller, CreditEngine, Ledger, MissionControl, AuctionHouse, or the vaults.
+   Section 5 independently pins the two live vault runtimes, but not every core
+   address; a future migration must confirm the same direct-runtime fact live
+   before relying on it.
+2. Vyper modules are compiled into each consuming wrapper. A change to
+   `BasicVault`, `SharesVault`, or `VaultData` changes the creation/runtime
+   artifacts of every wrapper that composes that module; it is not a separately
+   deployable library patch.
+3. `Migration.deploy` deploys a fresh contract and writes its address, ABI,
+   compiler input, constructor args, and source to the repository manifest
+   (`scripts/utils/migration.py:78-88`, `218-235`;
+   `scripts/utils/migration_helpers.py:164-184`). It does not itself prove that
+   `RipeHq` or `VaultBook` was updated onchain. Registry activation is a
+   separate governed/timelocked action.
+4. A fresh state-owning deployment starts with fresh storage. Replacing
+   Teller or AuctionHouse principally requires address activation, exact pause
+   posture, and dependency regression; replacing CreditEngine, Lootbox, or
+   Deleverage also requires exact local-config/history reconciliation.
+   Replacing Ledger, MissionControl, RipeGov, or a funded vault requires
+   explicit state migration. A manifest overwrite is not state migration.
+
+The current manifest declares the following Base addresses. Only the
+VaultBook/Simple/Rebase identities and vault runtime hashes were independently
+pinned live in Section 5; the remaining rows must be resolved and code-hashed
+again at a future migration block.
+
+| Manifest key | Repository-declared Base address |
+| --- | --- |
+| `Ledger` | `0x365256e322a47Aa2015F6724783F326e9B24fA47` |
+| `MissionControl` | `0x559E53F42b68b4995732Dba4aF300796761DBC19` |
+| `SwitchboardAlpha` | `0x4bf9025D76FeDd6331661C5de482b0a607D912B9` |
+| `SwitchboardBravo` | `0xF3775e9A7880a74644e90A9B22556F8Cee4e0b5B` |
+| `SwitchboardCharlie` | `0xA5801c426590F44Bc7d33551Caf7354488C8516C` |
+| `VaultBook` | `0xB758e30C14825519b895Fd9928d5d8748A71a944` |
+| `SimpleErc20` | `0xf75b566eF80Fde0dEfcC045A4d57b540eb43ddfD` |
+| `RebaseErc20` | `0xce2E96C9F6806731914A7b4c3E4aC1F296d98597` |
+| `AuctionHouse` | `0x8a02aC4754b72aFBDa4f403ec5DA7C2950164084` |
+| `CreditEngine` | `0xEdd0563D06CC52fb5F264A2366A31d9776f6dcC7` |
+| `Lootbox` | `0x1f90ef42Da9B41502d2311300E13FAcf70c64be7` |
+| `Teller` | `0xae87deB25Bc5030991Aa5E27Cbab38f37a112C13` |
+| `Deleverage` | `0x62591b3058c1428FA4b5eD2160387725be285a64` |
+
+The Base vault evidence remains:
+
+- vault ID 3 is the funded nominal `SimpleErc20`, with 9 of 27 assets
+  custody-positive at block `49,036,674`;
+- vault ID 4 is `RebaseErc20`, with no raw shares but three one-unit custody
+  donations that its current funds getter does not report; and
+- neither vault runtime is approved unchanged for Stock Token listing.
+
+The integrated S3 record independently pins a later, separate Lootbox
+source/live boundary: `origin/rh` now contains S3 source commit `f40dc25` via
+merge `3e6e6f2`, while Base ID 16 at block `49,059,353` still resolved the old
+21,637-byte runtime with SHA-256
+`db139674e84185d013b77211eb769631a9d3c0b5cc45ff90a00e0086095843da`.
+S3's new shared creation artifact SHA-256 is
+`9246a6d9dbee596750dc3a50d27d4418f318a62b7b4826a13f76aee37621e6ce`;
+its deployment, registry/capability transition, Base state-window policy, and
+live convergence remain open. Its dated latest-state read before block
+`49,059,477` reported rewards enabled, interval `43,200`, deposit reward
+`25e18`, yield bonus `150e18`, and `lastUnderscoreSend=49,037,562`; execution
+must resnapshot rather than treating those values as current. Track 8 does not
+convert that source approval into a deployment approval.
+
+### 19.2 Phase I application of the owner directions
+
+Phase I applies the five directions without expanding them:
+
+- **Resolution gate:** the proposed total-loss resolver consumes existing
+  `MissionControl.getGenLiqConfig().canLiquidate`. No dedicated resolution
+  gate, MissionControl field, Switchboard setter, default, or migration is
+  proposed. Disabling this global flag stops ordinary liquidation and
+  total-loss resolution together; the owner accepted that coupling for this
+  design analysis. Repayment does not consume the flag.
+- **Resolution caller:** the candidate
+  `CreditEngine.resolveUserTotalLoss(user)` may be permissionless only if
+  `user` is its sole value-relevant caller input and the contract derives the
+  full Section 16.8 scan, current debt, amount, auction cleanup, and bad-debt
+  destination itself. If gas constraints introduce caller-supplied asset
+  lists, amounts, recipients, or partial-selection discretion, permissionless
+  authorization no longer applies and the caller decision returns to the
+  owner/security reviewer.
+- **Checkpoint control:** no dedicated stored checkpoint pause is justified.
+  The narrow candidate requires the affected asset's existing
+  `canDeposit=false` and `canBuyInAuction=false` containment state before a
+  checkpoint can commit. Those flags are safety preconditions, not proof of
+  entitlement and not authorization by themselves.
+- **Checkpoint caller:** the candidate checkpoint entry is restricted through
+  the vault's existing `addys._isSwitchboardAddr(msg.sender)` authority. It
+  adds no role mapping or caller parameter. It remains callable while the
+  vault is paused so a broad pause cannot prevent durable loss observation.
+- **Withdrawals:** no new withdrawal mode is introduced. Existing global and
+  per-asset withdrawal controls remain authoritative; corrected vault math
+  permits delivery up to the user's live allocated claim. A failed/unsafe
+  delivery reverts, and operations may disable only the affected asset through
+  the existing flag while preserving repayment.
+
+These are control/caller specifications. The new resolver/checkpoint selectors
+and checkpoint storage they would control remain owner-returned compatibility
+choices below.
+
+### 19.3 Architecture-impact alternatives
+
+#### Settlement enforcement
+
+Two implementation shapes remain honest:
+
+| Option | Compatibility impact | Phase I assessment |
+| --- | --- | --- |
+| Make all fungible auction settlement external | Keep the existing Teller/AuctionHouse selectors and `_shouldTransferBalance` argument for ABI compatibility, but reject `true` before collateral movement; no config storage, tuple, setter, getter, default, or migration | **Recommended** because it enforces issuer-controlled external delivery without adding the per-asset parameter the owner prefers to avoid. Requires product confirmation that no existing asset depends on internal auction settlement. |
+| Add a generic per-asset external-settlement mode | Append/change `AssetConfig`, MissionControl storage/getters, Bravo/Charlie setter logic, defaults/params, ABIs, and every full-struct reader/writer; migrate all live asset configurations exactly | Technically expressible but high-risk. A direct MissionControl redeployment would require complete configuration migration, and tuple-layout changes create broad ABI/source coupling. **Not recommended by default and not approved.** |
+
+Ignoring `_shouldTransferBalance=true` and silently performing an external
+transfer is rejected: a caller could have selected an internal recipient
+assumption. The ABI-preserving all-external option must explicitly reject the
+unsupported mode.
+
+#### Corrected share boundary
+
+| Option | Compatibility impact | Phase I assessment |
+| --- | --- | --- |
+| Blanket-modify `SharesVault`/`VaultData` | Changes `RebaseErc20` and `RipeGov` runtimes and risks converting intended positive yield/rebase into quarantine; new state would not appear in already-deployed vaults | Rejected as the default boundary. It silently changes current yield/governance behavior and still cannot migrate live storage in place. |
+| New generic vault-level corrected-share variant | Reuse common Addys/Vault conventions and existing Vault selectors; isolate `A^s/U^s`, checkpoint, evidence, and no-positive-delta semantics in a separately deployed generic wrapper/module | **Recommended architecture boundary**, but no file name, storage layout, interface, registry ID, or production vault is selected. This avoids changing existing `RebaseErc20` and `RipeGov` semantics. |
+| Add a generic positive-delta mode to the current share wrapper | Requires mode storage/configuration, governance semantics, defaults, getters/events, and migration of current Rebase/RipeGov state | More coupling than a separate generic behavior boundary and conflicts with the preference for existing controls. Not recommended without new evidence. |
+| Do not list | No new compatibility surface | Operative fallback if the returned storage/interface/migration choices are rejected. |
+
+The recommended boundary is generic, not Stock-branded: no token name,
+issuer, vault ID, or `chain.id` branch. It does not select that variant for
+production.
+
+#### Bad-debt transition
+
+Section 16's two-selector design adds no Ledger storage and is the smallest
+atomic accounting expression. Phase I nevertheless exposes a major deployment
+cost: Ledger is a direct, state-heavy deployment. A new
+`moveUserDebtToBadDebt` runtime cannot be activated by swapping an address
+without migrating all Ledger state, including user vault indexes, debt,
+borrowers, intervals, reward points, auctions, HR/bond state, bad debt, and
+pool debt.
+
+The alternatives are:
+
+1. approve the two-selector design plus a separately audited full Ledger
+   state migration;
+2. redesign the accounting boundary only if another design can perform the
+   same user-debt decrement, aggregate-debt decrement, auction cleanup,
+   borrower removal, yield booking, and `badDebt += X` atomically without
+   giving a second contract unsynchronized write authority; or
+3. do not list.
+
+Reusing `setBadDebt` plus a separate CreditEngine debt write remains rejected:
+it is a global overwrite, has different authority/timing, and is not atomic.
+The two-selector mechanism remains recommended on accounting correctness, but
+its Ledger migration and interface are **not approved**.
+
+#### Rewards
+
+Existing Vault selectors can give the corrected variant live user claims and
+allocated aggregate value without changing canonical function signatures:
+that variant can define `getUserLootBoxShare` as its normalized live-claim
+input and `getTotalAmountForVault` as allocated backing `A`. Existing
+Rebase/RipeGov wrappers keep their current semantics.
+
+That does not solve lazy interval accrual after a global loss. Untouched users'
+persisted `lastBalance` values can otherwise accrue stale weight after the
+checkpoint. Integrated Track 6 S3 was reconciled during final Phase I
+validation: it governs the minimum Underscore send interval and strict send
+boundary, not loss-driven user weighting. The exact Lootbox/Ledger loss epoch,
+index, or checkpoint callback therefore remains an **owner-returned Track 8
+decision**. Phase I does not invent it.
+
+S3 also creates an integration collision that must not be hidden. Its merged
+source changes the Lootbox constructor, immutable runtime data, getter, and
+ABI, while its Base forward deployment and distribution-window continuity
+policy remain unexecuted/open. Any Track 8 Lootbox change must build on that
+integrated source. Deploying S3 first can require a second later Lootbox
+cutover; combining a Track 8 loss mechanism with the first S3 deployment would
+be a substantive source change that reopens S3 review. The owner must choose
+the sequencing after the Track 8 reward interface is selected.
+
+### 19.4 Source, storage, ABI, artifact, and live-impact table
+
+“Fresh deployment” below means creation/runtime bytecode and code hash change,
+followed by a governed registry update where applicable. It never means an
+in-place upgrade. Every Track 8 delta below is specification-only source
+intent: Track 8 changed no production source or live bytecode. Integrated S3
+separately changed Lootbox production source and ABI but, per its approved
+record, not live Base bytecode. A row that says “reused” means the recommended
+Track 8 branch requires no source/runtime change for that surface; a live
+address is treated as verified only where Section 5 or the dated integrated
+S3 evidence pinned it, otherwise it remains repository-manifest-declared
+pending same-block registry/code-hash verification.
+
+| Surface | Proposed or returned delta | Storage/order, function/event/struct compatibility, callers/readers | Artifact/live/migration/rollback consequence | Security/audit boundary |
+| --- | --- | --- | --- | --- |
+| `BasicVault` (`CM-024` module) | Consume Teller-verified `R`; remove any reliance on aggregate custody as proof of call receipt. Current `min(R,C)` is redundant once Teller proves `0<R<=Q`, and must return exactly `R`. | No storage. Internal signature may remain. Consumed by `SimpleErc20`; Phase E separately reads nominal totals/custody. | Any source edit recompiles `SimpleErc20`; however Release 1 can leave the live wrapper unchanged if tests prove current code returns exact Teller `R`. No vault-state migration solely for this semantic proof. Rollback is the prior Teller/core registry set, not a module swap. | Prove `V==R`, donation isolation, nominal deficit fail-closed behavior, and no direct vault depositor. |
+| `SharesVault` (`CM-025` module) | Existing positive-rebase behavior remains for current consumers. Teller `R` is the input; corrected quarantine behavior belongs in the returned generic variant. | Existing `userBalances/totalBalances` remain raw shares. Blanket new `A^s/U^s` storage is not selected. Consumed by `RebaseErc20` and `RipeGov`. | Avoids changing both live wrapper artifacts. Any common-module edit would change both runtimes and require separate migration/compatibility review. | Regression for current yield/rebase and RipeGov; prevent accidental quarantine semantics. |
+| `VaultData` | Corrected variant needs funds/deregistration/recovery guards covering raw shares, `A^s`, `U^s`, and custody. Current shared module remains unchanged unless a later design proves universal compatibility. | Current storage order/units unchanged. A variant may reuse enumeration but must override/extend guards rather than reinterpret `totalBalances`. | Blanket edit changes Simple, Rebase, RipeGov, StabilityPool, and other composing artifacts. Recommended variant isolates the new runtime. | Dust, zero-share custody, deregistration, recovery, and VaultBook guard audit. |
+| `SimpleErc20` (`CM-024`) | No permanent Stock Token selection. It may remain the Release 1 Base nominal vault only with Teller receipt enforcement plus CreditEngine/AuctionHouse containment. | Existing selectors/events/storage unchanged. Teller, CreditEngine, AuctionHouse, Deleverage, Lootbox, and VaultBook read it. | Section 5 runtime is live and funded. Replacing ID 3 is prohibited until exact migration; core containment can be deployed without moving this storage. Rollback after core activation is unsafe if new deposits/debt used new semantics. | All-user nominal deficit, internal settlement rejection, funded Base regression. |
+| `RebaseErc20` (`CM-025`) | Preserve current positive-delta/yield semantics; not selected for Stock Tokens unchanged. | Existing raw-share storage and ABI unchanged. Three live one-unit donations remain migration evidence. | No automatic ID-4 replacement: current funds getter misses custody dust. Any replacement must prove raw custody zero independently. | Positive-rebase regression and literal-custody funds checks. |
+| Returned generic corrected-share wrapper/module | Express Section 17 `A^s/U^s/A/U`, persistent freeze, checkpoint, exact rounding, and evidence without Stock-specific branches. | Requires at least per-asset allocated and quarantine checkpoints in fresh storage. Existing Vault selectors remain; specialized additive views/checkpoint/init surfaces are returned in Section 19.5. Readers: Teller, CreditEngine, AuctionHouse, Lootbox, VaultBook, operators/migration tools. | New creation/runtime artifact and new VaultBook registration. Fresh storage requires explicit seeding for any migrated position. No production name/ID or live address exists. Once users/custody are moved, rollback requires reverse migration and cannot be assumed. | New high-risk accounting boundary; full math/property, reentrancy, storage-seeding, recovery, and independent audit. |
+| `RipeGov` | Restrict `depositTokensWithLockDuration` to Teller so Phase D cannot be bypassed; otherwise preserve governance-share/reward semantics. | Authorization behavior changes; selector/return/event shapes and persisted governance/share state stay unchanged. Teller is the only production caller found. | Runtime changes and fresh deployment would strand extensive state unless fully migrated. Prefer a minimal separately reviewed replacement only if this authorization hardening is included in an approved release. After any new lock/deposit, rollback requires reverse state/custody migration, not an address flip. | Prove every production lock deposit enters Teller and governance points/locks are unchanged. |
+| `StabVault` module / `StabilityPool` wrapper | Ordinary and collateral-claim auto-deposits consume measured `R`; RIPE reward stake requires exact `R==Q`. Current Stability Pool economic/share formulas otherwise remain unchanged. | Source change to the composed module recompiles the wrapper. Existing Vault selectors/events and `VaultData` raw-share units remain. Persistent state includes all vault user/asset shares/enumeration/pause plus claimable balances/assets and literal custody. | Fresh StabilityPool runtime cannot replace the live wrapper without full custody, user/share, enumeration, claimable-balance, claimable-asset, and pause-state migration. This is a shared-protocol migration caused by Phase D caller exactness, even though Stock Tokens never route through the Stability Pool. After a new share/claim write, rollback is the inverse state/custody migration. | Legitimate Teller callback/reentrancy, measured versus exact paths, complete state/custody roots, claim conservation, reward-claim atomicity, and existing Stability Pool regression. |
+| `BondRoom` | Capture Teller's returned RIPE stake and require equality with the bond payout before accounting completes. | Existing selector/event shapes remain. Preserve `bondBooster`, Department pause, immutable constructor posture, and Ledger-owned bond/bad-debt epoch state. | Fresh runtime requires exact local config/pause reproduction and atomic compatibility with the Ledger state; it must not reset a customized booster or detach a payout from its stake credit. After a new payout/bad-debt write, rollback requires Ledger plus stake reconciliation. | Payout/stake atomicity, booster parity, bad-debt-clearing conservation, and callback behavior. |
+| `HumanResources` | Capture Teller's returned RIPE stake and require equality with compensation amount. | Existing selector/event shapes remain. Preserve exported LocalGov/TimeLock state, all pending contributor actions, Department pause, immutable constructor posture, and Ledger-owned contributor/reward state. | Fresh runtime requires complete local governance/timelock/pending-action migration plus Ledger reconciliation; omission can lose a pending contributor action or change its confirmation window. After a contributor/stake write, rollback requires reverse local/Ledger reconciliation. | Compensation/stake atomicity, governance authority, pending-action clocks, contributor enumeration/state, and repayment-independent liveness. |
+| `CreditRedeem` (`CM-043`) | Capture and require exact Teller sGREEN deposit return. Stock `canRedeemCollateral=false` and unsupported routes remain mandatory. | No new storage or public selector/event shape. Preserve Department pause and immutable constructor posture. | Fresh runtime/ABI only if included in the Phase D atomic caller update; reproduce pause/constructor state before RipeHq activation. Before a new-path transaction an address revert is possible; afterward external mint/deposit/redemption effects must reconcile. No redemption path is permission to list Stock collateral. | Mint/deposit/redemption atomicity, disabled Stock route, receiver restrictions, and shared existing-asset regression. |
+| `Teller` (`CM-034`) | Measure `C0/C1`, enforce `R`, recheck `C2/C3`, hold a global deposit-specific mutex, emit `TellerDepositMeasured`, and return `R`. | Use a transaction-local `transient(bool)` mutex candidate, not persistent storage, so no stale lock survives. Existing deposit selectors/returns/events remain; one additive event. Every Section 14.7 producer/caller is affected. Persistent state is the composed Department pause; the RipeHq address and mint permissions are immutable constructor state. | Fresh Teller creation/runtime and ABI. Reproduce the reviewed pause/constructor posture and activate through RipeHq only after all exact-receipt callers are compatible. Existing Teller rollback is unsafe after downstream code assumes the new event/return exactness. | Callback/reentrancy, token delta, housekeeping liveness, consumer exactness, gas, constructor/pause parity, and all entry-point inventory. |
+| `TellerUtils` (`CM-045`) | Keep pre-transfer limits/validation. Final minimum is rechecked by Teller from credited live state. | No storage, struct, selector, event, or ABI change required. Teller remains sole caller. | Reused runtime if integrated source confirms no helper change. No migration. | Preview/final-limit equivalence and no optimistic minimum. |
+| `CreditEngine` (`CM-030`) | Phase E backing/capacity-resolution split; non-raising repayment refresh; total-loss eligibility entry; call Ledger atomic transition. | No new persistent state proposed. Existing `undyVaulDiscount`, `buybackRatio`, and Department pause retain their exact units/values; public views keep signatures. Candidate additive `resolveUserTotalLoss(user)` and event; internal MissionControl/Vault/Ledger interfaces change. All borrow/health/withdraw/liquidation/repay consumers read changed semantics. | Fresh runtime/ABI and RipeHq address activation. Read and reproduce both live configuration values plus pause/constructor posture before cutover; defaults are not evidence of live values. Existing debt remains in Ledger. Address rollback is technically possible only before behavior-dependent transactions; after resolution writes it is not a semantic rollback. | Hot-path staticcall/gas, price-independent deficits, repayment liveness, deterministic caller, CAS race, config parity, and full consumer audit. |
+| `Ledger` (`CM-008`) | Candidate CreditEngine-only `moveUserDebtToBadDebt` performs Section 16.9 atomically and additively emits loss-transition evidence. | **No new storage slot or unit change**, but one selector/event changes runtime/ABI. It writes existing user debt, total debt, borrowers, auctions, unrealized yield, and bad debt. Every existing Ledger mapping/aggregate plus Department pause and immutable constructor posture retains its exact unit/value. CreditEngine is sole transition caller; Switchboard `setBadDebt` remains an audited reconciliation tool. | Fresh direct deployment would start empty; full state migration is mandatory before RipeHq activation. Partial Ledger migration is forbidden. Rollback after either new Ledger writes or address activation is a full reverse-state migration, not an address flip. | Highest-risk shared accounting/audit boundary: every Ledger mapping/aggregate, pause/constructor parity, yield double-booking rationale, auction removal, exact snapshot, and total equality. |
+| `AuctionHouse` (`CM-026`) | Re-read allocable custody; settle on measured `E`; prevent zero-backed auctions; enforce external-only issuer policy through one returned mechanism. | No persistent storage addition required. Existing buy selectors can remain. All-external option rejects `_shouldTransferBalance=true`; per-asset option would add config coupling. Current working caches are transient; persistent composed state is the Department pause/immutable constructor posture. Events retain existing fields plus additive delivery evidence if needed. | Fresh runtime/ABI; reproduce pause/constructor posture before RipeHq activation. Active auctions live in Ledger and must be reconciled before cutover. Rolling back can reopen internal settlement or stale auction semantics and is unsafe after new purchases. | Two-buyer ordering, payment/delivery atomicity, active auction cutover, discount/clock regression, pause parity, external-mode compatibility. |
+| `AuctionHouseNFT` (`CM-027`) | No delta. The current stub has no settlement entry or common Vault consumer and is inapplicable to fungible Stock Tokens. | No storage, selector, event, caller, or reader change. A future implementation must re-enter the consumer inventory rather than inherit this disposition. | Artifact reused unchanged; no live migration consequence from Track 8. | Tripwire that a future NFT settlement path cannot silently consume changed vault semantics. |
+| `Deleverage` (`CM-044`) | Price/repay only measured external receipt `E`; capture and assert exact Teller replacement-deposit return. Stock Token forbidden routes remain disabled. | No new storage or public selector required. Existing `minDeleverageBps`, `deleverageBuffer`, `deleverageCooldown`, `underscoreSafeSpreadBps`, per-user `lastDeleverageBlock`, and Department pause retain exact units/semantics; working caches are transient. Existing events must report measured amounts. Readers/callers: Teller, AuctionHouse, CreditEngine, PriceDesk. | Fresh runtime and RipeHq activation. Preserve integrated Track 6 source plus every live config value and cooldown history, or use an owner/security-approved conservative disable-and-wait cutover that cannot shorten any user's remaining cooldown. A reset-to-zero map is unsafe; rollback after a new swap/cooldown write requires downstream debt/custody plus last-block reconciliation. | Recipient-delta measurement, exact replacement deposit, cooldown state/cutover composition, zero delivery, routing prohibitions. |
+| `Lootbox` (`CM-033`) | Build on integrated S3; consume live-claim user weight and allocated aggregate value for the corrected variant; close the separate reward interval at loss checkpoint. | Preserve S3's immutable `MIN_UNDERSCORE_SEND_INTERVAL`, five-argument constructor order, `minUnderscoreSendInterval()` ABI, strict send boundary, and existing Vault selector shapes. Current local state—Underscore enablement, send interval, last send, deposit/yield reward amounts, and pause—must be explicitly reconciled. Config/permission values are preserved; `lastUnderscoreSend` follows S3's still-open final-distribution/partial-window/continuity decision rather than silently resetting. No Track 8 epoch/index/callback storage or selector is selected. | Integrated source/ABI are S3-new while live Base is still the dated old runtime. Any Track 8 artifact must compile from the integrated S3 baseline and either sequence after S3's governed cutover or reopen S3 review as a combined artifact. Apply the owner-selected S3 window policy and reconcile Ledger-owned user/global points. Rollback after distribution or point accrual is not lossless. | Economic-unit labeling, untouched-user accrual, global conservation, S3 floor/constructor/getter and approved per-chain immutable values, pending S3 distribution window, Track 8 loss-interval choice, RipeGov exception. |
+| `MissionControl` (`CM-009`) | Reuse current `canDeposit`, `DebtTerms.ltv`, `canLiquidate`, `canBuyInAuction`, and `canWithdraw`. No collateral-use or checkpoint field. Per-asset settlement mode remains the nonpreferred alternative. | Recommended path: no storage/tuple/selector/event change. Per-asset mode would require a new full-struct field and every getter/caller/writer to consume the same version. | Recommended path reuses live runtime/config. Per-asset mode requires fresh MissionControl plus complete general/asset/user/reward/debt configuration, enumeration, pause, and constructor-state migration plus new ABI/defaults. Rollback risks tuple/version mismatch. | Exact full-config round trip, no default drift, pause/constructor parity, and live-config hash/reconciliation. |
+| `ConfigStructs` | Preserve `AssetConfig` and every current struct layout on the recommended path. | No source/ABI tuple change. The nonpreferred per-asset settlement mode would change the struct and every full-struct encoder/decoder, Switchboard action, default, and migration fixture. | Reused by every importing compilation. Any later struct edit changes all consuming creation/runtime artifacts even though the interface source owns no runtime state. | Repository-wide compiler inventory, tuple encoding, mixed-version rejection, and generated ABI/schema review. |
+| `SwitchboardAlpha` (`CM-011`) | Existing `setCanLiquidate`, general borrow/repay/withdraw flags retained; no dedicated resolver setter. | No storage/interface/event change. `CanLiquidateSet` remains evidence; lite disable/governance enable behavior retained. | Reused runtime under recommended path. No migration. | Global coupling, disable/re-enable authority, repayment independence. |
+| `SwitchboardBravo` (`CM-012`) | Debt terms remain unchanged. It changes only if an owner later selects a governed per-asset settlement field. | Recommended path: no change. Alternative would need pending-action storage, validation, event, MissionControl tuple handling. | Reuse under recommended path; alternative fresh runtime/config migration. | Pending-action clocks, full-struct preservation, zero-LTV guard regression. |
+| `SwitchboardCharlie` (`CM-013`) | Existing fast per-asset deposit/withdraw/auction flags are checkpoint containment prerequisites; no new role mapping or dedicated gate. | No storage/interface/event change. Existing Switchboard membership authorizes the candidate vault checkpoint; existing events prove prerequisite flags. | Reused runtime. No migration. | Lite-action authority, asset identity, safe-withdraw posture, missing MissionControl failure. |
+| Canonical `Vault.vyi` | Preserve existing selectors/returns for deposits, withdrawals, transfers, live user amount, reward input, total amount, enumeration, and funds check. | Do **not** force every Vault implementation to add corrected-share methods. A specialized additive interface is the narrower returned option. Existing consumers keep compiling against canonical Vault. | Canonical ABI unchanged on recommended boundary; new variant has a superset runtime/ABI. | Cross-vault semantic labels, consumer dispatch, no hardcoded vault ID/type confusion. |
+| Other internal interfaces (contract-local `Teller`, `CreditEngine`, `Ledger`, `AuctionHouse`, and `MissionControl` declarations plus any specialized corrected-vault interface) | Add only the approved CreditEngine→Ledger selector declarations; update local MissionControl/Vault declarations only where existing selectors are consumed. The nonpreferred settlement-mode alternative expands Auction/Teller config tuples. | Additive local declarations do not create storage but must match deployed selectors. Canonical `interfaces/Vault.vyi` stays unchanged; a corrected-variant interface would be a separate superset. All callers named above require compile-time and runtime checks. | Every contract containing a changed local declaration must be recompiled; generated ABI changes only for externally exposed selectors/events. No interface file changes in Track 8. | Selector collision, return tuple encoding, caller authorization, mixed runtime/interface version skew. |
+| `VaultBook` + AddressRegistry (`CM-021`) | Reuse governed add/update/disable. Corrected vault should receive a new Track 7-owned ID; do not replace funded ID 3/4 casually. | No storage/interface change proposed. Current funds check is insufficient for ID-4 dust; migration uses explicit custody/share checks in addition. | Reuse runtime. New address registration is timelocked and manifest-tracked. Address rollback does not move custody/state and is unsafe after users are seeded at a new ID. | `NUMBER` timelock, funds-check semantics, concurrent registry actions, new/old validity. |
+| Defaults/parameter generation (`CM-007`, `CM-049`) | Recommended path adds no parameter. Keep Stock `canDeposit`, `canRedeemCollateral`, Stability Pool, and auction/borrow defaults disabled until release gates. | No `AssetConfig` tuple/default change under recommended path. Robinhood defaults remain pending Track 7; Track 8 invents no file/ID/value. | Rebuild only if a later owner selects a new parameter. Base/RH value manifests must be explicit and schema-identical. | Omitted-argument enable traps, chain profile parity, unsupported integration assertions. |
+| ABIs and events | Preserve existing selectors/events where specified; the future baseline includes integrated S3's five-argument Lootbox constructor and floor getter. Add only Teller measurement, CreditEngine/Ledger transition, and corrected-variant checkpoint/state evidence after approval. | Additive events/selectors still change ABI consumers. Candidate fields/units are defined in Sections 14, 16, 17, and 19.5; no Track 8 artifact may regress the integrated S3 ABI. | `scripts/export_abis.py` would regenerate production ABIs only after implementation; no ABI file changes in Track 8. S3's separately integrated `Lootbox.json` is source evidence, not a Track 8 edit. Pin creation/runtime hashes in manifests. | Indexed-field continuity, units, exact event ordering, S3 ABI continuity, offchain decoder/version compatibility. |
+| Base/RH migrations and manifests | Track 8 supplies sequencing, state roots, stop/rollback conditions; Track 7 owns IDs/namespaces/files/tooling. | No migration source or manifest change now. Every artifact records compiler input, constructor args, ABI, creation/runtime hashes, chain, registry ID/address, accounting capability/version. | Base containment and permanent-vault migration are separate gates. RH must deploy only the same approved shared source artifact. `pending Track 7` remains until reservations integrate. | Dry run, fork, dual-chain identical-artifact proof, signer/role/timelock review, partial-failure recovery. |
+| Post-deployment verification | Reconcile code identity, registry identity, flags, custody, nominal/shares, `A^s/U^s/A/U`, users, debt, auctions, points, and events. | Read-only; no dynamic balance belongs in static manifest. Consumers must declare getter units/version. | Required before any enable. Failure leaves asset disabled and old address retained for audit/exit; it does not trigger automated rewrite or rollback. | Independent reviewer, same-block snapshots, roots/totals, exact-token fork, Base regression, incident rehearsal. |
+
+### 19.5 Returned storage and interface contracts
+
+This subsection is deliberately exact enough for owner/security comparison
+without treating either proposal as approved.
+
+#### Corrected share state
+
+The minimum persistent economic state is:
+
+```text
+allocatedCheckpoint[asset]   # A^s, token base units
+quarantineCheckpoint[asset]  # U^s, token base units
+```
+
+Existing `VaultData.userBalances` and `totalBalances` remain raw user/aggregate
+shares. No separate post-zero boolean is needed: `S>0 && A^s==0` is the
+persistent recorded freeze. No per-asset collateral-use flag, positive-delta
+mode, recovery recipient, or ownership field is included.
+
+For a fresh generic variant, source-declaration order must preserve the chosen
+module composition and place the two mappings after the reused share/enumeration
+state in the compiled storage layout. Because there is no in-place proxy,
+“append” is a review discipline for compiler/storage proofs and migration
+tools, not permission to write those slots into `RebaseErc20` live storage.
+
+The minimum specialized interface candidate is:
+
+```text
+checkpointShareAsset(asset)
+    -> (allocatedCheckpoint, quarantineCheckpoint)
+
+getShareAssetState(asset)
+    -> (rawShares, liveCustody, allocatedCheckpoint,
+        quarantineCheckpoint, effectiveAllocated, effectiveQuarantine)
+
+getUserShareState(user, asset)
+    -> (rawShares, liveClaim, rewardWeight)
+```
+
+`checkpointShareAsset` has no caller-supplied amounts or allocation. It
+requires existing asset containment and Switchboard authority, recomputes from
+current custody, applies Section 17 loss-first ordering, records `A^s/U^s`,
+and emits previous/new buckets, custody, caller, and zero predicates. Views are
+unit-labeled and revert/fail closed on malformed token reads.
+
+The exact names, tuple shape, event name, interface file, and storage
+declarations are **returned, not selected**. Canonical `Vault.vyi` remains
+unchanged under the recommended boundary.
+
+#### Total-loss transition
+
+The minimum candidate remains:
+
+```text
+CreditEngine.resolveUserTotalLoss(user) -> transitionedAmount
+
+Ledger.moveUserDebtToBadDebt(
+    user,
+    expectedStoredAmount,
+    expectedLastTimestamp,
+    finalDebtAmount,
+    accruedInterest,
+) -> transitionedAmount
+```
+
+The external CreditEngine call consumes existing `canLiquidate`, takes no
+amount/asset/recipient list, derives all eligibility, and is permissionless
+only under that exact no-discretion property. The Ledger call is
+CreditEngine-only and writes existing fields atomically. Neither selector adds
+storage, but the Ledger runtime change still requires the full migration
+described above.
+
+#### Migration-only import
+
+A fresh corrected vault cannot inherit user shares or enumerations. Migration
+therefore needs either:
+
+1. a one-time, paused-state batch import surface plus an irreversible
+   `finalizeMigration`, with a sealed migration authority/state; or
+2. another audited deployment/constructor mechanism that seeds the same user,
+   asset, raw-share, `A^s`, and `U^s` state before registration.
+
+Ordinary deposit replay is not equivalent: order and rounding can change
+shares, the old vault owns custody, and pre-existing `U` must not be allocated.
+No import selector, migration-authority slot, constructor scheme, or finalizer
+is selected. This is a mandatory returned interface/storage decision if any
+live positions are migrated. An empty Robinhood launch can avoid user-state
+import, but that does not solve Base ID-3 custody migration.
+
+### 19.6 Vault migration sequence and stop conditions
+
+Track 7 owns exact migration identifiers, namespaces, filenames, manifests,
+and deployment tooling. Every Track 8 reference remains **pending Track 7**;
+no Track 8 ID is reserved or invented here. The integrated S3 record names
+`0010_Track6S3LootboxFloor.py` only as an S3-owned predeployment artifact
+assertion; Track 8 may neither reuse it nor treat the absent future file as an
+executed migration.
+
+The required per-chain sequence is:
+
+1. **Pin authority and identity.** Record chain ID, block/`NUMBER`, timestamp,
+   `RipeHq`/`VaultBook` addresses, resolved old vault/core addresses, runtime
+   hashes, governance/Switchboard/lite actors, all relevant pending actions,
+   and every affected Department's pause, constructor/immutable posture, local
+   config, and cooldown/timing state.
+2. **Disable deposits to the old vault and contain new exposure.** Set every
+   affected asset's `canDeposit=false`, keep the replacement inactive, and
+   verify no Teller/config/registry route can credit the old address. Disable
+   general borrow if blast radius is uncertain and set
+   `canBuyInAuction=false`. Keep `canRepay=true`. Preserve withdrawals only
+   where exact delivery is safe.
+3. **Enumerate candidates.** Build the user/asset set from all historical
+   deposit/withdraw/transfer events, Ledger user-vault participation,
+   borrowers, and active auctions. Vault storage has per-user/per-asset
+   enumeration but no global depositor list, so event-derived enumeration must
+   be reconciled rather than assumed complete.
+4. **Pin the old-state reconciliation.** For each asset record custody,
+   nominal totals or raw total shares, every user balance/share/live claim,
+   prices separately, reward checkpoints, debt, and auctions. Require sums and
+   indexes to reconcile. A failed token read is a stop, not zero.
+5. **Reconcile debt and auctions before movement.** Nominal `C<T`, positive
+   custody with unresolved ownership, debt/claim mismatch, or an unenumerated
+   auction blocks migration. Phase I does not allocate a nominal partial loss.
+   Total-loss debt uses the separately approved transition only; it is not
+   manufactured as a migration shortcut.
+6. **Close active economic intervals.** Settle or pause/cancel every affected
+   auction without payment for undelivered collateral. Close Lootbox intervals
+   under the separately owner-approved Track 8 loss-interval mechanism while
+   preserving integrated S3's send-floor and strict-distribution behavior.
+   Until that mechanism exists, a reward-bearing migration remains blocked.
+   Repayment stays open.
+7. **Deploy inactive artifacts.** Deploy reviewed core/vault contracts with
+   exact constructor state, leave the corrected vault paused/unregistered or
+   otherwise unreachable for deposits, record creation/runtime hashes, and
+   verify source. Deployment alone does not activate a registry entry.
+8. **Seed and move per asset.** Use the separately approved migration surface
+   to move exact custody and recreate exact user raw-share/claim entitlement,
+   `A^s/U^s`, enumeration, and Ledger participation. A nominal source can be
+   converted only from an owner-approved, fully backed entitlement snapshot.
+   Checkpoint reward state before and after each user/asset move.
+9. **Handle partial transaction failure.** Each transaction must be
+   internally atomic and idempotently recorded, but a multi-user migration
+   cannot be called globally atomic across mined transactions. During the
+   batch window neither old nor new position may support new borrow/auction
+   capacity twice. A failed batch leaves both vaults contained and resumes
+   from proven state; it never enables the partially migrated asset.
+10. **Reconcile before registry/config activation.** Prove old plus new custody
+    equals the expected start minus measured external delivery; prove no user
+    duplication/omission, exact aggregate shares/claims/buckets, Ledger
+    participation, debt, auction, and reward roots, literal custody for every
+    registered asset, and exact affected-core local config/pause/timing roots.
+11. **Activate through Track 7-owned actions.** Register the new generic vault
+    under a new reserved VaultBook ID unless the owner later approves a
+    fully-empty replacement. Update asset-to-vault configuration only after
+    timelock/role/`NUMBER` validation. New permissions begin disabled.
+12. **Retire the old address.** Require every old user raw balance/share zero,
+    accounted aggregate zero, literal custody zero, no active auction, no
+    Ledger participation, and no reward residue. Deregister assets/users only
+    after those checks. ID-4's current boolean alone is insufficient.
+13. **Post-migration reconcile and soak.** Repeat all roots, totals, code
+    hashes, flags, getter units, exact-token behavior, debt health, repayment,
+    auctions, and reward evidence. Keep Stock deposits/borrowing/auction
+    purchases disabled until the later release/audit gates.
+
+Bulk `recoverFunds` is not a migration tool for registered/funded assets.
+VaultBook address replacement does not move custody or storage. An old-address
+disable does not clean user Ledger participation. All three shortcuts are
+rejected.
+
+Rollback reality is phase-dependent:
+
+- before registry/config activation and before custody/state seeding, discard
+  the inactive deployment;
+- after some migration batches, resume forward or execute an independently
+  specified reverse migration while both sides stay disabled;
+- after new borrowing, settlement, reward accrual, or a bad-debt transition,
+  an address flip cannot restore prior economics; recovery requires a new
+  reconciled state transition and owner approval; and
+- an issuer transfer freeze/blocklist can prevent both forward and reverse
+  custody movement. Operations must treat that as a stop, not as permission to
+  rewrite claims.
+
+### 19.7 Base and Robinhood version posture
+
+The recommended live-version posture is:
+
+1. use one canonical reviewed source, compiler input, constructor schema, and
+   creation artifact for shared core changes, with every chain-specific
+   constructor argument explicit;
+2. harden Base before or atomically with Robinhood deployment, not after RH
+   lists an asset against safer semantics;
+3. allow only a documented, time-bounded divergence during governed registry
+   cutover, with the unsafe side contained and an expiry/abort condition; and
+4. do not accept permanent Base/RH logic divergence merely to avoid migrating
+   live Base state. Deployed runtime hashes may differ only where the reviewed
+   shared source embeds approved immutable constructor values, as S3 does for
+   RipeHq and `MIN_UNDERSCORE_SEND_INTERVAL`; manifests must reproduce and
+   explain that difference byte-for-byte.
+
+S3's owner-approved bounded temporary source/live drift is scoped to that
+Lootbox-floor rollout and still lacks its recorded rollout owner, deadline,
+maximum state, and distribution-window decision. It does not authorize a
+Track 8 migration, permanent Base/RH version skew, or an additional Track 8
+Lootbox delta.
+
+Release 1 Base containment can avoid moving funded `SimpleErc20` ID 3 if its
+nominal state remains fully reconciled, but it is not a three-contract
+“core-only” swap. Teller receipt semantics must compose with every Section
+14.7 consumer: measured RipeGov and StabilityPool paths; exact
+StabilityPool, BondRoom, Lootbox, HumanResources, CreditEngine, CreditRedeem,
+and Deleverage paths; plus AuctionHouse settlement and CreditEngine
+backing/repayment changes. Several of those artifacts own live state, so the
+cutover needs the row-specific migration or state-preserving procedure in
+Section 19.4. Mixed old/new versions may exist only while every affected value
+path is contained; repayment must remain live. This is not a permanent Stock
+Token vault approval. It avoids the ID-3 custody move but still requires exact
+registry/config sequencing, full regression, state reconciliation, and owner
+approval.
+
+Release 2 corrected-share adoption is a separate custody-bearing migration.
+Base ID 3 cannot be replaced casually, and ID 4's three dust units must be
+handled even though its current funds getter is false. Robinhood must use only
+a Track 7-reserved ID and manifest after the production vault and exact-token
+gates are approved.
+
+This posture is a recommendation, not migration authorization.
+
+### 19.8 Post-deployment evidence contract
+
+Before any enablement, one pinned evidence bundle per chain must include:
+
+```text
+chainId
+blockNumber
+blockHash
+timestamp
+sourceCommit
+migrationCommit
+manifestPathAndHash
+registryIdsAndResolvedAddresses
+creationAndRuntimeCodeHashes
+constructorArgs
+storageOrStateMigrationRoot
+coreLocalConfigPauseAndCooldownRoots
+oldAndNewUserAssetRoots
+custodyNominalShareAllocatedQuarantineTotals
+debtBorrowerAuctionRewardRoots
+controlValuesAndPendingActions
+exactTokenProxyBeaconImplementationHashes
+testAndAuditArtifactHashes
+```
+
+Required assertions:
+
+- Base and Robinhood shared components match the approved source/compiler/
+  constructor-schema/creation commitment; each deployed runtime matches its
+  approved chain-specific constructor arguments, with any immutable-derived
+  hash difference reproduced byte-for-byte and any other difference treated
+  as version skew;
+- every enabled asset resolves to the intended vault and getter semantics;
+- every replaced Department reproduces its reviewed immutable, pause, local
+  configuration, pending-action, and cooldown/timing state;
+- `sum(user claims) <= A <= C`, `U=C-A`, and no `U` contributes to debt,
+  settlement, or rewards;
+- no old and new position are simultaneously credit-eligible;
+- repayment works under every containment state;
+- issuer-controlled settlement cannot choose internal mode;
+- duplicate total-loss transition cannot add bad debt twice;
+- old addresses cannot receive deposits and hold no unreported custody before
+  retirement; and
+- unsupported Stock Token routes remain disabled.
+
+The evidence is read-only. A failed assertion keeps the asset disabled and
+requires owner/security review; it cannot auto-repair balances or re-enable a
+flag.
+
+### 19.9 Owner-returned decisions after Phase I
+
+Phase I recommends, but does not approve:
+
+| Decision | Alternatives | Recommendation and evidence | Required owner/reviewers | Needed before | Status |
+| --- | --- | --- | --- | --- | --- |
+| Fungible settlement enforcement | Reject internal mode for all fungible auctions / add per-asset settlement mode / do not list | Prefer all-external: preserves tuple/storage/default schemas and avoids MissionControl migration; first verify no existing product relies on internal auction settlement | Product + protocol + security | Phase F implementation design | **Returned; no behavior/config change approved** |
+| Corrected share implementation boundary | New generic vault-level variant / blanket shared-module change / generic mode / do not list | Prefer isolated generic variant to preserve Rebase/RipeGov positive-delta semantics | Protocol + security + economics | Storage/interface design and vault selection | **Returned; no file/layout/interface/vault approved** |
+| Corrected share storage/interface | Two bucket mappings plus specialized checkpoint/views and one-time migration import / another audited equivalent / do not list | Minimum state is `A^s/U^s`; canonical Vault can remain unchanged. Migration-import authority/finalization needs separate review | Protocol + security + counsel/risk | Any Phase G implementation or live migration | **Returned; new storage/selectors not approved** |
+| Atomic bad-debt interface and Ledger migration | Two-selector design plus full Ledger state migration / another atomic boundary / do not list | Accounting design remains preferred; direct Ledger deployment makes migration a first-class high-risk gate | Protocol + accounting + security + operations | Phase F implementation design | **Returned; selector/event/migration not approved** |
+| Reward loss-interval integration and S3 sequencing | Add a reviewed loss epoch/index or checkpoint callback on top of integrated S3 / defer Stock rewards or listing / do not list; deploy S3 first versus reopen S3 review for a combined artifact; preserve S3's separate final-distribution/partial-window/continuity choice | Integrated S3 must be preserved but does not solve untouched-user loss weighting. Prefer one reviewed forward Lootbox cutover if the Track 8 mechanism can be selected without delaying required S3 safety, otherwise contain and sequence two explicit migrations | Economics + Track 6 owner + protocol/security + operations | Lootbox/Ledger interface and S3/Base rollout selection | **Returned; S3 integrated in source, loss mechanism and rollout/window sequencing unapproved** |
+| Base live-version and migration posture | Base first/atomic convergence / bounded drift with expiry / permanent exception / no release | Prefer Base first or atomic. Any bounded cutover contains every affected Teller consumer and preserves/reconciles their state; avoiding the ID-3 move does not avoid stateful shared-caller/core cutovers | Protocol + security + operations | Implementation/release authorization | **Returned; no live action approved** |
+| Production vault and VaultBook ID | New generic corrected vault / another approved generic vault / none | No selection until storage/interface, reward loss-interval/S3 sequencing, exact-token, audit, and migration gates close; Track 7 owns any ID | Product + protocol + risk/security | Robinhood asset registration | **Deferred; do not list remains operative** |
+
+The earlier Phase I control directions are not reopened: existing
+`canLiquidate` is the baseline resolution gate, total-loss calling is
+permissionless only under a deterministic no-discretion selector, the
+checkpoint caller is an existing Switchboard actor, containment flags are
+checkpoint preconditions, and safe withdrawals remain available. What remains
+unapproved is the new machinery those policies would invoke.
+
+### 19.10 Phase I acceptance and stop boundary
+
+Phase I is specification-complete with companion validation-plan Section 11
+because it:
+
+1. covers every component required by the task contract and every additional
+   actual caller/reader;
+2. states storage order, function/event/struct compatibility, callers,
+   artifacts, Base live impact, source/live status, migration prerequisite,
+   rollback limitation, and audit boundary for every proposed delta;
+3. proves why stateful direct-deployment Department, Ledger, MissionControl,
+   and vault changes require exact state cutover/migration rather than
+   ordinary upgrades;
+4. distinguishes Base Release 1 shared containment/caller cutover from
+   Release 2 custody-bearing corrected-vault migration;
+5. specifies old-vault disablement, user/asset enumeration, live funds,
+   debt/auction/reward handling, raw state cleanup, custody/state movement,
+   partial failure, retirement, permissions, and post-state reconciliation;
+6. records all exact migration IDs/namespaces/manifests/tooling as
+   `pending Track 7`;
+7. reconciles integrated S3 without claiming it supplies Track 8 loss
+   weighting or is live, and returns rather than selects the settlement, share
+   storage/interface, Ledger migration, reward/S3 sequencing, live-version,
+   and production-vault choices; and
+8. stops before Phase J and leaves the operative posture `do not list`.
+
+## 20. Phases J–K hold
 
 The following are deliberately **not finalized**:
 
-- the owner-returned Phase H resolution/checkpoint gate and caller decisions;
-- exact source/storage/interface/migration impact table and the returned Phase
-  F/G mechanisms;
-- final Phase J validation plan;
-- implementation PR split and atomic deployable groups; and
+- owner selection of the returned Phase I mechanisms and live-version posture;
+- the final Phase J invariant/state-to-test plan and exact-token plus
+  integrated S1/S2/S3 reconciliation;
+- implementation PR split and atomic deployable groups;
+- production vault and VaultBook ID;
+- implementation, audit, deployment, Base/RH migration, or live enablement;
+  and
 - exact `rh-summary.md` handoff.
 
-Work must not continue into Phase I or later until the owner resolves the
-corresponding Section 12/18 gate and expressly authorizes that phase.
+Work must not continue into Phase J or later until the owner resolves the
+corresponding Section 19.9 gate and expressly authorizes that phase.
 
-## 20. Checklist handoff at this checkpoint
+## 21. Checklist handoff at this checkpoint
 
 No `rh-summary.md` checkbox is edited or closed.
 
@@ -3955,8 +4681,8 @@ Eligible for owner review:
 - Section 4, **finish the Simple versus Rebase comparison** (line 186 at the
   baseline) — Track 5 evidence is hash-verified, source-reconciled, and rerun.
 - Section 4, **write a separate vault-change specification if current behavior
-  is unacceptable** (line 190 at the baseline) — Phases A–H are specified, but
-  the item is not eligible for closure until Phases I–K are owner-directed and
+  is unacceptable** (line 190 at the baseline) — Phases A–I are specified, but
+  the item is not eligible for closure until Phases J–K are owner-directed and
   completed.
 
 Not eligible for closure:
