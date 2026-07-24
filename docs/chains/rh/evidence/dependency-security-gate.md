@@ -1,8 +1,8 @@
 # Track 7 H-01 Stage A Dependency-Security Gate
 
-**Status:** Stage A evidence complete; the owner/security checkpoint closed on
-24 July 2026; Stage B began and then stopped before worktree implementation
-because the approved Candidate Zero audit found four unresolved alerts
+**Status:** Stage A evidence complete; Stage B remains stopped before worktree
+implementation; reconciled to reviewed `rh` commit `27765d2`; refreshed
+minimum-candidate owner/security authorization packet pending
 
 **Evidence date:** 24 July 2026
 
@@ -1767,3 +1767,527 @@ unsupported resolver claim rather than making a new runtime claim.
 Approval of the previous Candidate Zero bundle does not answer these new
 questions. Until they are explicit, dependency/test implementation and the
 Stage B reviewer gate remain blocked.
+
+## Refreshed minimum-candidate authorization packet — pending
+
+**Packet date:** 24 July 2026
+
+**Packet status:** proposed for owner/security approval; not dependency-change
+authorization
+
+### Authority and supersession
+
+The owner directed H-01 to continue because dependency, deployment-tooling,
+and test-environment changes do not change production smart-contract behavior.
+That direction authorized reconciliation and preparation of this packet only.
+It explicitly did not authorize a requirement, lock, dependency, test, or
+tooling change.
+
+If and only if the owner and designated independent security/Track 6 reviewer
+approve this complete packet, it **supersedes in full** the previous
+eight-item H-01 Stage B owner authorization dated 24 July 2026, recorded under
+“Mandatory owner/security checkpoint — closed 24 July 2026” in commit
+`73914a5fd6588695369b1d54cae494ed163f961e`. The former Candidate Zero
+authorization will then be historical and non-operative. The two policies
+must never be combined, selectively inherited, or treated as simultaneously
+live.
+
+Until that approval is explicit, the prior authorization remains stopped by
+the recorded audit blocker and this replacement packet grants no
+implementation authority.
+
+### Reconciled reviewed baseline and fresh freeze
+
+At the reconciliation check, committed local `rh` resolved to reviewed
+commit `27765d29094256fa9619dd44a0bfd145863de8b7`; `origin/rh` remained
+`3e6e6f230169fc445d0b29454457480c62efd89a`. The committed delta was solely
+new Track 6 S5 brief
+`docs/chains/rh/track-6-s5-ledger-guard.md`. It touched no H-01-owned
+requirement, lock, S1 expectation, dependency-gate-test, or evidence path.
+
+The main `rh` worktree contained unrelated uncommitted documentation changes.
+They were preserved and excluded because they are not a reviewed commit.
+H-01 merged only exact commit `27765d2`, producing:
+
+```text
+a2b6f225b46f6b95271e86cf102e31b6285476a4
+parent 22eb097e86a123c01a7117d5166b87ed11ae30c9
+parent 27765d29094256fa9619dd44a0bfd145863de8b7
+```
+
+The fresh freeze was captured at `2026-07-24T20:14:05Z`
+(`2026-07-24T14:14:05-0600`, MDT) directly from merge commit `a2b6f225`.
+
+| Refrozen path | SHA-256 |
+|---|---|
+| `docs/chains/rh/track-7-h1-dependency-security-preflight.md` | `ac31478d185571c9b804c84a0f78de60bf40eeb3a0aec80b839b66f62befef22` |
+| `docs/chains/rh/robinhood-deployment-support-specification.md` | `a28db8424537d5f059a14a614265077fd4f64379f6596b6eaede9d2716d3269d` |
+| `docs/chains/rh/robinhood-deployment-validation-plan.md` | `6b61a24b838d84d87d88f9d04f95521f2e351a4c75e9511a86e8ac0e13422add` |
+| `docs/chains/rh/track-6-s5-ledger-guard.md` | `37332bb560ba5591da10b08f1e2e8aca28d4d21142c6a61ef8ac210566b564e1` |
+| `requirements.in` | `2a6726cdc447cb71cc376ef14ee93cc645dbb43826893c5d2433586a89f26f63` |
+| `requirements.txt` | `18df0aad224f2a10febc9e155e4a530e1000ec553916c8ef78dc9859c6c92ba0` |
+| `tests/clock/test_clock_profiles.py` | `2b1bbd8c77f97e614c9db54fcb98b284d3db95a6bb47d1ee9ab020bf6d725cc4` |
+| `tests/utils/clock_profiles.py` | `69f3a616a78cb3a155962edb779533f56e362a68cc922c307dc7d40cbd4b34de` |
+| `docs/chains/rh/lootbox-floor-implementation-record.md` | `d577f44507954ee3d1eee3efc4e940833557287d1fdb2890c863070cfee9be7c` |
+| `contracts/core/Lootbox.vy` | `669c2857e2402ef0e8f9a508dd6f342426ffbd1affce11dd429e5b5b0129ae65` |
+| `scripts/abis/Lootbox.json` | `33aadc219718332ef9163f0b85c8e6fba93735d149db3fb0bb2e3fab814db17c` |
+| `config/block-clock-inventory.json` | `cebc434d4e2628afd404ff3c76874e26d6e947783dd75ec74dd10001458df6fb` |
+| `scripts/check_block_clock_inventory.py` | `cc86f73629589c6a2ee0c9b60e480761d88e1e033e452c1f0843c18db9e28642` |
+| `tests/conf_core.py` | `2ee8fa9222c99345fbc43ecbbf1641c185688724cc36e6a910f43069e4c06f0f` |
+| `tests/inventory/test_block_clock_inventory.py` | `d9007158565979f7e5027a012a0cf6efdc6be354f0a96b16b7d35c87ba58a39c` |
+| `tests/core/lootbox/test_underscore_rewards.py` | `20b86c2d5466863dc2afceaa580d8ae19c5beb363fb937090aabc1eca6bf7e7b` |
+| `tests/config/test_switchboard_charlie.py` | `a444c5fc64439ccb28f5634248cb9459e579336452d59fb741e1d076d7e1fd44` |
+
+The existing old-profile validation remains applicable because the sole
+integrated delta is a new documentation brief and no dependency, runtime,
+test, source, artifact, or validation configuration changed. No test was
+rerun for packet preparation. Any later committed `rh` movement, any
+H-01-owned-file movement, or any integration of the currently uncommitted
+documentation work invalidates this freeze and requires another explicit
+reconciliation decision.
+
+### Fresh authoritative alert observation
+
+The exact approved K-02 read-only query was repeated at
+`2026-07-24T20:13:11Z` with GitHub CLI `2.96.0`. Before the query, a
+precheck invoked `gh auth status`. That command displayed authentication-state
+metadata and a fully masked token representation in the local command
+transcript. It exposed no literal credential value, and no authentication
+output was written to a file or the repository, but invoking it was contrary
+to K-02's stricter “never print authentication state” output-minimization
+rule. This is a recorded process deviation, not an assertion of compliance or
+an expansion of K-02. It performed no mutation. Future K-02 refreshes must not
+invoke `gh auth status`; they must use the approved API call's success or
+failure without printing separate authentication state. The query itself
+remained:
+
+```text
+gh api --method GET --paginate --slurp \
+  -H 'Accept: application/vnd.github+json' \
+  -H 'X-GitHub-Api-Version: 2022-11-28' \
+  '/repos/Ripe-Foundation/ripe-protocol/dependabot/alerts?state=open&per_page=100'
+```
+
+The response is byte-identical to both earlier retained snapshots: 13 open
+alerts, 6 high, 6 medium, and 1 low, alert numbers
+`13, 14, 15, 16, 18, 19, 21, 22, 23, 24, 25, 26, 27`. The new Pymdown
+Extensions `CVE-2026-61632` finding is in GitHub's reviewed advisory database
+but is not a separate default-branch Dependabot alert in this response.
+
+| Fresh retained K-02 file | SHA-256 | Mode |
+|---|---|---|
+| `~/dev/ripe-protocol-h1-private-evidence/dependabot-open-2026-07-24T201311Z-raw.json` | `52eccab5e38769070f5310b753f018030587b673cc2637105983ba670bfe2f0a` | `0600` |
+| `~/dev/ripe-protocol-h1-private-evidence/dependabot-open-2026-07-24T201311Z-sanitized.json` | `d2dd2d89acb63de901e164c3c7d69f402c04bc38da9a803fe9674734ab404b06` | `0600` |
+
+Default-branch alert state still cannot prove an unmerged candidate. Candidate
+remediation and authoritative closure remain separate facts.
+
+### Recommended minimum candidate
+
+The recommendation is the historical Candidate A selection, refreshed from a
+new resolver only after packet approval. It changes exactly six
+deployment-path packages and keeps every other package version fixed:
+
+```text
+titanoboa==0.2.7
+vyper==0.4.3
+rlp~=4.0.1
+ipython
+dotenv
+pytest==8.4.2
+requests==2.33.0
+urllib3==2.7.0
+idna==3.15
+python-dotenv==1.2.2
+cbor2==5.9.0
+wheel==0.46.2
+```
+
+| Package | Current | Proposed | Deployment-path purpose |
+|---|---:|---:|---|
+| `cbor2` | `5.7.0` | `5.9.0` | Resolve both compiler-transitive CBOR alerts; re-prove deterministic compiler artifacts. |
+| `idna` | `3.10` | `3.15` | Resolve oversized-Unicode hostname processing in the Requests path. |
+| `python-dotenv` | `1.2.1` | `1.2.2` | Resolve the dotenv write-helper alert while retaining tested load/interpolation behavior. |
+| `requests` | `2.32.5` | `2.33.0` | Resolve the Requests alert at the minimum patch in deployment HTTP tooling. |
+| `urllib3` | `2.5.0` | `2.7.0` | Resolve all four HTTP response/redirect/proxy alert ranges. |
+| `wheel` | `0.45.1` | `0.46.2` | Resolve build/install extraction risk at the minimum patch. |
+
+The historical Candidate A input/lock hashes and embedded literal diff remain
+Stage A evidence only. Post-reconciliation byte-for-byte reproduction was
+withdrawn and is not reasserted. Approval would authorize a new clean
+resolution, not reuse of those hashes. The new run must retain the complete
+resolver inventory and retain or hash-anchor every candidate preimage before
+disposal.
+
+The selected candidate is expected to remove 10 of the 13 current Dependabot
+vulnerable ranges from the candidate lock while leaving #22 Pygments, #23
+pytest, and #27 Pymdown Extensions visible and explicitly dispositioned.
+GitHub will still report all default-branch alerts until it observes a merged
+manifest.
+
+### Finding-by-finding applicability and residual ledger
+
+The retained Candidate Zero audit produced four findings. Candidate A keeps
+Click and Vyper at the same versions and returns Pymdown Extensions from
+Candidate Zero's `10.21.3` to the unchanged baseline `10.16.1`; both Pymdown
+versions remain within the new b64 finding's affected range. Every finding
+therefore needs an individual disposition:
+
+| Current audit finding | Affected range and source | Repository reachability | Proposed disposition |
+|---|---|---|---|
+| [`PYSEC-2026-2132`](https://raw.githubusercontent.com/pypa/advisory-database/main/vulns/click/PYSEC-2026-2132.yaml); Click `8.2.1`; command injection in `click.edit()` | PyPA records `<8.3.3`; upstream Click `8.3.3` [removes `shell=True` from editor/pager launch](https://github.com/pallets/click/releases/tag/8.3.3). | `scripts/migrate.py`, `scripts/verify.py`, and `scripts/console.py` directly use Click commands, options, choices, and prompts. No repository call to `click.edit()` exists. | Version is affected, but the vulnerable function is absent from the current deployment-tooling path. Proposed bounded exception `EX-H01-CLICK-01`; do not mislabel it documentation-only. |
+| [`CVE-2026-61632`](https://github.com/advisories/GHSA-9xwg-3r6f-jcx2); Pymdown Extensions; `pymdownx.b64` path traversal | GitHub-reviewed `<=10.21.3`; first patch `11.0.0`. | No repository MkDocs config, Pymdown import, `pymdownx.b64`, or documentation build exists. No untrusted Markdown is rendered. | Applicable version but unreachable extension. Proposed bounded exception `EX-H01-PYMDOWN-B64-01`. Candidate Zero's `10.21.3` remains vulnerable and must not be selected. |
+| [`PYSEC-2023-142`](https://github.com/advisories/GHSA-5824-cm3x-3c38); Vyper named reentrancy-lock allocation | Authoritative GitHub-reviewed `>=0.2.15,<0.3.1`; first patch `0.3.1`. | Exact compiler hold is `vyper==0.4.3`, outside the authoritative affected range. | Not applicable to `0.4.3`. [PyPA scanner metadata](https://raw.githubusercontent.com/pypa/advisory-database/main/vulns/vyper/PYSEC-2023-142.yaml) incorrectly records `introduced: 0` without a fixed boundary. Scanner-metadata defect, not accepted security risk. No ignore flag proposed. |
+| [`PYSEC-2025-33`](https://github.com/advisories/GHSA-vgf2-gvx8-xwc3); Vyper precompile-call success checks | Authoritative GitHub-reviewed `<0.4.1`; `0.4.3` is outside the range. | Exact compiler hold is `vyper==0.4.3`; the authoritative range and [current PyPA metadata](https://raw.githubusercontent.com/pypa/advisory-database/main/vulns/vyper/PYSEC-2025-33.yaml) `fixed: 0.4.1` both exclude it. | Not applicable to `0.4.3`. The earlier pip-audit PyPI service result was stale/inconsistent scanner metadata. No ignore flag proposed. |
+
+Candidate A also retains three previously visible alert packages and restores
+three findings that Candidate Zero had removed. The complete expected
+residual set, to be confirmed by a fresh no-ignore audit after approval, is:
+
+| Residual finding | Candidate A version | Proposed disposition |
+|---|---:|---|
+| [`PYSEC-2026-2132`](https://raw.githubusercontent.com/pypa/advisory-database/main/vulns/click/PYSEC-2026-2132.yaml) / `GHSA-47fr-3ffg-hgmw` Click command injection | `8.2.1` | `EX-H01-CLICK-01` |
+| [`PYSEC-2026-1845`](https://github.com/advisories/GHSA-6w46-j5rx-g56g) pytest tmpdir handling | `8.4.2` | `EX-H01-PYTEST-01` |
+| [`PYSEC-2026-2987`](https://github.com/advisories/GHSA-5239-wwwm-4pmq) Pygments Archetype lexer ReDoS | `2.19.2` | `EX-H01-PYGMENTS-01` |
+| [`PYSEC-2026-2999`](https://github.com/advisories/GHSA-62q4-447f-wv8h) Pymdown snippets traversal | `10.16.1` | `EX-H01-PYMDOWN-SNIPPETS-01` |
+| [`CVE-2026-61632`](https://github.com/advisories/GHSA-9xwg-3r6f-jcx2) Pymdown b64 traversal | `10.16.1` | `EX-H01-PYMDOWN-B64-01` |
+| [`PYSEC-2023-142`](https://github.com/advisories/GHSA-5824-cm3x-3c38) | `vyper==0.4.3` | not applicable; authoritative range exclusion |
+| [`PYSEC-2025-33`](https://github.com/advisories/GHSA-vgf2-gvx8-xwc3) | `vyper==0.4.3` | not applicable; authoritative range exclusion |
+
+This is a prediction from the retained old/Candidate Zero audits and unchanged
+versions, not a fresh Candidate A audit result. Any additional finding, range
+change, or disappearance must be reconciled rather than normalized.
+
+### Proposed bounded exceptions
+
+All exceptions are pending. The proposed exception owner is **Mick Hagen,
+acting H-01 and Track 6 owner**. Each exception has a scheduled security review
+on **15 August 2026** and hard expiry at **2026-08-31T23:59:59Z**. The earlier
+of hard expiry or a finding-specific invalidation trigger ends authorization.
+An expired exception blocks deployment rehearsal and merge; it never converts
+into permanent acceptance.
+
+#### `EX-H01-PYTEST-01` — retain pytest `8.4.2`
+
+- **Threat model:** pytest before `9.0.3` uses predictable
+  `/tmp/pytest-of-{user}` directories on Unix. Another local user can cause
+  denial of service and may be able to gain privileges. The exposure exists
+  while pytest runs; pytest is not part of deployed contract runtime.
+- **Scope:** exact pytest `8.4.2` under CPython `3.12.0` for H-01/S1/S2/S3 and
+  full-suite validation on owner-controlled local or ephemeral single-tenant
+  runners. No untrusted test, plugin, or pull-request code may run.
+- **Reason to accept temporarily:** pytest `8.4.2` is the exact S1-reviewed
+  runtime and matches Vyper `0.4.3`'s optional test/dev metadata. Moving to
+  pytest 9 crosses a major boundary, invalidates S1's fail-closed version gate,
+  and expands collection/plugin/fixture/warning/teardown proof without being
+  necessary to remediate the six deployment-path packages.
+- **Compensating controls:** create a fresh task-specific mode-`0700`
+  temporary directory for every pytest invocation; pass a dedicated explicit
+  child via `--basetemp`; delete only that task directory after the command;
+  run only trusted repository tests/plugins; prohibit shared multi-user
+  runners; preserve exact S1 assertions and run the entire required serial
+  suite without skip, xfail, or warning suppression.
+- **Re-review/invalidation triggers:** shared or multi-user runner use;
+  untrusted tests/plugins; inability to provide a private basetemp; pytest,
+  Vyper, Titanoboa, Python, plugin, or S1-profile change; advisory range or
+  exploit update; demonstrated pytest 9 compatibility; every K-02/audit
+  refresh; scheduled review or hard expiry.
+
+#### `EX-H01-CLICK-01` — retain Click `8.2.1`
+
+- **Threat model:** versions through `8.3.2` have command injection in
+  `click.edit()`, allowing an unprivileged local attacker to influence editor
+  command execution.
+- **Scope:** exact Click `8.2.1` only for the current direct repository CLI
+  uses in `scripts/migrate.py`, `scripts/verify.py`, and `scripts/console.py`.
+  Those uses are limited to commands, options, choices, and prompts.
+- **Compensating controls:** no `click.edit()` or equivalent editor launch;
+  no untrusted Click plugins; no untrusted `EDITOR`/`VISUAL` command source;
+  dependency gate asserts the absence of `click.edit` in repository code; only
+  owner-controlled deployment hosts may run these scripts.
+- **Re-review/invalidation triggers:** any editor helper or plugin use; any
+  new Click import/call surface; untrusted environment-variable control;
+  advisory or exploit change; selected package change; every K-02/audit
+  refresh; scheduled review or hard expiry.
+
+#### `EX-H01-PYGMENTS-01` — retain Pygments `2.19.2`
+
+- **Threat model:** crafted local content passed to the Archetype `AdlLexer`
+  can cause catastrophic regular-expression backtracking and local denial of
+  service.
+- **Scope:** exact Pygments `2.19.2` as transitive console, test, and
+  documentation tooling. No direct repository import or Archetype lexer
+  selection exists.
+- **Compensating controls:** prohibit `AdlLexer`/Archetype selection and
+  untrusted content highlighting; no repository documentation build; gate
+  scans for new direct imports/lexer selection; owner-controlled tooling only.
+- **Re-review/invalidation triggers:** any docs build, new Pygments import,
+  Archetype lexer use, untrusted highlighted content, advisory/exploit change,
+  every K-02/audit refresh, scheduled review, or hard expiry.
+
+#### `EX-H01-PYMDOWN-SNIPPETS-01` — retain Pymdown Extensions `10.16.1`
+
+- **Threat model:** `pymdownx.snippets` with `restrict_base_path=True` can
+  read sibling-prefix paths outside `base_path`; untrusted Markdown in a docs
+  build could exfiltrate readable files or CI secrets into rendered output.
+- **Scope:** exact transitive Pymdown Extensions `10.16.1`. The repository has
+  no MkDocs configuration, Pymdown import, snippets extension, or docs build.
+- **Compensating controls:** do not enable `pymdownx.snippets`; do not process
+  untrusted Markdown; do not run a docs build with repository or CI secrets;
+  gate scans for config/import/extension activation.
+- **Re-review/invalidation triggers:** any Markdown/docs pipeline, Pymdown
+  config/import, snippets activation, untrusted Markdown, advisory change,
+  every K-02/audit refresh, scheduled review, or hard expiry.
+
+#### `EX-H01-PYMDOWN-B64-01` — retain Pymdown Extensions `10.16.1`
+
+- **Threat model:** `pymdownx.b64` accepts relative traversal or absolute image
+  paths and embeds readable image-extension files outside `base_path` into
+  output.
+- **Scope:** exact transitive Pymdown Extensions `10.16.1`; no repository b64
+  extension, docs configuration, or Markdown-rendering path exists.
+- **Compensating controls:** do not enable `pymdownx.b64`; do not render
+  untrusted Markdown; gate scans for extension/config/import activation; no
+  docs build may run with readable secrets.
+- **Re-review/invalidation triggers:** any b64 extension or docs-build use,
+  untrusted Markdown, new Pymdown import/config, advisory change, every
+  K-02/audit refresh, scheduled review, or hard expiry.
+
+The two Vyper determinations are not exceptions: the selected compiler version
+is outside both primary affected ranges. This packet proposes **no
+`--ignore-vuln` flags**. The canonical audit remains a raw, no-ignore result;
+the evidence ledger performs the finding-specific applicability and exception
+reconciliation. If the owner later wants machine-level ignores, each exact ID
+requires a separate approval naming its authoritative range, scanner defect,
+owner, and removal trigger.
+
+### Candidate A versus previously approved Candidate Zero
+
+| Surface | Refreshed Candidate A | Previous Candidate Zero | Avoided or accepted consequence |
+|---|---|---|---|
+| Lock version changes | Six: cbor2, idna, python-dotenv, Requests, urllib3, wheel | Nine: the same six plus pytest, Pygments, Pymdown Extensions | Avoid three unrelated runtime/docs changes. |
+| pytest/S1 | Keep pytest `8.4.2`; S1 exact profile remains unchanged | Move to pytest `9.0.3`; intentionally fail and edit S1 exact expectation | Avoid pytest major-version compatibility work and an S1 profile change; accept bounded local-runner risk under `EX-H01-PYTEST-01`. |
+| Documentation/low packages | Keep Pygments `2.19.2` and Pymdown `10.16.1` | Pygments `2.20.0`, Pymdown `10.21.3` | Avoid lexer/Markdown churn. Pymdown `10.21.3` is now known vulnerable to `CVE-2026-61632`, so its former “zero” benefit is invalid. Accept two Pymdown and one Pygments bounded exceptions. |
+| Click | Keep `8.2.1`; no Candidate Zero change | Keep `8.2.1` | Same finding in both; bounded function-specific exception because deployment scripts do not use `click.edit()`. |
+| Vyper | Keep exact `0.4.3` | Keep exact `0.4.3` | Same scanner results; primary ranges exclude `0.4.3`, so no compiler change or security exception is warranted. |
+| Candidate alert outcome | Candidate lock is expected to remediate 10/13 current Dependabot ranges; three remain visibly excepted | Predicted remediation of 13/13 old Dependabot ranges, but broad audit still found four and new Pymdown advisory defeats the count | Prefer deployment-path risk reduction over a cosmetically perfect count. |
+| Required changed-package validation | HTTP, hostname, dotenv load, cbor2 vectors, wheel/install, S1/S2/S3/full suite, ABI and bytecode equality | Same plus pytest 9 behavior/S1 reapproval and docs/lexer behavior | Avoid pytest/docs change-specific proof; do not avoid the full serial suite or compiler/artifact proof. |
+
+Candidate A still changes cbor2 and wheel, so all old/new compiler, ABI,
+creation/runtime bytecode, S1/S2/S3, and full-suite evidence remains
+mandatory. Minimum churn reduces proof surface; it does not lower artifact or
+test standards.
+
+### Proposed Stage B toolchain, audit, and evidence controls
+
+If approved, retain the previously reviewed CPython `3.12.0`, pip `23.2.1`,
+pip-tools `7.4.1`, public PyPI-only, no-private-index, no-cache installation,
+frozen-output seeding, and truthful expanded pip-compile-header policy. Do not
+upgrade an environment in place. Create independent old, candidate, resolver,
+and `pip-audit==2.10.1` environments.
+
+The resolver inventory must be retained at mode `0600`. Candidate inputs,
+generated locks, literal diffs, and hashes must be generated mechanically;
+candidate preimages must be retained or hash-anchored before disposal. Manual
+numeric/hash transcription and manual lock-header normalization are
+prohibited. Any fresh resolver delta outside the six selected package versions
+plus expected direct-input annotations/header changes stops Stage B.
+
+Run the canonical audit against both old and candidate locks with no fix,
+ignore, suppression, or dependency resolution:
+
+```text
+PIP_CONFIG_FILE=/dev/null python -m pip_audit \
+  --no-deps --disable-pip -r requirements.txt --format=json
+```
+
+The audit is expected to exit nonzero for approved exceptions and scanner
+artifacts. Acceptance is based on exact JSON reconciliation against the
+approved finding ledger, not exit code or aggregate count. Every unexpected
+finding, changed range/version, expired exception, or lost compensating
+control is a stop. The raw no-ignore output must be retained outside the
+repository; ordinary pytest remains offline.
+
+Run the existing S1 test unchanged. pytest and Titanoboa expectations must
+remain exact at `8.4.2` and `0.2.7`; any S1 version failure is unexpected and
+stops Stage B. Use a new private `--basetemp` for every pytest command. Repeat
+the dependency gate, complete S1/S2/S3 surfaces, inventory checker, collection,
+full serial suite, clean resolution, ABI inventory/hashes, and representative
+creation/runtime bytecode fingerprints. No skip, xfail, warning suppression,
+unrelated source change, production-contract change, or artifact difference
+is authorized.
+
+### Refreshed evidence-freshness policy
+
+There is no general wall-clock freshness window. Evidence becomes stale on
+any of these events:
+
+- any change to direct inputs, compiled lock bytes, selected package version,
+  resolver/auditor command, index policy, Python/pip/pip-tools/pip-audit
+  provenance, or installed old/candidate inventory;
+- any change to the H-01 owned files, reconciled `rh` commit, integrated S3
+  source, S1/S2/S3 test surface, compiler input, ABI, or artifact baseline;
+- any change to the authoritative Dependabot ledger or fresh no-ignore audit
+  result, including a new finding, changed range/alias/fix version, or removed
+  finding;
+- any change to a primary advisory's affected range, exploit analysis, or
+  patch status for an exception or Vyper applicability determination;
+- loss of an exception's stated reachability assumption or compensating
+  control; scheduled review or hard expiry of an exception; or
+- any private-evidence custody event, integrity mismatch, or permission
+  change.
+
+After final Candidate A lock generation, refresh K-02 and run fresh raw
+no-ignore audits against both old and candidate locks. Recheck every primary
+range and exception assumption, then repeat K-02, the candidate audit,
+path/hash/mode custody checks, and branch-freshness check immediately before
+the Stage B reviewer gate. A lock, toolchain, selected-version, S1/S2/S3
+surface, compiler/source, or reconciled-baseline change additionally requires
+fresh deterministic resolution, environment inventories, the complete
+brief-defined validation suite, and ABI/creation/runtime-artifact comparison.
+
+This policy covers every alert severity, every auditor finding, the complete
+lock and environment, all bounded exceptions and applicability
+determinations, S1/S2/S3/full-suite results, and ABI/artifact evidence. Stale
+evidence blocks submission to the Stage B reviewer gate, Stage B acceptance,
+merge eligibility, and every rehearsal or deployment action. It does not make
+ordinary offline unit tests depend on the network, current advisory state, or
+wall clock; freshness is checked and recorded at the gated workflow events.
+
+### Refreshed private-evidence custody plan
+
+The pause extends custody beyond the originally anticipated Stage B gate.
+The proposed continuing custodian is **Mick Hagen, H-01 owner**. The
+authoritative local location remains:
+
+```text
+/Users/wigglez/dev/ripe-protocol-h1-private-evidence/
+```
+
+At packet preparation the directory was owned by local UID/GID `501:20` and
+mode `0755`; every retained file was owned by the same UID/GID and mode
+`0600`. Approval must require an owner-only directory mode of `0700` before
+any further H-01 evidence access or Stage B work, followed by a recorded
+owner/mode recheck. This packet does not itself authorize or perform that
+permission change.
+
+There are now three K-02 raw/sanitized pairs:
+
+| Snapshot | Raw SHA-256 | Sanitized SHA-256 | Mode |
+|---|---|---|---|
+| `2026-07-24T172639Z` | `52eccab5e38769070f5310b753f018030587b673cc2637105983ba670bfe2f0a` | `d2dd2d89acb63de901e164c3c7d69f402c04bc38da9a803fe9674734ab404b06` | `0600` |
+| `2026-07-24T182745Z` | `52eccab5e38769070f5310b753f018030587b673cc2637105983ba670bfe2f0a` | `d2dd2d89acb63de901e164c3c7d69f402c04bc38da9a803fe9674734ab404b06` | `0600` |
+| `2026-07-24T201311Z` | `52eccab5e38769070f5310b753f018030587b673cc2637105983ba670bfe2f0a` | `d2dd2d89acb63de901e164c3c7d69f402c04bc38da9a803fe9674734ab404b06` | `0600` |
+
+Five ancillary audit/environment records in the same directory remain at
+their recorded hashes and mode `0600`:
+
+| Ancillary private record | SHA-256 | Mode |
+|---|---|---|
+| `audit-tool-environment-inventory-2026-07-24T182745Z.txt` | `e1284aaefc7051673541ec1bb24b6a215169a78865375896314ba48b17c02d8e` | `0600` |
+| `candidate-zero-environment-inventory-2026-07-24T182745Z.txt` | `e9ec0c1bcc7954a5dbce5c98d8111935b3f32236960468db959aa447e1d37ca1` | `0600` |
+| `old-environment-inventory-2026-07-24T182745Z.txt` | `10a17ea189dfdf2ccd0e70eed88e1f9b274e080e6fce7c8dac2d214844180eeb` | `0600` |
+| `pip-audit-candidate-zero-2026-07-24T182745Z-raw.json` | `9ae967aadec370959f356929ed229928c48caffcd4b656c3f81ceaa1f80a7db9` | `0600` |
+| `pip-audit-old-2026-07-24T182745Z-raw.json` | `5bb47d3f69669aae51bf3007532ba156de40c1da0d5e3c50e005eebd75c3f8d2` | `0600` |
+
+The following controls apply to all private evidence:
+
+- **Permitted use:** local integrity verification, sanitized projection, and
+  direct owner/security/reviewer inspection for H-01 only. Raw authenticated
+  responses may not be committed, uploaded, emailed, pasted into review
+  systems, used to mutate alert state, or disclosed outside the named review
+  group. Only sanitized fields and hashes may enter the repository.
+- **Copy/storage rule:** these remain the sole authoritative copies in the
+  private directory. The owner continues to accept single-copy loss risk.
+  No move, rename, duplicate, cloud sync, or backup is authorized without a
+  separate custody decision.
+- **Integrity triggers:** recheck the directory path/owner/mode and every file
+  path, filename, hash, owner, and mode after every K-02/audit refresh, branch
+  reconciliation, access by a reviewer, custody event, staging operation, and
+  immediately before the Stage B reviewer gate.
+- **Retention:** retain through the latest of refreshed Stage B reviewer
+  acceptance, post-merge authoritative default-branch K-02 refresh, and final
+  disposition or expiry of every exception in this packet. Conduct a custody
+  review on 15 August 2026; that review does not authorize automatic disposal.
+- **Disposal:** only a separate explicit owner instruction after every
+  retention condition is satisfied may authorize deletion. Use exact-file
+  unlinking, not a broad directory target; record each path, pre-disposal
+  hash/mode, UTC time, operator, command/method, result, and any known
+  filesystem snapshot/backup limitation. Do not claim cryptographic secure
+  erasure on APFS. The disposal record must be committed as sanitized
+  evidence.
+
+### Packet-preparation verification
+
+| Read-only command or check | Result |
+|---|---|
+| `git rev-parse rh`; `git rev-parse origin/rh` | committed local `rh` `27765d2`; local remote-tracking ref `3e6e6f2` |
+| `git diff --name-status 3e6e6f2..27765d2` | one addition only: `docs/chains/rh/track-6-s5-ledger-guard.md`; 1,283 lines |
+| `git show -s --format=%P a2b6f225` | exact parents `22eb097e86a123c01a7117d5166b87ed11ae30c9` and `27765d29094256fa9619dd44a0bfd145863de8b7` |
+| Parse all “Refrozen path” rows; hash `git show a2b6f225:<path>` | 17/17 exact matches; all recorded values are 64 lowercase hexadecimal characters |
+| Fresh exact K-02 command above; canonical projection/count query | 13/13 retained alert records; 6 high, 6 medium, 1 low; exact alert-number set; raw and sanitized bytes unchanged |
+| `jq` over retained old and Candidate Zero raw audits | old: 20 entries / 18 unique IDs; Candidate Zero: 4 entries / 4 unique IDs; the four-item blocker ledger matches |
+| Repository search for `click.edit`, Pymdown config/import/extensions, and Pygments `AdlLexer`/Archetype use | direct Click CLI use confirmed; no `click.edit`; no repository Pymdown or affected lexer activation found |
+| `stat` and `shasum -a 256` over the private directory | 11/11 files present at the recorded hashes, owner `501:20`, mode `0600`; directory owner `501:20`, current mode `0755` |
+| `git diff --name-only a2b6f225`; `git ls-files --others --exclude-standard`; `git diff --check` | only this evidence file changed; zero untracked files; whitespace check passed |
+
+The only non-evidence repository delta was the owner-directed merge of the
+reviewed S5 documentation brief; the only new outside-repository records were
+the fresh retained K-02 pair. No requirement, lock, dependency environment,
+test, tool, production-contract source, script, artifact, or other production
+file was changed. No dependency or runtime test was run because reconciliation
+added only that documentation brief and this packet remains
+pre-implementation. No merge to `rh`, push, deployment, signature,
+verification submission, alert mutation, ignore flag, upstream report, or
+external state-changing action occurred.
+
+### Proposed replacement eight-item authorization
+
+Owner/security approval must answer all eight items as one replacement policy:
+
+1. **Supersession and policy:** approve this packet as the sole operative
+   H-01 Stage B authorization, superseding the prior eight-item Candidate Zero
+   authorization dated 24 July 2026; require zero unresolved applicable
+   deployment-path high/medium findings while permitting only the exact
+   bounded exceptions below.
+2. **Exact candidate:** approve fresh resolution and trial of Candidate A only:
+   exact `titanoboa==0.2.7`, `pytest==8.4.2`, `requests==2.33.0`,
+   `urllib3==2.7.0`, `idna==3.15`, `python-dotenv==1.2.2`,
+   `cbor2==5.9.0`, `wheel==0.46.2`, with Vyper/RLP/IPython/dotenv held as
+   above and no Click, Pygments, or Pymdown version change.
+3. **pytest/S1 exception:** approve `EX-H01-PYTEST-01`, its named owner,
+   private-basetemp/single-tenant controls, 15 August review, 31 August hard
+   expiry, and unchanged exact S1 profile.
+4. **Documentation/low exceptions:** approve
+   `EX-H01-PYGMENTS-01`, `EX-H01-PYMDOWN-SNIPPETS-01`, and
+   `EX-H01-PYMDOWN-B64-01` with their exact scopes, controls, triggers, review,
+   and expiry; explicitly reject docs/lexer churn solely to improve the alert
+   count.
+5. **Four audit-blocker findings:** approve `EX-H01-CLICK-01`; approve both
+   Vyper findings as not applicable to `vyper==0.4.3` based on their primary
+   reviewed ranges; approve raw no-ignore auditing and ledger reconciliation;
+   authorize no ignore flag and no upstream report.
+6. **Baseline and sequence:** approve reconciled baseline merge `a2b6f225`
+   over exact reviewed `rh` commit `27765d2`; require a new stop and owner
+   direction on any later `rh`/owned-file movement; preserve S3-first and run
+   Candidate A as a single six-package slice with no partial landing.
+7. **Toolchain, validation, and evidence hygiene:** approve the exact
+   resolver/auditor provenance and commands above, private pytest basetemps,
+   retained resolver inventory and candidate preimages, mechanically generated
+   hashes/diffs, complete old/new validation, artifact equality, and every
+   existing stop condition.
+8. **Freshness, custody, and reviewer gate:** approve the event-driven
+   evidence-freshness policy and covered evidence above; approve Mick Hagen as
+   custodian, changing only the exact private evidence directory from current
+   mode `0755` to `0700` before further access, the
+   permitted-use/copy/retention/integrity/disposal rules, continuing
+   single-copy risk, and the same independent security/Track 6 reviewer as the
+   mandatory Stage B reviewer. Explicitly accept the recorded non-secret K-02
+   process deviation as not invalidating this packet, while prohibiting
+   `gh auth status` in every future refresh; otherwise reject the packet and
+   provide a remediation decision. No merge, push, deployment, signing,
+   verification submission, alert mutation, or other live action is
+   authorized.
+
+Approval must be explicit. Until all eight decisions are approved, H-01
+remains **Stage B blocked / packet pending** and no implementation may begin.
