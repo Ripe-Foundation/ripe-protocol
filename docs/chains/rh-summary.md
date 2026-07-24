@@ -6,6 +6,10 @@
 
 **Source basis:** Hightop Notes research dated 22 July 2026 and decision-record updates/live verification through 23 July 2026
 
+**Checklist reconciliation baseline:** `be6a759e15e763b633feefdce91cf8f3ee31a10e` on 23 July 2026
+
+A checked planning or evidence item means that decision or artifact is complete at the reconciliation baseline. It does not imply that dependent implementation, deployment, activation, validation, or launch gates are complete unless the item itself says so. Any later reconciliation that closes or reopens an item must update the reconciliation baseline in the same commit.
+
 ## Purpose
 
 This document is the high-level engineering checklist for deploying the selected Ripe architecture on Robinhood Chain. It covers only work that belongs in or directly changes this repository: contracts, configuration, deployment and verification scripts, test infrastructure, and release artifacts.
@@ -71,9 +75,13 @@ Freeze and execute restricted mainnet release
 
 ## 0. Freeze scope and resolve blocking choices
 
-- [ ] Pin the exact release commit and regenerate the `block.number` inventory from that commit.
-- [ ] Commit to one canonical contract source and release line for Base and Robinhood; separate chain configuration and migration directories must not become separate protocol branches.
-- [ ] Create a Base-versus-Robinhood component matrix using the definitions above: `reused unchanged`, `modified`, `replaced`, `disabled`, or `deferred`.
+- [ ] Pin the exact release commit for implementation and release freeze.
+- [x] Regenerate and review the `block.number` inventory at the audited planning baseline.
+  - Evidence: [`block-number-inventory.md`](rh/block-number-inventory.md) and [`component-matrix.md`](rh/component-matrix.md).
+- [x] Commit to one canonical contract source and release line for Base and Robinhood; separate chain configuration and migration directories must not become separate protocol branches.
+  - Decision evidence: [`component-matrix.md`](rh/component-matrix.md) and [`shared-block-clock-specification.md`](rh/shared-block-clock-specification.md).
+- [x] Create a Base-versus-Robinhood component matrix using the definitions above: `reused unchanged`, `modified`, `replaced`, `disabled`, or `deferred`.
+  - Evidence: [`component-matrix.md`](rh/component-matrix.md).
 - [ ] Freeze the contracts that will be deployed on Robinhood and the Base-only contracts that will be omitted.
 - [ ] Approve the live-version policy for every `modified` or `replaced` component while retaining one canonical source:
   - require the live Base deployment to migrate before Robinhood launches;
@@ -81,18 +89,20 @@ Freeze and execute restricted mainnet release
   - explicitly accept permanent live-version divergence only where a component is immutable or migrating a custody-bearing deployment would be unacceptably risky.
 - [ ] Record every permanent live-version exception in the component matrix with its technical cause, risk, governance approval, and operational implications. This is an exception to live-bytecode parity, not permission to create chain-specific source.
 - [ ] If temporary drift makes Robinhood the first production deployment of generalized shared-contract revisions while Base retains its battle-tested bytecode, explicitly approve that rollout posture and apply the corresponding review, testnet, and soak requirements.
-- [ ] Approve the shared clock posture: retain `block.number` where its semantics are acceptable on both chains, move cadence assumptions into per-chain parameters, and change hardcoded or same-number behavior in the canonical shared contracts.
+- [x] Approve the shared clock posture: retain `block.number` where its semantics are acceptable on both chains, move cadence assumptions into per-chain parameters, and change hardcoded or same-number behavior in the canonical shared contracts.
+  - Decision evidence: [`shared-block-clock-specification.md`](rh/shared-block-clock-specification.md) and [`block-clock-validation-plan.md`](rh/block-clock-validation-plan.md). Individual parameter values and implementation slices remain separately gated.
 - [ ] Resolve the deployable Stock Token vault path:
   - nominal-balance `SimpleErc20`; or
   - share-based `RebaseErc20`/`SharesVault`.
 - [ ] Decide whether to deploy SavingsGreen/sGREEN on Robinhood; if it is omitted, identify the resulting Stability Pool, insurance, rewards, and lifecycle-test changes in the component matrix.
-- [ ] Resolve the USDG price path:
-  - existing Chainlink feed;
-  - existing reviewed adapter;
-  - new fixed/capped adapter with explicit depeg behavior; or
-  - PSM disabled.
+- [x] Resolve the USDG price path:
+  - **Selected:** use the existing official Chainlink USDG/USD feed through the shared `ChainlinkPrices`/`PriceDesk` path.
+  - Existing-adapter and new-adapter alternatives are not required for the selected path.
+  - The PSM deployment and activation posture remains separately gated.
+  - Decision evidence: [`usdg-psm-decision.md`](rh/usdg-psm-decision.md).
 - [ ] Pin the supported CCIP contracts release and decide how its Solidity contracts and artifacts will be built, tested, and deployed from this currently Vyper-focused repository.
-- [ ] Prefer Chainlink-assisted registration so Robinhood can deploy the same existing GREEN and RIPE token implementations without adding a Robinhood-only `getCCIPAdmin()` change.
+- [x] Prefer Chainlink-assisted registration so Robinhood can deploy the same existing GREEN and RIPE token implementations without adding a Robinhood-only `getCCIPAdmin()` change.
+  - Decision evidence: [`ccip-integration-decision.md`](rh/ccip-integration-decision.md). Chainlink confirmation of the supported registration path remains open below.
 - [ ] Confirm the supported registration path with Chainlink. If `getCCIPAdmin()` is unavoidable, design it as part of a new shared token revision usable on every chain and explicitly resolve the resulting Base migration, temporary live-version mismatch, or permanently accepted live divergence for the immutable Base tokens.
 - [ ] Prove the two highest-uncertainty paths before building the full deployment:
   - a Stock Token can transfer into and back out of a third-party test contract; and

@@ -650,12 +650,21 @@ new dependency returns to owner approval.
 
 Recommendations are not approvals. No clock parameter in this register is final.
 
+On 23 July 2026, the owner approved the narrow S1/S2 kickoff decisions after
+review of their implementation briefs: `+2`/`+4` representative jumps, `+60`
+as a synthetic stress jump that is not an observed or authoritative maximum,
+the pinned-Boa patch mechanism with fail-closed runtime validation, and the
+local script-plus-pytest inventory guard with later CI wiring still open. These
+approvals also confirm the shared clock posture underlying Track 6. They unblock
+S1 and S2; they do not mark either implementation complete or approve the
+remaining clock parameters.
+
 | Decision | Options | Evidence | Recommendation | Affected IDs/components | Owner | Needed before | Status |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| Shared clock posture | retain/configure; timestamp conversion; redesign all | Track 3 separates acceptable clocks from BN-002/012/025 defects | Retain observed-number semantics where valid; redesign only demonstrated failures; no chain branch | all BN/CAD; CM-007–059 | Protocol/security | S3–S9 | recommended/open |
+| Shared clock posture | retain/configure; timestamp conversion; redesign all | Track 3 separates acceptable clocks from BN-002/012/025 defects | Retain observed-number semantics where valid; redesign only demonstrated failures; no chain branch | all BN/CAD; CM-007–059 | Protocol/security | S3–S9 | owner-approved; slice implementation open |
 | Cadence basis | 2s/12s; other measured quantile; no wall-time mapping | Base/Arbitrum docs and RH sample | 2s Base, 12s RH nominal; ceil duration `/6`; label assumptions | duration/rate IDs | Protocol/risk | S6 | recommended/open |
-| Representative jumps | `+2/+4`; another set | RH live `+2`; Arbitrum example `+4` | approve `+2/+4` | all number IDs; CM-059 | Protocol/security | S1 | recommended/open |
-| Stress jump | `+60`; larger owner value; no stress | no authoritative max; occasional longer sync documented | test `+60` as conservative, not maximum | all number IDs; CM-059 | Protocol/security/risk | S1 and parameter signoff | recommended/open |
+| Representative jumps | `+2/+4`; another set | RH live `+2`; Arbitrum example `+4` | approve `+2/+4` | all number IDs; CM-059 | Protocol/security | S1 | owner-approved for S1 |
+| Stress jump | `+60`; larger owner value; no stress | no authoritative max; occasional longer sync documented | test `+60` as conservative, not maximum | all number IDs; CM-059 | Protocol/security/risk | S1 and parameter signoff | owner-approved for S1 as synthetic stress; production parameter signoff open |
 | Ledger Base version policy | coordinated Base upgrade; time-bounded old-policy drift; permanent divergence | live Ledger hash above; current any-touch→checked-action property; canonical-source constraint | approve the threat/policy first, then coordinate Base migration; no permanent divergence | BN-002; CM-008,009,034 | Security/protocol/deployment | S5 | blocked |
 | Deleverage Base version policy | coordinated Deleverage/Delta/Teller upgrade; time-bounded drift; permanent divergence | three shared artifacts and ABI/context must move together | one atomic reviewed Base rollout after duration/context approval; no permanent divergence | BN-012; CM-014,034,044 | Security/protocol/deployment | S4 | blocked |
 | Lootbox Base version policy | coordinated Lootbox redeploy/rewire; time-bounded drift; permanent divergence | live Lootbox hash; constructor ABI changes while strict `>` behavior is retained | coordinated upgrade, with explicit old/new hashes and rollback; no permanent divergence | BN-025; CM-013,033 | Protocol/rewards/deployment | S3 | open |
@@ -673,8 +682,8 @@ Recommendations are not approvals. No clock parameter in this register is final.
 | Lock/booster values | converted table; alternate product terms | dated Base terms and exact expiry code | ceil `/6`, absolute inputs chain-native | BN-008/009/032 | Governance/rewards | S6/S8 | open |
 | Disabled price/dynamic rate | omit; deploy unregistered; enable | selected architecture, Track 3, Track 4 | omit unsupported adapters; PSM disabled if deployed; CAD inert | BN-010/011/025/027/028, CAD-001; price CMs | Oracle/risk/protocol | S6/S9 | recommended/open |
 | CAD report correction | field metadata; special-case formatter; leave wrong | raw/display/runtime trace | field-specific denominator metadata and regression | CAD-001; CM-055 | Risk/oracle/tooling | S10 | recommended/open |
-| Harness mechanism | Boa patch; Anvil; new runtime | pinned Boa direct patch verified | Boa patch with snapshot/reset; no dependency | all; CM-059 | Engineering/test | S1 | recommended/open |
-| Inventory/CI integration | script+pytest local; future CI; workflow now | no committed `.github`; fixed-string baseline | script+pytest now, identical future CI command | all; CM-055,059 | Protocol/security/tooling | S2 | recommended/open |
+| Harness mechanism | Boa patch; Anvil; new runtime | pinned Boa direct patch verified | Boa patch with snapshot/reset; no dependency | all; CM-059 | Engineering/test | S1 | owner-approved for S1 |
+| Inventory/CI integration | script+pytest local; future CI; workflow now | no committed `.github`; fixed-string baseline | script+pytest now, identical future CI command | all; CM-055,059 | Protocol/security/tooling | S2 | owner-approved for S2; future CI wiring open |
 | Durable RPC evidence | derived dated summary only; re-run at implementation; sanitized raw responses plus metadata | Track 6 recorded endpoints/date but output scope excluded an evidence artifact | Track 7 re-runs reads and, if owner approves, commits sanitized raw responses and retrieval metadata | live Base version evidence and RH profiles; CM-055,056 | Deployment/operations | Base rollout and RH deployment evidence | recommended/open |
 | PSM posture consumed from Track 4 | omit; deploy disabled; activate | integrated `go — existing feed`; activation gates remain | if implemented, deploy disabled/no GREEN mint; otherwise omit | BN-027/028; CM-046,048 | Track 4 owners/risk | S6/S8/S9 | approved only as Track 4 decision; activation blocked |
 
