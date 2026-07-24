@@ -1,7 +1,7 @@
 # Track 6 S3 Lootbox Floor Implementation Record
 
-**Status:** Gate 1 owner-approved; Phase G inventory reconciliation authorized;
-mandatory reviewer gate 2 remains open
+**Status:** Gate 1 owner-approved; Phase G inventory reconciliation committed;
+stopped at mandatory reviewer gate 2
 
 **Evidence date:** 24 July 2026
 
@@ -25,12 +25,18 @@ mandatory reviewer gate 2 remains open
 **Wording-only follow-up commit:**
 `5c888e589ad0ff6bd76ee2da3d8f7194558bcdb1`
 
+**Gate 1 approval provenance commit:**
+`db7ae895d1b32ae6708f2405274c32c1e3f5222e`
+
+**Inventory reconciliation commit:**
+`51e5c5a47ac74083affb16516cd07dd8321c0fbb`
+
 **Branch:** `rh-track-6-s3-lootbox-floor`
 
 **Worktree:**
 `/Users/wigglez/dev/ripe-protocol-track-6-s3-lootbox-floor`
 
-This record covers Stage 1 and its Gate 1 approval provenance under
+This record covers Stage 1, its Gate 1 approval provenance, and Phase G under
 `docs/chains/rh/track-6-s3-lootbox-floor.md`. It is not a deployment approval,
 a Gate 2 approval, or a merge-readiness claim.
 
@@ -41,10 +47,10 @@ follow-up and reported no findings, the owner explicitly approved both:
    Phase E read-only evidence; and
 2. Gate 1 on the exact commits `f40dc25`, `3c1fea8`, `23697fa`, and `5c888e5`.
 
-This owner-supplied approval is the immutable Gate 1 provenance required by
-Phase G once committed. It authorizes only the owned S2 inventory
-reconciliation. It does not authorize Gate 2, push, merge, deployment,
-verification, configuration, signing, or another live action.
+Commit `db7ae895d1b32ae6708f2405274c32c1e3f5222e` immutably records
+this owner-supplied Gate 1 provenance. It authorizes only the owned S2
+inventory reconciliation. It does not authorize Gate 2, push, merge,
+deployment, verification, configuration, signing, or another live action.
 
 ## Approval provenance and implemented decisions
 
@@ -456,9 +462,9 @@ Stage 2 reconciliation:
 - `test_command_runs_outside_repository_root_and_is_deterministic`.
 
 All 2,715 non-failing tests passed. The same three inventory tests passed on
-the untouched baseline as part of the 56-test inventory suite. They must be
-rerun, together with the full suite, after reviewed reconciliation for Gate 2;
-their expected Stage 1 failure is not suppressed or repaired before Gate 1.
+the untouched baseline as part of the 56-test inventory suite. They were
+rerun, together with the full suite, after the reviewed reconciliation; their
+expected Stage 1 failure was not suppressed or repaired before Gate 1.
 
 ## Expected S2 drift before reconciliation
 
@@ -471,9 +477,9 @@ covered: `MIN_UNDERSCORE_SEND_INTERVAL` is currently invisible to cadence
 discovery. The checked patterns recognize uppercase identifiers ending in
 `_BLOCK`/`_BLOCKS`, camel-case identifiers ending in `Block`/`Blocks`, and a
 small reviewed list including `ONE_DAY`; the new identifier matches none of
-them. Phase G must deliberately extend the reviewed discovery pattern and add
-deterministic mutation coverage for the immutable before inventory
-reconciliation can pass.
+them. Phase G therefore had to extend the reviewed discovery pattern
+deliberately and add deterministic mutation coverage for the immutable before
+inventory reconciliation could pass.
 
 | Code and path | Count |
 | --- | ---: |
@@ -485,8 +491,9 @@ reconciliation can pass.
 
 Every diagnostic is accounted for below. There is no `INV-DIRECT-MISSING` or
 `INV-DIRECT-NEW`: the 100 direct production occurrences, 95 lines, 17 files,
-32 BN IDs, and 100 BN records retain their identities. Stage 2 must still
-review and reconcile their diagnostic line positions and the cadence surface.
+32 BN IDs, and 100 BN records retain their identities. At Gate 1, Stage 2 still
+had to review and reconcile their diagnostic line positions and the cadence
+surface.
 
 ### Three obsolete cadence rows
 
@@ -589,9 +596,134 @@ All retain their BN identity and move by three lines:
 - BN-025, `distributeUnderscoreRewards`: `1211->1214`, `1255->1258`; and
 - BN-026, `distributeUnderscoreRewards`: `1265->1268`.
 
-No diagnostic was ignored, suppressed, restamped, or reconciled. Gate 1 must
-supply immutable approval provenance for this exact Stage 1 implementation
-before any S2-owned file changes.
+No diagnostic was ignored, suppressed, restamped, or reconciled during Stage
+1. Gate 1 approval commit
+`db7ae895d1b32ae6708f2405274c32c1e3f5222e` later supplied the required
+immutable provenance for the Phase G reconciliation below.
+
+## Phase G inventory reconciliation
+
+Commit `51e5c5a47ac74083affb16516cd07dd8321c0fbb` changes only the three
+Stage 2-owned files:
+
+- `config/block-clock-inventory.json`;
+- `scripts/check_block_clock_inventory.py`; and
+- `tests/inventory/test_block_clock_inventory.py`.
+
+The reviewed cadence-identifier pattern now names
+`MIN_UNDERSCORE_SEND_INTERVAL` exactly. Word boundaries keep prefixed and
+suffixed identifiers out of that rule; the pattern was not generalized to an
+arbitrary `INTERVAL` match.
+
+The reconciled cadence ledger changes mechanically from 424 to 455 candidates:
+
+- remove exactly the three obsolete Lootbox `ONE_DAY` rows;
+- add five production occurrences of
+  `MIN_UNDERSCORE_SEND_INTERVAL`;
+- add the 29 Stage 1 test candidates enumerated above;
+- update the 32 moved existing Lootbox cadence rows and the 35 moved existing
+  Underscore-test rows; and
+- preserve every unrelated cadence candidate.
+
+The five immutable candidates cover its declaration, constructor assignment,
+constructor interval guard, getter, and setter guard. Deterministic mutation
+tests now prove that deleting, renaming, or moving the declaration produces an
+actionable missing or moved diagnostic. A separate exact-match test proves the
+new rule does not match an identifier with an additional prefix or suffix.
+
+The 100 direct production occurrences, 95 lines, 17 files, 32 BN IDs, and 100
+BN records remain unchanged in identity and count. Only the 21 reviewed
+Lootbox line positions move; BN-025 and BN-026 retain their Track 3 identities.
+The Lootbox path content SHA-256 changes from
+`3c8a011b9c56c953281d3a6b2e13aa2c11a9e57026709252c5e62690122f2d00`
+to
+`669c2857e2402ef0e8f9a508dd6f342426ffbd1affce11dd429e5b5b0129ae65`.
+No other Vyper path content hash changes.
+
+The checker's single hardening-provenance design requires one mechanical
+restamp. The top-level `hardeningApprovalCommit` and all 582 non-Track-3
+cadence, seconds-unit, mixed-clock, and path-classification records now cite
+Gate 1 approval commit
+`db7ae895d1b32ae6708f2405274c32c1e3f5222e`. The Track 3 commit
+`c3040041a1254a774e0a305060330d6ab9cc04ca` remains unchanged for all
+direct, timestamp, CAD-001, and indirect-CAD provenance.
+
+Reconciled file hashes are:
+
+| File | SHA-256 |
+| --- | --- |
+| S2 checked inventory | `cebc434d4e2628afd404ff3c76874e26d6e947783dd75ec74dd10001458df6fb` |
+| S2 checker | `cc86f73629589c6a2ee0c9b60e480761d88e1e033e452c1f0843c18db9e28642` |
+| S2 inventory tests | `d9007158565979f7e5027a012a0cf6efdc6be354f0a96b16b7d35c87ba58a39c` |
+
+### Final validation after Phase G
+
+Commands ran serially from inventory reconciliation commit
+`51e5c5a47ac74083affb16516cd07dd8321c0fbb`:
+
+| Command | Result | Wall time |
+| --- | --- | ---: |
+| `PYTHONPATH=. pytest -q tests/core/lootbox/test_underscore_rewards.py` | 59 passed | 70.05 s |
+| `PYTHONPATH=. pytest -q tests/config/test_switchboard_charlie.py` | 91 passed | 74.67 s |
+| `PYTHONPATH=. pytest -q tests/core/lootbox` | 175 passed | 80.36 s |
+| `PYTHONPATH=. pytest -q tests/clock/test_clock_profiles.py` | 57 passed | 67.01 s |
+| `PYTHONPATH=. python scripts/check_block_clock_inventory.py --check` | clean output below | 1.42 s |
+| `PYTHONPATH=. pytest -q tests/inventory/test_block_clock_inventory.py` | 60 passed | 28.36 s |
+| `PYTHONPATH=. pytest -q` | 2,722 passed, 142 deselected | 371.92 s |
+| `git diff --check` | clean | <0.01 s |
+| `git diff --check f0bfd0f..HEAD` | clean | 0.01 s |
+
+As in the earlier runs, pytest used only the documented non-secret
+`ETHERSCAN_API_KEY=local-placeholder` import placeholder. No fork, secret, or
+live RPC call was made during final validation.
+
+The reconciled checker output is:
+
+```text
+CLOCK_INVENTORY_OK schema=1 production_occurrences=100 production_lines=95 production_files=17 bn_ids=32 bn_records=100 indirect_ids=1 cadence_candidates=455 seconds_unit_candidates=58 timestamp_ids=11 timestamp_occurrences=37 mixed_clock_functions=4 vyper_paths=92
+CLOCK_INVENTORY_NONPROD mock=0/0/0 testing=0/0/0 test=31/29/5
+CLOCK_INVENTORY_NONPROD_CADENCE mock=0 testing=0 test=159
+```
+
+The three structurally expected Stage 1 inventory failures are green after
+reconciliation. The inventory suite grows from 56 to 60 tests through the
+exact-match check plus the three deletion/rename/move cases. The full suite
+grows from 2,718 collected at Stage 1 to 2,722 collected and fully passing.
+
+### Final integrity and branch freshness
+
+The complete branch diff from starting commit `f0bfd0f` contains exactly the
+nine files permitted by the two ownership stages:
+
+- `contracts/core/Lootbox.vy`;
+- `tests/conf_core.py`;
+- `tests/core/lootbox/test_underscore_rewards.py`;
+- `tests/config/test_switchboard_charlie.py`;
+- `scripts/abis/Lootbox.json`;
+- `docs/chains/rh/lootbox-floor-implementation-record.md`;
+- `config/block-clock-inventory.json`;
+- `scripts/check_block_clock_inventory.py`; and
+- `tests/inventory/test_block_clock_inventory.py`.
+
+Both immutable history trees remain byte-identical. Their tree IDs are:
+
+- `migrations/base-mainnet`:
+  `e7db6ed257f00d7ceb081716953920b897f01ee0`; and
+- `migration_history`:
+  `12b59cf73855a673946d88f69e30000e51681992`.
+
+`DefaultsBase`, any future `DefaultsRobinhood`, both named S10 parameter-report
+files, dependencies, CI, unrelated ABIs, and `docs/chains/rh-summary.md`
+remain unchanged.
+
+During final validation, local `rh` advanced from the starting commit to
+`127b4bf287bf63c5ed662d82fbf3db8bf66d06a3`, adding two documentation-only
+commits in Track 7 H1 and Track 6 S4 files. Those commits do not overlap any S3
+owned file. The merge base remains `f0bfd0f`; local `rh` is two commits ahead
+on its side and this branch is seven commits ahead on its side. A read-only
+synthetic merge succeeds with tree
+`6583ffe555a2a5336db634cd82cf632e57030ee6`. The branch was not rebased,
+merged, or pushed and has no upstream.
 
 ## Proposed Base forward rollout — not authorized or executed
 
@@ -691,14 +823,17 @@ same reviewed source/compiler/creation artifact. The reserved
 an onchain upgrade transaction. S6 still owns defaults and the parameter
 manifest.
 
-## Gate 1 resolution and remaining items
+## Gate 1 resolution and Gate 2 remaining items
 
 - The independent reviewer reproduced the Stage 1 evidence, reported no
   findings after the wording follow-up, and recommended Gate 1 approval.
 - On 24 July 2026, the owner approved Gate 1 on `f40dc25`, `3c1fea8`,
   `23697fa`, and `5c888e5`, authorizing Phase G inventory reconciliation.
-- Stage 2 inventory/checker/test changes, the reconciled S1/S2 run, full suite,
-  and mandatory reviewer Gate 2 remain open.
+- Gate 1 approval provenance is committed as `db7ae89`; Phase G is committed
+  as `51e5c5a`, and its ordered validation is green.
+- Mandatory reviewer Gate 2 remains open. This branch is not merge-ready until
+  an independent reviewer approves the complete branch, approval provenance,
+  reconciliation, tests, integrity evidence, and freshness evidence above.
 - Production-contract security/audit review remains open.
 - Track 7 migration ID, deployment graph, Base and Robinhood RipeHq/capability
   sequencing, manifests, and actual artifact assertions remain open.
@@ -712,6 +847,6 @@ manifest.
   signing, and transaction approval remains open.
 - Owner merge and push remain open.
 
-No historical migration, S2 inventory file, defaults file, parameter report,
-dependency, CI file, unrelated ABI, or `docs/chains/rh-summary.md` changed.
-No live state-changing action, deployment, push, or merge was performed.
+No historical migration, defaults file, parameter report, dependency, CI file,
+unrelated ABI, or `docs/chains/rh-summary.md` changed. No live
+state-changing action, deployment, push, or merge was performed.
