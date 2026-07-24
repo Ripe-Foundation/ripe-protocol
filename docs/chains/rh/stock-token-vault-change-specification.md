@@ -385,6 +385,11 @@ explicit audit trail, those edits were:
 | Settlement/total loss (Section 16) | Scoped retained non-issuer internal settlement to Section 17 allocated live claims with quarantine excluded, and recorded Section 17's no-automatic-allocation rule for later recovery without selecting a Phase I mechanism. |
 | Validation plan before Phase G | Propagated the same symbols, state diagnostics, formula composition, test prerequisites, and section renumbering into the already specified Phase D–F validation surfaces. |
 
+Both deliverables' status/introduction and closing hold/checklist language were
+also advanced from the Phase F checkpoint to the owner-authorized Phase G
+completion state; those are phase-progression markers, not technical
+reconciliation changes.
+
 These were consistency reconciliations needed to compose Phase G with the
 approved A–F contracts; they did not reverse an owner-approved policy, select
 an implementation mechanism, or begin Phase H.
@@ -402,6 +407,14 @@ showed external modifications to
 `docs/chains/rh/robinhood-deployment-validation-plan.md`. Those files and the
 untracked Track 7 file remain outside Track 8 scope; none was edited, staged,
 or imported here.
+
+During this final cosmetic closure pass, local integration `rh` advanced
+externally from `f0bfd0f` to
+`382eb7da82bc4ed54be945311a8ccd30fae87dec`, temporarily one commit ahead
+of `origin/rh`; the remote subsequently synchronized to the same commit before
+this pass completed. That commit contains only the same three out-of-scope
+documentation paths identified above. No Track 8 source/evidence path changed,
+no integration commit was imported, and Phase H was not begun.
 
 ## 4. Current consumer and ordering trace
 
