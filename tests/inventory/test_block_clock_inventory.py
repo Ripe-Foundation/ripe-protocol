@@ -111,12 +111,14 @@ def test_clean_approved_fixture_passes_without_git_or_network(
     assert "production_files=17" in result.output
     assert "bn_ids=32" in result.output
     assert "indirect_ids=1" in result.output
+    assert "cadence_candidates=455" in result.output
     assert "timestamp_ids=11" in result.output
     assert "seconds_unit_candidates=58" in result.output
     assert "mixed_clock_functions=4" in result.output
     assert "vyper_paths=92" in result.output
     assert "CLOCK_INVENTORY_NONPROD" in result.output
-    assert "test=130" in result.output
+    assert "CLOCK_INVENTORY_NONPROD_CADENCE" in result.output
+    assert "test=159" in result.output
 
 
 def test_unmapped_direct_addition_fails_with_actionable_context(
@@ -255,6 +257,57 @@ def test_new_indirect_cadence_identifier_fails(fixture_repo: Path) -> None:
     _append(fixture_repo / relative, "\nFRESH_INTERVAL_BLOCKS = 123\n")
     result = _assert_failure(fixture_repo, "INV-CADENCE-NEW", path=relative)
     assert "block-unit-identifier" in result.output
+
+
+def test_lootbox_floor_identifier_discovery_is_exact() -> None:
+    patterns = dict(checker.CADENCE_PATTERNS)
+    pattern = patterns["reviewed-cadence-identifier"]
+
+    assert pattern.fullmatch("MIN_UNDERSCORE_SEND_INTERVAL")
+    assert pattern.search("OTHER_MIN_UNDERSCORE_SEND_INTERVAL") is None
+    assert pattern.search("MIN_UNDERSCORE_SEND_INTERVAL_EXTRA") is None
+
+
+@pytest.mark.parametrize(
+    ("mutation", "expected_code"),
+    (
+        ("delete", "INV-CADENCE-MISSING"),
+        ("rename", "INV-CADENCE-MISSING"),
+        ("move", "INV-CADENCE-MOVE"),
+    ),
+)
+def test_lootbox_floor_inventory_mutations_fail(
+    fixture_repo: Path, mutation: str, expected_code: str
+) -> None:
+    relative = "contracts/core/Lootbox.vy"
+    path = fixture_repo / relative
+    declaration = "MIN_UNDERSCORE_SEND_INTERVAL: immutable(uint256)"
+
+    if mutation == "delete":
+        _replace_once(
+            path,
+            declaration,
+            "# mutation fixture: immutable floor declaration deleted",
+        )
+    elif mutation == "rename":
+        text = path.read_text(encoding="utf-8")
+        assert text.count("MIN_UNDERSCORE_SEND_INTERVAL") >= 1
+        path.write_text(
+            text.replace(
+                "MIN_UNDERSCORE_SEND_INTERVAL",
+                "RENAMED_MIN_UNDERSCORE_SEND_INTERVAL",
+            ),
+            encoding="utf-8",
+        )
+    else:
+        lines = path.read_text(encoding="utf-8").splitlines()
+        index = lines.index(declaration)
+        assert lines[index + 1] == ""
+        lines[index], lines[index + 1] = lines[index + 1], lines[index]
+        path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+    result = _assert_failure(fixture_repo, expected_code, path=relative)
+    assert "MIN_UNDERSCORE_SEND_INTERVAL" in result.output
 
 
 def test_blueprint_chain_default_value_change_fails(

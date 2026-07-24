@@ -26,7 +26,7 @@ EXPECTED_BN_IDS = {f"BN-{number:03d}" for number in range(1, 33)}
 EXPECTED_CAD_IDS = {"CAD-001"}
 EXPECTED_TS_IDS = {f"TS-{number:03d}" for number in range(1, 12)}
 TRACK3_REVIEW_COMMIT = "c3040041a1254a774e0a305060330d6ab9cc04ca"
-HARDENING_REVIEW_COMMIT = "cbe935b59e19ba2ab0df73767ce437c55493c916"
+HARDENING_REVIEW_COMMIT = "db7ae895d1b32ae6708f2405274c32c1e3f5222e"
 EXPECTED_PRODUCTION_ROOTS = ["contracts"]
 EXPECTED_EXCLUDED_PRODUCTION_GLOBS = [
     "contracts/mock/**",
@@ -106,8 +106,8 @@ CADENCE_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
     (
         "reviewed-cadence-identifier",
         re.compile(
-            r"\b(?:ONE_DAY|staleBlocks|numBlocksPerInterval|ripePerBlock|"
-            r"increasePerDangerBlock)\b"
+            r"\b(?:MIN_UNDERSCORE_SEND_INTERVAL|ONE_DAY|staleBlocks|"
+            r"numBlocksPerInterval|ripePerBlock|increasePerDangerBlock)\b"
         ),
     ),
     (
