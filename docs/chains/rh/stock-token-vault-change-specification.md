@@ -266,6 +266,12 @@ documentation-only working-tree changes in
 files are outside Track 8's owned deliverables and Phase E source set. They
 were neither read as controlling evidence, edited, staged, nor imported here.
 
+After the Phase E review-remediation commit, integration `rh` advanced
+externally to `f0bfd0fd5ac2be1d27321463b77248c7cd91d829`, committing only those
+same two documentation paths. A direct `c2ded229..f0bfd0f` comparison over the
+Phase E source set in Section 3.4 returned no paths. The Track 8 worktree was
+not rebased, merged, or otherwise moved to that integration commit.
+
 ## 4. Current consumer and ordering trace
 
 ### 4.1 Deposit
