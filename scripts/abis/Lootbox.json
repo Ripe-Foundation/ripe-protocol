@@ -1508,6 +1508,18 @@
     ]
   },
   {
+    "stateMutability": "view",
+    "type": "function",
+    "name": "minUnderscoreSendInterval",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256"
+      }
+    ]
+  },
+  {
     "stateMutability": "nonpayable",
     "type": "function",
     "name": "setHasUnderscoreRewards",
@@ -1622,6 +1634,10 @@
       {
         "name": "_ripeHq",
         "type": "address"
+      },
+      {
+        "name": "_minUnderscoreSendInterval",
+        "type": "uint256"
       },
       {
         "name": "_underscoreSendInterval",
