@@ -1,5 +1,12 @@
-titanoboa
+titanoboa==0.2.7
 vyper==0.4.3
 rlp~=4.0.1
 ipython
 dotenv
+pytest==8.4.2
+requests==2.33.0
+urllib3==2.7.0
+idna==3.15
+python-dotenv==1.2.2
+cbor2==5.9.0
+wheel==0.46.2

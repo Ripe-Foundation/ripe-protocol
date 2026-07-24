@@ -1,8 +1,8 @@
 # Track 7 H-01 Stage A Dependency-Security Gate
 
-**Status:** Stage A evidence complete; Stage B remains stopped before worktree
-implementation; reconciled to reviewed `rh` commit `27765d2`; refreshed
-minimum-candidate owner/security authorization packet pending
+**Status:** Candidate A implemented and fully validated against reviewed `rh`
+commit `4966969`; exception-gated; stopped at the mandatory Stage B reviewer
+gate; no merge, push, deployment, signing, or other live action authorized
 
 **Evidence date:** 24 July 2026
 
@@ -10,12 +10,14 @@ minimum-candidate owner/security authorization packet pending
 
 **Starting commit:** `382eb7da82bc4ed54be945311a8ccd30fae87dec`
 
-This is the sanitized, evidence-only Stage A record required by
-`track-7-h1-dependency-security-preflight.md`. It is not a dependency
-selection, alert acceptance, Stage B authorization, S3 approval, merge
-approval, deployment approval, or claim that an authoritative alert is
-closed. No requirement, lock, test, contract, script, production file, or
-other documentation file was changed.
+This record began as the sanitized, evidence-only Stage A record required by
+`track-7-h1-dependency-security-preflight.md`. Its historical Stage A sections
+remain evidence of the state and decisions at those gates; the later dated
+sections record the owner-authorized Stage B attempt, replacement
+authorization, Candidate A implementation, and validation. Nothing in this
+record is merge, push, deployment, signing, or other live-action approval, and
+it never claims an authoritative default-branch alert is closed merely because
+the unmerged candidate lock remediates its affected range.
 
 ## Executive decision summary
 
@@ -2291,3 +2293,419 @@ Owner/security approval must answer all eight items as one replacement policy:
 
 Approval must be explicit. Until all eight decisions are approved, H-01
 remains **Stage B blocked / packet pending** and no implementation may begin.
+
+## Replacement Stage B authorization record — closed 24 July 2026
+
+The designated independent security/Track 6 reviewer reviewed commit
+`3b8cf72f16ba8297ee6968d2d5b5d877e00b5cba` end to end and approved the
+packet subject to custody hardening, a full pre-edit serial baseline,
+deliberate treatment of in-flight authority-document changes, and a separately
+authorized upstream metadata report. The owner then explicitly approved all
+eight replacement items, Candidate A, all five bounded exceptions, both Vyper
+dispositions, the K-02 deviation, freshness, and custody controls.
+
+The owner accepted the first three operational conditions as follows:
+
+- change only the exact private-evidence directory from `0755` to `0700`
+  before any further private-evidence access, verify ownership/mode, and
+  preserve every retained file hash;
+- run the complete serial old-profile baseline immediately after custody
+  hardening and before any requirement, lock, dependency, or runtime-test
+  edit; and
+- treat uncommitted planning corrections as non-authoritative, but stop,
+  reconcile, refreeze, and rerun every affected validation if those
+  corrections or another relevant authority change integrates into `rh`
+  before the Stage B reviewer gate.
+
+The owner did **not** authorize a public PyPA report within H-01. The
+`PYSEC-2023-142` machine-readable metadata discrepancy remains recorded; any
+upstream report requires a separate, narrowly scoped owner approval. H-01 does
+not wait for upstream action. This owner decision replaces, rather than
+partially satisfying, the reviewer's proposed fourth condition.
+
+This approval supersedes in full the previous eight-item Candidate Zero
+authorization dated 24 July 2026. It authorizes Stage B implementation and
+evidence collection only. It does not authorize merge, push, deployment,
+signing, alert mutation, verification submission, or any other live action.
+H-01 must stop at the mandatory Stage B reviewer gate.
+
+### Custody hardening and retained-integrity proof
+
+The first post-approval action was exactly:
+
+```text
+chmod 0700 /Users/wigglez/dev/ripe-protocol-h1-private-evidence
+stat -f 'mode=%Lp owner=%u:%g path=%N' \
+  /Users/wigglez/dev/ripe-protocol-h1-private-evidence
+```
+
+The change completed at filesystem ctime `2026-07-24T20:54:37Z`, before any
+further private-evidence access. The resulting directory mode is `0700` and
+owner is `501:20`. A subsequent hash/mode/owner pass verified all 11 retained
+files are still present, owned by `501:20`, mode `0600`, and byte-identical to
+the hashes in the refreshed custody tables above. No file was moved, renamed,
+copied, or modified.
+
+### Freshness stop, reconciliation, and refreeze
+
+The first approved baseline run began on merge `a2b6f225`. Before completion,
+the owner reported that `rh` had advanced to
+`4966969265c6056bc7f3f139dc1a2437ef553c9f`. The freshness stop fired
+immediately. The in-progress full suite was interrupted at 1,726 passed and
+142 deselected after 197.58 seconds; this was an intentional stale-baseline
+interruption, not a test failure and not baseline-completion evidence. Its
+exact private basetemp was removed.
+
+The integration worktree was clean. The committed delta from `27765d2` to
+`4966969` was ten planning/authority documents only: 1,255 insertions and 453
+deletions. It changed both frozen Track 7 outputs but no H-01 requirement,
+lock, S1 file, dependency-gate path, evidence path, production source, script,
+ABI, or artifact. H-01 merged exact `4966969`, producing:
+
+```text
+789a8df27cea479e477ff1323b0a7d83b554d441
+parent 3b8cf72f16ba8297ee6968d2d5b5d877e00b5cba
+parent 4966969265c6056bc7f3f139dc1a2437ef553c9f
+```
+
+The refreeze was captured at `2026-07-24T21:03:14Z`
+(`2026-07-24T15:03:14-0600`, MDT).
+
+| Reconciled refrozen path | SHA-256 |
+|---|---|
+| `docs/chains/rh/track-7-h1-dependency-security-preflight.md` | `ac31478d185571c9b804c84a0f78de60bf40eeb3a0aec80b839b66f62befef22` |
+| `docs/chains/rh/robinhood-deployment-support-specification.md` | `ffd3f6a5d17d2c61b58ecbbe86d39230b38508b54ae44fb018bfa551f9cfd1e2` |
+| `docs/chains/rh/robinhood-deployment-validation-plan.md` | `ab39fd135c50f7d348788341a061511b50a854550234de9165554e5674ec2393` |
+| `docs/chains/rh/minimal-contract-change-reassessment.md` | `72c2d1fe13b6f551712935ff78eba0f801f56d80965f3f449a726c74e4a40186` |
+| `docs/chains/rh-summary.md` | `bb1190bcc9bb26201ffdfdea8ede91ef7a3ea384c7d60a2285405a03e66184c2` |
+| `docs/chains/rh/block-clock-validation-plan.md` | `b6891973cea3cb72dade1975f443b49b7ef5c210c481ac62472d07f15ed8e5bc` |
+| `docs/chains/rh/block-number-inventory.md` | `d6f5e89a673bf74f6ebd68033348e48ba295cd2c5c0c903869a8b339a10699d4` |
+| `docs/chains/rh/component-matrix.md` | `bea64119069943534d6b877c04f453f82f8560540099593841c4c770706764c7` |
+| `docs/chains/rh/shared-block-clock-specification.md` | `9c501491c8a96a08ef5136f836baea04ea041eb525a703862d3925e19c7afec4` |
+| `docs/chains/rh/track-6-s4-deleverage-cooldown.md` | `865b459e6d630cb89feebc69edc6f058d72093ccaa81c00e6fb889f87e582962` |
+| `docs/chains/rh/track-6-s5-ledger-guard.md` | `266112d5ee1cb0f261d4d3b833ea6c5911d4b62c5646718063e6808a2c1a4dd5` |
+| `requirements.in` | `2a6726cdc447cb71cc376ef14ee93cc645dbb43826893c5d2433586a89f26f63` |
+| `requirements.txt` | `18df0aad224f2a10febc9e155e4a530e1000ec553916c8ef78dc9859c6c92ba0` |
+| `tests/clock/test_clock_profiles.py` | `2b1bbd8c77f97e614c9db54fcb98b284d3db95a6bb47d1ee9ab020bf6d725cc4` |
+| `tests/utils/clock_profiles.py` | `69f3a616a78cb3a155962edb779533f56e362a68cc922c307dc7d40cbd4b34de` |
+| `docs/chains/rh/lootbox-floor-implementation-record.md` | `d577f44507954ee3d1eee3efc4e940833557287d1fdb2890c863070cfee9be7c` |
+| `contracts/core/Lootbox.vy` | `669c2857e2402ef0e8f9a508dd6f342426ffbd1affce11dd429e5b5b0129ae65` |
+| `scripts/abis/Lootbox.json` | `33aadc219718332ef9163f0b85c8e6fba93735d149db3fb0bb2e3fab814db17c` |
+| `config/block-clock-inventory.json` | `cebc434d4e2628afd404ff3c76874e26d6e947783dd75ec74dd10001458df6fb` |
+| `scripts/check_block_clock_inventory.py` | `cc86f73629589c6a2ee0c9b60e480761d88e1e033e452c1f0843c18db9e28642` |
+| `tests/conf_core.py` | `2ee8fa9222c99345fbc43ecbbf1641c185688724cc36e6a910f43069e4c06f0f` |
+| `tests/inventory/test_block_clock_inventory.py` | `d9007158565979f7e5027a012a0cf6efdc6be354f0a96b16b7d35c87ba58a39c` |
+| `tests/core/lootbox/test_underscore_rewards.py` | `20b86c2d5466863dc2afceaa580d8ae19c5beb363fb937090aabc1eca6bf7e7b` |
+| `tests/config/test_switchboard_charlie.py` | `a444c5fc64439ccb28f5634248cb9459e579336452d59fb741e1d076d7e1fd44` |
+
+A first read-only draft of the refreeze loop mistakenly named
+`docs/chains/rh/rh-summary.md`. `git show` rejected that nonexistent path, but
+the draft pipeline still hashed empty input because it lacked `pipefail`.
+That value was rejected immediately, never entered a file, and the correct
+`docs/chains/rh-summary.md` value above was recomputed. A second loop used the
+correct path, `pipefail`, and an existence check; all 24 paths passed.
+
+### Complete reconciled old-profile baseline
+
+Every pytest invocation used a fresh mode-`0700` task parent and an explicit
+private `--basetemp`; every task parent was removed after the command. The
+complete serial baseline finished before any requirement, lock, dependency,
+or test edit:
+
+| Command | Result |
+|---|---|
+| `python -m pip check` | no broken requirements; 0.34 s wall |
+| `ETHERSCAN_API_KEY=local-placeholder PYTHONPATH=. python -m pytest --basetemp=PRIVATE -q tests/clock/test_clock_profiles.py` | 57 passed in 27.45 s; 65.09 s wall |
+| `PYTHONPATH=. python scripts/check_block_clock_inventory.py --check` | clean; production `100/95/17`, BN `32/100`, indirect `1`, cadence candidates `455`, seconds-unit candidates `58`, timestamp `11/37`, mixed-clock functions `4`, Vyper paths `92`; non-production test `31/29/5`, cadence test `159`; 1.40 s wall |
+| `ETHERSCAN_API_KEY=local-placeholder PYTHONPATH=. python -m pytest --basetemp=PRIVATE -q tests/inventory/test_block_clock_inventory.py` | 60 passed in 25.78 s; 26.80 s wall |
+| `ETHERSCAN_API_KEY=local-placeholder PYTHONPATH=. python -m pytest --basetemp=PRIVATE -q tests/core/lootbox/test_underscore_rewards.py` | 59 passed in 29.80 s; 68.70 s wall |
+| `ETHERSCAN_API_KEY=local-placeholder PYTHONPATH=. python -m pytest --basetemp=PRIVATE -q tests/config/test_switchboard_charlie.py` | 91 passed in 35.53 s; 75.40 s wall |
+| `ETHERSCAN_API_KEY=local-placeholder PYTHONPATH=. python -m pytest --basetemp=PRIVATE --collect-only -q` | 2,722 collected, 142 deselected in 1.23 s; 2.58 s wall |
+| `ETHERSCAN_API_KEY=local-placeholder PYTHONPATH=. python -m pytest --basetemp=PRIVATE -q` | 2,722 passed, 142 deselected in 301.94 s; 362.03 s wall |
+
+The placeholder satisfies only the repository's collection-time environment
+guard. No explorer or external service was called. The worktree remained
+clean after the baseline. Candidate resolution and every dependency/test edit
+were still unstarted.
+
+## Candidate A Stage B implementation — reviewer gate 24 July 2026
+
+Candidate A was implemented only after the replacement authorization,
+custody hardening, `4966969` reconciliation/refreeze, and complete pre-edit
+serial baseline above. The resulting state is **exception-gated and pending
+the mandatory independent Stage B review**. It is not merged, pushed,
+deployed, signed, submitted for verification, or reflected in authoritative
+default-branch alert state.
+
+### Exact candidate and deterministic resolution
+
+The owner-approved CPython `3.12.0` / pip `23.2.1` resolver environment
+installed exact `pip-tools==7.4.1` from public PyPI with no installation
+cache. It was seeded with the frozen old lock and used:
+
+```text
+PIP_CONFIG_FILE=/dev/null
+PIP_INDEX_URL=https://pypi.org/simple
+PIP_EXTRA_INDEX_URL=
+PIP_NO_CACHE_DIR=1
+pip-compile \
+  --cache-dir=PRIVATE_DISPOSABLE_CACHE \
+  --index-url=https://pypi.org/simple \
+  --no-emit-index-url \
+  --output-file=requirements.txt requirements.in
+```
+
+The truthful emitted lock header is:
+
+```text
+#    pip-compile --cert=None --client-cert=None --index-url=https://pypi.org/simple --no-emit-index-url --output-file=requirements.txt --pip-args=None requirements.in
+```
+
+The fresh result reproduced the historically approved Candidate A preimages
+byte-for-byte. A second clean compile from the same approved input and frozen
+old-lock seed also reproduced both hashes exactly:
+
+| Candidate A artifact | SHA-256 |
+|---|---|
+| `requirements.in` | `2523c04409946a6625e30e5e4aa4f711663924f4a674f4cfd5fee5b7bbb3b80d` |
+| generated `requirements.txt` | `d2e12a6f0cfd128c3891634efafbba8305878bef7a7c5db33e25ebe93b0d2bce` |
+| `tests/deployment/test_dependency_gate.py` | `c95340364a92f3bf07b4c0bb9ff44da941d7029c4b727167289e03f0001e040e` |
+
+The full lock review found exactly six version changes:
+
+```text
+cbor2              5.7.0  -> 5.9.0
+idna               3.10   -> 3.15
+python-dotenv      1.2.1  -> 1.2.2
+requests           2.32.5 -> 2.33.0
+urllib3            2.5.0  -> 2.7.0
+wheel              0.45.1 -> 0.46.2
+```
+
+All other lock versions are unchanged. The remaining diff is limited to the
+approved direct-input pins, truthful resolver header, direct-input
+annotations for the six selected packages and pytest, and wheel's new direct
+annotation under packaging. Titanoboa `0.2.7`, Vyper `0.4.3`, pytest `8.4.2`,
+Click `8.2.1`, Pygments `2.19.2`, and Pymdown Extensions `10.16.1` remain
+exactly held.
+
+One initial repeat command named the nonexistent resolver path
+`.../venv/bin/pip-compile` and exited `127` before executing any resolver.
+The corrected command used the retained `.../resolver/bin/pip-compile` path
+and reproduced the exact lock above. During the manual direct-input edit, an
+initial patch briefly replaced the first line with the literal `...`; it was
+noticed on the immediate line-number inspection, corrected before lock copy,
+resolution, installation, or testing, and the corrected file was then
+byte-compared with the retained approved preimage. No candidate was generated
+from the transient invalid input.
+
+### Clean environments and rollback reproduction
+
+Independent old and Candidate A environments were created, never upgraded in
+place, from the frozen and candidate locks. Both used Darwin `25.5.0`,
+macOS `26.5.2`, arm64, CPython `3.12.0`, and pip `23.2.1`; both installed
+from public PyPI with `--no-cache-dir`; both contain 93 packages; and both
+passed `python -m pip check`. A mechanical inventory comparison found only
+the six version changes above. Selected-package metadata matched the lock and
+no `direct_url.json`, local, editable, URL, or private-index installation was
+present.
+
+Rollback is recreation from reconciled parent `789a8df`:
+
+```text
+git show 789a8df:requirements.in
+git show 789a8df:requirements.txt
+python3.12 -m venv PRIVATE_OLD_ENV
+PIP_CONFIG_FILE=/dev/null PRIVATE_OLD_ENV/bin/python -m pip install \
+  --no-cache-dir --index-url https://pypi.org/simple \
+  -r OLD_REQUIREMENTS_TXT
+PRIVATE_OLD_ENV/bin/python -m pip check
+```
+
+That exact old lock was installed successfully and is the hash-anchored old
+inventory below. This is rollback reproduction evidence, not authorization to
+reset, revert, merge, or alter another branch.
+
+| Retained private environment record | SHA-256 | Mode |
+|---|---|---|
+| `stageb-resolver-environment-inventory-2026-07-24T211519Z.txt` | `df6d690ab688349177fbc2ffbe46e1c43765d9ef62c3ca0318dc31eba9b545f4` | `0600` |
+| `candidate-a-requirements-in-2026-07-24T211609Z.txt` | `2523c04409946a6625e30e5e4aa4f711663924f4a674f4cfd5fee5b7bbb3b80d` | `0600` |
+| `candidate-a-requirements-lock-2026-07-24T211609Z.txt` | `d2e12a6f0cfd128c3891634efafbba8305878bef7a7c5db33e25ebe93b0d2bce` | `0600` |
+| `stageb-old-environment-inventory-2026-07-24T211741Z.txt` | `10a17ea189dfdf2ccd0e70eed88e1f9b274e080e6fce7c8dac2d214844180eeb` | `0600` |
+| `stageb-candidate-a-environment-inventory-2026-07-24T211741Z.txt` | `e15eb92a788af8fa0ad18b11c5a719f258e6e7428187ffeefe765c6998abdff1` | `0600` |
+| `stageb-audit-environment-inventory-2026-07-24T211948Z.txt` | `e1284aaefc7051673541ec1bb24b6a215169a78865375896314ba48b17c02d8e` | `0600` |
+
+### Fresh no-ignore audit reconciliation
+
+An independent CPython `3.12.0` / pip `23.2.1` environment installed exact
+`pip-audit==2.10.1` from public PyPI with no installation cache and passed
+`pip check`. Both audit commands used the approved canonical policy:
+
+```text
+PIP_CONFIG_FILE=/dev/null python -m pip_audit \
+  --no-deps --disable-pip -r REQUIREMENTS --format=json \
+  --output PRIVATE_RAW_JSON
+```
+
+The first sandboxed attempts stopped before a query because pip-audit could
+not create `~/Library/Caches/pip-audit`. The identical commands were repeated
+with permission to use that standard cache; no flag, lock, dependency, or
+audit policy changed. The frozen lock reported 20 entries in 11 packages
+(18 unique IDs, including the previously observed duplicated cbor2 and idna
+rows). Candidate A reported exactly seven entries in five packages. Every
+Candidate A row matches the authorized ledger; there is no new, disappeared,
+or range/fix-version-drifted finding:
+
+| Candidate package | Audit ID | Aliases | Fix version | Operative disposition |
+|---|---|---|---|---|
+| Click `8.2.1` | `PYSEC-2026-2132` | `GHSA-47fr-3ffg-hgmw`, `CVE-2026-7246` | `8.3.3` | `EX-H01-CLICK-01` |
+| pytest `8.4.2` | `PYSEC-2026-1845` | `GHSA-6w46-j5rx-g56g`, `CVE-2025-71176` | `9.0.3` | `EX-H01-PYTEST-01` |
+| Pygments `2.19.2` | `PYSEC-2026-2987` | `GHSA-5239-wwwm-4pmq`, `CVE-2026-4539` | `2.20.0` | `EX-H01-PYGMENTS-01` |
+| Pymdown Extensions `10.16.1` | `PYSEC-2026-2999` | `GHSA-62q4-447f-wv8h`, `CVE-2026-46338` | `10.21.3` | `EX-H01-PYMDOWN-SNIPPETS-01` |
+| Pymdown Extensions `10.16.1` | `CVE-2026-61632` | `GHSA-9xwg-3r6f-jcx2` | `11.0.0` | `EX-H01-PYMDOWN-B64-01` |
+| Vyper `0.4.3` | `PYSEC-2023-142` | `GHSA-5824-cm3x-3c38`, `CVE-2023-39363` | none | not applicable; primary range excludes `0.4.3` |
+| Vyper `0.4.3` | `PYSEC-2025-33` | `GHSA-vgf2-gvx8-xwc3`, `CVE-2025-21607` | none | not applicable; primary range and fixed boundary exclude `0.4.3` |
+
+The two Vyper results remain scanner-metadata dispositions, not ignored
+findings or accepted compiler vulnerabilities. No `--ignore-vuln` flag was
+used. Per owner direction, no PyPA or other upstream report was filed; that
+would require separate narrowly scoped approval.
+
+| Retained private raw audit | SHA-256 | Mode |
+|---|---|---|
+| `stageb-old-lock-raw-audit-2026-07-24T212056Z.json` | `b9e17c0f64df49d9e5127892a42063b7490a49e21aeb82a5ed1f8e1c176dd19d` | `0600` |
+| `stageb-candidate-a-raw-audit-2026-07-24T212056Z.json` | `039bdc746c8b1f59088bf21ddbbd22128ba5822863404cf24bf7ac051e6a0d4f` | `0600` |
+
+### Post-generation K-02 observation
+
+After final Candidate A lock generation, the exact approved read-only K-02
+query was repeated at `2026-07-24T21:21:49Z` without `gh auth status`. The
+raw bytes and canonical projection remain identical to the earlier retained
+snapshots: 13 current default-branch open alerts, 6 high, 6 medium, 1 low,
+alert numbers `13, 14, 15, 16, 18, 19, 21, 22, 23, 24, 25, 26, 27`.
+
+| Retained post-generation K-02 record | SHA-256 | Mode |
+|---|---|---|
+| `dependabot-open-2026-07-24T212149Z-raw.json` | `52eccab5e38769070f5310b753f018030587b673cc2637105983ba670bfe2f0a` | `0600` |
+| `dependabot-open-2026-07-24T212149Z-sanitized.json` | `d2dd2d89acb63de901e164c3c7d69f402c04bc38da9a803fe9674734ab404b06` | `0600` |
+
+These alerts describe the repository default branch, not this unmerged
+candidate. Candidate remediation is proven only against the generated lock
+and fresh audit; no GitHub alert is claimed fixed or closed.
+
+### Offline dependency gate and package behavior
+
+`tests/deployment/test_dependency_gate.py` contains 12 offline tests. It
+asserts the exact approved input/lock hashes and generated header; selected,
+held, and forbidden versions; public-PyPI-only/no-local-source policy; all
+seven residual findings and dispositions; the five complete exception
+schemas and event-driven freshness controls; absence of the approved
+Click/Pygments/Pymdown reachability triggers; unchanged S1 exact versions;
+and the absence of subprocess, socket, advisory-query, or GitHub-query logic.
+
+Isolated no-network cases additionally exercise Requests adapter, redirect,
+retry, proxy, timeout, TLS-setting, and exception behavior; Unicode IDNA
+normalization and rejection; dotenv search, interpolation, and environment
+precedence; canonical cbor2 vectors; and wheel metadata. The gate passed all
+12 tests under Candidate A with a private `--basetemp`.
+
+The first test-development replay reported three assertion failures because
+three required evidence phrases crossed Markdown line breaks. The package,
+runtime, and compatibility cases passed. The assertions were corrected to
+normalize only whitespace in the committed evidence text; no dependency,
+exception, policy, source, or production behavior was weakened. The complete
+gate then passed.
+
+### Candidate validation
+
+Every pytest invocation used a fresh mode-`0700` task parent and explicit
+private `--basetemp`, and every task parent was removed after completion.
+No skip, xfail, warning, or plugin suppression was used.
+
+| Command | Candidate A result |
+|---|---|
+| `python -m pip check` | no broken requirements |
+| `pytest -q tests/deployment/test_dependency_gate.py` | 12 passed |
+| `pytest -q tests/clock/test_clock_profiles.py` | 57 passed in 27.75 s; 65.19 s wall |
+| `python scripts/check_block_clock_inventory.py --check` | clean; production `100/95/17`, BN `32/100`, indirect `1`, cadence `455`, seconds-unit `58`, timestamp `11/37`, mixed-clock `4`, Vyper paths `92`; non-production test `31/29/5`, cadence test `159`; 1.30 s wall |
+| `pytest -q tests/inventory/test_block_clock_inventory.py` | 60 passed in 25.39 s; 26.29 s wall |
+| `pytest -q tests/core/lootbox` | all 175 reviewed Lootbox tests passed in 40.69 s; 79.45 s wall |
+| `pytest -q tests/core/lootbox/test_underscore_rewards.py` | exact brief minimum: 59 passed in 30.11 s; 69.22 s wall |
+| `pytest -q tests/config/test_switchboard_charlie.py` | 91 passed in 34.70 s; 73.06 s wall |
+| `pytest --collect-only -q` | 2,734 selected / 2,876 total collected; 142 deselected in 1.33 s; 2.57 s wall |
+| `pytest -q` | 2,734 passed, 142 deselected in 293.97 s; 351.62 s wall |
+| second seeded `pip-compile`; candidate hash comparison | byte-identical input and lock; no resolver drift |
+| `git diff --check` | passed |
+
+The collection/full-suite increase from 2,722 to 2,734 is exactly the 12 new
+dependency-gate tests. pytest and Titanoboa did not change, so the existing S1
+test ran unchanged and no intentional version failure or S1 edit was needed.
+The placeholder `ETHERSCAN_API_KEY=local-placeholder` satisfied only the
+repository collection-time guard; no explorer or live external service was
+called.
+
+### ABI and compiler-artifact equality
+
+S1 and S3 representative artifacts were compiled independently in the old and
+Candidate A environments. Each old/candidate pair was byte-identical:
+
+| Artifact | Source SHA-256 | ABI SHA-256 | Creation SHA-256 | Runtime SHA-256 | Combined fingerprint |
+|---|---|---|---|---|---|
+| S1 `ClockObserver` | `238b2198a0217158db3f93000da47e4af5535883807e7b39cc3864f8d5b432f7` | `55fd4609d43321ded86224d044944b9a1955be174ca91fd55b75fb179f5090c8` | `b5f9615f2267ede387f99c77873aded9a241d30d0269a6f1df336ed93e454ecd` | `6842b313171e51a6b1b4f99143074e263de3f72d943838a3ec887ad3b1dd16d6` | `9ac4b78267b62fe4a645212b3b2bc83498afcedb7b75804d9449ea2056ce791d` |
+| S3 `Lootbox` | `ebb4dcca8fa95bafe8e38ddc1d01886bfaceaf06302fe195f63db0bb7b3ef1da` | `e752a206ba5c78cb573c734c7bfd1c407f1cb98898d3d8e9d3513836c56f5fb2` | `9246a6d9dbee596750dc3a50d27d4418f318a62b7b4826a13f76aee37621e6ce` | `db9c2b91497a6e11191a181c9cbe1776e96532e50ff3e60e17f0bd447354e097` | `263f6e5a75b85763dfed0656b194109512fad6856bc2acf8cccef660586aea0d` |
+
+Both use `vyper==0.4.3+commit.bff19ea2`; compiler settings are identical
+within each pair. The first S3 fingerprint attempt supplied an unsupported
+`name=` argument to `boa.load_partial` and stopped with `TypeError`; the
+corrected read-only compile omitted that argument. The first S1 fingerprint
+attempt omitted `tests` from `PYTHONPATH` and stopped at import with
+`ModuleNotFoundError`; the corrected command used `PYTHONPATH=.:tests`.
+Neither failed attempt produced or changed an artifact.
+
+The old and Candidate A environments separately ran
+`scripts/export_abis.py` to disposable directories. Each exported the same 49
+ABIs, skipped the same 28 mock/testing paths, and reported the same nine known
+standalone module-initializer failures. Relative inventories and every output
+byte matched; both canonical 49-file hash inventories have SHA-256
+`47942174d74fc35e33ee8ae44c0cdea57ebb29685d747f90c932c4c8fd828d9a`.
+Both generated `Lootbox.json` files are byte-identical to committed
+`scripts/abis/Lootbox.json`, SHA-256
+`33aadc219718332ef9163f0b85c8e6fba93735d149db3fb0bb2e3fab814db17c`.
+
+As already recorded by S3, full exporter output has five pre-existing
+committed-output differences (`Deleverage.json`, `EndaomentPSM.json`,
+`SwitchboardAlpha.json`, `SwitchboardDelta.json`, and
+`wsuperOETHbPrices.json`) plus committed-only `DefaultsBaseSepolia.json`.
+Those are identical old-versus-candidate conditions, not Candidate A drift,
+and were not modified. An initial parallel exporter orchestration returned
+before presenting its subprocess output; clean synchronized old and candidate
+runs were then performed from empty disposable directories and are the results
+recorded here.
+
+### Scope, rollback, and reviewer stop
+
+The exact Stage B repository scope is:
+
+```text
+docs/chains/rh/evidence/dependency-security-gate.md
+requirements.in
+requirements.txt
+tests/deployment/test_dependency_gate.py
+```
+
+There is no change to S1, S2, S3, any production contract, deployment script,
+historical migration, manifest, committed ABI, cache, virtual environment, or
+other repository file. No secret, raw authenticated response, private path
+contents, or dependency environment is committed. The raw K-02/audit data and
+complete environment inventories remain outside Git under the approved
+custody policy.
+
+No Candidate A drift, unexpected audit finding, applicable unresolved
+deployment-path alert, compatibility failure, S3 artifact difference, or
+scope expansion remains. The five bounded exceptions remain current under the
+approved 15 August 2026 review / 31 August 2026 hard-expiry policy; the two
+Vyper findings remain approved not-applicable determinations. H-01 is therefore
+**exception-gated and stopped at the mandatory Stage B reviewer gate**. It is
+not closed, merge-ready, pushed, deployed, signed, or authorized for any live
+action until the named independent security/Track 6 reviewer approves the
+complete Stage B bundle and the owner separately acts within the brief.
