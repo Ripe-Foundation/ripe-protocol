@@ -187,6 +187,17 @@ Create a code-grounded current-state map before recommending changes.
 
 For every finding, record exact file/function/line or stable source reference from the starting commit. Separate a defect from a design limitation and a Robinhood-specific blocker.
 
+### Dependency-security preflight
+
+- [ ] Record a dated snapshot of current dependency-security alerts and map each affected package to deployment, verification, RPC, testing, or unrelated runtime use.
+- [ ] Treat the 13 alerts reported by GitHub during the 23 July 2026 `rh` push as dated evidence, not a stable count; re-query the authoritative alert set at implementation kickoff.
+- [ ] Re-check the reported `requests` and `urllib3` findings specifically because migration and verification tooling uses the Python network stack to communicate with RPC and explorer services.
+- [ ] Recommend the smallest reviewed pin-refresh plan that clears relevant high/moderate findings before deployment rehearsal without silently changing compiler, transaction, or test behavior.
+- [ ] Record transitive constraints, release notes, behavior changes, rollback, full-suite requirements, and the owner/security approval needed before editing pins.
+- [ ] Coordinate with Track 6 S1: if a refresh changes `titanoboa==0.2.7` or `pytest==8.4.2`, S1's exact-version gate must fail until a reviewed update approves the new pins and re-proves independent NUMBER/timestamp control, repeated values, jumps, and anchor restoration.
+
+Track 7 specifies this work but does not change a dependency. No deployment rehearsal or signing workflow may rely on an untriaged relevant high/moderate alert set.
+
 ## Phase B: Specify the network/configuration abstraction
 
 Define the smallest shared abstraction that supports current Base behavior and Robinhood without chain-specific protocol logic.
@@ -402,6 +413,8 @@ If the existing verification provider cannot verify Robinhood contracts, specify
 
 ### Stage 1: Static and unit validation
 
+- dependency-alert triage, pin provenance, and reviewed resolution of deployment-tooling findings;
+- deliberate S1 exact-version-gate failure and re-approval when its pinned runtime changes;
 - network-profile schema and unknown-network rejection;
 - environment-variable presence without secret logging;
 - chain-ID/RPC mismatch rejection;
@@ -492,17 +505,18 @@ Every future test must name its proposed file, prerequisite, fixture/network, ex
 
 Propose small, ordered implementation slices. At minimum, separate:
 
-1. network-profile abstraction and CLI selection;
-2. Robinhood blueprint schema plus explicit address/omission validation;
-3. `DefaultsRobinhood` generation and approved parameter manifest;
-4. migration namespace, discovery, ID reservation, and skeletons;
-5. manifest schema/versioning and release-evidence writer;
-6. explorer verification adapter and ABI/artifact handling;
-7. post-deployment assertion/checker tooling;
-8. clean-deployment and negative test suite;
-9. test-environment deployment/runbook;
-10. production rehearsal and restricted-release runbook; and
-11. CCIP Solidity/artifact integration after Track 1 closes.
+1. dependency-security preflight and any narrowly reviewed pin refresh needed before deployment rehearsal;
+2. network-profile abstraction and CLI selection;
+3. Robinhood blueprint schema plus explicit address/omission validation;
+4. `DefaultsRobinhood` generation and approved parameter manifest;
+5. migration namespace, discovery, ID reservation, and skeletons;
+6. manifest schema/versioning and release-evidence writer;
+7. explorer verification adapter and ABI/artifact handling;
+8. post-deployment assertion/checker tooling;
+9. clean-deployment and negative test suite;
+10. test-environment deployment/runbook;
+11. production rehearsal and restricted-release runbook; and
+12. CCIP Solidity/artifact integration after Track 1 closes.
 
 For every slice include:
 
@@ -540,6 +554,7 @@ The specification must contain a decision register with, at minimum:
 | External addresses | primary-source verification and freeze process |
 | Gas/finality/retries | explicit owner/operations policy |
 | CI | local commands now and future integration point |
+| Dependency supply chain | alert triage, affected tooling, pin-refresh boundary, S1 re-approval, and deployment-rehearsal gate |
 | Base upgrades | migration IDs, timing, drift/convergence, rollback |
 
 Each row must include options, evidence, recommendation, owner, prerequisite, deadline/slice, and status. Clearly label recommendations; never write `approved` without an actual recorded owner decision.
@@ -590,7 +605,7 @@ Each row must include options, evidence, recommendation, owner, prerequisite, de
 - **Track 3 / matrix and inventory:** use stable component IDs and accepted dispositions. Report reconciliation gaps; do not renumber IDs.
 - **Track 4 / USDG:** preserve the decision record and activation blockers. Deployment support must represent omitted versus deployed-disabled PSM precisely.
 - **Track 5 / vault:** reserve only the owner-approved path and required shared-fix dependencies. Do not implement or bypass vault remediation.
-- **Track 6 / clocks:** reserve migration IDs for S3–S10. Consume S1/S2 when integrated, but keep their validation status `pending` until commands actually pass.
+- **Track 6 / clocks:** reserve migration IDs for S3–S10. Consume S1/S2 when integrated, but keep their validation status `pending` until commands actually pass. Any dependency refresh that changes S1's pinned Boa or pytest versions must intentionally trip its exact-version gate and receive reviewed pin/profile re-approval; do not classify that failure as an ordinary regression or weaken the assertion.
 - **Future GREEN/RIPE price adapter:** keep disabled-feature slots explicit and deferred; do not select a market.
 
 If two tracks propose the same migration, manifest field, network identifier, ABI path, or test file, record the collision and assign integration to the owner. Do not edit another track's branch.

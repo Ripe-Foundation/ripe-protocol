@@ -119,6 +119,8 @@ The first tests in `tests/clock/test_clock_profiles.py` must fail closed unless 
 
 Use the pinned stack already in the repository. Do not install or add a dependency. Anvil is not an accepted primary fallback because ordinary mining cannot faithfully model repeated state-changing calls at one EVM `NUMBER`.
 
+An approved later dependency-security refresh may intentionally change the pinned Boa or pytest versions and trip this exact-version gate. That failure is expected and must remain fail-closed until a separately reviewed change approves the new expected versions and re-proves every runtime primitive in this phase. Do not loosen the assertion to a version range merely to accommodate a pin refresh.
+
 Stop if any pinned version differs, a runtime write is ignored, a call implicitly advances a controlled clock, or anchor restoration is unreliable.
 
 ## Phase B: Implement the public clock API
