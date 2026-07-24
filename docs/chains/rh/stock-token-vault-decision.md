@@ -54,6 +54,51 @@ artifact.
 
 All of those gates remain closed.
 
+## Owner-authorized scope amendment and complete deliverable ledger
+
+The original Track 5 contract permitted a test-only mock, a comparison test
+suite, and two decision/comparison documents. It also directed the agent to
+identify a required follow-on specification without designing that change in
+Track 5.
+
+After those four deliverables were complete, the owner separately asked, “Okay
+can you document somewhere what your recommended fixes are for this?” and
+specifically requested “the simplest way to mitigate this risk.” That request
+authorized a documentation-only scope amendment:
+
+`docs/chains/rh/stock-token-vault-fix-recommendations.md`
+
+It did **not** authorize production implementation, configuration, deployment,
+or acceptance of the behavior. The recommendations document remains an
+unapproved input to any future, separately opened implementation track.
+
+The complete branch deliverable set is five files:
+
+1. `contracts/mock/MockStockTokenControls.vy`;
+2. `tests/vaults/test_stock_token_vault_comparison.py`;
+3. `docs/chains/rh/stock-token-vault-comparison.md`;
+4. `docs/chains/rh/stock-token-vault-decision.md`; and
+5. `docs/chains/rh/stock-token-vault-fix-recommendations.md`.
+
+The complete material commit ledger through the pre-ledger-review head is:
+
+| Commit | Change |
+|---|---|
+| `d8f11e9` | Added the issuer-control mock and initial comparison harness |
+| `ee270ab` | Closed initial comparison-matrix gaps |
+| `4283008` | Added the comparison and decision records |
+| `c5d09f0` | Added tests for first re-review coverage gaps |
+| `a2c5fe1` | Updated both records for the first re-review |
+| `05940a5` | Tightened final test assertions |
+| `2b34989` | Refreshed final test evidence in both records |
+| `4f86616` | Added the owner-requested fix recommendations and linked them from this record |
+| `d941f31` | Recorded owner confirmation and normalized final-evidence citations |
+
+Any completion report for this branch must report all five files and must
+distinguish the original four deliverables from the later owner-authorized fifth
+deliverable. Reporting only the latest commit is not a complete branch
+completion report.
+
 ## Relationship to the earlier phantom-collateral posture
 
 The controlling executive summary had already accepted interim vault-balance

@@ -88,8 +88,8 @@ emergency patch.
 
 ### Continuous solvency check
 
-Monitor every registered ERC-20 vault asset at least once per block, supplemented
-by every relevant token/vault event:
+The operational detection target is to monitor every registered ERC-20 vault
+asset at least once per block, supplemented by every relevant token/vault event:
 
 ```text
 liveBalance      = token.balanceOf(vault)
@@ -119,6 +119,12 @@ Alert data must include:
 Monitoring is detection, not the fix. No monitor should automatically rewrite
 user balances or treat a later donation as proof that the original loss has
 been restored to the same users.
+
+The once-per-block cadence is a target, not a claim about current monitoring
+infrastructure. Before launch, operations must validate batched-read/RPC
+capacity, reorg handling, alert latency, and failover. Event ingestion may
+accelerate detection but must not replace block-triggered state reconciliation,
+because an integration can miss or misclassify an issuer-control event.
 
 ### Deficit response
 
@@ -255,6 +261,26 @@ successful backing reconciliation.
 The automatic deficit check remains necessary even after this flag exists. The
 flag provides an operational override; it must not be the only thing standing
 between an unnoticed issuer burn and phantom credit.
+
+This absence was verified against the checked-in source rather than inferred
+from the LTV restriction:
+
+- `ConfigStructs.AssetConfig` has per-asset deposit, withdrawal, redemption,
+  auction-purchase, and Stability Pool claim flags, but no borrow or
+  collateral-use flag (`interfaces/ConfigStructs.vyi:88-109`);
+- `MissionControl.getBorrowConfig` takes a user and caller, not an asset, and
+  returns the global `genConfig.canBorrow`
+  (`contracts/data/MissionControl.vy:647-667`);
+- CreditEngine obtains that asset-agnostic borrow configuration and separately
+  derives collateral value from each asset's debt terms
+  (`contracts/core/CreditEngine.vy:232-262`, `687-769`); and
+- the only per-asset borrowing-value control is effectively `debtTerms.ltv`,
+  whose setter rejects a direct nonzero-to-zero change
+  (`contracts/config/SwitchboardBravo.vy:500-565`).
+
+The implementation track must repeat this trace against its integration
+baseline and deployed MissionControl version before adding storage or changing
+an interface.
 
 ### 4. Fix deposit measurement in the same release
 
