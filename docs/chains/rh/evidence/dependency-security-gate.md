@@ -1400,6 +1400,7 @@ commit `cc0fd9977b854756114e2c3fda2185f2a81f0ce2`.
 | `scripts/abis/Lootbox.json` | `33aadc219718332ef9163f0b85c8e6fba93735d149db3fb0bb2e3fab814db17c` |
 | `config/block-clock-inventory.json` | `cebc434d4e2628afd404ff3c76874e26d6e947783dd75ec74dd10001458df6fb` |
 | `scripts/check_block_clock_inventory.py` | `cc86f73629589c6a2ee0c9b60e480761d88e1e033e452c1f0843c18db9e28642` |
+| `tests/conf_core.py` | `2ee8fa9222c99345fbc43ecbbf1641c185688724cc36e6a910f43069e4c06f0f` |
 | `tests/inventory/test_block_clock_inventory.py` | `d9007158565979f7e5027a012a0cf6efdc6be354f0a96b16b7d35c87ba58a39c` |
 | `tests/core/lootbox/test_underscore_rewards.py` | `20b86c2d5466863dc2afceaa580d8ae19c5beb363fb937090aabc1eca6bf7e7b` |
 | `tests/config/test_switchboard_charlie.py` | `a444c5fc64439ccb28f5634248cb9459e579336452d59fb741e1d076d7e1fd44` |
@@ -1421,6 +1422,9 @@ because the S3 reconciliation did not change those files. The nine integrated
 S3 hashes now identify the exact paths added or changed between S3's first
 parent and integration commit. Every value above was also checked for the
 required 64-hex-character shape; path existence was checked at `cc0fd99`.
+Follow-up rereview caught that the first correction still omitted
+`tests/conf_core.py`; this revision adds its directly recomputed hash, making
+the integrated-S3 set complete and the full table 16 rows.
 
 The relevant read-only reconciliation commands and results were:
 
@@ -1650,7 +1654,8 @@ It is recorded as reviewer analysis, not owner/security approval:
 - Retain a zero-vulnerability policy for applicable findings, with an explicit
   applicability determination for every auditor result rather than treating
   an advisory-database metadata defect as an automatically applicable
-  vulnerability.
+  vulnerability. Each determination must cite the primary reviewed
+  advisory's affected range and carry its own explicit re-review trigger.
 - Trial `click==8.3.3` in a refreshed candidate. The current lock records the
   dependency path `titanoboa -> mkdocs-material -> mkdocs -> click`; OSV/PyPA
   advisory
@@ -1661,7 +1666,11 @@ It is recorded as reviewer analysis, not owner/security approval:
   record reports `<=10.21.3` affected and `11.0.0` as the first patched
   version. A refreshed candidate must either trial `11.0.0` as an explicitly
   reviewed major crossing or retain `10.16.1` with an explicit open
-  disposition.
+  disposition. Review primary Click `8.3.x` and Pymdown Extensions `11.x`
+  release notes and breaking changes before selection; do not infer
+  compatibility merely from their documentation-tooling reachability.
+  Preserve the approved incremental Candidate A, then pytest, then
+  documentation/low sequence so each failure remains isolated.
 - Treat the two Vyper findings as applicability candidates, not silently as
   accepted risk or as an automatic Vyper-upgrade instruction. GitHub's
   reviewed records limit
@@ -1678,30 +1687,44 @@ It is recorded as reviewer analysis, not owner/security approval:
   --ignore-vuln PYSEC-2025-33
   ```
 
-  The applicability evidence and any upstream PyPA advisory-database report
-  must have an explicit re-review trigger. No ignore flag was used and no
-  upstream report was submitted in this blocked run.
+  Recheck the primary affected ranges and OSV/PyPA metadata at every K-02 and
+  candidate-audit refresh, and remove either ignore flag immediately when the
+  metadata no longer incorrectly flags `0.4.3`. The reviewer recommends
+  filing an upstream PyPA advisory-database report, but that external write
+  needs separate owner authorization. No ignore flag was used and no upstream
+  report was submitted in this blocked run.
 - Refresh the complete eight-item authorization bundle only after these
-  choices and the new `rh` reconciliation decision are explicit.
+  choices and the new `rh` reconciliation decision are explicit. Resolve and
+  record the exact current `rh` commit at approval time; `27765d2` is only the
+  latest observation, not a pre-approved future reconciliation target. Carry
+  retained resolver inventory, retained-or-hash-anchored candidate preimages,
+  and command-generated numeric transcription into the refreshed bundle as
+  binding evidence conditions.
 
 Fresh owner/security decisions are required before any resumption:
 
 1. whether to adopt the reviewer's recommended zero-applicable-vulnerability
-   policy and per-finding applicability rule, or to define another precise
-   residual policy;
+   policy and per-finding applicability rule, including a primary affected
+   range citation and explicit re-review trigger for each determination, or to
+   define another precise residual policy;
 2. whether scope may expand to trial and review exact `click==8.3.3` and
    either exact `pymdown-extensions==11.0.0` or an explicit hold at the current
-   `10.16.1`, including a fresh complete resolver diff, primary-source review,
-   clean environments, compatibility tests, and a new candidate approval;
+   `10.16.1`, including primary release-note and breaking-change review, the
+   unchanged Candidate A -> pytest -> documentation/low sequence, a fresh
+   complete resolver diff, clean environments, compatibility tests, and a new
+   candidate approval;
 3. whether to approve the primary-range determination that both Vyper
    findings do not apply to `vyper==0.4.3`, and if so, the exact two audit
-   ignore flags, re-review trigger, and whether an upstream metadata report is
-   required; otherwise, whether to exception-gate them or authorize a
-   separately reviewed Vyper profile change and its Track 6/S1/S3/artifact
-   consequences; and
-4. whether to reconcile the H-01 branch with local `rh` commit `27765d2`,
-   re-freeze every baseline, refresh the complete eight-item authorization
-   bundle, and only then resume Stage B.
+   ignore flags, recheck-and-remove trigger at every K-02/audit refresh, and
+   whether to separately authorize filing an upstream metadata report;
+   otherwise, whether to exception-gate them or authorize a separately
+   reviewed Vyper profile change and its Track 6/S1/S3/artifact consequences;
+   and
+4. whether, after resolving the exact current local `rh` commit at approval
+   time, to reconcile H-01 to that commit, re-freeze every baseline, retain
+   resolver inventory and candidate preimages under the new hygiene rules,
+   refresh the complete eight-item authorization bundle, and only then resume
+   Stage B.
 
 ### Evidence-integrity correction verification
 
@@ -1722,11 +1745,13 @@ sed -n '/^| Re-frozen input | SHA-256 |$/,/^$/p' \
   done
 ```
 
-Result: all 15 rows passed. A first read-only draft of this verification loop
+Result: all 16 rows passed. A first read-only draft of this verification loop
 used zsh's special `path` variable, which cleared the executable search path
 after the first row and produced `command not found` for subsequent commands.
 It made no file or Git change. Renaming the variable to `file_path` produced
-the all-green result above.
+the all-green result above. The final nine table paths, sorted and compared
+against `git diff --name-only 127b4bf..3e6e6f2`, matched exactly, including
+`tests/conf_core.py`.
 
 An independent shape scan of every 50–70-character lowercase hexadecimal
 value in this Stage B record produced no non-64-character result. Searches for
