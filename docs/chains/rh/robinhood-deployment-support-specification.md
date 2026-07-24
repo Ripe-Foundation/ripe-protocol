@@ -120,7 +120,7 @@ is not an implementation source.
 | Track 2, stock transfer | Evidence exists, but launch-asset and live-environment applicability must be frozen for the selected release. | Owner/release review |
 | Track 4, USDG | Existing Chainlink-feed direction and disabled-by-default PSM posture are recorded. Implementation, parameters, risk gates, and SavingsGreen disposition are not complete. | Owner/risk approval |
 | Track 5, vault | Rebase/Shares accounting is the preferred direction, but the vault is not approved for deployment unchanged and remediations remain. | Owner/security approval |
-| Track 6, S1/S2 | Specifications exist but are still inputs, not proof that implementation or validation has landed. | Reconcile exact implementation commits before H-09 or any rehearsal |
+| Track 6, S1/S2 | The narrow kickoff directions are owner-approved at `ce3805d`; specifications exist, but neither fact proves implementation or validation has landed. | Reconcile exact implementation commits before H-09 or any rehearsal |
 | Track 8, vault change | Brief-only post-kickoff input at `be6a759`; it assigns Track 7 exact Robinhood migration IDs, namespaces, manifests, and deployment tooling while reserving vault-specific sequencing for Track 8. | Keep Phase C vault rows provisional; reconcile reviewed Track 8 outputs before H-03/H-05 implementation and route collisions to the owner |
 
 ### 2.6 Parallel-input reconciliation
@@ -140,21 +140,24 @@ cherry-picked.
 
 ### 2.7 Final parallel-worktree reconciliation
 
-Immediately before completion validation, integration remained at `be6a759` but
-contained uncommitted edits not made by Track 7:
+During completion validation, integration first remained at `be6a759` with two
+uncommitted edits not made by Track 7. After Track 7's first completion commit,
+the same byte-for-byte edits landed as clean integration commit
+`ce3805d6079ee87d727486ea82b75cbddc12e46d`
+(`docs: owner-approved checklist reconciliation at be6a759`):
 
-| Working-tree input | Observed SHA-256 | Reconciliation |
+| Integrated input | SHA-256 | Reconciliation |
 | --- | --- | --- |
-| `docs/chains/rh-summary.md` | `b60f5c516b531d2cea67dfce08032e2fcd4f2ed6a26bff8c688d9e2fecf67c22` | Candidate Section 0 checklist-status clarifications; Section 1 text consumed by the exact handoff is unchanged |
-| `docs/chains/rh/shared-block-clock-specification.md` | `dd9e940aa03f065ad7ae9a0407074fe202dec7b563cf15972bad0fd3d6a154b0` | Candidate record of narrow S1/S2 owner directions; implementation and remaining clock values stay open |
+| `docs/chains/rh-summary.md` | `b60f5c516b531d2cea67dfce08032e2fcd4f2ed6a26bff8c688d9e2fecf67c22` | Section 0 checklist-status clarifications; Section 1 text consumed by the exact handoff is unchanged |
+| `docs/chains/rh/shared-block-clock-specification.md` | `dd9e940aa03f065ad7ae9a0407074fe202dec7b563cf15972bad0fd3d6a154b0` | Narrow S1/S2 directions are owner-approved; implementation and remaining clock values stay open |
 
-Uncommitted parallel edits are not a frozen Track 7 authority and do not replace
-the Section 2.3 hashes. Their content is compatible with this specification:
+These post-kickoff inputs do not replace the Section 2.3 hashes used for the
+frozen Phase A audit. Their content is compatible with this specification:
 the selected existing USDG Chainlink-feed direction, shared-source posture,
 assisted-registration preference and S1/S2 gates are already represented, while
 deployment, activation, exact values and implementation remain blocked. No
 owned Track 7 deliverable path or proposed migration ID collision was observed.
-The integration worktree was not edited, staged or cleaned by Track 7.
+Track 7 did not edit, stage, clean, push or merge the integration worktree.
 
 ## 3. Phase A audit
 
@@ -1643,13 +1646,14 @@ deployment/role transfer a rollback.
 | Component identities | CM-001–060 are consumed without renumbering | Track 3/component matrix owns stable identity/disposition reconciliation | No renumbering; provisional graph dispositions remain owner-review items |
 | Summary checklist | This section reports eligibility only | Owner alone edits/checks `docs/chains/rh-summary.md` | File intentionally unchanged |
 
-The integration branch's committed state advanced after kickoff only by the
-Track 8 brief at `be6a759e15e763b633feefdce91cf8f3ee31a10e`; its SHA-256 is
-`c885c25f5a19f0531a15ce947534a4a054bf6e18ef7f198734d879dfd6a52637`.
-Track 7 did not merge, cherry-pick or edit that branch. The brief was consumed as
-a pending interface input and cannot be treated as reviewed Track 8 output.
-The additional uncommitted integration edits and their compatibility disposition
-are recorded in Section 2.7; they were not copied or treated as frozen inputs.
+The integration branch advanced after kickoff in two documentation commits:
+the Track 8 brief at `be6a759e15e763b633feefdce91cf8f3ee31a10e`
+(SHA-256
+`c885c25f5a19f0531a15ce947534a4a054bf6e18ef7f198734d879dfd6a52637`)
+and the owner-approved checklist reconciliation at `ce3805d`. Track 7 did not
+merge, cherry-pick, push or edit that branch. The Track 8 brief remains a
+pending interface input, not reviewed Track 8 output; the two `ce3805d` input
+dispositions are recorded in Section 2.7.
 
 ### 21.2 Exact `rh-summary.md` Section 1 checklist handoff
 
