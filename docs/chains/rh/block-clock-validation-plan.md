@@ -8,6 +8,12 @@ currently pinned stack remain owner-gated
 **Review revision:** 23 July 2026 — added the lower-risk-to-higher-risk Ledger
 case, runtime primitive gate, and `contracts/testing/**` classification
 
+**Minimum-change revision:** 24 July 2026 — BN-012 tests validate the selected
+zero-cooldown/no-change candidate first; BN-025 validates the retained narrow S3
+change; and BN-002 validates the owner-selected portable same-execution-block
+direction. S5 implementation remains blocked on its Stage A architecture and
+security gate, and the deployed Base Ledger remains outside migration scope.
+
 **Authority:** [`shared-block-clock-specification.md`](shared-block-clock-specification.md),
 the integrated Track 3 inventory, and the integrated component matrix
 
@@ -120,8 +126,8 @@ compiler version/settings, ABI, and creation bytecode, then deploys the same
 fingerprint under:
 
 - `base_current`: currently tested Base values and current behavior;
-- `base_canonical`: approved post-shared-change Base behavior, initially an
-  expected-failure comparison until the shared change is implemented; and
+- `base_canonical`: the selected release behavior, which may be unchanged Base
+  source or an owner-approved indispensable shared change; and
 - `robinhood_candidate`: approved Robinhood values from `DefaultsRobinhood`.
 
 Before any behavioral assertion, the test fails if artifact fingerprints differ
@@ -129,10 +135,13 @@ between profiles. Parameter extraction then compares every constructor immutable
 getter, MissionControl field, and generated defaults entry to a checked parameter
 manifest. This distinguishes same artifact from different deployment data.
 
-For BN-002, BN-012, and BN-025, comparison tests keep the current Base behavior
-visible beside proposed canonical behavior until the owner-approved Base upgrade
-is complete. They are never silently rewritten as if current live Base already
-runs the new version.
+For BN-002, BN-012, and BN-025, comparison tests keep current Base behavior
+visible beside the selected Robinhood disposition. BN-012 proves the
+configuration/no-change path unless S4 closes its necessity gate. BN-025 proves
+the retained S3 artifact and keeps any Base convergence separate. BN-002 proves
+the revised forward canonical artifact on a fresh Robinhood deployment while
+treating the deployed Base Ledger as permanent retained regression evidence;
+it must not invent a Base convergence action.
 
 ## Boundary helpers
 
@@ -183,7 +192,7 @@ profile.
 | ID; components | Primary test location | Required assertions |
 | --- | --- | --- |
 | BN-001; CM-001,002 | `tests/tokens/test_erc20.py` | Base/RH values and bounds; pending data observes NUMBER; before/exact/after confirmation |
-| BN-002; CM-008,009,034 | `tests/data/test_ledger.py` plus Teller domain tests | current same-NUMBER lower-risk touch then checked higher-risk rejection; higher-risk then lower-risk succeeds but a later checked action rejects; selected canonical low-risk arming and nested/cross-tx property; locked account, delegation, Underscore-user handling, migration |
+| BN-002; CM-008,009,034 | `tests/data/test_ledger.py` plus Teller domain tests and focused action-block-source tests at the S5-approved path | Current native behavior; RH same-child-block rejection and next-child-block allowance even when ancestor `block.number` repeats; current lower/higher-risk ordering, Underscore classification, call/write/pause/authority/locked-account behavior; fail-closed provider/source validation; no Base migration |
 | BN-003; LocalGov components | `tests/modules/test_local_gov.py` and inheritor suites | all LocalGov values/bounds and exact confirmation |
 | BN-004; all TimeLock components | `tests/modules/test_time_lock.py` and each inheritor suite | before/open/last-valid/exact-expiry/jump-past; stress headroom |
 | BN-005; CM-005,032 | `tests/core/humanResources/test_hr_contributor.py` | transfer authority delay plus independent vesting seconds |
@@ -193,7 +202,7 @@ profile.
 | BN-009; CM-023 | same RipeGov suite | weighted lock, bonus at boundaries, deposit before/after jump, term change |
 | BN-010; CM-017 | `tests/priceSources/curve/test_green_ref_pool.py` plus RH disabled suite | Base staleness boundary; no RH deployment/registration |
 | BN-011; CM-017,030 | Curve suite and `tests/core/creditEngine/test_credit_dyn_rate.py` | same-number suppression; `+1/+2/+4/+60` danger delta/cap; RH base-rate fallback |
-| BN-012; CM-044,014,034 | `tests/core/deleverage/test_deleverage_for_withdrawal.py`, Delta suite | same-N independent call blocked; authorized same-context legs; forged/reused context; exact cooldown; near-redemption |
+| BN-012; CM-044,014,034 | `tests/core/deleverage/test_deleverage_for_withdrawal.py`, Delta suite | zero-cooldown Robinhood path has no pacing and never activates the duplicated ceiling/bypass; nonzero same-NUMBER/context/exact-boundary assertions only if S4 is approved |
 | BN-013; CM-014,029 | `tests/config/test_switchboard_delta.py` and BondRoom suite | past/equal/future absolute input clamps to EVM NUMBER |
 | BN-014; CM-029 | `tests/core/bondRoom/test_ripe_bonds.py` | entry/progress, partial and whole epoch skip, no retroactive capacity |
 | BN-015; CM-029 | same BondRoom suite | preview equals execution at every clock point |
@@ -206,7 +215,7 @@ profile.
 | BN-022; CM-033 | `tests/core/lootbox/test_loot_deposit_points.py` | global/asset/user prior balances across jump; allocation floors/conservation |
 | BN-023; CM-033 | `tests/core/lootbox/test_loot_borrow_points.py` | prior principal across jump; borrow/repay ordering; user/global totals |
 | BN-024; CM-033 | `tests/core/lootbox/test_loot_ripe_rewards.py` | 324/day nominal comparison, gap-at-prior-rate, cap, allocation dust, rate change order |
-| BN-025; CM-033,013 | `tests/core/lootbox/test_underscore_rewards.py`, Charlie suite, RH disabled suite | immutable floor; constructor/setter; strict `>` equality; no RH distributor |
+| BN-025; CM-033,013 | `tests/core/lootbox/test_underscore_rewards.py`, Charlie suite, RH disabled suite | retained S3 immutable floor; Base `43,200`; RH floor `7,200` with interval zero and no distributor; constructor/setter and strict `>` assertions |
 | BN-026; CM-033 | same Underscore suite plus event-consumer fixture | repeated/gapped telemetry accepted; log identity, not NUMBER, is unique |
 | BN-027; CM-048,046 | `tests/core/endaoment/test_endaoment_psm_mint.py`, config/Echo suites | repeat bucket, exact refill, one reset after many intervals, mid-bucket change, disabled flags |
 | BN-028; CM-048,046 | `tests/core/endaoment/test_endaoment_psm_redeem.py`, config/Echo suites | same plus mint/redeem independence |
@@ -236,7 +245,7 @@ assert no Robinhood deployment/registration.
 | TS-010 | CreditEngine borrow/dynamic-rate suites | held NUMBER accrues interest as time advances; NUMBER jump with held time adds no interest |
 | TS-011 | `tests/registries/test_address_registry.py` | lastModified follows timestamp; eligibility follows NUMBER |
 
-## Shared-change acceptance properties
+## Selected-disposition acceptance properties
 
 ### Ledger
 
@@ -249,30 +258,46 @@ assert no Robinhood deployment/registration.
 - Users classified as Underscore wallets/vaults skip the assertion; the test does
   not substitute caller identity for user classification and still verifies the
   `lastTouch` write.
-- The canonical test names whether lower-risk touches arm transient protection,
-  cross-transaction pacing, both, or neither; a silent behavior change fails.
-- Only the owner-selected threat property is encoded; the test name states it.
-- A transient guard cannot survive transaction/anchor reset.
-- A cross-transaction seconds guard, if selected, tests exact seconds boundary,
+- The Robinhood profile proves two transactions in the same actual child block
+  share one action-block ID and trigger the current checked-action rejection.
+- The next Robinhood child block clears the guard even when inherited
+  `block.number` remains unchanged; elapsed seconds alone do not clear it.
+- The selected source is immutable or equivalently non-mutable after
+  deployment, validates its native/Robinhood mode or provider, and fails closed
+  on unavailable, malformed, unsupported, or misconfigured child-block data.
+- `shouldCheckLastTouch=false` remains a compatibility/configuration test, not
+  the selected Robinhood launch posture.
+- The forward source/ABI/creation-artifact boundary stays canonical across
+  deployments; constructor immutables may produce expected runtime differences.
+- No test proposes, simulates, or claims a migration of the deployed Base
+  Ledger. Base is regression evidence only.
+- Tests prove the action-block abstraction is not consumed by timelocks,
+  rewards, rates, auctions, capacity intervals, or any other protocol clock.
+- A cross-transaction seconds guard, if approved, tests exact seconds boundary,
   future timestamp rejection assumptions, governance changes, and migration.
 - Locked-account protection remains later-call invariant even when pacing is off.
 - No assertion uses `chain.id` or Robinhood-specific production artifacts.
 
 ### Deleverage
 
-- One independent call at the same NUMBER is within cooldown.
-- A second leg bypasses only with the same user, registered coordinator, open
-  transient context, and transaction.
-- Another user, caller, context, transaction, or replay cannot bypass.
-- Exact `last + cooldown` is eligible; `-1` is not unless near redemption.
-- Delta and Deleverage accept/reject identical maxima from one getter.
+- The minimum-change candidate proves the cooldown is initialized and retained
+  at zero, the dormant maximum cannot force a migration, and no manifest or
+  governance step silently enables nonzero pacing.
+- If a nonzero cooldown is approved, one independent call at the same NUMBER is
+  within cooldown and the exact boundary/near-redemption behavior is tested.
+- Only an approved context design may bypass; another user, caller, context,
+  transaction, or replay cannot.
+- Delta and Deleverage maximum-consistency assertions apply only to the
+  approved nonzero design.
 
 ### Lootbox
 
-- Deployment rejects floor below the approved chain value.
-- Setter rejects `floor-1`, accepts `floor`, rejects max, and cannot mutate floor.
+- The retained S3 candidate proves interval zero leaves Robinhood Underscore
+  rewards disabled while preserving the immutable `7,200` floor and no
+  Robinhood Underscore address, permission, route, or call exists.
+- Deployment rejects a floor below the approved chain value and setter tests
+  cover `floor-1`, `floor`, max, and immutability.
 - Current strict send boundary is preserved in Base comparison.
-- Robinhood has no Underscore address, permission, route, or successful call.
 
 ### CAD-001
 
@@ -309,11 +334,14 @@ The minimum cross-contract scenarios are:
 
 1. RipeHq/AddressRegistry CCIP Department add, confirm, capability initiate,
    confirm, permitted mint, disable, and negative premature/unknown-address calls.
-2. Teller lower-risk housekeeping followed by higher-risk action, then the reverse
-   order, through Ledger, CreditEngine debt update, Lootbox borrow points,
-   repeat/jump, repay, Underscore-user classification, and locked-account checks.
-3. Multi-asset withdrawal through Teller and Deleverage using one authorized
-   context, followed by an independent same-NUMBER attempt and exact cooldown end.
+2. Teller lower-risk housekeeping followed by higher-risk action, then the
+   reverse order, through Ledger, CreditEngine debt update, Lootbox borrow
+   points, repeat/jump, repay, Underscore-user classification, and locked-account
+   checks under Base-enabled and Robinhood-disabled policies. Replacement
+   scenarios run only if approved.
+3. Multi-asset withdrawal through Teller and Deleverage with cooldown zero.
+   Context, independent same-NUMBER, and exact cooldown-end scenarios run only
+   if a nonzero S4 design is approved.
 4. PSM mint/redeem bucket independence with both flags false, governed interval
    change, and no GREEN mint authority; activation tests remain skipped/blocked
    until Track 4 owner gates approve.

@@ -11,6 +11,11 @@
   test was renamed to `tests/deployment/test_network_clock_profiles.py` to
   avoid a pytest basename collision with the integrated Track 6 S1 test; no
   implementation is implied
+- Minimum-change correction: on 2026-07-24, V-03 was clarified to require each
+  slice's selected minimum disposition rather than infer a production change
+  from a reservation. S3 is retained, S4 remains necessity-gated, and S5 now
+  requires the owner-selected fresh-RH action-block Ledger while the deployed
+  Base Ledger remains untouched.
 
 ## 1. Purpose and authority boundary
 
@@ -60,8 +65,8 @@ gate. A listed test is not evidence that the test exists or passed.
 | V-00 source freeze | Full commit, clean tree, input hashes, canonical plan hash | Every stage |
 | V-01 dependency security | Dated authoritative alerts, selected pin set, upstream release-note review, clean resolution, security approval | Any deployment/fork rehearsal |
 | V-02 Track 6 S1/S2 | Integrated reviewed clock harness/inventory and exact dependency profile | Stages 2–5 |
-| V-03 Track 6 S3–S10 | Integrated source/tooling artifacts or explicit not-applicable dispositions for reservations `0010`–`0080` | Clean graph execution |
-| V-04 Track 8 | Reviewed vault-change specification/artifacts and owner-selected vault posture | CM-021–026/030/043 and Stock Token lifecycle |
+| V-03 Track 6 S3–S10 | Integrated indispensable source/tooling artifacts or explicit unchanged/configuration/not-applicable dispositions for reservations `0010`–`0080`; S5 includes an approved RH action-block source and explicit no-Base-migration record | Clean graph execution |
+| V-04 Track 8 | Reviewed minimum-containment specification/artifacts and owner-selected vault posture for launch-mandatory Stock Tokens | CM-021–026/030/043 and Stock Token lifecycle |
 | V-05 Track 4 | Approved USDG reserve/feed/PSM parameter manifest and disabled/omitted decision | CM-046/048 |
 | V-06 Track 1 | Supported CCIP release, toolchain, chain selectors, router/registry/pool/admin facts and owner decision | CM-051–053 and bridge tests |
 | V-07 network operations | Provider, RPC policy, fee caps, confirmation/finality, account backend and public role addresses approved | Any nonlocal submission |
@@ -241,8 +246,10 @@ grants that approval.
 4. Verify receipts/finality and every postcondition before the next semantic
    action.
 5. Verify every supported contract and record truthful unsupported states.
-6. Configure one approved reserve. Configure a candidate Stock Token only after
-   Track 8 and exact-token gates.
+6. Configure one approved reserve. Configure the launch-mandatory Stock Token
+   only after Track 8's minimum-containment, exact-token, security, risk, and
+   owner gates close; otherwise the release is blocked rather than silently
+   omitting the product requirement.
 7. Exercise approved deposit, borrow, repay, withdraw, liquidation and bad-debt
    behavior; when a path is not approved, prove its flag/route remains disabled.
 8. Execute one local-governance parameter change through its actual timelock and
@@ -449,7 +456,9 @@ a separate implementation slice.
   evidence, tier and owner.
 - [ ] Base behavior and known defects are separately dispositioned.
 - [ ] Track 6 exact-version and clock gates are not weakened.
-- [ ] Track 8 and Stock Token tests remain blocked until owner selection.
+- [ ] Track 8 and Stock Token tests remain blocked until the exact minimum
+  containment artifact and activation gates close; Stock Token omission is not
+  treated as a passing initial-launch result.
 - [ ] PSM/SavingsGreen/CCIP tests remain blocked until their individual gates.
 - [ ] No test logs or persists secrets.
 - [ ] Current manifest cannot promote from a failed or partial plan.
@@ -529,7 +538,7 @@ required evidence, negative assertions or selected gates are missing.
 | Robinhood mint → CCIP → Base PSM propagation | Bounded test amounts, message evidence, supply and PSM reserve reconciliation | Stage 4/5; Track 1/4 and risk approval |
 | USDG/PSM valid or verifiably disabled | NEG-018–020, oracle/reserve/flag assertions and any approved lifecycle | Stage 2 disabled; Stage 4 enabled only after V-05/V-10 |
 | Savings/Stability/insurance posture selected and tested | NEG-033/036 or complete owner-approved lifecycle | Stage 2 disabled; Stage 4 active only after DR-007 |
-| Stock Token mapping/vault/risk posture selected and tested | NEG-021–023, Track 8 artifact tests and approved lifecycle | Stage 4; V-04/V-10 |
+| Launch-mandatory Stock Token mapping/minimum-containment/risk posture selected and tested | NEG-021–023, Track 8 artifact tests and approved lifecycle; omission fails the initial-launch gate | Stage 4; V-04/V-10 |
 | Unsupported Base integrations unreachable | NEG-003/016/017/024 and complete omission manifest | Stage 2, confirmed Stage 3 |
 | Full-stack testnet/adversarial/Base regression/rehearsal | Stage exit records, soak report and full-suite evidence | Stage 4 plus Stage 5 rehearsal |
 | Every live-version difference approved | Pinned code-hash matrix, policy classification and convergence evidence | Stage 3; DR-006/016 |
@@ -543,7 +552,8 @@ handoff:
 
 1. perform one bounded deposit, borrow and full repay/withdraw path for an
    approved reserve;
-2. perform no Stock Token smoke until Track 8 and exact-token gates close;
+2. perform no Stock Token smoke until Track 8 and exact-token gates close, but
+   block initial launch if the approved Stock Token lifecycle cannot then run;
 3. perform a PSM mint/redeem only if Track 4 activation is approved; otherwise
    rerun disabled invariants;
 4. perform one bounded liquidation/bad-debt path in the test environment;
