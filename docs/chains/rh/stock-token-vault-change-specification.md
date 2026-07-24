@@ -982,6 +982,30 @@ No contract, interface, test, mock, ABI, storage, default, migration, manifest,
 dependency, CI file, generated artifact, or `rh-summary.md` path was changed by
 Track 8 during this recheck.
 
+### 3.19 Independent re-review closure
+
+At entry to the independent re-review closure, the isolated worktree and
+backup branch were clean and synchronized at
+`1cc002a6079a321bd1ab9ac09b9bc4acc26074d9`. Local `rh` and `origin/rh`
+were both `4966969265c6056bc7f3f139dc1a2437ef553c9f`, and the merge base
+remained `be6a759e15e763b633feefdce91cf8f3ee31a10e`.
+
+The re-review found no remaining technical or process defect. Its one
+implementation caution was rechecked against pinned Deleverage source:
+`deleverageWithVolAssets` passes the live Endaoment Funds and PSM addresses to
+`_handleSpecificAsset`, which chooses one as `recipient` and forwards it
+unchanged through `_transferToEndaoment` and `_transferCollateral` into
+`AuctionHouse.withdrawTokensFromVault`. Sections 23.11 and companion
+validation-plan Sections 20.2/20.6 now require the future test to observe that
+real end-to-end argument propagation; a direct-vault test or mocked
+intermediary is insufficient.
+
+The clarification also closes a wording ambiguity in the review: the
+onchain-versus-runbook mechanism is no longer a separate open decision. The
+onchain recipient prohibition is part of owner decision 5's four-contract
+surface. A runbook remains defense-in-depth and is not an automatic fallback
+if the owner rejects that surface.
+
 ## 4. Current consumer and ordering trace
 
 ### 4.1 Deposit
@@ -6345,6 +6369,13 @@ The minimum proposal returns these decisions:
    authorization. Track 7 separately owns the production VaultBook ID,
    migration names, manifests, and transaction plan.
 
+Items 1–5 are the five substantive mechanism/risk approvals; item 6 is the
+later file-exact authorization. There is no additional
+onchain-versus-runbook choice: item 5 accepts or rejects the vault-level
+onchain recipient guard as part of the four-contract surface. Rejecting it
+returns the containment evidence to the owner; it does not silently select a
+runbook-only launch.
+
 This section does not pass any of those gates. It does establish that a small
 shared patch exists and that Stock Tokens need not be postponed for the
 corrected-share, bad-debt, Ledger, reward-loss, or recapitalization designs.
@@ -6358,3 +6389,20 @@ authorized. This costs two existing-registry address reads at the launch
 vault's external-withdrawal boundary and changes no Deleverage/config source,
 storage, selector, or interface. A permissions/runbook prohibition remains
 defense-in-depth, not the safety mechanism.
+
+Pinned source forwards the recipient without an intermediary:
+
+```text
+deleverageWithVolAssets
+  -> _handleSpecificAsset(recipient = Endaoment Funds or PSM)
+  -> _transferToEndaoment
+  -> _transferCollateral
+  -> AuctionHouse.withdrawTokensFromVault(..., recipient, ...)
+  -> launch vault withdrawTokensFromVault(..., recipient, ...)
+```
+
+Implementation acceptance must instrument the real composed call and prove
+the same live registry address reaches both the AuctionHouse wrapper and
+launch-vault boundary. A test that calls the vault directly, substitutes a
+different recipient in a mock, or proves only the final revert does not close
+the route gate.

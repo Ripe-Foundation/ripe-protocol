@@ -94,6 +94,10 @@ still mention automatic bad-debt transition or Stock reward distribution are
 conditional, not launch requirements, until Track 7 reconciles them to the
 owner-approved Track 8 artifact.
 
+Specification Section 3.19 records the clean independent re-review and the
+pinned end-to-end Deleverage recipient trace. The onchain guard is part of
+owner surface decision 5, not a separate onchain-versus-runbook choice.
+
 ## 1. Existing regression baseline
 
 Existing file, unchanged:
@@ -2059,7 +2063,7 @@ transient state.
 | ML-04 delivery before payment | `test_min_launch_vault_outflow_equals_report_equals_recipient_delta`; `test_min_sender_fee_cannot_consume_donation_or_create_deficit`; `test_min_external_payment_uses_exact_recipient_delta`; `test_min_zero_delivery_never_pays_and_preserves_outer_semantics`; `test_min_short_excess_delivery_reverts_all_state`; `test_min_delivery_mutex_blocks_nested_cross_asset_settlement`; `test_min_sequential_batch_settlement_still_succeeds`; `test_min_loss_after_auction_creation_cannot_charge_green`; `test_min_batch_row_rechecks_delivery`; `test_min_two_buyers_cannot_reuse_custody`; `test_min_legacy_internal_deficit_cannot_charge_green`; `test_min_deleverage_wrapper_returns_only_recipient_delta`; `test_min_deleverage_zero_delivery_preserves_leg_and_outer_semantics`; `test_min_sequential_deleverage_legs_still_succeed`; `test_min_deleverage_repay_is_bounded_by_delivery`; `test_min_swap_collateral_binds_exact_withdrawal_and_deposit` |
 | ML-05 no nominal-only Stock settlement | `test_min_launch_vault_rejects_internal_auction`; `test_min_launch_vault_rejects_internal_redemption`; `test_min_true_is_not_silently_reinterpreted`; `test_min_legacy_fully_backed_internal_mode_unchanged` |
 | ML-06 repayment liveness | `test_min_repay_uses_nonraising_terms_refresh`; `test_min_repay_with_missing_price_reduces_debt`; `test_min_repay_with_reverting_stock_backing_read_reduces_debt`; `test_min_safe_co_collateral_health_survives_reverting_stock_read`; `test_min_safe_co_collateral_liquidation_survives_reverting_stock_read`; `test_min_safe_co_collateral_auction_purchase_survives_reverting_stock_read`; `test_min_repay_during_deficit_does_not_allocate_loss`; `test_min_full_repay_clears_liquidation_under_existing_ledger_rules` |
-| ML-07 issuer-loss fail closed | `test_min_deficit_blocks_new_deposit`; `test_min_deficit_blocks_withdrawal_for_every_user`; `test_min_deficit_blocks_internal_transfer`; `test_min_partial_and_total_loss_freeze_equally`; `test_min_reduce_then_restore_preserves_nominal_claims`; `test_min_full_restoration_remains_config_disabled_until_review`; `test_min_launch_vault_rejects_endaoment_funds_recipient`; `test_min_launch_vault_rejects_endaoment_psm_recipient`; `test_min_volatile_override_cannot_bypass_vault_recipient_guard`; `test_min_normal_external_recipient_remains_live` |
+| ML-07 issuer-loss fail closed | `test_min_deficit_blocks_new_deposit`; `test_min_deficit_blocks_withdrawal_for_every_user`; `test_min_deficit_blocks_internal_transfer`; `test_min_partial_and_total_loss_freeze_equally`; `test_min_reduce_then_restore_preserves_nominal_claims`; `test_min_full_restoration_remains_config_disabled_until_review`; `test_min_launch_vault_rejects_endaoment_funds_recipient`; `test_min_launch_vault_rejects_endaoment_psm_recipient`; `test_min_volatile_override_propagates_registry_recipient_end_to_end`; `test_min_volatile_override_cannot_bypass_vault_recipient_guard`; `test_min_normal_external_recipient_remains_live` |
 
 Every failure assertion compares all relevant custody, nominal accounting,
 user debt, aggregate debt, GREEN balances, auction state, Ledger
@@ -2197,6 +2201,13 @@ AuctionHouse recipients must remain live. The proof also records the live
 registry IDs/addresses and shows an authorized endpoint update changes the
 rejected recipient without new storage or a Deleverage/config change.
 
+The privileged-path test must execute the real composed call chain, capture
+the recipient argument at both `AuctionHouse.withdrawTokensFromVault` and the
+launch vault, and prove it equals the same live RipeHq Endaoment Funds or PSM
+address selected by Deleverage. A direct call to the vault, a mocked
+intermediary that substitutes the expected address, or a revert without
+argument evidence is not acceptance.
+
 ### 20.7 Exact-token, Base, and release tiers
 
 | Tier | Required run |
@@ -2315,6 +2326,10 @@ on:
    prohibition; and
 6. an exact branch, baseline, files, tests, reviewers, and non-authorizations
    for implementation.
+
+Items 1–5 are substantive owner approvals; item 6 is the later file-exact
+authorization. The vault-level onchain Endaoment prohibition is included in
+item 5. A runbook-only launch is not a separate or fallback option.
 
 VaultBook ID, defaults, manifests, migration names, deployment transactions,
 and enablement remain later Track 7 and owner gates. This validation handoff
