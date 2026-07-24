@@ -116,7 +116,7 @@ def test_clean_approved_fixture_passes_without_git_or_network(
     assert "mixed_clock_functions=4" in result.output
     assert "vyper_paths=92" in result.output
     assert "CLOCK_INVENTORY_NONPROD" in result.output
-    assert "test=126" in result.output
+    assert "test=130" in result.output
 
 
 def test_unmapped_direct_addition_fails_with_actionable_context(
