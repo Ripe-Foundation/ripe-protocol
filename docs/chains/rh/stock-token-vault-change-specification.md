@@ -1,16 +1,16 @@
 # Shared Stock Token Vault-Change Specification
 
-Status: **Phase D specification complete under owner-approved option 4;
-Phases E–K intentionally not finalized**
+Status: **Phase E specification complete under the owner-approved
+existing-controls constraint; Phases F–K intentionally not finalized**
 
 Date: 2026-07-23 (America/Denver)
 
 This document is the Track 8 working specification required by
 `track-8-stock-token-vault-change.md`. It records the evidence reconciliation,
 formal state and invariant model, architecture comparison, mandatory early
-owner checkpoint, and exact deposit-accounting design. It does not select a
-production vault, approve a loss-allocation policy, authorize a Base migration,
-or authorize implementation.
+owner checkpoint, exact deposit-accounting design, and backing/debt-health
+design. It does not select a production vault, approve a loss-allocation
+policy, authorize a Base migration, or authorize implementation.
 
 The owner selected option 4 as the architecture direction for specification
 work only. Until the later gates are approved and implemented, the operative
@@ -203,7 +203,7 @@ nevertheless rerun rather than assumed.
 | External auction transfer failure is atomic | Tested and source-traced | Vault transfer reverts before `_buyFungibleAuction` sends GREEN or calls debt repayment. |
 | Paused internal settlement can still charge GREEN | Tested | Internal balance transfer does not exercise token transferability. |
 | Total loss has no automatic exactly-once user-debt-to-bad-debt transition | Source-traced | Ledger exposes a Switchboard `setBadDebt` overwrite, but no current loss path atomically removes the same liability from user debt and increments protocol bad debt. |
-| Per-asset collateral-use safety flag exists | Source-traced | False. `AssetConfig` has deposit, withdrawal, redemption, and auction flags plus LTV; borrowing is controlled globally. |
+| Dedicated per-asset collateral-use safety flag exists | Source-traced | False. `AssetConfig` already has `canDeposit`, deposit limits, and per-asset `DebtTerms.ltv`; only the general `canBorrow` switch is global. Phase E rejects adding another stored flag and instead defines one fail-closed eligibility predicate from those existing controls plus automatic backing state. |
 
 The evidence does not prove that every ordinary ERC-20 can spontaneously lose
 vault custody. It proves what happens if custody falls independently of Ripe
@@ -224,6 +224,43 @@ Base manifest, or Track 8 production assumption. The deployable Stock Token
 vault path remains unchecked. The Track 8 worktree intentionally remains pinned
 to `be6a759`; it was not rebased or moved after the checkpoint contract was
 started.
+
+### 3.4 Phase E source recheck
+
+Immediately before Phase E, the isolated Track 8 branch was clean at
+`b0fc9268b1f2543f3e8624e7695a41a613623b0a` with no upstream. Integration
+`rh` was clean at `c2ded229fefe2ad614693c999bd89faeaec1535e`. A direct diff
+between those commits showed no changes in the Phase E source set:
+
+- `interfaces/ConfigStructs.vyi` and `interfaces/Vault.vyi`;
+- `MissionControl`, `CreditEngine`, `TellerUtils`, and Ledger;
+- Switchboards Alpha, Bravo, and Charlie;
+- Simple/Rebase wrappers plus BasicVault, SharesVault, and VaultData; and
+- AuctionHouse and Deleverage.
+
+Phase E therefore uses the same source behavior reconciled in Phases A–D. No
+integration commit was imported into the isolated worktree.
+
+Captured at Phase E entry:
+
+```text
+git status --short --branch
+=> ## rh-track-8-stock-token-vault-change
+
+git -C /Users/wigglez/dev/ripe-protocol status --short --branch
+=> ## rh...origin/rh
+
+git diff --name-only b0fc9268 c2ded229 -- <Phase E source set above>
+=> no output
+```
+
+### 3.5 Post-recheck integration state
+
+During Phase E, integration `rh` remained at `c2ded229` but acquired external
+documentation-only working-tree changes in
+`shared-block-clock-specification.md` and an untracked Track 6 document. Those
+files are outside Track 8's owned deliverables and Phase E source set. They
+were neither read as controlling evidence, edited, staged, nor imported here.
 
 ## 4. Current consumer and ordering trace
 
@@ -932,14 +969,16 @@ behavior switch cannot commit any of:
 ### I-06 — deficit visibility
 
 Fail-closed zero borrowing value must not erase the fact that existing debt is
-unsafe. A deficit signal must remain visible to previews, borrow validation,
-account health, liquidation/resolution eligibility, events, and monitoring even
-when `B_u = 0`.
+unsafe. The derived deficit result must remain visible to previews, borrow
+validation, account health, liquidation/resolution eligibility, and
+getter-based monitoring even when `B_u = 0`. Existing configuration events
+must identify the applied control state; no new stored deficit event is
+required.
 
 ### I-07 — no new debt under an unsafe asset
 
-If the asset collateral-use flag is disabled, `δ > 0`, `Z`, or the backing
-check is unknown/failing:
+If existing `canDeposit` is disabled, `DebtTerms.ltv == 0`, `δ > 0`, `Z`, or
+the backing check is unknown/failing:
 
 ```text
 new borrowing capacity contributed by (v,a) = 0
@@ -978,9 +1017,9 @@ externally. Buyer-selected internal settlement is unavailable.
 
 ### I-12 — custody control is price-independent
 
-Custody backing and per-asset collateral-use checks do not depend on a valid,
-nonzero oracle price. Missing price may independently block valuation; it must
-not hide or clear a custody deficit.
+Custody backing and the derived per-asset collateral-use check do not depend on
+a valid, nonzero oracle price. Missing price may independently block valuation;
+it must not hide or clear a custody deficit.
 
 ## 8. Required state behavior
 
@@ -991,7 +1030,7 @@ not hide or clear a custody deficit.
 | 3. Donation between deposits | Later depositor cannot capture the donation through receipt inference. | Existing users may benefit only under an approved share/surplus policy. | Owner must decide who owns the donation. | Record first divergence and resulting surplus. |
 | 4. Short receipt / fee on transfer | Credit `R`, not `Q`; zero receipt commits no credit. | General call succeeds only if `R` satisfies minimums; exact callers or invalid deltas revert atomically. | Transfer fee remains external; `R > Q` reverts rather than being allocated. | `A`, `Q`, `R`, credited, returned, and event amounts must reconcile. |
 | 5. Partial issuer reduction | Nominal path sets deficit and disables new borrowing/internal settlement; corrected share path reprices pro rata. | Repay and safely allocable external delivery remain possible. | Nominal partial-loss allocation is not selected. | Expose `C`, `N` or `S`, claims, `δ`, flags, and affected auctions. |
-| 6. Aggregate nominal deficit | `B=0` for affected asset while explicit deficit keeps existing debt unsafe/visible. | Repay remains open; loss settlement freezes absent policy. | No silent `min(userNominal,C)` or pro rata. | Emit/return deficit independently of price. |
+| 6. Aggregate nominal deficit | `B=0` for affected asset while the derived deficit keeps existing debt unsafe/visible. | Repay remains open; loss settlement freezes absent policy. | No silent `min(userNominal,C)` or pro rata. | Reconstruct `C<T` and credit/health outputs from same-block getters independently of price. |
 | 7. Total custody loss with claims | No paid auction or collateral settlement for missing tokens. | Repay remains open; position becomes resolution-eligible. | Owner must approve exactly-once bad-debt transition. | `C=0`, claims/accounting positive, debt and transition state observable. |
 | 8. Zero custody, nonzero shares | Withdrawal/internal transfer cannot invent value; new deposits frozen. | User exit is blocked until repayment, restoration policy, or bad-debt resolution. | Old shares remain explicit; no automatic erasure. | `Z` getter/event and raw-share reporting. |
 | 9. Donation/restoration after zero | No automatic reassignment or re-enable. | Progress only through approved restoration/recapitalization procedure. | Owner chooses old users, donor return, protocol, or another explicit allocation. | Amount, source, approval, and allocation event. |
@@ -1040,10 +1079,11 @@ One atomic deployable safety group:
 
 - exact call-local received amount;
 - fail-closed Simple borrowing value during aggregate deficit;
-- explicit deficit signal through debt health;
+- explicit derived deficit propagation through debt health;
 - no zero-threshold false health or non-liquidatable disappearance;
 - internal-transfer deficit guard;
-- generic per-asset collateral-use safety flag;
+- derived per-asset collateral eligibility from existing `canDeposit`, LTV,
+  and automatic backing state;
 - repayment preserved; and
 - no zero-backed auction manufactured.
 
@@ -1117,10 +1157,10 @@ This is an architecture recommendation, not a selection of the current
 
 Not admitted at this checkpoint. The required invariants appear achievable
 through generic changes to the shared vault/config/credit/settlement
-architecture plus a corrected share path. Existing interfaces are insufficient
-unchanged, especially for deficit propagation, per-asset collateral use, and
-exactly-once bad debt, but they can be extended without an issuer-branded or
-Robinhood-only vault.
+architecture plus a corrected share path. Phase E established that existing
+state and getters are sufficient for deficit-aware collateral use; later
+settlement and exactly-once bad-debt work may still require interface changes,
+but no issuer-branded or Robinhood-only vault is justified.
 
 Reopen this outcome only if Phase D–I analysis, security review, or a proof
 shows the shared corrected design cannot express an invariant.
@@ -1174,10 +1214,10 @@ policy.
 | Continuous live/accounted solvency monitoring | **Accepted as an operational and future getter/event requirement**, but not as an onchain fix. Hosted monitoring is outside this repository track. |
 | Rehearsed global-borrow, per-asset-deposit, and per-asset-auction response | **Accepted as Release 0 preparation**. Any production flag change requires fresh owner approval. |
 | Keep Stock Tokens disabled until behavior is approved | **Accepted**. This is the current safe state. |
-| Fail-closed Simple borrowing amount under deficit | **Accepted into the containment recommendation**, conditional on explicit deficit propagation; exact interface is deferred to Phase E. |
+| Fail-closed Simple borrowing amount under deficit | **Specified in Phase E** using existing vault/token getters and explicit debt-term propagation; no new external getter or stored flag is introduced. |
 | Deficit-aware existing-debt health | **Accepted into the atomic containment group**; no amount-view-only patch is acceptable. |
 | Reject Simple internal transfer while underbacked | **Accepted into the atomic containment group**; exact guard/result behavior is deferred. |
-| Add generic per-asset collateral-use flag | **Returned for owner approval in principle**, with a positive recommendation. |
+| Add generic per-asset collateral-use flag | **Functional requirement accepted; new stored flag rejected by the owner.** Phase E derives effective eligibility from existing `canDeposit`, `DebtTerms.ltv`, and automatic backing state without changing `AssetConfig`, storage, or the deployed interface. |
 | Exact per-call deposit delta in the same release | **Specified in Phase D at the shared Teller boundary**; implementation remains unauthorized. |
 | External-only issuer-controlled settlement | **Returned for owner approval**, with a positive recommendation. |
 | Keep generic backing checks even with external-only settlement | **Accepted as invariants I-02, I-06, and I-07**. |
@@ -1226,19 +1266,33 @@ That authorization explicitly did not:
 - authorize a Base migration; or
 - approve a loss-allocation policy.
 
+On 2026-07-23, after requiring a deeper review of existing protocol parameters,
+the owner gave the controlling Phase E instruction:
+
+> I reject adding a new stored per-asset collateral-use parameter by default.
+> Authorize Phase E specification work to use existing deposit controls and
+> DebtTerms.ltv, fix their consumption semantics, and return to me before
+> proposing any new storage or interface. This does not authorize
+> implementation or Phase F.
+
+Phase E therefore may specify only a composition of existing controls and
+automatic backing state. It may not propose new storage or a new external
+interface without first returning to the owner.
+
 The remaining phase gates below remain operative. The current production
 posture is still `do not list Stock Tokens under the current vault designs`.
 
 ### 12.2 Checkpoint decisions and their actual gates
 
-Only the product/architecture direction was required to begin Phase D. That
-gate is now satisfied for specification work. The remaining eight decisions
-gate the later phases shown below; none was implied by the option-4 approval.
+The product/architecture direction required for Phase D and the existing-
+controls direction required for Phase E are now satisfied for specification
+work. The remaining seven decisions gate the later phases shown below; none is
+implied by either approval.
 
 | Decision | Options | Evidence and recommendation | Owner | Affected components | Prerequisite / milestone | Status |
 | --- | --- | --- | --- | --- | --- | --- |
 | Product outcome | Five checkpoint options above | Staged containment then corrected share path | Product + protocol owner | Whole track | Before Phase D | **Approved: option 4, specification work only** |
-| Per-asset collateral use | Approve generic flag / reject | Current config lacks it; recommend approve in principle | Protocol owner + security | `CM-009`, `CM-011`–`013`, `CM-030`, config/interfaces | Before Phase E | Requested at checkpoint; gates Phase E |
+| Per-asset collateral use | Add a stored flag / compose existing controls | Reuse `canDeposit`, `DebtTerms.ltv`, and automatic backing state; do not add storage or a deployed selector | Protocol owner + security | `CM-009`, `CM-011`–`013`, `CM-030`, existing config/getters | Before Phase E | **Approved: existing-controls Phase E specification only; implementation and Phase F not approved** |
 | Issuer-controlled settlement | Always external / permit bounded internal | Current internal mode can charge for undeliverable nominal claims; recommend external-only | Protocol owner + risk/security | `CM-026`, `CM-030`, `CM-043`, `CM-044`, Vault interface | Before Phase F | Requested at checkpoint; gates Phase F |
 | Total-loss transition | Approved user-debt→Ledger-bad-debt design / another existing-accounting design / no listing | Current system has no atomic exactly-once path; recommend a separate shared transition specification within the selected release | Protocol owner + accounting/security | `CM-026`, `CM-030`, Ledger, interfaces | Before Phase F | Requested at checkpoint; gates Phase F |
 | Post-zero state | Freeze / explicit recapitalization | Recommend freeze by default | Protocol owner + risk | `CM-025`, deposit callers, controls | Before Phase G | Requested at checkpoint; gates Phase G |
@@ -1257,7 +1311,7 @@ These must not be treated as approved by the checkpoint recommendation:
 | Requested/received/excess semantics | Validated transfer attempt `Q`; received/credited `R`; zero, negative, or excess delta reverts; see Section 14 | Phase D completion | **Specified; implementation not approved** |
 | Nominal partial loss | Freeze unresolved or owner-approved allocation; never silent pro rata | Phase E/F | Deferred |
 | Rounding | Offset, directions, minimum, dust bound | Phase G | Deferred |
-| Emergency disable/re-enable | Fast disable and stronger/timelocked re-enable recommended | Phase H | Deferred |
+| Emergency disable/re-enable | Existing fast per-asset disable and governance-only re-enable are specified in Phase E; final runbook/timing remains Phase H | Phase H | Partially specified; no live action approved |
 | Vault selection | No production vault selected | Phase I owner gate | Deferred |
 | Migration atomicity/rollback | Explicit live users/funds/debt/auctions plan | Phase I | Pending Track 7 |
 | Exact-token evidence | Pinned AAPL fork plus behavior-switch/loss tests | Phase J | Pending implementation |
@@ -1283,7 +1337,7 @@ This is a Phase C impact boundary, not the finalized Phase I change table.
 | `CM-045` TellerUtils | Deposit limit inputs and pre-transfer vault views |
 | `CM-007`–`CM-013`, `CM-049` | Defaults, MissionControl, Switchboards, per-asset controls, Robinhood configuration |
 | Ledger | User debt, auctions, and exactly-once protocol bad debt |
-| `ConfigStructs` and `Vault` interfaces | Missing flags/status/results; caller compatibility |
+| Existing `ConfigStructs`, MissionControl, and `Vault` interfaces | Phase E reuses current controls/getters; later settlement/result compatibility remains subject to Phase I |
 | StabilityPool, RipeGov, StabVault | Shared Teller deposit boundary must preserve semantics |
 | BondRoom, HumanResources, CreditEngine/CreditRedeem reward paths | Trusted RIPE/sGREEN deposits must consume and verify Teller's returned receipt |
 | Base/RH migration and manifests | Same canonical source, live-version policy, custody migration, verification |
@@ -1460,8 +1514,8 @@ inventory in Phase I before implementation.
 - Require `_amount > 0`; credit exactly `_amount == R`.
 - The vault may assert its current custody is at least `R`, but must not use
   total custody to enlarge or redefine the receipt.
-- Nominal accounting, existing withdrawal behavior, and future deficit
-  controls remain Phase E/F subjects.
+- Phase E specifies nominal deficit credit/health controls. Loss allocation,
+  settlement, and final withdrawal behavior remain Phase F/G subjects.
 
 **SharesVault / Rebase path**
 
@@ -1660,28 +1714,375 @@ a new accounted deficit. For the share path,
 conversion direction, so `Q - R` cannot mint shares and a prior donation
 affects the conversion base but never the receipt.
 
-The owner-approved option 4 direction and this deposit design do not resolve
-backing flags, existing-debt deficit behavior, settlement policy, total-loss
-transition, post-zero allocation, rewards units, production-vault selection,
-or migration. Phase E remains blocked on its documented owner decision.
+The owner-approved option 4 direction and this deposit design did not by
+themselves resolve backing or existing-debt deficit behavior. Section 15 now
+specifies those Phase E concerns under the owner's existing-controls
+constraint. Settlement policy, total-loss transition, post-zero allocation,
+reward units, production-vault selection, and migration remain unresolved.
 
-## 15. Phases E–K hold
+## 15. Phase E — backing, collateral-use, and debt health
+
+### 15.1 Authorization and no-new-state boundary
+
+The owner rejected a new stored per-asset collateral-use parameter by default
+and authorized Phase E specification work to reuse existing deposit controls
+and `DebtTerms.ltv`. This phase therefore specifies no change to:
+
+- `AssetConfig` or `DebtTerms` layout;
+- MissionControl storage;
+- canonical `interfaces/*.vyi`;
+- any externally callable selector, return type, event, ABI, default,
+  migration, or manifest; or
+- the existing `SwitchboardBravo._isLtvWithinMaxDeviation` rule that prevents a
+  direct nonzero-to-zero LTV change.
+
+A future implementation may need a contract-local declaration for an already
+deployed MissionControl getter. That is a compile-time adapter, not a new
+deployed selector or protocol interface, and must still be itemized in the
+Phase I impact table. If implementation review finds that a new stored field or
+external selector is actually necessary, work stops and returns to the owner
+before proposing it.
+
+Phase E changes the **consumption semantics** of existing state. It does not
+authorize implementation or Phase F.
+
+### 15.2 Existing controls and the selected predicate
+
+The existing controls have distinct jobs:
+
+| Input | Existing source and evidence | Phase E meaning |
+| --- | --- | --- |
+| `AssetConfig.canDeposit` | `MissionControl.assetConfig(asset)` and `getTellerDepositConfig`; `CanDepositAssetSet` | Existing fast asset safety switch. `false` blocks deposits today and, under Phase E, also contributes zero new borrowing capacity. |
+| `DebtTerms.ltv` | `getDebtTerms(asset)`; `PendingAssetDebtTermsChange` and `AssetDebtTermsSet` | Per-asset economic/prelaunch eligibility and capacity coefficient. `0` means the asset is not borrowable. It is not an incident-time custody sensor. |
+| Per-user/global deposit limits and minimum | Existing Teller deposit config | Exposure bounds while deposits are enabled. They do not measure backing and do not change the value of an existing position. |
+| General `GenConfig.canDeposit` | Existing general deposit config | Protocol-wide deposit admission only. It is not composed into per-asset collateral eligibility because a general maintenance pause must not zero every account's collateral capacity. |
+| General `GenConfig.canBorrow` | Existing borrow config | Protocol-wide borrow gate and incident bridge. It remains defense in depth, not the asset-specific answer. |
+| Automatic backing state | Existing token and Vault getters defined below | Call-time proof that the specific `(vault, asset)` accounting is safely backed. No operator transaction or oracle is required to make a deficit fail closed. |
+
+Pinned source anchors are `interfaces/ConfigStructs.vyi:88-117`;
+`MissionControl.vy:599-613,643-667`; `SwitchboardCharlie.vy:428-433,
+1140-1185`; `SwitchboardBravo.vy:501-527,555-565`;
+`CreditEngine.vy:373-425,542-579,687-807,920-979,1246-1285`;
+`BasicVault.vy:116-148`; `SharesVault.vy:123-165`; and
+`StabVault.vy:219-222`. The relevant existing event definitions are
+`SwitchboardCharlie.vy:311-314` and `SwitchboardBravo.vy:117-126,158-165`.
+
+For user amount `U` in vault `v` and asset `a`, the selected effective
+new-borrow predicate is:
+
+```text
+capacityEligible(v,a,u) =
+    AssetConfig[a].canDeposit
+    and DebtTerms[a].ltv > 0
+    and backingSafe(v,a,u)
+    and U > 0
+```
+
+There is deliberately no third boolean. The functional “collateral-use flag”
+required by the task contract is the derived result of this predicate.
+
+This choice creates one intentional coupling: disabling an asset's deposits
+also disables that asset's support for **new** borrowing. That is an accepted,
+conservative liveness restriction and makes `canDeposit` an asset safety freeze,
+not merely a throughput toggle. Operators must not use the per-asset switch for
+casual maintenance. The general deposit switch remains available when deposits
+must pause without changing per-asset credit treatment.
+
+`DebtTerms.ltv` remains the normal launch/economic control. It is not the
+emergency switch because changes are governed and pending, the current
+nonzero-to-zero transition is rejected, and an LTV value says nothing about
+whether custody still exists. No Phase E change weakens those protections.
+
+### 15.3 Automatic backing model
+
+For every actual user position traversed by CreditEngine:
+
+```text
+C(v,a) = IERC20(a).balanceOf(v)
+T(v,a) = Vault(v).getTotalAmountForVault(a)
+U(v,a,u) = amount returned with a by
+           Vault(v).getUserAssetAndAmountAtIndex(u, index)
+
+aggregateDeficit(v,a) = C(v,a) < T(v,a)
+zeroClaimPosition(v,a,u) = a != empty(address) and U(v,a,u) == 0
+
+backingSafe(v,a,u) =
+    not aggregateDeficit(v,a)
+    and not zeroClaimPosition(v,a,u)
+```
+
+The asset-zero result remains the explicit non-collateral signal. StabilityPool
+continues to return `(empty(address), 0)` to CreditEngine and is not pulled into
+this design.
+
+The same existing getters have vault-specific meaning:
+
+- BasicVault/Simple returns persisted nominal user and total balances. Thus
+  `T=N`, and any `C<T` is an aggregate nominal deficit. Every user's capacity
+  for that `(vault, asset)` becomes zero; remaining custody is not silently
+  assigned by user order.
+- SharesVault/Rebase returns each user's live, round-down claim and returns
+  live token custody as its vault total. Partial loss therefore remains
+  pro-rata and `C=T`; capacity uses the already-repriced `U`. At total loss,
+  the getter still returns the asset for a nonzero-share position but its
+  amount is zero, so `zeroClaimPosition` catches the state that CreditEngine
+  currently skips.
+- A surplus `C>T` on a nominal vault is not a deficit and is not assigned to
+  any depositor by this check. Phase D's receipt rule prevents a donation from
+  becoming the next call's credit.
+
+Both `C` and `T` reads are mandatory. A failed or malformed backing read is not
+converted into optimistic capacity: a state-changing borrow reverts, and a
+preview must return no capacity or fail rather than report a positive amount.
+No price is consulted before this classification.
+
+The nominal path expressly rejects:
+
+```text
+min(userNominal, C)
+```
+
+That formula lets multiple users each point at the same remaining custody. A
+one-unit aggregate deficit therefore disables the entire affected nominal
+`(vault, asset)` contribution until accounting is restored or an owner-approved
+loss allocation replaces it.
+
+### 15.4 CreditEngine evaluation and ordering
+
+`CreditEngine._getUserBorrowTerms` is the shared calculation boundary for
+maximum-borrow preview, state-changing borrow validation, account health,
+liquidation/redemption eligibility, debt-term refresh during repayment, and
+the excluding-asset calculation used by withdrawal preview. Phase E requires
+the following order for each enumerated position:
+
+1. Read `(asset, U)` from the Vault. Continue only when `asset` is empty. Do
+   **not** continue merely because `U == 0`.
+2. Read the existing asset configuration and `DebtTerms`.
+3. If `ltv == 0`, treat the ordinary asset as intentionally non-collateral.
+   A position with no configured debt terms contributes neither capacity nor
+   resolution terms.
+4. Read `C` and `T`, then derive `aggregateDeficit`,
+   `zeroClaimPosition`, and `backingSafe` without an oracle.
+5. Derive `capacityEligible` from Section 15.2.
+6. Only an amount that is backing-safe may be sent to PriceDesk.
+   State-changing borrowing uses the existing raising price mode. Previews and
+   health use the non-raising mode and fail closed to zero value.
+7. For an eligible position, compute:
+
+   ```text
+   liveCollateralValue = price(U)
+   configuredMaxDebt = liveCollateralValue * DebtTerms.ltv / 100%
+   capacityContribution = configuredMaxDebt
+   resolutionWeight = max(configuredMaxDebt, 1)
+   ```
+
+8. For a backing-safe position whose `canDeposit` is false, compute its live
+   value in non-raising mode for existing-debt resolution, but set:
+
+   ```text
+   capacityContribution = 0
+   resolutionWeight = max(
+       liveCollateralValue * DebtTerms.ltv / 100%,
+       1
+   )
+   ```
+
+   This prevents new borrowing immediately without pretending safely
+   deliverable existing collateral vanished from liquidation math.
+9. For an aggregate deficit, zero-claim position, or failed non-raising price,
+   do not add collateral value or capacity. Preserve the configured
+   liquidation, redemption, fee, rate, and daowry terms with the existing
+   fallback weight of one. The zero contribution must not be skipped.
+10. Add collateral value and `totalMaxDebt` only when the position is not the
+    explicitly skipped `(vaultId, asset)` pair. Terms are still accumulated
+    consistently for the call's documented purpose.
+
+The future implementation should express these rules once in the shared
+borrow-terms calculation, not as caller-specific patches. The `UserBorrowTerms`
+shape need not change. `totalMaxDebt` is the sum of capacity contributions;
+`collateralVal` is the sum of safely valued, deliverable live collateral used
+for resolution; and the existing `DebtTerms` result is the weighted resolution
+term set. A one-unit fallback weight is evidentiary/defensive—it prevents the
+only unsafe asset's terms from collapsing to zero without materially
+overwriting the weights of solvent positions.
+
+Repayment is a special liveness context. Its debt-term refresh must use
+non-raising prices, and known disabled/deficit/zero-claim positions must not
+invoke PriceDesk as a prerequisite to repayment. A missing or stale price
+therefore cannot stop the user from reducing debt. The repayment amount and
+Ledger debt remain independent of collateral valuation.
+
+### 15.5 Required consumer behavior
+
+| Surface | Required Phase E behavior |
+| --- | --- |
+| `getMaxBorrowAmount` | Uses the shared predicate. Disabled, deficit, zero-claim, or unpriced positions add zero; unrelated eligible solvent collateral retains its exact value/capacity. |
+| State-changing borrow | Uses the same backing and control inputs as the preview. Positive debt cannot be created from a contribution that preview treats as zero. A safe asset with a required invalid price reverts rather than borrowing optimistically. |
+| `hasGoodDebtHealth` | Compares debt with `totalMaxDebt` from eligible solvent contributions. A deficit entry is processed, not skipped. The account is healthy only if other eligible collateral actually covers the debt. |
+| `canLiquidateUser` / redemption eligibility | Uses only safely valued, deliverable collateral and preserved nonzero resolution terms. If the only configured collateral is missing, collateral value is zero while its threshold remains nonzero, so existing debt does not become falsely non-liquidatable. Phase F still owns whether and how settlement may progress. |
+| Repayment | Remains open. It reduces the existing account-level Ledger debt and refreshes terms conservatively without requiring a price for a known unsafe asset. It does not mutate LTV, allocate loss, or create bad debt. |
+| `getMaxWithdrawableForAsset` | Uses the same backing/config calculation for the target and remaining assets. It returns zero for a deficit/zero-claim position, and for a disabled collateral asset while the user has debt. With no user debt, ordinary solvent withdrawal remains subject to Teller/Vault controls; Phase E does not authorize deficit allocation or withdrawal. |
+| Existing auctions, internal settlement, deleverage, and bad debt | No new permission or transition is granted. Phase F remains the mandatory design gate. Phase E's health result may expose an unsafe account but cannot pay for, transfer, or write off missing collateral. |
+
+`DebtTerms.ltv == 0` remains the prelaunch/non-collateral state. Phase E does
+not repurpose the other debt terms as a custody switch and does not zero them
+during an incident. Existing account-level debt remains in Ledger, continues
+under the protocol's interest rules, and can be repaid. Because the incident
+action is `canDeposit=false`, the configured nonzero liquidation and rate terms
+remain available for resolution instead of disappearing with an amount-zero
+skip.
+
+### 15.6 Mixed collateral and price independence
+
+For a user with positions `p`:
+
+```text
+totalMaxDebt =
+    sum(capacityContribution(p))
+
+resolutionCollateralValue =
+    sum(safelyValuedDeliverableCollateral(p))
+```
+
+An unsafe position contributes zero to both sums. A solvent, enabled, priced
+position contributes exactly its existing live value and
+`value * ltv / 100%`; it is not haircut merely because another position is
+unsafe. Therefore:
+
+- one missing unit in a nominal vault can never support new GREEN debt;
+- other solvent collateral remains valued exactly once;
+- existing debt is not healthy merely because the unsafe position's amount is
+  zero; and
+- the account may remain legitimately healthy when unrelated eligible
+  collateral alone covers its debt.
+
+Backing classification precedes price lookup. A missing, zero, or stale price
+cannot clear `aggregateDeficit` or `zeroClaimPosition`. It independently makes
+the affected capacity zero (or makes a state-changing borrow revert). A known
+unsafe position does not need any price to contribute zero or to preserve its
+configured resolution terms.
+
+### 15.7 Fast disable, stronger re-enable, and operator evidence
+
+Existing permissions already implement the required asymmetry:
+
+- `SwitchboardCharlie.setCanDepositAsset(asset, false)` passes lite-action
+  permission to `_hasPermsForLiteAction`, so an authorized lite actor or
+  governance can disable quickly.
+- `setCanDepositAsset(asset, true)` does not receive lite permission, so
+  re-enable requires governance.
+- `SwitchboardBravo.setAssetDebtTerms` remains governed and pending. It is not
+  the incident response path.
+
+The recommended incident sequence is:
+
+1. set general `canBorrow=false` if the blast radius or asset identity is still
+   uncertain;
+2. set affected `canDeposit=false`, which immediately blocks deposits and,
+   after the Phase E implementation, removes that asset's new-borrow support;
+3. set `canBuyInAuction=false` for the affected asset as a separate existing
+   containment action, without treating that as Phase F settlement approval;
+4. reconcile every registered vault's `C`, `T`, user claims, debt, and active
+   auctions; and
+5. re-enable only through governance after `C>=T` for nominal paths, no
+   debt-bearing zero-claim share state remains, prices and code identity are
+   current, and the applicable settlement/migration plan is approved.
+
+Even if governance re-enables `canDeposit` prematurely, the automatic backing
+check still prevents an actual deficit from contributing capacity. Phase H may
+add operational detail but may not weaken this onchain fail-closed property.
+
+No new event is required to prove configuration changes:
+
+- `CanDepositAssetSet` identifies the asset, new value, and caller;
+- `PendingAssetDebtTermsChange` records proposed terms and confirmation block;
+  and
+- `AssetDebtTermsSet` records applied terms.
+
+Monitoring must collect one same-block evidence bundle containing:
+
+- `MissionControl.assetConfig(asset).canDeposit`;
+- `MissionControl.getDebtTerms(asset)`;
+- `IERC20(asset).balanceOf(vault)`;
+- `Vault.getTotalAmountForVault(asset)`;
+- the user's indexed asset/amount where user-level diagnosis is required; and
+- `getMaxBorrowAmount`, `hasGoodDebtHealth`, and `canLiquidateUser`.
+
+The getter bundle is the evidence for derived backing state; there is no
+stored “deficit cleared” bit that can become stale or be flipped without
+restoring custody.
+
+### 15.8 Conservation and no-double-counting proof
+
+For each nominal `(vault, asset)`:
+
+```text
+if C >= T:
+    sum(user nominal balances) = T <= C
+else:
+    capacityContribution(user) = 0 for every user
+```
+
+For each share `(vault, asset)`, user amounts are round-down live claims against
+the same `C`, so:
+
+```text
+sum(user live claims) <= C
+```
+
+The virtual offset and per-user rounding may leave dust; they cannot allocate
+more than live custody. If a user's nonzero shares round to zero, that position
+is processed as a zero-claim unsafe entry rather than disappearing.
+
+Different vaults have different custody addresses and are checked separately.
+The same asset in two vaults therefore cannot cause one vault's custody to back
+the other's accounting. Within a nominal deficit, no user-order formula
+allocates the same remaining `C` more than once.
+
+Preview and state-changing borrow both consume the same
+`_getUserBorrowTerms` rules and same onchain inputs. At an unchanged block/state
+with a valid price, they derive the same per-position capacity and aggregate
+maximum debt. With an invalid price they differ only in failure presentation:
+preview reports no optimistic capacity, while state-changing borrow reverts.
+
+### 15.9 Phase E acceptance and remaining boundary
+
+Phase E is specification-complete only with the companion Section 7 validation
+matrix. A future implementation must prove:
+
+1. a one-unit nominal aggregate deficit produces zero capacity for every user
+   of that `(vault, asset)`;
+2. unrelated solvent collateral retains exact value and capacity;
+3. an amount-zero unsafe position retains resolution terms and cannot make
+   existing debt falsely healthy or non-liquidatable;
+4. preview and state-changing validation share the same calculation;
+5. repayment remains live without a valid price for a known unsafe position;
+6. fast disable and governance-only re-enable retain their existing authority
+   boundary;
+7. no new storage field, canonical interface, selector, ABI, default, or
+   migration is introduced; and
+8. the change is generic—no asset name, issuer, vault ID, or chain branch.
+
+Phase E does not select a production vault, approve implementation, change a
+live flag, allocate a loss, authorize liquidation settlement, or create a
+bad-debt transition.
+
+## 16. Phases F–K hold
 
 The following are deliberately **not finalized**:
 
-- final backing/config storage and governance interface;
-- total-loss bad-debt transition mechanics;
+- settlement, liquidation, and total-loss bad-debt transition mechanics;
 - corrected permanent share formulas and post-zero allocation;
-- control roles and clock behavior;
-- exact source/storage/interface/migration table;
+- remaining control roles and clock behavior;
+- exact source/storage/interface/migration impact table;
 - final Phase J validation plan;
 - implementation PR split and atomic deployable groups; and
 - exact `rh-summary.md` handoff.
 
-Work must not continue into Phase E or later until the owner resolves the
+Work must not continue into Phase F or later until the owner resolves the
 corresponding Section 12 gate and expressly authorizes that phase.
 
-## 16. Checklist handoff at this checkpoint
+## 17. Checklist handoff at this checkpoint
 
 No `rh-summary.md` checkbox is edited or closed.
 
@@ -1694,8 +2095,8 @@ Eligible for owner review:
 - Section 4, **finish the Simple versus Rebase comparison** (line 186 at the
   baseline) — Track 5 evidence is hash-verified, source-reconciled, and rerun.
 - Section 4, **write a separate vault-change specification if current behavior
-  is unacceptable** (line 190 at the baseline) — Phases A–D are specified, but
-  the item is not eligible for closure until Phases E–K are owner-directed and
+  is unacceptable** (line 190 at the baseline) — Phases A–E are specified, but
+  the item is not eligible for closure until Phases F–K are owner-directed and
   completed.
 
 Not eligible for closure:

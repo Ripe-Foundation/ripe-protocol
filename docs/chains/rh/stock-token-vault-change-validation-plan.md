@@ -1,24 +1,25 @@
 # Stock Token Vault-Change Validation Plan
 
-Status: **Phase D deposit-accounting contract specified — not a finalized
-Phase J plan**
+Status: **Phases D–E test contracts specified — not a finalized Phase J plan**
 
 Date: 2026-07-23 (America/Denver)
 
 This document keeps the Phase B invariant model, Phase C architecture
-comparison, and owner-authorized Phase D deposit design testable. The owner
-selected option 4, containment followed by the corrected share path, and
-authorized Phase D specification work only. This is checkpoint option 4, the
-combination of architecture outcomes 2 and 3, not the separately numbered
+comparison, owner-authorized Phase D deposit design, and owner-authorized Phase
+E backing/debt-health design testable. The owner selected option 4,
+containment followed by the corrected share path, then rejected a new stored
+per-asset collateral-use parameter and authorized Phase E specification using
+existing deposit controls and `DebtTerms.ltv`. This is checkpoint option 4,
+the combination of architecture outcomes 2 and 3, not the separately numbered
 “another generic shared design.” All paths below are proposed future paths. No
 test, fixture, mock, production contract, interface, dependency, CI file,
-manifest, or ABI was created or changed. The direct owner instruction is
+manifest, or ABI was created or changed. Both direct owner instructions are
 preserved verbatim in `stock-token-vault-change-specification.md` Section 12.1.
 
-The Phase D test contract is now specific enough for later implementation
-planning. The full Phase J plan cannot be finalized until the owner resolves
-the later policy decisions in `stock-token-vault-change-specification.md`
-Section 12.
+The Phase D and E test contracts are now specific enough for later
+implementation planning. The full Phase J plan cannot be finalized until the
+owner resolves the later policy decisions in
+`stock-token-vault-change-specification.md` Section 12.
 
 ## 1. Existing regression baseline
 
@@ -61,11 +62,11 @@ against the owner-approved shared implementation.
 | `tests/vaults/test_vault_receipt_accounting.py` | Vault/Teller unit | `CM-024`, `CM-025`, `CM-034`, `CM-045` | Proposed; Phase D behavior specified, implementation not approved |
 | `tests/core/teller/test_teller_deposit_receipts.py` | Teller integration | `CM-034`, `CM-045`, every deposit entry point | Proposed; Phase D behavior specified, implementation not approved |
 | `tests/vaults/modules/test_vault_loss_properties.py` | Math/property | `CM-024`, `CM-025` | Proposed; loss/rounding policy required |
-| `tests/core/creditEngine/test_deficit_aware_credit.py` | CreditEngine | `CM-030`, `CM-009`, Ledger | Proposed; collateral flag and deficit interface required |
+| `tests/core/creditEngine/test_deficit_aware_credit.py` | CreditEngine | `CM-030`, `CM-009`, Ledger | Proposed; Phase E existing-controls behavior specified, implementation not approved |
 | `tests/core/auctionHouse/test_loss_aware_auctions.py` | AuctionHouse | `CM-026`, `CM-030`, Ledger | Proposed; settlement and bad-debt policy required |
 | `tests/core/deleverage/test_loss_aware_deleverage.py` | Teller/Deleverage | `CM-034`, `CM-044`, `CM-026` | Proposed |
 | `tests/core/lootbox/test_vault_loss_rewards.py` | Rewards/monitoring | `CM-033`, `CM-025` | Proposed; rewards-unit decision required |
-| `tests/config/test_asset_collateral_controls.py` | Governance/config | `CM-009`, `CM-011`–`CM-013`, config/interfaces | Proposed; flag/role decision required |
+| `tests/config/test_asset_collateral_controls.py` | Governance/config | `CM-009`, `CM-011`–`CM-013`, existing config/getters | Proposed; Phase E no-new-storage control semantics specified |
 | `tests/registries/test_vault_book_migration.py` | Migration | `CM-021`, vaults, Ledger, manifests | Proposed; pending Track 7 and owner migration policy |
 | `tests/vaults/test_stock_token_vault_lifecycle.py` | Full lifecycle | all primary IDs | Proposed; production direction required |
 | `tests/probes/test_aapl_vault_behavior_fork.py` | Exact-token fork | Track 2 AAPL + selected shared path | Proposed; no broadcast |
@@ -93,17 +94,17 @@ Likely reusable fixtures, subject to post-checkpoint design:
 | I-03 claim conservation | `test_two_buyers_cannot_allocate_same_remaining_custody` | Auction | Both purchase orders conserve custody | Settlement model |
 | I-04 pay for delivery | `test_green_and_debt_commit_only_after_actual_delivery` | Auction/Deleverage | Payment/debt value is bounded by delivered amount/value | Settlement policy |
 | I-05 atomic failure | `test_pause_blocklist_false_return_and_revert_leave_state_unchanged` | Vault/Auction | Balances, debt, GREEN, rewards, and auction state unchanged | External-only policy |
-| I-06 deficit visibility | `test_zero_borrow_value_does_not_erase_existing_debt_terms` | Credit | Deficit remains resolution/liquidation-visible | Deficit interface |
-| I-06 deficit visibility | `test_mixed_collateral_preserves_solvent_terms_and_unsafe_debt_signal` | Credit | Solvent collateral remains valued; deficit cannot create false health | Deficit interface |
-| I-07 no new unsafe debt | `test_one_unit_deficit_contributes_zero_new_capacity` | Credit | Preview and state-changing borrow match and return/revert safely | Collateral flag |
-| I-07 no new unsafe debt | `test_disabled_asset_cannot_support_new_borrow` | Governance/Credit | Fast disable affects every credit surface | Flag/roles |
+| I-06 deficit visibility | `test_zero_borrow_value_does_not_erase_existing_debt_terms` | Credit | Deficit remains resolution/liquidation-visible | Phase E specified |
+| I-06 deficit visibility | `test_mixed_collateral_preserves_solvent_terms_and_unsafe_debt_signal` | Credit | Solvent collateral remains valued; deficit cannot create false health | Phase E specified |
+| I-07 no new unsafe debt | `test_one_unit_deficit_contributes_zero_new_capacity` | Credit | Preview and state-changing borrow match and return/revert safely | Phase E specified |
+| I-07 no new unsafe debt | `test_disabled_asset_cannot_support_new_borrow` | Governance/Credit | Existing fast disable affects every credit surface | Phase E specified |
 | I-08 exactly once | `test_total_loss_moves_liability_to_bad_debt_exactly_once` | Credit/Auction/Ledger | User debt decreases by `x`, bad debt increases by `x`, repeat is no-op/revert | Bad-debt policy |
 | I-08 exactly once | `test_repayment_race_uses_one_pinned_debt_state` | Credit/Ledger | Repay and transition cannot duplicate or lose liability | Bad-debt policy |
 | I-09 repay liveness | `test_repayment_remains_available_during_deficit_freeze` | Credit/Teller | Repay succeeds while borrow/deposit/settlement are frozen | Product direction |
 | I-10 post-zero | `test_new_deposit_reverts_while_old_shares_exist_at_zero` | Share vault | No new shares or value transfer | Freeze/recap decision |
 | I-10 post-zero | `test_restoration_has_only_owner_approved_allocation` | Share/property | No automatic capture by old/new users outside selected policy | Donation policy |
 | I-11 external-only | `test_issuer_asset_rejects_buyer_internal_override` | Auction/config | Internal mode unavailable; external delivery enforced | Settlement policy |
-| I-12 price independence | `test_deficit_guard_survives_missing_or_zero_price` | Credit | Custody status remains visible and fail-closed without price | Collateral flag/interface |
+| I-12 price independence | `test_deficit_guard_survives_missing_or_zero_price` | Credit | Custody status remains visible and fail-closed without price | Phase E specified |
 
 ## 4. Sixteen-state matrix
 
@@ -381,7 +382,150 @@ A future Phase D implementation cannot be accepted unless:
 These are future acceptance conditions, not evidence that any implementation
 now exists.
 
-## 7. Exact-token fork plan
+## 7. Phase E backing and debt-health validation contract
+
+All tests in this section are proposed. They specify future acceptance
+behavior; no test or implementation is authorized by this document.
+
+### 7.1 Existing-control and no-new-schema matrix
+
+| Named future assertion | Setup | Required result |
+| --- | --- | --- |
+| `test_asset_config_and_debt_terms_layout_unchanged` | Compare pre/post `AssetConfig`, `DebtTerms`, MissionControl storage, canonical interfaces, selectors, and ABI | No new stored field, external getter/setter, selector, event, default, or migration; existing tuple layouts remain identical |
+| `test_existing_can_deposit_is_fast_disable_and_governance_reenable` | Governance and authorized lite actor each attempt disable/re-enable | Lite actor may set per-asset `canDeposit=false`; only governance may restore `true`; `CanDepositAssetSet` proves asset/value/caller |
+| `test_per_asset_disable_blocks_deposit_and_new_credit` | Solvent asset with nonzero LTV and existing user collateral | `canDeposit=false` rejects new deposit and makes the asset's new-borrow contribution zero across preview and state-changing validation |
+| `test_general_deposit_pause_does_not_zero_all_collateral` | Set general `GenConfig.canDeposit=false` while per-asset flags and backing remain safe | Deposits pause, but existing per-asset credit capacity and health do not change solely because of the general maintenance switch |
+| `test_disable_does_not_mutate_debt_terms` | Record all six `DebtTerms`, disable and re-enable deposits | LTV, redemption threshold, liquidation threshold, fee, rate, and daowry are byte-for-byte unchanged |
+| `test_ltv_zero_remains_prelaunch_non_collateral` | Backing-safe asset with `canDeposit=true`, `ltv=0` | Deposits may follow existing config, but the asset adds zero borrow capacity and no artificial resolution terms |
+| `test_deposit_limits_bound_admission_not_existing_value` | Change per-user/global/minimum deposit parameters around an existing position | Deposit validation changes as configured; existing collateral value/health is not recalculated from the limits |
+| `test_nonzero_to_zero_ltv_guard_is_unchanged` | Existing nonzero LTV; attempt direct zero through SwitchboardBravo | Existing guarded/pending behavior remains; the emergency path is `canDeposit=false`, not an LTV bypass |
+
+### 7.2 Automatic backing matrix
+
+| Named future assertion | Setup | Required result |
+| --- | --- | --- |
+| `test_one_unit_simple_deficit_zeroes_every_users_capacity` | Two or more Simple users; reduce aggregate custody from `T` to `T-1` | Every user of that `(vault, asset)` contributes zero, regardless of position size or enumeration order |
+| `test_nominal_deficit_never_uses_min_user_nominal_live_total` | Two nominal claims each individually `<= C`, but `sum claims > C` | Neither claim is treated as backed by `min(userNominal,C)`; both are frozen for new capacity |
+| `test_simple_surplus_is_safe_but_not_user_allocated` | Donate so `C>T` | Backing check passes; existing nominal amounts remain unchanged; the surplus is not added to any user's amount |
+| `test_simple_exact_backing_preserves_existing_capacity` | `C==T`, enabled, valid price | Existing user values and `amount * price * ltv` capacities are unchanged |
+| `test_share_partial_loss_uses_live_round_down_claims` | Two share users, partial custody reduction | Each user's capacity uses its live pro-rata claim; sum of live claims and resulting delivery allocation is custody-bounded |
+| `test_nonzero_shares_zero_claim_is_not_skipped` | Nonzero user shares whose live round-down amount is zero | Asset remains identified, capacity/collateral value are zero, and configured resolution terms remain present |
+| `test_total_loss_share_position_is_visible_without_new_getter` | Nonzero shares and `C=0` | Existing indexed asset/amount getter is sufficient to expose `(asset,0)`; no new external status selector is required |
+| `test_backing_is_isolated_per_vault_and_asset` | Same asset in two vaults; deficit only one vault | Only the deficient `(vault,asset)` contribution is automatically zero; the other vault's distinct custody is counted once |
+| `test_backing_read_failure_never_returns_positive_capacity` | Make token `balanceOf` or Vault total read fail/malformed | State-changing borrow reverts; preview returns zero or fails, never a positive optimistic amount |
+| `test_stability_pool_empty_asset_signal_remains_excluded` | User has StabilityPool and ordinary vault positions | `(empty,0)` StabilityPool entry remains outside CreditEngine collateral; the ordinary entry follows Phase E rules |
+
+### 7.3 Preview, borrow, health, liquidation, and repayment matrix
+
+| Named future assertion | Setup | Required result |
+| --- | --- | --- |
+| `test_preview_and_borrow_share_identical_phase_e_capacity` | Snapshot state with safe, disabled, and deficit positions | At unchanged state and valid prices, preview and state-changing validation derive identical per-position and aggregate capacity |
+| `test_preview_never_optimistic_when_borrow_would_revert` | Required safe-asset price invalid or backing read fails | Preview is zero/failing, never positive while the matching borrow fails |
+| `test_disabled_solvent_asset_has_zero_capacity_but_live_resolution_value` | `C>=T`, valid price, nonzero LTV, then `canDeposit=false` | New-borrow contribution is zero; safely deliverable existing collateral remains in liquidation/redemption value and uses its configured terms |
+| `test_deficit_cannot_appear_healthy_via_amount_zero_skip` | Existing debt supported only by a now-zero-claim or deficient asset | `hasGoodDebtHealth` is false; the unsafe entry is processed rather than skipped |
+| `test_deficit_preserves_nonzero_liquidation_terms` | Existing debt and only configured asset becomes fully missing | Collateral value/capacity are zero, but configured liquidation threshold remains nonzero and `canLiquidateUser` is not false merely because amount is zero |
+| `test_mixed_collateral_preserves_exact_solvent_capacity` | One deficient position and one unrelated solvent/enabled/priced position | Unsafe contribution is zero; solvent value and capacity exactly equal the single-position control case |
+| `test_mixed_collateral_health_uses_only_actual_capacity` | Vary debt below/above the solvent position's capacity | Health is true only when unrelated eligible collateral alone covers debt |
+| `test_missing_price_cannot_hide_deficit` | Deficit position with stale, zero, or missing price | Deficit remains fail-closed and terms remain visible without a price call |
+| `test_safe_missing_price_is_independently_fail_closed` | Backing-safe enabled position with invalid price | Preview/health give no optimistic value; state-changing borrow reverts under the existing raising mode |
+| `test_repayment_succeeds_without_unsafe_asset_price` | Existing debt, known disabled/deficit position, unusable price | Repayment reduces Ledger debt, updates conservatively, and does not require the unsafe asset price |
+| `test_repayment_does_not_clear_or_allocate_deficit` | Repay during deficit freeze | Debt decreases only by paid amount; custody/accounting and deficit state are unchanged; no bad debt is created |
+| `test_max_withdraw_preview_uses_same_backing_state` | Existing debt with disabled or deficient target asset | Preview returns zero for unsafe collateral and uses exact Phase E contributions for remaining assets |
+| `test_debt_free_solvent_disabled_asset_keeps_normal_exit` | No user debt, `C>=T`, per-asset deposits disabled, withdrawals enabled | CreditEngine does not unnecessarily block ordinary solvent exit; Teller/Vault withdrawal controls remain authoritative |
+
+### 7.4 Conservation and property matrix
+
+Property/state-machine runs must cover 6- and 18-decimal assets, one-base-unit
+amounts, multiple users, multiple vaults, reordered user/asset enumeration,
+donations, partial and total loss, disable/re-enable, stale prices, borrow,
+repay, and withdrawal preview.
+
+Required properties:
+
+```text
+nominal C < T
+    => capacity(user, vault, asset) == 0 for every user
+
+nominal C >= T
+    => sum(user nominal claims) == T <= C
+
+shares
+    => sum(roundDown(user live claims)) <= C
+
+totalMaxDebt
+    == sum(each eligible position's live value * configured LTV)
+
+disabled or unsafe position
+    => new-capacity contribution == 0
+
+preview(state) > 0
+    => state-changing validation at identical state cannot reject because of
+       a different backing/config calculation
+```
+
+Named assertions:
+
+- `test_sum_borrow_amounts_never_exceeds_live_custody`;
+- `test_user_and_vault_iteration_order_cannot_allocate_nominal_deficit`;
+- `test_same_asset_two_vaults_never_share_backing`;
+- `test_donation_deficit_and_restore_sequence_never_double_counts`;
+- `test_disabled_asset_capacity_is_zero_for_every_user`;
+- `test_safe_mixed_collateral_matches_isolated_control`; and
+- `test_phase_e_state_machine_preserves_i02_i06_i07_i09_i12`.
+
+Restoring `C>=T` does not itself authorize re-enable, loss allocation, or
+post-zero deposits. Those remain governance/policy gates.
+
+### 7.5 Monitoring and event evidence
+
+At one pinned block, future diagnostics must record:
+
+```text
+assetConfig(asset).canDeposit
+getDebtTerms(asset)
+IERC20(asset).balanceOf(vault)
+Vault(vault).getTotalAmountForVault(asset)
+Vault(vault).getUserAssetAndAmountAtIndex(user,index)
+CreditEngine.getMaxBorrowAmount(user)
+CreditEngine.hasGoodDebtHealth(user)
+CreditEngine.canLiquidateUser(user)
+```
+
+Required assertions:
+
+- `test_same_block_getter_bundle_reconstructs_backing_and_capacity`;
+- `test_can_deposit_event_matches_applied_asset_config`;
+- `test_pending_and_applied_debt_term_events_match_getter`;
+- `test_no_stored_deficit_bit_can_disagree_with_live_backing`; and
+- `test_monitoring_labels_read_failure_unknown_not_solvent`.
+
+The bundle must record block number/hash, vault/asset/user identities, raw
+responses, decoded values, and derived `C<T`, zero-claim, eligibility, value,
+capacity, and health results. Event evidence proves config transitions; live
+getters prove current backing.
+
+### 7.6 Phase E implementation acceptance
+
+A future Phase E implementation cannot be accepted unless:
+
+1. all tests in Sections 7.1–7.5 pass;
+2. the Phase D deposit tests and unchanged 90-case comparison baseline pass;
+3. full repository regression passes;
+4. no new storage/config field, canonical interface method, external selector,
+   event, ABI, default, migration, or manifest change appears;
+5. the implementation consumes existing `canDeposit` and `DebtTerms.ltv`
+   exactly as specified and does not weaken existing role/timelock rules;
+6. backing classification is call-time, oracle-independent, and generic;
+7. every CreditEngine preview/state/health/repay/withdraw consumer is covered;
+8. source and tests contain no asset-name, issuer, vault-ID, or chain-ID branch;
+9. security review accepts the deliberate coupling between per-asset deposit
+   disable and zero new-borrow support; and
+10. the owner separately authorizes implementation.
+
+These are future acceptance conditions, not evidence that any implementation
+exists. Phase F settlement and bad-debt behavior remains separately gated.
+
+## 8. Exact-token fork plan
 
 Proposed future file:
 `tests/probes/test_aapl_vault_behavior_fork.py`.
@@ -417,7 +561,7 @@ No live signing or broadcast is part of this plan. Live sender/recipient
 eligibility, acquisition, gas, approvals, and legal permission remain separate
 owner/counsel gates.
 
-## 8. Dual-clock and identical-artifact integration
+## 9. Dual-clock and identical-artifact integration
 
 The narrow S1/S2 kickoff choices were owner-approved in post-bootstrap
 integration commit `ce3805d6079ee87d727486ea82b75cbddc12e46d`. Their implementation
@@ -436,7 +580,7 @@ Clock behavior must not change custody conservation. Repeated or jumping numbers
 may delay a timelock or auction but cannot permit payment for undelivered
 collateral or duplicate bad debt.
 
-## 9. Migration validation scaffold
+## 10. Migration validation scaffold
 
 Pending owner live-version policy and Track 7 namespace/tooling:
 
@@ -460,7 +604,7 @@ Pending owner live-version policy and Track 7 namespace/tooling:
 Rollback reality must be tested as a state migration, not described as merely
 switching an address back.
 
-## 10. Diagnostics and evidence requirements
+## 11. Diagnostics and evidence requirements
 
 Every future test record must include:
 
@@ -481,7 +625,7 @@ Every future test record must include:
 
 Unknown pause/blocklist/upgrade state must be labeled unknown, not false.
 
-## 11. Proposed tiers and commands
+## 12. Proposed tiers and commands
 
 Commands are placeholders until files exist and the owner approves
 implementation:
@@ -497,15 +641,15 @@ implementation:
 
 No dependency or tool addition is authorized by this scaffold.
 
-## 12. Review and launch gates
+## 13. Review and launch gates
 
-The owner selected option 4 and authorized Phase D specification work only.
-The Phase D design and future test contract are complete; no implementation or
-test change is authorized. Entry into Phase E and finalization of later
-implementation/release gates remain blocked on the following decisions at
-their recorded phase boundaries:
+The owner selected option 4, authorized Phase D specification, then authorized
+Phase E specification under the explicit existing-controls/no-new-storage
+constraint. The Phase D and E designs and future test contracts are complete;
+no implementation or test change is authorized. Entry into Phase F and
+finalization of later implementation/release gates remain blocked on the
+following decisions at their recorded phase boundaries:
 
-- per-asset collateral flag approval;
 - external-only issuer settlement decision;
 - total-loss and exactly-once bad-debt policy;
 - post-zero/restoration/loss-allocation policy;
@@ -516,6 +660,6 @@ their recorded phase boundaries:
 - exact-token, Base regression, migration, testnet, and smoke evidence.
 
 At this checkpoint, the evidence baseline, formal invariant map, Phase C
-comparison, Phase D deposit-accounting design, proposed test names, and
-required matrices are ready for owner review. No implementation, test, or
-launch gate is passed by this specification.
+comparison, Phase D deposit-accounting design, Phase E backing/debt-health
+design, proposed test names, and required matrices are ready for owner review.
+No implementation, test, or launch gate is passed by this specification.
