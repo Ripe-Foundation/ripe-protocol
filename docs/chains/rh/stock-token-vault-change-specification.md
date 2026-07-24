@@ -45,7 +45,9 @@ authority.
 
 ### 1.1 Bootstrap command record
 
-The following results were captured before creating the Track worktree:
+The following results were captured in the original session before creating
+the Track worktree and transcribed from that session log into this document
+during the first checkpoint-review revision:
 
 ```text
 git -C /Users/wigglez/dev/ripe-protocol status --short --branch
@@ -99,9 +101,10 @@ git status --short
    ?? docs/chains/rh/stock-token-vault-change-validation-plan.md
 ```
 
-The final staged-file scope and `git diff --cached --check` result are recorded
-by the local checkpoint-draft commit; no non-document file is permitted in that
-commit.
+The local checkpoint-draft commit itself evidences the staged file scope.
+Immediately before that commit, `git diff --cached --check` returned no output;
+that command result is a session-log record, not data encoded in the Git commit
+object. No non-document file was included.
 
 ## 2. Evidence ledger
 
@@ -429,6 +432,28 @@ future implementation.
 At the pinned block, all funded assets were solvent in nominal accounting; WETH
 had a one-unit surplus. This snapshot does not prove future safety.
 
+For completeness, vault ID 4 (`RebaseErc20`) had the following six registered
+assets at the same block. Here `C` is live token custody and `S` is
+`RebaseErc20.totalBalances(asset)`, which stores aggregate raw shares.
+Names/symbols were read from the listed tokens at the pinned block.
+
+| # | Asset | `C / S` in raw units | Current implication |
+| ---: | --- | ---: | --- |
+| 1 | Compound AERO (`cAEROv3`) `0x784efeB622244d2348d4F2522f8860B96fbEcE89` | `0 / 0` | Registered; no custody or accounted shares. |
+| 2 | Aave Base cbBTC (`aBascbBTC`) `0xBdb9300b7CDE636d9cD4AFF00f6F009fFBBc8EE6` | `1 / 0` | One smallest-unit unaccounted donation/dust; no user shares. |
+| 3 | Aave Base USDC (`aBasUSDC`) `0x4e65fE4DbA92790696d040ac24Aa414708F5c0AB` | `1 / 0` | One smallest-unit unaccounted donation/dust; no user shares. |
+| 4 | Aave Base WETH (`aBasWETH`) `0xD4a0e0b9149BCee3C920d2E00b5dE09138fd8bb7` | `1 / 0` | One smallest-unit unaccounted donation/dust; no user shares. |
+| 5 | Compound USDC (`cUSDCv3`) `0xb125E6687d4313864e53df431d5425969c15Eb2F` | `0 / 0` | Registered; no custody or accounted shares. |
+| 6 | Compound WETH (`cWETHv3`) `0x46e6b214b524310239732D51387075E0e70970bf` | `0 / 0` | Registered; no custody or accounted shares. |
+
+`RebaseErc20.doesVaultHaveAnyFunds() == false` is therefore an
+**accounted-share result**, not proof of literal zero ERC-20 custody:
+`VaultData.doesVaultHaveAnyFunds()` iterates registered assets and checks
+`totalBalances`, while three assets contain one raw token unit with zero
+shares. No live user-funded share exposure is evidenced at this block, but a
+future migration/recovery plan must reconcile registered assets and incidental
+custody separately.
+
 ### 5.3 Base urgency conclusion
 
 **Recommendation, not approval:** Release 1 is an urgent live Base hardening
@@ -460,9 +485,16 @@ owner to approve the live-version and custody-bearing migration posture.
   2026-07-23 America/Denver
 - Review repeat for registry and funded-status reads:
   `2026-07-24T03:46:40Z`
+- Complete raw registry/custody/accounting response capture:
+  `2026-07-24T04:07:01Z`
 
 No secret, authenticated endpoint, write method, signing operation, or broadcast
 was used.
+
+The successful historical `eth_call` reads establish that
+`https://mainnet.base.org` served state for the pinned block at capture time.
+Reproduction later still requires an endpoint that retains historical state;
+public endpoint archive availability and rate limits are not guaranteed.
 
 #### RPC method transcript
 
@@ -515,6 +547,266 @@ The review repeat returned:
 RebaseErc20.getNumVaultAssets()      => 6
 RebaseErc20.doesVaultHaveAnyFunds() => false
 SimpleErc20.doesVaultHaveAnyFunds() => true
+```
+
+#### Raw historical-read snapshot
+
+The JSON below is committed inside this owned specification rather than as a
+third Track 8 deliverable. Each leaf under `result`/`asset`/`custody`/
+`accounting` is the unmodified hex string from the JSON-RPC `eth_call` result;
+only transport envelopes and request IDs are omitted. `accounting` means
+nominal `totalBalances` for Simple and raw-share `totalBalances` for Rebase.
+The request shapes are the commands above, all using block tag `0x2ec3d82`.
+
+```json
+{
+  "schema": "ripe.track8.base-vault-state.v1",
+  "capturedAt": "2026-07-24T04:07:01Z",
+  "rpc": "https://mainnet.base.org",
+  "block": {
+    "number": 49036674,
+    "tag": "0x2ec3d82",
+    "hash": "0x030f624ed01a4d2f6eca29774fca774570c2ff0eae80c9ecbaff0cf3381c86e0"
+  },
+  "vaultBook": {
+    "getAddr3": {
+      "calldata": "0xd81f84b70000000000000000000000000000000000000000000000000000000000000003",
+      "result": "0x000000000000000000000000f75b566ef80fde0defcc045a4d57b540eb43ddfd"
+    },
+    "getRegIdSimple": {
+      "calldata": "0xc4d9ba63000000000000000000000000f75b566ef80fde0defcc045a4d57b540eb43ddfd",
+      "result": "0x0000000000000000000000000000000000000000000000000000000000000003"
+    },
+    "getRegIdRebase": {
+      "calldata": "0xc4d9ba63000000000000000000000000ce2e96c9f6806731914a7b4c3e4ac1f296d98597",
+      "result": "0x0000000000000000000000000000000000000000000000000000000000000004"
+    }
+  },
+  "simple": {
+    "address": "0xf75b566eF80Fde0dEfcC045A4d57b540eb43ddfD",
+    "getNumVaultAssets": {
+      "calldata": "0x28788f26",
+      "result": "0x000000000000000000000000000000000000000000000000000000000000001b"
+    },
+    "doesVaultHaveAnyFunds": {
+      "calldata": "0xa82e46fc",
+      "result": "0x0000000000000000000000000000000000000000000000000000000000000001"
+    },
+    "assets": [
+      {
+        "index": 1,
+        "asset": "0x000000000000000000000000833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+        "custody": "0x0000000000000000000000000000000000000000000000000000000000000000",
+        "accounting": "0x0000000000000000000000000000000000000000000000000000000000000000"
+      },
+      {
+        "index": 2,
+        "asset": "0x000000000000000000000000cbb7c0000ab88b473b1f5afd9ef808440eed33bf",
+        "custody": "0x000000000000000000000000000000000000000000000000000000000014b481",
+        "accounting": "0x000000000000000000000000000000000000000000000000000000000014b481"
+      },
+      {
+        "index": 3,
+        "asset": "0x0000000000000000000000004200000000000000000000000000000000000006",
+        "custody": "0x0000000000000000000000000000000000000000000000000ff44c7f64c5e4d8",
+        "accounting": "0x0000000000000000000000000000000000000000000000000ff44c7f64c5e4d7"
+      },
+      {
+        "index": 4,
+        "asset": "0x000000000000000000000000cbd06e5a2b0c65597161de254aa074e489deb510",
+        "custody": "0x0000000000000000000000000000000000000000000000000000000360447100",
+        "accounting": "0x0000000000000000000000000000000000000000000000000000000360447100"
+      },
+      {
+        "index": 5,
+        "asset": "0x0000000000000000000000009b8df6e244526ab5f6e6400d331db28c8fdddb55",
+        "custody": "0x0000000000000000000000000000000000000000000000000b6d64cc6d48f370",
+        "accounting": "0x0000000000000000000000000000000000000000000000000b6d64cc6d48f370"
+      },
+      {
+        "index": 6,
+        "asset": "0x0000000000000000000000007bfa7c4f149e7415b73bdedfe609237e29cbf34a",
+        "custody": "0x0000000000000000000000000000000000000000000000000000000000000000",
+        "accounting": "0x0000000000000000000000000000000000000000000000000000000000000000"
+      },
+      {
+        "index": 7,
+        "asset": "0x000000000000000000000000940181a94a35a4569e4529a3cdfb74e38fd98631",
+        "custody": "0x000000000000000000000000000000000000000000000004facd7b98d3da6f6e",
+        "accounting": "0x000000000000000000000000000000000000000000000004facd7b98d3da6f6e"
+      },
+      {
+        "index": 8,
+        "asset": "0x00000000000000000000000073902f619ceb9b31fd8efecf435cbdf89e369ba6",
+        "custody": "0x0000000000000000000000000000000000000000000000000000000000000000",
+        "accounting": "0x0000000000000000000000000000000000000000000000000000000000000000"
+      },
+      {
+        "index": 9,
+        "asset": "0x000000000000000000000000cb585250f852c6c6bf90434ab21a00f02833a4af",
+        "custody": "0x0000000000000000000000000000000000000000000000000000000000000000",
+        "accounting": "0x0000000000000000000000000000000000000000000000000000000000000000"
+      },
+      {
+        "index": 10,
+        "asset": "0x000000000000000000000000a88594d404727625a9437c3f886c7643872296ae",
+        "custody": "0x000000000000000000000000000000000000000000000289c6e8f4f18e68be14",
+        "accounting": "0x000000000000000000000000000000000000000000000289c6e8f4f18e68be14"
+      },
+      {
+        "index": 11,
+        "asset": "0x0000000000000000000000000b3e328455c4059eeb9e3f84b5543f74e24e7e1b",
+        "custody": "0x000000000000000000000000000000000000000000000039235d8f5c72f3a1d0",
+        "accounting": "0x000000000000000000000000000000000000000000000039235d8f5c72f3a1d0"
+      },
+      {
+        "index": 12,
+        "asset": "0x000000000000000000000000acfe6019ed1a7dc6f7b508c02d1b04ec88cc21bf",
+        "custody": "0x0000000000000000000000000000000000000000000000000000000000000000",
+        "accounting": "0x0000000000000000000000000000000000000000000000000000000000000000"
+      },
+      {
+        "index": 13,
+        "asset": "0x0000000000000000000000004ed4e862860bed51a9570b96d89af5e1b0efefed",
+        "custody": "0x0000000000000000000000000000000000000000000000000000000000000000",
+        "accounting": "0x0000000000000000000000000000000000000000000000000000000000000000"
+      },
+      {
+        "index": 14,
+        "asset": "0x0000000000000000000000003bf93770f2d4a794c3d9ebefbaebae2a8f09a5e5",
+        "custody": "0x0000000000000000000000000000000000000000000000000000000000000000",
+        "accounting": "0x0000000000000000000000000000000000000000000000000000000000000000"
+      },
+      {
+        "index": 15,
+        "asset": "0x0000000000000000000000002ae3f1ec7f1f5012cfeab0185bfc7aa3cf0dec22",
+        "custody": "0x0000000000000000000000000000000000000000000000000b1a2bc2ec500000",
+        "accounting": "0x0000000000000000000000000000000000000000000000000b1a2bc2ec500000"
+      },
+      {
+        "index": 16,
+        "asset": "0x000000000000000000000000edc817a28e8b93b03976fbd4a3ddbc9f7d176c22",
+        "custody": "0x0000000000000000000000000000000000000000000000000000000000000000",
+        "accounting": "0x0000000000000000000000000000000000000000000000000000000000000000"
+      },
+      {
+        "index": 17,
+        "asset": "0x000000000000000000000000c1256ae5ff1cf2719d4937adb3bbccab2e00a2ca",
+        "custody": "0x0000000000000000000000000000000000000000000000000000000000000000",
+        "accounting": "0x0000000000000000000000000000000000000000000000000000000000000000"
+      },
+      {
+        "index": 18,
+        "asset": "0x000000000000000000000000616a4e1db48e22028f6bbf20444cd3b8e3273738",
+        "custody": "0x0000000000000000000000000000000000000000000000000000000000000000",
+        "accounting": "0x0000000000000000000000000000000000000000000000000000000000000000"
+      },
+      {
+        "index": 19,
+        "asset": "0x000000000000000000000000f42f5795d9ac7e9d757db633d693cd548cfd9169",
+        "custody": "0x0000000000000000000000000000000000000000000000000000000000000000",
+        "accounting": "0x0000000000000000000000000000000000000000000000000000000000000000"
+      },
+      {
+        "index": 20,
+        "asset": "0x0000000000000000000000000a1a3b5f2041f33522c4efc754a7d096f880ee16",
+        "custody": "0x0000000000000000000000000000000000000000000000000000000000000000",
+        "accounting": "0x0000000000000000000000000000000000000000000000000000000000000000"
+      },
+      {
+        "index": 21,
+        "asset": "0x000000000000000000000000f877acafa28c19b96727966690b2f44d35ad5976",
+        "custody": "0x0000000000000000000000000000000000000000000000000000000000000000",
+        "accounting": "0x0000000000000000000000000000000000000000000000000000000000000000"
+      },
+      {
+        "index": 22,
+        "asset": "0x000000000000000000000000a0e430870c4604ccfc7b38ca7845b1ff653d0ff1",
+        "custody": "0x0000000000000000000000000000000000000000000000000000000000000000",
+        "accounting": "0x0000000000000000000000000000000000000000000000000000000000000000"
+      },
+      {
+        "index": 23,
+        "asset": "0x00000000000000000000000027d8c7273fd3fcc6956a0b370ce5fd4a7fc65c18",
+        "custody": "0x0000000000000000000000000000000000000000000000000000000000000000",
+        "accounting": "0x0000000000000000000000000000000000000000000000000000000000000000"
+      },
+      {
+        "index": 24,
+        "asset": "0x000000000000000000000000859160db5841e5cfb8d3f144c6b3381a85a4b410",
+        "custody": "0x0000000000000000000000000000000000000000000000000000000000000000",
+        "accounting": "0x0000000000000000000000000000000000000000000000000000000000000000"
+      },
+      {
+        "index": 25,
+        "asset": "0x000000000000000000000000543257ef2161176d7c8cd90ba65c2d4caef5a796",
+        "custody": "0x0000000000000000000000000000000000000000000000000000000000000000",
+        "accounting": "0x0000000000000000000000000000000000000000000000000000000000000000"
+      },
+      {
+        "index": 26,
+        "asset": "0x000000000000000000000000211cc4dd073734da055fbf44a2b4667d5e5fe5d2",
+        "custody": "0x0000000000000000000000000000000000000000000000000b87381aa8af49be",
+        "accounting": "0x0000000000000000000000000000000000000000000000000b87381aa8af49be"
+      },
+      {
+        "index": 27,
+        "asset": "0x0000000000000000000000007fcd174e80f264448ebee8c88a7c4476aaf58ea6",
+        "custody": "0x0000000000000000000000000000000000000000000000000000000000000000",
+        "accounting": "0x0000000000000000000000000000000000000000000000000000000000000000"
+      }
+    ]
+  },
+  "rebase": {
+    "address": "0xce2E96C9F6806731914A7b4c3E4aC1F296d98597",
+    "getNumVaultAssets": {
+      "calldata": "0x28788f26",
+      "result": "0x0000000000000000000000000000000000000000000000000000000000000006"
+    },
+    "doesVaultHaveAnyFunds": {
+      "calldata": "0xa82e46fc",
+      "result": "0x0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    "assets": [
+      {
+        "index": 1,
+        "asset": "0x000000000000000000000000784efeb622244d2348d4f2522f8860b96fbece89",
+        "custody": "0x0000000000000000000000000000000000000000000000000000000000000000",
+        "accounting": "0x0000000000000000000000000000000000000000000000000000000000000000"
+      },
+      {
+        "index": 2,
+        "asset": "0x000000000000000000000000bdb9300b7cde636d9cd4aff00f6f009ffbbc8ee6",
+        "custody": "0x0000000000000000000000000000000000000000000000000000000000000001",
+        "accounting": "0x0000000000000000000000000000000000000000000000000000000000000000"
+      },
+      {
+        "index": 3,
+        "asset": "0x0000000000000000000000004e65fe4dba92790696d040ac24aa414708f5c0ab",
+        "custody": "0x0000000000000000000000000000000000000000000000000000000000000001",
+        "accounting": "0x0000000000000000000000000000000000000000000000000000000000000000"
+      },
+      {
+        "index": 4,
+        "asset": "0x000000000000000000000000d4a0e0b9149bcee3c920d2e00b5de09138fd8bb7",
+        "custody": "0x0000000000000000000000000000000000000000000000000000000000000001",
+        "accounting": "0x0000000000000000000000000000000000000000000000000000000000000000"
+      },
+      {
+        "index": 5,
+        "asset": "0x000000000000000000000000b125e6687d4313864e53df431d5425969c15eb2f",
+        "custody": "0x0000000000000000000000000000000000000000000000000000000000000000",
+        "accounting": "0x0000000000000000000000000000000000000000000000000000000000000000"
+      },
+      {
+        "index": 6,
+        "asset": "0x00000000000000000000000046e6b214b524310239732d51387075e0e70970bf",
+        "custody": "0x0000000000000000000000000000000000000000000000000000000000000000",
+        "accounting": "0x0000000000000000000000000000000000000000000000000000000000000000"
+      }
+    ]
+  }
+}
 ```
 
 For control classification, each full asset address was fetched through the

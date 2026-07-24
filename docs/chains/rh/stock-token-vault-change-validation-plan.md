@@ -264,8 +264,12 @@ Pending owner live-version policy and Track 7 namespace/tooling:
 6. reconcile aggregate and per-user state before registry activation;
 7. abort on any mismatch without leaving two authoritative claim ledgers;
 8. prove partial-failure recovery;
-9. retire the old address only after live-funds/accounting checks pass; and
-10. run post-migration Base and Robinhood smoke/reconciliation tests.
+9. independently reconcile registered assets, live token custody, and
+   nominal/share accounting; specifically retain the pinned Base ID 4 inventory
+   of six registered assets and three one-unit custody donations with zero
+   shares as a `doesVaultHaveAnyFunds()` semantics regression;
+10. retire the old address only after live-funds/accounting checks pass; and
+11. run post-migration Base and Robinhood smoke/reconciliation tests.
 
 Rollback reality must be tested as a state migration, not described as merely
 switching an address back.
