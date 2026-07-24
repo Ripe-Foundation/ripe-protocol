@@ -1,7 +1,8 @@
 # Track 7 H-01 Stage A Dependency-Security Gate
 
 **Status:** Stage A evidence complete; the owner/security checkpoint closed on
-24 July 2026 and Stage B is authorized under the exact record below
+24 July 2026; Stage B began and then stopped before worktree implementation
+because the approved Candidate Zero audit found four unresolved alerts
 
 **Evidence date:** 24 July 2026
 
@@ -1355,3 +1356,261 @@ reviewer must inspect the complete brief-defined reviewer surface after
 implementation. Until that review occurs, H-01 is **Stage B authorized but not
 accepted**. Merge, push, deployment, signing, verification submission, and
 every other live/state-changing action remain prohibited.
+
+## Stage B execution record — blocked 24 July 2026
+
+Stage B stopped during pre-implementation audit. No dependency, lock, S1
+expectation, dependency-gate test, contract, script, production file, or
+generated artifact was changed. The only worktree change after the stop is
+this sanitized evidence update. Candidate Zero is abandoned and must not be
+committed, merged, or described as an alert-free candidate.
+
+### Reconciliation and re-frozen baseline
+
+Before any Stage B candidate action, the integration worktree was clean and
+local `rh` and `origin/rh` both resolved to the owner-approved reviewed S3
+integration commit
+`3e6e6f230169fc445d0b29454457480c62efd89a`. That commit contains S3 reviewer
+approval commit `6f42645` in its ancestry. The H-01 branch recorded approval
+at `73914a5fd6588695369b1d54cae494ed163f961e`, then merged the exact approved
+S3 integration commit without conflict:
+
+```text
+cc0fd9977b854756114e2c3fda2185f2a81f0ce2
+parent 73914a5fd6588695369b1d54cae494ed163f961e
+parent 3e6e6f230169fc445d0b29454457480c62efd89a
+```
+
+The commits introduced on `rh` touched none of H-01's owned requirements,
+S1, new dependency-gate-test, or evidence paths. The re-freeze occurred at
+`2026-07-24T18:16:32Z` (`2026-07-24T12:16:32-0600`, MDT) from reconciled H-01
+commit `cc0fd9977b854756114e2c3fda2185f2a81f0ce2`.
+
+| Re-frozen input | SHA-256 |
+|---|---|
+| `docs/chains/rh/track-7-h1-dependency-security-preflight.md` | `ac31478dc5aa740267a93083dc97ed10c8645326112e344c17025946c94fef22` |
+| `docs/chains/rh/track-6-block-clock-spec.md` | `a28db8423d68ce05494f0c75468e11a182df14503ee9e6e7fe761523f23269d` |
+| `docs/chains/rh/evidence/block-clock-validation.md` | `6b61a24b0ceae85f6cc175182686186d076c38e7f2ece44bbff235d3f9d22add` |
+| `requirements.in` | `2a6726cdd9dd0ce209a5bf905448f6545798e9ace74d77711ad7c6b568f26f63` |
+| `requirements.txt` | `18df0aad224f2a10febc9e155e4a530e1000ec553916c8ef78dc9859c6c92ba0` |
+| `tests/clock/test_clock_profiles.py` | `2b1bbd80249dadf23dcf7db8ecee455a8ec78d914f6ef639c0a8ee434925cc4` |
+| `tests/clock/clock_test_utils.py` | `69f3a616fe1a177e1436defe4205b15b121c642e4804c40029e5795252b34de` |
+| integrated S3 record | `d577f445bb2bcbe84ba68a6699811997076719bb70361641f0b8fb8a9e7be7c` |
+| integrated Lootbox source | `669c285713ab7e1b6ec060a4840f6d53b36b1ec7fac520b817e04e470f18ae65` |
+| integrated Lootbox ABI | `33aadc2148f9d38c6b34579f70d730f27e146304c96d543e0a09fb20a4f517c` |
+| integrated block-clock inventory | `cebc434dbec01492e7a2b2256cc37ac35b84c0e8fbf113ceee81858ba2ffb6fb` |
+| integrated inventory checker | `cc86f7368f924ec017a8ddbd244a803b01e3cdf27d0bd7432e7d42ca174d5642` |
+| integrated inventory test | `d9007158d03576f79044398cbb8d5de57150c2cd70f27885aa60bb48b3a4c39` |
+| integrated underscore-rewards test | `20b86c2d0e1de6577d1dbf80009648844980be899d74592c51a7a156454a6e7b` |
+| integrated Switchboard Charlie test | `a444c5fc2a6dba10fd69e260d828113af57e99ebf9eced04cdb1683c66e5fd44` |
+
+The relevant read-only reconciliation commands and results were:
+
+```text
+git status --short --branch
+  clean integration worktree; clean H-01 worktree
+git rev-parse rh
+git rev-parse origin/rh
+  both 3e6e6f230169fc445d0b29454457480c62efd89a
+git merge-base --is-ancestor \
+  3e6e6f230169fc445d0b29454457480c62efd89a HEAD
+  exit 0 after reconciliation
+git diff --name-only 382eb7d..3e6e6f2 -- \
+  requirements.in requirements.txt \
+  tests/clock/test_clock_profiles.py \
+  tests/deployment/test_dependency_gate.py \
+  docs/chains/rh/evidence/dependency-security-gate.md
+  no H-01-owned overlap from integrated rh work
+```
+
+### Reconciled old-profile validation
+
+The old profile remained Python `3.12.0`, Titanoboa `0.2.7`, Vyper `0.4.3`,
+pytest `8.4.2`, and pip check-clean. The required serial baseline was repeated
+after reconciliation and before candidate implementation:
+
+| Command | Result |
+|---|---|
+| `ETHERSCAN_API_KEY=local-placeholder PYTHONPATH=. pytest -q tests/clock/test_clock_profiles.py` | 57 passed in 28.12 s; 67.28 s wall |
+| `PYTHONPATH=. python scripts/check_block_clock_inventory.py --check` | clean; production `100/95/17`, BN `32/100`, indirect `1`, cadence candidates `455`, seconds-unit candidates `58`, timestamp `11/37`, mixed-clock functions `4`, Vyper paths `92`; non-production test `31/29/5`, cadence test `159`; 1.45 s wall |
+| `ETHERSCAN_API_KEY=local-placeholder PYTHONPATH=. pytest -q tests/inventory/test_block_clock_inventory.py` | 60 passed in 26.42 s; 28.38 s wall |
+| `ETHERSCAN_API_KEY=local-placeholder PYTHONPATH=. pytest -q tests/core/lootbox/test_underscore_rewards.py` | 59 passed in 30.74 s; 70.70 s wall |
+| `ETHERSCAN_API_KEY=local-placeholder PYTHONPATH=. pytest -q tests/config/test_switchboard_charlie.py` | 91 passed in 35.43 s; 75.54 s wall |
+| `ETHERSCAN_API_KEY=local-placeholder PYTHONPATH=. pytest --collect-only -q` | 2,722 collected, 142 deselected in 1.27 s; 2.64 s wall |
+| `ETHERSCAN_API_KEY=local-placeholder PYTHONPATH=. pytest -q` | 2,722 passed, 142 deselected in 305.16 s; 365.29 s wall |
+
+The placeholder value supplied only the repository's collection-time
+environment guard; no explorer or other live service was called.
+
+### Fresh K-02 and candidate reproduction
+
+At approximately `2026-07-24T18:27:45Z`, the byte-for-byte approved K-02
+read-only query and canonical sanitization were repeated. The fresh response
+remained 13 open alerts: 6 high, 6 medium, and 1 low, alert numbers
+`13, 14, 15, 16, 18, 19, 21, 22, 23, 24, 25, 26, 27`. It was byte-identical
+to Stage A:
+
+| Retained fresh K-02 record | SHA-256 | Mode |
+|---|---|---|
+| `~/dev/ripe-protocol-h1-private-evidence/dependabot-open-2026-07-24T182745Z-raw.json` | `52eccab5e38769070f5310b753f018030587b673cc2637105983ba670bfe2f0a` | `0600` |
+| `~/dev/ripe-protocol-h1-private-evidence/dependabot-open-2026-07-24T182745Z-sanitized.json` | `d2dd2d89acb63de901e164c3c7d69f402c04bc38da9a803fe9674734ab404b06` | `0600` |
+
+The original Stage A retained records also remained at their recorded paths,
+hashes, and mode `0600`.
+
+The approved resolver was rebuilt from
+`/Users/wigglez/.pyenv/versions/3.12.0/bin/python3.12` with pip `23.2.1` and
+pip-tools `7.4.1`, using only public PyPI, no cache for tool installation, and
+a disposable compile cache. Its complete tool inventory remained the Stage A
+inventory (`build==1.3.0`, `click==8.4.2`, `packaging==26.2`,
+`pip==23.2.1`, `pip-tools==7.4.1`, `pyproject_hooks==1.2.0`,
+`setuptools==83.0.0`, `wheel==0.47.0`) and `pip check` passed.
+
+All four approved candidates reproduced byte-for-byte from their frozen inputs
+and emitted the exact Stage A lock diffs; therefore no candidate or index drift
+occurred:
+
+| Candidate | Input SHA-256 | Generated lock SHA-256 | Literal diff SHA-256 |
+|---|---|---|---|
+| A | `2523c044ef1050f5c38696579c17038594162353de3851412421368281533b80d` | `d2e12a6f276736add9b728e9d44a16b8b85b1856884a0c418e2c471f80d2bce` | `09915227fe00407d4849543353b76a363bedceb3226b50a8a4f22217bc261b05` |
+| pytest | `2b19212e5caa64b89ea4f58ca9f2cfe447b1bfa89310032739ef723bba3d82de` | `e2af4c14f8d77564aac91f39b0437d06891ec8d9e5024413120fdd42e92f5c07` | `abd03350934a9d16ab10ee1c06aaf3b407b8a6af7fd2861f0d36301735ef64fb` |
+| documentation/low | `26dbc8c7114d6c58c046f5454ad79db4532a686ebf1e6bd60831266ff71db7fb` | `d064cd53f27153b92a7ec4385a6259002c9083a0365cfe33523767c4b20dfb86` | `37389da2471de32127a937a6424845663868928453b7336eb6ef6b71a20baf3b` |
+| Zero | `c5d2e05d108e4ccfd87d8f714f287883e4715e7bffadbd35cc089b1db66113a4` | `b74b693a52d5b0b0f525bf9aae502af7936a35c52145ea54b8843bb7ccd10622` | `b226d0de0fb9363ff99db0ec8e8db39b872fb332e4db1de0ce413b0d1a545441` |
+
+Independent old and Candidate Zero environments used CPython `3.12.0` and
+pip `23.2.1`; neither was upgraded in place. Both locks installed from public
+PyPI with `--no-cache-dir`, and `python -m pip check` passed. Their complete
+inventories differed only in these nine approved lock changes:
+
+```text
+cbor2                 5.7.0   -> 5.9.0
+idna                  3.10    -> 3.15
+Pygments              2.19.2  -> 2.20.0
+pymdown-extensions    10.16.1 -> 10.21.3
+pytest                8.4.2   -> 9.0.3
+python-dotenv         1.2.1   -> 1.2.2
+requests              2.32.5  -> 2.33.0
+urllib3               2.5.0   -> 2.7.0
+wheel                 0.45.1  -> 0.46.2
+```
+
+The complete retained inventories are:
+
+| File | SHA-256 | Mode |
+|---|---|---|
+| `~/dev/ripe-protocol-h1-private-evidence/old-environment-inventory-2026-07-24T182745Z.txt` | `10a17ea189dfdf2ccd0e70eed88e1f9b274e080e6fce7c8dac2d214844180eeb` | `0600` |
+| `~/dev/ripe-protocol-h1-private-evidence/candidate-zero-environment-inventory-2026-07-24T182745Z.txt` | `e9ec0c1bcc7954a5dbce5c98d8111935b3f32236960468db959aa447e1d37ca1` | `0600` |
+
+### Approved auditor and blocking result
+
+A third independent CPython `3.12.0` / pip `23.2.1` environment installed
+exact `pip-audit==2.10.1` from public PyPI with `--no-cache-dir`. Its complete
+inventory SHA-256 was
+`e1284aaefc7051673541ec1bb24b6a215169a78865375896314ba48b17c02d8e`;
+`python -m pip check` passed. The inventory is retained at
+`~/dev/ripe-protocol-h1-private-evidence/audit-tool-environment-inventory-2026-07-24T182745Z.txt`
+with mode `0600`.
+
+The first sandboxed audit attempt stopped before any query because pip-audit
+could not create its standard macOS cache under
+`~/Library/Caches/pip-audit` (`PermissionError: [Errno 1] Operation not
+permitted`). The exact approved command was then rerun with permission to use
+that standard cache and its advisory network service; no flag, dependency,
+lock, or audit policy changed:
+
+```text
+PIP_CONFIG_FILE=/dev/null \
+  /private/tmp/ripe-h01-stageb-clean-20260724T182745Z/audit/bin/python \
+  -m pip_audit --no-deps --disable-pip \
+  -r requirements.txt --format=json \
+  --output /private/tmp/ripe-h01-stageb-clean-20260724T182745Z/old-audit.json
+
+PIP_CONFIG_FILE=/dev/null \
+  /private/tmp/ripe-h01-stageb-clean-20260724T182745Z/audit/bin/python \
+  -m pip_audit --no-deps --disable-pip \
+  -r /private/tmp/ripe-h01-stageb-resolver-20260724T182745Z/candidate-zero/requirements.txt \
+  --format=json \
+  --output /private/tmp/ripe-h01-stageb-clean-20260724T182745Z/candidate-audit.json
+```
+
+At `2026-07-24T18:33:46Z`, the old lock returned exit `1` and “Found 20
+known vulnerabilities in 11 packages.” The JSON contains 20 vulnerability
+entries representing 18 unique audit IDs because the service returned
+duplicate `PYSEC-2025-90` and `PYSEC-2026-215` entries. At
+`2026-07-24T18:33:54Z`, Candidate Zero returned exit `1` and “Found 4 known
+vulnerabilities in 3 packages.”
+
+The old-lock unique IDs were
+`CVE-2026-24049`, `CVE-2026-61632`, `PYSEC-2023-142`,
+`PYSEC-2025-238`, `PYSEC-2025-33`, `PYSEC-2025-90`,
+`PYSEC-2026-141`, `PYSEC-2026-1845`, `PYSEC-2026-1994`,
+`PYSEC-2026-1996`, `PYSEC-2026-1998`, `PYSEC-2026-2123`,
+`PYSEC-2026-2132`, `PYSEC-2026-215`, `PYSEC-2026-2270`,
+`PYSEC-2026-2275`, `PYSEC-2026-2987`, and `PYSEC-2026-2999`.
+
+Candidate Zero remediates all 13 alerts in the authoritative Stage A GitHub
+ledger but fails the broader approved auditor:
+
+| Package/version | Audit ID | Aliases | Auditor fix versions | Disposition |
+|---|---|---|---|---|
+| `click==8.2.1` | `PYSEC-2026-2132` | `GHSA-47fr-3ffg-hgmw`, `CVE-2026-7246` | `8.3.3` | unresolved; not in approved candidate |
+| `pymdown-extensions==10.21.3` | `CVE-2026-61632` | `GHSA-9xwg-3r6f-jcx2` | `11.0.0` | unresolved; approved version is still vulnerable |
+| `vyper==0.4.3` | `PYSEC-2023-142` | `GHSA-5824-cm3x-3c38`, `CVE-2023-39363` | none reported | unresolved; approved held package |
+| `vyper==0.4.3` | `PYSEC-2025-33` | `GHSA-vgf2-gvx8-xwc3`, `CVE-2025-21607` | none reported | unresolved; approved held package |
+
+These are newly surfaced relative to the Stage A GitHub alert ledger, not a
+claim that the advisories themselves are newly published. No ignore,
+suppression, exception, or residual acceptance was applied.
+
+Raw audit JSON remains outside the repository:
+
+| Retained raw audit | SHA-256 | Mode |
+|---|---|---|
+| `~/dev/ripe-protocol-h1-private-evidence/pip-audit-old-2026-07-24T182745Z-raw.json` | `5bb47d3f69669aae51bf3007532ba156de40c1da0d5e3c50e005eebd75c3f8d2` | `0600` |
+| `~/dev/ripe-protocol-h1-private-evidence/pip-audit-candidate-zero-2026-07-24T182745Z-raw.json` | `9ae967aadec370959f356929ed229928c48caffcd4b656c3f81ceaa1f80a7db9` | `0600` |
+
+### Stop boundary and decisions required
+
+Owner decision 5 required an audit with no known vulnerability and stated
+that any residual or newly surfaced alert stops Stage B. The user separately
+directed a stop on any unresolved alert. Both conditions fired. Accordingly:
+
+- no candidate was copied into the worktree;
+- the unchanged S1 intentional-failure step did not begin;
+- no S1 expectation or dependency-gate test was edited;
+- candidate compatibility, artifact, and full-suite validation did not begin;
+- B6 final re-query and the mandatory Stage B reviewer gate were not reached;
+- no merge, push, deployment, signing, verification submission, or other
+  live/state-changing action occurred; and
+- H-01 is **blocked during Stage B**, not complete and not reviewer-ready.
+
+At `2026-07-24T18:36:40Z`, the abandoned resolver, old-profile,
+Candidate Zero, and auditor environments were removed by deleting only
+`/private/tmp/ripe-h01-stageb-resolver-20260724T182745Z` and
+`/private/tmp/ripe-h01-stageb-clean-20260724T182745Z`; both paths were
+confirmed absent. The task-created standard pip-audit cache
+`~/Library/Caches/pip-audit` (creation time
+`2026-07-24T12:33:42-0600`) was also removed and confirmed absent. The
+worktree's old direct input and lock were never changed and remain reproducible
+at the re-frozen hashes above. The retained mode-`0600` evidence files were
+not moved or deleted.
+
+Fresh owner/security decisions are required before any resumption:
+
+1. whether H-01 must retain the zero-known-vulnerability policy or may accept
+   any precisely scoped residual;
+2. whether scope may expand to resolve and review `click==8.3.3` and
+   `pymdown-extensions==11.0.0`, including a fresh complete resolver diff,
+   primary-source review, clean environments, compatibility tests, and a new
+   candidate approval;
+3. how to disposition the two Vyper `0.4.3` audit findings for which the
+   auditor reports no fixed version—hold and exception-gate them with owner,
+   scope, controls, expiry, and re-review trigger; establish with primary
+   evidence that they do not apply; or authorize a separately reviewed Vyper
+   profile change and its Track 6/S1/S3/artifact consequences; and
+4. after those choices, whether to refresh the complete eight-item
+   authorization bundle and resume from a newly frozen reconciled baseline.
+
+Approval of the previous Candidate Zero bundle does not answer these new
+questions. Until they are explicit, dependency/test implementation and the
+Stage B reviewer gate remain blocked.
