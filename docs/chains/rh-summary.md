@@ -6,7 +6,7 @@
 
 **Source basis:** Hightop Notes research dated 22 July 2026 and decision-record updates/live verification through 23 July 2026
 
-**Checklist reconciliation baseline:** `27765d29094256fa9619dd44a0bfd145863de8b7` on 24 July 2026
+**Checklist reconciliation baseline:** `dd51c637f1462bede7529a53427bfb4327dbfb12` on 24 July 2026
 
 **Minimum-contract-change directive:** 24 July 2026 — implementation necessity
 is being re-evaluated in
@@ -198,10 +198,17 @@ features for future use, or add chain-specific branches.
     [`lootbox-floor-implementation-record.md`](rh/lootbox-floor-implementation-record.md)
     and
     [`minimal-contract-change-reassessment.md`](rh/minimal-contract-change-reassessment.md).
-- [ ] Decide whether S4 is needed at all. The current Deleverage cooldown
-  initializes to zero, so prefer the existing source plus a manifest assertion
-  that nonzero cooldown remains disabled unless the owner rejects the resulting
-  lack of pacing protection.
+- [x] Close S4 without a production-contract change for the initial release:
+  deploy the existing shared Deleverage and SwitchboardDelta source unchanged,
+  keep Robinhood `deleverageCooldown = 0`, accept the resulting lack of pacing,
+  omit Underscore, and reopen S4 before either Underscore inclusion or any
+  nonzero cooldown proposal or queued action.
+  - Decision and independent-security evidence:
+    [`deleverage-cooldown-security-decision.md`](rh/deleverage-cooldown-security-decision.md).
+  - Track 7 H-08 must later prove the actual deployed graph omits Underscore,
+    the live cooldown is zero, and no prohibited pending cooldown or Underscore
+    registry action exists. Migration `0020` is omitted or assertion-only and
+    may never be state-changing.
 - [ ] Implement S5's owner-selected portable action-block boundary only after
   Stage A and independent security review select the smallest abstraction.
   Preserve the existing same-execution-block action ordering; use native

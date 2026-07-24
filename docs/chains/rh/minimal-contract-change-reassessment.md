@@ -1,11 +1,14 @@
 # Robinhood Minimal Contract-Change Reassessment
 
-**Status:** Owner directive recorded; S3 and S5 directions selected; remaining
-contract-by-contract decisions pending
+**Status:** Owner directive recorded; S3 retained, S4 closed no-code, and S5
+direction selected; remaining contract-by-contract decisions pending
 
 **Prepared:** 24 July 2026
 
 **Planning baseline:** `27765d29094256fa9619dd44a0bfd145863de8b7`
+
+**S4 closure reconciliation:** `dd51c637f1462bede7529a53427bfb4327dbfb12`
+on 24 July 2026
 
 ## Purpose
 
@@ -54,9 +57,9 @@ The order of preference is:
 ## Program-wide implications
 
 - Track 6 is no longer an automatic S3-through-S5 production implementation
-  sequence. The owner has accepted S3 as a narrow shared improvement, selected
-  a portable same-child-block direction for S5, and left S4 subject to its
-  no-change checkpoint.
+  sequence. The owner has accepted S3 as a narrow shared improvement, closed
+  S4 without production implementation for the initial release, and selected
+  a portable same-child-block direction for S5.
 - Existing approvals of an implementation design do not prove that deploying
   that implementation is necessary.
 - A completed and reviewed source change may still be reverted before the
@@ -155,14 +158,17 @@ cooldown exception do not constrain execution.
 - downstream Underscore compatibility risk; and
 - materially larger audit and rollback surface.
 
-**Minimal-change recommendation:** make S4 Stage A answer whether the protocol
-actually requires a nonzero cooldown at Robinhood launch. If the owner accepts
-zero cooldown, conclude with configuration/manifest assertions and no
-production implementation. Do not proceed to S4 Stage B merely to clean up the
-duplicated constant.
+**Owner and independent-security decision — no-code S4 (24 July 2026):**
+Robinhood launches with the existing shared Deleverage and SwitchboardDelta
+source, `deleverageCooldown = 0`, no cooldown pacing, and no Underscore
+integration. S4 Stage B/C do not exist for the initial release. Track 7 H-08
+must prove the live zero value, actual deployed-graph omission, and absence of
+pending nonzero cooldown or nonempty Underscore-registry actions. Migration
+`0020` is omitted or assertion-only and never state-changing. Reopen S4 before
+Underscore inclusion or any nonzero cooldown proposal or queued action.
 
-**Owner decision:** pending after S4 Stage A explains the concrete protection
-lost at zero.
+**Decision evidence:**
+[`deleverage-cooldown-security-decision.md`](deleverage-cooldown-security-decision.md).
 
 ### S5 — Ledger same-execution-block guard
 
@@ -382,9 +388,9 @@ work rather than broad core-protocol redesign.
 
 ## Immediate program changes
 
-1. Pause any assumption that S4 Stage B will occur.
-2. Tell the active S4 agent that its first decision is now “is any production
-   change required if cooldown remains zero?”
+1. Treat S4 as closed no-code for the initial release; do not create Stage B/C.
+2. Carry S4's zero-value, omitted-Underscore, pending-action, and reopening
+   assertions into S6 and Track 7 H-08 without adding production behavior.
 3. Revise and review the S5 brief before launch. Stage A must treat the
    owner-selected same-child-block action clock as its controlling property,
    minimize the abstraction, and exclude Base migration.
@@ -394,15 +400,17 @@ work rather than broad core-protocol redesign.
    minimum-containment proposal and post-launch backlog before any code patch.
 6. Retain S3 in the release source, but do not infer Robinhood deployment or
    Base convergence authorization from that source decision.
-7. Draft S6 only after S4, S5 Stage A, and the Track 8 minimum-containment
-   decision define the minimal parameter and activation surface.
+7. Draft S6 only after S5 Stage A and the Track 8 minimum-containment decision
+   define the remaining minimal parameter and activation surface; consume S4
+   as an approved zero/omission assertion rather than a contract field.
 
 ## Owner decision queue
 
 The next owner discussion should answer these in order:
 
-1. **Deleverage cooldown:** is zero cooldown acceptable at launch, given the
-   lost pacing protection?
+1. **Deleverage cooldown — resolved:** zero cooldown and its lost pacing are
+   accepted for initial launch; reopen S4 before Underscore or any nonzero
+   proposal or queued action.
 2. **Ledger action clock:** which minimal abstraction safely returns native
    execution-block identity on ordinary EVM chains and ArbSys child-block
    identity on Robinhood without a Base Ledger migration?
