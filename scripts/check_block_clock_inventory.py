@@ -1,0 +1,1362 @@
+#!/usr/bin/env python3
+"""Deterministically validate the reviewed block-clock inventory.
+
+The checker intentionally uses only Python's standard library.  The JSON ledger is
+the reviewed source of truth; this module discovers current source state and
+refuses to create or update semantic classifications.
+"""
+
+from __future__ import annotations
+
+import argparse
+import fnmatch
+import hashlib
+import json
+import re
+import sys
+from dataclasses import dataclass
+from pathlib import Path, PurePosixPath
+from typing import Any, Iterable, Mapping, Sequence
+
+
+EXPECTED_SCHEMA_VERSION = 1
+EXPECTED_PRODUCTION_COUNTS = (100, 95, 17)
+EXPECTED_TIMESTAMP_COUNTS = (37, 37, 11)
+EXPECTED_BN_IDS = {f"BN-{number:03d}" for number in range(1, 33)}
+EXPECTED_CAD_IDS = {"CAD-001"}
+EXPECTED_TS_IDS = {f"TS-{number:03d}" for number in range(1, 12)}
+EXPECTED_PRODUCTION_ROOTS = ["contracts"]
+EXPECTED_EXCLUDED_PRODUCTION_GLOBS = [
+    "contracts/mock/**",
+    "contracts/testing/**",
+]
+EXPECTED_ALLOWED_NONPRODUCTION_GLOBS = [
+    "tests/**",
+    "contracts/mock/**",
+    "contracts/testing/**",
+]
+EXPECTED_CADENCE_ROOTS = ["contracts", "config", "migrations", "scripts"]
+EXPECTED_CADENCE_EXCLUDED_GLOBS = [
+    "config/block-clock-inventory.json",
+    "scripts/check_block_clock_inventory.py",
+    "tests/inventory/test_block_clock_inventory.py",
+]
+PLACEHOLDERS = {
+    "",
+    "-",
+    "n/a",
+    "na",
+    "none",
+    "not applicable",
+    "placeholder",
+    "skipped",
+    "tbd",
+    "todo",
+    "unknown",
+}
+SOURCE_SUFFIXES = {".json", ".md", ".py", ".vy"}
+DIRECT_PATTERN = re.compile(r"\bblock\s*\.\s*number\b")
+TIMESTAMP_PATTERN = re.compile(r"\bblock\s*\.\s*timestamp\b")
+FUNCTION_PATTERN = re.compile(r"^\s*def\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(")
+IMPORT_PATTERN = re.compile(
+    r"^\s*(?:from|import)\s+([A-Za-z_][A-Za-z0-9_./]*)", re.MULTILINE
+)
+SECONDS_IDENTIFIER_PATTERN = re.compile(
+    r"\b[A-Za-z_][A-Za-z0-9_]*_IN_SECONDS\b"
+)
+CADENCE_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
+    (
+        "block-unit-identifier",
+        re.compile(r"\b[A-Za-z_][A-Za-z0-9_]*BLOCKS[A-Za-z0-9_]*\b"),
+    ),
+    (
+        "reviewed-cadence-identifier",
+        re.compile(
+            r"\b(?:ONE_DAY|staleBlocks|numBlocksPerInterval|ripePerBlock|"
+            r"increasePerDangerBlock)\b"
+        ),
+    ),
+    (
+        "cadence-comment",
+        re.compile(
+            r"(?:\b(?:Base|Robinhood)\b.{0,80}\bcadence\b|"
+            r"\b\d+\s*(?:s|seconds?)\s*/\s*block\b|"
+            r"\bblocks?\s+per\s+(?:day|hour|interval)\b|"
+            r"\bper[- ]block\b)",
+            re.IGNORECASE,
+        ),
+    ),
+)
+
+
+@dataclass(frozen=True)
+class Finding:
+    code: str
+    domain: str
+    path: str = "-"
+    function: str = "-"
+    line: int = 0
+    snippet: str = "-"
+    candidate: str = "UNMAPPED"
+    expected: str = "-"
+    actual: str = "-"
+    remediation: str = "obtain semantic review before updating the inventory"
+
+    def render(self) -> str:
+        snippet = json.dumps(self.snippet, ensure_ascii=True)
+        remediation = json.dumps(self.remediation, ensure_ascii=True)
+        return (
+            f"CLOCK_INVENTORY_FAIL code={self.code} domain={self.domain} "
+            f"path={self.path} function={self.function} line={self.line} "
+            f"candidate={self.candidate} expected={self.expected} "
+            f"actual={self.actual} snippet={snippet} remediation={remediation}"
+        )
+
+
+@dataclass(frozen=True)
+class Occurrence:
+    path: str
+    function: str
+    normalized_expression: str
+    ordinal: int
+    line: int
+    column: int
+    snippet: str
+
+    @property
+    def key(self) -> tuple[str, str, str, int]:
+        return (
+            self.path,
+            self.function,
+            self.normalized_expression,
+            self.ordinal,
+        )
+
+
+@dataclass(frozen=True)
+class Candidate:
+    path: str
+    function: str
+    pattern: str
+    matched_text: str
+    normalized_snippet: str
+    ordinal: int
+    line: int
+    classification: str
+
+    @property
+    def key(self) -> tuple[str, str, str, str, str, int]:
+        return (
+            self.path,
+            self.function,
+            self.pattern,
+            self.matched_text,
+            self.normalized_snippet,
+            self.ordinal,
+        )
+
+
+@dataclass
+class CheckResult:
+    findings: list[Finding]
+    success_lines: list[str]
+
+    @property
+    def ok(self) -> bool:
+        return not self.findings
+
+    @property
+    def output(self) -> str:
+        lines = (
+            self.success_lines
+            if self.ok
+            else [finding.render() for finding in sorted(self.findings, key=_finding_key)]
+        )
+        return "\n".join(lines)
+
+
+def _finding_key(finding: Finding) -> tuple[Any, ...]:
+    return (
+        finding.code,
+        finding.domain,
+        finding.path,
+        finding.function,
+        finding.line,
+        finding.candidate,
+        finding.snippet,
+    )
+
+
+def _normalize_whitespace(value: str) -> str:
+    return " ".join(value.strip().split())
+
+
+def _matches_glob(path: str, pattern: str) -> bool:
+    if pattern.endswith("/**") and (
+        path == pattern[:-3] or path.startswith(pattern[:-2])
+    ):
+        return True
+    return fnmatch.fnmatchcase(path, pattern) or PurePosixPath(path).match(pattern)
+
+
+def classify_path(
+    path: str,
+    production_roots: Sequence[str],
+    excluded_production_globs: Sequence[str],
+) -> str:
+    if _matches_glob(path, "contracts/mock/**"):
+        return "mock"
+    if _matches_glob(path, "contracts/testing/**"):
+        return "testing"
+    if _matches_glob(path, "tests/**"):
+        return "test"
+    for root in production_roots:
+        normalized_root = root.rstrip("/")
+        if path == normalized_root or path.startswith(f"{normalized_root}/"):
+            if any(_matches_glob(path, glob) for glob in excluded_production_globs):
+                return "excluded"
+            return "production"
+    if path.endswith(".vy"):
+        return "unclassified"
+    if path.startswith("config/"):
+        return "config"
+    if path.startswith("migrations/"):
+        return "migration"
+    if path.startswith("scripts/"):
+        return "tooling"
+    return "other"
+
+
+def _iter_files(root: Path, relative_roots: Iterable[str]) -> list[Path]:
+    files: set[Path] = set()
+    for relative_root in relative_roots:
+        base = root / relative_root
+        if base.is_file():
+            files.add(base)
+        elif base.is_dir():
+            for candidate in base.rglob("*"):
+                if candidate.is_file() and not any(
+                    part in {".git", ".hypothesis", ".pytest_cache", ".venv", "__pycache__", "out"}
+                    for part in candidate.relative_to(root).parts
+                ):
+                    files.add(candidate)
+    return sorted(files, key=lambda path: path.relative_to(root).as_posix())
+
+
+def _read_text(path: Path) -> str:
+    return path.read_text(encoding="utf-8")
+
+
+def _line_functions(lines: Sequence[str]) -> list[str]:
+    current = "<module>"
+    functions: list[str] = []
+    for line in lines:
+        match = FUNCTION_PATTERN.match(line)
+        if match:
+            current = match.group(1)
+        functions.append(current)
+    return functions
+
+
+def _scan_expression_files(
+    root: Path,
+    paths: Iterable[Path],
+    pattern: re.Pattern[str],
+) -> list[Occurrence]:
+    occurrences: list[Occurrence] = []
+    ordinals: dict[tuple[str, str, str], int] = {}
+    for path in sorted(paths, key=lambda item: item.relative_to(root).as_posix()):
+        relative = path.relative_to(root).as_posix()
+        lines = _read_text(path).splitlines()
+        functions = _line_functions(lines)
+        for line_number, (line, function) in enumerate(zip(lines, functions), start=1):
+            for match in pattern.finditer(line):
+                normalized = _normalize_whitespace(match.group(0))
+                ordinal_key = (relative, function, normalized)
+                ordinal = ordinals.get(ordinal_key, 0) + 1
+                ordinals[ordinal_key] = ordinal
+                occurrences.append(
+                    Occurrence(
+                        path=relative,
+                        function=function,
+                        normalized_expression=normalized,
+                        ordinal=ordinal,
+                        line=line_number,
+                        column=match.start() + 1,
+                        snippet=_normalize_whitespace(line),
+                    )
+                )
+    return occurrences
+
+
+def _scan_fixed_counts(paths: Iterable[Path], needle: str) -> tuple[int, int, int]:
+    occurrences = 0
+    matching_lines = 0
+    matching_files = 0
+    for path in paths:
+        text = _read_text(path)
+        file_occurrences = text.count(needle)
+        if file_occurrences:
+            matching_files += 1
+            occurrences += file_occurrences
+            matching_lines += sum(1 for line in text.splitlines() if needle in line)
+    return occurrences, matching_lines, matching_files
+
+
+def _candidate_from_record(record: Mapping[str, Any]) -> tuple[str, str, str, str, str, int]:
+    return (
+        str(record.get("path", "")),
+        str(record.get("function", "")),
+        str(record.get("pattern", "")),
+        str(record.get("matchedText", "")),
+        str(record.get("normalizedSnippet", "")),
+        int(record.get("ordinalInFunction", 0)),
+    )
+
+
+def _scan_candidates(
+    root: Path,
+    paths: Iterable[Path],
+    production_roots: Sequence[str],
+    excluded_production_globs: Sequence[str],
+    excluded_globs: Sequence[str],
+) -> list[Candidate]:
+    candidates: list[Candidate] = []
+    ordinals: dict[tuple[str, str, str, str, str], int] = {}
+    for path in sorted(paths, key=lambda item: item.relative_to(root).as_posix()):
+        relative = path.relative_to(root).as_posix()
+        if path.suffix not in SOURCE_SUFFIXES or any(
+            _matches_glob(relative, glob) for glob in excluded_globs
+        ):
+            continue
+        lines = _read_text(path).splitlines()
+        functions = _line_functions(lines)
+        classification = classify_path(
+            relative, production_roots, excluded_production_globs
+        )
+        for line_number, (line, function) in enumerate(zip(lines, functions), start=1):
+            normalized_snippet = _normalize_whitespace(line)
+            for pattern_name, pattern in CADENCE_PATTERNS:
+                for match in pattern.finditer(line):
+                    matched_text = _normalize_whitespace(match.group(0))
+                    key = (
+                        relative,
+                        function,
+                        pattern_name,
+                        matched_text,
+                        normalized_snippet,
+                    )
+                    ordinal = ordinals.get(key, 0) + 1
+                    ordinals[key] = ordinal
+                    candidates.append(
+                        Candidate(
+                            path=relative,
+                            function=function,
+                            pattern=pattern_name,
+                            matched_text=matched_text,
+                            normalized_snippet=normalized_snippet,
+                            ordinal=ordinal,
+                            line=line_number,
+                            classification=classification,
+                        )
+                    )
+    return candidates
+
+
+def _scan_seconds_candidates(
+    root: Path,
+    paths: Iterable[Path],
+    production_roots: Sequence[str],
+    excluded_production_globs: Sequence[str],
+    excluded_globs: Sequence[str],
+) -> list[Candidate]:
+    candidates: list[Candidate] = []
+    ordinals: dict[tuple[str, str, str, str], int] = {}
+    for path in sorted(paths, key=lambda item: item.relative_to(root).as_posix()):
+        relative = path.relative_to(root).as_posix()
+        if path.suffix not in SOURCE_SUFFIXES or any(
+            _matches_glob(relative, glob) for glob in excluded_globs
+        ):
+            continue
+        lines = _read_text(path).splitlines()
+        functions = _line_functions(lines)
+        classification = classify_path(
+            relative, production_roots, excluded_production_globs
+        )
+        for line_number, (line, function) in enumerate(zip(lines, functions), start=1):
+            normalized_snippet = _normalize_whitespace(line)
+            for match in SECONDS_IDENTIFIER_PATTERN.finditer(line):
+                matched_text = match.group(0)
+                key = (relative, function, matched_text, normalized_snippet)
+                ordinal = ordinals.get(key, 0) + 1
+                ordinals[key] = ordinal
+                candidates.append(
+                    Candidate(
+                        path=relative,
+                        function=function,
+                        pattern="seconds-unit-identifier",
+                        matched_text=matched_text,
+                        normalized_snippet=normalized_snippet,
+                        ordinal=ordinal,
+                        line=line_number,
+                        classification=classification,
+                    )
+                )
+    return candidates
+
+
+def _record_key(record: Mapping[str, Any]) -> tuple[str, str, str, int]:
+    return (
+        str(record.get("path", "")),
+        str(record.get("function", "")),
+        str(record.get("normalizedExpression", "")),
+        int(record.get("ordinalInFunction", 0)),
+    )
+
+
+def _placeholder(value: Any) -> bool:
+    return not isinstance(value, str) or value.strip().lower() in PLACEHOLDERS
+
+
+def _validate_semantic_review(
+    record: Mapping[str, Any],
+    domain: str,
+    candidate: str,
+    findings: list[Finding],
+) -> None:
+    review = record.get("semanticReview")
+    if not isinstance(review, Mapping):
+        findings.append(
+            Finding(
+                code="INV-SCHEMA-REVIEW",
+                domain=domain,
+                path=str(record.get("path", "-")),
+                candidate=candidate,
+                actual="missing",
+                remediation="add the immutable reviewed owner, status, and commit",
+            )
+        )
+        return
+    for field in ("owner", "status", "commit"):
+        value = review.get(field)
+        invalid = _placeholder(value)
+        if field == "commit" and isinstance(value, str):
+            invalid = invalid or re.fullmatch(r"[0-9a-f]{40}", value) is None
+        if invalid:
+            findings.append(
+                Finding(
+                    code="INV-SCHEMA-PLACEHOLDER",
+                    domain=domain,
+                    path=str(record.get("path", "-")),
+                    candidate=candidate,
+                    expected=f"reviewed-{field}",
+                    actual=json.dumps(value, sort_keys=True),
+                    remediation="obtain the named semantic owner's review; do not self-approve",
+                )
+            )
+    status = str(review.get("status", "")).strip().lower()
+    if status == "ignore":
+        justification = review.get("justification")
+        if _placeholder(justification):
+            findings.append(
+                Finding(
+                    code="INV-SCHEMA-IGNORE",
+                    domain=domain,
+                    path=str(record.get("path", "-")),
+                    candidate=candidate,
+                    actual="ignore-without-reviewed-justification",
+                    remediation="obtain semantic-owner review and a non-placeholder justification",
+                )
+            )
+    elif status != "reviewed":
+        findings.append(
+            Finding(
+                code="INV-SCHEMA-STATUS",
+                domain=domain,
+                path=str(record.get("path", "-")),
+                candidate=candidate,
+                expected="reviewed",
+                actual=status or "missing",
+                remediation="obtain semantic-owner review; skipped or invented statuses are invalid",
+            )
+        )
+
+
+def _load_inventory(path: Path) -> tuple[dict[str, Any] | None, list[Finding]]:
+    try:
+        raw = path.read_text(encoding="utf-8")
+    except OSError as exc:
+        return None, [
+            Finding(
+                code="INV-SCHEMA-READ",
+                domain="schema",
+                path=path.as_posix(),
+                actual=type(exc).__name__,
+                remediation="restore the reviewed inventory file",
+            )
+        ]
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        return None, [
+            Finding(
+                code="INV-SCHEMA-JSON",
+                domain="schema",
+                path=path.as_posix(),
+                line=exc.lineno,
+                actual=exc.msg.replace(" ", "_"),
+                remediation="repair JSON without changing semantic classifications",
+            )
+        ]
+    if not isinstance(data, dict):
+        return None, [
+            Finding(
+                code="INV-SCHEMA-TYPE",
+                domain="schema",
+                path=path.as_posix(),
+                expected="object",
+                actual=type(data).__name__,
+            )
+        ]
+    return data, []
+
+
+def _validate_schema(data: Mapping[str, Any]) -> list[Finding]:
+    findings: list[Finding] = []
+    version = data.get("schemaVersion")
+    if version != EXPECTED_SCHEMA_VERSION:
+        findings.append(
+            Finding(
+                code="INV-SCHEMA-VERSION",
+                domain="schema",
+                expected=str(EXPECTED_SCHEMA_VERSION),
+                actual=str(version),
+                remediation="use a separately reviewed checker/schema migration",
+            )
+        )
+        return findings
+    expected_counts = data.get("expectedProductionCounts")
+    actual_counts = (
+        expected_counts.get("occurrences") if isinstance(expected_counts, Mapping) else None,
+        expected_counts.get("lines") if isinstance(expected_counts, Mapping) else None,
+        expected_counts.get("files") if isinstance(expected_counts, Mapping) else None,
+    )
+    if actual_counts != EXPECTED_PRODUCTION_COUNTS:
+        findings.append(
+            Finding(
+                code="INV-SCHEMA-BASELINE",
+                domain="schema",
+                expected="/".join(map(str, EXPECTED_PRODUCTION_COUNTS)),
+                actual="/".join(map(str, actual_counts)),
+                remediation="reconcile source drift with the semantic owner; do not update counts mechanically",
+            )
+        )
+    collections = {
+        "direct": data.get("directOccurrences"),
+        "indirect": data.get("indirectCadence"),
+        "timestamp": data.get("timestampContext"),
+        "cadence": data.get("cadenceCandidates"),
+        "classification": data.get("vyperPathClassifications"),
+    }
+    for domain, value in collections.items():
+        if not isinstance(value, list) or not value:
+            findings.append(
+                Finding(
+                    code="INV-SCHEMA-COLLECTION",
+                    domain=domain,
+                    expected="nonempty-list",
+                    actual=type(value).__name__,
+                )
+            )
+    if findings:
+        return findings
+    expected_path_config = (
+        EXPECTED_PRODUCTION_ROOTS,
+        EXPECTED_EXCLUDED_PRODUCTION_GLOBS,
+        EXPECTED_ALLOWED_NONPRODUCTION_GLOBS,
+        EXPECTED_CADENCE_ROOTS,
+        EXPECTED_CADENCE_EXCLUDED_GLOBS,
+    )
+    actual_path_config = (
+        data.get("productionRoots"),
+        data.get("excludedProductionGlobs"),
+        data.get("allowedNonProductionGlobs"),
+        data.get("cadenceRoots"),
+        data.get("cadenceExcludedGlobs"),
+    )
+    if actual_path_config != expected_path_config:
+        findings.append(
+            Finding(
+                code="INV-SCHEMA-PATH-CONFIG",
+                domain="classification",
+                expected=json.dumps(expected_path_config, separators=(",", ":")),
+                actual=json.dumps(actual_path_config, separators=(",", ":")),
+                remediation="restore the reviewed path roots and exclusions; paths may not evade discovery",
+            )
+        )
+    expected_pattern_config = [
+        {"name": name, "expression": pattern.pattern}
+        for name, pattern in CADENCE_PATTERNS
+    ]
+    if data.get("cadencePatterns") != expected_pattern_config:
+        findings.append(
+            Finding(
+                code="INV-SCHEMA-PATTERNS",
+                domain="indirect",
+                expected="reviewed-pattern-definitions",
+                actual="changed",
+                remediation="obtain semantic and tooling review before changing cadence discovery",
+            )
+        )
+
+    direct_records = data["directOccurrences"]
+    direct_keys: dict[tuple[str, str, str, int], list[Mapping[str, Any]]] = {}
+    for record in direct_records:
+        if not isinstance(record, Mapping):
+            findings.append(
+                Finding(code="INV-SCHEMA-RECORD", domain="direct", actual=type(record).__name__)
+            )
+            continue
+        key = _record_key(record)
+        direct_keys.setdefault(key, []).append(record)
+        _validate_semantic_review(record, "direct", str(record.get("id", "UNMAPPED")), findings)
+    for key, records in direct_keys.items():
+        if len(records) != 1:
+            findings.append(
+                Finding(
+                    code="INV-SCHEMA-DUPLICATE",
+                    domain="direct",
+                    path=key[0],
+                    function=key[1],
+                    candidate=",".join(sorted(str(record.get("id")) for record in records)),
+                    expected="1",
+                    actual=str(len(records)),
+                )
+            )
+
+    bn_ids = {str(record.get("id")) for record in direct_records if isinstance(record, Mapping)}
+    cad_ids = {
+        str(record.get("id"))
+        for record in data["indirectCadence"]
+        if isinstance(record, Mapping)
+    }
+    ts_ids = {
+        str(record.get("id"))
+        for record in data["timestampContext"]
+        if isinstance(record, Mapping)
+    }
+    for domain, expected, actual in (
+        ("direct", EXPECTED_BN_IDS, bn_ids),
+        ("indirect", EXPECTED_CAD_IDS, cad_ids),
+        ("timestamp", EXPECTED_TS_IDS, ts_ids),
+    ):
+        if actual != expected:
+            findings.append(
+                Finding(
+                    code="INV-SCHEMA-ID-SET",
+                    domain=domain,
+                    expected=",".join(sorted(expected)),
+                    actual=",".join(sorted(actual)),
+                    remediation="reconcile stable IDs with the reviewed Track 3 inventory; never renumber",
+                )
+            )
+    for domain, records in (
+        ("indirect", data["indirectCadence"]),
+        ("timestamp", data["timestampContext"]),
+        ("cadence", data["cadenceCandidates"]),
+        ("classification", data["vyperPathClassifications"]),
+    ):
+        for record in records:
+            if isinstance(record, Mapping):
+                _validate_semantic_review(
+                    record, domain, str(record.get("id", record.get("semanticId", "UNMAPPED"))), findings
+                )
+    cad_site_keys = {
+        _candidate_from_record(site)
+        for record in data["indirectCadence"]
+        if isinstance(record, Mapping)
+        for site in record.get("sites", [])
+        if isinstance(site, Mapping)
+    }
+    reviewed_cad_keys = {
+        _candidate_from_record(record)
+        for record in data["cadenceCandidates"]
+        if isinstance(record, Mapping) and record.get("semanticId") == "CAD-001"
+    }
+    if cad_site_keys != reviewed_cad_keys:
+        findings.append(
+            Finding(
+                code="INV-SCHEMA-CAD-SITES",
+                domain="indirect",
+                candidate="CAD-001",
+                expected=str(len(reviewed_cad_keys)),
+                actual=str(len(cad_site_keys)),
+                remediation="restore the reviewed CAD-001 site mapping; do not suppress cadence candidates",
+            )
+        )
+    path_records = [
+        record
+        for record in data["vyperPathClassifications"]
+        if isinstance(record, Mapping)
+    ]
+    path_names = [str(record.get("path", "")) for record in path_records]
+    if len(path_names) != len(set(path_names)) or any(not name for name in path_names):
+        findings.append(
+            Finding(
+                code="INV-SCHEMA-PATH-RECORD",
+                domain="classification",
+                expected="unique-nonempty-paths",
+                actual=str(len(path_names)),
+            )
+        )
+    for record in path_records:
+        classification = record.get("classification")
+        content_hash = record.get("contentSha256")
+        if classification not in {"production", "mock", "testing", "test"} or not (
+            isinstance(content_hash, str)
+            and re.fullmatch(r"[0-9a-f]{64}", content_hash)
+        ):
+            findings.append(
+                Finding(
+                    code="INV-SCHEMA-PATH-RECORD",
+                    domain="classification",
+                    path=str(record.get("path", "-")),
+                    expected="reviewed-classification+sha256",
+                    actual=f"{classification}:{content_hash}",
+                )
+            )
+    return findings
+
+
+def _current_vyper_classifications(
+    root: Path,
+    production_roots: Sequence[str],
+    excluded_production_globs: Sequence[str],
+) -> dict[str, dict[str, str]]:
+    records: dict[str, dict[str, str]] = {}
+    for path in _iter_files(root, ["."]):
+        if path.suffix != ".vy":
+            continue
+        relative = path.relative_to(root).as_posix()
+        records[relative] = {
+            "classification": classify_path(
+                relative, production_roots, excluded_production_globs
+            ),
+            "contentSha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+        }
+    return records
+
+
+def _check_path_classifications(
+    root: Path,
+    records: Sequence[Mapping[str, Any]],
+    production_roots: Sequence[str],
+    excluded_production_globs: Sequence[str],
+) -> list[Finding]:
+    findings: list[Finding] = []
+    expected = {
+        str(record.get("path")): {
+            "classification": str(record.get("classification")),
+            "contentSha256": str(record.get("contentSha256")),
+        }
+        for record in records
+    }
+    actual = _current_vyper_classifications(
+        root, production_roots, excluded_production_globs
+    )
+    missing = set(expected) - set(actual)
+    added = set(actual) - set(expected)
+    consumed_missing: set[str] = set()
+    consumed_added: set[str] = set()
+    for old_path in sorted(missing):
+        old_hash = expected[old_path]["contentSha256"]
+        matches = [
+            new_path
+            for new_path in sorted(added)
+            if actual[new_path]["contentSha256"] == old_hash
+        ]
+        if len(matches) != 1:
+            continue
+        new_path = matches[0]
+        consumed_missing.add(old_path)
+        consumed_added.add(new_path)
+        findings.append(
+            Finding(
+                code="INV-PATH-MOVED",
+                domain="classification",
+                path=new_path,
+                snippet=f"{old_path}->{new_path}",
+                expected=expected[old_path]["classification"],
+                actual=actual[new_path]["classification"],
+                remediation="obtain path-classification review before moving the Vyper source",
+            )
+        )
+    for path in sorted(added - consumed_added):
+        findings.append(
+            Finding(
+                code="INV-PATH-NEW",
+                domain="classification",
+                path=path,
+                actual=actual[path]["classification"],
+                remediation="obtain path-classification review before adding the Vyper source",
+            )
+        )
+    for path in sorted(missing - consumed_missing):
+        findings.append(
+            Finding(
+                code="INV-PATH-MISSING",
+                domain="classification",
+                path=path,
+                expected=expected[path]["classification"],
+                actual="missing",
+                remediation="obtain path-classification review before removing the Vyper source",
+            )
+        )
+    for path in sorted(set(expected) & set(actual)):
+        if expected[path]["classification"] != actual[path]["classification"]:
+            findings.append(
+                Finding(
+                    code="INV-PATH-CLASSIFICATION",
+                    domain="classification",
+                    path=path,
+                    expected=expected[path]["classification"],
+                    actual=actual[path]["classification"],
+                )
+            )
+    return findings
+
+
+def _production_vyper_files(
+    root: Path,
+    production_roots: Sequence[str],
+    excluded_production_globs: Sequence[str],
+) -> tuple[list[Path], list[Finding]]:
+    production: list[Path] = []
+    findings: list[Finding] = []
+    for path in _iter_files(root, ["."]):
+        if path.suffix != ".vy":
+            continue
+        relative = path.relative_to(root).as_posix()
+        classification = classify_path(
+            relative, production_roots, excluded_production_globs
+        )
+        if classification == "production":
+            production.append(path)
+        elif classification == "unclassified":
+            findings.append(
+                Finding(
+                    code="INV-PATH-UNCLASSIFIED",
+                    domain="classification",
+                    path=relative,
+                    actual="vyper",
+                    remediation="obtain path-classification review before adding or moving the contract",
+                )
+            )
+    return sorted(production), findings
+
+
+def _check_imports(root: Path, production_paths: Sequence[Path]) -> list[Finding]:
+    findings: list[Finding] = []
+    for path in production_paths:
+        relative = path.relative_to(root).as_posix()
+        text = _read_text(path)
+        lines = text.splitlines()
+        for match in IMPORT_PATTERN.finditer(text):
+            target = match.group(1).replace("/", ".")
+            if "contracts.mock" not in target and "contracts.testing" not in target:
+                continue
+            line = text.count("\n", 0, match.start()) + 1
+            findings.append(
+                Finding(
+                    code="INV-IMPORT-PROD-NONPROD",
+                    domain="import",
+                    path=relative,
+                    line=line,
+                    snippet=_normalize_whitespace(lines[line - 1]),
+                    actual=target,
+                    remediation="remove the production dependency on mock/testing code and obtain review",
+                )
+            )
+    return findings
+
+
+def _compare_occurrences(
+    actual: Sequence[Occurrence],
+    expected_records: Sequence[Mapping[str, Any]],
+    domain: str,
+    new_code: str,
+    missing_code: str,
+    move_code: str,
+) -> list[Finding]:
+    findings: list[Finding] = []
+    actual_by_key: dict[tuple[str, str, str, int], list[Occurrence]] = {}
+    for occurrence in actual:
+        actual_by_key.setdefault(occurrence.key, []).append(occurrence)
+    expected_by_key: dict[tuple[str, str, str, int], list[Mapping[str, Any]]] = {}
+    for record in expected_records:
+        expected_by_key.setdefault(_record_key(record), []).append(record)
+
+    for key in sorted(actual_by_key):
+        occurrences = actual_by_key[key]
+        records = expected_by_key.get(key, [])
+        if len(occurrences) != 1 or len(records) != 1:
+            occurrence = occurrences[0]
+            if not records:
+                findings.append(
+                    Finding(
+                        code=new_code,
+                        domain=domain,
+                        path=occurrence.path,
+                        function=occurrence.function,
+                        line=occurrence.line,
+                        snippet=occurrence.snippet,
+                        actual=occurrence.normalized_expression,
+                    )
+                )
+            elif len(occurrences) != 1 or len(records) != 1:
+                findings.append(
+                    Finding(
+                        code="INV-MAPPING-AMBIGUOUS",
+                        domain=domain,
+                        path=occurrence.path,
+                        function=occurrence.function,
+                        line=occurrence.line,
+                        snippet=occurrence.snippet,
+                        candidate=",".join(
+                            sorted(str(record.get("id", "UNMAPPED")) for record in records)
+                        ),
+                        expected="1:1",
+                        actual=f"{len(records)}:{len(occurrences)}",
+                    )
+                )
+            continue
+        record = records[0]
+        occurrence = occurrences[0]
+        reviewed_line = int(record.get("reviewedLine", 0))
+        if reviewed_line != occurrence.line:
+            findings.append(
+                Finding(
+                    code=move_code,
+                    domain=domain,
+                    path=occurrence.path,
+                    function=occurrence.function,
+                    line=occurrence.line,
+                    snippet=occurrence.snippet,
+                    candidate=str(record.get("id", "UNMAPPED")),
+                    expected=str(reviewed_line),
+                    actual=str(occurrence.line),
+                    remediation="obtain semantic review of the moved occurrence; line remains diagnostic, not identity",
+                )
+            )
+
+    for key in sorted(expected_by_key):
+        if key in actual_by_key:
+            continue
+        record = expected_by_key[key][0]
+        findings.append(
+            Finding(
+                code=missing_code,
+                domain=domain,
+                path=key[0],
+                function=key[1],
+                line=int(record.get("reviewedLine", 0)),
+                snippet=str(record.get("reviewedSnippet", key[2])),
+                candidate=str(record.get("id", "UNMAPPED")),
+                expected=key[2],
+                actual="missing",
+            )
+        )
+    return findings
+
+
+def _compare_candidates(
+    actual: Sequence[Candidate],
+    expected_records: Sequence[Mapping[str, Any]],
+    domain: str,
+    new_code: str,
+    missing_code: str,
+    move_code: str,
+) -> list[Finding]:
+    findings: list[Finding] = []
+    actual_by_key = {candidate.key: candidate for candidate in actual}
+    expected_by_key: dict[tuple[str, str, str, str, str, int], Mapping[str, Any]] = {}
+    for record in expected_records:
+        key = _candidate_from_record(record)
+        if key in expected_by_key:
+            findings.append(
+                Finding(
+                    code="INV-SCHEMA-DUPLICATE",
+                    domain=domain,
+                    path=key[0],
+                    function=key[1],
+                    snippet=key[4],
+                )
+            )
+        expected_by_key[key] = record
+    for key in sorted(actual_by_key):
+        candidate = actual_by_key[key]
+        record = expected_by_key.get(key)
+        if record is None:
+            findings.append(
+                Finding(
+                    code=new_code,
+                    domain=domain,
+                    path=candidate.path,
+                    function=candidate.function,
+                    line=candidate.line,
+                    snippet=candidate.normalized_snippet,
+                    actual=(
+                        f"{candidate.classification}:"
+                        f"{candidate.pattern}:{candidate.matched_text}"
+                    ),
+                    remediation=(
+                        "obtain probe/mock review before inventorying this non-production cadence dependency"
+                        if candidate.classification in {"mock", "testing", "test"}
+                        else "obtain semantic-owner review before inventorying this cadence dependency"
+                    ),
+                )
+            )
+            continue
+        reviewed_line = int(record.get("reviewedLine", 0))
+        if reviewed_line != candidate.line:
+            findings.append(
+                Finding(
+                    code=move_code,
+                    domain=domain,
+                    path=candidate.path,
+                    function=candidate.function,
+                    line=candidate.line,
+                    snippet=candidate.normalized_snippet,
+                    candidate=str(record.get("semanticId", record.get("id", "UNMAPPED"))),
+                    expected=str(reviewed_line),
+                    actual=str(candidate.line),
+                )
+            )
+    for key in sorted(expected_by_key):
+        if key in actual_by_key:
+            continue
+        record = expected_by_key[key]
+        findings.append(
+            Finding(
+                code=missing_code,
+                domain=domain,
+                path=key[0],
+                function=key[1],
+                line=int(record.get("reviewedLine", 0)),
+                snippet=key[4],
+                candidate=str(record.get("semanticId", record.get("id", "UNMAPPED"))),
+                expected=f"{key[2]}:{key[3]}",
+                actual="missing",
+            )
+        )
+    return findings
+
+
+def _mixed_clock_functions(
+    root: Path, production_paths: Sequence[Path]
+) -> list[tuple[str, str]]:
+    mixed: list[tuple[str, str]] = []
+    for path in production_paths:
+        relative = path.relative_to(root).as_posix()
+        text = _read_text(path)
+        lines = text.splitlines()
+        functions = _line_functions(lines)
+        bodies: dict[str, list[str]] = {}
+        for function, line in zip(functions, lines):
+            bodies.setdefault(function, []).append(line)
+        for function, body_lines in bodies.items():
+            body = "\n".join(body_lines)
+            if DIRECT_PATTERN.search(body) and TIMESTAMP_PATTERN.search(body):
+                mixed.append((relative, function))
+    return sorted(mixed)
+
+
+def _nonproduction_counts(
+    root: Path,
+    all_files: Sequence[Path],
+    production_roots: Sequence[str],
+    excluded_production_globs: Sequence[str],
+) -> dict[str, tuple[int, int, int]]:
+    grouped: dict[str, list[Path]] = {"mock": [], "testing": [], "test": []}
+    for path in all_files:
+        relative = path.relative_to(root).as_posix()
+        classification = classify_path(
+            relative, production_roots, excluded_production_globs
+        )
+        if classification in grouped and path.suffix in SOURCE_SUFFIXES:
+            grouped[classification].append(path)
+    return {
+        classification: _scan_fixed_counts(paths, "block.number")
+        for classification, paths in grouped.items()
+    }
+
+
+def check_repository(
+    repository_root: Path | str,
+    inventory_path: Path | str | None = None,
+) -> CheckResult:
+    root = Path(repository_root).resolve()
+    inventory = (
+        Path(inventory_path).resolve()
+        if inventory_path is not None
+        else root / "config" / "block-clock-inventory.json"
+    )
+    data, findings = _load_inventory(inventory)
+    if data is None:
+        return CheckResult(findings=findings, success_lines=[])
+    findings.extend(_validate_schema(data))
+    if findings:
+        return CheckResult(findings=findings, success_lines=[])
+
+    production_roots = [str(item) for item in data["productionRoots"]]
+    excluded_production_globs = [
+        str(item) for item in data["excludedProductionGlobs"]
+    ]
+    findings.extend(
+        _check_path_classifications(
+            root,
+            data["vyperPathClassifications"],
+            production_roots,
+            excluded_production_globs,
+        )
+    )
+    production_paths, classification_findings = _production_vyper_files(
+        root, production_roots, excluded_production_globs
+    )
+    findings.extend(classification_findings)
+    findings.extend(_check_imports(root, production_paths))
+
+    direct_actual = _scan_expression_files(
+        root, production_paths, DIRECT_PATTERN
+    )
+    fixed_counts = _scan_fixed_counts(production_paths, "block.number")
+    expected_counts = data["expectedProductionCounts"]
+    active_expected = (
+        int(expected_counts["occurrences"]),
+        int(expected_counts["lines"]),
+        int(expected_counts["files"]),
+    )
+    if fixed_counts != active_expected:
+        findings.append(
+            Finding(
+                code="INV-DIRECT-COUNT",
+                domain="direct",
+                expected="/".join(map(str, active_expected)),
+                actual="/".join(map(str, fixed_counts)),
+                remediation="reconcile the fixed-string source delta with protocol/security",
+            )
+        )
+    if len(direct_actual) != fixed_counts[0]:
+        first = next(
+            (
+                occurrence
+                for occurrence in direct_actual
+                if occurrence.normalized_expression != "block.number"
+            ),
+            direct_actual[0] if direct_actual else None,
+        )
+        findings.append(
+            Finding(
+                code="INV-PARSER-FIXED-DISAGREE",
+                domain="direct",
+                path=first.path if first else "-",
+                function=first.function if first else "-",
+                line=first.line if first else 0,
+                snippet=first.snippet if first else "-",
+                expected=str(fixed_counts[0]),
+                actual=str(len(direct_actual)),
+                remediation="repair discovery so the parser cannot suppress a fixed-string delta",
+            )
+        )
+    findings.extend(
+        _compare_occurrences(
+            direct_actual,
+            data["directOccurrences"],
+            "direct",
+            "INV-DIRECT-NEW",
+            "INV-DIRECT-MISSING",
+            "INV-DIRECT-MOVE",
+        )
+    )
+
+    timestamp_actual = _scan_expression_files(
+        root, production_paths, TIMESTAMP_PATTERN
+    )
+    timestamp_counts = _scan_fixed_counts(production_paths, "block.timestamp")
+    expected_timestamp_counts = data.get("expectedTimestampCounts", {})
+    timestamp_expected = (
+        int(expected_timestamp_counts.get("occurrences", -1)),
+        int(expected_timestamp_counts.get("lines", -1)),
+        int(expected_timestamp_counts.get("files", -1)),
+    )
+    if timestamp_expected != EXPECTED_TIMESTAMP_COUNTS:
+        findings.append(
+            Finding(
+                code="INV-SCHEMA-TIMESTAMP-BASELINE",
+                domain="timestamp",
+                expected="/".join(map(str, EXPECTED_TIMESTAMP_COUNTS)),
+                actual="/".join(map(str, timestamp_expected)),
+            )
+        )
+    if timestamp_counts != timestamp_expected:
+        findings.append(
+            Finding(
+                code="INV-TIMESTAMP-COUNT",
+                domain="timestamp",
+                expected="/".join(map(str, timestamp_expected)),
+                actual="/".join(map(str, timestamp_counts)),
+            )
+        )
+    findings.extend(
+        _compare_occurrences(
+            timestamp_actual,
+            data["timestampContext"],
+            "timestamp",
+            "INV-TIMESTAMP-NEW",
+            "INV-TIMESTAMP-MISSING",
+            "INV-TIMESTAMP-MOVE",
+        )
+    )
+
+    cadence_roots = [str(item) for item in data["cadenceRoots"]]
+    cadence_paths = _iter_files(root, cadence_roots)
+    cadence_excluded_globs = [
+        str(item) for item in data.get("cadenceExcludedGlobs", [])
+    ]
+    cadence_actual = _scan_candidates(
+        root,
+        cadence_paths,
+        production_roots,
+        excluded_production_globs,
+        cadence_excluded_globs,
+    )
+    findings.extend(
+        _compare_candidates(
+            cadence_actual,
+            data["cadenceCandidates"],
+            "indirect",
+            "INV-CADENCE-NEW",
+            "INV-CADENCE-MISSING",
+            "INV-CADENCE-MOVE",
+        )
+    )
+    seconds_actual = _scan_seconds_candidates(
+        root,
+        cadence_paths,
+        production_roots,
+        excluded_production_globs,
+        cadence_excluded_globs,
+    )
+    findings.extend(
+        _compare_candidates(
+            seconds_actual,
+            data.get("secondsUnitCandidates", []),
+            "timestamp-units",
+            "INV-SECONDS-UNIT-NEW",
+            "INV-SECONDS-UNIT-MISSING",
+            "INV-SECONDS-UNIT-MOVE",
+        )
+    )
+
+    actual_mixed = set(_mixed_clock_functions(root, production_paths))
+    expected_mixed = {
+        (str(record["path"]), str(record["function"]))
+        for record in data.get("allowedMixedClockFunctions", [])
+    }
+    for path, function in sorted(actual_mixed - expected_mixed):
+        findings.append(
+            Finding(
+                code="INV-MIXED-CLOCK-NEW",
+                domain="timestamp",
+                path=path,
+                function=function,
+                actual="NUMBER+timestamp",
+                remediation="obtain protocol/security review of the cross-domain dependency",
+            )
+        )
+    for path, function in sorted(expected_mixed - actual_mixed):
+        findings.append(
+            Finding(
+                code="INV-MIXED-CLOCK-MISSING",
+                domain="timestamp",
+                path=path,
+                function=function,
+                expected="reviewed-NUMBER+timestamp",
+                actual="missing",
+            )
+        )
+
+    all_files = _iter_files(root, ["."])
+    nonproduction = _nonproduction_counts(
+        root, all_files, production_roots, excluded_production_globs
+    )
+    nonproduction_cadence = {
+        classification: sum(
+            1
+            for candidate in cadence_actual
+            if candidate.classification == classification
+        )
+        for classification in ("mock", "testing", "test")
+    }
+    success_lines = [
+        (
+            "CLOCK_INVENTORY_OK "
+            f"schema={data['schemaVersion']} "
+            f"production_occurrences={fixed_counts[0]} "
+            f"production_lines={fixed_counts[1]} "
+            f"production_files={fixed_counts[2]} "
+            f"bn_ids={len(EXPECTED_BN_IDS)} "
+            f"bn_records={len(data['directOccurrences'])} "
+            f"indirect_ids={len(EXPECTED_CAD_IDS)} "
+            f"cadence_candidates={len(cadence_actual)} "
+            f"timestamp_ids={len(EXPECTED_TS_IDS)} "
+            f"timestamp_occurrences={timestamp_counts[0]}"
+        ),
+        (
+            "CLOCK_INVENTORY_NONPROD "
+            + " ".join(
+                (
+                    f"{classification}="
+                    f"{nonproduction[classification][0]}/"
+                    f"{nonproduction[classification][1]}/"
+                    f"{nonproduction[classification][2]}"
+                )
+                for classification in ("mock", "testing", "test")
+            )
+        ),
+        (
+            "CLOCK_INVENTORY_NONPROD_CADENCE "
+            + " ".join(
+                f"{classification}={nonproduction_cadence[classification]}"
+                for classification in ("mock", "testing", "test")
+            )
+        ),
+    ]
+    return CheckResult(findings=findings, success_lines=success_lines)
+
+
+def _parse_args(argv: Sequence[str]) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description="Validate the reviewed block-clock inventory"
+    )
+    parser.add_argument(
+        "--check",
+        action="store_true",
+        help="check the repository and exit nonzero on drift",
+    )
+    args = parser.parse_args(argv)
+    if not args.check:
+        parser.error("--check is required")
+    return args
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    _parse_args(sys.argv[1:] if argv is None else argv)
+    repository_root = Path(__file__).resolve().parents[1]
+    result = check_repository(repository_root)
+    print(result.output)
+    return 0 if result.ok else 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
