@@ -1,7 +1,8 @@
 # Track 6 S3 Lootbox Floor Implementation Record
 
-**Status:** Gate 1 owner-approved; Phase G inventory reconciliation committed;
-stopped at mandatory reviewer gate 2
+**Status:** Mandatory reviewer Gate 2 approved on 24 July 2026 for the exact
+reviewed branch head; owner-directed source integration is authorized, while
+all deployment and live-state gates remain open
 
 **Evidence date:** 24 July 2026
 
@@ -31,14 +32,21 @@ stopped at mandatory reviewer gate 2
 **Inventory reconciliation commit:**
 `51e5c5a47ac74083affb16516cd07dd8321c0fbb`
 
+**Gate 2 reviewed branch head:**
+`c823300c7af418a7b226093e3a9ddf1d970e1998`
+
+**Gate 2 integration baseline:**
+`127b4bf287bf63c5ed662d82fbf3db8bf66d06a3`
+
 **Branch:** `rh-track-6-s3-lootbox-floor`
 
 **Worktree:**
 `/Users/wigglez/dev/ripe-protocol-track-6-s3-lootbox-floor`
 
-This record covers Stage 1, its Gate 1 approval provenance, and Phase G under
-`docs/chains/rh/track-6-s3-lootbox-floor.md`. It is not a deployment approval,
-a Gate 2 approval, or a merge-readiness claim.
+This record covers Stage 1, its Gate 1 approval provenance, Phase G, and the
+independent Gate 2 integration review under
+`docs/chains/rh/track-6-s3-lootbox-floor.md`. It is not a deployment, registry,
+capability, configuration, verification, signing, or live-state approval.
 
 On 24 July 2026, after the independent reviewer re-reviewed the wording-only
 follow-up and reported no findings, the owner explicitly approved both:
@@ -840,7 +848,7 @@ same reviewed source/compiler/creation artifact. The reserved
 an onchain upgrade transaction. S6 still owns defaults and the parameter
 manifest.
 
-## Gate 1 resolution and Gate 2 remaining items
+## Gate 1 resolution, Gate 2 approval, and remaining deployment gates
 
 - The independent reviewer reproduced the Stage 1 evidence, reported no
   findings after the wording follow-up, and recommended Gate 1 approval.
@@ -848,9 +856,29 @@ manifest.
   `23697fa`, and `5c888e5`, authorizing Phase G inventory reconciliation.
 - Gate 1 approval provenance is committed as `db7ae89`; Phase G is committed
   as `51e5c5a`, and its ordered validation is green.
-- Mandatory reviewer Gate 2 remains open. This branch is not merge-ready until
-  an independent reviewer approves the complete branch, approval provenance,
-  reconciliation, tests, integrity evidence, and freshness evidence above.
+- On 24 July 2026, an independent final integration review inspected exact
+  branch head `c823300` against `rh` integration baseline `127b4bf`, including
+  every commit and changed file, owner-decision and Gate 1 provenance,
+  production source, generated ABI, artifact hashes, S1/S2 reconciliation,
+  historical-tree integrity, rollout analysis, and a current synthetic merge.
+- That review independently reran the required validation: 59 focused
+  Underscore tests, 91 SwitchboardCharlie tests, all 175 Lootbox tests, 57 S1
+  clock-profile tests, the clean S2 checker with production counts
+  `100/95/17` and 455 cadence candidates, all 60 inventory tests, and the full
+  suite with 2,722 passed and 142 deselected.
+- The same review regenerated a byte-identical `Lootbox.json` and independently
+  reproduced every recorded starting/new creation, runtime-template, Base
+  candidate, and Robinhood floor-isolation candidate byte count and SHA-256 /
+  Keccak-256 hash.
+- The merge base remained `f0bfd0f`; the current integration side had two
+  documentation-only commits, the S3 side had nine commits, their changed
+  paths were disjoint, and the synthetic merge was conflict-free.
+- No finding remained. The owner requested this final review and authorized
+  integration if ready; Mandatory reviewer Gate 2 is therefore approved for
+  exact reviewed branch head `c823300` plus this approval-record-only commit.
+  This paragraph's commit is the immutable Gate 2 provenance. Any later
+  production, test, ABI, inventory, or substantive evidence change reopens the
+  applicable gate.
 - Production-contract security/audit review remains open.
 - Track 7 migration ID, deployment graph, Base and Robinhood RipeHq/capability
   sequencing, manifests, and actual artifact assertions remain open.
@@ -862,8 +890,7 @@ manifest.
   separately scoped repository-hygiene task and are not S3 changes.
 - Every live deployment, registry, capability, configuration, verification,
   signing, and transaction approval remains open.
-- Owner merge and push remain open.
 
 No historical migration, defaults file, parameter report, dependency, CI file,
 unrelated ABI, or `docs/chains/rh-summary.md` changed. No live
-state-changing action, deployment, push, or merge was performed.
+state-changing action or deployment was performed by S3.
