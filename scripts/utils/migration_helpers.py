@@ -9,9 +9,11 @@ from eth_abi.abi import encode
 from eth_account import Account
 
 from config.network_profiles import (
+    get_profile,
     NetworkProfileError,
     Operation,
     VerifiedNetworkIdentity,
+    validate_verified_identity,
 )
 from scripts.utils import log
 
@@ -59,16 +61,17 @@ def get_account(
         raise NetworkProfileError(
             "H02_CHAIN_ID_MISMATCH", operation=operation
         )
-    if identity.operation is not operation:
-        raise NetworkProfileError(
-            "H02_CHAIN_ID_MISMATCH",
-            profile_id=identity.profile_id,
-            operation=operation,
-        )
+    profile = get_profile(identity.profile_id)
+    validate_verified_identity(
+        profile,
+        operation,
+        identity,
+        require_account=True,
+    )
     if not re.fullmatch(r"[A-Z][A-Z0-9_]*", account_name):
         raise NetworkProfileError(
             "H02_ACCOUNT_BACKEND_UNAPPROVED",
-            profile_id=identity.profile_id,
+            profile_id=profile.identity.profile_id,
             operation=operation,
         )
 
@@ -80,7 +83,7 @@ def get_account(
         ):
             raise NetworkProfileError(
                 "H02_ACCOUNT_BACKEND_UNAPPROVED",
-                profile_id=identity.profile_id,
+                profile_id=profile.identity.profile_id,
                 operation=operation,
             )
         account_key = private_key
@@ -88,7 +91,7 @@ def get_account(
         if private_key is not None or operation is not Operation.MIGRATION_FORK:
             raise NetworkProfileError(
                 "H02_ACCOUNT_BACKEND_UNAPPROVED",
-                profile_id=identity.profile_id,
+                profile_id=profile.identity.profile_id,
                 operation=operation,
             )
         env_name = f"{account_name}_PRIVATE_KEY"
@@ -98,14 +101,14 @@ def get_account(
         except KeyError:
             raise NetworkProfileError(
                 "H02_PRIVATE_KEY_MISSING",
-                profile_id=identity.profile_id,
+                profile_id=profile.identity.profile_id,
                 operation=operation,
                 env_name=env_name,
             ) from None
         if not account_key:
             raise NetworkProfileError(
                 "H02_PRIVATE_KEY_MISSING",
-                profile_id=identity.profile_id,
+                profile_id=profile.identity.profile_id,
                 operation=operation,
                 env_name=env_name,
             )
@@ -116,7 +119,7 @@ def get_account(
     except Exception:
         raise NetworkProfileError(
             "H02_PRIVATE_KEY_INVALID",
-            profile_id=identity.profile_id,
+            profile_id=profile.identity.profile_id,
             operation=operation,
         ) from None
     log.h2(f"Deployer account {account_name} connected")

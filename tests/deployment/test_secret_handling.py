@@ -244,24 +244,26 @@ def test_explicit_local_test_key_requires_local_runtime(monkeypatch):
 
 
 @pytest.mark.parametrize(
-    ("identity", "operation"),
+    ("identity", "operation", "error_code"),
     (
         (
             VerifiedNetworkIdentity(
                 "base-mainnet", Operation.MIGRATION_FORK, 8453, 8453
             ),
             Operation.MIGRATION_FORK,
+            "H02_ACCOUNT_BACKEND_UNAPPROVED",
         ),
         (
             VerifiedNetworkIdentity(
                 "base-mainnet", Operation.MIGRATION_LIVE, 8453, 8453
             ),
             Operation.MIGRATION_LIVE,
+            "H02_OPERATION_BLOCKED",
         ),
     ),
 )
 def test_injected_local_test_account_rejected_for_live_or_fork(
-    identity, operation, monkeypatch
+    identity, operation, error_code, monkeypatch
 ):
     calls = []
     monkeypatch.setattr(
@@ -269,9 +271,7 @@ def test_injected_local_test_account_rejected_for_live_or_fork(
         "from_key",
         lambda value: calls.append(value),
     )
-    with pytest.raises(
-        NetworkProfileError, match="H02_ACCOUNT_BACKEND_UNAPPROVED"
-    ):
+    with pytest.raises(NetworkProfileError, match=error_code):
         migration_helpers.get_account(
             "LOCAL_TEST",
             identity,
@@ -301,6 +301,75 @@ def test_wrong_chain_prevents_private_key_mapping_access(monkeypatch):
         _call_migrate()
     assert "H02_CHAIN_ID_MISMATCH" in str(captured.value)
     assert events == ["chain"]
+
+
+@pytest.mark.parametrize(
+    ("identity", "operation", "error_code"),
+    (
+        (
+            VerifiedNetworkIdentity(
+                "base-mainnet", Operation.MIGRATION_FORK, 8453, 1
+            ),
+            Operation.MIGRATION_FORK,
+            "H02_CHAIN_ID_MISMATCH",
+        ),
+        (
+            VerifiedNetworkIdentity(
+                "base-mainnet", Operation.MIGRATION_FORK, 1, 1
+            ),
+            Operation.MIGRATION_FORK,
+            "H02_CHAIN_ID_MISMATCH",
+        ),
+        (
+            VerifiedNetworkIdentity(
+                "unknown-profile", Operation.MIGRATION_FORK, 1, 1
+            ),
+            Operation.MIGRATION_FORK,
+            "H02_PROFILE_UNKNOWN",
+        ),
+        (
+            VerifiedNetworkIdentity(
+                "robinhood-mainnet",
+                Operation.MIGRATION_FORK,
+                4663,
+                4663,
+            ),
+            Operation.MIGRATION_FORK,
+            "H02_OPERATION_BLOCKED",
+        ),
+        (
+            VerifiedNetworkIdentity(
+                "base-mainnet",
+                Operation.REPOSITORY_READ,
+                8453,
+                8453,
+            ),
+            Operation.REPOSITORY_READ,
+            "H02_ACCOUNT_BACKEND_UNAPPROVED",
+        ),
+    ),
+)
+def test_account_identity_validation_precedes_key_access(
+    identity, operation, error_code, monkeypatch
+):
+    environment = SpyEnvironment({"DEPLOYER_PRIVATE_KEY": "not-read"})
+    account_calls = []
+    monkeypatch.setattr(
+        migration_helpers.Account,
+        "from_key",
+        lambda value: account_calls.append(value),
+    )
+
+    with pytest.raises(NetworkProfileError, match=error_code):
+        migration_helpers.get_account(
+            "DEPLOYER",
+            identity,
+            operation,
+            environ=environment,
+        )
+
+    assert environment.accesses == []
+    assert account_calls == []
 
 
 def test_console_wrong_chain_prevents_manifest_and_fork(monkeypatch):

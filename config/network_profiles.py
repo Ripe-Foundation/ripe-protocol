@@ -261,7 +261,12 @@ def _rpc_policy(
 
 
 _LOCAL_OPERATIONS = _operations(
-    _policy(Operation.LOCAL_RUNTIME, _SUPPORTED, identity=True),
+    _policy(
+        Operation.LOCAL_RUNTIME,
+        _SUPPORTED,
+        identity=True,
+        account=True,
+    ),
 )
 
 _BASE_MAINNET_OPERATIONS = _operations(
@@ -1004,12 +1009,27 @@ def validate_fork_request(
             )
 
 
-def _validate_verified_identity(
+def validate_verified_identity(
     profile: NetworkProfile,
     operation: Operation,
     identity: VerifiedNetworkIdentity | None,
-) -> None:
-    if identity is None or (
+    *,
+    require_account: bool = False,
+) -> OperationPolicy:
+    policy = require_operation(profile, operation)
+    if not policy.requires_identity:
+        raise NetworkProfileError(
+            "H02_OPERATION_INVALID",
+            profile_id=profile.identity.profile_id,
+            operation=operation,
+        )
+    if require_account and not policy.requires_account:
+        raise NetworkProfileError(
+            "H02_ACCOUNT_BACKEND_UNAPPROVED",
+            profile_id=profile.identity.profile_id,
+            operation=operation,
+        )
+    if not isinstance(identity, VerifiedNetworkIdentity) or (
         identity.profile_id != profile.identity.profile_id
         or identity.operation is not operation
         or identity.expected_chain_id != identity.observed_chain_id
@@ -1024,6 +1044,7 @@ def _validate_verified_identity(
             operation=operation,
             expected_chain_id=profile.identity.chain_id,
         )
+    return policy
 
 
 def repository_paths(
@@ -1041,7 +1062,7 @@ def repository_paths(
             operation=operation,
         )
     if policy.requires_identity:
-        _validate_verified_identity(profile, operation, identity)
+        validate_verified_identity(profile, operation, identity)
 
     repository = profile.repository
     if (
