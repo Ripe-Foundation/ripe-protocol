@@ -2456,3 +2456,98 @@ No row 2 RPC or signer access, Stage B, Stage C, inventory edit, push, merge
 into `rh`, deployment, registration, configuration, governance action,
 signing, broadcast, or Base migration is authorized. Stage B remains
 unauthorized.
+
+## 21. Row 2 packet-validation correction — 25 July 2026
+
+After complete read-only review of the current row 2 packet, probe, runner, and
+focused tests, a local dummy-input diagnostic proved that the prior parser
+accepted a packet when its three provenance approvals remained false and when
+several immutable packet facts were deliberately corrupted. The diagnostic
+used no endpoint, signer secret, RPC, preflight, signature, broadcast, or live
+value. The owner authorized a narrow correction limited to the runner, focused
+tests, this decision record, and the row 2 evidence record. The test-only Vyper
+probe was explicitly frozen.
+
+The corrected shared parser now requires all eight approval Booleans before
+either preflight or execution can proceed:
+
+1. `live_testnet_approved`;
+2. `approval_provenance.owner.approved`;
+3. `approval_provenance.independent_security.approved`;
+4. `approval_provenance.deployment.approved`;
+5. `rpc.approved`;
+6. `signer.approved`;
+7. `signer.funding_approved`; and
+8. `fees.owner_approved`.
+
+Each of the three provenance approvals also requires a strict `YYYY-MM-DD`
+date and nonempty reference. The top-level owner approval reference must equal
+the owner provenance reference. Per the controlling no-attribution decision,
+the schema requires no reviewer name.
+
+Before any endpoint environment read, RPC call, nonce/balance/code query, signer
+check, signing-secret read, or broadcast, the parser now:
+
+- accepts only lowercase `0x` plus 64-hex packet hashes;
+- compares source, ABI, compiler-input, creation-bytecode, and runtime-bytecode
+  identities with reviewed hardcoded constants;
+- compares exact ArbSys address and both selectors with runner constants;
+- compares the dated Nitro image/commit/interface, offset, and derivation pins
+  with runner constants;
+- requires the exact ordered five-case topology list;
+- requires `native_value_wei=0`, `token_transfer=false`, and
+  `stop_on_inconclusive_bound=true`; and
+- retains the existing chain, version, nonce/address, gas, fee, timeout, and
+  observation-bound validation.
+
+Strict lowercase hash syntax applies only to approval-packet hashes. A separate
+runtime/RPC hash helper preserves the runner's prior compatibility with valid
+mixed-case block, receipt, and transaction hashes, normalizes them to lowercase
+before comparison or storage, and still rejects malformed runtime hashes.
+Exact local-versus-RPC transaction-hash equality is unchanged after
+normalization.
+
+After packet parsing and still before the endpoint environment variable is
+read, both CLI live-capable modes compile the probe locally and compare all
+five compiled identities with those same hardcoded reviewed constants. The
+preflight function separately compares the compiled identities with the parsed
+packet identities before its first RPC call. A changed probe source, ABI,
+compiler-input identity, creation bytecode, or runtime bytecode therefore
+fails before live access.
+
+The probe contract remains byte-identical:
+
+| Probe identity | Exact value |
+| --- | --- |
+| source SHA-256 | `95716e4e2b383f2a07826be94d9ee402d263eec522bb4f77efd72a5e5f6eafe5` |
+| creation bytecode Keccak-256 | `0x835fdafe8f7e61253237837ae17cf7985a3cef2eb7e1c274ba2f98f8ea044333` |
+| runtime bytecode Keccak-256 | `0xd4114b7780177700bfac10a60e77a4ca49a4ad10a92f01685ea72bbd1c54ab56` |
+
+The expanded focused suite has 87 tests: the previously approved 35 plus 52
+strict packet-validation cases. It covers every new provenance, artifact,
+address, selector, source-pin, topology, value/transfer, bounded-stop, CLI
+ordering, compiled-drift rejection, strict approval-hash boundary, mixed-case
+runtime-hash normalization, and malformed runtime-hash rejection. The complete
+probe directory has 127 tests. Local-only validation recorded:
+
+| Validation | Result |
+| --- | --- |
+| Python compilation | runner and focused tests compiled; exit `0` |
+| focused row 2 suite | 87 tests; 0 failures, 0 errors, 0 skips; JUnit time `27.157s` |
+| complete probe suite | 127 tests; 0 failures, 0 errors, 0 skips; JUnit time `32.237s` |
+| local dry-run | exit `0`; all five artifact identities reproduced; `rpc_contacted=false`, `rpc_endpoint_read=false`, `signing_secret_read=false`, `broadcast_enabled=false` |
+| whitespace | `git diff --check` clean |
+
+The post-correction runner SHA-256 is
+`c43bb256110416001a55ad3a23a9e295921329b2ee82779def9f199bd1e22f98`;
+the focused-test SHA-256 is
+`7d06040b9b01613fcb37b6cd86e078299cf45526be39acbcbf10ebac9ddef628`.
+The section 12 JSON body was not changed and remains
+`277f3628853b5ff06d65f22611358e08e521fe05afc0dd91b58692dd91026534`;
+it remains intentionally non-executable with false/null live fields.
+
+This correction is unstaged and uncommitted pending independent review of the
+exact four-file bytes. It does not supply operator inputs, approve or run
+preflight, close row 2, authorize Stage B/C, or permit RPC, signer, signature,
+broadcast, push, merge, production, inventory, deployment, configuration,
+governance, or Base work.

@@ -1,6 +1,7 @@
 import copy
 import hashlib
 import json
+from dataclasses import replace
 from pathlib import Path
 
 import boa
@@ -90,6 +91,23 @@ def _approval_data():
         "expected_arb_sys_arb_os_version_return": 116,
         "live_testnet_approved": True,
         "owner_approval_reference": "unit-test-owner-approval",
+        "approval_provenance": {
+            "owner": {
+                "approved": True,
+                "decision_date": "2026-07-25",
+                "reference": "unit-test-owner-approval",
+            },
+            "independent_security": {
+                "approved": True,
+                "decision_date": "2026-07-25",
+                "reference": "unit-test-security-approval",
+            },
+            "deployment": {
+                "approved": True,
+                "decision_date": "2026-07-25",
+                "reference": "unit-test-deployment-approval",
+            },
+        },
         "rpc": {
             "approved": True,
             "label": "unit-test-rpc",
@@ -107,10 +125,18 @@ def _approval_data():
         },
         "probe": {
             "expected_address": _predict_create_address(SIGNER, nonce),
+            "source_sha256": runner.EXPECTED_PROBE_SOURCE_SHA256,
+            "abi_sha256": runner.EXPECTED_PROBE_ABI_SHA256,
+            "compiler_inputs_sha256": (
+                runner.EXPECTED_PROBE_COMPILER_INPUTS_SHA256
+            ),
             "creation_bytecode_keccak256": (
                 artifacts.creation_bytecode_keccak256
             ),
             "runtime_bytecode_keccak256": artifacts.runtime_bytecode_keccak256,
+            "arb_sys_address": ARB_SYS,
+            "arb_block_number_selector": runner.ARB_BLOCK_SELECTOR,
+            "arb_os_version_selector": runner.ARB_OS_VERSION_SELECTOR,
         },
         "fees": {
             "owner_approved": True,
@@ -123,6 +149,22 @@ def _approval_data():
         "execution": {
             "max_observation_transactions": observation_count,
             "receipt_timeout_seconds": 30,
+            "topology_cases": list(runner.REQUIRED_TOPOLOGY_CASES),
+            "stop_on_inconclusive_bound": True,
+            "native_value_wei": 0,
+            "token_transfer": False,
+        },
+        "source_pins": {
+            "evidence_date": runner.SOURCE_PIN_DATE,
+            "robinhood_node_image": runner.ROBINHOOD_NODE_IMAGE,
+            "nitro_commit": runner.NITRO_COMMIT,
+            "arb_sys_interface_commit": runner.ARB_SYS_INTERFACE_COMMIT,
+            "pinned_nitro_arb_sys_version_offset": (
+                runner.PINNED_NITRO_ARB_SYS_VERSION_OFFSET
+            ),
+            "version_return_derivation": (
+                runner.ARB_SYS_VERSION_RETURN_DERIVATION
+            ),
         },
     }
 
@@ -281,23 +323,196 @@ def test_approval_parser_requires_every_explicit_authorization():
     assert approved.max_observation_transactions == 4
     assert approved.max_transaction_count == 5
     assert approved.worst_case_total_fee_wei == approved.max_total_fee_wei
+    assert approved.owner_approval_reference == "unit-test-owner-approval"
+    assert approved.security_approval_reference == "unit-test-security-approval"
+    assert (
+        approved.deployment_approval_reference
+        == "unit-test-deployment-approval"
+    )
 
     cases = [
-        ("live_testnet_approved", None),
-        ("rpc.approved", None),
-        ("signer.approved", None),
-        ("signer.funding_approved", None),
-        ("fees.owner_approved", None),
+        ("live_testnet_approved",),
+        ("approval_provenance", "owner", "approved"),
+        ("approval_provenance", "independent_security", "approved"),
+        ("approval_provenance", "deployment", "approved"),
+        ("rpc", "approved"),
+        ("signer", "approved"),
+        ("signer", "funding_approved"),
+        ("fees", "owner_approved"),
     ]
-    for field, _ in cases:
+    for path in cases:
         invalid = copy.deepcopy(valid)
-        parent, key = (field.split(".", 1) if "." in field else (None, field))
-        if parent is None:
-            invalid[key] = False
-        else:
-            invalid[parent][key] = False
+        target = invalid
+        for key in path[:-1]:
+            target = target[key]
+        target[path[-1]] = False
         with pytest.raises(ApprovalError):
             parse_approval(invalid)
+
+
+@pytest.mark.parametrize(
+    ("role", "field", "value", "error_match"),
+    [
+        ("owner", "decision_date", None, "must be nonempty"),
+        ("owner", "decision_date", "07/25/2026", "YYYY-MM-DD"),
+        ("owner", "reference", None, "must be nonempty"),
+        ("independent_security", "decision_date", None, "must be nonempty"),
+        ("independent_security", "reference", None, "must be nonempty"),
+        ("deployment", "decision_date", None, "must be nonempty"),
+        ("deployment", "reference", None, "must be nonempty"),
+    ],
+)
+def test_approval_parser_requires_dated_provenance_references(
+    role,
+    field,
+    value,
+    error_match,
+):
+    invalid = _approval_data()
+    invalid["approval_provenance"][role][field] = value
+    with pytest.raises(ApprovalError, match=error_match):
+        parse_approval(invalid)
+
+
+def test_owner_reference_must_match_owner_provenance():
+    invalid = _approval_data()
+    invalid["owner_approval_reference"] = "different-owner-reference"
+    with pytest.raises(ApprovalError, match="owner provenance reference"):
+        parse_approval(invalid)
+
+
+@pytest.mark.parametrize(
+    "field",
+    [
+        "source_sha256",
+        "abi_sha256",
+        "compiler_inputs_sha256",
+        "creation_bytecode_keccak256",
+        "runtime_bytecode_keccak256",
+    ],
+)
+@pytest.mark.parametrize(
+    ("value", "error_match"),
+    [
+        ("0x1234", "invalid lowercase"),
+        ("0x" + "A" * 64, "invalid lowercase"),
+    ],
+)
+def test_approval_parser_rejects_malformed_or_nonlowercase_artifact_hashes(
+    field,
+    value,
+    error_match,
+):
+    invalid = _approval_data()
+    invalid["probe"][field] = value
+    with pytest.raises(ApprovalError, match=error_match):
+        parse_approval(invalid)
+
+
+@pytest.mark.parametrize(
+    ("path", "value", "error_match"),
+    [
+        (
+            ("probe", "source_sha256"),
+            "0x" + "00" * 32,
+            "probe.source_sha256",
+        ),
+        (
+            ("probe", "abi_sha256"),
+            "0x" + "00" * 32,
+            "probe.abi_sha256",
+        ),
+        (
+            ("probe", "compiler_inputs_sha256"),
+            "0x" + "00" * 32,
+            "probe.compiler_inputs_sha256",
+        ),
+        (
+            ("probe", "creation_bytecode_keccak256"),
+            "0x" + "00" * 32,
+            "probe.creation_bytecode_keccak256",
+        ),
+        (
+            ("probe", "runtime_bytecode_keccak256"),
+            "0x" + "00" * 32,
+            "probe.runtime_bytecode_keccak256",
+        ),
+        (
+            ("probe", "arb_sys_address"),
+            "0x0000000000000000000000000000000000000001",
+            "probe.arb_sys_address",
+        ),
+        (
+            ("probe", "arb_block_number_selector"),
+            "0x00000000",
+            "probe.arb_block_number_selector",
+        ),
+        (
+            ("probe", "arb_os_version_selector"),
+            "0x00000000",
+            "probe.arb_os_version_selector",
+        ),
+        (
+            ("source_pins", "evidence_date"),
+            "2026-07-23",
+            "source_pins.evidence_date",
+        ),
+        (
+            ("source_pins", "robinhood_node_image"),
+            "wrong-image",
+            "source_pins.robinhood_node_image",
+        ),
+        (
+            ("source_pins", "nitro_commit"),
+            "0" * 40,
+            "source_pins.nitro_commit",
+        ),
+        (
+            ("source_pins", "arb_sys_interface_commit"),
+            "0" * 40,
+            "source_pins.arb_sys_interface_commit",
+        ),
+        (
+            ("source_pins", "pinned_nitro_arb_sys_version_offset"),
+            54,
+            "source_pins.pinned_nitro_arb_sys_version_offset",
+        ),
+        (
+            ("source_pins", "version_return_derivation"),
+            "61 + 54 = 115",
+            "source_pins.version_return_derivation",
+        ),
+        (
+            ("execution", "topology_cases"),
+            [],
+            "execution.topology_cases",
+        ),
+        (
+            ("execution", "stop_on_inconclusive_bound"),
+            False,
+            "execution.stop_on_inconclusive_bound",
+        ),
+        (
+            ("execution", "native_value_wei"),
+            1,
+            "execution.native_value_wei",
+        ),
+        (
+            ("execution", "token_transfer"),
+            True,
+            "execution.token_transfer",
+        ),
+    ],
+)
+def test_approval_parser_rejects_reviewed_packet_fact_mismatches(
+    path,
+    value,
+    error_match,
+):
+    invalid = _approval_data()
+    invalid[path[0]][path[1]] = value
+    with pytest.raises(ApprovalError, match=error_match):
+        parse_approval(invalid)
 
 
 def test_approval_parser_rejects_wrong_chain_address_and_fee_bound():
@@ -502,6 +717,64 @@ def test_rpc_returned_hash_mismatch_is_persisted_and_rejected(
     assert persisted["result"] == "stopped-rpc-transaction-hash-mismatch"
 
 
+def test_mixed_case_rpc_returned_hash_is_normalized_before_exact_match(
+    monkeypatch,
+    tmp_path,
+):
+    approved = parse_approval(_approval_data())
+    ephemeral_signer = Account.create()
+    output = tmp_path / "progress.json"
+    report = {"result": "test", "signed_transactions": []}
+
+    def mixed_case_matching_hash(_rpc_url, method, params):
+        assert method == "eth_sendRawTransaction"
+        raw_transaction = bytes.fromhex(params[0][2:])
+        local_hash = keccak(raw_transaction).hex()
+        mixed = "".join(
+            character.upper() if index % 2 else character.lower()
+            for index, character in enumerate(local_hash)
+        )
+        assert mixed.lower() == local_hash
+        assert mixed != local_hash
+        return "0x" + mixed
+
+    monkeypatch.setattr(runner, "_rpc", mixed_case_matching_hash)
+    transaction_hash = runner._journal_and_broadcast(
+        report,
+        output,
+        RPC_URL,
+        _transaction(
+            approved,
+            nonce=approved.expected_nonce,
+            gas=approved.deployment_gas_limit,
+            data="0x1234",
+        ),
+        ephemeral_signer.key,
+        "deploy-probe",
+    )
+
+    persisted = json.loads(output.read_text())
+    entry = persisted["signed_transactions"][0]
+    assert transaction_hash == entry["transaction_hash"]
+    assert entry["rpc_returned_hash"] == entry["transaction_hash"]
+    assert entry["rpc_returned_hash"] == entry["rpc_returned_hash"].lower()
+    assert entry["broadcast_status"] == "rpc-hash-matched"
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        None,
+        "0x1234",
+        "0x" + "gg" * 32,
+        "not-hex",
+    ],
+)
+def test_malformed_rpc_runtime_hashes_remain_rejected(value):
+    with pytest.raises(ApprovalError, match="invalid RPC/runtime hash"):
+        runner._runtime_hash(value, "test RPC hash")
+
+
 def test_rpc_disables_http_redirects(monkeypatch):
     class FakeResponse:
         def raise_for_status(self):
@@ -559,6 +832,18 @@ def test_preflight_matches_endpoint_chain_artifacts_nonce_address_and_fee(monkey
     assert report["probe"]["predicted_address"] == approved.expected_probe_address
     assert report["probe"]["source_path"] == PROBE_PATH
     assert report["source_pins"]["nitro_commit"] == runner.NITRO_COMMIT
+    assert (
+        report["approval_provenance"]["owner"]["reference"]
+        == approved.owner_approval_reference
+    )
+    assert (
+        report["approval_provenance"]["independent_security"]["reference"]
+        == approved.security_approval_reference
+    )
+    assert (
+        report["approval_provenance"]["deployment"]["reference"]
+        == approved.deployment_approval_reference
+    )
     assert report["ready_for_live_testnet_execution"] is True
     assert RPC_URL not in json.dumps(report)
 
@@ -695,6 +980,84 @@ def test_live_mode_requires_progress_output_before_rpc_or_secret_read(
     )
 
     with pytest.raises(ApprovalError, match="requires --output"):
+        runner.main()
+
+
+@pytest.mark.parametrize(
+    "mode_args",
+    [
+        ["--preflight"],
+        [
+            "--execute",
+            "--confirm-live-testnet",
+            "--output",
+            "sanitized-output.json",
+        ],
+    ],
+)
+@pytest.mark.parametrize(
+    ("invalidator", "error_match"),
+    [
+        (
+            lambda data: data["probe"].__setitem__(
+                "source_sha256",
+                "0x" + "A" * 64,
+            ),
+            "invalid lowercase",
+        ),
+        (
+            lambda data: data["rpc"].__setitem__(
+                "url_sha256",
+                "0x" + "A" * 64,
+            ),
+            "invalid lowercase",
+        ),
+        (
+            lambda data: data["approval_provenance"][
+                "independent_security"
+            ].__setitem__("approved", False),
+            "independent_security approval",
+        ),
+    ],
+)
+def test_cli_rejects_packet_before_artifact_environment_rpc_or_secret_access(
+    monkeypatch,
+    tmp_path,
+    mode_args,
+    invalidator,
+    error_match,
+):
+    approval = _approval_data()
+    invalidator(approval)
+    approval_path = tmp_path / "approval.json"
+    approval_path.write_text(json.dumps(approval))
+    monkeypatch.setattr(
+        runner.sys,
+        "argv",
+        [
+            "action_block_identity_probe.py",
+            *mode_args,
+            "--approval-file",
+            str(approval_path),
+        ],
+    )
+    monkeypatch.setattr(
+        runner,
+        "compile_probe_artifacts",
+        lambda: pytest.fail("artifacts must not compile before packet rejection"),
+    )
+    monkeypatch.setattr(
+        runner,
+        "_rpc_url_from_environment",
+        lambda _approved: pytest.fail("RPC endpoint must not be read"),
+    )
+    monkeypatch.setattr(
+        runner,
+        "_signing_secret_from_environment",
+        lambda _approved: pytest.fail("signing secret must not be read"),
+    )
+
+    with pytest.raises(ApprovalError, match=error_match):
         runner.main()
 
 
@@ -868,9 +1231,48 @@ def test_artifact_hashes_are_keccak_of_exact_compiler_outputs():
     artifacts = compile_probe_artifacts()
     deployer = boa.load_partial(PROBE_PATH)
 
+    runner._validate_compiled_artifacts(artifacts)
+    assert artifacts.source_sha256 == runner.EXPECTED_PROBE_SOURCE_SHA256
+    assert artifacts.abi_sha256 == runner.EXPECTED_PROBE_ABI_SHA256
+    assert (
+        artifacts.compiler_inputs_sha256
+        == runner.EXPECTED_PROBE_COMPILER_INPUTS_SHA256
+    )
     assert artifacts.creation_bytecode_keccak256 == (
         "0x" + keccak(bytes(deployer.compiler_data.bytecode)).hex()
+    )
+    assert (
+        artifacts.creation_bytecode_keccak256
+        == runner.EXPECTED_PROBE_CREATION_BYTECODE_KECCAK256
     )
     assert artifacts.runtime_bytecode_keccak256 == (
         "0x" + keccak(bytes(deployer.compiler_data.bytecode_runtime)).hex()
     )
+    assert (
+        artifacts.runtime_bytecode_keccak256
+        == runner.EXPECTED_PROBE_RUNTIME_BYTECODE_KECCAK256
+    )
+
+
+@pytest.mark.parametrize(
+    "field",
+    [
+        "source_sha256",
+        "abi_sha256",
+        "compiler_inputs_sha256",
+        "creation_bytecode_keccak256",
+        "runtime_bytecode_keccak256",
+    ],
+)
+def test_compiled_artifact_drift_stops_before_rpc(monkeypatch, field):
+    artifacts = compile_probe_artifacts()
+    drifted = replace(artifacts, **{field: "0x" + "00" * 32})
+    approved = parse_approval(_approval_data())
+    monkeypatch.setattr(
+        runner,
+        "_rpc",
+        lambda *_args: pytest.fail("RPC must not run after artifact drift"),
+    )
+
+    with pytest.raises(ApprovalError, match="reviewed hardcoded identity"):
+        preflight(approved, RPC_URL, artifacts=drifted)

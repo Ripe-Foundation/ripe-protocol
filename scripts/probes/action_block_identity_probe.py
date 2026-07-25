@@ -18,7 +18,7 @@ import sys
 import tempfile
 import time
 from dataclasses import asdict, dataclass
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import Any, Callable
 
@@ -53,6 +53,7 @@ NITRO_COMMIT = "3599acae1ad2fab4059fc46453c9cd3294126641"
 ARB_SYS_INTERFACE_COMMIT = "7e88c8cc53c2e96201a23c638f1536557b9cb68b"
 ROBINHOOD_NODE_IMAGE = "offchainlabs/nitro-node:v3.11.2-3599aca"
 ROBINHOOD_PUBLISHED_ARB_OS_PROFILE = 61
+SOURCE_PIN_DATE = "2026-07-24"
 # Pinned Nitro precompiles/ArbSys.go returns 55 + c.State.ArbOSVersion().
 # The pinned ArbSys.sol interface independently documents the same offset.
 PINNED_NITRO_ARB_SYS_VERSION_OFFSET = 55
@@ -65,7 +66,33 @@ ARB_SYS_VERSION_RETURN_DERIVATION = (
     f"{EXPECTED_ARB_SYS_ARB_OS_VERSION_RETURN}"
 )
 
-HASH_RE = re.compile(r"^0x[0-9a-fA-F]{64}$")
+EXPECTED_PROBE_SOURCE_SHA256 = (
+    "0x95716e4e2b383f2a07826be94d9ee402d263eec522bb4f77efd72a5e5f6eafe5"
+)
+EXPECTED_PROBE_ABI_SHA256 = (
+    "0x2c237ba7e43aa009c69eabe950c733c79415b7eab37e874e065494273a45b359"
+)
+EXPECTED_PROBE_COMPILER_INPUTS_SHA256 = (
+    "0xf251237b97029e29122f5578c38817e518abcc3062c6d32019de028bdef79a65"
+)
+EXPECTED_PROBE_CREATION_BYTECODE_KECCAK256 = (
+    "0x835fdafe8f7e61253237837ae17cf7985a3cef2eb7e1c274ba2f98f8ea044333"
+)
+EXPECTED_PROBE_RUNTIME_BYTECODE_KECCAK256 = (
+    "0xd4114b7780177700bfac10a60e77a4ca49a4ad10a92f01685ea72bbd1c54ab56"
+)
+
+REQUIRED_TOPOLOGY_CASES = (
+    "each emitted ArbSys value equals its receipt blockNumber",
+    "two separate transactions included in one child block share one ArbSys identity",
+    "transactions included in successive child blocks have distinct ArbSys identities",
+    "successive child blocks share one native ancestor block.number",
+    "bounded repeated and advancing values without a protocol-maximum claim",
+)
+
+APPROVAL_HASH_RE = re.compile(r"^0x[0-9a-f]{64}$")
+RUNTIME_HASH_RE = re.compile(r"^0x[0-9a-fA-F]{64}$")
+SELECTOR_RE = re.compile(r"^0x[0-9a-f]{8}$")
 ENV_NAME_RE = re.compile(r"^[A-Z][A-Z0-9_]*$")
 MAX_OBSERVATION_TRANSACTIONS = 16
 MIN_OBSERVATION_TRANSACTIONS = 4
@@ -99,6 +126,12 @@ class ProbeArtifacts:
 @dataclass(frozen=True)
 class ApprovedRun:
     approval_reference: str
+    owner_approval_date: str
+    owner_approval_reference: str
+    security_approval_date: str
+    security_approval_reference: str
+    deployment_approval_date: str
+    deployment_approval_reference: str
     chain_id: int
     rpc_label: str
     rpc_url_env: str
@@ -109,6 +142,9 @@ class ApprovedRun:
     private_key_env: str
     expected_nonce: int
     expected_probe_address: str
+    expected_source_sha256: str
+    expected_abi_sha256: str
+    expected_compiler_inputs_sha256: str
     expected_creation_bytecode_hash: str
     expected_runtime_bytecode_hash: str
     deployment_gas_limit: int
@@ -135,6 +171,29 @@ def _required(data: dict[str, Any], key: str) -> Any:
     if key not in data:
         raise ApprovalError(f"missing approved input: {key}")
     return data[key]
+
+
+def _mapping(value: Any, field: str) -> dict[str, Any]:
+    if not isinstance(value, dict):
+        raise ApprovalError(f"approved field must be an object: {field}")
+    return value
+
+
+def _nonempty_text(value: Any, field: str) -> str:
+    if not isinstance(value, str) or not value.strip():
+        raise ApprovalError(f"approved text must be nonempty: {field}")
+    return value.strip()
+
+
+def _iso_date(value: Any, field: str) -> str:
+    text = _nonempty_text(value, field)
+    try:
+        parsed = date.fromisoformat(text)
+    except ValueError as exc:
+        raise ApprovalError(f"approved date must use YYYY-MM-DD: {field}") from exc
+    if parsed.isoformat() != text:
+        raise ApprovalError(f"approved date must use YYYY-MM-DD: {field}")
+    return text
 
 
 def _positive_int(value: Any, field: str) -> int:
@@ -167,10 +226,24 @@ def _address(value: Any, field: str) -> str:
     return address
 
 
-def _hash(value: Any, field: str) -> str:
-    if not isinstance(value, str) or not HASH_RE.fullmatch(value):
-        raise ApprovalError(f"invalid approved hash: {field}")
+def _approval_hash(value: Any, field: str) -> str:
+    if not isinstance(value, str) or not APPROVAL_HASH_RE.fullmatch(value):
+        raise ApprovalError(
+            f"invalid lowercase 0x-prefixed approved hash: {field}"
+        )
+    return value
+
+
+def _runtime_hash(value: Any, field: str) -> str:
+    if not isinstance(value, str) or not RUNTIME_HASH_RE.fullmatch(value):
+        raise ApprovalError(f"invalid RPC/runtime hash: {field}")
     return value.lower()
+
+
+def _selector(value: Any, field: str) -> str:
+    if not isinstance(value, str) or not SELECTOR_RE.fullmatch(value):
+        raise ApprovalError(f"invalid lowercase approved selector: {field}")
+    return value
 
 
 def _env_name(value: Any, field: str) -> str:
@@ -245,6 +318,23 @@ def compile_probe_artifacts() -> ProbeArtifacts:
     )
 
 
+def _validate_compiled_artifacts(artifacts: ProbeArtifacts) -> None:
+    expected = {
+        "source_sha256": EXPECTED_PROBE_SOURCE_SHA256,
+        "abi_sha256": EXPECTED_PROBE_ABI_SHA256,
+        "compiler_inputs_sha256": EXPECTED_PROBE_COMPILER_INPUTS_SHA256,
+        "creation_bytecode_keccak256": (
+            EXPECTED_PROBE_CREATION_BYTECODE_KECCAK256
+        ),
+        "runtime_bytecode_keccak256": EXPECTED_PROBE_RUNTIME_BYTECODE_KECCAK256,
+    }
+    for field, expected_value in expected.items():
+        if getattr(artifacts, field) != expected_value:
+            raise ApprovalError(
+                f"compiled probe {field} disagrees with reviewed hardcoded identity"
+            )
+
+
 def _predict_create_address(sender: str, nonce: int) -> str:
     encoded = rlp.encode([bytes.fromhex(sender[2:]), nonce])
     return to_checksum_address(keccak(encoded)[-20:])
@@ -267,15 +357,44 @@ def parse_approval(data: dict[str, Any]) -> ApprovedRun:
     if chain_id != ROBINHOOD_TESTNET_CHAIN_ID:
         raise ApprovalError("approved chain ID must be 46630")
 
-    approval_reference = str(_required(data, "owner_approval_reference")).strip()
-    if not approval_reference:
-        raise ApprovalError("owner approval reference must be nonempty")
+    approval_reference = _nonempty_text(
+        _required(data, "owner_approval_reference"),
+        "owner_approval_reference",
+    )
 
-    rpc = _required(data, "rpc")
-    signer = _required(data, "signer")
-    probe = _required(data, "probe")
-    fees = _required(data, "fees")
-    execution = _required(data, "execution")
+    provenance = _mapping(
+        _required(data, "approval_provenance"),
+        "approval_provenance",
+    )
+    approval_records: dict[str, tuple[str, str]] = {}
+    for role in ("owner", "independent_security", "deployment"):
+        record = _mapping(
+            _required(provenance, role),
+            f"approval_provenance.{role}",
+        )
+        if _required(record, "approved") is not True:
+            raise ApprovalError(f"{role} approval is not explicitly approved")
+        approval_records[role] = (
+            _iso_date(
+                _required(record, "decision_date"),
+                f"approval_provenance.{role}.decision_date",
+            ),
+            _nonempty_text(
+                _required(record, "reference"),
+                f"approval_provenance.{role}.reference",
+            ),
+        )
+    if approval_reference != approval_records["owner"][1]:
+        raise ApprovalError(
+            "owner approval reference disagrees with owner provenance reference"
+        )
+
+    rpc = _mapping(_required(data, "rpc"), "rpc")
+    signer = _mapping(_required(data, "signer"), "signer")
+    probe = _mapping(_required(data, "probe"), "probe")
+    fees = _mapping(_required(data, "fees"), "fees")
+    execution = _mapping(_required(data, "execution"), "execution")
+    source_pins = _mapping(_required(data, "source_pins"), "source_pins")
 
     if _required(rpc, "approved") is not True:
         raise ApprovalError("RPC endpoint is not explicitly approved")
@@ -285,6 +404,128 @@ def parse_approval(data: dict[str, Any]) -> ApprovedRun:
         raise ApprovalError("testnet funding is not explicitly approved")
     if _required(fees, "owner_approved") is not True:
         raise ApprovalError("total fee cap is not explicitly owner-approved")
+
+    expected_source_sha256 = _approval_hash(
+        _required(probe, "source_sha256"),
+        "probe.source_sha256",
+    )
+    expected_abi_sha256 = _approval_hash(
+        _required(probe, "abi_sha256"),
+        "probe.abi_sha256",
+    )
+    expected_compiler_inputs_sha256 = _approval_hash(
+        _required(probe, "compiler_inputs_sha256"),
+        "probe.compiler_inputs_sha256",
+    )
+    expected_creation_bytecode_hash = _approval_hash(
+        _required(probe, "creation_bytecode_keccak256"),
+        "probe.creation_bytecode_keccak256",
+    )
+    expected_runtime_bytecode_hash = _approval_hash(
+        _required(probe, "runtime_bytecode_keccak256"),
+        "probe.runtime_bytecode_keccak256",
+    )
+    expected_artifact_facts = {
+        "probe.source_sha256": (
+            expected_source_sha256,
+            EXPECTED_PROBE_SOURCE_SHA256,
+        ),
+        "probe.abi_sha256": (
+            expected_abi_sha256,
+            EXPECTED_PROBE_ABI_SHA256,
+        ),
+        "probe.compiler_inputs_sha256": (
+            expected_compiler_inputs_sha256,
+            EXPECTED_PROBE_COMPILER_INPUTS_SHA256,
+        ),
+        "probe.creation_bytecode_keccak256": (
+            expected_creation_bytecode_hash,
+            EXPECTED_PROBE_CREATION_BYTECODE_KECCAK256,
+        ),
+        "probe.runtime_bytecode_keccak256": (
+            expected_runtime_bytecode_hash,
+            EXPECTED_PROBE_RUNTIME_BYTECODE_KECCAK256,
+        ),
+    }
+    for field, (observed, expected) in expected_artifact_facts.items():
+        if observed != expected:
+            raise ApprovalError(f"approved packet fact mismatch: {field}")
+
+    approved_arb_sys = _address(
+        _required(probe, "arb_sys_address"),
+        "probe.arb_sys_address",
+    )
+    if approved_arb_sys != ARB_SYS:
+        raise ApprovalError("approved packet fact mismatch: probe.arb_sys_address")
+    if (
+        _selector(
+            _required(probe, "arb_block_number_selector"),
+            "probe.arb_block_number_selector",
+        )
+        != ARB_BLOCK_SELECTOR
+    ):
+        raise ApprovalError(
+            "approved packet fact mismatch: probe.arb_block_number_selector"
+        )
+    if (
+        _selector(
+            _required(probe, "arb_os_version_selector"),
+            "probe.arb_os_version_selector",
+        )
+        != ARB_OS_VERSION_SELECTOR
+    ):
+        raise ApprovalError(
+            "approved packet fact mismatch: probe.arb_os_version_selector"
+        )
+
+    source_pin_facts = {
+        "source_pins.evidence_date": (
+            _required(source_pins, "evidence_date"),
+            SOURCE_PIN_DATE,
+        ),
+        "source_pins.robinhood_node_image": (
+            _required(source_pins, "robinhood_node_image"),
+            ROBINHOOD_NODE_IMAGE,
+        ),
+        "source_pins.nitro_commit": (
+            _required(source_pins, "nitro_commit"),
+            NITRO_COMMIT,
+        ),
+        "source_pins.arb_sys_interface_commit": (
+            _required(source_pins, "arb_sys_interface_commit"),
+            ARB_SYS_INTERFACE_COMMIT,
+        ),
+        "source_pins.pinned_nitro_arb_sys_version_offset": (
+            _required(source_pins, "pinned_nitro_arb_sys_version_offset"),
+            PINNED_NITRO_ARB_SYS_VERSION_OFFSET,
+        ),
+        "source_pins.version_return_derivation": (
+            _required(source_pins, "version_return_derivation"),
+            ARB_SYS_VERSION_RETURN_DERIVATION,
+        ),
+    }
+    for field, (observed, expected) in source_pin_facts.items():
+        if observed != expected:
+            raise ApprovalError(f"approved packet fact mismatch: {field}")
+
+    topology_cases = _required(execution, "topology_cases")
+    if topology_cases != list(REQUIRED_TOPOLOGY_CASES):
+        raise ApprovalError(
+            "approved packet fact mismatch: execution.topology_cases"
+        )
+    if _required(execution, "stop_on_inconclusive_bound") is not True:
+        raise ApprovalError(
+            "approved packet fact mismatch: execution.stop_on_inconclusive_bound"
+        )
+    native_value = _required(execution, "native_value_wei")
+    if isinstance(native_value, bool) or native_value != 0:
+        raise ApprovalError(
+            "approved packet fact mismatch: execution.native_value_wei"
+        )
+    if _required(execution, "token_transfer") is not False:
+        raise ApprovalError(
+            "approved packet fact mismatch: execution.token_transfer"
+        )
 
     max_observations = _positive_int(
         _required(execution, "max_observation_transactions"),
@@ -298,13 +539,19 @@ def parse_approval(data: dict[str, Any]) -> ApprovedRun:
 
     approved = ApprovedRun(
         approval_reference=approval_reference,
+        owner_approval_date=approval_records["owner"][0],
+        owner_approval_reference=approval_records["owner"][1],
+        security_approval_date=approval_records["independent_security"][0],
+        security_approval_reference=approval_records["independent_security"][1],
+        deployment_approval_date=approval_records["deployment"][0],
+        deployment_approval_reference=approval_records["deployment"][1],
         chain_id=chain_id,
         rpc_label=str(_required(rpc, "label")).strip(),
         rpc_url_env=_env_name(
             _required(rpc, "url_environment_variable"),
             "rpc.url_environment_variable",
         ),
-        rpc_url_sha256=_hash(
+        rpc_url_sha256=_approval_hash(
             _required(rpc, "url_sha256"),
             "rpc.url_sha256",
         ),
@@ -332,14 +579,11 @@ def parse_approval(data: dict[str, Any]) -> ApprovedRun:
             _required(probe, "expected_address"),
             "probe.expected_address",
         ),
-        expected_creation_bytecode_hash=_hash(
-            _required(probe, "creation_bytecode_keccak256"),
-            "probe.creation_bytecode_keccak256",
-        ),
-        expected_runtime_bytecode_hash=_hash(
-            _required(probe, "runtime_bytecode_keccak256"),
-            "probe.runtime_bytecode_keccak256",
-        ),
+        expected_source_sha256=expected_source_sha256,
+        expected_abi_sha256=expected_abi_sha256,
+        expected_compiler_inputs_sha256=expected_compiler_inputs_sha256,
+        expected_creation_bytecode_hash=expected_creation_bytecode_hash,
+        expected_runtime_bytecode_hash=expected_runtime_bytecode_hash,
         deployment_gas_limit=_positive_int(
             _required(fees, "deployment_gas_limit"),
             "fees.deployment_gas_limit",
@@ -470,6 +714,7 @@ def _hex_int(value: Any, field: str) -> int:
 
 def local_dry_run() -> dict[str, Any]:
     artifacts = compile_probe_artifacts()
+    _validate_compiled_artifacts(artifacts)
     return {
         "mode": "local-dry-run",
         "broadcast_enabled": False,
@@ -543,6 +788,13 @@ def preflight(
     if _sha256_text(rpc_url) != approved.rpc_url_sha256:
         raise ApprovalError("RPC endpoint fingerprint mismatch")
     artifacts = artifacts or compile_probe_artifacts()
+    _validate_compiled_artifacts(artifacts)
+    if artifacts.source_sha256 != approved.expected_source_sha256:
+        raise ApprovalError("probe source hash mismatch")
+    if artifacts.abi_sha256 != approved.expected_abi_sha256:
+        raise ApprovalError("probe ABI hash mismatch")
+    if artifacts.compiler_inputs_sha256 != approved.expected_compiler_inputs_sha256:
+        raise ApprovalError("probe compiler-input hash mismatch")
     if artifacts.creation_bytecode_keccak256 != approved.expected_creation_bytecode_hash:
         raise ApprovalError("probe creation-bytecode hash mismatch")
     if artifacts.runtime_bytecode_keccak256 != approved.expected_runtime_bytecode_hash:
@@ -558,7 +810,7 @@ def preflight(
         raise ApprovalError("latest block is unavailable")
     latest_number = _hex_int(latest.get("number"), "latest block number")
     latest_timestamp = _hex_int(latest.get("timestamp"), "latest block timestamp")
-    latest_hash = _hash(latest.get("hash"), "latest block hash")
+    latest_hash = _runtime_hash(latest.get("hash"), "latest block hash")
     base_fee = _hex_int(latest.get("baseFeePerGas"), "latest base fee")
     if base_fee + approved.max_priority_fee_per_gas_wei > approved.max_fee_per_gas_wei:
         raise ApprovalError("approved max fee cannot cover current base plus priority fee")
@@ -637,6 +889,20 @@ def preflight(
         "rpc_endpoint_read": True,
         "signing_secret_read": False,
         "approval_reference": approved.approval_reference,
+        "approval_provenance": {
+            "owner": {
+                "decision_date": approved.owner_approval_date,
+                "reference": approved.owner_approval_reference,
+            },
+            "independent_security": {
+                "decision_date": approved.security_approval_date,
+                "reference": approved.security_approval_reference,
+            },
+            "deployment": {
+                "decision_date": approved.deployment_approval_date,
+                "reference": approved.deployment_approval_reference,
+            },
+        },
         "network": "Robinhood Chain testnet",
         "chain_id": chain_id,
         "rpc_identity": {
@@ -835,7 +1101,7 @@ def _decode_observation(
     receipt_block = _hex_int(receipt.get("blockNumber"), "receipt block number")
     block = _rpc(rpc_url, "eth_getBlockByNumber", [hex(receipt_block), False])
     block_timestamp = _hex_int(block.get("timestamp"), "receipt block timestamp")
-    transaction_hash = _hash(
+    transaction_hash = _runtime_hash(
         receipt.get("transactionHash"),
         "receipt transaction hash",
     )
@@ -984,7 +1250,7 @@ def _journal_and_broadcast(
     _persist_progress(report, output)
 
     try:
-        rpc_hash = _hash(
+        rpc_hash = _runtime_hash(
             _rpc(
                 rpc_url,
                 "eth_sendRawTransaction",
@@ -1020,12 +1286,14 @@ def execute_live_testnet(
     *,
     progress_output: Path | None = None,
     signing_secret_loader: Callable[[], Any] | None = None,
+    artifacts: ProbeArtifacts | None = None,
 ) -> dict[str, Any]:
     if progress_output is None:
         raise ApprovalError(
             "live execution requires a sanitized progress output file"
         )
-    artifacts = compile_probe_artifacts()
+    artifacts = artifacts or compile_probe_artifacts()
+    _validate_compiled_artifacts(artifacts)
     report = preflight(approved, rpc_url, artifacts=artifacts)
     private_key = (
         signing_secret_loader()
@@ -1297,8 +1565,13 @@ def main() -> int:
     if args.preflight:
         if args.confirm_live_testnet:
             raise ApprovalError("read-only preflight does not accept live confirmation")
+        artifacts = compile_probe_artifacts()
+        _validate_compiled_artifacts(artifacts)
         rpc_url = _rpc_url_from_environment(approved)
-        _write_or_print(preflight(approved, rpc_url), args.output)
+        _write_or_print(
+            preflight(approved, rpc_url, artifacts=artifacts),
+            args.output,
+        )
         return 0
 
     if not args.confirm_live_testnet:
@@ -1307,11 +1580,14 @@ def main() -> int:
         raise ApprovalError(
             "live execution requires --output for sanitized progress evidence"
         )
+    artifacts = compile_probe_artifacts()
+    _validate_compiled_artifacts(artifacts)
     rpc_url = _rpc_url_from_environment(approved)
     report = execute_live_testnet(
         approved,
         rpc_url,
         progress_output=args.output,
+        artifacts=artifacts,
     )
     _write_or_print(report, args.output)
     return 0

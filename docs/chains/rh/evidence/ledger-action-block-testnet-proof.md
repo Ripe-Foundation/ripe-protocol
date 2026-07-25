@@ -1060,3 +1060,163 @@ broadcast, deployment, registration, configuration, governance action,
 production change, inventory edit, Stage B, Stage C, push, merge into `rh`, or
 Base migration occurred. Row 2 remains pending and Stage B remains
 unauthorized.
+
+## 14. Row 2 packet-validation correction evidence — 25 July 2026
+
+### 14.1 Exact defect and authorized scope
+
+At clean documentation commit
+`646c7a745fcdde8e5cf0ce859f990f1e541987b3`, local `rh`, cached
+`origin/rh`, and the one explicitly requested live `origin/rh` check all
+resolved to `cb3fe7392c44613aaeec49bd2486369fe0da3556`. The S5 branch was
+12 ahead / 0 behind `rh`.
+
+A local dummy-public-data diagnostic showed that the prior
+`parse_approval()` accepted:
+
+- owner, independent-security, and deployment provenance approvals all false;
+  and
+- corrupted packet source/ABI/compiler identities, ArbSys address/selectors,
+  source offset, zero-value/no-token assertions, and bounded-stop assertion.
+
+The diagnostic did not read an endpoint environment value or signing secret,
+contact an RPC, derive a signer from a private key, run preflight, sign,
+broadcast, deploy, or transact. The owner then authorized a correction limited
+to:
+
+- `scripts/probes/action_block_identity_probe.py`;
+- `tests/probes/test_action_block_identity_probe.py`;
+- `docs/chains/rh/ledger-guard-security-decision.md`; and
+- this evidence record.
+
+`contracts/testing/ActionBlockIdentityProbe.vy` was not modified.
+
+### 14.2 Corrected fail-closed contract
+
+The one parser shared by the preflight and execution CLI paths now rejects
+unless all eight Booleans are exactly true:
+
+```text
+live_testnet_approved
+approval_provenance.owner.approved
+approval_provenance.independent_security.approved
+approval_provenance.deployment.approved
+rpc.approved
+signer.approved
+signer.funding_approved
+fees.owner_approved
+```
+
+Each provenance block requires a strict `YYYY-MM-DD` decision date and nonempty
+reference, and the top-level owner reference must match the owner provenance
+reference. No reviewer-name field is required.
+
+The parser accepts an approval-packet hash only as lowercase `0x` followed by
+exactly 64 lowercase hexadecimal digits. Before any environment, RPC, nonce,
+signer, or secret access, it compares the packet's exact values with reviewed
+runner constants:
+
+| Packet fact | Required value |
+| --- | --- |
+| source SHA-256 | `0x95716e4e2b383f2a07826be94d9ee402d263eec522bb4f77efd72a5e5f6eafe5` |
+| ABI SHA-256 | `0x2c237ba7e43aa009c69eabe950c733c79415b7eab37e874e065494273a45b359` |
+| compiler-input SHA-256 | `0xf251237b97029e29122f5578c38817e518abcc3062c6d32019de028bdef79a65` |
+| creation-bytecode Keccak-256 | `0x835fdafe8f7e61253237837ae17cf7985a3cef2eb7e1c274ba2f98f8ea044333` |
+| runtime-bytecode Keccak-256 | `0xd4114b7780177700bfac10a60e77a4ca49a4ad10a92f01685ea72bbd1c54ab56` |
+| ArbSys address | `0x0000000000000000000000000000000000000064` |
+| `arbBlockNumber()` selector | `0xa3b1b31d` |
+| `arbOSVersion()` selector | `0x051038f2` |
+| source-pin date | `2026-07-24` |
+| Robinhood node image | `offchainlabs/nitro-node:v3.11.2-3599aca` |
+| Nitro commit | `3599acae1ad2fab4059fc46453c9cd3294126641` |
+| ArbSys interface commit | `7e88c8cc53c2e96201a23c638f1536557b9cb68b` |
+| published profile / offset / raw return | `61 / 55 / 116`, exact derivation `61 + 55 = 116` |
+| topology | exact ordered five cases from section 12 |
+| execution assertions | `native_value_wei=0`, `token_transfer=false`, `stop_on_inconclusive_bound=true` |
+
+After parsing and before reading the endpoint environment variable, both
+live-capable CLI paths compile the probe and compare all five artifact
+identities with the hardcoded reviewed constants. Preflight repeats the
+compiled-versus-packet comparison before its first RPC call. The endpoint
+fingerprint uses the same strict lowercase `0x` plus 64-hex format.
+
+Runtime/RPC block, receipt, and transaction hashes use a separate helper. It
+accepts valid mixed-case hexadecimal, normalizes to lowercase before evidence
+storage or equality comparison, and rejects malformed values. Deterministic
+local-versus-RPC transaction-hash equality remains exact after normalization;
+this compatibility behavior does not relax any approval-packet hash rule.
+
+### 14.3 Tests and local-only results
+
+The 52 added focused cases cover:
+
+- every one of the eight approval Booleans;
+- each provenance date/reference and the owner-reference equality;
+- malformed and uppercase values for every one of the five artifact hashes;
+- valid-format but wrong values for every artifact hash;
+- wrong ArbSys address and both selectors;
+- every dated Nitro/source pin;
+- topology list, zero native value, no-token rule, and inconclusive-bound stop;
+- preflight and execution CLI rejection before artifact compilation,
+  environment, RPC, or secret access; and
+- local compiled drift in each of the five identities before RPC;
+- uppercase endpoint/artifact approval hashes failing before access;
+- valid mixed-case RPC transaction hashes normalizing before exact local-hash
+  comparison and sanitized storage; and
+- malformed RPC/runtime hashes remaining rejected.
+
+All local commands explicitly removed the Robinhood endpoint and signing-key
+variables from their child environments. The locked H-01 Candidate A
+interpreter remained:
+
+```text
+/private/tmp/h01-final-review.dL2pqo/candidate/bin/python
+Python 3.12.0
+Vyper 0.4.3 / compiler 0.4.3+commit.bff19ea2
+Titanoboa 0.2.7
+pytest 8.4.2
+cbor2 5.9.0
+```
+
+Exact results:
+
+| Command/scope | Result |
+| --- | --- |
+| `python -m py_compile` for runner and focused tests | exit `0` |
+| focused `tests/probes/test_action_block_identity_probe.py` | 87 tests; 0 failures, 0 errors, 0 skips; JUnit time `27.157s` |
+| complete `tests/probes` | 127 tests; 0 failures, 0 errors, 0 skips; JUnit time `32.237s` |
+| runner `--dry-run` | exit `0`; exact five artifact identities reproduced; no endpoint/RPC/secret/broadcast access |
+| `git diff --check` | clean |
+
+The dry-run again reported:
+
+```text
+rpc_contacted=false
+rpc_endpoint_read=false
+signing_secret_read=false
+broadcast_enabled=false
+maximum_supported_observation_transactions=16
+deployment_transactions=1
+native_value_wei=0
+token_transfer=false
+```
+
+Post-correction identities:
+
+| File/artifact | Identity |
+| --- | --- |
+| unchanged Vyper probe SHA-256 | `95716e4e2b383f2a07826be94d9ee402d263eec522bb4f77efd72a5e5f6eafe5` |
+| corrected runner SHA-256 | `c43bb256110416001a55ad3a23a9e295921329b2ee82779def9f199bd1e22f98` |
+| corrected focused tests SHA-256 | `7d06040b9b01613fcb37b6cd86e078299cf45526be39acbcbf10ebac9ddef628` |
+| unchanged creation-bytecode Keccak-256 | `0x835fdafe8f7e61253237837ae17cf7985a3cef2eb7e1c274ba2f98f8ea044333` |
+| unchanged runtime-bytecode Keccak-256 | `0xd4114b7780177700bfac10a60e77a4ca49a4ad10a92f01685ea72bbd1c54ab56` |
+| unchanged section 12 JSON-body SHA-256 | `277f3628853b5ff06d65f22611358e08e521fe05afc0dd91b58692dd91026534` |
+
+The current section 12 packet still contains false/null live fields and is
+non-executable. No operator value was requested, supplied, inferred, or read.
+The next permissible step is independent exact-hash review of these four
+unstaged files. Only after an exact-byte commit is separately authorized may
+the owner complete the secret-free packet for a new hash review. Preflight,
+execution, row 2 closure, Stage B/C, inventory work, push, merge, production,
+deployment, configuration, governance, signing, and broadcast remain
+prohibited.
