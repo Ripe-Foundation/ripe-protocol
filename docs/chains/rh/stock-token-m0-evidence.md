@@ -1,64 +1,74 @@
 # Track 8 M0: Stock Token launch evidence and product-freeze record
 
-**Status:** Evidence collected; **M0 has not passed** because the exact
-Robinhood runtime asset set, initial cross-chain graph, and day-one reward
-policy are not frozen.
+**Status:** Evidence collected and owner directions recorded on 24–25 July
+2026. All documentable pre-implementation M0 inputs are complete and ready for
+independent review. **M0 remains open pending that review and owner closure;
+M1 remains unauthorized.**
 
-**Evidence date:** 24 July 2026
+**Evidence acquisition date:** 24 July 2026
+
+**Owner-decision completion date:** 25 July 2026
 
 **Controlling integration commit:**
 `2517eeb0013cdb277dc4815db4b524d7a090d682`
 
 **Evidence branch:** `rh-track-8-m0-evidence`
 
+**Owner-decision revision baseline:** current reviewed `rh`
+`fc48ac45e5f6e8c698a6464a14289aad00e1f2d4`; prepared in
+`rh-track-8-m0-owner-decisions`
+
 **Scope:** Documentation and read-only evidence only. This record does not
 approve M1, a production contract, a vault or VaultBook ID, an interface,
 storage, ABI, default, migration, manifest, deployment, configuration, signed
 message, or transaction.
 
+The decision worktree was fast-forwarded on 25 July 2026 from
+`185bd32004121bbb1c60748844c517ea8da0affb` to exact current `rh`
+`fc48ac45e5f6e8c698a6464a14289aad00e1f2d4`, without rebase or history
+rewrite. That increment adds only
+`docs/chains/rh/track-6-s6-track-7-h4-defaults-parameters.md` and changes no
+M0 evidence or Track 8 specification file. The original raw evidence remains
+bound to its recorded acquisition pins.
+
 ## 1. Executive conclusion
 
-M0 returns three hard stops and one incomplete fork-refresh item to the owner.
-It does not widen the launch design.
+On 24 July 2026, the owner froze the product directions without closing the
+evidence gates:
 
-1. **Robinhood asset-inventory stop.** The repository requires Stock Tokens at
-   launch, but does not yet name every launch Stock Token or freeze every
-   non-Stock asset and route in the Robinhood Teller graph. AAPL is the only
-   exact Stock Token with a complete address and historical pinned-fork record.
-   `RIPE`, `GREEN`, `sGREEN`, USDG, other Stock Tokens, and any other collateral
-   remain included, omitted, disabled, or address-pending according to other
-   open Robinhood decisions. Because `deposit`, `depositMany`, `rebalance`,
-   `depositIntoGovVault`, Stability Pool auto-deposit, and trusted Deleverage
-   can collectively reach any configured asset, an unfrozen configuration is
-   an unfrozen compatibility matrix. This is an unknown Robinhood runtime-asset
-   hard stop before M1.
-2. **Cross-chain graph stop.** No Robinhood Ripe deployment, migration history,
-   or final manifest exists at the controlling commit. Current production
-   source contains no bridge or message implementation, so separate
-   deployments can be state-independent if all cross-chain routes are omitted
-   or inactive. The repository separately proposes GREEN/RIPE CCIP burn/mint
-   transport, however. If active at initial launch, a Base-created GREEN supply
-   or solvency failure can propagate economically into Robinhood token supply,
-   liquidity, repayment, PSM, and accounting paths. The initial CCIP
-   include/omit decision therefore must be frozen before state independence can
-   pass.
-3. **Reward-policy stop.** The current reward system has an account-wide
-   borrower bucket and a global generic-depositor bucket. Per-asset Stock
-   allocations of zero do not by themselves exclude a Stock-backed borrower or
-   a Stock depositor from those global point classes. There is no approved
-   Robinhood reward configuration. The owner must either disable rewards
-   globally, set every Stock-capable global bucket to zero while setting Stock
-   per-asset allocations to zero, or declare Stock-linked launch rewards
-   required. The last option reopens the reward-loss scope and stops M1.
-4. **Fork refresh incomplete, existing fork evidence intact.** The integrated
-   Track 2 pinned AAPL fork remains reproducible in its committed input and
-   records exact base-unit deposit and withdrawal. Fresh M0 live reads show the
-   same proxy, beacon, implementation, and runtime hashes. A fresh execution of
-   the historical fork did not complete because the two credential-free
-   providers returned rate-limit or historical-metadata errors before local
-   fork mutation. The owner or independent reviewer must decide whether the
-   immutable integrated run plus current identity match is sufficient, or
-   require a later credential-free/archive-capable rerun.
+1. AAPL is the only initial Stock Token; every later Stock Token requires its
+   own complete evidence.
+2. GREEN/RIPE CCIP are nonblocking targets for separately reviewed promotion
+   within seven days after launch. Seven days is not automatic authorization;
+   incomplete or late evidence leaves CCIP disabled. sGREEN is chain-native
+   and never CCIP-enabled.
+3. Rewards launch globally disabled and target validated activation within
+   seven days; AAPL depositors/borrowers may then participate under the
+   accepted brief global-accounting incident window and kill-switch runbook.
+4. The existing AAPL fork plus current matching identities is sufficient;
+   implementation-identity change requires revalidation.
+5. Base remains unchanged and separately gated.
+6. sGREEN, PSM, Stability Pool, RipeGov, and the two named LP routes are
+   launch targets under the exact restrictions in the owner packet.
+7. AAPL uses fixed USD exposure targets, one enabled vault, and no
+   trusted/Department deposit route.
+8. The settlement candidate permits only vault-local guarded internal
+   movement; external remains the frontend default. On 25 July 2026 the owner
+   approved the exact partial-fill invariant in Section 12 and accepted its
+   stated transfer-control residual risk.
+
+This revision closes the remaining documentable pre-implementation inputs:
+existing external-token identities and compatibility; the approved launch
+graph and route dispositions; the file-exact proposed Robinhood/Base
+state-independence graph; the AAPL/USD feed, price-pin procedure, cap
+inputs/formula/rounding/review rules; CCIP complete-or-disabled policy and
+promotion checklist; launch-disabled reward posture and incident runbook; the
+exact proposed Teller/`GuardedErc20`/CreditEngine file boundary; source-traced
+mechanism plausibility; the partial-fill decision; and the file-exact M1
+authorization proposal in the owner packet. Implemented GuardedErc20
+evidence, composed implementation tests, new Ripe deployment addresses/runtime
+hashes, post-deployment route/configuration proof, exact freeze-time cap
+integers, and final M1–M5 evidence are later gates, not M0 blockers.
 
 The refreshed Base snapshot does **not** trip Track 8's urgent-live criterion:
 all nine custody-positive ID-3 assets had `C >= N`; WETH retained its known
@@ -280,8 +290,10 @@ Stability auto-deposit retain arbitrary configured asset inputs.
 ### 4.2 Robinhood exact-transfer compatibility matrix
 
 `Pass` below means exact base-unit transfer behavior is positively evidenced;
-it does not mean approved for listing. `Unknown` is a hard stop for an enabled
-Robinhood runtime row.
+it does not mean approved for listing. `Unknown` is an M0 hard stop for an
+already-existing external token proposed for enablement. A new Ripe artifact
+that does not yet exist receives a route/file disposition in M0 and runtime
+evidence only after implementation.
 
 This is an M0 token-compatibility classification. The forward Teller and launch
 vault do not exist yet, so it does not claim that an unimplemented M1 route has
@@ -290,23 +302,40 @@ and prove the same exact delta.
 
 | Asset or asset class | Address/runtime | Ordinary routes | Trusted routes | Exact-transfer result | M0 disposition |
 | --- | --- | --- | --- | --- | --- |
-| AAPL Stock Token | Proxy `0xaF3D76f1834A1d425780943C99Ea8A608f8a93f9`; exact identities in Section 5 | Eligible only after future config | Deleverage/Stability auto-deposit could reach it after future config | **Pass at RH-T2-01**, conditional on unpaused/unblocked unchanged runtime; RH-M0-01 identity matches | Compatible candidate; not a vault/listing approval |
-| Every other launch Stock Token | **No final addresses or count in the repository** | Potentially all generic routes | Potentially Deleverage/Stability auto-deposit | **Unknown** | **Hard stop** until every token proxy/control/runtime and exact route is pinned |
-| RIPE | No Robinhood deployment address/runtime | RipeGov public route if included | StabVault, HR, Lootbox, BondRoom | **Unknown Robinhood runtime** | **Hard stop** if the route is enabled; otherwise manifest must prove omission/inactivity |
-| sGREEN | Inclusion is owner-pending; no Robinhood deployment address/runtime | GREEN-conversion route deposits sGREEN | CreditEngine/CreditRedeem | **Unknown Robinhood runtime and inclusion** | **Hard stop** if included; otherwise prove every dependent path omitted/inactive |
-| GREEN | No Robinhood deployment address/runtime | Enters Teller before optional ERC-4626 conversion; it is not the final `_deposit` asset in that route | None of the enumerated trusted `_deposit` calls use raw GREEN | **Unknown runtime; wrapper-input only** | Freeze inclusion and exact conversion behavior before enabling the route |
-| USDG | Canonical asset direction exists, but final PSM/collateral inclusion and address manifest are absent | Could reach generic Teller only if configured as collateral/RipeGov asset | Could reach arbitrary trusted routes if configured | **Unknown route inclusion/runtime** | **Hard stop if enabled through Teller**; disabled/omitted PSM alone does not prove Teller omission |
-| Any other Robinhood collateral, governance, reward, claim, or receipt token | No final asset/default/manifest inventory | Generic ordinary routes | Arbitrary configured trusted routes | **Unknown** | **Hard stop** |
+| AAPL Stock Token | Proxy `0xaF3D76f1834A1d425780943C99Ea8A608f8a93f9`; exact identities in Section 5 | Future ordinary deposit only, through exactly one enabled vault | **Prohibited:** every Department/trusted route, including Deleverage and Stability auto-deposit, must remain disabled/unreachable | **Pass at RH-T2-01**, conditional on unpaused/unblocked unchanged runtime; RH-M0-01 identity matches | Compatible candidate; not a vault/listing approval |
+| Every other Stock Token | No initial-launch row required | None at initial launch | None at initial launch | Not applicable while omitted | Owner-omitted; each later token requires a complete independent row |
+| RIPE | New Ripe artifact; no Robinhood deployment exists | RipeGov public route required at launch | Only the named RIPE producers StabVault, HumanResources, Lootbox, and BondRoom may use their existing RipeGov route; no arbitrary asset substitution | **Not runtime-classifiable in M0** | M0 freezes this exact file/route disposition; source/compiler/runtime and composed route proof are post-M0 |
+| sGREEN | New Ripe artifact; no Robinhood deployment exists | GREEN-conversion deposit/withdraw required | Only the named CreditEngine/CreditRedeem surplus-to-Stability routes; Stock extraction through CreditRedeem remains disabled | **Not runtime-classifiable in M0** | M0 freezes the chain-native file/route disposition; source/compiler/runtime and composed route proof are post-M0; CCIP must never exist |
+| GREEN | New Ripe artifact; no Robinhood deployment exists | Enters Teller only as the input to the sGREEN conversion; core debt/settlement token | No raw-GREEN trusted `_deposit` route in the inventory | **Not runtime-classifiable in M0; wrapper-input only** | M0 freezes core/sGREEN/CCIP file and route dispositions; runtime/composition proof is post-M0 |
+| USDG | Canonical Robinhood mainnet proxy `0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168`; implementation `0x68184C449E1a8f34fA18d289737129FD27B66f8F`; proxy/implementation hashes `0x864cc9ad53b338b82da1f7cab85ab0b3d5c8861acb422b6fec63cf36234f36a6` / `0x3a551ac5c744af57e68a1d1431ac403c0f516ffd7d224a75746aee11fc4f3baf` at block `17,572,269` | **Must not be ordinary Teller collateral; PSM and future GREEN/USDG LP only** | Every arbitrary trusted route omitted | **Pass for exact ordinary ERC-20 transfer under the pinned six-decimal, fee-free, non-rebasing runtime** | Existing identity/compatibility frozen from `usdg-public-evidence.md`; future PSM/LP composition and runtimes are post-M0 |
+| GREEN/USDG LP | New launch artifact; canonical USDG above is the existing external constituent; GREEN is a new Ripe artifact | Future ordinary deposit token only, `ltv=0` | Every trusted route omitted | **Not runtime-classifiable in M0 because the pool/token does not yet exist** | M0 freezes constituents, ordinary-only route, and zero-LTV policy; exact DEX/factory/pool implementation/oracle creation inputs, LP address/runtime, and composed proof are post-M0 launch gates, not fabricated M0 identities |
+| RIPE/WETH LP | New launch artifact; Robinhood WETH `0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73` is the existing external constituent documented by the [chain operator](https://docs.robinhood.com/chain/contracts/); RIPE is a new Ripe artifact | Future ordinary deposit token only, `ltv=0` | Every trusted route omitted | **Not runtime-classifiable in M0 because the pool/token does not yet exist** | M0 freezes constituents, ordinary-only route, and zero-LTV policy; exact DEX/factory/pool implementation/oracle creation inputs, LP address/runtime, and composed proof are post-M0 launch gates |
+| Any other Robinhood collateral, governance, reward, claim, or receipt token | Not approved in the M0 launch graph | No route permitted | No route permitted | Not applicable while omitted | M0 freezes omission; later inclusion requires a complete independent row |
 
 The repository evidence for the unknown set is explicit:
 
 - `docs/chains/rh-summary.md` requires “each launch Stock Token” but names only
   “one candidate Stock Token” in the testnet checklist;
-- the SavingsGreen decision remains open;
-- initial GREEN/RIPE bridging remains open;
-- PSM activation remains open even though the USDG price path is selected; and
-- Robinhood migration trees, manifests, and final address/parameter inventory
-  do not yet exist.
+- SavingsGreen is owner-required, but M0 can freeze its proposed file and route
+  disposition without fabricating a future deployment identity.
+- GREEN/RIPE CCIP targets a separately reviewed promotion within seven days
+  after launch and remains disabled if incomplete or late.
+- PSM activation is owner-required; M0 freezes the existing canonical
+  USDG/feed identities plus proposed authority/route ordering.
+- Robinhood migration trees, manifests, new Ripe contract addresses, and final
+  deployed runtime inventory do not yet exist and are post-M0 evidence.
+
+The LP pool/factory/implementation/oracle cannot be pinned as an already
+existing external dependency because no approved pool selection or deployed
+LP exists in the reviewed repository. That absence is a later launch-component
+gate, not an M0 evidence hole: neither LP can reach Teller until it exists and
+is separately configured. It remains a hard launch stop, and M0 does not
+select a DEX or pool.
+
+The Robinhood operator token-contract directory was retrieved on 25 July 2026
+and lists the WETH and USDG addresses used above. This was a documentation
+read, not an RPC/indexer/fork result; it does not supply a WETH runtime or
+approve a future LP.
 
 Therefore AAPL evidence cannot be extrapolated by ticker, issuer, beacon, or
 shared implementation to an unnamed token. Every enabled proxy remains a
@@ -393,6 +422,44 @@ live token, native token, or transaction was used.
 The M0 rerun limitation in Section 3 remains explicit. Current identity parity
 substantially reduces implementation-drift risk but is not a substitute for a
 fresh historical fork if the independent reviewer requires one.
+
+### 5.4 Approved AAPL/USD feed and cap-freeze procedure
+
+The integrated `stock-token-transferability-evidence.md` pins the approved
+Robinhood Chainlink AAPL/USD feed:
+
+| Field | Frozen M0 input |
+| --- | --- |
+| Feed proxy | `0x6B22A786bAa607d76728168703a39Ea9C99f2cD0` |
+| Aggregator at the integrated pin | `0xBb11A21267cFDb63d4935d99a499133DD1744ACb` |
+| Decimals | `8` |
+| Published heartbeat | `86,400` seconds |
+| Integrated reference answer | `32079999999` |
+| Integrated update time | `2026-07-23T15:07:00Z` |
+
+The final activation freeze must re-read the proxy and
+`latestRoundData()` at one recorded block number/hash/timestamp, record proxy
+and then-current aggregator runtime hashes, and require: positive answer,
+eight decimals, nonzero/not-future `updatedAt`,
+`answeredInRound >= roundId`, and age no greater than the approved nonzero
+effective stale ceiling. An identity or interface change triggers full
+revalidation.
+
+For target USD value `D`, AAPL decimals `18`, and positive eight-decimal answer
+`P8`, the fixed AAPL atomic cap is:
+
+```text
+capAtomic = floor(D * 10^(18 + 8) / P8)
+```
+
+Apply it independently with `D=5,000` and `D=25,000`. Rounding down ensures a
+stored cap never exceeds its USD target at the freeze price. The activation
+record must include both inputs, formula evaluation, two-person arithmetic
+review, and exact configuration readback. Re-review is required at least every
+seven days and whenever the current approved-feed valuation of either fixed
+cap exceeds `110%` of its target. The freeze-time price and resulting integers
+are post-M0 activation evidence; M0 freezes the procedure and inputs, not
+future market data.
 
 ## 6. Base ID-3 forward-source and live-risk classification
 
@@ -536,34 +603,55 @@ configuration, rewards, and permissions by construction. Shared source,
 governance personnel, monitoring, or release tooling is not shared onchain
 state.
 
+The proposed chain-local boundary is file-exact:
+
+| Source file | State/authority that must be a distinct Robinhood instance | Prohibited Base edge |
+| --- | --- | --- |
+| `contracts/registries/RipeHq.vy`; `contracts/modules/Addys.vy` | Root address registry and every resolved Department/token address | No Base RipeHq or Base Department address may be registered or used as fallback |
+| `contracts/registries/VaultBook.vy`; proposed `contracts/vaults/GuardedErc20.vy` | Vault registry, AAPL nominal accounting, and AAPL custody | No shared vault, custody address, VaultBook ID meaning, or token balance |
+| `contracts/data/Ledger.vy`; `contracts/core/CreditEngine.vy` | User/global debt, participation, bad debt, and collateral evaluation | No remote debt read/write, shared debt store, or cross-chain credit |
+| `contracts/data/MissionControl.vy` | Asset, route, debt-term, reward, permission, and pause configuration | No remote config read/write or Base default fallback |
+| `contracts/core/AuctionHouse.vy`; `contracts/core/Teller.vy` | Auction state, settlement, deposits, and withdrawals | No remote auction/settlement call or Base vault consumer |
+| `contracts/core/Lootbox.vy` | Points and RIPE reward accounting | No shared reward accumulator or cross-chain claim |
+| `contracts/tokens/GreenToken.vy`; `contracts/tokens/RipeToken.vy`; `contracts/tokens/SavingsGreen.vy` | Chain-local GREEN, RIPE, and sGREEN supply/balances/roles | No mint/burn/message authority connecting Base during launch; later GREEN/RIPE CCIP is a separately reviewed intentional economic edge; sGREEN never has one |
+
+The later deployment proof must resolve every row to a Robinhood address and
+runtime hash and show that no address equals a Base deployment. M0 freezes that
+graph and the exact source boundary; it cannot fabricate the future addresses.
+
 ### 7.3 Propagation-path matrix
 
 | Possible path | Current repository/deployment evidence | Can Base failure alter Robinhood protocol state? | M0 disposition |
 | --- | --- | --- | --- |
-| Shared vault custody | Base vault address is chain-local; no RH Ripe vault exists | No current path | Require distinct RH manifest address and reject every Base address |
-| Shared Ledger/credit/debt | Base Ledger is manifest-pinned; Addys resolves local HQ | No current path | Require distinct RH HQ/Ledger and state-root checks |
-| Shared AuctionHouse/settlement | Base AuctionHouse is manifest-pinned; no remote call source exists | No current path | Require distinct RH AuctionHouse and GREEN path |
-| Shared MissionControl/config | Local HQ resolution only | No current path | Require distinct RH MissionControl/default manifest |
+| Shared vault custody | Base vault address is chain-local; no RH Ripe vault exists | No current path | M0 freezes a distinct-chain deployment requirement; later deployment proof must reject every Base address |
+| Shared Ledger/credit/debt | Base Ledger is manifest-pinned; Addys resolves local HQ | No current path | M0 freezes local-HQ resolution; later deployment proof must show distinct RH HQ/Ledger and state roots |
+| Shared AuctionHouse/settlement | Base AuctionHouse is manifest-pinned; no remote call source exists | No current path | M0 freezes the local AuctionHouse/GREEN graph; distinct deployed addresses are post-M0 proof |
+| Shared MissionControl/config | Local HQ resolution only | No current path | M0 freezes local-only resolution; distinct RH MissionControl/default manifest is post-M0 proof |
 | Stock-token authority | AAPL beacon/registry exists on Robinhood; no repository or deployment evidence inspected in M0 identifies a Base Ripe address as privileged in that graph | No Base-to-RH protocol-state path observed from the available evidence | Enumerate exact launch-token roles at freeze; an unknown role is a stop |
 | Shared offchain operator/governance person | Possible operationally, but not an automatic state edge | No by itself | Role errors remain operational risk, not state propagation |
-| GREEN/RIPE CCIP burn/mint pools | Proposed in docs; no production source/deployment yet; initial-launch requirement open | **Yes if activated:** Base-originated excess/unsafe GREEN can be burned/minted into RH supply and affect liquidity, repayment, PSM, or accounting; token/pool authority is a direct edge | **Hard stop until omitted/inactive or separately security-approved with a revised independence claim** |
-| USDG/PSM or other external bridge | Inclusion and final graph are not frozen | Unknown | Hard stop if any remote custody/message/token-authority edge is included |
+| GREEN/RIPE CCIP burn/mint pools | Owner-selected post-launch target; no complete production source/deployment evidence yet | **Yes if activated:** Base-originated excess/unsafe GREEN can be burned/minted into RH supply and affect liquidity, repayment, PSM, or accounting; token/pool authority is a direct edge | Target a separately reviewed promotion within seven days after launch; this is not automatic authorization, incomplete or late evidence leaves CCIP disabled, and sGREEN has no route |
+| USDG/PSM or other external bridge | PSM is a launch target, but no cross-chain USDG route is approved by this record | Unknown if a remote edge is introduced | PSM must be chain-local under the current independence proof; any remote custody/message/token-authority edge is a hard stop |
 
 ### 7.4 Independence conclusion
 
-The file-level architecture supports independence, but a
-**deployment-exact proof cannot pass without the final Robinhood manifest and
-feature graph**. It passes provisionally only under both conditions:
+The file-level architecture supports independence. M0 can close its
+**file-exact proposed deployment-graph proof** without a not-yet-created
+Robinhood manifest if both requirements are frozen:
 
 1. every Robinhood Ripe contract, registry, custody address, debt store,
    auction store, configuration store, and token authority is a distinct
    chain-local instance; and
-2. GREEN/RIPE CCIP and every other cross-chain state/economic route is omitted
-   or provably inactive during Stock activation.
+2. GREEN/RIPE CCIP and every other cross-chain state/economic route is either
+   omitted/provably inactive or fully enumerated with a revised propagation
+   and security conclusion.
 
-If initial launch requires the proposed CCIP bridge, M0 must return to
-owner/security review. It cannot describe Robinhood-first as independent while
-the bridge intentionally joins token supply and economic state.
+Actual new Robinhood addresses, runtime hashes, manifest, and post-deployment
+state-root checks are later gates. CCIP is a nonblocking target for a fresh,
+separately reviewed promotion within seven days after launch. Seven days is
+not automatic authorization; incomplete or late evidence leaves CCIP
+disabled. If it enables later, the promotion package must describe the
+intentional economic edge rather than claim strict state independence.
+sGREEN must remain chain-native with no CCIP path in every case.
 
 ## 8. Day-one depositor and borrower reward posture
 
@@ -591,25 +679,55 @@ zero voter/generic-depositor distribution. They are not approved Robinhood
 defaults. In particular, blindly copying them would make every Robinhood
 borrower eligible for the global borrower bucket.
 
-### 8.2 Required owner decision
+### 8.2 Owner-approved reward lifecycle
 
-The owner must select one posture before M0 can pass:
+The owner selected:
 
-1. **Global launch disable — recommended minimum-risk posture.**
-   `arePointsEnabled=false`, `ripePerBlock=0`, and no funded/mintable launch
-   reward distribution. Stock and non-Stock positions accrue no launch points
-   or RIPE until a later approved enablement.
-2. **Non-Stock rewards only.** Points may be enabled, but
-   `borrowersAlloc=0`, `genDepositorsAlloc=0`, and every launch Stock Token has
-   `stakersPointsAlloc=0` and `voterPointsAlloc=0`. Any retained staker/voter
-   bucket must prove that only named non-Stock assets have nonzero per-asset
-   allocation. This sacrifices borrower rewards globally because the current
-   schema cannot distinguish debt by collateral.
-3. **Stock-linked launch rewards required.** This is a **hard stop**. Reopen
-   reward-loss attribution and incident behavior before M1; do not silently
-   accept pre-loss points or payouts after custody loss.
+1. launch with `arePointsEnabled=false`, `ripePerBlock=0`, and no live reward
+   distribution;
+2. target activation within seven days after launch, subject to validation;
+3. permit AAPL depositors and AAPL-backed borrowers to participate after that
+   validation;
+4. accept that nominal/global accounting can briefly accrue rewards after an
+   issuer/custody incident until the global switches are disabled; and
+5. require live monitoring and a rehearsed
+   `arePointsEnabled`/`ripePerBlock` kill-switch runbook.
 
-No option is selected by this evidence file.
+No reward-accounting contract change is required by default. M0 remains open
+pending package review, but the pre-implementation runbook is now exact. The
+seven-day target is not permission to distribute rewards.
+
+### 8.3 Source-exact incident runbook
+
+The two controls have different authority and timing:
+
+| Control | Current source path | Authority/timing | Required use |
+| --- | --- | --- | --- |
+| Stop new point accrual | `SwitchboardAlpha.setRewardsPointsEnabled(false)` -> `MissionControl.setRipeRewardsConfig` | Governance, or a configured MissionControl lite actor when disabling; immediate | Must already be `false` at launch. After a later reward promotion, the incident operator disables it in the first response transaction and verifies `MissionControl.getRewardsConfig().arePointsEnabled == false` plus `RewardsPointsEnabledModified(false, caller)`. |
+| Stop the RIPE-per-block schedule | `SwitchboardAlpha.setRipePerBlock(0)` -> pending `RIPE_REWARDS_BLOCK` action -> `executePendingAction` | Governance-only initiation and execution after the configured timelock | Must already be `0` at launch. After a later reward promotion, governance immediately initiates zero, records action ID/confirmation block, and executes at the first eligible block; readback must prove `ripePerBlock == 0` and the `RipeRewardsPerBlockSet(0)` event. |
+
+Monitoring must alert on AAPL proxy/beacon/implementation change, pause or
+blocklist control use, unknown backing read, `C<N`, failed external delivery,
+and any mismatch between the two launch-disabled readbacks and expected
+configuration. On an incident:
+
+1. disable AAPL deposits and auction purchases through existing fast-disable
+   controls, preserve `canRepay=true`, and use the global borrow stop if new
+   borrowing must halt before a custody deficit is observable;
+2. execute the immediate points disable and initiate the timelocked
+   `ripePerBlock=0` action;
+3. record chain, block/hash/timestamp, callers, action ID, events, and
+   MissionControl readbacks;
+4. verify no further point accrual after the disable block and quantify any
+   distribution/claim exposure that remains during the emission timelock; and
+5. keep the affected Stock path and reward promotion disabled until an
+   independently reviewed recovery package proves backing, token identity,
+   configuration, and reward state.
+
+The owner accepts the brief nominal/global accounting window, but the
+timelocked emission change means “two-switch kill” is not two simultaneous
+fast stops. Failure to provision a live lite actor, governance execution path,
+monitor, or confirmation-block runbook is a post-M0 launch/promotion stop.
 
 ## 9. Incompatibilities, unknowns, and accepted residual risk
 
@@ -622,23 +740,45 @@ No option is selected by this evidence file.
 - Per-route fork execution is incomplete for all 27 Base rows, so none is
   approved for a forward-source Base cutover by this file.
 
-### 9.2 Hard stops
+### 9.2 True M0 hard stops
 
-The following stop before M1:
+Any of the following would stop M0 before a later M1 authorization could be
+approved. The present package records each as closed at the
+pre-implementation level, subject to independent review:
 
-- any enabled Robinhood Stock or non-Stock asset not explicitly named by
-  address, runtime identity, route, and exact-transfer result;
-- any fee, short-receipt, rebasing-on-transfer, malformed-read, or unknown
-  Robinhood runtime;
-- an active GREEN/RIPE or other cross-chain propagation path during Stock
-  activation without a revised owner/security decision;
-- a day-one requirement to pay Stock-linked depositor or borrower rewards;
-- a refreshed Base `C<N` row with borrow capacity, exposed debt/auction, live
-  short receipt, or another immediately exploitable mismatch;
-- inability to obtain the exact Robinhood deployment graph and prove every
-  state-owning address distinct; or
-- independent-review rejection of the carried-forward AAPL fork without an
-  archive-capable rerun.
+- An already-existing external token proposed for a Robinhood route is not
+  explicitly named by address and identity, or remains fee-taking,
+  short-receipt, rebasing-on-transfer, malformed-read, or unknown.
+- The approved launch graph or any route disposition remains ambiguous,
+  including existing AAPL/USDG/WETH identities and the proposed file/route
+  disposition for sGREEN, PSM, Stability Pool, RipeGov, or either future LP.
+- The file-exact proposed deployment graph exposes an unclassified bridge,
+  message, shared custody, credit, debt, settlement, accounting, or
+  token-authority path capable of propagating a Base failure into Robinhood.
+- The CCIP complete-or-disabled policy, separate seven-day promotion target,
+  fresh-promotion-package requirement, or permanent sGREEN exclusion is not
+  frozen.
+- The launch-disabled reward posture or the
+  `arePointsEnabled`/`ripePerBlock` incident runbook is incomplete.
+- A refreshed Base `C<N` row has borrow capacity, exposed debt or auction,
+  live short receipt, or another immediately exploitable mismatch.
+- The AAPL implementation identity changes without revalidation, or the
+  approved AAPL/USD feed, price-pin procedure, cap inputs/formula/rounding, or
+  review cadence remains incomplete.
+- The exact proposed Teller/`GuardedErc20`/CreditEngine file boundary or
+  unchanged AuctionHouse/Deleverage/interface/storage/Ledger boundary remains
+  ambiguous.
+- Source tracing cannot make guarded internal settlement plausible without
+  zero-backed payment, first-withdrawer allocation, or production-surface
+  expansion.
+- The owner has not confirmed or rejected the exact partial-fill invariant.
+- A file-exact M1 authorization proposal is not ready.
+
+Implemented GuardedErc20 source/compiler/storage/ABI/runtime evidence,
+composed implementation tests, actual new Ripe addresses/runtime hashes,
+post-deployment route/configuration proof, exact freeze-time cap integers, and
+final M1–M5 integration/activation evidence do not exist yet by design and are
+not M0 hard stops.
 
 ### 9.3 Residual risks if the stops are closed
 
@@ -655,58 +795,82 @@ The following stop before M1:
   an incident snapshot must enumerate each indebted user's vault positions.
 - Public credential-free RPCs are not production-grade evidence backends. The
   AAPL historical fork refresh demonstrated rate/archive limitations.
-- Omitting CCIP preserves state independence but creates chain-local GREEN/RIPE
-  liquidity and supply. That product consequence must be accepted explicitly.
-- Disabling borrower rewards to exclude Stock-backed debt also disables
-  borrower rewards for non-Stock borrowers under the current global schema.
+- Disabled CCIP preserves state independence but creates chain-local
+  GREEN/RIPE liquidity and supply until the separately gated target enables.
+- After reward activation, a global/nominal accrual window may persist between
+  an issuer incident and operation of the two global kill switches.
+- Guarded internal settlement does not exercise AAPL transfer, blocklist, or
+  recipient-eligibility controls; the buyer's nominal claim may later freeze
+  or become undeliverable.
 
-## 10. Complete post-M0 owner-decision package
+### 9.4 Pre-implementation closure manifest
 
-M0 requires decisions, not implementation authorization.
+| M0 input | Closing evidence | Result |
+| --- | --- | --- |
+| Existing external tokens | Section 4.2 plus Sections 5 and 6; integrated `usdg-public-evidence.md`; operator token-contract directory | AAPL exact-transfer candidate; USDG exact-transfer but PSM/LP-only; WETH constituent-only; every other external asset omitted |
+| Launch graph/routes | Sections 4.1–4.2 and owner-packet Sections 2 and 4 | AAPL-only Stock; one-vault intent; every AAPL trusted/Department route disabled; all unsupported Stock routes omitted |
+| AAPL feed/caps | Section 5.4 | Proxy, decimals, heartbeat, round-quality rules, floor formula, two USD targets, review triggers, and final-freeze evidence shape frozen |
+| Robinhood/Base independence | Section 7 | Distinct local RipeHq graph and disabled-at-launch CCIP; no observed current propagation path; actual new addresses/runtimes remain post-M0 |
+| CCIP | Sections 7.3–7.4 and owner packet 2.2 | GREEN/RIPE disabled at launch unless later separately promoted; seven-day target is non-authorizing; sGREEN never CCIP |
+| Rewards | Sections 8.1–8.3 | Both launch values zero; points fast-disable and timelocked emission-zero procedure distinguished; monitoring/evidence/runbook frozen |
+| Three-file boundary | Specification Sections 23.2–23.4 and owner-packet Section 7 | `Teller.vy`, proposed `GuardedErc20.vy`, and `CreditEngine.vy`; AuctionHouse/Deleverage/interfaces/Ledger negative-diff boundary |
+| Mechanism plausibility | Specification Sections 23.3 A–D, current-source caller matrix in Section 4.1, and owner-approved invariant in Section 12 | ML-01–ML-07 are source-plausible within the three-production-contract boundary; composed implementation proof remains mandatory post-M0 |
+| M1 proposal | Owner-packet Section 10 and specification Section 23.9.1 | Teller-only production slice, exact later baseline placeholder, allowed existing tests, excluded files, reviewers, stop conditions, and exit evidence fixed |
 
-The owner supplied the following **preliminary recommendations** with the raw
-provenance amendment: keep CCIP inactive during initial Stock activation;
-disable rewards globally at launch; accept RH-T2-01 plus the current AAPL
-identity match; leave Base unchanged; and require separate evidence and
-approval before any future Base cutover. These recommendations align with
-D-M0-02 through D-M0-06 but do not close them in this evidence amendment. The
-complete Robinhood launch-token and route table in D-M0-01 remains the
-load-bearing owner input and the principal M0 stop.
+This manifest does not claim that future Ripe contracts, LPs, DEX/pool
+selection, deployed runtimes, routes, or configuration exist. Those artifacts
+cannot be M0 evidence. It confirms only that no remaining unknown
+already-existing external asset can reach the proposed Teller under the frozen
+graph.
+
+## 10. Historical post-M0 decision return
+
+This section records the questions returned before the 24–25 July 2026 owner
+decision revisions. Section 12 is controlling. The owner has now selected the
+policy directions, including the partial-fill invariant. The pre-implementation
+identity, compatibility, parameter-procedure, route-disposition, runbook,
+source-plausibility, decision, and M1-proposal evidence is complete for
+independent review.
 
 ### D-M0-01 — Freeze the complete Robinhood Teller asset graph
 
 Provide one exhaustive table containing:
 
 - every launch Stock Token proxy address;
-- every non-Stock token address, including RIPE, GREEN, sGREEN, USDG, reward,
-  governance, claim, and receipt tokens;
+- every already-existing external non-Stock token address, including canonical
+  USDG and the external constituents/dependencies of the launch LPs;
+- proposed file and route dispositions for new Ripe artifacts such as RIPE,
+  GREEN, and sGREEN, without fabricating future deployment addresses;
 - ordinary/trusted route availability;
 - target vault class, without selecting the production launch vault or ID in
   this M0 record;
 - enabled, disabled, omitted, or inactive-staging disposition; and
-- code/proxy/beacon/implementation identity for every enabled token.
+- code/proxy/beacon/implementation identity for every already-existing
+  external token proposed for enablement.
 
-Until this table exists, M0 remains stopped.
+The owner selected AAPL as the only initial Stock Token and named the non-Stock
+launch targets. Section 4.2 now freezes every existing external identity that
+can reach Teller and the complete route/file disposition. New Ripe deployment
+addresses, pool/factory selection, runtimes, and composed route tests are later
+launch gates.
 
 ### D-M0-02 — Initial cross-chain posture
 
-Choose:
-
-- **omit or keep all GREEN/RIPE CCIP and other cross-chain routes inactive
-  through Stock activation** — recommended for the minimum independent launch;
-  or
-- require a cross-chain route, which returns the propagation path to
-  owner/security review and prevents the current independence proof from
-  passing.
+Resolved direction: launch does not depend on CCIP. GREEN and RIPE target a
+fresh, separately reviewed promotion within seven days after launch. Seven
+days is a target, not automatic authorization; any incomplete or late package
+leaves CCIP disabled. sGREEN never has a CCIP route. The promotion package,
+deployed route identities, authorities, monitoring, rollback, and propagation
+evidence are post-M0.
 
 ### D-M0-03 — Day-one rewards
 
-Choose reward option 1, 2, or 3 from Section 8.2. Option 3 is a stop and reopens
-reward-loss scope.
+Resolved by Section 8.2: global disable at launch, then a validated target
+activation within seven days that may include AAPL positions.
 
 ### D-M0-04 — AAPL fork-refresh sufficiency
 
-Choose:
+Historical alternatives:
 
 - accept the integrated immutable RH-T2-01 exact fork plus RH-M0-01's current
   identity match for M0; or
@@ -717,7 +881,7 @@ This decision does not approve a live AAPL transfer.
 
 ### D-M0-05 — Base sequencing and residual risk
 
-Confirm or reject:
+Historical confirmation request:
 
 - BASE-M0-01 does not demonstrate an urgent live Base vulnerability;
 - Robinhood-first may continue after the other M0 stops close;
@@ -730,46 +894,117 @@ does not authorize a migration.
 
 ### D-M0-06 — Future Base cutover
 
-Confirm that this file does **not** approve a Base cutover. All 27 rows require
-route-exact fork/equivalent evidence, implementation/control refresh, borrower
-position enumeration, auction enumeration, and separate migration approval
-before any forward-source Base deployment.
+The owner confirmed that this file does **not** approve a Base cutover. All 27
+rows require route-exact fork/equivalent evidence, implementation/control
+refresh, borrower position enumeration, auction enumeration, and separate
+migration approval before any forward-source Base deployment.
 
 ### D-M0-07 — Next authorization boundary
 
-After D-M0-01 through D-M0-06 are resolved and this file is independently
-reviewed, the owner may authorize either:
+After the pre-implementation package in Section 9.2 is independently reviewed
+and M0 is explicitly closed, the owner may authorize either:
 
 - a documentation-only M0 closure revision; or
 - a later file-exact M1 implementation slice.
 
 Nothing in this file authorizes M1. No production vault or VaultBook ID is
-selected, and the three-contract mechanism remains unapproved.
+selected. The three-contract direction is documented but remains unimplemented
+and evidence-dependent.
 
 ## 11. M0 checklist
 
 - [x] Fresh worktree and branch created from exact integrated commit.
-- [x] Only this M0 file and its sanitized raw-evidence companion are authorized
-  repository deltas.
-- [x] Controlling Track 8 specification and validation plan unchanged.
+- [x] Original M0 evidence acquisition changed only this file and its sanitized
+  raw companion.
+- [x] The later 24–25 July owner-decision revisions update this file, the
+  packet, specification, and validation plan only; the raw companion remains
+  immutable.
 - [x] Exact original Base RPC URL, raw replay provenance, companion SHA-256,
   and unavailable-response classifications recorded without credentials.
 - [x] Current-source ordinary and trusted Teller caller inventory complete.
-- [ ] Exact Robinhood asset matrix complete — **blocked on D-M0-01**.
+- [x] M0 Robinhood asset matrix complete — **AAPL, canonical USDG, and WETH
+  constituent identities plus all route/file dispositions are frozen; new
+  Ripe/LP runtimes are post-M0**.
 - [x] Exact AAPL proxy/beacon/implementation and live hashes refreshed.
 - [x] Integrated exact AAPL fork behavior preserved with immutable provenance.
-- [ ] Fresh AAPL fork rerun — **provider-limited; D-M0-04 returned**.
+- [x] Fresh AAPL fork rerun not required for M0 — **owner accepted integrated
+  fork plus current identity; identity change requires revalidation**.
 - [x] All 27 Base ID-3 assets refreshed for `C/N`, deposit support, LTV,
   liquidation route, points allocation, and exact-block runtime hash.
 - [x] Nine funded Base rows and WETH one-unit surplus confirmed.
 - [x] Base aggregate debt, borrower count, auction sentinel, bad debt, yield,
   and rewards recorded.
 - [x] No urgent-live Base criterion observed.
-- [ ] Robinhood/Base deployment-exact independence complete — **blocked on
-  final Robinhood graph and D-M0-02**.
+- [x] Robinhood/Base file-exact proposed state-independence proof complete —
+  **CCIP is disabled at launch and separately promoted; actual new
+  addresses/runtime hashes are post-M0**.
 - [x] Every Stock-capable reward bucket identified.
-- [ ] Day-one reward policy frozen — **blocked on D-M0-03**.
+- [x] Day-one reward policy frozen — **global disable, later validated target
+  activation**.
+- [x] AAPL feed, price-pin procedure, cap inputs/formula/rounding, and review
+  cadence frozen — **actual freeze-time cap integers are post-M0**.
+- [x] Exact proposed three-contract/file and unchanged-consumer boundary plus
+  source-traced mechanism plausibility complete.
+- [x] Exact partial-fill invariant owner-confirmed on 25 July 2026.
+- [x] File-exact M1 authorization proposal ready in the owner packet without
+  beginning M1.
 - [x] No state-changing transaction, signing, deployment, configuration,
   migration, or live transfer performed.
 - [x] No secret or credential recorded.
 - [x] M1 not begun.
+
+## 12. Controlling owner-decision revision — 24–25 July 2026
+
+The complete owner record is
+`track-8-m0-owner-decision-packet.md`. The evidence effect is:
+
+| Direction | Evidence consequence |
+| --- | --- |
+| AAPL only | Other Stock Tokens no longer block initial launch, but cannot be enabled without a complete token-specific row. |
+| CCIP target, nonblocking | Target a fresh, separately reviewed promotion within seven days after launch. Seven days is not automatic authorization; incomplete or late evidence leaves CCIP disabled. sGREEN has no CCIP path. |
+| Rewards disabled then target activation | Prove launch disable, live monitoring, and both global kill switches; later AAPL reward participation remains validation-gated. |
+| Existing AAPL fork accepted | No new historical fork is required unless identity changes; the prior provider limitation remains disclosed. |
+| Base unchanged | No cutover evidence is needed for Robinhood launch beyond current-state risk and independence; every later cutover is separate. |
+| sGREEN, PSM, Stability, RipeGov, LP launch targets | M0 freezes existing external dependencies and proposed route/file dispositions; new Ripe identities, runtime hashes, and composed route evidence are later gates. |
+| AAPL USD targets/cardinality | M0 records the approved feed, pin procedure, cap formula/inputs/rounding/review cadence, one-vault policy, and trusted-route-disable policy. The actual freeze price, 18-decimal cap integers, new vault address, and post-deployment configuration proof are later gates. |
+| Guarded internal settlement | Owner-selected vault-local direction with the exact partial-fill invariant owner-approved on 25 July 2026. M0 source tracing establishes plausibility; composed implementation evidence is post-M0. |
+| Unacceptable boundary | Phantom collateral, first-withdrawer allocation, and zero-backed payment/debt reduction remain hard stops. |
+
+The owner approved the exact internal-settlement partial-fill invariant on
+25 July 2026:
+
+```text
+0 < W <= Q
+sellerNominalDecrease == W
+buyerNominalIncrease == W
+aggregateNominalAfter == N
+known(C0,C1)
+C0 >= N
+C1 >= N
+C1 == C0
+payment and debt reduction are based only on W
+```
+
+Here `Q` is the AuctionHouse maximum request and `W` is the amount actually
+moved. The rule permits a safe partial fill when the seller's remaining
+nominal balance is smaller than `Q`. Later composed validation must cover full
+fill, partial fill, seller depletion, batch auctions, over-request, and
+failure atomicity. External settlement remains governed independently by
+exact delivery and `E=min(Q,W,R)`.
+
+The guarded internal direction does not require a larger production surface on
+the current source evidence. Teller remains necessary for exact call-local
+deposit receipt, the fresh vault owns both external and internal settlement
+proofs, CreditEngine preserves unsafe-position terms, and AuctionHouse already
+commits payment/debt only after the vault returns. An AuctionHouse change,
+persistent mode field, canonical-interface change, Ledger change, or
+chain-specific branch is a stop-and-return unless independent composed review
+proves it necessary.
+
+The owner also expressly accepted that a successful internal accounting move
+does not exercise AAPL transfer, blocklist, or recipient-eligibility controls
+and that the buyer's resulting claim can later become frozen or
+undeliverable.
+
+All documentable pre-implementation M0 inputs are complete. M0 remains open
+pending independent review and owner closure. M1 remains unauthorized.

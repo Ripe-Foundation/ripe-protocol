@@ -1,11 +1,13 @@
 # Shared Stock Token Vault-Change Specification
 
-Status: **Narrow minimum-change reassessment complete at the owner checkpoint;
-Stock Tokens remain mandatory launch scope; no production code, vault/ID,
+Status: **M0 owner directions recorded on 24–25 July 2026; all documentable
+pre-implementation M0 inputs are complete for independent review; M0 remains
+open pending that review and owner closure; M1 remains unauthorized; Stock
+Tokens remain mandatory launch scope; no production code, vault/ID,
 implementation, migration, deployment, live configuration, or transaction is
 authorized**
 
-Date: 2026-07-24 (America/Denver)
+Date: 2026-07-25 (America/Denver)
 
 This document is the Track 8 working specification required by
 `track-8-stock-token-vault-change.md`. It records the evidence reconciliation,
@@ -1160,6 +1162,80 @@ ETHERSCAN_API_KEY=unused WEB3_ALCHEMY_API_KEY=unused PYTHONPATH=. \
 
 The placeholders are non-secret and no fork RPC was used.
 
+### 3.22 M0 owner-decision revisions and baseline reconciliation
+
+On **24 July 2026**, after review of the M0 evidence and decision interview,
+the owner approved the fourteen directions recorded in
+`track-8-m0-owner-decision-packet.md`. On **25 July 2026**, the owner approved
+the exact partial-fill invariant below and accepted its residual
+transfer-control risk. The Track 8 branch was then fast-forwarded, without
+rebase or history rewrite, from reviewed `rh`
+`185bd32004121bbb1c60748844c517ea8da0affb` to exact current `rh`
+`fc48ac45e5f6e8c698a6464a14289aad00e1f2d4`; that increment adds only
+`docs/chains/rh/track-6-s6-track-7-h4-defaults-parameters.md` and changes no
+Track 8 package file. This remains documentation-only. It does not close M0,
+begin M1, select a vault or VaultBook ID, or authorize a production, test,
+interface, ABI, default, migration, manifest, deployment, configuration, or
+transaction change.
+
+The operative product graph is now:
+
+- AAPL is the only initial Stock Token; every later Stock Token requires its
+  own identity, transfer, oracle, control, and route evidence;
+- GREEN/RIPE CCIP are nonblocking launch targets, with a separately reviewed
+  promotion targeted within seven days after launch; they remain disabled if
+  their gates are incomplete or the target is missed, and sGREEN is
+  chain-native and never CCIP-enabled;
+- rewards start globally disabled, may be activated within seven days only
+  after validation, and may then include AAPL depositors and borrowers under
+  the accepted global-accounting incident risk and kill-switch runbook;
+- the existing successful AAPL pinned fork plus matching current identities is
+  accepted, with mandatory revalidation after any implementation-identity
+  change;
+- Base remains unchanged and every future cutover is separately gated;
+- chain-native sGREEN deposit/withdraw, the GREEN Stability Pool, the RIPE
+  governance vault, the USDG/Endaoment PSM, GREEN/USDG LP, and RIPE/WETH LP
+  are launch targets subject to their exact evidence gates;
+- USDG is not ordinary Teller collateral; Stock remains excluded from
+  Stability Pool custody/swaps and CreditRedeem; and
+- AAPL uses one enabled vault, no trusted/Department deposit route, and
+  $5,000 per-user/$25,000 global USD targets converted to fixed 18-decimal
+  amounts at the approved final price, with a seven-day and greater-than-10%
+  upward-drift review.
+
+The settlement direction supersedes every earlier unqualified
+“external-only” recommendation for the initial AAPL path. Those earlier
+statements remain historical architecture analysis. The operative minimum
+allows a vault-local internal nominal move only if exact, revert-safe custody
+reads prove `C>=N` before and after and custody is unchanged across the move.
+The owner-approved partial-fill invariant permits `0<W<=Q` only when
+the seller decreases by `W`, the buyer increases by `W`, aggregate nominal
+accounting remains `N`, and payment/debt reduction use only `W`. Unknown
+reads, deficits, amount-accounting mismatch, or custody movement revert before
+AuctionHouse can charge GREEN or reduce debt. External delivery remains the
+frontend default. The owner accepts that a guarded internal move does not
+exercise issuer transfer, blocklist, or recipient-eligibility controls and
+that the buyer's resulting claim may later become frozen or undeliverable.
+The 25 July approval authorizes documentation and completion of
+pre-implementation M0 evidence only; it does not authorize M1.
+
+This change stays inside the proposed three-production-contract surface:
+Teller, the fresh generic nominal vault, and CreditEngine. The fresh vault
+already owns `transferBalanceWithinVault`, nominal totals, custody
+observation, and the shared nonreentrancy boundary. AuctionHouse already waits
+for the vault's successful return before GREEN payment and debt reduction.
+No AuctionHouse source, persistent settlement field, canonical interface,
+Ledger, or chain-specific branch is required by the specified mechanism.
+Independent implementation review must return to the owner if the composed
+tests disprove any of those facts.
+
+The former external-only wording of invariant I-11, the Phase F/H/I/J
+external-only branches, and earlier decision-register rows are therefore
+historical/superseded for this initial launch. They are not deleted because
+they document the alternatives and prior owner gates. Revised I-11, Section
+23, and validation-plan Section 20 are the controlling launch specification
+and test contract.
+
 ## 4. Current consumer and ordering trace
 
 ### 4.1 Deposit
@@ -1850,18 +1926,22 @@ No user or combination of users may borrow against the same custody twice.
 Quarantined `U` is excluded. Rounding dust must have an explicit bound and
 disposition.
 
-### I-04 — pay only for delivered collateral
+### I-04 — pay only for proved settlement
 
-For every auction, redemption, deleverage, or other collateral settlement:
+For external settlement:
 
 ```text
 GREEN paid or debt reduced
     <= price(value of collateral actually and safely delivered)
 ```
 
-An internal ledger move is not "safely delivered" for an issuer-controlled
-asset unless the owner explicitly rejects the external-only policy and the
-design separately proves live backing and later deliverability.
+For guarded internal AAPL settlement under the owner-approved partial-fill
+decision, GREEN payment or debt reduction is permitted only up to the
+price of `W`, where `0<W<=Q`, seller nominal decreases by `W`, buyer nominal
+increases by `W`, aggregate nominal remains `N`, and the selected vault proves
+the complete Section 23.4 custody conditions. A nominal move with unknown or
+deficient custody, inconsistent user deltas, changed aggregate nominal
+accounting, or custody movement is never proved settlement.
 
 ### I-05 — failed-delivery atomicity
 
@@ -1920,10 +2000,15 @@ claims, erase them, or capture later restoration by accident. New deposits
 remain frozen unless an explicit owner-approved recapitalization/allocation
 procedure proves otherwise.
 
-### I-11 — issuer-controlled external settlement
+### I-11 — issuer-controlled guarded settlement
 
-Under the recommended policy, issuer-controlled collateral is always settled
-externally. Buyer-selected internal settlement is unavailable.
+Under the controlling M0 owner decision, external settlement remains the
+frontend default. The owner-approved refinement permits
+buyer-selected internal settlement only through a vault that proves known
+`C>=N` before and after, `0<W<=Q`, seller decrease and buyer increase both
+equal `W`, unchanged aggregate nominal accounting, unchanged custody, and
+payment/debt reduction based only on `W`. Any unknown read, deficit, mismatch,
+or custody change reverts before GREEN payment or debt reduction.
 
 ### I-12 — custody control is price-independent
 
@@ -2052,7 +2137,8 @@ Required properties:
 - post-zero deposit freeze;
 - no automatic donation/restoration allocation and no recapitalization without
   a separate approval;
-- external-only issuer-controlled settlement;
+- historical external-only issuer-controlled settlement (superseded for the
+  initial AAPL path by Section 23.4);
 - bounded rounding/dust;
 - explicit reward and monitoring units; and
 - migration from any custody-bearing prior vault version.
@@ -2061,7 +2147,8 @@ Required properties:
 - **Specified choices:** partial loss is pro rata against allocated backing;
   post-zero deposits freeze; unsolicited positive deltas remain unallocated;
   user reward weight and global value use live economic claims; issuer-
-  controlled settlement is external-only; total-loss liability progress is
+  controlled settlement was external-only in this historical branch;
+  total-loss liability progress is
   atomic and exactly once.
 - **Unresolved choices:** the storage/interface boundary that distinguishes
   allocated backing from raw custody, any future recapitalization/recovery
@@ -2133,7 +2220,8 @@ the corrected share path**, with these boundaries:
    the permanent path satisfies all invariants and gates.
 3. Use a corrected generic share-based architecture as the permanent direction,
    without selecting a production vault at this checkpoint.
-4. Require external-only settlement for issuer-controlled collateral.
+4. Require guarded vault-local settlement for issuer-controlled collateral,
+   with external delivery as the frontend default.
 5. Freeze post-zero deposits by default.
 6. Do not begin implementation until the later owner gates and implementation
    authorization are satisfied.
@@ -2154,8 +2242,8 @@ policy.
 | Reject Simple internal transfer while underbacked | **Accepted into the atomic containment group**; exact guard/result behavior is deferred. |
 | Add generic per-asset collateral-use flag | **Functional requirement accepted; new stored flag rejected by the owner.** Phase E derives effective eligibility from existing `canDeposit`, `DebtTerms.ltv`, and automatic backing state without changing `AssetConfig`, storage, or the deployed interface. |
 | Exact per-call deposit delta in the same release | **Specified in Phase D at the shared Teller boundary**; implementation remains unauthorized. |
-| External-only issuer-controlled settlement | **Owner-approved for Phase F specification.** Section 16 proves that the policy cannot be enforced per asset by any current field; the exact implementation mechanism is returned without selecting new storage/interface. |
-| Keep generic backing checks even with external-only settlement | **Accepted as invariants I-02, I-06, and I-07**. |
+| External-only issuer-controlled settlement | **Historical Phase F direction, superseded for initial AAPL launch on 24 July 2026.** The controlling M0 decision permits only vault-local guarded internal settlement under Section 23.4; no storage/interface is selected. |
+| Keep generic backing checks across settlement modes | **Accepted as invariants I-02, I-06, I-07, and revised I-11**. |
 | Define deficit and total-loss debt progress | **Owner-approved for Phase F specification.** Section 16 defines the atomic exactly-once transition and identifies the minimum shared interfaces required; those interfaces and implementation remain unapproved. |
 | Corrected share-based permanent behavior | **Accepted as the recommended permanent architecture**, not selected as a production vault. |
 | Freeze post-zero deposits | **Owner-approved for Phase G specification**; implementation and its checkpoint gate/caller remain unapproved. |
@@ -2418,7 +2506,7 @@ is implied by a validation-target or implementation-unit definition.
 | --- | --- | --- | --- | --- | --- | --- |
 | Product outcome | Five checkpoint options above | Staged containment then corrected share path | Product + protocol owner | Whole track | Before Phase D | **Owner-confirmed: option 4, specification work only** |
 | Per-asset collateral use | Add a stored flag / compose existing controls | Reuse `canDeposit`, `DebtTerms.ltv`, and automatic backing state; do not add storage or a deployed selector | Protocol owner + security | `CM-009`, `CM-011`–`013`, `CM-030`, existing config/getters | Before Phase E | **Owner-confirmed: existing-controls Phase E specification only; implementation not approved; Phase F was authorized separately on 2026-07-24** |
-| Issuer-controlled settlement | Always external / permit bounded internal | Current internal mode can charge for undeliverable nominal claims; external-only selected | Protocol owner + risk/security | `CM-026`, `CM-030`, `CM-043`, `CM-044`, Vault interface | Before Phase F | **Owner-confirmed: external-only Phase F specification; enforcement mechanism and implementation not approved** |
+| Issuer-controlled settlement | Always external / permit bounded internal | Current internal mode can charge for undeliverable nominal claims; the later M0 decision selects bounded vault-local internal settlement with external as the frontend default | Protocol owner + risk/security | `CM-026`, `CM-030`, `CM-043`, `CM-044`, Vault interface | Before Phase F / revised at M0 | **Owner-confirmed on 24 July 2026: guarded internal mechanism for specification; implementation not approved** |
 | Total-loss transition | Approved user-debt→Ledger-bad-debt design / another existing-accounting design / no listing | Current system has no atomic exactly-once path; atomic transition selected for specification | Protocol owner + accounting/security | `CM-026`, `CM-030`, Ledger, interfaces | Before Phase F | **Owner-confirmed: atomic exactly-once Phase F specification; identified interfaces and implementation not approved** |
 | Post-zero state | Freeze / explicit recapitalization | Freeze selected; old shares persist with zero claim and no fresh deposits | Protocol owner + risk | `CM-025`, deposit callers, controls | Before Phase G | **Owner-confirmed: freeze for Phase G specification; implementation not approved** |
 | Later donation/restoration | Old holders / donor return / protocol / explicit recapitalization allocation / no automatic allocation | No automatic allocation selected; any later allocation/recovery requires a separate owner plus counsel/risk decision | Protocol owner + counsel/risk | Share math, recovery, migration | Before Phase G | **Owner-confirmed: no automatic allocation; no recapitalization/recovery transaction approved** |
@@ -2432,7 +2520,7 @@ transition caller's timing authority requires separate security review:
 
 | Decision | Options | Recommendation | Required before | Status |
 | --- | --- | --- | --- | --- |
-| External-settlement enforcement | Disable buyer-selected internal settlement globally / add a generic per-asset mode / enforce capability in the selected vault | Section 23.4 recommends the smaller vault-capability path: external return is exact and the internal selector reverts, leaving AuctionHouse unchanged | Section 23.11 before implementation | **Reassessed recommendation; no behavior, vault, field, implementation, migration, or ABI approved** |
+| Settlement enforcement | Disable buyer-selected internal settlement globally / add a generic per-asset mode / enforce guarded capability in the selected vault | The 24 July M0 decision selects the smaller vault-capability path: exact external delivery or exact guarded internal movement, leaving AuctionHouse unchanged | M0 evidence closure and later implementation authorization | **Owner-confirmed design direction; no vault, field, implementation, migration, or ABI approved** |
 | Atomic bad-debt mechanism | Approve the two-selector CreditEngine→Ledger transition in Section 16.10 / approve another reviewed atomic shared-contract design / do not list | Phase J models the no-new-storage, compare-and-set two-selector design and the full Ledger migration it would require | Any Phase F implementation design | **Phase J validation target; interfaces, event, implementation, and Ledger migration not approved** |
 | Total-loss transition caller | Permissionless deterministic / restricted approved keeper or Department / governed per-transition action | Permissionless is acceptable only for the zero-discretion `resolveUserTotalLoss(user)` shape in Section 19; any caller-supplied amount, asset list, recipient, or timing-sensitive value voids that direction and returns to owner/security | Any Phase F implementation design | **Owner-directed condition for Phase I; interface and implementation not approved** |
 
@@ -3416,7 +3504,8 @@ live pro-rata claim against allocated backing can be safely allocable;
 quarantined custody is excluded.
 
 This bounded-other-asset rule is not an exception for Stock Tokens.
-Issuer-controlled collateral remains external-only even while fully backed
+In this historical Phase F branch, issuer-controlled collateral remains
+external-only even while fully backed
 and even if an internal share transfer would be mathematically conserved. That
 is necessary because an internal move does not exercise issuer pause,
 blocklist, confiscation, or recipient eligibility.
@@ -3426,7 +3515,7 @@ blocklist, confiscation, or recipient eligibility.
 The source was re-searched specifically to avoid adding a parameter
 unnecessarily. `AssetConfig` contains deposit limits, `DebtTerms`, liquidation
 routes, auction/redemption permissions, whitelist, and NFT state, but no field
-that means issuer-controlled or external-only settlement
+that historically meant issuer-controlled or external-only settlement
 (`ConfigStructs.vyi:88-109`). `MissionControl.getAuctionBuyConfig` returns only
 general/asset buy permissions, recipient allowlisting, and deposit-for-user
 permission (`MissionControl.vy:713-722`).
@@ -3492,7 +3581,8 @@ to enable redemption for another external-required asset, its common
 and debt change must use positive measured `E`, not the vault's raw return.
 That future enablement is outside this approval.
 
-Deleverage remains external-only. Each asset leg must use measured `E` and
+In this historical Phase F design, Deleverage remains external-only. Each asset
+leg must use measured `E` and
 return an actual paid value. `totalRepaidAmount` is the sum of those paid
 values, capped by current user debt. A zero/failed delivery contributes zero;
 it cannot be converted into repayment by a target amount, nominal balance, or
@@ -4340,7 +4430,7 @@ graceful zero, and a configured `false` flag are different evidence.
 | T8H-02 per-asset collateral use | No dedicated field. Phase E derives capacity from `assetConfig(asset).canDeposit`, `DebtTerms.ltv`, automatic backing safety, and nonzero live position amount. MissionControl owns the two stored inputs; vault/token reads supply backing. | Charlie changes `canDeposit` immediately with fast-disable/governance-enable asymmetry. Bravo changes debt terms through governance plus `TimeLock`; current validation refuses nonzero LTV directly to zero. Automatic backing has no operator/caller. | `CanDepositAssetSet`; `PendingAssetDebtTermsChange`; `AssetDebtTermsSet`; `assetConfig(asset)`, `getDebtTerms(asset)`, vault getters, and ERC-20 `balanceOf(vault)`. There is deliberately no single “collateral-use” event/getter. |
 | T8H-03 per-asset deposits | `MissionControl.genConfig.canDeposit` plus `assetConfig(asset).canDeposit`; TellerUtils requires both and vault support. | Alpha general and Charlie asset fast flags. Both are immediate; lite actor may disable, governance may re-enable. | `CanDepositSet`; `CanDepositAssetSet`; `genConfig()`, `assetConfig(asset)`, and `getTellerDepositConfig(vaultId,asset,user)` |
 | T8H-04 per-asset auction purchases | `MissionControl.genConfig.canBuyInAuction` plus `assetConfig(asset).canBuyInAuction`; AuctionHouse rechecks both for every purchase. | Alpha general and Charlie asset fast flags. Both are immediate; lite actor may disable, governance may re-enable. Active auctions remain recorded but purchase returns zero while disabled. | `CanBuyInAuctionSet`; `CanBuyInAuctionAssetSet`; `genConfig()`, `assetConfig(asset)`, and `getAuctionBuyConfig(asset,recipient)` |
-| T8H-05 internal versus external settlement | No current config/storage owner. Teller exposes buyer input `_shouldTransferBalance`; AuctionHouse branches to `transferBalanceWithinVault` when true and external withdrawal when false. Phase F selects external-only behavior for issuer-controlled collateral but returns enforcement mechanism selection. | Current buyer chooses per call; no governance/timelock/asymmetry. The external route is only an entrypoint default, not an enforced policy. | No mode-change event/getter exists. The chosen route can be inferred only from call input plus settlement effects/events such as `FungAuctionPurchased`; `getAuctionBuyConfig` contains no mode. |
+| T8H-05 internal versus external settlement | No current config/storage owner. Teller exposes buyer input `_shouldTransferBalance`; AuctionHouse branches to `transferBalanceWithinVault` when true and external withdrawal when false. Historical Phase F selected external-only behavior; Section 23.4 later supersedes that initial-launch direction with guarded vault-local internal settlement. | Current buyer chooses per call; no governance/timelock/asymmetry. The external route is only an entrypoint default, not an enforced policy. | No mode-change event/getter exists. The chosen route can be inferred only from call input plus settlement effects/events such as `FungAuctionPurchased`; `getAuctionBuyConfig` contains no mode. |
 | T8H-06 withdrawals | `MissionControl.genConfig.canWithdraw` plus `assetConfig(asset).canWithdraw`; Teller/TellerUtils require both, authorization, limits, and debt-safe maximum. | Alpha general and Charlie asset fast flags; immediate lite disable/governance re-enable. A vault or Teller broad pause independently blocks execution. | `CanWithdrawSet`; `CanWithdrawAssetSet`; `genConfig()`, `assetConfig(asset)`, `getTellerWithdrawConfig(asset,user,caller)`, vault `isPaused()`, Teller `isPaused()` |
 | T8H-07 repayment | `MissionControl.genConfig.canRepay`; CreditEngine `_validateOnRepay` consumes `getRepayConfig`. Teller, CreditEngine, and Ledger must also remain callable/unpaused. | Alpha fast flag; immediate lite disable/governance re-enable. Broad pause of Teller, CreditEngine, or Ledger can block repayment despite `canRepay=true`. | `CanRepaySet`; `genConfig()`, `getRepayConfig(user).canRepay`, and `isPaused()` on Teller/CreditEngine/Ledger; successful state evidence includes `RepayDebt` and Ledger debt getters. |
 | T8H-08 liquidation initiation | `MissionControl.genConfig.canLiquidate`; AuctionHouse requires it before ordinary liquidation. | Alpha fast flag; immediate lite disable/governance re-enable. Individual auction start/pause actions in Charlie are instead governance and timelocked. | `CanLiquidateSet`; `genConfig()` and `getGenLiqConfig().canLiquidate`; individual pending/executed auction events and Ledger auction getters |
@@ -4372,8 +4462,8 @@ post-state getter and the current authority snapshot.
 | T8H-01 | `DefaultsBase.genConfig.canBorrow=true` | No default contract. Required prelaunch posture is global borrow disabled until all launch gates pass. |
 | T8H-02 | Per-asset. `addAsset` defaults `canDeposit=true` but empty `DebtTerms` has `ltv=0`; existing Base entries must be read individually. | No asset config. Stock Token `canDeposit=false` and `ltv=0`/unconfigured until explicit later approval; no new collateral-use field. |
 | T8H-03 | General deposit true; `addAsset` asset deposit argument defaults true. | No asset config. Stock Token deposit must be explicitly false/omitted before activation. |
-| T8H-04 | General auction buy true; `addAsset` asset auction-buy argument defaults true. | No asset config. Stock Token auction purchase must be explicitly false/omitted before the external-only mechanism is approved and implemented. |
-| T8H-05 | Teller's public auction call defaults `_shouldTransferBalance=false`, but a buyer may pass true; there is no enforced mode. | No configured auction route. The owner-approved issuer policy is external-only, but its enforcement mechanism remains unselected. |
+| T8H-04 | General auction buy true; `addAsset` asset auction-buy argument defaults true. | No asset config. This historical external-only launch condition is superseded by Section 23.4's guarded vault-local mechanism. |
+| T8H-05 | Teller's public auction call defaults `_shouldTransferBalance=false`, but a buyer may pass true; there is no enforced mode. | No configured auction route. The operative owner direction keeps external as the frontend default and requires the selected vault to guard any internal request. |
 | T8H-06 | General withdrawal true; `addAsset` asset withdrawal argument defaults true. | No asset config. Before custody exists it is absent/false by omission. Any future incident plan should leave an already-live safe withdrawal path open unless delivery itself is unsafe; no launch value is selected here. |
 | T8H-07 | `DefaultsBase.genConfig.canRepay=true`. | No default contract. Any future RH deployment proposal must explicitly keep repayment enabled and keep Teller/CreditEngine/Ledger unpaused during containment. |
 | T8H-08 | `DefaultsBase.genConfig.canLiquidate=true`. | No default contract and no value selected. No Stock liquidation path exists while Stock registration/LTV/auction support is omitted; a future global value must account for every non-Stock asset on the chain. |
@@ -4933,7 +5023,7 @@ pending same-block registry/code-hash verification.
 | `TellerUtils` (`CM-045`) | Keep pre-transfer limits/validation. Final minimum is rechecked by Teller from credited live state. | No storage, struct, selector, event, or ABI change required. Teller remains sole caller. | Reused runtime if integrated source confirms no helper change. No migration. | Preview/final-limit equivalence and no optimistic minimum. |
 | `CreditEngine` (`CM-030`) | Phase E backing/capacity-resolution split; non-raising repayment refresh; total-loss eligibility entry; call Ledger atomic transition. | No new persistent state proposed. Existing `undyVaulDiscount`, `buybackRatio`, and Department pause retain their exact units/values; public views keep signatures. Candidate additive `resolveUserTotalLoss(user)` and event; internal MissionControl/Vault/Ledger interfaces change. All borrow/health/withdraw/liquidation/repay consumers read changed semantics. | Fresh runtime/ABI and RipeHq address activation. Read and reproduce both live configuration values plus pause/constructor posture before cutover; defaults are not evidence of live values. Existing debt remains in Ledger. Address rollback is technically possible only before behavior-dependent transactions; after resolution writes it is not a semantic rollback. | Hot-path staticcall/gas, price-independent deficits, repayment liveness, deterministic caller, CAS race, config parity, and full consumer audit. |
 | `Ledger` (`CM-008`) | Candidate CreditEngine-only `moveUserDebtToBadDebt` performs Section 16.9 atomically and additively emits loss-transition evidence. | **No new storage slot or unit change**, but one selector/event changes runtime/ABI. It writes existing user debt, total debt, borrowers, auctions, unrealized yield, and bad debt. Every existing Ledger mapping/aggregate plus Department pause and immutable constructor posture retains its exact unit/value. CreditEngine is sole transition caller; Switchboard `setBadDebt` remains an audited reconciliation tool. | Fresh direct deployment would start empty; full state migration is mandatory before RipeHq activation. Partial Ledger migration is forbidden. Rollback after either new Ledger writes or address activation is a full reverse-state migration, not an address flip. | Highest-risk shared accounting/audit boundary: every Ledger mapping/aggregate, pause/constructor parity, yield double-booking rationale, auction removal, exact snapshot, and total equality. |
-| `AuctionHouse` (`CM-026`) | Re-read allocable custody; settle on measured `E`; prevent zero-backed auctions; enforce external-only issuer policy through one returned mechanism. | No persistent storage addition required. Existing buy selectors can remain. All-external option rejects `_shouldTransferBalance=true`; per-asset option would add config coupling. Current working caches are transient; persistent composed state is the Department pause/immutable constructor posture. Events retain existing fields plus additive delivery evidence if needed. | Fresh runtime/ABI; reproduce pause/constructor posture before RipeHq activation. Active auctions live in Ledger and must be reconciled before cutover. Rolling back can reopen internal settlement or stale auction semantics and is unsafe after new purchases. | Two-buyer ordering, payment/delivery atomicity, active auction cutover, discount/clock regression, pause parity, external-mode compatibility. |
+| `AuctionHouse` (`CM-026`) | Historical Phase I candidate: re-read allocable custody, settle on measured `E`, prevent zero-backed auctions, and enforce external-only issuer policy. Section 23.4 supersedes that initial-launch candidate with guarded vault-local settlement and no AuctionHouse change. | No persistent storage addition required. Existing buy selectors can remain. All-external would reject `_shouldTransferBalance=true`; per-asset mode would add config coupling. | No Robinhood AuctionHouse cutover is required by the current minimum. Active auctions and rollback remain post-launch hardening concerns. | Guarded internal and exact external payment/delivery atomicity, two-buyer ordering, discount/clock regression, and unchanged-source proof. |
 | `AuctionHouseNFT` (`CM-027`) | No delta. The current stub has no settlement entry or common Vault consumer and is inapplicable to fungible Stock Tokens. | No storage, selector, event, caller, or reader change. A future implementation must re-enter the consumer inventory rather than inherit this disposition. | Artifact reused unchanged; no live migration consequence from Track 8. | Tripwire that a future NFT settlement path cannot silently consume changed vault semantics. |
 | `Deleverage` (`CM-044`) | Price/repay only measured external receipt `E`; capture and assert exact Teller replacement-deposit return. Stock Token forbidden routes remain disabled. | No new storage or public selector required. Existing `minDeleverageBps`, `deleverageBuffer`, `deleverageCooldown`, `underscoreSafeSpreadBps`, per-user `lastDeleverageBlock`, and Department pause retain exact units/semantics; working caches are transient. Existing events must report measured amounts. Readers/callers: Teller, AuctionHouse, CreditEngine, PriceDesk. | Fresh runtime and RipeHq activation. Preserve integrated Track 6 source plus every live config value and cooldown history, or use an owner/security-approved conservative disable-and-wait cutover that cannot shorten any user's remaining cooldown. A reset-to-zero map is unsafe; rollback after a new swap/cooldown write requires downstream debt/custody plus last-block reconciliation. | Recipient-delta measurement, exact replacement deposit, cooldown state/cutover composition, zero delivery, routing prohibitions. |
 | `Lootbox` (`CM-033`) | Build on integrated S3; consume live-claim user weight and allocated aggregate value for the corrected variant; close the separate reward interval at loss checkpoint. | Preserve S3's immutable `MIN_UNDERSCORE_SEND_INTERVAL`, five-argument constructor order, `minUnderscoreSendInterval()` ABI, strict send boundary, and existing Vault selector shapes. Current local state—Underscore enablement, send interval, last send, deposit/yield reward amounts, and pause—must be explicitly reconciled. Config/permission values are preserved; `lastUnderscoreSend` follows S3's still-open final-distribution/partial-window/continuity decision rather than silently resetting. No Track 8 epoch/index/callback storage or selector is selected. | Integrated source/ABI are S3-new while live Base is still the dated old runtime. Any Track 8 artifact must compile from the integrated S3 baseline and either sequence after S3's governed cutover or reopen S3 review as a combined artifact. Apply the owner-selected S3 window policy and reconcile Ledger-owned user/global points. Rollback after distribution or point accrual is not lossless. | Economic-unit labeling, untouched-user accrual, global conservation, S3 floor/constructor/getter and approved per-chain immutable values, pending S3 distribution window, Track 8 loss-interval choice, RipeGov exception. |
@@ -5764,7 +5854,7 @@ mechanism priorities without deleting the permanent-design record.
 | Migration | Fresh deploy / complete state migration / no release | Track 7-owned exact plan; Ledger separate; vault custody/state/rewards exact | Protocol + accounting/security/operations + Track 7 | K-07/K-11 and all stateful artifacts | Exact files/IDs/roots | Live execution | **Unapproved; Base filename and production vault/ID open** |
 | Exact-token evidence | Mock only / pinned fork / authorized live evidence | Pinned AAPL full lifecycle plus implementation-switch and failure cases; live action separate | Track 2 + product/risk/security | AAPL proxy/beacon/implementation, all selected components | Approved candidate, permission | K-CP10/K-CP11 | **Plan complete; test/live evidence absent** |
 | Audit/release | Independent units / atomic groups / partial activation | Review units separately, re-review combined artifacts, Release 1/2 economically atomic | Owner + all boundary reviewers | K-00–K-12 | Phase K acceptance | K-CP4 onward | **Split specified; no implementation/audit/release authorized** |
-| Mandatory initial-launch minimum | Permanent option-4 group / external-only nominal containment / evidence return | Section 23's Teller + fresh external-only nominal vault + CreditEngine + AuctionHouse group; defer corrected shares, automatic bad debt, Ledger migration, reward-loss, and recapitalization | Product + protocol + risk/security/accounting/operations | M0–M5 | Owner acceptance of Section 23 | File-exact implementation authorization | **Owner-directed proposal complete; mechanism, vault/ID, implementation, and live action unapproved** |
+| Mandatory initial-launch minimum | Permanent option-4 group / guarded nominal containment / evidence return | Section 23's Teller + fresh guarded-settlement nominal vault + CreditEngine, with unchanged AuctionHouse proof; defer corrected shares, automatic bad debt, Ledger migration, reward-loss accounting changes, and recapitalization | Product + protocol + risk/security/accounting/operations | M0–M5 | M0 evidence closure and later file-exact authorization | File-exact implementation authorization | **Owner direction recorded; M0 open, mechanism unimplemented, vault/ID and live action unapproved** |
 
 ### 21.12 Phase K acceptance and final stop boundary
 
@@ -5859,26 +5949,29 @@ itself is mandatory initial-launch scope.
 
 ## 23. Owner-directed minimum-change initial-launch proposal
 
-### 23.1 Decision boundary and recommendation
+### 23.1 Decision boundary and owner direction
 
 This section is the controlling Track 8 launch handoff. It uses Phases A–K as
 evidence but deliberately does **not** continue the ideal permanent
 architecture.
 
-**Recommendation:** implement one atomic containment group consisting of:
+**Owner-directed candidate:** validate one atomic containment group consisting
+of:
 
 1. Teller call-local **exact** receipt measurement (`R==Q`);
-2. a fresh generic external-only nominal ERC-20 vault that composes the
+2. a fresh generic guarded-settlement nominal ERC-20 vault that composes the
    existing BasicVault accounting, requires aggregate solvency (`C>=N`),
-   proves exact external delivery, and fails closed on a deficit;
+   proves exact external delivery or exact custody-neutral internal movement,
+   and fails closed on a deficit;
 3. one minimal generic CreditEngine zero-amount semantics correction, with the
    new vault supplying revert-safe backing classification through existing
    getters; and
-4. existing configuration controls, with Stock rewards and unsupported routes
-   disabled.
+4. existing configuration controls, with rewards disabled at activation,
+   unsupported Stock routes disabled, and the approved non-Stock launch graph
+   held to its evidence gates.
 
 For specification purposes the proposed generic vault source is named
-`contracts/vaults/ExternalErc20.vy`. The name and path are review targets, not
+`contracts/vaults/GuardedErc20.vy`. The name and path are review targets, not
 an implemented or owner-selected production artifact. It is not
 issuer-branded, Robinhood-specific, share-based, or chain-gated.
 
@@ -5892,8 +5985,9 @@ larger architecture is **not reached** by the pinned source evidence.
 “Minimum” describes both mechanism and Robinhood launch impact. Teller and
 CreditEngine remain shared-source changes and require complete integration
 regression, but AuctionHouse is removed from the minimum production surface.
-The fresh vault proves delivery before returning, and current AuctionHouse
-ordering already commits GREEN/debt only after that return. Existing Base
+The fresh vault proves exact external delivery or the guarded internal
+settlement conditions before returning, and current AuctionHouse ordering
+already commits GREEN/debt only after that return. Existing Base
 deployments need not cut over for Robinhood launch absent evidence of an urgent
 live deficit/exploit. The minimum launch surface is therefore three production
 contracts on Robinhood, no live Base state migration, and no existing
@@ -5904,9 +5998,9 @@ Load-bearing pinned evidence:
 | Current source | Why the minimum patch lands there |
 | --- | --- |
 | `Teller.vy:272-320`; `TellerUtils.vy:104-161` | Teller owns the transfer and passes a pre-transfer amount to the vault; the validator owns existing admission/limit controls. |
-| `BasicVault.vy:24-91,97-148`; `SimpleErc20.vy:54-150` | Basic credits from aggregate custody, withdraws against nominal accounting, and supports nominal-only internal moves; the fresh wrapper is the narrow place to require aggregate solvency, classify deficits/unknown reads, prove recipient delivery, and reject internal movement. |
+| `BasicVault.vy:24-91,97-148`; `SimpleErc20.vy:54-150` | Basic credits from aggregate custody, withdraws against nominal accounting, and supports nominal-only internal moves; the fresh wrapper is the narrow place to require aggregate solvency, classify deficits/unknown reads, prove recipient delivery, and guard internal movement. |
 | `CreditEngine.vy:542-579,687-807,920-979,1230-1285` | One shared borrow-terms loop feeds borrow, health, liquidation, repayment refresh, and withdrawal capacity; it currently erases `asset,0` positions before loading their resolution terms. |
-| `AuctionHouse.vy:1014-1162,1184-1228`; `Deleverage.vy:338-473,814-907,1044-1078` | Buyer input selects internal versus external mode, but GREEN/debt commit only after vault return. A selected vault that returns positive only after proving `vault outflow == return == recipient increase` supplies the missing evidence without an AuctionHouse change; its internal selector reverts. |
+| `AuctionHouse.vy:1014-1162,1184-1228`; `Deleverage.vy:338-473,814-907,1044-1078` | Buyer input selects internal versus external mode, but GREEN/debt commit only after vault return. A selected vault returns positive only after proving exact external delivery or the guarded internal custody/nominal equalities, supplying the missing evidence without an AuctionHouse change. |
 | `MissionControl.vy:599-667,713-723`; `SwitchboardCharlie.vy:1140-1185` | Existing deposit, withdrawal, auction, repay, limit, and fast-disable controls already exist; no collateral-use or settlement-mode field is required. |
 | Section 5 Base snapshot | ID 3 is live and funded but had no observed deficit or deficit-attributable debt at the pinned block; this is latent Base risk, not evidence that a stateful Base core cutover must block Robinhood. |
 
@@ -5940,10 +6034,10 @@ The complete launch group must provide all seven properties at once:
 | ML-01 | Deposits credit only tokens actually received | Teller measures `R=C1-C0`, requires `R==Q>0`, and passes `Q`; the launch vault independently requires post-transfer `C1>=N+Q` before crediting exactly `Q`. Zero, short, fee, excess, failed/malformed reads, and pre-existing deficits revert atomically. A surplus remains outside nominal accounting and is never credited to the caller. |
 | ML-02 | Missing custody cannot support new borrowing | The launch vault's existing `getUserAssetAndAmountAtIndex` shape returns `(asset,0)` for a nonzero nominal claim whenever the custody read is unknown or reports `C<N`. CreditEngine treats that zero as zero value/capacity without erasing the asset's configured terms. `DebtTerms.ltv==0` remains the existing non-borrowable setting. A surplus supplies no extra user claim or capacity. |
 | ML-03 | Deficit cannot make existing debt falsely healthy or non-liquidatable | An unsafe `(asset,0)` position remains in the terms calculation with zero collateral/capacity and the existing nonzero configured resolution terms, using the current fallback weight of one. Safe co-collateral is still evaluated normally. |
-| ML-04 | No GREEN charge or debt reduction without delivery | Before returning, the launch vault requires `O==W==E` and post-withdraw solvency `V1>=N'`. Current AuctionHouse and Deleverage ordering consumes that return before GREEN/debt commit. Exact-zero or failed delivery cannot produce a positive return; negative, short, excess, or sender-side-extra loss reverts the whole transaction. |
-| ML-05 | Nominal internal movement cannot masquerade as delivery | The launch vault's existing `transferBalanceWithinVault` selector always reverts. Stock Tokens therefore have no internal settlement route even when the buyer requests it. |
+| ML-04 | No GREEN charge or debt reduction without proved settlement | In Phase F external vocabulary, `E=min(Q,W,R)`; the strict launch vault additionally reconciles its outflow, returned amount, recipient receipt, and post-withdraw solvency, and payment/debt use only `E`. For internal mode, payment/debt use only the owner-approved `W` proved by ML-05. Exact-zero, zero-backed, failed, mismatched, or unsafe settlement cannot produce a positive payable amount and reverts the whole transaction. |
+| ML-05 | Nominal internal movement cannot masquerade as delivery — owner-approved partial-fill invariant | Let `Q` be AuctionHouse's maximum request and `W` the vault result. Success requires `0<W<=Q`, seller nominal decrease `==W`, buyer nominal increase `==W`, unchanged aggregate nominal `N`, known `C0,C1`, `C0>=N`, `C1>=N`, and `C1==C0`; payment and debt reduction use only `W`. Any unknown read, deficit, user-delta mismatch, overfill, nominal-total change, or custody movement reverts before the caller can charge GREEN or reduce debt. |
 | ML-06 | Repayment remains available | The vault converts a failed/unsafe Stock backing observation into `(asset,0)` rather than a revert. CreditEngine skips PriceDesk only for that zero amount while retaining terms, so current repayment can reduce debt and safe co-collateral can still be evaluated. The broader pre-existing repayment-on-any-missing-price defect is not required to change for this Stock launch patch. |
-| ML-07 | Unsafe activity fails closed after issuer loss | The launch vault rejects deposits and withdrawals whenever `C<N` or backing is unknown, rejects every internal transfer, and reports a nonzero unsafe claim as zero usable amount. CreditEngine zeros its capacity/value; AuctionHouse and Deleverage cannot receive a positive settlement return. |
+| ML-07 | Unsafe activity fails closed after issuer loss | The launch vault rejects deposits, withdrawals, and internal transfers whenever `C<N` or backing is unknown and reports a nonzero unsafe claim as zero usable amount. CreditEngine zeros its capacity/value; AuctionHouse and Deleverage cannot receive a positive settlement return. |
 
 These are one atomic product gate. A deployment with only some rows is not
 launch-ready.
@@ -6020,7 +6114,7 @@ post-credit housekeeping, so the earlier comprehensive `C3` liveness
 assumption is outside this minimum patch. Its global cross-asset exclusion
 during the short window is an accepted liveness restriction.
 
-#### B. proposed `contracts/vaults/ExternalErc20.vy`
+#### B. proposed `contracts/vaults/GuardedErc20.vy`
 
 Composition:
 
@@ -6064,7 +6158,19 @@ withdraw:
     require V1 >= updated N
 
 internal transfer:
-    revert unconditionally
+    (known0, C0) = observeExactBalance(asset, vault)
+    require known0 and C0 >= N
+    require requested Q > 0
+    sellerBefore = seller nominal balance
+    buyerBefore = buyer nominal balance
+    W, isSellerDepleted = BasicVault internal balance transfer result
+    require 0 < W <= Q
+    require sellerBefore - sellerAfter == W
+    require buyerAfter - buyerBefore == W
+    require aggregate nominal accounting remains N
+    (known1, C1) = observeExactBalance(asset, vault)
+    require known1 and C1 == C0 and C1 >= N
+    return W, isSellerDepleted
 
 CreditEngine amount view:
     asset = userAssets[user][index]
@@ -6090,7 +6196,8 @@ Consequences:
   transaction order;
 - restoration to at least `C>=N` restores source backing mechanically, but
   operational re-enable still requires governance review;
-- no internal auction or redemption path can move only nominal accounting;
+- no internal auction or redemption path can move nominal accounting unless
+  the exact guarded-settlement proof succeeds;
 - no withdrawal can deliver the launch asset to either current Endaoment
   endpoint, including through the privileged volatile-asset Deleverage path;
 - sender-side fees, recipient fees, burns, reflections, or rebases cannot be
@@ -6105,10 +6212,10 @@ Addys module on each withdrawal. It adds no storage, configuration field,
 canonical selector, Deleverage source, or interface. It is generic protocol
 endpoint policy rather than token-, issuer-, chain-, or vault-ID branching;
 a RipeHq endpoint update changes the rejected recipient automatically.
-Its new artifact ABI contains `ExternalErc20VaultDeposit` and
-`ExternalErc20VaultWithdrawal` with the same amount/is-depleted units as the
-current Simple events. It emits no successful internal-transfer event because
-that selector always reverts.
+Its new artifact ABI contains `GuardedErc20VaultDeposit`,
+`GuardedErc20VaultWithdrawal`, and `GuardedErc20VaultTransfer`, using the
+same amount/is-depleted units and field shapes as the current Simple path.
+No selector or canonical interface changes.
 
 `observeExactBalance` must be a revert-safe, static, contract-local low-level
 call that classifies call failure or any return length other than exactly 32
@@ -6218,7 +6325,11 @@ Pinned ordering is sufficient once the selected vault becomes the proof
 boundary:
 
 1. `_transferCollateral` calls the vault's internal or external selector;
-2. the launch vault's internal selector always reverts;
+2. under the owner-approved partial-fill invariant, the launch vault's
+   internal selector returns
+   positive `W<=Q` only after proving seller decrease and buyer increase both
+   equal `W`, known pre/post `C>=N`, unchanged aggregate nominal accounting,
+   and unchanged custody;
 3. the external selector returns positive `W` only after proving
    `V0-V1==W==B1-B0` and post-withdraw solvency `V1>=N'`;
 4. `_buyFungibleAuction` returns/continues only for positive vault-reported
@@ -6230,13 +6341,16 @@ the launch vault's already-proved delivery amount. Deleverage prices and
 reduces debt from that return. A failed exact-delivery check reverts through
 the full composed transaction before payment or debt mutation.
 
-This proof is capability-bound. Track 7 must register each Stock Token only to
-the approved external-only vault, and activation callers/frontends must request
-external mode. If `_shouldTransferBalance=true`, the transaction reverts; it is
-never silently reinterpreted. The result does not harden internal settlement
-for existing Base `SimpleErc20` or any other legacy vault. AuctionHouse
-recipient measurement, its transient delivery mutex, and the legacy
-`C>=T` internal guard move to optional defense-in-depth/Base hardening.
+This proof is capability-bound. Track 7 must register AAPL only to the approved
+guarded-settlement vault, and activation callers/frontends must default to
+external mode. If `_shouldTransferBalance=true`, the vault applies the guarded
+internal proof without reinterpretation. The result does not harden internal
+settlement for existing Base `SimpleErc20` or any other legacy vault.
+AuctionHouse recipient measurement, its transient delivery mutex, and the
+legacy `C>=T` internal guard move to optional defense-in-depth/Base hardening.
+The accepted residual risk is explicit: a successful internal move does not
+exercise issuer transfer, blocklist, or recipient-eligibility controls, so the
+buyer's claim can later become frozen or undeliverable.
 
 #### E. interfaces, storage, ABIs, Ledger, and configuration
 
@@ -6247,19 +6361,20 @@ recipient measurement, its transient delivery mutex, and the legacy
 | ABI | No existing selector or event changes. Existing generated ABI files should be byte-for-byte unchanged. The fresh vault requires one new ABI/artifact with the existing canonical Vault selector shapes and vault-specific deposit/withdrawal events; any other ABI delta is a stop. |
 | Ledger | No source, interface, artifact, storage, migration, or bad-debt write change. Existing user debt remains user debt after an issuer loss. |
 | MissionControl/Switchboards | No new field or source change. Use existing `canDeposit`, `canWithdraw`, `canBuyInAuction`, `canRedeemCollateral`, `DebtTerms.ltv`, deposit limits, and general borrow/repay controls. `canDeposit` remains admission control, not a new collateral-value flag. |
-| Stock defaults | `canRedeemCollateral=false`; `shouldSwapInStabPools=false`; no ordinary configured Endaoment, Curve, Aerodrome, Underscore, yield, treasury, or unsupported route. The launch vault also rejects either current RipeHq Endaoment endpoint as a withdrawal recipient, so the privileged volatile Deleverage override fails onchain without a Deleverage/config change. Start contained and enable only in the final atomic activation. |
-| Rewards | Initial Robinhood launch must keep protocol points/reward accrual disabled, or set every reward allocation capable of paying Stock depositors/borrowers to zero. Per-asset staker/voter zeroes alone are insufficient because the generic depositor and borrower buckets are global. |
+| Stock defaults | `canRedeemCollateral=false`; `shouldSwapInStabPools=false`; no ordinary configured Endaoment, Curve, Aerodrome, Underscore, yield, treasury, or unsupported Stock route. The launch vault also rejects either current RipeHq Endaoment endpoint as an external-withdrawal recipient, so the privileged volatile Deleverage override fails onchain without a Deleverage/config change. Start contained and enable only in the final atomic activation. |
+| Rewards | Launch with `arePointsEnabled=false` and `ripePerBlock=0`. Target activation within seven days after validation may include AAPL depositors and borrowers. Live monitoring and the global kill-switch runbook are mandatory; no Stock-specific reward-accounting contract change is required by default. |
 
-If product requires Stock-linked deposit or borrower rewards at initial launch,
-the minimum proposal is no longer sufficient: the Track 8 reward-loss boundary
-returns to the owner before implementation.
+The owner accepts that nominal/global reward accounting may briefly accrue
+after an issuer/custody incident until the global switches are disabled.
+Validation must prove monitoring and the `arePointsEnabled`/`ripePerBlock`
+runbook before post-launch reward activation.
 
 #### F. Production-contract necessity table
 
 | Proposed production contract | Invariant only this boundary can enforce in the minimum | Smallest alternative considered | Risk if omitted | Required for Robinhood launch? |
 | --- | --- | --- | --- | --- |
 | `Teller.vy` | Call-local `R==Q`; the vault cannot reconstruct `C0` after the transfer | Vault-only post-transfer equality/solvency; vault-pull custody; prepare/finalize checkpoint | Donation can mask a short receipt and create phantom credit | **Yes**; narrow exact delta plus transient measurement mutex |
-| proposed `ExternalErc20.vy` | Aggregate solvency `C>=N`, external delivery equality, internal-transfer rejection, and revert-safe zero-amount views at the custody owner | Harden live Simple vault; share vault; AuctionHouse-only checks | A deficit can remain usable; internal nominal settlement or false return can reach consumers | **Yes**; fresh isolated generic vault |
+| proposed `GuardedErc20.vy` | Aggregate solvency `C>=N`, external delivery equality, guarded custody-neutral internal movement, and revert-safe zero-amount views at the custody owner | Harden live Simple vault; share vault; AuctionHouse-only checks | A deficit can remain usable; unchecked internal nominal settlement or false return can reach consumers | **Yes**; fresh isolated generic vault |
 | `CreditEngine.vy` | Preserve resolution terms for `(asset,0)` instead of erasing the unsafe position | Make the vault revert; leave current zero skip | Repayment/co-collateral can revert, or deficit debt can look non-liquidatable because terms disappear | **Yes**; one generic loop correction |
 | `AuctionHouse.vy` | None unique once the selected vault proves delivery before returning | Vault-local exact delivery (selected); global all-external; stored per-asset mode | If omitted, legacy vaults retain their current settlement risk; the launch vault remains safe | **No**; defer measurement/internal-deficit guard |
 | `Deleverage.vy` | None; it consumes the amount returned through unchanged AuctionHouse/vault ordering | Existing route disables plus vault recipient/delivery enforcement | Privileged governance could attempt the route, but the selected vault rejects the prohibited endpoint or unsafe delivery atomically | **No** |
@@ -6276,20 +6391,22 @@ are not additional production-contract changes.
 
 | Mechanism | Safety | Production impact | Evidence conclusion |
 | --- | --- | --- | --- |
-| Force external delivery for every fungible auction | Satisfies ML-05 and, with recipient-delta measurement, ML-04 | AuctionHouse source change and no storage, but changes every fungible asset and both chains once deployed. Source/tests prove internal mode is supported; decoded historical production-call coverage is incomplete. | Not required for the isolated Stock path. Eligible only as later shared hardening after complete integration/history evidence. |
-| Generic per-asset settlement mode | Satisfies ML-05 when correctly configured | Adds AssetConfig or parallel storage, getter/setter/event/defaults, governance rules, migration, ABI/interface consumption, and fail-safe default questions. | Rejected for initial launch. Existing controls do not encode settlement mode, but new stored configuration is unnecessary when the selected vault can enforce its own capability. |
-| Vault-capability enforcement with unchanged AuctionHouse | Satisfies ML-04/05 for assets registered only to the strict vault | One fresh stateless policy wrapper; no AuctionHouse change, canonical-interface change, persistent config, or historical-use prerequisite. External selector proves delivery; internal selector reverts. | **Recommended.** This is the smallest proved mechanism. It deliberately does not claim to harden legacy vaults. |
+| Force external delivery for every fungible auction | Satisfies ML-05 and, with recipient-delta measurement, ML-04 | AuctionHouse source change and no storage, but changes every fungible asset and both chains once deployed. Source/tests prove internal mode is supported; decoded historical production-call coverage is incomplete. | Not selected. Eligible only as later shared hardening after complete integration/history evidence. |
+| Generic per-asset settlement mode | Satisfies ML-05 when correctly configured | Adds AssetConfig or parallel storage, getter/setter/event/defaults, governance rules, migration, ABI/interface consumption, and fail-safe default questions. | Rejected for initial launch. Existing controls do not encode settlement mode, but new stored configuration is unnecessary when the selected vault enforces capability. |
+| Guarded vault capability with unchanged AuctionHouse | Satisfies ML-04/05 for assets registered only to the strict vault | One fresh stateless policy wrapper; no AuctionHouse change, canonical-interface change, persistent config, or historical-use prerequisite. External selector preserves `E=min(Q,W,R)` and exact delivery; internal selector proves known solvent backing, `0<W<=Q`, matching seller/buyer deltas, unchanged aggregate nominal, and custody neutrality. | **Owner-selected direction; partial-fill invariant approved 25 July 2026.** This is the smallest plausible mechanism subject to later implementation evidence. It deliberately does not claim to harden legacy vaults. |
 
 Silently changing `_shouldTransferBalance=true` into an external transfer is
-forbidden. For the proposed launch vault the call must revert. The transaction
-input therefore remains truthful and machine-auditable.
+forbidden. For the proposed launch vault the call must execute the guarded
+internal proof or revert. The transaction input therefore remains truthful and
+machine-auditable.
 
 The pinned production consumer inventory for
 `transferBalanceWithinVault` is exactly AuctionHouse and CreditEngine's
 CreditRedeem wrapper; the vault itself authorizes only those two core callers.
-The launch wrapper rejects both internal uses. Stock
-`canRedeemCollateral=false` independently keeps the CreditRedeem route
-unreachable, while AuctionHouse uses the launch vault's exact external path.
+The launch wrapper rejects an unsafe internal use and permits only the exact
+guarded move. Stock `canRedeemCollateral=false` independently keeps the
+CreditRedeem route unreachable, while AuctionHouse may use the exact external
+path or the guarded internal path.
 
 AuctionHouse recipient measurement is therefore **not strictly necessary** for
 initial Stock launch. Teller receipt measurement remains strictly necessary
@@ -6299,14 +6416,14 @@ because only Teller observes custody on both sides of the inbound token call.
 
 | Comprehensive feature | Required for safe initial Stock launch? | Minimum-launch disposition |
 | --- | --- | --- |
-| Corrected share vault / `A^s/U^s` model | **No** | Use the fresh external-only nominal vault. Aggregate deficit freezes the whole asset; no pro-rata loss allocation is claimed. Keep the corrected share design in post-launch research. |
+| Corrected share vault / `A^s/U^s` model | **No** | Use the fresh guarded-settlement nominal vault. Aggregate deficit freezes the whole asset; no pro-rata loss allocation is claimed. Keep the corrected share design in post-launch research. |
 | Automatic partial-loss allocation | **No** | Reject deposits/withdrawals/settlement while `C<N`. Governance and counsel/risk decide any later allocation. |
 | Automatic total-loss or bad-debt transition | **No** | Existing user debt persists, may remain in liquidation, and can be repaid. No automatic write-off is needed to prevent new borrowing or false payment. |
 | Two-selector CreditEngine→Ledger transition | **No** | Post-launch candidate only. Do not add selectors or events for initial launch. |
 | Full Ledger migration | **No** | Explicitly excluded. The minimum group never changes Ledger layout or artifact. |
 | Reward-loss accounting / loss interval | **No**, if Stock-linked rewards are disabled | Keep Robinhood reward accrual incapable of paying Stock depositors/borrowers at activation. Otherwise return to owner. Preserve S3 independently. |
 | New stored per-asset collateral-use flag | **No** | Existing `canDeposit` controls admission, `DebtTerms.ltv` controls configured borrowing, and the vault's solvency-aware view zeros actually deficient/unknown custody. The minimum does not overload `canDeposit` as collateral value. |
-| New stored per-asset settlement flag | **No** | The generic launch vault rejects internal transfer by capability. |
+| New stored per-asset settlement flag | **No** | The generic launch vault enforces guarded internal transfer by capability. |
 | Post-zero recapitalization | **No** | A deficit stays frozen. Full restoration can be reviewed under existing controls; any allocation/recapitalization is post-launch governance work. |
 | Automatic donation/restoration allocation | **No** | Donations do not enter Teller's call-local `R` and do not increase any user's nominal claim. A surplus remains unallocated without freezing nominal operations; no launch code assigns a deficit or surplus among users. |
 | Additive measurement/checkpoint events | **No** | Existing deposit/withdrawal/auction/config events plus raw balance reads are sufficient for launch safety. Additional diagnostics and AuctionHouse delivery evidence are backlog. |
@@ -6384,17 +6501,16 @@ The accepted Base residual risk is specifically:
 The pinned one-unit WETH surplus is evidence of the first mechanism's masking
 precondition, not evidence of a current deficit or exploit.
 
-The forward Teller source is exact-transfer-only. Before implementation
-authorization, M0 must classify every asset reachable through the candidate
-Robinhood Teller—including every Stock Token and every non-Stock asset in the
-fresh deployment—and prove that ordinary and trusted deposit routes receive
-exactly the requested amount. It must also classify all 27 Base ID-3 assets
-for forward-source compatibility and any later Base cutover, even though the
-current Base runtime remains unchanged. A fee-on-transfer,
-rebasing-on-transfer, short-receipt, or unknown asset is not eligible for the
-candidate runtime. Its discovery stops the file-exact authorization and
-returns either route scoping or broader `R<=Q` semantics to the owner; the
-specification does not silently break it.
+The proposed forward Teller source is exact-transfer-only. The M0 package
+classifies every already-existing external asset that the approved Robinhood
+route graph could pass through that Teller and traces every ordinary/trusted
+caller. A fee-on-transfer, rebasing-on-transfer,
+short-receipt, or unknown external asset is incompatible with the proposed
+boundary and returns route scoping or broader `R<=Q` semantics to the owner.
+M0 does not require a future Ripe deployment address, new runtime hash, or
+executed future route. It must also preserve the existing 27-row Base
+classification for future-cutover planning; route-exact implementation tests
+and any Base cutover remain later gates.
 
 Before implementation freeze, a read-only Base refresh must return to the
 owner if it finds any borrow-enabled `C<N` position, debt or active auction
@@ -6409,19 +6525,44 @@ own full ID-3/ID-4, borrower, auction, trusted-caller, constructor/pause/local
 state, rollback, and audit evidence. An empty Base copy of the new vault is
 inactive staging only and neither convergence nor launch proof.
 
+#### 23.6.1 Owner-approved Robinhood launch graph
+
+The following product directions are fixed. M0 now freezes the
+already-existing external identities, route dispositions, and proposed Ripe
+file boundary. New Ripe deployment addresses, runtimes, and composed tests are
+later gates:
+
+| Item | Approved disposition | M0 freeze and later gate |
+| --- | --- | --- |
+| Stock Tokens | AAPL only at initial launch; later Stock Tokens follow separate token-specific review | M0 pins the Section 5 AAPL proxy/beacon/implementation/control identity and AAPL/USD feed; revalidate at implementation/deployment freeze. |
+| GREEN/RIPE CCIP | Nonblocking target for a fresh promotion within seven days after launch; disable if incomplete or late | M0 freezes the complete-or-disabled policy, source/file boundary, promotion checklist, and no-sGREEN rule. Deploy/runtime/config evidence belongs to the separately approved promotion package. |
+| sGREEN | Chain-native deposit and withdrawal active day one; never CCIP | M0 freezes the route/file disposition. New token/vault identities and composed proof are later gates. |
+| USDG/EndaomentPSM | Mint/redeem launch target using canonical USDG `0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168` and approved USDG/USD feed `0x61B7e5650328764B076A108EFF5fa7282a1B9aD2`; redemption first, GREEN mint authority last; Curve not a dependency | M0 freezes both external identities, exact-transfer compatibility, route restriction, and ordering. New PSM runtime, authority, and composed tests are later gates. |
+| GREEN Stability Pool | Enabled at launch; Stock excluded from custody/swaps | M0 freezes file/route/config disposition. New pool identity and post-deployment Stock negative-route proof are later gates. |
+| RIPE governance vault | Enabled at launch | M0 freezes file/route disposition. New vault/token identities and composition proof are later gates. |
+| GREEN/USDG LP | New launch deposit token with `ltv=0`; ordinary Teller route only | M0 freezes constituents and route. No approved DEX/factory/pool exists yet, so its selection, creation inputs, token/runtime, oracle, and composed proof are later launch-component gates. |
+| RIPE/WETH LP | New launch deposit token with `ltv=0`; ordinary Teller route only; WETH constituent `0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73` | M0 freezes constituents and route. No approved DEX/factory/pool exists yet, so its selection, creation inputs, token/runtime, oracle, and composed proof are later launch-component gates. |
+| Stock CreditRedeem / unsupported routes | CreditRedeem disabled; Underscore and Base-only integrations omitted | M0 freezes the negative route disposition. Post-deployment configuration and negative-reachability proof are later gates. |
+
+USDG is not ordinary Teller collateral. AAPL is the only initial
+borrow-enabled Stock collateral. It must use exactly one enabled vault and no
+trusted/Department deposit route.
+
 ### 23.7 Intentionally accepted risks and exposure bound
 
 | Accepted risk | Deliberate minimum behavior | Operational consequence |
 | --- | --- | --- |
-| Issuer loss creates a nominal deficit and freezes the affected Stock asset | `C<N` or an unknown backing read blocks deposits, withdrawals, capacity, valuation, and paid settlement; internal movement always reverts | Users may temporarily be unable to withdraw or liquidate that Stock Token until backing is restored or a later resolution is approved. |
+| Issuer loss creates a nominal deficit and freezes the affected Stock asset | `C<N` or an unknown backing read blocks deposits, withdrawals, capacity, valuation, and both external and internal paid settlement | Users may temporarily be unable to withdraw or liquidate that Stock Token until backing is restored or a later resolution is approved. |
 | Donation/surplus remains unallocated | `C>N` is solvent, but only nominal user balances count as claims/capacity and Teller credits only `R==Q` | Nominal deposits, withdrawals, and settlement remain live; the surplus may remain stranded and no user, depositor, or borrower receives it. |
 | Existing debt may outlive collateral | No automatic Ledger transition or write-off | The user debt remains, interest follows existing rules, the protocol may carry stranded/economically bad debt, and accounting resolution may require a later upgrade/governance process. |
 | Partial nominal loss is not allocated | All claims freeze instead of assigning residual custody by call order | Solvent residual custody may remain stranded until counsel/risk and governance approve an allocation. |
 | Auction progress can stop | An auction may exist but cannot produce positive exact delivery | No GREEN is charged and debt is not reduced; operators disable new buys and retain evidence. |
 | Restoration can make `C>=N` again | Source backing becomes safe, but existing `canDeposit/canWithdraw/canBuyInAuction` controls remain the operational gate | Governance must review issuer status, balances, users, debt, auctions, and any unallocated surplus before re-enable. |
-| No Stock reward-loss correction | Stock-linked deposit/borrow rewards are disabled at initial activation | Launch forgoes those rewards; enabling them is a separate post-launch product/economics/security decision. |
+| No Stock reward-loss correction | Stock-linked deposit/borrow rewards are disabled at activation and may start only after validation | A later incident may create a brief global/nominal accrual window until the kill switches execute. |
 | Aggregate freeze is conservative | One-unit deficit freezes every user of the affected `(vault,asset)` | Liveness is sacrificed to prevent double allocation and phantom credit. |
-| Short/fee receipt on any route | Every Teller route requires `R==Q` | Exact-transfer assets remain simple and fail closed. M0 must prove compatibility for every candidate-runtime asset; any short/rebasing/unknown asset stops authorization and requires owner-selected scoping or broader Phase D semantics. |
+| Guarded internal settlement does not exercise issuer controls | Under the owner-approved invariant, a successful partial or full nominal move proves current aggregate backing, exact user deltas, and custody neutrality, not buyer transfer eligibility | External delivery remains the frontend default. Operators accept that the buyer's claim may later be frozen or undeliverable; auction disablement, conservative caps, monitoring, and incident response remain mandatory. |
+| Global rewards may react after the incident | AAPL depositor/borrower rewards may activate after validation, but current accounting is global/nominal | Operators accept a brief accrual window until `arePointsEnabled=false` and `ripePerBlock=0` take effect; live monitoring and the rehearsed kill-switch runbook are required. |
+| Short/fee receipt on any route | Every Teller route requires `R==Q` | Exact-transfer assets remain simple and fail closed. M0 proves compatibility for every already-existing external token proposed in the launch graph; any short/rebasing/unknown external asset stops authorization and requires owner-selected scoping or broader Phase D semantics. New Ripe artifacts receive runtime/composed-route proof only after implementation. |
 | Outbound fee, burn, or short delivery | Launch-vault withdrawal requires exact `O==W==E` | The transaction reverts atomically. An asset that cannot transfer out exactly is not activation-eligible under the minimum design. |
 | Endaoment endpoint identity is registry-dependent | The launch vault rejects the current nonzero RipeHq Endaoment Funds and PSM addresses on every withdrawal | Missing/incorrect endpoint configuration is an activation stop; an authorized endpoint change updates the rejected recipients automatically. No runbook can override the onchain check. |
 | Base remains on legacy runtimes | Robinhood-first does not harden current Base receipt accounting, custody-backed credit/health, or internal settlement | Operators accept the three explicit latent risks in Section 23.6, retain current Base monitoring/fast controls, and must make a separate migration decision; new urgent evidence or a cross-chain dependency returns sequencing to the owner. |
@@ -6447,9 +6588,18 @@ bad debt. Outstanding mixed-collateral debt and interest accrued under
 existing rules can exceed it after the asset freezes. Actual incident exposure
 must therefore report both the pre-incident Stock-attributable capacity and
 the user's full outstanding/accruing debt, with mixed collateral identified.
-The exact launch limit and LTV are risk/default values outside this behavior
-specification and require owner/risk approval. They must be finite,
-non-placeholder values in the final Robinhood manifest.
+The owner selected $5,000 per-user and $25,000 global AAPL targets. M0 pins
+the AAPL/USD proxy
+`0x6B22A786bAa607d76728168703a39Ea9C99f2cD0`, eight answer decimals,
+published 86,400-second heartbeat, and formula
+`floor(D * 10^(18+8) / P8)`, independently for `D=5,000` and `D=25,000`.
+The final freeze records one block/hash/timestamp, current proxy/aggregator
+runtime hashes, a positive complete nonfuture fresh round, and two-person
+arithmetic review. Rounding is down. Re-review occurs at least every seven
+days and whenever either fixed cap's feed-valued USD exposure exceeds 110% of
+its target. The actual freeze price and resulting base-unit integers are
+post-M0 configuration evidence. LTV and final manifest values are likewise
+later parameter/deployment gates.
 
 Incident sequence:
 
@@ -6459,10 +6609,21 @@ Incident sequence:
 3. preserve `canRepay=true`;
 4. pin code identities and read `C`, `N`, users, debt, auctions, prices, and
    config at one block;
-5. do not restart settlement, rewards, or withdrawals from a price-only or
+5. if rewards were promoted, call
+   `SwitchboardAlpha.setRewardsPointsEnabled(false)` immediately through
+   governance or the configured lite actor; governance simultaneously
+   initiates timelocked `setRipePerBlock(0)` and executes it at the first
+   eligible block, with action/event/readback evidence;
+6. do not restart settlement, rewards, or withdrawals from a price-only or
    issuer-only assurance; and
-6. return any allocation, write-off, restoration, or upgrade plan to the
+7. return any allocation, write-off, restoration, or upgrade plan to the
    owner with accounting and counsel/risk review.
+
+The points disable is a fast stop; `ripePerBlock=0` is not. It is a governed
+pending action under current source. Launch therefore requires both values
+already zero, and any later reward promotion requires monitoring and a
+confirmation-block runbook for the accepted interim emission/distribution
+exposure.
 
 ### 23.8 Minimum launch test plan
 
@@ -6473,10 +6634,11 @@ creates or runs them.
 | --- | --- |
 | Current-behavior baseline | Reproduce the existing 90-case Track 5 result on pinned `be6a759`; add candidate successor cases that explicitly invert only the unsafe receipt/deficit/settlement/repay expectations and pass only against the complete candidate group. |
 | Teller receipt | Ordinary exact receipt on every route; atomic rejection of zero, short/fee, negative, excess, failed, empty, short-return, and oversized-return observations; donation-masking counterexample; deficit/excess cancellation; `max_value`; batch; rebalance; every trusted producer; Teller-held sGREEN; measurement-window nested callback rejection; legitimate first trusted callback; and post-window housekeeping liveness. |
-| External-only nominal vault | First deposit, multi-user deposit, `C1>=N+Q`, pre-existing and inter-call donation/surplus that remains uncredited without blocking nominal operations, one-unit deficit, partial/total loss, deficit-only deposit/withdraw freeze, restoration to `C>=N` under disabled config, transient reduce-then-restore with no repricing/allocation, exact vault outflow/return/recipient inflow/post-accounting solvency, failed/malformed reads, both current Endaoment-recipient rejections, sender/recipient fee or burn, reflection/excess, transfer false/revert, and unconditional internal-transfer rejection for AuctionHouse and CreditEngine callers. Reentrancy tests must prove the Vyper module-wide lock and post-state companions. |
+| Guarded-settlement nominal vault | First deposit, multi-user deposit, `C1>=N+Q`, pre-existing and inter-call donation/surplus that remains uncredited without blocking nominal operations, one-unit deficit, partial/total loss, deficit-only deposit/withdraw/internal freeze, restoration to `C>=N` under disabled config, transient reduce-then-restore with no repricing/allocation, exact vault outflow/return/recipient inflow/post-accounting solvency, failed/malformed reads, both current Endaoment-recipient rejections, sender/recipient fee or burn, reflection/excess, transfer false/revert, plus guarded full and partial internal success only when `0<W<=Q`, seller decrease and buyer increase equal `W`, pre/post custody is known and solvent, aggregate nominal stays unchanged, and custody is identical. Include seller depletion, over-request, batch, and failure-atomicity cases. Reentrancy tests must prove the Vyper module-wide lock and post-state companions. |
 | CreditEngine | One-unit nominal deficit zeros every user's capacity/value through the vault getter while a surplus preserves only each user's nominal amount; `(asset,0)` keeps liquidation terms; true zero nominal returns `(empty,0)`; SharesVault total loss, StabVault empty-zero, BasicVault true-zero, and every nonzero legacy path retain their specified behavior; mixed safe collateral stays exact; `canDeposit=false` alone does not erase solvent value; no issuer-token PriceDesk call while unsafe; repay with failed/malformed backing observation; separate safe co-collateral remains evaluable and liquidatable; max-withdraw returns zero through the backing-aware user amount; generic preview/state parity and gas. |
-| Unchanged AuctionHouse and Deleverage consumers | Prove source/ABI byte identity; single/batch external Stock delivery; token pause/blocklist; loss after auction creation; two buyers; no GREEN/debt/event/points mutation when the vault reverts; `_shouldTransferBalance=true` propagates the vault revert without reinterpretation; Deleverage wrapper/repay and both `swapCollateral` legs consume only the vault-proved return. Preserve legacy behavior unchanged and record that legacy Base internal deficits are not hardened by this launch patch. |
-| Configuration and restricted routes | Stock redemption and ordinary Stability Pool/Endaoment/Curve/Aerodrome/Underscore/yield routes disabled; no new field; rewards cannot accrue to Stock depositors/borrowers; finite deposit/LTV limits; disable/re-enable authority and event evidence. Prove the launch vault rejects both live RipeHq Endaoment recipient IDs for ordinary and privileged routes without changing Deleverage. |
+| Unchanged AuctionHouse and Deleverage consumers | Prove source/ABI byte identity; single/batch exact external Stock delivery; guarded internal settlement; token pause/blocklist; loss after auction creation; two buyers; no GREEN/debt/event/points mutation when either vault proof reverts; `_shouldTransferBalance=true` executes the guarded proof without reinterpretation; Deleverage wrapper/repay and both `swapCollateral` legs consume only the vault-proved return. Preserve legacy behavior unchanged and record that legacy Base internal deficits are not hardened by this launch patch. |
+| Configuration and restricted routes | AAPL-only Stock, exactly one enabled AAPL vault, every AAPL trusted/Department route disabled, Stock redemption/Stability/Endaoment/Curve/Aerodrome/Underscore/yield routes disabled, and no new field. Prove activation-day global reward disable plus later monitoring/runbook, exact fixed caps and review triggers, finite LTV, and disable/re-enable evidence. Prove the launch vault rejects both live RipeHq Endaoment recipient IDs for ordinary and privileged external routes without changing Deleverage. |
+| Approved non-Stock launch graph | Exact sGREEN day-one chain-native deposit/withdraw; GREEN/RIPE CCIP fully evidenced or disabled and no sGREEN CCIP; canonical USDG/approved feed, redemption-first PSM and last-step mint authority; enabled GREEN Stability Pool and RIPE governance vault; GREEN/USDG and RIPE/WETH LP exact identities/routes with zero LTV; USDG excluded from ordinary Teller collateral |
 | Exact AAPL | Pinned proxy/beacon/implementation/code hashes, transfer-in/out, pause/blocklist/upgrade-behavior switch, receipt/delivery equality, issuer loss before borrow/health/auction/repay, and restoration still held by config. |
 | Exact-transfer compatibility | Enumerate every asset reachable through the candidate Robinhood Teller, including Stock and non-Stock assets, and classify all 27 Base ID-3 assets for forward-source/later-cutover compatibility. Pin token code/source/control identities and prove exact receipt on ordinary and trusted routes; fee-on-transfer, rebasing-on-transfer, short-receipt, or unknown behavior is a stop, not a skipped row. |
 | Base evidence/regression | Read-only refresh of all 27 ID-3 registrations, 9 funded rows, WETH surplus, debt/auctions/config, and urgent-vulnerability criteria; prove existing Base runtimes remain unchanged under Robinhood-first. Prove the per-chain deployment graph has no bridge, message, shared custody, credit, debt, or accounting route that propagates Base state into Robinhood. Shared-source tests still cover all Teller/CreditEngine consumers. |
@@ -6490,7 +6652,15 @@ vaultOutflow == recipientDelivery == O == W == E
 C < N or unknownBacking
     => deposit == withdraw == capacity == value == 0
 C >= N => user capacity/value is bounded by nominal M, never by surplus C-N
-internalTransfer => revert
+unsafeInternalTransfer => revert
+internalTransfer succeeds only if
+    known(C0,C1) and C0 >= N and C1 >= N
+    and 0 < W <= Q
+    and sellerNominalDecrease == W
+    and buyerNominalIncrease == W
+    and aggregateNominalAfter == N
+    and C1 == C0
+    and payment/debt reduction use only W
 debt > 0 and no safe collateral and not already in liquidation
     and configured liqThreshold > 0 => canLiquidateUser == true
 repayment decreases debt without an unsafe-asset price
@@ -6506,12 +6676,12 @@ PRs may be reviewed separately in this dependency order:
 
 | Slice | Exact proposed files | Exit evidence | Individually activatable? |
 | --- | --- | --- | --- |
-| M0 — evidence and product freeze | Documentation/evidence files approved in a later file-exact authorization; no production source | Current `rh` caller/runtime inventory; exact-transfer compatibility for every Robinhood candidate-runtime asset and all 27 Base ID-3 assets; read-only Base refresh with urgent-vulnerability decision; Robinhood/Base state-independence proof; exact AAPL identities; and explicit confirmation that Stock-compatible global deposit/borrow rewards are disabled at initial launch. Any incompatible/unknown Robinhood asset or cross-chain propagation path stops before M1. If product requires Stock rewards, reopen reward-loss scope. | No |
+| M0 — evidence and product freeze | These four decision/evidence documents only; no production source | Existing external-token/dependency identities and compatibility; approved route dispositions; Base refresh; file-exact proposed Robinhood/Base state-independence graph; CCIP-complete-or-disabled policy plus the seven-day promotion target/checklist; launch-disabled rewards/runbook; AAPL feed and cap procedure/inputs; exact proposed Teller/GuardedErc20/CreditEngine file boundary; source-traced plausibility; owner-approved partial-fill invariant; file-exact M1 proposal | No |
 | M1 — exact receipt boundary | `contracts/core/Teller.vy`; `tests/core/teller/test_teller_deposit.py`; `tests/core/teller/test_teller_rebalance.py`; candidate cases in `tests/vaults/test_stock_token_vault_comparison.py` | ML-01 `R==Q` on every route, donation-masking proof, exact observation failures, measurement-window mutex/callback liveness, unchanged signatures/persistent storage, all consumer regressions | No |
-| M2 — launch vault | proposed `contracts/vaults/ExternalErc20.vy`; proposed `scripts/abis/ExternalErc20.json`; proposed `tests/vaults/test_external_erc20.py` | ML-05/07, exact external delivery, deficit-only freeze, surplus liveness without allocation, backing-aware existing getters, onchain Endaoment endpoint rejection, canonical Vault ABI/layout proof | No |
+| M2 — launch vault | proposed `contracts/vaults/GuardedErc20.vy`; proposed `scripts/abis/GuardedErc20.json`; proposed `tests/vaults/test_guarded_erc20.py` | ML-05/07, exact external delivery, owner-confirmed partial/full guarded internal movement, seller depletion, batch/over-request/failure atomicity, deficit-only freeze, surplus liveness without allocation, backing-aware existing getters, onchain Endaoment endpoint rejection, canonical Vault ABI/layout proof | No |
 | M3 — credit containment | `contracts/core/CreditEngine.vy`; `tests/core/creditEngine/test_credit_borrow.py`; `tests/core/creditEngine/test_credit_repay.py`; proposed `tests/core/creditEngine/test_stock_backing.py` | ML-02/03/06 from the existing vault getter and one zero-amount loop correction; no CreditEngine raw backing reads, config getter, or repay-mode change; safe co-collateral liveness | No |
-| M4 — unchanged-settlement integration proof | No AuctionHouse or Deleverage production source; `tests/core/auctionHouse/test_ah_auctions.py`; proposed `tests/core/auctionHouse/test_stock_delivery.py`; `tests/core/deleverage/test_deleverage_swap_collateral.py`; proposed `tests/core/deleverage/test_stock_delivery.py` | ML-04/05 through vault proof and current ordering; source/ABI negative proof; internal-mode revert propagation; two-buyer/batch/Deleverage/state-root atomicity; legacy risk explicitly unchanged | No |
-| M5 — Robinhood integration/config/release | Proposed `tests/config/test_stock_token_minimum.py`; proposed `tests/config/test_core_cutover_state.py`; `tests/probes/test_stock_token_transfer_probe.py`; Track 6/7-owned defaults, migration, manifest, artifact verification, smoke/runbook files only after their exact paths are approved | Full suite, Robinhood-first live-version manifest and state-independence evidence, Base urgent-risk refresh, exact constructor/Department/CreditEngine-local state, disabled rewards/routes, exact AAPL lifecycle, audits, final state/config hashes | **Only as the complete group** |
+| M4 — unchanged-settlement integration proof | No AuctionHouse or Deleverage production source; `tests/core/auctionHouse/test_ah_auctions.py`; proposed `tests/core/auctionHouse/test_stock_delivery.py`; `tests/core/deleverage/test_deleverage_swap_collateral.py`; proposed `tests/core/deleverage/test_stock_delivery.py` | ML-04/05 through vault proof and current ordering; source/ABI negative proof; guarded-internal success and failure propagation; two-buyer/batch/Deleverage/state-root atomicity; legacy risk explicitly unchanged | No |
+| M5 — Robinhood integration/config/release | Proposed `tests/config/test_stock_token_minimum.py`; proposed `tests/config/test_core_cutover_state.py`; `tests/probes/test_stock_token_transfer_probe.py`; Track 6/7-owned defaults, migration, manifest, artifact verification, smoke/runbook files only after their exact paths are approved | Full suite, Robinhood-first live-version manifest and propagation evidence, Base urgent-risk refresh, exact constructor/Department/CreditEngine-local state, activation-day rewards disabled, unsupported Stock routes disabled, approved non-Stock routes exact, exact AAPL lifecycle, audits, final state/config hashes | **Only as the complete group** |
 
 The final Stock Token activation is one economic release:
 
@@ -6524,20 +6694,49 @@ value path is reachable; M4 is evidence against unchanged consumers, not a
 runtime. No partial group, empty vault, passed unit test, deployed bytecode, or
 completed audit is launch-ready by itself.
 
+#### 23.9.1 File-exact proposed M1 authorization
+
+The complete proposal is owner-packet Section 10. It names a fresh
+`rh-track-8-m1-exact-receipt` worktree from the exact reviewed `rh` commit that
+will contain the final integrated M0 package. That full 40-character baseline
+does not exist yet and must be inserted and separately approved by the owner.
+
+M1's only production file is `contracts/core/Teller.vy`. Existing allowed
+tests are:
+
+- `tests/core/teller/test_teller_deposit.py`;
+- `tests/core/teller/test_teller_rebalance.py`; and
+- `tests/vaults/test_stock_token_vault_comparison.py`.
+
+No other test file is proposed. If those three files cannot carry the required
+cases cleanly, the slice stops and returns a revised exact file list before
+creating a file. Vault source, CreditEngine, AuctionHouse, Deleverage,
+interfaces, persistent storage, ABIs, defaults, migrations, manifests,
+dependencies, CI, and `rh-summary.md` are excluded. Protocol accounting,
+security/reentrancy, Base compatibility, and an independent source/test review
+are mandatory.
+
+The slice stops on baseline drift, an unenumerated caller, any approved route
+that cannot require `R==Q`, trusted-callback breakage, any persistent
+storage/selector/event/ABI change, any second production file, implied Base
+cutover, or a failed mandatory test. Its exit proof is ML-01 only; it cannot
+deploy, configure, activate, or claim completion of M2–M5. This paragraph is a
+proposal, not M1 authorization.
+
 Deployment order:
 
-1. freeze the current pushed implementation baseline, obtain the day-one
-   reward decision, complete the exact-transfer asset matrix, prove
-   Robinhood/Base state independence, refresh Base read-only exposure, and
-   re-run M0; stop and return to the owner if an enabled Robinhood asset is
-   incompatible/unknown, a propagation path exists, or the urgent-Base
-   criteria are met;
-2. build/review/audit M1–M3 plus M4's unchanged-consumer proof as one composed
+1. close M0 using only pre-implementation evidence: existing external
+   identities/compatibility, product and route freeze, file-exact proposed
+   Robinhood/Base state independence, cap procedure/inputs, CCIP and reward
+   runbooks, exact proposed file boundary, source-traced plausibility,
+   partial-fill owner decision, and a file-exact M1 proposal;
+2. after separate owner authorization, build/review/audit M1–M3 plus M4's
+   unchanged-consumer proof as one composed
    Robinhood artifact set;
 3. leave existing Base deployments unchanged and record their exact runtime
    hashes/residual risk; any Base cutover is a separate owner decision;
 4. deploy/register the fresh Robinhood launch vault under a Track 7-owned ID
-   while all Stock controls and rewards remain disabled;
+   while all Stock controls, CCIP gates, and rewards remain disabled;
 5. apply approved finite limits, LTV, oracle, route disables, and role values;
 6. run full Base, Robinhood, and exact-AAPL post-state evidence;
 7. enable the complete Stock path in one reviewed transaction sequence whose
@@ -6572,55 +6771,62 @@ comprehensive Phase A–K analysis already specified it.
 
 ### 23.11 Owner decisions required before implementation
 
-The minimum proposal returns one immediate evidence decision and a later
-mechanism checkpoint. Because exact-transfer compatibility and per-chain state
-independence have not yet been proved for the final asset/deployment set, the
-owner should **not** finally approve the mechanism or implementation surface
-from this document alone.
+M0 documentation/evidence work was authorized and the initial evidence was
+collected in a separate branch. M0 remains open pending independent review and
+owner closure. On 24–25 July 2026, the owner selected the product directions
+in
+Section 3.22 and `track-8-m0-owner-decision-packet.md`, including:
 
-**Immediate decision:** authorize or reject M0 documentation/evidence work
-only: read-only RPC/indexer and pinned-fork acquisition sufficient to build the
-complete exact-transfer asset matrix, refresh Base exposure, and prove the
-Robinhood/Base deployment graph. This authorization would not approve a
-production test/source edit, contract deployment, migration, configuration,
-signer, or transaction.
+1. AAPL-only initial Stock scope and the exact non-Stock launch targets;
+2. CCIP as a nonblocking target for a separately reviewed promotion within
+   seven days after launch, disabled if incomplete or late, with sGREEN never
+   CCIP-enabled;
+3. global reward disable at activation and a validated seven-day activation
+   target that may include AAPL positions;
+4. acceptance of the integrated AAPL fork plus current identities;
+5. unchanged Base and a separately gated future cutover;
+6. fixed AAPL USD exposure targets, one enabled vault, and no trusted/
+   Department AAPL deposit route;
+7. the guarded-settlement vault direction, external frontend default, and
+   accepted internal-settlement issuer-control risk; and
+8. the unacceptable phantom-collateral, first-withdrawer, and zero-backed
+   payment boundary; and
+9. the exact guarded internal partial-fill invariant
+   `0<W<=Q`, matching seller/buyer deltas, unchanged nominal total, known
+   solvent and unchanged custody, and payment/debt based only on `W`.
 
-After M0 passes, return these substantive decisions:
+These are owner-approved directions, not implementation authorization. This
+revision now returns the complete pre-implementation evidence:
 
-1. approve or reject the generic external-only nominal vault as the initial
-   Stock path, including deficit-only `C>=N` operation, unallocated-surplus
-   liveness, exact-transfer-only deposits subject to the complete M0 asset
-   compatibility evidence, exact external delivery, internal-transfer
-   rejection, and the existing Vault selector shapes;
-2. approve or reject the three-contract Robinhood production surface:
-   Teller exact `R==Q` plus transient measurement mutex, the fresh vault, and
-   CreditEngine's generic `(asset,0)` term preservation; explicitly keep
-   AuctionHouse, Deleverage, MissionControl, Switchboards, Ledger, Lootbox, and
-   canonical interfaces unchanged;
-3. accept or reject the freeze/stranded-debt/later-governance risk model,
-   including deficit-triggered freeze and unallocated surplus that remains
-   outside user claims without freezing nominal operations;
-4. approve a day-one reward posture in which no global generic-depositor or
-   borrower bucket can pay a Stock position, including global disablement of
-   those buckets if the current configuration cannot exclude Stock;
-5. approve or reject Robinhood-first deployment with current Base runtimes
-   unchanged, the three latent Base mechanisms in Section 23.6 explicitly
-   accepted, a read-only urgent-risk refresh before implementation freeze,
-   file- and deployment-exact proof of Robinhood/Base state independence, and
-   every later Base migration separately gated;
-6. approve the no-new-persistent-storage/no-new-canonical-interface boundary,
-   vault-local revert-safe backing observation, existing
-   `canDeposit`/`canWithdraw`/`canBuyInAuction`/`DebtTerms.ltv` controls, and
-   the vault's onchain Endaoment-recipient prohibition; and
-7. only after those decisions, provide a file-exact implementation/test
-   authorization. Track 7 separately owns the production VaultBook ID,
-   migration names, manifests, and transaction plan.
+- exact identities/compatibility for already-existing external assets and
+  dependencies used by the approved graph;
+- final product/route dispositions and the current-source caller inventory;
+- file-exact proposed Robinhood/Base state independence, without requiring
+  not-yet-created deployment addresses or runtime hashes;
+- AAPL feed, price-pin procedure, cap inputs/formula, and review rules;
+- CCIP complete-or-disabled policy, seven-day separate-promotion
+  target/checklist, and permanent no-sGREEN-CCIP rule;
+- launch-disabled reward policy plus the monitoring/kill-switch runbook;
+- exact proposed Teller/`GuardedErc20`/CreditEngine file and test boundary;
+- source-traced plausibility of ML-01–ML-07 with unchanged consumers;
+- a file-exact M1 authorization proposal naming the branch, baseline, proposed
+  files/tests/reviewers, and non-authorizations.
 
-Items 1–6 are the post-M0 substantive mechanism/risk approvals; item 7 is the
-still-later file-exact authorization. There is no additional
-onchain-versus-runbook choice: item 6 accepts or rejects the vault-level
-onchain recipient guard. Rejecting it returns the containment evidence to the
-owner; it does not silently select a runbook-only launch.
+Independent review and explicit owner closure remain. No documentable
+pre-implementation input remains intentionally open. An adverse independent
+finding reopens the relevant evidence row; it does not authorize a production
+workaround.
+
+Implemented vault source/compiler/storage/ABI/runtime evidence, composed
+tests, actual new Ripe addresses/runtime hashes, post-deployment route/config
+proof, and final M1–M5 integration/activation evidence are later gates. Track
+7 separately owns any production VaultBook ID, migration names, manifests,
+and transaction plan.
+
+There is no additional onchain-versus-runbook choice for the vault-level
+Endaoment recipient guard. The three-contract direction remains subject to
+independent validation; failure returns evidence to the owner and does not
+silently authorize AuctionHouse, persistent mode, interface, or Ledger scope.
 
 This section does not pass any of those gates. It does establish that a small
 shared patch exists and that Stock Tokens need not be postponed for the
