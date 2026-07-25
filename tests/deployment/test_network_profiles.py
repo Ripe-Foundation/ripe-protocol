@@ -24,10 +24,12 @@ from config.network_profiles import (
     operation_decision,
     repository_paths,
     resolve_rpc_reference,
+    static_manifest_path,
     validate_fork_request,
     validate_registry,
     verify_chain_identity,
 )
+from scripts import migrate
 
 
 @pytest.fixture(scope="session")
@@ -60,6 +62,26 @@ def verified(profile_id: str, operation: Operation):
         profile.identity.chain_id,
         profile.identity.chain_id,
     )
+
+
+def call_migrate(**overrides):
+    values = {
+        "ask": False,
+        "safe": "",
+        "fork": True,
+        "is_retry": False,
+        "rpc": "https://rpc.invalid.example",
+        "single": False,
+        "environment": "v1",
+        "start_timestamp": "0",
+        "end_timestamp": "0",
+        "profile_id": "base-mainnet",
+        "blueprint": None,
+        "account": "DEPLOYER",
+        "ledger": -1,
+    }
+    values.update(overrides)
+    return migrate.cli.callback(**values)
 
 
 def test_all_five_canonical_profiles_and_chain_ids():
@@ -104,10 +126,22 @@ def test_operation_table_is_total_and_uses_required_vocabulary():
         assert {policy.outcome for policy in profile.operations} <= allowed
 
 
-def test_unknown_profile_fails_closed():
+def test_unknown_profile_fails_closed(monkeypatch):
     events = []
-    with pytest.raises(NetworkProfileError, match="H02_PROFILE_UNKNOWN"):
-        get_profile("unknown-profile")
+    for name in (
+        "resolve_rpc_reference",
+        "read_chain_id",
+        "get_account",
+        "repository_paths",
+    ):
+        monkeypatch.setattr(
+            migrate,
+            name,
+            lambda *args, _name=name, **kwargs: events.append(_name),
+        )
+
+    with pytest.raises(Exception, match="H02_PROFILE_UNKNOWN"):
+        call_migrate(profile_id="unknown-profile")
     assert events == []
 
 
@@ -211,6 +245,52 @@ def test_missing_repository_does_not_fallback_or_create(tmp_path):
     assert list(tmp_path.iterdir()) == []
 
 
+def test_static_manifest_path_rejects_proposed_and_absent_histories():
+    base_path = static_manifest_path(
+        get_profile("base-mainnet"),
+        "current",
+        operation=Operation.VERIFICATION,
+        environment="v1",
+    )
+    assert base_path == PurePosixPath(
+        "migration_history/base-mainnet/v1/current-manifest.json"
+    )
+
+    with pytest.raises(NetworkProfileError, match="H02_OPERATION_BLOCKED"):
+        static_manifest_path(
+            get_profile("robinhood-mainnet"),
+            "current",
+            operation=Operation.VERIFICATION,
+        )
+    with pytest.raises(
+        NetworkProfileError, match="H02_REPOSITORY_UNAVAILABLE"
+    ):
+        static_manifest_path(
+            get_profile("base-sepolia"),
+            "current",
+            operation=Operation.VERIFICATION,
+        )
+
+
+def test_static_manifest_path_rejects_history_alias_and_invalid_name():
+    profile = get_profile("base-mainnet")
+    with pytest.raises(NetworkProfileError, match="H02_HISTORY_ALIAS"):
+        static_manifest_path(
+            profile,
+            "current",
+            operation=Operation.VERIFICATION,
+            environment="bogus",
+        )
+    with pytest.raises(
+        NetworkProfileError, match="H02_REPOSITORY_UNAVAILABLE"
+    ):
+        static_manifest_path(
+            profile,
+            "../current",
+            operation=Operation.VERIFICATION,
+        )
+
+
 def test_verified_identity_cannot_select_another_profile_history():
     base = get_profile("base-mainnet")
     wrong_identity = VerifiedNetworkIdentity(
@@ -284,40 +364,70 @@ def test_latest_and_dirty_are_exploration_only():
         )
 
 
-def test_chain_id_mismatch_before_account_load():
-    profile = get_profile("base-mainnet")
-    operation = Operation.MIGRATION_FORK
-    rpc = resolve_rpc_reference(
-        profile, operation, {}, "https://rpc.invalid.example"
-    )
+def test_chain_id_mismatch_before_account_load(monkeypatch):
     events = []
 
     def reader(value):
         events.append("chain_id")
         return 1
 
-    with pytest.raises(NetworkProfileError, match="H02_CHAIN_ID_MISMATCH"):
-        verify_chain_identity(profile, operation, rpc, reader)
-        events.append("account")
+    monkeypatch.setattr(migrate, "read_chain_id", reader)
+    monkeypatch.setattr(
+        migrate,
+        "get_account",
+        lambda *args, **kwargs: events.append("account"),
+    )
+    monkeypatch.setattr(
+        migrate,
+        "repository_paths",
+        lambda *args, **kwargs: events.append("history"),
+    )
+    monkeypatch.setattr(
+        migrate.boa,
+        "fork",
+        lambda *args, **kwargs: events.append("fork"),
+    )
+
+    with pytest.raises(Exception, match="H02_CHAIN_ID_MISMATCH"):
+        call_migrate()
     assert events == ["chain_id"]
 
 
-def test_matching_chain_id_allows_only_next_mocked_step():
-    profile = get_profile("base-mainnet")
-    operation = Operation.MIGRATION_FORK
-    rpc = resolve_rpc_reference(
-        profile, operation, {}, "https://rpc.invalid.example"
-    )
+def test_matching_chain_id_allows_only_next_mocked_step(monkeypatch):
     events = []
 
     def reader(value):
         events.append("chain_id")
         return "0x2105"
 
-    identity = verify_chain_identity(profile, operation, rpc, reader)
-    events.append("next_mocked_step")
-    assert identity.expected_chain_id == 8453
-    assert events == ["chain_id", "next_mocked_step"]
+    class NextStepReached(Exception):
+        pass
+
+    def account(name, identity, operation):
+        events.append(
+            (
+                "account",
+                name,
+                identity.expected_chain_id,
+                operation,
+            )
+        )
+        raise NextStepReached
+
+    monkeypatch.setattr(migrate, "read_chain_id", reader)
+    monkeypatch.setattr(migrate, "get_account", account)
+    monkeypatch.setattr(
+        migrate,
+        "repository_paths",
+        lambda *args, **kwargs: events.append("history"),
+    )
+
+    with pytest.raises(NextStepReached):
+        call_migrate()
+    assert events == [
+        "chain_id",
+        ("account", "DEPLOYER", 8453, Operation.MIGRATION_FORK),
+    ]
 
 
 def test_invalid_chain_id_response_fails_with_sanitized_typed_error():

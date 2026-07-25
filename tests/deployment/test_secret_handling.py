@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 import ast
-import importlib
 import os
 import socket
 import subprocess
+from contextlib import contextmanager
 from pathlib import Path
+from types import SimpleNamespace
 
-import dotenv
 import pytest
 import requests
 
@@ -22,6 +22,7 @@ from config.network_profiles import (
 )
 from scripts import console, migrate, verify
 from scripts.utils import migration_helpers
+from scripts.utils.migration_runner import MigrationError
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -57,7 +58,6 @@ def ripe_hq():
 def isolated_environment_and_network(monkeypatch):
     for name in RELEVANT_ENV:
         monkeypatch.delenv(name, raising=False)
-    monkeypatch.setenv("PYTHON_DOTENV_DISABLED", "1")
 
     def blocked(*args, **kwargs):
         raise AssertionError("external networking is disabled")
@@ -80,7 +80,6 @@ def _child_environment():
     return {
         "PATH": os.defpath,
         "PYTHONPATH": str(ROOT),
-        "PYTHON_DOTENV_DISABLED": "1",
     }
 
 
@@ -124,6 +123,37 @@ def _call_migrate(**overrides):
     }
     values.update(overrides)
     return migrate.cli.callback(**values)
+
+
+def _prepare_migration_execution(monkeypatch, run):
+    sender = SimpleNamespace(
+        address="0x0000000000000000000000000000000000000001"
+    )
+    monkeypatch.setattr(migrate, "read_chain_id", lambda value: 8453)
+    monkeypatch.setattr(migrate, "get_account", lambda *args: sender)
+    monkeypatch.setattr(migrate, "load_vyper_files", lambda: {})
+    monkeypatch.setattr(
+        migrate,
+        "MigrationRunner",
+        lambda *args: SimpleNamespace(run=run),
+    )
+    monkeypatch.setattr(
+        migrate.boa.deployments,
+        "DeploymentsDB",
+        lambda *args: object(),
+    )
+    monkeypatch.setattr(
+        migrate.boa.deployments,
+        "set_deployments_db",
+        lambda *args: None,
+    )
+
+    @contextmanager
+    def fake_fork(rpc_url, **kwargs):
+        assert rpc_url == _SENSITIVE_RPC
+        yield SimpleNamespace(set_balance=lambda *args: None)
+
+    monkeypatch.setattr(migrate.boa, "fork", fake_fork)
 
 
 @pytest.mark.parametrize(
@@ -206,6 +236,8 @@ def test_missing_private_key_never_uses_public_fallback(monkeypatch):
 
 def test_public_local_key_is_test_only():
     occurrences = []
+    # This scanner intentionally searches for the one contiguous production
+    # hazard; this test's fixture is split so it cannot itself satisfy the scan.
     for directory in (ROOT / "config", ROOT / "scripts", ROOT / "tests"):
         for path in directory.rglob("*.py"):
             if _PUBLIC_ANVIL_TEST_KEY in path.read_text():
@@ -441,6 +473,40 @@ def test_user_supplied_rpc_is_fully_redacted(monkeypatch):
         assert component not in rendered
 
 
+def test_successful_migration_log_path_fully_redacts_rpc(monkeypatch, capsys):
+    _prepare_migration_execution(
+        monkeypatch,
+        lambda *args: 123,
+    )
+    _call_migrate(rpc=_SENSITIVE_RPC)
+
+    rendered = capsys.readouterr().out
+    assert "value=<redacted>" in rendered
+    assert "may write manifests under" in rendered
+    for component in (
+        _SENSITIVE_RPC,
+        "synthetic-user",
+        "synthetic-password",
+        "path-token",
+        "query-token",
+        "fragment-token",
+    ):
+        assert component not in rendered
+
+
+def test_migration_failure_preserves_sanitized_resume_timestamp(monkeypatch):
+    def fail(*args):
+        raise MigrationError("1712345678")
+
+    _prepare_migration_execution(monkeypatch, fail)
+    with pytest.raises(Exception) as captured:
+        _call_migrate(rpc=_SENSITIVE_RPC)
+    rendered = str(captured.value)
+    assert "H02_MIGRATION_EXECUTION_FAILED" in rendered
+    assert "failure_timestamp=1712345678" in rendered
+    assert _SENSITIVE_RPC not in rendered
+
+
 def test_explorer_key_is_not_read_at_import_or_help():
     for module in ("scripts.migrate", "scripts.console", "scripts.verify"):
         result = _run_child("-m", module, "--help")
@@ -449,13 +515,15 @@ def test_explorer_key_is_not_read_at_import_or_help():
 
 
 def test_unsupported_verifier_does_not_read_key(monkeypatch):
-    marker = "synthetic-explorer-value"
-    monkeypatch.setenv("ETHERSCAN_API_KEY", marker)
+    environment = SpyEnvironment(
+        {"ETHERSCAN_API_KEY": "synthetic-explorer-value"}
+    )
+    monkeypatch.setattr(os, "environ", environment)
     with pytest.raises(Exception) as captured:
         verify.cli.callback("base-mainnet", None, "current")
     rendered = f"{captured.value} {captured.value!r}"
     assert "H02_VERIFIER_BLOCKED" in rendered
-    assert marker not in rendered
+    assert environment.accesses == []
 
 
 def test_process_environment_is_not_dumped_or_persisted(
@@ -474,14 +542,59 @@ def test_process_environment_is_not_dumped_or_persisted(
             assert marker not in path.read_text(errors="ignore")
 
 
-def test_dotenv_is_not_loaded_by_h02_modules(monkeypatch):
-    calls = []
-    monkeypatch.setattr(
-        dotenv, "load_dotenv", lambda *args, **kwargs: calls.append(args)
+def test_dotenv_is_not_loaded_by_h02_modules():
+    result = _run_child(
+        "-c",
+        (
+            "import dotenv\n"
+            "def fail(*args, **kwargs):\n"
+            "    raise AssertionError('dotenv loader called')\n"
+            "dotenv.load_dotenv = fail\n"
+            "import config.network_profiles\n"
+            "import scripts.migrate\n"
+            "import scripts.console\n"
+            "import scripts.verify\n"
+            "import scripts.utils.migration_helpers\n"
+        ),
     )
-    importlib.reload(migration_helpers)
-    importlib.reload(console)
-    assert calls == []
+    assert result.returncode == 0, result.stderr
+
+
+def test_console_session_error_is_not_mislabeled_as_rpc_failure(monkeypatch):
+    monkeypatch.setattr(console, "read_chain_id", lambda value: 8453)
+    fake_console = SimpleNamespace(
+        _profile_id="base-mainnet",
+        _mode="local exploration",
+        _manifest={},
+        c=object(),
+    )
+    monkeypatch.setattr(console, "Console", lambda *args: fake_console)
+
+    @contextmanager
+    def fake_fork(rpc_url, **kwargs):
+        yield SimpleNamespace()
+
+    monkeypatch.setattr(console.boa, "fork", fake_fork)
+
+    import IPython
+
+    def fail_session(*args, **kwargs):
+        raise RuntimeError("synthetic session failure")
+
+    monkeypatch.setattr(IPython, "embed", fail_session)
+    with pytest.raises(
+        RuntimeError, match="synthetic session failure"
+    ) as error:
+        console.main.callback(
+            "base-mainnet",
+            None,
+            None,
+            "https://rpc.invalid.example",
+            "",
+            None,
+            False,
+        )
+    assert "H02_RPC_CONNECT_FAILED" not in str(error.value)
 
 
 @pytest.mark.parametrize(

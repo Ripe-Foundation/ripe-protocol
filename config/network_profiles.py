@@ -234,6 +234,7 @@ _SUPPORTED = OperationOutcome.SUPPORTED
 _UNSUPPORTED = OperationOutcome.UNSUPPORTED
 _BLOCKED = OperationOutcome.BLOCKED_PENDING_POLICY
 
+
 def _operations(*policies: OperationPolicy) -> tuple[OperationPolicy, ...]:
     operation_map = {
         operation: _policy(
@@ -995,7 +996,10 @@ def validate_fork_request(
                 operation=operation,
             )
     else:
-        if block_number is None and not profile.fork.latest_allowed_for_exploration:
+        if (
+            block_number is None
+            and not profile.fork.latest_allowed_for_exploration
+        ):
             raise NetworkProfileError(
                 "H02_FORK_PIN_REQUIRED",
                 profile_id=profile.identity.profile_id,
@@ -1099,6 +1103,54 @@ def repository_paths(
     )
 
 
+def static_manifest_path(
+    profile: NetworkProfile,
+    manifest_name: str,
+    *,
+    operation: Operation,
+    environment: str | None = None,
+) -> PurePosixPath:
+    if not isinstance(operation, Operation):
+        raise NetworkProfileError(
+            "H02_OPERATION_INVALID",
+            profile_id=profile.identity.profile_id,
+        )
+    repository = profile.repository
+    if repository.history_state is PathState.PROPOSED:
+        raise NetworkProfileError(
+            "H02_OPERATION_BLOCKED",
+            profile_id=profile.identity.profile_id,
+            operation=operation,
+        )
+    if (
+        repository.history_state is not PathState.EXISTING
+        or repository.history_dir is None
+    ):
+        raise NetworkProfileError(
+            "H02_REPOSITORY_UNAVAILABLE",
+            profile_id=profile.identity.profile_id,
+            operation=operation,
+        )
+    if (
+        environment is not None
+        and environment != repository.history_dir.name
+    ):
+        raise NetworkProfileError(
+            "H02_HISTORY_ALIAS",
+            profile_id=profile.identity.profile_id,
+            operation=operation,
+        )
+    if not isinstance(manifest_name, str) or not re.fullmatch(
+        r"[A-Za-z0-9][A-Za-z0-9_-]{0,127}", manifest_name
+    ):
+        raise NetworkProfileError(
+            "H02_REPOSITORY_UNAVAILABLE",
+            profile_id=profile.identity.profile_id,
+            operation=operation,
+        )
+    return repository.history_dir / f"{manifest_name}-manifest.json"
+
+
 def manifest_path(
     profile: NetworkProfile,
     manifest_name: str,
@@ -1107,16 +1159,13 @@ def manifest_path(
     identity: VerifiedNetworkIdentity,
     operation: Operation = Operation.REPOSITORY_READ,
 ) -> Path:
-    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]{0,127}", manifest_name):
-        raise NetworkProfileError(
-            "H02_REPOSITORY_UNAVAILABLE",
-            profile_id=profile.identity.profile_id,
-            operation=operation,
-        )
+    relative_path = static_manifest_path(
+        profile, manifest_name, operation=operation
+    )
     paths = repository_paths(
         profile, operation, root=root, identity=identity
     )
-    return paths.history_dir / f"{manifest_name}-manifest.json"
+    return paths.history_dir / relative_path.name
 
 
 validate_registry()

@@ -4,8 +4,15 @@
 
 This record contains the H-02 Phase A read-only audit, approved design,
 Phase B implementation, and Phase F validation. The owner approved the Phase A
-checkpoint before implementation. The implementation is committed for
-independent Gate 1 review; Gate 1 and Gate 2 are not yet approved.
+checkpoint before implementation.
+
+**The original status sentence here is superseded by “Current re-review
+correction and reopened gates” below.** Gate 1 was later approved at
+`596e868797f422afed8f46126556765961aba2c5`; the branch was reconciled to
+`rh` `185bd32004121bbb1c60748844c517ea8da0affb`, validated, and pushed.
+The subsequent independent Gate 2 re-review found material H-02 issues. The
+resulting correction reopens Gate 1 and Gate 2; neither is currently approved
+for the corrected HEAD.
 
 Phase A used the isolated worktree and branch:
 
@@ -176,6 +183,14 @@ environment mappings were absent or contained only a named synthetic
 placeholder. Captured output was reduced to booleans, error classes, profile
 IDs, and exit codes; no endpoint value, account address, key, or environment
 dump was retained.
+
+Later re-review called `PYTHON_DOTENV_DISABLED` a no-op. That observation does
+not apply to the integrated `python-dotenv==1.2.2`: its `load_dotenv()` checks
+that exact variable and returns without loading when the value is truthy. A
+sanitized disposable-runtime probe also returned `False` and left the probe
+key absent. The historical audit statement is therefore accurate. The current
+H-02 tests nevertheless omit the variable and use a subprocess loader spy, so
+their proof does not depend on that package-specific control.
 
 ### Import and help behavior
 
@@ -1078,7 +1093,9 @@ profile, operation, and reference name.
 The migration runner's discovery/resume/write behavior remains unchanged and
 is reachable only for the supported Base-mainnet exploration fork after
 profile, operation, RPC, chain identity, and account checks. The CLI labels
-that output non-pinned fork results as exploration-only, not release evidence.
+the run exploration-only and now warns that it may write directly into the
+committed Base history namespace; those writes must not be committed or
+treated as release evidence.
 
 ### Implemented operation disposition
 
@@ -1202,7 +1219,11 @@ For H-01, S1, S2, collection, and the full suite, the same command explicitly
 added `-u PYTHON_DOTENV_DISABLED` and omitted
 `PYTHON_DOTENV_DISABLED=1`, because H-01 itself tests dotenv behavior.
 
-### Exact final results
+### Historical Phase F results (superseded)
+
+**Superseded by the current re-review validation section below.** These values
+are preserved as the exact results for the earlier implementation commit, not
+as current branch results.
 
 Every pytest argument list below also included `-q`, `-p`, and
 `no:cacheprovider`.
@@ -1276,10 +1297,20 @@ Remaining risk is deliberately fail-closed:
 - `scripts/params/params_utils.py` retains out-of-scope Base/vendor assumptions;
 - no live account backend, provider, fee, finality, or release confirmation is
   approved; and
-- Base fork migration remains explicitly exploration-only and must not be
-  presented as release evidence.
+- Base fork migration remains exploration-only, but the unchanged
+  `MigrationRunner` writes timestamped and `current-manifest.json` output
+  directly under the committed
+  `migration_history/base-mainnet/v1` namespace. A fork can therefore replace
+  release-looking Base history with simulated addresses. H-06 owns isolated
+  output, atomic writes, and promotion; until that slice resolves the defect,
+  operators must treat the worktree as contaminated after a fork run and must
+  not commit its history output.
 
-## Reviewer-gate status
+## Historical reviewer-gate status (superseded)
+
+**Superseded by the Gate 1 approval, current-baseline reconciliation, and
+current re-review correction sections below.** This section records the state
+before Gate 1 review and must not be read as current.
 
 Gate 1 is open. An independent deployment-tooling/security/Base reviewer must
 inspect every changed line and the full evidence, then record approval or
@@ -1696,3 +1727,286 @@ migration execution, verification submission, deployment, governance action,
 contract/default/migration/manifest/history/generated-artifact change,
 `rh`/`master` merge, or integration-worktree edit occurred. The only authorized
 external write after this record is committed is the H-02 feature-branch push.
+
+## Current re-review correction and reopened gates
+
+### Review provenance and starting identity
+
+The independent re-review supplied after the Gate 2 package is preserved
+outside the repository with SHA-256
+`1ea8edb549b9d4bed2e9e389c416e8d520a1acb90eebb65b27d1093ab3d92f2f`.
+It independently reproduced the 73-test result, exact nine-file scope and
+hashes, remote parity, branch topology, negative-test mapping, RPC redaction,
+and the earlier Gate 1 account-boundary defect and correction.
+
+The correction started from clean, pushed feature HEAD
+`fbfbebd91d1c04b429c148558b2c3ac2c37b1f55`. Local `rh` and the existing
+`origin/rh` tracking reference both remained exact commit
+`185bd32004121bbb1c60748844c517ea8da0affb`; the feature was six commits ahead
+and zero behind. The integration worktree was not modified.
+
+The re-review found two material implementation defects, two operator-safety
+defects, test-proof gaps, evidence contradictions, and minor clarity/style
+issues. Because implementation bytes changed, the prior Gate 1/Gate 2
+approval package does not approve the corrected HEAD. Fresh independent Gate
+1 and Gate 2 review are required.
+
+### Complete finding disposition
+
+| Review item | Disposition |
+|---|---|
+| 1, fork writes committed Base history | Confirmed pre-existing H-06-owned defect. The CLI now warns that the run may write the exact history namespace and says not to commit or treat it as release evidence. The concrete write risk is recorded above and below. No history-output interface was added. |
+| 2, verifier parallel path authority | Fixed in H-02. `static_manifest_path()` is the sole static manifest-path constructor; it rejects proposed, absent, aliased, and invalid names. `verify.py` checks the operation outcome before asking for a path and no longer prints phantom paths. |
+| 3, verification always fails/orphaned adapter | Confirmed owner-approved fail-closed state and recorded as an H-07/operator-runbook residual below. |
+| 4, lost migration resume timestamp | Fixed. `MigrationError.failure_timestamp` is preserved as a digits-only sanitized field; fork entry and execution errors are separated. |
+| 5, fork-only private-key input | No new CLI/backend was added because that would expand the approved account model. Help now requires a purpose-limited disposable fork key and explicitly says never to use a live deployer key. An optional mock/injected account remains an owner decision. |
+| 6, `local` offered but unavailable to these CLIs | Retained because the approved design requires registry-derived five-profile choices and `local` remains a valid embedded `LOCAL_RUNTIME` identity. Help now states that availability is operation-specific and `local` is reserved for an embedded runtime. Operation-specific choice lists would be a new owner decision. |
+| 7, removal of implicit dotenv loading | Intentional and explicitly included in the owner-approved Phase A file plan. The operator impact is now stated below: values must be exported/injected before invocation; the CLIs do not load `.env`. |
+| 8, contradictory evidence status | Fixed with explicit superseded labels at the opening, historical Phase F results, and historical reviewer-gate status. |
+| 9, vacuous NEG-001/NEG-002 tests | Fixed. The exact named tests now drive the migration callback with real RPC/account/history/fork spies and assert the observed call sequence. The matching case reaches a real mocked account boundary and no later step. |
+| 10, no successful-log redaction proof | Fixed with a complete mocked successful migration path and captured-output component assertions. |
+| 11, verifier key test did not prove no lookup | Fixed with an environment mapping whose item access is recorded; the blocked verifier performs zero accesses. |
+| 12, declarative registry surface | Confirmed and documented in the table below. No later-slice provider, alias, or environment behavior was invented. |
+| 13, console mislabeled session errors | Fixed by limiting `H02_RPC_CONNECT_FAILED` translation to fork-context entry. A focused test proves a session exception retains its real type/message. |
+| 14, split public-key fixture ambiguity | Fixed with a source comment explaining that the scanner targets the one contiguous production hazard and the test fixture is intentionally split. |
+| 15, dotenv control | The reviewer's no-op premise is incorrect for locked `python-dotenv==1.2.2`, as recorded above. H-02 child tests still removed the variable and now prove behavior directly. |
+| 16, reload left module globals changed | Fixed by replacing parent-process reloads with a clean child-process import and a loader that raises if called. |
+| 17, source-text tripwires | Retained as cheap regression tripwires and explicitly distinguished from behavioral authority tests in code comments and below. |
+| 18, internal slice names in help | Fixed for Safe and Ledger help. |
+| 19, brittle Click/Git tests | Fixed with semantic Click assertions and a worktree prerequisite/checked return code for the Git inventory test. |
+| 20, vestigial/inconsistent options | Help now truthfully describes reserved verifier assertions, `--ask` only after explicit profile selection, and migration history assertion/default behavior. Click renders the `v1` default. Options were retained for reviewed compatibility/future owning slices. |
+| 21, style | Fixed the long fork-policy condition and PEP 8 top-level spacing. |
+
+### Registry path authority and verifier ordering
+
+`config.network_profiles.static_manifest_path(profile, manifest_name,
+operation=..., environment=...)` now owns static history selection. It:
+
+1. rejects a non-enum operation;
+2. rejects `PathState.PROPOSED` with `H02_OPERATION_BLOCKED`;
+3. rejects absent/non-existing history with
+   `H02_REPOSITORY_UNAVAILABLE`;
+4. treats `--environment` only as equality against the canonical history
+   namespace;
+5. accepts only a bounded manifest name; and
+6. returns the profile-owned relative path.
+
+The identity-requiring `manifest_path()` reuses this constructor, then calls
+`repository_paths()` to enforce supported operation, verified identity,
+canonical on-disk ownership, and existence.
+
+`verify.py` now evaluates `operation_decision()` first. Every current profile
+terminates with `H02_VERIFIER_BLOCKED` or `H02_VERIFIER_UNSUPPORTED` before a
+path, environment assertion, adapter, key, provider request, or submission is
+selected. It therefore emits no Base or proposed Robinhood manifest claim.
+The static helper is reached only if a later owning slice changes a
+verification operation to supported.
+
+### Migration and console failure boundaries
+
+The Base fork warning now says:
+
+```text
+Fork: exploration-only; this run may write manifests under
+`migration_history/base-mainnet/v1`. Do not commit or treat those outputs as
+release evidence.
+```
+
+This is a warning, not isolation. `MigrationRunner` still writes timestamped
+and current manifests into that committed namespace. H-06 must add isolated
+output/promotion policy before fork results can be considered safe release
+input.
+
+Fork-context entry failures are translated into redacted
+`H02_RPC_CONNECT_FAILED` messages. `MigrationError` is caught separately and
+preserves a digits-only `failure_timestamp=<timestamp>` so an operator can
+choose the existing `--start-timestamp` resume input. Other runner errors use
+a redacted execution code without provider exception text. Console exceptions
+after successful fork entry are no longer misreported as RPC connection
+failures.
+
+### Declarative versus enforced registry fields
+
+| Field/API | Current enforcement |
+|---|---|
+| `OperationPolicy` outcome/requirement flags | Live gate: all CLIs and helpers call `require_operation()` or `operation_decision()` before authority. |
+| `RepositoryPolicy` paths/states | Live gate in `repository_paths()` and `static_manifest_path()`; uniqueness and state/path consistency are import-validated. |
+| `RpcPolicy.env_name` / allowed operations | Live gate in `resolve_rpc_reference()`; derived operation set is import-validated. |
+| `RpcPolicy.require_chain_id_match` | Declarative after import validation. Runtime equality is enforced unconditionally by `verify_chain_identity()` for every non-local identity-requiring operation. |
+| `ForkPolicy.require_source_chain_id_match` | Declarative after type validation. The current caller always performs `verify_chain_identity()` before fork state. |
+| Other `ForkPolicy` evidence/dirty/submission flags | Live gate in `validate_fork_request()`; submission is import- and runtime-forbidden. |
+| `NetworkIdentity.environment` | Shape/classification invariant only; no environment-specific runtime behavior is inferred in H-02. |
+| `VerifierPolicy.provider`, adapter, key name | Declarative and consistency-validated only; H-07 must implement provider routing. |
+| `VerifierPolicy.operation_outcome` | Live consistency invariant: it must equal the verification operation outcome. |
+| `live_account_backend_ids` | Structurally enforced: an empty tuple makes a supported live-migration outcome registry-invalid. |
+| `PROFILE_INSPECTION` | Total-table/default capability only; no H-02 CLI entry point consumes it. |
+| `PROFILE_ALIASES` | API/validation surface only; the approved registry contains no value aliases. `--chain` is only an option spelling. |
+| `manifest_path()` / `REPOSITORY_READ` | Identity-requiring canonical filesystem API; currently consumed by regression tests and available to later owned tooling, not by the blocked verifier CLI. |
+
+Changing a verifier provider field, environment classification, fork
+declarative flag, or empty alias tuple alone does not activate runtime
+behavior. The owning slice must wire and test that behavior explicitly.
+
+### Test-proof classification
+
+The account, identity, RPC, path, successful-output, and verifier-key proofs
+are behavioral: they invoke the production boundary with spies or synthetic
+values and assert call order or captured output. The source-text tests for
+removed token construction, removed fallback fragments, and banned historical
+log forms are intentionally tripwires; they complement and do not replace the
+behavioral proofs.
+
+The public Anvil test key remains a split fixture in the H-02 test and one
+contiguous pre-existing literal in `tests/tokens/test_signatures.py`.
+Production code cannot import the H-02 secret test or that token test. No
+prohibited test file changed.
+
+### Operator compatibility and owner decisions
+
+Implicit dotenv loading was deliberately removed from the owned production
+modules under the approved Phase A plan. Operators must provide the named full
+RPC URL and fork-only key in the process environment (or the sensitive
+`--rpc` override) before invocation. A repository `.env` is not loaded by
+these CLIs.
+
+The H-02 verify command is selection-only and can never succeed at this
+checkpoint. The formerly reachable Base Etherscan flow is unreachable, and
+`scripts/utils/verify_etherscan.py::verify_from_manifest` has no production
+caller. H-07 owns restoring a supported, identity-checked provider adapter,
+key lookup, response policy, and submission path.
+
+Two choices remain intentionally outside this correction:
+
+1. whether to add an explicit fork-only mock/injected account CLI so no
+   private-key material is needed for Base simulation; and
+2. whether to replace the five registry-derived CLI choices with
+   operation-specific choices that omit `local`.
+
+The non-expansive H-02 answer is to retain both approved interfaces, require a
+purpose-limited disposable fork key, explain `local` in help, and fail closed.
+Either alternative changes the reviewed CLI/account model and requires owner
+direction.
+
+### Disposable runtime and first corrective checks
+
+The correction recreated an authorized disposable mode-0700 runtime outside
+the repository:
+
+```text
+root: /private/tmp/rh-h02-rereview-cpython312
+Python: 3.12.0
+pip: 23.2.1
+index: https://pypi.org/simple
+install: exact integrated requirements.txt, --no-cache-dir
+Vyper: 0.4.3
+Titanoboa: 0.2.7
+pytest: 8.4.2
+pip check: No broken requirements found
+```
+
+No requirement or active environment changed. The task-specific compiler
+cache is:
+
+```text
+variable: RH_H02_BOA_CACHE_DIR
+path: /private/tmp/rh-h02-rereview-cache
+mode: 0700
+```
+
+The same corrected `boa.interpret.set_cache_dir` launcher is used. Relevant
+RPC, account, explorer, vendor-token, and test-key variables are removed from
+the child environment; only the unchanged synthetic parent-pytest placeholder
+is supplied. H-02 child tests no longer set `PYTHON_DOTENV_DISABLED`.
+
+The first H-01 rerun produced `1 failed, 15 passed, 3 warnings in 1.47s`
+because the strengthened NEG tests directly imported `ClickException`,
+expanding the H-01 bounded exception-import surface. The test did not need
+that import; it was removed while retaining the exact behavioral error-code
+assertion. The immediate rerun passed `16 passed, 3 warnings in 1.46s`.
+No H-01 file, expectation, or exception boundary was changed.
+
+The first combined corrective H-02 run passed `79 passed, 3 warnings in
+10.75s`. After removing the unnecessary Click test import, the exact registry
+file rerun passed `23 passed, 3 warnings in 0.04s`.
+
+The three warnings were the same non-fatal `PytestAssertRewriteWarning`
+notices for `_hypothesis_globals`, `hypothesis`, and `boa`, imported before
+pytest by the cache launcher. No warning or test was suppressed.
+
+### Current validation, hashes, and commit
+
+All five H-02 modules imported and all three `--help` routes exited zero with
+the relevant environment absent. Help required an explicit profile and did not
+load a key or connect to a provider.
+
+Every pytest invocation used the same isolated launcher with `-q -p
+no:cacheprovider` and a unique task-specific `--basetemp`:
+
+| Scope | Result |
+|---|---|
+| `test_network_profiles.py` | `23 passed, 3 warnings in 0.03s` |
+| `test_secret_handling.py` | `33 passed, 3 warnings in 5.39s` |
+| `test_base_profile_regression.py` | `23 passed, 3 warnings in 5.09s` |
+| all three H-02 files | `79 passed, 3 warnings in 10.35s` |
+| H-01 dependency gate | `16 passed, 3 warnings in 1.43s` |
+| S1 clock profiles | `57 passed, 3 warnings in 58.32s` |
+| S2 inventory | `60 passed, 3 warnings in 25.01s` |
+| collection | `2,817/2,959 collected, 142 deselected in 1.27s` |
+| full suite | `2,817 passed, 142 deselected, 3 warnings in 300.84s` |
+
+No warning was suppressed. No selected test was skipped or xfailed. The
+unchanged 142-test external fork boundary remained deselected because external
+networking was not authorized.
+
+Current implementation/test hashes:
+
+| File | SHA-256 |
+|---|---|
+| `config/network_profiles.py` | `c83e64bfbcee4d733f5f4b23af730be394f75050a8825b57beb017a6b35dc408` |
+| `scripts/migrate.py` | `0d8a746312cc04e099fa974ce75583ff81004b5af206d2edccd789dff6e1942f` |
+| `scripts/console.py` | `8513402f5b3ccac812afa53bcad1a58b53abde17eab41194164a040eeb4fd180` |
+| `scripts/verify.py` | `6e68f0718958455bb6ce95c4d010a2ad16bc828727aa97bc5f3fc2f95591e5fd` |
+| `scripts/utils/migration_helpers.py` | `c8fa393c33541fac59b087e6b6d4125d1a97e2092c27960e0a3995ae54b06d1a` |
+| `tests/deployment/test_network_profiles.py` | `9a53fa7964fb0126eea97bc6f9f84463f2f10f5951638b800aea884c6b6bc4ed` |
+| `tests/deployment/test_secret_handling.py` | `ac35a1a76aca528dc94285973321a73a6405d665c593683e5302bcf6f80bea26` |
+| `tests/deployment/test_base_profile_regression.py` | `6246e1e1bb8d4c1a9f0d9417d83a8a0bdf9330bdd548d5e136317e283ab7186b` |
+
+The evidence hash, correction commit, commit tree, and virtual-merge tree are
+reported externally after commit creation because embedding any of those
+evidence-dependent identities here would change the value being identified.
+
+The net diff against exact baseline
+`185bd32004121bbb1c60748844c517ea8da0affb` contains exactly the same nine
+H-02-owned paths and totals `9 files changed, 5,174 insertions(+),
+340 deletions(-)`. The correction from prior pushed HEAD changes eight of
+those owned paths and totals `8 files changed, 799
+insertions(+), 164 deletions(-)`. Prohibited contracts, interfaces,
+migrations, histories, blueprints/defaults, dependency locks,
+runner/migration/verifier helpers, global test harness, H-01/S1/S2 tests,
+parameter tools, authority documents, and incoming H-03/Track 8 records are
+unchanged.
+
+The first prohibited-path loop used zsh's special `path` variable, which
+removed `git` from lookup inside that read-only loop and produced invalid
+`command not found` diagnostics. It changed nothing. The corrected loop used
+`target_path`, returned no prohibited diff, and the independent exact-scope
+comparison returned `EXACT_H02_SCOPE_OK`.
+
+The final commit, `git diff --check`, ahead/behind, remote parity, prohibited
+scope, and virtual-merge result are reported after the evidence-only identity
+is fixed. The feature branch is not pushed by this correction without explicit
+authorization.
+
+After validation, both `/private/tmp/rh-h02-rereview-cache` and
+`/private/tmp/rh-h02-rereview-cpython312` are removed by exact absolute path
+and verified absent before handoff.
+
+### Current gate status
+
+The prior independent review is materially addressed, but the corrected HEAD
+has not received fresh independent Gate 1 or Gate 2 approval. It must not be
+merged into `rh`.
+
+No live RPC, real account, secret, signing, migration execution, history
+write, verification request/submission, deployment, governance action,
+integration-worktree edit, or `rh` merge occurred during this correction.

@@ -45,7 +45,6 @@ def _run_module(module, *args):
     environment = {
         "PATH": __import__("os").defpath,
         "PYTHONPATH": str(ROOT),
-        "PYTHON_DOTENV_DISABLED": "1",
     }
     return subprocess.run(
         [str(PYTHON), "-m", module, *args],
@@ -103,7 +102,8 @@ def test_cli_default_policy_matches_help_and_runtime(module):
 
     result = _run_module(module)
     assert result.returncode != 0
-    assert "Missing option '--profile' / '--chain'" in result.stderr
+    assert "Missing option" in result.stderr
+    assert "--profile" in result.stderr
 
 
 def test_legacy_chain_option_resolves_only_to_canonical_base():
@@ -111,10 +111,18 @@ def test_legacy_chain_option_resolves_only_to_canonical_base():
         "scripts.verify", "--chain", "BASE-MAINNET"
     )
     assert result.returncode != 0
-    assert "migration_history/base-mainnet/v1/current-manifest.json" in (
-        result.stdout
-    )
+    assert "Manifest:" not in result.stdout
     assert "H02_VERIFIER_BLOCKED profile=base-mainnet" in result.stderr
+
+
+def test_blocked_robinhood_verification_never_advertises_proposed_path():
+    result = _run_module(
+        "scripts.verify", "--profile", "robinhood-mainnet"
+    )
+    assert result.returncode != 0
+    assert "Manifest:" not in result.stdout
+    assert "migration_history/robinhood-mainnet" not in result.stdout
+    assert "H02_VERIFIER_BLOCKED profile=robinhood-mainnet" in result.stderr
 
 
 def test_unknown_label_never_resolves_to_base():
@@ -208,6 +216,8 @@ def test_no_alchemy_token_url_construction():
 
 
 def test_no_test_key_fallback_regression():
+    # These source-text assertions are cheap tripwires; behavioral secret and
+    # account-boundary tests provide the authority proof.
     source = (ROOT / "scripts/utils/migration_helpers.py").read_text()
     assert "TEST_PRIVATE_KEY" not in source
     assert "ac0974bec39a" not in source
@@ -215,6 +225,8 @@ def test_no_test_key_fallback_regression():
 
 
 def test_no_rpc_logging_regression():
+    # Text checks complement the behavioral redaction tests that capture the
+    # successful and failing CLI paths.
     migrate_source = (ROOT / "scripts/migrate.py").read_text()
     console_source = (ROOT / "scripts/console.py").read_text()
     assert "final_rpc[:" not in migrate_source + console_source
@@ -245,6 +257,16 @@ def test_base_verification_route_is_truthfully_blocked(monkeypatch):
 
 
 def test_committed_base_history_inventory_is_unchanged():
+    checkout = subprocess.run(
+        ["git", "rev-parse", "--is-inside-work-tree"],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if checkout.returncode != 0 or checkout.stdout.strip() != "true":
+        pytest.skip("requires a Git worktree")
+
     result = subprocess.run(
         [
             "git",
@@ -257,6 +279,7 @@ def test_committed_base_history_inventory_is_unchanged():
         cwd=ROOT,
         capture_output=True,
         text=True,
-        check=True,
+        check=False,
     )
+    assert result.returncode == 0, result.stderr
     assert result.stdout == ""

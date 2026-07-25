@@ -1,4 +1,5 @@
 import os
+from contextlib import ExitStack
 from pathlib import Path
 
 import boa
@@ -20,7 +21,7 @@ from config.network_profiles import (
 from scripts.utils import log
 from scripts.utils.deploy_args import DeployArgs
 from scripts.utils.migration_helpers import get_account, load_vyper_files
-from scripts.utils.migration_runner import MigrationRunner
+from scripts.utils.migration_runner import MigrationError, MigrationRunner
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -29,14 +30,13 @@ CLICK_PROMPTS = {
     "safe": {
         "prompt": "What is the safe address?",
         "default": "",
-        "help": "Safe accounts are not supported by H-02.",
+        "help": "Safe accounts are not supported.",
     },
     "environment": {
         "prompt": "Manifest namespace",
         "default": "v1",
         "help": (
-            "Compatibility assertion for the profile-owned history namespace. "
-            "Defaults to `v1`."
+            "Compatibility assertion for the profile-owned history namespace."
         ),
     },
     "start_timestamp": {
@@ -64,7 +64,10 @@ CLICK_PROMPTS = {
     "account": {
         "prompt": "Deployer account name",
         "default": "DEPLOYER",
-        "help": "Environment key prefix for a fork-only account.",
+        "help": (
+            "Environment key prefix for a fork-only account. Use a "
+            "purpose-limited disposable key, never a live deployer key."
+        ),
     },
     "is_retry": {
         "prompt": "Ignore current logs (always run transactions)?",
@@ -145,7 +148,7 @@ def _require_static_assertions(profile, environment, blueprint) -> str:
     "--ask",
     is_flag=True,
     default=False,
-    help="Prompt for eligible missing parameters.",
+    help="Prompt for eligible optional parameters after profile selection.",
 )
 @click.option(
     "--safe",
@@ -170,6 +173,7 @@ def _require_static_assertions(profile, environment, blueprint) -> str:
 @click.option(
     "--environment",
     default=CLICK_PROMPTS["environment"]["default"],
+    show_default=True,
     help=CLICK_PROMPTS["environment"]["help"],
     callback=param_prompt,
 )
@@ -203,7 +207,9 @@ def _require_static_assertions(profile, environment, blueprint) -> str:
     type=click.Choice(NETWORK_PROFILE_IDS, case_sensitive=False),
     help=(
         "Required canonical network profile. `--chain` is a deprecated "
-        "equivalent spelling; it does not define a separate identity."
+        "equivalent spelling; it does not define a separate identity. "
+        "Availability is operation-specific; `local` is reserved for an "
+        "embedded local runtime."
     ),
 )
 @click.option(
@@ -225,7 +231,7 @@ def _require_static_assertions(profile, environment, blueprint) -> str:
 @click.option(
     "--ledger",
     default=-1,
-    help="Ledger accounts are not supported by H-02.",
+    help="Ledger accounts are not supported.",
     type=int,
 )
 @click.option(
@@ -306,7 +312,11 @@ def cli(
     log.info(f"History namespace `{paths.history_dir.relative_to(ROOT)}`.")
     log.info(f"Running migrations starting with timestamp {start_timestamp}.")
     log.info(f"Profile: {profile.identity.profile_id}.")
-    log.info("Fork: exploration-only; output is not release evidence.")
+    log.info(
+        "Fork: exploration-only; this run may write manifests under "
+        f"`{paths.history_dir.relative_to(ROOT)}`. Do not commit or treat "
+        "those outputs as release evidence."
+    )
     log.info("")
 
     vyper_files = load_vyper_files()
@@ -322,21 +332,51 @@ def cli(
         boa.deployments.set_deployments_db(
             boa.deployments.DeploymentsDB(":memory:")
         )
-        with boa.fork(redacted_rpc.value, allow_dirty=True) as env:
-            try:
-                env.set_balance(sender.address, 10 * 10**18)
-                log.h2("Fork-only deployer wallet funded with 10 ETH")
-            except Exception:
-                log.h2("Cannot fund fork-only deployer wallet")
-            total_gas = migrations.run(
-                deploy_args, start_timestamp, end_timestamp, not single
-            )
     except Exception:
         raise click.ClickException(
             "H02_MIGRATION_EXECUTION_FAILED "
             f"profile={profile.identity.profile_id} "
             f"operation={operation.value} env={redacted_rpc.reference}"
         ) from None
+
+    with ExitStack() as fork_stack:
+        try:
+            env = fork_stack.enter_context(
+                boa.fork(redacted_rpc.value, allow_dirty=True)
+            )
+        except Exception:
+            raise click.ClickException(
+                "H02_RPC_CONNECT_FAILED "
+                f"profile={profile.identity.profile_id} "
+                f"operation={operation.value} env={redacted_rpc.reference}"
+            ) from None
+
+        try:
+            env.set_balance(sender.address, 10 * 10**18)
+            log.h2("Fork-only deployer wallet funded with 10 ETH")
+        except Exception:
+            log.h2("Cannot fund fork-only deployer wallet")
+
+        try:
+            total_gas = migrations.run(
+                deploy_args, start_timestamp, end_timestamp, not single
+            )
+        except MigrationError as error:
+            failure_timestamp = str(error.failure_timestamp)
+            if not failure_timestamp.isdigit():
+                failure_timestamp = "<invalid>"
+            raise click.ClickException(
+                "H02_MIGRATION_EXECUTION_FAILED "
+                f"profile={profile.identity.profile_id} "
+                f"operation={operation.value} "
+                f"failure_timestamp={failure_timestamp}"
+            ) from None
+        except Exception:
+            raise click.ClickException(
+                "H02_MIGRATION_EXECUTION_FAILED "
+                f"profile={profile.identity.profile_id} "
+                f"operation={operation.value}"
+            ) from None
 
     log.info(f"Total gas used: {total_gas}")
     log.info("Done.")

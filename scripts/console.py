@@ -11,6 +11,7 @@ Examples:
 """
 
 import os
+from contextlib import ExitStack
 from pathlib import Path
 
 import click
@@ -291,7 +292,8 @@ def _validate_static_assertions(profile, operation, environment, blueprint):
     type=click.Choice(NETWORK_PROFILE_IDS, case_sensitive=False),
     help=(
         "Required canonical network profile. `--chain` is a deprecated "
-        "equivalent spelling."
+        "equivalent spelling. Availability is operation-specific; `local` "
+        "is reserved for an embedded local runtime."
     ),
 )
 @click.option(
@@ -401,64 +403,66 @@ def main(
     if block is not None:
         kwargs["block_identifier"] = block
 
-    try:
-        with boa.fork(redacted_rpc.value, **kwargs) as env:
-            if account:
-                env.eoa = account
-                try:
-                    env.set_balance(account, 10 * 10**18)
-                    log.info(
-                        "Configured explicit fork-only impersonation account."
-                    )
-                except Exception:
-                    log.info(
-                        "Configured explicit fork-only impersonation account "
-                        "without funding."
-                    )
+    with ExitStack() as fork_stack:
+        try:
+            env = fork_stack.enter_context(
+                boa.fork(redacted_rpc.value, **kwargs)
+            )
+        except Exception:
+            raise click.ClickException(
+                "H02_RPC_CONNECT_FAILED "
+                f"profile={profile.identity.profile_id} "
+                f"operation={operation.value} env={redacted_rpc.reference}"
+            ) from None
 
+        if account:
+            env.eoa = account
             try:
-                from IPython import embed
-                from traitlets.config import Config
+                env.set_balance(account, 10 * 10**18)
+                log.info(
+                    "Configured explicit fork-only impersonation account."
+                )
+            except Exception:
+                log.info(
+                    "Configured explicit fork-only impersonation account "
+                    "without funding."
+                )
 
-                config = Config()
-                config.InteractiveShellEmbed.colors = "Linux"
-                config.InteractiveShell.autocall = 0
-                namespace = {
-                    "c": console.c,
-                    "console": console,
-                    "boa": boa,
-                    "env": env,
-                }
-                embed(
-                    config=config,
-                    banner1=create_console_banner(console),
-                    user_ns=namespace,
-                    colors="Linux",
-                )
-            except ImportError:
-                log.error(
-                    "IPython is not installed. Falling back to the standard "
-                    "Python REPL."
-                )
-                import code
+        try:
+            from IPython import embed
+            from traitlets.config import Config
 
-                namespace = {
-                    "c": console.c,
-                    "console": console,
-                    "boa": boa,
-                    "env": env,
-                }
-                code.interact(
-                    banner=create_console_banner(console), local=namespace
-                )
-    except click.ClickException:
-        raise
-    except Exception:
-        raise click.ClickException(
-            "H02_RPC_CONNECT_FAILED "
-            f"profile={profile.identity.profile_id} "
-            f"operation={operation.value} env={redacted_rpc.reference}"
-        ) from None
+            config = Config()
+            config.InteractiveShellEmbed.colors = "Linux"
+            config.InteractiveShell.autocall = 0
+            namespace = {
+                "c": console.c,
+                "console": console,
+                "boa": boa,
+                "env": env,
+            }
+            embed(
+                config=config,
+                banner1=create_console_banner(console),
+                user_ns=namespace,
+                colors="Linux",
+            )
+        except ImportError:
+            log.error(
+                "IPython is not installed. Falling back to the standard "
+                "Python REPL."
+            )
+            import code
+
+            namespace = {
+                "c": console.c,
+                "console": console,
+                "boa": boa,
+                "env": env,
+            }
+            code.interact(
+                banner=create_console_banner(console), local=namespace
+            )
 
 
 if __name__ == "__main__":
