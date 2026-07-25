@@ -2,7 +2,12 @@
   "schema_version": 1,
   "title": "Track 8 M0 sanitized raw JSON-RPC evidence",
   "scope": "documentation and read-only evidence only",
-  "generated_at_utc": "2026-07-24T23:53:59.697395Z",
+  "primary_replay_serialized_at_utc": "2026-07-24T23:53:59.697395Z",
+  "artifact_finalized_at_utc": "2026-07-25T00:03:05.595658Z",
+  "timestamp_semantics": {
+    "primary_replay_serialized_at_utc": "Initial serialization after the RH-M0-01, BASE-M0-01, and BASE-M0-02 replay captures; it does not include the later PublicNode provider-limitation record.",
+    "artifact_finalized_at_utc": "Final local serialization after the PublicNode provider-limitation record and this provenance correction were included; no RPC was contacted for this correction."
+  },
   "capture_started_at_utc": "2026-07-24T23:53:53.518666Z",
   "controlling_integration_commit": "2517eeb0013cdb277dc4815db4b524d7a090d682",
   "evidence_branch": "rh-track-8-m0-evidence",

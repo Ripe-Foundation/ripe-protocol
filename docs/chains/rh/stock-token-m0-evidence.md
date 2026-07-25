@@ -220,7 +220,7 @@ balanceOf(address)
 
 The machine-readable companion is
 [`stock-token-m0-raw-evidence.json`](stock-token-m0-raw-evidence.json), SHA-256
-`53870cb53de9b772d8f6882ba8c41d28fa94d073d7a9c0503f3cb7977017e0f9`.
+`9ea333b4e84330f56c3a3d70e68823cfdba9c37948508e692450e01b3e994cba`.
 It contains:
 
 - the exact JSON-RPC requests, parsed raw responses, decoded values, targets,
