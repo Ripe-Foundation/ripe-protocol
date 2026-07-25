@@ -2512,3 +2512,197 @@ remote, integration worktree, dependency, live RPC, account, signer,
 migration, verifier submission, deployment, or governance state changed.
 Gate 2 remains prohibited until independent Gate 1 approves this exact
 working-tree package and the owner separately authorizes reconciliation.
+
+## Approved final Gate 1 and final Gate 2 reconciliation package
+
+### Final Gate 1 approval and reviewed commit
+
+On 25 July 2026, the owner approved the exact eight-file Gate 1 patch after
+independently verifying its complete diff and rerunning all three H-02 files
+with `95 passed` and only the three documented warnings. The approval
+confirmed that Item G remains correctly deferred to H-05 and authorized the
+exact reviewed patch commit, non-rebase reconciliation to `fc48ac45`, full
+Gate 2 validation, evidence commit, and feature-branch-only push.
+
+The reviewed unstaged patch SHA-256 was:
+
+```text
+d631f13dafd3b3766419c92723477d749c6c90701b333192a51626cb9da1f73c
+```
+
+It was committed without further semantic or byte changes:
+
+```text
+commit: d43e8e513d17e3793f40ff5e1fb51f2d7e7885e2
+tree: 71eed7c472775c393d8a391eb0021a9fdc6be874
+parent: 66200c6f70328f79ac11b6260851092b486394bf
+author/committer: Mick Hagen <mickhagen@gmail.com>
+author/committer time: 2026-07-25T00:29:58-06:00
+subject: Close H-02 Gate 1 findings
+diff: 8 files changed, 323 insertions(+), 14 deletions(-)
+committed diff SHA-256:
+  d631f13dafd3b3766419c92723477d749c6c90701b333192a51626cb9da1f73c
+```
+
+### Exact current-baseline reconciliation
+
+Before reconciliation, all required identities independently resolved to:
+
+```text
+local rh: fc48ac45e5f6e8c698a6464a14289aad00e1f2d4
+cached origin/rh: fc48ac45e5f6e8c698a6464a14289aad00e1f2d4
+live origin refs/heads/rh:
+  fc48ac45e5f6e8c698a6464a14289aad00e1f2d4
+integration worktree: clean on rh
+```
+
+The incoming commit is:
+
+```text
+commit: fc48ac45e5f6e8c698a6464a14289aad00e1f2d4
+parent: 185bd32004121bbb1c60748844c517ea8da0affb
+author/committer: Mick Hagen <mickhagen@gmail.com>
+time: 2026-07-24T23:42:19-06:00
+subject: docs: add Robinhood defaults and parameter brief
+```
+
+Its complete file scope is one new planning brief:
+
+```text
+docs/chains/rh/track-6-s6-track-7-h4-defaults-parameters.md
+SHA-256:
+  1602e1f3bf0864cb17eebcdf629b2afaa670da96e41434809a9629d80b3e6c26
+```
+
+The complete 1,131-line brief was reviewed. It treats integrated H-02 as a
+hard prerequisite, consumes its public API read-only, and explicitly
+prohibits changing H-02 source or tests. It does not redefine H-02 profiles,
+operation policy, account/identity ordering, RPC redaction, CLI behavior,
+tests, ownership, or evidence conclusions.
+
+The authorized reconciliation used a merge, not a rebase:
+
+```text
+commit: 664ef3d45476a86d238dfbe30c90c1a68700c257
+tree: 4643ef9546962a994779a12903bf0a1ba8df90dc
+first parent: d43e8e513d17e3793f40ff5e1fb51f2d7e7885e2
+second parent: fc48ac45e5f6e8c698a6464a14289aad00e1f2d4
+author/committer: Mick Hagen <mickhagen@gmail.com>
+author/committer time: 2026-07-25T00:30:18-06:00
+subject: Merge rh baseline into H-02
+```
+
+The merge added only the incoming brief. Direct path comparison returned no
+H-02-owned byte change.
+
+### Locked runtime and exact validation
+
+Gate 2 reused the authorized disposable environment:
+
+```text
+runtime root: /private/tmp/rh-h02-gate1-final-cpython312
+runtime mode: 0700
+Python: 3.12.0
+pip: 23.2.1
+requirements.txt SHA-256:
+  d2e12a6f0cfd128c3891634efafbba8305878bef7a7c5db33e25ebe93b0d2bce
+locked versions: 92/92 exact, 0 mismatches
+pip check: No broken requirements found
+
+cache variable: RH_H02_BOA_CACHE_DIR
+cache path: /private/tmp/rh-h02-gate2-final-cache
+cache mode: 0700
+```
+
+The corrected `boa.interpret.set_cache_dir` launcher removed every relevant
+explorer, vendor-token, profile RPC, deployer-key, and test-key variable.
+Only the unchanged synthetic parent-pytest placeholder was supplied.
+Direct import/help checks additionally removed the placeholder and set
+`PYTHON_DOTENV_DISABLED=1`.
+
+All five H-02 modules imported. Migrate, console, and verify `--help` exited
+zero, required an explicit profile, and preserved the approved
+recognized-but-unsupported `local` distinction.
+
+| Scope / basetemp | Result |
+|---|---|
+| `test_network_profiles.py`; `/private/tmp/rh-h02-gate2-final-network` | `23 passed, 3 warnings in 0.03s` |
+| `test_secret_handling.py`; `/private/tmp/rh-h02-gate2-final-secret` | `43 passed, 3 warnings in 5.34s` |
+| `test_base_profile_regression.py`; `/private/tmp/rh-h02-gate2-final-base` | `29 passed, 3 warnings in 7.82s` |
+| all three H-02 files; `/private/tmp/rh-h02-gate2-final-combined` | `95 passed, 3 warnings in 13.11s` |
+| H-01 dependency gate; `/private/tmp/rh-h02-gate2-final-h01` | `16 passed, 3 warnings in 1.48s` |
+| S1 clock profiles; `/private/tmp/rh-h02-gate2-final-s1` | `57 passed, 3 warnings in 102.03s` |
+| S2 inventory; `/private/tmp/rh-h02-gate2-final-s2` | `60 passed, 3 warnings in 25.06s` |
+| collection; `/private/tmp/rh-h02-gate2-final-collect` | `2,833/2,975 collected, 142 deselected in 1.25s` |
+| full serial suite; `/private/tmp/rh-h02-gate2-final-full` | `2,833 passed, 142 deselected, 3 warnings in 303.31s` |
+
+The three warnings in every cache-launched command remained the established
+non-fatal `PytestAssertRewriteWarning` notices for `_hypothesis_globals`,
+`hypothesis`, and `boa`, imported before pytest by the cache-setting launcher.
+No warning or test was suppressed; no selected test skipped or xfailed. The
+unchanged 142 external-fork tests remained deselected because live networking
+was not authorized.
+
+The exact runtime, cache, and all nine named Gate 2 basetemp directories were
+removed after validation and verified absent. No active environment,
+user-global cache, dependency file, or repository artifact changed.
+
+### Final hashes, scope, ownership, and virtual merge
+
+Current implementation/test hashes:
+
+| File | SHA-256 |
+|---|---|
+| `config/network_profiles.py` | `98ad6175e7f3af7d4c5faf46d687b3c32b05a483a9e2d76b60c878873a2cfbea` |
+| `scripts/migrate.py` | `df8ab15de5ad6384c658ff62d906051975110e52cc2034698dccc1b361051321` |
+| `scripts/console.py` | `bb572c42de40f5a9a36f90bea1bb082beb69b8947e45c94d3d97c5f41dcd7f64` |
+| `scripts/verify.py` | `5db7f0f50d509ca96560a22534647e0c36109dc8232a1bc790c8e7ddd4237edb` |
+| `scripts/utils/migration_helpers.py` | `559c7648f871e6b71b7d13f306290fee7c0d3fbe6d13182996964ba5b79465db` |
+| `tests/deployment/test_network_profiles.py` | `a938f79993fe1004b8771f64b86b60a185c6ccf2cf128b30d9fda24db26d407a` |
+| `tests/deployment/test_secret_handling.py` | `a8a5b583e0382c3d011cf2404f448724d98fb63a0db489ce3fa95ce5af1080e6` |
+| `tests/deployment/test_base_profile_regression.py` | `f7f7905cf48153593573b960b760e464454dc171b1d27a9ede1f9191a0de0cd6` |
+
+Before this evidence append, `git diff rh...HEAD` contained exactly the nine
+H-02-owned paths and no incoming-baseline file. The exact comparison returned
+`expected=9 actual=9 missing=[] unexpected=[]`. Prohibited contracts,
+interfaces, migrations, histories, defaults/blueprints, dependencies, global
+test configuration, H-01, S1, S2, summary/authority documents, and the
+incoming H-04/S6 brief had no feature diff.
+
+Eighteen other active worktrees were checked for both committed and uncommitted
+ownership of the nine H-02 paths. The result was `collisions=0`.
+
+At validated reconciled commit
+`664ef3d45476a86d238dfbe30c90c1a68700c257`:
+
+```text
+merge base with rh: fc48ac45e5f6e8c698a6464a14289aad00e1f2d4
+ahead/behind rh: 10/0
+worktree: clean
+net H-02 diff:
+  9 files changed, 6,003 insertions(+), 343 deletions(-)
+```
+
+The required ref-free virtual merge:
+
+```bash
+git merge-tree --write-tree \
+  fc48ac45e5f6e8c698a6464a14289aad00e1f2d4 \
+  664ef3d45476a86d238dfbe30c90c1a68700c257
+```
+
+returned `4643ef9546962a994779a12903bf0a1ba8df90dc`, exactly the
+validated merge commit's tree, with no conflict and no ref/worktree update.
+
+The evidence-containing final commit identity, final net diff total,
+final virtual-merge tree, and feature-branch remote parity are reported in the
+external completion handoff because embedding those self-dependent identities
+would change the values being identified.
+
+### Final review boundary
+
+All H-02 implementation and Gate 2 technical checks are eligible for final
+merge-readiness review. This package does not merge into `rh` or authorize
+deployment, signing, live credentials/RPCs, migration execution, verification
+submission, governance action, or H-03/H-05/H-07 work. Item G remains an
+explicit H-05 residual.
