@@ -2,10 +2,13 @@
 
 **Status:** Frozen Stage A evidence recreated on the integrated owner/H-01
 baseline; required local validation and live-proof authorization-packet
-preparation are complete; independent security review and every remaining
-Checkpoint 0 gate stay open; Stage B and Stage C are not authorized
+preparation are complete; the exact post-hardening package review is complete,
+while broader Checkpoint 0 security decisions and every remaining gate stay
+open; Stage B and Stage C are not authorized
 
 **Prepared:** 24 July 2026
+
+**Provenance correction:** 25 July 2026
 
 **Recreation branch:** `rh-track-6-s5-ledger-guard-recreation`
 
@@ -76,6 +79,83 @@ external-review gates. This addendum and the current sections below supersede
 the historical frozen package only for current baseline, dependency,
 validation, and Checkpoint 0 state. Historical observations remain labeled
 and are not rewritten as if they occurred at `02787d3`.
+
+### Local-commit authorization and review chronology
+
+On 24 July 2026, the owner answered the numbered question requesting authority
+for the exact five-file audit-point commit with the verbatim reply:
+
+> 1. yes
+> 2. no attribution
+
+That authorization produced local commit
+`2f6a49b6c82e69bda54f2fd64d2fe03132e0db21`, tree
+`9777f92084ad0ac9e1134f317e56b27d7601ce8f`. On 25 July 2026, the owner
+reconfirmed it verbatim:
+
+> My previous authorization of commit
+> `2f6a49b6c82e69bda54f2fd64d2fe03132e0db21` also remains valid.
+
+After an uncommitted hardening delta was prepared, the owner authorized its
+local commit with this verbatim instruction on 24 July 2026:
+
+> The post-review hardening delta is independently approved at the reported
+> current hashes. Focused verification reproduced `35 passed`, and the
+> standalone S2 checker reproduced exactly seven `INV-CADENCE-NEW` plus one
+> `INV-PATH-NEW` finding.
+>
+> Commit exactly the four currently modified hardening files to
+> `rh-track-6-s5-ledger-guard-recreation`, preserving the existing test-only
+> Vyper probe unchanged. Return the new commit/tree, five final hashes, exact
+> commit scope, and clean worktree status. Do not merge, begin Stage B/C, edit
+> the inventory, contact an RPC, sign, broadcast, or modify production Ledger.
+>
+> After that commit, stop. The next substantive action remains the separately
+> authorized Robinhood testnet proof. The probe should be retained until that
+> proof is complete. Inventory treatment, current-`rh` reconciliation, Stage B
+> implementation, Checkpoint 0 closure, and Gate 2 remain separately gated.
+
+The independent-approval status in that instruction was reported incorrectly:
+the exact hardening bytes had not yet received the contemplated independent
+re-review. Acting on the owner's explicit commit instruction nevertheless
+produced local commit
+`0a3414ade0ba6914f8f69b7cdc1205ea3499a26e`, tree
+`e63fb85e0fb3097daf48957bfbcaa2ad8de48a84`, before that re-review. This was a
+sequencing deviation from the agreed uncommitted-delta review boundary.
+
+An independent re-review supplied on 24 July 2026 subsequently inspected that
+exact commit/package, approved the code and documentation changes, reproduced
+`35/35` focused action-block tests and `75/75` complete probe tests, and
+reproduced the standalone S2 checker's exact seven `INV-CADENCE-NEW` plus one
+`INV-PATH-NEW` result. Per controlling owner instruction, the reviewer's
+identity is intentionally neither named nor inferred. The omission of an
+identity does not make this exact-package approval pending, but the approval
+does not close any broader Checkpoint 0 security decision it did not explicitly
+approve.
+
+The exact independently approved post-hardening package at `0a3414a` had:
+
+| File | SHA-256 |
+| --- | --- |
+| `contracts/testing/ActionBlockIdentityProbe.vy` | `95716e4e2b383f2a07826be94d9ee402d263eec522bb4f77efd72a5e5f6eafe5` |
+| `docs/chains/rh/evidence/ledger-action-block-testnet-proof.md` | `eeabc12cc987e287ed8a1864a95328ef080659efe43d07bca2795d5c07751e13` |
+| `docs/chains/rh/ledger-guard-security-decision.md` | `d11f70afd00d94a2242b294303302c1deefee134e316b5ed27cf71787613ea20` |
+| `scripts/probes/action_block_identity_probe.py` | `135a864356fdfa076acda0009a5e97907afd471215ba5bdfc3dfe1056b4b498b` |
+| `tests/probes/test_action_block_identity_probe.py` | `24c5bad958cba5425ec52e060995332302409b1fac01a1967c84b7261a2631b6` |
+
+On 25 July 2026, the owner resolved the deviation verbatim:
+
+> 1. I explicitly ratify commit
+> `0a3414ade0ba6914f8f69b7cdc1205ea3499a26e` despite the sequencing
+> deviation. Record the chronology accurately: I authorized the commit based
+> on the independent-approval status reported at that time, while the
+> independent approval of the exact post-hardening package actually arrived
+> afterward. No revert is required. My previous authorization of commit
+> `2f6a49b6c82e69bda54f2fd64d2fe03132e0db21` also remains valid.
+
+No revert is required. This provenance correction does not authorize a push,
+merge, live RPC contact, signing, broadcast, Stage B, Stage C, inventory edit,
+or Checkpoint 0 closure.
 
 At `02787d3`, H-01 is integrated at merge
 `575d47b82055b42da2bddf1535d8076cd7cf4c63`, with its post-integration evidence
@@ -473,10 +553,10 @@ to `/private/tmp/s5-recreation-cache/titanoboa`. That preload accounts for the
 three `PytestAssertRewriteWarning` lines in the switchboard, collection, and
 full-suite reports and changes no contract/test semantics.
 
-### 1.5.2 Uncommitted post-review hardening validation
+### 1.5.2 Committed post-review hardening validation
 
 After the audit-point commit, the runner and focused tests received a separate,
-uncommitted hardening delta. It disables HTTP redirects, adds explicit
+subsequently committed hardening delta. It disables HTTP redirects, adds explicit
 preflight rejection coverage for nonce mismatch, an occupied predicted address,
 and insufficient balance, and persists the final result and fee projection
 before stopping on an observation-burst total-fee-cap violation. Documentation
@@ -1284,7 +1364,7 @@ These results bind to the exact reviewed bytes committed locally at
 | `pytest --collect-only -q` | 2,768 selected / 2,910 total; 142 deselected in 5.07 s; 6.51 s wall |
 | complete serial `pytest -q -p no:cacheprovider` | 2,768 passed, 142 deselected, 3 cache-redirection assert-rewrite warnings in 313.58 s; 373.49 s wall |
 
-### 10.1.2 Uncommitted post-review hardening delta
+### 10.1.2 Committed post-review hardening delta
 
 | Command | Result |
 | --- | --- |
@@ -1300,10 +1380,11 @@ These results bind to the exact reviewed bytes committed locally at
 | `pytest --collect-only -q` | 2,773 selected / 2,915 total; 142 deselected, 3 cache-redirection assert-rewrite warnings in 1.23 s; 2.36 s wall |
 | complete serial `pytest -q -p no:cacheprovider` | 2,773 passed, 142 deselected, 3 cache-redirection assert-rewrite warnings in 297.06 s; 352.63 s wall |
 
-The hardening delta does not change the probe source or bytecode. It remains
-uncommitted for independent re-review. The exact clean-S2 disposition remains
-an owner-gated prerequisite to any future merge; no inventory change or Stage C
-work is authorized here.
+The hardening delta does not change the probe source or bytecode. It was
+committed locally at `0a3414ade0ba6914f8f69b7cdc1205ea3499a26e`, then
+independently re-reviewed and approved as described in the provenance section.
+The exact clean-S2 disposition remains an owner-gated prerequisite to any
+future merge; no inventory change or Stage C work is authorized here.
 
 ### 10.2 What those tests do and do not prove
 
@@ -1706,7 +1787,7 @@ weaken the task contract's mandatory owner and independent-security approval.
 | 8 | Configuration/compatibility | keep Boolean/governance/defaults unchanged; expose only the one immutable source getter; no per-touch event | owner + security + operations | **OWNER APPROVED; SECURITY AND OPERATIONS PENDING** |
 | 9 | Lock/pause/failure | preserve lock/pause; source failure blocks all housekeeping, including repay and both liquidation entries; no per-user nondecrease assertion | owner + security; explicit solvency-defense availability acceptance | **OWNER DIRECTLY ACCEPTED RISK; SECURITY PENDING** |
 | 10 | Base live-version exception | permanent no-migration/no-convergence exception | owner + independent security + operations; exact address/runtime/artifact record | **OWNER APPROVED; SECURITY AND OPERATIONS PENDING** |
-| 11 | H-01/S4 sequence | H-01 integrated; S4 no-code; fresh S5 recreation and authoritative validation on exact `02787d3` | H-01 security reviewer + independent S5 reviewer against this exact five-file recreation | **INTEGRATION AND RECREATION SATISFIED; INDEPENDENT S5 REVIEW PENDING** |
+| 11 | H-01/S4 sequence | H-01 integrated; S4 no-code; fresh S5 recreation and authoritative validation on exact `02787d3` | H-01 security reviewer + independent S5 reviewer against this exact five-file recreation | **INTEGRATION, RECREATION, AND EXACT `0a3414a` PACKAGE REVIEW SATISFIED; PROVENANCE-CORRECTION HASH CHECK AND FORMAL ROW DISPOSITION PENDING** |
 | 12 | Stage B ownership | approve exactly section 12 or return it; no implicit file expansion | owner + independent security reviewer | **OWNER APPROVED; SECURITY PENDING** |
 | 13 | Evidence bar | local isolated probe/doubles are necessary but insufficient; require pre-broadcast signed-transaction journal/hash verification, approved published ArbOS profile / observed derived raw ArbSys-version match, live RH receipt agreement and bounded topology proof, faithful same-child production tests, artifacts/storage/gas, targeted/S1/S2/full suite, testnet soak, and explicit external-audit decision | owner + independent security reviewer + deployment owner; exact endpoint, signer, funding, nonce/address, profile `61`, derived raw return `116`, and total-fee-cap approval still required | **OWNER APPROVED IN PRINCIPLE; LIVE/FINAL EVIDENCE, SECURITY, DEPLOYMENT, AND EXTERNAL-REVIEW DECISION PENDING** |
 

@@ -1,11 +1,14 @@
 # S5 Robinhood Testnet Action-Block Probe Evidence
 
 **Status:** Frozen local probe evidence recreated on exact integrated baseline
-`02787d3`; authoritative post-H-01 validation and the complete secret-free
-authorization template are recorded; live Robinhood testnet proof not
-attempted because required approvals and live inputs are absent
+`02787d3`; authoritative post-H-01 validation, exact-package independent
+review, and the complete secret-free authorization template are recorded; live
+Robinhood testnet proof not attempted because required approvals and live
+inputs are absent
 
 **Evidence date:** 24 July 2026
+
+**Provenance correction:** 25 July 2026
 
 **Network authorized:** Robinhood Chain testnet only, chain ID `46630`
 
@@ -83,10 +86,12 @@ committed locally, without push, at audit point
 - evidence record:
   `6c4d501d30d6b70753e0e92a9104cd1edab27d623602c6bcb38817fa4091846a`.
 
-The subsequent uncommitted post-review hardening delta changed the runner,
-focused tests, decision record, and this evidence record. It did not change the
-test-only Vyper probe. The resulting current SHA-256 identities, excluding this
-self-referential evidence-file hash, are:
+The subsequent post-review hardening delta changed the runner, focused tests,
+decision record, and this evidence record. It did not change the test-only
+Vyper probe. It was committed locally at
+`0a3414ade0ba6914f8f69b7cdc1205ea3499a26e`, tree
+`e63fb85e0fb3097daf48957bfbcaa2ad8de48a84`. The exact SHA-256 identities in
+that commit were:
 
 - decision record:
   `d11f70afd00d94a2242b294303302c1deefee134e316b5ed27cf71787613ea20`;
@@ -94,9 +99,63 @@ self-referential evidence-file hash, are:
   `95716e4e2b383f2a07826be94d9ee402d263eec522bb4f77efd72a5e5f6eafe5`;
 - runner:
   `135a864356fdfa076acda0009a5e97907afd471215ba5bdfc3dfe1056b4b498b`;
-  and
 - focused tests:
-  `24c5bad958cba5425ec52e060995332302409b1fac01a1967c84b7261a2631b6`.
+  `24c5bad958cba5425ec52e060995332302409b1fac01a1967c84b7261a2631b6`;
+  and
+- evidence record:
+  `eeabc12cc987e287ed8a1864a95328ef080659efe43d07bca2795d5c07751e13`.
+
+The audit-point commit was authorized on 24 July 2026 when the owner replied
+verbatim to the numbered local-commit question:
+
+> 1. yes
+> 2. no attribution
+
+The owner reconfirmed that authority on 25 July 2026:
+
+> My previous authorization of commit
+> `2f6a49b6c82e69bda54f2fd64d2fe03132e0db21` also remains valid.
+
+The hardening commit was authorized on 24 July 2026 with the verbatim
+instruction:
+
+> The post-review hardening delta is independently approved at the reported
+> current hashes. Focused verification reproduced `35 passed`, and the
+> standalone S2 checker reproduced exactly seven `INV-CADENCE-NEW` plus one
+> `INV-PATH-NEW` finding.
+>
+> Commit exactly the four currently modified hardening files to
+> `rh-track-6-s5-ledger-guard-recreation`, preserving the existing test-only
+> Vyper probe unchanged. Return the new commit/tree, five final hashes, exact
+> commit scope, and clean worktree status. Do not merge, begin Stage B/C, edit
+> the inventory, contact an RPC, sign, broadcast, or modify production Ledger.
+>
+> After that commit, stop. The next substantive action remains the separately
+> authorized Robinhood testnet proof. The probe should be retained until that
+> proof is complete. Inventory treatment, current-`rh` reconciliation, Stage B
+> implementation, Checkpoint 0 closure, and Gate 2 remain separately gated.
+
+That instruction relied on a reported independent-approval status that was
+incorrect at the time. Commit `0a3414a` was made before the contemplated
+independent re-review, which was a sequencing deviation from the agreed
+uncommitted-delta review boundary. An independent re-review supplied on
+24 July 2026 subsequently inspected and approved the exact package at
+`0a3414a`, reproducing `35/35` focused tests, `75/75` complete probe tests, and
+the exact seven `INV-CADENCE-NEW` plus one `INV-PATH-NEW` S2 result. Per owner
+instruction, the reviewer's identity is intentionally neither named nor
+inferred. That identity omission does not make the exact-package approval
+pending and does not close any broader Checkpoint 0 security decision that the
+review did not explicitly approve.
+
+On 25 July 2026, the owner ratified the sequence verbatim:
+
+> 1. I explicitly ratify commit
+> `0a3414ade0ba6914f8f69b7cdc1205ea3499a26e` despite the sequencing
+> deviation. Record the chronology accurately: I authorized the commit based
+> on the independent-approval status reported at that time, while the
+> independent approval of the exact post-hardening package actually arrived
+> afterward. No revert is required. My previous authorization of commit
+> `2f6a49b6c82e69bda54f2fd64d2fe03132e0db21` also remains valid.
 
 The final evidence-file hash is reported out of band in the handoff; this file
 does not embed its own hash because doing so would be self-referential.
@@ -224,7 +283,7 @@ local commit `2f6a49b6c82e69bda54f2fd64d2fe03132e0db21`, was:
 | `python -m pytest --collect-only -q` | 2,768 selected / 2,910 total; 142 deselected in 5.07 s; 6.51 s wall |
 | complete serial `python -m pytest -q -p no:cacheprovider` | 2,768 passed, 142 deselected, 3 cache-redirection assert-rewrite warnings in 313.58 s; 373.49 s wall |
 
-The separate uncommitted post-review hardening delta produced:
+The committed post-review hardening delta produced:
 
 | Command/suite | Result |
 | --- | --- |
@@ -540,8 +599,9 @@ estimates, and fee arithmetic still match the approved packet.
 ## 11. Remaining Checkpoint 0 blockers
 
 No Checkpoint 0 row is closed. The integrated owner packet records the owner
-states below, while every named independent-security, operations, live-proof,
-deployment, final-evidence, and external-review gate remains open:
+states below. The exact `0a3414a` package review is complete, while every
+broader independent-security decision and the remaining operations,
+live-proof, deployment, final-evidence, and external-review gates stay open:
 
 0. owner approved; independent-security validation of the exact recreation
    remains pending;
@@ -566,8 +626,9 @@ deployment, final-evidence, and external-review gate remains open:
    independent-security approval remains pending;
 10. owner approved the permanent deployed-Base Ledger exception; security and
     operations ownership remain pending;
-11. H-01 integration and exact-baseline recreation are satisfied; independent
-    S5 security review of this five-file recreation remains pending;
+11. H-01 integration, exact-baseline recreation, and independent review of the
+    exact `0a3414a` package are satisfied; final hash review of this provenance
+    correction and formal row disposition remain pending;
 12. owner approved the exact Stage B file ceiling; independent-security
     approval remains pending; and
 13. owner approved in principle; the completed live proof, final evidence,
