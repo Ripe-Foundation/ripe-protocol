@@ -1,35 +1,25 @@
 # Track 7 H-01 Stage A Dependency-Security Gate
 
-**Status:** The exact independently reviewed Candidate A dependency payload
-remains commit `001ccaccdf473223ba33e3eeb37509a01990a60e`. The subsequent
-reviewer-requested exception-reachability correction has SHA-256
-`d8f4c504623a7393c0e53cafdb9c81288981d655c329582eb70be1accc64e2aa`.
-Under explicit owner authorization, exact authoritative `origin/rh` commit
-`03c07f01dda03a5529c602aafbfe5545ae86df69` was merged without rebase,
-squash, or history rewrite at current reconciled branch commit
-`678034e4a8ba469f65485748bb7e612dc343a91a`. The merge was conflict-free;
-its incoming delta was exactly the two Track 8 M0 evidence files and did not
-overlap an H-01-owned path. A clean Candidate A environment has completed the
-required current-baseline install, audit, dependency gate, S1/S2/S3,
-collection, complete serial suite, final byte-level gate, scope, topology, and
-custody checks. The H-01 net delta against `03c07f0` is exactly the four
-authorized files. No dependency finding, version, exception disposition,
-compatibility result, inventory result, or H-01 scope changed; only
-time-varying EPSS metadata changed in the fresh K-02 raw response.
-The independent security/Track 6 reviewer has now approved H-01 Candidate A
-merge readiness against exact baseline `03c07f0`, reconciled HEAD `678034e4`,
-and complete pre-approval evidence SHA-256
-`8217348b2e0309597a33684ecba445334da0344109dae19e826624b5b387ac79`.
-That approval covers the exact four-file payload and all five bounded
-exceptions, including their 15 August 2026 review,
+**Status:** The independently approved four-file H-01 Candidate A payload was
+integrated and pushed on authoritative `rh` at exact merge commit
+`575d47b82055b42da2bddf1535d8076cd7cf4c63`. Its parents are the reviewed
+baseline `03c07f01dda03a5529c602aafbfe5545ae86df69` and final H-01 commit
+`3b46be0a3af3355661b4a9f55b6a4c2295a39da7`; the integration delta is
+exactly the four authorized H-01 files. The authorized post-integration
+K-02/default-branch refresh at `2026-07-25T01:20:02Z` found that GitHub still
+observes all 13 alerts open: 6 high, 6 medium, and 1 low, numbers
+`13,14,15,16,18,19,21,22,23,24,25,26,27`. GitHub's observed alert state is
+recorded exactly and controls this closeout: no alert is claimed resolved,
+closed, or remediated merely because Candidate A is integrated. The static
+integrated-lock range comparison remains separate evidence only. All five
+bounded exceptions remain in force with their 15 August 2026 review,
 `2026-08-31T23:59:59Z` hard expiry, compensating controls, invalidation
-triggers, custody requirements, and post-merge obligations. This approval
-record changes only this evidence file; the required post-amendment
-`git diff --check` and fresh private-basetemp 16-case gate pass. The branch is
-approved for owner integration after the authorized evidence/test commit and
-branch publication. The candidate remains unmerged into `rh`; no Dependabot
-mutation, deployment, signing, verification submission, or other production
-action is authorized.
+triggers, custody requirements, retention, and separately authorized disposal
+obligations. This post-integration amendment changes only this evidence file
+and awaits final review; no dependency, lock, test, exception, policy, or
+validation conclusion changed. No Dependabot mutation, deployment, signing,
+verification submission, private-evidence deletion/relocation, or other
+production action is authorized or performed.
 
 **Evidence date:** 24 July 2026
 
@@ -4044,3 +4034,163 @@ The owner authorized committing exactly this evidence file and
 merge. This final approval does not authorize merge into `rh`, Dependabot
 mutation, deployment, signing, verification submission, private-evidence
 deletion, or any other production action.
+
+## 24 July 2026: authorized post-integration K-02/default-branch refresh
+
+### Integrated identity and scope
+
+Read-only local and remote checks confirmed both the `rh` worktree and
+`origin/rh` at:
+
+```text
+575d47b82055b42da2bddf1535d8076cd7cf4c63
+merge: integrate Track 7 H-01 dependency security
+```
+
+The merge parents are:
+
+```text
+first parent / authoritative reviewed baseline:
+  03c07f01dda03a5529c602aafbfe5545ae86df69
+second parent / final published H-01 commit:
+  3b46be0a3af3355661b4a9f55b6a4c2295a39da7
+```
+
+The final H-01 commit is an ancestor of integrated `rh`. The first-parent
+integration delta is exactly:
+
+```text
+A  docs/chains/rh/evidence/dependency-security-gate.md
+M  requirements.in
+M  requirements.txt
+A  tests/deployment/test_dependency_gate.py
+```
+
+The integrated evidence file matched its reviewed final pre-refresh SHA-256
+`d8e33871b2676ebdf39da1b6176fe9ecb009a46c6d35730f68ef103343d26c2c`
+before this amendment. The `rh` worktree already contained unrelated,
+pre-existing Track 6 S5 planning changes at
+`docs/chains/rh/track-6-s5-ledger-guard.md` and
+`docs/chains/rh/track-6-s5-checkpoint-0-owner-decision-packet.md`; they were
+not read, modified, staged, or otherwise included in H-01 work. A concurrent
+untracked `contracts/data/test.md` appeared during the final scope check; it
+was likewise not read, modified, staged, or attributed to H-01.
+
+### Exact GitHub-observed default-branch state
+
+Before the query, the remote repository identity was verified as
+`Ripe-Foundation/ripe-protocol`, and read-only `git ls-remote` confirmed
+`origin/rh` remained exact `575d47b`. Authentication state, tokens, response
+headers, and unrelated repository/account data were not printed. At
+`2026-07-25T01:20:02Z`, the approved K-02 channel ran only this alert-list
+request:
+
+```text
+gh api --method GET --paginate --slurp \
+  -H 'Accept: application/vnd.github+json' \
+  -H 'X-GitHub-Api-Version: 2022-11-28' \
+  '/repos/Ripe-Foundation/ripe-protocol/dependabot/alerts?state=open&per_page=100'
+```
+
+GitHub returned 13 alerts, all with `state=open`: 6 high, 6 medium, and 1 low.
+The complete sanitized observed ledger is:
+
+| Alert | State | Severity | Package | GitHub vulnerable range | First patched version |
+|---:|---|---|---|---|---|
+| 13 | open | high | `urllib3` | `>= 1.24, < 2.6.0` | `2.6.0` |
+| 14 | open | high | `urllib3` | `>= 1.0, < 2.6.0` | `2.6.0` |
+| 15 | open | medium | `cbor2` | `>= 3.0.0, < 5.8.0` | `5.8.0` |
+| 16 | open | high | `urllib3` | `>= 1.22, < 2.6.3` | `2.6.3` |
+| 18 | open | high | `wheel` | `>= 0.40.0, <= 0.46.1` | `0.46.2` |
+| 19 | open | high | `cbor2` | `<= 5.8.0` | `5.9.0` |
+| 21 | open | medium | `requests` | `< 2.33.0` | `2.33.0` |
+| 22 | open | low | `Pygments` | `< 2.20.0` | `2.20.0` |
+| 23 | open | medium | `pytest` | `< 9.0.3` | `9.0.3` |
+| 24 | open | medium | `python-dotenv` | `< 1.2.2` | `1.2.2` |
+| 25 | open | high | `urllib3` | `>= 1.23, < 2.7.0` | `2.7.0` |
+| 26 | open | medium | `idna` | `< 3.15` | `3.15` |
+| 27 | open | medium | `pymdown-extensions` | `>= 10.0.1, <= 10.21.2` | `10.21.3` |
+
+The alert-number set, count, severity split, package identities, ranges, and
+first-patched versions are unchanged from the immediately preceding K-02
+refresh. The raw and approved minimized sanitized bytes are also byte-identical
+to that refresh:
+
+| Retained post-integration K-02 file | SHA-256 | Owner/group | Mode |
+|---|---|---|---|
+| `dependabot-open-post-integration-2026-07-25T012002Z-raw.json` | `a5d870192e7c2688bd81c4f5de24ef35f93fc2a7d86039169ded1025148ddbd0` | `wigglez:staff` | `0600` |
+| `dependabot-open-post-integration-2026-07-25T012002Z-sanitized.json` | `d2dd2d89acb63de901e164c3c7d69f402c04bc38da9a803fe9674734ab404b06` | `wigglez:staff` | `0600` |
+
+This is the authoritative state observed from GitHub at the query time. No
+alert is reported as resolved, closed, dismissed, fixed, or remediated in this
+record. Candidate A's integrated pins are outside the recorded vulnerable
+ranges for alerts `13,14,15,16,18,19,21,24,25,26`, but that static
+candidate-lock comparison is not GitHub closure and does not change the 13
+observed `open` states. Alerts `22,23,27` remain within the integrated pins and
+remain exception-governed. GitHub may re-observe the manifest later; any later
+state requires a new authorized observation and may not be inferred here.
+
+### Exceptions and custody after the refresh
+
+All five bounded exceptions survive unchanged:
+
+- `EX-H01-CLICK-01`
+- `EX-H01-PYTEST-01`
+- `EX-H01-PYGMENTS-01`
+- `EX-H01-PYMDOWN-SNIPPETS-01`
+- `EX-H01-PYMDOWN-B64-01`
+
+Alert `22` maps to the Pygments exception, alert `23` maps to the pytest
+exception, and alert `27` remains governed by both bounded Pymdown reachability
+exceptions. The Click exception has no separate alert in this K-02 response.
+Every exception retains its exact threat model, owner, scope, compensating
+controls, invalidation/recheck triggers, 15 August 2026 review, and
+`2026-08-31T23:59:59Z` hard expiry. Expiry continues to block rehearsal.
+
+Before K-02 access, the private-evidence directory was verified
+`wigglez:staff`, mode `0700`, with 31 retained files, all
+`wigglez:staff` mode `0600` and zero custody mismatches. The query and approved
+projection added only the two retained files named above. Afterward, all 33
+retained files were rehashed and rechecked with zero owner/group/mode
+mismatches; the directory remained `wigglez:staff` mode `0700`. The sorted
+33-row private path/hash inventory had SHA-256:
+
+```text
+1a192540fbaff78f7579a8db1fabe73b3cef4eb999a32fea927c969100703b5f
+```
+
+The temporary inventory at
+`/private/tmp/h01-post-integration-custody-inventory.nYE4lf` was removed after
+this sanitized record was updated. No retained private evidence was printed,
+moved, renamed, deleted, or copied elsewhere.
+
+Completion of the post-integration refresh satisfies that retention event but
+does not authorize disposal: retention continues until final disposition of
+all five exceptions, which is later than this refresh. Permitted use remains
+limited to H-01 security evidence and independent review. Disposal remains
+blocked absent separate explicit owner instruction, exact pre-disposal
+path/hash/mode verification, the approved per-file method, and a committed
+sanitized disposal record.
+
+### Evidence-only review handoff
+
+This refresh changed only
+`docs/chains/rh/evidence/dependency-security-gate.md`. It did not change
+requirements, the compiled lock, the dependency gate, any exception or policy,
+tests, scripts, contracts, artifacts, ABIs, or another repository file.
+`git diff --check` passes. No audit beyond the authorized K-02 alert-list
+refresh was run, and no alert endpoint was mutated.
+
+The current integrated payload hashes remain:
+
+| Integrated H-01 path | SHA-256 |
+|---|---|
+| `requirements.in` | `2523c04409946a6625e30e5e4aa4f711663924f4a674f4cfd5fee5b7bbb3b80d` |
+| `requirements.txt` | `d2e12a6f0cfd128c3891634efafbba8305878bef7a7c5db33e25ebe93b0d2bce` |
+| `tests/deployment/test_dependency_gate.py` | `d8f4c504623a7393c0e53cafdb9c81288981d655c329582eb70be1accc64e2aa` |
+
+The updated evidence hash is supplied out of band because this file cannot
+contain its own stable hash. This evidence-only amendment remains uncommitted
+for final review. No commit, push, merge, Dependabot mutation, deployment,
+signing, verification submission, private-evidence deletion/relocation, or
+other production action was performed.
