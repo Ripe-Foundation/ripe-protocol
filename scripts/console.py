@@ -11,7 +11,7 @@ Examples:
 """
 
 import os
-from contextlib import ExitStack
+from contextlib import ExitStack, contextmanager
 from pathlib import Path
 
 import click
@@ -263,6 +263,38 @@ def read_chain_id(rpc_url: str) -> int | str:
     return EthereumRPC(rpc_url).fetch("eth_chainId", [])
 
 
+@contextmanager
+def _fork_environment(profile, operation, redacted_rpc, **kwargs):
+    fork_stack = ExitStack()
+    body_error = None
+    try:
+        try:
+            env = fork_stack.enter_context(
+                boa.fork(redacted_rpc.value, **kwargs)
+            )
+        except Exception:
+            raise click.ClickException(
+                "H02_RPC_CONNECT_FAILED "
+                f"profile={profile.identity.profile_id} "
+                f"operation={operation.value} env={redacted_rpc.reference}"
+            ) from None
+        yield env
+    except BaseException as error:
+        body_error = error
+        raise
+    finally:
+        try:
+            fork_stack.close()
+        except Exception:
+            if body_error is None:
+                raise click.ClickException(
+                    "H02_FORK_TEARDOWN_FAILED "
+                    f"profile={profile.identity.profile_id} "
+                    f"operation={operation.value} "
+                    f"env={redacted_rpc.reference}"
+                ) from None
+
+
 def _validate_static_assertions(profile, operation, environment, blueprint):
     repository = profile.repository
     if environment is not None:
@@ -292,8 +324,8 @@ def _validate_static_assertions(profile, operation, environment, blueprint):
     type=click.Choice(NETWORK_PROFILE_IDS, case_sensitive=False),
     help=(
         "Required canonical network profile. `--chain` is a deprecated "
-        "equivalent spelling. Availability is operation-specific; `local` "
-        "is reserved for an embedded local runtime."
+        "equivalent spelling. `local` is not selectable by this command; "
+        "it is reserved for future embedded-runtime tooling."
     ),
 )
 @click.option(
@@ -403,18 +435,9 @@ def main(
     if block is not None:
         kwargs["block_identifier"] = block
 
-    with ExitStack() as fork_stack:
-        try:
-            env = fork_stack.enter_context(
-                boa.fork(redacted_rpc.value, **kwargs)
-            )
-        except Exception:
-            raise click.ClickException(
-                "H02_RPC_CONNECT_FAILED "
-                f"profile={profile.identity.profile_id} "
-                f"operation={operation.value} env={redacted_rpc.reference}"
-            ) from None
-
+    with _fork_environment(
+        profile, operation, redacted_rpc, **kwargs
+    ) as env:
         if account:
             env.eoa = account
             try:

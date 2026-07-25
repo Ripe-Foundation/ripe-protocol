@@ -8,6 +8,7 @@ from config.network_profiles import (
     get_profile,
     operation_decision,
     static_manifest_path,
+    validate_manifest_assertions,
 )
 
 
@@ -20,16 +21,16 @@ from config.network_profiles import (
     type=click.Choice(NETWORK_PROFILE_IDS, case_sensitive=False),
     help=(
         "Required canonical network profile. `--chain` is a deprecated "
-        "equivalent spelling. Availability is operation-specific; `local` "
-        "is reserved for an embedded local runtime."
+        "equivalent spelling. `local` is not selectable by this command; "
+        "it is reserved for future embedded-runtime tooling."
     ),
 )
 @click.option(
     "--environment",
     default=None,
     help=(
-        "Reserved history-namespace assertion, checked only for a supported "
-        "verification route."
+        "Optional profile history-namespace assertion, validated before the "
+        "verification route outcome."
     ),
 )
 @click.option(
@@ -37,14 +38,20 @@ from config.network_profiles import (
     default="current",
     show_default=True,
     help=(
-        "Reserved manifest-name assertion. This command does not submit "
-        "verification."
+        "Manifest-name assertion validated before route selection. This "
+        "command does not submit verification."
     ),
 )
 def cli(profile_id, environment, manifest):
     """Select a verification route without submitting verification."""
     try:
         profile = get_profile(profile_id)
+        validate_manifest_assertions(
+            profile,
+            manifest,
+            operation=Operation.VERIFICATION,
+            environment=environment,
+        )
         decision = operation_decision(profile, Operation.VERIFICATION)
 
         if decision.outcome is OperationOutcome.BLOCKED_PENDING_POLICY:

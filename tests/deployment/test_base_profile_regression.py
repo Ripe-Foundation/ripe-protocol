@@ -125,6 +125,29 @@ def test_blocked_robinhood_verification_never_advertises_proposed_path():
     assert "H02_VERIFIER_BLOCKED profile=robinhood-mainnet" in result.stderr
 
 
+@pytest.mark.parametrize(
+    ("option", "value", "error_code"),
+    (
+        ("--manifest", "../evil", "H02_REPOSITORY_UNAVAILABLE"),
+        ("--environment", "bogus", "H02_HISTORY_ALIAS"),
+    ),
+)
+def test_verify_validates_assertions_before_blocked_route(
+    option, value, error_code
+):
+    result = _run_module(
+        "scripts.verify",
+        "--profile",
+        "base-mainnet",
+        option,
+        value,
+    )
+    assert result.returncode != 0
+    assert "Manifest:" not in result.stdout
+    assert error_code in result.stderr
+    assert value not in result.stderr
+
+
 def test_unknown_label_never_resolves_to_base():
     with pytest.raises(NetworkProfileError, match="H02_PROFILE_UNKNOWN"):
         get_profile("totally-unknown")

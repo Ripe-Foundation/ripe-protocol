@@ -172,8 +172,8 @@ xfail-marked, changed, or weakened.
 
 The compiler cache was removed after validation and
 `/private/tmp/rh-h02-titanoboa-cache.gwHeaI` was verified absent. The disposable
-locked environment remains because H-02 still needs it; it must be removed and
-that removal recorded when H-02 no longer needs it.
+locked environment remained at this Phase A checkpoint. Its eventual removal
+is recorded in the current second-review validation section below.
 
 ## Phase A current-behavior audit
 
@@ -1050,6 +1050,8 @@ verify_chain_identity
 validate_verified_identity
 validate_fork_request
 repository_paths
+validate_manifest_assertions
+static_manifest_path
 manifest_path
 ```
 
@@ -1198,8 +1200,8 @@ mode: 0700
 
 The cache was removed after final validation and verified absent. It is
 regenerable and contained compiler artifacts only. The disposable locked
-environment remains because Gate 1/Gate 2 may require the exact runtime; it
-must be removed and its absence recorded when H-02 no longer needs it.
+environment remained at this Phase B checkpoint because Gate 1/Gate 2 still
+required the exact runtime. Its eventual removal is recorded below.
 
 The exact H-02 launcher was:
 
@@ -1728,7 +1730,12 @@ contract/default/migration/manifest/history/generated-artifact change,
 `rh`/`master` merge, or integration-worktree edit occurred. The only authorized
 external write after this record is committed is the H-02 feature-branch push.
 
-## Current re-review correction and reopened gates
+## First re-review correction (superseded)
+
+**Superseded by “Second re-review correction and current gate package”
+below.** Commit `5619927ab91f998b21d39ca7da0770ad74ff1a75`
+accurately records this checkpoint, but its hashes, test counts, path-helper
+semantics, and remote warning are historical rather than current.
 
 ### Review provenance and starting identity
 
@@ -2010,3 +2017,252 @@ merged into `rh`.
 No live RPC, real account, secret, signing, migration execution, history
 write, verification request/submission, deployment, governance action,
 integration-worktree edit, or `rh` merge occurred during this correction.
+
+## Second re-review correction and current gate package
+
+### Review provenance and starting state
+
+The second independent re-review is preserved outside the repository with
+SHA-256
+`bd9eaf6207e6dd6d040c8d14b4572e7f18efeaacd0bdacaceafc00dc8c1a88d6`.
+It re-derived and confirmed all nine prior file hashes, both diff totals,
+virtual-merge/tree identity, exact scope, branch topology, 79 H-02 tests,
+collection totals, redaction, five-profile verifier behavior, and evidence
+supersession markers. It also confirmed that the first re-review's
+`PYTHON_DOTENV_DISABLED` claim was wrong for locked
+`python-dotenv==1.2.2`.
+
+This correction started from clean local commit
+`5619927ab91f998b21d39ca7da0770ad74ff1a75`. Local `rh` and the
+existing `origin/rh` tracking reference remained
+`185bd32004121bbb1c60748844c517ea8da0affb`. The local feature was seven
+commits ahead and zero behind `rh`, and one commit ahead of stale upstream
+feature commit `fbfbebd91d1c04b429c148558b2c3ac2c37b1f55`. The integration
+worktree was clean and was not modified.
+
+### Complete second-review disposition
+
+| Item | Disposition |
+|---|---|
+| A, environment spy blind spots | Fixed. `SpyEnvironment` records `[]`, `get`, membership, `setdefault`, and `copy` reads. A focused test proves each surface records access, so the verifier/account zero-access assertions cannot pass through those common alternatives. |
+| B, unconditional test import of optional IPython | Fixed with `pytest.importorskip("IPython")` inside the console-session test. The locked runtime includes IPython, so the authoritative run executes rather than skips it. |
+| C, untested invalid timestamp sanitizer | Fixed. A malicious synthetic timestamp produces only `failure_timestamp=<invalid>`; neither the raw timestamp nor RPC appears. |
+| D, static manifest helper did not gate operation | Fixed. `static_manifest_path()` calls `require_operation()` before validation or path return. A blocked Base verification operation and unsupported Base Sepolia repository operation cannot obtain a path. |
+| E, inert verifier assertions | Fixed without reintroducing path claims. `validate_manifest_assertions()` performs pure manifest-name/history-namespace validation before the verifier outcome; only a supported route may call `static_manifest_path()`. CLI tests exercise hostile manifest and environment input and assert no path output. |
+| F, deployments-DB failure mislabeled | Fixed with stable `H02_MIGRATION_SETUP_FAILED`, profile, and operation only. It no longer carries an RPC environment reference. |
+| G, discarded root-cause type | Not implemented because controlling constraint 5 allows only stable error codes plus profile, operation, chain IDs, and environment-reference names. Exception class names are outside that allowlist, and migration error semantics belong to H-05. Adding `error_class` or a debug re-raise requires explicit owner/security amendment. |
+| H, aspirational `local` help | Fixed in all three CLIs: `local` is not selectable by that command and is reserved for future embedded-runtime tooling. |
+| I, registry tests retained ambient environment | Fixed. The registry suite removes the same explorer, RPC, deployer-key, test-key, and vendor-token variables before each test. |
+| J, unsanitized fork teardown | Fixed in both CLIs. Fork entry and teardown are separately sanitized; teardown cannot mask an existing body error. A two-CLI parameterized test proves credential-bearing teardown text is absent. |
+| K, stale remote | No push is authorized. The stale remote is explicitly prohibited from review below; only the local commit/evidence hashes in the final handoff identify reviewable bytes. |
+
+The reviewer agreed that the previously surfaced mock-account and
+operation-specific-choice proposals should remain deferred. Neither is needed
+for H-02 correctness, and both would expand the approved account/CLI model.
+
+### Manifest input, authority, and call order
+
+The registry now exposes two distinct boundaries:
+
+```text
+validate_manifest_assertions(
+    profile,
+    manifest_name,
+    operation=...,
+    environment=...,
+) -> None
+
+static_manifest_path(
+    profile,
+    manifest_name,
+    operation=...,
+    environment=...,
+) -> PurePosixPath
+```
+
+The first is pure input validation. It validates the operation identifier,
+checks an optional history namespace only against the selected profile, and
+rejects an unbounded/path-like manifest name. It does not return a path,
+inspect the filesystem, read environment values, or authorize an operation.
+
+The second first calls `require_operation()`, then reuses the assertion
+validator, applies `PathState`, and only then returns the canonical relative
+history path. The identity-requiring `manifest_path()` continues through
+`repository_paths()` before returning an on-disk path.
+
+The verifier CLI therefore performs:
+
+```text
+canonical profile
+  -> pure manifest/environment assertion validation
+  -> blocked/unsupported/supported outcome
+  -> static path only if supported
+  -> no path print before support
+  -> H-07 remains responsible for identity/provider/key/submission
+```
+
+Hostile `--manifest ../evil` and a non-canonical `--environment` now fail
+locally before the blocked verifier result and print no manifest path. Valid
+inputs still terminate at the current blocked/unsupported outcome.
+
+### Migration and fork diagnostics
+
+Deployments-database initialization now has its own redacted stable code:
+
+```text
+H02_MIGRATION_SETUP_FAILED profile=<id> operation=migration_fork
+```
+
+`MigrationError.failure_timestamp` remains digits-only. Invalid values become
+`<invalid>`. The underlying exception message and class remain suppressed.
+That is deliberate compliance with the current diagnostic allowlist, not a
+claim that the H-05-owned migration runner is sufficiently diagnosable.
+
+Both CLIs use a narrow fork context wrapper:
+
+```text
+entry failure    -> H02_RPC_CONNECT_FAILED
+body failure     -> original sanitized/owned body behavior
+teardown failure -> H02_FORK_TEARDOWN_FAILED
+body + teardown  -> preserve body failure; suppress teardown replacement
+```
+
+Only profile, operation, and the already-redacted reference name can appear in
+entry/teardown diagnostics.
+
+### Remote review prohibition
+
+**Do not review or approve
+`origin/rh-track-7-h2-network-profiles-cli` while it resolves to
+`fbfbebd91d1c04b429c148558b2c3ac2c37b1f55`.** That remote contains the
+rejected pre-correction verifier/test behavior. No independent Gate 1 or Gate
+2 approval against that ref is valid for the current local work.
+
+Pushing the corrected feature branch is an external write and requires
+explicit owner authorization. No push is inferred from a request to address
+review feedback.
+
+### Second-review disposable runtime and preliminary validation
+
+The authorized replacement runtime and cache are outside the repository:
+
+```text
+runtime root: /private/tmp/rh-h02-rereview2-cpython312
+runtime mode: 0700
+Python: 3.12.0
+pip: 23.2.1
+index: https://pypi.org/simple
+install: exact integrated requirements.txt, --no-cache-dir
+Vyper: 0.4.3
+Titanoboa: 0.2.7
+pytest: 8.4.2
+pip check: No broken requirements found
+
+cache variable: RH_H02_BOA_CACHE_DIR
+cache path: /private/tmp/rh-h02-rereview2-cache
+cache mode: 0700
+```
+
+The first combined corrective run passed `86 passed, 3 warnings in 10.63s`.
+The immediate H-01 gate passed `16 passed, 3 warnings in 1.45s`. The three
+warnings remained the known `_hypothesis_globals`, `hypothesis`, and `boa`
+assertion-rewrite notices. No warning or test was suppressed.
+
+### Current second-review validation, hashes, and commit
+
+All five H-02 modules imported, and the migrate, console, and verify
+`--help` routes exited zero with every relevant environment value absent.
+Each route required an explicit profile, described `--chain` only as a
+deprecated equivalent spelling, and stated that `local` is not selectable by
+that command.
+
+Every pytest invocation used `-q -p no:cacheprovider`, a unique task-specific
+`--basetemp`, the mode-0700 compiler cache above, and this launcher:
+
+```bash
+env -u BASESCAN_API_KEY -u WEB3_ALCHEMY_API_KEY -u TEST_PRIVATE_KEY \
+  -u BASE_MAINNET_RPC_URL -u BASE_SEPOLIA_RPC_URL \
+  -u ROBINHOOD_MAINNET_RPC_URL -u ROBINHOOD_TESTNET_RPC_URL \
+  -u DEPLOYER_PRIVATE_KEY -u PYTHON_DOTENV_DISABLED \
+  ETHERSCAN_API_KEY=local-placeholder PYTHONPATH=. \
+  RH_H02_BOA_CACHE_DIR=/private/tmp/rh-h02-rereview2-cache \
+  /private/tmp/rh-h02-rereview2-cpython312/venv/bin/python -c \
+'import os; from boa.interpret import set_cache_dir; cache_dir = os.environ.pop("RH_H02_BOA_CACHE_DIR"); set_cache_dir(cache_dir); import pytest; raise SystemExit(pytest.main(<ARGUMENTS>))'
+```
+
+The direct import/help checks removed `ETHERSCAN_API_KEY` as well, set
+`PYTHON_DOTENV_DISABLED=1`, and supplied no synthetic placeholder because
+they do not collect the unchanged parent pytest harness.
+
+| Scope / basetemp | Result |
+|---|---|
+| `test_network_profiles.py`; `/private/tmp/rh-h02-rereview2-network-final` | `23 passed, 3 warnings in 0.03s` |
+| `test_secret_handling.py`; `/private/tmp/rh-h02-rereview2-secret-final` | `40 passed, 3 warnings in 5.13s` |
+| `test_base_profile_regression.py`; `/private/tmp/rh-h02-rereview2-base-final` | `25 passed, 3 warnings in 5.12s` |
+| all three H-02 files; `/private/tmp/rh-h02-rereview2-combined-final` | `88 passed, 3 warnings in 10.62s` |
+| H-01 dependency gate; `/private/tmp/rh-h02-rereview2-h01-final` | `16 passed, 3 warnings in 1.45s` |
+| S1 clock profiles; `/private/tmp/rh-h02-rereview2-s1-final` | `57 passed, 3 warnings in 103.06s` |
+| S2 inventory; `/private/tmp/rh-h02-rereview2-s2-final` | `60 passed, 3 warnings in 24.52s` |
+| collection; `/private/tmp/rh-h02-rereview2-collect-final` | `2,826/2,968 collected, 142 deselected in 1.20s` |
+| full suite; `/private/tmp/rh-h02-rereview2-full-final` | `2,826 passed, 142 deselected, 3 warnings in 303.46s` |
+
+The three warnings in every cache-launched command were the known non-fatal
+`PytestAssertRewriteWarning` notices for `_hypothesis_globals`, `hypothesis`,
+and `boa`, imported before pytest by the cache-setting launcher. No warning or
+test was suppressed. No selected test skipped or xfailed. The unchanged 142
+external-fork tests remained deselected because external networking was not
+authorized.
+
+Current implementation/test hashes are:
+
+| File | SHA-256 |
+|---|---|
+| `config/network_profiles.py` | `43b18eca66e596fcfc804a76d25c9453006d8f441227fa34eb4080dcf47dadc5` |
+| `scripts/migrate.py` | `0a0a62878a2102c3b872a358d9170f2f9121eb00953018d34a8110a317656e1c` |
+| `scripts/console.py` | `fe9427c504c2b2e0f71009357c39b352c29a8178554c9bbcb296350e9e0b6fa9` |
+| `scripts/verify.py` | `1eabb8280bb2e5ef54fcaa40fc7eaabd636870436e5a0e65fb9a6e90093cefde` |
+| `scripts/utils/migration_helpers.py` | `c8fa393c33541fac59b087e6b6d4125d1a97e2092c27960e0a3995ae54b06d1a` |
+| `tests/deployment/test_network_profiles.py` | `a938f79993fe1004b8771f64b86b60a185c6ccf2cf128b30d9fda24db26d407a` |
+| `tests/deployment/test_secret_handling.py` | `c9a372f25a898ac48ede0f45d02e42719e125449f87546700eb68cb15d2402e6` |
+| `tests/deployment/test_base_profile_regression.py` | `a6aa3e7a53d5739bc33f937010d0f895766aff611bd18c972323622003890317` |
+
+The correction changes eight H-02-owned files from starting commit
+`5619927ab91f998b21d39ca7da0770ad74ff1a75`;
+`scripts/utils/migration_helpers.py` is byte-identical to that reviewed
+starting commit. Its exact diff is `8 files changed, 586 insertions(+), 69
+deletions(-)`. The net branch diff against exact baseline
+`185bd32004121bbb1c60748844c517ea8da0affb` remains exactly the nine
+H-02-owned paths and totals `9 files changed, 5,693 insertions(+), 342
+deletions(-)`. `git diff --check` is clean. Explicit checks found no change to
+contracts, interfaces, migrations, histories, blueprints/defaults, dependency
+files, the global test harness, H-01, S1, S2, parameter tooling,
+authority/summary documents, or the integrated H-03/Track 8 records.
+
+At final scope inspection the separate integration worktree contained an
+unrelated untracked
+`docs/chains/rh/track-6-s6-track-7-h4-defaults-parameters.md`. H-02 did not
+create, read, modify, stage, or include that file. It does not alter local
+`rh`, `origin/rh`, the merge base, the H-02 worktree, or the H-02 diff, but
+the owner must reconcile that unrelated integration-worktree state before an
+integration action.
+
+The correction commit identity, evidence hash, exact final diff totals,
+ahead/behind state, and final virtual-merge tree are necessarily recorded in
+the external handoff after the evidence-containing commit fixes those
+identities. The remote feature reference remains stale and was not contacted
+or updated.
+
+After all validation, the exact disposable runtime and compiler cache above
+are removed and their absence is verified. No active environment,
+user-global cache, repository dependency file, or repository artifact is
+modified by that cleanup.
+
+### Current second-review gate status
+
+This second correction changes implementation bytes and therefore still
+requires fresh independent Gate 1 and Gate 2 approval. It must not be merged
+into `rh`.
+
+No live RPC, real account, secret, external connection, signing, migration
+execution, history write, verification request/submission, deployment,
+governance action, integration-worktree edit, push, or `rh` merge occurred.

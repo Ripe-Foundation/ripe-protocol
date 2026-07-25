@@ -32,6 +32,19 @@ from config.network_profiles import (
 from scripts import migrate
 
 
+RELEVANT_ENV = (
+    "BASESCAN_API_KEY",
+    "ETHERSCAN_API_KEY",
+    "WEB3_ALCHEMY_API_KEY",
+    "BASE_MAINNET_RPC_URL",
+    "BASE_SEPOLIA_RPC_URL",
+    "ROBINHOOD_MAINNET_RPC_URL",
+    "ROBINHOOD_TESTNET_RPC_URL",
+    "DEPLOYER_PRIVATE_KEY",
+    "TEST_PRIVATE_KEY",
+)
+
+
 @pytest.fixture(scope="session")
 def ripe_hq():
     yield None
@@ -39,6 +52,9 @@ def ripe_hq():
 
 @pytest.fixture(autouse=True)
 def no_external_network(monkeypatch):
+    for name in RELEVANT_ENV:
+        monkeypatch.delenv(name, raising=False)
+
     def blocked(*args, **kwargs):
         raise AssertionError("external networking is disabled")
 
@@ -245,11 +261,11 @@ def test_missing_repository_does_not_fallback_or_create(tmp_path):
     assert list(tmp_path.iterdir()) == []
 
 
-def test_static_manifest_path_rejects_proposed_and_absent_histories():
+def test_static_manifest_path_gates_operation_before_returning_path():
     base_path = static_manifest_path(
         get_profile("base-mainnet"),
         "current",
-        operation=Operation.VERIFICATION,
+        operation=Operation.REPOSITORY_READ,
         environment="v1",
     )
     assert base_path == PurePosixPath(
@@ -258,12 +274,19 @@ def test_static_manifest_path_rejects_proposed_and_absent_histories():
 
     with pytest.raises(NetworkProfileError, match="H02_OPERATION_BLOCKED"):
         static_manifest_path(
+            get_profile("base-mainnet"),
+            "current",
+            operation=Operation.VERIFICATION,
+            environment="v1",
+        )
+    with pytest.raises(NetworkProfileError, match="H02_OPERATION_BLOCKED"):
+        static_manifest_path(
             get_profile("robinhood-mainnet"),
             "current",
             operation=Operation.VERIFICATION,
         )
     with pytest.raises(
-        NetworkProfileError, match="H02_REPOSITORY_UNAVAILABLE"
+        NetworkProfileError, match="H02_OPERATION_UNSUPPORTED"
     ):
         static_manifest_path(
             get_profile("base-sepolia"),
@@ -278,7 +301,7 @@ def test_static_manifest_path_rejects_history_alias_and_invalid_name():
         static_manifest_path(
             profile,
             "current",
-            operation=Operation.VERIFICATION,
+            operation=Operation.REPOSITORY_READ,
             environment="bogus",
         )
     with pytest.raises(
@@ -287,7 +310,7 @@ def test_static_manifest_path_rejects_history_alias_and_invalid_name():
         static_manifest_path(
             profile,
             "../current",
-            operation=Operation.VERIFICATION,
+            operation=Operation.REPOSITORY_READ,
         )
 
 

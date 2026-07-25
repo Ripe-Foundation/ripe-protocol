@@ -75,6 +75,22 @@ class SpyEnvironment(dict):
         self.accesses.append(name)
         return super().__getitem__(name)
 
+    def __contains__(self, name):
+        self.accesses.append(name)
+        return super().__contains__(name)
+
+    def get(self, name, default=None):
+        self.accesses.append(name)
+        return super().get(name, default)
+
+    def setdefault(self, name, default=None):
+        self.accesses.append(name)
+        return super().setdefault(name, default)
+
+    def copy(self):
+        self.accesses.append("<copy>")
+        return super().copy()
+
 
 def _child_environment():
     return {
@@ -103,6 +119,22 @@ def _verified(profile_id, operation):
         profile.identity.chain_id,
         profile.identity.chain_id,
     )
+
+
+def test_spy_environment_records_common_read_paths():
+    environment = SpyEnvironment({"KEY": "value"})
+    assert environment["KEY"] == "value"
+    assert environment.get("KEY") == "value"
+    assert "KEY" in environment
+    assert environment.setdefault("OTHER", "default") == "default"
+    assert environment.copy()["KEY"] == "value"
+    assert environment.accesses == [
+        "KEY",
+        "KEY",
+        "KEY",
+        "OTHER",
+        "<copy>",
+    ]
 
 
 def _call_migrate(**overrides):
@@ -496,7 +528,10 @@ def test_successful_migration_log_path_fully_redacts_rpc(monkeypatch, capsys):
 
 def test_migration_failure_preserves_sanitized_resume_timestamp(monkeypatch):
     def fail(*args):
-        raise MigrationError("1712345678")
+        try:
+            raise ValueError("synthetic root cause text")
+        except ValueError as cause:
+            raise MigrationError("1712345678") from cause
 
     _prepare_migration_execution(monkeypatch, fail)
     with pytest.raises(Exception) as captured:
@@ -504,6 +539,39 @@ def test_migration_failure_preserves_sanitized_resume_timestamp(monkeypatch):
     rendered = str(captured.value)
     assert "H02_MIGRATION_EXECUTION_FAILED" in rendered
     assert "failure_timestamp=1712345678" in rendered
+    assert "synthetic root cause text" not in rendered
+    assert _SENSITIVE_RPC not in rendered
+
+
+def test_migration_failure_sanitizes_invalid_resume_timestamp(monkeypatch):
+    def fail(*args):
+        raise MigrationError("../../etc/passwd")
+
+    _prepare_migration_execution(monkeypatch, fail)
+    with pytest.raises(Exception) as captured:
+        _call_migrate(rpc=_SENSITIVE_RPC)
+    rendered = str(captured.value)
+    assert "failure_timestamp=<invalid>" in rendered
+    assert "../../etc/passwd" not in rendered
+    assert _SENSITIVE_RPC not in rendered
+
+
+def test_migration_setup_failure_is_truthfully_labeled(monkeypatch, capsys):
+    _prepare_migration_execution(monkeypatch, lambda *args: 123)
+
+    def fail_setup(*args):
+        raise RuntimeError(_SENSITIVE_RPC)
+
+    monkeypatch.setattr(
+        migrate.boa.deployments,
+        "set_deployments_db",
+        fail_setup,
+    )
+    with pytest.raises(Exception) as captured:
+        _call_migrate(rpc=_SENSITIVE_RPC)
+    rendered = capsys.readouterr().out + str(captured.value)
+    assert "H02_MIGRATION_SETUP_FAILED" in rendered
+    assert "env=" not in str(captured.value)
     assert _SENSITIVE_RPC not in rendered
 
 
@@ -576,7 +644,7 @@ def test_console_session_error_is_not_mislabeled_as_rpc_failure(monkeypatch):
 
     monkeypatch.setattr(console.boa, "fork", fake_fork)
 
-    import IPython
+    IPython = pytest.importorskip("IPython")
 
     def fail_session(*args, **kwargs):
         raise RuntimeError("synthetic session failure")
@@ -595,6 +663,85 @@ def test_console_session_error_is_not_mislabeled_as_rpc_failure(monkeypatch):
             False,
         )
     assert "H02_RPC_CONNECT_FAILED" not in str(error.value)
+
+
+@pytest.mark.parametrize(
+    ("module", "operation"),
+    (
+        (migrate, Operation.MIGRATION_FORK),
+        (console, Operation.CONSOLE_EXPLORATION),
+    ),
+)
+def test_fork_teardown_error_is_sanitized(
+    module, operation, monkeypatch
+):
+    profile = get_profile("base-mainnet")
+    redacted_rpc = RedactedRpc(
+        _SENSITIVE_RPC,
+        profile.identity.profile_id,
+        operation,
+        "--rpc",
+    )
+
+    class FailingFork:
+        def __enter__(self):
+            return SimpleNamespace()
+
+        def __exit__(self, *args):
+            raise RuntimeError(_SENSITIVE_RPC)
+
+    monkeypatch.setattr(
+        module.boa,
+        "fork",
+        lambda *args, **kwargs: FailingFork(),
+    )
+    with pytest.raises(Exception) as captured:
+        with module._fork_environment(
+            profile, operation, redacted_rpc
+        ):
+            pass
+    rendered = str(captured.value)
+    assert "H02_FORK_TEARDOWN_FAILED" in rendered
+    assert _SENSITIVE_RPC not in rendered
+
+
+@pytest.mark.parametrize(
+    ("module", "operation"),
+    (
+        (migrate, Operation.MIGRATION_FORK),
+        (console, Operation.CONSOLE_EXPLORATION),
+    ),
+)
+def test_fork_teardown_error_does_not_mask_body_error(
+    module, operation, monkeypatch
+):
+    profile = get_profile("base-mainnet")
+    redacted_rpc = RedactedRpc(
+        _SENSITIVE_RPC,
+        profile.identity.profile_id,
+        operation,
+        "--rpc",
+    )
+
+    class FailingFork:
+        def __enter__(self):
+            return SimpleNamespace()
+
+        def __exit__(self, *args):
+            raise RuntimeError(_SENSITIVE_RPC)
+
+    monkeypatch.setattr(
+        module.boa,
+        "fork",
+        lambda *args, **kwargs: FailingFork(),
+    )
+    with pytest.raises(
+        ValueError, match="synthetic body failure"
+    ):
+        with module._fork_environment(
+            profile, operation, redacted_rpc
+        ):
+            raise ValueError("synthetic body failure")
 
 
 @pytest.mark.parametrize(

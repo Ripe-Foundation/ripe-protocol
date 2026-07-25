@@ -1103,6 +1103,36 @@ def repository_paths(
     )
 
 
+def validate_manifest_assertions(
+    profile: NetworkProfile,
+    manifest_name: str,
+    *,
+    operation: Operation,
+    environment: str | None = None,
+) -> None:
+    operation_decision(profile, operation)
+    if (
+        environment is not None
+        and (
+            profile.repository.history_dir is None
+            or environment != profile.repository.history_dir.name
+        )
+    ):
+        raise NetworkProfileError(
+            "H02_HISTORY_ALIAS",
+            profile_id=profile.identity.profile_id,
+            operation=operation,
+        )
+    if not isinstance(manifest_name, str) or not re.fullmatch(
+        r"[A-Za-z0-9][A-Za-z0-9_-]{0,127}", manifest_name
+    ):
+        raise NetworkProfileError(
+            "H02_REPOSITORY_UNAVAILABLE",
+            profile_id=profile.identity.profile_id,
+            operation=operation,
+        )
+
+
 def static_manifest_path(
     profile: NetworkProfile,
     manifest_name: str,
@@ -1110,11 +1140,13 @@ def static_manifest_path(
     operation: Operation,
     environment: str | None = None,
 ) -> PurePosixPath:
-    if not isinstance(operation, Operation):
-        raise NetworkProfileError(
-            "H02_OPERATION_INVALID",
-            profile_id=profile.identity.profile_id,
-        )
+    require_operation(profile, operation)
+    validate_manifest_assertions(
+        profile,
+        manifest_name,
+        operation=operation,
+        environment=environment,
+    )
     repository = profile.repository
     if repository.history_state is PathState.PROPOSED:
         raise NetworkProfileError(
@@ -1125,23 +1157,6 @@ def static_manifest_path(
     if (
         repository.history_state is not PathState.EXISTING
         or repository.history_dir is None
-    ):
-        raise NetworkProfileError(
-            "H02_REPOSITORY_UNAVAILABLE",
-            profile_id=profile.identity.profile_id,
-            operation=operation,
-        )
-    if (
-        environment is not None
-        and environment != repository.history_dir.name
-    ):
-        raise NetworkProfileError(
-            "H02_HISTORY_ALIAS",
-            profile_id=profile.identity.profile_id,
-            operation=operation,
-        )
-    if not isinstance(manifest_name, str) or not re.fullmatch(
-        r"[A-Za-z0-9][A-Za-z0-9_-]{0,127}", manifest_name
     ):
         raise NetworkProfileError(
             "H02_REPOSITORY_UNAVAILABLE",
