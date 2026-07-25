@@ -1,20 +1,25 @@
 import json
 import os
+import re
 import time
-from scripts.utils import log
-from eth_account import Account
 import subprocess
-from eth_abi.abi import encode
-import dotenv
+from collections.abc import Mapping
 
-dotenv.load_dotenv()
+from eth_abi.abi import encode
+from eth_account import Account
+
+from config.network_profiles import (
+    get_profile,
+    NetworkProfileError,
+    Operation,
+    VerifiedNetworkIdentity,
+    validate_verified_identity,
+)
+from scripts.utils import log
 
 # Define constants for directories
 CONTRACTS_DIR = "./contracts"
 INTERFACES_DIR = "./interfaces"
-
-
-TEST_PRIVATE_KEY = '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80'
 
 
 def load_vyper_files(directories=[CONTRACTS_DIR, INTERFACES_DIR], excluded_dirs=("testing",)):
@@ -42,14 +47,82 @@ def load_vyper_files(directories=[CONTRACTS_DIR, INTERFACES_DIR], excluded_dirs=
     return vyper_files
 
 
-def get_account(accountName):
-    log.h1(f'Connecting to deployer account {accountName}')
+def get_account(
+    account_name: str,
+    identity: VerifiedNetworkIdentity,
+    operation: Operation,
+    *,
+    environ: Mapping[str, str] | None = None,
+    private_key: str | None = None,
+    local_test_only: bool = False,
+):
+    """Load an account only after an explicit, verified operation context."""
+    if not isinstance(identity, VerifiedNetworkIdentity):
+        raise NetworkProfileError(
+            "H02_CHAIN_ID_MISMATCH", operation=operation
+        )
+    profile = get_profile(identity.profile_id)
+    validate_verified_identity(
+        profile,
+        operation,
+        identity,
+        require_account=True,
+    )
+    if not re.fullmatch(r"[A-Z][A-Z0-9_]*", account_name):
+        raise NetworkProfileError(
+            "H02_ACCOUNT_BACKEND_UNAPPROVED",
+            profile_id=profile.identity.profile_id,
+            operation=operation,
+        )
 
-    accountKey = os.environ.get(f'{accountName}_PRIVATE_KEY')
-    account = Account.from_key(
-        accountKey if accountKey else TEST_PRIVATE_KEY)
-    log.h2(f'Deployer account {accountName} connected')
+    if local_test_only:
+        if (
+            identity.profile_id != "local"
+            or operation is not Operation.LOCAL_RUNTIME
+            or private_key is None
+        ):
+            raise NetworkProfileError(
+                "H02_ACCOUNT_BACKEND_UNAPPROVED",
+                profile_id=profile.identity.profile_id,
+                operation=operation,
+            )
+        account_key = private_key
+    else:
+        if private_key is not None or operation is not Operation.MIGRATION_FORK:
+            raise NetworkProfileError(
+                "H02_ACCOUNT_BACKEND_UNAPPROVED",
+                profile_id=profile.identity.profile_id,
+                operation=operation,
+            )
+        env_name = f"{account_name}_PRIVATE_KEY"
+        values = os.environ if environ is None else environ
+        try:
+            account_key = values[env_name]
+        except KeyError:
+            raise NetworkProfileError(
+                "H02_PRIVATE_KEY_MISSING",
+                profile_id=profile.identity.profile_id,
+                operation=operation,
+                env_name=env_name,
+            ) from None
+        if not account_key:
+            raise NetworkProfileError(
+                "H02_PRIVATE_KEY_MISSING",
+                profile_id=profile.identity.profile_id,
+                operation=operation,
+                env_name=env_name,
+            )
 
+    log.h1(f"Connecting to deployer account {account_name}")
+    try:
+        account = Account.from_key(account_key)
+    except Exception:
+        raise NetworkProfileError(
+            "H02_PRIVATE_KEY_INVALID",
+            profile_id=profile.identity.profile_id,
+            operation=operation,
+        ) from None
+    log.h2(f"Deployer account {account_name} connected")
     return account
 
 
@@ -80,7 +153,7 @@ def execute_transaction(transaction, *args, **kwargs):
                 + (" (Trying again in 3 seconds)")
 
             )
-            log.error(f"\tException: {str(exception)}\n")
+            log.error("\tH02_TRANSACTION_FAILED\n")
             if attempts == max_attempts:
                 log.error(f"\tMax attempts reached. Exiting.\n")
                 break

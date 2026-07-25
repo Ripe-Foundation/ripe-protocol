@@ -1,202 +1,261 @@
+import os
+from contextlib import ExitStack, contextmanager
+from pathlib import Path
+
+import boa
 import boa.deployments
 import click
-import boa
+from boa.rpc import EthereumRPC
 
+from config.network_profiles import (
+    NETWORK_PROFILE_IDS,
+    NetworkProfileError,
+    Operation,
+    get_profile,
+    repository_paths,
+    require_operation,
+    resolve_rpc_reference,
+    validate_fork_request,
+    verify_chain_identity,
+)
 from scripts.utils import log
-from scripts.utils.migration_helpers import get_account, load_vyper_files
-from scripts.utils.migration_runner import MigrationRunner
 from scripts.utils.deploy_args import DeployArgs
-from boa.environment import Env
-# from scripts.utils.safe_account import SafeAccount
-# from scripts.utils.ledger_account import LedgerAccount
-from scripts.utils.mock_account import MockAccount
-import os
+from scripts.utils.migration_helpers import get_account, load_vyper_files
+from scripts.utils.migration_runner import MigrationError, MigrationRunner
 
 
-MIGRATION_SCRIPTS_DIR = "./migrations"
-MIGRATION_HISTORY_DIR = "./migration_history"
-
+ROOT = Path(__file__).resolve().parents[1]
 
 CLICK_PROMPTS = {
     "safe": {
         "prompt": "What is the safe address?",
         "default": "",
-        "help": "Safe address to use for the migration. Defaults to ``.",
-    },
-    "rpc": {
-        "prompt": "What is the desired rpc?",
-        "default": "",
-        "help": "RPC url for the chain to deploy to. Defaults to ``.",
+        "help": "Safe accounts are not supported.",
     },
     "environment": {
-        "prompt": "Inform the environment name",
+        "prompt": "Manifest namespace",
         "default": "v1",
-        "help": f"Environment of manifests that are written and read by migration scripts to pass state from previous migrations. Defaults to `dev`.",
+        "help": (
+            "Compatibility assertion for the profile-owned history namespace."
+        ),
     },
     "start_timestamp": {
         "prompt": "Start timestamp",
         "default": "0",
-        "help": "Timestamp at which to start running migrations. If none is provided, the timestamp of the first manifest is used.",
+        "help": (
+            "Timestamp at which to start running migrations. Existing resume "
+            "semantics are unchanged."
+        ),
     },
     "single": {
         "prompt": "Is single migration?",
         "default": False,
-        "help": "Runs only the specified migration. If false, runs all the migrations starting from the specified timestamp."
+        "help": (
+            "Runs only the specified migration. If false, runs all migrations "
+            "starting from the specified timestamp."
+        ),
     },
     "end_timestamp": {
         "prompt": "End timestamp",
         "default": "0",
-        "help": "Last timestamp migration that will run. If none is provided, the timestamp of the most recent manifest is used.",
-        "depends": {
-            "single": False
-        }
-    },
-    "blueprint": {
-        "prompt": "Blueprint",
-        "default": "base",
-        "help": "Blueprint to use for the migration. Defaults to ``.",
-    },
-    "chain": {
-        "prompt": "Chain name",
-        "default": "base-mainnet",
-        "help": "Chain name for custom configuration on the deployment (ex: eth-mainnet, eth-sepolia, base-mainnet, base-sepolia).  Defaults to `local`",
-        "type": click.Choice(["local", "base-mainnet", "base-sepolia", "eth-sepolia", "eth-mainnet", "base-mainnet", "base-sepolia"], case_sensitive=False),
-
+        "help": "Last migration timestamp to run.",
+        "depends": {"single": False},
     },
     "account": {
         "prompt": "Deployer account name",
         "default": "DEPLOYER",
-        "help": "Account name for deployment. Defaults to `DEPLOYER`"
+        "help": (
+            "Environment key prefix for a fork-only account. Use a "
+            "purpose-limited disposable key, never a live deployer key."
+        ),
     },
     "is_retry": {
         "prompt": "Ignore current logs (always run transactions)?",
-        "help": "Ignore previous log files",
+        "help": "Ignore previous log files.",
         "default": False,
     },
-    "manifest": {
-        "prompt": "Manifest",
-        "default": "current",
-        "help": "Manifest to use for the migration. Defaults to `current`.",
-    },
-}
-
-
-ETHERSCAN_API_KEYS = {
-    "base-mainnet": os.environ["BASESCAN_API_KEY"],
-    "base-sepolia": os.environ["BASESCAN_API_KEY"],
-}
-ETHERSCAN_URLS = {
-    "eth-mainnet": "https://api.etherscan.io/api",
-    "eth-goerli": "https://api-goerli.etherscan.io/api",
-    "eth-sepolia": "https://api-sepolia.etherscan.io/api",
-    "base-mainnet": "https://api.basescan.org/api",
-    "base-goerli": "https://api-goerli.basescan.org/api",
-    "base-sepolia": "https://api-sepolia.basescan.org/api",
 }
 
 
 def param_prompt(ctx, param, value):
-    param_config = CLICK_PROMPTS[param.name]
-    is_configured_param = not (param_config is None)
-
-    if not is_configured_param:
+    param_config = CLICK_PROMPTS.get(param.name)
+    if param_config is None:
         return value
 
-    default_val = None if "default" not in param_config.keys(
-    ) else param_config["default"]
-    prompt = None if "prompt" not in param_config.keys(
-    ) else param_config["prompt"]
-    optional = not default_val is None if "optional" not in param_config.keys(
-    ) else param_config["optional"]
-
+    default_val = param_config.get("default")
+    prompt = param_config.get("prompt")
+    optional = param_config.get("optional", default_val is not None)
     if value != default_val:
         return value
-
     if prompt is None or (not ctx.params.get("ask") and optional):
         return value
 
     should_prompt = True
-
-    depends = None if "depends" not in param_config.keys(
-    ) else param_config["depends"]
-
-    if not (depends is None):
-        should_prompt = False
-        for key in param_config["depends"].keys():
-            dependency_val = ctx.params.get(key)
-            if dependency_val == param_config["depends"][key]:
-                should_prompt = True
-                break
-
+    depends = param_config.get("depends")
+    if depends is not None:
+        should_prompt = any(
+            ctx.params.get(key) == expected
+            for key, expected in depends.items()
+        )
     if not should_prompt:
         return value
 
-    type = None if "type" not in param_config.keys() else param_config["type"]
-
-    value = click.prompt(
+    return click.prompt(
         f"{prompt} --{param.name.replace('_', '-')}",
         default=default_val,
         hide_input=param.name == "password",
-        type=type,
+        type=param_config.get("type"),
     )
 
-    return value
+
+def read_chain_id(rpc_url: str) -> int | str:
+    return EthereumRPC(rpc_url).fetch("eth_chainId", [])
+
+
+@contextmanager
+def _fork_environment(profile, operation, redacted_rpc, **kwargs):
+    fork_stack = ExitStack()
+    body_error = None
+    try:
+        try:
+            env = fork_stack.enter_context(
+                boa.fork(redacted_rpc.value, **kwargs)
+            )
+        except Exception:
+            raise click.ClickException(
+                "H02_RPC_CONNECT_FAILED "
+                f"profile={profile.identity.profile_id} "
+                f"operation={operation.value} env={redacted_rpc.reference}"
+            ) from None
+        yield env
+    except BaseException as error:
+        body_error = error
+        raise
+    finally:
+        try:
+            fork_stack.close()
+        except Exception:
+            if body_error is None:
+                raise click.ClickException(
+                    "H02_FORK_TEARDOWN_FAILED "
+                    f"profile={profile.identity.profile_id} "
+                    f"operation={operation.value} "
+                    f"env={redacted_rpc.reference}"
+                ) from None
+
+
+def _require_static_assertions(profile, environment, blueprint) -> str:
+    repository = profile.repository
+    if repository.history_dir is None:
+        raise NetworkProfileError(
+            "H02_REPOSITORY_UNAVAILABLE",
+            profile_id=profile.identity.profile_id,
+            operation=Operation.MIGRATION_FORK,
+        )
+    expected_environment = repository.history_dir.name
+    if environment != expected_environment:
+        raise NetworkProfileError(
+            "H02_HISTORY_ALIAS",
+            profile_id=profile.identity.profile_id,
+            operation=Operation.MIGRATION_FORK,
+        )
+    expected_blueprint = repository.blueprint_id
+    if expected_blueprint is None:
+        raise NetworkProfileError(
+            "H02_REPOSITORY_UNAVAILABLE",
+            profile_id=profile.identity.profile_id,
+            operation=Operation.MIGRATION_FORK,
+        )
+    if blueprint is not None and blueprint != expected_blueprint:
+        raise NetworkProfileError(
+            "H02_PROFILE_INVALID",
+            profile_id=profile.identity.profile_id,
+            operation=Operation.MIGRATION_FORK,
+        )
+    return expected_blueprint
 
 
 @click.command()
-@click.option("--ask", is_flag=True, default=False, help="Shoild ask for missing parameters (Not use default values).")
+@click.option(
+    "--ask",
+    is_flag=True,
+    default=False,
+    help="Prompt for eligible optional parameters after profile selection.",
+)
 @click.option(
     "--safe",
     default=CLICK_PROMPTS["safe"]["default"],
     help=CLICK_PROMPTS["safe"]["help"],
     callback=param_prompt,
 )
-@click.option("--fork", is_flag=True, default=False, help="Declare that the migration is running on a fork.")
+@click.option(
+    "--fork",
+    is_flag=True,
+    default=False,
+    help="Run the existing migration runner in exploration-only fork mode.",
+)
 @click.option(
     "--rpc",
-    default=CLICK_PROMPTS["rpc"]["default"],
-    help=CLICK_PROMPTS["rpc"]["help"],
-    callback=param_prompt,
+    default=None,
+    help=(
+        "Sensitive full RPC URL override. If omitted, the selected profile's "
+        "named RPC_URL environment variable is used. The value is never logged."
+    ),
 )
 @click.option(
     "--environment",
     default=CLICK_PROMPTS["environment"]["default"],
+    show_default=True,
     help=CLICK_PROMPTS["environment"]["help"],
     callback=param_prompt,
 )
 @click.option(
-    "--start-timestamp", "-t",
+    "--start-timestamp",
+    "-t",
     default=CLICK_PROMPTS["start_timestamp"]["default"],
     help=CLICK_PROMPTS["start_timestamp"]["help"],
     callback=param_prompt,
 )
 @click.option(
-    "--single", "-s",
+    "--single",
+    "-s",
     is_flag=True,
     default=CLICK_PROMPTS["single"]["default"],
     help=CLICK_PROMPTS["single"]["help"],
     callback=param_prompt,
 )
 @click.option(
-    "--end-timestamp", "-e",
+    "--end-timestamp",
+    "-e",
     default=CLICK_PROMPTS["end_timestamp"]["default"],
     help=CLICK_PROMPTS["end_timestamp"]["help"],
     callback=param_prompt,
 )
 @click.option(
-    "--chain", "-f",
-    default=CLICK_PROMPTS["chain"]["default"],
-    help=CLICK_PROMPTS["chain"]["help"],
-    callback=param_prompt,
+    "--profile",
+    "--chain",
+    "profile_id",
+    required=True,
+    type=click.Choice(NETWORK_PROFILE_IDS, case_sensitive=False),
+    help=(
+        "Required canonical network profile. `--chain` is a deprecated "
+        "equivalent spelling; it does not define a separate identity. "
+        "`local` is recognized but unsupported by this command; it is "
+        "reserved for a future embedded-runtime path."
+    ),
 )
 @click.option(
-    "--blueprint", "-b",
-    default=CLICK_PROMPTS["blueprint"]["default"],
-    help=CLICK_PROMPTS["blueprint"]["help"],
-    callback=param_prompt,
+    "--blueprint",
+    "-b",
+    default=None,
+    help=(
+        "Optional compatibility assertion; when supplied it must equal the "
+        "selected profile's blueprint."
+    ),
 )
 @click.option(
-    "--account", "-a",
+    "--account",
+    "-a",
     default=CLICK_PROMPTS["account"]["default"],
     help=CLICK_PROMPTS["account"]["help"],
     callback=param_prompt,
@@ -204,7 +263,7 @@ def param_prompt(ctx, param, value):
 @click.option(
     "--ledger",
     default=-1,
-    help="Ledger account index to use (default: -1 = Not using Ledger)",
+    help="Ledger accounts are not supported.",
     type=int,
 )
 @click.option(
@@ -224,101 +283,125 @@ def cli(
     environment,
     start_timestamp,
     end_timestamp,
-    chain,
+    profile_id,
     blueprint,
     account,
     ledger,
 ):
-    """
-    Deploys the protocol by running migration scripts.
+    """Run migrations through a validated, explicit network profile."""
+    del ask
+    try:
+        profile = get_profile(profile_id)
+        operation = (
+            Operation.MIGRATION_FORK if fork else Operation.MIGRATION_LIVE
+        )
+        require_operation(profile, operation)
 
-    Migrations scripts are located in the `./migrations` directory.
-    Migration script filenames are prefixed with a numeric timestamp
-    that is used to set the order in which the scripts are run, and
-    to determine which scripts to continue from in future migrations.
+        if safe or ledger != -1:
+            raise NetworkProfileError(
+                "H02_ACCOUNT_BACKEND_UNAPPROVED",
+                profile_id=profile.identity.profile_id,
+                operation=operation,
+            )
+        selected_blueprint = _require_static_assertions(
+            profile, environment, blueprint
+        )
+        validate_fork_request(
+            profile,
+            operation,
+            evidence_mode=False,
+            block_number=None,
+            allow_dirty=True,
+        )
+        redacted_rpc = resolve_rpc_reference(
+            profile, operation, os.environ, rpc
+        )
+        identity = verify_chain_identity(
+            profile, operation, redacted_rpc, read_chain_id
+        )
+        sender = get_account(account, identity, operation)
+        paths = repository_paths(
+            profile, operation, root=ROOT, identity=identity
+        )
+    except NetworkProfileError as error:
+        raise click.ClickException(str(error)) from None
 
-    Each migration script returns an object that is stored in a JSON
-    manifest file in the directory specified by `--environment`. The
-    manifest filename includes the timestamp of the migration that
-    created it. Future migrations resume from the first migration
-    script with a timestamp greater than that of the most recent
-    manifest file.
-
-    The contents of the most recent manifest file are parsed into an
-    object and passed to the `migrate` function of the next migration
-    script. This enables each migration script to access data from
-    previous migrations, such as the addresses of deployed contracts.
-
-    Different history directories should be used to record the
-    manifests for different networks/environments,
-    under a subfolder named with the network ID, e.g.,
-    `migration_history/network-219183`.
-    """
-
-    final_rpc = rpc if rpc else (
-        'boa' if chain == 'local' else f"https://{chain}.g.alchemy.com/v2/{os.environ.get('WEB3_ALCHEMY_API_KEY')}")
-
-    if safe != "":
-        if fork:
-            sender = MockAccount(safe)
-        # else:
-        #     sender = SafeAccount(
-        #         safe_address=safe,
-        #         rpc_url=final_rpc
-        #     )
-    elif ledger != -1:
-        # sender = LedgerAccount(final_rpc, ledger)
-        if fork:
-            sender = MockAccount(sender.address)
-    else:
-        sender = get_account(account)
-
-    deploy_args = DeployArgs(sender, chain, ignore_logs=not is_retry, blueprint=blueprint, rpc=final_rpc)
+    deploy_args = DeployArgs(
+        sender,
+        profile.identity.profile_id,
+        ignore_logs=not is_retry,
+        blueprint=selected_blueprint,
+        rpc=redacted_rpc.value,
+    )
 
     log.h1("Contract Migration")
-    log.info(f"Connected to rpc `{final_rpc}`.")
-    log.info(f"Deployer account `{sender.address}`.")
-    log.info(f"Manifests are stored in `{environment}`.")
-    log.info(f"Deployment arguments: {deploy_args}")
+    log.info(
+        "RPC configured: "
+        f"profile={profile.identity.profile_id} "
+        f"reference={redacted_rpc.reference} value=<redacted>."
+    )
+    log.info(f"Deployer account name `{account}`.")
+    log.info(f"History namespace `{paths.history_dir.relative_to(ROOT)}`.")
     log.info(f"Running migrations starting with timestamp {start_timestamp}.")
-    log.info(f"Chain: {chain}.")
-    log.info(f"Fork: {fork}.")
+    log.info(f"Profile: {profile.identity.profile_id}.")
+    log.info(
+        "Fork: exploration-only; this run may write manifests under "
+        f"`{paths.history_dir.relative_to(ROOT)}`. Do not commit or treat "
+        "those outputs as release evidence."
+    )
     log.info("")
+
     vyper_files = load_vyper_files()
     log.info(f"Loaded {len(vyper_files)} Vyper files.")
     log.h2("Running migrations...")
-
     migrations = MigrationRunner(
-        f"{MIGRATION_SCRIPTS_DIR}/{chain}",
-        f"{MIGRATION_HISTORY_DIR}/{chain}/{environment}",
-        vyper_files
+        str(paths.migration_dir),
+        str(paths.history_dir),
+        vyper_files,
     )
 
-    boa.deployments.set_deployments_db(boa.deployments.DeploymentsDB(":memory:"))
-    boa.set_etherscan(api_key=ETHERSCAN_API_KEYS[chain], uri=ETHERSCAN_URLS[chain])
+    try:
+        boa.deployments.set_deployments_db(
+            boa.deployments.DeploymentsDB(":memory:")
+        )
+    except Exception:
+        raise click.ClickException(
+            "H02_MIGRATION_SETUP_FAILED "
+            f"profile={profile.identity.profile_id} "
+            f"operation={operation.value}"
+        ) from None
 
-    if final_rpc == 'boa':
-        with boa.set_env(Env()) as env:
+    with _fork_environment(
+        profile, operation, redacted_rpc, allow_dirty=True
+    ) as env:
+        try:
+            env.set_balance(sender.address, 10 * 10**18)
+            log.h2("Fork-only deployer wallet funded with 10 ETH")
+        except Exception:
+            log.h2("Cannot fund fork-only deployer wallet")
+
+        try:
             total_gas = migrations.run(
-                deploy_args, start_timestamp, end_timestamp, not single)
+                deploy_args, start_timestamp, end_timestamp, not single
+            )
+        except MigrationError as error:
+            failure_timestamp = str(error.failure_timestamp)
+            if not failure_timestamp.isdigit():
+                failure_timestamp = "<invalid>"
+            raise click.ClickException(
+                "H02_MIGRATION_EXECUTION_FAILED "
+                f"profile={profile.identity.profile_id} "
+                f"operation={operation.value} "
+                f"failure_timestamp={failure_timestamp}"
+            ) from None
+        except Exception:
+            raise click.ClickException(
+                "H02_MIGRATION_EXECUTION_FAILED "
+                f"profile={profile.identity.profile_id} "
+                f"operation={operation.value}"
+            ) from None
 
-    elif fork:
-        with boa.fork(final_rpc, allow_dirty=True) as env:
-            try:
-                env.set_balance(sender.address, 10*10**18)
-                log.h2('Deployer wallet funded with 10 ETH')
-            except:
-                log.h2('Cannot fund deployer wallet')
-            total_gas = migrations.run(
-                deploy_args, start_timestamp, end_timestamp, not single)
-    else:
-        with boa.set_network_env(final_rpc) as env:
-            env.add_account(sender)
-            total_gas = migrations.run(
-                deploy_args, start_timestamp, end_timestamp, not single)
-
-    log.info(f'Total gas used: {total_gas}')
-
+    log.info(f"Total gas used: {total_gas}")
     log.info("Done.")
     log.info("")
 
