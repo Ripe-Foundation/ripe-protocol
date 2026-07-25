@@ -67,22 +67,37 @@ at frozen evidence commit `6652a10`, recreation baseline `02787d3`, current
 branch HEAD, and working tree. The production Ledger is byte-for-byte
 untouched.
 
-The byte-identical restored probe-package SHA-256 identities, before the
-current documentation-only provenance reconciliation, were:
+The exact five-file bytes independently reviewed before hardening were
+committed locally, without push, at audit point
+`2f6a49b6c82e69bda54f2fd64d2fe03132e0db21`. Their SHA-256 identities were:
 
 - decision record:
-  `c425bd57201d268e39b2f3fac7e0c0999f1fa2b7bfab74605f4ed96329505095`;
+  `0b4f8c7b1c6d424b17dffd5c2650cc7c60a48929b2bc5c51ef2d4d94edf946ba`;
 - probe source:
   `95716e4e2b383f2a07826be94d9ee402d263eec522bb4f77efd72a5e5f6eafe5`;
 - runner:
   `8406107af89f8bee464a544ae462c27aa61004e268b768c5e7527b1885c1052a`;
+- focused tests:
+  `ac4665731777a9d7e85e2a36f0383598047198c9d5f3de178594a40da8cb2a12`;
+  and
+- evidence record:
+  `6c4d501d30d6b70753e0e92a9104cd1edab27d623602c6bcb38817fa4091846a`.
+
+The subsequent uncommitted post-review hardening delta changed the runner,
+focused tests, decision record, and this evidence record. It did not change the
+test-only Vyper probe. The resulting current SHA-256 identities, excluding this
+self-referential evidence-file hash, are:
+
+- decision record:
+  `d11f70afd00d94a2242b294303302c1deefee134e316b5ed27cf71787613ea20`;
+- probe source:
+  `95716e4e2b383f2a07826be94d9ee402d263eec522bb4f77efd72a5e5f6eafe5`;
+- runner:
+  `135a864356fdfa076acda0009a5e97907afd471215ba5bdfc3dfe1056b4b498b`;
   and
 - focused tests:
-  `ac4665731777a9d7e85e2a36f0383598047198c9d5f3de178594a40da8cb2a12`.
+  `24c5bad958cba5425ec52e060995332302409b1fac01a1967c84b7261a2631b6`.
 
-The probe source, runner, and focused tests remain byte-identical to those
-reviewed values. The recreated decision record SHA-256 is
-`0b4f8c7b1c6d424b17dffd5c2650cc7c60a48929b2bc5c51ef2d4d94edf946ba`.
 The final evidence-file hash is reported out of band in the handoff; this file
 does not embed its own hash because doing so would be self-referential.
 
@@ -138,6 +153,8 @@ Focused local tests establish:
 
 - dry-run records `rpc_endpoint_read=false` and
   `signing_secret_read=false`;
+- every RPC POST refuses HTTP redirects rather than silently changing the
+  owner-approved endpoint;
 - successful read-only preflight records `rpc_endpoint_read=true` and
   `signing_secret_read=false`;
 - execution loads the signing secret only after preflight succeeds, then
@@ -148,6 +165,9 @@ Focused local tests establish:
   derived expected raw return `61 + 55 = 116`;
 - raw `61`, another incompatible value, a malformed response, and a reverting
   version call each fail closed before nonce/address or signing checks;
+- pending nonce disagreement, code already present at the predicted deployment
+  address, and signer balance below the approved total-fee cap each fail closed
+  during preflight;
 - `web3_clientVersion` is recorded only as observed evidence, with an explicit
   statement that it does not prove the pinned Nitro build;
 - before every `eth_sendRawTransaction`, the exact signed transaction's locally
@@ -157,7 +177,9 @@ Focused local tests establish:
 - an ambiguous RPC failure after possible acceptance leaves the deterministic
   transaction identity journaled; and
 - if the second observation in a two-transaction burst fails during broadcast,
-  both the first and second signed transaction identities remain journaled.
+  both the first and second signed transaction identities remain journaled; and
+- an observation-burst fee-cap stop persists the final stop result, next-burst
+  worst-case fee, and projected total fee before raising.
 
 No raw signed transaction or signing secret is written to the progress record.
 
@@ -179,7 +201,8 @@ cbor2 5.9.0
 python -m pip check: no broken requirements
 ```
 
-No package was installed or refreshed. The exact result set was:
+No package was installed or refreshed. The audit-point result set, binding to
+local commit `2f6a49b6c82e69bda54f2fd64d2fe03132e0db21`, was:
 
 | Command/suite | Result |
 | --- | --- |
@@ -200,6 +223,28 @@ No package was installed or refreshed. The exact result set was:
 | `python -m pytest -q tests/inventory/test_block_clock_inventory.py` | 60 passed in 26.74 s; 27.96 s wall |
 | `python -m pytest --collect-only -q` | 2,768 selected / 2,910 total; 142 deselected in 5.07 s; 6.51 s wall |
 | complete serial `python -m pytest -q -p no:cacheprovider` | 2,768 passed, 142 deselected, 3 cache-redirection assert-rewrite warnings in 313.58 s; 373.49 s wall |
+
+The separate uncommitted post-review hardening delta produced:
+
+| Command/suite | Result |
+| --- | --- |
+| `python -m py_compile scripts/probes/action_block_identity_probe.py tests/probes/test_action_block_identity_probe.py` | exit `0` |
+| `python scripts/probes/action_block_identity_probe.py --dry-run` | exit `0`; no RPC/secret read; all source and artifact hashes unchanged |
+| `python -m pytest -q tests/deployment/test_dependency_gate.py` | 16 passed in 1.49 s; 2.37 s wall |
+| `python -m pytest -q tests/probes/test_action_block_identity_probe.py` | 35 passed in 26.90 s; 63.98 s wall |
+| `python -m pytest -q tests/probes` | 75 passed in 31.24 s; 73.04 s wall |
+| `python -m pytest -q tests/clock/test_clock_profiles.py` | 57 passed in 27.18 s; 64.62 s wall |
+| `python scripts/check_block_clock_inventory.py --check` | expected exit `1`; the same seven `INV-CADENCE-NEW` findings and one `INV-PATH-NEW` finding, all caused by the authorized test-only probe package |
+| `python -m pytest -q tests/inventory/test_block_clock_inventory.py` | 60 passed in 26.08 s; 26.97 s wall |
+| eight required targeted regression files | 397 passed, 3 cache-redirection assert-rewrite warnings in 52.59 s; 91.64 s wall |
+| `python -m pytest --collect-only -q` | 2,773 selected / 2,915 total; 142 deselected, 3 cache-redirection assert-rewrite warnings in 1.23 s; 2.36 s wall |
+| complete serial `python -m pytest -q -p no:cacheprovider` | 2,773 passed, 142 deselected, 3 cache-redirection assert-rewrite warnings in 297.06 s; 352.63 s wall |
+
+The probe contract and all five compiled artifact identities in section 3 are
+unchanged. Merging the probe package while the eight S2 findings remain would
+break the clean-S2 invariant consumed by other workstreams. A future merge
+therefore requires an owner-approved probe-inventory or removal disposition;
+this record does not authorize Stage C or an inventory edit.
 
 The dry-run reproduced exactly:
 
@@ -224,6 +269,12 @@ identifier. This is an expected consequence of leaving the S2 inventory
 untouched under the Stage A/Stage C boundary, not a production inclusion. It
 remains a blocker for later inventory reconciliation; it was not bypassed or
 hidden.
+
+The five-file probe package therefore must not merge into `rh` while these
+findings remain. Doing so would break the clean-S2 invariant used by other
+workstream gates. Before any future integration, the owner must approve a
+reviewed disposition for the probe files and their inventory treatment; this
+record does not authorize that Stage C-adjacent decision or any inventory edit.
 
 The inherited `ripe-lite` interpreter was tested diagnostically and is not
 authoritative: its H-01 gate reported 15 passed and one failed because installed

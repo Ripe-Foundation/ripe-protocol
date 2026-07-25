@@ -127,6 +127,54 @@ def _approval_data():
     }
 
 
+def _successful_preflight_rpc(
+    approved,
+    *,
+    pending_nonce=None,
+    predicted_address_code="0x",
+    signer_balance=None,
+):
+    nonce = approved.expected_nonce if pending_nonce is None else pending_nonce
+    balance = (
+        approved.max_total_fee_wei
+        if signer_balance is None
+        else signer_balance
+    )
+
+    def fake_rpc(_rpc_url, method, params):
+        assert _rpc_url == RPC_URL
+        if method == "eth_chainId":
+            return hex(46630)
+        if method == "web3_clientVersion":
+            return "unit-test-client"
+        if method == "eth_getBlockByNumber":
+            return {
+                "number": hex(123),
+                "hash": "0x" + "12" * 32,
+                "timestamp": hex(1_700_000_000),
+                "baseFeePerGas": hex(1),
+            }
+        if method == "eth_call":
+            assert params[0]["to"] == ARB_SYS
+            assert params[0]["value"] == "0x0"
+            if params[0]["data"] == runner.ARB_BLOCK_SELECTOR:
+                return "0x" + (123).to_bytes(32, "big").hex()
+            assert params[0]["data"] == runner.ARB_OS_VERSION_SELECTOR
+            return "0x" + (116).to_bytes(32, "big").hex()
+        if method == "eth_getTransactionCount":
+            return hex(nonce)
+        if method == "eth_getCode":
+            return predicted_address_code
+        if method == "eth_getBalance":
+            return hex(balance)
+        if method == "eth_estimateGas":
+            assert params[0]["value"] == "0x0"
+            return hex(approved.deployment_gas_limit - 1)
+        raise AssertionError(method)
+
+    return fake_rpc
+
+
 def _observation(
     observation_id,
     transaction_hash,
@@ -454,41 +502,27 @@ def test_rpc_returned_hash_mismatch_is_persisted_and_rejected(
     assert persisted["result"] == "stopped-rpc-transaction-hash-mismatch"
 
 
+def test_rpc_disables_http_redirects(monkeypatch):
+    class FakeResponse:
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {"jsonrpc": "2.0", "id": 1, "result": "0x1"}
+
+    def fake_post(url, **kwargs):
+        assert url == RPC_URL
+        assert kwargs["allow_redirects"] is False
+        assert kwargs["timeout"] == 30
+        return FakeResponse()
+
+    monkeypatch.setattr(runner.requests, "post", fake_post)
+    assert runner._rpc(RPC_URL, "eth_chainId", []) == "0x1"
+
+
 def test_preflight_matches_endpoint_chain_artifacts_nonce_address_and_fee(monkeypatch):
     approved = parse_approval(_approval_data())
-
-    def fake_rpc(_rpc_url, method, params):
-        assert _rpc_url == RPC_URL
-        if method == "eth_chainId":
-            return hex(46630)
-        if method == "web3_clientVersion":
-            return "unit-test-client"
-        if method == "eth_getBlockByNumber":
-            return {
-                "number": hex(123),
-                "hash": "0x" + "12" * 32,
-                "timestamp": hex(1_700_000_000),
-                "baseFeePerGas": hex(1),
-            }
-        if method == "eth_call":
-            assert params[0]["to"] == ARB_SYS
-            assert params[0]["value"] == "0x0"
-            if params[0]["data"] == runner.ARB_BLOCK_SELECTOR:
-                return "0x" + (123).to_bytes(32, "big").hex()
-            assert params[0]["data"] == runner.ARB_OS_VERSION_SELECTOR
-            return "0x" + (116).to_bytes(32, "big").hex()
-        if method == "eth_getTransactionCount":
-            return hex(approved.expected_nonce)
-        if method == "eth_getCode":
-            return "0x"
-        if method == "eth_getBalance":
-            return hex(approved.max_total_fee_wei)
-        if method == "eth_estimateGas":
-            assert params[0]["value"] == "0x0"
-            return hex(approved.deployment_gas_limit - 1)
-        raise AssertionError(method)
-
-    monkeypatch.setattr(runner, "_rpc", fake_rpc)
+    monkeypatch.setattr(runner, "_rpc", _successful_preflight_rpc(approved))
     report = preflight(approved, RPC_URL)
 
     assert report["chain_id"] == 46630
@@ -527,6 +561,39 @@ def test_preflight_matches_endpoint_chain_artifacts_nonce_address_and_fee(monkey
     assert report["source_pins"]["nitro_commit"] == runner.NITRO_COMMIT
     assert report["ready_for_live_testnet_execution"] is True
     assert RPC_URL not in json.dumps(report)
+
+
+@pytest.mark.parametrize(
+    ("rpc_overrides", "error_match"),
+    [
+        (
+            {"pending_nonce": 1},
+            "pending signer nonce mismatch",
+        ),
+        (
+            {"predicted_address_code": "0x6000"},
+            "already contains code",
+        ),
+        (
+            {"signer_balance": 1},
+            "balance is below the total fee cap",
+        ),
+    ],
+)
+def test_preflight_rejects_nonce_code_and_balance_mismatches(
+    monkeypatch,
+    rpc_overrides,
+    error_match,
+):
+    approved = parse_approval(_approval_data())
+    monkeypatch.setattr(
+        runner,
+        "_rpc",
+        _successful_preflight_rpc(approved, **rpc_overrides),
+    )
+
+    with pytest.raises(ApprovalError, match=error_match):
+        preflight(approved, RPC_URL)
 
 
 def test_preflight_rejects_wrong_endpoint_before_rpc(monkeypatch):
@@ -680,6 +747,34 @@ def test_execution_reports_endpoint_and_signing_secret_reads_separately(
             progress_output=output,
             signing_secret_loader=load_signing_secret,
         )
+
+
+def test_fee_cap_stop_persists_final_result_and_projection(tmp_path):
+    output = tmp_path / "progress.json"
+    report = {
+        "result": "deployment-confirmed",
+        "fees": {"actual_total_fee_paid_wei": 40},
+    }
+
+    with pytest.raises(
+        ApprovalError,
+        match="next observation burst would exceed total fee cap",
+    ):
+        runner._enforce_observation_burst_fee_cap(
+            report,
+            output,
+            actual_fee=40,
+            batch_worst_case=20,
+            max_total_fee=50,
+        )
+
+    persisted = json.loads(output.read_text())
+    assert (
+        persisted["result"]
+        == "stopped-before-observation-burst-total-fee-cap"
+    )
+    assert persisted["fees"]["next_observation_burst_worst_case_wei"] == 20
+    assert persisted["fees"]["projected_total_fee_wei"] == 60
 
 
 def test_topology_analysis_proves_all_required_relationships():

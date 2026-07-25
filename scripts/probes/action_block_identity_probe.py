@@ -419,6 +419,7 @@ def _rpc(rpc_url: str, method: str, params: list[Any]) -> Any:
             rpc_url,
             json={"jsonrpc": "2.0", "id": 1, "method": method, "params": params},
             timeout=30,
+            allow_redirects=False,
         )
         response.raise_for_status()
         payload = response.json()
@@ -943,6 +944,29 @@ def _persist_progress(report: dict[str, Any], output: Path | None) -> None:
         output.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n")
 
 
+def _enforce_observation_burst_fee_cap(
+    report: dict[str, Any],
+    output: Path | None,
+    *,
+    actual_fee: int,
+    batch_worst_case: int,
+    max_total_fee: int,
+) -> None:
+    projected_total_fee = actual_fee + batch_worst_case
+    if projected_total_fee <= max_total_fee:
+        return
+
+    report["result"] = "stopped-before-observation-burst-total-fee-cap"
+    report.setdefault("fees", {}).update(
+        {
+            "next_observation_burst_worst_case_wei": batch_worst_case,
+            "projected_total_fee_wei": projected_total_fee,
+        }
+    )
+    _persist_progress(report, output)
+    raise ApprovalError("next observation burst would exceed total fee cap")
+
+
 def _journal_and_broadcast(
     report: dict[str, Any],
     output: Path | None,
@@ -1133,8 +1157,13 @@ def execute_live_testnet(
             * approved.observation_gas_limit
             * approved.max_fee_per_gas_wei
         )
-        if actual_fee + batch_worst_case > approved.max_total_fee_wei:
-            raise ApprovalError("next observation burst would exceed total fee cap")
+        _enforce_observation_burst_fee_cap(
+            report,
+            progress_output,
+            actual_fee=actual_fee,
+            batch_worst_case=batch_worst_case,
+            max_total_fee=approved.max_total_fee_wei,
+        )
 
         pending: list[tuple[int, str]] = []
         for offset in range(batch_size):

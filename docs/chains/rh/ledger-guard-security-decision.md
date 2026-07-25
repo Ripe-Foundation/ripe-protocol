@@ -31,8 +31,21 @@ branch remains unchanged at commit
 `4966969265c6056bc7f3f139dc1a2437ef553c9f`.
 
 The current owner instruction authorized a fresh recreation from exact
-integrated `rh` commit
-`02787d351a3064e35d627e8fbc44150770e61c73`, tree
+integrated `rh` commit. The controlling language was:
+
+> The approved S5 owner/checkpoint documentation is integrated on `rh` at
+> `02787d351a3064e35d627e8fbc44150770e61c73`.
+>
+> Preserve the old `6652a10` branch as frozen historical evidence. Following
+> the brief’s default rule, create a fresh S5 recreation branch/worktree from
+> exact `02787d3`; do not rewrite or silently rebase the frozen evidence
+> branch.
+>
+> Recreate exactly the five Stage A evidence/probe files from the reviewed
+> frozen package, then:
+
+Exact baseline
+`02787d351a3064e35d627e8fbc44150770e61c73` has tree
 `38996e251cd3298e8f5ff5d0a5a23ee047863f69`. Before recreation, local `rh` and
 the local `origin/rh` tracking ref both resolved to that commit. No live remote
 query was made, because this pass prohibits RPC/external access. The
@@ -410,7 +423,7 @@ non-fatal pyenv rehash warning because its shared shim directory was read-only.
 No authoritative run reported a skip or xfail; the 142 full-suite deselections
 are the repository's normal local-profile selection.
 
-### 1.5.1 Current `02787d3` recreation validation
+### 1.5.1 `02787d3` recreation audit-point validation
 
 The authoritative recreation used retained approved H-01 Candidate A
 interpreter
@@ -419,7 +432,12 @@ Vyper `0.4.3` / compiler `0.4.3+commit.bff19ea2`, Titanoboa `0.2.7`, pytest
 `8.4.2`, and locked `cbor2 5.9.0`. `python -m pip check` reported no broken
 requirements. No dependency was installed, refreshed, or modified.
 
-| Validation | Authoritative recreation result |
+The exact independently reviewed five-file bytes were committed locally,
+without push, at audit point
+`2f6a49b6c82e69bda54f2fd64d2fe03132e0db21`. The table below records the
+validation of that audit point.
+
+| Validation | Audit-point recreation result |
 | --- | --- |
 | Python compilation | runner and focused test compiled; exit `0` |
 | local dry-run | exit `0`; no RPC/secret read; artifact hashes exactly reproduce section 2.1 |
@@ -454,6 +472,36 @@ Titanoboa cache; the identical source then passed with Boa explicitly directed
 to `/private/tmp/s5-recreation-cache/titanoboa`. That preload accounts for the
 three `PytestAssertRewriteWarning` lines in the switchboard, collection, and
 full-suite reports and changes no contract/test semantics.
+
+### 1.5.2 Uncommitted post-review hardening validation
+
+After the audit-point commit, the runner and focused tests received a separate,
+uncommitted hardening delta. It disables HTTP redirects, adds explicit
+preflight rejection coverage for nonce mismatch, an occupied predicted address,
+and insufficient balance, and persists the final result and fee projection
+before stopping on an observation-burst total-fee-cap violation. Documentation
+was updated to distinguish the frozen, audit-point, and hardening evidence.
+The test-only Vyper probe and all of its compiler artifacts remain unchanged.
+
+| Validation | Post-review hardening result |
+| --- | --- |
+| Python compilation | runner and focused test compiled; exit `0` |
+| local dry-run | exit `0`; no RPC/secret read; all source and artifact hashes unchanged |
+| H-01 dependency gate | 16 passed in 1.49 s; 2.37 s wall |
+| focused action-block probe | 35 passed in 26.90 s; 63.98 s wall |
+| all probe suites | 75 passed in 31.24 s; 73.04 s wall |
+| S1 clock profiles | 57 passed in 27.18 s; 64.62 s wall |
+| S2 inventory tests | 60 passed in 26.08 s; 26.97 s wall |
+| eight required targeted regression files | 397 passed, 3 cache-redirection assert-rewrite warnings in 52.59 s; 91.64 s wall |
+| collection | 2,773 selected / 2,915 total; 142 deselected, 3 cache-redirection assert-rewrite warnings in 1.23 s; 2.36 s wall |
+| complete serial suite | 2,773 passed, 142 deselected, 3 cache-redirection assert-rewrite warnings in 297.06 s; 352.63 s wall |
+
+The post-hardening S2 checker again exited `1` with exactly the same seven
+`INV-CADENCE-NEW` findings and one `INV-PATH-NEW` finding caused solely by the
+authorized test-only probe package. A future merge is prohibited until the
+owner approves either the Stage C inventory treatment or removal of the probe
+package, because merging while those findings remain would break the clean-S2
+gate used by other workstreams.
 
 ## 2. External source authority
 
@@ -1197,7 +1245,7 @@ brief, branch, review, and rollout.
 
 ## 10. Test authority and gaps
 
-### 10.1 Stage A targeted results
+### 10.1 Frozen Stage A targeted results
 
 All authoritative commands used `PYTHONPATH=.` and the local non-secret
 Etherscan placeholder.
@@ -1213,17 +1261,49 @@ Etherscan placeholder.
 | `pytest -q tests/core/creditEngine/test_credit_repay.py` | 17 passed in 29.37 s |
 | `pytest -q tests/vaults/modules/test_stab_vault_claims.py` | 51 passed in 32.50 s |
 | local `DefaultsBase` guard reproduction | `BASE_GUARD_REPRO_OK`; direct-Ledger sequences reproduced in 4.11 s; Underscore classification is separate source evidence plus the equivalent unchecked path |
-| `pytest -q tests/probes/test_action_block_identity_probe.py` | 30/30 passed, exit 0; includes profile `61` / offset `55` / raw return `116`, raw `61`, incompatible `117`, malformed response, and reversion cases |
-| `python scripts/probes/action_block_identity_probe.py --dry-run` | local-only success; chain `46630`; exact artifact hashes reproduced; profile `61`, pinned offset `55`, and derived raw return `116` recorded; `rpc_contacted=false`, `rpc_endpoint_read=false`, `signing_secret_read=false`, `broadcast_enabled=false` |
 | `pytest -q tests/clock/test_clock_profiles.py` | 57 passed in 29.40 s |
 | `python scripts/check_block_clock_inventory.py --check` | frozen Stage A before the owner-authorized probe: clean with exact section 1.5 counts |
 | `pytest -q tests/inventory/test_block_clock_inventory.py` | frozen Stage A: 60 passed in 26.65 s |
 | `pytest --collect-only -q` | 2,722 selected / 2,864 total; 142 deselected in 1.60 s |
 | `pytest -q` | 2,722 passed, 142 deselected in 299.32 s |
+
+### 10.1.1 Recreated five-file audit point
+
+These results bind to the exact reviewed bytes committed locally at
+`2f6a49b6c82e69bda54f2fd64d2fe03132e0db21`.
+
+| Command | Result |
+| --- | --- |
+| `python -m py_compile scripts/probes/action_block_identity_probe.py tests/probes/test_action_block_identity_probe.py` | exit 0 |
+| `pytest -q tests/probes/test_action_block_identity_probe.py` | 30/30 passed, exit 0; includes profile `61` / offset `55` / raw return `116`, raw `61`, incompatible `117`, malformed response, and reversion cases |
+| `python scripts/probes/action_block_identity_probe.py --dry-run` | local-only success; chain `46630`; exact artifact hashes reproduced; profile `61`, pinned offset `55`, and derived raw return `116` recorded; `rpc_contacted=false`, `rpc_endpoint_read=false`, `signing_secret_read=false`, `broadcast_enabled=false` |
 | `pytest -q tests/probes` | 70/70 passed, exit 0; complete probe set after version-gate correction |
 | `pytest -q tests/probes/test_probe_tooling.py tests/probes/test_stock_token_transfer_probe.py` | 40/40 passed, exit 0; existing probe suites remain green |
 | `python scripts/check_block_clock_inventory.py --check` after adding the probe | expected fail: eight `INV-CADENCE-NEW`/`INV-PATH-NEW` findings for the authorized but deliberately uninventoryed test-only contract/runner/test; no inventory file was edited |
 | `pytest -q tests/inventory/test_block_clock_inventory.py` after version-gate correction | 60 passed in 26.78 s; the committed S2 inventory rules remain internally green |
+| `pytest --collect-only -q` | 2,768 selected / 2,910 total; 142 deselected in 5.07 s; 6.51 s wall |
+| complete serial `pytest -q -p no:cacheprovider` | 2,768 passed, 142 deselected, 3 cache-redirection assert-rewrite warnings in 313.58 s; 373.49 s wall |
+
+### 10.1.2 Uncommitted post-review hardening delta
+
+| Command | Result |
+| --- | --- |
+| `python -m py_compile scripts/probes/action_block_identity_probe.py tests/probes/test_action_block_identity_probe.py` | exit 0 |
+| `pytest -q tests/probes/test_action_block_identity_probe.py` | 35/35 passed in 26.90 s; 63.98 s wall |
+| `pytest -q tests/probes` | 75/75 passed in 31.24 s; 73.04 s wall |
+| `python scripts/probes/action_block_identity_probe.py --dry-run` | local-only success; no RPC/secret read; exact source and artifact hashes unchanged |
+| `pytest -q tests/deployment/test_dependency_gate.py` | 16/16 passed in 1.49 s; 2.37 s wall |
+| `pytest -q tests/clock/test_clock_profiles.py` | 57/57 passed in 27.18 s; 64.62 s wall |
+| `python scripts/check_block_clock_inventory.py --check` | expected fail: the same seven `INV-CADENCE-NEW` findings and one `INV-PATH-NEW` finding, all caused by the authorized test-only probe package |
+| `pytest -q tests/inventory/test_block_clock_inventory.py` | 60/60 passed in 26.08 s; 26.97 s wall |
+| eight required targeted regression files | 397/397 passed, 3 cache-redirection assert-rewrite warnings in 52.59 s; 91.64 s wall |
+| `pytest --collect-only -q` | 2,773 selected / 2,915 total; 142 deselected, 3 cache-redirection assert-rewrite warnings in 1.23 s; 2.36 s wall |
+| complete serial `pytest -q -p no:cacheprovider` | 2,773 passed, 142 deselected, 3 cache-redirection assert-rewrite warnings in 297.06 s; 352.63 s wall |
+
+The hardening delta does not change the probe source or bytecode. It remains
+uncommitted for independent re-review. The exact clean-S2 disposition remains
+an owner-gated prerequisite to any future merge; no inventory change or Stage C
+work is authorized here.
 
 ### 10.2 What those tests do and do not prove
 
@@ -1488,6 +1568,15 @@ Stage C inventory reconciliation remains separate and owner-gated after
 implementation and review. Later owner-approved updates would be needed for
 BN-002 and component rows CM-008/CM-034 plus the decision register; Stage A
 does not edit them.
+
+The isolated probe package must not merge into `rh` while the standalone S2
+checker reports its eight expected findings. That is a technical integration
+gate, not merely a process preference: landing the files without a reviewed
+probe-inventory disposition would break the clean-S2 invariant consumed by
+other workstreams. The owner must decide the probe package's inventory or
+removal disposition before any future merge, most naturally after the live
+proof is complete so the evidence can integrate once. This statement does not
+authorize Stage C or an inventory edit now.
 
 ## 14. Evidence limitations and unresolved decisions
 
