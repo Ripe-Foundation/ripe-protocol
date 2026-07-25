@@ -1427,3 +1427,272 @@ resolved to `02787d351a3064e35d627e8fbc44150770e61c73`. The integration
 worktree contained unrelated, pre-existing documentation changes and was not
 modified. Reconciliation and the complete post-reconciliation validation are
 recorded in the following section.
+
+## Current-baseline reconciliation and Gate 2 package
+
+### Gate 1 approval and reconciliation authorization
+
+On 24 July 2026, the owner approved H-02 Gate 1 at exact reviewed HEAD
+`596e868797f422afed8f46126556765961aba2c5`. The approval covered the
+corrected canonical identity/account boundary and required reconciliation to
+change none of the nine H-02-owned files.
+
+The owner authorized a merge, not a rebase, of exact current `rh` commit
+`185bd32004121bbb1c60748844c517ea8da0affb`. Rewriting any of the four
+reviewed H-02 commits was prohibited. The authorization also required the
+complete offline validation, evidence update, feature-branch-only push, and a
+return for final integration review. It did not authorize merging into `rh`.
+
+The four reviewed commits remain exact ancestors:
+
+```text
+9bef34cbc67d95c2536ca391a208a03ec8e50b03
+2262d197c9c5a2ed647e749678cdaee706d68208
+0370c1abfb545288ba22ea7e2210583057b24348
+596e868797f422afed8f46126556765961aba2c5
+```
+
+### Incoming `rh` identity and exact scope
+
+At reconciliation, local `rh` and the existing `origin/rh` tracking reference
+both resolved to `185bd32004121bbb1c60748844c517ea8da0affb`. The
+integration worktree was clean and was not modified by H-02.
+
+The incoming range after H-02's prior reconciliation point
+`02787d351a3064e35d627e8fbc44150770e61c73` contained exactly:
+
+| Commit | Tree | Parent(s) | Subject |
+|---|---|---|---|
+| `4bd4fcb965a37c64a02894abe41c01a0e95f94b0` | `a2b016b49333f06bcb8daa851487514c301d5ef5` | `02787d351a3064e35d627e8fbc44150770e61c73` | `docs: add Track 8 M0 owner decision packet` |
+| `252ed96c5d0790463c6ba2ab5fdd40bab163943c` | `a2b016b49333f06bcb8daa851487514c301d5ef5` | `02787d351a3064e35d627e8fbc44150770e61c73`, `4bd4fcb965a37c64a02894abe41c01a0e95f94b0` | `merge: integrate Track 8 M0 owner decision packet` |
+| `185bd32004121bbb1c60748844c517ea8da0affb` | `3db41c41f115f820e86626d879f49a6cafc0ea56` | `252ed96c5d0790463c6ba2ab5fdd40bab163943c` | `docs: add Track 7 H-03 blueprint omissions brief` |
+
+All three commits were authored and committed by Mick Hagen
+`<mickhagen@gmail.com>` on 24 July 2026. Their author timestamps were
+`21:52:37-06:00`, `21:55:09-06:00`, and `21:58:53-06:00`,
+respectively.
+
+The net incoming file scope was exactly:
+
+```text
+M docs/chains/rh/robinhood-deployment-support-specification.md
+M docs/chains/rh/robinhood-deployment-validation-plan.md
+A docs/chains/rh/track-7-h3-robinhood-blueprint-omissions.md
+A docs/chains/rh/track-8-m0-owner-decision-packet.md
+
+4 files changed, 1,426 insertions, 3 deletions
+```
+
+Current incoming-document hashes:
+
+| File | SHA-256 |
+|---|---|
+| `docs/chains/rh/robinhood-deployment-support-specification.md` | `1e3fc931ecab674e3ec61640f5c649458d1d6793eecb30465614455090312906` |
+| `docs/chains/rh/robinhood-deployment-validation-plan.md` | `5ffbcfc14cb33e9a5cdc5f2c300cf3d1f9bae90fd90e14d04a408cbe274a94fb` |
+| `docs/chains/rh/track-7-h3-robinhood-blueprint-omissions.md` | `84055f1c1ad3505b38250bf2d2a4851fae8d3358642237ef37da76e59ab5ba4b` |
+| `docs/chains/rh/track-8-m0-owner-decision-packet.md` | `120e20ed004b92389658402652cfbd9361b2d6943954f12a823bc4816e2acd48` |
+
+### Incoming semantic review
+
+The incoming commits do not modify any H-02-owned path. A direct diff of all
+nine paths between `02787d351a3064e35d627e8fbc44150770e61c73` and
+`185bd32004121bbb1c60748844c517ea8da0affb` was empty.
+
+The two authority corrections do not change the H-02 row, registry API,
+profile IDs, operation outcomes, account policy, Base compatibility,
+redaction rules, tests, or evidence conclusions:
+
+- U-015 now truthfully records the integrated Track 8 inputs while keeping M0
+  and minimum containment open;
+- the H-03 row adds its Phase A evidence ownership and routes its registry-slot
+  assertions to H-03's own tests rather than the future H-08 test;
+- the validation command map makes the same H-03/H-08 test-ownership
+  correction; and
+- H-02's command map and exact file row remain unchanged.
+
+The new H-03 brief treats integrated H-02 as a read-only prerequisite. Its
+exact four-file ownership excludes every H-02 file, explicitly prohibits
+changes to `config/network_profiles.py`, the three H-02 CLI/helper surfaces,
+the three H-02 tests, and the H-02 evidence, and requires H-02's Base
+regression and targeted suite to stay green. At review time there was no H-03
+branch or worktree. The Track 8 packet contains no H-02 file or API
+instruction.
+
+The incoming changes therefore add downstream documentation and blockers but
+do not overlap or semantically change H-02 ownership, profiles, account
+authority, tests, or conclusions.
+
+### Non-rewriting merge and byte-identity proof
+
+The authorized command was:
+
+```bash
+git merge --no-ff 185bd32004121bbb1c60748844c517ea8da0affb \
+  -m "Merge rh baseline into H-02"
+```
+
+It created:
+
+```text
+commit: 9631521caebcb21819f4daf6a80dfa677d2189cf
+tree: 5a3b0019d225fb153b6f188ed5c8846ffc21bfd6
+parents:
+  596e868797f422afed8f46126556765961aba2c5
+  185bd32004121bbb1c60748844c517ea8da0affb
+subject: Merge rh baseline into H-02
+author/committer: Mick Hagen, 2026-07-24T22:08:24-06:00
+```
+
+The merge used the `ort` strategy without conflict. Its first parent is the
+exact Gate 1-approved HEAD; the four reviewed commits were not rebased,
+amended, or rewritten.
+
+All nine H-02 hashes immediately before and after the merge were identical:
+
+| File | SHA-256 |
+|---|---|
+| `config/network_profiles.py` | `c570a27a9fb50f6f6591ca68471ba8df9b1adc07da13e64405188b2e13fc08d0` |
+| `docs/chains/rh/evidence/network-profile-cli-implementation.md` | `3dac7e2f488f6b99c549a422da0952bbcc769a5e46e186ac54aa99f96607dc63` |
+| `scripts/console.py` | `e9901c58e7dd95c1ca345e52cc1cd61224bca0f23653dc4bb9bf577f918b9030` |
+| `scripts/migrate.py` | `b711789b6efdfb85bb2b2f40ca7c5da83792ab85031a694b10fea1a1271248cc` |
+| `scripts/utils/migration_helpers.py` | `c8fa393c33541fac59b087e6b6d4125d1a97e2092c27960e0a3995ae54b06d1a` |
+| `scripts/verify.py` | `334b8cee749f5716ef1b771c22b1454919778d7c2a085d9cfede327cb0794027` |
+| `tests/deployment/test_base_profile_regression.py` | `6013096e8292798a289dc0d3d3ca5d51830f2a90944e88d54b3261b69688aa65` |
+| `tests/deployment/test_network_profiles.py` | `020ff8e5026c6baef7c015140105651593d1b76d330e4d9ff8954c21cbefe738` |
+| `tests/deployment/test_secret_handling.py` | `fb3f5ccbe12266493144c33bc8f5428e4856f0cafbf035dea1a22714ac0ff5bd` |
+
+This Gate 2 section is the separately authorized evidence-only change after
+that byte-identity proof. Its final file hash and evidence commit are reported
+outside the file after commit creation; embedding either value here would
+change the value being identified.
+
+### Locked Gate 2 runtime and isolation
+
+All post-merge Python validation used the unchanged approved environment:
+
+```text
+root: /private/tmp/rh-h02-cpython312.pQexIu
+root mode: 0700
+Python: 3.12.0
+pip: 23.2.1
+Vyper: 0.4.3
+Titanoboa: 0.2.7
+pytest: 8.4.2
+pip check: No broken requirements found
+```
+
+The fresh compiler cache was:
+
+```text
+variable: RH_H02_BOA_CACHE_DIR
+path: /private/tmp/rh-h02-gate2-cache.ZfAsZw
+mode: 0700
+```
+
+The launcher remained the corrected
+`boa.interpret.set_cache_dir` launcher recorded above. H-02 tests set
+`PYTHON_DOTENV_DISABLED=1`; H-01, S1, S2, collection, and the full suite
+explicitly unset it. All commands removed explorer, vendor-token, profile RPC,
+deployer-key, and test-key variables from the child environment and used only
+the synthetic parent pytest placeholder required by the unchanged global
+harness.
+
+After validation, both the compiler cache and disposable environment were
+removed using their exact absolute paths. Both paths were verified absent.
+
+### Exact post-merge validation
+
+Direct imports of all five H-02 modules and `--help` for migrate, console, and
+verify passed with every relevant environment value absent.
+
+Every pytest invocation used `-q -p no:cacheprovider` plus the listed
+task-specific `--basetemp`:
+
+| Scope / basetemp | Result |
+|---|---|
+| `test_network_profiles.py`; `/private/tmp/rh-h02-gate2-network` | `21 passed, 3 warnings in 0.02s` |
+| `test_secret_handling.py`; `/private/tmp/rh-h02-gate2-secret` | `30 passed, 3 warnings in 4.48s` |
+| `test_base_profile_regression.py`; `/private/tmp/rh-h02-gate2-base` | `22 passed, 3 warnings in 4.99s` |
+| all three H-02 files; `/private/tmp/rh-h02-gate2-combined` | `73 passed, 3 warnings in 9.77s` |
+| H-01 dependency gate; `/private/tmp/rh-h02-gate2-h01` | `16 passed, 3 warnings in 1.52s` |
+| S1 clock profiles; `/private/tmp/rh-h02-gate2-s1` | `57 passed, 3 warnings in 104.52s` |
+| S2 inventory; `/private/tmp/rh-h02-gate2-s2` | `60 passed, 3 warnings in 25.06s` |
+| collection; `/private/tmp/rh-h02-gate2-collect` | `2,811/2,953 collected, 142 deselected in 1.27s` |
+| full suite; `/private/tmp/rh-h02-gate2-full` | `2,811 passed, 142 deselected, 3 warnings in 310.11s` |
+
+The three warnings in every cache-launched command remained the known
+non-fatal `PytestAssertRewriteWarning` notices for `_hypothesis_globals`,
+`hypothesis`, and `boa`, imported before pytest by the cache launcher. No
+warning or test was suppressed. There were no skips or xfails. The unchanged
+external fork-marked Base tests remained within the accepted 142-test
+deselection boundary and were not enabled because external networking was not
+authorized.
+
+### Gate 2 scope, parity, and virtual merge
+
+At validated merge commit `9631521caebcb21819f4daf6a80dfa677d2189cf`:
+
+```text
+local rh: 185bd32004121bbb1c60748844c517ea8da0affb
+origin/rh tracking reference:
+  185bd32004121bbb1c60748844c517ea8da0affb
+merge base: 185bd32004121bbb1c60748844c517ea8da0affb
+feature branch ahead/behind rh: 5/0
+worktree: clean
+```
+
+`git diff rh...HEAD` contained exactly the nine H-02-owned files and no
+incoming-baseline file. Its validated pre-evidence total was:
+
+```text
+9 files changed, 4,300 insertions, 370 deletions
+```
+
+`git diff --check` was clean. Explicit prohibited-path checks covered
+contracts, interfaces, migrations, histories, blueprints/defaults, runner and
+verifier helpers, requirements, H-01, S1, S2, global test configuration,
+parameter tooling, summary/authority documents, and the two incoming
+H-03/Track 8 records; all were clean relative to `rh`.
+
+The required virtual merge command:
+
+```bash
+git merge-tree --write-tree \
+  185bd32004121bbb1c60748844c517ea8da0affb \
+  9631521caebcb21819f4daf6a80dfa677d2189cf
+```
+
+returned tree `5a3b0019d225fb153b6f188ed5c8846ffc21bfd6`,
+exactly the validated merge commit's tree. It updated no ref or worktree and
+reported no conflict.
+
+No H-03 branch or worktree existed at the overlap check. Existing track
+worktrees owned no H-02 path. No H-02 dependency, authority, profile,
+operation, account, CLI, test, or implementation byte changed during baseline
+reconciliation.
+
+### Gate status and remaining integration boundary
+
+Gate 1 is owner-approved at
+`596e868797f422afed8f46126556765961aba2c5`, and that exact commit remains
+the first parent and ancestor of the reconciliation merge.
+
+The Gate 2 technical package is complete for final owner/integration review:
+
+- exact current baseline merged without rewriting Gate 1 commits;
+- incoming scope and semantics reviewed;
+- H-02 bytes preserved by reconciliation;
+- complete targeted and full validation green;
+- exact scope and prohibited-path checks clean;
+- local/tracking `rh` parity and ahead/behind recorded; and
+- virtual merge clean.
+
+The final evidence-only commit and feature-branch remote parity are reported by
+the completion response after commit and push. Gate 2 does not itself merge
+H-02 into `rh`; explicit final integration approval is still required.
+
+No secret, live RPC, real account, external provider request, signing,
+migration execution, verification submission, deployment, governance action,
+contract/default/migration/manifest/history/generated-artifact change,
+`rh`/`master` merge, or integration-worktree edit occurred. The only authorized
+external write after this record is committed is the H-02 feature-branch push.
