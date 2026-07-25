@@ -1230,3 +1230,184 @@ the owner complete the secret-free packet for a new hash review. Preflight,
 execution, row 2 closure, Stage B/C, inventory work, push, merge, production,
 deployment, configuration, governance, signing, and broadcast remain
 prohibited.
+
+## 15. Faucet, funding, and owner-value provenance — 25 July 2026
+
+This section records later preparation activity and supersedes section 14.3's
+statement that no operator value had been requested or supplied. It does not
+supersede any prohibition in section 14.3 or authorize a live-capable action.
+The implementation-task transcript is the direct authority for the owner
+statements quoted below.
+
+### 15.1 Exact faucet chronology
+
+Every faucet destination was disposable signer public address
+`0xc01858d69034c8d1414FC1f252E35DF0A0CdFCb1`. During agent-performed faucet
+actions, the agent submitted only that public address and provided no private
+key, endpoint credential, wallet connection, login credential, or permission
+grant.
+
+1. The first authorized service was the Robinhood testnet page at
+   `ethfaucet.com`. The public address was entered, but the page remained at
+   `Checking eligibility for this address...`, its claim control stayed
+   disabled, and no request or transfer resulted.
+2. The owner then authorized searching for another Robinhood testnet faucet
+   and separately authorized the address-only ZalalenA path verbatim:
+
+   > I authorize submitting public address
+   > 0xc01858d69034c8d1414FC1f252E35DF0A0CdFCb1 to the ZalalenA Robinhood
+   > Chain testnet faucet. I will manually complete the CAPTCHA. Do not
+   > connect a wallet, log in, provide credentials, or submit any other
+   > information.
+
+   ZalalenA did not present a CAPTCHA and reported a successful `0.000015 ETH`
+   “mini reward” to that address in transaction
+   `0x8ef9f542618adfa0a5bd6d2db4a90997a1257759bd740ec408adaec5217c4e12`.
+3. After the owner said, `Yes you can get more if you need more`, one further
+   request was attempted through the same ZalalenA address-only path. It
+   failed before transfer with:
+
+   > This request couldn't be completed on your current connection. Please
+   > try using a regular internet connection and claim again.
+
+   No second ZalalenA transaction or request identifier resulted.
+4. The owner then asked for another link and the same public address so the
+   owner could try it personally. The agent supplied Robinhood's official
+   testnet faucet link and the public address; the owner, not the agent,
+   manually used that faucet. The agent neither connected a wallet nor
+   received or recorded a secret.
+5. When the owner subsequently said, `okay see if you got those`, the agent
+   treated that sentence as authority for one read-only query of the public
+   Robinhood Blockscout explorer, not the Robinhood RPC endpoint. Blockscout
+   displayed a `0.010015 ETH` balance, consisting of the earlier
+   `0.000015 ETH` and an official-faucet `0.01 ETH` internal transfer
+   associated with parent transaction
+   `0x30a85d7ffd15fcdd8f0fb0f44115a354ac81bb8dc16e990dde85cdf2bd0d941d`.
+   It also displayed five accompanying test Stock Token holdings and no
+   outgoing activity. These were public-explorer observations; the required
+   later preflight must independently confirm balance, nonce, funding
+   sufficiency, and all other RPC-bound facts.
+
+This chronology distinguishes the three services and outcomes: the initial
+`ethfaucet.com` eligibility check produced nothing; the separately authorized
+ZalalenA submission produced one small transfer and its later authorized retry
+failed; the owner manually used Robinhood's official faucet, which produced
+the larger transfer and unsolicited test-token holdings.
+
+### 15.2 Owner ratification and permitted asset use
+
+The owner supplied this verbatim dated decision on 25 July 2026:
+
+> On July 25, 2026, I ratify use of Robinhood’s official testnet faucet for
+> disposable signer 0xc01858d69034c8d1414FC1f252E35DF0A0CdFCb1, including
+> receipt of 0.01 ETH and the five accompanying test Stock Token holdings.
+> Only the ETH may be used for the bounded S5 proof’s testnet gas; the Stock
+> Tokens must remain inert and be abandoned with the disposable signer. I also
+> ratify the read-only Robinhood Blockscout explorer query performed at my
+> request to confirm the signer’s balance and incoming transfers. This does
+> not authorize RPC access, nonce queries, secret access, preflight, signing,
+> broadcasting, execution, Stage B/C, or use of the Stock Tokens.
+
+The five test Stock Token holdings therefore are outside the proof's permitted
+asset surface. They must not be approved, transferred, tested, or used and
+must be abandoned with the disposable signer. Only testnet ETH may later be
+used, and only for gas after all row 2 packet, exact-hash review, and separate
+preflight/execution gates close.
+
+The earlier ZalalenA funding-use decision is also preserved verbatim:
+
+> I approve use of the Robinhood testnet ETH actually received by disposable
+> signer 0xc01858d69034c8d1414FC1f252E35DF0A0CdFCb1 from faucet
+> transaction
+> 0x8ef9f542618adfa0a5bd6d2db4a90997a1257759bd740ec408adaec5217c4e12,
+> solely for the bounded S5 testnet proof’s gas costs. This approval is subject
+> to a later authorized preflight confirming receipt, sufficient balance, and
+> compliance with the final aggregate fee cap. It does not authorize RPC
+> access, signing, broadcasting, or execution.
+
+Both funding decisions remain approval inputs. They do not by themselves set
+`signer.funding_approved` or any other packet Boolean to true.
+
+### 15.3 Owner-approved bounded values
+
+The execution-ceiling question/input bundle in the implementation-task
+transcript stated verbatim:
+
+> Next owner decision: do you approve these proposed execution ceilings for the eventual packet?
+>
+> - Deployment gas limit: `500,000`
+> - Each observation gas limit: `100,000`
+> - Maximum observations: `16` (`17` total transactions including deployment)
+> - Receipt timeout: `300 seconds`
+>
+> The three fee caps remain a separate decision.
+
+The owner replied verbatim:
+
+> yes i approve
+
+The fee-cap question immediately preceding the owner's answer stated:
+
+> - Maximum priority fee: `10,000,000 wei/gas` (`0.01 Gwei`)
+> - Maximum fee: `200,000,000 wei/gas` (`0.2 Gwei`)
+> - Maximum aggregate fee: `500,000,000,000,000 wei` (`0.0005 ETH`)
+>
+> Worst case:
+>
+> `2,100,000 × 200,000,000 = 420,000,000,000,000 wei = 0.00042 ETH`
+>
+> Do you approve these three exact fee ceilings for the packet? This would
+> approve only the caps—not RPC access, signing, broadcasting, or execution.
+
+The owner replied verbatim:
+
+> i approve
+
+The endpoint/signer question/input bundle in the implementation-task
+transcript stated verbatim:
+
+> Next approval question: do you approve these exact endpoint and signer identities for the packet?
+>
+> - RPC label: `robinhood-testnet-official-public-endpoint`
+> - RPC environment-variable name: `ROBINHOOD_TESTNET_RPC_URL`
+> - Endpoint URL SHA-256: `6c163ade146dadc263774bd634844f5981096b9232e490593c2497d92dfba51f`
+> - Signer: `0xc01858d69034c8d1414FC1f252E35DF0A0CdFCb1`
+> - Private-key environment-variable name: `ROBINHOOD_TESTNET_PRIVATE_KEY`
+> - Expected pending nonce: `0`
+> - Expected CREATE address: `0xe76f0852d5875EfCF607A684fde245cc3BA44e64`
+>
+> Nonce and CREATE address remain subject to fail-closed preflight confirmation. Approval here would authorize only these packet values—not environment access, RPC contact, secret reading, signing, broadcasting, or execution.
+
+The owner replied verbatim:
+
+> yes i approve
+
+The nonce and CREATE address remain provisional until a separately authorized
+preflight confirms them. The endpoint URL and signing secret are not recorded
+in this evidence.
+
+### 15.4 Packet state and standing prohibitions
+
+The secret-free candidate outside the repository has SHA-256
+`ad6f69810be6d9da67e84452421b917d0d1e1c3fb357f2482c0e6d644b3042d2`.
+It is non-executable and retains all eight approval Booleans as `false`:
+
+```text
+live_testnet_approved
+approval_provenance.owner.approved
+approval_provenance.independent_security.approved
+approval_provenance.deployment.approved
+rpc.approved
+signer.approved
+signer.funding_approved
+fees.owner_approved
+```
+
+The values and owner decisions above are evidence inputs only. Before any
+Boolean may become true, the final packet must contain the required dated
+decision and nonempty provenance references, its exact completed-packet hash
+must receive independent review, and the owner must separately authorize the
+next action. This section does not authorize an RPC or nonce query, endpoint or
+signing-secret access, preflight, signing, broadcasting, deployment, live
+execution, row 2 closure, Stage B/C, inventory work, push, merge, production
+change, configuration, registration, governance, or Base migration.
