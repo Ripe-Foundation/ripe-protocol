@@ -785,11 +785,21 @@ The exact newline-terminated JSON body above has SHA-256
 `277f3628853b5ff06d65f22611358e08e521fe05afc0dd91b58692dd91026534`.
 It parses as JSON and is intentionally non-executable.
 
-Before preflight, the owner-supplied fields must replace every null and the
-five approval booleans (`live_testnet_approved`, `rpc.approved`,
-`signer.approved`, `signer.funding_approved`, and
-`fees.owner_approved`) must actually be true under dated approvals. The owner
-must approve:
+Before preflight, the owner-supplied fields must replace every null and all
+eight approval Booleans must be true:
+
+1. `live_testnet_approved`;
+2. `approval_provenance.owner.approved`;
+3. `approval_provenance.independent_security.approved`;
+4. `approval_provenance.deployment.approved`;
+5. `rpc.approved`;
+6. `signer.approved`;
+7. `signer.funding_approved`; and
+8. `fees.owner_approved`.
+
+Each provenance role requires its dated decision and nonempty reference, and
+`owner_approval_reference` must match the owner provenance reference. The
+owner must approve:
 
 - exact endpoint fingerprint and the proposed endpoint label;
 - exact signer address and use of its existing testnet gas funds;
