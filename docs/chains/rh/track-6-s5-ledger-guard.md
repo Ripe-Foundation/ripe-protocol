@@ -1,11 +1,21 @@
 # Track 6 S5: Portable User-Action Guard and State-Safe Rollout
 
-**Status:** Revised draft after owner action-block direction; no implementation
-or kickoff is authorized
+**Status:** Stage A owner direction, the later isolated-probe authorization,
+and the named owner's direct rows 7/9 risk decisions are recorded. H-01
+recreation/revalidation, live proof, independent-security/operations
+approvals, and final Checkpoint 0 closure remain pending. Stage B is not
+authorized.
 
 **Prepared:** 24 July 2026
 
 **Planning baseline:** `27765d29094256fa9619dd44a0bfd145863de8b7`
+
+**Planning correction:** 24 July 2026 — Phase A2 previously misidentified the
+sole production-source caller of external `Teller.performHousekeeping` as
+`Deleverage.deleverageForWithdrawal`. The verified caller is
+`Deleverage.swapCollateral`; the call is independent of the Underscore
+withdrawal path and the deleverage cooldown. This correction changes no owner
+approval, implementation authority, or checkpoint.
 
 **Owner action-block direction:** 24 July 2026 — preserve the existing
 same-execution-block security property through a narrow shared Ledger clock
@@ -14,6 +24,46 @@ block identity. The deployed Base Ledger remains untouched indefinitely because
 its accounting state makes migration risk disproportionate. Production
 implementation remains prohibited until Stage A proves the smallest safe
 abstraction and an independent security reviewer approves it.
+
+**Later owner authorization for the isolated Stage A probe:** 24 July 2026 —
+after the original one-file Stage A boundary was written, the owner instructed:
+
+> This authorizes the narrow Stage A correction and a Robinhood testnet-only
+> proof. It does not authorize production Ledger implementation, mainnet
+> activity, merge, or deployment.
+
+The same instruction explicitly required:
+
+> - test-only Vyper contract under `contracts/testing/`;
+> - runner under `scripts/probes/`;
+> - focused local tests under `tests/probes/`; and
+> - a sanitized evidence record under `docs/chains/rh/evidence/`.
+
+The instruction also preserved the stop boundary:
+
+> After completing the work, leave the repository changes uncommitted for
+> security review. Report every changed file, all commands and test results,
+> all sanitized testnet evidence, any inconclusive topology, and the exact
+> remaining Checkpoint 0 blockers. Do not begin S5 Stage B, merge, push, or
+> modify the production Ledger.
+
+That later authorization expanded Stage A ownership only for the four isolated
+probe paths named in the Stage A ownership section below. It did not authorize
+production Ledger work, live RPC contact without a separate approval packet,
+Stage B/C, inventory reconciliation, merge, push, or deployment.
+
+**Checkpoint 0 owner approval:** 24 July 2026 — after the recorded walkthrough
+and general approval response, the owner directly confirmed that the human
+approver is **Mick Hagen**, accepted row 7's preserved external-housekeeping
+griefing and caller-supplied bundle risk instead of expanding S5 into Teller,
+and accepted row 9's strict fail-closed ArbSys availability risk—including
+blocked repayment and both liquidation entry points—with no ancestor-number
+fallback, subject to proof, monitoring, and an incident runbook. The exact
+questions and the owner's verbatim numbered answers are preserved in
+`track-6-s5-checkpoint-0-owner-decision-packet.md`. Live proof, H-01
+recreation/revalidation, independent-security, operations, external-review,
+implementation, inventory, merge, deployment, configuration, activation,
+governance, and Base-migration gates remain open.
 
 **Required launch baseline:** this brief must be reviewed and committed to `rh`.
 Stage A may run while H-01 and S4 are in progress. Stage B remains blocked on
@@ -32,8 +82,10 @@ Ledger is not migrated or replaced.
 S5 has three stages:
 
 1. **Stage A — threat model and architecture decision:** repository-read-only
-   analysis plus one decision record. No production contract, ABI, test,
-   inventory, dependency, migration, or external-repository change is allowed.
+   analysis plus one decision record and the later owner-authorized, exact
+   four-file isolated probe exception recorded above. No production contract,
+   ABI, inventory, dependency, migration, or external-repository change is
+   allowed, and no other test or tooling file is owned.
 2. **Stage B — production implementation:** blocked until the owner and an
    independent security reviewer approve every mandatory decision below,
    approve the exact file set, and close the H-01/S4 sequencing gates.
@@ -412,15 +464,27 @@ Ignore unrelated untracked files. Do not clean or modify that repository.
 
 ## Stage A ownership
 
-Stage A may create or edit only:
+The original Stage A contract allowed creation or editing only of:
 
 - `docs/chains/rh/ledger-guard-security-decision.md`
 
-It may run read-only repository commands and tests that do not update tracked
-artifacts. It may not edit:
+The later verbatim owner authorization recorded at the top of this brief
+created one narrow exception for the isolated Robinhood testnet proof:
+
+- `contracts/testing/ActionBlockIdentityProbe.vy`;
+- `scripts/probes/action_block_identity_probe.py`;
+- `tests/probes/test_action_block_identity_probe.py`; and
+- `docs/chains/rh/evidence/ledger-action-block-testnet-proof.md`.
+
+The exception authorized local dry-run and controlled-double evidence and a
+separately approved, testnet-only proof. It did not itself authorize RPC
+contact, signing, broadcast, production implementation, Stage B/C, or
+inventory reconciliation. Outside the decision record and those four exact
+probe-package paths, Stage A may run read-only repository commands and tests
+that do not update tracked artifacts. It may not edit:
 
 - production contracts or interfaces;
-- tests or fixtures;
+- any other tests or fixtures;
 - generated ABIs;
 - the checked inventory;
 - dependency files;
@@ -549,12 +613,15 @@ department, vault, or switchboard can grief a user by writing or arming guard
 state, choose another user, or choose a weaker risk flag.
 
 At the planning baseline, the sole production-source caller found is
-`Deleverage.deleverageForWithdrawal`, which calls
-`Teller.performHousekeeping(False, _user, True, a)` in
-`contracts/core/Deleverage.vy`. Re-verify that fact from the integrated source
-and record the exact line. One source call site does not narrow
-`addys._isValidRipeAddr` authorization or eliminate the broader griefing
-analysis.
+`Deleverage.swapCollateral`, which calls
+`Teller.performHousekeeping(False, _user, True, a)` after withdrawing the
+user's existing collateral, receiving replacement collateral from the
+authorized caller, and depositing that replacement for the user. Re-verify the
+function boundary, call, authorization, value flow, and exact line from the
+integrated source. This is not the Underscore `deleverageForWithdrawal` path
+and is not disabled by a zero deleverage cooldown. One source call site does
+not narrow `addys._isValidRipeAddr` authorization or eliminate the broader
+griefing and forced-collateral-swap analysis.
 
 Inspect `contracts/core/AuctionHouse.vy` and commit
 `4ac5449b3e792600baf20edb0ec9e1819ec45bfe` explicitly. AuctionHouse does not
@@ -818,6 +885,11 @@ Create:
 
 - `docs/chains/rh/ledger-guard-security-decision.md`
 
+The later owner authorization additionally permits only the four isolated
+probe-package files enumerated in the Stage A ownership section. Those files
+are evidence supporting this deliverable, not production implementation or an
+expansion of Stage B authority.
+
 It must contain:
 
 - baseline and provenance;
@@ -956,8 +1028,9 @@ Robinhood-branded production logic or `chain.id`.
 
 Before editing:
 
-- rebase or recreate from the exact owner-approved post-H-01/post-S4 `rh`
-  baseline;
+- recreate from the exact owner-approved post-H-01/post-S4 `rh` baseline by
+  default; rebase/reconcile the stale branch only as an expressly
+  owner/security-approved exception;
 - re-read the integrated H-01 and S4 records;
 - verify no file overlap or semantic conflict;
 - repeat all Stage A hashes and tests;
