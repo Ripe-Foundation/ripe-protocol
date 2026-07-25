@@ -2349,3 +2349,110 @@ The remaining pre-Stage-B conditions are therefore:
 3. a separate explicit owner authorization to begin bounded Stage B.
 
 Stage B remains unauthorized.
+
+## 20. Exact `cb3fe739` reconciliation and validation — 25 July 2026
+
+The owner wrote in the controlling reconciliation request:
+
+> I authorize reconciliation of the S5 branch with exact current `rh` commit:
+>
+> `cb3fe7392c44613aaeec49bd2486369fe0da3556`
+>
+> Proceed under these constraints:
+>
+> 1. Reconfirm local `rh`, cached `origin/rh`, and live remote `origin/rh` all
+> remain exactly `cb3fe739…`. If any differs, stop.
+> 2. Merge `cb3fe739…` into `rh-track-6-s5-ledger-guard-recreation` normally,
+> without rebase, squash, amendment, cherry-pick, or history rewriting.
+> 3. Preserve approved commit `fe66f595…` unchanged in the resulting ancestry.
+> 4. Confirm the incoming delta is limited to the reviewed H‑02 correction and
+> does not conflict with an S5-owned production, probe, evidence, or inventory
+> file. Stop on any conflict or scope change.
+
+The owner authorized a normal, non-rewriting merge of exact current `rh`
+`cb3fe7392c44613aaeec49bd2486369fe0da3556` after the row 8/10 approval
+record was independently reviewed and committed at
+`fe66f595e58acf840ed9928e6bb60e28be4ebf05`. Before the merge, local `rh`,
+cached `origin/rh`, and live remote `origin/rh` all resolved to the authorized
+commit. The S5 worktree was clean, the index was empty, and the branch was 10
+ahead / 2 behind `rh` with merge-base `e1f14ddb030c5ce3f44d4cdd54e8c6daaad41369`.
+
+The incoming range consisted only of:
+
+- content commit `5c1ba54c5d34670ddba13ce84e46f490f8a8aaa4`,
+  `fix(rh): close H-02 post-integration review findings`; and
+- integration commit `cb3fe7392c44613aaeec49bd2486369fe0da3556`,
+  `merge: integrate H-02 post-integration corrections`.
+
+Its seven paths were `config/network_profiles.py`,
+`docs/chains/rh/evidence/network-profile-cli-implementation.md`,
+`scripts/console.py`, `scripts/migrate.py`,
+`tests/deployment/test_base_profile_regression.py`,
+`tests/deployment/test_network_profiles.py`, and
+`tests/deployment/test_secret_handling.py`. The incoming diff was 378
+insertions / 10 deletions and corrected only H-02 repository-profile
+validation plus sanitized fork-teardown diagnostics and their tests/evidence.
+It changed no S5-owned production, probe, focused-test, S5 evidence, or
+inventory path.
+
+The authorized normal merge completed without conflict:
+
+| Identity | Exact value |
+| --- | --- |
+| merge | `f934cf4513f55db66ffb120a51b1c4fe9791c9ed` |
+| tree | `aca2bd5aa0d4cc6fc83363eb638e3a9fc4c4915a` |
+| first parent | `fe66f595e58acf840ed9928e6bb60e28be4ebf05` |
+| second parent | `cb3fe7392c44613aaeec49bd2486369fe0da3556` |
+| subject | `Merge commit 'cb3fe7392c44613aaeec49bd2486369fe0da3556' into rh-track-6-s5-ledger-guard-recreation` |
+
+Both parents and approved commit `fe66f595…` are ancestors of the merge.
+After the merge and again after validation, local `rh`, cached `origin/rh`,
+and live remote `origin/rh` remained exact `cb3fe739…`; the merge-base became
+that exact commit and the S5 branch was 11 ahead / 0 behind `rh`.
+
+The integrated H-01 Candidate A environment remained unchanged: Python
+`3.12.0`, Vyper `0.4.3`, pytest `8.4.2`, Titanoboa `0.2.7`, and `cbor2 5.9.0`.
+`python -m pip check` reported no broken requirements. Boa was preloaded only
+to redirect its compiler cache to task-specific `/private/tmp` paths. Every
+pytest command produced exactly the three established non-fatal
+`PytestAssertRewriteWarning` notices for already imported
+`_hypothesis_globals`, `hypothesis`, and `boa`; no warning, selected test, or
+failure was suppressed.
+
+| Required validation | Exact result |
+| --- | --- |
+| H-01 dependency gate | `16 passed, 3 warnings in 1.60s` |
+| integrated H-02 suite | `99 passed, 3 warnings in 13.62s` |
+| S1 clock profiles | `57 passed, 3 warnings in 103.91s` |
+| focused S5 action-block probes | `35 passed, 3 warnings in 27.55s` |
+| complete probe suites | `75 passed, 3 warnings in 31.99s` |
+| S2 inventory tests | `60 passed, 3 warnings in 25.47s` |
+| standalone inventory checker | expected exit `1` in 1.33s wall; exactly seven `INV-CADENCE-NEW` plus one `INV-PATH-NEW`, all isolated-probe findings and nothing else |
+| exact nine-file targeted regressions | `437 passed, 3 warnings in 134.58s` |
+| collection | `2,872/3,014 collected, 142 deselected, 3 warnings in 1.55s` |
+| complete serial suite | `2,872 passed, 142 deselected, 3 warnings in 304.53s` |
+
+The four-test collection increase from the prior `2,868` selected cases is
+exactly the incoming H-02 correction. Section 13 of
+[`evidence/ledger-action-block-testnet-proof.md`](evidence/ledger-action-block-testnet-proof.md)
+records the exact launchers, paths, hashes, and result details.
+
+Production `contracts/data/Ledger.vy`, the test-only probe, runner, focused
+tests, row 2 authorization JSON, and `config/block-clock-inventory.json`
+remain byte-identical. The deployed-Base retention decision and section 12
+file ceiling are unchanged. Rows 8 and 10 remain owner/security/operations
+approved; operational roles still require named assignment before deployment
+readiness.
+
+This reconciliation does not close row 2 or approve the new documentation
+hashes. The remaining pre-Stage-B conditions are still:
+
+1. successful owner-authorized row 2 live proof;
+2. independent approval of the final reconciled decision record and exact
+   section 12 file ceiling; and
+3. separate explicit owner authorization for bounded Stage B.
+
+No row 2 RPC or signer access, Stage B, Stage C, inventory edit, push, merge
+into `rh`, deployment, registration, configuration, governance action,
+signing, broadcast, or Base migration is authorized. Stage B remains
+unauthorized.

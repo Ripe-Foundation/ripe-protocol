@@ -900,3 +900,163 @@ no URL, credential, signing secret, or other secret.
 
 Until that sentence is completed with exact values and explicitly adopted,
 row 2 remains open and neither preflight nor execution is authorized.
+
+## 13. Exact `cb3fe739` H-02 reconciliation evidence — 25 July 2026
+
+This section records the owner-authorized reconciliation and complete
+non-live validation after rows 8 and 10 were approved and committed. It does
+not modify or complete the section 12 row 2 packet, authorize preflight, or
+record live evidence. Decision-record section 20 quotes the controlling owner
+reconciliation instruction verbatim.
+
+### 13.1 Identity, scope, and merge
+
+Immediately before merge:
+
+```text
+branch: rh-track-6-s5-ledger-guard-recreation
+HEAD: fe66f595e58acf840ed9928e6bb60e28be4ebf05
+local rh: cb3fe7392c44613aaeec49bd2486369fe0da3556
+cached origin/rh: cb3fe7392c44613aaeec49bd2486369fe0da3556
+live origin refs/heads/rh: cb3fe7392c44613aaeec49bd2486369fe0da3556
+merge-base: e1f14ddb030c5ce3f44d4cdd54e8c6daaad41369
+topology, rh...HEAD: 2 left / 10 right
+worktree/index: clean
+```
+
+The incoming range contained exact H-02 correction commit
+`5c1ba54c5d34670ddba13ce84e46f490f8a8aaa4` and its `rh` merge
+`cb3fe7392c44613aaeec49bd2486369fe0da3556`. Complete path scope and
+post-merge SHA-256 values:
+
+| Incoming path | SHA-256 |
+| --- | --- |
+| `config/network_profiles.py` | `9c19d237eaa049a9d521fc3ab8ef868e6ee35ab6ba48c45e61180fa2daf8c42a` |
+| `docs/chains/rh/evidence/network-profile-cli-implementation.md` | `79cf2f7e5c362b8880f2c460abac946126bf2f329425a82e3c8f5bd4da9a8de7` |
+| `scripts/console.py` | `a7f0c2b15db0634398dbf975bd40fe5cb449a96e7da6ff5a1c9159df75ec5f6a` |
+| `scripts/migrate.py` | `6401e3fe35f29981378bb187a4070b1b0a75e6f7105204269e65aeef4aa6a12c` |
+| `tests/deployment/test_base_profile_regression.py` | `6da51a700e7a8a914ee541b594fa4bb4cb45df6b2a62842695898f2e467f9ecb` |
+| `tests/deployment/test_network_profiles.py` | `9178b2a13c7c6a6102c21d592d609ccd2ab1dea099450397f17ca9ddd81dd7c6` |
+| `tests/deployment/test_secret_handling.py` | `ac27dcb31f4c17459cb45847ec904237bf790225b53184d3d2e2e4e95cdee2f3` |
+
+The incoming diff was whitespace-clean and exactly 378 insertions / 10
+deletions. It added no S5-owned path and produced no conflict. The authorized
+normal merge was:
+
+```text
+merge: f934cf4513f55db66ffb120a51b1c4fe9791c9ed
+tree: aca2bd5aa0d4cc6fc83363eb638e3a9fc4c4915a
+first parent: fe66f595e58acf840ed9928e6bb60e28be4ebf05
+second parent: cb3fe7392c44613aaeec49bd2486369fe0da3556
+subject: Merge commit 'cb3fe7392c44613aaeec49bd2486369fe0da3556' into rh-track-6-s5-ledger-guard-recreation
+```
+
+`fe66f595…` and both merge parents are ancestors of `f934cf4…`. After merge
+and after all validation, local/cached/live `rh` remained exact `cb3fe739…`,
+the merge-base was `cb3fe739…`, and the branch was 11 ahead / 0 behind.
+
+### 13.2 Locked runtime and exact commands
+
+The existing integrated H-01 Candidate A interpreter was reused without
+installation or modification:
+
+```text
+interpreter: /private/tmp/h01-final-review.dL2pqo/candidate/bin/python
+Python: 3.12.0
+Vyper: 0.4.3
+pytest: 8.4.2
+Titanoboa: 0.2.7
+cbor2: 5.9.0
+requirements.txt SHA-256:
+  d2e12a6f0cfd128c3891634efafbba8305878bef7a7c5db33e25ebe93b0d2bce
+pip check: No broken requirements found.
+task root: /private/tmp/s5-cb3-validation
+task-root mode: 0700
+```
+
+Every non-H-02 pytest command used this exact launcher shape, with the table's
+literal cache path and pytest arguments substituted:
+
+```bash
+env -u BASESCAN_API_KEY -u WEB3_ALCHEMY_API_KEY -u TEST_PRIVATE_KEY \
+  -u BASE_MAINNET_RPC_URL -u BASE_SEPOLIA_RPC_URL \
+  -u ROBINHOOD_MAINNET_RPC_URL -u ROBINHOOD_TESTNET_RPC_URL \
+  -u ROBINHOOD_TESTNET_PRIVATE_KEY -u DEPLOYER_PRIVATE_KEY \
+  -u PYTHON_DOTENV_DISABLED \
+  ETHERSCAN_API_KEY=local-placeholder PYTHONPATH=. \
+  /private/tmp/h01-final-review.dL2pqo/candidate/bin/python -c \
+  'from boa.interpret import set_cache_dir; set_cache_dir("<CACHE>"); import pytest; raise SystemExit(pytest.main(<ARGS>))'
+```
+
+The integrated H-02 suite used the same launcher but set
+`PYTHON_DOTENV_DISABLED=1` instead of unsetting it, matching H-02's profile
+test boundary. No environment-variable value was printed or recorded.
+
+| Scope | `<CACHE>` and exact `<ARGS>` | Result |
+| --- | --- | --- |
+| H-01 | `/private/tmp/s5-cb3-validation/boa-h01`; `["-q","-p","no:cacheprovider","tests/deployment/test_dependency_gate.py","--basetemp=/private/tmp/s5-cb3-validation/pytest-h01"]` | `16 passed, 3 warnings in 1.60s` |
+| H-02 combined | `/private/tmp/s5-cb3-validation/boa-h02`; `["-q","-p","no:cacheprovider","tests/deployment/test_network_profiles.py","tests/deployment/test_secret_handling.py","tests/deployment/test_base_profile_regression.py","--basetemp=/private/tmp/s5-cb3-validation/pytest-h02"]` | `99 passed, 3 warnings in 13.62s` |
+| focused S5 probe | `/private/tmp/s5-cb3-validation/boa-focused`; `["-q","-p","no:cacheprovider","tests/probes/test_action_block_identity_probe.py","--basetemp=/private/tmp/s5-cb3-validation/pytest-focused"]` | `35 passed, 3 warnings in 27.55s` |
+| complete probes | `/private/tmp/s5-cb3-validation/boa-probes`; `["-q","-p","no:cacheprovider","tests/probes","--basetemp=/private/tmp/s5-cb3-validation/pytest-probes"]` | `75 passed, 3 warnings in 31.99s` |
+| S1 | `/private/tmp/s5-cb3-validation/boa-s1`; `["-q","-p","no:cacheprovider","tests/clock/test_clock_profiles.py","--basetemp=/private/tmp/s5-cb3-validation/pytest-s1"]` | `57 passed, 3 warnings in 103.91s` |
+| S2 | `/private/tmp/s5-cb3-validation/boa-s2`; `["-q","-p","no:cacheprovider","tests/inventory/test_block_clock_inventory.py","--basetemp=/private/tmp/s5-cb3-validation/pytest-s2"]` | `60 passed, 3 warnings in 25.47s` |
+| nine-file target | `/private/tmp/s5-cb3-validation/boa-targeted`; `["-q","-p","no:cacheprovider","tests/data/test_ledger.py","tests/config/test_switchboard_delta.py","tests/core/teller/test_teller_deposit.py","tests/core/teller/test_teller_withdraw.py","tests/core/teller/test_teller_rebalance.py","tests/core/creditEngine/test_credit_borrow.py","tests/core/creditEngine/test_credit_repay.py","tests/vaults/modules/test_stab_vault_claims.py","tests/core/deleverage/test_deleverage_swap_collateral.py","--basetemp=/private/tmp/s5-cb3-validation/pytest-targeted"]` | `437 passed, 3 warnings in 134.58s` |
+| collection | `/private/tmp/s5-cb3-validation/boa-collection`; `["--collect-only","-q","-p","no:cacheprovider","--basetemp=/private/tmp/s5-cb3-validation/pytest-collection"]` | `2,872/3,014 collected, 142 deselected, 3 warnings in 1.55s` |
+| full serial | `/private/tmp/s5-cb3-validation/boa-full`; `["-q","-p","no:cacheprovider","--basetemp=/private/tmp/s5-cb3-validation/pytest-full"]` | `2,872 passed, 142 deselected, 3 warnings in 304.53s` |
+
+The standalone checker command was:
+
+```bash
+PYTHONPATH=. \
+  /private/tmp/h01-final-review.dL2pqo/candidate/bin/python \
+  scripts/check_block_clock_inventory.py --check
+```
+
+It produced expected exit `1` in 1.33 seconds wall time with exactly:
+
+- seven `INV-CADENCE-NEW` findings: one test-only Vyper identifier, five
+  runner evidence keys, and one focused-test identifier; and
+- one `INV-PATH-NEW` for
+  `contracts/testing/ActionBlockIdentityProbe.vy`.
+
+Every finding belonged to the isolated S5 probe package; there was no ninth
+finding and no production/incoming-H-02 finding. Inventory remains unchanged
+and the eight findings remain assigned to separately gated Stage C.
+
+Every pytest command reported only the three established
+`PytestAssertRewriteWarning` notices for `_hypothesis_globals`, `hypothesis`,
+and `boa`, which were already imported by the cache-redirection launcher. The
+outer login shell also printed its pre-existing pyenv-shim rehash warning, and
+`pip check` printed the pre-existing disabled-user-cache warning before
+reporting no broken requirements. Neither warning changed the locked
+interpreter, collected tests, or results.
+
+### 13.3 Unchanged S5 identities and stop
+
+The exact S5 and inventory identities at merge commit `f934cf4…` were:
+
+| Path/artifact | Identity |
+| --- | --- |
+| production `contracts/data/Ledger.vy` | SHA-256 `00d86847273621857b80701be5faf7ca88ff9505f68671d5b6ab3c8b4ec972e0`; Git blob `ef02462508e01f59e8f8112ffce0ca8d17d4d0b8` |
+| `contracts/testing/ActionBlockIdentityProbe.vy` | SHA-256 `95716e4e2b383f2a07826be94d9ee402d263eec522bb4f77efd72a5e5f6eafe5`; Git blob `82a56a6770d07b6330ca19d55df10f05bef5e105` |
+| `scripts/probes/action_block_identity_probe.py` | SHA-256 `135a864356fdfa076acda0009a5e97907afd471215ba5bdfc3dfe1056b4b498b`; Git blob `0bea5c3fb3991097e1e4ae0e57fdcbaf36779f74` |
+| `tests/probes/test_action_block_identity_probe.py` | SHA-256 `24c5bad958cba5425ec52e060995332302409b1fac01a1967c84b7261a2631b6`; Git blob `5ccfb6eafbf05dcf260dfd5658723c7e587c8d93` |
+| probe ABI | SHA-256 `0x2c237ba7e43aa009c69eabe950c733c79415b7eab37e874e065494273a45b359` |
+| probe compiler inputs | SHA-256 `0xf251237b97029e29122f5578c38817e518abcc3062c6d32019de028bdef79a65` |
+| probe creation bytecode | Keccak-256 `0x835fdafe8f7e61253237837ae17cf7985a3cef2eb7e1c274ba2f98f8ea044333` |
+| probe runtime bytecode | Keccak-256 `0xd4114b7780177700bfac10a60e77a4ca49a4ad10a92f01685ea72bbd1c54ab56` |
+| `config/block-clock-inventory.json` | SHA-256 `cebc434d4e2628afd404ff3c76874e26d6e947783dd75ec74dd10001458df6fb`; Git blob `e3e08b2e45aebcdddbf16faa6fcf99e2f908e6a9` |
+| committed row 2 JSON body | SHA-256 `277f3628853b5ff06d65f22611358e08e521fe05afc0dd91b58692dd91026534` |
+
+Before this documentation update, the committed decision record was
+`e99d8917132aae49bccb7ddab2fb57e2bf7e27c0c54a499226fcf3cabb77f0b2`
+and this evidence record was
+`457675670886304a9f00f13fd78c6cbcfabcbb47a6babeed6a4c087b2a6f4b8c`.
+The new documentation hashes are reported out of band because an evidence file
+cannot include its own complete hash without self-reference.
+
+No RPC endpoint or signing-secret value was read; no signer, signature,
+broadcast, deployment, registration, configuration, governance action,
+production change, inventory edit, Stage B, Stage C, push, merge into `rh`, or
+Base migration occurred. Row 2 remains pending and Stage B remains
+unauthorized.
