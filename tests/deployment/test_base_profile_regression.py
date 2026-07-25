@@ -72,6 +72,19 @@ def test_base_mainnet_source_and_history_are_preserved():
     assert repository.history_state is PathState.EXISTING
 
 
+def test_profile_blueprints_do_not_alias_missing_repository_namespaces():
+    assert {
+        profile_id: get_profile(profile_id).repository.blueprint_id
+        for profile_id in NETWORK_PROFILE_IDS
+    } == {
+        "local": None,
+        "base-mainnet": "base",
+        "base-sepolia": None,
+        "robinhood-mainnet": None,
+        "robinhood-testnet": None,
+    }
+
+
 def test_generated_profile_choices_have_no_duplicates():
     assert len(NETWORK_PROFILE_IDS) == len(set(NETWORK_PROFILE_IDS))
     assert NETWORK_PROFILE_IDS == (

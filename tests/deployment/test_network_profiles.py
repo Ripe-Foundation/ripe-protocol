@@ -186,6 +186,13 @@ def test_invalid_schema_fields_fail_closed():
         validate_registry((replace(profile, verifier=invalid_verifier),))
 
 
+def test_blueprint_requires_existing_migration_namespace():
+    profile = get_profile("base-sepolia")
+    invalid_repository = replace(profile.repository, blueprint_id="base")
+    with pytest.raises(NetworkProfileError, match="H02_PROFILE_INVALID"):
+        validate_registry((replace(profile, repository=invalid_repository),))
+
+
 def test_alias_cannot_change_identity_or_repository():
     alias = ProfileAlias("base", "base-mainnet")
     validate_registry(NETWORK_PROFILES, (alias,))

@@ -142,6 +142,15 @@ def _fork_environment(profile, operation, redacted_rpc, **kwargs):
                     f"operation={operation.value} "
                     f"env={redacted_rpc.reference}"
                 ) from None
+            try:
+                log.error(
+                    "H02_FORK_TEARDOWN_FAILED "
+                    f"profile={profile.identity.profile_id} "
+                    f"operation={operation.value} "
+                    f"env={redacted_rpc.reference}"
+                )
+            except Exception:
+                pass
 
 
 def _require_static_assertions(profile, environment, blueprint) -> str:

@@ -758,7 +758,7 @@ def test_fork_teardown_error_is_sanitized(
     ),
 )
 def test_fork_teardown_error_does_not_mask_body_error(
-    module, operation, monkeypatch
+    module, operation, monkeypatch, capsys
 ):
     profile = get_profile("base-mainnet")
     redacted_rpc = RedactedRpc(
@@ -780,6 +780,64 @@ def test_fork_teardown_error_does_not_mask_body_error(
         "fork",
         lambda *args, **kwargs: FailingFork(),
     )
+    with pytest.raises(
+        ValueError, match="synthetic body failure"
+    ):
+        with module._fork_environment(
+            profile, operation, redacted_rpc
+        ):
+            raise ValueError("synthetic body failure")
+    rendered = capsys.readouterr().out
+    assert "H02_FORK_TEARDOWN_FAILED" in rendered
+    assert "profile=base-mainnet" in rendered
+    assert f"operation={operation.value}" in rendered
+    assert "env=--rpc" in rendered
+    for component in (
+        _SENSITIVE_RPC,
+        "synthetic-user",
+        "synthetic-password",
+        "path-token",
+        "query-token",
+        "fragment-token",
+    ):
+        assert component not in rendered
+
+
+@pytest.mark.parametrize(
+    ("module", "operation"),
+    (
+        (migrate, Operation.MIGRATION_FORK),
+        (console, Operation.CONSOLE_EXPLORATION),
+    ),
+)
+def test_fork_teardown_diagnostic_failure_does_not_mask_body_error(
+    module, operation, monkeypatch
+):
+    profile = get_profile("base-mainnet")
+    redacted_rpc = RedactedRpc(
+        _SENSITIVE_RPC,
+        profile.identity.profile_id,
+        operation,
+        "--rpc",
+    )
+
+    class FailingFork:
+        def __enter__(self):
+            return SimpleNamespace()
+
+        def __exit__(self, *args):
+            raise RuntimeError(_SENSITIVE_RPC)
+
+    def fail_diagnostic(*args, **kwargs):
+        raise BrokenPipeError("synthetic diagnostic writer failure")
+
+    monkeypatch.setattr(
+        module.boa,
+        "fork",
+        lambda *args, **kwargs: FailingFork(),
+    )
+    monkeypatch.setattr(module.log, "error", fail_diagnostic)
+
     with pytest.raises(
         ValueError, match="synthetic body failure"
     ):
