@@ -603,7 +603,8 @@ states below. The exact `0a3414a` package review is complete, while every
 broader independent-security decision and the remaining operations,
 live-proof, deployment, final-evidence, and external-review gates stay open:
 
-0. owner approved; independent-security validation of the exact recreation
+0. owner approved; review of the exact `0a3414a` package is complete, while
+   independent-security approval of the broader row-0 owner-direction decision
    remains pending;
 1. owner approved; independent-security acceptance of the one-immutable source
    discriminator remains pending;
