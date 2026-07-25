@@ -1,10 +1,10 @@
 # Stock Token Vault-Change Validation Plan
 
-Status: **M0 owner directions recorded on 24–25 July 2026; all documentable
-pre-implementation M0 validation inputs are complete for independent review;
-M0 remains open pending that review and owner closure; M1 remains
-unauthorized; every production file change, vault/ID, implementation,
-migration, deployment, configuration, and live action remains unapproved**
+Status: **Track 8 M0 independently reviewed and owner-closed on 25 July 2026
+at reviewed commit `c5c8b699b229792dc61e66af35502684ea3c8155`.
+M1 remains unauthorized. Every production or test file change, vault/ID,
+implementation, migration, deployment, configuration, signing, transaction,
+and live action remains unapproved.**
 
 Date: 2026-07-25 (America/Denver)
 
@@ -2571,10 +2571,13 @@ final M1–M5 integration/activation evidence are post-M0 checkpoints. The
 vault-level onchain Endaoment prohibition remains in the proposed M2
 mechanism; a runbook-only launch is not a separate or fallback option.
 
-M0 remains open pending independent review and explicit owner closure.
-VaultBook ID, defaults, manifests, migration names, deployment transactions,
-and enablement remain later Track 7 and owner gates. This validation handoff
-selects none of them.
+Independent review confirmed that no M0 hard stop was converted into an
+unsupported documentation assumption, and the owner closed M0 at reviewed
+commit `c5c8b699b229792dc61e66af35502684ea3c8155` on 25 July 2026. M1 remains
+unauthorized; the separate file-exact authorization proposal remains
+unapproved. VaultBook ID, defaults, manifests, migration names, deployment
+transactions, and enablement remain later Track 7 and owner gates. This
+validation handoff selects none of them.
 
 This is the owner checkpoint. No test, production source, ABI, default,
 migration, manifest, vault/ID, deployment, configuration, transaction, or

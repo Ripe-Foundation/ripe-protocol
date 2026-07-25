@@ -1,9 +1,8 @@
 # Track 8 M0 owner-decision packet
 
-**Status:** Owner directions recorded on 24–25 July 2026. All documentable
-pre-implementation M0 inputs are complete and ready for independent review.
-**M0 remains open pending that review and owner closure; M1 remains
-unauthorized.**
+**Status:** Track 8 M0 was independently reviewed and owner-closed on 25 July
+2026 at reviewed commit
+`c5c8b699b229792dc61e66af35502684ea3c8155`. **M1 remains unauthorized.**
 
 **Revision baseline:** current reviewed `rh`
 `fc48ac45e5f6e8c698a6464a14289aad00e1f2d4`
@@ -32,22 +31,29 @@ the decision and completing the remaining pre-implementation M0 evidence
 only. The owner expressly prohibited M1 and every production/test/interface/
 ABI/default/migration/manifest/`rh-summary.md` change.
 
-This revision must be independently reviewed with:
+On **25 July 2026**, independent review confirmed that no M0 hard stop was
+converted into an unsupported documentation assumption, and the owner
+explicitly closed M0 at reviewed commit
+`c5c8b699b229792dc61e66af35502684ea3c8155`. That closure does not authorize
+M1 or any production/test change, vault or VaultBook ID selection, deployment,
+configuration, signing, or transaction.
+
+This closure revision must be reviewed with:
 
 - [Track 8 M0 evidence](stock-token-m0-evidence.md), SHA-256
-  `6da31ade6594b2988d06e896abd9e219a41780e0bb36bf9a0cbab479026e2fba`;
+  `1ca5ec599e7bab406dd63e2d220251bb085ac2fbf9416bc8f4585632e283e4be`;
 - [Track 8 M0 sanitized raw evidence](stock-token-m0-raw-evidence.json),
   immutable in this revision, SHA-256
   `9ea333b4e84330f56c3a3d70e68823cfdba9c37948508e692450e01b3e994cba`;
 - [Track 8 minimum-change specification](stock-token-vault-change-specification.md),
   SHA-256
-  `61173781b4a410efa693e24075955f1d40d5621758a9e078f42703f9053fa1a9`;
+  `84e3368991803a92ffe2f82f47ef762045cdd9ed90ddd6a833e1531c866d4059`;
   and
 - [Track 8 validation plan](stock-token-vault-change-validation-plan.md),
   SHA-256
-  `c786ef7dd7ff925e1667f3aab90423aa51e30daeba325250e1ec939792fff5e6`.
+  `675f31c7245243b286649b95f1d621c42fc9a662bc3f70cf446c76bb028325bf`.
 
-The companion hashes above were computed after the complete unstaged revision;
+The companion hashes above were computed after the complete closure revision;
 the packet's own final hash is returned out of band because embedding it would
 be self-referential. A checked decision below records owner policy; it does not
 prove or close its evidence requirements.
@@ -140,9 +146,9 @@ launch-component gates; this packet does not invent or select them.
   `arePointsEnabled=false` / `ripePerBlock=0` kill-switch runbook.
 - [x] Do not add Stock-specific reward-accounting contract changes by default.
 
-This revision freezes the launch-disabled policy and returns its
-monitoring/kill-switch runbook for independent review. Later launch-day
-evidence must prove the
+This revision freezes the launch-disabled policy; independent M0 review
+accepted its monitoring/kill-switch runbook. Later launch-day evidence must
+prove the
 deployed global disabled state. Reward activation requires its own validation
 and operations record; the seven-day target is not permission to distribute
 rewards.
@@ -326,9 +332,9 @@ implementation:
 10. the file-exact M1 authorization proposal in Section 10 is complete without
     beginning M1.
 
-M0 nevertheless remains open until this package receives independent review
-and the owner explicitly closes M0. No unresolved pre-implementation evidence
-item is converted into an implementation or deployment assertion.
+Independent review confirmed this package, and the owner explicitly closed M0
+on 25 July 2026. No unresolved pre-implementation evidence item was converted
+into an implementation or deployment assertion.
 
 ### 7.1 Post-M0 evidence gates
 
@@ -373,7 +379,7 @@ authorized implementation or deployment:
 - [x] Cross-chain, reward, fork, Base, route, cap-target, and settlement
   directions selected.
 - [x] Existing raw evidence preserved unchanged.
-- [x] M0 remains open.
+- [x] M0 independently reviewed and owner-closed on 25 July 2026.
 - [x] M1 remains unauthorized.
 - [x] Every already-existing external token that can reach the proposed Teller
   has exact identity and compatibility evidence; future Ripe/LP runtime
@@ -391,12 +397,12 @@ authorized implementation or deployment:
   review-complete.
 - [x] Partial-fill invariant is owner-confirmed.
 - [x] File-exact M1 authorization proposal is ready without beginning M1.
-- [ ] Independent reviewer confirms no hard stop was converted into a
+- [x] Independent reviewer confirmed no hard stop was converted into a
   documentation assumption.
 - [ ] Owner separately authorizes any exact M1 files after M0 closure.
 
-This packet does not close M0. It does not authorize M1 or any production/live
-action.
+This packet records the independent review and owner closure of M0. It does
+not authorize M1 or any production/live action.
 
 ## 10. File-exact M1 authorization proposal
 

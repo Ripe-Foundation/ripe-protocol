@@ -1,9 +1,8 @@
 # Track 8 M0: Stock Token launch evidence and product-freeze record
 
-**Status:** Evidence collected and owner directions recorded on 24–25 July
-2026. All documentable pre-implementation M0 inputs are complete and ready for
-independent review. **M0 remains open pending that review and owner closure;
-M1 remains unauthorized.**
+**Status:** Track 8 M0 was independently reviewed and owner-closed on 25 July
+2026 at reviewed commit
+`c5c8b699b229792dc61e66af35502684ea3c8155`. **M1 remains unauthorized.**
 
 **Evidence acquisition date:** 24 July 2026
 
@@ -30,6 +29,13 @@ rewrite. That increment adds only
 `docs/chains/rh/track-6-s6-track-7-h4-defaults-parameters.md` and changes no
 M0 evidence or Track 8 specification file. The original raw evidence remains
 bound to its recorded acquisition pins.
+
+On 25 July 2026, independent review confirmed that no M0 hard stop was
+converted into an unsupported documentation assumption, and the owner
+explicitly closed M0 at reviewed commit
+`c5c8b699b229792dc61e66af35502684ea3c8155`. That closure does not authorize
+M1 or any production/test change, vault or VaultBook ID selection, deployment,
+configuration, signing, or transaction.
 
 ## 1. Executive conclusion
 
@@ -693,9 +699,9 @@ The owner selected:
 5. require live monitoring and a rehearsed
    `arePointsEnabled`/`ripePerBlock` kill-switch runbook.
 
-No reward-accounting contract change is required by default. M0 remains open
-pending package review, but the pre-implementation runbook is now exact. The
-seven-day target is not permission to distribute rewards.
+No reward-accounting contract change is required by default. M0 closed after
+independent review, and the pre-implementation runbook is exact. The seven-day
+target is not permission to distribute rewards.
 
 ### 8.3 Source-exact incident runbook
 
@@ -743,8 +749,8 @@ monitor, or confirmation-block runbook is a post-M0 launch/promotion stop.
 ### 9.2 True M0 hard stops
 
 Any of the following would stop M0 before a later M1 authorization could be
-approved. The present package records each as closed at the
-pre-implementation level, subject to independent review:
+approved. Independent review confirmed that the present package closes each
+at the pre-implementation level:
 
 - An already-existing external token proposed for a Robinhood route is not
   explicitly named by address and identity, or remains fee-taking,
@@ -827,10 +833,10 @@ graph.
 
 This section records the questions returned before the 24–25 July 2026 owner
 decision revisions. Section 12 is controlling. The owner has now selected the
-policy directions, including the partial-fill invariant. The pre-implementation
-identity, compatibility, parameter-procedure, route-disposition, runbook,
-source-plausibility, decision, and M1-proposal evidence is complete for
-independent review.
+policy directions, including the partial-fill invariant. Independent review
+confirmed the pre-implementation identity, compatibility,
+parameter-procedure, route-disposition, runbook, source-plausibility,
+decision, and M1-proposal evidence.
 
 ### D-M0-01 — Freeze the complete Robinhood Teller asset graph
 
@@ -901,11 +907,12 @@ migration approval before any forward-source Base deployment.
 
 ### D-M0-07 — Next authorization boundary
 
-After the pre-implementation package in Section 9.2 is independently reviewed
-and M0 is explicitly closed, the owner may authorize either:
+The pre-implementation package in Section 9.2 was independently reviewed, and
+the owner explicitly closed M0 on 25 July 2026. The owner used the first of
+the following two separate authorization paths:
 
-- a documentation-only M0 closure revision; or
-- a later file-exact M1 implementation slice.
+- this documentation-only M0 closure revision; or
+- a later file-exact M1 implementation slice, which remains unauthorized.
 
 Nothing in this file authorizes M1. No production vault or VaultBook ID is
 selected. The three-contract direction is documented but remains unimplemented
@@ -948,6 +955,10 @@ and evidence-dependent.
 - [x] Exact partial-fill invariant owner-confirmed on 25 July 2026.
 - [x] File-exact M1 authorization proposal ready in the owner packet without
   beginning M1.
+- [x] Independent reviewer confirmed no M0 hard stop was converted into an
+  unsupported documentation assumption.
+- [x] Owner closed M0 at reviewed commit
+  `c5c8b699b229792dc61e66af35502684ea3c8155` on 25 July 2026.
 - [x] No state-changing transaction, signing, deployment, configuration,
   migration, or live transfer performed.
 - [x] No secret or credential recorded.
@@ -1006,5 +1017,8 @@ does not exercise AAPL transfer, blocklist, or recipient-eligibility controls
 and that the buyer's resulting claim can later become frozen or
 undeliverable.
 
-All documentable pre-implementation M0 inputs are complete. M0 remains open
-pending independent review and owner closure. M1 remains unauthorized.
+All documentable pre-implementation M0 inputs are complete. Independent review
+confirmed that no M0 hard stop was converted into an unsupported documentation
+assumption, and the owner closed M0 at reviewed commit
+`c5c8b699b229792dc61e66af35502684ea3c8155` on 25 July 2026. M1 remains
+unauthorized.

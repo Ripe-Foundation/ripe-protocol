@@ -1,11 +1,10 @@
 # Shared Stock Token Vault-Change Specification
 
-Status: **M0 owner directions recorded on 24–25 July 2026; all documentable
-pre-implementation M0 inputs are complete for independent review; M0 remains
-open pending that review and owner closure; M1 remains unauthorized; Stock
-Tokens remain mandatory launch scope; no production code, vault/ID,
-implementation, migration, deployment, live configuration, or transaction is
-authorized**
+Status: **Track 8 M0 independently reviewed and owner-closed on 25 July 2026
+at reviewed commit `c5c8b699b229792dc61e66af35502684ea3c8155`; M1 remains
+unauthorized; Stock Tokens remain mandatory launch scope; no production code,
+test, vault/ID, implementation, migration, deployment, live configuration,
+signing, or transaction is authorized**
 
 Date: 2026-07-25 (America/Denver)
 
@@ -1173,10 +1172,14 @@ rebase or history rewrite, from reviewed `rh`
 `185bd32004121bbb1c60748844c517ea8da0affb` to exact current `rh`
 `fc48ac45e5f6e8c698a6464a14289aad00e1f2d4`; that increment adds only
 `docs/chains/rh/track-6-s6-track-7-h4-defaults-parameters.md` and changes no
-Track 8 package file. This remains documentation-only. It does not close M0,
-begin M1, select a vault or VaultBook ID, or authorize a production, test,
-interface, ABI, default, migration, manifest, deployment, configuration, or
-transaction change.
+Track 8 package file. That decision revision remained documentation-only and
+did not itself close M0, begin M1, select a vault or VaultBook ID, or authorize
+a production, test, interface, ABI, default, migration, manifest, deployment,
+configuration, signing, or transaction change. On 25 July 2026, independent
+review confirmed that no M0 hard stop was converted into an unsupported
+documentation assumption, and the owner explicitly closed M0 at reviewed
+commit `c5c8b699b229792dc61e66af35502684ea3c8155`. M0 closure does not begin M1
+or expand any production or live authorization.
 
 The operative product graph is now:
 
@@ -5854,7 +5857,7 @@ mechanism priorities without deleting the permanent-design record.
 | Migration | Fresh deploy / complete state migration / no release | Track 7-owned exact plan; Ledger separate; vault custody/state/rewards exact | Protocol + accounting/security/operations + Track 7 | K-07/K-11 and all stateful artifacts | Exact files/IDs/roots | Live execution | **Unapproved; Base filename and production vault/ID open** |
 | Exact-token evidence | Mock only / pinned fork / authorized live evidence | Pinned AAPL full lifecycle plus implementation-switch and failure cases; live action separate | Track 2 + product/risk/security | AAPL proxy/beacon/implementation, all selected components | Approved candidate, permission | K-CP10/K-CP11 | **Plan complete; test/live evidence absent** |
 | Audit/release | Independent units / atomic groups / partial activation | Review units separately, re-review combined artifacts, Release 1/2 economically atomic | Owner + all boundary reviewers | K-00–K-12 | Phase K acceptance | K-CP4 onward | **Split specified; no implementation/audit/release authorized** |
-| Mandatory initial-launch minimum | Permanent option-4 group / guarded nominal containment / evidence return | Section 23's Teller + fresh guarded-settlement nominal vault + CreditEngine, with unchanged AuctionHouse proof; defer corrected shares, automatic bad debt, Ledger migration, reward-loss accounting changes, and recapitalization | Product + protocol + risk/security/accounting/operations | M0–M5 | M0 evidence closure and later file-exact authorization | File-exact implementation authorization | **Owner direction recorded; M0 open, mechanism unimplemented, vault/ID and live action unapproved** |
+| Mandatory initial-launch minimum | Permanent option-4 group / guarded nominal containment / evidence return | Section 23's Teller + fresh guarded-settlement nominal vault + CreditEngine, with unchanged AuctionHouse proof; defer corrected shares, automatic bad debt, Ledger migration, reward-loss accounting changes, and recapitalization | Product + protocol + risk/security/accounting/operations | M0–M5 | M0 evidence closure and later file-exact authorization | File-exact implementation authorization | **M0 owner-closed; mechanism unimplemented, M1 unauthorized, vault/ID and live action unapproved** |
 
 ### 21.12 Phase K acceptance and final stop boundary
 
@@ -6772,9 +6775,11 @@ comprehensive Phase A–K analysis already specified it.
 ### 23.11 Owner decisions required before implementation
 
 M0 documentation/evidence work was authorized and the initial evidence was
-collected in a separate branch. M0 remains open pending independent review and
-owner closure. On 24–25 July 2026, the owner selected the product directions
-in
+collected in a separate branch. On 25 July 2026, independent review confirmed
+that no M0 hard stop was converted into an unsupported documentation
+assumption, and the owner explicitly closed M0 at reviewed commit
+`c5c8b699b229792dc61e66af35502684ea3c8155`. On 24–25 July 2026, the owner
+selected the product directions in
 Section 3.22 and `track-8-m0-owner-decision-packet.md`, including:
 
 1. AAPL-only initial Stock scope and the exact non-Stock launch targets;
@@ -6812,10 +6817,11 @@ revision now returns the complete pre-implementation evidence:
 - a file-exact M1 authorization proposal naming the branch, baseline, proposed
   files/tests/reviewers, and non-authorizations.
 
-Independent review and explicit owner closure remain. No documentable
-pre-implementation input remains intentionally open. An adverse independent
-finding reopens the relevant evidence row; it does not authorize a production
-workaround.
+Independent review and explicit owner closure are complete. No documentable
+pre-implementation input remains intentionally open. M1 remains unauthorized
+pending the separate file-exact owner authorization proposed in the owner
+packet. A later adverse finding reopens the relevant evidence row; it does not
+authorize a production workaround.
 
 Implemented vault source/compiler/storage/ABI/runtime evidence, composed
 tests, actual new Ripe addresses/runtime hashes, post-deployment route/config
@@ -6828,9 +6834,10 @@ Endaoment recipient guard. The three-contract direction remains subject to
 independent validation; failure returns evidence to the owner and does not
 silently authorize AuctionHouse, persistent mode, interface, or Ledger scope.
 
-This section does not pass any of those gates. It does establish that a small
-shared patch exists and that Stock Tokens need not be postponed for the
-corrected-share, bad-debt, Ledger, reward-loss, or recapitalization designs.
+M0 closure does not pass any post-M0 implementation, deployment, configuration,
+or activation gate. It does establish that a small shared patch exists and
+that Stock Tokens need not be postponed for the corrected-share, bad-debt,
+Ledger, reward-loss, or recapitalization designs.
 
 The route boundary is now explicit and onchain:
 `shouldTransferToEndaoment=false` excludes Stock from ordinary configured
