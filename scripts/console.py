@@ -324,8 +324,8 @@ def _validate_static_assertions(profile, operation, environment, blueprint):
     type=click.Choice(NETWORK_PROFILE_IDS, case_sensitive=False),
     help=(
         "Required canonical network profile. `--chain` is a deprecated "
-        "equivalent spelling. `local` is not selectable by this command; "
-        "it is reserved for future embedded-runtime tooling."
+        "equivalent spelling. `local` is recognized but unsupported by this "
+        "command; it is reserved for a future embedded-runtime path."
     ),
 )
 @click.option(

@@ -834,7 +834,7 @@ def resolve_rpc_reference(
             operation=operation,
         )
 
-    if explicit_rpc:
+    if explicit_rpc is not None:
         value = explicit_rpc
         reference = "--rpc"
     else:

@@ -2051,7 +2051,7 @@ worktree was clean and was not modified.
 | E, inert verifier assertions | Fixed without reintroducing path claims. `validate_manifest_assertions()` performs pure manifest-name/history-namespace validation before the verifier outcome; only a supported route may call `static_manifest_path()`. CLI tests exercise hostile manifest and environment input and assert no path output. |
 | F, deployments-DB failure mislabeled | Fixed with stable `H02_MIGRATION_SETUP_FAILED`, profile, and operation only. It no longer carries an RPC environment reference. |
 | G, discarded root-cause type | Not implemented because controlling constraint 5 allows only stable error codes plus profile, operation, chain IDs, and environment-reference names. Exception class names are outside that allowlist, and migration error semantics belong to H-05. Adding `error_class` or a debug re-raise requires explicit owner/security amendment. |
-| H, aspirational `local` help | Fixed in all three CLIs: `local` is not selectable by that command and is reserved for future embedded-runtime tooling. |
+| H, aspirational `local` help | Superseded by final Gate 1 below. All three CLIs now state accurately that `local` is recognized but unsupported by that command and reserved for a future embedded-runtime path. |
 | I, registry tests retained ambient environment | Fixed. The registry suite removes the same explorer, RPC, deployer-key, test-key, and vendor-token variables before each test. |
 | J, unsanitized fork teardown | Fixed in both CLIs. Fork entry and teardown are separately sanitized; teardown cannot mask an existing body error. A two-CLI parameterized test proves credential-bearing teardown text is absent. |
 | K, stale remote | No push is authorized. The stale remote is explicitly prohibited from review below; only the local commit/evidence hashes in the final handoff identify reviewable bytes. |
@@ -2170,11 +2170,11 @@ assertion-rewrite notices. No warning or test was suppressed.
 
 ### Current second-review validation, hashes, and commit
 
-All five H-02 modules imported, and the migrate, console, and verify
-`--help` routes exited zero with every relevant environment value absent.
-Each route required an explicit profile, described `--chain` only as a
-deprecated equivalent spelling, and stated that `local` is not selectable by
-that command.
+At that checkpoint all five H-02 modules imported, and the migrate, console,
+and verify `--help` routes exited zero with every relevant environment value
+absent. Each route required an explicit profile and described `--chain` only
+as a deprecated equivalent spelling. Its then-current `local` wording is
+superseded by the accurate final Gate 1 correction below.
 
 Every pytest invocation used `-q -p no:cacheprovider`, a unique task-specific
 `--basetemp`, the mode-0700 compiler cache above, and this launcher:
@@ -2266,3 +2266,249 @@ into `rh`.
 No live RPC, real account, secret, external connection, signing, migration
 execution, history write, verification request/submission, deployment,
 governance action, integration-worktree edit, push, or `rh` merge occurred.
+
+## Final Gate 1 execute-transaction redaction correction
+
+### Finding, starting identity, and exact scope
+
+Independent Gate 1 review reproduced a credential disclosure through
+`scripts/utils/migration_helpers.py::execute_transaction()`: the helper logged
+`str(exception)` verbatim, so an exception containing a credential-bearing
+RPC URL exposed its username, password, path token, query token, and fragment.
+The helper is reachable from the supported Base migration-fork route and
+therefore falls within H-02's full-redaction boundary.
+
+This correction starts from local feature HEAD
+`66200c6f70328f79ac11b6260851092b486394bf`. It does not reconcile local
+`rh` commit `fc48ac45e5f6e8c698a6464a14289aad00e1f2d4`; the feature branch
+remains based on merge base
+`185bd32004121bbb1c60748844c517ea8da0affb`. No ref is changed.
+
+The unstaged, uncommitted correction changes exactly:
+
+- `scripts/utils/migration_helpers.py`;
+- `tests/deployment/test_secret_handling.py`; and
+- this evidence file.
+
+### Smallest security correction and unchanged semantics
+
+The single production-line change replaces:
+
+```text
+Exception: <raw exception text>
+```
+
+with:
+
+```text
+H02_TRANSACTION_FAILED
+```
+
+The stable diagnostic contains no exception text, exception class, RPC value,
+profile-derived secret, or environment value. The pre-existing `"NoneType"`
+compatibility check may still inspect exception text internally but never
+prints it.
+
+No retry or transaction semantic changes are included. The attempt counter,
+default 20-attempt limit, `max_attempts` override, `no_retry` one-attempt
+behavior, three-second retry delay, transaction arguments, successful return,
+`"NoneType"` early `None` return, exhausted-retry fallthrough, and
+max-attempts diagnostic are byte-identical to starting HEAD. The focused test
+also asserts the existing `None` return for a one-attempt failure.
+
+Item G remains intentionally unimplemented. No exception-class diagnostic or
+richer root-cause field is added. Selecting and proving a richer sanitized
+failure taxonomy remains H-05-owned and requires a separate owner/security
+decision.
+
+### Focused negative proof
+
+`test_execute_transaction_failure_never_logs_exception_text` raises a
+`RuntimeError` whose text includes this synthetic shape:
+
+```text
+https://<username>:<password>@rpc.invalid.example/<path>?api_key=<query>#<fragment>
+```
+
+Captured output must contain `H02_TRANSACTION_FAILED` and must not contain the
+complete exception text, its non-secret synthetic prefix, the complete URL,
+username, password, path token, query token, or fragment token. No external
+request is made; the transaction callable fails locally before any network
+surface.
+
+Current implementation/test hashes:
+
+| File | SHA-256 |
+|---|---|
+| `scripts/utils/migration_helpers.py` | `559c7648f871e6b71b7d13f306290fee7c0d3fbe6d13182996964ba5b79465db` |
+| `tests/deployment/test_secret_handling.py` | `8de4820f1836c1af1014c639fb9fab8d3ed258b18d9ce33118eb2c455c9320b5` |
+
+### Disposable locked runtime and validation
+
+The standing H-02 disposable-environment authorization was used because the
+previous task environment had correctly been removed. No active environment
+or repository dependency file was modified.
+
+```text
+runtime root: /private/tmp/rh-h02-gate1-final-cpython312
+runtime mode: 0700
+Python: 3.12.0
+pip: 23.2.1
+requirements.txt SHA-256:
+  d2e12a6f0cfd128c3891634efafbba8305878bef7a7c5db33e25ebe93b0d2bce
+index: https://pypi.org/simple
+install: exact requirements.txt, --no-cache-dir
+locked versions: 92/92 exact, 0 mismatches
+pip check: No broken requirements found
+
+cache variable: RH_H02_BOA_CACHE_DIR
+cache path: /private/tmp/rh-h02-gate1-final-cache
+cache mode: 0700
+```
+
+The compiler cache was removed after validation and verified absent. The
+mode-0700 runtime remains because independent review and the later authorized
+reconciliation/Gate 2 validation still require the exact locked environment;
+it must be removed and its absence recorded when H-02 no longer needs it.
+
+All relevant explorer, vendor-token, profile RPC, deployer-key, and test-key
+variables were removed from each pytest child environment. Only the unchanged
+synthetic parent-pytest placeholder was supplied.
+
+| Scope / basetemp | Result |
+|---|---|
+| untouched H-01 gate; `/private/tmp/rh-h02-gate1-final-h01` | `16 passed, 3 warnings in 1.45s` |
+| exact new regression; `/private/tmp/rh-h02-gate1-final-focused-rerun` | `1 passed, 3 warnings in 0.04s` |
+| complete secret-handling suite; `/private/tmp/rh-h02-gate1-final-secret` | `41 passed, 3 warnings in 5.23s` |
+
+The three warnings were the established non-fatal
+`PytestAssertRewriteWarning` notices for `_hypothesis_globals`, `hypothesis`,
+and `boa`, imported before pytest by the cache-setting launcher. No warning or
+test was suppressed; no selected test skipped or xfailed.
+
+Public-PyPI package download/install was the only authorized external
+connection. No RPC, account, signer, migration, verification, deployment, or
+governance endpoint was contacted. No secret was accessed or printed.
+
+### Review and next-phase boundary
+
+This correction is intentionally unstaged and uncommitted for independent
+Gate 1 review. It does not authorize or perform Item G, reconciliation of
+`fc48ac45e5f6e8c698a6464a14289aad00e1f2d4`, final Gate 2 validation,
+feature-branch push, or merge into `rh`.
+
+## Final Gate 1 RPC override and local-help correction
+
+### Re-review finding and retained transaction correction
+
+Final Gate 1 re-review found two remaining accuracy defects:
+
+1. `resolve_rpc_reference()` used the truthiness of `explicit_rpc`, so an
+   explicitly supplied empty `--rpc` value fell back to the profile RPC
+   environment variable instead of failing as an invalid override.
+2. All three CLI help routes said `local` was “not selectable” even though
+   registry-derived Click choices recognize and parse it before the
+   operation-specific policy rejects it.
+
+The reviewed `H02_TRANSACTION_FAILED` correction immediately above remains
+unchanged at SHA-256
+`559c7648f871e6b71b7d13f306290fee7c0d3fbe6d13182996964ba5b79465db`.
+Item G remains unimplemented, and richer sanitized root-cause reporting
+remains H-05-owned.
+
+### RPC omission versus explicit override
+
+The only production logic change in `resolve_rpc_reference()` is:
+
+```text
+if explicit_rpc is not None:
+```
+
+`None` alone means the operator omitted `--rpc`, so only that state may read
+the selected profile's named RPC environment variable. An explicit empty
+string or malformed value remains on the override branch, is validated by the
+existing `_validate_rpc_url()` boundary, and fails with
+`H02_RPC_INVALID ... env=--rpc`.
+
+`test_invalid_explicit_rpc_never_reads_environment` covers both `""` and
+`"not-a-valid-rpc"` with a populated `SpyEnvironment`. Both fail with the
+stable invalid-RPC code and record exactly zero mapping access. Existing
+omitted-RPC coverage continues to prove that the named environment key is read
+once when no override is supplied.
+
+`test_invalid_cli_rpc_override_does_not_fall_back` covers the empty and
+malformed override through both RPC-accepting H-02 commands:
+
+- migrate with explicit Base fork mode; and
+- console exploration mode.
+
+All four CLI cases fail locally with `H02_RPC_INVALID ... env=--rpc`, never
+name `BASE_MAINNET_RPC_URL`, and stop before chain-ID/provider access.
+
+### Accurate local-profile help
+
+Migrate, console, and verify now use the same accurate statement:
+
+```text
+`local` is recognized but unsupported by this command; it is reserved for a
+future embedded-runtime path.
+```
+
+This preserves the distinction between registry/Click recognition and
+operation-specific command support. The parameterized help test normalizes
+line wrapping, requires the complete statement for all three commands, and
+rejects the former “not selectable” claim.
+
+### Current unstaged implementation/test hashes
+
+| File | SHA-256 |
+|---|---|
+| `config/network_profiles.py` | `98ad6175e7f3af7d4c5faf46d687b3c32b05a483a9e2d76b60c878873a2cfbea` |
+| `scripts/migrate.py` | `df8ab15de5ad6384c658ff62d906051975110e52cc2034698dccc1b361051321` |
+| `scripts/console.py` | `bb572c42de40f5a9a36f90bea1bb082beb69b8947e45c94d3d97c5f41dcd7f64` |
+| `scripts/verify.py` | `5db7f0f50d509ca96560a22534647e0c36109dc8232a1bc790c8e7ddd4237edb` |
+| `scripts/utils/migration_helpers.py` | `559c7648f871e6b71b7d13f306290fee7c0d3fbe6d13182996964ba5b79465db` |
+| `tests/deployment/test_network_profiles.py` | `a938f79993fe1004b8771f64b86b60a185c6ccf2cf128b30d9fda24db26d407a` |
+| `tests/deployment/test_secret_handling.py` | `a8a5b583e0382c3d011cf2404f448724d98fb63a0db489ce3fa95ce5af1080e6` |
+| `tests/deployment/test_base_profile_regression.py` | `f7f7905cf48153593573b960b760e464454dc171b1d27a9ede1f9191a0de0cd6` |
+
+The current package changes exactly eight H-02-owned files and is
+`8 files changed, 323 insertions(+), 14 deletions(-)`. The index remains empty
+and `git diff --check` is clean.
+
+### Focused and combined validation
+
+Validation reused the retained mode-0700 CPython 3.12.0 / pip 23.2.1
+environment at `/private/tmp/rh-h02-gate1-final-cpython312`. Its 92 locked
+packages and clean `pip check` were recorded immediately above; neither the
+environment nor either dependency file changed.
+
+The fresh compiler cache used:
+
+```text
+variable: RH_H02_BOA_CACHE_DIR
+path: /private/tmp/rh-h02-gate1-rereview-cache
+mode: 0700
+```
+
+It was removed after validation and verified absent.
+
+| Scope / basetemp | Result |
+|---|---|
+| exact RPC/help/transaction focus; `/private/tmp/rh-h02-gate1-rereview-focused` | `11 passed, 3 warnings in 4.30s` |
+| all three H-02 files; `/private/tmp/rh-h02-gate1-rereview-combined` | `95 passed, 3 warnings in 13.80s` |
+
+The three warnings remained the established non-fatal
+`PytestAssertRewriteWarning` notices for `_hypothesis_globals`, `hypothesis`,
+and `boa`, imported before pytest by the cache-setting launcher. No warning or
+test was suppressed; no selected test skipped or xfailed.
+
+### Current review boundary
+
+All changes remain unstaged and uncommitted on feature HEAD
+`66200c6f70328f79ac11b6260851092b486394bf`. Local `rh`
+`fc48ac45e5f6e8c698a6464a14289aad00e1f2d4` is not reconciled. No ref,
+remote, integration worktree, dependency, live RPC, account, signer,
+migration, verifier submission, deployment, or governance state changed.
+Gate 2 remains prohibited until independent Gate 1 approves this exact
+working-tree package and the owner separately authorizes reconciliation.

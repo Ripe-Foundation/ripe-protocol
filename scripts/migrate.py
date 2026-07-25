@@ -240,8 +240,8 @@ def _require_static_assertions(profile, environment, blueprint) -> str:
     help=(
         "Required canonical network profile. `--chain` is a deprecated "
         "equivalent spelling; it does not define a separate identity. "
-        "`local` is not selectable by this command; it is reserved for "
-        "future embedded-runtime tooling."
+        "`local` is recognized but unsupported by this command; it is "
+        "reserved for a future embedded-runtime path."
     ),
 )
 @click.option(

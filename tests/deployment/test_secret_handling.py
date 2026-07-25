@@ -212,6 +212,12 @@ def test_cli_help_without_relevant_env(module):
     assert result.returncode == 0, result.stderr
     assert "--profile" in result.stdout
     assert "[required]" in result.stdout
+    normalized_help = " ".join(result.stdout.split())
+    assert (
+        "`local` is recognized but unsupported by this command; it is "
+        "reserved for a future embedded-runtime path."
+    ) in normalized_help
+    assert "`local` is not selectable" not in normalized_help
 
 
 def test_rpc_env_read_only_for_required_operation():
@@ -236,6 +242,21 @@ def test_rpc_env_read_only_for_required_operation():
     )
     assert required_environment.accesses == ["BASE_MAINNET_RPC_URL"]
     assert rpc.reference == "BASE_MAINNET_RPC_URL"
+
+
+@pytest.mark.parametrize("explicit_rpc", ("", "not-a-valid-rpc"))
+def test_invalid_explicit_rpc_never_reads_environment(explicit_rpc):
+    environment = SpyEnvironment(
+        {"BASE_MAINNET_RPC_URL": "https://fallback.invalid.example"}
+    )
+    with pytest.raises(NetworkProfileError, match="H02_RPC_INVALID"):
+        resolve_rpc_reference(
+            get_profile("base-mainnet"),
+            Operation.MIGRATION_FORK,
+            environment,
+            explicit_rpc=explicit_rpc,
+        )
+    assert environment.accesses == []
 
 
 def test_missing_rpc_env_fails_lazily():
@@ -478,6 +499,30 @@ def test_rpc_components_never_appear_in_logs_exceptions_or_repr():
             lambda value: (_ for _ in ()).throw(RuntimeError(value)),
         )
     rendered = f"{rpc} {rpc!r} {captured.value} {captured.value!r}"
+    for component in (
+        _SENSITIVE_RPC,
+        "synthetic-user",
+        "synthetic-password",
+        "path-token",
+        "query-token",
+        "fragment-token",
+    ):
+        assert component not in rendered
+
+
+def test_execute_transaction_failure_never_logs_exception_text(capsys):
+    failure_text = f"synthetic provider failure {_SENSITIVE_RPC}"
+
+    def fail():
+        raise RuntimeError(failure_text)
+
+    result = migration_helpers.execute_transaction(fail, no_retry=True)
+    rendered = capsys.readouterr().out
+
+    assert result is None
+    assert "H02_TRANSACTION_FAILED" in rendered
+    assert failure_text not in rendered
+    assert "synthetic provider failure" not in rendered
     for component in (
         _SENSITIVE_RPC,
         "synthetic-user",

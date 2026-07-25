@@ -106,6 +106,24 @@ def test_cli_default_policy_matches_help_and_runtime(module):
     assert "--profile" in result.stderr
 
 
+@pytest.mark.parametrize(
+    ("module", "prefix"),
+    (
+        ("scripts.migrate", ("--profile", "base-mainnet", "--fork")),
+        ("scripts.console", ("--profile", "base-mainnet")),
+    ),
+)
+@pytest.mark.parametrize("rpc_value", ("", "not-a-valid-rpc"))
+def test_invalid_cli_rpc_override_does_not_fall_back(
+    module, prefix, rpc_value
+):
+    result = _run_module(module, *prefix, "--rpc", rpc_value)
+    assert result.returncode != 0
+    assert "H02_RPC_INVALID" in result.stderr
+    assert "env=--rpc" in result.stderr
+    assert "BASE_MAINNET_RPC_URL" not in result.stderr
+
+
 def test_legacy_chain_option_resolves_only_to_canonical_base():
     result = _run_module(
         "scripts.verify", "--chain", "BASE-MAINNET"

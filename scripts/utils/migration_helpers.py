@@ -153,7 +153,7 @@ def execute_transaction(transaction, *args, **kwargs):
                 + (" (Trying again in 3 seconds)")
 
             )
-            log.error(f"\tException: {str(exception)}\n")
+            log.error("\tH02_TRANSACTION_FAILED\n")
             if attempts == max_attempts:
                 log.error(f"\tMax attempts reached. Exiting.\n")
                 break
