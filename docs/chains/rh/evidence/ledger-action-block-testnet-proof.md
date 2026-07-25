@@ -639,3 +639,264 @@ live-proof, deployment, final-evidence, and external-review gates stay open:
 Until those blockers close, the result remains no Stage B, no production
 Ledger implementation, no merge, no push, no deployment, and no governance
 action.
+
+## 12. Current reconciled row 2 authorization package — pending
+
+This section supersedes section 10 only as the packet to complete for the next
+live-proof decision. Section 10 remains historical evidence of the reviewed
+`02787d3` recreation package. The current branch is reconciled through
+`e1f14ddb030c5ce3f44d4cdd54e8c6daaad41369`; current S5 HEAD at preparation
+time is `444b3c91711ab79fc0fa2c36063dd11701481f51`. No incoming reconciliation
+changed the probe contract, runner, focused tests, or production Ledger.
+
+No endpoint or signing-secret environment value was read to prepare this
+section. No RPC was contacted, no transaction was signed or broadcast, and
+every live authorization field remains false or null. The complete packet is
+therefore intentionally rejected before either environment variable is read.
+The shell-level removal of those two variables from test child processes is
+recorded command provenance, not a fact recoverable from result artifacts
+afterward; the independently reproducible runner output and tests prove that
+dry-run does not read either value and that broadcast remains disabled.
+
+### 12.1 Field classification
+
+| Class | Fields | Meaning |
+| --- | --- | --- |
+| **verified local/source fact** | network name; chain ID `46630`; source, ABI, compiler-input, creation, and runtime hashes; exact `0x64` address; selectors; published profile `61`; pinned offset `55`; derived raw return `116`; 4–16 runner bound; 300-second maximum; zero-value/no-token rule; endpoint-fingerprint algorithm; redirect prohibition; deterministic pre-broadcast journal/hash comparison; stop behavior | reproduced from the exact local package, runner/tests, integrated profile boundary, and dated source pins; these values are not live endpoint proof |
+| **proposed operational value** | endpoint label; environment-variable names; deployment gas limit `500000`; observation gas limit `100000`; 16 observations; 300-second timeout; nonce-selection rule; retry policy; cleanup/retention procedure | a decision-ready bounded proposal, not owner approval and not a claim that live gas estimates fit these ceilings |
+| **owner-supplied/approved value** | exact endpoint fingerprint; signer address and approval; funding approval; exact nonce; derived probe address; priority/max/aggregate fee caps; dated approval references; completed-packet approvers | intentionally missing; no value is invented or inferred |
+| **live observed value** | endpoint identity responses; `web3_clientVersion`; raw `arbOSVersion()`; pending nonce; balance; code occupancy; gas estimates; deployed address/transactions; receipts; native/ArbSys values; timestamps and actual fees | unavailable until a separately approved preflight/execution; `web3_clientVersion` is evidence only, never proof of the pinned Nitro build |
+
+The proposed gas limits are conservative test-fixture ceilings, not measured
+Robinhood estimates. Preflight must stop if either live estimate exceeds its
+ceiling. The exact fee caps remain owner-supplied because inventing them without
+a dated network observation and explicit approval would defeat the fee gate.
+`ROBINHOOD_TESTNET_PRIVATE_KEY` is a probe-runner-specific proposed name, not
+an H-02 network-profile binding. H-02 supplies no fixed signing-key environment
+name for this proof.
+
+### 12.2 Complete secret-free packet
+
+The endpoint fingerprint procedure is exact: the owner selects the endpoint,
+places its full URL only in `ROBINHOOD_TESTNET_RPC_URL`, computes lowercase
+hex `SHA-256` over the exact UTF-8 URL bytes with no newline or normalization,
+and puts only that 64-hex fingerprint in `rpc.url_sha256`. The runner hashes the
+environment value before the first JSON-RPC call and stops on disagreement.
+The URL and credential must never appear in a command line, packet, journal,
+test output, evidence record, or repository. HTTP redirects are disabled and a
+3xx response is a hard failure.
+
+The nonce rule is also exact: the owner must approve one signer address, its
+exact pending nonce, and the corresponding CREATE address derived as the final
+20 bytes of `keccak256(rlp([signer_address, expected_nonce]))`. The derived
+address is entered in `probe.expected_address`; preflight independently reads
+the pending nonce, recomputes the address, and proves `eth_getCode` is `0x`.
+The signer must have at least the owner-approved aggregate fee cap in existing
+testnet gas funds. No token transfer and no transaction value are permitted;
+only the bounded testnet gas cost is allowed.
+
+<!-- BEGIN S5_CURRENT_SECRET_FREE_AUTHORIZATION_PACKET -->
+```json
+{
+  "schema_version": 2,
+  "scope": "robinhood-testnet-action-block-proof",
+  "network": "Robinhood Chain testnet",
+  "chain_id": 46630,
+  "robinhood_published_arb_os_profile": 61,
+  "expected_arb_sys_arb_os_version_return": 116,
+  "live_testnet_approved": false,
+  "owner_approval_reference": null,
+  "approval_provenance": {
+    "owner": {
+      "approved": false,
+      "decision_date": null,
+      "reference": null
+    },
+    "independent_security": {
+      "approved": false,
+      "decision_date": null,
+      "reference": null
+    },
+    "deployment": {
+      "approved": false,
+      "decision_date": null,
+      "reference": null
+    }
+  },
+  "rpc": {
+    "approved": false,
+    "label": "robinhood-testnet-owner-selected-endpoint",
+    "url_environment_variable": "ROBINHOOD_TESTNET_RPC_URL",
+    "url_sha256": null
+  },
+  "signer": {
+    "approved": false,
+    "funding_approved": false,
+    "address": null,
+    "private_key_environment_variable": "ROBINHOOD_TESTNET_PRIVATE_KEY",
+    "expected_nonce": null
+  },
+  "probe": {
+    "expected_address": null,
+    "source_sha256": "0x95716e4e2b383f2a07826be94d9ee402d263eec522bb4f77efd72a5e5f6eafe5",
+    "abi_sha256": "0x2c237ba7e43aa009c69eabe950c733c79415b7eab37e874e065494273a45b359",
+    "compiler_inputs_sha256": "0xf251237b97029e29122f5578c38817e518abcc3062c6d32019de028bdef79a65",
+    "creation_bytecode_keccak256": "0x835fdafe8f7e61253237837ae17cf7985a3cef2eb7e1c274ba2f98f8ea044333",
+    "runtime_bytecode_keccak256": "0xd4114b7780177700bfac10a60e77a4ca49a4ad10a92f01685ea72bbd1c54ab56",
+    "arb_sys_address": "0x0000000000000000000000000000000000000064",
+    "arb_block_number_selector": "0xa3b1b31d",
+    "arb_os_version_selector": "0x051038f2"
+  },
+  "fees": {
+    "owner_approved": false,
+    "deployment_gas_limit": 500000,
+    "observation_gas_limit": 100000,
+    "max_fee_per_gas_wei": null,
+    "max_priority_fee_per_gas_wei": null,
+    "max_total_fee_wei": null
+  },
+  "execution": {
+    "max_observation_transactions": 16,
+    "receipt_timeout_seconds": 300,
+    "topology_cases": [
+      "each emitted ArbSys value equals its receipt blockNumber",
+      "two separate transactions included in one child block share one ArbSys identity",
+      "transactions included in successive child blocks have distinct ArbSys identities",
+      "successive child blocks share one native ancestor block.number",
+      "bounded repeated and advancing values without a protocol-maximum claim"
+    ],
+    "stop_on_inconclusive_bound": true,
+    "native_value_wei": 0,
+    "token_transfer": false
+  },
+  "source_pins": {
+    "evidence_date": "2026-07-24",
+    "robinhood_node_image": "offchainlabs/nitro-node:v3.11.2-3599aca",
+    "nitro_commit": "3599acae1ad2fab4059fc46453c9cd3294126641",
+    "arb_sys_interface_commit": "7e88c8cc53c2e96201a23c638f1536557b9cb68b",
+    "pinned_nitro_arb_sys_version_offset": 55,
+    "version_return_derivation": "61 + 55 = 116"
+  }
+}
+```
+<!-- END S5_CURRENT_SECRET_FREE_AUTHORIZATION_PACKET -->
+
+The exact newline-terminated JSON body above has SHA-256
+`277f3628853b5ff06d65f22611358e08e521fe05afc0dd91b58692dd91026534`.
+It parses as JSON and is intentionally non-executable.
+
+Before preflight, the owner-supplied fields must replace every null and the
+five approval booleans (`live_testnet_approved`, `rpc.approved`,
+`signer.approved`, `signer.funding_approved`, and
+`fees.owner_approved`) must actually be true under dated approvals. The owner
+must approve:
+
+- exact endpoint fingerprint and the proposed endpoint label;
+- exact signer address and use of its existing testnet gas funds;
+- exact pending nonce and independently derived probe address;
+- maximum priority fee, maximum fee per gas, and aggregate fee cap in wei;
+- the proposed `500000` deployment and `100000` observation gas ceilings;
+- the proposed 16-observation/17-total-transaction ceiling and 300-second
+  receipt timeout; and
+- the completed packet SHA-256 and exact testnet-only scope.
+
+The minimum funding is the approved `max_total_fee_wei`; the worst-case formula
+remains:
+
+```text
+(500000 + 100000 * 16) * max_fee_per_gas_wei
+<= max_total_fee_wei
+<= signer_balance_wei
+```
+
+The fee packet is invalid if the aggregate cap is below that formula, if the
+priority fee exceeds the max fee, or if the latest base fee plus priority cap
+exceeds the max fee. Gas estimation, transaction formation, and every
+observation remain bounded by those same ceilings.
+
+### 12.3 Fail-closed execution and evidence contract
+
+The runner may perform no blind transaction retry. It may poll a known
+locally-derived transaction hash for its receipt within the approved timeout,
+but it must never resend after an ambiguous `eth_sendRawTransaction` failure
+without separate reconciliation and new approval. Before each send it writes
+the signed transaction's deterministic local hash, nonce, and intended action
+to the sanitized journal. The RPC-returned hash must equal the local hash. An
+ambiguous acceptance failure, a failure while sending the second transaction
+in a burst, or a local/RPC hash disagreement stops the run with every prepared
+transaction still recorded.
+
+The following are hard stops, not warnings:
+
+1. endpoint SHA-256 disagreement, redirect, transport error, wrong chain ID, or
+   incompatible RPC identity;
+2. source/compiler/artifact hash disagreement;
+3. approved profile other than `61`, expected raw return other than the pinned
+   derivation `61 + 55 = 116`, missing/reverting/malformed
+   `arbOSVersion()`, or observed raw return other than `116`;
+4. missing/reverting/malformed `arbBlockNumber()` or disagreement between
+   `0x64` and receipt child-block identity;
+5. pending nonce disagreement, predicted-address disagreement, or nonempty
+   code at the predicted address;
+6. unapproved signer/funding, signer address mismatch, or signer balance below
+   the aggregate cap;
+7. gas estimate above its approved limit, fee arithmetic outside any approved
+   cap, or projected/actual total fee above the aggregate cap;
+8. signed/local/RPC transaction-hash disagreement or any ambiguous possible
+   acceptance; and
+9. any attempt to touch mainnet, Base, governance, production contracts, token
+   value, or user funds.
+
+Within the 16-observation bound, sanitized evidence must attempt and record:
+
+- direct equality of every emitted in-contract ArbSys value and that
+  transaction receipt's `blockNumber`;
+- two distinct transactions in one child block with the same ArbSys identity;
+- transactions in successive child blocks with distinct ArbSys identities;
+- successive child blocks sharing one native ancestor `block.number`;
+- bounded repeated and advancing values without treating the largest observed
+  repetition or jump as a protocol maximum; and
+- deployed address, deployment and observation transaction hashes, locally
+  derived hashes, nonces, actions, exact source/ABI/compiler/bytecode hashes,
+  chain/RPC label and fingerprint, raw version result, receipt block numbers,
+  native/ArbSys values, timestamps, gas, effective fee, total fee, and dated
+  source pins.
+
+If the topology is not observed within the approved bound, the outcome is
+`INCONCLUSIVE`; the bound is not extended and the conclusion is not weakened.
+The minimal probe has no destruction function, so no onchain cleanup
+transaction exists or is authorized. Post-run cleanup means ending this packet's
+signer/endpoint authority, clearing transient process access to both
+environment values, and retaining the deployed test-only address as dated
+evidence. Retain only the sanitized packet, preflight report, transaction
+journal, receipts/observations, totals, hashes, and decision references; retain
+no URL, credential, signing secret, or other secret.
+
+**Copy-ready owner authorization sentence (not yet approved):**
+
+> I authorize only the Robinhood Chain testnet action-block proof described by
+> the completed secret-free packet with SHA-256
+> `[COMPLETED_PACKET_SHA256]`, using endpoint label
+> `[APPROVED_ENDPOINT_LABEL]` whose exact URL is held only in
+> `ROBINHOOD_TESTNET_RPC_URL` and hashes to `[ENDPOINT_SHA256]`, approved signer
+> `[SIGNER_ADDRESS]` whose private key is held only in
+> `ROBINHOOD_TESTNET_PRIVATE_KEY`, nonce `[NONCE]`, predicted deployment
+> address `[PREDICTED_ADDRESS]`, deployment gas limit `[DEPLOYMENT_GAS]`,
+> observation gas limit `[OBSERVATION_GAS]`, maximum priority fee
+> `[MAX_PRIORITY_FEE_WEI]` wei, maximum fee `[MAX_FEE_PER_GAS_WEI]` wei,
+> aggregate fee cap `[MAX_TOTAL_FEE_WEI]` wei, at most
+> `[OBSERVATION_COUNT]` observation transactions plus one deployment, and a
+> receipt timeout of `[TIMEOUT_SECONDS]` seconds. I approve use of only that
+> signer's existing Robinhood testnet gas funds up to the aggregate cap. The
+> run must enforce chain ID `46630`, exact `0x64`, published profile `61`,
+> pinned offset `55`, raw `arbOSVersion()` return `116`, the packet's artifact
+> hashes, deterministic pre-broadcast transaction journaling and hash
+> agreement, no redirects, every stated stop condition, zero transaction value
+> and token transfer, bounded inconclusive topology handling, and sanitized
+> evidence retention. This authorizes no mainnet or Base action, user-fund or
+> governance action, production Ledger work, Stage B/C, merge, push,
+> deployment other than the test-only probe, cleanup transaction, or reuse of
+> the signer/endpoint outside this exact proof.
+
+Until that sentence is completed with exact values and explicitly adopted,
+row 2 remains open and neither preflight nor execution is authorized.

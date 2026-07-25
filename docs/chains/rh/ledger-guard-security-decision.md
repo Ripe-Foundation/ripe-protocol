@@ -2107,3 +2107,172 @@ After a separately authorized Stage B, Gate 1 must approve rows 6 and 13 and
 the row 7/12 conditions before any Stage C work, merge, deployment, or
 activation. Gate 2 remains the final merge-readiness gate after separately
 approved Stage C inventory reconciliation.
+
+## 17. Pending operations-approval packages — 25 July 2026
+
+This section makes the two remaining non-live operations decisions
+decision-ready. It does not record an approval, close either row, or authorize
+Stage B. The owner and an operations approver must adopt the applicable
+copy-ready sentence explicitly and with dated provenance before the row can
+close.
+
+### 17.1 Row 8 — configuration and diagnostics
+
+**Recommendation, pending owner/operations approval.** Keep
+`shouldCheckLastTouch`, its governance path, and every default exactly as they
+are. The revised shared Ledger should expose only the read-only immutable
+action-block-source getter selected in section 7.2. It should add no per-touch
+event and no other diagnostic surface.
+
+The **no-change alternative** is to add no getter and require operators to
+recover the constructor selection from deployment calldata, compiler/runtime
+evidence, and the deployment manifest. That alternative avoids one ABI getter,
+but it makes deployment verification and incident diagnosis more indirect and
+more dependent on offchain records. The selected minimal getter provides one
+stable onchain readback of the immutable source without changing action
+classification, write order, configuration, governance, storage policy, or
+event volume.
+
+The residual risk is deliberately accepted rather than hidden: there is no
+per-touch telemetry, so an operator cannot reconstruct each touch from a new
+Ledger event. Diagnosis continues to depend on the immutable getter,
+`shouldCheckLastTouch` configuration readback, constructor and artifact
+evidence, transaction/receipt evidence, and accurate manifests. A missing,
+stale, or misread manifest can therefore delay diagnosis even though the source
+itself is immutable and fail-closed.
+
+The required operational ownership is:
+
+| Time | Accountable role | Required verification |
+| --- | --- | --- |
+| artifact/deployment preparation | deployment operator | independently compile the approved source; confirm the creation/runtime identities, constructor argument position, zero-or-exact-`0x64` input, and absence of another source/mode/selector |
+| pre-activation review | independent deployment reviewer | recompute the constructor input and expected runtime; read the immutable source getter and `shouldCheckLastTouch`; compare both with the approved manifest and activation packet |
+| activation handoff | manifest owner | record the chain, Ledger address, source/ABI/artifact hashes, constructor input, source-getter value, Boolean value, and dated reviewers; refuse an incomplete or inconsistent record |
+| incident response and chain/runtime change | operations/on-call owner | read the source getter and Boolean, compare address/runtime/configuration with the manifest, check ArbSys availability/version and receipt agreement through separately approved evidence, and pause/contain rather than fall back if the source is unavailable |
+
+**Copy-ready approval sentence (still proposed):**
+
+> Owner and Operations approve Checkpoint 0 row 8: keep
+> `shouldCheckLastTouch`, its governance path, and all defaults unchanged;
+> expose only the read-only immutable action-block-source getter; add no
+> per-touch event; accept the resulting lower per-touch telemetry and
+> dependence on getter, configuration, deployment, transaction, and manifest
+> evidence; and assign the deployment operator, independent deployment
+> reviewer, manifest owner, and operations/on-call owner the verification and
+> incident duties stated in section 17.1 of the exact reviewed S5 decision
+> record.
+
+Until that sentence or an explicitly equivalent dated decision is adopted by
+both the owner and operations, row 8 remains
+**OWNER AND SECURITY APPROVED; OPERATIONS PENDING**.
+
+### 17.2 Row 10 — permanent deployed-Base exception
+
+**Recommendation, pending owner/operations approval.** Keep the deployed,
+state-bearing Base Ledger unchanged permanently. Create no Base migration and
+no convergence deadline. The deployment/component inventory and operational
+runbook must record the exact Base Ledger address, deployed runtime hash,
+artifact/source version, constructor behavior, and the explicitly accepted
+Base/Robinhood bytecode divergence.
+
+The no-migration risk is permanent bytecode divergence between Base and
+Robinhood, plus an ongoing operational and code-review burden to identify which
+Ledger generation applies to each chain. Every manifest, incident response,
+future change review, and audit must therefore preserve both identities and
+must never assume automatic Base convergence.
+
+The migration risk is materially greater: the deployed Base Ledger is
+state-bearing and its complete economically relevant state is not safely
+enumerable from the contract. An incomplete, duplicated, reordered, or
+incorrect transfer could corrupt accounting, locks, debt, rewards, or action
+state, with potentially severe user-fund and protocol consequences. Imposing a
+deadline would create pressure to attempt that transfer without a complete
+proof. Permanent retention is therefore the minimum-risk choice under the
+owner's minimum-production-change directive.
+
+The required operational ownership is:
+
+| Surface | Accountable role | Continuing duty |
+| --- | --- | --- |
+| deployment/component inventories and manifests | manifest owner | retain exact Base address/runtime/artifact/source/constructor behavior and accepted divergence beside the exact Robinhood identities |
+| runtime monitoring and incident response | operations/on-call owner | monitor each chain against its own pinned identity; route alerts and runbooks by chain/version; never propose a source swap as ordinary rollback |
+| release and audit review | release/security reviewer | compare future Ledger changes against both the retained Base generation and the forward canonical generation; reject an implicit Base migration or convergence assumption |
+| runbook custody | deployment/operations lead | preserve activation, pause/containment, artifact-reproduction, and version-identification procedures and require dated signoff when identities or owners change |
+
+**Copy-ready approval sentence (still proposed):**
+
+> Owner and Operations approve Checkpoint 0 row 10: retain the deployed
+> state-bearing Base Ledger unchanged permanently, with no migration and no
+> convergence deadline; require the exact Base address, runtime hash,
+> artifact/source version, constructor behavior, and accepted
+> Base/Robinhood bytecode divergence in deployment/component inventories,
+> manifests, and runbooks; accept the permanent divergence and additional
+> version-tracking burden because incomplete or incorrect Ledger-state
+> migration could have severe accounting consequences; and assign the
+> manifest, monitoring, runbook, release, and future-review duties stated in
+> section 17.2 of the exact reviewed S5 decision record.
+
+Until that sentence or an explicitly equivalent dated decision is adopted by
+both the owner and operations, row 10 remains
+**OWNER AND SECURITY APPROVED; OPERATIONS PENDING**.
+
+## 18. Pending Checkpoint 0 closure template
+
+This is a template for use only after the separately authorized Robinhood
+testnet proof succeeds and every pre-implementation approval below is recorded.
+Every field remains pending now. Filling the template is a new owner/security
+decision; it is not self-executing authority.
+
+| Closure item | Required final record | Current state |
+| --- | --- | --- |
+| exact decision authority | exact reconciled decision-record SHA-256 `[FINAL_REVIEWED_DECISION_SHA256]`, exact section 12 file ceiling, independent-review date `[DATE]`, and approval reference `[REFERENCE]` | **PENDING final independent review of the post-package bytes; the previously reviewed `dd863771...` record is historical authority, not approval of this appended package** |
+| row 2 live source proof | completed secret-free packet SHA-256 `[COMPLETED_PACKET_SHA256]`; owner/security/deployment approvals; endpoint fingerprint; signer/nonce/predicted address; fee cap; deployed address and transaction; exact receipt/native/ArbSys observations; topology outcome; sanitized evidence SHA-256 `[LIVE_EVIDENCE_SHA256]` | **PENDING; no RPC contact or live receipt/ArbSys evidence exists** |
+| row 8 operations decision | exact dated owner and operations adoption of section 17.1's approval sentence or an explicitly equivalent statement | **PENDING** |
+| row 10 operations decision | exact dated owner and operations adoption of section 17.2's approval sentence or an explicitly equivalent statement | **PENDING** |
+| corrected Stage B ceiling | owner/security approval of exactly section 12 against `[FINAL_REVIEWED_DECISION_SHA256]`, with no implicit path expansion | **PENDING final exact-record approval** |
+| bounded implementation authority | explicit owner sentence: “I authorize bounded S5 Stage B implementation only within section 12 of decision record `[FINAL_REVIEWED_DECISION_SHA256]`; this does not authorize Gate 1 closure, Stage C, merge, deployment, registration, configuration, activation, governance, signing, broadcast, or Base migration.” | **NOT GIVEN; STAGE B UNAUTHORIZED** |
+
+If the pre-implementation items above later close, the closure record must
+state all of the following without weakening them:
+
+1. row 2 closed only on real, owner-authorized Robinhood testnet
+   receipt/`ArbSys(0x64).arbBlockNumber()` evidence and the approved
+   profile-`61`/raw-`116` version gate;
+2. rows 8 and 10 closed only on explicit owner and operations approvals;
+3. the exact reconciled decision record and exact section 12 file ceiling
+   received final independent review;
+4. rows 6 and 13 remain implementation-dependent Gate 1 evidence, not
+   pre-implementation prerequisites;
+5. row 7 remains conditionally security-approved minimum-change residual risk
+   and its complete broad-valid-Ripe-caller/victim/Addys/Deleverage matrix is a
+   mandatory Gate 1 test condition;
+6. any Stage B authority is bounded to section 12 and does not close Gate 1;
+   and
+7. no merge, Stage C, deployment, registration, configuration, activation,
+   governance, signing, broadcast, or Base migration is authorized.
+
+At this writing, that closure record cannot be completed honestly. Stage B
+remains explicitly unauthorized.
+
+### 18.1 Review clarification — exact current targeted regression set
+
+The current `437 passed` targeted result is exactly nine files, not an
+approximation or a probe-suite total:
+
+| Targeted file | Cases |
+| --- | ---: |
+| `tests/data/test_ledger.py` | 101 |
+| `tests/config/test_switchboard_delta.py` | 109 |
+| `tests/core/teller/test_teller_deposit.py` | 26 |
+| `tests/core/teller/test_teller_withdraw.py` | 32 |
+| `tests/core/teller/test_teller_rebalance.py` | 22 |
+| `tests/core/creditEngine/test_credit_borrow.py` | 39 |
+| `tests/core/creditEngine/test_credit_repay.py` | 17 |
+| `tests/vaults/modules/test_stab_vault_claims.py` | 51 |
+| `tests/core/deleverage/test_deleverage_swap_collateral.py` | 40 |
+| **Total** | **437** |
+
+The first eight paths total `397`; the sole added path,
+`test_deleverage_swap_collateral.py`, contributes `40`, so the current set is
+`397 + 40 = 437` across exactly nine files. The 75-test complete probe suite is
+separate and is not included in this targeted count.
