@@ -6,13 +6,13 @@ This record contains the H-02 Phase A read-only audit, approved design,
 Phase B implementation, and Phase F validation. The owner approved the Phase A
 checkpoint before implementation.
 
-**The original status sentence here is superseded by “Current re-review
-correction and reopened gates” below.** Gate 1 was later approved at
-`596e868797f422afed8f46126556765961aba2c5`; the branch was reconciled to
-`rh` `185bd32004121bbb1c60748844c517ea8da0affb`, validated, and pushed.
-The subsequent independent Gate 2 re-review found material H-02 issues. The
-resulting correction reopens Gate 1 and Gate 2; neither is currently approved
-for the corrected HEAD.
+Final Gate 1 was owner-approved for reviewed patch SHA-256
+`d631f13dafd3b3766419c92723477d749c6c90701b333192a51626cb9da1f73c`,
+committed at `d43e8e513d17e3793f40ff5e1fb51f2d7e7885e2`. The branch was
+reconciled without rebase at `664ef3d45476a86d238dfbe30c90c1a68700c257`.
+Gate 2 technical validation and evidence are complete at
+`1a1fae809367964331101ddeed94532d912f7b4c`. H-02 is awaiting final owner
+integration and has not yet been merged into `rh`.
 
 Phase A used the isolated worktree and branch:
 
