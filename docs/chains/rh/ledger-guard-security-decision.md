@@ -3,12 +3,16 @@
 **Status:** Frozen Stage A evidence recreated on the integrated owner/H-01
 baseline; required local validation and live-proof authorization-packet
 preparation are complete; the exact post-hardening package review is complete,
-while broader Checkpoint 0 security decisions and every remaining gate stay
-open; Stage B and Stage C are not authorized
+and the one-immutable architecture is security-approved in substance; Stage B
+remains unauthorized until the pre-implementation Checkpoint 0 gate closes;
+Gate 1, Stage C, Gate 2, merge, deployment, and activation remain prohibited
 
 **Prepared:** 24 July 2026
 
 **Provenance correction:** 25 July 2026
+
+**Checkpoint 0 security disposition and current-`rh` reconciliation:**
+25 July 2026
 
 **Recreation branch:** `rh-track-6-s5-ledger-guard-recreation`
 
@@ -17,6 +21,13 @@ open; Stage B and Stage C are not authorized
 
 **Exact recreation baseline:**
 `02787d351a3064e35d627e8fbc44150770e61c73`
+
+**Exact owner-directed current-`rh` reconciliation baseline:**
+`fc48ac45e5f6e8c698a6464a14289aad00e1f2d4`
+
+**Local reconciliation merge:**
+`d769f8d5338465dd26a1d315be78268277200666`, tree
+`a8c3b2a5c10e915e77120eb5d84d629266cb56fe`
 
 **Frozen historical evidence branch/commit:**
 `rh-track-6-s5-ledger-guard` at
@@ -67,13 +78,14 @@ interface, ABI, dependency, migration, manifest, inventory, default, Teller,
 or S5-owned path. No M0 closure is inferred without reviewing that separate
 workstream. The integration worktree later showed two unrelated modified
 Track 7 planning files and one untracked Track 7 H3 brief; their contents were
-not read or changed. The S5 recreation branch remains based exactly on
-`02787d3`, and this concurrent movement is not authority to rebase it.
+not read or changed. At that point, the S5 recreation branch remained based
+exactly on `02787d3`, and this concurrent movement was not authority to rebase
+it.
 
 The five reviewed Stage A files were restored byte-for-byte from `6652a10`
 before this provenance update. The integrated S5 task contract and owner
 packet were then re-read at `02787d3`. The owner packet records Mick Hagen's
-owner approval and direct row 7/9 risk acceptances, but does not close the
+owner approval and direct row 7/9 risk acceptances, but did not itself close the
 independent-security, operations, live-proof, deployment, final-evidence, or
 external-review gates. This addendum and the current sections below supersede
 the historical frozen package only for current baseline, dependency,
@@ -153,9 +165,72 @@ On 25 July 2026, the owner resolved the deviation verbatim:
 > afterward. No revert is required. My previous authorization of commit
 > `2f6a49b6c82e69bda54f2fd64d2fe03132e0db21` also remains valid.
 
-No revert is required. This provenance correction does not authorize a push,
-merge, live RPC contact, signing, broadcast, Stage B, Stage C, inventory edit,
-or Checkpoint 0 closure.
+No revert is required. That provenance correction itself did not authorize a
+push, merge into `rh`, live RPC contact, signing, broadcast, Stage B, Stage C,
+inventory edit, or Checkpoint 0 closure.
+
+### Current-`rh` reconciliation and security-review authority
+
+On 25 July 2026, local `rh` and the local `origin/rh` tracking ref both resolved
+to exact
+`fc48ac45e5f6e8c698a6464a14289aad00e1f2d4`, tree
+`3a9d6f0e0dfdd1ccd30e0488c617372238809288`. The integration worktree was
+clean. The owner directed this recreation branch to reconcile that exact commit
+without a rebase or history rewrite.
+
+Local merge commit
+`d769f8d5338465dd26a1d315be78268277200666` has parents
+`db6b6018235c9e8f5bbcdf51a7120e64e603a8e0` and
+`fc48ac45e5f6e8c698a6464a14289aad00e1f2d4`. The incoming committed range from
+the original recreation baseline `02787d3` to `fc48ac4` changes only:
+
+- `docs/chains/rh/robinhood-deployment-support-specification.md`;
+- `docs/chains/rh/robinhood-deployment-validation-plan.md`;
+- `docs/chains/rh/track-6-s6-track-7-h4-defaults-parameters.md`;
+- `docs/chains/rh/track-7-h3-robinhood-blueprint-omissions.md`; and
+- `docs/chains/rh/track-8-m0-owner-decision-packet.md`.
+
+That incoming range is documentation-only: 2,557 insertions and 3 deletions.
+It changes no S5 decision/probe path, production contract, interface, ABI,
+dependency, migration, manifest, inventory, fixture, test, default, Teller,
+Deleverage, MissionControl, or SwitchboardDelta surface. The merge preserves
+all prior S5 commits and the frozen historical branch; nothing was rebased,
+amended, or rewritten.
+
+After that exact requested reconciliation and its validation completed, a
+concurrent owner workflow advanced local `rh` and the local `origin/rh`
+tracking ref to
+`e1f14ddb030c5ce3f44d4cdd54e8c6daaad41369`, tree
+`66d6b063b03ad0d3b8bc1eaccdd189be6cbc226c`. The integration worktree remained
+clean. The later `fc48ac4..e1f14dd` range changes 13 files with 7,645 insertions
+and 1,162 deletions, including Track 7 H-02 configuration, migration/console
+support, verification helpers, and deployment tests as well as Track 8 M0
+documentation. It is not the documentation-only delta authorized by this
+instruction. It was inspected only for local identity and scope, was not
+merged into this recreation branch, and was not validated as S5 authority.
+
+This record and the results in section 1.5.3 therefore remain tied to the exact
+owner-directed `fc48ac4` reconciliation. Any Stage B authorization after the
+concurrent movement requires a separate owner-directed current-`rh`
+reconciliation and revalidation; no silent extension to `e1f14dd` or a later
+tip is claimed.
+
+The independent S5 Checkpoint 0 security review approved in substance:
+
+- the one immutable source discriminator with zero selecting native
+  `block.number`, exact `0x64` selecting only `arbBlockNumber()`, constructor
+  rejection of every other address, no `chain.id` branch, and no fallback;
+- permanent retention of the deployed Base Ledger;
+- preservation of existing arming, six-action high-risk, Underscore,
+  identity/configuration, lock, pause, and fail-closed semantics; and
+- the minimum-change retention of external housekeeping as an explicitly
+  accepted residual risk, subject to the bounded Stage B tests in sections 10
+  and 12.
+
+This security disposition approves the architecture and the listed preserved
+semantics. It does not authorize Stage B now, close live/evidence/operations
+conditions, authorize inventory work, or permit merge into `rh`, deployment,
+activation, governance, signing, broadcast, or live RPC contact.
 
 At `02787d3`, H-01 is integrated at merge
 `575d47b82055b42da2bddf1535d8076cd7cf4c63`, with its post-integration evidence
@@ -203,16 +278,18 @@ with an immutable internal native/ArbSys action-block helper:
 - Robinhood receives only a fresh Ledger deployment before any state-bearing
   user action.
 
-This recommendation is not implementation authority. Confidence is **high**
-that the single-discriminator shape is the smallest design satisfying the
-owner-selected requirements, and **insufficient for Stage B** because no
-owner-approved Robinhood testnet transaction was run. The isolated probe and
-controlled-double tests described in section 10 establish local construction,
-decoding, and fail-closed behavior. Committed official documentation and pinned
-Offchain Labs source still do not prove that Robinhood's deployed `0x64`
-precompile returns the receipt/RPC child block number in the exact
-same-child/successive-child transaction cases. Checkpoint 0 therefore remains
-open and the default is no Stage B.
+This security-approved architecture is not implementation authority.
+Confidence is **high** that the single-discriminator shape is the smallest
+design satisfying the owner-selected requirements, and **insufficient for
+Stage B authorization** because no owner-approved Robinhood testnet transaction
+was run. The isolated probe and controlled-double tests described in section 10
+establish local construction, decoding, and fail-closed behavior. Committed
+official documentation and pinned Offchain Labs source still do not prove that
+Robinhood's deployed `0x64` precompile returns the receipt/RPC child block
+number in the exact same-child/successive-child transaction cases. Checkpoint 0
+therefore remains open at the pre-implementation evidence/operations/file-set
+conditions, while rows 6 and 13 are explicitly deferred to Gate 1. The default
+remains no Stage B.
 
 The recommended helper is smaller than an external generic provider: it avoids
 one deployed contract, one registry/manifest artifact, one call frame on every
@@ -369,7 +446,9 @@ then-approved baseline.
 The current recreation supersedes those stale-baseline stops without rewriting
 them: branch `rh-track-6-s5-ledger-guard-recreation` was created directly from
 exact `02787d351a3064e35d627e8fbc44150770e61c73`. The frozen branch remains at
-`6652a10`; it was not reset, rebased, amended, or otherwise changed.
+`6652a10`; it was not reset, rebased, amended, or otherwise changed. This is
+creation history, not current branch-tip ancestry: the later owner-directed
+merge of exact `fc48ac4` is recorded in the current-`rh` reconciliation section.
 
 ### 1.3 Current integrated dependency state
 
@@ -582,6 +661,43 @@ authorized test-only probe package. A future merge is prohibited until the
 owner approves either the Stage C inventory treatment or removal of the probe
 package, because merging while those findings remain would break the clean-S2
 gate used by other workstreams.
+
+### 1.5.3 Current `fc48ac4` reconciliation validation
+
+After local merge
+`d769f8d5338465dd26a1d315be78268277200666`, the complete applicable gate set
+was rerun on 25 July 2026 with the retained approved H-01 Candidate A
+interpreter, Python `3.12.0`, Vyper `0.4.3`, pytest `8.4.2`, Titanoboa `0.2.7`,
+and locked `cbor2 5.9.0`. `python -m pip check` again reported no broken
+requirements. No dependency was installed, refreshed, or modified.
+
+Boa was preloaded only to redirect its compiler cache to
+`/private/tmp/s5-fc48-validation/titanoboa`. Each pytest invocation therefore
+reported the same three `PytestAssertRewriteWarning` lines for already imported
+`_hypothesis_globals`, `hypothesis`, and `boa`; these warnings do not change
+test semantics.
+
+| Validation | Current reconciled result |
+| --- | --- |
+| documentation/scope gate | `S5_DECISION_DOC_GATE_OK`; `git diff --check` clean; only this decision record modified; no production/test/inventory diff |
+| H-01 dependency gate | 16 passed, 3 expected cache-preload warnings in 1.49 s |
+| S1 clock profiles | 57 passed, 3 expected warnings in 103.47 s |
+| focused action-block probe | 35 passed, 3 expected warnings in 26.80 s |
+| all probe suites | 75 passed, 3 expected warnings in 31.16 s |
+| standalone S2 checker | expected exit 1; exactly seven `INV-CADENCE-NEW` plus one `INV-PATH-NEW`, all from the isolated probe package |
+| S2 inventory tests | 60 passed, 3 expected warnings in 26.43 s |
+| prior eight targeted regression files plus `tests/core/deleverage/test_deleverage_swap_collateral.py` | 437 passed, 3 expected warnings in 59.74 s |
+| collection | 2,773 selected / 2,915 total; 142 deselected, 3 expected warnings in 1.24 s |
+| complete serial suite | 2,773 passed, 142 deselected, 3 expected warnings in 297.88 s |
+
+The expanded targeted count is the prior 397 cases plus 40 existing
+`Deleverage.swapCollateral` cases. The future
+`tests/core/teller/test_teller_action_block.py` does not yet exist and was not
+created: it is an exact Stage B test deliverable, not documentation-stage
+authority. No RPC endpoint or signing secret was read, and no live preflight,
+signature, broadcast, production implementation, inventory edit, deployment,
+or activation occurred. These results predate and do not validate the later
+concurrent local `rh` movement to `e1f14dd`.
 
 ## 2. External source authority
 
@@ -977,12 +1093,13 @@ through caller-supplied addresses. Ledger's own Teller-only check constrains a
 call that targets the genuine Ledger, but it does not make the broad Teller
 surface harmless.
 
-The minimum-change recommendation preserves this existing surface only with an
-explicit owner/security risk acceptance. Narrowing it to Deleverage, removing
-caller-supplied risk, or validating the Addys bundle would touch Teller and
-expand the Stage B/audit boundary. If the reviewer does not accept the current
-surface, this proposed Stage B file set is rejected and must be replaced rather
-than expanded silently.
+The minimum-change decision preserves this existing surface with explicit
+owner acceptance and conditional security approval of the residual risk.
+Narrowing it to Deleverage, removing caller-supplied risk, or validating the
+Addys bundle would touch Teller and expand the Stage B/audit boundary. The
+accepted surface must instead receive the exact Stage B tests in sections 10
+and 12. Any later decision to narrow it rejects this file set and requires a
+new owner/security scope rather than silent expansion.
 
 ## 5. Ledger state and enumerability
 
@@ -1172,10 +1289,13 @@ Costs and risks:
   lower-risk and Boolean-disabled calls; and
 - test doubles must faithfully model precompile return/revert/malformed cases.
 
-**Recommendation:** Candidate B with exactly one immutable source
-discriminator, conditional on independent-security approval plus successful
-live/testnet source evidence and all remaining Checkpoint 0 decisions. This is
-the smallest boundary that satisfies the owner-selected two-source contract.
+**Security-approved architecture:** Candidate B with exactly one immutable
+source discriminator is approved in substance as the smallest boundary that
+satisfies the owner-selected two-source contract. This architecture approval
+does not itself authorize implementation. The pre-implementation Checkpoint 0
+gate must still close its live-source, operations, exact-file-set, and current
+baseline conditions before the owner may authorize bounded Stage B work.
+Implementation-dependent rows 6 and 13 then close only at Gate 1.
 
 ### 7.3 Candidate C — generic immutable address and selector
 
@@ -1202,7 +1322,11 @@ abstraction needed for both source families.
 
 ## 8. Recommended policy contract
 
-Every line remains pending Checkpoint 0 approval.
+The policy contract below is security-approved in substance. Stage B remains
+unauthorized until the pre-implementation Checkpoint 0 gate closes, and its
+implementation must return to Gate 1 for the row 6 identity/reachability matrix
+and row 13 final evidence. No approval here authorizes merge, deployment,
+activation, or inventory work.
 
 ### 8.1 Action identity and ordering
 
@@ -1286,8 +1410,8 @@ the 24 internally routed Teller housekeeping paths and the external
 atomic, both liquidation transactions unwind even though their housekeeping
 call occurs after AuctionHouse work. Robinhood can therefore lose debt-repayment
 and liquidation/solvency-defense availability exactly when the precompile
-misbehaves. Checkpoint 0 row 9 must accept that trade-off explicitly; ancestor
-`block.number` fallback remains prohibited.
+misbehaves. The owner directly accepted that trade-off and row 9 is
+security-approved; ancestor `block.number` fallback remains prohibited.
 
 ## 9. Underscore compatibility
 
@@ -1386,6 +1510,16 @@ independently re-reviewed and approved as described in the provenance section.
 The exact clean-S2 disposition remains an owner-gated prerequisite to any
 future merge; no inventory change or Stage C work is authorized here.
 
+### 10.1.3 Current reconciled authority
+
+Section 1.5.3 is the authoritative current-branch result after merging exact
+`fc48ac4`: documentation gate passed; H-01 16/16; S1 57/57; focused probes
+35/35; all probes 75/75; S2 inventory tests 60/60; expanded targeted
+regressions 437/437; collection 2,773/2,915 with 142 normal deselections; and
+the serial full suite 2,773/2,773. The standalone S2 checker retained exactly
+the expected seven `INV-CADENCE-NEW` plus one `INV-PATH-NEW` probe-package
+findings. No current result weakens or bypasses that merge prerequisite.
+
 ### 10.2 What those tests do and do not prove
 
 They prove that the exact frozen source compiles, existing native/local
@@ -1462,6 +1596,15 @@ Before implementation can be accepted, the approved test slice must cover:
 The same-child/successive-child test must use an environment capable of
 faithfully producing that block topology. A generic local counter or ancestor
 height mock alone cannot close it.
+
+The external-housekeeping condition is not satisfied by generic Ledger unit
+coverage. Stage B must put the broad valid-Ripe-caller/victim/caller-supplied
+Addys/risk/debt matrix in
+`tests/core/teller/test_teller_action_block.py` and the sole production
+external-housekeeping route, `Deleverage.swapCollateral`, in
+`tests/core/deleverage/test_deleverage_swap_collateral.py`. Those are test-only
+ownership additions; they do not authorize edits to `Teller.vy`,
+`TellerUtils.vy`, or `Deleverage.vy`.
 
 ## 11. Base and Robinhood rollout decision
 
@@ -1561,9 +1704,11 @@ Robinhood must receive a fresh Ledger before any state-bearing user action:
 S6 owns the final Robinhood Defaults/parameter manifest. S5 supplies only the
 approved Ledger source discriminator and compatibility constraints.
 
-## 12. Proposed exact Stage B file set
+## 12. Corrected exact Stage B file set
 
-This is a recommendation for Checkpoint 0, not authority.
+This corrected ceiling is conditionally security-approved for the
+pre-implementation Checkpoint 0 decision, subject to final review of this exact
+record and no implicit expansion. It is not present authority to begin Stage B.
 
 ### 12.1 Recommended owned files
 
@@ -1575,6 +1720,8 @@ This is a recommendation for Checkpoint 0, not authority.
 | `tests/core/teller/test_teller_deposit.py` | prove low-risk arming through actual Teller path |
 | `tests/core/teller/test_teller_withdraw.py` | prove checked withdraw and order/identity behavior |
 | `tests/core/teller/test_teller_rebalance.py` | prove checked post-two-leg behavior |
+| `tests/core/teller/test_teller_action_block.py` | prove the external-housekeeping valid-Ripe-caller/invalid-caller, victim, caller-supplied Addys/risk/debt, griefing, rollback, and action-block matrix without changing Teller source |
+| `tests/core/deleverage/test_deleverage_swap_collateral.py` | prove the sole production external-housekeeping route, exact `(False, _user, True, a)` values, effect order, caller/user identity, Addys propagation, action-block behavior, and full rollback without changing Deleverage source |
 | `tests/core/creditEngine/test_credit_borrow.py` | prove checked guard precedes borrow |
 | `tests/core/creditEngine/test_credit_repay.py` | prove lower-risk repay arming/order |
 | `tests/vaults/modules/test_stab_vault_claims.py` | prove both checked Stability Pool claim paths |
@@ -1594,6 +1741,7 @@ No Stage B edit is recommended for:
 
 - `contracts/core/Teller.vy`;
 - `contracts/core/TellerUtils.vy`;
+- `contracts/core/Deleverage.vy`;
 - `contracts/data/MissionControl.vy`;
 - `contracts/config/SwitchboardDelta.vy`;
 - `contracts/config/DefaultsBase.vy`;
@@ -1612,12 +1760,51 @@ No Stage B edit is recommended for:
 - Underscore source/tests; or
 - any live system.
 
-All excluded tests still run for validation. If external housekeeping is
-narrowed, Teller becomes necessary and the entire proposed file set must return
-to the owner/security reviewer because Teller also intersects the future S4
-review boundary.
+All excluded tests still run for validation. The two new/existing targeted test
+paths above do not authorize any Teller or Deleverage production-source edit.
+If external housekeeping is narrowed, Teller becomes necessary and the entire
+proposed file set must return to the owner/security reviewer because Teller also
+intersects the future S4 review boundary.
 
 ## 13. Review, audit, and Track 7 handoff
+
+### 13.1 Checkpoint 0 and Gate 1 are distinct
+
+The former rule requiring all 14 Checkpoint 0 rows to close before Stage B was
+circular because rows 6 and 13 require evidence from the production
+implementation. It is replaced by two gates:
+
+1. **Checkpoint 0 — pre-implementation authorization.** It records the
+   architecture and preserved-policy decisions, closes row 2's live
+   clock-source evidence gate, obtains the remaining operations approvals for
+   rows 8 and 10, confirms the exact corrected row 12 file ceiling, and assigns
+   the implementation-dependent row 6 and row 13 evidence to Gate 1. Row 7's
+   accepted minimum-change residual risk carries a mandatory Stage B test
+   condition into Gate 1. Only after those pre-implementation conditions close
+   may the owner separately authorize bounded Stage B implementation against
+   section 12.
+2. **Gate 1 — implementation and final-evidence approval.** After Stage B,
+   independent review must close row 6 using the complete
+   identity/reachability/zero-address matrix and close row 13 using the
+   production artifact, ABI/storage/gas, source-failure, same-child topology,
+   targeted, S1, S2, collection, full-suite, rollout, soak, and external-review
+   evidence. Gate 1 must also verify row 7's broad
+   valid-Ripe-caller/victim/Addys/Deleverage tests and prove that Stage B stayed
+   within the conditionally approved row 12 ceiling.
+
+Checkpoint 0 authorization is bounded Stage B implementation authority only.
+It is not merge, inventory, deployment, governance, or activation authority.
+Until Gate 1 approves the implementation-dependent evidence, merge into `rh`,
+Stage C, deployment, registration, configuration, activation, governance,
+signing, and broadcast remain prohibited. After Gate 1, Stage C remains
+separately owner-gated; Gate 2 remains the final merge-readiness decision.
+
+At this record's current state, Stage B is still prohibited: row 2 live proof,
+row 8/10 operations approvals, final acceptance of the corrected row 12 file
+ceiling, reconciliation/revalidation against the then-current approved `rh`
+tip, and an explicit owner Stage B authorization remain outstanding.
+
+### 13.2 Required review slices
 
 Required independent slices:
 
@@ -1694,6 +1881,11 @@ authorize Stage C or an inventory edit now.
 - H-01 is integrated, and this Stage A package has been recreated directly on
   exact `02787d351a3064e35d627e8fbc44150770e61c73`. Its bounded dependency
   exceptions remain active; S5 does not close or alter them.
+- The recreation branch was later reconciled without rebase to exact current
+  `rh` `fc48ac45e5f6e8c698a6464a14289aad00e1f2d4` through local merge
+  `d769f8d5338465dd26a1d315be78268277200666`. The incoming range is
+  documentation-only; this does not replace the required validation or final
+  review of the corrected decision record.
 - The inherited `ripe-lite` interpreter is not the authoritative H-01
   environment: the dependency gate correctly found installed `cbor2 5.7.0`
   instead of locked `5.9.0`. The retained approved H-01 Candidate A
@@ -1703,38 +1895,44 @@ authorize Stage C or an inventory edit now.
   `02787d351a3064e35d627e8fbc44150770e61c73` at bootstrap. No live remote
   refresh was performed, and the unrelated untracked Track 8 owner packet in
   the integration worktree was left untouched.
-- Integrated Track 8 remains documentation-only; its future production graph
-  may require a new compatibility review.
+- At the 25 July reconciliation, local `rh` and the local `origin/rh` tracking
+  ref both resolved to `fc48ac4`, and the integration worktree was clean. No
+  live remote query was performed.
+- Integrated Track 8 remains documentation-only; the incoming M0 owner packet
+  does not itself close M0, and its future production graph may require a new
+  compatibility review.
 - Underscore compatibility is read-only committed-source analysis; no
   downstream test suite was run.
 
-### 14.2 Unresolved policy/architecture items
+### 14.2 Unresolved gates and evidence
 
-- independent-security approval of the owner-selected one-immutable internal
-  helper over the rejected generic provider;
-- exact immutable/getter naming, constructor argument position, and strict ABI
-  return handling;
-- live RH ArbSys/receipt agreement and source version pin;
-- explicit acceptance of lower-risk arming and all six high-risk actions;
-- independent-security acceptance of all preserved canonical identity choices,
-  especially recipient/keeper/liquidated user, multi-user claims, delegation,
-  and current zero-address behavior;
-- independent-security acceptance of the preserved Underscore exemption;
-- explicit risk acceptance for preserved external housekeeping and its
-  caller-supplied Addys/risk/debt controls; any narrowing requires a separate
-  rescope;
-- explicit acceptance that source failure blocks even lower-risk and
-  Boolean-disabled housekeeping because writes are preserved, including repay
-  and both liquidation entry points;
-- immutable/getter naming and manifest/monitoring diagnostics; no per-touch
-  event or current-action-block view;
-- permanent Base live-version exception and operational ownership;
-- independent-security confirmation that the `02787d3` recreation and
-  authoritative validation satisfy row 11; S4 remains no-code;
-- exact Stage B file set;
-- dedicated external audit and testnet-soak requirement;
-- Track 7 manifest/activation/abort/rollback signers and reviewers; and
-- later S2/component/decision-register reconciliation ownership.
+The one-immutable architecture, preserved arming/high-risk/Underscore
+semantics, fail-closed source behavior, external-housekeeping residual risk,
+permanent Base live-version exception, and H-01/S4 sequence are no longer
+unresolved security-architecture questions. The remaining gates are:
+
+- row 2 live Robinhood ArbSys/receipt agreement, approved source-version pin,
+  endpoint/signer/funding/fee inputs, and final clock-source evidence;
+- exact immutable/getter naming, constructor argument position, strict ABI
+  return handling, bytecode, storage-layout, and gas evidence from Stage B;
+- row 6 Gate 1 identity/reachability evidence, especially
+  recipient/keeper/liquidated user, multi-user claims, delegation, every valid
+  Teller entry, and current zero-address behavior;
+- row 7 Gate 1 tests for broad valid Ripe callers, arbitrary victims,
+  caller-supplied Addys/risk/debt flags, invalid callers, and the sole
+  `Deleverage.swapCollateral` production route;
+- operations approval for row 8 configuration/diagnostics and row 10 permanent
+  Base live-version ownership;
+- final review of this corrected exact row 12 Stage B file ceiling;
+- separate owner-directed reconciliation and revalidation against
+  `e1f14dd` or the then-current approved `rh` tip before Stage B;
+- row 13 Gate 1 production implementation, same-child topology,
+  artifact/storage/gas, targeted/S1/S2/full-suite, rollout, testnet-soak, and
+  explicit external-audit evidence;
+- Track 7 manifest/activation/abort/rollback signers and reviewers;
+- owner disposition of the probe package's eight expected standalone S2
+  findings before any merge; and
+- later Stage C S2/component/decision-register reconciliation plus Gate 2.
 
 ## 15. Explicitly rejected alternatives
 
@@ -1763,42 +1961,56 @@ authorize Stage C or an inventory edit now.
 
 ## 16. Checkpoint 0 approval table
 
-The integrated owner packet records owner approval or in-principle approval as
-shown below. **No row is closed.** Recommendations and owner approval do not
-replace the missing independent-security, operations, deployment, live-proof,
-final-evidence, or external-review gates. Final closure must name the decision,
-date, owner, independent security reviewer, evidence commit, and conditions.
+The independent S5 Checkpoint 0 security review is complete for the
+architecture and preserved semantics identified below. These row dispositions
+do not by themselves close the pre-implementation Checkpoint 0 gate or
+authorize Stage B. Per the controlling no-attribution instruction, the
+reviewer's identity is intentionally omitted; the review date, exact record,
+conditions, and final evidence hash are the review provenance.
 
-Rows 8, 10, and 13 intentionally add operations or deployment-owner sign-off
-for configuration, permanent live-version, activation, and evidence facts they
-must own. These are additive operational approvals; they neither replace nor
-weaken the task contract's mandatory owner and independent-security approval.
+Rows 6 and 13 are implementation-dependent and are expressly assigned to Gate
+1 rather than used as circular prerequisites for Stage B. Row 7's accepted
+minimum-change risk carries a mandatory Stage B test condition into Gate 1.
+Rows 8 and 10 still require operations approval. Row 2 remains a
+pre-implementation live-evidence gate. Row 12 is conditionally
+security-approved after the exact section 12 file-set correction and must be
+confirmed against this final record.
 
 | # | Mandatory decision | Stage A recommendation | Required approvers / evidence | Status |
 | --- | --- | --- | --- | --- |
-| 0 | Owner-direction validation | confirm same actual execution block, native ordinary EVM, ArbSys child block on RH, and listed non-goals | owner plus independent security reviewer against this exact recreation | **OWNER APPROVED; SECURITY PENDING** |
-| 1 | Abstraction shape | one immutable internal source discriminator: zero native, exact `0x64` ArbSys, every other address rejected; no separate mode/provider | independent security reviewer confirms owner-selected correction against sections 7.1/7.2 | **OWNER APPROVED; SECURITY PENDING** |
-| 2 | Clock-source contract | zero returns native `block.number`; exact `0x64` calls only pinned `arbBlockNumber()`; ArbSys construction calls/decodes successfully; read-only source getter; no fallback | owner + security; official source plus owner-approved endpoint/signer/funding/fee-cap and published-profile `61` / expected-raw-return `116` live RH proof | **OWNER APPROVED IN PRINCIPLE; LIVE PROOF AND SECURITY PENDING** |
-| 3 | Current arming semantics | preserve any-touch write and later checked-higher-risk rejection | owner + security; explicit low/high matrix | **OWNER APPROVED; SECURITY PENDING** |
-| 4 | High-risk set | preserve exact six actions | owner + security; complete call graph rereview | **OWNER APPROVED; SECURITY PENDING** |
-| 5 | Underscore policy | preserve exemption in shared source; omit registry from initial RH | owner + security; downstream compatibility review and explicit preserved-behavior acceptance | **OWNER APPROVED; SECURITY PENDING** |
-| 6 | Identity policy | preserve all current per-entry identities and current zero-address behavior | owner + security; delegated/recipient/keeper/liquidator/zero-address matrix and mandatory Stage B reachability evidence | **OWNER APPROVED; SECURITY AND STAGE B REACHABILITY EVIDENCE PENDING** |
-| 7 | External housekeeping | minimum-change preserve only with explicit risk acceptance; otherwise return with expanded Teller scope | owner + security; valid-caller grief/Addys/Deleverage tests | **OWNER DIRECTLY ACCEPTED RISK; SECURITY PENDING** |
-| 8 | Configuration/compatibility | keep Boolean/governance/defaults unchanged; expose only the one immutable source getter; no per-touch event | owner + security + operations | **OWNER APPROVED; SECURITY AND OPERATIONS PENDING** |
-| 9 | Lock/pause/failure | preserve lock/pause; source failure blocks all housekeeping, including repay and both liquidation entries; no per-user nondecrease assertion | owner + security; explicit solvency-defense availability acceptance | **OWNER DIRECTLY ACCEPTED RISK; SECURITY PENDING** |
-| 10 | Base live-version exception | permanent no-migration/no-convergence exception | owner + independent security + operations; exact address/runtime/artifact record | **OWNER APPROVED; SECURITY AND OPERATIONS PENDING** |
-| 11 | H-01/S4 sequence | H-01 integrated; S4 no-code; fresh S5 recreation and authoritative validation on exact `02787d3` | H-01 security reviewer + independent S5 reviewer against this exact five-file recreation | **INTEGRATION, RECREATION, AND EXACT `0a3414a` PACKAGE REVIEW SATISFIED; PROVENANCE-CORRECTION HASH CHECK AND FORMAL ROW DISPOSITION PENDING** |
-| 12 | Stage B ownership | approve exactly section 12 or return it; no implicit file expansion | owner + independent security reviewer | **OWNER APPROVED; SECURITY PENDING** |
-| 13 | Evidence bar | local isolated probe/doubles are necessary but insufficient; require pre-broadcast signed-transaction journal/hash verification, approved published ArbOS profile / observed derived raw ArbSys-version match, live RH receipt agreement and bounded topology proof, faithful same-child production tests, artifacts/storage/gas, targeted/S1/S2/full suite, testnet soak, and explicit external-audit decision | owner + independent security reviewer + deployment owner; exact endpoint, signer, funding, nonce/address, profile `61`, derived raw return `116`, and total-fee-cap approval still required | **OWNER APPROVED IN PRINCIPLE; LIVE/FINAL EVIDENCE, SECURITY, DEPLOYMENT, AND EXTERNAL-REVIEW DECISION PENDING** |
+| 0 | Owner-direction validation | confirm same actual execution block, native ordinary EVM, ArbSys child block on RH, and listed non-goals | owner plus independent security reviewer against this exact recreation | **OWNER AND SECURITY APPROVED** |
+| 1 | Abstraction shape | one immutable internal source discriminator: zero native, exact `0x64` ArbSys, every other address rejected; no separate mode/provider | independent security reviewer confirms owner-selected correction against sections 7.1/7.2 | **OWNER AND SECURITY APPROVED** |
+| 2 | Clock-source contract | zero returns native `block.number`; exact `0x64` calls only pinned `arbBlockNumber()`; ArbSys construction calls/decodes successfully; read-only source getter; no fallback | owner + security; official source plus owner-approved endpoint/signer/funding/fee-cap and published-profile `61` / expected-raw-return `116` live RH proof | **OWNER APPROVED IN PRINCIPLE; PRE-IMPLEMENTATION LIVE CLOCK-SOURCE EVIDENCE GATE REMAINS OPEN** |
+| 3 | Current arming semantics | preserve any-touch write and later checked-higher-risk rejection | owner + security; explicit low/high matrix | **OWNER AND SECURITY APPROVED** |
+| 4 | High-risk set | preserve exact six actions | owner + security; complete call graph rereview | **OWNER AND SECURITY APPROVED** |
+| 5 | Underscore policy | preserve exemption in shared source; omit registry from initial RH | owner + security; downstream compatibility review and explicit preserved-behavior acceptance | **OWNER AND SECURITY APPROVED** |
+| 6 | Identity policy | preserve all current per-entry identities and current zero-address behavior | owner + security; delegated/recipient/keeper/liquidator/zero-address matrix and mandatory Stage B reachability evidence | **OWNER APPROVED; IMPLEMENTATION-DEPENDENT SECURITY EVIDENCE DEFERRED TO GATE 1** |
+| 7 | External housekeeping | minimum-change preserve only with explicit risk acceptance; otherwise return with expanded Teller scope | owner + security; exact broad valid-caller/victim/Addys/Deleverage tests in section 12 | **OWNER DIRECTLY ACCEPTED RESIDUAL RISK; SECURITY CONDITIONALLY APPROVED SUBJECT TO STAGE B TESTS AND GATE 1** |
+| 8 | Configuration/compatibility | keep Boolean/governance/defaults unchanged; expose only the one immutable source getter; no per-touch event | owner + security + operations | **OWNER AND SECURITY APPROVED; OPERATIONS PENDING** |
+| 9 | Lock/pause/failure | preserve lock/pause; source failure blocks all housekeeping, including repay and both liquidation entries; no per-user nondecrease assertion | owner + security; explicit solvency-defense availability acceptance | **OWNER DIRECTLY ACCEPTED RISK; SECURITY APPROVED** |
+| 10 | Base live-version exception | permanent no-migration/no-convergence exception | owner + independent security + operations; exact address/runtime/artifact record | **OWNER AND SECURITY APPROVED; OPERATIONS PENDING** |
+| 11 | H-01/S4/current-`rh` sequence | H-01 integrated; S4 no-code; fresh S5 recreation on `02787d3`; exact `fc48ac4` documentation-only reconciliation and authoritative validation | owner + security against this exact reconciled decision record | **OWNER AND SECURITY APPROVED FOR EXACT `fc48ac4`; FINAL RECORD-HASH REVIEW AND POST-VALIDATION CURRENT-`rh` RECONCILIATION PENDING** |
+| 12 | Stage B ownership | approve exactly corrected section 12 or return it; no implicit file expansion and no Teller/Deleverage production edit | owner + independent security reviewer | **OWNER APPROVED; SECURITY CONDITIONALLY APPROVED AFTER FILE-SET CORRECTION, SUBJECT TO FINAL REVIEW OF THIS EXACT RECORD** |
+| 13 | Evidence bar | local isolated probe/doubles are necessary but insufficient; require production implementation, pre-broadcast signed-transaction journal/hash verification, approved published ArbOS profile / observed derived raw ArbSys-version match, live RH receipt agreement and bounded topology proof, faithful same-child production tests, artifacts/storage/gas, targeted/S1/S2/full suite, testnet soak, and explicit external-audit decision | Gate 1 security + deployment evidence; exact endpoint, signer, funding, nonce/address, profile `61`, derived raw return `116`, and total-fee-cap approval still required | **OWNER APPROVED IN PRINCIPLE; IMPLEMENTATION-DEPENDENT FINAL EVIDENCE GATE DEFERRED TO GATE 1** |
 
-Until every row closes, the mandatory result is:
+Checkpoint 0 may authorize the bounded Stage B implementation only after the
+pre-implementation conditions close: row 2 live evidence, row 8/10 operations
+approval, final confirmation of corrected row 12, owner-directed reconciliation
+and validation against the then-current approved `rh` tip, and explicit owner
+Stage B authorization. Rows 6 and 13 do not create a circular Stage B
+prerequisite because their implementation-dependent evidence is assigned to
+Gate 1. Row 7's test condition also closes at Gate 1.
 
-- no Stage B or Stage C;
+At the present checkpoint, the mandatory result is:
+
+- no Stage B until the pre-implementation conditions above close and the owner
+  expressly authorizes it;
+- no Stage C before Gate 1 approval;
 - no production Ledger implementation or production contract, interface,
   fixture, ABI, inventory, dependency, migration, default, shared-plan, or
   external-repository change beyond the isolated test-only probe package
   already authorized here;
-- no merge or push;
+- no merge into `rh` or push;
 - no Base or Robinhood deployment;
 - no governance/registry action;
 - no live RPC/probe/transaction until the exact testnet endpoint, signer,
@@ -1807,4 +2019,10 @@ Until every row closes, the mandatory result is:
   bound, and maximum total fee are approved and preflight cleanly;
 - no ancestor-number fallback;
 - no disabled Robinhood guard; and
-- no claim that the recommended architecture is approved.
+- no claim that architecture approval is Stage B, Gate 1, Stage C, Gate 2,
+  merge, deployment, or activation approval.
+
+After a separately authorized Stage B, Gate 1 must approve rows 6 and 13 and
+the row 7/12 conditions before any Stage C work, merge, deployment, or
+activation. Gate 2 remains the final merge-readiness gate after separately
+approved Stage C inventory reconciliation.
