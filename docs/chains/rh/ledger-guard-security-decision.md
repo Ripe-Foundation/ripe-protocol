@@ -23,9 +23,13 @@ Gate 1, Stage C, Gate 2, merge, deployment, and activation remain prohibited
 `02787d351a3064e35d627e8fbc44150770e61c73`
 
 **Exact owner-directed current-`rh` reconciliation baseline:**
-`fc48ac45e5f6e8c698a6464a14289aad00e1f2d4`
+`e1f14ddb030c5ce3f44d4cdd54e8c6daaad41369`
 
 **Local reconciliation merge:**
+`bf029d0fc5bee5cfd3c4c4f548f39c2117dbaf4c`, tree
+`7148880fcbe6556bbff0fac664ac4874e593ea7a`
+
+**Prior `fc48ac4` reconciliation merge:**
 `d769f8d5338465dd26a1d315be78268277200666`, tree
 `a8c3b2a5c10e915e77120eb5d84d629266cb56fe`
 
@@ -202,18 +206,51 @@ concurrent owner workflow advanced local `rh` and the local `origin/rh`
 tracking ref to
 `e1f14ddb030c5ce3f44d4cdd54e8c6daaad41369`, tree
 `66d6b063b03ad0d3b8bc1eaccdd189be6cbc226c`. The integration worktree remained
-clean. The later `fc48ac4..e1f14dd` range changes 13 files with 7,645 insertions
-and 1,162 deletions, including Track 7 H-02 configuration, migration/console
-support, verification helpers, and deployment tests as well as Track 8 M0
-documentation. It is not the documentation-only delta authorized by this
-instruction. It was inspected only for local identity and scope, was not
-merged into this recreation branch, and was not validated as S5 authority.
+clean.
 
-This record and the results in section 1.5.3 therefore remain tied to the exact
-owner-directed `fc48ac4` reconciliation. Any Stage B authorization after the
-concurrent movement requires a separate owner-directed current-`rh`
-reconciliation and revalidation; no silent extension to `e1f14dd` or a later
-tip is claimed.
+The exact decision-record correction at SHA-256
+`a4a0ed207355669134171e95ee7568fbe06c1ec4992a47cf0151868c27c2f305`
+received independent approval, and the owner then authorized it as a
+standalone documentation-only commit. Commit
+`73f6a6a4ffaf9d90dd3e5040044b5f6cca021157`, tree
+`94b7ac5489004a7d0fc9391532b6e3fe1cf640ff`, has sole parent `d769f8d` and
+changes only this decision record. No prior commit was amended.
+
+The owner then authorized exact `e1f14dd` reconciliation without rebase or
+history rewriting. Local merge
+`bf029d0fc5bee5cfd3c4c4f548f39c2117dbaf4c`, tree
+`7148880fcbe6556bbff0fac664ac4874e593ea7a`, has parents `73f6a6a` and
+`e1f14dd`. The `fc48ac4..e1f14dd` incoming range changes 13 files with 7,645
+insertions and 1,162 deletions:
+
+- Track 7 H-02 adds `config/network_profiles.py`, network-profile/secret/Base
+  regression tests, migration/console/verification support, and its evidence
+  record; and
+- Track 8 updates four M0 decision/evidence/specification documents.
+
+Git integration merge
+`6c3052668555a7104ea12a7fb1a7c641c7e6b304` establishes that H-02 is
+integrated. Track 8 M0 was independently reviewed and owner-closed on 25 July
+2026 at `c5c8b699b229792dc61e66af35502684ea3c8155`, and integration merge
+`e1f14dd` carries that closure; M1 remains unauthorized.
+
+The integrated H-02 evidence file retains pre-integration status prose saying
+that final integration is still awaited. That sentence is historical/stale at
+`e1f14dd`; the two-parent `6c30526` integration merge and current committed
+implementation are the authoritative integration facts. S5 does not rewrite
+the H-02 record.
+
+Neither incoming workstream changes an S5-owned production or probe path:
+there is no incoming delta to the five Stage A package paths,
+`contracts/data/Ledger.vy`, `contracts/core/Teller.vy`,
+`contracts/core/TellerUtils.vy`, `contracts/core/Deleverage.vy`, or any exact
+Stage B production/test path in section 12. The H-02 migration and CLI support
+changes are adjacent shared tooling and therefore require the complete
+revalidation below, but they do not implement or configure S5.
+
+Exact baseline `e1f14dd` and local merge `bf029d0` control the next S5 gate.
+The older `fc48ac4`/`d769f8d` results remain dated provenance only; they do not
+substitute for the post-reconciliation validation in section 1.5.4.
 
 The independent S5 Checkpoint 0 security review approved in substance:
 
@@ -448,16 +485,17 @@ them: branch `rh-track-6-s5-ledger-guard-recreation` was created directly from
 exact `02787d351a3064e35d627e8fbc44150770e61c73`. The frozen branch remains at
 `6652a10`; it was not reset, rebased, amended, or otherwise changed. This is
 creation history, not current branch-tip ancestry: the later owner-directed
-merge of exact `fc48ac4` is recorded in the current-`rh` reconciliation section.
+merges of exact `fc48ac4` and then exact `e1f14dd` are recorded in the
+current-`rh` reconciliation section.
 
 ### 1.3 Current integrated dependency state
 
-| Workstream | Integrated state at recreation baseline `02787d3` | S5 consequence |
+| Workstream | Integrated state at reconciled baseline `e1f14dd` | S5 consequence |
 | --- | --- | --- |
 | H-01 dependency security | integrated at merge `575d47b82055b42da2bddf1535d8076cd7cf4c63`; post-integration evidence at `26eb3a78668d623be40ed2b6e16f52c919906a12`; approved Candidate A lock hashes are recorded below | use the integrated environment without changing dependencies; rerun the gate, focused tests, S1/S2, targeted regressions, collection, and full suite |
 | S4 deleverage cooldown | integrated owner/security-approved no-code disposition; no S4 Stage B/C | no production overlap; unchanged zero-cooldown launch posture remains a separate S4 handoff |
-| Track 7 deployment support | owns migration namespace, manifest, activation, and later proof operations | S5 prepares evidence only; no migration, signer, RPC, or deployment action |
-| Track 8 | documentation/evidence-only integrations are present, including M0; M0 is not closed | no current production overlap and no authority to touch Track 8 |
+| Track 7 H-02 and deployment support | H-02 network profiles and CLI safety integrated at merge `6c3052668555a7104ea12a7fb1a7c641c7e6b304`; Track 7 retains migration namespace, manifest, activation, and later proof operations | no S5-owned production/probe overlap; consume the integrated shared tooling read-only and rerun all gates; no migration, signer, RPC, or deployment action |
+| Track 8 | M0 independently reviewed and owner-closed at `c5c8b699b229792dc61e66af35502684ea3c8155`, integrated through `e1f14dd`; M1 unauthorized | no S5-owned production/probe overlap and no authority to begin or modify M1 |
 
 H-01's five bounded exceptions and their expiry/review controls remain in
 force. Recreating S5 does not close, waive, extend, or modify them.
@@ -657,12 +695,12 @@ The test-only Vyper probe and all of its compiler artifacts remain unchanged.
 
 The post-hardening S2 checker again exited `1` with exactly the same seven
 `INV-CADENCE-NEW` findings and one `INV-PATH-NEW` finding caused solely by the
-authorized test-only probe package. A future merge is prohibited until the
-owner approves either the Stage C inventory treatment or removal of the probe
-package, because merging while those findings remain would break the clean-S2
-gate used by other workstreams.
+authorized test-only probe package. The probe remains required through the live
+proof. The eight findings must be reconciled in Stage C before the eventual S5
+implementation can merge, because merging while those findings remain would
+break the clean-S2 gate used by other workstreams.
 
-### 1.5.3 Current `fc48ac4` reconciliation validation
+### 1.5.3 Prior `fc48ac4` reconciliation validation
 
 After local merge
 `d769f8d5338465dd26a1d315be78268277200666`, the complete applicable gate set
@@ -698,6 +736,46 @@ authority. No RPC endpoint or signing secret was read, and no live preflight,
 signature, broadcast, production implementation, inventory edit, deployment,
 or activation occurred. These results predate and do not validate the later
 concurrent local `rh` movement to `e1f14dd`.
+
+### 1.5.4 Current `e1f14dd` reconciliation validation
+
+After owner-approved local merge
+`bf029d0fc5bee5cfd3c4c4f548f39c2117dbaf4c`, the complete applicable gate set
+was rerun on 25 July 2026 with the retained approved H-01 Candidate A
+interpreter: Python `3.12.0`, Vyper `0.4.3`, pytest `8.4.2`, Titanoboa `0.2.7`,
+and locked `cbor2 5.9.0`. `python -m pip check` reported no broken
+requirements. No dependency was installed, refreshed, or modified.
+
+Boa was preloaded only through `boa.interpret.set_cache_dir` to redirect its
+compiler cache to `/private/tmp/s5-e1f-validation/titanoboa`. Each pytest
+invocation therefore reported the same three `PytestAssertRewriteWarning`
+lines for already imported `_hypothesis_globals`, `hypothesis`, and `boa`;
+these warnings do not change test semantics. The first attempted H-01 wrapper
+used the nonexistent convenience attribute `boa.set_cache_dir` and stopped
+before pytest collection with `AttributeError`; the corrected wrapper used the
+actual Titanoboa API and all authoritative runs below passed.
+
+| Validation | Exact `e1f14dd` reconciled result |
+| --- | --- |
+| Python compilation | probe runner and focused test compiled; exit `0` |
+| local dry-run | exit `0`; no RPC/secret read; source, ABI, compiler-input, creation-bytecode, and runtime-bytecode hashes reproduced |
+| H-01 dependency gate | 16 passed, 3 expected cache-preload warnings in 1.46 s |
+| S1 clock profiles | 57 passed, 3 expected warnings in 102.40 s |
+| focused action-block probe | 35 passed, 3 expected warnings in 26.65 s |
+| all probe suites | 75 passed, 3 expected warnings in 31.08 s |
+| standalone S2 checker | expected exit `1`; exactly seven `INV-CADENCE-NEW` plus one `INV-PATH-NEW`, all from the isolated probe package |
+| S2 inventory tests | 60 passed, 3 expected warnings in 26.12 s |
+| nine-file targeted regression set, including `tests/core/deleverage/test_deleverage_swap_collateral.py` | 437 passed, 3 expected warnings in 59.40 s |
+| collection | 2,868 selected / 3,010 total; 142 deselected, 3 expected warnings in 1.29 s |
+| complete serial suite | 2,868 passed, 142 deselected, 3 expected warnings in 305.32 s |
+
+The 95-test increase from the prior `fc48ac4` collection is the integrated
+H-02 deployment/profile/secret-handling coverage. The future
+`tests/core/teller/test_teller_action_block.py` still does not exist and was
+not created; it remains an exact Stage B deliverable. No RPC endpoint, explorer
+credential, or signing secret was read. No live preflight, signature,
+broadcast, production implementation, inventory edit, Stage C action,
+deployment, configuration, activation, or governance action occurred.
 
 ## 2. External source authority
 
@@ -1508,17 +1586,20 @@ The hardening delta does not change the probe source or bytecode. It was
 committed locally at `0a3414ade0ba6914f8f69b7cdc1205ea3499a26e`, then
 independently re-reviewed and approved as described in the provenance section.
 The exact clean-S2 disposition remains an owner-gated prerequisite to any
-future merge; no inventory change or Stage C work is authorized here.
+future merge. The controlling disposition is Stage C reconciliation of all
+eight expected findings after the live proof; no inventory change or Stage C
+work is authorized here.
 
 ### 10.1.3 Current reconciled authority
 
-Section 1.5.3 is the authoritative current-branch result after merging exact
-`fc48ac4`: documentation gate passed; H-01 16/16; S1 57/57; focused probes
-35/35; all probes 75/75; S2 inventory tests 60/60; expanded targeted
-regressions 437/437; collection 2,773/2,915 with 142 normal deselections; and
-the serial full suite 2,773/2,773. The standalone S2 checker retained exactly
-the expected seven `INV-CADENCE-NEW` plus one `INV-PATH-NEW` probe-package
-findings. No current result weakens or bypasses that merge prerequisite.
+Section 1.5.4 is the authoritative current-branch result after merging exact
+`e1f14dd`: H-01 16/16; S1 57/57; focused probes 35/35; all probes 75/75; S2
+inventory tests 60/60; targeted regressions 437/437; collection 2,868/3,010
+with 142 normal deselections; and the serial full suite 2,868/2,868. The
+standalone S2 checker retained exactly the expected seven `INV-CADENCE-NEW`
+plus one `INV-PATH-NEW` probe-package findings. Those eight findings remain a
+mandatory Stage C reconciliation before the eventual S5 implementation can
+merge; no current result weakens or bypasses that gate.
 
 ### 10.2 What those tests do and do not prove
 
@@ -1801,8 +1882,8 @@ separately owner-gated; Gate 2 remains the final merge-readiness decision.
 
 At this record's current state, Stage B is still prohibited: row 2 live proof,
 row 8/10 operations approvals, final acceptance of the corrected row 12 file
-ceiling, reconciliation/revalidation against the then-current approved `rh`
-tip, and an explicit owner Stage B authorization remain outstanding.
+ceiling and this exact reconciled record, and an explicit owner Stage B
+authorization remain outstanding.
 
 ### 13.2 Required review slices
 
@@ -1841,10 +1922,9 @@ The isolated probe package must not merge into `rh` while the standalone S2
 checker reports its eight expected findings. That is a technical integration
 gate, not merely a process preference: landing the files without a reviewed
 probe-inventory disposition would break the clean-S2 invariant consumed by
-other workstreams. The owner must decide the probe package's inventory or
-removal disposition before any future merge, most naturally after the live
-proof is complete so the evidence can integrate once. This statement does not
-authorize Stage C or an inventory edit now.
+other workstreams. The probe remains through the live proof, after which Stage
+C must reconcile all eight findings before the eventual S5 implementation can
+merge. This statement does not authorize Stage C or an inventory edit now.
 
 ## 14. Evidence limitations and unresolved decisions
 
@@ -1881,11 +1961,16 @@ authorize Stage C or an inventory edit now.
 - H-01 is integrated, and this Stage A package has been recreated directly on
   exact `02787d351a3064e35d627e8fbc44150770e61c73`. Its bounded dependency
   exceptions remain active; S5 does not close or alter them.
-- The recreation branch was later reconciled without rebase to exact current
-  `rh` `fc48ac45e5f6e8c698a6464a14289aad00e1f2d4` through local merge
-  `d769f8d5338465dd26a1d315be78268277200666`. The incoming range is
-  documentation-only; this does not replace the required validation or final
-  review of the corrected decision record.
+- The recreation branch was reconciled without rebase first to exact
+  `fc48ac45e5f6e8c698a6464a14289aad00e1f2d4` through local merge `d769f8d`,
+  then to exact
+  `e1f14ddb030c5ce3f44d4cdd54e8c6daaad41369` through owner-authorized local
+  merge `bf029d0fc5bee5cfd3c4c4f548f39c2117dbaf4c`. The latter exact baseline
+  and merge identities control the next S5 gate.
+- H-02 network profiles and CLI safety are integrated at `6c30526`. Track 8
+  M0 is independently reviewed and owner-closed at `c5c8b69`, integrated
+  through `e1f14dd`; M1 remains unauthorized. Neither incoming workstream
+  changes an S5-owned production or probe path.
 - The inherited `ripe-lite` interpreter is not the authoritative H-01
   environment: the dependency gate correctly found installed `cbor2 5.7.0`
   instead of locked `5.9.0`. The retained approved H-01 Candidate A
@@ -1895,12 +1980,11 @@ authorize Stage C or an inventory edit now.
   `02787d351a3064e35d627e8fbc44150770e61c73` at bootstrap. No live remote
   refresh was performed, and the unrelated untracked Track 8 owner packet in
   the integration worktree was left untouched.
-- At the 25 July reconciliation, local `rh` and the local `origin/rh` tracking
-  ref both resolved to `fc48ac4`, and the integration worktree was clean. No
-  live remote query was performed.
-- Integrated Track 8 remains documentation-only; the incoming M0 owner packet
-  does not itself close M0, and its future production graph may require a new
-  compatibility review.
+- At the final 25 July reconciliation, local `rh` and the local `origin/rh`
+  tracking ref both resolved to `e1f14dd`, and the integration worktree was
+  clean. No live remote query was performed.
+- Track 8 M0 closure is a product/evidence decision, not authority for M1 or
+  any S5 production, deployment, configuration, or live action.
 - Underscore compatibility is read-only committed-source analysis; no
   downstream test suite was run.
 
@@ -1924,15 +2008,13 @@ unresolved security-architecture questions. The remaining gates are:
 - operations approval for row 8 configuration/diagnostics and row 10 permanent
   Base live-version ownership;
 - final review of this corrected exact row 12 Stage B file ceiling;
-- separate owner-directed reconciliation and revalidation against
-  `e1f14dd` or the then-current approved `rh` tip before Stage B;
 - row 13 Gate 1 production implementation, same-child topology,
   artifact/storage/gas, targeted/S1/S2/full-suite, rollout, testnet-soak, and
   explicit external-audit evidence;
 - Track 7 manifest/activation/abort/rollback signers and reviewers;
-- owner disposition of the probe package's eight expected standalone S2
-  findings before any merge; and
-- later Stage C S2/component/decision-register reconciliation plus Gate 2.
+- Stage C reconciliation of the probe package's eight expected standalone S2
+  findings before the eventual S5 implementation can merge; and
+- later Stage C component/decision-register reconciliation plus Gate 2.
 
 ## 15. Explicitly rejected alternatives
 
@@ -1989,17 +2071,16 @@ confirmed against this final record.
 | 8 | Configuration/compatibility | keep Boolean/governance/defaults unchanged; expose only the one immutable source getter; no per-touch event | owner + security + operations | **OWNER AND SECURITY APPROVED; OPERATIONS PENDING** |
 | 9 | Lock/pause/failure | preserve lock/pause; source failure blocks all housekeeping, including repay and both liquidation entries; no per-user nondecrease assertion | owner + security; explicit solvency-defense availability acceptance | **OWNER DIRECTLY ACCEPTED RISK; SECURITY APPROVED** |
 | 10 | Base live-version exception | permanent no-migration/no-convergence exception | owner + independent security + operations; exact address/runtime/artifact record | **OWNER AND SECURITY APPROVED; OPERATIONS PENDING** |
-| 11 | H-01/S4/current-`rh` sequence | H-01 integrated; S4 no-code; fresh S5 recreation on `02787d3`; exact `fc48ac4` documentation-only reconciliation and authoritative validation | owner + security against this exact reconciled decision record | **OWNER AND SECURITY APPROVED FOR EXACT `fc48ac4`; FINAL RECORD-HASH REVIEW AND POST-VALIDATION CURRENT-`rh` RECONCILIATION PENDING** |
+| 11 | H-01/S4/current-`rh` sequence | H-01 integrated; S4 no-code; fresh S5 recreation on `02787d3`; exact `fc48ac4` and `e1f14dd` non-rewriting reconciliations; authoritative validation at `bf029d0` | owner + security against this exact reconciled decision record | **OWNER AND SECURITY APPROVED; EXACT `e1f14dd` RECONCILIATION VALIDATED; FINAL RECORD-HASH REVIEW PENDING** |
 | 12 | Stage B ownership | approve exactly corrected section 12 or return it; no implicit file expansion and no Teller/Deleverage production edit | owner + independent security reviewer | **OWNER APPROVED; SECURITY CONDITIONALLY APPROVED AFTER FILE-SET CORRECTION, SUBJECT TO FINAL REVIEW OF THIS EXACT RECORD** |
 | 13 | Evidence bar | local isolated probe/doubles are necessary but insufficient; require production implementation, pre-broadcast signed-transaction journal/hash verification, approved published ArbOS profile / observed derived raw ArbSys-version match, live RH receipt agreement and bounded topology proof, faithful same-child production tests, artifacts/storage/gas, targeted/S1/S2/full suite, testnet soak, and explicit external-audit decision | Gate 1 security + deployment evidence; exact endpoint, signer, funding, nonce/address, profile `61`, derived raw return `116`, and total-fee-cap approval still required | **OWNER APPROVED IN PRINCIPLE; IMPLEMENTATION-DEPENDENT FINAL EVIDENCE GATE DEFERRED TO GATE 1** |
 
 Checkpoint 0 may authorize the bounded Stage B implementation only after the
 pre-implementation conditions close: row 2 live evidence, row 8/10 operations
-approval, final confirmation of corrected row 12, owner-directed reconciliation
-and validation against the then-current approved `rh` tip, and explicit owner
-Stage B authorization. Rows 6 and 13 do not create a circular Stage B
-prerequisite because their implementation-dependent evidence is assigned to
-Gate 1. Row 7's test condition also closes at Gate 1.
+approval, final confirmation of corrected row 12 and this exact reconciled
+record, and explicit owner Stage B authorization. Rows 6 and 13 do not create
+a circular Stage B prerequisite because their implementation-dependent
+evidence is assigned to Gate 1. Row 7's test condition also closes at Gate 1.
 
 At the present checkpoint, the mandatory result is:
 
