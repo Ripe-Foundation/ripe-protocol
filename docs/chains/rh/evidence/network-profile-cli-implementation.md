@@ -1032,6 +1032,7 @@ operation_decision
 require_operation
 resolve_rpc_reference
 verify_chain_identity
+validate_verified_identity
 validate_fork_request
 repository_paths
 manifest_path
@@ -1104,6 +1105,14 @@ ordinary path reads exactly `${ACCOUNT}_PRIVATE_KEY` only for
 and no fallback. Its explicit-key path additionally requires
 `local_test_only=True`, profile `local`, and `LOCAL_RUNTIME`.
 
+The Gate 1 correction recorded below further requires `get_account()` to
+resolve the identity's profile through the canonical registry and call
+`validate_verified_identity(..., require_account=True)` before account-name,
+environment-mapping, or `Account.from_key` access. The validator requires a
+supported operation, an identity-requiring policy, an account-requiring policy
+when requested, exact expected/observed equality, and equality with the
+canonical non-local chain ID.
+
 Spies prove both migration and console wrong-chain cases terminate after the
 chain-ID reader. They do not call account, repository/manifest, fork,
 verifier, or submission sentinels. Matching identity permits only the next
@@ -1139,6 +1148,7 @@ request to modify another owner's test.
 | NEG-032 cross-history | `test_profiles_cannot_share_history` |
 | Cross-profile identity | `test_verified_identity_cannot_select_another_profile_history` |
 | Migration order | `test_wrong_chain_prevents_private_key_mapping_access` |
+| Forged account identity boundary | `test_account_identity_validation_precedes_key_access` covers mismatch, wrong canonical chain, unknown profile, blocked Robinhood migration-fork, and supported but non-account operation |
 | Console order | `test_console_wrong_chain_prevents_manifest_and_fork` |
 | Test-key containment | `test_public_local_key_is_test_only` and the explicit local/rejection cases |
 | RPC component leakage | `test_rpc_components_never_appear_in_logs_exceptions_or_repr` |
@@ -1146,8 +1156,8 @@ request to modify another owner's test.
 | Import/help keylessness | module/help and Base explorer-key subprocess cases |
 | Base compatibility | all 22 cases in `test_base_profile_regression.py` |
 
-The three owned modules contain 68 selected cases: 21 registry, 25 secret and
-call-order, and 22 Base regression cases.
+After the Gate 1 correction, the three owned modules contain 73 selected cases:
+21 registry, 30 secret and call-order, and 22 Base regression cases.
 
 ## Phase F validation
 
@@ -1297,3 +1307,123 @@ H-02 is not merge-ready until Gate 1 and Gate 2 close. No secret, live RPC,
 real account, external connection, external write, signing, migration,
 verification submission, deployment, governance action, push, merge, or
 integration-worktree edit occurred.
+
+## Gate 1 security correction
+
+### Independent finding and root cause
+
+An independent Gate 1 reviewer found that the account helper accepted a
+publicly constructible `VerifiedNetworkIdentity` after checking only the
+operation field. The reproduced malformed Base identity had expected chain ID
+`8453` and observed chain ID `1`; the reproduced Robinhood identity used the
+canonical `4663` values even though `MIGRATION_FORK` is
+`blocked_pending_policy`. Both reached the supplied key boundary.
+
+The root cause was local validation in `get_account()` rather than reuse of the
+registry's identity validation. The registry's prior private helper protected
+repository access but was not called by the account helper.
+
+### Narrow correction
+
+The correction changes only these owned files:
+
+- `config/network_profiles.py`;
+- `scripts/utils/migration_helpers.py`; and
+- `tests/deployment/test_secret_handling.py`.
+
+`validate_verified_identity()` is now the public canonical validation boundary.
+It:
+
+1. requires the profile's operation to be `supported`;
+2. requires that operation to be identity-bearing;
+3. optionally requires the operation to be account-bearing;
+4. requires an actual `VerifiedNetworkIdentity`;
+5. requires exact profile and operation equality;
+6. requires `expected_chain_id == observed_chain_id`; and
+7. for a canonical non-local profile, requires the identity's expected chain ID
+   to equal the registry chain ID.
+
+`get_account()` resolves `identity.profile_id` through `get_profile()`, then
+calls `validate_verified_identity(..., require_account=True)` before validating
+the account label, selecting an environment mapping, reading a key, logging an
+account connection, or calling `Account.from_key`.
+
+The explicit local test account path is preserved. `LOCAL_RUNTIME` is now
+truthfully marked as an account-requiring supported operation; its runtime
+chain identity remains explicit and dynamically supplied. The valid
+Base-mainnet `MIGRATION_FORK` caller in `scripts/migrate.py` remains unchanged.
+
+### Focused negative proof
+
+`test_account_identity_validation_precedes_key_access` supplies a recording
+private-key mapping and an `Account.from_key` spy. Each of these cases raises
+before either spy records access:
+
+| Case | Expected result |
+|---|---|
+| Base expected `8453`, observed `1` | `H02_CHAIN_ID_MISMATCH` |
+| Base expected/observed `1` | `H02_CHAIN_ID_MISMATCH` against canonical `8453` |
+| Unknown profile with equal synthetic IDs | `H02_PROFILE_UNKNOWN` |
+| Robinhood mainnet migration-fork with equal canonical IDs | `H02_OPERATION_BLOCKED` |
+| Base supported repository-read operation | `H02_ACCOUNT_BACKEND_UNAPPROVED` |
+
+The existing explicit-local-key test continues to pass. The existing Base live
+test now expects the stronger, earlier `H02_OPERATION_BLOCKED` outcome, while
+the supported Base fork still fails injected local-key use with
+`H02_ACCOUNT_BACKEND_UNAPPROVED`. Both continue to assert that
+`Account.from_key` is not called.
+
+### Pre-reconciliation validation and commit
+
+The correction used the existing disposable locked runtime:
+
+```text
+Python: 3.12.0
+pip: 23.2.1
+Titanoboa cache variable: RH_H02_BOA_CACHE_DIR
+Titanoboa cache path: /private/tmp/rh-h02-gate1-cache.Scabkv
+cache mode: 0700
+```
+
+The first untouched secret-suite rerun reported `1 failed, 29 passed,
+3 warnings in 4.87s`. The sole failure was the pre-existing Base-live
+assertion expecting `H02_ACCOUNT_BACKEND_UNAPPROVED`; the canonical operation
+gate correctly returned `H02_OPERATION_BLOCKED` first. Updating that one
+expected error classification produced:
+
+```text
+tests/deployment/test_secret_handling.py:
+30 passed, 3 warnings in 4.77s
+
+all three H-02 files:
+73 passed, 3 warnings in 10.03s
+```
+
+The warnings were the same non-fatal cache-launcher
+`PytestAssertRewriteWarning` notices for `_hypothesis_globals`, `hypothesis`,
+and `boa`. No warning, test, or negative assertion was suppressed, skipped,
+deselected, or weakened.
+
+Pre-reconciliation correction commit:
+
+```text
+commit: 820964fc583463bf86c090a52b86244127bfec81
+tree: aa35f1f5e53e1d14ca0ace7d353836776bb579a8
+parent: ddede467b1ff333e4d03952a175a56bd1b08e70f
+subject: Harden H-02 account identity validation
+author/committer: Mick Hagen, 2026-07-24T21:46:58-06:00
+```
+
+Current correction file hashes before reconciliation:
+
+| File | SHA-256 |
+|---|---|
+| `config/network_profiles.py` | `c570a27a9fb50f6f6591ca68471ba8df9b1adc07da13e64405188b2e13fc08d0` |
+| `scripts/utils/migration_helpers.py` | `c8fa393c33541fac59b087e6b6d4125d1a97e2092c27960e0a3995ae54b06d1a` |
+| `tests/deployment/test_secret_handling.py` | `fb3f5ccbe12266493144c33bc8f5428e4856f0cafbf035dea1a22714ac0ff5bd` |
+
+At this point local `rh` and the existing `origin/rh` tracking reference both
+resolved to `02787d351a3064e35d627e8fbc44150770e61c73`. The integration
+worktree contained unrelated, pre-existing documentation changes and was not
+modified. Reconciliation and the complete post-reconciliation validation are
+recorded in the following section.
