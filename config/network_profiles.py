@@ -402,7 +402,7 @@ NETWORK_PROFILES: tuple[NetworkProfile, ...] = (
         ),
         rpc=_rpc_policy("BASE_SEPOLIA_RPC_URL", _BASE_SEPOLIA_OPERATIONS),
         repository=RepositoryPolicy(
-            "base", None, PathState.ABSENT, None, PathState.ABSENT
+            None, None, PathState.ABSENT, None, PathState.ABSENT
         ),
         fork=ForkPolicy(True, True, True, True),
         verifier=VerifierPolicy(
@@ -651,6 +651,13 @@ def validate_registry(
                 raise NetworkProfileError(
                     "H02_PROFILE_INVALID", profile_id=profile_id
                 )
+        if (
+            repository.blueprint_id is not None
+            and repository.migration_state is not PathState.EXISTING
+        ):
+            raise NetworkProfileError(
+                "H02_PROFILE_INVALID", profile_id=profile_id
+            )
 
         if repository.history_dir is not None:
             if repository.history_dir in history_owners:

@@ -11,8 +11,13 @@ Final Gate 1 was owner-approved for reviewed patch SHA-256
 committed at `d43e8e513d17e3793f40ff5e1fb51f2d7e7885e2`. The branch was
 reconciled without rebase at `664ef3d45476a86d238dfbe30c90c1a68700c257`.
 Gate 2 technical validation and evidence are complete at
-`1a1fae809367964331101ddeed94532d912f7b4c`. H-02 is awaiting final owner
-integration and has not yet been merged into `rh`.
+`1a1fae809367964331101ddeed94532d912f7b4c`. The owner integrated reviewed
+feature commit `751784023aa216daea082bf87feba21cff378608` into `rh` with merge
+commit `6c3052668555a7104ea12a7fb1a7c641c7e6b304`. This supersedes any
+pre-integration statement below when read as current status; those statements
+remain historical descriptions of the package before the merge. A subsequent
+post-integration audit reopened Gate 1 for the narrow correction recorded in
+the final section. That correction is not yet integrated.
 
 Phase A used the isolated worktree and branch:
 
@@ -224,7 +229,7 @@ must remove those import-time `.env` reads from its owned files.
 | Safe selection | Non-fork Safe branch leaves `sender` undefined | H-02 must deliberately reject; backend implementation is out of scope |
 | Ledger selection | Branch can reference `sender` before assignment | H-02 must deliberately reject; backend implementation is out of scope |
 | Start/end defaults | String `"0"` defeats intended resume behavior | H-05 defect; do not change in H-02 |
-| Retry/log semantics | Positional and ambiguous | H-05 defect; do not change in H-02 |
+| Retry/log semantics | Exhausted retries fall through with `None`; the non-deployment caller can then print `Transaction confirmed` and advance toward a history write | H-05 execution defect composed with H-06 history risk; do not change those prohibited files in H-02 |
 
 The Base and Ethereum labels were traced through current code and Git history.
 There is no current `migrations/eth-mainnet`, `migrations/eth-sepolia`,
@@ -360,6 +365,7 @@ changing the global test harness.
 | Cross-profile history alias | H-02 invalid schema | Reject |
 | Base Sepolia chain ID `84532` | Intended identity | Preserve |
 | Base Sepolia migration/history operation | Unsupported current claim | No Base-mainnet borrowing; repository operations return `unsupported` |
+| Base Sepolia blueprint identity | H-02 unsafe alias defect | Declare no blueprint when the migration namespace is absent; schema validation rejects such aliases |
 | Ethereum labels in H-02 CLIs | Stale/unsupported claims | Remove after owner confirms no undocumented workflow |
 | Local profile identity | Intended profile | Runtime chain ID must be supplied explicitly |
 | Local migration repository/blueprint | Unsupported in H-02 | Do not edit `config/BluePrint.py`; no fallback |
@@ -1110,7 +1116,8 @@ states:
   `migrations/base-mainnet`, and history
   `migration_history/base-mainnet/v1`;
 - Base Sepolia preserves chain `84532`, supports identity-checked console
-  exploration without a repository claim, and rejects repository operations;
+  exploration without a blueprint, source, or history claim, and rejects
+  repository operations;
 - both Robinhood profiles preserve reviewed identities and proposed,
   non-aliasing histories while repository/live/evidence/verification actions
   remain blocked pending policy; and
@@ -1289,14 +1296,24 @@ S2, `tests/conf_env.py`, parameter tooling, authority documents, or
 Remaining risk is deliberately fail-closed:
 
 - H-03 owns complete local and Robinhood blueprints;
-- H-05 owns discovery, migration IDs, resume, execution plans, and ambiguous
-  retry behavior;
-- H-06 owns manifest schema, atomic writes, and promotion;
+- H-05 owns discovery, migration IDs, resume, execution plans, and transaction
+  retry outcomes. In particular, exhausted `execute_transaction()` retries
+  fall through with `None`, while `Migration.transaction()` prints
+  `Transaction confirmed` for a non-deployment call and continues;
+- H-06 owns manifest schema, atomic writes, and promotion. The exhausted-retry
+  false-success path can compose with the existing Base fork-history write and
+  advance or replace release-looking history despite the failed transaction;
 - H-07 owns provider adapters, explorer keys, rates, responses, and
   verification submission;
 - the global pytest harness still eagerly reads its synthetic parent
   placeholder and remains separate test-infrastructure/H-09 work;
 - `scripts/params/params_utils.py` retains out-of-scope Base/vendor assumptions;
+- committed migration
+  `migrations/base-mainnet/2025071801_LootBoxPointsRefresh.py` constructs a
+  `Web3.HTTPProvider` from the raw `migration.rpc()` value outside H-02's
+  registry redaction boundary. The current CLI wrapper sanitizes propagated
+  failures, but H-05/H-06 must account for this consumer when repairing
+  execution and evidence-writing semantics;
 - no live account backend, provider, fee, finality, or release confirmation is
   approved; and
 - Base fork migration remains exploration-only, but the unchanged
@@ -2124,11 +2141,14 @@ Both CLIs use a narrow fork context wrapper:
 entry failure    -> H02_RPC_CONNECT_FAILED
 body failure     -> original sanitized/owned body behavior
 teardown failure -> H02_FORK_TEARDOWN_FAILED
-body + teardown  -> preserve body failure; suppress teardown replacement
+body + teardown  -> preserve body failure; emit sanitized teardown diagnostic
+diagnostic write failure -> preserve body failure; suppress logger failure
 ```
 
 Only profile, operation, and the already-redacted reference name can appear in
-entry/teardown diagnostics.
+entry/teardown diagnostics. Neither teardown exception text nor an RPC value is
+rendered. The body-plus-teardown diagnostic is best-effort: a broken output
+stream cannot replace the body exception or discard its sanitized resume data.
 
 ### Remote review prohibition
 
@@ -2315,6 +2335,14 @@ behavior, three-second retry delay, transaction arguments, successful return,
 `"NoneType"` early `None` return, exhausted-retry fallthrough, and
 max-attempts diagnostic are byte-identical to starting HEAD. The focused test
 also asserts the existing `None` return for a one-attempt failure.
+
+The post-integration audit established the concrete downstream failure mode:
+after ordinary retry exhaustion, `scripts/utils/migration.py` appends that
+`None` result and prints `Transaction confirmed` when `contract_name == ""`.
+The migration can then continue toward the H-06-owned manifest/history write.
+H-02 does not change this prohibited caller or reinterpret retry results; H-05
+must repair and test the false-success behavior, and H-06 must isolate and
+govern the resulting history output.
 
 Item G remains intentionally unimplemented. No exception-class diagnostic or
 richer root-cause field is added. Selecting and proving a richer sanitized
@@ -2530,6 +2558,17 @@ The reviewed unstaged patch SHA-256 was:
 d631f13dafd3b3766419c92723477d749c6c90701b333192a51626cb9da1f73c
 ```
 
+That historical hash reproduces with the full-index diff form:
+
+```text
+git diff --no-ext-diff --full-index d43e8e513d17e3793f40ff5e1fb51f2d7e7885e2^ \
+  d43e8e513d17e3793f40ff5e1fb51f2d7e7885e2 | shasum -a 256
+```
+
+The `--full-index` option is required because default `git diff` abbreviates
+the before/after blob identities and therefore produces a different byte
+stream and SHA-256.
+
 It was committed without further semantic or byte changes:
 
 ```text
@@ -2706,3 +2745,229 @@ merge-readiness review. This package does not merge into `rh` or authorize
 deployment, signing, live credentials/RPCs, migration execution, verification
 submission, governance action, or H-03/H-05/H-07 work. Item G remains an
 explicit H-05 residual.
+
+## Post-integration independent-review correction
+
+### Integrated baseline and reopened gate
+
+The owner integrated the reviewed H-02 feature with merge commit:
+
+```text
+merge: 6c3052668555a7104ea12a7fb1a7c641c7e6b304
+first parent: fc48ac45e5f6e8c698a6464a14289aad00e1f2d4
+second parent: 751784023aa216daea082bf87feba21cff378608
+```
+
+Three later Track 8 M0 closure commits changed documentation only. The
+post-integration correction starts from clean local, cached remote, and live
+remote `rh` commit:
+
+```text
+e1f14ddb030c5ce3f44d4cdd54e8c6daaad41369
+```
+
+The isolated correction worktree and branch are:
+
+```text
+worktree:
+  /Users/wigglez/dev/ripe-protocol-track-7-h2-post-integration-corrections
+branch:
+  rh-track-7-h2-post-integration-corrections
+starting HEAD:
+  e1f14ddb030c5ce3f44d4cdd54e8c6daaad41369
+```
+
+The integration worktree was clean at correction bootstrap and was not
+modified by H-02. The final read-only worktree-status recheck is recorded
+below. Because production tooling bytes change, Gate 1 is reopened for
+independent review. No Gate 2 reconciliation, push, or merge is included in
+this correction package.
+
+### Independent finding disposition
+
+| Finding | Disposition |
+|---|---|
+| Base Sepolia blueprint aliases Base mainnet | Fixed. `base-sepolia.repository.blueprint_id` is `None`. `validate_registry()` rejects any non-`None` blueprint unless its migration namespace is `PathState.EXISTING`. Exact five-profile blueprint values and the schema invariant are tested. |
+| Exhausted retries can become false success | No prohibited semantic change. The evidence now names the exact `None` fallthrough, `Transaction confirmed` caller behavior, and composition with the H-06 Base history write. H-05/H-06 retain ownership. |
+| Evidence says H-02 is not integrated | Fixed through the opening supersession and exact merge identity above. The older final-review sentence remains as historical provenance for the package before owner integration. |
+| Body plus teardown failure loses teardown signal | Fixed without masking the body error. Both H-02 CLI wrappers attempt only stable `H02_FORK_TEARDOWN_FAILED`, profile, operation, and redacted reference fields when suppressing teardown replacement. The two-CLI tests prove every synthetic credential-bearing URL component is absent and that a failing diagnostic writer cannot replace the body exception. |
+| Committed migration consumes raw RPC | Recorded as an H-05/H-06 residual. The prohibited migration file was inspected but not modified; current H-02 CLI wrapping remains fully redacted. |
+
+The blueprint constraint is deliberately one-directional:
+`blueprint_id is not None` requires a migration namespace declared
+`PathState.EXISTING`, but an existing namespace may still declare no blueprint.
+That latter state fails closed at runtime with `H02_REPOSITORY_UNAVAILABLE`.
+H-03 does not modify the H-02 registry and is unaffected. A later slice that
+attaches a Robinhood blueprint to a network profile must first integrate and
+declare the Robinhood migration namespace as existing, or return for an
+explicit owner amendment of this invariant; it must not bypass the ordering
+with a parallel mapping.
+
+The correction changes only six implementation/test files plus this evidence
+record. `scripts/utils/migration_helpers.py`, including the reviewed
+`H02_TRANSACTION_FAILED` behavior, is unchanged at SHA-256
+`559c7648f871e6b71b7d13f306290fee7c0d3fbe6d13182996964ba5b79465db`.
+No prohibited migration, runner, history, contract, interface, dependency,
+authority, global test-harness, H-03, H-05, H-06, or H-07 file changed.
+
+| Corrected implementation/test file | SHA-256 |
+|---|---|
+| `config/network_profiles.py` | `9c19d237eaa049a9d521fc3ab8ef868e6ee35ab6ba48c45e61180fa2daf8c42a` |
+| `scripts/migrate.py` | `6401e3fe35f29981378bb187a4070b1b0a75e6f7105204269e65aeef4aa6a12c` |
+| `scripts/console.py` | `a7f0c2b15db0634398dbf975bd40fe5cb449a96e7da6ff5a1c9159df75ec5f6a` |
+| `tests/deployment/test_network_profiles.py` | `9178b2a13c7c6a6102c21d592d609ccd2ab1dea099450397f17ca9ddd81dd7c6` |
+| `tests/deployment/test_secret_handling.py` | `ac27dcb31f4c17459cb45847ec904237bf790225b53184d3d2e2e4e95cdee2f3` |
+| `tests/deployment/test_base_profile_regression.py` | `6da51a700e7a8a914ee541b594fa4bb4cb45df6b2a62842695898f2e467f9ecb` |
+
+### Complete patch identity
+
+Because this evidence file is itself part of the unstaged patch, embedding the
+current complete-patch SHA-256 here would be self-referential. The external
+Gate 1 handoff records that value. Reproduce it from the unchanged correction
+worktree with exactly:
+
+```text
+git diff --no-ext-diff --full-index | shasum -a 256
+```
+
+Default `git diff` is not byte-equivalent because its abbreviated `index`
+lines produce a different digest. The six corrected implementation/test hashes
+above plus the evidence-file SHA-256 in the external handoff provide the
+non-self-referential seven-file identity.
+
+### Locked runtime and sanitized validation (superseded by the refreshed validation below)
+
+The standing H-02 disposable-runtime authorization was used to create:
+
+```text
+runtime root: /private/tmp/rh-h02-postintegration-cpython312
+runtime mode: 0700
+Python: 3.12.0
+pip: 23.2.1
+requirements.txt SHA-256:
+  d2e12a6f0cfd128c3891634efafbba8305878bef7a7c5db33e25ebe93b0d2bce
+locked package verification: 92/92 exact, 0 mismatches
+pip check: No broken requirements found.
+
+cache variable: RH_H02_POST_CACHE_DIR
+cache path: /private/tmp/rh-h02-postintegration-cache
+cache mode: 0700
+```
+
+The exact lock was installed with no cache, no dependency re-resolution, and
+public PyPI as the only index:
+
+```text
+env -u PIP_INDEX_URL -u PIP_EXTRA_INDEX_URL -u PIP_TRUSTED_HOST \
+  PIP_NO_CACHE_DIR=1 \
+  /private/tmp/rh-h02-postintegration-cpython312/venv/bin/python \
+  -m pip install --disable-pip-version-check --no-cache-dir --no-deps \
+  --index-url https://pypi.org/simple --requirement requirements.txt
+```
+
+The first H-01 launcher incorrectly included
+`PYTHON_DOTENV_DISABLED=1`. That invalidated the gate's explicit
+`load_dotenv()` behavior assertion and produced `15 passed, 1 failed, 3
+warnings in 1.44s`. Removing only that import/help-specific flag produced the
+authoritative untouched H-01 result below. No product or dependency file was
+changed in response to the launcher error.
+
+| Scope / basetemp | Result |
+|---|---|
+| New blueprint/schema and two-CLI teardown focus; `/private/tmp/rh-h02-postintegration-focused` | `4 passed, 3 warnings in 0.09s` |
+| H-01 dependency gate corrected rerun; `/private/tmp/rh-h02-postintegration-h01-rerun` | `16 passed, 3 warnings in 1.33s` |
+| `test_network_profiles.py`; `/private/tmp/rh-h02-postintegration-network` | `24 passed, 3 warnings in 0.03s` |
+| `test_secret_handling.py`; `/private/tmp/rh-h02-postintegration-secret` | `43 passed, 3 warnings in 4.85s` |
+| `test_base_profile_regression.py`; `/private/tmp/rh-h02-postintegration-base` | `30 passed, 3 warnings in 7.51s` |
+| all three H-02 files; `/private/tmp/rh-h02-postintegration-combined` | `97 passed, 3 warnings in 12.18s` |
+| S1 clock profiles; `/private/tmp/rh-h02-postintegration-s1` | `57 passed, 3 warnings in 100.44s` |
+| S2 checked inventory; `/private/tmp/rh-h02-postintegration-s2` | `60 passed, 3 warnings in 23.77s` |
+| collection; `/private/tmp/rh-h02-postintegration-collect` | `2,835/2,977 collected, 142 deselected in 5.02s` |
+| full serial suite; `/private/tmp/rh-h02-postintegration-full` | `2,835 passed, 142 deselected, 3 warnings in 381.13s` |
+
+All five H-02 modules imported with relevant variables absent. Migrate,
+console, and verify help each exited zero. The three warnings remained the
+established non-fatal `PytestAssertRewriteWarning` notices for
+`_hypothesis_globals`, `hypothesis`, and `boa`, imported before pytest by the
+cache-setting launcher. No warning or selected test was suppressed, skipped,
+or xfailed. The unchanged 142 live-fork tests remained deselected.
+
+The runtime, compiler cache, ten successful-test basetemp directories, and the
+initial failed H-01 basetemp were removed by exact absolute path and verified
+absent. No active environment, user-global cache, dependency file, repository
+cache, live RPC, key, account, signer, migration, verification submission,
+deployment, or external operational state was accessed or changed. The only
+external network access was the authorized package download from public PyPI
+into the disposable environment.
+
+### Diagnostic-writer follow-up and refreshed validation
+
+The independent re-review found one correction-introduced masking path:
+`log.error()` could itself raise while a body error and teardown error were
+already active, replacing the body error from inside `finally`. A sanitized
+local probe reproduced `BrokenPipeError` instead of the original `ValueError`
+in both CLIs.
+
+Each body-plus-teardown diagnostic is now a best-effort nested `try` whose
+ordinary writer failure is suppressed. This does not change clean teardown,
+teardown-only failure, body-only failure, RPC redaction, migration retry,
+resume, or return semantics. A new two-CLI parameterized test makes
+`log.error()` raise `BrokenPipeError` and proves the original body `ValueError`
+still propagates.
+
+The refreshed locked runtime was:
+
+```text
+runtime root: /private/tmp/rh-h02-diagnostic-final-cpython312
+runtime mode: 0700
+Python: 3.12.0
+pip: 23.2.1
+requirements.txt SHA-256:
+  d2e12a6f0cfd128c3891634efafbba8305878bef7a7c5db33e25ebe93b0d2bce
+locked package verification: 92/92 exact, 0 mismatches
+pip check: No broken requirements found.
+
+cache variable: RH_H02_FINAL_CACHE_DIR
+cache path: /private/tmp/rh-h02-diagnostic-final-cache
+cache mode: 0700
+```
+
+| Refreshed scope / basetemp | Result |
+|---|---|
+| Blueprint/schema, sanitized teardown, and failing-writer focus; `/private/tmp/rh-h02-diagnostic-final-focused` | `6 passed, 3 warnings in 0.05s` |
+| `test_network_profiles.py`; `/private/tmp/rh-h02-diagnostic-final-network` | `24 passed, 3 warnings in 0.03s` |
+| `test_secret_handling.py`; `/private/tmp/rh-h02-diagnostic-final-secret` | `45 passed, 3 warnings in 5.23s` |
+| `test_base_profile_regression.py`; `/private/tmp/rh-h02-diagnostic-final-base` | `30 passed, 3 warnings in 7.63s` |
+| all three H-02 files; `/private/tmp/rh-h02-diagnostic-final-combined` | `99 passed, 3 warnings in 12.79s` |
+| H-01 dependency gate; `/private/tmp/rh-h02-diagnostic-final-h01` | `16 passed, 3 warnings in 1.44s` |
+| S1 clock profiles; `/private/tmp/rh-h02-diagnostic-final-s1` | `57 passed, 3 warnings in 102.39s` |
+| S2 checked inventory; `/private/tmp/rh-h02-diagnostic-final-s2` | `60 passed, 3 warnings in 24.60s` |
+| collection; `/private/tmp/rh-h02-diagnostic-final-collect-summary` | `2,837/2,979 collected, 142 deselected in 1.23s` |
+| full serial suite; `/private/tmp/rh-h02-diagnostic-final-full` | `2,837 passed, 142 deselected, 3 warnings in 304.07s` |
+
+All five H-02 modules imported with relevant variables absent, and all three
+help routes exited zero. The three warnings were the same non-fatal
+`PytestAssertRewriteWarning` notices for `_hypothesis_globals`, `hypothesis`,
+and `boa`. No selected test was suppressed, skipped, or xfailed. The 142
+live-fork tests remained deselected.
+
+The refreshed runtime, compiler cache, and all test basetemps were removed by
+exact absolute path and verified absent. No active environment, user-global
+cache, dependency file, repository cache, live RPC, key, account, signer,
+migration, verification submission, deployment, or external operational state
+was accessed or changed. The only external network access was the authorized
+package download from public PyPI into the disposable environment.
+
+At the final read-only status check, the integration worktree contained one
+unrelated untracked Track 8 document:
+
+```text
+docs/chains/rh/track-8-m1-exact-receipt.md
+```
+
+H-02 did not read, modify, stage, or remove that file. The integration
+worktree's tracked index remained clean, and local, cached remote, and live
+remote `rh` all remained exact
+`e1f14ddb030c5ce3f44d4cdd54e8c6daaad41369`. The untracked file does not
+overlap this seven-file H-02 correction, but the package does not claim that
+the integration worktree is currently fully clean.
