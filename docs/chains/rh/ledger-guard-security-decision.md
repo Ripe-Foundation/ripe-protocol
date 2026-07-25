@@ -2276,3 +2276,76 @@ The first eight paths total `397`; the sole added path,
 `test_deleverage_swap_collateral.py`, contributes `40`, so the current set is
 `397 + 40 = 437` across exactly nine files. The 75-test complete probe suite is
 separate and is not included in this targeted count.
+
+## 19. Owner and operations approval of rows 8 and 10 — 25 July 2026
+
+This section records the owner interview conducted after local documentation
+commit `949b864ebd7552f861ce4eab358dbdf02280e68d`. It supersedes only the
+row 8 and row 10 `OPERATIONS PENDING` labels in sections 13 through 18. Those
+earlier labels remain accurate historical state at the time the package was
+prepared and committed.
+
+The implementation-task transcript is the direct authority for the interview.
+The independent reviewer did not witness it and is not presented as a
+transcript witness; that reviewer assessed the record at SHA-256
+`88273166f77a50f0e02f1c094f016702019f79dfae40ad965bfae532e8fb0e52`
+against the relayed answers and approved its accuracy and decision mapping.
+This clarification produces new bytes that still require exact-hash review.
+
+The interview first asked whether the owner was authorized and willing to act
+as both protocol owner and operations approver for rows 8 and 10. The owner
+replied verbatim:
+
+> yes i approve both
+
+The interview then restated the complete row 8 decision: unchanged
+`shouldCheckLastTouch` Boolean, governance path, and defaults; only the
+immutable action-block-source getter; no per-touch event; explicit acceptance
+of reduced telemetry and dependence on getter/configuration/deployment/manifest
+evidence; and the section 17.1 deployment and incident-response duties. The
+owner replied verbatim:
+
+> yes
+
+The interview separately restated the complete row 10 decision: permanently
+retain the deployed state-bearing Base Ledger unchanged; no migration or
+convergence deadline; exact Base address/runtime/artifact/source/constructor
+and divergence records; explicit acceptance of the permanent version-tracking
+burden; and the section 17.2 monitoring, manifest, runbook, incident-response,
+and future-review duties because incorrect state migration could have severe
+accounting consequences. The owner replied verbatim:
+
+> yes
+
+These answers explicitly adopt the section 17.1 and section 17.2 approval
+sentences in substance and assign the recorded duties. Together with the
+existing independent-security dispositions, the current row states are:
+
+| Row | Current disposition |
+| --- | --- |
+| 8 — configuration and diagnostics | **OWNER, SECURITY, AND OPERATIONS APPROVED** |
+| 10 — permanent deployed-Base exception | **OWNER, SECURITY, AND OPERATIONS APPROVED** |
+
+The policy approval does not imply that the four operational roles in sections
+17.1 and 17.2 are already assigned to separate people. Named assignment and
+acceptance by the deployment operator, independent deployment reviewer,
+manifest owner, and operations/on-call owner are deployment-phase
+prerequisites; an unstaffed duty blocks deployment readiness.
+
+This closes only the row 8 and row 10 operations-approval requirements. It does
+not approve or execute the row 2 live proof, approve this new record hash,
+finally confirm section 12 against this new record hash, authorize Stage B or
+Stage C, close Gate 1 or Gate 2, reconcile inventory, or authorize any merge,
+push, RPC access, secret access, signing, broadcast, production change,
+deployment, registration, configuration, activation, governance action, or
+Base migration.
+
+The remaining pre-Stage-B conditions are therefore:
+
+1. the separately approved and successfully completed row 2 live Robinhood
+   proof with exact owner-supplied packet values and sanitized evidence;
+2. final independent review of this exact post-approval decision record and
+   exact section 12 file ceiling; and
+3. a separate explicit owner authorization to begin bounded Stage B.
+
+Stage B remains unauthorized.
