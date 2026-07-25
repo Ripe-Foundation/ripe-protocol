@@ -510,7 +510,7 @@ slice creates the named paths and closes its prerequisite gates.
 | --- | --- | --- |
 | H-01 | `python -m pytest -q tests/deployment/test_dependency_gate.py`; approved resolver/audit and release-note review | Track 6 S1 exact profile; `python -m pytest -q` |
 | H-02 | `python -m pytest -q tests/deployment/test_network_profiles.py tests/deployment/test_secret_handling.py tests/deployment/test_base_profile_regression.py`; CLI help/import with env absent | Stage 1 subset; full suite |
-| H-03 | `python -m pytest -q tests/deployment/test_robinhood_blueprint.py tests/deployment/test_robinhood_omissions.py tests/deployment/test_registry_topology.py` | Base profile regression; full suite |
+| H-03 | `python -m pytest -q tests/deployment/test_robinhood_blueprint.py tests/deployment/test_robinhood_omissions.py`; prove H-03 registry-slot expectations in those owned tests | Base profile regression; full suite. `tests/deployment/test_registry_topology.py` remains H-08-owned and is run only after H-08 creates it |
 | H-04 | `python -m pytest -q tests/config/test_defaults_robinhood.py tests/deployment/test_network_clock_profiles.py`; deterministic generator comparison | Track 6 S1/S2 and Base defaults regression; full suite |
 | H-05 | `python -m pytest -q tests/deployment/test_migration_discovery.py tests/deployment/test_execution_plan.py`; dry plan for both RH profiles | Base runner/history regression; full suite |
 | H-06 | `python -m pytest -q tests/deployment/test_manifest_schema.py tests/deployment/test_current_manifest_promotion.py`; parse all historical JSON | Base history read compatibility; full suite |
