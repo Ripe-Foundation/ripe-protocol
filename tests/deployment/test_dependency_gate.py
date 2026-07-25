@@ -63,6 +63,47 @@ EXPECTED_HEADER = (
     "--index-url=https://pypi.org/simple --no-emit-index-url "
     "--output-file=requirements.txt --pip-args=None requirements.in"
 )
+REACHABILITY_SUFFIXES = {
+    ".cfg",
+    ".ini",
+    ".json",
+    ".py",
+    ".toml",
+    ".yaml",
+    ".yml",
+}
+REACHABILITY_EXCLUDED_DIRS = {
+    ".cache",
+    ".direnv",
+    ".git",
+    ".hg",
+    ".mypy_cache",
+    ".nox",
+    ".pytest_cache",
+    ".ruff_cache",
+    ".svn",
+    ".tox",
+    ".venv",
+    "__pycache__",
+    "artifacts",
+    "build",
+    "dist",
+    "env",
+    "generated",
+    "htmlcov",
+    "node_modules",
+    "private",
+    "private-evidence",
+    "site",
+    "site-packages",
+    "venv",
+    "vendor",
+}
+APPROVED_CLICK_SURFACES = {
+    Path("scripts/console.py"),
+    Path("scripts/migrate.py"),
+    Path("scripts/verify.py"),
+}
 
 
 @pytest.fixture(scope="session")
@@ -96,6 +137,148 @@ def _exception_section(evidence: str, exception_id: str) -> str:
     )
     assert match is not None, f"missing exception section {exception_id}"
     return match.group(0)
+
+
+def _dotted_name(node: ast.expr) -> str | None:
+    if isinstance(node, ast.Name):
+        return node.id
+    if isinstance(node, ast.Attribute):
+        parent = _dotted_name(node.value)
+        return f"{parent}.{node.attr}" if parent else None
+    return None
+
+
+def _resolved_name(node: ast.expr, aliases: dict[str, str]) -> str | None:
+    dotted = _dotted_name(node)
+    if dotted is None:
+        return None
+    head, *tail = dotted.split(".")
+    resolved = aliases.get(head, head)
+    return ".".join((resolved, *tail))
+
+
+def _python_reachability_violations(path: Path, root: Path) -> list[str]:
+    relative = path.relative_to(root)
+    try:
+        tree = ast.parse(path.read_text(), filename=str(relative))
+    except (SyntaxError, UnicodeDecodeError) as error:
+        return [f"{relative}: cannot AST-scan Python source: {error}"]
+
+    aliases: dict[str, str] = {}
+    violations: list[str] = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            for imported in node.names:
+                bound = imported.asname or imported.name.split(".", 1)[0]
+                aliases[bound] = imported.name if imported.asname else bound
+                if imported.name == "click" or imported.name.startswith("click."):
+                    if relative not in APPROVED_CLICK_SURFACES:
+                        violations.append(
+                            f"{relative}:{node.lineno}: adds a new Click "
+                            "import surface"
+                        )
+        elif isinstance(node, ast.ImportFrom):
+            module = node.module or ""
+            for imported in node.names:
+                target = f"{module}.{imported.name}" if module else imported.name
+                aliases[imported.asname or imported.name] = target
+                if module == "click" or module.startswith("click."):
+                    if relative not in APPROVED_CLICK_SURFACES:
+                        violations.append(
+                            f"{relative}:{node.lineno}: adds a new Click "
+                            "import surface"
+                        )
+                    if imported.name in {"*", "edit"}:
+                        violations.append(
+                            f"{relative}:{node.lineno}: imports Click edit surface"
+                        )
+                if module == "pygments" or module.startswith("pygments."):
+                    lowered = imported.name.lower()
+                    if "adllexer" in lowered or "archetype" in lowered:
+                        violations.append(
+                            f"{relative}:{node.lineno}: imports Pygments "
+                            "Archetype/AdlLexer surface"
+                        )
+
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.Attribute, ast.Name)):
+            resolved = _resolved_name(node, aliases)
+            if resolved and resolved.startswith("click.") and resolved.endswith(
+                ".edit"
+            ):
+                violations.append(
+                    f"{relative}:{node.lineno}: references {resolved}"
+                )
+            if resolved and resolved.startswith("pygments."):
+                lowered = resolved.lower()
+                if "adllexer" in lowered or "archetype" in lowered:
+                    violations.append(
+                        f"{relative}:{node.lineno}: references Pygments "
+                        "Archetype/AdlLexer surface"
+                    )
+        if not isinstance(node, ast.Call):
+            continue
+        resolved_call = _resolved_name(node.func, aliases)
+        if not resolved_call or not resolved_call.startswith("pygments."):
+            continue
+        if resolved_call.endswith(".get_lexer_by_name") and node.args:
+            lexer_name = node.args[0]
+            if isinstance(lexer_name, ast.Constant) and isinstance(
+                lexer_name.value, str
+            ):
+                if lexer_name.value.lower() in {"adl", "archetype"}:
+                    violations.append(
+                        f"{relative}:{node.lineno}: selects Pygments "
+                        f"{lexer_name.value!r} lexer"
+                    )
+
+    return violations
+
+
+def _configuration_reachability_violations(path: Path, root: Path) -> list[str]:
+    relative = path.relative_to(root)
+    source = path.read_text(errors="ignore").lower()
+    violations = []
+    for extension in ("pymdownx.snippets", "pymdownx.b64"):
+        if extension in source:
+            violations.append(f"{relative}: enables {extension}")
+    if "adllexer" in source or "archetypelexer" in source:
+        violations.append(f"{relative}: selects Pygments Archetype/AdlLexer")
+    elif "pygments" in source and "archetype" in source:
+        violations.append(f"{relative}: selects Pygments Archetype lexer")
+    return violations
+
+
+def _exception_reachability_violations(root: Path) -> list[str]:
+    violations: list[str] = []
+    for directory, dirnames, filenames in root.walk():
+        dirnames[:] = [
+            name
+            for name in dirnames
+            if name not in REACHABILITY_EXCLUDED_DIRS
+            and not name.endswith((".egg-info", ".dist-info"))
+        ]
+        for filename in filenames:
+            path = directory / filename
+            if (
+                path.is_symlink()
+                or path.suffix.lower() not in REACHABILITY_SUFFIXES
+            ):
+                continue
+            if path.suffix.lower() == ".py":
+                violations.extend(_python_reachability_violations(path, root))
+            else:
+                violations.extend(
+                    _configuration_reachability_violations(path, root)
+                )
+    return sorted(set(violations))
+
+
+def _assert_exception_reachability_controls(root: Path) -> None:
+    violations = _exception_reachability_violations(root)
+    assert not violations, "bounded-exception reachability changed:\n" + "\n".join(
+        violations
+    )
 
 
 def test_approved_inputs_and_generated_lock_are_exact():
@@ -198,25 +381,45 @@ def test_bounded_exceptions_are_explicit_and_workflow_gated():
 
 
 def test_exception_reachability_controls_remain_true():
-    click_sources = [
-        ROOT / "scripts/migrate.py",
-        ROOT / "scripts/verify.py",
-        ROOT / "scripts/console.py",
-    ]
-    assert all("click." + "edit(" not in path.read_text() for path in click_sources)
+    _assert_exception_reachability_controls(ROOT)
 
-    controlled_roots = [ROOT / "scripts", ROOT / "config", ROOT / "contracts"]
-    prohibited = (
-        "pymdownx." + "snippets",
-        "pymdownx." + "b64",
-        "Adl" + "Lexer",
-        "archetype" + "lexer",
+
+@pytest.mark.parametrize("extension", ("pymdownx.snippets", "pymdownx.b64"))
+def test_reachability_gate_rejects_root_mkdocs_extension(tmp_path, extension):
+    (tmp_path / "mkdocs.yml").write_text(
+        f"markdown_extensions:\n  - {extension}\n"
     )
-    for root in controlled_roots:
-        for path in root.rglob("*"):
-            if path.is_file() and path.suffix in {".py", ".toml", ".yaml", ".yml"}:
-                source = path.read_text(errors="ignore").lower()
-                assert all(term.lower() not in source for term in prohibited)
+
+    with pytest.raises(AssertionError, match=rf"enables {re.escape(extension)}"):
+        _assert_exception_reachability_controls(tmp_path)
+
+
+def test_reachability_gate_rejects_aliased_click_edit_import(tmp_path):
+    tooling = tmp_path / "tooling"
+    tooling.mkdir()
+    (tooling / "editor.py").write_text(
+        "from click import edit as launch_editor\n"
+        "launch_editor('trusted initial text')\n"
+    )
+
+    with pytest.raises(
+        AssertionError,
+        match="(adds a new Click import surface|imports Click edit surface)",
+    ):
+        _assert_exception_reachability_controls(tmp_path)
+
+
+def test_reachability_gate_rejects_direct_adllexer_import(tmp_path):
+    tooling = tmp_path / "tooling"
+    tooling.mkdir()
+    (tooling / "highlight.py").write_text(
+        "from pygments.lexers.algebra import AdlLexer as SelectedLexer\n"
+    )
+
+    with pytest.raises(
+        AssertionError, match="imports Pygments Archetype/AdlLexer surface"
+    ):
+        _assert_exception_reachability_controls(tmp_path)
 
 
 def test_s1_exact_runtime_profile_matches_the_approved_lock():

@@ -1,20 +1,35 @@
 # Track 7 H-01 Stage A Dependency-Security Gate
 
-**Status:** The exact Candidate A dependency/test payload at commit
-`001ccaccdf473223ba33e3eeb37509a01990a60e` is implemented and technically
-approved by the independent security/Track 6 reviewer against the previous
-reviewed integration baseline
-`063d9459c4c0acf29a4d4e59251ad32bf2d71184`. Current `rh` and `origin/rh`
-have advanced to new integration baseline
-`2517eeb0013cdb277dc4815db4b524d7a090d682`; the H-01 branch has not yet
-reconciled that baseline and is not merge-ready. The evidence-only provenance
-amendment is directionally approved but remains uncommitted pending
-independent review of the complete current file. Final merge-readiness review
-of the actually reconciled branch remains open. All five recorded bounded
-exceptions and the post-merge alert-refresh, exception-review, custody,
-retention, and disposal obligations survive. The candidate remains unmerged
-and unpublished; no deployment, signing, verification submission, alert
-mutation, or other production action is authorized.
+**Status:** The exact independently reviewed Candidate A dependency payload
+remains commit `001ccaccdf473223ba33e3eeb37509a01990a60e`. The subsequent
+reviewer-requested exception-reachability correction has SHA-256
+`d8f4c504623a7393c0e53cafdb9c81288981d655c329582eb70be1accc64e2aa`.
+Under explicit owner authorization, exact authoritative `origin/rh` commit
+`03c07f01dda03a5529c602aafbfe5545ae86df69` was merged without rebase,
+squash, or history rewrite at current reconciled branch commit
+`678034e4a8ba469f65485748bb7e612dc343a91a`. The merge was conflict-free;
+its incoming delta was exactly the two Track 8 M0 evidence files and did not
+overlap an H-01-owned path. A clean Candidate A environment has completed the
+required current-baseline install, audit, dependency gate, S1/S2/S3,
+collection, complete serial suite, final byte-level gate, scope, topology, and
+custody checks. The H-01 net delta against `03c07f0` is exactly the four
+authorized files. No dependency finding, version, exception disposition,
+compatibility result, inventory result, or H-01 scope changed; only
+time-varying EPSS metadata changed in the fresh K-02 raw response.
+The independent security/Track 6 reviewer has now approved H-01 Candidate A
+merge readiness against exact baseline `03c07f0`, reconciled HEAD `678034e4`,
+and complete pre-approval evidence SHA-256
+`8217348b2e0309597a33684ecba445334da0344109dae19e826624b5b387ac79`.
+That approval covers the exact four-file payload and all five bounded
+exceptions, including their 15 August 2026 review,
+`2026-08-31T23:59:59Z` hard expiry, compensating controls, invalidation
+triggers, custody requirements, and post-merge obligations. This approval
+record changes only this evidence file; the required post-amendment
+`git diff --check` and fresh private-basetemp 16-case gate pass. The branch is
+approved for owner integration after the authorized evidence/test commit and
+branch publication. The candidate remains unmerged into `rh`; no Dependabot
+mutation, deployment, signing, verification submission, or other production
+action is authorized.
 
 **Evidence date:** 24 July 2026
 
@@ -3061,7 +3076,7 @@ fast-forward at that reviewed baseline. This is historical payload-review
 evidence, not a claim about current merge readiness and not permission for the
 agent to merge or push.
 
-### New integration baseline awaiting reconciliation
+### Reconciliation to the new integration baseline
 
 After payload approval, local `rh` and `origin/rh` advanced to:
 
@@ -3088,14 +3103,45 @@ requirement, lock, test, compiler input, artifact, ABI, contract, migration,
 script, or H-01-owned file change. The two documents introduce Track 8
 planning/evidence authority only.
 
-Before reconciliation, H-01 HEAD remains exact reviewed payload commit
+Before reconciliation, H-01 HEAD remained exact reviewed payload commit
 `001ccaccdf473223ba33e3eeb37509a01990a60e`, its merge base with current `rh`
-remains `063d9459c4c0acf29a4d4e59251ad32bf2d71184`, and the branch is 35 commits
-behind and 17 ahead of current `rh`. No merge, rebase, history rewrite,
-dependency action, audit, or validation replay has occurred for
-`2517eeb0013cdb277dc4815db4b524d7a090d682`. Reconciliation must wait until an
-independent reviewer verifies the complete current evidence file and approves
-its exact uncommitted bytes.
+remained `063d9459c4c0acf29a4d4e59251ad32bf2d71184`, and the branch was 35
+commits behind and 17 ahead of current `rh`.
+
+The independent reviewer then approved the complete evidence file at exact
+SHA-256
+`9a8438109c046bab789ec5ba9048e1b35c955632dd5d160a0fe53020dfe39854`.
+Those exact bytes were committed without amendment:
+
+```text
+579def4b22240cfc8e2a5e95d97cf40014b83f9e
+parent 001ccaccdf473223ba33e3eeb37509a01990a60e
+docs(rh): record final H-01 review provenance
+```
+
+Exact current `rh` baseline
+`2517eeb0013cdb277dc4815db4b524d7a090d682` was then merged into the H-01
+branch using a merge, not a rebase:
+
+```text
+c9ce0f501824305f74e84e1c8f1c1b3d4a20477f
+parents:
+  579def4b22240cfc8e2a5e95d97cf40014b83f9e
+  2517eeb0013cdb277dc4815db4b524d7a090d682
+```
+
+The merge completed without conflict and preserved the already reviewed
+Candidate A history. Immediately after reconciliation, `rh` and `origin/rh`
+both remained exact `2517eeb`; the merge base was exact `2517eeb`; H-01 was
+zero behind and 19 commits ahead; and the net delta remained exactly the four
+authorized H-01 files. No dependency, requirement, lock, test, compiler,
+artifact, ABI, contract, migration, or script byte changed during
+reconciliation.
+
+At reconciliation, current-baseline audit and validation still had to complete
+against the reconciled tree before final independent merge-readiness review.
+The completed results are recorded in the next dated section; reconciliation
+alone did not establish merge readiness or authorize merge into `rh`.
 
 ### Surviving exceptions and post-merge obligations
 
@@ -3127,9 +3173,874 @@ binding. Disposal requires the recorded event, method, and disposal record
 and may occur only on separate explicit owner instruction.
 
 The existing approval authorizes technical acceptance of the exact four-file
-Candidate A payload at `001ccac` only. It does not approve the uncommitted
-evidence amendment, the unreconciled `2517eeb` baseline, or the final branch
-merge-readiness state. It does not authorize deployment, signing,
-verification submission, alert mutation, production configuration, or any
-other live or production action. Merge and push remain gated by the required
-review sequence and owner direction.
+Candidate A payload at `001ccac` only. It does not by itself approve the
+current post-reconciliation evidence update, the subsequent `2517eeb`
+baseline merge, or the final branch merge-readiness state. It does not
+authorize deployment, signing, verification submission, alert mutation,
+production configuration, or any other live or production action. Merge and
+push remain gated by the required review sequence and owner direction.
+
+## Current-baseline audit and validation — complete 24 July 2026; final review pending
+
+Required validation ran against the actual reconciled tree at
+`c9ce0f501824305f74e84e1c8f1c1b3d4a20477f`, with current local and
+remote-tracking `rh` fixed at
+`2517eeb0013cdb277dc4815db4b524d7a090d682`. The run began at
+`2026-07-24T23:23:25Z` and completed at `2026-07-24T23:32:43Z`.
+
+### Clean environments and fresh no-ignore audit
+
+A new mode-`0700` disposable directory held two isolated CPython 3.12.0
+environments:
+
+- the Candidate A environment was installed from the exact committed lock
+  using `python -m pip install --no-cache-dir -r requirements.txt`; it used
+  pip 23.2.1, contained 93 installed packages, and `python -m pip check`
+  reported no broken requirements; and
+- the separate audit environment installed exact `pip-audit==2.10.1` from
+  public PyPI with `--no-cache-dir`, so the audit tool and its dependencies
+  could not alter the Candidate A environment.
+
+The audit used the approved no-ignore policy:
+
+```text
+PIP_CONFIG_FILE=/dev/null python -m pip_audit \
+  --no-deps --disable-pip -r requirements.txt --format=json \
+  --output PRIVATE_RAW_JSON --cache-dir PRIVATE_CACHE
+```
+
+It reported exactly seven findings in five packages. The IDs, package
+versions, aliases, fix versions, and dispositions match the committed ledger
+exactly:
+
+```text
+click               8.2.1   PYSEC-2026-2132
+pygments             2.19.2  PYSEC-2026-2987
+pymdown-extensions   10.16.1 CVE-2026-61632
+pymdown-extensions   10.16.1 PYSEC-2026-2999
+pytest               8.4.2   PYSEC-2026-1845
+vyper                0.4.3   PYSEC-2023-142
+vyper                0.4.3   PYSEC-2025-33
+```
+
+There is no changed, added, disappeared, severity-drifted, range-drifted, or
+fix-version-drifted finding. No `--ignore-vuln` flag was used. The Vyper
+findings remain outside Vyper `0.4.3`'s authoritative affected ranges and
+remain not-applicable scanner-metadata dispositions.
+
+The fresh raw result is retained under the approved private-evidence controls:
+
+| Retained current-baseline audit | SHA-256 | Owner/group | Mode |
+|---|---|---|---|
+| `stageb-post-2517eeb-candidate-a-raw-audit-2026-07-24T232325Z.json` | `1cec5232704458776de962c4116fcdf353c4e0d449392c0b4dd7b6305e9a49ce` | `wigglez:staff` | `0600` |
+
+The custody directory remained `wigglez:staff` mode `0700`. Existing private
+evidence was not moved, deleted, or rewritten. This new raw audit inherits
+the same permitted-use, retention, recheck, and disposal obligations.
+
+### Reconciled validation results
+
+Every pytest command used the exact environment prefix
+`ETHERSCAN_API_KEY=local-placeholder PYTHONPATH=.`. The prefix is repeated
+verbatim below so that no row depends on an implied environment.
+
+The first current-baseline validation sequence did use explicit private
+basetemps beneath the mode-`0700` parent
+`/private/tmp/h01-2517eeb.JFtqCn`, but that shared parent was removed only
+after the sequence rather than after each command. These commands and results
+are retained as historical provenance, not as the final
+`EX-H01-PYTEST-01`-compliant results:
+
+| Exact historical current-baseline pytest command | Historical result |
+|---|---|
+| `ETHERSCAN_API_KEY=local-placeholder PYTHONPATH=. /private/tmp/h01-2517eeb.JFtqCn/candidate/bin/python -m pytest -q tests/deployment/test_dependency_gate.py --basetemp=/private/tmp/h01-2517eeb.JFtqCn/pytest-gate` | 12 passed in 0.05 s |
+| `ETHERSCAN_API_KEY=local-placeholder PYTHONPATH=. /private/tmp/h01-2517eeb.JFtqCn/candidate/bin/python -m pytest -q tests/clock/test_clock_profiles.py --basetemp=/private/tmp/h01-2517eeb.JFtqCn/pytest-clock` | 57 passed in 26.93 s |
+| `ETHERSCAN_API_KEY=local-placeholder PYTHONPATH=. /private/tmp/h01-2517eeb.JFtqCn/candidate/bin/python -m pytest -q tests/inventory/test_block_clock_inventory.py --basetemp=/private/tmp/h01-2517eeb.JFtqCn/pytest-inventory` | 60 passed in 25.52 s |
+| `ETHERSCAN_API_KEY=local-placeholder PYTHONPATH=. /private/tmp/h01-2517eeb.JFtqCn/candidate/bin/python -m pytest --collect-only -q --basetemp=/private/tmp/h01-2517eeb.JFtqCn/pytest-collect` | 2,734 selected / 2,876 total; 142 deselected in 1.30 s |
+| `ETHERSCAN_API_KEY=local-placeholder PYTHONPATH=. /private/tmp/h01-2517eeb.JFtqCn/candidate/bin/python -m pytest -q -p no:cacheprovider --basetemp=/private/tmp/h01-2517eeb.JFtqCn/pytest-full` | 2,734 passed, 142 deselected in 298.71 s |
+| `ETHERSCAN_API_KEY=local-placeholder PYTHONPATH=. /private/tmp/h01-2517eeb.JFtqCn/candidate/bin/python -m pytest -q tests/deployment/test_dependency_gate.py --basetemp=/private/tmp/h01-2517eeb.JFtqCn/pytest-final-evidence` | 12 passed in 0.06 s |
+| `ETHERSCAN_API_KEY=local-placeholder PYTHONPATH=. /private/tmp/h01-2517eeb.JFtqCn/candidate/bin/python -m pytest -q tests/deployment/test_dependency_gate.py --basetemp=/private/tmp/h01-2517eeb.JFtqCn/pytest-handoff` | 12 passed in 0.05 s |
+| `ETHERSCAN_API_KEY=local-placeholder PYTHONPATH=. /private/tmp/h01-final-gate.iC21aP/venv/bin/python -m pytest -q tests/deployment/test_dependency_gate.py --basetemp=/private/tmp/h01-final-gate.iC21aP/pytest` | 12 passed in 0.06 s; this separate parent was mode `0700` and removed after the command |
+
+Because the shared-parent cleanup timing did not establish the strict
+one-command/one-parent control, all five required current-baseline results
+were replaced on 24 July 2026 from a newly installed clean Candidate A
+environment at
+`/private/tmp/h01-current-baseline-env.xk2AE2/candidate`. Its enclosing
+disposable directory was mode `0700`; installation from the committed lock
+again completed cleanly and `python -m pip check` again reported no broken
+requirements.
+
+For every replacement command, a distinct task-specific parent was created,
+changed to mode `0700`, and verified as `drwx------ 700 wigglez:wheel` before
+pytest started. The exact parent was recursively removed immediately after
+its one command, and nonexistence was verified before the next command:
+
+| Exact authoritative replacement pytest command | Result and parent disposal |
+|---|---|
+| `ETHERSCAN_API_KEY=local-placeholder PYTHONPATH=. /private/tmp/h01-current-baseline-env.xk2AE2/candidate/bin/python -m pytest -q tests/deployment/test_dependency_gate.py --basetemp=/private/tmp/h01-pytest-gate.oA11Lb/basetemp` | 12 passed in 0.05 s; `/private/tmp/h01-pytest-gate.oA11Lb` was mode `0700` and removed after the command |
+| `ETHERSCAN_API_KEY=local-placeholder PYTHONPATH=. /private/tmp/h01-current-baseline-env.xk2AE2/candidate/bin/python -m pytest -q tests/clock/test_clock_profiles.py --basetemp=/private/tmp/h01-pytest-clock.TBpBBS/basetemp` | 57 passed in 28.75 s; `/private/tmp/h01-pytest-clock.TBpBBS` was mode `0700` and removed after the command |
+| `ETHERSCAN_API_KEY=local-placeholder PYTHONPATH=. /private/tmp/h01-current-baseline-env.xk2AE2/candidate/bin/python -m pytest -q tests/inventory/test_block_clock_inventory.py --basetemp=/private/tmp/h01-pytest-inventory.g51Z0P/basetemp` | 60 passed in 26.35 s; `/private/tmp/h01-pytest-inventory.g51Z0P` was mode `0700` and removed after the command |
+| `ETHERSCAN_API_KEY=local-placeholder PYTHONPATH=. /private/tmp/h01-current-baseline-env.xk2AE2/candidate/bin/python -m pytest --collect-only -q --basetemp=/private/tmp/h01-pytest-collect.TWCbRY/basetemp` | 2,734 selected / 2,876 total; 142 deselected in 1.29 s; `/private/tmp/h01-pytest-collect.TWCbRY` was mode `0700` and removed after the command |
+| `ETHERSCAN_API_KEY=local-placeholder PYTHONPATH=. /private/tmp/h01-current-baseline-env.xk2AE2/candidate/bin/python -m pytest -q -p no:cacheprovider --basetemp=/private/tmp/h01-pytest-full.4CFNDY/basetemp` | **2,734 passed, 142 deselected in 295.79 s**; `/private/tmp/h01-pytest-full.4CFNDY` was mode `0700` and removed after the command |
+
+The non-pytest current-baseline results are unchanged:
+
+| Command | Result |
+|---|---|
+| `/private/tmp/h01-current-baseline-env.xk2AE2/candidate/bin/python -m pip check` | no broken requirements |
+| fresh no-ignore `pip-audit` | seven findings in five packages; exact exception-ledger match |
+| `/private/tmp/h01-current-baseline-env.xk2AE2/candidate/bin/python scripts/check_block_clock_inventory.py --check` | clean; production `100/95/17`, BN `32/100`, indirect `1`, cadence `455`, seconds-unit `58`, timestamp `11/37`, mixed-clock `4`, Vyper paths `92`; non-production test `31/29/5`, cadence test `159` |
+
+After this corrected result section was written, the evidence-dependent gate
+was repeated against the complete current evidence bytes with:
+
+```text
+ETHERSCAN_API_KEY=local-placeholder PYTHONPATH=. \
+  /private/tmp/h01-current-baseline-env.xk2AE2/candidate/bin/python \
+  -m pytest -q tests/deployment/test_dependency_gate.py \
+  --basetemp=/private/tmp/h01-pytest-final-evidence.EpYXs6/basetemp
+```
+
+It passed all 12 tests in 0.07 s. Its task-specific parent
+`/private/tmp/h01-pytest-final-evidence.EpYXs6` was verified mode `0700`
+before the command and removed immediately afterward.
+
+The final byte-level gate then used the exact complete evidence file returned
+for review:
+
+```text
+ETHERSCAN_API_KEY=local-placeholder PYTHONPATH=. \
+  /private/tmp/h01-current-baseline-env.xk2AE2/candidate/bin/python \
+  -m pytest -q tests/deployment/test_dependency_gate.py \
+  --basetemp=/private/tmp/h01-pytest-final-bytes.kN1wEt/basetemp
+```
+
+It passed all 12 tests. Its distinct task-specific parent
+`/private/tmp/h01-pytest-final-bytes.kN1wEt` was verified mode `0700` before
+the command and removed immediately afterward.
+
+The first clean-environment replay attempt stopped during package download on
+a transient TLS record-layer failure, before any validation ran; that partial
+environment was deleted without use. A second empty setup attempt referenced
+a nonexistent fixed interpreter path and was likewise deleted without use.
+Neither attempt supplied or replaced any validation result.
+
+No failure, skip, warning, compatibility change, collection change, candidate
+drift, inventory drift, or scope expansion occurred in the completed
+replacement validations.
+
+### Prior reconciled topology and scope — superseded by reachability correction
+
+At the prior validation handoff, repository metadata was:
+
+```text
+H-01 reconciled HEAD:
+  c9ce0f501824305f74e84e1c8f1c1b3d4a20477f
+current rh and origin/rh:
+  2517eeb0013cdb277dc4815db4b524d7a090d682
+merge base:
+  2517eeb0013cdb277dc4815db4b524d7a090d682
+ahead / behind:
+  19 / 0
+```
+
+The exact net delta from current `rh` was:
+
+```text
+docs/chains/rh/evidence/dependency-security-gate.md
+requirements.in
+requirements.txt
+tests/deployment/test_dependency_gate.py
+```
+
+The three self-hashable payload paths at that checkpoint were byte-identical
+to the approved Candidate A payload:
+
+| Prior payload path | SHA-256 |
+|---|---|
+| `requirements.in` | `2523c04409946a6625e30e5e4aa4f711663924f4a674f4cfd5fee5b7bbb3b80d` |
+| `requirements.txt` | `d2e12a6f0cfd128c3891634efafbba8305878bef7a7c5db33e25ebe93b0d2bce` |
+| `tests/deployment/test_dependency_gate.py` | `a0d3dcc22d0754229c8226fb55a99c2f17cfb004766285ed67a3c5075a39d948` |
+
+The evidence-file hash for that prior handoff was supplied out of band because
+the file cannot contain its own stable hash. The later reachability correction
+changes the dependency-gate test and evidence bytes; the section below
+supersedes this prior current-state description.
+
+All five bounded exceptions, their 15 August 2026 review, the
+`2026-08-31T23:59:59Z` hard expiry, the authorized post-merge
+K-02/default-branch refresh, and all custody, retention, and disposal
+obligations remain unchanged. No post-merge K-02 refresh was attempted because
+H-01 has not been merged into `rh`. No merge into `rh`, push, deployment,
+signing, verification submission, alert mutation, private-evidence deletion,
+or other production/live action occurred.
+
+At that checkpoint H-01 was reconciled and validation-complete, but not yet
+merge-ready. The subsequent reviewer finding reopened the test-policy and
+evidence scope.
+
+## Reviewer-gate reachability correction — 24 July 2026; final review pending
+
+The final independent review found that
+`test_exception_reachability_controls_remain_true` did not mechanically
+enforce the full approved invalidation surface for
+`EX-H01-CLICK-01`, `EX-H01-PYGMENTS-01`,
+`EX-H01-PYMDOWN-SNIPPETS-01`, and `EX-H01-PYMDOWN-B64-01`. The old check
+looked for literal `click.edit()` only in three existing scripts and looked
+for Pymdown/Pygments tokens only under `scripts/`, `config/`, and
+`contracts/`. It could therefore miss an aliased Click import, a new Click
+surface, a root or nested MkDocs configuration, or a Pygments
+Archetype/`AdlLexer` activation elsewhere.
+
+### Smallest sufficient gate correction
+
+Only `tests/deployment/test_dependency_gate.py` and this evidence record were
+changed. The correction:
+
+- walks all repository Python and activation-capable configuration suffixes
+  (`.py`, `.cfg`, `.ini`, `.json`, `.toml`, `.yaml`, and `.yml`) from the
+  repository root;
+- prunes version-control, cache, generated-output, private, dependency-vendor,
+  and virtual-environment directories, and skips symlinks;
+- AST-parses Python files, resolves ordinary import aliases, fails on
+  `click.edit` references/imports, and permits Click imports only in the three
+  already approved files `scripts/console.py`, `scripts/migrate.py`, and
+  `scripts/verify.py`;
+- detects direct or aliased Pygments Archetype/`AdlLexer` imports and
+  references, plus `get_lexer_by_name("adl")` or
+  `get_lexer_by_name("archetype")`; and
+- detects `pymdownx.snippets` and `pymdownx.b64` in root or nested
+  configuration files and direct Pygments Archetype/`AdlLexer` configuration
+  selection.
+
+This is a local helper inside the existing dependency-gate module, not a new
+repository-wide lint framework. No dependency, exception term, production
+code, policy, CI, script, compiler input, contract, ABI, or artifact changed.
+
+Four mutation cases prove that the same assertion used by the live gate fails
+for:
+
+1. root `mkdocs.yml` enabling `pymdownx.snippets`;
+2. root `mkdocs.yml` enabling `pymdownx.b64`;
+3. `from click import edit as launch_editor` in a new tooling path; and
+4. a direct aliased `AdlLexer` import in a new tooling path.
+
+The corrected gate contains 16 cases and has SHA-256:
+
+```text
+d8f4c504623a7393c0e53cafdb9c81288981d655c329582eb70be1accc64e2aa
+```
+
+An initial corrected-gate replay passed 16 cases before the explicit
+three-file Click allowlist was added. The final implementation with that
+additional fail-closed control was then replayed and is the result below.
+
+### Clean Candidate A environment and fresh security reconciliation
+
+A new mode-`0700` disposable root,
+`/private/tmp/h01-reachability-validation.xHpsMn`, held separate Candidate A
+and audit environments. CPython `3.12.0` / pip `23.2.1` installed the exact
+unchanged committed lock from public PyPI with:
+
+```text
+PIP_CONFIG_FILE=/dev/null
+PIP_INDEX_URL=https://pypi.org/simple
+PIP_EXTRA_INDEX_URL=
+PIP_NO_CACHE_DIR=1
+/private/tmp/h01-reachability-validation.xHpsMn/candidate/bin/python \
+  -m pip install --no-cache-dir -r requirements.txt
+```
+
+Installation completed cleanly and
+`/private/tmp/h01-reachability-validation.xHpsMn/candidate/bin/python -m pip check`
+reported no broken requirements.
+
+The separate audit environment installed exact `pip-audit==2.10.1` from
+public PyPI without cache. The approved no-ignore command was:
+
+```text
+PIP_CONFIG_FILE=/dev/null \
+  /private/tmp/h01-reachability-validation.xHpsMn/audit/bin/python \
+  -m pip_audit --no-deps --disable-pip -r requirements.txt --format=json \
+  --output /Users/wigglez/dev/ripe-protocol-h1-private-evidence/stageb-reachability-correction-candidate-a-raw-audit-2026-07-25T001306Z.json \
+  --cache-dir=/private/tmp/h01-reachability-validation.xHpsMn/audit-cache
+```
+
+Its expected nonzero finding exit reported exactly seven findings in five
+packages, with no added, removed, version-drifted, range-drifted, or
+disposition-drifted row:
+
+```text
+click               8.2.1   PYSEC-2026-2132
+pygments             2.19.2  PYSEC-2026-2987
+pymdown-extensions   10.16.1 CVE-2026-61632
+pymdown-extensions   10.16.1 PYSEC-2026-2999
+pytest               8.4.2   PYSEC-2026-1845
+vyper                0.4.3   PYSEC-2023-142
+vyper                0.4.3   PYSEC-2025-33
+```
+
+The raw audit is retained mode `0600`, owner/group `wigglez:staff`, SHA-256:
+
+```text
+2f655db221ffed938627e3da5d150ecc873ea0acde7b76a00e84ec670b120268
+```
+
+The two Vyper findings remain outside Vyper `0.4.3`'s authoritative affected
+ranges. No ignore, fix, suppression, alert mutation, or upstream report was
+used.
+
+The exact approved K-02 read-only query ran at
+`2026-07-25T00:12:49Z` without `gh auth status`:
+
+```text
+gh api --method GET --paginate --slurp \
+  -H 'Accept: application/vnd.github+json' \
+  -H 'X-GitHub-Api-Version: 2022-11-28' \
+  '/repos/Ripe-Foundation/ripe-protocol/dependabot/alerts?state=open&per_page=100'
+```
+
+It returned the unchanged default-branch ledger: 13 open alerts, 6 high, 6
+medium, 1 low, numbers
+`13,14,15,16,18,19,21,22,23,24,25,26,27`. The raw response and approved
+sanitized projection are byte-identical to the prior retained snapshots:
+
+| Fresh K-02 record | SHA-256 | Owner/group | Mode |
+|---|---|---|---|
+| `dependabot-open-2026-07-25T001249Z-raw.json` | `52eccab5e38769070f5310b753f018030587b673cc2637105983ba670bfe2f0a` | `wigglez:staff` | `0600` |
+| `dependabot-open-2026-07-25T001249Z-sanitized.json` | `d2dd2d89acb63de901e164c3c7d69f402c04bc38da9a803fe9674734ab404b06` | `wigglez:staff` | `0600` |
+
+The first refreshed sanitized projection used a broader nested schema. Before
+handoff it was regenerated from the retained raw bytes with the existing
+approved minimized projection, yielding the exact prior hash above. The
+replacement temporarily inherited group `wheel` from its private temporary
+file; the immediate custody check corrected it to `wigglez:staff` while mode
+remained `0600`. No pre-existing retained file changed.
+
+After the refresh, the H-01 private directory remained
+`wigglez:staff` mode `0700`. All 28 retained files were rehashed and verified
+`wigglez:staff` mode `0600`; the sorted private path/hash inventory contained
+28 rows and had SHA-256
+`1737af25d7c7c8fa7de810af5f7a1e525f9f5feb4c0d8d709d8c82b899373a6b`.
+The inventory itself remained outside the repository and was used only for
+this custody integrity check.
+
+### Fresh validation commands and results
+
+Every pytest command used exact prefix
+`ETHERSCAN_API_KEY=local-placeholder PYTHONPATH=.` and a distinct
+task-specific mode-`0700` parent with an explicit private `--basetemp`.
+Every named parent was removed immediately after its command and verified
+absent:
+
+| Exact command | Result and parent disposal |
+|---|---|
+| `ETHERSCAN_API_KEY=local-placeholder PYTHONPATH=. /private/tmp/h01-reachability-validation.xHpsMn/candidate/bin/python -m pytest -q tests/deployment/test_dependency_gate.py --basetemp=/private/tmp/h01-reachability-gate2.kprpCe/basetemp` | corrected gate 16 passed in 1.46 s; parent removed |
+| `ETHERSCAN_API_KEY=local-placeholder PYTHONPATH=. /private/tmp/h01-reachability-validation.xHpsMn/candidate/bin/python -m pytest -q tests/clock/test_clock_profiles.py --basetemp=/private/tmp/h01-reachability-clock.tafqQr/basetemp` | S1 57 passed in 27.35 s; parent removed |
+| `PYTHONPATH=. /private/tmp/h01-reachability-validation.xHpsMn/candidate/bin/python scripts/check_block_clock_inventory.py --check` | clean; production `100/95/17`, BN `32/100`, indirect `1`, cadence `455`, seconds-unit `58`, timestamp `11/37`, mixed-clock `4`, Vyper paths `92`; non-production test `31/29/5`, cadence test `159` |
+| `ETHERSCAN_API_KEY=local-placeholder PYTHONPATH=. /private/tmp/h01-reachability-validation.xHpsMn/candidate/bin/python -m pytest -q tests/inventory/test_block_clock_inventory.py --basetemp=/private/tmp/h01-reachability-inventory.uvJK9G/basetemp` | S2 60 passed in 25.22 s; parent removed |
+| `ETHERSCAN_API_KEY=local-placeholder PYTHONPATH=. /private/tmp/h01-reachability-validation.xHpsMn/candidate/bin/python -m pytest -q tests/core/lootbox/test_underscore_rewards.py --basetemp=/private/tmp/h01-reachability-lootbox.7ijAth/basetemp` | S3-targeted 59 passed in 29.29 s; parent removed |
+| `ETHERSCAN_API_KEY=local-placeholder PYTHONPATH=. /private/tmp/h01-reachability-validation.xHpsMn/candidate/bin/python -m pytest -q tests/config/test_switchboard_charlie.py --basetemp=/private/tmp/h01-reachability-switchboard.ImcEWi/basetemp` | S3-targeted 91 passed in 35.66 s; parent removed |
+| `ETHERSCAN_API_KEY=local-placeholder PYTHONPATH=. /private/tmp/h01-reachability-validation.xHpsMn/candidate/bin/python -m pytest --collect-only -q --basetemp=/private/tmp/h01-reachability-collect.RQLlzk/basetemp` | 2,738 selected / 2,880 total; 142 deselected in 1.28 s; parent removed |
+| `ETHERSCAN_API_KEY=local-placeholder PYTHONPATH=. /private/tmp/h01-reachability-validation.xHpsMn/candidate/bin/python -m pytest -q -p no:cacheprovider --basetemp=/private/tmp/h01-reachability-full.bMHpGC/basetemp` | **2,738 passed, 142 deselected in 298.10 s**; parent removed |
+
+The four-case increase from 2,734 to 2,738 is exactly the two parameterized
+Pymdown mutation cases, the aliased Click import case, and the direct
+`AdlLexer` import case. There was no skip, xfail, warning suppression,
+compatibility failure, unrelated collection change, inventory change, or
+artifact-relevant source/input change.
+
+The final byte-level dependency-gate command against the complete corrected
+evidence returned for review was:
+
+```text
+ETHERSCAN_API_KEY=local-placeholder PYTHONPATH=. \
+  /private/tmp/h01-reachability-validation.xHpsMn/candidate/bin/python \
+  -m pytest -q tests/deployment/test_dependency_gate.py \
+  --basetemp=/private/tmp/h01-reachability-final-evidence.mPr5Tk/basetemp
+```
+
+It passed all 16 tests. The distinct task-specific parent
+`/private/tmp/h01-reachability-final-evidence.mPr5Tk` was verified mode
+`0700` before the command and removed immediately afterward.
+
+### Corrected hashes, scope, and review stop
+
+The corrected self-hashable H-01 files are:
+
+| Current H-01 path | SHA-256 |
+|---|---|
+| `requirements.in` | `2523c04409946a6625e30e5e4aa4f711663924f4a674f4cfd5fee5b7bbb3b80d` |
+| `requirements.txt` | `d2e12a6f0cfd128c3891634efafbba8305878bef7a7c5db33e25ebe93b0d2bce` |
+| `tests/deployment/test_dependency_gate.py` | `d8f4c504623a7393c0e53cafdb9c81288981d655c329582eb70be1accc64e2aa` |
+
+The requirement and lock hashes are unchanged. The test hash changed only for
+the reviewed reachability correction and four mutation cases. The evidence
+hash is supplied out of band because the file cannot contain its own stable
+hash.
+
+The repository remains based on reconciliation commit
+`c9ce0f501824305f74e84e1c8f1c1b3d4a20477f`, whose second parent is exact
+reviewed baseline `2517eeb0013cdb277dc4815db4b524d7a090d682`.
+
+### Post-validation remote-baseline freshness stop
+
+The final scope check discovered that the remote had advanced after the
+reviewed `2517eeb` baseline. Read-only `git ls-remote` confirmed authoritative
+remote `rh` at:
+
+```text
+03c07f01dda03a5529c602aafbfe5545ae86df69
+merge: integrate Track 8 M0 evidence
+```
+
+The complete `2517eeb..03c07f0` remote delta is four commits and adds only:
+
+```text
+docs/chains/rh/stock-token-m0-evidence.md
+docs/chains/rh/stock-token-m0-raw-evidence.json
+```
+
+The delta is 12,492 inserted lines of Track 8 M0 evidence and changes no H-01
+owned path, requirement, lock, dependency, Python test, compiler input,
+contract, ABI, artifact, deployment script, or configuration. Nevertheless,
+the approved freshness policy treats a reconciled-`rh` commit change as a
+freshness event. No non-overlap inference can silently carry merge readiness
+to new baseline bytes.
+
+Current authoritative topology is:
+
+```text
+H-01 HEAD:
+  c9ce0f501824305f74e84e1c8f1c1b3d4a20477f
+authoritative remote/origin rh:
+  03c07f01dda03a5529c602aafbfe5545ae86df69
+merge base:
+  2517eeb0013cdb277dc4815db4b524d7a090d682
+ahead / behind relative to origin/rh:
+  19 / 4
+local rh:
+  706975bec0e608d2d9705a8331f03aad3ef7bf7f
+```
+
+Local `rh` and `origin/rh` are themselves one commit ahead of and one commit
+behind each other; local `rh` is therefore not substituted for the
+authoritative remote baseline. The H-01 branch remains unpublished.
+
+The merge-base-only H-01 change set remains the four authorized files:
+
+```text
+docs/chains/rh/evidence/dependency-security-gate.md
+requirements.in
+requirements.txt
+tests/deployment/test_dependency_gate.py
+```
+
+The actual net tree delta against current `origin/rh` additionally shows the
+two Track 8 files as absent because H-01 has not reconciled their integration.
+Therefore the required exact-four-file net-scope condition is not currently
+satisfied.
+
+The worktree has exactly two unstaged changes: the gate correction and this
+evidence update. No commit, merge, push, deployment, signing, verification
+submission, alert mutation, private-evidence deletion, or other
+production/live action occurred.
+
+All five bounded exceptions remain unchanged, including the 15 August 2026
+review, `2026-08-31T23:59:59Z` hard expiry, post-merge K-02/default-branch
+refresh, exception review, custody, retention, and separately authorized
+disposal obligations. The prior reviewer approval does not cover these new
+test/evidence bytes. The just-completed clean install, gate, S1/S2/S3,
+collection, full suite, no-ignore audit, K-02, and custody checks remain exact
+evidence for `2517eeb`, but became stale for merge readiness when the remote
+baseline advancement was detected. H-01 is stopped before reconciliation.
+Owner direction is required to merge exact current `origin/rh` into the H-01
+branch and rerun the freshness-required checks; this record does not authorize
+that merge.
+
+After recording this freshness stop, a new clean environment installed the
+unchanged Candidate A lock and passed `pip check`. The final offline
+dependency gate against the exact stopped-state evidence bytes returned for
+review used:
+
+```text
+ETHERSCAN_API_KEY=local-placeholder PYTHONPATH=. \
+  /private/tmp/h01-reachability-stop-final.Ba2K76/candidate/bin/python \
+  -m pytest -q tests/deployment/test_dependency_gate.py \
+  --basetemp=/private/tmp/h01-reachability-stop-gate.IC0ALt/basetemp
+```
+
+It passed all 16 cases. The task-specific parent
+`/private/tmp/h01-reachability-stop-gate.IC0ALt` was verified mode `0700`
+before the command and removed immediately afterward. This byte-level offline
+gate confirms the corrected scanner and stopped-state evidence; it does not
+clear the new-baseline freshness stop.
+
+## 24 July 2026: exact `origin/rh` `03c07f0` reconciliation and validation
+
+This section records the final current state. The immediately preceding
+`03c07f0` freshness stop is retained as historical checkpoint evidence only:
+the owner subsequently authorized reconciliation with that exact remote
+commit, and the stop was cleared by the merge and complete replay below.
+Earlier stopped, pending, or approved statements remain accurate only for the
+specific historical bytes and baseline they name.
+
+### Authority, preflight, and merge
+
+Read-only `git ls-remote origin rh` confirmed exact authority:
+
+```text
+03c07f01dda03a5529c602aafbfe5545ae86df69	refs/heads/rh
+```
+
+The complete `2517eeb0013cdb277dc4815db4b524d7a090d682..03c07f0`
+incoming delta was inspected before the merge and contained exactly:
+
+```text
+docs/chains/rh/stock-token-m0-evidence.md
+docs/chains/rh/stock-token-m0-raw-evidence.json
+```
+
+It contained 12,492 inserted lines and no other path. It did not overlap the
+two then-unstaged H-01 paths or any H-01-owned file. It changed no requirement,
+lock, dependency, Python test, compiler input, artifact, ABI, contract,
+deployment script, or configuration. A conflict-checking virtual merge
+completed and produced tree
+`898a37126905446665896baf86d8bafc27ee7ce8`. The authorized exact merge was:
+
+```text
+git merge --no-ff --no-edit 03c07f01dda03a5529c602aafbfe5545ae86df69
+```
+
+It completed without conflict at:
+
+```text
+merge commit:
+  678034e4a8ba469f65485748bb7e612dc343a91a
+first parent:
+  c9ce0f501824305f74e84e1c8f1c1b3d4a20477f
+second parent:
+  03c07f01dda03a5529c602aafbfe5545ae86df69
+commit time:
+  2026-07-24T18:39:07-06:00
+```
+
+The two merged Track 8 worktree blobs exactly matched the authoritative
+remote commit:
+
+```text
+docs/chains/rh/stock-token-m0-evidence.md
+  b680e03d6b1ed687491f55fbec41d7eb270e613d
+docs/chains/rh/stock-token-m0-raw-evidence.json
+  c55e5c25c15ef15190161193ea6f04212e8ff605
+```
+
+An initial post-merge verification loop mistakenly assigned zsh's reserved
+`path` array, which made its child `git` commands unavailable and its printed
+comparison unusable. That output was discarded. The loop made no repository
+or private-evidence change; independent commands with a non-reserved variable
+then established all hashes, topology, and scope values recorded here.
+
+Actual reconciled topology is:
+
+```text
+H-01 reconciled HEAD:
+  678034e4a8ba469f65485748bb7e612dc343a91a
+authoritative baseline and merge base:
+  03c07f01dda03a5529c602aafbfe5545ae86df69
+ahead / behind relative to that exact baseline:
+  20 / 0
+```
+
+The exact net worktree delta against `03c07f0`, including the two uncommitted
+review corrections, is:
+
+```text
+A  docs/chains/rh/evidence/dependency-security-gate.md
+M  requirements.in
+M  requirements.txt
+A  tests/deployment/test_dependency_gate.py
+```
+
+No other net path exists.
+
+### Clean Candidate A and audit environments
+
+A new disposable root
+`/private/tmp/h01-03c07f0-validation.l1mMSg` was created mode `0700`,
+owner/group `wigglez:wheel`, using CPython `3.12.0` and pip `23.2.1`.
+Candidate A was installed from the unchanged committed lock with the complete
+prefix and command:
+
+```text
+PIP_CONFIG_FILE=/dev/null \
+PIP_INDEX_URL=https://pypi.org/simple \
+PIP_EXTRA_INDEX_URL= \
+PIP_NO_CACHE_DIR=1 \
+  /private/tmp/h01-03c07f0-validation.l1mMSg/candidate/bin/python \
+  -m pip install --no-cache-dir -r requirements.txt
+```
+
+Installation completed successfully from public PyPI with 93 packages. The
+exact post-install check:
+
+```text
+/private/tmp/h01-03c07f0-validation.l1mMSg/candidate/bin/python -m pip check
+```
+
+reported `No broken requirements found`.
+
+The same root held a separate mode-`0700` audit environment and
+mode-`0700` audit cache. Exact `pip-audit==2.10.1` was installed from public
+PyPI without cache using:
+
+```text
+PIP_CONFIG_FILE=/dev/null \
+PIP_INDEX_URL=https://pypi.org/simple \
+PIP_EXTRA_INDEX_URL= \
+PIP_NO_CACHE_DIR=1 \
+  /private/tmp/h01-03c07f0-validation.l1mMSg/audit/bin/python \
+  -m pip install --no-cache-dir --index-url https://pypi.org/simple \
+  pip-audit==2.10.1
+```
+
+The audit environment passed `pip check` and reported
+`pip-audit 2.10.1`. The approved raw no-ignore audit command was:
+
+```text
+PIP_CONFIG_FILE=/dev/null \
+  /private/tmp/h01-03c07f0-validation.l1mMSg/audit/bin/python \
+  -m pip_audit --no-deps --disable-pip -r requirements.txt --format=json \
+  --output /Users/wigglez/dev/ripe-protocol-h1-private-evidence/stageb-post-03c07f0-reachability-candidate-a-raw-audit-2026-07-25T005409Z.json \
+  --cache-dir=/private/tmp/h01-03c07f0-validation.l1mMSg/audit-cache
+```
+
+Its expected finding exit was `1`: seven findings in five packages. A shell
+wrapper then attempted to store that exit in zsh's reserved read-only
+`status` variable and stopped before its postprocessing commands. The audit
+itself had completed and written the full result. Separate read-only checks
+confirmed the retained file, its mode, hash, and exact ledger:
+
+```text
+click               8.2.1   PYSEC-2026-2132
+pygments             2.19.2  PYSEC-2026-2987
+pymdown-extensions   10.16.1 CVE-2026-61632
+pymdown-extensions   10.16.1 PYSEC-2026-2999
+pytest               8.4.2   PYSEC-2026-1845
+vyper                0.4.3   PYSEC-2023-142
+vyper                0.4.3   PYSEC-2025-33
+```
+
+Compared with the preceding no-ignore audit, only the order of the Pygments
+and pytest advisory-alias arrays changed. Finding IDs, packages, versions,
+aliases as sets, fix versions, applicability, and all five exception
+dispositions remained exact. Both Vyper findings remain outside Vyper
+`0.4.3`'s authoritative affected-version ranges. No ignore flag, suppression,
+alert mutation, or upstream report was used.
+
+The retained raw audit file is owner/group `wigglez:staff`, mode `0600`,
+SHA-256:
+
+```text
+28733404ee019ff13813df7be6b323374925a057e1428b9d839592c481acb6d4
+```
+
+### Fresh K-02 and custody reconciliation
+
+Before access, the approved private directory was verified
+`wigglez:staff`, mode `0700`. No authentication state was printed. At
+approximately `2026-07-25T00:52:48Z`, the exact approved read-only K-02 query
+was:
+
+```text
+gh api --method GET --paginate --slurp \
+  -H 'Accept: application/vnd.github+json' \
+  -H 'X-GitHub-Api-Version: 2022-11-28' \
+  '/repos/Ripe-Foundation/ripe-protocol/dependabot/alerts?state=open&per_page=100'
+```
+
+The approved minimized projection was regenerated directly in the private
+directory with mode `0600`:
+
+```text
+jq '[.[][] | {number, state, severity: .security_advisory.severity,
+package: .dependency.package.name, manifest: .dependency.manifest_path,
+scope: .dependency.scope, ghsa: .security_advisory.ghsa_id,
+cve: .security_advisory.cve_id,
+vulnerable_range: .security_vulnerability.vulnerable_version_range,
+first_patched_version:
+.security_vulnerability.first_patched_version.identifier,
+published_at: .security_advisory.published_at,
+updated_at: .security_advisory.updated_at, advisory_url: null}]
+| sort_by(.number)'
+```
+
+The result remained 13 open alerts, 6 high, 6 medium, and 1 low, numbers
+`13,14,15,16,18,19,21,22,23,24,25,26,27`. The sanitized projection was
+byte-identical to every prior approved projection. The raw response changed
+only in time-varying EPSS `percentage`/`percentile` fields for alerts
+`13,15,16,26,27`; a path-and-value-hash comparison found no other scalar
+change. Thus no alert identity, package, state, severity, affected range,
+first patched version, publication/update time, or disposition changed.
+
+| Fresh K-02 record | SHA-256 | Owner/group | Mode |
+|---|---|---|---|
+| `dependabot-open-2026-07-25T005248Z-raw.json` | `a5d870192e7c2688bd81c4f5de24ef35f93fc2a7d86039169ded1025148ddbd0` | `wigglez:staff` | `0600` |
+| `dependabot-open-2026-07-25T005248Z-sanitized.json` | `d2dd2d89acb63de901e164c3c7d69f402c04bc38da9a803fe9674734ab404b06` | `wigglez:staff` | `0600` |
+
+After the K-02 and audit refresh, the private directory remained
+`wigglez:staff`, mode `0700`. All 31 retained files were rehashed and verified
+owner/group `wigglez:staff`, mode `0600`; there were zero custody mismatches.
+The sorted private path/hash inventory contained 31 rows and had SHA-256:
+
+```text
+8700cf1125742f35202cf9575cf89cab83e30555298cda471edb8a56c205cacf
+```
+
+That inventory was retained only at
+`/private/tmp/h01-03c07f0-custody-inventory.D7xl6D` during reconciliation and
+removed after this record was updated. No retained private evidence was moved,
+renamed, deleted, or printed. Retention continues through the later of the
+authorized post-merge default-branch K-02 refresh and final disposition of all
+five exceptions; disposal still requires separate explicit owner instruction
+and a recorded hash/mode/custody recheck.
+
+### Current-baseline validation commands and results
+
+Every pytest invocation used the exact complete prefix
+`ETHERSCAN_API_KEY=local-placeholder PYTHONPATH=.` and an explicit private
+`--basetemp` under a distinct task-specific parent. Each parent was verified
+mode `0700` before its command and removed immediately afterward:
+
+| Exact command | Result |
+|---|---|
+| `ETHERSCAN_API_KEY=local-placeholder PYTHONPATH=. /private/tmp/h01-03c07f0-validation.l1mMSg/candidate/bin/python -m pytest -q tests/deployment/test_dependency_gate.py --basetemp=/private/tmp/h01-03c07f0-gate.63FEkH/basetemp` | corrected dependency gate: 16 passed in 1.43 s; parent removed and absent |
+| `ETHERSCAN_API_KEY=local-placeholder PYTHONPATH=. /private/tmp/h01-03c07f0-validation.l1mMSg/candidate/bin/python -m pytest -q tests/clock/test_clock_profiles.py --basetemp=/private/tmp/h01-03c07f0-s1.56VZ5R/basetemp` | S1 clock profiles: 57 passed in 26.97 s; parent removed and absent |
+| `ETHERSCAN_API_KEY=local-placeholder PYTHONPATH=. /private/tmp/h01-03c07f0-validation.l1mMSg/candidate/bin/python -m pytest -q tests/inventory/test_block_clock_inventory.py --basetemp=/private/tmp/h01-03c07f0-s2-inventory.cNgDAS/basetemp` | S2 inventory tests: 60 passed in 25.26 s; parent removed and absent |
+| `ETHERSCAN_API_KEY=local-placeholder PYTHONPATH=. /private/tmp/h01-03c07f0-validation.l1mMSg/candidate/bin/python -m pytest -q tests/core/lootbox/test_underscore_rewards.py --basetemp=/private/tmp/h01-03c07f0-s3-lootbox.No9N5Z/basetemp` | S3 Lootbox target: 59 passed in 29.17 s; parent removed and absent |
+| `ETHERSCAN_API_KEY=local-placeholder PYTHONPATH=. /private/tmp/h01-03c07f0-validation.l1mMSg/candidate/bin/python -m pytest -q tests/config/test_switchboard_charlie.py --basetemp=/private/tmp/h01-03c07f0-s3-switchboard.RuiyxM/basetemp` | S3 Switchboard target: 91 passed in 35.89 s; parent removed and absent |
+| `ETHERSCAN_API_KEY=local-placeholder PYTHONPATH=. /private/tmp/h01-03c07f0-validation.l1mMSg/candidate/bin/python -m pytest --collect-only -q --basetemp=/private/tmp/h01-03c07f0-collection.SgvzHt/basetemp` | 2,738/2,880 collected, 142 deselected in 1.31 s; parent removed and absent |
+| `ETHERSCAN_API_KEY=local-placeholder PYTHONPATH=. /private/tmp/h01-03c07f0-validation.l1mMSg/candidate/bin/python -m pytest -q -p no:cacheprovider --basetemp=/private/tmp/h01-03c07f0-full.uE7R9H/basetemp` | complete serial suite: 2,738 passed, 142 deselected in 302.35 s; parent removed and absent |
+| `ETHERSCAN_API_KEY=local-placeholder PYTHONPATH=. /private/tmp/h01-03c07f0-validation.l1mMSg/candidate/bin/python -m pytest -q tests/deployment/test_dependency_gate.py --basetemp=/private/tmp/h01-03c07f0-final-gate.kx59HD/basetemp` | final byte-level dependency gate after this complete evidence update: 16 passed; parent removed and absent |
+
+The checked S2 inventory command was:
+
+```text
+PYTHONPATH=. \
+  /private/tmp/h01-03c07f0-validation.l1mMSg/candidate/bin/python \
+  scripts/check_block_clock_inventory.py --check
+```
+
+It returned:
+
+```text
+CLOCK_INVENTORY_OK schema=1 production_occurrences=100 production_lines=95 production_files=17 bn_ids=32 bn_records=100 indirect_ids=1 cadence_candidates=455 seconds_unit_candidates=58 timestamp_ids=11 timestamp_occurrences=37 mixed_clock_functions=4 vyper_paths=92
+CLOCK_INVENTORY_NONPROD mock=0/0/0 testing=0/0/0 test=31/29/5
+CLOCK_INVENTORY_NONPROD_CADENCE mock=0 testing=0 test=159
+```
+
+The validation root, Candidate A environment, separate audit environment,
+audit cache, and final-gate parent were removed after the final dependency
+gate and verified absent. The `ETHERSCAN_API_KEY` value was a documented
+non-secret collection placeholder only; no explorer or other production
+service was called by pytest.
+
+### Current hashes, obligations, and reviewer stop
+
+The current self-hashable H-01 payload files are:
+
+| Current H-01 path | SHA-256 |
+|---|---|
+| `requirements.in` | `2523c04409946a6625e30e5e4aa4f711663924f4a674f4cfd5fee5b7bbb3b80d` |
+| `requirements.txt` | `d2e12a6f0cfd128c3891634efafbba8305878bef7a7c5db33e25ebe93b0d2bce` |
+| `tests/deployment/test_dependency_gate.py` | `d8f4c504623a7393c0e53cafdb9c81288981d655c329582eb70be1accc64e2aa` |
+
+The evidence hash is intentionally supplied out of band because this file
+cannot contain its own stable hash. `git diff --check` passes. The worktree
+contains exactly two unstaged changes: the corrected dependency gate and this
+complete evidence amendment. Requirements and lock bytes are unchanged from
+the reviewed Candidate A payload.
+
+All five bounded exceptions remain exactly as approved. Their scheduled review
+is 15 August 2026 and their hard expiry is
+`2026-08-31T23:59:59Z`; expiry blocks rehearsal. After owner integration, the
+authorized default-branch K-02 refresh must distinguish candidate remediation
+from authoritative alert closure and reconcile the expected post-observation
+residual alerts with the exception ledger. Exception review and the recorded
+custody, retention, hash/mode recheck, and separately authorized disposal
+obligations remain mandatory.
+
+At the completion of this pre-approval section, the reconciled branch and
+complete evidence were stopped at the mandatory final independent
+merge-readiness review. No final reviewer approval was claimed here. The next
+section records the later exact-byte approval and the owner's narrow
+authorization to commit and publish the H-01 branch. Neither approval
+authorizes merge into `rh`, Dependabot mutation, deployment, signing,
+verification submission, private-evidence deletion, or another
+production/live action.
+
+## 24 July 2026: final independent merge-readiness approval
+
+The independent security/Track 6 reviewer approved H-01 Candidate A merge
+readiness against this exact identity:
+
+```text
+authoritative baseline:
+  03c07f01dda03a5529c602aafbfe5545ae86df69
+reconciled HEAD:
+  678034e4a8ba469f65485748bb7e612dc343a91a
+complete pre-approval evidence SHA-256:
+  8217348b2e0309597a33684ecba445334da0344109dae19e826624b5b387ac79
+requirements.in SHA-256:
+  2523c04409946a6625e30e5e4aa4f711663924f4a674f4cfd5fee5b7bbb3b80d
+requirements.txt SHA-256:
+  d2e12a6f0cfd128c3891634efafbba8305878bef7a7c5db33e25ebe93b0d2bce
+tests/deployment/test_dependency_gate.py SHA-256:
+  d8f4c504623a7393c0e53cafdb9c81288981d655c329582eb70be1accc64e2aa
+```
+
+The approval covers the exact four-file Candidate A payload and all five
+previously owner-approved bounded exceptions. It expressly retains the
+15 August 2026 review, `2026-08-31T23:59:59Z` hard expiry, compensating
+controls, invalidation triggers, custody requirements, and post-merge
+obligations. No dependency, exception, policy, test logic, validation
+conclusion, requirement, or lock byte changed to record this approval. The
+addition necessarily changes only this evidence file's out-of-band hash.
+
+After this approval record was added, `git diff --check` passed. A newly
+created mode-`0700` disposable Candidate A root,
+`/private/tmp/h01-final-approval-validation.CzGWIx`, installed the exact
+committed lock from public PyPI with:
+
+```text
+PIP_CONFIG_FILE=/dev/null \
+PIP_INDEX_URL=https://pypi.org/simple \
+PIP_EXTRA_INDEX_URL= \
+PIP_NO_CACHE_DIR=1 \
+  /private/tmp/h01-final-approval-validation.CzGWIx/candidate/bin/python \
+  -m pip install --no-cache-dir -r requirements.txt
+```
+
+The environment used CPython `3.12.0` and pip `23.2.1`; installation
+completed cleanly and `python -m pip check` reported no broken requirements.
+The exact approval-record gate replay used the documented non-secret
+collection placeholder and a fresh task-specific mode-`0700` parent:
+
+```text
+ETHERSCAN_API_KEY=local-placeholder PYTHONPATH=. \
+  /private/tmp/h01-final-approval-validation.CzGWIx/candidate/bin/python \
+  -m pytest -q tests/deployment/test_dependency_gate.py \
+  --basetemp=/private/tmp/h01-final-approval-gate.usiaky/basetemp
+```
+
+It passed all 16 cases. The basetemp parent and complete disposable Candidate A
+root were removed immediately afterward and verified absent. No private
+evidence was accessed or deleted.
+
+The owner authorized committing exactly this evidence file and
+`tests/deployment/test_dependency_gate.py`, then publishing only
+`rh-track-7-h1-dependency-security`. The owner/integration agent retains the
+merge. This final approval does not authorize merge into `rh`, Dependabot
+mutation, deployment, signing, verification submission, private-evidence
+deletion, or any other production action.
