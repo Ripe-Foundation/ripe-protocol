@@ -18,9 +18,16 @@
 **Final evidence-only reconciliation captured:** `2026-07-26T16:14:31Z`
 (`2026-07-26T10:14:31-0600`, MDT)
 
-**Status:** **Phase A owner questions approved but Phase A remains open
-pending independent exact-hash approval; Phase B remains unauthorized and did
-not begin**
+**Lifecycle and provenance reconciliation captured:** `2026-07-26T22:22:50Z`
+(`2026-07-26T16:22:50-0600`, MDT)
+
+**Current-`rh` convergence refresh captured:** `2026-07-26T22:34:34Z`
+(`2026-07-26T16:34:34-0600`, MDT)
+
+**Status:** **Phase A closed when the independently reviewed evidence was
+committed byte-for-byte at `2935f0e2fc7c1f0a783e5b822ca560dc11f375f5`;
+this lifecycle-only follow-up is unstaged for independent exact-hash review;
+Phase B remains unauthorized and unstarted**
 
 **Review and re-review correction date:** 25 July 2026
 
@@ -43,23 +50,34 @@ not begin**
 
 **Feature branch:** `rh-track-8-m1-exact-receipt`
 **Feature worktree:** `/Users/wigglez/dev/ripe-protocol-track-8-m1-exact-receipt`
+**Phase A evidence commit:** `2935f0e2fc7c1f0a783e5b822ca560dc11f375f5`
+**Committed evidence SHA-256:**
+`9ef48b80fc0fe1e37ee6878d81201274a1ac7eda682d96de0205439e2242917e`
+**Current local/cached/live `rh`:**
+`8e4a965f034dc3d11b60fbb674ebbb4095b57d98`
+**Current `rh` tree:** `d0a6048d902a035bf69158359dc80e9786792f38`
 
 The durable record itself is the only repository file created in Phase A.
-Its SHA-256 is reported in the checkpoint response rather than embedded here,
-because embedding a file's own digest would change the bytes being hashed.
+The current working copy's SHA-256 is reported in the checkpoint response
+rather than embedded here, because embedding a file's own digest would change
+the bytes being hashed. The embedded `9ef48b80...917e` identity is explicitly
+the approved and committed predecessor, not a self-digest claim for this
+follow-up revision.
 
 Sections 1 through 12 retain the historical 25 July Phase A evidence and
 commands, with current-disposition annotations where their original
-present-tense status became stale. Section 0 is the later, owner-directed
-exact-feasibility durability addendum and controls where a historical
-statement below differs from the current disposition. In particular, the
-owner has now resolved the
+present-tense status became stale. Sections 0 and 12.3 control where a
+historical statement below differs from the current disposition. Section 0
+is the later, owner-directed exact-feasibility durability addendum. In
+particular, the owner has now resolved the
 CreditEngine/CreditRedeem nomenclature and reachability question, approved the
 fixed-sGREEN test ceiling, authorized reproduction under the exact reviewed
 lock, and accepted the exact Teller source form and its limited headroom under
-the byte-specific conditions below. Phase A is not closed until independent
-exact-hash approval. This update authorizes neither candidate modification,
-Phase B, Gate 1, staging, a commit, nor any later action.
+the byte-specific conditions below. The task transcript later records exact-hash
+approval of evidence SHA-256 `9ef48b80...917e`, its byte-identical one-file
+commit, and Phase A closure. This lifecycle-only follow-up does not reopen
+Phase A and authorizes neither candidate modification, Phase B, Gate 1,
+staging, a commit, nor any later action.
 
 ## 0. Exact-feasibility durability addendum
 
@@ -100,7 +118,7 @@ interpretations:
    CreditRedeem, CreditEngine, a vault, an interface, or any other production
    contract is a stop.
 
-The owner supplied this approval against the untracked Phase A evidence at
+The owner supplied this approval against the then-untracked Phase A evidence at
 SHA-256
 `f5ed7d1e2e63b0491369e91932ba4a8aa2391e3dbd83a31749a8016c41831075`
 and the preserved exact-candidate identities in Sections 0.2 through 0.6.
@@ -122,14 +140,18 @@ The owner expressly approved all of the following:
    test file, with no additional implementation file, that proves both
    `runtime <= 24_576` and `runtime <= 24_152`; any later growth must fail
    until separately reviewed and approved;
-6. recording the Phase A owner questions as approved, while keeping Phase A
-   open until the complete evidence and preserved candidate receive
-   independent exact-hash approval; and
-7. keeping official Phase B unauthorized until independent Phase A review is
-   complete, the reviewed Phase A evidence is committed, S5's final
+6. recording the Phase A owner questions as approved while, at that
+   checkpoint, keeping Phase A open until the complete evidence and preserved
+   candidate received independent exact-hash approval; and
+7. keeping official Phase B unauthorized unless and until independent Phase A
+   review completed, the reviewed Phase A evidence was committed, S5's final
    integration state is reconciled because the workstreams overlap Teller
    tests, and the owner gives separate explicit file-exact Phase B
    authorization.
+
+The independent Phase A review and evidence-commit conditions in items 6 and
+7 are now complete. The S5/current-`rh` reconciliation and separate
+file-exact Phase B authorization conditions remain pending.
 
 Because the exact Teller source form is now approved, that approval includes
 its use of Vyper's checked unsigned subtraction as the `C1 >= C0` failure
@@ -144,20 +166,48 @@ SHA-256
 `4afc6ce1ccf21cb65e04ce3c56fedcf60bb79cba8e7dc51fd855a1f1f82bd909`;
 they must not be stripped, rewritten, or resealed independently.
 
-The later independent review substantively approved the exact Teller
-candidate and independently reproduced its source, complete patch, invariant
-behavior, ABI/layout invariance, and 24,152-byte runtime. Its evidence target,
-however, was the superseded
+An earlier independent candidate review substantively approved the exact
+Teller candidate and independently reproduced its source, complete patch,
+invariant behavior, ABI/layout invariance, and 24,152-byte runtime. Its
+evidence target, however, was the superseded
 `f5ed7d1e2e63b0491369e91932ba4a8aa2391e3dbd83a31749a8016c41831075`
 snapshot, not the then-current evidence at
 `b32a15c8cc07543625d24234c509e9b74d8607ed1051a6b5f03f30e08a24da95`.
-It therefore supplies substantive candidate approval but not exact-hash
-approval of this reconciled record. This evidence-only reconciliation starts
-from `b32a15c8...da95`, supersedes those evidence bytes, and requires a new
-independent exact-hash review.
+It therefore supplied substantive candidate approval but not exact-hash
+approval of that reconciled record. The evidence-only reconciliation from
+`b32a15c8...da95` subsequently produced
+`9ef48b80fc0fe1e37ee6878d81201274a1ac7eda682d96de0205439e2242917e`.
 
-The two earlier uncommitted evidence snapshots remain preserved for
-auditability:
+The task transcript then records the exact lifecycle provenance:
+
+1. at `2026-07-26T20:44:16.018Z`, the owner stated that the independent
+   exact-hash review had approved the complete Phase A evidence at
+   `9ef48b80...917e`, authorized one local commit containing exactly this
+   evidence file with those bytes unchanged, and specified that Phase A would
+   close with that exact commit;
+2. at `2026-07-26T20:45:52.710Z`, the resulting handoff reported commit
+   `2935f0e2fc7c1f0a783e5b822ca560dc11f375f5`, tree
+   `a805c4b2fa0145b8bf0d80f822ed05cc730af318`, parent
+   `332ae2bc8e0ce4b694766d6d20759295d9267ec3`, exact one-file scope, and
+   committed-file SHA-256 `9ef48b80...917e`; and
+3. after a separate push authorization at `2026-07-26T20:47:39.116Z`, the
+   `2026-07-26T20:48:41.225Z` handoff reported local, tracking, and live
+   remote feature refs all at `2935f0e2...75f5`.
+
+Current Git inspection independently reproduces those commit, tree, parent,
+scope, file-hash, and ref identities. The transcript proves the owner's
+statement of independent exact-hash approval and the exact commit
+authorization; this record does not invent a reviewer identity or claim
+access to a separate review artifact that the transcript does not contain.
+
+The current working copy changes only lifecycle, provenance, Git-state, and
+current-baseline wording on top of the closed Phase A commit. It is deliberately
+unstaged for a new independent exact-hash review before any later
+documentation-only commit. That follow-up review is not a condition that
+reopens Phase A and is not Phase B authorization.
+
+The two earlier evidence snapshots that were never committed remain preserved
+for auditability:
 
 - `phase-a-evidence-before-durability.md`, SHA-256
   `bbe08bc624403b0c4ecd76f6ab3505f6be318650099aed89070e20f4d0029c0e`;
@@ -165,8 +215,9 @@ auditability:
 - `phase-a-evidence-superseded-acceptance-characterization.md`, SHA-256
   `65321cd9f0d697f8a1f434cf36266fa5dc549bd5c3fe4e2731e586f61c0eba77`.
 
-Neither older snapshot substitutes for the current evidence or independent
-approval. Phase A remains open and Phase B remains unauthorized.
+Neither older snapshot substitutes for the independently approved and
+committed `9ef48b80...917e` evidence. Phase A is closed. Phase B remains
+unauthorized and unstarted.
 
 ### 0.2 Exact reconstruction and durable preservation
 
@@ -190,7 +241,9 @@ tests/vaults/test_stock_token_vault_comparison.py
 
 No fifth file is modified or untracked in that worktree. Its index is empty.
 The active M1 worktree was not used to reconstruct or run the candidate and
-still contains only this untracked evidence record.
+was clean at the reviewed Phase A commit before this reconciliation. At this
+handoff it contains only this evidence file as an unstaged modification on
+top of that commit, and its index is empty.
 
 The exact patches and the pre-update evidence snapshot are preserved outside
 every worktree in a mode-`0700` directory:
@@ -207,7 +260,7 @@ every worktree in a mode-`0700` directory:
 
 The separate superseded-characterization snapshot is 122,323 bytes, mode
 `0444`, and has the SHA-256 recorded in Section 0.1. It is retained to make
-the uncommitted evidence history independently diffable rather than silently
+the pre-commit evidence history independently diffable rather than silently
 overwriting the only prior bytes.
 
 `git apply --check` accepted the preserved four-file patch against the clean
@@ -235,7 +288,7 @@ Line-neutral blank-line removals keep the existing S2 cadence candidate on
 line 992. Removing inherited trailing whitespace at EOF and adding the missing
 final newline make `git diff --check` clean; neither changes runtime behavior.
 They are nevertheless accepted bytes of the exact Teller source identity and
-must remain in the candidate through independent review.
+must remain unchanged in any official Phase B package and every later review.
 
 ### 0.3 Exact candidate structure
 
@@ -570,17 +623,19 @@ baseline worktree used for the four printed counterexamples was removed with
 basetemps, pycache, and artifact-comparison helper under the three exact
 `/private/tmp/ripe-track8-m1-durability-*` paths were deleted and their
 absence verified. The preserved candidate worktree and read-only artifacts
-were intentionally retained for independent review. Ignored `.pytest_cache`,
-`.hypothesis`, `__pycache__`, and compiled-Python files created by validation
-were removed from the preserved worktree; an ignored-inclusive status now
-shows only the same four source/test modifications.
+were intentionally retained for the then-pending independent review and
+remain preserved. Ignored `.pytest_cache`, `.hypothesis`, `__pycache__`, and
+compiled-Python files created by validation were removed from the preserved
+worktree; an ignored-inclusive status now shows only the same four
+source/test modifications.
 
 ### 0.7 Current feasibility disposition and remaining decisions
 
 The exact result is now:
 
-> **Feasible as the exact approved Teller-only M1 candidate, subject to
-> independent exact-hash Phase A approval and every remaining gate below.**
+> **Feasible as the exact owner-approved and independently reviewed
+> Teller-only M1 candidate, subject to every still-pending Phase B gate
+> below.**
 
 No other production contract or interface is needed. No required regression
 fails. The exact lock, fixed-sGREEN failure, CreditEngine route,
@@ -607,44 +662,63 @@ The following limitations remain controlling:
   controlling-object change requires the brief's stop and reconciliation;
 - nothing here establishes a later Teller headroom policy or precedent.
 
-The owner questions above are approved, but Phase A is not closed. The
-remaining gates are:
+The owner questions are approved, and the exact-hash review and one-file
+evidence commit that closed Phase A are complete. The current
+lifecycle/provenance edit remains deliberately unstaged for independent
+exact-hash review before any later documentation-only commit; that review
+does not reopen Phase A. The still-pending gates are:
 
-1. independent exact-hash approval of the complete current Phase A evidence,
-   preserved candidate, and full patch;
-2. after that approval, commit the reviewed Phase A evidence; this update
-   remains deliberately unstaged and uncommitted;
-3. reconcile S5's final integration state and all overlapping Teller-test
-   effects;
-4. obtain separate explicit, file-exact owner authorization for official
+1. reconcile current `rh` at `8e4a965f...7d98`, S5's final reviewed and
+   integrated state, and all overlapping Teller-test effects;
+2. reseal the two overlapping Teller test files and complete M1 patch against
+   that reconciled baseline;
+3. obtain separate explicit, file-exact owner authorization for official
    Phase B;
-5. only during that later authorized Phase B, add the dual-threshold size
-   guard inside an already authorized M1 test file, without changing Teller
-   or adding an implementation file;
-6. require Gate 1 to reproduce the exact compiler output, 24,152-byte runtime,
+4. only during that later authorized Phase B, add the dual-threshold size
+   guard inside an already authorized M1 test file, without changing the
+   accepted Teller bytes or adding an implementation file;
+5. require Gate 1 to reproduce the exact compiler output, 24,152-byte runtime,
    artifact hashes, ABI/selectors/events/layout invariance, guard result, and
    complete validation;
-7. separately decide whether to authorize a local implementation commit after
+6. separately decide whether to authorize a local implementation commit after
    Gate 1; and
-8. retain all existing later push, merge, Gate 2, deployment, configuration,
+7. retain all existing later merge, Gate 2, deployment, configuration,
    signing, broadcasting, live-RPC, activation, and M2-M5 gates.
 
-At this handoff, **Phase B remains unauthorized**. No file is staged; no
-commit, push, merge, deployment, configuration, signature, transaction,
-broadcast, external-human contact, or live RPC occurred.
+At this handoff, **Phase B remains unauthorized and unstarted**. This
+reconciliation leaves exactly this evidence file modified but unstaged and
+the index empty. The earlier authorized Phase A evidence commit and feature
+push are recorded in Section 0.1; no new commit, push, merge, deployment,
+configuration, signature, transaction, broadcast, external-human contact, or
+live RPC occurred in this reconciliation.
 
 ### 0.8 Current authority, `rh`, and S5 refresh
 
-A read-only refresh at `2026-07-26T16:14:31Z` found:
+The read-only convergence refresh at `2026-07-26T22:34:34Z` found:
 
 - the integration worktree clean on `rh`;
 - integration `HEAD`, local `rh`, cached `origin/rh`, and live remote `rh`
-  all still equal the owner-approved baseline
-  `332ae2bc8e0ce4b694766d6d20759295d9267ec3`, with tree
-  `f67dc91e47331785837de879b6557b285aec3b1b`;
-- the official M1 feature worktree still at that exact commit and tree, with
-  only this untracked evidence record, an empty index, and no live remote
-  feature branch; and
+  all equal
+  `8e4a965f034dc3d11b60fbb674ebbb4095b57d98`, with tree
+  `d0a6048d902a035bf69158359dc80e9786792f38`;
+- the net incoming H-03 Phase A R6 movement adds
+  `docs/chains/rh/evidence/robinhood-blueprint-phase-a.md` and modifies
+  `docs/chains/rh/track-7-h3-robinhood-blueprint-omissions.md`;
+- current `rh` is ten commits beyond the owner-approved launch baseline. Its
+  full net delta is documentation-only: three added evidence records and two
+  modified Robinhood briefs. The incoming H-03 movement and full net delta
+  change none of the five controlling M0/M1 documents, `Teller.vy`, the three
+  M1 test files, the feasibility candidate, or either preserved patch;
+- the official M1 feature branch, its tracking ref, and the live remote
+  feature ref all equal
+  `2935f0e2fc7c1f0a783e5b822ca560dc11f375f5`, with tree
+  `a805c4b2fa0145b8bf0d80f822ed05cc730af318`;
+- the feature/current-`rh` merge base remains the launch baseline
+  `332ae2bc...7ec3`; the feature is one commit ahead and ten commits behind
+  current `rh` and remains unintegrated. No feature reconciliation, merge,
+  rebase, or amendment has occurred;
+- the official M1 worktree was clean before this reconciliation and now has
+  exactly this evidence file modified but unstaged, with an empty index; and
 - the five controlling M0/M1 authority hashes unchanged:
 
 | Controlling authority | Refreshed SHA-256 |
@@ -665,7 +739,7 @@ the docs-only snapshot recorded historically in Section 2.2:
 | Local versus remote | `0 behind / 12 ahead` |
 | Merge base with `rh` | `332ae2bc8e0ce4b694766d6d20759295d9267ec3` |
 | Recreation head ancestor of `rh` | No |
-| Worktree state | 11 unstaged modified paths, three untracked paths, empty index |
+| Worktree state | 14 unstaged modified paths, three untracked paths, empty index |
 | Working `contracts/data/Ledger.vy` SHA-256 | `6bd731a6ce9084de213494ebad09f8e52c782153842708b78f90fa178c06e9e3` |
 | Working `contracts/core/Teller.vy` SHA-256 | `51cf13e3c9d58262ba446a462332d8f4f181c07ce689031b2398c20137f04198` |
 
@@ -673,13 +747,14 @@ The current unstaged S5 delta changes Ledger action-block behavior and
 modifies both M1-owned Teller test files
 `tests/core/teller/test_teller_deposit.py` and
 `tests/core/teller/test_teller_rebalance.py`, among other tests. No S5 byte is
-present in `rh`, and S5 does not change Teller source. Therefore this movement
-does not retroactively invalidate the exact feasibility result against
-baseline `332ae2bc...`; it does activate the brief's coordination stop for
-any progression beyond evidence-only reconciliation. S5 must reach a final
-reviewed state, then its Ledger behavior and overlapping Teller-test effects
-must be reconciled and rerun before separate file-exact Phase B
-authorization.
+present in current `rh`, and S5 does not change Teller source. The
+documentation-only advance in current `rh` likewise changes no controlling
+M1 object or production/test byte. Neither movement retroactively invalidates
+the exact feasibility result against baseline `332ae2bc...`. Local, cached,
+and live `rh` are converged and add no separate ref-state stop. S5 must still
+reach a final reviewed and integrated state; current `rh`, its Ledger
+behavior, and the overlapping Teller-test effects must then be reconciled and
+rerun before separate file-exact Phase B authorization.
 
 ## 1. Historical 25 July owner authorization and gate ledger
 
@@ -704,13 +779,13 @@ The kickoff authorization received from the owner is:
 | M1-D05 one exact-transfer policy for every route | Approved 25 July 2026; the later owner disposition resolves the historical CreditRedeem reachability conflict by preserving dormancy |
 | M1-D06 Robinhood-first and unchanged live Base | Approved 25 July 2026 |
 | M1-D07 review, commit, and non-activation boundary | Approved 25 July 2026 |
-| Bootstrap and Phase A | Authorized and performed; exact feasibility is reproduced, but Phase A remains open for exact-hash review and commit |
+| Bootstrap and Phase A | Authorized and performed; exact feasibility reproduced; complete evidence independently exact-hash approved and committed byte-for-byte at `2935f0e2...75f5`; **closed** |
 | Phase B production/test implementation | **Not authorized; not started** |
 | Gate 1 complete-file review | Pending; the preserved feasibility patch exists, but no official Phase B repository implementation patch exists because Phase B has not begun |
 | Local implementation commit | Pending separate owner authorization |
-| Reconciliation with current `rh` and S5 | Not applicable at the historical checkpoint; now required before separate file-exact Phase B authorization |
+| Reconciliation with current `rh` and S5 | Not applicable at the historical checkpoint; local, cached, and live `rh` now converge at `8e4a965f...7d98`, while final S5/current-`rh` reconciliation remains required before separate file-exact Phase B authorization |
 | Gate 2 | Pending |
-| Feature push / merge | Not authorized; not performed |
+| Feature push / merge | Evidence-only feature push later separately authorized and performed at exact commit `2935f0e2...75f5`; merge remains unauthorized and unperformed |
 | Deploy / configure / sign / broadcast / activate | Not authorized; not performed |
 | M2 through M5 | Not authorized; not started |
 
@@ -839,7 +914,7 @@ git -C /Users/wigglez/dev/ripe-protocol worktree add \
   332ae2bc8e0ce4b694766d6d20759295d9267ec3
 ```
 
-The resulting feature identity was:
+The resulting feature identity at creation was:
 
 | Check | Result |
 | --- | --- |
@@ -848,7 +923,7 @@ The resulting feature identity was:
 | Tree | `f67dc91e47331785837de879b6557b285aec3b1b` |
 | Merge base with approved baseline | `332ae2bc8e0ce4b694766d6d20759295d9267ec3` |
 | Ahead / behind approved baseline | `0 / 0` |
-| Remote feature branch | Absent |
+| Remote feature branch | Absent at creation; Section 0.8 records its later exact preservation |
 | Integration worktree | Clean and unmodified |
 | Feature worktree before this record | Clean |
 
@@ -2222,7 +2297,7 @@ The compiler's 123 method identifiers, normalized to four-byte hex, are:
 
 | Controlling stop | Result |
 | --- | --- |
-| “the exact baseline is missing, stale, or ambiguous” | No; all four `rh` identities were exact at bootstrap and are rechecked at handoff |
+| “the exact baseline is missing, stale, or ambiguous” | No; all four `rh` identities were exact at bootstrap, and current local, cached, and live `rh` converge at `8e4a965f...7d98`. Section 0.8 proves the incoming H-03 movement is documentation-only and changes no M1 byte. The feature remains unintegrated at one ahead / ten behind; Phase B still requires final S5/current-`rh` reconciliation and separate baseline authority |
 | “the integration worktree is dirty” | No |
 | “the proposed branch or worktree already exists” | No; both were absent before fresh creation |
 | “an H-01 gate fails or an exception control is stale” | No; the owner-authorized exact-lock replay passed H-01/S1/S2 with 133 tests and the clean inventory result |
@@ -2243,8 +2318,10 @@ The exact preserved four-file candidate proves deployable Teller-only
 feasibility, including the vault-return invariant, 24,152-byte runtime,
 fixed-sGREEN failure construction, CreditEngine live route, and CreditRedeem
 dormancy/refund behavior. That feasibility result is not an official Phase B
-repository implementation, and Phase A remains open for exact-hash review and
-commit.
+repository implementation. The complete Phase A evidence was independently
+exact-hash approved and committed byte-for-byte at `2935f0e2...75f5`, closing
+Phase A. This unstaged lifecycle-only follow-up requires its own exact-hash
+review before any later documentation commit but does not reopen Phase A.
 
 ### 11.2 Historical reachability blocker and owner resolution
 
@@ -2280,10 +2357,10 @@ authorization remain required.
 | `tests/core/teller/test_teller_deposit.py` | Exact candidate covers direct, batch, Gov, trusted callers, fixed-sGREEN failure, CreditEngine, CreditRedeem dormancy/refund, permissions, pause, and atomicity | Byte-identical to baseline; official Phase B edit has not begun |
 | `tests/core/teller/test_teller_rebalance.py` | Exact candidate covers rebalance exact and failure behavior | Byte-identical to baseline; official Phase B edit has not begun |
 | `tests/vaults/test_stock_token_vault_comparison.py` | Exact candidate records both masking baselines, inverts M-01, and proves exact-candidate rejection | Byte-identical to baseline; official Phase B edit has not begun |
-| `docs/chains/rh/evidence/stock-token-m1-exact-receipt.md` | This complete Phase A evidence record | The only file present in the official worktree; untracked, unstaged, and uncommitted |
+| `docs/chains/rh/evidence/stock-token-m1-exact-receipt.md` | Complete Phase A evidence independently approved at SHA-256 `9ef48b80...917e` and committed byte-for-byte at `2935f0e2...75f5` | Committed at feature `HEAD`; this lifecycle-only working-copy revision is the sole unstaged modification, and the index is empty |
 
 The exact preserved four-file candidate proves the Teller-only mechanism
-within the approved production/test ceiling:
+within the approved four-file Phase B production/test ceiling:
 
 1. runtime is 24,152 bytes, below EIP-170 by 424 bytes;
 2. T8's fixed-sGREEN failure is induced inside an authorized test file;
@@ -2412,9 +2489,12 @@ The historical decision list now has these dispositions:
    `4afc6ce1ccf21cb65e04ce3c56fedcf60bb79cba8e7dc51fd855a1f1f82bd909`,
    its 24,152-byte runtime, and its 424-byte reserve; any source-byte change
    invalidates it.
-6. **Phase A closure — still open.** This reconciled evidence and the
-   preserved exact candidate/full patch require independent exact-hash
-   approval, after which the reviewed evidence must be committed.
+6. **Phase A closure — complete.** The task transcript records independent
+   exact-hash approval of evidence SHA-256 `9ef48b80...917e`; the exact bytes
+   were committed as the sole file in `2935f0e2...75f5`, closing Phase A, and
+   were later preserved on the remote feature branch. This unstaged
+   lifecycle-only follow-up needs a new exact-hash review before any later
+   documentation commit but does not reopen Phase A.
 7. **Pre-Phase-B reconciliation — still required.** Reconcile current `rh`,
    S5's final integration state, and overlapping Teller-test effects.
 8. **Official Phase B — still unauthorized.** It requires a separate,
@@ -2429,16 +2509,22 @@ action.
 
 ## 12. Checkpoint scope and prohibited actions
 
-In the official M1 feature worktree at this checkpoint:
+In the official M1 feature worktree at this lifecycle reconciliation
+checkpoint:
 
 - `Teller.vy` is byte-identical to the approved baseline;
 - all three authorized test files are byte-identical to the approved baseline;
 - no production, interface, ABI, vault, dependency, fixture, default,
   migration, manifest, inventory, CI, or summary file changed;
-- no file is staged;
-- no commit, push, merge, deployment, configuration, signature, transaction,
-  live RPC call, signer use, broadcast, external-human contact, or activation
-  occurred; and
+- the independently reviewed Phase A evidence is committed at feature `HEAD`
+  `2935f0e2...75f5`, and the local, tracking, and live remote feature refs
+  have exact parity;
+- this evidence file is the sole working-copy modification and is unstaged;
+  the index is empty;
+- no new commit or push and no merge, amendment, rebase, deployment,
+  configuration, signature, transaction, live RPC call, signer use,
+  broadcast, external-human contact, or activation occurred in this
+  reconciliation; and
 - Phase B and M2-M5 did not begin.
 
 These worktree statements do not deny the separate, detached feasibility
@@ -2446,10 +2532,11 @@ candidate documented in Section 0. That candidate is intentionally preserved
 outside the official M1 worktree with four unstaged modifications; it is not
 an official Phase B repository implementation.
 
-The expected final feature worktree state is one untracked file:
+The expected lifecycle-reconciliation handoff state is one unstaged
+modification:
 
 ```text
-?? docs/chains/rh/evidence/stock-token-m1-exact-receipt.md
+ M docs/chains/rh/evidence/stock-token-m1-exact-receipt.md
 ```
 
 ### 12.1 Review-correction handoff validation
@@ -2463,8 +2550,9 @@ At `2026-07-25T21:49:07Z`:
 - live remote `rh-track-8-m1-exact-receipt` was absent;
 - feature `HEAD` and merge base were the approved baseline, feature tree was
   `f67dc91e47331785837de879b6557b285aec3b1b`, and ahead/behind was `0/0`;
-- the feature status was exactly the one untracked evidence file above, with
-  no staged content;
+- the feature status was exactly one untracked evidence file,
+  `?? docs/chains/rh/evidence/stock-token-m1-exact-receipt.md`, with no
+  staged content;
 - Teller and the three authorized tests reproduced their Section 3 SHA-256
   values;
 - exact Vyper `0.4.3+commit.bff19ea2` reproduced the 23,906-byte baseline
@@ -2493,36 +2581,78 @@ re-review size-probe paths were removed before validation and remained absent
 at handoff. Their verified absence and this record's final SHA-256 are reported
 with the checkpoint handoff.
 
-### 12.2 Current evidence-only reconciliation handoff
+### 12.2 Pre-closure evidence-only reconciliation handoff (historical)
 
-This reconciliation chain:
+At the pre-closure handoff, this reconciliation chain:
 
 - started from evidence SHA-256
   `b32a15c8cc07543625d24234c509e9b74d8607ed1051a6b5f03f30e08a24da95`;
 - produced the first complete stale-status reconciliation at SHA-256
   `b9deb6d4eca46fa5bad6e9a06f1033d3feb45a2de83cf24e4c0b996c142195e3`,
   then used those live bytes for this final editorial and current-state pass;
-- changed only this untracked Phase A evidence record;
+- changed only the then-untracked Phase A evidence record;
 - did not alter or rerun the exact feasibility candidate, its tests, or either
   preserved patch;
 - read-only reverified Teller source SHA-256
   `4afc6ce1ccf21cb65e04ce3c56fedcf60bb79cba8e7dc51fd855a1f1f82bd909`
   and four-file patch SHA-256
   `556a3553930da1008ac1bb75751ad4be2c5c28faf6fc6d9138e8b85e4b00768f`;
-- records that the substantive independent candidate review targeted
+- recorded that the substantive independent candidate review targeted
   superseded evidence SHA-256
   `f5ed7d1e2e63b0491369e91932ba4a8aa2391e3dbd83a31749a8016c41831075`
-  and therefore is not exact-hash approval of this record;
+  and therefore was not exact-hash approval of that record;
 - read-only refreshed the unchanged M0/M1 authority hashes and exact local,
   cached, and live `rh` identity, and recorded the current unintegrated S5
   behavior/test delta in Section 0.8;
-- leaves the evidence unstaged and uncommitted for a new independent
-  exact-hash review; and
-- leaves Phase B unauthorized and unstarted pending exact-hash approval,
-  evidence commit, final S5/current-`rh` reconciliation, and separate
-  explicit file-exact owner authorization.
+- at that time, left the evidence unstaged and uncommitted for a new
+  independent exact-hash review; and
+- at that time, left Phase B unauthorized and unstarted behind exact-hash
+  approval, evidence commit, final S5/current-`rh` reconciliation, and
+  separate explicit file-exact owner authorization. The first two conditions
+  later completed; the latter two remain pending.
 
 No compiler, pytest, feasibility, deployment, configuration, signing,
 broadcast, live-RPC, or external-contact action was run for this
-reconciliation. The new evidence SHA-256 is reported outside the file so the
-record does not attempt to embed its own changing digest.
+historical reconciliation. Those lifecycle statements were later superseded
+by the exact-hash approval and one-file commit recorded in Sections 0.1 and
+12.3.
+
+### 12.3 Lifecycle and provenance reconciliation handoff
+
+This documentation-only reconciliation:
+
+- starts from feature commit
+  `2935f0e2fc7c1f0a783e5b822ca560dc11f375f5`, whose sole committed path is
+  this evidence record and whose committed file SHA-256 is the independently
+  approved `9ef48b80fc0fe1e37ee6878d81201274a1ac7eda682d96de0205439e2242917e`;
+- records only transcript-proved provenance: the owner's explicit statement
+  of completed independent exact-hash review, the file-exact commit
+  authorization, the reported and Git-reproduced commit/tree/parent/scope,
+  Phase A closure with that commit, and the later separately authorized
+  remote preservation;
+- leaves local, tracking, and live remote feature refs unchanged at
+  `2935f0e2...75f5`, with exactly this evidence file modified but unstaged
+  and an empty index;
+- records local, cached, and live `rh` converged at
+  `8e4a965f034dc3d11b60fbb674ebbb4095b57d98`, tree
+  `d0a6048d902a035bf69158359dc80e9786792f38`. Its ten-commit advance from
+  `332ae2bc...7ec3` changes only unrelated documentation paths, leaves every
+  controlling M0/M1 authority and all four prospective Phase B
+  production/test paths byte-identical, and leaves the unintegrated feature
+  one commit ahead and ten commits behind, with merge base
+  `332ae2bc...7ec3`;
+- leaves the exact feasibility candidate and preserved patches unchanged;
+- does not apply or rerun the candidate, modify a production or test file,
+  stage, commit, push, merge, amend, rebase, deploy, configure, sign,
+  broadcast, contact a live RPC, or begin Phase B; and
+- leaves Phase B explicitly unauthorized and unstarted pending S5's final
+  reviewed and integrated state, current-`rh`/S5 reconciliation, resealing
+  the two overlapping Teller test files and complete M1 patch, complete
+  required validation and review, and separate file-exact owner
+  authorization.
+
+This revised working copy requires independent exact-hash review before any
+later documentation-only commit. That review is provenance for this follow-up
+revision; it is not a reopening of Phase A and grants no Phase B authority.
+The revised evidence SHA-256 is reported outside the file so the record does
+not attempt to embed its own changing digest.
