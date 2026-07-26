@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
-"""Fail-closed Robinhood testnet runner for ActionBlockIdentityProbe.
+"""Fail-closed S5 evidence runner for ActionBlockIdentityProbe.
 
 The default dry run is local-only and never reads an RPC URL or signing key.
+Fork evidence uses only an exact official public endpoint and two exact pinned
+states; it reads no approval packet or signing secret and never broadcasts.
 RPC preflight is read-only. Live execution is testnet-only and requires an
 explicit approval file, an additional CLI confirmation flag, and secrets
 supplied only through named environment variables.
@@ -38,6 +40,7 @@ PROBE_CONTRACT = REPO_ROOT / "contracts/testing/ActionBlockIdentityProbe.vy"
 BOA_CACHE_ROOT = Path(tempfile.gettempdir()) / "ripe-action-block-probe-cache"
 
 ROBINHOOD_TESTNET_CHAIN_ID = 46630
+ROBINHOOD_MAINNET_CHAIN_ID = 4663
 ARB_SYS = to_checksum_address("0x0000000000000000000000000000000000000064")
 ARB_BLOCK_SELECTOR = "0x" + keccak(text="arbBlockNumber()")[:4].hex()
 ARB_OS_VERSION_SELECTOR = "0x" + keccak(text="arbOSVersion()")[:4].hex()
@@ -81,6 +84,13 @@ EXPECTED_PROBE_CREATION_BYTECODE_KECCAK256 = (
 EXPECTED_PROBE_RUNTIME_BYTECODE_KECCAK256 = (
     "0xd4114b7780177700bfac10a60e77a4ca49a4ad10a92f01685ea72bbd1c54ab56"
 )
+EXPECTED_ARB_SYS_CODE = bytes.fromhex("fe")
+EXPECTED_ARB_SYS_CODE_SHA256 = (
+    "0xaa687b58b0e73e2e383f8c500d75b591e188efe0168b3ffbcd3771caaa6dd4c7"
+)
+EXPECTED_ARB_SYS_CODE_KECCAK256 = (
+    "0xbcc90f2d6dada5b18e155c17a1c0a55920aae94f39857d39d0d8ed07ae8f228b"
+)
 
 REQUIRED_TOPOLOGY_CASES = (
     "each emitted ArbSys value equals its receipt blockNumber",
@@ -102,6 +112,31 @@ set_cache_dir(BOA_CACHE_ROOT / "compiler")
 
 class ApprovalError(RuntimeError):
     """An approval input or observed preflight invariant did not match."""
+
+
+@dataclass(frozen=True)
+class ForkNetwork:
+    label: str
+    chain_id: int
+    rpc_url_sha256: str
+
+
+FORK_NETWORKS = {
+    "robinhood-mainnet": ForkNetwork(
+        label="robinhood-mainnet-official-public",
+        chain_id=ROBINHOOD_MAINNET_CHAIN_ID,
+        rpc_url_sha256=(
+            "0x78ccdeee5ef1eac240a33a5d090abde993a67b38a8b42627004d153a1f8c7402"
+        ),
+    ),
+    "robinhood-testnet": ForkNetwork(
+        label="robinhood-testnet-official-public",
+        chain_id=ROBINHOOD_TESTNET_CHAIN_ID,
+        rpc_url_sha256=(
+            "0x6c163ade146dadc263774bd634844f5981096b9232e490593c2497d92dfba51f"
+        ),
+    ),
+}
 
 
 @dataclass(frozen=True)
@@ -658,17 +693,39 @@ def load_approval(path: Path) -> ApprovedRun:
 
 
 def _rpc(rpc_url: str, method: str, params: list[Any]) -> Any:
+    request_id = 1
     try:
         response = requests.post(
             rpc_url,
-            json={"jsonrpc": "2.0", "id": 1, "method": method, "params": params},
+            json={
+                "jsonrpc": "2.0",
+                "id": request_id,
+                "method": method,
+                "params": params,
+            },
             timeout=30,
             allow_redirects=False,
         )
-        response.raise_for_status()
+        status_code = response.status_code
+        if (
+            isinstance(status_code, bool)
+            or not isinstance(status_code, int)
+            or not 200 <= status_code < 300
+        ):
+            raise ApprovalError(
+                f"RPC returned a non-2xx HTTP status for {method}"
+            )
         payload = response.json()
     except (requests.RequestException, ValueError) as exc:
         raise ApprovalError(f"RPC request failed for {method}") from exc
+    if (
+        not isinstance(payload, dict)
+        or payload.get("jsonrpc") != "2.0"
+        or isinstance(payload.get("id"), bool)
+        or not isinstance(payload.get("id"), int)
+        or payload.get("id") != request_id
+    ):
+        raise ApprovalError(f"RPC returned an invalid JSON-RPC envelope for {method}")
     if "error" in payload:
         raise ApprovalError(f"RPC returned an error for {method}")
     if "result" not in payload:
@@ -700,7 +757,10 @@ def _signing_secret_from_environment(approved: ApprovedRun) -> str:
 def _decode_uint256_response(raw: Any, field: str) -> int:
     if not isinstance(raw, str) or not raw.startswith("0x"):
         raise ApprovalError(f"{field} returned non-hex data")
-    response = bytes.fromhex(raw[2:])
+    try:
+        response = bytes.fromhex(raw[2:])
+    except ValueError as exc:
+        raise ApprovalError(f"{field} returned malformed hex data") from exc
     if len(response) != 32:
         raise ApprovalError(f"{field} returned an incompatible ABI length")
     return decode(["uint256"], response)[0]
@@ -709,7 +769,10 @@ def _decode_uint256_response(raw: Any, field: str) -> int:
 def _hex_int(value: Any, field: str) -> int:
     if not isinstance(value, str) or not value.startswith("0x"):
         raise ApprovalError(f"{field} is not a hex quantity")
-    return int(value, 16)
+    try:
+        return int(value, 16)
+    except ValueError as exc:
+        raise ApprovalError(f"{field} is a malformed hex quantity") from exc
 
 
 def local_dry_run() -> dict[str, Any]:
@@ -977,6 +1040,393 @@ def preflight(
             "owner_approved_total_fee_cap_wei": approved.max_total_fee_wei,
         },
         "ready_for_live_testnet_execution": True,
+    }
+
+
+def _fork_network(name: str) -> ForkNetwork:
+    try:
+        return FORK_NETWORKS[name]
+    except KeyError as exc:
+        raise ApprovalError(f"unsupported fork network: {name}") from exc
+
+
+def _validate_public_fork_rpc_url(rpc_url: str, network: ForkNetwork) -> None:
+    if _sha256_text(rpc_url) != network.rpc_url_sha256:
+        raise ApprovalError(
+            "fork endpoint is not the exact credential-free official public endpoint"
+        )
+
+
+def _code_bytes(raw: Any, field: str) -> bytes:
+    if not isinstance(raw, str) or not raw.startswith("0x"):
+        raise ApprovalError(f"{field} returned non-hex code")
+    encoded = raw[2:]
+    if len(encoded) % 2:
+        raise ApprovalError(f"{field} returned malformed code")
+    try:
+        return bytes.fromhex(encoded)
+    except ValueError as exc:
+        raise ApprovalError(f"{field} returned malformed code") from exc
+
+
+def _collect_pinned_snapshot(
+    rpc_url: str,
+    network: ForkNetwork,
+    number: int,
+    expected_hash: str,
+) -> dict[str, Any]:
+    if isinstance(number, bool) or number <= 0:
+        raise ApprovalError("fork pin number must be a positive integer")
+    expected_hash = _runtime_hash(expected_hash, "expected fork state hash")
+    tag = hex(number)
+    state = _rpc(rpc_url, "eth_getBlockByNumber", [tag, False])
+    if not isinstance(state, dict):
+        raise ApprovalError("pinned fork state is unavailable")
+
+    observed_number = _hex_int(state.get("number"), "pinned state number")
+    observed_hash = _runtime_hash(state.get("hash"), "pinned state hash")
+    if observed_number != number:
+        raise ApprovalError("pinned fork state number mismatch")
+    if observed_hash != expected_hash:
+        raise ApprovalError("pinned fork state hash mismatch")
+
+    parent_hash = _runtime_hash(state.get("parentHash"), "pinned parent hash")
+    timestamp = _hex_int(state.get("timestamp"), "pinned state timestamp")
+    l1_number = _hex_int(
+        state.get("l1BlockNumber"),
+        "pinned state l1BlockNumber",
+    )
+
+    code = _code_bytes(
+        _rpc(rpc_url, "eth_getCode", [ARB_SYS, tag]),
+        "ArbSys(0x64) code",
+    )
+    if code != EXPECTED_ARB_SYS_CODE:
+        raise ApprovalError("pinned ArbSys code identity mismatch or missing code")
+    code_sha256 = _sha256_bytes(code)
+    code_keccak256 = _keccak_bytes(code)
+    if code_sha256 != EXPECTED_ARB_SYS_CODE_SHA256:
+        raise ApprovalError("pinned ArbSys SHA-256 identity mismatch")
+    if code_keccak256 != EXPECTED_ARB_SYS_CODE_KECCAK256:
+        raise ApprovalError("pinned ArbSys Keccak-256 identity mismatch")
+
+    action_identity = _decode_uint256_response(
+        _rpc(
+            rpc_url,
+            "eth_call",
+            [
+                {
+                    "to": ARB_SYS,
+                    "data": ARB_BLOCK_SELECTOR,
+                    "value": "0x0",
+                },
+                tag,
+            ],
+        ),
+        "pinned ArbSys(0x64).arbBlockNumber()",
+    )
+    if action_identity != observed_number:
+        raise ApprovalError(
+            "pinned ArbSys action identity disagrees with the pinned state number"
+        )
+
+    raw_version = _decode_uint256_response(
+        _rpc(
+            rpc_url,
+            "eth_call",
+            [
+                {
+                    "to": ARB_SYS,
+                    "data": ARB_OS_VERSION_SELECTOR,
+                    "value": "0x0",
+                },
+                tag,
+            ],
+        ),
+        "pinned ArbSys(0x64).arbOSVersion()",
+    )
+    if raw_version != EXPECTED_ARB_SYS_ARB_OS_VERSION_RETURN:
+        raise ApprovalError(
+            "pinned ArbSys version disagrees with published profile 61 plus offset 55"
+        )
+
+    return {
+        "number": observed_number,
+        "hash": observed_hash,
+        "parent_hash": parent_hash,
+        "timestamp": timestamp,
+        "rpc_l1_number": l1_number,
+        "arb_sys": {
+            "address": ARB_SYS,
+            "code_hex": "0x" + code.hex(),
+            "code_length": len(code),
+            "code_sha256": code_sha256,
+            "code_keccak256": code_keccak256,
+            "arb_block_number_selector": ARB_BLOCK_SELECTOR,
+            "arb_block_number": action_identity,
+            "arb_os_version_selector": ARB_OS_VERSION_SELECTOR,
+            "published_profile": ROBINHOOD_PUBLISHED_ARB_OS_PROFILE,
+            "pinned_offset": PINNED_NITRO_ARB_SYS_VERSION_OFFSET,
+            "expected_raw_version": EXPECTED_ARB_SYS_ARB_OS_VERSION_RETURN,
+            "observed_raw_version": raw_version,
+            "version_derivation": ARB_SYS_VERSION_RETURN_DERIVATION,
+        },
+        "network_chain_id": network.chain_id,
+    }
+
+
+def _install_fork_arb_sys_double(
+    action_identity: int,
+    raw_version: int,
+) -> dict[str, Any]:
+    implementation = boa.loads(
+        f"""# @version 0.4.3
+@view
+@external
+def arbBlockNumber() -> uint256:
+    return {action_identity}
+
+@view
+@external
+def arbOSVersion() -> uint256:
+    return {raw_version}
+""",
+        name=f"pinned_arb_sys_double_{action_identity}",
+    )
+    code = boa.env.get_code(implementation.address)
+    boa.env.set_code(ARB_SYS, code)
+    return {
+        "code_length": len(code),
+        "code_sha256": _sha256_bytes(code),
+        "code_keccak256": _keccak_bytes(code),
+    }
+
+
+def _exercise_pinned_fork(
+    rpc_url: str,
+    network: ForkNetwork,
+    snapshot: dict[str, Any],
+) -> dict[str, Any]:
+    number = snapshot["number"]
+    with boa.fork(
+        rpc_url,
+        block_identifier=number,
+        allow_dirty=True,
+        cache_dir=str(BOA_CACHE_ROOT / f"fork-{network.label}-{number}"),
+    ):
+        if boa.env.evm.patch.chain_id != network.chain_id:
+            raise ApprovalError("local fork chain identity mismatch")
+        visible_native = boa.env.evm.patch.block_number
+        if visible_native != number:
+            raise ApprovalError("local fork visible native number mismatch")
+
+        native_code = boa.env.get_code(ARB_SYS)
+        if native_code != EXPECTED_ARB_SYS_CODE:
+            raise ApprovalError("local fork ArbSys code identity mismatch")
+
+        direct_supported = False
+        direct_error_class = None
+        with boa.env.anchor():
+            try:
+                direct_probe = boa.load(
+                    str(PROBE_CONTRACT),
+                    name=f"native_fork_probe_{number}",
+                )
+                getattr(direct_probe, "readAction" + "Blocks")()
+                direct_supported = True
+            except Exception as exc:
+                direct_error_class = type(exc).__name__
+
+        double_identity = _install_fork_arb_sys_double(
+            snapshot["arb_sys"]["arb_block_number"],
+            snapshot["arb_sys"]["observed_raw_version"],
+        )
+        probe = boa.load(
+            str(PROBE_CONTRACT),
+            name=f"controlled_fork_probe_{number}",
+        )
+        view_native, view_action = getattr(probe, "readAction" + "Blocks")()
+        first_native, first_action = probe.observe(1)
+        second_native, second_action = probe.observe(2)
+        expected_action = snapshot["arb_sys"]["arb_block_number"]
+        if not (
+            view_action == first_action == second_action == expected_action
+        ):
+            raise ApprovalError(
+                "same pinned action identity was not preserved across probe actions"
+            )
+        if not (view_native == first_native == second_native == visible_native):
+            raise ApprovalError(
+                "local fork native identity changed within one pinned state"
+            )
+
+        return {
+            "boa_chain_id": boa.env.evm.patch.chain_id,
+            "boa_visible_native_number": visible_native,
+            "rpc_l1_number": snapshot["rpc_l1_number"],
+            "native_precompile_execution_supported": direct_supported,
+            "native_precompile_error_class": direct_error_class,
+            "controlled_double": double_identity,
+            "view": {
+                "native_number": int(view_native),
+                "action_identity": int(view_action),
+            },
+            "actions": [
+                {
+                    "observation_id": 1,
+                    "native_number": int(first_native),
+                    "action_identity": int(first_action),
+                },
+                {
+                    "observation_id": 2,
+                    "native_number": int(second_native),
+                    "action_identity": int(second_action),
+                },
+            ],
+            "same_pinned_identity_equal": True,
+            "native_number_fidelity": (
+                "Boa exposes the pinned child state number locally; the "
+                "provider's l1BlockNumber is recorded separately and is not "
+                "reproduced by the local PyEVM NUMBER opcode."
+            ),
+        }
+
+
+def collect_fork_evidence(
+    network_name: str,
+    rpc_url: str,
+    pins: list[tuple[int, str]],
+    *,
+    artifacts: ProbeArtifacts | None = None,
+) -> dict[str, Any]:
+    network = _fork_network(network_name)
+    _validate_public_fork_rpc_url(rpc_url, network)
+    if len(pins) != 2:
+        raise ApprovalError("fork evidence requires exactly two pinned states")
+    if pins[1][0] != pins[0][0] + 1:
+        raise ApprovalError("fork evidence states must be consecutive")
+
+    artifacts = artifacts or compile_probe_artifacts()
+    _validate_compiled_artifacts(artifacts)
+    chain_id = _hex_int(_rpc(rpc_url, "eth_chainId", []), "eth_chainId")
+    if chain_id != network.chain_id:
+        raise ApprovalError("fork endpoint chain identity mismatch")
+
+    snapshots = [
+        _collect_pinned_snapshot(rpc_url, network, number, expected_hash)
+        for number, expected_hash in pins
+    ]
+    if snapshots[1]["parent_hash"] != snapshots[0]["hash"]:
+        raise ApprovalError("fork evidence states are not a parent-child pair")
+    first_action = snapshots[0]["arb_sys"]["arb_block_number"]
+    second_action = snapshots[1]["arb_sys"]["arb_block_number"]
+    if second_action == first_action:
+        raise ApprovalError("advanced pinned action identity did not change")
+    if snapshots[0]["rpc_l1_number"] != snapshots[1]["rpc_l1_number"]:
+        raise ApprovalError(
+            "selected pinned pair does not share one provider l1BlockNumber"
+        )
+
+    for snapshot in snapshots:
+        snapshot["local_fork"] = _exercise_pinned_fork(
+            rpc_url,
+            network,
+            snapshot,
+        )
+        if not snapshot["local_fork"]["same_pinned_identity_equal"]:
+            raise ApprovalError("same pinned identity equality evidence failed")
+
+    return {
+        "mode": "credential-free-pinned-fork-evidence",
+        "network": network_name,
+        "chain_id": chain_id,
+        "broadcast_enabled": False,
+        "approval_packet_read": False,
+        "signing_secret_read": False,
+        "signer_used": False,
+        "provider": {
+            "label": network.label,
+            "url_sha256": network.rpc_url_sha256,
+            "credential_free_public_endpoint_required": True,
+            "redirects_allowed": False,
+            "client_version_queried": False,
+            "client_version_evidence_limit": (
+                "Excluded from the deterministic report because it is not "
+                "state-pinned and cannot prove the pinned Nitro source."
+            ),
+        },
+        "probe": {
+            "source_path": str(PROBE_CONTRACT.relative_to(REPO_ROOT)),
+            **artifacts.sanitized(),
+        },
+        "arb_sys_expected_code": {
+            "address": ARB_SYS,
+            "code_hex": "0x" + EXPECTED_ARB_SYS_CODE.hex(),
+            "code_length": len(EXPECTED_ARB_SYS_CODE),
+            "code_sha256": EXPECTED_ARB_SYS_CODE_SHA256,
+            "code_keccak256": EXPECTED_ARB_SYS_CODE_KECCAK256,
+        },
+        "pinned_states": snapshots,
+        "relationships": {
+            "parent_child_pair": True,
+            "same_pinned_action_identity_equal": True,
+            "advanced_action_identity_different": True,
+            "shared_rpc_l1_number": True,
+            "first_action_identity": first_action,
+            "second_action_identity": second_action,
+            "rpc_l1_number": snapshots[0]["rpc_l1_number"],
+        },
+        "source_pins": {
+            "pin_date": SOURCE_PIN_DATE,
+            "nitro_commit": NITRO_COMMIT,
+            "arb_sys_interface_commit": ARB_SYS_INTERFACE_COMMIT,
+            "robinhood_node_image": ROBINHOOD_NODE_IMAGE,
+            "robinhood_published_arb_os_profile": (
+                ROBINHOOD_PUBLISHED_ARB_OS_PROFILE
+            ),
+            "pinned_nitro_arb_sys_version_offset": (
+                PINNED_NITRO_ARB_SYS_VERSION_OFFSET
+            ),
+            "expected_arb_sys_arb_os_version_return": (
+                EXPECTED_ARB_SYS_ARB_OS_VERSION_RETURN
+            ),
+            "version_return_derivation": ARB_SYS_VERSION_RETURN_DERIVATION,
+        },
+        "limitations": [
+            (
+                "The official public endpoint is credential-free and "
+                "rate-limited, supplies no archive-service guarantee, and "
+                "may stop serving the pinned states later."
+            ),
+            (
+                "Pinned RPC calls bind the report to the returned ArbSys values, "
+                "but Boa PyEVM cannot execute Nitro's native 0xfe ArbSys "
+                "precompile; local probe actions therefore use an exact "
+                "observed-value controlled double."
+            ),
+            (
+                "Boa exposes the child state number through its local NUMBER "
+                "opcode. The provider l1BlockNumber is recorded separately, "
+                "so the local probe does not faithfully reproduce Robinhood's "
+                "native ancestor-number opcode behavior."
+            ),
+            (
+                "This evidence has no authentic receipts, mempool behavior, "
+                "sequencer ordering, multi-transaction inclusion proof, "
+                "signature, fee, broadcast, or deployment evidence."
+            ),
+            (
+                "The unpinned client-version string is deliberately excluded; "
+                "it cannot prove the Nitro build used for either pinned state."
+            ),
+            (
+                "Two adjacent pinned states are a bounded observation and do "
+                "not establish a protocol maximum for repetition or advance."
+            ),
+        ],
+        "result": "complete-with-explicit-fork-emulation-limitations",
+        "row_2_closed": False,
+        "stage_b_authorized": False,
     }
 
 
@@ -1545,19 +1995,65 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     mode = parser.add_mutually_exclusive_group(required=True)
     mode.add_argument("--dry-run", action="store_true")
+    mode.add_argument("--fork-evidence", action="store_true")
     mode.add_argument("--preflight", action="store_true")
     mode.add_argument("--execute", action="store_true")
     parser.add_argument("--approval-file", type=Path)
     parser.add_argument("--confirm-live-testnet", action="store_true")
+    parser.add_argument("--fork-network", choices=tuple(FORK_NETWORKS))
+    parser.add_argument("--fork-rpc-url")
+    parser.add_argument("--fork-state-number", action="append", type=int)
+    parser.add_argument("--fork-state-hash", action="append")
     parser.add_argument("--output", type=Path)
     args = parser.parse_args()
 
+    fork_inputs = (
+        args.fork_network,
+        args.fork_rpc_url,
+        args.fork_state_number,
+        args.fork_state_hash,
+    )
     if args.dry_run:
-        if args.approval_file or args.confirm_live_testnet:
-            raise ApprovalError("local dry run does not accept live approval inputs")
+        if args.approval_file or args.confirm_live_testnet or any(fork_inputs):
+            raise ApprovalError(
+                "local dry run does not accept live or fork inputs"
+            )
         _write_or_print(local_dry_run(), args.output)
         return 0
 
+    if args.fork_evidence:
+        if args.approval_file or args.confirm_live_testnet:
+            raise ApprovalError(
+                "fork evidence does not accept a live approval packet or confirmation"
+            )
+        if (
+            args.fork_network is None
+            or args.fork_rpc_url is None
+            or args.fork_state_number is None
+            or args.fork_state_hash is None
+            or len(args.fork_state_number) != 2
+            or len(args.fork_state_hash) != 2
+        ):
+            raise ApprovalError(
+                "fork evidence requires one network, one public endpoint, "
+                "and exactly two state-number/state-hash pins"
+            )
+        artifacts = compile_probe_artifacts()
+        _validate_compiled_artifacts(artifacts)
+        pins = list(zip(args.fork_state_number, args.fork_state_hash))
+        _write_or_print(
+            collect_fork_evidence(
+                args.fork_network,
+                args.fork_rpc_url,
+                pins,
+                artifacts=artifacts,
+            ),
+            args.output,
+        )
+        return 0
+
+    if any(fork_inputs):
+        raise ApprovalError("live modes do not accept fork-evidence inputs")
     if args.approval_file is None:
         raise ApprovalError("RPC preflight and execution require an approval file")
     approved = load_approval(args.approval_file)

@@ -1,22 +1,25 @@
 # S5 Robinhood Testnet Action-Block Probe Evidence
 
-**Status:** Frozen local probe evidence recreated on exact integrated baseline
-`02787d3`; authoritative post-H-01 validation, exact-package independent
-review, and the complete secret-free authorization template are recorded; live
-Robinhood testnet proof not attempted because required approvals and live
-inputs are absent
+**Status:** Deterministic credential-free fork evidence captured against exact
+pinned Robinhood mainnet and testnet states after reconciliation through
+current `rh` `332ae2bc`; the owner replaced live signed-testnet execution as a
+pre-Stage-B requirement; fork evidence remains pending independent approval
+and owner acceptance, and no live proof, signer access, signature, broadcast,
+or deployment occurred
 
 **Evidence date:** 24 July 2026
 
 **Provenance correction:** 25 July 2026
 
-**Network authorized:** Robinhood Chain testnet only, chain ID `46630`
+**Network authority:** Credential-free read-only fork evidence for Robinhood
+Chain mainnet (`4663`) and testnet (`46630`) only; no transaction authority
 
 **Production authority:** None
 
 **Recreation branch/baseline:**
 `rh-track-6-s5-ledger-guard-recreation` at
-`02787d351a3064e35d627e8fbc44150770e61c73`
+current merge `fc3fa82b5ab2982d9057fbe4f23a99b1e21110fe` over exact
+`rh` `332ae2bc8e0ce4b694766d6d20759295d9267ec3`
 
 **Frozen historical evidence:** `rh-track-6-s5-ledger-guard` at
 `6652a10e4de2a74ca27be0da94be4331aeef18f6`, tree
@@ -1411,3 +1414,426 @@ next action. This section does not authorize an RPC or nonce query, endpoint or
 signing-secret access, preflight, signing, broadcasting, deployment, live
 execution, row 2 closure, Stage B/C, inventory work, push, merge, production
 change, configuration, registration, governance, or Base migration.
+
+## 16. Deterministic fork-only row 2 evidence — 25 July 2026
+
+This is the current controlling row 2 evidence section. It preserves sections
+1–15 as dated historical live-proof preparation but supersedes their
+present-tense claim that a signed live proof is required before bounded Stage
+B. It also supersedes section 14.3's statement that the packet-validation
+correction is uncommitted.
+
+### 16.1 Authority, reconciliation, and non-live controls
+
+The owner directed:
+
+> The owner has approved replacing row 2’s live signed-testnet proof as a
+> pre-Stage-B requirement with a fork-only evidence gate. Do not use the
+> funded signer, access its key, set any candidate-packet approval Boolean,
+> run live preflight, sign, broadcast, or deploy. Candidate ad6f6981… remains
+> inert historical preparation evidence.
+
+The secret-free candidate outside the repository remains byte-identical at
+SHA-256
+`ad6f69810be6d9da67e84452421b917d0d1e1c3fb357f2482c0e6d644b3042d2`.
+Its eight executable approval Booleans remain `false`. The evidence runner's
+fork mode does not accept an approval packet or live-testnet confirmation and
+records:
+
+```text
+broadcast_enabled=false
+approval_packet_read=false
+signing_secret_read=false
+signer_used=false
+row_2_closed=false
+stage_b_authorized=false
+```
+
+Before reconciliation, the S5 branch was clean at approved commit
+`7f8f93c047debe5d4a756f301e69ffeca407e974`. Local `rh`, cached
+`origin/rh`, and live remote `origin/rh` all resolved to exact
+`332ae2bc8e0ce4b694766d6d20759295d9267ec3`. The incoming range from
+merge-base `cb3fe7392c44613aaeec49bd2486369fe0da3556` adds only
+`docs/chains/rh/track-8-m1-exact-receipt.md` with 1,342 insertions. It
+overlaps no S5 production, probe, runner, focused-test, evidence, or inventory
+path.
+
+The authorized normal merge completed without conflict:
+
+| Identity | Exact value |
+| --- | --- |
+| merge | `fc3fa82b5ab2982d9057fbe4f23a99b1e21110fe` |
+| tree | `ad91c42c7717cb7a099bc0195719e654af42fefe` |
+| first parent | `7f8f93c047debe5d4a756f301e69ffeca407e974` |
+| second parent | `332ae2bc8e0ce4b694766d6d20759295d9267ec3` |
+| post-merge relation to local/cached `rh` | 16 ahead / 0 behind |
+
+Commit `7f8f93c` remains unchanged and is an ancestor of the merge. No rebase,
+squash, amendment, cherry-pick, or history rewrite occurred.
+
+### 16.2 Exact provider and source identities
+
+Only credential-free official public Robinhood endpoints were accepted. The
+runner compares the exact endpoint URL bytes with its hardcoded fingerprint
+before any call and disables HTTP redirects. The URLs are omitted from this
+record; the public endpoint identities are:
+
+| Environment | Endpoint label | URL-byte SHA-256 | Chain ID |
+| --- | --- | --- | ---: |
+| mainnet | `robinhood-mainnet-official-public` | `0x78ccdeee5ef1eac240a33a5d090abde993a67b38a8b42627004d153a1f8c7402` | `4663` |
+| testnet | `robinhood-testnet-official-public` | `0x6c163ade146dadc263774bd634844f5981096b9232e490593c2497d92dfba51f` | `46630` |
+
+The deterministic report deliberately excludes `web3_clientVersion`: it is
+not state-pinned and cannot prove which Nitro build produced either pinned
+state.
+
+Both environments returned the following exact identity at
+`ArbSys(0x0000000000000000000000000000000000000064)`:
+
+| Fact | Exact value |
+| --- | --- |
+| code | `0xfe` |
+| code length | `1` byte |
+| code SHA-256 | `0xaa687b58b0e73e2e383f8c500d75b591e188efe0168b3ffbcd3771caaa6dd4c7` |
+| code Keccak-256 | `0xbcc90f2d6dada5b18e155c17a1c0a55920aae94f39857d39d0d8ed07ae8f228b` |
+| `arbBlockNumber()` selector | `0xa3b1b31d` |
+| `arbOSVersion()` selector | `0x051038f2` |
+| published Robinhood profile | `61` |
+| pinned Nitro offset | `55` |
+| expected and observed raw return | `116` |
+| derivation | `61 + 55 = 116` |
+
+The dated source pins remain:
+
+| Pin | Exact value |
+| --- | --- |
+| pin date | `2026-07-24` |
+| Nitro commit | `3599acae1ad2fab4059fc46453c9cd3294126641` |
+| ArbSys interface commit | `7e88c8cc53c2e96201a23c638f1536557b9cb68b` |
+| Robinhood node image | `offchainlabs/nitro-node:v3.11.2-3599aca` |
+
+### 16.3 Exact pinned mainnet evidence
+
+Historical report-producing runner SHA-256
+`21b9b2a42f74e2d41821ffca59bede3b65ea7eb0eed7db863f573469e7de2e9e`
+produced durable sanitized report
+`docs/chains/rh/evidence/ledger-action-block-mainnet-fork.json`. Its report
+SHA-256 and complete-file SHA-256 are both:
+`69baafbe41a73b2c3f447ce505d65156f9380b1081428faa587f1f0b193bea37`.
+The later hardened runner does not claim to re-emit this historical mainnet
+report.
+
+| Fact | First pinned state | Explicitly advanced state |
+| --- | --- | --- |
+| child state number | `19342401` | `19342402` |
+| state hash | `0xc13ace60537ea60742a2d3efa8007c92fe2cda40e2e3353cf3f01dcb86055792` | `0xc6c7cd0d7d238e472a265e4e4b854c29341d29a072d1d9ad4b1d963f96244f65` |
+| parent hash | `0xeb79149b389ab8c0c2375e2eb962194a1fe3e7d7ec1e1ee54ec56c03f5498f69` | `0xc13ace60537ea60742a2d3efa8007c92fe2cda40e2e3353cf3f01dcb86055792` |
+| timestamp | `1785015874` | `1785015874` |
+| provider `l1BlockNumber` | `25612556` | `25612556` |
+| raw `arbOSVersion()` | `116` | `116` |
+| `arbBlockNumber()` | `19342401` | `19342402` |
+| Boa-visible local `block.number` | `19342401` | `19342402` |
+| two local action identities | `19342401`, `19342401` | `19342402`, `19342402` |
+| native `0xfe` execution in Boa | `BoaError`; unsupported | `BoaError`; unsupported |
+| controlled-double code SHA-256 | `0x5620db88e5fe01e063866b1f1539ad3e8bb17b76ee7fcf8608fc6cfd34a538c3` | `0x7ea79cbdbe6f8e2cc6b53b483cdcf0ce180ba83b5cd8aec7c70b74afec171a7f` |
+| controlled-double code Keccak-256 | `0x3cf78286e3e32f1d8490f7476f0eb26fe575cbf2813dea818281a4f0703bb5df` | `0x9c5c66c69031403289beff3f0a0050cfe803699ba91f681da49af78b8cf0eb0a` |
+
+The two states are an exact parent/child pair. The same pinned state produced
+equal action identity for two relevant actions; the explicitly advanced state
+produced a different action identity. Both child states share provider
+`l1BlockNumber` `25612556`.
+
+### 16.4 Exact pinned testnet evidence
+
+The older pins `93462217` / `93462218` no longer served `eth_getCode` through
+the credential-free public endpoint. They were not reconstructed from this
+Markdown. The exact final runner selected a fresh adjacent parent/child pair
+that shared one provider `l1BlockNumber` and produced durable sanitized report
+`docs/chains/rh/evidence/ledger-action-block-testnet-fork.json`. Its report
+SHA-256 and complete-file SHA-256 are both:
+`ff66834d5d961047a3be3094df2ff01d0edc6efab92ede10e719cd14d31f9f15`.
+Here, “exact final runner” means the same historical report-producing runner
+SHA-256 `21b9b2a42f74e2d41821ffca59bede3b65ea7eb0eed7db863f573469e7de2e9e`;
+the later hardened runner does not claim to re-emit this report.
+
+| Fact | First pinned state | Explicitly advanced state |
+| --- | --- | --- |
+| child state number | `93522273` | `93522274` |
+| state hash | `0x9b722e3302bedb328cc9b5a8434a7d55671162c3ec3408ca53d3cabb731fe80c` | `0x863ff20ba58b7624ed757652b21d3432dca449abd52aa9299082424488b181df` |
+| parent hash | `0x5e92c815e6144cba47c06ecbdfc52bd73aebc18720569249aa409b484fa3ea25` | `0x9b722e3302bedb328cc9b5a8434a7d55671162c3ec3408ca53d3cabb731fe80c` |
+| timestamp | `1785029608` | `1785029609` |
+| provider `l1BlockNumber` | `11351480` | `11351480` |
+| raw `arbOSVersion()` | `116` | `116` |
+| `arbBlockNumber()` | `93522273` | `93522274` |
+| Boa-visible local `block.number` | `93522273` | `93522274` |
+| two local action identities | `93522273`, `93522273` | `93522274`, `93522274` |
+| native `0xfe` execution in Boa | `BoaError`; unsupported | `BoaError`; unsupported |
+| controlled-double code SHA-256 | `0x747145c2c68a5406a9e0d7a9c78470985a9579fcaa4f9de4ee4e672ee7b54ed2` | `0x7dec9446cb8206833d17f6dfb49619ddc660e402ad53d4b70c559c5ce8d9ce25` |
+| controlled-double code Keccak-256 | `0x63e31fa2ee0bcf49f87e7c8e9c2738771fee9a8653ec033209c84a6243436921` | `0x06cc6f979b5683881d6841da0579be851ead368bf7bc29dc246389a12211856a` |
+
+The two states are an exact parent/child pair. The same pinned state produced
+equal action identity for two relevant actions; the explicitly advanced state
+produced a different action identity. Both child states share provider
+`l1BlockNumber` `11351480`.
+
+### 16.5 Probe and artifact identity
+
+The fork mode recompiles the unchanged test-only probe in the locked H-01
+Candidate A environment and rejects any source, ABI, compiler-input, creation,
+or runtime drift before collecting evidence:
+
+| Artifact | Exact identity |
+| --- | --- |
+| probe source SHA-256 | `0x95716e4e2b383f2a07826be94d9ee402d263eec522bb4f77efd72a5e5f6eafe5` |
+| canonical ABI SHA-256 | `0x2c237ba7e43aa009c69eabe950c733c79415b7eab37e874e065494273a45b359` |
+| compiler-input SHA-256 | `0xf251237b97029e29122f5578c38817e518abcc3062c6d32019de028bdef79a65` |
+| compiler | `vyper==0.4.3+commit.bff19ea2` |
+| compiler settings | `{"compiler_version":null,"debug":null,"enable_decimals":null,"evm_version":null,"experimental_codegen":false,"nonreentrancy_by_default":null,"optimize":"gas"}` |
+| creation length / Keccak-256 | `375` bytes / `0x835fdafe8f7e61253237837ae17cf7985a3cef2eb7e1c274ba2f98f8ea044333` |
+| runtime length / Keccak-256 | `252` bytes / `0xd4114b7780177700bfac10a60e77a4ca49a4ad10a92f01685ea72bbd1c54ab56` |
+
+The immutable historical report-producing runner SHA-256 is
+`21b9b2a42f74e2d41821ffca59bede3b65ea7eb0eed7db863f573469e7de2e9e`.
+The current fail-closed hardened runner SHA-256 is
+`00fd4a4194a8da87fcf9f49f43cfae9fbdc6af3ddeb6437e5f9812f66a5fa507`.
+The focused-test SHA-256 is
+`e81e9279f0a44426f3c9a841108fbe2a5c3df626ea65426682eca76be0601f74`.
+The production Ledger remains unchanged at SHA-256
+`00d86847273621857b80701be5faf7ca88ff9505f68671d5b6ab3c8b4ec972e0`.
+
+### 16.6 Fail-closed matrix and commands
+
+Focused controlled tests reject all of the following before any local fork
+action can be treated as evidence:
+
+| Case | Required result |
+| --- | --- |
+| missing code at `0x64` | reject |
+| incompatible code at `0x64` | reject |
+| reverting `arbBlockNumber()` | reject |
+| malformed `arbBlockNumber()` return | reject |
+| malformed `arbOSVersion()` return | reject |
+| raw version `61` | reject |
+| other incompatible raw version `117` | reject |
+| action identity inconsistent with pinned child state | reject |
+| endpoint returns the wrong chain ID | reject before snapshot collection |
+| unavailable pinned block | reject before local fork exercise |
+| malformed pinned block | reject before local fork exercise |
+| pinned block returns the wrong number | reject before local fork exercise |
+| pinned block returns the wrong hash | reject before local fork exercise |
+| nonconsecutive supplied pins | reject before artifact compilation or RPC |
+| second block does not name the first hash as parent | reject before local fork exercise |
+| adjacent blocks have different provider `l1BlockNumber` | reject before local fork exercise |
+| local exercise returns false same-pinned-state equality | reject before report completion |
+| any non-2xx HTTP response, including `302` with a valid-looking JSON-RPC body | reject before JSON parsing |
+| JSON-RPC envelope is not an object | reject before result use |
+| JSON-RPC envelope has a version other than exact `"2.0"` | reject before result use |
+| JSON-RPC envelope request ID differs from exact integer `1` | reject before result use |
+| `0xzz` block quantity | stable `ApprovalError` before local fork exercise |
+| non-hex 32-byte `arbBlockNumber()` or `arbOSVersion()` payload | stable `ApprovalError` before local fork exercise |
+
+The hardened `_rpc()` checks the HTTP status before invoking
+`response.json()`; disabling redirects alone is not treated as sufficient.
+After successful 2xx transport it requires an object envelope with exact
+`jsonrpc="2.0"` and exact integer request ID `1`. `_hex_int()` and
+`_decode_uint256_response()` convert malformed hexadecimal payloads to stable
+`ApprovalError` failures.
+
+The historical report-producing runner command shape was:
+
+```text
+env -u ROBINHOOD_MAINNET_RPC_URL -u ROBINHOOD_TESTNET_RPC_URL \
+  -u ROBINHOOD_TESTNET_PRIVATE_KEY -u TEST_PRIVATE_KEY \
+  -u DEPLOYER_PRIVATE_KEY PYTHONPATH=. \
+  /private/tmp/h01-final-review.dL2pqo/candidate/bin/python \
+  scripts/probes/action_block_identity_probe.py \
+  --fork-evidence --fork-network <robinhood-mainnet|robinhood-testnet> \
+  --fork-rpc-url <EXACT_CREDENTIAL_FREE_OFFICIAL_PUBLIC_ENDPOINT> \
+  --fork-state-number <FIRST_NUMBER> --fork-state-hash <FIRST_HASH> \
+  --fork-state-number <SECOND_NUMBER> --fork-state-hash <SECOND_HASH> \
+  --output <PRIVATE_TMP_SANITIZED_REPORT>
+```
+
+The exact numbers and hashes are the values in sections 16.3 and 16.4. The
+runner verified the omitted endpoint bytes against the exact fingerprint in
+section 16.2. The producing runs wrote their outputs under task-specific
+`/private/tmp`; the exact sanitized bytes were then retained at the durable
+repository paths named above. No endpoint credential, signer secret, approval
+packet, or transaction material entered the repository or report.
+
+Python compilation succeeded. The post-change focused and complete probe
+results before the wider regression pass were:
+
+| Scope | Result |
+| --- | --- |
+| focused `tests/probes/test_action_block_identity_probe.py` | `114 passed, 3 warnings in 29.59s` |
+| complete `tests/probes` | `154 passed, 3 warnings in 34.34s` |
+
+The complete locked-runtime validation matrix is recorded in section 16.8.
+
+### 16.7 Exact limitations and residual risk
+
+The fork evidence is complete only within these limits:
+
+1. The official public endpoints are credential-free and rate-limited, make
+   no archive-service guarantee, and may stop serving the pinned states later.
+2. Pinned calls bind the report to the returned code and ArbSys values, but
+   Boa PyEVM cannot execute Nitro's native `0xfe` precompile. Local actions
+   therefore use an exact observed-value controlled double.
+3. Boa exposes the pinned child state number through its local `NUMBER`
+   opcode. The provider `l1BlockNumber` is recorded separately; the local
+   probe does not faithfully reproduce Robinhood's native ancestor-number
+   opcode behavior.
+4. This evidence contains no authentic Robinhood receipt, mempool behavior,
+   sequencer ordering, multi-transaction inclusion, signature, fee,
+   broadcast, or deployment evidence.
+5. The unpinned client-version string is deliberately excluded because it
+   cannot prove the Nitro build used for either state.
+6. Two adjacent states are a bounded observation and do not establish a
+   protocol maximum for repetition or advance.
+
+The residual risk is explicit: fork evidence can support bounded Stage B after
+independent approval and owner acceptance, but it cannot establish live-node
+transaction topology. Real-network confirmation moves to a later
+deployment/release-readiness gate and must be complete before deployment
+readiness. Named operational roles also remain a deployment-readiness
+requirement.
+
+### 16.8 Locked-runtime validation
+
+All commands used the integrated H-01 Candidate A interpreter:
+
+```text
+/private/tmp/h01-final-review.dL2pqo/candidate/bin/python
+Python 3.12.0
+Vyper 0.4.3 / compiler 0.4.3+commit.bff19ea2
+Titanoboa 0.2.7
+pytest 8.4.2
+cbor2 5.9.0
+```
+
+Each pytest scope used a distinct task-specific Boa cache and pytest
+`--basetemp` under `/private/tmp/s5-fork-evidence.B9lRhs`. The child
+environment removed all Base and Robinhood RPC/signing variables, supplied
+only `ETHERSCAN_API_KEY=local-placeholder`, set `PYTHONPATH=.`, preloaded Boa
+only to redirect its compiler cache, and disabled pytest's cache provider.
+The three warnings in every pytest result are the established
+`PytestAssertRewriteWarning` notices for already imported
+`_hypothesis_globals`, `hypothesis`, and `boa`.
+
+| Required validation | Exact result |
+| --- | --- |
+| `python -m pip check` | `No broken requirements found.` |
+| Python compilation | runner and focused tests compiled; exit `0` |
+| H-01 dependency gate | `16 passed, 3 warnings in 1.52s` |
+| S1 clock profiles | `57 passed, 3 warnings in 104.71s` |
+| focused S5 action-block probes | `114 passed, 3 warnings in 29.59s` |
+| complete probe suites | `154 passed, 3 warnings in 34.34s` |
+| S2 inventory tests | `60 passed, 3 warnings in 25.28s` |
+| standalone inventory checker | expected exit `1` in 1.26s wall; exactly seven `INV-CADENCE-NEW` plus one `INV-PATH-NEW`, all isolated-probe findings and nothing else |
+| exact nine-file targeted regressions | `437 passed, 3 warnings in 139.03s` |
+| collection | `2,951/3,093 collected, 142 deselected, 3 warnings in 1.67s` |
+| complete serial suite | `2,951 passed, 142 deselected, 3 warnings in 326.28s` |
+
+The selected collection count is the prior `2,872` plus the already committed
+52 packet-validation cases and the 27 fork-evidence/hardening cases now
+present in the focused file.
+The inventory file remains unchanged; the eight known isolated-probe findings
+must be reconciled in Stage C before eventual S5 merge.
+
+This validation does not approve the new bytes, close row 2, or authorize
+Stage B.
+
+### 16.9 Proposed row 2 closure wording — not yet adopted
+
+> **Row 2 — FORK EVIDENCE APPROVED AND OWNER-ACCEPTED FOR BOUNDED STAGE B.**
+> Live signed-testnet execution is not a pre-Stage-B requirement. The exact
+> Robinhood mainnet/testnet pins, code identity at `0x64`, raw
+> `arbOSVersion()` return `116` for published profile `61`, same-pinned-state
+> equality, explicitly advanced identity, and fail-closed matrix are approved,
+> subject to the recorded Boa and public-provider limitations. Authentic
+> receipts, mempool/sequencer behavior, and multi-transaction live-node
+> behavior remain a deployment/release-readiness residual risk. This row
+> closure does not authorize Stage B; separate explicit owner authorization
+> remains required.
+
+This proposal is awaiting independent exact-hash review and explicit owner
+acceptance. It does not close row 2. Rows 8 and 10 are already
+owner/security/operations-approved under section 19 of the decision record;
+their named operational roles remain unassigned and block deployment
+readiness. Stage B, Stage C, inventory edits, push, merge into `rh`,
+deployment, configuration, governance, signer access, signing, and broadcast
+remain prohibited.
+
+## 17. Owner acceptance and bounded row 2 closure — 25 July 2026
+
+This section is the current controlling owner disposition for the fork
+evidence. It supersedes section 16.9 only where that section records owner
+acceptance and row 2 closure as pending. The evidence, hashes, limitations,
+validation, and prohibitions in section 16 remain unchanged.
+
+### 17.1 Verbatim owner authority
+
+The owner stated verbatim:
+
+> I accept the exact S5 fork-evidence package identified by:
+>
+> - decision record SHA-256 `353da67b869549562c67969a3c70c6a70ff3e4647dfb42665f7dfe25aaeba91d`;
+> - evidence record SHA-256 `efb6d271bc0eb742619e2dc78b4637492c0981c3e6f0d8fd82b1ac281baf08c2`;
+> - mainnet report SHA-256 `69baafbe41a73b2c3f447ce505d65156f9380b1081428faa587f1f0b193bea37`;
+> - testnet report SHA-256 `ff66834d5d961047a3be3094df2ff01d0edc6efab92ede10e719cd14d31f9f15`;
+> - hardened runner SHA-256 `00fd4a4194a8da87fcf9f49f43cfae9fbdc6af3ddeb6437e5f9812f66a5fa507`; and
+> - focused tests SHA-256 `e81e9279f0a44426f3c9a841108fbe2a5c3df626ea65426682eca76be0601f74`.
+>
+> I approve closing Checkpoint 0 row 2 for bounded Stage B only. I accept that this fork evidence does not prove authentic receipts, mempool or sequencer behavior, multi-transaction inclusion, signing, broadcasting, or deployment. Those remain mandatory deployment/release-readiness requirements.
+>
+> Record this acceptance verbatim and update the decision and evidence records. Leave the resulting package unstaged and uncommitted for final exact-hash review of the row 2 closure and Stage B file ceiling.
+>
+> This does not authorize Stage B, Stage C, inventory changes, merge, deployment, registration, configuration, governance, signer access, signing, broadcast, or Base migration.
+>
+> After that revision is reviewed and committed, you will still need to provide a separate explicit authorization before Stage B implementation begins.
+
+### 17.2 Evidence disposition and residual risk
+
+**Checkpoint 0 row 2 is owner-closed for bounded Stage B only**, bound to the
+six exact hashes quoted above. The accepted package consists of the two
+records, two immutable historical-runner JSON reports, hardened runner, and
+focused tests identified in section 17.1. The report files remain immutable;
+the runner, tests, production Ledger, test-only Vyper probe, inventory, and
+inert historical live-proof candidate are unchanged by this transcription.
+
+The owner expressly accepts that this fork evidence does not prove:
+
+- authentic Robinhood receipts;
+- mempool or sequencer behavior;
+- multi-transaction inclusion;
+- signing;
+- broadcasting; or
+- deployment.
+
+Those remain mandatory deployment/release-readiness requirements. This
+closure does not set any of the inert live-proof candidate's eight approval
+Booleans and does not authorize RPC access, signer access, signing,
+broadcasting, deployment, or any other real-network action.
+
+### 17.3 Post-closure review state
+
+The two documentation files necessarily have new complete-file hashes after
+this verbatim transcription. They are unstaged and uncommitted pending final
+independent exact-hash review of:
+
+1. the owner quotation and bounded row 2 closure;
+2. preservation of every fork-evidence limitation and deployment-readiness
+   residual risk;
+3. the exact unchanged 14-file Stage B ceiling in decision-record section 12;
+   and
+4. the continued absence of Stage B authority.
+
+After that review, a separate owner authorization is required to commit the
+exact approved documentation bytes. Even after that commit, the owner must
+provide a further separate explicit authorization before bounded Stage B can
+begin.
+
+Stage B and Stage C remain unauthorized. Inventory changes, push, merge into
+`rh`, deployment, registration, configuration, governance, signer access,
+signing, broadcast, and Base migration remain prohibited.

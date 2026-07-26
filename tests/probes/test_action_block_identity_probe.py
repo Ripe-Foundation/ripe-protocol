@@ -31,6 +31,11 @@ from scripts.utils.migration_helpers import load_vyper_files
 PROBE_PATH = "contracts/testing/ActionBlockIdentityProbe.vy"
 RPC_URL = "https://approved.invalid"
 SIGNER = to_checksum_address("0x0000000000000000000000000000000000000a11")
+MAINNET_PUBLIC_RPC = "https://rpc.mainnet.chain.robinhood.com"
+FORK_PINS = [
+    (100, "0x" + "11" * 32),
+    (101, "0x" + "22" * 32),
+]
 
 
 def _install_compatible_arb_sys():
@@ -217,6 +222,67 @@ def _successful_preflight_rpc(
     return fake_rpc
 
 
+def _successful_fork_rpc(**overrides):
+    states = {
+        100: {
+            "number": hex(100),
+            "hash": FORK_PINS[0][1],
+            "parentHash": "0x" + "00" * 32,
+            "timestamp": hex(1_700_000_000),
+            "l1BlockNumber": hex(50),
+        },
+        101: {
+            "number": hex(101),
+            "hash": FORK_PINS[1][1],
+            "parentHash": FORK_PINS[0][1],
+            "timestamp": hex(1_700_000_001),
+            "l1BlockNumber": hex(50),
+        },
+    }
+    for number, changes in overrides.get("state_overrides", {}).items():
+        states[number].update(changes)
+    state_results = overrides.get("state_results", {})
+
+    def fake_rpc(_rpc_url, method, params):
+        assert _rpc_url == MAINNET_PUBLIC_RPC
+        if method == "eth_chainId":
+            return hex(
+                overrides.get(
+                    "chain_id",
+                    runner.ROBINHOOD_MAINNET_CHAIN_ID,
+                )
+            )
+        if method == "web3_clientVersion":
+            return "unit-test-public-client"
+        if method == "eth_getBlockByNumber":
+            number = int(params[0], 16)
+            if number in state_results:
+                return state_results[number]
+            return states[number]
+        number = int(params[-1], 16)
+        if method == "eth_getCode":
+            return overrides.get("code", "0xfe")
+        assert method == "eth_call"
+        selector = params[0]["data"]
+        if selector == overrides.get("revert_selector"):
+            raise ApprovalError("simulated pinned ArbSys reversion")
+        if selector == runner.ARB_BLOCK_SELECTOR:
+            if "action_raw" in overrides:
+                return overrides["action_raw"]
+            action = number + overrides.get("action_offset", 0)
+            return "0x" + action.to_bytes(32, "big").hex()
+        assert selector == runner.ARB_OS_VERSION_SELECTOR
+        if "version_raw" in overrides:
+            return overrides["version_raw"]
+        version = overrides.get(
+            "version",
+            runner.EXPECTED_ARB_SYS_ARB_OS_VERSION_RETURN,
+        )
+        return "0x" + version.to_bytes(32, "big").hex()
+
+    return fake_rpc
+
+
 def _observation(
     observation_id,
     transaction_hash,
@@ -312,6 +378,313 @@ def test_local_dry_run_is_secret_free_and_non_networked():
     )
     assert report["arb_sys"]["version_return_derivation"] == "61 + 55 = 116"
     assert len(report["pending_approvals"]) == 8
+
+
+def test_fork_evidence_uses_pins_without_live_approval_or_signer(monkeypatch):
+    monkeypatch.setattr(runner, "_rpc", _successful_fork_rpc())
+
+    def fake_fork(_rpc_url, network, snapshot):
+        return {
+            "boa_chain_id": network.chain_id,
+            "boa_visible_native_number": snapshot["number"],
+            "rpc_l1_number": snapshot["rpc_l1_number"],
+            "same_pinned_identity_equal": True,
+            "actions": [
+                {"action_identity": snapshot["arb_sys"]["arb_block_number"]},
+                {"action_identity": snapshot["arb_sys"]["arb_block_number"]},
+            ],
+        }
+
+    monkeypatch.setattr(runner, "_exercise_pinned_fork", fake_fork)
+    report = runner.collect_fork_evidence(
+        "robinhood-mainnet",
+        MAINNET_PUBLIC_RPC,
+        FORK_PINS,
+    )
+    serialized = json.dumps(report, sort_keys=True)
+
+    assert report["mode"] == "credential-free-pinned-fork-evidence"
+    assert report["chain_id"] == runner.ROBINHOOD_MAINNET_CHAIN_ID
+    assert report["broadcast_enabled"] is False
+    assert report["approval_packet_read"] is False
+    assert report["signing_secret_read"] is False
+    assert report["signer_used"] is False
+    assert report["relationships"]["parent_child_pair"] is True
+    assert report["relationships"]["same_pinned_action_identity_equal"] is True
+    assert report["relationships"]["advanced_action_identity_different"] is True
+    assert report["relationships"]["shared_rpc_l1_number"] is True
+    assert report["pinned_states"][0]["arb_sys"]["observed_raw_version"] == 116
+    assert report["pinned_states"][0]["arb_sys"]["code_hex"] == "0xfe"
+    assert report["provider"]["client_version_queried"] is False
+    assert "private_key" not in serialized.lower()
+    assert MAINNET_PUBLIC_RPC not in serialized
+    assert report["row_2_closed"] is False
+    assert report["stage_b_authorized"] is False
+
+
+def test_fork_controlled_actions_hold_same_identity_then_advance():
+    runner._install_fork_arb_sys_double(
+        100,
+        runner.EXPECTED_ARB_SYS_ARB_OS_VERSION_RETURN,
+    )
+    probe = boa.load(PROBE_PATH)
+    _, first = probe.observe(1)
+    _, second = probe.observe(2)
+    assert first == second == 100
+
+    runner._install_fork_arb_sys_double(
+        101,
+        runner.EXPECTED_ARB_SYS_ARB_OS_VERSION_RETURN,
+    )
+    _, advanced = probe.observe(3)
+    assert advanced == 101
+    assert advanced != first
+
+
+def test_fork_rejects_nonofficial_endpoint_before_rpc(monkeypatch):
+    called = False
+
+    def unexpected_rpc(*_args):
+        nonlocal called
+        called = True
+        raise AssertionError("RPC must not be called")
+
+    monkeypatch.setattr(runner, "_rpc", unexpected_rpc)
+    with pytest.raises(ApprovalError, match="credential-free official"):
+        runner.collect_fork_evidence(
+            "robinhood-mainnet",
+            "https://wrong.invalid",
+            FORK_PINS,
+        )
+    assert called is False
+
+
+def test_fork_rejects_wrong_endpoint_chain_before_snapshot(monkeypatch):
+    monkeypatch.setattr(
+        runner,
+        "_rpc",
+        _successful_fork_rpc(chain_id=1),
+    )
+    monkeypatch.setattr(
+        runner,
+        "_exercise_pinned_fork",
+        lambda *_args: pytest.fail("local fork must not run"),
+    )
+    with pytest.raises(ApprovalError, match="chain identity mismatch"):
+        runner.collect_fork_evidence(
+            "robinhood-mainnet",
+            MAINNET_PUBLIC_RPC,
+            FORK_PINS,
+        )
+
+
+@pytest.mark.parametrize(
+    ("state_result", "error_match"),
+    [
+        (None, "pinned fork state is unavailable"),
+        ({"number": "not-hex"}, "pinned state number is not a hex quantity"),
+        (
+            {"number": "0xzz"},
+            "pinned state number is a malformed hex quantity",
+        ),
+    ],
+)
+def test_fork_rejects_unavailable_or_malformed_pinned_block_before_local_fork(
+    monkeypatch,
+    state_result,
+    error_match,
+):
+    monkeypatch.setattr(
+        runner,
+        "_rpc",
+        _successful_fork_rpc(state_results={100: state_result}),
+    )
+    monkeypatch.setattr(
+        runner,
+        "_exercise_pinned_fork",
+        lambda *_args: pytest.fail("local fork must not run"),
+    )
+    with pytest.raises(ApprovalError, match=error_match):
+        runner.collect_fork_evidence(
+            "robinhood-mainnet",
+            MAINNET_PUBLIC_RPC,
+            FORK_PINS,
+        )
+
+
+@pytest.mark.parametrize(
+    ("state_overrides", "error_match"),
+    [
+        ({100: {"number": hex(99)}}, "pinned fork state number mismatch"),
+        (
+            {100: {"hash": "0x" + "44" * 32}},
+            "pinned fork state hash mismatch",
+        ),
+    ],
+)
+def test_fork_rejects_wrong_pinned_number_or_hash_before_local_fork(
+    monkeypatch,
+    state_overrides,
+    error_match,
+):
+    monkeypatch.setattr(
+        runner,
+        "_rpc",
+        _successful_fork_rpc(state_overrides=state_overrides),
+    )
+    monkeypatch.setattr(
+        runner,
+        "_exercise_pinned_fork",
+        lambda *_args: pytest.fail("local fork must not run"),
+    )
+    with pytest.raises(ApprovalError, match=error_match):
+        runner.collect_fork_evidence(
+            "robinhood-mainnet",
+            MAINNET_PUBLIC_RPC,
+            FORK_PINS,
+        )
+
+
+def test_fork_rejects_nonconsecutive_pins_before_artifact_or_rpc_access(
+    monkeypatch,
+):
+    monkeypatch.setattr(
+        runner,
+        "compile_probe_artifacts",
+        lambda: pytest.fail("artifacts must not be compiled"),
+    )
+    monkeypatch.setattr(
+        runner,
+        "_rpc",
+        lambda *_args: pytest.fail("RPC must not be called"),
+    )
+    with pytest.raises(ApprovalError, match="states must be consecutive"):
+        runner.collect_fork_evidence(
+            "robinhood-mainnet",
+            MAINNET_PUBLIC_RPC,
+            [
+                FORK_PINS[0],
+                (102, FORK_PINS[1][1]),
+            ],
+        )
+
+
+def test_fork_rejects_parent_child_hash_mismatch_before_local_fork(monkeypatch):
+    monkeypatch.setattr(
+        runner,
+        "_rpc",
+        _successful_fork_rpc(
+            state_overrides={
+                101: {"parentHash": "0x" + "55" * 32},
+            }
+        ),
+    )
+    monkeypatch.setattr(
+        runner,
+        "_exercise_pinned_fork",
+        lambda *_args: pytest.fail("local fork must not run"),
+    )
+    with pytest.raises(ApprovalError, match="not a parent-child pair"):
+        runner.collect_fork_evidence(
+            "robinhood-mainnet",
+            MAINNET_PUBLIC_RPC,
+            FORK_PINS,
+        )
+
+
+def test_fork_rejects_differing_provider_l1_number_before_local_fork(monkeypatch):
+    monkeypatch.setattr(
+        runner,
+        "_rpc",
+        _successful_fork_rpc(
+            state_overrides={
+                101: {"l1BlockNumber": hex(51)},
+            }
+        ),
+    )
+    monkeypatch.setattr(
+        runner,
+        "_exercise_pinned_fork",
+        lambda *_args: pytest.fail("local fork must not run"),
+    )
+    with pytest.raises(ApprovalError, match="does not share one provider"):
+        runner.collect_fork_evidence(
+            "robinhood-mainnet",
+            MAINNET_PUBLIC_RPC,
+            FORK_PINS,
+        )
+
+
+def test_fork_rejects_false_same_pinned_state_result_before_completion(
+    monkeypatch,
+):
+    monkeypatch.setattr(runner, "_rpc", _successful_fork_rpc())
+
+    def false_same_identity(_rpc_url, network, snapshot):
+        return {
+            "boa_chain_id": network.chain_id,
+            "boa_visible_native_number": snapshot["number"],
+            "rpc_l1_number": snapshot["rpc_l1_number"],
+            "same_pinned_identity_equal": False,
+        }
+
+    monkeypatch.setattr(
+        runner,
+        "_exercise_pinned_fork",
+        false_same_identity,
+    )
+    with pytest.raises(
+        ApprovalError,
+        match="same pinned identity equality evidence failed",
+    ):
+        runner.collect_fork_evidence(
+            "robinhood-mainnet",
+            MAINNET_PUBLIC_RPC,
+            FORK_PINS,
+        )
+
+
+@pytest.mark.parametrize(
+    ("overrides", "error_match"),
+    [
+        ({"code": "0x"}, "code identity mismatch or missing code"),
+        ({"code": "0x60"}, "code identity mismatch or missing code"),
+        (
+            {"revert_selector": runner.ARB_BLOCK_SELECTOR},
+            "simulated pinned ArbSys reversion",
+        ),
+        ({"action_raw": "0x01"}, "incompatible ABI length"),
+        ({"version_raw": "0x01"}, "incompatible ABI length"),
+        (
+            {"action_raw": "0x" + "00" * 31 + "zz"},
+            "malformed hex data",
+        ),
+        (
+            {"version_raw": "0x" + "00" * 31 + "zz"},
+            "malformed hex data",
+        ),
+        ({"version": 61}, "version disagrees"),
+        ({"version": 117}, "version disagrees"),
+        ({"action_offset": 1}, "action identity disagrees"),
+    ],
+)
+def test_fork_snapshot_failures_stop_before_local_fork(
+    monkeypatch,
+    overrides,
+    error_match,
+):
+    monkeypatch.setattr(runner, "_rpc", _successful_fork_rpc(**overrides))
+    monkeypatch.setattr(
+        runner,
+        "_exercise_pinned_fork",
+        lambda *_args: pytest.fail("local fork must not run"),
+    )
+    with pytest.raises(ApprovalError, match=error_match):
+        runner.collect_fork_evidence(
+            "robinhood-mainnet",
+            MAINNET_PUBLIC_RPC,
+            FORK_PINS,
+        )
 
 
 def test_approval_parser_requires_every_explicit_authorization():
@@ -777,8 +1150,7 @@ def test_malformed_rpc_runtime_hashes_remain_rejected(value):
 
 def test_rpc_disables_http_redirects(monkeypatch):
     class FakeResponse:
-        def raise_for_status(self):
-            return None
+        status_code = 200
 
         def json(self):
             return {"jsonrpc": "2.0", "id": 1, "result": "0x1"}
@@ -791,6 +1163,51 @@ def test_rpc_disables_http_redirects(monkeypatch):
 
     monkeypatch.setattr(runner.requests, "post", fake_post)
     assert runner._rpc(RPC_URL, "eth_chainId", []) == "0x1"
+
+
+def test_rpc_rejects_302_before_parsing_valid_looking_json(monkeypatch):
+    json_calls = []
+
+    class FakeResponse:
+        status_code = 302
+
+        def json(self):
+            json_calls.append(True)
+            return {"jsonrpc": "2.0", "id": 1, "result": "0x1"}
+
+    def fake_post(url, **kwargs):
+        assert url == RPC_URL
+        assert kwargs["allow_redirects"] is False
+        return FakeResponse()
+
+    monkeypatch.setattr(runner.requests, "post", fake_post)
+    with pytest.raises(ApprovalError, match="non-2xx HTTP status"):
+        runner._rpc(RPC_URL, "eth_chainId", [])
+    assert json_calls == []
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        ["not", "an", "object"],
+        {"jsonrpc": "1.0", "id": 1, "result": "0x1"},
+        {"jsonrpc": "2.0", "id": 2, "result": "0x1"},
+    ],
+)
+def test_rpc_rejects_invalid_json_rpc_envelope(monkeypatch, payload):
+    class FakeResponse:
+        status_code = 200
+
+        def json(self):
+            return payload
+
+    monkeypatch.setattr(
+        runner.requests,
+        "post",
+        lambda *_args, **_kwargs: FakeResponse(),
+    )
+    with pytest.raises(ApprovalError, match="invalid JSON-RPC envelope"):
+        runner._rpc(RPC_URL, "eth_chainId", [])
 
 
 def test_preflight_matches_endpoint_chain_artifacts_nonce_address_and_fee(monkeypatch):

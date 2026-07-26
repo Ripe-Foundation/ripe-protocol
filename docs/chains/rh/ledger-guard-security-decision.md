@@ -1,11 +1,12 @@
 # Track 6 S5 Ledger Guard Security and Architecture Decision
 
-**Status:** Frozen Stage A evidence recreated on the integrated owner/H-01
-baseline; required local validation and live-proof authorization-packet
-preparation are complete; the exact post-hardening package review is complete,
-and the one-immutable architecture is security-approved in substance; Stage B
-remains unauthorized until the pre-implementation Checkpoint 0 gate closes;
-Gate 1, Stage C, Gate 2, merge, deployment, and activation remain prohibited
+**Status:** Stage A evidence reconciled through exact current `rh`
+`332ae2bc`; the owner replaced row 2's pre-Stage-B live signed-testnet
+requirement with deterministic fork evidence; exact mainnet/testnet fork
+evidence is captured and remains pending independent approval and owner
+acceptance; the one-immutable architecture is security-approved in substance;
+Stage B remains unauthorized; Gate 1, Stage C, Gate 2, merge, deployment, and
+activation remain prohibited
 
 **Prepared:** 24 July 2026
 
@@ -28,6 +29,11 @@ Gate 1, Stage C, Gate 2, merge, deployment, and activation remain prohibited
 **Local reconciliation merge:**
 `bf029d0fc5bee5cfd3c4c4f548f39c2117dbaf4c`, tree
 `7148880fcbe6556bbff0fac664ac4874e593ea7a`
+
+**Current controlling `rh` baseline and reconciliation merge:**
+`332ae2bc8e0ce4b694766d6d20759295d9267ec3`; local merge
+`fc3fa82b5ab2982d9057fbe4f23a99b1e21110fe`, tree
+`ad91c42c7717cb7a099bc0195719e654af42fefe`
 
 **Prior `fc48ac4` reconciliation merge:**
 `d769f8d5338465dd26a1d315be78268277200666`, tree
@@ -2551,3 +2557,325 @@ exact four-file bytes. It does not supply operator inputs, approve or run
 preflight, close row 2, authorize Stage B/C, or permit RPC, signer, signature,
 broadcast, push, merge, production, inventory, deployment, configuration,
 governance, or Base work.
+
+## 22. Current row 2 fork-evidence gate and `332ae2bc` reconciliation — 25 July 2026
+
+This section is the current controlling S5 state. It supersedes present-tense
+statements in sections 0–21 that describe:
+
+- a live signed-testnet transaction proof as a pre-Stage-B row 2 requirement;
+- rows 8 and 10 as awaiting operations approval; or
+- the section 21 packet-validation correction as unstaged or uncommitted.
+
+Those statements remain dated historical provenance. They are not the current
+gate.
+
+### 22.1 Owner direction and non-live boundary
+
+The owner directed:
+
+> The owner has approved replacing row 2’s live signed-testnet proof as a
+> pre-Stage-B requirement with a fork-only evidence gate. Do not use the
+> funded signer, access its key, set any candidate-packet approval Boolean,
+> run live preflight, sign, broadcast, or deploy. Candidate ad6f6981… remains
+> inert historical preparation evidence.
+
+The owner also required that real-network confirmation move to a later
+deployment/release-readiness gate and not block bounded Stage B after the
+exact fork package is independently approved and owner-accepted.
+
+Accordingly:
+
+- row 2 remains open during this pass;
+- row 2's pre-Stage-B evidence requirement is now deterministic fork evidence,
+  not a signed transaction, receipt, mempool, sequencer, or multi-transaction
+  live-node proof;
+- exact fork-package independent approval and explicit owner acceptance are
+  both required before row 2 may be recorded closed for bounded Stage B;
+- authentic real-network confirmation remains a deployment/release-readiness
+  requirement and residual risk;
+- no row 2 candidate-packet Boolean may be set by this evidence pass; and
+- a separate explicit owner authorization is still required before Stage B.
+
+The secret-free candidate outside the repository remains inert historical
+preparation evidence at SHA-256
+`ad6f69810be6d9da67e84452421b917d0d1e1c3fb357f2482c0e6d644b3042d2`.
+All eight executable approval Booleans remain `false`. No signer secret,
+signer environment variable, balance, nonce, signature, transaction,
+broadcast, or deployment was read or used.
+
+### 22.2 Exact current-`rh` reconciliation
+
+Before reconciliation, the branch was clean at approved commit
+`7f8f93c047debe5d4a756f301e69ffeca407e974`, tree
+`681a5983c8b9028792f27a091084f4ac1b23e8ab`. Local `rh`, cached
+`origin/rh`, and live remote `origin/rh` all resolved to exact
+`332ae2bc8e0ce4b694766d6d20759295d9267ec3`. The branch was 15 commits
+ahead / 1 behind `rh`, with merge-base
+`cb3fe7392c44613aaeec49bd2486369fe0da3556`.
+
+The incoming range from that merge-base to `332ae2bc` adds exactly one file:
+
+```text
+A  docs/chains/rh/track-8-m1-exact-receipt.md
+1 file changed, 1,342 insertions(+)
+```
+
+It changes no S5-owned production, probe, runner, focused-test, evidence, or
+inventory path. It also changes no contract, interface, ABI, dependency,
+migration, manifest, fixture, default, Teller, Deleverage, MissionControl, or
+Ledger path.
+
+The authorized normal merge completed without conflict and without rebase,
+squash, amendment, cherry-pick, or history rewriting:
+
+| Identity | Exact value |
+| --- | --- |
+| merge | `fc3fa82b5ab2982d9057fbe4f23a99b1e21110fe` |
+| tree | `ad91c42c7717cb7a099bc0195719e654af42fefe` |
+| first parent | `7f8f93c047debe5d4a756f301e69ffeca407e974` |
+| second parent | `332ae2bc8e0ce4b694766d6d20759295d9267ec3` |
+| subject | `Merge commit '332ae2bc8e0ce4b694766d6d20759295d9267ec3' into rh-track-6-s5-ledger-guard-recreation` |
+
+Commit `7f8f93c` remains unchanged and is an ancestor of the current branch.
+After the merge the branch is 16 commits ahead / 0 behind both local `rh` and
+cached `origin/rh`.
+
+### 22.3 Fork-evidence decision and architecture preservation
+
+The exact fork evidence in
+[`evidence/ledger-action-block-testnet-proof.md`](evidence/ledger-action-block-testnet-proof.md)
+section 16 records two consecutive parent/child states on both Robinhood
+mainnet and testnet. Both environments reproduced:
+
+- the expected chain identity;
+- exact state number and state hash;
+- code `0xfe` at
+  `0x0000000000000000000000000000000000000064`, with exact code hashes;
+- published Robinhood ArbOS profile `61`, pinned Nitro offset `55`, and raw
+  `arbOSVersion()` return `116`, derived as `61 + 55 = 116`;
+- `arbBlockNumber()` equal to each pinned child state number;
+- two relevant probe actions with equal action identity inside each pinned
+  state;
+- a distinct identity at the explicitly advanced child state; and
+- the same provider `l1BlockNumber` across the adjacent child states.
+
+The failure matrix rejects missing or incompatible code, an ArbSys call
+reversion, malformed `arbBlockNumber()` or `arbOSVersion()` data, raw versions
+`61` and `117`, and an ArbSys identity inconsistent with the pinned child
+state. It also rejects a wrong endpoint chain ID; unavailable or malformed
+pinned blocks; wrong pinned number or hash; nonconsecutive pins; parent/child
+hash mismatch; differing provider `l1BlockNumber`; and a false
+same-pinned-state result returned by the local exercise. Every case stops
+before evidence can report completion. These failures do not fall back to
+native `block.number`.
+
+The hardened transport/decoding boundary additionally rejects every non-2xx
+HTTP response before JSON parsing, including a `302` carrying a valid-looking
+JSON-RPC result. It requires a JSON object with exact `jsonrpc="2.0"` and
+exact integer request ID `1`. Malformed hexadecimal quantities such as
+`0xzz` and non-hex 32-byte ArbSys responses become stable `ApprovalError`
+failures rather than escaping as `ValueError`.
+
+Both complete reports are durable exact runner outputs:
+
+| Environment | Durable file | Producing runner SHA-256 | Report/file SHA-256 |
+| --- | --- | --- | --- |
+| mainnet | `docs/chains/rh/evidence/ledger-action-block-mainnet-fork.json` | `21b9b2a42f74e2d41821ffca59bede3b65ea7eb0eed7db863f573469e7de2e9e` | `69baafbe41a73b2c3f447ce505d65156f9380b1081428faa587f1f0b193bea37` |
+| testnet | `docs/chains/rh/evidence/ledger-action-block-testnet-fork.json` | `21b9b2a42f74e2d41821ffca59bede3b65ea7eb0eed7db863f573469e7de2e9e` | `ff66834d5d961047a3be3094df2ff01d0edc6efab92ede10e719cd14d31f9f15` |
+
+Both files contain exact compiler, source, ABI, compiler-input, creation,
+runtime, source-pin, block-pin, code, version, action-identity, and limitation
+fields. They contain no endpoint URL, endpoint credential, signer, signing
+secret, mutable approval, signature, transaction, or deployment material.
+They remain immutable outputs of historical producing runner
+`21b9b2a42f74e2d41821ffca59bede3b65ea7eb0eed7db863f573469e7de2e9e`.
+The current hardened runner is distinct at SHA-256
+`00fd4a4194a8da87fcf9f49f43cfae9fbdc6af3ddeb6437e5f9812f66a5fa507`
+and does not claim to re-emit either historical report.
+
+The evidence has an important emulation boundary. Robinhood exposes the
+precompile as native code byte `0xfe`; Boa PyEVM can pin the returned state
+identity but cannot execute Nitro's native precompile. Direct deployment of
+the unchanged probe against native `0xfe` therefore fails with `BoaError`.
+Local action calls use a controlled double returning the exact values already
+read from each pinned state. Boa's local `NUMBER` opcode exposes the pinned
+child state number, while the provider's `l1BlockNumber` is recorded
+separately. The fork does not faithfully reproduce Robinhood's native
+ancestor-number opcode behavior.
+
+This package therefore does **not** claim authentic receipts, mempool behavior,
+sequencer ordering, multi-transaction inclusion, signing, fees, broadcast, or
+deployment. The adjacent-state observation is bounded and does not establish
+a protocol maximum. Credential-free public endpoints are rate-limited, make
+no archive-retention guarantee, and may cease serving these exact pins.
+The historical producing runner generated the durable mainnet report while
+its exact pins remained retrievable; the hardened-runner pass did not re-emit
+it and makes no present archive-retention claim. The older testnet pins ceased
+serving `eth_getCode`; no report was reconstructed from Markdown. Fresh
+adjacent testnet pins `93522273` / `93522274` shared provider `l1BlockNumber`
+`11351480` and produced the durable historical-runner report.
+
+The approved architecture remains unchanged:
+
+- source address zero selects native `block.number`;
+- exact `0x0000000000000000000000000000000000000064` selects only
+  `arbBlockNumber()`;
+- every other constructor value rejects;
+- the selected immutable source remains read-only;
+- there is no `chain.id` branch, provider mutability, fallback, separate mode
+  field, arbitrary selector, or Robinhood-specific Ledger source;
+- all existing equality, write ordering, lock, pause, Teller classification,
+  identity, arming, high-risk, Underscore, and configuration semantics remain;
+  and
+- the deployed Base Ledger remains untouched indefinitely.
+
+Production `contracts/data/Ledger.vy` remains unchanged at SHA-256
+`00d86847273621857b80701be5faf7ca88ff9505f68671d5b6ab3c8b4ec972e0`.
+The test-only Vyper probe remains unchanged at SHA-256
+`95716e4e2b383f2a07826be94d9ee402d263eec522bb4f77efd72a5e5f6eafe5`.
+
+The locked H-01 Candidate A validation completed without failure: H-01
+`16/16`, S1 `57/57`, focused probes `114/114`, complete probes `154/154`, S2
+inventory tests `60/60`, the exact nine-file target `437/437`, collection
+`2,951/3,093` with 142 deselected, and the complete serial suite
+`2,951/2,951` with 142 deselected. The standalone inventory checker returned
+exactly the known seven `INV-CADENCE-NEW` plus one `INV-PATH-NEW` isolated
+probe findings and nothing else. Evidence section 16.8 records exact commands,
+durations, and warnings.
+
+### 22.4 Current approvals and remaining gates
+
+The packet-validation correction described as uncommitted in section 21 was
+later committed without amendment at
+`b6fabab0ce071ebc6a5c7cbaa1fded793120fcf3`. Its approval-count prose
+correction was committed at
+`017c931dd5953c9369fc83c0070bf2ba0b270f56`, and the faucet/owner-value
+provenance was committed at preserved commit `7f8f93c`.
+
+Rows 8 and 10 are owner-, security-, and operations-approved as recorded in
+section 19 and commit
+`fe66f595e58acf840ed9928e6bb60e28be4ebf05`. The named operational roles
+remain unassigned and block deployment readiness, but do not block the fork
+evidence or bounded Stage B.
+
+Rows 6 and 13 remain Gate 1 implementation/evidence rows. The eight
+probe-only S2 findings remain an explicit Stage C reconciliation requirement
+before eventual S5 merge; inventory is unchanged in this pass.
+
+The current pre-Stage-B conditions are:
+
+1. independent approval and explicit owner acceptance of the exact fork
+   package, closing row 2 only for bounded Stage B;
+2. final independent approval of this exact reconciled decision record and
+   section 12 file ceiling; and
+3. separate explicit owner authorization to begin bounded Stage B.
+
+### 22.5 Proposed row 2 closure wording — not yet adopted
+
+> **Row 2 — FORK EVIDENCE APPROVED AND OWNER-ACCEPTED FOR BOUNDED STAGE B.**
+> Live signed-testnet execution is not a pre-Stage-B requirement. The exact
+> Robinhood mainnet/testnet pins, code identity at `0x64`, raw
+> `arbOSVersion()` return `116` for published profile `61`, same-pinned-state
+> equality, explicitly advanced identity, and fail-closed matrix are approved,
+> subject to the recorded Boa and public-provider limitations. Authentic
+> receipts, mempool/sequencer behavior, and multi-transaction live-node
+> behavior remain a deployment/release-readiness residual risk. This row
+> closure does not authorize Stage B; separate explicit owner authorization
+> remains required.
+
+This wording is a proposal for independent review and later owner acceptance.
+It does not close row 2 now. Stage B, Stage C, inventory edits, push, merge
+into `rh`, deployment, registration, configuration, governance, signer access,
+signing, broadcast, and Base migration remain prohibited.
+
+## 23. Owner acceptance and Checkpoint 0 row 2 closure — 25 July 2026
+
+This section is the current controlling row 2 disposition. It supersedes
+sections 22.4 and 22.5 only where they describe owner acceptance and row 2
+closure as pending. It does not rewrite those sections' accurate historical
+state or alter any other Checkpoint 0 or later-gate requirement.
+
+### 23.1 Verbatim owner authority
+
+The owner stated verbatim:
+
+> I accept the exact S5 fork-evidence package identified by:
+>
+> - decision record SHA-256 `353da67b869549562c67969a3c70c6a70ff3e4647dfb42665f7dfe25aaeba91d`;
+> - evidence record SHA-256 `efb6d271bc0eb742619e2dc78b4637492c0981c3e6f0d8fd82b1ac281baf08c2`;
+> - mainnet report SHA-256 `69baafbe41a73b2c3f447ce505d65156f9380b1081428faa587f1f0b193bea37`;
+> - testnet report SHA-256 `ff66834d5d961047a3be3094df2ff01d0edc6efab92ede10e719cd14d31f9f15`;
+> - hardened runner SHA-256 `00fd4a4194a8da87fcf9f49f43cfae9fbdc6af3ddeb6437e5f9812f66a5fa507`; and
+> - focused tests SHA-256 `e81e9279f0a44426f3c9a841108fbe2a5c3df626ea65426682eca76be0601f74`.
+>
+> I approve closing Checkpoint 0 row 2 for bounded Stage B only. I accept that this fork evidence does not prove authentic receipts, mempool or sequencer behavior, multi-transaction inclusion, signing, broadcasting, or deployment. Those remain mandatory deployment/release-readiness requirements.
+>
+> Record this acceptance verbatim and update the decision and evidence records. Leave the resulting package unstaged and uncommitted for final exact-hash review of the row 2 closure and Stage B file ceiling.
+>
+> This does not authorize Stage B, Stage C, inventory changes, merge, deployment, registration, configuration, governance, signer access, signing, broadcast, or Base migration.
+>
+> After that revision is reviewed and committed, you will still need to provide a separate explicit authorization before Stage B implementation begins.
+
+### 23.2 Controlling row 2 disposition
+
+**Checkpoint 0 row 2 is owner-closed for bounded Stage B only.** The closure
+is bound to the six exact package hashes quoted in section 23.1 and adopts the
+fork-evidence wording proposed in section 22.5. It does not set or use any
+historical candidate-packet approval Boolean and does not authorize live RPC,
+signer, signature, broadcast, transaction, or deployment work.
+
+The owner expressly accepts the evidence boundary: the package does not prove
+authentic Robinhood receipts, mempool or sequencer behavior,
+multi-transaction inclusion, signing, broadcasting, or deployment. Those
+items remain mandatory deployment/release-readiness requirements. The named
+operational roles also remain unassigned and must be staffed before deployment
+readiness.
+
+The two documentation files necessarily acquire new hashes by recording this
+closure. Those post-closure bytes are unstaged, uncommitted, and awaiting
+independent exact-hash review. That review verifies this transcription,
+row 2's bounded closure, and the unchanged section 12 Stage B file ceiling; it
+is not a substitute for the later separate owner authorization to begin
+Stage B.
+
+### 23.3 Exact Stage B ceiling and remaining authorization gate
+
+Section 12 remains the controlling Stage B file ceiling without expansion.
+Its exact 14-file set remains:
+
+```text
+contracts/data/Ledger.vy
+tests/conf_core.py
+tests/data/test_ledger.py
+tests/core/teller/test_teller_deposit.py
+tests/core/teller/test_teller_withdraw.py
+tests/core/teller/test_teller_rebalance.py
+tests/core/teller/test_teller_action_block.py
+tests/core/deleverage/test_deleverage_swap_collateral.py
+tests/core/creditEngine/test_credit_borrow.py
+tests/core/creditEngine/test_credit_repay.py
+tests/vaults/modules/test_stab_vault_claims.py
+tests/data/test_ledger_action_block.py
+scripts/abis/Ledger.json
+docs/chains/rh/ledger-guard-implementation-record.md
+```
+
+No Teller or Deleverage production-source edit is permitted. The inline
+ArbSys-interface stop condition and every section 12.2 exclusion remain
+controlling.
+
+Row 2 closure alone is not implementation authority. Before Stage B may
+begin:
+
+1. the exact post-closure decision and evidence bytes, including the unchanged
+   section 12 ceiling, must receive independent exact-hash approval;
+2. those exact approved bytes must be committed under separate owner
+   authorization without drift; and
+3. the owner must then separately and explicitly authorize bounded Stage B
+   against section 12.
+
+Until all three conditions are satisfied, Stage B remains unauthorized.
+Stage C, inventory edits, push, merge into `rh`, deployment, registration,
+configuration, activation, governance, signer access, signing, broadcast, and
+Base migration remain prohibited.
