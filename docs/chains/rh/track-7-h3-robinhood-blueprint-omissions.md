@@ -1,12 +1,18 @@
 # Track 7 H-03: Robinhood Blueprint and Explicit Omissions
 
-**Status:** Draft for owner, deployment-tooling, protocol, security, and
-cross-track review; implementation launch is blocked until H-02 is reviewed,
-integrated into `rh`, and current
+**Status:** Phase A R6 correction pending independent complete-file review and
+exact-hash owner approval. H-02 and Track 8 M0 are integrated. Owner decisions
+`D-H03-005` (typed caller-to-callee relations) and `D-H03-006` (terminal
+global-mint sequence) are approved, but they do not approve the R6 bytes or
+`D-H03-004-R6`. Those two approvals are owner-attested provenance, not facts
+independently verifiable from repository bytes. Phase B remains blocked until
+the complete corrected Phase A package is approved, the provenance-only
+amendment gate closes, the package is committed as a new baseline, and Phase
+B is separately authorized.
 
-**Prepared:** 24 July 2026
+**Prepared:** 24 July 2026; planning status corrected 25 July 2026
 
-**Planning baseline:** `02787d351a3064e35d627e8fbc44150770e61c73`
+**Planning baseline:** `c0d0e708ae4a89ed730615c9eaf2d23a4fecc05d`
 
 ## Fresh-agent instruction
 
@@ -34,16 +40,23 @@ Apply the owner's minimum-change directive throughout:
 5. preserve residual risk and future work as typed data rather than solving it
    by expanding H-03.
 
-Use branch `rh-track-7-h3-robinhood-blueprint-omissions`. Commit deliverables to
-that branch with clear messages. Never push directly to or merge into `rh` or
-`master`; the owner reviews and integrates the work.
+Use branch `rh-track-7-h3-robinhood-blueprint-omissions-r6`. Leave the
+documentation-only R6 deliverables unstaged and uncommitted for complete
+independent exact-hash review. Never push or merge into `rh` or `master`; the
+owner reviews and separately authorizes any later integration.
 
 ## Worktree bootstrap
 
-The owner must first commit this reviewed brief and its two narrow authority
-corrections to `rh`. H-02 must then pass both reviewer gates and be integrated
-into `rh`. The fresh H-03 agent creates its own worktree only after both
-conditions are true:
+H-02 and Track 8 M0 are already integrated at the planning baseline. Phase A's
+two outputs are this corrected brief and
+`docs/chains/rh/evidence/robinhood-blueprint-phase-a.md`. Phase B may begin
+only after those exact two candidate files receive independent review and
+owner approval, any approval metadata is inserted through the independently
+confirmed provenance-only amendment gate, and the resulting two files are
+committed together on the R6 H-03 branch and integrated into `rh` as the new
+H-03 baseline. A fresh Phase B agent must resume that exact isolated R6
+branch/worktree; it must not reuse the rejected R5 worktree or restart from an
+older planning baseline:
 
 1. Start from `/Users/wigglez/dev/ripe-protocol`.
 2. Verify that:
@@ -52,15 +65,16 @@ conditions are true:
    - this brief exists in that commit;
    - the merged Track 7 support specification and validation plan contain the
      reviewed H-03/U-015 corrections;
-   - the reviewed H-02 network-profile implementation and sanitized evidence
-     are integrated into `rh`;
+   - the reviewed H-02 network-profile implementation, post-integration
+     correction, and sanitized evidence are integrated into `rh`;
    - H-01, S1, S2, and S3 remain integrated;
    - the H-01 dependency gate, H-02 targeted tests, S1, and S2 pass on the
      untouched baseline;
-   - the current Track 8 specification, validation plan, M0 evidence, and any
-     owner-approved M0 closure revision present in `rh` are identified exactly;
-     and
-   - no active branch owns an H-03 file.
+   - the owner-closed Track 8 M0 packet, specification, validation plan, and
+     evidence present in `rh` are identified exactly, without treating any
+     later M1-M5 gate as closed; and
+   - no branch or worktree other than the exact named H-03 branch/worktree
+     owns an H-03 file.
 3. Record:
    - the full starting commit;
    - SHA-256 hashes of this brief, both Track 7 authority documents, the
@@ -71,23 +85,21 @@ conditions are true:
    - the exact H-02 public API consumed by H-03; and
    - baseline H-01, H-02, S1, S2, collection, and full-suite results.
 4. Confirm that branch
-   `rh-track-7-h3-robinhood-blueprint-omissions` and path
-   `/Users/wigglez/dev/ripe-protocol-track-7-h3-robinhood-blueprint-omissions`
-   do not exist. If either exists, stop and ask the owner. Do not reuse, delete,
-   reset, or overwrite it.
-5. Create the isolated worktree:
-
-   ```bash
-   git -C /Users/wigglez/dev/ripe-protocol worktree add \
-     -b rh-track-7-h3-robinhood-blueprint-omissions \
-     /Users/wigglez/dev/ripe-protocol-track-7-h3-robinhood-blueprint-omissions \
-     rh
-   ```
-
-6. Verify the new worktree's branch, commit, clean status, file hashes,
+   `rh-track-7-h3-robinhood-blueprint-omissions-r6` and path
+   `/Users/wigglez/dev/ripe-protocol-track-7-h3-robinhood-blueprint-omissions-r6`
+   exist, are paired with each other, and contain the exact approved Phase A
+   documentation commit. If either is absent, mismatched, dirty outside the
+   approved Phase A package, or points to different history, stop and ask the
+   owner. Do not create, reuse under another identity, delete, reset, or
+   overwrite anything.
+5. After the Phase A documentation commit is integrated, obtain explicit owner
+   authorization to merge that exact current `rh` commit into the existing
+   H-03 branch without rebase or history rewriting. Stop on any unexpected
+   incoming path, conflict, or authority drift.
+6. Verify the reconciled worktree's branch, commit, clean status, file hashes,
    dependency versions, and baseline test results.
 7. Run every subsequent command and make every edit inside
-   `/Users/wigglez/dev/ripe-protocol-track-7-h3-robinhood-blueprint-omissions`.
+   `/Users/wigglez/dev/ripe-protocol-track-7-h3-robinhood-blueprint-omissions-r6`.
 
 Do not modify or commit from the integration worktree.
 
@@ -117,9 +129,9 @@ rerun affected validation. Do not continue against a stale checkpoint.
 This reviewed H-03 batch corrects two stale planning statements:
 
 1. U-015 said the Track 8 specification and validation plan did not exist.
-   They are integrated, along with M0 evidence. The truthful blocker is that M0
-   remains open and the exact minimum-containment implementation is not yet
-   approved.
+   They are integrated, along with the owner-closed M0 evidence and decision
+   packet. The truthful blockers are the separately gated M1-M5
+   implementation, composed-proof, deployment, and activation work.
 2. The validation command map assigned
    `tests/deployment/test_registry_topology.py` to H-03 even though that file is
    created and owned by H-08. H-03 must prove its own registry-slot
@@ -130,6 +142,27 @@ These are documentation corrections, not expanded implementation authority.
 H-03 still owns exactly three implementation/test files. It also owns one
 durable Phase A evidence record so the source-backed topology analysis and
 owner approval do not exist only in a task response.
+
+R4b corrected the exact H-02 history paths, LP ordinary-only routing,
+reward-state separation, global-mint proposal, and approval continuity, but
+was rejected. R5 preserves those valid corrections, implements the approved
+typed caller-to-callee relation model, records `D-H03-006` as approved,
+regenerates every relation and dependent count, and reconciles all
+supersession/status language, but was rejected for unsupported `R-282`, a
+truncated canonical exclusion rule, and drift from the integrated H-04
+lifecycle vocabulary. R6 corrects only those documentation defects and the
+mechanically dependent promotion, count, assertion, provenance, and handoff
+language. It does not authorize Phase B.
+
+Independent re-review then verified the first complete R6 candidate at brief
+SHA-256
+`43f29ba8b7cc7a7cc4497a2dc4d1ff3c7086bbae20505d16ae16e161919d51b6`
+and evidence SHA-256
+`a9c2b2d7628b5a00594b25604f31d8ca34c9ffd1cf3ec3976df9f23498684418`,
+including every canonical count and source proof. It requested that the
+launch-disabled meaning of the two token CCIP capability rows be made
+explicit. Those hashes were never approved and are superseded by this
+clarified R6 candidate; no inventory, lifecycle assignment, or count changed.
 
 ## Exact file ownership
 
@@ -237,6 +270,7 @@ field. Do not assume the list is exhaustive for analysis.
 - `contracts/core/HumanResources.vy`
 - `contracts/core/Lootbox.vy`
 - `contracts/core/Endaoment.vy`
+- `contracts/core/EndaomentFunds.vy`
 - `contracts/config/SwitchboardBravo.vy`
 - `contracts/config/SwitchboardDelta.vy`
 - `contracts/config/SwitchboardEcho.vy`
@@ -278,12 +312,14 @@ integrated H-03 baseline and stop if it changed.
 - `docs/chains/rh/track-6-s5-checkpoint-0-owner-decision-packet.md`
 - any reviewed S5 decision/evidence files integrated into `rh` before H-03
   bootstrap
+- `docs/chains/rh/track-6-s6-track-7-h4-defaults-parameters.md`
 - `docs/chains/rh/track-8-stock-token-vault-change.md`
 - `docs/chains/rh/stock-token-vault-change-specification.md`
 - `docs/chains/rh/stock-token-vault-change-validation-plan.md`
 - `docs/chains/rh/stock-token-m0-evidence.md`
 - `docs/chains/rh/stock-token-m0-raw-evidence.json`
-- any reviewed, integrated Track 8 M0 owner-decision or closure record
+- `docs/chains/rh/track-8-m0-owner-decision-packet.md`
+- `docs/chains/rh/track-8-m1-exact-receipt.md`
 
 Never treat a local untracked packet, floating worktree, reviewer message, or
 chat summary as integrated authority.
@@ -316,9 +352,10 @@ Produce the smallest pure-Python H-03 implementation that:
 7. makes missing and unresolved values fail closed rather than falling back to
    Base, local, zero, `None`-as-success, or another profile;
 8. makes every initial-launch omission and disabled path machine-testable;
-9. leaves Track 8 M0, Stock containment, sGREEN, PSM, rewards, CCIP, S5, and
-   every other unresolved decision visibly blocked at the exact sub-surface
-   where it matters; and
+9. consumes owner-closed Track 8 M0 and its required active chain-native
+   sGREEN posture, while leaving Stock containment M1-M5, PSM activation,
+   rewards, CCIP, S5, and every other later unresolved decision visibly
+   blocked at the exact sub-surface where it matters; and
 10. preserves `config/BluePrint.py` and intended Base profile behavior
     byte-for-byte.
 
@@ -354,6 +391,32 @@ These states are not aliases:
 
 If a component is required while one sub-surface is disabled or blocked, model
 both facts explicitly. Do not collapse the row to a single optimistic label.
+
+The exact lifecycle vocabulary is:
+
+- `deployed_initial_value`;
+- `pre_activation_configuration`;
+- `atomic_stock_activation`;
+- `within_seven_day_separately_reviewed_ccip_promotion`;
+- `within_seven_day_separately_reviewed_reward_activation`;
+- `post_launch_release`;
+- `omitted`; and
+- `blocked`.
+
+The CCIP-promotion phase applies only to the exact six CCIP surfaces approved
+in the evidence record. Within that exact set, `S-001-CCIP-CAP` and
+`S-002-CCIP-CAP` are capabilities of tokens deployed at launch: their
+`disabled` disposition must hold from `deployed_initial_value` continuously
+through the separate CCIP-promotion checkpoint. Their promotion-phase label
+identifies the controlling reviewed action and is not permission to leave
+them unspecified at launch. The other four CCIP members are deferred
+artifact/registration/toolchain surfaces.
+
+The reward-activation phase applies only to the separate reward
+`PromotionRecord`; every referenced reward surface remains `disabled` at
+`deployed_initial_value`. A zero reward-activation cardinality among
+`SurfaceRecord` values is therefore correct and required, not an unused enum
+value.
 
 ## Symbolic-input rules
 
@@ -403,11 +466,34 @@ At minimum the schema must provide:
 - registry-domain/ID/name, ID-authority class, or reserved-slot metadata when
   applicable;
 - capability, route, feature, and activation sub-surface dispositions;
-- dependency component IDs;
+- separately reviewed promotion actions, distinct from launch-state surfaces;
+- stable relation IDs, closed relation kinds, target component IDs, phases,
+  nonempty tuples of mechanically resolvable `path:line` proofs, semantic
+  bases, and exact evidence-authority-ID tuples;
 - blocker IDs and accountable owner classes;
 - negative assertion IDs;
-- downstream slice ownership; and
+- downstream slice ownership;
+- exact controlling-evidence-ID tuples; and
 - a pure lookup/validation API.
+
+Approved `D-H03-005` fixes relation semantics:
+
+1. direct execution/call relations use caller to callee direction;
+2. a governed contract points to its authority registry/controller through a
+   separately typed `authority_dependency`;
+3. a controller points to a target only where source proves a direct call;
+4. a configuration writer does not point to downstream consumers merely
+   because they read the configuration;
+5. registry membership/admission belongs in registration-order and registry
+   expectation records, not fictitious runtime calls; and
+6. indirect/transitive security assertions require a separate typed record
+   with a complete multi-source proof tuple.
+
+Every canonical row is one explicit edge. Grouped Cartesian expansion is
+forbidden. Selected-source to omitted-target edges are permitted when required
+to prove a source-retained disabled or fail-closed route. Phase B must encode
+only the independently reviewed R6 relation records and may not reinterpret
+or regroup them.
 
 All nested values must be immutable. Importing or validating the module must
 not:
@@ -452,8 +538,12 @@ supersedes an earlier recommendation:
   mechanically implied; and
 - propose the minimum-change disposition.
 
-No code comment or test name may claim that an open M0, M1, S5, CCIP, oracle,
+No code comment or test name may claim that an open M1, S5, CCIP, oracle,
 reward, role, or production-value gate has passed.
+
+Track 8 M0 is owner-closed and must never be described as open. Its selected
+launch outcomes do not close M1-M5 or any implementation, proof, deployment,
+configuration, or activation gate.
 
 ## Blueprint amendment ownership
 
@@ -522,8 +612,8 @@ dispositions and blockers.
 
 - Stock Tokens are an initial-launch requirement; treating all Stock Tokens as
   omitted is not an acceptable final launch graph.
-- Until M0 closes, M1–M3 are approved and implemented, M4's composed proof
-  passes, and M5 activation is separately approved, every Stock asset
+- M0 is owner-closed. Until M1–M3 are approved and implemented, M4's composed
+  proof passes, and M5 activation is separately approved, every Stock asset
   registration, vault selection, borrow route, liquidation route, CreditRedeem
   route, Stability Pool route, trusted deposit route, reward route, and
   activation surface remains `blocked` or `disabled` as appropriate.
@@ -536,34 +626,85 @@ dispositions and blockers.
 
 ### SavingsGreen and Stability Pool
 
-- Track 8 M0 requires a final unconditional choice between omission and an
-  inert topology placeholder.
-- H-03 Phase A must trace every constructor, hard-coded ID, consumer, and
-  registry consequence of both choices.
-- If canonical source requires a nonzero SavingsGreen address for RipeHq
-  construction, state that fact; do not replace it with zero or assume a sparse
+- Owner-closed Track 8 M0 requires active chain-native sGREEN and the GREEN
+  Stability Pool at launch; omission and inert-topology alternatives are
+  superseded.
+- H-03 Phase A must trace every constructor, hard-coded ID, consumer, registry
+  consequence, and launch/security route required by that selected posture.
+- Canonical source requires a real SavingsGreen deployment identity for
+  RipeHq construction; do not replace it with zero or assume a sparse
   registry.
-- An inert scaffold, if proven necessary and owner-approved, must have no
-  deposit, conversion, Stability Pool, insurance, reward, or surplus route.
-- If neither option can be proven without a source change, stop and return the
-  smallest exact source-change question to the owner. Do not implement it in
-  H-03.
+- sGREEN remains permanently excluded from CCIP. Stock custody and swaps in
+  the Stability Pool remain disabled until their separately approved Track 8
+  gates say otherwise.
 
 ### USDG and EndaomentPSM
 
-- H-03 Phase A must determine whether canonical topology requires ID-22
-  disabled staging or permits complete omission.
-- If staged, the blueprint requires explicit assertions for `canMint=false`,
-  `canRedeem=false`, no GREEN mint capability, auto-deposit disabled, no yield
-  route, no approval, and no generic Teller asset route.
+- Owner-closed M0 and source topology require CM-048 at RipeHq ID 22. H-03
+  must represent disabled staging followed by gated launch activation; it must
+  not reopen omission as an option.
+- The blueprint requires explicit staging assertions for `canMint=false`,
+  `canRedeem=false`, no GREEN mint capability, no yield route, no approval,
+  and no generic Teller asset route. Source initializes auto-deposit to
+  `True`; the launch-disabled posture therefore requires an explicit,
+  separately reviewed pre-activation action setting it to `False`.
 - The official price path does not approve USDG identity, reserve values,
   parameters, deployment, or activation.
 - No address or zero-address placeholder belongs in H-03.
 
+### RipeHq capabilities and Teller initialization
+
+- RipeHq source initializes `mintEnabled=True`. The selected launch graph
+  therefore requires an explicit pre-activation transition to `False` and a
+  testable assertion that global minting remains disabled throughout staging.
+- Encode separate post-registration target tuples for Switchboard blacklist
+  authority, VaultBook RIPE minting, and AuctionHouse, CreditEngine, and
+  Endaoment GREEN minting. A generic "capabilities pending" record is
+  insufficient and no tuple may be enabled before its setup/handoff gates.
+- Encode owner-approved `D-H03-006`: with global minting disabled, configure
+  and verify every
+  exact Department capability tuple and prove all unlisted capability bits
+  false; enable and prove PSM redemption; make the CM-048
+  `(canMintGreen=True, canMintRipe=False,
+  canSetTokenBlacklist=False)` grant the final capability-tuple mutation;
+  re-verify the complete tuple set; then call
+  `RipeHq.setMintingEnabled(True)` as the final launch activation. No
+  capability, route, parameter, or registry mutation may follow that global
+  re-enable within the launch plan. This approved ordering does not approve
+  any execution detail or R6 artifact; Phase B remains blocked.
+- Teller's `_shouldPause` constructor argument is a separate symbolic input
+  and launch-safety surface. It must have exact owners, blockers, consumers,
+  and lifecycle semantics; H-03 must not infer its value from asset settings
+  or select it.
+
+### LP deposit-only semantics
+
+- Represent each approved LP's explicit legitimate `ltv=0` configuration as a
+  required but currently blocked configuration surface.
+- Represent the absent LP borrowing route/capability separately as omitted.
+  Missing LTV data must never satisfy the zero-LTV requirement.
+- For each of `I-GREEN-USDG-LP` and `I-RIPE-WETH-LP`, the only permitted
+  Teller entrypoints are the ordinary `deposit` and `depositMany` paths.
+  `depositFromTrusted` is forbidden for the LP asset regardless of producer,
+  vault ID, lock duration, or supplied `Addys`; no Department-specific or
+  direct-vault bypass may substitute for an ordinary Teller deposit. Encode
+  this as a dedicated assertion over both LP identities and mutation-test
+  every trusted producer/call-site class, not as descriptive
+  "deposit-only" prose.
+
 ### Rewards, HR, bonds, and Underscore
 
-- Global launch rewards remain disabled unless a later integrated owner record
-  says otherwise.
+- Global launch rewards are a deployed-initial disabled state. The possible
+  seven-day action is a separate immutable promotion record that references
+  the exact reward surfaces, remains deferred and blocked on the rewards
+  validation/monitoring/kill package, and requires a new reviewed release.
+  Elapsed time or the launch-state record alone cannot perform the promotion.
+- GREEN/RIPE CCIP has a separate immutable promotion record referencing only
+  `S-001-CCIP-CAP`, `S-002-CCIP-CAP`, `S-051-ARTIFACT`,
+  `S-052-ARTIFACT`, `S-053-REGISTRATION`, and `S-058-TOOLCHAIN`. It remains
+  deferred, separately reviewed, nonautomatic, and blocked on the Track 1
+  security/toolchain package. It does not change launch state if incomplete
+  or late.
 - Boardroom, BondRoom, BondBooster, Lootbox reward minting, HumanResources,
   Contributor instances, and related allocations stay disabled or blocked.
 - Lootbox remains the shared S3 artifact with the Robinhood symbolic floor
@@ -625,6 +766,28 @@ in its owned tests:
 - NEG-036 disabled scaffold gains authority; and
 - NEG-037 PriceDesk semantic slot reuse.
 
+The H-03 test set must also include a dedicated Teller exact-receipt assertion
+and mutation family. It must prove that every source `depositFromTrusted`
+producer is governed by one M1 policy and that success requires exact receipt
+and exact vault return, while short/zero/excess/malformed returns, reentrancy,
+and downstream failure roll back atomically. NEG-021 alone is not sufficient
+for this boundary.
+
+It must additionally include:
+
+- `NEG-H03-LP-ORDINARY-ONLY`
+  `test_lp_assets_exclude_every_trusted_teller_route`, asserting for both
+  approved LP identities that the exact allowed Teller route set is
+  `deposit`/`depositMany`, the `depositFromTrusted` set is empty, and no
+  Department/direct-vault bypass exists; and
+- `NEG-H03-GLOBAL-MINT-SEQUENCE`
+  `test_global_mint_reenable_is_final_launch_activation`, asserting the
+  owner-approved `D-H03-006` sequence of global disable, exact tuple
+  configuration/verification, PSM redemption proof, final PSM tuple mutation,
+  full re-verification, and final global re-enable. Execution and proof remain
+  blocked; the approved sequence does not authorize Phase B or a production
+  action.
+
 Use the validation plan's exact test names where it assigns one to an H-03
 file. If a case requires a deployed contract, migration plan, or H-08 checker,
 H-03 proves only its declarative prerequisite and leaves the integration tier
@@ -641,7 +804,7 @@ Before editing implementation files:
    - symbolic inputs;
    - registry domain/ID/name or reservation;
    - disabled/blocked sub-surfaces;
-   - dependencies;
+   - phase-qualified component relations;
    - blocker and owner IDs;
    - negative assertion IDs;
    - downstream slice; and
@@ -650,8 +813,11 @@ Before editing implementation files:
    tables. For each numeric ID, label its authority as source-hard-coded,
    registration-order, or provisional reservation; cite source for the first
    class and the committed Base manifest/deployment history for the second.
+   Include exact RipeHq global-mint and post-registration capability
+   transitions rather than a catch-all handoff flag.
 4. Trace omission versus inert-scaffold feasibility for SavingsGreen and PSM.
-5. Reconcile current Track 8 M0 status without pre-closing it.
+5. Consume the owner-closed Track 8 M0 decisions while keeping every later
+   M1-M5 implementation, proof, deployment, and activation gate open.
 6. Design a generic address-shaped-literal rejection plus a read-only,
    test-time comparison with the values already present in
    `config/BluePrint.py` and the Base manifest. Do not copy those addresses into
@@ -661,8 +827,9 @@ Before editing implementation files:
 8. Propose the smallest immutable public API and explain why each field is
    necessary for H-04/H-05/H-09.
 9. Design mutation tests for missing CM rows, duplicates, mutable nested state,
-   status flattening, zero/Base fallback, registry shifts, blocker removal, and
-   profile aliasing.
+   status flattening, zero/Base fallback, registry shifts, blocker removal,
+   profile aliasing, reward-state/promotion collapse, LP trusted-route
+   admission, and early or nonterminal global-mint re-enable.
 10. Identify every required fact H-03 cannot own.
 
 ### Phase A mandatory checkpoint
@@ -676,12 +843,19 @@ must durably contain:
 - the integrated H-02 API and exact proposed H-03 API;
 - the full CM-001–060 table;
 - the four registry-topology tables;
-- the SavingsGreen omission-versus-inert proof;
+- the active chain-native SavingsGreen/Stability selection and excluded-path
+  proof;
 - the PSM omission-versus-disabled-staging proof;
+- the owner-approved terminal global-mint sequence, its blocked
+  execution/proof status, and its non-approval of the R6 artifact;
+- the exact LP ordinary-only route assertion and trusted-route mutation
+  coverage;
+- the launch-disabled reward inventory and exact two-record promotion-action
+  inventory;
 - the current Track 8 M0 reconciliation;
 - the address-shaped-literal rejection and read-only Base-comparison strategy;
-- the exact three-file implementation/test diff plan and four-file total
-  ownership boundary;
+- the exact two-file Phase A documentation package, its required baseline
+  reset, and the later four-file Phase B ownership boundary;
 - the negative and mutation test matrix;
 - every unresolved field with owner and deadline;
 - any authority conflict or need for a prohibited file; and
@@ -692,10 +866,33 @@ The checkpoint must ask the owner only for decisions that the source-backed
 analysis makes necessary. It must not ask the owner to approve a production
 address, contract artifact, migration, or parameter in H-03.
 
-After review, append the exact dated Phase A approval provenance to the same
-evidence record and commit that record on the H-03 branch before Phase B. Do
-not create a second checkpoint or implementation-evidence document. If Phase A
-is rejected or materially revised, update and re-review the same record.
+Immediately before owner approval, re-hash every cited integrated authority.
+Also re-hash any observed mutable cross-track worktree artifact and confirm it
+is explicitly non-authoritative. Integrated drift, a changed controlling
+conclusion, or any attempt to use uncommitted cross-track evidence as authority
+requires refreshed review and blocks approval.
+
+After exact-hash review, owner approval must name the reviewed brief and
+evidence hashes. Inserting dated approval metadata changes the evidence bytes,
+so those post-insertion bytes must not be called the already reviewed bytes.
+The only permitted post-approval change is a provenance-only amendment to the
+designated provenance block in this same evidence record. A second independent
+reviewer must then:
+
+1. hash both post-amendment files;
+2. compare the candidate-to-post-amendment diff exactly;
+3. confirm the brief is byte-identical to its approved hash;
+4. confirm every evidence change is confined to the authorized provenance
+   block and contains only the approved decision IDs, actor/role, date, and
+   reviewed hashes; and
+5. record independent confirmation of the post-amendment evidence hash.
+
+Any other byte change voids the approval and requires full exact-hash review
+again. Only after this gate closes may the exact unchanged brief and confirmed
+post-amendment evidence be committed together on the H-03 branch. Do not
+create a second checkpoint or implementation-evidence document. If Phase A is
+rejected or materially revised, update and re-review the same two-document
+package.
 Any Phase B or Gate 1 change to an approved disposition, topology
 classification, blocker, or public-API conclusion must update the Phase A
 evidence record in the same commit and trigger review of both artifacts; the
@@ -743,7 +940,9 @@ configuration engine.
 - no zero/Base/local fallback;
 - required fields are symbolic and owner/gate-attributed;
 - missing and unresolved are distinct from legitimate disabled values;
-- all dependency IDs resolve;
+- every relation ID, kind, phase, target component ID, source proof, and
+  evidence-authority ID resolves; direct, authority, and indirect orientation
+  matches `D-H03-005`;
 - all blocker IDs have an accountable owner class;
 - every source-hard-coded registry ID is source-correct;
 - every registration-order ID matches its reviewed precedent and is encoded as
@@ -752,7 +951,13 @@ configuration engine.
 - omitted components have no artifact/route/capability surface;
 - disabled components enumerate their negative surfaces;
 - deferred and blocked are distinct;
-- Track 8 M0 cannot be represented as passed while an integrated stop remains;
+- the CCIP-promotion phase is confined to the exact six reviewed surfaces,
+  while `S-001-CCIP-CAP` and `S-002-CCIP-CAP` are explicitly disabled from
+  launch continuously through that promotion checkpoint;
+- the reward-activation phase has zero `SurfaceRecord` members and appears
+  only on the separate reward `PromotionRecord`;
+- owner-closed Track 8 M0 is represented closed without representing any
+  later M1-M5 gate as passed;
 - Base `config/BluePrint.py` is unchanged;
 - integrated H-02 Base regression remains green; and
 - mutation cases fail closed with stable diagnostics.
@@ -769,17 +974,34 @@ At minimum prove:
   manifest-record expectation;
 - zero cannot satisfy a required symbolic field;
 - every disabled scaffold has exact negative capabilities;
+- RipeHq's source-default `mintEnabled=True` is represented with its required
+  pre-activation `False` transition; the five pre-PSM post-registration HQ
+  target tuples are exact and remain withheld before their gates; the PSM
+  GREEN tuple is a separately blocked final capability-tuple mutation; and
+  global re-enable is represented as the owner-approved final launch
+  activation, with execution and proof still blocked;
+- Teller's initial pause choice remains symbolic, owner-attributed, and
+  impossible to default or infer;
+- each approved LP has an explicit zero-LTV configuration requirement while
+  its borrowing route is separately omitted, and both LPs reject
+  `depositFromTrusted` and every Department/direct-vault bypass while allowing
+  only ordinary `deposit`/`depositMany` entrypoints;
 - no Stock surface is enabled before its integrated Track 8 gates;
 - `canRedeemCollateral=false` and
   `shouldSwapInStabPools=false` remain required for Stock assets;
-- PSM mint, redeem, auto-deposit, yield, GREEN capability, approvals, and Teller
-  routes remain absent when disabled;
-- SavingsGreen/Stability paths remain inert while their decision is open or
-  while an inert posture is selected;
-- HR, contributors, bonds, rewards, and Underscore remain inert;
+- PSM mint, redeem, yield, GREEN capability, approvals, and Teller routes
+  remain absent when disabled; auto-deposit must be changed from its source
+  default `True` to `False` through an approved pre-activation action;
+- SavingsGreen deposits/withdrawals and the GREEN Stability path remain
+  required, while Stock and CCIP paths remain disabled or omitted exactly as
+  selected;
+- HR, contributors, bonds, and Underscore remain inert; every reward surface
+  is launch-disabled and the possible seven-day promotion is a separate,
+  deferred record that cannot self-activate;
 - unsupported oracles are absent and their semantic slots reserved;
-- CCIP pools, registration, remote routes, and mint capabilities remain
-  absent;
+- CCIP pool artifacts, registration, and remote routes remain absent, while
+  the GREEN/RIPE CCIP mint-burn capabilities remain disabled from launch
+  continuously through the separately reviewed promotion checkpoint;
 - a missing early registry row cannot shift a later semantic ID;
 - a reserved empty slot cannot be filled by a different component; and
 - a blocked row cannot be reclassified by deleting its blocker.
@@ -844,9 +1066,12 @@ green exit code does not waive a missing semantic assertion.
 Before the branch may be considered merge-ready, independent reviewers must:
 
 - inspect every changed line;
-- verify the exact four-file total boundary and three-file implementation/test
-  ownership;
+- verify the exact two-file Phase A documentation package is committed and
+  integrated as the new baseline before Phase B, then verify Phase B changes
+  exactly the evidence record plus the three implementation/test files;
 - inspect the complete Phase A evidence and approval provenance;
+- confirm the provenance-only amendment has an independent exact-diff/hash
+  confirmation and that the brief stayed byte-identical to its approved hash;
 - confirm the Phase A CM/topology conclusions and the implemented blueprint
   agree, with any approved revision recorded in the same commit;
 - compare all CM-001–060 records with integrated authority;
@@ -874,7 +1099,9 @@ After Gate 1 approval:
 1. fetch and compare current `rh`;
 2. stop if H-02, Track 8, S5, or another controlling input changed;
 3. reconcile only with explicit owner authorization;
-4. refresh all hashes and the CM/blocker comparison;
+4. refresh every cited integrated authority hash and the CM/blocker
+   comparison; re-hash any observed mutable cross-track worktree artifact and
+   treat it as non-authoritative until separately reviewed and committed;
 5. rerun H-03, H-02, H-01, S1, S2, Base regression, collection, and full-suite
    validation;
 6. compare the exact diff with Gate 1;
@@ -890,7 +1117,8 @@ either gate.
 Allowed without further owner approval after Phase A checkpoint approval:
 
 - edits to the exact three H-03 implementation/test files;
-- the reviewed approval-provenance update to the Phase A evidence file;
+- the provenance-only Phase A evidence amendment, but only through the
+  independently confirmed exact-diff/hash gate above;
 - offline deterministic tests;
 - local import and schema validation;
 - temporary test directories inside the normal test process; and
@@ -921,12 +1149,14 @@ Stop and return to the owner/reviewers if:
 - integrated authority disagrees on a component or registry identity;
 - an ID classified as registration-order is represented as source-hard-coded,
   or H-05 cannot preserve its reviewed order;
-- SavingsGreen or PSM omission cannot be represented safely without a source
-  change;
+- required SavingsGreen or owner-closed PSM disabled staging cannot be
+  represented safely without a source change;
 - a required field would need a guessed, Base, local, zero, or production
   value;
 - a production address or endpoint would be needed;
 - Track 8 M0 or minimum-containment status cannot remain explicit;
+- a relation record departs from approved `D-H03-005` typed orientation;
+- a launch-order record departs from approved `D-H03-006`;
 - a blocker must be flattened to make a test pass;
 - a registry ID can shift or a semantic slot can be repurposed;
 - the H-02 API requires H-03 to mutate network-profile state;
@@ -965,9 +1195,11 @@ H-03 is complete only when:
 
 - H-02 is integrated and recorded;
 - Phase A receives explicit owner/reviewer approval;
-- the Phase A evidence and approval provenance are durable;
-- the exact four-file total boundary and three-file implementation/test
-  ownership are respected;
+- the Phase A evidence and approval provenance are durable and the
+  provenance-only amendment has independent exact-diff/hash confirmation;
+- the two-file Phase A documentation package is integrated as the Phase B
+  baseline, after which the evidence record plus exactly three
+  implementation/test files are the complete Phase B boundary;
 - both Robinhood profiles consume one shared symbolic graph;
 - CM-001–060 are complete, unique, immutable, and source-backed;
 - all required fields remain symbolic;
@@ -975,6 +1207,11 @@ H-03 is complete only when:
 - Stock launch requirements and open Track 8 gates are both represented
   honestly;
 - sGREEN and PSM topology conclusions have approved evidence;
+- approved `D-H03-005` relation semantics and `D-H03-006` global-mint order
+  are encoded exactly without treating either as artifact or execution
+  approval;
+- LP ordinary-only routing and the reward-state/promotion split are encoded
+  and mutation-tested;
 - source-hard-coded registry semantics cannot shift or be repurposed;
 - registration-order constraints remain explicit inputs to H-05;
 - no production address, Base fallback, zero placeholder, secret, network, or
@@ -985,9 +1222,10 @@ H-03 is complete only when:
 - deliverables are committed to the H-03 branch; and
 - the owner decides whether to integrate.
 
-The agent must report which checklist and M0 items become eligible for owner
-review. The agent must not tick `docs/chains/rh-summary.md`, close M0, or approve
-a deployment graph.
+The agent must report which post-M0 checklist and downstream gates become
+eligible for owner review. M0 is already owner-closed and must not be reopened
+or re-closed. The agent must not tick `docs/chains/rh-summary.md` or approve a
+deployment graph.
 
 ## Completion report
 
@@ -997,9 +1235,13 @@ Report:
 - exact files changed;
 - H-02 integration identity and consumed API;
 - Phase A evidence hash and checkpoint approval provenance;
+- candidate and post-provenance hashes plus the independent provenance-only
+  exact-diff/hash confirmation;
 - CM-001–060 completeness and disposition counts;
 - exact registry-topology proof, including each ID's authority class;
 - SavingsGreen and PSM conclusions;
+- relation-orientation and global-mint owner-decision status;
+- LP ordinary-only and reward-promotion conclusions;
 - Track 8 M0 and Stock blocker state;
 - symbolic-input and no-address proof;
 - negative/mutation tests and exact outcomes;
