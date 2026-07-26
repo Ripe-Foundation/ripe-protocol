@@ -80,6 +80,79 @@ def test_teller_basic_rebalance(
     assert bravo_token.balanceOf(simple_erc20_vault) == initial_vault_bravo + deposit_amount
 
 
+def test_rebalance_after_effects_guard_rejection_rolls_back_every_leg(
+    simple_erc20_vault,
+    alpha_token,
+    bravo_token,
+    alpha_token_whale,
+    bravo_token_whale,
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    teller,
+    performDeposit,
+    vault_book,
+    ledger,
+    mission_control,
+    switchboard_alpha,
+):
+    setGeneralConfig()
+    setAssetConfig(alpha_token)
+    setAssetConfig(bravo_token)
+
+    total = 100 * EIGHTEEN_DECIMALS
+    amount = 25 * EIGHTEEN_DECIMALS
+    performDeposit(bob, total, alpha_token, alpha_token_whale)
+    bravo_token.transfer(bob, total, sender=bravo_token_whale)
+    bravo_token.approve(teller.address, total, sender=bob)
+
+    mission_control.setShouldCheckLastTouch(
+        True,
+        sender=switchboard_alpha.address,
+    )
+    boa.env.time_travel(blocks=1)
+    vault_id = vault_book.getRegId(simple_erc20_vault)
+
+    teller.rebalance(
+        bravo_token,
+        vault_id,
+        alpha_token,
+        vault_id,
+        amount,
+        amount,
+        bob,
+        sender=bob,
+    )
+    before = (
+        alpha_token.balanceOf(bob),
+        bravo_token.balanceOf(bob),
+        simple_erc20_vault.getTotalAmountForUser(bob, alpha_token),
+        simple_erc20_vault.getTotalAmountForUser(bob, bravo_token),
+        ledger.lastTouch(bob),
+    )
+
+    with boa.reverts("one action per block"):
+        teller.rebalance(
+            bravo_token,
+            vault_id,
+            alpha_token,
+            vault_id,
+            amount,
+            amount,
+            bob,
+            sender=bob,
+        )
+
+    after = (
+        alpha_token.balanceOf(bob),
+        bravo_token.balanceOf(bob),
+        simple_erc20_vault.getTotalAmountForUser(bob, alpha_token),
+        simple_erc20_vault.getTotalAmountForUser(bob, bravo_token),
+        ledger.lastTouch(bob),
+    )
+    assert after == before
+
+
 def test_teller_rebalance_partial_amounts(
     simple_erc20_vault,
     alpha_token,

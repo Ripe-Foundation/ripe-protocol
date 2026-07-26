@@ -55,6 +55,52 @@ def test_basic_repay(
     assert green_token.balanceOf(credit_engine) == 0
 
 
+def test_repay_low_risk_succeeds_between_checked_actions_and_rearms_guard(
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    setGeneralDebtConfig,
+    performDeposit,
+    mock_price_source,
+    teller,
+    green_token,
+    ledger,
+    mission_control,
+    switchboard_alpha,
+):
+    setGeneralConfig()
+    setAssetConfig(alpha_token)
+    setGeneralDebtConfig()
+    performDeposit(
+        bob,
+        100 * EIGHTEEN_DECIMALS,
+        alpha_token,
+        alpha_token_whale,
+    )
+    mock_price_source.setPrice(alpha_token, 1 * EIGHTEEN_DECIMALS)
+
+    mission_control.setShouldCheckLastTouch(
+        True,
+        sender=switchboard_alpha.address,
+    )
+    boa.env.time_travel(blocks=1)
+
+    teller.borrow(20 * EIGHTEEN_DECIMALS, bob, False, sender=bob)
+    repay_amount = 5 * EIGHTEEN_DECIMALS
+    green_token.approve(teller, repay_amount, sender=bob)
+    assert teller.repay(repay_amount, bob, False, False, sender=bob)
+
+    debt = ledger.userDebt(bob).amount
+    touch = ledger.lastTouch(bob)
+    with boa.reverts("one action per block"):
+        teller.borrow(1 * EIGHTEEN_DECIMALS, bob, False, sender=bob)
+
+    assert ledger.userDebt(bob).amount == debt
+    assert ledger.lastTouch(bob) == touch
+
+
 def test_repay_zero_amount(
     alpha_token,
     alpha_token_whale,
@@ -730,5 +776,4 @@ def test_repay_with_savings_green_payment_max_amount(
     # verify no regular green tokens remain with bob
     assert green_token.balanceOf(bob) == 0
     assert green_token.balanceOf(credit_engine) == 0
-
 

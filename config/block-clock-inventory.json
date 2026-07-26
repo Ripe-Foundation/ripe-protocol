@@ -34,8 +34,8 @@
     "interfaces"
   ],
   "expectedProductionCounts": {
-    "occurrences": 100,
-    "lines": 95,
+    "occurrences": 99,
+    "lines": 94,
     "files": 17
   },
   "directOccurrences": [
@@ -93,31 +93,15 @@
     {
       "id": "BN-002",
       "path": "contracts/data/Ledger.vy",
-      "function": "checkAndUpdateLastTouch",
+      "function": "_getActionBlock",
       "normalizedExpression": "block.number",
       "ordinalInFunction": 1,
-      "reviewedLine": 207,
-      "reviewedColumn": 41,
-      "reviewedSnippet": "assert self.lastTouch[_user] != block.number # dev: one action per block",
+      "reviewedLine": 229,
+      "reviewedColumn": 16,
+      "reviewedSnippet": "return block.number",
       "category": "true same-number security guard",
       "sourceReference": "docs/chains/rh/block-number-inventory.md#exact-occurrence-coverage-ledger",
-      "semanticReview": {
-        "owner": "protocol/security",
-        "status": "reviewed",
-        "commit": "c3040041a1254a774e0a305060330d6ab9cc04ca"
-      }
-    },
-    {
-      "id": "BN-002",
-      "path": "contracts/data/Ledger.vy",
-      "function": "checkAndUpdateLastTouch",
-      "normalizedExpression": "block.number",
-      "ordinalInFunction": 2,
-      "reviewedLine": 210,
-      "reviewedColumn": 29,
-      "reviewedSnippet": "self.lastTouch[_user] = block.number",
-      "category": "true same-number security guard",
-      "sourceReference": "docs/chains/rh/block-number-inventory.md#exact-occurrence-coverage-ledger",
+      "s5ReviewArtifactSha256": "e2c7b92b3ca51f903e0cdb8eb5c5eda3d6c1f2e644a6ee424ea67fe8e8ea9a76",
       "semanticReview": {
         "owner": "protocol/security",
         "status": "reviewed",
@@ -5129,10 +5113,11 @@
       "matchedText": "per block",
       "normalizedSnippet": "# one action per block",
       "ordinalInFunction": 1,
-      "reviewedLine": 197,
+      "reviewedLine": 208,
       "classification": "production",
       "semanticIds": [],
       "reviewDomain": "cadence-surface",
+      "s5ReviewArtifactSha256": "e2c7b92b3ca51f903e0cdb8eb5c5eda3d6c1f2e644a6ee424ea67fe8e8ea9a76",
       "semanticReview": {
         "owner": "protocol/security",
         "status": "reviewed",
@@ -5144,12 +5129,13 @@
       "function": "checkAndUpdateLastTouch",
       "pattern": "cadence-comment",
       "matchedText": "per block",
-      "normalizedSnippet": "assert self.lastTouch[_user] != block.number # dev: one action per block",
+      "normalizedSnippet": "assert self.lastTouch[_user] != actionBlock # dev: one action per block",
       "ordinalInFunction": 1,
-      "reviewedLine": 207,
+      "reviewedLine": 242,
       "classification": "production",
       "semanticIds": [],
       "reviewDomain": "cadence-surface",
+      "s5ReviewArtifactSha256": "e2c7b92b3ca51f903e0cdb8eb5c5eda3d6c1f2e644a6ee424ea67fe8e8ea9a76",
       "semanticReview": {
         "owner": "protocol/security",
         "status": "reviewed",
@@ -9579,10 +9565,11 @@
       "matchedText": "per block",
       "normalizedSnippet": "with boa.reverts(\"one action per block\"):",
       "ordinalInFunction": 1,
-      "reviewedLine": 1633,
+      "reviewedLine": 1626,
       "classification": "test",
       "semanticIds": [],
       "reviewDomain": "cadence-surface",
+      "s5ReviewArtifactSha256": "e2c7b92b3ca51f903e0cdb8eb5c5eda3d6c1f2e644a6ee424ea67fe8e8ea9a76",
       "semanticReview": {
         "owner": "protocol/security",
         "status": "reviewed",
@@ -10586,6 +10573,348 @@
       "classification": "test",
       "semanticIds": [],
       "reviewDomain": "cadence-surface",
+      "semanticReview": {
+        "owner": "protocol/security",
+        "status": "reviewed",
+        "commit": "db7ae895d1b32ae6708f2405274c32c1e3f5222e"
+      }
+    },
+    {
+      "path": "contracts/testing/ActionBlockIdentityProbe.vy",
+      "function": "readActionBlocks",
+      "pattern": "block-unit-identifier",
+      "matchedText": "readActionBlocks",
+      "normalizedSnippet": "def readActionBlocks() -> (uint256, uint256):",
+      "ordinalInFunction": 1,
+      "reviewedLine": 30,
+      "classification": "testing",
+      "semanticIds": [],
+      "reviewDomain": "cadence-surface",
+      "s5ReviewArtifactSha256": "e2c7b92b3ca51f903e0cdb8eb5c5eda3d6c1f2e644a6ee424ea67fe8e8ea9a76",
+      "semanticReview": {
+        "owner": "protocol/security",
+        "status": "reviewed",
+        "commit": "db7ae895d1b32ae6708f2405274c32c1e3f5222e"
+      }
+    },
+    {
+      "path": "scripts/probes/action_block_identity_probe.py",
+      "function": "preflight",
+      "pattern": "block-default-key",
+      "matchedText": "\"latest_block\":",
+      "normalizedSnippet": "\"latest_block\": {",
+      "ordinalInFunction": 1,
+      "reviewedLine": 979,
+      "classification": "tooling",
+      "semanticIds": [],
+      "reviewDomain": "cadence-surface",
+      "s5ReviewArtifactSha256": "e2c7b92b3ca51f903e0cdb8eb5c5eda3d6c1f2e644a6ee424ea67fe8e8ea9a76",
+      "semanticReview": {
+        "owner": "protocol/security",
+        "status": "reviewed",
+        "commit": "db7ae895d1b32ae6708f2405274c32c1e3f5222e"
+      }
+    },
+    {
+      "path": "scripts/probes/action_block_identity_probe.py",
+      "function": "analyze_observations",
+      "pattern": "block-default-key",
+      "matchedText": "\"child_block\":",
+      "normalizedSnippet": "\"child_block\": child,",
+      "ordinalInFunction": 1,
+      "reviewedLine": 1594,
+      "classification": "tooling",
+      "semanticIds": [],
+      "reviewDomain": "cadence-surface",
+      "s5ReviewArtifactSha256": "e2c7b92b3ca51f903e0cdb8eb5c5eda3d6c1f2e644a6ee424ea67fe8e8ea9a76",
+      "semanticReview": {
+        "owner": "protocol/security",
+        "status": "reviewed",
+        "commit": "db7ae895d1b32ae6708f2405274c32c1e3f5222e"
+      }
+    },
+    {
+      "path": "scripts/probes/action_block_identity_probe.py",
+      "function": "analyze_observations",
+      "pattern": "block-default-key",
+      "matchedText": "\"first_child_block\":",
+      "normalizedSnippet": "\"first_child_block\": first_block,",
+      "ordinalInFunction": 1,
+      "reviewedLine": 1611,
+      "classification": "tooling",
+      "semanticIds": [],
+      "reviewDomain": "cadence-surface",
+      "s5ReviewArtifactSha256": "e2c7b92b3ca51f903e0cdb8eb5c5eda3d6c1f2e644a6ee424ea67fe8e8ea9a76",
+      "semanticReview": {
+        "owner": "protocol/security",
+        "status": "reviewed",
+        "commit": "db7ae895d1b32ae6708f2405274c32c1e3f5222e"
+      }
+    },
+    {
+      "path": "scripts/probes/action_block_identity_probe.py",
+      "function": "analyze_observations",
+      "pattern": "block-default-key",
+      "matchedText": "\"second_child_block\":",
+      "normalizedSnippet": "\"second_child_block\": second_block,",
+      "ordinalInFunction": 1,
+      "reviewedLine": 1612,
+      "classification": "tooling",
+      "semanticIds": [],
+      "reviewDomain": "cadence-surface",
+      "s5ReviewArtifactSha256": "e2c7b92b3ca51f903e0cdb8eb5c5eda3d6c1f2e644a6ee424ea67fe8e8ea9a76",
+      "semanticReview": {
+        "owner": "protocol/security",
+        "status": "reviewed",
+        "commit": "db7ae895d1b32ae6708f2405274c32c1e3f5222e"
+      }
+    },
+    {
+      "path": "scripts/probes/action_block_identity_probe.py",
+      "function": "analyze_observations",
+      "pattern": "block-default-key",
+      "matchedText": "\"distinct_child_blocks\":",
+      "normalizedSnippet": "\"distinct_child_blocks\": len(set(arb_values)),",
+      "ordinalInFunction": 1,
+      "reviewedLine": 1646,
+      "classification": "tooling",
+      "semanticIds": [],
+      "reviewDomain": "cadence-surface",
+      "s5ReviewArtifactSha256": "e2c7b92b3ca51f903e0cdb8eb5c5eda3d6c1f2e644a6ee424ea67fe8e8ea9a76",
+      "semanticReview": {
+        "owner": "protocol/security",
+        "status": "reviewed",
+        "commit": "db7ae895d1b32ae6708f2405274c32c1e3f5222e"
+      }
+    },
+    {
+      "path": "tests/core/creditEngine/test_credit_borrow.py",
+      "function": "test_borrow_guard_runs_before_credit_effects_and_rejects_second_action",
+      "pattern": "cadence-comment",
+      "matchedText": "per block",
+      "normalizedSnippet": "with boa.reverts(\"one action per block\"):",
+      "ordinalInFunction": 1,
+      "reviewedLine": 98,
+      "classification": "test",
+      "semanticIds": [],
+      "reviewDomain": "cadence-surface",
+      "s5ReviewArtifactSha256": "e2c7b92b3ca51f903e0cdb8eb5c5eda3d6c1f2e644a6ee424ea67fe8e8ea9a76",
+      "semanticReview": {
+        "owner": "protocol/security",
+        "status": "reviewed",
+        "commit": "db7ae895d1b32ae6708f2405274c32c1e3f5222e"
+      }
+    },
+    {
+      "path": "tests/core/creditEngine/test_credit_repay.py",
+      "function": "test_repay_low_risk_succeeds_between_checked_actions_and_rearms_guard",
+      "pattern": "cadence-comment",
+      "matchedText": "per block",
+      "normalizedSnippet": "with boa.reverts(\"one action per block\"):",
+      "ordinalInFunction": 1,
+      "reviewedLine": 97,
+      "classification": "test",
+      "semanticIds": [],
+      "reviewDomain": "cadence-surface",
+      "s5ReviewArtifactSha256": "e2c7b92b3ca51f903e0cdb8eb5c5eda3d6c1f2e644a6ee424ea67fe8e8ea9a76",
+      "semanticReview": {
+        "owner": "protocol/security",
+        "status": "reviewed",
+        "commit": "db7ae895d1b32ae6708f2405274c32c1e3f5222e"
+      }
+    },
+    {
+      "path": "tests/core/teller/test_teller_action_block.py",
+      "function": "test_external_housekeeping_valid_caller_can_select_victim_and_risk_flag",
+      "pattern": "cadence-comment",
+      "matchedText": "per block",
+      "normalizedSnippet": "with boa.reverts(\"one action per block\"):",
+      "ordinalInFunction": 1,
+      "reviewedLine": 124,
+      "classification": "test",
+      "semanticIds": [],
+      "reviewDomain": "cadence-surface",
+      "s5ReviewArtifactSha256": "e2c7b92b3ca51f903e0cdb8eb5c5eda3d6c1f2e644a6ee424ea67fe8e8ea9a76",
+      "semanticReview": {
+        "owner": "protocol/security",
+        "status": "reviewed",
+        "commit": "db7ae895d1b32ae6708f2405274c32c1e3f5222e"
+      }
+    },
+    {
+      "path": "tests/core/teller/test_teller_rebalance.py",
+      "function": "test_rebalance_after_effects_guard_rejection_rolls_back_every_leg",
+      "pattern": "cadence-comment",
+      "matchedText": "per block",
+      "normalizedSnippet": "with boa.reverts(\"one action per block\"):",
+      "ordinalInFunction": 1,
+      "reviewedLine": 134,
+      "classification": "test",
+      "semanticIds": [],
+      "reviewDomain": "cadence-surface",
+      "s5ReviewArtifactSha256": "e2c7b92b3ca51f903e0cdb8eb5c5eda3d6c1f2e644a6ee424ea67fe8e8ea9a76",
+      "semanticReview": {
+        "owner": "protocol/security",
+        "status": "reviewed",
+        "commit": "db7ae895d1b32ae6708f2405274c32c1e3f5222e"
+      }
+    },
+    {
+      "path": "tests/core/teller/test_teller_withdraw.py",
+      "function": "test_low_risk_deposit_arms_same_action_block_withdraw_rejection",
+      "pattern": "cadence-comment",
+      "matchedText": "per block",
+      "normalizedSnippet": "with boa.reverts(\"one action per block\"):",
+      "ordinalInFunction": 1,
+      "reviewedLine": 114,
+      "classification": "test",
+      "semanticIds": [],
+      "reviewDomain": "cadence-surface",
+      "s5ReviewArtifactSha256": "e2c7b92b3ca51f903e0cdb8eb5c5eda3d6c1f2e644a6ee424ea67fe8e8ea9a76",
+      "semanticReview": {
+        "owner": "protocol/security",
+        "status": "reviewed",
+        "commit": "db7ae895d1b32ae6708f2405274c32c1e3f5222e"
+      }
+    },
+    {
+      "path": "tests/core/teller/test_teller_withdraw.py",
+      "function": "test_checked_withdraw_rejects_second_same_action_block_and_rolls_back",
+      "pattern": "cadence-comment",
+      "matchedText": "per block",
+      "normalizedSnippet": "with boa.reverts(\"one action per block\"):",
+      "ordinalInFunction": 1,
+      "reviewedLine": 165,
+      "classification": "test",
+      "semanticIds": [],
+      "reviewDomain": "cadence-surface",
+      "s5ReviewArtifactSha256": "e2c7b92b3ca51f903e0cdb8eb5c5eda3d6c1f2e644a6ee424ea67fe8e8ea9a76",
+      "semanticReview": {
+        "owner": "protocol/security",
+        "status": "reviewed",
+        "commit": "db7ae895d1b32ae6708f2405274c32c1e3f5222e"
+      }
+    },
+    {
+      "path": "tests/data/test_ledger_action_block.py",
+      "function": "test_arb_sys_identity_not_native_block_controls_equality",
+      "pattern": "cadence-comment",
+      "matchedText": "per block",
+      "normalizedSnippet": "with boa.reverts(\"one action per block\"):",
+      "ordinalInFunction": 1,
+      "reviewedLine": 155,
+      "classification": "test",
+      "semanticIds": [],
+      "reviewDomain": "cadence-surface",
+      "s5ReviewArtifactSha256": "e2c7b92b3ca51f903e0cdb8eb5c5eda3d6c1f2e644a6ee424ea67fe8e8ea9a76",
+      "semanticReview": {
+        "owner": "protocol/security",
+        "status": "reviewed",
+        "commit": "db7ae895d1b32ae6708f2405274c32c1e3f5222e"
+      }
+    },
+    {
+      "path": "tests/data/test_ledger_action_block.py",
+      "function": "test_arb_sys_preserves_low_high_and_high_low_high_ordering",
+      "pattern": "cadence-comment",
+      "matchedText": "per block",
+      "normalizedSnippet": "with boa.reverts(\"one action per block\"):",
+      "ordinalInFunction": 1,
+      "reviewedLine": 191,
+      "classification": "test",
+      "semanticIds": [],
+      "reviewDomain": "cadence-surface",
+      "s5ReviewArtifactSha256": "e2c7b92b3ca51f903e0cdb8eb5c5eda3d6c1f2e644a6ee424ea67fe8e8ea9a76",
+      "semanticReview": {
+        "owner": "protocol/security",
+        "status": "reviewed",
+        "commit": "db7ae895d1b32ae6708f2405274c32c1e3f5222e"
+      }
+    },
+    {
+      "path": "tests/data/test_ledger_action_block.py",
+      "function": "test_arb_sys_preserves_low_high_and_high_low_high_ordering",
+      "pattern": "cadence-comment",
+      "matchedText": "per block",
+      "normalizedSnippet": "with boa.reverts(\"one action per block\"):",
+      "ordinalInFunction": 2,
+      "reviewedLine": 197,
+      "classification": "test",
+      "semanticIds": [],
+      "reviewDomain": "cadence-surface",
+      "s5ReviewArtifactSha256": "e2c7b92b3ca51f903e0cdb8eb5c5eda3d6c1f2e644a6ee424ea67fe8e8ea9a76",
+      "semanticReview": {
+        "owner": "protocol/security",
+        "status": "reviewed",
+        "commit": "db7ae895d1b32ae6708f2405274c32c1e3f5222e"
+      }
+    },
+    {
+      "path": "tests/data/test_ledger_action_block.py",
+      "function": "test_arb_sys_keeps_users_isolated_within_one_action_block",
+      "pattern": "cadence-comment",
+      "matchedText": "per block",
+      "normalizedSnippet": "with boa.reverts(\"one action per block\"):",
+      "ordinalInFunction": 1,
+      "reviewedLine": 215,
+      "classification": "test",
+      "semanticIds": [],
+      "reviewDomain": "cadence-surface",
+      "s5ReviewArtifactSha256": "e2c7b92b3ca51f903e0cdb8eb5c5eda3d6c1f2e644a6ee424ea67fe8e8ea9a76",
+      "semanticReview": {
+        "owner": "protocol/security",
+        "status": "reviewed",
+        "commit": "db7ae895d1b32ae6708f2405274c32c1e3f5222e"
+      }
+    },
+    {
+      "path": "tests/data/test_ledger_action_block.py",
+      "function": "test_arb_sys_keeps_users_isolated_within_one_action_block",
+      "pattern": "cadence-comment",
+      "matchedText": "per block",
+      "normalizedSnippet": "with boa.reverts(\"one action per block\"):",
+      "ordinalInFunction": 2,
+      "reviewedLine": 217,
+      "classification": "test",
+      "semanticIds": [],
+      "reviewDomain": "cadence-surface",
+      "s5ReviewArtifactSha256": "e2c7b92b3ca51f903e0cdb8eb5c5eda3d6c1f2e644a6ee424ea67fe8e8ea9a76",
+      "semanticReview": {
+        "owner": "protocol/security",
+        "status": "reviewed",
+        "commit": "db7ae895d1b32ae6708f2405274c32c1e3f5222e"
+      }
+    },
+    {
+      "path": "tests/probes/test_action_block_identity_probe.py",
+      "function": "test_probe_emits_native_and_arb_sys_values_from_compatible_double",
+      "pattern": "block-unit-identifier",
+      "matchedText": "readActionBlocks",
+      "normalizedSnippet": "native_view, arb_view = probe.readActionBlocks()",
+      "ordinalInFunction": 1,
+      "reviewedLine": 310,
+      "classification": "test",
+      "semanticIds": [],
+      "reviewDomain": "cadence-surface",
+      "s5ReviewArtifactSha256": "e2c7b92b3ca51f903e0cdb8eb5c5eda3d6c1f2e644a6ee424ea67fe8e8ea9a76",
+      "semanticReview": {
+        "owner": "protocol/security",
+        "status": "reviewed",
+        "commit": "db7ae895d1b32ae6708f2405274c32c1e3f5222e"
+      }
+    },
+    {
+      "path": "tests/vaults/modules/test_stab_vault_claims.py",
+      "function": "test_claim_after_effects_guard_rejection_rolls_back_second_claim",
+      "pattern": "cadence-comment",
+      "matchedText": "per block",
+      "normalizedSnippet": "with boa.reverts(\"one action per block\"):",
+      "ordinalInFunction": 1,
+      "reviewedLine": 530,
+      "classification": "test",
+      "semanticIds": [],
+      "reviewDomain": "cadence-surface",
+      "s5ReviewArtifactSha256": "e2c7b92b3ca51f903e0cdb8eb5c5eda3d6c1f2e644a6ee424ea67fe8e8ea9a76",
       "semanticReview": {
         "owner": "protocol/security",
         "status": "reviewed",
@@ -12343,6 +12672,17 @@
       "path": "contracts/registries/modules/AddressRegistry.vy",
       "classification": "production",
       "contentSha256": "fd359e70f7a24541233cc49ecff791417269d2c4c79abd1585f2464657c6226f",
+      "semanticReview": {
+        "owner": "engineering/tooling",
+        "status": "reviewed",
+        "commit": "db7ae895d1b32ae6708f2405274c32c1e3f5222e"
+      }
+    },
+    {
+      "path": "contracts/testing/ActionBlockIdentityProbe.vy",
+      "classification": "testing",
+      "contentSha256": "95716e4e2b383f2a07826be94d9ee402d263eec522bb4f77efd72a5e5f6eafe5",
+      "s5ReviewArtifactSha256": "e2c7b92b3ca51f903e0cdb8eb5c5eda3d6c1f2e644a6ee424ea67fe8e8ea9a76",
       "semanticReview": {
         "owner": "engineering/tooling",
         "status": "reviewed",
