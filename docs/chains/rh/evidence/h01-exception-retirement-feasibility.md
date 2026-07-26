@@ -2,15 +2,22 @@
 
 Date: 2026-07-25
 
+Reviewer-correction finalization: 2026-07-26
+
 Study baseline: `332ae2bc8e0ce4b694766d6d20759295d9267ec3`
 
-Study worktree: detached, mode-`0700`, created from the exact baseline under
-`/private/tmp`
+Study worktree: mode-`0700` under `/private/tmp`, originally created detached
+from the exact baseline and now on local branch
+`rh-track-7-h1-exception-retirement` at preservation commit
+`37a85b8078f798466f0a315b273a667ad72b02e3`
 
 Integration worktree: `/Users/wigglez/dev/ripe-protocol`, branch `rh`, left
 unchanged at the exact baseline
 
-Status: independent feasibility evidence only; untracked and uncommitted
+Status: independent feasibility evidence only. The earlier artifact is
+preserved in local commit `37a85b8078f798466f0a315b273a667ad72b02e3`;
+the current reviewer-correction delta is unstaged and uncommitted. No remote
+preservation is claimed.
 
 ## Decision summary
 
@@ -64,8 +71,10 @@ The integration `rh` worktree was clean at the requested commit before the
 study and remained clean at that commit after evidence collection. Candidate
 locks, environments, resolver caches, audit caches, Boa caches, pytest
 basetemps, generated ABIs, and probe inputs were created only in a private
-mode-`0700` task root under `/private/tmp`. The only repository artifact is
-this untracked report in the detached study worktree.
+mode-`0700` task root under `/private/tmp`. This report is the only repository
+artifact produced by the study. Its earlier state is preserved in local commit
+`37a85b8078f798466f0a315b273a667ad72b02e3`; the present reviewer corrections
+are the worktree's sole unstaged and uncommitted delta.
 
 The study did not:
 
@@ -75,7 +84,13 @@ The study did not:
 - edit a requirement, lock, test, contract, migration, manifest, production
   source file, existing evidence file, or committed ABI;
 - contact a live chain or explorer;
-- commit, stage, push, merge, deploy, sign, or broadcast.
+- push, merge, deploy, sign, or broadcast.
+
+After study completion, local commit
+`37a85b8078f798466f0a315b273a667ad72b02e3` preserved only this report. That
+preservation commit and the current reviewer corrections do not implement or
+authorize a dependency change, retire an exception, or establish
+GitHub/Dependabot alert closure.
 
 `ETHERSCAN_API_KEY=local-placeholder` satisfied the repository's
 collection-time guard only. No explorer request was made.
@@ -90,9 +105,15 @@ was not treated as the authority for these values.
 |---|---|---|---|---|
 | Click command injection, `PYSEC-2026-2132`, CVE-2026-7246 / GHSA-47fr-3ffg-hgmw | versions before `8.3.3` | `8.3.3` | `a2bf429bb3033c89fa4936ffb35d5cb471e3719e1f3c8a7c3fff0b8314305613` | [PyPA advisory YAML](https://raw.githubusercontent.com/pypa/advisory-database/main/vulns/click/PYSEC-2026-2132.yaml), [Click 8.3.3 on PyPI](https://pypi.org/project/click/8.3.3/) |
 | Pygments Archetype lexer ReDoS, `PYSEC-2026-2987`, CVE-2026-4539 / GHSA-5239-wwwm-4pmq | `<2.20.0` | `2.20.0` | `81a9e26dd42fd28a23a2d169d86d7ac03b46e2f8b59ed4698fb4785f946d0176` | [GitHub advisory](https://github.com/advisories/GHSA-5239-wwwm-4pmq), [Pygments 2.20.0 on PyPI](https://pypi.org/project/Pygments/2.20.0/) |
-| Pymdown Snippets base-path bypass, `PYSEC-2026-2999`, GHSA-62q4-447f-wv8h | `>=10.0.1,<=10.21.2` | `10.21.3` | `d7a5d08014fc571e80ca21dd6f854e31f94c489800350564d55d15b3c41e76b6` | [GitHub advisory](https://github.com/advisories/GHSA-62q4-447f-wv8h), [Pymdown Extensions 10.21.3 on PyPI](https://pypi.org/project/pymdown-extensions/10.21.3/) |
+| Pymdown Snippets base-path bypass, `PYSEC-2026-2999`, CVE-2026-46338 / GHSA-62q4-447f-wv8h | `>=10.0.1,<=10.21.2` | `10.21.3` | `d7a5d08014fc571e80ca21dd6f854e31f94c489800350564d55d15b3c41e76b6` | [GitHub advisory](https://github.com/advisories/GHSA-62q4-447f-wv8h), [Pymdown Extensions 10.21.3 on PyPI](https://pypi.org/project/pymdown-extensions/10.21.3/) |
 | Pymdown b64 local-file disclosure, CVE-2026-61632 / GHSA-9xwg-3r6f-jcx2 | `<=10.21.3` | `11.0.0` | `fbc4acb641814fa9d17521bbd21a5240ef739a662f11c06330c4b78c93e954d6` | [GitHub advisory](https://github.com/advisories/GHSA-9xwg-3r6f-jcx2), [Pymdown Extensions 11.0.0 on PyPI](https://pypi.org/project/pymdown-extensions/11.0.0/) |
 | pytest predictable temporary directory, `PYSEC-2026-1845`, CVE-2025-71176 / GHSA-6w46-j5rx-g56g | `<9.0.3` | `9.0.3` | `2c5efc453d45394fdd706ade797c0a81091eccd1d6e4bccfcd476e2b8e0ab5d9` | [GitHub advisory](https://github.com/advisories/GHSA-6w46-j5rx-g56g), [pytest 9.0.3 on PyPI](https://pypi.org/project/pytest/9.0.3/) |
+
+The cited upstream URLs were fetched on 25 July 2026. Raw HTTP response
+snapshots and response digests were not retained, so re-verification requires
+refetching those primary sources. This report does not assign retrospective
+retrieval hashes or more precise retrieval timestamps to responses that were
+not retained.
 
 The downloaded Pymdown 11.0 wheel was also inspected directly. Its b64
 implementation defaults `restrict_path` to true and introduces `root_path`,
@@ -139,7 +160,14 @@ pip-compile \
 
 Every valid candidate was installed into a new CPython 3.12.0 virtual
 environment with public PyPI and `--no-cache-dir`; every environment then ran
-`python -m pip check`. The no-ignore audit command was:
+`python -m pip check`. The private resolver cache named in the `pip-compile`
+command was used only by `pip-compile` for isolated resolution and download
+metadata. Candidate environment installation separately used
+`--no-cache-dir`. These are complementary boundaries: the former isolates
+resolver inputs and metadata, while the latter prevents candidate installs
+from consuming or populating a pip installation cache.
+
+The no-ignore audit command was:
 
 ```text
 pip-audit \
@@ -220,6 +248,14 @@ authorized boundary. A synthetic lock audit was used only to confirm that
 compatibility evidence.
 
 ## Fresh no-ignore audit
+
+Click and Pymdown b64 were later findings introduced by post-snapshot advisory
+and audit refreshes; they were not members of H-01's original 13-alert
+snapshot. That chronology explains why the current record governs five
+exceptions while the original snapshot contained alert rows for only
+Pygments, pytest, and Pymdown Snippets among them. It does not imply that any
+alert closed, changed state, or was otherwise mutated, and it does not turn
+candidate audit results into GitHub/Dependabot state evidence.
 
 | Candidate | Audit result | Relevant remaining rows |
 |---|---|---|
@@ -453,6 +489,16 @@ hashes was
 in every environment. Generated `Lootbox.json` and the committed production ABI
 were byte-identical at
 `33aadc219718332ef9163f0b85c8e6fba93735d149db3fb0bb2e3fab814db17c`.
+
+This study's aggregate ABI inventory digest
+`c49c61ad006d223a1bf13e2d26c5862eda82128f3cc640501c278c28f69b1dde`
+and integrated H-01's aggregate digest
+`47942174d74fc35e33ee8ae44c0cdea57ebb29685d747f90c932c4c8fd828d9a`
+use different canonicalization constructions and are therefore not directly
+comparable. They must not be described as identifying the same serialized
+aggregate. ABI equality instead rests on the matching 49 relative files and
+their per-file bytes, the same 28 skips, the same nine known failures, and the
+matching `Lootbox.json`.
 
 These results show no candidate compiler output, ABI identity, creation/runtime
 bytecode, or committed production artifact drift. They do not authorize a
@@ -783,9 +829,17 @@ cache.
 After this report recorded the reproducible identities and results, the private
 resolver, audit, install, download, ABI, pytest, pip, and Boa task root
 `/private/tmp/h01-retirement-study.ARKr37` was resolved as a mode-`0700`
-non-symlink directory, deleted recursively, and verified absent. The detached
+non-symlink directory, deleted recursively, and verified absent. The study
 worktree's ignored `.hypothesis`, `__pycache__`, and bytecode outputs were also
-deleted and verified absent. The detached exact-baseline worktree remains only
-because it contains this authorized untracked evidence artifact.
+deleted and verified absent.
+
+The mode-`0700` worktree now remains on local branch
+`rh-track-7-h1-exception-retirement` at preservation commit
+`37a85b8078f798466f0a315b273a667ad72b02e3`. The current reviewer-correction
+delta affects only this report and is intentionally unstaged and uncommitted.
+Because the worktree is under `/private/tmp`, that delta is volatile and can be
+lost if the worktree is removed or the temporary filesystem is cleared. The
+earlier commit is preserved only in the local repository; no pushed or other
+durable copy is claimed.
 
 Cleanup status: **complete and verified**
