@@ -24,10 +24,14 @@
 **Current-`rh` convergence refresh captured:** `2026-07-26T22:34:34Z`
 (`2026-07-26T16:34:34-0600`, MDT)
 
-**Status:** **Phase A closed when the independently reviewed evidence was
-committed byte-for-byte at `2935f0e2fc7c1f0a783e5b822ca560dc11f375f5`;
-this lifecycle-only follow-up is unstaged for independent exact-hash review;
-Phase B remains unauthorized and unstarted**
+**Status:** **Phase A closed at
+`2935f0e2fc7c1f0a783e5b822ca560dc11f375f5`; the lifecycle/provenance
+reconciliation was independently approved at SHA-256
+`7591dece2099af9e7a79af716c134a4600e1c69d7c2bc408e0d5b55eb7d1339b`
+and those exact bytes were first committed and pushed at
+`1805aabb9bcaf03ca411a75abb35743a7a4f266e`; that reconciliation did not
+reopen Phase A or authorize Phase B; Phase B remains unauthorized and
+unstarted**
 
 **Review and re-review correction date:** 25 July 2026
 
@@ -58,11 +62,13 @@ Phase B remains unauthorized and unstarted**
 **Current `rh` tree:** `d0a6048d902a035bf69158359dc80e9786792f38`
 
 The durable record itself is the only repository file created in Phase A.
-The current working copy's SHA-256 is reported in the checkpoint response
-rather than embedded here, because embedding a file's own digest would change
-the bytes being hashed. The embedded `9ef48b80...917e` identity is explicitly
-the approved and committed predecessor, not a self-digest claim for this
-follow-up revision.
+Phase A closed at `2935f0e2fc7c1f0a783e5b822ca560dc11f375f5`.
+The later lifecycle/provenance reconciliation was independently approved at
+SHA-256
+`7591dece2099af9e7a79af716c134a4600e1c69d7c2bc408e0d5b55eb7d1339b`,
+and those exact bytes were first committed and pushed at
+`1805aabb9bcaf03ca411a75abb35743a7a4f266e`. Those predecessor identities
+are durable historical anchors, not self-digest claims for later revisions.
 
 Sections 1 through 12 retain the historical 25 July Phase A evidence and
 commands, with current-disposition annotations where their original
@@ -200,11 +206,13 @@ statement of independent exact-hash approval and the exact commit
 authorization; this record does not invent a reviewer identity or claim
 access to a separate review artifact that the transcript does not contain.
 
-The current working copy changes only lifecycle, provenance, Git-state, and
-current-baseline wording on top of the closed Phase A commit. It is deliberately
-unstaged for a new independent exact-hash review before any later
-documentation-only commit. That follow-up review is not a condition that
-reopens Phase A and is not Phase B authorization.
+The lifecycle/provenance reconciliation changed only lifecycle, provenance,
+Git-state, and current-baseline wording on top of the closed Phase A commit.
+It was independently approved at SHA-256
+`7591dece2099af9e7a79af716c134a4600e1c69d7c2bc408e0d5b55eb7d1339b`,
+and those exact bytes were first committed and pushed at
+`1805aabb9bcaf03ca411a75abb35743a7a4f266e`. That reconciliation did not
+reopen Phase A or authorize Phase B.
 
 The two earlier evidence snapshots that were never committed remain preserved
 for auditability:
@@ -663,10 +671,12 @@ The following limitations remain controlling:
 - nothing here establishes a later Teller headroom policy or precedent.
 
 The owner questions are approved, and the exact-hash review and one-file
-evidence commit that closed Phase A are complete. The current
-lifecycle/provenance edit remains deliberately unstaged for independent
-exact-hash review before any later documentation-only commit; that review
-does not reopen Phase A. The still-pending gates are:
+evidence commit that closed Phase A are complete. The lifecycle/provenance
+reconciliation was independently approved at SHA-256
+`7591dece2099af9e7a79af716c134a4600e1c69d7c2bc408e0d5b55eb7d1339b`,
+and those exact bytes were first committed and pushed at
+`1805aabb9bcaf03ca411a75abb35743a7a4f266e`. It did not reopen Phase A or
+authorize Phase B. The still-pending gates are:
 
 1. reconcile current `rh` at `8e4a965f...7d98`, S5's final reviewed and
    integrated state, and all overlapping Teller-test effects;
@@ -682,7 +692,7 @@ does not reopen Phase A. The still-pending gates are:
    complete validation;
 6. separately decide whether to authorize a local implementation commit after
    Gate 1; and
-7. retain all existing later merge, Gate 2, deployment, configuration,
+7. retain all existing later push, merge, Gate 2, deployment, configuration,
    signing, broadcasting, live-RPC, activation, and M2-M5 gates.
 
 At this handoff, **Phase B remains unauthorized and unstarted**. This
@@ -785,7 +795,7 @@ The kickoff authorization received from the owner is:
 | Local implementation commit | Pending separate owner authorization |
 | Reconciliation with current `rh` and S5 | Not applicable at the historical checkpoint; local, cached, and live `rh` now converge at `8e4a965f...7d98`, while final S5/current-`rh` reconciliation remains required before separate file-exact Phase B authorization |
 | Gate 2 | Pending |
-| Feature push / merge | Evidence-only feature push later separately authorized and performed at exact commit `2935f0e2...75f5`; merge remains unauthorized and unperformed |
+| Feature push / merge | Evidence-only feature pushes occurred at `2935f0e2...75f5` and `1805aabb...266e` under separate authorization; any later push remains separately gated; merge remains unauthorized and unperformed |
 | Deploy / configure / sign / broadcast / activate | Not authorized; not performed |
 | M2 through M5 | Not authorized; not started |
 
@@ -2320,8 +2330,8 @@ fixed-sGREEN failure construction, CreditEngine live route, and CreditRedeem
 dormancy/refund behavior. That feasibility result is not an official Phase B
 repository implementation. The complete Phase A evidence was independently
 exact-hash approved and committed byte-for-byte at `2935f0e2...75f5`, closing
-Phase A. This unstaged lifecycle-only follow-up requires its own exact-hash
-review before any later documentation commit but does not reopen Phase A.
+Phase A. Any later lifecycle-only follow-up requires its own exact-hash review
+before a documentation commit and does not reopen Phase A or authorize Phase B.
 
 ### 11.2 Historical reachability blocker and owner resolution
 
@@ -2357,7 +2367,7 @@ authorization remain required.
 | `tests/core/teller/test_teller_deposit.py` | Exact candidate covers direct, batch, Gov, trusted callers, fixed-sGREEN failure, CreditEngine, CreditRedeem dormancy/refund, permissions, pause, and atomicity | Byte-identical to baseline; official Phase B edit has not begun |
 | `tests/core/teller/test_teller_rebalance.py` | Exact candidate covers rebalance exact and failure behavior | Byte-identical to baseline; official Phase B edit has not begun |
 | `tests/vaults/test_stock_token_vault_comparison.py` | Exact candidate records both masking baselines, inverts M-01, and proves exact-candidate rejection | Byte-identical to baseline; official Phase B edit has not begun |
-| `docs/chains/rh/evidence/stock-token-m1-exact-receipt.md` | Complete Phase A evidence independently approved at SHA-256 `9ef48b80...917e` and committed byte-for-byte at `2935f0e2...75f5` | Committed at feature `HEAD`; this lifecycle-only working-copy revision is the sole unstaged modification, and the index is empty |
+| `docs/chains/rh/evidence/stock-token-m1-exact-receipt.md` | Complete Phase A evidence independently approved at SHA-256 `9ef48b80...917e` and committed byte-for-byte at `2935f0e2...75f5` | Phase A evidence was first committed at `2935f0e2fc7c1f0a783e5b822ca560dc11f375f5`; the independently approved lifecycle reconciliation at SHA-256 `7591dece...1339b` was first committed and pushed at `1805aabb9bcaf03ca411a75abb35743a7a4f266e`; official Phase B production/test implementation remains unstarted |
 
 The exact preserved four-file candidate proves the Teller-only mechanism
 within the approved four-file Phase B production/test ceiling:
@@ -2492,9 +2502,9 @@ The historical decision list now has these dispositions:
 6. **Phase A closure — complete.** The task transcript records independent
    exact-hash approval of evidence SHA-256 `9ef48b80...917e`; the exact bytes
    were committed as the sole file in `2935f0e2...75f5`, closing Phase A, and
-   were later preserved on the remote feature branch. This unstaged
-   lifecycle-only follow-up needs a new exact-hash review before any later
-   documentation commit but does not reopen Phase A.
+   were later preserved on the remote feature branch. Any later lifecycle-only
+   follow-up requires separate exact-hash review before a documentation
+   commit; such a follow-up does not reopen Phase A or authorize Phase B.
 7. **Pre-Phase-B reconciliation — still required.** Reconcile current `rh`,
    S5's final integration state, and overlapping Teller-test effects.
 8. **Official Phase B — still unauthorized.** It requires a separate,
