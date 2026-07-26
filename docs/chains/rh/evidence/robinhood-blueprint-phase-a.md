@@ -1,13 +1,28 @@
 # Track 7 H-03 Robinhood blueprint — Phase A checkpoint
 
-**Status:** Phase A analysis and the R6 correction are complete, but the R6
-schema, inventories, corrected brief, and exact bytes remain pending
-independent complete-file review and exact-hash owner approval.
-`D-H03-001` through `D-H03-003` remain approved where their conclusions are
-unchanged. `D-H03-004` and R1-R5 are superseded by pending
-`D-H03-004-R6`; R5 was rejected and is superseded. Owner decisions
-`D-H03-005` and `D-H03-006` are approved and are encoded below; neither
-decision approves the R6 artifact. Phase B remains unauthorized.
+**Status:** The complete R6 Phase A package and `D-H03-004-R6` were approved
+at exact brief SHA-256
+`f528cc474c5abdf84fec68dbb6c3ec9a2ae92e5ab8dc0c3d2703388da676cce5`
+and pre-provenance evidence SHA-256
+`9b8bc27522c24ed40cfadb2e594e450ffab2e4f947c036affac7cf9bdacd46ad`.
+The authorized provenance-only amendment produced evidence SHA-256
+`c9724a4b85ff0d8e26505133f845a78cf573910a991a2548e1d8e96afeaa592c`;
+independent exact-diff/hash review approved it, and the two documents were
+published on the R6 feature branch in commit
+`2c8468affaa4301fbe51287d76e9e1c0c5d4fb21`. They are not integrated into
+`rh`.
+
+Post-publication review found stale pre-approval status language in this
+evidence record. The current evidence-only correction necessarily changes
+bytes outside the designated provenance block, so it is a new unapproved
+candidate requiring complete-file independent exact-hash review and fresh
+owner approval before any follow-up commit or integration. The approved brief
+remains byte-identical; its embedded pre-approval posture is preserved as
+historical candidate text, while this evidence record carries the later
+approval, publication, and correction status. `D-H03-005` and `D-H03-006`
+remain approved owner-attested authority, all downstream blockers remain
+open, exact-lock validation has not occurred, and Phase B remains
+unauthorized.
 
 **Prepared:** 25 July 2026; R6 corrected 26 July 2026
 
@@ -183,24 +198,53 @@ coverage, zero reward-surface cardinality explanation, and
 owner-attestation provenance note. It changes no canonical record, ID,
 disposition, lifecycle assignment, count, blocker, owner, evidence authority,
 or proof tuple. The pre-clarification R6 hashes were never approved and are
-superseded by the current clarified R6 candidate.
+superseded by the clarified R6 candidate.
 
-R6 does not approve `D-H03-004-R6`, begin Phase B, modify implementation,
-stage, commit, push, merge, deploy, configure, or perform a live action.
+The owner then approved `D-H03-004-R6` and the complete clarified R6 package
+at exact brief SHA-256
+`f528cc474c5abdf84fec68dbb6c3ec9a2ae92e5ab8dc0c3d2703388da676cce5`
+and evidence SHA-256
+`9b8bc27522c24ed40cfadb2e594e450ffab2e4f947c036affac7cf9bdacd46ad`.
+The authorized provenance-only amendment inserted the decision ID, owner
+role, date, and reviewed hashes; independent review confirmed that reversing
+only that amendment reproduced the approved evidence candidate exactly. The
+post-amendment evidence SHA-256
+`c9724a4b85ff0d8e26505133f845a78cf573910a991a2548e1d8e96afeaa592c`
+and byte-identical brief were committed and pushed only to the R6 feature
+branch in commit `2c8468affaa4301fbe51287d76e9e1c0c5d4fb21`, tree
+`59210354b205f17c996fcdfe6e8af6a7cb756532`, with parent
+`c0d0e708ae4a89ed730615c9eaf2d23a4fecc05d`. `rh` was not changed.
+
+**Post-publication status correction — 26 July 2026.** Review of the published
+commit found that several pre-approval status statements were not reconciled
+with the inserted approval provenance. This correction changes only this
+evidence file but necessarily changes bytes outside the former
+provenance-only block. The published commit remains immutable historical
+provenance. The corrected evidence is a new candidate; it is not approved,
+staged, committed, pushed, or integrated. It must receive complete-file
+independent exact-hash review and fresh owner approval before a follow-up
+documentation commit or integration. This correction does not reopen the
+substantive owner decision at the published hashes, close any downstream
+blocker, satisfy exact-lock validation, authorize integration, or authorize
+Phase B.
 
 ## 1. Scope and checkpoint result
 
-This record is analysis only. It proposes the smallest immutable public API,
-the complete CM-001–060 graph, topology constraints, blocker ownership, and
-Phase B tests. It is not an executable blueprint, address file, defaults or
+This record is analysis only. Its published R6 content specifies the approved
+smallest immutable public API, complete CM-001–060 graph, topology
+constraints, blocker ownership, and Phase B test ceiling. The current
+post-publication status correction does not change that substantive content.
+This record is not an executable blueprint, address file, defaults or
 parameter manifest, migration plan, manifest, production-value freeze,
 deployment approval, or activation approval.
 
 Phase A found no need to change a production contract, H-02 file,
 `config/BluePrint.py`, migration, manifest, history, default, ABI, generated
 artifact, Track 8 record, or `docs/chains/rh-summary.md`. The only Phase A
-worktree changes are this evidence record and the corrected controlling brief
-recorded above.
+paths published in commit `2c8468a…` were this evidence record and the
+corrected controlling brief. The current post-publication correction changes
+only this evidence record; the brief remains byte-identical to the approved
+and published blob.
 
 The proposed component primary-disposition counts are:
 
@@ -338,11 +382,19 @@ absent before creation. The rejected R5 worktree was not reused or modified;
 its two input hashes matched the frozen values in Section 3.2 before they were
 copied byte-for-byte.
 
-At the R6 freeze, local `rh`, cached `origin/rh`, live `origin/rh`, R6 HEAD,
-and merge-base all resolve to `c0d0e708…`. No Phase B module/test exists. The
-R6 worktree contains two unstaged documentation changes: this
-untracked evidence record and the corrected tracked H-03 brief. No other H-03
-path changed.
+At the prepublication R6 candidate freeze, local `rh`, cached `origin/rh`,
+live `origin/rh`, R6 HEAD, and merge-base all resolved to `c0d0e708…`. No
+Phase B module/test existed. The R6 worktree then contained two unstaged
+documentation changes: this untracked evidence record and the corrected
+tracked H-03 brief.
+
+After exact-hash approval, the provenance amendment, independent confirmation,
+and the authorized feature publication, the R6 branch advanced by exactly one
+two-document commit to `2c8468affaa4301fbe51287d76e9e1c0c5d4fb21`;
+local, tracking, and live feature refs matched. Integrated `rh` remained
+`c0d0e708…`. The current post-publication correction leaves the approved brief
+identical to `HEAD` and changes only this evidence file, unstaged. No Phase B
+module/test exists.
 
 Prerequisite integration identities present in that ancestry:
 
@@ -363,10 +415,13 @@ Prerequisite integration identities present in that ancestry:
 Unless explicitly labeled candidate or rejected, hashes are SHA-256 of
 integrated baseline files. The R6 starting hashes prove byte continuity from
 the rejected R5 candidate, and the R5 starting hashes preserve continuity from
-rejected R4b. Final R6 hashes are intentionally reported outside these
-self-referential files and cannot become baseline authority
-until exact-hash review, approval, the provenance-only amendment gate, commit,
-and integration.
+rejected R4b. The approved and post-amendment R6 hashes are recorded in the
+status/history and designated provenance block. Feature publication at
+`2c8468a…` does not make them integrated `rh` authority; documentation
+integration remains separate. Because the current correction changes
+non-provenance bytes, its final hash must be reported outside this
+self-referential file and receive complete-file review and fresh owner
+approval before any follow-up commit or integration.
 
 | Authority/input | SHA-256 |
 | --- | --- |
@@ -576,7 +631,7 @@ warnings are the established assertion-rewrite warnings caused by importing
 Boa before pytest to redirect its compiler cache. R5 does not reinterpret
 this current-environment replay as the exact-lock green release gate.
 
-### 4.4 R6 documentation-only mechanical validation on 26 July 2026
+### 4.4 Prepublication R6 documentation-only mechanical validation on 26 July 2026
 
 R6 installed no dependency and ran no pytest or exact-lock claim. The
 documentation-only validators independently reproduced:
@@ -608,9 +663,10 @@ documentation-only validators independently reproduced:
 - all 793 file/range citations in this complete evidence record resolving
   across 66 files with valid bounds.
 
-The exact two-file Git scope check found only the tracked brief modification
-and untracked evidence record, with no staged path. `git diff --check`
-reported no whitespace error. The required untracked
+At the prepublication candidate freeze, the exact two-file Git scope check
+found only the tracked brief modification and untracked evidence record, with
+no staged path. `git diff --check` reported no whitespace error. The required
+untracked
 `git diff --no-index --check /dev/null <evidence>` returned the expected
 status 1 for a nonempty file and emitted no whitespace diagnostic. Markdown
 fences, tables, local links, and conflict-marker checks passed. The
@@ -619,9 +675,13 @@ literal, RPC value, or credential value; the two historical
 `ETHERSCAN_API_KEY` local-placeholder references are the documented non-secret
 offline test placeholder.
 
-Exact-lock validation remains a required pre-Phase-B gate under Section 3.3.
+The later approval/provenance/publication sequence is recorded in the status,
+Section 3.1, Section 10, and Sections 17–18. The current status correction
+must rerun the applicable documentation checks and be reviewed as a complete
+new evidence candidate. Exact-lock validation remains a required
+pre-Phase-B gate under Section 3.3 and has not been run for R6.
 
-## 5. Integrated H-02 API and proposed H-03 API
+## 5. Integrated H-02 API and approved R6 H-03 API
 
 ### 5.1 H-02 public surface consumed
 
@@ -645,7 +705,7 @@ H-02 lookup case-folds its input. H-03 must first require exact membership in
 its two-ID tuple and only then call `get_profile`; this deliberately rejects
 case variants and any future alias.
 
-### 5.2 Proposed immutable schema
+### 5.2 Approved R6 immutable schema
 
 Phase B may define only these closed enums and frozen, slot-based dataclasses:
 
@@ -794,7 +854,7 @@ derive, append, or silently correct an unseen crosswalk. Any ambiguity,
 missing proof, path-class disagreement, relation-kind/orientation change, or
 inventory change requires a new reviewed Phase A amendment.
 
-### 5.3 Exact proposed public API
+### 5.3 Exact approved R6 public API
 
 `config/robinhood_blueprint.py` should expose:
 
@@ -823,7 +883,7 @@ H-02 `NetworkProfileError`. A caller that validates a network profile and its
 blueprint under one `except RuntimeError` boundary therefore cannot miss an
 H-03 validation failure. H-03 adds no richer exception hierarchy.
 
-Proposed stable validation diagnostics:
+Approved R6 stable validation diagnostics:
 
 | Code | Failure |
 | --- | --- |
@@ -842,7 +902,7 @@ Proposed stable validation diagnostics:
 | `H03_OMISSION_SURFACE` | omitted component has a deployable/callable surface |
 | `H03_TRACK8_GATE` | Stock or other M0-selected surface represented as active before later gates |
 
-### 5.4 Existing and proposed consumers
+### 5.4 Existing and future consumers
 
 The repository-wide use map shows:
 
@@ -905,9 +965,12 @@ wildcards, undeclared aliases, and implied expansion are invalid. The tuple
 binds each executable component row to the reviewed authority that controls
 its disposition without copying narrative rationale into the module. H-09
 must still review the blueprint and this evidence record together.
-`D-H03-004-R6` asks the owner/reviewer to approve this single, deterministic
-schema/evidence boundary. `D-H03-005` and `D-H03-006` approve the modeling
-semantics and launch order only; they do not approve these exact R6 bytes.
+`D-H03-004-R6` approved this single, deterministic schema/evidence boundary at
+the published hashes recorded above. `D-H03-005` and `D-H03-006` separately
+approve the modeling semantics and launch order, and their representations
+were included in that exact R6 package approval. None of those approvals
+extends automatically to the current post-publication evidence correction,
+integration, downstream blocker closure, exact-lock validation, or Phase B.
 
 ### 6.2 Owner IDs
 
@@ -2825,23 +2888,34 @@ lifecycle spellings are invalid and absent from the closed enum.
 
 ## 14. Exact file boundary and diff plan
 
-Phase A currently changes exactly two documentation paths: this evidence
-record and the controlling H-03 brief. Those exact reviewed files must be
-approved through the two-stage hash-continuity gate below, then committed and
-integrated into `rh` first. Their integration commit becomes the new Phase B
-baseline; the brief is not edited again in Phase B.
+The published R6 Phase A package changed exactly two documentation paths:
+this evidence record and the controlling H-03 brief. It is preserved in
+feature commit `2c8468affaa4301fbe51287d76e9e1c0c5d4fb21`; it has not been
+integrated into `rh`. Relative to that published commit, the current
+post-publication correction changes only this evidence record and keeps the
+approved brief byte-identical.
+
+Because this correction necessarily changes status bytes outside the former
+provenance-only block, the revised evidence is a new candidate. Complete-file
+independent exact-hash review and fresh owner approval of its exact hash must
+precede any follow-up commit or integration. After an authorized follow-up
+documentation commit, the corrected two-document package may be considered
+for separately authorized mechanical integration. Only that future
+integration commit can become the Phase B baseline; neither the feature
+publication nor this correction authorizes Phase B.
 
 Relative to that new baseline, the four-file total Phase B ceiling is:
 
 | Phase | File | Purpose |
 | --- | --- | --- |
-| A | `docs/chains/rh/evidence/robinhood-blueprint-phase-a.md` | this complete reviewed Phase A authority and its approval/supersession provenance |
+| A | `docs/chains/rh/evidence/robinhood-blueprint-phase-a.md` | the approved substantive Phase A authority plus approval/supersession provenance; the current revised evidence bytes require complete-file review and fresh owner approval |
 | B | `config/robinhood_blueprint.py` | immutable symbolic schema, complete record tuple, lookup, and validation |
 | C | `tests/deployment/test_robinhood_blueprint.py` | identity, completeness, immutability, purity, topology, address/Base comparison, and mutation tests |
 | D | `tests/deployment/test_robinhood_omissions.py` | H-03-owned negative/disabled/deferred/blocked surface tests |
 
-Phase B authorization permits exactly the final three files above plus one
-same-commit implementation/Gate-1-provenance update to this existing record.
+If Phase B is later separately authorized, its file ceiling permits exactly
+the final three files above plus one same-commit
+implementation/Gate-1-provenance update to this existing record.
 The complete non-relation inventories and R6 explicit typed relation graph
 already exist in Phase A and may not be derived, regrouped, or appended in
 Phase B. Approved `D-H03-005` and `D-H03-006` must be encoded exactly. No
@@ -2850,35 +2924,39 @@ consumer change is needed. `config/BluePrint.py`,
 manifests, H-08's future topology checker, contracts, interfaces, ABIs,
 generated artifacts, and every other file remain outside the ceiling.
 
-Implementation order after approval:
+The published package completed these historical steps:
 
-1. independent exact-hash review covers both Phase A candidate documentation
-   paths, including exact implementation of approved `D-H03-005` and
-   `D-H03-006`;
-2. owner approval names the exact reviewed brief/evidence hashes and exact
-   approved decision IDs;
-3. insert only the dated approval metadata into the designated provenance
-   block in this evidence record; the brief remains byte-identical;
-4. a second independent reviewer hashes both post-amendment files, compares
-   the candidate-to-post-amendment diff exactly, confirms that every evidence
-   change is confined to approval actor/role/date/decision IDs/reviewed
-   hashes, and records the confirmed post-amendment evidence hash; any other
-   byte change voids approval and returns to step 1;
-5. commit and integrate the exact unchanged brief plus the confirmed
-   post-amendment evidence, then pin the exact resulting `rh` commit as the new
-   Phase B baseline;
-6. immediately before Phase B authorization, re-hash every cited integrated
-   authority; re-hash any observed mutable cross-track worktree file and
-   confirm it remains explicitly non-authoritative;
-7. add only the immutable module and two test files;
-8. update this record in the same Phase B commit only for implementation and
-   Gate 1 provenance; any inventory/schema change is a stop and requires a
-   separately reviewed Phase A amendment;
-9. run the complete H-03 Phase E validation serially; and
-10. stop at Gate 1 without push, merge, deployment, or activation. Gate 1
-   re-derives the Phase A source-path and relation authorities and treats any
-   ambiguity, invented path, class disagreement, or source-proof mismatch as
-   a stop.
+1. complete-file independent exact-hash review of the clarified R6 candidate;
+2. exact-hash owner approval of `D-H03-004-R6` and the complete package;
+3. the authorized provenance-only amendment;
+4. independent exact-diff/hash confirmation of the post-amendment bytes; and
+5. the authorized two-document feature commit and push at `2c8468a…`.
+
+The current correction reopens a narrower documentation gate, not the
+substantive R6 decision. Required order from this candidate is:
+
+1. complete-file independent exact-hash review of this revised evidence and
+   confirmation that the brief remains exactly
+   `f528cc474c5abdf84fec68dbb6c3ec9a2ae92e5ab8dc0c3d2703388da676cce5`;
+2. fresh owner approval of the revised evidence hash before any follow-up
+   commit or integration;
+3. separately authorized evidence-only follow-up commit and feature-remote
+   parity;
+4. separately authorized mechanical integration of the corrected
+   two-document package into current `rh`;
+5. current-baseline reconciliation and a fresh re-hash of every cited
+   integrated authority, while every mutable cross-track worktree artifact
+   remains explicitly non-authoritative;
+6. exact-lock validation under the then-approved dependency interval;
+7. disposition of the outstanding deployment-tooling, protocol, security,
+   Track 1/CCIP, Track 8, product/risk, and affected-downstream review domains;
+8. separate explicit owner authorization to begin Phase B;
+9. only then add the immutable module and two test files, with a same-commit
+   implementation/Gate-1 provenance update to this record; and
+10. run the complete H-03 validation serially and stop at Gate 1 without push,
+    merge, deployment, or activation. Gate 1 re-derives the Phase A
+    source-path and relation authorities and treats any ambiguity, invented
+    path, class disagreement, or source-proof mismatch as a stop.
 
 ## 15. Unresolved facts and downstream deadlines
 
@@ -2918,7 +2996,7 @@ These facts are intentionally not H-03 owner decisions:
 | Older CCIP wording calls it a launch target | Current M0 makes it nonblocking and separately promoted; CM-051–053/058 remain deferred and disabled if incomplete |
 | Integrated Track 8 M1 brief at `332ae2bc…` still carries pre-approval status text, while the owner approved M1 decisions and authorized Phase A | H-03 records only the integrated brief and dated owner provenance. Mutable/untracked M1 evidence is non-authoritative, its current conclusions are unknown to H-03, and `B-T8-M1` remains open |
 | Former `ComponentRecord.dependencies` mixed deployment order, replacement facts, and workflow identifiers | Superseded by the `relations` model in Section 7A.3; replacement and future-release facts live in dispositions, blockers, downstream ownership, and evidence |
-| `D-H03-004` and R1-R5 schemas/inventories were invalidated or superseded by successive deep reviews | All are superseded by pending `D-H03-004-R6` in Section 17; no earlier inventory is Phase B authority |
+| `D-H03-004` and R1-R5 schemas/inventories were invalidated or superseded by successive deep reviews | All are superseded by approved `D-H03-004-R6` at the published exact hashes in Section 17; the current status-correction bytes require fresh exact-hash approval, and no earlier inventory is Phase B authority |
 | R3 CM-056 used `migration_history/base-mainnet` and invented `migration_history/robinhood` aliases | R6 preserves the exact H-02 roots `migration_history/base-mainnet/v1`, `migration_history/robinhood-mainnet/v1`, and `migration_history/robinhood-testnet/v1`, with `config/network_profiles.py:387`, `:427`, and `:450` as source authority |
 | R4a/R4b selected invariant-enforcer orientation and grouped Cartesian expansion | Approved `D-H03-005` requires explicit typed caller-to-callee records, governed-contract-to-authority dependencies, no configuration-writer fan-out, and complete proof for separately typed indirect assertions; Section 7A.3 is fully regenerated |
 | R5 `R-282` asserted unsupported EndaomentFunds pause/recovery authority through Switchboard | R6 proves `EndaomentFunds.transfer()` admits only the exact Endaoment address resolved by `Addys._getEndaomentAddr()` through RipeHq, so `R-282` is `CM-047→CM-031` `authority_dependency`; `CM-031→CM-047` remains the separate direct call |
@@ -2939,16 +3017,18 @@ prohibited authority-file revision becomes necessary only if reviewers demand:
 In any of those cases, do not begin Phase B; authorize the owning component
 matrix/Track 8/H-05/validation-plan revision separately.
 
-## 17. Checkpoint decisions requested, ordered by blast radius
+## 17. Checkpoint decision dispositions, ordered by blast radius
 
-Only these H-03 decisions are necessary now. All production values and
-downstream deployment decisions remain with their owners.
+This table records the final R6 decision dispositions and their exact
+boundaries. The current status correction requests no new substantive H-03
+schema decision. All production values and downstream deployment decisions
+remain with their owners.
 
-| Decision ID | Blast radius | Requested owner/reviewer decision | Default if not approved |
+| Decision ID | Disposition / blast radius | Approved or historical content | Current effect |
 | --- | --- | --- | --- |
-| `D-H03-001` | High — component and VaultBook identity | Approve representing the proposed guarded Stock vault without inventing a CM ID, changing CM-024/025, or assigning a VaultBook ID: `I-STOCK-VAULT-ARTIFACT` is consumed by CM-021/026/030/034, while `I-STOCK-VAULT-SLOT` is consumed only by CM-021 | Phase B blocked; return to Track 8/component-matrix/H-05 authority |
-| `D-H03-002` | High — launch graph and negative tests | Approve the current-authority launch disposition: CM-003/022 required active; CM-013 launch reward/points/emission actions disabled; CM-048 required with disabled staging and gated launch activation; replace stale NEG-033 semantics and remove CM-003 from NEG-036's inert-scaffold set. This decision alone owns whether CM-048 is required and how its activation is gated. | Phase B blocked; no silent use of older inert/deferred language |
-| `D-H03-003` | Medium — topology-preserving deployment | Approve required artifacts plus exact disabled sub-surfaces for HQ hard-coded rows 11, 12, 15, 16, and 19; required inert BondBooster dependency; required Switchboard Echo; and, only if CM-048 is approved as required by `D-H03-002`, preserve its HQ row 22 semantic and disabled pre-activation topology. This decision cannot authorize, omit, or activate CM-048 and does not override `D-H03-002`. No zero/unrelated placeholder or sparse-registry assumption is allowed. | Phase B blocked; a shared-source/topology redesign would require separate authority |
+| `D-H03-001` | **APPROVED — High — component and VaultBook identity** | Represent the proposed guarded Stock vault without inventing a CM ID, changing CM-024/025, or assigning a VaultBook ID: `I-STOCK-VAULT-ARTIFACT` is consumed by CM-021/026/030/034, while `I-STOCK-VAULT-SLOT` is consumed only by CM-021 | Track 8/component-matrix/H-05 authority still owns any artifact or ID; Phase B remains unauthorized |
+| `D-H03-002` | **APPROVED — High — launch graph and negative tests** | Current-authority launch disposition: CM-003/022 required active; CM-013 launch reward/points/emission actions disabled; CM-048 required with disabled staging and gated launch activation; stale NEG-033 semantics replaced and CM-003 removed from NEG-036's inert-scaffold set. This decision alone owns whether CM-048 is required and how its activation is gated. | No silent use of older inert/deferred language; execution, configuration, activation, and Phase B remain unauthorized |
+| `D-H03-003` | **APPROVED — Medium — topology-preserving deployment** | Required artifacts plus exact disabled sub-surfaces for HQ hard-coded rows 11, 12, 15, 16, and 19; required inert BondBooster dependency; required Switchboard Echo; and, because CM-048 is required by `D-H03-002`, preservation of its HQ row 22 semantic and disabled pre-activation topology. This decision cannot authorize, omit, or activate CM-048 and does not override `D-H03-002`. No zero/unrelated placeholder or sparse-registry assumption is allowed. | A shared-source/topology redesign still requires separate authority; Phase B remains unauthorized |
 | `D-H03-004` | **SUPERSEDED** | Original schema/API decision. Its still-valid singleton/API/error/address-comparison conclusions are carried into R6; its invalidated schema and crosswalk boundary are not authority | See `D-H03-004-R6` |
 | `D-H03-004-R1` | **SUPERSEDED, NEVER APPROVED** | Historical correction proposal containing the overbroad 112-surface, 135-relation, component-wide source-state, and compressed lifecycle designs | See `D-H03-004-R6` |
 | `D-H03-004-R2` | **SUPERSEDED, NEVER APPROVED** | Historical 85-surface/130-relation/99-path proposal rejected for mutable M1 authority, PSM/LP lifecycle errors, missing exact-receipt producer coverage, missing constructor/path inputs, inexact proof refs, contradictory evidence fields, and fail-open baseline/drift handling | See `D-H03-004-R6` |
@@ -2957,14 +3037,16 @@ downstream deployment decisions remain with their owners.
 | `D-H03-005` | **APPROVED — High blast radius, relation schema semantics** | Direct execution/call relations use caller→callee; governed contract→authority uses `authority_dependency`; controller→target requires a proved direct call; configuration writes do not create downstream-consumer edges; registry admission stays in registry records; operational callers remain direct; indirect assertions require a separately typed complete multi-source proof. | R6 encodes the decision; any semantic deviation requires a new owner decision and Phase A review |
 | `D-H03-006` | **APPROVED — Critical launch-control ordering** | Disable global minting during staging; configure and verify exact Department tuples; make the PSM grant the final capability-tuple mutation; re-verify; then re-enable global minting only as the final launch activation. | Execution/proof remain blocked; the decision supplies no value, address, role, transaction, deployment, or activation authority |
 | `D-H03-004-R5` | **SUPERSEDED, REJECTED, NEVER APPROVED** | R5 carried 94 surfaces, 288 typed relations, and one reward promotion, but independent review rejected unsupported `R-282`, the truncated canonical exclusion rule, and drift from integrated H-04 lifecycle/promotion authority. Rejected hashes are frozen in Sections 3.2 and 18. | See `D-H03-004-R6` |
-| `D-H03-004-R6` | **PENDING — High blast radius, H-03 executable schema and scope boundary** | Approve: (a) exact CM-001–060 deployment dispositions, registry constraints, 94 launch/security surfaces, two separate promotion actions with exact CCIP/reward surface sets, deterministic blocker/owner/evidence references, 103 component-qualified path records, 48 symbolic inputs, 24 assertion IDs, and 288 explicit typed relation records; (b) mutable/uncommitted M1 evidence stays non-authoritative and M1 unknown/blocked; (c) LP deposits and PSM activation are launch-blocking, LP zero-LTV/borrow omission/ordinary-only trusted-route exclusion are distinct, source HQ mint and PSM auto-deposit defaults require reviewed staging actions, Teller initial pause remains symbolic, and exact receipt has its own mutation family; (d) the Section 5.2 closed enums/frozen schemas, including the exact continuous launch-disabled convention for the two token CCIP capabilities and zero reward-activation `SurfaceRecord` cardinality; (e) Sections 7A.1–7A.5 and Section 8; (f) approved `D-H03-005` and `D-H03-006` representation, inclusion/exclusion, and proof rules; (g) the corrected brief; (h) the two-stage exact-hash/provenance-only gate, baseline reset, and four-path Phase B ceiling; and (i) retention of `D-H03-001`–`D-H03-003` only where unchanged | Phase B blocked; no exact R6 bytes or schema are approved |
+| `D-H03-004-R6` | **APPROVED AT PUBLISHED HASHES — High blast radius, H-03 executable schema and scope boundary** | The owner approved: (a) exact CM-001–060 deployment dispositions, registry constraints, 94 launch/security surfaces, two separate promotion actions with exact CCIP/reward surface sets, deterministic blocker/owner/evidence references, 103 component-qualified path records, 48 symbolic inputs, 24 assertion IDs, and 288 explicit typed relation records; (b) mutable/uncommitted M1 evidence stays non-authoritative and M1 unknown/blocked; (c) LP deposits and PSM activation are launch-blocking, LP zero-LTV/borrow omission/ordinary-only trusted-route exclusion are distinct, source HQ mint and PSM auto-deposit defaults require reviewed staging actions, Teller initial pause remains symbolic, and exact receipt has its own mutation family; (d) the Section 5.2 closed enums/frozen schemas, including the exact continuous launch-disabled convention for the two token CCIP capabilities and zero reward-activation `SurfaceRecord` cardinality; (e) Sections 7A.1–7A.5 and Section 8; (f) approved `D-H03-005` and `D-H03-006` representation, inclusion/exclusion, and proof rules; (g) the corrected brief; (h) the two-stage exact-hash/provenance-only gate, baseline reset, and four-path Phase B ceiling; and (i) retention of `D-H03-001`–`D-H03-003` only where unchanged | Approval controls the exact brief/evidence hashes recorded in the provenance block and published commit `2c8468a…`; it does not authorize integration, exact-lock status, downstream closure, implementation, or Phase B, and it does not automatically approve this post-publication correction candidate |
 
 `D-H03-001` through `D-H03-003` remain approved because their exact
 artifact/slot, launch-graph, and topology-preservation conclusions remain
 unchanged. R6 changes the schema and representation around those conclusions,
 not the conclusions themselves. The owner approved `D-H03-005` and
-`D-H03-006` and authorized R6 corrective work, not the final exact bytes or
-`D-H03-004-R6`.
+`D-H03-006`, then approved `D-H03-004-R6` and the complete R6 package at the
+exact candidate hashes recorded in the provenance block. Independent review
+confirmed the post-amendment evidence hash, and the exact two-document package
+was published in feature commit `2c8468a…`.
 
 Like the M1 decision provenance, the `D-H03-005` and `D-H03-006` approvals are
 owner-attested authority supplied to this workstream; they are not
@@ -2972,77 +3054,86 @@ independently derivable or verifiable from repository bytes. A cold reviewer
 must verify that R6 scopes and represents those attestations correctly, not
 claim that Git history proves the approvals.
 
-Deadline for the remaining `D-H03-004-R6` decision: before any Phase B
-authorization. Approval
-must not include or be construed as approval of an address, contract artifact,
-migration, registry transaction, parameter, role, signer, deployment, or
-activation.
+No substantive `D-H03-004-R6` decision remains open for the published hashes.
+The current evidence correction is a new byte candidate because it changes
+status text outside the former provenance-only block. Its exact revised hash
+requires complete-file independent review and fresh owner approval before any
+follow-up commit or integration. That fresh byte approval must not be
+construed as approval of an address, contract artifact, migration, registry
+transaction, parameter, role, signer, deployment, configuration, activation,
+exact-lock completion, downstream blocker closure, or Phase B.
 
-## 18. Phase A status and remaining gates
+## 18. Phase A publication status and remaining gates
 
-Phase A analysis and the R6 correction are complete, but the R6 checkpoint is
-open. The original owner/reviewer checkpoint approved `D-H03-001` through
-`D-H03-004` on 25 July 2026 at reviewed SHA-256
-`29061e3e0142251388ed2d2ffc17fabfad5f118a5d9e3f07752bc6581a1f534a`.
-Successive deep reviews later superseded `D-H03-004` and rejected unapproved
-R1-R5. R4b was rejected at brief SHA-256
-`6c52679aca8e05d806705bc962edd522c5d633c7b54a5e3a74940cd0fd2711af`
-and evidence SHA-256
-`c2d658943b7812651e5cbcbc8b000985666243d8b478672e22fe891c21fe50b5`.
-R5 was rejected at brief SHA-256
-`0fdc573ea4955bf78976f0bcff18accb6bf90857e160bedf3035e37327a7d4a0`
-and evidence SHA-256
-`ad31229f5fda9a262ba00e20482a99a6f486fbf92644b342cf132684f7f82cb5`.
-`D-H03-005` and `D-H03-006` remain approved, but `D-H03-004-R6`, the
-corrected brief, and these exact R6 bytes require fresh exact-hash owner and
-independent adversarial approval.
+The substantive R6 Phase A approval checkpoint closed for the published
+package. The owner approved `D-H03-004-R6`, including the approved
+representations of `D-H03-005` and `D-H03-006`, at brief SHA-256
+`f528cc474c5abdf84fec68dbb6c3ec9a2ae92e5ab8dc0c3d2703388da676cce5`
+and pre-provenance evidence SHA-256
+`9b8bc27522c24ed40cfadb2e594e450ffab2e4f947c036affac7cf9bdacd46ad`.
+The authorized provenance-only amendment and its independent exact-diff/hash
+review produced approved post-amendment evidence SHA-256
+`c9724a4b85ff0d8e26505133f845a78cf573910a991a2548e1d8e96afeaa592c`.
+The exact two-document package was committed and pushed only to the R6 feature
+branch in commit `2c8468affaa4301fbe51287d76e9e1c0c5d4fb21`, tree
+`59210354b205f17c996fcdfe6e8af6a7cb756532`, with local/tracking/live feature
+parity. That publication did not integrate the package into `rh`.
 
-The former parallel H-02 audit condition is closed at integrated correction
-merge `cb3fe739...`. Current baseline `c0d0e708…` advances
-`332ae2bc…` only through two H-01 evidence additions and the integrated
-S6/H-04 brief reconciliation described in Sections 2–3; no contract, H-02,
-H-03, S5, Teller, Ledger, or Track 8 implementation byte changed.
+Post-publication review found stale pre-approval status text in the published
+evidence. Correcting it necessarily changes bytes outside the designated
+provenance-only block. Therefore the current revised evidence is a new,
+unapproved complete-file candidate even though the substantive R6 decision
+remains historical fact at the published hashes. The approved brief remains
+byte-identical. The published commit is preserved without amendment, rewrite,
+or force-push.
 
-The remaining gates before Phase B are:
+Completed historical R6 publication gates:
 
-1. exact-hash independent adversarial re-review of this complete R6 artifact
-   and corrected brief, including all 712 canonical relation-table proof
-   references, all 735 full-Section-7A.3 proof references, 288 explicit
-   records, and 60 component determinations;
-2. immediately before owner approval, re-hash every cited integrated
-   authority and any observed mutable cross-track worktree artifact; any
-   integrated drift or any attempt to promote mutable evidence to authority is
-   a stop requiring refreshed review;
-3. exact-hash owner approval of `D-H03-004-R6`, explicitly preserving approved
-   `D-H03-005` and `D-H03-006` without treating them as production authority;
-4. insert only the approved R6 metadata in the designated provenance block,
-   then obtain independent exact-diff/hash confirmation that the brief remains
-   byte-identical and the evidence changed only by that authorized
-   provenance; any other byte change returns to gate 1;
-5. disposition of the outstanding deployment-tooling, protocol, security,
-   Track 1/CCIP, Track 8, product/risk, and affected-downstream reviews;
-6. commit and integrate the unchanged approved brief plus the independently
-   confirmed post-provenance evidence as the new baseline;
-7. against that integrated baseline and immediately before Phase B, re-hash
-   every cited authority once, verify no controlling conclusion changed, and
-   treat every observed mutable cross-track worktree artifact as
-   non-authoritative; and
-8. separate explicit owner authorization to begin Phase B.
+1. complete-file independent exact-hash review of the clarified R6 candidate;
+2. exact-hash owner approval of `D-H03-004-R6` and the complete Phase A
+   package;
+3. the authorized provenance-only amendment;
+4. independent exact-diff/hash confirmation of the post-amendment bytes; and
+5. the authorized two-document feature commit and feature-branch push.
 
-Phase B is not authorized until all eight close. Once they close without an
-authority change, Phase B may be authorized even while S5, Track 8 M1–M5,
-H-04/H-05/H-08/H-09, rewards, oracle, LP, and CCIP gates remain open: the
-purpose of the blueprint is to preserve those facts as typed blockers, not to
-close them.
+Remaining documentation and integration gates:
 
-Phase A stops here. No Phase B module or test file was created. No production
-address, endpoint, account, credential, signer, signature, private role,
-concrete default/parameter, migration, manifest, history, ABI, generated
-artifact, contract change, live RPC observation, explorer submission,
-verification, governance action, deployment, configuration, activation,
-external-system write, push, merge, commit, stage, or checklist edit occurred.
-No human, protocol, explorer, governance, or owner contact was initiated by
-this Phase A work. Public Git remote identity checks were read-only bootstrap
-activities. The historical R5 exact-lock dependency download remains recorded
-in Section 3.3; R6 installed no dependency and made no protocol or explorer
-request. Neither activity supplied protocol evidence or production data.
+1. complete-file independent exact-hash review of this corrected evidence,
+   including confirmation that no brief byte changed;
+2. fresh owner approval of the corrected evidence hash;
+3. separately authorized evidence-only follow-up commit and feature-remote
+   parity;
+4. current-`rh` reconciliation and re-hash of every cited integrated
+   authority, with mutable cross-track worktrees kept non-authoritative; and
+5. separately authorized mechanical integration of the corrected
+   two-document package into `rh`.
+
+Even after documentation integration, Phase B remains unauthorized until:
+
+1. exact-lock validation succeeds under the then-approved dependency
+   interval;
+2. the outstanding deployment-tooling, protocol, security, Track 1/CCIP,
+   Track 8, product/risk, and affected-downstream review domains receive their
+   required dispositions without flattening the 18 typed blockers;
+3. the integrated current baseline and all controlling authorities are
+   reconciled again immediately before implementation; and
+4. the owner separately and explicitly authorizes Phase B.
+
+Approval of the R6 artifact, feature publication, follow-up correction,
+documentation integration, exact-lock validation, downstream review
+disposition, and Phase B authorization are distinct gates. None may be
+inferred from another. S5, Track 8 M1–M5, H-04/H-05/H-08/H-09, rewards,
+oracle, LP, CCIP, security/operations, and every other Section 6.3 blocker
+remain open unless their owning review closes them separately.
+
+The current correction stops here. It changes only this evidence file and is
+left unstaged and uncommitted; the brief remains byte-identical to
+`f528cc474c5abdf84fec68dbb6c3ec9a2ae92e5ab8dc0c3d2703388da676cce5`.
+No follow-up commit, push, merge, integration, Phase B module/test, dependency
+installation, exact-lock run, production address, endpoint, account,
+credential, signer, signature, private role, concrete default/parameter,
+migration, manifest, history, ABI, generated artifact, contract change, live
+RPC observation, explorer submission, verification, governance action,
+deployment, configuration, activation, or external-system write occurred in
+this correction. Integrated `rh` remains
+`c0d0e708ae4a89ed730615c9eaf2d23a4fecc05d`.
