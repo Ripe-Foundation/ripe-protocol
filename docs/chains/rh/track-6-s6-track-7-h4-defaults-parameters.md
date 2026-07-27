@@ -1,20 +1,28 @@
 # Track 6 S6 / Track 7 H-04: Robinhood Defaults and Parameter Manifest
 
-**Status:** Draft for review. Do not launch this workstream yet. Phase A is
-blocked until the reviewed H-02 implementation, the Track 8 M0 decision
-revision, the reconciled H-03 blueprint, and the applicable S5 decision inputs
-are integrated into `rh`.
+**Status:** Documentation-reconciliation draft for independent review. This
+revision authorizes neither Phase A nor Phase B. H-01, the corrected H-02
+implementation, and owner-closed Track 8 M0 are integrated. The Track 8 M1
+brief is integrated, but M1 implementation remains separately gated. Phase A
+is blocked until the reviewed H-03 implementation is integrated and every
+other prerequisite below is satisfied. S5 remains an independent in-flight
+workstream and does not supply a final source, constructor, ABI, or
+`shouldCheckLastTouch` input to this brief.
 
-**Planning baseline:** `185bd32004121bbb1c60748844c517ea8da0affb`
+**Documentation-reconciliation kickoff commit:**
+`332ae2bc8e0ce4b694766d6d20759295d9267ec3`
 
-**Proposed branch:** `rh-track-6-s6-track-7-h4-defaults-parameters`
+**Kickoff tree:** `f67dc91e47331785837de879b6557b285aec3b1b`
 
-**Proposed worktree:**
+**Reconciliation branch:** `rh-track-6-s6-track-7-h4-defaults-parameters`
+
+**Reconciliation worktree:**
 `/Users/wigglez/dev/ripe-protocol-track-6-s6-track-7-h4-defaults-parameters`
 
 ## Fresh-agent instruction
 
-Implement one combined workstream satisfying both:
+When separately authorized after the gates below close, implement one combined
+workstream satisfying both:
 
 - Track 6 slice S6, “per-chain defaults/bounds/rates”; and
 - Track 7 slice H-04, “`DefaultsRobinhood` and parameter manifest.”
@@ -37,6 +45,11 @@ The work has two hard stages:
 No approval of this brief authorizes Phase B, a production value, a contract
 change, a migration, a deployment, a governance action, a signer, a
 transaction, or an external write.
+
+This documentation reconciliation does not authorize Phase A, creation of the
+Phase A evidence file, baseline test execution, parameter analysis, or a
+recommendation. Independent review of this complete revised brief is the only
+next step authorized here.
 
 ## Why S6 and H-04 are one workstream
 
@@ -77,10 +90,18 @@ No parallel S6 or H-04 branch may own any file reserved here.
 
 ### 1. H-01 and H-02 control the runtime and profile boundary
 
-Phase A may start only after the reviewed H-01 dependency baseline and H-02
-network-profile implementation are integrated into local and remote `rh`.
-The agent must consume H-02's public profile API from integrated source. It
-must not copy or infer that API from a floating worktree.
+The reviewed H-01 payload is integrated at
+`575d47b82055b42da2bddf1535d8076cd7cf4c63`. The original reviewed H-02
+implementation is integrated at
+`6c3052668555a7104ea12a7fb1a7c641c7e6b304`; the reviewed post-integration
+correction is integrated at
+`cb3fe7392c44613aaeec49bd2486369fe0da3556`. Both are ancestors of the
+documentation-reconciliation kickoff commit. These two prerequisite
+integrations are satisfied at this kickoff.
+
+Phase A must consume H-02's public profile API from the then-current integrated
+source. It must not copy or infer that API from a floating worktree or from
+historical status prose in the H-02 evidence record.
 
 If H-01 dependencies, the H-02 profile API, account/identity ordering, or
 Base-compatibility behavior changes after bootstrap, stop and reconcile only
@@ -88,52 +109,73 @@ after review.
 
 ### 2. Track 8 controls the launch product graph
 
-At this brief's planning baseline, the integrated Track 8 M0 owner-decision
-packet is still marked `Draft for owner and independent review`, with 33
-decisions unchecked and none approved. Its current planning set names five
-assets explicitly:
+Track 8 M0 reviewed decision bytes were fixed at
+`c5c8b699b229792dc61e66af35502684ea3c8155`. The final closure-record commit
+is `11824aa672809ad49ad7b2f823b9fb02c6e4608b`, and the integration merge is
+`e1f14ddb030c5ce3f44d4cdd54e8c6daaad41369`.
+The Track 8 M1 brief is integrated at this reconciliation's kickoff commit,
+but it explicitly leaves M1 implementation unauthorized.
 
-- AAPL;
-- GREEN;
-- RIPE;
-- sGREEN; and
-- canonical USDG.
+The controlling M0 launch graph and product requirements are:
 
-That integrated packet currently treats sGREEN as omitted or inert, GREEN/RIPE
-CCIP as inactive, USDG/EndaomentPSM as omitted or disabled staging, and rewards
-as disabled. Those are pending planning dispositions, not production approval.
+- AAPL is the only initial Stock Token; each additional Stock Token is a
+  separate later release with token-specific identity, runtime, transfer,
+  oracle, control, and route evidence.
+- AAPL targets `$5,000` per-user and `$25,000` global exposure, converted at
+  the final price freeze using the integrated formula and approved feed. The
+  actual freeze price and fixed 18-decimal cap integers remain later typed
+  blockers. Exactly one AAPL vault may be enabled, and every trusted or
+  Department AAPL deposit route remains disabled.
+- AAPL Stock use remains atomically blocked until the complete
+  `M1 + M2 + M3 + M4 proof + approved M5` containment group, audit, exact
+  configuration, and activation gates are complete. External settlement is
+  the frontend default. The owner-approved guarded internal-settlement
+  direction and partial-fill invariant are Track 8 mechanism authority, not
+  an H-04 implementation choice.
+- Chain-native sGREEN deposits and withdrawals are launch requirements.
+  sGREEN must never receive a CCIP route.
+- GREEN and RIPE CCIP are separately reviewed promotion targets within seven
+  days after launch, not launch blockers. If any identity, route, authority,
+  supply, accounting, monitoring, rollback, or state-independence gate is
+  incomplete or late, launch and continue with CCIP disabled.
+- Canonical USDG and the approved USDG/USD feed govern the EndaomentPSM launch
+  target. Curve is not a PSM dependency. Redemption must be proved first and
+  GREEN mint authority granted last.
+- GREEN Stability Pool and RIPE governance-vault participation are launch
+  requirements. Stock Tokens remain excluded from Stability Pool custody and
+  swaps and from CreditRedeem extraction.
+- GREEN/USDG LP and RIPE/WETH LP are launch deposit tokens with explicit
+  legitimate `ltv=0`; their factory, pool, oracle, artifact, runtime, address,
+  and composed-route inputs remain blockers until separately proved.
+- USDG is PSM/LP-only and is not ordinary Teller collateral.
+- Rewards launch globally disabled with `arePointsEnabled=false` and
+  `ripePerBlock=0`. A separately reviewed activation is targeted within seven
+  days and may then include AAPL depositors and AAPL-backed borrowers. Missing
+  the target leaves rewards disabled; it does not promote a value
+  automatically.
+- Underscore and every other unsupported Base-only integration are omitted
+  from the initial Robinhood launch.
+- Current Base deployments remain unchanged. Any future Base cutover requires
+  a separate proposal, evidence, migration design, security review, and owner
+  authorization.
 
-The Track 8 owner-decision revision currently in flight may materially change
-that graph. The owner interview is expected to ask the revision to address,
-subject to final review and integration:
-
-- AAPL-first Stock Token activation and finite exposure targets;
-- additional Stock Tokens as token-specific later releases;
-- chain-native sGREEN active at launch;
-- GREEN and RIPE CCIP as launch targets but not launch blockers;
-- GREEN Stability Pool and RIPE governance-vault participation;
-- GREEN/USDG and RIPE/WETH LP deposit-only roles;
-- USDG/EndaomentPSM as a staged launch target;
-- rewards initially disabled with a separately gated near-launch enablement;
-- Stock exclusion from Stability Pool custody/swaps and CreditRedeem;
-- guarded internal Stock settlement as a newly returned design question; and
-- unchanged Base deployments with separately gated future cutover.
-
-None of those chat-level or draft-level directions is implementation
-authority. Phase A must consume the final reviewed, integrated Track 8
-revision and reproduce its exact status distinctions. LP-token rows, active
-sGREEN, an enabled PSM target, revised reward posture, or any other expansion
-beyond the integrated five-asset planning set is contingent on that revision
-landing in `rh`; this brief does not pre-approve it. Phase A must record the
-exact delta between the planning-baseline packet and the then-integrated Track
-8 authority. If Track 8 M0 remains open, every dependent parameter stays
-`blocked` rather than being guessed.
+These M0 decisions freeze product and route requirements; they do not approve
+the future Ripe/LP addresses, a vault or VaultBook ID, exact cap integers,
+defaults, a manifest, implementation, deployment, configuration, activation,
+signing, or a transaction. Every post-M0 value or artifact not yet proved
+remains a typed blocker.
 
 ### 3. H-03 controls topology and symbolic inputs
 
-The current H-03 brief predates the latest Track 8 owner interview. H-03 must
-first be reconciled to the reviewed Track 8 revision, implemented, reviewed,
-and integrated.
+The H-03 brief is integrated, but no H-03 Phase A evidence, implementation, or
+test artifact is integrated at the documentation-reconciliation kickoff. The
+active H-03 worktree reports Phase A under owner and independent review and
+Phase B unauthorized. That uncommitted worktree is concurrent-ownership and
+gate-status evidence only; none of its contents is controlling authority here.
+
+Phase A for this combined slice must not begin until the reviewed H-03 Phase A
+record, immutable blueprint implementation, and owned tests are integrated
+into the then-current `rh`.
 
 This combined slice consumes:
 
@@ -149,16 +191,21 @@ H-03 component remains blocked stays blocked here.
 ### 4. S3, S4, and S5 remain independently bounded
 
 - **S3:** consume the integrated Robinhood Lootbox floor requirement and
-  interval-zero Underscore posture. The floor and interval are deployment
-  inputs, not new `Defaults` fields. Do not edit Lootbox or its historical
-  migrations.
+  interval-zero Underscore posture. The shared source change is accepted and
+  integrated: Robinhood uses immutable floor `7_200` and mutable interval `0`.
+  The floor and interval are deployment inputs, not new `Defaults` fields.
+  Live Base convergence remains separately governed and must not be inferred
+  from source integration. Do not edit Lootbox or its historical migrations.
 - **S4:** consume the reviewed no-code, zero-cooldown initial-launch
-  disposition. Do not add a cooldown field, select a dormant maximum, or
-  create an S4 migration.
-- **S5:** consume only the reviewed, integrated action-block source and
-  `shouldCheckLastTouch` decision applicable to the fresh Robinhood Ledger.
-  Do not infer the source address, mode, ABI, constructor argument, or boolean
-  from a draft or probe. Do not create a Base Ledger migration.
+  disposition and initial Underscore omission. Do not add an S4 field, select a
+  dormant maximum, create a constructor/config assignment, or create a
+  state-changing S4 migration.
+- **S5:** treat S5 as an independent in-flight workstream. Its integrated
+  brief and owner packet do not close the final Ledger source input,
+  constructor argument, ABI, or `shouldCheckLastTouch` value. Do not infer or
+  preselect any of them from an active worktree, probe, recommendation, or
+  draft. Preserve the deployed Base Ledger as the approved permanent
+  live-bytecode exception and do not create a Base Ledger migration.
 
 If S5 is not final at Phase A, record its entries as blocked. Phase B cannot
 guess them.
@@ -183,51 +230,51 @@ Phase B cannot begin while any value included in the contract or manifest is:
 Omit an optional unresolved component. Block a required unresolved component.
 Never invent a value to make the artifact compile.
 
-## Worktree bootstrap
+## Documentation-reconciliation kickoff and future Phase A seal
 
-After all launch gates above are visibly satisfied:
+This documentation-only reconciliation was bootstrapped from clean integrated
+`rh` at exact commit
+`332ae2bc8e0ce4b694766d6d20759295d9267ec3`, tree
+`f67dc91e47331785837de879b6557b285aec3b1b`. Local `rh`, cached
+`origin/rh`, and live `origin/rh` matched that commit. The branch and worktree
+named at the top of this document were newly created from that identity. The
+integration worktree was not modified.
 
-1. In `/Users/wigglez/dev/ripe-protocol`, verify:
-   - branch `rh` is checked out;
-   - `git status --porcelain` is empty;
-   - local `rh`, cached `origin/rh`, and live `origin/rh` resolve to the same
-     reviewed commit;
-   - H-01, H-02, the reconciled H-03 implementation, the reviewed Track 8
-     revision, S3, S4, and every required S5 decision artifact are ancestors
-     of that commit; and
-   - no active worktree owns a file reserved by this brief.
-2. Record the exact starting commit, tree, parent, author/committer identity,
+The current worktree is reserved for this brief reconciliation and independent
+review. It must not create the Phase A evidence file or begin Phase A.
+
+Before a later Phase A kickoff:
+
+1. Require this complete reconciled brief to be independently reviewed and
+   present in the exact owner-approved `rh` baseline.
+2. Verify the integration worktree is clean and local `rh`, cached
+   `origin/rh`, and live `origin/rh` resolve to that same reviewed commit.
+3. Verify H-01, corrected H-02, reviewed H-03 Phase A plus implementation and
+   tests, owner-closed M0, the integrated M1 brief, S3, and S4 are ancestors of
+   that commit.
+4. Record current S5 status. If S5 is still not final, retain every
+   S5-dependent value as blocked; S5 completion is not permission to infer a
+   field.
+5. Recheck every active worktree for exact file ownership. Do not consume,
+   copy, or relabel unintegrated H-03, S5, or M1 content as approved.
+6. Obtain an explicit owner instruction naming the exact Phase A baseline and
+   whether this reconciliation worktree is to be continued or replaced. Do
+   not silently reuse, delete, reset, overwrite, or recreate it.
+7. Record the exact starting commit, tree, parent, author/committer identity,
    commit time, and SHA-256 of every controlling document.
-3. Confirm the proposed branch and worktree do not already exist. If either
-   exists, stop instead of deleting, reusing, or overwriting it.
-4. Create the branch and worktree from exact integrated `rh`:
-
-   ```bash
-   git worktree add \
-     -b rh-track-6-s6-track-7-h4-defaults-parameters \
-     /Users/wigglez/dev/ripe-protocol-track-6-s6-track-7-h4-defaults-parameters \
-     rh
-   ```
-
-5. Reconfirm the new worktree is clean and its `HEAD` equals the recorded
-   integration commit.
-6. Use the integrated H-01 locked environment. If the active environment does
+8. Use the integrated H-01 locked environment. If the active environment does
    not match, stop or obtain separate authorization for a disposable locked
    environment. Do not alter dependency files in this track.
-7. Run and record:
-   - H-01's dependency gate;
-   - H-02's targeted suite;
-   - S1 clock profiles;
-   - S2 inventory checks and tests;
-   - integrated H-03 targeted tests;
-   - collection; and
-   - the serial full suite.
-8. Remove task-specific temporary caches and basetemp directories after each
-   command. Do not write into a shared user cache if an isolated cache is
-   required.
+9. Run and record H-01's dependency gate, H-02's targeted suite, S1 clock
+   profiles, S2 inventory checks and tests, integrated H-03 targeted tests,
+   collection, and the serial full suite.
+10. Remove task-specific temporary caches and basetemp directories after each
+    command. Do not write into a shared user cache if an isolated cache is
+    required.
 
 Stop on any identity mismatch, dirty integration state, failed baseline,
-missing authority document, or unexpected file owner.
+missing authority document, unresolved worktree instruction, or unexpected
+file owner.
 
 ## Required reading
 
@@ -239,16 +286,24 @@ Read every file in this section before Phase A.
 - `docs/chains/rh/shared-block-clock-specification.md`
 - `docs/chains/rh/block-clock-validation-plan.md`
 - `docs/chains/rh/component-matrix.md`
+- every integrated decision register in those program records
+- `docs/chains/rh/minimal-contract-change-reassessment.md`
 - `docs/chains/rh/robinhood-deployment-support-specification.md`
 - `docs/chains/rh/robinhood-deployment-validation-plan.md`
+- `docs/chains/rh/evidence/dependency-security-gate.md`
+- `docs/chains/rh/evidence/network-profile-cli-implementation.md`
+- `docs/chains/rh/track-7-h3-robinhood-blueprint-omissions.md`
 - `docs/chains/rh/track-6-s3-lootbox-floor.md`
 - `docs/chains/rh/deleverage-cooldown-security-decision.md`
 - `docs/chains/rh/track-6-s5-ledger-guard.md`
-- integrated S5 decision/evidence and owner packet, if final
-- integrated H-02 implementation and evidence
-- integrated H-03 brief, implementation, tests, and Phase A evidence
-- integrated Track 8 M0 evidence, owner decisions, specification, and
-  validation plan
+- `docs/chains/rh/track-6-s5-checkpoint-0-owner-decision-packet.md`
+- every additional S5 decision/evidence artifact integrated before Phase A
+- integrated H-03 implementation, tests, and Phase A evidence
+- `docs/chains/rh/track-8-m0-owner-decision-packet.md`
+- `docs/chains/rh/stock-token-m0-evidence.md`
+- `docs/chains/rh/stock-token-vault-change-specification.md`
+- `docs/chains/rh/stock-token-vault-change-validation-plan.md`
+- `docs/chains/rh/track-8-m1-exact-receipt.md`
 - `docs/chains/rh/usdg-psm-decision.md`
 
 Also read
@@ -443,15 +498,40 @@ returns only approved canonical interface values.
 
 ## Minimum-change rules
 
-### 1. No shared-source change by default
+### 1. Apply the minimum-change order
 
-`DefaultsRobinhood.vy` is the intended chain-specific value artifact. It may
-contain Robinhood values and approved asset entries but no Robinhood-only
-protocol behavior.
+For every requirement, prefer in order:
+
+1. no production change;
+2. typed manifest-only configuration;
+3. existing shared behavior;
+4. disabled, omitted, or deferred functionality; and
+5. only then the smallest explicitly approved production source change.
+
+`DefaultsBase.vy` must remain unchanged. Any future
+`DefaultsRobinhood.vy` must implement the unchanged canonical `Defaults`
+interface, contain no divergent protocol logic, and contain only fields
+explicitly approved for that contract. Deployment-only values remain typed
+manifest entries for the correct later owner; they must not be forced into a
+contract or interface merely for convenience.
 
 Do not modify a shared contract merely to make a parameter easier to express.
-If the canonical `Defaults` interface cannot express a desired deployment
-action, keep that value in the manifest for the correct later owner.
+Do not introduce `chain.id` branching, Robinhood-only protocol behavior, or a
+Base migration. Preserve the deployed Base Ledger as the approved permanent
+live-bytecode exception.
+
+For every proposed contract field, the Phase A packet must state:
+
+- why manifest-only configuration is insufficient;
+- the concrete risk of making no contract change;
+- the smallest sufficient implementation;
+- the Base and Robinhood blast radius; and
+- the residual risk the owner would accept.
+
+If any answer is missing or does not defeat the no-change/configuration option,
+the field is not eligible for Phase B. An S4 field is prohibited. No S5 source,
+constructor, ABI, or `shouldCheckLastTouch` input may be inferred or
+preselected.
 
 ### 2. Preserve safe initial state
 
@@ -503,7 +583,7 @@ A configured flag or address does not prove:
 
 Keep those as explicit prerequisites and later assertion inputs.
 
-### 4. No silent Base parity
+### 5. No silent Base parity
 
 For every value, compare four options:
 
@@ -514,7 +594,7 @@ For every value, compare four options:
 
 Select only an owner-approved result. A Base value is not a default answer.
 
-### 5. No broad “Robinhood cadence ratio”
+### 6. No broad “Robinhood cadence ratio”
 
 The S3 floor approval does not approve a general six-to-one conversion. For
 each block-count field, record:
@@ -595,23 +675,24 @@ from `Defaults`, including:
   enable flags, and mint-authority sequence;
 - AAPL exposure targets and final token-unit conversion inputs;
 - Stock asset routes and disabled controls;
-- the integrated five-asset Track 8 planning rows: AAPL, GREEN, RIPE, sGREEN,
-  and canonical USDG, preserving each row's approved, pending, blocked,
-  omitted, disabled, or inert status;
-- Stability Pool and RipeGov parameters only where required by the integrated
-  H-03/Track 8 graph;
-- GREEN/USDG LP and RIPE/WETH LP parameters only if the reviewed Track 8
-  revision adds those assets and is integrated before Phase A freezes;
+- the complete owner-closed M0 launch graph: AAPL, GREEN, RIPE, chain-native
+  sGREEN, canonical USDG, GREEN/USDG LP, and RIPE/WETH LP, preserving the exact
+  route, activation, disabled, and blocked distinctions for each;
+- launch-active GREEN Stability Pool and RIPE governance-vault inputs;
+- GREEN/USDG LP and RIPE/WETH LP deposit-only inputs with explicit legitimate
+  `ltv=0`, while their unproved artifact, pool, oracle, runtime, address, and
+  composed-route inputs remain blocked;
 - reward initial and fast-follow states;
-- CCIP target/fallback status from the integrated Track 8 authority, without
-  pool addresses or capabilities;
+- the GREEN/RIPE CCIP disabled-at-launch and separately reviewed
+  within-seven-day promotion posture, plus the permanent sGREEN no-CCIP rule,
+  without inventing pool addresses or capabilities;
 - external price-source stale times and priorities; and
 - role, signer, and TrainingWheels symbolic inputs.
 
 Do not assign exact addresses or values that are not already reviewed and
-integrated. Record any difference between the five-asset planning baseline and
-the then-integrated Track 8 graph; do not materialize an interview-only asset
-or posture as a manifest requirement.
+integrated. The M0 product graph is controlling, but future Ripe/LP addresses,
+runtime hashes, vault/registry selections, freeze-time AAPL cap integers, and
+post-deployment facts remain typed blockers until their later gates close.
 
 ### A4. Classify initial launch versus fast follow
 
@@ -620,29 +701,28 @@ For every field or action, state one exact phase:
 - deployed initial value;
 - pre-activation configuration;
 - atomic Stock activation;
-- launch-target-but-nonblocking optional activation;
-- within-seven-day separately reviewed fast follow;
+- within-seven-day separately reviewed CCIP promotion;
+- within-seven-day separately reviewed reward activation;
 - post-launch release;
 - omitted; or
 - blocked.
 
-At minimum, reconcile the statuses actually present in the integrated Track 8
-authority. At the planning baseline those are:
+At minimum, reconcile:
 
-- rewards deployed disabled versus later enablement;
-- AAPL blocked staging versus atomic activation;
-- inactive CCIP versus any separately reviewed target revision;
-- USDG/PSM omission or disabled staging versus any separately reviewed
-  redemption/mint target;
-- sGREEN omitted/inert versus any separately reviewed launch-day activation;
-- GREEN and RIPE vault roles;
-- additional Stock Tokens after token-specific evidence; and
-- any internal Stock settlement design still under Track 8 review.
-
-If and only if a reviewed Track 8 revision has integrated the LP rows or other
-expanded launch roles, also reconcile their deposit-only, zero-LTV, activation,
-and fallback phases. Otherwise record them as proposed deltas outside the
-controlling graph, not as launch parameters.
+- rewards deployed globally disabled versus a separately validated,
+  separately authorized activation target within seven days;
+- AAPL disabled staging versus the complete atomic M1–M5 activation group;
+- GREEN/RIPE CCIP disabled at launch unless and until a separately reviewed
+  promotion closes, while sGREEN remains permanently excluded from CCIP;
+- USDG/PSM redemption-first and GREEN-mint-last launch sequencing;
+- chain-native sGREEN deposits and withdrawals active at launch;
+- launch-active GREEN Stability Pool and RIPE governance-vault roles;
+- GREEN/USDG LP and RIPE/WETH LP deposit-only, explicit-zero-LTV launch roles
+  with every unproved external input blocked;
+- additional Stock Tokens only after token-specific later-release evidence;
+  and
+- owner-approved guarded internal Stock settlement as a Track 8 mechanism
+  direction whose M1–M5 implementation and activation remain blocked.
 
 No time target converts a later action into an initial default.
 
@@ -670,34 +750,41 @@ Do not use S10's CAD display correction as authority for a raw runtime value.
 ### A6. Define the asset-configuration matrix
 
 For every initial or staged asset, specify all `AssetConfig` fields and their
-status. The matrix must at least account for the five named assets in the
-integrated planning baseline and the omission rule that bounds the set:
+status where that structure applies, and explicitly state `not_applicable`
+where the M0-approved route does not use ordinary Teller asset configuration.
+The matrix must account for the complete owner-closed M0 graph and the omission
+rule that bounds the set:
 
 - AAPL;
 - GREEN;
 - RIPE;
 - sGREEN;
 - canonical USDG;
+- GREEN/USDG LP;
+- RIPE/WETH LP;
 - an explicit omission rule for every other asset.
-
-Add GREEN/USDG LP, RIPE/WETH LP, or any other asset only if a reviewed Track 8
-revision containing that exact row has integrated before Phase A freezes.
-Record the integrated-graph delta either way.
 
 The matrix must prove:
 
 - AAPL has exactly one enabled vault at activation;
 - AAPL trusted/Department deposit routes cannot bypass caps;
 - Stock Stability Pool and CreditRedeem routes are disabled;
-- every integrated LP row, if any, has zero borrowing power;
+- both LP rows have explicit legitimate zero borrowing power and no omitted
+  LTV masquerading as zero;
+- chain-native sGREEN deposits and withdrawals are launch requirements and
+  sGREEN has no CCIP surface;
+- GREEN Stability Pool and RIPE governance-vault participation match M0;
 - USDG is not ordinary Teller collateral;
+- PSM configuration preserves redemption-first and GREEN-mint-last activation;
 - Underscore and Base-only integrations are absent;
 - reward allocations match the approved initial phase;
 - no omitted field inherits an enabling default; and
 - every exact address remains blocked until identity evidence is approved.
 
-If Track 8's guarded internal-settlement revision is not final, represent
-AAPL auction purchasing as blocked. Do not choose a settlement behavior here.
+Represent AAPL auction purchasing, borrowing, and internal settlement as
+blocked until the complete Track 8 M1–M5 group is approved, implemented,
+audited, configured, and atomically activated. Do not reinterpret or implement
+the owner-approved settlement direction here.
 
 ### A7. Specify deterministic generation
 
@@ -756,10 +843,12 @@ The Phase A evidence must return, at minimum, explicit decisions for:
 Each recommendation must include:
 
 - no-change/disabled alternative;
+- why manifest-only configuration is insufficient if a contract field is
+  proposed;
 - risk of no change;
-- smallest sufficient value/configuration;
-- blast radius;
-- residual risk;
+- smallest sufficient value, configuration, or implementation;
+- separate Base and Robinhood blast radius;
+- residual risk the owner would accept;
 - reviewer;
 - approval form; and
 - downstream invalidation effect.
@@ -797,7 +886,11 @@ If the owner gives no answer, Phase B remains prohibited.
 
 After owner and independent review, record the exact approval provenance in
 the evidence and commit only that document to the feature branch. Do not begin
-Phase B until a separate file-exact implementation authorization is recorded.
+Phase B until the complete Phase A owner-decision packet has independent
+complete-file approval, exact Phase B file ownership has been reverified, and
+a separate file-exact owner implementation authorization is recorded. A
+recommendation, owner-decision request, or Phase A approval is not Phase B
+approval.
 
 ## Phase B — conditional implementation
 
@@ -867,13 +960,23 @@ At minimum prove:
 - array ordering is deterministic;
 - allocation denominators conserve exactly;
 - omitted/disabled/blocked distinctions survive generation;
-- Base and Local defaults remain byte-identical;
+- `contracts/config/DefaultsBase.vy` and
+  `contracts/config/DefaultsLocal.vy` each remain byte-for-byte identical to
+  their respective kickoff-baseline versions; they are not expected to be
+  identical to each other;
 - S3/S4/S5 boundaries are preserved;
 - AAPL cannot be accidentally active before Track 8 gates;
 - Stock Stability Pool/CreditRedeem/trusted routes remain disabled;
-- sGREEN, governance, Stability Pool, LP, PSM, and reward states included by
-  the integrated graph match the reviewed phase table, while excluded rows
-  remain omitted or blocked; and
+- chain-native sGREEN launch routing is present and no sGREEN CCIP route can
+  be generated;
+- GREEN Stability Pool, RIPE governance-vault, and both deposit-only LP rows
+  match the integrated graph, including explicit zero LTV for both LP rows;
+- the USDG PSM ordering is redemption first and GREEN mint last;
+- rewards remain globally disabled at launch unless a separately reviewed
+  promotion proves the post-launch state;
+- incomplete GREEN/RIPE CCIP promotion inputs remain disabled without
+  blocking launch;
+- Underscore remains omitted; and
 - repeated generation produces byte-identical Vyper.
 
 ### `tests/deployment/test_network_clock_profiles.py`
@@ -931,7 +1034,8 @@ Run serially in the integrated locked environment:
 8. H-03 targeted suite;
 9. S1 clock profiles;
 10. S2 checker and inventory tests;
-11. integrated S3/S4/S5 regressions;
+11. integrated S3/S4 regressions and any then-integrated S5 regressions,
+    while an unfinished S5 keeps every S5-dependent entry blocked;
 12. Track 8 tests available at the integrated baseline;
 13. collection;
 14. the serial full suite;
@@ -1019,14 +1123,20 @@ This slice may provide approved inputs but must not absorb those files.
 ### Track 8
 
 Track 8 owns Stock containment mechanism, vault selection, and activation
-eligibility. This slice owns only reviewed configuration projections. If M0
-or the settlement design is open, dependent asset fields remain blocked.
+eligibility. M0 is owner-closed and integrated, including the settlement
+direction, but it does not supply the post-M0 implementation, audit,
+configuration, atomic-activation, address, vault-ID, cap-integer, or
+operational proof required by M1-M5. This slice owns only reviewed
+configuration projections. Every field that depends on those later artifacts
+remains blocked until its exact Track 8 gate closes.
 
 ### Track 1 / CCIP
 
-CCIP is a launch target but not a configuration assumption. No pool, remote
-mapping, admin, capability, or artifact enters this slice before Track 1 and
-H-12 close their gates.
+GREEN and RIPE CCIP are a separately reviewed promotion target within seven
+days after launch, not an initial-launch blocker or configuration assumption.
+If Track 1 or H-12 evidence is incomplete or late, the routes remain disabled.
+No pool, remote mapping, admin, capability, or artifact enters this slice
+before those gates close. sGREEN must never receive a CCIP route.
 
 ## Approval boundaries
 
