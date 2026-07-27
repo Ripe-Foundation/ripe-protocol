@@ -3315,3 +3315,65 @@ This post-S5 amendment is left unstaged and uncommitted. It authorizes no H-03
 implementation, push, `rh` integration, dependency installation, RPC or
 secret access, signing, broadcast, migration, deployment, registration,
 configuration, activation, governance, or external-system change.
+
+## 20. H-03 Phase B Gate 1 provenance — 27 July 2026
+
+This section is the controlling Gate 1 provenance addendum. It supersedes only
+earlier lifecycle statements that described Phase B as unauthorized,
+unstarted, unimplemented, or still awaiting Gate 1 at their historical
+checkpoints. All earlier content remains the byte-identical historical record.
+This addendum does not rewrite any historical approval, inventory, relation,
+blocker, mutation, or validation material.
+
+### 20.1 Owner authorization and exact implementation identity
+
+Owner-authorized Phase B implementation began from feature tip
+`6217d4860b98c343e076d4df2e3916f8e59a2bf2`.
+
+| Field | Controlling Gate 1 provenance |
+|---|---|
+| Implementation commit | `35e3a8df5c0768f17121407c18da185aabd82f43` |
+| Implementation tree | `6fcf10e21b75daced64529da25381da0449e9bd1` |
+| Commit and publication | Valid signed commit and normal feature publication |
+| Canonical three-file patch SHA-256 | `54339e604c7d4f21b2ffbd62a5ed21d405231921c9fb9af0d7ae8e96a338bea5` |
+
+The exact implementation scope and committed file hashes are:
+
+| Path | SHA-256 |
+|---|---|
+| `config/robinhood_blueprint.py` | `5bcb4dc3d6bdf77a3165926a8c4c07ad658f2b219e685105591cb6a5738a945e` |
+| `tests/deployment/test_robinhood_blueprint.py` | `6040f39aff07d04ed2b452cbe83fedce1841596d0fc9787131c99e934d52e84f` |
+| `tests/deployment/test_robinhood_omissions.py` | `11aaf514c243c5a335cf940c1634fc24841c839b31152fbb5add8b74acd4783b` |
+
+### 20.2 Independent Gate 1 verdict and validation
+
+The independent Gate 1 verdict is **approved**.
+
+Gate 1 validation recorded:
+
+- 104 H-03 tests passed;
+- collection: 3,148 selected / 3,290 collected / 142 deselected;
+- complete suite: 3,148 passed / 142 deselected;
+- zero skips or xfails; and
+- only the three established assertion-rewrite warnings.
+
+All canonical inventories remain unchanged. All 18 blockers remain unchanged
+and open.
+
+Gate 1 finding F-1 was expressly accepted as a nonblocking, fail-closed
+diagnostic deviation: duplicate surface IDs report `H03_IMMUTABLE` rather than
+`H03_SURFACE_SET`. No candidate byte was changed to address it.
+
+### 20.3 Current `rh` identity and remaining authorization boundary
+
+At this evidence-update preflight, the current controlling `rh` identity was:
+
+- commit `81478fe33dfa47a8e135682a047b64949650cb29`;
+- tree `4eb1e5ae690694b3bc1f6248b6e92d8ebb4d2f53`.
+
+Gate 2, `rh` integration, blocker closure, deployment, configuration,
+migration, activation, signing, broadcasting, and release remain unauthorized
+and unperformed.
+
+This provenance-only evidence update changes no implementation byte. It is
+left unstaged and uncommitted for one narrow independent exact-hash review.
