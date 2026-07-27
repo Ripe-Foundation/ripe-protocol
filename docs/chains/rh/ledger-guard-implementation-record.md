@@ -856,3 +856,238 @@ hashes, confirm current-`rh` reconciliation separately, and decide final
 merge readiness. Commit, push, merge, deployment, registration,
 configuration, activation, governance, signer access, signing, broadcast,
 Base migration, and release activity remain prohibited.
+
+## 14. Post-H-01 reconciliation and locked validation — 27 July 2026
+
+This section is the controlling post-H-01 reconciliation and validation
+snapshot. It appends to and supersedes only the current-candidate identities,
+topology, environment, and results in the historical Gate 1 and Stage C
+sections above. It does not rewrite or invalidate their contemporaneous
+results or review boundaries.
+
+### 14.1 Reconciliation identity, ancestry, and scope
+
+The final controlling `rh` identity was:
+
+| Item | Exact identity |
+| --- | --- |
+| controlling `rh` commit | `7098211db5693f986b65ec7a9e897f3518e9538c` |
+| controlling `rh` tree | `c07329ed9fcc2dc99afbef3f7888f478024d1ede` |
+| frozen S5 parent | `ed10d4d13fb22c2d00ad2dc06b4faece1e2629f3` |
+| original S5 / `rh` merge base | `332ae2bc8e0ce4b694766d6d20759295d9267ec3` |
+| reconciliation merge commit | `89c832cd35cee3acce6bc08569ae95cc3facce8a` |
+| reconciliation merge tree | `7c86b23b0ce9b5eae779e28ee7949a8dc323623f` |
+| merge parent 1 | `ed10d4d13fb22c2d00ad2dc06b4faece1e2629f3` |
+| merge parent 2 | `7098211db5693f986b65ec7a9e897f3518e9538c` |
+
+The merge used normal Git merge ancestry: no rebase, squash, amendment,
+cherry-pick, or history rewrite. The frozen S5 commit `ed10d4d…` remains
+unchanged as first parent and is an ancestor of the reconciled candidate.
+After the merge, `git rev-list --left-right --count rh...HEAD` returned
+`0 19`: the candidate is 19 commits ahead of and zero commits behind the
+controlling `rh`.
+
+The exact 11-path incoming contribution from the original merge base through
+the controlling `rh` was:
+
+1. `docs/chains/rh/evidence/dependency-exception-exit-preflight.md`;
+2. `docs/chains/rh/evidence/dependency-security-gate.md`;
+3. `docs/chains/rh/evidence/h01-exception-retirement-feasibility.md`;
+4. `docs/chains/rh/evidence/robinhood-blueprint-phase-a.md`;
+5. `docs/chains/rh/evidence/robinhood-migration-phase-a.md`;
+6. `docs/chains/rh/evidence/stock-token-m1-exact-receipt.md`;
+7. `docs/chains/rh/track-6-s6-track-7-h4-defaults-parameters.md`;
+8. `docs/chains/rh/track-7-h3-robinhood-blueprint-omissions.md`;
+9. `requirements.in`;
+10. `requirements.txt`; and
+11. `tests/deployment/test_dependency_gate.py`.
+
+Its intersection with the complete 24-path S5 contribution was empty. The
+merge preview and completed merge therefore had zero candidate-path conflict
+and did not change an approved S5 byte.
+
+### 14.2 Final H-01 lock and private validation environment
+
+The final H-01 requirement identities were:
+
+| File or inventory | SHA-256 |
+| --- | --- |
+| `requirements.in` | `1227d9681d8b37f6820a7c09fa33b87798229e613748085e45454efea962a2b9` |
+| `requirements.txt` | `214f6c32c628df1eb2bbb1979b3bae8147ceaf338e68959dd58d82394b9be010` |
+| canonical installed inventory, 93 rows | `f0393df6e4c1728b28d95e5034fee7b6ca4c5463df8fb387dbae839e15b87e4d` |
+
+Relative to the pre-H-01 lock, exactly three packages changed:
+
+| Package | Previous | Final |
+| --- | --- | --- |
+| Click | `8.2.1` | `8.3.3` |
+| Pygments | `2.19.2` | `2.20.0` |
+| Pymdown Extensions | `10.16.1` | `10.21.3` |
+
+The security-relevant execution stack remained `pytest 8.4.2`,
+`titanoboa 0.2.7`, and `vyper 0.4.3`; `cbor2 5.9.0` also remained pinned.
+
+Validation used Python `3.12.0` in the fresh mode-`0700` root
+`/private/tmp/s5-post-h01-reconcile.WIZBZp`, with its private virtual
+environment, gate-specific Boa caches under `boa/`, and unique pytest base
+temporary directories under `basetemps/`. Tests that require the non-secret
+explorer placeholder used `ETHERSCAN_API_KEY=local-placeholder`. No RPC or
+signing credential was present or read.
+
+The installed-inventory digest was independently recomputed before this
+section was written from the documented canonical serialization:
+
+```python
+from importlib.metadata import distributions
+import sys
+
+rows = sorted(
+    "{}=={}".format(d.metadata["Name"].lower(), d.version)
+    for d in distributions()
+)
+sys.stdout.buffer.write(("\n".join(rows) + "\n").encode("utf-8"))
+```
+
+The exact private interpreter produced 93 newline-terminated rows and
+SHA-256
+`f0393df6e4c1728b28d95e5034fee7b6ca4c5463df8fb387dbae839e15b87e4d`.
+This is the controlling lowercase 64-hex value. A prior handoff omitted its
+final `d`; that truncated value is invalid and is not used here.
+
+The complete non-semantic retry chronology was:
+
+1. the initial sandboxed `git merge --no-edit 7098211d…` was blocked before
+   ref mutation because Git could not lock the worktree `ORIG_HEAD`; the exact
+   authorized merge command then succeeded with the necessary filesystem
+   access;
+2. the preserved historical interpreter at
+   `/private/tmp/h01-final-review.dL2pqo/candidate/bin/python` still contained
+   Click `8.2.1`, Pygments `2.19.2`, and Pymdown Extensions `10.16.1`, so it
+   was rejected before any validation test ran;
+3. the first fresh-environment installation attempt was blocked by sandbox
+   DNS restrictions; the identical approved public-PyPI installation
+   succeeded without changing the lock;
+4. S1's first sandboxed attempt produced 57 setup errors because the
+   `free_port` fixture could not bind a local socket; the identical local-only
+   retry with socket permission produced 57 passes;
+5. the first standalone checker command omitted its required `--check`
+   option and returned usage exit `2`; the corrected invocation returned exit
+   `0` with zero findings; and
+6. during preparation of this section, an ambient-interpreter digest check
+   was discarded because that interpreter contained 119 packages. Repeating
+   the exact canonical serialization with the private validation interpreter
+   produced the controlling 93-row digest above before any repository byte
+   was edited.
+
+None of these retries changed source, tests, assertions, selection,
+dependencies, or expected behavior.
+
+### 14.3 Reconciled validation results
+
+The complete locked-runtime validation results were:
+
+| Gate | Reconciled result |
+| --- | --- |
+| H-01, ambient `NO_COLOR` absent | `45 passed, 3 warnings in 2.60s` |
+| H-01, `NO_COLOR=1` | `45 passed, 3 warnings in 2.45s` |
+| H-02 / Base | `99 passed, 3 warnings in 14.17s` |
+| S1 clock profiles | `57 passed, 3 warnings in 106.03s` |
+| complete probe suite | `154 passed, 3 warnings in 32.12s` |
+| focused Ledger / Teller action-block suite | `45 passed, 3 warnings in 139.19s` |
+| dedicated batch cases | `2 passed, 3 warnings in 109.07s` |
+| exact nine-file targeted regression set | `447 passed, 3 warnings in 143.61s` |
+| standalone S2 checker | exit `0`; zero findings; exact production `99/94/17` |
+| complete S2 inventory suite | `69 passed, 3 warnings in 29.36s` |
+| `python -m pip check` | `No broken requirements found.` |
+| fresh collection | `3,044/3,186 tests collected; 142 deselected in 7.04s` |
+| complete serial suite | `3,044 passed, 142 deselected, 3 warnings in 352.72s` |
+
+The checker emitted:
+
+```text
+CLOCK_INVENTORY_OK schema=1 production_occurrences=99 production_lines=94 production_files=17 bn_ids=32 bn_records=99 indirect_ids=1 cadence_candidates=474 seconds_unit_candidates=58 timestamp_ids=11 timestamp_occurrences=37 mixed_clock_functions=4 vyper_paths=93
+CLOCK_INVENTORY_NONPROD mock=0/0/0 testing=2/2/1 test=34/32/7
+CLOCK_INVENTORY_NONPROD_CADENCE mock=0 testing=1 test=172
+```
+
+There were zero failures, skips, xfails, warning suppressions, assertion
+relaxations, or new deselections. The three warnings were the established
+pytest assertion-rewrite warnings for `_hypothesis_globals`, `hypothesis`,
+and `boa`.
+
+For this reconciled candidate, `3,044 selected / 3,186 total / 142
+deselected` supersedes the historical Stage C snapshot of `3,015 selected /
+3,157 total / 142 deselected`. The historical section 13 snapshot remains
+unchanged as the contemporaneous pre-H-01 result.
+
+### 14.4 Reproduced Ledger compiler and artifact identities
+
+The reconciled candidate reproduced the following identities under Vyper
+`0.4.3+commit.bff19ea2`:
+
+| Artifact or comparison | Exact result |
+| --- | --- |
+| baseline Ledger source SHA-256 | `00d86847273621857b80701be5faf7ca88ff9505f68671d5b6ab3c8b4ec972e0` |
+| current Ledger source SHA-256 | `6bd731a6ce9084de213494ebad09f8e52c782153842708b78f90fa178c06e9e3` |
+| settings/compiler-input output SHA-256 | `94e854f66051117f6988116763754f6b43f7cd33902ca927e278d902e61eaa11` |
+| raw current storage-layout output SHA-256 | `7213fc05a17fd978ff618610263114fc4aa4fd7471d7e1047ec3e0ea11d27227` |
+| canonical baseline/current storage-layout SHA-256 | `bb19201a6bf4f4ef2649e5054e0fce6a53f007af4e4a004365edcc245c7e45a6`, equal, 37 entries |
+| integrity-output file SHA-256 | `04e43bd3f6b29ab5070a98f53a79db1274de26d2e0b59513f0b5d9bdab0c5cfb` |
+| compiler integrity value | `62cc9e492ee1b1a3e84ad104507d684dc81edecef969fc0ae0f7a1586dd0d830` |
+| ABI compiler-output SHA-256 | `ac8cc634b24c896381e473c6dd1a8681f28de5edb926b2e65190eba26bd9ff8b` |
+| normalized compiler/generated ABI SHA-256 | `695654b0ecbe794c2c7893fdc1af1c3bbce58cd77eeb848ec07079961b34b54b` |
+| ABI-with-gas-estimates SHA-256 | `eeb67f2516cf2af7deffc1a0d42f5e95470d5c0ebe7e609b39fb4603057abf22` |
+| committed/generated `Ledger.json` | byte-identical; SHA-256 `c6fc1c410e13f144ae9e9d1853378d476fa578211b08f67b23f80c2075bc415f` |
+| creation CLI-output SHA-256 | `5af8f96a89c226233bf5cc264818a66ce3db3cb5e50684dc6518e4a6591eac29` |
+| creation bytecode | 13,730 bytes; raw SHA-256 `a31f400f5364f8dbbd22b79bea2557f7f3dd57538eb659c06a21e18e9d8e9127`; Keccak-256 `0xe9d55d68fa1bb9122e93a69b8b2a37f81033c3a9e958c8caac5e8bc134be47fd` |
+| runtime CLI-output SHA-256 | `28f0f80a383251472ef3a40116ab5b6fb25d1141e3df586a307e3c0d3972a1ad` |
+| runtime bytecode template | 13,125 bytes; raw SHA-256 `8fbc85b5bac4586fdb4fc432284f9c38d12ed3966b2de5630f9d4c80973dcce7`; Keccak-256 `0xf45131f4322bf240a2285d39d6c00f04a0a1c158dcdb693919112746474c49c2` |
+| method identifiers SHA-256 | `bf49ac79ece839fd3795cf39368614be787e32cf2efc725a33bc87a90e6ba6f5` |
+| metadata SHA-256 | `e8375b768c959cbfe005420ee3fa1a12c3dc60286805c79ef2ba50294f3b7b2a` |
+| combined JSON SHA-256 | `15e19b2c17e39b6d37776c2aa1f671e13ff38f307b6f3e63a5585ae224bc8d83` |
+| compiler archive, raw | `385b6d53fa03a13880cb5f6da195c59aaeb196f74c95d37f7846907b31a6a08d` |
+| compiler archive, base64 | `1a4151fa1175ccb5293e3b53f2bd20098b3667e1f1e35cfcaaf7a472784d6138` |
+
+### 14.5 Preserved S5 bytes and authority boundary
+
+Only this implementation record changes in the present append-and-supersede
+update. The other 16 approved Stage B / Stage C files remain at their reviewed
+identities:
+
+| File | SHA-256 |
+| --- | --- |
+| `config/block-clock-inventory.json` | `862b585ff8deafcffa58eb8518a04473e2c154e33d5ec42f0a08ea0e72c85946` |
+| `contracts/data/Ledger.vy` | `6bd731a6ce9084de213494ebad09f8e52c782153842708b78f90fa178c06e9e3` |
+| `scripts/abis/Ledger.json` | `c6fc1c410e13f144ae9e9d1853378d476fa578211b08f67b23f80c2075bc415f` |
+| `scripts/check_block_clock_inventory.py` | `be62e87a065482431fadc710c793d1c11b9c4946cf78f03f7d5c060f29f42b3b` |
+| `tests/conf_core.py` | `eb83edff2d431de8326d416cd43c274f3add44b2ae739639570a2fa7e749905b` |
+| `tests/core/creditEngine/test_credit_borrow.py` | `1e483db3ff6f824f6dd241bbe00740b3e661de14986e047734eda4c5d914cef9` |
+| `tests/core/creditEngine/test_credit_repay.py` | `8d1558bf5a8725e25173583de745f7048e713897e93d531991984e0c01d2da76` |
+| `tests/core/deleverage/test_deleverage_swap_collateral.py` | `aa5c584f4fe4d934ac0bb8d167e2b0616b4cd6966dd9ff54588232dbd62ec98f` |
+| `tests/core/teller/test_teller_action_block.py` | `747712c09ba45d5495ec77a19e936399c81078e5e82c05496dc878602078936c` |
+| `tests/core/teller/test_teller_deposit.py` | `b58659053054382ed0e9909f1f29dc21121e7d1a4481dbddb6a95e991f414041` |
+| `tests/core/teller/test_teller_rebalance.py` | `fb923e7ce7671d9d2f6db52d07e581361774fc00e7db7c8d9d13c8b888eead6d` |
+| `tests/core/teller/test_teller_withdraw.py` | `54b01a66d56189113c1eae48ad6cb7377bb4fe83cc27830fb5f96b444da8f943` |
+| `tests/data/test_ledger.py` | `02171b15e8af2487f416385039ff277d6426e14e2129b75fba94bec616b24d4e` |
+| `tests/data/test_ledger_action_block.py` | `37d71202a8d7efb81bd014c747eb7984763ada57dad17a2f111668f0124b6f16` |
+| `tests/inventory/test_block_clock_inventory.py` | `c2c0897888d99c75377d5f1352944d33a3dad7342285ddfefdd62748d619df87` |
+| `tests/vaults/modules/test_stab_vault_claims.py` | `c24392238771547162ace1e83473113c71881a389c15d6f47ec6c0b457e86d97` |
+
+The seven previously committed S5 probe/evidence paths also remain unchanged:
+
+| File | SHA-256 |
+| --- | --- |
+| `contracts/testing/ActionBlockIdentityProbe.vy` | `95716e4e2b383f2a07826be94d9ee402d263eec522bb4f77efd72a5e5f6eafe5` |
+| `docs/chains/rh/evidence/ledger-action-block-mainnet-fork.json` | `69baafbe41a73b2c3f447ce505d65156f9380b1081428faa587f1f0b193bea37` |
+| `docs/chains/rh/evidence/ledger-action-block-testnet-fork.json` | `ff66834d5d961047a3be3094df2ff01d0edc6efab92ede10e719cd14d31f9f15` |
+| `docs/chains/rh/evidence/ledger-action-block-testnet-proof.md` | `3cca1e14aa9103cd94388184c4a7e6c69aea66d448683ebcdc38e7943c7cf428` |
+| `docs/chains/rh/ledger-guard-security-decision.md` | `15610bac4293d06320581dc1603b2980ea352af55d89f040ccab18ca26c9e739` |
+| `scripts/probes/action_block_identity_probe.py` | `00fd4a4194a8da87fcf9f49f43cfae9fbdc6af3ddeb6437e5f9812f66a5fa507` |
+| `tests/probes/test_action_block_identity_probe.py` | `e81e9279f0a44426f3c9a841108fbe2a5c3df626ea65426682eca76be0601f74` |
+
+Reconciliation, validation, and this bounded documentation update are not
+independent Gate 2 approval, push authority, `rh` integration authority,
+deployment authority, or release readiness. No commit, push, integration,
+deployment, registration, configuration, activation, governance, RPC or
+signer access, signing, broadcast, Base migration, or release action is
+authorized by this record.
