@@ -112,6 +112,61 @@ in this document. The H-06 worktree remains based on `c0d0e708...`, tree
 input movement requires a fresh input and interface reconciliation rather than
 rewriting this timestamped observation.
 
+### 1.2.1 Final post-H-01 reconciliation observation
+
+At `2026-07-27T13:30:28Z`, local `rh`, cached `origin/rh`, and live
+`origin/rh` all resolved read-only to
+`7098211db5693f986b65ec7a9e897f3518e9538c`, tree
+`c07329ed9fcc2dc99afbef3f7888f478024d1ede`.
+
+The approved and signed H-06 evidence commit
+`9a3426201eb62ab7ca1cc3fc55b0834d21590477` was preserved unchanged and
+normally reconciled with exact final `rh` by merge commit
+`47af0786620a527d0b60d25405a719effa0ea1dd`, tree
+`7ef5000d318db5425cb6fccef4dea1a60331dc72`, with parents ordered
+`9a3426201eb62ab7ca1cc3fc55b0834d21590477` then
+`7098211db5693f986b65ec7a9e897f3518e9538c`. The conflict-free virtual merge
+produced the same tree. Net `rh...HEAD` scope remains exactly this H-06
+evidence file, whose blob
+`30197c4c20d650cf918b20a1796d08a8f8c13d28` and SHA-256
+`831cd701c13dbe1c9c7d5f666f91ac5cc84ab425d5fb2c95438f414bd7746c2c`
+were unchanged by reconciliation.
+
+From the prior controlling `7a3a36666f277277fa08b55081b3f58c7cd3ba64`
+state to final `rh`, only the two H-01 evidence files, `requirements.in`,
+`requirements.txt`, and `tests/deployment/test_dependency_gate.py` changed.
+No H-06 migration, manifest, profile, history, schema, or writer input changed.
+
+H-01's integrated transition makes `EX-H01-CLICK-01`,
+`EX-H01-PYGMENTS-01`, and `EX-H01-PYMDOWN-SNIPPETS-01` historical and
+non-operative. `EX-H01-PYTEST-01` and `EX-H01-PYMDOWN-B64-01` remain
+operative under their recorded controls, review date, expiry, and invalidation
+triggers. This records repository exception disposition only and makes no
+GitHub or Dependabot alert-state claim.
+
+The controlling H-05 evidence remains SHA-256
+`28c3e32b9732334c4904667eeb983d057d5d96391fb5fd8b13f37a9f5033af7c`,
+blob `cc730d393daad01c7403c4305770d2b33209c752`; its six-file ceiling,
+RFC 8785/JCS rules, synthetic-read boundary, migration-ID grammar, and
+interface-relevant implementation inputs are unchanged.
+
+A disposable, non-controlling OD-04 feasibility study found the
+dependency-free native direction conditionally feasible on the exact tested
+environments: macOS APFS using `renameatx_np(..., RENAME_EXCL)` and Linux
+overlayfs/tmpfs using `renameat2(..., RENAME_NOREPLACE)`. It found no need for
+a dependency, helper module, runtime fallback, or ninth file. The study also
+proved that the native calls can publish symlinks and non-regular source
+objects unless the implementation independently enforces held-descriptor,
+inode, regular-file, symlink, and device checks.
+
+The study does not close OD-04. It did not implement the adapter or no-skip
+tests inside the approved H-06 files, qualify the intended persistent Linux
+target filesystem, resolve the macOS `F_FULLFSYNC` durability policy, or
+receive the required independent filesystem and security reviews. Final `rh`
+contains no controlling adapter implementation or proof. The conditional
+eight-file ceiling therefore remains gated, OD-04 remains a mandatory Phase B
+stop, and Phase B remains unauthorized.
+
 ### 1.3 Explicit exclusions
 
 This Phase A does not implement or authorize:
@@ -2120,9 +2175,9 @@ after every applicable gate below, including the mandatory OD-04 feasibility
 stop, is satisfied. Any of the following invalidates this ceiling and requires
 renewed review:
 
-- `rh` moves beyond the timestamped controlling
-  `7a3a36666f277277fa08b55081b3f58c7cd3ba64` observation, or any controlling
-  input changes;
+- `rh` moves beyond final post-H-01 controlling commit
+  `7098211db5693f986b65ec7a9e897f3518e9538c`, tree
+  `c07329ed9fcc2dc99afbef3f7888f478024d1ede`, or any controlling input changes;
 - integrated H-05 evidence is not exactly
   `28c3e32b9732334c4904667eeb983d057d5d96391fb5fd8b13f37a9f5033af7c`,
   or its six-file ceiling, RFC 8785/JCS rules, synthetic-read boundary, or
