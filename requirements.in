@@ -10,3 +10,6 @@ idna==3.15
 python-dotenv==1.2.2
 cbor2==5.9.0
 wheel==0.46.2
+click==8.3.3
+Pygments==2.20.0
+pymdown-extensions==10.21.3

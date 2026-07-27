@@ -1,6 +1,7 @@
 # Track 7 H-01 Stage A Dependency-Security Gate
 
-**Status:** The independently approved four-file H-01 Candidate A payload was
+**Historical post-Candidate-A status (recorded 25 July 2026 UTC):** The
+independently approved four-file H-01 Candidate A payload was
 integrated and pushed on authoritative `rh` at exact merge commit
 `575d47b82055b42da2bddf1535d8076cd7cf4c63`. Its parents are the reviewed
 baseline `03c07f01dda03a5529c602aafbfe5545ae86df69` and final H-01 commit
@@ -20,6 +21,20 @@ and awaits final review; no dependency, lock, test, exception, policy, or
 validation conclusion changed. No Dependabot mutation, deployment, signing,
 verification submission, private-evidence deletion/relocation, or other
 production action is authorized or performed.
+
+**Current transition status (updated 27 July 2026 UTC):** The exact
+three-package remediation is integrated and pushed on authoritative `rh` at
+commit `d62777646cba1ae448fb9e26519c6fa295f437df`, tree
+`01b1d7c8fc7bdf5163e20efe1f61b53db2b01a61`. The integrated pins are Click
+`8.3.3`, Pygments `2.20.0`, and Pymdown Extensions `10.21.3`; pytest `8.4.2`,
+Titanoboa `0.2.7`, Vyper `0.4.3`, and every other dependency remain held. The
+final corrected validation interval is recorded at the end of this evidence.
+The owner-authorized three-file exception-status transition is also recorded
+in the latest controlling section. Its target split becomes effective only
+when the exact independently approved transition commit is integrated into
+authoritative `rh`; a feature branch or uncommitted candidate does not itself
+retire an exception. Package remediation, repository exception retirement,
+and GitHub/Dependabot alert closure remain separate determinations.
 
 **Evidence date:** 24 July 2026
 
@@ -4194,3 +4209,845 @@ contain its own stable hash. This evidence-only amendment remains uncommitted
 for final review. No commit, push, merge, Dependabot mutation, deployment,
 signing, verification submission, private-evidence deletion/relocation, or
 other production action was performed.
+
+## 26 July 2026: three-package exception-retirement implementation — Gate 1 validation
+
+This section is the current implementation record. Historical Candidate A,
+review, integration, K-02, and exception records above remain unchanged.
+
+### Authority, baseline, isolation, and scope
+
+The owner authorized exactly:
+
+```text
+click==8.3.3
+Pygments==2.20.0
+pymdown-extensions==10.21.3
+```
+
+Exact pytest `8.4.2`, Titanoboa `0.2.7`, Vyper `0.4.3`, and every other
+direct and transitive dependency are held. The implementation identities are:
+
+```text
+baseline commit:
+  c0d0e708ae4a89ed730615c9eaf2d23a4fecc05d
+baseline tree:
+  b2c2358f565e27ad6a5c787a9a0d1396af513076
+branch:
+  rh-track-7-h1-exception-retirement-implementation
+worktree:
+  /Users/wigglez/dev/ripe-protocol-track-7-h1-exception-retirement-implementation
+```
+
+Before worktree creation, the integration worktree was clean and local `rh`,
+cached `origin/rh`, and live `origin/rh` all equaled the exact baseline. The
+distinct implementation branch and worktree did not exist locally or
+remotely. The preserved feasibility and preflight evidence branches and
+worktrees were not reused, modified, moved, deleted, pruned, or treated as
+implementation candidates.
+
+The immutable feasibility report remains byte-identical at SHA-256:
+
+```text
+9b9ad56d73d8a7418dcc0e452b3affb927979ce53fd90fcd5f84f9b9dfcfbfec
+```
+
+### Deterministic resolver and exact lock delta
+
+Two independent mode-`0700` resolver environments used the same exact
+CPython `3.12.0` seed, SHA-256
+`d23fa2c326127c9590d097603f105d69e68774968f46246fc7a8a80103600765`,
+with pip `23.2.1`, pip-tools `7.4.1`, build `1.5.0`, Click `8.4.2`,
+packaging `26.2`, pyproject-hooks `1.2.0`, setuptools `83.0.0`, and wheel
+`0.47.0`. Each used its own frozen-lock seed and private resolver cache, public
+`https://pypi.org/simple` only, no extra/private index, and the approved
+truthful command-header form.
+
+Both candidate inputs are byte-identical at:
+
+```text
+1227d9681d8b37f6820a7c09fa33b87798229e613748085e45454efea962a2b9
+```
+
+Both generated locks are byte-identical at:
+
+```text
+214f6c32c628df1eb2bbb1979b3bae8147ceaf338e68959dd58d82394b9be010
+```
+
+The final-path compile reproduced the same bytes. Mechanical normalized-pin
+comparison found 90 pins in both control and candidate and exactly:
+
+```text
+click                 8.2.1  -> 8.3.3
+pygments              2.19.2 -> 2.20.0
+pymdown-extensions    10.16.1 -> 10.21.3
+```
+
+No fourth package or transitive version changed. The only other literal lock
+changes are the three corresponding `-r requirements.in` annotations.
+
+### Fresh clean installations and audit
+
+Separate fresh mode-`0700` control and candidate CPython `3.12.0` environments
+installed their respective locks from public PyPI with `--no-cache-dir`.
+Both passed `python -m pip check`, contained exactly 93 distributions, and
+contained no `direct_url.json`. Their canonical inventory SHA-256 identities
+are:
+
+```text
+control:
+  dd7409860ff2f014fc607c77c57ce56df4d1da3175f381fa54eed9644fe50e59
+candidate:
+  1f60250c51822ad4e033ed729563ff8f2625a05e93730116c55477e97dae3688
+```
+
+The inventories differ only in the three authorized packages above.
+
+A separate CPython `3.12.0` / pip `23.2.1` environment installed exact
+`pip-audit==2.10.1`. Fresh raw no-ignore audits used `--no-deps`,
+`--disable-pip`, no fix, no suppression, and no `--ignore-vuln` flags.
+Control reported seven rows in five packages; candidate reported four rows in
+three packages:
+
+| Candidate package | Finding | Disposition before final review |
+|---|---|---|
+| Pymdown Extensions `10.21.3` | `CVE-2026-61632` | retained `EX-H01-PYMDOWN-B64-01`; first patch remains `11.0.0` |
+| pytest `8.4.2` | `PYSEC-2026-1845` | retained `EX-H01-PYTEST-01`; first patch remains `9.0.3` |
+| Vyper `0.4.3` | `PYSEC-2023-142` | authoritative range exclusion; not an exception |
+| Vyper `0.4.3` | `PYSEC-2025-33` | authoritative range exclusion; not an exception |
+
+The Click `PYSEC-2026-2132`, Pygments `PYSEC-2026-2987`, and Pymdown
+Snippets `PYSEC-2026-2999` rows are absent from the candidate result. The b64
+row remains at Pymdown `10.21.3`. The two Vyper determinations are not
+exceptions and both Vyper dispositions remain unchanged.
+
+Raw audit SHA-256 identities inside the private disposable task root are:
+
+```text
+control:
+  6652eda4acae57de587d01799946f2e417e875c81d38e047a1d10b43a212d80c
+candidate:
+  88e5243eac8236c8eae64b7890708aa913d7cadf3d408303c2f0a5512bfe0a84
+```
+
+This audit proves candidate-lock remediation only. It is not GitHub or
+Dependabot alert closure, no alert state was queried, and no exception is
+claimed retired.
+
+### Click, Pygments, and Pymdown behavior
+
+Control Click `8.2.1` and candidate Click `8.3.3` were invoked independently
+through migrate, console, and verify. Fourteen offline cases covered all three
+help routes, missing-required-option failures, invalid choices,
+case-insensitive accepted choices, and migrate/console sensitive-RPC
+redaction. Every `(return code, stdout, stderr)` tuple was byte-identical
+between environments, and the synthetic sensitive RPC never appeared in
+output. The dependency gate additionally verifies the installed Click editor
+patch uses a parsed argument vector and does not use `shell=True`.
+
+Control and candidate Pygments produced the same exact normal Python token,
+HTML, terminal, IPython, pytest terminal-writer, and Rich terminal outputs:
+
+| Surface | SHA-256 |
+|---|---|
+| Token rows | `48953b4016ec793c0e8e23c9baaa7afe2ef8cc40b9605187666490c0071e5f35` |
+| HTML | `c3e57a4263eb74006e0988b6dea2d398bbcabeb4e1b0119bd4fd8dbac899f48c` |
+| Terminal and IPython terminal | `37ebe32a865ffdd7ecd4a5d097375ac299210fc8c16eeb6b9866682e0e0cb401` |
+| pytest terminal writer | `b1c489802e2e3adbbf152619aee2bf48c29798c933a67066cdb53f9d478cf6f4` |
+| Rich terminal | `14793d92ce8bc074a7d3ae21e04ab478339a33e81fc0382bfcbcaecc6255c317` |
+
+Direct, aliased, and literal-folded affected-lexer selections remain rejected
+by the repository reachability gate.
+
+Fresh synthetic Snippets fixtures showed that Pymdown `10.16.1` leaked both a
+shared-prefix sibling and an absolute outside-base file, while `10.21.3`
+blocked shared-prefix, parent, and absolute traversal shapes and preserved an
+inside-base include. The separate b64 fixture still encoded an image outside
+the configured base under both versions. That result is residual evidence for
+`EX-H01-PYMDOWN-B64-01`, not a b64 remediation claim.
+
+### Candidate validation results
+
+Every pytest command used `ETHERSCAN_API_KEY=local-placeholder`, an external
+single-use mode-`0700` parent, an explicit external basetemp, and a distinct
+private Boa cache installed with `from boa.interpret import set_cache_dir`.
+Every parent was removed and verified absent after its command.
+
+| Gate | Result |
+|---|---|
+| Complete H-01 dependency gate | 24 passed in 1.77 s |
+| Current H-02 combined suite | 99 passed in 13.88 s |
+| S1 clock profiles | 57 passed in 105.33 s |
+| S2 checked inventory | `CLOCK_INVENTORY_OK`; production `100/95/17`, BN `32/100`, indirect `1`, cadence `455`, seconds-unit `58`, timestamp `11/37`, mixed-clock `4`, Vyper paths `92`; non-production test `31/29/5`, cadence `159` |
+| S2 inventory tests | 60 passed in 25.56 s |
+| Complete Lootbox directory | 175 passed in 120.66 s |
+| S3 Switchboard Charlie target | 91 passed in 114.63 s |
+| Collection | 2,845/2,987 selected; 142 pre-existing deselected in 5.91 s |
+| Complete serial suite | 2,845 passed, 142 deselected in 316.46 s |
+
+The candidate adds exactly eight selected H-01 dependency-gate cases over the
+2,837-case baseline. It adds no skip, xfail, deselection, warning suppression,
+or test relaxation.
+
+### Compiler, artifact, and ABI identity
+
+Control and candidate independently compiled both representative artifacts
+with separate private Boa caches and exact
+`vyper==0.4.3+commit.bff19ea2`:
+
+| Artifact | Optimize | Source SHA-256 | ABI SHA-256 | Creation SHA-256 | Runtime SHA-256 | Combined fingerprint |
+|---|---|---|---|---|---|---|
+| `ClockObserver` | GAS | `238b2198a0217158db3f93000da47e4af5535883807e7b39cc3864f8d5b432f7` | `55fd4609d43321ded86224d044944b9a1955be174ca91fd55b75fb179f5090c8` | `b5f9615f2267ede387f99c77873aded9a241d30d0269a6f1df336ed93e454ecd` | `6842b313171e51a6b1b4f99143074e263de3f72d943838a3ec887ad3b1dd16d6` | `9ac4b78267b62fe4a645212b3b2bc83498afcedb7b75804d9449ea2056ce791d` |
+| `Lootbox` | CODESIZE | `ebb4dcca8fa95bafe8e38ddc1d01886bfaceaf06302fe195f63db0bb7b3ef1da` | `e752a206ba5c78cb573c734c7bfd1c407f1cb98898d3d8e9d3513836c56f5fb2` | `9246a6d9dbee596750dc3a50d27d4418f318a62b7b4826a13f76aee37621e6ce` | `db9c2b91497a6e11191a181c9cbe1776e96532e50ff3e60e17f0bd447354e097` | `263f6e5a75b85763dfed0656b194109512fad6856bc2acf8cccef660586aea0d` |
+
+Separate empty ABI roots each exported 49 byte-identical files, skipped the
+same 28 mock/testing paths, and reproduced the same nine pre-existing
+standalone initializer failures. The canonical 49-file mapping SHA-256 is
+`c49c61ad006d223a1bf13e2d26c5862eda82128f3cc640501c278c28f69b1dde`.
+Generated and committed `Lootbox.json` are byte-identical at
+`33aadc219718332ef9163f0b85c8e6fba93735d149db3fb0bb2e3fab814db17c`.
+
+### Rollback reproduction
+
+Rollback used the separate fresh control environment installed directly from
+the old lock and the untouched exact-baseline integration worktree. It was
+not an in-place downgrade. `pip check` passed, the baseline H-01 gate passed
+16 cases, H-02 passed 99, S1 passed 57, collection was exactly 2,837/2,979
+selected with 142 deselected, and the complete serial baseline suite passed
+2,837 with the same 142 deselected in 322.85 seconds.
+
+Before merge, rollback is to discard only the validated candidate environment
+and restore the five authorized repository files to the frozen baseline
+bytes. After any later merge, rollback requires a separately reviewed revert
+and regenerated old lock; destructive reset is not authorized.
+
+### Proposed exception disposition and Gate 1 stop
+
+Subject to final exact-byte independent review and later owner approval, the
+proposed disposition is:
+
+- proposed retirement only: `EX-H01-CLICK-01`,
+  `EX-H01-PYGMENTS-01`, and `EX-H01-PYMDOWN-SNIPPETS-01`;
+- retain: `EX-H01-PYTEST-01` and `EX-H01-PYMDOWN-B64-01`.
+
+All five bounded exceptions remain operative during implementation and review.
+Final byte-level dependency-gate, exact-scope, whitespace, and local/cached/live
+`rh` freshness results are recorded only after these evidence bytes are
+complete. The package stops at Gate 1 unstaged and uncommitted. No staging,
+commit, push, merge, deployment, signing, verification submission, alert
+query/mutation, live-chain action, or private retained-evidence access was
+performed.
+
+### Final Gate 1 scope and freshness
+
+After the complete evidence bytes were written, the dependency gate passed
+again with 24 cases and the complete serial suite passed again with 2,845
+selected cases and the same 142 deselected. `git diff --check` is clean.
+The exact changed-path set is only:
+
+```text
+docs/chains/rh/evidence/dependency-exception-exit-preflight.md
+docs/chains/rh/evidence/dependency-security-gate.md
+requirements.in
+requirements.txt
+tests/deployment/test_dependency_gate.py
+```
+
+There is no staged or untracked path. The diff adds no skip, xfail,
+deselection, warning suppression, or relaxation. The final non-self-referential
+implementation file hashes are:
+
+```text
+requirements.in
+  1227d9681d8b37f6820a7c09fa33b87798229e613748085e45454efea962a2b9
+requirements.txt
+  214f6c32c628df1eb2bbb1979b3bae8147ceaf338e68959dd58d82394b9be010
+tests/deployment/test_dependency_gate.py
+  c2aacf206d159bc74968496ced55f7eb7978f74249b7b5af7634172db8bd903b
+```
+
+The feasibility report remains byte-identical at
+`9b9ad56d73d8a7418dcc0e452b3affb927979ce53fd90fcd5f84f9b9dfcfbfec`,
+and its preserved branch still resolves to
+`2b6920c2fc9044cbfb6f715c03674e96027084e3`. The integration worktree is
+clean. Local `rh`, cached `origin/rh`, and a final live `origin/rh` read all
+remain exact
+`c0d0e708ae4a89ed730615c9eaf2d23a4fecc05d`.
+
+Gate 1 therefore stops with these five authorized files unstaged and
+uncommitted. The proposed dispositions remain pending independent review and
+owner approval; all five exceptions remain operative.
+
+## 26 July 2026: bounded F1/F3 correction and current-`rh` reconciliation
+
+This latest section supersedes the first implementation Gate 1 verdict above.
+It does not rewrite the historical test results; it marks them
+non-authoritative and records the fresh corrected interval.
+
+### Reconciliation identity and byte preservation
+
+Before reconciliation, the complete unstaged full-index patch had SHA-256
+`22e4fa540a8f27aff68ad5a906bad9533138a88f2c91c5a2e853e4ddcd0fcaae`
+and contained 815 lines / 34,322 bytes. Its exact five file hashes were:
+
+```text
+requirements.in
+  1227d9681d8b37f6820a7c09fa33b87798229e613748085e45454efea962a2b9
+requirements.txt
+  214f6c32c628df1eb2bbb1979b3bae8147ceaf338e68959dd58d82394b9be010
+tests/deployment/test_dependency_gate.py
+  c2aacf206d159bc74968496ced55f7eb7978f74249b7b5af7634172db8bd903b
+docs/chains/rh/evidence/dependency-security-gate.md
+  a2266346b0255df63e3291eef8e106c6ac39ec9269e1a531dc06201a3b45bacd
+docs/chains/rh/evidence/dependency-exception-exit-preflight.md
+  15a9dfebb3415f0204a73123180780bb2c720547612624c78bd8c1183def369e
+```
+
+At the authorized pre-merge observation on 26 July 2026, local `rh`, cached
+`origin/rh`, live `origin/rh`, and the clean integration worktree all resolved
+to `8e4a965f034dc3d11b60fbb674ebbb4095b57d98`. This is historical
+reconciliation provenance, not a current-ref claim. The incoming range
+contained only H-03 documentation commits `2c8468a` and `d65e4db`, adding or
+changing only:
+
+```text
+docs/chains/rh/evidence/robinhood-blueprint-phase-a.md
+docs/chains/rh/track-7-h3-robinhood-blueprint-omissions.md
+```
+
+A normal conflict-free `--no-ff` merge created
+`9aedbbbf13f8f60e0bd816d6493e310cacbfbbda` with parents:
+
+```text
+parent 1: c0d0e708ae4a89ed730615c9eaf2d23a4fecc05d
+parent 2: 8e4a965f034dc3d11b60fbb674ebbb4095b57d98
+```
+
+Immediately after the merge, all five file hashes and the complete full-index
+patch hash remained byte-identical. There was no conflict, staged H-01 path,
+or candidate-byte movement.
+
+### Fresh resolver, installation, and audit evidence
+
+Two independent mode-`0700` CPython `3.12.0` resolver environments used seed
+interpreter SHA-256
+`d23fa2c326127c9590d097603f105d69e68774968f46246fc7a8a80103600765`,
+pip `23.2.1`, pip-tools `7.4.1`, build `1.5.0`, Click `8.4.2`,
+packaging `26.2`, pyproject-hooks `1.2.0`, setuptools `83.0.0`, and wheel
+`0.47.0`. Each authoritative run started with the approved frozen lock at the
+output path, a separate private cache, and public PyPI only.
+
+Both input hashes were
+`1227d9681d8b37f6820a7c09fa33b87798229e613748085e45454efea962a2b9`;
+both generated locks were byte-identical to the repository lock at
+`214f6c32c628df1eb2bbb1979b3bae8147ceaf338e68959dd58d82394b9be010`.
+The exact normalized delta remains only:
+
+```text
+click                 8.2.1  -> 8.3.3
+pygments              2.19.2 -> 2.20.0
+pymdown-extensions    10.16.1 -> 10.21.3
+```
+
+Separate fresh old-lock and candidate environments each contained 93
+distributions, passed `pip check`, contained no `direct_url.json`, and differed
+only in those three rows. For a sorted lowercase `name==version` newline
+inventory, their SHA-256 values were:
+
+```text
+control:
+  d27107b4ef813977aa270e8e4d363a455c18e009e0336db8c4b803416bc8f234
+candidate:
+  06200ff43c346a61da7ded7e11a8c5b973e0167080f8f1764b417bda183a6a36
+```
+
+Fresh exact `pip-audit==2.10.1` no-ignore audits reported seven control rows
+and four candidate rows. Raw JSON SHA-256 values were:
+
+```text
+control:
+  9738ae73d02ab0a403a7aed7d0608a700d99929f8ad7234b384ad7ac4fc9c587
+candidate:
+  5d098257bf6a21d9903c0b3af99fa8b63c8e417cef8501dc1a058465b1996c4f
+```
+
+The candidate rows remain Pymdown b64 `CVE-2026-61632`, pytest
+`PYSEC-2026-1845`, and the two range-excluded Vyper rows. No GitHub or
+Dependabot state was queried, and candidate audit remediation is not alert
+closure.
+
+### F1: explicit Rich color mode
+
+The Rich behavior case now constructs `Console` with `no_color=False` together
+with the existing `force_terminal=True`, `color_system="standard"`, and fixed
+width. It asserts the rendered transcript contains `\x1b[` before accepting
+the exact colored-output SHA-256:
+
+```text
+4a98e8fea362182468a3d6c34cc22bdbc6efb5c4a293833960a382bdaf9afdd5
+```
+
+The complete corrected H-01 gate passed 30 cases with `NO_COLOR` absent and
+passed the same 30 cases with ambient `NO_COLOR=1`. Therefore ambient
+no-color state cannot satisfy or alter this colored rendering check. The
+earlier 24-case result is not authoritative.
+
+### F3: bounded string-activation reachability
+
+The AST reachability scanner now rejects direct and imported/aliased
+`markdown.markdown(..., extensions=...)` activation of `pymdownx.b64` and
+`pymdownx.snippets` without requiring a Pymdown import. It resolves:
+
+- direct string literals;
+- list, tuple, and set literals;
+- bounded name assignments;
+- statically resolvable string `+` concatenations; and
+- bounded sequence `+` concatenations.
+
+The existing allowlist remains exact only for
+`tests/deployment/test_dependency_gate.py`. Four focused positive cases cover
+both extensions, direct literals, aliases, assignments, string
+concatenations, and sequence concatenation. Two focused negative cases cover
+ordinary safe extensions and a deliberately unresolved runtime selection.
+The focused run passed 6 cases. This is intentionally bounded static analysis,
+not unrestricted runtime dataflow.
+
+### F4, F5, and F6 residual dispositions
+
+- **F4 — Pygments:** The scanner still does not claim exhaustive coverage of
+  runtime-computed lexer names, plugin registry selection, `getattr`, or other
+  dynamic indirection. It covers direct/aliased affected-lexer imports and
+  bounded literal/concatenated `get_lexer_by_name` calls. A current
+  repository-wide scan finds no dynamic affected-lexer path. This limitation
+  remains disclosed, and `EX-H01-PYGMENTS-01` remains operative until the
+  separately reviewed retirement transition.
+- **F5 — Click:** The procedural Click reachability trigger is not a control
+  relied upon after any separately reviewed Click retirement transition.
+  Current evidence also includes installed patch-source and migrate/console/
+  verify behavior checks, but `EX-H01-CLICK-01` remains operative here.
+- **F6 — scanner boundary:** Repository traversal is rooted at the supplied
+  tree, excludes the enumerated generated/vendor/environment directories,
+  does not follow directory symlinks, and skips symlinked files. It does not
+  claim coverage outside that root or through symlink targets. The Pygments
+  pytest-rendering assertion imports pinned pytest `8.4.2`'s private
+  `_pytest._io.terminalwriter.TerminalWriter`; any pytest movement or private
+  API change reopens this evidence. Filesystem traversal is not widened and
+  pytest is not upgraded.
+
+### Corrected validation results
+
+Every pytest invocation used a new mode-`0700` external parent, an explicit
+external basetemp, and a private Boa cache.
+
+| Gate | Fresh corrected result |
+|---|---|
+| Focused F3 scanner cases | 6 passed; 24 deselected |
+| Complete H-01, `NO_COLOR` absent | 30 passed in 1.75 s |
+| Complete H-01, ambient `NO_COLOR=1` | 30 passed in 1.77 s |
+| Current H-02 | 99 passed in 13.34 s |
+| S1 | 57 passed in 104.11 s |
+| S2 checker/tests | `CLOCK_INVENTORY_OK`; 60 passed in 25.45 s |
+| Complete Lootbox directory | 175 passed in 121.24 s |
+| Switchboard Charlie | 91 passed in 114.43 s |
+| Collection | 2,851/2,993 selected; 142 pre-existing deselected |
+| Complete serial candidate suite | 2,851 passed; 142 deselected in 313.39 s |
+
+The count increase from the superseded 2,845 result is exactly six selected
+F3 cases: four fail-closed positives and two bounded negatives. No skip,
+xfail, warning suppression, relaxation, or unexplained deselection was added.
+
+### Compiler and ABI canonicalization
+
+Fresh control and candidate compilations with separate Boa caches reproduced
+byte-identical ClockObserver and Lootbox source, compiler settings, ABI,
+creation bytecode, runtime bytecode, and combined fingerprints listed in the
+preceding artifact table. The raw Lootbox file hash remains
+`669c2857e2402ef0e8f9a508dd6f342426ffbd1affce11dd429e5b5b0129ae65`.
+
+The reviewed compiler-data source and creation sub-hashes are reproducible
+with this exact canonicalization procedure:
+
+```text
+H01_BOA_CACHE_DIR=<new-mode-0700-cache> PYTHONPATH=. <exact-python> -c '
+from pathlib import Path
+import os
+import boa
+from boa.interpret import set_cache_dir
+from tests.utils.clock_profiles import artifact_fingerprint
+cache = Path(os.environ["H01_BOA_CACHE_DIR"])
+cache.mkdir(mode=0o700)
+set_cache_dir(cache)
+artifact = boa.load_partial("contracts/core/Lootbox.vy")
+fingerprint = artifact_fingerprint(artifact)
+print(fingerprint.source_sha256)
+print(fingerprint.creation_bytecode_sha256)
+'
+```
+
+It prints, in order:
+
+```text
+ebb4dcca8fa95bafe8e38ddc1d01886bfaceaf06302fe195f63db0bb7b3ef1da
+9246a6d9dbee596750dc3a50d27d4418f318a62b7b4826a13f76aee37621e6ce
+```
+
+These are hashes of Boa/Vyper compiler-data source and creation bytes, not the
+raw source-file hash. Old/candidate byte equality and the combined fingerprint
+are the controlling artifact result. No private retained evidence was read.
+
+Separate ABI exports again produced 49 byte-identical files, the same 28
+mock/testing skips, and the same nine known standalone initializer failures.
+The canonical mapping hash remains
+`c49c61ad006d223a1bf13e2d26c5862eda82128f3cc640501c278c28f69b1dde`;
+generated and committed `Lootbox.json` remain byte-identical at
+`33aadc219718332ef9163f0b85c8e6fba93735d149db3fb0bb2e3fab814db17c`.
+
+### Fresh rollback and exception status
+
+The separate fresh old-lock environment and untouched current-`rh` integration
+worktree passed `pip check`, baseline H-01 16, H-02 99, S1 57, collection
+2,837/2,979 with 142 deselected, and the complete serial rollback suite with
+2,837 passed / 142 deselected in 279.78 seconds.
+
+No exception is retired. `PROPOSED_RETIREMENTS` remains proposed only. All
+five bounded exceptions remain operative. Any split into retired historical
+records and the two retained operative exceptions requires another fresh
+exact-hash review, independent approval, and separate owner authorization.
+This corrected package stops unstaged and uncommitted at Gate 1. The
+reconciliation merge exists only on the local feature branch; nothing was
+pushed or merged into `rh`.
+
+## 27 July 2026 final bounded Gate 1 correction
+
+This section supersedes the preceding 30-case / 2,851-case result only where
+the new scanner cases, reproducible aggregate serialization, rollback
+boundary, or ref wording differ. It does not change the lock, compiler,
+exception, or owner disposition.
+
+### Exact starting bytes, cleanup, and ref observations
+
+Before editing, the five approved files still had the Gate 1 hashes:
+
+```text
+requirements.in
+  1227d9681d8b37f6820a7c09fa33b87798229e613748085e45454efea962a2b9
+requirements.txt
+  214f6c32c628df1eb2bbb1979b3bae8147ceaf338e68959dd58d82394b9be010
+tests/deployment/test_dependency_gate.py
+  9e9b1091d764a47a5f209a30b40cdefdaa38fd245b1d648cf2a62b361d2102d8
+docs/chains/rh/evidence/dependency-security-gate.md
+  a08ede99983ac73386faabc33e6fd6c35d31890c943e712bcbcfce19587a1daf
+docs/chains/rh/evidence/dependency-exception-exit-preflight.md
+  d7ab7b0d63a2ce2674360e2d8c09e48a1948af7c05847614d7c2c6030ce8341e
+```
+
+The complete unstaged full-index patch SHA-256 was exact
+`9c075c4f6f2a69bd5a56eab79fee44fb53669b83a0df69b4fcc9cffa6ade93cf`.
+
+The ignored generated Python cache/bytecode inventory was resolved before
+cleanup and contained only these exact paths:
+
+```text
+.hypothesis/constants/0236a436f2a29278
+.hypothesis/constants/06b5d4da03c0dbc5
+.hypothesis/constants/090671e773896788
+.hypothesis/constants/0e9ef9ec119ea428
+.hypothesis/constants/47246ce20fa5c099
+.hypothesis/constants/59ce3bf3e4616a90
+.hypothesis/constants/6a23e09f813b6a5c
+.hypothesis/constants/8a6e0e1115a36284
+.hypothesis/constants/8b1a8fbd01a24982
+.hypothesis/constants/8c7cee9e0d794ba9
+.hypothesis/constants/cd5041e2a0414bb9
+.hypothesis/constants/ce6fdaf779cc0a92
+.hypothesis/constants/e422491e1f6ea729
+.hypothesis/constants/f2d64de826b91460
+.hypothesis/constants/f32d0f9860fc926e
+.hypothesis/constants/f53330046d3946ef
+config/__pycache__/BluePrint.cpython-312.pyc
+config/__pycache__/network_profiles.cpython-312.pyc
+scripts/__pycache__/console.cpython-312.pyc
+scripts/__pycache__/migrate.cpython-312.pyc
+scripts/__pycache__/verify.cpython-312.pyc
+scripts/utils/__pycache__/deploy_args.cpython-312.pyc
+scripts/utils/__pycache__/json_file.cpython-312.pyc
+scripts/utils/__pycache__/log.cpython-312.pyc
+scripts/utils/__pycache__/migration.cpython-312.pyc
+scripts/utils/__pycache__/migration_helpers.cpython-312.pyc
+scripts/utils/__pycache__/migration_runner.cpython-312.pyc
+tests/__pycache__/conf_core.cpython-312-pytest-8.4.2.pyc
+tests/__pycache__/conf_env.cpython-312-pytest-8.4.2.pyc
+tests/__pycache__/conf_mock.cpython-312-pytest-8.4.2.pyc
+tests/__pycache__/conf_utils.cpython-312-pytest-8.4.2.pyc
+tests/__pycache__/conftest.cpython-312-pytest-8.4.2.pyc
+tests/__pycache__/constants.cpython-312.pyc
+tests/utils/__pycache__/clock_profiles.cpython-312-pytest-8.4.2.pyc
+tests/utils/__pycache__/clock_profiles.cpython-312.pyc
+```
+
+Only those ignored cache roots were removed. No tracked file, other worktree,
+or stash was touched.
+
+At `2026-07-27T03:02:59Z`, an initial read observed local `rh` and cached
+`origin/rh` at `7a3a36666f277277fa08b55081b3f58c7cd3ba64`; a separate live
+`git ls-remote` immediately confirmed the same live ref. At
+`2026-07-27T03:30:58Z`, the final validation-freeze recomputation again
+observed local, cached, and live `rh` at exact `7a3a3666`, with a clean
+integration worktree. These are timestamped observations only. They do not
+make later documentation movement candidate authority, and this correction
+does not reconcile `rh`. Immediately before any later commit-time
+reconciliation, all three refs and integration cleanliness must be recomputed,
+the incoming delta must be reviewed, and new authority obtained where the
+approved target differs.
+
+### Per-element and expanded Markdown activation scanning
+
+The scanner no longer treats a sequence as all-or-nothing. It independently
+collects every statically resolvable string element in list, tuple, set,
+bounded name, string-`+`, and sequence-`+` forms. An unresolved sibling
+contributes no inferred value but cannot hide a direct banned value. Both:
+
+```text
+extensions=["pymdownx.b64", pick_extra()]
+extensions=[pick_extra(), "pymdownx.snippets"]
+```
+
+therefore fail closed. Safe literals alongside unresolved runtime values
+remain allowed because this is bounded static resolution, not speculative
+runtime dataflow.
+
+The same extension check now covers:
+
+- `markdown.markdown(...)`;
+- `markdown.Markdown(...)`; and
+- `markdown.markdownFromFile(...)`.
+
+Direct imports, module aliases, imported function/class aliases, direct static
+function/class alias assignments, bounded extension assignments and
+concatenations, and direct or bounded named `**` keyword mappings are covered.
+The allowlist remains exactly
+`tests/deployment/test_dependency_gate.py`. Sixteen positive cases exercise
+both banned extensions across the three call surfaces and alias shapes; five
+negative cases preserve safe literal and unresolved-runtime behavior. The
+focused matrix is therefore 21 cases, 24 other H-01 cases deselected.
+
+### Reproducible installed-inventory identities
+
+Each fresh interpreter generated its 93-row inventory twice using this exact
+command and byte serialization:
+
+```text
+<exact-python> -c 'from importlib.metadata import distributions; import sys; rows=sorted("{}=={}".format(d.metadata["Name"].lower(), d.version) for d in distributions()); sys.stdout.buffer.write(("\n".join(rows)+"\n").encode("utf-8"))' > inventory.txt
+shasum -a 256 inventory.txt
+```
+
+The serialization is UTF-8, package metadata `Name` lowercased without other
+normalization, Python-codepoint sorted complete `name==version` rows, one LF
+after every row including the last, and no other bytes. Independent reruns
+reproduced:
+
+```text
+control:   9e30800bec2f4d9a784314b6a3d3d25a37ee7c994a022366a577966a698abfa2
+candidate: f0393df6e4c1728b28d95e5034fee7b6ca4c5463df8fb387dbae839e15b87e4d
+```
+
+Both contain exactly 93 rows. Their textual diff contains only Click
+`8.2.1 -> 8.3.3`, Pygments `2.19.2 -> 2.20.0`, and Pymdown Extensions
+`10.16.1 -> 10.21.3`. The earlier `d27107b4...` and `06200ff4...` aggregate
+digests lacked a retained exact generating serialization and did not reproduce
+under the command above. They are historical, non-load-bearing observations
+and are not assigned invented provenance. The complete inventories, exact
+three-row diff, lock equality, and the newly reproducible digests are the
+controlling installed-state evidence.
+
+### Reproducible 49-file ABI mapping identity
+
+Control and candidate independently ran `scripts/export_abis.py` into separate
+empty private output roots. Each produced 49 files, skipped the same 28
+mock/testing paths, and reported the same nine known standalone initializer
+failures. Every corresponding output byte was identical. Each root then used:
+
+```text
+<exact-python> -c 'from pathlib import Path; import hashlib,json,sys; root=Path(sys.argv[1]); mapping={p.relative_to(root).as_posix():hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted(root.rglob("*")) if p.is_file()}; sys.stdout.buffer.write(json.dumps(mapping,sort_keys=True,separators=(",",":")).encode("utf-8"))' <abi-root> > abi-map.json
+shasum -a 256 abi-map.json
+```
+
+The mapping is a JSON object from POSIX relative filename to lowercase
+hexadecimal file SHA-256, with lexicographically sorted keys, compact `,` and
+`:` separators, UTF-8 encoding, and no trailing newline. Both independently
+generated 4,240-byte mappings reproduced:
+
+```text
+c49c61ad006d223a1bf13e2d26c5862eda82128f3cc640501c278c28f69b1dde
+```
+
+Control, candidate, and committed `scripts/abis/Lootbox.json` also remained
+byte-identical at
+`33aadc219718332ef9163f0b85c8e6fba93735d149db3fb0bb2e3fab814db17c`.
+Separate private-cache compilation again reproduced byte-identical
+ClockObserver and Lootbox source, settings, ABI, creation/runtime bytecode,
+and combined fingerprints `9ac4b782...` and `263f6e5a...`.
+
+### Real-worktree rollback boundary and fresh validation
+
+The authoritative rollback replay used the fresh old-lock environment from the
+clean real Git integration worktree observed at `2026-07-27T03:22:10Z`, not an
+export. The
+`test_committed_base_history_inventory_is_unchanged` Base-profile regression
+explicitly calls `git rev-parse --is-inside-work-tree` and self-skips outside
+a Git worktree. A `git archive` lacks `.git`; its
+`2,836 passed + 1 skip` shape is therefore not equivalent to the authoritative
+result and is non-load-bearing because it does not execute the committed
+Base-history assertion.
+
+The real-worktree rollback environment passed `pip check`, H-01 16, H-02 99,
+S1 57, collection 2,837/2,979 with 142 deselected, and the complete serial
+suite at 2,837 passed / 142 deselected in 278.02 seconds, with no skip or
+xfail.
+
+Every corrected candidate pytest command used an external mode-`0700`
+basetemp parent, a private Boa cache, and the exact candidate interpreter.
+
+| Gate | Final bounded-correction result |
+|---|---|
+| Focused expanded scanner matrix | 21 passed; 24 deselected |
+| Complete H-01, `NO_COLOR` absent | 45 passed |
+| Complete H-01, ambient `NO_COLOR=1` | 45 passed |
+| H-02 | 99 passed in 11.60 s |
+| S1 | 57 passed in 96.53 s |
+| S2 checker/tests | `CLOCK_INVENTORY_OK`; 60 passed in 24.00 s |
+| Complete Lootbox directory | 175 passed in 108.09 s |
+| Switchboard Charlie | 91 passed in 102.83 s |
+| Collection | 2,866/3,008 selected; 142 pre-existing deselected |
+| Complete serial candidate suite | 2,866 passed; 142 deselected in 276.58 s |
+
+The exact increase over the superseded 2,851 selected cases is 15: twelve new
+positive scanner parameters and three new negative parameters. No skip,
+xfail, warning suppression, relaxation, or new deselection was introduced.
+The two independent resolvers still produced byte-identical lock SHA-256
+`214f6c32...`, with exactly the authorized three-package delta and no
+transitive drift.
+
+No exception is retired. `PROPOSED_RETIREMENTS` remains proposed only, and all
+five bounded exceptions remain operative. This package remains unstaged and
+uncommitted pending narrow delta re-review. No reconciliation, commit, push,
+alert mutation, deployment, signing, or live-chain action is authorized or
+performed here.
+
+## H-01 three-exception retirement transition
+
+**Authorization status:** The owner adopted the exact
+`H-01 THREE-EXCEPTION RETIREMENT TRANSITION AUTHORIZATION` against integrated
+baseline commit `d62777646cba1ae448fb9e26519c6fa295f437df`, tree
+`01b1d7c8fc7bdf5163e20efe1f61b53db2b01a61`.
+
+**Effectivity boundary:** This section defines the final target repository
+policy. It becomes operative only when the exact independently approved
+transition commit containing these bytes is integrated into authoritative
+`rh`. Until that integration, the historical all-five operative state remains
+the authoritative policy. A feature branch, working-tree change, Gate 1
+candidate, review approval, or commit that is not integrated into `rh` does
+not itself retire an exception.
+
+The transition changes no dependency byte. Its immutable integrated inputs
+remain:
+
+```text
+requirements.in
+  1227d9681d8b37f6820a7c09fa33b87798229e613748085e45454efea962a2b9
+requirements.txt
+  214f6c32c628df1eb2bbb1979b3bae8147ceaf338e68959dd58d82394b9be010
+```
+
+The exact integrated versions remain Click `8.3.3`, Pygments `2.20.0`,
+Pymdown Extensions `10.21.3`, pytest `8.4.2`, Titanoboa `0.2.7`, and Vyper
+`0.4.3`. The three-package lock delta and every transitive hold remain
+unchanged.
+
+### Final target exception register
+
+| Exception | Final target status | Basis and boundary |
+|---|---|---|
+| `EX-H01-CLICK-01` | **Retired—historical and non-operative.** | Exact `click==8.3.3` is outside the `PYSEC-2026-2132` affected range and contains the reviewed editor-launch remediation. The former exception remains retained as historical evidence only. |
+| `EX-H01-PYGMENTS-01` | **Retired—historical and non-operative.** | Exact `Pygments==2.20.0` remediates `PYSEC-2026-2987`. Dynamic/plugin lexer-selection limitations remain disclosed defense-in-depth boundaries, not a continuing exception basis. |
+| `EX-H01-PYMDOWN-SNIPPETS-01` | **Retired—historical and non-operative.** | Exact `pymdown-extensions==10.21.3` remediates the reviewed `PYSEC-2026-2999` Snippets traversal finding. This disposition does not apply to `pymdownx.b64`. |
+| `EX-H01-PYTEST-01` | **Retained—operative.** | Exact `pytest==8.4.2` remains governed by the controls, triggers, review, and expiry below. Pytest 9 remains a separate S1/Vyper/Track 6 decision. |
+| `EX-H01-PYMDOWN-B64-01` | **Retained—operative.** | Exact `pymdown-extensions==10.21.3` remains affected by `CVE-2026-61632`; first patch remains `11.0.0`, outside the current resolver-valid Titanoboa/docs graph. |
+
+The historical `PROPOSED_RETIREMENTS` state is superseded only when the
+effectivity boundary above is satisfied. The three retired records remain
+preserved for audit chronology, evidence retention, and separately authorized
+disposal; they are not operative authorization after effective integration.
+
+### Operative retained exception terms
+
+The retained-exception owner is **Mick Hagen, H-01 owner**. Both retained
+exceptions keep the scheduled security review on **15 August 2026** and hard
+expiry at **2026-08-31T23:59:59Z**. The earlier of a finding-specific
+invalidation trigger or hard expiry ends authorization. An expired exception
+blocks deployment rehearsal and merge; it never converts into permanent
+acceptance.
+
+#### `EX-H01-PYTEST-01` — retain pytest `8.4.2`
+
+- **Status:** Retained—operative.
+- **Threat model:** pytest before `9.0.3` uses predictable
+  `/tmp/pytest-of-{user}` directories on Unix. Another local user can cause
+  denial of service and may be able to gain privileges while pytest runs.
+- **Scope:** Exact pytest `8.4.2` under CPython `3.12.0` for trusted repository
+  validation on owner-controlled local or ephemeral single-tenant runners.
+  Pytest is not part of deployed contract runtime.
+- **Compensating controls:** Use a fresh task-specific mode-`0700` parent and
+  explicit private `--basetemp` for every invocation; run only trusted
+  repository tests/plugins; prohibit shared multi-user runners; preserve the
+  exact S1 runtime assertions; add no skip, xfail, warning suppression, or test
+  relaxation.
+- **Re-review/invalidation triggers:** Shared or multi-user runner use;
+  untrusted tests/plugins; inability to provide a private basetemp; pytest,
+  Vyper, Titanoboa, Python, plugin, private pytest API, or S1-profile change;
+  advisory/exploit change; demonstrated pytest 9 compatibility; scheduled
+  review; or hard expiry.
+
+#### `EX-H01-PYMDOWN-B64-01` — retain Pymdown Extensions `10.21.3`
+
+- **Status:** Retained—operative.
+- **Threat model:** `pymdownx.b64` accepts relative traversal or absolute image
+  paths and embeds readable image-extension files outside `base_path` into
+  rendered output.
+- **Scope:** Exact transitive Pymdown Extensions `10.21.3`. The repository has
+  no b64 extension, MkDocs configuration, documentation build, or untrusted
+  Markdown-rendering path. The first patch is `11.0.0`, which is not
+  resolver-valid under unchanged `titanoboa==0.2.7` and
+  `mkdocs-material==9.5.41`.
+- **Compensating controls:** Do not enable `pymdownx.b64`; do not render
+  untrusted Markdown; preserve fail-closed source/configuration scanning; do
+  not run a docs build with repository, CI, or readable host secrets.
+- **Re-review/invalidation triggers:** Any b64 activation, Pymdown import or
+  configuration, Markdown/docs pipeline, untrusted Markdown, advisory/exploit
+  change, Titanoboa/docs-graph movement, scanner-boundary change, scheduled
+  review, or hard expiry.
+
+### Validation inheritance and alert-state boundary
+
+The retirement basis is the exact integrated lock, raw no-ignore package
+audit, reviewed package behavior, complete H-01/H-02/S1/S2/S3 and serial-suite
+results, compiler/ABI identity, and real-worktree rollback recorded above. The
+final reviewed interval passed H-01 45 cases with `NO_COLOR` absent and
+present, H-02 99, S1 57, S2 60 with `CLOCK_INVENTORY_OK`, Lootbox 175,
+Switchboard Charlie 91, collection 2,866 of 3,008 with 142 expected
+deselections, and the complete 2,866-case serial suite with zero skip or
+xfail.
+
+The Pygments scanner still does not claim exhaustive runtime/plugin selection
+coverage; the patched package and retained scanner are separate controls. The
+procedural Click trigger is not relied upon after effective retirement. The
+scanner root/symlink boundary and pinned pytest private API remain disclosed;
+the latter remains governed by `EX-H01-PYTEST-01`.
+
+Package remediation and repository exception retirement are distinct from
+GitHub/Dependabot alert closure. This transition does not claim that any
+GitHub or Dependabot alert is closed, dismissed, resolved, or otherwise
+changed. No authenticated alert-state query was required or performed. Any
+future alert-state statement requires separate authority and fresh
+authenticated evidence.

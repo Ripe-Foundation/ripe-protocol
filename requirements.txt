@@ -30,8 +30,10 @@ ckzg==2.1.2
     # via
     #   eth-account
     #   py-evm
-click==8.2.1
-    # via mkdocs
+click==8.3.3
+    # via
+    #   -r requirements.in
+    #   mkdocs
 colorama==0.4.6
     # via mkdocs-material
 coverage[toml]==7.10.6
@@ -190,15 +192,18 @@ pydantic==2.11.7
     #   eth-utils
 pydantic-core==2.33.2
     # via pydantic
-pygments==2.19.2
+pygments==2.20.0
     # via
+    #   -r requirements.in
     #   ipython
     #   ipython-pygments-lexers
     #   mkdocs-material
     #   pytest
     #   rich
-pymdown-extensions==10.16.1
-    # via mkdocs-material
+pymdown-extensions==10.21.3
+    # via
+    #   -r requirements.in
+    #   mkdocs-material
 pytest==8.4.2
     # via
     #   -r requirements.in
