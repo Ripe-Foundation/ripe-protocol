@@ -1,18 +1,30 @@
 from __future__ import annotations
 
 import ast
+import base64
 import hashlib
+import io
+import json
 import re
 from importlib import metadata
 from pathlib import Path
 
 import cbor2
 import idna
+import markdown
 import pytest
 import requests
+from _pytest._io.terminalwriter import TerminalWriter
 from dotenv import dotenv_values, find_dotenv, load_dotenv
+from IPython.lib.lexers import IPython3Lexer
+from pygments import highlight, lex
+from pygments.formatters import HtmlFormatter, TerminalFormatter
+from pygments.lexers import PythonLexer
+from pymdownx.snippets import SnippetMissingError
 from requests.adapters import BaseAdapter, HTTPAdapter
 from requests.exceptions import ConnectTimeout
+from rich.console import Console
+from rich.syntax import Syntax
 from urllib3.util import Retry
 
 
@@ -23,40 +35,48 @@ EVIDENCE = ROOT / "docs/chains/rh/evidence/dependency-security-gate.md"
 S1 = ROOT / "tests/clock/test_clock_profiles.py"
 
 APPROVED_HASHES = {
-    DIRECT_INPUT: "2523c04409946a6625e30e5e4aa4f711663924f4a674f4cfd5fee5b7bbb3b80d",
-    LOCK: "d2e12a6f0cfd128c3891634efafbba8305878bef7a7c5db33e25ebe93b0d2bce",
+    DIRECT_INPUT: "1227d9681d8b37f6820a7c09fa33b87798229e613748085e45454efea962a2b9",
+    LOCK: "214f6c32c628df1eb2bbb1979b3bae8147ceaf338e68959dd58d82394b9be010",
 }
 SELECTED = {
     "cbor2": "5.9.0",
+    "click": "8.3.3",
     "idna": "3.15",
+    "pygments": "2.20.0",
+    "pymdown-extensions": "10.21.3",
     "python-dotenv": "1.2.2",
     "requests": "2.33.0",
     "urllib3": "2.7.0",
     "wheel": "0.46.2",
 }
 HELD = {
-    "click": "8.2.1",
-    "pygments": "2.19.2",
-    "pymdown-extensions": "10.16.1",
     "pytest": "8.4.2",
     "titanoboa": "0.2.7",
     "vyper": "0.4.3",
 }
-RESIDUAL_FINDINGS = {
+CANDIDATE_REMEDIATED_FINDINGS = {
     "PYSEC-2026-2132": "EX-H01-CLICK-01",
-    "PYSEC-2026-1845": "EX-H01-PYTEST-01",
     "PYSEC-2026-2987": "EX-H01-PYGMENTS-01",
     "PYSEC-2026-2999": "EX-H01-PYMDOWN-SNIPPETS-01",
+}
+RESIDUAL_FINDINGS = {
+    "PYSEC-2026-1845": "EX-H01-PYTEST-01",
     "CVE-2026-61632": "EX-H01-PYMDOWN-B64-01",
     "PYSEC-2023-142": "authoritative range exclusion",
     "PYSEC-2025-33": "authoritative range exclusion",
 }
-EXCEPTION_IDS = {
+PROPOSED_RETIREMENTS = {
     "EX-H01-CLICK-01",
-    "EX-H01-PYTEST-01",
     "EX-H01-PYGMENTS-01",
     "EX-H01-PYMDOWN-SNIPPETS-01",
+}
+RETAINED_EXCEPTION_IDS = {
+    "EX-H01-PYTEST-01",
     "EX-H01-PYMDOWN-B64-01",
+}
+EXCEPTION_IDS = {
+    *PROPOSED_RETIREMENTS,
+    *RETAINED_EXCEPTION_IDS,
 }
 EXPECTED_HEADER = (
     "#    pip-compile --cert=None --client-cert=None "
@@ -104,6 +124,8 @@ APPROVED_CLICK_SURFACES = {
     Path("scripts/migrate.py"),
     Path("scripts/verify.py"),
 }
+DEPENDENCY_BEHAVIOR_TEST = Path("tests/deployment/test_dependency_gate.py")
+PYMDOWN_EXTENSION_NAMES = {"pymdownx.b64", "pymdownx.snippets"}
 
 
 @pytest.fixture(scope="session")
@@ -157,6 +179,79 @@ def _resolved_name(node: ast.expr, aliases: dict[str, str]) -> str | None:
     return ".".join((resolved, *tail))
 
 
+def _literal_string(
+    node: ast.expr, string_literals: dict[str, str]
+) -> str | None:
+    if isinstance(node, ast.Constant) and isinstance(node.value, str):
+        return node.value
+    if isinstance(node, ast.Name):
+        return string_literals.get(node.id)
+    if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Add):
+        left = _literal_string(node.left, string_literals)
+        right = _literal_string(node.right, string_literals)
+        if left is not None and right is not None:
+            return left + right
+    return None
+
+
+def _statically_resolved_string_elements(
+    node: ast.expr,
+    string_literals: dict[str, str],
+    sequence_literals: dict[str, tuple[str, ...]],
+) -> tuple[str, ...]:
+    if isinstance(node, ast.Name) and node.id in sequence_literals:
+        return sequence_literals[node.id]
+    value = _literal_string(node, string_literals)
+    if value is not None:
+        return (value,)
+    if isinstance(node, (ast.List, ast.Tuple, ast.Set)):
+        return tuple(
+            value
+            for item in node.elts
+            for value in _statically_resolved_string_elements(
+                item, string_literals, sequence_literals
+            )
+        )
+    if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Add):
+        return _statically_resolved_string_elements(
+            node.left, string_literals, sequence_literals
+        ) + _statically_resolved_string_elements(
+            node.right, string_literals, sequence_literals
+        )
+    return ()
+
+
+def _literal_keyword_mapping(
+    node: ast.expr,
+    keyword_mappings: dict[str, dict[str, ast.expr]],
+) -> dict[str, ast.expr]:
+    if isinstance(node, ast.Name):
+        return keyword_mappings.get(node.id, {})
+    if not isinstance(node, ast.Dict):
+        return {}
+    return {
+        key.value: value
+        for key, value in zip(node.keys, node.values, strict=True)
+        if isinstance(key, ast.Constant) and isinstance(key.value, str)
+    }
+
+
+def _call_keyword_values(
+    node: ast.Call,
+    keyword: str,
+    keyword_mappings: dict[str, dict[str, ast.expr]],
+) -> tuple[ast.expr, ...]:
+    values: list[ast.expr] = []
+    for item in node.keywords:
+        if item.arg == keyword:
+            values.append(item.value)
+        elif item.arg is None:
+            mapping = _literal_keyword_mapping(item.value, keyword_mappings)
+            if keyword in mapping:
+                values.append(mapping[keyword])
+    return tuple(values)
+
+
 def _python_reachability_violations(path: Path, root: Path) -> list[str]:
     relative = path.relative_to(root)
     try:
@@ -165,8 +260,36 @@ def _python_reachability_violations(path: Path, root: Path) -> list[str]:
         return [f"{relative}: cannot AST-scan Python source: {error}"]
 
     aliases: dict[str, str] = {}
+    string_literals: dict[str, str] = {}
+    sequence_literals: dict[str, tuple[str, ...]] = {}
+    keyword_mappings: dict[str, dict[str, ast.expr]] = {}
     violations: list[str] = []
     for node in ast.walk(tree):
+        if isinstance(node, (ast.Assign, ast.AnnAssign)):
+            value = _literal_string(node.value, string_literals)
+            sequence = _statically_resolved_string_elements(
+                node.value, string_literals, sequence_literals
+            )
+            keyword_mapping = _literal_keyword_mapping(
+                node.value, keyword_mappings
+            )
+            resolved_alias = _resolved_name(node.value, aliases)
+            targets = (
+                node.targets if isinstance(node, ast.Assign) else [node.target]
+            )
+            for target in targets:
+                if isinstance(target, ast.Name):
+                    if value is not None:
+                        string_literals[target.id] = value
+                    if sequence:
+                        sequence_literals[target.id] = sequence
+                    if keyword_mapping:
+                        keyword_mappings[target.id] = keyword_mapping
+                    if resolved_alias and (
+                        resolved_alias == "markdown"
+                        or resolved_alias.startswith("markdown.")
+                    ):
+                        aliases[target.id] = resolved_alias
         if isinstance(node, ast.Import):
             for imported in node.names:
                 bound = imported.asname or imported.name.split(".", 1)[0]
@@ -177,6 +300,14 @@ def _python_reachability_violations(path: Path, root: Path) -> list[str]:
                             f"{relative}:{node.lineno}: adds a new Click "
                             "import surface"
                         )
+                if (
+                    imported.name == "pymdownx"
+                    or imported.name.startswith("pymdownx.")
+                ) and relative != DEPENDENCY_BEHAVIOR_TEST:
+                    violations.append(
+                        f"{relative}:{node.lineno}: adds a Pymdown "
+                        "programmatic activation surface"
+                    )
         elif isinstance(node, ast.ImportFrom):
             module = node.module or ""
             for imported in node.names:
@@ -199,6 +330,13 @@ def _python_reachability_violations(path: Path, root: Path) -> list[str]:
                             f"{relative}:{node.lineno}: imports Pygments "
                             "Archetype/AdlLexer surface"
                         )
+                if (
+                    module == "pymdownx" or module.startswith("pymdownx.")
+                ) and relative != DEPENDENCY_BEHAVIOR_TEST:
+                    violations.append(
+                        f"{relative}:{node.lineno}: adds a Pymdown "
+                        "programmatic activation surface"
+                    )
 
     for node in ast.walk(tree):
         if isinstance(node, (ast.Attribute, ast.Name)):
@@ -219,18 +357,36 @@ def _python_reachability_violations(path: Path, root: Path) -> list[str]:
         if not isinstance(node, ast.Call):
             continue
         resolved_call = _resolved_name(node.func, aliases)
+        if (
+            resolved_call
+            in {
+                "markdown.Markdown",
+                "markdown.markdown",
+                "markdown.markdownFromFile",
+            }
+            and relative != DEPENDENCY_BEHAVIOR_TEST
+        ):
+            for extensions in _call_keyword_values(
+                node, "extensions", keyword_mappings
+            ):
+                literal_extensions = _statically_resolved_string_elements(
+                    extensions, string_literals, sequence_literals
+                )
+                for extension in literal_extensions:
+                    if extension.lower() in PYMDOWN_EXTENSION_NAMES:
+                        violations.append(
+                            f"{relative}:{node.lineno}: activates "
+                            f"{extension!r} through {resolved_call}"
+                        )
         if not resolved_call or not resolved_call.startswith("pygments."):
             continue
         if resolved_call.endswith(".get_lexer_by_name") and node.args:
-            lexer_name = node.args[0]
-            if isinstance(lexer_name, ast.Constant) and isinstance(
-                lexer_name.value, str
-            ):
-                if lexer_name.value.lower() in {"adl", "archetype"}:
-                    violations.append(
-                        f"{relative}:{node.lineno}: selects Pygments "
-                        f"{lexer_name.value!r} lexer"
-                    )
+            lexer_name = _literal_string(node.args[0], string_literals)
+            if lexer_name and lexer_name.lower() in {"adl", "archetype"}:
+                violations.append(
+                    f"{relative}:{node.lineno}: selects Pygments "
+                    f"{lexer_name!r} lexer"
+                )
 
     return violations
 
@@ -306,7 +462,10 @@ def test_selected_and_held_versions_match_lock_and_runtime():
     # Candidate A. Exact approved pins above make the range check fail closed.
     forbidden = {
         "cbor2": {"5.7.0"},
+        "click": {"8.2.1"},
         "idna": {"3.10"},
+        "pygments": {"2.19.2"},
+        "pymdown-extensions": {"10.16.1"},
         "python-dotenv": {"1.2.1"},
         "requests": {"2.32.5"},
         "urllib3": {"2.5.0", "2.6.0", "2.6.2", "2.6.3"},
@@ -352,11 +511,16 @@ def test_evidence_reconciles_every_selected_package_and_residual_finding():
     for finding, disposition in RESIDUAL_FINDINGS.items():
         assert finding in evidence
         assert disposition in evidence
+    for finding, disposition in CANDIDATE_REMEDIATED_FINDINGS.items():
+        assert finding in evidence
+        assert disposition in evidence
 
     assert "The two Vyper determinations are not exceptions" in normalized
     assert "no `--ignore-vuln` flags" in normalized
     assert "all five bounded exceptions" in normalized
     assert "both Vyper dispositions" in normalized
+    assert "proposed retirement only" in normalized
+    assert "final independent review and owner approval" in normalized
 
 
 def test_bounded_exceptions_are_explicit_and_workflow_gated():
@@ -420,6 +584,341 @@ def test_reachability_gate_rejects_direct_adllexer_import(tmp_path):
         AssertionError, match="imports Pygments Archetype/AdlLexer surface"
     ):
         _assert_exception_reachability_controls(tmp_path)
+
+
+def test_reachability_gate_rejects_dynamic_literal_adl_selection(tmp_path):
+    tooling = tmp_path / "tooling"
+    tooling.mkdir()
+    (tooling / "highlight.py").write_text(
+        "from pygments.lexers import get_lexer_by_name as select_lexer\n"
+        "lexer_name = 'ad' + 'l'\n"
+        "select_lexer(lexer_name)\n"
+    )
+
+    with pytest.raises(
+        AssertionError, match="selects Pygments 'adl' lexer"
+    ):
+        _assert_exception_reachability_controls(tmp_path)
+
+
+def test_reachability_gate_rejects_programmatic_pymdown_import(tmp_path):
+    tooling = tmp_path / "tooling"
+    tooling.mkdir()
+    (tooling / "render.py").write_text(
+        "from pymdownx import snippets\n"
+    )
+
+    with pytest.raises(
+        AssertionError, match="adds a Pymdown programmatic activation surface"
+    ):
+        _assert_exception_reachability_controls(tmp_path)
+
+
+@pytest.mark.parametrize(
+    ("source", "extension"),
+    (
+        (
+            "import markdown\n"
+            "markdown.markdown(text, extensions=['pymdownx.b64'])\n",
+            "pymdownx.b64",
+        ),
+        (
+            "from markdown import markdown as render\n"
+            "render(text, extensions=['pymdownx.snippets'])\n",
+            "pymdownx.snippets",
+        ),
+        (
+            "import markdown as md\n"
+            "extension = 'pymdownx.' + 'b64'\n"
+            "md.markdown(text, extensions=[extension])\n",
+            "pymdownx.b64",
+        ),
+        (
+            "import markdown\n"
+            "selected = ['pymdownx.' + 'snippets']\n"
+            "extensions = selected + ['tables']\n"
+            "markdown.markdown(text, extensions=extensions)\n",
+            "pymdownx.snippets",
+        ),
+        (
+            "import markdown\n"
+            "markdown.markdown(\n"
+            "    text,\n"
+            "    extensions=['pymdownx.b64', pick_extra()],\n"
+            ")\n",
+            "pymdownx.b64",
+        ),
+        (
+            "from markdown import markdown as render\n"
+            "render(\n"
+            "    text,\n"
+            "    extensions=[pick_extra(), 'pymdownx.snippets'],\n"
+            ")\n",
+            "pymdownx.snippets",
+        ),
+        (
+            "import markdown\n"
+            "markdown.Markdown(extensions=['pymdownx.b64'])\n",
+            "pymdownx.b64",
+        ),
+        (
+            "from markdown import Markdown\n"
+            "Markdown(extensions=['pymdownx.snippets'])\n",
+            "pymdownx.snippets",
+        ),
+        (
+            "from markdown import Markdown as Renderer\n"
+            "extension = 'pymdownx.' + 'b64'\n"
+            "Renderer(extensions=[extension])\n",
+            "pymdownx.b64",
+        ),
+        (
+            "import markdown as md\n"
+            "md.Markdown(extensions=['pymdownx.snippets'])\n",
+            "pymdownx.snippets",
+        ),
+        (
+            "import markdown\n"
+            "Renderer = markdown.Markdown\n"
+            "Renderer(extensions=['pymdownx.b64'])\n",
+            "pymdownx.b64",
+        ),
+        (
+            "import markdown\n"
+            "markdown.markdownFromFile(\n"
+            "    input='input.md',\n"
+            "    extensions=['pymdownx.b64'],\n"
+            ")\n",
+            "pymdownx.b64",
+        ),
+        (
+            "from markdown import markdownFromFile\n"
+            "markdownFromFile(\n"
+            "    input='input.md',\n"
+            "    extensions=['pymdownx.snippets'],\n"
+            ")\n",
+            "pymdownx.snippets",
+        ),
+        (
+            "from markdown import markdownFromFile as render_file\n"
+            "render_file(\n"
+            "    input='input.md',\n"
+            "    extensions=['pymdownx.' + 'b64'],\n"
+            ")\n",
+            "pymdownx.b64",
+        ),
+        (
+            "import markdown as md\n"
+            "render_file = md.markdownFromFile\n"
+            "render_file(\n"
+            "    input='input.md',\n"
+            "    extensions=['pymdownx.snippets'],\n"
+            ")\n",
+            "pymdownx.snippets",
+        ),
+        (
+            "import markdown\n"
+            "options = {\n"
+            "    'extensions': ['pymdownx.b64', pick_extra()],\n"
+            "}\n"
+            "markdown.Markdown(**options)\n",
+            "pymdownx.b64",
+        ),
+    ),
+)
+def test_reachability_gate_rejects_literal_pymdown_activation(
+    tmp_path, source, extension
+):
+    tooling = tmp_path / "tooling"
+    tooling.mkdir()
+    (tooling / "render.py").write_text(source)
+
+    with pytest.raises(
+        AssertionError,
+        match=rf"activates {re.escape(repr(extension))}",
+    ):
+        _assert_exception_reachability_controls(tmp_path)
+
+
+@pytest.mark.parametrize(
+    "source",
+    (
+        (
+            "import markdown\n"
+            "markdown.markdown(text, extensions=['tables', 'toc'])\n"
+        ),
+        (
+            "import markdown\n"
+            "extension = select_extension_at_runtime()\n"
+            "markdown.markdown(text, extensions=[extension])\n"
+        ),
+        (
+            "import markdown\n"
+            "markdown.Markdown(\n"
+            "    extensions=['tables', select_extension_at_runtime()],\n"
+            ")\n"
+        ),
+        (
+            "import markdown as md\n"
+            "md.markdownFromFile(\n"
+            "    input='input.md',\n"
+            "    extensions=[select_extension_at_runtime(), 'toc'],\n"
+            ")\n"
+        ),
+        (
+            "from markdown import Markdown as Renderer\n"
+            "options = {\n"
+            "    'extensions': ['tables', select_extension_at_runtime()],\n"
+            "}\n"
+            "Renderer(**options)\n"
+        ),
+    ),
+)
+def test_reachability_gate_allows_safe_or_runtime_markdown_selection(
+    tmp_path, source
+):
+    tooling = tmp_path / "tooling"
+    tooling.mkdir()
+    (tooling / "render.py").write_text(source)
+
+    _assert_exception_reachability_controls(tmp_path)
+
+
+def test_click_editor_patch_uses_argv_without_shell_execution():
+    source = (
+        metadata.distribution("click")
+        .locate_file("click/_termui_impl.py")
+        .read_text()
+    )
+    edit_files = re.search(
+        r"    def edit_files\(.*?(?=\n    def |\Z)",
+        source,
+        flags=re.DOTALL,
+    )
+    assert edit_files is not None
+    assert "shlex.split(editor) + list(filenames)" in edit_files.group(0)
+    assert "shell=True" not in edit_files.group(0)
+
+
+def test_pygments_lexer_and_ipython_rich_pytest_rendering_are_exact():
+    source = (
+        "def greet(name: str) -> str:\n"
+        '    return f"hello {name}"\n'
+    )
+    lexer = PythonLexer()
+    token_rows = [(str(token), value) for token, value in lex(source, lexer)]
+    outputs = {
+        "tokens": hashlib.sha256(
+            json.dumps(token_rows, separators=(",", ":")).encode()
+        ).hexdigest(),
+        "html": hashlib.sha256(
+            highlight(source, lexer, HtmlFormatter(nowrap=True)).encode()
+        ).hexdigest(),
+        "terminal": hashlib.sha256(
+            highlight(source, lexer, TerminalFormatter(bg="dark")).encode()
+        ).hexdigest(),
+        "ipython_terminal": hashlib.sha256(
+            highlight(
+                source,
+                IPython3Lexer(),
+                TerminalFormatter(bg="dark"),
+            ).encode()
+        ).hexdigest(),
+    }
+    pytest_writer = TerminalWriter(file=io.StringIO())
+    pytest_writer.hasmarkup = True
+    pytest_writer.code_highlight = True
+    outputs["pytest_terminal"] = hashlib.sha256(
+        pytest_writer._highlight(source).encode()
+    ).hexdigest()
+    rich_console = Console(
+        file=io.StringIO(),
+        force_terminal=True,
+        color_system="standard",
+        no_color=False,
+        width=80,
+    )
+    rich_console.print(Syntax(source, "python", theme="ansi_dark"))
+    rich_output = rich_console.file.getvalue()
+    assert "\x1b[" in rich_output
+    outputs["rich_terminal"] = hashlib.sha256(
+        rich_output.encode()
+    ).hexdigest()
+    assert outputs == {
+        "tokens": "48953b4016ec793c0e8e23c9baaa7afe2ef8cc40b9605187666490c0071e5f35",
+        "html": "c3e57a4263eb74006e0988b6dea2d398bbcabeb4e1b0119bd4fd8dbac899f48c",
+        "terminal": "37ebe32a865ffdd7ecd4a5d097375ac299210fc8c16eeb6b9866682e0e0cb401",
+        "ipython_terminal": (
+            "37ebe32a865ffdd7ecd4a5d097375ac299210fc8c16eeb6b9866682e0e0cb401"
+        ),
+        "pytest_terminal": (
+            "b1c489802e2e3adbbf152619aee2bf48c29798c933a67066cdb53f9d478cf6f4"
+        ),
+        "rich_terminal": (
+            "4a98e8fea362182468a3d6c34cc22bdbc6efb5c4a293833960a382bdaf9afdd5"
+        ),
+    }
+
+
+@pytest.mark.parametrize("escape_shape", ("shared-prefix", "parent", "absolute"))
+def test_pymdown_snippets_blocks_outside_base_paths(tmp_path, escape_shape):
+    base = tmp_path / "docs"
+    sibling = tmp_path / "docs-private"
+    base.mkdir()
+    sibling.mkdir()
+    (base / "inside.md").write_text("SAFE_SNIPPET")
+    (sibling / "secret.md").write_text("SYNTHETIC_SECRET")
+    (tmp_path / "outside.md").write_text("SYNTHETIC_OUTSIDE")
+
+    config = {
+        "pymdownx.snippets": {
+            "base_path": [str(base)],
+            "restrict_base_path": True,
+            "check_paths": True,
+        }
+    }
+    safe = markdown.markdown(
+        '--8<-- "inside.md"',
+        extensions=["pymdownx.snippets"],
+        extension_configs=config,
+    )
+    assert "SAFE_SNIPPET" in safe
+
+    target = {
+        "shared-prefix": "../docs-private/secret.md",
+        "parent": "../outside.md",
+        "absolute": str(sibling / "secret.md"),
+    }[escape_shape]
+    with pytest.raises(SnippetMissingError, match="could not be found"):
+        markdown.markdown(
+            f'--8<-- "{target}"',
+            extensions=["pymdownx.snippets"],
+            extension_configs=config,
+        )
+
+
+def test_pymdown_b64_remains_affected_and_exception_governed(tmp_path):
+    base = tmp_path / "docs"
+    outside = tmp_path / "outside"
+    base.mkdir()
+    outside.mkdir()
+    image = outside / "synthetic.png"
+    payload = b"synthetic-h01-b64-fixture"
+    image.write_bytes(payload)
+
+    rendered = markdown.markdown(
+        f"![fixture]({image})",
+        extensions=["pymdownx.b64"],
+        extension_configs={"pymdownx.b64": {"base_path": str(base)}},
+    )
+    assert base64.b64encode(payload).decode() in rendered
+
+    evidence = EVIDENCE.read_text()
+    section = _exception_section(evidence, "EX-H01-PYMDOWN-B64-01")
+    assert "CVE-2026-61632" in evidence
+    assert "11.0.0" in evidence
+    assert "**Compensating controls:**" in section
+    assert "EX-H01-PYMDOWN-B64-01" in RETAINED_EXCEPTION_IDS
 
 
 def test_s1_exact_runtime_profile_matches_the_approved_lock():

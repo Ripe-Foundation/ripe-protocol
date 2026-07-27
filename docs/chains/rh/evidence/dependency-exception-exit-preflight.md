@@ -788,3 +788,173 @@ Performed from the isolated worktree at the verified baseline:
 
 The only repository change produced by this task is this new untracked
 document. It is intentionally unstaged and uncommitted for independent review.
+
+## 26 July 2026 implementation checkpoint
+
+This later checkpoint records execution under the owner's separate exact
+authorization. It does not alter the historical blank proposed-authorization
+form above and does not itself approve exception retirement.
+
+**Superseded status:** The owner did not approve this checkpoint's first Gate
+1 verdict. Its 24-case H-01 and 2,845-case full-suite results below are
+historical, non-authoritative inputs to a bounded F1/F3 correction. Only a
+later corrected validation record may state the current Gate 1 result.
+
+The implementation branch
+`rh-track-7-h1-exception-retirement-implementation` was created in the fresh
+isolated worktree
+`/Users/wigglez/dev/ripe-protocol-track-7-h1-exception-retirement-implementation`
+from exact commit `c0d0e708ae4a89ed730615c9eaf2d23a4fecc05d`, tree
+`b2c2358f565e27ad6a5c787a9a0d1396af513076`. The preserved feasibility
+report remains byte-identical at SHA-256
+`9b9ad56d73d8a7418dcc0e452b3affb927979ce53fd90fcd5f84f9b9dfcfbfec`.
+
+Two independent approved-seed resolutions produced byte-identical candidate
+inputs at
+`1227d9681d8b37f6820a7c09fa33b87798229e613748085e45454efea962a2b9`
+and byte-identical locks at
+`214f6c32c628df1eb2bbb1979b3bae8147ceaf338e68959dd58d82394b9be010`.
+The exact version delta is only:
+
+```text
+click                 8.2.1  -> 8.3.3
+pygments              2.19.2 -> 2.20.0
+pymdown-extensions    10.16.1 -> 10.21.3
+```
+
+There is no fourth direct or transitive change. Exact pytest `8.4.2`,
+Titanoboa `0.2.7`, Vyper `0.4.3`, and all other dependency versions are
+unchanged. Separate fresh control and candidate environments both passed
+`pip check`; their 93-distribution inventories differed only in the three
+authorized packages and contained no direct/local/editable source.
+
+A fresh raw no-ignore `pip-audit==2.10.1` candidate audit reported only
+Pymdown b64 `CVE-2026-61632`, pytest `PYSEC-2026-1845`, and the two
+range-excluded Vyper rows. The Click, Pygments, and Pymdown Snippets rows were
+absent. This is candidate audit remediation only, not evidence of GitHub or
+Dependabot alert closure.
+
+The exact validation matrix completed as follows:
+
+| Gate | Result |
+|---|---|
+| H-01 dependency gate | 24 passed |
+| Click behavior | 14 control/candidate CLI cases byte-identical; secret URL absent from output |
+| Pygments behavior | Python tokens plus HTML, terminal, IPython, pytest, and Rich rendering byte-identical |
+| Pymdown behavior | `10.21.3` blocked shared-prefix, parent, and absolute Snippets traversal; b64 outside-base encoding persisted |
+| H-02 | 99 passed |
+| S1 | 57 passed |
+| S2 | `CLOCK_INVENTORY_OK`; 60 passed |
+| S3 / Lootbox | complete Lootbox directory, 175 passed |
+| S3 / Switchboard | Charlie target, 91 passed |
+| Collection | 2,845 selected; 142 pre-existing deselected |
+| Complete candidate suite | 2,845 passed; 142 deselected |
+| Compiler artifacts | ClockObserver and Lootbox ABI, creation/runtime bytecode, settings, version, and combined fingerprints byte-identical |
+| ABI inventory | 49 byte-identical files; committed Lootbox ABI byte-identical |
+| Rollback | fresh old-lock environment: `pip check`, baseline H-01 16, H-02 99, S1 57, 2,837 selected, and complete 2,837-pass suite all clean |
+
+All pytest commands used an external single-use mode-`0700` basetemp parent
+and a private Boa cache, and each parent was removed after its command. The
+candidate adds exactly eight H-01 cases and introduces no skip, xfail,
+deselection, warning suppression, or relaxation.
+
+The proposed disposition, pending final independent review and owner approval,
+is retirement only of `EX-H01-CLICK-01`, `EX-H01-PYGMENTS-01`, and
+`EX-H01-PYMDOWN-SNIPPETS-01`. Retain `EX-H01-PYTEST-01` and
+`EX-H01-PYMDOWN-B64-01`. All five remain operative at this Gate 1 stop. The
+implementation is intentionally unstaged and uncommitted; no alert query or
+mutation, private retained-evidence access, external write, deployment,
+signing, verification submission, or live-chain action was performed.
+
+## 26 July 2026 corrected Gate 1 checkpoint
+
+The first 24-case / 2,845-case verdict above remains superseded. After normal
+conflict-free reconciliation of the `rh` snapshot observed as `8e4a965f...`
+on 26 July 2026 in local merge
+`9aedbbbf13f8f60e0bd816d6493e310cacbfbbda`, the bounded correction:
+
+- set Rich `Console(no_color=False, force_terminal=True,
+  color_system="standard")`, asserted ANSI output, and reproduced colored hash
+  `4a98e8fea362182468a3d6c34cc22bdbc6efb5c4a293833960a382bdaf9afdd5`;
+- made direct `markdown.markdown(..., extensions=...)` Pymdown b64/Snippets
+  literal and bounded-concatenation activation fail closed;
+- added four positive and two negative focused F3 cases;
+- passed H-01 30/30 both with `NO_COLOR` absent and with `NO_COLOR=1`;
+- recollected exactly 2,851 selected / 142 pre-existing deselected and passed
+  all 2,851 selected cases;
+- reproduced H-02 99, S1 57, S2 60 plus `CLOCK_INVENTORY_OK`, Lootbox 175,
+  Switchboard Charlie 91, compiler/ABI identities, and the 49-file ABI
+  inventory; and
+- reproduced the fresh old-lock rollback suite at 2,837 passed / 142
+  deselected.
+
+Pygments runtime/plugin selection, the scanner root/symlink boundary, and the
+pinned-pytest private terminal-writer dependency remain explicitly disclosed.
+The procedural Click trigger is not relied upon after any later separately
+reviewed retirement transition. The exact compiler-data canonicalization
+command and residual boundaries are in the latest
+`dependency-security-gate.md` section.
+
+No exception is retired. All five remain operative, and
+`PROPOSED_RETIREMENTS` remains proposed only pending another fresh exact-hash
+review, independent approval, and separate owner authorization. The package
+remains unstaged and uncommitted; nothing was pushed or merged into `rh`.
+
+## 27 July 2026 final bounded-correction checkpoint
+
+The five-file package began this correction at approved full-index patch
+SHA-256
+`9c075c4f6f2a69bd5a56eab79fee44fb53669b83a0df69b4fcc9cffa6ade93cf`
+and the five approved hashes recorded in the latest
+`dependency-security-gate.md` section. The lock and direct input did not move.
+
+The Python reachability scanner now evaluates each statically resolvable
+extension element independently, so a dynamic sibling cannot hide direct
+`pymdownx.b64` or `pymdownx.snippets` activation. The bounded check covers
+`markdown.markdown`, `markdown.Markdown`, and `markdown.markdownFromFile`
+through direct imports, module aliases, imported function/class aliases,
+direct static alias assignments, static string/sequence concatenation, and
+direct or bounded named `**` mappings. It does not infer unrestricted runtime
+dataflow, and the behavior-test allowlist remains exact.
+
+The expanded scanner matrix passed 21 focused cases. Complete H-01 passed all
+45 cases both with ambient `NO_COLOR` absent and with `NO_COLOR=1`. H-02
+passed 99, S1 passed 57, S2 passed 60 with `CLOCK_INVENTORY_OK`, Lootbox
+passed 175, and Switchboard Charlie passed 91. Collection is exactly 2,866
+selected of 3,008, with the same 142 expected deselections; the 15-case
+increase is twelve new fail-closed scanner parameters and three new bounded
+negative parameters. The complete serial candidate suite passed all 2,866
+selected cases with zero skip or xfail.
+
+Both 93-distribution inventories now have exact reproducible command and byte
+serialization provenance. Independent reruns produced control SHA-256
+`9e30800bec2f4d9a784314b6a3d3d25a37ee7c994a022366a577966a698abfa2`
+and candidate SHA-256
+`f0393df6e4c1728b28d95e5034fee7b6ca4c5463df8fb387dbae839e15b87e4d`,
+with only the three authorized rows different. The older undocumented
+aggregate inventory digests are historical and non-load-bearing. Independent
+control/candidate 49-file ABI exports reproduced compact sorted-JSON mapping
+SHA-256
+`c49c61ad006d223a1bf13e2d26c5862eda82128f3cc640501c278c28f69b1dde`
+from the exact command and serialization recorded in the security-gate
+evidence.
+
+Rollback is authoritative only from a real Git worktree. The Base-history test
+explicitly self-skips when `.git` is unavailable, so a `git archive` result of
+2,836 passed plus one skip is not equivalent and is non-load-bearing. The
+fresh old-lock replay from the clean integration Git worktree passed
+`pip check`, H-01 16, H-02 99, S1 57, collection 2,837/2,979 with 142
+deselected, and the complete serial suite at 2,837 passed / 142 deselected
+with no skip or xfail.
+
+At `2026-07-27T03:30:58Z`, the final validation-freeze read observed local,
+cached, and live `rh` at
+`7a3a36666f277277fa08b55081b3f58c7cd3ba64`, with a clean integration
+worktree. This is a timestamped observation, not continuing candidate
+authority. Local, cached, and live refs plus integration cleanliness must be
+recomputed immediately before any later commit-time reconciliation. This
+correction performs no reconciliation.
+
+No exception is retired. All five remain operative, and
+`PROPOSED_RETIREMENTS` remains proposed only. The package remains unstaged and
+uncommitted pending narrow delta re-review.
