@@ -1,19 +1,30 @@
 # H-01 bounded-exception exit preflight
 
-**Status:** Documentation-only preflight for independent owner/security review;
-no dependency change or exception disposition is authorized by this record.
+**Status:** Historical documentation-only preflight plus the owner-authorized
+three-file transition record at the end of this document. The target
+retirement split becomes effective only when the exact independently approved
+transition commit is integrated into authoritative `rh`; an uncommitted or
+feature-branch candidate does not itself retire an exception.
 
 **Evidence date:** 25 July 2026
 
 **Reconciliation date:** 26 July 2026
 
-**Verified baseline commit:** `332ae2bc8e0ce4b694766d6d20759295d9267ec3`
+**Historical preflight baseline commit:**
+`332ae2bc8e0ce4b694766d6d20759295d9267ec3`
 
-**Verified baseline tree:** `f67dc91e47331785837de879b6557b285aec3b1b`
+**Historical preflight baseline tree:**
+`f67dc91e47331785837de879b6557b285aec3b1b`
 
-**Isolated branch:** `codex/rh-h01-exception-exit-preflight`
+**Current transition baseline commit:**
+`d62777646cba1ae448fb9e26519c6fa295f437df`
 
-**Isolated worktree:**
+**Current transition baseline tree:**
+`01b1d7c8fc7bdf5163e20efe1f61b53db2b01a61`
+
+**Historical isolated branch:** `codex/rh-h01-exception-exit-preflight`
+
+**Historical isolated worktree:**
 `/Users/wigglez/dev/ripe-protocol-h01-exception-exit-preflight`
 
 ## Decision summary
@@ -958,3 +969,80 @@ correction performs no reconciliation.
 No exception is retired. All five remain operative, and
 `PROPOSED_RETIREMENTS` remains proposed only. The package remains unstaged and
 uncommitted pending narrow delta re-review.
+
+## H-01 three-exception retirement transition authorization record
+
+The owner adopted verbatim the frozen
+`H-01 THREE-EXCEPTION RETIREMENT TRANSITION AUTHORIZATION` against exact
+integrated `rh` commit
+`d62777646cba1ae448fb9e26519c6fa295f437df`, tree
+`01b1d7c8fc7bdf5163e20efe1f61b53db2b01a61`.
+
+The transition file ceiling is exactly:
+
+```text
+tests/deployment/test_dependency_gate.py
+docs/chains/rh/evidence/dependency-security-gate.md
+docs/chains/rh/evidence/dependency-exception-exit-preflight.md
+```
+
+The dependency inputs and feasibility evidence are immutable:
+
+```text
+requirements.in
+  1227d9681d8b37f6820a7c09fa33b87798229e613748085e45454efea962a2b9
+requirements.txt
+  214f6c32c628df1eb2bbb1979b3bae8147ceaf338e68959dd58d82394b9be010
+docs/chains/rh/evidence/h01-exception-retirement-feasibility.md
+  9b9ad56d73d8a7418dcc0e452b3affb927979ce53fd90fcd5f84f9b9dfcfbfec
+```
+
+### Final target dispositions
+
+| Exception | Final target disposition |
+|---|---|
+| `EX-H01-CLICK-01` | **Retired—historical and non-operative.** Exact `click==8.3.3` supplies the reviewed remediation. |
+| `EX-H01-PYGMENTS-01` | **Retired—historical and non-operative.** Exact `Pygments==2.20.0` supplies the reviewed remediation. |
+| `EX-H01-PYMDOWN-SNIPPETS-01` | **Retired—historical and non-operative.** Exact `pymdown-extensions==10.21.3` remediates Snippets only. |
+| `EX-H01-PYTEST-01` | **Retained—operative.** Exact pytest `8.4.2`, private-basetemp/single-tenant controls, review, expiry, and triggers remain in force. |
+| `EX-H01-PYMDOWN-B64-01` | **Retained—operative.** Exact Pymdown Extensions `10.21.3` remains affected; first patch `11.0.0` remains outside the resolver-valid current graph. |
+
+The unchecked decision forms above and in the immutable feasibility report are
+historical proposals against earlier baselines. They remain unchecked and
+unchanged. This current record resolves those decisions without rewriting
+their chronology.
+
+### Effectivity and alert-state boundary
+
+The three retirement dispositions become effective only when the exact
+independently approved transition commit containing this record is integrated
+into authoritative `rh`. Until that event, all five prior exceptions remain
+operative on authoritative `rh`. The two retained exceptions remain operative
+both before and after the transition.
+
+Package remediation and repository exception retirement do not establish
+GitHub/Dependabot alert closure. No authenticated GitHub or Dependabot query is
+required or authorized for this transition. No alert may be described as
+closed, dismissed, resolved, or changed without separate authority and fresh
+authenticated evidence.
+
+### Transition validation and rollback requirements
+
+The transition candidate must preserve the exact dependency and feasibility
+hashes above; pass `pip check`; reconcile a fresh raw no-ignore package audit
+without GitHub access; pass the focused retirement/retention assertions and
+complete H-01 gate with `NO_COLOR` absent and present; reproduce H-02, S1, S2,
+Lootbox, Switchboard Charlie, compiler/ABI, collection, and complete serial
+suite identities; add no skip, xfail, warning suppression, relaxation, or
+unexplained deselection; and pass whitespace and exact-scope checks.
+
+The expected unchanged counts are H-01 45, H-02 99, S1 57, S2 60,
+Lootbox 175, Switchboard Charlie 91, collection 2,866 of 3,008 with 142
+deselected, and complete serial 2,866 passed. Any count change stops the
+transition.
+
+Rollback before integration restores only the three transition files to their
+exact `d627776...` bytes and discards only disposable validation environments.
+After any later transition commit or integration, rollback requires a
+separately reviewed normal revert. No dependency downgrade, reset, rebase, or
+history rewrite is authorized.

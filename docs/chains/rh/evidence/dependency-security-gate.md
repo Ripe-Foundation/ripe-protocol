@@ -1,6 +1,7 @@
 # Track 7 H-01 Stage A Dependency-Security Gate
 
-**Status:** The independently approved four-file H-01 Candidate A payload was
+**Historical post-Candidate-A status (recorded 25 July 2026 UTC):** The
+independently approved four-file H-01 Candidate A payload was
 integrated and pushed on authoritative `rh` at exact merge commit
 `575d47b82055b42da2bddf1535d8076cd7cf4c63`. Its parents are the reviewed
 baseline `03c07f01dda03a5529c602aafbfe5545ae86df69` and final H-01 commit
@@ -21,24 +22,19 @@ validation conclusion changed. No Dependabot mutation, deployment, signing,
 verification submission, private-evidence deletion/relocation, or other
 production action is authorized or performed.
 
-**Current implementation status (updated 27 July 2026 UTC):** The first Gate 1
-verdict for the separately authorized three-package exception-retirement
-implementation was not approved. Its 24-case H-01 and 2,845-case full-suite
-results are superseded and non-authoritative. The bounded F1/F3 correction
-completed fresh technical validation after authorized reconciliation with the
-`rh` snapshot observed as
-`8e4a965f034dc3d11b60fbb674ebbb4095b57d98` on 26 July 2026 and recorded in
-merge `9aedbbbf13f8f60e0bd816d6493e310cacbfbbda` at
-`2026-07-26T22:58:49Z`. That SHA is a historical merge parent, not an
-unqualified statement of current ref state or authority for any later
-reconciliation. The final bounded scanner correction and validation are
-recorded in the latest dated section. The candidate pins remain Click `8.3.3`,
-Pygments `2.20.0`, and Pymdown Extensions `10.21.3`; pytest `8.4.2`,
-Titanoboa `0.2.7`, Vyper `0.4.3`, and all other dependency versions remain
-held. All five bounded exceptions remain operative. The three candidate
-dispositions remain proposed retirement only pending a corrected fresh Gate 1,
-final independent review and owner approval. No GitHub or Dependabot alert
-closure is claimed.
+**Current transition status (updated 27 July 2026 UTC):** The exact
+three-package remediation is integrated and pushed on authoritative `rh` at
+commit `d62777646cba1ae448fb9e26519c6fa295f437df`, tree
+`01b1d7c8fc7bdf5163e20efe1f61b53db2b01a61`. The integrated pins are Click
+`8.3.3`, Pygments `2.20.0`, and Pymdown Extensions `10.21.3`; pytest `8.4.2`,
+Titanoboa `0.2.7`, Vyper `0.4.3`, and every other dependency remain held. The
+final corrected validation interval is recorded at the end of this evidence.
+The owner-authorized three-file exception-status transition is also recorded
+in the latest controlling section. Its target split becomes effective only
+when the exact independently approved transition commit is integrated into
+authoritative `rh`; a feature branch or uncommitted candidate does not itself
+retire an exception. Package remediation, repository exception retirement,
+and GitHub/Dependabot alert closure remain separate determinations.
 
 **Evidence date:** 24 July 2026
 
@@ -4938,3 +4934,120 @@ five bounded exceptions remain operative. This package remains unstaged and
 uncommitted pending narrow delta re-review. No reconciliation, commit, push,
 alert mutation, deployment, signing, or live-chain action is authorized or
 performed here.
+
+## H-01 three-exception retirement transition
+
+**Authorization status:** The owner adopted the exact
+`H-01 THREE-EXCEPTION RETIREMENT TRANSITION AUTHORIZATION` against integrated
+baseline commit `d62777646cba1ae448fb9e26519c6fa295f437df`, tree
+`01b1d7c8fc7bdf5163e20efe1f61b53db2b01a61`.
+
+**Effectivity boundary:** This section defines the final target repository
+policy. It becomes operative only when the exact independently approved
+transition commit containing these bytes is integrated into authoritative
+`rh`. Until that integration, the historical all-five operative state remains
+the authoritative policy. A feature branch, working-tree change, Gate 1
+candidate, review approval, or commit that is not integrated into `rh` does
+not itself retire an exception.
+
+The transition changes no dependency byte. Its immutable integrated inputs
+remain:
+
+```text
+requirements.in
+  1227d9681d8b37f6820a7c09fa33b87798229e613748085e45454efea962a2b9
+requirements.txt
+  214f6c32c628df1eb2bbb1979b3bae8147ceaf338e68959dd58d82394b9be010
+```
+
+The exact integrated versions remain Click `8.3.3`, Pygments `2.20.0`,
+Pymdown Extensions `10.21.3`, pytest `8.4.2`, Titanoboa `0.2.7`, and Vyper
+`0.4.3`. The three-package lock delta and every transitive hold remain
+unchanged.
+
+### Final target exception register
+
+| Exception | Final target status | Basis and boundary |
+|---|---|---|
+| `EX-H01-CLICK-01` | **Retired—historical and non-operative.** | Exact `click==8.3.3` is outside the `PYSEC-2026-2132` affected range and contains the reviewed editor-launch remediation. The former exception remains retained as historical evidence only. |
+| `EX-H01-PYGMENTS-01` | **Retired—historical and non-operative.** | Exact `Pygments==2.20.0` remediates `PYSEC-2026-2987`. Dynamic/plugin lexer-selection limitations remain disclosed defense-in-depth boundaries, not a continuing exception basis. |
+| `EX-H01-PYMDOWN-SNIPPETS-01` | **Retired—historical and non-operative.** | Exact `pymdown-extensions==10.21.3` remediates the reviewed `PYSEC-2026-2999` Snippets traversal finding. This disposition does not apply to `pymdownx.b64`. |
+| `EX-H01-PYTEST-01` | **Retained—operative.** | Exact `pytest==8.4.2` remains governed by the controls, triggers, review, and expiry below. Pytest 9 remains a separate S1/Vyper/Track 6 decision. |
+| `EX-H01-PYMDOWN-B64-01` | **Retained—operative.** | Exact `pymdown-extensions==10.21.3` remains affected by `CVE-2026-61632`; first patch remains `11.0.0`, outside the current resolver-valid Titanoboa/docs graph. |
+
+The historical `PROPOSED_RETIREMENTS` state is superseded only when the
+effectivity boundary above is satisfied. The three retired records remain
+preserved for audit chronology, evidence retention, and separately authorized
+disposal; they are not operative authorization after effective integration.
+
+### Operative retained exception terms
+
+The retained-exception owner is **Mick Hagen, H-01 owner**. Both retained
+exceptions keep the scheduled security review on **15 August 2026** and hard
+expiry at **2026-08-31T23:59:59Z**. The earlier of a finding-specific
+invalidation trigger or hard expiry ends authorization. An expired exception
+blocks deployment rehearsal and merge; it never converts into permanent
+acceptance.
+
+#### `EX-H01-PYTEST-01` — retain pytest `8.4.2`
+
+- **Status:** Retained—operative.
+- **Threat model:** pytest before `9.0.3` uses predictable
+  `/tmp/pytest-of-{user}` directories on Unix. Another local user can cause
+  denial of service and may be able to gain privileges while pytest runs.
+- **Scope:** Exact pytest `8.4.2` under CPython `3.12.0` for trusted repository
+  validation on owner-controlled local or ephemeral single-tenant runners.
+  Pytest is not part of deployed contract runtime.
+- **Compensating controls:** Use a fresh task-specific mode-`0700` parent and
+  explicit private `--basetemp` for every invocation; run only trusted
+  repository tests/plugins; prohibit shared multi-user runners; preserve the
+  exact S1 runtime assertions; add no skip, xfail, warning suppression, or test
+  relaxation.
+- **Re-review/invalidation triggers:** Shared or multi-user runner use;
+  untrusted tests/plugins; inability to provide a private basetemp; pytest,
+  Vyper, Titanoboa, Python, plugin, private pytest API, or S1-profile change;
+  advisory/exploit change; demonstrated pytest 9 compatibility; scheduled
+  review; or hard expiry.
+
+#### `EX-H01-PYMDOWN-B64-01` — retain Pymdown Extensions `10.21.3`
+
+- **Status:** Retained—operative.
+- **Threat model:** `pymdownx.b64` accepts relative traversal or absolute image
+  paths and embeds readable image-extension files outside `base_path` into
+  rendered output.
+- **Scope:** Exact transitive Pymdown Extensions `10.21.3`. The repository has
+  no b64 extension, MkDocs configuration, documentation build, or untrusted
+  Markdown-rendering path. The first patch is `11.0.0`, which is not
+  resolver-valid under unchanged `titanoboa==0.2.7` and
+  `mkdocs-material==9.5.41`.
+- **Compensating controls:** Do not enable `pymdownx.b64`; do not render
+  untrusted Markdown; preserve fail-closed source/configuration scanning; do
+  not run a docs build with repository, CI, or readable host secrets.
+- **Re-review/invalidation triggers:** Any b64 activation, Pymdown import or
+  configuration, Markdown/docs pipeline, untrusted Markdown, advisory/exploit
+  change, Titanoboa/docs-graph movement, scanner-boundary change, scheduled
+  review, or hard expiry.
+
+### Validation inheritance and alert-state boundary
+
+The retirement basis is the exact integrated lock, raw no-ignore package
+audit, reviewed package behavior, complete H-01/H-02/S1/S2/S3 and serial-suite
+results, compiler/ABI identity, and real-worktree rollback recorded above. The
+final reviewed interval passed H-01 45 cases with `NO_COLOR` absent and
+present, H-02 99, S1 57, S2 60 with `CLOCK_INVENTORY_OK`, Lootbox 175,
+Switchboard Charlie 91, collection 2,866 of 3,008 with 142 expected
+deselections, and the complete 2,866-case serial suite with zero skip or
+xfail.
+
+The Pygments scanner still does not claim exhaustive runtime/plugin selection
+coverage; the patched package and retained scanner are separate controls. The
+procedural Click trigger is not relied upon after effective retirement. The
+scanner root/symlink boundary and pinned pytest private API remain disclosed;
+the latter remains governed by `EX-H01-PYTEST-01`.
+
+Package remediation and repository exception retirement are distinct from
+GitHub/Dependabot alert closure. This transition does not claim that any
+GitHub or Dependabot alert is closed, dismissed, resolved, or otherwise
+changed. No authenticated alert-state query was required or performed. Any
+future alert-state statement requires separate authority and fresh
+authenticated evidence.

@@ -54,7 +54,7 @@ HELD = {
     "titanoboa": "0.2.7",
     "vyper": "0.4.3",
 }
-CANDIDATE_REMEDIATED_FINDINGS = {
+RETIRED_REMEDIATED_FINDINGS = {
     "PYSEC-2026-2132": "EX-H01-CLICK-01",
     "PYSEC-2026-2987": "EX-H01-PYGMENTS-01",
     "PYSEC-2026-2999": "EX-H01-PYMDOWN-SNIPPETS-01",
@@ -65,7 +65,7 @@ RESIDUAL_FINDINGS = {
     "PYSEC-2023-142": "authoritative range exclusion",
     "PYSEC-2025-33": "authoritative range exclusion",
 }
-PROPOSED_RETIREMENTS = {
+RETIRED_EXCEPTION_IDS = {
     "EX-H01-CLICK-01",
     "EX-H01-PYGMENTS-01",
     "EX-H01-PYMDOWN-SNIPPETS-01",
@@ -74,10 +74,17 @@ RETAINED_EXCEPTION_IDS = {
     "EX-H01-PYTEST-01",
     "EX-H01-PYMDOWN-B64-01",
 }
-EXCEPTION_IDS = {
-    *PROPOSED_RETIREMENTS,
+OPERATIVE_EXCEPTION_IDS = RETAINED_EXCEPTION_IDS
+KNOWN_EXCEPTION_IDS = {
+    *RETIRED_EXCEPTION_IDS,
     *RETAINED_EXCEPTION_IDS,
 }
+TRANSITION_MARKER = "## H-01 three-exception retirement transition"
+RETAINED_TERMS_MARKER = "### Operative retained exception terms"
+RETAINED_REVIEW_FIELD = "scheduled security review on **15 August 2026**"
+RETAINED_EXPIRY_FIELD = "hard expiry at **2026-08-31T23:59:59Z**"
+RETAINED_STATUS = "**Status:** Retained—operative."
+RETIRED_STATUS = "**Status:** Retired—historical and non-operative."
 EXPECTED_HEADER = (
     "#    pip-compile --cert=None --client-cert=None "
     "--index-url=https://pypi.org/simple --no-emit-index-url "
@@ -152,13 +159,116 @@ def _pins(path: Path) -> dict[str, str]:
 
 
 def _exception_section(evidence: str, exception_id: str) -> str:
-    match = re.search(
-        rf"#### `{re.escape(exception_id)}`.*?(?=\n#### |\n### )",
-        evidence,
-        flags=re.DOTALL,
+    matches = list(
+        re.finditer(
+            rf"#### `{re.escape(exception_id)}`.*?(?=\n#### |\n### )",
+            evidence,
+            flags=re.DOTALL,
+        )
     )
-    assert match is not None, f"missing exception section {exception_id}"
-    return match.group(0)
+    assert matches, f"missing exception section {exception_id}"
+    return matches[-1].group(0)
+
+
+def _latest_transition_section(evidence: str) -> str:
+    assert (
+        TRANSITION_MARKER in evidence
+    ), "missing H-01 retirement transition section"
+    return TRANSITION_MARKER + evidence.rsplit(
+        TRANSITION_MARKER, maxsplit=1
+    )[1]
+
+
+def _exception_heading_sections(
+    evidence: str, exception_id: str
+) -> list[tuple[int, str]]:
+    headings = list(
+        re.finditer(
+            rf"^(?P<level>#{{1,6}})\s+[^\n]*"
+            rf"{re.escape(exception_id)}[^\n]*$",
+            evidence,
+            flags=re.MULTILINE,
+        )
+    )
+    sections: list[tuple[int, str]] = []
+    for heading in headings:
+        level = len(heading.group("level"))
+        tail = evidence[heading.end() :]
+        boundary = re.search(
+            rf"^#{{1,{level}}}\s+",
+            tail,
+            flags=re.MULTILINE,
+        )
+        end = heading.end() + boundary.start() if boundary else len(evidence)
+        sections.append((heading.start(), evidence[heading.start() : end]))
+    return sections
+
+
+def _retained_exception_control(evidence: str, exception_id: str) -> str:
+    transition = _latest_transition_section(evidence)
+    assert (
+        transition.count(RETAINED_TERMS_MARKER) == 1
+    ), "retained terms must have exactly one controlling section"
+    terms_tail = transition.split(RETAINED_TERMS_MARKER, maxsplit=1)[1]
+    first_exception = re.search(r"^####\s+", terms_tail, flags=re.MULTILINE)
+    assert first_exception is not None, "missing retained exception sections"
+    common_terms = (
+        RETAINED_TERMS_MARKER + terms_tail[: first_exception.start()]
+    )
+    sections = [
+        section
+        for _, section in _exception_heading_sections(
+            transition, exception_id
+        )
+    ]
+    assert (
+        len(sections) == 1
+    ), f"expected one controlling section for {exception_id}"
+    return common_terms + sections[0]
+
+
+def _assert_retained_exception_control(
+    control: str, exception_id: str
+) -> None:
+    normalized = " ".join(control.split())
+    assert exception_id in normalized
+    assert RETAINED_STATUS in normalized
+    assert normalized.count(RETAINED_REVIEW_FIELD) == 1
+    assert normalized.count(RETAINED_EXPIRY_FIELD) == 1
+    assert "**Threat model:**" in normalized
+    assert "**Scope:**" in normalized
+    assert "**Compensating controls:**" in normalized
+    assert "**Re-review/invalidation triggers:**" in normalized
+
+
+def _assert_no_retired_exception_shadow(
+    evidence: str, exception_id: str
+) -> None:
+    transition_start = evidence.rfind(TRANSITION_MARKER)
+    assert transition_start >= 0
+    transition = evidence[transition_start:]
+    normalized_transition = " ".join(transition.split())
+    assert (
+        "The historical `PROPOSED_RETIREMENTS` state is superseded only when "
+        "the effectivity boundary above is satisfied."
+    ) in normalized_transition
+    assert (
+        "The three retired records remain preserved for audit chronology"
+    ) in normalized_transition
+
+    sections = _exception_heading_sections(evidence, exception_id)
+    assert any(
+        start < transition_start for start, _ in sections
+    ), f"missing preserved historical section for {exception_id}"
+    for start, section in sections:
+        if start < transition_start:
+            continue
+        assert (
+            RETIRED_STATUS in section
+        ), f"later shadow section for {exception_id} is not explicitly retired"
+        assert (
+            RETAINED_STATUS not in section
+        ), f"later operative shadow section for retired {exception_id}"
 
 
 def _dotted_name(node: ast.expr) -> str | None:
@@ -506,37 +616,96 @@ def test_dependency_sources_are_public_pypi_only():
 def test_evidence_reconciles_every_selected_package_and_residual_finding():
     evidence = EVIDENCE.read_text()
     normalized = " ".join(evidence.split())
+    transition = _latest_transition_section(evidence)
+    normalized_transition = " ".join(transition.split())
     for package in SELECTED | HELD:
         assert package in evidence.lower()
     for finding, disposition in RESIDUAL_FINDINGS.items():
         assert finding in evidence
         assert disposition in evidence
-    for finding, disposition in CANDIDATE_REMEDIATED_FINDINGS.items():
+    for finding, disposition in RETIRED_REMEDIATED_FINDINGS.items():
         assert finding in evidence
-        assert disposition in evidence
+        assert disposition in transition
 
     assert "The two Vyper determinations are not exceptions" in normalized
     assert "no `--ignore-vuln` flags" in normalized
-    assert "all five bounded exceptions" in normalized
     assert "both Vyper dispositions" in normalized
-    assert "proposed retirement only" in normalized
-    assert "final independent review and owner approval" in normalized
+    assert (
+        "Package remediation and repository exception retirement are distinct "
+        "from GitHub/Dependabot alert closure."
+    ) in normalized_transition
+    assert (
+        "No authenticated alert-state query was required or performed."
+    ) in normalized_transition
 
 
 def test_bounded_exceptions_are_explicit_and_workflow_gated():
     evidence = EVIDENCE.read_text()
     normalized = " ".join(evidence.split())
-    assert "Mick Hagen, H-01 owner" in evidence
-    assert "15 August 2026" in evidence
-    assert "2026-08-31T23:59:59Z" in evidence
-    assert "An expired exception blocks deployment rehearsal and merge" in evidence
+    transition = _latest_transition_section(evidence)
+    normalized_transition = " ".join(transition.split())
+    assert "Mick Hagen, H-01 owner" in transition
+    assert (
+        "An expired exception blocks deployment rehearsal and merge"
+        in normalized_transition
+    )
 
-    for exception_id in EXCEPTION_IDS:
-        section = _exception_section(evidence, exception_id)
-        assert "**Threat model:**" in section
-        assert "**Scope:**" in section
-        assert "**Compensating controls:**" in section
-        assert "**Re-review/invalidation triggers:**" in section
+    assert RETIRED_EXCEPTION_IDS == {
+        "EX-H01-CLICK-01",
+        "EX-H01-PYGMENTS-01",
+        "EX-H01-PYMDOWN-SNIPPETS-01",
+    }
+    assert OPERATIVE_EXCEPTION_IDS == {
+        "EX-H01-PYTEST-01",
+        "EX-H01-PYMDOWN-B64-01",
+    }
+    assert RETIRED_EXCEPTION_IDS.isdisjoint(OPERATIVE_EXCEPTION_IDS)
+    assert RETIRED_EXCEPTION_IDS | OPERATIVE_EXCEPTION_IDS == KNOWN_EXCEPTION_IDS
+
+    for exception_id in RETIRED_EXCEPTION_IDS:
+        assert (
+            f"| `{exception_id}` | **Retired—historical and non-operative.**"
+            in transition
+        )
+        _assert_no_retired_exception_shadow(evidence, exception_id)
+        operative_shadow = (
+            f"\n\n#### `{exception_id}` — appended operative shadow\n\n"
+            f"- {RETAINED_STATUS}\n"
+            "- **Threat model:** shadow\n"
+            "- **Scope:** shadow\n"
+            "- **Compensating controls:** shadow\n"
+            "- **Re-review/invalidation triggers:** shadow\n"
+        )
+        with pytest.raises(
+            AssertionError,
+            match="later (?:shadow|operative shadow) section",
+        ):
+            _assert_no_retired_exception_shadow(
+                evidence + operative_shadow, exception_id
+            )
+
+    for exception_id in OPERATIVE_EXCEPTION_IDS:
+        control = _retained_exception_control(evidence, exception_id)
+        _assert_retained_exception_control(control, exception_id)
+        normalized_control = " ".join(control.split())
+        assert normalized_control.count("15 August 2026") == 1
+        assert normalized_control.count("2026-08-31T23:59:59Z") == 1
+
+        mutations = (
+            normalized_control.replace(
+                "15 August 2026", "16 August 2026", 1
+            ),
+            normalized_control.replace(
+                "2026-08-31T23:59:59Z", "2026-09-01T00:00:00Z", 1
+            ),
+            normalized_control.replace(RETAINED_REVIEW_FIELD, "", 1),
+            normalized_control.replace(RETAINED_EXPIRY_FIELD, "", 1),
+        )
+        for mutated_control in mutations:
+            with pytest.raises(AssertionError):
+                _assert_retained_exception_control(
+                    mutated_control, exception_id
+                )
 
     assert "There is no general wall-clock freshness window." in normalized
     assert "Evidence becomes stale on any of these events:" in normalized
