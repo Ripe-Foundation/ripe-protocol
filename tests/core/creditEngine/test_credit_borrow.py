@@ -58,6 +58,51 @@ def test_basic_borrow(
     assert green_token.balanceOf(bob) == borrow_amount
 
 
+def test_borrow_guard_runs_before_credit_effects_and_rejects_second_action(
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    setGeneralDebtConfig,
+    performDeposit,
+    mock_price_source,
+    teller,
+    green_token,
+    ledger,
+    mission_control,
+    switchboard_alpha,
+):
+    setGeneralConfig()
+    setAssetConfig(alpha_token)
+    setGeneralDebtConfig()
+    performDeposit(
+        bob,
+        100 * EIGHTEEN_DECIMALS,
+        alpha_token,
+        alpha_token_whale,
+    )
+    mock_price_source.setPrice(alpha_token, 1 * EIGHTEEN_DECIMALS)
+
+    mission_control.setShouldCheckLastTouch(
+        True,
+        sender=switchboard_alpha.address,
+    )
+    boa.env.time_travel(blocks=1)
+
+    teller.borrow(10 * EIGHTEEN_DECIMALS, bob, False, sender=bob)
+    debt = ledger.userDebt(bob).amount
+    balance = green_token.balanceOf(bob)
+    touch = ledger.lastTouch(bob)
+
+    with boa.reverts("one action per block"):
+        teller.borrow(1 * EIGHTEEN_DECIMALS, bob, False, sender=bob)
+
+    assert ledger.userDebt(bob).amount == debt
+    assert green_token.balanceOf(bob) == balance
+    assert ledger.lastTouch(bob) == touch
+
+
 def test_borrow_protocol_disabled(
     alpha_token,
     alpha_token_whale,

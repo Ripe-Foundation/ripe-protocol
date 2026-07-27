@@ -9,6 +9,7 @@ refuses to create or update semantic classifications.
 from __future__ import annotations
 
 import argparse
+import copy
 import fnmatch
 import hashlib
 import json
@@ -20,7 +21,7 @@ from typing import Any, Callable, Iterable, Mapping, Sequence
 
 
 EXPECTED_SCHEMA_VERSION = 1
-EXPECTED_PRODUCTION_COUNTS = (100, 95, 17)
+EXPECTED_PRODUCTION_COUNTS = (99, 94, 17)
 EXPECTED_TIMESTAMP_COUNTS = (37, 37, 11)
 EXPECTED_BN_IDS = {f"BN-{number:03d}" for number in range(1, 33)}
 EXPECTED_CAD_IDS = {"CAD-001"}
@@ -69,6 +70,219 @@ EXPECTED_REVIEW_PROVENANCE = {
     "track3ReviewCommit": TRACK3_REVIEW_COMMIT,
     "hardeningApprovalCommit": HARDENING_REVIEW_COMMIT,
 }
+S5_REVIEW_ARTIFACT_SHA256 = (
+    "e2c7b92b3ca51f903e0cdb8eb5c5eda3d6c1f2e644a6ee424ea67fe8e8ea9a76"
+)
+S5_REVIEW_ARTIFACT_FIELD = "s5ReviewArtifactSha256"
+S5_LEGACY_INVENTORY_SHA256 = (
+    "924a559075d5b96bcac3f73d28390deee3b436fe5500adc4fb6bf769282217b4"
+)
+S5_REVIEW_DIRECT_KEYS = {
+    ("contracts/data/Ledger.vy", "_getActionBlock", "block.number", 1),
+}
+S5_RECONCILED_DIRECT_KEYS = S5_REVIEW_DIRECT_KEYS | {
+    (
+        "contracts/data/Ledger.vy",
+        "checkAndUpdateLastTouch",
+        "block.number",
+        1,
+    ),
+    (
+        "contracts/data/Ledger.vy",
+        "checkAndUpdateLastTouch",
+        "block.number",
+        2,
+    ),
+}
+S5_REVIEW_CADENCE_KEYS = {
+    (
+        "contracts/data/Ledger.vy",
+        "<module>",
+        "cadence-comment",
+        "per block",
+        "# one action per block",
+        1,
+    ),
+    (
+        "contracts/data/Ledger.vy",
+        "checkAndUpdateLastTouch",
+        "cadence-comment",
+        "per block",
+        "assert self.lastTouch[_user] != actionBlock # dev: one action per block",
+        1,
+    ),
+    (
+        "contracts/testing/ActionBlockIdentityProbe.vy",
+        "readActionBlocks",
+        "block-unit-identifier",
+        "readActionBlocks",
+        "def readActionBlocks() -> (uint256, uint256):",
+        1,
+    ),
+    (
+        "scripts/probes/action_block_identity_probe.py",
+        "preflight",
+        "block-default-key",
+        '"latest_block":',
+        '"latest_block": {',
+        1,
+    ),
+    (
+        "scripts/probes/action_block_identity_probe.py",
+        "analyze_observations",
+        "block-default-key",
+        '"child_block":',
+        '"child_block": child,',
+        1,
+    ),
+    (
+        "scripts/probes/action_block_identity_probe.py",
+        "analyze_observations",
+        "block-default-key",
+        '"first_child_block":',
+        '"first_child_block": first_block,',
+        1,
+    ),
+    (
+        "scripts/probes/action_block_identity_probe.py",
+        "analyze_observations",
+        "block-default-key",
+        '"second_child_block":',
+        '"second_child_block": second_block,',
+        1,
+    ),
+    (
+        "scripts/probes/action_block_identity_probe.py",
+        "analyze_observations",
+        "block-default-key",
+        '"distinct_child_blocks":',
+        '"distinct_child_blocks": len(set(arb_values)),',
+        1,
+    ),
+    (
+        "tests/core/creditEngine/test_credit_borrow.py",
+        "test_borrow_guard_runs_before_credit_effects_and_rejects_second_action",
+        "cadence-comment",
+        "per block",
+        'with boa.reverts("one action per block"):',
+        1,
+    ),
+    (
+        "tests/core/creditEngine/test_credit_repay.py",
+        "test_repay_low_risk_succeeds_between_checked_actions_and_rearms_guard",
+        "cadence-comment",
+        "per block",
+        'with boa.reverts("one action per block"):',
+        1,
+    ),
+    (
+        "tests/core/teller/test_teller_action_block.py",
+        "test_external_housekeeping_valid_caller_can_select_victim_and_risk_flag",
+        "cadence-comment",
+        "per block",
+        'with boa.reverts("one action per block"):',
+        1,
+    ),
+    (
+        "tests/core/teller/test_teller_rebalance.py",
+        "test_rebalance_after_effects_guard_rejection_rolls_back_every_leg",
+        "cadence-comment",
+        "per block",
+        'with boa.reverts("one action per block"):',
+        1,
+    ),
+    (
+        "tests/core/teller/test_teller_withdraw.py",
+        "test_low_risk_deposit_arms_same_action_block_withdraw_rejection",
+        "cadence-comment",
+        "per block",
+        'with boa.reverts("one action per block"):',
+        1,
+    ),
+    (
+        "tests/core/teller/test_teller_withdraw.py",
+        "test_checked_withdraw_rejects_second_same_action_block_and_rolls_back",
+        "cadence-comment",
+        "per block",
+        'with boa.reverts("one action per block"):',
+        1,
+    ),
+    (
+        "tests/data/test_ledger.py",
+        "test_ledger_check_and_update_last_touch_mixed_check_modes",
+        "cadence-comment",
+        "per block",
+        'with boa.reverts("one action per block"):',
+        1,
+    ),
+    (
+        "tests/data/test_ledger_action_block.py",
+        "test_arb_sys_identity_not_native_block_controls_equality",
+        "cadence-comment",
+        "per block",
+        'with boa.reverts("one action per block"):',
+        1,
+    ),
+    (
+        "tests/data/test_ledger_action_block.py",
+        "test_arb_sys_preserves_low_high_and_high_low_high_ordering",
+        "cadence-comment",
+        "per block",
+        'with boa.reverts("one action per block"):',
+        1,
+    ),
+    (
+        "tests/data/test_ledger_action_block.py",
+        "test_arb_sys_preserves_low_high_and_high_low_high_ordering",
+        "cadence-comment",
+        "per block",
+        'with boa.reverts("one action per block"):',
+        2,
+    ),
+    (
+        "tests/data/test_ledger_action_block.py",
+        "test_arb_sys_keeps_users_isolated_within_one_action_block",
+        "cadence-comment",
+        "per block",
+        'with boa.reverts("one action per block"):',
+        1,
+    ),
+    (
+        "tests/data/test_ledger_action_block.py",
+        "test_arb_sys_keeps_users_isolated_within_one_action_block",
+        "cadence-comment",
+        "per block",
+        'with boa.reverts("one action per block"):',
+        2,
+    ),
+    (
+        "tests/probes/test_action_block_identity_probe.py",
+        "test_probe_emits_native_and_arb_sys_values_from_compatible_double",
+        "block-unit-identifier",
+        "readActionBlocks",
+        "native_view, arb_view = probe.readActionBlocks()",
+        1,
+    ),
+    (
+        "tests/vaults/modules/test_stab_vault_claims.py",
+        "test_claim_after_effects_guard_rejection_rolls_back_second_claim",
+        "cadence-comment",
+        "per block",
+        'with boa.reverts("one action per block"):',
+        1,
+    ),
+}
+S5_RECONCILED_CADENCE_KEYS = S5_REVIEW_CADENCE_KEYS | {
+    (
+        "contracts/data/Ledger.vy",
+        "checkAndUpdateLastTouch",
+        "cadence-comment",
+        "per block",
+        "assert self.lastTouch[_user] != block.number # dev: one action per block",
+        1,
+    ),
+}
+S5_REVIEW_PATHS = {"contracts/testing/ActionBlockIdentityProbe.vy"}
 PLACEHOLDERS = {
     "",
     "-",
@@ -395,9 +609,9 @@ def _candidate_label(record: Mapping[str, Any]) -> str:
     return str(record.get("reviewDomain", record.get("id", "UNMAPPED")))
 
 
-def _key_set_fingerprint(keys: set[tuple[Any, ...]]) -> str:
+def _key_set_fingerprint(keys: set[Any]) -> str:
     serialized = json.dumps(
-        [list(key) for key in sorted(keys)],
+        [list(key) if isinstance(key, tuple) else key for key in sorted(keys)],
         ensure_ascii=True,
         separators=(",", ":"),
     )
@@ -502,6 +716,167 @@ def _record_key(record: Mapping[str, Any]) -> tuple[str, str, str, int]:
         str(record.get("normalizedExpression", "")),
         int(record.get("ordinalInFunction", 0)),
     )
+
+
+def _validate_s5_review_value(
+    record: Mapping[str, Any],
+    *,
+    expected: bool,
+    domain: str,
+    candidate: str,
+    findings: list[Finding],
+) -> None:
+    has_field = S5_REVIEW_ARTIFACT_FIELD in record
+    value = record.get(S5_REVIEW_ARTIFACT_FIELD)
+    if expected and value != S5_REVIEW_ARTIFACT_SHA256:
+        findings.append(
+            Finding(
+                code="INV-SCHEMA-S5-PROVENANCE",
+                domain=domain,
+                path=str(record.get("path", "-")),
+                candidate=candidate,
+                expected=S5_REVIEW_ARTIFACT_SHA256,
+                actual=json.dumps(value, sort_keys=True),
+                remediation=(
+                    "restore the exact lowercase frozen Gate 1 artifact SHA-256 "
+                    "for this enumerated S5 reconciliation record"
+                ),
+            )
+        )
+    elif not expected and has_field:
+        findings.append(
+            Finding(
+                code="INV-SCHEMA-S5-PROVENANCE-SCOPE",
+                domain=domain,
+                path=str(record.get("path", "-")),
+                candidate=candidate,
+                expected="field-absent",
+                actual=json.dumps(value, sort_keys=True),
+                remediation=(
+                    "remove S5 review provenance from records outside the exact "
+                    "Gate 1 reconciliation set"
+                ),
+            )
+        )
+
+
+def _s5_legacy_inventory_fingerprint(data: Mapping[str, Any]) -> str:
+    legacy = copy.deepcopy(dict(data))
+    legacy.pop("expectedProductionCounts", None)
+    legacy["directOccurrences"] = [
+        record
+        for record in legacy["directOccurrences"]
+        if _record_key(record) not in S5_RECONCILED_DIRECT_KEYS
+    ]
+    legacy["cadenceCandidates"] = [
+        record
+        for record in legacy["cadenceCandidates"]
+        if _candidate_from_record(record) not in S5_RECONCILED_CADENCE_KEYS
+    ]
+    legacy["vyperPathClassifications"] = [
+        record
+        for record in legacy["vyperPathClassifications"]
+        if str(record.get("path", "")) not in S5_REVIEW_PATHS
+    ]
+    encoded = (
+        json.dumps(legacy, sort_keys=True, separators=(",", ":")) + "\n"
+    ).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def _validate_s5_review_provenance(
+    data: Mapping[str, Any],
+    findings: list[Finding],
+) -> None:
+    direct_records = data["directOccurrences"]
+    cadence_records = data["cadenceCandidates"]
+    path_records = data["vyperPathClassifications"]
+
+    direct_keys = {_record_key(record) for record in direct_records}
+    cadence_keys = {_candidate_from_record(record) for record in cadence_records}
+    path_keys = {str(record.get("path", "")) for record in path_records}
+    for domain, expected, actual in (
+        ("direct", S5_REVIEW_DIRECT_KEYS, direct_keys),
+        ("cadence", S5_REVIEW_CADENCE_KEYS, cadence_keys),
+        ("classification", S5_REVIEW_PATHS, path_keys),
+    ):
+        missing = expected - actual
+        if missing:
+            findings.append(
+                Finding(
+                    code="INV-SCHEMA-S5-SET",
+                    domain=domain,
+                    candidate=f"missing={len(missing)}",
+                    expected=_key_set_fingerprint(expected),
+                    actual=_key_set_fingerprint(actual & expected),
+                    remediation=(
+                        "restore every exact record covered by the 28 reviewed "
+                        "S5 inventory dispositions"
+                    ),
+                )
+            )
+
+    for record in direct_records:
+        key = _record_key(record)
+        _validate_s5_review_value(
+            record,
+            expected=key in S5_REVIEW_DIRECT_KEYS,
+            domain="direct",
+            candidate=str(record.get("id", "UNMAPPED")),
+            findings=findings,
+        )
+    for record in cadence_records:
+        key = _candidate_from_record(record)
+        _validate_s5_review_value(
+            record,
+            expected=key in S5_REVIEW_CADENCE_KEYS,
+            domain="cadence",
+            candidate=_candidate_label(record),
+            findings=findings,
+        )
+    for record in path_records:
+        path = str(record.get("path", ""))
+        _validate_s5_review_value(
+            record,
+            expected=path in S5_REVIEW_PATHS,
+            domain="classification",
+            candidate=path,
+            findings=findings,
+        )
+    for domain, collection in (
+        ("indirect", data["indirectCadence"]),
+        ("timestamp", data["timestampContext"]),
+        ("seconds", data["secondsUnitCandidates"]),
+        ("mixed", data["allowedMixedClockFunctions"]),
+    ):
+        for record in collection:
+            _validate_s5_review_value(
+                record,
+                expected=False,
+                domain=domain,
+                candidate=str(record.get("id", _candidate_label(record))),
+                findings=findings,
+            )
+
+
+def _check_s5_legacy_inventory_fingerprint(
+    data: Mapping[str, Any],
+) -> list[Finding]:
+    fingerprint = _s5_legacy_inventory_fingerprint(data)
+    if fingerprint == S5_LEGACY_INVENTORY_SHA256:
+        return []
+    return [
+        Finding(
+            code="INV-SCHEMA-S5-LEGACY-FINGERPRINT",
+            domain="schema",
+            expected=S5_LEGACY_INVENTORY_SHA256,
+            actual=fingerprint,
+            remediation=(
+                "restore every inventory byte outside the exact S5 "
+                "reconciliation set"
+            ),
+        )
+    ]
 
 
 def _placeholder(value: Any) -> bool:
@@ -791,6 +1166,7 @@ def _validate_schema(data: Mapping[str, Any]) -> list[Finding]:
                 remediation="obtain semantic and tooling review before changing cadence discovery",
             )
         )
+    _validate_s5_review_provenance(data, findings)
 
     direct_records = data["directOccurrences"]
     direct_keys: dict[tuple[str, str, str, int], list[Mapping[str, Any]]] = {}
@@ -1659,6 +2035,7 @@ def check_repository(
         )
         for classification in ("mock", "testing", "test")
     }
+    findings.extend(_check_s5_legacy_inventory_fingerprint(data))
     success_lines = [
         (
             "CLOCK_INVENTORY_OK "

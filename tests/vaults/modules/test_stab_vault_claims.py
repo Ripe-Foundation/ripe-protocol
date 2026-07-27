@@ -1,8 +1,57 @@
 import pytest
 import boa
+from eth_utils import to_checksum_address
 
 from constants import EIGHTEEN_DECIMALS, ZERO_ADDRESS, MAX_UINT256
 from conf_utils import filter_logs
+
+
+ARB_SYS = to_checksum_address("0x0000000000000000000000000000000000000064")
+LEDGER_ID = 4
+
+
+def _replace_ledger_with_arb_source(
+    ripe_hq_deploy,
+    defaults,
+    governance,
+    child_identity,
+):
+    implementation = boa.loads(
+        """# @version 0.4.3
+actionBlock: uint256
+
+@view
+@external
+def arbBlockNumber() -> uint256:
+    return self.actionBlock
+""",
+        name="claim_many_arb_source",
+    )
+    boa.env.set_code(ARB_SYS, boa.env.get_code(implementation.address))
+    boa.env.set_storage(ARB_SYS, 0, child_identity)
+
+    arb_ledger = boa.load(
+        "contracts/data/Ledger.vy",
+        ripe_hq_deploy,
+        defaults,
+        ARB_SYS,
+        name="claim_many_arb_ledger",
+    )
+    assert ripe_hq_deploy.startAddressUpdateToRegistry(
+        LEDGER_ID,
+        arb_ledger,
+        sender=governance.address,
+    )
+    boa.env.time_travel(blocks=ripe_hq_deploy.registryChangeTimeLock())
+    assert ripe_hq_deploy.confirmAddressUpdateToRegistry(
+        LEDGER_ID,
+        sender=governance.address,
+    )
+    return arb_ledger
+
+
+def _set_claim_many_child_identity(child_identity):
+    boa.env.set_storage(ARB_SYS, 0, child_identity)
 
 
 def test_stab_vault_claims_full(
@@ -398,6 +447,101 @@ def test_stab_vault_claims_multiple_assets(
     assert stability_pool.getTotalUserValue(bob, alpha_token) <= 1
 
 
+def test_claim_after_effects_guard_rejection_rolls_back_second_claim(
+    stability_pool,
+    alpha_token,
+    bravo_token,
+    charlie_token,
+    alpha_token_whale,
+    bravo_token_whale,
+    charlie_token_whale,
+    bob,
+    teller,
+    auction_house,
+    mock_price_source,
+    vault_book,
+    savings_green,
+    setGeneralConfig,
+    setAssetConfig,
+    ledger,
+    mission_control,
+    switchboard_alpha,
+):
+    setGeneralConfig()
+    setAssetConfig(bravo_token)
+    setAssetConfig(charlie_token)
+    price = 1 * EIGHTEEN_DECIMALS
+    mock_price_source.setPrice(alpha_token, price)
+    mock_price_source.setPrice(bravo_token, price)
+    mock_price_source.setPrice(charlie_token, price)
+
+    deposit_amount = 100 * EIGHTEEN_DECIMALS
+    alpha_token.transfer(stability_pool, deposit_amount, sender=alpha_token_whale)
+    stability_pool.depositTokensInVault(
+        bob,
+        alpha_token,
+        deposit_amount,
+        sender=teller.address,
+    )
+
+    bravo_amount = 50 * EIGHTEEN_DECIMALS
+    bravo_token.transfer(stability_pool, bravo_amount, sender=bravo_token_whale)
+    stability_pool.swapForLiquidatedCollateral(
+        alpha_token,
+        deposit_amount // 2,
+        bravo_token,
+        bravo_amount,
+        ZERO_ADDRESS,
+        alpha_token,
+        savings_green,
+        sender=auction_house.address,
+    )
+
+    charlie_amount = 50 * 10 ** charlie_token.decimals()
+    charlie_token.transfer(stability_pool, charlie_amount, sender=charlie_token_whale)
+    stability_pool.swapForLiquidatedCollateral(
+        alpha_token,
+        deposit_amount // 2,
+        charlie_token,
+        charlie_amount,
+        ZERO_ADDRESS,
+        alpha_token,
+        savings_green,
+        sender=auction_house.address,
+    )
+
+    mission_control.setShouldCheckLastTouch(
+        True,
+        sender=switchboard_alpha.address,
+    )
+    vault_id = vault_book.getRegId(stability_pool)
+    teller.claimFromStabilityPool(
+        vault_id,
+        alpha_token,
+        bravo_token,
+        sender=bob,
+    )
+
+    before = (
+        charlie_token.balanceOf(bob),
+        stability_pool.getTotalUserValue(bob, alpha_token),
+        ledger.lastTouch(bob),
+    )
+    with boa.reverts("one action per block"):
+        teller.claimFromStabilityPool(
+            vault_id,
+            alpha_token,
+            charlie_token,
+            sender=bob,
+        )
+    after = (
+        charlie_token.balanceOf(bob),
+        stability_pool.getTotalUserValue(bob, alpha_token),
+        ledger.lastTouch(bob),
+    )
+    assert after == before
+
+
 def test_stab_vault_claims_tiny_amounts(
     stability_pool,
     alpha_token,
@@ -511,6 +655,9 @@ def test_stab_vault_claim_many_basic(
     _test,
     setGeneralConfig,
     setAssetConfig,
+    ledger,
+    mission_control,
+    switchboard_alpha,
 ):
     """Test claimManyFromStabilityPool with multiple assets"""
     setGeneralConfig()
@@ -550,6 +697,12 @@ def test_stab_vault_claim_many_basic(
         (alpha_token.address, charlie_token.address, MAX_UINT256)
     ]
 
+    mission_control.setShouldCheckLastTouch(
+        True,
+        sender=switchboard_alpha.address,
+    )
+    boa.env.time_travel(blocks=1)
+
     # Claim many
     vault_id = vault_book.getRegId(stability_pool)
     total_usd_value = teller.claimManyFromStabilityPool(vault_id, claims, sender=bob)
@@ -558,6 +711,159 @@ def test_stab_vault_claim_many_basic(
     _test(bravo_amount, bravo_token.balanceOf(bob))
     _test(charlie_amount, charlie_token.balanceOf(bob))
     assert total_usd_value == 200 * EIGHTEEN_DECIMALS
+    assert ledger.lastTouch(bob) == boa.env.evm.patch.block_number
+
+
+def test_claim_many_arb_sys_rejects_second_same_action_block(
+    stability_pool,
+    alpha_token,
+    bravo_token,
+    charlie_token,
+    alpha_token_whale,
+    bravo_token_whale,
+    charlie_token_whale,
+    bob,
+    teller,
+    auction_house,
+    mock_price_source,
+    vault_book,
+    savings_green,
+    setGeneralConfig,
+    setAssetConfig,
+    mission_control,
+    switchboard_alpha,
+    ripe_hq_deploy,
+    defaults,
+    governance,
+):
+    arb_ledger = _replace_ledger_with_arb_source(
+        ripe_hq_deploy,
+        defaults,
+        governance,
+        5_200,
+    )
+    setGeneralConfig()
+    setAssetConfig(bravo_token)
+    setAssetConfig(charlie_token)
+
+    price = EIGHTEEN_DECIMALS
+    mock_price_source.setPrice(alpha_token, price)
+    mock_price_source.setPrice(bravo_token, price)
+    mock_price_source.setPrice(charlie_token, price)
+
+    deposit_amount = 200 * EIGHTEEN_DECIMALS
+    alpha_token.transfer(
+        stability_pool,
+        deposit_amount,
+        sender=alpha_token_whale,
+    )
+    stability_pool.depositTokensInVault(
+        bob,
+        alpha_token,
+        deposit_amount,
+        sender=teller.address,
+    )
+
+    bravo_amount = 80 * EIGHTEEN_DECIMALS
+    bravo_token.transfer(
+        stability_pool,
+        bravo_amount,
+        sender=bravo_token_whale,
+    )
+    stability_pool.swapForLiquidatedCollateral(
+        alpha_token,
+        deposit_amount // 2,
+        bravo_token,
+        bravo_amount,
+        ZERO_ADDRESS,
+        alpha_token,
+        savings_green,
+        sender=auction_house.address,
+    )
+
+    charlie_amount = 120 * 10 ** charlie_token.decimals()
+    charlie_token.transfer(
+        stability_pool,
+        charlie_amount,
+        sender=charlie_token_whale,
+    )
+    stability_pool.swapForLiquidatedCollateral(
+        alpha_token,
+        deposit_amount // 2,
+        charlie_token,
+        charlie_amount,
+        ZERO_ADDRESS,
+        alpha_token,
+        savings_green,
+        sender=auction_house.address,
+    )
+
+    mission_control.setShouldCheckLastTouch(
+        True,
+        sender=switchboard_alpha.address,
+    )
+    child_identity = 5_201
+    _set_claim_many_child_identity(child_identity)
+    vault_id = vault_book.getRegId(stability_pool)
+    first_claims = [
+        (
+            alpha_token.address,
+            bravo_token.address,
+            40 * EIGHTEEN_DECIMALS,
+        ),
+        (
+            alpha_token.address,
+            charlie_token.address,
+            60 * EIGHTEEN_DECIMALS,
+        ),
+    ]
+    assert (
+        teller.claimManyFromStabilityPool(
+            vault_id,
+            first_claims,
+            sender=bob,
+        )
+        == 100 * EIGHTEEN_DECIMALS
+    )
+    assert arb_ledger.lastTouch(bob) == child_identity
+
+    before = (
+        bravo_token.balanceOf(bob),
+        charlie_token.balanceOf(bob),
+        bravo_token.balanceOf(stability_pool),
+        charlie_token.balanceOf(stability_pool),
+        stability_pool.getTotalUserValue(bob, alpha_token),
+        arb_ledger.lastTouch(bob),
+    )
+    boa.env.time_travel(blocks=60)
+    second_claims = [
+        (
+            alpha_token.address,
+            bravo_token.address,
+            MAX_UINT256,
+        ),
+        (
+            alpha_token.address,
+            charlie_token.address,
+            MAX_UINT256,
+        ),
+    ]
+    with boa.reverts():
+        teller.claimManyFromStabilityPool(
+            vault_id,
+            second_claims,
+            sender=bob,
+        )
+    after = (
+        bravo_token.balanceOf(bob),
+        charlie_token.balanceOf(bob),
+        bravo_token.balanceOf(stability_pool),
+        charlie_token.balanceOf(stability_pool),
+        stability_pool.getTotalUserValue(bob, alpha_token),
+        arb_ledger.lastTouch(bob),
+    )
+    assert after == before
+    assert arb_ledger.lastTouch(bob) == child_identity
 
 
 def test_stab_vault_claim_many_empty_array(

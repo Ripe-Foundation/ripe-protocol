@@ -37,6 +37,51 @@ def test_teller_basic_deposit(
     assert alpha_token.balanceOf(simple_erc20_vault) == deposit_amount
 
 
+def test_deposit_low_risk_repeats_and_arms_current_action_block(
+    simple_erc20_vault,
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    setGeneralConfig,
+    setAssetConfig,
+    teller,
+    ledger,
+    mission_control,
+    switchboard_alpha,
+):
+    setGeneralConfig()
+    setAssetConfig(alpha_token)
+    mission_control.setShouldCheckLastTouch(
+        True,
+        sender=switchboard_alpha.address,
+    )
+
+    deposit_amount = 25 * EIGHTEEN_DECIMALS
+    alpha_token.transfer(bob, deposit_amount * 2, sender=alpha_token_whale)
+    alpha_token.approve(teller.address, deposit_amount * 2, sender=bob)
+
+    teller.deposit(
+        alpha_token,
+        deposit_amount,
+        bob,
+        simple_erc20_vault,
+        sender=bob,
+    )
+    teller.deposit(
+        alpha_token,
+        deposit_amount,
+        bob,
+        simple_erc20_vault,
+        sender=bob,
+    )
+
+    assert ledger.lastTouch(bob) == boa.env.evm.patch.block_number
+    assert (
+        simple_erc20_vault.getTotalAmountForUser(bob, alpha_token)
+        == deposit_amount * 2
+    )
+
+
 def test_teller_deposit_protocol_disabled(
     simple_erc20_vault,
     alpha_token,
@@ -875,4 +920,3 @@ def test_teller_deposit_min_balance_zero_allows_any_amount(
     # Verify tokens were transferred
     assert alpha_token.balanceOf(bob) == 0
     assert alpha_token.balanceOf(simple_erc20_vault) == deposit_amount
-

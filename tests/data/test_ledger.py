@@ -1558,16 +1558,9 @@ def test_ledger_check_and_update_last_touch_paused(ledger, switchboard_alpha, te
 
 
 def test_ledger_check_and_update_last_touch_empty_user(ledger, teller):
-    """Test checkAndUpdateLastTouch with empty user address."""
-    # Should handle empty address gracefully
-    # This tests the edge case, behavior depends on implementation
-    try:
-        ledger.checkAndUpdateLastTouch(ZERO_ADDRESS, True, sender=teller.address)
-        # If it doesn't revert, check it set lastTouch
-        assert ledger.lastTouch(ZERO_ADDRESS) == boa.env.evm.patch.block_number
-    except:
-        # If it reverts, that's also acceptable behavior
-        pass
+    """The approved identity policy preserves the zero-address user key."""
+    ledger.checkAndUpdateLastTouch(ZERO_ADDRESS, True, sender=teller.address)
+    assert ledger.lastTouch(ZERO_ADDRESS) == boa.env.evm.patch.block_number
 
 
 def test_ledger_check_and_update_last_touch_block_progression(ledger, teller, alice):
