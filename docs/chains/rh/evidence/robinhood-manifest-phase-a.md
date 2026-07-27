@@ -2200,3 +2200,253 @@ renewed review:
 Until a separate Phase B authorization after all gates, this document is the
 only H-06 Phase A output. Its approved decisions are Phase A design authority,
 not implementation authority.
+
+## 14. Final post-H-03 reconciliation and controlling platform policy
+
+This section is the controlling current-state and owner-policy addendum as of
+`2026-07-27T21:52:33Z`. It supersedes only stale lifecycle, current-`rh`,
+initial-platform, and qualification statements above. All preceding bytes
+remain the approved historical record at their stated observation times.
+In particular, this addendum does not rewrite OD-04, OD-05, any other owner
+decision, the event-evidence vector, the schema or canonicalization model, the
+H-05/H-06 ownership boundary, the conditional file ceilings, or historical
+review provenance.
+
+### 14.1 Final integrated authority and reconciliation topology
+
+Local `rh`, cached `origin/rh`, and live `origin/rh` resolved read-only to the
+same final controlling identity before reconciliation:
+
+- commit `66eae5ac516466be360fe53a53a4bcd672c1ed23`;
+- tree `9a0f75696e5b4ac76b9ea2fd6ca41bc3d2762f9c`; and
+- subject `feat(rh): implement M1 exact receipt accounting`.
+
+The controlling ancestry and evidence identities are:
+
+| Authority | Final controlling identity and effect |
+| --- | --- |
+| H-01 retirement transition | Commit `7098211db5693f986b65ec7a9e897f3518e9538c`, tree `c07329ed9fcc2dc99afbef3f7888f478024d1ede`, is an ancestor of final `rh`. The H-01 exception disposition recorded in Section 1.2.1 remains controlling. |
+| S5 Ledger guard | Commit `81478fe33dfa47a8e135682a047b64949650cb29`, tree `4eb1e5ae690694b3bc1f6248b6e92d8ebb4d2f53`, is an ancestor of final `rh`. The implementation record remains SHA-256 `6ce94f25f00e6924b540378f09ed1a84ce401e6474863b2eae6820437b2f847b`, blob `589c334f13dfb9bfe0432f0632b1ee7dcb286859`; the integrated Ledger source remains SHA-256 `6bd731a6ce9084de213494ebad09f8e52c782153842708b78f90fa178c06e9e3`. |
+| H-03 Phase B | Gate 1 provenance commit `ee07d9b6b4ae85f76646617051ec7d331e30a824`, tree `a7512b03e836996ec56e8bcfaecb787c218210d0`, is an ancestor of final `rh`. Its parent is implementation commit `35e3a8df5c0768f17121407c18da185aabd82f43`, tree `6fcf10e21b75daced64529da25381da0449e9bd1`. The integrated H-03 evidence is SHA-256 `f1f8bf077723b08b87da6244a56ea36706c82152182e227972abe02363146d22`, blob `b0de9e5712cbaf960a6181b6f4523ddeba029f1d`. |
+| Track 8 M1 Phase B | Final controlling commit `66eae5ac516466be360fe53a53a4bcd672c1ed23`, tree `9a0f75696e5b4ac76b9ea2fd6ca41bc3d2762f9c`, has parent `ee07d9b6b4ae85f76646617051ec7d331e30a824`. It integrates the exact-receipt change in `contracts/core/Teller.vy` and three authorized test paths. |
+| H-05 interface | Evidence remains SHA-256 `28c3e32b9732334c4904667eeb983d057d5d96391fb5fd8b13f37a9f5033af7c`, blob `cc730d393daad01c7403c4305770d2b33209c752`; its six-file ceiling, RFC 8785/JCS `report_sha256`, synthetic-read boundary, fixed-width migration-ID grammar, and separation from H-06 remain controlling. |
+
+Before the merge, local, tracking, and live H-06 feature refs all resolved to
+signed commit `f54b17c07fd24e54a0ae491dd9b3b1b37848e149`, tree
+`e90de01165071384128b99e5d616c59950f1e6db`. Its committed evidence was
+SHA-256 `bb8aa2a95cda644863a58deec048c01c61b0c037b453f9e163fe77aa73ba5804`,
+blob `f8845052453333de2969d3ca83a5043c69dc64e4`.
+
+The merge base between that H-06 tip and final `rh` was
+`7098211db5693f986b65ec7a9e897f3518e9538c`; H-06 was three commits ahead
+and 26 commits behind. A read-only virtual merge found 30 merged path sections,
+zero conflict signals, and prospective tree
+`9676604db81ac7083d21ff1b6fb6fa693267dc01`.
+
+Normal reconciliation then produced merge commit
+`56416ecd9319ba8b1b30804d8144629553c97d36`, with that exact tree and parents
+ordered:
+
+1. `f54b17c07fd24e54a0ae491dd9b3b1b37848e149`; then
+2. `66eae5ac516466be360fe53a53a4bcd672c1ed23`.
+
+No rebase, squash, amendment, cherry-pick, force operation, or conflict
+resolution occurred. Final `rh` is an ancestor of the reconciliation merge.
+The merge left the H-06 evidence bytes and blob unchanged, and net
+`rh...HEAD` contribution remained exactly this evidence file before this
+addendum.
+
+### 14.2 Semantic reconciliation and preserved H-06 boundaries
+
+The final incoming delta has no path intersection with this evidence file, the
+H-05 six-file ceiling, the conditional H-06 eight-file ceiling, the H-06
+schema/writer modules, either Robinhood history root, or committed Base
+history. The integrated work changes no H-05 discovery/report interface and
+no H-06 manifest schema, canonicalization rule, hash domain, immutable-chain
+rule, promotion rule, retention class, or sensitivity boundary.
+
+S5 and H-03 make the exact Ledger source and action-block selection controlling
+deployment-plan inputs. A future H-05 plan and H-06 manifest must bind the
+approved Robinhood `0x64` source selection, constructor inputs, immutable
+getter, compiler and creation/runtime identities, registry placement, and
+required postconditions. These are values carried by the existing source,
+configuration, assertion, and postcondition fields; they do not require a new
+H-06 schema field or owner decision.
+
+Track 8 M1 makes the final `contracts/core/Teller.vy` source SHA-256
+`4afc6ce1ccf21cb65e04ce3c56fedcf60bb79cba8e7dc51fd855a1f1f82bd909`,
+blob `7019b6c47dde03151acc1952944dd19301c83328`, controlling repository input.
+The approved exact-candidate boundary remains a 24,152-byte deployed runtime,
+424 bytes below the 24,576-byte EIP-170 limit. This reconciliation reverified
+the exact source bytes but did not compile or remeasure runtime bytecode; the
+24,152-byte value remains the reviewed, source-bound M1 evidence. Any Teller
+source-byte change invalidates that runtime boundary and requires fresh
+compiler/artifact evidence. Future H-05/H-06 source, action, and postcondition
+identities must bind the then-controlling exact Teller source and artifacts;
+the integrated M1 change does not alter the H-06 schema.
+
+S5 moved the historical inventory-test link in Section 3.3 without changing
+the asserted policy. On final `rh`, future Robinhood history scanning is
+proved at
+[inventory test L852-L859](../../../../tests/inventory/test_block_clock_inventory.py#L852-L859),
+and the Base historical exclusion is proved at
+[inventory test L870-L880](../../../../tests/inventory/test_block_clock_inventory.py#L870-L880).
+The earlier line anchor remains historical provenance; these are its current
+source locations.
+
+The reviewed event-evidence vector remains
+`4008ce9d56daa4cfe33ebea06761a8508ca04933d7709670c81f944d7df4c79b`.
+All schema/version, dual-canonicalization, hashing, chain, current-index,
+finality, reconciliation, retention, redaction, legacy Base, H-05 interface,
+and forward-remediation decisions remain unchanged.
+
+### 14.3 Controlling OD-04 initial-platform policy
+
+The protocol owner approves the design and platform direction in this
+section. This approval does not authorize implementation, Phase B, a file
+change, a deployment, or a release. It supersedes only the earlier requirement
+that Linux ext4/XFS qualification block the initial macOS-only Gate 1 or
+release. Historical OD-04 text remains unchanged as the record of the earlier
+decision and feasibility state.
+
+#### 14.3.1 Initial supported environment and threat model
+
+Initial H-06 deployment and current promotion support is limited to a trusted
+macOS operator machine using a local APFS volume. The repository, state root,
+history, immutable manifests, and current-promotion files must be stored
+locally on APFS and outside:
+
+- iCloud, Dropbox, or any other synchronized folder;
+- network filesystems;
+- container overlayfs;
+- `tmpfs`;
+- removable storage; and
+- any filesystem or storage arrangement not expressly qualified for the
+  initial release.
+
+The state root must be owned by the dedicated trusted operator account and
+have mode `0700`. Every existing held-descriptor, inode, regular-file, device,
+link-count, basename, directory-descriptor, path-escape, and symlink check
+remains mandatory. Lock ownership, prior identity, profile, chain, plan, and
+current-index validation remain mandatory.
+
+Malicious same-UID interference, root interference, and dynamic-loader
+interposition are outside the supported threat model. Cooperative advisory
+locking does not protect against those excluded actors. Lying firmware,
+defective hardware, media failure, and behavior outside documented operating
+system or device guarantees also remain residual risks rather than conditions
+the writer claims to eliminate.
+
+#### 14.3.2 Native-only immutable publication and durability
+
+Immutable publication must use only:
+
+```text
+renameatx_np(..., RENAME_EXCL)
+```
+
+There is no immutable-publication fallback to `os.rename`, `os.replace`,
+`os.link`, copying, unlink-before-rename, raw syscall numbers, another
+filesystem, or external state. Absence, incompatibility, or failure of the
+approved native primitive is a fail-closed result. A retained Linux adapter or
+test cannot be selected on the initial supported platform.
+
+A successful macOS durability result requires this ordered protocol:
+
+1. finish complete-schema and canonical-byte validation before publication;
+2. flush the temporary regular file and complete file `fsync`;
+3. complete `F_FULLFSYNC` on that held file descriptor;
+4. publish exclusively in the held target directory with
+   `renameatx_np(..., RENAME_EXCL)`;
+5. complete parent-directory `fsync`;
+6. complete final published-file `F_FULLFSYNC`; and
+7. revalidate the post-operation directory entry, held descriptor, inode,
+   device, file type, link count, basename, bytes, and digest identities.
+
+No partial file becomes canonical. No immutable completed record may be
+overwritten or mutated. Errors are reconciled from observed filesystem state,
+not inferred from the last attempted call. Pre-publication failure,
+publication collision, publication-success ambiguity, cleanup ambiguity,
+durability ambiguity, and final identity mismatch retain their distinct,
+truthful outcomes.
+
+Successful synchronization calls provide strong best-effort power-loss
+protection. They are not an absolute guarantee against lying firmware,
+defective hardware, media failure, or behavior outside documented operating
+system and device guarantees.
+
+The exact reviewed error and state taxonomy remains controlling and
+unchanged, including `H06_POST_RENAME_DURABILITY_AMBIGUOUS` and
+`H06_CURRENT_PROMOTION_AMBIGUOUS`. This addendum adds, removes, or renames no
+error code, result state, ambiguity state, cleanup state, or reconciliation
+classification.
+
+#### 14.3.3 OD-05 current-index replacement
+
+`os.replace` is permitted only for the separately reviewed OD-05
+`current-manifest.json` replacement protocol while holding the cooperative
+advisory lock and after validating the expected prior-index hash and immutable
+target. It is not an immutable-publication fallback and is not a kernel
+compare-and-swap primitive.
+
+The current index remains generated, self-hashed, non-authoritative evidence.
+Its cooperative-lock and prior-hash model retains the documented limitation
+against non-cooperating or excluded-threat-model writers. A failed, partial,
+ambiguous, finality-pending, unreconciled, stale-prior, or otherwise
+postcondition-incomplete result must not promote current.
+
+#### 14.3.4 Authorization and qualification boundaries
+
+The following states are deliberately separate:
+
+| Boundary | Controlling disposition |
+| --- | --- |
+| approved design and platform policy | Approved by the protocol owner through this addendum, subject to independent review of the exact evidence bytes |
+| implementation authorization | Absent; H-06 Phase B has not been authorized |
+| bounded implementation start | May occur only after a separate exact-file owner authorization; completed macOS/APFS Gate 1 or release qualification is not a prerequisite to beginning that separately authorized bounded implementation |
+| macOS/APFS Gate 1 qualification | Mandatory no-skip qualification of the exact native adapter, APFS checks, durability sequence, ambiguity taxonomy, cleanup, lock/prior identity behavior, and all negative cases on the supported environment |
+| initial release qualification | Mandatory repeatable no-skip macOS/APFS qualification on the intended trusted operator/storage class, plus independent deployment/schema, macOS durability, and security approval |
+| Linux qualification | Deferred and unsupported for the initial release; Linux execution must fail closed |
+| deployment or release authorization | Absent and separately required after implementation, Gate 1, and release evidence |
+
+Linux `renameat2(..., RENAME_NOREPLACE)` implementation or tests, if retained
+inside the conditional ceiling, are future compatibility work only. They do
+not establish production support or release qualification. Exact ext4/XFS
+architecture, kernel, libc, Python, filesystem, mount, and storage
+qualification becomes mandatory only before a later, separately approved
+Linux enablement. It does not block initial macOS/APFS Gate 1 or release.
+
+No-skip macOS/APFS testing remains mandatory at Gate 1 and again for release.
+Independent deployment/schema, macOS filesystem/durability, and
+security/sensitivity reviewers remain required. The conditional eight-file
+ceiling remains unchanged; no dependency, helper module, runtime fallback,
+ninth file, or external restricted-state root is approved.
+
+### 14.4 Current H-06 stop rule
+
+H-06 Phase B remains unauthorized. Beginning it requires a separate,
+explicit, exact-file owner authorization after this final evidence amendment
+is independently reviewed, committed, published, and integrated. This
+documentation reconciliation does not authorize `.gitignore`, schema, code,
+test, history, namespace, dependency, configuration, cleanup, RPC, account,
+signing, transaction, migration, deployment, promotion, or release work.
+
+Fresh reconciliation and renewed review are required if:
+
+- `rh` moves beyond commit
+  `66eae5ac516466be360fe53a53a4bcd672c1ed23`, tree
+  `9a0f75696e5b4ac76b9ea2fd6ca41bc3d2762f9c`;
+- an H-01, S5, H-03, Track 8 M1, H-05, or execution-hardening authority or
+  controlling byte changes;
+- the approved macOS/APFS-only platform policy, threat model, native-only
+  primitive, durability sequence, no-fallback rule, Gate 1, or release
+  qualification changes;
+- Linux enablement is proposed;
+- any existing Section 13 invalidation condition, except the superseded
+  initial Linux-qualification requirement and superseded current-`rh`
+  identity, becomes true; or
+- any Phase B path beyond the conditional exact eight-file ceiling becomes
+  necessary.
+
+All prior owner choices remain approved Phase A design authority. None is
+implementation, integration, deployment, or release authority.
