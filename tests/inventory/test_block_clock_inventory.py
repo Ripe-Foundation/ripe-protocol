@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import shutil
@@ -15,6 +16,9 @@ from scripts import check_block_clock_inventory as checker
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 INVENTORY_RELATIVE = Path("config/block-clock-inventory.json")
 SCRIPT_RELATIVE = Path("scripts/check_block_clock_inventory.py")
+IMPLEMENTATION_RECORD_RELATIVE = Path(
+    "docs/chains/rh/ledger-guard-implementation-record.md"
+)
 
 
 @pytest.fixture(scope="session")
@@ -106,19 +110,146 @@ def test_clean_approved_fixture_passes_without_git_or_network(
     assert not (fixture_repo / ".git").exists()
     result = checker.check_repository(fixture_repo)
     assert result.ok, result.output
-    assert "production_occurrences=100" in result.output
-    assert "production_lines=95" in result.output
+    assert "production_occurrences=99" in result.output
+    assert "production_lines=94" in result.output
     assert "production_files=17" in result.output
     assert "bn_ids=32" in result.output
     assert "indirect_ids=1" in result.output
-    assert "cadence_candidates=455" in result.output
+    assert "cadence_candidates=474" in result.output
     assert "timestamp_ids=11" in result.output
     assert "seconds_unit_candidates=58" in result.output
     assert "mixed_clock_functions=4" in result.output
-    assert "vyper_paths=92" in result.output
+    assert "vyper_paths=93" in result.output
     assert "CLOCK_INVENTORY_NONPROD" in result.output
     assert "CLOCK_INVENTORY_NONPROD_CADENCE" in result.output
-    assert "test=159" in result.output
+    assert "test=172" in result.output
+
+
+def test_s5_review_artifact_scope_and_legacy_commits_are_exact(
+    fixture_repo: Path,
+) -> None:
+    inventory = _load_inventory(fixture_repo)
+    field = checker.S5_REVIEW_ARTIFACT_FIELD
+
+    direct_records = {
+        checker._record_key(record): record
+        for record in inventory["directOccurrences"]
+        if field in record
+    }
+    cadence_records = {
+        checker._candidate_from_record(record): record
+        for record in inventory["cadenceCandidates"]
+        if field in record
+    }
+    path_records = {
+        record["path"]: record
+        for record in inventory["vyperPathClassifications"]
+        if field in record
+    }
+
+    assert set(direct_records) == checker.S5_REVIEW_DIRECT_KEYS
+    assert set(cadence_records) == checker.S5_REVIEW_CADENCE_KEYS
+    assert set(path_records) == checker.S5_REVIEW_PATHS
+    assert len(direct_records) + len(cadence_records) + len(path_records) == 24
+    assert all(
+        record[field] == checker.S5_REVIEW_ARTIFACT_SHA256
+        for record in (
+            list(direct_records.values())
+            + list(cadence_records.values())
+            + list(path_records.values())
+        )
+    )
+    assert all(
+        record["semanticReview"]["commit"] == checker.TRACK3_REVIEW_COMMIT
+        for record in direct_records.values()
+    )
+    assert all(
+        record["semanticReview"]["commit"]
+        == checker.HARDENING_REVIEW_COMMIT
+        for record in (
+            list(cadence_records.values()) + list(path_records.values())
+        )
+    )
+    assert (
+        checker._s5_legacy_inventory_fingerprint(inventory)
+        == checker.S5_LEGACY_INVENTORY_SHA256
+    )
+
+
+@pytest.mark.parametrize(
+    "replacement",
+    [
+        pytest.param(None, id="missing"),
+        pytest.param("0x1234", id="malformed"),
+        pytest.param(
+            checker.S5_REVIEW_ARTIFACT_SHA256.upper(),
+            id="uppercase",
+        ),
+        pytest.param("0" * 64, id="mismatched"),
+        pytest.param(checker.HARDENING_REVIEW_COMMIT, id="legacy-commit"),
+        pytest.param("__LIVE_STAGE_C_RECORD__", id="live-record"),
+    ],
+)
+def test_s5_review_artifact_value_fails_closed(
+    fixture_repo: Path,
+    replacement: str | None,
+) -> None:
+    inventory = _load_inventory(fixture_repo)
+    record = next(
+        item
+        for item in inventory["directOccurrences"]
+        if checker._record_key(item) in checker.S5_REVIEW_DIRECT_KEYS
+    )
+    if replacement is None:
+        record.pop(checker.S5_REVIEW_ARTIFACT_FIELD)
+    else:
+        if replacement == "__LIVE_STAGE_C_RECORD__":
+            replacement = hashlib.sha256(
+                (
+                    REPOSITORY_ROOT / IMPLEMENTATION_RECORD_RELATIVE
+                ).read_bytes()
+            ).hexdigest()
+            assert replacement != checker.S5_REVIEW_ARTIFACT_SHA256
+        record[checker.S5_REVIEW_ARTIFACT_FIELD] = replacement
+    _write_inventory(fixture_repo, inventory)
+    _assert_failure(fixture_repo, "INV-SCHEMA-S5-PROVENANCE")
+
+
+def test_legacy_record_rejects_s5_review_artifact(
+    fixture_repo: Path,
+) -> None:
+    inventory = _load_inventory(fixture_repo)
+    record = next(
+        item
+        for item in inventory["directOccurrences"]
+        if checker._record_key(item) not in checker.S5_RECONCILED_DIRECT_KEYS
+    )
+    record[checker.S5_REVIEW_ARTIFACT_FIELD] = (
+        checker.S5_REVIEW_ARTIFACT_SHA256
+    )
+    _write_inventory(fixture_repo, inventory)
+    _assert_failure(
+        fixture_repo,
+        "INV-SCHEMA-S5-PROVENANCE-SCOPE",
+        path=record["path"],
+    )
+
+
+def test_legacy_inventory_record_mutation_fails_fingerprint(
+    fixture_repo: Path,
+) -> None:
+    inventory = _load_inventory(fixture_repo)
+    record = next(
+        item
+        for item in inventory["directOccurrences"]
+        if checker._record_key(item) not in checker.S5_RECONCILED_DIRECT_KEYS
+    )
+    record["category"] = "mutated outside S5 scope"
+    _write_inventory(fixture_repo, inventory)
+    _assert_failure(
+        fixture_repo,
+        "INV-SCHEMA-S5-LEGACY-FINGERPRINT",
+    )
 
 
 def test_unmapped_direct_addition_fails_with_actionable_context(

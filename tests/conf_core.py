@@ -253,6 +253,7 @@ def ledger(ripe_hq_deploy, defaults):
         "contracts/data/Ledger.vy",
         ripe_hq_deploy,
         defaults,
+        ZERO_ADDRESS,
         name="ledger",
     )
 

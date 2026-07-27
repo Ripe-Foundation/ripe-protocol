@@ -584,7 +584,7 @@ def test_withdraw_blocklist_roles_and_retry(
 
 
 @pytest.mark.parametrize(("vault_kind", "vault_id"), VAULT_CASES)
-def test_short_received_second_deposit_is_reported_as_requested_amount(
+def test_short_received_after_existing_user_backing_reverts_atomically(
     vault_kind,
     vault_id,
     stock_token,
@@ -599,7 +599,7 @@ def test_short_received_second_deposit_is_reported_as_requested_amount(
     bob,
     alice,
 ):
-    """Aggregate post-transfer balance masks a one-unit short receipt after deposit one."""
+    """Call-local custody delta rejects the primary multi-user masking path."""
 
     vault = _vault_for_case(vault_kind, simple_erc20_vault, rebase_erc20_vault)
     _configure_stock_asset(
@@ -610,30 +610,74 @@ def test_short_received_second_deposit_is_reported_as_requested_amount(
         setAssetConfig,
         createDebtTerms,
     )
-    stock_token.setUpgradeBehavior(3, sender=deploy3r)
     requested = 100 * EIGHTEEN_DECIMALS
 
     stock_token.mint(bob, requested, sender=deploy3r)
     stock_token.approve(teller, requested, sender=bob)
     first_reported = teller.deposit(stock_token, requested, bob, vault, sender=bob)
-    assert first_reported == requested - 1
+    assert first_reported == requested
 
     raw_total_before = vault.totalBalances(stock_token)
+    custody_before = stock_token.balanceOf(vault)
+    bob_claim_before = vault.getTotalAmountForUser(bob, stock_token)
     stock_token.mint(alice, requested, sender=deploy3r)
     stock_token.approve(teller, requested, sender=alice)
-    second_reported = teller.deposit(stock_token, requested, alice, vault, sender=alice)
+    stock_token.setUpgradeBehavior(3, sender=deploy3r)
 
-    assert second_reported == requested
-    assert stock_token.balanceOf(vault) == 2 * requested - 2
-    if vault_kind == "simple":
-        assert vault.getTotalAmountForVault(stock_token) == 2 * requested - 1
-    else:
-        minted_shares = vault.totalBalances(stock_token) - raw_total_before
-        correct_measured_shares = (
-            (requested - 1) * (raw_total_before + 10**8) // requested
-        )
-        assert minted_shares != correct_measured_shares
-        assert vault.getTotalAmountForVault(stock_token) == 2 * requested - 2
+    with boa.reverts():
+        teller.deposit(stock_token, requested, alice, vault, sender=alice)
+
+    assert stock_token.balanceOf(alice) == requested
+    assert stock_token.balanceOf(vault) == custody_before
+    assert vault.totalBalances(stock_token) == raw_total_before
+    assert vault.getTotalAmountForUser(bob, stock_token) == bob_claim_before
+    assert vault.getTotalAmountForUser(alice, stock_token) == 0
+    assert filter_logs(teller, "TellerDeposit") == []
+
+
+@pytest.mark.parametrize(("vault_kind", "vault_id"), VAULT_CASES)
+def test_donation_cannot_mask_short_current_receipt(
+    vault_kind,
+    vault_id,
+    stock_token,
+    simple_erc20_vault,
+    rebase_erc20_vault,
+    setGeneralConfig,
+    setGeneralDebtConfig,
+    setAssetConfig,
+    createDebtTerms,
+    teller,
+    ledger,
+    deploy3r,
+    bob,
+):
+    """A pre-existing custody surplus cannot substitute for this call's receipt."""
+
+    vault = _vault_for_case(vault_kind, simple_erc20_vault, rebase_erc20_vault)
+    _configure_stock_asset(
+        stock_token,
+        vault_id,
+        setGeneralConfig,
+        setGeneralDebtConfig,
+        setAssetConfig,
+        createDebtTerms,
+    )
+    requested = 100 * EIGHTEEN_DECIMALS
+    donation = 25 * EIGHTEEN_DECIMALS
+    stock_token.mint(vault, donation, sender=deploy3r)
+    stock_token.mint(bob, requested, sender=deploy3r)
+    stock_token.approve(teller, requested, sender=bob)
+    stock_token.setUpgradeBehavior(3, sender=deploy3r)
+
+    with boa.reverts():
+        teller.deposit(stock_token, requested, bob, vault, sender=bob)
+
+    assert stock_token.balanceOf(bob) == requested
+    assert stock_token.balanceOf(vault) == donation
+    assert vault.totalBalances(stock_token) == 0
+    assert vault.getTotalAmountForUser(bob, stock_token) == 0
+    assert ledger.getNumUserVaults(bob) == 0
+    assert filter_logs(teller, "TellerDeposit") == []
 
 
 @pytest.mark.parametrize(("vault_kind", "vault_id"), VAULT_CASES)
