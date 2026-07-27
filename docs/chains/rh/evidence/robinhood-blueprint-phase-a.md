@@ -3207,3 +3207,111 @@ deployment, configuration, activation, or external-system write occurred in
 this correction. Final controlling `rh` remains
 `7098211db5693f986b65ec7a9e897f3518e9538c`, tree
 `c07329ed9fcc2dc99afbef3f7888f478024d1ede`.
+
+## 19. Final post-S5 lifecycle reconciliation — 27 July 2026
+
+This section is the controlling post-S5 current-state addendum. It supersedes
+only stale lifecycle, provenance, baseline, and S5-status language above. All
+pre-existing bytes remain the approved historical record at their stated
+baselines; in particular, Sections 5–13, the Section 6.3 blocker register,
+Sections 7A.1–7A.5, and the Section 17 substantive owner decisions are not
+amended or reinterpreted.
+
+### 19.1 Final integrated authority and reconciliation topology
+
+| Authority | Exact identity and current effect |
+| --- | --- |
+| final H-01 retirement integration | commit `7098211db5693f986b65ec7a9e897f3518e9538c`, tree `c07329ed9fcc2dc99afbef3f7888f478024d1ede`; dependency gate SHA-256 `8860b81b694d0fd8f1a6bb886b819c13b4817f7f4522ab74a712cad03dbe2582` |
+| published H-03 lifecycle correction | commit `6c07396fb9f140328f643ff6672ab62cc19af948`, tree `404da037961c2b15808e81fc1efba677fa9a040e`; evidence SHA-256 `a91c45923450218dc2c52830071d4258bda286187d0275eb429dd46ba5dbf48a` |
+| final S5 Gate 2 approval and integration | controlling `rh` commit `81478fe33dfa47a8e135682a047b64949650cb29`, tree `4eb1e5ae690694b3bc1f6248b6e92d8ebb4d2f53`; Ledger SHA-256 `6bd731a6ce9084de213494ebad09f8e52c782153842708b78f90fa178c06e9e3`; implementation-record SHA-256 `6ce94f25f00e6924b540378f09ed1a84ce401e6474863b2eae6820437b2f847b` |
+| local post-S5 H-03 reconciliation | signed merge `db2beb6ddf7f17b1b5beb2390d3df481e4332cdf`, tree `eae67897cb5e762121a2534a1d0bdf91d5e491b6`; parents, in order, `6c07396fb9f140328f643ff6672ab62cc19af948` and `81478fe33dfa47a8e135682a047b64949650cb29` |
+
+The owner-supplied final S5 Gate 2 approval and integration status controls
+this reconciliation. It supersedes only the S5 implementation record's
+contemporaneous statements that Gate 2 approval or integration remained
+pending; it does not convert source, test, or local validation into deployment
+or live-network proof.
+
+The reconciliation merge imported exactly the 24-path S5 delta from the
+`7098211…` merge base. That delta has no path overlap with this evidence file
+or the controlling H-03 brief. The merge was normal Git ancestry with no
+rebase, squash, cherry-pick, amendment, conflict, or history rewrite.
+
+### 19.2 Integrated Ledger source and action-block behavior
+
+Integrated `contracts/data/Ledger.vy` now supplies the approved shared Ledger
+implementation:
+
+1. constructor
+   `__init__(_ripeHq, _defaults, _actionBlockSource)` accepts only the zero
+   address or exact `0x0000000000000000000000000000000000000064`;
+2. the selected value is the public immutable `ACTION_BLOCK_SOURCE`;
+3. zero selects native `block.number` and makes no external source call;
+4. exact `0x64` selects a static raw call to the fixed
+   `arbBlockNumber()` selector, captures up to 65 bytes, requires exactly
+   32 returned bytes, and decodes one `uint256`;
+5. missing code, revert, short, oversized, or incompatible return data fails
+   closed at construction and runtime, with no native fallback, `chain.id`
+   branch, arbitrary provider, mutable source, or separate mode field; and
+6. `checkAndUpdateLastTouch` reads the selected action-block identity once,
+   applies the existing equality rejection when `_shouldCheck` is true, writes
+   that identity, and then applies the existing locked-account assertion.
+
+The current source locations are
+`contracts/data/Ledger.vy:130-134`,
+`contracts/data/Ledger.vy:189-205`, and
+`contracts/data/Ledger.vy:211-248`. The S5 insertion moved the historical
+Ledger constructor proof range used by `R-006`, `R-007`, and `R-085` without
+changing any of those three relationships. Their current-source equivalents
+are `contracts/data/Ledger.vy:189-200` for `R-006`,
+`contracts/data/Ledger.vy:189-205` for `R-007`, and
+`contracts/data/Ledger.vy:189-200` plus the unchanged DeptBasics/Addys proofs
+for `R-085`. This provenance crosswalk does not add, remove, retype, or amend
+a canonical relation record.
+
+### 19.3 `B-S5-LEDGER` disposition
+
+`B-S5-LEDGER` remains open as one of the approved 18 blockers. S5 integration
+changes the truth of one historical predicate, but it does not close the
+composite blocker:
+
+| S5 dimension | Final post-S5 disposition |
+| --- | --- |
+| shared Ledger source implementation | satisfied by the integrated Ledger SHA-256 above |
+| source architecture and Robinhood provider decision | satisfied at the design level: the only external source is exact `0x64`, and Robinhood must use that source without fallback |
+| final Robinhood constructor/provider binding | open: the future H-05 deployment plan and H-06 manifest must bind and verify exact `0x64`, RipeHq/default constructor inputs, the immutable getter, compiler input, creation/runtime identities, and registry placement |
+| authentic action-block and deployment proof | open: deployment-time ArbSys/version and receipt agreement, sequencer/multi-transaction behavior, paused registration, empty-state/topology checks, activation boundary, monitoring, and abort/containment evidence remain downstream gates |
+| final deployment and release authority | open: no deployment, registration, configuration, activation, signer, transaction, migration execution, or release action is approved |
+
+Accordingly, the Section 6.3 sentence that source implementation and all S5
+proof are absent is historical pre-S5 state. Only its source-implementation
+subcondition is now satisfied. The blocker ID, owner/co-owner allocation,
+deadline, canonical row, CM-008 `blocked` disposition, symbolic
+`I-LEDGER-BLOCK-SOURCE`, omitted provider fallback, and no-Base-migration
+decision remain unchanged because final binding and downstream proof are not
+complete. Closing or retyping that blocker would require a separately
+authorized substantive Phase A owner decision.
+
+Every other Section 6.3 blocker is unaffected by S5 and remains open under its
+existing owner, deadline, and downstream effect.
+
+### 19.4 H-03 authority and remaining gates
+
+H-03 Phase A remains the controlling immutable model: 60 components,
+94 surfaces, 103 source-path records, 288 relations, 18 blockers, 48 symbolic
+inputs, 38 registry expectations, 24 negative assertions, and two promotion
+records. No topology, PSM, global-mint, LP, Teller, reward, CCIP, registry,
+blocker, or substantive owner-decision byte changes in this reconciliation.
+
+H-03 Phase B remains unauthorized and unstarted. Before Phase B, this
+one-file append-only evidence candidate requires complete-file independent
+exact-hash review, fresh owner approval, and separately authorized
+commit/push/integration. Fresh H-03 exact-lock validation against the final
+integrated authority and separate file-exact owner authorization for only the
+three Phase B implementation paths remain mandatory. Any implementation must
+remain unstaged and uncommitted through independent Gate 1 review.
+
+This post-S5 amendment is left unstaged and uncommitted. It authorizes no H-03
+implementation, push, `rh` integration, dependency installation, RPC or
+secret access, signing, broadcast, migration, deployment, registration,
+configuration, activation, governance, or external-system change.
