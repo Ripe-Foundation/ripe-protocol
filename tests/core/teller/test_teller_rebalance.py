@@ -1304,3 +1304,65 @@ def test_teller_rebalance_respects_deposit_limits(
     # deposit should be capped at user limit
     assert deposited_amount == user_limit
     assert withdrawn_amount == alpha_amount
+
+
+def test_m1_rebalance_short_deposit_reverts_before_withdrawal_atomically(
+    simple_erc20_vault,
+    alpha_token,
+    alpha_token_whale,
+    bob,
+    deploy3r,
+    setGeneralConfig,
+    setAssetConfig,
+    teller,
+    performDeposit,
+    vault_book,
+    credit_engine,
+):
+    setGeneralConfig()
+    setAssetConfig(alpha_token)
+    hostile = boa.load(
+        "contracts/mock/MockStockTokenControls.vy",
+        deploy3r,
+        18,
+        name="m1_rebalance_short_token",
+        override_address=boa.env.generate_address(),
+    )
+    setAssetConfig(hostile)
+
+    amount = 100 * EIGHTEEN_DECIMALS
+    performDeposit(bob, amount, alpha_token, alpha_token_whale)
+    hostile.mint(bob, amount, sender=deploy3r)
+    hostile.approve(teller, amount, sender=bob)
+    hostile.setUpgradeBehavior(3, sender=deploy3r)
+    vault_id = vault_book.getRegId(simple_erc20_vault)
+
+    bob_alpha_before = alpha_token.balanceOf(bob)
+    bob_hostile_before = hostile.balanceOf(bob)
+    vault_alpha_before = alpha_token.balanceOf(simple_erc20_vault)
+    vault_hostile_before = hostile.balanceOf(simple_erc20_vault)
+    alpha_claim_before = simple_erc20_vault.getTotalAmountForUser(bob, alpha_token)
+    hostile_claim_before = simple_erc20_vault.getTotalAmountForUser(bob, hostile)
+    debt_before = credit_engine.getUserDebtAmount(bob)
+
+    with boa.reverts():
+        teller.rebalance(
+            hostile,
+            vault_id,
+            alpha_token,
+            vault_id,
+            amount,
+            amount,
+            bob,
+            sender=bob,
+        )
+
+    assert alpha_token.balanceOf(bob) == bob_alpha_before
+    assert hostile.balanceOf(bob) == bob_hostile_before
+    assert alpha_token.balanceOf(simple_erc20_vault) == vault_alpha_before
+    assert hostile.balanceOf(simple_erc20_vault) == vault_hostile_before
+    assert simple_erc20_vault.getTotalAmountForUser(bob, alpha_token) == alpha_claim_before
+    assert simple_erc20_vault.getTotalAmountForUser(bob, hostile) == hostile_claim_before
+    assert credit_engine.getUserDebtAmount(bob) == debt_before
+    assert filter_logs(teller, "TellerRebalance") == []
+    assert filter_logs(teller, "TellerWithdrawal") == []
