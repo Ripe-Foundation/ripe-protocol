@@ -1,243 +1,160 @@
-# Chainlink question packet: Base <-> Robinhood Chain Ripe tokens
+# Chainlink technical question packet: GREEN/RIPE on Base <-> Robinhood Chain
 
-Status: **MESSAGE TEXT APPROVED — NOT SENT — DELIVERY DETAILS PENDING**
+Status: **REVISED DRAFT — NOT SENT — FRESH OWNER APPROVAL REQUIRED**
 
-Prepared: 2026-07-23
+Revised: 2026-07-27
 
 Recipient and channel: Pending owner selection
 
 External actions taken: None
 
-Owner approval: The exact message text was approved on 2026-07-23. The owner
-will separately select the recipient and channel and handle delivery. This
-approval does not authorize an agent to contact Chainlink or accept terms.
-
-This is the proposed external question packet. Sending it, submitting a form,
-contacting Chainlink, or accepting any terms requires separate explicit owner
-authorization.
+The 2026-07-23 approval applied to an older, materially different packet. This
+shortened pure-Vyper version requires fresh approval of the exact text,
+recipient, channel, and act of sending. It asks only questions that require
+Chainlink's technical or operational knowledge.
 
 ## Proposed subject
 
-Confirming supported CCIP pool and registration path for GREEN/RIPE on Base and
+Pure-Vyper custom CCT pool and assisted registration for GREEN/RIPE on Base and
 Robinhood Chain
 
 ## Proposed message
 
 Hello Chainlink team,
 
-Ripe is evaluating a minimal CCIP burn/mint bridge for GREEN and RIPE between
-Base and Robinhood Chain. We are still in technical confirmation and have not
-deployed or registered pools.
+Ripe is evaluating a direct CCIP burn/mint bridge for GREEN and RIPE between
+Base and Robinhood Chain. Nothing has been deployed or registered.
 
-The existing Base deployments are:
+Existing Base deployments:
 
 - GREEN: `0xd1Eac76497D06Cf15475A5e3984D5bC03de7C707`
 - RIPE: `0x2A0a59d6B975828e781EcaC125dBA40d7ee5dDC0`
 - RipeHq: `0x6162df1b329E157479F8f1407E888260E0EC3d2b`
 
-We see direct Base <-> Robinhood Chain and Base Sepolia <-> Robinhood Chain
-Testnet lanes in the CCIP directory, with the lane records reporting version
-`1.6.0`. The current public EVM API reference labels contracts-CCIP `1.6.1` as
-latest and pins commit
-`bbab0601244ce58e2ffac0dbc178a80aab1fa4a3`.
+Both tokens have 18 decimals and expose
+`mint(address,uint256) returns (bool)`, `burn(uint256) returns (bool)`,
+`balanceOf(address)`, and `decimals()`. They expose neither `owner()` nor
+`getCCIPAdmin()`. The tokens are pausable and blacklistable.
 
-Both Ripe tokens have 18 decimals and expose:
+The immutable Base token contracts must remain unchanged. The Robinhood token
+contracts are not yet fixed and could add a supported Chainlink
+admin-discovery interface before deployment if required. The selected pool
+design is pure Vyper `0.4.3`, one GREEN pool implementation deployed on both
+chains and one RIPE pool implementation deployed on both chains. Each pool
+directly calls the token's `burn`/`mint`. Ripe-local authorization makes the
+pool a registered minter, but does not change the CCIP ABI.
 
-```solidity
-function mint(address recipient, uint256 amount) external returns (bool);
-function burn(uint256 amount) external returns (bool);
-function balanceOf(address account) external view returns (uint256);
-function decimals() external view returns (uint8);
-```
+The reference pool mirrors contracts-CCIP v1.6.1's relevant surface, including:
 
-They do not expose `burnFrom`, `owner`, or `getCCIPAdmin`.
+- `IPoolV1`, `CCIP_POOL_V1`, and ERC-165;
+- `applyChainUpdates(uint64[],ChainUpdate[])`;
+- `addRemotePool(uint64,bytes)` and `removeRemotePool(uint64,bytes)`;
+- singular/plural chain rate-limiter setters and current-state getters;
+- enumerable supported chains and remote pools;
+- deployment-time optional allowlist mode;
+- Router, RMN proxy, decimal conversion, OnRamp/OffRamp, and source-pool
+  validation;
+- v1.6.1 event parameter types/indexing and security/rate-limit custom-error
+  encodings; and
+- state-preserving v1.6.1 rate-limit reconfiguration.
 
-They are pausable and blacklistable. While paused, transfer, mint, and burn
-revert. Mint also reverts for a blacklisted receiver, while transfer rejects a
-blacklisted sender or receiver. We therefore expect a paused destination token
-or blacklisted destination receiver to make CCIP release/mint fail until the
-condition is removed.
+Its execution selectors are `lockOrBurn=0x9a4575b9` and
+`releaseOrMint=0x39077537`; its administration selectors include
+`applyChainUpdates=0xe8a1da17`,
+`addRemotePool=0x62ddd3c4`,
+`removeRemotePool=0xacfecf91`, and
+`setChainRateLimiterConfig=0xcf7401f3`.
 
-There is an additional authorization layer. GREEN minting calls
-`RipeHq.canMintGreen(msg.sender)`, and RIPE minting calls
-`RipeHq.canMintRipe(msg.sender)`. RipeHq first checks its global `mintEnabled`
-circuit breaker, then requires the direct mint caller to be a registered
-department with the corresponding mint permission enabled and the corresponding
-view exposed. RipeHq does not enforce capability exclusivity; Ripe's integration
-policy separately restricts each pool to exactly one mint capability:
+One source/documentation mismatch is explicit: the pinned v1.6.1
+`RateLimiter.sol` rejects only `rate > capacity`, while the current v1.6.1 API
+text says an enabled rate must be nonzero. The Vyper reference follows the
+safer documented rule and rejects `rate == 0`; disabled limits use
+`(false,0,0)`. The version-compatibility question below includes this mismatch.
+The constructor also requires `token.decimals()` to succeed and match the
+supplied value; GREEN and RIPE both satisfy that stricter check, while TokenPool
+v1.6.1 permits a missing optional decimals method.
 
-```solidity
-// GREEN pool only
-function canMintGreen() external view returns (bool); // true
+We have answered the Ripe-contract questions locally. We need Chainlink's help
+only with the following:
 
-// RIPE pool only
-function canMintRipe() external view returns (bool); // true
-```
+1. **Custom-pool eligibility and tooling.** Is a non-Chainlink-derived,
+   from-scratch pure-Vyper pool eligible for assisted registration, production
+   lane enablement, CCIP Directory listing, monitoring, Token Manager/Expert,
+   CCIP tools, and supported manual execution? Beyond `IPoolV1`, which exact
+   ABI, event, error, `typeAndVersion`, audit, test, or security-review
+   requirements are mandatory for testnet and mainnet?
 
-The CCIP pool must therefore remain the direct caller of `token.mint`; a
-separate mint adapter is not viable. Our proposed shape is:
+2. **Pool/lane version compatibility.** For Base <-> Robinhood mainnet and Base
+   Sepolia <-> Robinhood testnet, which pool/API release should we target when
+   the public directory lane records report core `1.6.0` but the current
+   documented pool API is contracts-CCIP `1.6.1`? We have already recorded the
+   public selectors, Routers, Token Admin Registries, and directory-listed RMN
+   addresses. Please confirm that the directory's `RMN` field is the proxy
+   address intended for the v1.6.1 `TokenPool` constructor, and identify any
+   non-public lane-specific pool constraints. Please also confirm whether the
+   pinned source or current API text controls enabled zero-rate validation.
 
-- one thin GREEN burn/mint pool implementation, deployed on both chains;
-- one thin RIPE burn/mint pool implementation, deployed on both chains;
-- the standard CCIP burn/mint path unchanged;
-- only the appropriate Ripe capability view added to each implementation;
-- each pool registered in RipeHq and enabled only for its corresponding token.
+3. **Assisted Token Admin Registry process.** For the immutable Base tokens,
+   which expose neither `owner()` nor `getCCIPAdmin()`, what exact assisted
+   `proposeAdministrator` process, proof of authority, initiator, and ordering
+   should we use? Can the same assisted path be used for the new Robinhood
+   deployments; if not, which exact admin-discovery interface should those
+   tokens implement? The onchain authority chain is
+   `token.ripeHq() -> RipeHq.governance()`.
 
-Illustrative compatibility layer, with constructor forwarding and the final
-Chainlink base class omitted pending your answer:
+4. **Destination token gas.** What `destGasAmount`/token transfer overhead is
+   configured for these lanes, and what measurement margin do you require for
+   the full OffRamp `balanceOf` + `releaseOrMint` + `balanceOf` path? If the
+   measured RipeHq-authorized mint path is too close to or above the default,
+   what is the supported process for a custom `destGasOverhead`?
 
-```solidity
-contract GreenTokenBurnMintPool is BurnMintTokenPool {
-    function canMintGreen() external pure returns (bool) { return true; }
-}
+5. **Failure and upgrade operations.** When destination minting reverts because
+   RipeHq minting is disabled, the token is paused, or the receiver is
+   blacklisted, what exact CCIP message state and retry/manual-execution
+   procedure applies after recovery? For remote-pool upgrades/removal, which
+   monitoring or waiting procedure establishes that no in-flight message will
+   be stranded?
 
-contract RipeTokenBurnMintPool is BurnMintTokenPool {
-    function canMintRipe() external pure returns (bool) { return true; }
-}
-```
+For each answer, please identify whether it is:
 
-Each implementation deliberately omits the opposite mint capability.
-
-Although the tokens lack Chainlink's self-service admin-discovery functions,
-they are not ownerless. Each token exposes `ripeHq()`, that RipeHq exposes
-`governance()`, and token `pause(bool)` accepts only that governance address.
-Subject to owner approval, governance can provide a proof signature or a
-non-disruptive demonstration transaction in whatever format your assisted
-registration process requires.
-
-Could you please confirm the following?
-
-### Blocking compatibility and pool-design questions
-
-1. Can you confirm that direct token transport is currently supported for both
-   Base <-> Robinhood Chain mainnet and Base Sepolia <-> Robinhood Chain
-   Testnet, rather than only independent support for each chain?
-2. Which exact production and test Router, Token Admin Registry, chain
-   selectors, OnRamps, OffRamps, RMN contracts, and other lane-specific
-   addresses should we use?
-3. Which exact contracts-CCIP release, repository tag or commit, Solidity
-   version, and dependency set do you recommend for pools on the live
-   Base <-> Robinhood Chain lane?
-4. Is a contracts-CCIP `1.6.1` token pool compatible with the directory's
-   `1.6.0` lane contracts on both chains?
-5. For this minimal extension, do you prefer:
-   - subclassing `BurnMintTokenPool` and adding only the corresponding
-     capability view; or
-   - inheriting `BurnMintTokenPoolAbstract`, retaining the standard direct
-     `burn(amount)` and `mint(receiver, amount)` behavior, and declaring a
-     custom type/version?
-6. Will Chainlink review and support that thin custom pool for production? If
-   yes, what review artifacts, test vectors, audit scope, and lead time are
-   required?
-7. Can the supported implementation remain the direct caller of
-   `mint(address,uint256)` while preserving standard CCIP registration,
-   monitoring, upgrade, and manual-execution tooling?
-8. Please confirm which burn function the recommended pool calls. Is its
-   direct `burn(uint256)` call compatible with the tokens' self-burn behavior
-   without changing GREEN or RIPE?
-9. Ripe's broader Department convention includes `isPaused()`, `pause(bool)`,
-   and fund-recovery methods, although RipeHq validates only the enabled mint
-   capability. Should this pool implement a Chainlink-approved lifecycle/pause
-   surface, or should it remain capability-only and rely on standard CCIP rate
-   controls plus Ripe's token and global mint circuit breakers?
-10. Are there any Robinhood-specific Router, RMN, pool factory, allowlist,
-   decimal, gas, or remote-pool constraints not represented in the public
-   directory and EVM pool documentation?
-
-### Registration and administration questions
-
-11. Because the immutable Base tokens expose neither `owner()` nor
-    `getCCIPAdmin()`, is assisted/manual Token Admin Registry registration the
-    correct path? Is the onchain `token.ripeHq() -> RipeHq.governance()`
-    authority chain sufficient, and what additional signature or
-    demonstration transaction, contracts, contacts, and review steps are
-    required?
-12. For newly deployed Robinhood GREEN and RIPE, is self-service registration
-    preferred? If so, is `getCCIPAdmin()` required, or can the same portable
-    token source use assisted registration on both sides? We do not want a
-    Robinhood-only token variant.
-13. Ripe must deploy the pool before starting its two-step, block-timelocked
-    address registration, then complete a second timelocked Hq-config change
-    that rechecks the pool's capability at confirmation. Around that fixed
-    Ripe-side sequence, what is Chainlink's required ordering for:
-
-    - establishing token administrators;
-    - associating local tokens and pools;
-    - applying remote-chain and remote-pool configuration;
-    - configuring rate limits; and
-    - activating production transfers?
-14. Do you support separate multisigs for pool ownership, Token Admin Registry
-   administration, and the `rateLimitAdmin` incident role? Are there prescribed
-   role-transition or two-step ownership procedures?
-
-### Operations, security, and commercial questions
-
-15. Ripe governance can immediately call `RipeHq.setMintingEnabled(false)`.
-    This stops every RipeHq-authorized GREEN and RIPE mint on that chain,
-    including CCIP inbound and protocol-native issuance, but does not stop
-    outbound burns. Token pause is narrower by asset but broader by operation:
-    it stops that token's transfers, burns, and mints. For a guarded launch and
-    emergency response:
-
-    - what initial per-token inbound/outbound capacities and refill rates do
-      you recommend;
-    - how should the global Ripe circuit breaker, token pause, and CCIP rate
-      controls be coordinated; and
-    - if an in-flight message fails because `mintEnabled` is false, the token is
-      paused, or the receiver is blacklisted, what state does it enter and what
-      is the supported retry or manual-execution procedure after re-enable?
-
-16. What monitoring, alerting, manual-execution coverage, upgrade coordination,
-    incident-response, and support responsibilities should Ripe plan to own?
-17. Where is the 90,000 combined token-pool execution gas allowance enforced,
-    what measurements and margin should accompany review, and what supported
-    configuration or assistance path applies if the RipeHq authorization path
-    cannot be kept below it?
-18. Beyond public per-message CCIP billing, are there onboarding fees,
-    liquidity or volume requirements, recurring fees, support commitments,
-    SLAs, audits, security-review requirements, program/deprecation conditions,
-    or external terms that apply to this integration?
-19. Is there a recommended testnet acceptance checklist before requesting
-    mainnet registration?
-
-For an actionable response, it would help if you could identify each answer as
-one of:
-
-- confirmed from current production support;
-- recommended but optional;
-- required before testnet registration;
-- required before mainnet registration; or
-- subject to a separate commercial/security review.
+- required before testnet;
+- required before mainnet;
+- recommended but optional; or
+- unsupported.
 
 Thank you.
 
+## Why no other questions are included
+
+Ripe can answer these items locally and should not ask Chainlink to reverse
+engineer them:
+
+- how `RipeHq.canMintGreen/canMintRipe` works;
+- whether the pool is the direct token mint caller;
+- whether a separately registered mint adapter could technically work;
+- how RipeHq's two timelocks and capability checks operate;
+- which Vyper bounds, allowlist policy, Department lifecycle surface, or
+  governance roles Ripe chooses; and
+- whether GREEN/RIPE need token-contract changes. They do not under the
+  assisted-registration design.
+
 ## Answer-to-decision map
 
-| Answer area | If confirmed / supported | If rejected / required otherwise |
-| --- | --- | --- |
-| Direct lanes and addresses | Freeze the verified test and production network matrix | Block Track 1; do not infer a multi-hop route |
-| Exact release and lane compatibility | Lock the named commit, compiler, and dependency graph | Replace the provisional `1.6.1` candidate before implementation |
-| Standard-pool subclass | Add only the appropriate Ripe capability view | Use the accepted abstract/custom form without changing the direct caller |
-| Thin pool review/support | Proceed to an implementation and review specification | Block and escalate; do not add an adapter or token fork |
-| Direct mint and self-burn compatibility | Keep GREEN, RIPE, and RipeHq unchanged | Block and escalate any required token migration or nonstandard mint authority |
-| Department lifecycle surface | Implement only the approved pause/recovery shape | Keep the pool capability-only and document the Switchboard limitation |
-| Assisted Base registration | Write the authority-evidence and registration runbook | Block if immutable Base tokens cannot be registered |
-| Portable Robinhood registration | Deploy the same canonical token source on both chains | Escalate before any `getCCIPAdmin()` or Robinhood-only source change |
-| Configuration order and roles | Freeze the governance transaction and signer matrix | Revise the matrix before preparing transactions |
-| Token restrictions and emergency controls | Define rate limits, circuit-breaker order, and in-flight recovery | Keep activation blocked until retry behavior is accepted |
-| Gas expectations | Adopt the confirmed measured acceptance threshold | Redesign only within the direct-pool constraint or block |
-| Commercial/security requirements | Add the stated budget, review, agreements, and gates | Keep launch blocked until requirements are known |
+| Chainlink answer | Ripe consequence |
+| --- | --- |
+| Pure-Vyper custom pool supported with stated requirements | Freeze the mandatory surface and write the production implementation/audit specification |
+| Pure-Vyper pool unsupported | Stop and return to the owner; do not add an adapter or change token contracts implicitly |
+| `1.6.1` pool/API compatible with the live lanes | Freeze the exact source/API reference and differential-test oracle |
+| Different release required | Rebase the reference and repeat selector/event/error/runtime review |
+| Assisted registration available on both chains | Keep Base and Robinhood token bytecode source-equivalent |
+| Token admin hook required on Robinhood | Stop for an owner decision between the smallest pre-deployment Robinhood change and the existing shared-source policy; do not alter or migrate Base implicitly |
+| Token admin hook required on Base | Stop; any Base migration or live-version divergence requires a separate owner decision |
+| Current gas overhead has adequate measured margin | Keep the standard lane configuration |
+| Custom overhead required or unavailable | Obtain the supported configuration or redesign/block before activation |
+| Retry/upgrade procedure confirmed | Encode it in testnet acceptance and the incident runbook |
 
 ## Approval gate
 
-The owner approved item 1 on 2026-07-23. Items 2–4 remain outside agent
-authorization and will be handled by the owner:
-
-1. the exact message text — **approved**;
-2. the named recipient or form;
-3. the delivery channel; and
-4. the act of sending.
-
-Approval to send this question packet would not authorize accepting terms,
-installing dependencies, deploying contracts, changing roles, signing
-transactions, or broadcasting transactions.
+Do not send this packet, select a recipient on the owner's behalf, submit a
+form, accept terms, deploy, register, or broadcast a transaction without fresh
+explicit authorization.

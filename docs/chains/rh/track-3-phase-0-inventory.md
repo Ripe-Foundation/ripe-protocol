@@ -217,7 +217,8 @@ The matrix must visibly surface:
 - GREEN/RIPE local pricing deferral;
 - GREEN and RIPE CCIP pools;
 - assisted registration versus `getCCIPAdmin()`;
-- Solidity build/test/deployment tooling; and
+- pure-Vyper CCIP parity/build/test/deployment tooling, including EVM target,
+  ABI bounds, differential oracle, gas and audit gates; and
 - Base contracts that may remain on older live bytecode.
 
 Do not label configuration differences as contract forks. Do not use `modified` for a component whose source is unchanged and only receives different parameters.
@@ -245,7 +246,7 @@ At minimum, surface:
 - Stock Token vault;
 - USDG price path;
 - CCIP registration/admin path; and
-- Solidity toolchain boundary.
+- pure-Vyper CCIP parity/toolchain boundary.
 
 Recommendations must not be presented as approvals.
 

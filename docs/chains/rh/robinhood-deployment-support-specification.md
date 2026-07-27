@@ -1096,14 +1096,14 @@ shifted registration.
 | CM-048 `EndaomentPSM` | Scaffolded disabled to preserve ID 22; omission instead requires approved shared sparse-registry redesign | `contracts/core/EndaomentPSM.vy`; `ARG-HQ`; interval/fees/caps/reserve token from approved Track 4 manifest; yield `(0, zero address)` | `0600` deploy/register; `0800` proves disabled; RipeHq ID 22 `Endaoment PSM`; no GREEN capability | `canMint=false`, `canRedeem=false`, auto-deposit false, no approvals; `ASSERT-D`; `BASE-U`; `ABORT-G`; activation separately blocked |
 | CM-049 `DefaultsRobinhood` | Selected chain-specific configuration artifact; not divergent protocol logic | Proposed `contracts/config/DefaultsRobinhood.vy`; generated only from approved parameter manifest | Built before `0100`; constructor mirrors canonical defaults interface; not registered | Hash/parity/field-denominator assertions; no Base addresses; `BASE-O`; replacement approved in architecture, values open |
 | CM-050 `AeroRipePrices` | Omitted | `contracts/priceSources/AeroRipePrices.vy` | No migration/PriceDesk row | `ASSERT-O`; `BASE-O`; no rollback |
-| CM-051 GREEN CCIP BurnMint pool | Deferred Solidity contract | Exact shared Chainlink source/package/constructor pending Track 1 | `1000_CcipPoolsAndRegistration.py`; provisional RipeHq ID 23 `GREEN CCIP Pool`; direct `canMintGreen=true` only after registration/timelock | `ROLE-G` plus external token-admin/router roles; remote/rate-limit assertions; `BASE-M` new shared integration; `ABORT-G`; Track 1/owner blocked |
-| CM-052 RIPE CCIP BurnMint pool | Deferred Solidity contract | Exact shared Chainlink source/package/constructor pending Track 1 | `1000`; provisional RipeHq ID 24 `RIPE CCIP Pool`; direct `canMintRipe=true` only after registration/timelock | Same as CM-051; `ASSERT-D` until active; Track 1/owner blocked |
+| CM-051 GREEN CCIP BurnMint pool | Deferred pure-Vyper contract | Reviewed v1.6.1-shaped reference; production source awaits Track 1 eligibility/version, audit, EVM, gas and role gates | `1000_CcipPoolsAndRegistration.py`; provisional RipeHq ID 23 `GREEN CCIP Pool`; direct `canMintGreen=true` only after registration/timelock | `ROLE-G` plus external token-admin/router roles; standard selector/event/error/lifecycle, remote/rate-limit, ABI-bound and gas assertions; `BASE-M` new shared integration; `ABORT-G`; Track 1/owner blocked |
+| CM-052 RIPE CCIP BurnMint pool | Deferred pure-Vyper contract | Same reviewed behavior as CM-051 with opposite Ripe capability; same production gates | `1000`; provisional RipeHq ID 24 `RIPE CCIP Pool`; direct `canMintRipe=true` only after registration/timelock | Same as CM-051; `ASSERT-D` until active; Track 1/owner blocked |
 | CM-053 CCIP token-admin registration | Deferred external configuration sequence | Chainlink Token Admin Registry/Router facts pending Track 1 | `1000`, after both pools and before capability enablement | Assisted registration preferred; no secret/signature in manifest; Base and RH mappings asserted; `ABORT-G`; external-action approval required |
 | CM-054 GREEN/RIPE local price adapter | Deferred; no fabricated peg | Source/artifact and constructor do not yet exist | No migration ID until separate oracle specification; dependent features disabled | `ASSERT-O`; `BASE-M` if new shared source; owner/oracle/security blocked |
 | CM-055 deployment/migration/report tooling | Selected follow-on shared tooling, not onchain | `config/BluePrint.py`, deployment scripts and parameter scripts; profile/schema inputs from this specification | No onchain migration; implementation slices H-01–H-08 | Secret-safe, deterministic, chain-neutral assertions; `BASE-M` tooling regression; normal code revert is rollback |
 | CM-056 manifests/history | Selected follow-on shared tooling and chain-local evidence | Migration utilities plus schema in Section 15 | No onchain migration; separate RH histories | Atomic/progression assertions; Base reader compatibility; normal code revert cannot erase already-published evidence |
 | CM-057 ABI/export/verifier | Selected follow-on shared tooling | `scripts/export_abis.py`, `scripts/verify.py`, provider adapters | No onchain migration; verification follows deployed receipt | Deterministic clean build and truthful provider status; Base regression; code revert only |
-| CM-058 Solidity toolchain | Deferred until Track 1 and explicit toolchain approval | No committed canonical source today | No migration; required before CM-051–053 | Pinned reproducible build only; no dependency selection authorized; owner/security blocked |
+| CM-058 CCIP Vyper parity/build/test boundary | Existing Vyper/titanoboa toolchain selected; production pool implementation remains deferred | Reviewed reference exists; production source and declared artifact index await Track 1 gates | No migration; required before CM-051–053 | Pin Vyper/EVM/bounds/oracle revisions; selector/event/error/lifecycle, audit, fork and gas evidence required; owner/security blocked |
 | CM-059 Base/RH test profiles | Selected future test tooling | `tests/**`, `tests/conf_core.py`, `tests/conf_utils.py` plus Track 6 inputs | No onchain migration; Deliverable B Stages 1–5 | Pinned/clean fork evidence; Base regression; no production effect |
 | CM-060 `DefaultsLocal` | Omitted from RH artifacts; retained for generic local tests | `contracts/config/DefaultsLocal.vy` | No RH migration/manifest record | Assert CM-049 selected for RH; `BASE-U`; no rollback |
 
@@ -1572,7 +1572,6 @@ Proposed collision-safe identity:
 
 ```text
 scripts/abis/vyper/<source-relative-path-without-extension>/<Contract>.json
-scripts/abis/solidity/<package>/<source-relative-path>/<Contract>.json
 ```
 
 Changing the existing flat ABI layout requires a compatibility/migration plan for
@@ -1581,25 +1580,33 @@ to move current files now. Every changed ABI receives semantic review for
 functions, events, errors, structs, mutability and selector compatibility; a JSON
 diff alone is insufficient.
 
-### 16.5 Solidity/CCIP boundary
+### 16.5 Pure-Vyper CCIP boundary
 
-Track 1 recommends a pinned repository-native Solidity toolchain, with Foundry as
-the current recommendation, but neither the toolchain nor exact Chainlink release
-is approved or installed. CM-051–053 remain outside the executable graph.
+Track 1 selects the existing pinned Vyper/titanoboa toolchain. CM-051–053 remain
+outside the executable graph until Chainlink custom-pool eligibility/version,
+the production implementation, independent audit, destination-gas margin,
+EVM-target compatibility, and owner/security decisions close.
 
-A future approved toolchain must produce a declared artifact index containing:
+The approved workflow must produce a declared artifact index containing:
 
-- package/source/contract identity;
-- exact dependency lock and compiler version;
-- compiler input, ABI, creation/runtime bytecode and link-reference hashes;
-- test/fuzz result references; and
+- source/contract identity and source hash;
+- exact Vyper/titanoboa versions, EVM target, optimization settings, and ABI
+  bounds;
+- ABI plus creation/runtime bytecode hashes;
+- exact Chainlink source/API revision used as the differential oracle;
+- selector/event/error/lifecycle parity, unit/fuzz/fork/gas result references;
+  and
 - verification format/provider capability.
 
 Python deployment tooling consumes that index through a versioned interface; it
-does not search arbitrary `out/` directories, infer a "latest" artifact, rewrite
-Solidity metadata, or become a second compiler/package manager. The same declared
-pool artifact must be used for the Base and Robinhood counterpart deployment
-unless a separately approved source/version policy says otherwise.
+does not search arbitrary output directories, infer a "latest" artifact, or
+become a second compiler/package manager. The same declared pool artifact must
+be used for Base and Robinhood counterpart deployment unless a separately
+approved source/version policy says otherwise.
+
+The dated Phase-A evidence snapshot still records the pre-decision Solidity
+toolchain blocker. Preserve that record as historical evidence; this section
+and the current Track 1 decision documents supersede it for future CCIP work.
 
 ## 17. Phase G — clean-deployment validation plan
 
@@ -1656,13 +1663,14 @@ isolation is proven.
 | **H-09 clean-deployment and negative suite.** Proposed `tests/deployment/test_clean_deployment.py`, `test_resume_reconciliation.py`, `test_reproducible_artifacts.py`, and `tests/deployment/fork/**` fixtures with network disabled by default; consumes all Stage 1 files, including H-04's `tests/deployment/test_network_clock_profiles.py`. | H-01–H-08; Track 6 S1/S2 and selected configuration/no-change/implemented dispositions for S3–S10; Track 8 launch decision; CM-001–060; selected migration IDs. | Tests/fixtures only; local generated histories remain temporary. Base full suite and ordinary/repeated/jumping-number profiles mandatory. S5 must prove the fresh RH action-block source while treating live Base as retained regression evidence, not a migration target. | Every selected Stage 1/2 target; two clean builds; `python -m pytest -q` serially. Prove omitted contract changes and disabled features as negative invariants. | No secret or public state change. QA, protocol, security and all cross-track owners review. Abort on nondeterminism, manual repair, unproved omission, accidental changed artifact, flaky shared state or Base regression. Fix owning slice; downstream H-10/H-11. |
 | **H-10 test-environment deployment/runbook.** Proposed `docs/chains/rh/runbooks/robinhood-testnet-deployment.md`, `tests/deployment/live/test_robinhood_testnet_deployment.py`, `test_robinhood_testnet_lifecycle.py`, `test_robinhood_governance.py`, `test_robinhood_psm.py`, `test_robinhood_ccip.py`; authorized outputs only under `migration_history/robinhood-testnet/v1/`. | V-00–V-10; H-01–H-09; selected CM graph; `0010`–`1000`; exact approved test values/roles. | Runbook/live harness before action; public sanitized manifests only after a separately authorized run and review. No Base production change; Base Sepolia CCIP action is separately gated. | Stage 4 dry run, exact plan digest, then only separately authorized live commands; rerun full static/local suite before and after evidence review. | Requires fresh owner authorization, signer/provider/funds and external-action approvals. Operations, protocol, security, risk, Track owners approve. Abort on any stale fact/hash/gate, ambiguous receipt, assertion failure or unexpected authority. No chain rollback; pause/disable/orphan/adopt/forward migration only. Downstream H-11 and release decision. |
 | **H-11 production rehearsal/restricted-release runbook.** Proposed `docs/chains/rh/runbooks/robinhood-mainnet-rehearsal.md`, `docs/chains/rh/runbooks/robinhood-mainnet-restricted-release.md`, `tests/deployment/live/test_robinhood_mainnet_preflight.py`; authorized outputs only under `migration_history/robinhood-mainnet/v1/`. | Accepted H-10 evidence; every DR row closed for selected graph; exact production source/plan/roles/values; `0010`–`1000`. | Documentation, read-only/preflight harness and reviewed release bundle template. No production manifest until separately authorized transactions finalize. Base effects only through separately approved Base migrations/CCIP registration. | Stage 5 two-environment rebuild, full suite, exact-plan rehearsal and preflight. Production command is deliberately absent until separate authorization names plan hash/backend. | No production authority from this spec. Owner, operations, governance, security and risk approve. Abort on any unresolved required field, changed fact/hash, insufficient balance, verifier/finality mismatch or authority gap. Onchain remediation is pause/disable/forward migration; never claim rollback. Downstream restricted-release decision. |
-| **H-12 CCIP Solidity/artifact integration.** Proposed interface paths `contracts/ccip/GreenBurnMintPool.sol`, `contracts/ccip/RipeBurnMintPool.sol`, `scripts/artifacts/ccip-artifact-index.json`, `tests/deployment/test_ccip_artifact_index.py`; exact dependency/lock/build files remain unnamed until Track 1 and toolchain approval. | Track 1 supported release/interface; CM-051–053/058; migration `1000`; Base/RH mappings and role decisions. | Only pinned shared Solidity source, declared artifact index, tests and reviewed build metadata. Generated artifacts follow Section 16. Same pool artifact on both chains unless separately approved. | Approved toolchain build/test/fuzz commands, artifact-index/ABI/verifier tests, cross-chain integration tests and full Vyper/Base suite. | Fresh dependency/toolchain and external-action approvals required. Track 1, compiler, protocol and security owners review. Abort if exact build files cannot be named, pool is not direct mint caller, artifacts are guessed, versions unsupported, or remote/role facts remain open. Remediation before deployment is code revert; after registration use revoke/pause/forward migration and supply reconciliation. Downstream separate CCIP activation release. |
+| **H-12 CCIP pure-Vyper parity/artifact integration.** Proposed production paths `contracts/ccip/GreenBurnMintPool.vy`, `contracts/ccip/RipeBurnMintPool.vy`, `scripts/artifacts/ccip-artifact-index.json`, `tests/deployment/test_ccip_artifact_index.py`; current reviewed reference remains under `docs/chains/rh/examples/` and is not deployable source. | Track 1 custom-pool eligibility and supported pool/API reference; CM-051–053/058; migration `1000`; Base/RH mappings, gas, lifecycle and role decisions. | Only pinned shared Vyper source, declared artifact index, parity/audit evidence, tests and reviewed compiler/EVM metadata. Generated artifacts follow Section 16. Same token-specific pool artifact on both chains unless separately approved. | Vyper build plus exact selector/event/error/lifecycle parity, differential fuzz, artifact-index/ABI/verifier, fork destination-gas, cross-chain integration and full Base/RH suites. | Fresh implementation and external-action approvals required. Track 1, compiler, protocol and security owners review. Abort if custom pool is unsupported, exact settings/bounds cannot be named, pool is not direct mint caller, artifacts are guessed, gas margin/audit is absent, versions unsupported, or remote/role facts remain open. Remediation before deployment is code revert; after registration use revoke/chain removal/token or RipeHq stops/forward migration and supply reconciliation. Downstream separate CCIP activation release. |
 
-The exact dependency/toolchain build files for H-12 cannot responsibly be fixed
-before Track 1 names the supported release and the owner approves a toolchain.
-That exception is deliberate: the four stable interface/output paths above
-reserve ownership, while inability to name the remaining files is an explicit
-pre-PR abort condition rather than a fabricated specification.
+The exact production pool/test files for H-12 cannot responsibly be fixed
+before Track 1 confirms custom-pool eligibility and the supported reference,
+and the owner/security review accepts the remaining lifecycle, role, gas, and
+audit gates. The stable interface/output paths above reserve ownership;
+inability to name exact compiler/EVM/bound/test inputs is a pre-PR abort
+condition rather than permission to fabricate them.
 
 ## 19. Required decision register
 

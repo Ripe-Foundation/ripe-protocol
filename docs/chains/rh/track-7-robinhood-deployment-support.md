@@ -394,15 +394,17 @@ Define what is committed under `migration_history/`, what remains local/operator
 
 Specify how `current-manifest.json` is generated, validated, linked to immutable step manifests, and prevented from hiding an incomplete or failed migration.
 
-## Phase F: Specify verification, ABI, and Solidity boundaries
+## Phase F: Specify verification, ABI, and CCIP Vyper boundaries
 
 - [ ] Define chain-neutral verifier adapters and the unsupported-provider failure.
 - [ ] Define constructor/immutable encoding and compiler metadata required for reproducible verification.
 - [ ] Define blueprint, module, proxy-like, and ordinary-contract verification behavior.
 - [ ] Define ABI export inputs, deterministic naming, collision handling, and review of changed ABIs.
 - [ ] Preserve current Vyper deployment support.
-- [ ] Record Track 1's CCIP Solidity-toolchain recommendation and pending Chainlink facts.
-- [ ] Define how a future pinned Solidity/Foundry output enters manifests, verification, and ABI export without teaching the Python tooling to guess artifacts.
+- [ ] Record Track 1's pure-Vyper decision, exact Chainlink differential-oracle
+  pin, explicit EVM target/ABI bounds, and pending eligibility/gas/audit facts.
+- [ ] Define how the CCIP Vyper outputs enter manifests, verification, and ABI
+  export through the existing Python authority without guessed artifacts.
 - [ ] Keep CCIP artifacts out of the initial deployment graph until the supported release and interface are approved.
 
 If the existing verification provider cannot verify Robinhood contracts, specify a truthful `unverified — provider unsupported` state and a launch decision gate. Do not report verification success from browser availability alone.
@@ -516,7 +518,7 @@ Propose small, ordered implementation slices. At minimum, separate:
 9. clean-deployment and negative test suite;
 10. test-environment deployment/runbook;
 11. production rehearsal and restricted-release runbook; and
-12. CCIP Solidity/artifact integration after Track 1 closes.
+12. CCIP Vyper parity/artifact integration after Track 1 closes.
 
 For every slice include:
 
@@ -644,7 +646,8 @@ Stop and report evidence if:
 - the manifest model cannot distinguish omission, disabled state, and unresolved blockers;
 - existing tooling inherently leaks a secret or Base address into another network;
 - migration discovery cannot support isolated namespaces without a larger redesign;
-- CCIP Solidity artifacts cannot fit a shared, reproducible release process;
+- CCIP Vyper artifacts, exact compiler/EVM settings, and Chainlink parity
+  evidence cannot fit a shared, reproducible release process;
 - a proposal requires Robinhood-only core-contract source or `chain.id` protocol logic;
 - an unresolved choice materially changes the graph and alternatives cannot safely be specified;
 - a migration ID/path collides with integrated or parallel work;
