@@ -37,7 +37,7 @@ VAULT_CASES = (
 
 LIQUIDATION_AFTER_TOTAL_LOSS_CASES = (
     pytest.param("simple", 3, True, id="simple-erc20"),
-    pytest.param("rebase", 4, False, id="rebase-erc20"),
+    pytest.param("rebase", 4, True, id="rebase-erc20"),
 )
 
 
@@ -1609,7 +1609,7 @@ def test_auction_started_after_total_issuer_loss(
     alice,
     sally,
 ):
-    """A-07: post-zero liquidation starts only on Simple, then settles unsafely."""
+    """A-07: both auctions start; settlement remains vault-dependent."""
 
     vault = _vault_for_case(vault_kind, simple_erc20_vault, rebase_erc20_vault)
     _configure_stock_asset(
@@ -1641,7 +1641,28 @@ def test_auction_started_after_total_issuer_loss(
     payment = 20 * EIGHTEEN_DECIMALS
     green_token.transfer(alice, payment, sender=whale)
     green_token.approve(teller, payment, sender=alice)
+    alice_green_before = green_token.balanceOf(alice)
     debt_before = credit_engine.getUserDebtAmount(bob)
+    if vault_kind == "rebase":
+        with boa.reverts("no asset to withdraw"):
+            teller.buyFungibleAuction(
+                bob,
+                vault_id,
+                stock_token,
+                payment,
+                False,
+                True,
+                False,
+                sender=alice,
+            )
+        assert green_token.balanceOf(alice) == alice_green_before
+        assert credit_engine.getUserDebtAmount(bob) == debt_before
+        assert vault.getTotalAmountForUser(alice, stock_token) == 0
+        assert stock_token.balanceOf(alice) == 0
+        assert stock_token.balanceOf(vault) == 0
+        assert ledger.hasFungibleAuction(bob, vault_id, stock_token)
+        return
+
     assert teller.buyFungibleAuction(
         bob,
         vault_id,
