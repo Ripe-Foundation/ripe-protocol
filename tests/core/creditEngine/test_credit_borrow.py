@@ -1207,25 +1207,49 @@ def test_get_user_borrow_terms_multiple_assets_some_zero_ltv(
 
 def test_get_user_borrow_terms_asset_with_zero_amount(
     alpha_token,
+    alpha_token_whale,
     bob,
     setGeneralConfig,
     setAssetConfig,
     setGeneralDebtConfig,
+    performDeposit,
     credit_engine,
     createDebtTerms,
+    rebase_erc20_vault,
 ):
     setGeneralConfig()
     debt_terms = createDebtTerms(_ltv=50_00, _redemptionThreshold=60_00, _liqThreshold=70_00, _liqFee=10_00, _borrowRate=5_00, _daowry=1_00)
-    setAssetConfig(alpha_token, _debtTerms=debt_terms)
+    setAssetConfig(alpha_token, _vaultIds=[4], _debtTerms=debt_terms)
     setGeneralDebtConfig()
-    # Manually ensure user has a vault but zero amount (simulate)
-    # This requires direct manipulation or a fixture that allows it; here we just check that zero amount is ignored
-    # (Assume the vault returns zero for getUserAssetAndAmountAtIndex)
-    # So, no deposit is made
+
+    # SharesVault preserves a nonempty position after total loss.
+    nominal_amount = 1 * EIGHTEEN_DECIMALS
+    performDeposit(
+        bob,
+        nominal_amount,
+        alpha_token,
+        alpha_token_whale,
+        rebase_erc20_vault,
+    )
+    alpha_token.transfer(
+        alpha_token_whale,
+        nominal_amount,
+        sender=rebase_erc20_vault.address,
+    )
+    assert rebase_erc20_vault.getUserAssetAndAmountAtIndex(bob, 1) == (
+        alpha_token.address,
+        0,
+    )
+
     terms = credit_engine.getUserBorrowTerms(bob, True)
     assert terms.collateralVal == 0
     assert terms.totalMaxDebt == 0
-    assert terms.debtTerms.ltv == 0
+    assert terms.debtTerms.ltv == 50_00
+    assert terms.debtTerms.redemptionThreshold == 60_00
+    assert terms.debtTerms.liqThreshold == 70_00
+    assert terms.debtTerms.liqFee == 10_00
+    assert terms.debtTerms.borrowRate == 5_00
+    assert terms.debtTerms.daowry == 1_00
 
 
 def test_get_user_borrow_terms_asset_with_no_price(

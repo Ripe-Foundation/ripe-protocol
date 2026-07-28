@@ -727,7 +727,7 @@ def _getUserBorrowTerms(
             asset: address = empty(address)
             amount: uint256 = 0
             asset, amount = staticcall Vault(vaultAddr).getUserAssetAndAmountAtIndex(_user, y)
-            if asset == empty(address) or amount == 0:
+            if asset == empty(address):
                 continue
 
             # debt terms
@@ -738,14 +738,15 @@ def _getUserBorrowTerms(
                 continue
 
             # collateral value, max debt
-            collateralVal: uint256 = staticcall PriceDesk(_a.priceDesk).getUsdValue(asset, amount, _shouldRaise)
+            collateralVal: uint256 = 0
+            if amount != 0:
+                collateralVal = staticcall PriceDesk(_a.priceDesk).getUsdValue(asset, amount, _shouldRaise)
             maxDebt: uint256 = collateralVal * debtTerms.ltv // HUNDRED_PERCENT
 
             # need to return some debt terms, even if not getting any price
             debtTermsWeight: uint256 = maxDebt
             if debtTermsWeight == 0:
                 debtTermsWeight = 1
-
             # debt terms sums -- weight is based on max debt (ltv)
             ltvSum += debtTermsWeight * debtTerms.ltv
             redemptionThresholdSum += debtTermsWeight * debtTerms.redemptionThreshold
@@ -754,7 +755,6 @@ def _getUserBorrowTerms(
             borrowRateSum += debtTermsWeight * debtTerms.borrowRate
             daowrySum += debtTermsWeight * debtTerms.daowry
             totalSum += debtTermsWeight
-
             # lowest ltv
             if debtTerms.ltv != 0 and debtTerms.ltv < bt.lowestLtv:
                 bt.lowestLtv = debtTerms.ltv
