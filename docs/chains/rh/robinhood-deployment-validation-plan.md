@@ -519,7 +519,7 @@ slice creates the named paths and closes its prerequisite gates.
 | H-09 | All Stage 1/2 and NEG-001–037 cases; two-checkout reproduction | Base full suite, Track 6 profiles and serial `python -m pytest -q` |
 | H-10 | Stage 4 dry plan and exact plan/hash review; live command intentionally withheld until fresh authorization | Re-run Stages 1–3; post-run evidence/soak review if authorized |
 | H-11 | Stage 5 rebuild, rehearsal and preflight; production command intentionally absent | Re-run Stages 1–4 and every selected launch gate |
-| H-12 | Pinned Vyper/EVM build plus selector/event/error parity, differential fuzz, `test_ccip_artifact_index.py`, destination-gas measurement, verifier/ABI and two-chain tests | Full Vyper/Base/RH suites, custom-pool eligibility/audit evidence, and cross-chain supply reconciliation |
+| H-12 | Pinned Chainlink/Solidity build plus source/storage/method delta checks, inherited ABI/behavior tests, `test_ccip_artifact_index.py`, destination-gas measurement, verifier/ABI and two-chain tests | Exact-hash reference-review record plus production-package independent review/audit; full Solidity/Vyper/Base/RH suites; and cross-chain supply reconciliation |
 
 Parallel execution remains prohibited until H-09 proves fixture, EVM, compiler
 cache and filesystem isolation. A command returning zero is insufficient if

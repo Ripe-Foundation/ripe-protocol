@@ -2,8 +2,8 @@
 
 Status: Public-evidence baseline complete; external confirmation remains required
 
-Evidence retrieved: 2026-07-23; directory and v1.6.1 API facts rechecked
-2026-07-27
+Evidence retrieved: 2026-07-23; directory/API facts and thin-subclass build
+evidence rechecked 2026-07-27
 
 Track branch: `rh-track-1-chainlink-ccip`
 
@@ -27,11 +27,11 @@ bridge built on Chainlink CCIP:
   technically become that direct caller, but is rejected because it adds a
   mint-critical contract and trust boundary without solving a token-interface
   problem.
-- The owner selected one pure-Vyper GREEN burn/mint pool implementation
-  deployed on both chains and one pure-Vyper RIPE pool implementation deployed
-  on both chains. The Vyper implementation must reproduce and independently
-  verify the selected Chainlink behavior; Chainlink's Solidity audits do not
-  transfer to it.
+- The owner selected one thin Solidity GREEN subclass and one thin Solidity
+  RIPE subclass of Chainlink's concrete v1.6.1 `BurnMintTokenPool`, each used
+  on both chains. Local compilation and the exact-hash Round-3 independent
+  review prove the subclasses add only the two Ripe capability selectors and
+  no storage or bridge override.
 - The immutable Base token deployments expose neither `owner()` nor
   `getCCIPAdmin()`. Public Chainlink documentation therefore points to assisted
   registration rather than self-service registration for Base. An unchanged
@@ -39,8 +39,9 @@ bridge built on Chainlink CCIP:
 
 This evidence is sufficient to prepare the technical question packet and a
 conditional integration decision. It is not sufficient to choose the final
-pool/API reference version, establish that Chainlink will accept a
-non-Chainlink-derived pure-Vyper pool, or authorize deployment.
+pool/API reference version, establish that Chainlink will support the thin
+subclass on the target lanes, clear the full destination-gas budget, or
+authorize deployment.
 
 ## Research boundaries and reproducibility
 
@@ -133,13 +134,15 @@ Testnet](https://docs.chain.link/ccip/directory/testnet/chain/robinhood-testnet)
 | Directory lane version | `1.6.0` | `1.6.0` |
 
 The OnRamp and OffRamp values above are the local-chain addresses in the
-directory's structured record for the peer lane. They are not proposed pool
-constructor values: the pool constructor takes the local token, decimals,
-allowlist, directory-listed RMN proxy, and Router, while remote-chain
-configuration is applied separately. The Base mainnet explorer identifies its
-directory-listed address as the proxy contract (`ARMProxy`, the predecessor
-name); confirmation that every current directory `RMN` field is the intended
-v1.6.1 constructor proxy remains in the external packet.
+directory's structured record for the peer lane. They are not pool constructor
+values. The selected subclasses retain Chainlink TokenPool v1.6.1's five
+arguments: local token, decimals, allowlist, directory-listed RMN proxy, and
+Router. The deployer is the initial owner through inherited ownership logic,
+and remote-chain configuration is applied separately. The Base mainnet
+explorer identifies its directory-listed address as the proxy contract
+(`ARMProxy`, the predecessor name); confirmation that every current directory
+`RMN` field is the intended v1.6.1 constructor proxy remains in the external
+packet.
 
 ### Existing token-transfer configuration
 
@@ -182,68 +185,92 @@ lane. The provisional implementation pin is therefore the exact documented
 `1.6.1` commit, subject to Chainlink confirmation of lane compatibility and the
 recommended production version.
 
-### Pure-Vyper reference parity
+### Thin Solidity inheritance evidence
 
-The current
+The selected
+[`examples/RipeCcipBurnMintTokenPools.sol`](examples/RipeCcipBurnMintTokenPools.sol)
+contains one GREEN and one RIPE subclass of the concrete v1.6.1
+`BurnMintTokenPool`. It is an independently reviewed reference, not production
+deployment source. The review is bound to source SHA-256
+`28fea3591caf8955a4c1f47d34f5abfe249564001578687525f94fddf5cfac77`;
+see the
+[`Round-3 review record`](evidence/ccip-solidity-reference-round-3-review.md).
+
+Each subclass:
+
+- uses the standard five-argument constructor;
+- adds `canMintGreen()` and `canMintRipe()`;
+- adds no storage; and
+- does not override any inherited function.
+
+The 2026-07-27 reference build used
+`@chainlink/contracts-ccip@1.6.1`,
+`@chainlink/contracts@1.4.0`, Solidity `0.8.26`, EVM `paris`, via-IR,
+optimizer `80_000`, and no metadata hash. Those are the upstream v1.6.1
+Foundry settings. The npm tarball shasums and published SRI integrity values
+observed in that build were:
+
+- contracts-CCIP shasum:
+  `9b0f5665634110bfa1d249eb58c141e358e05945`; integrity:
+  `sha512-2ainz7DhzSPyUTD01e0roRHQ4V895peJ6rlu+GgxOYCZVFVtuwXEbT27ByyaJSFsB9ZubAtu1zhAijuL0OwPzw==`;
+- shared contracts shasum:
+  `e976e012fe9104067e9f00ef397de6d48a7d1593`; integrity:
+  `sha512-SpNCJ0TPOI6pa2l702Wk4WIP8ccw5ARcRP1E/ZTqaFffXNoZeF03WhsVL8f3l3OTRFA9Z40O5KcZzmJmZQkoFA==`.
+
+Compile comparison:
+
+| Property | Standard pool | Ripe subclass |
+| --- | ---: | ---: |
+| Runtime bytecode | 17,334 bytes | 17,472 bytes |
+| EIP-170 margin | 7,242 bytes | 7,104 bytes |
+| External methods | 30 | 32 |
+| Storage entries | 8 | 8 |
+
+After removing the compiler's contract-name annotation, the base and derived
+storage layouts were identical. The only added selectors were
+`canMintGreen() = 0x40fd6f94` and
+`canMintRipe() = 0x3b6fccc0`.
+
+The initial implementation harness ran two isolated Foundry tests: one GREEN
+capability/burn/mint path and one RIPE capability/mint path. The token mock
+deliberately returned `bool` from `mint` and `burn`; the inherited void-return
+calls accepted the extra return data.
+
+The independent reviewer then ran 28 passing integration scenarios with the
+compiled pools and the real Vyper GREEN, RIPE, and RipeHq contracts. Those
+scenarios covered both capability truth tables, the direct RipeHq authorization
+path, real mint/burn balance and supply changes, and the relevant inherited
+ramp, peer, RMN, decimal, rate-limit, allowlist, pause/blacklist, and ownership
+behavior. The isolated harness remains review evidence rather than a committed
+repository test package.
+
+The mock gas report measured `releaseOrMint` at 78,813 gas after a preceding
+call warmed relevant state and 95,902 gas on a colder path. The harness did not
+include the real RipeHq registry/config reads or the OffRamp's before/after
+`balanceOf` calls. The cold pool-call figure exceeds the documented 90,000
+combined default by 5,902 gas before that omitted work. Automatic execution may
+therefore fail with the default configuration; manual execution with a token
+gas override is recovery, not acceptable normal service. These figures do not
+clear the required Base-fork/testnet full-path and FeeQuoter-configuration
+gates.
+
+The pinned Chainlink
+[`v1.6 Additional Use Grant`](https://github.com/smartcontractkit/chainlink-ccip/blob/bbab0601244ce58e2ffac0dbc178a80aab1fa4a3/chains/evm/contracts/v1.6-CCIP-License-grants.md)
+permits developing, deploying, and operating the token-pool contracts solely
+for CCIP integration and use. The `1.6.1` npm tarball includes a BUSL-1.1
+`contracts/LICENSE.md` that refers to that grant, but omits the referenced
+grant file. Production packaging must retain both files from the exact pinned
+source and complete internal license review before deployment.
+
+The earlier
 [`examples/ExampleGreenCcipBurnMintPool.vy`](examples/ExampleGreenCcipBurnMintPool.vy)
-is a reviewed reference, not production source. It pins Vyper `0.4.3` and EVM
-target `shanghai`. Compilation confirms these standard selectors:
-
-| Function | Selector |
-| --- | --- |
-| `lockOrBurn((bytes,uint64,address,uint256,address))` | `0x9a4575b9` |
-| `releaseOrMint((bytes,uint64,address,uint256,address,bytes,bytes,bytes))` | `0x39077537` |
-| `applyChainUpdates(uint64[],ChainUpdate[])` | `0xe8a1da17` |
-| `addRemotePool(uint64,bytes)` | `0x62ddd3c4` |
-| `removeRemotePool(uint64,bytes)` | `0xacfecf91` |
-| `setChainRateLimiterConfig(uint64,Config,Config)` | `0xcf7401f3` |
-| `getCurrentOutboundRateLimiterState(uint64)` | `0xc75eea9c` |
-| `getCurrentInboundRateLimiterState(uint64)` | `0xaf58d59f` |
-| `getRateLimitAdmin()` | `0x6d3d1a58` |
-
-The reference also restores the v1.6.1 lifecycle and observability behavior
-missing from the first draft:
-
-- chains and remote pools are enumerable, and chain removal clears the remote
-  token, every pool approval, and both buckets;
-- remote-pool add/remove uses canonical `(uint64,bytes)` ABI;
-- rate-limit reconfiguration refills at the old rate and clamps to the new
-  capacity rather than resetting to full;
-- current-state getters simulate refill and return the Chainlink
-  `uint128/uint32` bucket layout;
-- event types/indexing and security/rate-limit custom-error encodings follow the
-  pinned source; and
-- deployment-time allowlist mode and zero-address ownership-transfer
-  cancellation are explicit.
-
-The pinned v1.6.1 `RateLimiter.sol` source and current v1.6.1 API text disagree
-on enabled zero-rate buckets: the source rejects only `rate > capacity`, while
-the API text says an enabled rate must be nonzero. The Vyper reference follows
-the safer documented rule and rejects `rate == 0`; otherwise a depleted
-zero-rate bucket can divide by zero while calculating wait time. Disabled
-limits use `isEnabled == false`, capacity `0`, and rate `0`. Chainlink should
-identify the canonical acceptance semantics before the production pin is
-frozen.
-
-The constructor also deliberately requires `token.decimals()` to succeed and
-match the supplied value. TokenPool v1.6.1 catches a failed optional decimals
-call and trusts the supplied value; GREEN and RIPE both implement `decimals()`,
-so failing closed removes an unused fallback without changing this lane.
-
-The runtime bytecode is 14,952 bytes under the pinned settings, below EIP-170's
-24,576-byte limit. Local in-memory tests exercised chain add/remove,
-remote-pool add/remove and revocation, outbound burn, inbound mint,
-consumed-capacity-preserving reconfiguration, allowlist enforcement, standard
-custom-error selectors, and ownership-transfer cancellation. These are local
-development checks, not fork, testnet, audit, Chainlink-support, or gas-budget
-evidence.
-
-Vyper's ABI bounds are an explicit lane invariant: remote address and pool
-values are at most 64 bytes, `sourcePoolData` at most 64 bytes,
-`offchainTokenData` at most 2,048 bytes, and enumerable collections are bounded
-to eight chains, eight pools per chain, and 256 allowlist entries. The selected
-EVM-to-EVM address and decimal encodings fit those values. Any future non-EVM
-or custom peer format must be rejected or re-reviewed before configuration.
+is retained only as a superseded comparison. The Round-2-reviewed historical
+artifact is commit `8147784`, SHA-256
+`7f3b46af23b9456869b0a72578d3ae295cbfb8ff112d0f7bddd1d66a4afb1e18`.
+The superseded file is frozen byte-for-byte at that artifact and is not
+maintained alongside the active design. Its finite ABI/collection bounds,
+sixth constructor argument, enabled-zero-rate policy choice, and post-2106
+timestamp conversion are not properties of the selected inherited design.
 
 ## Ripe token and authorization evidence
 
@@ -310,14 +337,14 @@ Consequences:
 
 | Requirement | Ripe token | Standard Chainlink behavior | Result |
 | --- | --- | --- | --- |
-| `mint(address,uint256)` | Present; RipeHq-gated; returns `bool` | Called directly on release/mint through a void-return interface | Selector-compatible; extra return data is harmless, and the Vyper reference asserts it is true |
-| `burn(uint256)` | Present; burns caller balance; returns `bool` | Called directly after tokens reach the pool through a void-return interface | Selector-compatible; extra return data is harmless, and the Vyper reference asserts it is true |
+| `mint(address,uint256)` | Present; RipeHq-gated; returns `bool` | Called directly on release/mint through a void-return interface | Selector-compatible; the inherited-pool mock test accepted the extra return data |
+| `burn(uint256)` | Present; burns caller balance; returns `bool` | Called directly after tokens reach the pool through a void-return interface | Selector-compatible; the inherited-pool mock test accepted the extra return data |
 | `burnFrom(address,uint256)` | Absent | Required by `BurnFromMintTokenPool`, not by `BurnMintTokenPool` | Use burn/mint, not burn-from/mint |
 | `decimals()` | Present; 18 | Used for remote decimal handling | Compatible |
 | `balanceOf(address)` | Present | Used by pool accounting | Compatible |
 | `owner()` | Absent | One self-service admin-discovery path | Assisted registration required |
 | `getCCIPAdmin()` | Absent | Another self-service admin-discovery path | Assisted registration required |
-| Ripe capability view | Token does not supply it; department must | Not present in standard pool | Ripe-aware custom pool required |
+| Ripe capability view | Token does not supply it; department must | Not present in standard pool | Thin token-specific subclass adds only the two views |
 | Global mint circuit breaker | `RipeHq.setMintingEnabled(false)` immediately makes both mint checks return false | Destination release/mint reverts when token mint reverts | Protocol-wide issuance stop for every RipeHq-authorized minter; in-flight recovery must be confirmed and tested |
 | Token pause | Transfer, mint, and burn revert while paused | Source transfer/burn or destination mint can fail | True token-wide stop with broader protocol impact |
 | Token blacklist | Transfer rejects blacklisted parties; mint rejects blacklisted receiver | Destination mint can fail for a particular receiver | Disclose and test failed-message recovery |
@@ -345,12 +372,14 @@ Local source anchors at the recorded track start commit:
 As retrieved on 2026-07-23, Chainlink's [token-pool
 documentation](https://docs.chain.link/ccip/concepts/cross-chain-token/evm/token-pools)
 describes the standard burn/mint pool as fully audited. For custom burn/mint
-behavior it recommends inheriting `BurnMintTokenPoolAbstract`; a subclass of
-the standard `BurnMintTokenPool` would minimize changed behavior further. The
-owner instead selected pure Vyper. Consequently none of that inheritance or
-audit coverage transfers, and public documentation does not establish whether
-Chainlink will register, list, monitor, or support the resulting pool. That is
-a blocking external question.
+behavior it recommends inheriting `BurnMintTokenPoolAbstract`. Ripe does not
+need different burn/mint behavior, so it now subclasses the concrete standard
+`BurnMintTokenPool` and adds only unrelated capability views. This maximizes
+code reuse, but the public audit statement does not automatically cover Ripe's
+subclass, RipeHq callback, build pin, deployment configuration, or operational
+assumptions. Public documentation also does not explicitly establish whether
+Chainlink will register, list, monitor, or support this exact thin subclass;
+that remains an external question.
 
 ## Registration and administration
 
@@ -438,8 +467,8 @@ item. Ripe-specific controls come from the local source anchors above.
 - Chainlink v1.6.1's `applyChainUpdates` can completely remove a chain and its
   remote-pool approvals. Its rate-limiter reconfiguration first refills at the
   old rate and then clamps to the new capacity, so an administrator cannot
-  restore consumed capacity merely by reapplying a config. The pure-Vyper
-  reference mirrors both behaviors.
+  restore consumed capacity merely by reapplying a config. The selected
+  subclasses inherit both behaviors directly.
 - Token-pool execution receives a combined default gas allowance of `90,000`.
   It covers the pre-mint `balanceOf` check, `releaseOrMint`, and the post-mint
   `balanceOf` check. Exceeding it makes destination execution fail; the public
@@ -448,10 +477,16 @@ item. Ripe-specific controls come from the local source anchors above.
   check plus RipeHq authorization must fit within a measured budget with margin.
   See [EVM service limits](https://docs.chain.link/ccip/service-limits/evm) and
   [manual execution](https://docs.chain.link/ccip/concepts/manual-execution).
-  Local warm/fresh-storage estimates from the independent review are not
-  accepted proof; mainnet remains blocked on a Base fork measurement through
-  the real OffRamp, Router, RMN proxy, token, and RipeHq, followed by testnet
-  evidence.
+  The inherited-pool mock measured 78,813 gas after warming and 95,902 gas on a
+  colder `releaseOrMint` path. It omits the real RipeHq reads and OffRamp
+  balance checks, so it is not accepted proof. The cold pool call alone exceeds
+  the combined default by 5,902 gas; automatic execution may fail before the
+  real path's additional work is counted. Mainnet remains blocked on a Base
+  fork measurement through the real OffRamp, Router, RMN proxy, token, and
+  RipeHq, followed by testnet evidence and a supported FeeQuoter token overhead
+  with margin. The production compiler/EVM settings must remain identical
+  across both chains unless a separately approved and reviewed compatibility
+  exception is unavoidable.
 - If automatic execution fails, any externally owned account can manually
   execute after the documented smart-execution window by supplying gas.
   See [manual execution](https://docs.chain.link/ccip/concepts/manual-execution).
@@ -481,38 +516,31 @@ proven on that chain.
 The repository's `Department.vyi` convention also declares `isPaused()`,
 `pause(bool)`, and fund-recovery functions. RipeHq registration does not
 runtime-check that full interface; it checks only the enabled mint capability.
-`SwitchboardCharlie.pause(address,bool)` is a generic targeted call, not an
-automatic registry sweep, but targeting a CCIP pool that lacks `pause(bool)`
-would revert. The implementation must explicitly choose between:
-
-- adding a Chainlink-approved pool pause/lifecycle surface and testing how it
-  gates lock/burn and release/mint; or
-- intentionally relying on RipeHq `mintEnabled`, token pause, and CCIP rate
-  limits while documenting that SwitchboardCharlie cannot pause the pool.
-
-The reference example explicitly chooses the capability-only shape so it does
-not silently claim a broader Department interface. Production must still
-accept that minimum-change choice or authorize the larger pool-local
-pause/recovery surface.
+The selected subclasses intentionally add only the two required views.
+Therefore `SwitchboardCharlie.pause(address,bool)` will revert if aimed at a
+pool, and operations must use inherited CCIP controls, RipeHq `mintEnabled`,
+or token pause according to the incident scope. Production security review
+must accept that minimum-change lifecycle and the global circuit breaker's
+wider blast radius.
 
 The exact multisig setup, role-transition sequence, emergency playbook,
 monitoring, and manual-execution responsibilities require confirmation.
 
 ## Publicly unresolved questions
 
-1. Is a non-Chainlink-derived pure-Vyper pool eligible for registration,
-   production lanes, Directory/monitoring, Token Manager/Expert, and supported
-   manual execution, and what exact additional ABI/audit/review requirements
-   apply?
-2. Which pool/API version should the implementation target for the `1.6.0`
-   lanes, and are the directory `RMN` entries the proxy addresses intended for
-   the v1.6.1 `TokenPool` constructor?
-3. What assisted-registration evidence, initiator, and sequence apply to
+1. Is a direct subclass of `BurnMintTokenPool` that only adds two pure
+   capability views supported for registration, production lanes,
+   Directory/monitoring, Token Manager/Expert, and manual execution? Which
+   pool/API version should target the `1.6.0` lanes, and are the directory
+   `RMN` entries the intended constructor proxies?
+2. What assisted-registration evidence, initiator, and sequence apply to
    unchanged Base and Robinhood tokens that expose neither `owner()` nor
    `getCCIPAdmin()`?
-4. What destination token-gas overhead is configured, what measurement margin
-   is required, and how is a custom overhead approved if needed?
-5. What exact message retry/manual-execution and remote-pool retirement
+3. What destination token-gas overhead is configured, what measurement margin
+   is required, and how is a custom
+   `TokenTransferFeeConfig.destGasOverhead` approved and applied in FeeQuoter
+   configuration if needed?
+4. What exact message retry/manual-execution and remote-pool retirement
    procedures apply to Ripe's failure and upgrade cases?
 
 These questions are formatted for external review in

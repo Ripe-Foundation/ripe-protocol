@@ -135,10 +135,19 @@ Freeze and execute restricted mainnet release
   - The PSM deployment and activation posture remains separately gated.
   - Decision evidence: [`usdg-psm-decision.md`](rh/usdg-psm-decision.md).
 - [ ] Pin the supported CCIP pool/API reference and decide how the selected
-  pure-Vyper contracts and artifacts will be built, differentially tested,
-  verified, and deployed with an explicit EVM target and ABI bounds.
-- [x] Prefer Chainlink-assisted registration so Robinhood can deploy the same existing GREEN and RIPE token implementations without adding a Robinhood-only `getCCIPAdmin()` change.
-  - Decision evidence: [`ccip-integration-decision.md`](rh/ccip-integration-decision.md). Chainlink confirmation of the supported registration path remains open below.
+  thin Solidity subclasses and artifacts will be dependency-locked, built,
+  delta-tested, verified, and deployed with exact compiler/EVM settings.
+  - Owner decision required before implementation: authorize or reject the
+    bounded H-12 Solidity build/test/artifact package. The reference contract,
+    scratch builds, and independent reference review do not authorize adding
+    production dependencies or tooling.
+- [x] Select Chainlink-assisted registration as the preferred path so Robinhood
+  can deploy the same existing GREEN and RIPE token implementations without
+  adding a Robinhood-only `getCCIPAdmin()` change.
+  - This checkbox closes only Ripe's internal topology preference; it does not
+    establish Chainlink support or authorize registration. Decision evidence:
+    [`ccip-integration-decision.md`](rh/ccip-integration-decision.md).
+    Chainlink confirmation remains open below.
 - [ ] Confirm the supported registration path with Chainlink. If `getCCIPAdmin()` is unavoidable, design it as part of a new shared token revision usable on every chain and explicitly resolve the resulting Base migration, temporary live-version mismatch, or permanently accepted live divergence for the immutable Base tokens.
 - [ ] Prove the two highest-uncertainty paths before building the full deployment:
   - a Stock Token can transfer into and back out of a third-party test contract; and
@@ -239,17 +248,22 @@ Robinhood tests pass.
 
 - [ ] Confirm that GREEN/RIPE bridging is required for the initial release. If
   it is not launch-critical, prefer deferral over token or pool changes.
-- [ ] Pin the exact Chainlink source/API used as the differential-test oracle;
-  do not treat that Solidity source as inherited implementation or audit
-  coverage for the pure-Vyper pool.
+- [ ] Pin the exact Chainlink source/API used as the inherited implementation.
+  Prove the subclass adds no storage or bridge override, while treating
+  upstream audit claims as evidence for the base rather than automatic
+  coverage of the Ripe integration.
 - [ ] Implement the minimal Department-compatible BurnMint pool layer:
-  - use pure Vyper `0.4.3` through the existing repository toolchain;
-  - GREEN pool exposes `canMintGreen() == true` and no RIPE mint capability;
-  - RIPE pool exposes `canMintRipe() == true` and no GREEN mint capability;
+  - inherit the concrete Chainlink `BurnMintTokenPool` in Solidity;
+  - pass through its standard five constructor arguments;
+  - GREEN pool retains both views, with `canMintGreen() == true` and
+    `canMintRipe() == false`;
+  - RIPE pool retains both views, with `canMintGreen() == false` and
+    `canMintRipe() == true`;
+  - add no storage and override no CCIP behavior;
   - the pool remains the direct caller of `GreenToken.mint()` or `RipeToken.mint()`; and
   - standard CCIP Router, RMN proxy, chain/pool lifecycle, optional allowlist,
     decimal, burn/mint, rate-limit, event, error, and administration behavior
-    remains intact.
+    is inherited intact.
 - [ ] Deploy the same GREEN pool implementation on Base and Robinhood and the same RIPE pool implementation on Base and Robinhood; keep Router, selector, remote-pool, ownership, and rate-limit differences in configuration.
 - [ ] Do not insert a standalone mint adapter. A separately registered adapter
   could technically become RipeHq's authorized direct caller, but is rejected
@@ -267,9 +281,10 @@ Robinhood tests pass.
 - [ ] Add tests that prove each pool has exactly one intended RipeHq mint capability and cannot mint through any alternate caller.
 - [ ] Add bidirectional GREEN and RIPE bridge tests that reconcile source burns, destination mints, in-flight messages, and total cross-chain supply.
 - [ ] Add negative tests for wrong Router, selector, token, remote pool, decimal configuration, Department permission, and governance owner.
-- [ ] Add parity tests for standard selectors, event indexing, custom-error
-  encodings, complete chain removal, remote-pool enumeration, Vyper calldata
-  bounds, and rate-limit reconfiguration without capacity reset.
+- [ ] Add inheritance/delta tests for standard selectors, event indexing,
+  custom-error encodings, storage layout, method identifiers, complete chain
+  removal, remote-pool enumeration, and rate-limit reconfiguration without
+  capacity reset.
 - [ ] Measure the complete destination `balanceOf` + `releaseOrMint` +
   `balanceOf` path against the lane token-gas overhead on a Base fork and both
   test lanes; activation requires explicit margin, not a local estimate.

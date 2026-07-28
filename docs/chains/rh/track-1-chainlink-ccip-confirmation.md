@@ -12,7 +12,19 @@ Treat this document as the task contract. Work only within the scope below. Veri
 
 Do not contact Chainlink, submit a form, send a message, agree to commercial terms, or broadcast a transaction without explicit owner authorization. Do not implement the production pool or modify GREEN, RIPE, or RipeHq during this track.
 
-Use a dedicated branch or worktree named `rh-track-1-chainlink-ccip`. Do not edit `docs/chains/rh-summary.md` or files owned by the other Robinhood tracks. Commit deliverables to the track branch with clear messages; never push directly to or merge into the shared `rh` or `master` branch. The owner reviews and integrates the work.
+For a new independent Track 1 execution, use a dedicated branch or worktree
+named `rh-track-1-chainlink-ccip`. Do not edit `docs/chains/rh-summary.md` or
+files owned by the other Robinhood tracks. Commit deliverables to the track
+branch with clear messages; never push directly to or merge into the shared
+`rh` or `master` branch. The owner reviews and integrates the work.
+
+The owner integrated the pure-Vyper reference package on `rh` in commit
+`8147784a` and separately directed the 2026-07-27 thin-Solidity architecture
+and cross-document correction pass in the integration worktree. That was
+one-time task authority, not a reusable maintenance exception. Future work
+must follow this track's branch/file rules or receive new explicit owner
+authority. Nothing here authorizes a commit, push, merge, deployment, external
+contact, or transaction.
 
 ## Worktree bootstrap
 
@@ -33,7 +45,9 @@ The owner must commit the approved track briefs to the `rh` integration branch b
 5. Verify the new worktree's branch, commit, and clean status. Record the full starting commit in the deliverables.
 6. Run every subsequent command and make every edit inside `/Users/wigglez/dev/ripe-protocol-track-1-chainlink-ccip`.
 
-Do not modify or commit from the integration worktree. Leave the track worktree and branch in place for owner review; do not remove or merge them yourself.
+For a new isolated Track 1 run, do not modify or commit from the integration
+worktree. Leave the track worktree and branch in place for owner review; do not
+remove or merge them yourself.
 
 ## Objective
 
@@ -59,10 +73,14 @@ This track does not build the bridge. It determines the supported path the bridg
 - Prefer assisted registration of the immutable Base GREEN and RIPE tokens.
 - Add `getCCIPAdmin()` only if Chainlink confirms that it is required and assisted registration is unavailable or inappropriate.
 - The Ripe-compatible pool must remain the direct caller of `GreenToken.mint()` or `RipeToken.mint()`.
-- The GREEN pool must expose only `canMintGreen() == true`; the RIPE pool must expose only `canMintRipe() == true`.
+- Both pools retain both capability views. The GREEN pool returns true only
+  from `canMintGreen()` and false from `canMintRipe()`; the RIPE pool returns
+  false from `canMintGreen()` and true only from `canMintRipe()`.
 - Use one shared GREEN pool implementation on both chains and one shared RIPE pool implementation on both chains. Network addresses and permissions belong in configuration.
-- Implement the selected pools in pure Vyper `0.4.3`; do not introduce a
-  Solidity/Foundry boundary unless a later owner decision reverses this choice.
+- Implement each selected pool as a thin Solidity subclass of Chainlink's
+  concrete `BurnMintTokenPool`. Add only the standard constructor pass-through
+  and the two Ripe capability views; do not add storage or override CCIP
+  behavior.
 - CCIP is the sole active minting bridge.
 
 ## Required repository reading
@@ -103,7 +121,7 @@ Record the actual starting commit. If contract code has changed since the planni
   technically possible but rejected for added attack surface and governance
   complexity.
 - [ ] Identify any Chainlink review, allowlisting, audit, deployment, or
-  operational requirements for a non-Chainlink-derived pure-Vyper pool.
+  operational requirements for a thin subclass of the concrete standard pool.
 - [ ] Verify current rate-limit, manual-execution, ownership-transfer, pause, and recovery behavior relevant to the proposed design.
 - [ ] Treat program availability, fees, service levels, feed availability, and deprecation terms as unconfirmed until supported by a current primary source or direct written answer.
 
@@ -124,14 +142,14 @@ The packet must be concise enough to send to a Chainlink technical contact while
 Ask only what cannot be answered from Ripe code or current public Chainlink
 sources:
 
-1. pure-Vyper custom-pool eligibility and mandatory tooling/ABI/audit surface;
-2. the supported pool/API version for the live `1.6.0` lanes and confirmation
-   that the directory RMN value is the constructor proxy;
-3. the exact assisted Token Admin Registry process for unchanged tokens with no
+1. support for the two-view-only `BurnMintTokenPool` subclass, the pool/API
+   version for the live `1.6.0` lanes, and confirmation that the directory RMN
+   value is the constructor proxy;
+2. the exact assisted Token Admin Registry process for unchanged tokens with no
    `owner()` or `getCCIPAdmin()`;
-4. destination token-gas overhead, required margin, and the supported custom
-   overhead path; and
-5. failed-message retry/manual execution plus safe remote-pool retirement.
+3. destination token-gas overhead, required margin, and the supported
+   `TokenTransferFeeConfig.destGasOverhead`/FeeQuoter configuration path; and
+4. failed-message retry/manual execution plus safe remote-pool retirement.
 
 Include:
 
@@ -145,27 +163,31 @@ Include:
 
 Stop after drafting the packet. Present it to the owner for review. Do not send it or initiate external contact without explicit authorization for the message, recipient, and channel.
 
-## Phase C: Confirm the pure-Vyper toolchain boundary
+## Phase C: Confirm the thin-Solidity toolchain boundary
 
-Use the repository's pinned Vyper/titanoboa workflow for the pool contracts.
-Specify how to build, differentially test, verify, export, and deploy the
-from-scratch Vyper implementation without adding a Solidity application
-toolchain.
+Use a path-scoped, reproducible Foundry/Solidity build for the pool subclasses
+while preserving the existing Python migration and manifest workflow as the
+deployment authority. The owner-selected reference inherits
+contracts-CCIP v1.6.1's concrete `BurnMintTokenPool` and adds no storage or
+bridge override.
 
 The recommendation must address:
 
-- dependency and compiler pinning;
+- exact Chainlink dependency, Solidity compiler, EVM, optimizer, via-IR, and
+  metadata pinning;
 - reproducible builds;
-- Vyper unit, differential, invariant, fork, and integration tests;
+- Solidity unit, ABI/storage-delta, invariant, fork, and integration tests;
 - interaction with Vyper RipeHq and token deployments;
 - ABI/artifact export;
 - migration integration;
 - explorer verification;
 - CI impact; and
-- explicit EVM-version and Vyper dynamic-array/bytes bounds;
-- exact standard selectors, events, errors, lifecycle, and rate-limit parity;
-- independent audit scope because Chainlink's Solidity audit does not transfer;
-  and
+- proof that no storage or CCIP behavior differs from the pinned base;
+- exact standard selectors, events, errors, lifecycle, and rate-limit
+  inheritance;
+- independent review scope because the standard-pool audit does not
+  automatically cover the subclass, RipeHq integration, dependency pin, or
+  deployment configuration; and
 - destination gas measurement through the real RipeHq-authorized mint path.
 
 Create `docs/chains/rh/ccip-integration-decision.md` during this phase rather than waiting for Chainlink's response. Record the toolchain recommendation immediately and leave explicit `pending Chainlink response` fields for unresolved external decisions. Do not install dependencies or modify the build until the recommendation is approved.
@@ -201,7 +223,7 @@ It must record:
 - whether `getCCIPAdmin()` is required;
 - accepted pool compatibility design;
 - required contracts and administrative roles;
-- selected pure-Vyper toolchain and Chainlink parity boundary;
+- selected thin-Solidity toolchain and Chainlink inheritance/delta boundary;
 - unresolved external dependencies;
 - live-version implications for immutable Base tokens;
 - required follow-on implementation and test specifications; and
@@ -214,7 +236,7 @@ Stop and involve the owner if:
 - external outreach or a commercial commitment is required;
 - a current address, lane, or release cannot be verified;
 - assisted registration is unavailable;
-- Chainlink rejects or materially changes the pure-Vyper custom-pool design;
+- Chainlink rejects or materially changes the thin-subclass design;
 - a solution requires a Robinhood-only token or RipeHq implementation without
   the explicit owner policy decision described above;
 - production GREEN or RIPE migration becomes necessary;
