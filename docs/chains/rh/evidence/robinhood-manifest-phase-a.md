@@ -2552,3 +2552,771 @@ Any movement beyond controlling `rh` commit
 H-01, S5, H-03, Track 8 M1, H-05, H-06, or execution-hardening authority
 requires fresh reconciliation and renewed review before H-06 Phase B may be
 considered.
+
+## 16. Phase B Gate 1 implementation candidate
+
+This section is the append-only H-06 Phase B implementation and validation
+record as of `2026-07-28T02:33:58Z`. The protocol owner authorized bounded
+implementation and validation from the exact baseline below. The authorization
+did not authorize staging, commit, push, `rh` integration, migration,
+deployment, current promotion, signing, transaction submission, release, or
+external-state access.
+
+The first 138,561 bytes of this evidence remain the complete reviewed Phase A
+record at SHA-256
+`54aea0a8df18d83dc53493ba561195d432d8e7df0d057932eeed7dfe60cd7c19`
+and Git blob `2184165bfecdf60bc8199a2d6db7221497ead416`. No historical
+Phase A byte was rewritten.
+
+### 16.1 Exact baseline, branch, and ceiling
+
+The candidate was constructed in the isolated worktree
+`/Users/wigglez/dev/ripe-protocol-track-7-h6-manifest-schema-phase-b` on
+branch `rh-track-7-h6-manifest-schema-phase-b`, created directly from:
+
+- `rh` commit `70dd76516ca9b4af8c0797c327bf15732634e5f6`;
+- tree `9f269826f0adfd6e970218a9957b3129c1481ccc`;
+- this evidence at the prefix SHA-256 and Git blob above; and
+- local, cached `origin/rh`, and live `origin/rh` identities that agreed
+  before the isolated branch and worktree were created.
+
+No rebase, merge, cherry-pick, squash, amendment, or baseline rewrite was
+performed. The real index remains empty. The complete candidate uses exactly
+the approved eight-file ceiling:
+
+| Path | Candidate SHA-256 | Purpose |
+| --- | --- | --- |
+| `docs/chains/rh/evidence/robinhood-manifest-phase-a.md` | reported outside this self-referential record after the append-only document is sealed | This Gate 1 implementation and provenance record; historical prefix preserved |
+| `scripts/utils/migration.py` | `58733561aae7c0a599de86f64a1f20529c61a92943d7c29408fd7501e915d1ba` | Robinhood-only in-memory typed result handoff; legacy Base flow preserved |
+| `scripts/utils/json_file.py` | `84c38a4975454ccec77607c3987f459917ce23794d355396cbdb01ee6c398c82` | Strict duplicate-key/float-rejecting loads and descriptor read/write primitives while retaining legacy `load`/`save` |
+| `scripts/utils/manifest_schema.py` | `d3db5ef9bb75706512e8b54337741f182e0c8c1fecceeca4606b9bade27a120b` | Authoritative schema builder, canonicalization, hashes, history reader, native writer, and current promotion |
+| `docs/chains/rh/schemas/deployment-manifest-v2.schema.json` | `19ce1868e4fbff170ab0b8256dcb5634e2554ab1ba3f08be87ea43100227d41a` | Deterministic byte-identical rendering of the in-code schema |
+| `tests/deployment/test_manifest_schema.py` | `f5bfb1a28ef09ee5d255e991ab847e186638c9eb1d44f52e319b810481905f67` | Schema, hash, chain, sensitivity, H-05 boundary, legacy, and reproducibility matrix |
+| `tests/deployment/test_current_manifest_promotion.py` | `d1b8e3147205ded2c0ee5be96cd064a9ecb0c126120b94060710d2d0e159deec` | Native APFS, fault, lock, collision, concurrency, and current-promotion matrix |
+| `.gitignore` | `eed831d2e74e8b8deb786bc89c2ab0f895195f28fdecc8967acf5471a0035abf` | Only the six approved profile-anchored attempt, lock, and temporary rules |
+
+No ninth file, dependency, lockfile, helper module, external restricted-state
+root, Robinhood history namespace, manifest, current index, attempt, writer
+lock, or writer temporary file was added to the repository.
+
+### 16.2 Implemented schema and digest boundary
+
+`scripts/utils/manifest_schema.py` is standard-library-only and constructs the
+closed `ripe.robinhood.deployment-manifest` schema version `2`. The committed
+schema is exactly 29,490 bytes and equals the builder output byte-for-byte.
+The implementation rejects duplicate keys, floats, non-finite numbers,
+negative zero parsed as a number, non-NFC text, invalid Unicode scalar values,
+wrong ordering, missing terminal LF, extra fields, malformed public hex,
+ambiguous nulls, prohibited paths, and prohibited sensitive fields.
+
+The candidate implements:
+
+- H-06 UTF-8 canonical serialization, exact key and array ordering, minimal
+  escaping, terminal LF, self-field omission/reinsertion, and SHA-256 rules;
+- domain-separated source-set, semantic-plan, plan-action, immutable-record,
+  attempt-record, current-index, and event-evidence identities;
+- ordered semantic migrations, steps, and action records with stable typed
+  IDs, explicit executable and non-executable dispositions, receipts,
+  finality, reconciliation, events, postconditions, errors, and supersession;
+- immutable single-head chain validation with prior record ID/hash linkage,
+  source and forward-plan transition checks, terminal completion, anchored
+  attempts, and forward-only remediation;
+- the nine-result read boundary: `valid`, `absent-clean`, `incomplete`,
+  `corrupt`, `stale`, `wrong-profile`, `wrong-chain`, `wrong-plan`, and
+  `ambiguous`; and
+- strict Robinhood profile isolation with no Base path, blob, Ledger,
+  deployment-source, or history fallback.
+
+The known digest identities are:
+
+| Identity | SHA-256 |
+| --- | --- |
+| generated schema bytes | `19ce1868e4fbff170ab0b8256dcb5634e2554ab1ba3f08be87ea43100227d41a` |
+| event-evidence vector | `4008ce9d56daa4cfe33ebea06761a8508ca04933d7709670c81f944d7df4c79b` |
+| source-set vector | `a0b5b40118486c2f82e15fe06f7a8e0909fcf80ed1de1b39b02dc3b5116b3a12` |
+| semantic-plan vector | `24a538ecabbed898e434bb9165a5c085ec4ba25bae84726dcb645df1fca3da8a` |
+| plan-action vector | `de3f80900f766cd2cdb6b17661fe6de40d0c0b1c0718b07ab43dfff9e052ca61` |
+| deterministic complete-record bytes in each clean checkout | `c052923eefbc7d77f69c9930958d260a00713d4f7c5cd8b191bc7206b33e63eb` |
+
+The event digest retains the exact closed raw-log projection and
+`UTF8("ripe-manifest-v2-event-evidence") || 0x00` prefix approved in Section
+11.2. Tests recompute it from the public receipt-log identity and reject
+missing parent receipt linkage, wrong chain/transaction/block/emitter/index,
+malformed lengths, reordered topics, altered data, and inclusion of the digest
+inside its own projection.
+
+H-05 remains bound to integrated evidence SHA-256
+`28c3e32b9732334c4904667eeb983d057d5d96391fb5fd8b13f37a9f5033af7c`
+at commit `7a3a36666f277277fa08b55081b3f58c7cd3ba64`, its six-file
+ceiling, `[0-9]{4}` migration-ID grammar, synthetic read boundary, and RFC
+8785/JCS `report_sha256` rules. H-05 owns report construction and discovery.
+H-06 owns the semantic `plan_sha256`, real immutable reader, manifest
+serialization, evidence hashes, writer, and current promotion. Seven boundary
+vectors prove the H-05 and H-06 encodings, self-field rules, and newline rules
+cannot be confused or substituted. `migration.py` accepts only a complete,
+truthful typed action result and does not add submission or retry behavior.
+
+### 16.3 Native writer and current promotion
+
+Initial implementation support is macOS on a local APFS volume only.
+Immutable publication invokes only
+`renameatx_np(..., RENAME_EXCL)`. There is no immutable-publication fallback
+to `os.rename`, `os.replace`, `os.link`, copying, unlink-before-rename, raw
+syscall numbers, Linux, another filesystem, or external state. Unsupported
+platforms and filesystems fail closed before creating writer state.
+
+The writer validates complete canonical bytes and source identities before it
+opens the state root. It then:
+
+1. opens every absolute root component descriptor-relatively with
+   `O_NOFOLLOW`;
+2. requires a dedicated-current-user, mode-`0700`, local APFS root outside
+   prohibited synchronized and removable locations;
+3. creates or opens the mode-`0600` cooperative lock and validates its held
+   descriptor, directory entry, owner, type, mode, link count, device, and
+   inode before and after locking;
+4. revalidates chain, current, prior, and unresolved-attempt identity under
+   the lock;
+5. exclusively creates a unique mode-`0600` same-directory temporary regular
+   file;
+6. completely writes, file-fsyncs, `F_FULLFSYNC`s, re-reads, parses, hashes,
+   and revalidates its descriptor and directory entry;
+7. publishes descriptor-relatively with `RENAME_EXCL`;
+8. directory-fsyncs, `F_FULLFSYNC`s the held published descriptor, and
+   revalidates basename, device, inode, regular-file type, link count, bytes,
+   and digest; and
+9. releases the lock only after fixing the truthful typed result.
+
+Pre-publication failure, collision, publication ambiguity, cleanup ambiguity,
+durability ambiguity, final identity mismatch, stale prior, exact
+already-present, and durable success remain distinct. Cleanup targets only
+the exact invocation-owned temporary basename and fsyncs the directory.
+Failed post-publication synchronization never deletes or promotes the record.
+
+`os.replace` appears only in the separately validated OD-05
+`current-manifest.json` protocol. Promotion holds the cooperative lock,
+revalidates the prior index hash and complete durable immutable target, writes
+and syncs a unique canonical temporary index, replaces current, syncs the
+directory, and revalidates the final identity. It is not a kernel CAS. Failed,
+incomplete, ambiguous, stale, finality-pending, unreconciled, mismatched, or
+postcondition-incomplete histories do not promote.
+
+### 16.4 macOS/APFS Gate 1 qualification evidence
+
+The no-skip platform run used:
+
+- macOS `26.5.2`, build `25F84`;
+- Apple Silicon `arm64`;
+- Python `3.12.0`;
+- pytest `8.4.2`;
+- the repository's exact 92-package `requirements.txt` environment, for
+  which `uv pip check` passed;
+- private validation root `/private/tmp/h06-phase-b.UatHDn`, owned by the
+  current dedicated test account and mode `0700`; and
+- the local APFS Data volume mounted at `/System/Volumes/Data` with
+  `local,journaled` mount properties.
+
+The native test called the C-library `renameatx_np` symbol with
+`RENAME_EXCL` on that APFS volume without skip. It proved same-directory
+descriptor-relative publication, first-writer byte/inode identity, and
+existing-target refusal. A separate negative proves the primitive itself can
+publish a symlink and therefore cannot replace the writer's independent held
+descriptor, regular-file, link-count, entry, and device checks.
+
+The real writer test completed file `fsync`, temporary-file `F_FULLFSYNC`,
+native exclusive publication, parent-directory `fsync`, final-file
+`F_FULLFSYNC`, and final identity validation in the approved order. Fault
+injection covers every pre-publication checkpoint, cleanup, native
+publication, post-publication, directory-sync, final-full-sync, and
+final-identity boundary. Process-level concurrency covers immutable first
+writers and current first promoters. Symlink, hardlink, wrong mode, path
+escape, stale prior, held lock, collision, and unsupported-platform cases
+fail closed.
+
+This is an implementation candidate and Gate 1 input, not release
+qualification. Power-loss behavior remains strong best-effort based on
+successful operating-system and device synchronization calls, not an
+absolute guarantee. Malicious same-UID/root interference, loader
+interposition, lying firmware, defective hardware, and media failure remain
+outside the supported claim. Linux is unsupported and fails closed; no Linux
+adapter or fallback exists.
+
+### 16.5 Validation ledger
+
+All pytest runs were serial, used `-p no:cacheprovider`, the private validation
+root above, a private Boa cache, and only the non-secret
+`ETHERSCAN_API_KEY=local-placeholder` harness value.
+
+| Gate | Exact result |
+| --- | --- |
+| H-06 schema/writer/promotion targeted suite after final lock hardening | 115 passed; zero failed/skipped/xfail/deselected; three explained pytest assertion-rewrite warnings |
+| H-01 dependency gate | 45 passed |
+| H-02 network profile, secret handling, and Base profile regression | 99 passed |
+| S1 clock profiles | 57 passed |
+| S2 inventory pytest gate | 69 passed |
+| H-03 Robinhood blueprint and omissions | 104 passed |
+| S5 focused action-block gate | 45 passed |
+| S5 nine-file integration gate | 493 passed |
+| Track 8 M1 Teller/vault overlap gate | 188 passed |
+| final collection | 3,453 total; 3,311 selected; 142 controlling deselections; no collection errors |
+| final complete serial repository suite | 3,311 passed; 142 deselected; zero failures/skips/xfails; three explained warnings; 373.14 seconds |
+| Python compilation | all five changed Python source/test files compiled |
+| dependency consistency | all 92 locked packages compatible |
+| generated schema | builder bytes equal committed bytes; strict JSON parse passed |
+| Base legacy corpus | all 58 committed JSON files parsed; repository-root-relative path/digest inventory SHA-256 `ec065f978014e44c81930bb451b3d1831e3ace9acfb1a0791435f3886910db35`; no Base byte changed |
+| two clean local checkouts/processes | record and schema hashes were byte-identical in both checkouts |
+| whitespace and patch checks before this append | no tab or trailing whitespace in implementation files; `git diff --check` passed |
+
+The three warnings are `PytestAssertRewriteWarning` for
+`_hypothesis_globals`, `hypothesis`, and `boa`. They result from initializing
+the private Boa cache before pytest plugin rewrite. They were not suppressed
+and are not new repository warning suppressions.
+
+The standalone `python scripts/check_block_clock_inventory.py --check`
+command exits `1` on the controlling baseline because the already committed
+CCIP documentation example
+`docs/chains/rh/examples/ExampleGreenCcipBurnMintPool.vy` produces exactly
+`INV-PATH-NEW` and `INV-PATH-UNCLASSIFIED`. The S2 pytest gate itself passes
+69/69. H-06 changes neither that CCIP path nor the inventory checker or
+inventory data. The same standalone result reproduces before any H-06
+inventory interaction, and correcting it would require an unauthorized ninth
+file or separate CCIP/inventory authority. This inherited limitation is
+disclosed for Gate 1 rather than hidden, reclassified, or silently repaired.
+
+### 16.6 Sensitivity, retention, and repository-state result
+
+The implementation rejects secrets, private keys, RPC/provider URLs,
+environment dumps, raw provider payloads, signer/from identity, unredacted
+exception text and tracebacks, calldata, signatures, and signed or unsigned
+transaction material beyond approved public transaction identity. The only
+URL literals in the candidate are the public schema identifiers and a
+synthetic `.invalid` rejection fixture. Public operator addresses are accepted
+only through an approved typed role postcondition.
+
+The three retention classes remain `success-7d`, `failure-30d`, and
+`ambiguity-until-resolved-30d`. Tests validate classification and
+exact-target-only cleanup inputs without performing operational retention
+cleanup. The six anchored ignore rules cover only `.attempt-*`,
+`.manifest-v2.lock`, and `.*.tmp.*` under the two exact Robinhood profile
+roots; immutable manifests and `current-manifest.json` remain visible, and
+near matches, Base paths, and unrelated paths remain unignored.
+
+No RPC, secret, account, signer, transaction, migration, deployment,
+promotion, or external chain/state access occurred. No Robinhood history
+directory, manifest, current index, attempt, operational lock, or writer
+temporary was created in the repository. Test-created Python, pytest, and
+Hypothesis caches were removed from the isolated worktree before handoff.
+
+### 16.7 Gate 1 stop, reviewers, and rollback
+
+The candidate remains unstaged and uncommitted with an empty real index for
+independent Gate 1 review. It requires at least the three approved independent
+review perspectives:
+
+1. deployment/schema and H-05/H-06 interface;
+2. macOS/APFS filesystem and durability; and
+3. security, sensitivity, retention, and threat model.
+
+No review is recorded by this section. Phase B implementation validation does
+not authorize commit, push, integration, migration, deployment, current
+promotion, release, Linux enablement, or any external action.
+
+Rollback before any authorized commit is deletion of the isolated candidate
+only: first preserve any requested review patch and hashes, then remove
+worktree
+`/Users/wigglez/dev/ripe-protocol-track-7-h6-manifest-schema-phase-b`, delete
+branch `rh-track-7-h6-manifest-schema-phase-b`, and remove only the exact
+disposable validation root `/private/tmp/h06-phase-b.UatHDn`. Those rollback
+actions have not been executed. They do not change controlling `rh`.
+
+Any implementation change, schema/builder mismatch, digest disagreement,
+taxonomy change, sensitivity admission, dependency or ninth-file need,
+macOS/APFS no-skip regression, Base or H-05 drift, or controlling-authority
+movement invalidates this candidate and requires a new exact review.
+
+## 17. Final post-S2 controlling rebind and Gate 1 completion
+
+This section is the append-only final H-06 Phase B reconciliation and Gate 1
+validation record as of `2026-07-28T04:15:21Z`. It supersedes only the
+controlling-baseline identity, the inherited S2 checker limitation, and the
+pre-reconciliation validation counts in Section 16. All earlier text remains
+historically accurate at its stated observation time.
+
+The first 155,102 evidence bytes remain byte-identical at SHA-256
+`24f7c24358dce9c14bc49f4934fd5c7fb1c29eb8d8bd9231d26dc4d77dcadd0a`.
+No historical evidence or OD text was rewritten.
+
+### 17.1 Controlling topology and integrated authorities
+
+Immediately before this section was appended, local `rh`, cached `origin/rh`,
+live `origin/rh`, and the fast-forwarded H-06 feature HEAD all resolved to:
+
+- commit `e39815d710ecfaf8bbeea54cabe8ae8d553a2740`;
+- tree `dd0e3a852970fb971713e145908a2a58dfcdd5ec`;
+- first parent `347156108cac5d9a30189dd9615d90e8745a8850`;
+- second parent `38cef4db1665cf8258c07200356004f8aaf6eb9d`; and
+- subject `Merge commit '38cef4db1665cf8258c07200356004f8aaf6eb9d' into
+  rh-track-6-s6-track-7-h4-current-state-reconciliation`.
+
+The controlling merge tip is unsigned. The protocol owner explicitly
+authorized that exact identity for this reconciliation and directed that its
+unsigned status not independently stop the work. H-06 created no replacement
+merge, signature, rebase, squash, cherry-pick, or rewritten commit.
+
+The feature baseline moved from
+`70dd76516ca9b4af8c0797c327bf15732634e5f6` to the controlling tip with
+`git merge --ff-only`. The resulting feature/rh ahead-behind state was `0/0`.
+The integrated movement is exactly:
+
+| Authority | Commit | Tree | Parent | Exact scope |
+| --- | --- | --- | --- | --- |
+| thin Solidity CCIP reference package | `8d1d2d40c3ca795a37b8cb5bbed54c5e805cddaa` | `68a0d26e35d0437eea62eb4495e68ad25cbf85d1` | `70dd76516ca9b4af8c0797c327bf15732634e5f6` | 14 documentation/reference paths |
+| H-04 current-state prerequisite correction | `347156108cac5d9a30189dd9615d90e8745a8850` | `5eb0e70931521e66b83d9d5f3feeb16a6f26cfd2` | `8d1d2d40c3ca795a37b8cb5bbed54c5e805cddaa` | one H-04 document |
+| S2 CCIP-example inventory correction | `38cef4db1665cf8258c07200356004f8aaf6eb9d` | `67d35b47f2c6875a671ef2a2d56b8722cecf3eeb` | `8d1d2d40c3ca795a37b8cb5bbed54c5e805cddaa` | inventory data, checker, and checker tests |
+| controlling H-04/S2 integration | `e39815d710ecfaf8bbeea54cabe8ae8d553a2740` | `dd0e3a852970fb971713e145908a2a58dfcdd5ec` | H-04 first, S2 second | conflict-free union of the three authorities above |
+
+The CCIP commit changes these 14 paths:
+
+```text
+docs/chains/rh-summary.md
+docs/chains/rh/block-number-inventory.md
+docs/chains/rh/ccip-chainlink-question-packet.md
+docs/chains/rh/ccip-integration-decision.md
+docs/chains/rh/ccip-public-evidence.md
+docs/chains/rh/component-matrix.md
+docs/chains/rh/evidence/ccip-solidity-reference-round-3-review.md
+docs/chains/rh/examples/README.md
+docs/chains/rh/examples/RipeCcipBurnMintTokenPools.sol
+docs/chains/rh/robinhood-deployment-support-specification.md
+docs/chains/rh/robinhood-deployment-validation-plan.md
+docs/chains/rh/track-1-chainlink-ccip-confirmation.md
+docs/chains/rh/track-3-phase-0-inventory.md
+docs/chains/rh/track-7-robinhood-deployment-support.md
+```
+
+The H-04 correction changes only
+`docs/chains/rh/track-6-s6-track-7-h4-defaults-parameters.md`, whose
+controlling blob is `846ee99742afa6d6d44ca7ba797ab6f81db64f9c`.
+It updates H-04 current-state prerequisites without assigning H-04 work,
+implementation, or configuration to H-06.
+
+The integrated S2 authority changes exactly:
+
+| Path | Controlling Git blob |
+| --- | --- |
+| `config/block-clock-inventory.json` | `d479dbfa7133ce3bb6e129bb529b0c232980baa7` |
+| `scripts/check_block_clock_inventory.py` | `3b9fb6c85d0f0b600996079deecafd850056e757` |
+| `tests/inventory/test_block_clock_inventory.py` | `99392cc8ae20fd260ec7530495700b3393506b8b` |
+
+The exact `70dd7651...e39815d7` movement contains 18 paths. Its set
+intersection with the eight H-06 candidate paths is empty. It changes no H-06
+schema, builder, migration handoff, JSON helper, manifest test, promotion
+test, ignore rule, historical evidence byte, digest vector, platform adapter,
+or implementation authority.
+
+### 17.2 Frozen candidate preservation and rollback snapshot
+
+Before the fast-forward, the complete candidate was independently reproduced
+as a 231,306-byte, 15-hunk full-index patch:
+
+`3b6ab31b8460c91d9111abc55dd52eb0f53d23b0ae37d0d700f9fd1dcfbac6c2`
+
+A private mode-`0700` rollback snapshot was created at
+`/private/tmp/h06-phase-b-reconcile.usLBIw` before the feature ref moved. It
+contains:
+
+- `frozen.patch` at the exact patch SHA-256 above; and
+- `frozen-eight-files.tgz` at SHA-256
+  `666b31e7146de74b305a21d2725cd2efac7ae9a00db161a2fe82cdd9ed107e14`.
+
+Immediately after the fast-forward and before this evidence addendum, the
+candidate patch reproduced byte-for-byte at the same SHA-256 and compared
+equal to `frozen.patch`. Every candidate file also retained its exact
+pre-reconciliation SHA-256:
+
+| Path | Preserved SHA-256 |
+| --- | --- |
+| `.gitignore` | `eed831d2e74e8b8deb786bc89c2ab0f895195f28fdecc8967acf5471a0035abf` |
+| `docs/chains/rh/evidence/robinhood-manifest-phase-a.md` | `24f7c24358dce9c14bc49f4934fd5c7fb1c29eb8d8bd9231d26dc4d77dcadd0a` |
+| `docs/chains/rh/schemas/deployment-manifest-v2.schema.json` | `19ce1868e4fbff170ab0b8256dcb5634e2554ab1ba3f08be87ea43100227d41a` |
+| `scripts/utils/json_file.py` | `84c38a4975454ccec77607c3987f459917ce23794d355396cbdb01ee6c398c82` |
+| `scripts/utils/manifest_schema.py` | `d3db5ef9bb75706512e8b54337741f182e0c8c1fecceeca4606b9bade27a120b` |
+| `scripts/utils/migration.py` | `58733561aae7c0a599de86f64a1f20529c61a92943d7c29408fd7501e915d1ba` |
+| `tests/deployment/test_manifest_schema.py` | `f5bfb1a28ef09ee5d255e991ab847e186638c9eb1d44f52e319b810481905f67` |
+| `tests/deployment/test_current_manifest_promotion.py` | `d1b8e3147205ded2c0ee5be96cd064a9ecb0c126120b94060710d2d0e159deec` |
+
+The private snapshot proves that the pre-reconciliation candidate can be
+reconstructed without rewriting `rh`: remove only the isolated Phase B
+worktree and branch, recreate them from `70dd7651...`, and apply the exact
+frozen patch. Those destructive rollback actions were not executed.
+
+### 17.3 Unchanged H-06 decisions and authority boundaries
+
+The controlling macOS/APFS-only OD-04 policy remains unchanged. Immutable
+publication uses only `renameatx_np(..., RENAME_EXCL)` with no immutable
+fallback to `os.rename`, `os.replace`, `os.link`, copying,
+unlink-before-rename, raw syscall numbers, Linux, another filesystem, or
+external state. Linux remains unsupported and fails closed.
+
+The exact eight-file ceiling, closed v2 schema, canonicalization, source-set,
+plan, plan-action, record, index, and event-evidence digests, H-05/H-06
+ownership boundary, Base compatibility, finality, reconciliation, retention,
+redaction, error taxonomy, supersession, and current-index rules remain
+unchanged. In particular, the reviewed event-evidence vector remains
+`4008ce9d56daa4cfe33ebea06761a8508ca04933d7709670c81f944d7df4c79b`.
+
+The authority states remain deliberately distinct:
+
+| Boundary | Controlling state after this reconciliation |
+| --- | --- |
+| bounded H-06 implementation | Authorized and represented only by this unstaged eight-file candidate |
+| Gate 1 platform qualification | Completed locally on the exact macOS/APFS environment and still requires independent reviewer approval |
+| release qualification | Not performed or authorized; requires later repeatable qualification on the intended operator/storage environment |
+| commit, push, or `rh` integration | Not authorized |
+| migration, deployment, promotion, signing, transaction, or release | Not authorized |
+| Linux support | Deferred, unsupported, and separately authorized if ever pursued |
+
+The CCIP, S2, and H-04 movement changes none of those boundaries.
+
+### 17.4 Final post-reconciliation Gate 1 validation
+
+The exact 92-package locked environment and private mode-`0700` validation
+root from Section 16 were reused. All pytest commands were serial, used
+`-p no:cacheprovider`, a private Boa cache, and only the non-secret
+`ETHERSCAN_API_KEY=local-placeholder` harness value.
+
+| Gate | Final result |
+| --- | --- |
+| `uv pip check` | all 92 locked packages compatible |
+| standalone S2 inventory checker | passed; `CLOCK_INVENTORY_OK`, 99 production occurrences, 94 production lines, 17 production files, 94 Vyper paths |
+| explicit no-skip native APFS `renameatx_np(RENAME_EXCL)` qualification | 1 passed; zero skips |
+| complete H-06 schema/writer/promotion target set | 115 passed; zero failures/skips/xfails/deselections |
+| H-01 dependency gate | 45 passed |
+| H-02 network profile, secret handling, and Base profile regression | 99 passed |
+| S1 clock profiles | 57 passed |
+| integrated S2 inventory pytest gate | 76 passed |
+| H-03 Robinhood blueprint and omissions | 104 passed |
+| focused S5 action-block gate | 45 passed |
+| S5 nine-file integration gate | 493 passed |
+| Track 8 M1 Teller/vault overlap gate | 188 passed |
+| final collection | 3,460 total; 3,318 selected; 142 controlling deselections; no collection errors |
+| complete final serial repository suite | 3,318 passed; 142 deselected; zero failures/skips/xfails; three explained warnings; 368.34 seconds |
+
+The S2 correction therefore closes the two inherited
+`INV-PATH-NEW`/`INV-PATH-UNCLASSIFIED` findings disclosed in Section 16. The
+standalone checker and its 76-test module now both pass without an H-06 file
+change.
+
+The three warnings remain the unsuppressed `PytestAssertRewriteWarning`
+messages for `_hypothesis_globals`, `hypothesis`, and `boa`, caused by
+initializing the private Boa cache before pytest plugin rewrite. No warning
+suppression, skip, xfail, assertion relaxation, or unexplained deselection was
+added.
+
+### 17.5 Final stop and repository-state boundary
+
+This addendum changes only the H-06 evidence file and adds no ninth path.
+Final post-append schema equality, Python compilation, Base-corpus parsing,
+links, tables, fences, whitespace, sensitivity, patch, and Git-scope checks
+must remain clean in the exact-hash handoff.
+
+No RPC, secret, account, signer, transaction, migration, deployment,
+promotion, external chain/state, Robinhood history directory, immutable
+record, current index, attempt, writer lock, or writer temporary was created.
+The real Git index remains empty. The final eight-file candidate must remain
+unstaged and uncommitted for independent Gate 1 review.
+
+Any later `rh` movement, candidate-byte change outside this append-only
+evidence record, ninth-file need, historical evidence mutation, native
+publication fallback, Linux enablement, macOS no-skip regression, test
+regression, or external-state access invalidates this handoff.
+
+## 18. Gate 1 findings correction and narrow re-review handoff
+
+This section is the append-only correction record as of
+`2026-07-28T05:28:11Z`. The complete 3,032-line, 165,986-byte evidence file
+rejected by Gate 1 remains the exact prefix of this document at SHA-256
+`576710867899eb0d11174cd4f86e864260aab5b7929f14643b9c71d833042d76`.
+Nothing in Sections 1 through 17 was rewritten.
+
+The rejected package was the eight-file candidate based on commit
+`e39815d710ecfaf8bbeea54cabe8ae8d553a2740`, tree
+`dd0e3a852970fb971713e145908a2a58dfcdd5ec`, and full-index patch SHA-256
+`01ecfb0aa564b6104d6b31c6c431e2d76ecc8a8f1aaadee6156934649327b70a`.
+That patch was 242,387 bytes, 15 hunks, 5,738 insertions, and one deletion.
+Gate 1 returned **NOT APPROVED** for four findings:
+
+1. required transaction results were not mandatorily rebound to the exact
+   semantic plan before immutable publication;
+2. a two-record plan chain could omit a previously completed required step,
+   claim terminal status, and promote current;
+3. the prior 160-case collection delta compared different effective
+   environments and incorrectly included an existing 45-case H-01 gate; and
+4. the fault-coverage prose overstated named-checkpoint tests as complete
+   primitive-level coverage.
+
+Only these four files changed during the correction:
+
+| Corrected path | Post-implementation, pre-evidence SHA-256 |
+| --- | --- |
+| `scripts/utils/manifest_schema.py` | `386c0988481ca451e18b77c43ed106ef9466970cbde0c369c8bfbc2060609b5d` |
+| `tests/deployment/test_manifest_schema.py` | `74380b7c786fe2cecf47eb3d8c18a1a009dcb9542a4a5f32650a1e0555739c0c` |
+| `tests/deployment/test_current_manifest_promotion.py` | `63db4291df2d3193b24d6a30ec1b950d1f511c08be9bde1c35934e5270f564cb` |
+| this evidence | final self-referential hash reported outside this document |
+
+The schema representation did not change. `.gitignore`, the generated schema,
+`scripts/utils/json_file.py`, and `scripts/utils/migration.py` remain
+byte-identical to the rejected package.
+
+### 18.1 Reproduction before correction
+
+Both High findings were reproduced through the real writer on the local APFS
+Data volume before any implementation byte changed. Canonical inputs,
+published test objects, and machine-readable diagnostics are preserved
+outside the repository under the private mode-`0700` root
+`/private/tmp/h06-gate1-correction.9d6TJ3`.
+
+For the first finding, the artifact supplied
+`cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc` while the
+plan-derived action hash was
+`de3f80900f766cd2cdb6b17661fe6de40d0c0b1c0718b07ab43dfff9e052ca61`.
+The rejected writer returned `durable / H06_IMMUTABLE_DURABLE` and created the
+immutable target.
+
+For the second finding, a valid first `configure` record was followed by a
+`finalize` record whose terminal `completed_step_ids` contained only
+`["finalize"]`. The rejected implementation returned:
+
+| Operation | Rejected result |
+| --- | --- |
+| first immutable publication | `durable / H06_IMMUTABLE_DURABLE` |
+| invalid second immutable publication | `durable / H06_IMMUTABLE_DURABLE` |
+| invalid current promotion | `durable / H06_CURRENT_PROMOTED` |
+
+This reproduction used disposable state only. No repository or configured
+Robinhood operational history/current/attempt root was created.
+
+### 18.2 Mandatory semantic-plan binding
+
+`publish_immutable` now requires a nonempty explicit sequence of validated
+semantic plans. Before opening the history root, acquiring the writer lock,
+creating a temporary, or reaching the native adapter, it:
+
+1. validates each closed semantic plan and recomputes its domain-separated
+   `plan_sha256`;
+2. requires the artifact's source plan hash, profile, commit, tree,
+   source-set hash, and ordered source members to equal the selected plan;
+3. selects the exact plan step by ordinal and requires exact migration and
+   semantic-step identity;
+4. requires a one-for-one ordered action set;
+5. compares every plan-owned action field: `action_id`,
+   `semantic_action_id`, ordinal, kind, required flag,
+   `transaction_required`, expected postconditions, supersession set, and
+   disposition;
+6. independently recomputes every required transaction's
+   `plan_action_sha256` from the validated plan hash and exact action ID; and
+7. rejects absent proof, wrong plan, unknown step/action, altered action
+   semantics, or wrong action hash with stable fail-closed diagnostics.
+
+Attempt records use the same binding. The separately callable execution
+handoff remains defense in depth but is no longer accepted as proof for a
+write. The public immutable writer has no default plan argument and no
+alternate write path.
+
+`promote_current_index` also requires the explicit semantic-plan set. It
+validates the index against the selected plan, reloads the immutable history
+under the cooperative lock, and independently revalidates every chain record
+against the full supplied plans before creating the mutable-current
+temporary. It does not trust a prior publication claim.
+
+The successor fixture now computes the exact action hash. Adversarial tests
+cover arbitrary hashes, another action's hash, another plan's hash, correct
+action ID with altered semantic fields, absent proof, attempt records, and
+promotion bypass. Each invalid publication fails before lock or temporary
+creation; the correct hash publishes through the native path.
+
+### 18.3 Complete cumulative plan state
+
+For each selected plan, the validator derives the ordered required-step
+universe directly from the validated semantic plan. Every artifact must
+provide sorted, unique, disjoint completed and remaining sets whose union is
+exactly that universe. Unknown, missing, duplicated, omitted, or silently
+dropped steps fail closed.
+
+An immutable record must identify a required plan step. Its completed set is
+exactly the required steps at or before that ordinal; its remaining set is
+exactly the required steps after it. `complete` is accepted only when the
+remaining set is empty and the completed set equals the full required
+universe. General manifest validation still requires every required action in
+an immutable record to be `reconciled` or `complete`.
+
+The chain validator additionally requires, within a plan segment:
+
+- completed sets to increase by exactly the current step;
+- remaining sets to decrease by exactly the current step;
+- no completed step to disappear;
+- no remaining step to be silently dropped or reintroduced; and
+- exact plan ordinals and semantic identities without reentry.
+
+A plan transition remains possible only after the predecessor's terminal
+record is genuinely complete against the predecessor's own supplied semantic
+plan.
+
+Negative tests cover omitted prior/future steps, a dropped remaining step, a
+dropped completed step, an unknown step, reintroduction, duplicate
+completion, skipped ordinal, false empty terminal state, premature plan
+transition, and structurally readable state inconsistent with the supplied
+plan. The reviewer's exact invalid second record now fails publication with
+`H06_PLAN_STATE_MISMATCH`. When the same canonical bytes are injected only
+through disposable test setup, promotion independently fails with the same
+code and creates no current index.
+
+### 18.4 Primitive-level fault coverage
+
+The corrected matrix distinguishes direct primitive mutations from named
+logical checkpoints:
+
+| Boundary | Direct coverage and result |
+| --- | --- |
+| short `os.write` | repeated partial writes complete the exact bytes; zero/truncation cannot report success |
+| write/read failure | exact `json_file.write_all` and `read_all` boundaries raise; no final target |
+| changed readback bytes | byte mismatch raises `H06_TEMP_BYTES_MISMATCH` before publication |
+| file `fsync` | regular-file failure is pre-publication |
+| `F_FULLFSYNC` | direct adapter failure is pre-publication |
+| native exclusive rename | direct `EXDEV`, `EIO`, `EPERM`, `EINVAL`, and `ENOTSUP` mutations return typed pre-publication failure |
+| parent-directory `fsync` | post-rename failure returns durability ambiguity, never success |
+| matching existing target | exact bytes return already-present without inode or byte replacement |
+| mismatching native collision | injected first-writer bytes remain unchanged and the candidate returns collision |
+| FIFO/symlink/regular source swap | exact temporary entry is replaced after reread; held/path identity fails and cleanup refuses to unlink the replacement |
+| socket/device source type | deterministic `S_IFSOCK`/`S_IFCHR` mutation at the exact descriptor-relative `stat` boundary fails closed |
+| cleanup unlink | direct `os.unlink` failure returns cleanup ambiguity |
+| writer lock acquisition | direct permission failure returns the stable lock diagnostic without a write |
+| writer lock release | direct unlock failure raises after closing descriptors; no false-success result is returned |
+| post-rename synchronization/identity | logical and direct failures retain publication/durability/final-identity ambiguity classifications |
+
+An actual UNIX-domain socket cannot be bound to the generated immutable
+temporary basename on this platform because the basename alone exceeds the
+AF_UNIX pathname limit. Socket and device cases therefore use deterministic
+mode mutation at the exact `os.stat(..., follow_symlinks=False)` call boundary;
+the FIFO, symlink, and replacement-inode cases exercise actual filesystem
+objects. This limitation is disclosed rather than presented as a native
+socket/device creation test.
+
+Cleanup now accepts the held temporary identity and refuses to unlink a
+different entry. This closes the source-swap cleanup defect exposed by the
+new behavioral tests.
+
+### 18.5 Same-environment collection reconciliation
+
+Collection used one Python `3.12.0`, pytest `8.4.2`, and the same 92-row
+locked environment for:
+
+- a private local-only clean detached clone at exact `e39815d7...`; and
+- a second private local-only detached clone containing the corrected
+  eight-file candidate.
+
+Both commands used `--collect-only -q -p no:cacheprovider`, separate
+mode-`0700` Boa caches/basetemps, the non-secret
+`ETHERSCAN_API_KEY=local-placeholder`, and no external access.
+
+| Collection | Selected | Deselected | Total |
+| --- | ---: | ---: | ---: |
+| clean `e39815d7...` baseline | 3,203 | 142 | 3,345 |
+| corrected H-06 candidate | 3,351 | 142 | 3,493 |
+| exact H-06 delta | **148** | **0** | **148** |
+
+The 45-case H-01 dependency gate is present on both sides. The former
+3,158/3,300 baseline omitted that existing gate; adding 45 yields the clean
+same-environment 3,203/3,345 baseline above.
+
+The corrected H-06 decomposition is exact:
+
+| H-06 test module | Rejected package | Correction additions | Corrected |
+| --- | ---: | ---: | ---: |
+| `test_manifest_schema.py` | 84 | 2 unparameterized semantic-plan/fixture cases | 86 |
+| `test_current_manifest_promotion.py` | 31 | 10 semantic/history cases plus 21 primitive cases | 62 |
+| **Total** | **115** | **33** | **148** |
+
+The 21 new primitive node IDs comprise one short-write case, two write/read
+failure parameters, one readback mismatch, one file-fsync failure, one
+full-fsync failure, five rename errno parameters, one directory-fsync
+failure, one mismatching collision, three actual source-swap parameters, two
+nonregular stat-mode parameters, one cleanup-unlink failure, and two
+lock-acquire/release cases. A complete node-ID and parametrization ledger is
+preserved in the private correction root. There is zero unexplained
+collection difference.
+
+The 92-package terminology is now exact: `requirements.txt` contains 92
+pinned distribution rows, the private environment contains 92 installed
+distributions, and `uv pip check` checked all 92 and reported them compatible.
+
+### 18.6 Corrected validation ledger
+
+All pytest commands were serial and used private caches/basetemps. No retry,
+skip, xfail, warning suppression, assertion relaxation, network, RPC, signer,
+or external system was used.
+
+| Gate | Corrected result |
+| --- | --- |
+| focused former-High reproductions and semantic/history negatives | passed; wrong hash and invalid terminal chain rejected with no target/current |
+| explicit native APFS `renameatx_np(RENAME_EXCL)` qualification | 1 passed; zero skips |
+| complete H-06 schema/writer/promotion suite | 148 passed; zero failures/skips/xfails/deselections |
+| H-01 dependency gate | 45 passed |
+| H-02 network profile, secret handling, and Base regression | 99 passed |
+| S1 clock profiles | 57 passed |
+| standalone corrected S2 checker | `CLOCK_INVENTORY_OK`; exact production `99/94/17` |
+| corrected S2 inventory pytest gate | 76 passed |
+| H-03 Robinhood blueprint and omissions | 104 passed |
+| focused S5 action-block gate | 45 passed |
+| S5 exact nine-file integration gate | 493 passed |
+| Track 8 M1 three-file overlap gate | 188 passed |
+| same-environment final collection | 3,493 total; 3,351 selected; 142 controlling deselections |
+| one complete serial candidate suite | 3,351 passed; 142 deselected; zero failures/skips/xfails; three established warnings; 352.76 seconds |
+| dependency consistency | `uv pip check`: 92 compatible packages |
+| generated schema | 29,490 bytes; builder bytes equal committed bytes |
+| independent event vector | `4008ce9d56daa4cfe33ebea06761a8508ca04933d7709670c81f944d7df4c79b` |
+| Python compilation | all five H-06 Python source/test files compiled with external bytecode cache |
+| Base legacy corpus | all 58 committed JSON files parsed; no Base byte changed |
+
+The native qualification ran on macOS `26.5.2` build `25F84`, Apple Silicon
+`arm64`, and the local `/System/Volumes/Data` mount independently reported
+`apfs, local, journaled`. The writer's own descriptor-bound `fstatfs` check
+also required APFS before native publication.
+
+The three warnings remain exactly the unsuppressed
+`PytestAssertRewriteWarning` notices for `_hypothesis_globals`, `hypothesis`,
+and `boa`, caused by initializing the private Boa cache before pytest plugin
+rewrite.
+
+### 18.7 Stop state, limitations, and rollback material
+
+Local `rh` and cached `origin/rh` remained
+`e39815d710ecfaf8bbeea54cabe8ae8d553a2740`. A true remote query was not made
+because this correction explicitly prohibited external-system access.
+
+The real index remains empty. The repository still contains exactly four
+tracked modifications and four untracked candidate files, with no ninth path,
+unmerged entry, or operational history/current/attempt/lock/temporary state.
+All ignored Python, pytest, and Hypothesis caches created by validation were
+removed.
+
+The private correction root preserves the rejected patch, all eight rejected
+hashes, both pre-correction exploit artifacts and diagnostics, post-correction
+rejection diagnostics, same-environment collection logs, parametrization
+ledger, gate logs, and full-suite output. Final full-index and inter-candidate
+patch hashes, Git blobs, prefix proof, and disposable reverse-apply rollback
+proof are reported in the external narrow-review handoff because including
+this document's own final hash would be self-referential.
+
+Power-loss behavior remains strong best-effort after successful operating
+system and device synchronization calls, never an absolute guarantee.
+Malicious same-UID/root interference, loader interposition, lying firmware,
+defective hardware, and media failure remain outside the supported claim.
+Linux remains unsupported and unreleasable; no Linux adapter, qualification,
+or fallback was added.
+
+This correction authorizes no commit, push, `rh` integration, release,
+deployment, operational execution, migration, transaction, signing, current
+promotion, Linux enablement, or external state. The corrected eight-file
+candidate remains unstaged and uncommitted solely for narrow independent
+Gate 1 re-review.
