@@ -2450,3 +2450,105 @@ Fresh reconciliation and renewed review are required if:
 
 All prior owner choices remain approved Phase A design authority. None is
 implementation, integration, deployment, or release authority.
+
+## 15. Final CCIP baseline rebind
+
+This section is the controlling final-baseline reconciliation as of
+`2026-07-27T22:32:09Z`. It supersedes only the current-`rh` identity and
+movement stop recorded in Section 14. All preceding bytes remain the approved
+historical record at their stated observation times. This append-only rebind
+does not amend or reinterpret any H-06 design, platform, security, retention,
+canonicalization, evidence, promotion, testing, or ownership decision.
+
+### 15.1 Controlling identity and fast-forward topology
+
+Before this addendum, local `rh`, cached `origin/rh`, and live `origin/rh`
+resolved to the same controlling signed commit:
+
+- commit `8147784aef666726f1073accaa268b33634e6bff`;
+- tree `956af37850892e37e913989437029b93b0159e80`;
+- sole parent `18f19f567499c239e7ce02634c298f920a7d8913`; and
+- subject `docs(rh): add CCIP burn-mint reference package`.
+
+The parent is the integrated signed H-06 Phase A commit. At controlling `rh`,
+the H-06 evidence before this addendum remained exactly:
+
+- SHA-256
+  `c4431b6c9ba5156bb1dacc4fb6c7d5df4318c878f91eb8a0b1f42e969a27963d`;
+- Git blob `9b90814ec11ab52a308cf60b4ff9cc0eeb791d1a`; and
+- 133,851 bytes.
+
+The clean H-06 feature branch was fast-forwarded with `--ff-only` from
+`18f19f567499c239e7ce02634c298f920a7d8913` to
+`8147784aef666726f1073accaa268b33634e6bff`. No merge commit, rebase, squash,
+amendment, cherry-pick, manual edit, or history rewrite occurred during that
+rebind.
+
+### 15.2 Exact CCIP package and H-06 intersection
+
+The exact `18f19f5...8147784` delta contains these 13 paths:
+
+```text
+docs/chains/rh-summary.md
+docs/chains/rh/block-number-inventory.md
+docs/chains/rh/ccip-chainlink-question-packet.md
+docs/chains/rh/ccip-integration-decision.md
+docs/chains/rh/ccip-public-evidence.md
+docs/chains/rh/component-matrix.md
+docs/chains/rh/examples/ExampleGreenCcipBurnMintPool.vy
+docs/chains/rh/examples/README.md
+docs/chains/rh/robinhood-deployment-support-specification.md
+docs/chains/rh/robinhood-deployment-validation-plan.md
+docs/chains/rh/track-1-chainlink-ccip-confirmation.md
+docs/chains/rh/track-3-phase-0-inventory.md
+docs/chains/rh/track-7-robinhood-deployment-support.md
+```
+
+The Vyper file is a reviewed documentation/reference example. Its own header
+marks it `NOT PRODUCTION READY`, and the adjacent README states that it is not
+production-ready or deployment-authorized. Its inclusion in `rh` does not make
+it a production contract, compiler input, deployment artifact, H-06
+implementation input, or authorized live action.
+
+The set intersection between those 13 paths and the conditional H-06 Phase B
+ceiling is empty. The CCIP commit changes none of:
+
+- `docs/chains/rh/evidence/robinhood-manifest-phase-a.md`;
+- `scripts/utils/migration.py`;
+- `scripts/utils/json_file.py`;
+- `scripts/utils/manifest_schema.py`;
+- `docs/chains/rh/schemas/deployment-manifest-v2.schema.json`;
+- `tests/deployment/test_manifest_schema.py`;
+- `tests/deployment/test_current_manifest_promotion.py`; or
+- `.gitignore`.
+
+It also changes no dependency, migration script, manifest schema, H-06 test,
+history root, namespace, platform adapter, durability rule, error taxonomy,
+canonicalization rule, H-05 interface, owner decision, or implementation
+authority. The package therefore requires this provenance/current-baseline
+rebind but no H-06 schema, event vector, hash, chain, current-index, retention,
+redaction, sensitivity, finality, reconciliation, supersession, or test-policy
+change.
+
+### 15.3 Preserved platform policy, ceiling, and authorization stop
+
+The macOS/APFS-only controlling OD-04 policy in Section 14.3 remains unchanged.
+Immutable publication remains native-only through
+`renameatx_np(..., RENAME_EXCL)` with no immutable-publication fallback.
+The trusted-operator, mode-`0700` state-root, durability, ambiguity,
+state-first reconciliation, threat-model, current-index, Gate 1, release, and
+deferred-Linux boundaries remain controlling.
+
+The conditional exact eight-file H-06 Phase B ceiling remains unchanged.
+H-06 Phase B remains unauthorized and may begin only after a separate,
+explicit, exact-file owner authorization. This final-baseline reconciliation
+authorizes no implementation, schema, test, `.gitignore`, history, namespace,
+dependency, configuration, cleanup, RPC, account, signing, transaction,
+migration, deployment, current promotion, or release action.
+
+Any movement beyond controlling `rh` commit
+`8147784aef666726f1073accaa268b33634e6bff`, tree
+`956af37850892e37e913989437029b93b0159e80`, or any movement in a controlling
+H-01, S5, H-03, Track 8 M1, H-05, H-06, or execution-hardening authority
+requires fresh reconciliation and renewed review before H-06 Phase B may be
+considered.
