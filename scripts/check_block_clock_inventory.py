@@ -93,8 +93,18 @@ M2_GUARDED_ERC20_PATH = "contracts/vaults/GuardedErc20.vy"
 M2_GUARDED_ERC20_SHA256 = (
     "0fcdb02a0b3adf56ef0fd04397c57ac40325a37c87a32f29979dadc5eaf353ed"
 )
+M3_CREDIT_ENGINE_PATH = "contracts/core/CreditEngine.vy"
+M3_CREDIT_ENGINE_SHA256 = (
+    "7de649cece6e076b75775bb4ff5f397bf5ffa0a50ccdc462a061ca047b888e3d"
+)
+# Exact pre-M3 CreditEngine ledger record content hash, used only to
+# reconstruct the frozen S5 legacy fingerprint.  Any deviation from the one
+# reviewed M3 record disables that reconstruction and fails closed.
+M3_CREDIT_ENGINE_BASELINE_SHA256 = (
+    "23129f8f6e87805bc47712d06f7ddf6c0de920866ad36ca78ee96e9c57ef96d8"
+)
 POST_S5_PRODUCTION_INVENTORY_SHA256 = (
-    "148418962f49be10a52f87428fb4b9a6d7a739ededae57086fd403254f863c05"
+    "f29e30aef76e01f77a74a910b07ba16204aabb6a0860add4a072da7de76035bd"
 )
 S5_REVIEW_DIRECT_KEYS = {
     ("contracts/data/Ledger.vy", "_getActionBlock", "block.number", 1),
@@ -805,6 +815,36 @@ def _is_reviewed_m2_production_record(record: Mapping[str, Any]) -> bool:
     }
 
 
+def _is_reviewed_m3_production_record(record: Mapping[str, Any]) -> bool:
+    return dict(record) == {
+        "path": M3_CREDIT_ENGINE_PATH,
+        "classification": "production",
+        "contentSha256": M3_CREDIT_ENGINE_SHA256,
+        "semanticReview": {
+            "owner": "engineering/tooling",
+            "status": "reviewed",
+            "commit": HARDENING_REVIEW_COMMIT,
+        },
+    }
+
+
+# CreditEngine predates S5, so its exact pre-M3 record is part of the frozen
+# legacy fingerprint.  The reviewed M3 record is substituted back to the exact
+# baseline record for that computation only; any other CreditEngine record is
+# left in place so the legacy fingerprint fails closed.
+def _m3_baseline_credit_engine_record() -> dict[str, Any]:
+    return {
+        "path": M3_CREDIT_ENGINE_PATH,
+        "classification": "production",
+        "contentSha256": M3_CREDIT_ENGINE_BASELINE_SHA256,
+        "semanticReview": {
+            "owner": "engineering/tooling",
+            "status": "reviewed",
+            "commit": HARDENING_REVIEW_COMMIT,
+        },
+    }
+
+
 def _s5_legacy_inventory_fingerprint(data: Mapping[str, Any]) -> str:
     legacy = copy.deepcopy(dict(data))
     legacy.pop("expectedProductionCounts", None)
@@ -819,7 +859,9 @@ def _s5_legacy_inventory_fingerprint(data: Mapping[str, Any]) -> str:
         if _candidate_from_record(record) not in S5_RECONCILED_CADENCE_KEYS
     ]
     legacy["vyperPathClassifications"] = [
-        record
+        _m3_baseline_credit_engine_record()
+        if _is_reviewed_m3_production_record(record)
+        else record
         for record in legacy["vyperPathClassifications"]
         if str(record.get("path", "")) not in S5_REVIEW_PATHS
         and not _is_reviewed_ccip_excluded_record(record)
@@ -1703,6 +1745,23 @@ def _check_path_classifications(
                     remediation=(
                         "restore the exact reviewed GuardedErc20 source bytes; "
                         "changing the M2 production identity requires new review"
+                    ),
+                )
+            )
+        if (
+            path == M3_CREDIT_ENGINE_PATH
+            and actual[path]["contentSha256"] != M3_CREDIT_ENGINE_SHA256
+        ):
+            findings.append(
+                Finding(
+                    code="INV-PATH-M3-CONTENT",
+                    domain="classification",
+                    path=path,
+                    expected=M3_CREDIT_ENGINE_SHA256,
+                    actual=actual[path]["contentSha256"],
+                    remediation=(
+                        "restore the exact reviewed CreditEngine source bytes; "
+                        "changing the M3 production identity requires new review"
                     ),
                 )
             )

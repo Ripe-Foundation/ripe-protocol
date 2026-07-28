@@ -20,6 +20,7 @@ IMPLEMENTATION_RECORD_RELATIVE = Path(
     "docs/chains/rh/ledger-guard-implementation-record.md"
 )
 M2_GUARDED_RELATIVE = "contracts/vaults/GuardedErc20.vy"
+M3_CREDIT_RELATIVE = "contracts/core/CreditEngine.vy"
 
 
 @pytest.fixture(scope="session")
@@ -271,6 +272,191 @@ def test_future_production_admission_requires_new_controlling_fingerprint(
     fixture_repo: Path,
 ) -> None:
     relative = "contracts/vaults/FutureGuardedErc20.vy"
+    path = fixture_repo / relative
+    path.write_text("@external\ndef noop():\n    pass\n", encoding="utf-8")
+    inventory = _load_inventory(fixture_repo)
+    inventory["vyperPathClassifications"].append(
+        {
+            "path": relative,
+            "classification": "production",
+            "contentSha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+            "semanticReview": {
+                "owner": "engineering/tooling",
+                "status": "reviewed",
+                "commit": checker.HARDENING_REVIEW_COMMIT,
+            },
+        }
+    )
+    assert (
+        checker._post_s5_production_inventory_fingerprint(inventory)
+        != checker.POST_S5_PRODUCTION_INVENTORY_SHA256
+    )
+    _write_inventory(fixture_repo, inventory)
+    _assert_failure(
+        fixture_repo,
+        "INV-SCHEMA-POST-S5-PRODUCTION-FINGERPRINT",
+    )
+
+
+def test_m3_production_record_is_exact_and_content_pinned(
+    fixture_repo: Path,
+) -> None:
+    inventory = _load_inventory(fixture_repo)
+    record = next(
+        item
+        for item in inventory["vyperPathClassifications"]
+        if item["path"] == M3_CREDIT_RELATIVE
+    )
+    assert checker._is_reviewed_m3_production_record(record)
+    assert record["classification"] == "production"
+    assert record["contentSha256"] == checker.M3_CREDIT_ENGINE_SHA256
+    assert (
+        checker.M3_CREDIT_ENGINE_SHA256
+        != checker.M3_CREDIT_ENGINE_BASELINE_SHA256
+    )
+    assert (
+        hashlib.sha256((fixture_repo / M3_CREDIT_RELATIVE).read_bytes()).hexdigest()
+        == checker.M3_CREDIT_ENGINE_SHA256
+    )
+    assert (
+        checker._s5_legacy_inventory_fingerprint(inventory)
+        == checker.S5_LEGACY_INVENTORY_SHA256
+    )
+    result = checker.check_repository(fixture_repo)
+    assert result.ok, result.output
+
+
+@pytest.mark.parametrize(
+    ("field", "replacement"),
+    [
+        pytest.param(
+            "path",
+            "contracts/core/CreditEngineMoved.vy",
+            id="path",
+        ),
+        pytest.param("contentSha256", "0" * 64, id="content-hash"),
+        pytest.param("classification", "test", id="classification"),
+    ],
+)
+def test_m3_inventory_identity_drift_fails_current_and_legacy_fingerprints(
+    fixture_repo: Path,
+    field: str,
+    replacement: str,
+) -> None:
+    inventory = _load_inventory(fixture_repo)
+    record = next(
+        item
+        for item in inventory["vyperPathClassifications"]
+        if item["path"] == M3_CREDIT_RELATIVE
+    )
+    record[field] = replacement
+    _write_inventory(fixture_repo, inventory)
+    result = _assert_failure(
+        fixture_repo,
+        "INV-SCHEMA-POST-S5-PRODUCTION-FINGERPRINT",
+    )
+    assert "INV-SCHEMA-S5-LEGACY-FINGERPRINT" in _codes(result), result.output
+
+
+def test_m3_review_owner_drift_disables_legacy_substitution(
+    fixture_repo: Path,
+) -> None:
+    inventory = _load_inventory(fixture_repo)
+    record = next(
+        item
+        for item in inventory["vyperPathClassifications"]
+        if item["path"] == M3_CREDIT_RELATIVE
+    )
+    record["semanticReview"]["owner"] = "protocol/security"
+    assert not checker._is_reviewed_m3_production_record(record)
+    assert (
+        checker._s5_legacy_inventory_fingerprint(inventory)
+        != checker.S5_LEGACY_INVENTORY_SHA256
+    )
+    assert (
+        checker._post_s5_production_inventory_fingerprint(inventory)
+        != checker.POST_S5_PRODUCTION_INVENTORY_SHA256
+    )
+    _write_inventory(fixture_repo, inventory)
+    _assert_failure(
+        fixture_repo,
+        "INV-SCHEMA-OWNER",
+        path=M3_CREDIT_RELATIVE,
+    )
+
+
+def test_m3_baseline_hash_reversion_fails_current_fingerprint(
+    fixture_repo: Path,
+) -> None:
+    inventory = _load_inventory(fixture_repo)
+    record = next(
+        item
+        for item in inventory["vyperPathClassifications"]
+        if item["path"] == M3_CREDIT_RELATIVE
+    )
+    record["contentSha256"] = checker.M3_CREDIT_ENGINE_BASELINE_SHA256
+    _write_inventory(fixture_repo, inventory)
+    assert (
+        checker._s5_legacy_inventory_fingerprint(inventory)
+        == checker.S5_LEGACY_INVENTORY_SHA256
+    )
+    _assert_failure(
+        fixture_repo,
+        "INV-SCHEMA-POST-S5-PRODUCTION-FINGERPRINT",
+    )
+
+
+def test_m3_record_removal_fails_both_fingerprints(
+    fixture_repo: Path,
+) -> None:
+    inventory = _load_inventory(fixture_repo)
+    records = inventory["vyperPathClassifications"]
+    records[:] = [
+        item for item in records if item["path"] != M3_CREDIT_RELATIVE
+    ]
+    _write_inventory(fixture_repo, inventory)
+    result = _assert_failure(
+        fixture_repo,
+        "INV-SCHEMA-S5-LEGACY-FINGERPRINT",
+    )
+    assert (
+        "INV-SCHEMA-POST-S5-PRODUCTION-FINGERPRINT" in _codes(result)
+    ), result.output
+
+
+def test_m3_source_content_drift_fails_exact_pin(fixture_repo: Path) -> None:
+    _append(fixture_repo / M3_CREDIT_RELATIVE, "\n# drift fixture\n")
+    _assert_failure(
+        fixture_repo,
+        "INV-PATH-M3-CONTENT",
+        path=M3_CREDIT_RELATIVE,
+    )
+
+
+def test_m3_source_deletion_fails(fixture_repo: Path) -> None:
+    (fixture_repo / M3_CREDIT_RELATIVE).unlink()
+    _assert_failure(
+        fixture_repo,
+        "INV-PATH-MISSING",
+        path=M3_CREDIT_RELATIVE,
+    )
+
+
+def test_m3_sibling_production_path_fails(fixture_repo: Path) -> None:
+    relative = "contracts/core/FutureCreditEngine.vy"
+    path = fixture_repo / relative
+    path.write_text("@external\ndef noop():\n    pass\n", encoding="utf-8")
+    result = checker.check_repository(fixture_repo)
+    assert "INV-PATH-NEW" in _codes(result), result.output
+    finding = next(item for item in result.findings if item.code == "INV-PATH-NEW")
+    assert finding.path == relative
+    assert finding.actual == "production"
+
+
+def test_m3_future_admission_requires_new_controlling_fingerprint(
+    fixture_repo: Path,
+) -> None:
+    relative = "contracts/core/FutureCreditEngine.vy"
     path = fixture_repo / relative
     path.write_text("@external\ndef noop():\n    pass\n", encoding="utf-8")
     inventory = _load_inventory(fixture_repo)
