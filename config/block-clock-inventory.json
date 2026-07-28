@@ -12830,6 +12830,16 @@
       }
     },
     {
+      "path": "docs/chains/rh/examples/ExampleGreenCcipBurnMintPool.vy",
+      "classification": "excluded",
+      "contentSha256": "7f3b46af23b9456869b0a72578d3ae295cbfb8ff112d0f7bddd1d66a4afb1e18",
+      "semanticReview": {
+        "owner": "engineering/tooling",
+        "status": "reviewed",
+        "commit": "db7ae895d1b32ae6708f2405274c32c1e3f5222e"
+      }
+    },
+    {
       "path": "interfaces/ConfigStructs.vyi",
       "classification": "interface",
       "contentSha256": "def6208cd81de43d0d33656f9d05b5394d3a74c695fdc27ffe3c9711ccd67c2c",

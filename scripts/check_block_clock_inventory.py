@@ -38,6 +38,18 @@ EXPECTED_ALLOWED_NONPRODUCTION_GLOBS = [
     "contracts/mock/**",
     "contracts/testing/**",
 ]
+# Exact non-production reference examples excluded from every clock count.
+# Both the path and the content SHA-256 are frozen: adding, moving, or
+# editing an excluded example requires a reviewed checker change.
+EXCLUDED_CCIP_EXAMPLE_PATH = (
+    "docs/chains/rh/examples/ExampleGreenCcipBurnMintPool.vy"
+)
+EXCLUDED_CCIP_EXAMPLE_SHA256 = (
+    "7f3b46af23b9456869b0a72578d3ae295cbfb8ff112d0f7bddd1d66a4afb1e18"
+)
+EXCLUDED_EXAMPLE_CONTENT_HASHES = {
+    EXCLUDED_CCIP_EXAMPLE_PATH: EXCLUDED_CCIP_EXAMPLE_SHA256,
+}
 EXPECTED_INTERFACE_ROOTS = ["interfaces"]
 EXPECTED_CADENCE_ROOTS = [
     "contracts",
@@ -463,6 +475,8 @@ def classify_path(
     interface_roots: Sequence[str] = EXPECTED_INTERFACE_ROOTS,
     allowed_nonproduction_globs: Sequence[str] = EXPECTED_ALLOWED_NONPRODUCTION_GLOBS,
 ) -> str:
+    if path in EXCLUDED_EXAMPLE_CONTENT_HASHES:
+        return "excluded"
     for root in interface_roots:
         normalized_root = root.rstrip("/")
         if path == normalized_root or path.startswith(f"{normalized_root}/"):
@@ -760,6 +774,17 @@ def _validate_s5_review_value(
         )
 
 
+# The legacy-fingerprint exception is bound to the one reviewed CCIP record
+# tuple; adding another path to EXCLUDED_EXAMPLE_CONTENT_HASHES does not
+# remove that record from legacy fingerprint authority.
+def _is_reviewed_ccip_excluded_record(record: Mapping[str, Any]) -> bool:
+    return (
+        str(record.get("path", "")) == EXCLUDED_CCIP_EXAMPLE_PATH
+        and record.get("classification") == "excluded"
+        and record.get("contentSha256") == EXCLUDED_CCIP_EXAMPLE_SHA256
+    )
+
+
 def _s5_legacy_inventory_fingerprint(data: Mapping[str, Any]) -> str:
     legacy = copy.deepcopy(dict(data))
     legacy.pop("expectedProductionCounts", None)
@@ -777,6 +802,7 @@ def _s5_legacy_inventory_fingerprint(data: Mapping[str, Any]) -> str:
         record
         for record in legacy["vyperPathClassifications"]
         if str(record.get("path", "")) not in S5_REVIEW_PATHS
+        and not _is_reviewed_ccip_excluded_record(record)
     ]
     encoded = (
         json.dumps(legacy, sort_keys=True, separators=(",", ":")) + "\n"
@@ -1454,13 +1480,20 @@ def _validate_schema(data: Mapping[str, Any]) -> list[Finding]:
     for record in path_records:
         classification = record.get("classification")
         content_hash = record.get("contentSha256")
-        if classification not in {
-            "production",
-            "mock",
-            "testing",
-            "test",
-            "interface",
-        } or not (
+        reviewed_excluded = classification == "excluded" and (
+            content_hash
+            == EXCLUDED_EXAMPLE_CONTENT_HASHES.get(str(record.get("path", "")))
+        )
+        if (
+            classification not in {
+                "production",
+                "mock",
+                "testing",
+                "test",
+                "interface",
+            }
+            and not reviewed_excluded
+        ) or not (
             isinstance(content_hash, str)
             and re.fullmatch(r"[0-9a-f]{64}", content_hash)
         ):
@@ -1581,6 +1614,23 @@ def _check_path_classifications(
                     remediation=(
                         "obtain engineering/tooling path review and protocol/security "
                         "review for any production-boundary classification change"
+                    ),
+                )
+            )
+        if (
+            expected[path]["classification"] == "excluded"
+            and expected[path]["contentSha256"] != actual[path]["contentSha256"]
+        ):
+            findings.append(
+                Finding(
+                    code="INV-PATH-EXCLUDED-CONTENT",
+                    domain="classification",
+                    path=path,
+                    expected=expected[path]["contentSha256"],
+                    actual=actual[path]["contentSha256"],
+                    remediation=(
+                        "obtain engineering/tooling review before changing an "
+                        "excluded reference example; its content hash is frozen"
                     ),
                 )
             )

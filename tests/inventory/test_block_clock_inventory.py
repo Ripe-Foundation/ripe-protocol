@@ -119,7 +119,7 @@ def test_clean_approved_fixture_passes_without_git_or_network(
     assert "timestamp_ids=11" in result.output
     assert "seconds_unit_candidates=58" in result.output
     assert "mixed_clock_functions=4" in result.output
-    assert "vyper_paths=93" in result.output
+    assert "vyper_paths=94" in result.output
     assert "CLOCK_INVENTORY_NONPROD" in result.output
     assert "CLOCK_INVENTORY_NONPROD_CADENCE" in result.output
     assert "test=172" in result.output
@@ -793,6 +793,130 @@ def test_path_classification_record_tampering_fails(
     record["classification"] = "test"
     _write_inventory(fixture_repo, inventory)
     _assert_failure(fixture_repo, "INV-PATH-CLASSIFICATION", path=relative)
+
+
+EXCLUDED_EXAMPLE_RELATIVE = (
+    "docs/chains/rh/examples/ExampleGreenCcipBurnMintPool.vy"
+)
+
+
+def test_ccip_reference_example_is_excluded_and_content_pinned(
+    fixture_repo: Path,
+) -> None:
+    relative = EXCLUDED_EXAMPLE_RELATIVE
+    frozen = checker.EXCLUDED_EXAMPLE_CONTENT_HASHES[relative]
+    assert (
+        checker.classify_path(
+            relative,
+            checker.EXPECTED_PRODUCTION_ROOTS,
+            checker.EXPECTED_EXCLUDED_PRODUCTION_GLOBS,
+        )
+        == "excluded"
+    )
+    inventory = _load_inventory(fixture_repo)
+    record = next(
+        item
+        for item in inventory["vyperPathClassifications"]
+        if item["path"] == relative
+    )
+    assert record["classification"] == "excluded"
+    assert record["contentSha256"] == frozen
+    source = fixture_repo / relative
+    assert hashlib.sha256(source.read_bytes()).hexdigest() == frozen
+    assert checker.TIMESTAMP_PATTERN.search(source.read_text(encoding="utf-8"))
+    result = checker.check_repository(fixture_repo)
+    assert result.ok, result.output
+    assert "production_occurrences=99" in result.output
+    assert "production_files=17" in result.output
+
+
+def test_excluded_example_content_drift_fails_closed(
+    fixture_repo: Path,
+) -> None:
+    relative = EXCLUDED_EXAMPLE_RELATIVE
+    _append(fixture_repo / relative, "\n# drift fixture\n")
+    _assert_failure(fixture_repo, "INV-PATH-EXCLUDED-CONTENT", path=relative)
+
+
+def test_excluded_example_drift_cannot_be_relabeled_in_inventory(
+    fixture_repo: Path,
+) -> None:
+    relative = EXCLUDED_EXAMPLE_RELATIVE
+    path = fixture_repo / relative
+    _append(path, "\n# drift fixture\n")
+    drifted = hashlib.sha256(path.read_bytes()).hexdigest()
+    assert drifted != checker.EXCLUDED_EXAMPLE_CONTENT_HASHES[relative]
+    inventory = _load_inventory(fixture_repo)
+    record = next(
+        item
+        for item in inventory["vyperPathClassifications"]
+        if item["path"] == relative
+    )
+    record["contentSha256"] = drifted
+    _write_inventory(fixture_repo, inventory)
+    _assert_failure(fixture_repo, "INV-SCHEMA-PATH-RECORD", path=relative)
+
+
+def test_excluded_example_removal_fails_closed(fixture_repo: Path) -> None:
+    relative = EXCLUDED_EXAMPLE_RELATIVE
+    (fixture_repo / relative).unlink()
+    _assert_failure(fixture_repo, "INV-PATH-MISSING", path=relative)
+
+
+def test_new_docs_example_vyper_path_still_fails_closed(
+    fixture_repo: Path,
+) -> None:
+    relative = "docs/chains/rh/examples/AnotherCcipExample.vy"
+    (fixture_repo / relative).write_text(
+        "@external\ndef noop():\n    pass\n", encoding="utf-8"
+    )
+    result = checker.check_repository(fixture_repo)
+    assert {"INV-PATH-NEW", "INV-PATH-UNCLASSIFIED"} <= _codes(result), result.output
+
+
+def test_excluded_classification_cannot_be_claimed_by_other_paths(
+    fixture_repo: Path,
+) -> None:
+    inventory = _load_inventory(fixture_repo)
+    record = next(
+        item
+        for item in inventory["vyperPathClassifications"]
+        if item["classification"] == "production"
+    )
+    record["classification"] = "excluded"
+    _write_inventory(fixture_repo, inventory)
+    _assert_failure(fixture_repo, "INV-SCHEMA-PATH-RECORD", path=record["path"])
+
+
+def test_future_excluded_map_entry_stays_inside_legacy_fingerprint(
+    fixture_repo: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    relative = "docs/chains/rh/examples/FutureCcipExample.vy"
+    path = fixture_repo / relative
+    path.write_text("@external\ndef noop():\n    pass\n", encoding="utf-8")
+    content_hash = hashlib.sha256(path.read_bytes()).hexdigest()
+    monkeypatch.setitem(
+        checker.EXCLUDED_EXAMPLE_CONTENT_HASHES, relative, content_hash
+    )
+    inventory = _load_inventory(fixture_repo)
+    inventory["vyperPathClassifications"].append(
+        {
+            "path": relative,
+            "classification": "excluded",
+            "contentSha256": content_hash,
+            "semanticReview": {
+                "owner": "engineering/tooling",
+                "status": "reviewed",
+                "commit": checker.HARDENING_REVIEW_COMMIT,
+            },
+        }
+    )
+    _write_inventory(fixture_repo, inventory)
+    assert (
+        checker._s5_legacy_inventory_fingerprint(inventory)
+        != checker.S5_LEGACY_INVENTORY_SHA256
+    )
+    _assert_failure(fixture_repo, "INV-SCHEMA-S5-LEGACY-FINGERPRINT")
 
 
 def test_new_vyi_interface_cadence_field_is_discovered(
