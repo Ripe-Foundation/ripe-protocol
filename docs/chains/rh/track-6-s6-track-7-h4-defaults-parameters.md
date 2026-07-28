@@ -1,23 +1,239 @@
 # Track 6 S6 / Track 7 H-04: Robinhood Defaults and Parameter Manifest
 
-**Status:** Documentation-reconciliation draft for independent review. This
-revision authorizes neither Phase A nor Phase B. H-01, the corrected H-02
-implementation, and owner-closed Track 8 M0 are integrated. The Track 8 M1
-brief is integrated, but M1 implementation remains separately gated. Phase A
-is blocked until the reviewed H-03 implementation is integrated and every
-other prerequisite below is satisfied. S5 remains an independent in-flight
-workstream and does not supply a final source, constructor, ABI, or
-`shouldCheckLastTouch` input to this brief.
+**Current reconciliation status (2026-07-27):** Documentation-only
+current-state correction for independent complete-file exact-hash review.
+The brief was reviewed, published, and integrated. This correction authorizes
+neither Phase A nor Phase B, creates no H-04 evidence or implementation
+artifact, and does not convert any blocked value into parameter authority.
 
-**Documentation-reconciliation kickoff commit:**
+**Current reconciliation baseline commit:**
+`8d1d2d40c3ca795a37b8cb5bbed54c5e805cddaa`
+
+**Current reconciliation baseline tree:**
+`68a0d26e35d0437eea62eb4495e68ad25cbf85d1`
+
+**Published H-04 provenance:** commit
+`d7809b82f0e2adc660b1e40fe0e4e28d6056b35a`, tree
+`336db452b7c331debb565350651418312ee0b203`, complete-file SHA-256
+`2d9a1e0777751265b4aacc1c65434349e19c7c91f2a1d796bf9ff0f4bb349010`.
+That commit is an ancestor of the current reconciliation baseline.
+
+**Historical published status:** Documentation-reconciliation draft for
+independent review. This revision authorizes neither Phase A nor Phase B.
+H-01, the corrected H-02 implementation, and owner-closed Track 8 M0 are
+integrated. The Track 8 M1 brief is integrated, but M1 implementation remains
+separately gated. Phase A is blocked until the reviewed H-03 implementation is
+integrated and every other prerequisite below is satisfied. S5 remains an
+independent in-flight workstream and does not supply a final source,
+constructor, ABI, or `shouldCheckLastTouch` input to this brief.
+
+**Historical documentation-reconciliation kickoff commit:**
 `332ae2bc8e0ce4b694766d6d20759295d9267ec3`
 
-**Kickoff tree:** `f67dc91e47331785837de879b6557b285aec3b1b`
+**Historical kickoff tree:** `f67dc91e47331785837de879b6557b285aec3b1b`
 
-**Reconciliation branch:** `rh-track-6-s6-track-7-h4-defaults-parameters`
+**Historical reconciliation branch:**
+`rh-track-6-s6-track-7-h4-defaults-parameters`
 
-**Reconciliation worktree:**
+**Historical reconciliation worktree:**
 `/Users/wigglez/dev/ripe-protocol-track-6-s6-track-7-h4-defaults-parameters`
+
+## 2026-07-27 current-state reconciliation layer
+
+This section is a current authority and lifecycle overlay on the complete
+historical brief below. It supersedes only stale status, prerequisite, launch,
+and handoff statements that were true at publication. It does not rewrite the
+contemporaneous record or alter the Defaults inventory, classification method,
+ownership boundaries, Phase A or conditional Phase B ceilings, prohibited
+paths, units, manifest rules, owner decisions, stop conditions, or parameter
+dispositions.
+
+The overlay is bound to exact current `rh`
+`8d1d2d40c3ca795a37b8cb5bbed54c5e805cddaa`, tree
+`68a0d26e35d0437eea62eb4495e68ad25cbf85d1`. The original publication
+identity, kickoff identity, and historical branch/worktree above remain
+provenance only and are not changed or republished by this correction.
+
+### Exact current authority bindings
+
+| Authority | Current binding at `8d1d2d40` | Reconciled effect |
+| --- | --- | --- |
+| H-01 dependency implementation and exception retirement | The reviewed H-01 payload remains integrated at `575d47b82055b42da2bddf1535d8076cd7cf4c63`; the final transition is integrated at `7098211db5693f986b65ec7a9e897f3518e9538c`. `docs/chains/rh/evidence/dependency-security-gate.md` SHA-256 is `81baca680d8f21c309d87e83f25366ea50c8d27700cd3e0d6ea7001a1892b41c`. | The dependency prerequisite and final operative exception split are controlling. |
+| H-03 Phase A/R6 and Phase B immutable blueprint | Phase A/R6 closure is integrated at `2c8468affaa4301fbe51287d76e9e1c0c5d4fb21`; the post-S5 evidence is integrated at `6217d4860b98c343e076d4df2e3916f8e59a2bf2`; implementation is integrated from `35e3a8df5c0768f17121407c18da185aabd82f43` with Gate 1 provenance at `ee07d9b6b4ae85f76646617051ec7d331e30a824`. The Phase A evidence SHA-256 is `f1f8bf077723b08b87da6244a56ea36706c82152182e227972abe02363146d22`. | H-03 documentation, implementation, and immutable blueprint are integrated; all 18 typed blockers remain open. |
+| S5 Ledger guard | The final S5 integration record is integrated at `81478fe33dfa47a8e135682a047b64949650cb29`. `docs/chains/rh/ledger-guard-implementation-record.md` SHA-256 is `6ce94f25f00e6924b540378f09ed1a84ce401e6474863b2eae6820437b2f847b`; the security decision SHA-256 is `15610bac4293d06320581dc1603b2980ea352af55d89f040ccab18ca26c9e739`. | S5 source behavior is controlling; deployment values remain evidence-bound and must not be guessed. |
+| Track 8 M1 exact receipt | Phase B implementation is integrated at `66eae5ac516466be360fe53a53a4bcd672c1ed23`. `docs/chains/rh/evidence/stock-token-m1-exact-receipt.md` SHA-256 is `999a9dcadf0d15332f8847e198cdf82efc32e099f31b496ecdb4f3e64b78c0eb`. | Exact receipt/custody enforcement is controlling; M2-M5 configuration and activation inputs remain blocked. |
+| H-05 Phase A | The controlling evidence was published at `28d2dc9b2fb3b9e55d792b811ce5738555e1762a` and integrated through merge `7a3a36666f277277fa08b55081b3f58c7cd3ba64`. `docs/chains/rh/evidence/robinhood-migration-phase-a.md` SHA-256 is `28c3e32b9732334c4904667eeb983d057d5d96391fb5fd8b13f37a9f5033af7c`. | Phase A planning authority is integrated; H-05 Phase B remains downstream and requires separate authorization. |
+| H-06 Phase A | Manifest-v2 evidence is integrated through `70dd76516ca9b4af8c0797c327bf15732634e5f6`. `docs/chains/rh/evidence/robinhood-manifest-phase-a.md` SHA-256 is `54aea0a8df18d83dc53493ba561195d432d8e7df0d057932eeed7dfe60cd7c19`. | The deployment/evidence manifest-v2 protocol is controlling and remains distinct from H-04's parameter manifest. |
+| Thin-Solidity CCIP reference decision | Current `rh` commit `8d1d2d40c3ca795a37b8cb5bbed54c5e805cddaa` selects the reviewed reference direction. `docs/chains/rh/ccip-integration-decision.md` SHA-256 is `9b668e3b6aaba48f0ec4af60af1a3d92de4e9c190aeefadd3cc69f2afc5d1ab2`; Round 3 review SHA-256 is `4d122008a538a3bc3cb962a90c345fb7415b682e69d4641bbab85bd9fcf2688c`; reviewed reference source SHA-256 is `28fea3591caf8955a4c1f47d34f5abfe249564001578687525f94fddf5cfac77`; reference README SHA-256 is `fe298fa2bc7215494ae3c2d61f19b7c716f5919f2a4ce74837a4de86155a8ad0`. | The subclass is a non-production reference only; it supplies no H-04 parameter value or deployment authority. |
+
+### H-01 operative dependency state
+
+The integrated dependency implementation and final exception-retirement
+transition are both controlling. The current split is exact:
+
+- retired and historical only: Click, Pygments, and Pymdown Snippets;
+- retained and operative: pytest and Pymdown b64; and
+- held toolchain: pytest `8.4.2`, Titanoboa `0.2.7`, and Vyper `0.4.3`.
+
+This repository evidence records exception disposition only. It does not
+establish, and this reconciliation does not infer, GitHub or Dependabot alert
+closure.
+
+### H-03 integrated graph and still-open parameter blockers
+
+The following implementation paths now exist and are integrated:
+
+- `config/robinhood_blueprint.py`;
+- `tests/deployment/test_robinhood_blueprint.py`; and
+- `tests/deployment/test_robinhood_omissions.py`.
+
+The approved immutable inventory remains exactly 60 components, 94 surfaces,
+103 source-path records, 288 explicit relations over 284 unique
+phase-qualified triples, 18 open blockers, 48 symbolic inputs, 38 registry
+expectations, 24 negative assertions, and 2 promotion records. Integration of
+the blueprint does not close any of its 18 blockers.
+
+In particular, `TrainingWheels` and `specialStabPoolId` remain H-04 parameter
+blockers. The PSM preactivation auto-deposit setting must change to `false`.
+Terminal promotion preserves the approved global-mint/PSM activation ordering.
+Ordinary Teller LP deposit routes are the only allowed LP deposit path; no
+trusted or direct-vault bypass is allowed, and LTV is explicitly zero.
+GREEN/RIPE CCIP capabilities remain disabled continuously through promotion.
+
+### S5 controlling semantic direction
+
+The integrated Ledger guard has one exact selector split:
+
+- source zero uses native `block.number`;
+- exact source `0x64` uses the ArbSys child-block identity;
+- the ArbSys response must be exactly 32 bytes and the call uses
+  `max_outsize=65`;
+- there is no fallback; and
+- every other source value fails closed.
+
+`shouldCheckLastTouch` remains enabled for Robinhood. This statement does not
+guess a deployment address, constructor value, or other deployment input
+beyond the controlling S5 evidence.
+
+### Track 8 M1 controlling implementation and remaining gates
+
+M1 Phase B exact-receipt implementation is integrated and controlling. The
+reviewed Teller runtime is 24,152 bytes, leaving 424 bytes of EIP-170
+headroom. Teller now enforces exact receipt/custody accounting with a mutex;
+any failed exactness assertion or downstream call reverts atomically.
+
+M1 integration does not authorize Stock activation. Every remaining M2-M5
+launch or configuration value, including the audit, vault, registration,
+cap-integer, address, and atomic-activation proofs, remains blocked until its
+own controlling authority exists.
+
+### H-05 integrated Phase A boundary
+
+H-05 Phase A owns deterministic import-free discovery, semantic ordering,
+typed blocked planning, report serialization, and later execution planning.
+It did not publish a namespace or executable skeleton. Its separately gated
+conditional Phase B ceiling remains exactly:
+
+- `docs/chains/rh/evidence/robinhood-migration-phase-a.md`;
+- `config/network_profiles.py`;
+- `scripts/migrate.py`;
+- `scripts/utils/migration_runner.py`;
+- `tests/deployment/test_migration_discovery.py`; and
+- `tests/deployment/test_execution_plan.py`.
+
+H-05 consumes H-04's later reviewed exact hashes and values. H-05 Phase B is
+downstream, requires separate authorization, and supplies no H-04 value.
+
+### H-06 integrated Phase A boundary
+
+H-04's parameter manifest and H-06's deployment/evidence manifest-v2 schema,
+immutable history, and current-index protocol are different authorities.
+H-06's controlling direction is macOS/APFS-only initially:
+
+- immutable publication uses `renameatx_np(..., RENAME_EXCL)` only, with no
+  fallback;
+- durability uses file `fsync`, `F_FULLFSYNC`, exclusive rename, directory
+  `fsync`, and final `F_FULLFSYNC` in the approved sequence;
+- current-index promotion permits `os.replace` only under the cooperative lock
+  after validating the expected prior-index hash and immutable target; and
+- Linux is initially unsupported and fails closed.
+
+Its conditional Phase B ceiling remains exactly eight files:
+
+- `docs/chains/rh/evidence/robinhood-manifest-phase-a.md`;
+- `scripts/utils/migration.py`;
+- `scripts/utils/json_file.py`;
+- `scripts/utils/manifest_schema.py`;
+- `docs/chains/rh/schemas/deployment-manifest-v2.schema.json`;
+- `tests/deployment/test_manifest_schema.py`;
+- `tests/deployment/test_current_manifest_promotion.py`; and
+- `.gitignore`.
+
+H-06 Phase B is separately owner-authorized and, as of this reconciliation,
+is being implemented in an isolated worktree. Those uncommitted bytes are
+non-controlling, were not inspected for this reconciliation, and supply no
+H-04 authority.
+
+### CCIP reference-only state
+
+The reviewed thin-Solidity subclass selected at the current baseline is
+reference material only. It is non-production and not deployment-authorized.
+RipeHq IDs `23` and `24` remain provisional reference IDs, and GREEN/RIPE CCIP
+capabilities remain disabled continuously through promotion.
+
+Production dependency packaging, compiler/build settings, audit, gas
+qualification, external roles, registration, and activation remain separately
+blocked. No provisional CCIP ID, address, role, route, or capability value is
+imported into H-04's parameter authority.
+
+### Current prerequisite and blocker disposition
+
+| H-04 prerequisite or input | Current disposition | H-04 consequence |
+| --- | --- | --- |
+| H-01 dependency implementation and final exception transition | Satisfied and integrated | Consume only the held toolchain and operative two-exception split; make no external alert-state claim. |
+| Corrected H-02 profile API and Track 8 M0 | Satisfied and integrated | Re-read from final `rh`; historical closure remains valid. |
+| H-03 Phase A/R6, immutable blueprint, source, and tests | Satisfied and integrated | Phase A may later inventory its exact symbolic inputs, but all 18 blockers stay open. |
+| S5 Ledger guard | Satisfied and integrated | Use the exact source semantics above; do not infer any unproven deployment value. |
+| Track 8 M1 exact receipt | Satisfied and integrated | Exact receipt is controlling; all M2-M5 activation/configuration inputs remain blockers. |
+| H-05 Phase A | Satisfied and integrated | H-04 may later supply reviewed hashes/values; H-05 Phase B remains downstream. |
+| H-06 Phase A | Satisfied and integrated | Keep the two manifest authorities distinct; uncommitted Phase B bytes are non-controlling. |
+| Thin-Solidity CCIP reference decision | Satisfied only as a reference-direction decision | No production package, parameter, registration, role, address, or activation authority exists. |
+| H-04 current-state correction | Pending independent complete-file exact-hash review and later integration decision | Phase A and Phase B remain unauthorized. |
+| H-04-owned values and every S5-, M1-M5-, oracle-, rewards-, PSM-, LP-, CCIP-, role-, cap-, fee-, cadence-, or address-dependent input without final authority | Blocked or conditional | Preserve a typed `blocked`, `omitted`, `deferred`, or `unresolved` disposition; never substitute a Base or provisional value. |
+| Phase A owner authorization on an exact final `rh` freeze | Missing | No parameter inventory, evidence artifact, recommendation, baseline tests, or implementation may begin. |
+| Phase B owner authorization and closed approved Phase A packet | Missing and downstream | No Defaults source, parameter manifest, generator, tests, migration, deployment, configuration, or activation may begin. |
+
+### Historical stale-statement disposition
+
+| Historical location or statement family | Publication-time meaning | Current disposition |
+| --- | --- | --- |
+| Top-level “draft,” M1-unimplemented, H-03-not-integrated, and S5-in-flight status | Correct at the historical kickoff and publication. | Retained as labeled historical provenance; superseded by this dated layer. |
+| Hard gate 1 H-01 identity | Bound the original integrated dependency payload only. | Still historical provenance; the final `7098211db5693f986b65ec7a9e897f3518e9538c` exception-retirement transition and operative two-exception split now control. |
+| Hard gate 2 statement that M1 implementation is unauthorized | Preserved the publication-time Track 8 gate. | Superseded: M1 Phase B is integrated; M2-M5 and Stock activation remain blocked. |
+| Hard gate 3 statements that H-03 evidence/source/tests are absent and its worktree is uncommitted | Preserved the publication-time concurrency boundary. | Superseded: the Phase A/R6 record, immutable blueprint, source, tests, and Gate 1 provenance are integrated; all 18 blockers remain open. |
+| Hard gate 4 statements that S5 is in flight and does not supply source/ABI/`shouldCheckLastTouch` direction | Prevented consumption of unintegrated S5 bytes. | Superseded for integrated source semantics: the Ledger guard and enabled `shouldCheckLastTouch` direction now control. Any deployment value not fixed by that evidence remains blocked. |
+| Future Phase A seal steps 3-5 and validation item 11, where H-03/S5/M1 could still be unfinished | Required a fresh final-baseline check rather than floating-worktree consumption. | The conditional procedure remains sound, but current status is now satisfied/integrated for H-03, S5, and M1. Unintegrated bytes from any later worktree remain non-controlling. |
+| Minimum-change instruction barring inference of S5 source, constructor, ABI, or `shouldCheckLastTouch` | Prevented preselection from the then-active S5 worktree. | Still controls as a no-inference rule; exact integrated evidence may be consumed, while absent deployment inputs may not be guessed. |
+| Historical H-05 handoff to “discovery, ordering, and skeletons” | Reflected the earlier specification allowance. | Corrected: Phase A published no namespace or executable skeleton and owns the narrower planning/report boundary and conditional six-file Phase B ceiling. |
+| No historical H-06 handoff | H-06 had not yet supplied integrated Phase A authority. | Added: H-06's manifest-v2 protocol and conditional eight-file ceiling are distinct from H-04; current uncommitted H-06 Phase B bytes are non-controlling. |
+| Historical Track 8 handoff treating all M1-M5 implementation as later | Correct before M1 integration. | Corrected: M1 exact receipt is integrated; every M2-M5 launch/configuration input stays blocked. |
+| Historical CCIP handoff without the selected thin-Solidity reference | Correct before the reference decision. | Corrected: the subclass is non-production reference material only; IDs `23`/`24` are provisional and disabled, and production qualification/activation remains blocked. |
+
+After this correction receives independent complete-file exact-hash review and
+the final `rh` baseline is frozen, a separately authorized Phase A may begin
+repository-only inventory/classification, provenance tracing, denominator and
+unit reconciliation, and preparation of the one-file owner-decision packet.
+It may record every unresolved dependency as a typed blocker. It must not
+select values that remain dependent on S5 deployment evidence, Track 8 M2-M5,
+oracle/reward/PSM/LP/CCIP/role/cap/fee/cadence/address authorities, H-05 or H-06
+implementation bytes, or another unfinished track.
+
+The historical “draft,” “uncommitted,” “in-flight,” prerequisite, and
+“independent review is the only next step” statements below remain accurate
+records of the publication-time state. Where they conflict with this dated
+overlay, this overlay controls only the present lifecycle and handoff status.
+The only next action authorized by this correction is independent review of
+the complete corrected file; neither H-04 phase is authorized.
 
 ## Fresh-agent instruction
 
@@ -46,10 +262,11 @@ No approval of this brief authorizes Phase B, a production value, a contract
 change, a migration, a deployment, a governance action, a signer, a
 transaction, or an external write.
 
-This documentation reconciliation does not authorize Phase A, creation of the
-Phase A evidence file, baseline test execution, parameter analysis, or a
-recommendation. Independent review of this complete revised brief is the only
-next step authorized here.
+The original documentation reconciliation did not authorize Phase A, creation
+of the Phase A evidence file, baseline test execution, parameter analysis, or
+a recommendation. This current-state correction also authorizes none of those
+actions. Independent complete-file exact-hash review of the corrected brief is
+the only next step authorized here.
 
 ## Why S6 and H-04 are one workstream
 
@@ -291,12 +508,19 @@ Read every file in this section before Phase A.
 - `docs/chains/rh/robinhood-deployment-support-specification.md`
 - `docs/chains/rh/robinhood-deployment-validation-plan.md`
 - `docs/chains/rh/evidence/dependency-security-gate.md`
+- `docs/chains/rh/evidence/dependency-exception-exit-preflight.md`
 - `docs/chains/rh/evidence/network-profile-cli-implementation.md`
 - `docs/chains/rh/track-7-h3-robinhood-blueprint-omissions.md`
+- `docs/chains/rh/evidence/robinhood-blueprint-phase-a.md`
+- `config/robinhood_blueprint.py`
+- `tests/deployment/test_robinhood_blueprint.py`
+- `tests/deployment/test_robinhood_omissions.py`
 - `docs/chains/rh/track-6-s3-lootbox-floor.md`
 - `docs/chains/rh/deleverage-cooldown-security-decision.md`
 - `docs/chains/rh/track-6-s5-ledger-guard.md`
 - `docs/chains/rh/track-6-s5-checkpoint-0-owner-decision-packet.md`
+- `docs/chains/rh/ledger-guard-security-decision.md`
+- `docs/chains/rh/ledger-guard-implementation-record.md`
 - every additional S5 decision/evidence artifact integrated before Phase A
 - integrated H-03 implementation, tests, and Phase A evidence
 - `docs/chains/rh/track-8-m0-owner-decision-packet.md`
@@ -304,6 +528,13 @@ Read every file in this section before Phase A.
 - `docs/chains/rh/stock-token-vault-change-specification.md`
 - `docs/chains/rh/stock-token-vault-change-validation-plan.md`
 - `docs/chains/rh/track-8-m1-exact-receipt.md`
+- `docs/chains/rh/evidence/stock-token-m1-exact-receipt.md`
+- `docs/chains/rh/evidence/robinhood-migration-phase-a.md`
+- `docs/chains/rh/evidence/robinhood-manifest-phase-a.md`
+- `docs/chains/rh/ccip-integration-decision.md`
+- `docs/chains/rh/evidence/ccip-solidity-reference-round-3-review.md`
+- `docs/chains/rh/examples/README.md`
+- `docs/chains/rh/examples/RipeCcipBurnMintTokenPools.sol`
 - `docs/chains/rh/usdg-psm-decision.md`
 
 Also read
@@ -1102,9 +1333,22 @@ Any graph change returns to H-03 first.
 
 ### H-05
 
-H-05 owns migration discovery, ordering, and skeletons. This slice supplies
-typed values and hashes only. It cannot create migration `0040` or any other
-migration file.
+H-05 Phase A owns deterministic import-free discovery, semantic ordering,
+typed blocked planning, report serialization, and later execution planning.
+It published neither a namespace nor an executable skeleton. This slice
+supplies reviewed typed values and hashes only. H-05's conditional Phase B
+ceiling is the exact six files recorded in the current-state overlay; it
+cannot create migration `0040` or any other migration file, and Phase B
+remains downstream and requires separate authorization.
+
+### H-06
+
+H-06 owns the deployment/evidence manifest-v2 schema, immutable-history writer
+and reader, and current-index promotion protocol. H-04 owns the parameter
+manifest. Neither may substitute for or silently absorb the other. The
+conditional H-06 Phase B ceiling is the exact eight files recorded in the
+current-state overlay. Separately authorized uncommitted H-06 implementation
+bytes remain non-controlling and provide no H-04 parameter authority.
 
 ### H-08 and H-09
 
@@ -1123,19 +1367,27 @@ This slice may provide approved inputs but must not absorb those files.
 ### Track 8
 
 Track 8 owns Stock containment mechanism, vault selection, and activation
-eligibility. M0 is owner-closed and integrated, including the settlement
-direction, but it does not supply the post-M0 implementation, audit,
-configuration, atomic-activation, address, vault-ID, cap-integer, or
-operational proof required by M1-M5. This slice owns only reviewed
-configuration projections. Every field that depends on those later artifacts
-remains blocked until its exact Track 8 gate closes.
+eligibility. M0 is owner-closed and integrated, and M1 exact-receipt Phase B
+implementation is integrated and controlling. M1 supplies exact
+receipt/custody accounting, mutex, and atomic-rollback behavior only; it does
+not authorize Stock activation or supply the audit, configuration,
+atomic-activation, address, vault-ID, cap-integer, or operational proof
+required by M2-M5. This slice owns only reviewed configuration projections.
+Every field that depends on those later artifacts remains blocked until its
+exact Track 8 gate closes.
 
 ### Track 1 / CCIP
 
 GREEN and RIPE CCIP are a separately reviewed promotion target within seven
 days after launch, not an initial-launch blocker or configuration assumption.
-If Track 1 or H-12 evidence is incomplete or late, the routes remain disabled.
-No pool, remote mapping, admin, capability, or artifact enters this slice
+The current thin-Solidity subclass decision is a reviewed reference direction
+only: it is non-production and not deployment-authorized. RipeHq IDs `23` and
+`24` remain provisional, and GREEN/RIPE capabilities remain disabled
+continuously through promotion. Production dependency packaging,
+compiler/build settings, audit, gas, external roles, registration, and
+activation remain separately blocked. If Track 1 or H-12 evidence is
+incomplete or late, the routes remain disabled. No provisional pool ID,
+address, remote mapping, admin, capability, or artifact enters this slice
 before those gates close. sGREEN must never receive a CCIP route.
 
 ## Approval boundaries
