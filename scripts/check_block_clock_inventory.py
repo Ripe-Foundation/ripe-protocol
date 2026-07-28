@@ -89,6 +89,13 @@ S5_REVIEW_ARTIFACT_FIELD = "s5ReviewArtifactSha256"
 S5_LEGACY_INVENTORY_SHA256 = (
     "924a559075d5b96bcac3f73d28390deee3b436fe5500adc4fb6bf769282217b4"
 )
+M2_GUARDED_ERC20_PATH = "contracts/vaults/GuardedErc20.vy"
+M2_GUARDED_ERC20_SHA256 = (
+    "0fcdb02a0b3adf56ef0fd04397c57ac40325a37c87a32f29979dadc5eaf353ed"
+)
+POST_S5_PRODUCTION_INVENTORY_SHA256 = (
+    "148418962f49be10a52f87428fb4b9a6d7a739ededae57086fd403254f863c05"
+)
 S5_REVIEW_DIRECT_KEYS = {
     ("contracts/data/Ledger.vy", "_getActionBlock", "block.number", 1),
 }
@@ -785,6 +792,19 @@ def _is_reviewed_ccip_excluded_record(record: Mapping[str, Any]) -> bool:
     )
 
 
+def _is_reviewed_m2_production_record(record: Mapping[str, Any]) -> bool:
+    return dict(record) == {
+        "path": M2_GUARDED_ERC20_PATH,
+        "classification": "production",
+        "contentSha256": M2_GUARDED_ERC20_SHA256,
+        "semanticReview": {
+            "owner": "engineering/tooling",
+            "status": "reviewed",
+            "commit": HARDENING_REVIEW_COMMIT,
+        },
+    }
+
+
 def _s5_legacy_inventory_fingerprint(data: Mapping[str, Any]) -> str:
     legacy = copy.deepcopy(dict(data))
     legacy.pop("expectedProductionCounts", None)
@@ -803,11 +823,46 @@ def _s5_legacy_inventory_fingerprint(data: Mapping[str, Any]) -> str:
         for record in legacy["vyperPathClassifications"]
         if str(record.get("path", "")) not in S5_REVIEW_PATHS
         and not _is_reviewed_ccip_excluded_record(record)
+        and not _is_reviewed_m2_production_record(record)
     ]
     encoded = (
         json.dumps(legacy, sort_keys=True, separators=(",", ":")) + "\n"
     ).encode("utf-8")
     return hashlib.sha256(encoded).hexdigest()
+
+
+def _post_s5_production_inventory_fingerprint(
+    data: Mapping[str, Any],
+) -> str:
+    records = [
+        record
+        for record in data["vyperPathClassifications"]
+        if record.get("classification") == "production"
+    ]
+    encoded = (
+        json.dumps(records, sort_keys=True, separators=(",", ":")) + "\n"
+    ).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def _check_post_s5_production_inventory_fingerprint(
+    data: Mapping[str, Any],
+) -> list[Finding]:
+    fingerprint = _post_s5_production_inventory_fingerprint(data)
+    if fingerprint == POST_S5_PRODUCTION_INVENTORY_SHA256:
+        return []
+    return [
+        Finding(
+            code="INV-SCHEMA-POST-S5-PRODUCTION-FINGERPRINT",
+            domain="schema",
+            expected=POST_S5_PRODUCTION_INVENTORY_SHA256,
+            actual=fingerprint,
+            remediation=(
+                "restore the exact current production-classification ledger "
+                "or obtain review for a new controlling fingerprint"
+            ),
+        )
+    ]
 
 
 def _validate_s5_review_provenance(
@@ -1634,6 +1689,23 @@ def _check_path_classifications(
                     ),
                 )
             )
+        if (
+            path == M2_GUARDED_ERC20_PATH
+            and actual[path]["contentSha256"] != M2_GUARDED_ERC20_SHA256
+        ):
+            findings.append(
+                Finding(
+                    code="INV-PATH-M2-CONTENT",
+                    domain="classification",
+                    path=path,
+                    expected=M2_GUARDED_ERC20_SHA256,
+                    actual=actual[path]["contentSha256"],
+                    remediation=(
+                        "restore the exact reviewed GuardedErc20 source bytes; "
+                        "changing the M2 production identity requires new review"
+                    ),
+                )
+            )
     return findings
 
 
@@ -2086,6 +2158,7 @@ def check_repository(
         for classification in ("mock", "testing", "test")
     }
     findings.extend(_check_s5_legacy_inventory_fingerprint(data))
+    findings.extend(_check_post_s5_production_inventory_fingerprint(data))
     success_lines = [
         (
             "CLOCK_INVENTORY_OK "
@@ -2101,7 +2174,11 @@ def check_repository(
             f"timestamp_ids={len(EXPECTED_TS_IDS)} "
             f"timestamp_occurrences={timestamp_counts[0]} "
             f"mixed_clock_functions={len(actual_mixed)} "
-            f"vyper_paths={len(data['vyperPathClassifications'])}"
+            f"vyper_paths={len(data['vyperPathClassifications'])} "
+            "post_s5_production_records="
+            f"{sum(record.get('classification') == 'production' for record in data['vyperPathClassifications'])} "
+            "post_s5_production_sha256="
+            f"{_post_s5_production_inventory_fingerprint(data)}"
         ),
         (
             "CLOCK_INVENTORY_NONPROD "

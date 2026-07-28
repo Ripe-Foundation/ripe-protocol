@@ -19,6 +19,7 @@ SCRIPT_RELATIVE = Path("scripts/check_block_clock_inventory.py")
 IMPLEMENTATION_RECORD_RELATIVE = Path(
     "docs/chains/rh/ledger-guard-implementation-record.md"
 )
+M2_GUARDED_RELATIVE = "contracts/vaults/GuardedErc20.vy"
 
 
 @pytest.fixture(scope="session")
@@ -119,7 +120,13 @@ def test_clean_approved_fixture_passes_without_git_or_network(
     assert "timestamp_ids=11" in result.output
     assert "seconds_unit_candidates=58" in result.output
     assert "mixed_clock_functions=4" in result.output
-    assert "vyper_paths=94" in result.output
+    assert "vyper_paths=95" in result.output
+    assert "post_s5_production_records=59" in result.output
+    assert (
+        "post_s5_production_sha256="
+        + checker.POST_S5_PRODUCTION_INVENTORY_SHA256
+        in result.output
+    )
     assert "CLOCK_INVENTORY_NONPROD" in result.output
     assert "CLOCK_INVENTORY_NONPROD_CADENCE" in result.output
     assert "test=172" in result.output
@@ -173,6 +180,120 @@ def test_s5_review_artifact_scope_and_legacy_commits_are_exact(
     assert (
         checker._s5_legacy_inventory_fingerprint(inventory)
         == checker.S5_LEGACY_INVENTORY_SHA256
+    )
+    assert (
+        checker._post_s5_production_inventory_fingerprint(inventory)
+        == checker.POST_S5_PRODUCTION_INVENTORY_SHA256
+    )
+
+
+def test_m2_production_record_is_exact_and_content_pinned(
+    fixture_repo: Path,
+) -> None:
+    inventory = _load_inventory(fixture_repo)
+    record = next(
+        item
+        for item in inventory["vyperPathClassifications"]
+        if item["path"] == M2_GUARDED_RELATIVE
+    )
+    assert checker._is_reviewed_m2_production_record(record)
+    assert record["classification"] == "production"
+    assert record["contentSha256"] == checker.M2_GUARDED_ERC20_SHA256
+    assert (
+        hashlib.sha256((fixture_repo / M2_GUARDED_RELATIVE).read_bytes()).hexdigest()
+        == checker.M2_GUARDED_ERC20_SHA256
+    )
+    result = checker.check_repository(fixture_repo)
+    assert result.ok, result.output
+
+
+@pytest.mark.parametrize(
+    ("field", "replacement"),
+    [
+        pytest.param(
+            "path",
+            "contracts/vaults/GuardedErc20Moved.vy",
+            id="path",
+        ),
+        pytest.param("contentSha256", "0" * 64, id="content-hash"),
+        pytest.param("classification", "test", id="classification"),
+    ],
+)
+def test_m2_inventory_identity_drift_fails_current_fingerprint(
+    fixture_repo: Path,
+    field: str,
+    replacement: str,
+) -> None:
+    inventory = _load_inventory(fixture_repo)
+    record = next(
+        item
+        for item in inventory["vyperPathClassifications"]
+        if item["path"] == M2_GUARDED_RELATIVE
+    )
+    record[field] = replacement
+    _write_inventory(fixture_repo, inventory)
+    _assert_failure(
+        fixture_repo,
+        "INV-SCHEMA-POST-S5-PRODUCTION-FINGERPRINT",
+    )
+
+
+def test_m2_source_content_drift_fails_exact_pin(fixture_repo: Path) -> None:
+    _append(fixture_repo / M2_GUARDED_RELATIVE, "\n# drift fixture\n")
+    _assert_failure(
+        fixture_repo,
+        "INV-PATH-M2-CONTENT",
+        path=M2_GUARDED_RELATIVE,
+    )
+
+
+def test_m2_source_deletion_fails(fixture_repo: Path) -> None:
+    (fixture_repo / M2_GUARDED_RELATIVE).unlink()
+    _assert_failure(
+        fixture_repo,
+        "INV-PATH-MISSING",
+        path=M2_GUARDED_RELATIVE,
+    )
+
+
+def test_m2_sibling_production_path_fails(fixture_repo: Path) -> None:
+    relative = "contracts/vaults/FutureGuardedErc20.vy"
+    path = fixture_repo / relative
+    path.write_text("@external\ndef noop():\n    pass\n", encoding="utf-8")
+    result = checker.check_repository(fixture_repo)
+    assert "INV-PATH-NEW" in _codes(result), result.output
+    finding = next(item for item in result.findings if item.code == "INV-PATH-NEW")
+    assert finding.path == relative
+    assert finding.actual == "production"
+
+
+def test_future_production_admission_requires_new_controlling_fingerprint(
+    fixture_repo: Path,
+) -> None:
+    relative = "contracts/vaults/FutureGuardedErc20.vy"
+    path = fixture_repo / relative
+    path.write_text("@external\ndef noop():\n    pass\n", encoding="utf-8")
+    inventory = _load_inventory(fixture_repo)
+    inventory["vyperPathClassifications"].append(
+        {
+            "path": relative,
+            "classification": "production",
+            "contentSha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+            "semanticReview": {
+                "owner": "engineering/tooling",
+                "status": "reviewed",
+                "commit": checker.HARDENING_REVIEW_COMMIT,
+            },
+        }
+    )
+    assert (
+        checker._post_s5_production_inventory_fingerprint(inventory)
+        != checker.POST_S5_PRODUCTION_INVENTORY_SHA256
+    )
+    _write_inventory(fixture_repo, inventory)
+    _assert_failure(
+        fixture_repo,
+        "INV-SCHEMA-POST-S5-PRODUCTION-FINGERPRINT",
     )
 
 
@@ -805,6 +926,7 @@ def test_ccip_reference_example_is_excluded_and_content_pinned(
 ) -> None:
     relative = EXCLUDED_EXAMPLE_RELATIVE
     frozen = checker.EXCLUDED_EXAMPLE_CONTENT_HASHES[relative]
+    assert checker.EXCLUDED_EXAMPLE_CONTENT_HASHES == {relative: frozen}
     assert (
         checker.classify_path(
             relative,

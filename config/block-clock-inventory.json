@@ -12750,6 +12750,16 @@
       }
     },
     {
+      "path": "contracts/vaults/GuardedErc20.vy",
+      "classification": "production",
+      "contentSha256": "0fcdb02a0b3adf56ef0fd04397c57ac40325a37c87a32f29979dadc5eaf353ed",
+      "semanticReview": {
+        "owner": "engineering/tooling",
+        "status": "reviewed",
+        "commit": "db7ae895d1b32ae6708f2405274c32c1e3f5222e"
+      }
+    },
+    {
       "path": "contracts/vaults/RebaseErc20.vy",
       "classification": "production",
       "contentSha256": "14fe0db39f96ffebbb8fa4b28fc6fe6fb173ab51095c2853885f4c37c8c41b42",
