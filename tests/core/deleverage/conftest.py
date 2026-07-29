@@ -84,10 +84,11 @@ def deploy_deleverage(ripe_hq):
         deleverage_buffer=0,
         deleverage_cooldown=0,
         underscore_safe_spread_bps=100,
-        deleverage_full_payoff_buffer=10**15,
-        deleverage_overage_bps=100,
-        deleverage_dust_threshold=10**15,
-        deleverage_dust_bps=100,
+        # Match the deployment migrations; feature tests opt in explicitly.
+        deleverage_full_payoff_buffer=0,
+        deleverage_overage_bps=0,
+        deleverage_dust_threshold=0,
+        deleverage_dust_bps=0,
     ):
         # Load and deploy fresh Deleverage contract
         with open("contracts/core/Deleverage.vy", "r") as f:

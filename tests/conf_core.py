@@ -299,10 +299,11 @@ def deleverage(ripe_hq_deploy):
         0,
         0,
         100,
-        10**15,
-        100,
-        10**15,
-        100,
+        # Full-payoff extras stay disabled by default, matching migrations.
+        0,
+        0,
+        0,
+        0,
         name="deleverage",
     )
 

@@ -1402,11 +1402,9 @@ def test_phase2_then_phase3_prevents_double_processing(
     assert transfer_logs[1].isDepleted == True
 
     # 4. Third event: vault_4 alpha (Phase 3 - different vault OK)
-    full_payoff_buffer = 10**15
-    expected_vault4_alpha = 100 * EIGHTEEN_DECIMALS + full_payoff_buffer
     assert transfer_logs[2].vaultId == 4
     assert transfer_logs[2].asset == alpha_token.address
-    assert transfer_logs[2].amountSent == expected_vault4_alpha
+    assert transfer_logs[2].amountSent == 100 * EIGHTEEN_DECIMALS
     assert transfer_logs[2].isDepleted == False  # 200 remains
 
     # 5. Verify NO double-processing of vault_3 alpha
@@ -1415,19 +1413,19 @@ def test_phase2_then_phase3_prevents_double_processing(
 
     # 6. Verify correct final balances
     assert post_alpha_vault3 == 0  # Fully depleted
-    assert post_alpha_vault4 == 300 * EIGHTEEN_DECIMALS - expected_vault4_alpha
+    assert post_alpha_vault4 == 200 * EIGHTEEN_DECIMALS  # 300 - 100 = 200
     assert post_bravo_vault3 == 0  # Fully depleted
 
     # 7. Verify Endaoment received correct totals
     alpha_increase = post_endaoment_alpha - pre_endaoment_alpha
     bravo_increase = post_endaoment_bravo - pre_endaoment_bravo
 
-    _test(alpha_increase, 300 * EIGHTEEN_DECIMALS + full_payoff_buffer)
+    _test(alpha_increase, 300 * EIGHTEEN_DECIMALS)  # 200 from vault_3 + 100 from vault_4
     _test(bravo_increase, 100 * EIGHTEEN_DECIMALS)  # 100 from vault_3
 
-    # 8. Total transferred should be exactly target plus buffer (not 500 if double-processed)
+    # 8. Total transferred should be exactly 400 (not 500 if double-processed)
     total_transferred = sum(log.amountSent for log in transfer_logs)
-    _test(total_transferred, 400 * EIGHTEEN_DECIMALS + full_payoff_buffer)
+    _test(total_transferred, 400 * EIGHTEEN_DECIMALS)
 
 
 def test_phase2_with_non_dollar_asset_prices(
@@ -1544,17 +1542,14 @@ def test_phase2_with_non_dollar_asset_prices(
     assert transfer_logs[0].isDepleted == True
 
     # 3. Second event: bravo partially used (25 tokens @ $2 = $50)
-    full_payoff_buffer = 10**15
-    expected_bravo_sent = 25 * EIGHTEEN_DECIMALS + full_payoff_buffer // 2
-    expected_bravo_value = 50 * EIGHTEEN_DECIMALS + full_payoff_buffer
     assert transfer_logs[1].asset == bravo_token.address
-    assert transfer_logs[1].amountSent == expected_bravo_sent
-    assert transfer_logs[1].usdValue == expected_bravo_value
+    assert transfer_logs[1].amountSent == 25 * EIGHTEEN_DECIMALS  # 25 tokens
+    assert transfer_logs[1].usdValue == 50 * EIGHTEEN_DECIMALS    # $50 value
     assert transfer_logs[1].isDepleted == False
 
     # 4. Verify final balances
     assert post_alpha_vault == 0  # Fully depleted
-    assert post_bravo_vault == 100 * EIGHTEEN_DECIMALS - expected_bravo_sent
+    assert post_bravo_vault == 75 * EIGHTEEN_DECIMALS  # 100 - 25 = 75
     assert post_charlie_vault == 20 * SIX_DECIMALS  # Untouched
 
     # 5. Verify Endaoment received correct token amounts
@@ -1563,12 +1558,12 @@ def test_phase2_with_non_dollar_asset_prices(
     charlie_increase = post_charlie_endaoment - pre_charlie_endaoment
 
     _test(alpha_increase, 500 * EIGHTEEN_DECIMALS)  # 500 tokens
-    _test(bravo_increase, expected_bravo_sent)
+    _test(bravo_increase, 25 * EIGHTEEN_DECIMALS)   # 25 tokens
     _test(charlie_increase, 0)  # Untouched
 
-    # 6. Total USD value repaid should be exactly $300 plus the full-payoff buffer
+    # 6. Total USD value repaid should be exactly $300
     total_usd_repaid = sum(log.usdValue for log in transfer_logs)
-    _test(total_usd_repaid, 300 * EIGHTEEN_DECIMALS + full_payoff_buffer)
+    _test(total_usd_repaid, 300 * EIGHTEEN_DECIMALS)
     _test(repaid_amount, 300 * EIGHTEEN_DECIMALS)
 
     # 7. Verify price ratios are correct (amountSent * price = usdValue)

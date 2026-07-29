@@ -1659,6 +1659,19 @@ def test_deleverageManyUsers_trusted_no_caps(
     """
     Test that batch payoff extras are classified per position owner.
     """
+    full_payoff_buffer = 10**15
+    full_payoff_overage_bps = 100
+    deleverage.setDeleverageFullPayoffParam(
+        1,
+        full_payoff_buffer,
+        sender=switchboard_alpha.address,
+    )
+    deleverage.setDeleverageFullPayoffParam(
+        2,
+        full_payoff_overage_bps,
+        sender=switchboard_alpha.address,
+    )
+
     # Setup both users in redemption zone
     initial_price, new_price = setup_redemption_zone(
         alpha_token, alpha_token_whale, bob,
@@ -1700,7 +1713,10 @@ def test_deleverageManyUsers_trusted_no_caps(
 
     logs = filter_logs(teller, "DeleverageUser")[-2:]
     logs_by_user = {log.user: log for log in logs}
-    expected_alice_overage = min(10**15, alice_pre_debt * 100 // HUNDRED_PERCENT)
+    expected_alice_overage = min(
+        full_payoff_buffer,
+        alice_pre_debt * full_payoff_overage_bps // HUNDRED_PERCENT,
+    )
     assert logs_by_user[bob].targetRepayAmountWithBuffer == bob_pre_debt
     assert logs_by_user[alice].targetRepayAmountWithBuffer == alice_pre_debt + expected_alice_overage
 

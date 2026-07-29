@@ -35,20 +35,8 @@ def setup(
     setup_priority_configs,
     mock_price_source,
     mock_undy_v2,
-    deleverage,
-    switchboard_alpha,
     alice,
 ):
-    # Specific-asset tests use the intended production defaults so full-payoff
-    # behavior is exercised by default; tests opt out by setting params to zero.
-    _set_full_payoff_params(
-        deleverage,
-        switchboard_alpha,
-        buffer_amount=10**15,
-        overage_bps=100,
-        dust_threshold=10**15,
-        dust_bps=100,
-    )
     setGeneralConfig()
     setGeneralDebtConfig()
 
@@ -288,6 +276,7 @@ def test_single_asset_endaoment_transfer(
 
 def test_partial_target_specific_assets_do_not_use_full_payoff_extras(
     switchboard_alpha,
+    deleverage,
     teller,
     credit_engine,
     simple_erc20_vault,
@@ -299,6 +288,15 @@ def test_partial_target_specific_assets_do_not_use_full_payoff_extras(
     """
     Enabled full-payoff params must not add buffer or forgive dust for partial targets.
     """
+    _set_full_payoff_params(
+        deleverage,
+        switchboard_alpha,
+        buffer_amount=10**15,
+        overage_bps=100,
+        dust_threshold=10**15,
+        dust_bps=100,
+    )
+
     setupDeleverage(
         bob,
         bravo_token,
@@ -329,6 +327,7 @@ def test_partial_target_specific_assets_do_not_use_full_payoff_extras(
 
 def test_full_payoff_single_specific_asset_uses_buffer(
     switchboard_alpha,
+    deleverage,
     teller,
     credit_engine,
     simple_erc20_vault,
@@ -342,6 +341,15 @@ def test_full_payoff_single_specific_asset_uses_buffer(
     Full-payoff specific-asset calls lift the collateral target by the configured buffer,
     while debt clearing stays capped at the real debt amount.
     """
+    full_payoff_buffer = 10**15
+    full_payoff_overage_bps = 100
+    _set_full_payoff_params(
+        deleverage,
+        switchboard_alpha,
+        buffer_amount=full_payoff_buffer,
+        overage_bps=full_payoff_overage_bps,
+    )
+
     setupDeleverage(
         bob,
         bravo_token,
@@ -352,7 +360,10 @@ def test_full_payoff_single_specific_asset_uses_buffer(
     )
 
     pre_debt = credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount
-    expected_buffer = min(10**15, pre_debt * 100 // 100_00)
+    expected_buffer = min(
+        full_payoff_buffer,
+        pre_debt * full_payoff_overage_bps // 100_00,
+    )
     pre_bravo_vault = simple_erc20_vault.getTotalAmountForUser(bob, bravo_token)
     pre_endaoment_bravo = bravo_token.balanceOf(endaoment_funds)
 
@@ -548,6 +559,7 @@ def test_full_payoff_specific_assets_uses_owner_not_earn_vault_caller(
 
 def test_full_payoff_specific_assets_carries_buffer_after_depleted_trigger_asset(
     switchboard_alpha,
+    deleverage,
     teller,
     credit_engine,
     stability_pool,
@@ -569,6 +581,15 @@ def test_full_payoff_specific_assets_carries_buffer_after_depleted_trigger_asset
     If the asset that completes full-payoff intent cannot fill the buffer, the
     remaining buffer stays in the collateral budget for later specified assets.
     """
+    full_payoff_buffer = 10**15
+    full_payoff_overage_bps = 100
+    _set_full_payoff_params(
+        deleverage,
+        switchboard_alpha,
+        buffer_amount=full_payoff_buffer,
+        overage_bps=full_payoff_overage_bps,
+    )
+
     debt_terms = createDebtTerms(
         _ltv=50_00,
         _redemptionThreshold=60_00,
@@ -598,7 +619,10 @@ def test_full_payoff_specific_assets_carries_buffer_after_depleted_trigger_asset
     performDeposit(bob, 30 * SIX_DECIMALS, charlie_token, charlie_token_whale, simple_erc20_vault)
 
     pre_debt = credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount
-    expected_buffer = min(10**15, pre_debt * 100 // 100_00)
+    expected_buffer = min(
+        full_payoff_buffer,
+        pre_debt * full_payoff_overage_bps // 100_00,
+    )
 
     bravo_target = 50 * EIGHTEEN_DECIMALS
     charlie_available = 30 * EIGHTEEN_DECIMALS
@@ -1196,6 +1220,7 @@ def test_empty_array_fails(
 
 def test_full_payoff_specific_assets_all_skipped_still_reverts(
     switchboard_alpha,
+    deleverage,
     teller,
     bob,
     alpha_token,
@@ -1205,6 +1230,13 @@ def test_full_payoff_specific_assets_all_skipped_still_reverts(
     """
     Full-payoff buffer cannot turn skipped/non-deleveragable assets into a debt clear.
     """
+    _set_full_payoff_params(
+        deleverage,
+        switchboard_alpha,
+        buffer_amount=10**15,
+        overage_bps=100,
+    )
+
     setupDeleverage(
         bob,
         alpha_token,
