@@ -1,0 +1,148 @@
+"""
+Compile and deploy the Solidity contracts that live in `solidity/`.
+
+Vyper contracts are deployed by boa straight from source. Solidity contracts are built
+with foundry (`forge build`, settings in `solidity/foundry.toml`) and deployed from the
+resulting artifact, so they go through the exact same migration bookkeeping.
+"""
+
+import json
+import os
+import subprocess
+
+import boa
+from eth_abi.abi import encode
+
+from scripts.utils import log
+
+SOLIDITY_DIR = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+    "solidity",
+)
+
+
+_built = False
+
+
+def build(force=False):
+    """
+    Compiles `solidity/` with foundry, once per run.
+    """
+    global _built
+    if _built and not force:
+        return
+
+    try:
+        subprocess.run(
+            ["forge", "build", "--root", SOLIDITY_DIR],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+    except FileNotFoundError:
+        raise Exception(
+            "`forge` not found. Install foundry (https://getfoundry.sh) to build the "
+            "Solidity contracts in solidity/"
+        )
+    except subprocess.CalledProcessError as exception:
+        raise Exception(f"forge build failed:\n{exception.stdout}\n{exception.stderr}")
+
+    _built = True
+
+
+def artifact(name, source_file=None):
+    """
+    Returns the foundry artifact (abi + bytecode) for the contract named `name`.
+    """
+    build()
+    filename = os.path.join(SOLIDITY_DIR, "out", source_file or f"{name}.sol", f"{name}.json")
+    if not os.path.exists(filename):
+        raise Exception(f"No foundry artifact for {name} (looked in {filename})")
+
+    return json.load(open(filename))
+
+
+def abi(name, source_file=None):
+    return artifact(name, source_file)["abi"]
+
+
+def at(name, address, source_file=None):
+    """
+    Returns a contract object for an already deployed Solidity contract.
+    """
+    contract_abi = abi(name, source_file)
+    return boa.loads_abi(json.dumps(contract_abi), name=name).at(address)
+
+
+def deploy(name, *args, sender=None, source_file=None):
+    """
+    Deploys a Solidity contract with the given constructor args.
+    Returns the deployed contract.
+    """
+    contract_artifact = artifact(name, source_file)
+    bytecode = bytes.fromhex(_strip_hex(contract_artifact["bytecode"]["object"]))
+
+    constructor = next(
+        (item for item in contract_artifact["abi"] if item.get("type") == "constructor"),
+        None,
+    )
+    if constructor is not None and constructor["inputs"]:
+        types = [_abi_type(item) for item in constructor["inputs"]]
+        bytecode += encode(types, [_arg(arg) for arg in args])
+
+    address, computation = boa.env.deploy(sender=sender, bytecode=bytecode)
+    if computation.is_error:
+        raise computation.error
+
+    return at(name, address, source_file)
+
+
+def constructor_args(name, *args, source_file=None):
+    """
+    Abi encoded constructor args, as `forge verify-contract --constructor-args` wants them.
+    """
+    constructor = next(
+        (item for item in abi(name, source_file) if item.get("type") == "constructor"),
+        None,
+    )
+    if constructor is None or not constructor["inputs"]:
+        return ""
+
+    types = [_abi_type(item) for item in constructor["inputs"]]
+    return "0x" + encode(types, [_arg(arg) for arg in args]).hex()
+
+
+def log_verify_command(migration, name, *args, source_file=None):
+    """
+    Logs the `forge verify-contract` command for a deployed Solidity contract - boa's
+    etherscan verification only knows how to bundle Vyper sources.
+    """
+    address = migration.get_address(name)
+    log.info(
+        f"To verify {name}, run:\n"
+        f"    forge verify-contract --root solidity --chain {migration.chain()} \\\n"
+        f"        --constructor-args {constructor_args(name, *args, source_file=source_file)} \\\n"
+        f"        --etherscan-api-key $ETHERSCAN_API_KEY \\\n"
+        f"        {address} {source_file or f'src/{name}.sol'}:{name}"
+    )
+
+
+def _abi_type(item):
+    # tuples carry their component types in `components`, everything else is flat
+    if item["type"].startswith("tuple"):
+        components = ",".join(_abi_type(component) for component in item["components"])
+        return f"({components}){item['type'][len('tuple'):]}"
+    return item["type"]
+
+
+def _arg(arg):
+    # accept deployed contracts / accounts wherever an address is expected
+    if hasattr(arg, "address"):
+        return str(arg.address)
+    if isinstance(arg, (list, tuple)):
+        return type(arg)(_arg(item) for item in arg)
+    return arg
+
+
+def _strip_hex(value):
+    return value[2:] if value.startswith("0x") else value

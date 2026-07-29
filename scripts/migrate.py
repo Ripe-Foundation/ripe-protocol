@@ -144,7 +144,7 @@ CLICK_PROMPTS = {
 # it is needed, never at import: importing this module must not require, or
 # capture, a credential -- and a missing key should not stop `--help` or a
 # deployment to a chain that has no explorer.
-_BASESCAN_CHAINS = ("base-mainnet", "base-sepolia")
+_BASESCAN_CHAINS = ("base-mainnet", "base-sepolia", "robinhood-testnet")
 
 
 def _etherscan_api_key(chain):
@@ -158,6 +158,7 @@ ETHERSCAN_URLS = {
     "base-mainnet": "https://api.basescan.org/api",
     "base-goerli": "https://api-goerli.basescan.org/api",
     "base-sepolia": "https://api-sepolia.basescan.org/api",
+    "robinhood-testnet": "https://api-sepolia.basescan.org/api",
 }
 
 

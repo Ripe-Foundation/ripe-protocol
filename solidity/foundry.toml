@@ -1,0 +1,17 @@
+[profile.default]
+src = 'src'
+out = 'out'
+libs = []
+test = 'src'
+script = 'src'
+
+# these settings mirror the ones chainlink used for the verified
+# `BurnMintTokenPool 1.5.1` deployments, so the vendored sources compile
+# exactly the same way here as they do upstream
+solc_version = '0.8.26'
+evm_version = 'paris'
+optimizer = true
+optimizer_runs = 80000
+via_ir = true
+bytecode_hash = 'none'
+cbor_metadata = true
