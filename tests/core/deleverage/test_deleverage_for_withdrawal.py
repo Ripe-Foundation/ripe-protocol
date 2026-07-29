@@ -413,6 +413,72 @@ def test_withdraw_cbbtc_with_sgreen_deleveragable(
     assert events[0].stabAsset == savings_green.address
 
 
+@pytest.mark.parametrize("is_earn_vault_owner", [False, True])
+def test_full_payoff_withdrawal_classifies_position_owner(
+    is_earn_vault_owner,
+    deleverage,
+    teller,
+    credit_engine,
+    simple_erc20_vault,
+    bob,
+    alpha_token,
+    alpha_token_whale,
+    charlie_token,
+    charlie_token_whale,
+    setupDeleverage,
+    performDeposit,
+    setup_priority_configs,
+    mission_control,
+    mock_undy_v2,
+    switchboard_alpha,
+):
+    """Withdrawal payoff extras depend on the owner, not the trusted Teller caller."""
+    mission_control.setUnderscoreRegistry(mock_undy_v2.address, sender=switchboard_alpha.address)
+    mock_undy_v2.setAllAddressesAreVaults(False)
+    mock_undy_v2.setEarnVault(bob, is_earn_vault_owner)
+    mock_undy_v2.setBasicEarnVault(bob, False)
+
+    deleverage.setDeleverageFullPayoffParam(1, 10**15, sender=switchboard_alpha.address)
+    deleverage.setDeleverageFullPayoffParam(2, 100, sender=switchboard_alpha.address)
+    deleverage.setDeleverageFullPayoffParam(3, 0, sender=switchboard_alpha.address)
+    deleverage.setDeleverageFullPayoffParam(4, 0, sender=switchboard_alpha.address)
+
+    setupDeleverage(
+        bob,
+        alpha_token,
+        alpha_token_whale,
+        deposit_amount=1_000 * EIGHTEEN_DECIMALS,
+        borrow_amount=700 * EIGHTEEN_DECIMALS,
+        get_sgreen=False,
+    )
+    performDeposit(
+        bob,
+        700 * SIX_DECIMALS,
+        charlie_token,
+        charlie_token_whale,
+        simple_erc20_vault,
+    )
+    setup_priority_configs(
+        priority_stab_assets=[],
+        priority_liq_assets=[(simple_erc20_vault, charlie_token)],
+    )
+
+    pre_debt = credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount
+    assert deleverage.deleverageForWithdrawal(
+        bob,
+        3,
+        alpha_token,
+        1_000 * EIGHTEEN_DECIMALS,
+        sender=teller.address,
+    )
+    assert credit_engine.getLatestUserDebtAndTerms(bob, False)[0].amount == 0
+
+    deleverage_log = filter_logs(deleverage, "DeleverageUser")[-1]
+    expected_buffer = 0 if is_earn_vault_owner else 10**15
+    assert deleverage_log.targetRepayAmount == pre_debt
+    assert deleverage_log.targetRepayAmountWithBuffer == pre_debt + expected_buffer
+
+
 def test_withdraw_cbbtc_with_mixed_usdc_and_sgreen(
     deleverage,
     teller,
