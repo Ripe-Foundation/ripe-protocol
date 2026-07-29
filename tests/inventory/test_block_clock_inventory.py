@@ -21,6 +21,10 @@ IMPLEMENTATION_RECORD_RELATIVE = Path(
 )
 M2_GUARDED_RELATIVE = "contracts/vaults/GuardedErc20.vy"
 M3_CREDIT_RELATIVE = "contracts/core/CreditEngine.vy"
+H04_MANIFEST_RELATIVE = "config/robinhood-parameters.json"
+H04_GENERATOR_RELATIVE = "scripts/params/generate_robinhood_defaults.py"
+H04_TEST_RELATIVE = "tests/config/test_defaults_robinhood.py"
+H04_CONTRACT_RELATIVE = "contracts/config/DefaultsRobinhood.vy"
 
 
 @pytest.fixture(scope="session")
@@ -117,7 +121,7 @@ def test_clean_approved_fixture_passes_without_git_or_network(
     assert "production_files=17" in result.output
     assert "bn_ids=32" in result.output
     assert "indirect_ids=1" in result.output
-    assert "cadence_candidates=474" in result.output
+    assert "cadence_candidates=590" in result.output
     assert "timestamp_ids=11" in result.output
     assert "seconds_unit_candidates=58" in result.output
     assert "mixed_clock_functions=4" in result.output
@@ -130,7 +134,298 @@ def test_clean_approved_fixture_passes_without_git_or_network(
     )
     assert "CLOCK_INVENTORY_NONPROD" in result.output
     assert "CLOCK_INVENTORY_NONPROD_CADENCE" in result.output
-    assert "test=172" in result.output
+    assert "test=177" in result.output
+
+
+def test_h04_exact_batch_preserves_both_frozen_fingerprints(
+    fixture_repo: Path,
+) -> None:
+    inventory = _load_inventory(fixture_repo)
+    records = checker._h04_cadence_records(inventory)
+    sites = checker._h04_cad_sites(inventory)
+    assert checker._is_exact_h04_cadence_batch(inventory)
+    assert len(records) == checker.H04_CADENCE_RECORD_COUNT == 116
+    assert checker._records_fingerprint(records) == (
+        checker.H04_CADENCE_RECORDS_SHA256
+    )
+    assert checker.H04_CADENCE_RECORDS_SHA256 == (
+        "d0d0e3ca3ac472b1a709a9525e9ad38d5b76c5337b4e540c3ca10b7c0dcddf05"
+    )
+    assert len(sites) == checker.H04_CAD_SITE_COUNT == 6
+    assert checker._records_fingerprint(sites) == checker.H04_CAD_SITES_SHA256
+    assert checker.H04_CAD_SITES_SHA256 == (
+        "8ffb9dd92c225d4cacea6827194bf3b42eb5cb2efaf6729f6aa1f083503f42ee"
+    )
+    exact_records, exact_sites = (
+        checker._exact_reviewed_h04_record_fingerprints(inventory)
+    )
+    assert len(exact_records) == 116
+    assert len(exact_sites) == 6
+    assert checker._s5_legacy_inventory_fingerprint(inventory) == (
+        checker.S5_LEGACY_INVENTORY_SHA256
+    )
+    assert checker._post_s5_production_inventory_fingerprint(inventory) == (
+        checker.POST_S5_PRODUCTION_INVENTORY_SHA256
+    )
+
+
+def test_h04_absent_contract_has_no_production_admission(
+    fixture_repo: Path,
+) -> None:
+    inventory = _load_inventory(fixture_repo)
+    assert not (fixture_repo / H04_CONTRACT_RELATIVE).exists()
+    assert H04_CONTRACT_RELATIVE not in {
+        record["path"] for record in inventory["vyperPathClassifications"]
+    }
+    assert checker.POST_S5_PRODUCTION_INVENTORY_SHA256 == (
+        "f29e30aef76e01f77a74a910b07ba16204aabb6a0860add4a072da7de76035bd"
+    )
+    assert checker.S5_LEGACY_INVENTORY_SHA256 == (
+        "924a559075d5b96bcac3f73d28390deee3b436fe5500adc4fb6bf769282217b4"
+    )
+
+
+@pytest.mark.parametrize(
+    ("field", "replacement"),
+    [
+        pytest.param("path", "config/robinhood-parameters-moved.json", id="path"),
+        pytest.param("function", "different_function", id="function"),
+        pytest.param("pattern", "cadence-comment", id="pattern"),
+        pytest.param("matchedText", "ripePerBlock", id="matched-text"),
+        pytest.param("normalizedSnippet", "mutated snippet", id="snippet"),
+        pytest.param("ordinalInFunction", 999, id="ordinal"),
+        pytest.param("reviewedLine", 999, id="line"),
+        pytest.param("classification", "other", id="classification"),
+        pytest.param("semanticIds", ["BN-030"], id="semantic-id"),
+        pytest.param("reviewDomain", "timestamp-surface", id="review-domain"),
+        pytest.param("semanticReview.owner", "engineering/tooling", id="owner"),
+        pytest.param("semanticReview.status", "ignored", id="status"),
+        pytest.param("semanticReview.commit", "0" * 40, id="provenance"),
+    ],
+)
+def test_h04_record_tuple_drift_never_inherits_legacy_exclusion(
+    fixture_repo: Path,
+    field: str,
+    replacement: object,
+) -> None:
+    inventory = _load_inventory(fixture_repo)
+    record = next(
+        item
+        for item in checker._h04_cadence_records(inventory)
+        if "CAD-001" not in item["semanticIds"]
+    )
+    if field.startswith("semanticReview."):
+        record["semanticReview"][field.split(".", 1)[1]] = replacement
+    else:
+        record[field] = replacement
+    assert not checker._is_exact_h04_cadence_batch(inventory)
+    assert checker._s5_legacy_inventory_fingerprint(inventory) != (
+        checker.S5_LEGACY_INVENTORY_SHA256
+    )
+    _write_inventory(fixture_repo, inventory)
+    _assert_failure(fixture_repo, "INV-SCHEMA-H04-CADENCE-BATCH")
+
+
+@pytest.mark.parametrize(
+    ("field", "replacement"),
+    [
+        pytest.param("path", "config/robinhood-parameters-moved.json", id="path"),
+        pytest.param("function", "different_function", id="function"),
+        pytest.param("pattern", "cadence-comment", id="pattern"),
+        pytest.param("matchedText", "ripePerBlock", id="matched-text"),
+        pytest.param("normalizedSnippet", "mutated snippet", id="snippet"),
+        pytest.param("ordinalInFunction", 999, id="ordinal"),
+        pytest.param("reviewedLine", 999, id="line"),
+        pytest.param("classification", "other", id="classification"),
+        pytest.param("semanticIds", ["BN-029"], id="semantic-id"),
+        pytest.param("reviewDomain", "other", id="review-domain"),
+    ],
+)
+def test_h04_cad_mirror_metadata_drift_is_not_excluded(
+    fixture_repo: Path,
+    field: str,
+    replacement: object,
+) -> None:
+    inventory = _load_inventory(fixture_repo)
+    checker._h04_cad_sites(inventory)[0][field] = replacement
+    assert not checker._is_exact_h04_cadence_batch(inventory)
+    assert checker._s5_legacy_inventory_fingerprint(inventory) != (
+        checker.S5_LEGACY_INVENTORY_SHA256
+    )
+    _write_inventory(fixture_repo, inventory)
+    _assert_failure(fixture_repo, "INV-SCHEMA-H04-CADENCE-BATCH")
+
+
+@pytest.mark.parametrize(
+    ("field", "replacement", "code"),
+    [
+        pytest.param(
+            "owner",
+            "protocol/security",
+            "INV-SCHEMA-OWNER",
+            id="owner",
+        ),
+        pytest.param(
+            "status",
+            "ignored",
+            "INV-SCHEMA-STATUS",
+            id="status",
+        ),
+        pytest.param(
+            "commit",
+            checker.H04_REVIEW_COMMIT,
+            "INV-SCHEMA-PROVENANCE",
+            id="provenance",
+        ),
+    ],
+)
+def test_h04_cad_parent_authority_drift_never_inherits_legacy_exclusion(
+    fixture_repo: Path,
+    field: str,
+    replacement: str,
+    code: str,
+) -> None:
+    inventory = _load_inventory(fixture_repo)
+    parent = next(
+        record
+        for record in inventory["indirectCadence"]
+        if record["id"] == "CAD-001"
+    )
+    parent["semanticReview"][field] = replacement
+    assert checker._is_exact_h04_cadence_batch(inventory)
+    assert checker._s5_legacy_inventory_fingerprint(inventory) != (
+        checker.S5_LEGACY_INVENTORY_SHA256
+    )
+    _write_inventory(fixture_repo, inventory)
+    _assert_failure(fixture_repo, code)
+
+
+def test_extending_exact_h04_record_set_gains_no_exclusion_authority(
+    fixture_repo: Path,
+) -> None:
+    inventory = _load_inventory(fixture_repo)
+    inventory["cadenceCandidates"].append(
+        json.loads(
+            json.dumps(checker._h04_cadence_records(inventory)[0])
+        )
+    )
+    assert not checker._is_exact_h04_cadence_batch(inventory)
+    exact_records, exact_sites = (
+        checker._exact_reviewed_h04_record_fingerprints(inventory)
+    )
+    assert exact_records == frozenset()
+    assert exact_sites == frozenset()
+    assert checker._s5_legacy_inventory_fingerprint(inventory) != (
+        checker.S5_LEGACY_INVENTORY_SHA256
+    )
+    _write_inventory(fixture_repo, inventory)
+    _assert_failure(fixture_repo, "INV-SCHEMA-H04-CADENCE-BATCH")
+
+
+def test_h04_source_content_drift_is_new_cadence(fixture_repo: Path) -> None:
+    _append(fixture_repo / H04_GENERATOR_RELATIVE, "\n# ripePerBlock\n")
+    _assert_failure(
+        fixture_repo,
+        "INV-CADENCE-NEW",
+        path=H04_GENERATOR_RELATIVE,
+    )
+
+
+def test_h04_source_deletion_fails_candidate_completeness(
+    fixture_repo: Path,
+) -> None:
+    (fixture_repo / H04_MANIFEST_RELATIVE).unlink()
+    _assert_failure(
+        fixture_repo,
+        "INV-CADENCE-MISSING",
+        path=H04_MANIFEST_RELATIVE,
+    )
+
+
+def test_h04_sibling_path_substitution_fails_both_directions(
+    fixture_repo: Path,
+) -> None:
+    sibling = fixture_repo / "config/robinhood-parameters-sibling.json"
+    (fixture_repo / H04_MANIFEST_RELATIVE).rename(sibling)
+    result = checker.check_repository(fixture_repo)
+    assert not result.ok
+    assert {"INV-CADENCE-NEW", "INV-CADENCE-MISSING"} <= _codes(result)
+
+
+def test_future_h04_path_is_unknown_even_with_h04_review_labels(
+    fixture_repo: Path,
+) -> None:
+    future_relative = "scripts/params/h04_future.py"
+    future = fixture_repo / future_relative
+    future.parent.mkdir(parents=True, exist_ok=True)
+    future.write_text("# ripePerBlock\n", encoding="utf-8")
+    inventory = _load_inventory(fixture_repo)
+    candidate = checker._scan_candidates(
+        fixture_repo,
+        [future],
+        inventory["productionRoots"],
+        inventory["excludedProductionGlobs"],
+        inventory["cadenceExcludedGlobs"],
+    )[0]
+    inventory["cadenceCandidates"].append(
+        {
+            "path": candidate.path,
+            "function": candidate.function,
+            "pattern": candidate.pattern,
+            "matchedText": candidate.matched_text,
+            "normalizedSnippet": candidate.normalized_snippet,
+            "ordinalInFunction": candidate.ordinal,
+            "reviewedLine": candidate.line,
+            "classification": candidate.classification,
+            "semanticIds": ["BN-024"],
+            "reviewDomain": "cadence-surface",
+            "semanticReview": {
+                "owner": "protocol/security",
+                "status": "reviewed",
+                "commit": checker.H04_REVIEW_COMMIT,
+            },
+        }
+    )
+    _write_inventory(fixture_repo, inventory)
+    result = checker.check_repository(fixture_repo)
+    assert not result.ok
+    assert "INV-SCHEMA-PROVENANCE" in _codes(result)
+    assert checker._s5_legacy_inventory_fingerprint(inventory) != (
+        checker.S5_LEGACY_INVENTORY_SHA256
+    )
+
+
+def test_extending_h04_path_predicate_does_not_gain_exclusion_authority(
+    fixture_repo: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    inventory = _load_inventory(fixture_repo)
+    extra = dict(checker._h04_cadence_records(inventory)[0])
+    extra["path"] = "scripts/params/h04_future.py"
+    inventory["cadenceCandidates"].append(extra)
+    original = checker._is_h04_cadence_path
+    monkeypatch.setattr(
+        checker,
+        "_is_h04_cadence_path",
+        lambda path: original(path) or path == "scripts/params/h04_future.py",
+    )
+    assert not checker._is_exact_h04_cadence_batch(inventory)
+    assert checker._s5_legacy_inventory_fingerprint(inventory) != (
+        checker.S5_LEGACY_INVENTORY_SHA256
+    )
+
+
+def test_unknown_future_h04_cadence_file_gets_new_candidate_diagnostic(
+    fixture_repo: Path,
+) -> None:
+    future = fixture_repo / "scripts/params/h04_unknown_future.py"
+    future.parent.mkdir(parents=True, exist_ok=True)
+    future.write_text("# ripePerBlock\n", encoding="utf-8")
+    _assert_failure(
+        fixture_repo,
+        "INV-CADENCE-NEW",
+        path="scripts/params/h04_unknown_future.py",
+    )
 
 
 def test_s5_review_artifact_scope_and_legacy_commits_are_exact(
@@ -833,8 +1128,8 @@ def test_cad_001_site_set_divergence_reports_fingerprints(
         for item in result.findings
         if item.code == "INV-SCHEMA-CAD-SITES"
     )
-    assert finding.expected.startswith("count=27,sha256=")
-    assert finding.actual.startswith("count=27,sha256=")
+    assert finding.expected.startswith("count=33,sha256=")
+    assert finding.actual.startswith("count=33,sha256=")
     assert finding.expected != finding.actual
 
 

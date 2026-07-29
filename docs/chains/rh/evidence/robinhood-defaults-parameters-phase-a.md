@@ -2541,3 +2541,583 @@ This approval-provenance amendment does not:
 - authorize staging, commit, push, integration, merge, deployment,
   configuration, migration, signing, transaction, activation, or external
   state change.
+
+## 18. Phase B blocked-input implementation amendment (2026-07-29)
+
+### 18.1 Baseline, controlling authority, and bounded scope
+
+This implementation was prepared unstaged and uncommitted in the isolated
+`rh-track-7-h4-defaults-parameters-phase-b-wave2` worktree from the final
+Wave 1 baseline commit
+`a86650b187c523f27c92f05bfe959d06840025a6`, tree
+`cb640ed3d8e7074cc6fb78ac118a4d45566ba421`. Before mutation, feature `HEAD`,
+local `rh`, cached `origin/rh`, and a credential-free live `origin/rh` query
+all resolved to that commit; its owner signature verified to fingerprint
+`625E97736545F6FDCAF1EF002BF641157E6D4240`.
+
+The controlling Group 2 R2 artifact remained byte-exact:
+
+- path:
+  `/Users/wigglez/dev/ripe-protocol-review-archives/h04/h04-group2-proposal-R2.md`;
+- SHA-256:
+  `05069136bf2bcbbd1a0dcc698fe84c31ba54cb1daaa9d4587e143fbc54f71e0e`;
+- cadence/configuration approval provenance commit:
+  `81ad3ff758c2a3a08577ce5b9dc0ae0eff31a038`, verified as an ancestor of the
+  controlling baseline.
+
+The authorized nine-path list was a maximum ceiling. The actual candidate
+changes exactly eight paths:
+
+1. `config/robinhood-parameters.json`;
+2. `scripts/params/generate_robinhood_defaults.py`;
+3. `tests/config/test_defaults_robinhood.py`;
+4. `tests/deployment/test_network_clock_profiles.py`;
+5. `docs/chains/rh/evidence/robinhood-defaults-parameters-phase-a.md`;
+6. `config/block-clock-inventory.json`;
+7. `scripts/check_block_clock_inventory.py`;
+8. `tests/inventory/test_block_clock_inventory.py`.
+
+`contracts/config/DefaultsRobinhood.vy` remains absent. It was not created,
+rendered in the repository, compiled, classified, hashed into the production
+inventory, or otherwise materialized. No ninth changed path and no tenth
+repository path was required.
+
+### 18.2 Deliverable and closed manifest census
+
+The Phase B deliverable for the current blocker state is the authoritative
+typed manifest plus its deterministic, standard-library-only, network-free,
+fail-closed generator. The manifest validates as one closed document with:
+
+- 428 exact 19-key parameter records;
+- 305 expanded `Defaults` records;
+- complete parity with all 109 normalized `Defaults` leaves;
+- complete parity with all 17 `Defaults` selectors;
+- 123 deployment/assertion records spanning every DP-01 through DP-22 row;
+- no JSON null, missing-field equivalence, duplicate ID/destination, unknown
+  key, placeholder, zero address, environment value, endpoint, secret,
+  username, timestamp, host path, or Base/local production binding;
+- explicit and non-equivalent concrete zero, concrete false, blocked,
+  unresolved, omitted, disabled, derived, inherited, not-applicable, and
+  deferred launch-phase representations; and
+- canonical ordering, H-03 references, enabled-allocation conservation, and
+  all-zero disabled reward groups.
+
+The generator validates the entire schema before rendering, reads only the
+canonical manifest, performs no import-time environment or filesystem access,
+rejects every noncanonical target and Base/local leakage, preserves zero,
+uses `ceil(Base blocks / 6)` with a nonzero minimum of one for approved block
+durations, keeps seconds values unconverted, and preserves
+`rate_per_block_1e6` danger-slope semantics.
+
+### 18.3 Exact generation-bearing blocker inventory
+
+The real manifest contains exactly these 17 unresolved generation-bearing
+bindings, in deterministic canonical order:
+
+1. `Defaults.ripeGovVaultConfigs[RIPE].asset`;
+2. `Defaults.ripeGovVaultConfigs[RIPE_WETH_LP].asset`;
+3. `Defaults.trainingWheels`;
+4. `Defaults.assetConfigs[GREEN].asset`;
+5. `Defaults.assetConfigs[RIPE].asset`;
+6. `Defaults.assetConfigs[SGREEN].asset`;
+7. `Defaults.assetConfigs[GREEN_USDG_LP].asset`;
+8. `Defaults.assetConfigs[GREEN_USDG_LP].config.perUserDepositLimit`;
+9. `Defaults.assetConfigs[GREEN_USDG_LP].config.globalDepositLimit`;
+10. `Defaults.assetConfigs[GREEN_USDG_LP].config.minDepositBalance`;
+11. `Defaults.assetConfigs[RIPE_WETH_LP].asset`;
+12. `Defaults.assetConfigs[RIPE_WETH_LP].config.perUserDepositLimit`;
+13. `Defaults.assetConfigs[RIPE_WETH_LP].config.globalDepositLimit`;
+14. `Defaults.assetConfigs[RIPE_WETH_LP].config.minDepositBalance`;
+15. `Defaults.priorityStabVaults[0].asset`;
+16. `Defaults.priorityStabVaults[1].asset`;
+17. `Defaults.liteSigners[0]`.
+
+Two consecutive real `--check` executions both exited `2` with byte-identical
+stdout SHA-256
+`92f43fba67312dbe3fa180441b71b093ec9a927c5e53eb3f617759f8ca7f28b9`:
+
+`H04_BLOCKED: H04_UNRESOLVED_GENERATION:Defaults.ripeGovVaultConfigs[RIPE].asset`
+
+The output directory was unchanged and no repository output or temporary file
+was created. Parameterized tests prove that closing any 16 while leaving any
+one of the 17 unresolved still produces no contract. A fully bound synthetic
+fixture rendered in two separate processes and two independent private roots
+to byte-identical 7,588-byte output with SHA-256
+`e08a66851b3795975f4a216448729d2d8051ca3513c756c0e08534169ef99c32`;
+the repository contract path remained absent throughout.
+
+This is **implementation complete for the approved blocked-input state**. It
+is not a renderable deployment contract. Supplying all blocked bindings is a
+later owner-controlled action and will require deterministic regeneration, an
+exact production inventory admission, fresh Gate 1 review, and release-train
+review before any deployment or activation progression.
+
+### 18.4 Exact artifact identities before this self-referential evidence append
+
+The non-evidence candidate artifacts had these exact identities after all code
+and test corrections:
+
+| Path | SHA-256 | Git blob |
+| --- | --- | --- |
+| `config/robinhood-parameters.json` | `4afc89f7aa637bb42438435b589f1b0a2fdc875b7771ede0ceae5b1a500e8d0a` | `50bc9c511b808b4f19497865b9309a06467fe149` |
+| `scripts/params/generate_robinhood_defaults.py` | `7c47e3bb9b13da5015b6542c39730f53686de4cc29bdaa8f9c24e46919b1d1dc` | `5fcc94b3698789a5ccada2f12c8efa7915410ade` |
+| `tests/config/test_defaults_robinhood.py` | `a77c9d74448dfde71cf870ea2843db821162455fa1eea9f27d4114164966cee2` | `8faa8b85d9aafb725ebd762673ba00184aeb8531` |
+| `tests/deployment/test_network_clock_profiles.py` | `4ac3971e98f5ce09eccc208ae9a9d566df89a3d6ac7a831aa9747c9214416be7` | `e593e258b9bd6dce19b0f8275ab2875ad386d596` |
+| `config/block-clock-inventory.json` | `b5cbbe23421cd9d66b35eb8072d0f42209360cb4042d1e2bad02bbb22d8533aa` | `b0ad4c1d3e532d835110e3065370ff8053b85bc5` |
+| `scripts/check_block_clock_inventory.py` | `c7aac226e5cedd3ab5584f53bcb76b3ecf972b3590cce4ca90b41e456eb52ec7` | `305864f95d562af24b8b5a3203897032a677b39a` |
+| `tests/inventory/test_block_clock_inventory.py` | `43ba8b752ed33a7e73169a5525bea35482942e51638c82a3184b51d632d113dd` | `69529aad99894f6835f15be232c5d19820a36cc8` |
+
+This section intentionally does not claim a future candidate commit or
+signature and cannot embed the final hash of its own evidence file.
+
+### 18.5 Inventory-authority expansion and preserved fingerprints
+
+The unchanged scanner discovered exactly 116 new cadence records and zero new
+seconds-unit records:
+
+- 106 records in `config/robinhood-parameters.json`;
+- 5 records in `scripts/params/generate_robinhood_defaults.py`;
+- 5 records in `tests/config/test_defaults_robinhood.py`;
+- 0 records in `tests/deployment/test_network_clock_profiles.py`.
+
+Cadence candidates therefore moved from 474 to 590; seconds-unit candidates
+remain 58. Six of the new records are exact CAD-001 mirrors, moving CAD sites
+from 27 to 33 while preserving their existing `risk/oracle` owner and Track 3
+provenance commit `c3040041a1254a774e0a305060330d6ab9cc04ca`. The other
+110 H-04-specific records are owned by `protocol/security` and cite the signed
+H-04 approval commit
+`81ad3ff758c2a3a08577ce5b9dc0ae0eff31a038`.
+
+The legacy exception is conditional on the complete exact 116-record batch
+(SHA-256
+`86bdd2bf01999f3de28a42ab19e9ca617aa6dd2ed0865d3effe0b9624c421e6c`)
+and the complete exact six-site CAD mirror batch (SHA-256
+`a6218f497aa892e27ddae3c668c92b8d7fa10e4a7ee495d1de5e6b7e7a9fb942`).
+It is not conferred by a directory, glob, classification, H-04 label, general
+registry, or expandable record set. Adversarial tests prove source, path,
+function, pattern, match, normalized snippet, ordinal, reviewed line,
+classification, semantic ID, review domain, owner, status, and provenance
+drift; deletion; sibling substitution; future admission; and predicate
+extension all fail closed.
+
+Because no production Vyper path changed and `DefaultsRobinhood.vy` remains
+absent, both controlling fingerprints are unchanged:
+
+- historical S5 fingerprint:
+  `924a559075d5b96bcac3f73d28390deee3b436fe5500adc4fb6bf769282217b4`;
+- current post-S5 production fingerprint:
+  `f29e30aef76e01f77a74a910b07ba16204aabb6a0860add4a072da7de76035bd`.
+
+The current production inventory remains 59 production records and 95 Vyper
+path classifications, including the existing M2 GuardedErc20 and M3
+CreditEngine admissions. No `DefaultsRobinhood.vy` admission exists.
+
+### 18.6 Exact validation results
+
+All pytest commands used
+`/Users/wigglez/dev/ripe-protocol-validation-envs/rh-wave2-py312/bin/python`
+from the repository root without `PYTHONPATH` or import-mode overrides, with
+private mode-`0700` external HOME, Boa, Hypothesis, bytecode, and basetemp
+roots, `PYTHONDONTWRITEBYTECODE=1`, pytest cache disabled, and the local
+non-secret `ETHERSCAN_API_KEY=local-placeholder` fixture value. No RPC,
+account, key, signer, connector, provider, or external protocol state was
+accessed.
+
+| Validation | Exact result |
+| --- | --- |
+| Real inventory checker | `CLOCK_INVENTORY_OK`; production 99 occurrences / 94 lines / 17 files; 590 cadence; 58 seconds-unit; 95 Vyper paths; unchanged `f29e30ae...` fingerprint |
+| Complete H-04 manifest/generator plus eight-profile module | 90 passed (65 Defaults/manifest/generator + 25 `B-ORD`, `R-REP128`, `R-PLUS1`, `R-J2-J4`, `BOUNDARY-OPEN`, `BOUNDARY-WINDOW`, `R-STRESS60`, and `MIXED` tests) |
+| Complete inventory module | 119 passed in 56.65 s |
+| H-01 + complete H-02 + S1 + H-03 + both H-06 modules | 453 passed in 58.09 s (45 + 99 + 57 + 104 + 148) |
+| S5 focused Ledger/Teller action-block gate | 45 passed in 67.88 s |
+| Complete configuration, switchboard, TrainingWheels, and H-04 config suite | 563 passed in 63.86 s |
+| Track 8 M4 complete selection | 74 passed in 47.13 s |
+| M1/M2/M3 eight-file union, including complete inventory | 431 passed in 155.95 s; the +24 over the 407 baseline is exactly inventory growth from 95 to 119 |
+| Complete repository collection | 3,565 selected / 3,707 total / 142 deselected in 7.42 s; zero collection errors |
+| Complete serial selected repository suite | 3,565 passed / 142 deselected in 447.76 s; zero failed, skipped, xfailed, or warnings |
+| Python compilation | all five changed Python files compiled; five `.pyc` outputs written only to the external cache |
+| `pip check` | no broken requirements |
+
+The exact pre-candidate baseline was 3,451 selected / 3,593 total / 142
+deselected. The candidate adds 114 selected tests: 65 in the new Defaults
+module, 25 in the new clock-profile module, and a net 24 in the inventory
+module (95 to 119). Collection arithmetic reconciles exactly:
+3,451 + 114 = 3,565 and 3,593 + 114 = 3,707.
+
+Toolchain identities were reverified:
+
+- Python executable SHA-256:
+  `d23fa2c326127c9590d097603f105d69e68774968f46246fc7a8a80103600765`;
+- `requirements.txt` SHA-256:
+  `214f6c32c628df1eb2bbb1979b3bae8147ceaf338e68959dd58d82394b9be010`;
+- canonical normalized 93-row installed inventory SHA-256:
+  `9d1b066c4d8c96bff1c97cdcd243905b8c02324b434c962553a1f1b58886df92`.
+
+### 18.7 Continuing lifecycle boundary
+
+The operative decision lifecycle remains exactly 15 approved, five open
+(`D-H04-12`, `D-H04-15`, `D-H04-16`, `D-H04-17`, and `D-H04-18`), and
+retired/non-operative `D-H04-19`. PSM remains disabled; governance/Safe/
+guardian/lite-signer/TrainingWheels identities remain blocked; token supplies,
+recipients, and Endaoment metadata remain blocked; AAPL identity/feed/
+decimals/P8/caps/vault/risk/auction/routes remain blocked with no launch row;
+and final S3/S4/S5 deployment bindings remain blocked or assertion-only.
+
+This candidate grants no deployment, configuration, migration, release,
+activation, integration, staging, commit, push, merge, PR, signing,
+broadcasting, RPC, account, key, transaction, CCIP, M5, Deleverage,
+zero-backing settlement, loss-allocation, or bad-debt-policy authority.
+
+## 19. Post-freeze Phase B replacement: closed decisions and scheduled bindings
+
+This section is an append-only amendment. It supersedes the operative lifecycle
+description in section 18.7 without changing any earlier byte. The frozen
+Gate 1 evidence is retained as an exact 195,737-byte, 2,769-line prefix with
+SHA-256:
+`974bae5f37cf5aefe8509e0bb29a134a78814be11deb50dfd85e06448b3dc1a3`.
+
+The replacement implements the owner-approved distinction between a closed
+policy decision and a later concrete release, deployment, or operator binding.
+The typed manifest and fail-closed generator are the complete deliverable for
+the present blocked-input state. A renderable deployment contract is not
+available: `contracts/config/DefaultsRobinhood.vy` remains intentionally absent.
+
+### 19.1 Rebound authority
+
+The replacement was prepared from the unchanged integrated baseline:
+
+- commit: `a86650b187c523f27c92f05bfe959d06840025a6`;
+- tree: `cb640ed3d8e7074cc6fb78ac118a4d45566ba421`;
+- local `rh`, cached `origin/rh`, credential-free live `origin/rh`, and feature
+  `HEAD`: exact commit parity;
+- owner signing fingerprint:
+  `625E97736545F6FDCAF1EF002BF641157E6D4240`;
+- signed H-04 Group 2 approval commit:
+  `81ad3ff758c2a3a08577ce5b9dc0ae0eff31a038`, verified as an ancestor.
+
+The consolidated 2026-07-29 owner approval was rebound directly from the
+controlling task turn before mutation. Its exact extracted bytes are:
+
+- task: `019fac81-5ceb-7e71-a1a0-16b2aa21affc`;
+- turn: `019fad0a-a88e-7293-b313-160bb543198e`;
+- recorded timestamp: `2026-07-29T08:43:05.143Z`;
+- SHA-256:
+  `0c031e44d3f68a1620cab2abd2f4407442ecd9fb1615d903f2195a690165795f`;
+- size: 19,408 bytes;
+- length: 514 lines.
+
+The controlling durable R2 archive was read only from:
+`/Users/wigglez/dev/ripe-protocol-review-archives/h04/h04-group2-proposal-R2.md`.
+It recomputed before use to:
+
+- SHA-256:
+  `05069136bf2bcbbd1a0dcc698fe84c31ba54cb1daaa9d4587e143fbc54f71e0e`;
+- size: 39,944 bytes;
+- length: 486 lines.
+
+Every R2-derived comparison used those durable bytes. No Git copy or
+reconstruction was substituted.
+
+### 19.2 Frozen checkpoint identities
+
+Before amendment, the complete frozen candidate was recorded as:
+
+- `config/block-clock-inventory.json`:
+  SHA-256 `b5cbbe23421cd9d66b35eb8072d0f42209360cb4042d1e2bad02bbb22d8533aa`,
+  Git blob `b0ad4c1d3e532d835110e3065370ff8053b85bc5`;
+- `config/robinhood-parameters.json`:
+  SHA-256 `4afc89f7aa637bb42438435b589f1b0a2fdc875b7771ede0ceae5b1a500e8d0a`,
+  Git blob `50bc9c511b808b4f19497865b9309a06467fe149`;
+- `docs/chains/rh/evidence/robinhood-defaults-parameters-phase-a.md`:
+  SHA-256 `974bae5f37cf5aefe8509e0bb29a134a78814be11deb50dfd85e06448b3dc1a3`,
+  Git blob `a684150f2a147509f1bd7c3b991a92537170556b`;
+- `scripts/check_block_clock_inventory.py`:
+  SHA-256 `c7aac226e5cedd3ab5584f53bcb76b3ecf972b3590cce4ca90b41e456eb52ec7`,
+  Git blob `305864f95d562af24b8b5a3203897032a677b39a`;
+- `scripts/params/generate_robinhood_defaults.py`:
+  SHA-256 `7c47e3bb9b13da5015b6542c39730f53686de4cc29bdaa8f9c24e46919b1d1dc`,
+  Git blob `5fcc94b3698789a5ccada2f12c8efa7915410ade`;
+- `tests/config/test_defaults_robinhood.py`:
+  SHA-256 `a77c9d74448dfde71cf870ea2843db821162455fa1eea9f27d4114164966cee2`,
+  Git blob `8faa8b85d9aafb725ebd762673ba00184aeb8531`;
+- `tests/deployment/test_network_clock_profiles.py`:
+  SHA-256 `4ac3971e98f5ce09eccc208ae9a9d566df89a3d6ac7a831aa9747c9214416be7`,
+  Git blob `e593e258b9bd6dce19b0f8275ab2875ad386d596`;
+- `tests/inventory/test_block_clock_inventory.py`:
+  SHA-256 `43ba8b752ed33a7e73169a5525bea35482942e51638c82a3184b51d632d113dd`,
+  Git blob `69529aad99894f6835f15be232c5d19820a36cc8`.
+
+The network-clock-profile test remains byte-identical to that frozen identity.
+
+### 19.3 Closed v2 decision-versus-binding model
+
+The canonical manifest schema is `h04-robinhood-parameters-v2` and has exactly
+these top-level keys, in order:
+
+1. `schema_version`;
+2. `baseline`;
+3. `decision_registry`;
+4. `binding_schedules`;
+5. `parameters`.
+
+The decision registry contains exactly 20 genuine approved decisions:
+`D-H04-01` through `D-H04-18`, excluding `D-H04-19`, plus `D-H04-20` and
+`D-H04-21`. There are zero open genuine decisions. `D-H04-19` occurs exactly
+once as retired/non-operative and is not a genuine operative decision.
+
+The closed pending-binding branch is exactly:
+`{"status":"pending_binding","schedule_id":"<registered ID>"}`.
+The former `{"status":"pending","decision":"..."}` branch is rejected.
+Unknown schedule IDs, arbitrary strings, duplicate or missing ownership,
+missing reverse references, registry typos, and semantic divergence from the
+approved registry fail closed.
+
+Registry v1 contains exactly these 14 schedules and owned-record sets:
+
+- `BS-H04-CORE-TOKEN-IDENTITIES-RC`:
+  056, 112, 143, 174, 303;
+- `BS-H04-LP-ARTIFACTS-RC`:
+  064, 236, 240, 241, 242, 267, 271, 272, 273, 301, 393, 394, 395, 396;
+- `BS-H04-TRAINING-WHEELS-OP`: 079, 413, 414;
+- `BS-H04-GOVERNANCE-ROLES-OP`: 409, 410, 411;
+- `BS-H04-PSM-PARAMETERS-RC`: 361, 362, 363, 364, 365, 367;
+- `BS-H04-PSM-ALLOWLIST-OP`: 366;
+- `BS-H04-PSM-SEQUENCE-OP`: 370;
+- `BS-H04-SUPPLY-RECIPIENTS-OP`: 416, 418, 420;
+- `BS-H04-ENDAOMENT-METADATA-RC`: 422, 423, 424, 425;
+- `BS-H04-STOCK-ACTIVATION-PARKED`:
+  371 through 381 and 383 through 388;
+- `BS-H04-S5-DEFAULTS-BIND-RC`: 310;
+- `BS-H04-STABILITY-PLAN-RC`: 390;
+- `BS-H04-REWARDS-PROMOTION-RC`: 399;
+- `BS-H04-CCIP-PARKED`: 403.
+
+Each schedule encodes the approved owner, reviewer class, classification,
+lifecycle phase, prerequisite, closure artifacts, and invalidation conditions.
+Their canonical registry digest is:
+`f6605710bb6a3f7274d66bfcbb8104fdd21f9a78cf043736474a2f5a6e14e167`.
+The validator binds that digest and an exact in-code semantic registry.
+
+The 81 decision-linked transitions are:
+
+- 36 records closed directly:
+  `P-H04-305`, `P-H04-412`, `P-H04-415`, `P-H04-417`, `P-H04-419`, and
+  `P-H04-081` through `P-H04-111`;
+- the remaining 45 decision-linked records retain their unresolved or derived
+  values and move to their exact registered binding schedules.
+
+The direct outcomes are:
+
+- `P-H04-305`: approved omitted, typed null, no element, no blockers;
+- `P-H04-412`: approved concrete exact empty address collection `[]`,
+  legitimate-empty semantics, no blockers;
+- `P-H04-415`, `P-H04-417`, and `P-H04-419`: approved concrete integer zero,
+  legitimate-zero constructor-premint semantics, no blockers;
+- `P-H04-081` through `P-H04-111`: approved launch omissions for Stock/AAPL,
+  typed null, no blockers, and no implied future value or activation.
+
+Sixteen non-decision pending records retain their value, status, and blocker
+semantics while migrating to exact schedules:
+`P-H04-236`, `P-H04-240` through `P-H04-242`, `P-H04-267`,
+`P-H04-271` through `P-H04-273`, `P-H04-301`,
+`P-H04-393` through `P-H04-396`, `P-H04-390`, `P-H04-399`, and
+`P-H04-403`.
+
+The resulting semantic census is exact:
+
+- records: 428;
+- statuses: 152 approved, 150 disabled, 34 omitted, 60 blocked,
+  one derived, and 31 not applicable;
+- approval branches: 367 approved, 61 pending binding, zero old pending;
+- schedules: 14;
+- scheduled records: 61;
+- genuine decisions: 20 approved, zero open;
+- `D-H04-19`: retired/non-operative;
+- generation blockers: 16.
+
+### 19.4 Fail-closed render boundary
+
+The remaining exact generation-bearing blockers are:
+
+1. `Defaults.ripeGovVaultConfigs[RIPE].asset`;
+2. `Defaults.ripeGovVaultConfigs[RIPE_WETH_LP].asset`;
+3. `Defaults.trainingWheels`;
+4. `Defaults.assetConfigs[GREEN].asset`;
+5. `Defaults.assetConfigs[RIPE].asset`;
+6. `Defaults.assetConfigs[SGREEN].asset`;
+7. `Defaults.assetConfigs[GREEN_USDG_LP].asset`;
+8. `Defaults.assetConfigs[GREEN_USDG_LP].config.perUserDepositLimit`;
+9. `Defaults.assetConfigs[GREEN_USDG_LP].config.globalDepositLimit`;
+10. `Defaults.assetConfigs[GREEN_USDG_LP].config.minDepositBalance`;
+11. `Defaults.assetConfigs[RIPE_WETH_LP].asset`;
+12. `Defaults.assetConfigs[RIPE_WETH_LP].config.perUserDepositLimit`;
+13. `Defaults.assetConfigs[RIPE_WETH_LP].config.globalDepositLimit`;
+14. `Defaults.assetConfigs[RIPE_WETH_LP].config.minDepositBalance`;
+15. `Defaults.priorityStabVaults[0].asset`;
+16. `Defaults.priorityStabVaults[1].asset`.
+
+`liteSigners()` now renders as literal `return []`, while the omitted indexed
+record remains in the closed Defaults census. Closing fewer than all 16
+generation blockers cannot produce a contract. Governance, Safe, guardian,
+TrainingWheels, recipient, PSM, LP, plan, and future Defaults bindings remain
+policy-approved but concretely blocked under their exact schedules.
+
+Two real-manifest generator invocations both exited 2, reported the same first
+deterministic blocker, and produced no file, temporary file, or directory.
+Their stdout bytes were identical with SHA-256:
+`92f43fba67312dbe3fa180441b71b093ec9a927c5e53eb3f617759f8ca7f28b9`.
+
+A fully bound synthetic fixture rendered in two independent private roots to
+byte-identical 7,546-byte Vyper outputs with SHA-256:
+`91ee1ff3a2171028c4f7a5f7c49c24c80b6dd4ee243febf2cffb0a79b8aa8f9f`.
+Those synthetic values never entered the canonical manifest or repository.
+The repository path `contracts/config/DefaultsRobinhood.vy` remains absent.
+
+### 19.5 Inventory-authority amendment
+
+The exact reviewed H-04 inventory retains 116 cadence/seconds-unit records and
+six CAD sites. Schema-v2 line movement changed their content-bound tuples:
+
+- reviewed-record fingerprint:
+  `86bdd2bf01999f3de28a42ab19e9ca617aa6dd2ed0865d3effe0b9624c421e6c`
+  to
+  `d0d0e3ca3ac472b1a709a9525e9ad38d5b76c5337b4e540c3ca10b7c0dcddf05`;
+- CAD-site fingerprint:
+  `a6218f497aa892e27ddae3c668c92b8d7fa10e4a7ee495d1de5e6b7e7a9fb942`
+  to
+  `8ffb9dd92c225d4cacea6827194bf3b42eb5cb2efaf6729f6aa1f083503f42ee`.
+
+The legacy reconstruction exception is bound to the complete batch of those
+exact 116 record fingerprints and six exact CAD-site fingerprints. It is not
+derived from path, directory, glob, classification, arbitrary registry/map
+membership, H-04 labeling, or an expandable set. Mutation of path, function,
+pattern, matched text, normalized snippet, ordinal, classification, semantic
+ID, review domain, owner, status, provenance, parent CAD authority, content,
+or batch membership fails closed. Deletion, sibling substitution, unknown
+future cadence files, and extension of an admission set also fail closed.
+
+Existing `CAD-001` mirrors retain Track 3 risk/oracle authority and commit
+`c3040041a1254a774e0a305060330d6ab9cc04ca`. H-04-specific cadence and
+configuration semantics use signed owner provenance
+`81ad3ff758c2a3a08577ce5b9dc0ae0eff31a038`.
+
+No production Vyper path changed. `DefaultsRobinhood.vy` is absent from
+`vyperPathClassifications` and has no content-hash admission. Both production
+fingerprints remain unchanged:
+
+- historical S5:
+  `924a559075d5b96bcac3f73d28390deee3b436fe5500adc4fb6bf769282217b4`;
+- current post-S5 production:
+  `f29e30aef76e01f77a74a910b07ba16204aabb6a0860add4a072da7de76035bd`.
+
+The real checker reported:
+99 production occurrences, 94 production lines, 17 production files,
+32 BN IDs, 99 BN records, one indirect ID, 590 cadence candidates,
+58 seconds-unit candidates, 11 timestamp IDs, 37 timestamp occurrences,
+four mixed-clock functions, 95 classified Vyper paths, and 59 post-S5
+production records. Non-production counts remained mock 0/0/0,
+testing 2/2/1, and test 34/32/7, with one testing cadence candidate and
+177 test cadence candidates.
+
+### 19.6 Replacement artifact identities before the evidence self-hash
+
+The implementation artifacts were frozen before this self-referential evidence
+append:
+
+- `config/robinhood-parameters.json`:
+  SHA-256 `7b8ea0e235eaf7e98a1e320252e7369e2ae7d17ec312e5d0f6c0fc30483267e5`,
+  Git blob `e494770ebe685c36d694824b4a3aa3ca369240d8`;
+- `scripts/params/generate_robinhood_defaults.py`:
+  SHA-256 `20adf7ed2d4e579f21c410550c2196a0a6b6d9cb4bdad4d73bc35d6da42188fb`,
+  Git blob `7214f19a182187412b7acef53f082929a4700161`;
+- `tests/config/test_defaults_robinhood.py`:
+  SHA-256 `1757e89ebd022c9b8a03127c62ce2aaf3b041239c9c2839bf256799a7eb0d7da`,
+  Git blob `e2424c22c51453ddf94dfd784e4a76572fe3495d`;
+- `config/block-clock-inventory.json`:
+  SHA-256 `f1044b222e5184d1e2144eee966910b3db488abf1b0dc2432c303c269a861fb7`,
+  Git blob `4de30de7573bb4251929ce1cf93592ecf02990bc`;
+- `scripts/check_block_clock_inventory.py`:
+  SHA-256 `337d8316d105e46a9258e90ff0481b93df71d64a83ca5160588b7b0192d4ac2b`,
+  Git blob `96846d1e1d9dce05c991d48cc283a171983815d9`;
+- `tests/inventory/test_block_clock_inventory.py`:
+  SHA-256 `91256cc87ca1242c83fa64c44fcaf7c0ce25d21d99275133c39b42887f847849`,
+  Git blob `bed7e9a850eec6bf6a32f413e1a32f6dc3e50a04`;
+- unchanged `tests/deployment/test_network_clock_profiles.py`:
+  SHA-256 `4ac3971e98f5ce09eccc208ae9a9d566df89a3d6ac7a831aa9747c9214416be7`,
+  Git blob `e593e258b9bd6dce19b0f8275ab2875ad386d596`.
+
+The pre-evidence amendment patch covered exactly the six implementation and
+inventory-authority paths, 294 hunks, 225,331 bytes, 2,382 insertions, and
+941 deletions. Its SHA-256 was:
+`f69002a9ad330f74920f97ffb5d232018ba398c36676983897797e28ab7319ef`.
+The seventh amendment path is this append-only evidence file; its final hash
+and the complete final patch seal are necessarily recorded in the independent
+handoff rather than recursively inside its own bytes.
+
+### 19.7 Validation
+
+All commands used the prepared Python 3.12 environment, private external
+mode-0700 HOME, Boa cache, Hypothesis storage, pytest basetemp, and bytecode
+cache; `PYTHONDONTWRITEBYTECODE=1` was set and pytest's cache provider was
+disabled. No package was installed, upgraded, or removed.
+
+Exact results:
+
+- H-04 manifest/generator plus the complete unchanged network-clock-profile
+  module: 111 passed;
+- complete inventory module: 130 passed;
+- corrected parent-authority mutation cases: 3 passed;
+- H-01/H-02/S1/clock/H-03/H-06 selection, including the unchanged
+  network-clock-profile module: 478 passed;
+- S5 Ledger/Teller selection, including the unchanged network-clock-profile
+  module: 70 passed;
+- complete configuration selection, including the unchanged
+  network-clock-profile module: 609 passed;
+- M4 complete selection, including the unchanged network-clock-profile
+  module: 99 passed;
+- M1/M2/M3 eight-file union, including the unchanged network-clock-profile
+  module: 467 passed;
+- real inventory checker: passed with the exact counts in section 19.5;
+- real-manifest fail-closed/no-output proof: two identical passes;
+- two-independent-root synthetic render: byte-identical;
+- changed-Python compilation through an external bytecode cache: passed;
+- `pip check`: no broken requirements;
+- complete collection: 3,597 selected, 3,739 total, 142 deselected,
+  zero collection errors;
+- complete serial selected suite: 3,597 passed, 142 deselected in 411.93
+  seconds, with zero failures, skips, xfails, or warnings.
+
+The exact baseline was 3,451 selected / 3,593 total / 142 deselected.
+The replacement adds 146 tests:
+3,451 + 146 = 3,597 selected and 3,593 + 146 = 3,739 total.
+Relative to the frozen candidate, the v2 replacement adds 32 tests:
+21 manifest/generator tests and 11 inventory tests.
+
+Toolchain identities:
+
+- Python executable SHA-256:
+  `d23fa2c326127c9590d097603f105d69e68774968f46246fc7a8a80103600765`;
+- `requirements.txt` SHA-256:
+  `214f6c32c628df1eb2bbb1979b3bae8147ceaf338e68959dd58d82394b9be010`;
+- canonical normalized 93-row installed inventory SHA-256:
+  `9d1b066c4d8c96bff1c97cdcd243905b8c02324b434c962553a1f1b58886df92`.
+
+### 19.8 Lifecycle boundary
+
+Implementation is complete for the owner-approved blocked-input state. It does
+not mean a renderable deployment contract is available. Supplying all 16
+generation-bearing bindings is a later owner-controlled action requiring
+regeneration, exact production inventory admission, a fresh Gate 1 review,
+H-05/H-06 binding, and release-train review.
+
+The PSM remains disabled; no PSM activation is approved. There are no lite
+signers. TrainingWheels remains fresh and default-deny. Constructor premints
+are exactly zero without approving zero recipient addresses. Stock/AAPL,
+M5, zero-backing settlement, loss allocation, bad-debt policy, CCIP, and the
+separate Deleverage work remain parked or excluded. Ledger retains its exact
+0x64/no-fallback behavior and is not reopened.
+
+This replacement grants no deployment, configuration, migration execution,
+release, activation, integration, staging, commit, push, merge, PR, signing,
+broadcasting, RPC, account, key, signer, transaction, or external-state
+authority.

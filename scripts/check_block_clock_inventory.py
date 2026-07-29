@@ -28,6 +28,15 @@ EXPECTED_CAD_IDS = {"CAD-001"}
 EXPECTED_TS_IDS = {f"TS-{number:03d}" for number in range(1, 12)}
 TRACK3_REVIEW_COMMIT = "c3040041a1254a774e0a305060330d6ab9cc04ca"
 HARDENING_REVIEW_COMMIT = "db7ae895d1b32ae6708f2405274c32c1e3f5222e"
+H04_REVIEW_COMMIT = "81ad3ff758c2a3a08577ce5b9dc0ae0eff31a038"
+H04_CADENCE_RECORD_COUNT = 116
+H04_CADENCE_RECORDS_SHA256 = (
+    "d0d0e3ca3ac472b1a709a9525e9ad38d5b76c5337b4e540c3ca10b7c0dcddf05"
+)
+H04_CAD_SITE_COUNT = 6
+H04_CAD_SITES_SHA256 = (
+    "8ffb9dd92c225d4cacea6827194bf3b42eb5cb2efaf6729f6aa1f083503f42ee"
+)
 EXPECTED_PRODUCTION_ROOTS = ["contracts"]
 EXPECTED_EXCLUDED_PRODUCTION_GLOBS = [
     "contracts/mock/**",
@@ -802,6 +811,74 @@ def _is_reviewed_ccip_excluded_record(record: Mapping[str, Any]) -> bool:
     )
 
 
+def _is_h04_cadence_path(path: str) -> bool:
+    """Match only the three H-04 files with actual cadence candidates."""
+
+    return (
+        path == "config/robinhood-parameters.json"
+        or path == "scripts/params/generate_robinhood_defaults.py"
+        or path == "tests/config/test_defaults_robinhood.py"
+    )
+
+
+def _h04_cadence_records(data: Mapping[str, Any]) -> list[Mapping[str, Any]]:
+    return [
+        record
+        for record in data["cadenceCandidates"]
+        if _is_h04_cadence_path(str(record.get("path", "")))
+    ]
+
+
+def _h04_cad_sites(data: Mapping[str, Any]) -> list[Mapping[str, Any]]:
+    return [
+        site
+        for record in data["indirectCadence"]
+        for site in record.get("sites", [])
+        if isinstance(site, Mapping)
+        and _is_h04_cadence_path(str(site.get("path", "")))
+    ]
+
+
+def _records_fingerprint(records: Sequence[Mapping[str, Any]]) -> str:
+    encoded = (
+        json.dumps(records, sort_keys=True, separators=(",", ":")) + "\n"
+    ).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def _record_fingerprint(record: Mapping[str, Any]) -> str:
+    return _records_fingerprint([record])
+
+
+def _is_exact_h04_cadence_batch(data: Mapping[str, Any]) -> bool:
+    records = _h04_cadence_records(data)
+    sites = _h04_cad_sites(data)
+    return (
+        len(records) == H04_CADENCE_RECORD_COUNT
+        and _records_fingerprint(records) == H04_CADENCE_RECORDS_SHA256
+        and len(sites) == H04_CAD_SITE_COUNT
+        and _records_fingerprint(sites) == H04_CAD_SITES_SHA256
+    )
+
+
+def _exact_reviewed_h04_record_fingerprints(
+    data: Mapping[str, Any],
+) -> tuple[frozenset[str], frozenset[str]]:
+    """Return exact tuple authority only for the fully frozen reviewed batch."""
+
+    if not _is_exact_h04_cadence_batch(data):
+        return frozenset(), frozenset()
+    return (
+        frozenset(
+            _record_fingerprint(record)
+            for record in _h04_cadence_records(data)
+        ),
+        frozenset(
+            _record_fingerprint(site) for site in _h04_cad_sites(data)
+        ),
+    )
+
+
 def _is_reviewed_m2_production_record(record: Mapping[str, Any]) -> bool:
     return dict(record) == {
         "path": M2_GUARDED_ERC20_PATH,
@@ -846,6 +923,9 @@ def _m3_baseline_credit_engine_record() -> dict[str, Any]:
 
 
 def _s5_legacy_inventory_fingerprint(data: Mapping[str, Any]) -> str:
+    exact_h04_records, exact_h04_sites = (
+        _exact_reviewed_h04_record_fingerprints(data)
+    )
     legacy = copy.deepcopy(dict(data))
     legacy.pop("expectedProductionCounts", None)
     legacy["directOccurrences"] = [
@@ -857,7 +937,15 @@ def _s5_legacy_inventory_fingerprint(data: Mapping[str, Any]) -> str:
         record
         for record in legacy["cadenceCandidates"]
         if _candidate_from_record(record) not in S5_RECONCILED_CADENCE_KEYS
+        and _record_fingerprint(record) not in exact_h04_records
     ]
+    if exact_h04_sites:
+        for record in legacy["indirectCadence"]:
+            record["sites"] = [
+                site
+                for site in record["sites"]
+                if _record_fingerprint(site) not in exact_h04_sites
+            ]
     legacy["vyperPathClassifications"] = [
         _m3_baseline_credit_engine_record()
         if _is_reviewed_m3_production_record(record)
@@ -1195,6 +1283,31 @@ def _validate_schema(data: Mapping[str, Any]) -> list[Finding]:
             )
     if findings:
         return findings
+    h04_records = _h04_cadence_records(data)
+    h04_sites = _h04_cad_sites(data)
+    exact_h04_batch = _is_exact_h04_cadence_batch(data)
+    if not exact_h04_batch:
+        findings.append(
+            Finding(
+                code="INV-SCHEMA-H04-CADENCE-BATCH",
+                domain="cadence",
+                expected=(
+                    f"records={H04_CADENCE_RECORD_COUNT}/"
+                    f"{H04_CADENCE_RECORDS_SHA256},"
+                    f"cad_sites={H04_CAD_SITE_COUNT}/{H04_CAD_SITES_SHA256}"
+                ),
+                actual=(
+                    f"records={len(h04_records)}/"
+                    f"{_records_fingerprint(h04_records)},"
+                    f"cad_sites={len(h04_sites)}/"
+                    f"{_records_fingerprint(h04_sites)}"
+                ),
+                remediation=(
+                    "restore the exact reviewed H-04 cadence records and CAD-001 "
+                    "mirrors; no registry or path expansion inherits authority"
+                ),
+            )
+        )
     expected_path_config = (
         EXPECTED_PRODUCTION_ROOTS,
         EXPECTED_EXCLUDED_PRODUCTION_GLOBS,
@@ -1442,7 +1555,12 @@ def _validate_schema(data: Mapping[str, Any]) -> list[Finding]:
         expected_commit = (
             TRACK3_REVIEW_COMMIT
             if "CAD-001" in semantic_ids
-            else HARDENING_REVIEW_COMMIT
+            else (
+                H04_REVIEW_COMMIT
+                if exact_h04_batch
+                and _is_h04_cadence_path(str(record.get("path", "")))
+                else HARDENING_REVIEW_COMMIT
+            )
         )
         _validate_semantic_review(
             record,
